@@ -2200,7 +2200,7 @@ bool LLViewerRegion::isAlive()
     return mAlive;
 }
 
-bool LLViewerRegion::isOwnedSelf(const LLVector3& pos)
+bool LLViewerRegion::isOwnedSelf(const LLVector3& pos) const
 {
     if (mParcelOverlay)
     {
@@ -2211,7 +2211,7 @@ bool LLViewerRegion::isOwnedSelf(const LLVector3& pos)
 }
 
 // Owned by a group you belong to?  (officer or member)
-bool LLViewerRegion::isOwnedGroup(const LLVector3& pos)
+bool LLViewerRegion::isOwnedGroup(const LLVector3& pos) const
 {
     if (mParcelOverlay)
     {

@@ -189,6 +189,7 @@ public:
      */
     static void inviteToGroup(const LLUUID& id);
 
+#if 0
     static void freezeAvatar(const LLUUID& id);
 
     static void ejectAvatar(const LLUUID& id, bool ban_enabled = false);
@@ -206,6 +207,7 @@ public:
      * Unfreeze avatar
      */
     static void unfreeze(const LLUUID& id);
+#endif
 
     /**
      * Open csr page for avatar
@@ -261,11 +263,13 @@ private:
     static bool callbackAddFriendWithMessage(const LLSD& notification, const LLSD& response);
     static bool handleRemove(const LLSD& notification, const LLSD& response);
     static bool handlePay(const LLSD& notification, const LLSD& response, LLUUID avatar_id);
+#if 0
     static bool handleFreezeAvatar(const LLSD& notification, const LLSD& response);
     static bool handleEjectAvatar(const LLSD& notification, const LLSD& response);
     static bool handleKick(const LLSD& notification, const LLSD& response);
     static bool handleFreeze(const LLSD& notification, const LLSD& response);
     static bool handleUnfreeze(const LLSD& notification, const LLSD& response);
+#endif
     static void callback_invite_to_group(LLUUID group_id, LLUUID id);
 
     // Just request friendship, no dialog.

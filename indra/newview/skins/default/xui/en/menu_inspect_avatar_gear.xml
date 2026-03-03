@@ -13,27 +13,10 @@
      function="InspectAvatar.ViewProfile"/>
   </menu_item_call>
   <menu_item_call
-   label="Add Friend"
-   name="add_friend">
-    <menu_item_call.on_click
-     function="InspectAvatar.AddFriend"/>
-    <menu_item_call.on_enable
-     function="InspectAvatar.Gear.Enable"/>
-  </menu_item_call>
-  <menu_item_call
    label="IM"
    name="im">
     <menu_item_call.on_click
      function="InspectAvatar.IM"/>
-  </menu_item_call>
-  <menu_item_call
-   label="Call"
-   enabled="true"
-   name="call">
-    <menu_item_call.on_click
-     function="InspectAvatar.Call"/>
-    <menu_item_call.on_enable
-     function="InspectAvatar.Gear.EnableCall"/>
   </menu_item_call>
   <menu_item_call
    label="Offer Teleport"
@@ -52,90 +35,165 @@
      function="InspectAvatar.Gear.EnableTeleportRequest"/>
   </menu_item_call>
   <menu_item_call
+   label="Voice call"
+   enabled="true"
+   name="call">
+    <menu_item_call.on_click
+     function="InspectAvatar.Call"/>
+    <menu_item_call.on_enable
+     function="InspectAvatar.Gear.EnableCall"/>
+  </menu_item_call>
+    <menu_item_call
+     label="View chat history..."
+     layout="topleft"
+     name="chat_history">
+        <menu_item_call.on_click
+         function="InspectAvatar.ViewChatHistory" />
+        <menu_item_call.on_enable
+      	 function="InspectAvatar.Gear.EnableChatHistory" />
+    </menu_item_call>
+  <menu_item_separator />
+  <menu_item_call
+   label="Add Friend"
+   name="add_friend">
+    <menu_item_call.on_click
+     function="InspectAvatar.AddFriend"/>
+    <menu_item_call.on_visible
+     function="InspectAvatar.Gear.EnableAddFriend"/>
+  </menu_item_call>
+  <menu_item_call
+   label="Remove Friend"
+   name="remove_friend">
+    <menu_item_call.on_click
+     function="InspectAvatar.RemoveFriend"/>
+    <menu_item_call.on_visible
+     function="InspectAvatar.Gear.EnableRemoveFriend"/>
+  </menu_item_call>
+  <menu_item_call
    label="Invite to Group"
    name="invite_to_group">
     <menu_item_call.on_click
      function="InspectAvatar.InviteToGroup"/>
   </menu_item_call>
+  <context_menu
+   label="Manage"
+   name="manage_menu">
+      <menu_item_call
+       label="Block"
+       name="block">
+          <menu_item_call.on_click
+           function="InspectAvatar.ToggleMute"/>
+          <menu_item_call.on_visible
+           function="InspectAvatar.EnableMute" />
+      </menu_item_call>
+      <menu_item_call
+       label="Unblock"
+       name="unblock">
+          <menu_item_call.on_click
+           function="InspectAvatar.ToggleMute"/>
+          <menu_item_call.on_visible
+           function="InspectAvatar.EnableUnmute" />
+      </menu_item_call>
+      <menu_item_call
+       label="Report"
+       name="report">
+          <menu_item_call.on_click
+           function="InspectAvatar.Report"/>
+      </menu_item_call>
+      <menu_item_separator>
+          <menu_item_separator.on_visible
+           function="InspectAvatar.VisibleFreezeEject"/>
+      </menu_item_separator>
+      <menu_item_call
+       label="Freeze"
+       name="freeze">
+          <menu_item_call.on_click
+           function="InspectAvatar.Freeze"/>
+          <menu_item_call.on_visible
+           function="InspectAvatar.VisibleFreezeEject"/>
+      </menu_item_call>
+      <menu_item_call
+       label="Eject"
+       name="eject">
+          <menu_item_call.on_click
+           function="InspectAvatar.Eject"/>
+          <menu_item_call.on_visible
+           function="InspectAvatar.VisibleFreezeEject"/>
+      </menu_item_call>
+      <menu_item_separator>
+          <menu_item_separator.on_visible
+           function="InspectAvatar.VisibleManageEstate"/>
+      </menu_item_separator>
+      <menu_item_call
+       label="Teleport Home"
+       name="teleporthome">
+          <menu_item_call.on_click
+           function="InspectAvatar.EstateTPHome" />
+          <menu_item_call.on_visible
+           function="InspectAvatar.VisibleManageEstate"/>
+      </menu_item_call>
+      <menu_item_call
+       label="Estate Kick"
+       name="estatekick">
+          <menu_item_call.on_click
+           function="InspectAvatar.EstateKick" />
+          <menu_item_call.on_visible
+           function="InspectAvatar.VisibleManageEstate"/>
+      </menu_item_call>
+      <menu_item_call
+       label="Estate Ban"
+       name="estateban">
+          <menu_item_call.on_click
+           function="InspectAvatar.EstateBan" />
+          <menu_item_call.on_visible
+           function="InspectAvatar.VisibleManageEstate"/>
+      </menu_item_call>
+      <menu_item_separator>
+          <menu_item_separator.on_visible
+           function="InspectAvatar.EnableGod"/>
+      </menu_item_separator>
+      <menu_item_call
+       label="God Freeze"
+       name="godfreeze">
+          <menu_item_call.on_click
+           function="InspectAvatar.GodFreeze"/>
+          <menu_item_call.on_visible
+           function="InspectAvatar.EnableGod"/>
+      </menu_item_call>
+      <menu_item_call
+       label="God Kick"
+       name="godkick">
+          <menu_item_call.on_click
+           function="InspectAvatar.GodKick"/>
+          <menu_item_call.on_visible
+           function="InspectAvatar.EnableGod"/>
+      </menu_item_call>
+      <menu_item_call
+      label="CSR"
+      name="csr">
+          <menu_item_call.on_click
+           function="InspectAvatar.CSR" />
+          <menu_item_call.on_visible
+           function="InspectAvatar.EnableGod" />
+      </menu_item_call>
+      <menu_item_call
+       label="Debug Textures"
+       name="debug">
+          <menu_item_call.on_click
+           function="Avatar.Debug"/>
+          <menu_item_call.on_visible
+           function="IsGodCustomerService"/>
+      </menu_item_call>
+      <menu_item_call
+           label="Dump XML"
+           name="Dump XML">
+          <menu_item_call.on_click
+           function="Advanced.AppearanceToXML" />
+          <menu_item_call.on_visible
+           function="Advanced.EnableAppearanceToXML"/>
+      </menu_item_call>
+  </context_menu>
   <menu_item_separator />
-  <menu_item_call
-   label="Block"
-   name="block">
-    <menu_item_call.on_click
-     function="InspectAvatar.ToggleMute"/>
-    <menu_item_call.on_visible
-     function="InspectAvatar.EnableMute" />
-  </menu_item_call>
-  <menu_item_call
-   label="Unblock"
-   name="unblock">
-    <menu_item_call.on_click
-     function="InspectAvatar.ToggleMute"/>
-    <menu_item_call.on_visible
-     function="InspectAvatar.EnableUnmute" />
-  </menu_item_call>
-  <menu_item_call
-   label="Report"
-   name="report">
-    <menu_item_call.on_click
-     function="InspectAvatar.Report"/>
-  </menu_item_call>  
-  <menu_item_call
-   label="Freeze"
-   name="freeze">
-    <menu_item_call.on_click
-     function="InspectAvatar.Freeze"/>
-    <menu_item_call.on_visible
-     function="InspectAvatar.VisibleFreeze"/>
-  </menu_item_call>
-  <menu_item_call
-   label="Eject"
-   name="eject">
-    <menu_item_call.on_click
-     function="InspectAvatar.Eject"/>
-    <menu_item_call.on_visible
-     function="InspectAvatar.VisibleEject"/>
-  </menu_item_call>
-  <menu_item_call
-   label="Kick"
-   name="kick">
-    <menu_item_call.on_click
-     function="InspectAvatar.Kick"/>
-    <menu_item_call.on_visible
-     function="InspectAvatar.EnableGod"/>
-  </menu_item_call>
-  <menu_item_call
-  label="CSR"
-  name="csr">
-    <menu_item_call.on_click
-     function="InspectAvatar.CSR" />
-    <menu_item_call.on_visible
-     function="InspectAvatar.EnableGod" />
-  </menu_item_call>
-  <menu_item_call
-   label="Debug Textures"
-   name="debug">
-    <menu_item_call.on_click
-     function="Avatar.Debug"/>
-    <menu_item_call.on_visible
-     function="IsGodCustomerService"/>
-  </menu_item_call>
-    <menu_item_call
-		 label="Dump XML"
-         name="Dump XML">
-            <menu_item_call.on_click
-             function="Advanced.AppearanceToXML" />
-            <menu_item_call.on_visible
-             function="Advanced.EnableAppearanceToXML"/>
-    </menu_item_call>
-  <menu_item_call
-   label="Find On Map"
-   name="find_on_map">
-    <menu_item_call.on_click
-     function="InspectAvatar.FindOnMap"/>
-    <menu_item_call.on_visible
-     function="InspectAvatar.VisibleFindOnMap"/>
-  </menu_item_call>
   <menu_item_call
    label="Zoom In"
    name="zoom_in">
@@ -143,7 +201,29 @@
      function="InspectAvatar.ZoomIn"/>
     <menu_item_call.on_visible
      function="InspectAvatar.VisibleZoomIn"/>
+  </menu_item_call>
+  <menu_item_call
+   label="Teleport To"
+   name="zoom_in">
+    <menu_item_call.on_click
+     function="InspectAvatar.TeleportTo"/>
+    <menu_item_call.on_visible
+     function="InspectAvatar.VisibleTeleportTo"/>
   </menu_item_call>  
+  <menu_item_call
+   label="Map"
+   name="find_on_map">
+    <menu_item_call.on_click
+     function="InspectAvatar.FindOnMap"/>
+    <menu_item_call.on_visible
+     function="InspectAvatar.VisibleFindOnMap"/>
+  </menu_item_call>
+  <menu_item_call
+   label="Share"
+   name="share">
+    <menu_item_call.on_click
+     function="InspectAvatar.Share"/>
+  </menu_item_call>
   <menu_item_call
    label="Pay"
    name="pay">
@@ -152,10 +232,44 @@
     <menu_item_call.on_enable
      function="InspectAvatar.Gear.EnablePay"/>
   </menu_item_call>
-  <menu_item_call
-   label="Share"
-   name="share">
-    <menu_item_call.on_click
-     function="InspectAvatar.Share"/>
-  </menu_item_call>
+  <menu_item_separator name="separator_utils" />
+  <context_menu
+   label="Copy"
+   name="utils_menu">
+    <menu_item_call
+     label="Copy Full Name"
+     name="copy_full_name">
+      <menu_item_call.on_click
+       function="Avatar.CopyData"
+       parameter="full_name"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Copy Display Name"
+     name="copy_display_name">
+      <menu_item_call.on_click
+       function="Avatar.CopyData"
+       parameter="display_name"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Copy Agent Name"
+     name="copy_username">
+      <menu_item_call.on_click
+       function="Avatar.CopyData"
+       parameter="user_name"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Copy SLurl"
+     name="copy_slurl">
+      <menu_item_call.on_click
+       function="Avatar.CopyData"
+       parameter="slurl"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Copy UUID"
+     name="copy_uuid">
+      <menu_item_call.on_click
+       function="Avatar.CopyData"
+       parameter="id"/>
+    </menu_item_call>
+  </context_menu>
 </toggleable_menu>

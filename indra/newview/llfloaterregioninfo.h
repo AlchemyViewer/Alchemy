@@ -507,9 +507,11 @@ private:
     // used for both add and remove operations
     static bool accessCoreConfirm(const LLSD& notification, const LLSD& response);
 
+public:
     // Send the actual EstateOwnerRequest "estateaccessdelta" message
     static void sendEstateAccessDelta(U32 flags, const LLUUID& agent_id);
 
+private:
     static void requestEstateGetAccessCoro(std::string url);
 
     void searchAgent(LLNameListCtrl* listCtrl, const std::string& search_string);

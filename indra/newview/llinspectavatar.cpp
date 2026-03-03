@@ -28,6 +28,7 @@
 #include "llinspectavatar.h"
 
 // viewer files
+#include "alavataractions.h"
 #include "llagent.h"
 #include "llagentdata.h"
 #include "llavataractions.h"
@@ -116,6 +117,7 @@ private:
 
     // Button callbacks
     void onClickAddFriend();
+    void onClickRemoveFriend();
     void onClickViewProfile();
     void onClickIM();
     void onClickCall();
@@ -128,14 +130,22 @@ private:
     void onClickReport();
     void onClickFreeze();
     void onClickEject();
-    void onClickKick();
+    void onClickEstateTPHome();
+    void onClickEstateKick();
+    void onClickEstateBan();
+    void onClickGodFreeze();
+    void onClickGodKick();
     void onClickCSR();
     void onClickZoomIn();
     void onClickFindOnMap();
+    void onClickViewChatHistory();
+    void onClickTeleportTo();
     bool onVisibleFindOnMap();
-    bool onVisibleEject();
-    bool onVisibleFreeze();
+    bool onVisibleFreezeEject();
+    bool onVisibleManageEstate();
     bool onVisibleZoomIn();
+    bool onVisibleTeleportTo();
+    bool onVisibleChatHistory();
     void onClickMuteVolume();
     void onVolumeChange(const LLSD& data);
     bool enableMute();
@@ -146,6 +156,7 @@ private:
     bool godModeEnabled();
 
     // Is used to determine if "Add friend" option should be enabled in gear menu
+    bool isFriend();
     bool isNotFriend();
 
     void moderationActionCoro(std::string url, LLSD action);
@@ -218,6 +229,7 @@ LLInspectAvatar::LLInspectAvatar(const LLSD& sd)
 {
     mCommitCallbackRegistrar.add("InspectAvatar.ViewProfile",   boost::bind(&LLInspectAvatar::onClickViewProfile, this));
     mCommitCallbackRegistrar.add("InspectAvatar.AddFriend", boost::bind(&LLInspectAvatar::onClickAddFriend, this));
+    mCommitCallbackRegistrar.add("InspectAvatar.RemoveFriend", boost::bind(&LLInspectAvatar::onClickRemoveFriend, this));
     mCommitCallbackRegistrar.add("InspectAvatar.IM",        boost::bind(&LLInspectAvatar::onClickIM, this));
     mCommitCallbackRegistrar.add("InspectAvatar.Call",      boost::bind(&LLInspectAvatar::onClickCall, this));
     mCommitCallbackRegistrar.add("InspectAvatar.Teleport",  boost::bind(&LLInspectAvatar::onClickTeleport, this));
@@ -228,21 +240,30 @@ LLInspectAvatar::LLInspectAvatar(const LLSD& sd)
     mCommitCallbackRegistrar.add("InspectAvatar.ToggleMute",    boost::bind(&LLInspectAvatar::onToggleMute, this));
     mCommitCallbackRegistrar.add("InspectAvatar.Freeze", boost::bind(&LLInspectAvatar::onClickFreeze, this));
     mCommitCallbackRegistrar.add("InspectAvatar.Eject", boost::bind(&LLInspectAvatar::onClickEject, this));
-    mCommitCallbackRegistrar.add("InspectAvatar.Kick", boost::bind(&LLInspectAvatar::onClickKick, this));
+    mCommitCallbackRegistrar.add("InspectAvatar.EstateTPHome", boost::bind(&LLInspectAvatar::onClickEstateTPHome, this));
+    mCommitCallbackRegistrar.add("InspectAvatar.EstateKick", boost::bind(&LLInspectAvatar::onClickEstateKick, this));
+    mCommitCallbackRegistrar.add("InspectAvatar.EstateBan", boost::bind(&LLInspectAvatar::onClickEstateBan, this));
+    mCommitCallbackRegistrar.add("InspectAvatar.GodFreeze", boost::bind(&LLInspectAvatar::onClickGodFreeze, this));
+    mCommitCallbackRegistrar.add("InspectAvatar.GodKick", boost::bind(&LLInspectAvatar::onClickGodKick, this));
     mCommitCallbackRegistrar.add("InspectAvatar.CSR", boost::bind(&LLInspectAvatar::onClickCSR, this));
     mCommitCallbackRegistrar.add("InspectAvatar.Report",    boost::bind(&LLInspectAvatar::onClickReport, this));
     mCommitCallbackRegistrar.add("InspectAvatar.FindOnMap", boost::bind(&LLInspectAvatar::onClickFindOnMap, this));
     mCommitCallbackRegistrar.add("InspectAvatar.ZoomIn", boost::bind(&LLInspectAvatar::onClickZoomIn, this));
     mCommitCallbackRegistrar.add("InspectAvatar.DisableVoice", boost::bind(&LLInspectAvatar::toggleSelectedVoice, this, false));
     mCommitCallbackRegistrar.add("InspectAvatar.EnableVoice", boost::bind(&LLInspectAvatar::toggleSelectedVoice, this, true));
+    mCommitCallbackRegistrar.add("InspectAvatar.ViewChatHistory", boost::bind(&LLInspectAvatar::onClickViewChatHistory, this));
+    mCommitCallbackRegistrar.add("InspectAvatar.TeleportTo", boost::bind(&LLInspectAvatar::onClickTeleportTo, this));
 
     mEnableCallbackRegistrar.add("InspectAvatar.EnableGod", boost::bind(&LLInspectAvatar::godModeEnabled, this));
     mEnableCallbackRegistrar.add("InspectAvatar.VisibleFindOnMap",  boost::bind(&LLInspectAvatar::onVisibleFindOnMap, this));
-    mEnableCallbackRegistrar.add("InspectAvatar.VisibleEject",  boost::bind(&LLInspectAvatar::onVisibleEject, this));
-    mEnableCallbackRegistrar.add("InspectAvatar.VisibleFreeze", boost::bind(&LLInspectAvatar::onVisibleFreeze, this));
+    mEnableCallbackRegistrar.add("InspectAvatar.VisibleFreezeEject",  boost::bind(&LLInspectAvatar::onVisibleFreezeEject, this));
+    mEnableCallbackRegistrar.add("InspectAvatar.VisibleManageEstate", boost::bind(&LLInspectAvatar::onVisibleManageEstate, this));
     mEnableCallbackRegistrar.add("InspectAvatar.VisibleZoomIn", boost::bind(&LLInspectAvatar::onVisibleZoomIn, this));
-    mEnableCallbackRegistrar.add("InspectAvatar.Gear.Enable", boost::bind(&LLInspectAvatar::isNotFriend, this));
+    mEnableCallbackRegistrar.add("InspectAvatar.VisibleTeleportTo", boost::bind(&LLInspectAvatar::onVisibleTeleportTo, this));
+    mEnableCallbackRegistrar.add("InspectAvatar.Gear.EnableRemoveFriend", boost::bind(&LLInspectAvatar::isFriend, this));
+    mEnableCallbackRegistrar.add("InspectAvatar.Gear.EnableAddFriend", boost::bind(&LLInspectAvatar::isNotFriend, this));
     mEnableCallbackRegistrar.add("InspectAvatar.Gear.EnableCall", boost::bind(&LLAvatarActions::canCall));
+    mEnableCallbackRegistrar.add("InspectAvatar.Gear.EnableChatHistory", boost::bind(&LLInspectAvatar::onVisibleChatHistory, this));
     mEnableCallbackRegistrar.add("InspectAvatar.Gear.EnableTeleportOffer", boost::bind(&LLInspectAvatar::enableTeleportOffer, this));
     mEnableCallbackRegistrar.add("InspectAvatar.Gear.EnableTeleportRequest",    boost::bind(&LLInspectAvatar::enableTeleportRequest, this));
     mEnableCallbackRegistrar.add("InspectAvatar.Gear.EnablePay",    boost::bind(&LLInspectAvatar::enablePay, this));
@@ -616,10 +637,21 @@ void LLInspectAvatar::onClickAddFriend()
     closeFloater();
 }
 
+void LLInspectAvatar::onClickRemoveFriend()
+{
+    LLAvatarActions::removeFriendDialog(mAvatarID);
+    closeFloater();
+}
+
 void LLInspectAvatar::onClickViewProfile()
 {
     LLAvatarActions::showProfile(mAvatarID);
     closeFloater();
+}
+
+bool LLInspectAvatar::isFriend()
+{
+    return LLAvatarActions::isFriend(mAvatarID);
 }
 
 bool LLInspectAvatar::isNotFriend()
@@ -629,24 +661,32 @@ bool LLInspectAvatar::isNotFriend()
 
 bool LLInspectAvatar::onVisibleFindOnMap()
 {
-    return gAgent.isGodlike() || is_agent_mappable(mAvatarID);
+    return ALAvatarActions::isAgentMappable(mAvatarID);
 }
 
-bool LLInspectAvatar::onVisibleEject()
+bool LLInspectAvatar::onVisibleFreezeEject()
 {
-    return enable_freeze_eject( LLSD(mAvatarID) );
+    return ALAvatarActions::canFreezeEject(mAvatarID);
 }
 
-bool LLInspectAvatar::onVisibleFreeze()
+bool LLInspectAvatar::onVisibleManageEstate()
 {
-    // either user is a god and can do long distance freeze
-    // or check for target proximity and permissions
-    return gAgent.isGodlike() || enable_freeze_eject(LLSD(mAvatarID));
+    return ALAvatarActions::canManageAvatarsEstate(mAvatarID);
 }
 
 bool LLInspectAvatar::onVisibleZoomIn()
 {
-    return gObjectList.findObject(mAvatarID);
+    return ALAvatarActions::canZoomIn(mAvatarID);
+}
+
+bool LLInspectAvatar::onVisibleTeleportTo()
+{
+    return ALAvatarActions::canTeleportTo(mAvatarID);
+}
+
+bool LLInspectAvatar::onVisibleChatHistory()
+{
+    return LLLogChat::isTranscriptExist(mAvatarID);
 }
 
 void LLInspectAvatar::onClickIM()
@@ -714,53 +754,70 @@ void LLInspectAvatar::onClickReport()
     closeFloater();
 }
 
-bool godlike_freeze(const LLSD& notification, const LLSD& response)
-{
-    LLUUID avatar_id = notification["payload"]["avatar_id"].asUUID();
-    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
-
-    switch (option)
-    {
-    case 0:
-        LLAvatarActions::freeze(avatar_id);
-        break;
-    case 1:
-        LLAvatarActions::unfreeze(avatar_id);
-        break;
-    default:
-        break;
-    }
-
-    return false;
-}
-
 void LLInspectAvatar::onClickFreeze()
 {
-    if (gAgent.isGodlike())
-    {
-        // use godlike freeze-at-a-distance, with confirmation
-        LLNotificationsUtil::add("FreezeAvatar",
-            LLSD(),
-            LLSD().with("avatar_id", mAvatarID),
-            godlike_freeze);
-    }
-    else
-    {
-        // use default "local" version of freezing that requires avatar to be in range
-        handle_avatar_freeze( LLSD(mAvatarID) );
-    }
+    // use default "local" version of freezing that requires avatar to be in range
+    ALAvatarActions::parcelFreeze(mAvatarID);
     closeFloater();
 }
 
 void LLInspectAvatar::onClickEject()
 {
-    handle_avatar_eject( LLSD(mAvatarID) );
+    ALAvatarActions::parcelEject(mAvatarID);
     closeFloater();
 }
 
-void LLInspectAvatar::onClickKick()
+void LLInspectAvatar::onClickEstateTPHome()
 {
-    LLAvatarActions::kick(mAvatarID);
+    ALAvatarActions::estateTeleportHome(mAvatarID);
+    closeFloater();
+}
+
+void LLInspectAvatar::onClickEstateKick()
+{
+    ALAvatarActions::estateKick(mAvatarID);
+    closeFloater();
+}
+
+void LLInspectAvatar::onClickEstateBan()
+{
+    ALAvatarActions::estateBan(mAvatarID);
+    closeFloater();
+}
+
+bool godlike_freeze(const LLSD& notification, const LLSD& response)
+{
+    LLUUID avatar_id = notification["payload"]["avatar_id"].asUUID();
+    S32    option    = LLNotificationsUtil::getSelectedOption(notification, response);
+
+    switch (option)
+    {
+        case 0:
+            ALAvatarActions::godFreeze(avatar_id);
+            break;
+        case 1:
+            ALAvatarActions::godUnfreeze(avatar_id);
+            break;
+        default:
+            break;
+    }
+
+    return false;
+}
+
+void LLInspectAvatar::onClickGodFreeze()
+{
+    if (gAgent.isGodlike())
+    {
+        // use godlike freeze-at-a-distance, with confirmation
+        LLNotificationsUtil::add("FreezeAvatar", LLSD(), LLSD().with("avatar_id", mAvatarID), godlike_freeze);
+    }
+    closeFloater();
+}
+
+void LLInspectAvatar::onClickGodKick()
+{
+    ALAvatarActions::godKick(mAvatarID);
     closeFloater();
 }
 
@@ -775,7 +832,7 @@ void LLInspectAvatar::onClickCSR()
 
 void LLInspectAvatar::onClickZoomIn()
 {
-    handle_zoom_to_object(mAvatarID);
+    ALAvatarActions::zoomIn(mAvatarID);
     closeFloater();
 }
 
@@ -783,6 +840,18 @@ void LLInspectAvatar::onClickFindOnMap()
 {
     gFloaterWorldMap->trackAvatar(mAvatarID, mAvatarName.getDisplayName());
     LLFloaterReg::showInstance("world_map");
+}
+
+void LLInspectAvatar::onClickViewChatHistory()
+{
+    LLAvatarActions::viewChatHistory(mAvatarID);
+    closeFloater();
+}
+
+void LLInspectAvatar::onClickTeleportTo()
+{
+    ALAvatarActions::teleportTo(mAvatarID);
+    closeFloater();
 }
 
 bool LLInspectAvatar::enableMute()

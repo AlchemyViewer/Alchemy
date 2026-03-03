@@ -41,6 +41,7 @@
 #include "v4coloru.h"
 
 // newview includes
+#include "alavataractions.h"
 #include "llagent.h"
 #include "llagentaccess.h"
 #include "llagentbenefits.h"
@@ -3818,7 +3819,7 @@ class LLAvatarReportAbuse : public view_listener_t
         LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstance()->getSelection()->getPrimaryObject() );
         if(avatar)
         {
-            LLFloaterReporter::showFromObject(avatar->getID());
+            ALAvatarActions::reportAbuse(avatar->getID());
         }
         return true;
     }
@@ -3877,6 +3878,9 @@ void handle_avatar_freeze(const LLSD& avatar_id)
 
         if( avatar )
         {
+#if 1
+            ALAvatarActions::parcelFreeze(avatar->getID());
+#else
             std::string fullname = avatar->getFullname();
             LLSD payload;
             payload["avatar_id"] = avatar->getID();
@@ -3900,6 +3904,7 @@ void handle_avatar_freeze(const LLSD& avatar_id)
                             payload,
                             callback_freeze);
             }
+#endif
         }
 }
 
@@ -4003,6 +4008,9 @@ void handle_avatar_eject(const LLSD& avatar_id)
 
         if( avatar )
         {
+#if 1
+            ALAvatarActions::parcelEject(avatar->getID());
+#else
             LLSD payload;
             payload["avatar_id"] = avatar->getID();
             std::string fullname = avatar->getFullname();
@@ -4056,6 +4064,7 @@ void handle_avatar_eject(const LLSD& avatar_id)
                                 callback_eject);
                 }
             }
+#endif
         }
 }
 
@@ -4088,6 +4097,9 @@ bool enable_freeze_eject(const LLSD& avatar_id)
     // Gods can always freeze
     if (gAgent.isGodlike()) return true;
 
+#if 1
+    return ALAvatarActions::canFreezeEject(avatar->getID());
+#else
     // Estate owners / managers can freeze
     // Parcel owners can also freeze
     const LLVector3& pos = avatar->getPositionRegion();
@@ -4102,6 +4114,7 @@ bool enable_freeze_eject(const LLSD& avatar_id)
         new_value = LLViewerParcelMgr::getInstance()->isParcelOwnedByAgent(parcel,GP_LAND_ADMIN);
     }
     return new_value;
+#endif
 }
 
 bool callback_leave_group(const LLSD& notification, const LLSD& response)
@@ -8487,6 +8500,22 @@ class LLCheckControl : public view_listener_t
     }
 };
 
+class LLResetControl : public view_listener_t
+{
+protected:
+
+    bool handleEvent(const LLSD& userdata)
+    {
+        std::string control_name = userdata.asString();
+        auto ctrlp = gSavedSettings.getControl(control_name);
+        if (ctrlp)
+        {
+            ctrlp->resetToDefault(true);
+        }
+        return true;
+    }
+};
+
 // not so generic
 
 class LLAdvancedCheckRenderShadowOption: public view_listener_t
@@ -10694,6 +10723,7 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToggleControl(), "ToggleControl");
     view_listener_t::addMenu(new LLToggleShaderControl(), "ToggleShaderControl");
     view_listener_t::addMenu(new LLCheckControl(), "CheckControl");
+    view_listener_t::addMenu(new LLResetControl(), "ResetControl");
     view_listener_t::addMenu(new LLGoToObject(), "GoToObject");
     commit.add("PayObject", boost::bind(&handle_give_money_dialog));
 
