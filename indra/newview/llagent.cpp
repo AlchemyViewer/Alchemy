@@ -3526,9 +3526,19 @@ bool LLAgent::allowOperation(PermissionBit op,
     return perm.allowOperationBy(op, agent_proxy, group_proxy);
 }
 
-const LLColor4 &LLAgent::getEffectColor()
+LLColor4 LLAgent::getEffectColor()
 {
-    return *mEffectColor;
+    LLColor4 effect_color = *mEffectColor;
+
+    //<alchemy> Rainbow Particle Effects
+    static LLCachedControl<bool> AlchemyRainbowEffects(gSavedSettings, "AlchemyRainbowEffects", true);
+    if(AlchemyRainbowEffects)
+    {
+        LLColor3 rainbow;
+        rainbow.setHSL(fmodf((F32)LLFrameTimer::getElapsedSeconds()/4.f, 1.f), 1.f, 0.5f);
+        effect_color.set(rainbow, 1.0f);
+    }
+    return effect_color;
 }
 
 void LLAgent::setEffectColor(const LLColor4 &color)
