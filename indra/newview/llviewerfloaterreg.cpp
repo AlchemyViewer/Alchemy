@@ -31,6 +31,7 @@
 #include "llfloaterreg.h"
 #include "llviewerfloaterreg.h"
 
+#include "alfloatergenerictext.h"
 #include "alfloaterprogressview.h"
 #include "llcommandhandler.h"
 #include "llcompilequeue.h"
@@ -537,6 +538,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("world_map", "floater_world_map.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterWorldMap>);
 
     // Alchemy Floaters
+    LLFloaterReg::add("generic_text", "floater_al_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGenericText>);
     LLFloaterReg::add("progress_view", "floater_al_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProgressView>);
 
     // *NOTE: Please keep these alphabetized for easier merges
