@@ -922,6 +922,7 @@ public:
 public:
     void            setHideGroupTitle(bool hide)    { mHideGroupTitle = hide; }
     bool            isGroupTitleHidden() const      { return mHideGroupTitle; }
+    LLUUID          getGroupForRezzing();
 private:
     std::string     mGroupTitle;                    // Honorific, like "Sir"
     bool            mHideGroupTitle;
