@@ -62,8 +62,8 @@ private:
     };
     struct Entry
     {
-            Entry() :
-                mBodySize(0),
+        Entry() :
+            mBodySize(0),
             mImageSize(0),
             mTime(0)
         {
@@ -71,7 +71,6 @@ private:
         Entry(const LLUUID& id, S32 imagesize, S32 bodysize, U32 time) :
             mID(id), mImageSize(imagesize), mBodySize(bodysize), mTime(time) {}
         void init(const LLUUID& id, U32 time) { mID = id, mImageSize = 0; mBodySize = 0; mTime = time; }
-        Entry& operator=(const Entry& entry) {mID = entry.mID, mImageSize = entry.mImageSize; mBodySize = entry.mBodySize; mTime = entry.mTime; return *this;}
         LLUUID mID; // 16 bytes
         S32 mImageSize; // total size of image if known
         S32 mBodySize; // size of body file in body cache
@@ -217,7 +216,7 @@ private:
     EntriesInfo mHeaderEntriesInfo;
     std::set<S32> mFreeList; // deleted entries
     std::set<LLUUID> mLRU;
-    typedef std::map<LLUUID, S32> id_map_t;
+    typedef boost::unordered_map<LLUUID, S32> id_map_t;
     id_map_t mHeaderIDMap;
 
     LLFile*      mFastCachep;
@@ -226,7 +225,7 @@ private:
 
     // BODIES (TEXTURES minus headers)
     std::string mTexturesDirName;
-    typedef std::map<LLUUID,S32> size_map_t;
+    typedef boost::unordered_map<LLUUID,S32> size_map_t;
     size_map_t mTexturesSizeMap;
     S64 mTexturesSizeTotal;
     LLAtomicBool mDoPurge;
