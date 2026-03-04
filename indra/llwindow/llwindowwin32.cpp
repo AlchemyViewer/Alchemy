@@ -4908,7 +4908,9 @@ void LLWindowWin32::LLWindowWin32Thread::checkDXMem()
 void LLWindowWin32::LLWindowWin32Thread::run()
 {
     sWindowThreadId = std::this_thread::get_id();
+#ifndef LL_RELEASE_FOR_DOWNLOAD
     LogChange logger("Window");
+#endif
 
     //as good a place as any to up the MM timer resolution (see ms_sleep)
     //attempt to set timer resolution to 1ms
@@ -4936,19 +4938,23 @@ void LLWindowWin32::LLWindowWin32Thread::run()
             if (mhDCThrd == 0)
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("w32t - PeekMessage");
+#ifndef LL_RELEASE_FOR_DOWNLOAD
                 logger.onChange("PeekMessage(", std::hex, mWindowHandleThrd, ")");
+#endif
                 status = PeekMessage(&msg, mWindowHandleThrd, 0, 0, PM_REMOVE);
             }
             else
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("w32t - GetMessage");
+#ifndef LL_RELEASE_FOR_DOWNLOAD
                 logger.always("GetMessage(", std::hex, mWindowHandleThrd, ")");
+#endif
                 status = GetMessage(&msg, NULL, 0, 0);
             }
             if (status > 0)
             {
-                logger.always("got MSG (", std::hex, msg.hwnd, ", ", msg.message,
-                              ", ", msg.wParam, ")");
+                //logger.always("got MSG (", std::hex, msg.hwnd, ", ", msg.message,
+                //              ", ", msg.wParam, ")");
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
 
@@ -4959,7 +4965,9 @@ void LLWindowWin32::LLWindowWin32Thread::run()
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("w32t - Function Queue");
             pingTimeout("queue");
+#ifndef LL_RELEASE_FOR_DOWNLOAD
             logger.onChange("runPending()");
+#endif
             //process any pending functions
             getQueue().runPending();
         }
