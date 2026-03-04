@@ -9691,7 +9691,8 @@ bool LLPipeline::getVisiblePointCloud(LLCamera& camera, LLVector3& min, LLVector
         LLPlane(max, LLVector3(0,0,1))};
 
     //potential points
-    std::vector<LLVector3> pp;
+    static std::vector<LLVector3> pp;
+    pp.clear();
 
     //add corners of AABB
     pp.push_back(LLVector3(min.mV[0], min.mV[1], min.mV[2]));
@@ -10042,7 +10043,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     F32 near_clip = 0.f;
     {
         //get visible point cloud
-        std::vector<LLVector3> fp;
+        static std::vector<LLVector3> fp;
+        fp.clear();
 
         main_camera.calcAgentFrustumPlanes(main_camera.mAgentFrustum);
 
@@ -10182,7 +10184,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 mShadowCamera[j] = shadow_cam;
             }
 
-            std::vector<LLVector3> fp;
+            static std::vector<LLVector3> fp;
+            fp.clear();
 
             if (!gPipeline.getVisiblePointCloud(shadow_cam, min, max, fp, lightDir)
                 || j > RenderShadowSplits)
