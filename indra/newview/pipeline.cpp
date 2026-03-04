@@ -5605,35 +5605,41 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
         }
 
         // UPDATE THE EXISTING NEARBY LIGHTS
-        light_set_t cur_nearby_lights;
         for (light_set_t::iterator iter = mNearbyLights.begin();
-            iter != mNearbyLights.end(); iter++)
+            iter != mNearbyLights.end();)
         {
             const Light* light = &(*iter);
             LLDrawable* drawable = light->drawable;
             const LLViewerObject *vobj = light->drawable->getVObj();
-            if(vobj && vobj->getAvatar()
-               && (vobj->getAvatar()->isTooComplex() || vobj->getAvatar()->isInMuteList() || vobj->getAvatar()->isTooSlow())
-               )
+            if(vobj && vobj->isAttachment())
             {
-                drawable->clearState(LLDrawable::NEARBY_LIGHT);
-                continue;
+                if (!sRenderAttachedLights)
+                {
+                    drawable->clearState(LLDrawable::NEARBY_LIGHT);
+                    iter = mNearbyLights.erase(iter);
+                    continue;
+                }
+
+                LLVOAvatar *avatar = vobj->getAvatar();
+                if (avatar && (avatar->isTooComplex() || avatar->isInMuteList() || avatar->isTooSlow()))
+                {
+                    drawable->clearState(LLDrawable::NEARBY_LIGHT);
+                    iter = mNearbyLights.erase(iter);
+                    continue;
+                }
             }
 
             LLVOVolume* volight = drawable->getVOVolume();
             if (!volight || !drawable->isState(LLDrawable::LIGHT))
             {
                 drawable->clearState(LLDrawable::NEARBY_LIGHT);
+                iter = mNearbyLights.erase(iter);
                 continue;
             }
             if (light->fade <= -LIGHT_FADE_TIME)
             {
                 drawable->clearState(LLDrawable::NEARBY_LIGHT);
-                continue;
-            }
-            if (!sRenderAttachedLights && volight && volight->isAttachment())
-            {
-                drawable->clearState(LLDrawable::NEARBY_LIGHT);
+                iter = mNearbyLights.erase(iter);
                 continue;
             }
 
@@ -5668,12 +5674,11 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
                     fade -= LIGHT_FADE_TIME;
                 }
             }
-            cur_nearby_lights.insert(Light(drawable, dist, fade));
+
+            ++iter; // Advance to next light
         }
-        mNearbyLights = cur_nearby_lights;
 
         // FIND NEW LIGHTS THAT ARE IN RANGE
-        light_set_t new_nearby_lights;
         for (LLDrawable::ordered_drawable_set_t::iterator iter = mLights.begin();
              iter != mLights.end(); ++iter)
         {
@@ -5687,70 +5692,27 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
             {
                 continue; // no lighting from HUD objects
             }
-            if (!sRenderAttachedLights && light && light->isAttachment())
+            if (light->isAttachment())
             {
-                continue;
-            }
-            LLVOAvatar * av = light->getAvatar();
-            if (av && (av->isTooComplex() || av->isInMuteList() || av->isTooSlow()))
-            {
-                // avatars that are already in the list will be removed by removeMutedAVsLights
-                continue;
+                if (!sRenderAttachedLights)
+                {
+                    continue;
+                }
+                LLVOAvatar* av = light->getAvatar();
+                if (av && (av->isTooComplex() || av->isInMuteList() || av->isTooSlow()))
+                {
+                    // avatars that are already in the list will be removed by removeMutedAVsLights
+                    continue;
+                }
             }
             F32 dist = calc_light_dist(light, cam_pos, max_dist);
             if (dist >= max_dist)
             {
                 continue;
             }
-            new_nearby_lights.insert(Light(drawable, dist, 0.f));
-            if (!LLPipeline::sRenderDeferred && new_nearby_lights.size() > (U32)MAX_LOCAL_LIGHTS)
-            {
-                new_nearby_lights.erase(--new_nearby_lights.end());
-                const Light& last = *new_nearby_lights.rbegin();
-                max_dist = last.dist;
-            }
-        }
 
-        // INSERT ANY NEW LIGHTS
-        for (light_set_t::iterator iter = new_nearby_lights.begin();
-             iter != new_nearby_lights.end(); iter++)
-        {
-            const Light* light = &(*iter);
-            if (LLPipeline::sRenderDeferred || mNearbyLights.size() < (U32)MAX_LOCAL_LIGHTS)
-            {
-                mNearbyLights.insert(*light);
-                ((LLDrawable*) light->drawable)->setState(LLDrawable::NEARBY_LIGHT);
-            }
-            else
-            {
-                // crazy cast so that we can overwrite the fade value
-                // even though gcc enforces sets as const
-                // (fade value doesn't affect sort so this is safe)
-                Light* farthest_light = (const_cast<Light*>(&(*(mNearbyLights.rbegin()))));
-                if (light->dist < farthest_light->dist)
-                {
-                    // mark light to fade out
-                    // visibility goes down from -0 to -LIGHT_FADE_TIME.
-                    //
-                    // This is a mess, but for now it needs to be in sync
-                    // with fade code above. Ex: code above detects distance < max,
-                    // sets fade time to positive, this code then detects closer
-                    // lights and sets fade time negative, fully compensating
-                    // for the code above
-                    if (farthest_light->fade >= LIGHT_FADE_TIME)
-                    {
-                        farthest_light->fade = -0.0001f; // was fully visible
-                    }
-                    else if (farthest_light->fade >= 0)
-                    {
-                        farthest_light->fade -= LIGHT_FADE_TIME;
-                    }
-                }
-                else
-                {
-                    break; // none of the other lights are closer
-                }
-            }
+            mNearbyLights.insert(Light(drawable, dist, 0.f));
+            drawable->setState(LLDrawable::NEARBY_LIGHT);
         }
 
         //mark nearby lights not-removable.
@@ -8682,9 +8644,18 @@ void LLPipeline::renderDeferredLighting()
         if (local_light_count > 0 && (!gCubeSnapshot || probe_level > 0))
         {
             gGL.setSceneBlendType(LLRender::BT_ADD);
-            std::list<LLVector4>        fullscreen_lights;
-            LLDrawable::drawable_list_t spot_lights;
-            LLDrawable::drawable_list_t fullscreen_spot_lights;
+            static std::vector<LLVector4>        fullscreen_lights;
+            static LLDrawable::drawable_vector_t spot_lights;
+            static LLDrawable::drawable_vector_t fullscreen_spot_lights;
+            static std::vector<LLVector4>        light_colors;
+
+
+            // Clear does not free internal vector storage, so this is more efficient than creating new vectors each frame
+            fullscreen_lights.clear();
+            spot_lights.clear();
+            fullscreen_spot_lights.clear();
+            light_colors.clear();
+
             LLSettingsSky::ptr_t        psky        = LLEnvironment::instance().getCurrentSky();
 
             if (!gCubeSnapshot)
@@ -8694,8 +8665,6 @@ void LLPipeline::renderDeferredLighting()
                     mTargetShadowSpotLight[i] = NULL;
                 }
             }
-
-            std::list<LLVector4> light_colors;
 
             LLVertexBuffer::unbind();
 
@@ -8821,10 +8790,8 @@ void LLPipeline::renderDeferredLighting()
 
                 gDeferredSpotLightProgram.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
 
-                for (LLDrawable::drawable_list_t::iterator iter = spot_lights.begin(); iter != spot_lights.end(); ++iter)
+                for (LLDrawable* drawablep : spot_lights)
                 {
-                    LLDrawable *drawablep = *iter;
-
                     LLVOVolume *volume = drawablep->getVOVolume();
 
                     LLVector4a center;
@@ -8859,6 +8826,7 @@ void LLPipeline::renderDeferredLighting()
                 LL_PROFILE_GPU_ZONE("fullscreen lights");
 
                 U32 count = 0;
+                U32 total_count = 0;
 
                 const U32 max_count = LL_DEFERRED_MULTI_LIGHT_COUNT;
                 LLVector4 light[max_count];
@@ -8866,16 +8834,15 @@ void LLPipeline::renderDeferredLighting()
 
                 F32 far_z = 0.f;
 
-                while (!fullscreen_lights.empty())
+                for (size_t i = 0, num_fullscreen_lights = fullscreen_lights.size(); i < num_fullscreen_lights; ++i)
                 {
-                    light[count] = fullscreen_lights.front();
-                    fullscreen_lights.pop_front();
-                    col[count] = light_colors.front();
-                    light_colors.pop_front();
+                    light[count] = fullscreen_lights[i];
+                    col[count] = light_colors[i];
 
                     far_z = llmin(light[count].mV[2] - light[count].mV[3], far_z);
                     count++;
-                    if (count == max_count || fullscreen_lights.empty())
+                    total_count++;
+                    if (count == max_count || total_count == num_fullscreen_lights)
                     {
                         U32 idx = count - 1;
                         bindDeferredShader(gDeferredMultiLightProgram[idx]);
@@ -8898,9 +8865,8 @@ void LLPipeline::renderDeferredLighting()
 
                 mScreenTriangleVB->setBuffer();
 
-                for (LLDrawable::drawable_list_t::iterator iter = fullscreen_spot_lights.begin(); iter != fullscreen_spot_lights.end(); ++iter)
+                for (LLDrawable* drawablep : fullscreen_spot_lights)
                 {
-                    LLDrawable* drawablep = *iter;
                     LLVOVolume* volume = drawablep->getVOVolume();
                     LLVector3   center = drawablep->getPositionAgent();
                     F32         light_size_final = volume->getLightRadius() * 1.5f;
