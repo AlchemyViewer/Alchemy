@@ -105,7 +105,7 @@ class LLMotion;
 class LLPoseBlender
 {
 protected:
-    typedef std::list<LLJointStateBlender*> blender_list_t;
+    typedef std::vector<LLJointStateBlender*> blender_list_t;
     typedef std::map<LLJoint*,LLJointStateBlender*> blender_map_t;
     blender_map_t mJointStateBlenderPool;
     blender_list_t mActiveBlenders;
