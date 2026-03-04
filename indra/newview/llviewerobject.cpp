@@ -4087,10 +4087,8 @@ U32 LLViewerObject::recursiveGetTriangleCount(S32* vcount) const
 {
     S32 total_tris = getTriangleCount(vcount);
     LLViewerObject::const_child_list_t& child_list = getChildren();
-    for (LLViewerObject::const_child_list_t::const_iterator iter = child_list.begin();
-         iter != child_list.end(); ++iter)
+    for (LLViewerObject* childp : child_list)
     {
-        LLViewerObject* childp = *iter;
         if (childp)
         {
             total_tris += childp->getTriangleCount(vcount);
@@ -4118,17 +4116,17 @@ F32 LLViewerObject::recursiveGetScaledSurfaceArea() const
                 const LLVector3& scale = volume->getScale();
                 area += volume->getVolume()->getSurfaceArea() * llmax(llmax(scale.mV[0], scale.mV[1]), scale.mV[2]);
             }
-            LLViewerObject::const_child_list_t children = volume->getChildren();
-            for (LLViewerObject::const_child_list_t::const_iterator child_iter = children.begin();
-                 child_iter != children.end();
-                 ++child_iter)
+
+            for (LLViewerObject* child_obj : volume->getChildren())
             {
-                LLViewerObject* child_obj = *child_iter;
-                LLVOVolume *child = dynamic_cast<LLVOVolume*>( child_obj );
-                if (child && child->getVolume())
+                if (child_obj && child_obj->getPCode() == LL_PCODE_VOLUME)
                 {
-                    const LLVector3& scale = child->getScale();
-                    area += child->getVolume()->getSurfaceArea() * llmax(llmax(scale.mV[0], scale.mV[1]), scale.mV[2]);
+                    LLVOVolume *child = static_cast<LLVOVolume*>( child_obj );
+                    if (child->getVolume())
+                    {
+                        const LLVector3& scale = child->getScale();
+                        area += child->getVolume()->getSurfaceArea() * llmax(llmax(scale.mV[0], scale.mV[1]), scale.mV[2]);
+                    }
                 }
             }
         }

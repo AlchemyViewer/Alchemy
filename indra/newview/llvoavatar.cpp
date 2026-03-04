@@ -11298,12 +11298,8 @@ void LLVOAvatar::accountRenderComplexityForObject(
                 }
                 attachment_volume_cost += volume->getRenderCost(textures);
 
-                const_child_list_t children = volume->getChildren();
-                for (const_child_list_t::const_iterator child_iter = children.begin();
-                    child_iter != children.end();
-                    ++child_iter)
+                for (LLViewerObject* child_obj : volume->getChildren())
                 {
-                    LLViewerObject* child_obj = *child_iter;
                     LLVOVolume* child = dynamic_cast<LLVOVolume*>(child_obj);
                     if (child)
                     {
@@ -11431,9 +11427,6 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
         static LLCachedControl<F32> max_complexity_setting(gSavedSettings, "MaxAttachmentComplexity");
         F32 max_attachment_complexity = max_complexity_setting;
         max_attachment_complexity = llmax(max_attachment_complexity, DEFAULT_MAX_ATTACHMENT_COMPLEXITY);
-
-        // Diagnostic list of all textures on our avatar
-        static boost::unordered_set<const LLViewerTexture*> all_textures;
 
         U32 cost = VISUAL_COMPLEXITY_UNKNOWN;
         LLVOVolume::texture_cost_t textures;
