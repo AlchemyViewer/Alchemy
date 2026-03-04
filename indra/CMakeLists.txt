@@ -82,7 +82,7 @@ endif ()
 # Default Tracy profiling on for test builds, but off for all others
 set(BUILDING_TEST_CHANNEL OFF)
 string(TOLOWER "${VIEWER_CHANNEL}" channel_lower)
-if(channel_lower MATCHES "^second life test")
+if(channel_lower MATCHES "^alchemy test")
   set(BUILDING_TEST_CHANNEL ON)
 endif()
 cmake_dependent_option(USE_TRACY "Enable support for Tracy profiler" ON "BUILDING_TEST_CHANNEL" OFF)
