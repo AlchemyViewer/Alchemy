@@ -344,13 +344,13 @@ public:
 };
 
 
-class LLVoiceClient: public LLParamSingleton<LLVoiceClient>
+class LLVoiceClient: public LLSimpleton<LLVoiceClient>
 {
-    LLSINGLETON(LLVoiceClient, LLPumpIO *pump);
     LOG_CLASS(LLVoiceClient);
+public:
+    LLVoiceClient(LLPumpIO* pump);
     ~LLVoiceClient();
 
-public:
     typedef boost::signals2::signal<void(void)> micro_changed_signal_t;
     micro_changed_signal_t mMicroChangedSignal;
 

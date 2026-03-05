@@ -78,12 +78,12 @@ inline std::size_t hash_value(TEMaterialPair const& id)
     return seed;
 }
 
-class LLMaterialMgr : public LLSingleton<LLMaterialMgr>
+class LLMaterialMgr : public LLSimpleton<LLMaterialMgr>
 {
-    LLSINGLETON(LLMaterialMgr);
+public:
+    LLMaterialMgr();
     virtual ~LLMaterialMgr();
 
-public:
     typedef std::map<LLMaterialID, LLMaterialPtr> material_map_t;
 
     typedef boost::signals2::signal<void (const LLMaterialID&, const LLMaterialPtr)> get_callback_t;

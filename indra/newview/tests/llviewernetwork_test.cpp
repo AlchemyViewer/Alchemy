@@ -175,6 +175,8 @@ namespace tut
     {
         viewerNetworkTest()
         {
+            LLGridManager::createInstance();
+
             LLFile::remove(TEST_FILENAME);
             gCmdLineLoginURI.clear();
             gCmdLineGridChoice.clear();
@@ -185,6 +187,8 @@ namespace tut
         ~viewerNetworkTest()
         {
             LLFile::remove(TEST_FILENAME);
+
+            LLGridManager::deleteSingleton();
         }
     };
 

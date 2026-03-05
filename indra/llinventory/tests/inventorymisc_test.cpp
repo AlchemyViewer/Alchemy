@@ -127,6 +127,18 @@ namespace tut
 {
     struct inventory_data
     {
+        inventory_data()
+        {
+            LLAssetDictionary::createInstance();
+            LLFolderDictionary::createInstance();
+            LLInventoryDictionary::createInstance();
+        }
+        ~inventory_data()
+        {
+            LLInventoryDictionary::deleteSingleton();
+            LLFolderDictionary::deleteSingleton();
+            LLAssetDictionary::deleteSingleton();
+        }
     };
     typedef test_group<inventory_data> inventory_test;
     typedef inventory_test::object inventory_object;

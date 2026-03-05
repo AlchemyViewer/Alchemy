@@ -224,6 +224,7 @@
 #include "llfloatersimplesnapshot.h"
 #include "llfloatersnapshot.h"
 #include "llsidepanelinventory.h"
+#include "llinventorymodelbackgroundfetch.h"
 
 // includes for idle() idleShutdown()
 #include "llviewercontrol.h"
@@ -256,6 +257,22 @@ using namespace LL;
 
 #include "llcoproceduremanager.h"
 #include "llviewereventrecorder.h"
+#include "llcontrolavatar.h"
+#include "lldonotdisturbnotificationstorage.h"
+#include "llemojidictionary.h"
+#include "llfoldertype.h"
+#include "llmaterialmgr.h"
+#include "llpersistentnotificationstorage.h"
+#include "lltoolcomp.h"
+#include "lltooldraganddrop.h"
+#include "lltoolface.h"
+#include "lltoolfocus.h"
+#include "lltoolgrab.h"
+#include "lltoolindividual.h"
+#include "lltoolpie.h"
+#include "lltoolpipette.h"
+#include "lltoolselectland.h"
+#include "llviewerfoldertype.h"
 
 // *FIX: These extern globals should be cleaned up.
 // The globals either represent state/config/resource-storage of either
@@ -756,7 +773,7 @@ bool LLAppViewer::init()
 
     // initialize the LLSettingsType translation bridge.
     LLTranslationBridge::ptr_t trans = std::make_shared<LLUITranslationBridge>();
-    LLSettingsType::initParamSingleton(trans);
+    LLSettingsType::createInstance(trans);
 
     // initialize SSE options
     LLVector4a::initClass();
@@ -767,6 +784,13 @@ bool LLAppViewer::init()
     // set skin search path to default, will be overridden later
     // this allows simple skinned file lookups to work
     gDirUtilp->setSkinFolder("default", "en");
+
+    // Init early simpletons
+    LLInventoryDictionary::createInstance();
+    LLAssetDictionary::createInstance();
+    LLFolderDictionary::createInstance();
+    LLViewerFolderDictionary::createInstance();
+    LLUIColorTable::createInstance();
 
 //  initLoggingAndGetLastDuration();
 
@@ -784,6 +808,9 @@ bool LLAppViewer::init()
     }
 
     LL_INFOS("InitInfo") << "Configuration initialized." << LL_ENDL ;
+
+    // Init coroutine manager
+    LLCoros::createInstance();
 
     //set the max heap size.
     initMaxHeapSize() ;
@@ -857,11 +884,14 @@ bool LLAppViewer::init()
 
     // initialize LLWearableType translation bridge.
     // Will immediately use LLTranslationBridge to init LLWearableDictionary
-    LLWearableType::initParamSingleton(trans);
+    LLWearableType::createInstance(trans);
 
     // Setup notifications after LLUI::initClass() has been called.
     LLNotifications::instance();
     LL_INFOS("InitInfo") << "Notifications initialized." << LL_ENDL ;
+
+    // Init grid manager
+    LLGridManager::createInstance();
 
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
@@ -906,8 +936,6 @@ bool LLAppViewer::init()
     LLUrlFloaterDispatchHandler::registerInDispatcher();
 
     /////////////////////////////////////////////////
-
-    LLToolMgr::getInstance(); // Initialize tool manager if not already instantiated
 
     LLViewerFloaterReg::registerFloaters();
 
@@ -976,6 +1004,12 @@ bool LLAppViewer::init()
     // Initialize event recorder
     LLViewerEventRecorder::createInstance();
 
+    // Init parcel manager, name cache, and mute list simpletons
+    LLViewerParcelMgr::createInstance();
+    LLAvatarNameCache::createInstance();
+    LLMuteList::createInstance();
+
+    // Initialize tool manager if not already instantiated
     //
     // Initialize the window
     //
@@ -1113,9 +1147,17 @@ bool LLAppViewer::init()
     gSimLastTime = gRenderStartTime.getElapsedTimeF32();
     gSimFrames = (F32)gFrameCount;
 
-    if (gSavedSettings.getBOOL("JoystickEnabled"))
+    // Create joystick singleton and init if enabled
     {
-        LLViewerJoystick::getInstance()->init(false);
+        LLViewerJoystick::createInstance();
+
+        if (gSavedSettings.getBOOL("JoystickEnabled"))
+        {
+            LLViewerJoystick::getInstance()->init(false);
+        }
+
+        joystick = LLViewerJoystick::getInstance();
+        joystick->setNeedsReset(true);
     }
 
     try
@@ -1265,22 +1307,45 @@ bool LLAppViewer::init()
     // Note: this is where gLocalSpeakerMgr and gActiveSpeakerMgr used to be instantiated.
 
     LLVoiceChannel::initClass();
-    LLVoiceClient::initParamSingleton(gServicePump);
+    LLVoiceClient::createInstance(gServicePump);
     LLVoiceChannel::setCurrentVoiceChannelChangedCallback(boost::bind(&LLFloaterIMContainer::onCurrentChannelChanged, _1), true);
 
-    joystick = LLViewerJoystick::getInstance();
-    joystick->setNeedsReset(true);
     /*----------------------------------------------------------------------*/
     // Load User's bindings
     loadKeyBindings();
 
+    // Init media
+    LLViewerMedia::createInstance();
+
+    // Initialize tool manager and tools
+    LLToolSelectLand::createInstance();
+    LLToolIndividual::createInstance();
+    LLToolCompInspect::createInstance();
+    LLToolCompTranslate::createInstance();
+    LLToolCompScale::createInstance();
+    LLToolCompRotate::createInstance();
+    LLToolCompCreate::createInstance();
+    LLToolCompGun::createInstance();
+    LLToolFace::createInstance();
+    LLToolPipette::createInstance();
+    LLToolGrab::createInstance();
+    LLToolCamera::createInstance();
+    LLToolDragAndDrop::createInstance();
+    LLToolPie::createInstance();
+    LLToolMgr::createInstance();
+
     //LLSimpleton creations
     LLEnvironment::createInstance();
+    LLViewerPartSim::createInstance();
     LLWorld::createInstance();
     LLViewerStatsRecorder::createInstance();
     LLSelectMgr::createInstance();
     LLViewerCamera::createInstance();
     LL::GLTFSceneManager::createInstance();
+    LLMaterialMgr::createInstance();
+    LLHUDManager::createInstance();
+    LLWorldMap::createInstance();
+    LLObjectSignaledAnimationMap::createInstance();
 
     gSavedSettings.setU32("DebugQualityPerformance", gSavedSettings.getU32("RenderQualityPerformance"));
 
@@ -1822,7 +1887,7 @@ bool LLAppViewer::cleanup()
     // Note: this is where gHUDManager used to be deleted.
     if(LLHUDManager::instanceExists())
     {
-        LLHUDManager::getInstance()->shutdownClass();
+        LLHUDManager::deleteSingleton();
     }
 
     delete gAssetStorage;
@@ -1892,6 +1957,7 @@ bool LLAppViewer::cleanup()
     // Cleanup Inventory after the UI since it will delete any remaining observers
     // (Deleted observers should have already removed themselves)
     gInventory.cleanupInventory();
+    LLInventoryModelBackgroundFetch::deleteSingleton();
 
     LLCoros::getInstance()->printActiveCoroutines();
 
@@ -2087,6 +2153,9 @@ bool LLAppViewer::cleanup()
     {
         // Turn off Space Navigator and similar devices
         LLViewerJoystick::getInstance()->terminate();
+
+        // Cleanup joystick singleton
+        LLViewerJoystick::deleteSingleton();
     }
 
     LL_INFOS() << "Shutting down message system" << LL_ENDL;
@@ -2138,6 +2207,8 @@ bool LLAppViewer::cleanup()
     //Note:
     //SUBSYSTEM_CLEANUP(LLViewerMedia) has to be put before gTextureList.shutdown()
     //because some new image might be generated during cleaning up media. --bao
+    LLViewerMedia::deleteSingleton();
+
     gTextureList.shutdown(); // shutdown again in case a callback added something
     LLUIImageList::getInstance()->cleanUp();
 
@@ -2177,14 +2248,41 @@ bool LLAppViewer::cleanup()
     ll_close_fail_log();
 
     LLError::LLCallStacks::cleanup();
+
+    // Cleanup simpletons
+    LLPersistentNotificationStorage::deleteSingleton();
+    LLDoNotDisturbNotificationStorage::deleteSingleton();
+    LLObjectSignaledAnimationMap::deleteSingleton();
+    LLWorldMap::deleteSingleton();
+    LLAvatarNameCache::deleteSingleton();
+    LLMaterialMgr::deleteSingleton();
     LL::GLTFSceneManager::deleteSingleton();
-    LLEnvironment::deleteSingleton();
     LLSelectMgr::deleteSingleton();
+    LLToolMgr::deleteSingleton();
+    LLToolPie::deleteSingleton();
+    LLToolDragAndDrop::deleteSingleton();
+    LLToolCamera::deleteSingleton();
+    LLToolGrab::deleteSingleton();
+    LLToolPipette::deleteSingleton();
+    LLToolFace::deleteSingleton();
+    LLToolCompGun::deleteSingleton();
+    LLToolCompCreate::deleteSingleton();
+    LLToolCompRotate::deleteSingleton();
+    LLToolCompScale::deleteSingleton();
+    LLToolCompTranslate::deleteSingleton();
+    LLToolCompInspect::deleteSingleton();
+    LLToolIndividual::deleteSingleton();
+    LLToolSelectLand::deleteSingleton();
     LLViewerStatsRecorder::deleteSingleton();
     LLViewerEventRecorder::deleteSingleton();
     LLWorld::deleteSingleton();
+    LLViewerPartSim::deleteSingleton();
+    LLEnvironment::deleteSingleton();
     LLVoiceClient::deleteSingleton();
     LLUI::deleteSingleton();
+    LLMuteList::deleteSingleton();
+    LLAvatarNameCache::deleteSingleton();
+    LLViewerParcelMgr::deleteSingleton();
 
     // It's not at first obvious where, in this long sequence, a generic cleanup
     // call OUGHT to go. So let's say this: as we migrate cleanup from
@@ -2196,6 +2294,24 @@ bool LLAppViewer::cleanup()
     // This calls every remaining LLSingleton's cleanupSingleton() and
     // deleteSingleton() methods.
     LLSingletonBase::deleteAll();
+
+    LLDiskCache::deleteSingleton();
+
+    // Destroy simpletons that singletons depend on
+    LLGridManager::deleteSingleton();
+    LLUIColorTable::deleteSingleton();
+
+    // Destroy coroutine manager after everything besides dictionaries
+    LLCoros::deleteSingleton();
+
+    // Destroy static dictionaries
+    LLSettingsType::deleteSingleton();
+    LLWearableType::deleteSingleton();
+    LLEmojiDictionary::deleteSingleton();
+    LLViewerFolderDictionary::deleteSingleton();
+    LLFolderDictionary::deleteSingleton();
+    LLAssetDictionary::deleteSingleton();
+    LLInventoryDictionary::deleteSingleton();
 
     LLSplashScreen::hide();
 
@@ -4441,7 +4557,7 @@ bool LLAppViewer::initCache()
     mPurgeCache = false;
     bool read_only = mSecondInstance;
     LLAppViewer::getTextureCache()->setReadOnly(read_only) ;
-    LLVOCache::initParamSingleton(read_only);
+    LLVOCache::createInstance(read_only);
 
     // initialize the new disk cache using saved settings
     const std::string cache_dir_name = gSavedSettings.getString("DiskCacheDirName");
@@ -4513,7 +4629,7 @@ bool LLAppViewer::initCache()
     }
 
     const std::string cache_dir = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, cache_dir_name);
-    LLDiskCache::initParamSingleton(cache_dir, disk_cache_size, enable_cache_debug_info);
+    LLDiskCache::createInstance(cache_dir, disk_cache_size, enable_cache_debug_info);
 
     if (!read_only)
     {
@@ -5795,6 +5911,7 @@ void LLAppViewer::disconnectViewer()
     if(LLWorld::instanceExists())
     {
         LLWorld::getInstance()->resetClass();
+        LLWorld::deleteSingleton();
     }
     LLVOCache::deleteSingleton();
 

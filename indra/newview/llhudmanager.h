@@ -34,19 +34,17 @@
 class LLHUDEffect;
 class LLMessageSystem;
 
-class LLHUDManager : public LLSingleton<LLHUDManager>
+class LLHUDManager : public LLSimpleton<LLHUDManager>
 {
-    LLSINGLETON(LLHUDManager);
+public:
+    LLHUDManager();
     ~LLHUDManager();
 
-public:
     LLHUDEffect *createViewerEffect(const U8 type, bool send_to_sim = true, bool originated_here = true);
 
     void updateEffects();
     void sendEffects();
     void cleanupEffects();
-
-    static void shutdownClass();
 
     static void processViewerEffect(LLMessageSystem *mesgsys, void **user_data);
 

@@ -65,17 +65,10 @@
 #include "llsingleton.h"
 
 class LLDiskCache :
-    public LLParamSingleton<LLDiskCache>
+    public LLSimpleton<LLDiskCache>
 {
     public:
-        /**
-         * Since this is using the LLSingleton pattern but we
-         * want to allow the constructor to be called first
-         * with various parameters, we also invoke the
-         * LLParamSingleton idiom and use it to initialize
-         * the class via a call in LLAppViewer.
-         */
-        LLSINGLETON(LLDiskCache,
+        LLDiskCache(
                     /**
                      * The full name of the cache folder - typically a
                      * a child of the main Viewer cache directory. Defined

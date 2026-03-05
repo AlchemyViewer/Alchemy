@@ -29,6 +29,8 @@
 
 #include <string>
 #include "llassettype.h"
+#include "lldictionary.h"
+#include "llsingleton.h"
 
 // This class handles folder types (similar to assettype, except for folders)
 // and operations on those.
@@ -120,6 +122,38 @@ public:
 protected:
     LLFolderType() {}
     ~LLFolderType() {}
+};
+
+///----------------------------------------------------------------------------
+/// Class LLFolderType
+///----------------------------------------------------------------------------
+struct FolderEntry : public LLDictionaryEntry
+{
+    FolderEntry(const std::string& type_name,    // 8 character limit!
+                bool               is_protected, // can the viewer change categories of this type?
+                bool               is_automatic, // always made before first login?
+                bool               is_singleton  // should exist as a unique copy under root
+                ) :
+        LLDictionaryEntry(type_name),
+        mIsProtected(is_protected),
+        mIsAutomatic(is_automatic),
+        mIsSingleton(is_singleton)
+    {
+        llassert(type_name.length() <= 8);
+    }
+
+    const bool mIsProtected;
+    const bool mIsAutomatic;
+    const bool mIsSingleton;
+};
+
+class LLFolderDictionary : public LLSimpleton<LLFolderDictionary>, public LLDictionary<LLFolderType::EType, FolderEntry>
+{
+public:
+    LLFolderDictionary();
+
+protected:
+    virtual LLFolderType::EType notFound() const override { return LLFolderType::FT_NONE; }
 };
 
 #endif // LL_LLFOLDERTYPE_H

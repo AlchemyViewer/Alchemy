@@ -185,12 +185,10 @@ LLMuteList::LLMuteList() :
 //-----------------------------------------------------------------------------
 LLMuteList::~LLMuteList()
 {
-
-}
-
-void LLMuteList::cleanupSingleton()
-{
-    LLAvatarNameCache::getInstance()->setAccountNameChangedCallback(nullptr);
+    if (LLAvatarNameCache::instanceExists())
+    {
+        LLAvatarNameCache::getInstance()->setAccountNameChangedCallback(nullptr);
+    }
 }
 
 bool LLMuteList::isLinden(const std::string& name)

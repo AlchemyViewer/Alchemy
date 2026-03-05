@@ -1022,8 +1022,8 @@ bool idle_startup()
         {
             // check existance since this part of code can be reached
             // twice due to login failures
-            LLPersistentNotificationStorage::initParamSingleton();
-            LLDoNotDisturbNotificationStorage::initParamSingleton();
+            LLPersistentNotificationStorage::createInstance();
+            LLDoNotDisturbNotificationStorage::createInstance();
         }
         else
         {

@@ -74,11 +74,11 @@ public:
     U32         mFlags; // flags pertaining to this mute entry
 };
 
-class LLMuteList : public LLSingleton<LLMuteList>
+class LLMuteList : public LLSimpleton<LLMuteList>
 {
-    LLSINGLETON(LLMuteList);
+public:
+    LLMuteList();
     ~LLMuteList();
-    /*virtual*/ void cleanupSingleton() override;
 
     enum EMuteListState
     {
@@ -87,7 +87,7 @@ class LLMuteList : public LLSingleton<LLMuteList>
         ML_LOADED,
         ML_FAILED,
     };
-public:
+
     // reasons for auto-unmuting a resident
     enum EAutoReason
     {

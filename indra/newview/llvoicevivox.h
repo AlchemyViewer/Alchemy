@@ -62,16 +62,17 @@ class LLVivoxVoiceP2PIncomingCall : public LLVoiceP2PIncomingCallInterface
     LLSD mCallInfo;
 };
 
-class LLVivoxVoiceClient :  public LLSingleton<LLVivoxVoiceClient>,
+class LLVivoxVoiceClient :  public LLSimpleton<LLVivoxVoiceClient>,
                             virtual public LLVoiceModuleInterface,
                             virtual public LLVoiceEffectInterface,
                             virtual public LLVoiceP2POutgoingCallInterface
 {
-    LLSINGLETON(LLVivoxVoiceClient);
     LOG_CLASS(LLVivoxVoiceClient);
-    virtual ~LLVivoxVoiceClient();
 
 public:
+    LLVivoxVoiceClient();
+    virtual ~LLVivoxVoiceClient();
+
     /// @name LLVoiceModuleInterface virtual implementations
     ///  @see LLVoiceModuleInterface
     //@{

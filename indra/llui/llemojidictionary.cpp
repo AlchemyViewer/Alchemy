@@ -128,7 +128,8 @@ LLEmojiDictionary::LLEmojiDictionary()
 // static
 void LLEmojiDictionary::initClass()
 {
-    LLEmojiDictionary* pThis = &LLEmojiDictionary::initParamSingleton();
+    LLEmojiDictionary::createInstance();
+    LLEmojiDictionary* pThis = LLEmojiDictionary::getInstance();
 
     pThis->loadTranslations();
     pThis->loadGroups();

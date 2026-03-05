@@ -27,6 +27,14 @@ namespace tut
 {
     struct llcond_data
     {
+        llcond_data()
+        {
+            LLCoros::createInstance();
+        }
+        ~llcond_data()
+        {
+            LLCoros::deleteSingleton();
+        }
         LLScalarCond<int> cond{0};
     };
     typedef test_group<llcond_data> llcond_group;

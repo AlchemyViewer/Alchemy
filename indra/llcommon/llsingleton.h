@@ -230,10 +230,6 @@ LLSingletonBase::LLSingletonBase(tag<DERIVED_TYPE>):
     LLSingleton_manage_master<DERIVED_TYPE>().push_initializing(this);
 }
 
-// forward declare for friend directive within LLSingleton
-template <typename DERIVED_TYPE>
-class LLParamSingleton;
-
 /**
  * LLSingleton implements the getInstance() method part of the Singleton
  * pattern. It can't make the derived class constructors protected, though, so
@@ -308,10 +304,6 @@ private:
         DERIVED_TYPE*   mInstance{nullptr};
     };
     typedef llthread::LockStatic<SingletonData> LockStatic;
-
-    // Allow LLParamSingleton subclass -- but NOT DERIVED_TYPE itself -- to
-    // access our private members.
-    friend class LLParamSingleton<DERIVED_TYPE>;
 
     // LLSingleton only supports a nullary constructor. However, the specific
     // purpose for its subclass LLParamSingleton is to support Singletons
@@ -614,176 +606,6 @@ public:
     }
 };
 
-
-/**
- * LLParamSingleton<T> is like LLSingleton<T>, except in the following ways:
- *
- * * It is NOT instantiated on demand (instance() or getInstance()). You must
- *   first call initParamSingleton(constructor args...).
- * * Before initParamSingleton(), calling instance() or getInstance() dies with
- *   LL_ERRS.
- * * initParamSingleton() may be called only once. A second call dies with
- *   LL_ERRS.
- * * However, distinct initParamSingleton() calls can be used to engage
- *   different constructors, as long as only one such call is executed at
- *   runtime.
- * * Unlike LLSingleton, an LLParamSingleton cannot be "revived" by an
- *   instance() or getInstance() call after deleteSingleton().
- *
- * Importantly, though, each LLParamSingleton subclass does participate in the
- * dependency-ordered LLSingletonBase::deleteAll() processing.
- */
-template <typename DERIVED_TYPE>
-class LLParamSingleton : public LLSingleton<DERIVED_TYPE>
-{
-private:
-    typedef LLSingleton<DERIVED_TYPE> super;
-    using typename super::LockStatic;
-
-    // Passes arguments to DERIVED_TYPE's constructor and sets appropriate
-    // states, returning a pointer to the new instance.
-    template <typename... Args>
-    static DERIVED_TYPE* initParamSingleton_(Args&&... args)
-    {
-        // In case racing threads both call initParamSingleton() at the same
-        // time, serialize them. One should initialize; the other should see
-        // mInitState already set.
-        LockStatic lk; LL_PROFILE_MUTEX_LOCK(lk->mMutex);
-        // For organizational purposes this function shouldn't be called twice
-        if (lk->mInitState != super::UNINITIALIZED)
-        {
-            super::logerrs({"Tried to initialize singleton ",
-                           super::template classname<DERIVED_TYPE>(),
-                           " twice!"});
-            return nullptr;
-        }
-        else if (on_main_thread())
-        {
-            // on the main thread, simply construct instance while holding lock
-            super::logdebugs({super::template classname<DERIVED_TYPE>(),
-                             "::initParamSingleton()"});
-            super::constructSingleton(lk, std::forward<Args>(args)...);
-            return lk->mInstance;
-        }
-        else
-        {
-            // on secondary thread, dispatch to main thread --
-            // set state so we catch any other calls before the main thread
-            // picks up the task
-            lk->mInitState = super::QUEUED;
-            // very important to unlock here so main thread can actually process
-            lk.unlock();
-            super::loginfos({super::template classname<DERIVED_TYPE>(),
-                            "::initParamSingleton() dispatching to main thread"});
-            // Normally it would be the height of folly to reference-bind
-            // 'args' into a lambda to be executed on some other thread! By
-            // the time that thread executed the lambda, the references would
-            // all be dangling, and Bad Things would result. But
-            // LLMainThreadTask::dispatch() promises to block until the passed
-            // task has completed. So in this case we know the references will
-            // remain valid until the lambda has run, so we dare to bind
-            // references.
-            auto instance = LLMainThreadTask::dispatch(
-                [&](){
-                    super::loginfos({super::template classname<DERIVED_TYPE>(),
-                                    "::initParamSingleton() on main thread"});
-                    return initParamSingleton_(std::forward<Args>(args)...);
-                });
-            super::loginfos({super::template classname<DERIVED_TYPE>(),
-                            "::initParamSingleton() returning on requesting thread"});
-            return instance;
-        }
-    }
-
-public:
-    using super::deleteSingleton;
-    using super::instanceExists;
-    using super::wasDeleted;
-
-    /// initParamSingleton() constructs the instance, returning a reference.
-    /// Pass whatever arguments are required to construct DERIVED_TYPE.
-    template <typename... Args>
-    static DERIVED_TYPE& initParamSingleton(Args&&... args)
-    {
-        return *initParamSingleton_(std::forward<Args>(args)...);
-    }
-
-    static DERIVED_TYPE* getInstance()
-    {
-        // In case racing threads call getInstance() at the same moment as
-        // initParamSingleton(), serialize the calls.
-        LockStatic lk; LL_PROFILE_MUTEX_LOCK(lk->mMutex);
-
-        switch (lk->mInitState)
-        {
-        case super::UNINITIALIZED:
-        case super::QUEUED:
-            super::logerrs({"Uninitialized param singleton ",
-                           super::template classname<DERIVED_TYPE>()});
-            break;
-
-        case super::CONSTRUCTING:
-            super::logerrs({"Tried to access param singleton ",
-                           super::template classname<DERIVED_TYPE>(),
-                           " from singleton constructor!"});
-            break;
-
-        case super::INITIALIZING:
-            // As with LLSingleton, explicitly permit circular calls from
-            // within initSingleton()
-        case super::INITIALIZED:
-            // for any valid call, capture dependencies
-            super::capture_dependency(lk->mInstance);
-            return lk->mInstance;
-
-        case super::DELETED:
-            super::logerrs({"Trying to access deleted param singleton ",
-                           super::template classname<DERIVED_TYPE>()});
-            break;
-        }
-
-        // should never actually get here; this is to pacify the compiler,
-        // which assumes control might return from logerrs()
-        return nullptr;
-    }
-
-    // instance() is replicated here so it calls
-    // LLParamSingleton::getInstance() rather than LLSingleton::getInstance()
-    // -- avoid making getInstance() virtual
-    static DERIVED_TYPE& instance()
-    {
-        return *getInstance();
-    }
-};
-
-/**
- * Initialization locked singleton, only derived class can decide when to initialize.
- * Starts locked.
- * For cases when singleton has a dependency onto something or.
- *
- * LLLockedSingleton is like an LLParamSingleton with a nullary constructor.
- * It cannot be instantiated on demand (instance() or getInstance() call) --
- * it must be instantiated by calling construct(). However, it does
- * participate in dependency-ordered LLSingletonBase::deleteAll() processing.
- */
-template <typename DT>
-class LLLockedSingleton : public LLParamSingleton<DT>
-{
-    typedef LLParamSingleton<DT> super;
-
-public:
-    using super::deleteSingleton;
-    using super::getInstance;
-    using super::instance;
-    using super::instanceExists;
-    using super::wasDeleted;
-
-    static DT* construct()
-    {
-        return super::initParamSingleton();
-    }
-};
-
 /**
  * Use LLSINGLETON(Foo); at the start of an LLSingleton<Foo> subclass body
  * when you want to declare an out-of-line constructor:
@@ -845,7 +667,7 @@ public:
     template <typename... ARGS>
     static void createInstance(ARGS&&... args)
     {
-        llassert(sInstance == nullptr);
+        llassert_always(sInstance == nullptr);
         sInstance = new T(std::forward<ARGS>(args)...);
     }
 

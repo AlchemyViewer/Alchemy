@@ -74,12 +74,12 @@ public:
     virtual void changed() = 0;
 };
 
-class LLViewerParcelMgr : public LLSingleton<LLViewerParcelMgr>
+class LLViewerParcelMgr : public LLSimpleton<LLViewerParcelMgr>
 {
-    LLSINGLETON(LLViewerParcelMgr);
+public:
+    LLViewerParcelMgr();
     ~LLViewerParcelMgr();
 
-public:
     typedef std::function<void (const LLVector3d&, const bool& local)> teleport_finished_callback_t;
     typedef boost::signals2::signal<void (const LLVector3d&, const bool&)> teleport_finished_signal_t;
     typedef std::function<void()> teleport_failed_callback_t;

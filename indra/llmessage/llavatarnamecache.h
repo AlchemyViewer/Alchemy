@@ -38,11 +38,12 @@
 class LLSD;
 class LLUUID;
 
-class LLAvatarNameCache : public LLSingleton<LLAvatarNameCache>
+class LLAvatarNameCache : public LLSimpleton<LLAvatarNameCache>
 {
-    LLSINGLETON(LLAvatarNameCache);
-    ~LLAvatarNameCache();
 public:
+    LLAvatarNameCache();
+    ~LLAvatarNameCache();
+
     typedef boost::signals2::signal<void (void)> use_display_name_signal_t;
     typedef std::function<void (const LLUUID id, const LLAvatarName& av_name)> account_name_changed_callback_t;
 

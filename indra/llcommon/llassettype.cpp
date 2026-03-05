@@ -27,45 +27,8 @@
 #include "linden_common.h"
 
 #include "llassettype.h"
-#include "lldictionary.h"
 #include "llmemory.h"
 #include "llsd.h"
-#include "llsingleton.h"
-
-///----------------------------------------------------------------------------
-/// Class LLAssetType
-///----------------------------------------------------------------------------
-struct AssetEntry : public LLDictionaryEntry
-{
-    AssetEntry(const char *desc_name,
-               const char *type_name,   // 8 character limit!
-               const char *human_name,  // for decoding to human readable form; put any and as many printable characters you want in each one
-               bool can_link,           // can you create a link to this type?
-               bool can_fetch,          // can you fetch this asset by ID?
-               bool can_know)           // can you see this asset's ID?
-        :
-        LLDictionaryEntry(desc_name),
-        mTypeName(type_name),
-        mHumanName(human_name),
-        mCanLink(can_link),
-        mCanFetch(can_fetch),
-        mCanKnow(can_know)
-    {
-        llassert(strlen(mTypeName) <= 8);
-    }
-
-    const char *mTypeName;
-    const char *mHumanName;
-    bool mCanLink;
-    bool mCanFetch;
-    bool mCanKnow;
-};
-
-class LLAssetDictionary : public LLSingleton<LLAssetDictionary>,
-                          public LLDictionary<LLAssetType::EType, AssetEntry>
-{
-    LLSINGLETON(LLAssetDictionary);
-};
 
 LLAssetDictionary::LLAssetDictionary()
 {

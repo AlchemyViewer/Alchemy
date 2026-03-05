@@ -75,12 +75,12 @@ struct LLEmojiSearchResult
 // LLEmojiDictionary class
 //
 
-class LLEmojiDictionary : public LLParamSingleton<LLEmojiDictionary>, public LLInitClass<LLEmojiDictionary>
+class LLEmojiDictionary : public LLSimpleton<LLEmojiDictionary>, public LLInitClass<LLEmojiDictionary>
 {
-    LLSINGLETON(LLEmojiDictionary);
-    ~LLEmojiDictionary() override {};
-
 public:
+    LLEmojiDictionary();
+    ~LLEmojiDictionary() = default;
+
     typedef std::map<std::string, std::string> cat2cat_map_t;
     typedef std::map<std::string, const LLEmojiGroup*> cat2group_map_t;
     typedef std::map<llwchar, const LLEmojiDescriptor*> emoji2descr_map_t;
