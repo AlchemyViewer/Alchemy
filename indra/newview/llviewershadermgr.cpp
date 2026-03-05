@@ -570,10 +570,11 @@ void LLViewerShaderMgr::setShaders()
     static LLCachedControl<U32> max_texture_index(gSavedSettings, "RenderMaxTextureIndex", 16);
 
     // when using indexed texture rendering, leave some texture units available for shadow and reflection maps
-    static LLCachedControl<S32> reserved_texture_units(gSavedSettings, "RenderReservedTextureIndices", 14);
+    // We assume we always have atleast 16 texunits available, but we clamp the reserved units to ensure we don't end up with a negative
+    // number of texture channels
+    static LLCachedControl<S32> reserved_texture_units(gSavedSettings, "RenderReservedTextureIndices", 12);
 
-    LLGLSLShader::sIndexedTextureChannels = 4;
-        //llclamp<S32>(max_texture_index, 1, gGLManager.mNumTextureImageUnits-reserved_texture_units);
+    LLGLSLShader::sIndexedTextureChannels = llmax(4, gGLManager.mNumTextureImageUnits - reserved_texture_units);
 
     reentrance = true;
 
