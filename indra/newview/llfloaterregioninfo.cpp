@@ -302,8 +302,8 @@ bool LLFloaterRegionInfo::postBuild()
         mTab->addTabPanel(panel);
     }
 
-    gMessageSystem->setHandlerFunc(
-        "EstateOwnerMessage",
+    gMessageSystem->setHandlerFuncFast(
+        _PREHASH_EstateOwnerMessage,
         &processEstateOwnerRequest);
 
     // Request region info when agent region changes.
@@ -368,10 +368,10 @@ void LLFloaterRegionInfo::requestRegionInfo()
     // so non-owners/non-gods can see the values.
     // Therefore can't use an EstateOwnerMessage JC
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("RequestRegionInfo");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
+    msg->newMessageFast(_PREHASH_RequestRegionInfo);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     gAgent.sendReliableMessage();
 }
 
@@ -450,38 +450,38 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
     F32 terrain_lower_limit;
     bool use_estate_sun;
     F32 sun_hour;
-    msg->getString("RegionInfo", "SimName", sim_name);
-    msg->getU8("RegionInfo", "MaxAgents", agent_limit);
-    msg->getS32("RegionInfo2", "HardMaxAgents", hard_agent_limit);
-    msg->getF32("RegionInfo", "ObjectBonusFactor", object_bonus_factor);
-    msg->getU8("RegionInfo", "SimAccess", sim_access);
+    msg->getStringFast(_PREHASH_RegionInfo, _PREHASH_SimName, sim_name);
+    msg->getU8Fast(_PREHASH_RegionInfo, _PREHASH_MaxAgents, agent_limit);
+    msg->getS32Fast(_PREHASH_RegionInfo2, _PREHASH_HardMaxAgents, hard_agent_limit);
+    msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_ObjectBonusFactor, object_bonus_factor);
+    msg->getU8Fast(_PREHASH_RegionInfo, _PREHASH_SimAccess, sim_access);
     msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_WaterHeight, water_height);
     msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainRaiseLimit, terrain_raise_limit);
     msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainLowerLimit, terrain_lower_limit);
-    msg->getBOOL("RegionInfo", "UseEstateSun", use_estate_sun);
+    msg->getBOOLFast(_PREHASH_RegionInfo, _PREHASH_UseEstateSun, use_estate_sun);
     // actually the "last set" sun hour, not the current sun hour. JC
-    msg->getF32("RegionInfo", "SunHour", sun_hour);
+    msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_SunHour, sun_hour);
     // the only reasonable way to decide if we actually have any data is to
     // check to see if any of these fields have nonzero sizes
-    if (msg->getSize("RegionInfo2", "ProductSKU") > 0 ||
-        msg->getSize("RegionInfo2", "ProductName") > 0)
+    if (msg->getSizeFast(_PREHASH_RegionInfo2, _PREHASH_ProductSKU) > 0 ||
+        msg->getSizeFast(_PREHASH_RegionInfo2, _PREHASH_ProductName) > 0)
     {
-        msg->getString("RegionInfo2", "ProductName", sim_type);
+        msg->getStringFast(_PREHASH_RegionInfo2, _PREHASH_ProductName, sim_type);
         LLTrans::findString(sim_type, sim_type); // try localizing sim product name
     }
 
-    if (msg->has(_PREHASH_RegionInfo3))
+    if (msg->hasFast(_PREHASH_RegionInfo3))
     {
-        msg->getU64("RegionInfo3", "RegionFlagsExtended", region_flags);
+        msg->getU64Fast(_PREHASH_RegionInfo3, _PREHASH_RegionFlagsExtended, region_flags);
     }
     else
     {
         U32 flags = 0;
-        msg->getU32("RegionInfo", "RegionFlags", flags);
+        msg->getU32Fast(_PREHASH_RegionInfo, _PREHASH_RegionFlags, flags);
         region_flags = flags;
     }
 
-    if (msg->has(_PREHASH_RegionInfo5))
+    if (msg->hasFast(_PREHASH_RegionInfo5))
     {
         F32 chat_whisper_range;
         F32 chat_normal_range;
@@ -533,7 +533,7 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
     // detect teen grid for maturity
 
     U32 parent_estate_id;
-    msg->getU32("RegionInfo", "ParentEstateID", parent_estate_id);
+    msg->getU32Fast(_PREHASH_RegionInfo, _PREHASH_ParentEstateID, parent_estate_id);
     bool teen_grid = (parent_estate_id == 5);  // *TODO add field to estate table and test that
     panel->getChildView("access_combo")->setEnabled(gAgent.isGodlike() || (region && region->canManageEstate() && !teen_grid));
     panel->setCtrlsEnabled(allow_modify);
@@ -821,18 +821,18 @@ void LLPanelRegionInfo::sendEstateOwnerMessage(
     const strings_t& strings)
 {
     LL_INFOS() << "Sending estate request '" << request << "'" << LL_ENDL;
-    msg->newMessage("EstateOwnerMessage");
+    msg->newMessageFast(_PREHASH_EstateOwnerMessage);
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
-    msg->nextBlock("MethodData");
-    msg->addString("Method", request);
-    msg->addUUID("Invoice", invoice);
+    msg->nextBlockFast(_PREHASH_MethodData);
+    msg->addStringFast(_PREHASH_Method, request);
+    msg->addUUIDFast(_PREHASH_Invoice, invoice);
     if(strings.empty())
     {
-        msg->nextBlock("ParamList");
-        msg->addString("Parameter", NULL);
+        msg->nextBlockFast(_PREHASH_ParamList);
+        msg->addStringFast(_PREHASH_Parameter, NULL);
     }
     else
     {
@@ -840,8 +840,8 @@ void LLPanelRegionInfo::sendEstateOwnerMessage(
         strings_t::const_iterator end = strings.end();
         for(; it != end; ++it)
         {
-            msg->nextBlock("ParamList");
-            msg->addString("Parameter", *it);
+            msg->nextBlockFast(_PREHASH_ParamList);
+            msg->addStringFast(_PREHASH_Parameter, *it);
         }
     }
     msg->sendReliable(mHost);
@@ -2618,7 +2618,7 @@ bool LLPanelEstateCovenant::refreshFromRegion(LLViewerRegion* region)
     // let the parent class handle the general data collection.
     bool rv = LLPanelRegionInfo::refreshFromRegion(region);
     LLMessageSystem *msg = gMessageSystem;
-    msg->newMessage("EstateCovenantRequest");
+    msg->newMessageFast(_PREHASH_EstateCovenantRequest);
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID,  gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
@@ -2829,18 +2829,18 @@ void LLPanelEstateCovenant::sendChangeCovenantID(const LLUUID &asset_id)
         setCovenantID(asset_id);
 
         LLMessageSystem* msg = gMessageSystem;
-        msg->newMessage("EstateOwnerMessage");
+        msg->newMessageFast(_PREHASH_EstateOwnerMessage);
         msg->nextBlockFast(_PREHASH_AgentData);
         msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
         msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
         msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
 
-        msg->nextBlock("MethodData");
-        msg->addString("Method", "estatechangecovenantid");
-        msg->addUUID("Invoice", LLFloaterRegionInfo::getLastInvoice());
+        msg->nextBlockFast(_PREHASH_MethodData);
+        msg->addStringFast(_PREHASH_Method, "estatechangecovenantid");
+        msg->addUUIDFast(_PREHASH_Invoice, LLFloaterRegionInfo::getLastInvoice());
 
-        msg->nextBlock("ParamList");
-        msg->addString("Parameter", getCovenantID().asString());
+        msg->nextBlockFast(_PREHASH_ParamList);
+        msg->addStringFast(_PREHASH_Parameter, getCovenantID().asString());
         gAgent.sendReliableMessage();
     }
 }
@@ -4018,28 +4018,28 @@ bool LLPanelEstateAccess::accessCoreConfirm(const LLSD& notification, const LLSD
 void LLPanelEstateAccess::sendEstateAccessDelta(U32 flags, const LLUUID& agent_or_group_id)
 {
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("EstateOwnerMessage");
+    msg->newMessageFast(_PREHASH_EstateOwnerMessage);
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
 
-    msg->nextBlock("MethodData");
-    msg->addString("Method", "estateaccessdelta");
-    msg->addUUID("Invoice", LLFloaterRegionInfo::getLastInvoice());
+    msg->nextBlockFast(_PREHASH_MethodData);
+    msg->addStringFast(_PREHASH_Method, "estateaccessdelta");
+    msg->addUUIDFast(_PREHASH_Invoice, LLFloaterRegionInfo::getLastInvoice());
 
     std::string buf;
     gAgent.getID().toString(buf);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buf);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buf);
 
     buf = llformat("%u", flags);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buf);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buf);
 
     agent_or_group_id.toString(buf);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buf);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buf);
 
     gAgent.sendReliableMessage();
 }

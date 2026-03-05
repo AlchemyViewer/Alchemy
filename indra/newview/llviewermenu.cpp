@@ -3847,13 +3847,13 @@ bool callback_freeze(const LLSD& notification, const LLSD& response)
 
         if (avatar)
         {
-            msg->newMessage("FreezeUser");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgent.getID());
-            msg->addUUID("SessionID", gAgent.getSessionID());
-            msg->nextBlock("Data");
-            msg->addUUID("TargetID", avatar_id );
-            msg->addU32("Flags", flags );
+            msg->newMessageFast(_PREHASH_FreezeUser);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->nextBlockFast(_PREHASH_Data);
+            msg->addUUIDFast(_PREHASH_TargetID, avatar_id );
+            msg->addU32Fast(_PREHASH_Flags, flags );
             msg->sendReliable( avatar->getRegion()->getHost() );
         }
     }
@@ -3953,13 +3953,13 @@ bool callback_eject(const LLSD& notification, const LLSD& response)
         if (avatar)
         {
             U32 flags = 0x0;
-            msg->newMessage("EjectUser");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgent.getID() );
-            msg->addUUID("SessionID", gAgent.getSessionID() );
-            msg->nextBlock("Data");
-            msg->addUUID("TargetID", avatar_id );
-            msg->addU32("Flags", flags );
+            msg->newMessageFast(_PREHASH_EjectUser);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->nextBlockFast(_PREHASH_Data);
+            msg->addUUIDFast(_PREHASH_TargetID, avatar_id);
+            msg->addU32Fast(_PREHASH_Flags, flags);
             msg->sendReliable( avatar->getRegion()->getHost() );
         }
     }
@@ -3974,13 +3974,13 @@ bool callback_eject(const LLSD& notification, const LLSD& response)
         if (avatar)
         {
             U32 flags = 0x1;
-            msg->newMessage("EjectUser");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgent.getID() );
-            msg->addUUID("SessionID", gAgent.getSessionID() );
-            msg->nextBlock("Data");
-            msg->addUUID("TargetID", avatar_id );
-            msg->addU32("Flags", flags );
+            msg->newMessageFast(_PREHASH_EjectUser);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->nextBlockFast(_PREHASH_Data);
+            msg->addUUIDFast(_PREHASH_TargetID, avatar_id);
+            msg->addU32Fast(_PREHASH_Flags, flags);
             msg->sendReliable( avatar->getRegion()->getHost() );
         }
     }
@@ -4922,27 +4922,27 @@ void handle_claim_public_land()
     LLVector3 east_north = gAgent.getPosAgentFromGlobal(east_north_global);
 
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("GodlikeMessage");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
+    msg->newMessageFast(_PREHASH_GodlikeMessage);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
-    msg->nextBlock("MethodData");
-    msg->addString("Method", "claimpublicland");
-    msg->addUUID("Invoice", LLUUID::null);
+    msg->nextBlockFast(_PREHASH_MethodData);
+    msg->addStringFast(_PREHASH_Method, "claimpublicland");
+    msg->addUUIDFast(_PREHASH_Invoice, LLUUID::null);
     std::string buffer;
     buffer = llformat( "%f", west_south.mV[VX]);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buffer);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buffer);
     buffer = llformat( "%f", west_south.mV[VY]);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buffer);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buffer);
     buffer = llformat( "%f", east_north.mV[VX]);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buffer);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buffer);
     buffer = llformat( "%f", east_north.mV[VY]);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buffer);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buffer);
     gAgent.sendReliableMessage();
 }
 

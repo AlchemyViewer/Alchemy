@@ -166,19 +166,19 @@ void LLPanelDirPlaces::queryCore(const std::string& name, S32 category, U32 flag
 
     LLMessageSystem* msg = gMessageSystem;
 
-    msg->newMessage("DirPlacesQuery");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
-    msg->nextBlock("QueryData");
-    msg->addUUID("QueryID", getSearchID());
-    msg->addString("QueryText", name);
-    msg->addU32("QueryFlags", flags);
-    msg->addS8("Category", (S8)category);
+    msg->newMessageFast(_PREHASH_DirPlacesQuery);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_QueryData);
+    msg->addUUIDFast(_PREHASH_QueryID, getSearchID());
+    msg->addStringFast(_PREHASH_QueryText, name);
+    msg->addU32Fast(_PREHASH_QueryFlags, flags);
+    msg->addS8Fast(_PREHASH_Category, (S8)category);
     // No longer support queries by region name, too many regions
     // for combobox, no easy way to do autocomplete. JC
-    msg->addString("SimName", "");
-    msg->addS32Fast(_PREHASH_QueryStart,mSearchStart);
+    msg->addStringFast(_PREHASH_SimName, "");
+    msg->addS32Fast(_PREHASH_QueryStart, mSearchStart);
     gAgent.sendReliableMessage();
 }
 

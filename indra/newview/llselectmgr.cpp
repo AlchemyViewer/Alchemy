@@ -3052,11 +3052,11 @@ void LLSelectMgr::packGodlikeHead(void* user_data)
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-    msg->addUUID("TransactionID", LLUUID::null);
+    msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null);
     godlike_request_t* data = (godlike_request_t*)user_data;
-    msg->nextBlock("MethodData");
-    msg->addString("Method", data->first);
-    msg->addUUID("Invoice", LLUUID::null);
+    msg->nextBlockFast(_PREHASH_MethodData);
+    msg->addStringFast(_PREHASH_Method, data->first);
+    msg->addUUIDFast(_PREHASH_Invoice, LLUUID::null);
 
     // The parameters used to be restricted to either string or
     // integer. This mimics that behavior under the new 'string-only'
@@ -3065,8 +3065,8 @@ void LLSelectMgr::packGodlikeHead(void* user_data)
     // packObjectIDAsParam() method.
     if(data->second.size() > 0)
     {
-        msg->nextBlock("ParamList");
-        msg->addString("Parameter", data->second);
+        msg->nextBlockFast(_PREHASH_ParamList);
+        msg->addStringFast(_PREHASH_Parameter, data->second);
     }
 }
 
@@ -3091,8 +3091,8 @@ void LLSelectMgr::logDetachRequest(LLSelectNode* node, void *)
 void LLSelectMgr::packObjectIDAsParam(LLSelectNode* node, void *)
 {
     std::string buf = llformat("%u", node->getObject()->getLocalID());
-    gMessageSystem->nextBlock("ParamList");
-    gMessageSystem->addString("Parameter", buf);
+    gMessageSystem->nextBlockFast(_PREHASH_ParamList);
+    gMessageSystem->addStringFast(_PREHASH_Parameter, buf);
 }
 
 //-----------------------------------------------------------------------------
@@ -5679,14 +5679,14 @@ void LLSelectMgr::packObjectClickAction(LLSelectNode* node, void *user_data)
 {
     gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
     gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, node->getObject()->getLocalID() );
-    gMessageSystem->addU8("ClickAction", node->getObject()->getClickAction());
+    gMessageSystem->addU8Fast(_PREHASH_ClickAction, node->getObject()->getClickAction());
 }
 
 void LLSelectMgr::packObjectIncludeInSearch(LLSelectNode* node, void *user_data)
 {
     gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
     gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, node->getObject()->getLocalID() );
-    gMessageSystem->addBOOL("IncludeInSearch", node->getObject()->getIncludeInSearch());
+    gMessageSystem->addBOOLFast(_PREHASH_IncludeInSearch, node->getObject()->getIncludeInSearch());
 }
 
 // static
@@ -6293,7 +6293,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 {
     bool reset_list;
-    msg->getBOOL("Header", "ResetList", reset_list);
+    msg->getBOOLFast(_PREHASH_Header, _PREHASH_ResetList, reset_list);
 
     if (reset_list)
     {
@@ -6305,11 +6305,11 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
     LLViewerObject* object;
     std::vector<LLViewerObject*> objects;
     S32 i;
-    S32 block_count = msg->getNumberOfBlocks("Data");
+    S32 block_count = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
     for (i = 0; i < block_count; i++)
     {
-        msg->getS32("Data", "LocalID", local_id, i);
+        msg->getS32Fast(_PREHASH_Data, _PREHASH_LocalID, local_id, i);
 
         gObjectList.getUUIDFromLocal(full_id,
                                      local_id,
@@ -8884,7 +8884,7 @@ void LLSelectMgr::sendSelectionMove()
     }
 
     // prepare first bulk message
-    gMessageSystem->newMessage("MultipleObjectUpdate");
+    gMessageSystem->newMessageFast(_PREHASH_MultipleObjectUpdate);
     packAgentAndSessionID(&update_type);
 
     LLViewerObject *obj = NULL;
@@ -8905,7 +8905,7 @@ void LLSelectMgr::sendSelectionMove()
             // send sim the current message and start new one
             gMessageSystem->sendReliable(last_region->getHost());
             objects_in_this_packet = 0;
-            gMessageSystem->newMessage("MultipleObjectUpdate");
+            gMessageSystem->newMessageFast(_PREHASH_MultipleObjectUpdate);
             packAgentAndSessionID(&update_type);
         }
 

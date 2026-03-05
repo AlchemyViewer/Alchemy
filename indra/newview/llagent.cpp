@@ -3231,13 +3231,13 @@ bool LLAgent::setGroupContribution(const LLUUID& group_id, S32 contribution)
         {
             mGroups[i].mContribution = contribution;
             LLMessageSystem* msg = gMessageSystem;
-            msg->newMessage("SetGroupContribution");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgentID);
-            msg->addUUID("SessionID", gAgentSessionID);
-            msg->nextBlock("Data");
-            msg->addUUID("GroupID", group_id);
-            msg->addS32("Contribution", contribution);
+            msg->newMessageFast(_PREHASH_SetGroupContribution);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgentID);
+            msg->addUUIDFast(_PREHASH_SessionID, gAgentSessionID);
+            msg->nextBlockFast(_PREHASH_Data);
+            msg->addUUIDFast(_PREHASH_GroupID, group_id);
+            msg->addS32Fast(_PREHASH_Contribution, contribution);
             sendReliableMessage();
             return true;
         }
@@ -3255,15 +3255,15 @@ bool LLAgent::setUserGroupFlags(const LLUUID& group_id, bool accept_notices, boo
             mGroups[i].mAcceptNotices = accept_notices;
             mGroups[i].mListInProfile = list_in_profile;
             LLMessageSystem* msg = gMessageSystem;
-            msg->newMessage("SetGroupAcceptNotices");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgentID);
-            msg->addUUID("SessionID", gAgentSessionID);
-            msg->nextBlock("Data");
-            msg->addUUID("GroupID", group_id);
-            msg->addBOOL("AcceptNotices", accept_notices);
-            msg->nextBlock("NewData");
-            msg->addBOOL("ListInProfile", list_in_profile);
+            msg->newMessageFast(_PREHASH_SetGroupAcceptNotices);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgentID);
+            msg->addUUIDFast(_PREHASH_SessionID, gAgentSessionID);
+            msg->nextBlockFast(_PREHASH_Data);
+            msg->addUUIDFast(_PREHASH_GroupID, group_id);
+            msg->addBOOLFast(_PREHASH_AcceptNotices, accept_notices);
+            msg->nextBlockFast(_PREHASH_NewData);
+            msg->addBOOLFast(_PREHASH_ListInProfile, list_in_profile);
             sendReliableMessage();
             return true;
         }
@@ -3730,9 +3730,9 @@ void LLAgent::processAgentGroupDataUpdate(LLMessageSystem *msg, void **)
     {
         msg->getUUIDFast(_PREHASH_GroupData, _PREHASH_GroupID, group.mID, i);
         msg->getUUIDFast(_PREHASH_GroupData, _PREHASH_GroupInsigniaID, group.mInsigniaID, i);
-        msg->getU64(_PREHASH_GroupData, "GroupPowers", group.mPowers, i);
-        msg->getBOOL(_PREHASH_GroupData, "AcceptNotices", group.mAcceptNotices, i);
-        msg->getS32(_PREHASH_GroupData, "Contribution", group.mContribution, i);
+        msg->getU64Fast(_PREHASH_GroupData, _PREHASH_GroupPowers, group.mPowers, i);
+        msg->getBOOLFast(_PREHASH_GroupData, _PREHASH_AcceptNotices, group.mAcceptNotices, i);
+        msg->getS32Fast(_PREHASH_GroupData, _PREHASH_Contribution, group.mContribution, i);
         msg->getStringFast(_PREHASH_GroupData, _PREHASH_GroupName, group.mName, i);
 
         if(group.mID.notNull())
@@ -3838,8 +3838,8 @@ void LLAgent::processAgentDataUpdate(LLMessageSystem *msg, void **)
     if(active_id.notNull())
     {
         gAgent.mGroupID = active_id;
-        msg->getU64(_PREHASH_AgentData, "GroupPowers", gAgent.mGroupPowers);
-        msg->getString(_PREHASH_AgentData, _PREHASH_GroupName, gAgent.mGroupName);
+        msg->getU64Fast(_PREHASH_AgentData, _PREHASH_GroupPowers, gAgent.mGroupPowers);
+        msg->getStringFast(_PREHASH_AgentData, _PREHASH_GroupName, gAgent.mGroupName);
     }
     else
     {
@@ -3854,19 +3854,19 @@ void LLAgent::processAgentDataUpdate(LLMessageSystem *msg, void **)
 // static
 void LLAgent::processScriptControlChange(LLMessageSystem *msg, void **)
 {
-    S32 block_count = msg->getNumberOfBlocks("Data");
+    S32 block_count = msg->getNumberOfBlocksFast(_PREHASH_Data);
     for (S32 block_index = 0; block_index < block_count; block_index++)
     {
         bool take_controls;
         U32 controls;
         bool passon;
         U32 i;
-        msg->getBOOL("Data", "TakeControls", take_controls, block_index);
+        msg->getBOOLFast(_PREHASH_Data, _PREHASH_TakeControls, take_controls, block_index);
         if (take_controls)
         {
             // take controls
-            msg->getU32("Data", "Controls", controls, block_index );
-            msg->getBOOL("Data", "PassToAgent", passon, block_index );
+            msg->getU32Fast(_PREHASH_Data, _PREHASH_Controls, controls, block_index );
+            msg->getBOOLFast(_PREHASH_Data, _PREHASH_PassToAgent, passon, block_index );
             for (i = 0; i < TOTAL_CONTROLS; i++)
             {
                 if (controls & ( 1 << i))
@@ -3885,8 +3885,8 @@ void LLAgent::processScriptControlChange(LLMessageSystem *msg, void **)
         else
         {
             // release controls
-            msg->getU32("Data", "Controls", controls, block_index );
-            msg->getBOOL("Data", "PassToAgent", passon, block_index );
+            msg->getU32Fast(_PREHASH_Data, _PREHASH_Controls, controls, block_index );
+            msg->getBOOLFast(_PREHASH_Data, _PREHASH_PassToAgent, passon, block_index );
             for (i = 0; i < TOTAL_CONTROLS; i++)
             {
                 if (controls & ( 1 << i))
@@ -4000,10 +4000,10 @@ bool LLAgent::isControlGrabbed(S32 control_index) const
 
 void LLAgent::forceReleaseControls()
 {
-    gMessageSystem->newMessage("ForceScriptControlRelease");
-    gMessageSystem->nextBlock("AgentData");
-    gMessageSystem->addUUID("AgentID", getID());
-    gMessageSystem->addUUID("SessionID", getSessionID());
+    gMessageSystem->newMessageFast(_PREHASH_ForceScriptControlRelease);
+    gMessageSystem->nextBlockFast(_PREHASH_AgentData);
+    gMessageSystem->addUUIDFast(_PREHASH_AgentID, getID());
+    gMessageSystem->addUUIDFast(_PREHASH_SessionID, getSessionID());
     sendReliableMessage();
 }
 
@@ -4357,19 +4357,19 @@ void LLAgent::teleportRequest(const U64& region_handle, const LLVector3& pos_loc
         LL_INFOS("Teleport") << "Sending TeleportLocationRequest: '" << region_handle << "':"
                              << pos_local << LL_ENDL;
         LLMessageSystem* msg = gMessageSystem;
-        msg->newMessage("TeleportLocationRequest");
+        msg->newMessageFast(_PREHASH_TeleportLocationRequest);
         msg->nextBlockFast(_PREHASH_AgentData);
         msg->addUUIDFast(_PREHASH_AgentID, getID());
         msg->addUUIDFast(_PREHASH_SessionID, getSessionID());
         msg->nextBlockFast(_PREHASH_Info);
-        msg->addU64("RegionHandle", region_handle);
-        msg->addVector3("Position", pos_local);
+        msg->addU64Fast(_PREHASH_RegionHandle, region_handle);
+        msg->addVector3Fast(_PREHASH_Position, pos_local);
 //      LLVector3 look_at(0,1,0);
 //      if (look_at_from_camera)
 //      {
 //          look_at = LLViewerCamera::getInstance()->getAtAxis();
 //      }
-        msg->addVector3("LookAt", look_at);
+        msg->addVector3Fast(_PREHASH_LookAt, look_at);
         sendReliableMessage();
     }
 }
@@ -4466,7 +4466,7 @@ void LLAgent::doTeleportViaLure(const LLUUID& lure_id, bool godlike)
         msg->addUUIDFast(_PREHASH_SessionID, getSessionID());
         msg->addUUIDFast(_PREHASH_LureID, lure_id);
         // teleport_flags is a legacy field, now derived sim-side:
-        msg->addU32("TeleportFlags", teleport_flags);
+        msg->addU32Fast(_PREHASH_TeleportFlags, teleport_flags);
         sendReliableMessage();
     }
 }
@@ -4483,7 +4483,7 @@ void LLAgent::teleportCancel()
 
             // send the message
             LLMessageSystem* msg = gMessageSystem;
-            msg->newMessage("TeleportCancel");
+            msg->newMessageFast(_PREHASH_TeleportCancel);
             msg->nextBlockFast(_PREHASH_Info);
             msg->addUUIDFast(_PREHASH_AgentID, getID());
             msg->addUUIDFast(_PREHASH_SessionID, getSessionID());
@@ -4973,7 +4973,7 @@ void LLAgent::sendAgentUpdateUserInfoMessage(const std::string& directory_visibi
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, getID());
     gMessageSystem->addUUIDFast(_PREHASH_SessionID, getSessionID());
     gMessageSystem->nextBlockFast(_PREHASH_UserData);
-    gMessageSystem->addString("DirectoryVisibility", directory_visibility);
+    gMessageSystem->addStringFast(_PREHASH_DirectoryVisibility, directory_visibility);
     gAgent.sendReliableMessage();
 
 }

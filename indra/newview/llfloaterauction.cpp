@@ -255,14 +255,14 @@ void LLFloaterAuction::onClickStartAuction(void* data)
     }
     LLMessageSystem* msg = gMessageSystem;
 
-    msg->newMessage("ViewerStartAuction");
+    msg->newMessageFast(_PREHASH_ViewerStartAuction);
 
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
-    msg->nextBlock("ParcelData");
-    msg->addS32("LocalID", self->mParcelID);
-    msg->addUUID("SnapshotID", self->mImageID);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_ParcelData);
+    msg->addS32Fast(_PREHASH_LocalID, self->mParcelID);
+    msg->addUUIDFast(_PREHASH_SnapshotID, self->mImageID);
     msg->sendReliable(self->mParcelHost);
 
     // clean up floater, and get out
@@ -411,7 +411,7 @@ void LLFloaterAuction::clearParcelAccessList(LLParcel* parcel, LLViewerRegion* r
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
     msg->nextBlockFast(_PREHASH_Data);
     msg->addU32Fast(_PREHASH_Flags, list);
-    msg->addS32(_PREHASH_LocalID, parcel->getLocalID() );
+    msg->addS32Fast(_PREHASH_LocalID, parcel->getLocalID() );
     msg->addUUIDFast(_PREHASH_TransactionID, transactionUUID);
     msg->addS32Fast(_PREHASH_SequenceID, 1);            // sequence_id
     msg->addS32Fast(_PREHASH_Sections, 0);              // num_sections

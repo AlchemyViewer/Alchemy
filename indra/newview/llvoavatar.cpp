@@ -9639,7 +9639,7 @@ void LLVOAvatar::parseAppearanceMessage(LLMessageSystem* mesgsys, LLAppearanceMe
     parseTEMessage(mesgsys, _PREHASH_ObjectData, -1, contents.mTEContents);
 
     // Parse the AppearanceData field, if any.
-    if (mesgsys->has(_PREHASH_AppearanceData))
+    if (mesgsys->hasFast(_PREHASH_AppearanceData))
     {
         U8 av_u8;
         mesgsys->getU8Fast(_PREHASH_AppearanceData, _PREHASH_AppearanceVersion, av_u8, 0);
@@ -9652,7 +9652,7 @@ void LLVOAvatar::parseAppearanceMessage(LLMessageSystem* mesgsys, LLAppearanceMe
 
     // Parse the AppearanceHover field, if any.
     contents.mHoverOffsetWasSet = false;
-    if (mesgsys->has(_PREHASH_AppearanceHover))
+    if (mesgsys->hasFast(_PREHASH_AppearanceHover))
     {
         LLVector3 hover;
         mesgsys->getVector3Fast(_PREHASH_AppearanceHover, _PREHASH_HoverHeight, hover);

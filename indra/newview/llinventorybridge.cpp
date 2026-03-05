@@ -550,7 +550,7 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
             msg->nextBlockFast(_PREHASH_InventoryData);
             msg->addUUIDFast(_PREHASH_ItemID, item->getUUID());
             msg->addUUIDFast(_PREHASH_FolderID, trash_id);
-            msg->addString("NewName", NULL);
+            msg->addStringFast(_PREHASH_NewName, nullptr);
             if(msg->isSendFullFast(_PREHASH_InventoryData))
             {
                 start_new_message = true;
@@ -586,7 +586,7 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
                 msg->nextBlockFast(_PREHASH_AgentData);
                 msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
                 msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-                msg->addBOOL("Stamp", true);
+                msg->addBOOLFast(_PREHASH_Stamp, true);
             }
             msg->nextBlockFast(_PREHASH_InventoryData);
             msg->addUUIDFast(_PREHASH_FolderID, cat->getUUID());
@@ -1975,7 +1975,7 @@ void LLItemBridge::restoreToWorld()
     if (itemp)
     {
         LLMessageSystem* msg = gMessageSystem;
-        msg->newMessage("RezRestoreToWorld");
+        msg->newMessageFast(_PREHASH_RezRestoreToWorld);
         msg->nextBlockFast(_PREHASH_AgentData);
         msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
         msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());

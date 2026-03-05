@@ -549,7 +549,7 @@ LLParcelSelectionHandle LLViewerParcelMgr::selectLand(const LLVector3d &corner1,
     msg->addF32Fast(_PREHASH_South, wsb_region.mV[VY] );
     msg->addF32Fast(_PREHASH_East,  ent_region.mV[VX] );
     msg->addF32Fast(_PREHASH_North, ent_region.mV[VY] );
-    msg->addBOOL("SnapSelection", snap_selection);
+    msg->addBOOLFast(_PREHASH_SnapSelection, snap_selection);
     msg->sendReliable( region->getHost() );
 
     mRequestResult = PARCEL_RESULT_NO_DATA;
@@ -957,7 +957,7 @@ void LLViewerParcelMgr::sendParcelAccessListRequest(U32 flags)
     msg->nextBlockFast(_PREHASH_Data);
     msg->addS32Fast(_PREHASH_SequenceID, 0);
     msg->addU32Fast(_PREHASH_Flags, flags);
-    msg->addS32("LocalID", mCurrentParcel->getLocalID() );
+    msg->addS32Fast(_PREHASH_LocalID, mCurrentParcel->getLocalID() );
     msg->sendReliable( region->getHost() );
 }
 
@@ -975,13 +975,13 @@ void LLViewerParcelMgr::sendParcelDwellRequest()
     LLMessageSystem *msg = gMessageSystem;
 
     // Only the headers differ
-    msg->newMessage("ParcelDwellRequest");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID() );
-    msg->addUUID("SessionID", gAgent.getSessionID());
-    msg->nextBlock("Data");
-    msg->addS32("LocalID", mCurrentParcel->getLocalID());
-    msg->addUUID("ParcelID", LLUUID::null); // filled in on simulator
+    msg->newMessageFast(_PREHASH_ParcelDwellRequest);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_Data);
+    msg->addS32Fast(_PREHASH_LocalID, mCurrentParcel->getLocalID());
+    msg->addUUIDFast(_PREHASH_ParcelID, LLUUID::null); // filled in on simulator
     msg->sendReliable( region->getHost() );
 }
 
@@ -1042,13 +1042,13 @@ bool callback_god_force_owner(const LLSD& notification, const LLSD& response)
     if(0 == option)
     {
         LLMessageSystem* msg = gMessageSystem;
-        msg->newMessage("ParcelGodForceOwner");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgent.getID());
-        msg->addUUID("SessionID", gAgent.getSessionID());
-        msg->nextBlock("Data");
-        msg->addUUID("OwnerID", notification["payload"]["owner_id"].asUUID());
-        msg->addS32( "LocalID", notification["payload"]["parcel_local_id"].asInteger());
+        msg->newMessageFast(_PREHASH_ParcelGodForceOwner);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addUUIDFast(_PREHASH_OwnerID, notification["payload"]["owner_id"].asUUID());
+        msg->addS32Fast(_PREHASH_LocalID, notification["payload"]["parcel_local_id"].asInteger());
         msg->sendReliable(LLHost(notification["payload"]["region_host"].asString()));
     }
     return false;
@@ -1069,12 +1069,12 @@ void LLViewerParcelMgr::sendParcelGodForceToContent()
     }
 
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("ParcelGodMarkAsContent");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
-    msg->nextBlock("ParcelData");
-    msg->addS32("LocalID", mCurrentParcel->getLocalID());
+    msg->newMessageFast(_PREHASH_ParcelGodMarkAsContent);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_ParcelData);
+    msg->addS32Fast(_PREHASH_LocalID, mCurrentParcel->getLocalID());
     msg->sendReliable(region->getHost());
 }
 
@@ -1097,13 +1097,13 @@ void LLViewerParcelMgr::sendParcelRelease()
     //if (god_force) flags |= PR_GOD_FORCE;
 
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("ParcelRelease");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID() );
-    msg->addUUID("SessionID", gAgent.getSessionID() );
-    msg->nextBlock("Data");
-    msg->addS32("LocalID", mCurrentParcel->getLocalID() );
-    //msg->addU32("Flags", flags);
+    msg->newMessageFast(_PREHASH_ParcelRelease);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
+    msg->nextBlockFast(_PREHASH_Data);
+    msg->addS32Fast(_PREHASH_LocalID, mCurrentParcel->getLocalID() );
+    //msg->addU32Fast(_PREHASH_Flags, flags);
     msg->sendReliable( region->getHost() );
 
     // Blitz selection, since the parcel might be non-rectangular, and
@@ -1210,32 +1210,32 @@ void LLViewerParcelMgr::sendParcelBuy(ParcelBuyInfo* info)
 {
     // send the message
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage(info->mIsClaim ? "ParcelClaim" : "ParcelBuy");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", info->mAgent);
-    msg->addUUID("SessionID", info->mSession);
-    msg->nextBlock("Data");
-    msg->addUUID("GroupID", info->mGroup);
-    msg->addBOOL("IsGroupOwned", info->mIsGroupOwned);
+    msg->newMessageFast(info->mIsClaim ? _PREHASH_ParcelClaim : _PREHASH_ParcelBuy);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, info->mAgent);
+    msg->addUUIDFast(_PREHASH_SessionID, info->mSession);
+    msg->nextBlockFast(_PREHASH_Data);
+    msg->addUUIDFast(_PREHASH_GroupID, info->mGroup);
+    msg->addBOOLFast(_PREHASH_IsGroupOwned, info->mIsGroupOwned);
     if (!info->mIsClaim)
     {
-        msg->addBOOL("RemoveContribution", info->mRemoveContribution);
-        msg->addS32("LocalID", info->mParcelID);
+        msg->addBOOLFast(_PREHASH_RemoveContribution, info->mRemoveContribution);
+        msg->addS32Fast(_PREHASH_LocalID, info->mParcelID);
     }
-    msg->addBOOL("Final", true);    // don't allow escrow buys
+    msg->addBOOLFast(_PREHASH_Final, true);    // don't allow escrow buys
     if (info->mIsClaim)
     {
-        msg->nextBlock("ParcelData");
-        msg->addF32("West",  info->mWest);
-        msg->addF32("South", info->mSouth);
-        msg->addF32("East",  info->mEast);
-        msg->addF32("North", info->mNorth);
+        msg->nextBlockFast(_PREHASH_ParcelData);
+        msg->addF32Fast(_PREHASH_West, info->mWest);
+        msg->addF32Fast(_PREHASH_South, info->mSouth);
+        msg->addF32Fast(_PREHASH_East, info->mEast);
+        msg->addF32Fast(_PREHASH_North, info->mNorth);
     }
     else // ParcelBuy
     {
-        msg->nextBlock("ParcelData");
-        msg->addS32("Price",info->mPrice);
-        msg->addS32("Area",info->mArea);
+        msg->nextBlockFast(_PREHASH_ParcelData);
+        msg->addS32Fast(_PREHASH_Price, info->mPrice);
+        msg->addS32Fast(_PREHASH_Area, info->mArea);
     }
     msg->sendReliable(info->mHost);
 }
@@ -1267,14 +1267,14 @@ void LLViewerParcelMgr::sendParcelDeed(const LLUUID& group_id)
     }
 
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("ParcelDeedToGroup");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID() );
-    msg->addUUID("SessionID", gAgent.getSessionID() );
-    msg->nextBlock("Data");
-    msg->addUUID("GroupID", group_id );
-    msg->addS32("LocalID", mCurrentParcel->getLocalID() );
-    //msg->addU32("JoinNeighbors", join);
+    msg->newMessageFast(_PREHASH_ParcelDeedToGroup);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
+    msg->nextBlockFast(_PREHASH_Data);
+    msg->addUUIDFast(_PREHASH_GroupID, group_id );
+    msg->addS32Fast(_PREHASH_LocalID, mCurrentParcel->getLocalID() );
+    //msg->addU32Fast(_PREHASH_JoinNeighbors, join);
     msg->sendReliable( region->getHost() );
 }
 
@@ -1363,7 +1363,7 @@ void LLViewerParcelMgr::sendParcelPropertiesUpdate(LLParcel* parcel)
         msg->addS32Fast(_PREHASH_LocalID, parcel->getLocalID() );
 
         U32 message_flags = 0x01;
-        msg->addU32("Flags", message_flags);
+        msg->addU32Fast(_PREHASH_Flags, message_flags);
 
         parcel->packMessage(msg);
 
@@ -1478,7 +1478,7 @@ void LLViewerParcelMgr::setHoverParcel(const LLVector3d& pos)
         msg->addF32Fast(_PREHASH_South, south);
         msg->addF32Fast(_PREHASH_East, east);
         msg->addF32Fast(_PREHASH_North, north);
-        msg->addBOOL("SnapSelection", false);
+        msg->addBOOLFast(_PREHASH_SnapSelection, false);
         msg->sendReliable(region->getHost());
 
         mHoverRequestResult = PARCEL_RESULT_NO_DATA;
@@ -1620,7 +1620,7 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
         return;
     }
 
-    msg->getBOOL("ParcelData", "SnapSelection", snap_selection);
+    msg->getBOOLFast(_PREHASH_ParcelData, _PREHASH_SnapSelection, snap_selection);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_SelfCount, self_count);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_OtherCount, other_count);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_PublicCount, public_count);
@@ -1635,9 +1635,9 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
     msg->getVector3Fast(_PREHASH_ParcelData, _PREHASH_AABBMax, aabb_max);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_Area, area);
     //msg->getUUIDFast( _PREHASH_ParcelData, _PREHASH_BuyerID, buyer_id);
-    msg->getU8("ParcelData", "Status", status);
-    msg->getS32("ParcelData", "SimWideMaxPrims", sw_max_prims);
-    msg->getS32("ParcelData", "SimWideTotalPrims", sw_total_prims);
+    msg->getU8Fast(_PREHASH_ParcelData, _PREHASH_Status, status);
+    msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_SimWideMaxPrims, sw_max_prims);
+    msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_SimWideTotalPrims, sw_total_prims);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_MaxPrims, max_prims);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_TotalPrims, total_prims);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_OwnerPrims, owner_prims);
@@ -1655,23 +1655,23 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
         msg->getBOOLFast(_PREHASH_AgeVerificationBlock, _PREHASH_RegionDenyAgeUnverified, region_deny_age_unverified_override);
     }
 
-    if (msg->getNumberOfBlocks(_PREHASH_RegionAllowAccessBlock))
+    if (msg->getNumberOfBlocksFast(_PREHASH_RegionAllowAccessBlock))
     {
         msg->getBOOLFast(_PREHASH_RegionAllowAccessBlock, _PREHASH_RegionAllowAccessOverride, region_allow_access_override);
     }
 
-    if (msg->getNumberOfBlocks(_PREHASH_ParcelExtendedFlags))
+    if (msg->getNumberOfBlocksFast(_PREHASH_ParcelExtendedFlags))
     {
         msg->getU32Fast(_PREHASH_ParcelExtendedFlags, _PREHASH_Flags, extended_flags);
      }
 
-    if (msg->getNumberOfBlocks(_PREHASH_ParcelEnvironmentBlock))
+    if (msg->getNumberOfBlocksFast(_PREHASH_ParcelEnvironmentBlock))
     {
         msg->getS32Fast(_PREHASH_ParcelEnvironmentBlock, _PREHASH_ParcelEnvironmentVersion, parcel_environment_version);
         msg->getBOOLFast(_PREHASH_ParcelEnvironmentBlock, _PREHASH_RegionAllowEnvironmentOverride, region_allow_environment_override);
     }
 
-    msg->getS32("ParcelData", "OtherCleanTime", other_clean_time );
+    msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_OtherCleanTime, other_clean_time );
 
     LL_DEBUGS("ParcelMgr") << "Processing parcel " << local_id << " update, target(sequence): " << sequence_id << LL_ENDL;
 
@@ -2113,16 +2113,16 @@ void LLViewerParcelMgr::processParcelAccessListReply(LLMessageSystem *msg, void 
 void LLViewerParcelMgr::processParcelDwellReply(LLMessageSystem* msg, void**)
 {
     LLUUID agent_id;
-    msg->getUUID("AgentData", "AgentID", agent_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
 
     S32 local_id;
-    msg->getS32("Data", "LocalID", local_id);
+    msg->getS32Fast(_PREHASH_Data, _PREHASH_LocalID, local_id);
 
     LLUUID parcel_id;
-    msg->getUUID("Data", "ParcelID", parcel_id);
+    msg->getUUIDFast(_PREHASH_Data, _PREHASH_ParcelID, parcel_id);
 
     F32 dwell;
-    msg->getF32("Data", "Dwell", dwell);
+    msg->getF32Fast(_PREHASH_Data, _PREHASH_Dwell, dwell);
 
     if (local_id == LLViewerParcelMgr::getInstance()->mCurrentParcel->getLocalID())
     {
@@ -2191,7 +2191,7 @@ void LLViewerParcelMgr::sendParcelAccessListUpdate(U32 flags, const LLAccessEntr
             msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
             msg->nextBlockFast(_PREHASH_Data);
             msg->addU32Fast(_PREHASH_Flags, flags);
-            msg->addS32(_PREHASH_LocalID,  parcel_local_id);
+            msg->addS32Fast(_PREHASH_LocalID,  parcel_local_id);
             msg->addUUIDFast(_PREHASH_TransactionID, transactionUUID);
             msg->addS32Fast(_PREHASH_SequenceID, sequence_id);
             msg->addS32Fast(_PREHASH_Sections, num_sections);
@@ -2435,15 +2435,15 @@ bool LLViewerParcelMgr::callbackDivideLand(const LLSD& notification, const LLSD&
         LLVector3 east_north = region->getPosRegionFromGlobal(east_north_d);
 
         LLMessageSystem* msg = gMessageSystem;
-        msg->newMessage("ParcelDivide");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgent.getID());
-        msg->addUUID("SessionID", gAgent.getSessionID());
-        msg->nextBlock("ParcelData");
-        msg->addF32("West", west_south.mV[VX]);
-        msg->addF32("South", west_south.mV[VY]);
-        msg->addF32("East", east_north.mV[VX]);
-        msg->addF32("North", east_north.mV[VY]);
+        msg->newMessageFast(_PREHASH_ParcelDivide);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        msg->nextBlockFast(_PREHASH_ParcelData);
+        msg->addF32Fast(_PREHASH_West, west_south.mV[VX]);
+        msg->addF32Fast(_PREHASH_South, west_south.mV[VY]);
+        msg->addF32Fast(_PREHASH_East, east_north.mV[VX]);
+        msg->addF32Fast(_PREHASH_North, east_north.mV[VY]);
         msg->sendReliable(region->getHost());
     }
     return false;
@@ -2498,15 +2498,15 @@ bool LLViewerParcelMgr::callbackJoinLand(const LLSD& notification, const LLSD& r
         LLVector3 east_north = region->getPosRegionFromGlobal(east_north_d);
 
         LLMessageSystem* msg = gMessageSystem;
-        msg->newMessage("ParcelJoin");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgent.getID());
-        msg->addUUID("SessionID", gAgent.getSessionID());
-        msg->nextBlock("ParcelData");
-        msg->addF32("West", west_south.mV[VX]);
-        msg->addF32("South", west_south.mV[VY]);
-        msg->addF32("East", east_north.mV[VX]);
-        msg->addF32("North", east_north.mV[VY]);
+        msg->newMessageFast(_PREHASH_ParcelJoin);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        msg->nextBlockFast(_PREHASH_ParcelData);
+        msg->addF32Fast(_PREHASH_West, west_south.mV[VX]);
+        msg->addF32Fast(_PREHASH_South, west_south.mV[VY]);
+        msg->addF32Fast(_PREHASH_East, east_north.mV[VX]);
+        msg->addF32Fast(_PREHASH_North, east_north.mV[VY]);
         msg->sendReliable(region->getHost());
     }
     return false;
@@ -2566,12 +2566,12 @@ void LLViewerParcelMgr::reclaimParcel()
        && regionp && (regionp->getOwner() == gAgent.getID()))
     {
         LLMessageSystem* msg = gMessageSystem;
-        msg->newMessage("ParcelReclaim");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgent.getID());
-        msg->addUUID("SessionID", gAgent.getSessionID());
-        msg->nextBlock("Data");
-        msg->addS32("LocalID", parcel->getLocalID());
+        msg->newMessageFast(_PREHASH_ParcelReclaim);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addS32Fast(_PREHASH_LocalID, parcel->getLocalID());
         msg->sendReliable(regionp->getHost());
     }
 }
@@ -2598,9 +2598,9 @@ void LLViewerParcelMgr::buyPass()
 
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_ParcelBuyPass);
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->nextBlockFast(_PREHASH_ParcelData);
     msg->addS32Fast(_PREHASH_LocalID, parcel->getLocalID() );
     msg->sendReliable( region->getHost() );

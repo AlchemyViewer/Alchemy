@@ -1770,7 +1770,7 @@ void    process_start_ping_check(LLMessageSystem *msgsystem, void** /*user_data*
     // Send off the response
     msgsystem->newMessageFast(_PREHASH_CompletePingCheck);
     msgsystem->nextBlockFast(_PREHASH_PingID);
-    msgsystem->addU8(_PREHASH_PingID, ping_id);
+    msgsystem->addU8Fast(_PREHASH_PingID, ping_id);
     msgsystem->sendMessage(msgsystem->getSender());
 }
 
@@ -2004,17 +2004,17 @@ void LLMessageSystem::processUseCircuitCode(LLMessageSystem* msg,
 void LLMessageSystem::processError(LLMessageSystem* msg, void**)
 {
     S32 error_code = 0;
-    msg->getS32("Data", "Code", error_code);
+    msg->getS32Fast(_PREHASH_Data, _PREHASH_Code, error_code);
     std::string error_token;
-    msg->getString("Data", "Token", error_token);
+    msg->getStringFast(_PREHASH_Data, _PREHASH_Token, error_token);
 
     LLUUID error_id;
-    msg->getUUID("Data", "ID", error_id);
+    msg->getUUIDFast(_PREHASH_Data, _PREHASH_ID, error_id);
     std::string error_system;
-    msg->getString("Data", "System", error_system);
+    msg->getStringFast(_PREHASH_Data, _PREHASH_System, error_system);
 
     std::string error_message;
-    msg->getString("Data", "Message", error_message);
+    msg->getStringFast(_PREHASH_Data, _PREHASH_Message, error_message);
 
     LL_WARNS("Messaging") << "Message error from " << msg->getSender() << " - "
         << error_code << " " << error_token << " " << error_id << " \""
@@ -2155,18 +2155,18 @@ S32 LLMessageSystem::sendError(
     const std::string& message,
     const LLSD& data)
 {
-    newMessage("Error");
+    newMessageFast(_PREHASH_Error);
     nextBlockFast(_PREHASH_AgentData);
     addUUIDFast(_PREHASH_AgentID, agent_id);
     nextBlockFast(_PREHASH_Data);
-    addS32("Code", code);
-    addString("Token", token);
-    addUUID("ID", id);
-    addString("System", system);
+    addS32Fast(_PREHASH_Code, code);
+    addStringFast(_PREHASH_Token, token);
+    addUUIDFast(_PREHASH_ID, id);
+    addStringFast(_PREHASH_System, system);
     std::string temp;
     temp = message;
     if(temp.size() > (size_t)MTUBYTES) temp.resize((size_t)MTUBYTES);
-    addString("Message", message);
+    addStringFast(_PREHASH_Message, message);
     LLPointer<LLSDBinaryFormatter> formatter = new LLSDBinaryFormatter;
     std::ostringstream ostr;
     formatter->format(data, ostr);
@@ -2184,13 +2184,13 @@ S32 LLMessageSystem::sendError(
     }
     if(pack_data)
     {
-        addBinaryData("Data", (void*)temp.c_str(), static_cast<S32>(temp.size()));
+        addBinaryDataFast(_PREHASH_Data, (void*)temp.c_str(), static_cast<S32>(temp.size()));
     }
     else
     {
         LL_WARNS("Messaging") << "Data and message were too large -- data removed."
             << LL_ENDL;
-        addBinaryData("Data", NULL, 0);
+        addBinaryDataFast(_PREHASH_Data, nullptr, 0);
     }
     return sendReliable(host);
 }
@@ -3311,7 +3311,7 @@ void LLMessageSystem::establishBidirectionalTrust(const LLHost &host, S64 frame_
 
     // Send a request, a deny, and give the host 2 seconds to complete
     // the trust handshake.
-    newMessage("RequestTrustedCircuit");
+    newMessageFast(_PREHASH_RequestTrustedCircuit);
     sendMessage(host);
     reallySendDenyTrustedCircuit(host);
     setHandlerFuncFast(_PREHASH_StartPingCheck, process_start_ping_check, NULL);
@@ -3927,7 +3927,12 @@ void LLMessageSystem::getString(const char *block, const char *var,
                   blocknum);
 }
 
-bool    LLMessageSystem::has(const char *blockname) const
+bool LLMessageSystem::hasFast(const char* blockname) const
+{
+    return getNumberOfBlocksFast(blockname) > 0;
+}
+
+bool LLMessageSystem::has(const char *blockname) const
 {
     return getNumberOfBlocks(blockname) > 0;
 }

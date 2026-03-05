@@ -3252,8 +3252,8 @@ void LLInventoryModel::buildParentChildMap()
             msg->nextBlockFast(_PREHASH_InventoryData);
             msg->addUUIDFast(_PREHASH_ItemID, (*it));
             msg->addUUIDFast(_PREHASH_FolderID, lnf);
-            msg->addString("NewName", NULL);
-            if(msg->isSendFull(NULL))
+            msg->addStringFast(_PREHASH_NewName, nullptr);
+            if(msg->isSendFull(nullptr))
             {
                 start_new_message = true;
                 gAgent.sendReliableMessage();
@@ -3673,7 +3673,7 @@ void LLInventoryModel::registerCallbacks(LLMessageSystem* msg)
     msg->setHandlerFuncFast(_PREHASH_BulkUpdateInventory,
                             processBulkUpdateInventory,
                             NULL);
-    msg->setHandlerFunc("MoveInventoryItem", processMoveInventoryItem);
+    msg->setHandlerFuncFast(_PREHASH_MoveInventoryItem, processMoveInventoryItem);
 }
 
 

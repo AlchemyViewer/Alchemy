@@ -566,7 +566,7 @@ void LLViewerInventoryItem::updateParentOnServer(bool restamp) const
     msg->nextBlockFast(_PREHASH_InventoryData);
     msg->addUUIDFast(_PREHASH_ItemID, mUUID);
     msg->addUUIDFast(_PREHASH_FolderID, mParentUUID);
-    msg->addString("NewName", NULL);
+    msg->addStringFast(_PREHASH_NewName, nullptr);
     gAgent.sendReliableMessage();
 }
 
@@ -644,7 +644,7 @@ void LLViewerInventoryCategory::updateParentOnServer(bool restamp) const
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
-    msg->addBOOL("Stamp", restamp);
+    msg->addBOOLFast(_PREHASH_Stamp, restamp);
     msg->nextBlockFast(_PREHASH_InventoryData);
     msg->addUUIDFast(_PREHASH_FolderID, mUUID);
     msg->addUUIDFast(_PREHASH_ParentID, mParentUUID);
@@ -1170,10 +1170,10 @@ void create_inventory_item(
 
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_CreateInventoryItem);
-    msg->nextBlock(_PREHASH_AgentData);
+    msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, agent_id);
     msg->addUUIDFast(_PREHASH_SessionID, session_id);
-    msg->nextBlock(_PREHASH_InventoryBlock);
+    msg->nextBlockFast(_PREHASH_InventoryBlock);
     msg->addU32Fast(_PREHASH_CallbackID, gInventoryCallbacks.registerCB(cb));
     msg->addUUIDFast(_PREHASH_FolderID, parent_id);
     msg->addUUIDFast(_PREHASH_TransactionID, transaction_id);

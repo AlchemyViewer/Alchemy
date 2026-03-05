@@ -477,13 +477,13 @@ void LLPanelDirBrowser::processDirPlacesReply(LLMessageSystem* msg, void**)
     bool is_auction = false;
     F32 dwell;
 
-    msg->getUUID("AgentData", "AgentID", agent_id);
-    msg->getUUID("QueryData", "QueryID", query_id );
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
+    msg->getUUIDFast(_PREHASH_QueryData, _PREHASH_QueryID, query_id );
 
-    if (msg->getNumberOfBlocks("StatusData"))
+    if (msg->getNumberOfBlocksFast(_PREHASH_StatusData))
     {
         U32 status;
-        msg->getU32("StatusData", "Status", status);
+        msg->getU32Fast(_PREHASH_StatusData, _PREHASH_Status, status);
         if (status & STATUS_SEARCH_PLACES_BANNEDWORD)
         {
             LLNotificationsUtil::add("SearchWordBanned");
@@ -508,18 +508,18 @@ void LLPanelDirBrowser::processDirPlacesReply(LLMessageSystem* msg, void**)
         self->mResultsContents = LLSD();
     }
 
-    S32 count = msg->getNumberOfBlocks("QueryReplies");
+    S32 count = msg->getNumberOfBlocksFast(_PREHASH_QueryReplies);
     self->mResultsReceived += count;
 
     count = self->showNextButton(count);
 
     for (S32 i = 0; i < count ; i++)
     {
-        msg->getUUID("QueryReplies", "ParcelID", parcel_id, i);
-        msg->getString("QueryReplies", "Name", name, i);
-        msg->getBOOL("QueryReplies", "ForSale", is_for_sale, i);
-        msg->getBOOL("QueryReplies", "Auction", is_auction, i);
-        msg->getF32("QueryReplies", "Dwell", dwell, i);
+        msg->getUUIDFast(_PREHASH_QueryReplies, _PREHASH_ParcelID, parcel_id, i);
+        msg->getStringFast(_PREHASH_QueryReplies, _PREHASH_Name, name, i);
+        msg->getBOOLFast(_PREHASH_QueryReplies, _PREHASH_ForSale, is_for_sale, i);
+        msg->getBOOLFast(_PREHASH_QueryReplies, _PREHASH_Auction, is_auction, i);
+        msg->getF32Fast(_PREHASH_QueryReplies, _PREHASH_Dwell, dwell, i);
 
         if (parcel_id.isNull())
         {
@@ -560,8 +560,8 @@ void LLPanelDirBrowser::processDirEventsReply(LLMessageSystem* msg, void**)
     std::string name;
     std::string date;
 
-    msg->getUUID("AgentData", "AgentID", agent_id);
-    msg->getUUID("QueryData", "QueryID", query_id );
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
+    msg->getUUIDFast(_PREHASH_QueryData, _PREHASH_QueryID, query_id );
 
     LLPanelDirBrowser* self = get_if_there(gDirBrowserInstances, query_id, (LLPanelDirBrowser*)NULL);
     if (!self)
@@ -569,10 +569,10 @@ void LLPanelDirBrowser::processDirEventsReply(LLMessageSystem* msg, void**)
         return;
     }
 
-    if (msg->getNumberOfBlocks("StatusData"))
+    if (msg->getNumberOfBlocksFast(_PREHASH_StatusData))
     {
         U32 status;
-        msg->getU32("StatusData", "Status", status);
+        msg->getU32Fast(_PREHASH_StatusData, _PREHASH_Status, status);
         if (status & STATUS_SEARCH_EVENTS_BANNEDWORD)
         {
             LLNotificationsUtil::add("SearchWordBanned");
@@ -590,7 +590,7 @@ void LLPanelDirBrowser::processDirEventsReply(LLMessageSystem* msg, void**)
         self->mResultsContents = LLSD();
     }
 
-    S32 rows = msg->getNumberOfBlocks("QueryReplies");
+    S32 rows = msg->getNumberOfBlocksFast(_PREHASH_QueryReplies);
     self->mResultsReceived += rows;
 
     rows = self->showNextButton(rows);
@@ -601,12 +601,12 @@ void LLPanelDirBrowser::processDirEventsReply(LLMessageSystem* msg, void**)
         U32 unix_time;
         U32 event_flags;
 
-        msg->getUUID("QueryReplies", "OwnerID", owner_id, i);
-        msg->getString("QueryReplies", "Name", name, i);
-        msg->getU32("QueryReplies", "EventID", event_id, i);
-        msg->getString("QueryReplies", "Date", date, i);
-        msg->getU32("QueryReplies", "UnixTime", unix_time, i);
-        msg->getU32("QueryReplies", "EventFlags", event_flags, i);
+        msg->getUUIDFast(_PREHASH_QueryReplies, _PREHASH_OwnerID, owner_id, i);
+        msg->getStringFast(_PREHASH_QueryReplies, _PREHASH_Name, name, i);
+        msg->getU32Fast(_PREHASH_QueryReplies, _PREHASH_EventID, event_id, i);
+        msg->getStringFast(_PREHASH_QueryReplies, _PREHASH_Date, date, i);
+        msg->getU32Fast(_PREHASH_QueryReplies, _PREHASH_UnixTime, unix_time, i);
+        msg->getU32Fast(_PREHASH_QueryReplies, _PREHASH_EventFlags, event_flags, i);
 
         // Skip empty events
         if (owner_id.isNull())
@@ -763,7 +763,7 @@ void LLPanelDirBrowser::processDirClassifiedReply(LLMessageSystem* msg, void**)
     LLUUID agent_id;
     LLUUID query_id;
 
-    msg->getUUID("AgentData", "AgentID", agent_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
     if (agent_id != gAgent.getID())
     {
         LL_WARNS() << "Message for wrong agent " << agent_id
@@ -771,17 +771,17 @@ void LLPanelDirBrowser::processDirClassifiedReply(LLMessageSystem* msg, void**)
         return;
     }
 
-    msg->getUUID("QueryData", "QueryID", query_id);
+    msg->getUUIDFast(_PREHASH_QueryData, _PREHASH_QueryID, query_id);
     LLPanelDirBrowser* self = get_if_there(gDirBrowserInstances, query_id, (LLPanelDirBrowser*)NULL);
     if (!self)
     {
         return;
     }
 
-    if (msg->getNumberOfBlocks("StatusData"))
+    if (msg->getNumberOfBlocksFast(_PREHASH_StatusData))
     {
         U32 status;
-        msg->getU32("StatusData", "Status", status);
+        msg->getU32Fast(_PREHASH_StatusData, _PREHASH_Status, status);
         if (status & STATUS_SEARCH_CLASSIFIEDS_BANNEDWORD)
         {
             LLNotificationsUtil::add("SearchWordBanned");
@@ -810,11 +810,11 @@ void LLPanelDirBrowser::processDirClassifiedReply(LLMessageSystem* msg, void**)
         U32 creation_date = 0;  // unix timestamp
         U32 expiration_date = 0;    // future use
         S32 price_for_listing = 0;
-        msg->getUUID("QueryReplies", "ClassifiedID", classified_id, i);
-        msg->getString("QueryReplies", "Name", name, i);
-        msg->getU32("QueryReplies","CreationDate",creation_date,i);
-        msg->getU32("QueryReplies","ExpirationDate",expiration_date,i);
-        msg->getS32("QueryReplies","PriceForListing",price_for_listing,i);
+        msg->getUUIDFast(_PREHASH_QueryReplies, _PREHASH_ClassifiedID, classified_id, i);
+        msg->getStringFast(_PREHASH_QueryReplies, _PREHASH_Name, name, i);
+        msg->getU32Fast(_PREHASH_QueryReplies,_PREHASH_CreationDate,creation_date,i);
+        msg->getU32Fast(_PREHASH_QueryReplies,_PREHASH_ExpirationDate,expiration_date,i);
+        msg->getS32Fast(_PREHASH_QueryReplies,_PREHASH_PriceForListing,price_for_listing,i);
 
         if ( classified_id.notNull() )
         {
@@ -847,8 +847,8 @@ void LLPanelDirBrowser::processDirLandReply(LLMessageSystem *msg, void**)
     S32 sale_price;
     S32 actual_area;
 
-    msg->getUUID("AgentData", "AgentID", agent_id);
-    msg->getUUID("QueryData", "QueryID", query_id );
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
+    msg->getUUIDFast(_PREHASH_QueryData, _PREHASH_QueryID, query_id );
 
     LLPanelDirBrowser* browser = get_if_there(gDirBrowserInstances, query_id, (LLPanelDirBrowser*)NULL);
     if (!browser)
@@ -878,18 +878,18 @@ void LLPanelDirBrowser::processDirLandReply(LLMessageSystem *msg, void**)
     S32 limit_area = self->childGetValue("areaedit").asInteger();
 
     S32 i;
-    S32 count = msg->getNumberOfBlocks("QueryReplies");
+    S32 count = msg->getNumberOfBlocksFast(_PREHASH_QueryReplies);
     self->mResultsReceived += count;
 
     S32 non_auction_count = 0;
     for (i = 0; i < count; i++)
     {
-        msg->getUUID("QueryReplies", "ParcelID", parcel_id, i);
-        msg->getString("QueryReplies", "Name", name, i);
-        msg->getBOOL("QueryReplies", "Auction", auction, i);
-        msg->getBOOL("QueryReplies", "ForSale", for_sale, i);
-        msg->getS32("QueryReplies", "SalePrice", sale_price, i);
-        msg->getS32("QueryReplies", "ActualArea", actual_area, i);
+        msg->getUUIDFast(_PREHASH_QueryReplies, _PREHASH_ParcelID, parcel_id, i);
+        msg->getStringFast(_PREHASH_QueryReplies, _PREHASH_Name, name, i);
+        msg->getBOOLFast(_PREHASH_QueryReplies, _PREHASH_Auction, auction, i);
+        msg->getBOOLFast(_PREHASH_QueryReplies, _PREHASH_ForSale, for_sale, i);
+        msg->getS32Fast(_PREHASH_QueryReplies, _PREHASH_SalePrice, sale_price, i);
+        msg->getS32Fast(_PREHASH_QueryReplies, _PREHASH_ActualArea, actual_area, i);
 
         if ( msg->getSizeFast(_PREHASH_QueryReplies, i, _PREHASH_ProductSKU) > 0 )
         {
@@ -1083,15 +1083,15 @@ void LLPanelDirBrowser::sendDirFindQuery(
     U32 flags,
     S32 query_start)
 {
-    msg->newMessage("DirFindQuery");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
-    msg->nextBlock("QueryData");
-    msg->addUUID("QueryID", query_id);
-    msg->addString("QueryText", text);
-    msg->addU32("QueryFlags", flags);
-    msg->addS32("QueryStart", query_start);
+    msg->newMessageFast(_PREHASH_DirFindQuery);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_QueryData);
+    msg->addUUIDFast(_PREHASH_QueryID, query_id);
+    msg->addStringFast(_PREHASH_QueryText, text);
+    msg->addU32Fast(_PREHASH_QueryFlags, flags);
+    msg->addS32Fast(_PREHASH_QueryStart, query_start);
     gAgent.sendReliableMessage();
 }
 

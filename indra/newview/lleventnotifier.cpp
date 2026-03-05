@@ -284,59 +284,59 @@ void LLEventNotifier::remove(const U32 event_id)
 void LLEventNotifier::serverPushRequest(U32 event_id, bool add)
 {
     // Push up a message to tell the server we have this notification.
-    gMessageSystem->newMessage(add?"EventNotificationAddRequest":"EventNotificationRemoveRequest");
+    gMessageSystem->newMessageFast(add ? _PREHASH_EventNotificationAddRequest : _PREHASH_EventNotificationRemoveRequest);
     gMessageSystem->nextBlockFast(_PREHASH_AgentData);
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
     gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-    gMessageSystem->nextBlock("EventData");
-    gMessageSystem->addU32("EventID", event_id);
+    gMessageSystem->nextBlockFast(_PREHASH_EventData);
+    gMessageSystem->addU32Fast(_PREHASH_EventID, event_id);
     gAgent.sendReliableMessage();
 }
 
 void LLEventInfo::unpack(LLMessageSystem* msg)
 {
     U32 event_id;
-    msg->getU32("EventData", "EventID", event_id);
+    msg->getU32Fast(_PREHASH_EventData, _PREHASH_EventID, event_id);
     mID = event_id;
 
-    msg->getString("EventData", "Name", mName);
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_Name, mName);
 
-    msg->getString("EventData", "Category", mCategoryStr);
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_Category, mCategoryStr);
 
-    msg->getString("EventData", "Date", mTimeStr);
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_Date, mTimeStr);
 
     U32 duration;
-    msg->getU32("EventData", "Duration", duration);
+    msg->getU32Fast(_PREHASH_EventData, _PREHASH_Duration, duration);
     mDuration = duration;
 
     U32 date;
-    msg->getU32("EventData", "DateUTC", date);
+    msg->getU32Fast(_PREHASH_EventData, _PREHASH_DateUTC, date);
     mUnixTime = date;
 
-    msg->getString("EventData", "Desc", mDesc);
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_Desc, mDesc);
 
     std::string buffer;
-    msg->getString("EventData", "Creator", buffer);
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_Creator, buffer);
     mRunByID = LLUUID(buffer);
 
     U32 foo;
-    msg->getU32("EventData", "Cover", foo);
+    msg->getU32Fast(_PREHASH_EventData, _PREHASH_Cover, foo);
 
     mHasCover = foo ? true : false;
     if (mHasCover)
     {
         U32 cover;
-        msg->getU32("EventData", "Amount", cover);
+        msg->getU32Fast(_PREHASH_EventData, _PREHASH_Amount, cover);
         mCover = cover;
     }
 
-    msg->getString("EventData", "SimName", mSimName);
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_SimName, mSimName);
 
-    msg->getVector3d("EventData", "GlobalPos", mPosGlobal);
+    msg->getVector3dFast(_PREHASH_EventData, _PREHASH_GlobalPos, mPosGlobal);
 
     // Mature content
     U32 event_flags;
-    msg->getU32("EventData", "EventFlags", event_flags);
+    msg->getU32Fast(_PREHASH_EventData, _PREHASH_EventFlags, event_flags);
     mEventFlags = event_flags;
 }
 

@@ -727,6 +727,7 @@ public:
     LLHost  findHost(const U32 circuit_code);
     void    sanityCheck();
 
+    bool    hasFast(const char* blockname) const;
     bool    has(const char *blockname) const;
     S32     getNumberOfBlocksFast(const char *blockname) const;
     S32     getNumberOfBlocks(const char *blockname) const;

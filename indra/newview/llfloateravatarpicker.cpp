@@ -591,13 +591,13 @@ void LLFloaterAvatarPicker::find()
             else
             {
                 LLMessageSystem* msg = gMessageSystem;
-                msg->newMessage("AvatarPickerRequest");
-                msg->nextBlock("AgentData");
-                msg->addUUID("AgentID", gAgent.getID());
-                msg->addUUID("SessionID", gAgent.getSessionID());
-                msg->addUUID("QueryID", mQueryID);  // not used right now
-                msg->nextBlock("Data");
-                msg->addString("Name", text);
+                msg->newMessageFast(_PREHASH_AvatarPickerRequest);
+                msg->nextBlockFast(_PREHASH_AgentData);
+                msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+                msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+                msg->addUUIDFast(_PREHASH_QueryID, mQueryID);  // not used right now
+                msg->nextBlockFast(_PREHASH_Data);
+                msg->addStringFast(_PREHASH_Name, text);
                 gAgent.sendReliableMessage();
             }
         }
@@ -698,8 +698,8 @@ void LLFloaterAvatarPicker::processAvatarPickerReply(LLMessageSystem* msg, void*
     std::string first_name;
     std::string last_name;
 
-    msg->getUUID("AgentData", "AgentID", agent_id);
-    msg->getUUID("AgentData", "QueryID", query_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_QueryID, query_id);
 
     // Not for us
     if (agent_id != gAgent.getID()) return;
@@ -721,7 +721,7 @@ void LLFloaterAvatarPicker::processAvatarPickerReply(LLMessageSystem* msg, void*
     }
 
     bool found_one = false;
-    S32 num_new_rows = msg->getNumberOfBlocks("Data");
+    S32 num_new_rows = msg->getNumberOfBlocksFast(_PREHASH_Data);
     for (S32 i = 0; i < num_new_rows; i++)
     {
         msg->getUUIDFast(  _PREHASH_Data,_PREHASH_AvatarID, avatar_id, i);

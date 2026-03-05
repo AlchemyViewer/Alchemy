@@ -738,7 +738,7 @@ bool RlvUtil::sendChatReply(S32 nChannel, const std::string& strUTF8Text)
     gMessageSystem->nextBlockFast(_PREHASH_ChatData);
     gMessageSystem->addStringFast(_PREHASH_Message, utf8str_truncate(strUTF8Text, MAX_MSG_STR_LEN));
     gMessageSystem->addU8Fast(_PREHASH_Type, CHAT_TYPE_SHOUT);
-    gMessageSystem->addS32("Channel", nChannel);
+    gMessageSystem->addS32Fast(_PREHASH_Channel, nChannel);
     gAgent.sendReliableMessage();
     add(LLStatViewer::CHAT_COUNT, 1);
 

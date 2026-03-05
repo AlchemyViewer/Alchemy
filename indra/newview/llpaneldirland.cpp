@@ -218,16 +218,16 @@ void LLPanelDirLand::performQuery()
         query_flags |= DFQ_LIMIT_BY_AREA;
     }
 
-    msg->newMessage("DirLandQuery");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
-    msg->nextBlock("QueryData");
-    msg->addUUID("QueryID", getSearchID());
-    msg->addU32("QueryFlags", query_flags);
-    msg->addU32("SearchType", search_type);
-    msg->addS32("Price", childGetValue("priceedit").asInteger());
-    msg->addS32("Area", childGetValue("areaedit").asInteger());
-    msg->addS32Fast(_PREHASH_QueryStart,mSearchStart);
+    msg->newMessageFast(_PREHASH_DirLandQuery);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_QueryData);
+    msg->addUUIDFast(_PREHASH_QueryID, getSearchID());
+    msg->addU32Fast(_PREHASH_QueryFlags, query_flags);
+    msg->addU32Fast(_PREHASH_SearchType, search_type);
+    msg->addS32Fast(_PREHASH_Price, childGetValue("priceedit").asInteger());
+    msg->addS32Fast(_PREHASH_Area, childGetValue("areaedit").asInteger());
+    msg->addS32Fast(_PREHASH_QueryStart, mSearchStart);
     gAgent.sendReliableMessage();
 }

@@ -617,7 +617,7 @@ bool LLInventoryItem::unpackMessage(LLMessageSystem* msg, const char* block, S32
     S8 type;
     msg->getS8Fast(block, _PREHASH_Type, type, block_num);
     mType = static_cast<LLAssetType::EType>(type);
-    msg->getS8(block, "InvType", type, block_num);
+    msg->getS8Fast(block, _PREHASH_InvType, type, block_num);
     mInventoryType = static_cast<LLInventoryType::EType>(type);
     mPermissions.initMasks(mInventoryType);
 
@@ -632,12 +632,12 @@ bool LLInventoryItem::unpackMessage(LLMessageSystem* msg, const char* block, S32
     LLStringUtil::replaceNonstandardASCII(mDescription, ' ');
 
     S32 date;
-    msg->getS32(block, "CreationDate", date, block_num);
+    msg->getS32Fast(block, _PREHASH_CreationDate, date, block_num);
     mCreationDate = date;
 
     U32 local_crc = getCRC32();
     U32 remote_crc = 0;
-    msg->getU32(block, "CRC", remote_crc, block_num);
+    msg->getU32Fast(block, _PREHASH_CRC, remote_crc, block_num);
 //#define CRC_CHECK
 #ifdef CRC_CHECK
     if(local_crc == remote_crc)

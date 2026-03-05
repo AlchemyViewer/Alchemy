@@ -580,7 +580,7 @@ void LLParcel::unpackMessage(LLMessageSystem* msg)
     setHaveNewParcelLimitData(have_new_parcel_limit_data);
 
     // non-optimized version
-    msg->getU8 ( "ParcelData", "MediaAutoScale", mMediaAutoScale );
+    msg->getU8Fast( _PREHASH_ParcelData, _PREHASH_MediaAutoScale, mMediaAutoScale );
 
     msg->getUUIDFast( _PREHASH_ParcelData,_PREHASH_MediaID, mMediaID );
     msg->getUUIDFast( _PREHASH_ParcelData,_PREHASH_GroupID, mGroupID );
@@ -599,15 +599,15 @@ void LLParcel::unpackMessage(LLMessageSystem* msg)
 
     // New Media Data
     // Note: the message has been converted to TCP
-    if(msg->has("MediaData"))
+    if(msg->hasFast(_PREHASH_MediaData))
     {
-        msg->getString("MediaData", "MediaDesc", buffer);
+        msg->getStringFast(_PREHASH_MediaData, _PREHASH_MediaDesc, buffer);
         setMediaDesc(buffer);
-        msg->getString("MediaData", "MediaType", buffer);
+        msg->getStringFast(_PREHASH_MediaData, _PREHASH_MediaType, buffer);
         setMediaType(buffer);
-        msg->getS32("MediaData", "MediaWidth", mMediaWidth);
-        msg->getS32("MediaData", "MediaHeight", mMediaHeight);
-        msg->getU8 ( "MediaData", "MediaLoop", mMediaLoop );
+        msg->getS32Fast(_PREHASH_MediaData, _PREHASH_MediaWidth, mMediaWidth);
+        msg->getS32Fast(_PREHASH_MediaData, _PREHASH_MediaHeight, mMediaHeight);
+        msg->getU8Fast( _PREHASH_MediaData, _PREHASH_MediaLoop, mMediaLoop );
         // the ObscureMedia and ObscureMusic flags previously set here are no longer used
     }
     else
@@ -617,13 +617,13 @@ void LLParcel::unpackMessage(LLMessageSystem* msg)
         mMediaLoop = true;
     }
 
-    if(msg->getNumberOfBlocks("MediaLinkSharing") > 0)
+    if(msg->hasFast(_PREHASH_MediaLinkSharing))
     {
-        msg->getString("MediaLinkSharing", "MediaCurrentURL", buffer);
+        msg->getStringFast(_PREHASH_MediaLinkSharing, _PREHASH_MediaCurrentURL, buffer);
         setMediaCurrentURL(buffer);
-        msg->getU8 ( "MediaLinkSharing", "MediaAllowNavigate", mMediaAllowNavigate );
-        msg->getU8 ( "MediaLinkSharing", "MediaPreventCameraZoom", mMediaPreventCameraZoom );
-        msg->getF32( "MediaLinkSharing", "MediaURLTimeout", mMediaURLTimeout);
+        msg->getU8Fast( _PREHASH_MediaLinkSharing, _PREHASH_MediaAllowNavigate, mMediaAllowNavigate );
+        msg->getU8Fast( _PREHASH_MediaLinkSharing, _PREHASH_MediaPreventCameraZoom, mMediaPreventCameraZoom );
+        msg->getF32Fast( _PREHASH_MediaLinkSharing, _PREHASH_MediaURLTimeout, mMediaURLTimeout);
     }
     else
     {
