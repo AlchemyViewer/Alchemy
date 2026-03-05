@@ -298,7 +298,7 @@ private:
         // Use a recursive_mutex in case of constructor circularity. With a
         // non-recursive mutex, that would result in deadlock.
         typedef std::recursive_mutex mutex_t;
-        LL_PROFILE_MUTEX_NAMED(mutex_t, mMutex, "Singleton Data"); // LockStatic looks for mMutex
+        LL_PROFILE_MUTEX(mutex_t, mMutex); // LockStatic looks for mMutex
 
         EInitState      mInitState{UNINITIALIZED};
         DERIVED_TYPE*   mInstance{nullptr};
@@ -319,6 +319,10 @@ private:
         lk->mInitState = CONSTRUCTING;
         try
         {
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+            std::string_view typeidname(typeid(DERIVED_TYPE).name());
+            LockableName(lk->mMutex, typeidname.data(), typeidname.size());
+#endif
             lk->mInstance = new DERIVED_TYPE(std::forward<Args>(args)...);
         }
         catch (const std::exception& err)
