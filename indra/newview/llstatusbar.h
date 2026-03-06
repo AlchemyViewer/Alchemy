@@ -41,6 +41,7 @@ class LLUICtrl;
 class LLUUID;
 class LLFrameTimer;
 class LLStatGraph;
+class ALPanelAOPulldown;
 class LLPanelPresetsCameraPulldown;
 class LLPanelPresetsPulldown;
 class LLPanelVolumePulldown;
@@ -108,9 +109,11 @@ private:
 
     void onMouseEnterPresetsCamera();
     void onMouseEnterPresets();
+    void onMouseEnterAO();
     void onMouseEnterVolume();
     void onMouseEnterNearbyMedia();
 
+    static void onClickAOBtn(void* data);
     static void onClickMediaToggle(void* data);
     static void onClickRefreshBalance(void* data);
     void onClickToggleBalance();
@@ -125,6 +128,8 @@ private:
     void updateMenuSearchPosition(); // depends onto balance position
     void updateBalancePanelPosition();
 
+    void onAOStateChanged();
+
 private:
     LLTextBox   *mTextTime;
 
@@ -133,6 +138,7 @@ private:
 
     LLIconCtrl  *mIconPresetsCamera;
     LLIconCtrl  *mIconPresetsGraphic;
+    LLButton    *mBtnAO;
     LLButton    *mBtnVolume;
     LLTextBox   *mBoxBalance;
     LLButton    *mMediaToggle;
@@ -147,6 +153,7 @@ private:
     S32             mSquareMetersCommitted;
     LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown;
     LLPanelPresetsPulldown* mPanelPresetsPulldown;
+    ALPanelAOPulldown* mPanelAOPulldown;
     LLPanelVolumePulldown* mPanelVolumePulldown;
     LLPanelNearByMedia* mPanelNearByMedia;
 };

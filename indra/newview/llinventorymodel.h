@@ -325,6 +325,11 @@ public:
         LLFolderType::EType preferred_type,
         const LLUUID& root_id) const;
 
+    const LLUUID findCategoryUUIDForNameInRoot(std::string const& folder_name,
+                                               LLUUID const& root_id,
+                                               bool create_folder = false,
+                                               inventory_func_type func = {});
+
     // Returns the uuid of the category that specifies 'type' as what it
     // defaults to containing. The category is not necessarily only for that type.
     //    NOTE: If create_folder is true, this will create a new inventory category

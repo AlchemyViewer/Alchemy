@@ -2510,6 +2510,7 @@ If you continue to receive this message, please contact Second Life support for 
   <string name="InvFolder Settings">Settings</string>
   <string name="InvFolder Material">Materials</string>
   <string name="InvFolder Materials">Materials</string>
+	<string name="InvFolder Animation Overrides">Animation Overrides</string>
 
   <!-- are used for Friends and Friends/All folders in Inventory "Calling cards" folder. See EXT-694-->
 	<string name="InvFolder Friends">Friends</string>	
@@ -4198,6 +4199,7 @@ Try enclosing path to the editor with double quotes.
   <string 
 name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_AboutLand_Label">About land</string>
+  <string name="Command_AnimationOverride_Label">AO</string>
   <string name="Command_Appearance_Label">Outfits</string>
   <string name="Command_Avatar_Label">Avatar Welcome Pack</string>
   <string name="Command_Build_Label">Build</string>

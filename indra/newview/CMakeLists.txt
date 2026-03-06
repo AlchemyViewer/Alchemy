@@ -70,9 +70,14 @@ if (HAVOK)
 endif ()
 
 set(viewer_SOURCE_FILES
+    ao.cpp
+    aoengine.cpp
+    aoset.cpp
     alavataractions.cpp
     alfloatergenerictext.cpp
     alfloaterprogressview.cpp
+    alpanelaomini.cpp
+    alpanelaopulldown.cpp
     alunzip.cpp
     gltfscenemanager.cpp
     gltf/asset.cpp
@@ -763,9 +768,14 @@ set(viewer_SOURCE_FILES
 
 set(viewer_HEADER_FILES
     ViewerInstall.cmake
+    ao.h
+    aoengine.h
+    aoset.h
     alavataractions.h
     alfloatergenerictext.h
     alfloaterprogressview.h
+    alpanelaomini.h
+    alpanelaopulldown.h
     alunzip.h
     gltfscenemanager.h
     groupchatlistener.h

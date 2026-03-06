@@ -924,6 +924,40 @@ const LLUUID LLInventoryModel::findCategoryUUIDForTypeInRoot(
     return rv;
 }
 
+const LLUUID LLInventoryModel::findCategoryUUIDForNameInRoot(std::string const& folder_name, LLUUID const& root_id, bool create_folder, inventory_func_type func)
+{
+    LLUUID rv = LLUUID::null;
+    if (root_id.notNull())
+    {
+        cat_array_t* cats = nullptr;
+        cats = get_ptr_in_map(mParentChildCategoryTree, root_id);
+        if (cats)
+        {
+            for (const auto& cat : *cats)
+            {
+                if (cat->getName() == folder_name)
+                {
+                    LLUUID const& folder_id = cat->getUUID();
+                    if (rv.isNull() || folder_id < rv)
+                    {
+                        rv = folder_id;
+                    }
+                }
+            }
+        }
+    }
+    if (rv.isNull() && isInventoryUsable() && create_folder && root_id.notNull())
+    {
+        createNewCategory(root_id, LLFolderType::FT_NONE, folder_name, func);
+        return rv;
+    }
+    if (func)
+    {
+        func(rv);
+    }
+    return rv;
+}
+
 // findCategoryUUIDForType() returns the uuid of the category that
 // specifies 'type' as what it defaults to containing. The category is
 // not necessarily only for that type. *NOTE: This will create a new
@@ -1349,10 +1383,8 @@ void LLInventoryModel::collectDescendentsIf(const LLUUID& id,
     // Note: if making it fully recursive, need more checking against infinite loops.
     if (follow_folder_links && item_array)
     {
-        size_t count = item_array->size();
-        for(size_t i = 0; i < count; ++i)
+        for (LLViewerInventoryItem* item : *item_array)
         {
-            LLViewerInventoryItem* item = item_array->at(i);
             if (item && item->getActualType() == LLAssetType::AT_LINK_FOLDER)
             {
                 LLViewerInventoryCategory *linked_cat = item->getLinkedCategory();
@@ -4715,9 +4747,8 @@ LLPointer<LLInventoryValidationInfo> LLInventoryModel::validate() const
             else
             {
                 bool found = false;
-                for (S32 i = 0; i<cats->size(); i++)
+                for (LLViewerInventoryCategory* kid_cat : *cats)
                 {
-                    LLViewerInventoryCategory *kid_cat = cats->at(i);
                     if (kid_cat == cat)
                     {
                         found = true;
@@ -4794,9 +4825,9 @@ LLPointer<LLInventoryValidationInfo> LLInventoryModel::validate() const
             else
             {
                 bool found = false;
-                for (S32 i=0; i<items->size(); ++i)
+                for (LLViewerInventoryItem* desc_item : *items)
                 {
-                    if (items->at(i) == item)
+                    if (desc_item == item)
                     {
                         found = true;
                         break;

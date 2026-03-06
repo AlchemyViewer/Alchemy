@@ -97,6 +97,8 @@ public:
 
         FT_MATERIAL = 57,
 
+        FT_ANIM_OVERRIDES = 58,
+
         FT_COUNT,
 
         FT_NONE = -1

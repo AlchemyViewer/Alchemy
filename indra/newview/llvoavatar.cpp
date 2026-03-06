@@ -37,6 +37,7 @@
 #include "sound_ids.h"
 #include "raytrace.h"
 
+#include "aoengine.h"
 #include "llagent.h" //  Get state values from here
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -3254,6 +3255,8 @@ void LLVOAvatar::idleUpdateLoadingEffect()
                 {
                     LL_INFOS("Avatar") << avString() << "self isFullyLoaded, mFirstFullyVisible after " << mFirstDecloudTime << LL_ENDL;
                     LLAppearanceMgr::instance().onFirstFullyVisible();
+
+                    AOEngine::instance().onLoginComplete();
                 }
                 else
                 {
@@ -3907,7 +3910,12 @@ void LLVOAvatar::idleUpdateBelowWater()
     F32 water_height;
     water_height = getRegion()->getWaterHeight();
 
+    bool wasBelowWater = mBelowWater;
     mBelowWater =  avatar_height < water_height;
+    if (isSelf() && wasBelowWater != mBelowWater)
+    {
+        AOEngine::instance().checkBelowWater(mBelowWater);
+    }
 }
 
 void LLVOAvatar::slamPosition()
@@ -6319,7 +6327,28 @@ bool LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 {
     LL_DEBUGS("Motion") << "motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
 
-    LLUUID remap_id = remapMotionID(id);
+    LLUUID remap_id;
+    if (isSelf())
+    {
+        remap_id = AOEngine::getInstance()->override(id, true);
+        if (remap_id.isNull())
+        {
+            remap_id = remapMotionID(id);
+        }
+        else
+        {
+            gAgent.sendAnimationRequest(remap_id, ANIM_REQUEST_START);
+
+            // since we did an override, there is no need to do anything else,
+            // specifically not the startMotion() part at the bottom of this function
+            // See FIRE-29020
+            return true;
+        }
+    }
+    else
+    {
+        remap_id = remapMotionID(id);
+    }
 
     if (remap_id != id)
     {
@@ -6342,7 +6371,28 @@ bool LLVOAvatar::stopMotion(const LLUUID& id, bool stop_immediate)
 {
     LL_DEBUGS("Motion") << "Motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
 
-    LLUUID remap_id = remapMotionID(id);
+    LLUUID remap_id;
+    if (isSelf())
+    {
+        remap_id = AOEngine::getInstance()->override(id, false);
+        if (remap_id.isNull())
+        {
+            remap_id = remapMotionID(id);
+        }
+        else
+        {
+            gAgent.sendAnimationRequest(remap_id, ANIM_REQUEST_STOP);
+
+            // since we did an override, there is no need to do anything else,
+            // specifically not the stopMotion() part at the bottom of this function
+            // See FIRE-29020
+            return true;
+        }
+    }
+    else
+    {
+        remap_id = remapMotionID(id);
+    }
 
     if (remap_id != id)
     {

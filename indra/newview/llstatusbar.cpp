@@ -29,6 +29,7 @@
 #include "llstatusbar.h"
 
 // viewer includes
+#include "alpanelaopulldown.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llbutton.h"
@@ -174,6 +175,12 @@ bool LLStatusBar::postBuild()
     mIconPresetsGraphic = getChild<LLIconCtrl>( "presets_icon_graphic" );
     mIconPresetsGraphic->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterPresets, this));
 
+
+    mBtnAO = getChild<LLButton>("ao_btn");
+    mBtnAO->setClickedCallback(&LLStatusBar::onClickAOBtn, this);
+    mBtnAO->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterAO, this));
+    mBtnAO->setToggleState(gSavedPerAccountSettings.getBOOL("AlchemyAOEnable")); // shunt it into correct state - ALCH-368
+
     mBtnVolume = getChild<LLButton>( "volume_btn" );
     mBtnVolume->setClickedCallback( onClickVolume, this );
     mBtnVolume->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterVolume, this));
@@ -250,6 +257,11 @@ bool LLStatusBar::postBuild()
     addChild(mPanelVolumePulldown);
     mPanelVolumePulldown->setFollows(FOLLOWS_TOP|FOLLOWS_RIGHT);
     mPanelVolumePulldown->setVisible(false);
+
+    mPanelAOPulldown = new ALPanelAOPulldown();
+    addChild(mPanelAOPulldown);
+    mPanelAOPulldown->setFollows(FOLLOWS_TOP | FOLLOWS_RIGHT);
+    mPanelAOPulldown->setVisible(FALSE);
 
     mPanelNearByMedia = new LLPanelNearByMedia();
     addChild(mPanelNearByMedia);
@@ -553,6 +565,7 @@ void LLStatusBar::onMouseEnterPresetsCamera()
     mPanelNearByMedia->setVisible(false);
     mPanelVolumePulldown->setVisible(false);
     mPanelPresetsPulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(FALSE);
     mPanelPresetsCameraPulldown->setVisible(true);
 }
 
@@ -574,9 +587,38 @@ void LLStatusBar::onMouseEnterPresets()
     // show the master presets pull-down
     LLUI::getInstance()->clearPopups();
     LLUI::getInstance()->addPopup(mPanelPresetsPulldown);
+    mPanelPresetsCameraPulldown->setVisible(FALSE);
     mPanelNearByMedia->setVisible(false);
     mPanelVolumePulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(FALSE);
     mPanelPresetsPulldown->setVisible(true);
+}
+
+
+void LLStatusBar::onMouseEnterAO()
+{
+    LLView* popup_holder = gViewerWindow->getRootView()->getChildView("popup_holder");
+    LLRect qs_rect = mPanelAOPulldown->getRect();
+    LLRect qs_btn_rect = mBtnAO->getRect();
+    qs_rect.setLeftTopAndSize(qs_btn_rect.mLeft -
+                              (qs_rect.getWidth() - qs_btn_rect.getWidth()) / 2,
+                              qs_btn_rect.mBottom,
+                              qs_rect.getWidth(),
+                              qs_rect.getHeight());
+    // force onscreen
+    qs_rect.translate(popup_holder->getRect().getWidth() - qs_rect.mRight, 0);
+
+    mPanelAOPulldown->setShape(qs_rect);
+    LLUI::getInstance()->clearPopups();
+    LLUI::getInstance()->addPopup(mPanelAOPulldown);
+
+    mPanelPresetsCameraPulldown->setVisible(FALSE);
+    mPanelPresetsPulldown->setVisible(FALSE);
+    mPanelNearByMedia->setVisible(FALSE);
+    mPanelVolumePulldown->setVisible(FALSE);
+    //mPanelQuickSettingsPulldown->setVisible(FALSE);
+    mPanelAOPulldown->setVisible(TRUE);
+    //mPanelAvatarComplexityPulldown->setVisible(FALSE);
 }
 
 void LLStatusBar::onMouseEnterVolume()
@@ -601,6 +643,7 @@ void LLStatusBar::onMouseEnterVolume()
     mPanelPresetsCameraPulldown->setVisible(false);
     mPanelPresetsPulldown->setVisible(false);
     mPanelNearByMedia->setVisible(false);
+    mPanelAOPulldown->setVisible(FALSE);
     mPanelVolumePulldown->setVisible(true);
 }
 
@@ -626,9 +669,16 @@ void LLStatusBar::onMouseEnterNearbyMedia()
     mPanelPresetsCameraPulldown->setVisible(false);
     mPanelPresetsPulldown->setVisible(false);
     mPanelVolumePulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(FALSE);
     mPanelNearByMedia->setVisible(true);
 }
 
+
+// static
+void LLStatusBar::onClickAOBtn(void* data)
+{
+    gSavedPerAccountSettings.set("AlchemyAOEnable", !gSavedPerAccountSettings.getBOOL("AlchemyAOEnable"));
+}
 
 static void onClickVolume(void* data)
 {
@@ -666,6 +716,11 @@ void LLStatusBar::onClickMediaToggle(void* data)
     // "Selected" means it was showing the "play" icon (so media was playing), and now it shows "pause", so turn off media
     bool pause = status_bar->mMediaToggle->getValue();
     LLViewerMedia::getInstance()->setAllMediaPaused(pause);
+}
+
+void LLStatusBar::onAOStateChanged()
+{
+    mBtnAO->setToggleState(gSavedPerAccountSettings.getBOOL("AlchemyAOEnable"));
 }
 
 bool can_afford_transaction(S32 cost)

@@ -74,6 +74,7 @@ LLViewerFolderDictionary::LLViewerFolderDictionary()
 
     addEntry(LLFolderType::FT_NONE,                 new ViewerFolderEntry("New Folder",             "Inv_FolderOpen",       "Inv_FolderClosed",     false,     false, "default"));
 
+    addEntry(LLFolderType::FT_ANIM_OVERRIDES,       new ViewerFolderEntry("Animation Overrides",    "Inv_SysOpen",          "Inv_SysClosed",        FALSE,  false));
     for (U32 type = (U32)LLFolderType::FT_ENSEMBLE_START; type <= (U32)LLFolderType::FT_ENSEMBLE_END; ++type)
     {
         addEntry((LLFolderType::EType)type,         new ViewerFolderEntry("New Folder",             "Inv_FolderOpen",       "Inv_FolderClosed",     false,     false));

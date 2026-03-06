@@ -90,6 +90,8 @@ LLFolderDictionary::LLFolderDictionary()
     addEntry(LLFolderType::FT_SETTINGS,             new FolderEntry("settings", true, false, true));
     addEntry(LLFolderType::FT_MATERIAL,             new FolderEntry("material", true, false, true));
 
+    addEntry(LLFolderType::FT_ANIM_OVERRIDES,       new FolderEntry("animover", TRUE, FALSE, FALSE));
+
     addEntry(LLFolderType::FT_NONE,                 new FolderEntry("-1",       false, false, false));
 };
 

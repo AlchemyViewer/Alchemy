@@ -29,6 +29,7 @@
 
 #include "pipeline.h"
 
+#include "aoengine.h"
 #include "llagent.h"
 #include "llanimationstates.h"
 #include "llfloatercamera.h"
@@ -2428,6 +2429,7 @@ void LLAgentCamera::changeCameraToMouselook(bool animate)
 
         updateLastCamera();
         mCameraMode = CAMERA_MODE_MOUSELOOK;
+        AOEngine::getInstance()->inMouselook(TRUE);
         gAgent.setControlFlags(AGENT_CONTROL_MOUSELOOK);
 
         if (animate)
@@ -2489,6 +2491,7 @@ void LLAgentCamera::changeCameraToFollow(bool animate)
 
         updateLastCamera();
         mCameraMode = CAMERA_MODE_FOLLOW;
+        AOEngine::getInstance()->inMouselook(FALSE);
 
         // bang-in the current focus, position, and up vector of the follow cam
         const LLViewerCamera& camera = LLViewerCamera::instance();
@@ -2570,6 +2573,7 @@ void LLAgentCamera::changeCameraToThirdPerson(bool animate)
         }
         updateLastCamera();
         mCameraMode = CAMERA_MODE_THIRD_PERSON;
+        AOEngine::getInstance()->inMouselook(FALSE);
         gAgent.clearControlFlags(AGENT_CONTROL_MOUSELOOK);
     }
 
