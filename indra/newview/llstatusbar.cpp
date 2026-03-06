@@ -280,6 +280,7 @@ bool LLStatusBar::postBuild()
     mFilterEdit->setCommitCallback(boost::bind(&LLStatusBar::onUpdateFilterTerm, this));
     collectSearchableItems();
     gSavedSettings.getControl("MenuSearch")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateMenuSearchVisibility, this, _2));
+    gSavedSettings.getControl("ShowStatusBarSeconds")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
 
     if (search_panel_visible)
     {
@@ -307,27 +308,12 @@ void LLStatusBar::refresh()
     }
 
     // update clock every 10 seconds
-    if(mClockUpdateTimer.getElapsedTimeF32() > 10.f)
+    static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
+    if((mClockUpdateTimer.getElapsedTimeF32() > 10.f || (show_clock_seconds && mClockUpdateTimer.getElapsedTimeF32() > 1.f)))
     {
         mClockUpdateTimer.reset();
 
-        // Get current UTC time, adjusted for the user's clock
-        // being off.
-        time_t utc_time;
-        utc_time = time_corrected();
-
-        static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
-        std::string timeStr = use_24h ? getString("time") : getString("time_ampm");
-
-        LLSD substitution;
-        substitution["datetime"] = (S32) utc_time;
-        LLStringUtil::format (timeStr, substitution);
-        mTextTime->setText(timeStr);
-
-        // set the tooltip to have the date
-        std::string dtStr = getString("timeTooltip");
-        LLStringUtil::format (dtStr, substitution);
-        mTextTime->setToolTip (dtStr);
+        updateClock();
     }
 
     if (mBalanceClicked && mBalanceClickTimer.getElapsedTimeF32() > 1.f)
@@ -833,6 +819,31 @@ void LLStatusBar::updateBalancePanelPosition()
 void LLStatusBar::setBalanceVisible(bool visible)
 {
     mBoxBalance->setVisible(visible);
+}
+
+void LLStatusBar::updateClock()
+{
+    static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
+
+    // Get current UTC time, adjusted for the user's clock
+    // being off.
+    time_t utc_time;
+    utc_time = time_corrected();
+
+    static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+    std::string timeStr = show_clock_seconds ?
+    use_24h ? getString("time_sec") : getString("time_ampm_sec") :
+    use_24h ? getString("time") : getString("time_ampm");
+
+    LLSD substitution;
+    substitution["datetime"] = (S32) utc_time;
+    LLStringUtil::format (timeStr, substitution);
+    mTextTime->setText(timeStr);
+
+    // set the tooltip to have the date
+    std::string dtStr = getString("timeTooltip");
+    LLStringUtil::format (dtStr, substitution);
+    mTextTime->setToolTip (dtStr);
 }
 
 // Implements secondlife:///app/balance/request to request a L$ balance

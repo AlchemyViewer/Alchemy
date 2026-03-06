@@ -29,6 +29,14 @@
         [hour, datetime, slt]:[min, datetime, slt] [timezone,datetime, slt]
     </panel.string>
     <panel.string
+     name="time_ampm_sec">
+        [hour12, datetime, slt]:[min, datetime, slt]:[second, datetime, slt] [ampm, datetime, slt] [timezone,datetime, slt]
+    </panel.string>
+    <panel.string
+     name="time_sec">
+        [hour, datetime, slt]:[min, datetime, slt]:[second, datetime, slt] [timezone,datetime, slt]
+    </panel.string>
+    <panel.string
      name="timeTooltip">
         [weekday, datetime, slt], [day, datetime, slt] [month, datetime, slt] [year, datetime, slt]
     </panel.string>

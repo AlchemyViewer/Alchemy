@@ -96,6 +96,12 @@ private:
      */
     void onParcelIconClick(EParcelIcon icon);
 
+
+    /**
+     * Handles clicks on the parcel info text.
+     */
+    void onParcelInfoTextClicked();
+
     /**
      * Handles clicks on the info buttons.
      */
