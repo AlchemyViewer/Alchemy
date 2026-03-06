@@ -92,6 +92,8 @@ LLFolderDictionary::LLFolderDictionary()
 
     addEntry(LLFolderType::FT_ANIM_OVERRIDES,       new FolderEntry("animover", TRUE, FALSE, FALSE));
 
+    addEntry(LLFolderType::FT_RLV,                  new FolderEntry("rlv",      TRUE, FALSE, FALSE));
+
     addEntry(LLFolderType::FT_NONE,                 new FolderEntry("-1",       false, false, false));
 };
 

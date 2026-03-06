@@ -98,6 +98,7 @@ public:
         FT_MATERIAL = 57,
 
         FT_ANIM_OVERRIDES = 58,
+        FT_RLV = 60,
 
         FT_COUNT,
 

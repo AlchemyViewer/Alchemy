@@ -3937,6 +3937,8 @@ LLFolderType::EType LLFolderBridge::getPreferredType() const
         const std::string& cat_name(cat->getName());
         if (cat_name == ROOT_AO_FOLDER)
             preferred_type = LLFolderType::FT_ANIM_OVERRIDES;
+        else if (cat_name == RLV_ROOT_FOLDER)
+            preferred_type = LLFolderType::FT_RLV;
         else
             preferred_type = cat->getPreferredType();
     }
