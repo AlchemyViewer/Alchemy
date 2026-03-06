@@ -588,7 +588,6 @@ void LLViewerShaderMgr::setShaders()
     unloadShaders();
 
     LLPipeline::sRenderGlow = gSavedSettings.getBOOL("RenderGlow");
-    LLPipeline::RenderAvatarCloth = gSavedSettings.getBOOL("RenderAvatarCloth");
     LLPipeline::sRenderTransparentWater = gSavedSettings.getBOOL("RenderTransparentWater");
 
     if (gViewerWindow)
@@ -2374,7 +2373,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         gDeferredAvatarProgram.clearPermutations();
         add_common_permutations(&gDeferredAvatarProgram);
-        gDeferredAvatarProgram.addPermutation("AVATAR_CLOTH", LLPipeline::RenderAvatarCloth ? "1" : "0");
+        if (gSavedSettings.getBOOL("RenderAvatarCloth"))
+        {
+            gDeferredAvatarProgram.addPermutation("AVATAR_CLOTH", "1");
+        }
 
         success = gDeferredAvatarProgram.createShader();
         llassert(success);
