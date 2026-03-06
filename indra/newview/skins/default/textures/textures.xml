@@ -799,6 +799,8 @@ with the same filename but different name
   <texture name="cloud-particle.j2c" use_mips="true" />
   <texture name="transparent.j2c" use_mips="true" />
 
+  <texture name="Transparent" file_name="transparent.tga" preload="true" />
+
   <!--WARNING OLD ART BELOW *do not use*-->
   <texture name="icn_media_web.tga" preload="true" />
   <texture name="icn_media_movie.tga" preload="true" />
@@ -831,7 +833,8 @@ with the same filename but different name
   <texture name="button_anim_play.tga" />
   <texture name="button_anim_play_selected.tga" />
   <texture name="crosshairs.tga" />
-  <texture name="direction_arrow.tga" file_name="world/BeaconArrow.png" />
+  <texture name="direction_arrow.tga" />
+  <texture name="target_arrow.tga" />
 
   <texture name="icon_avatar_offline.tga" />
   <texture name="icon_avatar_online.tga" />
@@ -901,6 +904,14 @@ with the same filename but different name
   <texture name="Camera_Drag_Dot" file_name="world/CameraDragDot.png"/>
   <texture name="NavBar Separator" file_name="navbar/separator.png"/>
 
+  <texture name="Cake" file_name="icons/cake_32.png" preload="false"/>
+  <texture name="Clipboard_Copy" file_name="icons/clipboard_copy.png" preload="false" />
+  <texture name="Clipboard_Cut" file_name="icons/clipboard_cut.png" preload="false" />
+  <texture name="Clipboard_Paste" file_name="icons/clipboard_paste.png" preload="false" />
+
+  <texture name="AccountLevel_Plus" file_name="icons/AccountLevel_Plus.png" preload="false" />
+  <texture name="AccountLevel_Premium" file_name="icons/AccountLevel_Premium.png" preload="false" />
+
   <texture name="Default_Outfit_Photo" file_name="icons/Default_Outfit_Photo.png" preload="true"/>
   <texture name="Notification_Condense" file_name="icons/Icon_Notification_Condense.png" preload="true"/>
   <texture name="Notification_Expand" file_name="icons/Icon_Notification_Expand.png" preload="true"/>
@@ -915,5 +926,14 @@ with the same filename but different name
   <texture name="Single_Folder_Up" file_name="icons/single_folder_up.png" preload="true"/>
   <texture name="Icon_Color_Palette" file_name="icons/Icon_Color_Palette.png" preload="false"/>
   <texture name="Icon_Font_Size" file_name="icons/Icon_Font_Size.png" preload="false"/>
+ 
+  <texture name="AlchemyRelease128" file_name="alchemy/alchemy_128.png" preload="false" />
+  <texture name="AlchemyBeta128" file_name="alchemy/alchemybeta_128.png" preload="false" />
+  <texture name="AlchemyProject128" file_name="alchemy/alchemyproject_128.png" preload="false" />
+  <texture name="AlchemyTest128" file_name="alchemy/alchemytest_128.png" preload="false" />
+
+  <texture name="Cam_Recall" file_name="icons/Cam_Recall.png"/>
+  <texture name="Cam_Save" file_name="icons/Cam_Save.png"/>
+
   <texture name="Icon_Pointer" file_name="icons/Icon_Pointer.png" preload="false"/>
 </textures>
