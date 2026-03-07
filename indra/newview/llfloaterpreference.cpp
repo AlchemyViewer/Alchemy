@@ -684,7 +684,7 @@ void LLFloaterPreference::reloadSkinList()
         row["columns"][0]["font"]["style"] = current_skin == skin.first ? "BOLD" : "NORMAL";
         skin_list->addElement(row);
     }
-    skin_list->setSelectedByValue(current_skin, TRUE);
+    skin_list->setSelectedByValue(current_skin, true);
     onSelectSkin(skin_list->getSelectedValue());
 }
 
@@ -796,10 +796,10 @@ void LLFloaterPreference::callbackApplySkin(const LLSD& notification, const LLSD
     switch (option)
     {
         case 0: // Yes
-            gSavedSettings.setBOOL("ResetUserColorsOnLogout", TRUE);
+            gSavedSettings.setBOOL("ResetUserColorsOnLogout", true);
             break;
         case 1: // No
-            gSavedSettings.setBOOL("ResetUserColorsOnLogout", FALSE);
+            gSavedSettings.setBOOL("ResetUserColorsOnLogout", false);
             break;
         case 2: // Cancel
             gSavedSettings.setString("SkinCurrent", sSkin);

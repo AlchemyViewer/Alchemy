@@ -2330,7 +2330,7 @@ void sendRadarAlert(const LLUUID& agent, const std::string& region_str, bool ent
     if (entering)
     {
         notify_params.name = "RadarAlertEnter";
-        notify_params.payload = LLSD().with("respond_on_mousedown", TRUE);
+        notify_params.payload = LLSD().with("respond_on_mousedown", true);
         notify_params.functor.function = boost::bind(&ALAvatarActions::zoomIn, agent);
     }
     else

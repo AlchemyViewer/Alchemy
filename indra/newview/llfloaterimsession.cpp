@@ -308,7 +308,7 @@ void LLFloaterIMSession::sendMsg(const std::string& msg)
                         }
 
                         LLSpeakerMgr::speaker_list_t speakers;
-                        pIMSession->mSpeakers->getSpeakerList(&speakers, TRUE);
+                        pIMSession->mSpeakers->getSpeakerList(&speakers, true);
                         for (LLSpeakerMgr::speaker_list_t::const_iterator itSpeaker = speakers.begin();
                                 itSpeaker != speakers.end(); ++itSpeaker)
                         {

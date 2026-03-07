@@ -856,7 +856,7 @@ bool LLSelectMgr::enableLinkObjects()
         // Allow only if the avie isn't sitting on any of the selected objects
         LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
         RlvSelectIsSittingOn f(gAgentAvatarp);
-        if (hSel->getFirstRootNode(&f, TRUE) != NULL)
+        if (hSel->getFirstRootNode(&f, true) != nullptr)
             new_value = false;
     }
 // [/RLVa:KB]
@@ -878,7 +878,7 @@ bool LLSelectMgr::enableUnlinkObjects()
         // Allow only if the avie isn't sitting on any of the selected objects
         LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
         RlvSelectIsSittingOn f(gAgentAvatarp);
-        if (hSel->getFirstRootNode(&f, TRUE) != NULL)
+        if (hSel->getFirstRootNode(&f, true) != nullptr)
             new_value = false;
     }
 // [/RLVa:KB]
@@ -5032,7 +5032,7 @@ void LLSelectMgr::deselectAllIfTooFar()
                 return (!pNode->isTransient()) && (pObj) && (!RlvActions::canEdit(pObj)) && (pObj->getID() != LLViewerMediaFocus::getInstance()->getFocusedObjectID());
             }
         } f;
-        if (mSelectedObjects->getFirstRootNode(&f, TRUE))
+        if (mSelectedObjects->getFirstRootNode(&f, true))
             deselectAll();
     }
 // [/RLVa:KB]
