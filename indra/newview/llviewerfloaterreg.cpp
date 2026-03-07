@@ -35,6 +35,7 @@
 #include "alfloatergenerictext.h"
 #include "alfloaterparticleeditor.h"
 #include "alfloaterprogressview.h"
+#include "alfloaterregiontracker.h"
 #include "llcommandhandler.h"
 #include "llcompilequeue.h"
 #include "llfasttimerview.h"
@@ -544,6 +545,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("generic_text", "floater_al_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGenericText>);
     LLFloaterReg::add("particle_editor", "floater_al_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
     LLFloaterReg::add("progress_view", "floater_al_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProgressView>);
+    LLFloaterReg::add("region_tracker", "floater_al_region_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterRegionTracker>);
 
     // *NOTE: Please keep these alphabetized for easier merges
 

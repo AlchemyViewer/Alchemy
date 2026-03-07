@@ -719,9 +719,22 @@
      top_pad="5"
      name="Show Destination"
      tool_tip="Center map on selected location"
-     width="213">
+     width="104">
 		<button.commit_callback
 		function="WMap.ShowTarget" />
+    </button>
+    <button
+     enabled="false"
+     follows="right|bottom"
+     height="23"
+     label="Track Region"
+     left_pad="5"
+     name="track_region"
+     tool_tip="Add the region to the region tracker"
+	 top_delta="0"
+     width="104">
+		<button.commit_callback
+		function="WMap.TrackRegion" />
     </button>
     </panel>
       <panel

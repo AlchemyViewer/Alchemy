@@ -155,6 +155,7 @@ protected:
     void            onShowTargetBtn();
     void            onShowAgentBtn();
     void            onCopySLURL();
+    void            onTrackRegion();
 
     void            onExpandCollapseBtn();
 
@@ -224,6 +225,7 @@ private:
     LLButton*               mTeleportButton = nullptr;
     LLButton*               mShowDestinationButton = nullptr;
     LLButton*               mCopySlurlButton = nullptr;
+    LLButton*               mTrackRegionButton = nullptr;
     LLButton*               mGoHomeButton = nullptr;
     LLButton*               mSearchButton = nullptr;
 

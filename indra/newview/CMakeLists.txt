@@ -78,6 +78,7 @@ set(viewer_SOURCE_FILES
     alfloatergenerictext.cpp
     alfloaterparticleeditor.cpp
     alfloaterprogressview.cpp
+    alfloaterregiontracker.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
     alpanelradaralert.cpp
@@ -779,6 +780,7 @@ set(viewer_HEADER_FILES
     alfloatergenerictext.h
     alfloaterparticleeditor.h
     alfloaterprogressview.h
+    alfloaterregiontracker.h
     alpanelaomini.h
     alpanelaopulldown.h
     alpanelradaralert.h
