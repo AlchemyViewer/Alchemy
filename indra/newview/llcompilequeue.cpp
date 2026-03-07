@@ -49,6 +49,7 @@
 #include "llresmgr.h"
 
 #include "llbutton.h"
+#include "llscrolllistctrl.h"
 #include "lldir.h"
 #include "llnotificationsutil.h"
 #include "llviewerstats.h"
@@ -381,11 +382,18 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     // Attempt to retrieve the experience
     LLUUID experienceId;
     {
-        LLExperienceCache::instance().fetchAssociatedExperience(inventory->getParentUUID(), inventory->getUUID(),
-            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _1));
+        if (object->getRegion() && object->getRegion()->isCapabilityAvailable("GetMetadata"))
+        {
+        	LLExperienceCache::instance().fetchAssociatedExperience(inventory->getParentUUID(), inventory->getUUID(),
+            	boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _1));
 
-        result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT,
-            LLSDMap("timeout", LLSD::Boolean(true)));
+        	result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT,
+            	LLSDMap("timeout", LLSD::Boolean(true)));
+        }
+        else
+        {
+            result = LLSD();
+        }
 
         floater.check();
 
@@ -537,6 +545,10 @@ bool LLFloaterCompileQueue::startQueue()
             LLCoreHttpUtil::HttpCoroutineAdapter::callbackHttpGet(lookup_url,
                 success, failure);
             return true;
+        }
+        else
+        {
+            processExperienceIdResults(LLSD(), getKey().asUUID());
         }
     }
 
@@ -713,6 +725,48 @@ bool LLFloaterNotRunQueue::startQueue()
 
     return true;
 }
+
+///----------------------------------------------------------------------------
+/// Class LLFloaterDeleteQueue
+///----------------------------------------------------------------------------
+
+LLFloaterDeleteQueue::LLFloaterDeleteQueue(const LLSD& key)
+    : LLFloaterScriptQueue(key)
+{
+    setTitle(LLTrans::getString("DeleteQueueTitle"));
+    setStartString(LLTrans::getString("DeleteQueueStart"));
+}
+
+bool LLFloaterDeleteQueue::deleteObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater,
+    const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump)
+{
+    LLCheckedHandle<LLFloaterScriptQueue> floater(hfloater);
+    // Dereferencing floater may fail. If they do they throw LLExeceptionStaleHandle.
+    // which is caught in objectScriptProcessingQueueCoro
+
+    std::string buffer;
+    buffer = floater->getString("Deleting") + (": ") + inventory->getName();
+    floater->addStringMessage(buffer);
+
+    const_cast<LLViewerObject*>(object.get())->removeInventory(inventory->getUUID());
+
+    return true;
+}
+
+bool LLFloaterDeleteQueue::startQueue()
+{
+    LLHandle<LLFloaterScriptQueue> hFloater(getDerivedHandle<LLFloaterScriptQueue>());
+
+    fnQueueAction_t fn = boost::bind(&LLFloaterDeleteQueue::deleteObjectScripts, hFloater, _1, _2, _3);
+    LLCoros::instance().launch("ScriptDeleteQueue", boost::bind(LLFloaterScriptQueue::objectScriptProcessingQueueCoro,
+        mStartString,
+        hFloater,
+        mObjectList,
+        fn));
+
+    return true;
+}
+
 
 ///----------------------------------------------------------------------------
 /// Local function definitions
