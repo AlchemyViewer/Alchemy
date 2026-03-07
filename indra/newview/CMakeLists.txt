@@ -74,6 +74,7 @@ set(viewer_SOURCE_FILES
     aoengine.cpp
     aoset.cpp
     alavataractions.cpp
+    alchatcommand.cpp
     alfloatergenerictext.cpp
     alfloaterprogressview.cpp
     alpanelaomini.cpp
@@ -772,6 +773,7 @@ set(viewer_HEADER_FILES
     aoengine.h
     aoset.h
     alavataractions.h
+    alchatcommand.h
     alfloatergenerictext.h
     alfloaterprogressview.h
     alpanelaomini.h

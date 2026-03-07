@@ -55,6 +55,7 @@
 #include "llfloaterimnearbychat.h"
 #include "llappearancemgr.h"
 #include "llgesturelistener.h"
+#include "alchatcommand.h"
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvactions.h"
@@ -1071,8 +1072,11 @@ void LLGestureMgr::runStep(LLMultiGesture* gesture, LLGestureStep* step)
 
             const bool animate = false;
 
-            (LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))->
-                    sendChatFromViewer(chat_text, CHAT_TYPE_NORMAL, animate);
+            if(!chat_text.empty() && !ALChatCommand::parseCommand(chat_text))
+            {
+                (LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))->
+                        sendChatFromViewer(chat_text, CHAT_TYPE_NORMAL, animate);
+            }
 
             gesture->mCurrentStep++;
             break;

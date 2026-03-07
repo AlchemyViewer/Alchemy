@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+    height="408"
+    layout="topleft"
+    name="autoresponse_settings"
+    top="0"
+    left="13"
+    width="517">
+      <text
+         type="string"
+         length="1"
+         follows="left|top"
+         height="13"
+         layout="topleft"
+         left="15"
+         mouse_opaque="false"
+         name="autorespond_response_label"
+         top_pad="10"
+         width="475">
+           Automatic response to all avatars when in AUTORESPONSE to everyone mode:
+        </text>
+        <text_editor
+         enabled_control="AlchemyAutoresponseEnable"
+         control_name="AlchemyAutoresponse"
+         use_ellipses="false"
+         commit_on_focus_lost = "true"
+         follows="left|top"
+         height="45"
+         layout="topleft"
+         left="15"
+         top_pad="10"
+         name="AlchemyAutoresponse"
+         width="475"
+         word_wrap="true">
+           log_in_to_change
+        </text_editor>
+
+        <text
+         type="string"
+         length="1"
+         follows="left|top"
+         height="13"
+         layout="topleft"
+         left="15"
+         mouse_opaque="false"
+         name="autorespond_nf_response_label"
+         top_pad="10"
+         width="475">
+           Automatic response to non-friends when in AUTORESPONSE TO NON-FRIENDS mode:
+        </text>
+        <text_editor
+        enabled_control="AlchemyAutoresponseNotFriendEnable"
+         control_name="AlchemyAutoresponseNotFriend"
+         use_ellipses="false"
+         commit_on_focus_lost = "true"
+         follows="left|top"
+         height="45"
+         layout="topleft"
+         left="15"
+         top_pad="10"
+         name="AlchemyAutoresponseNotFriend"
+         width="475"
+         word_wrap="true">
+           log_in_to_change
+        </text_editor>
+    <check_box
+     top_pad="5"
+     follows="left|top"
+     height="16"
+     label="Autorespond to new instant messages from anyone"
+     left="10"
+     name="AlchemyAutoresponseEnable"
+     width="270"
+     control_name="AlchemyAutoresponseEnable"/>
+    <check_box
+     top_pad="5"
+     follows="left|top"
+     height="16"
+     label="Autorespond to new instant messages from non-friends"
+     left="10"
+     name="AlchemyAutoresponseNotFriendEnable"
+     width="270"
+     control_name="AlchemyAutoresponseNotFriendEnable"/>
+
+    </panel>

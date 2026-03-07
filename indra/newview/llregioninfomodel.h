@@ -87,6 +87,7 @@ protected:
 private:
     void reset();
 
+public:
     // *FIXME: Duplicated code from LLPanelRegionInfo
     static void sendEstateOwnerMessage(
         LLMessageSystem* msg,
@@ -94,6 +95,7 @@ private:
         const LLUUID& invoice,
         const std::vector<std::string>& strings);
 
+private:
     update_signal_t mUpdateSignal;
 };
 
