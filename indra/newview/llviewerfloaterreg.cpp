@@ -33,6 +33,7 @@
 
 #include "ao.h"
 #include "alfloatergenerictext.h"
+#include "alfloaterparticleeditor.h"
 #include "alfloaterprogressview.h"
 #include "llcommandhandler.h"
 #include "llcompilequeue.h"
@@ -541,6 +542,7 @@ void LLViewerFloaterReg::registerFloaters()
     // Alchemy Floaters
     LLFloaterReg::add("ao", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterAO>);
     LLFloaterReg::add("generic_text", "floater_al_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGenericText>);
+    LLFloaterReg::add("particle_editor", "floater_al_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
     LLFloaterReg::add("progress_view", "floater_al_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProgressView>);
 
     // *NOTE: Please keep these alphabetized for easier merges

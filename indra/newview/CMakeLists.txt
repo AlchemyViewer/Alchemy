@@ -76,6 +76,7 @@ set(viewer_SOURCE_FILES
     alavataractions.cpp
     alchatcommand.cpp
     alfloatergenerictext.cpp
+    alfloaterparticleeditor.cpp
     alfloaterprogressview.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
@@ -776,6 +777,7 @@ set(viewer_HEADER_FILES
     alavataractions.h
     alchatcommand.h
     alfloatergenerictext.h
+    alfloaterparticleeditor.h
     alfloaterprogressview.h
     alpanelaomini.h
     alpanelaopulldown.h
