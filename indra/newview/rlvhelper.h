@@ -98,14 +98,14 @@ protected:
 // RlvBehaviourDictionary and related classes
 //
 
-class RlvBehaviourDictionary : public LLSingleton<RlvBehaviourDictionary>
+class RlvBehaviourDictionary : public LLSimpleton<RlvBehaviourDictionary>
 {
     friend class RlvFloaterBehaviours;
 
-    LLSINGLETON(RlvBehaviourDictionary);
-protected:
-    ~RlvBehaviourDictionary();
 public:
+    RlvBehaviourDictionary();
+    ~RlvBehaviourDictionary();
+
     void addEntry(const RlvBehaviourInfo* pBhvrEntry);
     void addModifier(ERlvBehaviour eBhvr, ERlvBehaviourModifier eModifier, RlvBehaviourModifier* pModifierEntry);
     void addModifier(const RlvBehaviourInfo* pBhvrEntry, ERlvBehaviourModifier eModifier, RlvBehaviourModifier* pModifierEntry);

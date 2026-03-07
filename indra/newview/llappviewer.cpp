@@ -255,6 +255,7 @@ using namespace LL;
 #include "llmachineid.h"
 #include "llcleanup.h"
 
+#include "llinventoryicon.h"
 #include "llcoproceduremanager.h"
 #include "llviewereventrecorder.h"
 #include "llcontrolavatar.h"
@@ -785,19 +786,15 @@ bool LLAppViewer::init()
     // this allows simple skinned file lookups to work
     gDirUtilp->setSkinFolder("default", "en");
 
-    // Init early simpletons
-    LLInventoryDictionary::createInstance();
-    LLAssetDictionary::createInstance();
-    LLFolderDictionary::createInstance();
-    LLViewerFolderDictionary::createInstance();
-    LLUIColorTable::createInstance();
-
 //  initLoggingAndGetLastDuration();
 
     //
     // OK to write stuff to logs now, we've now crash reported if necessary
     //
     init_default_trans_args();
+
+    // Initialize ui color table singleton
+    LLUIColorTable::createInstance();
 
     // inits from settings.xml and from strings.xml
     if (!initConfiguration())
@@ -808,6 +805,14 @@ bool LLAppViewer::init()
     }
 
     LL_INFOS("InitInfo") << "Configuration initialized." << LL_ENDL ;
+
+    // Init dictionary simpletons
+    LLInventoryDictionary::createInstance();
+    LLAssetDictionary::createInstance();
+    LLFolderDictionary::createInstance();
+    LLViewerFolderDictionary::createInstance();
+    LLIconDictionary::createInstance();
+    RlvBehaviourDictionary::createInstance();
 
     // Init coroutine manager
     LLCoros::createInstance();
@@ -2305,9 +2310,11 @@ bool LLAppViewer::cleanup()
     LLCoros::deleteSingleton();
 
     // Destroy static dictionaries
+    RlvBehaviourDictionary::deleteSingleton();
     LLSettingsType::deleteSingleton();
     LLWearableType::deleteSingleton();
     LLEmojiDictionary::deleteSingleton();
+    LLIconDictionary::deleteSingleton();
     LLViewerFolderDictionary::deleteSingleton();
     LLFolderDictionary::deleteSingleton();
     LLAssetDictionary::deleteSingleton();
