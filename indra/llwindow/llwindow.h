@@ -40,7 +40,7 @@ class LLWindowCallbacks;
 
 // Refer to llwindow_test in test/common/llwindow for usage example
 
-class LLWindow : public LLInstanceTracker<LLWindow>
+class LLWindow
 {
 public:
 
@@ -317,6 +317,7 @@ public:
 //
 // helper funcs
 //
+extern LLWindow* gWindowp;
 extern bool gDebugWindowProc;
 
 // Protocols, like "http" and "https" we support in URLs
