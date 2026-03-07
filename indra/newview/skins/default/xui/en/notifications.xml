@@ -12971,6 +12971,24 @@ are wearing now.
     <tag>fail</tag>
     [PACKAGE] was added successfully.
   </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="RadarAlertEnter"
+   log_to_chat="false"
+   type="notifytip">
+    <tag>radar</tag>
+    [AGENT] has entered [REGION].
+   </notification>
+   <notification
+    icon="notifytip.tga"
+    name="RadarAlertLeave"
+    log_to_chat="false"
+    type="notifytip">
+     <tag>radar</tag>
+     [AGENT] has left [REGION].
+  </notification>
+
   <notification
    icon="alertmodal.tga"
    name="NewAOSet"
@@ -13136,5 +13154,36 @@ Could not create import folder for animation set [NAME]. Giving up.
    name="AOImportLinkFailed"
    type="notifytip">
 Creating animation link for animation "[NAME]" failed!
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="RevokedMapRights"
+    persist="true"
+    log_to_im="true"
+    type="notify">
+Your privilege to find [NAME]&apos;s map location has been revoked.
+  </notification>
+  <notification
+    icon="alertmodal.tga"
+    name="GrantedMapRights"
+    persist="true"
+    log_to_im="true"
+    type="notify">
+[NAME] has given you permission to find their location on the map.
+  </notification>
+
+  <notification
+	icon="notifytip.tga"
+	name="SnapshotDetected"
+	type="notifytip">
+	[NAME] took a snapshot! :O
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="CantRestoreToWorldNoCopy"
+   type="alertmodal">
+Restore to Last Position is not allowed for no copy items to prevent possible content loss.
   </notification>
 </notifications>

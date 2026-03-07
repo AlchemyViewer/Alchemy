@@ -654,35 +654,37 @@ void LLAvatarTracker::processChange(LLMessageSystem* msg)
         msg->getS32Fast(_PREHASH_Rights,_PREHASH_RelatedRights, new_rights, i);
         if(agent_id == gAgent.getID())
         {
-            if(mBuddyInfo.find(agent_related) != mBuddyInfo.end())
+            auto buddy_it = mBuddyInfo.find(agent_related);
+            if(buddy_it != mBuddyInfo.end())
             {
-                (mBuddyInfo[agent_related])->setRightsTo(new_rights);
+                buddy_it->second->setRightsTo(new_rights);
                 mChangedBuddyIDs.insert(agent_related);
             }
         }
         else
         {
+            auto buddy_it = mBuddyInfo.find(agent_id);
             if(mBuddyInfo.find(agent_id) != mBuddyInfo.end())
             {
-                if (((mBuddyInfo[agent_id]->getRightsGrantedFrom() ^  new_rights) & LLRelationship::GRANT_MODIFY_OBJECTS))
+                S32 change = buddy_it->second->getRightsGrantedFrom() ^ new_rights;
+                if (change && !gAgent.isDoNotDisturb())
                 {
-                    LLSD args;
-                    args["NAME"] = LLSLURL("agent", agent_id, "displayname").getSLURLString();
-
-                    LLSD payload;
-                    payload["from_id"] = agent_id;
-                    if(LLRelationship::GRANT_MODIFY_OBJECTS & new_rights)
+                    LLSD args = LLSD().with("NAME", LLSLURL("agent", agent_id, "displayname").getSLURLString());
+                    LLSD payload = LLSD().with("from_id", agent_id);
+                    if (change & LLRelationship::GRANT_MODIFY_OBJECTS)
                     {
-                        LLNotifications::instance().add("GrantedModifyRights",args, payload);
+                        LLNotifications::instance().add(LLRelationship::GRANT_MODIFY_OBJECTS & new_rights
+                            ? "GrantedModifyRights" : "RevokedModifyRights", args, payload);
                     }
-                    else
+                    if (change & LLRelationship::GRANT_MAP_LOCATION)
                     {
-                        LLNotifications::instance().add("RevokedModifyRights",args, payload);
+                        LLNotifications::instance().add(LLRelationship::GRANT_MAP_LOCATION & new_rights
+                            ? "GrantedMapRights" : "RevokedMapRights", args, payload);
                     }
                 }
                 // update modify permissions flags for affected objects
                 LLViewerObject::markObjectsForUpdate(agent_id);
-                (mBuddyInfo[agent_id])->setRightsFrom(new_rights);
+                buddy_it->second->setRightsFrom(new_rights);
             }
         }
     }
@@ -761,24 +763,31 @@ static void on_avatar_name_cache_notify(const LLUUID& agent_id,
 {
     // Popup a notify box with online status of this agent
     // Use display name only because this user is your friend
+    static const std::string online_status = LLTrans::getString("OnlineStatus");
+    static const std::string offline_status = LLTrans::getString("OfflineStatus");
+
     LLSD args;
     args["NAME"] = av_name.getDisplayName();
-    args["STATUS"] = online ? LLTrans::getString("OnlineStatus") : LLTrans::getString("OfflineStatus");
+    args["STATUS"] = online ? online_status : offline_status;
 
-    LLNotificationPtr notification;
+    LLNotification::Params notify_params;
+    notify_params.name = "FriendOnlineOffline";
+    notify_params.substitutions = args;
     if (online)
     {
-        notification =
-            LLNotifications::instance().add("FriendOnlineOffline",
-                                     args,
-                                     payload.with("respond_on_mousedown", true),
-                                     boost::bind(&LLAvatarActions::startIM, agent_id));
+        notify_params.payload = payload.with("respond_on_mousedown", true);
+
+        LLNotification::Params::Functor functor_p;
+        functor_p.function = boost::bind(&LLAvatarActions::startIM, agent_id);
+        notify_params.functor = functor_p;
     }
     else
     {
-        notification =
-            LLNotifications::instance().add("FriendOnlineOffline", args, payload);
+        notify_params.payload = payload;
     }
+
+    notify_params.force_to_chat = gSavedSettings.getBOOL("AlchemyOnlineOfflineToChat");
+    LLNotificationPtr notification = LLNotifications::instance().add(notify_params);
 
     // If there's an open IM session with this agent, send a notification there too.
     LLUUID session_id = LLIMMgr::computeSessionID(IM_NOTHING_SPECIAL, agent_id);

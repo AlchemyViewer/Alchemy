@@ -79,7 +79,7 @@ bool LLTipHandler::processNotification(const LLNotificationPtr& notification, bo
     }
 
         // archive message in nearby chat
-    if (notification->canLogToChat())
+    if (notification->canLogToChat() || notification->isSendToChatForced())
     {
         LLHandlerUtil::logToNearbyChat(notification, CHAT_SOURCE_SYSTEM);
     }

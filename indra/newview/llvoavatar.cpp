@@ -78,6 +78,7 @@
 #include "llregionhandle.h"
 #include "llresmgr.h"
 #include "llselectmgr.h"
+#include "llslurl.h"
 #include "llsprite.h"
 #include "lltargetingmotion.h"
 #include "lltoolmgr.h"
@@ -3621,19 +3622,19 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
             if ( (fRlvShowAvName) || (isSelf()) )
             {
 // [/RLVa:KB]
-            // Might be blank if name not available yet, that's OK
-            if (show_display_names)
-            {
-                addNameTagLine(av_name.getDisplayName(), name_tag_color, LLFontGL::NORMAL,
-                    LLFontGL::getFontSansSerif(), true);
-            }
-            // Suppress SLID display if display name matches exactly (ugh)
-            if (show_usernames && !av_name.isDisplayNameDefault())
-            {
-                // *HACK: Desaturate the color
-                LLColor4 username_color = name_tag_color * 0.83f;
-                addNameTagLine(av_name.getUserName(), username_color, LLFontGL::NORMAL,
-                    LLFontGL::getFontSansSerifSmall(), true);
+                // Might be blank if name not available yet, that's OK
+                if (show_display_names)
+                {
+                    addNameTagLine(av_name.getDisplayName(), name_tag_color, LLFontGL::NORMAL,
+                        LLFontGL::getFontSansSerif(), true);
+                }
+                // Suppress SLID display if display name matches exactly (ugh)
+                if (show_usernames && !av_name.isDisplayNameDefault())
+                {
+                    // *HACK: Desaturate the color
+                    LLColor4 username_color = name_tag_color * 0.83f;
+                    addNameTagLine(av_name.getUserName(), username_color, LLFontGL::NORMAL,
+                        LLFontGL::getFontSansSerifSmall(), true);
                 }
 // [RLVa:KB] - Checked: RLVa-1.2.2
             }
@@ -6208,7 +6209,14 @@ bool LLVOAvatar::processSingleAnimationStateChange( const LLUUID& anim_id, bool 
         {
             sitDown(true);
         }
-
+        else if (anim_id == ANIM_AGENT_SNAPSHOT)
+        {
+            static LLCachedControl<bool> announce_snapshot(gSavedSettings, "SnapshotDetection");
+            if (announce_snapshot)
+            {
+                LLNotificationsUtil::add("SnapshotDetected", LLSD().with("NAME", LLSLURL("agent", mID, "about").getSLURLString()));
+            }
+        }
 
         if (startMotion(anim_id))
         {
@@ -8822,7 +8830,6 @@ void LLVOAvatar::updateTooSlow()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     static LLCachedControl<S32> complexity_render_mode(gSavedSettings, "RenderAvatarComplexityMode");
     static LLCachedControl<bool> allowSelfImpostor(gSavedSettings, "AllowSelfImpostor");
-    const auto id = getID();
 
     // mTooSlow - Is the avatar flagged as being slow (includes shadow time)
     // mTooSlowWithoutShadows - Is the avatar flagged as being slow even with shadows removed.
@@ -10925,8 +10932,6 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
     for (const auto& iter : mAttachmentPoints)
     {
         LLViewerJointAttachment* attachment = iter.second;
-        LLViewerJointAttachment::attachedobjs_vec_t::iterator attach_end = attachment->mAttachedObjects.end();
-
         for (LLViewerObject* attached_object : attachment->mAttachedObjects)
         {
             if (attached_object->isDead())

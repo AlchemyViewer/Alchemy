@@ -44,6 +44,7 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h"
+#include "alavataractions.h"
 #include "llavatarrenderinfoaccountant.h"
 #include "llcallingcard.h"
 #include "llcommandhandler.h"
@@ -81,6 +82,7 @@
 #include "lleventcoro.h"
 #include "llcorehttputil.h"
 #include "llsettingsdaycycle.h"
+#include "llslurl.h"
 
 #include <boost/regex.hpp>
 
@@ -2312,12 +2314,48 @@ LLHTTPRegistration<CoarseLocationUpdate>
        "/message/CoarseLocationUpdate");
 
 
+void sendRadarAlert(const LLUUID& agent, const std::string& region_str, bool entering)
+{
+    // If we're teleporting, we don't want to see the radar's alerts about EVERY agent leaving.
+    if(gAgent.getTeleportState() != LLAgent::TELEPORT_NONE && !entering)
+    {
+        return;
+    }
+    LLSD args;
+    args["AGENT"] = LLSLURL("agent", agent, "inspect").getSLURLString();
+    args["REGION"] = region_str;
+
+    LLNotification::Params notify_params;
+    notify_params.substitutions = args;
+    if (entering)
+    {
+        notify_params.name = "RadarAlertEnter";
+        notify_params.payload = LLSD().with("respond_on_mousedown", TRUE);
+        notify_params.functor.function = boost::bind(&ALAvatarActions::zoomIn, agent);
+    }
+    else
+    {
+        notify_params.name = "RadarAlertLeave";
+    }
+
+    static LLCachedControl<bool> sLogRadarToChat(gSavedSettings, "AlchemyRadarAlertsToChat", false);
+    notify_params.force_to_chat = sLogRadarToChat;
+    LLNotifications::instance().add(notify_params);
+
+}
+
+static uuid_vec_t mVecAgents;
+
 // the deprecated coarse location handler
 void LLViewerRegion::updateCoarseLocations(LLMessageSystem* msg)
 {
     //LL_INFOS() << "CoarseLocationUpdate" << LL_ENDL;
     mMapAvatars.clear();
     mMapAvatarIDs.clear(); // only matters in a rare case but it's good to be safe.
+
+    static LLCachedControl<bool> sRadarAlerts(gSavedSettings, "AlchemyRadarAlerts", false);
+    LLViewerRegion* cur_region = gAgent.getRegion();
+    uuid_vec_t region_agents;
 
     U8 x_pos = 0;
     U8 y_pos = 0;
@@ -2370,8 +2408,33 @@ void LLViewerRegion::updateCoarseLocations(LLMessageSystem* msg)
             if(has_agent_data)
             {
                 mMapAvatarIDs.push_back(agent_id);
+
+                if (this == cur_region)
+                {
+                    region_agents.push_back(agent_id);
+                    uuid_vec_t::iterator end = mVecAgents.end();
+                    if (find(mVecAgents.begin(), end, agent_id) == end)
+                    {
+                        if (sRadarAlerts)
+                            sendRadarAlert(agent_id, this->getName(), true);
+                    }
+                }
             }
         }
+    }
+    if (this == cur_region)
+    {
+        for (const LLUUID& agent: mVecAgents)
+        {
+            uuid_vec_t::iterator end = region_agents.end();
+            if (find(region_agents.begin(), end, agent) == end)
+            {
+                if (sRadarAlerts)
+                    sendRadarAlert(agent, this->getName(), false);
+            }
+        }
+        mVecAgents.clear();
+        mVecAgents = region_agents;
     }
 }
 

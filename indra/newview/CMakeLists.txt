@@ -79,6 +79,7 @@ set(viewer_SOURCE_FILES
     alfloaterprogressview.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
+    alpanelradaralert.cpp
     alunzip.cpp
     gltfscenemanager.cpp
     gltf/asset.cpp
@@ -778,6 +779,7 @@ set(viewer_HEADER_FILES
     alfloaterprogressview.h
     alpanelaomini.h
     alpanelaopulldown.h
+    alpanelradaralert.h
     alunzip.h
     gltfscenemanager.h
     groupchatlistener.h

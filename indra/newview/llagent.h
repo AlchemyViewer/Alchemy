@@ -509,6 +509,7 @@ private:
     S32             mControlsTakenPassedOnCount[TOTAL_CONTROLS];
     U32             mControlFlags;                  // Replacement for the mFooKey's
 
+    bool            mIgnorePrejump;
     //--------------------------------------------------------------------
     // Animations
     //--------------------------------------------------------------------

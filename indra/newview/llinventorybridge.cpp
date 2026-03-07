@@ -1975,6 +1975,18 @@ void LLItemBridge::restoreToWorld()
     LLViewerInventoryItem* itemp = static_cast<LLViewerInventoryItem*>(getItem());
     if (itemp)
     {
+        // do not restore to last position when the item is no-copy to prevent
+        // inventory loss
+        if(!itemp->getPermissions().allowCopyBy(gAgent.getID()))
+        {
+            // debug guard for future testing of a server side fix
+            if(!gSavedSettings.getBOOL("AllowNoCopyRezRestoreToWorld"))
+            {
+                LLNotificationsUtil::add("CantRestoreToWorldNoCopy");
+                return;
+            }
+        }
+
         LLMessageSystem* msg = gMessageSystem;
         msg->newMessageFast(_PREHASH_RezRestoreToWorld);
         msg->nextBlockFast(_PREHASH_AgentData);
