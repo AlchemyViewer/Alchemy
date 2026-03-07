@@ -4405,4 +4405,8 @@ and report the problem.
 [https://community.secondlife.com/knowledgebase/english/error-messages-r520/#Section__3 Knowledge Base]
   </string>
 
+<!-- Alchemy Below This Line-->
+
+  <string name="SimulatorFeaturesTitle">SIMULATOR FEATURES</string>
+
 </strings>

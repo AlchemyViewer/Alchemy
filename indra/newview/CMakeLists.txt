@@ -83,6 +83,7 @@ set(viewer_SOURCE_FILES
     alpanelaopulldown.cpp
     alpanelradaralert.cpp
     alunzip.cpp
+    alviewermenu.cpp
     gltfscenemanager.cpp
     gltf/asset.cpp
     gltf/accessor.cpp
@@ -785,6 +786,7 @@ set(viewer_HEADER_FILES
     alpanelaopulldown.h
     alpanelradaralert.h
     alunzip.h
+    alviewermenu.h
     gltfscenemanager.h
     groupchatlistener.h
     gltf/asset.h

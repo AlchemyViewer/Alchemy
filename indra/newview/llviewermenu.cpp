@@ -42,6 +42,7 @@
 
 // newview includes
 #include "alavataractions.h"
+#include "alviewermenu.h"
 #include "llagent.h"
 #include "llagentaccess.h"
 #include "llagentbenefits.h"
@@ -2541,6 +2542,14 @@ class LLAdvancedShowDebugSettings : public view_listener_t
     }
 };
 
+class LLAdvancedToggleDebugSettings : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        LLFloaterReg::toggleInstanceOrBringToFront("settings_debug",userdata);
+        return true;
+    }
+};
 
 
 ////////////////////////
@@ -3128,7 +3137,7 @@ void handle_object_open()
 {
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Added: RLVa-1.2.0e
     if (enable_object_open())
-    LLFloaterReg::showInstance("openobject");
+        LLFloaterReg::showInstance("openobject");
 // [/RLVa:KB]
 //  LLFloaterReg::showInstance("openobject");
 }
@@ -3466,7 +3475,7 @@ bool enable_object_edit()
         }
         else
         {
-        enable = true;
+            enable = true;
         }
 // [/RLVa:KB]
 //      enable = true;
@@ -6896,11 +6905,11 @@ class LLAvatarResetSkeleton : public view_listener_t
             }
             else
             {
-                avatar->resetSkeleton(false);
+            avatar->resetSkeleton(false);
 // [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
-                avatar->rebuildAttachments();
+            avatar->rebuildAttachments();
 // [/SL:KB]
-            }
+        }
         }
         return true;
     }
@@ -7899,7 +7908,7 @@ class LLAttachmentDetach : public view_listener_t
         {
             LLObjectSelectionHandle hSelect = LLSelectMgr::getInstance()->getSelection();
             RlvSelectHasLockedAttach f;
-            if ((hSelect->isAttachment()) && (hSelect->getFirstRootNode(&f, false) != NULL))
+            if ( (hSelect->isAttachment()) && (hSelect->getFirstRootNode(&f, false) != NULL) )
                 return true;
         }
 // [/RLVa:KB]
@@ -10560,6 +10569,7 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedCompressImage(), "Advanced.CompressImage");
     view_listener_t::addMenu(new LLAdvancedCompressFileTest(), "Advanced.CompressFileTest");
     view_listener_t::addMenu(new LLAdvancedShowDebugSettings(), "Advanced.ShowDebugSettings");
+    view_listener_t::addMenu(new LLAdvancedShowDebugSettings(), "Advanced.ToggleDebugSettings");
     view_listener_t::addMenu(new LLAdvancedEnableViewAdminOptions(), "Advanced.EnableViewAdminOptions");
     view_listener_t::addMenu(new LLAdvancedToggleViewAdminOptions(), "Advanced.ToggleViewAdminOptions");
     view_listener_t::addMenu(new LLAdvancedCheckViewAdminOptions(), "Advanced.CheckViewAdminOptions");
@@ -10760,4 +10770,6 @@ void initialize_menus()
     enable.add("RLV.CanShowName", boost::bind(&rlvMenuCanShowName));
     enable.add("RLV.EnableIfNot", boost::bind(&rlvMenuEnableIfNot, _2));
 // [/RLVa:KB]
+
+    ALViewerMenu::initialize_menus();
 }

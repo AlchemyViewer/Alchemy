@@ -12891,7 +12891,7 @@ are wearing now.
           name="okignore"
           yestext="OK"/>
   </notification>
- <!-- ALCHEMY BELOW THIS LINE -->
+  <!-- ALCHEMY BELOW THIS LINE -->
  
   <notification
    icon="notifytip.tga"
@@ -13178,7 +13178,7 @@ Creating animation link for animation "[NAME]" failed!
   </notification>
 
   <notification
-    icon="alertmodal.tga"
+   icon="alertmodal.tga"
    name="ParticleSaveChanges"
    type="alertmodal">
 Inject with particle script before closing?
@@ -13275,6 +13275,47 @@ Always Run enabled.
     log_to_chat="true"
     type="notifytip">
 Always Run disabled.
+  </notification>
+
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyUnpoweredWizard"
+  persist="true"
+  log_to_chat="true"
+  type="notifytip">
+	 I’m sorry Dave, I’m afraid I can’t do that
+ </notification>
+	
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyExplosions"
+  persist="true"
+  log_to_chat="true"
+  type="notifytip">
+	 Explosions!~
+ </notification>
+
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyDestroyObject"
+  persist="true"
+  log_to_chat="true"
+  type="notifytip">
+	 Irrevocably destroying object. Hope you didn't need that.
+ </notification>
+
+  <notification
+   icon="notify.tga"
+   name="LoadCameraPositionNoneSaved"
+   type="notify">
+No camera view has been saved yet.
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="LoadCameraPositionOutsideDrawDistance"
+   type="notify">
+Can't restore the camera view because the camera position is beyond draw distance.
   </notification>
 
   <notification

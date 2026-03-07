@@ -36,13 +36,17 @@
          function="Inventory.NewWindow"
          parameter="" />
       </menu_item_call>
-      <menu_item_call
+      <menu_item_check
        label="Places..."
        name="Places"
-       shortcut="control|L">
-        <menu_item_call.on_click
-         function="Tools.Link"/>
-      </menu_item_call>
+       shortcut="alt|L">
+        <menu_item_check.on_check
+            function="Floater.Visible"
+            parameter="places" />
+        <menu_item_check.on_click
+            function="Floater.Toggle"
+            parameter="places" />
+      </menu_item_check>
       <menu_item_call
        label="Picks..."
        name="Picks">
@@ -492,6 +496,18 @@
          function="Avatar.ResetSelfSkeletonAndAnimations" />
       </menu_item_call>
       <menu_item_call
+       label="Undeform Me"
+       name="Undeform Me">
+        <menu_item_call.on_click
+         function="Tools.UndeformSelf" />
+      </menu_item_call>
+      <menu_item_call
+       label="Clear Viewer Effects"
+       name="Clear Viewer Effects">
+        <menu_item_call.on_click
+         function="World.ClearEffects" />
+      </menu_item_call>
+      <menu_item_call
        label="Attachment scripts..."
        name="MyScripts">
         <menu_item_call.on_click
@@ -631,6 +647,14 @@
      label="World"
      name="World"
      tear_off="true">
+        <menu_item_call
+         label="Resync Animations"
+         name="Resync Animations"
+         shortcut="control|S">
+          <menu_item_call.on_click
+           function="World.SyncAnimations" />
+        </menu_item_call>
+        <menu_item_separator/>
         <menu_item_call
          label="Landmark This Place"
          name="Create Landmark Here">
@@ -788,7 +812,8 @@
         </menu_item_call>
         <menu_item_call
          label="Region / Estate"
-         name="RegionEstate">
+         name="RegionEstate"
+         shortcut="alt|R">
             <menu_item_call.on_click
              function="Floater.Show"
              parameter="region_info" />
@@ -978,9 +1003,9 @@
             <menu_item_check.on_check
              function="World.EnableEnvSettings"
              parameter="noon" />
-                <menu_item_check.on_enable
-                 function="RLV.EnableIfNot"
-                 parameter="setenv" />
+            <menu_item_check.on_enable
+             function="RLV.EnableIfNot"
+             parameter="setenv" />
           </menu_item_check>
           <menu_item_check
              label="Midday (Legacy)"
@@ -993,7 +1018,7 @@
              parameter="legacy noon" />
             <menu_item_check.on_enable
              function="RLV.EnableIfNot"
-             parameter="setenv" />
+             parameter="setenv" />	     
           </menu_item_check>
             <menu_item_check
              label="Sunset"
@@ -1025,7 +1050,8 @@
             </menu_item_check>
             <menu_item_check
              label="Use Shared Environment"
-             name="Use Shared Environment">
+             name="Use Shared Environment"
+             shortcut="control|shift|X">
                 <menu_item_check.on_click
                  function="World.EnvSettings"
                  parameter="region" />
@@ -1068,9 +1094,9 @@
 	     	 	 	<menu_item_check.on_check
 	     	 	 	function="World.EnableEnvSettings" 
 	     	 	 	parameter="pause_clouds" />
-					<menu_item_call.on_enable
-					 function="RLV.EnableIfNot"
-					 parameter="setenv" />
+                               <menu_item_check.on_enable
+                                function="RLV.EnableIfNot"
+                                parameter="setenv" />
 	     	 	</menu_item_check>
 	     	</menu>
 	     	
@@ -1373,6 +1399,14 @@ function="World.EnvPreset"
                function="Tools.EnableTakeCopy" />
           </menu_item_call>
           <menu_item_call
+             label="Edit Particles"
+             name="Menu Object Edit Particles">
+            <menu_item_call.on_click
+               function="Object.EditParticles" />
+            <menu_item_call.on_enable
+               function="Object.EnableEditParticles" />
+          </menu_item_call>
+          <menu_item_call
 			 label="Save Back to Object Contents"
 			 name="Save Object Back to Object Contents">
 			<menu_item_call.on_click
@@ -1569,6 +1603,7 @@ function="World.EnvPreset"
           <menu_item_separator/>
 
                 <menu_item_check
+                 shortcut="alt|control|H"
                  label="Show Selection Outlines"
                  name="Show Selection Outlines">
                     <menu_item_check.on_check
@@ -1578,7 +1613,8 @@ function="World.EnvPreset"
                      function="ToggleControl"
                      parameter="RenderHighlightSelections" />
                 </menu_item_check>
-                <menu_item_check
+                <menu_item_check			
+                 shortcut="alt|control|shift|h"
                  label="Show Hidden Selection"
                  name="Show Hidden Selection">
                     <menu_item_check.on_check
@@ -1633,6 +1669,17 @@ function="World.EnvPreset"
                    function="View.HighlightTransparentProbe" />
                   <menu_item_check.on_enable
                    function="View.CheckHighlightTransparent"/>
+                </menu_item_check>
+                <menu_item_separator/>
+                <menu_item_check
+                   label="Grab objects with Ctrl-Drag"
+                   name="EnableCtrlDragMovement">
+                  <menu_item_check.on_check
+                   function="CheckControl"
+                   parameter="EnableGrab" />
+                  <menu_item_check.on_click
+                   function="ToggleControl"
+                   parameter="EnableGrab" />
                 </menu_item_check>
         <menu_item_separator/>
           
@@ -2217,6 +2264,16 @@ function="World.EnvPreset"
              parameter="LimitSelectDistance" />
         </menu_item_check>
         <menu_item_check
+         label="Limit Drag Distance"
+         name="Limit Drag Distance">
+            <menu_item_check.on_check
+             function="CheckControl"
+             parameter="LimitDragDistance" />
+            <menu_item_check.on_click
+             function="ToggleControl"
+             parameter="LimitDragDistance" />
+        </menu_item_check>
+        <menu_item_check
          label="Disable Camera Constraints"
          name="Disable Camera Distance">
             <menu_item_check.on_check
@@ -2228,7 +2285,17 @@ function="World.EnvPreset"
         </menu_item_check>
 
         <menu_item_separator/>
-
+		<menu_item_check
+         label="Avatar Nimble"
+         name="Avatar Ignore Prejump">
+			<menu_item_check.on_check
+             function="CheckControl"
+             parameter="AlchemyNimble" />
+			<menu_item_check.on_click
+             function="ToggleControl"
+             parameter="AlchemyNimble" />
+		</menu_item_check>
+		<menu_item_separator/>
         <menu_item_check
          label="High-res Snapshot"
          name="HighResSnapshot">
@@ -2340,7 +2407,9 @@ function="World.EnvPreset"
                  function="ToggleControl"
                  parameter="ShowCrosshairs" />
             </menu_item_check>
-  <!-- <menu
+        </menu>
+
+        <menu
          create_jump_keys="true"
          label="Hover Tips"
          name="Hover Tips"
@@ -2379,8 +2448,6 @@ function="World.EnvPreset"
                 <menu_item_check.on_enable
                  function="View.CheckShowHoverTips" />
             </menu_item_check>
-        </menu>-->
-
         </menu>
 
         <menu
@@ -2884,18 +2951,6 @@ function="World.EnvPreset"
                parameter="notifications_console" />
             </menu_item_call>
             <menu_item_check
-             label="Region Debug Console"
-             name="Region Debug Console"
-             shortcut="control|shift|`"
-             use_mac_ctrl="true">
-                <menu_item_check.on_check
-                 function="Floater.Visible"
-                 parameter="region_debug_console" />
-                <menu_item_check.on_click
-                 function="Floater.Toggle"
-                 parameter="region_debug_console" />
-            </menu_item_check>
-            <menu_item_check
              label="Fast Timers"
              name="Fast Timers"
              shortcut="control|shift|9"
@@ -2929,6 +2984,21 @@ function="World.EnvPreset"
             </menu_item_check>
             <menu_item_separator/>
 
+            <menu_item_check
+             label="Region Debug Console"
+             name="Region Debug Console"
+             shortcut="control|shift|`"
+             use_mac_ctrl="true">
+                <menu_item_check.on_check
+                 function="Floater.Visible"
+                 parameter="region_debug_console" />
+                <menu_item_check.on_click
+                 function="Floater.Toggle"
+                 parameter="region_debug_console" />
+            </menu_item_check>
+
+            <menu_item_separator/>
+
             <menu_item_call
              label="Region Info to Debug Console"
              name="Region Info to Debug Console">
@@ -2949,6 +3019,12 @@ function="World.EnvPreset"
                 <menu_item_call.on_click
                  function="Advanced.DumpInfoToConsole"
                  parameter="capabilities" />
+            </menu_item_call>
+            <menu_item_call
+             label="View Simulator Features"
+             name="View Simulator Features">
+                <menu_item_call.on_click
+                 function="Advanced.DebugSimFeatures" />
             </menu_item_call>
 
             <menu_item_separator/>
@@ -2985,8 +3061,7 @@ function="World.EnvPreset"
             </menu_item_check>
             <menu_item_check
              label="Badge"
-             name="Badge"
-			 shortcut="alt|control|shift|h">
+             name="Badge">
                 <menu_item_check.on_check
                  function="Advanced.CheckHUDInfo"
                  parameter="badge" />
@@ -3104,8 +3179,7 @@ function="World.EnvPreset"
          tear_off="true">
             <menu_item_call
              label="Force Breakpoint"
-             name="Force Breakpoint"
-             shortcut="control|alt|shift|B">
+             name="Force Breakpoint">
                 <menu_item_call.on_click
                  function="Advanced.ForceErrorBreakpoint" />
             </menu_item_call>
@@ -4251,9 +4325,16 @@ function="World.EnvPreset"
         </menu>
         <menu
          create_jump_keys="true"
-         label="XUI"
+         label="XUI / Colors"
          name="XUI"
          tear_off="true">
+            <menu_item_call
+             label="XUI Preview Tool"
+             name="UI Preview Tool">
+             <menu_item_call.on_click
+              function="Floater.Toggle"
+              parameter="ui_preview" />
+            </menu_item_call>
             <menu_item_call
              label="Show Color settings"
              name="Color Settings">
