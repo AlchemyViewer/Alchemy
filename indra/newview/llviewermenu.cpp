@@ -6609,11 +6609,13 @@ class LLWorldAlwaysRun : public view_listener_t
         {
             gAgent.clearAlwaysRun();
 //          gAgent.clearRunning();
+            LLNotifications::instance().add("AlwaysRunDisabled" , LLSD(), LLSD());
         }
         else
         {
             gAgent.setAlwaysRun();
 //          gAgent.setRunning();
+            LLNotifications::instance().add("AlwaysRunEnabled", LLSD(), LLSD());
         }
 
         // tell the simulator.
