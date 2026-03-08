@@ -57,10 +57,14 @@
 #include "llfocusmgr.h"
 #include "lldraghandle.h"
 #include "llwindow.h"
+#include "llclipboard.h"
+#include "llregex.h"
+#include "llstring.h"
 
 // System includes
 #include <sstream>
 #include <iomanip>
+#include <cstdint>
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -76,7 +80,7 @@ LLFloaterColorPicker::LLFloaterColorPicker (LLColorSwatchCtrl* swatch, bool show
       mMouseDownInSwatch    ( false ),
       // *TODO: Specify this in XML
       mRGBViewerImageLeft   ( 140 ),
-      mRGBViewerImageTop    ( 356 ),
+      mRGBViewerImageTop    ( 386 ),
       mRGBViewerImageWidth  ( 256 ),
       mRGBViewerImageHeight ( 256 ),
       mLumRegionLeft        ( mRGBViewerImageLeft + mRGBViewerImageWidth + 16 ),
@@ -86,18 +90,18 @@ LLFloaterColorPicker::LLFloaterColorPicker (LLColorSwatchCtrl* swatch, bool show
       mLumMarkerSize        ( 6 ),
       // *TODO: Specify this in XML
       mSwatchRegionLeft     ( 12 ),
-      mSwatchRegionTop      ( 190 ),
+      mSwatchRegionTop      ( 170 ),
       mSwatchRegionWidth    ( 116 ),
-      mSwatchRegionHeight   ( 60 ),
+      mSwatchRegionHeight   ( 40 ),
       mSwatchView           ( NULL ),
       // *TODO: Specify this in XML
       numPaletteColumns     ( 16 ),
-      numPaletteRows        ( 2 ),
+      numPaletteRows        ( 4 ),
       highlightEntry        ( -1 ),
       mPaletteRegionLeft    ( 11 ),
-      mPaletteRegionTop     ( 100 - 8 ),
+      mPaletteRegionTop     ( 130 - 8 ),
       mPaletteRegionWidth   ( mLumRegionLeft + mLumRegionWidth - 10 ),
-      mPaletteRegionHeight  ( 40 ),
+      mPaletteRegionHeight  ( 80 ),
       mSwatch               ( swatch ),
       mActive               ( true ),
       mCanApplyImmediately  ( show_apply_immediate ),
@@ -106,6 +110,8 @@ LLFloaterColorPicker::LLFloaterColorPicker (LLColorSwatchCtrl* swatch, bool show
       mContextConeOutAlpha   (CONTEXT_CONE_OUT_ALPHA),
       mContextConeFadeTime   (CONTEXT_CONE_FADE_TIME)
 {
+    mCommitCallbackRegistrar.add("ColorPicker.menuDoToSelected", boost::bind(&LLFloaterColorPicker::menuDoToSelected, this, _2));
+
     buildFromFile ( "floater_color_picker.xml");
 
     // create user interface for this picker
@@ -154,7 +160,7 @@ void LLFloaterColorPicker::createUI ()
     // create palette
     for ( S32 each = 0; each < numPaletteColumns * numPaletteRows; ++each )
     {
-        mPalette.push_back(new LLColor4(LLUIColorTable::instance().getColor(llformat("ColorPaletteEntry%02d", each + 1))));
+        mPalette.emplace_back(std::make_unique<LLColor4>(LLUIColorTable::instance().getColor(llformat("ColorPaletteEntry%02d", each + 1), LLColor4::white)));
     }
 }
 
@@ -229,9 +235,13 @@ bool LLFloaterColorPicker::postBuild()
     childSetCommitCallback("rspin", onTextCommit, (void*)this );
     childSetCommitCallback("gspin", onTextCommit, (void*)this );
     childSetCommitCallback("bspin", onTextCommit, (void*)this );
+    childSetCommitCallback("rspin_float", onTextCommit, (void*)this );
+    childSetCommitCallback("gspin_float", onTextCommit, (void*)this );
+    childSetCommitCallback("bspin_float", onTextCommit, (void*)this );
     childSetCommitCallback("hspin", onTextCommit, (void*)this );
     childSetCommitCallback("sspin", onTextCommit, (void*)this );
     childSetCommitCallback("lspin", onTextCommit, (void*)this );
+    childSetCommitCallback("hex_value", onTextCommit, (void*)this );
 
     LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _1));
 
@@ -265,12 +275,7 @@ void LLFloaterColorPicker::destroyUI ()
     stopUsingPipette();
 
     // delete palette we created
-    std::vector < LLColor4* >::iterator iter = mPalette.begin ();
-    while ( iter != mPalette.end () )
-    {
-        delete ( *iter );
-        ++iter;
-    }
+    mPalette.clear();
 
     if ( mSwatchView )
     {
@@ -680,6 +685,12 @@ void LLFloaterColorPicker::updateTextEntry ()
     getChild<LLUICtrl>("hspin")->setValue(( getCurH () * 360.0f ) );
     getChild<LLUICtrl>("sspin")->setValue(( getCurS () * 100.0f ) );
     getChild<LLUICtrl>("lspin")->setValue(( getCurL () * 100.0f ) );
+
+    getChild<LLUICtrl>("rspin_float")->setValue(( getCurR () ) );
+    getChild<LLUICtrl>("gspin_float")->setValue(( getCurG () ) );
+    getChild<LLUICtrl>("bspin_float")->setValue(( getCurB () ) );
+
+    getChild<LLUICtrl>("hex_value")->setValue(llformat("%02x%02x%02x", (S32)(getCurR() * 255.f), (S32)(getCurG() * 255.f), (S32)(getCurB() * 255.f)));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -715,9 +726,61 @@ void LLFloaterColorPicker::onTextEntryChanged ( LLUICtrl* ctrl )
 
         updateTextEntry ();
     }
-    else
+    else if ( ( name == "rspin_float" ) || ( name == "gspin_float" ) || ( name == "bspin_float" ) )
+    {
+        // get current RGB
+        F32 rVal, gVal, bVal;
+        getCurRgb ( rVal, gVal, bVal );
+
+        // update component value with new value from text
+        if ( name == "rspin_float" )
+        {
+            rVal = (F32)ctrl->getValue().asReal();
+        }
+        else
+        if ( name == "gspin_float" )
+        {
+            gVal = (F32)ctrl->getValue().asReal();
+        }
+        else
+        if ( name == "bspin_float" )
+        {
+            bVal = (F32)ctrl->getValue().asReal();
+        }
+
+        // update current RGB (and implicitly HSL)
+        selectCurRgb ( rVal, gVal, bVal );
+
+        updateTextEntry ();
+    }
+    else if ( name == "hex_value" )
+    {
+        // get current RGB
+        S32 r, g, b;
+        F32 rVal, gVal, bVal;
+        getCurRgb ( rVal, gVal, bVal );
+
+        std::string hex_string = ctrl->getValue().asString();
+
+        static const boost::regex pattern("[[:xdigit:]]{6}");
+        if (!ll_regex_match(hex_string, pattern))
+        {
+            return;
+        }
+
+        sscanf(hex_string.c_str(), "%02x%02x%02x", &r, &g, &b);
+
+        rVal = F32(r) / 255.f;
+        gVal = F32(g) / 255.f;
+        bVal = F32(b) / 255.f;
+
+        // update current RGB (and implicitly HSL)
+        selectCurRgb ( rVal, gVal, bVal );
+
+        updateTextEntry ();
+    }
     // value in HSL boxes changed
-    if ( ( name == "hspin" ) || ( name == "sspin" ) || ( name == "lspin" ) )
+    else if ( ( name == "hspin" ) || ( name == "sspin" ) || ( name == "lspin" ) )
     {
         // get current HSL
         F32 hVal, sVal, lVal;
@@ -984,15 +1047,14 @@ bool LLFloaterColorPicker::handleMouseUp ( S32 x, S32 y, MASK mask )
                     {
                         if ( mPalette [ curEntry ] )
                         {
-                            delete mPalette [ curEntry ];
-
-                            mPalette [ curEntry ] = new LLColor4 ( getCurR (), getCurG (), getCurB (), 1.0f );
+                            LLColor4 new_color(getCurR(), getCurG(), getCurB(), 1.0f);
+                            mPalette[curEntry] = std::make_unique<LLColor4>(new_color);
 
                             // save off color
                             std::ostringstream codec;
                             codec << "ColorPaletteEntry" << std::setfill ( '0' ) << std::setw ( 2 ) << curEntry + 1;
                             const std::string s ( codec.str () );
-                            LLUIColorTable::instance().setColor(s, *mPalette [ curEntry ] );
+                            LLUIColorTable::instance().setColor(s, new_color);
                         }
                     }
 
@@ -1087,4 +1149,31 @@ void LLFloaterColorPicker::stopUsingPipette()
     {
         LLToolMgr::getInstance()->clearTransientTool();
     }
+}
+
+void LLFloaterColorPicker::menuDoToSelected(const LLSD& userdata)
+{
+    std::string command = userdata.asString();
+
+    F32 rVal, gVal, bVal;
+    getCurRgb(rVal, gVal, bVal);
+
+    LLWString colorstr;
+    if (command == "color_copy_lsl")
+    {
+        colorstr = utf8str_to_wstring(llformat("<%.3f, %.3f, %.3f>", rVal, gVal, bVal));
+    }
+    else if (command == "color_copy_hex")
+    {
+        colorstr = utf8str_to_wstring(llformat("%02x%02x%02x", (S32)(rVal * 255.f), (S32)(gVal * 255.f), (S32)(bVal * 255.f)));
+    }
+    else if (command == "color_copy_vec4")
+    {
+        colorstr = utf8str_to_wstring(llformat("%.3f, %.3f, %.3f, 1.0", rVal, gVal, bVal));
+    }
+    else if (command == "color_copy_vec4u")
+    {
+        colorstr = utf8str_to_wstring(llformat("%d, %d, %d, 1", (S32)(rVal * 255.f), (S32)(gVal * 255.f), (S32)(bVal * 255.f)));
+    }
+    LLClipboard::instance().copyToClipboard(colorstr, 0, S32(colorstr.size()));
 }

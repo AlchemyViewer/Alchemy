@@ -123,6 +123,7 @@ class LLFloaterColorPicker
         static void onTextCommit ( LLUICtrl* ctrl, void* data );
         static void onImmediateCheck ( LLUICtrl* ctrl, void* data );
                void onColorSelect( const class LLTextureEntry& te );
+        void menuDoToSelected(const LLSD& userdata);
     private:
         // mutators for color values, can raise event to preview changes at object
         void selectCurRgb ( F32 curRIn, F32 curGIn, F32 curBIn );
@@ -167,7 +168,7 @@ class LLFloaterColorPicker
 
         const S32 numPaletteColumns;
         const S32 numPaletteRows;
-        std::vector < LLColor4* > mPalette;
+        std::vector<std::unique_ptr<LLColor4>> mPalette;
         S32 highlightEntry;
         const S32 mPaletteRegionLeft;
         const S32 mPaletteRegionTop;
