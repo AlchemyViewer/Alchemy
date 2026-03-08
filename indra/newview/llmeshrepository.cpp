@@ -3327,6 +3327,8 @@ void LLMeshRepoThread::notifyLoadedMeshes()
             loaded_queue.swap(mLoadedQ);
             mLoadedMutex->unlock();
 
+            LL_PROFILE_ZONE_NAMED("notify loaded meshes");
+
             update_metrics = true;
 
             // Process the elements free of the lock
@@ -3358,6 +3360,8 @@ void LLMeshRepoThread::notifyLoadedMeshes()
             unavil_queue.swap(mUnavailableQ);
             mLoadedMutex->unlock();
 
+            LL_PROFILE_ZONE_NAMED("notify unavail meshes");
+
             update_metrics = true;
 
             // Process the elements free of the lock
@@ -3376,6 +3380,7 @@ void LLMeshRepoThread::notifyLoadedMeshes()
     {
         if (mLoadedMutex->trylock())
         {
+            LL_PROFILE_ZONE_NAMED("notify misc meshes");
             std::deque<LLPointer<LLMeshSkinInfo>> skin_info_q;
             std::deque<UUIDBasedRequest> skin_info_unavail_q;
             std::list<LLModel::Decomposition*> decomp_q;

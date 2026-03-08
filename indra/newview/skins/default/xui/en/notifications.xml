@@ -9268,6 +9268,14 @@ Failed to save snapshot to [PATH]: Disk is full. [NEED_MEMORY]KB is required but
 Failed to save snapshot to [PATH]: Directory does not exist.
   </notification>
 
+  <notification icon="notifytip.tga"
+    name="SnapshotSavedToComputer" type="notifytip">
+Screenshot saved to:
+    [FILEPATH]
+
+Click to open folder.
+  </notification>
+
   <notification
     icon="notifytip.tga"
     name="PresetNotSaved"
@@ -9818,6 +9826,22 @@ Are you sure you want to leave this call?
     <tag>voice</tag>
     <usetemplate
      ignoretext="Confirm before I leave call"
+     name="okcancelignore"
+     notext="No"
+     yestext="Yes">
+      <unique/>
+    </usetemplate>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ConfirmLeaveAdhoc"
+   type="alertmodal">
+Are you sure you want to leave this conference chat?
+    <tag>confirm</tag>
+    <tag>voice</tag>
+    <usetemplate
+     ignoretext="Confirm before I leave conference chat"
      name="okcancelignore"
      notext="No"
      yestext="Yes">

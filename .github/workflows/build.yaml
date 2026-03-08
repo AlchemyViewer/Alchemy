@@ -408,7 +408,7 @@ jobs:
       #     return $tpv_status
 
       - name: Upload executable
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
         with:
           name: "${{ steps.build.outputs.artifact }}-app"
@@ -420,7 +420,7 @@ jobs:
       # The other upload of nontrivial size is the symbol file. Use a distinct
       # artifact for that too.
       - name: Upload Windows symbol file
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: runner.os == 'Windows' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.build_type == 'proprietary'
         with:
           name: "${{ steps.build.outputs.artifact }}-symbols"
@@ -429,7 +429,7 @@ jobs:
             ${{ steps.configure.outputs.build_directory }}/symbols/Release/${{ needs.setup.outputs.viewer_channel }}.sym.tar.xz
 
       - name: Upload macOS symbol file
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: runner.os == 'macOS' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.build_type == 'proprietary'
         with:
           name: "${{ steps.build.outputs.artifact }}-symbols"
@@ -438,7 +438,7 @@ jobs:
             ${{ steps.configure.outputs.build_directory }}/symbols/Release/${{ needs.setup.outputs.viewer_channel }}.xcarchive.zip
 
       - name: Upload metadata
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
         with:
           name: "${{ steps.build.outputs.artifact }}-metadata"
@@ -457,7 +457,7 @@ jobs:
       #       ${{ steps.configure.outputs.build_directory }}/llphysicsextensions_package*.tar.xz
 
       - name: Upload appearance utility package
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: runner.os == 'Linux' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
         with:
           name: "${{ steps.build.outputs.artifact }}-appearanceutility"
@@ -539,13 +539,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download viewer exe
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: Windows-x64-app
           path: _artifacts
       - name: Download Windows Symbols
         if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: Windows-x64-symbols
       - name: Extract viewer pdb
@@ -578,7 +578,7 @@ jobs:
     steps:
       - name: Download Mac Symbols
         if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: macOS-x64-symbols
       - name: Post Mac symbols
@@ -600,15 +600,15 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.setup.outputs.release_run
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: "*-installer"
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: "*-metadata"
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: "Linux-app"
 

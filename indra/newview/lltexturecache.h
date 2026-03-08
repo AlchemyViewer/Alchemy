@@ -147,7 +147,7 @@ public:
     U32 getMaxEntries() { return sCacheMaxEntries; };
     bool isInCache(const LLUUID& id) ;
     bool isInLocal(const LLUUID& id) ; //not thread safe at the moment
-
+    LLMutex* getFastCacheMutex() { return &mFastCacheMutex; }
 protected:
     // Accessed by LLTextureCacheWorker
     std::string getLocalFileName(const LLUUID& id);
@@ -193,6 +193,7 @@ private:
     // Internal
     LLMutex mWorkersMutex;
     LLMutex mHeaderMutex;
+    LLMutex mHeaderIDMapMutex; // To avoid deadlocks, never lock mFastCacheMutex after mHeaderIDMapMutex.
     LLMutex mListMutex;
     LLMutex mFastCacheMutex;
     LLFile* mHeaderAPRFile;

@@ -1008,6 +1008,7 @@ bool LLAppViewer::init()
 
     // Initialize event recorder
     LLViewerEventRecorder::createInstance();
+    LLWatchdog::createInstance();
 
     // Init parcel manager, name cache, and mute list simpletons
     LLViewerParcelMgr::createInstance();
@@ -1733,17 +1734,20 @@ bool LLAppViewer::doFrame()
 
     if (LLApp::isExiting())
     {
+        pingMainloopTimeout("Main:qSnapshot");
         // Save snapshot for next time, if we made it through initialization
         if (STATE_STARTED == LLStartUp::getStartupState())
         {
             saveFinalSnapshot();
         }
 
+        pingMainloopTimeout("Main:TerminateVoice");
         if (LLVoiceClient::instanceExists())
         {
             LLVoiceClient::getInstance()->terminate();
         }
 
+        pingMainloopTimeout("Main:TerminatePump");
         delete gServicePump;
         gServicePump = NULL;
 
@@ -4369,6 +4373,7 @@ void LLAppViewer::requestQuit()
         return;
     }
 
+    pingMainloopTimeout("Main:qMetrics");
     // Try to send metrics back to the grid
     metricsSend(!gDisconnected);
 
@@ -4384,6 +4389,7 @@ void LLAppViewer::requestQuit()
     LLHUDManager::getInstance()->sendEffects();
     effectp->markDead() ;//remove it.
 
+    pingMainloopTimeout("Main:qFloaters");
     // Attempt to close all floaters that might be
     // editing things.
     if (gFloaterView)
@@ -4392,6 +4398,7 @@ void LLAppViewer::requestQuit()
         gFloaterView->closeAllChildren(true);
         mClosingFloaters = true;
     }
+    pingMainloopTimeout("Main:qStats");
 
     // Send preferences once, when exiting
     bool include_preferences = true;
@@ -4399,6 +4406,7 @@ void LLAppViewer::requestQuit()
 
     gLogoutTimer.reset();
     mQuitRequested = true;
+    pingMainloopTimeout("Main:LoggingOut");
 }
 
 static bool finish_quit(const LLSD& notification, const LLSD& response)
@@ -5700,6 +5708,7 @@ void LLAppViewer::outOfMemorySoftQuit()
         LLLFSThread::sLocal->pause();
         gLogoutTimer.reset();
         mQuitRequested = true;
+        destroyMainloopTimeout();
 
         LLError::LLUserWarningMsg::showOutOfMemory();
     }
@@ -6126,6 +6135,11 @@ void LLAppViewer::pingMainloopTimeout(std::string_view state)
 
 F32 LLAppViewer::getMainloopTimeoutSec() const
 {
+    if (isQuitting() || mQuitRequested)
+    {
+        constexpr F32 QUITTING_SECONDS = 240.f;
+        return QUITTING_SECONDS;
+    }
     if (LLStartUp::getStartupState() == STATE_STARTED
         && gAgent.getTeleportState() == LLAgent::TELEPORT_NONE)
     {
