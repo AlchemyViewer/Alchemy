@@ -10890,7 +10890,7 @@
       <key>Type</key>
       <string>U32</string>
       <key>Value</key>
-      <integer>0</integer>
+      <integer>1</integer>
     </map>
     <key>SelectMovableOnly</key>
     <map>
