@@ -53,8 +53,10 @@ using namespace std::literals;
   */
 #if LL_WINDOWS
 static constexpr std::wstring_view CACHE_FILENAME_PREFIX(L"sl_cache"sv);
+constexpr std::wstring_view CACHE_SUBDIRS = L"0123456789abcdef";
 #else
 static constexpr std::string_view CACHE_FILENAME_PREFIX("sl_cache"sv);
+constexpr std::string_view CACHE_SUBDIRS = "0123456789abcdef";
 #endif
 
 std::filesystem::path LLDiskCache::sCacheDir;
@@ -67,6 +69,16 @@ LLDiskCache::LLDiskCache(const std::string& cache_dir,
 {
     sCacheDir = fsyspath(cache_dir);
     LLFile::mkdir(cache_dir);
+    for (S32 i = 0; i < 16; i++)
+    {
+        std::filesystem::path dirname = sCacheDir / CACHE_SUBDIRS.substr(i, 1);
+        LLFile::mkdir(dirname);
+        for (S32 j = 0; j < 16; j++)
+        {
+            std::filesystem::path dirname_inner = dirname / CACHE_SUBDIRS.substr(j, 1);
+            LLFile::mkdir(dirname_inner);
+        }
+    }
 }
 
 // WARNING: purge() is called by LLPurgeDiskCacheThread. As such it must
@@ -217,11 +229,11 @@ std::filesystem::path LLDiskCache::metaDataToFilepath(const LLUUID& id, LLAssetT
 #if LL_WINDOWS
     wchar_t uuid_str[UUID_STR_LENGTH]{};
     id.to_wchars(uuid_str);
-    return fmt::format(L"{:s}\\{:s}_{:s}_0.asset", sCacheDir.native(), CACHE_FILENAME_PREFIX, uuid_str);
+    return fmt::format(L"{:s}\\{:c}\\{:c}\\{:s}_{:s}_0.asset", sCacheDir.native(), uuid_str[0], uuid_str[1], CACHE_FILENAME_PREFIX, uuid_str);
 #else
     char uuid_str[UUID_STR_LENGTH]{};
     id.to_chars(uuid_str);
-    return fmt::format("{:s}/{:s}_{:s}_0.asset", sCacheDir.native(), CACHE_FILENAME_PREFIX, uuid_str);
+    return fmt::format("{:s}/{:c}/{:c}/{:s}_{:s}_0.asset", sCacheDir.native(), uuid_str[0], uuid_str[1], CACHE_FILENAME_PREFIX, uuid_str);
 #endif
 }
 
