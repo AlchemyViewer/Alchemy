@@ -40,6 +40,8 @@
 #include "llmenugl.h"
 #include "lltrans.h"
 
+#include <fmt/format.h>
+
 // static
 void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, const std::string& attach_to_hud_menu_name)
 {
@@ -69,11 +71,11 @@ void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, c
 
         if (LLTrans::findString(translated_submenu_name, submenu_name))
         {
-            p.name = (" ") + translated_submenu_name + " ";
+            p.name = attachment->getIsHUDAttachment() ? translated_submenu_name : fmt::format(FMT_STRING("{} ({})"), translated_submenu_name, curiter->first);
         }
         else
         {
-            p.name = submenu_name;
+            p.name = attachment->getIsHUDAttachment() ? submenu_name : fmt::format(FMT_STRING("{} ({})"), submenu_name, curiter->first);
         }
 
         LLSD cbparams;

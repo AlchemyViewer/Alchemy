@@ -1132,6 +1132,8 @@ private:
     bool            mNameCloud;
     F32             mNameAlpha;
     S32             mRenderGroupTitles;
+    LLColor4        mNameTagColor;
+    std::string     mDistanceString;
 
     //--------------------------------------------------------------------
     // Display the name (then optionally fade it out)
@@ -1143,6 +1145,7 @@ private:
     LLFrameTimer    mTimeVisible;
     std::deque<LLChat> mChats;
     bool            mTyping;
+    bool            mTypingLast;
     LLFrameTimer    mTypingTimer;
 
 /**                    Name

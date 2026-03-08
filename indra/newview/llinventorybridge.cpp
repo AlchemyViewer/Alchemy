@@ -92,6 +92,8 @@
 #include "rlvlocks.h"
 // [/RLVa:KB]
 
+#include <fmt/format.h>
+
 void copy_slurl_to_clipboard_callback_inv(const std::string& slurl);
 
 const F32 SOUND_GAIN = 1.0f;
@@ -7592,13 +7594,14 @@ void LLObjectBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
                         LLViewerJointAttachment* attachment = curiter->second;
                         LLMenuItemCallGL::Params p;
                         std::string submenu_name = attachment->getName();
-                        if (LLTrans::getString(submenu_name) != "")
+                        std::string translated_submenu_name;
+                        if (LLTrans::findString(translated_submenu_name, submenu_name))
                         {
-                            p.name = (" ")+LLTrans::getString(submenu_name)+" ";
+                            p.name = attachment->getIsHUDAttachment() ? translated_submenu_name : fmt::format(FMT_STRING("{} ({})"), translated_submenu_name, curiter->first);
                         }
                         else
                         {
-                            p.name = submenu_name;
+                            p.name = attachment->getIsHUDAttachment() ? submenu_name  : fmt::format(FMT_STRING("{} ({})"), submenu_name, curiter->first);
                         }
                         LLSD cbparams;
                         cbparams["index"] = curiter->first;
