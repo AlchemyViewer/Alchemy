@@ -66,7 +66,7 @@ LLToolSelect::LLToolSelect( LLToolComposite* composite )
 bool LLToolSelect::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     // do immediate pick query
-    bool pick_rigged = false; //gSavedSettings.getBOOL("AnimatedObjectsAllowLeftClick");
+    bool pick_rigged = gSavedSettings.getBOOL("AnimatedObjectsAllowLeftClick");
     static LLCachedControl<bool> select_invisible_objects(gSavedSettings, "SelectInvisibleObjects");
     static LLCachedControl<bool> select_reflection_probes(gSavedSettings, "SelectReflectionProbes");
 
