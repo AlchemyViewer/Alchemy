@@ -42,6 +42,7 @@
 
 // newview includes
 #include "alavataractions.h"
+#include "alfloaterblocked.h"
 #include "alviewermenu.h"
 #include "llagent.h"
 #include "llagentaccess.h"
@@ -3844,7 +3845,7 @@ class LLObjectMute : public view_listener_t
         else
         {
             LLMuteList::getInstance()->add(mute);
-            LLPanelBlockedList::showPanelAndSelect(mute.mID);
+            ALFloaterBlocked::showMuteAndSelect(mute.mID);
         }
 
         return true;
@@ -7580,7 +7581,7 @@ class LLMuteParticle : public view_listener_t
             else
             {
                 LLMuteList::getInstance()->add(mute);
-                LLPanelBlockedList::showPanelAndSelect(mute.mID);
+                ALFloaterBlocked::showMuteAndSelect(mute.mID);
             }
         }
 

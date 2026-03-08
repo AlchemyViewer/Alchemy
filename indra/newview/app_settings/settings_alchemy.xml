@@ -600,6 +600,50 @@
             <key>Value</key>
             <real>130.0</real>
         </map>
+        <key>BlockMuteSortOrder</key>
+        <map>
+            <key>Comment</key>
+            <string>Specifies sort order for mute list</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>BlockDerenderSortOrder</key>
+        <map>
+            <key>Comment</key>
+            <string>Specifies sort order for derender list</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>BlockAssetSortOrder</key>
+        <map>
+            <key>Comment</key>
+            <string>Specifies sort order for asset list</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>BlockRenderingSortOrder</key>
+        <map>
+            <key>Comment</key>
+            <string>Specifies sort order for avatar rendering list</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>MiniMapPrimMaxVertDistance</key>
         <map>
             <key>Comment</key>

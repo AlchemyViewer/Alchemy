@@ -30,6 +30,8 @@
 // newview
 #include "alavataractions.h"
 //#include "alcinematicmode.h"
+#include "alderenderlist.h"
+#include "alfloaterblocked.h"
 #include "alfloaterparticleeditor.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -438,7 +440,43 @@ namespace
             return userdata.asInteger() == (S32)gSavedSettings.getU32("NavigationBarStyle");
         }
     };
-}
+
+// [SL:KB] - Patch: World-Derender | Checked: 2012-06-08 (Catznip-3.3)
+    void handle_view_blocked(const LLSD& sdParam)
+    {
+        if (LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject()))
+        {
+            std::string strParam = sdParam.asString();
+            if (BLOCKED_TAB_NAME == strParam)
+                strParam = BLOCKED_PARAM_NAME;
+            else if (DERENDER_TAB_NAME == strParam)
+                strParam = DERENDER_PARAM_NAME;
+            else if (EXCEPTION_TAB_NAME == strParam)
+                strParam = EXCEPTION_PARAM_NAME;
+
+            LLFloaterReg::showInstance("blocked", LLSD().with(strParam, pAvatar->getID()));
+        }
+        else
+        {
+            LLFloaterReg::showInstance("blocked", sdParam);
+        }
+    }
+
+    void handle_object_derender(const LLSD& sdParam)
+    {
+        std::vector<LLUUID> idList;
+        if (ALDerenderList::instance().addSelection("persistent" == sdParam.asString(), &idList))
+        {
+            LLFloaterReg::showInstance("blocked", LLSD().with("derender_to_select", idList.front()));
+        }
+    }
+
+    bool enable_object_derender()
+    {
+        return ALDerenderList::canAddSelection();
+    }
+    // [/SL:KB]
+    }
 
 ////////////////////////////////////////////////////////
 
@@ -468,6 +506,15 @@ void ALViewerMenu::initialize_menus()
     commit.add("Object.AlchemyDestroy", [](LLUICtrl* ctrl, const LLSD& param) { object_destroy(); });
     commit.add("Object.AlchemyForceDelete", [](LLUICtrl* ctrl, const LLSD& param) { object_force_delete(); });
     commit.add("Object.RefreshTexture", [](LLUICtrl* ctrl, const LLSD& param) { object_texture_refresh(); });
+
+// [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2)
+    commit.add("Object.Derender", boost::bind(&handle_object_derender, _2));
+    enable.add("Object.EnableDerender", boost::bind(&enable_object_derender));
+    // [/SL:KB]
+
+    // [SL:KB] - Patch: World-RenderExceptions | Checked: Catznip-5.2
+    commit.add("View.Blocked", boost::bind(&handle_view_blocked, _2));
+    // [/SL:KB]
 
     commit.add("Tools.UndeformSelf", [](LLUICtrl* ctrl, const LLSD& param) { avatar_undeform_self(); });
 

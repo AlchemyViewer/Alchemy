@@ -69,6 +69,9 @@
 #include "u64.h"
 #include "llviewertexturelist.h"
 #include "lldatapacker.h"
+// [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2.1)
+#include "alderenderlist.h"
+// [/SL:KB]
 #include <zlib.h>
 #include "object_flags.h"
 
@@ -348,6 +351,15 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
         }
     }
 
+// [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
+    // Don't recreate derendered objects (also kill the cache entry so we don't do this per-frame)
+    if (ALDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, entry))
+    {
+        regionp->killCacheEntry(local_id);  // NOTE: this will kill all child entries from the cache as well
+        return NULL;
+    }
+// [/SL:KB]
+
     bool justCreated = false;
     if (!objectp)
     {
@@ -622,6 +634,27 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                 continue;
             }
 #endif
+
+// [SL:KB] - Patch: World-Derender | Checked: 2012-06-08 (Catznip-3.3)
+            // Don't recreate derendered objects (update the core object information so we'll have enough information to rerequest it later if needed)
+            if ( (OUT_FULL == update_type) || (OUT_FULL_COMPRESSED == update_type) )
+            {
+                bool fBlockObject = false;
+                if (OUT_FULL == update_type)
+                {
+                    U32 idRootLocal = 0;
+                    mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ParentID, idRootLocal, i);
+                    fBlockObject = ALDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, local_id, idRootLocal);
+                }
+                else if (OUT_FULL_COMPRESSED == update_type)
+                {
+                    fBlockObject = ALDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, local_id, compressed_dp.getBuffer());
+                }
+
+                if (fBlockObject)
+                    continue;
+            }
+// [/SL:KB]
 
             objectp = createObject(pcode, regionp, fullid, local_id, gMessageSystem->getSender());
 

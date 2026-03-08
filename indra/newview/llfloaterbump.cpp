@@ -35,7 +35,7 @@
 #include "llfloaterreg.h"
 #include "llfloaterreporter.h"
 #include "llmutelist.h"
-#include "llpanelblockedlist.h"
+#include "alfloaterblocked.h"
 #include "llscrolllistctrl.h"
 #include "lltrans.h"
 #include "lluictrlfactory.h"
@@ -244,7 +244,7 @@ void LLFloaterBump::muteAvatar()
     else
     {
         LLMuteList::getInstance()->add(mute);
-        LLPanelBlockedList::showPanelAndSelect(mute.mID);
+        ALFloaterBlocked::showMuteAndSelect(mute.mID);
     }
 }
 

@@ -70,7 +70,7 @@
 #include "lllogchat.h"
 #include "llmutelist.h"
 #include "llnotificationsutil.h"
-#include "llpanelblockedlist.h"
+#include "alfloaterblocked.h"
 #include "llpanelprofileclassifieds.h"
 #include "llpanelprofilepicks.h"
 #include "lltrans.h"
@@ -403,7 +403,7 @@ public:
                 const std::string object_name = LLURI::unescape(params[2].asString());
                 LLMute mute(avatar_id, object_name, LLMute::OBJECT);
                 LLMuteList::getInstance()->add(mute);
-                LLPanelBlockedList::showPanelAndSelect(mute.mID);
+                ALFloaterBlocked::showMuteAndSelect(mute.mID);
             }
             return true;
         }

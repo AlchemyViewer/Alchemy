@@ -32,6 +32,9 @@
 #include "llviewerfloaterreg.h"
 
 #include "ao.h"
+// [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
+#include "alfloaterblocked.h"
+// [/SL:KB]
 #include "alfloatergenerictext.h"
 #include "alfloaterparticleeditor.h"
 #include "alfloaterprogressview.h"
@@ -342,7 +345,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("auction", "floater_auction.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAuction>);
     LLFloaterReg::add("avatar_picker", "floater_avatar_picker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAvatarPicker>);
     LLFloaterReg::add("avatar_welcome_pack", "floater_avatar_welcome_pack.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAvatarWelcomePack>);
-    LLFloaterReg::add("avatar_render_settings", "floater_avatar_render_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAvatarRenderSettings>);
+    //LLFloaterReg::add("avatar_render_settings", "floater_avatar_render_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAvatarRenderSettings>);
     LLFloaterReg::add("avatar_textures", "floater_avatar_textures.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAvatarTextures>);
 
     LLFloaterReg::add("ban_duration", "floater_ban_duration.xml", &LLFloaterReg::build<LLFloaterBanDuration>);
@@ -535,6 +538,9 @@ void LLViewerFloaterReg::registerFloaters()
 
     // Alchemy Floaters
     LLFloaterReg::add("ao", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterAO>);
+// [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
+    LLFloaterReg::add("blocked", "floater_al_blocked.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterBlocked>);
+// [/SL:KB]
     LLFloaterReg::add("delete_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeleteQueue>);
     LLFloaterReg::add("generic_text", "floater_al_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGenericText>);
     LLFloaterReg::add("particle_editor", "floater_al_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);

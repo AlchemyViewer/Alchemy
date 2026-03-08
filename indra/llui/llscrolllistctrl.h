@@ -110,6 +110,9 @@ public:
         Optional<bool>  multi_select,
                         commit_on_keyboard_movement,
                         commit_on_selection_change,
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+                        select_on_focus,
+// [/SL:KB]
                         mouse_wheel_opaque;
 
         Optional<ESelectionType, SelectionTypeNames> selection_type;
@@ -183,6 +186,9 @@ public:
     // "columns" => [ "column" => column name, "value" => value, "type" => type, "font" => font, "font-style" => style ], "id" => uuid
     // Creates missing columns automatically.
     virtual LLScrollListItem* addElement(const LLSD& element, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL);
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+    virtual LLScrollListItem* addElement(const LLSD& element, const LLScrollListItem::commit_signal_t::slot_type& cb, EAddPosition pos = ADD_BOTTOM);
+// [/SL:KB]
     virtual LLScrollListItem* addRow(LLScrollListItem *new_item, const LLScrollListItem::Params& value, EAddPosition pos = ADD_BOTTOM);
     virtual LLScrollListItem* addRow(const LLScrollListItem::Params& value, EAddPosition pos = ADD_BOTTOM);
     // Simple add element. Takes a single array of:
@@ -227,6 +233,9 @@ public:
     bool            selectItemAt(S32 x, S32 y, MASK mask);
 
     void            deleteSingleItem( S32 index );
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-3.5
+    void            deleteSingleItem(LLScrollListItem* itemp);
+// [/SL:KB]
     void            deleteItems(const LLSD& sd);
     void            deleteSelectedItems();
     void            deselectAllItems(bool no_commit_on_change = false); // by default, go ahead and commit on selection change
@@ -314,6 +323,9 @@ public:
     S32  getRowPadding() const                  { return mColumnPadding; }
     void setCommitOnKeyboardMovement(bool b)    { mCommitOnKeyboardMovement = b; }
     void setCommitOnSelectionChange(bool b)     { mCommitOnSelectionChange = b; }
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-3.3
+    void setCommitOnDelete(bool b)              { mCommitOnDelete = b; }
+// [/SL:KB]
     void setAllowKeyboardMovement(bool b)       { mAllowKeyboardMovement = b; }
 
     void            setMaxSelectable(U32 max_selected) { mMaxSelectable = max_selected; }
@@ -401,6 +413,9 @@ public:
     S32             getTotalStaticColumnWidth() const { return mTotalStaticColumnWidth; }
 
     std::string     getSortColumnName();
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-3.5
+    S32             getSortColumnIndex() const;
+// [/SL:KB]
     bool            getSortAscending() { return mSortColumns.empty() ? true : mSortColumns.back().second; }
     bool            hasSortOrder() const;
     void            clearSortOrder();
@@ -484,6 +499,12 @@ private:
     bool            mAllowKeyboardMovement;
     bool            mCommitOnKeyboardMovement;
     bool            mCommitOnSelectionChange;
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-3.3
+    bool            mCommitOnDelete;
+// [/SL:KB]
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+    bool            mSelectOnFocus = true;
+// [/SL:KB]
     bool            mSelectionChanged;
     ESelectionType  mSelectionType;
     bool            mNeedsScroll;

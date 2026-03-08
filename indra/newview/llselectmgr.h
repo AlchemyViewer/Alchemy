@@ -184,7 +184,7 @@ public:
     void renderOneSilhouette(const LLColor4 &color);
     void setTransient(bool transient) { mTransient = transient; }
     bool isTransient() const { return mTransient; }
-    LLViewerObject* getObject();
+    LLViewerObject* getObject() const;
     void setObject(LLViewerObject* object);
     // *NOTE: invalidate stored textures and colors when # faces change
     // Used by tools floater's color/texture pickers to restore changes
@@ -251,7 +251,7 @@ public:
     S32             mSelectedGLTFPrimitive = -1;
 
 protected:
-    LLPointer<LLViewerObject>   mObject;
+    mutable LLPointer<LLViewerObject>   mObject;
     S32             mTESelectMask;
     S32             mLastTESelected;
 

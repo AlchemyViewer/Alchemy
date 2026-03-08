@@ -73,9 +73,12 @@ set(viewer_SOURCE_FILES
     ao.cpp
     aoengine.cpp
     aoset.cpp
+    alassetblocklist.cpp
     alavataractions.cpp
     alavatargroups.cpp
     alchatcommand.cpp
+    alderenderlist.cpp
+    alfloaterblocked.cpp
     alfloatergenerictext.cpp
     alfloaterparticleeditor.cpp
     alfloaterprogressview.cpp
@@ -201,7 +204,7 @@ set(viewer_SOURCE_FILES
     llfloaterauction.cpp
     llfloaterautoreplacesettings.cpp
     llfloateravatarpicker.cpp
-    llfloateravatarrendersettings.cpp
+#   llfloateravatarrendersettings.cpp
     llfloateravatartextures.cpp
     llfloaterbanduration.cpp
     llfloaterbeacons.cpp
@@ -775,9 +778,12 @@ set(viewer_HEADER_FILES
     ao.h
     aoengine.h
     aoset.h
+    alassetblocklist.h
     alavataractions.h
     alavatargroups.h
     alchatcommand.h
+    alderenderlist.h
+    alfloaterblocked.h
     alfloatergenerictext.h
     alfloaterparticleeditor.h
     alfloaterprogressview.h
@@ -906,7 +912,7 @@ set(viewer_HEADER_FILES
     llfloaterauction.h
     llfloaterautoreplacesettings.h
     llfloateravatarpicker.h
-    llfloateravatarrendersettings.h
+#   llfloateravatarrendersettings.h
     llfloateravatartextures.h
     llfloaterbanduration.h
     llfloaterbeacons.h

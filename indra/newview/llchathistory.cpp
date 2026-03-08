@@ -33,6 +33,7 @@
 #include "llavatarnamecache.h"
 #include "llinstantmessage.h"
 
+#include "alfloaterblocked.h"
 #include "llimview.h"
 #include "llcommandhandler.h"
 #include "llpanel.h"
@@ -183,9 +184,7 @@ public:
         else if (level == "block")
         {
             LLMuteList::getInstance()->add(LLMute(getAvatarId(), mFrom, LLMute::OBJECT));
-
-            LLFloaterSidePanelContainer::showPanel("people", "panel_people",
-                LLSD().with("people_panel_tab_name", "blocked_panel").with("blocked_to_select", getAvatarId()));
+            ALFloaterBlocked::showMuteAndSelect(getAvatarId());
         }
         else if (level == "unblock")
         {

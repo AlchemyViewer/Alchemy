@@ -42,7 +42,7 @@
 #include "llimview.h"
 #include "llinspect.h"
 #include "llmutelist.h"
-#include "llpanelblockedlist.h"
+#include "alfloaterblocked.h"
 #include "llslurl.h"
 #include "llstartup.h"
 #include "llspeakers.h"
@@ -744,7 +744,7 @@ void LLInspectAvatar::onToggleMute()
         LLMuteList::getInstance()->add(mute);
     }
 
-    LLPanelBlockedList::showPanelAndSelect(mute.mID);
+    ALFloaterBlocked::showMuteAndSelect(mute.mID);
     closeFloater();
 }
 
