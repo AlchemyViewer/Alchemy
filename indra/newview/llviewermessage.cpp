@@ -50,6 +50,7 @@
 #include "llxfermanager.h"
 #include "mean_collision_data.h"
 
+#include "alfloatertransactionlog.h"
 #include "llagent.h"
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -5039,6 +5040,13 @@ static void process_money_balance_reply_extended(LLMessageSystem* msg)
         // make notification loggable
         payload["from_id"] = source_id;
         notification = "PaymentReceived";
+    }
+
+    ALFloaterTransactionLog* floater = LLFloaterReg::findTypedInstance<ALFloaterTransactionLog>("transaction_log");
+    // only log the successful transactions --FLN
+    if (success && floater)
+    {
+        floater->addTransaction(LLDate::now(), source_id, amount, !you_paid_someone);
     }
 
     // Despite using SLURLs, wait until the name is available before
