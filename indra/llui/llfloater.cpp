@@ -435,14 +435,14 @@ void LLFloater::layoutDragHandle()
 // static
 void LLFloater::updateActiveFloaterTransparency()
 {
-    static LLCachedControl<F32> active_transparency(*LLUI::getInstance()->mSettingGroups["config"], "ActiveFloaterTransparency", 1.f);
+    static LLUICachedControl<F32> active_transparency("ActiveFloaterTransparency", 1.f);
     sActiveControlTransparency = active_transparency;
 }
 
 // static
 void LLFloater::updateInactiveFloaterTransparency()
 {
-    static LLCachedControl<F32> inactive_transparency(*LLUI::getInstance()->mSettingGroups["config"], "InactiveFloaterTransparency", 0.95f);
+    static LLUICachedControl<F32> inactive_transparency("InactiveFloaterTransparency", 0.95f);
     sInactiveControlTransparency = inactive_transparency;
 }
 
@@ -2127,11 +2127,11 @@ void LLFloater::draw()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     LL_PROFILE_ZONE_TEXT(getTitle().c_str(), getTitle().length());
 
-    const F32 alpha = getCurrentTransparency();
-
     // draw background
     if( isBackgroundVisible() )
     {
+        const F32 alpha = getCurrentTransparency();
+
         drawShadow(this);
 
         S32 left = LLPANEL_BORDER_WIDTH;
