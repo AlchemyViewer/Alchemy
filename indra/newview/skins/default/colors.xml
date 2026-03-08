@@ -706,7 +706,7 @@
      reference="White" />
     <color
      name="NetMapBackgroundColor"
-     value="0 0 0 1" />
+     reference="Black_10" />
     <color
      name="NetMapGroupOwnAboveWater"
      value="0.85 0 0.85 1" />

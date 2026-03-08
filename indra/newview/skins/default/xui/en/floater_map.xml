@@ -1,56 +1,27 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater
  positioning="cascading"
+ bg_alpha_image_overlay="DkGray_33"
  can_minimize="true" 
  can_resize="true"
+ header_height="0"
  chrome="true"
  height="200"
  layout="topleft"
  min_height="128"
  min_width="128"
  name="Map"
- title="MINI-MAP"
+ title=""
  help_topic="map"
  save_rect="true"
  save_visibility="true"
  width="200">
     <!-- RLVa shows the anonymized name on the regular tooltip when @shownames=n restricted (rather than show the avatar inspector) --> 
-    <floater.string
-     name="ToolTipMsg">
-        [AGENT][PARCEL_NAME_MSG][PARCEL_SALE_PRICE_MSG][PARCEL_SALE_AREA_MSG][PARCEL_OWNER_MSG][REGION_NAME_MSG][TOOL_TIP_HINT_MSG]
-    </floater.string>
-    <floater.string
-     name="ParcelNameMsg">
-        [PARCEL_NAME]
-    </floater.string>
-    <floater.string
-     name="ParcelSalePriceMsg">
-        Price: L$[PRICE] (L$[PRICE_PER_SQM]/m²)
-    </floater.string>
-    <floater.string
-     name="ParcelSaleAreaMsg">
-        Area: [AREA]m²
-    </floater.string>
-    <floater.string
-     name="ParcelOwnerMsg">
-        Owner: [PARCEL_OWNER]
-    </floater.string>
-    <floater.string
-     name="RegionNameMsg">
-        Region: [REGION_NAME]
-    </floater.string>
-	<floater.string
-     name="ToolTipHintMsg">
-        Double-click to open map
-	</floater.string>
-	<floater.string
-     name="AltToolTipHintMsg">
-        Double-click to teleport
-	</floater.string>
 	<floater.string name="mini_map_caption">
 	Mini-map
     </floater.string>
     <net_map
+     bg_color="NetMapBackgroundColor"
      follows="top|left|bottom|right"
      layout="topleft"
      left="0"

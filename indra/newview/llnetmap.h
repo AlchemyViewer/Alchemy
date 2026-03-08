@@ -40,8 +40,9 @@ class LLImageRaw;
 class LLViewerTexture;
 class LLFloaterMap;
 class LLMenuGL;
+class LLViewerRegion;
 
-class LLNetMap : public LLUICtrl
+class LLNetMap final : public LLUICtrl
 {
 public:
     struct Params

@@ -101,6 +101,7 @@ LLNetMap::LLNetMap (const Params & p)
     mPopupWorldPos(0.f, 0.f, 0.f),
     mMouseDown(0, 0),
     mPanning(false),
+    mCentering(false),
     mUpdateNow(false),
     mObjectImageCenterGlobal( gAgentCamera.getCameraPositionGlobal() ),
     mObjectRawImagep(),
@@ -109,7 +110,7 @@ LLNetMap::LLNetMap (const Params & p)
     mClosestAgentAtLastRightClick(),
     mToolTipMsg()
 {
-    mScale = gSavedSettings.getF32("MiniMapScale");
+    setScale(gSavedSettings.getF32("MiniMapScale"));
     if (gAgent.isFirstLogin())
     {
         // *HACK: On first run, set this to false for new users, otherwise the
@@ -117,8 +118,6 @@ LLNetMap::LLNetMap (const Params & p)
         // users.
         gSavedSettings.setBOOL("MiniMapRotate", false);
     }
-    mPixelsPerMeter = mScale / REGION_WIDTH_METERS;
-    mDotRadius = llmax(DOT_SCALE * mPixelsPerMeter, MIN_DOT_RADIUS);
 }
 
 LLNetMap::~LLNetMap()
@@ -471,7 +470,8 @@ void LLNetMap::draw()
                         S32 x = ll_round( pos_map.mV[VX] );
                         S32 y = ll_round( pos_map.mV[VY] );
                         LLWorldMapView::drawTrackingCircle( getRect(), x, y, color, 1, 10);
-                    } else
+                    }
+                    else
                     {
                         LLWorldMapView::drawTrackingDot(pos_map.mV[VX],pos_map.mV[VY],color,0.f);
                     }
@@ -1046,6 +1046,8 @@ void LLNetMap::createObjectImage()
 
 bool LLNetMap::handleMouseDown(S32 x, S32 y, MASK mask)
 {
+    if (!(mask & MASK_SHIFT)) return false;
+
     // Start panning
     gFocusMgr.setMouseCapture(this);
 

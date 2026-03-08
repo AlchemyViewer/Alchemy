@@ -4434,4 +4434,37 @@ and report the problem.
 
   <string name="SimulatorFeaturesTitle">SIMULATOR FEATURES</string>
 
+	<string
+     name="MinimapToolTipMsg">
+		[AGENT][PARCEL_NAME_MSG][PARCEL_SALE_PRICE_MSG][PARCEL_SALE_AREA_MSG][PARCEL_OWNER_MSG][REGION_NAME_MSG][TOOL_TIP_HINT_MSG]
+	</string>
+	<string
+     name="MinimapParcelNameMsg">
+		[PARCEL_NAME]
+	</string>
+	<string
+     name="MinimapParcelSalePriceMsg">
+		Price: L$[PRICE] (L$[PRICE_PER_SQM]/m²)
+	</string>
+	<string
+     name="MinimapParcelSaleAreaMsg">
+		Area: [AREA]m²
+	</string>
+	<string
+     name="MinimapParcelOwnerMsg">
+		Owner: [PARCEL_OWNER]
+	</string>
+	<string
+     name="MinimapRegionNameMsg">
+		Region: [REGION_NAME]
+	</string>
+	<string
+     name="MinimapToolTipHintMsg">
+		Double-click to open map
+	</string>
+	<string
+     name="MinimapAltToolTipHintMsg">
+		Double-click to teleport
+	</string>
+
 </strings>

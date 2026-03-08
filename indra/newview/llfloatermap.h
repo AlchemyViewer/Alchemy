@@ -46,10 +46,13 @@ public:
     bool    handleDoubleClick( S32 x, S32 y, MASK mask ) override;
     void    reshape(S32 width, S32 height, bool called_from_parent = true) override;
     void    draw() override;
+    void    setMinimized(bool b) override;
 
 private:
     void setDirectionPos( LLTextBox* text_box, F32 rotation );
     void updateMinorDirections();
+
+    void stretchMiniMap(S32 width,S32 height);
 
     LLTextBox*      mTextBoxEast;
     LLTextBox*      mTextBoxNorth;

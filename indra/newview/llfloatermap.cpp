@@ -33,6 +33,7 @@
 #include "llfloaterreg.h"
 #include "llfontgl.h"
 #include "llglheaders.h"
+#include "lltrans.h"
 
 // Viewer includes
 #include "llagentcamera.h"
@@ -52,6 +53,10 @@
 // The minor cardinal direction labels are hidden if their height is more
 // than this proportion of the map.
 const F32 MAP_MINOR_DIR_THRESHOLD = 0.035f;
+const S32 MAP_PADDING_LEFT = 0;
+const S32 MAP_PADDING_TOP = 2;
+const S32 MAP_PADDING_RIGHT = 2;
+const S32 MAP_PADDING_BOTTOM = 0;
 
 //
 // Member functions
@@ -78,14 +83,14 @@ LLFloaterMap::~LLFloaterMap()
 bool LLFloaterMap::postBuild()
 {
     mMap = getChild<LLNetMap>("Net Map");
-    mMap->setToolTipMsg(getString("ToolTipMsg"));
-    mMap->setParcelNameMsg(getString("ParcelNameMsg"));
-    mMap->setParcelSalePriceMsg(getString("ParcelSalePriceMsg"));
-    mMap->setParcelSaleAreaMsg(getString("ParcelSaleAreaMsg"));
-    mMap->setParcelOwnerMsg(getString("ParcelOwnerMsg"));
-    mMap->setRegionNameMsg(getString("RegionNameMsg"));
-    mMap->setToolTipHintMsg(getString("ToolTipHintMsg"));
-    mMap->setAltToolTipHintMsg(getString("AltToolTipHintMsg"));
+    mMap->setToolTipMsg(LLTrans::getString("MinimapToolTipMsg"));
+    mMap->setParcelNameMsg(LLTrans::getString("MinimapParcelNameMsg"));
+    mMap->setParcelSalePriceMsg(LLTrans::getString("MinimapParcelSalePriceMsg"));
+    mMap->setParcelSaleAreaMsg(LLTrans::getString("MinimapParcelSaleAreaMsg"));
+    mMap->setParcelOwnerMsg(LLTrans::getString("MinimapParcelOwnerMsg"));
+    mMap->setRegionNameMsg(LLTrans::getString("MinimapRegionNameMsg"));
+    mMap->setToolTipHintMsg(LLTrans::getString("MinimapToolTipHintMsg"));
+    mMap->setAltToolTipHintMsg(LLTrans::getString("MinimapAltToolTipHintMsg"));
     sendChildToBack(mMap);
 
     mTextBoxNorth     = getChild<LLTextBox>("floater_map_north");
@@ -96,6 +101,9 @@ bool LLFloaterMap::postBuild()
     mTextBoxNorthEast = getChild<LLTextBox>("floater_map_northeast");
     mTextBoxSouthWest = getChild<LLTextBox>("floater_map_southwest");
     mTextBoxNorthWest = getChild<LLTextBox>("floater_map_northwest");
+
+    stretchMiniMap(getRect().getWidth() - MAP_PADDING_LEFT - MAP_PADDING_RIGHT
+        ,getRect().getHeight() - MAP_PADDING_TOP - MAP_PADDING_BOTTOM);
 
     mTextBoxNorth->reshapeToFitText();
     mTextBoxEast->reshapeToFitText();
@@ -241,11 +249,34 @@ void LLFloaterMap::draw()
     LLFloater::draw();
 }
 
+void LLFloaterMap::stretchMiniMap(S32 width,S32 height)
+{
+    //fix for ext-7112
+    //by default ctrl can't overlap caption area
+    if(mMap)
+    {
+        LLRect map_rect;
+        map_rect.setLeftTopAndSize( MAP_PADDING_LEFT, getRect().getHeight() - MAP_PADDING_TOP, width, height);
+        mMap->reshape( width, height, 1);
+        mMap->setRect(map_rect);
+    }
+}
+
 void LLFloaterMap::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLFloater::reshape(width, height, called_from_parent);
 
+    stretchMiniMap(width - MAP_PADDING_LEFT - MAP_PADDING_RIGHT
+        ,height - MAP_PADDING_TOP - MAP_PADDING_BOTTOM);
+
     updateMinorDirections();
+}
+
+void LLFloaterMap::setMinimized(bool b)
+{
+    LLFloater::setMinimized(b);
+    setTitle(b ? getString("mini_map_caption") : "");
+
 }
 
 LLFloaterMap* LLFloaterMap::getInstance()
