@@ -384,11 +384,11 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     {
         if (object->getRegion() && object->getRegion()->isCapabilityAvailable("GetMetadata"))
         {
-        	LLExperienceCache::instance().fetchAssociatedExperience(inventory->getParentUUID(), inventory->getUUID(),
-            	boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _1));
+            LLExperienceCache::instance().fetchAssociatedExperience(inventory->getParentUUID(), inventory->getUUID(),
+                boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _1));
 
-        	result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT,
-            	LLSDMap("timeout", LLSD::Boolean(true)));
+            result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT,
+                LLSDMap("timeout", LLSD::Boolean(true)));
         }
         else
         {
