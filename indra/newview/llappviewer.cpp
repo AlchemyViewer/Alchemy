@@ -255,6 +255,7 @@ using namespace LL;
 #include "llmachineid.h"
 #include "llcleanup.h"
 
+#include "altoolalign.h"
 #include "llinventoryicon.h"
 #include "llcoproceduremanager.h"
 #include "llviewereventrecorder.h"
@@ -1331,6 +1332,7 @@ bool LLAppViewer::init()
     LLToolCompScale::createInstance();
     LLToolCompRotate::createInstance();
     LLToolCompCreate::createInstance();
+    ALToolAlign::createInstance();
     LLToolCompGun::createInstance();
     LLToolFace::createInstance();
     LLToolPipette::createInstance();
@@ -2274,6 +2276,7 @@ bool LLAppViewer::cleanup()
     LLToolGrab::deleteSingleton();
     LLToolPipette::deleteSingleton();
     LLToolFace::deleteSingleton();
+    ALToolAlign::deleteSingleton();
     LLToolCompGun::deleteSingleton();
     LLToolCompCreate::deleteSingleton();
     LLToolCompRotate::deleteSingleton();

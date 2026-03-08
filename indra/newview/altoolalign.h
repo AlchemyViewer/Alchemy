@@ -33,12 +33,12 @@ class LLPickInfo;
 class LLToolSelectRect;
 
 class ALToolAlign final
-:   public LLTool, public LLSingleton<ALToolAlign>
+:   public LLTool, public LLSimpleton<ALToolAlign>
 {
-    LLSINGLETON(ALToolAlign);
+public:
+    ALToolAlign();
     ~ALToolAlign() = default;
 
-public:
     void    handleSelect() override;
     void    handleDeselect() override;
     bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
