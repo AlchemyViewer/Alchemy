@@ -413,9 +413,6 @@ static void update_tp_display(bool minimized)
         case LLAgent::TELEPORT_NONE:
             // No teleport in progress
             pProgFloater->setShowProgress(false);
-// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
-            LLViewerParcelMgr::getInstance()->onTeleportDone();
-// [/SL:KB]
             gTeleportDisplay = false;
     }
 }
@@ -610,6 +607,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         LLAppViewer::instance()->pingMainloopTimeout("Display:Teleport");
         // Note: false = not minimized, do update the TP screen. HB
         update_tp_display(false);
+// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
+        LLViewerParcelMgr::getInstance()->onTeleportDone();
+// [/SL:KB]
     }
     else if(LLAppViewer::instance()->logoutRequestSent())
     {
