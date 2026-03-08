@@ -299,8 +299,8 @@ public:
 private:
     void setDirNames(ELLPath location);
     // determine the cache filename for the region from the region handle
-    void getObjectCacheFilename(U64 handle, std::string& filename);
-    std::string getObjectCacheExtrasFilename(U64 handle);
+    std::filesystem::path getObjectCacheFilename(U64 handle);
+    std::filesystem::path getObjectCacheExtrasFilename(U64 handle);
     void removeFromCache(HeaderEntryInfo* entry);
     void readCacheHeader();
     void writeCacheHeader();

@@ -34,6 +34,9 @@
 #include "llagentcamera.h"
 #include "llsdserialize.h"
 #include "llworld.h" // For LLWorld::getInstance()
+
+#include <fmt/xchar.h>
+
 //static variables
 U32 LLVOCacheEntry::sMinFrameRange = 0;
 F32 LLVOCacheEntry::sNearRadius = 1.0f;
@@ -1141,10 +1144,6 @@ void LLVOCachePartition::removeOccluder(LLVOCacheGroup* group)
 //-------------------------------------------------------------------
 //LLVOCache
 //-------------------------------------------------------------------
-// Format strings used to construct filename for the object cache
-static const char OBJECT_CACHE_FILENAME[] = "objects_%d_%d.slc";
-static const char OBJECT_CACHE_EXTRAS_FILENAME[] = "objects_%d_%d_extras.slec";
-
 const U32 MAX_NUM_OBJECT_ENTRIES = 128 ;
 const U32 MIN_ENTRIES_TO_PURGE = 16 ;
 const U32 INVALID_TIME = 0 ;
@@ -1290,9 +1289,7 @@ void LLVOCache::removeEntry(HeaderEntryInfo* entry)
         return;
     }
     // Bit more tracking of cache creation/destruction.
-    std::string filename;
-    getObjectCacheFilename(entry->mHandle, filename);
-    LL_INFOS() << "Removing entry for region with filename" << filename << LL_ENDL;
+    LL_DEBUGS() << "Removing entry for region with filename" << getObjectCacheFilename(entry->mHandle) << LL_ENDL;
 
     // make sure corresponding LLViewerRegion also clears its in-memory cache
     LLViewerRegion* regionp = LLWorld::instance().getRegionFromHandle(entry->mHandle);
@@ -1339,24 +1336,28 @@ void LLVOCache::clearCacheInMemory()
 
 }
 
-void LLVOCache::getObjectCacheFilename(U64 handle, std::string& filename)
+std::filesystem::path LLVOCache::getObjectCacheFilename(U64 handle)
 {
     U32 region_x, region_y;
 
     grid_from_region_handle(handle, &region_x, &region_y);
-    filename = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, object_cache_dirname,
-               llformat(OBJECT_CACHE_FILENAME, region_x, region_y));
-
-    return ;
+#if LL_WINDOWS
+    return fmt::format(L"{:s}\\objects_{:d}_{:d}.slc", mObjectCacheDirPath.native(), region_x, region_y);
+#else
+    return fmt::format("{:s}/objects_{:d}_{:d}.slc", mObjectCacheDirPath.native(), region_x, region_y);
+#endif
 }
 
-std::string LLVOCache::getObjectCacheExtrasFilename(U64 handle)
+std::filesystem::path LLVOCache::getObjectCacheExtrasFilename(U64 handle)
 {
     U32 region_x, region_y;
 
     grid_from_region_handle(handle, &region_x, &region_y);
-    return gDirUtilp->getExpandedFilename(LL_PATH_CACHE, object_cache_dirname,
-               llformat(OBJECT_CACHE_EXTRAS_FILENAME, region_x, region_y));
+#if LL_WINDOWS
+    return fmt::format(L"{:s}\\objects_{:d}_{:d}_extras.slec", mObjectCacheDirPath.native(), region_x, region_y);
+#else
+    return fmt::format("{:s}/objects_{:d}_{:d}_extras.slec", mObjectCacheDirPath.native(), region_x, region_y);
+#endif
 }
 
 void LLVOCache::removeFromCache(HeaderEntryInfo* entry)
@@ -1367,8 +1368,7 @@ void LLVOCache::removeFromCache(HeaderEntryInfo* entry)
         return ;
     }
 
-    std::string filename;
-    getObjectCacheFilename(entry->mHandle, filename);
+    std::filesystem::path filename = getObjectCacheFilename(entry->mHandle);
     LL_WARNS("GLTF", "VOCache") << "Removing object cache for handle " << entry->mHandle << "Filename: " << filename << LL_ENDL;
     LLFile::remove(filename);
 
@@ -1546,10 +1546,10 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
 
     bool success = true ;
     S32 num_entries = 0 ; // lifted out of inner loop.
-    std::string filename; // lifted out of loop
+    std::filesystem::path filename; // lifted out of loop
     {
         LLUUID cache_id;
-        getObjectCacheFilename(handle, filename);
+        filename = getObjectCacheFilename(handle);
 
         std::error_code ec;
         LLFile apr_file(filename, LLFile::in|LLFile::binary, ec);
@@ -1632,7 +1632,7 @@ void LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
         return;
     }
 
-    std::string filename(getObjectCacheExtrasFilename(handle));
+    std::filesystem::path filename(getObjectCacheExtrasFilename(handle));
     llifstream in(filename, std::ios::in | std::ios::binary);
 
     std::string line;
@@ -1759,8 +1759,7 @@ void LLVOCache::purgeEntries(U32 size)
 
 void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled)
 {
-    std::string filename;
-    getObjectCacheFilename(handle, filename);
+    std::filesystem::path filename = getObjectCacheFilename(handle);
     if(!mEnabled)
     {
         LL_WARNS() << "Not writing cache for " << filename << " (handle:" << handle << "): Cache is currently disabled." << LL_ENDL;
@@ -1925,7 +1924,7 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
         return;
     }
 
-    std::string filename = getObjectCacheExtrasFilename(handle);
+    std::filesystem::path filename = getObjectCacheExtrasFilename(handle);
     llofstream out(filename, std::ios::out | std::ios::binary);
     if(!out.good())
     {
