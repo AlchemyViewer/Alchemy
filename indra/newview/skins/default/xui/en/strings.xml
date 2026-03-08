@@ -4431,6 +4431,9 @@ and report the problem.
   </string>
 
 <!-- Alchemy Below This Line-->
+  <string name="NotifyIncomingMessage">Incoming message from [NAME]...</string>
+  <string name="AvatarTyping">Typing</string>
+  <string name="UnknownAvatar">Unknown Avatar</string>
 
   <string name="SimulatorFeaturesTitle">SIMULATOR FEATURES</string>
 

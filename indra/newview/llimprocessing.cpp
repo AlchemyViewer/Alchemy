@@ -703,6 +703,31 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
         case IM_TYPING_START:
         {
+            static LLCachedControl<bool> sNotifyIncomingMessage(gSavedSettings, "AlchemyNotifyIncomingMessage");
+            if (sNotifyIncomingMessage &&
+                !gIMMgr->hasSession(session_id) &&
+                ((accept_im_from_only_friend && (is_friend || is_linden)) ||
+                (!(is_muted || is_do_not_disturb)))
+                )
+            {
+                LLStringUtil::format_map_t args;
+                args["[NAME]"] = name;
+                const std::string notify_str = LLTrans::getString("NotifyIncomingMessage", args);
+                gIMMgr->addMessage(session_id,
+                    from_id,
+                    LLStringUtil::null,
+                    notify_str,
+                    IM_ONLINE,
+                    LLStringUtil::null,
+                    IM_NOTHING_SPECIAL,
+                    parent_estate_id,
+                    region_id,
+                    position,
+                    false,
+                    0
+                );
+            }
+
             gIMMgr->processIMTypingStart(from_id, dialog);
         }
         break;
