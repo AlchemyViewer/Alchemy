@@ -41,6 +41,7 @@
      layout="topleft"
      max_length="65530"
      word_wrap="true"
+     show_emoji_helper="true"
     />
     <button
      name="notes_save_changes"

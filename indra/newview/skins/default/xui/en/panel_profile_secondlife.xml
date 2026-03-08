@@ -5,7 +5,7 @@
  top="0"
  left="0"
  height="480"
- width="440"
+ width="500"
  follows="all"
  layout="topleft"
 >
@@ -50,7 +50,13 @@ Account: [ACCTTYPE]
     <string
      name="BadgePremiumPlusLifetime"
      value="Premium Plus lifetime" />
-
+    <string
+     name="BadgePremium"
+     value="Premium" />
+    <string
+     name="BadgePremiumPlus"
+     value="Premium Plus" />
+	
   <layout_stack
    name="image_stack"
    top="8"
@@ -410,7 +416,7 @@ Account: [ACCTTYPE]
      name="display_name_panel"
      follows="all"
      layout="topleft"
-     height="24"
+     height="45"
      auto_resize="false"
      user_resize="false">
       <line_editor
@@ -425,7 +431,7 @@ Account: [ACCTTYPE]
        top="0"
        left="6"
        height="19"
-       right="-86"
+       right="-79"
        follows="left|top|right"
        layout="topleft"/>
 
@@ -438,7 +444,7 @@ Account: [ACCTTYPE]
        follows="right|top"
        interactable="true"
        top="0"
-       right="-61"
+       right="-53"
        height="24"
        width="24"
        left_pad="2" />
@@ -452,7 +458,7 @@ Account: [ACCTTYPE]
        follows="right|top"
        interactable="true"
        top="0"
-       right="-61"
+       right="-53"
        height="24"
        width="24"
        left_pad="2" />
@@ -466,7 +472,7 @@ Account: [ACCTTYPE]
        follows="right|top"
        interactable="true"
        top="0"
-       right="-30"
+       right="-27"
        height="24"
        width="24"
        left_pad="2" />
@@ -480,7 +486,7 @@ Account: [ACCTTYPE]
        follows="right|top"
        interactable="true"
        top="0"
-       right="-30"
+       right="-27"
        height="24"
        width="24"
        left_pad="2" />
@@ -513,8 +519,43 @@ Account: [ACCTTYPE]
        width="24"
        left_pad="2" />
 
-    </layout_panel>
-
+    <text
+     top_pad="4"
+     left="6"
+     height="16"
+     width="25"
+     layout="topleft"
+     follows="left|top"
+     name="Key:"
+     value="Key:"/>
+    <line_editor
+     top_delta="-1"
+     left_pad="0"
+     height="16"
+     layout="topleft"
+     follows="left|top|right"
+     name="user_key"
+     border_thickness="0"
+     use_bg_color="false"
+     background_image_disabled=""
+     background_image_focused=""
+     enabled="false"
+     max_length_bytes="254"
+     value="00000000-0000-0000-0000-000000000000"
+     width="250"/>
+     <menu_button
+     menu_filename="menu_copy_paste_avatar_profile.xml"
+     follows="top|right"
+     height="15"
+     image_disabled="ClipboardMenu_Disabled"
+     image_selected="ClipboardMenu_Press"
+     image_unselected="ClipboardMenu_Off"
+     layout="topleft"
+     left_pad="9"
+     name="clipboard_avatar_params"
+     tool_tip="Paste options"
+     width="22"/>
+   </layout_panel>
     <layout_panel
      name="about_panel"
      follows="all"
@@ -541,6 +582,7 @@ Account: [ACCTTYPE]
        max_length="65000"
        parse_urls="true"
        word_wrap="true"
+       show_emoji_helper="true"
         />
     </layout_panel>
     <layout_panel

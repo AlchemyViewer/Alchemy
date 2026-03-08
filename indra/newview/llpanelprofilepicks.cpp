@@ -51,6 +51,8 @@
 #include "llviewergenericmessage.h" // send_generic_message
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
+#include "rlvactions.h"
+#include "rlvhandler.h"
 
 static LLPanelInjector<LLPanelProfilePicks> t_panel_profile_picks("panel_profile_picks");
 static LLPanelInjector<LLPanelProfilePick> t_panel_profile_pick("panel_profile_pick");
@@ -233,6 +235,8 @@ bool LLPanelProfilePicks::postBuild()
 
     mNewButton->setCommitCallback(boost::bind(&LLPanelProfilePicks::onClickNewBtn, this));
     mDeleteButton->setCommitCallback(boost::bind(&LLPanelProfilePicks::onClickDelete, this));
+
+    mRlvBehaviorConn = gRlvHandler.setBehaviourToggleCallback([this](ERlvBehaviour eBhvr, ERlvParamType eParam) { if (eBhvr == RLV_BHVR_SHOWLOC) updateButtons(); });
 
     return true;
 }
@@ -478,7 +482,7 @@ bool LLPanelProfilePicks::hasUnsavedChanges()
     for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
     {
         LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
-        if (pick_panel && (pick_panel->isDirty() || pick_panel->isDirty()))
+        if (pick_panel && pick_panel->isDirty())
         {
             return true;
         }
@@ -501,7 +505,8 @@ void LLPanelProfilePicks::commitUnsavedChanges()
 bool LLPanelProfilePicks::canAddNewPick()
 {
     return (!LLAgentPicksInfo::getInstance()->isPickLimitReached() &&
-        mTabContainer->getTabCount() < LLAgentPicksInfo::getInstance()->getMaxNumberOfPicks());
+        mTabContainer->getTabCount() < LLAgentPicksInfo::getInstance()->getMaxNumberOfPicks() &&
+        RlvActions::canShowLocation());
 }
 
 bool LLPanelProfilePicks::canDeletePick()

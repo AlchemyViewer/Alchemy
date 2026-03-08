@@ -92,6 +92,7 @@ private:
 
     LLUUID          mPickToSelectOnLoad;
     std::list<LLPickData> mSheduledPickCreation;
+    boost::signals2::connection mRlvBehaviorConn;
 };
 
 

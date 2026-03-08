@@ -54,6 +54,7 @@
 #include "llimagej2c.h"
 
 // Newview
+#include "alavataractions.h"
 #include "llagent.h" //gAgent
 #include "llagentpicksinfo.h"
 #include "llavataractions.h"
@@ -79,6 +80,7 @@
 #include "llviewertexturelist.h"
 #include "llvoiceclient.h"
 #include "llweb.h"
+#include "rlvhandler.h"
 
 
 static LLPanelInjector<LLPanelProfileSecondLife> t_panel_profile_secondlife("panel_profile_secondlife");
@@ -695,6 +697,9 @@ LLPanelProfileSecondLife::LLPanelProfileSecondLife()
     , mHideAge(false)
     , mAllowEdit(true)
 {
+    mCommitCallbackRegistrar.add("Profile.Commit", [this](LLUICtrl*, const LLSD& userdata) { onCommitMenu(userdata); });
+    mEnableCallbackRegistrar.add("Profile.EnableItem", [this](LLUICtrl*, const LLSD& userdata) { return onEnableMenu(userdata); });
+    mEnableCallbackRegistrar.add("Profile.CheckItem", [this](LLUICtrl*, const LLSD& userdata) { return onCheckMenu(userdata); });
 }
 
 LLPanelProfileSecondLife::~LLPanelProfileSecondLife()
@@ -803,6 +808,8 @@ void LLPanelProfileSecondLife::onOpen(const LLSD& key)
         updateOnlineStatus();
         fillRightsData();
     }
+
+    getChild<LLUICtrl>("user_key")->setValue(avatar_id.asString());
 
     mAvatarNameCacheConnection = LLAvatarNameCache::get(getAvatarId(), boost::bind(&LLPanelProfileSecondLife::onAvatarNameCache, this, _1, _2));
 }
@@ -1105,6 +1112,20 @@ void LLPanelProfileSecondLife::fillAccountStatus(const LLAvatarData* avatar_data
         childSetVisible("badge_layout", true);
         childSetVisible("partner_spacer_layout", false);
     }
+    else if (customer_lower == "monthly" || customer_lower == "quarterly" || customer_lower == "annual")
+    {
+        getChild<LLUICtrl>("badge_icon")->setValue("AccountLevel_Premium");
+        getChild<LLUICtrl>("badge_text")->setValue(getString("BadgePremium"));
+        childSetVisible("badge_layout", true);
+        childSetVisible("partner_spacer_layout", false);
+    }
+    else if (customer_lower.find("premium_plus") != std::string::npos)
+    {
+        getChild<LLUICtrl>("badge_icon")->setValue("AccountLevel_Plus");
+        getChild<LLUICtrl>("badge_text")->setValue(getString("BadgePremiumPlus"));
+        childSetVisible("badge_layout", true);
+        childSetVisible("partner_spacer_layout", false);
+    }
     else
     {
         childSetVisible("badge_layout", false);
@@ -1381,7 +1402,7 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
     const std::string item_name = userdata.asString();
     const LLUUID agent_id = getAvatarId();
     // todo: consider moving this into LLAvatarActions::onCommit(name, id)
-    // and making all other flaoters, like people menu do the same
+    // and making all other floaters, like people menu, do the same
     if (item_name == "im")
     {
         LLAvatarActions::startIM(agent_id);
@@ -1430,6 +1451,11 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
     {
         LLAvatarActions::toggleBlock(agent_id);
     }
+    else if (item_name == "copy_user_slurl")
+    {
+        LLWString wstr = utf8str_to_wstring(LLSLURL("agent", getAvatarId(), "about").getSLURLString());
+        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+    }
     else if (item_name == "copy_user_id")
     {
         LLWString wstr = utf8str_to_wstring(getAvatarId().asString());
@@ -1440,7 +1466,8 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
         onShowAgentPermissionsDialog();
     }
     else if (item_name == "copy_display_name"
-        || item_name == "copy_username")
+        || item_name == "copy_username"
+        || item_name == "copy_full_name")
     {
         LLAvatarName av_name;
         if (!LLAvatarNameCache::get(getAvatarId(), &av_name))
@@ -1457,6 +1484,10 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
         else if (item_name == "copy_username")
         {
             wstr = utf8str_to_wstring(av_name.getUserName());
+        }
+        else if (item_name == "copy_full_name")
+        {
+            wstr = utf8str_to_wstring(av_name.getCompleteName(true, true));
         }
         LLClipboard::instance().copyToClipboard(wstr, 0, static_cast<S32>(wstr.size()));
     }
@@ -1524,8 +1555,8 @@ bool LLPanelProfileSecondLife::onEnableMenu(const LLSD& userdata)
     }
     else if (item_name == "can_show_on_map")
     {
-        return (LLAvatarTracker::instance().isBuddyOnline(agent_id) && is_agent_mappable(agent_id))
-        || gAgent.isGodlike();
+        return ((LLAvatarTracker::instance().isBuddyOnline(agent_id) && is_agent_mappable(agent_id))
+        || gAgent.isGodlike()) && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWWORLDMAP);
     }
     else if (item_name == "toggle_block_agent")
     {
@@ -1536,7 +1567,8 @@ bool LLPanelProfileSecondLife::onEnableMenu(const LLSD& userdata)
         return LLAvatarActions::isFriend(agent_id);
     }
     else if (item_name == "copy_display_name"
-        || item_name == "copy_username")
+        || item_name == "copy_username"
+        || item_name == "copy_full_name")
     {
         return !mAvatarNameCacheConnection.connected();
     }
