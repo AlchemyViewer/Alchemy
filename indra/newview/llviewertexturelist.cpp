@@ -403,7 +403,7 @@ void LLViewerTextureList::destroyGL()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-LLViewerFetchedTexture* LLViewerTextureList::getImageFromFile(const std::string& filename,
+LLViewerFetchedTexture* LLViewerTextureList::getImageFromFile(std::string_view filename,
                                                    FTType f_type,
                                                    bool usemipmaps,
                                                    LLViewerTexture::EBoostLevel boost_priority,
@@ -413,7 +413,7 @@ LLViewerFetchedTexture* LLViewerTextureList::getImageFromFile(const std::string&
                                                    const LLUUID& force_id)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    LL_PROFILE_ZONE_TEXT(filename.c_str(), filename.size());
+    LL_PROFILE_ZONE_TEXT(filename.data(), filename.size());
     if(!mInitialized)
     {
         return NULL ;
@@ -1616,7 +1616,7 @@ LLUIImagePtr LLUIImageList::getUIImageByID(const LLUUID& image_id, S32 priority)
     return loadUIImageByID(image_id, use_mips, scale_rect, clip_rect, (LLViewerTexture::EBoostLevel)priority);
 }
 
-LLUIImagePtr LLUIImageList::getUIImage(const std::string& image_name, S32 priority)
+LLUIImagePtr LLUIImageList::getUIImage(std::string_view image_name, S32 priority)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     // look for existing image
@@ -1632,7 +1632,7 @@ LLUIImagePtr LLUIImageList::getUIImage(const std::string& image_name, S32 priori
     return loadUIImageByName(image_name, image_name, use_mips, scale_rect, clip_rect, (LLViewerTexture::EBoostLevel)priority);
 }
 
-LLUIImagePtr LLUIImageList::loadUIImageByName(const std::string& name, const std::string& filename,
+LLUIImagePtr LLUIImageList::loadUIImageByName(std::string_view name, std::string_view filename,
                                               bool use_mips, const LLRect& scale_rect, const LLRect& clip_rect, LLViewerTexture::EBoostLevel boost_priority,
                                               LLUIImage::EScaleStyle scale_style)
 {
@@ -1658,7 +1658,7 @@ LLUIImagePtr LLUIImageList::loadUIImageByID(const LLUUID& id,
     return loadUIImage(imagep, id.asString(), use_mips, scale_rect, clip_rect, scale_style);
 }
 
-LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, const std::string& name, bool use_mips, const LLRect& scale_rect, const LLRect& clip_rect,
+LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, std::string_view name, bool use_mips, const LLRect& scale_rect, const LLRect& clip_rect,
                                         LLUIImage::EScaleStyle scale_style)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -1669,7 +1669,7 @@ LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, const st
     //don't compress UI images
     imagep->getGLTexture()->setAllowCompression(false);
 
-    LLUIImagePtr new_imagep = new LLUIImage(name, imagep);
+    LLUIImagePtr new_imagep = new LLUIImage(std::string(name), imagep);
     new_imagep->setScaleStyle(scale_style);
 
     if (imagep->getBoostLevel() != LLGLTexture::BOOST_ICON

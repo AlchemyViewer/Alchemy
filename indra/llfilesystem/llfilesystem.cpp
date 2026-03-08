@@ -50,7 +50,7 @@ LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_
     mMode = mode;
 
     // build the filepath
-    mPath = fsyspath(LLDiskCache::metaDataToFilepath(mFileID, mFileType));
+    mPath = LLDiskCache::metaDataToFilepath(mFileID, mFileType);
 
     // This block of code was originally called in the read() method but after comments here:
     // https://bitbucket.org/lindenlab/viewer/commits/e28c1b46e9944f0215a13cab8ee7dded88d7fc90#comment-10537114
@@ -72,7 +72,7 @@ LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_
 bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
     LL_PROFILE_ZONE_SCOPED;
-    const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
+    const std::filesystem::path filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
 
     // not only test for existence but for the file to be not empty
     S64 size =  LLFile::size(filename);
@@ -82,9 +82,9 @@ bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType fil
 // static
 bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType file_type, int suppress_warning /*= 0*/)
 {
-    const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
+    const std::filesystem::path filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
 
-    LLFile::remove(filename.c_str(), suppress_warning);
+    LLFile::remove(filename, suppress_warning);
 
     return true;
 }
@@ -93,8 +93,8 @@ bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType fi
 bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
                               const LLUUID& new_file_id, const LLAssetType::EType new_file_type)
 {
-    const std::string old_filename = LLDiskCache::metaDataToFilepath(old_file_id, old_file_type);
-    const std::string new_filename = LLDiskCache::metaDataToFilepath(new_file_id, new_file_type);
+    const std::filesystem::path old_filename = LLDiskCache::metaDataToFilepath(old_file_id, old_file_type);
+    const std::filesystem::path new_filename = LLDiskCache::metaDataToFilepath(new_file_id, new_file_type);
 
     if (LLFile::rename(old_filename, new_filename) != 0)
     {
@@ -257,7 +257,7 @@ bool LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_typ
 
     mFileID = new_id;
     mFileType = new_type;
-    mPath = fsyspath(LLDiskCache::metaDataToFilepath(mFileID, mFileType));
+    mPath = LLDiskCache::metaDataToFilepath(mFileID, mFileType);
 
     return true;
 }

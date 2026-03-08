@@ -664,7 +664,7 @@ public:
                                      LLHost request_from_host = LLHost()
                                      );
 
-    static LLViewerFetchedTexture* getFetchedTextureFromFile(const std::string& filename,
+    static LLViewerFetchedTexture* getFetchedTextureFromFile(std::string_view filename,
                                      FTType f_type = FTT_LOCAL_FILE,
                                      bool usemipmap = true,
                                      LLViewerTexture::EBoostLevel boost_priority = LLGLTexture::BOOST_NONE,

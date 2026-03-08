@@ -46,6 +46,20 @@ LLUIImage::LLUIImage(const std::string& name, LLPointer<LLTexture> image)
     getTextureHeight();
 }
 
+LLUIImage::LLUIImage(std::string&& name, LLPointer<LLTexture> image) :
+    mName(std::move(name)),
+    mImage(image),
+    mScaleRegion(0.f, 1.f, 1.f, 0.f),
+    mClipRegion(0.f, 1.f, 1.f, 0.f),
+    mImageLoaded(NULL),
+    mScaleStyle(SCALE_INNER),
+    mCachedW(-1),
+    mCachedH(-1)
+{
+    getTextureWidth();
+    getTextureHeight();
+}
+
 LLUIImage::~LLUIImage()
 {
     delete mImageLoaded;

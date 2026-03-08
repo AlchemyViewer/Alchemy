@@ -279,6 +279,7 @@ target_link_libraries(
         ll::sse2neon
         ll::xxhash
         ll::simdutf
+        ll::fmt
         Threads::Threads
     )
 

@@ -251,6 +251,7 @@ private:
 
 public:
     typedef std::basic_string<T> string_type;
+    typedef std::basic_string_view<T> string_view_type;
     typedef typename string_type::size_type size_type;
 
 public:
@@ -328,8 +329,8 @@ public:
      * If etither string or substr are empty, this method returns false.
      */
     static bool startsWith(
-        const string_type& string,
-        const string_type& substr);
+        const string_view_type& string,
+        const string_view_type& substr);
 
     /**
      * @brief Returns true if string ends in substr
@@ -337,8 +338,8 @@ public:
      * If etither string or substr are empty, this method returns false.
      */
     static bool endsWith(
-        const string_type& string,
-        const string_type& substr);
+        const string_view_type& string,
+        const string_view_type& substr);
 
     /**
      * get environment string value with proper Unicode handling
@@ -1816,8 +1817,8 @@ bool LLStringUtilBase<T>::isHead( const string_type& string, const T* s )
 // static
 template<class T>
 bool LLStringUtilBase<T>::startsWith(
-    const string_type& string,
-    const string_type& substr)
+    const string_view_type& string,
+    const string_view_type& substr)
 {
     if(string.empty() || (substr.empty())) return false;
     if (substr.length() > string.length()) return false;
@@ -1828,8 +1829,8 @@ bool LLStringUtilBase<T>::startsWith(
 // static
 template<class T>
 bool LLStringUtilBase<T>::endsWith(
-    const string_type& string,
-    const string_type& substr)
+    const string_view_type& string,
+    const string_view_type& substr)
 {
     if(string.empty() || (substr.empty())) return false;
     size_t sub_len = substr.length();

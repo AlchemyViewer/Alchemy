@@ -306,7 +306,7 @@ LLViewerFetchedTexture* LLViewerTextureManager::getFetchedTexture(
 }
 
 LLViewerFetchedTexture* LLViewerTextureManager::getFetchedTextureFromFile(
-                                                   const std::string& filename,
+                                                   std::string_view filename,
                                                    FTType f_type,
                                                    bool usemipmaps,
                                                    LLViewerTexture::EBoostLevel boost_priority,

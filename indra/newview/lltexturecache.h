@@ -151,7 +151,7 @@ public:
 protected:
     // Accessed by LLTextureCacheWorker
     std::string getLocalFileName(const LLUUID& id);
-    std::string getTextureFileName(const LLUUID& id);
+    std::filesystem::path getTextureFileName(const LLUUID& id);
     void addCompleted(Responder* responder, bool success);
 
 protected:
@@ -176,7 +176,7 @@ private:
     void writeEntriesAndClose(const std::vector<Entry>& entries);
     void readEntryFromHeaderImmediately(S32& idx, Entry& entry) ;
     void writeEntryToHeaderImmediately(S32& idx, Entry& entry, bool write_header = false) ;
-    void removeEntry(S32 idx, Entry& entry, std::string& filename);
+    void removeEntry(S32 idx, Entry& entry, const std::filesystem::path& filename);
     void removeCachedTexture(const LLUUID& id) ;
     S32 getHeaderCacheEntry(const LLUUID& id, Entry& entry);
     S32 setHeaderCacheEntry(const LLUUID& id, Entry& entry, S32 imagesize, S32 datasize);
@@ -224,7 +224,7 @@ private:
     U8*          mFastCachePadBuffer;
 
     // BODIES (TEXTURES minus headers)
-    std::string mTexturesDirName;
+    std::filesystem::path mTexturesDirPath;
     typedef boost::unordered_map<LLUUID,S32> size_map_t;
     size_map_t mTexturesSizeMap;
     S64 mTexturesSizeTotal;

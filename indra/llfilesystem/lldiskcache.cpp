@@ -39,6 +39,8 @@
 
 #include "lldiskcache.h"
 
+#include <fmt/xchar.h>
+
 using namespace std::literals;
 
 /**
@@ -49,14 +51,13 @@ using namespace std::literals;
   * like the users' OS system dir by mistake or maliciously and
   * this will help to offset any damage if that happens.
   */
-static const std::string CACHE_FILENAME_PREFIX("sl_cache");
 #if LL_WINDOWS
-static constexpr std::wstring_view CACHE_FILENAME_PREFIX_NATIVE(L"sl_cache"sv);
+static constexpr std::wstring_view CACHE_FILENAME_PREFIX(L"sl_cache"sv);
 #else
-static constexpr std::string_view CACHE_FILENAME_PREFIX_NATIVE("sl_cache"sv);
+static constexpr std::string_view CACHE_FILENAME_PREFIX("sl_cache"sv);
 #endif
 
-std::string LLDiskCache::sCacheDir;
+std::filesystem::path LLDiskCache::sCacheDir;
 
 LLDiskCache::LLDiskCache(const std::string& cache_dir,
                          const uintmax_t max_size_bytes,
@@ -64,7 +65,7 @@ LLDiskCache::LLDiskCache(const std::string& cache_dir,
     mMaxSizeBytes(max_size_bytes),
     mEnableCacheDebugInfo(enable_cache_debug_info)
 {
-    sCacheDir = cache_dir;
+    sCacheDir = fsyspath(cache_dir);
     LLFile::mkdir(cache_dir);
 }
 
@@ -111,10 +112,9 @@ void LLDiskCache::purge()
     typedef std::pair<std::filesystem::file_time_type, std::pair<uintmax_t, std::filesystem::path>> file_info_t;
     std::vector<file_info_t> file_info;
 
-    std::filesystem::path cache_path = fsyspath(sCacheDir);
-    if (std::filesystem::is_directory(cache_path, ec) && !ec)
+    if (std::filesystem::is_directory(sCacheDir, ec) && !ec)
     {
-        std::filesystem::directory_iterator iter(cache_path, ec);
+        std::filesystem::directory_iterator iter(sCacheDir, ec);
         while (iter != std::filesystem::directory_iterator() && !ec)
         {
             if(!LLApp::isRunning())
@@ -123,7 +123,7 @@ void LLDiskCache::purge()
             }
             if (std::filesystem::is_regular_file(*iter, ec) && !ec)
             {
-                if ((*iter).path().native().find(CACHE_FILENAME_PREFIX_NATIVE) != std::filesystem::path::string_type::npos)
+                if ((*iter).path().native().find(CACHE_FILENAME_PREFIX) != std::filesystem::path::string_type::npos)
                 {
                     uintmax_t file_size = std::filesystem::file_size(*iter, ec);
                     if (ec)
@@ -212,11 +212,17 @@ void LLDiskCache::purge()
     }
 }
 
-const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id, LLAssetType::EType at)
+std::filesystem::path LLDiskCache::metaDataToFilepath(const LLUUID& id, LLAssetType::EType at)
 {
+#if LL_WINDOWS
+    wchar_t uuid_str[UUID_STR_LENGTH]{};
+    id.to_wchars(uuid_str);
+    return fmt::format(L"{:s}\\{:s}_{:s}_0.asset", sCacheDir.native(), CACHE_FILENAME_PREFIX, uuid_str);
+#else
     char uuid_str[UUID_STR_LENGTH]{};
     id.to_chars(uuid_str);
-    return llformat("%s%s%s_%s_0.asset", sCacheDir.c_str(), gDirUtilp->getDirDelimiter().c_str(), CACHE_FILENAME_PREFIX.c_str(), uuid_str);
+    return fmt::format("{:s}/{:s}_{:s}_0.asset", sCacheDir.native(), CACHE_FILENAME_PREFIX, uuid_str);
+#endif
 }
 
 const std::string LLDiskCache::getCacheInfo()
@@ -243,15 +249,14 @@ void LLDiskCache::clearCache()
      * likely just fine
      */
     std::error_code ec;
-    std::filesystem::path cache_path = fsyspath(sCacheDir);
-    if (std::filesystem::is_directory(cache_path, ec) && !ec)
+    if (std::filesystem::is_directory(sCacheDir, ec) && !ec)
     {
-        std::filesystem::directory_iterator iter(cache_path, ec);
+        std::filesystem::directory_iterator iter(sCacheDir, ec);
         while (iter != std::filesystem::directory_iterator() && !ec)
         {
             if (std::filesystem::is_regular_file(*iter, ec) && !ec)
             {
-                if ((*iter).path().native().find(CACHE_FILENAME_PREFIX_NATIVE) != std::filesystem::path::string_type::npos)
+                if ((*iter).path().native().find(CACHE_FILENAME_PREFIX) != std::filesystem::path::string_type::npos)
                 {
                     std::filesystem::remove(*iter, ec);
                     if (ec)
@@ -300,7 +305,7 @@ void LLDiskCache::removeOldVFSFiles()
     }
 }
 
-uintmax_t LLDiskCache::dirFileSize(const std::string& dir)
+uintmax_t LLDiskCache::dirFileSize(const std::filesystem::path& dir_path)
 {
     uintmax_t total_file_size = 0;
 
@@ -314,7 +319,6 @@ uintmax_t LLDiskCache::dirFileSize(const std::string& dir)
      * is an easy win.
      */
     std::error_code ec;
-    std::filesystem::path dir_path = fsyspath(dir);
     if (std::filesystem::is_directory(dir_path, ec) && !ec)
     {
         std::filesystem::directory_iterator iter(dir_path, ec);
@@ -322,7 +326,7 @@ uintmax_t LLDiskCache::dirFileSize(const std::string& dir)
         {
             if (std::filesystem::is_regular_file(*iter, ec) && !ec)
             {
-                if ((*iter).path().native().find(CACHE_FILENAME_PREFIX_NATIVE) != std::filesystem::path::string_type::npos)
+                if ((*iter).path().native().find(CACHE_FILENAME_PREFIX) != std::filesystem::path::string_type::npos)
                 {
                     uintmax_t file_size = std::filesystem::file_size(*iter, ec);
                     if (!ec)

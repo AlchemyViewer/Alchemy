@@ -321,7 +321,7 @@ public:
     static void setLineWidth(F32 width) { LLRender2D::setLineWidth(width); }
     static LLPointer<LLUIImage> getUIImageByID(const LLUUID& image_id, S32 priority = 0)
         { return LLRender2D::getInstance()->getUIImageByID(image_id, priority); }
-    static LLPointer<LLUIImage> getUIImage(const std::string& name, S32 priority = 0)
+    static LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority = 0)
         { return LLRender2D::getInstance()->getUIImage(name, priority); }
 
     //

@@ -28,6 +28,7 @@
     },
     "dullahan-bin",
     "expat",
+    "fmt",
     {
       "name": "fontconfig",
       "platform": "linux"

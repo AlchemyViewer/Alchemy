@@ -457,17 +457,17 @@ static std::string ELLPathToString(ELLPath location)
     return STRINGIZE("Invalid ELLPath value " << location);
 }
 
-std::string LLDir::getExpandedFilename(ELLPath location, const std::string& filename) const
+std::string LLDir::getExpandedFilename(ELLPath location, std::string_view filename) const
 {
     return getExpandedFilename(location, "", filename);
 }
 
-std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subdir, const std::string& filename) const
+std::string LLDir::getExpandedFilename(ELLPath location, std::string_view subdir, std::string_view filename) const
 {
     return getExpandedFilename(location, "", subdir, filename);
 }
 
-std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subdir1, const std::string& subdir2, const std::string& in_filename) const
+std::string LLDir::getExpandedFilename(ELLPath location, std::string_view subdir1, std::string_view subdir2, std::string_view in_filename) const
 {
     std::string prefix;
     switch (location)
@@ -634,8 +634,8 @@ std::string LLDir::getExtension(const std::string& filepath) const
     return exten;
 }
 
-std::string LLDir::findSkinnedFilenameBaseLang(const std::string &subdir,
-                                               const std::string &filename,
+std::string LLDir::findSkinnedFilenameBaseLang(std::string_view subdir,
+                                               std::string_view filename,
                                                ESkinConstraint constraint) const
 {
     // This implementation is basically just as described in the declaration comments.
@@ -647,8 +647,8 @@ std::string LLDir::findSkinnedFilenameBaseLang(const std::string &subdir,
     return found.front();
 }
 
-std::string LLDir::findSkinnedFilename(const std::string &subdir,
-                                       const std::string &filename,
+std::string LLDir::findSkinnedFilename(std::string_view subdir,
+                                       std::string_view filename,
                                        ESkinConstraint constraint) const
 {
     // This implementation is basically just as described in the declaration comments.
@@ -665,9 +665,9 @@ std::string LLDir::findSkinnedFilename(const std::string &subdir,
 // generate the list of candidate pathnames in identical ways. The only
 // difference is in the body of the inner loop.
 template <typename FUNCTION>
-void LLDir::walkSearchSkinDirs(const std::string& subdir,
+void LLDir::walkSearchSkinDirs(std::string_view subdir,
                                const std::vector<std::string>& subsubdirs,
-                               const std::string& filename,
+                               std::string_view filename,
                                const FUNCTION& function) const
 {
     for (const std::string& skindir : mSearchSkinDirs)
@@ -690,21 +690,21 @@ inline void push_back(std::vector<std::string>& vector, const std::string& value
     vector.push_back(value);
 }
 
-typedef std::map<std::string, std::string> StringMap;
+typedef std::map<std::string, std::string, std::less<>> StringMap;
 // ridiculous little helper function that should go away when we can use lambda
 inline void store_in_map(StringMap& map, const std::string& key, const std::string& value)
 {
     map[key] = value;
 }
 
-std::vector<std::string> LLDir::findSkinnedFilenames(const std::string& subdir,
-                                                     const std::string& filename,
+std::vector<std::string> LLDir::findSkinnedFilenames(std::string_view subdir,
+                                                     std::string_view filename,
                                                      ESkinConstraint constraint) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     // Recognize subdirs that have no localization.
-    static const std::set<std::string> sUnlocalized = {
+    static const std::set<std::string, std::less<>> sUnlocalized = {
         "",        // top-level directory not localized
         "textures" // textures not localized
     };
@@ -1042,7 +1042,7 @@ void LLDir::dumpCurrentDirectories(LLError::ELevel level)
     LL_VLOGS(level, "AppInit", "Directories") << "  UserSkinDir:           " << getUserSkinDir() << LL_ENDL;
 }
 
-void LLDir::append(std::string& destpath, const std::string& name) const
+void LLDir::append(std::string& destpath, std::string_view name) const
 {
     // Delegate question of whether we need a separator to helper method.
     SepOff sepoff(needSep(destpath, name));
@@ -1055,7 +1055,7 @@ void LLDir::append(std::string& destpath, const std::string& name) const
     destpath += name.substr(sepoff.second);
 }
 
-LLDir::SepOff LLDir::needSep(const std::string& path, const std::string& name) const
+LLDir::SepOff LLDir::needSep(const std::string& path, std::string_view name) const
 {
     if (path.empty() || name.empty())
     {

@@ -1813,7 +1813,7 @@ LLPointer<LLUIImage> LLRender2D::getUIImageByID(const LLUUID& image_id, S32 prio
     }
 }
 
-LLPointer<LLUIImage> LLRender2D::getUIImage(const std::string& name, S32 priority)
+LLPointer<LLUIImage> LLRender2D::getUIImage(std::string_view name, S32 priority)
 {
     if (!name.empty() && mImageProvider)
         return mImageProvider->getUIImage(name, priority);
