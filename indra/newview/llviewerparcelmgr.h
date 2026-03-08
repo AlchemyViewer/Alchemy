@@ -168,6 +168,13 @@ public:
 
     LLParcel*   getCollisionParcel() const;
 
+    const U8*   getCollisionBitmap() const { return mCollisionBitmap; }
+    size_t      getCollisionBitmapSize() const { return mParcelsPerEdge * mParcelsPerEdge / 8; }
+    U64         getCollisionRegionHandle() const { return mCollisionRegionHandle; }
+
+    typedef boost::signals2::signal<void (const LLViewerRegion*)> collision_update_signal_t;
+    boost::signals2::connection setCollisionUpdateCallback(const collision_update_signal_t::slot_type & cb);
+
     // Can this agent build on the parcel he is on?
     // Used for parcel property icons in nav bar.
     bool    allowAgentBuild() const;
@@ -383,6 +390,9 @@ private:
     // Watch for pending collisions with a parcel you can't access.
     // If it's coming, draw the parcel's boundaries.
     LLParcel*                   mCollisionParcel;
+    U8*                         mCollisionBitmap;
+    U64                         mCollisionRegionHandle;
+    collision_update_signal_t*  mCollisionUpdateSignal;
     U8*                         mCollisionSegments;
     bool                        mRenderCollision;
     bool                        mRenderSelection;

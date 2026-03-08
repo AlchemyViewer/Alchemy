@@ -127,6 +127,8 @@ LLViewerParcelMgr::LLViewerParcelMgr()
     mHoverWestSouth(),
     mHoverEastNorth(),
     mTeleportInProgressPosition(),
+    mCollisionRegionHandle(0),
+    mCollisionUpdateSignal(nullptr),
     mRenderCollision(false),
     mRenderSelection(true),
     mCollisionBanned(0),
@@ -145,6 +147,9 @@ LLViewerParcelMgr::LLViewerParcelMgr()
     mParcelsPerEdge = S32(  REGION_WIDTH_METERS / PARCEL_GRID_STEP_METERS );
     mHighlightSegments = new U8[(mParcelsPerEdge+1)*(mParcelsPerEdge+1)];
     resetSegments(mHighlightSegments);
+
+    mCollisionBitmap = new U8[getCollisionBitmapSize()];
+    memset(mCollisionBitmap, 0, getCollisionBitmapSize());
 
     mCollisionSegments = new U8[(mParcelsPerEdge+1)*(mParcelsPerEdge+1)];
     resetSegments(mCollisionSegments);
@@ -171,6 +176,13 @@ LLViewerParcelMgr::LLViewerParcelMgr()
 
 LLViewerParcelMgr::~LLViewerParcelMgr()
 {
+    if (mCollisionUpdateSignal)
+    {
+        mCollisionUpdateSignal->disconnect_all_slots();
+        delete mCollisionUpdateSignal;
+        mCollisionUpdateSignal = nullptr;
+    }
+
     mCurrentParcelSelection->setParcel(NULL);
     mCurrentParcelSelection = NULL;
 
@@ -191,6 +203,9 @@ LLViewerParcelMgr::~LLViewerParcelMgr()
 
     delete[] mHighlightSegments;
     mHighlightSegments = NULL;
+
+    delete[] mCollisionBitmap;
+    mCollisionBitmap = NULL;
 
     delete[] mCollisionSegments;
     mCollisionSegments = NULL;
@@ -671,7 +686,7 @@ LLParcel * LLViewerParcelMgr::getAgentOrSelectedParcel() const
     }
 
     if (!parcel)
-        parcel = LLViewerParcelMgr::instance().getAgentParcel();
+        parcel = getAgentParcel();
 
     return parcel;
 }
@@ -803,12 +818,12 @@ bool LLViewerParcelMgr::canHearSound(const LLVector3d &pos_global) const
     }
     else
     {
-        if (LLViewerParcelMgr::getInstance()->getAgentParcel()->getSoundLocal())
+        if (getAgentParcel()->getSoundLocal())
         {
             // Not in same parcel, and agent parcel only has local sound
             return false;
         }
-        else if (LLViewerParcelMgr::getInstance()->isSoundLocal(pos_global))
+        else if (isSoundLocal(pos_global))
         {
             // Not in same parcel, and target parcel only has local sound
             return false;
@@ -1896,18 +1911,16 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
 
         }
 
-        S32 bitmap_size =   parcel_mgr.mParcelsPerEdge
-                            * parcel_mgr.mParcelsPerEdge
-                            / 8;
-        U8* bitmap = new U8[ bitmap_size ];
-        msg->getBinaryDataFast(_PREHASH_ParcelData, _PREHASH_Bitmap, bitmap, bitmap_size);
+        msg->getBinaryDataFast(_PREHASH_ParcelData, _PREHASH_Bitmap, parcel_mgr.mCollisionBitmap, narrow(parcel_mgr.getCollisionBitmapSize()));
 
         parcel_mgr.resetSegments(parcel_mgr.mCollisionSegments);
-        parcel_mgr.writeSegmentsFromBitmap( bitmap, parcel_mgr.mCollisionSegments );
+        parcel_mgr.writeSegmentsFromBitmap(parcel_mgr.mCollisionBitmap, parcel_mgr.mCollisionSegments);
 
-        delete[] bitmap;
-        bitmap = NULL;
+        LLViewerRegion* pRegion = LLWorld::getInstance()->getRegion(msg->getSender());
+        parcel_mgr.mCollisionRegionHandle = (pRegion) ? pRegion->getHandle() : 0;
 
+        if (parcel_mgr.mCollisionUpdateSignal)
+            (*parcel_mgr.mCollisionUpdateSignal)(pRegion);
     }
     else if (sequence_id == HOVERED_PARCEL_SEQ_ID)
     {
@@ -2777,6 +2790,13 @@ void LLViewerParcelMgr::postTeleportFinished(bool local)
     {
         post();
     }
+}
+
+boost::signals2::connection LLViewerParcelMgr::setCollisionUpdateCallback(const collision_update_signal_t::slot_type& cb)
+{
+    if (!mCollisionUpdateSignal)
+        mCollisionUpdateSignal = new collision_update_signal_t();
+    return mCollisionUpdateSignal->connect(cb);
 }
 
 // [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0

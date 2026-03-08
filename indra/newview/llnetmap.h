@@ -83,6 +83,8 @@ public:
     /*virtual*/ bool    handleClick(S32 x, S32 y, MASK mask);
     /*virtual*/ bool    handleDoubleClick( S32 x, S32 y, MASK mask );
 
+    void            refreshParcelOverlay() { mUpdateParcelImage = true; }
+
     void            setScale(F32 scale);
 
     void            setToolTipMsg(const std::string& msg) { mToolTipMsg = msg; }
@@ -112,13 +114,17 @@ private:
     bool            handleToolTipAgent(const LLUUID& avatar_id);
     static void     showAvatarInspector(const LLUUID& avatar_id);
 
+    bool            createImage(LLPointer<LLImageRaw>& rawimagep) const;
     void            createObjectImage();
+    void            createParcelImage();
+    void            renderPropertyLinesForRegion(LLViewerRegion* pRegion, const LLColor4U& clrOverlay);
 
     F32             getScaleForName(std::string scale_name);
     static bool     outsideSlop(S32 x, S32 y, S32 start_x, S32 start_y, S32 slop);
 
 private:
-    bool            mUpdateNow;
+    bool            mUpdateObjectImage;
+    bool            mUpdateParcelImage;
 
     LLUIColor       mBackgroundColor;
 
@@ -138,6 +144,13 @@ private:
     LLVector3d      mObjectImageCenterGlobal;
     LLPointer<LLImageRaw> mObjectRawImagep;
     LLPointer<LLViewerTexture>  mObjectImagep;
+
+    LLVector3d      mParcelImageCenterGlobal;
+    LLPointer<LLImageRaw> mParcelRawImagep;
+    LLPointer<LLViewerTexture>  mParcelImagep;
+
+    boost::signals2::connection mParcelMgrConn;
+    boost::signals2::connection mParcelOverlayConn;
 
     LLUUID          mClosestAgentToCursor;
     LLUUID          mClosestAgentAtLastRightClick;

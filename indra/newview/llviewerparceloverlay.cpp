@@ -61,6 +61,7 @@ LLUIColor LLViewerParcelOverlay::sGroupColor;
 LLUIColor LLViewerParcelOverlay::sSelfColor;
 LLUIColor LLViewerParcelOverlay::sForSaleColor;
 LLUIColor LLViewerParcelOverlay::sAuctionColor;
+LLViewerParcelOverlay::update_signal_t* LLViewerParcelOverlay::mUpdateSignal = NULL;
 
 LLViewerParcelOverlay::LLViewerParcelOverlay(LLViewerRegion* region, F32 region_width_meters)
 :   mRegion(region),
@@ -114,6 +115,13 @@ LLViewerParcelOverlay::LLViewerParcelOverlay(LLViewerRegion* region, F32 region_
 
 LLViewerParcelOverlay::~LLViewerParcelOverlay()
 {
+    if (mUpdateSignal)
+    {
+        mUpdateSignal->disconnect_all_slots();
+        delete mUpdateSignal;
+        mUpdateSignal = nullptr;
+    }
+
     delete[] mOwnership;
     mOwnership = NULL;
     mImageRaw = NULL;
@@ -675,6 +683,8 @@ void LLViewerParcelOverlay::idleUpdate(bool force_update)
         {
             updateOverlayTexture();
             updatePropertyLines();
+            if (mUpdateSignal)
+                (*mUpdateSignal)(mRegion);
             mTimeSinceLastUpdate.reset();
         }
     }
@@ -853,4 +863,11 @@ void LLViewerParcelOverlay::renderPropertyLinesOnMinimap(F32 scale_pixels_per_me
             grid_2d_part_lines(left, top, right, bottom, has_left, has_bottom);
         }
     }
+}
+
+boost::signals2::connection LLViewerParcelOverlay::setUpdateCallback(const update_signal_t::slot_type& cb)
+{
+    if (!mUpdateSignal)
+        mUpdateSignal = new update_signal_t();
+    return mUpdateSignal->connect(cb);
 }

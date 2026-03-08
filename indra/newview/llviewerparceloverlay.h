@@ -65,6 +65,7 @@ public:
     bool            isSoundLocal(const LLVector3& pos) const;
 
     F32             getOwnedRatio() const;
+    const U8*       getOwnership() const { return mOwnership; }
 
     // Returns the number of vertices drawn
     void            renderPropertyLines();
@@ -82,6 +83,9 @@ public:
 
     void    idleUpdate(bool update_now = false);
     void    updateGL();
+
+    typedef boost::signals2::signal<void (const LLViewerRegion*)> update_signal_t;
+    static boost::signals2::connection setUpdateCallback(const update_signal_t::slot_type & cb);
 
 private:
     // This is in parcel rows and columns, not grid rows and columns
@@ -132,6 +136,8 @@ private:
     static LLUIColor sSelfColor;
     static LLUIColor sForSaleColor;
     static LLUIColor sAuctionColor;
+
+    static update_signal_t* mUpdateSignal;
 };
 
 #endif
