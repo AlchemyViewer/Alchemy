@@ -113,6 +113,8 @@ namespace LLToolBarEnums
     {
         BTNTYPE_ICONS_WITH_TEXT = 0,
         BTNTYPE_ICONS_ONLY,
+        BTNTYPE_ICONS_ONLY_SMALL,
+        BTNTYPE_TEXT_ONLY,
 
         BTNTYPE_COUNT
     };
@@ -125,17 +127,26 @@ namespace LLToolBarEnums
         SIDE_TOP,
     };
 
+    enum LayoutType
+    {
+        LAYOUT_NONE,
+        LAYOUT_LEFT,
+        LAYOUT_RIGHT,
+        LAYOUT_FILL
+    };
+
     enum EToolBarLocation
     {
         TOOLBAR_NONE = 0,
         TOOLBAR_LEFT,
         TOOLBAR_RIGHT,
         TOOLBAR_BOTTOM,
+        TOOLBAR_TOP,
 
         TOOLBAR_COUNT,
 
         TOOLBAR_FIRST = TOOLBAR_LEFT,
-        TOOLBAR_LAST = TOOLBAR_BOTTOM,
+        TOOLBAR_LAST = TOOLBAR_TOP,
     };
 
     LLView::EOrientation getOrientation(SideType sideType);
@@ -152,6 +163,12 @@ namespace LLInitParam
 
     template<>
     struct TypeValues<LLToolBarEnums::SideType> : public TypeValuesHelper<LLToolBarEnums::SideType>
+    {
+        static void declareValues();
+    };
+
+    template<>
+    struct TypeValues<LLToolBarEnums::LayoutType> : public TypeValuesHelper<LLToolBarEnums::LayoutType>
     {
         static void declareValues();
     };
@@ -191,8 +208,12 @@ public:
         Mandatory<LLToolBarEnums::ButtonType>   button_display_mode;
         Mandatory<LLToolBarEnums::SideType>     side;
 
+        Optional<LLToolBarEnums::LayoutType>    button_layout_mode;
+
         Optional<LLToolBarButton::Params>       button_icon,
-                                                button_icon_and_text;
+                                                button_icon_small,
+                                                button_icon_and_text,
+                                                button_text;
 
         Optional<bool>                          read_only,
                                                 wrap;
@@ -250,13 +271,16 @@ public:
     LLToolBarEnums::SideType getSideType() const { return mSideType; }
     bool hasButtons() const { return !mButtons.empty(); }
     bool isModified() const { return mModified; }
+    bool checkOrientation(const LLSD& userdata) const;
 
     int  getRankFromPosition(S32 x, S32 y);
     int  getRankFromPosition(const LLCommandId& id);
 
     // Methods used in loading and saving toolbar settings
     void setButtonType(LLToolBarEnums::ButtonType button_type);
+    void setLayoutType(LLToolBarEnums::LayoutType layout_type);
     LLToolBarEnums::ButtonType getButtonType() const { return mButtonType; }
+    LLToolBarEnums::LayoutType getLayoutType() const { return mLayoutType; }
     command_id_list_t& getCommandsList() { return mButtonCommands; }
     void clearCommandsList();
 
@@ -270,8 +294,10 @@ private:
     void updateLayoutAsNeeded();
     void createButtons();
     void resizeButtonsInRow(std::vector<LLToolBarButton*>& buttons_in_row, S32 max_row_girth);
-    bool isSettingChecked(const LLSD& userdata);
-    void onSettingEnable(const LLSD& userdata);
+    bool isButtonTypeChecked(const LLSD& userdata);
+    void onButtonTypeChanged(const LLSD& userdata);
+    bool isLayoutChecked(const LLSD& userdata);
+    void onLayoutChanged(const LLSD& userdata);
     void onRemoveSelectedCommand();
 
 private:
@@ -303,10 +329,13 @@ private:
     command_id_map                  mButtonMap;
 
     LLToolBarEnums::ButtonType      mButtonType;
+    LLToolBarEnums::LayoutType      mLayoutType;
     LLToolBarButton::Params         mButtonParams[LLToolBarEnums::BTNTYPE_COUNT];
 
     // related widgets
     LLLayoutStack*                  mCenteringStack;
+    LLLayoutPanel*                  mLeftTopPanel;
+    LLLayoutPanel*                  mRightBottomPanel;
     LLCenterLayoutPanel*            mCenterPanel;
     LLPanel*                        mButtonPanel;
     LLHandle<class LLContextMenu>   mPopupMenuHandle;

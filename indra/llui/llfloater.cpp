@@ -3420,6 +3420,9 @@ void LLFloaterView::setToolbarRect(LLToolBarEnums::EToolBarLocation tb, const LL
     case LLToolBarEnums::TOOLBAR_RIGHT:
         mToolbarRightRect = toolbar_rect;
         break;
+    case LLToolBarEnums::TOOLBAR_TOP:
+        mToolbarTopRect = toolbar_rect;
+        break;
     default:
         LL_WARNS() << "setToolbarRect() passed odd toolbar number " << (S32) tb << LL_ENDL;
         break;

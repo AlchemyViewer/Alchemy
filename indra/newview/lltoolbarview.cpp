@@ -57,13 +57,15 @@ bool isToolDragged()
 
 LLToolBarView::Toolbar::Toolbar()
 :   button_display_mode("button_display_mode"),
+    button_layout_mode("button_layout_mode"),
     commands("command")
 {}
 
 LLToolBarView::ToolbarSet::ToolbarSet()
 :   left_toolbar("left_toolbar"),
     right_toolbar("right_toolbar"),
-    bottom_toolbar("bottom_toolbar")
+    bottom_toolbar("bottom_toolbar"),
+    top_toolbar("top_toolbar")
 {}
 
 
@@ -103,6 +105,9 @@ bool LLToolBarView::postBuild()
 
     mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM] = getChild<LLToolBar>("toolbar_bottom");
     mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_BOTTOM);
+
+    mToolbars[LLToolBarEnums::TOOLBAR_TOP] = getChild<LLToolBar>("toolbar_top");
+    mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_TOP);
 
     mBottomToolbarPanel = getChild<LLView>("bottom_toolbar_panel");
 
@@ -280,6 +285,11 @@ bool LLToolBarView::loadToolbars(bool force_default)
             LLToolBarEnums::ButtonType button_type = toolbar_set.left_toolbar.button_display_mode;
             mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->setButtonType(button_type);
         }
+        if (toolbar_set.left_toolbar.button_layout_mode.isProvided())
+        {
+            LLToolBarEnums::LayoutType layout_type = toolbar_set.left_toolbar.button_layout_mode;
+            mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->setLayoutType(layout_type);
+        }
         for (const LLCommandId::Params& command_params : toolbar_set.left_toolbar.commands)
         {
             if (!addCommandInternal(LLCommandId(command_params), mToolbars[LLToolBarEnums::TOOLBAR_LEFT]))
@@ -294,6 +304,11 @@ bool LLToolBarView::loadToolbars(bool force_default)
         {
             LLToolBarEnums::ButtonType button_type = toolbar_set.right_toolbar.button_display_mode;
             mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->setButtonType(button_type);
+        }
+        if (toolbar_set.right_toolbar.button_layout_mode.isProvided())
+        {
+            LLToolBarEnums::LayoutType layout_type = toolbar_set.right_toolbar.button_layout_mode;
+            mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->setLayoutType(layout_type);
         }
         for (const LLCommandId::Params& command_params : toolbar_set.right_toolbar.commands)
         {
@@ -310,11 +325,36 @@ bool LLToolBarView::loadToolbars(bool force_default)
             LLToolBarEnums::ButtonType button_type = toolbar_set.bottom_toolbar.button_display_mode;
             mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->setButtonType(button_type);
         }
+        if (toolbar_set.bottom_toolbar.button_layout_mode.isProvided())
+        {
+            LLToolBarEnums::LayoutType layout_type = toolbar_set.bottom_toolbar.button_layout_mode;
+            mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->setLayoutType(layout_type);
+        }
         for (const LLCommandId::Params& command_params : toolbar_set.bottom_toolbar.commands)
         {
             if (!addCommandInternal(LLCommandId(command_params), mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]))
             {
                 LL_WARNS() << "Error adding command '" << command_params.name() << "' to bottom toolbar." << LL_ENDL;
+            }
+        }
+    }
+    if (toolbar_set.top_toolbar.isProvided() && mToolbars[LLToolBarEnums::TOOLBAR_TOP])
+    {
+        if (toolbar_set.top_toolbar.button_display_mode.isProvided())
+        {
+            LLToolBarEnums::ButtonType button_type = toolbar_set.top_toolbar.button_display_mode;
+            mToolbars[LLToolBarEnums::TOOLBAR_TOP]->setButtonType(button_type);
+        }
+        if (toolbar_set.top_toolbar.button_layout_mode.isProvided())
+        {
+            LLToolBarEnums::LayoutType layout_type = toolbar_set.top_toolbar.button_layout_mode;
+            mToolbars[LLToolBarEnums::TOOLBAR_TOP]->setLayoutType(layout_type);
+        }
+        for (const LLCommandId::Params& command_params : toolbar_set.top_toolbar.commands)
+        {
+            if (addCommandInternal(LLCommandId(command_params), mToolbars[LLToolBarEnums::TOOLBAR_TOP]))
+            {
+                LL_WARNS() << "Error adding command '" << command_params.name() << "' to top toolbar." << LL_ENDL;
             }
         }
     }
@@ -398,17 +438,26 @@ void LLToolBarView::saveToolbars() const
     if (mToolbars[LLToolBarEnums::TOOLBAR_LEFT])
     {
         toolbar_set.left_toolbar.button_display_mode = mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getButtonType();
+        toolbar_set.left_toolbar.button_layout_mode = mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getLayoutType();
         addToToolset(mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getCommandsList(), toolbar_set.left_toolbar);
     }
     if (mToolbars[LLToolBarEnums::TOOLBAR_RIGHT])
     {
         toolbar_set.right_toolbar.button_display_mode = mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getButtonType();
+        toolbar_set.right_toolbar.button_layout_mode = mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getLayoutType();
         addToToolset(mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getCommandsList(), toolbar_set.right_toolbar);
     }
     if (mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM])
     {
         toolbar_set.bottom_toolbar.button_display_mode = mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getButtonType();
+        toolbar_set.bottom_toolbar.button_layout_mode = mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getLayoutType();
         addToToolset(mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getCommandsList(), toolbar_set.bottom_toolbar);
+    }
+    if (mToolbars[LLToolBarEnums::TOOLBAR_TOP])
+    {
+        toolbar_set.top_toolbar.button_display_mode = mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getButtonType();
+        toolbar_set.top_toolbar.button_layout_mode = mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getLayoutType();
+        addToToolset(mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getCommandsList(), toolbar_set.top_toolbar);
     }
 
     // Serialize the parameter tree

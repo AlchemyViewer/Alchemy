@@ -52,6 +52,7 @@ public:
     struct Toolbar : public LLInitParam::Block<Toolbar>
     {
         Mandatory<LLToolBarEnums::ButtonType>   button_display_mode;
+        Optional<LLToolBarEnums::LayoutType>    button_layout_mode;
         Multiple<LLCommandId::Params>   commands;
 
         Toolbar();
@@ -60,7 +61,8 @@ public:
     {
         Optional<Toolbar>   left_toolbar,
                             right_toolbar,
-                            bottom_toolbar;
+                            bottom_toolbar,
+                            top_toolbar;
 
         ToolbarSet();
     };
