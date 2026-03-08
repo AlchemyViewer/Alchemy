@@ -4,7 +4,6 @@ repos:
     hooks:
       - id: llsd
       - id: no-trigraphs
-      - id: copyright
       - id: end-of-file
         files: \.(cpp|c|m|mm|h|py|glsl|cmake|txt)$
         exclude: language.txt

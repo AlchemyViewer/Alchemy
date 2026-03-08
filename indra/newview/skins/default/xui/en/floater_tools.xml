@@ -150,7 +150,7 @@
 	     parameter="Land" />
 	</button>
     <text
-     height="20"
+     height="30"
      word_wrap="true"
      use_ellipses="true"
      type="string"
@@ -166,9 +166,9 @@
     </text>
    <radio_group
      layout="topleft"
-     left="10"
+     left="5"
       height="70"
-      top="59"
+      top="55"
      name="focus_radio_group">
         <radio_item
          top_pad="6"
@@ -203,9 +203,9 @@
 	     function="BuildTool.commitZoom"/>
 	</slider_bar>
    <radio_group
-      left="10"
+      left="5"
       height="70"
-      top="59"
+      top="55"
      layout="topleft"
      name="move_radio_group">
         <radio_item
@@ -238,32 +238,37 @@
 		 layout="topleft"
 		 name="radio position" />
         <radio_item
-		 top_pad="6"
+		 top_pad="5"
          label="Rotate (Ctrl)"
          layout="topleft"
          name="radio rotate" />
         <radio_item
-		 top_pad="6"
+		 top_pad="5"
          label="Stretch (Ctrl+Shift)"
          layout="topleft"
          name="radio stretch" />
         <radio_item
-		 top_pad="6"
+		 top_pad="5"
          label="Select Face"
          layout="topleft"
          name="radio select face" />
+        <radio_item
+         top_pad="5"
+         label="Align"
+         layout="topleft"
+         name="radio align" />
 			<radio_group.commit_callback
 			function="BuildTool.commitRadioEdit"/>
     </radio_group>
     <check_box
      left="5"
      follows="left|top"
-     height="28"
+     height="19"
 	 control_name="EditLinkedParts"
      label="Edit linked"
      layout="topleft"
      name="checkbox edit linked parts"
-     top_pad="-18">
+     top_pad="0">
 		  <check_box.commit_callback
 			function="BuildTool.selectComponent"/>
 	</check_box>

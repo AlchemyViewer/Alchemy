@@ -82,6 +82,7 @@ set(viewer_SOURCE_FILES
     alpanelaomini.cpp
     alpanelaopulldown.cpp
     alpanelradaralert.cpp
+    altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
     gltfscenemanager.cpp
@@ -781,6 +782,7 @@ set(viewer_HEADER_FILES
     alpanelaomini.h
     alpanelaopulldown.h
     alpanelradaralert.h
+    altoolalign.h
     alunzip.h
     alviewermenu.h
     gltfscenemanager.h

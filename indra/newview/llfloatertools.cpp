@@ -32,6 +32,7 @@
 #include "llcoord.h"
 //#include "llgl.h"
 
+#include "altoolalign.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llbutton.h"
@@ -682,6 +683,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
                         tool == LLToolCompScale::getInstance() ||
                         tool == LLToolFace::getInstance() ||
                         tool == LLToolIndividual::getInstance() ||
+                        tool == ALToolAlign::getInstance() ||
                         tool == LLToolPipette::getInstance();
 
     mBtnEdit    ->setToggleState( edit_visible );
@@ -716,6 +718,10 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
     else if ( tool == LLToolFace::getInstance() )
     {
         mRadioGroupEdit->setValue("radio select face");
+    }
+    else if ( tool == ALToolAlign::getInstance() )
+    {
+        mRadioGroupEdit->setValue("radio align");
     }
 
     if (mComboGridMode)
