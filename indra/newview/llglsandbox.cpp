@@ -404,7 +404,7 @@ void LLViewerParcelMgr::renderRect(const LLVector3d &west_south_bottom_global,
 
 // north = a wall going north/south.  Need that info to set up texture
 // coordinates correctly.
-void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 height, U8 direction, LLViewerRegion* regionp)
+void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 height, U8 direction, LLViewerRegion* regionp, bool absolute_height /* = false */)
 {
     // HACK: At edge of last region of world, we need to make sure the region
     // resolves correctly so we can get a height value.
@@ -436,7 +436,7 @@ void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 hei
 
     if (height < 1.f)
     {
-        z = z1+height;
+        z = absolute_height ? height : z1+height;
         gGL.vertex3f(x1, y1, z);
 
         gGL.vertex3f(x1, y1, z1);
@@ -447,7 +447,8 @@ void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 hei
 
         gGL.vertex3f(x2, y2, z2);
 
-        z = z2+height;
+        z = absolute_height ? height : z2+height;
+
         gGL.vertex3f(x2, y2, z);
     }
     else
@@ -484,7 +485,8 @@ void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 hei
         gGL.vertex3f(x2, y2, z2);
 
         // top edge stairsteps
-        z = llmax(z2 + height, z1 + height);
+        z = absolute_height ? height : llmax(z2+height, z1+height);
+
         gGL.texCoord2f(tex_coord2 * 0.5f + 0.5f, z * 0.5f);
         gGL.vertex3f(x2, y2, z);
 
@@ -510,6 +512,9 @@ void LLViewerParcelMgr::renderHighlightSegments(const U8* segments, LLViewerRegi
     LLGLSUIDefault gls_ui;
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     LLGLDepthTest gls_depth(GL_TRUE);
+
+    static LLCachedControl<bool> RenderParcelSelectionToMaxBuildHeight(gSavedSettings, "RenderParcelSelectionToMaxHeight", false);
+    F32 height = RenderParcelSelectionToMaxBuildHeight ? LLWorld::instance().getRegionMaxHeight() : PARCEL_POST_HEIGHT;
 
     gGL.color4f(1.f, 1.f, 0.f, 0.2f);
 
@@ -537,7 +542,7 @@ void LLViewerParcelMgr::renderHighlightSegments(const U8* segments, LLViewerRegi
                     has_segments = true;
                     gGL.begin(LLRender::TRIANGLES);
                 }
-                renderOneSegment(x1, y1, x2, y2, PARCEL_POST_HEIGHT, SOUTH_MASK, regionp);
+                renderOneSegment(x1, y1, x2, y2, height, SOUTH_MASK, regionp, RenderParcelSelectionToMaxBuildHeight);
             }
 
             if (segment_mask & WEST_MASK)
@@ -553,7 +558,7 @@ void LLViewerParcelMgr::renderHighlightSegments(const U8* segments, LLViewerRegi
                     has_segments = true;
                     gGL.begin(LLRender::TRIANGLES);
                 }
-                renderOneSegment(x1, y1, x2, y2, PARCEL_POST_HEIGHT, WEST_MASK, regionp);
+                renderOneSegment(x1, y1, x2, y2, height, WEST_MASK, regionp, RenderParcelSelectionToMaxBuildHeight);
             }
         }
     }
