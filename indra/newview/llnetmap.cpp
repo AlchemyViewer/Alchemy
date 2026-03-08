@@ -44,6 +44,7 @@
 #include "llglheaders.h"
 
 // Viewer includes
+#include "alavatargroups.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h" // for gDisconnected
@@ -211,7 +212,7 @@ void LLNetMap::draw()
     LL_PROFILE_ZONE_SCOPED;
     static LLFrameTimer map_timer;
     static LLUIColor map_avatar_color = LLUIColorTable::instance().getColor("MapAvatarColor", LLColor4::white);
-    static LLUIColor map_avatar_friend_color = LLUIColorTable::instance().getColor("MapAvatarFriendColor", LLColor4::white);
+    //static LLUIColor map_avatar_friend_color = LLUIColorTable::instance().getColor("MapAvatarFriendColor", LLColor4::white);
     static LLUIColor map_track_color = LLUIColorTable::instance().getColor("MapTrackColor", LLColor4::white);
     static LLUIColor map_whisper_ring_color = LLUIColorTable::instance().getColor("MapWhisperRingColor", LLColor4::white);
     static LLUIColor map_chat_ring_color = LLUIColorTable::instance().getColor("MapChatRingColor", LLColor4::white);
@@ -524,10 +525,10 @@ void LLNetMap::draw()
             pos_map = globalPosToView(sorted_positions[i]);
 
 // [RLVa:KB] - Checked: RLVa-1.2.0
-            bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, uuid));
+//            bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, uuid));
 // [/RLVa:KB]
 //          bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL);
-            LLColor4 color = LLAvatarActions::isFriend(uuid) ? map_avatar_friend_color : map_avatar_color;
+            LLColor4 color = ALAvatarGroups::instance().getAvatarColor(uuid, map_avatar_color, ALAvatarGroups::COLOR_MINIMAP);
 
             unknown_relative_z = sorted_positions[i].mdV[VZ] >= COARSEUPDATE_MAX_Z &&
                     camera_position.mV[VZ] >= COARSEUPDATE_MAX_Z;

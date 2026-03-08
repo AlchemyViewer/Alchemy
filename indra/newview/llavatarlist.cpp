@@ -137,6 +137,7 @@ LLAvatarList::Params::Params()
 , show_profile_btn("show_profile_btn", true)
 , show_speaking_indicator("show_speaking_indicator", true)
 , show_permissions_granted("show_permissions_granted", SP_NEVER)
+, use_colorize("use_colorizer", false)
 {
 }
 
@@ -159,6 +160,7 @@ LLAvatarList::LLAvatarList(const Params& p)
 // [RLVa:KB] - Checked: RLVa-1.2.0
 , mRlvCheckShowNames(false)
 // [/RLVa:KB]
+, mUseColorizer(p.use_colorize)
 {
     setCommitOnSelectionChange(true);
 
@@ -189,7 +191,7 @@ LLAvatarList::~LLAvatarList()
 
 void LLAvatarList::setShowIcons(std::string param_name)
 {
-    mIconParamName= param_name;
+    mIconParamName = std::move(param_name);
     mShowIcons = gSavedSettings.getBOOL(mIconParamName);
 }
 
@@ -244,7 +246,7 @@ void LLAvatarList::setNameFilter(const std::string& filter)
     LLStringUtil::toUpper(filter_upper);
     if (mNameFilter != filter_upper)
     {
-        mNameFilter = filter_upper;
+        mNameFilter = std::move(filter_upper);
 
         // update message for empty state here instead of refresh() to avoid blinking when switch
         // between tabs.
@@ -455,7 +457,7 @@ void LLAvatarList::addNewItem(const LLUUID& id, const std::string& name, bool is
     item->setRlvCheckShowNames(mRlvCheckShowNames);
 // [/RLVa:KB]
     // This sets the name as a side effect
-    item->setAvatarId(id, mSessionID, mIgnoreOnlineStatus);
+    item->setAvatarId(id, mSessionID, mIgnoreOnlineStatus, true, mUseColorizer);
     item->setOnline(mIgnoreOnlineStatus ? true : is_online);
     item->showTextField(mShowLastInteractionTime || mShowDistance);
 

@@ -24,6 +24,9 @@
 	 name="White_10"
 	 value="1 1 1 0.1" />
 	<color
+	 name="White_20"
+	 value="1 1 1 0.20" />
+	<color
 	 name="White_25"
 	 value="1 1 1 0.25" />
 	<color
@@ -48,11 +51,17 @@
 	 name="DkGray"
 	 value="0.125 0.125 0.125 1" />
 	<color
+	 name="DkGray_33"
+	 value="0.125 0.125 0.125 .33" />
+	<color
 	 name="DkGray_66"
 	 value="0.125 0.125 0.125 .66" />
 	<color
 	 name="DkGray2"
 	 value="0.169 0.169 0.169 1" />
+	<color
+	 name="Grey3"
+	 value="0.4 0.4 0.4 1" />
 	<color
 	 name="MouseGray"
 	 value="0.191 0.191 0.191 1" />
@@ -128,6 +137,9 @@
   <color
       name="Orange"
       value="1 .82 .46 1" />
+  <color
+     name="LindenBlue"
+     value="0.149 0.788 1.0 1.0" />
 
   <!-- This color name makes potentially unused colors show up bright purple.
   Leave this here until all Unused? are removed below, otherwise
@@ -611,13 +623,31 @@
      reference="Yellow" />
     <color
      name="MapAvatarSelfColor"
-     value="0.53125 0 0.498047 1" />
+     reference="White" />
+	<color
+     name="MapAvatarLindenColor"
+     reference="LindenBlue" />
+	<color
+     name="MapAvatarMutedColor"
+     reference="Grey3" />
+	<color
+     name="MapWhisperRingColor"
+     reference="Green" />
+	<color
+     name="MapChatRingColor"
+     reference="Green" />
+    <color
+     name="MapShoutRingColor"
+     reference="Yellow" />
     <color
      name="MapFrustumColor"
-     reference="White_10" />
+     reference="White_20" />
+    <color
+     name="MapFrustumRotatingColor"
+     reference="White_20" />
     <color
      name="MapParcelOutlineColor"
-     value="1 1 0 0.5" />
+     reference="White" />
     <color
      name="MapTrackColor"
      reference="Red" />
@@ -696,6 +726,15 @@
      name="NameTagFriend"
      value="0.447 0.784 0.663 1" />
     <color
+     name="NameTagSelf"
+     reference="White" />
+    <color
+     name="NameTagMuted"
+     reference="Grey3" />
+    <color
+     name="NameTagLinden"
+     reference="LindenBlue" />
+    <color
      name="NameTagLegacy"
      reference="White" />
     <color
@@ -748,7 +787,7 @@
      reference="Red" />
     <color
      name="PanelDefaultBackgroundColor"
-     reference="DkGray" />
+     reference="DkGray2" />
     <color
      name="PanelDefaultHighlightLight"
      reference="White_50" />
@@ -894,6 +933,9 @@
      name="TextBgFocusColor"
      reference="White" />
     <color
+     name="TextBgHighlightColor"
+     value="0.95 0.90 0 1" />
+    <color
      name="TextBgReadOnlyColor"
 	 reference="White_05" />
     <color
@@ -945,6 +987,15 @@
      name="UserChatColor"
      reference="Yellow" />
     <color
+     name="FriendChatColor"
+     reference="White" />
+    <color
+     name="LindenChatColor"
+     reference="LindenBlue" />
+    <color
+     name="MutedChatColor"
+     reference="Grey3" />
+	<color
      name="llOwnerSayChatColor"
      reference="LtYellow" />
 
@@ -993,6 +1044,10 @@
     <color
       name="PanelNotificationListItem"
       value="0.3 0.3 0.3 .3" />
+
+	<color
+	 name="ProfileOnlineIndicatorColor"
+	 reference="Green" />
 
 	<!-- profiles -->
     <color
@@ -1114,4 +1169,43 @@
   <color
     name="MentionFlashBgColor"
     value="1 1 0 0.5" />
+
+
+  <!-- Alchemy -->
+  <color
+   name="AvatarListItemOnlineColor"
+   reference="White" />
+  <color
+   name="FPSTextColor"
+   reference="EmphasisColor" />
+   <color
+    name="MusicTickerGridColor" 
+    reference="White_50"/>
+   <color
+    name="ALMediaTickerOscillatorColor" 
+    reference="EmphasisColor"/>
+   <color
+    name="MusicTickerEmphasisColor" 
+    reference="EmphasisColor"/>
+  <color
+   name="ChatHeaderDisplayNameColor"
+   reference="White" />
+  <color
+   name="ChatHeaderTimestampColor"
+   reference="White" />
+    <color
+     name="AlchemyFancyChatDividerColor"
+     reference="White" />
+	<color
+	 name="NameTagWhisperDistanceColor"
+	 reference="Green"/>
+	<color
+	 name="NameTagChatDistanceColor"
+	 reference="Green" />
+	<color
+	 name="NameTagShoutDistanceColor"
+	 reference="Yellow" />
+	<color
+     name="NameTagBeyondShoutDistanceColor"
+     reference="Red" />
 </colors>

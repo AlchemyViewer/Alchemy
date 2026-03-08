@@ -49,6 +49,7 @@
 // Linden library includes
 #include "llwindow.h"           // setMouseClipping()
 
+#include "alavatargroups.h"
 #include "llavatarnamecache.h"
 #include "llagent.h"
 #include "llnetmap.h"
@@ -197,8 +198,8 @@ void LLToolGun::draw()
             }
 
             LLColor4 marker_color = LLColor4::white;
-            //if(show_iff_markers || !target_rendered)
-            //    marker_color = ALAvatarGroups::instance().getAvatarColor(id, LLColor4::white, ALAvatarGroups::COLOR_MINIMAP);
+            if(show_iff_markers || !target_rendered)
+                marker_color = ALAvatarGroups::instance().getAvatarColor(id, LLColor4::white, ALAvatarGroups::COLOR_MINIMAP);
             marker_color.mV[VALPHA] = 0.75f;
 
             if (show_iff_markers)

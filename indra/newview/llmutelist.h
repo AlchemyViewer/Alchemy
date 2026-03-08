@@ -118,6 +118,7 @@ public:
     // Alternate (convenience) form for places we don't need to pass the name, but do need flags
     bool isMuted(const LLUUID& id, U32 flags) const { return isMuted(id, LLStringUtil::null, flags); };
 
+    static bool isLinden(const LLUUID& id);
     static bool isLinden(const std::string& name);
 
     bool isLoaded() const { return mLoadState == ML_LOADED; }

@@ -74,6 +74,7 @@ set(viewer_SOURCE_FILES
     aoengine.cpp
     aoset.cpp
     alavataractions.cpp
+    alavatargroups.cpp
     alchatcommand.cpp
     alfloatergenerictext.cpp
     alfloaterparticleeditor.cpp
@@ -775,6 +776,7 @@ set(viewer_HEADER_FILES
     aoengine.h
     aoset.h
     alavataractions.h
+    alavatargroups.h
     alchatcommand.h
     alfloatergenerictext.h
     alfloaterparticleeditor.h

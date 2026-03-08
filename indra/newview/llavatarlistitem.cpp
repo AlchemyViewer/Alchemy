@@ -36,6 +36,7 @@
 #include "llfloaterreg.h"
 #include "lltextutil.h"
 
+#include "alavatargroups.h"
 #include "llagent.h"
 #include "llavatarnamecache.h"
 #include "llavatariconctrl.h"
@@ -92,7 +93,8 @@ LLAvatarListItem::LLAvatarListItem(bool not_from_ui_factory/* = true*/)
     mForceCompleteName(false),
     mHovered(false),
     mAvatarNameCacheConnection(),
-    mGreyOutUsername("")
+    mGreyOutUsername(""),
+    mColorize(false)
 {
     if (not_from_ui_factory)
     {
@@ -309,6 +311,11 @@ void LLAvatarListItem::setState(EItemState item_style)
         break;
     }
 
+    if (mColorize)
+    {
+        mAvatarNameStyle.color = ALAvatarGroups::instance().getAvatarColor(mAvatarId, mAvatarNameStyle.color.getValue(), ALAvatarGroups::COLOR_NEARBY);
+    }
+
     // *NOTE: You cannot set the style on a text box anymore, you must
     // rebuild the text.  This will cause problems if the text contains
     // hyperlinks, as their styles will be wrong.
@@ -318,12 +325,13 @@ void LLAvatarListItem::setState(EItemState item_style)
     mAvatarIcon->setColor(item_icon_color_map[item_style]);
 }
 
-void LLAvatarListItem::setAvatarId(const LLUUID& id, const LLUUID& session_id, bool ignore_status_changes/* = false*/, bool is_resident/* = true*/)
+void LLAvatarListItem::setAvatarId(const LLUUID& id, const LLUUID& session_id, bool ignore_status_changes/* = false*/, bool is_resident/* = true*/, bool use_colorizer/* = false*/)
 {
     if (mAvatarId.notNull())
         LLAvatarTracker::instance().removeParticularFriendObserver(mAvatarId, this);
 
     mAvatarId = id;
+    mColorize = use_colorizer;
     mSpeakingIndicator->setSpeakerId(id, session_id);
 
     // We'll be notified on avatar online status changes

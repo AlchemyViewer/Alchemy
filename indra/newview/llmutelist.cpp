@@ -191,6 +191,15 @@ LLMuteList::~LLMuteList()
     }
 }
 
+// static
+bool LLMuteList::isLinden(const LLUUID& id)
+{
+    std::string name;
+    gCacheName->getFullName(id, name);
+    return isLinden(name);
+}
+
+// static
 bool LLMuteList::isLinden(const std::string& name)
 {
     std::string username = boost::replace_all_copy(name, ".", " ");
@@ -205,7 +214,7 @@ bool LLMuteList::isLinden(const std::string& name)
 
     std::string last_name = *token_iter;
     LLStringUtil::toLower(last_name);
-    return last_name == "linden";
+    return last_name == "linden" || last_name == "productengine" || last_name == "mole";
 }
 
 bool LLMuteList::getLoadFailed() const

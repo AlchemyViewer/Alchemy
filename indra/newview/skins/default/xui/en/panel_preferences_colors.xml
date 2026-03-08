@@ -9,6 +9,22 @@
  name="colors_panel"
  top="1"
  width="517">
+ <tab_container 
+ top_pad="0" 
+ enabled="true" 
+ follows="left|top" 
+ height="430" 
+ left_delta="0"
+ mouse_opaque="false" 
+ name="color_tab_container" 
+ tab_position="top"
+ tab_stop="false" 
+ width="517">
+ <panel
+ label="General"
+ name="general_colors"
+ layout="topleft"
+ follows="top|left">
   <text
    type="string"
    length="1"
@@ -22,6 +38,7 @@
     My effects (selection beam):
   </text>
   <color_swatch
+  disabled_control="AlchemyRainbowEffects"
 	 can_apply_immediately="true"
      follows="left|top"
      height="24"
@@ -40,16 +57,26 @@
     <color_swatch.caption_text
     height="0" />
   </color_swatch>
+  <check_box
+  control_name="AlchemyRainbowEffects"
+  height="16"
+  label="Use Rainbow cycle for effect color"
+  layout="topleft"
+  name="rainbow_effect_Check"
+  left_pad="5"
+  top_delta="6"
+  width="330">
+</check_box>
   <text
    follows="left|top"
    layout="topleft"
    left="30"
    height="12"
-   name="font_colors"
-   top_pad="20"
+   name="nametag_font_colors"
+   top_pad="10"
    width="170"
    >
-    Chat font colors:
+    Name tag font colors:
   </text>
   <color_swatch
    can_apply_immediately="true"
@@ -58,15 +85,15 @@
    label_height="0"
    layout="topleft"
    left="40"
-   name="user"
+   name="user_nametag_color"
    top_pad="10"
    width="44" >
     <color_swatch.init_callback
 		 function="Pref.getUIColor"
-		 parameter="UserChatColor" />
+		 parameter="NameTagSelf" />
     <color_swatch.commit_callback
 		 function="Pref.applyUIColor"
-		 parameter="UserChatColor" />
+		 parameter="NameTagSelf" />
   </color_swatch>
   <text
    type="string"
@@ -76,7 +103,7 @@
    layout="topleft"
    left_pad="5"
    mouse_opaque="false"
-   name="text_box1"
+   name="text_nametag_box1"
    top_delta="5"
    width="95">
     Me
@@ -88,15 +115,15 @@
    label_height="0"
    layout="topleft"
    left="190"
-   name="agent"
+   name="agent_nametag_color"
    top_pad="-15"
    width="44" >
     <color_swatch.init_callback
 		 function="Pref.getUIColor"
-		 parameter="AgentChatColor" />
+		 parameter="NameTagMatch" />
     <color_swatch.commit_callback
 		 function="Pref.applyUIColor"
-		 parameter="AgentChatColor" />
+		 parameter="NameTagMatch" />
   </color_swatch>
   <text
    type="string"
@@ -106,29 +133,28 @@
    layout="topleft"
    left_pad="5"
    mouse_opaque="false"
-   name="text_box2"
+   name="text_nametag_box2"
    top_delta="5"
    width="95">
     Others
   </text>
   <color_swatch
    can_apply_immediately="true"
-   color="EmphasisColor_35"
    follows="left|top"
    height="24"
    label_height="0"
    label_width="60"
    layout="topleft"
    left="360"
-   name="objects"
+   name="friends_nametag_color"
    top_pad="-15"
    width="44">
     <color_swatch.init_callback
 		 function="Pref.getUIColor"
-		 parameter="ObjectChatColor" />
+		 parameter="NameTagFriend" />
     <color_swatch.commit_callback
 		 function="Pref.applyUIColor"
-		 parameter="ObjectChatColor" />
+		 parameter="NameTagFriend" />
   </color_swatch>
   <text
      type="string"
@@ -138,10 +164,42 @@
      layout="topleft"
      left_pad="5"
      mouse_opaque="false"
-     name="text_box3"
+     name="text_nametag_box3"
      top_delta="5"
      width="95">
-    Objects
+    Friends
+  </text>
+  <color_swatch
+   can_apply_immediately="true"
+   color="LindenBlue"
+   follows="left|top"
+   height="24"
+   label_height="0"
+   label_width="44"
+   layout="topleft"
+   left="40"
+   name="linden_nametag_color"
+   top_pad="22"
+   width="44" >
+    <color_swatch.init_callback
+		 function="Pref.getUIColor"
+		 parameter="NameTagLinden" />
+    <color_swatch.commit_callback
+		 function="Pref.applyUIColor"
+		 parameter="NameTagLinden" />
+  </color_swatch>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="10"
+   layout="topleft"
+   left_pad="5"
+   mouse_opaque="false"
+   name="text_nametag_box4"
+   top_delta="5"
+   width="95">
+    Lindens
   </text>
   <color_swatch
    can_apply_immediately="true"
@@ -149,49 +207,17 @@
    follows="left|top"
    height="24"
    label_height="0"
-   label_width="44"
-   layout="topleft"
-   left="40"
-   name="system"
-   top_pad="22"
-   width="44" >
-    <color_swatch.init_callback
-		 function="Pref.getUIColor"
-		 parameter="SystemChatColor" />
-    <color_swatch.commit_callback
-		 function="Pref.applyUIColor"
-		 parameter="SystemChatColor" />
-  </color_swatch>
-  <text
-   type="string"
-   length="1"
-   follows="left|top"
-   height="10"
-   layout="topleft"
-   left_pad="5"
-   mouse_opaque="false"
-   name="text_box4"
-   top_delta="5"
-   width="95">
-    System
-  </text>
-  <color_swatch
-   can_apply_immediately="true"
-   color="Red"
-   follows="left|top"
-   height="24"
-   label_height="0"
    layout="topleft"
    left="190"
-   name="script_error"
+   name="muted_nametag_color"
    top_pad="-15"
    width="44">
     <color_swatch.init_callback
 		 function="Pref.getUIColor"
-		 parameter="ScriptErrorColor" />
+		 parameter="NameTagMuted" />
     <color_swatch.commit_callback
 		 function="Pref.applyUIColor"
-		 parameter="ScriptErrorColor" />
+		 parameter="NameTagMuted" />
   </color_swatch>
   <text
    type="string"
@@ -201,205 +227,11 @@
    layout="topleft"
    left_pad="5"
    mouse_opaque="false"
-   name="text_box5"
+   name="text_nametag_box5"
    top_delta="5"
    width="95">
-    Errors
+    Muted
   </text>
-  <color_swatch
-   can_apply_immediately="true"
-   color="LtOrange"
-   follows="left|top"
-   height="24"
-   label_height="0"
-   layout="topleft"
-   left="360"
-   name="direct"
-   top_pad="-15"
-   width="44" >
-    <color_swatch.init_callback
-		 function="Pref.getUIColor"
-		 parameter="DirectChatColor" />
-    <color_swatch.commit_callback
-		 function="Pref.applyUIColor"
-		 parameter="DirectChatColor" />
-  </color_swatch>
-  <text
-   type="string"
-   length="1"
-   follows="left|top"
-   height="10"
-   layout="topleft"
-   left_pad="5"
-   mouse_opaque="false"
-   name="text_box10"
-   top_delta="5"
-   width="95">
-    Direct
-  </text>
-  <color_swatch
-   can_apply_immediately="true"
-   color="LtYellow"
-   follows="left|top"
-   height="24"
-   label_height="0"
-   layout="topleft"
-   left="40"
-   name="owner"
-   top_pad="22"
-   width="44" >
-    <color_swatch.init_callback
-		 function="Pref.getUIColor"
-		 parameter="llOwnerSayChatColor" />
-    <color_swatch.commit_callback
-		 function="Pref.applyUIColor"
-		 parameter="llOwnerSayChatColor" />
-  </color_swatch>
-  <text
-   type="string"
-   length="1"
-   follows="left|top"
-   height="10"
-   layout="topleft"
-   left_pad="5"
-   mouse_opaque="false"
-   name="text_box7"
-   top_delta="5"
-   width="95">
-    Owner
-  </text>
-  <color_swatch
-   can_apply_immediately="true"
-   color="EmphasisColor"
-   follows="left|top"
-   height="24"
-   label_height="0"
-   layout="topleft"
-   left="190"
-   name="links"
-   top_pad="-15"
-   width="44" >
-    <color_swatch.init_callback
-		 function="Pref.getUIColor"
-		 parameter="HTMLLinkColor" />
-    <color_swatch.commit_callback
-		 function="Pref.applyUIColor"
-		 parameter="HTMLLinkColor" />
-  </color_swatch>
-  <text
-   type="string"
-   length="1"
-   follows="left|top"
-   height="10"
-   layout="topleft"
-   left_pad="5"
-   mouse_opaque="false"
-   name="text_box9"
-   top_delta="5"
-   width="95">
-    URLs
-  </text>
-  <color_swatch
-   can_apply_immediately="true"
-   color="EmphasisColor"
-   follows="left|top"
-   height="24"
-   label_height="0"
-   layout="topleft"
-   left="360"
-   name="mentions"
-   top_pad="-15"
-   width="44" >
-    <color_swatch.init_callback
-         function="Pref.getUIColor"
-         parameter="ChatMentionFont" />
-    <color_swatch.commit_callback
-         function="Pref.applyUIColor"
-         parameter="ChatMentionFont" />
-    </color_swatch>
-  <text
-   type="string"
-   length="1"
-   follows="left|top"
-   height="10"
-   layout="topleft"
-   left_pad="5"
-   mouse_opaque="false"
-   name="text_mentions"
-   top_delta="5"
-   width="95">
-    Mentions
-  </text>
-  <text
-   follows="left|top"
-   layout="topleft"
-   left="30"
-   height="12"
-   name="mentions_colors"
-   top_pad="20"
-   width="170">
-    Chat mentions highlight colors:
-  </text>
-  <color_swatch
-   can_apply_immediately="true"
-   follows="left|top"
-   height="24"
-   label_height="0"
-   layout="topleft"
-   left="40"
-   name="mention_self"
-   top_pad="10"
-   width="44" >
-    <color_swatch.init_callback
-         function="Pref.getUIColor"
-         parameter="ChatSelfMentionHighlight" />
-    <color_swatch.commit_callback
-         function="Pref.applyUIColor"
-         parameter="ChatSelfMentionHighlight" />
-  </color_swatch>
-  <text
-   type="string"
-   length="1"
-   follows="left|top"
-   height="10"
-   layout="topleft"
-   left_pad="5"
-   mouse_opaque="false"
-   name="text_mentions_self"
-   top_delta="5"
-   width="95">
-    Me
-  </text>
-  <color_swatch
-     can_apply_immediately="true"
-     follows="left|top"
-     height="24"
-     label_height="0"
-     layout="topleft"
-     left="190"
-     name="mention_others"
-     top_pad="-15"
-     width="44" >
-        <color_swatch.init_callback
-             function="Pref.getUIColor"
-             parameter="ChatMentionHighlight" />
-        <color_swatch.commit_callback
-             function="Pref.applyUIColor"
-             parameter="ChatMentionHighlight" />
-    </color_swatch>
-    <text
-     type="string"
-     length="1"
-     follows="left|top"
-     height="10"
-     layout="topleft"
-     left_pad="5"
-     mouse_opaque="false"
-     name="text_mentions_others"
-     top_delta="5"
-     width="95">
-        Others
-    </text>
   <text
    follows="left|top"
    layout="topleft"
@@ -444,6 +276,171 @@
    tool_tip="Choose name tag opacity"
    top_delta = "6"
    width="378" />
+   <text
+   follows="left|top"
+   layout="topleft"
+   left="30"
+   height="12"
+   name="minimap_dot_colors"
+   top_pad="10"
+   width="170"
+   >
+    Minimap dot colors:
+  </text>
+  <color_swatch
+   can_apply_immediately="true"
+   follows="left|top"
+   height="24"
+   label_height="0"
+   layout="topleft"
+   left="40"
+   name="user_minimap_color"
+   top_pad="10"
+   width="44" >
+    <color_swatch.init_callback
+		 function="Pref.getUIColor"
+		 parameter="MapAvatarSelfColor" />
+    <color_swatch.commit_callback
+		 function="Pref.applyUIColor"
+		 parameter="MapAvatarSelfColor" />
+  </color_swatch>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="10"
+   layout="topleft"
+   left_pad="5"
+   mouse_opaque="false"
+   name="text_minimap_box1"
+   top_delta="5"
+   width="95">
+    Me
+  </text>
+  <color_swatch
+   can_apply_immediately="true"
+   follows="left|top"
+   height="24"
+   label_height="0"
+   layout="topleft"
+   left="190"
+   name="agent_minimap_color"
+   top_pad="-15"
+   width="44" >
+    <color_swatch.init_callback
+		 function="Pref.getUIColor"
+		 parameter="MapAvatarColor" />
+    <color_swatch.commit_callback
+		 function="Pref.applyUIColor"
+		 parameter="MapAvatarColor" />
+  </color_swatch>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="10"
+   layout="topleft"
+   left_pad="5"
+   mouse_opaque="false"
+   name="text_minimap_box2"
+   top_delta="5"
+   width="95">
+    Others
+  </text>
+  <color_swatch
+   can_apply_immediately="true"
+   follows="left|top"
+   height="24"
+   label_height="0"
+   label_width="60"
+   layout="topleft"
+   left="360"
+   name="friends_minimap_color"
+   top_pad="-15"
+   width="44">
+    <color_swatch.init_callback
+		 function="Pref.getUIColor"
+		 parameter="MapAvatarFriendColor" />
+    <color_swatch.commit_callback
+		 function="Pref.applyUIColor"
+		 parameter="MapAvatarFriendColor" />
+  </color_swatch>
+  <text
+     type="string"
+     length="1"
+     follows="left|top"
+     height="10"
+     layout="topleft"
+     left_pad="5"
+     mouse_opaque="false"
+     name="text_minimap_box3"
+     top_delta="5"
+     width="95">
+    Friends
+  </text>
+  <color_swatch
+   can_apply_immediately="true"
+   color="LindenBlue"
+   follows="left|top"
+   height="24"
+   label_height="0"
+   label_width="44"
+   layout="topleft"
+   left="40"
+   name="linden_minimap_color"
+   top_pad="22"
+   width="44" >
+    <color_swatch.init_callback
+		 function="Pref.getUIColor"
+		 parameter="MapAvatarLindenColor" />
+    <color_swatch.commit_callback
+		 function="Pref.applyUIColor"
+		 parameter="MapAvatarLindenColor" />
+  </color_swatch>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="10"
+   layout="topleft"
+   left_pad="5"
+   mouse_opaque="false"
+   name="text_minimap_box4"
+   top_delta="5"
+   width="95">
+    Lindens
+  </text>
+  <color_swatch
+   can_apply_immediately="true"
+   color="LtGray"
+   follows="left|top"
+   height="24"
+   label_height="0"
+   layout="topleft"
+   left="190"
+   name="muted_minimap_color"
+   top_pad="-15"
+   width="44">
+    <color_swatch.init_callback
+		 function="Pref.getUIColor"
+		 parameter="MapAvatarMutedColor" />
+    <color_swatch.commit_callback
+		 function="Pref.applyUIColor"
+		 parameter="MapAvatarMutedColor" />
+  </color_swatch>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="10"
+   layout="topleft"
+   left_pad="5"
+   mouse_opaque="false"
+   name="text_minimap_box5"
+   top_delta="5"
+   width="95">
+    Muted
+  </text>
   <text
    follows="left|top"
    layout="topleft"
@@ -491,4 +488,332 @@
    show_text="true"
    top_pad="5"
    width="415" />
+  </panel>
+  <panel
+  label="Chat"
+  name="chat_colors"
+  layout="topleft"
+  follows="top|left">
+   <text
+    follows="left|top"
+    layout="topleft"
+    left="30"
+    height="12"
+    name="font_colors"
+    top_pad="10"
+    width="170"
+    >
+     Chat font colors:
+   </text>
+   <color_swatch
+    can_apply_immediately="true"
+    follows="left|top"
+    height="24"
+    label_height="0"
+    layout="topleft"
+    left="40"
+    name="user"
+    top_pad="10"
+    width="44" >
+     <color_swatch.init_callback
+      function="Pref.getUIColor"
+      parameter="UserChatColor" />
+     <color_swatch.commit_callback
+      function="Pref.applyUIColor"
+      parameter="UserChatColor" />
+   </color_swatch>
+   <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="10"
+    layout="topleft"
+    left_pad="5"
+    mouse_opaque="false"
+    name="text_box1"
+    top_delta="5"
+    width="95">
+     Me
+   </text>
+   <color_swatch
+    can_apply_immediately="true"
+    follows="left|top"
+    height="24"
+    label_height="0"
+    layout="topleft"
+    left="190"
+    name="agent"
+    top_pad="-15"
+    width="44" >
+     <color_swatch.init_callback
+      function="Pref.getUIColor"
+      parameter="AgentChatColor" />
+     <color_swatch.commit_callback
+      function="Pref.applyUIColor"
+      parameter="AgentChatColor" />
+   </color_swatch>
+   <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="10"
+    layout="topleft"
+    left_pad="5"
+    mouse_opaque="false"
+    name="text_box2"
+    top_delta="5"
+    width="95">
+     Others
+   </text>
+   <color_swatch
+    can_apply_immediately="true"
+    follows="left|top"
+    height="24"
+    label_height="0"
+    label_width="60"
+    layout="topleft"
+    left="360"
+    name="friends"
+    top_pad="-15"
+    width="44">
+     <color_swatch.init_callback
+      function="Pref.getUIColor"
+      parameter="FriendChatColor" />
+     <color_swatch.commit_callback
+      function="Pref.applyUIColor"
+      parameter="FriendChatColor" />
+   </color_swatch>
+   <text
+      type="string"
+      length="1"
+      follows="left|top"
+      height="10"
+      layout="topleft"
+      left_pad="5"
+      mouse_opaque="false"
+      name="text_box3"
+      top_delta="5"
+      width="95">
+     Friends
+   </text>
+   <color_swatch
+    can_apply_immediately="true"
+    color="LtGray"
+    follows="left|top"
+    height="24"
+    label_height="0"
+    label_width="44"
+    layout="topleft"
+    left="40"
+    name="system"
+    top_pad="22"
+    width="44" >
+     <color_swatch.init_callback
+      function="Pref.getUIColor"
+      parameter="SystemChatColor" />
+     <color_swatch.commit_callback
+      function="Pref.applyUIColor"
+      parameter="SystemChatColor" />
+   </color_swatch>
+   <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="10"
+    layout="topleft"
+    left_pad="5"
+    mouse_opaque="false"
+    name="text_box4"
+    top_delta="5"
+    width="95">
+     System
+   </text>
+   <color_swatch
+    can_apply_immediately="true"
+    color="Red"
+    follows="left|top"
+    height="24"
+    label_height="0"
+    layout="topleft"
+    left="190"
+    name="script_error"
+    top_pad="-15"
+    width="44">
+     <color_swatch.init_callback
+      function="Pref.getUIColor"
+      parameter="ScriptErrorColor" />
+     <color_swatch.commit_callback
+      function="Pref.applyUIColor"
+      parameter="ScriptErrorColor" />
+   </color_swatch>
+   <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="10"
+    layout="topleft"
+    left_pad="5"
+    mouse_opaque="false"
+    name="text_box5"
+    top_delta="5"
+    width="95">
+     Errors
+   </text>
+   <color_swatch
+    can_apply_immediately="true"
+    color="LtOrange"
+    follows="left|top"
+    height="24"
+    label_height="0"
+    layout="topleft"
+    left="360"
+    name="direct"
+    top_pad="-15"
+    width="44" >
+     <color_swatch.init_callback
+      function="Pref.getUIColor"
+      parameter="DirectChatColor" />
+     <color_swatch.commit_callback
+      function="Pref.applyUIColor"
+      parameter="DirectChatColor" />
+   </color_swatch>
+   <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="10"
+    layout="topleft"
+    left_pad="5"
+    mouse_opaque="false"
+    name="text_box10"
+    top_delta="5"
+    width="95">
+     Direct
+   </text>
+   <color_swatch
+    can_apply_immediately="true"
+    color="LtYellow"
+    follows="left|top"
+    height="24"
+    label_height="0"
+    layout="topleft"
+    left="40"
+    name="owner"
+    top_pad="22"
+    width="44" >
+     <color_swatch.init_callback
+      function="Pref.getUIColor"
+      parameter="llOwnerSayChatColor" />
+     <color_swatch.commit_callback
+      function="Pref.applyUIColor"
+      parameter="llOwnerSayChatColor" />
+   </color_swatch>
+   <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="10"
+    layout="topleft"
+    left_pad="5"
+    mouse_opaque="false"
+    name="text_box7"
+    top_delta="5"
+    width="95">
+     Owner
+   </text>
+   <color_swatch
+    can_apply_immediately="true"
+    color="EmphasisColor"
+    follows="left|top"
+    height="24"
+    label_height="0"
+    layout="topleft"
+    left="190"
+    name="links"
+    top_pad="-15"
+    width="44" >
+     <color_swatch.init_callback
+      function="Pref.getUIColor"
+      parameter="HTMLLinkColor" />
+     <color_swatch.commit_callback
+      function="Pref.applyUIColor"
+      parameter="HTMLLinkColor" />
+   </color_swatch>
+   <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="10"
+    layout="topleft"
+    left_pad="5"
+    mouse_opaque="false"
+    name="text_box9"
+    top_delta="5"
+    width="95">
+     URLs
+   </text>
+   <color_swatch
+    can_apply_immediately="true"
+    color="EmphasisColor_35"
+    follows="left|top"
+    height="24"
+    label_height="0"
+    layout="topleft"
+    left="360"
+    name="objects"
+    top_pad="-15"
+    width="44" >
+     <color_swatch.init_callback
+      function="Pref.getUIColor"
+      parameter="ObjectChatColor" />
+     <color_swatch.commit_callback
+      function="Pref.applyUIColor"
+      parameter="ObjectChatColor" />
+   </color_swatch>
+   <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="10"
+    layout="topleft"
+    left_pad="5"
+    mouse_opaque="false"
+    name="text_box10"
+    top_delta="5"
+    width="95">
+     Objects
+   </text>
+   <color_swatch
+    can_apply_immediately="true"
+    color="LindenBlue"
+    follows="left|top"
+    height="24"
+    label_height="0"
+    layout="topleft"
+    left="40"
+    name="linden"
+    top_pad="22"
+    width="44" >
+     <color_swatch.init_callback
+      function="Pref.getUIColor"
+      parameter="LindenChatColor" />
+     <color_swatch.commit_callback
+      function="Pref.applyUIColor"
+      parameter="LindenChatColor" />
+   </color_swatch>
+   <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="10"
+    layout="topleft"
+    left_pad="5"
+    mouse_opaque="false"
+    name="text_box7"
+    top_delta="5"
+    width="95">
+     Lindens
+   </text>
+   </panel>
+ </tab_container>
 </panel>
