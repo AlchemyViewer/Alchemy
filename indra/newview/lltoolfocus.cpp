@@ -62,6 +62,8 @@ bool gCameraBtnPan = false;
 
 const S32 SLOP_RANGE = 4;
 
+extern bool agent_push_forward(EKeystate s);
+
 //
 // Camera - shared functionality
 //
@@ -337,6 +339,11 @@ bool LLToolCamera::handleMouseUp(S32 x, S32 y, MASK mask)
 
 bool LLToolCamera::handleHover(S32 x, S32 y, MASK mask)
 {
+    if (gViewerWindow->getRightMouseDown())
+    {
+        agent_push_forward(KEYSTATE_LEVEL);
+    }
+
     S32 dx = gViewerWindow->getCurrentMouseDX();
     S32 dy = gViewerWindow->getCurrentMouseDY();
 
@@ -471,8 +478,34 @@ bool LLToolCamera::handleHover(S32 x, S32 y, MASK mask)
     return true;
 }
 
+bool LLToolCamera::handleRightMouseDown(S32 x, S32 y, MASK mask)
+{
+    if(mMouseSteering)
+    {
+        agent_push_forward(KEYSTATE_DOWN);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+bool LLToolCamera::handleRightMouseUp(S32 x, S32 y, MASK mask)
+{
+    if (mMouseSteering)
+    {
+        agent_push_forward(KEYSTATE_UP);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
 
 void LLToolCamera::onMouseCaptureLost()
 {
     releaseMouse();
+    handleRightMouseUp(0, 0, 0);
 }

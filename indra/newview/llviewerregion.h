@@ -428,6 +428,12 @@ public:
 
     // rebuild reflection probe list
     void updateReflectionProbes(bool full_update);
+    /// Chat Range (0.8.1)
+    U32 getChatRange() const;
+    /// Shout Range (0.8.1)
+    U32 getShoutRange() const;
+    /// Whisper Range (0.8.1)
+    U32 getWhisperRange() const;
 
 private:
     void addToVOCacheTree(LLVOCacheEntry* entry);
@@ -601,6 +607,9 @@ public:
     caps_received_signal_t mSimulatorFeaturesReceivedSignal;
 
     LLSD mSimulatorFeatures;
+    U32  mWhisperRange = 10;
+    U32  mSayRange = 20;
+    U32  mShoutRange = 100;
 
     typedef std::map<U32, LLPointer<LLVOCacheEntry> >      vocache_entry_map_t;
     static vocache_entry_map_t sRegionCacheCleanup;

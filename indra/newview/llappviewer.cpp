@@ -1324,6 +1324,19 @@ bool LLAppViewer::init()
     // Init media
     LLViewerMedia::createInstance();
 
+    //LLSimpleton creations
+    LLEnvironment::createInstance();
+    LLViewerPartSim::createInstance();
+    LLWorld::createInstance();
+    LLViewerStatsRecorder::createInstance();
+    LLSelectMgr::createInstance();
+    LLViewerCamera::createInstance();
+    LL::GLTFSceneManager::createInstance();
+    LLMaterialMgr::createInstance();
+    LLHUDManager::createInstance();
+    LLWorldMap::createInstance();
+    LLObjectSignaledAnimationMap::createInstance();
+
     // Initialize tool manager and tools
     LLToolSelectLand::createInstance();
     LLToolIndividual::createInstance();
@@ -1341,19 +1354,6 @@ bool LLAppViewer::init()
     LLToolDragAndDrop::createInstance();
     LLToolPie::createInstance();
     LLToolMgr::createInstance();
-
-    //LLSimpleton creations
-    LLEnvironment::createInstance();
-    LLViewerPartSim::createInstance();
-    LLWorld::createInstance();
-    LLViewerStatsRecorder::createInstance();
-    LLSelectMgr::createInstance();
-    LLViewerCamera::createInstance();
-    LL::GLTFSceneManager::createInstance();
-    LLMaterialMgr::createInstance();
-    LLHUDManager::createInstance();
-    LLWorldMap::createInstance();
-    LLObjectSignaledAnimationMap::createInstance();
 
     gSavedSettings.setU32("DebugQualityPerformance", gSavedSettings.getU32("RenderQualityPerformance"));
 

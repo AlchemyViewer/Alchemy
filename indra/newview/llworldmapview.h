@@ -162,6 +162,7 @@ public:
     static LLUIImagePtr sClassifiedsImage;
     static LLUIImagePtr sForSaleImage;
     static LLUIImagePtr sForSaleAdultImage;
+    static LLUIImagePtr sIFFArrowImage;
 
     bool            mItemPicked;
 

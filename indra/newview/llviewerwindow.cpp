@@ -2788,7 +2788,7 @@ void LLViewerWindow::draw()
         // Draw tool specific overlay on world
         LLToolMgr::getInstance()->getCurrentTool()->draw();
 
-        if( gAgentCamera.cameraMouselook() || LLFloaterCamera::inFreeCameraMode() )
+        if (gAgentCamera.cameraMouselook())
         {
             drawMouselookInstructions();
             stop_glerror();
@@ -5667,20 +5667,77 @@ void LLViewerWindow::destroyWindow()
 
 void LLViewerWindow::drawMouselookInstructions()
 {
-    // Draw instructions for mouselook ("Press ESC to return to World View" partially transparent at the bottom of the screen.)
-    const std::string instructions = LLTrans::getString("LeaveMouselook");
-    const LLFontGL* font = LLFontGL::getFont(LLFontDescriptor("SansSerif", "Large", LLFontGL::BOLD));
+    static LLCachedControl<bool> draw_mouselook_instructions(gSavedSettings, "AlchemyMouselookInstructions", true);
+    static LLCachedControl<bool> draw_mouselook_position(gSavedSettings, "AlchemyMouselookPosition", true);
+    if (draw_mouselook_position || draw_mouselook_instructions)
+    {
+        // Draw information for mouselook (pos, health)
+        const LLFontGL* font = LLFontGL::getFontSansSerifBig();
 
-    //to be on top of Bottom bar when it is opened
-    const S32 INSTRUCTIONS_PAD = 50;
+        if (draw_mouselook_position)
+        {
+            //to be at top of viewer
+            const S32 INSTRUCTIONS_TOP_PAD = getWorldViewRectScaled().mTop - 15;
+            const S32 text_pos_start = getWorldViewRectScaled().getCenterX() - 150;
+            const LLVector3& vec = gAgent.getPositionAgent();
 
-    font->renderUTF8(
-        instructions, 0,
-        getWorldViewRectScaled().getCenterX(),
-        getWorldViewRectScaled().mBottom + INSTRUCTIONS_PAD,
-        LLColor4( 1.0f, 1.0f, 1.0f, 0.5f ),
-        LLFontGL::HCENTER, LLFontGL::TOP,
-        LLFontGL::NORMAL,LLFontGL::DROP_SHADOW);
+            font->renderUTF8(
+                llformat("X: %.2f", vec.mV[VX]), 0,
+                text_pos_start,
+                INSTRUCTIONS_TOP_PAD,
+                LLColor4(1.0f, 0.5f, 0.5f, 0.5f),
+                LLFontGL::HCENTER, LLFontGL::TOP,
+                LLFontGL::BOLD, LLFontGL::DROP_SHADOW_SOFT);
+            font->renderUTF8(
+                llformat("Y: %.2f", vec.mV[VY]), 0,
+                text_pos_start + 100,
+                INSTRUCTIONS_TOP_PAD,
+                LLColor4(0.5f, 1.0f, 0.5f, 0.5f),
+                LLFontGL::HCENTER, LLFontGL::TOP,
+                LLFontGL::BOLD, LLFontGL::DROP_SHADOW_SOFT);
+            font->renderUTF8(
+                llformat("Z: %.2f", vec.mV[VZ]), 0,
+                text_pos_start + 200,
+                INSTRUCTIONS_TOP_PAD,
+                LLColor4(0.5f, 0.5f, 1.0f, 0.5f),
+                LLFontGL::HCENTER, LLFontGL::TOP,
+                LLFontGL::BOLD, LLFontGL::DROP_SHADOW_SOFT);
+            LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
+            const bool allow_damage = vpm->allowAgentDamage(gAgent.getRegion(), vpm->getAgentParcel());
+            if (allow_damage)
+            {
+                S32 health = -1;
+                if (gStatusBar)
+                {
+                    health = gStatusBar->getHealth();
+                }
+                font->renderUTF8(
+                    llformat("HP: %d%%", health), 0,
+                    text_pos_start + 300,
+                    INSTRUCTIONS_TOP_PAD,
+                    LLColor4(1.0f, 1.0f, 1.0f, 0.5f),
+                    LLFontGL::HCENTER, LLFontGL::TOP,
+                    LLFontGL::BOLD, LLFontGL::DROP_SHADOW_SOFT);
+            }
+        }
+
+        if (draw_mouselook_instructions)
+        {
+            // Draw instructions for mouselook ("Press ESC to return to World View" partially transparent at the bottom of the screen.)
+            static const std::string instructions = LLTrans::getString("LeaveMouselook");
+
+            //to be on top of Bottom bar when it is opened
+            const S32 INSTRUCTIONS_BOTTOM_PAD = 50;
+
+            font->renderUTF8(
+                instructions, 0,
+                getWorldViewRectScaled().getCenterX(),
+                getWorldViewRectScaled().mBottom + INSTRUCTIONS_BOTTOM_PAD,
+                LLColor4(1.0f, 1.0f, 1.0f, 0.5f),
+                LLFontGL::HCENTER, LLFontGL::TOP,
+                LLFontGL::BOLD, LLFontGL::DROP_SHADOW);
+        }
+    }
 }
 
 void* LLViewerWindow::getPlatformWindow() const

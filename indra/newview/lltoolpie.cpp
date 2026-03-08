@@ -47,6 +47,7 @@
 #include "llkeyboard.h"
 #include "llmediaentry.h"
 #include "llmenugl.h"
+#include "llmeshrepository.h"
 #include "llmutelist.h"
 #include "llresmgr.h"  // getMonetaryString
 #include "llselectmgr.h"
@@ -62,6 +63,7 @@
 #include "llviewerobjectlist.h"
 #include "llviewerobject.h"
 #include "llviewerparcelmgr.h"
+#include "llviewerregion.h"
 #include "llviewerwindow.h"
 #include "llviewerinput.h"
 #include "llviewermedia.h"
@@ -692,6 +694,15 @@ bool LLToolPie::walkToClickedLocation()
     if (fValidPick)
 // [/RLVa:KB]
     {
+// [RLVa:KB] - Checked: RLVa-2.0.0
+        if (RlvActions::isRlvEnabled() && !RlvActions::canTeleportToLocal(mPick.mPosGlobal))
+        {
+            RlvUtil::notifyBlocked(RlvStringKeys::Blocked::AutoPilot);
+            mPick = saved_pick;
+            return false;
+        }
+// [/RLVa:KB]
+
         gAgentCamera.setFocusOnAvatar(true, true);
 
         if (mAutoPilotDestination) { mAutoPilotDestination->markDead(); }
@@ -749,6 +760,13 @@ bool LLToolPie::teleportToClickedLocation()
 
     if (pos_non_zero && (is_land || (is_in_world && !has_click_action)))
     {
+// [RLVa:KB] - Checked: RLVa-2.0.0
+        if (RlvActions::isRlvEnabled() && !RlvActions::canTeleportToLocal(mPick.mPosGlobal))
+        {
+            RlvUtil::notifyBlocked(RlvStringKeys::Blocked::AutoPilot);
+            return false;
+        }
+// [/RLVa:KB]
         LLVector3d pos = mHoverPick.mPosGlobal;
         pos.mdV[VZ] += gAgentAvatarp->getPelvisToFoot();
         gAgent.teleportViaLocationLookAt(pos);
@@ -970,7 +988,8 @@ static bool needs_tooltip(LLSelectNode* nodep)
 bool LLToolPie::handleTooltipLand(std::string line, std::string tooltip_msg)
 {
     //  Do not show hover for land unless prefs are set to allow it.
-    if (!gSavedSettings.getBOOL("ShowLandHoverTip")) return true;
+    static const LLCachedControl<bool> show_land_hover_tips(gSavedSettings, "ShowLandHoverTip");
+    if (!show_land_hover_tips) return true;
 
     LLViewerParcelMgr::getInstance()->setHoverParcel( mHoverPick.mPosGlobal );
 
@@ -1212,8 +1231,7 @@ bool LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
         //
         //  Default prefs will suppress display unless the object is interactive
         //
-        bool show_all_object_tips =
-        (bool)gSavedSettings.getBOOL("ShowAllObjectHoverTip");
+        static const LLCachedControl<bool> show_all_object_tips(gSavedSettings, "ShowAllObjectHoverTip");
         LLSelectNode *nodep = LLSelectMgr::getInstance()->getHoverNode();
 
         // only show tooltip if same inspector not already open
@@ -1288,6 +1306,50 @@ bool LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
                 }
             }
 
+            if (gSavedSettings.getBOOL("ShowAdvancedHoverTips"))
+            {
+                LLStringUtil::format_map_t args;
+                // Get Position
+                LLViewerRegion* region = gAgent.getRegion();
+                if (region)
+                {
+                    LLVector3 objectPosition = region->getPosRegionFromGlobal(hover_object->getPositionGlobal());
+                    if (!RlvActions::isRlvEnabled() || RlvActions::canShowLocation())
+                    {
+                        //Check if we are in the same region, otherwise it shows large negitive position numbers.
+                        if (hover_object->getRegion() && gAgent.getRegion() && hover_object->getRegion()->getRegionID() == gAgent.getRegion()->getRegionID())
+                        {
+                            args["OBJECT_POSITION"] =
+                                llformat("<%.02f, %.02f, %.02f>", objectPosition.mV[VX], objectPosition.mV[VY], objectPosition.mV[VZ]);
+                            tooltip_msg.append("\n" + LLTrans::getString("TooltipPosition", args));
+                        }
+                    }
+
+                    // Get Distance
+                    F32 distance            = (objectPosition - region->getPosRegionFromGlobal(gAgent.getPositionGlobal())).magVec();
+                    args["OBJECT_DISTANCE"] = llformat("%.02f", distance);
+                    tooltip_msg.append("\n" + LLTrans::getString("TooltipDistance", args));
+                }
+
+                // Get Prim Count
+                args["PRIM_COUNT"] = llformat("%d", LLSelectMgr::getInstance()->getHoverObjects()->getObjectCount());
+                tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCount", args));
+
+                // Get Prim Land Impact
+                if (gMeshRepo.meshRezEnabled())
+                {
+                    S32 cost = ll_round(LLSelectMgr::getInstance()->getHoverObjects()->getSelectedLinksetCost());
+                    if (cost > 0)
+                    {
+                        args["PRIM_COST"] = llformat("%d", cost);
+                        tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCost", args));
+                    }
+                    else
+                    {
+                        tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCostLoading"));
+                    }
+                }
+            }
 
             // Avoid showing tip over media that's displaying unless it's for sale
             // also check the primary node since sometimes it can have an action even though
@@ -1975,7 +2037,6 @@ static void handle_click_action_open_media(LLPointer<LLViewerObject> objectp)
     }
 
     std::string media_url = std::string ( parcel->getMediaURL () );
-    std::string media_type = std::string ( parcel->getMediaType() );
     LLStringUtil::trim(media_url);
 
     LLWeb::loadURL(media_url);
@@ -1991,10 +2052,6 @@ static ECursorType cursor_from_parcel_media(U8 click_action)
     ECursorType open_cursor = UI_CURSOR_ARROW;
     LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
     if (!parcel) return open_cursor;
-
-    std::string media_url = std::string ( parcel->getMediaURL () );
-    std::string media_type = std::string ( parcel->getMediaType() );
-    LLStringUtil::trim(media_url);
 
     open_cursor = UI_CURSOR_TOOLMEDIAOPEN;
 
@@ -2307,7 +2364,7 @@ void LLToolPie::steerCameraWithMouse(S32 x, S32 y)
     {
         old_yaw_angle = F_PI_BY_TWO + asinf(pick_distance_from_rotation_center / camera_distance_from_rotation_center);
 
-        if (mouse_ray * rotation_frame.getLeftAxis() < 0.f)
+        if (old_mouse_ray * rotation_frame.getLeftAxis() < 0.f)
         {
             old_yaw_angle *= -1.f;
         }

@@ -6993,6 +6993,7 @@ void process_script_dialog(LLMessageSystem* msg, void**)
     LLSD args;
     args["TITLE"] = object_name;
     args["MESSAGE"] = message;
+    args["CHANNEL"] = chat_channel;
     LLNotificationPtr notification;
     if (!first_name.empty())
     {

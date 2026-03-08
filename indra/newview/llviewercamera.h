@@ -91,6 +91,11 @@ public:
     F32 getDefaultFOV() const { return mCameraFOVDefault; }
     void setDefaultFOV(F32 fov) ;
 
+    bool mSavedFOVLoaded;
+    F32 getAndSaveDefaultFOV() { mSavedFOVLoaded = false; return mSavedFOVDefault = mCameraFOVDefault; }
+    void setAndSaveDefaultFOV(F32 fov) { mSavedFOVDefault = fov; setDefaultFOV(mSavedFOVDefault); }
+    void loadDefaultFOV();
+
     bool isDefaultFOVChanged();
 
     bool cameraUnderWater() const;
@@ -117,6 +122,7 @@ protected:
     mutable LLMatrix4   mModelviewMatrix;
     F32                 mCameraFOVDefault;
     F32                 mPrevCameraFOVDefault;
+    F32                 mSavedFOVDefault;
     F32                 mCosHalfCameraFOV;
     LLVector3           mLastPointOfInterest;
     F32                 mPixelMeterRatio; // Divide by distance from camera to get pixels per meter at that distance.

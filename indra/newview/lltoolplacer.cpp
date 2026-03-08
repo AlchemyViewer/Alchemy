@@ -520,7 +520,7 @@ bool LLToolPlacer::placeObject(S32 x, S32 y, MASK mask)
 // [RLVa:KB] - Checked: 2010-03-23 (RLVa-1.2.0e) | Modified: RLVa-1.1.0l
     if ( (rlv_handler_t::isEnabled()) && ((gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || (gRlvHandler.hasBehaviour(RLV_BHVR_INTERACT))) )
     {
-        return true; // Callers seem to expect a "did you handle it?" so we return TRUE rather than FALSE
+        return true; // Callers seem to expect a "did you handle it?" so we return true rather than false
     }
 // [/RLVa:KB]
 

@@ -49,10 +49,19 @@
 // Linden library includes
 #include "llwindow.h"           // setMouseClipping()
 
+#include "llavatarnamecache.h"
+#include "llagent.h"
+#include "llnetmap.h"
+#include "llworld.h"
+#include "lltrans.h"
+#include "lltracker.h"
+#include "rlvhandler.h"
+
 LLToolGun::LLToolGun( LLToolComposite* composite )
 :   LLTool( std::string("gun"), composite ),
         mIsSelected(false)
 {
+    mCrosshairp = LLUI::getUIImage("crosshairs.tga");
 }
 
 void LLToolGun::handleSelect()
@@ -92,8 +101,8 @@ bool LLToolGun::handleHover(S32 x, S32 y, MASK mask)
     {
         const F32 NOMINAL_MOUSE_SENSITIVITY = 0.0025f;
 
-        F32 mouse_sensitivity = gSavedSettings.getF32("MouseSensitivity");
-        mouse_sensitivity = clamp_rescale(mouse_sensitivity, 0.f, 15.f, 0.5f, 2.75f) * NOMINAL_MOUSE_SENSITIVITY;
+        static LLCachedControl<F32> mouse_sensitivity_setting(gSavedSettings, "MouseSensitivity");
+        F32 mouse_sensitivity = clamp_rescale(mouse_sensitivity_setting, 0.f, 15.f, 0.5f, 2.75f) * NOMINAL_MOUSE_SENSITIVITY;
 
         // ...move the view with the mouse
 
@@ -104,29 +113,33 @@ bool LLToolGun::handleHover(S32 x, S32 y, MASK mask)
         if (dx != 0 || dy != 0)
         {
             // ...actually moved off center
-            if (gSavedSettings.getBOOL("InvertMouse"))
+            const F32 fov = LLViewerCamera::getInstance()->getView() / DEFAULT_FIELD_OF_VIEW;
+            static LLCachedControl<bool> invert_mouse(gSavedSettings, "InvertMouse");
+            if (invert_mouse)
             {
-                gAgent.pitch(mouse_sensitivity * -dy);
+                gAgent.pitch(mouse_sensitivity * fov * -dy);
             }
             else
             {
-                gAgent.pitch(mouse_sensitivity * dy);
+                gAgent.pitch(mouse_sensitivity * fov * dy);
             }
             LLVector3 skyward = gAgent.getReferenceUpVector();
-            gAgent.rotate(mouse_sensitivity * dx, skyward.mV[VX], skyward.mV[VY], skyward.mV[VZ]);
+            gAgent.rotate(mouse_sensitivity * fov * dx, skyward.mV[VX], skyward.mV[VY], skyward.mV[VZ]);
 
-            if (gSavedSettings.getBOOL("MouseSun"))
+            static LLCachedControl<bool> mouse_sun(gSavedSettings, "MouseSun");
+            if (mouse_sun)
             {
-                LLVector3 sunpos = LLViewerCamera::getInstance()->getAtAxis();
+                const LLVector3& sunpos = LLViewerCamera::getInstance()->getAtAxis();
                 gSky.setSunDirectionCFR(sunpos);
-                gSavedSettings.setVector3("SkySunDefaultPosition", LLViewerCamera::getInstance()->getAtAxis());
+                gSavedSettings.setVector3("SkySunDefaultPosition", sunpos);
             }
 
-            if (gSavedSettings.getBOOL("MouseMoon"))
+            static LLCachedControl<bool> mouse_moon(gSavedSettings, "MouseMoon");
+            if (mouse_moon)
             {
-                LLVector3 moonpos = LLViewerCamera::getInstance()->getAtAxis();
+                const LLVector3& moonpos = LLViewerCamera::getInstance()->getAtAxis();
                 gSky.setMoonDirectionCFR(moonpos);
-                gSavedSettings.setVector3("SkyMoonDefaultPosition", LLViewerCamera::getInstance()->getAtAxis());
+                gSavedSettings.setVector3("SkyMoonDefaultPosition", moonpos);
             }
 
             gViewerWindow->moveCursorToCenter();
@@ -148,11 +161,86 @@ bool LLToolGun::handleHover(S32 x, S32 y, MASK mask)
 
 void LLToolGun::draw()
 {
-    if( gSavedSettings.getBOOL("ShowCrosshairs") )
+    static const std::string unknown_agent = LLTrans::getString("UnknownAvatar");
+
+    static LLCachedControl<bool> show_crosshairs(gSavedSettings, "ShowCrosshairs");
+    static LLCachedControl<bool> show_iff(gSavedSettings, "AlchemyMouselookIFF", true);
+    static LLCachedControl<bool> show_iff_markers(gSavedSettings, "AlchemyMouselookIFFMarkers", false);
+    static LLCachedControl<F32> iff_range(gSavedSettings, "AlchemyMouselookIFFRange", 380.f);
+    static LLCachedControl<F32> userPresetX(gSavedSettings, "AlchemyMouselookTextOffsetX", 0.f);
+    static LLCachedControl<F32> userPresetY(gSavedSettings, "AlchemyMouselookTextOffsetY", -25.f);
+    static LLCachedControl<U32> userPresetHAlign(gSavedSettings, "AlchemyMouselookTextHAlign", 2);
+
+    const S32 windowWidth = gViewerWindow->getWorldViewRectScaled().getWidth();
+    const S32 windowHeight = gViewerWindow->getWorldViewRectScaled().getHeight();
+
+    LLColor4 crosshair_color = LLColor4::white;
+    crosshair_color.mV[VALPHA] = 0.75f;
+
+    if (show_iff)
     {
-        LLUIImagePtr crosshair = LLUI::getUIImage("crosshairs.tga");
-        crosshair->draw(
-            ( gViewerWindow->getWorldViewRectScaled().getWidth() - crosshair->getWidth() ) / 2,
-            ( gViewerWindow->getWorldViewRectScaled().getHeight() - crosshair->getHeight() ) / 2);
+        bool target_rendered = false;
+
+        LLVector3d myPosition = gAgentCamera.getCameraPositionGlobal();
+        LLQuaternion myRotation = LLViewerCamera::getInstance()->getQuaternion();
+        myRotation.set(-myRotation.mQ[VX], -myRotation.mQ[VY], -myRotation.mQ[VZ], myRotation.mQ[VW]);
+
+        LLWorld::pos_map_t positions;
+        LLWorld::getInstance()->getAvatars(&positions, gAgent.getPositionGlobal(), iff_range);
+        for (const auto& position : positions)
+        {
+            const auto& id = position.first;
+            const auto& targetPosition = position.second;
+            if (id == gAgentID || targetPosition.isNull())
+            {
+                continue;
+            }
+
+            LLColor4 marker_color = LLColor4::white;
+            //if(show_iff_markers || !target_rendered)
+            //    marker_color = ALAvatarGroups::instance().getAvatarColor(id, LLColor4::white, ALAvatarGroups::COLOR_MINIMAP);
+            marker_color.mV[VALPHA] = 0.75f;
+
+            if (show_iff_markers)
+            {
+                LLTracker::instance()->drawMarker(targetPosition, marker_color, true);
+            }
+
+            if (!target_rendered && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES))
+            {
+                LLVector3d magicVector = (targetPosition - myPosition) * myRotation;
+                magicVector.setVec(-magicVector.mdV[VY], magicVector.mdV[VZ], magicVector.mdV[VX]);
+
+                if (magicVector.mdV[VX] > -0.75 && magicVector.mdV[VX] < 0.75 && magicVector.mdV[VZ] > 0.0 && magicVector.mdV[VY] > -1.5 && magicVector.mdV[VY] < 1.5) // Do not change with these, cheater. :(
+                {
+                    crosshair_color = marker_color;
+
+                    LLAvatarName avatarName;
+                    std::string targetName = unknown_agent;
+                    if (LLAvatarNameCache::get(id, &avatarName))
+                    {
+                        targetName = avatarName.getCompleteName();
+                    }
+
+                    LLFontGL::getFontSansSerifBold()->renderUTF8(
+                        llformat("%s : %.2fm", targetName.c_str(), (targetPosition - myPosition).magVec()),
+                        0, (windowWidth / 2.f) + userPresetX, (windowHeight / 2.f) + userPresetY, crosshair_color,
+                        (LLFontGL::HAlign)((S32)userPresetHAlign), LLFontGL::TOP, LLFontGL::BOLD, LLFontGL::DROP_SHADOW
+                    );
+
+                    if (!show_iff_markers)
+                    {
+                        break;
+                    }
+                    target_rendered = true;
+                }
+            }
+        }
+    }
+    if (show_crosshairs)
+    {
+        mCrosshairp->draw(
+            (windowWidth - mCrosshairp->getWidth()) / 2,
+            (windowHeight - mCrosshairp->getHeight()) / 2, crosshair_color);
     }
 }

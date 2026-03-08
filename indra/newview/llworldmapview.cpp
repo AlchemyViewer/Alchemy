@@ -98,6 +98,7 @@ LLUIImagePtr LLWorldMapView::sEventAdultImage = NULL;
 
 LLUIImagePtr LLWorldMapView::sTrackCircleImage = NULL;
 LLUIImagePtr LLWorldMapView::sTrackArrowImage = NULL;
+LLUIImagePtr LLWorldMapView::sIFFArrowImage = NULL;
 
 LLUIImagePtr LLWorldMapView::sClassifiedsImage = NULL;
 LLUIImagePtr LLWorldMapView::sForSaleImage = NULL;
@@ -141,6 +142,7 @@ void LLWorldMapView::initClass()
 
     sTrackCircleImage =     LLUI::getUIImage("map_track_16.tga");
     sTrackArrowImage =      LLUI::getUIImage("direction_arrow.tga");
+    sIFFArrowImage =        LLUI::getUIImage("target_arrow.tga");
     sClassifiedsImage =     LLUI::getUIImage("icon_top_pick.tga");
     sForSaleImage =         LLUI::getUIImage("icon_for_sale.tga");
     // To Do: update the image resource for adult lands on sale.

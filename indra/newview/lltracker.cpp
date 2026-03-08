@@ -169,7 +169,8 @@ void LLTracker::drawHUDArrow()
 // static
 void LLTracker::render3D()
 {
-    if (!gFloaterWorldMap || !gSavedSettings.getBOOL("RenderTrackerBeacon"))
+    static const LLCachedControl<bool> render_tracker_beacon(gSavedSettings, "RenderTrackerBeacon");
+    if (!instance()->isTracking(nullptr) || !gFloaterWorldMap || !render_tracker_beacon)
     {
         return;
     }
@@ -727,7 +728,7 @@ void LLTracker::clearFocus()
     instance()->mTrackingStatus = TRACKING_NOTHING;
 }
 
-void LLTracker::drawMarker(const LLVector3d& pos_global, const LLColor4& color)
+void LLTracker::drawMarker(const LLVector3d& pos_global, const LLColor4& color, bool is_iff /*= false*/)
 {
     // get position
     LLVector3 pos_local = gAgent.getPosAgentFromGlobal(pos_global);
@@ -738,8 +739,9 @@ void LLTracker::drawMarker(const LLVector3d& pos_global, const LLColor4& color)
     S32 y = 0;
     const bool CLAMP = true;
 
-    if (LLViewerCamera::getInstance()->projectPosAgentToScreen(pos_local, screen, CLAMP)
-        || LLViewerCamera::getInstance()->projectPosAgentToScreenEdge(pos_local, screen) )
+    bool on_screen = LLViewerCamera::getInstance()->projectPosAgentToScreen(pos_local, screen, CLAMP);
+    if (on_screen && is_iff) return;
+    if (on_screen || LLViewerCamera::getInstance()->projectPosAgentToScreenEdge(pos_local, screen) )
     {
         gHUDView->screenPointToLocal(screen.mX, screen.mY, &x, &y);
 
@@ -757,6 +759,7 @@ void LLTracker::drawMarker(const LLVector3d& pos_global, const LLColor4& color)
         S32 y_center = lltrunc(0.5f * (F32)rect.getHeight());
         x = x - x_center;   // x and y relative to center
         y = y - y_center;
+        if (is_iff) y += 100;
         F32 dist = sqrt((F32)(x*x + y*y));
         S32 half_arrow_size = lltrunc(0.5f * HUD_ARROW_SIZE);
         if (dist > 0.f)
@@ -806,7 +809,9 @@ void LLTracker::drawMarker(const LLVector3d& pos_global, const LLColor4& color)
                                      mHUDArrowCenterY - half_arrow_size,
                                      HUD_ARROW_SIZE, HUD_ARROW_SIZE,
                                      RAD_TO_DEG * angle,
-                                     LLWorldMapView::sTrackArrowImage->getImage(),
+                                     is_iff ?
+                                        LLWorldMapView::sIFFArrowImage->getImage() :
+                                        LLWorldMapView::sTrackArrowImage->getImage(),
                                      color);
     }
 }

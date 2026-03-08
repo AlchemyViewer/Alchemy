@@ -3885,3 +3885,19 @@ void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj)
     }
 }
 
+
+U32 LLViewerRegion::getChatRange() const
+{
+     return mSayRange;
+}
+
+U32 LLViewerRegion::getShoutRange() const
+{
+    return mShoutRange;
+}
+
+U32 LLViewerRegion::getWhisperRange() const
+{
+    return mWhisperRange;
+}
+
