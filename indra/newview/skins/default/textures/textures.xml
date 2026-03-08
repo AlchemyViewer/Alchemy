@@ -69,6 +69,9 @@ with the same filename but different name
   <texture name="Audio_Off" file_name="icons/Audio_Off.png" preload="false" />
   <texture name="Audio_Press" file_name="icons/Audio_Press.png" preload="false" />
 
+  <texture name="Move" file_name="icons/move.png" preload="false" />
+  <texture name="Move_Off" file_name="icons/move_off.png" preload="false" />
+
   <texture name="BackArrow_Off" file_name="icons/BackArrow_Off.png" preload="false" />
 
   <texture name="BackButton_Off" file_name="icons/back_arrow_off.png" preload="false" scale.left="22" scale.top="12" scale.right="25" scale.bottom="12" />
@@ -139,6 +142,7 @@ with the same filename but different name
   <texture name="Command_Build_Icon"        file_name="toolbar_icons/build.png"        preload="true" />
   <texture name="Command_Chat_Icon"         file_name="toolbar_icons/chat.png"         preload="true" />
   <texture name="Command_Compass_Icon"      file_name="toolbar_icons/land.png"         preload="true" />
+  <texture name="Command_Debug_Icon"        file_name="toolbar_icons/debug.png"        preload="true" />
   <texture name="Command_Destinations_Icon" file_name="toolbar_icons/destinations.png" preload="true" />
   <texture name="Command_Gestures_Icon"     file_name="toolbar_icons/gestures.png"     preload="true" />
   <texture name="Command_Grid_Status_Icon"  file_name="toolbar_icons/grid_status.png"  preload="true" />
@@ -151,18 +155,25 @@ with the same filename but different name
   <texture name="Command_MiniMap_Icon"      file_name="toolbar_icons/mini_map.png"     preload="true" />
   <texture name="Command_Move_Icon"         file_name="toolbar_icons/move.png"         preload="true" />
   <texture name="Command_Environments_Icon" file_name="toolbar_icons/environments.png" preload="true" />
+  <texture name="Command_Panic_Icon"        file_name="toolbar_icons/panic.png"        preload="false" />
   <texture name="Command_People_Icon"       file_name="toolbar_icons/people.png"       preload="true" />
   <texture name="Command_Performance_Icon"  file_name="toolbar_icons/performance.png"  preload="true" />
+  <texture name="Command_PersonalLighting_Icon"  file_name="toolbar_icons/personal_lighting.png"  preload="true" />
   <texture name="Command_Picks_Icon"        file_name="toolbar_icons/picks.png"        preload="true" />
   <texture name="Command_Places_Icon"       file_name="toolbar_icons/places.png"       preload="true" />
   <texture name="Command_Preferences_Icon"  file_name="toolbar_icons/preferences.png"  preload="true" />
   <texture name="Command_Profile_Icon"      file_name="toolbar_icons/profile.png"      preload="true" />
+  <texture name="Command_RegionTracker_Icon" file_name="toolbar_icons/regiontracker.png"       preload="true" />
   <texture name="Command_Report_Abuse_Icon" file_name="toolbar_icons/report_abuse.png" preload="true" />
+  <texture name="Command_Scripts_Icon"      file_name="toolbar_icons/script.png"       preload="true" />
+  <texture name="Command_Stats_Icon"        file_name="toolbar_icons/stats.png"        preload="true" />
   <texture name="Command_Search_Icon"       file_name="toolbar_icons/search.png"       preload="true" />
   <texture name="Command_Snapshot_Icon"     file_name="toolbar_icons/snapshot.png"     preload="true" />
+  <texture name="Command_Snapshot_Disk_Icon" file_name="toolbar_icons/snapshot_disk.png"     preload="true" />
   <texture name="Command_Speak_Icon"        file_name="toolbar_icons/speak.png"        preload="true" />
   <texture name="Command_View_Icon"         file_name="toolbar_icons/view.png"         preload="true" />
   <texture name="Command_Voice_Icon"        file_name="toolbar_icons/nearbyvoice.png"  preload="true" />
+  <texture name="Command_Webbrowser_Icon"   file_name="toolbar_icons/web.png"          preload="true" />
   <texture name="Caret_Top_Icon"            file_name="toolbar_icons/caret_top.png"    preload="true" scale.left="1" scale.top="28" scale.right="15" scale.bottom="5" />
   <texture name="Caret_Bottom_Icon"         file_name="toolbar_icons/caret_bottom.png" preload="true" scale.left="1" scale.top="23" scale.right="15" scale.bottom="1" />
   <texture name="Caret_Right_Icon"          file_name="toolbar_icons/caret_right.png"  preload="true" scale.left="5" scale.top="15" scale.right="28" scale.bottom="1" />
@@ -230,7 +241,7 @@ with the same filename but different name
   <texture name="Flyout_Pointer" file_name="windows/Flyout_Pointer.png" preload="false" />
   <texture name="Flyout_Right" file_name="windows/Flyout_Right.png" preload="false" />
 
-  <texture name="Folder_Arrow" file_name="folder_arrow.tga" preload="false" />
+  <texture name="Folder_Arrow" file_name="folder_arrow.tga" preload="true" />
   <texture name="ForSale_Badge" file_name="icons/ForSale_Badge.png" preload="false" />
   <texture name="ForwardArrow_Off" file_name="icons/ForwardArrow_Off.png" preload="false" />
   <texture name="ForwardArrow_Press" file_name="icons/ForwardArrow_Press.png" preload="false" />
@@ -266,6 +277,7 @@ with the same filename but different name
 
   <texture name="Icon_Dock_Foreground" file_name="windows/Icon_Dock_Foreground.png" preload="true" />
   <texture name="Icon_Dock_Press" file_name="windows/Icon_Dock_Press.png" preload="true" />
+  <texture name="Icon_Undock_Foreground" file_name="windows/Icon_Undock_Foreground.png" preload="true" />
 
   <texture name="Icon_File_Upload" file_name="icons/file_upload.png" preload="true" />
   
@@ -528,9 +540,12 @@ with the same filename but different name
   <texture name="Person_Star" file_name="icons/Person_Star.png" preload="false" />
 
   <texture name="Permission_Visible_Online" file_name="icons/see_me_online.png" preload="false" />
+  <texture name="Permission_Visible_Them_Online" file_name="icons/see_them_online.png" preload="false" />
   <texture name="Permission_Visible_Map" file_name="icons/see_on_map.png" preload="false" />
+  <texture name="Permission_Visible_Them_Map" file_name="icons/see_them_on_map.png" preload="false" />
   <texture name="Permission_Edit_Objects_Mine" file_name="icons/edit_mine.png" preload="false" />
   <texture name="Permission_Edit_Objects_Theirs" file_name="icons/edit_theirs.png" preload="false" />
+  <texture name="Permission_Ungranted" file_name="icons/Permission_Ungranted.png" preload="false" />
 
   <texture name="Play_Off" file_name="icons/Play_Off.png" preload="false" />
   <texture name="Play_Over" file_name="icons/Play_Over.png" preload="false" />
@@ -649,6 +664,7 @@ with the same filename but different name
   <texture name="SliderThumb_Disabled" file_name="widgets/SliderThumb_Disabled.png" />
   <texture name="SliderThumb_Press" file_name="widgets/SliderThumb_Press.png" />
 
+  <texture name="AL_Logo" file_name="icons/AL_Logo.png" preload="true" />
   <texture name="SL_Logo" file_name="icons/SL_Logo.png" preload="true" />
   <texture name="OBJECT_Icon" file_name="icons/object_icon.png" preload="true" />
   <texture name="Unknown_Icon" file_name="icons/unknown_icon.png" preload="true" />
