@@ -486,7 +486,7 @@ bool LLToolPie::handleLeftClickPick()
         }
         object = (LLViewerObject*)object->getParent();
     }
-    if (object && object == gAgentAvatarp)
+    if (object && object == gAgentAvatarp && !gSavedSettings.getBOOL("AlchemyDisableMouseSteering"))
     {
         // we left clicked on avatar, switch to focus mode
         mMouseButtonDown = false;
@@ -495,7 +495,10 @@ bool LLToolPie::handleLeftClickPick()
         LLToolCamera::getInstance()->setMouseCapture(true);
         LLToolCamera::getInstance()->setClickPickPending();
         LLToolCamera::getInstance()->pickCallback(mPick);
-        gAgentCamera.setFocusOnAvatar(true, true);
+        if (!gSavedSettings.getBOOL("ClickingAvatarKeepsCamera"))
+        {
+            gAgentCamera.setFocusOnAvatar(true, true);
+        }
 
         return true;
     }
