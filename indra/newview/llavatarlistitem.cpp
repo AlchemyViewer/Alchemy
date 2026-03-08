@@ -48,6 +48,8 @@
 #include "rlvcommon.h"
 // [/RLVa:KB]
 
+#include <fmt/format.h>
+
 bool LLAvatarListItem::sStaticInitialized = false;
 S32 LLAvatarListItem::sLeftPadding = 0;
 S32 LLAvatarListItem::sNameRightPadding = 0;
@@ -369,7 +371,7 @@ void LLAvatarListItem::setTextFieldDistance(F32 distance)
     if (distance == 0)
         mTextField->setValue(LLStringUtil::null);
     else
-        mTextField->setValue(llformat("%0.1fm", distance));
+        mTextField->setValue(fmt::format("{:0.0f}m", distance));
 }
 
 void LLAvatarListItem::setTextFieldSeconds(U32 secs_since)
@@ -625,7 +627,7 @@ std::string LLAvatarListItem::formatSeconds(U32 secs)
     }
 
     LLStringUtil::format_map_t args;
-    args["[COUNT]"] = llformat("%u", count);
+    args["[COUNT]"] = fmt::to_string(count);
     return getString(fmt, args);
 }
 
