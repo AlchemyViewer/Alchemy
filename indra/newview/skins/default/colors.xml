@@ -142,6 +142,9 @@
      name="AccordionHeaderTextColor"
      reference="LtGray" />
     <color
+     name="AccordionHeaderBgColor"
+     reference="DkGray2" />
+    <color
      name="AgentChatColor"
      reference="White" />
     <color
