@@ -178,9 +178,24 @@
      layout="topleft"
      left_pad="155"
      name="restart_btn"
-     tool_tip="Give 2 minute countdown and restart region"
+     tool_tip="Give a countdown and restart region"
      top_delta="0"
-     width="150" />
+     width="100" />
+    <spinner
+     decimal_digits="0"
+     enabled="true"
+     follows="left|top"
+     height="20"
+     increment="1"
+     initial_value="120"
+     layout="topleft"
+     left_pad="0"
+     max_val="1024"
+     min_val="0"
+     name="restart_timer"
+     tool_tip="Seconds before restart"
+     top_delta="0"
+     width="50" />
     <button
      follows="left|top"
      height="20"

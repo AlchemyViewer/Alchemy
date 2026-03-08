@@ -28,10 +28,11 @@
 #ifndef LLPANELLANDAUDIO_H
 #define LLPANELLANDAUDIO_H
 
-#include "lllineeditor.h"
 #include "llpanel.h"
 #include "llparcelselection.h"
 #include "lluifwd.h"    // widget pointer types
+
+class LLComboBox;
 
 class LLPanelLandAudio
     :   public LLPanel
@@ -44,13 +45,14 @@ public:
 
 private:
     static void onCommitAny(LLUICtrl* ctrl, void *userdata);
+    void onCommitMusicUrl();
 
 private:
     LLCheckBoxCtrl* mCheckSoundLocal;
     LLCheckBoxCtrl* mCheckParcelEnableVoice;
     LLCheckBoxCtrl* mCheckEstateDisabledVoice;
     LLCheckBoxCtrl* mCheckParcelVoiceLocal;
-    LLLineEditor*   mMusicURLEdit;
+    LLComboBox* mMusicURLEdit;
     LLCheckBoxCtrl* mCheckAVSoundAny;
     LLCheckBoxCtrl* mCheckAVSoundGroup;
     LLCheckBoxCtrl* mCheckObscureMOAP;
