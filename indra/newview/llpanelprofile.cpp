@@ -1730,7 +1730,7 @@ void LLPanelProfileSecondLife::onShowTexturePicker()
                 this,
                 mSecondLifePic->getImageAssetId(),
                 LLUUID::null,
-                LLUUID::null,
+                mSecondLifePic->getImageAssetId(),
                 mSecondLifePic->getImageAssetId(),
                 false,
                 false,
@@ -1977,6 +1977,7 @@ bool LLPanelProfileFirstLife::postBuild()
     mSaveChanges->setCommitCallback([this](LLUICtrl*, void*) { onSaveDescriptionChanges(); }, nullptr);
     mDiscardChanges->setCommitCallback([this](LLUICtrl*, void*) { onDiscardDescriptionChanges(); }, nullptr);
     mDescriptionEdit->setKeystrokeCallback([this](LLTextEditor* caller) { onSetDescriptionDirty(); });
+    mPicture->setMouseUpCallback([this](LLUICtrl*, S32 x, S32 y, MASK mask) { onShowAgentFirstlifeTexture(); });
 
     return true;
 }
@@ -2053,7 +2054,7 @@ void LLPanelProfileFirstLife::onChangePhoto()
                 this,
                 mPicture->getImageAssetId(),
                 LLUUID::null,
-                LLUUID::null,
+                mPicture->getImageAssetId(),
                 mPicture->getImageAssetId(),
                 false,
                 false,
@@ -2188,6 +2189,51 @@ void LLPanelProfileFirstLife::setLoaded()
         mDescriptionEdit->setEnabled(true);
         mPicture->setEnabled(true);
         mRemovePhoto->setEnabled(mPicture->getImageAssetId().notNull());
+    }
+}
+
+void LLPanelProfileFirstLife::onShowAgentFirstlifeTexture()
+{
+    if (!getIsLoaded())
+    {
+        return;
+    }
+
+    LLFloater* floater = mFloaterProfileTextureHandle.get();
+    if (!floater)
+    {
+        LLFloater* parent_floater = gFloaterView->getParentFloater(this);
+        if (parent_floater)
+        {
+            LLFloaterProfileTexture* texture_view = new LLFloaterProfileTexture(parent_floater);
+            mFloaterProfileTextureHandle = texture_view->getHandle();
+            if (mPicture->getImageAssetId().notNull())
+            {
+                texture_view->loadAsset(mPicture->getImageAssetId());
+            }
+            else
+            {
+                texture_view->resetAsset();
+            }
+            texture_view->openFloater();
+            texture_view->setVisibleAndFrontmost(true);
+
+            parent_floater->addDependentFloater(mFloaterProfileTextureHandle);
+        }
+    }
+    else // already open
+    {
+        LLFloaterProfileTexture* texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        texture_view->setMinimized(false);
+        texture_view->setVisibleAndFrontmost(true);
+        if (mPicture->getImageAssetId().notNull())
+        {
+            texture_view->loadAsset(mPicture->getImageAssetId());
+        }
+        else
+        {
+            texture_view->resetAsset();
+        }
     }
 }
 

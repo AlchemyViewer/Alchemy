@@ -292,6 +292,7 @@ protected:
     void onSetDescriptionDirty();
     void onSaveDescriptionChanges();
     void onDiscardDescriptionChanges();
+    void onShowAgentFirstlifeTexture();
 
     LLTextEditor*   mDescriptionEdit;
     LLProfileImageCtrl* mPicture;
@@ -301,6 +302,7 @@ protected:
     LLButton* mSaveChanges;
     LLButton* mDiscardChanges;
 
+    LLHandle<LLFloater> mFloaterProfileTextureHandle;
     LLHandle<LLFloater> mFloaterTexturePickerHandle;
 
     std::string     mCurrentDescription;
