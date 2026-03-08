@@ -467,6 +467,17 @@
      layout="topleft" 
      name="Paste Separator" />
     <menu_item_call
+     label="Restore to Last Position"
+     layout="topleft"
+     name="Restore to Last Position">
+    <menu_item_call.on_click
+     function="Inventory.DoToSelected"
+     parameter="restoreToWorld" />
+    <menu_item_call.on_enable
+     function="SavedSetting"
+     parameter="AlchemyPowerfulWizard" />
+	</menu_item_call>
+    <menu_item_call
      label="Delete"
      layout="topleft"
      name="Delete">
@@ -634,17 +645,6 @@
     <menu_item_separator
      layout="topleft" 
      name="Wearable And Object Separator"/>
-	<!-- COMMENTED OUT for DEV-32347 -->
-	<!--
-    <menu_item_call
-     label="Restore to Last Position"
-     layout="topleft"
-     name="Restore to Last Position">
-        <menu_item_call.on_click
-         function="Inventory.DoToSelected"
-         parameter="restoreToWorld" />
-    </menu_item_call>
-	-->
     <menu_item_call
      label="Wear"
      layout="topleft"
@@ -652,6 +652,14 @@
         <menu_item_call.on_click
          function="Inventory.DoToSelected"
          parameter="wear" />
+    </menu_item_call>
+    <menu_item_call
+     label="Add"
+     layout="topleft"
+     name="Wearable Add">
+        <menu_item_call.on_click
+         function="Inventory.DoToSelected"
+         parameter="wear_add" />
     </menu_item_call>
     <menu
      label="Attach To"
@@ -676,14 +684,6 @@
         <menu_item_call.on_click
          function="Inventory.DoToSelected"
          parameter="edit" />
-    </menu_item_call>
-    <menu_item_call
-     label="Add"
-     layout="topleft"
-     name="Wearable Add">
-        <menu_item_call.on_click
-         function="Inventory.DoToSelected"
-         parameter="wear_add" />
     </menu_item_call>
     <menu_item_call
      label="Detach From Yourself"
