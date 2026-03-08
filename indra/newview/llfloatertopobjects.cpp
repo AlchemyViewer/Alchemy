@@ -53,6 +53,11 @@
 #include "llviewerwindow.h"
 #include "llfloaterregioninfo.h"
 
+#include "alavataractions.h"
+#include "llavataractions.h"
+
+const std::string OBJECT_NOT_AVATAR_NAME = "(?\?\?) (?\?\?)";
+
 //LLFloaterTopObjects* LLFloaterTopObjects::sInstance = NULL;
 
 // Globals
@@ -73,6 +78,7 @@ void LLFloaterTopObjects::show()
 */
 LLFloaterTopObjects::LLFloaterTopObjects(const LLSD& key)
 :   LLFloater(key),
+    mObjectsScrollList(nullptr),
     mInitialized(false),
     mtotalScore(0.f)
 {
@@ -86,6 +92,9 @@ LLFloaterTopObjects::LLFloaterTopObjects(const LLSD& key)
     mCommitCallbackRegistrar.add("TopObjects.CommitObjectsList",boost::bind(&LLFloaterTopObjects::onCommitObjectsList, this));
 
     mCommitCallbackRegistrar.add("TopObjects.TeleportToSelected",        boost::bind(&LLFloaterTopObjects::teleportToSelectedObject, this));
+    mCommitCallbackRegistrar.add("TopObjects.Profile",          boost::bind(&LLFloaterTopObjects::onProfile, this));
+    mCommitCallbackRegistrar.add("TopObjects.Kick",             boost::bind(&LLFloaterTopObjects::onEstateKick, this));
+    mCommitCallbackRegistrar.add("TopObjects.Ban",              boost::bind(&LLFloaterTopObjects::onEstateBan, this));
 }
 
 LLFloaterTopObjects::~LLFloaterTopObjects()
@@ -152,8 +161,6 @@ void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
     msg->getU32Fast(_PREHASH_RequestData, _PREHASH_RequestFlags, request_flags);
     msg->getU32Fast(_PREHASH_RequestData, _PREHASH_TotalObjectCount, total_count);
     msg->getU32Fast(_PREHASH_RequestData, _PREHASH_ReportType, mCurrentMode);
-
-    LLScrollListCtrl *list = getChild<LLScrollListCtrl>("objects_list");
 
     S32 block_count = msg->getNumberOfBlocksFast(_PREHASH_ReportData);
     for (S32 block = 0; block < block_count; ++block)
@@ -248,7 +255,7 @@ void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
             columns[column_num++]["font"] = "SANSSERIF";
         }
         element["columns"] = columns;
-        list->addElement(element);
+        mObjectsScrollList->addElement(element);
 
         mObjectListData.append(element);
         mObjectListIDs.push_back(task_id);
@@ -256,19 +263,19 @@ void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
         mtotalScore += score;
     }
 
-    if (total_count == 0 && list->getItemCount() == 0)
+    if (total_count == 0 && mObjectsScrollList->getItemCount() == 0)
     {
-        list->setCommentText(getString("none_descriptor"));
+        mObjectsScrollList->setCommentText(getString("none_descriptor"));
     }
     else
     {
-        list->selectFirstItem();
+        mObjectsScrollList->selectFirstItem();
     }
 
     if (mCurrentMode == STAT_REPORT_TOP_SCRIPTS)
     {
         setTitle(getString("top_scripts_title"));
-        list->setColumnLabel("score", getString("scripts_score_label"));
+        mObjectsScrollList->setColumnLabel("score", getString("scripts_score_label"));
 
         LLUIString format = getString("top_scripts_text");
         total_memory /= 1024;
@@ -276,15 +283,15 @@ void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
         format.setArg("[COUNT]", llformat("%d", total_count));
         format.setArg("[TIME]", llformat("%0.3f", mtotalScore));
         getChild<LLUICtrl>("title_text")->setValue(LLSD(format));
-        list->setColumnLabel("URLs", getString("URLs"));
-        list->setColumnLabel("memory", getString("memory"));
+        mObjectsScrollList->setColumnLabel("URLs", getString("URLs"));
+        mObjectsScrollList->setColumnLabel("memory", getString("memory"));
     }
     else
     {
         setTitle(getString("top_colliders_title"));
-        list->setColumnLabel("score", getString("colliders_score_label"));
-        list->setColumnLabel("URLs", "");
-        list->setColumnLabel("memory", "");
+        mObjectsScrollList->setColumnLabel("score", getString("colliders_score_label"));
+        mObjectsScrollList->setColumnLabel("URLs", "");
+        mObjectsScrollList->setColumnLabel("memory", "");
         LLUIString format = getString("top_colliders_text");
         format.setArg("[COUNT]", llformat("%d", total_count));
         getChild<LLUICtrl>("title_text")->setValue(LLSD(format));
@@ -305,17 +312,29 @@ void LLFloaterTopObjects::onCommitObjectsList()
 
 void LLFloaterTopObjects::updateSelectionInfo()
 {
-    LLScrollListCtrl* list = getChild<LLScrollListCtrl>("objects_list");
-
-    if (!list) return;
-
-    LLUUID object_id = list->getCurrentID();
+    LLUUID object_id = mObjectsScrollList->getCurrentID();
     if (object_id.isNull()) return;
+
+    LLAvatarName av_name;
+    if (LLAvatarNameCache::get(object_id, &av_name))
+    {
+        bool isAvatar = (av_name.getDisplayName() != OBJECT_NOT_AVATAR_NAME);
+        getChild<LLButton>("profile_btn")->setEnabled(isAvatar);
+        getChild<LLButton>("estate_kick_btn")->setEnabled(isAvatar && object_id != gAgentID);
+        getChild<LLButton>("estate_ban_btn")->setEnabled(isAvatar && object_id != gAgentID);
+    }
+    else
+    {
+        getChild<LLButton>("profile_btn")->setEnabled(false);
+        getChild<LLButton>("estate_kick_btn")->setEnabled(false);
+        getChild<LLButton>("estate_ban_btn")->setEnabled(false);
+        LLAvatarNameCache::get(object_id, boost::bind(&LLFloaterTopObjects::callbackAvatarName, this, _1, _2));
+    }
 
     std::string object_id_string = object_id.asString();
 
     getChild<LLUICtrl>("id_editor")->setValue(LLSD(object_id_string));
-    LLScrollListItem* sli = list->getFirstSelected();
+    LLScrollListItem* sli = mObjectsScrollList->getFirstSelected();
     llassert(sli);
     if (sli)
     {
@@ -345,8 +364,7 @@ void LLFloaterTopObjects::returnObjects(bool all)
     LLViewerRegion* region = gAgent.getRegion();
     if (!region) return;
 
-    LLCtrlListInterface *list = getChild<LLUICtrl>("objects_list")->getListInterface();
-    if (!list || list->getItemCount() == 0) return;
+    if (!mObjectsScrollList || mObjectsScrollList->getItemCount() == 0) return;
 
     uuid_vec_t::iterator id_itor;
 
@@ -355,7 +373,7 @@ void LLFloaterTopObjects::returnObjects(bool all)
     for (id_itor = mObjectListIDs.begin(); id_itor != mObjectListIDs.end(); ++id_itor)
     {
         LLUUID task_id = *id_itor;
-        if (!all && !list->isSelected(task_id))
+        if (!all && !mObjectsScrollList->isSelected(task_id))
         {
             // Selected only
             continue;
@@ -415,11 +433,9 @@ void LLFloaterTopObjects::onReturnSelected()
 
 void LLFloaterTopObjects::clearList()
 {
-    LLCtrlListInterface *list = childGetListInterface("objects_list");
-
-    if (list)
+    if (mObjectsScrollList)
     {
-        list->operateOnAll(LLCtrlListInterface::OP_DELETE);
+        mObjectsScrollList->operateOnAll(LLCtrlListInterface::OP_DELETE);
     }
 
     mObjectListData.clear();
@@ -495,10 +511,9 @@ void LLFloaterTopObjects::onGetByParcelName()
 
 void LLFloaterTopObjects::showBeacon()
 {
-    LLScrollListCtrl* list = getChild<LLScrollListCtrl>("objects_list");
-    if (!list) return;
+    if (!mObjectsScrollList) return;
 
-    LLScrollListItem* first_selected = list->getFirstSelected();
+    LLScrollListItem* first_selected = mObjectsScrollList->getFirstSelected();
     if (!first_selected) return;
 
     std::string name = first_selected->getColumn(1)->getValue().asString();
@@ -510,8 +525,7 @@ void LLFloaterTopObjects::showBeacon()
 
     LLVector3 pos_agent(x, y, z);
     LLVector3d pos_global = gAgent.getPosGlobalFromAgent(pos_agent);
-    std::string tooltip("");
-    LLTracker::trackLocation(pos_global, name, tooltip, LLTracker::LOCATION_ITEM);
+    LLTracker::trackLocation(pos_global, name, std::string(), LLTracker::LOCATION_ITEM);
 }
 
 void LLFloaterTopObjects::teleportToSelectedObject()
@@ -547,4 +561,53 @@ void LLFloaterTopObjects::teleportToSelectedObject()
 void LLFloaterTopObjects::onSelectionChanged()
 {
     getChildView("teleport_btn")->setEnabled(mObjectsScrollList->getNumSelected() == 1);
+}
+
+void LLFloaterTopObjects::onProfile()
+{
+    if (!mObjectsScrollList) return;
+
+    LLScrollListItem* first_selected = mObjectsScrollList->getFirstSelected();
+    if (!first_selected) return;
+
+    auto avatar_id = first_selected->getUUID();
+    LLAvatarActions::showProfile(avatar_id);
+}
+
+void LLFloaterTopObjects::onEstateKick()
+{
+    if (!mObjectsScrollList) return;
+
+    LLScrollListItem* first_selected = mObjectsScrollList->getFirstSelected();
+    if (!first_selected) return;
+
+    const LLUUID& objectId = first_selected->getUUID();
+    ALAvatarActions::estateKick(objectId);
+}
+
+void LLFloaterTopObjects::onEstateBan()
+{
+    if (!mObjectsScrollList) return;
+
+    LLScrollListItem* first_selected = mObjectsScrollList->getFirstSelected();
+    if (!first_selected) return;
+
+    const LLUUID& objectId = first_selected->getUUID();
+    ALAvatarActions::estateBan(objectId);
+}
+
+void LLFloaterTopObjects::callbackAvatarName(const LLUUID& avatar_id, LLAvatarName av_name)
+{
+    if (!mObjectsScrollList) return;
+
+    LLScrollListItem* first_selected = mObjectsScrollList->getFirstSelected();
+    if (!first_selected) return;
+
+    if (first_selected->getUUID() == avatar_id)
+    {
+        bool isAvatar = (av_name.getDisplayName() != OBJECT_NOT_AVATAR_NAME);
+        getChild<LLButton>("profile_btn")->setEnabled(isAvatar);
+        getChild<LLButton>("estate_kick_btn")->setEnabled(isAvatar && avatar_id != gAgentID);
+        getChild<LLButton>("estate_ban_btn")->setEnabled(isAvatar && avatar_id != gAgentID);
+    }
 }

@@ -28,6 +28,7 @@
 #define LL_LLFLOATERTOPOBJECTS_H
 
 #include "llfloater.h"
+#include "llavatarname.h"
 
 class LLUICtrl;
 class LLScrollListCtrl;
@@ -48,7 +49,7 @@ enum LAND_STAT_REPORT_TYPE
     STAT_REPORT_TOP_COLLIDERS
 };
 
-class LLFloaterTopObjects : public LLFloater
+class LLFloaterTopObjects final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
@@ -84,6 +85,13 @@ private:
 
     void onReturnAll();
     void onReturnSelected();
+
+    void onTeleportTo();
+    void onProfile();
+    void onEstateKick();
+    void onEstateBan();
+
+    void callbackAvatarName(const LLUUID& avatar_id, const LLAvatarName av_name);
 
     static bool callbackReturnAll(const LLSD& notification, const LLSD& response);
 
