@@ -47,6 +47,11 @@
 #include "llfloatercamera.h"
 #include "llinitparam.h"
 #include "llselectmgr.h"
+// [RLVa:KB] - Checked: 2021-07-29 (RLVa-1.4.4a)
+#include "rlvactions.h"
+#include "rlvhandler.h"
+#include "rlvhelper.h"
+// [/RLVa:KB]
 
 //
 // Constants
@@ -868,13 +873,17 @@ bool toggle_run(EKeystate s)
 bool toggle_sit(EKeystate s)
 {
     if (KEYSTATE_DOWN != s) return true;
-    if (gAgent.isSitting())
+    if (isAgentAvatarValid())
     {
-        gAgent.standUp();
-    }
-    else
-    {
-        gAgent.sitDown();
+        if (gAgent.isSitting() && RlvActions::canStand())
+        {
+            gAgent.standUp();
+        }
+        else if(!gAgentAvatarp->isSitting() && !gAgentAvatarp->isEditingAppearance() &&
+                !gAgent.getFlying() && !gRlvHandler.hasBehaviour(RLV_BHVR_SIT))
+        {
+            gAgent.sitDown();
+        }
     }
     return true;
 }
