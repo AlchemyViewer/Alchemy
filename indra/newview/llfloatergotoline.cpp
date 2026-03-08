@@ -63,11 +63,11 @@ bool LLFloaterGotoLine::postBuild()
     mGotoBox = getChild<LLLineEditor>("goto_line");
     mGotoBox->setCommitCallback(boost::bind(&LLFloaterGotoLine::onGotoBoxCommit, this));
     mGotoBox->setCommitOnFocusLost(false);
-        getChild<LLLineEditor>("goto_line")->setPrevalidate(LLTextValidate::validateNonNegativeS32);
-        childSetAction("goto_btn", onBtnGoto,this);
-        setDefaultBtn("goto_btn");
+    mGotoBox->setPrevalidate(LLTextValidate::validateNonNegativeS32);
+    childSetAction("goto_btn", onBtnGoto,this);
+    setDefaultBtn("goto_btn");
 
-        return true;
+    return LLFloater::postBuild();
 }
 
 //static
@@ -110,7 +110,10 @@ void LLFloaterGotoLine::handleBtnGoto()
                 if (mEditorCore && mEditorCore->mEditor)
                 {
             mEditorCore->mEditor->deselect();
-            mEditorCore->mEditor->setCursor(row, column);
+// [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
+            mEditorCore->mEditor->scrollTo(row, column);
+// [/SL:KB]
+//          mEditorCore->mEditor->setCursor(row, column);
             mEditorCore->mEditor->setFocus(true);
                 }
         }
@@ -144,7 +147,10 @@ void LLFloaterGotoLine::onGotoBoxCommit()
         {
                 if (mEditorCore && mEditorCore->mEditor)
                 {
-            mEditorCore->mEditor->setCursor(row, column);
+// [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
+            mEditorCore->mEditor->scrollTo(row, column);
+// [/SL:KB]
+//          mEditorCore->mEditor->setCursor(row, column);
 
             S32 rownew = 0;
             S32 columnnew = 0;
