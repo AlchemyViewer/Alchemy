@@ -2916,6 +2916,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
     if (keyboard_focus
         && !gFocusMgr.getKeystrokesOnly())
     {
+#if 0 // THIS BREAKS SO MUCH - RYE
         //Most things should fall through, but mouselook is an exception,
         //don't switch to mouselook if any floater has focus
         if ((key == KEY_MOUSELOOK) && !(mask & (MASK_CONTROL | MASK_ALT)))
@@ -2925,6 +2926,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
 
         LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(keyboard_focus);
         if (cur_focus && cur_focus->acceptsTextInput())
+#endif
         {
 #ifdef LL_WINDOWS
             // On windows Alt Gr key generates additional Ctrl event, as result handling situations
