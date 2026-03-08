@@ -861,6 +861,7 @@ void LLFloaterChangeItemThumbnail::showTexturePicker(const LLUUID &thumbnail_id)
             thumbnail_id,
             thumbnail_id,
             thumbnail_id,
+            thumbnail_id,
             false,
             true,
             "SELECT PHOTO",

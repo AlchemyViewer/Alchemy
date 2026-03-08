@@ -1730,6 +1730,7 @@ void LLPanelProfileSecondLife::onShowTexturePicker()
                 this,
                 mSecondLifePic->getImageAssetId(),
                 LLUUID::null,
+                LLUUID::null,
                 mSecondLifePic->getImageAssetId(),
                 false,
                 false,
@@ -2051,6 +2052,7 @@ void LLPanelProfileFirstLife::onChangePhoto()
             LLFloaterTexturePicker* texture_floaterp = new LLFloaterTexturePicker(
                 this,
                 mPicture->getImageAssetId(),
+                LLUUID::null,
                 LLUUID::null,
                 mPicture->getImageAssetId(),
                 false,
