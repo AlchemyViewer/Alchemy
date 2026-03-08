@@ -40,6 +40,13 @@ class LLAvatarIconCtrl;
 class LLOutputMonitorCtrl;
 class LLAvatarName;
 class LLIconCtrl;
+typedef enum
+{
+    SP_NEVER = 0,           // Never show permission icons
+    SP_HOVER = 1,           // Only show permission icons on hover
+    SP_NONDEFAULT = 2,      // Show permissions different from default
+    SP_COUNT
+} EShowPermissionType;
 
 class LLAvatarListItem : public LLPanel, public LLFriendObserver
 {
@@ -79,17 +86,17 @@ public:
     LLAvatarListItem(bool not_from_ui_factory = true);
     virtual ~LLAvatarListItem();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     /**
      * Processes notification from speaker indicator to update children when indicator's visibility is changed.
      */
     virtual void handleVisibilityChange ( bool new_visibility );
-    virtual S32 notifyParent(const LLSD& info);
-    virtual void onMouseLeave(S32 x, S32 y, MASK mask);
-    virtual void onMouseEnter(S32 x, S32 y, MASK mask);
-    virtual void setValue(const LLSD& value);
-    virtual void changed(U32 mask); // from LLFriendObserver
+    virtual S32 notifyParent(const LLSD& info) override;
+    virtual void onMouseLeave(S32 x, S32 y, MASK mask) override;
+    virtual void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    virtual void setValue(const LLSD& value) override;
+    virtual void changed(U32 mask) override; // from LLFriendObserver
 
     void setOnline(bool online);
     void updateAvatarName(); // re-query the name cache
@@ -98,13 +105,16 @@ public:
     void setHighlight(const std::string& highlight);
     void setState(EItemState item_style);
     void setAvatarId(const LLUUID& id, const LLUUID& session_id, bool ignore_status_changes = false, bool is_resident = true);
-    void setLastInteractionTime(U32 secs_since);
+    void setTextField(const std::string& text);
+    void setTextFieldDistance(F32 distance);
+    void setTextFieldSeconds(U32 secs_since);
     //Show/hide profile/info btn, translating speaker indicator and avatar name coordinates accordingly
     void setShowProfileBtn(bool show);
     void setShowInfoBtn(bool show);
     void showSpeakingIndicator(bool show);
-    void setShowPermissions(bool show) { mShowPermissions = show; };
-    void showLastInteractionTime(bool show);
+    void setShowPermissions(EShowPermissionType spType);
+
+    void showTextField(bool show);
     void setAvatarIconVisible(bool visible);
     void setShowCompleteName(bool show, bool force = false) { mShowCompleteName = show; mForceCompleteName = force;};
 // [RLVa:KB] - Checked: RLVa-1.2.0
@@ -118,24 +128,33 @@ public:
     void onInfoBtnClick();
     void onProfileBtnClick();
 
-    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask);
+    void onPermissionBtnToggle(S32 toggleRight);
+    void onModifyRightsConfirmationCallback(const LLSD& notification, const LLSD& response, bool fGrant);
+
+    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
 protected:
     /**
      * Contains indicator to show voice activity.
      */
-    LLOutputMonitorCtrl* mSpeakingIndicator;
+    LLOutputMonitorCtrl* mSpeakingIndicator = nullptr;
 
-    LLAvatarIconCtrl* mAvatarIcon;
+    LLAvatarIconCtrl* mAvatarIcon = nullptr;
 
     /// Indicator for permission to see me online.
-    LLIconCtrl* mIconPermissionOnline;
+    LLButton* mIconPermissionOnline = nullptr;
     /// Indicator for permission to see my position on the map.
-    LLIconCtrl* mIconPermissionMap;
+    LLButton* mIconPermissionMap = nullptr;
     /// Indicator for permission to edit my objects.
-    LLIconCtrl* mIconPermissionEditMine;
+    LLButton* mIconPermissionEditMine = nullptr;
     /// Indicator for permission to edit their objects.
-    LLIconCtrl* mIconPermissionEditTheirs;
+    LLIconCtrl* mIconPermissionEditTheirs = nullptr;
+    /// Indicator for permission to show their position on the map.
+    LLIconCtrl* mIconPermissionMapTheirs = nullptr;
+    /// Indicator for permission to see their online status.
+    LLIconCtrl* mIconPermissionOnlineTheirs = nullptr;
+
+    LLIconCtrl* mIconHovered = nullptr;
 
 private:
 
@@ -154,13 +173,15 @@ private:
      */
     typedef enum e_avatar_item_child {
         ALIC_SPEAKER_INDICATOR,
+        ALIC_TEXT_FIELD,
         ALIC_PROFILE_BUTTON,
         ALIC_INFO_BUTTON,
         ALIC_PERMISSION_ONLINE,
         ALIC_PERMISSION_MAP,
         ALIC_PERMISSION_EDIT_MINE,
         ALIC_PERMISSION_EDIT_THEIRS,
-        ALIC_INTERACTION_TIME,
+        ALIC_PERMISSION_MAP_THEIRS,
+        ALIC_PERMISSION_ONLINE_THEIRS,
         ALIC_NAME,
         ALIC_ICON,
         ALIC_COUNT,
@@ -191,7 +212,7 @@ private:
      *
      * Need to call updateChildren() afterwards to sort out their layout.
      */
-    bool showPermissions(bool visible);
+    bool refreshPermissions();
 
     /**
      * Gets child view specified by index.
@@ -201,12 +222,12 @@ private:
      */
     LLView* getItemChildView(EAvatarListItemChildIndex child_index);
 
-    LLTextBox* mAvatarName;
-    LLTextBox* mLastInteractionTime;
+    LLTextBox* mAvatarName = nullptr;
+    LLTextBox* mTextField = nullptr;
     LLStyle::Params mAvatarNameStyle;
 
-    LLButton* mInfoBtn;
-    LLButton* mProfileBtn;
+    LLButton* mInfoBtn = nullptr;
+    LLButton* mProfileBtn = nullptr;
 
     LLUUID mAvatarId;
     std::string mHighlihtSubstring; // substring to highlight
@@ -220,7 +241,7 @@ private:
 // [/RLVa:KB]
 
     /// indicates whether to show icons representing permissions granted
-    bool mShowPermissions;
+    EShowPermissionType mShowPermissions;
 
     /// true when the mouse pointer is hovering over this item
     bool mHovered;

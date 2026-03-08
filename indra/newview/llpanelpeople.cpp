@@ -44,6 +44,7 @@
 #include "llpanelpeople.h"
 
 // newview
+#include "alavataractions.h"
 #include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
 #include "llagent.h"
@@ -638,19 +639,24 @@ bool LLPanelPeople::postBuild()
     mFriendsGearBtn = friends_tab->getChild<LLButton>("gear_btn");
     mFriendsDelFriendBtn = friends_tab->getChild<LLUICtrl>("friends_del_btn");
 
+    EShowPermissionType spType = (EShowPermissionType)gSavedSettings.getU32("FriendsListShowPermissions");
+    if (spType >= SP_COUNT)
+        spType = SP_NEVER;
+
     mOnlineFriendList = friends_tab->getChild<LLAvatarList>("avatars_online");
     mAllFriendList = friends_tab->getChild<LLAvatarList>("avatars_all");
     mOnlineFriendList->setNoItemsCommentText(getString("no_friends_online"));
     mOnlineFriendList->setShowIcons("FriendsListShowIcons");
-    mOnlineFriendList->showPermissions(gSavedSettings.getBOOL("FriendsListShowPermissions"));
+    mOnlineFriendList->showPermissions(spType);
     mOnlineFriendList->setShowCompleteName(!gSavedSettings.getBOOL("FriendsListHideUsernames"));
     mAllFriendList->setNoItemsCommentText(getString("no_friends"));
     mAllFriendList->setShowIcons("FriendsListShowIcons");
-    mAllFriendList->showPermissions(gSavedSettings.getBOOL("FriendsListShowPermissions"));
+    mAllFriendList->showPermissions(spType);
     mAllFriendList->setShowCompleteName(!gSavedSettings.getBOOL("FriendsListHideUsernames"));
 
     LLPanel* nearby_tab = getChild<LLPanel>(NEARBY_TAB_NAME);
     nearby_tab->setVisibleCallback(boost::bind(&Updater::setActive, mNearbyListUpdater, _2));
+    mNearbyCountText = nearby_tab->getChild<LLTextBox>("nearbycount");
 
     mNearbyList = nearby_tab->getChild<LLAvatarList>("avatar_list");
     mNearbyList->setNoItemsCommentText(getString("no_one_near"));
@@ -699,7 +705,7 @@ bool LLPanelPeople::postBuild()
 
     mOnlineFriendList->setItemDoubleClickCallback(boost::bind(&LLPanelPeople::onAvatarListDoubleClicked, this, _1));
     mAllFriendList->setItemDoubleClickCallback(boost::bind(&LLPanelPeople::onAvatarListDoubleClicked, this, _1));
-    mNearbyList->setItemDoubleClickCallback(boost::bind(&LLPanelPeople::onAvatarListDoubleClicked, this, _1));
+    mNearbyList->setItemDoubleClickCallback(boost::bind(&LLPanelPeople::onNearbyListDoubleClicked, this, _1));
     mRecentList->setItemDoubleClickCallback(boost::bind(&LLPanelPeople::onAvatarListDoubleClicked, this, _1));
 
     mOnlineFriendList->setCommitCallback(boost::bind(&LLPanelPeople::onAvatarListCommitted, this, mOnlineFriendList));
@@ -765,6 +771,29 @@ void LLPanelPeople::onChange(EStatusType status, const LLSD& channelInfo, bool p
     updateButtons();
 }
 
+void LLPanelPeople::updateFriendAccordionTitles()
+{
+    // NOTE: changed name from `updateAccordionTabTitles` to `updateFriendAccordionTitles`
+    // Friends list is only one that uses the accordions -- Fallen
+    if (mOnlineFriendList)
+    {
+        LLStringUtil::format_map_t args_online;
+        args_online["[COUNT]"] = std::to_string(mOnlineFriendList->size());
+        std::string online_title = getString("online_friends_count", args_online);
+
+        mFriendsOnlineTab->setTitle(online_title);
+    }
+
+    if (mAllFriendList)
+    {
+        LLStringUtil::format_map_t args_all;
+        args_all["[COUNT]"] = std::to_string(mAllFriendList->size());
+        std::string all_title = getString("all_friends_count", args_all);
+
+        mFriendsAllTab->setTitle(all_title);
+    }
+}
+
 void LLPanelPeople::updateFriendListHelpText()
 {
     // show special help text for just created account to help finding friends. EXT-4836
@@ -783,6 +812,12 @@ void LLPanelPeople::updateFriendListHelpText()
         LLStringUtil::format_map_t args;
         args["[SEARCH_TERM]"] = LLURI::escape(filter);
         no_friends_text->setText(getString(message_name, args));
+    }
+    else
+    {
+        // Move this away from `LLPanelPeople::updateFriendList()` as it makes sense only to update if there's friends.
+        // -- Fallen
+        updateFriendAccordionTitles();
     }
 }
 
@@ -854,6 +889,30 @@ void LLPanelPeople::updateNearbyList()
     {
 // [/RLVa:KB]
         LLWorld::getInstance()->getAvatars(&mNearbyList->getIDs(), &positions, gAgent.getPositionGlobal(), gSavedSettings.getF32("NearMeRange"));
+        int count_in_region = 0;
+        LLViewerRegion* cur_region = gAgent.getRegion();
+
+         if (!cur_region)
+         {
+            LL_WARNS() << "Current region is null" << LL_ENDL;
+            return;
+        }
+
+        // Iterate through avatars in the region.
+        // The nearby list reports the avatars in 4096m range (`ALControlCache::NearMeRange`)
+        // Reported UUIDs may not be in same region.
+        // Also the TOTAL changes based on your filter results -- Fallen
+        for (size_t i = 0; i < positions.size(); ++i)
+        {
+            if (cur_region->pointInRegionGlobal(positions[i]))
+            {
+                count_in_region++;
+            }
+        }
+
+        mNearbyCountText->setTextArg("[TOTAL]", std::to_string(mNearbyList->size()));
+        mNearbyCountText->setTextArg("[COUNT]", std::to_string(count_in_region));
+        mNearbyCountText->setTextArg("[REGION]", RlvActions::canShowLocation() ? cur_region->getName() : "[REDACTED]");
 // [RLVa:KB] - Checked: RLVa-2.0.3
     }
     else
@@ -1195,6 +1254,38 @@ void LLPanelPeople::onAvatarListCommitted(LLAvatarList* list)
     updateButtons();
 }
 
+void LLPanelPeople::onNearbyListDoubleClicked(LLUICtrl* ctrl)
+{
+    LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl);
+    if(!item)
+    {
+        return;
+    }
+
+    LLUUID clicked_id = item->getAvatarId();
+    if(gAgent.getID() == clicked_id)
+    {
+        return;
+    }
+    U32 nearby_list_click_behavior = gSavedSettings.getU32("AlchemyNearbyPeopleClickAction");
+    switch (nearby_list_click_behavior)
+    {
+    default:
+    case 0:
+        LLAvatarActions::startIM(clicked_id);
+        break;
+    case 1:
+        LLAvatarActions::showProfile(clicked_id);
+        break;
+    case 2:
+        handle_zoom_to_object(clicked_id);
+        break;
+    case 3:
+        ALAvatarActions::teleportTo(clicked_id);
+        break;
+    }
+}
+
 void LLPanelPeople::onAddFriendButtonClicked()
 {
     LLUUID id = getCurrentItemID();
@@ -1351,13 +1442,19 @@ void LLPanelPeople::onFriendsViewSortMenuItemClicked(const LLSD& userdata)
         mAllFriendList->toggleIcons();
         mOnlineFriendList->toggleIcons();
     }
-    else if (chosen_item == "view_permissions")
+    else if ( ("view_permissions_never" == chosen_item) ||
+              ("view_permissions_hover" == chosen_item) ||
+              ("view_permissions_nondefault" == chosen_item) )
     {
-        bool show_permissions = !gSavedSettings.getBOOL("FriendsListShowPermissions");
-        gSavedSettings.setBOOL("FriendsListShowPermissions", show_permissions);
+        EShowPermissionType spType = SP_NEVER;
+        if ("view_permissions_hover" == chosen_item)
+            spType = SP_HOVER;
+        else if ("view_permissions_nondefault" == chosen_item)
+            spType = SP_NONDEFAULT;
+        gSavedSettings.setU32("FriendsListShowPermissions", (U32)spType);
 
-        mAllFriendList->showPermissions(show_permissions);
-        mOnlineFriendList->showPermissions(show_permissions);
+        mAllFriendList->showPermissions(spType);
+        mOnlineFriendList->showPermissions(spType);
     }
     else if (chosen_item == "view_usernames")
     {
@@ -1413,21 +1510,46 @@ void LLPanelPeople::onNearbyViewSortMenuItemClicked(const LLSD& userdata)
         mNearbyList->setShowCompleteName(!hide_usernames);
         mNearbyList->handleDisplayNamesOptionChanged();
     }
+    else if (chosen_item == "click_im")
+    {
+        gSavedSettings.setU32("AlchemyNearbyPeopleClickAction", E_CLICK_TO_IM);
+    }
+    else if (chosen_item == "click_profile")
+    {
+        gSavedSettings.setU32("AlchemyNearbyPeopleClickAction", E_CLICK_TO_PROFILE);
+    }
+    else if (chosen_item == "click_zoom")
+    {
+        gSavedSettings.setU32("AlchemyNearbyPeopleClickAction", E_CLICK_TO_ZOOM);
+    }
+    else if (chosen_item == "click_teleport")
+    {
+        gSavedSettings.setU32("AlchemyNearbyPeopleClickAction", E_CLICK_TO_TELEPORT);
+    }
 }
 
 bool LLPanelPeople::onNearbyViewSortMenuItemCheck(const LLSD& userdata)
 {
     std::string item = userdata.asString();
     U32 sort_order = gSavedSettings.getU32("NearbyPeopleSortOrder");
+    U32 click_action = gSavedSettings.getU32("AlchemyNearbyPeopleClickAction");
 
     if (item == "sort_by_recent_speakers")
         return sort_order == E_SORT_BY_RECENT_SPEAKERS;
-    if (item == "sort_name")
+    else if (item == "sort_name")
         return sort_order == E_SORT_BY_NAME;
-    if (item == "sort_distance")
+    else if (item == "sort_distance")
         return sort_order == E_SORT_BY_DISTANCE;
-    if (item == "sort_arrival")
+    else if (item == "sort_arrival")
         return sort_order == E_SORT_BY_RECENT_ARRIVAL;
+    else if (item == "click_im")
+        return click_action == E_CLICK_TO_IM;
+    else if (item == "click_profile")
+        return click_action == E_CLICK_TO_PROFILE;
+    else if (item == "click_zoom")
+        return click_action == E_CLICK_TO_ZOOM;
+    else if (item == "click_teleport")
+        return click_action == E_CLICK_TO_TELEPORT;
 
     return false;
 }
@@ -1464,6 +1586,14 @@ bool LLPanelPeople::onFriendsViewSortMenuItemCheck(const LLSD& userdata)
         return sort_order == E_SORT_BY_NAME;
     if (item == "sort_status")
         return sort_order == E_SORT_BY_STATUS;
+
+    EShowPermissionType spType = (EShowPermissionType)gSavedSettings.getU32("FriendsListShowPermissions");
+    if ("view_permissions_never" == item)
+        return SP_NEVER == spType;
+    if ("view_permissions_hover" == item)
+        return SP_HOVER == spType;
+    if ("view_permissions_nondefault" == item)
+        return SP_NONDEFAULT == spType;
 
     return false;
 }
@@ -1570,6 +1700,8 @@ void LLPanelPeople::onFriendListRefreshComplete(LLUICtrl*ctrl, const LLSD& param
     {
         showAccordion(mFriendsAllTab, param.asInteger());
     }
+
+    updateFriendAccordionTitles();
 }
 
 void LLPanelPeople::setAccordionCollapsedByUser(LLUICtrl* acc_tab, bool collapsed)

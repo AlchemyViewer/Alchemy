@@ -64,6 +64,8 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
 	<string
 	 name="GroupCountWithInfo"
 	 value="You belong to [COUNT] groups, and can join [REMAINING] more.  [secondlife:/// Raise your limit]"/>
+   <string name="online_friends_count">Online ([COUNT])</string>
+   <string name="all_friends_count">All ([COUNT])</string>
     <tab_container
      bottom="-10"
      follows="all"
@@ -176,25 +178,20 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                      function="People.DelFriend" />
                  </dnd_button>
             </panel>
-            <slider
-              control_name="NearMeRange"
-              decimal_digits="0"
-              increment="1"
-              follows="left|top"
-              left="5"
-              min_val="0"
-              max_val="4096"
-              label="Range:"
-              name="near_me_range"
-              tool_tip="Nearby people range"
-              width="230"/>
             <text
-              type="string"
-              follows="left|top"
-              left_delta="225"
-              name="near_me_range_text2">
-              m
-            </text>
+               type="string"
+               length="1"
+               follows="left|top|right"
+               height="14"
+               layout="topleft"
+               right="-10"
+               top_pad="4"
+               left="3"
+               use_ellipses="true"
+               skip_link_underline="true"
+               name="nearbycount">
+            There are [TOTAL] avatars total and [COUNT] in [REGION].
+         </text>
          <layout_stack
            clip="false"
            follows="all"
@@ -204,7 +201,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
            mouse_opaque="false"
            orientation="vertical"
            right="-1"
-           top_pad="0">
+           top_pad="1">
            <layout_panel
              height="142"
              layout="topleft"
@@ -233,9 +230,10 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
              right="-1"
              user_resize="true">
              <avatar_list
+               show_distance="true"
                allow_select="true"
                follows="all"
-               height="197"
+               height="195"
                ignore_online_status="true"
                layout="topleft"
                left="3"
@@ -348,8 +346,8 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
             </panel>
             <accordion
        		 background_visible="true"
-       		 bg_alpha_color="DkGray2"
-       		 bg_opaque_color="DkGray2"
+       		 bg_alpha_color="PanelDefaultBackgroundColor"
+       		 bg_opaque_color="PanelDefaultBackgroundColor"
              follows="all"
              height="408"
              layout="topleft"
@@ -372,7 +370,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                          multi_select="true"
                          name="avatars_online"
                          keep_one_selected="false"
-                         show_permissions_granted="true"
+                         show_permissions_granted="hover"
                          top="0"
                          width="307" />
                 </accordion_tab>
@@ -390,7 +388,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                          multi_select="true"
                          name="avatars_all"
                          keep_one_selected="false"
-                         show_permissions_granted="true"
+                         show_permissions_granted="hover"
                          top="0"
                          width="307" />
                 </accordion_tab>           
