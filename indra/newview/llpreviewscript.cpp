@@ -36,6 +36,9 @@
 #include "llexternaleditor.h"
 #include "llfilepicker.h"
 #include "llfloaterreg.h"
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
+#include "llfloatersearchreplace.h"
+// [/SL:KB]
 #include "llinventorydefines.h"
 #include "llinventorymodel.h"
 #include "llkeyboard.h"
@@ -150,6 +153,8 @@ bool LLLiveLSLFile::loadFile()
 
     return mOnChangeCallback(filename());
 }
+
+#if 0 // MOVED TO STANDALONE llfloatersearchreplace
 
 /// ---------------------------------------------------------------------------
 /// LLFloaterScriptSearch
@@ -329,6 +334,8 @@ void LLFloaterScriptSearch::onSearchBoxCommit()
     }
 }
 
+#endif // MOVED TO STANDALONE
+
 /// ---------------------------------------------------------------------------
 
 class LLScriptMovedObserver : public LLInventoryObserver
@@ -379,17 +386,20 @@ LLScriptEdCore::LLScriptEdCore(
     const LLHandle<LLFloater>& floater_handle,
     void (*load_callback)(void*),
     void (*save_callback)(void*, bool),
-    void (*search_replace_callback) (void* userdata),
+//  void (*search_replace_callback) (void* userdata),
     void* userdata,
     bool live,
     S32 bottom_pad)
     :
     LLPanel(),
     mSampleText(sample),
+// [SL:KB] - Patch: Build-ScriptEditor | Checked: 2014-01-29 (Catznip-3.6)
+    mMenuBar(nullptr),
+// [/SL:KB]
     mEditor( NULL ),
     mLoadCallback( load_callback ),
     mSaveCallback( save_callback ),
-    mSearchReplaceCallback( search_replace_callback ),
+//  mSearchReplaceCallback( search_replace_callback ),
     mUserdata( userdata ),
     mForceClose( false ),
     mLastHelpToken(NULL),
@@ -414,18 +424,18 @@ LLScriptEdCore::~LLScriptEdCore()
     deleteBridges();
 
     // If the search window is up for this editor, close it.
-    LLFloaterScriptSearch* script_search = LLFloaterScriptSearch::getInstance();
-    if (script_search && script_search->getEditorCore() == this)
-    {
-        script_search->closeFloater();
-        // closeFloater can delete instance since it's not reusable nor single instance
-        // so make sure instance is still there before deleting
-        script_search = LLFloaterScriptSearch::getInstance();
-        if (script_search)
-        {
-            delete script_search;
-        }
-    }
+//  LLFloaterScriptSearch* script_search = LLFloaterScriptSearch::getInstance();
+//  if (script_search && script_search->getEditorCore() == this)
+//  {
+//      script_search->closeFloater();
+//      // closeFloater can delete instance since it's not reusable nor single instance
+//      // so make sure instance is still there before deleting
+//      script_search = LLFloaterScriptSearch::getInstance();
+//      if (script_search)
+//      {
+//          delete script_search;
+//      }
+//  }
 
     delete mLiveFile;
     if (mSyntaxIDConnection.connected())
@@ -486,6 +496,10 @@ void LLLiveLSLEditor::onToggleExperience( LLUICtrl *ui, void* userdata )
 bool LLScriptEdCore::postBuild()
 {
     mLineCol = getChild<LLTextBox>("line_col");
+// [SL:KB] - Patch: Build-ScriptEditor | Checked: 2014-01-29 (Catznip-3.6)
+    mMenuBar = getChild<LLMenuBarGL>("script_menu");
+// [/SL:KB]
+
     mErrorList = getChild<LLScrollListCtrl>("lsl errors");
 
     mFunctions = getChild<LLComboBox>("Insert...");
@@ -585,6 +599,12 @@ void LLScriptEdCore::initMenu()
     menuItem->setClickCallback(boost::bind(&LLTextEditor::paste, mEditor));
     menuItem->setEnableCallback(boost::bind(&LLTextEditor::canPaste, mEditor));
 
+// [SL:KB] - Patch: Build-ScriptEditor | Checked: 2014-01-29 (Catznip-3.6)
+    menuItem = getChild<LLMenuItemCallGL>("Delete");
+    menuItem->setClickCallback(boost::bind(&LLTextEditor::doDelete, mEditor));
+    menuItem->setEnableCallback(boost::bind(&LLTextEditor::canDoDelete, mEditor));
+// [/SL:KB]
+
     menuItem = getChild<LLMenuItemCallGL>("Select All");
     menuItem->setClickCallback(boost::bind(&LLTextEditor::selectAll, mEditor));
     menuItem->setEnableCallback(boost::bind(&LLTextEditor::canSelectAll, mEditor));
@@ -594,7 +614,10 @@ void LLScriptEdCore::initMenu()
     menuItem->setEnableCallback(boost::bind(&LLTextEditor::canDeselect, mEditor));
 
     menuItem = getChild<LLMenuItemCallGL>("Search / Replace...");
-    menuItem->setClickCallback(boost::bind(&LLFloaterScriptSearch::show, this));
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
+    menuItem->setClickCallback(boost::bind(&LLFloaterSearchReplace::show, mEditor));
+// [/SL:KB]
+//  menuItem->setClickCallback(boost::bind(&LLFloaterScriptSearch::show, this));
 
     menuItem = getChild<LLMenuItemCallGL>("Go to line...");
     menuItem->setClickCallback(boost::bind(&LLFloaterGotoLine::show, this));
@@ -1232,28 +1255,35 @@ void LLScriptEdCore::deleteBridges()
 // virtual
 bool LLScriptEdCore::handleKeyHere(KEY key, MASK mask)
 {
-    bool just_control = MASK_CONTROL == (mask & MASK_MODIFIERS);
-
-    if(('S' == key) && just_control)
+// [SL:KB] - Patch: Build-ScriptEditor | Checked: 2014-01-29 (Catznip-3.6)
+    if (mMenuBar->handleAcceleratorKey(key, mask))
     {
-        if(mSaveCallback)
-        {
-            // don't close after saving
-            mSaveCallback(mUserdata, false);
-        }
-
         return true;
     }
+// [/SL:KB]
 
-    if(('F' == key) && just_control)
-    {
-        if(mSearchReplaceCallback)
-        {
-            mSearchReplaceCallback(mUserdata);
-        }
-
-        return true;
-    }
+//  bool just_control = MASK_CONTROL == (mask & MASK_MODIFIERS);
+//
+//  if(('S' == key) && just_control)
+//  {
+//      if(mSaveCallback)
+//      {
+//          // don't close after saving
+//          mSaveCallback(mUserdata, false);
+//      }
+//
+//      return true;
+//  }
+//
+//  if(('F' == key) && just_control)
+//  {
+//      if(mSearchReplaceCallback)
+//      {
+//          mSearchReplaceCallback(mUserdata);
+//      }
+//
+//      return true;
+//  }
 
     return false;
 }
@@ -1590,7 +1620,7 @@ void* LLPreviewLSL::createScriptEdPanel(void* userdata)
                                    self->getHandle(),
                                    LLPreviewLSL::onLoad,
                                    LLPreviewLSL::onSave,
-                                   LLPreviewLSL::onSearchReplace,
+//                                 LLPreviewLSL::onSearchReplace,
                                    self,
                                    false,
                                    0);
@@ -1749,12 +1779,15 @@ void LLPreviewLSL::closeIfNeeded()
     }
 }
 
-void LLPreviewLSL::onSearchReplace(void* userdata)
-{
-    LLPreviewLSL* self = (LLPreviewLSL*)userdata;
-    LLScriptEdCore* sec = self->mScriptEd;
-    LLFloaterScriptSearch::show(sec);
-}
+//void LLPreviewLSL::onSearchReplace(void* userdata)
+//{
+//  LLPreviewLSL* self = (LLPreviewLSL*)userdata;
+//  LLScriptEdCore* sec = self->mScriptEd;
+//// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
+//  LLFloaterSearchReplace::show(sec->mEditor);
+//// [/SL:KB]
+////    LLFloaterScriptSearch::show(sec);
+//}
 
 // static
 void LLPreviewLSL::onLoad(void* userdata)
@@ -1943,7 +1976,7 @@ void* LLLiveLSLEditor::createScriptEdPanel(void* userdata)
                                    self->getHandle(),
                                    &LLLiveLSLEditor::onLoad,
                                    &LLLiveLSLEditor::onSave,
-                                   &LLLiveLSLEditor::onSearchReplace,
+//                                 &LLLiveLSLEditor::onSearchReplace,
                                    self,
                                    true,
                                    0);
@@ -2314,13 +2347,13 @@ void LLLiveLSLEditor::draw()
 }
 
 
-void LLLiveLSLEditor::onSearchReplace(void* userdata)
-{
-    LLLiveLSLEditor* self = (LLLiveLSLEditor*)userdata;
-
-    LLScriptEdCore* sec = self->mScriptEd;
-    LLFloaterScriptSearch::show(sec);
-}
+//void LLLiveLSLEditor::onSearchReplace(void* userdata)
+//{
+//    LLLiveLSLEditor* self = (LLLiveLSLEditor*)userdata;
+//
+//    LLScriptEdCore* sec = self->mScriptEd;
+//    LLFloaterScriptSearch::show(sec);
+//}
 
 struct LLLiveLSLSaveData
 {

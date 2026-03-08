@@ -308,6 +308,7 @@ set(viewer_SOURCE_FILES
     llfloaterscriptedprefs.cpp
     llfloaterscriptlimits.cpp
     llfloatersearch.cpp
+    llfloatersearchreplace.cpp
     llfloatersellland.cpp
     llfloatersettingscolor.cpp
     llfloatersettingsdebug.cpp
@@ -1020,6 +1021,7 @@ set(viewer_HEADER_FILES
     llfloaterscriptedprefs.h
     llfloaterscriptlimits.h
     llfloatersearch.h
+    llfloatersearchreplace.h
     llfloatersellland.h
     llfloatersettingscolor.h
     llfloatersettingsdebug.h

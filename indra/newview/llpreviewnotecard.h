@@ -42,6 +42,9 @@
 class LLViewerTextEditor;
 class LLButton;
 class LLLineEditor;
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
+class LLTextEditor;
+// [/SL:KB]
 
 class LLPreviewNotecard : public LLPreview, public LLVOInventoryListener
 {
@@ -54,6 +57,9 @@ public:
 
     // llview
     void draw() override;
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
+    virtual bool hasAccelerators() const override { return true; }
+// [/SL:KB]
     bool handleKeyHere(KEY key, MASK mask) override;
     void setEnabled(bool enabled) override;
 
@@ -66,7 +72,9 @@ public:
     // reach into the text editor, and grab the drag item
     const LLInventoryItem* getDragItem();
 
-
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
+    LLTextEditor* getEditor();
+// [/SL:KB]
     // return true if there is any embedded inventory.
     bool hasEmbeddedInventory();
 

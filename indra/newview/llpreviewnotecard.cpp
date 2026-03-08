@@ -36,6 +36,9 @@
 #include "llviewerwindow.h"
 #include "llbutton.h"
 #include "llfloaterreg.h"
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
+#include "llfloatersearchreplace.h"
+// [/SL:KB]
 #include "llinventorydefines.h"
 #include "llinventorymodel.h"
 #include "lllineeditor.h"
@@ -161,6 +164,13 @@ bool LLPreviewNotecard::handleKeyHere(KEY key, MASK mask)
         return true;
     }
 
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
+    if(('F' == key) && (MASK_CONTROL == (mask & MASK_CONTROL)))
+    {
+        LLFloaterSearchReplace::show(getEditor());
+        return true;
+    }
+// [/SL:KB]
     return LLPreview::handleKeyHere(key, mask);
 }
 
@@ -196,6 +206,13 @@ const LLInventoryItem* LLPreviewNotecard::getDragItem()
 {
     return mEditor->getDragItem();
 }
+
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
+LLTextEditor* LLPreviewNotecard::getEditor()
+{
+    return getChild<LLViewerTextEditor>("Notecard Editor");
+}
+// [/SL:KB]
 
 bool LLPreviewNotecard::hasEmbeddedInventory()
 {
