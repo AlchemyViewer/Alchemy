@@ -79,6 +79,7 @@ LLFloaterSettingsPicker::LLFloaterSettingsPicker(LLView * owner, LLUUID initial_
 
     buildFromFile(FLOATER_DEFINITION_XML);
     setCanMinimize(false);
+    setCanCollapse(false);
 }
 
 
