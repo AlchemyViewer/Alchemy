@@ -88,11 +88,15 @@ protected:
     void    onCameraTrack();
     void    onCameraRotate();
     F32     getOrbitRate(F32 time);
+    void    onRollLeftHeldDown();
+    void    onRollRightHeldDown();
 
 private:
     LLButton*   mPlusBtn { nullptr };
     LLButton*   mMinusBtn{ nullptr };
     LLSlider*   mSlider{ nullptr };
+    LLButton*   mRollLeft{ nullptr };
+    LLButton*   mRollRight{ nullptr };
 
     friend class LLUICtrlFactory;
 };
@@ -177,6 +181,8 @@ void LLPanelCameraZoom::onCreate()
     mCommitCallbackRegistrar.add("Slider.value_changed", boost::bind(&LLPanelCameraZoom::onSliderValueChanged, this));
     mCommitCallbackRegistrar.add("Camera.track", boost::bind(&LLPanelCameraZoom::onCameraTrack, this));
     mCommitCallbackRegistrar.add("Camera.rotate", boost::bind(&LLPanelCameraZoom::onCameraRotate, this));
+    mCommitCallbackRegistrar.add("Camera.roll_left", boost::bind(&LLPanelCameraZoom::onRollLeftHeldDown, this));
+    mCommitCallbackRegistrar.add("Camera.roll_right", boost::bind(&LLPanelCameraZoom::onRollRightHeldDown, this));
 }
 
 bool LLPanelCameraZoom::postBuild()
@@ -184,6 +190,8 @@ bool LLPanelCameraZoom::postBuild()
     mPlusBtn  = getChild<LLButton>("zoom_plus_btn");
     mMinusBtn = getChild<LLButton>("zoom_minus_btn");
     mSlider   = getChild<LLSlider>("zoom_slider");
+    mRollLeft   = getChild<LLButton>("roll_left");
+    mRollRight  = getChild<LLButton>("roll_right");
     return LLPanel::postBuild();
 }
 
@@ -211,6 +219,20 @@ void LLPanelCameraZoom::onZoomMinusHeldDown()
     F32 time = mMinusBtn->getHeldDownTime();
     gAgentCamera.unlockView();
     gAgentCamera.setOrbitOutKey(getOrbitRate(time));
+}
+
+void LLPanelCameraZoom::onRollLeftHeldDown()
+{
+    F32 time = mRollLeft->getHeldDownTime();
+    gAgentCamera.unlockView();
+    gAgentCamera.setRollLeftKey(getOrbitRate(time));
+}
+
+void LLPanelCameraZoom::onRollRightHeldDown()
+{
+    F32 time = mRollRight->getHeldDownTime();
+    gAgentCamera.unlockView();
+    gAgentCamera.setRollRightKey(getOrbitRate(time));
 }
 
 void LLPanelCameraZoom::onCameraTrack()
@@ -481,11 +503,11 @@ bool LLFloaterCamera::postBuild()
     mZoom = getChild<LLPanelCameraZoom>(ZOOM);
     mTrack = getChild<LLJoystickCameraTrack>(PAN);
     mPresetCombo = getChild<LLComboBox>("preset_combo");
-    mPreciseCtrls = getChild<LLTextBox>("precise_ctrs_label");
+//  mPreciseCtrls = getChild<LLTextBox>("precise_ctrs_label");
 
-    mPreciseCtrls->setShowCursorHand(false);
-    mPreciseCtrls->setSoundFlags(LLView::MOUSE_UP);
-    mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), false));
+//  mPreciseCtrls->setShowCursorHand(false);
+//  mPreciseCtrls->setSoundFlags(LLView::MOUSE_UP);
+//  mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), FALSE));
 
     mPresetCombo->setCommitCallback(boost::bind(&LLFloaterCamera::onCustomPresetSelected, this));
     LLPresetsManager::getInstance()->setPresetListChangeCameraCallback(boost::bind(&LLFloaterCamera::populatePresetCombo, this));
@@ -494,6 +516,10 @@ bool LLFloaterCamera::postBuild()
 
     // ensure that appearance mode is handled while building. See EXT-7796.
     handleAvatarEditingAppearance(sAppearanceEditing);
+
+    mBtnCollapse = getChild<LLButton>("collapse_btn");
+    mBtnCollapse->setCommitCallback(boost::bind(&LLFloaterCamera::toggleCollapse, this));
+    collapse();
 
     return LLFloater::postBuild();
 }
@@ -639,7 +665,7 @@ void LLFloaterCamera::onClickCameraItem(const LLSD& param)
         LLFloaterCamera* camera_floater = LLFloaterCamera::findInstance();
         if (camera_floater)
         {
-            camera_floater->switchMode(CAMERA_CTRL_MODE_FREE_CAMERA);
+            camera_floater->mCurrMode == CAMERA_CTRL_MODE_FREE_CAMERA ? camera_floater->switchMode(CAMERA_CTRL_MODE_PAN) : camera_floater->switchMode(CAMERA_CTRL_MODE_FREE_CAMERA);
             camera_floater->updateItemsSelection();
         }
     }
@@ -745,4 +771,19 @@ void LLFloaterCamera::onCustomPresetSelected()
     {
         switchToPreset(selected_preset);
     }
+}
+
+void LLFloaterCamera::toggleCollapse()
+{
+    BOOL setting = !gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
+    gSavedSettings.setBOOL("AlchemyCameraFloaterExpanded", setting);
+    collapse();
+}
+
+void LLFloaterCamera::collapse()
+{
+    BOOL collapse = gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
+    mBtnCollapse->setImageOverlay(collapse ? "Conv_toolbar_collapse" : "Conv_toolbar_expand");
+    getChild<LLPanel>("buttons_panel")->setVisible(collapse);
+    reshape(collapse ? 370 : 210, getRect().getHeight(), FALSE);
 }
