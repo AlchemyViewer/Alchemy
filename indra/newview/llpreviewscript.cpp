@@ -653,43 +653,59 @@ void LLScriptEdCore::makeEditorPristine()
 
 bool LLScriptEdCore::loadScriptText(const std::string& filename)
 {
-    if (filename.empty())
-    {
-        LL_WARNS() << "Empty file name" << LL_ENDL;
-        return false;
-    }
-
-    LLFILE* file = LLFile::fopen(filename, LLFILE_MODE("rb"));       /*Flawfinder: ignore*/
-    if (!file)
-    {
-        LL_WARNS() << "Error opening " << filename << LL_ENDL;
-        return false;
-    }
-
-    // read in the whole file
-    fseek(file, 0L, SEEK_END);
-    size_t file_length = (size_t) ftell(file);
-    fseek(file, 0L, SEEK_SET);
-    char* buffer = new char[file_length+1];
-    size_t nread = fread(buffer, 1, file_length, file);
-    if (nread < file_length)
-    {
-        LL_WARNS() << "Short read" << LL_ENDL;
-    }
-    buffer[nread] = '\0';
-    fclose(file);
-
-    std::string text = std::string(buffer);
-    LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
-
-    mEditor->setText(text);
-    delete[] buffer;
-
-    return true;
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+    return mEditor->loadFromFile(filename);
+// [/SL:KB]
+//  if (filename.empty())
+//  {
+//      LL_WARNS() << "Empty file name" << LL_ENDL;
+//      return false;
+//  }
+//
+//  LLFILE* file = LLFile::fopen(filename, "rb");       /*Flawfinder: ignore*/
+//  if (!file)
+//  {
+//      LL_WARNS() << "Error opening " << filename << LL_ENDL;
+//      return false;
+//  }
+//
+//  // read in the whole file
+//  fseek(file, 0L, SEEK_END);
+//  size_t file_length = (size_t) ftell(file);
+//  fseek(file, 0L, SEEK_SET);
+//  char* buffer = new char[file_length+1];
+//  size_t nread = fread(buffer, 1, file_length, file);
+//  if (nread < file_length)
+//  {
+//      LL_WARNS() << "Short read" << LL_ENDL;
+//  }
+//  buffer[nread] = '\0';
+//  fclose(file);
+//
+//    std::string text = std::string(buffer);
+//    LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
+//
+//    mEditor->setText(text);
+//  delete[] buffer;
+//
+//  return true;
 }
 
 bool LLScriptEdCore::writeToFile(const std::string& filename)
 {
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+//  if (!mEditor->writeToFile(filename))
+//  {
+//      LL_WARNS() << "Unable to write to " << filename << LL_ENDL;
+//
+//      LLSD row;
+//      row["columns"][0]["value"] = "Error writing to local file. Is your hard drive full?";
+//      row["columns"][0]["font"] = "SANSSERIF_SMALL";
+//      mErrorList->addElement(row);
+//      return false;
+//  }
+//  return true;
+// [/SL:KB]
     LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("wb"));
     if (!fp)
     {
@@ -1543,6 +1559,18 @@ LLScriptEdContainer::LLScriptEdContainer(const LLSD& key) :
 {
 }
 
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+void LLScriptEdContainer::onBackupTimer()
+{
+    if ( (mScriptEd) && (mScriptEd->hasChanged()) )
+    {
+        if (mBackupFilename.empty())
+            mBackupFilename = getBackupFileName();
+        mScriptEd->writeToFile(mBackupFilename);
+    }
+}
+// [/SL:KB]
+
 std::string LLScriptEdContainer::getTmpFileName(const std::string& script_name)
 {
     // Take script inventory item id (within the object inventory)
@@ -1685,6 +1713,15 @@ void LLPreviewLSL::callbackLSLCompileSucceeded()
     LL_INFOS() << "LSL Bytecode saved" << LL_ENDL;
     mScriptEd->mErrorList->setCommentText(LLTrans::getString("CompileSuccessful"));
     mScriptEd->mErrorList->setCommentText(LLTrans::getString("SaveComplete"));
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
+    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
+    {
+        removeBackupFile();
+    }
+// [/SL:KB]
+
     closeIfNeeded();
 }
 
@@ -1705,6 +1742,15 @@ void LLPreviewLSL::callbackLSLCompileFailed(const LLSD& compile_errors)
         mScriptEd->mErrorList->addElement(row);
     }
     mScriptEd->selectFirstError();
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
+    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
+    {
+        removeBackupFile();
+    }
+// [/SL:KB]
+
     closeIfNeeded();
 }
 
@@ -1854,7 +1900,10 @@ bool LLPreviewLSL::failedLSLUpload(LLUUID itemId, LLUUID taskId, LLSD response, 
 // fails, go ahead and save the text anyway.
 void LLPreviewLSL::saveIfNeeded(bool sync /*= true*/)
 {
-    if (!mScriptEd->hasChanged())
+//  if(!mScriptEd->hasChanged())
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2012-02-10 (Catznip-3.2)
+    if ( (!mScriptEd->hasChanged()) || (!gAgent.getRegion()) )
+// [/SL:KB]
     {
         return;
     }
@@ -1935,6 +1984,14 @@ void LLPreviewLSL::onLoadComplete(const LLUUID& asset_uuid, LLAssetType::EType t
             preview->mScriptEd->setEnableEditing(is_modifiable);
             preview->mScriptEd->setAssetID(asset_uuid);
             preview->mAssetStatus = PREVIEW_ASSET_LOADED;
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+            // Start the timer which will perform regular backup saves
+            if (!preview->isBackupRunning())
+            {
+                preview->startBackupTimer(60.0f);
+            }
+// [/SL:KB]
         }
         else
         {
@@ -2034,6 +2091,15 @@ void LLLiveLSLEditor::callbackLSLCompileSucceeded(const LLUUID& task_id,
     LL_DEBUGS() << "LSL Bytecode saved" << LL_ENDL;
     mScriptEd->mErrorList->setCommentText(LLTrans::getString("CompileSuccessful"));
     mScriptEd->mErrorList->setCommentText(LLTrans::getString("SaveComplete"));
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
+    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
+    {
+        removeBackupFile();
+    }
+// [/SL:KB]
+
     getChild<LLCheckBoxCtrl>("running")->set(is_script_running);
     mIsSaving = false;
     closeIfNeeded();
@@ -2057,6 +2123,15 @@ void LLLiveLSLEditor::callbackLSLCompileFailed(const LLSD& compile_errors)
     }
     mScriptEd->selectFirstError();
     mIsSaving = false;
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
+    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
+    {
+        removeBackupFile();
+    }
+// [/SL:KB]
+
     closeIfNeeded();
 }
 
@@ -2190,6 +2265,14 @@ void LLLiveLSLEditor::onLoadComplete(const LLUUID& asset_id,
             instance->mScriptEd->setEnableEditing(true);
             instance->mAssetStatus = PREVIEW_ASSET_LOADED;
             instance->mScriptEd->setAssetID(asset_id);
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+            // Start the timer which will perform regular backup saves
+            if (!instance->isBackupRunning())
+            {
+                instance->startBackupTimer(60.0f);
+            }
+// [/SL:KB]
         }
         else
         {

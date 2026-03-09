@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2016, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -47,6 +48,9 @@
 #include "llfloaterabout.h"
 #include "llfloateraddpaymentmethod.h"
 #include "llfloaterauction.h"
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2011-11-24 (Catznip-3.2)
+#include "llfloaterassetrecovery.h"
+// [/SL:KB]
 #include "llfloaterautoreplacesettings.h"
 #include "llfloateravatarpicker.h"
 #include "llfloateravatarwelcomepack.h"
@@ -541,6 +545,9 @@ void LLViewerFloaterReg::registerFloaters()
 
     // Alchemy Floaters
     LLFloaterReg::add("ao", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterAO>);
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2011-11-24 (Catznip-3.2)
+    LLFloaterReg::add("asset_recovery", "floater_asset_recovery.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAssetRecovery>);
+// [/SL:KB]
 // [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
     LLFloaterReg::add("blocked", "floater_al_blocked.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterBlocked>);
 // [/SL:KB]

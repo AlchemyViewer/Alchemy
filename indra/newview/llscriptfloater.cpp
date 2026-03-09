@@ -612,7 +612,7 @@ LLScriptFloaterManager::EObjectType LLScriptFloaterManager::getObjectType(const 
         return it->second;
     }
 
-    LL_WARNS() << "Unknown object type" << LL_ENDL;
+    LL_WARNS() << "Unknown object type: " << notification->getName() << LL_ENDL;
     return OBJ_UNKNOWN;
 }
 
@@ -656,6 +656,7 @@ LLScriptFloaterManager::object_type_map LLScriptFloaterManager::initObjectTypeMa
     type_map["ScriptDialogGroup"] = OBJ_SCRIPT;
     type_map["LoadWebPage"] = OBJ_LOAD_URL;
     type_map["ObjectGiveItem"] = OBJ_GIVE_INVENTORY;
+    type_map["OwnObjectGiveItem"] = OBJ_GIVE_INVENTORY;
     return type_map;
 }
 
@@ -693,7 +694,7 @@ void LLScriptFloaterManager::saveFloaterPosition(const LLUUID& object_id, const 
 {
     if(object_id.notNull())
     {
-        LLScriptFloaterManager::getInstance()->mFloaterPositions[object_id] = fpi;
+        mFloaterPositions[object_id] = fpi;
     }
     else
     {
@@ -704,7 +705,7 @@ void LLScriptFloaterManager::saveFloaterPosition(const LLUUID& object_id, const 
 bool LLScriptFloaterManager::getFloaterPosition(const LLUUID& object_id, FloaterPositionInfo& fpi)
 {
     floater_position_map_t::const_iterator it = mFloaterPositions.find(object_id);
-    if(LLScriptFloaterManager::getInstance()->mFloaterPositions.end() != it)
+    if(mFloaterPositions.end() != it)
     {
         fpi = it->second;
         return true;

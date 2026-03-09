@@ -1095,6 +1095,10 @@ void LLViewerAssetUpload::HandleUploadError(LLCore::HttpStatus status, LLSD &res
     {
         // no further action required, already handled by a callback
         // ex: do not trigger snapshot floater when failing material texture
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: Catznip-4.0
+        uploadInfo->callUploadErrorCb();
+// [/SL:KB]
         return;
     }
 
