@@ -73,7 +73,8 @@
   <menu_item_call
    label="Edit"
    layout="topleft"
-   name="edit">
+   name="edit"
+   enabled="true">
         <menu_item_call.on_click
          function="Object.Edit" />
         <menu_item_call.on_enable
