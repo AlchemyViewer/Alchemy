@@ -2314,7 +2314,7 @@ void LLAgentCamera::handleScrollWheel(S32 clicks)
         }
         else if (mFocusOnAvatar && (mCameraMode == CAMERA_MODE_THIRD_PERSON))
         {
-            MASK mask = gKeyboard->currentMask(TRUE);
+            MASK mask = gKeyboard->currentMask(true);
             if (mask & MASK_SHIFT)
             {
                 LLVector3d offset = gSavedSettings.getVector3d("FocusOffsetRearView");
@@ -2430,7 +2430,7 @@ void LLAgentCamera::changeCameraToMouselook(bool animate)
 
         updateLastCamera();
         mCameraMode = CAMERA_MODE_MOUSELOOK;
-        AOEngine::getInstance()->inMouselook(TRUE);
+        AOEngine::getInstance()->inMouselook(true);
         gAgent.setControlFlags(AGENT_CONTROL_MOUSELOOK);
 
         if (animate)
@@ -2492,7 +2492,7 @@ void LLAgentCamera::changeCameraToFollow(bool animate)
 
         updateLastCamera();
         mCameraMode = CAMERA_MODE_FOLLOW;
-        AOEngine::getInstance()->inMouselook(FALSE);
+        AOEngine::getInstance()->inMouselook(false);
 
         // bang-in the current focus, position, and up vector of the follow cam
         const LLViewerCamera& camera = LLViewerCamera::instance();
@@ -2574,7 +2574,7 @@ void LLAgentCamera::changeCameraToThirdPerson(bool animate)
         }
         updateLastCamera();
         mCameraMode = CAMERA_MODE_THIRD_PERSON;
-        AOEngine::getInstance()->inMouselook(FALSE);
+        AOEngine::getInstance()->inMouselook(false);
         gAgent.clearControlFlags(AGENT_CONTROL_MOUSELOOK);
     }
 

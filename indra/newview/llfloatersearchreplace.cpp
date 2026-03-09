@@ -83,7 +83,7 @@ void LLFloaterSearchReplace::onOpen(const LLSD& sdKey)
         getChild<LLButton>("replace_btn")->setEnabled( (pEditor) && (!pEditor->getReadOnly()) );
         getChild<LLButton>("replace_all_btn")->setEnabled( (pEditor) && (!pEditor->getReadOnly()) );
     }
-    m_pSearchEditor->setFocus(TRUE);
+    m_pSearchEditor->setFocus(true);
 }
 
 void LLFloaterSearchReplace::onClose(bool fQuiting)
@@ -111,7 +111,7 @@ bool LLFloaterSearchReplace::handleKeyHere(KEY key, MASK mask)
 {
     // Pass this on to the editor we're operating on (or any view up along its hierarchy) if we don't handle the key ourselves
     // (allows Ctrl-F to work when the floater itself has focus - see changeset 0c8947e5f433)
-    BOOL handled = LLFloater::handleKeyHere(key, mask);
+    bool handled = LLFloater::handleKeyHere(key, mask);
     if (!handled)
     {
         // Check if one of our children currently has keyboard focus and if so route edit accellerators to it
@@ -199,7 +199,7 @@ void LLFloaterSearchReplace::onSearchClick()
     LLTextEditor* pEditor = getEditor();
     if (pEditor)
     {
-        pEditor->selectNext(m_pSearchEditor->getText(), m_pCaseInsensitiveCheck->get(), TRUE, m_pSearchUpCheck->get());
+        pEditor->selectNext(m_pSearchEditor->getText(), m_pCaseInsensitiveCheck->get(), true, m_pSearchUpCheck->get());
     }
 }
 
@@ -208,7 +208,7 @@ void LLFloaterSearchReplace::onReplaceClick()
     LLTextEditor* pEditor = getEditor();
     if (pEditor)
     {
-        pEditor->replaceText(m_pSearchEditor->getText(), m_pReplaceEditor->getText(), m_pCaseInsensitiveCheck->get(), TRUE, m_pSearchUpCheck->get());
+        pEditor->replaceText(m_pSearchEditor->getText(), m_pReplaceEditor->getText(), m_pCaseInsensitiveCheck->get(), true, m_pSearchUpCheck->get());
     }
 }
 

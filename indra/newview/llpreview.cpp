@@ -659,7 +659,7 @@ void LLMultiPreview::tabOpen(LLFloater* opened_floater, bool from_click)
         }
         else
         {
-            pSearchFloater->setVisible(FALSE);
+            pSearchFloater->setVisible(false);
         }
     }
 // [/SL:KB]

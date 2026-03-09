@@ -231,7 +231,7 @@ void LLPanelLandAudio::onCommitMusicUrl()
     if (!parcel)
         return;
 
-    BOOL can_change_media = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_CHANGE_MEDIA);
+    bool can_change_media = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_CHANGE_MEDIA);
     if (!can_change_media)
         return;
 

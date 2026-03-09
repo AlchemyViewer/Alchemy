@@ -507,7 +507,7 @@ bool LLFloaterCamera::postBuild()
 
 //  mPreciseCtrls->setShowCursorHand(false);
 //  mPreciseCtrls->setSoundFlags(LLView::MOUSE_UP);
-//  mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), FALSE));
+//  mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), false));
 
     mPresetCombo->setCommitCallback(boost::bind(&LLFloaterCamera::onCustomPresetSelected, this));
     LLPresetsManager::getInstance()->setPresetListChangeCameraCallback(boost::bind(&LLFloaterCamera::populatePresetCombo, this));
@@ -785,5 +785,5 @@ void LLFloaterCamera::collapse()
     BOOL collapse = gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
     mBtnCollapse->setImageOverlay(collapse ? "Conv_toolbar_collapse" : "Conv_toolbar_expand");
     getChild<LLPanel>("buttons_panel")->setVisible(collapse);
-    reshape(collapse ? 370 : 210, getRect().getHeight(), FALSE);
+    reshape(collapse ? 370 : 210, getRect().getHeight(), false);
 }

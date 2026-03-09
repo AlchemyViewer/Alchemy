@@ -261,7 +261,7 @@ bool LLStatusBar::postBuild()
     mPanelAOPulldown = new ALPanelAOPulldown();
     addChild(mPanelAOPulldown);
     mPanelAOPulldown->setFollows(FOLLOWS_TOP | FOLLOWS_RIGHT);
-    mPanelAOPulldown->setVisible(FALSE);
+    mPanelAOPulldown->setVisible(false);
 
     mPanelNearByMedia = new LLPanelNearByMedia();
     addChild(mPanelNearByMedia);
@@ -551,7 +551,7 @@ void LLStatusBar::onMouseEnterPresetsCamera()
     mPanelNearByMedia->setVisible(false);
     mPanelVolumePulldown->setVisible(false);
     mPanelPresetsPulldown->setVisible(false);
-    mPanelAOPulldown->setVisible(FALSE);
+    mPanelAOPulldown->setVisible(false);
     mPanelPresetsCameraPulldown->setVisible(true);
 }
 
@@ -573,10 +573,10 @@ void LLStatusBar::onMouseEnterPresets()
     // show the master presets pull-down
     LLUI::getInstance()->clearPopups();
     LLUI::getInstance()->addPopup(mPanelPresetsPulldown);
-    mPanelPresetsCameraPulldown->setVisible(FALSE);
+    mPanelPresetsCameraPulldown->setVisible(false);
     mPanelNearByMedia->setVisible(false);
     mPanelVolumePulldown->setVisible(false);
-    mPanelAOPulldown->setVisible(FALSE);
+    mPanelAOPulldown->setVisible(false);
     mPanelPresetsPulldown->setVisible(true);
 }
 
@@ -598,13 +598,13 @@ void LLStatusBar::onMouseEnterAO()
     LLUI::getInstance()->clearPopups();
     LLUI::getInstance()->addPopup(mPanelAOPulldown);
 
-    mPanelPresetsCameraPulldown->setVisible(FALSE);
-    mPanelPresetsPulldown->setVisible(FALSE);
-    mPanelNearByMedia->setVisible(FALSE);
-    mPanelVolumePulldown->setVisible(FALSE);
-    //mPanelQuickSettingsPulldown->setVisible(FALSE);
-    mPanelAOPulldown->setVisible(TRUE);
-    //mPanelAvatarComplexityPulldown->setVisible(FALSE);
+    mPanelPresetsCameraPulldown->setVisible(false);
+    mPanelPresetsPulldown->setVisible(false);
+    mPanelNearByMedia->setVisible(false);
+    mPanelVolumePulldown->setVisible(false);
+    //mPanelQuickSettingsPulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(true);
+    //mPanelAvatarComplexityPulldown->setVisible(false);
 }
 
 void LLStatusBar::onMouseEnterVolume()
@@ -629,7 +629,7 @@ void LLStatusBar::onMouseEnterVolume()
     mPanelPresetsCameraPulldown->setVisible(false);
     mPanelPresetsPulldown->setVisible(false);
     mPanelNearByMedia->setVisible(false);
-    mPanelAOPulldown->setVisible(FALSE);
+    mPanelAOPulldown->setVisible(false);
     mPanelVolumePulldown->setVisible(true);
 }
 
@@ -655,7 +655,7 @@ void LLStatusBar::onMouseEnterNearbyMedia()
     mPanelPresetsCameraPulldown->setVisible(false);
     mPanelPresetsPulldown->setVisible(false);
     mPanelVolumePulldown->setVisible(false);
-    mPanelAOPulldown->setVisible(FALSE);
+    mPanelAOPulldown->setVisible(false);
     mPanelNearByMedia->setVisible(true);
 }
 
