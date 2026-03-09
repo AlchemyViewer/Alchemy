@@ -53,8 +53,10 @@
 #include "llviewerwindow.h"
 #include "llfocusmgr.h"
 #include "llviewercontrol.h"
+#include "llviewermenufile.h"
 
 #include "roles_constants.h"
+#include "llfilepicker.h"
 
 static LLPanelInjector<LLPanelGroupRoles> t_panel_group_roles("panel_group_roles");
 
@@ -416,6 +418,10 @@ void LLPanelGroupRoles::setGroupID(const LLUUID& id)
     LLButton* button = getChild<LLButton>("member_invite");
     if ( button )
         button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_INVITE));
+
+    button = getChild<LLButton>("export_list");
+    if (button)
+        button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_VISIBLE_IN_DIR));
 
     if(mSubTabContainer)
         mSubTabContainer->selectTab(1);
@@ -847,6 +853,10 @@ bool LLPanelGroupMembersSubTab::postBuildSubTab(LLView* root)
     button->setClickedCallback(onInviteMember, this);
     button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_INVITE));
 
+    button = root->getChild<LLButton>("export_list");
+    button->setClickedCallback(boost::bind(&LLPanelGroupMembersSubTab::onExportMembersToCSV, this));
+    button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_VISIBLE_IN_DIR));
+
     mEjectBtn = root->getChild<LLButton>("member_eject");
     mEjectBtn->setClickedCallback(onEjectMembers, this);
     mEjectBtn->setEnabled(false);
@@ -860,6 +870,10 @@ bool LLPanelGroupMembersSubTab::postBuildSubTab(LLView* root)
 
 void LLPanelGroupMembersSubTab::setGroupID(const LLUUID& id)
 {
+    LLButton* button = getChild<LLButton>("export_list");
+    if (button)
+        button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_VISIBLE_IN_DIR));
+
     //clear members list
     if(mMembersList) mMembersList->deleteAllItems();
     if(mAssignedRolesList) mAssignedRolesList->deleteAllItems();
@@ -1929,6 +1943,47 @@ void LLPanelGroupMembersSubTab::handleBanMember()
     handleEjectMembers();
 }
 
+void LLPanelGroupMembersSubTab::onExportMembersToCSV()
+{
+    if (mPendingMemberUpdate) return;
+
+    LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mGroupID);
+    if (gdatap)
+    {
+        LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelGroupMembersSubTab::exportMembersToCSVCallback, this, _1), LLFilePicker::FFSAVE_CSV, LLDir::getScrubbedFileName(gdatap->mName + "_members.csv"));
+    }
+}
+
+void LLPanelGroupMembersSubTab::exportMembersToCSVCallback(const std::vector<std::string>& filenames)
+{
+    LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mGroupID);
+    if (!gdatap)
+    {
+        return;
+    }
+    std::string fullpath = filenames[0];
+
+    std::error_code ec;
+    LLFile outfile(fullpath, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+    if (!outfile)
+        return;
+
+    outfile.printf("Group membership record for %s", gdatap->mName.c_str());
+
+    LLSD memberlist;
+    LLAvatarName av_name;
+    for (LLGroupMgrGroupData::member_list_t::const_iterator member_itr = gdatap->mMembers.begin();
+         member_itr != gdatap->mMembers.end();
+         ++member_itr)
+    {
+        LLAvatarNameCache::get(member_itr->first, &av_name);
+        outfile.printf("\n%s,%s,%s",
+                        member_itr->first.asString().c_str(),
+                        av_name.getLegacyName().c_str(),
+                        member_itr->second->getOnlineStatus().c_str());
+    }
+    outfile.printf("\n");
+}
 
 // LLPanelGroupRolesSubTab ///////////////////////////////////////////////
 static LLPanelInjector<LLPanelGroupRolesSubTab> t_panel_group_roles_subtab("panel_group_roles_subtab");

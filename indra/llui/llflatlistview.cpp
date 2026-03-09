@@ -272,6 +272,13 @@ LLPanel* LLFlatListView::getItemByValue(const LLSD& value) const
     return NULL;
 }
 
+bool LLFlatListView::valueExists(const LLSD& value) const
+{
+    if (value.isUndefined()) return false;
+    item_pair_t* pair = getItemPair(value);
+    return pair != nullptr;
+}
+
 bool LLFlatListView::selectItem(LLPanel* item, bool select /*= true*/)
 {
     if (!item) return false;

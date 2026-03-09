@@ -514,6 +514,13 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
         }
         file_filters.push_back({ "glTF Asset File (*.gltf)", "gltf" });
         break;
+    case FFSAVE_CSV:
+        if (default_filename.empty())
+        {
+            default_filename = "untitled.csv";
+        }
+        file_filters.push_back({ "Comma seperated values (*.csv)", "csv" });
+        break;
     case FFSAVE_XML:
         if (default_filename.empty())
         {
@@ -978,6 +985,17 @@ bool LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
             L"glTF Asset File (*.gltf)\0*.gltf\0" \
             L"\0";
         break;
+    case FFSAVE_CSV:
+        if (filename.empty())
+        {
+            wcsncpy( mFilesW,L"untitled.csv", FILENAME_BUFFER_SIZE);    /*Flawfinder: ignore*/
+        }
+
+        mOFN.lpstrDefExt = L"csv";
+        mOFN.lpstrFilter =
+            L"Comma seperated values (*.csv)\0*.csv\0" \
+            L"\0";
+        break;
     case FFSAVE_XML:
         if (filename.empty())
         {
@@ -1260,7 +1278,11 @@ void set_nav_save_data(LLFilePicker::ESaveFilter filter, std::string &extension,
             creator = "\?\?\?\?";
             extension = "xml";
             break;
-
+        case LLFilePicker::FFSAVE_CSV:
+            type = "\?\?\?\?";
+            creator = "\?\?\?\?";
+            extension = "csv";
+            break;
         case LLFilePicker::FFSAVE_RAW:
             type = "\?\?\?\?";
             creator = "\?\?\?\?";

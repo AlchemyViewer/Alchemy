@@ -209,6 +209,9 @@ protected:
 
     bool matchesSearchFilter(const std::string& fullname);
 
+    void onExportMembersToCSV();
+    void exportMembersToCSVCallback(const std::vector<std::string>& filenames);
+
     U64  getAgentPowersBasedOnRoleChanges(const LLUUID& agent_id);
     bool getRoleChangeType(const LLUUID& member_id,
                            const LLUUID& role_id,
