@@ -523,6 +523,9 @@ void upload_single_file(
         case LLFilePicker::FFLOAD_WAV:
             floater_name = "upload_sound";
             break;
+        case LLFilePicker::FFLOAD_GLTF:
+            LLMaterialEditor::loadMaterialFromFile(filename, -1);
+            return;
         default:
             break;
         }

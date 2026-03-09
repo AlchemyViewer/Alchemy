@@ -65,6 +65,9 @@ class LLHUDIcon;
 class LLWindow;
 class LLRootView;
 class LLWindowListener;
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-27 (Catznip-3.6)
+class LLViewerInventoryItem;
+// [/SL:KB]
 class LLViewerWindowListener;
 class LLVOPartGroup;
 class LLPopupView;
@@ -212,7 +215,14 @@ public:
     /*virtual*/ bool handleOtherMouseDown(LLWindow *window, LLCoordGL pos, MASK mask, S32 button);
     /*virtual*/ bool handleOtherMouseUp(LLWindow *window, LLCoordGL pos, MASK mask, S32 button);
     bool handleOtherMouse(LLWindow *window, LLCoordGL pos, MASK mask, S32 button, bool down);
-    /*virtual*/ LLWindowCallbacks::DragNDropResult handleDragNDrop(LLWindow *window, LLCoordGL pos, MASK mask, LLWindowCallbacks::DragNDropAction action, std::string data);
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+    /*virtual*/ LLWindowCallbacks::DragNDropResult handleDragNDrop(LLWindow* window, LLCoordGL pos, MASK mask, LLWindowCallbacks::DragNDropAction action,
+                                                                   LLWindowCallbacks::DragNDropType type, const std::vector<std::string>& data);
+                LLWindowCallbacks::DragNDropResult handleDragNDropDefault(LLWindow* window, LLCoordGL pos, MASK mask, LLWindowCallbacks::DragNDropAction action, std::string data);
+                LLWindowCallbacks::DragNDropResult handleDragNDropFile(LLWindow* window, LLCoordGL pos, MASK mask, LLWindowCallbacks::DragNDropAction action,
+                                                                       LLWindowCallbacks::DragNDropType type, const std::vector<std::string>& data);
+// [/SL:KB]
+//  /*virtual*/ LLWindowCallbacks::DragNDropResult handleDragNDrop(LLWindow *window, LLCoordGL pos, MASK mask, LLWindowCallbacks::DragNDropAction action, std::string data);
                 void handleMouseMove(LLWindow *window,  LLCoordGL pos, MASK mask);
                 void handleMouseDragged(LLWindow *window,  LLCoordGL pos, MASK mask);
     /*virtual*/ void handleMouseLeave(LLWindow *window);
@@ -565,6 +575,10 @@ private:
 
     // Object temporarily hovered over while dragging
     LLPointer<LLViewerObject>   mDragHoveredObject;
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-27 (Catznip-3.6)
+    typedef std::pair<LLPointer<LLViewerInventoryItem>, std::string> drag_item_t;
+    std::vector<drag_item_t> mDragItems;
+// [/SL:KB]
 
     static LLTrace::SampleStatHandle<>  sMouseVelocityStat;
 };
