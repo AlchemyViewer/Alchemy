@@ -20,13 +20,12 @@ Please ensure the following before requesting review:
 
 - [ ] I have provided a clear title and detailed description for this pull request.
 - [ ] If useful, I have included media such as screenshots and video to show off my changes.
-- [ ] The PR is linked to a relevant issue with sufficient context.
 - [ ] I have tested the changes locally and verified they work as intended.
 - [ ] All new and existing tests pass.
 - [ ] Code follows the project's style guidelines.
 - [ ] Documentation has been updated if needed.
 - [ ] Any dependent changes have been merged and published in downstream modules
-- [ ] I have reviewed the [contributing guidelines](https://github.com/secondlife/viewer/blob/develop/CONTRIBUTING.md).
+- [ ] I have reviewed the [contributing guidelines](https://github.com/AlchemyViewer/Alchemy/blob/main/CONTRIBUTING.md).
 
 ---
 

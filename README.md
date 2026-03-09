@@ -1,32 +1,17 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="doc/sl-logo-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="doc/sl-logo.png">
-  <img alt="Second Life Logo" src="doc/sl-logo.png">
+  <source srcset="doc/alchemy_logo.png">
+  <img alt="Alchemy Viewer Logo" src="doc/alchemy_logo.png">
 </picture>
 
-**[Second Life][] is a free 3D virtual world where users can create, connect and chat with others from around the
-world.** This repository contains the source code for the official client.
-
-## Open Source
-
-Second Life provides a huge variety of tools for expression, content creation, socialization and play. Its vibrancy is
-only possible because of input and contributions from its residents. The client codebase has been open source since
-2007 and is available under the LGPL license. The [Open Source Portal][] contains additional information about Linden
-Lab's open source history and projects.
+[Alchemy Viewer](https://www.alchemyviewer.org) is a third-party client for Second Life. Our focus is on creating a cohesive and modern experience, with carefully considered default behaviors and settings while maintaining a bleeding-edge approach to adopting new features and developments from the Second Life platform.
 
 ## Download
 
-Most people use a pre-built viewer release to access Second Life. Windows and macOS builds are
-[published on the official website][download]. More experimental viewers, such as release candidates and
-project viewers, are detailed on the [Alternate Viewers page](https://releasenotes.secondlife.com/viewer.html).
-
-### Third Party Viewers
-
-Third party maintained forks, which include Linux compatible builds, are indexed in the [Third Party Viewer Directory][tpv].
+Most people use a pre-built release of Alchemy Viewer. Windows macOS, and Linux builds are published as [releases on Github][releasesgh]. More experimental releases, such as release candidates and project viewers, are typically announced on our [Discord server][discord].
 
 ## Build Instructions
 
-The Second Life viewer uses CMake for build system generation and vcpkg for dependency management. 
+Alchemy Viewer uses CMake for build system generation and vcpkg for dependency management. 
 
 ### Platform-specific setup guides
 
@@ -56,11 +41,14 @@ The Second Life viewer uses CMake for build system generation and vcpkg for depe
 
 ## Contribute
 
-Help make Second Life better! You can get involved with improvements by filing bugs, suggesting enhancements, submitting
-pull requests and more. See the [CONTRIBUTING][] and the [open source portal][] for details.
+Help improve Alchemy Viewer! You can get involved with improvements by filing bugs, suggesting enhancements, submitting pull requests and more. See [CONTRIBUTING][] for details.
 
-[Second Life]: https://secondlife.com/
-[download]: https://secondlife.com/support/downloads/
-[tpv]: http://wiki.secondlife.com/wiki/Third_Party_Viewer_Directory
-[open source portal]: http://wiki.secondlife.com/wiki/Open_Source_Portal
-[contributing]: https://github.com/secondlife/viewer/blob/main/CONTRIBUTING.md
+## Resources
+
+* [Alchemy Website](http://www.alchemyviewer.org)
+* [Downloads](https://alchemyviewer.org/downloads)
+* [Issue Tracker](https://github.com/AlchemyViewer/Alchemy/issues)
+
+[contributing]: https://github.com/alchemyviewer/alchemy/blob/main/CONTRIBUTING.md
+[releasesgh]: https://github.com/AlchemyViewer/Alchemy/releases
+[discord]: https://discordapp.com/invite/KugCgs6
