@@ -441,6 +441,116 @@ namespace
         }
     };
 
+    class LLCommunicateSetRejectTeleportOffers : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersMode");
+            if (is_rejecting_offers)
+            {
+                gSavedPerAccountSettings.setBOOL("ALRejectTeleportOffersMode", false);
+            }
+            else
+            {
+                gSavedPerAccountSettings.setBOOL("ALRejectTeleportOffersMode", true);
+                LLNotificationsUtil::add("RejectTeleportOffersModeSet");
+            }
+            return true;
+        }
+    };
+
+    class LLCommunicateGetRejectTeleportOffers : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersMode");
+
+            return is_rejecting_offers;
+        }
+    };
+
+    class LLCommunicateSetRejectFriendshipRequests : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsMode");
+            if (is_rejecting_offers)
+            {
+                gSavedPerAccountSettings.setBOOL("ALRejectFriendshipRequestsMode", false);
+            }
+            else
+            {
+                gSavedPerAccountSettings.setBOOL("ALRejectFriendshipRequestsMode", true);
+                LLNotificationsUtil::add("RejectFriendshipRequestsModeSet");
+            }
+            return true;
+        }
+    };
+
+    class LLCommunicateGetRejectFriendshipRequests : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsMode");
+
+            return is_rejecting_offers;
+        }
+    };
+
+    class LLCommunicateSetAutoRespond : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_autorespond_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseEnable");
+            if (is_autorespond_set)
+            {
+                gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseEnable", false);
+            }
+            else
+            {
+                gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseEnable", true);
+                LLNotificationsUtil::add("AutoRespondModeSet");
+            }
+            return true;
+        }
+    };
+
+    class LLCommunicateCheckAutoRespond : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_autorespond_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseEnable");
+            return is_autorespond_set;
+        }
+    };
+
+    class LLCommunicateSetAutoRespondNonFriends : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_autorespond_nonfriends_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseNotFriendEnable");
+            if (is_autorespond_nonfriends_set)
+            {
+                gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendEnable", false);
+            }
+            else
+            {
+                gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendEnable", true);
+                LLNotificationsUtil::add("AutoRespondNonFriendsModeSet");
+            }
+            return true;
+        }
+    };
+
+    class LLCommunicateCheckAutoRespondNonFriends : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_autorespond_nonfriends_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseNotFriendEnable");
+            return is_autorespond_nonfriends_set;
+        }
+    };
+
 // [SL:KB] - Patch: World-Derender | Checked: 2012-06-08 (Catznip-3.3)
     void handle_view_blocked(const LLSD& sdParam)
     {
@@ -475,8 +585,8 @@ namespace
     {
         return ALDerenderList::canAddSelection();
     }
-    // [/SL:KB]
-    }
+// [/SL:KB]
+}
 
 ////////////////////////////////////////////////////////
 
@@ -499,6 +609,15 @@ void ALViewerMenu::initialize_menus()
 
     commit.add("Camera.SavePosition", [](LLUICtrl* ctrl, const LLSD& param) { gAgentCamera.storeCameraPosition(); });
     commit.add("Camera.RestorePosition", [](LLUICtrl* ctrl, const LLSD& param) { gAgentCamera.loadCameraPosition(); });
+
+    view_listener_t::addMenu(new LLCommunicateSetRejectTeleportOffers(), "Communicate.SetRejectTeleportOffers");
+    view_listener_t::addMenu(new LLCommunicateGetRejectTeleportOffers(), "Communicate.GetRejectTeleportOffers");
+    view_listener_t::addMenu(new LLCommunicateSetRejectFriendshipRequests(), "Communicate.SetRejectFriendshipRequests");
+    view_listener_t::addMenu(new LLCommunicateGetRejectFriendshipRequests(), "Communicate.GetRejectFriendshipRequests");
+    view_listener_t::addMenu(new LLCommunicateSetAutoRespond(), "Communicate.SetAutoRespond");
+    view_listener_t::addMenu(new LLCommunicateSetAutoRespondNonFriends(), "Communicate.SetAutoRespondNonFriends");
+    view_listener_t::addMenu(new LLCommunicateCheckAutoRespond(), "Communicate.GetAutoRespond");
+    view_listener_t::addMenu(new LLCommunicateCheckAutoRespondNonFriends(), "Communicate.GetAutoRespondNonFriends");
 
     commit.add("Object.CopyID", [](LLUICtrl* ctrl, const LLSD& param) { object_copy_key(); });
     commit.add("Object.EditParticles",  [](LLUICtrl* ctrl, const LLSD& param) { edit_particle_source(); });

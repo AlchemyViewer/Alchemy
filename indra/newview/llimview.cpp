@@ -56,6 +56,7 @@
 #include "llmd5.h"
 #include "llmutelist.h"
 #include "llrecentpeople.h"
+#include "llslurl.h"
 #include "llviewermessage.h"
 #include "llviewerwindow.h"
 #include "llnotifications.h"
@@ -3189,6 +3190,8 @@ void LLIMMgr::addMessage(
         fixed_session_name = session_name;
         name_is_setted = true;
     }
+
+    bool is_group_chat = false;
     bool skip_message = false;
     bool from_linden = LLMuteList::isLinden(from);
     if (gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly") && !from_linden)
@@ -3264,6 +3267,32 @@ void LLIMMgr::addMessage(
                 if (!chat_url.empty())
                 {
                     LLCoros::instance().launch("chatterBoxHistoryCoro", boost::bind(&chatterBoxHistoryCoro, chat_url, session_id, from, msg, timestamp));
+                }
+            }
+
+            S32 is_rejecting_conferences = gSavedPerAccountSettings.getS32("AlchemyIgnoreAdHocSessions");
+            bool is_allowing_friend_conferences = (is_rejecting_conferences == 1);
+            bool is_friend = LLAvatarTracker::instance().isBuddy(other_participant_id);
+            is_group_chat = session->isGroupSessionType();
+
+            if (IM_NOTHING_SPECIAL != dialog && !is_group_chat && is_rejecting_conferences && !from_linden)
+            {
+                if (!is_allowing_friend_conferences || (is_allowing_friend_conferences && !is_friend))
+                {
+                    bool report_ignored_conferences = gSavedPerAccountSettings.getBOOL("AlchemyReportIgnoredAdHocSession");
+                    LLSD args;
+                    args["AVATAR_NAME"] = LLSLURL("agent", other_participant_id, "about").getSLURLString();
+                    LL_INFOS() << "Ignoring conference (ad-hoc) chat from " << args["AVATAR_NAME"] << LL_ENDL;
+                    if (!gIMMgr->leaveSession(new_session_id))
+                    {
+                        LL_WARNS() << "Ad-hoc session " << new_session_id << " doesn't exist" << LL_ENDL;
+                    }
+                    else if (report_ignored_conferences)
+                    {
+                        LLNotificationsUtil::add("IgnoredAdHocSession", args);
+                    }
+
+                    return;
                 }
             }
 

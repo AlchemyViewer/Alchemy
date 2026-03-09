@@ -2412,7 +2412,12 @@ void LLViewerWindow::initBase()
     gToolTipView = getRootView()->getChild<LLToolTipView>("tooltip view");
 
     // Initialize do not disturb response message when logged in
-    LLAppViewer::instance()->setOnLoginCompletedCallback(boost::bind(&LLFloaterPreference::initDoNotDisturbResponse));
+    // LLAppViewer::instance()->setOnLoginCompletedCallback(boost::bind(&LLFloaterPreference::initDoNotDisturbResponse));
+    //
+    // This method was created, as we'll be adding more auto-responses in the future
+    // rather than putting multiple callbacks, single callback and address them there.
+    // -- Fallen
+    LLAppViewer::instance()->setOnLoginCompletedCallback(boost::bind(&LLFloaterPreference::initAutoResponses));
 
     // Add the progress bar view (startup view), which overrides everything
     mProgressView = getRootView()->findChild<LLProgressView>("progress_view");

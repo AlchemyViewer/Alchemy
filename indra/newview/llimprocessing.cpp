@@ -29,6 +29,7 @@
 #include "llimprocessing.h"
 
 #include "llagent.h"
+#include "llagentui.h"
 #include "llappviewer.h"
 #include "llavatarnamecache.h"
 #include "llfirstuse.h"
@@ -63,7 +64,24 @@
 #include "rlvui.h"
 // [/RLVa:KB]
 
+#include <boost/algorithm/string/predicate.hpp> // <alchemy/>
+#include <boost/algorithm/string/replace.hpp>
 #include "boost/lexical_cast.hpp"
+
+// Resurrect the Autorespond from the archive
+// -- Fallen
+std::string replace_wildcards(std::string input, const LLUUID& id, const std::string& name)
+{
+    boost::algorithm::replace_all(input, "#n", name);
+    // disable boost::lexical_cast warning
+    LLSLURL slurl;
+    LLAgentUI::buildSLURL(slurl);
+    boost::algorithm::replace_all(input, "#r", slurl.getSLURLString());
+
+    LLAvatarName av_name;
+    boost::algorithm::replace_all(input, "#d", LLAvatarNameCache::get(id, &av_name) ? av_name.getDisplayName() : name);
+    return input;
+}
 
 extern void on_new_message(const LLSD& msg);
 
@@ -483,6 +501,19 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     name = clean_name_from_im(name, dialog);
 
     bool is_do_not_disturb = gAgent.isDoNotDisturb();
+
+    // NOTE: Not set on this
+    // *TODO*: Revisit this
+    // -- Fallen
+    static LLCachedControl<bool> AlchemyRejectTeleportOffers(gSavedPerAccountSettings, "ALRejectTeleportOffersMode");
+    static LLCachedControl<bool> AlchemyDontRejectTeleportOffersFromFriends(gSavedPerAccountSettings, "ALDontRejectTeleportOffersFromFriends");
+    static LLCachedControl<bool> AlchemyRejectFriendshipRequests(gSavedPerAccountSettings, "ALRejectFriendshipRequestsMode");
+
+    // Resurrect AutoResponse from Alchemy Archive (Thanks Cinders!)
+    // -- Fallen
+    static LLCachedControl<bool> sAutorespond(gSavedPerAccountSettings, "AlchemyAutoresponseEnable");
+    static LLCachedControl<bool> sAutorespondNonFriend(gSavedPerAccountSettings, "AlchemyAutoresponseNotFriendEnable");
+
     bool is_muted = LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat)
         // object IMs contain sender object id in session_id (STORM-1209)
         || (dialog == IM_FROM_TASK && LLMuteList::getInstance()->isMuted(session_id));
@@ -606,6 +637,48 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     gIMMgr->setDNDMessageSent(session_id, true);
                 }
 
+            }
+            else if (offline == IM_ONLINE
+            && (sAutorespond || (sAutorespondNonFriend && !is_friend))
+            && from_id.notNull() //not a system message
+            && to_id.notNull()) //not global message
+            {
+                buffer = message;
+                LL_DEBUGS("Messaging") << "process_improved_im: session_id( " << session_id << " ), from_id( " << from_id << " )" << LL_ENDL;
+                bool send_response = !gIMMgr->hasSession(session_id);
+                gIMMgr->addMessage(session_id,
+                    from_id,
+                    name,
+                    buffer,
+                    IM_OFFLINE == offline,
+                    LLStringUtil::null,
+                    dialog,
+                    parent_estate_id,
+                    region_id,
+                    position,
+                    true);
+                if (send_response)
+                {
+                    std::string my_name;
+                    LLAgentUI::buildFullname(my_name);
+                    std::string response = gSavedPerAccountSettings.getString(sAutorespondNonFriend && !is_friend
+                        ? "AlchemyAutoresponseNotFriend"
+                        : "AlchemyAutoresponse");
+                    response = replace_wildcards(response, from_id, name);
+                    pack_instant_message(
+                        gMessageSystem,
+                        gAgent.getID(),
+                        FALSE,
+                        gAgent.getSessionID(),
+                        from_id,
+                        my_name,
+                        response,
+                        IM_ONLINE,
+                        IM_DO_NOT_DISTURB_AUTO_RESPONSE,
+                        session_id);
+                    gAgent.sendReliableMessage();
+                    gIMMgr->addMessage(session_id, gAgent.getID(), my_name, LLTrans::getString("AutoresponsePrefix").append(response));
+                }
             }
             else if (from_id.isNull())
             {
@@ -1339,6 +1412,10 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             {
                 return;
             }
+            else if ((AlchemyRejectTeleportOffers && (!AlchemyDontRejectTeleportOffersFromFriends || (AlchemyDontRejectTeleportOffersFromFriends && !is_friend))) && (!fRlvAutoAccept))
+            {
+                send_rejecting_tp_offers_message(gMessageSystem, from_id);
+            }
             else
             {
 //              if (is_do_not_disturb)
@@ -1616,6 +1693,12 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             payload["session_id"] = session_id;;
             payload["online"] = (offline == IM_ONLINE);
             payload["sender"] = sender.getIPandPort();
+
+            if (AlchemyRejectFriendshipRequests)
+            {
+                send_rejecting_friendship_requests_message(gMessageSystem, from_id);
+                return;
+            }
 
             bool add_notification = true;
             for (auto& panel : LLToastNotifyPanel::instance_snapshot())

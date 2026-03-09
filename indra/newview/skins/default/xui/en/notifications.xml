@@ -13368,4 +13368,64 @@ Can't restore the camera view because the camera position is beyond draw distanc
    type="alertmodal">
 Restore to Last Position is not allowed for no copy items to prevent possible content loss.
   </notification>
+ <notification
+      icon="alert.tga"
+      name="RejectTeleportOffersModeSet"
+      type="alert">
+   Reject all incoming teleport offers and requests mode is on.
+   Incoming teleport offers and requests from anyone will now be rejected with your configured autoresponse. You will not be notified because of that fact.
+      <usetemplate
+      ignoretext="I change my status to reject all teleport offers and requests mode"
+      name="okignore"
+      yestext="OK"/>
+  </notification>
+   <notification
+      icon="alert.tga"
+      name="RejectTeleportOffersModeWarning"
+      type="alert">
+      You cannot send a teleport request at the moment, because &apos;reject all incoming teleport offers and requests&apos; mode is on.
+      <usetemplate
+      name="okbutton"
+      yestext="OK"/>
+  </notification>
+  <notification
+   icon="alert.tga"
+   name="RejectFriendshipRequestsModeSet"
+   type="alert">
+Reject all incoming friendship requests mode is on.
+Incoming friendship requests will now be rejected with your configured autoresponse. You will not be notified.
+    <usetemplate
+     ignoretext="I change my status to reject all friendship requests mode"
+     name="okignore"
+     yestext="OK"/>
+  </notification>
+  <notification
+     icon="notifytip.tga"
+     name="IgnoredAdHocSession"
+     type="notifytip">
+You've been invited to a conference (ad-hoc) chat by [AVATAR_NAME], but the viewer automatically ignored it because of your settings.
+  </notification>
+  <notification
+   icon="alert.tga"
+   name="AutoRespondModeSet"
+   type="alert">
+Autorespond mode is on.
+Incoming instant messages will now be answered with your configured autoresponse.
+    <usetemplate
+     ignoretext="I change my status to autorespond mode"
+     name="okignore"
+     yestext="OK"/>
+  </notification>
+
+    <notification
+   icon="alert.tga"
+   name="AutoRespondNonFriendsModeSet"
+   type="alert">
+Autorespond mode for non-friends is on.
+Incoming instant messages from anyone who is not your friend will now be answered with your configured autoresponse.
+    <usetemplate
+     ignoretext="I change my status to autorespond mode for non-friends"
+     name="okignore"
+     yestext="OK"/>
+  </notification>
 </notifications>

@@ -403,6 +403,16 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
     mCommitCallbackRegistrar.add("Pref.RemoveSkin", boost::bind(&LLFloaterPreference::onRemoveSkin, this));
     mCommitCallbackRegistrar.add("Pref.ApplySkin", boost::bind(&LLFloaterPreference::onApplySkin, this));
     mCommitCallbackRegistrar.add("Pref.SelectSkin", boost::bind(&LLFloaterPreference::onSelectSkin, this, _2));
+
+    mCommitCallbackRegistrar.add("Pref.ResetControlDefault", [](LLUICtrl* ctrl, const LLSD& userdata)
+        {
+            const std::string& control_name = userdata.asString();
+            LLControlVariable* controlp = gSavedSettings.getControl(control_name);
+            if (controlp)
+            {
+                controlp->resetToDefault(true);
+            }
+        });
 }
 
 void LLFloaterPreference::processProperties( void* pData, EAvatarProcessorType type )
@@ -522,6 +532,8 @@ bool LLFloaterPreference::postBuild()
     if (LLStartUp::getStartupState() < STATE_STARTED)
     {
         gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
+        gSavedPerAccountSettings.setString("ALRejectTeleportOffersResponse", LLTrans::getString("RejectTeleportOffersResponseDefault"));
+        gSavedPerAccountSettings.setString("ALRejectFriendshipRequestsResponse", LLTrans::getString("RejectFriendshipRequestsResponseDefault"));
     }
 
     // set 'enable' property for 'Clear log...' button
@@ -586,6 +598,48 @@ void LLFloaterPreference::onDoNotDisturbResponseChanged()
                     != getChild<LLUICtrl>("do_not_disturb_response")->getValue().asString();
 
     gSavedPerAccountSettings.setBOOL("DoNotDisturbResponseChanged", response_changed_flag );
+}
+
+void LLFloaterPreference::onRejectTeleportOffersResponseChanged()
+{
+    bool reject_teleport_offers_response_changed_flag =
+        LLTrans::getString("RejectTeleportOffersResponseDefault")
+            != getChild<LLUICtrl>("autorespond_rto_response")->getValue().asString();
+
+    gSavedPerAccountSettings.setBOOL("ALRejectTeleportOffersResponseChanged", reject_teleport_offers_response_changed_flag);
+}
+
+void LLFloaterPreference::onRejectFriendshipRequestResponseChanged()
+{
+    bool reject_friendship_request_response_changed_flag =
+        LLTrans::getString("RejectFriendshipRequestsResponseDefault")
+            != getChild<LLUICtrl>("autorespond_reject_friends_response")->getValue().asString();
+
+    gSavedPerAccountSettings.setBOOL("ALRejectFriendshipRequestsChanged", reject_friendship_request_response_changed_flag);
+}
+
+void LLFloaterPreference::onAdHocSelectionChanged(const LLSD& newvalue)
+{
+    S32 value = gSavedPerAccountSettings.getS32("AlchemyIgnoreAdHocSessions");
+    getChild<LLCheckBoxCtrl>("AlchemyReportIgnoredAdHocSession")->setEnabled(value != 0);
+}
+
+void LLFloaterPreference::onAutoRespondResponseChanged()
+{
+    bool auto_response_changed_flag =
+            LLTrans::getString("AutoResponseModeDefault")
+                    != getChild<LLUICtrl>("autorespond_response")->getValue().asString();
+
+    gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseChanged", auto_response_changed_flag);
+}
+
+void LLFloaterPreference::onAutoRespondNonFriendsResponseChanged()
+{
+    bool auto_response_non_friends_changed_flag =
+            LLTrans::getString("AutoResponseModeNonFriendsDefault")
+                    != getChild<LLUICtrl>("autorespond_nf_response")->getValue().asString();
+
+    gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendChanged", auto_response_non_friends_changed_flag);
 }
 
 ////////////////////////////////////////////////////
@@ -857,6 +911,10 @@ LLFloaterPreference::~LLFloaterPreference()
     }
     mComplexityChangedSignal.disconnect();
     mImpostorsChangedSignal.disconnect();
+    mRejectTeleportConnection.disconnect();
+    mRejectFriendshipRequestsConnection.disconnect();
+    mAutoResponseConnection.disconnect();
+    mAutoResponseNonFriendsConnection.disconnect();
 }
 
 void LLFloaterPreference::draw()
@@ -943,6 +1001,15 @@ void LLFloaterPreference::apply()
         }
     }
 
+    // Setting this up so we sync the settings with menu.
+    // i.e Checking the checkox form the Preferences will also check it in the menu.
+    // --Fallen
+    bool autoresponse_enabled = getChild<LLCheckBoxCtrl>("AlchemyAutoresponseEnable")->get();
+    bool autoresponse_notfriends_enabled = getChild<LLCheckBoxCtrl>("AlchemyAutoresponseNotFriendEnable")->get();
+
+    gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseEnable", autoresponse_enabled);
+    gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendEnable", autoresponse_notfriends_enabled);
+
     saveAvatarProperties();
 }
 
@@ -1017,7 +1084,10 @@ void LLFloaterPreference::onOpen(const LLSD& key)
         // this connection is needed to properly set "DoNotDisturbResponseChanged" setting when user makes changes in
         // do not disturb response message.
         gSavedPerAccountSettings.getControl("DoNotDisturbModeResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onDoNotDisturbResponseChanged, this));
-    }
+        mRejectTeleportConnection = gSavedPerAccountSettings.getControl("ALRejectTeleportOffersResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onRejectTeleportOffersResponseChanged, this));
+        mRejectFriendshipRequestsConnection = gSavedPerAccountSettings.getControl("ALRejectFriendshipRequestsResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onRejectFriendshipRequestResponseChanged, this));
+        mAutoResponseConnection = gSavedPerAccountSettings.getControl("AlchemyAutoresponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onAutoRespondResponseChanged, this));
+        mAutoResponseNonFriendsConnection = gSavedPerAccountSettings.getControl("AlchemyAutoresponseNotFriend")->getSignal()->connect(boost::bind(&LLFloaterPreference::onAutoRespondNonFriendsResponseChanged, this));    }
     gAgent.sendAgentUserInfoRequest();
 
     /////////////////////////// From LLPanelGeneral //////////////////////////
@@ -1138,14 +1208,53 @@ void LLFloaterPreference::onAvatarImpostorsEnable()
 }
 
 //static
-void LLFloaterPreference::initDoNotDisturbResponse()
+// NOTE: This was moved to the section below as we may add more autoresponses.
+// - [x] Do Not Disturb
+// - [x] Reject Teleport
+// - [ ] Autoresponses.
+// - [ ] ....
+//
+// -- Fallen
+// void LLFloaterPreference::initDoNotDisturbResponse()
+//     {
+//         if (!gSavedPerAccountSettings.getBOOL("DoNotDisturbResponseChanged"))
+//         {
+//             //LLTrans::getString("DoNotDisturbModeResponseDefault") is used here for localization (EXT-5885)
+//             gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
+//         }
+//     }
+
+// static
+void LLFloaterPreference::initAutoResponses()
+{
+    // NOTE: Combined the initDoNotDisturbReponse
+    // -- Fallen
+    if (!gSavedPerAccountSettings.getBOOL("DoNotDisturbResponseChanged"))
     {
-        if (!gSavedPerAccountSettings.getBOOL("DoNotDisturbResponseChanged"))
-        {
-            //LLTrans::getString("DoNotDisturbModeResponseDefault") is used here for localization (EXT-5885)
-            gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
-        }
+        //LLTrans::getString("DoNotDisturbModeResponseDefault") is used here for localization (EXT-5885)
+        gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
     }
+
+    if (!gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersResponseChanged"))
+    {
+        gSavedPerAccountSettings.setString("ALRejectTeleportOffersResponse", LLTrans::getString("RejectTeleportOffersResponseDefault"));
+    }
+
+    if (!gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsChanged"))
+    {
+        gSavedPerAccountSettings.setString("ALRejectFriendshipRequestsResponse", LLTrans::getString("RejectFriendshipRequestsResponseDefault"));
+    }
+
+    if (!gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseEnable"))
+    {
+        gSavedPerAccountSettings.setString("AlchemyAutoresponse", LLTrans::getString("AutoResponseModeDefault"));
+    }
+
+    if (!gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseNotFriendEnable"))
+    {
+        gSavedPerAccountSettings.setString("AlchemyAutoresponseNotFriend", LLTrans::getString("AutoResponseModeNonFriendsDefault"));
+    }
+}
 
 //static
 void LLFloaterPreference::updateShowFavoritesCheckbox(bool val)

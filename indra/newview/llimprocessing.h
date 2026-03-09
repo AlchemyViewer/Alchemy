@@ -60,5 +60,9 @@ private:
     static void requestOfflineMessagesLegacy();
 };
 
+// Resurrect the Autorespond from the archive
+// -- Fallen
+// Replace wild cards in message strings
+std::string replace_wildcards(std::string input, const LLUUID& id, const std::string& name);
 
 #endif  // LL_LLLLIMPROCESSING_H
