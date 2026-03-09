@@ -442,7 +442,7 @@ void LLFloaterPreference::saveAvatarProperties( void )
         {
             mAllowPublish = allowPublish;
 
-            LLCoros::instance().launch("requestAgentUserInfoCoro",
+            LLCoros::instance().launch("saveAvatarPropertiesCoro",
                 boost::bind(saveAvatarPropertiesCoro, cap_url, allowPublish));
         }
     }

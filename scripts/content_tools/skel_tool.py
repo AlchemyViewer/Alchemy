@@ -83,10 +83,10 @@ def enforce_alias_rules(tree, element, fix=False):
     if name:
         std_alias = "avatar_" + name
         if not std_alias in alias_lis:
-            print "missing expected alias",name,std_alias
+            print("missing expected alias",name,std_alias)
         for alias in alias_lis:
             if alias.startswith("avatar_") and alias != std_alias:
-                print "invalid avatar_ alias",name,alias
+                print("invalid avatar_ alias",name,alias)
 
 def enforce_symmetry(tree, element, field, fix=False):
     name = element.get("name")

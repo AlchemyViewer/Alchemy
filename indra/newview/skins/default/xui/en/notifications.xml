@@ -2667,7 +2667,7 @@ Select objects with scripts.
 	
   <notification
    icon="alertmodal.tga"
-   name="CannotResetSelectObjectsNoPermission"
+   name="CannotDeleteSelectObjectsNoPermission"
    type="alertmodal">
 Not able to perform &apos;delete&apos;.
 
