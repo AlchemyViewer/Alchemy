@@ -2064,19 +2064,26 @@ bool idle_startup()
             return false;
         }
 
+        // set up callbacks
+        LL_INFOS() << "Registering Callbacks" << LL_ENDL;
+        LLMessageSystem* msg = gMessageSystem;
+        LL_INFOS() << " Inventory" << LL_ENDL;
+        LLInventoryModel::registerCallbacks(msg);
+        LL_INFOS() << " Landmark" << LL_ENDL;
+        LLLandmark::registerCallbacks(msg);
+        do_startup_frame();
+
         LLInventoryModelBackgroundFetch::instance().start();
         LLAppearanceMgr::instance().initCOFID();
-        LLUUID cof_id = LLAppearanceMgr::instance().getCOF();
-        LLViewerInventoryCategory* cof = gInventory.getCategory(cof_id);
-        if (cof
-            && cof->getVersion() == LLViewerInventoryCategory::VERSION_UNKNOWN)
+        LLUUID                     cof_id = LLAppearanceMgr::instance().getCOF();
+        LLViewerInventoryCategory* cof    = gInventory.getCategory(cof_id);
+        if (cof && cof->getVersion() == LLViewerInventoryCategory::VERSION_UNKNOWN)
         {
             // Special case, dupplicate request prevention.
             // Cof folder will be requested via FetchCOF
             // in appearance manager, prevent recursive fetch
             cof->setFetching(LLViewerInventoryCategory::FETCH_RECURSIVE);
         }
-
 
         // It's debatable whether this flag is a good idea - sets all
         // bits, and in general it isn't true that inventory
@@ -2085,15 +2092,6 @@ bool idle_startup()
         gInventory.addChangedMask(LLInventoryObserver::ALL, LLUUID::null);
         gInventory.notifyObservers();
 
-        do_startup_frame();
-
-        // set up callbacks
-        LL_INFOS() << "Registering Callbacks" << LL_ENDL;
-        LLMessageSystem* msg = gMessageSystem;
-        LL_INFOS() << " Inventory" << LL_ENDL;
-        LLInventoryModel::registerCallbacks(msg);
-        LL_INFOS() << " Landmark" << LL_ENDL;
-        LLLandmark::registerCallbacks(msg);
         do_startup_frame();
 
         // request all group information
