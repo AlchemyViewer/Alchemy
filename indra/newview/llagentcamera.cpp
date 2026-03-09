@@ -3231,29 +3231,29 @@ S32 LLAgentCamera::directionToKey(S32 direction)
 
 void LLAgentCamera::storeCameraPosition()
 {
-    gSavedPerAccountSettings.setVector3d("AlchemyStoredCameraPos", getCameraPositionGlobal());
+    gSavedPerAccountSettings.setVector3d("ALStoredCameraPos", getCameraPositionGlobal());
 
     // get a vector pointing forward from the camera view manually, getFocusTargetGlobal() will
     // not return useful values if the camera is in flycam mode or was just switched out of
     // flycam  mode and not repositioned after
     LLVector3d forward = LLVector3d(1.0, 0.0, 0.0) * LLViewerCamera::getInstance()->getQuaternion() + getCameraPositionGlobal();
-    gSavedPerAccountSettings.setVector3d("AlchemyStoredCameraFocus", forward);
-    gSavedPerAccountSettings.setF32("AlchemyStoredCameraRoll", mRollAngle);
+    gSavedPerAccountSettings.setVector3d("ALStoredCameraFocus", forward);
+    gSavedPerAccountSettings.setF32("ALStoredCameraRoll", mRollAngle);
 
     LLUUID stored_camera_focus_object_id = LLUUID::null;
     if (mFocusObject)
     {
         stored_camera_focus_object_id = mFocusObject->getID();
     }
-    gSavedPerAccountSettings.setString("AlchemyStoredCameraFocusObjectId", stored_camera_focus_object_id.asString());
+    gSavedPerAccountSettings.setString("ALStoredCameraFocusObjectId", stored_camera_focus_object_id.asString());
 }
 
 void LLAgentCamera::loadCameraPosition()
 {
-    LLVector3d stored_camera_pos = gSavedPerAccountSettings.getVector3d("AlchemyStoredCameraPos");
-    LLVector3d stored_camera_focus = gSavedPerAccountSettings.getVector3d("AlchemyStoredCameraFocus");
-    F32 stored_camera_roll = gSavedPerAccountSettings.getF32("AlchemyStoredCameraRoll");
-    LLUUID stored_camera_focus_object_id = LLUUID(gSavedPerAccountSettings.getString("AlchemyStoredCameraFocusObjectId"));
+    LLVector3d stored_camera_pos = gSavedPerAccountSettings.getVector3d("ALStoredCameraPos");
+    LLVector3d stored_camera_focus = gSavedPerAccountSettings.getVector3d("ALStoredCameraFocus");
+    F32 stored_camera_roll = gSavedPerAccountSettings.getF32("ALStoredCameraRoll");
+    LLUUID stored_camera_focus_object_id = LLUUID(gSavedPerAccountSettings.getString("ALStoredCameraFocusObjectId"));
 
     F32 renderFarClip = gSavedSettings.getF32("RenderFarClip");
     F32 far_clip_squared = renderFarClip * renderFarClip;

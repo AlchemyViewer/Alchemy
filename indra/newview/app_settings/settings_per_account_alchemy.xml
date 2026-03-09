@@ -187,7 +187,7 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>AlchemyStoredCameraPos</key>
+        <key>ALStoredCameraPos</key>
         <map>
             <key>Comment</key>
             <string>Stored camera position in camera tools</string>
@@ -202,7 +202,7 @@
                 <real>0.0</real>
             </array>
         </map>
-        <key>AlchemyStoredCameraFocus</key>
+        <key>ALStoredCameraFocus</key>
         <map>
             <key>Comment</key>
             <string>Stored camera focus position in camera tools</string>
@@ -217,7 +217,7 @@
                 <real>0.0</real>
             </array>
         </map>
-        <key>AlchemyStoredCameraRoll</key>
+        <key>ALStoredCameraRoll</key>
         <map>
             <key>Comment</key>
             <string>Stored camera roll in camera tools</string>
@@ -228,7 +228,7 @@
             <key>Value</key>
             <real>0.0</real>
         </map>
-        <key>AlchemyStoredCameraFocusObjectId</key>
+        <key>ALStoredCameraFocusObjectId</key>
         <map>
             <key>Comment</key>
             <string>Stored object ID of camera focus in camera tools</string>
