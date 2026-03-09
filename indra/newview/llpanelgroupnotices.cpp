@@ -539,6 +539,7 @@ void LLPanelGroupNotices::processNotices(LLMessageSystem* msg)
         msg->getBOOLFast(_PREHASH_Data, _PREHASH_HasAttachment, has_attachment, i);
         msg->getU8Fast(_PREHASH_Data, _PREHASH_AssetType, asset_type, i);
         msg->getU32Fast(_PREHASH_Data, _PREHASH_Timestamp, timestamp, i);
+
         // we only have the legacy name here, convert it to a username
         name = LLCacheName::buildUsername(name);
 

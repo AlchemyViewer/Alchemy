@@ -31,6 +31,7 @@
 
 #include "message.h"
 
+#include "alfloatergroupprofile.h"
 #include "llagent.h"
 #include "llcommandhandler.h"
 #include "llfloaterreg.h"
@@ -54,11 +55,11 @@
 //
 static LLGroupChatListener sGroupChatListener;
 
-class LLGroupHandler : public LLCommandHandler
+class LLGroupCommandHandler : public LLCommandHandler
 {
 public:
     // requires trusted browser to trigger
-    LLGroupHandler() : LLCommandHandler("group", UNTRUSTED_THROTTLE) { }
+    LLGroupCommandHandler() : LLCommandHandler("group", UNTRUSTED_THROTTLE) { }
 
     virtual bool canHandleUntrusted(
         const LLSD& params,
@@ -148,7 +149,7 @@ public:
         return false;
     }
 };
-LLGroupHandler gGroupHandler;
+LLGroupCommandHandler gGroupHandler;
 
 // This object represents a pending request for specified group member information
 // which is needed to check whether avatar can leave group
@@ -440,45 +441,69 @@ void LLGroupActions::show(const LLUUID &group_id, bool expand_notices_tab)
 
     LLSD params;
     params["group_id"] = group_id;
-    params["open_tab_name"] = "panel_group_info_sidetray";
     if (expand_notices_tab)
     {
         params["action"] = "show_notices";
     }
 
-    LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
-    LLFloater *floater = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>("people");
-    if (!floater->isFrontmost())
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
-        floater->setVisibleAndFrontmost(true, params);
+        ALFloaterGroupProfile::showInstance(params, true);
+    }
+    else
+    {
+        LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+        LLFloater *floater = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>("people");
+        if (!floater->isFrontmost())
+        {
+            floater->setVisibleAndFrontmost(true, params);
+        }
     }
 }
 
-void LLGroupActions::refresh_notices()
+void LLGroupActions::refresh_notices(const LLUUID& group_id)
 {
-    if(!isGroupUIVisible())
-        return;
-
     LLSD params;
-    params["group_id"] = LLUUID::null;
-    params["open_tab_name"] = "panel_group_info_sidetray";
+    params["group_id"] = group_id;
     params["action"] = "refresh_notices";
 
-    LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
+    {
+        if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
+        {
+            ALFloaterGroupProfile::showInstance(params, false);
+        }
+    }
+    else
+    {
+        if (isGroupUIVisible())
+        {
+            LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+        }
+    }
 }
 
 //static
 void LLGroupActions::refresh(const LLUUID& group_id)
 {
-    if(!isGroupUIVisible())
-        return;
-
     LLSD params;
     params["group_id"] = group_id;
-    params["open_tab_name"] = "panel_group_info_sidetray";
     params["action"] = "refresh";
 
-    LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
+    {
+        if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
+        {
+            ALFloaterGroupProfile::showInstance(params, true);
+        }
+    }
+    else
+    {
+        if (isGroupUIVisible())
+        {
+            LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+        }
+    }
 }
 
 //static
@@ -486,24 +511,29 @@ void LLGroupActions::createGroup()
 {
     LLSD params;
     params["group_id"] = LLUUID::null;
-    params["open_tab_name"] = "panel_group_creation_sidetray";
     params["action"] = "create";
 
-    LLFloaterSidePanelContainer::showPanel("people", "panel_group_creation_sidetray", params);
-
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
+    {
+        ALFloaterGroupProfile::showInstance(params, true);
+    }
+    else
+    {
+        LLFloaterSidePanelContainer::showPanel("people", "panel_group_creation_sidetray", params);
+    }
 }
 //static
 void LLGroupActions::closeGroup(const LLUUID& group_id)
 {
-    if(!isGroupUIVisible())
-        return;
+    LLFloaterReg::hideInstance("group_profile", LLSD(group_id));
 
-    LLSD params;
-    params["group_id"] = group_id;
-    params["open_tab_name"] = "panel_group_info_sidetray";
-    params["action"] = "close";
-
-    LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+    if (isGroupUIVisible())
+    {
+        LLSD params;
+        params["group_id"] = group_id;
+        params["action"] = "close";
+        LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+    }
 }
 
 

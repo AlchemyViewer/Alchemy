@@ -87,7 +87,7 @@ bool LLGroupHandler::processNotification(const LLNotificationPtr& notification, 
     if(channel)
         channel->addToast(p);
 
-    LLGroupActions::refresh_notices();
+    LLGroupActions::refresh_notices(notification->getPayload()["group_id"].asUUID());
 
     return false;
 }

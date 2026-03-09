@@ -166,7 +166,8 @@ Maximum 200 per group daily
          spellcheck="true"
          top_delta="0"
          width="218"
-         word_wrap="true" />
+         word_wrap="true"
+         show_emoji_helper="true" />
         <text
          follows="left|top"
          type="string"
