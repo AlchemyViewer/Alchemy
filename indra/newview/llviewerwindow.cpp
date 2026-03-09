@@ -2495,7 +2495,8 @@ void LLViewerWindow::initWorldUI()
         mNavBarContainer->setVisible(true);
     }
 
-    if (!gSavedSettings.getBOOL("ShowNavbarNavigationPanel"))
+    const U32 location_bar = gSavedSettings.getU32("NavigationBarStyle");
+    if (location_bar != 2)
     {
         navbar->setVisible(false);
     }
@@ -2512,7 +2513,7 @@ void LLViewerWindow::initWorldUI()
     mTopInfoContainer->addChild(topinfo_bar);
     mTopInfoContainer->setVisible(true);
 
-    if (!gSavedSettings.getBOOL("ShowMiniLocationPanel"))
+    if (gSavedSettings.getU32("NavigationBarStyle") != 1)
     {
         topinfo_bar->setVisible(false);
     }
@@ -2857,7 +2858,7 @@ void LLViewerWindow::setNormalControlsVisible( bool visible )
     {
         // when it's time to show navigation bar we need to ensure that the user wants to see it
         // i.e. ShowNavbarNavigationPanel option is true
-        mNavBarContainer->setVisible( visible && gSavedSettings.getBOOL("ShowNavbarNavigationPanel") );
+        mNavBarContainer->setVisible( visible && (gSavedSettings.getU32("NavigationBarStyle") == 2));
     }
 }
 
@@ -6389,34 +6390,31 @@ LLRect LLViewerWindow::getChatConsoleRect()
 
 void LLViewerWindow::reshapeStatusBarContainer()
 {
-    S32 new_height = mStatusBarContainer->getRect().getHeight();
+    static S32 original_status_bar_height = mStatusBarContainer->getRect().getHeight();
+    S32 new_height = original_status_bar_height;
     S32 new_width = mStatusBarContainer->getRect().getWidth();
 
-    if (gSavedSettings.getBOOL("ShowNavbarNavigationPanel"))
+    if (gSavedSettings.getU32("NavigationBarStyle") == 2)
     {
         // Navigation bar is outside visible area, expand status_bar_container to show it
         new_height += mNavBarContainer->getRect().getHeight();
     }
-    else
-    {
-        // collapse status_bar_container
-        new_height -= mNavBarContainer->getRect().getHeight();
-    }
+
     mStatusBarContainer->reshape(new_width, new_height, true);
 }
 
-void LLViewerWindow::resetStatusBarContainer()
-{
-    LLNavigationBar* navbar = LLNavigationBar::getInstance();
-    if (gSavedSettings.getBOOL("ShowNavbarNavigationPanel") || navbar->getVisible())
-    {
-        // was previously showing navigation bar
-        S32 new_height = mStatusBarContainer->getRect().getHeight();
-        S32 new_width = mStatusBarContainer->getRect().getWidth();
-        new_height -= mNavBarContainer->getRect().getHeight();
-        mStatusBarContainer->reshape(new_width, new_height, true);
-    }
-}
+//void LLViewerWindow::resetStatusBarContainer()
+//{
+//    LLNavigationBar* navbar = LLNavigationBar::getInstance();
+//    if (gSavedSettings.getBOOL("ShowNavbarNavigationPanel") || navbar->getVisible())
+//    {
+//        // was previously showing navigation bar
+//        S32 new_height = mStatusBarContainer->getRect().getHeight();
+//        S32 new_width = mStatusBarContainer->getRect().getWidth();
+//        new_height -= mNavBarContainer->getRect().getHeight();
+//        mStatusBarContainer->reshape(new_width, new_height, true);
+//    }
+//}
 //----------------------------------------------------------------------------
 
 
@@ -6439,8 +6437,9 @@ void LLViewerWindow::setUIVisibility(bool visible)
         gToolBarView->setToolBarsVisible(visible);
     }
 
-    LLNavigationBar::getInstance()->setVisible(visible ? gSavedSettings.getBOOL("ShowNavbarNavigationPanel") : false);
-    LLPanelTopInfoBar::getInstance()->setVisible(visible? gSavedSettings.getBOOL("ShowMiniLocationPanel") : false);
+    const U32 location_bar = gSavedSettings.getU32("NavigationBarStyle");
+    LLNavigationBar::getInstance()->setVisible(visible ? (location_bar == 2) : FALSE);
+    LLPanelTopInfoBar::getInstance()->setVisible(visible ? (location_bar == 1) : FALSE);
     mStatusBarContainer->setVisible(visible);
 }
 

@@ -2,6 +2,17 @@
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="llsd.xsd">
     <map>
+        <key>AlchemyDisableClickToSit</key>
+        <map>
+            <key>Comment</key>
+            <string>Disable automatic sit upon click for sit click action targets</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyCameraFloaterExpanded</key>
         <map>
             <key>Comment</key>
@@ -575,6 +586,17 @@
             <key>Value</key>
             <integer>30</integer>
         </map>
+        <key>AlchemyRevokeObjectPerms</key>
+        <map>
+            <key>Comment</key>
+            <string>Revoke permissions on object on sit(1), stand(2) or both(3)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRezUnderLandGroup</key>
         <map>
             <key>Comment</key>
@@ -732,6 +754,17 @@
             <key>Value</key>
             <boolean>1</boolean>
         </map>
+        <key>ShowStatusBarTime</key>
+        <map>
+            <key>Comment</key>
+            <string>Show Time in Status Bar</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ShowStatusBarSeconds</key>
         <map>
             <key>Comment</key>
@@ -764,6 +797,17 @@
             <string>LLSD</string>
             <key>Value</key>
             <string />
+        </map>
+        <key>Use24HourClockInStatusBar</key>
+        <map>
+            <key>Comment</key>
+            <string>12 vs 24. At the moment coverage is partial</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
         </map>
         <key>ALInspectColumnConfig</key>
         <map>
@@ -820,6 +864,52 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>NameTagHPad</key>
+        <map>
+            <key>Comment</key>
+            <string>Name tag horizontal padding</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <string>16.0</string>
+        </map>
+        <key>NameTagVPad</key>
+        <map>
+            <key>Comment</key>
+            <string>Name tag vertical padding</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <string>8.0</string>
+        </map>
+        <key>NameTagLinePad</key>
+        <map>
+            <key>Comment</key>
+            <string>Name tag line padding</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <string>1.0</string>
+        </map>
+        <key>NavigationBarStyle</key>
+        <map>
+            <key>Comment</key>
+            <string>
+                0 - none, 1 = mini, 2 = navigation
+            </string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>2</integer>
         </map>
         <key>ShowAdvancedHoverTips</key>
         <map>

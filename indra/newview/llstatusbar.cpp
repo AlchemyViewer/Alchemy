@@ -158,6 +158,7 @@ bool LLStatusBar::postBuild()
     gMenuBarView->setRightMouseDownCallback(boost::bind(&show_navbar_context_menu, _1, _2, _3));
 
     mTextTime = getChild<LLTextBox>("TimeText" );
+    mTextTime->setClickedCallback(boost::bind(&LLStatusBar::onClickToggleClockStyle, this));
 
     getChild<LLUICtrl>("buyL")->setCommitCallback(
         boost::bind(&LLStatusBar::onClickBuyCurrency, this));
@@ -194,6 +195,9 @@ bool LLStatusBar::postBuild()
     gSavedSettings.getControl("MuteAudio")->getSignal()->connect(boost::bind(&LLStatusBar::onVolumeChanged, this, _2));
     gSavedSettings.getControl("EnableVoiceChat")->getSignal()->connect(boost::bind(&LLStatusBar::onVoiceChanged, this, _2));
     gSavedSettings.getControl("ObscureBalanceInStatusBar")->getSignal()->connect(boost::bind(&LLStatusBar::onObscureBalanceChanged, this, _2));
+    gSavedSettings.getControl("Use24HourClockInStatusBar")->getSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
+    gSavedSettings.getControl("ShowStatusBarSeconds")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
+    gSavedSettings.getControl("ShowStatusBarTime")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
 
     if (!gSavedSettings.getBOOL("EnableVoiceChat") && LLAppViewer::instance()->isSecondInstance())
     {
@@ -280,12 +284,13 @@ bool LLStatusBar::postBuild()
     mFilterEdit->setCommitCallback(boost::bind(&LLStatusBar::onUpdateFilterTerm, this));
     collectSearchableItems();
     gSavedSettings.getControl("MenuSearch")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateMenuSearchVisibility, this, _2));
-    gSavedSettings.getControl("ShowStatusBarSeconds")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
 
     if (search_panel_visible)
     {
         updateMenuSearchPosition();
     }
+
+    updateClock();
 
     return true;
 }
@@ -308,8 +313,9 @@ void LLStatusBar::refresh()
     }
 
     // update clock every 10 seconds
+    static LLCachedControl<bool> show_clock(gSavedSettings, "ShowStatusBarTime", false);
     static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
-    if((mClockUpdateTimer.getElapsedTimeF32() > 10.f || (show_clock_seconds && mClockUpdateTimer.getElapsedTimeF32() > 1.f)))
+    if (show_clock && (mClockUpdateTimer.getElapsedTimeF32() > 10.f || (show_clock_seconds && mClockUpdateTimer.getElapsedTimeF32() > 1.f)))
     {
         mClockUpdateTimer.reset();
 
@@ -823,6 +829,7 @@ void LLStatusBar::setBalanceVisible(bool visible)
 
 void LLStatusBar::updateClock()
 {
+    static LLCachedControl<bool> use_24h(gSavedSettings, "Use24HourClockInStatusBar", false);
     static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
 
     // Get current UTC time, adjusted for the user's clock
@@ -830,7 +837,6 @@ void LLStatusBar::updateClock()
     time_t utc_time;
     utc_time = time_corrected();
 
-    static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
     std::string timeStr = show_clock_seconds ?
     use_24h ? getString("time_sec") : getString("time_ampm_sec") :
     use_24h ? getString("time") : getString("time_ampm");
@@ -844,6 +850,12 @@ void LLStatusBar::updateClock()
     std::string dtStr = getString("timeTooltip");
     LLStringUtil::format (dtStr, substitution);
     mTextTime->setToolTip (dtStr);
+}
+
+void LLStatusBar::onClickToggleClockStyle()
+{
+    gSavedSettings.setBOOL("Use24HourClockInStatusBar", !gSavedSettings.getBOOL("Use24HourClockInStatusBar"));
+    updateClock();
 }
 
 // Implements secondlife:///app/balance/request to request a L$ balance

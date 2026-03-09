@@ -129,6 +129,7 @@ private:
     void updateBalancePanelPosition();
 
     void updateClock();
+    void onClickToggleClockStyle();
 
     void onAOStateChanged();
 

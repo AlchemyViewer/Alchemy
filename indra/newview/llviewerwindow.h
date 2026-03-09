@@ -192,7 +192,7 @@ public:
     void            handlePieMenu(S32 x, S32 y, MASK mask);
 
     void            reshapeStatusBarContainer();
-    void            resetStatusBarContainer(); // undo changes done by resetStatusBarContainer on initWorldUI()
+    //void            resetStatusBarContainer(); // undo changes done by resetStatusBarContainer on initWorldUI()
 
     bool handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK mask, EMouseClickType clicktype, bool down, bool &is_toolmgr_action);
 

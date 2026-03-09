@@ -103,6 +103,7 @@
 #include "llanimstatelabels.h"
 #include "lltrans.h"
 #include "llappearancemgr.h"
+#include "llscriptruntimeperms.h"
 // [RLVa:KB] - Checked: RLVa-2.0.1
 #include "rlvactions.h"
 #include "rlvhandler.h"
@@ -643,6 +644,12 @@ S32 LLVOAvatar::sAvatarsNearby = 0;
 // Helper functions
 //-----------------------------------------------------------------------------
 static F32 calc_bouncy_animation(F32 x);
+
+void revoke_permissions_on_object(const LLUUID &object_id)
+{
+    U32 permissions = SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TRIGGER_ANIMATION].permbit | SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_OVERRIDE_ANIMATIONS].permbit;
+    gAgent.sendRevokePermissions(object_id, permissions);
+}
 
 //-----------------------------------------------------------------------------
 // LLVOAvatar()
@@ -8182,6 +8189,12 @@ void LLVOAvatar::sitOnObject(LLViewerObject *sit_object)
                 }
             }
         }
+
+        static LLCachedControl<U32> revoke_perms(gSavedSettings, "AlchemyRevokeObjectPerms");
+        if ((revoke_perms == 1 || revoke_perms == 3) && !sit_object->permYouOwner())
+        {
+            revoke_permissions_on_object(sit_object->getID());
+        }
     }
 
     if (mDrawable.isNull())
@@ -8284,6 +8297,12 @@ void LLVOAvatar::getOffObject()
         gAgent.resetAxes(at_axis);
         gAgentCamera.setThirdPersonHeadOffset(LLVector3(0.f, 0.f, 1.f));
         gAgentCamera.setSitCamera(LLUUID::null);
+
+        static LLCachedControl<U32> revoke_perms(gSavedSettings, "AlchemyRevokeObjectPerms");
+        if ((revoke_perms == 2 || revoke_perms == 3) && sit_object && !sit_object->permYouOwner())
+        {
+            revoke_permissions_on_object(sit_object->getID());
+        }
     }
 }
 

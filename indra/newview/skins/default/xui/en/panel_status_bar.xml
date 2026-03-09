@@ -142,6 +142,7 @@
      width="65" />
   </panel>
     <text
+     visibility_control="ShowStatusBarTime"
      type="string"
      font="SansSerifSmall"
      text_readonly_color="TimeTextColor"

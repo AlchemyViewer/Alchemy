@@ -3200,10 +3200,10 @@ void reset_login()
     // Hide any other stuff
     LLFloaterReg::hideVisibleInstances();
 
-    if (LLStartUp::getStartupState() > STATE_WORLD_INIT)
-    {
-        gViewerWindow->resetStatusBarContainer();
-    }
+    //if (LLStartUp::getStartupState() > STATE_WORLD_INIT)
+    //{
+    //    gViewerWindow->resetStatusBarContainer();
+    //}
     LLStartUp::setStartupState( STATE_BROWSER_INIT );
 
     if (LLVoiceClient::instanceExists())
