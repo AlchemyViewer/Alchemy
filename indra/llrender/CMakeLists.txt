@@ -71,6 +71,7 @@ if (BUILD_HEADLESS)
           llfilesystem
           llwindowheadless
           ll::freetype
+          ll::harfbuzz
           ll::nanosvg
           ll::glext
           OpenGL::GL
@@ -92,6 +93,7 @@ target_link_libraries(llrender
         llxml
         llwindow
         ll::freetype
+        ll::harfbuzz
         ll::glext
         )
 

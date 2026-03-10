@@ -49,6 +49,7 @@
       ]
     },
     "glm",
+    "harfbuzz",
     "hunspell",
     {
       "name": "libjpeg-turbo",
