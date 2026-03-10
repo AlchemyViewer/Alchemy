@@ -28,6 +28,8 @@
 #define LL_LLSTRING_H
 
 #include <boost/call_traits.hpp>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -232,10 +234,11 @@ LL_COMMON_API std::string ll_safe_string(const char* in, S32 maxlen);
 class LLFormatMapString
 {
 public:
-    LLFormatMapString() {};
+    LLFormatMapString() = default;
     LLFormatMapString(const char* s) : mString(ll_safe_string(s)) {};
     LLFormatMapString(const std::string& s) : mString(s) {};
-    operator std::string() const { return mString; }
+    operator const std::string&() const { return mString; }
+    const std::string& operator()() const { return mString; }
     bool operator<(const LLFormatMapString& rhs) const { return mString < rhs.mString; }
     std::size_t length() const { return mString.length(); }
 
@@ -315,6 +318,11 @@ public:
     static void trimHead(string_type& string);
     static void trimTail(string_type& string);
     static void trim(string_type& string)   { trimHead(string); trimTail(string); }
+
+    static void trimHead(string_view_type& string);
+    static void trimTail(string_view_type& string);
+    static void trim(string_view_type& string)   { trimHead(string); trimTail(string); }
+
     static void truncate(string_type& string, size_type count);
 
     static void toUpper(string_type& string);
@@ -329,8 +337,8 @@ public:
      * If etither string or substr are empty, this method returns false.
      */
     static bool startsWith(
-        const string_view_type& string,
-        const string_view_type& substr);
+        string_view_type string,
+        string_view_type substr);
 
     /**
      * @brief Returns true if string ends in substr
@@ -338,8 +346,8 @@ public:
      * If etither string or substr are empty, this method returns false.
      */
     static bool endsWith(
-        const string_view_type& string,
-        const string_view_type& substr);
+        string_view_type string,
+        string_view_type substr);
 
     /**
      * get environment string value with proper Unicode handling
@@ -365,7 +373,7 @@ public:
     static string_type capitalize(const string_type& str);
     static void capitalize(string_type& str);
 
-    static bool containsNonprintable(const string_type& string);
+    static bool containsNonprintable(string_view_type string);
     static void stripNonprintable(string_type& string);
 
     /**
@@ -391,15 +399,15 @@ public:
     static void _makeASCII(string_type& string);
 
     // Conversion to other data types
-    static bool convertToBOOL(const string_type& string, bool& value);
-    static bool convertToU8(const string_type& string, U8& value);
-    static bool convertToS8(const string_type& string, S8& value);
-    static bool convertToS16(const string_type& string, S16& value);
-    static bool convertToU16(const string_type& string, U16& value);
-    static bool convertToU32(const string_type& string, U32& value);
-    static bool convertToS32(const string_type& string, S32& value);
-    static bool convertToF32(const string_type& string, F32& value);
-    static bool convertToF64(const string_type& string, F64& value);
+    static bool convertToBOOL(string_view_type string, bool& value);
+    static bool convertToU8(string_view_type string, U8& value);
+    static bool convertToS8(string_view_type string, S8& value);
+    static bool convertToS16(string_view_type string, S16& value);
+    static bool convertToU16(string_view_type string, U16& value);
+    static bool convertToU32(string_view_type string, U32& value);
+    static bool convertToS32(string_view_type string, S32& value);
+    static bool convertToF32(string_view_type string, F32& value);
+    static bool convertToF64(string_view_type string, F64& value);
 
     /////////////////////////////////////////////////////////////////////////////////////////
     // Utility functions for working with char*'s and strings
@@ -1480,6 +1488,38 @@ void LLStringUtilBase<T>::trimTail(string_type& string)
     }
 }
 
+// static
+template<class T>
+void LLStringUtilBase<T>::trimHead(string_view_type& string)
+{
+    if (!string.empty())
+    {
+        size_type i = 0;
+        while (i < string.length() && LLStringOps::isSpace(string[i]))
+        {
+            i++;
+        }
+        string = string.substr(i);
+    }
+}
+
+// static
+template<class T>
+void LLStringUtilBase<T>::trimTail(string_view_type& string)
+{
+    if (string.size())
+    {
+        size_type len = string.length();
+        size_type i   = len;
+        while (i > 0 && LLStringOps::isSpace(string[i - 1]))
+        {
+            i--;
+        }
+
+        string = string.substr(0, i);
+    }
+}
+
 
 // Replace line feeds with carriage return-line feed pairs.
 //static
@@ -1664,7 +1704,7 @@ void LLStringUtilBase<T>::capitalize(string_type& str)
 
 //static
 template<class T>
-bool LLStringUtilBase<T>::containsNonprintable(const string_type& string)
+bool LLStringUtilBase<T>::containsNonprintable(string_view_type string)
 {
     const char MIN = 32;
     bool rv = false;
@@ -1817,8 +1857,8 @@ bool LLStringUtilBase<T>::isHead( const string_type& string, const T* s )
 // static
 template<class T>
 bool LLStringUtilBase<T>::startsWith(
-    const string_view_type& string,
-    const string_view_type& substr)
+    string_view_type string,
+    string_view_type substr)
 {
     if(string.empty() || (substr.empty())) return false;
     if (substr.length() > string.length()) return false;
@@ -1829,8 +1869,8 @@ bool LLStringUtilBase<T>::startsWith(
 // static
 template<class T>
 bool LLStringUtilBase<T>::endsWith(
-    const string_view_type& string,
-    const string_view_type& substr)
+    string_view_type string,
+    string_view_type substr)
 {
     if(string.empty() || (substr.empty())) return false;
     size_t sub_len = substr.length();
@@ -1873,34 +1913,33 @@ auto LLStringUtilBase<T>::getenv(const std::string& key, const string_type& dflt
 }
 
 template<class T>
-bool LLStringUtilBase<T>::convertToBOOL(const string_type& string, bool& value)
+bool LLStringUtilBase<T>::convertToBOOL(string_view_type string, bool& value)
 {
     if( string.empty() )
     {
         return false;
     }
 
-    string_type temp( string );
-    trim(temp);
+    trim(string);
     if(
-        (temp == "1") ||
-        (temp == "T") ||
-        (temp == "t") ||
-        (temp == "TRUE") ||
-        (temp == "true") ||
-        (temp == "True") )
+        (string == "1") ||
+        (string == "T") ||
+        (string == "t") ||
+        (string == "TRUE") ||
+        (string == "true") ||
+        (string == "True") )
     {
         value = true;
         return true;
     }
     else
     if(
-        (temp == "0") ||
-        (temp == "F") ||
-        (temp == "f") ||
-        (temp == "FALSE") ||
-        (temp == "false") ||
-        (temp == "False") )
+        (string == "0") ||
+        (string == "F") ||
+        (string == "f") ||
+        (string == "FALSE") ||
+        (string == "false") ||
+        (string == "False") )
     {
         value = false;
         return true;
@@ -1910,7 +1949,7 @@ bool LLStringUtilBase<T>::convertToBOOL(const string_type& string, bool& value)
 }
 
 template<class T>
-bool LLStringUtilBase<T>::convertToU8(const string_type& string, U8& value)
+bool LLStringUtilBase<T>::convertToU8(string_view_type string, U8& value)
 {
     S32 value32 = 0;
     bool success = convertToS32(string, value32);
@@ -1923,7 +1962,7 @@ bool LLStringUtilBase<T>::convertToU8(const string_type& string, U8& value)
 }
 
 template<class T>
-bool LLStringUtilBase<T>::convertToS8(const string_type& string, S8& value)
+bool LLStringUtilBase<T>::convertToS8(string_view_type string, S8& value)
 {
     S32 value32 = 0;
     bool success = convertToS32(string, value32);
@@ -1936,7 +1975,7 @@ bool LLStringUtilBase<T>::convertToS8(const string_type& string, S8& value)
 }
 
 template<class T>
-bool LLStringUtilBase<T>::convertToS16(const string_type& string, S16& value)
+bool LLStringUtilBase<T>::convertToS16(string_view_type string, S16& value)
 {
     S32 value32 = 0;
     bool success = convertToS32(string, value32);
@@ -1949,7 +1988,7 @@ bool LLStringUtilBase<T>::convertToS16(const string_type& string, S16& value)
 }
 
 template<class T>
-bool LLStringUtilBase<T>::convertToU16(const string_type& string, U16& value)
+bool LLStringUtilBase<T>::convertToU16(string_view_type string, U16& value)
 {
     S32 value32 = 0;
     bool success = convertToS32(string, value32);
@@ -1962,17 +2001,16 @@ bool LLStringUtilBase<T>::convertToU16(const string_type& string, U16& value)
 }
 
 template<class T>
-bool LLStringUtilBase<T>::convertToU32(const string_type& string, U32& value)
+bool LLStringUtilBase<T>::convertToU32(string_view_type string, U32& value)
 {
     if( string.empty() )
     {
         return false;
     }
 
-    string_type temp( string );
-    trim(temp);
+    trim(string);
     U32 v;
-    std::basic_istringstream<T> i_stream((string_type)temp);
+    boost::iostreams::stream<boost::iostreams::array_source> i_stream(string.data(), string.size());
     if(i_stream >> v)
     {
         value = v;
@@ -1982,17 +2020,16 @@ bool LLStringUtilBase<T>::convertToU32(const string_type& string, U32& value)
 }
 
 template<class T>
-bool LLStringUtilBase<T>::convertToS32(const string_type& string, S32& value)
+bool LLStringUtilBase<T>::convertToS32(string_view_type string, S32& value)
 {
     if( string.empty() )
     {
         return false;
     }
 
-    string_type temp( string );
-    trim(temp);
+    trim(string);
     S32 v;
-    std::basic_istringstream<T> i_stream((string_type)temp);
+    boost::iostreams::stream<boost::iostreams::array_source> i_stream(string.data(), string.size());
     if(i_stream >> v)
     {
         //TODO: figure out overflow and underflow reporting here
@@ -2009,7 +2046,7 @@ bool LLStringUtilBase<T>::convertToS32(const string_type& string, S32& value)
 }
 
 template<class T>
-bool LLStringUtilBase<T>::convertToF32(const string_type& string, F32& value)
+bool LLStringUtilBase<T>::convertToF32(string_view_type string, F32& value)
 {
     F64 value64 = 0.0;
     bool success = convertToF64(string, value64);
@@ -2022,17 +2059,16 @@ bool LLStringUtilBase<T>::convertToF32(const string_type& string, F32& value)
 }
 
 template<class T>
-bool LLStringUtilBase<T>::convertToF64(const string_type& string, F64& value)
+bool LLStringUtilBase<T>::convertToF64(string_view_type string, F64& value)
 {
     if( string.empty() )
     {
         return false;
     }
 
-    string_type temp( string );
-    trim(temp);
+    trim(string);
     F64 v;
-    std::basic_istringstream<T> i_stream((string_type)temp);
+    boost::iostreams::stream<boost::iostreams::array_source> i_stream(string.data(), string.size());
     if(i_stream >> v)
     {
         //TODO: figure out overflow and underflow reporting here

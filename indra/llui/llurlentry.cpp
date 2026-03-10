@@ -403,9 +403,9 @@ bool LLUrlEntryInvalidSLURL::isSLURLvalid(const std::string &url) const
     if (path_parts == actual_parts)
     {
         // handle slurl with (X,Y,Z) coordinates
-        LLStringUtil::convertToS32(path_array[path_parts-3],x);
-        LLStringUtil::convertToS32(path_array[path_parts-2],y);
-        LLStringUtil::convertToS32(path_array[path_parts-1],z);
+        LLStringUtil::convertToS32(path_array[path_parts - 3].asStringRef(), x);
+        LLStringUtil::convertToS32(path_array[path_parts - 2].asStringRef(), y);
+        LLStringUtil::convertToS32(path_array[path_parts - 1].asStringRef(), z);
 
         if((x>= 0 && x<= 256) && (y>= 0 && y<= 256) && (z>= 0))
         {
@@ -416,8 +416,8 @@ bool LLUrlEntryInvalidSLURL::isSLURLvalid(const std::string &url) const
     {
         // handle slurl with (X,Y) coordinates
 
-        LLStringUtil::convertToS32(path_array[path_parts-2],x);
-        LLStringUtil::convertToS32(path_array[path_parts-1],y);
+        LLStringUtil::convertToS32(path_array[path_parts - 2].asStringRef(), x);
+        LLStringUtil::convertToS32(path_array[path_parts - 1].asStringRef(), y);
         ;
         if((x>= 0 && x<= 256) && (y>= 0 && y<= 256))
         {
@@ -427,7 +427,7 @@ bool LLUrlEntryInvalidSLURL::isSLURLvalid(const std::string &url) const
     else if (path_parts == (actual_parts-2))
     {
         // handle slurl with (X) coordinate
-        LLStringUtil::convertToS32(path_array[path_parts-1],x);
+        LLStringUtil::convertToS32(path_array[path_parts - 1].asStringRef(), x);
         if(x>= 0 && x<= 256)
         {
             return true;
