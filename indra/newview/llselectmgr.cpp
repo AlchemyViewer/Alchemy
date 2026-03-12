@@ -5106,7 +5106,7 @@ void LLSelectMgr::selectionSetObjectName(const std::string& name)
     std::string name_copy(name);
 
     // we only work correctly if 1 object is selected.
-    if(mSelectedObjects->getRootObjectCount() == 1)
+    if(mSelectedObjects->getRootObjectCount() >= 1)
     {
         sendListToRegions("ObjectName",
                           packAgentAndSessionID,
@@ -5115,7 +5115,7 @@ void LLSelectMgr::selectionSetObjectName(const std::string& name)
                           (void*)(&name_copy),
                           SEND_ONLY_ROOTS);
     }
-    else if(mSelectedObjects->getObjectCount() == 1)
+    else if(mSelectedObjects->getObjectCount() >= 1)
     {
         sendListToRegions("ObjectName",
                           packAgentAndSessionID,
@@ -5131,7 +5131,7 @@ void LLSelectMgr::selectionSetObjectDescription(const std::string& desc)
     std::string desc_copy(desc);
 
     // we only work correctly if 1 object is selected.
-    if(mSelectedObjects->getRootObjectCount() == 1)
+    if(mSelectedObjects->getRootObjectCount() >= 1)
     {
         sendListToRegions("ObjectDescription",
                           packAgentAndSessionID,
@@ -5140,7 +5140,7 @@ void LLSelectMgr::selectionSetObjectDescription(const std::string& desc)
                           (void*)(&desc_copy),
                           SEND_ONLY_ROOTS);
     }
-    else if(mSelectedObjects->getObjectCount() == 1)
+    else if(mSelectedObjects->getObjectCount() >= 1)
     {
         sendListToRegions("ObjectDescription",
                           packAgentAndSessionID,
@@ -5911,7 +5911,7 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
 
         // if to same simulator and message not too big
         if ((current_region == last_region)
-            && (! gMessageSystem->isSendFull(NULL))
+            && (! gMessageSystem->isSendFullFast(nullptr))
             && (objects_in_this_packet < MAX_OBJECTS_PER_PACKET))
         {
             if (link_operation && linkset_root == NULL)
@@ -8906,7 +8906,7 @@ void LLSelectMgr::sendSelectionMove()
 
         // if not simulator or message too big
         if (curr_region != last_region
-            || gMessageSystem->isSendFull(NULL)
+            || gMessageSystem->isSendFullFast(nullptr)
             || objects_in_this_packet >= MAX_OBJECTS_PER_PACKET)
         {
             // send sim the current message and start new one

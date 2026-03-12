@@ -1891,7 +1891,7 @@ void LLGroupMgr::sendGroupMemberInvites(const LLUUID& group_id, std::map<LLUUID,
         msg->addUUIDFast(_PREHASH_InviteeID,(*it).first);
         msg->addUUIDFast(_PREHASH_RoleID,(*it).second);
 
-        if (msg->isSendFull())
+        if (msg->isSendFullFast())
         {
             gAgent.sendReliableMessage();
             start_message = true;
@@ -1941,7 +1941,7 @@ void LLGroupMgr::sendGroupMemberEjects(const LLUUID& group_id,
             msg->nextBlockFast(_PREHASH_EjectData);
             msg->addUUIDFast(_PREHASH_EjecteeID, ejected_member_id);
 
-            if (msg->isSendFull())
+            if (msg->isSendFullFast())
             {
                 gAgent.sendReliableMessage();
                 start_message = true;

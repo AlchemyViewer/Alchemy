@@ -567,8 +567,18 @@ void LLPanelPermissions::refresh()
     }
     else
     {
-        getChild<LLUICtrl>("Object Name")->setValue(LLStringUtil::null);
-        LineEditorObjectDesc->setText(LLStringUtil::null);
+        if (keyboard_focus_view != LineEditorObjectName)
+        {
+            getChild<LLUICtrl>("Object Name")->setValue(getString("multiple selection"));
+        }
+
+        if (LineEditorObjectDesc)
+        {
+            if (keyboard_focus_view != LineEditorObjectDesc)
+            {
+                LineEditorObjectDesc->setText(getString("multiple selection"));
+            }
+        }
     }
 
     // figure out the contents of the name, description, & category

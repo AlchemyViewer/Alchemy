@@ -3285,7 +3285,7 @@ void LLInventoryModel::buildParentChildMap()
             msg->addUUIDFast(_PREHASH_ItemID, (*it));
             msg->addUUIDFast(_PREHASH_FolderID, lnf);
             msg->addStringFast(_PREHASH_NewName, nullptr);
-            if(msg->isSendFull(nullptr))
+            if(msg->isSendFullFast(nullptr))
             {
                 start_new_message = true;
                 gAgent.sendReliableMessage();
