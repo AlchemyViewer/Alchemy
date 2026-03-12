@@ -3403,6 +3403,7 @@ bool LLVolumeParams::setHollow(const F32 h)
 
     F32 max_hollow = HOLLOW_MAX;
 
+#if 0 // Limit removal
     // Only square holes have trouble.
     if (LL_PCODE_HOLE_SQUARE == hole_type)
     {
@@ -3414,6 +3415,7 @@ bool LLVolumeParams::setHollow(const F32 h)
             max_hollow = HOLLOW_MAX_SQUARE;
         }
     }
+#endif
 
     F32 hollow = h;
     bool valid = limit_range(hollow, HOLLOW_MIN, max_hollow);

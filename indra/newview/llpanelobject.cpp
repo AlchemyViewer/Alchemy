@@ -816,6 +816,7 @@ void LLPanelObject::getState( )
         // Radius offset.
         F32 radius_offset = volume_params.getRadiusOffset();
         // Limit radius offset, based on taper and hole size y.
+#if 0 // Limit removal
         F32 radius_mag = fabs(radius_offset);
         F32 hole_y_mag = fabs(scale_y);
         F32 taper_y_mag  = fabs(taper_y);
@@ -840,6 +841,7 @@ void LLPanelObject::getState( )
                 radius_offset = max_radius_mag;
             }
         }
+#endif
         mSpinRadiusOffset->set( radius_offset);
         calcp->setVar(LLCalc::RADIUS_OFFSET, radius_offset);
 
@@ -851,6 +853,7 @@ void LLPanelObject::getState( )
         // Skew
         F32 skew    = volume_params.getSkew();
         // Limit skew, based on revolutions hole size x.
+#if 0 // Limit removal
         F32 skew_mag= fabs(skew);
         F32 min_skew_mag = 1.0f - 1.0f / (revolutions * scale_x + 1.0f);
         // Discontinuity; A revolution of 1 allows skews below 0.5.
@@ -870,6 +873,7 @@ void LLPanelObject::getState( )
                 skew = min_skew_mag;
             }
         }
+#endif
         mSpinSkew->set( skew );
         calcp->setVar(LLCalc::SKEW, skew);
     }
@@ -883,11 +887,11 @@ void LLPanelObject::getState( )
     bool top_shear_x_visible        = true;
     bool top_shear_y_visible        = true;
     bool twist_visible              = true;
-    bool advanced_cut_visible       = false;
-    bool taper_visible              = false;
-    bool skew_visible               = false;
-    bool radius_offset_visible      = false;
-    bool revolutions_visible        = false;
+    bool advanced_cut_visible       = true;
+    bool taper_visible              = true;
+    bool skew_visible               = true;
+    bool radius_offset_visible      = true;
+    bool revolutions_visible        = true;
     bool sculpt_texture_visible     = false;
     F32  twist_min                  = OBJECT_TWIST_LINEAR_MIN;
     F32  twist_max                  = OBJECT_TWIST_LINEAR_MAX;
@@ -901,11 +905,11 @@ void LLPanelObject::getState( )
     switch (selected_item)
     {
     case MI_SPHERE:
-        top_size_x_visible      = false;
-        top_size_y_visible      = false;
-        top_shear_x_visible     = false;
-        top_shear_y_visible     = false;
-        //twist_visible         = false;
+        top_size_x_visible      = true;
+        top_size_y_visible      = true;
+        top_shear_x_visible     = true;
+        top_shear_y_visible     = true;
+        twist_visible           = true;
         advanced_cut_visible    = true;
         advanced_is_dimple      = true;
         twist_min               = OBJECT_TWIST_MIN;
@@ -950,6 +954,7 @@ void LLPanelObject::getState( )
     case MI_BOX:
         advanced_cut_visible    = true;
         advanced_is_slice       = true;
+        taper_visible           = false;
         break;
 
     case MI_CYLINDER:
@@ -970,6 +975,15 @@ void LLPanelObject::getState( )
     switch (selected_item)
     {
     case MI_SPHERE:
+        mSpinScaleX->set( scale_x );
+        mSpinScaleY->set( scale_y );
+        calcp->setVar(LLCalc::X_HOLE, scale_x);
+        calcp->setVar(LLCalc::Y_HOLE, scale_y);
+        mSpinScaleX->setMinValue(0.0f);
+        mSpinScaleX->setMaxValue(1.0f);
+        mSpinScaleY->setMinValue(0.0f);
+        mSpinScaleY->setMaxValue(1.0f);
+        break;
     case MI_TORUS:
     case MI_TUBE:
     case MI_RING:
@@ -985,12 +999,24 @@ void LLPanelObject::getState( )
     default:
         if (editable && single_volume)
         {
-            mSpinScaleX->set( 1.f - scale_x );
-            mSpinScaleY->set( 1.f - scale_y );
-            mSpinScaleX->setMinValue(-1.f);
-            mSpinScaleX->setMaxValue(1.f);
-            mSpinScaleY->setMinValue(-1.f);
-            mSpinScaleY->setMaxValue(1.f);
+            if (selected_item == MI_BOX || selected_item == MI_CYLINDER || selected_item == MI_PRISM)
+            {
+                mSpinScaleX->set( 1.f - scale_x );
+                mSpinScaleY->set( 1.f - scale_y );
+                mSpinScaleX->setMinValue(-1.f);
+                mSpinScaleX->setMaxValue(1.f);
+                mSpinScaleY->setMinValue(-1.f);
+                mSpinScaleY->setMaxValue(1.f);
+            }
+            else
+            {
+                mSpinScaleX->set( scale_x );
+                mSpinScaleY->set( scale_x );
+                mSpinScaleX->setMinValue(-4000.f);
+                mSpinScaleX->setMaxValue(4000.f);
+                mSpinScaleY->setMinValue(-4000.f);
+                mSpinScaleY->setMaxValue(4000.f);
+            }
 
             // Torus' Hole Size is Box/Cyl/Prism's Taper
             calcp->setVar(LLCalc::X_TAPER, 1.f - scale_x);
@@ -1004,6 +1030,7 @@ void LLPanelObject::getState( )
     }
 
     // Check if we need to limit the hollow based on the hole type.
+#if 0 // Limit removal
     if (  selected_hole == MI_HOLE_SQUARE &&
           ( selected_item == MI_CYLINDER || selected_item == MI_TORUS ||
             selected_item == MI_PRISM    || selected_item == MI_RING  ||
@@ -1013,6 +1040,7 @@ void LLPanelObject::getState( )
         mSpinHollow->setMaxValue(70.f);
     }
     else
+#endif
     {
         mSpinHollow->setMinValue(0.f);
         mSpinHollow->setMaxValue(95.f);
@@ -1552,6 +1580,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
     // Hollowness
     F32 hollow = mSpinHollow->get() / 100.f;
 
+#if 0 // Limit removal
     if (  selected_hole == MI_HOLE_SQUARE &&
         ( selected_type == MI_CYLINDER || selected_type == MI_TORUS ||
           selected_type == MI_PRISM    || selected_type == MI_RING  ||
@@ -1559,6 +1588,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
     {
         if (hollow > 0.7f) hollow = 0.7f;
     }
+#endif
 
     volume_params.setHollow( hollow );
 
@@ -1602,6 +1632,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
     // Revolutions
     F32 revolutions   = mSpinRevolutions->get();
 
+#if 0 // Limit removal
     if ( selected_type == MI_SPHERE )
     {
         // Snap values to valid sphere parameters.
@@ -1672,6 +1703,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
             }
         }
     }
+#endif
 
     volume_params.setRatio( scale_x, scale_y );
     volume_params.setSkew(skew);
@@ -1715,7 +1747,8 @@ void LLPanelObject::sendRotation(bool btn_down)
     // Note: must compare before conversion to radians
     LLVector3 delta = new_rot - mCurEulerDegrees;
 
-    if (delta.magVec() >= 0.0005f)
+    // Rotated more then 1/20th of a millimeter
+    if (delta.magVec() >= 0.00005f)
     {
         mCurEulerDegrees = new_rot;
         new_rot *= DEG_TO_RAD;
@@ -1766,9 +1799,9 @@ void LLPanelObject::sendScale(bool btn_down)
     LLVector3 newscale(mCtrlScaleX->get(), mCtrlScaleY->get(), mCtrlScaleZ->get());
 
     LLVector3 delta = newscale - mObject->getScale();
-    if (delta.magVec() >= 0.0005f || (mSizeChanged && !btn_down))
+    if (delta.magVec() >= 0.00005f || (mSizeChanged && !btn_down))
     {
-        // scale changed by more than 1/2 millimeter
+        // scale changed by more than 1/20 millimeter
         mSizeChanged = btn_down;
 
         // check to see if we aren't scaling the textures
@@ -1860,8 +1893,8 @@ void LLPanelObject::sendPosition(bool btn_down)
         // send only if the position is changed, that is, the delta vector is not zero
         LLVector3d old_pos_global = mObject->getPositionGlobal();
         LLVector3d delta = new_pos_global - old_pos_global;
-        // moved more than 1/2 millimeter
-        if (delta.magVec() >= 0.0005f)
+        // moved more than 1/20 millimeter
+        if (delta.magVec() >= 0.00005f)
         {
             if (mRootObject != mObject)
             {
@@ -1970,69 +2003,64 @@ void LLPanelObject::refresh()
 
 void LLPanelObject::draw()
 {
-    const LLColor4  white(  1.0f,   1.0f,   1.0f,   1);
-    const LLColor4  red(    1.0f,   0.25f,  0.f,    1);
-    const LLColor4  green(  0.f,    1.0f,   0.f,    1);
-    const LLColor4  blue(   0.f,    0.5f,   1.0f,   1);
-
     // Tune the colors of the labels
     LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
 
     if (tool == LLToolCompTranslate::getInstance())
     {
-        mCtrlPosX   ->setLabelColor(red);
-        mCtrlPosY   ->setLabelColor(green);
-        mCtrlPosZ   ->setLabelColor(blue);
+        mCtrlPosX   ->setLabelColor(LLColor4::red);
+        mCtrlPosY   ->setLabelColor(LLColor4::green);
+        mCtrlPosZ   ->setLabelColor(LLColor4::blue);
 
-        mCtrlScaleX ->setLabelColor(white);
-        mCtrlScaleY ->setLabelColor(white);
-        mCtrlScaleZ ->setLabelColor(white);
+        mCtrlScaleX ->setLabelColor(LLColor4::white);
+        mCtrlScaleY ->setLabelColor(LLColor4::white);
+        mCtrlScaleZ ->setLabelColor(LLColor4::white);
 
-        mCtrlRotX   ->setLabelColor(white);
-        mCtrlRotY   ->setLabelColor(white);
-        mCtrlRotZ   ->setLabelColor(white);
+        mCtrlRotX   ->setLabelColor(LLColor4::white);
+        mCtrlRotY   ->setLabelColor(LLColor4::white);
+        mCtrlRotZ   ->setLabelColor(LLColor4::white);
     }
     else if ( tool == LLToolCompScale::getInstance() )
     {
-        mCtrlPosX   ->setLabelColor(white);
-        mCtrlPosY   ->setLabelColor(white);
-        mCtrlPosZ   ->setLabelColor(white);
+        mCtrlPosX   ->setLabelColor(LLColor4::white);
+        mCtrlPosY   ->setLabelColor(LLColor4::white);
+        mCtrlPosZ   ->setLabelColor(LLColor4::white);
 
-        mCtrlScaleX ->setLabelColor(red);
-        mCtrlScaleY ->setLabelColor(green);
-        mCtrlScaleZ ->setLabelColor(blue);
+        mCtrlScaleX ->setLabelColor(LLColor4::red);
+        mCtrlScaleY ->setLabelColor(LLColor4::green);
+        mCtrlScaleZ ->setLabelColor(LLColor4::blue);
 
-        mCtrlRotX   ->setLabelColor(white);
-        mCtrlRotY   ->setLabelColor(white);
-        mCtrlRotZ   ->setLabelColor(white);
+        mCtrlRotX   ->setLabelColor(LLColor4::white);
+        mCtrlRotY   ->setLabelColor(LLColor4::white);
+        mCtrlRotZ   ->setLabelColor(LLColor4::white);
     }
     else if ( tool == LLToolCompRotate::getInstance() )
     {
-        mCtrlPosX   ->setLabelColor(white);
-        mCtrlPosY   ->setLabelColor(white);
-        mCtrlPosZ   ->setLabelColor(white);
+        mCtrlPosX   ->setLabelColor(LLColor4::white);
+        mCtrlPosY   ->setLabelColor(LLColor4::white);
+        mCtrlPosZ   ->setLabelColor(LLColor4::white);
 
-        mCtrlScaleX ->setLabelColor(white);
-        mCtrlScaleY ->setLabelColor(white);
-        mCtrlScaleZ ->setLabelColor(white);
+        mCtrlScaleX ->setLabelColor(LLColor4::white);
+        mCtrlScaleY ->setLabelColor(LLColor4::white);
+        mCtrlScaleZ ->setLabelColor(LLColor4::white);
 
-        mCtrlRotX   ->setLabelColor(red);
-        mCtrlRotY   ->setLabelColor(green);
-        mCtrlRotZ   ->setLabelColor(blue);
+        mCtrlRotX   ->setLabelColor(LLColor4::red);
+        mCtrlRotY   ->setLabelColor(LLColor4::green);
+        mCtrlRotZ   ->setLabelColor(LLColor4::blue);
     }
     else
     {
-        mCtrlPosX   ->setLabelColor(white);
-        mCtrlPosY   ->setLabelColor(white);
-        mCtrlPosZ   ->setLabelColor(white);
+        mCtrlPosX   ->setLabelColor(LLColor4::white);
+        mCtrlPosY   ->setLabelColor(LLColor4::white);
+        mCtrlPosZ   ->setLabelColor(LLColor4::white);
 
-        mCtrlScaleX ->setLabelColor(white);
-        mCtrlScaleY ->setLabelColor(white);
-        mCtrlScaleZ ->setLabelColor(white);
+        mCtrlScaleX ->setLabelColor(LLColor4::white);
+        mCtrlScaleY ->setLabelColor(LLColor4::white);
+        mCtrlScaleZ ->setLabelColor(LLColor4::white);
 
-        mCtrlRotX   ->setLabelColor(white);
-        mCtrlRotY   ->setLabelColor(white);
-        mCtrlRotZ   ->setLabelColor(white);
+        mCtrlRotX   ->setLabelColor(LLColor4::white);
+        mCtrlRotY   ->setLabelColor(LLColor4::white);
+        mCtrlRotZ   ->setLabelColor(LLColor4::white);
     }
 
     LLPanel::draw();
