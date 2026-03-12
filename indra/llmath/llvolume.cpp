@@ -73,10 +73,10 @@ constexpr F32 TWIST_MAX =  1.f;
 constexpr F32 RATIO_MIN = 0.f;
 constexpr F32 RATIO_MAX = 2.f; // Tom Y: Inverted sense here: 0 = top taper, 2 = bottom taper
 
-constexpr F32 HOLE_X_MIN= 0.05f;
+constexpr F32 HOLE_X_MIN= 0.01f;
 constexpr F32 HOLE_X_MAX= 1.0f;
 
-constexpr F32 HOLE_Y_MIN= 0.05f;
+constexpr F32 HOLE_Y_MIN= 0.01f;
 constexpr F32 HOLE_Y_MAX= 0.5f;
 
 constexpr F32 SHEAR_MIN = -0.5f;

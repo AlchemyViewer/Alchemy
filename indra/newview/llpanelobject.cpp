@@ -85,6 +85,20 @@ enum {
     MI_TUBE,
     MI_RING,
     MI_SCULPT,
+    MI_PATH_LINE_PROFILE_CIRCLE_HALF,
+    MI_PATH_CIRCLE_PROFILE_CIRCLE_HALF,
+    MI_PATH_CIRCLE2_PROFILE_SQUARE,
+    MI_PATH_CIRCLE2_PROFILE_TRI,
+    MI_PATH_CIRCLE2_PROFILE_CIRCLE,
+    MI_PATH_CIRCLE2_PROFILE_CIRCLE_HALF,
+    MI_PATH_TEST_PROFILE_SQUARE,
+    MI_PATH_TEST_PROFILE_TRI,
+    MI_PATH_TEST_PROFILE_CIRCLE,
+    MI_PATH_TEST_PROFILE_CIRCLE_HALF,
+    MI_PATH_33_PROFILE_CIRCLE,
+    MI_PATH_33_PROFILE_SQUARE,
+    MI_PATH_33_PROFILE_TRIANGLE,
+    MI_PATH_33_PROFILE_HALFCIRCLE,
     MI_NONE,
     MI_VOLUME_COUNT
 };
@@ -629,6 +643,54 @@ void LLPanelObject::getState( )
         else if ( path == LL_PCODE_PATH_CIRCLE && profile == LL_PCODE_PROFILE_SQUARE && scale_y <= 0.75f)
         {
             selected_item = MI_TUBE;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE2 && profile == LL_PCODE_PROFILE_EQUALTRI )
+        {
+            selected_item = MI_PATH_CIRCLE2_PROFILE_TRI;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE2 && profile == LL_PCODE_PROFILE_SQUARE )
+        {
+            selected_item = MI_PATH_CIRCLE2_PROFILE_SQUARE;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE2 && profile == LL_PCODE_PROFILE_CIRCLE_HALF )
+        {
+            selected_item = MI_PATH_CIRCLE2_PROFILE_CIRCLE_HALF;
+        }
+        else if ( path == LL_PCODE_PATH_TEST && profile == LL_PCODE_PROFILE_SQUARE )
+        {
+            selected_item = MI_PATH_TEST_PROFILE_SQUARE;
+        }
+        else if ( path == LL_PCODE_PATH_TEST && profile == LL_PCODE_PROFILE_EQUALTRI )
+        {
+            selected_item = MI_PATH_TEST_PROFILE_TRI;
+        }
+        else if ( path == LL_PCODE_PATH_TEST && profile == LL_PCODE_PROFILE_CIRCLE )
+        {
+            selected_item = MI_PATH_TEST_PROFILE_CIRCLE;
+        }
+        else if ( path == LL_PCODE_PATH_TEST && profile == LL_PCODE_PROFILE_CIRCLE_HALF )
+        {
+            selected_item = MI_PATH_TEST_PROFILE_CIRCLE_HALF;
+        }
+        else if ( path == LL_PCODE_PATH_LINE && profile == LL_PCODE_PROFILE_CIRCLE_HALF )
+        {
+            selected_item = MI_PATH_LINE_PROFILE_CIRCLE_HALF;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE_33 && profile == LL_PCODE_PROFILE_CIRCLE )
+        {
+            selected_item = MI_PATH_33_PROFILE_CIRCLE;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE_33 && profile == LL_PCODE_PROFILE_SQUARE )
+        {
+            selected_item = MI_PATH_33_PROFILE_SQUARE;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE_33 && profile == LL_PCODE_PROFILE_ISOTRI )
+        {
+            selected_item = MI_PATH_33_PROFILE_TRIANGLE;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE_33 && profile == LL_PCODE_PROFILE_CIRCLE_HALF )
+        {
+            selected_item = MI_PATH_33_PROFILE_HALFCIRCLE;
         }
         else
         {
@@ -1328,6 +1390,76 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
     case MI_SCULPT:
         profile = LL_PCODE_PROFILE_CIRCLE;
         path = LL_PCODE_PATH_CIRCLE;
+        break;
+
+    case MI_PATH_LINE_PROFILE_CIRCLE_HALF:
+        profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+        path = LL_PCODE_PATH_LINE;
+        break;
+
+    case MI_PATH_CIRCLE_PROFILE_CIRCLE_HALF:
+        profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+        path = LL_PCODE_PATH_CIRCLE;
+        break;
+
+    case MI_PATH_CIRCLE2_PROFILE_SQUARE:
+        profile = LL_PCODE_PROFILE_SQUARE;
+        path = LL_PCODE_PATH_CIRCLE2;
+        break;
+
+    case MI_PATH_CIRCLE2_PROFILE_TRI:
+        profile = LL_PCODE_PROFILE_EQUALTRI;
+        path = LL_PCODE_PATH_CIRCLE2;
+        break;
+
+    case MI_PATH_CIRCLE2_PROFILE_CIRCLE:
+        profile = LL_PCODE_PROFILE_CIRCLE;
+        path = LL_PCODE_PATH_CIRCLE2;
+        break;
+
+    case MI_PATH_CIRCLE2_PROFILE_CIRCLE_HALF:
+        profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+        path = LL_PCODE_PATH_CIRCLE2;
+        break;
+
+    case MI_PATH_TEST_PROFILE_SQUARE:
+        profile = LL_PCODE_PROFILE_SQUARE;
+        path = LL_PCODE_PATH_TEST;
+        break;
+
+    case MI_PATH_TEST_PROFILE_TRI:
+        profile = LL_PCODE_PROFILE_EQUALTRI;
+        path = LL_PCODE_PATH_TEST;
+        break;
+
+    case MI_PATH_TEST_PROFILE_CIRCLE:
+        profile = LL_PCODE_PROFILE_CIRCLE;
+        path = LL_PCODE_PATH_TEST;
+        break;
+
+    case MI_PATH_TEST_PROFILE_CIRCLE_HALF:
+        profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+        path = LL_PCODE_PATH_TEST;
+        break;
+
+    case MI_PATH_33_PROFILE_CIRCLE:
+        profile = LL_PCODE_PROFILE_CIRCLE;
+        path = LL_PCODE_PATH_CIRCLE_33;
+        break;
+
+    case MI_PATH_33_PROFILE_SQUARE:
+        profile = LL_PCODE_PROFILE_SQUARE;
+        path = LL_PCODE_PATH_CIRCLE_33;
+        break;
+
+    case MI_PATH_33_PROFILE_TRIANGLE:
+        profile = LL_PCODE_PROFILE_ISOTRI;
+        path = LL_PCODE_PATH_CIRCLE_33;
+        break;
+
+    case MI_PATH_33_PROFILE_HALFCIRCLE:
+        profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+        path = LL_PCODE_PATH_CIRCLE_33;
         break;
 
     default:

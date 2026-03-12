@@ -159,6 +159,7 @@ constexpr U8    LL_PCODE_PATH_IGNORE    = 0x00;
 constexpr U8    LL_PCODE_PATH_MIN       = 0x01;     // min/max needs to be >> 4 of real min/max
 constexpr U8    LL_PCODE_PATH_LINE      = 0x10;
 constexpr U8    LL_PCODE_PATH_CIRCLE    = 0x20;
+constexpr U8    LL_PCODE_PATH_CIRCLE_33 = 0x21;
 constexpr U8    LL_PCODE_PATH_CIRCLE2   = 0x30;
 constexpr U8    LL_PCODE_PATH_TEST      = 0x40;
 constexpr U8    LL_PCODE_PATH_FLEXIBLE  = 0x80;
