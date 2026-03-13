@@ -1888,17 +1888,17 @@ void LLGLTFLoader::notifyUnsupportedExtension(bool unsupported)
 
 size_t LLGLTFLoader::getSuffixPosition(const std::string &label)
 {
-    if ((label.find("_LOD") != -1) || (label.find("_PHYS") != -1))
+    if ((label.find("_LOD") != std::string::npos) || (label.find("_PHYS") != std::string::npos))
     {
         return label.rfind('_');
     }
-    return -1;
+    return std::string::npos;
 }
 
 std::string LLGLTFLoader::getLodlessLabel(const LL::GLTF::Node& node)
 {
     size_t ext_pos = getSuffixPosition(node.mName);
-    if (ext_pos != -1)
+    if (ext_pos != std::string::npos)
     {
         return node.mName.substr(0, ext_pos);
     }

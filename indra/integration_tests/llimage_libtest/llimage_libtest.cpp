@@ -242,7 +242,7 @@ void store_input_file(std::list<std::string> &input_filenames, const std::string
         return;
     }
 
-    if ((name.find('*') != -1) || ((name.find('?') != -1)))
+    if ((name.find('*') != std::string::npos) || ((name.find('?') != std::string::npos)))
     {
         // If file name is a pattern, iterate to get each file name and store
         std::string next_name;

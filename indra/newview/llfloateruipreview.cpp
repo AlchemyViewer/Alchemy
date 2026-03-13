@@ -497,7 +497,7 @@ bool LLFloaterUIPreview::postBuild()
                 continue;
             }
 
-            if (strncmp("template",language_directory.c_str(), 8) && -1 == language_directory.find(".")) // if it's not the template directory or a hidden directory
+            if (strncmp("template",language_directory.c_str(), 8) && std::string::npos == language_directory.find(".")) // if it's not the template directory or a hidden directory
             {
                 if (!strncmp("en",language_directory.c_str(), 5))              // remember if we've seen en, so we can make it default
                 {
@@ -1062,7 +1062,7 @@ void LLFloaterUIPreview::getExecutablePath(const std::vector<std::string>& filen
     }
     else
     {
-        if(-1 != executable_path.find(".app"))  // only warn if this path actually had ".app" in it, i.e. it probably just wasn'nt an app bundle and that's okay
+        if(std::string::npos != executable_path.find(".app"))  // only warn if this path actually had ".app" in it, i.e. it probably just wasn'nt an app bundle and that's okay
         {
             std::string warning = std::string("Unable to get bundle from path \"") + chosen_path + std::string("\"");
             popupAndPrintWarning(warning);

@@ -2150,7 +2150,7 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
                         {
                             // Don't change model's name if possible, it will play havoc with scenes that already use said model.
                             size_t ext_pos = getSuffixPosition(model->mLabel);
-                            if (ext_pos != -1)
+                            if (ext_pos != std::string::npos)
                             {
                                 label = model->mLabel.substr(0, ext_pos);
                             }
@@ -2395,7 +2395,7 @@ std::string LLDAELoader::getElementLabel(daeElement *element)
             // make sure that index won't mix up with pre-named lod extensions
             size_t ext_pos = getSuffixPosition(name);
 
-            if (ext_pos == -1)
+            if (ext_pos == std::string::npos)
             {
                 return name + index_string;
             }
@@ -2420,11 +2420,11 @@ std::string LLDAELoader::getElementLabel(daeElement *element)
 // static
 size_t LLDAELoader::getSuffixPosition(const std::string &label)
 {
-    if ((label.find("_LOD") != -1) || (label.find("_PHYS") != -1))
+    if ((label.find("_LOD") != std::string::npos) || (label.find("_PHYS") != std::string::npos))
     {
         return label.rfind('_');
     }
-    return -1;
+    return std::string::npos;
 }
 
 // static
@@ -2432,7 +2432,7 @@ std::string LLDAELoader::getLodlessLabel(daeElement *element)
 {
     std::string label = getElementLabel(element);
     size_t ext_pos = getSuffixPosition(label);
-    if (ext_pos != -1)
+    if (ext_pos != std::string::npos)
     {
         return label.substr(0, ext_pos);
     }
