@@ -89,6 +89,7 @@
 #include "llavatarappearancedefines.h"
 #include "llgltfmateriallist.h"
 #include "gltfscenemanager.h"
+#include "lltoolmgr.h"
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvactions.h"
 #include "rlvlocks.h"
@@ -4743,7 +4744,7 @@ bool LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 
     if (mDrawable->isState(LLDrawable::RIGGED))
     {
-        if ((pick_rigged) || (getAvatar() && (getAvatar()->isSelf()) && (LLFloater::isVisible(gFloaterTools))))
+        if ((pick_rigged) || LLToolMgr::getInstance()->inBuildMode())
         {
             updateRiggedVolume(true, LLRiggedVolume::DO_NOT_UPDATE_FACES);
             volume = mRiggedVolume;

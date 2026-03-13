@@ -53,6 +53,7 @@
 #include "llvolumemgr.h"
 #include "llviewershadermgr.h"
 #include "llcontrolavatar.h"
+#include "lltoolmgr.h"
 
 extern bool gShiftFrame;
 
@@ -3741,7 +3742,7 @@ public:
                 if (vobj->isAvatar())
                 {
                     LLVOAvatar* avatar = (LLVOAvatar*) vobj;
-                    if ((mPickRigged) || ((avatar->isSelf()) && (LLFloater::isVisible(gFloaterTools))))
+                    if ((mPickRigged) || LLToolMgr::getInstance()->inBuildMode())
                     {
                         LLViewerObject* hit = avatar->lineSegmentIntersectRiggedAttachments(mStart, mEnd, -1, mPickTransparent, mPickRigged, mPickUnselectable, mFaceHit, &intersection, mTexCoord, mNormal, mTangent);
                         if (hit)
