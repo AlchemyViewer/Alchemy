@@ -395,7 +395,7 @@ LLSD LLSettingsBase::interpolateSDValue(const std::string& key_name, const LLSD 
     return new_value;
 }
 
-LLSettingsBase::stringset_t LLSettingsBase::getSkipInterpolateKeys() const
+const LLSettingsBase::stringset_t& LLSettingsBase::getSkipInterpolateKeys() const
 {
     static stringset_t skipSet;
 
@@ -406,6 +406,18 @@ LLSettingsBase::stringset_t LLSettingsBase::getSkipInterpolateKeys() const
     }
 
     return skipSet;
+}
+
+const LLSettingsBase::stringset_t& LLSettingsBase::getSlerpKeys() const
+{
+    static stringset_t empty;
+    return empty;
+}
+
+const LLSettingsBase::parammapping_t& LLSettingsBase::getParameterMap() const
+{
+    static parammapping_t empty;
+    return empty;
 }
 
 LLSD& LLSettingsBase::getSettings()

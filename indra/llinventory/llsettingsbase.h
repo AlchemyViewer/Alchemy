@@ -365,11 +365,11 @@ protected:
     /// when lerping between settings, some may require special handling.
     /// Get a list of these key to be skipped by the default settings lerp.
     /// (handling should be performed in the override of lerpSettings.
-    virtual stringset_t getSkipInterpolateKeys() const;
+    virtual const stringset_t& getSkipInterpolateKeys() const;
 
     // A list of settings that represent quaternions and should be slerped
     // rather than lerped.
-    virtual stringset_t getSlerpKeys() const { return stringset_t(); }
+    virtual const stringset_t& getSlerpKeys() const;
 
     virtual validation_list_t getValidationList() const = 0;
 
@@ -377,7 +377,7 @@ protected:
     virtual void applyToUniforms(void *) { };
     virtual void applySpecial(void*, bool force = false) { };
 
-    virtual parammapping_t getParameterMap() const { return parammapping_t(); }
+    virtual const parammapping_t& getParameterMap() const;
 
     inline void setBlendFactor(BlendFactor blendfactor)
     {

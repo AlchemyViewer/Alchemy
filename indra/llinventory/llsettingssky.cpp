@@ -688,12 +688,6 @@ void LLSettingsSky::blend(LLSettingsBase::ptr_t &end, F64 blendf)
             mHasLegacyHaze |= lerp_legacy_float(mDensityMultiplier, mLegacyDensityMultiplier, other->mDensityMultiplier, other->mLegacyDensityMultiplier, 0.0001f, (F32)blendf);
             mHasLegacyHaze |= lerp_legacy_color(mBlueHorizon, mLegacyBlueHorizon, other->mBlueHorizon, other->mLegacyBlueHorizon, LLColor3(0.4954f, 0.4954f, 0.6399f), (F32)blendf);
         }
-        parammapping_t defaults = other->getParameterMap();
-        stringset_t skip = getSkipInterpolateKeys();
-        stringset_t slerps = getSlerpKeys();
-        mAbsorptionConfigs = interpolateSDValue("absorption_config", mAbsorptionConfigs, other->mAbsorptionConfigs, defaults, blendf, skip, slerps);
-        mMieConfigs = interpolateSDValue("mie_config", mMieConfigs, other->mMieConfigs, defaults, blendf, skip, slerps);
-        mRayleighConfigs = interpolateSDValue("rayleigh_config", mRayleighConfigs, other->mRayleighConfigs, defaults, blendf, skip, slerps);
 
         setDirtyFlag(true);
         setReplaced();
@@ -714,7 +708,7 @@ void LLSettingsSky::blend(LLSettingsBase::ptr_t &end, F64 blendf)
     setBlendFactor(blendf);
 }
 
-LLSettingsSky::stringset_t LLSettingsSky::getSkipInterpolateKeys() const
+const LLSettingsSky::stringset_t& LLSettingsSky::getSkipInterpolateKeys() const
 {
     static stringset_t skipSet;
 
@@ -730,7 +724,7 @@ LLSettingsSky::stringset_t LLSettingsSky::getSkipInterpolateKeys() const
     return skipSet;
 }
 
-LLSettingsSky::stringset_t LLSettingsSky::getSlerpKeys() const
+const LLSettingsSky::stringset_t& LLSettingsSky::getSlerpKeys() const
 {
     static stringset_t slepSet;
 

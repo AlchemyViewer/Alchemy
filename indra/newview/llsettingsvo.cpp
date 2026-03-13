@@ -869,7 +869,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
     shader->uniform1f(LLShaderMgr::GAMMA, g);
 }
 
-LLSettingsSky::parammapping_t LLSettingsVOSky::getParameterMap() const
+const LLSettingsSky::parammapping_t& LLSettingsVOSky::getParameterMap() const
 {
     static parammapping_t param_map;
 
@@ -1159,7 +1159,7 @@ void LLSettingsVOWater::updateSettings()
     }
 }
 
-LLSettingsWater::parammapping_t LLSettingsVOWater::getParameterMap() const
+const LLSettingsWater::parammapping_t& LLSettingsVOWater::getParameterMap() const
 {
     static parammapping_t param_map;
 

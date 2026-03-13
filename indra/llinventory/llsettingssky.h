@@ -356,8 +356,8 @@ protected:
 
     LLSettingsSky();
 
-    virtual stringset_t getSlerpKeys() const SETTINGS_OVERRIDE;
-    virtual stringset_t getSkipInterpolateKeys() const SETTINGS_OVERRIDE;
+    virtual const stringset_t& getSlerpKeys() const SETTINGS_OVERRIDE;
+    virtual const stringset_t& getSkipInterpolateKeys() const SETTINGS_OVERRIDE;
 
     LLUUID      mSunTextureId;
     LLUUID      mMoonTextureId;
