@@ -387,13 +387,17 @@ void LLPanelObject::getState( )
     }
 // [/RLVa:KB]
 
-    bool is_attachment = objectp->isAttachment();
-    mCtrlPosX->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -256);
-    mCtrlPosX->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : 512);
-    mCtrlPosY->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -256);
-    mCtrlPosY->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : 512);
-    mCtrlPosZ->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -32);
-    mCtrlPosZ->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : 4096);
+    const F32 min_height = LLWorld::getInstance()->getMinAllowedZ(objectp, objectp->getPositionGlobal());
+    const F32 max_height = LLWorld::getInstance()->getRegionMaxHeight();
+    const F32 region_width = LLWorld::getInstance()->getRegionWidthInMeters();
+
+    const bool is_attachment = objectp->isAttachment();
+    mCtrlPosX->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -region_width);
+    mCtrlPosX->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : region_width);
+    mCtrlPosY->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -region_width);
+    mCtrlPosY->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : region_width);
+    mCtrlPosZ->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : min_height);
+    mCtrlPosZ->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : max_height);
 
     LLVector3 vec;
     if (enable_move)
@@ -1183,9 +1187,6 @@ void LLPanelObject::getState( )
     // sculpt texture
     if (selected_item == MI_SCULPT)
     {
-
-
-        LLUUID id;
         LLSculptParams *sculpt_params = objectp->getSculptParams();
 
 
@@ -1203,15 +1204,14 @@ void LLPanelObject::getState( )
             bool sculpt_mirror = sculpt_type & LL_SCULPT_FLAG_MIRROR;
             isMesh = (sculpt_stitching == LL_SCULPT_TYPE_MESH);
 
-            LLTextureCtrl*  mTextureCtrl = getChild<LLTextureCtrl>("sculpt texture control");
-            if(mTextureCtrl)
+            if (mCtrlSculptTexture)
             {
-                mTextureCtrl->setTentative(false);
-                mTextureCtrl->setEnabled(editable && !isMesh);
+                mCtrlSculptTexture->setTentative(false);
+                mCtrlSculptTexture->setEnabled(editable && !isMesh);
                 if (editable)
-                    mTextureCtrl->setImageAssetID(sculpt_params->getSculptTexture());
+                    mCtrlSculptTexture->setImageAssetID(sculpt_params->getSculptTexture());
                 else
-                    mTextureCtrl->setImageAssetID(LLUUID::null);
+                    mCtrlSculptTexture->setImageAssetID(LLUUID::null);
             }
 
             mComboBaseType->setEnabled(!isMesh);
@@ -1256,6 +1256,9 @@ void LLPanelObject::getState( )
         mSculptTextureRevert = LLUUID::null;
     }
 
+    mCtrlSculptTexture->setVisible(sculpt_texture_visible && !isMesh);
+    mLabelSculptType->setVisible(sculpt_texture_visible && !isMesh);
+    mCtrlSculptType->setVisible(sculpt_texture_visible && !isMesh);
     mCtrlSculptMirror->setVisible(sculpt_texture_visible && !isMesh);
     mCtrlSculptInvert->setVisible(sculpt_texture_visible && !isMesh);
 
@@ -2194,11 +2197,9 @@ void LLPanelObject::onCommitPhantom( LLUICtrl* ctrl, void* userdata )
 
 void LLPanelObject::onSelectSculpt(const LLSD& data)
 {
-    LLTextureCtrl* mTextureCtrl = getChild<LLTextureCtrl>("sculpt texture control");
-
-    if (mTextureCtrl)
+    if (mCtrlSculptTexture)
     {
-        mSculptTextureRevert = mTextureCtrl->getImageAssetID();
+        mSculptTextureRevert = mCtrlSculptTexture->getImageAssetID();
     }
 
     sendSculpt();
@@ -2212,13 +2213,11 @@ void LLPanelObject::onCommitSculpt( const LLSD& data )
 
 bool LLPanelObject::onDropSculpt(LLInventoryItem* item)
 {
-    LLTextureCtrl* mTextureCtrl = getChild<LLTextureCtrl>("sculpt texture control");
-
-    if (mTextureCtrl)
+    if (mCtrlSculptTexture)
     {
         LLUUID asset = item->getAssetUUID();
 
-        mTextureCtrl->setImageAssetID(asset);
+        mCtrlSculptTexture->setImageAssetID(asset);
         mSculptTextureRevert = asset;
     }
 
@@ -2228,15 +2227,14 @@ bool LLPanelObject::onDropSculpt(LLInventoryItem* item)
 
 void LLPanelObject::onCancelSculpt(const LLSD& data)
 {
-    LLTextureCtrl* mTextureCtrl = getChild<LLTextureCtrl>("sculpt texture control");
-    if(!mTextureCtrl)
+    if(!mCtrlSculptTexture)
         return;
 
     if(mSculptTextureRevert == LLUUID::null)
     {
         mSculptTextureRevert = SCULPT_DEFAULT_TEXTURE;
     }
-    mTextureCtrl->setImageAssetID(mSculptTextureRevert);
+    mCtrlSculptTexture->setImageAssetID(mSculptTextureRevert);
 
     sendSculpt();
 }

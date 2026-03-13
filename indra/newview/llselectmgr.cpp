@@ -951,7 +951,7 @@ void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, bool send_to_s
         objects[i]->setAngularVelocity( 0,0,0 );
         objects[i]->setVelocity( 0,0,0 );
 
-        if(msg->isSendFull(NULL) || select_count >= MAX_OBJECTS_PER_PACKET)
+        if(msg->isSendFullFast(nullptr) || select_count >= MAX_OBJECTS_PER_PACKET)
         {
             msg->sendReliable(regionp->getHost() );
             select_count = 0;
