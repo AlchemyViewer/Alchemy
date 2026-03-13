@@ -1903,7 +1903,7 @@ void* LLWindowWin32::createSharedContext()
     mMaxGLVersion = llclamp(mMaxGLVersion, 3.f, 4.6f);
 
     S32 version_major = llfloor(mMaxGLVersion);
-    S32 version_minor = (S32)llround((mMaxGLVersion-version_major)*10);
+    S32 version_minor = (S32)ll_round((mMaxGLVersion-version_major)*10);
 
     S32 attribs[] =
     {

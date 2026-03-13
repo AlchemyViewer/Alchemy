@@ -280,7 +280,7 @@ S32 LLImageJ2C::calcDataSizeJ2C(S32 w, S32 h, S32 comp, S32 discard_level, F32 r
     S32 height = (h > 0) ? h : 2048;
     S32 max_dimension = llmax(width, height); // Find largest dimension
     S32 block_area = MAX_BLOCK_SIZE * MAX_BLOCK_SIZE; // Calculated initial block area from established max block size (currently 64)
-    S32 max_layers = (S32)llmax(llround(log2f((float)max_dimension) - log2f((float)MAX_BLOCK_SIZE)), 4); // Find number of powers of two between extents and block size to a minimum of 4
+    S32 max_layers = (S32)llmax(ll_round(log2f((float)max_dimension) - log2f((float)MAX_BLOCK_SIZE)), 4); // Find number of powers of two between extents and block size to a minimum of 4
     block_area *= llmax(max_layers, 1); // Adjust initial block area by max number of layers
     S32 totalbytes = (S32) (MIN_LAYER_SIZE * max_components * precision); // Start estimation with a minimum reasonable size
     S32 block_layers = 0;
