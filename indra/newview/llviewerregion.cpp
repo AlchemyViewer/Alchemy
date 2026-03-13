@@ -978,65 +978,93 @@ std::string LLViewerRegion::regionFlagsToString(U64 flags)
 }
 
 // static
-std::string LLViewerRegion::accessToString(U8 sim_access)
+const std::string& LLViewerRegion::accessToString(U8 sim_access)
 {
-    switch(sim_access)
+    static std::vector<std::string> sim_access_string;
+    if (sim_access_string.empty())
+    {
+        sim_access_string.resize(5);
+        sim_access_string[0] = LLTrans::getString("SIM_ACCESS_MIN");
+        sim_access_string[1] = LLTrans::getString("SIM_ACCESS_PG");
+        sim_access_string[2] = LLTrans::getString("SIM_ACCESS_MATURE");
+        sim_access_string[3] = LLTrans::getString("SIM_ACCESS_ADULT");
+        sim_access_string[4] = LLTrans::getString("SIM_ACCESS_DOWN");
+    }
+
+    switch (sim_access)
     {
     case SIM_ACCESS_PG:
-        return LLTrans::getString("SIM_ACCESS_PG");
+        return sim_access_string[1];
 
     case SIM_ACCESS_MATURE:
-        return LLTrans::getString("SIM_ACCESS_MATURE");
+        return sim_access_string[2];
 
     case SIM_ACCESS_ADULT:
-        return LLTrans::getString("SIM_ACCESS_ADULT");
+        return sim_access_string[3];
 
     case SIM_ACCESS_DOWN:
-        return LLTrans::getString("SIM_ACCESS_DOWN");
+        return sim_access_string[4];
 
     case SIM_ACCESS_MIN:
     default:
-        return LLTrans::getString("SIM_ACCESS_MIN");
+        return sim_access_string[0];
     }
 }
 
 // static
-std::string LLViewerRegion::getAccessIcon(U8 sim_access)
+const std::string& LLViewerRegion::getAccessIcon(U8 sim_access)
 {
+    static std::vector<std::string> sim_access_icon;
+    if (sim_access_icon.empty())
+    {
+        sim_access_icon.resize(3);
+        sim_access_icon[0] = "Parcel_PG_Light";
+        sim_access_icon[1] = "Parcel_M_Dark";
+        sim_access_icon[2] = "Parcel_R_Light";
+    }
     switch(sim_access)
     {
     case SIM_ACCESS_MATURE:
-        return "Parcel_M_Dark";
+        return sim_access_icon[1];
 
     case SIM_ACCESS_ADULT:
-        return "Parcel_R_Light";
+        return sim_access_icon[2];
 
     case SIM_ACCESS_PG:
-        return "Parcel_PG_Light";
+        return sim_access_icon[0];
 
     case SIM_ACCESS_MIN:
     default:
-        return "";
+        return LLStringUtil::null;
     }
 }
 
 // static
-std::string LLViewerRegion::accessToShortString(U8 sim_access)
+const std::string& LLViewerRegion::accessToShortString(U8 sim_access)
 {
+    static std::vector<std::string> short_access_strs;
+    if (short_access_strs.empty())
+    {
+        short_access_strs.resize(4);
+        short_access_strs[0] = "PG";
+        short_access_strs[1] = "M";
+        short_access_strs[2] = "A";
+        short_access_strs[3] = "U";
+    }
     switch(sim_access)      /* Flawfinder: ignore */
     {
     case SIM_ACCESS_PG:
-        return "PG";
+        return short_access_strs[0];
 
     case SIM_ACCESS_MATURE:
-        return "M";
+        return short_access_strs[1];
 
     case SIM_ACCESS_ADULT:
-        return "A";
+        return short_access_strs[2];
 
     case SIM_ACCESS_MIN:
     default:
-        return "U";
+        return short_access_strs[3];
     }
 }
 

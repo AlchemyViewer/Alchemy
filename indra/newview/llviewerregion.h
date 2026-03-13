@@ -225,14 +225,14 @@ public:
     static std::string regionFlagsToString(U64 flags);
 
     // Returns translated version of "Mature", "PG", "Adult", etc.
-    static std::string accessToString(U8 sim_access);
+    static const std::string& accessToString(U8 sim_access);
 
     // Returns "M", "PG", "A" etc.
-    static std::string accessToShortString(U8 sim_access);
+    static const std::string& accessToShortString(U8 sim_access);
     static U8          shortStringToAccess(const std::string &sim_access);
 
     // Return access icon name
-    static std::string getAccessIcon(U8 sim_access);
+    static const std::string& getAccessIcon(U8 sim_access);
 
     // helper function which just makes sure all interested parties
     // can process the message.

@@ -212,6 +212,8 @@ private:
     std::string mHumanReadableLocation;
     bool isHumanReadableLocationVisible = false;
     std::string mMaturityHelpTopic;
+
+    U8 mLastSimAccess = 0;
 };
 
 #endif

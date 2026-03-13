@@ -607,9 +607,10 @@ void LLStatBar::drawLabelAndValue( F32 value, std::string &label, LLRect &bar_re
     LLFontGL::getFontMonospace()->render(mLabel.getWString(), 0, 0.F, (F32)getRect().getHeight(), LLColor4(1.f, 1.f, 1.f, 1.f),
         LLFontGL::LEFT, LLFontGL::TOP);
 
+    static std::string na_string = LLTrans::getString("na");
     std::string value_str   = !llisnan(value)
                             ? llformat("%10.*f %s", decimal_digits, value, label.c_str())
-                            : LLTrans::getString("na");
+                            : na_string;
 
     // Draw the current value.
     if (mOrientation == HORIZONTAL)

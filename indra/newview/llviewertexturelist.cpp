@@ -1241,7 +1241,8 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
     typedef std::vector<LLPointer<LLViewerFetchedTexture> > entries_list_t;
-    entries_list_t entries;
+    static entries_list_t entries;
+    entries.clear();
 
     // update N textures at beginning of mImageList
     U32 update_count = 0;
