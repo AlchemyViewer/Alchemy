@@ -108,6 +108,9 @@ private:
     static void setObjectType( LLPCode pcode );
     void onClickGridOptions();
 
+    void buildTreeGrassCombo();
+    void onSelectTreeGrassCombo();
+
 public:
     LLButton        *mBtnFocus;
     LLButton        *mBtnMove;
@@ -156,6 +159,7 @@ public:
     LLTextBox*  mTextSelectionEmpty = nullptr;
     LLTextBox*  mTextSelectionFaces = nullptr;
     LLSlider*   mSliderZoom = nullptr;
+    LLComboBox* mTreeGrassCombo = nullptr;
 
     // Create buttons
     LLCheckBoxCtrl  *mCheckSticky;

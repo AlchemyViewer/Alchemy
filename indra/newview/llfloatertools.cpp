@@ -85,6 +85,8 @@
 #include "llviewermenu.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerwindow.h"
+#include "llvograss.h"
+#include "llvotree.h"
 #include "llvovolume.h"
 #include "lluictrlfactory.h"
 #include "llmeshrepository.h"
@@ -281,6 +283,7 @@ bool    LLFloaterTools::postBuild()
     mCheckCopyRotates = getChild<LLCheckBoxCtrl>("checkbox copy rotates");
     getChild<LLUICtrl>("checkbox copy rotates")->setValue((bool)gSavedSettings.getBOOL("CreateToolCopyRotates"));
 
+    mTreeGrassCombo         = getChild<LLComboBox>("tree_grass_combo");
     mRadioGroupLand         = getChild<LLRadioGroup>("land_radio_group");
     mBtnApplyToSelection    = getChild<LLButton>("button apply to selection");
     mSliderDozerSize        = getChild<LLSlider>("slider brush size");
@@ -863,6 +866,10 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
     // Create buttons
     bool create_visible = (tool == LLToolCompCreate::getInstance());
 
+    // Tree/grass picker
+    mTreeGrassCombo->setVisible(create_visible);
+    if (create_visible) buildTreeGrassCombo();
+
     mBtnCreate  ->setToggleState(   tool == LLToolCompCreate::getInstance() );
 
     if (mCheckCopySelection
@@ -1209,6 +1216,7 @@ void LLFloaterTools::setObjectType( LLPCode pcode )
 {
     LLToolPlacer::setObjectType( pcode );
     gSavedSettings.setBOOL("CreateToolCopySelection", false);
+    gFloaterTools->buildTreeGrassCombo();
     gFocusMgr.setMouseCapture(NULL);
 }
 
@@ -1304,3 +1312,90 @@ void LLFloaterTools::updateLandImpacts()
     }
 }
 
+template<class P>
+void build_plant_combo(const std::map<U32, P*>& list, LLComboBox* combo)
+{
+    if (!combo || list.empty()) return;
+    combo->removeall();
+    typename std::map<U32, P*>::const_iterator it = list.begin();
+    typename std::map<U32, P*>::const_iterator end = list.end();
+    for ( ; it != end; ++it )
+    {
+        P* plant = (*it).second;
+        if (plant) combo->addSimpleElement(plant->mName, ADD_BOTTOM);
+    }
+}
+
+void LLFloaterTools::buildTreeGrassCombo()
+{
+    if (!mTreeGrassCombo) return;
+
+    // Rebuild the combo with the list we need, then select the last-known use
+    // TODO: rebuilding this list continuously is probably not the best way
+    LLPCode pcode = LLToolPlacer::getObjectType();
+    std::string type = LLStringUtil::null;
+
+    // LL_PCODE_TREE_NEW seems to be "new" as in "dodo"
+    switch (pcode)
+    {
+        case LL_PCODE_LEGACY_TREE:
+        case LL_PCODE_TREE_NEW:
+            build_plant_combo(LLVOTree::sSpeciesTable, mTreeGrassCombo);
+            mTreeGrassCombo->addSimpleElement("Random", ADD_TOP);
+            type = "Tree";
+            break;
+        case LL_PCODE_LEGACY_GRASS:
+            build_plant_combo(LLVOGrass::sSpeciesTable, mTreeGrassCombo);
+            mTreeGrassCombo->addSimpleElement("Random", ADD_TOP);
+            type = "Grass";
+            break;
+        default:
+            mTreeGrassCombo->setEnabled(false);
+            break;
+    }
+
+    // select last selected if exists
+    if (!type.empty())
+    {
+        // Enable the options
+        mTreeGrassCombo->setEnabled(true);
+
+        // Set the last selection, or "Random" (old default) if there isn't one
+        std::string last_selected = gSavedSettings.getString("LastSelected"+type);
+        if (last_selected.empty())
+        {
+            mTreeGrassCombo->selectByValue(LLSD(std::string("Random")));
+        }
+        else
+        {
+            mTreeGrassCombo->selectByValue(LLSD(last_selected));
+        }
+    }
+}
+
+void LLFloaterTools::onSelectTreeGrassCombo()
+{
+    // Save the last-used selection
+    std::string last_selected = mTreeGrassCombo->getValue().asString();
+    LLPCode pcode = LLToolPlacer::getObjectType();
+    std::string type = "";
+
+    switch (pcode)
+    {
+        case LL_PCODE_LEGACY_GRASS:
+            type = "Grass";
+            break;
+        case LL_PCODE_LEGACY_TREE:
+        case LL_PCODE_TREE_NEW:
+            type = "Tree";
+            break;
+        default:
+            break;
+    }
+
+    if (!type.empty())
+    {
+        // Should never be an empty string
+        gSavedSettings.setString("LastSelected"+type, last_selected);
+    }
+}
