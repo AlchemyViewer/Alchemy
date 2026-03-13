@@ -537,7 +537,7 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
     panel->getChild<LLUICtrl>("block_terraform_check")->setValue(is_flag_set(region_flags, REGION_FLAGS_BLOCK_TERRAFORM));
     panel->getChild<LLUICtrl>("block_fly_check")->setValue(is_flag_set(region_flags, REGION_FLAGS_BLOCK_FLY));
     panel->getChild<LLUICtrl>("block_fly_over_check")->setValue(is_flag_set(region_flags, REGION_FLAGS_BLOCK_FLYOVER));
-    panel->getChild<LLUICtrl>("allow_damage_check")->setValue((region_flags & REGION_FLAGS_ALLOW_DAMAGE) ? TRUE : FALSE );
+    panel->getChild<LLUICtrl>("allow_damage_check")->setValue((region_flags & REGION_FLAGS_ALLOW_DAMAGE));
     panel->getChild<LLUICtrl>("restrict_pushobject")->setValue(is_flag_set(region_flags, REGION_FLAGS_RESTRICT_PUSHOBJECT));
     panel->getChild<LLUICtrl>("allow_land_resell_check")->setValue(!is_flag_set(region_flags, REGION_FLAGS_BLOCK_LAND_RESELL));
     panel->getChild<LLUICtrl>("allow_parcel_changes_check")->setValue(is_flag_set(region_flags, REGION_FLAGS_ALLOW_PARCEL_CHANGES));
@@ -555,18 +555,18 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
         panel_general->setCombatEnabled(supports_combat2);
     }
 
-    panel->getChild<LLUICtrl>("allow_damage_check")->setValue((region_flags & REGION_FLAGS_ALLOW_DAMAGE) ? TRUE : FALSE);
+    panel->getChild<LLUICtrl>("allow_damage_check")->setValue((region_flags & REGION_FLAGS_ALLOW_DAMAGE));
 
-    panel->getChild<LLUICtrl>("combat_restrict_log")->setValue((combat_flags & REGION_COMBAT_FLAG_RESTRICT_LOG) ? TRUE : FALSE);
-    panel->getChild<LLUICtrl>("combat_allow_damage_adjust")->setValue((combat_flags & REGION_COMBAT_FLAG_DAMAGE_ADJUST) ? TRUE : FALSE);
-    panel->getChild<LLUICtrl>("combat_restore_health")->setValue((combat_flags & REGION_COMBAT_FLAG_RESTORE_HEALTH) ? TRUE : FALSE);
+    panel->getChild<LLUICtrl>("combat_restrict_log")->setValue((combat_flags & REGION_COMBAT_FLAG_RESTRICT_LOG));
+    panel->getChild<LLUICtrl>("combat_allow_damage_adjust")->setValue((combat_flags & REGION_COMBAT_FLAG_DAMAGE_ADJUST));
+    panel->getChild<LLUICtrl>("combat_restore_health")->setValue((combat_flags & REGION_COMBAT_FLAG_RESTORE_HEALTH));
     panel->getChild<LLUICtrl>("combat_on_death")->setValue(on_death);
     panel->getChild<LLUICtrl>("combat_dps_spin")->setValue(damage_throttle);
     panel->getChild<LLUICtrl>("combat_hps_spin")->setValue(regeneration_rate);
     panel->getChild<LLUICtrl>("combat_invuln_spin")->setValue(invulnerability_time);
     panel->getChild<LLUICtrl>("combat_damage_limit")->setValue(damage_limit);
 
-    BOOL combat2_enabled = ((region_flags & REGION_FLAGS_ALLOW_DAMAGE) && supports_combat2) ? TRUE : FALSE;
+    bool combat2_enabled = ((region_flags & REGION_FLAGS_ALLOW_DAMAGE) && supports_combat2);
 
     panel->getChild<LLUICtrl>("combat_restrict_log")->setEnabled(combat2_enabled);
     panel->getChild<LLUICtrl>("combat_allow_damage_adjust")->setEnabled(combat2_enabled);
@@ -1051,7 +1051,7 @@ bool LLPanelRegionGeneralInfo::onChangeObjectBonus(const LLSD& notification, con
 
 void LLPanelRegionGeneralInfo::onChangeCombatEnabled()
 {
-    BOOL combat2_enabled = getChild<LLUICtrl>("allow_damage_check")->getValue().asBoolean() && mSupportsCombat2;
+    bool combat2_enabled = getChild<LLUICtrl>("allow_damage_check")->getValue().asBoolean() && mSupportsCombat2;
 
     getChild<LLUICtrl>("combat_restrict_log")->setEnabled(combat2_enabled);
     getChild<LLUICtrl>("combat_allow_damage_adjust")->setEnabled(combat2_enabled);

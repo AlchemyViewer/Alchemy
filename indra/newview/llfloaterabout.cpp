@@ -181,7 +181,7 @@ bool LLFloaterAbout::postBuild()
     support_widget->blockUndo();
 
     // Fix views
-    support_widget->setEnabled(FALSE);
+    support_widget->setEnabled(false);
     support_widget->startOfDoc();
 
     {
@@ -200,7 +200,7 @@ bool LLFloaterAbout::postBuild()
             LL_WARNS("AboutInit") << "Could not read contributors file at " << contributors_path << LL_ENDL;
         }
         contrib_names_widget->setText(contributors);
-        contrib_names_widget->setEnabled(FALSE);
+        contrib_names_widget->setEnabled(false);
         contrib_names_widget->startOfDoc();
     }
 
@@ -220,7 +220,7 @@ bool LLFloaterAbout::postBuild()
             LL_WARNS("AboutInit") << "Could not read supporters file at " << supporters_path << LL_ENDL;
         }
         suppoter_names_widget->setText(supporters);
-        suppoter_names_widget->setEnabled(FALSE);
+        suppoter_names_widget->setEnabled(false);
         suppoter_names_widget->startOfDoc();
     }
 

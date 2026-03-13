@@ -524,7 +524,7 @@ void LLPanelPermissions::refresh()
     if (groups_identical)
     {
         mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
-        mLabelGroupName->setEnabled(TRUE);
+        mLabelGroupName->setEnabled(true);
     }
     else
     {
