@@ -189,7 +189,7 @@ bool LLPanelPermissions::postBuild()
     childSetCommitCallback("clickaction",LLPanelPermissions::onCommitClickAction,this);
     childSetCommitCallback("search_check",LLPanelPermissions::onCommitIncludeInSearch,this);
 
-    mLabelGroupName = getChild<LLNameBox>("Group Name Proxy");
+    mLabelGroupName = getChild<LLTextBox>("Group Name");
     mLabelOwnerName = getChild<LLTextBox>("Owner Name");
     mLabelCreatorName = getChild<LLTextBox>("Creator Name");
 
@@ -220,26 +220,22 @@ void LLPanelPermissions::disableAll()
     getChild<LLUICtrl>("pathfinding_attributes_value")->setValue(LLStringUtil::null);
 
     getChildView("Creator:")->setEnabled(false);
-    getChild<LLUICtrl>("Creator Icon")->setVisible(false);
     mLabelCreatorName->setValue(LLStringUtil::null);
     mLabelCreatorName->setEnabled(false);
 
     getChildView("Owner:")->setEnabled(false);
-    getChild<LLUICtrl>("Owner Icon")->setVisible(false);
-    getChild<LLUICtrl>("Owner Group Icon")->setVisible(false);
     mLabelOwnerName->setValue(LLStringUtil::null);
     mLabelOwnerName->setEnabled(false);
 
     getChildView("Group:")->setEnabled(false);
-    getChild<LLUICtrl>("Group Name Proxy")->setValue(LLStringUtil::null);
-    getChildView("Group Name Proxy")->setEnabled(false);
+    mLabelGroupName->setValue(LLStringUtil::null);
+    mLabelGroupName->setEnabled(false);
     getChildView("button set group")->setEnabled(false);
 
     getChild<LLUICtrl>("Object Name")->setValue(LLStringUtil::null);
     getChildView("Object Name")->setEnabled(false);
     getChildView("Name:")->setEnabled(false);
-    getChild<LLUICtrl>("Group Name")->setValue(LLStringUtil::null);
-    getChildView("Group Name")->setEnabled(false);
+
     getChildView("Description:")->setEnabled(false);
     getChild<LLUICtrl>("Object Description")->setValue(LLStringUtil::null);
     getChildView("Object Description")->setEnabled(false);
@@ -300,7 +296,8 @@ void LLPanelPermissions::refresh()
     if(BtnDeedToGroup)
     {
         std::string deedText;
-        if (gWarningSettings.getBOOL("DeedObject"))
+        static const LLCachedControl<bool> deed_object(gWarningSettings, "DeedObject");
+        if (deed_object)
         {
             deedText = getString("text deed continued");
         }
@@ -418,7 +415,7 @@ void LLPanelPermissions::refresh()
     //style_params.font.size = LLFontGL::sizeFromFont(fontp);
     //style_params.font.style = "UNDERLINE";
 
-    LLAvatarName av_name;
+    //LLAvatarName av_name;
     //style_params.link_href = creator_app_link;
 // [RLVa:KB] - Checked: RLVa-2.0.1
     // Only anonymize the creator if all of the selection was created by the same avie who's also the owner or they're a nearby avie
@@ -522,25 +519,17 @@ void LLPanelPermissions::refresh()
 
     // update group text field
     getChildView("Group:")->setEnabled(true);
-    getChild<LLUICtrl>("Group Name")->setValue(LLStringUtil::null);
     LLUUID group_id;
     bool groups_identical = LLSelectMgr::getInstance()->selectGetGroup(group_id);
     if (groups_identical)
     {
-        if (mLabelGroupName)
-        {
-            mLabelGroupName->setNameID(group_id,true);
-            mLabelGroupName->setEnabled(true);
-        }
+        mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
+        mLabelGroupName->setEnabled(TRUE);
     }
     else
     {
-        if (mLabelGroupName)
-        {
-            mLabelGroupName->setNameID(LLUUID::null, true);
-            mLabelGroupName->refresh(LLUUID::null, std::string(), true);
-            mLabelGroupName->setEnabled(false);
-        }
+        mLabelGroupName->setValue(LLStringUtil::null);
+        mLabelGroupName->setEnabled(false);
     }
 
     getChildView("button set group")->setEnabled(root_selected && owners_identical && (mOwnerID == gAgent.getID()) && is_nonpermanent_enforced);
@@ -583,7 +572,7 @@ void LLPanelPermissions::refresh()
 
     // figure out the contents of the name, description, & category
     bool edit_name_desc = false;
-    if (is_one_object && objectp->permModify() && !objectp->isPermanentEnforced())
+    if (objectp->permModify() && !objectp->isPermanentEnforced())
     {
         edit_name_desc = true;
     }
@@ -1113,10 +1102,8 @@ void LLPanelPermissions::onClickGroup()
 
 void LLPanelPermissions::cbGroupID(LLUUID group_id)
 {
-    if(mLabelGroupName)
-    {
-        mLabelGroupName->setNameID(group_id, true);
-    }
+    mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
+    mLabelGroupName->setEnabled(true);
     LLSelectMgr::getInstance()->sendGroup(group_id);
 }
 

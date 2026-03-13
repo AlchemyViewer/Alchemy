@@ -1179,11 +1179,6 @@ void LLPanelObject::getState( )
     mLabelRevolutions->setVisible( revolutions_visible );
     mSpinRevolutions ->setVisible( revolutions_visible );
 
-    mCtrlSculptTexture->setVisible(sculpt_texture_visible);
-    mLabelSculptType->setVisible(sculpt_texture_visible);
-    mCtrlSculptType->setVisible(sculpt_texture_visible);
-
-
     // sculpt texture
     if (selected_item == MI_SCULPT)
     {
@@ -1241,12 +1236,12 @@ void LLPanelObject::getState( )
             if (mCtrlSculptInvert)
             {
                 mCtrlSculptInvert->set(sculpt_invert);
-                mCtrlSculptInvert->setEnabled(editable);
+                mCtrlSculptInvert->setEnabled(editable && !isMesh);
             }
 
             if (mLabelSculptType)
             {
-                mLabelSculptType->setEnabled(true);
+                mLabelSculptType->setEnabled(!isMesh);
             }
 
         }
@@ -1872,9 +1867,9 @@ void LLPanelObject::sendPosition(bool btn_down)
             mCtrlPosZ->set(LLWorld::getInstance()->resolveLandHeightAgent(newpos) + 1.f);
         }
 
-    	// Make sure new position is in a valid region, so the object
-    	// won't get dumped by the simulator.
-    	new_pos_global = regionp->getPosGlobalFromRegion(newpos);
+        // Make sure new position is in a valid region, so the object
+        // won't get dumped by the simulator.
+        new_pos_global = regionp->getPosGlobalFromRegion(newpos);
     }
     else
     {

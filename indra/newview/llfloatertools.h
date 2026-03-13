@@ -51,7 +51,7 @@ class LLLandImpactsObserver;
 
 typedef LLSafeHandle<LLObjectSelection> LLObjectSelectionHandle;
 
-class LLFloaterTools
+class LLFloaterTools final
 : public LLFloater
 {
 public:
@@ -130,11 +130,15 @@ public:
     LLButton*       mBtnLink;
     LLButton*       mBtnUnlink;
 
+    LLButton*       mBtnPrevPart;
+    LLButton*       mBtnNextPart;
+
     LLCheckBoxCtrl* mCheckSnapToGrid;
     LLButton*       mBtnGridOptions;
     LLComboBox*     mComboGridMode;
     LLCheckBoxCtrl* mCheckStretchUniform;
     LLCheckBoxCtrl* mCheckStretchTexture;
+    LLCheckBoxCtrl* mCheckActualRoot;
 
     // !HACK! Replacement of mCheckStretchUniform label because LLCheckBoxCtrl
     //  doesn't support word_wrap of its label. Need to fix truncation bug EXT-6658
