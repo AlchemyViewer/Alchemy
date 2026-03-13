@@ -137,9 +137,7 @@ private:
 
 private:
     LLTextBox   *mTextTime;
-
-    LLStatGraph *mSGBandwidth;
-    LLStatGraph *mSGPacketLoss;
+    LLTextBox   *mTextFPS;
 
     LLView      *mPanelPopupHolder;
     LLButton    *mIconPresetsCamera;
@@ -149,7 +147,9 @@ private:
     LLButton    *mBtnVolume;
     LLTextBox   *mBoxBalance;
     LLButton    *mMediaToggle;
+    LLView      *mBalanceBG;
     LLFrameTimer    mClockUpdateTimer;
+    LLFrameTimer    mFPSUpdateTimer;
 
     S32             mBalance;
     bool            mBalanceClicked;

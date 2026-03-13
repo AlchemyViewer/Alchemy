@@ -88,6 +88,8 @@
 #include "llsearchableui.h"
 #include "llsearcheditor.h"
 
+#include <fmt/format.h>
+
 // system includes
 #include <iomanip>
 
@@ -111,8 +113,6 @@ static void onClickVolume(void*);
 LLStatusBar::LLStatusBar(const LLRect& rect)
 :   LLPanel(),
     mTextTime(NULL),
-    mSGBandwidth(NULL),
-    mSGPacketLoss(NULL),
     mBtnVolume(NULL),
     mBoxBalance(NULL),
     mBalance(0),
@@ -195,7 +195,8 @@ bool LLStatusBar::postBuild()
     mMediaToggle->setClickedCallback( &LLStatusBar::onClickMediaToggle, this );
     mMediaToggle->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterNearbyMedia, this));
 
-    LLHints::getInstance()->registerHintTarget("linden_balance", getChild<LLView>("balance_bg")->getHandle());
+    mBalanceBG = getChild<LLView>("balance_bg");
+    LLHints::getInstance()->registerHintTarget("linden_balance", mBalanceBG->getHandle());
 
     gSavedSettings.getControl("MuteAudio")->getSignal()->connect(boost::bind(&LLStatusBar::onVolumeChanged, this, _2));
     gSavedSettings.getControl("EnableVoiceChat")->getSignal()->connect(boost::bind(&LLStatusBar::onVoiceChanged, this, _2));
@@ -211,46 +212,10 @@ bool LLStatusBar::postBuild()
     }
     mObscureBalance = gSavedSettings.getBOOL("ObscureBalanceInStatusBar");
 
-    // Adding Net Stat Graph
-    S32 x = getRect().getWidth() - 2;
-    S32 y = 0;
-    LLRect r;
-    r.set( x-SIM_STAT_WIDTH, y+MENU_BAR_HEIGHT-1, x, y+1);
-    LLStatGraph::Params sgp;
-    sgp.name("BandwidthGraph");
-    sgp.rect(r);
-    sgp.follows.flags(FOLLOWS_BOTTOM | FOLLOWS_RIGHT);
-    sgp.mouse_opaque(false);
-    sgp.stat.count_stat_float(&LLStatViewer::ACTIVE_MESSAGE_DATA_RECEIVED);
-    sgp.units("Kbps");
-    sgp.precision(0);
-    sgp.per_sec(true);
-    mSGBandwidth = LLUICtrlFactory::create<LLStatGraph>(sgp);
-    addChild(mSGBandwidth);
-    x -= SIM_STAT_WIDTH + 2;
+    mTextFPS = getChild<LLTextBox>("FPSText");
+    mTextFPS->setClickedCallback([](void*) { LLFloaterReg::showInstance("stats"); });
 
-    r.set( x-SIM_STAT_WIDTH, y+MENU_BAR_HEIGHT-1, x, y+1);
-    //these don't seem to like being reused
-    LLStatGraph::Params pgp;
-    pgp.name("PacketLossPercent");
-    pgp.rect(r);
-    pgp.follows.flags(FOLLOWS_BOTTOM | FOLLOWS_RIGHT);
-    pgp.mouse_opaque(false);
-    pgp.stat.sample_stat_float(&LLStatViewer::PACKETS_LOST_PERCENT);
-    pgp.units("%");
-    pgp.min(0.f);
-    pgp.max(5.f);
-    pgp.precision(1);
-    pgp.per_sec(false);
-    LLStatGraph::Thresholds thresholds;
-    thresholds.threshold.add(LLStatGraph::ThresholdParams().value(0.1f).color(LLColor4::green))
-                        .add(LLStatGraph::ThresholdParams().value(0.25f).color(LLColor4::yellow))
-                        .add(LLStatGraph::ThresholdParams().value(0.6f).color(LLColor4::red));
-
-    pgp.thresholds(thresholds);
-
-    mSGPacketLoss = LLUICtrlFactory::create<LLStatGraph>(pgp);
-    addChild(mSGPacketLoss);
+    mTextFPS->setVisible(gSavedSettings.getBOOL("ShowStatusBarFPS"));
 
     mPanelPresetsCameraPulldown = new LLPanelPresetsCameraPulldown();
     addChild(mPanelPresetsCameraPulldown);
@@ -308,20 +273,6 @@ bool LLStatusBar::postBuild()
 // Per-frame updates of visibility
 void LLStatusBar::refresh()
 {
-    static LLCachedControl<bool> show_net_stats(gSavedSettings, "ShowNetStats", false);
-    bool net_stats_visible = show_net_stats;
-
-    if (net_stats_visible)
-    {
-        // Adding Net Stat Meter back in
-        F32 bwtotal = gViewerThrottle.getMaxBandwidth() / 1000.f;
-        mSGBandwidth->setMin(0.f);
-        mSGBandwidth->setMax(bwtotal*1.25f);
-        //mSGBandwidth->setThreshold(0, bwtotal*0.75f);
-        //mSGBandwidth->setThreshold(1, bwtotal);
-        //mSGBandwidth->setThreshold(2, bwtotal);
-    }
-
     // update clock every 10 seconds
     static LLCachedControl<bool> show_clock(gSavedSettings, "ShowStatusBarTime", false);
     static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
@@ -347,9 +298,6 @@ void LLStatusBar::refresh()
         gMenuBarView->reshape(MENU_RIGHT, gMenuBarView->getRect().getHeight());
     }
 
-    mSGBandwidth->setVisible(net_stats_visible);
-    mSGPacketLoss->setVisible(net_stats_visible);
-
     // update the master volume button state
     bool mute_audio = LLAppViewer::instance()->getMasterSystemAudioMute();
     mBtnVolume->setToggleState(mute_audio);
@@ -358,7 +306,9 @@ void LLStatusBar::refresh()
 
     // Disable media toggle if there's no media, parcel media, and no parcel audio
     // (or if media is disabled)
-    bool button_enabled = (gSavedSettings.getBOOL("AudioStreamingMusic")||gSavedSettings.getBOOL("AudioStreamingMedia")) &&
+    static const LLCachedControl<bool> audio_streaming_enabled(gSavedSettings, "AudioStreamingMusic");
+    static const LLCachedControl<bool> media_streaming_enabled(gSavedSettings, "AudioStreamingMedia");
+    bool button_enabled = (audio_streaming_enabled || media_streaming_enabled) &&
                           (media_inst->hasInWorldMedia() || media_inst->hasParcelMedia() || media_inst->hasParcelAudio());
     mMediaToggle->setEnabled(button_enabled);
     // Note the "sense" of the toggle is opposite whether media is playing or not
@@ -366,21 +316,32 @@ void LLStatusBar::refresh()
                               media_inst->isParcelMediaPlaying() ||
                               media_inst->isParcelAudioPlaying());
     mMediaToggle->setValue(!any_media_playing);
+
+    static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
+    if (show_fps && mFPSUpdateTimer.getElapsedTimeF32() > 0.1f)
+    {
+        mFPSUpdateTimer.reset();
+        F32 fps = (F32)LLTrace::get_frame_recording().getLastRecording().getMean(LLStatViewer::FPS_SAMPLE);
+        mTextFPS->setText(fmt::format("{:d}", ll_round(fps)));
+    }
 }
 
 void LLStatusBar::setVisibleForMouselook(bool visible)
 {
+    static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
+    static LLCachedControl<bool> show_menu_search(gSavedSettings, "MenuSearch", false);
     mTextTime->setVisible(visible);
-    getChild<LLUICtrl>("balance_bg")->setVisible(visible);
+    mBalanceBG->setVisible(visible);
     mBoxBalance->setVisible(visible);
+    mBtnQuickSettings->setVisible(visible);
+    mBtnAO->setVisible(visible);
     mBtnVolume->setVisible(visible);
     mMediaToggle->setVisible(visible);
-    mSGBandwidth->setVisible(visible);
-    mSGPacketLoss->setVisible(visible);
-    mSearchPanel->setVisible(visible && gSavedSettings.getBOOL("MenuSearch"));
+    mSearchPanel->setVisible(visible && show_menu_search);
     setBackgroundVisible(visible);
     mIconPresetsCamera->setVisible(visible);
     mIconPresetsGraphic->setVisible(visible);
+    mTextFPS->setVisible(visible && show_fps);
 }
 
 void LLStatusBar::debitBalance(S32 debit)
@@ -833,7 +794,7 @@ void LLStatusBar::updateMenuSearchVisibility(const LLSD& data)
 void LLStatusBar::updateMenuSearchPosition()
 {
     const S32 HPAD = 12;
-    LLRect balanceRect = getChildView("balance_bg")->getRect();
+    LLRect balanceRect = mBalanceBG->getRect();
     LLRect searchRect = mSearchPanel->getRect();
     S32 w = searchRect.getWidth();
     searchRect.mLeft = balanceRect.mLeft - w - HPAD;
@@ -848,10 +809,9 @@ void LLStatusBar::updateBalancePanelPosition()
     LLRect balance_rect = mBoxBalance->getTextBoundingRect();
     LLRect buy_rect = getChildView("buyL")->getRect();
     LLRect shop_rect = getChildView("goShop")->getRect();
-    LLView* balance_bg_view = getChildView("balance_bg");
-    LLRect balance_bg_rect = balance_bg_view->getRect();
+    LLRect balance_bg_rect = mBalanceBG->getRect();
     balance_bg_rect.mLeft = balance_bg_rect.mRight - (buy_rect.getWidth() + shop_rect.getWidth() + balance_rect.getWidth() + HPAD);
-    balance_bg_view->setShape(balance_bg_rect);
+    mBalanceBG->setShape(balance_bg_rect);
 }
 
 void LLStatusBar::setBalanceVisible(bool visible)
