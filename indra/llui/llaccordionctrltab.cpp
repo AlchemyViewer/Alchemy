@@ -742,7 +742,7 @@ bool LLAccordionCtrlTab::notifyChildren (const LLSD& info)
 {
     if (info.has("action"))
     {
-        std::string str_action = info["action"];
+        const std::string& str_action = info["action"].asStringRef();
         if (str_action == "store_state")
         {
             storeOpenCloseState();
@@ -763,7 +763,7 @@ S32 LLAccordionCtrlTab::notifyParent(const LLSD& info)
 {
     if (info.has("action"))
     {
-        std::string str_action = info["action"];
+        const std::string& str_action = info["action"].asStringRef();
         if (str_action == "size_changes")
         {
             S32 height = info["height"];

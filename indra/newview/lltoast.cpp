@@ -615,7 +615,7 @@ bool LLToast::isNotificationValid()
 
 S32 LLToast::notifyParent(const LLSD& info)
 {
-    if (info.has("action") && "hide_toast" == info["action"].asString())
+    if (info.has("action") && "hide_toast" == info["action"].asStringRef())
     {
         hide();
         return 1;

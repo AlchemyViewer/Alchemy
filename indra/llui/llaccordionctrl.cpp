@@ -685,7 +685,7 @@ S32 LLAccordionCtrl::notifyParent(const LLSD& info)
 {
     if (info.has("action"))
     {
-        std::string str_action = info["action"];
+        const std::string& str_action = info["action"].asStringRef();
         if (str_action == "size_changes")
         {
             // Multiple children can request an arrange,

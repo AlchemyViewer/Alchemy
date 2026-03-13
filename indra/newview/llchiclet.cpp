@@ -764,7 +764,7 @@ S32 LLChicletPanel::notifyParent(const LLSD& info)
 {
     if(info.has("notification"))
     {
-        std::string str_notification = info["notification"];
+        const std::string& str_notification = info["notification"].asStringRef();
         if(str_notification == "size_changes")
         {
             arrange();
