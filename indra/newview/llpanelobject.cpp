@@ -111,8 +111,6 @@ enum {
     MI_HOLE_COUNT
 };
 
-const F32 MAX_ATTACHMENT_DIST = 3.5f; // meters
-
 //static const std::string LEGACY_FULLBRIGHT_DESC =LLTrans::getString("Fullbright");
 
 bool    LLPanelObject::postBuild()
@@ -388,6 +386,14 @@ void LLPanelObject::getState( )
             enable_move = enable_scale = enable_rotate = false;
     }
 // [/RLVa:KB]
+
+    bool is_attachment = objectp->isAttachment();
+    mCtrlPosX->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -256);
+    mCtrlPosX->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : 512);
+    mCtrlPosY->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -256);
+    mCtrlPosY->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : 512);
+    mCtrlPosZ->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -32);
+    mCtrlPosZ->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : 4096);
 
     LLVector3 vec;
     if (enable_move)
@@ -1758,7 +1764,7 @@ void LLPanelObject::sendRotation(bool btn_down)
 
         if (mRootObject != mObject)
         {
-            rotation = rotation * ~mRootObject->getRotationRegion();
+            rotation = rotation * (mObject->isAttachment() ? ~mRootObject->getRotationEdit() : ~mRootObject->getRotationRegion());
         }
 
         // To include avatars into movements and rotation
@@ -1834,6 +1840,7 @@ void LLPanelObject::sendPosition(bool btn_down)
     if (mObject.isNull()) return;
 
     LLVector3 newpos(mCtrlPosX->get(), mCtrlPosY->get(), mCtrlPosZ->get());
+    LLVector3d new_pos_global;
     LLViewerRegion* regionp = mObject->getRegion();
 
     if (!regionp) return;
@@ -1861,6 +1868,10 @@ void LLPanelObject::sendPosition(bool btn_down)
         {
             mCtrlPosZ->set(LLWorld::getInstance()->resolveLandHeightAgent(newpos) + 1.f);
         }
+
+    	// Make sure new position is in a valid region, so the object
+    	// won't get dumped by the simulator.
+    	new_pos_global = regionp->getPosGlobalFromRegion(newpos);
     }
     else
     {
@@ -1873,22 +1884,40 @@ void LLPanelObject::sendPosition(bool btn_down)
         }
     }
 
-    // Make sure new position is in a valid region, so the object
-    // won't get dumped by the simulator.
-    LLVector3d new_pos_global = regionp->getPosGlobalFromRegion(newpos);
-    bool is_valid_pos = true;
     if (mObject->isAttachment())
     {
-        LLVector3 delta_pos = mObject->getPositionEdit() - newpos;
-        LLVector3d attachment_pos = regionp->getPosGlobalFromRegion(mObject->getPositionRegion() + delta_pos);
-        is_valid_pos = LLWorld::getInstance()->positionRegionValidGlobal(attachment_pos);
-    }
-    else
-    {
-        is_valid_pos = LLWorld::getInstance()->positionRegionValidGlobal(new_pos_global);
-    }
+        const LLVector3& old_pos_local = mObject->getPosition();
 
-    if (is_valid_pos)
+        if (mRootObject != mObject)
+        {
+            newpos = newpos - mRootObject->getPosition();
+            newpos = newpos * ~mRootObject->getRotation();
+            mObject->setPositionParent(newpos);
+        }
+        else
+        {
+            mObject->setPosition(newpos);
+        }
+
+        LLManip::rebuild(mObject);
+        gAgentAvatarp->clampAttachmentPositions();
+
+        // for individually selected roots, we need to counter-translate all unselected children
+        if (mObject->isRootEdit())
+        {
+            const LLVector3& delta = mObject->getPosition();
+            // counter-translate child objects if we are moving the root as an individual
+            mObject->resetChildrenPosition(old_pos_local - delta, TRUE);
+        }
+
+        if (!btn_down)
+        {
+            LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_POSITION);
+        }
+
+        LLSelectMgr::getInstance()->updateSelectionCenter();
+    }
+    else if (LLWorld::getInstance()->positionRegionValidGlobal(new_pos_global))
     {
         // send only if the position is changed, that is, the delta vector is not zero
         LLVector3d old_pos_global = mObject->getPositionGlobal();
