@@ -120,7 +120,7 @@ inline void LLVector4a::clear()
 
 inline void LLVector4a::splat(const F32 x)
 {
-    mQ = _mm_set1_ps(x);
+    mQ = _mm_set_ps1(x);
 }
 
 inline void LLVector4a::splat(const LLSimdScalar& x)
@@ -351,8 +351,6 @@ inline void LLVector4a::normalize3()
     LLVector4a lenSqrd; lenSqrd.setAllDot3( *this, *this );
     // rsqrt = approximate reciprocal square (i.e., { ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2 }
     const LLQuad rsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-    static const LLQuad half = { 0.5f, 0.5f, 0.5f, 0.5f };
-    static const LLQuad three = {3.f, 3.f, 3.f, 3.f };
     // Now we do one round of Newton-Raphson approximation to get full accuracy
     // According to the Newton-Raphson method, given a first 'w' for the root of f(x) = 1/x^2 - a (i.e., x = 1/sqrt(a))
     // the next better approximation w[i+1] = w - f(w)/f'(w) = w - (1/w^2 - a)/(-2*w^(-3))
@@ -362,8 +360,8 @@ inline void LLVector4a::normalize3()
     // which is actually lenSqrd). So out = a * [0.5*rsqrt * (3 - lenSqrd*rsqrt*rsqrt)]
     const LLQuad AtimesRsqrt = _mm_mul_ps( lenSqrd.mQ, rsqrt );
     const LLQuad AtimesRsqrtTimesRsqrt = _mm_mul_ps( AtimesRsqrt, rsqrt );
-    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(three, AtimesRsqrtTimesRsqrt );
-    const LLQuad nrApprox = _mm_mul_ps(half, _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
+    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt);
+    const LLQuad nrApprox = _mm_mul_ps(_mm_set_ps1(0.5f), _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
     mQ = _mm_mul_ps( mQ, nrApprox );
 }
 
@@ -375,8 +373,6 @@ inline void LLVector4a::normalize4()
     LLVector4a lenSqrd; lenSqrd.setAllDot4( *this, *this );
     // rsqrt = approximate reciprocal square (i.e., { ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2 }
     const LLQuad rsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-    static const LLQuad half = { 0.5f, 0.5f, 0.5f, 0.5f };
-    static const LLQuad three = {3.f, 3.f, 3.f, 3.f };
     // Now we do one round of Newton-Raphson approximation to get full accuracy
     // According to the Newton-Raphson method, given a first 'w' for the root of f(x) = 1/x^2 - a (i.e., x = 1/sqrt(a))
     // the next better approximation w[i+1] = w - f(w)/f'(w) = w - (1/w^2 - a)/(-2*w^(-3))
@@ -386,8 +382,8 @@ inline void LLVector4a::normalize4()
     // which is actually lenSqrd). So out = a * [0.5*rsqrt * (3 - lenSqrd*rsqrt*rsqrt)]
     const LLQuad AtimesRsqrt = _mm_mul_ps( lenSqrd.mQ, rsqrt );
     const LLQuad AtimesRsqrtTimesRsqrt = _mm_mul_ps( AtimesRsqrt, rsqrt );
-    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(three, AtimesRsqrtTimesRsqrt );
-    const LLQuad nrApprox = _mm_mul_ps(half, _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
+    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt );
+    const LLQuad nrApprox = _mm_mul_ps(_mm_set_ps1(0.5f), _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
     mQ = _mm_mul_ps( mQ, nrApprox );
 }
 
@@ -399,8 +395,6 @@ inline LLSimdScalar LLVector4a::normalize3withLength()
     LLVector4a lenSqrd; lenSqrd.setAllDot3( *this, *this );
     // rsqrt = approximate reciprocal square (i.e., { ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2 }
     const LLQuad rsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-    static const LLQuad half = { 0.5f, 0.5f, 0.5f, 0.5f };
-    static const LLQuad three = {3.f, 3.f, 3.f, 3.f };
     // Now we do one round of Newton-Raphson approximation to get full accuracy
     // According to the Newton-Raphson method, given a first 'w' for the root of f(x) = 1/x^2 - a (i.e., x = 1/sqrt(a))
     // the next better approximation w[i+1] = w - f(w)/f'(w) = w - (1/w^2 - a)/(-2*w^(-3))
@@ -410,8 +404,8 @@ inline LLSimdScalar LLVector4a::normalize3withLength()
     // which is actually lenSqrd). So out = a * [0.5*rsqrt * (3 - lenSqrd*rsqrt*rsqrt)]
     const LLQuad AtimesRsqrt = _mm_mul_ps( lenSqrd.mQ, rsqrt );
     const LLQuad AtimesRsqrtTimesRsqrt = _mm_mul_ps( AtimesRsqrt, rsqrt );
-    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(three, AtimesRsqrtTimesRsqrt );
-    const LLQuad nrApprox = _mm_mul_ps(half, _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
+    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt );
+    const LLQuad nrApprox = _mm_mul_ps(_mm_set_ps1(0.5f), _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
     mQ = _mm_mul_ps( mQ, nrApprox );
     return _mm_sqrt_ss(lenSqrd);
 }
@@ -589,7 +583,7 @@ inline bool LLVector4a::equals4(const LLVector4a& rhs, F32 tolerance ) const
 {
     LLVector4a diff; diff.setSub( *this, rhs );
     diff.setAbs( diff );
-    const LLQuad tol = _mm_set1_ps( tolerance );
+    const LLQuad tol = _mm_set_ps1(tolerance);
     const LLQuad cmp = _mm_cmplt_ps( diff, tol );
     return (_mm_movemask_ps( cmp ) & LLVector4Logical::MASK_XYZW) == LLVector4Logical::MASK_XYZW;
 }
@@ -598,7 +592,7 @@ inline bool LLVector4a::equals3(const LLVector4a& rhs, F32 tolerance ) const
 {
     LLVector4a diff; diff.setSub( *this, rhs );
     diff.setAbs( diff );
-    const LLQuad tol = _mm_set1_ps( tolerance );
+    const LLQuad tol = _mm_set_ps1(tolerance);
     const LLQuad t = _mm_cmplt_ps( diff, tol );
     return (_mm_movemask_ps( t ) & LLVector4Logical::MASK_XYZ) == LLVector4Logical::MASK_XYZ;
 

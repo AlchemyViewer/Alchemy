@@ -146,10 +146,8 @@ void LLVector4a::quantize16( const LLVector4a& low, const LLVector4a& high )
         // 16-bit quantization means we need a round of Newton-Raphson
         LLVector4a oneOverDelta;
         {
-            alignas(16) static const F32 F_TWO_4A[4] = { 2.f, 2.f, 2.f, 2.f };
-            ll_assert_aligned(F_TWO_4A,16);
-
-            LLVector4a two; two.load4a( F_TWO_4A );
+            LLVector4a two;
+            two.splat(2.f);
 
             // Here we use _mm_rcp_ps plus one round of newton-raphson
             // We wish to find 'x' such that x = 1/delta
