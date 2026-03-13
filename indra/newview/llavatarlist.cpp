@@ -585,6 +585,11 @@ void LLAvatarList::updateLastInteractionTimes()
 
 void LLAvatarList::updateDistances()
 {
+    if (gDisconnected)
+    {
+        return;
+    }
+
     std::vector<LLPanel*> items;
     getItems(items);
 
