@@ -42,6 +42,7 @@ class LLUUID;
 class LLFrameTimer;
 class LLStatGraph;
 class ALPanelAOPulldown;
+class ALPanelQuickSettingsPulldown;
 class LLPanelPresetsCameraPulldown;
 class LLPanelPresetsPulldown;
 class LLPanelVolumePulldown;
@@ -109,6 +110,7 @@ private:
 
     void onMouseEnterPresetsCamera();
     void onMouseEnterPresets();
+    void onMouseEnterQuickSettings();
     void onMouseEnterAO();
     void onMouseEnterVolume();
     void onMouseEnterNearbyMedia();
@@ -139,8 +141,10 @@ private:
     LLStatGraph *mSGBandwidth;
     LLStatGraph *mSGPacketLoss;
 
-    LLIconCtrl  *mIconPresetsCamera;
+    LLView      *mPanelPopupHolder;
+    LLButton    *mIconPresetsCamera;
     LLIconCtrl  *mIconPresetsGraphic;
+    LLButton    *mBtnQuickSettings;
     LLButton    *mBtnAO;
     LLButton    *mBtnVolume;
     LLTextBox   *mBoxBalance;
@@ -157,6 +161,7 @@ private:
     LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown;
     LLPanelPresetsPulldown* mPanelPresetsPulldown;
     ALPanelAOPulldown* mPanelAOPulldown;
+    ALPanelQuickSettingsPulldown* mPanelQuickSettingsPulldown;
     LLPanelVolumePulldown* mPanelVolumePulldown;
     LLPanelNearByMedia* mPanelNearByMedia;
 };

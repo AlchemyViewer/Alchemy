@@ -88,6 +88,8 @@ set(viewer_SOURCE_FILES
     alpanelaomini.cpp
     alpanelaopulldown.cpp
     alpanelradaralert.cpp
+    alpanelquicksettings.cpp
+    alpanelquicksettingspulldown.cpp
     altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
@@ -796,6 +798,8 @@ set(viewer_HEADER_FILES
     alpanelaomini.h
     alpanelaopulldown.h
     alpanelradaralert.h
+    alpanelquicksettings.h
+    alpanelquicksettingspulldown.h
     altoolalign.h
     alunzip.h
     alviewermenu.h

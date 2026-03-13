@@ -46,13 +46,11 @@
     </panel.string>
   <panel
 	 height="18"
-	 left="-398"
-	 top="0"
+	 left="375"
+	 top="1"
 	 width="120"
 	 follows="right|top"
 	 name="menu_search_panel"
-	 background_opaque="true"
-	 background_visible="true"
 	 bg_opaque_color="MouseGray">
 		<search_editor
 		 clear_button_visible="true"
@@ -86,7 +84,7 @@
   </panel>
   <panel
     height="18"
-    left="-398"
+    left_pad="73"
     width="185"
     top="1"
     follows="right|top" 
@@ -157,14 +155,21 @@
      width="85">
         24:00 AM PST
     </text>
-    <icon
+    <button
      follows="right|top"
      height="16"
-     image_name="Cam_FreeCam_Off"
-     left_pad="8"
+     image_selected="Cam_FreeCam_Off"
+     image_pressed="Cam_FreeCam_Off"
+     image_unselected="Cam_FreeCam_Off"
+     left_pad="2"
      top="2"
      name="presets_icon_camera"
-     width="18" />
+     tool_tip="My Camera Presets"
+     width="16">
+        <click_callback
+         function="Floater.ToggleOrBringToFront"
+         parameter="camera" />
+    </button>
     <icon
      follows="right|top"
      height="13"
@@ -191,12 +196,11 @@
      image_pressed="Pause_Press"
      image_pressed_selected="Play_Press"
      is_toggle="true"
-     left_pad="5"
-     top="1"
+     left_pad="6"
+     top="2"
      name="media_toggle_btn"
      tool_tip="Start/Stop All Media (Music, Video, Web pages)"
-     width="16" >
-    </button>
+     width="16" />
     <button
      follows="right|top"
      height="16"
@@ -204,8 +208,39 @@
      image_pressed="Audio_Press"
      image_unselected="Audio_Off"
      is_toggle="true"
-     left_pad="5"
+     left_pad="6"
      top="2"
      name="volume_btn"
      width="16" />
+    <button
+     follows="right|top"
+     height="16"
+     image_selected="Icon_Gear"
+     image_pressed="Icon_Gear"
+     image_unselected="Icon_Gear"
+     left_pad="6"
+     top="2"
+     name="quick_settings_btn"
+     width="16">
+          <click_callback
+           function="Floater.ToggleOrBringToFront"
+           parameter="quick_settings" />
+     </button>
+    <text
+     visibility_control="ShowStatusBarFPS"
+     type="string"
+     font="SansSerif"
+     text_color="FPSTextColor"
+     follows="right|top"
+     halign="center"
+     valign="center"
+     height="18"
+     top="1"
+     v_pad="0"
+     left_pad="0"
+     name="FPSText"
+     tool_tip="Current FPS"
+     width="40">
+     240
+     </text>
 </panel>

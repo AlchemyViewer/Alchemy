@@ -557,6 +557,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("group_profile", "floater_al_group_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGroupProfile>);
     LLFloaterReg::add("particle_editor", "floater_al_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
     LLFloaterReg::add("progress_view", "floater_al_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProgressView>);
+    LLFloaterReg::add("quick_settings", "floater_quick_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
     LLFloaterReg::add("region_tracker", "floater_al_region_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterRegionTracker>);
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
     LLFloaterReg::add("search_replace", "floater_search_replace.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSearchReplace>);
