@@ -12,7 +12,6 @@ if (WINDOWS)
     )
 
     find_library(VELOPACK_LIBRARY velopack_libc REQUIRED)
-
     target_link_libraries(ll::velopack INTERFACE ${VELOPACK_LIBRARY})
 
     # Windows system libraries required by Velopack
@@ -33,12 +32,11 @@ elseif (DARWIN)
     add_library(ll::velopack INTERFACE IMPORTED)
 
     target_include_directories(ll::velopack SYSTEM INTERFACE
-        ${LIBS_PREBUILT_DIR}/include/velopack
+        ${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/velopack
     )
 
-    target_link_libraries(ll::velopack INTERFACE
-        ${ARCH_PREBUILT_DIRS_RELEASE}/libvelopack_libc.a
-    )
+    find_library(VELOPACK_LIBRARY velopack_libc REQUIRED)
+    target_link_libraries(ll::velopack INTERFACE ${VELOPACK_LIBRARY})
 
     # macOS system frameworks required by Velopack (Rust static library dependencies)
     target_link_libraries(ll::velopack INTERFACE

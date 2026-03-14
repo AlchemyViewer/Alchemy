@@ -44,7 +44,7 @@
 
 #include "Velopack.h"
 
-#if 1
+#if LL_WINDOWS
 #include <windows.h>
 #include <shlobj.h>
 #include <shobjidl.h>
@@ -271,7 +271,7 @@ static bool custom_download_asset(void* user_data,
 // Platform-specific helpers and hooks
 //
 
-#if 1
+#if LL_WINDOWS
 
 static const wchar_t* PROTOCOL_SECONDLIFE = L"secondlife";
 static const wchar_t* PROTOCOL_GRID_INFO = L"x-grid-location-info";

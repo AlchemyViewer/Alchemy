@@ -41,6 +41,20 @@ if(VCPKG_TARGET_IS_WINDOWS)
 
     file(INSTALL "${SOURCE_PATH}/target/x86_64-pc-windows-msvc/release/velopack_libc.dll" DESTINATION "${CURRENT_PACKAGES_DIR}/bin")
     file(INSTALL "${SOURCE_PATH}/target/x86_64-pc-windows-msvc/release/velopack_libc.dll.lib" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
+elseif(VCPKG_TARGET_IS_OSX)
+    vcpkg_execute_required_process(
+        COMMAND ${RUSTUP_EXECUTABLE} target add aarch64-apple-darwin
+        WORKING_DIRECTORY "${SOURCE_PATH}"
+        LOGNAME rustup-${TARGET_TRIPLET}-dbg
+    )
+
+    vcpkg_execute_build_process(
+        COMMAND ${CARGO_EXECUTABLE} build --target aarch64-apple-darwin --release -p velopack_libc
+        WORKING_DIRECTORY "${SOURCE_PATH}"
+        LOGNAME cargo-${TARGET_TRIPLET}-dbg
+    )
+
+    file(INSTALL "${SOURCE_PATH}/target/aarch64-apple-darwin/release/libvelopack_libc.a" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
 endif()
 
 file(INSTALL "${SOURCE_PATH}/src/lib-cpp/include/Velopack.h" DESTINATION "${CURRENT_PACKAGES_DIR}/include/velopack")
