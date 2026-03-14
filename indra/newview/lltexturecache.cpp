@@ -876,7 +876,7 @@ std::filesystem::path LLTextureCache::getTextureFileName(const LLUUID& id)
 #else
     char idstr[UUID_STR_LENGTH]{};
     id.to_chars(idstr);
-    std::string filename = llformat("%s%s%c%s%s.texture", mTexturesDirName.c_str(), gDirUtilp->getDirDelimiter().c_str(), idstr[0], gDirUtilp->getDirDelimiter().c_str(), idstr);
+    std::string filename = fmt::format("{:s}\\{:c}\\{:s}.texture", mTexturesDirPath.native(), idstr[0], idstr);
     return filename;
 #endif
 }
