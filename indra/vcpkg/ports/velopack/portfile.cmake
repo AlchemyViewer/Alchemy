@@ -12,7 +12,7 @@ else()
     set(USER_HOME "$ENV{HOME}")
 endif()
 
-if("$ENV{CARGO_HOME}" STREQUAL "")
+if(NOT DEFINED $ENV{CARGO_HOME})
     set(CARGO_HOME "${USER_HOME}/.cargo")
 else()
     set(CARGO_HOME "$ENV{CARGO_HOME}")
@@ -39,8 +39,8 @@ if(VCPKG_TARGET_IS_WINDOWS)
         LOGNAME cargo-${TARGET_TRIPLET}-dbg
     )
 
-    file(INSTALL "${SOURCE_PATH}/target/release/velopack_libc.dll" DESTINATION "${CURRENT_PACKAGES_DIR}/bin")
-    file(INSTALL "${SOURCE_PATH}/target/release/velopack_libc.dll.lib" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
+    file(INSTALL "${SOURCE_PATH}/target/x86_64-pc-windows-msvc/release/velopack_libc.dll" DESTINATION "${CURRENT_PACKAGES_DIR}/bin")
+    file(INSTALL "${SOURCE_PATH}/target/x86_64-pc-windows-msvc/release/velopack_libc.dll.lib" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
 endif()
 
 file(INSTALL "${SOURCE_PATH}/src/lib-cpp/include/Velopack.h" DESTINATION "${CURRENT_PACKAGES_DIR}/include/velopack")

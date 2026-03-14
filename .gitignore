@@ -55,6 +55,7 @@ indra/newview/fmod.dll
 indra/newview/fmod.log
 indra/newview/fonts
 indra/newview/installers/windows/install_icon.ico
+indra/newview/installers/windows/install_splash.gif
 indra/newview/installers/windows/uninstall_icon.ico
 indra/newview/installers/windows/install_wizard_small.png
 indra/newview/mozilla-theme

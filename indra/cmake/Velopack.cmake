@@ -29,7 +29,6 @@ if (WINDOWS)
     )
 
     target_compile_definitions(ll::velopack INTERFACE LL_VELOPACK=1)
-
 elseif (DARWIN)
     add_library(ll::velopack INTERFACE IMPORTED)
 
@@ -55,5 +54,4 @@ elseif (DARWIN)
     )
 
     target_compile_definitions(ll::velopack INTERFACE LL_VELOPACK=1)
-
 endif()
