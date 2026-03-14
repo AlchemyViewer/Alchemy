@@ -1454,7 +1454,6 @@ void LLFloaterTexturePicker::changeMode()
     getChild<LLScrollListCtrl>("l_name_list")->setVisible(index == PICKER_LOCAL);
 
     getChild<LLComboBox>("l_bake_use_texture_combo_box")->setVisible(index == PICKER_BAKE);
-    getChild<LLCheckBoxCtrl>("hide_base_mesh_region")->setVisible(false);// index == 2);
 
     bool pipette_visible = (index == PICKER_INVENTORY)
         && (mInventoryPickType != PICK_MATERIAL);

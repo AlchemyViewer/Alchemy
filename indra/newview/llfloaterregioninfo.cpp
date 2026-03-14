@@ -994,7 +994,7 @@ bool LLPanelRegionGeneralInfo::postBuild()
     initCombatCtrl("allow_damage_check");
     initCtrl("combat_restrict_log");
     initCtrl("combat_allow_damage_adjust");
-    initCtrl("combat_allow_restore_health");
+    initCtrl("combat_restore_health");
     initCtrl("combat_on_death");
     initCtrl("combat_dps_spin");
     initCtrl("combat_hps_spin");

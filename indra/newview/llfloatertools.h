@@ -157,7 +157,7 @@ public:
 
     LLTextBox*  mTextSelectionCount = nullptr;
     LLTextBox*  mTextSelectionEmpty = nullptr;
-    LLTextBox*  mTextSelectionFaces = nullptr;
+    //LLTextBox*  mTextSelectionFaces = nullptr;
     LLSlider*   mSliderZoom = nullptr;
     LLComboBox* mTreeGrassCombo = nullptr;
 

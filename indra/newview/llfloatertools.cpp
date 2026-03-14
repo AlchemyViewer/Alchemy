@@ -299,7 +299,7 @@ bool    LLFloaterTools::postBuild()
 
     mTextSelectionCount = getChild<LLTextBox>("selection_count");
     mTextSelectionEmpty = getChild<LLTextBox>("selection_empty");
-    mTextSelectionFaces = getChild<LLTextBox>("selection_faces");
+    //mTextSelectionFaces = getChild<LLTextBox>("selection_faces");
 
     mCostTextBorder = getChild<LLViewBorder>("cost_text_border");
 
