@@ -295,12 +295,18 @@ public:
     void setShowContextMenu(bool show) { mShowContextMenu = show; }
     bool getShowContextMenu() const { return mShowContextMenu; }
 
+    // Autoreplace
+    typedef std::function<void(S32&, S32&, LLWString&, S32&, const LLWString&)> autoreplace_callback_t;
+    autoreplace_callback_t mAutoreplaceCallback;
+    void            setAutoreplaceCallback(autoreplace_callback_t cb) { mAutoreplaceCallback = cb; }
+
   private:
     // private helper methods
 
     void                    pasteHelper(bool is_primary);
 
     void            removeChar();
+    void            removeWord(bool prev);
     void            addChar(const llwchar c);
     void            setCursorAtLocalPos(S32 local_mouse_x);
     S32             findPixelNearestPos(S32 cursor_offset = 0) const;
