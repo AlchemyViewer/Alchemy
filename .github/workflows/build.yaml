@@ -64,6 +64,17 @@ jobs:
         with:
           token: ${{ github.token }}
 
+      - name: Setup .NET for Velopack
+        if: (runner.os == 'Windows' || runner.os == 'macOS') && (github.event.inputs.installer_type || 'velopack') == 'velopack'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Install Velopack CLI
+        if: (runner.os == 'Windows' || runner.os == 'macOS') && (github.event.inputs.installer_type || 'velopack') == 'velopack'
+        shell: bash
+        run: dotnet tool install -g vpk
+
       - name: Set Variables
         id: setvar
         shell: bash
@@ -157,6 +168,13 @@ jobs:
     outputs:
       viewer_version: ${{ steps.build.outputs.viewer_version }}
       imagename: ${{ steps.build.outputs.imagename }}
+      velopack_pack_id:       ${{ steps.build.outputs.velopack_pack_id }}
+      velopack_pack_version:  ${{ steps.build.outputs.velopack_pack_version }}
+      velopack_pack_title:    ${{ steps.build.outputs.velopack_pack_title }}
+      velopack_main_exe:      ${{ steps.build.outputs.velopack_main_exe }}
+      velopack_exclude:       ${{ steps.build.outputs.velopack_exclude }}
+      velopack_icon:          ${{ steps.build.outputs.velopack_icon }}
+      velopack_installer_base: ${{ steps.build.outputs.velopack_installer_base }}
     env:
       # Sets Xcode version used for build
       DEVELOPER_DIR: "/Applications/Xcode_26.2.app/Contents/Developer"
@@ -478,13 +496,21 @@ jobs:
     steps:
       - name: Sign and package Windows viewer
         if: env.AZURE_KEY_VAULT_URI && env.AZURE_CERT_NAME && env.AZURE_CLIENT_ID && env.AZURE_CLIENT_SECRET && env.AZURE_TENANT_ID
-        uses: secondlife/viewer-build-util/sign-pkg-windows@v2.0.4
+        uses: secondlife/viewer-build-util/sign-pkg-windows@geenz/velopack
         with:
           vault_uri: "${{ env.AZURE_KEY_VAULT_URI }}"
           cert_name: "${{ env.AZURE_CERT_NAME }}"
           client_id: "${{ env.AZURE_CLIENT_ID }}"
           client_secret: "${{ env.AZURE_CLIENT_SECRET }}"
           tenant_id: "${{ env.AZURE_TENANT_ID }}"
+          installer_type: "${{ github.event.inputs.installer_type || 'velopack' }}"
+          velopack_pack_id: "${{ needs.build.outputs.velopack_pack_id }}"
+          velopack_pack_version: "${{ needs.build.outputs.velopack_pack_version }}"
+          velopack_pack_title: "${{ needs.build.outputs.velopack_pack_title }}"
+          velopack_main_exe: "${{ needs.build.outputs.velopack_main_exe }}"
+          velopack_exclude: "${{ needs.build.outputs.velopack_exclude }}"
+          velopack_icon: "${{ needs.build.outputs.velopack_icon }}"
+          velopack_installer_base: "${{ needs.build.outputs.velopack_installer_base }}"
 
   sign-and-package-mac:
     env:
@@ -608,6 +634,10 @@ jobs:
         with:
           pattern: "*-metadata"
 
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-releases"
+
       - uses: actions/download-artifact@v8
         with:
           name: "Linux-app"
@@ -642,6 +672,8 @@ jobs:
             Windows-installer/*.exe
             *.tar.xz
             *-viewer_version.txt
+            Windows-releases/*
+            macOS-releases/*
 
       - name: post release URL
         run: |

@@ -55,6 +55,7 @@ set(cmake_SOURCE_FILES
         UI.cmake
         UnixInstall.cmake
         Variables.cmake
+        Velopack.cmake
         VHACD.cmake
         Vorbis.cmake
         WebRTC.cmake

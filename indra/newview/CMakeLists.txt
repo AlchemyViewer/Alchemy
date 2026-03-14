@@ -3,6 +3,7 @@
 include(BuildPackagesInfo)
 include(BuildVersion)
 include(CMakeCopyIfDifferent)
+include(Velopack)
 include(TemplateCheck)
 
 set(VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING
@@ -671,6 +672,7 @@ set(viewer_SOURCE_FILES
     llurllineeditorctrl.cpp
     llurlwhitelist.cpp
     llversioninfo.cpp
+    llvvmquery.cpp
     llviewchildren.cpp
     llviewerassetstats.cpp
     llviewerassetstorage.cpp
@@ -1378,6 +1380,7 @@ set(viewer_HEADER_FILES
     llurllineeditorctrl.h
     llurlwhitelist.h
     llversioninfo.h
+    llvvmquery.h
     llviewchildren.h
     llviewerassetstats.h
     llviewerassetstorage.h
@@ -1500,6 +1503,8 @@ if (DARWIN)
   LIST(APPEND viewer_SOURCE_FILES llappviewermacosx-objc.h)
   LIST(APPEND viewer_SOURCE_FILES llfilepicker_mac.mm)
   LIST(APPEND viewer_HEADER_FILES llfilepicker_mac.h)
+  LIST(APPEND viewer_SOURCE_FILES llvelopack.cpp)
+  LIST(APPEND viewer_HEADER_FILES llvelopack.h)
 
   set_source_files_properties(
     llappviewermacosx-objc.mm
@@ -1553,11 +1558,13 @@ if (WINDOWS)
 
     list(APPEND viewer_SOURCE_FILES
          llappviewerwin32.cpp
+         llvelopack.cpp
          llwindebug.cpp
          )
 
     list(APPEND viewer_HEADER_FILES
          llappviewerwin32.h
+         llvelopack.h
          llwindebug.h
          )
 
@@ -1847,6 +1854,10 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         ll::minizip
         )
 
+if (TARGET ll::velopack)
+   target_link_libraries(${VIEWER_BINARY_NAME} ll::velopack )
+endif ()
+
 if (NOT DISABLE_WEBRTC)
     if(WINDOWS)
         target_link_libraries(${VIEWER_BINARY_NAME} $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:llwebrtc>)
@@ -2059,6 +2070,7 @@ add_custom_command(
     --touch=${VIEWER_BINARY_DIR}/copy_touched.bat
     --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
     --vcpkg_dir=${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
+    "--velopack=${USE_VELOPACK}"
   COMMENT "Performing viewer_manifest copy"
   )
 
@@ -2113,9 +2125,11 @@ if (PACKAGE)
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
           "--bugsplat=${BUGSPLAT_DB}"
+              --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER}
           "--discord=${USE_DISCORD}"
           "--openal=${USE_OPENAL}"
           "--tracy=${USE_TRACY}"
+              "--velopack=${USE_VELOPACK}"
           --build=${CMAKE_CURRENT_BINARY_DIR}
           --buildtype=$<CONFIG>
           --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER} # Harmless to other platforms

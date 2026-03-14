@@ -202,6 +202,20 @@ No tutorial is currently available.
 
   <notification
    icon="alertmodal.tga"
+   name="PromptRemoveNsisInstallation"
+   type="alertmodal">
+[APP_NAME] found an installation from an older version. Do you want to uninstall the previous version now?
+
+The uninstaller may display additional prompts requesting permission to access or modify files on your disk.
+      <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Uninstall"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="LoginFailedNoNetwork"
    type="alertmodal">
     <tag>fail</tag>
@@ -4548,6 +4562,14 @@ Click OK to download and install.
     <usetemplate
      name="okbutton"
      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="DownloadingUpdate"
+   type="alertmodal">
+Downloading update [VERSION]...
+The viewer will restart once the download is complete.
   </notification>
 
   <notification

@@ -71,6 +71,11 @@
 
 #include "llversioninfovars.h"
 
+// Velopack installer and update framework
+#if LL_VELOPACK
+#include "llvelopack.h"
+#endif
+
 // Bugsplat (http://bugsplat.com) crash reporting tool
 #ifdef LL_BUGSPLAT
 #include "bugsplat/BugSplat.h"
@@ -423,6 +428,16 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
                      PWSTR     pCmdLine,
                      int       nCmdShow)
 {
+#if LL_VELOPACK
+    // Velopack MUST be initialized first - it may handle install/uninstall
+    // commands and exit the process before we do anything else.
+    if (!velopack_initialize())
+    {
+        // Velopack handled the invocation (install/uninstall hook)
+        return 0;
+    }
+#endif
+
     // Call Tracy first thing to have it allocate memory
     // https://github.com/wolfpld/tracy/issues/196
     LL_PROFILER_FRAME_END;
