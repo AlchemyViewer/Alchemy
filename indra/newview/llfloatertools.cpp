@@ -414,6 +414,8 @@ LLFloaterTools::LLFloaterTools(const LLSD& key)
     mCommitCallbackRegistrar.add("BuildTool.LinkObjects",       boost::bind(&LLSelectMgr::linkObjects, LLSelectMgr::getInstance()));
     mCommitCallbackRegistrar.add("BuildTool.UnlinkObjects",     boost::bind(&LLSelectMgr::unlinkObjects, LLSelectMgr::getInstance()));
 
+    mCommitCallbackRegistrar.add("BuildTool.TreeGrass",         boost::bind(&LLFloaterTools::onSelectTreeGrassCombo, this));
+
     mLandImpactsObserver = new LLLandImpactsObserver();
     LLViewerParcelMgr::getInstance()->addObserver(mLandImpactsObserver);
 }
