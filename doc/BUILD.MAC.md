@@ -16,14 +16,16 @@ brew install git cmake zip unzip curl pkgconf automake autoconf autoconf-archive
 ```
 
 ### Initialize Rust SDK
+Initialize the rust SDK using default options
+
 ```
-rustup default stable
+rustup-init
 ```
 
 ## Step 2: Checkout Viewer Code
 Open a Terminal and checkout the viewer source code:
 
-```git clone https://github.com/secondlife/viewer.git```
+```git clone https://github.com/alchemyviewer/alchemy.git```
 
 ## Step 3: Setup Build Tooling
 
@@ -31,7 +33,7 @@ Please follow the below steps to set up the required tools to build the viewer
 
 ### Setup Virtual Environment and Python dependencies
 ```
-cd viewer
+cd alchemy
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -43,7 +45,7 @@ dotnet tool restore
 ```
 
 ## Step 4: Configure and install vcpkg dependencies
-Switch to the viewer repository you just checked out and run cmake to configure:
+Switch to the alchemy repository you just checked out and run cmake to configure:
 
 ```
 cmake -S indra --preset xcode-os
