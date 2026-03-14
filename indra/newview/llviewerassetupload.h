@@ -95,9 +95,9 @@ public:
     static bool         findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec);
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: Catznip-4.0
-    typedef boost::function<void(LLUUID itemId)> upload_error_f;
+    typedef std::function<void(LLUUID itemId)> upload_error_f;
     // Should add this as a parameter to the constructor but this requires less code changes
-    void callUploadErrorCb() { if (mUploadErrorFn) { mUploadErrorFn(mItemId); } }
+    void callUploadErrorCb() { if (mUploadErrorFn != nullptr) { mUploadErrorFn(mItemId); } }
     void setUploadErrorCb(upload_error_f fnUploadError) { mUploadErrorFn = fnUploadError; }
 // [/SL:KLB]
 protected:
