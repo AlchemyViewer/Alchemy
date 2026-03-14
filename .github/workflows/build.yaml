@@ -64,17 +64,6 @@ jobs:
         with:
           token: ${{ github.token }}
 
-      - name: Setup .NET for Velopack
-        if: (runner.os == 'Windows' || runner.os == 'macOS') && (github.event.inputs.installer_type || 'velopack') == 'velopack'
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
-
-      - name: Install Velopack CLI
-        if: (runner.os == 'Windows' || runner.os == 'macOS') && (github.event.inputs.installer_type || 'velopack') == 'velopack'
-        shell: bash
-        run: dotnet tool install -g vpk
-
       - name: Set Variables
         id: setvar
         shell: bash
@@ -241,10 +230,18 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       - name: Install python dependencies
         run: pip3 install llsd cmake ninja
+
+      - name: Setup .NET for Velopack
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.x'
+
+      - name: Install Velopack CLI
+        run: dotnet tool restore
 
       # - name: Set up vcpkg nuget caching
       #   shell: bash
@@ -273,6 +270,14 @@ jobs:
       #         setapikey "${{ secrets.GITHUB_TOKEN }}" \
       #         -Source "${{ env.VCPKG_FEED_URL }}"
       #     fi
+
+      - name: Cache Rust Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Configure
         id: configure

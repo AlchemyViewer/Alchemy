@@ -110,6 +110,7 @@
     "tinyexr",
     "tinygltf",
     "v-hacd",
+    "velopack",
     {
       "name": "vlc-bin",
       "platform": "windows | osx"

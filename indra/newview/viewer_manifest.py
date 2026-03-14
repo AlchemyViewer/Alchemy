@@ -607,11 +607,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
         exclude_pattern = r'.*\.pdb|.*\.map|.*\.bat|.*\.exp|.*\.lib|.*\.nsi|.*\.tar\.xz|secondlife-bin\..*|.*_Setup\.exe|.*-Setup\.exe'
 
         # Channel-specific icon for the Velopack installer.
-        # CMake copies icons/{channel}/secondlife.ico to res/ll_icon.ico at configure time.
-        # Try the CMake-generated copy first, fall back to the source icon.
-        icon_path = os.path.join(self.get_src_prefix(), 'res', 'll_icon.ico')
-        if not os.path.exists(icon_path):
-            icon_path = os.path.join(self.get_src_prefix(), self.icon_path(), 'secondlife.ico')
+        icon_path = os.path.join(self.get_src_prefix(), 'installers', 'windows', 'install_icon.ico')
 
         # In CI, defer Velopack packaging to the sign step where Azure credentials
         # are available. Emit metadata as GitHub outputs so the sign step can run
@@ -642,7 +638,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
 
         # Local builds: run vpk pack directly (unsigned)
         vpk_args = [
-            'vpk', 'pack',
+            'dotnet', 'vpk', 'pack',
             '--packId', pack_id,
             '--packVersion', pack_version,
             '--packDir', pack_dir,
@@ -652,6 +648,9 @@ class Windows_x86_64_Manifest(ViewerManifest):
             # Suppress Velopack's built-in shortcut creation; we create our own
             # shortcuts in llvelopack.cpp on_after_install hook instead.
             '--shortcuts', '',
+            '--outputDir', os.path.join(self.args['build'], 'Releases'),
+            '--splashImage', os.path.join(self.get_src_prefix(), 'installers', 'windows', 'install_splash.gif'),
+            '--splashProgressColor', '#00a5dc',
         ]
 
         # Add icon — CMake copies the channel-appropriate secondlife.ico to res/ll_icon.ico

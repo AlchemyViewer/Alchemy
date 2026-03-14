@@ -672,7 +672,7 @@ set(viewer_SOURCE_FILES
     llurllineeditorctrl.cpp
     llurlwhitelist.cpp
     llversioninfo.cpp
-    llvvmquery.cpp
+#    llvvmquery.cpp
     llviewchildren.cpp
     llviewerassetstats.cpp
     llviewerassetstorage.cpp
@@ -1380,7 +1380,7 @@ set(viewer_HEADER_FILES
     llurllineeditorctrl.h
     llurlwhitelist.h
     llversioninfo.h
-    llvvmquery.h
+#    llvvmquery.h
     llviewchildren.h
     llviewerassetstats.h
     llviewerassetstorage.h
@@ -1615,6 +1615,11 @@ if (WINDOWS)
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
         "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_wizard_small.png"
+      )
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${BRANDING_SOURCE_DIR}/installer/splash/${ICON_PATH}/install_splash.gif"
+        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif"
       )
 
     # Add resource files to the project.

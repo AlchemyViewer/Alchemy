@@ -12,7 +12,12 @@
 Now we're going to install required build tools from Homebrew.
 
 ```
-brew install git cmake zip unzip curl pkgconf automake autoconf autoconf-archive gettext libtool
+brew install git cmake zip unzip curl pkgconf automake autoconf autoconf-archive gettext libtool rustup dotnet
+```
+
+### Initialize Rust SDK
+```
+rustup default stable
 ```
 
 ## Step 2: Checkout Viewer Code
@@ -20,12 +25,21 @@ Open a Terminal and checkout the viewer source code:
 
 ```git clone https://github.com/secondlife/viewer.git```
 
-## Step 3: Setup Virtual Environment and Python dependencies
+## Step 3: Setup Build Tooling
+
+Please follow the below steps to set up the required tools to build the viewer
+
+### Setup Virtual Environment and Python dependencies
 ```
 cd viewer
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+### Install VPK package tool
+```
+dotnet tool restore
 ```
 
 ## Step 4: Configure and install vcpkg dependencies

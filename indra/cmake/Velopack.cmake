@@ -4,22 +4,16 @@
 
 include_guard()
 
-# USE_VELOPACK controls whether to use Velopack for installer packaging (instead of NSIS/DMG)
-option(USE_VELOPACK "Use Velopack for installer packaging" OFF)
-
 if (WINDOWS)
-    include(Prebuilt)
-    use_prebuilt_binary(velopack)
-
     add_library(ll::velopack INTERFACE IMPORTED)
 
     target_include_directories(ll::velopack SYSTEM INTERFACE
-        ${LIBS_PREBUILT_DIR}/include/velopack
+        ${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/velopack
     )
 
-    target_link_libraries(ll::velopack INTERFACE
-        ${ARCH_PREBUILT_DIRS_RELEASE}/velopack_libc.lib
-    )
+    find_library(VELOPACK_LIBRARY velopack_libc REQUIRED)
+
+    target_link_libraries(ll::velopack INTERFACE ${VELOPACK_LIBRARY})
 
     # Windows system libraries required by Velopack
     target_link_libraries(ll::velopack INTERFACE
@@ -37,9 +31,6 @@ if (WINDOWS)
     target_compile_definitions(ll::velopack INTERFACE LL_VELOPACK=1)
 
 elseif (DARWIN)
-    include(Prebuilt)
-    use_prebuilt_binary(velopack)
-
     add_library(ll::velopack INTERFACE IMPORTED)
 
     target_include_directories(ll::velopack SYSTEM INTERFACE

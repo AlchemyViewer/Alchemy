@@ -1,0 +1,7 @@
+{
+  "name": "velopack",
+  "version-string": "0.0.1444",
+  "description": "Installer and automatic update framework for cross-platform desktop applications",
+  "homepage": "https://velopack.io/",
+  "license": "MIT"
+}

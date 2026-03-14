@@ -98,7 +98,7 @@
 #include "llurlmatch.h"
 #include "lltextutil.h"
 #include "lllogininstance.h"
-#include "llvvmquery.h"
+//#include "llvvmquery.h"
 
 #if LL_VELOPACK
 #include "llvelopack.h"
@@ -1193,10 +1193,6 @@ bool LLAppViewer::init()
     }
     else
 #endif //LL_RELEASE_FOR_DOWNLOAD
-    {
-        mUpdaterNotFound = true;
-        LL_WARNS("InitInfo") << "Skipping updater check." << LL_ENDL;
-    }
 
     {
         // Iterate over --leap command-line options. But this is a bit tricky: if

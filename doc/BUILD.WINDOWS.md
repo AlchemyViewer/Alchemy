@@ -4,8 +4,10 @@
 
 * [CMake](https://cmake.org/download/)
 * [Git for Windows](https://git-scm.com/install/windows)
-* [Visual Studio 2022 or 2026](https://visualstudio.microsoft.com/vs/community/) - Select "Desktop development with C++" workload
-* [Python 3.10+](https://www.python.org/downloads/) - Be sure to "Add Python to PATH"
+* [Visual Studio 2026](https://visualstudio.microsoft.com/vs/community/) - Select "Desktop development with C++" workload
+* [Python 3.13+](https://www.python.org/downloads/) - Be sure to "Add Python to PATH"
+* [Rust](https://rust-lang.org/tools/install/) - `Download and install RUSTUP-INIT.exe`
+* [dotnet SDK](https://dotnet.microsoft.com/en-us/download)
 
 ### Intermediate Check
 
@@ -22,11 +24,11 @@ If everything reported sensible values and not "Command not found" errors, then 
 ## Step 2: Checkout Viewer Code
 Open a `Powershell` from the `Start Menu` and checkout the viewer source code:
 
-```git clone https://github.com/secondlife/viewer.git```
+```git clone https://github.com/alchemyviewer/alchemy.git```
 
 ## Step 3: Setup Virtual Environment and Python dependencies
 ```
-cd viewer
+cd alchemy
 python3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -36,7 +38,7 @@ pip install -r requirements.txt
 Switch to the viewer repository you just checked out and run cmake to configure and install dependencies:
 
 ```
-cmake -S indra --preset vs2022-os
+cmake -S indra --preset vs2026-os
 ```
 
 The --preset argument determines which build configuration to create, generally either an individual build configuration or a multi-config IDE such as Visual Studio.
@@ -48,11 +50,11 @@ To list availiable presets:
 
 For the Linden viewer build, this usage:
 
-```cmake -S indra --preset vs2022-os [other options]...```
+```cmake -S indra --preset vs2026-os [other options]...```
 
 passes [other options] to CMake. This can be used to override different CMake variables, e.g.:
 
-```cmake -S indra --preset vs2022-os -DSOME_VARIABLE:BOOL=TRUE```
+```cmake -S indra --preset vs2026-os -DSOME_VARIABLE:BOOL=TRUE```
 
 The set of applicable CMake variables is still evolving. Please consult the CMake source files in indra/cmake, as well as the individual CMakeLists.txt files in the indra directory tree, to learn their effects.
 
@@ -63,20 +65,20 @@ When that completes, you can either build within Visual Studio or from the comma
 The command below will open the generated solution in Visual Studio
 
 ```
-explorer.exe .\build-Windows-vs2022-os\SecondLife.sln
+explorer.exe .\build-Windows-vs2026-os\SecondLife.slnx
 ```
 
 ### Command Line:
 Build by running:
 
 ```
-cmake --build build-Windows-vs2022-os --config Release
+cmake --build build-Windows-vs2026-os --config Release
 ```
 
 the resulting viewer executable will be at:
 
 ```
-build-Windows-vs2022-os/newview/<CONFIGURATION>/SecondLifeViewer.exe
+build-Windows-vs2026-os/newview/<CONFIGURATION>/SecondLifeViewer.exe
 ```
 
 

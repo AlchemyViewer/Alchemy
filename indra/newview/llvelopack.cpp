@@ -27,6 +27,9 @@
 #if LL_VELOPACK
 
 #include "llviewerprecompiledheaders.h"
+
+#include "llversioninfovars.h"
+
 #include "llvelopack.h"
 #include "llstring.h"
 #include "llcorehttputil.h"
@@ -41,7 +44,7 @@
 
 #include "Velopack.h"
 
-#if LL_WINDOWS
+#if 1
 #include <windows.h>
 #include <shlobj.h>
 #include <shobjidl.h>
@@ -268,7 +271,7 @@ static bool custom_download_asset(void* user_data,
 // Platform-specific helpers and hooks
 //
 
-#if LL_WINDOWS
+#if 1
 
 static const wchar_t* PROTOCOL_SECONDLIFE = L"secondlife";
 static const wchar_t* PROTOCOL_GRID_INFO = L"x-grid-location-info";
@@ -511,21 +514,21 @@ static void register_uninstall_info(const std::wstring& install_dir,
         RegSetValueExW(hkey, L"DisplayVersion", 0, REG_SZ,
                       (BYTE*)version.c_str(), (DWORD)((version.size() + 1) * sizeof(wchar_t)));
         RegSetValueExW(hkey, L"Publisher", 0, REG_SZ,
-                      (BYTE*)L"Linden Research, Inc.", 44);
+                      (BYTE*)L"Alchemy Development Group", 44);
         RegSetValueExW(hkey, L"UninstallString", 0, REG_SZ,
                       (BYTE*)uninstall_cmd.c_str(), (DWORD)((uninstall_cmd.size() + 1) * sizeof(wchar_t)));
         RegSetValueExW(hkey, L"DisplayIcon", 0, REG_SZ,
                       (BYTE*)exe_path.c_str(), (DWORD)((exe_path.size() + 1) * sizeof(wchar_t)));
 
-        std::wstring link_url = L"https://support.secondlife.com/contact-support/";
+        std::wstring link_url = L"https://www.alchemyviewer.org";
         RegSetValueExW(hkey, L"HelpLink", 0, REG_SZ,
             (BYTE*)link_url.c_str(), (DWORD)((link_url.size() + 1) * sizeof(wchar_t)));
 
-        link_url = L"https://secondlife.com/whatis/";
+        link_url = L"https://www.alchemyviewer.org";
         RegSetValueExW(hkey, L"URLInfoAbout", 0, REG_SZ,
             (BYTE*)link_url.c_str(), (DWORD)((link_url.size() + 1) * sizeof(wchar_t)));
 
-        link_url = L"http://secondlife.com/support/downloads/";
+        link_url = L"https://www.alchemyviewer.org";
         RegSetValueExW(hkey, L"URLUpdateInfo", 0, REG_SZ,
             (BYTE*)link_url.c_str(), (DWORD)((link_url.size() + 1) * sizeof(wchar_t)));
 

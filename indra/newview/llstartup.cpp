@@ -29,7 +29,7 @@
 #include "llappviewer.h"
 #include "llstartup.h"
 
-#if LL_VELOPACK && LL_WINDOWS
+#if 0
 #include "llvelopack.h"
 #include <shellapi.h>
 #endif
@@ -2644,7 +2644,7 @@ void release_notes_coro(const std::string url)
 */
 void uninstall_nsis_if_required()
 {
-#if LL_VELOPACK && LL_WINDOWS
+#if 0
     // Todo: perhaps use marker files?
     // Debug variable isn't specific to one channel
     // and something channel specific is needed.
