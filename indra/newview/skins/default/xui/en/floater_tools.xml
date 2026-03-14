@@ -882,7 +882,7 @@
      left="0"
      name="Object Info Tabs"
      tab_max_width="100"
-     tab_min_width="40"
+     tab_min_width="59"
      tab_position="top"
      open_tabs_on_drag_and_drop="true"
      top="209"
@@ -2867,7 +2867,7 @@ even though the user gets a free copy.
          help_topic="toolbox_contents_tab"
          name="Contents"
          top_delta="0"
-         width="295">
+         width="300">
             <button
              follows="left|top"
              height="23"
@@ -2877,7 +2877,7 @@ even though the user gets a free copy.
              left="10"
              name="button new script"
              top="10"
-             width="134" />
+             width="140" />
             <button
              follows="left|top"
              height="23"
@@ -2885,7 +2885,7 @@ even though the user gets a free copy.
              layout="topleft"
              left_pad="8"
              name="button permissions"
-             width="134" />
+             width="140" />
             <filter_editor
              follows="left|top|right"
              label="Enter filter text"
@@ -2897,7 +2897,7 @@ even though the user gets a free copy.
              highlight_text_field="true"
              name="contents_filter"
              height="23"
-             width="275" />
+             width="280" />
             <panel_inventory_object
              border="true"
              border_visible="true"
@@ -2907,11 +2907,12 @@ even though the user gets a free copy.
              layout="topleft"
              left="10"
              name="contents_inventory"
-             top="50"
-             width="275" />
+             top="65"
+             width="280" />
 		</panel>
         </tab_container>
 	<panel
+	 visible="false"
 	 follows="left|top"
      height="384"
      layout="topleft"
