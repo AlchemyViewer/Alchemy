@@ -55,6 +55,20 @@ elseif(VCPKG_TARGET_IS_OSX)
     )
 
     file(INSTALL "${SOURCE_PATH}/target/aarch64-apple-darwin/release/libvelopack_libc.a" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
+elseif(VCPKG_TARGET_IS_LINUX)
+    vcpkg_execute_required_process(
+        COMMAND ${RUSTUP_EXECUTABLE} target add x86_64-unknown-linux-gnu
+        WORKING_DIRECTORY "${SOURCE_PATH}"
+        LOGNAME rustup-${TARGET_TRIPLET}-dbg
+    )
+
+    vcpkg_execute_build_process(
+        COMMAND ${CARGO_EXECUTABLE} build --target x86_64-unknown-linux-gnu --release -p velopack_libc
+        WORKING_DIRECTORY "${SOURCE_PATH}"
+        LOGNAME cargo-${TARGET_TRIPLET}-dbg
+    )
+
+    file(INSTALL "${SOURCE_PATH}/target/x86_64-unknown-linux-gnu/release/libvelopack_libc.a" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
 endif()
 
 file(INSTALL "${SOURCE_PATH}/src/lib-cpp/include/Velopack.h" DESTINATION "${CURRENT_PACKAGES_DIR}/include/velopack")

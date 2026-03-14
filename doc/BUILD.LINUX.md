@@ -45,7 +45,7 @@ libosmesa6-dev libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-p
 libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
 libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
 libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
-pkgconf tar tex-common texinfo unzip zip 
+pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 rustup
 ```
 
 </details>
@@ -101,6 +101,11 @@ cd ~/code/secondlife/viewer
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+## Install VPK package tool
+```
+dotnet tool restore
 ```
 
 ## Configure and install vcpkg dependencies

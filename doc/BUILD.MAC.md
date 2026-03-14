@@ -29,7 +29,7 @@ Open a Terminal and checkout the viewer source code:
 
 ## Step 3: Setup Build Tooling
 
-Please follow the below steps to set up the required tools to build the viewer
+Please follow the below steps to set up the required tools to build and package the viewer
 
 ### Setup Virtual Environment and Python dependencies
 ```

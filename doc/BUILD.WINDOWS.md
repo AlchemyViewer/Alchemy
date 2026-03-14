@@ -26,12 +26,21 @@ Open a `Powershell` from the `Start Menu` and checkout the viewer source code:
 
 ```git clone https://github.com/alchemyviewer/alchemy.git```
 
-## Step 3: Setup Virtual Environment and Python dependencies
+## Step 3: Setup Build Tooling
+
+Please follow the below steps to set up the required tools to build and package the viewer
+
+### Setup Virtual Environment and Python dependencies
 ```
 cd alchemy
 python3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+```
+
+### Install VPK package tool
+```
+dotnet tool restore
 ```
 
 ## Step 4: Configure and install vcpkg dependencies
