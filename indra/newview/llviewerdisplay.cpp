@@ -1003,6 +1003,8 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             static LLCachedControl<bool> render_depth_pre_pass(gSavedSettings, "RenderDepthPrePass", false);
             if (render_depth_pre_pass)
             {
+                LLGLDepthTest depth(GL_TRUE, GL_TRUE);
+                LLGLEnable cull_face(GL_CULL_FACE);
                 gGL.setColorMask(false, false);
 
                 constexpr U32 types[] = {
