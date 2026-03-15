@@ -86,6 +86,7 @@ LLSpinCtrl::LLSpinCtrl(const LLSpinCtrl::Params& p)
         params.name("SpinCtrl Label");
         params.rect(label_rect);
         params.initial_value(p.label());
+        params.font_valign = LLFontGL::VCENTER;
         if (p.font.isProvided())
         {
             params.font(p.font);
