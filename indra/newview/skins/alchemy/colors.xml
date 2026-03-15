@@ -96,13 +96,13 @@
     <!-- Named Colors -->
     <color
      name="EmphasisColor"
-     value="0 0.631 0.878 1" />
+     value="0 0.631 0.874 1" />
     <color
      name="EmphasisColor_13"
-     value="0 0.631 0.878 0.13" />
+     value="0 0.631 0.874 0.13" />
     <color
      name="EmphasisColor_35"
-     value="0 0.631 0.878 0.35" />
+     value="0 0.631 0.874 0.35" />
     <color
      name="BeaconColor"
 	 value="0.65 0.25 0.23 0.97" />
