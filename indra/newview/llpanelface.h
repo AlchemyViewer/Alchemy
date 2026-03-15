@@ -245,6 +245,8 @@ protected:
     void onCommitPlanarAlign();
     void onCommitRepeatsPerMeter();
 
+    void onClickBtnSelectSameTexture(const LLUICtrl* ctrl, const LLSD& user_data);
+
     void onCommitGLTFTextureScaleU();
     void onCommitGLTFTextureScaleV();
     void onCommitGLTFRotation();
@@ -562,8 +564,10 @@ private:
 
     void setMaterialOverridesFromSelection();
 
-    LLMenuButton*   mMenuClipboardColor;
-    LLMenuButton*   mMenuClipboardTexture;
+    LLButton* mBtnCopyColor = nullptr;
+    LLButton* mBtnPasteColor = nullptr;
+    LLButton* mBtnCopyTextures = nullptr;
+    LLButton* mBtnPasteTextures = nullptr;
 
     bool mIsAlpha;
     bool mExcludeWater { false };

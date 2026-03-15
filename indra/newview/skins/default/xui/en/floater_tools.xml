@@ -2412,42 +2412,62 @@ even though the user gets a free copy.
 	<panel.string name="None">None</panel.string>
 	<panel.string name="Prim">Prim</panel.string>
 	<panel.string name="Convex Hull">Convex Hull</panel.string>
-            <menu_button
-              menu_filename="menu_copy_paste_features.xml"
+              <button
               follows="top|left"
-              height="15"
-              image_disabled="ClipboardMenu_Disabled"
-              image_selected="ClipboardMenu_Press"
-              image_unselected="ClipboardMenu_Off"
-              layout="topleft"
-              left="258"
-              top="8"
-              name="clipboard_features_params_btn"
-              tool_tip="Paste options"
-              width="22"/>
+              height="19"
+              left="235"
+              top="18"
+              tab_stop="false"
+              image_overlay="Clipboard_Copy"
+              name="copy_features_btn"
+              tool_tip="Copy Feature Parameters"
+              width="20" />
+              <button
+              follows="top|left"
+              height="19"
+              left_pad="1"
+              top_delta="0"
+              mouse_opaque="true"
+              tab_stop="false"
+              image_overlay="Clipboard_Paste"
+              name="paste_features_btn"
+              tool_tip="Paste Feature Parameters"
+              width="20" />
+              <button
+              follows="top|left"
+              height="19"
+              left_pad="1"
+              top_delta="0"
+              mouse_opaque="true"
+              tab_stop="false"
+              image_selected="eye_button_active.tga"
+              image_unselected="eye_button_inactive.tga"
+              name="pipette_features_btn"
+              tool_tip="Paste Feature Parameters using the Pipette tool"
+              width="20" />
             <text
              type="string"
              length="1"
              follows="left|top"
-             height="20"
+             height="16"
              layout="topleft"
              left="10"
              name="select_single"
-             top="5"
-             width="252"
+             top="3"
+             width="282"
              word_wrap="true">
-                Select only one primitive to edit features.
+                Select only one prim to edit features.
             </text>
             <text
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left="10"
              name="edit_object"
-             top="5"
-             width="252">
+             top="3"
+             width="282">
                 Edit object features:
             </text>
             <check_box
@@ -2620,27 +2640,51 @@ even though the user gets a free copy.
             name="light texture control"
             tool_tip="Click to choose a projection image (only has effect with deferred rendering enabled)"
             width="32" />
-         <menu_button
-              menu_filename="menu_copy_paste_light.xml"
-              follows="top|left"
-              height="15"
-              image_disabled="ClipboardMenu_Disabled"
-              image_selected="ClipboardMenu_Press"
-              image_unselected="ClipboardMenu_Off"
-              layout="topleft"
-              left="258"
-              top_delta="0"
-              name="clipboard_light_params_btn"
-              tool_tip="Paste options"
-              width="22"/>
+            <button
+            follows="top|left"
+            layout="topleft"
+            height="19"
+            left="235"
+            top_delta="0"
+            tab_stop="false"
+            image_overlay="Clipboard_Copy"
+            name="copy_light_btn"
+            tool_tip="Copy Light and Reflection Probe Parameters"
+            width="20" />
+            <button
+            follows="top|left"
+            height="19"
+            left_pad="1"
+            top_delta="0"
+            mouse_opaque="true"
+            tab_stop="false"
+            image_overlay="Clipboard_Paste"
+            name="paste_light_btn"
+            tool_tip="Paste Light and Reflection Probe Parameters"
+            width="20" />
+            <button
+            follows="top|left"
+            height="19"
+            left_pad="1"
+            top_delta="0"
+            mouse_opaque="true"
+            tab_stop="false"
+            image_selected="eye_button_active.tga"
+            image_unselected="eye_button_inactive.tga"
+            name="pipette_light_btn"
+            tool_tip="Paste Light and Reflection Probe Parameters using the Pipette tool"
+            width="20" />
           <spinner
              follows="left|top"
              height="19"
+             increment="0.1"
              initial_value="0.5"
              label="Intensity"
              label_width="70"
              layout="topleft"
              left="10"
+             max_val="1"
+             min_val="0"
              name="Light Intensity"
              top_pad="26"
              width="128" />
@@ -2651,13 +2695,13 @@ even though the user gets a free copy.
                    increment="0.1"
                    initial_value="0.5"
                    label="FOV"
-                   label_width="55"
+                   label_width="65"
                    left="144"
                    max_val="3"
                    min_val="0"
                    mouse_opaque="true"
                    name="Light FOV"
-                   width="120" />
+                   width="130" />
           <spinner follows="left|top"
                    height="19"
                    initial_value="5"
@@ -2676,13 +2720,13 @@ even though the user gets a free copy.
                    increment="0.5"
                    initial_value="0.5"
                    label="Focus"
-                   label_width="55"
+                   label_width="65"
                    left="144"
                    max_val="20"
                    min_val="-20"
                    mouse_opaque="true"
                    name="Light Focus"
-                   width="120" />
+                   width="130" />
           <spinner follows="left|top"
                    height="19"
                    increment="0.25"
@@ -2702,13 +2746,13 @@ even though the user gets a free copy.
                    increment="0.05"
                    initial_value="1"
                    label="Ambiance"
-                   label_width="55"
+                   label_width="65"
                    left="144"
                    max_val="1"
                    min_val="0"
                    mouse_opaque="true"
                    name="Light Ambiance"
-                   width="120" />
+                   width="130" />
           <check_box
              height="16"
              label="Reflection Probe"
@@ -2791,13 +2835,13 @@ even though the user gets a free copy.
                    increment="0.05"
                    initial_value="0"
                    label="Ambiance"
-                   label_width="55"
+                   label_width="65"
                    left="10"
                    max_val="100"
                    min_val="0"
                    mouse_opaque="true"
                    name="Probe Ambiance"
-                   width="120" />
+                   width="130" />
           <spinner bottom_delta="0"
                    decimal_digits="3"
                    follows="left|top"
@@ -2806,7 +2850,7 @@ even though the user gets a free copy.
                    initial_value="0"
                    label="Near Clip"
                    label_width="55"
-                   left="144"
+                   left="148"
                    max_val="1024"
                    min_val="0"
                    mouse_opaque="true"
@@ -2834,6 +2878,7 @@ even though the user gets a free copy.
             <combo_box
              height="19"
              layout="topleft"
+             follows="top|left"
              name="material"
              top_pad="5"
              width="150">
@@ -2873,13 +2918,13 @@ even though the user gets a free copy.
              increment="1"
              initial_value="1"
              label="Gravity"
-             label_width="70"
+             label_width="80"
              layout="topleft"
              min_val="-1"
              max_val="28"
              name="Physics Gravity"
              top_pad="10"
-             width="132" />
+             width="142" />
 
             <spinner
              follows="left|top"
@@ -2887,14 +2932,14 @@ even though the user gets a free copy.
              increment="0.1"
              initial_value="0"
              label="Friction"
-             label_width="70"
+             label_width="80"
              layout="topleft"
              left_delta="0"
              max_val="255"
              min_val="0"
              name="Physics Friction"
              top_pad="4"
-             width="132" />
+             width="142" />
 
             <spinner
              follows="left|top"
@@ -2902,7 +2947,7 @@ even though the user gets a free copy.
              increment="0.1"
              initial_value="0"
              label="Density in 100 kg/m^3"
-             label_width="70"
+             label_width="80"
              label_wrap="true"
              layout="topleft"
              left_delta="0"
@@ -2910,7 +2955,7 @@ even though the user gets a free copy.
              min_val="1"
              name="Physics Density"
              top_pad="4"
-             width="132" />
+             width="142" />
 
             <spinner
              follows="left|top"
@@ -2918,14 +2963,14 @@ even though the user gets a free copy.
              increment="0.01"
              initial_value="0"
              label="Restitution"
-             label_width="70"
+             label_width="80"
              layout="topleft"
              left_delta="0"
              max_val="1"
              min_val="0"
              name="Physics Restitution"
              top_pad="8"
-             width="132" />
+             width="142" />
         </panel>
          <panel
          label="Texture"

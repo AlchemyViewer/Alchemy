@@ -499,8 +499,15 @@ bool LLPanelFace::postBuild()
     mLabelGlow = getChild<LLTextBox>("glow label");
     getChildSetCommitCallback(mCtrlGlow, "glow", [&](LLUICtrl*, const LLSD&) { onCommitGlow(); });
 
-    mMenuClipboardColor = getChild<LLMenuButton>("clipboard_color_params_btn");
-    mMenuClipboardTexture = getChild<LLMenuButton>("clipboard_texture_params_btn");
+    mBtnCopyColor = findChild<LLButton>("copy_color_btn");
+    mBtnCopyColor->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyColor(); });
+    mBtnPasteColor = findChild<LLButton>("paste_color_btn");
+    mBtnPasteColor->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteColor(); });
+
+    mBtnCopyTextures = findChild<LLButton>("copy_texture_btn");
+    mBtnCopyTextures->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyTexture(); });
+    mBtnPasteTextures = findChild<LLButton>("paste_texture_btn");
+    mBtnPasteTextures->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteTexture(); });
 
     mTitleMedia = getChild<LLMediaCtrl>("title_media");
     mTitleMediaText = getChild<LLTextBox>("media_info");
@@ -534,6 +541,7 @@ LLPanelFace::LLPanelFace()
     USE_TEXTURE = LLTrans::getString("use_texture");
     mCommitCallbackRegistrar.add("PanelFace.menuDoToSelected", boost::bind(&LLPanelFace::menuDoToSelected, this, _2));
     mEnableCallbackRegistrar.add("PanelFace.menuEnable", boost::bind(&LLPanelFace::menuEnableItem, this, _2));
+    mCommitCallbackRegistrar.add("BuildTool.SelectSameTexture", boost::bind(&LLPanelFace::onClickBtnSelectSameTexture, this, _1, _2));
 }
 
 LLPanelFace::~LLPanelFace()
@@ -1893,7 +1901,9 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 
         S32 selected_count = LLSelectMgr::getInstance()->getSelection()->getObjectCount();
         bool single_volume = (selected_count == 1);
-        mMenuClipboardColor->setEnabled(editable && single_volume);
+
+        mBtnCopyColor->setEnabled(editable&& single_volume);
+        mBtnPasteColor->setEnabled(editable&& single_volume&& mClipboardParams.has("color"));
 
         // Set variable values for numeric expressions
         LLCalc* calcp = LLCalc::getInstance();
@@ -2139,13 +2149,15 @@ void LLPanelFace::updateVisibilityGLTF(LLViewerObject* objectp /*= nullptr */)
 void LLPanelFace::updateCopyTexButton()
 {
     LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
-    mMenuClipboardTexture->setEnabled(objectp && objectp->getPCode() == LL_PCODE_VOLUME && objectp->permModify()
+    bool enable = (objectp && objectp->getPCode() == LL_PCODE_VOLUME && objectp->permModify()
                                                     && !objectp->isPermanentEnforced() && !objectp->isInventoryPending()
                                                     && (LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1)
                                                     && LLMaterialEditor::canClipboardObjectsMaterial()
                                                     && !mExcludeWater);
+    mBtnCopyTextures->setEnabled(enable);
+    mBtnPasteTextures->setEnabled(enable && mClipboardParams.has("texture"));
     std::string tooltip = (objectp && objectp->isInventoryPending()) ? LLTrans::getString("LoadingContents") : getString("paste_options");
-    mMenuClipboardTexture->setToolTip(tooltip);
+    mBtnPasteTextures->setToolTip(tooltip);
 }
 
 void LLPanelFace::refresh()
@@ -4019,6 +4031,8 @@ void LLPanelFace::onCopyColor()
             }
         }
     }
+
+    refresh();
 }
 
 void LLPanelFace::onPasteColor()
@@ -4377,6 +4391,7 @@ void LLPanelFace::onCopyTexture()
             }
         }
     }
+    refresh();
 }
 
 bool get_full_permission(const LLSD& te, const std::string &prefix)
@@ -5654,3 +5669,86 @@ void LLPanelFace::LLSelectedTE::getMaxDiffuseRepeats(F32& repeats, bool& identic
     identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &max_diff_repeats_func, repeats );
 }
 
+void LLPanelFace::onClickBtnSelectSameTexture(const LLUICtrl* ctrl, const LLSD& user_data)
+{
+    char channel = user_data.asStringRef()[0];
+
+    std::unordered_set<LLViewerObject*> objects;
+
+    // get a list of all linksets where at least one face is selected
+    for (auto iter = LLSelectMgr::getInstance()->getSelection()->valid_begin();
+        iter != LLSelectMgr::getInstance()->getSelection()->valid_end(); iter++)
+    {
+        objects.insert((*iter)->getObject()->getRootEdit());
+    }
+
+    // clean out the selection
+    LLSelectMgr::getInstance()->deselectAll();
+
+    // select all faces of all linksets that were found before
+    LLObjectSelectionHandle handle;
+    for(auto objectp : objects)
+    {
+        handle = LLSelectMgr::getInstance()->selectObjectAndFamily(objectp, true, false);
+    }
+
+    // grab the texture ID from the texture selector
+    LLTextureCtrl* texture_control = mTextureCtrl;
+    if (channel == 'n')
+    {
+        texture_control = mBumpyTextureCtrl;
+    }
+    else if (channel == 's')
+    {
+        texture_control = mShinyTextureCtrl;
+    }
+    else if (channel == 'p')
+    {
+        texture_control = getChild<LLTextureCtrl>("pbr_control");
+    }
+
+    LLUUID id = texture_control->getImageAssetID();
+
+    // go through all selected links in all selected linksets
+    for (auto iter = handle->begin(); iter != handle->end(); iter++)
+    {
+        LLSelectNode* node = *iter;
+        LLViewerObject* objectp = node->getObject();
+
+        U8 te_count = objectp->getNumTEs();
+
+        for (U8 i = 0; i < te_count; i++)
+        {
+            LLUUID image_id = objectp->getRenderMaterialID(i); // Always check PBR material to prevent selection of non-editable faces
+            if (image_id.isNull())
+            {
+                if (channel == 'd')
+                {
+                    image_id = objectp->getTEImage(i)->getID();
+                }
+                else
+                {
+                    const LLMaterialPtr mat = objectp->getTE(i)->getMaterialParams();
+                    if (mat.notNull())
+                    {
+                        if (channel == 'n')
+                        {
+                            image_id = mat->getNormalID();
+                        }
+                        else if (channel == 's')
+                        {
+                            image_id = mat->getSpecularID();
+                        }
+                    }
+                }
+            }
+
+            // deselect all faces that use a different texture UUID
+            if (image_id != id)
+            {
+                objectp->setTESelected(i, false);
+                node->selectTE(i, false);
+            }
+        }
+    }
+}
