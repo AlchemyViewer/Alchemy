@@ -43,19 +43,34 @@ void mirrorClip(vec3 pos)
     }
 }
 
+ // Octahedron normal vector encoding
+ // https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
+ //
+
+vec2 OctWrap( vec2 v )
+{
+    return ( 1.0 - abs( v.yx ) ) * vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
+}
+
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag)
 {
-    float f = sqrt(8 * n.z + 8);
-    return vec4(n.xy / f + 0.5, env, gbuffer_flag);
+    n /= ( abs( n.x ) + abs( n.y ) + abs( n.z ) );
+    n.xy = n.z >= 0.0 ? n.xy : OctWrap( n.xy );
+    n.xy = n.xy * 0.5 + 0.5;
+    return vec4(n.xy, env, gbuffer_flag);
 }
 
 vec4 decodeNormal(vec4 norm)
 {
-    vec2 fenc = norm.xy*4-2;
-    float f = dot(fenc,fenc);
-    float g = sqrt(1-f/4);
+    vec2 f = norm.xy;
+    f = f * 2.0 - 1.0;
+
+    // https://twitter.com/Stubbesaurus/status/937994790553227264
     vec4 n;
-    n.xy = fenc*g;
-    n.z = 1-f/2;
+    n.xyz = vec3( f.x, f.y, 1.0 - abs( f.x ) - abs( f.y ) );
+    float t = clamp( -n.z , 0.0, 1.0);
+    n.xy += vec2(n.x >= 0.0 ? -t : t, n.y >= 0.0 ? -t : t);
+    n.xyz = normalize(n.xyz);
     return n;
 }
+
