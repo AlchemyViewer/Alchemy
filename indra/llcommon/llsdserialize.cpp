@@ -885,13 +885,16 @@ bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
         if(encoded.size() > 0)
         {
             // allocate enough memory for the maximal binary length
-            std::vector<U8> value(simdutf::maximal_binary_length_from_base64(encoded.data(), encoded.size()));
+            std::vector<U8> value(simdutf::binary_length_from_base64(encoded.data(), encoded.size()));
             // convert to binary and check for errors
             simdutf::result r = simdutf::base64_to_binary(encoded.data(), encoded.size(), (char*)value.data());
             if(r.error == simdutf::error_code::SUCCESS)
             {
-                value.resize(r.count); // in case of success, r.count contains the output length
                 data = std::move(value);
+            }
+            else
+            {
+                return false;
             }
         }
     }

@@ -795,12 +795,11 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
             if(stripped.size() > 0)
             {
                 // allocate enough memory for the maximal binary length
-                std::vector<U8> data(simdutf::maximal_binary_length_from_base64(stripped.data(), stripped.size()));
+                std::vector<U8> data(simdutf::binary_length_from_base64(stripped.data(), stripped.size()));
                 // convert to binary and check for errors
                 simdutf::result r = simdutf::base64_to_binary(stripped.data(), stripped.size(), (char*)data.data());
                 if(r.error == simdutf::error_code::SUCCESS)
                 {
-                    data.resize(r.count); // in case of success, r.count contains the output length
                     value = std::move(data);
                 }
             }

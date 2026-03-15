@@ -52,7 +52,7 @@ public:
     {
         // allocate enough memory for the maximal binary length
         std::string buffer;
-        buffer.resize(simdutf::maximal_binary_length_from_base64(input.data(), input.size()));
+        buffer.resize(simdutf::binary_length_from_base64(input.data(), input.size()));
         // convert to binary and check for errors
         simdutf::result r = simdutf::base64_to_binary(input.data(), input.size(), (char*)buffer.data());
         if (r.error != simdutf::error_code::SUCCESS)
@@ -61,7 +61,6 @@ public:
         }
         else
         {
-            buffer.resize(r.count); // in case of success, r.count contains the output length
             return buffer;
         }
     }

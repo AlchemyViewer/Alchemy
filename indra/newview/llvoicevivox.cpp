@@ -5248,7 +5248,7 @@ bool LLVivoxVoiceClient::IDFromName(const std::string inName, LLUUID &uuid)
         LLStringUtil::replaceChar(temp, '_', '/');
 
         // allocate enough memory for the maximal binary length
-        std::vector<uint8_t> buffer(simdutf::maximal_binary_length_from_base64(temp.data(), temp.size()));
+        std::vector<uint8_t> buffer(simdutf::binary_length_from_base64(temp.data(), temp.size()));
         // convert to binary and check for errors
         simdutf::result r = simdutf::base64_to_binary(temp.data(), temp.size(), (char*)buffer.data());
         if(r.error == simdutf::error_code::SUCCESS && r.count == UUID_BYTES)
