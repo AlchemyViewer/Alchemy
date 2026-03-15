@@ -1466,136 +1466,100 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
 
     if (wglChoosePixelFormatARB && wglGetPixelFormatAttribivARB)
     {
-        // OK, at this point, use the ARB wglChoosePixelFormatsARB function to see if we
-        // can get exactly what we want.
-        GLint attrib_list[256];
-        S32 cur_attrib = 0;
-
-        attrib_list[cur_attrib++] = WGL_DEPTH_BITS_ARB;
-        attrib_list[cur_attrib++] = 24;
-
-        //attrib_list[cur_attrib++] = WGL_STENCIL_BITS_ARB; //stencil buffer is deprecated (performance penalty)
-        //attrib_list[cur_attrib++] = 8;
-
-        attrib_list[cur_attrib++] = WGL_DRAW_TO_WINDOW_ARB;
-        attrib_list[cur_attrib++] = GL_TRUE;
-
-        attrib_list[cur_attrib++] = WGL_ACCELERATION_ARB;
-        attrib_list[cur_attrib++] = WGL_FULL_ACCELERATION_ARB;
-
-        attrib_list[cur_attrib++] = WGL_SUPPORT_OPENGL_ARB;
-        attrib_list[cur_attrib++] = GL_TRUE;
-
-        attrib_list[cur_attrib++] = WGL_DOUBLE_BUFFER_ARB;
-        attrib_list[cur_attrib++] = GL_TRUE;
-
-        attrib_list[cur_attrib++] = WGL_COLOR_BITS_ARB;
-        attrib_list[cur_attrib++] = 24;
-
-        attrib_list[cur_attrib++] = WGL_ALPHA_BITS_ARB;
-        attrib_list[cur_attrib++] = 0;
-
-        U32 end_attrib = 0;
-        if (mFSAASamples > 0)
-        {
-            end_attrib = cur_attrib;
-            attrib_list[cur_attrib++] = WGL_SAMPLE_BUFFERS_ARB;
-            attrib_list[cur_attrib++] = GL_TRUE;
-
-            attrib_list[cur_attrib++] = WGL_SAMPLES_ARB;
-            attrib_list[cur_attrib++] = mFSAASamples;
-        }
-
-        // End the list
-        attrib_list[cur_attrib++] = 0;
-
         GLint pixel_formats[256];
         U32 num_formats = 0;
 
         // First we try and get a 32 bit depth pixel format
-        BOOL result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
+        BOOL result = FALSE;
 
-        while(!result && mFSAASamples > 0)
+        // OK, at this point, use the ARB wglChoosePixelFormatsARB function to see if we
+        // can get exactly what we want.
+
+        // First we try 10-bit format if requested
+        if (LLRender::s10bitBackBuffer)
         {
-            LL_WARNS() << "FSAASamples: " << mFSAASamples << " not supported." << LL_ENDL ;
+            GLint attrib_list[256];
+            S32   cur_attrib = 0;
 
-            mFSAASamples /= 2 ; //try to decrease sample pixel number until to disable anti-aliasing
-            if(mFSAASamples < 2)
-            {
-                mFSAASamples = 0 ;
-            }
+            attrib_list[cur_attrib++] = WGL_DEPTH_BITS_ARB;
+            attrib_list[cur_attrib++] = 24;
 
-            if (mFSAASamples > 0)
-            {
-                attrib_list[end_attrib + 3] = mFSAASamples;
-            }
-            else
-            {
-                cur_attrib = end_attrib ;
-                end_attrib = 0 ;
-                attrib_list[cur_attrib++] = 0 ; //end
-            }
-            result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
+            //attrib_list[cur_attrib++] = WGL_STENCIL_BITS_ARB;
+            //attrib_list[cur_attrib++] = 8;
 
-            if(result)
-            {
-                LL_WARNS() << "Only support FSAASamples: " << mFSAASamples << LL_ENDL ;
-            }
+            attrib_list[cur_attrib++] = WGL_DRAW_TO_WINDOW_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_ACCELERATION_ARB;
+            attrib_list[cur_attrib++] = WGL_FULL_ACCELERATION_ARB;
+
+            attrib_list[cur_attrib++] = WGL_SUPPORT_OPENGL_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_DOUBLE_BUFFER_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_RED_BITS_ARB;
+            attrib_list[cur_attrib++] = 10;
+
+            attrib_list[cur_attrib++] = WGL_BLUE_BITS_ARB;
+            attrib_list[cur_attrib++] = 10;
+
+            attrib_list[cur_attrib++] = WGL_GREEN_BITS_ARB;
+            attrib_list[cur_attrib++] = 10;
+
+            // End the list
+            attrib_list[cur_attrib++] = 0;
+
+            result = wglChoosePixelFormatARB(mhDC, attrib_list, nullptr, 256, pixel_formats, &num_formats);
         }
 
-        if (!result)
+        // If that fails, try 8-bit format
+        if (!result || !num_formats)
         {
-            LL_WARNS() << "mFSAASamples: " << mFSAASamples << LL_ENDL ;
+            GLint attrib_list[256];
+            S32   cur_attrib = 0;
 
+            attrib_list[cur_attrib++] = WGL_DEPTH_BITS_ARB;
+            attrib_list[cur_attrib++] = 24;
+
+            //attrib_list[cur_attrib++] = WGL_STENCIL_BITS_ARB;
+            //attrib_list[cur_attrib++] = 8;
+
+            attrib_list[cur_attrib++] = WGL_DRAW_TO_WINDOW_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_ACCELERATION_ARB;
+            attrib_list[cur_attrib++] = WGL_FULL_ACCELERATION_ARB;
+
+            attrib_list[cur_attrib++] = WGL_SUPPORT_OPENGL_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_DOUBLE_BUFFER_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_RED_BITS_ARB;
+            attrib_list[cur_attrib++] = 8;
+
+            attrib_list[cur_attrib++] = WGL_BLUE_BITS_ARB;
+            attrib_list[cur_attrib++] = 8;
+
+            attrib_list[cur_attrib++] = WGL_GREEN_BITS_ARB;
+            attrib_list[cur_attrib++] = 8;
+
+            // End the list
+            attrib_list[cur_attrib++] = 0;
+
+            result = wglChoosePixelFormatARB(mhDC, attrib_list, nullptr, 256, pixel_formats, &num_formats);
+
+            LLRender::s10bitBackBuffer = false;
+        }
+
+        if (!result || ! num_formats)
+        {
             close();
             show_window_creation_error("Error after wglChoosePixelFormatARB 32-bit");
             return false;
-        }
-
-        if (!num_formats)
-        {
-            if (end_attrib > 0)
-            {
-                LL_INFOS("Window") << "No valid pixel format for " << mFSAASamples << "x anti-aliasing." << LL_ENDL;
-                attrib_list[end_attrib] = 0;
-
-                BOOL result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
-                if (!result)
-                {
-                    close();
-                    show_window_creation_error("Error after wglChoosePixelFormatARB 32-bit no AA");
-                    return false;
-                }
-            }
-
-            if (!num_formats)
-            {
-                LL_INFOS("Window") << "No 32 bit z-buffer, trying 24 bits instead" << LL_ENDL;
-                // Try 24-bit format
-                attrib_list[1] = 24;
-                BOOL result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
-                if (!result)
-                {
-                    close();
-                    show_window_creation_error("Error after wglChoosePixelFormatARB 24-bit");
-                    return false;
-                }
-
-                if (!num_formats)
-                {
-                    LL_WARNS("Window") << "Couldn't get 24 bit z-buffer,trying 16 bits instead!" << LL_ENDL;
-                    attrib_list[1] = 16;
-                    BOOL result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
-                    if (!result || !num_formats)
-                    {
-                        close();
-                        show_window_creation_error("Error after wglChoosePixelFormatARB 16-bit");
-                        return false;
-                    }
-                }
-            }
-
-            LL_INFOS("Window") << "Choosing pixel formats: " << num_formats << " pixel formats returned" << LL_ENDL;
         }
 
         LL_INFOS("Window") << "pixel formats done." << LL_ENDL ;
@@ -1613,11 +1577,17 @@ const   S32   max_format  = (S32)num_formats - 1;
         {
             if (swap_method == WGL_SWAP_UNDEFINED_ARB)
             {
+                LL_INFOS() << "Found pixel format with undefined swap method at index " << cur_format << LL_ENDL;
                 break;
             }
             else if (cur_format >= max_format)
             {
                 cur_format = 0;
+                if (wglGetPixelFormatAttribivARB(mhDC, pixel_formats[cur_format], 0, 1, &swap_query, &swap_method))
+                {
+                    LL_INFOS() << "No pixel format with undefined swap method found, using first format with swap method " << swap_method
+                               << " at index " << cur_format << LL_ENDL;
+                }
                 break;
             }
 

@@ -502,6 +502,7 @@ public:
     static bool sNsightDebugSupport;
     static LLVector2 sUIGLScaleFactor;
     static bool sClassicMode; // classic sky mode active
+    static bool s10bitBackBuffer;
 
 private:
     friend class LLLightState;

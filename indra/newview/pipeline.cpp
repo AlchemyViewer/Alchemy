@@ -932,7 +932,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
     if (!gCubeSnapshot) // hack to not re-allocate various targets for cube snapshots
     {
-        U32 post_color_fmt = gSavedSettings.getBOOL("RenderHighPrecisionPostProcess") ? GL_RGBA16F : GL_RGBA;
+        U32 post_color_fmt = (LLRender::s10bitBackBuffer || (hdr && gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))) ? GL_RGBA16 : GL_RGBA;
 
         if (RenderUIBuffer)
         {
@@ -8132,22 +8132,24 @@ void LLPipeline::renderFinalize()
     }
 
     // Present the screen target.
-
-    gDeferredPostNoDoFNoiseProgram.bind(); // Add noise as part of final render to screen pass to avoid damaging other post effects
-
-    // Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems.
-    gDeferredPostNoDoFNoiseProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, sourceBuffer);
-    gDeferredPostNoDoFNoiseProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
-
-    gDeferredPostNoDoFNoiseProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)sourceBuffer->getWidth(), (GLfloat)sourceBuffer->getHeight());
-
     {
-        LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);
-        mScreenTriangleVB->setBuffer();
-        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-    }
+        LLGLSLShader& final_shader = LLRender::s10bitBackBuffer ? gDeferredPostNoDoFProgram : gDeferredPostNoDoFNoiseProgram;
+        final_shader.bind(); // Add noise as part of final render to screen pass to avoid damaging other post effects
 
-    gDeferredPostNoDoFNoiseProgram.unbind();
+        // Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems.
+        final_shader.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, sourceBuffer);
+        final_shader.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+
+        final_shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)sourceBuffer->getWidth(), (GLfloat)sourceBuffer->getHeight());
+
+        {
+            LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+        }
+
+        final_shader.unbind();
+    }
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 

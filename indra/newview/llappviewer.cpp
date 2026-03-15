@@ -578,8 +578,10 @@ static void settings_to_globals()
 
 #if LL_DARWIN
     LLRender::sGLCoreProfile = true;
+    LLRender::s10bitBackBuffer = false;
 #else
     LLRender::sGLCoreProfile = gSavedSettings.getBOOL("RenderGLContextCoreProfile");
+    LLRender::s10bitBackBuffer = gSavedSettings.getBOOL("RenderGLContext10bitSDR");
 #endif
     LLRender::sNsightDebugSupport = gSavedSettings.getBOOL("RenderNsightDebugSupport");
     LLRender::sAnisotropicFilteringLevel = static_cast<F32>(gSavedSettings.getU32("RenderAnisotropicLevel"));

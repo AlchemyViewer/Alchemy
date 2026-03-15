@@ -721,6 +721,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>RenderGLContext10bitSDR</key>
+        <map>
+            <key>Comment</key>
+            <string>[EXPERIMENTAL] - Use 10-bit SDR framebuffer if supported.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>RenderParcelSelectionToMaxHeight</key>
         <map>
             <key>Comment</key>
