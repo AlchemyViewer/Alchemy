@@ -1438,6 +1438,9 @@ even though the user gets a free copy.
          name="Object"
          top="16"
          width="295">
+         <panel.string name="paste_position">Paste Position [VALUE]</panel.string>
+         <panel.string name="paste_size">Paste Size [VALUE]</panel.string>
+         <panel.string name="paste_rotation">Paste Rotation [VALUE]</panel.string>
             <check_box
              height="19"
              label="Locked"
@@ -1480,19 +1483,6 @@ even though the user gets a free copy.
              name="object_horizontal"
              top_pad="10"
              width="95" />
-            <menu_button
-             menu_filename="menu_copy_paste_pos.xml"
-             follows="top|left"
-             height="11"
-             image_disabled="ClipboardSmallMenu_Disabled"
-             image_selected="ClipboardSmallMenu_Press"
-             image_unselected="ClipboardSmallMenu_Off"
-             layout="topleft"
-             left_delta="0"
-             top_pad="13"
-             name="clipboard_pos_btn"
-             tool_tip="Paste options"
-             width="19"/>
             <text
              type="string"
              length="1"
@@ -1501,8 +1491,8 @@ even though the user gets a free copy.
              layout="topleft"
              name="label position"
              tool_tip="Position (meters)"
-             left_pad="8"
-             top_delta="0"
+             left="5"
+             top_pad="13"
              width="121">
                 Position (m)
             </text>
@@ -1515,7 +1505,7 @@ even though the user gets a free copy.
              label="X"
              label_width="10"
              layout="topleft"
-             left_delta="-27"
+             left_delta="0"
              max_val="512"
              min_val="-256"
              name="Pos X"
@@ -1554,27 +1544,44 @@ even though the user gets a free copy.
              text_enabled_color="0 0.8 1 .65"
              top_pad="3"
              width="87" />
-            <menu_button
-             menu_filename="menu_copy_paste_size.xml"
+            <button
              follows="top|left"
-             height="11"
-             image_disabled="ClipboardSmallMenu_Disabled"
-             image_selected="ClipboardSmallMenu_Press"
-             image_unselected="ClipboardSmallMenu_Off"
-             layout="topleft"
-             left_delta="0"
-             top_pad="13"
-             name="clipboard_size_btn"
-             tool_tip="Paste options"
-             width="19"/>
+             height="19" 
+             top_delta="-43"
+             left_pad="0"
+             tab_stop="false"
+             image_overlay="Clipboard_Copy"
+             name="copy_position_btn"
+             tool_tip="Copy Position"
+             width="20" />
+            <button
+             follows="top|left"
+             height="19"
+             top_pad="3"
+             tab_stop="false"
+             image_overlay="Clipboard_Paste"
+             name="paste_position_btn"
+             tool_tip="Paste Position"
+             width="20" />
+             <button
+             follows="top|left"
+             height="19"
+             top_pad="3"
+             mouse_opaque="true"
+             tab_stop="false"
+             image_selected="eye_button_active.tga"
+             image_unselected="eye_button_inactive.tga" 
+             name="pipette_position_btn"
+             tool_tip="Paste Position using the Pipette tool"
+             width="20" />
             <text
              type="string"
              length="1"
              follows="left|top"
              height="10"
              layout="topleft"
-             left_pad="8"
-             top_delta="0"
+             left="5"
+             top_pad="5"
              name="label size"
              tool_tip="Size (meters)"
              width="121">
@@ -1589,7 +1596,7 @@ even though the user gets a free copy.
              label="X"
              label_width="10"
              layout="topleft"
-             left_delta="-27"
+             left_delta="0"
              max_val="64"
              min_val="0.01"
              name="Scale X"
@@ -1628,27 +1635,44 @@ even though the user gets a free copy.
              text_enabled_color="1 1 1 1"
              top_pad="3"
              width="87" />
-            <menu_button
-             menu_filename="menu_copy_paste_rot.xml"
+             <button
              follows="top|left"
-             height="11"
-             image_disabled="ClipboardSmallMenu_Disabled"
-             image_selected="ClipboardSmallMenu_Press"
-             image_unselected="ClipboardSmallMenu_Off"
-             layout="topleft"
-             left_delta="0"
-             top_pad="13"
-             name="clipboard_rot_btn"
-             tool_tip="Paste options"
-             width="19"/>
+             height="19" 
+             top_delta="-43"
+             left_pad="5"
+             tab_stop="false"
+             image_overlay="Clipboard_Copy"
+             name="copy_size_btn"
+             tool_tip="Copy Size"
+             width="20" />
+            <button
+             follows="top|left"
+             height="19"
+             top_pad="3"
+             tab_stop="false"
+             image_overlay="Clipboard_Paste"
+             name="paste_size_btn"
+             tool_tip="Paste Size"
+             width="20" />
+             <button
+             follows="top|left"
+             height="19"
+             top_pad="3"
+             mouse_opaque="true"
+             tab_stop="false"
+             name="pipette_size_btn"
+             tool_tip="Paste Size using the Pipette tool"
+             width="20" 
+             image_selected="eye_button_active.tga"
+             image_unselected="eye_button_inactive.tga"/>
             <text
              type="string"
              length="1"
              follows="left|top"
              height="10"
              layout="topleft"
-             left_pad="8"
-             top_delta="0"
+             left="5"
+             top_pad="5"
              name="label rotation"
              tool_tip="Rotation (degrees)"
              width="121">
@@ -1663,7 +1687,7 @@ even though the user gets a free copy.
              label="X"
              label_width="10"
              layout="topleft"
-             left_delta="-27"
+             left_delta="0"
              max_val="9999"
              min_val="-9999"
              name="Rot X"
@@ -1702,6 +1726,36 @@ even though the user gets a free copy.
              text_enabled_color="1 1 1 1"
              top_pad="3"
              width="87" />
+             <button
+             follows="top|left"
+             height="19" 
+             top_delta="-43"
+             left_pad="5"
+             tab_stop="false"
+             image_overlay="Clipboard_Copy"
+             name="copy_rotation_btn"
+             tool_tip="Copy Rotation"
+             width="20" />
+            <button
+             follows="top|left"
+             height="19"
+             top_pad="3"
+             tab_stop="false"
+             image_overlay="Clipboard_Paste"
+             name="paste_rotation_btn"
+             tool_tip="Paste Rotation"
+             width="20" />
+             <button
+             follows="top|left"
+             height="19"
+             top_pad="3"
+             mouse_opaque="true"
+             tab_stop="false"
+             image_selected="eye_button_active.tga"
+             image_unselected="eye_button_inactive.tga"
+             name="pipette_rotation_btn"
+             tool_tip="Paste Rotation using the Pipette tool"
+             width="20" />
  <!--           <text
              type="string"
              length="1"
@@ -1726,11 +1780,12 @@ even though the user gets a free copy.
              width="0"/>
             <combo_box
              height="19"
+             follows="top|left"
              layout="topleft"
              name="comboBaseType"
              top="6"
-             left="125"
-             width="125">
+             left="120"
+             width="105">
                 <combo_box.item
                  label="Box"
                  name="Box"
@@ -1820,24 +1875,44 @@ even though the user gets a free copy.
                  value="Path33Profile5"
                  label="33->HalfCircle" />
             </combo_box>
-            <menu_button
-              menu_filename="menu_copy_paste_object.xml"
+              <button
               follows="top|left"
-              height="15"
-              image_disabled="ClipboardMenu_Disabled"
-              image_selected="ClipboardMenu_Press"
-              image_unselected="ClipboardMenu_Off"
-              layout="topleft"
-              left_pad="8"
-              top_delta="2"
-              name="clipboard_obj_params_btn"
-              tool_tip="Paste options"
-              width="22"/>
+              height="19"
+              left_pad="1"
+              top_delta="0"
+              tab_stop="false"
+              image_overlay="Clipboard_Copy"
+              name="copy_primparams_btn"
+              tool_tip="Copy Primitive Parameters"
+              width="20" />
+              <button
+              follows="top|left"
+              height="19"
+              left_pad="1"
+              top_delta="0"
+              mouse_opaque="true"
+              tab_stop="false"
+              image_overlay="Clipboard_Paste"
+              name="paste_primparams_btn"
+              tool_tip="Paste Primitive Parameters"
+              width="20" />
+              <button
+              follows="top|left"
+              height="19"
+              left_pad="1"
+              top_delta="0"
+              mouse_opaque="true"
+              tab_stop="false"
+              image_selected="eye_button_active.tga"
+              image_unselected="eye_button_inactive.tga"
+              name="pipette_primparams_btn"
+              tool_tip="Paste Primitive Parameters using the Pipette tool"
+              width="20" />
             <text
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left="125"
              name="text cut"
@@ -1847,39 +1922,39 @@ even though the user gets a free copy.
             </text>
             <spinner
              follows="left|top"
-             height="16"
+             height="21"
              increment="0.025"
              initial_value="0"
              label="B"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_delta="0"
              max_val="0.98"
              name="cut begin"
-             top_pad="4"
-             width="68" />
+             top_pad="2"
+             width="70" />
             <spinner
              follows="left|top"
-             height="16"
+             height="21"
              increment="0.025"
              initial_value="1"
              label="E"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_pad="10"
              min_val="0.02"
              name="cut end"
              top_delta="0"
-             width="68" />
+             width="70" />
             <text
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left="125"
              name="text hollow"
-             top_pad="7"
+             top_pad="4"
              width="68">
                 Hollow
             </text>
@@ -1887,7 +1962,7 @@ even though the user gets a free copy.
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left_pad="10"
              name="text skew"
@@ -1897,19 +1972,19 @@ even though the user gets a free copy.
             <spinner
              decimal_digits="1"
              follows="left|top"
-             height="19"
+             height="21"
              increment="5"
              initial_value="0"
              layout="topleft"
              left="125"
-             max_val="99"
+             max_val="95"
              name="Scale 1"
-             top_pad="4"
-             width="68" />
+             top_pad="2"
+             width="70" />
             <spinner
              decimal_digits="2"
              follows="left|top"
-             height="19"
+             height="21"
              increment="0.05"
              initial_value="0"
              layout="topleft"
@@ -1918,25 +1993,26 @@ even though the user gets a free copy.
              min_val="-0.95"
              name="Skew"
              top_delta="0"
-             width="68" />
+             width="70" />
             <text
              type="string"
              length="1"
              follows="left|top"
-             height="15"
+             height="16"
              layout="topleft"
              left="125"
              name="Hollow Shape"
-             top_pad="7"
+             top_pad="4"
              width="150">
                 Hollow Shape
             </text>
             <combo_box
              height="23"
              layout="topleft"
+             follows="top|left"
              left_delta="0"
              name="hole"
-             top_pad="-2"
+             top_pad="2"
              width="150">
                 <combo_box.item
                  label="Default"
@@ -1959,53 +2035,53 @@ even though the user gets a free copy.
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left_delta="0"
              name="text twist"
-             top_pad="7"
+             top_pad="4"
              width="150">
                 Twist (begin/end)
             </text>
             <spinner
              decimal_digits="0"
              follows="left|top"
-             height="19"
+             height="21"
              increment="9"
              initial_value="0"
              label="B"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_delta="0"
              max_val="180"
              min_val="-180"
              name="Twist Begin"
-             top_pad="4"
-             width="68" />
+             top_pad="2"
+             width="70" />
             <spinner
              decimal_digits="0"
              follows="left|top"
-             height="19"
+             height="21"
              increment="9"
              initial_value="0"
              label="E"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_pad="10"
              max_val="180"
              min_val="-180"
              name="Twist End"
              top_delta="0"
-             width="68" />
+             width="70" />
             <text
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left="125"
              name="scale_taper"
-             top_pad="7"
+             top_pad="4"
              width="150">
                 Taper
             </text>
@@ -2014,7 +2090,7 @@ even though the user gets a free copy.
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left_delta="0"
              name="scale_hole"
@@ -2023,85 +2099,85 @@ even though the user gets a free copy.
                 Hole Size
             </text>
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
-             height="19"
+             height="21"
              increment="0.05"
              initial_value="0"
              label="X"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_delta="0"
              min_val="-1"
              name="Taper Scale X"
-             top_pad="4"
-             width="68" />
+             top_pad="2"
+             width="70" />
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
-             height="19"
+             height="21"
              increment="0.05"
              initial_value="0"
              label="Y"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_pad="10"
              min_val="-1"
              name="Taper Scale Y"
              top_delta="0"
-             width="68" />
+             width="70" />
             <text
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left="125"
              name="text topshear"
-             top_pad="5"
+             top_pad="4"
              width="141">
                 Top Shear
             </text>
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
-             height="19"
+             height="21"
              increment="0.05"
              initial_value="0"
              label="X"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_delta="0"
              max_val="0.5"
              min_val="-0.5"
              name="Shear X"
-             top_pad="4"
-             width="68" />
+             top_pad="2"
+             width="70" />
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
-             height="19"
+             height="21"
              increment="0.05"
              initial_value="0"
              label="Y"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_pad="10"
              max_val="0.5"
              min_val="-0.5"
              name="Shear Y"
              top_delta="0"
-             width="68" />
+             width="70" />
             <text
 			 visible="false"
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left="125"
              name="advanced_cut"
-             top_pad="7"
+             top_pad="4"
              width="150">
                 Profile Cut (begin/end)
             </text>
@@ -2110,7 +2186,7 @@ even though the user gets a free copy.
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left_delta="0"
              name="advanced_dimple"
@@ -2122,7 +2198,7 @@ even though the user gets a free copy.
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left_delta="0"
              name="advanced_slice"
@@ -2132,83 +2208,83 @@ even though the user gets a free copy.
             </text>
             <spinner
              follows="left|top"
-             height="19"
+             height="21"
              increment="0.02"
              initial_value="0"
              label="B"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_delta="0"
              max_val="0.98"
              name="Path Limit Begin"
-             top_pad="3"
-             width="68" />
+             top_pad="2"
+             width="70" />
             <spinner
              follows="left|top"
-             height="19"
+             height="21"
              increment="0.02"
              initial_value="1"
              label="E"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_pad="10"
              min_val="0.02"
              name="Path Limit End"
              top_delta="0"
-             width="68" />
+             width="70" />
             <text
 			 visible="false"
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left="125"
              name="text taper2"
-             top_pad="7"
+             top_pad="4"
              width="150">
-                Taper
+                Taper Profile
             </text>
             <spinner
 			 visible="false"
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
-             height="19"
+             height="21"
              increment="0.05"
              initial_value="0"
              label="X"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_delta="0"
              min_val="-1"
              name="Taper X"
-             top_pad="3"
-             width="68" />
+             top_pad="2"
+             width="70" />
             <spinner
 			 visible="false"
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
-             height="19"
+             height="21"
              increment="0.05"
              initial_value="0"
              label="Y"
-             label_width="10"
+             label_width="12"
              layout="topleft"
              left_pad="10"
              min_val="-1"
              name="Taper Y"
              top_delta="0"
-             width="68" />
+             width="70" />
             <text
 			 visible="false"
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left="125"
              name="text radius delta"
-             top_pad="7"
+             top_pad="4"
              width="78">
                 Radius
             </text>
@@ -2217,7 +2293,7 @@ even though the user gets a free copy.
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left_delta="78"
              name="text revolutions"
@@ -2227,20 +2303,20 @@ even though the user gets a free copy.
             <spinner
 			 visible="false"
              follows="left|top"
-             height="19"
+             height="21"
              increment="0.05"
              initial_value="0"
              layout="topleft"
              left="125"
              min_val="-1"
              name="Radius Offset"
-             top_pad="4"
+             top_pad="2"
              width="68" />
             <spinner
 			 visible="false"
              decimal_digits="2"
              follows="left|top"
-             height="19"
+             height="21"
              initial_value="1"
              layout="topleft"
              left_pad="10"
@@ -2286,7 +2362,7 @@ even though the user gets a free copy.
              type="string"
              length="1"
              follows="left|top"
-             height="10"
+             height="16"
              layout="topleft"
              left_delta="0"
              name="label sculpt type"
@@ -2300,7 +2376,7 @@ even though the user gets a free copy.
              layout="topleft"
              left_delta="0"
              name="sculpt type control"
-             top_pad="4"
+             top_pad="2"
              visible="false"
              width="150">
                 <combo_box.item
