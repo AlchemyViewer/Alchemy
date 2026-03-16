@@ -97,84 +97,84 @@ bool    LLPanelVolume::postBuild()
     mLabelSelectSingle = getChild<LLTextBox>("select_single");
 
     mCheckAnimesh = getChild<LLCheckBoxCtrl>("Animated Mesh Checkbox Ctrl");
-    mCheckAnimesh->setCommitCallback(std::bind(&LLPanelVolume::onCommitAnimatedMeshCheckbox, this, std::placeholders::_1, this));
+    mCheckAnimesh->setCommitCallback(boost::bind(&LLPanelVolume::onCommitAnimatedMeshCheckbox, this, boost::placeholders::_1, this));
 
     // Flexible Objects Parameters
     {
         mCheckFlexible1D = getChild<LLCheckBoxCtrl>("Flexible1D Checkbox Ctrl");
-        mCheckFlexible1D->setCommitCallback(std::bind(&LLPanelVolume::onCommitIsFlexible, this, std::placeholders::_1, this));
+        mCheckFlexible1D->setCommitCallback(boost::bind(&LLPanelVolume::onCommitIsFlexible, this, boost::placeholders::_1, this));
 
         mSpinSections = getChild<LLSpinCtrl>("FlexNumSections");
         mSpinSections->setValidateBeforeCommit(precommitValidate);
-        mSpinSections->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
+        mSpinSections->setCommitCallback(boost::bind(onCommitFlexible, boost::placeholders::_1, this));
 
         mSpinGravity  = getChild<LLSpinCtrl>("FlexGravity");
         mSpinGravity->setValidateBeforeCommit(precommitValidate);
-        mSpinGravity->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
+        mSpinGravity->setCommitCallback(boost::bind(onCommitFlexible, boost::placeholders::_1, this));
 
         mSpinTension  = getChild<LLSpinCtrl>("FlexTension");
         mSpinTension->setValidateBeforeCommit(precommitValidate);
-        mSpinTension->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
+        mSpinTension->setCommitCallback(boost::bind(onCommitFlexible, boost::placeholders::_1, this));
 
         mSpinFriction = getChild<LLSpinCtrl>("FlexFriction");
         mSpinFriction->setValidateBeforeCommit(precommitValidate);
-        mSpinFriction->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
+        mSpinFriction->setCommitCallback(boost::bind(onCommitFlexible, boost::placeholders::_1, this));
 
         mSpinWind = getChild<LLSpinCtrl>("FlexWind");
         mSpinWind->setValidateBeforeCommit(precommitValidate);
-        mSpinWind->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
+        mSpinWind->setCommitCallback(boost::bind(onCommitFlexible, boost::placeholders::_1, this));
 
         mSpinForceX = getChild<LLSpinCtrl>("FlexForceX");
         mSpinForceX->setValidateBeforeCommit(precommitValidate);
-        mSpinForceX->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
+        mSpinForceX->setCommitCallback(boost::bind(onCommitFlexible, boost::placeholders::_1, this));
 
         mSpinForceY = getChild<LLSpinCtrl>("FlexForceY");
         mSpinForceY->setValidateBeforeCommit(precommitValidate);
-        mSpinForceY->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
+        mSpinForceY->setCommitCallback(boost::bind(onCommitFlexible, boost::placeholders::_1, this));
 
         mSpinForceZ = getChild<LLSpinCtrl>("FlexForceZ");
         mSpinForceZ->setValidateBeforeCommit(precommitValidate);
-        mSpinForceZ->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
+        mSpinForceZ->setCommitCallback(boost::bind(onCommitFlexible, boost::placeholders::_1, this));
     }
 
     // LIGHT Parameters
     {
         mCheckLight = getChild<LLCheckBoxCtrl>("Light Checkbox Ctrl");
-        mCheckLight->setCommitCallback(std::bind(onCommitIsLight, std::placeholders::_1, this));
+        mCheckLight->setCommitCallback(boost::bind(onCommitIsLight, boost::placeholders::_1, this));
 
         mLightColorSwatch = getChild<LLColorSwatchCtrl>("colorswatch");
-        mLightColorSwatch->setOnCancelCallback(std::bind(&LLPanelVolume::onLightCancelColor, this, std::placeholders::_2));
-        mLightColorSwatch->setOnSelectCallback(std::bind(&LLPanelVolume::onLightSelectColor, this, std::placeholders::_2));
-        mLightColorSwatch->setCommitCallback(std::bind(onCommitLight, std::placeholders::_1, this));
+        mLightColorSwatch->setOnCancelCallback(boost::bind(&LLPanelVolume::onLightCancelColor, this, boost::placeholders::_2));
+        mLightColorSwatch->setOnSelectCallback(boost::bind(&LLPanelVolume::onLightSelectColor, this, boost::placeholders::_2));
+        mLightColorSwatch->setCommitCallback(boost::bind(onCommitLight, boost::placeholders::_1, this));
 
         mLightTextureCtrl = getChild<LLTextureCtrl>("light texture control");
         mLightTextureCtrl->setOnCancelCallback(boost::bind(&LLPanelVolume::onLightCancelTexture, this, _2));
         mLightTextureCtrl->setOnSelectCallback(boost::bind(&LLPanelVolume::onLightSelectTexture, this, _2));
-        mLightTextureCtrl->setCommitCallback(std::bind(onCommitLight, std::placeholders::_1, this));
+        mLightTextureCtrl->setCommitCallback(boost::bind(onCommitLight, boost::placeholders::_1, this));
 
         mLightIntensity = getChild<LLSpinCtrl>("Light Intensity");
         mLightIntensity->setValidateBeforeCommit(precommitValidate);
-        mLightIntensity->setCommitCallback(std::bind(onCommitLight, std::placeholders::_1, this));
+        mLightIntensity->setCommitCallback(boost::bind(onCommitLight, boost::placeholders::_1, this));
 
         mLightRadius = getChild<LLSpinCtrl>("Light Radius");
         mLightRadius->setValidateBeforeCommit(precommitValidate);
-        mLightRadius->setCommitCallback(std::bind(onCommitLight, std::placeholders::_1, this));
+        mLightRadius->setCommitCallback(boost::bind(onCommitLight, boost::placeholders::_1, this));
 
         mLightFalloff = getChild<LLSpinCtrl>("Light Falloff");
         mLightFalloff->setValidateBeforeCommit(precommitValidate);
-        mLightFalloff->setCommitCallback(std::bind(onCommitLight, std::placeholders::_1, this));
+        mLightFalloff->setCommitCallback(boost::bind(onCommitLight, boost::placeholders::_1, this));
 
         mLightFOV = getChild<LLSpinCtrl>("Light FOV");
         mLightFOV->setValidateBeforeCommit(precommitValidate);
-        mLightFOV->setCommitCallback(std::bind(onCommitLight, std::placeholders::_1, this));
+        mLightFOV->setCommitCallback(boost::bind(onCommitLight, boost::placeholders::_1, this));
 
         mLightFocus = getChild<LLSpinCtrl>("Light Focus");
         mLightFocus->setValidateBeforeCommit(precommitValidate);
-        mLightFocus->setCommitCallback(std::bind(onCommitLight, std::placeholders::_1, this));
+        mLightFocus->setCommitCallback(boost::bind(onCommitLight, boost::placeholders::_1, this));
 
         mLightAmbiance = getChild<LLSpinCtrl>("Light Ambiance");
         mLightAmbiance->setValidateBeforeCommit(precommitValidate);
-        mLightAmbiance->setCommitCallback(std::bind(onCommitLight, std::placeholders::_1, this));
+        mLightAmbiance->setCommitCallback(boost::bind(onCommitLight, boost::placeholders::_1, this));
     }
 
     // REFLECTION PROBE Parameters
@@ -240,7 +240,7 @@ bool    LLPanelVolume::postBuild()
 
     // material type popup
     mComboMaterial = getChild<LLComboBox>("material");
-    mComboMaterial->setCommitCallback(std::bind(onCommitMaterial, std::placeholders::_1, this));
+    mComboMaterial->setCommitCallback(boost::bind(onCommitMaterial, boost::placeholders::_1, this));
     mComboMaterial->removeall();
 
     for (LLMaterialTable::info_list_t::iterator iter = LLMaterialTable::basic.mMaterialInfoList.begin();
@@ -1367,7 +1367,7 @@ void LLPanelVolume::onClickPipetteLight()
         LLToolMgr::getInstance()->clearTransientTool();
         LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelVolume::onLightSelect, this, _1, _2, _3));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
-        mBtnPipetteLight->setToggleState(TRUE);
+        mBtnPipetteLight->setToggleState(true);
     }
     else
     {

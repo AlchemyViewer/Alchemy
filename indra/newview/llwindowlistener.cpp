@@ -487,8 +487,8 @@ void LLWindowListener::mouseDown(LLSD const & request)
         // complaint, but going through std::bind() evidently
         // bypasses that special case: it only knows you're trying to pass an
         // int to a pointer. Explicitly cast NULL to the desired pointer type.
-        mouseEvent(std::bind(actions.down, mWindow,
-                             static_cast<LLWindow*>(NULL), std::placeholders::_1, std::placeholders::_2),
+        mouseEvent(boost::bind(actions.down, mWindow,
+                             static_cast<LLWindow*>(NULL), boost::placeholders::_1, boost::placeholders::_2),
                    request);
     }
 }
@@ -498,7 +498,7 @@ void LLWindowListener::mouseUp(LLSD const & request)
     Actions actions(buttons.lookup(request["button"]));
     if (actions.valid)
     {
-        mouseEvent(std::bind(actions.up, mWindow, static_cast<LLWindow*>(NULL), std::placeholders::_1, std::placeholders::_2),
+        mouseEvent(boost::bind(actions.up, mWindow, static_cast<LLWindow*>(NULL), boost::placeholders::_1, boost::placeholders::_2),
                    request);
     }
 }
@@ -510,8 +510,8 @@ void LLWindowListener::mouseMove(LLSD const & request)
     // void, whereas mouseEvent() accepts a function returning bool -- and
     // uses that bool return. Use MouseFuncTrue to construct a callable that
     // returns bool anyway.
-    mouseEvent(MouseFuncTrue(std::bind(&LLWindowCallbacks::handleMouseMove, mWindow, static_cast<LLWindow*>(NULL), std::placeholders::_1,
-                                         std::placeholders::_2)),
+    mouseEvent(MouseFuncTrue(boost::bind(&LLWindowCallbacks::handleMouseMove, mWindow, static_cast<LLWindow*>(NULL), boost::placeholders::_1,
+                                       boost::placeholders::_2)),
                request);
 }
 

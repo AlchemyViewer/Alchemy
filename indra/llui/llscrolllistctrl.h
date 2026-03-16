@@ -250,7 +250,7 @@ public:
     void            setMaximumSelectCallback( callback_t cb) { mOnMaximumSelectCallback = cb; }
     void            setSortChangedCallback( callback_t cb)  { mOnSortChangedCallback = cb; }
     // Convenience function; *TODO: replace with setter above + boost::bind() in calling code
-    void            setDoubleClickCallback( std::function<void (void* userdata)> cb, void* userdata) { mOnDoubleClickCallback = std::bind(cb, userdata); }
+    void            setDoubleClickCallback( std::function<void (void* userdata)> cb, void* userdata) { mOnDoubleClickCallback = boost::bind(cb, userdata); }
 
     void            swapWithNext(S32 index);
     void            swapWithPrevious(S32 index);

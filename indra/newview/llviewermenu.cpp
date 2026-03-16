@@ -10820,7 +10820,7 @@ void initialize_menus()
     enable.add("EnableGLTF", boost::bind(&enable_gltf));
     enable.add("EnableGLTFSaveAs", boost::bind(&enable_gltf_save_as));
     enable.add("EnableGLTFUpload", boost::bind(&enable_gltf_upload));
-    enable.add("EnableTerrainLocalPaintMap", std::bind(&enable_terrain_local_paintmap));
+    enable.add("EnableTerrainLocalPaintMap", boost::bind(&enable_terrain_local_paintmap));
 
     view_listener_t::addMenu(new LLFloaterVisible(), "FloaterVisible");
     view_listener_t::addMenu(new LLShowSidetrayPanel(), "ShowSidetrayPanel");
