@@ -477,6 +477,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             stop_glerror();
         }
 
+        // Process hud objects to prevent overflow when backgrounded or minimized.
+        LLHUDObject::renderAllForTimer();
+
         stop_glerror();
         gViewerWindow->returnEmptyPicks();
         stop_glerror();
