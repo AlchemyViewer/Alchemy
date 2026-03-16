@@ -574,12 +574,12 @@ void LLStatusBar::onMouseEnterQuickSettings()
     LLUI::getInstance()->clearPopups();
     LLUI::getInstance()->addPopup(mPanelQuickSettingsPulldown);
 
-    mPanelPresetsCameraPulldown->setVisible(FALSE);
-    mPanelPresetsPulldown->setVisible(FALSE);
-    mPanelNearByMedia->setVisible(FALSE);
-    mPanelVolumePulldown->setVisible(FALSE);
-    mPanelAOPulldown->setVisible(FALSE);
-    mPanelQuickSettingsPulldown->setVisible(TRUE);
+    mPanelPresetsCameraPulldown->setVisible(false);
+    mPanelPresetsPulldown->setVisible(false);
+    mPanelNearByMedia->setVisible(false);
+    mPanelVolumePulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(false);
+    mPanelQuickSettingsPulldown->setVisible(true);
 }
 
 void LLStatusBar::onMouseEnterAO()

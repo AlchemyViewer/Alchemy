@@ -6443,8 +6443,8 @@ void LLViewerWindow::setUIVisibility(bool visible)
     }
 
     const U32 location_bar = gSavedSettings.getU32("NavigationBarStyle");
-    LLNavigationBar::getInstance()->setVisible(visible ? (location_bar == 2) : FALSE);
-    LLPanelTopInfoBar::getInstance()->setVisible(visible ? (location_bar == 1) : FALSE);
+    LLNavigationBar::getInstance()->setVisible(visible ? (location_bar == 2) : false);
+    LLPanelTopInfoBar::getInstance()->setVisible(visible ? (location_bar == 1) : false);
     mStatusBarContainer->setVisible(visible);
 }
 

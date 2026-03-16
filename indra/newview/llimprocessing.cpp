@@ -668,7 +668,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     pack_instant_message(
                         gMessageSystem,
                         gAgent.getID(),
-                        FALSE,
+                        false,
                         gAgent.getSessionID(),
                         from_id,
                         my_name,

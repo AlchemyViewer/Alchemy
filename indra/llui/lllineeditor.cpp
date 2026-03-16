@@ -1502,7 +1502,7 @@ bool LLLineEditor::handleSpecialKey(KEY key, MASK mask)
                 LLUI::getInstance()->reportBadKeystroke();
             }
         }
-        handled = TRUE;
+        handled = true;
         break;
 
     case KEY_DELETE:

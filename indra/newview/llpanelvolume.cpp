@@ -1397,7 +1397,7 @@ void LLPanelVolume::onLightSelect(bool success, LLViewerObject* obj, const LLTex
             // Light Source
             if (hit_volobjp->getIsLight())
             {
-                volobjp->setIsLight(TRUE);
+                volobjp->setIsLight(true);
                 volobjp->setLightIntensity(hit_volobjp->getLightIntensity());
                 volobjp->setLightRadius(hit_volobjp->getLightRadius());
                 volobjp->setLightFalloff(hit_volobjp->getLightFalloff());
@@ -1416,7 +1416,7 @@ void LLPanelVolume::onLightSelect(bool success, LLViewerObject* obj, const LLTex
             }
             else
             {
-                volobjp->setIsLight(FALSE);
+                volobjp->setIsLight(false);
             }
 
             if (hit_volobjp->isReflectionProbe())
@@ -1437,7 +1437,7 @@ void LLPanelVolume::onLightSelect(bool success, LLViewerObject* obj, const LLTex
                     if (in_linkeset)
                     {
                         // In linkset with a phantom flag
-                        volobjp->setFlags(FLAGS_PHANTOM, FALSE);
+                        volobjp->setFlags(FLAGS_PHANTOM, false);
                     }
                 }
 
@@ -1446,7 +1446,7 @@ void LLPanelVolume::onLightSelect(bool success, LLViewerObject* obj, const LLTex
             refresh();
         }
     }
-    mBtnPipetteLight->setToggleState(FALSE);
+    mBtnPipetteLight->setToggleState(false);
 }
 
 void LLPanelVolume::onClickPipetteFeatures()
@@ -1457,7 +1457,7 @@ void LLPanelVolume::onClickPipetteFeatures()
         LLToolMgr::getInstance()->clearTransientTool();
         LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelVolume::onFeaturesSelect, this, _1, _2, _3));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
-        mBtnPipetteFeatures->setToggleState(TRUE);
+        mBtnPipetteFeatures->setToggleState(true);
     }
     else
     {
@@ -1505,14 +1505,14 @@ void LLPanelVolume::onFeaturesSelect(bool success, LLViewerObject* obj, const LL
                 volobjp->setPhysicsFriction(hit_volobjp->getPhysicsFriction());
                 volobjp->setPhysicsDensity(hit_volobjp->getPhysicsDensity());
                 volobjp->setPhysicsRestitution(hit_volobjp->getPhysicsRestitution());
-                volobjp->updateFlags(TRUE);
+                volobjp->updateFlags(true);
             }
 
             // Flexible
             bool is_flexible = hit_volobjp->isFlexible();
             if (is_flexible && volobjp->canBeFlexible())
             {
-                BOOL update_shape = FALSE;
+                BOOL update_shape = false;
 
                 // do before setParameterEntry or it will think that it is already flexi
                 update_shape = volobjp->setIsFlexible(is_flexible);
@@ -1554,7 +1554,7 @@ void LLPanelVolume::onFeaturesSelect(bool success, LLViewerObject* obj, const LL
             refresh();
         }
     }
-    mBtnPipetteFeatures->setToggleState(FALSE);
+    mBtnPipetteFeatures->setToggleState(false);
 }
 
 // static

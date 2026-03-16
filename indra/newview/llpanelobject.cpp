@@ -1945,7 +1945,7 @@ void LLPanelObject::sendPosition(bool btn_down)
         {
             const LLVector3& delta = mObject->getPosition();
             // counter-translate child objects if we are moving the root as an individual
-            mObject->resetChildrenPosition(old_pos_local - delta, TRUE);
+            mObject->resetChildrenPosition(old_pos_local - delta, true);
         }
 
         if (!btn_down)
@@ -2161,14 +2161,14 @@ void LLPanelObject::clearCtrls()
     mLabelRadiusOffset->setEnabled( false );
     mLabelRevolutions->setEnabled( false );
 
-    mBtnCopyPosition->setEnabled(FALSE);
-    mBtnPastePosition->setEnabled(FALSE);
-    mBtnCopySize->setEnabled(FALSE);
-    mBtnPasteSize->setEnabled(FALSE);
-    mBtnCopyRotation->setEnabled(FALSE);
-    mBtnPasteRotation->setEnabled(FALSE);
-    mBtnCopyPrimParams->setEnabled(FALSE);
-    mBtnPastePrimParams->setEnabled(FALSE);
+    mBtnCopyPosition->setEnabled(false);
+    mBtnPastePosition->setEnabled(false);
+    mBtnCopySize->setEnabled(false);
+    mBtnPasteSize->setEnabled(false);
+    mBtnCopyRotation->setEnabled(false);
+    mBtnPasteRotation->setEnabled(false);
+    mBtnCopyPrimParams->setEnabled(false);
+    mBtnPastePrimParams->setEnabled(false);
     getChildView("scale_hole")->setEnabled(false);
     getChildView("scale_taper")->setEnabled(false);
     getChildView("advanced_cut")->setEnabled(false);
@@ -2596,7 +2596,7 @@ void LLPanelObject::onClickPipettePos()
         LLToolMgr::getInstance()->clearTransientTool();
         LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onPosSelect, this, _1, _2, _3));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
-        mBtnPipettePosition->setToggleState(TRUE);
+        mBtnPipettePosition->setToggleState(true);
     }
     else
     {
@@ -2612,7 +2612,7 @@ void LLPanelObject::onClickPipetteSize()
         LLToolMgr::getInstance()->clearTransientTool();
         LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onSizeSelect, this, _1, _2, _3));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
-        mBtnPipetteSize->setToggleState(TRUE);
+        mBtnPipetteSize->setToggleState(true);
     }
     else
     {
@@ -2628,7 +2628,7 @@ void LLPanelObject::onClickPipetteRot()
         LLToolMgr::getInstance()->clearTransientTool();
         LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onRotSelect, this, _1, _2, _3));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
-        mBtnPipetteRotation->setToggleState(TRUE);
+        mBtnPipetteRotation->setToggleState(true);
     }
     else
     {
@@ -2644,7 +2644,7 @@ void LLPanelObject::onClickPipetteParams()
         LLToolMgr::getInstance()->clearTransientTool();
         LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onParamsSelect, this, _1, _2, _3));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
-        mBtnPipettePrimParams->setToggleState(TRUE);
+        mBtnPipettePrimParams->setToggleState(true);
     }
     else
     {
@@ -2675,9 +2675,9 @@ void LLPanelObject::onPosSelect(bool success, LLViewerObject* obj, const LLTextu
         mCtrlPosY->set(selected_pos.mV[VY]);
         mCtrlPosZ->set(selected_pos.mV[VZ]);
 
-        sendPosition(FALSE);
+        sendPosition(false);
     }
-    mBtnPipettePosition->setToggleState(FALSE);
+    mBtnPipettePosition->setToggleState(false);
 }
 
 void LLPanelObject::onSizeSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
@@ -2696,9 +2696,9 @@ void LLPanelObject::onSizeSelect(bool success, LLViewerObject* obj, const LLText
         mCtrlScaleY->set(selected_scale.mV[VY]);
         mCtrlScaleZ->set(selected_scale.mV[VZ]);
 
-        sendScale(FALSE);
+        sendScale(false);
     }
-    mBtnPipetteSize->setToggleState(FALSE);
+    mBtnPipetteSize->setToggleState(false);
 }
 
 void LLPanelObject::onRotSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
@@ -2718,9 +2718,9 @@ void LLPanelObject::onRotSelect(bool success, LLViewerObject* obj, const LLTextu
         mCtrlRotY->set(new_euler_angles.mV[VY]);
         mCtrlRotZ->set(new_euler_angles.mV[VZ]);
 
-        sendRotation(FALSE);
+        sendRotation(false);
     }
-    mBtnPipetteRotation->setToggleState(FALSE);
+    mBtnPipetteRotation->setToggleState(false);
 }
 
 void LLPanelObject::onParamsSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
@@ -2743,14 +2743,14 @@ void LLPanelObject::onParamsSelect(bool success, LLViewerObject* obj, const LLTe
                 LLUUID sculpt_id = sculpt_texture;
                 U8 sculpt_type = hit_sculpt_params->getSculptType();;
                 sculpt_params.setSculptTexture(sculpt_id, sculpt_type);
-                mObject->setParameterEntry(LLNetworkData::PARAMS_SCULPT, sculpt_params, TRUE);
+                mObject->setParameterEntry(LLNetworkData::PARAMS_SCULPT, sculpt_params, true);
             }
             else
             {
                 LLSculptParams* sculpt_params = (LLSculptParams*)mObject->getSculptParams();
                 if (sculpt_params)
                 {
-                    mObject->setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, FALSE, TRUE);
+                    mObject->setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, false, true);
                 }
             }
 
@@ -2773,5 +2773,5 @@ void LLPanelObject::onParamsSelect(bool success, LLViewerObject* obj, const LLTe
             mObject->updateVolume(new_params);
         }
     }
-    mBtnPipettePrimParams->setToggleState(FALSE);
+    mBtnPipettePrimParams->setToggleState(false);
 }
