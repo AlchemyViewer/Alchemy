@@ -192,7 +192,7 @@ void LLPanelLandAudio::onCommitAny(LLUICtrl*, void *userdata)
 
     // Extract data from UI
     bool sound_local        = self->mCheckSoundLocal->get();
-    std::string music_url   = self->mMusicURLEdit->getText();
+    std::string music_url   = self->mMusicURLEdit->getSimple();
 
     bool voice_enabled = self->mCheckParcelEnableVoice->get();
     bool voice_estate_chan = !self->mCheckParcelVoiceLocal->get();
