@@ -201,6 +201,7 @@
 #include "llvoicechannel.h"
 #include "llpathfindingmanager.h"
 #include "llremoteparcelrequest.h"
+#include "llfloatersidepanelcontainer.h"
 // [RLVa:KB] - Checked: RLVa-1.2.0
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -1673,6 +1674,9 @@ bool idle_startup()
         }
 
         gAgent.addRegionChangedCallback(boost::bind(&LLPerfStats::StatsRecorder::clearStats));
+
+        // Create people views early enough to register with avatar tracker
+        LLFloaterSidePanelContainer::getPanel("people", "panel_people");
 
         // *Note: this is where gWorldMap used to be initialized.
 
