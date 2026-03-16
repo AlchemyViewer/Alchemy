@@ -8854,11 +8854,8 @@ bool LLVOAvatar::processFullyLoadedChange(bool loading)
 
 bool LLVOAvatar::isFullyLoaded() const
 {
-// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-2.2
     static LLCachedControl<bool> render_unloaded_avatar(gSavedSettings, "RenderUnloadedAvatar", false);
-    return (render_unloaded_avatar && !isSelf()) ||(mFullyLoaded);
-// [/SL:KB]
-//  return (render_unloaded_avatar || mFullyLoaded);
+    return (render_unloaded_avatar && !isSelf()) || mFullyLoaded;
 }
 
 bool LLVOAvatar::hasFirstFullAttachmentData() const

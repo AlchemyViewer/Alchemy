@@ -44,33 +44,20 @@
 const F32 COF_LINK_BATCH_TIME = 5.0F;
 const F32 MAX_ATTACHMENT_REQUEST_LIFETIME = 30.0F;
 const F32 MIN_RETRY_REQUEST_TIME = 5.0F;
-//const F32 MAX_BAD_COF_TIME = 30.0F;
 
-// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
 class LLRegisterAttachmentCallback : public LLRequestServerAppearanceUpdateOnDestroy
 {
 public:
-    LLRegisterAttachmentCallback()
-        : LLRequestServerAppearanceUpdateOnDestroy()
+    void fire(const LLUUID& item_id) override
     {
-    }
-
-    ~LLRegisterAttachmentCallback() override
-    {
-    }
-
-    void fire(const LLUUID& idItem) override
-    {
-        LLAttachmentsMgr::instance().onRegisterAttachmentComplete(idItem);
-        LLRequestServerAppearanceUpdateOnDestroy::fire(idItem);
+        LLAttachmentsMgr::instance().onRegisterAttachmentComplete(item_id);
+        LLRequestServerAppearanceUpdateOnDestroy::fire(item_id);
     }
 };
-// [/SL:KB]
 
 LLAttachmentsMgr::LLAttachmentsMgr():
     mAttachmentRequests("attach",MIN_RETRY_REQUEST_TIME),
     mDetachRequests("detach",MIN_RETRY_REQUEST_TIME)
-//  ,  mQuestionableCOFLinks("badcof",MAX_BAD_COF_TIME)
 {
 }
 
@@ -130,10 +117,8 @@ void LLAttachmentsMgr::addAttachmentRequest(const LLUUID& item_id,
 
 void LLAttachmentsMgr::onAttachmentRequested(const LLUUID& item_id)
 {
-// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
     if (item_id.isNull())
         return;
-// [/SL:KB]
 
     LLViewerInventoryItem *item = gInventory.getItem(item_id);
     LL_DEBUGS("Avatar") << "ATT attachment was requested "
@@ -167,8 +152,6 @@ void LLAttachmentsMgr::onIdle()
     expireOldAttachmentRequests();
 
     expireOldDetachRequests();
-
-//  checkInvalidCOFLinks();
 
     spamStatusInfo();
 }
@@ -277,12 +260,10 @@ void LLAttachmentsMgr::linkRecentlyArrivedAttachments()
 {
     if (mRecentlyArrivedAttachments.size())
     {
- // [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
         if (!LLAppearanceMgr::instance().getAttachmentInvLinkEnable())
         {
             return;
         }
-// [/SL:KB]
 
         // One or more attachments have arrived but have not yet been
         // processed for COF links
@@ -330,34 +311,25 @@ void LLAttachmentsMgr::linkRecentlyArrivedAttachments()
         }
         if (ids_to_link.size())
         {
-// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
             LLPointer<LLInventoryCallback> cb = new LLRegisterAttachmentCallback();
-            for (const LLUUID& idAttach : ids_to_link)
+            for (const LLUUID& id_item: ids_to_link)
             {
-                if (std::find(mPendingAttachLinks.begin(), mPendingAttachLinks.end(), idAttach) == mPendingAttachLinks.end())
+                if (std::find(mPendingAttachLinks.begin(), mPendingAttachLinks.end(), id_item) == mPendingAttachLinks.end())
                 {
-                    LLAppearanceMgr::instance().addCOFItemLink(idAttach, cb);
-                    mPendingAttachLinks.insert(idAttach);
+                    LLAppearanceMgr::instance().addCOFItemLink(id_item, cb);
+                    mPendingAttachLinks.insert(id_item);
                 }
             }
-// [/SL:KB]
-//            LLPointer<LLInventoryCallback> cb = new LLRequestServerAppearanceUpdateOnDestroy();
-//            for (uuid_vec_t::const_iterator uuid_it = ids_to_link.begin();
-//                 uuid_it != ids_to_link.end(); ++uuid_it)
-//            {
-//                LLAppearanceMgr::instance().addCOFItemLink(*uuid_it, cb);
-//            }
         }
         mRecentlyArrivedAttachments.clear();
     }
 }
 
-// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-2.2
 bool LLAttachmentsMgr::getPendingAttachments(std::set<LLUUID>& ids) const
 {
     ids.clear();
 
-    // Returns the union of the LL maintained list of attachments that are waiting for link creation and our maintained list of attachments that are pending link creation
+    // Returns the combined set of attachments that are pending link creation and those that currently have an ongoing link creation process.
     set_union(mRecentlyArrivedAttachments.begin(), mRecentlyArrivedAttachments.end(), mPendingAttachLinks.begin(), mPendingAttachLinks.end(), std::inserter(ids, ids.begin()));
 
     return !ids.empty();
@@ -368,24 +340,22 @@ void LLAttachmentsMgr::clearPendingAttachmentLink(const LLUUID& idItem)
     mPendingAttachLinks.erase(idItem);
 }
 
-void LLAttachmentsMgr::onRegisterAttachmentComplete(const LLUUID& idAttachLink)
+void LLAttachmentsMgr::onRegisterAttachmentComplete(const LLUUID& id_item_link)
 {
-    const LLViewerInventoryItem* pAttachLink = gInventory.getItem(idAttachLink);
-    if (!pAttachLink)
-        return;
-
-    const LLUUID& idAttachBase = pAttachLink->getLinkedUUID();
-
-    // Remove the attachment from the pending list
-    clearPendingAttachmentLink(idAttachBase);
-
-    // It may have been detached already in which case we should remove the COF link
-    if ( (isAgentAvatarValid()) && (!gAgentAvatarp->isWearingAttachment(idAttachBase)) )
+    if (const LLUUID& id_item = gInventory.getLinkedItemID(id_item_link); id_item != id_item_link)
     {
-        LLAppearanceMgr::instance().removeCOFItemLinks(idAttachBase, NULL, true);
+        clearPendingAttachmentLink(id_item);
+
+        // It may have been detached already in which case we should remove the COF link
+        if ( isAgentAvatarValid() && !gAgentAvatarp->isWearingAttachment(id_item) )
+        {
+// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-2.2
+			LLAppearanceMgr::instance().removeCOFItemLinks(id_item, nullptr, true);
+// [/SL:KB]
+//          LLAppearanceMgr::instance().removeCOFItemLinks(id_item);
+        }
     }
 }
-// [/SL:KB]
 
 LLAttachmentsMgr::LLItemRequestTimes::LLItemRequestTimes(const std::string& op_name, F32 timeout):
     mOpName(op_name),
@@ -515,10 +485,7 @@ void LLAttachmentsMgr::onDetachRequested(const LLUUID& inv_item_id)
 
 void LLAttachmentsMgr::onDetachCompleted(const LLUUID& inv_item_id)
 {
-// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-2.2
-    // (mRecentlyArrivedAttachments doesn't need pruning since it'll check the attachment is actually worn before linking)
     clearPendingAttachmentLink(inv_item_id);
-// [/SL:KB]
 
     LLTimer timer;
     LLInventoryItem *item = gInventory.getItem(inv_item_id);
@@ -541,100 +508,16 @@ void LLAttachmentsMgr::onDetachCompleted(const LLUUID& inv_item_id)
     {
         LL_DEBUGS("Avatar") << "ATT detach on shutdown for " << (item ? item->getName() : "UNKNOWN") << " " << inv_item_id << LL_ENDL;
     }
-
-//    LL_DEBUGS("Avatar") << "ATT detached item flagging as questionable for COF link checking "
-//                        << (item ? item->getName() : "UNKNOWN") << " id " << inv_item_id << LL_ENDL;
-//    mQuestionableCOFLinks.addTime(inv_item_id);
 }
 
 bool LLAttachmentsMgr::isAttachmentStateComplete() const
 {
-// [SL:KB] - Patch: Appearance-Misc | Checked: Catznip-4.3
     return  mPendingAttachments.empty()
         && mAttachmentRequests.empty()
         && mDetachRequests.empty()
         && mRecentlyArrivedAttachments.empty()
         && mPendingAttachLinks.empty();
-// [/SL:KB]
-//    return  mPendingAttachments.empty()
-//        && mAttachmentRequests.empty()
-//        && mDetachRequests.empty()
-//        && mRecentlyArrivedAttachments.empty()
-//        && mQuestionableCOFLinks.empty();
-}
-
-// Check for attachments that are (a) linked in COF and (b) not
-// attached to the avatar.  This is a rotten function to have to
-// include, because it runs the risk of either repeatedly spamming out
-// COF link removals if they're failing for some reason, or getting
-// into a tug of war with some other sequence of events that's in the
-// process of adding the attachment in question. However, it's needed
-// because we have no definitive source of authority for what things
-// are actually supposed to be attached. Scripts, run on the server
-// side, can remove an attachment without our expecting it. If this
-// happens to an attachment that's just been added, then the COF link
-// creation may still be in flight, and we will have to delete the
-// link after it shows up.
-//
-// Note that we only flag items for possible link removal if they have
-// been previously detached. This means that an attachment failure
-// will leave the link in the COF, where it will hopefully resolve
-// correctly on relog.
-//
-// See related: MAINT-5070, MAINT-4409
-//
-//void LLAttachmentsMgr::checkInvalidCOFLinks()
-//{
-//  if (!gInventory.isInventoryUsable() || mQuestionableCOFLinks.empty())
-//  {
-//      return;
-//  }
-//  LLInventoryModel::cat_array_t cat_array;
-//  LLInventoryModel::item_array_t item_array;
-//  gInventory.collectDescendents(LLAppearanceMgr::instance().getCOF(),
-//                                cat_array,item_array,LLInventoryModel::EXCLUDE_TRASH);
-//  for (S32 i=0; i<item_array.size(); i++)
-//  {
-//      const LLViewerInventoryItem* inv_item = item_array.at(i).get();
-//      const LLUUID& item_id = inv_item->getLinkedUUID();
-//      if (inv_item->getType() == LLAssetType::AT_OBJECT)
-//      {
-//          LLTimer timer;
-//          bool is_flagged_questionable = mQuestionableCOFLinks.getTime(item_id,timer);
-//          bool is_wearing_attachment = isAgentAvatarValid() && gAgentAvatarp->isWearingAttachment(item_id);
-//          if (is_wearing_attachment && is_flagged_questionable)
-//          {
-//              LL_DEBUGS("Avatar") << "ATT was flagged questionable but is now "
-//                                  << (is_wearing_attachment ? "attached " : "")
-//                                  <<"removing flag after "
-//                                  << timer.getElapsedTimeF32() << " item "
-//                                  << inv_item->getName() << " id " << item_id << LL_ENDL;
-//              mQuestionableCOFLinks.removeTime(item_id);
-//          }
-//      }
-//  }
-//
-//  for(LLItemRequestTimes::iterator it = mQuestionableCOFLinks.begin();
-//      it != mQuestionableCOFLinks.end(); )
-//  {
-//      LLItemRequestTimes::iterator curr_it = it;
-//      ++it;
-//      const LLUUID& item_id = curr_it->first;
-//      LLViewerInventoryItem *inv_item = gInventory.getItem(item_id);
-//      if (curr_it->second.getElapsedTimeF32() > MAX_BAD_COF_TIME)
-//      {
-//          if (LLAppearanceMgr::instance().isLinkedInCOF(item_id))
-//          {
-//              LL_DEBUGS("Avatar") << "ATT Linked in COF but not attached or requested, deleting link after "
-//                                  << curr_it->second.getElapsedTimeF32() << " seconds for "
-//                                  << (inv_item ? inv_item->getName() : "UNKNOWN") << " id " << item_id << LL_ENDL;
-//              LLAppearanceMgr::instance().removeCOFItemLinks(item_id);
-//          }
-//          mQuestionableCOFLinks.erase(curr_it);
-//          continue;
-//      }
-//  }
-//}
+ }
 
 void LLAttachmentsMgr::spamStatusInfo()
 {

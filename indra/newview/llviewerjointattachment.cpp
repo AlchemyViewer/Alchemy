@@ -170,27 +170,17 @@ void LLViewerJointAttachment::setupDrawable(LLViewerObject *object)
 //-----------------------------------------------------------------------------
 bool LLViewerJointAttachment::addObject(LLViewerObject* object)
 {
-//  object->extractAttachmentItemID();
 
     // Same object reattached
     if (isObjectAttached(object))
     {
         LL_INFOS() << "(same object re-attached)" << LL_ENDL;
-//// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
-//      if ( (object->permYouOwner()) && (gAgentAvatarp) )
-//      {
-//          gAgentAvatarp->removePendingDetach(object->getID());
-//      }
-//// [/SL:KB]
         removeObject(object);
         // Pass through anyway to let setupDrawable()
         // re-connect object to the joint correctly
     }
 
-// [SL:KB] - Patch: Appearance-Misc | Checked: 2011-01-13 (Catznip-2.4)
-    // LLViewerJointAttachment::removeObject() sets the object's item to the NULL UUID so we need to extract it *after* the block above
     object->extractAttachmentItemID();
-// [/SL:KB]
 
     // Two instances of the same inventory item attached --
     // Request detach, and kill the object in the meantime.
