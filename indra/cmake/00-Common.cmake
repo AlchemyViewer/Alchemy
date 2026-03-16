@@ -445,6 +445,9 @@ if(LINUX OR DARWIN)
 
     # This warning is extremely false positive sensitive, including on libstdc++'s own headers.
     add_compile_options(-Wno-array-bounds)
+
+    # This warning is annoying.
+    add_compile_options(-Wno-switch)
   endif()
 
   if (BUILD_TARGET_IS_X86_64)
