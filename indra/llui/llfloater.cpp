@@ -186,6 +186,8 @@ LLFloater::Params::Params()
     single_instance("single_instance", false),
     reuse_instance("reuse_instance", false),
     can_resize("can_resize", false),
+    can_resize_height("can_resize_height", true),
+    can_resize_width("can_resize_width", true),
     can_minimize("can_minimize", true),
 // [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
     can_collapse("can_collapse", true),
@@ -281,6 +283,8 @@ LLFloater::LLFloater(const LLSD& key, const LLFloater::Params& p)
     mCanClose(p.can_close),
     mDragOnLeft(p.can_drag_on_left),
     mResizable(p.can_resize),
+    mResizableHeight(p.can_resize_height),
+    mResizableWidth(p.can_resize_width),
     mAutoClose(p.auto_close),
     mPositioning(p.positioning),
     mMinWidth(p.min_width),
@@ -2302,7 +2306,7 @@ void    LLFloater::setCanTearOff(bool can_tear_off)
 void LLFloater::setCanResize(bool can_resize)
 {
     mResizable = can_resize;
-    enableResizeCtrls(can_resize);
+    enableResizeCtrls(can_resize, mResizableWidth, mResizableHeight);
 }
 
 void LLFloater::setCanDrag(bool can_drag)
@@ -3511,6 +3515,8 @@ void LLFloater::initFromParams(const LLFloater::Params& p)
 // [/SL:KB]
     setCanClose(p.can_close);
     setCanDock(p.can_dock);
+    mResizableWidth = p.can_resize_width;
+    mResizableHeight = p.can_resize_height;
     setCanResize(p.can_resize);
     setResizeLimits(p.min_width, p.min_height);
 
