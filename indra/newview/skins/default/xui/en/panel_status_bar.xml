@@ -170,14 +170,21 @@
          function="Floater.ToggleOrBringToFront"
          parameter="camera" />
     </button>
-    <icon
+    <button
      follows="right|top"
-     height="13"
-     image_name="Presets_Icon"
-     left_pad="8"
-     top="4"
+     height="16"
+     image_selected="Presets_Icon"
+     image_pressed="Presets_Icon"
+     image_unselected="Presets_Icon"
+     left_pad="6"
+     top="2"
      name="presets_icon_graphic"
-     width="16" />
+     tool_tip="Graphics Presets"
+     width="16">
+        <click_callback
+         function="Floater.ToggleOrBringToFront"
+         parameter="preferences" />
+    </button>
     <button
      follows="right|top"
      height="16"

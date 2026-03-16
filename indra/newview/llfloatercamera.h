@@ -76,7 +76,7 @@ public:
     virtual void onOpen(const LLSD& key);
     virtual void onClose(bool app_quitting);
 
-    void onSavePreset();
+    static void onSavePreset();
     void onCustomPresetSelected();
 
     void populatePresetCombo();

@@ -53,7 +53,7 @@ enum EDefaultOptions
     DEFAULT_HIDE                // Do not display "Default" in a list
 };
 
-class LLPresetsManager : public LLSingleton<LLPresetsManager>
+class LLPresetsManager final : public LLSingleton<LLPresetsManager>
 {
     LLSINGLETON(LLPresetsManager);
     ~LLPresetsManager();
@@ -73,8 +73,6 @@ public:
     bool savePreset(const std::string& subdirectory, std::string name, bool createDefault = false);
     void loadPreset(const std::string& subdirectory, std::string name);
     bool deletePreset(const std::string& subdirectory, std::string name);
-    bool isCameraDirty();
-    static void setCameraDirty(bool dirty);
 
     void createCameraDefaultPresets();
 
@@ -83,12 +81,16 @@ public:
     void resetCameraPreset(std::string preset_name);
     bool createDefaultCameraPreset(std::string preset_name, bool force_reset = false);
 
+    void setIgnoreChangeSignal(bool val)
+    {
+        mIgnoreChangedSignal = val;
+    }
+
     // Emitted when a preset gets loaded, deleted, or saved.
     boost::signals2::connection setPresetListChangeCameraCallback(const preset_list_signal_t::slot_type& cb);
     boost::signals2::connection setPresetListChangeCallback(const preset_list_signal_t::slot_type& cb);
 
     // Emitted when a preset gets loaded or saved.
-
     preset_name_list_t mPresetNames;
 
     preset_list_signal_t mPresetListChangeCameraSignal;
@@ -97,13 +99,15 @@ public:
   private:
     LOG_CLASS(LLPresetsManager);
 
-    void getControlNames(std::vector<std::string>& names);
-    static void settingChanged();
+    void getGraphicsControlNames(std::vector<std::string>& names);
+    void getCameraControlNames(std::vector<std::string>& names);
+    void graphicsSettingChanged();
+    void cameraSettingChanged();
 
-    boost::signals2::connection mCameraChangedSignal;
+    std::vector<boost::signals2::connection> mGraphicsChangedSignals;
+    std::vector<boost::signals2::connection> mCameraChangedSignals;
 
-    static bool mCameraDirty;
-    static bool mIgnoreChangedSignal;
+    bool mIgnoreChangedSignal = false;
 };
 
 #endif // LL_PRESETSMANAGER_H

@@ -7,63 +7,529 @@
  border_visible="false"
  border="false"
  chrome="true"
- follows="bottom"
- height="155"
+ follows="left|top"
+ height="427"
  layout="topleft"
  name="presets_camera_pulldown"
- width="225">
-  <text
-    type="string"
-    length="1"
-    follows="left|top"
-    height="12"
-    layout="topleft"
-    top="4"
-    left_delta="5"
-    font.style="BOLD"
-    name="Camera Presets"
-    width="120">
-      Camera Presets
-  </text>
-  <scroll_list
-    follows="left|top"
-    layout="topleft"
-    column_padding="0"
-    height="100"
-    width="215"
-    draw_heading="false"
-    draw_stripes="false"
-    bg_stripe_color="0.25 0.25 0.25 0.25"
-    top_delta="15"
-    left_delta="0"
-    name="preset_camera_list">
-    <scroll_list.columns
-      name="icon"
-      width="16" />
-    <scroll_list.columns
-      relative_width="1"
-      name="preset_name" />
-      <scroll_list.commit_callback
-      function="PresetsCamera.RowClick" />
-  </scroll_list>
-  <view_border
-    bevel_style="none"
-    follows="top|left"
-    height="0"
+ width="295">
+    <text
+      type="string"
+      length="1"
+      follows="left|top"
+      height="12"
+      layout="topleft"
+      top="4"
+      left_delta="5"
+      font.style="BOLD"
+      name="Camera Presets"
+      width="120">
+        Camera Presets
+    </text>
+    <scroll_list
+      follows="left|top|right"
+      layout="topleft"
+      column_padding="0"
+      height="100"
+      width="285"
+      draw_heading="false"
+      draw_stripes="false"
+      bg_stripe_color="0.25 0.25 0.25 0.25"
+      top_delta="15"
+      left_delta="0"
+      name="preset_camera_list">
+        <scroll_list.columns
+          name="icon"
+          width="16" />
+        <scroll_list.columns
+          relative_width="1"
+          name="preset_name" />
+        <scroll_list.commit_callback
+        function="PresetsCamera.RowClick" />
+    </scroll_list>
+    <view_border
+      bevel_style="none"
+      follows="top|left|right"
+      height="0"
+      layout="topleft"
+      left="5"
+      name="horiz_separator"
+      top_delta="105"
+      width="285" />
+    <text
+    follows="top|left|right"
+    name="camera_offset_lbl"
+    height="16"
     layout="topleft"
     left="5"
-    name="horiz_separator"
-    top_delta="105"
-    width="215" />
-  <button
-    name="open_prefs_btn"
-    label="Open Camera floater"
-    tool_tip = "Bring up Camera floater"
-    top_delta="5"
-    left="15"
-    height="20"
-    width="200">
+    top_pad="5"
+    width="100">
+        Camera offset:
+    </text>
+
+    <spinner
+     height="20"
+     label="X"
+     label_width="12"
+     follows="top|left"
+     layout="topleft"
+     left="10"
+     name="camera_x"
+     top_pad="5"
+     min_val="-1e+007"
+     max_val="1e+007"
+     width="70">
+        <spinner.commit_callback
+         function="CommitSettings" />
+    </spinner>
+
+    <spinner
+     height="20"
+     label="Y"
+     label_width="12"
+     follows="top|left"
+     layout="topleft"
+     name="camera_y"
+     top_delta="0"
+     left_pad="21"
+     min_val="-1e+007"
+     max_val="1e+007"
+     width="70">
+        <spinner.commit_callback
+         function="CommitSettings" />
+    </spinner>
+
+    <spinner
+     height="20"
+     label="Z"
+     label_width="12"
+     follows="top|left"
+     layout="topleft"
+     name="camera_z"
+     left_pad="21"
+     min_val="-1e+007"
+     max_val="1e+007"
+     width="70">
+        <spinner.commit_callback
+         function="CommitSettings" />
+    </spinner>
+
+    <button
+    follows="top|left"
+    layout="topleft"
+    left_pad="6"
+    top_delta="0"
+    height="22"
+    width="22"
+    name="reset_offset_rear"
+    image_overlay="Refresh_Off"
+    tool_tip="Reset camera offset to default value">
+        <button.commit_callback
+           function="ResetControl"
+           parameter="CameraOffsetRearView" />
+    </button>
+
+    <text
+      follows="top|left|right"
+      name="focus_offset_lbl"
+      height="16"
+      layout="topleft"
+      left="5"
+      top_pad="9"
+      width="100">
+        Focus offset:
+    </text>
+
+    <spinner
+     height="20"
+     label="X"
+     label_width="12"
+     follows="top|left"
+     layout="topleft"
+     left="10"
+     name="focus_x"
+     top_pad="5"
+     min_val="-1e+007"
+     max_val="1e+007"
+     width="70">
+        <spinner.commit_callback
+         function="CommitSettings" />
+    </spinner>
+
+    <spinner
+     height="20"
+     label="Y"
+     label_width="12"
+     follows="top|left"
+     layout="topleft"
+     name="focus_y"
+     left_pad="21"
+     min_val="-1e+007"
+     max_val="1e+007"
+     width="70">
+        <spinner.commit_callback
+         function="CommitSettings" />
+    </spinner>
+
+    <spinner
+     height="20"
+     label="Z"
+     label_width="12"
+     follows="top|left"
+     layout="topleft"
+     name="focus_z"
+     left_pad="21"
+     min_val="-1e+007"
+     max_val="1e+007"
+     width="70">
+        <spinner.commit_callback
+         function="CommitSettings" />
+    </spinner>
+    <button
+    follows="top|left"
+    layout="topleft"
+    left_pad="6"
+    top_delta="0"
+    height="22"
+    width="22"
+    name="reset_offset_rear"
+    image_overlay="Refresh_Off"
+    tool_tip="Reset focus offset to default value">
+        <button.commit_callback
+           function="ResetControl"
+           parameter="FocusOffsetRearView" />
+    </button>
+
+    <text
+     follows="top|left|right"
+     name="offset_scale_lbl"
+     height="16"
+     layout="topleft"
+     left="5"
+     top_pad="8"
+     width="140">
+        Camera offset scale:
+    </text>
+
+    <slider
+     control_name="CameraOffsetScale"
+     follows="top|left|right"
+     height="16"
+     top_pad="2"
+     increment="0.1"
+     min_val="-3"
+     max_val="5"
+     show_text="false"
+     layout="topleft"
+     left="3"
+     name="offset_scale_sld"
+     width="196" />
+    <spinner
+     control_name="CameraOffsetScale"
+     height="20"
+     follows="top|right"
+     layout="topleft"
+     left_pad="5"
+     name="offset_scale_ctrl"
+     min_val="-3"
+     max_val="5"
+     width="58">
+        <spinner.commit_callback
+         function="CommitSettings" />
+    </spinner>
+    <button
+    follows="top|right"
+    layout="topleft"
+    left_pad="3"
+    top_delta="0"
+    right="-5"
+    height="22"
+    width="22"
+    name="reset_offset_scale"
+    image_overlay="Refresh_Off"
+    tool_tip="Reset offset scaling to default value">
+        <button.commit_callback
+           function="ResetControl"
+           parameter="CameraOffsetScale" />
+    </button>
+    <text
+    follows="top|left"
+    name="offset_scale_lbl"
+    height="16"
+    layout="topleft"
+    left="5"
+    top_pad="3"
+    width="140">
+        Camera angle:
+    </text>
+
+    <slider
+     control_name="CameraAngle"
+     follows="top|left|right"
+     height="16"
+     top_pad="2"
+     increment="0.025"
+     min_val="0.08"
+     max_val="3.06"
+     show_text="false"
+     layout="topleft"
+     left="3"
+     name="camera_angle_slider"
+     width="196" />
+    <spinner
+     control_name="CameraAngle"
+     height="20"
+     follows="top|right"
+     layout="topleft"
+     left_pad="5"
+     top_delta="0"
+     name="camera_angle_spinner"
+     min_val="0.08"
+     max_val="3.06"
+     width="58"
+     increment="0.025">
+        <spinner.commit_callback
+         function="CommitSettings" />
+    </spinner>
+    <button
+    follows="top|right"
+    layout="topleft"
+    left_pad="3"
+    top_delta="0"
+    right="-5"
+    height="22"
+    width="22"
+    name="reset_angle"
+    image_overlay="Refresh_Off"
+    tool_tip="Reset camera angle to default value">
+        <button.commit_callback
+           function="ResetControl"
+           parameter="CameraAngle" />
+    </button>
+
+    <text
+    follows="top|left"
+    name="offset_scale_lbl"
+    height="16"
+    layout="topleft"
+    left="5"
+    top_pad="3"
+    width="140">
+        Zoom Speed:
+    </text>
+
+    <slider
+     control_name="ZoomTime"
+     follows="top|left|right"
+     height="16"
+     top_pad="2"
+     increment="0.1"
+     min_val="0.0"
+     max_val="30.0"
+     show_text="false"
+     layout="topleft"
+     left="3"
+     name="zoom_time_slider"
+     width="196" />
+    <spinner
+     control_name="ZoomTime"
+     height="20"
+     follows="top|right"
+     layout="topleft"
+     left_pad="5"
+     name="zoom_time_spin"
+     min_val="0.0"
+     max_val="30.0"
+     width="58"
+     increment="0.1">
+        <spinner.commit_callback
+         function="CommitSettings" />
+    </spinner>
+    <button
+    follows="top|right"
+    layout="topleft"
+    left_pad="3"
+    top_delta="0"
+    right="-5"
+    height="22"
+    width="22"
+    name="reset_zoom_time"
+    image_overlay="Refresh_Off"
+    tool_tip="Reset camera zoom speed to default value">
+        <button.commit_callback
+           function="ResetControl"
+           parameter="ZoomTime" />
+    </button>
+
+    <text
+    follows="top|left"
+    name="offset_scale_lbl"
+    height="16"
+    layout="topleft"
+    left="5"
+    top_pad="3"
+    width="140">
+        Position Smoothing:
+    </text>
+
+    <slider
+     control_name="CameraPositionSmoothing"
+     follows="top|left|right"
+     height="16"
+     top_pad="2"
+     increment="1.000"
+     min_val="0.0"
+     max_val="60.0"
+     show_text="false"
+     layout="topleft"
+     left="3"
+     name="cam_pos_slider"
+     width="196" />
+    <spinner
+     control_name="CameraPositionSmoothing"
+     height="20"
+     follows="top|right"
+     layout="topleft"
+     left_pad="5"
+     name="cam_pos_spinner"
+     min_val="0.0"
+     max_val="60.0"
+     width="58"
+     increment="1.000">
+    </spinner>
+    <button
+    follows="top|right"
+    layout="topleft"
+    left_pad="3"
+    top_delta="0"
+    right="-5"
+    height="22"
+    width="22"
+    name="cam_pos_reset"
+    image_overlay="Refresh_Off"
+    tool_tip="Reset camera position smoothing to default value">
+        <button.commit_callback
+           function="ResetControl"
+           parameter="CameraPositionSmoothing" />
+    </button>
+    <button
+    height="23"
+    label=""
+    image_overlay="Cam_Save"
+    name="save_cam_pos_btn"
+    tab_stop="false"
+    tool_tip="Save current camera position and focus"
+    follows="top|left"
+    layout="topleft"
+    top_pad="5"
+    left="5"
+    width="23">
+        <button.commit_callback
+          function="Camera.SavePosition"/>
+    </button>
+    <button
+     height="23"
+     label=""
+     follows="top|left"
+     layout="topleft"
+     top_delta="0"
+     left_pad="4"
+     image_overlay="Cam_Recall"
+     name="restore_cam_pos_btn"
+     tab_stop="false"
+     tool_tip="Restore saved camera position and focus"
+     width="23">
     <button.commit_callback
-      function="Presets.toggleCameraFloater" />
-  </button>
+        function="Camera.RestorePosition"/>
+    </button>
+    <panel_camera_item
+        follows="top|left"
+        layout="topleft"
+        name="front_view"
+        tool_tip="Front View"
+        top_delta="0"
+        left_pad="4"
+        width="23">
+        <panel_camera_item.mousedown_callback
+            function="CameraPresets.ChangeView"
+            parameter="Front View" />
+        <panel_camera_item.picture
+            image_name="Cam_Preset_Front_Off" />
+        <panel_camera_item.selected_picture
+            image_name="Cam_Preset_Front_On" />
+    </panel_camera_item>
+    <panel_camera_item
+        follows="top|left"
+        layout="topleft"
+        name="group_view"
+        tool_tip="Side View"
+        width="23"
+        left_pad="4">
+        <panel_camera_item.mousedown_callback
+            function="CameraPresets.ChangeView"
+            parameter="Side View" />
+        <panel_camera_item.picture
+            image_name="Cam_Preset_Side_Off" />
+        <panel_camera_item.selected_picture
+            image_name="Cam_Preset_Side_On" />
+    </panel_camera_item>
+    <panel_camera_item
+        follows="top|left"
+        layout="topleft"
+        name="rear_view"
+        tool_tip="Rear View"
+        width="23"
+        left_pad="4">
+        <panel_camera_item.mousedown_callback
+            function="CameraPresets.ChangeView"
+            tool_tip="Rear View"
+            parameter="Rear View" />
+        <panel_camera_item.picture
+            image_name="Cam_Preset_Back_Off" />
+        <panel_camera_item.selected_picture
+            image_name="Cam_Preset_Back_On" />
+    </panel_camera_item>
+    <panel_camera_item
+        follows="top|left"
+        layout="topleft"
+        name="object_view"
+        tool_tip="Object View"
+        width="23"
+        left_pad="4">
+        <panel_camera_item.mousedown_callback
+            function="CameraPresets.ChangeView"
+            parameter="object_view" />
+        <panel_camera_item.picture
+            image_name="Object_View_Off" />
+        <panel_camera_item.selected_picture
+            image_name="Object_View_On" />
+    </panel_camera_item>
+    <panel_camera_item
+        follows="top|left"
+        layout="topleft"
+        name="mouselook_view"
+        tool_tip="Mouselook View"
+        width="23"
+        left_pad="4">
+        <panel_camera_item.mousedown_callback
+            function="CameraPresets.ChangeView"
+            parameter="mouselook_view" />
+        <panel_camera_item.picture
+            image_name="MouseLook_View_Off" />
+        <panel_camera_item.selected_picture
+            image_name="MouseLook_View_On" />
+    </panel_camera_item>
+    <button
+      name="save_preset_btn"
+      label="Save as preset..."
+      tool_tip = "Save current camera settings as a preset"
+      follows="top|right"
+      layout="topleft"
+      top_delta="0"
+      left_pad="5"
+      right="-5"
+      height="23"
+      width="150">
+        <button.commit_callback
+          function="PresetsCamera.Save" />
+    </button>
 </panel>

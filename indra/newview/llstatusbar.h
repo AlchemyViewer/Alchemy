@@ -141,7 +141,7 @@ private:
 
     LLView      *mPanelPopupHolder;
     LLButton    *mIconPresetsCamera;
-    LLIconCtrl  *mIconPresetsGraphic;
+    LLButton    *mIconPresetsGraphic;
     LLButton    *mBtnQuickSettings;
     LLButton    *mBtnAO;
     LLButton    *mBtnVolume;

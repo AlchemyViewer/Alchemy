@@ -487,7 +487,7 @@ LLFloaterCamera::LLFloaterCamera(const LLSD& val)
 {
     LLHints::getInstance()->registerHintTarget("view_popup", getHandle());
     mCommitCallbackRegistrar.add("CameraPresets.ChangeView", boost::bind(&LLFloaterCamera::onClickCameraItem, _2));
-    mCommitCallbackRegistrar.add("CameraPresets.Save", boost::bind(&LLFloaterCamera::onSavePreset, this));
+    mCommitCallbackRegistrar.add("CameraPresets.Save", boost::bind(&LLFloaterCamera::onSavePreset));
     mCommitCallbackRegistrar.add("CameraPresets.ShowPresetsList", boost::bind(&LLFloaterReg::showInstance, "camera_presets", LLSD(), false));
 }
 
@@ -756,6 +756,7 @@ void LLFloaterCamera::populatePresetCombo()
     updateItemsSelection();
 }
 
+// static
 void LLFloaterCamera::onSavePreset()
 {
     LLFloaterReg::hideInstance("delete_pref_preset", PRESETS_CAMERA);

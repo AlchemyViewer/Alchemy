@@ -176,7 +176,7 @@ bool LLStatusBar::postBuild()
     mIconPresetsCamera = getChild<LLButton>( "presets_icon_camera" );
     mIconPresetsCamera->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterPresetsCamera, this));
 
-    mIconPresetsGraphic = getChild<LLIconCtrl>( "presets_icon_graphic" );
+    mIconPresetsGraphic = getChild<LLButton>( "presets_icon_graphic" );
     mIconPresetsGraphic->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterPresets, this));
 
     mBtnQuickSettings = getChild<LLButton>("quick_settings_btn");
@@ -509,8 +509,7 @@ void LLStatusBar::onClickShop()
 
 void LLStatusBar::onMouseEnterPresetsCamera()
 {
-    LLIconCtrl* icon =  getChild<LLIconCtrl>( "presets_icon_camera" );
-    LLRect icon_rect = icon->getRect();
+    LLRect icon_rect = mIconPresetsCamera->getRect();
     LLRect pulldown_rect = mPanelPresetsCameraPulldown->getRect();
     pulldown_rect.setLeftTopAndSize(icon_rect.mLeft -
          (pulldown_rect.getWidth() - icon_rect.getWidth()),
@@ -534,8 +533,7 @@ void LLStatusBar::onMouseEnterPresetsCamera()
 
 void LLStatusBar::onMouseEnterPresets()
 {
-    LLIconCtrl* icon =  getChild<LLIconCtrl>( "presets_icon_graphic" );
-    LLRect icon_rect = icon->getRect();
+    LLRect icon_rect = mIconPresetsGraphic->getRect();
     LLRect pulldown_rect = mPanelPresetsPulldown->getRect();
     pulldown_rect.setLeftTopAndSize(icon_rect.mLeft -
          (pulldown_rect.getWidth() - icon_rect.getWidth()),

@@ -42,11 +42,25 @@
 
 LLPresetsManager::LLPresetsManager()
 {
+    // Connect preset signals
+    startWatching(PRESETS_GRAPHIC);
+    startWatching(PRESETS_CAMERA);
 }
 
 LLPresetsManager::~LLPresetsManager()
 {
-    mCameraChangedSignal.disconnect();
+    for (auto& signal : mGraphicsChangedSignals)
+    {
+        signal.disconnect();
+    }
+    mGraphicsChangedSignals.clear();
+
+
+    for (auto& signal : mCameraChangedSignals)
+    {
+        signal.disconnect();
+    }
+    mCameraChangedSignals.clear();
 }
 
 void LLPresetsManager::triggerChangeCameraSignal()
@@ -61,10 +75,6 @@ void LLPresetsManager::triggerChangeSignal()
 
 void LLPresetsManager::createMissingDefault(const std::string& subdirectory)
 {
-    if(gDirUtilp->getLindenUserDir().empty())
-    {
-        return;
-    }
 
     if (PRESETS_CAMERA == subdirectory)
     {
@@ -72,7 +82,7 @@ void LLPresetsManager::createMissingDefault(const std::string& subdirectory)
         return;
     }
 
-    std::string default_file = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, PRESETS_DIR,
+    std::string default_file = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, PRESETS_DIR,
         subdirectory, PRESETS_DEFAULT + ".xml");
     if (!gDirUtilp->fileExists(default_file))
     {
@@ -104,7 +114,7 @@ void LLPresetsManager::startWatching(const std::string& subdirectory)
     if (PRESETS_CAMERA == subdirectory)
     {
         std::vector<std::string> name_list;
-        getControlNames(name_list);
+        getCameraControlNames(name_list);
 
         for (std::vector<std::string>::iterator it = name_list.begin(); it != name_list.end(); ++it)
         {
@@ -119,7 +129,43 @@ void LLPresetsManager::startWatching(const std::string& subdirectory)
                 }
                 else
                 {
-                    mCameraChangedSignal = cntrl_ptr->getCommitSignal()->connect(boost::bind(&settingChanged));
+                    mCameraChangedSignals.push_back(cntrl_ptr->getCommitSignal()->connect(boost::bind(&LLPresetsManager::cameraSettingChanged, this)));
+                }
+            }
+        }
+    }
+    else if (PRESETS_GRAPHIC == subdirectory)
+    {
+        std::vector<std::string> name_list;
+        getGraphicsControlNames(name_list);
+
+        for (std::vector<std::string>::iterator it = name_list.begin(); it != name_list.end(); ++it)
+        {
+            std::string ctrl_name = *it;
+            if (gSavedSettings.controlExists(ctrl_name))
+            {
+                LLPointer<LLControlVariable> cntrl_ptr = gSavedSettings.getControl(ctrl_name);
+                if (cntrl_ptr.isNull())
+                {
+                    LL_WARNS("Init") << "Unable to set signal on global setting '" << ctrl_name
+                        << "'" << LL_ENDL;
+                }
+                else
+                {
+                    mGraphicsChangedSignals.push_back(cntrl_ptr->getCommitSignal()->connect(boost::bind(&LLPresetsManager::graphicsSettingChanged, this)));
+                }
+            }
+            else if (gSavedPerAccountSettings.controlExists(ctrl_name))
+            {
+                LLPointer<LLControlVariable> cntrl_ptr = gSavedPerAccountSettings.getControl(ctrl_name);
+                if (cntrl_ptr.isNull())
+                {
+                    LL_WARNS("Init") << "Unable to set signal on global setting '" << ctrl_name
+                        << "'" << LL_ENDL;
+                }
+                else
+                {
+                    mGraphicsChangedSignals.push_back(cntrl_ptr->getCommitSignal()->connect(boost::bind(&LLPresetsManager::graphicsSettingChanged, this)));
                 }
             }
         }
@@ -128,15 +174,15 @@ void LLPresetsManager::startWatching(const std::string& subdirectory)
 
 std::string LLPresetsManager::getPresetsDir(const std::string& subdirectory)
 {
-    std::string presets_path = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, PRESETS_DIR);
+    std::string presets_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, PRESETS_DIR);
 
     LLFile::mkdir(presets_path);
 
-    std::string dest_path = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, PRESETS_DIR, subdirectory);
-    if (!gDirUtilp->fileExists(dest_path))
-        LLFile::mkdir(dest_path);
+    presets_path = gDirUtilp->add(presets_path, subdirectory);
+    if (!gDirUtilp->fileExists(presets_path))
+        LLFile::mkdir(presets_path);
 
-    return dest_path;
+    return presets_path;
 }
 
 void LLPresetsManager::loadPresetNamesFromDir(const std::string& subdirectory, preset_name_list_t& presets, EDefaultOptions default_option)
@@ -218,35 +264,66 @@ void LLPresetsManager::loadPresetNamesFromDir(const std::string& subdirectory, p
     presets = mPresetNames;
 }
 
-bool LLPresetsManager::mCameraDirty = false;
-bool LLPresetsManager::mIgnoreChangedSignal = false;
-
-void LLPresetsManager::setCameraDirty(bool dirty)
+void LLPresetsManager::graphicsSettingChanged()
 {
-    mCameraDirty = dirty;
-}
-
-bool LLPresetsManager::isCameraDirty()
-{
-    return mCameraDirty;
-}
-
-void LLPresetsManager::settingChanged()
-{
-    setCameraDirty(true);
-
-    static LLCachedControl<std::string> preset_camera_active(gSavedSettings, "PresetCameraActive", "");
-    std::string preset_name = preset_camera_active;
-    if (!preset_name.empty() && !mIgnoreChangedSignal)
+    static LLCachedControl<std::string> graphic_preset_active(gSavedSettings, "PresetGraphicActive", "");
+    if (!graphic_preset_active().empty() && !mIgnoreChangedSignal)
     {
-        gSavedSettings.setString("PresetCameraActive", "");
+        gSavedSettings.setString("PresetGraphicActive", "");
 
-        // Hack call because this is a static routine
-        LLPresetsManager::getInstance()->triggerChangeCameraSignal();
+        triggerChangeSignal();
     }
 }
 
-void LLPresetsManager::getControlNames(std::vector<std::string>& names)
+void LLPresetsManager::cameraSettingChanged()
+{
+    static LLCachedControl<std::string> preset_camera_active(gSavedSettings, "PresetCameraActive", "");
+    if (!preset_camera_active().empty() && !mIgnoreChangedSignal)
+    {
+        gSavedSettings.setString("PresetCameraActive", "");
+
+        triggerChangeCameraSignal();
+    }
+}
+
+void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
+{
+    const std::vector<std::string> camera_controls = {
+        // From panel_preferences_graphics.xml
+        "AlwaysRenderFriends",
+        "RenderAnisotropicLevel",
+        "RenderAvatarLODFactor",
+        "RenderAvatarMaxComplexity",
+        "RenderAvatarMaxNonImpostors",
+        "RenderAvatarPhysicsLODFactor",
+        "RenderDeferredSSAO",
+        "RenderDepthOfField",
+        "RenderFSAASamples",
+        "RenderFSAAType",
+        "RenderFarClip",
+        "RenderFlexTimeFactor",
+        "RenderGlowResolutionPow",
+        "RenderLocalLights",
+        "RenderLocalLightCount",
+        "RenderMaxPartCount",
+        "RenderQualityPerformance",
+        "RenderShadowDetail",
+        "RenderTerrainLODFactor",
+        "RenderExposure",
+        "RenderToneMapType",
+        "RenderTransparentWater",
+        "RenderTreeLODFactor",
+        "RenderVolumeLODFactor",
+        "RenderHighPrecisionPostProcess",
+        "RenderScreenSpaceReflections",
+        "RenderReflectionProbeDetail",
+        "RenderReflectionProbeLevel"
+        "RenderCASSharpness",
+    };
+    names = camera_controls;
+}
+
+void LLPresetsManager::getCameraControlNames(std::vector<std::string>& names)
 {
     const std::vector<std::string> camera_controls = {
         // From panel_preferences_move.xml
@@ -258,6 +335,8 @@ void LLPresetsManager::getControlNames(std::vector<std::string>& names)
         "CameraOffsetRearView",
         "FocusOffsetRearView",
         "AvatarSitRotation",
+        "ZoomTime",
+        "CameraPositionSmoothing"
     };
     names = camera_controls;
 }
@@ -288,23 +367,19 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
 
     if (IS_GRAPHIC)
     {
-        LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
-        if (instance && !createDefault)
+        name_list.clear();
+        getGraphicsControlNames(name_list);
+
+        if (!createDefault)
         {
             gSavedSettings.setString("PresetGraphicActive", name);
-            instance->getControlNames(name_list);
-            LL_DEBUGS() << "saving preset '" << name << "'; " << name_list.size() << " names" << LL_ENDL;
             name_list.push_back("PresetGraphicActive");
-        }
-        else
-        {
-            LL_WARNS("Presets") << "preferences floater instance not found" << LL_ENDL;
         }
     }
     else if (IS_CAMERA)
     {
         name_list.clear();
-        getControlNames(name_list);
+        getCameraControlNames(name_list);
         name_list.push_back("PresetCameraActive");
     }
     else
@@ -321,8 +396,29 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
         paramsData = LLFeatureManager::getInstance()->getRecommendedSettingsMap();
         if (gSavedSettings.getU32("RenderAvatarMaxComplexity") == 0)
         {
+            mIgnoreChangedSignal = true;
             // use the recommended setting as an initial one (MAINT-6435)
             gSavedSettings.setU32("RenderAvatarMaxComplexity", paramsData["RenderAvatarMaxComplexity"]["Value"].asInteger());
+            mIgnoreChangedSignal = false;
+        }
+
+        // Add dynamic controls to default preset
+        for (std::vector<std::string>::iterator it = name_list.begin(); it != name_list.end(); ++it)
+        {
+            std::string ctrl_name = *it;
+
+            LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
+            if (ctrl)
+            {
+                std::string comment = ctrl->getComment();
+                std::string type = LLControlGroup::typeEnumToString(ctrl->type());
+                LLSD value = ctrl->getValue();
+
+                paramsData[ctrl_name]["Comment"] = comment;
+                paramsData[ctrl_name]["Persist"] = 1;
+                paramsData[ctrl_name]["Type"] = type;
+                paramsData[ctrl_name]["Value"] = value;
+            }
         }
     }
     else
@@ -399,7 +495,6 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
             if (IS_CAMERA)
             {
                 gSavedSettings.setString("PresetCameraActive", name);
-                setCameraDirty(false);
                 // signal interested parties
                 triggerChangeCameraSignal();
             }
@@ -568,7 +663,7 @@ void LLPresetsManager::resetCameraPreset(std::string preset_name)
 
 bool LLPresetsManager::createDefaultCameraPreset(std::string preset_name, bool force_reset)
 {
-    std::string preset_file = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, PRESETS_DIR,
+    std::string preset_file = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, PRESETS_DIR,
         PRESETS_CAMERA, LLURI::escape(preset_name) + ".xml");
     if (!gDirUtilp->fileExists(preset_file) || force_reset)
     {

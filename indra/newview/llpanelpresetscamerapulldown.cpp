@@ -50,6 +50,7 @@ LLPanelPresetsCameraPulldown::LLPanelPresetsCameraPulldown()
 {
     mCommitCallbackRegistrar.add("Presets.toggleCameraFloater", boost::bind(&LLPanelPresetsCameraPulldown::onViewButtonClick, this, _2));
     mCommitCallbackRegistrar.add("PresetsCamera.RowClick", boost::bind(&LLPanelPresetsCameraPulldown::onRowClick, this, _2));
+    mCommitCallbackRegistrar.add("PresetsCamera.Save", boost::bind(&LLFloaterCamera::onSavePreset));
 
     buildFromFile( "panel_presets_camera_pulldown.xml");
 }
@@ -61,8 +62,6 @@ bool LLPanelPresetsCameraPulldown::postBuild()
     {
         // Make sure there is a default preference file
         presetsMgr->createMissingDefault(PRESETS_CAMERA);
-
-        presetsMgr->startWatching(PRESETS_CAMERA);
 
         presetsMgr->setPresetListChangeCameraCallback(boost::bind(&LLPanelPresetsCameraPulldown::populatePanel, this));
     }
