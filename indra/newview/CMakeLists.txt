@@ -80,6 +80,7 @@ set(viewer_SOURCE_FILES
     alchatcommand.cpp
     alderenderlist.cpp
     alfloaterblocked.cpp
+    alfloaterexploresounds.cpp
     alfloatergenerictext.cpp
     alfloatergroupprofile.cpp
     alfloaterlightbox.cpp
@@ -796,6 +797,7 @@ set(viewer_HEADER_FILES
     alchatcommand.h
     alderenderlist.h
     alfloaterblocked.h
+    alfloaterexploresounds.h
     alfloatergenerictext.h
     alfloatergroupprofile.h
     alfloaterlightbox.h

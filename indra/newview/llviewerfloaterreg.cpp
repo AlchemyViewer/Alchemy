@@ -36,6 +36,7 @@
 // [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
 #include "alfloaterblocked.h"
 // [/SL:KB]
+#include "alfloaterexploresounds.h"
 #include "alfloatergenerictext.h"
 #include "alfloatergroupprofile.h"
 #include "alfloaterlightbox.h"
@@ -573,7 +574,9 @@ void LLViewerFloaterReg::registerFloaters()
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
     LLFloaterReg::add("search_replace", "floater_search_replace.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSearchReplace>);
 // [/SL:KB]
+    LLFloaterReg::add("sound_explorer", "floater_explore_sounds.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterExploreSounds>);
     LLFloaterReg::add("transaction_log", "floater_al_transaction_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterTransactionLog>);
+	
     // *NOTE: Please keep these alphabetized for easier merges
 
     LLFloaterReg::registerControlVariables(); // Make sure visibility and rect controls get preserved when saving
