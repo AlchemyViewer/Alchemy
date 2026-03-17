@@ -42,6 +42,8 @@
 
 #include "lllistener.h"
 
+#include <boost/unordered_map.hpp>
+
 const F32 LL_WIND_UPDATE_INTERVAL = 0.1f;
 const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
 
@@ -242,6 +244,13 @@ protected:
 private:
     void setDefaults();
     LLStreamingAudioInterface *mStreamingAudioImpl;
+
+    boost::unordered_map<LLUUID,U32> mCorruptData;
+
+public:
+    void markSoundCorrupt(LLUUID const&);
+    bool isCorruptSound(LLUUID const&) const;
+
 };
 
 

@@ -647,6 +647,9 @@ bool LLAudioEngine::preloadSound(const LLUUID &uuid)
 {
     LL_DEBUGS("AudioEngine")<<"( "<<uuid<<" )"<<LL_ENDL;
 
+    if (isCorruptSound(uuid))
+        return false;
+
     getAudioData(uuid); // We don't care about the return value, this is just to make sure
                                     // that we have an entry, which will mean that the audio engine knows about this
 
@@ -905,7 +908,10 @@ F32 LLAudioEngine::getRolloffFactor()
 
 void LLAudioEngine::commitDeferredChanges()
 {
-    mListenerp->commitDeferredChanges();
+    if (mListenerp)
+    {
+        mListenerp->commitDeferredChanges();
+    }
 }
 
 
@@ -928,8 +934,10 @@ LLAudioSource * LLAudioEngine::findAudioSource(const LLUUID &source_id)
 LLAudioData * LLAudioEngine::getAudioData(const LLUUID &audio_uuid)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
-    data_map::iterator iter;
-    iter = mAllData.find(audio_uuid);
+    if( isCorruptSound( audio_uuid ) )
+        return nullptr;
+
+    auto iter = mAllData.find(audio_uuid);
     if (iter == mAllData.end())
     {
         // Create the new audio data
@@ -1310,6 +1318,7 @@ void LLAudioSource::update()
             {
                 LL_WARNS() << "Marking LLAudioSource corrupted for " << adp->getID() << LL_ENDL;
                 mCorrupted = true ;
+                gAudiop->markSoundCorrupt( adp->getID() );
             }
         }
     }
@@ -1845,4 +1854,26 @@ bool LLAudioData::load()
     }
     mBufferp->mAudioDatap = this;
     return true;
+}
+
+const U32 MAX_SOUND_RETRIES = 5;
+
+void LLAudioEngine::markSoundCorrupt(const LLUUID& sound_id)
+{
+    auto itr = mCorruptData.find(sound_id);
+    if (mCorruptData.end() == itr)
+        mCorruptData[sound_id] = 1;
+    else if (itr->second != MAX_SOUND_RETRIES)
+        itr->second += 1;
+}
+
+bool LLAudioEngine::isCorruptSound(const LLUUID& sound_id) const
+{
+    if (sound_id.isNull()) return true;
+
+    auto itr = mCorruptData.find(sound_id);
+    if (mCorruptData.end() == itr)
+        return false;
+
+    return itr->second >= MAX_SOUND_RETRIES;
 }

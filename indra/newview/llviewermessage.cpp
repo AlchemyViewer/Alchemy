@@ -50,6 +50,7 @@
 #include "llxfermanager.h"
 #include "mean_collision_data.h"
 
+#include "alassetblocklist.h"
 #include "alfloaterblocked.h"
 #include "alfloatertransactionlog.h"
 #include "llagent.h"
@@ -4078,6 +4079,13 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
     LLVector3   pos_local;
 
     msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_SoundID, sound_id);
+
+    if (gAudiop && gAudiop->isCorruptSound(sound_id))
+        return;
+
+    if (ALAssetBlocklist::instance().isBlocked(sound_id))
+        return;
+
     msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_OwnerID, owner_id);
     msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_ObjectID, object_id);
     msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_ParentID, parent_id);
@@ -4146,6 +4154,12 @@ void process_preload_sound(LLMessageSystem *msg, void **user_data)
     LLUUID owner_id;
 
     msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_SoundID, sound_id);
+    if (gAudiop->isCorruptSound(sound_id))
+        return;
+
+    if (ALAssetBlocklist::instance().isBlocked(sound_id))
+        return;
+
     msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_ObjectID, object_id);
     msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_OwnerID, owner_id);
 
@@ -4182,6 +4196,12 @@ void process_attached_sound(LLMessageSystem *msg, void **user_data)
     U8 flags;
 
     msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_SoundID, sound_id);
+    if (gAudiop && gAudiop->isCorruptSound(sound_id))
+        return;
+
+    if (ALAssetBlocklist::instance().isBlocked(sound_id))
+        return;
+
     msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_ObjectID, object_id);
     msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_OwnerID, owner_id);
     msg->getF32Fast(_PREHASH_DataBlock, _PREHASH_Gain, gain);

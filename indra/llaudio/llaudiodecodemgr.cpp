@@ -525,6 +525,9 @@ void LLVorbisDecodeState::flushBadFile()
     {
         LL_WARNS("AudioEngine") << "Flushing bad vorbis file from cache for " << mUUID << LL_ENDL;
         mInFilep->remove();
+
+        delete mInFilep;
+        mInFilep = NULL;
     }
 }
 
@@ -615,6 +618,9 @@ void LLAudioDecodeMgr::Impl::startMoreDecodes()
 
                 if (!decode_state)
                 {
+                    if (gAudiop)
+                        gAudiop->markSoundCorrupt(decode_id);
+
                     // Audio decode has errored
                     return decode_state;
                 }
@@ -781,6 +787,9 @@ void LLAudioDecodeMgr::processQueue()
 
 bool LLAudioDecodeMgr::addDecodeRequest(const LLUUID &uuid)
 {
+    if (gAudiop && gAudiop->isCorruptSound(uuid))
+        return false;
+
     if (gAudiop && gAudiop->hasDecodedFile(uuid))
     {
         // Already have a decoded version, don't need to decode it.
