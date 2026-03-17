@@ -374,8 +374,9 @@ static DWORD seek_mode_from_dir(std::ios_base::seekdir seekdir)
             return FILE_CURRENT;
         case LLFile::end:
             return FILE_END;
+        default:
+            return FILE_BEGIN;
     }
-    return FILE_BEGIN;
 }
 
 #else
@@ -471,8 +472,9 @@ inline int seek_mode_from_dir(std::ios_base::seekdir seekdir)
             return SEEK_CUR;
         case LLFile::end:
             return SEEK_END;
+        default:
+            return SEEK_SET;
     }
-    return SEEK_SET;
 }
 
 #endif

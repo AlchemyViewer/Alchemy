@@ -92,5 +92,6 @@ web/secondlife.com.*
 
 .env
 .vscode
+.idea
 .vs
 .zed

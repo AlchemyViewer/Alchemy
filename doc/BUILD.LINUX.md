@@ -86,14 +86,14 @@ sudo zypper install cmake fontconfig-devel git glib2-devel gstreamer-devel gstre
 
 ## Create development folders
 ```
-mkdir -p ~/code/secondlife
-cd ~/code/secondlife
+mkdir -p ~/code/alchemy
+cd ~/code/alchemy
 ```
 
 ## Checkout viewer code
 ```
 git clone https://github.com/secondlife/viewer.git
-cd ~/code/secondlife/viewer
+cd ~/code/alchemy/viewer
 ```
 
 ## Setup Virtual Environment and Python dependencies

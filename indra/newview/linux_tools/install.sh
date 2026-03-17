@@ -6,8 +6,8 @@
 VT102_STYLE_NORMAL='\E[0m'
 VT102_COLOR_RED='\E[31m'
 
-SCRIPTSRC=`readlink -f "$0" || echo "$0"`
-RUN_PATH=`dirname "${SCRIPTSRC}" || echo .`
+SCRIPTSRC=$(readlink -f "$0" || echo "$0")
+RUN_PATH=$(dirname "${SCRIPTSRC}" || echo .)
 tarball_path=${RUN_PATH}
 
 function prompt()
@@ -17,7 +17,7 @@ function prompt()
 
     echo -n "$prompt"
 
-    while read input; do
+    while read -r input; do
         case $input in
             [Yy]* )
                 return 1
@@ -34,22 +34,22 @@ function prompt()
 
 function die()
 {
-    warn $1
+    warn "$1"
     exit 1
 }
 
 function warn()
 {
-    echo -n -e $VT102_COLOR_RED
-    echo $1
-    echo -n -e $VT102_STYLE_NORMAL
+    echo -n -e "$VT102_COLOR_RED"
+    echo "$1"
+    echo -n -e "$VT102_STYLE_NORMAL"
 }
 
 function homedir_install()
 {
     warn "You are not running as a privileged user, so you will only be able"
-    warn "to install the Second Life Viewer in your home directory. If you"
-    warn "would like to install the Second Life Viewer system-wide, please run"
+    warn "to install the Alchemy Viewer in your home directory. If you"
+    warn "would like to install the Alchemy Viewer system-wide, please run"
     warn "this script as the root user, or with the 'sudo' command."
     echo
 
@@ -58,16 +58,16 @@ function homedir_install()
 	exit 0
     fi
 
-    install_to_prefix "$HOME/.secondlife-install"
-    $HOME/.secondlife-install/etc/refresh_desktop_app_entry.sh
+    install_to_prefix "$HOME/.alchemy-install"
+    $HOME/.alchemy-install/etc/refresh_desktop_app_entry.sh
 }
 
 function root_install()
 {
-    local default_prefix="/opt/secondlife-install"
+    local default_prefix="/opt/alchemy-install"
 
     echo -n "Enter the desired installation directory [${default_prefix}]: ";
-    read
+    read -r
     if [[ "$REPLY" = "" ]] ; then
 	local install_prefix=$default_prefix
     else
@@ -77,7 +77,7 @@ function root_install()
     install_to_prefix "$install_prefix"
 
     mkdir -p /usr/local/share/applications
-    ${install_prefix}/etc/refresh_desktop_app_entry.sh
+    "${install_prefix}"/etc/refresh_desktop_app_entry.sh
 }
 
 function install_to_prefix()
