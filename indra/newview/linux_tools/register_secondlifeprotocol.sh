@@ -31,7 +31,7 @@ Icon=${installation_prefix}/alchemy_icon.png\n\
 Terminal=false\n\
 Type=Application\n\
 StartupNotify=true\n\
-StartupWMClass="com.alchemy.indra.viewer"\n\
+StartupWMClass="org.alchemyviewer.viewer"\n\
 NoDisplay=true\n\
 MimeType=x-scheme-handler/alchemy\n\
 X-Desktop-File-Install-Version=3.0"
@@ -41,7 +41,7 @@ X-Desktop-File-Install-Version=3.0"
     PROTOCOL_HANDLER="secondlife-protocol.desktop"
     echo -e $desktop_entry > "${WORK_DIR}/${PROTOCOL_HANDLER}" || "Failed to create desktop file!"
     desktop-file-install --dir="${desktop_entries_dir}" "${WORK_DIR}/${PROTOCOL_HANDLER}" || "Failed to install desktop file!"
-    rm -r $WORK_DIR
+    rm -r "$WORK_DIR"
 
     xdg-mime default "${desktop_entries_dir}/${PROTOCOL_HANDLER}" x-scheme-handler/secondlife
 
