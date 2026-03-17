@@ -4,6 +4,10 @@
 
 include_guard()
 
+if(NOT USE_VELOPACK)
+    return()
+endif()
+
 if (WINDOWS)
     add_library(ll::velopack INTERFACE IMPORTED)
 

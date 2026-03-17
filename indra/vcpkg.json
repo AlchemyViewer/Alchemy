@@ -110,7 +110,6 @@
     "tinyexr",
     "tinygltf",
     "v-hacd",
-    "velopack",
     {
       "name": "vlc-bin",
       "platform": "windows | osx"
@@ -194,6 +193,12 @@
             "on-demand"
           ]
         }
+      ]
+    },
+    "velopack": {
+      "description": "Build with support for the Velopack install and update framework",
+      "dependencies": [
+        "velopack"
       ]
     }
   }

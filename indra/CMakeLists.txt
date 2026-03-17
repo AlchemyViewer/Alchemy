@@ -18,7 +18,7 @@ set(VIEWER_CHANNEL "Alchemy Test" CACHE STRING "Viewer Channel Name")
 set(GRID agni CACHE STRING "Target Grid")
 
 # USE_VELOPACK controls whether to use Velopack for installer packaging (instead of NSIS/DMG)
-option(USE_VELOPACK "Use Velopack for installer packaging" ON)
+option(USE_VELOPACK "Use Velopack for installer packaging" OFF)
 
 # Build executable options
 option(BUILD_VIEWER "Build the viewer project" ON)
