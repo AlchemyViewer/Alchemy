@@ -5745,6 +5745,11 @@ void LLPipeline::setupHWLights()
     { //darken local lights when probe ambiance is above 1
         light_scale = mReflectionMapManager.mLightScale;
     }
+    else
+    {
+        static LLCachedControl<F32> alchemy_light_scale(gSavedSettings, "AlchemyGlobalLightScale", 1.f);
+        light_scale = alchemy_light_scale;
+    }
 
 
     LLEnvironment& environment = LLEnvironment::instance();
@@ -8479,6 +8484,11 @@ void LLPipeline::renderDeferredLighting()
     if (gCubeSnapshot)
     { //darken local lights when probe ambiance is above 1
         light_scale = mReflectionMapManager.mLightScale;
+    }
+    else
+    {
+        static LLCachedControl<F32> alchemy_light_scale(gSavedSettings, "AlchemyGlobalLightScale", 1.f);
+        light_scale = alchemy_light_scale;
     }
 
     LLRenderTarget *screen_target         = &mRT->screen;
