@@ -293,7 +293,7 @@
 			<combo_box
 				allow_text_entry="false"
 				tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
-				control_name="RenderToneMapType"
+				control_name="RenderTonemapType"
 				follows="left|top"
 				height="16"
 				layout="topleft"
