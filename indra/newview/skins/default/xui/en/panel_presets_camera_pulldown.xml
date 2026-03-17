@@ -44,7 +44,7 @@
           relative_width="1"
           name="preset_name" />
         <scroll_list.commit_callback
-        function="PresetsCamera.RowClick" />
+        function="CameraPresets.RowClick" />
     </scroll_list>
     <view_border
       bevel_style="none"
@@ -530,6 +530,6 @@
       height="23"
       width="150">
         <button.commit_callback
-          function="PresetsCamera.Save" />
+          function="CameraPresets.Save" />
     </button>
 </panel>
