@@ -82,6 +82,7 @@ set(viewer_SOURCE_FILES
     alfloaterblocked.cpp
     alfloatergenerictext.cpp
     alfloatergroupprofile.cpp
+    alfloaterlightbox.cpp
     alfloaterparticleeditor.cpp
     alfloaterprogressview.cpp
     alfloaterregiontracker.cpp
@@ -797,6 +798,7 @@ set(viewer_HEADER_FILES
     alfloaterblocked.h
     alfloatergenerictext.h
     alfloatergroupprofile.h
+    alfloaterlightbox.h
     alfloaterparticleeditor.h
     alfloaterprogressview.h
     alfloaterregiontracker.h

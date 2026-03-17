@@ -183,7 +183,7 @@
      width="16">
         <click_callback
          function="Floater.ToggleOrBringToFront"
-         parameter="preferences" />
+         parameter="lightbox" />
     </button>
     <button
      follows="right|top"
