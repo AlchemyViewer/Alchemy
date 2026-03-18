@@ -143,23 +143,23 @@ namespace
 #if LL_VELOPACK
             std::string velopack_url = platforms[platform]["velopack_url"].asString();
             U32 updater_service = gSavedSettings.getU32("UpdaterServiceSetting");
+            std::string required_version = update_required ? result["version"].asString() : "";
+            // Skip network check if no required version AND user only wants mandatory updates
             if (!velopack_url.empty() && (update_required || updater_service != 0))
             {
-                LL_INFOS("VVM") << "Velopack update URL: " << velopack_url
-                                << " required: " << update_required << LL_ENDL;
+                LL_INFOS("VVM") << "Velopack feed URL: " << velopack_url
+                                << " required_version: " << required_version << LL_ENDL;
                 velopack_set_update_url(velopack_url);
 
-                std::string update_version = result["version"].asString();
                 LLCoros::instance().launch("VelopackUpdateCheck",
-                    [update_required, update_version, relnotes]()
+                    [required_version, relnotes]()
                     {
-                        velopack_check_for_updates(update_required, update_version, relnotes);
+                        velopack_check_for_updates(required_version, relnotes);
                     });
             }
             else if (!velopack_url.empty())
             {
-                LL_INFOS("VVM") << "Optional update to " << result["version"].asString()
-                                << " skipped (UpdaterServiceSetting=0)" << LL_ENDL;
+                LL_INFOS("VVM") << "Optional update skipped (UpdaterServiceSetting=0)" << LL_ENDL;
             }
             else
 #endif

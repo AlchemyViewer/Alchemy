@@ -1007,23 +1007,38 @@ class DarwinManifest(ViewerManifest):
 
         # The .app bundle path (e.g., "/path/to/Second Life Release.app")
         app_bundle = self.get_dst_prefix()
-        # Parent directory containing the .app bundle - this is where we run vpk from
-        # and where the Releases directory will be created
-        work_dir = os.path.dirname(app_bundle)
         # Bundle ID from args (e.g., "com.secondlife.viewer")
         bundle_id = self.args.get('bundleid', 'com.secondlife.indra.viewer')
-
-        # Output directory for releases - clean it first to avoid version conflicts
-        releases_dir = os.path.join(work_dir, 'Releases')
-        if os.path.exists(releases_dir):
-            print("Cleaning existing Releases directory: %s" % releases_dir)
-            shutil.rmtree(releases_dir)
 
         # Icon path for macOS
         icon_path = os.path.join(self.get_src_prefix(), self.icon_path(), 'secondlife.icns')
 
         # The main executable inside Contents/MacOS/ is named after the channel
         main_exe = self.channel()
+
+        # In CI, defer Velopack packaging to the sign step where code signing
+        # credentials are available. Emit metadata as GitHub outputs so the
+        # sign step can run vpk pack after signing the app bundle.
+        if os.getenv('GITHUB_ACTIONS'):
+            self.set_github_output('velopack_mac_pack_id', pack_id)
+            self.set_github_output('velopack_mac_pack_version', pack_version)
+            self.set_github_output('velopack_mac_pack_title', pack_title)
+            self.set_github_output('velopack_mac_main_exe', main_exe)
+            self.set_github_output('velopack_mac_bundle_id', bundle_id)
+            print("CI mode: macOS Velopack packaging deferred to sign step")
+            return
+
+        # Local builds: run vpk pack directly (unsigned)
+
+        # Parent directory containing the .app bundle - this is where we run vpk from
+        # and where the Releases directory will be created
+        work_dir = os.path.dirname(app_bundle)
+
+        # Output directory for releases - clean it first to avoid version conflicts
+        releases_dir = os.path.join(work_dir, 'Releases')
+        if os.path.exists(releases_dir):
+            print("Cleaning existing Releases directory: %s" % releases_dir)
+            shutil.rmtree(releases_dir)
 
         # Build vpk command for macOS
         # See: https://docs.velopack.io/reference/cli/content/vpk-osx
