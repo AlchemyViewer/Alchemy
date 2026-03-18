@@ -969,11 +969,9 @@ void LLButton::draw()
     }
 
     // Draw label
-    if( !getCurrentLabel().empty() )    // Unselected label assignments
+    const LLWString& label = getCurrentLabel();
+    if (!label.empty()) // Unselected label assignments
     {
-        LLWString label = getCurrentLabel();
-        LLWStringUtil::trim(label);
-
         S32 x;
         switch( mHAlign )
         {
