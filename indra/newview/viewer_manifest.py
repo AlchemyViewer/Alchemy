@@ -1008,7 +1008,7 @@ class DarwinManifest(ViewerManifest):
         # The .app bundle path (e.g., "/path/to/Second Life Release.app")
         app_bundle = self.get_dst_prefix()
         # Bundle ID from args (e.g., "com.secondlife.viewer")
-        bundle_id = self.args.get('bundleid', 'com.secondlife.indra.viewer')
+        bundle_id = self.args.get('bundleid', 'org.alchemyviewer.viewer')
 
         # Icon path for macOS
         icon_path = os.path.join(self.get_src_prefix(), self.icon_path(), 'secondlife.icns')

@@ -117,7 +117,7 @@ BASE_ARGUMENTS=[
     dict(name='buildtype', description='Build type (i.e. Debug, Release, RelWithDebInfo).', default=None),
     dict(name='bundleid',
          description="""The macOS Bundle identifier.""",
-         default="com.secondlife.indra.viewer"),
+         default="org.alchemyviewer.viewer"),
     dict(name='channel',
          description="""The channel to use for updates, packaging, settings name, etc.""",
          default='CHANNEL UNSET'),

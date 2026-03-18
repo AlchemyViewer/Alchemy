@@ -205,7 +205,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     // This needs to be set as early as possible
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, LLVersionInfo::getInstance()->getChannel().c_str());
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, LLVersionInfo::getInstance()->getVersion().c_str());
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "com.secondlife.indra.viewer");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "org.alchemyviewer.viewer");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Linden Research Inc");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "Copyright (c) Linden Research, Inc. 2025");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://www.secondlife.com");
