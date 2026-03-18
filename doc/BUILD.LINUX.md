@@ -6,7 +6,7 @@
 <summary>Arch</summary>
 
 ```
-sudo pacman -Syu automake autoconf base-devel cmake fontconfig git glib2-devel gstreamer gst-plugins-base-libs ninja libglvnd libvlc libx11 pkgconf python wayland
+sudo pacman -Syu automake autoconf base-devel cmake fontconfig git glib2-devel gstreamer gst-plugins-base-libs ninja libglvnd libvlc libx11 pkgconf python wayland dotnet-sdk rustup
 ```
 
 </details>
@@ -56,20 +56,20 @@ pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 rustup
 #### AlmaLinux 10
 ```
 sudo dnf group install "Development Tools"
-sudo dnf install cmake fontconfig-devel git glib2-devel gstreamer1-devel gstreamer1-plugins-base-devel libX11-devel mesa-libOSMesa-devel libglvnd-devel ninja-build python3 vlc-devel wayland-devel
+sudo dnf install cmake fontconfig-devel git glib2-devel gstreamer1-devel gstreamer1-plugins-base-devel libX11-devel mesa-libOSMesa-devel libglvnd-devel ninja-build python3 vlc-devel wayland-devel dotnet-sdk-10.0 rustup
 ```
 > [!NOTE]
 > You may need to enable the EPEL repository for some packages `sudo dnf install epel-release`
 
 #### Fedora 44+
 ```
-sudo dnf install @development-tools @c-development cmake fontconfig-devel git glib-devel gstreamer1-devel gstreamer1-plugins-base-devel libX11-devel mesa-compat-libOSMesa-devel libglvnd-devel ninja-build python3 vlc-devel wayland-devel dotnet-sdk-10.0
+sudo dnf install @development-tools @c-development cmake fontconfig-devel git glib-devel gstreamer1-devel gstreamer1-plugins-base-devel libX11-devel mesa-compat-libOSMesa-devel libglvnd-devel ninja-build python3 vlc-devel wayland-devel dotnet-sdk-10.0 rustup
 ```
-
-To build with clang instead of gcc, also install:
-```
-sudo dnf install clang lld
-```
+> [!TIP]
+> To build with Clang instead of GCC, also install:
+> ```
+> sudo dnf install clang lld
+> ```
 
 </details>
 
@@ -83,6 +83,19 @@ sudo zypper install cmake fontconfig-devel git glib2-devel gstreamer-devel gstre
 ```
 
 </details>
+
+### Additional packages needed for Velopack Installer
+
+* rustup
+* dotnet-sdk-10
+
+### Initialize Rust SDK - For Velopack
+
+Initialize the rust SDK using default options
+
+```
+rustup add stable
+```
 
 ## Create development folders
 ```
@@ -103,7 +116,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Install VPK package tool
+## Install VPK package tool -- Optional for Velopack Installer
 ```
 dotnet tool restore
 ```
