@@ -54,7 +54,24 @@
      left="15"
      top_pad="4"	
      name="notify_money_received_checkbox"     
-     width="300" />   
+     width="300" /> 
+     <check_box
+     control_name="ShowStreamInfo"
+     height="16"
+     label="When music stream titles change"
+     layout="topleft"
+     left_delta="120"
+     name="music_stream_title"     
+     width="30" />
+     <check_box
+     control_name="ShowStreamInfoToChat"
+     enabled_control="ShowStreamInfo"
+     height="16"
+     label="In Nearby Chat"
+     layout="topleft"
+     left_delta="240"
+     name="music_stream_title_checkbox_chat"     
+     width="20" />
     <text
      type="string"
      length="1"

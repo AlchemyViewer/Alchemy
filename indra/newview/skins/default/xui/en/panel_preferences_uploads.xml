@@ -13,7 +13,7 @@
    type="string"
    length="1"
    follows="left|top"
-   height="12"
+   height="16"
    layout="topleft"
    left="33"
    name="title"
@@ -22,18 +22,33 @@
     Current destination folders for uploads
   </text>
 
+  <button
+    name="reset_textures"
+    follows="left|top"
+    layout="topleft"
+    height="18"
+    left="37"
+    width="18"
+    image_overlay="Refresh_Off"
+    tool_tip="Reset destination folder for Image uploads"
+    image_overlay_alignment="center">
+    <button.commit_callback
+      function="Pref.ResetControlDefault"
+      parameter="TextureUploadFolder" />
+  </button>
   <text
    type="string"
    length="1"
    follows="left|top"
-   height="12"
+   height="18"
    layout="topleft"
-   left="37"
-   name="title_models"
-   top_pad="17"
+   left_pad="5"
+   valign="center"
+   name="title_textures"
    width="100">
     Images
   </text>
+
   <text
    type="string"
    use_ellipses="true"
@@ -47,18 +62,34 @@
    width="370"
    word_wrap="true"/>
   
+   <button
+   name="reset_sounds"
+   follows="left|top"
+   layout="topleft"
+   height="18"
+   left="37"
+   width="18"
+   image_overlay="Refresh_Off"
+   tool_tip="Reset destination folder for Sound uploads"
+   image_overlay_alignment="center">
+   <button.commit_callback
+     function="Pref.ResetControlDefault"
+     parameter="SoundUploadFolder" />
+ </button>
+
   <text
    type="string"
    length="1"
    follows="left|top"
-   height="12"
+   height="18"
    layout="topleft"
-   left="37"
+   left_pad="5"
+   valign="center"
    name="title_sounds"
-   top_pad="7"
    width="100">
     Sounds
   </text>
+
   <text
    type="string"
    use_ellipses="true"
@@ -72,15 +103,29 @@
    width="370"
    word_wrap="true"/>
   
+   <button
+   name="reset_animations"
+   follows="left|top"
+   layout="topleft"
+   height="18"
+   left="37"
+   width="18"
+   image_overlay="Refresh_Off"
+   tool_tip="Reset destination folder for Animation uploads"
+   image_overlay_alignment="center">
+   <button.commit_callback
+     function="Pref.ResetControlDefault"
+     parameter="AnimationUploadFolder" />
+ </button>
   <text
    type="string"
    length="1"
    follows="left|top"
-   height="12"
+   height="18"
    layout="topleft"
-   left="37"
+   left_pad="5"
+   valign="center"
    name="title_animation"
-   top_pad="7"
    width="100">
     Animations
   </text>
@@ -97,15 +142,29 @@
    width="370"
    word_wrap="true"/>
 
+   <button
+   name="reset_models"
+   follows="left|top"
+   layout="topleft"
+   height="18"
+   left="37"
+   width="18"
+   image_overlay="Refresh_Off"
+   tool_tip="Reset destination folder for Model uploads"
+   image_overlay_alignment="center">
+   <button.commit_callback
+     function="Pref.ResetControlDefault"
+     parameter="ModelUploadFolder" />
+ </button>
   <text
    type="string"
    length="1"
    follows="left|top"
-   height="12"
+   height="18"
    layout="topleft"
-   left="37"
+   left_pad="5"
+   valign="center"
    name="title_model"
-   top_pad="7"
    width="100">
     Models
   </text>
@@ -122,15 +181,29 @@
    width="370"
    word_wrap="true"/>
 
+   <button
+   name="reset_pbr"
+   follows="left|top"
+   layout="topleft"
+   height="18"
+   left="37"
+   width="18"
+   image_overlay="Refresh_Off"
+   tool_tip="Reset destination folder for Image uploads"
+   image_overlay_alignment="center">
+   <button.commit_callback
+     function="Pref.ResetControlDefault"
+     parameter="PBRUploadFolder" />
+ </button>
   <text
    type="string"
    length="1"
    follows="left|top"
-   height="12"
+   height="18"
    layout="topleft"
-   left="37"
+   left_pad="5"
+   valign="center"
    name="title_pbr"
-   top_pad="7"
    width="100">
     PBR Materials
   </text>
