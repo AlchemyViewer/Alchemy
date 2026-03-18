@@ -8603,6 +8603,45 @@ protected:
     }
 };
 
+class LLToggleControlPerAccount : public view_listener_t
+{
+protected:
+
+    bool handleEvent(const LLSD& userdata)
+    {
+        std::string control_name = userdata.asString();
+        bool checked = gSavedPerAccountSettings.getBOOL( control_name );
+        gSavedPerAccountSettings.setBOOL( control_name, !checked );
+        return true;
+    }
+};
+
+class LLCheckControlPerAccount : public view_listener_t
+{
+    bool handleEvent( const LLSD& userdata)
+    {
+        std::string callback_data = userdata.asString();
+        bool new_value = gSavedPerAccountSettings.getBOOL(callback_data);
+        return new_value;
+    }
+};
+
+class LLResetControlPerAccount : public view_listener_t
+{
+protected:
+
+    bool handleEvent(const LLSD& userdata)
+    {
+        std::string control_name = userdata.asString();
+        auto ctrlp = gSavedPerAccountSettings.getControl(control_name);
+        if (ctrlp)
+        {
+            ctrlp->resetToDefault(true);
+        }
+        return true;
+    }
+};
+
 // not so generic
 
 class LLAdvancedCheckRenderShadowOption: public view_listener_t
@@ -10802,6 +10841,10 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToggleShaderControl(), "ToggleShaderControl");
     view_listener_t::addMenu(new LLCheckControl(), "CheckControl");
     view_listener_t::addMenu(new LLResetControl(), "ResetControl");
+
+    view_listener_t::addMenu(new LLToggleControlPerAccount(), "ToggleControlPerAccount");
+    view_listener_t::addMenu(new LLCheckControlPerAccount(), "CheckControlPerAccount");
+    view_listener_t::addMenu(new LLResetControlPerAccount(), "ResetControlPerAccount");
     view_listener_t::addMenu(new LLGoToObject(), "GoToObject");
     commit.add("PayObject", boost::bind(&handle_give_money_dialog));
 

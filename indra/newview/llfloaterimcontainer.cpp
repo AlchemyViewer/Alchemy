@@ -30,10 +30,13 @@
 #include "llfloaterimsession.h"
 #include "llfloaterimcontainer.h"
 
+#include "llclipboard.h"
 #include "llfloaterreg.h"
 #include "lllayoutstack.h"
+#include "llslurl.h"
 #include "llfloaterimnearbychat.h"
 
+#include "alavataractions.h"
 #include "llagent.h"
 #include "llavataractions.h"
 #include "llavatariconctrl.h"
@@ -1275,7 +1278,7 @@ void LLFloaterIMContainer::doToParticipants(const std::string& command, uuid_vec
         }
         else if ("zoom_in" == command)
         {
-            handle_zoom_to_object(userID);
+            ALAvatarActions::zoomIn(userID);
         }
         else if ("map" == command)
         {
@@ -1305,6 +1308,10 @@ void LLFloaterIMContainer::doToParticipants(const std::string& command, uuid_vec
         {
             LLAvatarActions::toggleMute(userID, LLMute::flagVoiceChat);
         }
+        else if ("report_abuse" == command)
+        {
+            ALAvatarActions::reportAbuse(userID);
+        }
         else if ("mute_unmute" == command)
         {
             LLAvatarActions::toggleMute(userID, LLMute::flagTextChat);
@@ -1320,6 +1327,30 @@ void LLFloaterIMContainer::doToParticipants(const std::string& command, uuid_vec
         else if ("ban_member" == command)
         {
             banSelectedMember(userID);
+        }
+        else if ("copy_username" == command)
+        {
+            ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_USER_NAME);
+        }
+        else if ("copy_display_name" == command)
+        {
+            ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_DISPLAY_NAME);
+        }
+        else if ("copy_account_name" == command)
+        {
+            ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_ACCOUNT_NAME);
+        }
+        else if ("copy_full_name" == command)
+        {
+            ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_COMPLETE_NAME);
+            }
+        else if ("copy_slurl" == command)
+        {
+            ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_SLURL);
+        }
+        else if ("copy_uuid" == command)
+        {
+            ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_UUID);
         }
     }
     else if (selectedIDS.size() > 1)
@@ -1339,6 +1370,30 @@ void LLFloaterIMContainer::doToParticipants(const std::string& command, uuid_vec
         else if ("remove_friend" == command)
         {
             LLAvatarActions::removeFriendsDialog(selectedIDS);
+        }
+        else if ("copy_username" == command)
+        {
+            ALAvatarActions::copyDataMultiple(selectedIDS, ALAvatarActions::E_DATA_USER_NAME);
+        }
+        else if ("copy_display_name" == command)
+        {
+            ALAvatarActions::copyDataMultiple(selectedIDS, ALAvatarActions::E_DATA_DISPLAY_NAME);
+        }
+        else if ("copy_account_name" == command)
+        {
+            ALAvatarActions::copyDataMultiple(selectedIDS, ALAvatarActions::E_DATA_ACCOUNT_NAME);
+        }
+        else if ("copy_full_name" == command)
+        {
+            ALAvatarActions::copyDataMultiple(selectedIDS, ALAvatarActions::E_DATA_COMPLETE_NAME);
+        }
+        else if ("copy_slurl" == command)
+        {
+            ALAvatarActions::copyDataMultiple(selectedIDS, ALAvatarActions::E_DATA_SLURL);
+        }
+        else if ("copy_uuid" == command)
+        {
+            ALAvatarActions::copyDataMultiple(selectedIDS, ALAvatarActions::E_DATA_UUID);
         }
     }
 }
@@ -1465,6 +1520,24 @@ void LLFloaterIMContainer::doToSelectedGroup(const LLSD& userdata)
     else if (action == "leave_group")
     {
         LLGroupActions::leave(mSelectedSession);
+    }
+    else if (action == "copy_group_name")
+    {
+        if (auto group = LLGroupMgr::getInstance()->getGroupData(mSelectedSession))
+        {
+            LLWString wstr = utf8str_to_wstring(group->mName);
+            LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.length()));
+        }
+    }
+    else if (action == "copy_group_slurl")
+    {
+        LLWString wstr = utf8str_to_wstring(LLSLURL("group", mSelectedSession, "about").getSLURLString());
+        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.length()));
+    }
+    else if (action == "copy_group_id")
+    {
+        LLWString wstr = utf8str_to_wstring(mSelectedSession.asString());
+        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.length()));
     }
 }
 
@@ -1597,7 +1670,9 @@ bool LLFloaterIMContainer::enableContextMenuItem(const std::string& item, uuid_v
 //  if (("can_invite" == item)
         || ("can_chat_history" == item)
         || ("can_share" == item)
+// [RLVa:KB] - @pay
 //        || ("can_pay" == item)
+// [/RLVa:KB]
         || ("report_abuse" == item))
     {
         // Those menu items are enable only if a single avatar is selected
@@ -1638,11 +1713,11 @@ bool LLFloaterIMContainer::enableContextMenuItem(const std::string& item, uuid_v
     }
     else if ("can_zoom_in" == item)
     {
-        return is_single_select && gObjectList.findObject(single_id);
+        return is_single_select && ALAvatarActions::canZoomIn(single_id);
     }
     else if ("can_show_on_map" == item)
     {
-        return (is_single_select ? (LLAvatarTracker::instance().isBuddyOnline(single_id) && is_agent_mappable(single_id)) || gAgent.isGodlike() : false);
+        return (is_single_select ? (LLAvatarTracker::instance().isBuddyOnline(single_id) && ALAvatarActions::isAgentMappable(single_id)) || gAgent.isGodlike() : false);
     }
     else if ("can_offer_teleport" == item)
     {

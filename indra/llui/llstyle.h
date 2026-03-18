@@ -50,6 +50,7 @@ public:
         Optional<LLUIImage*>            image;
         Optional<std::string>           link_href;
         Optional<bool>                  is_link;
+        Optional<bool>                  use_default_link_style;
         Optional<bool>                  draw_highlight_bg;
         Params();
     };

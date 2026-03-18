@@ -156,4 +156,44 @@
       <on_click function="AvatarIcon.Action" parameter="ban_member" />
       <on_enable function="AvatarIcon.Enable" parameter="can_ban_member" />
     </menu_item_call>
+  <menu_item_separator />
+  <context_menu
+   label="Actions"
+   name="Utilities">
+    <menu_item_call
+     label="Copy Full Name"
+     name="Copy Full Name">
+      <menu_item_call.on_click
+       function="AvatarIcon.CopyData"
+       parameter="full_name"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Copy Display Name"
+     name="Copy Display Name">
+      <menu_item_call.on_click
+       function="AvatarIcon.CopyData"
+       parameter="display_name"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Copy Agent Name"
+     name="Copy Username">
+      <menu_item_call.on_click
+       function="AvatarIcon.CopyData"
+       parameter="user_name"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Copy SLurl"
+     name="Copy SLurl">
+      <menu_item_call.on_click
+       function="AvatarIcon.CopyData"
+       parameter="slurl"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Copy UUID"
+     name="Copy ID">
+      <menu_item_call.on_click
+       function="AvatarIcon.CopyData"
+       parameter="id"/>
+    </menu_item_call>
+  </context_menu>
 </toggleable_menu>

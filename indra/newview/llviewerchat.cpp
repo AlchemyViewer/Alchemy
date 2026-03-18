@@ -28,6 +28,7 @@
 #include "llviewerchat.h"
 
 // newview includes
+#include "alavatargroups.h"
 #include "llagent.h"    // gAgent
 #include "llslurl.h"
 #include "lluicolor.h"
@@ -69,6 +70,8 @@ void LLViewerChat::getChatColor(const LLChat& chat, LLUIColor& r_color, F32& r_c
                     else
                     {
                         r_color = LLUIColorTable::instance().getColor("AgentChatColor");
+
+                        r_color = ALAvatarGroups::instance().getAvatarColor(chat.mFromID, r_color, ALAvatarGroups::COLOR_CHAT);
                     }
                 }
                 break;
@@ -141,7 +144,7 @@ void LLViewerChat::getChatColor(const LLChat& chat, std::string& r_color_name, F
                     }
                     else
                     {
-                        r_color_name = "AgentChatColor";
+                        r_color_name = ALAvatarGroups::instance().getAvatarColorName(chat.mFromID, "AgentChatColor", ALAvatarGroups::COLOR_CHAT);
                     }
                 }
                 break;
@@ -195,6 +198,9 @@ LLFontGL* LLViewerChat::getChatFont()
     LLFontGL* fontp = NULL;
     switch(font_size)
     {
+        case -1:
+            fontp = LLFontGL::getFontMonospace();
+            break;
         case 0:
             fontp = LLFontGL::getFontSansSerifSmall();
             break;
@@ -204,6 +210,9 @@ LLFontGL* LLViewerChat::getChatFont()
             break;
         case 2:
             fontp = LLFontGL::getFontSansSerifBig();
+            break;
+        case 3:
+            fontp = LLFontGL::getFontSansSerifHuge();
             break;
     }
 
