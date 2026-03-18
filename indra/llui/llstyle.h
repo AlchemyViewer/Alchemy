@@ -123,7 +123,6 @@ protected:
     ~LLStyle() = default;
 
 private:
-    std::string         mFontName;
     std::string         mLink;
     LLUIColor           mColor;
     LLUIColor           mReadOnlyColor;

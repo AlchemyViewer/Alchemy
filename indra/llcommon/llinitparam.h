@@ -199,7 +199,7 @@ namespace LLInitParam
         typedef T   default_value_t;
         typedef T   value_t;
 
-        ParamValue(): mValue() {}
+        ParamValue() = default;
         ParamValue(const default_value_t& other) : mValue(other) {}
 
         void setValue(const value_t& val)
@@ -220,7 +220,7 @@ namespace LLInitParam
         bool isValid() const { return true; }
 
     protected:
-        T mValue;
+        T mValue{};
     };
 
     template<typename T>
@@ -232,9 +232,7 @@ namespace LLInitParam
         typedef T   default_value_t;
         typedef T   value_t;
 
-        ParamValue()
-        :   T()
-        {}
+        ParamValue() = default;
 
         ParamValue(const default_value_t& other)
         :   T(other)
@@ -509,7 +507,7 @@ namespace LLInitParam
             mParserInspectFuncs(&inspect_map)
         {}
 
-        virtual ~Parser();
+        virtual ~Parser() = default;
 
         template <typename T> bool readValue(T& param, typename std::enable_if_t<!std::is_enum_v<T>>* dummy = 0)
         {
@@ -611,11 +609,6 @@ namespace LLInitParam
     // various callbacks and constraints associated with an individual param
     struct LL_COMMON_API ParamDescriptor
     {
-        struct UserData
-        {
-            virtual ~UserData() = default;
-        };
-
         typedef bool(*merge_func_t)(Param&, const Param&, bool);
         typedef bool(*deserialize_func_t)(Param&, Parser&, Parser::name_stack_range_t&, bool);
         typedef bool(*serialize_func_t)(const Param&, Parser&, Parser::name_stack_t&, const predicate_rule_t rules, const Param* diff_param);
@@ -632,7 +625,7 @@ namespace LLInitParam
                         S32 max_count);
 
         ParamDescriptor();
-        ~ParamDescriptor();
+        ~ParamDescriptor() = default;
 
         param_handle_t      mParamHandle;
         merge_func_t        mMergeFunc;
@@ -643,7 +636,6 @@ namespace LLInitParam
         S32                 mMinCount;
         S32                 mMaxCount;
         S32                 mNumRefs;
-        UserData*           mUserData;
     };
 
     typedef std::shared_ptr<ParamDescriptor> ParamDescriptorPtr;
