@@ -461,6 +461,35 @@ void LLGroupActions::show(const LLUUID &group_id, bool expand_notices_tab)
     }
 }
 
+
+// [SL:KB] - Patch: Notification-GroupCreateNotice | Checked: 2012-02-16 (Catznip-3.2)
+// static
+void LLGroupActions::showNotices(const LLUUID& group_id)
+{
+    if (group_id.isNull())
+        return;
+
+    LLSD sdParams;
+    sdParams["group_id"] = group_id;
+    sdParams["action"] = "view_notices";
+
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
+    {
+        ALFloaterGroupProfile::showInstance(sdParams, true);
+    }
+    else
+    {
+        LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", sdParams);
+    }
+}
+
+// static
+void LLGroupActions::viewChatHistory(const LLUUID& group_id)
+{
+    LLFloaterReg::showInstance("preview_conversation", group_id, true);
+}
+// [/SL:KB]
+
 void LLGroupActions::refresh_notices(const LLUUID& group_id)
 {
     LLSD params;

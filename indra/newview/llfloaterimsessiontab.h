@@ -213,6 +213,9 @@ protected:
     LLButton* mGearBtn;
     LLButton* mAddBtn;
     LLButton* mVoiceButton;
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+    LLPanel* mExtendedButtonPanel = nullptr;
+// [/SL:KB]
 
     // Since mVoiceButton can work in one of two modes, "Start call" or "Hang up",
     // (with different images and tooltips depending on the currently chosen mode)

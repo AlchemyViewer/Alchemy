@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2016, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -141,6 +142,16 @@ LLFloaterIMNearbyChat* LLFloaterIMNearbyChat::buildFloater(const LLSD& key)
 //virtual
 bool LLFloaterIMNearbyChat::postBuild()
 {
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+    if (mIsNearbyChat)
+    {
+        mExtendedButtonPanel = getChild<LLPanel>("nearby_toolbar");
+        mExtendedButtonPanel->setVisible(true);
+
+        mExtendedButtonPanel->getChild<LLUICtrl>("chat_history_btn")->setCommitCallback(boost::bind(&LLFloaterReg::showInstance, "preview_conversation", LLUUID::null, true));
+    }
+// [/SL:KB]
+
     setIsSingleInstance(true);
     bool result = LLFloaterIMSessionTab::postBuild();
 

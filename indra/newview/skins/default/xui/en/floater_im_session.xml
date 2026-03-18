@@ -10,10 +10,11 @@
  can_close="true"
  save_rect="true"
  visible="false"
- width="394"
+ width="400"
  can_resize="true"
  can_tear_off="false"
  min_height="190"
+ min_width="400"
  positioning="relative">
     <floater.string name="call_btn_start">Conv_toolbar_open_call</floater.string>
     <floater.string name="call_btn_stop">Conv_toolbar_hang_up</floater.string>
@@ -141,7 +142,166 @@
                  left_pad="2"
                  name="voice_call_btn"
                  tool_tip="Open voice connection"
-                 width="31"/>                
+                 width="31"/>     
+                <panel
+                 follows="top|left"
+                 height="25"
+                 width="32"
+                 layout="topleft"
+                 left_pad="2"
+                 mouse_opaque="false"
+                 name="nearby_toolbar"
+                 top="0"
+                 visible="false">
+                  <button
+                   follows="top|left"
+                   height="25"
+                   image_hover_unselected="Toolbar_Middle_Over"
+                   image_overlay="Command_Chat_Icon"
+                   image_selected="Toolbar_Middle_Selected"
+                   image_unselected="Toolbar_Middle_Off"
+                   layout="topleft"
+                   left="0"
+                   name="chat_history_btn"
+                   tool_tip="Show chat history"
+                   top="1"
+                   width="31" />
+                </panel>
+                <panel
+                 follows="top|left"
+                 height="25"
+                 width="144"
+                 layout="topleft"
+                 left_delta="0"
+                 mouse_opaque="false"
+                 name="p2p_toolbar"
+                 top="0"
+                 visible="false">
+                  <button
+                   follows="top|left"
+                   height="25"
+                   image_hover_unselected="Toolbar_Middle_Over"
+                   image_overlay="Web_Profile_Off"
+                   image_selected="Toolbar_Middle_Selected"
+                   image_unselected="Toolbar_Middle_Off"
+                   layout="topleft"
+                   left="0"
+                   name="profile_btn"
+                   tool_tip="View profile"
+                   top="1"
+                   width="31" />
+                  <flyout_button
+                   arrow_button_width="18"
+                   follows="top|left"
+                   height="25"
+                   halign="left"
+                   label=""
+                   layout="topleft"
+                   left_pad="2"
+                   name="teleport_btn"
+                   tool_tip="Offer or request a teleport"
+                   top="1"
+                   width="44">
+                    <flyout_button.item
+                     label="Offer Teleport"
+                     value="offer_teleport" />
+                    <flyout_button.item
+                     label="Request Teleport"
+                     value="request_teleport" />
+                    <flyout_button.action_button
+                     image_hover_unselected="Toolbar_Middle_Over"
+                     image_overlay="Conv_toolbar_teleport"
+                     image_overlay_alignment="left"
+                     image_bottom_pad="1"
+                     imgoverlay_label_space="0"
+                     image_selected="Toolbar_Middle_Selected"
+                     image_unselected="transparent.j2c" />
+                    <flyout_button.drop_down_button
+                     image_hover_unselected="Toolbar_Middle_Over"
+                     image_overlay="Arrow_Small_Down"
+                     image_overlay_alignment="right"
+                     image_selected="Toolbar_Middle_Selected"
+                     image_unselected="Toolbar_Middle_Off"
+                     image_pressed="none"
+                     pad_right="-2" />
+                  </flyout_button>
+                  <button
+                   follows="top|left"
+                   height="25"
+                   image_hover_unselected="Toolbar_Middle_Over"
+                   image_overlay="Command_Chat_Icon"
+                   image_selected="Toolbar_Middle_Selected"
+                   image_unselected="Toolbar_Middle_Off"
+                   layout="topleft"
+                   left_pad="2"
+                   name="chat_history_btn"
+                   tool_tip="Show chat history"
+                   top="1"
+                   width="31" />
+                  <button
+                   follows="top|left"
+                   height="25"
+                   image_hover_unselected="Toolbar_Middle_Over"
+                   image_overlay="Conv_toolbar_pay"
+                   image_selected="Toolbar_Middle_Selected"
+                   image_unselected="Toolbar_Middle_Off"
+                   layout="topleft"
+                   left_pad="2"
+                   name="pay_btn"
+                   tool_tip="Pay this avatar"
+                   top="1"
+                   width="31" />
+                </panel>
+                <panel
+                 follows="top|left"
+                 height="25"
+                 width="144"
+                 layout="topleft"
+                 left_delta="0"
+                 mouse_opaque="false"
+                 name="group_toolbar"
+                 top="0"
+                 visible="false">
+                  <button
+                   follows="top|left"
+                   height="25"
+                   image_hover_unselected="Toolbar_Middle_Over"
+                   image_overlay="Web_Profile_Off"
+                   image_selected="Toolbar_Middle_Selected"
+                   image_unselected="Toolbar_Middle_Off"
+                   layout="topleft"
+                   left="0"
+                   name="profile_btn"
+                   tool_tip="View profile"
+                   top="1"
+                   width="31" />
+                  <button
+                   follows="top|left"
+                   height="25"
+                   image_hover_unselected="Toolbar_Middle_Over"
+                   image_overlay="Command_Chat_Icon"
+                   image_selected="Toolbar_Middle_Selected"
+                   image_unselected="Toolbar_Middle_Off"
+                   layout="topleft"
+                   left_pad="2"
+                   name="chat_history_btn"
+                   tool_tip="Show chat history"
+                   top="1"
+                   width="31" />
+                  <button
+                   follows="top|left"
+                   height="25"
+                   image_hover_unselected="Toolbar_Middle_Over"
+                   image_overlay="Notices_Unread"
+                   image_selected="Toolbar_Middle_Selected"
+                   image_unselected="Toolbar_Middle_Off"
+                   layout="topleft"
+                   left_pad="2"
+                   name="view_notices_btn"
+                   tool_tip="View group notices"
+                   top="1"
+                   width="31" />
+                </panel>           
                 <button
                  follows="right|top"
                  height="25"
@@ -308,7 +468,7 @@
                          image_selected="Toolbar_Middle_Selected"
                          image_unselected="Toolbar_Middle_Off"
                          image_overlay="Emoji_Picker_Icon"
-                         bottom="-2"
+                         bottom="-1"
                          right="-1"
                          height="25"
                          width="25"/>
@@ -316,10 +476,10 @@
                     <layout_panel
                      auto_resize="false"
                      name="input_button_layout_panel"
-                     width="32">
+                     width="31">
                         <button
                          left="1"
-                         top="4"
+                         top="3"
                          height="25"
                          follows="left|right|top"
                          image_hover_unselected="Toolbar_Middle_Over"

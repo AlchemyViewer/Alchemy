@@ -381,7 +381,8 @@ bool LLFloaterIMSessionTab::postBuild()
     mFloaterExtraWidth =
             getRect().getWidth()
             - mParticipantListAndHistoryStack->getRect().getWidth()
-            - (mParticipantListPanel->isCollapsed()? 0 : LLPANEL_BORDER_WIDTH);
+            - (mParticipantListPanel->isCollapsed()? 0 : LLPANEL_BORDER_WIDTH)
+            + (mExtendedButtonPanel ? mExtendedButtonPanel->getRect().getWidth() : 0);
 
     assignResizeLimits();
 
@@ -1250,6 +1251,9 @@ void LLFloaterIMSessionTab::updateGearBtn()
         LLRect gear_btn_rect =  mGearBtn->getRect();
         LLRect add_btn_rect = mAddBtn->getRect();
         LLRect call_btn_rect = mVoiceButton->getRect();
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+        LLRect extended_toolbar_rect = (mExtendedButtonPanel) ? mExtendedButtonPanel->getRect() : LLRect();
+// [/SL:KB]
         S32 gap_width = call_btn_rect.mLeft - add_btn_rect.mRight;
         S32 right_shift = gear_btn_rect.getWidth() + gap_width;
         if(mGearBtn->getVisible())
@@ -1257,14 +1261,24 @@ void LLFloaterIMSessionTab::updateGearBtn()
             // Move buttons to the right to give space for Gear button
             add_btn_rect.translate(right_shift,0);
             call_btn_rect.translate(right_shift,0);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+            extended_toolbar_rect.translate(right_shift,0);
+// [/SL:KB]
         }
         else
         {
             add_btn_rect.translate(-right_shift,0);
             call_btn_rect.translate(-right_shift,0);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+            extended_toolbar_rect.translate(-right_shift,0);
+// [/SL:KB]
         }
         mAddBtn->setRect(add_btn_rect);
         mVoiceButton->setRect(call_btn_rect);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+        if (mExtendedButtonPanel)
+            mExtendedButtonPanel->setRect(extended_toolbar_rect);
+// [/SL:KB]
     }
 }
 
@@ -1273,14 +1287,22 @@ void LLFloaterIMSessionTab::initBtns()
     LLRect gear_btn_rect =  mGearBtn->getRect();
     LLRect add_btn_rect = mAddBtn->getRect();
     LLRect call_btn_rect = mVoiceButton->getRect();
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+    LLRect extended_toolbar_rect = (mExtendedButtonPanel) ? mExtendedButtonPanel->getRect() : LLRect();
+// [/SL:KB]
     S32 gap_width = call_btn_rect.mLeft - add_btn_rect.mRight;
     S32 right_shift = gear_btn_rect.getWidth() + gap_width;
 
     add_btn_rect.translate(-right_shift,0);
     call_btn_rect.translate(-right_shift,0);
+    extended_toolbar_rect.translate(-right_shift, 0);
 
     mAddBtn->setRect(add_btn_rect);
     mVoiceButton->setRect(call_btn_rect);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+    if (mExtendedButtonPanel)
+        mExtendedButtonPanel->setRect(extended_toolbar_rect);
+// [/SL:KB]
 }
 
 // static

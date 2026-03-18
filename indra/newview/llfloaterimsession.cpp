@@ -62,6 +62,12 @@
 #include "llnotificationmanager.h"
 #include "llautoreplace.h"
 #include "llcorehttputil.h"
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+#include "llfloatergroupinvite.h"
+#include "llgroupactions.h"
+#include "llslurl.h"
+#include <boost/lexical_cast.hpp>
+// [/SL:KB]
 // [RLVa:KB] - Checked: 2013-05-10 (RLVa-1.4.9)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -247,6 +253,44 @@ bool LLFloaterIMSession::checkGearMenuItem(const LLSD& userdata)
     return floater_container->checkContextMenuItem(command, selected_uuids);
 }
 
+// [SL:KB] - Patch: Chat-BaseGearBtn | Checked: 2014-04-10 (Catznip-3.6)
+void LLFloaterIMSession::GearDoToSelectedGroup(const LLSD& userdata)
+{
+    const std::string action = userdata.asString();
+
+    if ("view_profile" == action)
+    {
+        LLGroupActions::show(mSessionID);
+    }
+    else if ("chat_history" == action)
+    {
+        LLGroupActions::viewChatHistory(mSessionID);
+    }
+    else if ("view_notices" == action)
+    {
+        LLGroupActions::showNotices(mSessionID);
+    }
+    else if ("end_session" == action)
+    {
+        LLGroupActions::endIM(mSessionID);
+    }
+}
+// [/SL:KB]
+
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+void LLFloaterIMSession::onTeleportClicked(const LLUICtrl* pCtrl)
+{
+    if (pCtrl)
+    {
+        const std::string strValue = pCtrl->getValue().asString();
+        if ( (strValue.empty()) || ("offer_teleport" == strValue) )
+            GearDoToSelected("offer_teleport");
+        else if ("request_teleport" == strValue)
+            GearDoToSelected("request_teleport");
+    }
+}
+// [/SL:KB]
+
 void LLFloaterIMSession::sendMsgFromInputEditor()
 {
     if (gAgent.isGodlike()
@@ -408,6 +452,28 @@ void LLFloaterIMSession::initIMFloater()
 //virtual
 bool LLFloaterIMSession::postBuild()
 {
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+    if (mIsP2PChat)
+    {
+        mExtendedButtonPanel = getChild<LLPanel>("p2p_toolbar");
+        mExtendedButtonPanel->setVisible(true);
+
+        mExtendedButtonPanel->getChild<LLUICtrl>("profile_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelected, this, "view_profile"));
+        mExtendedButtonPanel->getChild<LLUICtrl>("teleport_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::onTeleportClicked, this, _1));
+        mExtendedButtonPanel->getChild<LLUICtrl>("chat_history_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelected, this, "chat_history"));
+        mExtendedButtonPanel->getChild<LLUICtrl>("pay_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelected, this, "pay"));
+    }
+    else if ( (mSession) && (mSession->isGroupSessionType()) )
+    {
+        mExtendedButtonPanel = getChild<LLPanel>("group_toolbar");
+        mExtendedButtonPanel->setVisible(true);
+
+        mExtendedButtonPanel->getChild<LLUICtrl>("profile_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "view_profile"));
+        mExtendedButtonPanel->getChild<LLUICtrl>("chat_history_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "chat_history"));
+        mExtendedButtonPanel->getChild<LLUICtrl>("view_notices_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "view_notices"));
+    }
+// [/SL:KB]
+
     bool result = LLFloaterIMSessionTab::postBuild();
 
     mInputEditor->setMaxTextLength(1023);
