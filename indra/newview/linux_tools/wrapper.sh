@@ -24,10 +24,10 @@ export mesa_glthread=true
 ## Nothing worth editing below this line.
 ##-------------------------------------------------------------------
 
-SCRIPTSRC=`readlink -f "$0" || echo "$0"`
-RUN_PATH=`dirname "${SCRIPTSRC}" || echo .`
+SCRIPTSRC=$(readlink -f "$0" || echo "$0")
+RUN_PATH=$(dirname "${SCRIPTSRC}" || echo .)
 echo "Running from ${RUN_PATH}"
-cd "${RUN_PATH}"
+cd "${RUN_PATH}" || exit
 
 # Re-register the secondlife:// protocol handler every launch, for now.
 ./etc/register_secondlifeprotocol.sh
@@ -56,11 +56,11 @@ done
 # Don't quote $LL_WRAPPER because, if empty, it should simply vanish from the
 # command line. But DO quote "${ARGS[@]}": preserve separate args as
 # individually quoted.
-$LL_WRAPPER bin/secondlife-bin "${ARGS[@]}"
+$LL_WRAPPER bin/alchemy-bin "${ARGS[@]}"
 LL_RUN_ERR=$?
 
 # Handle any resulting errors
 if [ $LL_RUN_ERR -ne 0 ]; then
 	# generic error running the binary
-	echo '*** Bad shutdown ($LL_RUN_ERR). ***'
+	echo "*** Bad shutdown ($LL_RUN_ERR). ***"
 fi

@@ -6,12 +6,12 @@
 
 HANDLER="$1"
 
-SCRIPTSRC=`readlink -f "$0" || echo "$0"`
-RUN_PATH=`dirname "${SCRIPTSRC}" || echo .`
+SCRIPTSRC=$(readlink -f "$0" || echo "$0")
+RUN_PATH=$(dirname "${SCRIPTSRC}" || echo .)
 
 install_prefix="$(realpath -- "${RUN_PATH}/..")"
 
-cd "${RUN_PATH}/.."
+cd "${RUN_PATH}/.." || exit
 
 if [ -z "$HANDLER" ]; then
     HANDLER=$install_prefix/etc/handle_secondlifeprotocol.sh
@@ -24,16 +24,16 @@ function install_desktop_entry()
 
     local desktop_entry="\
 [Desktop Entry]\n\
-Name=Second Life SLURL handler\n\
+Name=Second Life SLURL handler for Alchemy\n\
 Path=${installation_prefix}\n\
 Exec=${HANDLER} %u\n\
-Icon=${installation_prefix}/secondlife_icon.png\n\
+Icon=${installation_prefix}/alchemy_icon.png\n\
 Terminal=false\n\
 Type=Application\n\
 StartupNotify=true\n\
-StartupWMClass="com.secondlife.indra.viewer"\n\
+StartupWMClass="org.alchemyviewer.viewer"\n\
 NoDisplay=true\n\
-MimeType=x-scheme-handler/secondlife\n\
+MimeType=x-scheme-handler/alchemy\n\
 X-Desktop-File-Install-Version=3.0"
 
     echo " - Installing protocol entries in ${desktop_entries_dir}"
@@ -41,7 +41,7 @@ X-Desktop-File-Install-Version=3.0"
     PROTOCOL_HANDLER="secondlife-protocol.desktop"
     echo -e $desktop_entry > "${WORK_DIR}/${PROTOCOL_HANDLER}" || "Failed to create desktop file!"
     desktop-file-install --dir="${desktop_entries_dir}" "${WORK_DIR}/${PROTOCOL_HANDLER}" || "Failed to install desktop file!"
-    rm -r $WORK_DIR
+    rm -r "$WORK_DIR"
 
     xdg-mime default "${desktop_entries_dir}/${PROTOCOL_HANDLER}" x-scheme-handler/secondlife
 

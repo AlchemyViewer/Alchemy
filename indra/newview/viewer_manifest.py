@@ -1116,7 +1116,7 @@ class LinuxManifest(ViewerManifest):
 
         self.path("licenses-linux.txt","licenses.txt")
         with self.prefix("linux_tools"):
-            self.path("wrapper.sh","secondlife")
+            self.path("wrapper.sh","alchemy")
             with self.prefix(dst="etc"):
                 self.path("handle_secondlifeprotocol.sh")
                 self.path("register_secondlifeprotocol.sh")
