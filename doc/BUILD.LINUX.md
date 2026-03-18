@@ -63,8 +63,7 @@ sudo dnf install cmake fontconfig-devel git glib2-devel gstreamer1-devel gstream
 
 #### Fedora 44+
 ```
-sudo dnf install @development-tools @c-development cmake fontconfig-devel git glib-devel gstreamer1-devel gstreamer1-plugins-base-devel libX11-devel mesa-compat-libOSMesa-devel libglvnd-devel ninja-build python3 vlc-devel wayland-devel dotnet-sdk-10.0 rustup perl-IPC-Cmd perl-FindBin perl-Time-Piece autoconf-archive perl-open libXcursor-devel wayland-protocols-devel dbus-devel ibus-devel mesa-libGLU-devel libxkbcommon-devel mesa-libEGL-devel mesa-libGL-devel 
-libXtst-devel libXrandr-devel 
+sudo dnf install @development-tools @c-development cmake fontconfig-devel git glib-devel gstreamer1-devel gstreamer1-plugins-base-devel libX11-devel mesa-compat-libOSMesa-devel libglvnd-devel ninja-build python3 vlc-devel wayland-devel dotnet-sdk-10.0 rustup perl-IPC-Cmd perl-FindBin perl-Time-Piece autoconf-archive perl-open libXcursor-devel wayland-protocols-devel dbus-devel ibus-devel mesa-libGLU-devel libxkbcommon-devel mesa-libEGL-devel mesa-libGL-devel libXtst-devel libXrandr-devel 
 ```
 > [!TIP]
 > To build with Clang instead of GCC, also install:
