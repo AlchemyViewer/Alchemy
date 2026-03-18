@@ -20,6 +20,12 @@ configure_file("${INDRA_SOURCE_DIR}/externals/js/jpeg_encoder_basic.js" "${CMAKE
 configure_file("${INDRA_SOURCE_DIR}/externals/js/three.min.js" "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/three.min.js" COPYONLY)
 configure_file("${INDRA_SOURCE_DIR}/externals/js/OrbitControls.js" "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/OrbitControls.js" COPYONLY)
 
+# LSL Definitions
+configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/definitions/lsl_keywords_pretty.xml"
+               "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lsl_default.xml" COPYONLY)
+configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/definitions/slua_keywords_pretty.xml"
+               "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lua_default.xml" COPYONLY)
+
 message(STATUS "Copying fonts")
 file(GLOB FONT_FILE_GLOB_LIST
   "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/alchemy-fonts/fonts/*"
