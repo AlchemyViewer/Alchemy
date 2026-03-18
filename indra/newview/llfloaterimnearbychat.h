@@ -83,6 +83,7 @@ public:
     static bool isWordsName(const std::string& name);
 
     void showHistory();
+    void changeChannelLabel(S32 channel);
 
 protected:
     static bool matchChatTypeTrigger(const std::string& in_str, std::string* out_str);

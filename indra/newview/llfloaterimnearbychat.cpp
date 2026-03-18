@@ -123,6 +123,8 @@ LLFloaterIMNearbyChat::LLFloaterIMNearbyChat(const LLSD& llsd)
     mEnableCallbackRegistrar.add("Avatar.CheckGearItem", boost::bind(&cb_do_nothing));
 
     mMinFloaterHeight = EXPANDED_MIN_HEIGHT;
+
+    mChatChannelConnection = gSavedSettings.getControl("AlchemyNearbyChatChannel")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&) { changeChannelLabel(newval.asInteger()); });
 }
 
 // [RLVa:KB]
@@ -160,8 +162,7 @@ bool LLFloaterIMNearbyChat::postBuild()
     mInputEditor->setKeystrokeCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxKeystroke, this));
     mInputEditor->setFocusLostCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxFocusLost, this));
     mInputEditor->setFocusReceivedCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxFocusReceived, this));
-    std::string nearbyChatTitle(LLTrans::getString("NearbyChatTitle"));
-    mInputEditor->setLabel(nearbyChatTitle);
+    changeChannelLabel(gSavedSettings.getS32("AlchemyNearbyChatChannel"));
 
 // [RLVa:KB]
     mInputEditor->setShowChatMentionPicker(!RlvActions::isRlvEnabled() || RlvActions::canShowName(RlvActions::SNC_DEFAULT));
@@ -738,6 +739,18 @@ void LLFloaterIMNearbyChat::displaySpeakingIndicator()
     }
 }
 
+void LLFloaterIMNearbyChat::changeChannelLabel(S32 channel)
+{
+    if (channel == 0)
+        mInputEditor->setLabel(LLTrans::getString("NearbyChatTitle"));
+    else
+    {
+        LLStringUtil::format_map_t args;
+        args["CHANNEL"] = llformat("%d", channel);
+        mInputEditor->setLabel(LLTrans::getString("NearbyChatTitleChannel", args));
+    }
+}
+
 void LLFloaterIMNearbyChat::sendChatFromViewer(const std::string &utf8text, EChatType type, bool animate)
 {
     sendChatFromViewer(utf8str_to_wstring(utf8text), type, animate);
@@ -746,7 +759,7 @@ void LLFloaterIMNearbyChat::sendChatFromViewer(const std::string &utf8text, ECha
 void LLFloaterIMNearbyChat::sendChatFromViewer(const LLWString &wtext, EChatType type, bool animate)
 {
     // Look for "/20 foo" channel chats.
-    S32 channel = 0;
+    S32 channel = gSavedSettings.getS32("AlchemyNearbyChatChannel");
     LLWString out_text = stripChannelNumber(wtext, &channel);
     std::string utf8_out_text = wstring_to_utf8str(out_text);
     std::string utf8_text = wstring_to_utf8str(wtext);
@@ -906,7 +919,7 @@ LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* 
     else
     {
         // This is normal chat.
-        *channel = 0;
+        *channel = gSavedSettings.getS32("AlchemyNearbyChatChannel");
         return mesg;
     }
 }

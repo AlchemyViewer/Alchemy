@@ -478,6 +478,17 @@
             <key>Value</key>
             <real>0.15</real>
         </map>
+        <key>AlchemyNearbyChatChannel</key>
+        <map>
+            <key>Comment</key>
+            <string>Chat channel used for sending nearby chat from the viewer</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyNearbyColorize</key>
         <map>
             <key>Comment</key>

@@ -4441,6 +4441,7 @@ and report the problem.
   <string name="AutoResponseModeNonFriendsDefault">The Resident you messaged has activated [APP_NAME]&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
 
   <string name="NotifyIncomingMessage">Incoming message from [NAME]...</string>
+  <string name="NearbyChatTitleChannel">Nearby chat (on channel [CHANNEL])</string>
   <string name="AvatarTyping">Typing</string>
   <string name="UnknownAvatar">Unknown Avatar</string>
 
