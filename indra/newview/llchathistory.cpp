@@ -351,7 +351,7 @@ public:
     bool canModerate(const std::string& userdata)
     {
         // only group moderators can perform actions related to this "enable callback"
-        if (!isGroupModerator() || gAgentID == getAvatarId())
+        if (gAgentID == getAvatarId()  || !isGroupModerator())
         {
             return false;
         }
