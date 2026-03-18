@@ -604,8 +604,7 @@ void ALFloaterParticleEditor::callbackReturned(const LLUUID& inventoryItemID)
 
     LLBufferedAssetUploadInfo::taskUploadFinish_f proc =
         boost::bind(&ALFloaterParticleEditor::finishUpload, _1, _2, _3, _4, true, mObject->getID());
-    LLResourceUploadInfo::ptr_t uploadInfo(new LLScriptAssetUpload(mObject->getID(), inventoryItemID,
-        LLScriptAssetUpload::MONO, true, LLUUID::null, script, proc, nullptr));
+    LLResourceUploadInfo::ptr_t uploadInfo(new LLScriptAssetUpload(mObject->getID(), inventoryItemID, "mono", true, LLUUID::null, script, proc, nullptr));
     LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
 
     if (mCloseAfterSave) closeFloater();
@@ -639,7 +638,7 @@ void ALFloaterParticleEditor::finishUpload(LLUUID itemId, LLUUID taskId, LLUUID 
         return;
     }
     auto* script = gInventory.getItem(itemId);
-    object->saveScript(script, true, false);
+    object->saveScript(script, true, false, LLUUID::null);
 
     LLNotificationsUtil::add("ParticleScriptInjected");
 }
