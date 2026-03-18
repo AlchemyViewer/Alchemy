@@ -124,6 +124,8 @@ private:
     /*virtual*/ void refresh();
 
     std::vector<LLChat> mMessageArchive;
+
+    boost::signals2::connection mChatChannelConnection;
 };
 
 #endif // LL_LLFLOATERIMNEARBYCHAT_H

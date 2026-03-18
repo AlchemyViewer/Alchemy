@@ -1045,6 +1045,28 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ChatOOCPrefix</key>
+        <map>
+            <key>Comment</key>
+            <string>OOC chat prefix characters</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>((</string>
+        </map>
+        <key>ChatOOCPostfix</key>
+        <map>
+            <key>Comment</key>
+            <string>OOC chat postfix characters</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>))</string>
+        </map>
         <key>NameTagShowDistance</key>
         <map>
             <key>Comment</key>
