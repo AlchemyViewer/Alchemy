@@ -62,6 +62,7 @@
 
 #include "llviewerassetupload.h"
 #include "llcorehttputil.h"
+#include "llpreviewscript.h"
 
 namespace
 {
@@ -123,9 +124,9 @@ namespace
 class LLQueuedScriptAssetUpload : public LLScriptAssetUpload
 {
 public:
-    LLQueuedScriptAssetUpload(LLUUID taskId, LLUUID itemId, LLUUID assetId, TargetType_t targetType,
+    LLQueuedScriptAssetUpload(LLUUID taskId, LLUUID itemId, LLUUID assetId, std::string compileTarget,
             bool isRunning, std::string scriptName, LLUUID queueId, LLUUID exerienceId, taskUploadFinish_f finish) :
-        LLScriptAssetUpload(taskId, itemId, targetType, isRunning,
+        LLScriptAssetUpload(taskId, itemId, compileTarget, isRunning,
             exerienceId, std::string(), finish, nullptr),
         mScriptName(scriptName),
         mQueueId(queueId)
@@ -184,9 +185,7 @@ struct LLScriptQueueData
 
 // Default constructor
 LLFloaterScriptQueue::LLFloaterScriptQueue(const LLSD& key) :
-    LLFloater(key),
-    mDone(false),
-    mMono(false)
+    LLFloater(key)
 {
 
 }
@@ -198,7 +197,7 @@ LLFloaterScriptQueue::~LLFloaterScriptQueue()
 
 bool LLFloaterScriptQueue::postBuild()
 {
-    childSetAction("close",onCloseBtn,this);
+    childSetAction("close", onCloseBtn, this);
     getChildView("close")->setEnabled(false);
     setVisible(true);
     return true;
@@ -223,8 +222,8 @@ bool LLFloaterScriptQueue::start()
 
     LLStringUtil::format_map_t args;
     args["[START]"] = mStartString;
-    args["[COUNT]"] = llformat ("%d", mObjectList.size());
-    buffer = getString ("Starting", args);
+    args["[COUNT]"] = llformat("%d", mObjectList.size());
+    buffer = getString("Starting", args);
 
     getChild<LLScrollListCtrl>("queue output")->addSimpleElement(buffer, ADD_BOTTOM);
 
@@ -277,8 +276,8 @@ bool LLFloaterCompileQueue::hasExperience( const LLUUID& id ) const
     return mExperienceIds.find(id) != mExperienceIds.end();
 }
 
-// //Attempt to record this asset ID.  If it can not be inserted into the set
-// //then it has already been processed so return false.
+// Attempt to record this asset ID.  If it can not be inserted into the set
+// then it has already been processed so return false.
 
 void LLFloaterCompileQueue::handleHTTPResponse(std::string pumpName, const LLSD &expresult)
 {
@@ -360,7 +359,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     LLCheckedHandle<LLFloaterCompileQueue> floater(hfloater);
     // Dereferencing floater may fail. If they do they throw LLExeceptionStaleHandle.
     // which is caught in objectScriptProcessingQueueCoro
-    bool monocompile = floater->mMono;
+    std::string compile_target = floater->mCompileTarget;
 
     // Initial test to see if we can (or should) attempt to compile the script.
     LLInventoryItem *item = dynamic_cast<LLInventoryItem *>(inventory);
@@ -472,13 +471,40 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
 
     LLUUID assetId = result["asset_id"];
 
+    // Check if this is a SLua script that shouldn't be recompiled to Mono/LSL
+    if (compile_target == "mono" || compile_target == "lsl2")
+    {
+        // Read the script from cache to check its type
+        LLFileSystem file(assetId, LLAssetType::AT_LSL_TEXT, LLFileSystem::READ);
+        if (file.getSize() > 0)
+        {
+            S32 file_length = file.getSize();
+            std::vector<char> buffer(file_length + 1);
+            file.read((U8*)&buffer[0], file_length);
+            buffer[file_length] = 0;
+            std::string script_text(&buffer[0]);
+
+            if (is_lua_script(script_text))
+            {
+                // This is a SLua script - skip it with a warning
+                LLStringUtil::format_map_t args;
+                args["[SCRIPT_NAME]"] = inventory->getName();
+                args["[TARGET]"] = (compile_target == "mono") ? "Mono" : "LSL";
+                std::string buffer = floater->getString("SkippingSluaScript", args);
+                floater->addStringMessage(buffer);
+                LL_INFOS("SCRIPTQ") << "Skipping SLua script: " << inventory->getName() << LL_ENDL;
+                return true;
+            }
+        }
+    }
+
     std::string url = object->getRegion()->getCapability("UpdateScriptTask");
 
     {
         LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLQueuedScriptAssetUpload>(object->getID(),
             inventory->getUUID(),
             assetId,
-            monocompile ? LLScriptAssetUpload::MONO : LLScriptAssetUpload::LSL2,
+            compile_target,
             true,
             inventory->getName(),
             LLUUID(),

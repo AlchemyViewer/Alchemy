@@ -60,6 +60,7 @@ set(cmake_SOURCE_FILES
         VHACD.cmake
         Vorbis.cmake
         WebRTC.cmake
+        websocketpp.cmake
         xxHash.cmake
         ZLIBNG.cmake
         )

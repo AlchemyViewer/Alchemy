@@ -13,6 +13,8 @@ target_sources(llcorehttp
     httprequest.cpp
     httpresponse.cpp
     httpstats.cpp
+    llwebsocketmgr.cpp
+    lljsonrpcws.cpp
     _httplibcurl.cpp
     _httpopcancel.cpp
     _httpoperation.cpp
@@ -42,6 +44,8 @@ target_sources(llcorehttp
     httprequest.h
     httpresponse.h
     httpstats.h
+    llwebsocketmgr.h
+    lljsonrpcws.h
     _httpinternal.h
     _httplibcurl.h
     _httpopcancel.h
@@ -68,6 +72,7 @@ target_link_libraries(
         llcommon
         ll::libcurl
         ll::openssl
+        ll::websocketpp
   )
 target_include_directories( llcorehttp INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 # llmessage depends on llcorehttp, yet llcorehttp also depends on llmessage (at least for includes).
