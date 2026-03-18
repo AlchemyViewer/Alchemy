@@ -84,7 +84,7 @@ bool ALFloaterExploreSounds::postBuild()
     mHistoryScroller = getChild<LLScrollListCtrl>("sound_list");
     mHistoryScroller->setCommitCallback(boost::bind(&ALFloaterExploreSounds::handleSelection, this));
     mHistoryScroller->setDoubleClickCallback(boost::bind(&ALFloaterExploreSounds::handlePlayLocally, this));
-    mHistoryScroller->sortByColumn("playing", TRUE);
+    mHistoryScroller->sortByColumn("playing", true);
 
     mCollisionSounds = getChild<LLCheckBoxCtrl>("collision_chk");
     mRepeatedAssets = getChild<LLCheckBoxCtrl>("repeated_asset_chk");
@@ -355,7 +355,7 @@ bool ALFloaterExploreSounds::tick()
 
     mStopLocalButton->setEnabled(mLocalPlayingAudioSourceIDs.size() > 0);
 
-    return FALSE;
+    return false;
 }
 
 void ALFloaterExploreSounds::handlePlayLocally()
@@ -415,9 +415,9 @@ void ALFloaterExploreSounds::handleLookAt()
     cam += pos_global;
     cam += LLVector3d(0.0, 0.0, 3.0);
 
-    gAgentCamera.setFocusOnAvatar(FALSE, FALSE);
+    gAgentCamera.setFocusOnAvatar(false, false);
     gAgentCamera.setCameraPosAndFocusGlobal(cam, pos_global, item.mSourceID);
-    gAgentCamera.setCameraAnimating(FALSE);
+    gAgentCamera.setCameraAnimating(false);
 }
 
 void ALFloaterExploreSounds::handleStop()
