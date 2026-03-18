@@ -291,7 +291,7 @@ void LLFloaterIMSession::onTeleportClicked(const LLUICtrl* pCtrl)
 }
 // [/SL:KB]
 
-void LLFloaterIMSession::sendMsgFromInputEditor()
+void LLFloaterIMSession::sendMsgFromInputEditor(bool ooc_chat)
 {
     if (gAgent.isGodlike()
         || (mDialog != IM_NOTHING_SPECIAL)
@@ -309,6 +309,13 @@ void LLFloaterIMSession::sendMsgFromInputEditor()
                 // Truncate and convert to UTF8 for transport
                 std::string utf8_text = wstring_to_utf8str(text);
 
+                if (ooc_chat)
+                {
+                    utf8_text = fmt::format("{} {} {}", gSavedSettings.getString("ChatOOCPrefix"), utf8_text, gSavedSettings.getString("ChatOOCPostfix"));
+                }
+
+                applyOOCClose(utf8_text);
+                applyMUPose(utf8_text);
                 sendMsg(utf8_text);
 
                 mInputEditor->setText(LLStringUtil::null);
@@ -1477,6 +1484,20 @@ void LLFloaterIMSession::sRemoveTypingIndicator(const LLSD& data)
 void LLFloaterIMSession::onIMChicletCreated( const LLUUID& session_id )
 {
     LLFloaterIMSession::addToHost(session_id);
+}
+
+// virtual
+bool LLFloaterIMSession::handleKeyHere(KEY key, MASK mask)
+{
+    BOOL handled = FALSE;
+
+    if (KEY_RETURN == key && mask == MASK_ALT)
+    {
+        mInputEditor->updateHistory();
+        sendMsgFromInputEditor(true);
+        handled = TRUE;
+    }
+    return handled;
 }
 
 boost::signals2::connection LLFloaterIMSession::setIMFloaterShowedCallback(const floater_showed_signal_t::slot_type& cb)

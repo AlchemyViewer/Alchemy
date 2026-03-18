@@ -657,6 +657,28 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>EnableAutoCloseOOC</key>
+        <map>
+            <key>Comment</key>
+            <string>Auto-close ((OOC)) parentheses</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>EnableMUPoseChat</key>
+        <map>
+            <key>Comment</key>
+            <string>: as a synonym for /me</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AVPickerNearMeRange</key>
         <map>
             <key>Comment</key>

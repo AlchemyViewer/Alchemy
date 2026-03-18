@@ -1427,6 +1427,71 @@ void LLFloaterIMSessionTab::sessionRemoved(const LLUUID& session_id)
     }
 }
 
+void LLFloaterIMSessionTab::applyMUPose(std::string& text)
+{
+    if (!gSavedSettings.getBOOL("EnableMUPoseChat"))
+    {
+        return;
+    }
+    if (text.at(0) == ':'
+        && text.length() > 3)
+    {
+        if (text.find(":'") == 0)
+        {
+            text.replace(0, 1, "/me");
+        }
+        // Account for emotes and smilies
+        else if (!isdigit(text.at(1))
+                 && !ispunct(text.at(1))
+                 && !isspace(text.at(1)))
+        {
+            text.replace(0, 1, "/me ");
+        }
+    }
+}
+
+void LLFloaterIMSessionTab::applyOOCClose(std::string& message)
+{
+    if (!gSavedSettings.getBOOL("EnableAutoCloseOOC"))
+    {
+        return;
+    }
+
+    // Try to find any unclosed OOC chat (i.e. an opening
+    // double parenthesis without a matching closing double
+    // parenthesis.
+    if (message.find("(( ") != std::string::npos && message.find("))") == std::string::npos)
+    {
+        // add the missing closing double parenthesis.
+        message.append(" ))");
+    }
+    else if (message.find("((") != std::string::npos && message.find("))") == std::string::npos)
+    {
+        if (message.at(message.length() - 1) == ')')
+        {
+            // cosmetic: add a space first to avoid a closing triple parenthesis
+            message.append(" ");
+        }
+        // add the missing closing double parenthesis.
+        message.append("))");
+    }
+    else if (message.find("[[ ") != std::string::npos && message.find("]]") == std::string::npos)
+    {
+        // add the missing closing double parenthesis.
+        message.append(" ]]");
+    }
+    else if (message.find("[[") != std::string::npos && message.find("]]") == std::string::npos)
+    {
+        if (message.at(message.length() - 1) == ']')
+        {
+            // cosmetic: add a space first to avoid a closing triple parenthesis
+            message.append(" ");
+        }
+            // add the missing closing double parenthesis.
+        message.append("]]");
+    }
+}
+
 bool LLFloaterIMSessionTab::handleKeyHere(KEY key, MASK mask )
 {
     bool handled = false;

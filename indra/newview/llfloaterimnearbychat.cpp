@@ -638,6 +638,9 @@ void LLFloaterIMNearbyChat::sendChat( EChatType type )
             std::string utf8_revised_text;
             if (0 == channel)
             {
+                applyOOCClose(utf8text);
+                applyMUPose(utf8text);
+			
                 // discard returned "found" boolean
                 if(!LLGestureMgr::instance().triggerAndReviseString(utf8text, &utf8_revised_text))
                 {
