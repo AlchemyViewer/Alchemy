@@ -226,19 +226,6 @@ LONG WINAPI catchallCrashHandler(EXCEPTION_POINTERS * /*ExceptionInfo*/)
 
 const std::string LLAppViewerWin32::sWindowClass = "Second Life";
 
-/*
-    This function is used to print to the command line a text message
-    describing the nvapi error and quits
-*/
-void nvapi_error(NvAPI_Status status)
-{
-    NvAPI_ShortString szDesc = {0};
-    NvAPI_GetErrorMessage(status, szDesc);
-    LL_WARNS() << szDesc << LL_ENDL;
-
-    //should always trigger when asserts are enabled
-    //llassert(status == NVAPI_OK);
-}
 
 // Create app mutex creates a unique global windows object.
 // If the object can be created it returns true, otherwise
@@ -261,6 +248,20 @@ bool create_app_mutex()
     return result;
 }
 
+/*
+    This function is used to print to the command line a text message
+    describing the nvapi error and quits
+*/
+void nvapi_error(NvAPI_Status status)
+{
+    NvAPI_ShortString szDesc = {0};
+    NvAPI_GetErrorMessage(status, szDesc);
+    LL_WARNS() << "nvapi error: " << szDesc << LL_ENDL;
+
+    //should always trigger when asserts are enabled
+    //llassert(status == NVAPI_OK);
+}
+
 void ll_nvapi_init(NvDRSSessionHandle hSession)
 {
     // (2) load all the system settings into the session
@@ -272,8 +273,7 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
     }
 
     NvAPI_UnicodeString profile_name;
-    std::string app_name = LLTrans::getString("APP_NAME");
-    std::wstring w_app_name = ll_convert<std::wstring>(app_name);
+    std::wstring w_app_name = TEXT("Alchemy Viewer");
     wsprintf(reinterpret_cast<wchar_t*>(profile_name), L"%s", w_app_name.c_str());
     NvDRSProfileHandle hProfile = 0;
     // (3) Check if we already have an application profile for the viewer
@@ -286,7 +286,7 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
     else if (status == NVAPI_PROFILE_NOT_FOUND)
     {
         // Don't have an application profile yet - create one
-        LL_INFOS() << "Creating NVIDIA application profile" << LL_ENDL;
+        LL_INFOS() << "Creating Alchemy Viewer profile for NVIDIA driver" << LL_ENDL;
 
         NVDRS_PROFILE profileInfo;
         profileInfo.version = NVDRS_PROFILE_VER;
@@ -299,11 +299,51 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
             nvapi_error(status);
             return;
         }
+
+        // set the preferred power management mode
+        {
+            NVDRS_SETTING drsSetting = {};
+            drsSetting.version = NVDRS_SETTING_VER;
+            drsSetting.settingId = PREFERRED_PSTATE_ID;
+            drsSetting.settingType = NVDRS_DWORD_TYPE;
+            drsSetting.u32CurrentValue = PREFERRED_PSTATE_PREFER_MAX;
+            status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
+            if (status != NVAPI_OK)
+            {
+                nvapi_error(status);
+                return;
+            }
+            LL_INFOS() << "Set preferred power management mode" << LL_ENDL;
+        }
+
+        // set the preferred opengl threading state
+        {
+            NVDRS_SETTING drsSetting = {};
+            drsSetting.version = NVDRS_SETTING_VER;
+            drsSetting.settingId = OGL_THREAD_CONTROL_ID;
+            drsSetting.settingType = NVDRS_DWORD_TYPE;
+            drsSetting.u32CurrentValue = OGL_THREAD_CONTROL_ENABLE;
+            status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
+            if (status != NVAPI_OK)
+            {
+                nvapi_error(status);
+                return;
+            }
+            LL_INFOS() << "Set preferred GL Threading mode" << LL_ENDL;
+        }
+
+        // apply our changes to the system
+        status = NvAPI_DRS_SaveSettings(hSession);
+        if (status != NVAPI_OK)
+        {
+            nvapi_error(status);
+            return;
+        }
     }
 
     // (4) Check if current exe is part of the profile
     std::string exe_name = gDirUtilp->getExecutableFilename();
-    NVDRS_APPLICATION profile_application;
+    NVDRS_APPLICATION profile_application = {};
     profile_application.version = NVDRS_APPLICATION_VER;
 
     std::wstring w_exe_name = ll_convert<std::wstring>(exe_name);
@@ -321,12 +361,12 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
         LL_INFOS() << "Creating application for " << exe_name << " for NVIDIA application profile" << LL_ENDL;
 
         // Add this exe to the profile
-        NVDRS_APPLICATION application;
+        NVDRS_APPLICATION application = {};
         application.version = NVDRS_APPLICATION_VER;
         application.isPredefined = 0;
         wsprintf(reinterpret_cast<wchar_t*>(application.appName), L"%s", w_exe_name.c_str());
-        wsprintf(reinterpret_cast<wchar_t*>(application.userFriendlyName), L"%s", w_exe_name.c_str());
         wsprintf(reinterpret_cast<wchar_t*>(application.launcher), L"%s", w_exe_name.c_str());
+        wsprintf(reinterpret_cast<wchar_t*>(application.userFriendlyName), L"%s", w_app_name.c_str());
         wsprintf(reinterpret_cast<wchar_t*>(application.fileInFolder), L"%s", "");
 
         status = NvAPI_DRS_CreateApplication(hSession, hProfile, &application);
@@ -353,63 +393,9 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
         return;
     }
 
-    //get the preferred power management mode for Second Life
-    NVDRS_SETTING drsSetting = {0};
-    drsSetting.version = NVDRS_SETTING_VER;
-    status = NvAPI_DRS_GetSetting(hSession, hProfile, PREFERRED_PSTATE_ID, &drsSetting);
-    if (status == NVAPI_SETTING_NOT_FOUND)
-    { //only override if the user hasn't specifically set this setting
-        // (5) Specify that we want to enable maximum performance setting
-        // first we fill the NVDRS_SETTING struct, then we call the function
-        drsSetting.version = NVDRS_SETTING_VER;
-        drsSetting.settingId = PREFERRED_PSTATE_ID;
-        drsSetting.settingType = NVDRS_DWORD_TYPE;
-        drsSetting.u32CurrentValue = PREFERRED_PSTATE_PREFER_MAX;
-        status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-
-        // (6) Now we apply (or save) our changes to the system
-        status = NvAPI_DRS_SaveSettings(hSession);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-    }
-    else if (status != NVAPI_OK)
-    {
-        nvapi_error(status);
-        return;
-    }
-
-    // enable Threaded Optimization instead of letting the driver decide
-    status = NvAPI_DRS_GetSetting(hSession, hProfile, OGL_THREAD_CONTROL_ID, &drsSetting);
-    if (status == NVAPI_SETTING_NOT_FOUND || (status == NVAPI_OK && drsSetting.u32CurrentValue != OGL_THREAD_CONTROL_ENABLE))
-    {
-        drsSetting.version = NVDRS_SETTING_VER;
-        drsSetting.settingId = OGL_THREAD_CONTROL_ID;
-        drsSetting.settingType = NVDRS_DWORD_TYPE;
-        drsSetting.u32CurrentValue = OGL_THREAD_CONTROL_ENABLE;
-        status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-
-        // Now we apply (or save) our changes to the system
-        status = NvAPI_DRS_SaveSettings(hSession);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-    }
-    else if (status != NVAPI_OK)
+    // apply our changes to the system
+    status = NvAPI_DRS_SaveSettings(hSession);
+    if (status != NVAPI_OK)
     {
         nvapi_error(status);
         return;
