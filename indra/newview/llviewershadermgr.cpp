@@ -2808,7 +2808,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         success = gDeferredPostProgram.createShader();
         llassert(success);
     }
-	
+
     if (success)
     {
         gDeferredPostProgramNoNear.mName = "Deferred Post Shader No Near Blur";

@@ -1971,19 +1971,19 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
         size_t maxChatLen = MAX_MSG_STR_LEN;
         if (utf8_text.length() <= maxChatLen)
         {
-        	pack_instant_message(
-            	gMessageSystem,
-            	gAgent.getID(),
-            	false,
-            	gAgent.getSessionID(),
-            	other_participant_id,
-            	name.c_str(),
-            	utf8_text.c_str(),
-            	offline,
-            	(EInstantMessage)new_dialog,
-            	im_session_id);
-        	gAgent.sendReliableMessage();
-    	}
+            pack_instant_message(
+                gMessageSystem,
+                gAgent.getID(),
+                false,
+                gAgent.getSessionID(),
+                other_participant_id,
+                name.c_str(),
+                utf8_text.c_str(),
+                offline,
+                (EInstantMessage)new_dialog,
+                im_session_id);
+            gAgent.sendReliableMessage();
+        }
         else
         {
             std::list<std::string> lines;

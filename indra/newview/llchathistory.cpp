@@ -1399,11 +1399,11 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
     {
         square_brackets = chat.mSourceType == CHAT_SOURCE_SYSTEM && !use_irssi_text_chat_history;
 
-		if (use_irssi_text_chat_history)
-		{
-        	name_params.color(fancy_chat_divider_color);
-        	name_params.readonly_color(fancy_chat_divider_color);
-		}
+        if (use_irssi_text_chat_history)
+        {
+            name_params.color(fancy_chat_divider_color);
+            name_params.readonly_color(fancy_chat_divider_color);
+        }
 
         // out of the timestamp
         if (args["show_time"].asBoolean())

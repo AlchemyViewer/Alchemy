@@ -350,7 +350,7 @@ void LLAttachmentsMgr::onRegisterAttachmentComplete(const LLUUID& id_item_link)
         if ( isAgentAvatarValid() && !gAgentAvatarp->isWearingAttachment(id_item) )
         {
 // [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-2.2
-			LLAppearanceMgr::instance().removeCOFItemLinks(id_item, nullptr, true);
+            LLAppearanceMgr::instance().removeCOFItemLinks(id_item, nullptr, true);
 // [/SL:KB]
 //          LLAppearanceMgr::instance().removeCOFItemLinks(id_item);
         }

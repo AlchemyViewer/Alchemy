@@ -658,7 +658,7 @@ void LLFloaterIMNearbyChat::sendChat( EChatType type )
             {
                 applyOOCClose(utf8text);
                 applyMUPose(utf8text);
-			
+
                 // discard returned "found" boolean
                 if(!LLGestureMgr::instance().triggerAndReviseString(utf8text, &utf8_revised_text))
                 {

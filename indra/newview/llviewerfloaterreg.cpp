@@ -578,7 +578,7 @@ void LLViewerFloaterReg::registerFloaters()
 // [/SL:KB]
     LLFloaterReg::add("sound_explorer", "floater_explore_sounds.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterExploreSounds>);
     LLFloaterReg::add("transaction_log", "floater_al_transaction_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterTransactionLog>);
-	
+
     // *NOTE: Please keep these alphabetized for easier merges
 
     LLFloaterReg::registerControlVariables(); // Make sure visibility and rect controls get preserved when saving
