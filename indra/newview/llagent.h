@@ -620,6 +620,7 @@ private:
     void*           mAutoPilotCallbackData;
     LLUUID          mLeaderID;
     bool            mMovementKeysLocked;
+    bool            mMovementResetCamera;
 
 /**                    Movement
  **                                                                            **

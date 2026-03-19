@@ -462,6 +462,8 @@ LLAgent::LLAgent() :
 
     mMovementKeysLocked(false),
 
+    mMovementResetCamera(true),
+
     mEffectColor(new LLUIColor(LLColor4(0.f, 1.f, 1.f, 1.f))),
 
     mHaveHomePosition(false),
@@ -519,7 +521,11 @@ void LLAgent::init()
     mIsDoSendMaturityPreferenceToServer = true;
 
     mIgnorePrejump = gSavedSettings.getBOOL("AlchemyNimble");
-    gSavedSettings.getControl("AlchemyNimble")->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD&) { mIgnorePrejump = new_val.asBoolean(); });
+    gSavedSettings.getControl("AlchemyNimble")->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD&) { if(isAgentAvatarValid()) mIgnorePrejump = new_val.asBoolean(); });
+
+    auto controlp = gSavedSettings.getControl("AlchemyMotionResetsCamera");
+    controlp->getSignal()->connect([&](LLControlVariable* control, const LLSD& new_val, const LLSD&) { if(isAgentAvatarValid()) mMovementResetCamera = new_val.asBoolean(); });
+    mMovementResetCamera = controlp->getValue().asBoolean();
 
 
     if (!mTeleportFinishedSlot.connected())
@@ -710,7 +716,7 @@ void LLAgent::moveAt(S32 direction, bool reset)
 
     if (reset)
     {
-        gAgentCamera.resetView();
+        gAgentCamera.resetView(mMovementResetCamera);
     }
 }
 
@@ -736,7 +742,7 @@ void LLAgent::moveAtNudge(S32 direction)
         setControlFlags(AGENT_CONTROL_NUDGE_AT_NEG);
     }
 
-    gAgentCamera.resetView();
+    gAgentCamera.resetView(mMovementResetCamera);
 }
 
 //-----------------------------------------------------------------------------
@@ -761,7 +767,7 @@ void LLAgent::moveLeft(S32 direction)
         setControlFlags(AGENT_CONTROL_LEFT_NEG | AGENT_CONTROL_FAST_LEFT);
     }
 
-    gAgentCamera.resetView();
+    gAgentCamera.resetView(mMovementResetCamera);
 }
 
 //-----------------------------------------------------------------------------
@@ -786,7 +792,7 @@ void LLAgent::moveLeftNudge(S32 direction)
         setControlFlags(AGENT_CONTROL_NUDGE_LEFT_NEG);
     }
 
-    gAgentCamera.resetView();
+    gAgentCamera.resetView(mMovementResetCamera);
 }
 
 //-----------------------------------------------------------------------------
@@ -825,7 +831,7 @@ void LLAgent::moveUp(S32 direction)
 
     if (!mCrouch)
     {
-        gAgentCamera.resetView();
+        gAgentCamera.resetView(mMovementResetCamera);
     }
 }
 
@@ -856,7 +862,7 @@ void LLAgent::moveYaw(F32 mag, bool reset_view)
 
     if (reset_view)
     {
-        gAgentCamera.resetView();
+        gAgentCamera.resetView(mMovementResetCamera);
     }
 }
 
@@ -993,7 +999,7 @@ void LLAgent::toggleFlying()
     LLFirstUse::notMoving(false);
 
     gAgent.setFlying( fly );
-    gAgentCamera.resetView();
+    gAgentCamera.resetView(gAgent.mMovementResetCamera);
 }
 
 // static

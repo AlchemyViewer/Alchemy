@@ -1525,6 +1525,7 @@ void LLPanelEditWearable::getSortedParams(value_map_t &sorted_params, const std:
 
 void LLPanelEditWearable::buildParamList(LLScrollingPanelList *panel_list, value_map_t &sorted_params, LLAccordionCtrlTab *tab, LLJoint* jointp)
 {
+        bool show_hints = gSavedSettings.getBOOL("AlchemyAppearanceShowHints");
         // sorted_params is sorted according to magnitude of effect from
         // least to greatest.  Adding to the front of the child list
         // reverses that order.
@@ -1538,7 +1539,7 @@ void LLPanelEditWearable::buildParamList(LLScrollingPanelList *panel_list, value
                         p.name("LLScrollingPanelParam");
                         LLViewerWearable *wearable = this->getWearable();
                         LLScrollingPanelParamBase *panel_param = NULL;
-                        if (wearable && wearable->getType() == LLWearableType::WT_PHYSICS) // Hack to show a different panel for physics.  Should generalize this later.
+                        if (!show_hints || (wearable && wearable->getType() == LLWearableType::WT_PHYSICS)) // Hack to show a different panel for physics.  Should generalize this later.
                         {
                                 panel_param = new LLScrollingPanelParamBase( p, NULL, (*it).second, true, this->getWearable(), jointp);
                         }

@@ -1054,6 +1054,9 @@ public:
     static bool RenderGlowNoise;
     static bool RenderDepthOfField;
     static bool RenderDepthOfFieldInEditMode;
+    static bool RenderDepthOfFieldNearBlur;
+    static bool RenderFocusPointLocked;
+    static bool RenderFocusPointFollowsPointer;
     static F32 CameraFocusTransitionTime;
     static F32 CameraFNumber;
     static F32 CameraFocalLength;

@@ -191,6 +191,7 @@ LLGLSLShader            gHUDFullbrightAlphaMaskAlphaProgram;
 LLGLSLShader            gDeferredEmissiveProgram;
 LLGLSLShader            gDeferredSkinnedEmissiveProgram;
 LLGLSLShader            gDeferredPostProgram;
+LLGLSLShader            gDeferredPostProgramNoNear;
 LLGLSLShader            gDeferredCoFProgram;
 LLGLSLShader            gDeferredDoFCombineProgram;
 LLGLSLShader            gDeferredPostTonemapProgram;
@@ -2801,7 +2802,25 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gDeferredPostProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredF.glsl", GL_FRAGMENT_SHADER));
         gDeferredPostProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredPostProgram.clearPermutations();
+        gDeferredPostProgram.addPermutation("FRONT_BLUR", "1");
+
         success = gDeferredPostProgram.createShader();
+        llassert(success);
+    }
+	
+    if (success)
+    {
+        gDeferredPostProgramNoNear.mName = "Deferred Post Shader No Near Blur";
+        gDeferredPostProgramNoNear.mFeatures.isDeferred = true;
+        gDeferredPostProgramNoNear.mShaderFiles.clear();
+        gDeferredPostProgramNoNear.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gDeferredPostProgramNoNear.mShaderFiles.push_back(make_pair("deferred/postDeferredF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredPostProgramNoNear.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredPostProgramNoNear.clearPermutations();
+        gDeferredPostProgramNoNear.addPermutation("FRONT_BLUR", "0");
+
+        success = gDeferredPostProgramNoNear.createShader();
         llassert(success);
     }
 

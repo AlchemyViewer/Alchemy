@@ -194,7 +194,10 @@ F32 LLPipeline::RenderGlowWidth;
 F32 LLPipeline::RenderGlowStrength;
 bool LLPipeline::RenderGlowNoise;
 bool LLPipeline::RenderDepthOfField;
+bool LLPipeline::RenderDepthOfFieldNearBlur;
 bool LLPipeline::RenderDepthOfFieldInEditMode;
+bool LLPipeline::RenderFocusPointLocked;
+bool LLPipeline::RenderFocusPointFollowsPointer;
 F32 LLPipeline::CameraFocusTransitionTime;
 F32 LLPipeline::CameraFNumber;
 F32 LLPipeline::CameraFocalLength;
@@ -631,6 +634,9 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderHeroProbeUpdateRate");
     connectRefreshCachedSettingsSafe("RenderHeroProbeConservativeUpdateMultiplier");
     connectRefreshCachedSettingsSafe("RenderAvatarCloth");
+    connectRefreshCachedSettingsSafe("RenderFocusPointLocked");
+    connectRefreshCachedSettingsSafe("RenderFocusPointFollowsPointer");
+    connectRefreshCachedSettingsSafe("RenderDepthOfFieldNearBlur");
 
     LLPointer<LLControlVariable> cntrl_ptr = gSavedSettings.getControl("CollectFontVertexBuffers");
     if (cntrl_ptr.notNull())
@@ -1154,6 +1160,9 @@ void LLPipeline::refreshCachedSettings()
     RenderGlowNoise = gSavedSettings.getBOOL("RenderGlowNoise");
     RenderDepthOfField = gSavedSettings.getBOOL("RenderDepthOfField");
     RenderDepthOfFieldInEditMode = gSavedSettings.getBOOL("RenderDepthOfFieldInEditMode");
+    RenderDepthOfFieldNearBlur = gSavedSettings.getBOOL("RenderDepthOfFieldNearBlur");
+    RenderFocusPointLocked = gSavedSettings.getBOOL("RenderFocusPointLocked");
+    RenderFocusPointFollowsPointer = gSavedSettings.getBOOL("RenderFocusPointFollowsPointer");
     CameraFocusTransitionTime = gSavedSettings.getF32("CameraFocusTransitionTime");
     CameraFNumber = gSavedSettings.getF32("CameraFNumber");
     CameraFocalLength = gSavedSettings.getF32("CameraFocalLength");
@@ -7837,46 +7846,54 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
             static F32 transition_time = 1.f;
 
             LLVector3 focus_point;
-
-            LLViewerObject* obj = LLViewerMediaFocus::getInstance()->getFocusedObject();
-            if (obj && obj->mDrawable && obj->isSelected())
-            { // focus on selected media object
-                S32 face_idx = LLViewerMediaFocus::getInstance()->getFocusedFace();
-                if (obj && obj->mDrawable)
-                {
-                    LLFace* face = obj->mDrawable->getFace(face_idx);
-                    if (face)
-                    {
-                        focus_point = face->getPositionAgent();
-                    }
-                }
-            }
-
-            if (focus_point.isExactlyZero())
+            static LLVector3 last_focus_point{};
+            if (LLPipeline::RenderFocusPointLocked && !last_focus_point.isExactlyZero())
             {
-                if (LLViewerJoystick::getInstance()->getOverrideCamera())
-                { // focus on point under cursor
-                    focus_point.set(gDebugRaycastIntersection.getF32ptr());
-                }
-                else if (gAgentCamera.cameraMouselook())
-                { // focus on point under mouselook crosshairs
-                    LLVector4a result;
-                    result.clear();
-
-                    gViewerWindow->cursorIntersect(-1, -1, 512.f, nullptr, -1, false, false, true, true, nullptr, nullptr, nullptr, &result);
-
-                    focus_point.set(result.getF32ptr());
-                }
-                else
-                {
-                    // focus on alt-zoom target
-                    LLViewerRegion* region = gAgent.getRegion();
-                    if (region)
+                focus_point = last_focus_point;
+            }
+            else
+            {
+                LLViewerObject* obj = LLViewerMediaFocus::getInstance()->getFocusedObject();
+                if (obj && obj->mDrawable && obj->isSelected())
+                { // focus on selected media object
+                    S32 face_idx = LLViewerMediaFocus::getInstance()->getFocusedFace();
+                    if (obj && obj->mDrawable)
                     {
-                        focus_point = LLVector3(gAgentCamera.getFocusGlobal() - region->getOriginGlobal());
+                        LLFace* face = obj->mDrawable->getFace(face_idx);
+                        if (face)
+                        {
+                            focus_point = face->getPositionAgent();
+                        }
+                    }
+                }
+
+                if (focus_point.isExactlyZero())
+                {
+                        if (LLViewerJoystick::getInstance()->getOverrideCamera() || LLPipeline::RenderFocusPointFollowsPointer)
+                    { // focus on point under cursor
+                        focus_point.set(gDebugRaycastIntersection.getF32ptr());
+                    }
+                    else if (gAgentCamera.cameraMouselook())
+                    { // focus on point under mouselook crosshairs
+                        LLVector4a result;
+                        result.clear();
+
+                        gViewerWindow->cursorIntersect(-1, -1, 512.f, nullptr, -1, false, false, true, true, nullptr, nullptr, nullptr, &result);
+
+                        focus_point.set(result.getF32ptr());
+                    }
+                    else
+                    {
+                        // focus on alt-zoom target
+                        LLViewerRegion* region = gAgent.getRegion();
+                        if (region)
+                        {
+                            focus_point = LLVector3(gAgentCamera.getFocusGlobal() - region->getOriginGlobal());
+                        }
                     }
                 }
             }
+            last_focus_point = focus_point;
 
             LLVector3 eye = LLViewerCamera::getInstance()->getOrigin();
             F32 target_distance = 16.f;
@@ -7963,6 +7980,8 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
                 glViewport(0, 0, dof_width, dof_height);
 
                 gGL.setColorMask(true, false);
+
+                LLGLSLShader& post_program = RenderDepthOfFieldNearBlur ? gDeferredPostProgram : gDeferredPostProgramNoNear;
 
                 gDeferredPostProgram.bind();
                 gDeferredPostProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->deferredLight, LLTexUnit::TFO_POINT);
