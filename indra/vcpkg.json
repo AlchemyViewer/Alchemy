@@ -159,6 +159,19 @@
         "sdl3"
       ]
     },
+    "sentry": {
+      "description": "Build with support for Sentry crash reporting",
+      "dependencies": [
+        {
+          "name": "sentry-native",
+          "platform": "windows | linux"
+        },
+        {
+          "name": "sentry-cocoa",
+          "platform": "osx"
+        }
+      ]
+    },
     "tracy": {
       "description": "Build with Tracy profiler support",
       "dependencies": [

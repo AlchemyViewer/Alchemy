@@ -84,6 +84,9 @@ else ()
     set(BUGSPLAT_DB "" CACHE STRING "BugSplat crash database name")
 endif ()
 
+# Sentry Setup
+option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
+
 # Tracy Profiler
 # Default Tracy profiling on for test builds, but off for all others
 set(BUILDING_TEST_CHANNEL OFF)
@@ -152,6 +155,10 @@ endif()
 
 if(USE_VELOPACK)
   list(APPEND VCPKG_MANIFEST_FEATURES "velopack")
+endif()
+
+if(USE_SENTRY)
+  list(APPEND VCPKG_MANIFEST_FEATURES "sentry")
 endif()
 
 # Export compile_commands.json for ninja and makefile generators
@@ -244,6 +251,7 @@ include(OpenSSL)
 include(OpenXR)
 include(PNG)
 include(SDL3)
+include(Sentry)
 include(simdutf)
 include(SSE2NEON)
 include(TinyEXR)
