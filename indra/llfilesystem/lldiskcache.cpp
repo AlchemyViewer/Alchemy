@@ -126,8 +126,8 @@ void LLDiskCache::purge()
 
     if (std::filesystem::is_directory(sCacheDir, ec) && !ec)
     {
-        std::filesystem::directory_iterator iter(sCacheDir, ec);
-        while (iter != std::filesystem::directory_iterator() && !ec)
+        std::filesystem::recursive_directory_iterator iter(sCacheDir, ec);
+        while (iter != std::filesystem::recursive_directory_iterator() && !ec)
         {
             if(!LLApp::isRunning())
             {
@@ -241,12 +241,12 @@ const std::string LLDiskCache::getCacheInfo()
 {
     std::ostringstream cache_info;
 
-    F32 max_in_mb = (F32)mMaxSizeBytes / (1024.0f * 1024.0f);
-    F32 percent_used = ((F32)dirFileSize(sCacheDir) / (F32)mMaxSizeBytes) * 100.0f;
+    U64Megabytes max_in_mb = U64Bytes(mMaxSizeBytes);
+    F64 percent_used = ((F64)dirFileSize(sCacheDir) / (F64)mMaxSizeBytes) * 100.0;
 
     cache_info << std::fixed;
     cache_info << std::setprecision(1);
-    cache_info << "Max size " << max_in_mb << " MB ";
+    cache_info << "Max size " << max_in_mb.value() << " MB ";
     cache_info << "(" << percent_used << "% used)";
 
     return cache_info.str();
@@ -263,8 +263,8 @@ void LLDiskCache::clearCache()
     std::error_code ec;
     if (std::filesystem::is_directory(sCacheDir, ec) && !ec)
     {
-        std::filesystem::directory_iterator iter(sCacheDir, ec);
-        while (iter != std::filesystem::directory_iterator() && !ec)
+        std::filesystem::recursive_directory_iterator iter(sCacheDir, ec);
+        while (iter != std::filesystem::recursive_directory_iterator() && !ec)
         {
             if (std::filesystem::is_regular_file(*iter, ec) && !ec)
             {
@@ -297,8 +297,8 @@ void LLDiskCache::removeOldVFSFiles()
     std::filesystem::path cache_path = fsyspath(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ""));
     if (std::filesystem::is_directory(cache_path, ec) && !ec)
     {
-        std::filesystem::directory_iterator iter(cache_path, ec);
-        while (iter != std::filesystem::directory_iterator() && !ec)
+        std::filesystem::recursive_directory_iterator iter(cache_path, ec);
+        while (iter != std::filesystem::recursive_directory_iterator() && !ec)
         {
             if (std::filesystem::is_regular_file(*iter, ec) && !ec)
             {
@@ -333,8 +333,8 @@ uintmax_t LLDiskCache::dirFileSize(const std::filesystem::path& dir_path)
     std::error_code ec;
     if (std::filesystem::is_directory(dir_path, ec) && !ec)
     {
-        std::filesystem::directory_iterator iter(dir_path, ec);
-        while (iter != std::filesystem::directory_iterator() && !ec)
+        std::filesystem::recursive_directory_iterator iter(dir_path, ec);
+        while (iter != std::filesystem::recursive_directory_iterator() && !ec)
         {
             if (std::filesystem::is_regular_file(*iter, ec) && !ec)
             {
