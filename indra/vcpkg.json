@@ -63,6 +63,7 @@
     },
     "libpng",
     "libvorbis",
+    "libwebp",
     "lsl-definitions",
     "meshoptimizer",
     "minizip",

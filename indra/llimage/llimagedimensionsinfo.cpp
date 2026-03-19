@@ -30,6 +30,8 @@
 
 #include "llimagedimensionsinfo.h"
 
+#include <webp/decode.h>
+
 // Value is true if one of Libjpeg's functions has encountered an error while working.
 static bool sJpegErrorEncountered = false;
 
@@ -66,6 +68,8 @@ bool LLImageDimensionsInfo::load(const std::string& src_filename,U32 codec)
         return getImageDimensionsJpeg();
     case IMG_CODEC_PNG:
         return getImageDimensionsPng();
+    case IMG_CODEC_WEBP:
+        return getImageDimensionsWebP();
     default:
         return false;
 
@@ -156,6 +160,41 @@ bool LLImageDimensionsInfo::getImageDimensionsPng()
     mHeight = read_s32();
 
     return true;
+}
+
+bool LLImageDimensionsInfo::getImageDimensionsWebP()
+{
+    const S32 WEBP_MAGIC_SIZE = 12;
+
+    // Make sure the file is long enough.
+    if (!checkFileLength(WEBP_MAGIC_SIZE + 8 + sizeof(S32) * 2 /* width, height */))
+    {
+        LL_WARNS() << "Premature end of file" << LL_ENDL;
+        return false;
+    }
+
+    auto image_size = LLFile::size(mSrcFilename);
+    if(image_size > 0)
+    {
+        auto image_buf = std::make_unique<U8[]>(image_size);
+
+        std::error_code ec;
+        mInfile.read(image_buf.get(), image_size, ec);
+
+        WebPBitstreamFeatures features;
+        // Decode the WebP data and extract sizing information
+        if (WebPGetFeatures(image_buf.get(), image_size, &features) != VP8_STATUS_OK)
+        {
+            LL_WARNS() << "Not a WebP" << LL_ENDL;
+            return false;
+        }
+
+        mWidth = features.width;
+        mHeight = features.height;
+
+        return true;
+    }
+    return false;
 }
 
 // Called instead of exit() if Libjpeg encounters an error.

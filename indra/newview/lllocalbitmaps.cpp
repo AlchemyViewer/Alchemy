@@ -37,6 +37,7 @@
 #include "llimagej2c.h"
 #include "llimagejpeg.h"
 #include "llimagepng.h"
+#include "llimagewebp.h"
 
 /* misc headers */
 #include "fsyspath.h"
@@ -107,6 +108,10 @@ LLLocalBitmap::LLLocalBitmap(std::string filename)
     else if (temp_exten == "png")
     {
         mExtension = ET_IMG_PNG;
+    }
+    else if (temp_exten == "webp")
+    {
+        mExtension = ET_IMG_WEBP;
     }
     else
     {
@@ -367,6 +372,17 @@ bool LLLocalBitmap::decodeBitmap(LLPointer<LLImageRaw> rawimg)
         {
             LLPointer<LLImagePNG> png_image = new LLImagePNG;
             if (png_image->load(mFilename) && png_image->decode(rawimg, 0.0f))
+            {
+                rawimg->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
+                decode_successful = true;
+            }
+            break;
+        }
+
+        case ET_IMG_WEBP:
+        {
+            LLPointer<LLImageWebP> webp_image = new LLImageWebP;
+            if (webp_image->load(mFilename) && webp_image->decode(rawimg, 0.0f))
             {
                 rawimg->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
                 decode_successful = true;

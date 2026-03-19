@@ -13,6 +13,7 @@ target_sources(llimage
     llimagejpeg.cpp
     llimagepng.cpp
     llimagetga.cpp
+    llimagewebp.cpp
     llimageworker.cpp
     llpngwrapper.cpp
     )
@@ -30,6 +31,7 @@ target_sources(llimage
     llimagejpeg.h
     llimagepng.h
     llimagetga.h
+    llimagewebp.h
     llimageworker.h
     llmapimagetype.h
     llpngwrapper.h
@@ -49,6 +51,7 @@ target_link_libraries(llimage
     llfilesystem
     llmath
     llcommon
+    ll::libwebp
     ll::libpng
     ll::libjpeg
     )

@@ -5066,6 +5066,8 @@ void LLViewerWindow::saveImageNumbered(LLImageFormatted *image, bool force_picke
             pick_type = LLFilePicker::FFSAVE_PNG;
         else if (extension == ".tga")
             pick_type = LLFilePicker::FFSAVE_TGA;
+        else if (extension == ".webp")
+            pick_type = LLFilePicker::FFSAVE_WEBP;
         else
             pick_type = LLFilePicker::FFSAVE_ALL;
 

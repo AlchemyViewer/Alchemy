@@ -38,6 +38,7 @@
 #include "llimagej2c.h"
 #include "llimagejpeg.h"
 #include "llimagepng.h"
+#include "llimagewebp.h"
 #include "llimagedxt.h"
 #include "llmemory.h"
 
@@ -2046,7 +2047,8 @@ file_extensions[] =
     { "jpeg", IMG_CODEC_JPEG },
     { "mip", IMG_CODEC_DXT },
     { "dxt", IMG_CODEC_DXT },
-    { "png", IMG_CODEC_PNG }
+    { "png", IMG_CODEC_PNG },
+    { "webp", IMG_CODEC_WEBP }
 };
 
 static struct
@@ -2065,7 +2067,8 @@ wide_file_extensions[] =
     { L"jpeg", IMG_CODEC_JPEG },
     { L"mip", IMG_CODEC_DXT },
     { L"dxt", IMG_CODEC_DXT },
-    { L"png", IMG_CODEC_PNG }
+    { L"png", IMG_CODEC_PNG },
+    { L"webp", IMG_CODEC_WEBP }
 };
 #define NUM_FILE_EXTENSIONS LL_ARRAY_SIZE(file_extensions)
 #if 0
@@ -2263,6 +2266,9 @@ LLImageFormatted* LLImageFormatted::createFromType(S8 codec)
       case IMG_CODEC_PNG:
         image = new LLImagePNG();
         break;
+      case IMG_CODEC_WEBP:
+        image = new LLImageWebP();
+        break;
       case IMG_CODEC_J2C:
         image = new LLImageJ2C();
         break;
@@ -2302,6 +2308,10 @@ S8 LLImageFormatted::getCodecFromMimeType(std::string_view mimetype)
     else if (mimetype == "image/dxt")
     {
         return IMG_CODEC_DXT;
+    }
+    else if (mimetype == "image/webp")
+    {
+        return IMG_CODEC_WEBP;
     }
     return IMG_CODEC_INVALID;
 }
