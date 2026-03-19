@@ -57,7 +57,7 @@
              height="150"
              layout="topleft"
              left="0"
-             name="2_days_ago"
+             name="2_days_ago_items"
              top="0"
              width="307">
 	        </flat_list_view>
@@ -71,7 +71,7 @@
              height="150"
              layout="topleft"
              left="0"
-             name="3_days_ago"
+             name="3_days_ago_items"
              top="0"
              width="307">
 	        </flat_list_view>
@@ -85,7 +85,7 @@
              height="150"
              layout="topleft"
              left="0"
-             name="4_days_ago"
+             name="4_days_ago_items"
              top="0"
              width="307">
 	        </flat_list_view>
