@@ -175,6 +175,11 @@
          label="Themes"
          layout="topleft"
          name="skins" />
+        <panel
+         filename="panel_preferences_interface.xml"
+         label="Interface"
+         layout="topleft"
+         name="interface" />
     </tab_container>
 
 </floater>
