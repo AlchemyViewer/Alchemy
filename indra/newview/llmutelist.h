@@ -133,9 +133,9 @@ public:
     void cache(const LLUUID& agent_id);
 
     // group functions
-    BOOL addGroup(const LLUUID& group_id);
-    BOOL removeGroup(const LLUUID& group_id);
-    BOOL isGroupMuted(const LLUUID& group_id);
+    bool addGroup(const LLUUID& group_id);
+    bool removeGroup(const LLUUID& group_id);
+    bool isGroupMuted(const LLUUID& group_id);
 
 private:
     bool loadFromFile(const std::string& filename);

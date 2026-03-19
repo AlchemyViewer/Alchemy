@@ -1488,10 +1488,10 @@ void LLPanelVolume::onFeaturesSelect(bool success, LLViewerObject* obj, const LL
             //bool is_root = volobjp->isRoot();
 
             //// Not sure if phantom should go under physics, but doesn't fit elsewhere
-            //BOOL is_phantom = clipboard["is_phantom"].asBoolean() && is_root;
+            //bool is_phantom = clipboard["is_phantom"].asBoolean() && is_root;
             //LLSelectMgr::getInstance()->selectionUpdatePhantom(is_phantom);
 
-            //BOOL is_physical = clipboard["is_physical"].asBoolean() && is_root;
+            //bool is_physical = clipboard["is_physical"].asBoolean() && is_root;
             //LLSelectMgr::getInstance()->selectionUpdatePhysics(is_physical);
 
             {
@@ -1512,7 +1512,7 @@ void LLPanelVolume::onFeaturesSelect(bool success, LLViewerObject* obj, const LL
             bool is_flexible = hit_volobjp->isFlexible();
             if (is_flexible && volobjp->canBeFlexible())
             {
-                BOOL update_shape = false;
+                bool update_shape = false;
 
                 // do before setParameterEntry or it will think that it is already flexi
                 update_shape = volobjp->setIsFlexible(is_flexible);

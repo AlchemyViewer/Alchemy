@@ -799,17 +799,17 @@ void LLMuteList::cache(const LLUUID& agent_id)
 // Group muting
 //-----------------------------------------------------------------------------
 
-BOOL LLMuteList::addGroup(const LLUUID& group_id)
+bool LLMuteList::addGroup(const LLUUID& group_id)
 {
     return add(LLMute(LLUUID::null, std::string("Group:" + group_id.asString()), LLMute::BY_NAME));
 }
 
-BOOL LLMuteList::removeGroup(const LLUUID& group_id)
+bool LLMuteList::removeGroup(const LLUUID& group_id)
 {
     return remove(LLMute(LLUUID::null, std::string("Group:" + group_id.asString()), LLMute::BY_NAME));
 }
 
-BOOL LLMuteList::isGroupMuted(const LLUUID& group_id)
+bool LLMuteList::isGroupMuted(const LLUUID& group_id)
 {
     return isMuted(LLUUID::null, std::string("Group:" + group_id.asString()));
 }

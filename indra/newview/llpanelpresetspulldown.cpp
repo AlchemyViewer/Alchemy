@@ -174,7 +174,7 @@ void LLPanelPresetsPulldown::onAutofpsButtonClick(const LLSD& user_data)
 
 void LLPanelPresetsPulldown::onLightboxButtonClick(const LLSD& user_data)
 {
-    setVisible(FALSE);
+    setVisible(false);
     LLFloaterReg::showInstanceOrBringToFront("lightbox");
 }
 

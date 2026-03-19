@@ -776,14 +776,14 @@ void LLFloaterCamera::onCustomPresetSelected()
 
 void LLFloaterCamera::toggleCollapse()
 {
-    BOOL setting = !gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
+    bool setting = !gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
     gSavedSettings.setBOOL("AlchemyCameraFloaterExpanded", setting);
     collapse();
 }
 
 void LLFloaterCamera::collapse()
 {
-    BOOL collapse = gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
+    bool collapse = gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
     mBtnCollapse->setImageOverlay(collapse ? "Conv_toolbar_collapse" : "Conv_toolbar_expand");
     getChild<LLPanel>("buttons_panel")->setVisible(collapse);
     reshape(collapse ? 370 : 210, getRect().getHeight(), false);

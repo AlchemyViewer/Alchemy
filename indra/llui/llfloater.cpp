@@ -1856,7 +1856,7 @@ bool LLFloater::handleDoubleClick(S32 x, S32 y, MASK mask)
     }
     return LLPanel::handleDoubleClick(x, y, mask);
 // [/SL:KB]
-//  BOOL was_minimized = mMinimized;
+//  bool was_minimized = mMinimized;
 //  setMinimized(false);
 //  return was_minimized || LLPanel::handleDoubleClick(x, y, mask);
 }

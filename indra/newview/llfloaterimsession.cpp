@@ -1493,13 +1493,13 @@ void LLFloaterIMSession::onIMChicletCreated( const LLUUID& session_id )
 // virtual
 bool LLFloaterIMSession::handleKeyHere(KEY key, MASK mask)
 {
-    BOOL handled = FALSE;
+    bool handled = false;
 
     if (KEY_RETURN == key && mask == MASK_ALT)
     {
         mInputEditor->updateHistory();
         sendMsgFromInputEditor(true);
-        handled = TRUE;
+        handled = true;
     }
     return handled;
 }
