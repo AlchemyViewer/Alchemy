@@ -108,7 +108,7 @@ public:
     LLConversationItem* getCurSelectedViewModelItem();
     void forceReshape();
     virtual bool handleKeyHere( KEY key, MASK mask ) override;
-    bool isMessagePaneExpanded(){return mMessagePaneExpanded;}
+    bool isMessagePaneExpanded() const {return mMessagePaneExpanded;}
     void setMessagePaneExpanded(bool expanded){mMessagePaneExpanded = expanded;}
     void restoreFloater();
     void saveCollapsedState();
