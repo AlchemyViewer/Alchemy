@@ -150,6 +150,10 @@ if(USE_BUGSPLAT)
   list(APPEND VCPKG_MANIFEST_FEATURES "bugsplat")
 endif()
 
+if(USE_VELOPACK)
+  list(APPEND VCPKG_MANIFEST_FEATURES "velopack")
+endif()
+
 # Export compile_commands.json for ninja and makefile generators
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
