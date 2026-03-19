@@ -76,6 +76,11 @@
 #include "llvelopack.h"
 #endif
 
+// Sentry (https://sentry.io) crash reporting tool
+#if AL_SENTRY
+#include <sentry.h>
+#endif
+
 // Bugsplat (http://bugsplat.com) crash reporting tool
 #ifdef LL_BUGSPLAT
 #include "bugsplat/BugSplat.h"
@@ -224,8 +229,7 @@ LONG WINAPI catchallCrashHandler(EXCEPTION_POINTERS * /*ExceptionInfo*/)
     return 0;
 }
 
-const std::string LLAppViewerWin32::sWindowClass = "Second Life";
-
+const std::string LLAppViewerWin32::sWindowClass = "Alchemy";
 
 // Create app mutex creates a unique global windows object.
 // If the object can be created it returns true, otherwise
@@ -238,7 +242,7 @@ const std::string LLAppViewerWin32::sWindowClass = "Second Life";
 bool create_app_mutex()
 {
     bool result = true;
-    LPCWSTR unique_mutex_name = L"SecondLifeAppMutex";
+    LPCWSTR unique_mutex_name = L"AlchemyAppMutex";
     HANDLE hMutex;
     hMutex = CreateMutex(NULL, TRUE, unique_mutex_name);
     if (GetLastError() == ERROR_ALREADY_EXISTS)
@@ -704,12 +708,7 @@ bool LLAppViewerWin32::init()
 #endif
 
 #if LL_SEND_CRASH_REPORTS
-#if ! defined(LL_BUGSPLAT)
-#pragma message("Building without BugSplat")
-
-#else // LL_BUGSPLAT
-#pragma message("Building with BugSplat")
-
+#if defined(LL_BUGSPLAT)
     if (!isSecondInstance())
     {
         // Cleanup previous session
