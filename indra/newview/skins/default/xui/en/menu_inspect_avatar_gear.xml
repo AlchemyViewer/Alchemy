@@ -240,35 +240,35 @@
      label="Copy Full Name"
      name="copy_full_name">
       <menu_item_call.on_click
-       function="Avatar.CopyData"
+       function="InspectAvatar.CopyData"
        parameter="full_name"/>
     </menu_item_call>
     <menu_item_call
      label="Copy Display Name"
      name="copy_display_name">
       <menu_item_call.on_click
-       function="Avatar.CopyData"
+       function="InspectAvatar.CopyData"
        parameter="display_name"/>
     </menu_item_call>
     <menu_item_call
      label="Copy Agent Name"
      name="copy_username">
       <menu_item_call.on_click
-       function="Avatar.CopyData"
+       function="InspectAvatar.CopyData"
        parameter="user_name"/>
     </menu_item_call>
     <menu_item_call
      label="Copy SLurl"
      name="copy_slurl">
       <menu_item_call.on_click
-       function="Avatar.CopyData"
+       function="InspectAvatar.CopyData"
        parameter="slurl"/>
     </menu_item_call>
     <menu_item_call
      label="Copy UUID"
      name="copy_uuid">
       <menu_item_call.on_click
-       function="Avatar.CopyData"
+       function="InspectAvatar.CopyData"
        parameter="id"/>
     </menu_item_call>
   </context_menu>

@@ -140,6 +140,7 @@ private:
     void onClickFindOnMap();
     void onClickViewChatHistory();
     void onClickTeleportTo();
+    void onClickCopyData();
     bool onVisibleFindOnMap();
     bool onVisibleFreezeEject();
     bool onVisibleManageEstate();
@@ -253,6 +254,7 @@ LLInspectAvatar::LLInspectAvatar(const LLSD& sd)
     mCommitCallbackRegistrar.add("InspectAvatar.EnableVoice", boost::bind(&LLInspectAvatar::toggleSelectedVoice, this, true));
     mCommitCallbackRegistrar.add("InspectAvatar.ViewChatHistory", boost::bind(&LLInspectAvatar::onClickViewChatHistory, this));
     mCommitCallbackRegistrar.add("InspectAvatar.TeleportTo", boost::bind(&LLInspectAvatar::onClickTeleportTo, this));
+    mCommitCallbackRegistrar.add("InspectAvatar.CopyData", boost::bind(&LLInspectAvatar::onClickCopyData, this));
 
     mEnableCallbackRegistrar.add("InspectAvatar.EnableGod", boost::bind(&LLInspectAvatar::godModeEnabled, this));
     mEnableCallbackRegistrar.add("InspectAvatar.VisibleFindOnMap",  boost::bind(&LLInspectAvatar::onVisibleFindOnMap, this));
@@ -851,6 +853,12 @@ void LLInspectAvatar::onClickViewChatHistory()
 void LLInspectAvatar::onClickTeleportTo()
 {
     ALAvatarActions::teleportTo(mAvatarID);
+    closeFloater();
+}
+
+void LLInspectAvatar::onClickCopyData()
+{
+    ALAvatarActions::copyDataUI(mAvatarID);
     closeFloater();
 }
 
