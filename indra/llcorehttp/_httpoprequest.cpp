@@ -148,6 +148,7 @@ HttpOpRequest::HttpOpRequest()
       mReplyLength(0),
       mReplyFullLength(0),
       mReplyHeaders(),
+      mReplyRetryAfter(0),
       mPolicyRetries(0),
       mPolicy503Retries(0),
       mPolicyRetryAt(HttpTime(0)),
@@ -669,10 +670,15 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
         break;
     }
 
-
-    // *TODO: Should this be 'Keep-Alive' ?
-    mCurlHeaders = curl_slist_append(mCurlHeaders, "Connection: keep-alive");
-    mCurlHeaders = curl_slist_append(mCurlHeaders, "Keep-alive: 300");
+    if (!mReqHeaders || !mReqHeaders->find(HTTP_OUT_HEADER_CONNECTION))
+    {
+        // *TODO: Should this be 'Keep-Alive' ?
+        mCurlHeaders = curl_slist_append(mCurlHeaders, "Connection: keep-alive");
+    }
+    if (!mReqHeaders || !mReqHeaders->find(HTTP_OUT_HEADER_KEEP_ALIVE))
+    {
+        mCurlHeaders = curl_slist_append(mCurlHeaders, "Keep-alive: 300");
+    }
 
     // Tracing
     if (mTracing >= HTTP_TRACE_CURL_HEADERS)
