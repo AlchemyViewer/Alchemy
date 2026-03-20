@@ -101,6 +101,7 @@
 #include "llfloatergridstatus.h"
 #include "llfloatergroups.h"
 #include "llfloaterhelpbrowser.h"
+#include "llfloaterhexeditor.h"
 #include "llfloaterhoverheight.h"
 #include "llfloaterhowto.h"
 #include "llfloaterhud.h"
@@ -561,6 +562,7 @@ void LLViewerFloaterReg::registerFloaters()
 
     // Alchemy Floaters
     LLFloaterReg::add("ao", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterAO>);
+    LLFloaterReg::add("asset_hex_editor", "floater_hex_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterHexEditor>);
 // [SL:KB] - Patch: Build-AssetRecovery | Checked: 2011-11-24 (Catznip-3.2)
     LLFloaterReg::add("asset_recovery", "floater_asset_recovery.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAssetRecovery>);
 // [/SL:KB]

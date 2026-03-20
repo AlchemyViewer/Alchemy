@@ -272,6 +272,7 @@ set(viewer_SOURCE_FILES
     llfloatergroups.cpp
     llfloaterhandler.cpp
     llfloaterhelpbrowser.cpp
+    llfloaterhexeditor.cpp
     llfloaterhoverheight.cpp
     llfloaterhowto.cpp
     llfloaterhud.cpp
@@ -372,6 +373,7 @@ set(viewer_SOURCE_FILES
     llgrouplist.cpp
     llgroupmgr.cpp
     llhasheduniqueid.cpp
+    llhexeditor.cpp
     llhints.cpp
     llhttpretrypolicy.cpp
     llhudeffect.cpp
@@ -1000,6 +1002,7 @@ set(viewer_HEADER_FILES
     llfloatergroups.h
     llfloaterhandler.h
     llfloaterhelpbrowser.h
+    llfloaterhexeditor.h
     llfloaterhoverheight.h
     llfloaterhowto.h
     llfloaterhud.h
@@ -1103,6 +1106,7 @@ set(viewer_HEADER_FILES
     llgrouplist.h
     llgroupmgr.h
     llhasheduniqueid.h
+    llhexeditor.h
     llhints.h
     llhttpretrypolicy.h
     llhudeffect.h

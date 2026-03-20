@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2020, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -930,10 +931,23 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
                     is_asset_knowable = LLAssetType::lookupIsAssetIDKnowable(inv_item->getType());
                 }
                 if ( !is_asset_knowable // disable menu item for Inventory items with unknown asset. EXT-5308
-                     || (! ( isItemPermissive() || gAgent.isGodlike() ) )
+                     || (! ( isItemPermissive() || gAgent.isGodlikeWithoutAdminMenuFakery() ) )
                      || (flags & FIRST_SELECTED_ITEM) == 0)
                 {
                     disabled_items.push_back(std::string("Copy Asset UUID"));
+                    is_asset_knowable = false;
+                }
+
+                static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
+                if (is_asset_knowable && sPowerfulWizard)
+                {
+                    items.push_back(LLStringExplicit("Extras Separator"));
+                    items.push_back(LLStringExplicit("Extras Menu"));
+
+                    if (!isItemPermissive())
+                    {
+                        disabled_items.push_back(LLStringExplicit("Edit Hex"));
+                    }
                 }
             }
 
@@ -1902,6 +1916,27 @@ void LLItemBridge::performAction(LLInventoryModel* model, std::string action)
     {
         std::string url = LLMarketplaceData::instance().getListingURL(mUUID);
         LLUrlAction::openURL(url);
+    }
+    else if ("edit_hex" == action)
+    {
+        LLViewerInventoryItem* item = model->getItem(mUUID);
+        bool is_asset_knowable = false;
+        if (item)
+        {
+            is_asset_knowable = LLAssetType::lookupIsAssetIDKnowable(item->getType());
+        }
+        if (!is_asset_knowable
+            || (!((item && item->getIsFullPerm()) || gAgent.isGodlikeWithoutAdminMenuFakery())))
+        {
+            is_asset_knowable = false;
+        }
+
+        if (is_asset_knowable)
+        {
+            LLFloaterReg::showInstance("asset_hex_editor",
+                LLSD().with("inv_id", item->getUUID())
+                .with("asset_type", item->getActualType()));
+        }
     }
 }
 
