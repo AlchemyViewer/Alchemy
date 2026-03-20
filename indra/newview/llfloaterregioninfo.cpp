@@ -507,7 +507,7 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
     U32 combat_flags = (REGION_COMBAT_FLAG_DAMAGE_ADJUST | REGION_COMBAT_FLAG_RESTORE_HEALTH);
     U8  on_death = 0;
     F32 damage_throttle = 0.0f;
-    F32 regeneration_rate = 0.1666;
+    F32 regeneration_rate = 0.1666f;
     F32 invulnerability_time = 0.0f;
     F32  damage_limit = 0.0f;
     bool supports_combat2 = false;
