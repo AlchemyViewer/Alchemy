@@ -156,7 +156,15 @@
     "sdl3": {
       "description": "Build with platform independent SDL window backend",
       "dependencies": [
-        "sdl3"
+      {
+        "name": "sdl3",
+        "features": [
+          "dbus",
+          "ibus",
+          "wayland",
+          "x11"
+        ]
+      }
       ]
     },
     "sentry": {

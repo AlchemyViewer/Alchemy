@@ -1897,7 +1897,6 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         ll::tinygltf
         ll::tinyexr
         ll::minizip
-        ll::libxml2
         )
 
 if (TARGET ll::velopack)
