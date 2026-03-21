@@ -24,6 +24,7 @@
 
 #if LL_WINDOWS
 #pragma warning(disable : 4244)
+#pragma warning(disable : 4267)
 #endif
 
 
