@@ -1,6 +1,6 @@
 repos:
-  - repo: https://github.com/secondlife/git-hooks.git
-    rev: v1.0.2
+  - repo: https://github.com/alchemyviewer/git-hooks.git
+    rev: v1.0.4
     hooks:
       - id: llsd
       - id: no-trigraphs
@@ -12,7 +12,9 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      - id: check-merge-conflict
       - id: check-xml
+      - id: fix-byte-order-marker
       - id: mixed-line-ending
       - id: trailing-whitespace
         files: \.(cpp|c|m|mm|h|inl|py|glsl|cmake|yaml|sh)$
