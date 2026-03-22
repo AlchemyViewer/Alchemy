@@ -426,7 +426,7 @@
         <key>AlchemyMoonWalk</key>
         <map>
             <key>Comment</key>
-            <string>Walking backwards when moving backwards</string>
+            <string>Disables walking backwards when moving backwards</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
