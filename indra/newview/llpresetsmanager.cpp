@@ -290,7 +290,6 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 {
     const std::vector<std::string> camera_controls = {
         // From panel_preferences_graphics.xml
-        "AlwaysRenderFriends",
         "RenderAnisotropicLevel",
         "RenderAvatarLODFactor",
         "RenderAvatarMaxComplexity",
@@ -303,7 +302,6 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
         "RenderFarClip",
         "RenderFlexTimeFactor",
         "RenderGlowResolutionPow",
-        "RenderLocalLights",
         "RenderLocalLightCount",
         "RenderMaxPartCount",
         "RenderQualityPerformance",

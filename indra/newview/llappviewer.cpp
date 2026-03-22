@@ -915,9 +915,6 @@ bool LLAppViewer::init()
     LLNotifications::instance();
     LL_INFOS("InitInfo") << "Notifications initialized." << LL_ENDL ;
 
-    // Init grid manager
-    LLGridManager::createInstance();
-
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
@@ -3010,6 +3007,9 @@ bool LLAppViewer::initConfiguration()
         LLError::setEnabledLogTypesMask(0);
         llassert_always(!gSavedSettings.getBOOL("SLURLPassToOtherInstance"));
     }
+
+    // Init grid manager
+    LLGridManager::createInstance();
 
     // Handle slurl use. NOTE: Don't let SL-55321 reappear.
     // This initial-SLURL logic, up through the call to
