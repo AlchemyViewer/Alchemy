@@ -6503,6 +6503,39 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>OpenDebugStatVoice</key>
+    <map>
+      <key>Comment</key>
+      <string>Expand Voice (WebRTC) stats display</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>OpenDebugStatVoiceOutgoing</key>
+    <map>
+      <key>Comment</key>
+      <string>Expand Outgoing audio (Voice) stats display</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>OpenDebugStatVoiceIncoming</key>
+    <map>
+      <key>Comment</key>
+      <string>Expand Incoming audio (Voice) stats display</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>OutBandwidth</key>
     <map>
       <key>Comment</key>
