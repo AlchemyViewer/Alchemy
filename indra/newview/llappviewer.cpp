@@ -5748,9 +5748,10 @@ void LLAppViewer::createWatchdogMarker() const
     {
         std::string error_marker = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, WATCHDOG_MARKER_FILE_NAME);
 
-        LLAPRFile file;
-        file.open(error_marker, LL_APR_WB);
-        if (file.getFileHandle())
+        std::error_code ec;
+        LLFile file;
+        file.open(error_marker, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+        if (file)
         {
             recordMarkerVersion(file);
             file.close();
