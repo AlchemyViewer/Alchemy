@@ -44,6 +44,7 @@
 #include "alfloaterprogressview.h"
 #include "alfloaterregiontracker.h"
 #include "alfloatertransactionlog.h"
+#include "alfloaterwebprofile.h"
 #include "allegacynotificationwellwindow.h"
 #include "llcommandhandler.h"
 #include "llcompilequeue.h"
@@ -586,6 +587,7 @@ void LLViewerFloaterReg::registerFloaters()
 // [/SL:KB]
     LLFloaterReg::add("sound_explorer", "floater_explore_sounds.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterExploreSounds>);
     LLFloaterReg::add("transaction_log", "floater_al_transaction_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterTransactionLog>);
+    LLFloaterReg::add("webprofile", "floater_al_web_profile.xml", (LLFloaterBuildFunc)&ALFloaterWebProfile::create);
 
     // *NOTE: Please keep these alphabetized for easier merges
 
