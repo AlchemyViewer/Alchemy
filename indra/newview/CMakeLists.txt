@@ -1961,7 +1961,7 @@ if (WINDOWS)
       ENABLE_EXPORTS OFF
       VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" # Sets VS debugger working directory
       )
-  target_compile_options(${VIEWER_BINARY_NAME} PRIVATE /bigobj)
+
   if(HAVOK)
       target_link_options(${VIEWER_BINARY_NAME} PRIVATE "/MAP\"alchemy-bin.MAP\"") # generate symbol map for havok_tpv scripts
   endif()

@@ -33,9 +33,5 @@ target_link_libraries(llphysicsextensionsos
 
 target_precompile_headers(llphysicsextensionsos REUSE_FROM llprecompiled)
 
-if(WINDOWS)
-  target_compile_options(llphysicsextensionsos PRIVATE /bigobj)
-endif()
-
 # Add tests
 

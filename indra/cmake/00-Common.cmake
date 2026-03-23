@@ -157,6 +157,7 @@ if(WINDOWS)
 
   # Options shared between all configurations
   add_compile_options(
+    /bigobj # Generated template code can be large
     /EHsc
     /Gy
     /GS
