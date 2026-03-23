@@ -30,11 +30,11 @@
 #define LL_LLCOROS_H
 
 #include "llexception.h"
+#include "llsingleton.h"
 #include <boost/fiber/fss.hpp>
 #include <boost/fiber/future/future.hpp>
 #include <boost/fiber/future/promise.hpp>
 #include <boost/fiber/recursive_mutex.hpp>
-#include "llsingleton.h"
 #include "llinstancetracker.h"
 #include <functional>
 #include <mutex>
