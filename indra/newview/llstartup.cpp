@@ -2104,6 +2104,15 @@ bool idle_startup()
             return false;
         }
 
+        // set up callbacks
+        LL_INFOS() << "Registering Callbacks" << LL_ENDL;
+        LLMessageSystem* msg = gMessageSystem;
+        LL_INFOS() << " Inventory" << LL_ENDL;
+        LLInventoryModel::registerCallbacks(msg);
+        LL_INFOS() << " Landmark" << LL_ENDL;
+        LLLandmark::registerCallbacks(msg);
+        do_startup_frame();
+
         LLInventoryModelBackgroundFetch::instance().start();
         LLAppearanceMgr::instance().initCOFID();
         LLUUID cof_id = LLAppearanceMgr::instance().getCOF();
@@ -2125,15 +2134,6 @@ bool idle_startup()
         gInventory.addChangedMask(LLInventoryObserver::ALL, LLUUID::null);
         gInventory.notifyObservers();
 
-        do_startup_frame();
-
-        // set up callbacks
-        LL_INFOS() << "Registering Callbacks" << LL_ENDL;
-        LLMessageSystem* msg = gMessageSystem;
-        LL_INFOS() << " Inventory" << LL_ENDL;
-        LLInventoryModel::registerCallbacks(msg);
-        LL_INFOS() << " Landmark" << LL_ENDL;
-        LLLandmark::registerCallbacks(msg);
         do_startup_frame();
 
         // request all group information
