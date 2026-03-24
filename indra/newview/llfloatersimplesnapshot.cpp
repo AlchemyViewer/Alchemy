@@ -54,7 +54,7 @@ void post_thumbnail_image_coro(std::string cap_url, std::string path_to_image, L
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("post_profile_image_coro", httpPolicy);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("post_thumbnail_image_coro", httpPolicy);
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpHeaders::ptr_t httpHeaders;
 

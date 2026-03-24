@@ -1212,7 +1212,7 @@ bool LLAgent::inPrelude()
     return mRegionp && mRegionp->isPrelude();
 }
 
-std::string LLAgent::getRegionCapability(const std::string &name)
+std::string LLAgent::getRegionCapability(std::string_view name)
 {
     if (!mRegionp)
         return std::string();
