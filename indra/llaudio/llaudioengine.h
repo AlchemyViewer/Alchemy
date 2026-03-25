@@ -50,8 +50,8 @@ const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
 const F32 ATTACHED_OBJECT_TIMEOUT = 5.0f;
 const F32 DEFAULT_MIN_DISTANCE = 2.0f;
 
-#define LL_MAX_AUDIO_CHANNELS 30
-#define LL_MAX_AUDIO_BUFFERS 40 // Some extra for preloading, maybe?
+#define LL_MAX_AUDIO_CHANNELS 120
+#define LL_MAX_AUDIO_BUFFERS 140 // Some extra for preloading, maybe?
 
 class LLAudioSource;
 class LLAudioData;

@@ -97,10 +97,6 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
             << " expected:" << FMOD_VERSION << LL_ENDL;
     }
 
-    // In this case, all sounds, PLUS wind and stream will be software.
-    result = mSystem->setSoftwareChannels(LL_MAX_AUDIO_CHANNELS + 2);
-    Check_FMOD_Error(result, "FMOD::System::setSoftwareChannels");
-
     FMOD_ADVANCEDSETTINGS settings;
     memset(&settings, 0, sizeof(settings));
     settings.cbSize = sizeof(FMOD_ADVANCEDSETTINGS);
@@ -221,6 +217,8 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
     mSystem->getDriverInfo(0, r_name, 511, nullptr, &r_samplerate, nullptr, &r_channels);
     r_name[511] = '\0';
     LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): r_name=\"" << r_name << "\"" << LL_ENDL;
+    LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): r_samplerate=" << r_samplerate << "Hz" << LL_ENDL;
+    LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): r_channels=" << r_channels << LL_ENDL;
 
     if (r_samplerate != 0)
         latency = (int)(1000.0f * r_bufferlength * r_numbuffers / r_samplerate);
