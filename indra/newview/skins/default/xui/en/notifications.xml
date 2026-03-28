@@ -13013,6 +13013,13 @@ are wearing now.
   </notification>
 
   <notification
+   icon="notify.tga"
+   name="DumpArchetypeSuccess"
+   type="notify">
+    Successfully saved appearance to [FILE_PATH].
+  </notification>
+
+  <notification
    icon="alertmodal.tga"
    name="ConfirmRemoveSkin"
    type="alertmodal">
@@ -13357,6 +13364,21 @@ Your privilege to find [NAME]&apos;s map location has been revoked.
     log_to_im="true"
     type="notify">
 [NAME] has given you permission to find their location on the map.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ShapeImportGenericFail"
+   type="notifytip">
+    <tag>fail</tag>
+    There was a problem importing [FILENAME]. Please see the log for more details.
+  </notification>
+  <notification
+   icon="notifytip.tga"
+   name="ShapeImportVersionFail"
+   type="notifytip">
+    <tag>fail</tag>
+    Shape import failed. Are you sure [FILENAME] is an avatar genepool file?
   </notification>
 
   <notification

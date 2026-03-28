@@ -57,6 +57,7 @@
 #include "llpolyskeletaldistortion.h"
 #include "lleditingmotion.h"
 #include "llemote.h"
+#include "llfilepicker.h"
 #include "llfloatertools.h"
 #include "llheadrotmotion.h"
 #include "llhudeffecttrail.h"
@@ -88,6 +89,7 @@
 #include "llviewertexlayer.h"
 #include "llviewertexturelist.h"
 #include "llviewermenu.h"
+#include "llviewermenufile.h"
 #include "llviewerobjectlist.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
@@ -10603,13 +10605,17 @@ void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_weara
     std::string outprefix(prefix);
     if (outprefix.empty())
     {
-        outprefix = getDebugName() + (isSelf() ? "_s" : "_o");
+        outprefix = std::string("new_archetype");
     }
     std::string outfilename = get_sequential_numbered_file_name(outprefix, ".xml");
+    LLFilePickerReplyThread::startPicker(boost::bind(&LLVOAvatar::dumpArchetypeXMLCallback, this, _1, group_by_wearables), LLFilePicker::FFSAVE_XML, outfilename);
+}
 
+void LLVOAvatar::dumpArchetypeXMLCallback(const std::vector<std::string>& filenames, bool group_by_wearables)
+{
     LLFile outfile;
     LLWearableType *wr_inst = LLWearableType::getInstance();
-    std::string fullpath = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, outfilename);
+    std::string fullpath = filenames[0];
 
     std::error_code ec;
     if (outfile.open(fullpath, LLFile::out|LLFile::trunc|LLFile::binary, ec) == 0 && !ec)
@@ -10834,6 +10840,8 @@ void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_weara
         LLNotificationsUtil::add("AppearanceToXMLFailed");
     }
     // File will close when handle goes out of scope
+    LL_INFOS("DumpArchetypeXML") << "Archetype xml written successfully!" << LL_ENDL;
+    LLNotificationsUtil::add("DumpArchetypeSuccess", LLSD().with("FILE_PATH", fullpath));
 }
 
 

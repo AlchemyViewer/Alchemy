@@ -450,10 +450,10 @@
      follows="bottom|left|right"
      height="23"
      layout="topleft"
-     left="2"
+     left="10"
      name="button_panel"
      top_pad="6"
-     width="333">
+     width="313">
         <layout_stack
          follows="bottom|left|right"
          height="23"
@@ -463,7 +463,7 @@
          left="0"
          orientation="horizontal"
          top="0"
-         width="333">	
+         width="313">	
             <layout_panel
              follows="bottom|left|right"
              height="23"
@@ -472,7 +472,7 @@
              mouse_opaque="false"
              name="save_as_btn_lp"
              auto_resize="true"
-             width="154">
+             width="151">
                 <button
                  follows="bottom|left|right"
                  height="23"
@@ -481,17 +481,17 @@
                  left="1"
                  name="save_as_button"
                  top="0"
-                 width="153" />
+                 width="148" />
             </layout_panel>
             <layout_panel
              follows="bottom|left|right"
              height="23"
              layout="bottomleft"
-             left_pad="3"			
+             left="0"
              mouse_opaque="false"
              name="revert_btn_lp"
              auto_resize="true"
-             width="152">
+             width="151">
                 <button
                  follows="bottom|left|right"
                  height="23"
@@ -499,6 +499,25 @@
                  layout="topleft"
                  left="1"
                  name="revert_button"
+                 top="0"
+                 width="148" />
+            </layout_panel>
+            <layout_panel
+             follows="bottom|left|right"
+             height="23"
+             layout="bottomleft"
+             left="0"
+             mouse_opaque="false"
+             name="import_btn_lp"
+             auto_resize="true"
+             width="151">
+                <button
+                 follows="bottom|left|right"
+                 height="23"
+                 label="Import"
+                 layout="topleft"
+                 left="1"
+                 name="import_btn"
                  top="0"
                  width="148" />
             </layout_panel>

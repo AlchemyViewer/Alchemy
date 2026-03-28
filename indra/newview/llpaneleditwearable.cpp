@@ -51,6 +51,7 @@
 #include "lliconctrl.h"
 
 #include "llcolorswatch.h"
+#include "llfilepicker.h"
 #include "lltexturectrl.h"
 #include "lltextureentry.h"
 #include "llviewercontrol.h"    // gSavedSettings
@@ -62,6 +63,7 @@
 #include "llcommandhandler.h"
 #include "lltextutil.h"
 #include "llappearancemgr.h"
+#include "llviewermenufile.h"
 
 // register panel with appropriate XML
 static LLPanelInjector<LLPanelEditWearable> t_edit_wearable("panel_edit_wearable");
@@ -722,6 +724,8 @@ bool LLPanelEditWearable::postBuild()
         mBtnBack->setLabel(LLStringUtil::null);
 
         mBtnBack->setClickedCallback(boost::bind(&LLPanelEditWearable::onBackButtonClicked, this));
+
+        getChild<LLButton>("import_btn")->setClickedCallback(boost::bind(&LLPanelEditWearable::onClickedImportBtn, this));
 
         mNameEditor = getChild<LLLineEditor>("description");
 
@@ -1686,6 +1690,82 @@ void LLPanelEditWearable::initPreviousAlphaTextureEntry(LLAvatarAppearanceDefine
         {
                 mPreviousAlphaTexture[te] = lto->getID();
         }
+}
+
+void LLPanelEditWearable::onClickedImportBtn()
+{
+    LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelEditWearable::onClickedImportBtnCallback, this, _1), LLFilePicker::FFLOAD_XML, false);
+}
+
+void LLPanelEditWearable::onClickedImportBtnCallback(const std::vector<std::string>& filenames)
+{
+    const std::string filename = filenames[0];
+    LLXmlTree tree;
+    if (!tree.parseFile(filename, FALSE))
+    {
+        LL_WARNS("ShapeImport") << "Parsing " << filename << "failed miserably." << LL_ENDL;
+        LLNotificationsUtil::add("ShapeImportGenericFail", LLSD().with("FILENAME", filename));
+        return;
+    }
+    LLXmlTreeNode* root = tree.getRoot();
+    if (!root || !root->hasName("linden_genepool"))
+    {
+        LL_WARNS("ShapeImport") << filename << " has an invaid root node (not linden_genepool). Are you sure this is an avatar file?" << LL_ENDL;
+        LLNotificationsUtil::add("ShapeImportVersionFail", LLSD().with("FILENAME", filename));
+        return;
+    }
+    std::string version;
+    static LLStdStringHandle version_string = LLXmlTree::addAttributeString("version");
+    if(!root->getFastAttributeString(version_string, version) || (version != "1.0") )
+    {
+        LL_WARNS("ShapeImport") << "Invalid avatar file version: " << version << " in file: " << filename << LL_ENDL;
+        LLNotificationsUtil::add("ShapeImportVersionFail", LLSD().with("FILENAME", filename));
+        return;
+    }
+    LLXmlTreeNode* archetype = root->getChildByName("archetype");
+    if (archetype)
+    {
+        static const LLStdStringHandle id_handle = LLXmlTree::addAttributeString("id");
+        static const LLStdStringHandle value_handle = LLXmlTree::addAttributeString("value");
+        U32 parse_errors = 0;
+
+        for (LLXmlTreeNode* child = archetype->getFirstChild(); child != nullptr; child = archetype->getNextChild())
+        {
+            if (!child->hasName("param")) continue;
+            S32 id;
+            F32 value;
+            if (child->getFastAttributeS32(id_handle, id)
+                && child->getFastAttributeF32(value_handle, value))
+            {
+                LLVisualParam* visual_param = getWearable()->getVisualParam(id);
+                if (visual_param)
+                    visual_param->setWeight(value);
+            }
+            else
+            {
+                LL_WARNS("ShapeImport") << "Failed to parse parameters in " << filename << LL_ENDL;
+                ++parse_errors;
+            }
+        }
+        if (parse_errors)
+        {
+            LLNotificationsUtil::add("ShapeImportGenericFail", LLSD().with("FILENAME", filename));
+        }
+        if (isAgentAvatarValid())
+        {
+            getWearable()->writeToAvatar(gAgentAvatarp);
+            gAgentAvatarp->updateVisualParams();
+            updateScrollingPanelUI();
+            LL_INFOS("ShapeImport") << "Shape import has finished with great success!" << LL_ENDL;
+        }
+        else
+            LL_WARNS("ShapeImport") << "Agent is not valid. Can't apply shape import changes" << LL_ENDL;
+    }
+    else
+    {
+        LL_WARNS("ShapeImport") << filename << " is missing the archetype." << LL_ENDL;
+        LLNotificationsUtil::add("ShapeImportGenericFail");
+    }
 }
 
 // handle secondlife:///app/metricsystem

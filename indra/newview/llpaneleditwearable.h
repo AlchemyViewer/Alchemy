@@ -91,6 +91,9 @@ private:
     // update bottom bar buttons ("Save", "Revert", etc)
     void                updateVerbs();
 
+    void                onClickedImportBtn();
+    void                onClickedImportBtnCallback(const std::vector<std::string>& filenames);
+
     void                onColorSwatchCommit(const LLUICtrl*);
     void                onTexturePickerCommit(const LLUICtrl*);
     void                updatePanelPickerControls(LLWearableType::EType type);
