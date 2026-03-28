@@ -421,6 +421,7 @@ static std::string gLaunchFileOnQuit;
 // Used on Win32 for other apps to identify our window (eg, win_setup)
 const char* const VIEWER_WINDOW_CLASSNAME = "Alchemy";
 
+
 //----------------------------------------------------------------------------
 
 // List of entries from strings.xml to always replace

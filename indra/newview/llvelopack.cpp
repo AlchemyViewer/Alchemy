@@ -408,6 +408,50 @@ static void register_protocol_handler(const std::wstring& protocol,
     }
 }
 
+void clear_nsis_links()
+{
+    wchar_t path[MAX_PATH];
+
+    // 1. The 'start' shortcuts set by nsis would be global, like app shortcut:
+    // C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Second Life Viewer\Second Life Viewer.lnk
+    // But it isn't just one link, it's a whole directory that needs to be removed.
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_COMMON_PROGRAMS, NULL, 0, path)))
+    {
+        std::wstring start_menu_path = path;
+        std::wstring folder_path   = start_menu_path + L"\\" + get_app_name();
+
+        std::error_code ec;
+        std::filesystem::path dir(folder_path);
+        if (std::filesystem::exists(dir, ec))
+        {
+            std::filesystem::remove_all(dir, ec);
+            if (ec)
+            {
+                LL_WARNS("Velopack") << "Failed to remove NSIS start menu directory: "
+                    << ll_convert_wide_to_string(folder_path) << LL_ENDL;
+            }
+        }
+    }
+
+    // 2. Desktop link, also a global one.
+    // C:\Users\Public\Desktop
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_COMMON_DESKTOPDIRECTORY, NULL, 0, path)))
+    {
+        std::wstring desktop_path = path;
+        std::wstring shortcut_path = desktop_path + L"\\" + get_app_name() + L".lnk";
+        if (!DeleteFileW(shortcut_path.c_str()))
+        {
+            DWORD error = GetLastError();
+            if (error != ERROR_FILE_NOT_FOUND)
+            {
+                LL_WARNS("Velopack") << "Failed to delete NSIS desktop shortcut: "
+                    << ll_convert_wide_to_string(shortcut_path)
+                    << " (error: " << error << ")" << LL_ENDL;
+            }
+        }
+    }
+}
+
 static void parse_version(const wchar_t* version_str, int& major, int& minor, int& patch, uint64_t& build)
 {
     major = minor = patch = 0;
@@ -417,7 +461,11 @@ static void parse_version(const wchar_t* version_str, int& major, int& minor, in
     swscanf(version_str, L"%d.%d.%d.%llu", &major, &minor, &patch, &build);
 }
 
-bool get_nsis_uninstaller_path(wchar_t* path_buffer, DWORD bufSize, S32 cur_major_ver, S32 cur_minor_ver, S32 cur_patch_ver, U64 cur_build_ver)
+bool get_nsis_version(
+    int& nsis_major,
+    int& nsis_minor,
+    int& nsis_patch,
+    uint64_t& nsis_build)
 {
     // Test for presence of NSIS viewer registration, then
     // attempt to read uninstall info
@@ -442,23 +490,12 @@ bool get_nsis_uninstaller_path(wchar_t* path_buffer, DWORD bufSize, S32 cur_majo
         return false;
     }
 
-    int nsis_major = 0, nsis_minor = 0, nsis_patch = 0;
-    uint64_t nsis_build = 0;
     parse_version(version_buf, nsis_major, nsis_minor, nsis_patch, nsis_build);
 
-    // Compare numerically
-    if ((nsis_major > cur_major_ver) ||
-        (nsis_major == cur_major_ver && nsis_minor > cur_minor_ver) ||
-        (nsis_major == cur_major_ver && nsis_minor == cur_minor_ver && nsis_patch > cur_patch_ver) ||
-         // Assume that bigger build number means newer version, which is not always true but works for our purposes
-        (nsis_major == cur_major_ver && nsis_minor == cur_minor_ver && nsis_patch == cur_patch_ver && nsis_build > cur_build_ver))
-    {
-        LL_INFOS() << "Found installed nsis version that is newer" << nsis_major << "." << nsis_minor << "." << nsis_patch << LL_ENDL;
-        RegCloseKey(hkey);
-        return false;
-    }
-
-    LONG rv = RegGetValueW(hkey, nullptr, L"UninstallString", RRF_RT_REG_SZ, &type, path_buffer, &bufSize);
+    // Make sure it actually exists and not a dead entry.
+    wchar_t path_buffer[MAX_PATH] = { 0 };
+    DWORD path_buf_size = sizeof(path_buffer);
+    LONG rv = RegGetValueW(hkey, nullptr, L"UninstallString", RRF_RT_REG_SZ, &type, path_buffer, &path_buf_size);
     RegCloseKey(hkey);
     if (rv != ERROR_SUCCESS)
     {
@@ -502,7 +539,13 @@ static void register_uninstall_info(const std::wstring& install_dir,
                                     const std::wstring& version)
 {
     std::wstring app_name_oneword = get_app_name_oneword();
+    // Clear previous 'alpha' name just in case, won't be needed after one-click releases.
     std::wstring key_path = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + app_name_oneword;
+    RegDeleteTreeW(HKEY_CURRENT_USER, key_path.c_str());
+    // Use a unique key name to avoid conflicts with any existing NSIS-based uninstall info,
+    // which can cause nly one of the two entries to show up in the Add/Remove Programs list.
+    // The UI will show DisplayName, so the key name itself is not important to be user-friendly.
+    key_path = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Vlpk" + app_name_oneword;
     HKEY hkey;
 
     if (RegCreateKeyExW(HKEY_CURRENT_USER, key_path.c_str(), 0, NULL,
@@ -550,7 +593,7 @@ static void register_uninstall_info(const std::wstring& install_dir,
 static void unregister_uninstall_info()
 {
     std::wstring app_name_oneword = get_app_name_oneword();
-    std::wstring key_path = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + app_name_oneword;
+    std::wstring key_path = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Vlpk" + app_name_oneword;
     RegDeleteTreeW(HKEY_CURRENT_USER, key_path.c_str());
 }
 
@@ -705,9 +748,96 @@ static void ensure_update_manager(bool allow_downgrade)
             nullptr);
     }
 
+    vpkc_locator_config_t* locator_ptr = nullptr;
+
+#if LL_DARWIN
+    // Try auto-detection first (works when the app bundle was packaged by vpk
+    // and has UpdateMac + sq.version already present)
     if (!vpkc_new_update_manager_with_source(sUpdateSource, &options, nullptr, &sUpdateManager))
     {
-        LL_WARNS("Velopack") << "Failed to create update manager" << LL_ENDL;
+        char err[512];
+        vpkc_get_last_error(err, sizeof(err));
+        LL_INFOS("Velopack") << "Auto-detect failed (" << ll_safe_string(err)
+                             << "), falling back to explicit locator" << LL_ENDL;
+
+        // Auto-detection failed — construct an explicit locator.
+        // This handles legacy DMG installs that don't have Velopack's
+        // install state (UpdateMac, sq.version) in the bundle.
+        vpkc_locator_config_t locator = {};
+
+        // The executable lives at <bundle>/Contents/MacOS/<exe>
+        // The app bundle root is two levels up from the executable directory.
+        std::string exe_dir = gDirUtilp->getExecutableDir();
+        std::string bundle_root = exe_dir + "/../..";
+        char resolved[PATH_MAX];
+        if (realpath(bundle_root.c_str(), resolved))
+        {
+            bundle_root = resolved;
+        }
+
+        // Construct a version string in Velopack SemVer format: major.minor.patch-build
+        const LLVersionInfo& vi = LLVersionInfo::instance();
+        std::string current_version = llformat("%d.%d.%d-%llu",
+            vi.getMajor(), vi.getMinor(), vi.getPatch(), vi.getBuild());
+
+        // Create a minimal sq.version manifest so Velopack knows our version.
+        // Proper vpk-packaged builds have this in the bundle already.
+        std::string manifest_path = gDirUtilp->getExpandedFilename(LL_PATH_TEMP, "sq.version");
+        {
+            std::string app_name = LLVersionInfo::instance().getChannel();
+            std::string pack_id = app_name;
+            pack_id.erase(std::remove(pack_id.begin(), pack_id.end(), ' '), pack_id.end());
+
+            std::string nuspec = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                "<package xmlns=\"http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd\">\n"
+                "  <metadata>\n"
+                "    <id>" + pack_id + "</id>\n"
+                "    <version>" + current_version + "</version>\n"
+                "    <title>" + app_name + "</title>\n"
+                "  </metadata>\n"
+                "</package>\n";
+
+            llofstream manifest_file(manifest_path, std::ios::trunc);
+            if (manifest_file.is_open())
+            {
+                manifest_file << nuspec;
+                manifest_file.close();
+            }
+        }
+
+        std::string packages_dir = gDirUtilp->getExpandedFilename(LL_PATH_TEMP, "velopack-packages");
+        LLFile::mkdir(packages_dir);
+
+        locator.RootAppDir = const_cast<char*>(bundle_root.c_str());
+        locator.CurrentBinaryDir = const_cast<char*>(exe_dir.c_str());
+        locator.ManifestPath = const_cast<char*>(manifest_path.c_str());
+        locator.PackagesDir = const_cast<char*>(packages_dir.c_str());
+        locator.UpdateExePath = nullptr;
+        locator.IsPortable = false;
+
+        locator_ptr = &locator;
+
+        LL_INFOS("Velopack") << "Explicit locator: RootAppDir=" << bundle_root
+                             << " CurrentBinaryDir=" << exe_dir
+                             << " Version=" << current_version << LL_ENDL;
+
+        if (!vpkc_new_update_manager_with_source(sUpdateSource, &options, locator_ptr, &sUpdateManager))
+        {
+            char err2[512];
+            vpkc_get_last_error(err2, sizeof(err2));
+            LL_WARNS("Velopack") << "Failed to create update manager: " << ll_safe_string(err2) << LL_ENDL;
+        }
+    }
+    return;
+#endif
+
+    // Windows: Velopack auto-detection works because the viewer is installed
+    // by Velopack's Setup.exe which creates the proper install structure.
+    if (!vpkc_new_update_manager_with_source(sUpdateSource, &options, nullptr, &sUpdateManager))
+    {
+        char err[512];
+        vpkc_get_last_error(err, sizeof(err));
+        LL_WARNS("Velopack") << "Failed to create update manager: " << ll_safe_string(err) << LL_ENDL;
     }
 }
 

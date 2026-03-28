@@ -4582,16 +4582,16 @@
       <key>Value</key>
       <string>0.0.0</string>
     </map>
-    <key>LastInstallVersion</key>
+    <key>PreviousInstallChecked</key>
     <map>
         <key>Comment</key>
-        <string>Version number of last instance of the viewer that you installed</string>
+        <string>Whether viewer checked previous install on the same channel for NSIS</string>
         <key>Persist</key>
         <integer>1</integer>
         <key>Type</key>
-        <string>String</string>
+        <string>Boolean</string>
         <key>Value</key>
-        <string></string>
+        <integer>0</integer>
     </map>
     <key>LimitDragDistance</key>
     <map>
@@ -13544,11 +13544,11 @@
     <key>UpdaterShowReleaseNotes</key>
     <map>
         <key>Comment</key>
-        <string>Enables displaying of the Release notes in a web floater after update.</string>
+        <string>Enables displaying of the Release notes in a web floater after update. 0 - don't show, 1 - show, 2 - show even for test viewers</string>
         <key>Persist</key>
         <integer>1</integer>
         <key>Type</key>
-        <string>Boolean</string>
+        <string>S32</string>
         <key>Value</key>
         <integer>1</integer>
     </map>

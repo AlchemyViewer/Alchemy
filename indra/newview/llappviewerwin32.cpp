@@ -438,6 +438,21 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     if (!velopack_initialize())
     {
         // Velopack handled the invocation (install/uninstall hook)
+
+        // Drop install related settings
+        gDirUtilp->initAppDirs("AlchemyNext");
+
+        std::string user_settings_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "settings.xml");
+        LLControlGroup settings("global");
+        if (settings.loadFromFile(user_settings_path))
+        {
+            // If user reinstalls or updates, we want to recheck for nsis leftovers.
+            if (settings.controlExists("PreviousInstallChecked"))
+            {
+                settings.setBOOL("PreviousInstallChecked", false);
+            }
+            settings.saveToFile(user_settings_path, true);
+        }
         return 0;
     }
 #endif

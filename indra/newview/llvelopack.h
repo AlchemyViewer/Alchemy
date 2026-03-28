@@ -46,7 +46,12 @@ void velopack_set_progress_callback(std::function<void(int)> callback);
 void velopack_cleanup();
 
 #if LL_WINDOWS
-bool get_nsis_uninstaller_path(wchar_t* path_buffer, DWORD bufSize, S32 cur_major_ver, S32 cur_minor_ver, S32 cur_patch_ver, U64 cur_build_ver);
+void clear_nsis_links();
+bool get_nsis_version(
+    int& nsis_major,
+    int& nsis_minor,
+    int& nsis_patch,
+    uint64_t& nsis_build);
 #endif
 
 #endif // LL_VELOPACK
