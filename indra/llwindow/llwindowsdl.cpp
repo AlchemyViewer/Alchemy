@@ -107,7 +107,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     mNativeAspectRatio = 1024.f / 768.f;
 
     if (title.empty())
-        mWindowTitle = "Second Life";
+        mWindowTitle = "Alchemy";
     else
         mWindowTitle = title;
 
@@ -391,10 +391,10 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     if (colorBits < 32)
     {
         setupFailure(
-                "Second Life requires True Color (32-bit) to run in a window.\n"
+                "Alchemy Viewer requires True Color (32-bit) to run in a window.\n"
                 "Please go to Control Panels -> Display -> Settings and\n"
                 "set the screen to 32-bit color.\n"
-                "Alternately, if you choose to run fullscreen, Second Life\n"
+                "Alternately, if you choose to run fullscreen, Alchemy Viewer\n"
                 "will automatically adjust the screen each time it runs.",
                 "Error",
                 OSMB_OK);
@@ -429,7 +429,7 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
 void* LLWindowSDL::createSharedContext()
 {
     SDL_PropertiesID props = SDL_CreateProperties();
-    SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Second Life OSR Utility");
+    SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Alchemy Viewer OSR Utility");
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 1);
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 1);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, false);

@@ -275,7 +275,7 @@ class ViewerManifest(LLManifest):
         return ''.join(self.app_name().split())
 
     def icon_path(self):
-        return "icons/" + self.channel_type()
+        return os.path.join(self.args['vcpkg_dir'], 'share', 'alchemy-branding', 'viewer', 'icons', self.channel_type())
 
     def extract_names(self,src):
         """Extract contributor names from source file, returns string"""
@@ -827,7 +827,7 @@ class DarwinManifest(ViewerManifest):
 
                 # need .icns file referenced by Info.plist
                 with self.prefix(src=self.icon_path(), dst="") :
-                    self.path("secondlife.icns")
+                    self.path("alchemy.icns")
                 with self.prefix(src_dst="cursors_mac"):
                     self.path("*.tif")
 
@@ -1003,7 +1003,7 @@ class DarwinManifest(ViewerManifest):
         bundle_id = self.args.get('bundleid', 'org.alchemyviewer.viewer')
 
         # Icon path for macOS
-        icon_path = os.path.join(self.get_src_prefix(), self.icon_path(), 'secondlife.icns')
+        icon_path = os.path.join(self.get_src_prefix(), self.icon_path(), 'alchemy.icns')
 
         # The main executable inside Contents/MacOS/ is named after the channel
         main_exe = self.channel()
@@ -1128,9 +1128,9 @@ class LinuxManifest(ViewerManifest):
         icon_path = self.icon_path()
         print("DEBUG: icon_path '%s'" % icon_path)
         with self.prefix(src=icon_path) :
-            self.path("secondlife_256.png","secondlife_icon.png")
+            self.path("alchemy_256.png","alchemy_icon.png")
             with self.prefix(dst="res-sdl") :
-                self.path("secondlife_256.BMP","ll_icon.BMP")
+                self.path("alchemy_256.BMP","ll_icon.BMP")
 
         with self.prefix(src=os.path.join(self.args['build'], os.pardir, "llwebrtc", self.args['configuration']), dst="lib"):
             self.path("libllwebrtc.so")

@@ -1577,7 +1577,7 @@ if (DARWIN)
 
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
-    secondlife.icns
+    alchemy.icns
     Info-Alchemy.plist
     Alchemy.xib
     # CMake doesn't seem to support Xcode language variants well just yet
