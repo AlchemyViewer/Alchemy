@@ -283,6 +283,9 @@ public:
     // Src and dst can be any size.  Src and dst can each have 3 or 4 components.
     void composite( const LLImageRaw* src );
 
+    std::string getComment() const { return mComment; }
+    std::string mComment;
+
     // Emissive operations used by minimap
     // Roughly emulates GLTF emissive texture, but is not GLTF-compliant
     // *TODO: Remove in favor of shader

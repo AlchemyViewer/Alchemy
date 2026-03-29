@@ -1510,6 +1510,39 @@ bool LLViewerFetchedTexture::preCreateTexture(S32 usename/*= 0*/)
         mOrigHeight = mFullHeight;
     }
 
+    if (!mRawImage->mComment.empty())
+    {
+        // a is for uploader
+        // z is for time
+        // K is the whole thing (just coz)
+        std::string comment = mRawImage->getComment();
+        mComment['K'] = comment;
+        size_t position = 0;
+        size_t length = comment.length();
+        while (position < length)
+        {
+            std::size_t equals_position = comment.find('=', position);
+            if (equals_position != std::string::npos)
+            {
+                S8 type = comment.at(equals_position - 1);
+                position = comment.find('&', position);
+                if (position != std::string::npos)
+                {
+                    mComment[type] = comment.substr(equals_position + 1, position - (equals_position + 1));
+                    position++;
+                }
+                else
+                {
+                    mComment[type] = comment.substr(equals_position + 1, length - (equals_position + 1));
+                }
+            }
+            else
+            {
+                position = equals_position;
+            }
+        }
+    }
+
     bool size_okay = true;
 
     S32 discard_level = mRawDiscardLevel;
@@ -2997,6 +3030,29 @@ bool LLViewerFetchedTexture::hasSavedRawImage() const
 F32 LLViewerFetchedTexture::getElapsedLastReferencedSavedRawImageTime() const
 {
     return sCurrentTime - mLastReferencedSavedRawImageTime;
+}
+
+LLUUID LLViewerFetchedTexture::getUploader()
+{
+    return (mComment.find('a') != mComment.end()) ? LLUUID(mComment['a']) : LLUUID::null;
+}
+
+LLDate LLViewerFetchedTexture::getUploadTime()
+{
+    if (mComment.find('z') != mComment.end())
+    {
+        struct tm t = {};
+        sscanf(mComment['z'].c_str(), "%4d%2d%2d%2d%2d%2d",
+               &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &t.tm_sec);
+        std::string iso_date = llformat("%d-%d-%dT%d:%d:%dZ", t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+        return LLDate(iso_date);
+    }
+    return LLDate();
+}
+
+std::string LLViewerFetchedTexture::getComment()
+{
+    return (mComment.find('K') != mComment.end()) ? mComment['K'] : LLStringUtil::null;
 }
 
 //----------------------------------------------------------------------------------------------

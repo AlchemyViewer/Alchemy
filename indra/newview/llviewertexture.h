@@ -420,6 +420,10 @@ public:
     bool mCreatePending = false;    // if true, this is in gTextureList.mCreateTextureList
     mutable bool mDownScalePending = false; // if true, this is in gTextureList.mDownScaleQueue
 
+    LLUUID      getUploader();
+    LLDate      getUploadTime();
+    std::string getComment();
+
 protected:
     S32 getCurrentDiscardLevelForFetching() ;
     void forceToRefetchTexture(S32 desired_discard = 0, F32 kept_time = 60.f);
@@ -509,6 +513,8 @@ protected:
 
     bool   mForSculpt ; //a flag if the texture is used as sculpt data.
     bool   mIsFetched ; //is loaded from remote or from cache, not generated locally.
+
+    std::map<S8, std::string> mComment;
 
 public:
     static F32 sMaxVirtualSize; //maximum possible value of mMaxVirtualSize
