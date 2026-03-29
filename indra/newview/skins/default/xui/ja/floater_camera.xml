@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<floater name="camera_floater" help_topic="camera_floater" title="カメラ操作">
+<floater name="camera_floater">
 	<floater.string name="rotate_tooltip">
 		対象を中心にカメラを回す
 	</floater.string>
@@ -15,29 +15,30 @@
 	<string name="inactive_combo_text">
 		プリセットを使用
 	</string>
+	<panel name="buttons">
+		<button name="collapse_btn" tool_tip="折り畳む／展開する"/>
+		<button name="save_cam_pos_btn" tool_tip="現在のカメラの位置とフォーカスを保存します。"/>
+		<button name="restore_cam_pos_btn" tool_tip="保存されたカメラの位置とフォーカスを復元します。"/>
+	</panel>
 	<panel name="controls">
+		<!--TODO: replace + - images -->
 		<panel name="zoom">
-			<joystick_rotate name="cam_rotate_stick" tool_tip="対象にカメラを追尾"/>
-			<button name="zoom_plus_btn"/>
-			<slider_bar tool_tip="対象にカメラをズーム"/>
-			<button name="zoom_minus_btn"/>
-			<joystick_track tool_tip="カメラを上下左右に動かします。"/>
-			<text name="precise_ctrs_label">
-				数値で角度方位を指定
-			</text>
+			<joystick_rotate name="cam_rotate_stick" tool_tip="対象にカメラを追尾させます。"/>
+			<slider_bar name="zoom_slider" tool_tip="対象にカメラをズームします。"/>
+			<joystick_track name="cam_track_stick" tool_tip="カメラを上下左右に動かします。"/>
 		</panel>
 	</panel>
 	<panel name="buttons_panel">
-		<panel_camera_item name="front_view" tool_tip="前方視界"/>
-		<panel_camera_item name="group_view" tool_tip="斜方視界"/>
-		<panel_camera_item name="rear_view" tool_tip="後方視界"/>
-		<panel_camera_item name="object_view" tool_tip="オブジェクト視点"/>
+		<panel_camera_item name="front_view" tool_tip="前方ビュー"/>
+		<panel_camera_item name="group_view" tool_tip="サイドビュー"/>
+		<panel_camera_item name="rear_view" tool_tip="後方ビュー"/>
+		<panel_camera_item name="object_view" tool_tip="オブジェクトビュー"/>
 		<panel_camera_item name="mouselook_view" tool_tip="マウスルックビュー"/>
 		<combo_box name="preset_combo">
-			<combo_list mouse_wheel_opaque="true"/>
-			<combo_box.item label="プリセットを使用" name="Use preset" value="default"/>
+			<combo_box.item label="プリセットを使用" name="Use preset"/>
 		</combo_box>
 		<button name="gear_btn" tool_tip="カメラのプリセット"/>
 		<button label="プリセットを保存…" name="save_preset_btn"/>
+		<button name="precise_controls_btn" tool_tip="小数点単位の操作を使用します。"/>
 	</panel>
 </floater>

@@ -7,10 +7,10 @@
 		ぜひご覧ください！
 	</string>
 	<string name="upload_message">
-		送信中…
+		送信しています…
 	</string>
 	<text name="title">
-		Eメール
+		Ｅメール
 	</text>
 	<tab_container name="postcard_tabs">
 		<panel label="メッセージ" name="panel_postcard_message"/>

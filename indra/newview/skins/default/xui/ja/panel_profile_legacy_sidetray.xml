@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel label="プロフィール" name="Avatar Profile">
+	<panel.string name="account_info_fmt">
+		[ACCOUNT_TYPE]
+[PAYMENT_INFO]
+[AGE_VERIFIED]
+	</panel.string>
+	<panel.string name="age_verified">
+		年齢認証済み
+	</panel.string>
+	<panel.string name="rezday_fmt">
+		[REZDAY]（[AGE]）
+	</panel.string>
+	<panel.string name="add_friend">
+		フレンドに追加
+	</panel.string>
+	<panel.string name="remove_friend">
+		フレンドから削除
+	</panel.string>
+	<panel name="avatar_info_top">
+		<text_editor name="avatar_name" value="（読み込んでいます…）"/>
+	</panel>
+	<layout_stack name="layout">
+		<layout_panel name="avatar_accordions">
+			<accordion name="avatar_accordion">
+				<accordion_tab name="avatar_secondlife_tab" title="セカンドライフ"/>
+				<accordion_tab name="avatar_groups_tab" title="グループ"/>
+				<accordion_tab name="avatar_picks_tab" title="ピック"/>
+				<accordion_tab name="avatar_firstlife_tab" title="ファーストライフ"/>
+				<accordion_tab name="avatar_notes_tab" title="ノート"/>
+			</accordion>
+		</layout_panel>
+	</layout_stack>
+	<layout_stack name="button_row_ls">
+		<layout_panel name="btn_chat_lp">
+			<button name="btn_chat" label="チャット" tool_tip="インスタントメッセージを送ります。"/>
+		</layout_panel>
+		<layout_panel name="btn_friend_lp">
+			<button name="btn_friend" label="フレンドに追加"/>
+		</layout_panel>
+		<layout_panel name="btn_block_lp">
+			<button name="btn_block" label="ブロック" tool_tip="このアバターをブロックします。"/>
+		</layout_panel>
+		<layout_panel name="btn_menu_lp">
+			<menu_button tool_tip="このアバターへの操作を実行します。" name="btn_menu"/>
+		</layout_panel>
+	</layout_stack>
+</panel>

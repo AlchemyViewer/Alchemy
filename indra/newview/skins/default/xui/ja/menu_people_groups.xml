@@ -4,5 +4,8 @@
 	<menu_item_call label="チャット" name="Chat"/>
 	<menu_item_call label="ボイスコール" name="Call"/>
 	<menu_item_call label="アクティブ" name="Activate"/>
+	<menu_item_call label="名前をコピー" name="copy_label"/>
+	<menu_item_call label="SLurlをコピー" name="copy_slurl"/>
+	<menu_item_call label="ＵＵＩＤをコピー" name="copy_uuid"/>
 	<menu_item_call label="脱退" name="Leave"/>
 </menu>

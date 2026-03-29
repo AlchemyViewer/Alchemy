@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+Not can_close / no title to avoid window chrome
+Single instance - only have one at a time, recycle it each spawn
+-->
 <floater name="inspect_group">
 	<string name="PrivateGroup">
 		プライベートグループ
@@ -20,7 +24,7 @@
 ヘラジカを恐れてください！恐れよ！そしてマングースも！
 	</text>
 	<text name="group_cost">
-		L$123 to join
+		加入費用L$ 123
 	</text>
 	<button label="参加" name="join_btn"/>
 	<button label="脱退" name="leave_btn"/>

@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+Not can_close / no title to avoid window chrome
+Single instance - only have one at a time, recycle it each spawn
+-->
 <floater name="inspect_avatar">
 	<string name="Subtitle">
 		[AGE]
@@ -12,7 +16,6 @@
 	<text name="user_details">
 		これは私のSecondLifeの説明であり、本当に素晴らしいと思います。しかし、どういうわけか、私の説明は非常に長くなっています。なぜなら、私はたくさん話すのが好きだからです。
 	</text>
-	<slider name="volume_slider" tool_tip="ボイス音量" value="0.5"/>
+	<slider name="volume_slider" tool_tip="ボイス音量"/>
 	<text name="avatar_profile_link" value="[[LINK] プロフィールを閲覧]"/>
-	<avatar_icon name="avatar_icon"/>
 </floater>

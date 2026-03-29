@@ -1,4 +1,4 @@
-<?xml version="1.0" ?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="llsd.xsd">
   <array>
     <map>
@@ -11,7 +11,7 @@
       <key>Name</key>
       <string>people and body</string>
       <key>Category</key>
-      <string>人体</string>
+      <string>人物と人体</string>
     </map>
     <map>
       <key>Name</key>
@@ -23,25 +23,25 @@
       <key>Name</key>
       <string>animals and nature</string>
       <key>Category</key>
-      <string>動物自然</string>
+      <string>動物と自然</string>
     </map>
     <map>
       <key>Name</key>
       <string>food and drink</string>
       <key>Category</key>
-      <string>飲み物・食べ物</string>
+      <string>飲み物と食べ物</string>
     </map>
     <map>
       <key>Name</key>
       <string>travel and places</string>
       <key>Category</key>
-      <string>旅行・場所</string>
+      <string>旅行と場所</string>
     </map>
     <map>
       <key>Name</key>
       <string>activities</string>
       <key>Category</key>
-      <string>有効化</string>
+      <string>活動</string>
     </map>
     <map>
       <key>Name</key>
@@ -54,6 +54,12 @@
       <string>symbols</string>
       <key>Category</key>
       <string>シンボル</string>
+    </map>
+    <map>
+      <key>Name</key>
+      <string>other</string>
+      <key>Category</key>
+      <string>その他</string>
     </map>
   </array>
 </llsd>

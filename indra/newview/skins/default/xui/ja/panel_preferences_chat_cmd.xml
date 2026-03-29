@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="commands_settings">
+	<check_box label="チャットバーコマンドを有効化" name="chat_cmd_toggle"/>
+	<!--dd-->
+	<text name="AlchemyChatCommandDrawDistance_txt">
+		描画距離を変更（使用方法：cmd meters）
+	</text>
+	<!--gth-->
+	<text name="AlchemyChatCommandHeight_txt">
+		テレポートする高さ（0～8192）
+	</text>
+	<!--flr-->
+	<text name="AlchemyChatCommandGround_txt">
+		地表にテレポート
+	</text>
+	<!--pos-->
+	<text name="AlchemyChatCommandPos_txt">
+		座標にテレポート（使用方法：cmd x y z）
+	</text>
+	<!--mapto-->
+	<text name="AlchemyChatCommandMapto_txt">
+		リージョンにテレポート
+	</text>
+	<!--clr-->
+	<text name="AlchemyChatCommandClearNearby_txt">
+		近くのチャットのコンテンツをクリア
+	</text>
+	<!--Hover-->
+	<text name="hover_txt">
+		ホバーする高さ
+	</text>
+	<!--AO-->
+	<text name="ao_txt">
+		アニメーションオーバーライド
+	</text>
+	<!--home-->
+	<text name="AlchemyChatCommandHome_txt">
+		ホームにテレポート
+	</text>
+	<!--sethome-->
+	<text name="AlchemyChatCommandSetHome_txt">
+		現在地をホームにする
+	</text>
+	<!--tp2cam-->
+	<text name="AlchemyChatCommandTeleportToCam_txt">
+		カメラの位置にテレポート
+	</text>
+	<!--Calculatooor-->
+	<text name="calc_txt">
+		計算機
+	</text>
+	<!--Resync Anims-->
+	<text name="calc_txt">
+		アニメーションを再同期
+	</text>
+	<!--Set Channel-->
+	<text name="calc_txt">
+		近くのチャットのチャンネルをセット
+	</text>
+	<!--rezplat-->
+	<text name="AlchemyChatCommandRezPlat_txt">
+		プラットフォームにRez（使用法：cmd size）
+	</text>
+	<slider name="AlchemyChatCommandRezPlatSize" label="幅" tool_tip="コマンドでサイズが指定されていない場合、Rezされたプラットフォームのデフォルトのサイズを指定します。"/>
+</panel>
