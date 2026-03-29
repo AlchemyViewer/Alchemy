@@ -490,14 +490,6 @@ class Windows_x86_64_Manifest(ViewerManifest):
                                                 '**/*.exp',
                                                 '**/*.tar.xz')))
 
-            with self.prefix(dst="vmp_icons"):
-                with self.prefix(src=self.icon_path()):
-                    self.path("secondlife.ico")
-                #VMP  Tkinter icons
-                with self.prefix(src="vmp_icons"):
-                    self.path("*.png")
-                    self.path("*.gif")
-
         # BugSplat
         if self.args.get('bugsplat'):
             with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'tools')):
