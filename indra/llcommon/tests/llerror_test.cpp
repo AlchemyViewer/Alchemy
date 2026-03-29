@@ -285,6 +285,9 @@ namespace tut
     void ErrorTestObject::test<2>()
         // messages are filtered based on default level
     {
+#ifdef LL_DISABLE_DEBUG_LOGGING
+        skip("Debug messages disabled");
+#endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         writeSome();
         ensure_message_field_equals(0, MSG_FIELD, "one");
@@ -328,6 +331,9 @@ namespace tut
     void ErrorTestObject::test<3>()
         // error type string in output
     {
+#ifdef LL_DISABLE_DEBUG_LOGGING
+        skip("Debug messages disabled");
+#endif
         writeSome();
         ensure_message_field_equals(0, LEVEL_FIELD, "DEBUG");
         ensure_message_field_equals(1, LEVEL_FIELD, "INFO");
@@ -541,6 +547,9 @@ namespace tut
     void ErrorTestObject::test<5>()
         // backslash, return, and newline are not escaped with backslashes
     {
+#ifdef LL_DISABLE_DEBUG_LOGGING
+        skip("Debug messages disabled");
+#endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         setWantsMultiline(true);
         writeMsgNeedsEscaping(); // but should not be now
@@ -882,6 +891,9 @@ namespace tut
     void ErrorTestObject::test<17>()
         // backslash, return, and newline are escaped with backslashes
     {
+#ifdef LL_DISABLE_DEBUG_LOGGING
+        skip("Debug messages disabled");
+#endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         writeMsgNeedsEscaping();
         ensure_message_field_equals(0, MSG_FIELD, "backslash\\\\");
@@ -909,6 +921,9 @@ namespace tut
     void ErrorTestObject::test<18>()
         // space character is not allowed in a tag
     {
+#ifdef LL_DISABLE_DEBUG_LOGGING
+        skip("Debug messages disabled");
+#endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         fatalWasCalled = false;
 

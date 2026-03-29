@@ -216,12 +216,12 @@ public:
                     remainptr += written;
                     remainlen -= written;
 
-                    char msgbuf[512];
                     LL_DEBUGS("LLProcess") << "wrote " << written << " of " << towrite
                                            << " bytes to " << mDesc
                                            << " (original " << total << "),"
-                                           << " code " << err << ": "
-                                           << apr_strerror(err, msgbuf, sizeof(msgbuf))
+                                           << " code " << err << ": ";
+                                           char msgbuf[512];
+                                           LL_CONT << apr_strerror(err, msgbuf, sizeof(msgbuf))
                                            << LL_ENDL;
 
                     // The parent end of this pipe is nonblocking. If we weren't able

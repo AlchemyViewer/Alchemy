@@ -112,6 +112,17 @@ if(NON_RELEASE_CRASH_REPORTING)
   add_compile_definitions(LL_SEND_CRASH_REPORTS=1)
 endif()
 
+# Only enable debug logging in Release builds under the Test channel by default
+if(BUILDING_TEST_CHANNEL)
+  option(DISABLE_RELEASE_DEBUG_LOGGING "Disable building with debug logging in Release" OFF)
+else()
+  option(DISABLE_RELEASE_DEBUG_LOGGING "Disable building with debug logging in Release" ON)
+endif()
+
+if (DISABLE_RELEASE_DEBUG_LOGGING)
+  add_compile_definitions($<$<CONFIG:Release>:LL_DISABLE_DEBUG_LOGGING=1>)
+endif()
+
 # Platform-specific compilation flags.
 if(WINDOWS)
   set(CMAKE_MSVC_RUNTIME_CHECKS "$<$<CONFIG:Debug>:StackFrameErrorCheck;UninitializedVariable>")
