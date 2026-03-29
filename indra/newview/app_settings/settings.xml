@@ -4395,6 +4395,17 @@
         <key>Value</key>
             <integer>0</integer>
         </map>
+    <key>LSLFindDirection</key>
+    <map>
+        <key>Comment</key>
+        <string>Direction to search in LSL editor(true means up)</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>0</integer>
+    </map>
     <key>LSLHelpURL</key>
     <map>
       <key>Comment</key>
