@@ -50,8 +50,6 @@ class LLToggleableMenu;
 
 class ALPanelProfileLegacy final : public ALPanelProfileLegacyTab
 {
-    friend class ALPanelProfileLegacy;
-
 public:
     ALPanelProfileLegacy();
     bool postBuild() override;
