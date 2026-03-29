@@ -518,7 +518,6 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
     }
 // [/RLVa:KB]
 
-    LLFloaterReg::getInstance("im_container");
     LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
 
     // Build notification data
