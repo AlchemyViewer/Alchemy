@@ -204,7 +204,7 @@ Your search terms were missing a query string.
       left="0"
       width="313"
       class="panel_profile_legacy_sidetray"
-      filename="panel_profile_legacy_sidetray.xml" />
+      filename="panel_al_profile_legacy_sidetray.xml" />
      <panel
       follows="all"
       name="detail_group"

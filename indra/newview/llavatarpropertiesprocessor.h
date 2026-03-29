@@ -34,12 +34,12 @@
 #include <map>
 
 // For Flags in AvatarPropertiesReply
-const U32 AVATAR_ALLOW_PUBLISH          = 0x1 << 0; // whether profile is externally visible or not
-const U32 AVATAR_MATURE_PUBLISH         = 0x1 << 1; // profile is "mature"
-const U32 AVATAR_IDENTIFIED             = 0x1 << 2; // whether avatar has provided payment info
-const U32 AVATAR_TRANSACTED             = 0x1 << 3; // whether avatar has actively used payment info
-const U32 AVATAR_ONLINE                 = 0x1 << 4; // the online status of this avatar, if known.
-const U32 AVATAR_AGEVERIFIED            = 0x1 << 5; // whether avatar has been age-verified
+constexpr U32 AVATAR_ALLOW_PUBLISH  = 0x1 << 0; // whether profile is externally visible or not
+constexpr U32 AVATAR_MATURE_PUBLISH = 0x1 << 1; // profile is "mature"
+constexpr U32 AVATAR_IDENTIFIED     = 0x1 << 2; // whether avatar has provided payment info
+constexpr U32 AVATAR_TRANSACTED     = 0x1 << 3; // whether avatar has actively used payment info
+constexpr U32 AVATAR_ONLINE         = 0x1 << 4; // the online status of this avatar, if known.
+constexpr U32 AVATAR_AGEVERIFIED    = 0x1 << 5; // whether avatar has been age-verified
 
 /*
 *TODO Vadim: This needs some refactoring:
@@ -52,10 +52,14 @@ enum EAvatarProcessorType
 {
     APT_PROPERTIES_LEGACY, // APT_PROPERTIES via udp request (Truncates data!!!)
     APT_PROPERTIES,        // APT_PROPERTIES via http request
+    APT_NOTES,
+    APT_GROUPS,
+    APT_PICKS,
     APT_PICK_INFO,
     APT_TEXTURES,
     APT_CLASSIFIEDS,
-    APT_CLASSIFIED_INFO
+    APT_CLASSIFIED_INFO,
+    APT_INTERESTS_INFO  // legacy support. don't be lazy and keep this. :O)
 };
 
 // legacy data is supposed to match AvatarPropertiesReply,
@@ -78,6 +82,18 @@ struct LLAvatarLegacyData
     std::string caption_text;
     std::string customer_type;
     U32         flags;
+};
+
+// Don't belete my sexy InterestsData.
+struct LLLegacyInterestsData
+{
+    LLUUID      agent_id;
+    LLUUID      avatar_id;  // target id
+    U32         want_to_mask;
+    std::string want_to_text;
+    U32         skills_mask;
+    std::string skills_text;
+    std::string languages_text;
 };
 
 struct LLAvatarData
@@ -105,6 +121,24 @@ struct LLAvatarData
     typedef std::pair<LLUUID, std::string> pick_data_t;
     typedef std::list< pick_data_t> picks_list_t;
     picks_list_t picks_list;
+    bool        allow_publish;
+    LLAvatarData() = default;
+    LLAvatarData(const LLAvatarLegacyData& legacy_data)
+    {
+        agent_id = legacy_data.agent_id;
+        avatar_id = legacy_data.avatar_id;
+        image_id = legacy_data.image_id;
+        fl_image_id = legacy_data.fl_image_id;
+        partner_id = legacy_data.partner_id;
+        about_text = legacy_data.about_text;
+        fl_about_text = legacy_data.fl_about_text;
+        born_on = legacy_data.born_on;
+        profile_url = legacy_data.profile_url;
+        caption_index = legacy_data.caption_index;
+        caption_text = legacy_data.caption_text;
+        customer_type = legacy_data.customer_type;
+        flags = legacy_data.flags;
+    }
 };
 
 struct LLAvatarData::LLGroupData
@@ -138,6 +172,45 @@ struct LLPickData
 
     //used only in write (update) requests
     LLUUID session_id;
+};
+
+struct LLAvatarPicks
+{
+    LLUUID agent_id;
+    LLUUID target_id; //target id
+
+    typedef std::pair<LLUUID,std::string> pick_data_t;
+    typedef std::list< pick_data_t> picks_list_t;
+    picks_list_t picks_list;
+};
+
+struct LLAvatarNotes
+{
+    LLUUID agent_id;
+    LLUUID target_id; //target id
+    std::string notes;
+};
+
+struct LLAvatarGroups
+{
+    LLUUID agent_id;
+    LLUUID avatar_id; //target id
+    bool list_in_profile;
+
+    struct LLGroupData;
+    typedef std::list<LLGroupData> group_list_t;
+
+    group_list_t group_list;
+
+    struct LLGroupData
+    {
+        U64 group_powers;
+        bool accept_notices;
+        std::string group_title;
+        LLUUID group_id;
+        std::string group_name;
+        LLUUID group_insignia_id;
+    };
 };
 
 struct LLAvatarClassifieds
@@ -180,7 +253,7 @@ struct LLAvatarClassifiedInfo
 class LLAvatarPropertiesObserver
 {
 public:
-    virtual ~LLAvatarPropertiesObserver() {}
+    virtual ~LLAvatarPropertiesObserver() = default;
     virtual void processProperties(void* data, EAvatarProcessorType type) = 0;
 };
 
@@ -199,6 +272,9 @@ public:
     // suppressed while waiting for a response from the network.
     void sendAvatarPropertiesRequest(const LLUUID& avatar_id);
     void sendAvatarLegacyPropertiesRequest(const LLUUID& avatar_id);
+    void sendAvatarLegacyPicksRequest(const LLUUID& avatar_id);
+    void sendAvatarLegacyNotesRequest(const LLUUID& avatar_id);
+    void sendAvatarLegacyGroupsRequest(const LLUUID& avatar_id);
     void sendAvatarTexturesRequest(const LLUUID& avatar_id);
     void sendAvatarClassifiedsRequest(const LLUUID& avatar_id);
 
@@ -211,13 +287,15 @@ public:
 
     void sendClassifiedInfoUpdate(const LLAvatarClassifiedInfo* c_data);
 
+    void sendInterestsInfoUpdate(const LLLegacyInterestsData* interests_data);
+
     void sendFriendRights(const LLUUID& avatar_id, S32 rights);
 
     void sendPickDelete(const LLUUID& pick_id);
 
     void sendClassifiedDelete(const LLUUID& classified_id);
 
-    bool isHideAgeSupportedByServer() { return mIsHideAgeSupportedByServer; }
+    bool isHideAgeSupportedByServer() const { return mIsHideAgeSupportedByServer; }
 
     // Returns translated, human readable string for account type, such
     // as "Resident" or "Linden Employee".  Used for profiles, inspectors.
@@ -268,9 +346,6 @@ protected:
 
     // Call this when the reply to the request is received
     void removePendingRequest(const LLUUID& avatar_id, EAvatarProcessorType type);
-
-    typedef void* (*processor_method_t)(LLMessageSystem*);
-    static processor_method_t getProcessor(EAvatarProcessorType type);
 
 protected:
 

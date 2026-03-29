@@ -96,6 +96,7 @@ set(viewer_SOURCE_FILES
     alfloatergroupprofile.cpp
     alfloaterlightbox.cpp
     alfloaterparticleeditor.cpp
+    alfloaterprofilelegacy.cpp
     alfloaterprogressview.cpp
     alfloaterregiontracker.cpp
     alfloatertransactionlog.cpp
@@ -103,11 +104,13 @@ set(viewer_SOURCE_FILES
     allegacynotificationwellwindow.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
+    alpanelavatarlegacy.cpp
     alpanelclassified.cpp
     alpanelclassifiededit.cpp
     alpaneleventinfo.cpp
     alpanelmusicticker.cpp
     alpanelpick.cpp
+    alpanelprofilelegacy.cpp
     alpanelquicksettings.cpp
     alpanelquicksettingspulldown.cpp
     alpanelradaralert.cpp
@@ -845,6 +848,7 @@ set(viewer_HEADER_FILES
     alfloatergroupprofile.h
     alfloaterlightbox.h
     alfloaterparticleeditor.h
+    alfloaterprofilelegacy.h
     alfloaterprogressview.h
     alfloaterregiontracker.h
     alfloatertransactionlog.h
@@ -852,11 +856,13 @@ set(viewer_HEADER_FILES
     allegacynotificationwellwindow.h
     alpanelaomini.h
     alpanelaopulldown.h
+    alpanelavatarlegacy.h
     alpanelclassified.h
     alpanelclassifiededit.h
     alpaneleventinfo.h
     alpanelmusicticker.h
     alpanelpick.h
+    alpanelprofilelegacy.h
     alpanelquicksettings.h
     alpanelquicksettingspulldown.h
     alpanelradaralert.h

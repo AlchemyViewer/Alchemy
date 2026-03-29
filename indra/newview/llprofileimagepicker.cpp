@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "llprofileimagepicker.h"
 
+#include "alpanelprofilelegacy.h"
 #include "llavatariconctrl.h"
 #include "llagent.h"
 #include "llloadingindicator.h"
@@ -218,7 +219,14 @@ void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::s
         {
             case PROFILE_IMAGE_SL:
             {
-                if (LLPanelProfileSecondLife* panel = dynamic_cast<LLPanelProfileSecondLife*>(handle.get()))
+                if (ALPanelProfileLegacy* panel = dynamic_cast<ALPanelProfileLegacy*>(handle.get()))
+                {
+                    if (result.notNull())
+                    {
+                        panel->setProfileImageUploaded(result, PROFILE_IMAGE_SL);
+                    }
+                }
+                else if (LLPanelProfileSecondLife* panel = dynamic_cast<LLPanelProfileSecondLife*>(handle.get()))
                 {
                     if (result.notNull())
                     {
@@ -234,7 +242,14 @@ void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::s
             }
             case PROFILE_IMAGE_FL:
             {
-                if (LLPanelProfileFirstLife* panel = dynamic_cast<LLPanelProfileFirstLife*>(handle.get()))
+                if (ALPanelProfileLegacy* panel = dynamic_cast<ALPanelProfileLegacy*>(handle.get()))
+                {
+                    if (result.notNull())
+                    {
+                        panel->setProfileImageUploaded(result, PROFILE_IMAGE_FL);
+                    }
+                }
+                else if (LLPanelProfileFirstLife* panel = dynamic_cast<LLPanelProfileFirstLife*>(handle.get()))
                 {
                     if (result.notNull())
                     {

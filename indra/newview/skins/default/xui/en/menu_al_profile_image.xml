@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu
+ layout="topleft"
+ name="Profile Image">
+    <menu_item_call
+     label="Upload Image"
+     layout="topleft"
+     name="profile_image_upload">
+        <menu_item_call.on_click
+         function="Profile.UploadAction"
+         parameter="upload_profile_pic" />
+        <menu_item_call.on_enable
+         function="Profile.Enable"
+         parameter="can_upload_pic" />
+    </menu_item_call>
+    <menu_item_call
+     label="Change Image"
+     layout="topleft"
+     name="profile_image_upload">
+        <menu_item_call.on_click
+         function="Profile.UploadAction"
+         parameter="change_profile_pic" />
+        <menu_item_call.on_enable
+         function="Profile.Enable"
+         parameter="can_upload_pic" />
+    </menu_item_call>
+    <menu_item_call
+     label="Remove Image"
+     layout="topleft"
+     name="profile_image_upload">
+        <menu_item_call.on_click
+         function="Profile.UploadAction"
+         parameter="remove_profile_pic" />
+        <menu_item_call.on_enable
+         function="Profile.Enable"
+         parameter="can_upload_pic" />
+    </menu_item_call>
+</context_menu>

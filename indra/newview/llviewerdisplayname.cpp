@@ -49,9 +49,9 @@ namespace LLViewerDisplayName
     // Fired when there is a change in the agent's name
     name_changed_signal_t sNameChangedSignal;
 
-    void addNameChangedCallback(const name_changed_signal_t::slot_type& cb)
+    boost::signals2::connection addNameChangedCallback(const name_changed_signal_t::slot_type& cb)
     {
-        sNameChangedSignal.connect(cb);
+        return sNameChangedSignal.connect(cb);
     }
 
     void doNothing() { }
@@ -100,7 +100,7 @@ void LLViewerDisplayName::set(const std::string& display_name, const set_name_sl
             boost::bind(&LLViewerDisplayName::setDisplayNameCoro, cap_url, body));
 }
 
-void LLViewerDisplayName::setDisplayNameCoro(const std::string& cap_url, const LLSD& body)
+void LLViewerDisplayName::setDisplayNameCoro(std::string cap_url, LLSD body)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t

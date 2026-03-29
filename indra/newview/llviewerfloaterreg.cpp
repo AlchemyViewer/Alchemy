@@ -43,6 +43,7 @@
 #include "alfloatergroupprofile.h"
 #include "alfloaterlightbox.h"
 #include "alfloaterparticleeditor.h"
+#include "alfloaterprofilelegacy.h"
 #include "alfloaterprogressview.h"
 #include "alfloaterregiontracker.h"
 #include "alfloatertransactionlog.h"
@@ -587,6 +588,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("delete_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeleteQueue>);
     LLFloaterReg::add("generic_text", "floater_al_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGenericText>);
     LLFloaterReg::add("group_profile", "floater_al_group_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGroupProfile>);
+    LLFloaterReg::add("legacy_profile", "floater_al_profile_legacy.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProfileLegacy>);
     LLFloaterReg::add("lightbox", "floater_lightbox_settings.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<ALFloaterLightBox>);
     LLFloaterReg::add("message_builder", "floater_message_builder.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageBuilder>);
     LLFloaterReg::add("message_log", "floater_message_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageLog>);
