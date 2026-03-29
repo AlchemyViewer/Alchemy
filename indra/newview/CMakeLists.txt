@@ -86,6 +86,8 @@ set(viewer_SOURCE_FILES
     alchatcommand.cpp
     alderenderlist.cpp
     alfloaterblocked.cpp
+    alfloaterdirectory.cpp
+    alfloaterevent.cpp
     alfloaterexploresounds.cpp
     alfloatergenerictext.cpp
     alfloatergroupprofile.cpp
@@ -98,10 +100,19 @@ set(viewer_SOURCE_FILES
     allegacynotificationwellwindow.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
+    alpaneleventinfo.cpp
     alpanelmusicticker.cpp
     alpanelquicksettings.cpp
     alpanelquicksettingspulldown.cpp
     alpanelradaralert.cpp
+    alpanelsearchbase.cpp
+    alpanelsearchclassifieds.cpp
+    alpanelsearchevents.cpp
+    alpanelsearchgroups.cpp
+    alpanelsearchlandsales.cpp
+    alpanelsearchpeople.cpp
+    alpanelsearchplaces.cpp
+    alpanelsearchweb.cpp
     alpanelstreaminfo.cpp
     alstreaminfo.cpp
     altoolalign.cpp
@@ -333,7 +344,6 @@ set(viewer_SOURCE_FILES
     llfloaterscriptedprefs.cpp
     llfloaterscripting.cpp
     llfloaterscriptlimits.cpp
-    llfloatersearch.cpp
     llfloatersearchreplace.cpp
     llfloatersellland.cpp
     llfloatersettingscolor.cpp
@@ -815,6 +825,8 @@ set(viewer_HEADER_FILES
     alchatcommand.h
     alderenderlist.h
     alfloaterblocked.h
+    alfloaterdirectory.h
+    alfloaterevent.h
     alfloaterexploresounds.h
     alfloatergenerictext.h
     alfloatergroupprofile.h
@@ -827,10 +839,19 @@ set(viewer_HEADER_FILES
     allegacynotificationwellwindow.h
     alpanelaomini.h
     alpanelaopulldown.h
+    alpaneleventinfo.h
     alpanelmusicticker.h
     alpanelquicksettings.h
     alpanelquicksettingspulldown.h
     alpanelradaralert.h
+    alpanelsearchbase.h
+    alpanelsearchclassifieds.h
+    alpanelsearchevents.h
+    alpanelsearchgroups.h
+    alpanelsearchlandsales.h
+    alpanelsearchpeople.h
+    alpanelsearchplaces.h
+    alpanelsearchweb.h
     alpanelstreaminfo.h
     alstreaminfo.h
     altoolalign.h
@@ -1069,7 +1090,6 @@ set(viewer_HEADER_FILES
     llfloaterscriptedprefs.h
     llfloaterscripting.h
     llfloaterscriptlimits.h
-    llfloatersearch.h
     llfloatersearchreplace.h
     llfloatersellland.h
     llfloatersettingscolor.h

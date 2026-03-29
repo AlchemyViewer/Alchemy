@@ -2569,9 +2569,9 @@ void LLViewerWindow::initWorldUI()
     {
         LL_INFOS() << "Preloading cef instances" << LL_ENDL;
 
-        LLFloaterReg::getInstance("destinations");
-        LLFloaterReg::getInstance("avatar_welcome_pack");
-        LLFloaterReg::getInstance("search");
+        //LLFloaterReg::getInstance("destinations");
+        //LLFloaterReg::getInstance("avatar_welcome_pack");
+        //LLFloaterReg::getInstance("search");
         LLFloaterReg::getInstance("marketplace");
     }
 }

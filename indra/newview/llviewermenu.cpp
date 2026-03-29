@@ -74,7 +74,6 @@
 #include "llfloaterpathfindinglinksets.h"
 #include "llfloaterpay.h"
 #include "llfloaterreporter.h"
-#include "llfloatersearch.h"
 #include "llfloaterscriptdebug.h"
 #include "llfloatersnapshot.h"
 #include "llfloatertools.h"

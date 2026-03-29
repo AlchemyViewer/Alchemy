@@ -36,6 +36,8 @@
 // [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
 #include "alfloaterblocked.h"
 // [/SL:KB]
+#include "alfloaterdirectory.h"
+#include "alfloaterevent.h"
 #include "alfloaterexploresounds.h"
 #include "alfloatergenerictext.h"
 #include "alfloatergroupprofile.h"
@@ -157,7 +159,6 @@
 #include "llfloaterscriptdebug.h"
 #include "llfloaterscriptedprefs.h"
 #include "llfloaterscriptlimits.h"
-#include "llfloatersearch.h"
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
 #include "llfloatersearchreplace.h"
 // [/SL:KB]
@@ -256,8 +257,7 @@ public:
                 "upload_model",
                 "upload_script",
                 "upload_sound",
-                "bulk_upload",
-                "legacy_search"
+                "bulk_upload"
             };
             return std::find(blacklist_clicked.begin(), blacklist_clicked.end(), fl_name) == blacklist_clicked.end();
         }
@@ -309,8 +309,7 @@ public:
                 "upload_script",
                 "upload_sound",
                 "bulk_upload",
-                "slapp_test",
-                "legacy_search"
+                "slapp_test"
             };
             return std::find(blacklist_untrusted.begin(), blacklist_untrusted.end(), fl_name) == blacklist_untrusted.end();
         }
@@ -403,7 +402,14 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("env_edit_extdaycycle", "floater_edit_ext_day_cycle.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEditExtDayCycle>);
     LLFloaterReg::add("my_environments", "floater_my_environments.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMyEnvironment>);
 
-    LLFloaterReg::add("event", "floater_event.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEvent>);
+    if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
+    {
+        LLFloaterReg::add("event", "floater_al_event.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterEvent>);
+    }
+    else
+    {
+        LLFloaterReg::add("event", "floater_event.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEvent>);
+    }
     LLFloaterReg::add("experiences", "floater_experiences.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperiences>);
     LLFloaterReg::add("experience_profile", "floater_experienceprofile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperienceProfile>);
     LLFloaterReg::add("experience_search", "floater_experience_search.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperiencePicker>);
@@ -542,8 +548,15 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("stop_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotRunQueue>);
     LLFloaterReg::add("snapshot", "floater_snapshot.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSnapshot>);
     LLFloaterReg::add("simple_snapshot", "floater_simple_snapshot.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSimpleSnapshot>);
-    LLFloaterReg::add("search", "floater_search.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSearch>);
-    LLFloaterReg::add("legacy_search", "floater_directory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDirectory>);
+
+    if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
+    {
+        LLFloaterReg::add("search", "floater_al_directory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterDirectory>);
+    }
+    else
+    {
+        LLFloaterReg::add("search", "floater_directory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDirectory>);
+    }
     LLFloaterReg::add("profile", "floater_profile.xml",(LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProfile>);
     LLFloaterReg::add("guidebook", "floater_how_to.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterHowTo>);
     LLFloaterReg::add("slapp_test", "floater_test_slapp.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSLappTest>);

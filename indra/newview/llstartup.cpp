@@ -94,6 +94,7 @@
 #include "message.h"
 #include "v3math.h"
 
+#include "alfloaterdirectory.h"
 #include "alstreaminfo.h"
 #include "llagent.h"
 #include "llagentbenefits.h"
@@ -3002,12 +3003,24 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 
     msg->setHandlerFuncFast(_PREHASH_AvatarPickerReply,             LLFloaterAvatarPicker::processAvatarPickerReply);
 
-    msg->setHandlerFuncFast(_PREHASH_DirPlacesReply,                LLPanelDirBrowser::processDirPlacesReply);
-    msg->setHandlerFuncFast(_PREHASH_DirPeopleReply,                LLPanelDirBrowser::processDirPeopleReply);
-    msg->setHandlerFuncFast(_PREHASH_DirEventsReply,                LLPanelDirBrowser::processDirEventsReply);
-    msg->setHandlerFuncFast(_PREHASH_DirGroupsReply,                LLPanelDirBrowser::processDirGroupsReply);
-    msg->setHandlerFuncFast(_PREHASH_DirClassifiedReply,            LLPanelDirBrowser::processDirClassifiedReply);
-    msg->setHandlerFuncFast(_PREHASH_DirLandReply,                  LLPanelDirBrowser::processDirLandReply);
+    if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
+    {
+        msg->setHandlerFuncFast(_PREHASH_DirPlacesReply,            ALFloaterDirectory::processSearchPlacesReply);
+        msg->setHandlerFuncFast(_PREHASH_DirPeopleReply,            ALFloaterDirectory::processSearchPeopleReply);
+        msg->setHandlerFuncFast(_PREHASH_DirEventsReply,            ALFloaterDirectory::processSearchEventsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirGroupsReply,            ALFloaterDirectory::processSearchGroupsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirClassifiedReply,        ALFloaterDirectory::processSearchClassifiedsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirLandReply,              ALFloaterDirectory::processSearchLandReply);
+    }
+    else
+    {
+        msg->setHandlerFuncFast(_PREHASH_DirPlacesReply,            LLPanelDirBrowser::processDirPlacesReply);
+        msg->setHandlerFuncFast(_PREHASH_DirPeopleReply,            LLPanelDirBrowser::processDirPeopleReply);
+        msg->setHandlerFuncFast(_PREHASH_DirEventsReply,            LLPanelDirBrowser::processDirEventsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirGroupsReply,            LLPanelDirBrowser::processDirGroupsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirClassifiedReply,        LLPanelDirBrowser::processDirClassifiedReply);
+        msg->setHandlerFuncFast(_PREHASH_DirLandReply,              LLPanelDirBrowser::processDirLandReply);
+    }
 
     msg->setHandlerFuncFast(_PREHASH_MapBlockReply,                 LLWorldMapMessage::processMapBlockReply);
     msg->setHandlerFuncFast(_PREHASH_MapItemReply,                  LLWorldMapMessage::processMapItemReply);

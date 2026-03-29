@@ -31,12 +31,14 @@
 #include "llnotificationsutil.h"
 #include "message.h"
 
+#include "alfloaterevent.h"
 #include "llfloaterreg.h"
 #include "llfloaterworldmap.h"
 #include "llfloaterevent.h"
 #include "llagent.h"
 #include "llcommandhandler.h"   // secondlife:///app/... support
 #include "lltrans.h"
+#include "llviewercontrol.h"
 
 class LLEventHandler : public LLCommandHandler
 {
@@ -56,12 +58,25 @@ public:
         S32 event_id = params[0].asInteger();
         if(event_command == "details")
         {
-            LLFloaterEvent* floater = LLFloaterReg::getTypedInstance<LLFloaterEvent>("event");
-            if (floater)
+            if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
             {
-                floater->setEventID(event_id);
-                LLFloaterReg::showTypedInstance<LLFloaterEvent>("event");
-                return true;
+                ALFloaterEvent* floater = LLFloaterReg::getTypedInstance<ALFloaterEvent>("event");
+                if (floater)
+                {
+                    floater->setEventID(event_id);
+                    LLFloaterReg::showTypedInstance<ALFloaterEvent>("event");
+                    return true;
+                }
+            }
+            else
+            {
+                LLFloaterEvent* floater = LLFloaterReg::getTypedInstance<LLFloaterEvent>("event");
+                if (floater)
+                {
+                    floater->setEventID(event_id);
+                    LLFloaterReg::showTypedInstance<LLFloaterEvent>("event");
+                    return true;
+                }
             }
         }
         else if(event_command == "notify")
@@ -152,11 +167,24 @@ bool LLEventNotifier::handleResponse(U32 eventId, const LLSD& notification, cons
     {
         case 0:
         {
-            LLFloaterEvent* floater = LLFloaterReg::getTypedInstance<LLFloaterEvent>("event");
-            if (floater)
+            if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
             {
-                floater->setEventID(eventId);
-                LLFloaterReg::showTypedInstance<LLFloaterEvent>("event");
+                ALFloaterEvent* floater = LLFloaterReg::getTypedInstance<ALFloaterEvent>("event");
+                if (floater)
+                {
+                    floater->setEventID(eventId);
+                    LLFloaterReg::showTypedInstance<ALFloaterEvent>("event");
+                    return true;
+                }
+            }
+            else
+            {
+                LLFloaterEvent* floater = LLFloaterReg::getTypedInstance<LLFloaterEvent>("event");
+                if (floater)
+                {
+                    floater->setEventID(eventId);
+                    LLFloaterReg::showTypedInstance<LLFloaterEvent>("event");
+                }
             }
             break;
         }

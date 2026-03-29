@@ -1,10 +1,11 @@
 /**
- * @file llfloatersearch.h
- * @brief Floater for Search (update 2025, preload)
+ * @file alfloaterevent.h
+ * @brief Display for events in the finder
  *
- * $LicenseInfo:firstyear=2011&license=viewerlgpl$
- * Second Life Viewer Source Code
- * Copyright (C) 2011, Linden Research, Inc.
+ * $LicenseInfo:firstyear=2004&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2014, Cinder Roxley @ Second Life
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,25 +25,23 @@
  * $/LicenseInfo$
  */
 
-#pragma once
+#ifndef AL_LLFLOATEREVENT_H
+#define AL_LLFLOATEREVENT_H
 
 #include "llfloater.h"
-#include "llfloaterwebcontent.h"
 
-class LLFloaterSearch:
-        public LLFloaterWebContent {
-        friend class LLFloaterReg;
+class ALFloaterEvent final : public LLFloater
 
-    public:
-        void onOpen(const LLSD& key) override;
-        void onClose(bool app_quitting) override;
+{
+public:
+    ALFloaterEvent(const LLSD& key);
+    /*virtual*/ ~ALFloaterEvent() = default;
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void setEventID(const U32 event_id);
 
-    private:
-        LLFloaterSearch(const LLSD& key);
-        ~LLFloaterSearch();
-        void initiateSearch(const LLSD& tokens);
-        bool postBuild() override;
-
-        std::set<std::string> mSearchType;
-        std::set<std::string> mCollectionType;
+private:
+    LLPanel* mPanel;
 };
+
+#endif // AL_LLFLOATEREVENT_H
