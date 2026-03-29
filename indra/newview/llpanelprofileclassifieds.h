@@ -38,6 +38,7 @@
 #include "llcoros.h"
 #include "lleventcoro.h"
 
+class LLFloaterPublishClassified;
 class LLCheckBoxCtrl;
 class LLLineEditor;
 class LLMediaCtrl;
@@ -47,7 +48,7 @@ class LLTextEditor;
 class LLTextureCtrl;
 class LLUICtrl;
 
-
+#if 0 // Moved to LLFloaterPublishClassified
 class LLPublishClassifiedFloater : public LLFloater
 {
 public:
@@ -62,7 +63,7 @@ public:
     void setPublishClickedCallback(const commit_signal_t::slot_type& cb);
     void setCancelClickedCallback(const commit_signal_t::slot_type& cb);
 };
-
+#endif
 
 /**
 * Panel for displaying Avatar's picks.
@@ -335,7 +336,7 @@ private:
     bool mCanClose;
     bool mEditOnLoad;
 
-    LLPublishClassifiedFloater* mPublishFloater;
+    LLFloaterPublishClassified* mPublishFloater;
 };
 
 #endif // LL_PANELPROFILECLASSIFIEDS_H

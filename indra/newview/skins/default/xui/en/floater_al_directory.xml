@@ -239,8 +239,8 @@ Your search terms were missing a query string.
       bottom="-1"
       left="0"
       width="313"
-      class="panel_classified_info"
-      filename="panel_classified_info.xml" />
+      class="panel_al_classified_info"
+      filename="panel_al_classified_info.xml" />
    </layout_panel>
  </layout_stack>
  <text

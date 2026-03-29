@@ -84,6 +84,7 @@ set(viewer_SOURCE_FILES
     alavataractions.cpp
     alavatargroups.cpp
     alchatcommand.cpp
+    alclassifieditem.cpp
     alderenderlist.cpp
     alfloaterblocked.cpp
     alfloaterdirectory.cpp
@@ -100,6 +101,8 @@ set(viewer_SOURCE_FILES
     allegacynotificationwellwindow.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
+    alpanelclassified.cpp
+    alpanelclassifiededit.cpp
     alpaneleventinfo.cpp
     alpanelmusicticker.cpp
     alpanelquicksettings.cpp
@@ -332,6 +335,7 @@ set(viewer_SOURCE_FILES
     llfloaterpreferenceviewadvanced.cpp
     llfloaterpreviewtrash.cpp
     llfloaterprofiletexture.cpp
+    llfloaterpublishclassified.cpp
     llfloaterregiondebugconsole.cpp
     llfloaterregioninfo.cpp
     llfloaterreporter.cpp
@@ -823,6 +827,7 @@ set(viewer_HEADER_FILES
     alavataractions.h
     alavatargroups.h
     alchatcommand.h
+    alclassifieditem.h
     alderenderlist.h
     alfloaterblocked.h
     alfloaterdirectory.h
@@ -839,6 +844,8 @@ set(viewer_HEADER_FILES
     allegacynotificationwellwindow.h
     alpanelaomini.h
     alpanelaopulldown.h
+    alpanelclassified.h
+    alpanelclassifiededit.h
     alpaneleventinfo.h
     alpanelmusicticker.h
     alpanelquicksettings.h
@@ -1078,6 +1085,7 @@ set(viewer_HEADER_FILES
     llfloaterpreferenceviewadvanced.h
     llfloaterpreviewtrash.h
     llfloaterprofiletexture.h
+    llfloaterpublishclassified.h
     llfloaterregiondebugconsole.h
     llfloaterregioninfo.h
     llfloaterreporter.h

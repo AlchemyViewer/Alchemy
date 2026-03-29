@@ -38,6 +38,7 @@
 #include "lldispatcher.h"
 #include "llfloaterclassified.h"
 #include "llfloaterreg.h"
+#include "llfloaterpublishclassified.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llfloaterworldmap.h"
 #include "lliconctrl.h"
@@ -64,7 +65,6 @@
 //*TODO: verify this limit
 const S32 MAX_AVATAR_CLASSIFIEDS = 100;
 
-const S32 MINIMUM_PRICE_FOR_LISTING = 50; // L$
 const S32 DEFAULT_EDIT_CLASSIFIED_SCROLL_HEIGHT = 530;
 
 //static
@@ -965,12 +965,12 @@ void LLPanelProfileClassified::onSaveClick()
             return;
         }
 
-        mPublishFloater = LLFloaterReg::findTypedInstance<LLPublishClassifiedFloater>(
+        mPublishFloater = LLFloaterReg::findTypedInstance<LLFloaterPublishClassified>(
             "publish_classified", LLSD());
 
         if(!mPublishFloater)
         {
-            mPublishFloater = LLFloaterReg::getTypedInstance<LLPublishClassifiedFloater>(
+            mPublishFloater = LLFloaterReg::getTypedInstance<LLFloaterPublishClassified>(
                 "publish_classified", LLSD());
 
             mPublishFloater->setPublishClickedCallback(boost::bind
@@ -1511,7 +1511,7 @@ void LLPanelProfileClassified::updateTabLabel(const std::string& title)
     }
 }
 
-
+#if 0 // Moved to LLFloaterPublishClassified
 //-----------------------------------------------------------------------------
 // LLPublishClassifiedFloater
 //-----------------------------------------------------------------------------
@@ -1554,3 +1554,4 @@ void LLPublishClassifiedFloater::setCancelClickedCallback(const commit_signal_t:
 {
     getChild<LLButton>("cancel_btn")->setClickedCallback(cb);
 }
+#endif
