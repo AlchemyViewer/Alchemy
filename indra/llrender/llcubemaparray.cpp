@@ -117,13 +117,10 @@ LLCubeMapArray::LLCubeMapArray(LLCubeMapArray& lhs, U32 width, U32 count) : mTex
     U32 min_count = std::min(count, lhs.mCount);
     for (U32 i = 0; i < min_count * 6; ++i)
     {
-        U32 src_resolution = lhs.mWidth;
-        U32 dst_resolution = mWidth;
         {
             GLint components = GL_RGB;
             if (mImage->getComponents() == 4)
                 components = GL_RGBA;
-            GLint format = GL_RGB;
 
             // Handle different resolutions by scaling the image
             LLPointer<LLImageRaw> src_image = new LLImageRaw(lhs.mWidth, lhs.mWidth, lhs.mImage->getComponents());

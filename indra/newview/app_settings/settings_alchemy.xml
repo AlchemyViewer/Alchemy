@@ -912,6 +912,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>RenderReflectionProbeIrradianceResolution</key>
+        <map>
+            <key>Comment</key>
+            <string>Resolution of reflection probe irrradiance maps.  Will be set to the next highest power of two clamped to [16, 256].  Note that changing this value may consume a massive amount of video memory.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>16</integer>
+        </map>
         <key>ResetUserColorsOnLogout</key>
         <map>
             <key>Comment</key>

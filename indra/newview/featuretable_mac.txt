@@ -87,6 +87,7 @@ RenderDownScaleMethod       1   0
 RenderMaxTextureResolution         1   2048
 RenderReflectionProbeCount  1   256
 RenderHighPrecisionPostProcess 1 1
+RenderReflectionProbeIrradianceResolution 1 16
 
 //
 // Low Graphics Settings

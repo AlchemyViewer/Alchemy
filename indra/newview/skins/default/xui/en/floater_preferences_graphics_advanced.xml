@@ -689,6 +689,7 @@
   </check_box>
 
   <slider
+    enabled_control="RenderDisableVintageMode"
     control_name="RenderHighPrecisionPostProcess"
     decimal_digits="0"
     follows="left|top"

@@ -194,10 +194,6 @@ F32 LLPipeline::RenderGlowWidth;
 F32 LLPipeline::RenderGlowStrength;
 bool LLPipeline::RenderGlowNoise;
 bool LLPipeline::RenderDepthOfField;
-bool LLPipeline::RenderDepthOfFieldNearBlur;
-bool LLPipeline::RenderDepthOfFieldInEditMode;
-bool LLPipeline::RenderFocusPointLocked;
-bool LLPipeline::RenderFocusPointFollowsPointer;
 F32 LLPipeline::CameraFocusTransitionTime;
 F32 LLPipeline::CameraFNumber;
 F32 LLPipeline::CameraFocalLength;
@@ -591,7 +587,6 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderGlowStrength");
     connectRefreshCachedSettingsSafe("RenderGlowNoise");
     connectRefreshCachedSettingsSafe("RenderDepthOfField");
-    connectRefreshCachedSettingsSafe("RenderDepthOfFieldInEditMode");
     connectRefreshCachedSettingsSafe("CameraFocusTransitionTime");
     connectRefreshCachedSettingsSafe("CameraFNumber");
     connectRefreshCachedSettingsSafe("CameraFocalLength");
@@ -634,9 +629,6 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderHeroProbeUpdateRate");
     connectRefreshCachedSettingsSafe("RenderHeroProbeConservativeUpdateMultiplier");
     connectRefreshCachedSettingsSafe("RenderAvatarCloth");
-    connectRefreshCachedSettingsSafe("RenderFocusPointLocked");
-    connectRefreshCachedSettingsSafe("RenderFocusPointFollowsPointer");
-    connectRefreshCachedSettingsSafe("RenderDepthOfFieldNearBlur");
 
     LLPointer<LLControlVariable> cntrl_ptr = gSavedSettings.getControl("CollectFontVertexBuffers");
     if (cntrl_ptr.notNull())
@@ -1159,10 +1151,6 @@ void LLPipeline::refreshCachedSettings()
     RenderGlowStrength = gSavedSettings.getF32("RenderGlowStrength");
     RenderGlowNoise = gSavedSettings.getBOOL("RenderGlowNoise");
     RenderDepthOfField = gSavedSettings.getBOOL("RenderDepthOfField");
-    RenderDepthOfFieldInEditMode = gSavedSettings.getBOOL("RenderDepthOfFieldInEditMode");
-    RenderDepthOfFieldNearBlur = gSavedSettings.getBOOL("RenderDepthOfFieldNearBlur");
-    RenderFocusPointLocked = gSavedSettings.getBOOL("RenderFocusPointLocked");
-    RenderFocusPointFollowsPointer = gSavedSettings.getBOOL("RenderFocusPointFollowsPointer");
     CameraFocusTransitionTime = gSavedSettings.getF32("CameraFocusTransitionTime");
     CameraFNumber = gSavedSettings.getF32("CameraFNumber");
     CameraFocalLength = gSavedSettings.getF32("CameraFocalLength");
@@ -7829,6 +7817,9 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 {
     LL_PROFILE_GPU_ZONE("dof");
     {
+        static LLCachedControl<bool> RenderDepthOfFieldInEditMode(gSavedSettings, "RenderDepthOfFieldInEditMode", false);
+        static LLCachedControl<bool> RenderFocusPointLocked(gSavedSettings, "RenderFocusPointLocked", false);
+        static LLCachedControl<bool> RenderFocusPointFollowsPointer(gSavedSettings, "RenderFocusPointFollowsPointer", false);
         bool dof_enabled =
             (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
             RenderDepthOfField &&
@@ -7847,7 +7838,7 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 
             LLVector3 focus_point;
             static LLVector3 last_focus_point{};
-            if (LLPipeline::RenderFocusPointLocked && !last_focus_point.isExactlyZero())
+            if (RenderFocusPointLocked && !last_focus_point.isExactlyZero())
             {
                 focus_point = last_focus_point;
             }
@@ -7869,7 +7860,7 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 
                 if (focus_point.isExactlyZero())
                 {
-                        if (LLViewerJoystick::getInstance()->getOverrideCamera() || LLPipeline::RenderFocusPointFollowsPointer)
+                        if (LLViewerJoystick::getInstance()->getOverrideCamera() || RenderFocusPointFollowsPointer)
                     { // focus on point under cursor
                         focus_point.set(gDebugRaycastIntersection.getF32ptr());
                     }
@@ -7981,19 +7972,20 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 
                 gGL.setColorMask(true, false);
 
+                static LLCachedControl<bool> RenderDepthOfFieldNearBlur(gSavedSettings, "RenderDepthOfFieldNearBlur", false);
                 LLGLSLShader& post_program = RenderDepthOfFieldNearBlur ? gDeferredPostProgram : gDeferredPostProgramNoNear;
 
-                gDeferredPostProgram.bind();
-                gDeferredPostProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->deferredLight, LLTexUnit::TFO_POINT);
+                post_program.bind();
+                post_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->deferredLight, LLTexUnit::TFO_POINT);
 
-                gDeferredPostProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
-                gDeferredPostProgram.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
-                gDeferredPostProgram.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
+                post_program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
+                post_program.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
+                post_program.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
 
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-                gDeferredPostProgram.unbind();
+                post_program.unbind();
 
                 src->flush();
                 gGL.setColorMask(true, true);
@@ -8092,6 +8084,7 @@ void LLPipeline::renderFinalize()
     gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
     glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
 
+    static LLCachedControl<bool> RenderDepthOfFieldInEditMode(gSavedSettings, "RenderDepthOfFieldInEditMode", false);
     if((RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
         RenderDepthOfField &&
         !gCubeSnapshot)
