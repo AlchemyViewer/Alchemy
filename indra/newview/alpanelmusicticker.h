@@ -4,7 +4,7 @@
 *
 * $LicenseInfo:firstyear=2015&license=viewerlgpl$
 * Copyright (C) Shyotl Kuhr
-* Copyright (C) 2015 Drake Arconis
+* Copyright (C) Rye Mutt <rye@alchemyviewer.org>
 *
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public

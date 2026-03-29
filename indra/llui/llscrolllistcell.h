@@ -328,7 +328,7 @@ public:
     void    setEnabled(bool enable) override { mLineEditor->setEnabled(enable); }
 
     LLLineEditor*   getLineEditor()             { return mLineEditor; }
-    bool    isText() const override { return FALSE; }
+    bool    isText() const override { return false; }
 
 private:
     LLLineEditor* mLineEditor;

@@ -343,7 +343,7 @@ static LLPanelInjector<ALPanelDerenderList> t_panel_derender_list("panel_derende
 
 ALPanelDerenderList::ALPanelDerenderList()
     : LLPanel()
-    , m_pDerenderList(NULL)
+    , m_pDerenderList(nullptr)
 {
 }
 
@@ -398,7 +398,7 @@ void ALPanelDerenderList::onColumnSortChange()
 
 void ALPanelDerenderList::onSelectionChange()
 {
-    bool hasSelected = (NULL != m_pDerenderList->getFirstSelected());
+    bool hasSelected = (nullptr != m_pDerenderList->getFirstSelected());
     getChildView("derender_trash_btn")->setEnabled(hasSelected);
 }
 
@@ -502,7 +502,7 @@ void ALPanelAssetBlocklist::onColumnSortChange()
 
 void ALPanelAssetBlocklist::onSelectionChange()
 {
-    bool hasSelected = (NULL != mAssetBlocklist->getFirstSelected());
+    bool hasSelected = (nullptr != mAssetBlocklist->getFirstSelected());
     getChildView("asset_trash_btn")->setEnabled(hasSelected);
 }
 

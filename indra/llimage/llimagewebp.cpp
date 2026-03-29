@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2020&license=viewerlgpl$
  * Alchemy Viewer Source Code
- * Copyright (C) 2020, Rye Mutt <rye@alchemyviewer.org>
+ * Copyright (C) Rye Mutt <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

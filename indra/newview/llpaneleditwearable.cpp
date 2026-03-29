@@ -1701,7 +1701,7 @@ void LLPanelEditWearable::onClickedImportBtnCallback(const std::vector<std::stri
 {
     const std::string filename = filenames[0];
     LLXmlTree tree;
-    if (!tree.parseFile(filename, FALSE))
+    if (!tree.parseFile(filename, false))
     {
         LL_WARNS("ShapeImport") << "Parsing " << filename << "failed miserably." << LL_ENDL;
         LLNotificationsUtil::add("ShapeImportGenericFail", LLSD().with("FILENAME", filename));

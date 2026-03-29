@@ -74,7 +74,7 @@ void LLFloaterMessageBuilder::onOpen(const LLSD& key)
 bool LLFloaterMessageBuilder::tick()
 {
     refreshNetList();
-    return FALSE;
+    return false;
 }
 LLNetListItem* LLFloaterMessageBuilder::findNetListItem(LLHost host)
 {
@@ -385,12 +385,12 @@ bool LLFloaterMessageBuilder::handleKeyHere(KEY key, MASK mask)
     if(key == KEY_RETURN && (mask & MASK_CONTROL))
     {
         onClickSend();
-        return TRUE;
+        return true;
     }
     if(key == KEY_ESCAPE)
     {
         releaseFocus();
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }

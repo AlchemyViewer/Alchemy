@@ -1,5 +1,5 @@
 /*
-* @file alfloatergroupprofile.h
+* @file alfloatergroupprofile.cpp
 * @brief Floater that holds panel
 *
 * Copyright (c) 2017, Cinder Roxley <cinder@sdf.org>

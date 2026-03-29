@@ -161,7 +161,7 @@ protected:
      * Object helper functions
      */
 public:
-    bool              addSelection(bool fPersist, std::vector<LLUUID>* pIdList = NULL);
+    bool              addSelection(bool fPersist, std::vector<LLUUID>* pIdList = nullptr);
     static bool       canAdd(const LLViewerObject* pObj);
     static bool       canAddSelection();
     bool              processObjectUpdate(U64 idRegion, const LLUUID& idObject, const LLVOCacheEntry* pEntry);
@@ -170,8 +170,8 @@ public:
 protected:
     ALDerenderObject* getObjectEntry(const LLUUID& idObject) /*const*/;
     ALDerenderObject* getObjectEntry(U64 idRegion, const LLUUID& idObject, U32 idRootLocal) /*const*/;
-    bool              isDerendered(const LLUUID& idObject) /*const*/                                { return getObjectEntry(idObject) != NULL; }
-    bool              isDerendered(U64 idRegion, const LLUUID& idObject, U32 idRootLocal) /*const*/ { return getObjectEntry(idRegion, idObject, idRootLocal) != NULL; }
+    bool              isDerendered(const LLUUID& idObject) /*const*/                                { return getObjectEntry(idObject) != nullptr; }
+    bool              isDerendered(U64 idRegion, const LLUUID& idObject, U32 idRootLocal) /*const*/ { return getObjectEntry(idRegion, idObject, idRootLocal) != nullptr; }
 
     /*
      * Static member functions

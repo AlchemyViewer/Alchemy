@@ -2,7 +2,7 @@
  * @file alfloaterlightbox.cpp
  * @brief A generic text floater for dumping info (usually debug info)
  *
- * Copyright (c) 2022, Rye Mutt <rye@alchemyviewer.org>
+ * Copyright (C) Rye Mutt <rye@alchemyviewer.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by

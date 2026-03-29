@@ -3629,6 +3629,6 @@ void LLScrollListIcon::setClickCallback(bool (*callback)(void*), void* user_data
 bool LLScrollListIcon::handleClick()
 {
     if(mCallback) return mCallback(mUserData);
-    return FALSE;
+    return false;
 }
 

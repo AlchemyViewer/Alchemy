@@ -1,5 +1,5 @@
 /**
- * @file qtoolalign.cpp
+ * @file altoolalign.cpp
  * @brief A tool to align objects
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$

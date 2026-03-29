@@ -365,7 +365,7 @@ public:
     {
         for (auto& cb : mMessageCallbacks)
             cb(msgsystem);
-        return (BOOL)!mMessageCallbacks.empty();
+        return !mMessageCallbacks.empty();
     }
 
     bool isUdpBanned() const

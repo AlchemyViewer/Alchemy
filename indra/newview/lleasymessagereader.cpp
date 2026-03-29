@@ -94,12 +94,12 @@ S32 LLEasyMessageReader::getNumberOfBlocks(const char *blockname)
     return mTemplateMessageReader.getNumberOfBlocks(blockname);
 }
 
-std::string LLEasyMessageReader::var2Str(const char* block_name, S32 block_num, LLMessageVariable* variable, BOOL &returned_hex, BOOL summary_mode)
+std::string LLEasyMessageReader::var2Str(const char* block_name, S32 block_num, LLMessageVariable* variable, bool &returned_hex, bool summary_mode)
 {
     const char* var_name = variable->getName();
     e_message_variable_type var_type = variable->getType();
 
-    returned_hex = FALSE;
+    returned_hex = false;
     std::stringstream stream;
 
     U32 valueU32;
@@ -243,7 +243,7 @@ std::string LLEasyMessageReader::var2Str(const char* block_name, S32 block_num, 
             }
             else
             {
-                returned_hex = TRUE;
+                returned_hex = true;
                 S32 end = (summary_mode && (size > 8)) ? 8 : size;
                 for(S32 i = 0; i < end; i++)
                     //stream << std::uppercase << std::hex << U32(value[i]) << " ";
@@ -255,5 +255,5 @@ std::string LLEasyMessageReader::var2Str(const char* block_name, S32 block_num, 
         break;
     }
 
-    return stream.str();
+    return std::move(stream).str();
 }

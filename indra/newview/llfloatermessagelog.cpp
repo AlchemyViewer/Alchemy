@@ -87,7 +87,7 @@ LLFloaterMessageLog::LLMessageLogNetMan::LLMessageLogNetMan(LLFloaterMessageLog*
 bool LLFloaterMessageLog::LLMessageLogNetMan::tick()
 {
     if (mParent) { mParent->updateGlobalNetList(); }
-    return FALSE;
+    return false;
 }
 
 ////////////////////////////////
@@ -156,7 +156,7 @@ bool LLFloaterMessageLog::postBuild()
     getChild<LLUICtrl>("msg_builder_send_btn")->setCommitCallback(boost::bind(&LLFloaterMessageLog::onClickSendToMessageBuilder, this));
     getChild<LLLineEditor>("filter_edit")->setText(mMessageLogFilter.asString());
 
-    startApplyingFilter(mMessageLogFilter.asString(), TRUE);
+    startApplyingFilter(mMessageLogFilter.asString(), true);
 
     updateGlobalNetList(true);
     mNetListTimer.reset(new LLMessageLogNetMan(this));
@@ -164,7 +164,7 @@ bool LLFloaterMessageLog::postBuild()
     setInfoPaneMode(IPANE_NET);
     wrapInfoPaneText(true);
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterMessageLog::onOpen(const LLSD& key)
@@ -671,14 +671,14 @@ bool LLFloaterMessageLog::onClickCloseCircuit(void* user_data)
 {
     LLNetListItem* itemp = static_cast<LLNetListItem*>(user_data);
     LLCircuitData* cdp = itemp->mCircuitData;
-    if(!cdp) return FALSE;
+    if(!cdp) return false;
     LLHost myhost = cdp->getHost();
     LLSD args;
     args["MESSAGE"] = "This will delete local circuit data.\nDo you want to tell the remote host to close the circuit too?";
     LLSD payload;
     payload["circuittoclose"] = myhost.getString();
     LLNotificationsUtil::add("GenericAlertYesCancel", args, payload, onConfirmCloseCircuit);
-    return TRUE;
+    return true;
 }
 
 // static
@@ -722,7 +722,7 @@ void LLFloaterMessageLog::onConfirmRemoveRegion(const LLSD& notification, const 
 
 void LLFloaterMessageLog::onClickFilterApply()
 {
-    startApplyingFilter(childGetValue("filter_edit"), TRUE);
+    startApplyingFilter(childGetValue("filter_edit"), true);
 }
 
 void LLFloaterMessageLog::startApplyingFilter(const std::string& filter, bool force)
@@ -756,7 +756,7 @@ void LLFloaterMessageLog::updateFilterStatus() const
 
 void LLFloaterMessageLog::onCommitFilter()
 {
-    startApplyingFilter(childGetValue("filter_edit"), FALSE);
+    startApplyingFilter(childGetValue("filter_edit"), false);
 }
 
 void LLFloaterMessageLog::onClickClearLog()
@@ -771,7 +771,7 @@ void LLFloaterMessageLog::onClickClearLog()
 void LLFloaterMessageLog::onClickFilterMenu(const LLSD& user_data)
 {
     getChild<LLLineEditor>("filter_edit")->setText(user_data.asString());
-    startApplyingFilter(user_data.asString(), FALSE);
+    startApplyingFilter(user_data.asString(), false);
 }
 
 void LLFloaterMessageLog::onClickSendToMessageBuilder() const

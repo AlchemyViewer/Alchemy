@@ -31,7 +31,7 @@ struct LLNetListItem
 {
     LLNetListItem(LLUUID id);
     LLUUID mID;
-    BOOL mAutoName;
+    bool mAutoName;
     std::string mName;
     std::string mPreviousRegionName;
     U64 mHandle;
