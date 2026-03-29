@@ -55,6 +55,7 @@
 
 // Newview
 #include "alavataractions.h"
+#include "alfloaterblocked.h"
 #include "llagent.h" //gAgent
 #include "llagentpicksinfo.h"
 #include "llavataractions.h"
@@ -70,9 +71,10 @@
 #include "lllogchat.h"
 #include "llmutelist.h"
 #include "llnotificationsutil.h"
-#include "alfloaterblocked.h"
 #include "llpanelprofileclassifieds.h"
 #include "llpanelprofilepicks.h"
+#include "llprofileimagectrl.h"
+#include "llprofileimagepicker.h"
 #include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h" //is_agent_mappable
@@ -90,19 +92,21 @@ static LLPanelInjector<LLPanelProfileFirstLife> t_panel_firstlife("panel_profile
 static LLPanelInjector<LLPanelProfileNotes> t_panel_notes("panel_profile_notes");
 static LLPanelInjector<LLPanelProfile>          t_panel_profile("panel_profile");
 
-static const std::string PANEL_SECONDLIFE   = "panel_profile_secondlife";
-static const std::string PANEL_WEB          = "panel_profile_web";
-static const std::string PANEL_PICKS        = "panel_profile_picks";
-static const std::string PANEL_CLASSIFIEDS  = "panel_profile_classifieds";
-static const std::string PANEL_FIRSTLIFE    = "panel_profile_firstlife";
-static const std::string PANEL_NOTES        = "panel_profile_notes";
-static const std::string PANEL_PROFILE_VIEW = "panel_profile_view";
+static constexpr std::string_view PANEL_SECONDLIFE   = "panel_profile_secondlife";
+static constexpr std::string_view PANEL_WEB          = "panel_profile_web";
+static constexpr std::string_view PANEL_PICKS        = "panel_profile_picks";
+static constexpr std::string_view PANEL_CLASSIFIEDS  = "panel_profile_classifieds";
+static constexpr std::string_view PANEL_FIRSTLIFE    = "panel_profile_firstlife";
+static constexpr std::string_view PANEL_NOTES        = "panel_profile_notes";
+static constexpr std::string_view PANEL_PROFILE_VIEW = "panel_profile_view";
 
-static const std::string PROFILE_PROPERTIES_CAP = "AgentProfile";
-static const std::string PROFILE_IMAGE_UPLOAD_CAP = "UploadAgentProfileImage";
+static constexpr std::string_view PROFILE_PROPERTIES_CAP = "AgentProfile";
+static constexpr std::string_view PROFILE_IMAGE_UPLOAD_CAP = "UploadAgentProfileImage";
 
 
 //////////////////////////////////////////////////////////////////////////
+
+#if 0 // Alchemy: Moved to standalone handler in llprofileimagepicker.cpp
 
 LLUUID post_profile_image(std::string cap_url, const LLSD &first_data, std::string path_to_image, LLHandle<LLPanel> *handle)
 {
@@ -257,6 +261,8 @@ void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::s
     delete handle;
 }
 
+#endif
+
 //////////////////////////////////////////////////////////////////////////
 // LLProfileHandler
 
@@ -282,6 +288,8 @@ public:
 };
 LLProfileHandler gProfileHandler;
 
+
+#if 0 // Alchemy: Moved to standalone handler in llagenthandler.cpp
 
 //////////////////////////////////////////////////////////////////////////
 // LLAgentHandler
@@ -439,6 +447,7 @@ public:
 };
 LLAgentHandler gAgentHandler;
 
+#endif // Moved
 
 ///----------------------------------------------------------------------------
 /// LLFloaterProfilePermissions
@@ -1311,6 +1320,7 @@ void LLPanelProfileSecondLife::setLoaded()
     }
 }
 
+#if 0 // Alchemy: Moved to standalone handler in llprofileimagepicker.cpp
 
 class LLProfileImagePicker : public LLFilePickerThread
 {
@@ -1396,6 +1406,8 @@ void LLProfileImagePicker::notify(const std::vector<std::string>& filenames)
 
     mHandle = nullptr; // transferred to post_profile_image_coro
 }
+
+#endif
 
 void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
 {
@@ -1505,7 +1517,7 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
     }
     else if (item_name == "upload_photo")
     {
-        (new LLProfileImagePicker(PROFILE_IMAGE_SL, new LLHandle<LLPanel>(LLPanel::getHandle())))->getFile();
+        (new LLProfileImagePicker(PROFILE_IMAGE_SL, getHandle()))->getFile();
 
         LLFloater* floaterp = mFloaterTexturePickerHandle.get();
         if (floaterp)
@@ -2061,7 +2073,7 @@ void LLPanelProfileFirstLife::commitUnsavedChanges()
 
 void LLPanelProfileFirstLife::onUploadPhoto()
 {
-    (new LLProfileImagePicker(PROFILE_IMAGE_FL, new LLHandle<LLPanel>(LLPanel::getHandle())))->getFile();
+    (new LLProfileImagePicker(PROFILE_IMAGE_FL, getHandle()))->getFile();
 
     LLFloater* floaterp = mFloaterTexturePickerHandle.get();
     if (floaterp)

@@ -84,8 +84,10 @@ set(viewer_SOURCE_FILES
     alavataractions.cpp
     alavatargroups.cpp
     alchatcommand.cpp
+    alcheatcodes.cpp
     alclassifieditem.cpp
     alderenderlist.cpp
+    aldroptarget.cpp
     alfloaterblocked.cpp
     alfloaterdirectory.cpp
     alfloaterevent.cpp
@@ -105,6 +107,7 @@ set(viewer_SOURCE_FILES
     alpanelclassifiededit.cpp
     alpaneleventinfo.cpp
     alpanelmusicticker.cpp
+    alpanelpick.cpp
     alpanelquicksettings.cpp
     alpanelquicksettingspulldown.cpp
     alpanelradaralert.cpp
@@ -117,6 +120,7 @@ set(viewer_SOURCE_FILES
     alpanelsearchplaces.cpp
     alpanelsearchweb.cpp
     alpanelstreaminfo.cpp
+    alpickitem.cpp
     alstreaminfo.cpp
     altoolalign.cpp
     alunzip.cpp
@@ -135,6 +139,7 @@ set(viewer_SOURCE_FILES
     llagentbenefits.cpp
     llagentcamera.cpp
     llagentdata.cpp
+    llagenthandler.cpp
     llagentlanguage.cpp
     llagentlistener.cpp
     llagentpicksinfo.cpp
@@ -594,6 +599,8 @@ set(viewer_SOURCE_FILES
     llplacesfolderview.cpp
     llpopupview.cpp
     llpostcard.cpp
+    llprofileimagectrl.cpp
+    llprofileimagepicker.cpp
     llpresetsmanager.cpp
     llpreview.cpp
     llpreviewanim.cpp
@@ -829,6 +836,7 @@ set(viewer_HEADER_FILES
     alchatcommand.h
     alclassifieditem.h
     alderenderlist.h
+    aldroptarget.h
     alfloaterblocked.h
     alfloaterdirectory.h
     alfloaterevent.h
@@ -848,6 +856,7 @@ set(viewer_HEADER_FILES
     alpanelclassifiededit.h
     alpaneleventinfo.h
     alpanelmusicticker.h
+    alpanelpick.h
     alpanelquicksettings.h
     alpanelquicksettingspulldown.h
     alpanelradaralert.h
@@ -860,6 +869,7 @@ set(viewer_HEADER_FILES
     alpanelsearchplaces.h
     alpanelsearchweb.h
     alpanelstreaminfo.h
+    alpickitem.h
     alstreaminfo.h
     altoolalign.h
     alunzip.h
@@ -1328,6 +1338,8 @@ set(viewer_HEADER_FILES
     llplacesfolderview.h
     llpopupview.h
     llpostcard.h
+    llprofileimagectrl.h
+    llprofileimagepicker.h
     llpresetsmanager.h
     llpreview.h
     llpreviewanim.h
