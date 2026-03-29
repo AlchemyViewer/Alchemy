@@ -29,7 +29,11 @@
 #include "pipeline.h"
 
 // library includes
+#include "llimagebmp.h"
+#include "llimagejpeg.h"
 #include "llimagepng.h"
+#include "llimagetga.h"
+#include "llimagewebp.h"
 #include "llaudioengine.h" // For debugging.
 #include "llerror.h"
 #include "llviewercontrol.h"
@@ -115,6 +119,7 @@
 #include "llprogressview.h"
 #include "llcleanup.h"
 #include "gltfscenemanager.h"
+#include "lutcube.h"
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "llvisualeffect.h"
 #include "rlvactions.h"
@@ -638,6 +643,9 @@ void LLPipeline::init()
             LLFontVertexBuffer::enableBufferCollection(control->getValue().asBoolean());
         });
     }
+
+    gSavedSettings.getControl("RenderColorGrade")->getCommitSignal()->connect(boost::bind(&LLPipeline::setupGradingLUT, this));
+    gSavedSettings.getControl("RenderColorGradeLUT")->getCommitSignal()->connect(boost::bind(&LLPipeline::setupGradingLUT, this));
 }
 
 LLPipeline::~LLPipeline()
@@ -1464,6 +1472,8 @@ void LLPipeline::createGLBuffers()
 
     createLUTBuffers();
 
+    setupGradingLUT();
+
     gBumpImageList.restoreGL();
 }
 
@@ -1569,6 +1579,195 @@ void LLPipeline::createLUTBuffers()
     mLuminanceMap.allocate(256, 256, GL_R16F, false, LLTexUnit::TT_TEXTURE, LLTexUnit::TMG_AUTO);
 
     mLastExposure.allocate(1, 1, GL_R16F);
+}
+
+void LLPipeline::setupGradingLUT()
+{
+    if (mCGLut)
+    {
+        LLImageGL::deleteTextures(1, &mCGLut);
+        mCGLut = 0;
+    }
+
+    std::string lut_name = gSavedSettings.getString("RenderColorGradeLUT");
+    if (gSavedSettings.getBOOL("RenderColorGrade") && !lut_name.empty())
+    {
+        std::string lut_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut", lut_name);
+
+        if (!LLFile::isfile(lut_path))
+        {
+            lut_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut", lut_name);
+        }
+
+        if (LLFile::isfile(lut_path))
+        {
+            std::string temp_exten = gDirUtilp->getExtension(lut_path);
+            bool decode_success = false;
+            LLPointer<LLImageRaw> raw_image;
+            bool flip_green = true;
+            bool swap_bluegreen = true;
+            if (temp_exten == "cube")
+            {
+                LutCube lutCube(lut_path);
+                if (!lutCube.colorCube.empty())
+                {
+                    try
+                    {
+                        raw_image = new LLImageRaw(lutCube.colorCube.data(), lutCube.size * lutCube.size, lutCube.size, 4);
+                    }
+                    catch (const std::bad_alloc&)
+                    {
+                        return;
+                    }
+                    flip_green = false;
+                    swap_bluegreen = false;
+                    decode_success = true;
+                }
+            }
+            else
+            {
+                enum class ELutExt
+                {
+                    EXT_IMG_TGA = 0,
+                    EXT_IMG_PNG,
+                    EXT_IMG_JPEG,
+                    EXT_IMG_BMP,
+                    EXT_IMG_WEBP,
+                    EXT_NONE
+                };
+
+                ELutExt extension = ELutExt::EXT_NONE;
+                if (temp_exten == "tga")
+                {
+                    extension = ELutExt::EXT_IMG_TGA;
+                }
+                else if (temp_exten == "png")
+                {
+                    extension = ELutExt::EXT_IMG_PNG;
+                }
+                else if (temp_exten == "jpg" || temp_exten == "jpeg")
+                {
+                    extension = ELutExt::EXT_IMG_JPEG;
+                }
+                else if (temp_exten == "bmp")
+                {
+                    extension = ELutExt::EXT_IMG_BMP;
+                }
+                else if (temp_exten == "webp")
+                {
+                    extension = ELutExt::EXT_IMG_WEBP;
+                }
+
+                raw_image = new LLImageRaw;
+
+                switch (extension)
+                {
+                    default:
+                        break;
+                    case ELutExt::EXT_IMG_TGA:
+                    {
+                        LLPointer<LLImageTGA> tga_image = new LLImageTGA;
+                        if (tga_image->load(lut_path) && tga_image->decode(raw_image, 0.0f))
+                        {
+                            decode_success = true;
+                        }
+                        break;
+                    }
+                    case ELutExt::EXT_IMG_PNG:
+                    {
+                        LLPointer<LLImagePNG> png_image = new LLImagePNG;
+                        if (png_image->load(lut_path) && png_image->decode(raw_image, 0.0f))
+                        {
+                            decode_success = true;
+                        }
+                        break;
+                    }
+                    case ELutExt::EXT_IMG_JPEG:
+                    {
+                        LLPointer<LLImageJPEG> jpg_image = new LLImageJPEG;
+                        if (jpg_image->load(lut_path) && jpg_image->decode(raw_image, 0.0f))
+                        {
+                            decode_success = true;
+                        }
+                        break;
+                    }
+                    case ELutExt::EXT_IMG_BMP:
+                    {
+                        LLPointer<LLImageBMP> bmp_image = new LLImageBMP;
+                        if (bmp_image->load(lut_path) && bmp_image->decode(raw_image, 0.0f))
+                        {
+                            decode_success = true;
+                        }
+                        break;
+                    }
+                    case ELutExt::EXT_IMG_WEBP:
+                    {
+                        LLPointer<LLImageWebP> webp_image = new LLImageWebP;
+                        if (webp_image->load(lut_path) && webp_image->decode(raw_image, 0.0f))
+                        {
+                            decode_success = true;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (decode_success && raw_image)
+            {
+                U32 primary_format = 0;
+                U32 int_format = 0;
+                switch (raw_image->getComponents())
+                {
+                    case 3:
+                    {
+                        primary_format = GL_RGB;
+                        int_format = GL_RGB8;
+                        break;
+                    }
+                    case 4:
+                    {
+                        primary_format = GL_RGBA;
+                        int_format = GL_RGBA8;
+                        break;
+                    }
+                    default:
+                    {
+                        LL_WARNS() << "Color LUT has invalid number of color components: " << raw_image->getComponents() << LL_ENDL;
+                        return;
+                    }
+                };
+
+                S32 image_height = raw_image->getHeight();
+                S32 image_width  = raw_image->getWidth();
+                if ((image_height > 0 && image_height <= gGLManager.mGLMaxTextureSize) // within dimension limit
+                    && ((image_height * image_height) == image_width))                 // width is height * height
+                {
+                    mCGLutSize = LLVector4((F32)image_height, (F32)flip_green, (F32)swap_bluegreen);
+
+                    LLImageGL::generateTextures(1, &mCGLut);
+                    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
+                    {
+                        stop_glerror();
+                        glTexImage3D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE_3D), 0, int_format, image_height, image_height,
+                                        image_height, 0, primary_format, GL_UNSIGNED_BYTE, raw_image->getData());
+                        stop_glerror();
+                    }
+                    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                    gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
+                }
+                else
+                {
+                    LL_WARNS() << "Color LUT is invalid width or height: " << image_height << " x " << image_width << " at path "
+                                << lut_path << LL_ENDL;
+                }
+            }
+            else
+            {
+                LL_WARNS() << "Failed to decode color grading LUT: " << lut_path << LL_ENDL;
+            }
+        }
+    }
 }
 
 
@@ -7214,8 +7413,6 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     }
 }
 
-extern LLPointer<LLImageGL> gEXRImage;
-
 void LLPipeline::tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_correct)
 {
     LL_PROFILE_GPU_ZONE("tonemap");
@@ -7233,18 +7430,24 @@ void LLPipeline::tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_co
 
         LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
+        bool color_grade = false;
         bool no_post = gSnapshotNoPost || psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f || (buildNoPost && gFloaterTools && gFloaterTools->isAvailable());
         LLGLSLShader* shader = nullptr;
         if(gamma_correct)
         {
+            color_grade = (mCGLut != 0);
             bool legacy_gamma = psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f;
             if(legacy_gamma)
             {
-                shader = no_post ? &gNoPostTonemapLegacyGammaCorrectProgram : &gDeferredPostTonemapLegacyGammaCorrectProgram;
+                shader = no_post ?
+                    color_grade ? &gNoPostTonemapLegacyGammaCorrectCGLutProgram : &gNoPostTonemapLegacyGammaCorrectProgram :
+                    color_grade ? &gDeferredPostTonemapLegacyGammaCorrectCGLutProgram : &gDeferredPostTonemapLegacyGammaCorrectProgram;
             }
             else
             {
-                shader = no_post ? &gNoPostTonemapGammaCorrectProgram : &gDeferredPostTonemapGammaCorrectProgram;
+                shader = no_post ?
+                    color_grade ? &gNoPostTonemapGammaCorrectCGLutProgram : &gNoPostTonemapGammaCorrectProgram :
+                    color_grade ? &gDeferredPostTonemapGammaCorrectCGLutProgram: &gDeferredPostTonemapGammaCorrectProgram;
             }
         }
         else
@@ -7276,8 +7479,28 @@ void LLPipeline::tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_co
         shader->uniform1i(tonemap_type, tonemap_type_setting);
         shader->uniform1f(tonemap_mix, psky->getTonemapMix(should_auto_adjust()));
 
+        S32 cglut_channel = -1;
+        if (gamma_correct && color_grade)
+        {
+            cglut_channel = shader->getTextureChannel(LLShaderMgr::COLOR_GRADE_LUT);
+            if (cglut_channel > -1)
+            {
+                gGL.getTexUnit(cglut_channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
+                gGL.getTexUnit(cglut_channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                gGL.getTexUnit(cglut_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+            }
+
+            shader->uniform4fv(LLShaderMgr::COLOR_GRADE_LUT_SIZE, 1, mCGLutSize.mV);
+        }
+
+
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+        if (cglut_channel > -1)
+        {
+            gGL.getTexUnit(cglut_channel)->unbind(LLTexUnit::TT_TEXTURE_3D);
+        }
 
         gGL.getTexUnit(channel)->unbind(src->getUsage());
         shader->unbind();
@@ -7298,12 +7521,29 @@ void LLPipeline::gammaCorrect(LLRenderTarget* src, LLRenderTarget* dst)
         static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
 
         LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-        LLGLSLShader& shader = psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f ? gLegacyPostGammaCorrectProgram :
-            gDeferredPostGammaCorrectProgram;
+        bool color_grade = (mCGLut != 0);
+        LLGLSLShader& shader =
+            psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f ?
+            color_grade ? gLegacyPostGammaCorrectCGLutProgram : gLegacyPostGammaCorrectProgram :
+            color_grade ? gDeferredPostGammaCorrectCGLutProgram : gDeferredPostGammaCorrectProgram;
 
         shader.bind();
         shader.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
         shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)src->getWidth(), (GLfloat)src->getHeight());
+
+        S32 cglut_channel = -1;
+        if (color_grade)
+        {
+            cglut_channel = shader.getTextureChannel(LLShaderMgr::COLOR_GRADE_LUT);
+            if (cglut_channel > -1)
+            {
+                gGL.getTexUnit(cglut_channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
+                gGL.getTexUnit(cglut_channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                gGL.getTexUnit(cglut_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+            }
+
+            shader.uniform4fv(LLShaderMgr::COLOR_GRADE_LUT_SIZE, 1, mCGLutSize.mV);
+        }
 
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -7459,15 +7699,15 @@ void LLPipeline::applyCAS(LLRenderTarget* src, LLRenderTarget* dst)
         gPipeline.copyRenderTarget(src, dst);
         return;
     }
-
-    LLGLSLShader* sharpen_shader = &gCASProgram;
+    bool color_grade = (mCGLut != 0);
+    LLGLSLShader* sharpen_shader = color_grade ? &gCASCGLutProgram : &gCASProgram;
     static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
 
     LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
     bool legacy_gamma = psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f;
     if(legacy_gamma)
     {
-        sharpen_shader = &gCASLegacyGammaProgram;
+        sharpen_shader = color_grade ? &gCASLegacyGammaCGLutProgram : &gCASLegacyGammaProgram;
     }
 
     // Bind setup:
@@ -7495,9 +7735,28 @@ void LLPipeline::applyCAS(LLRenderTarget* src, LLRenderTarget* dst)
 
     sharpen_shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
 
+    S32 cglut_channel = -1;
+    if (color_grade)
+    {
+        cglut_channel = sharpen_shader->getTextureChannel(LLShaderMgr::COLOR_GRADE_LUT);
+        if (cglut_channel > -1)
+        {
+            gGL.getTexUnit(cglut_channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
+            gGL.getTexUnit(cglut_channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+            gGL.getTexUnit(cglut_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        }
+
+        sharpen_shader->uniform4fv(LLShaderMgr::COLOR_GRADE_LUT_SIZE, 1, mCGLutSize.mV);
+    }
+
     // Draw
     gPipeline.mScreenTriangleVB->setBuffer();
     gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+    if (cglut_channel > -1)
+    {
+        gGL.getTexUnit(cglut_channel)->unbind(LLTexUnit::TT_TEXTURE_3D);
+    }
 
     sharpen_shader->unbind();
 

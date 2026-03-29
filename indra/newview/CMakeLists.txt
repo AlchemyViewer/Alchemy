@@ -813,6 +813,7 @@ set(viewer_SOURCE_FILES
     llworldmapview.cpp
     llxmlrpclistener.cpp
     llxmlrpctransaction.cpp
+    lutcube.cpp
     noise.cpp
     pipeline.cpp
     rlvactions.cpp
@@ -1560,6 +1561,7 @@ set(viewer_HEADER_FILES
     llworldmapview.h
     llxmlrpclistener.h
     llxmlrpctransaction.h
+    lutcube.h
     noise.h
     pipeline.h
     rlvactions.h

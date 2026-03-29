@@ -299,6 +299,14 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
+    if (features->hasColorGrade)
+    {
+        if (!shader->attachFragmentObject("deferred/colorGradeUtilF.glsl"))
+        {
+            return false;
+        }
+    }
+
     // NOTE order of shader object attaching is VERY IMPORTANT!!!
     if (features->hasAtmospherics)
     {
@@ -1544,6 +1552,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("areaTex");
     mReservedUniforms.push_back("searchTex");
     mReservedUniforms.push_back("blendTex");
+    mReservedUniforms.push_back("color_grade_lut");
+    mReservedUniforms.push_back("color_grade_lut_size");
 
     llassert(mReservedUniforms.size() == END_RESERVED_UNIFORMS);
 

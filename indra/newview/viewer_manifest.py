@@ -89,6 +89,9 @@ class ViewerManifest(LLManifest):
                 # ... and the entire image filters directory
                 self.path("filters")
 
+                # ... and the entire color grading LUT directory
+                self.path("colorlut")
+
                 # ... and the included spell checking dictionaries
                 dicts_dir = os.path.join(self.args['vcpkg_dir'], 'share', 'alchemy-dictionaries')
                 with self.prefix(src=dicts_dir):

@@ -111,6 +111,7 @@ public:
 
     void createGLBuffers();
     void createLUTBuffers();
+    void setupGradingLUT();
 
     //allocate the largest screen buffer possible up to resX, resY
     //returns true if full size buffer allocated, false if some other size is allocated
@@ -968,6 +969,10 @@ protected:
     LLDrawPool*                 mWaterExclusionPool      = nullptr;
 
     // Note: no need to keep an quick-lookup to avatar pools, since there's only one per avatar
+
+    // Color grading lookup texture and size
+    U32       mCGLut{};
+    LLVector4 mCGLutSize{};
 
 public:
     std::vector<LLFace*>        mHighlightFaces;    // highlight faces on physical objects

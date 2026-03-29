@@ -22,12 +22,12 @@
 		tab_min_width="70"
 		width="400">
 		<!--Image Panel-->
-		<!--<panel
+		<panel
 			label="Image"
 			layout="topleft"
 			name="colortone_settings"
 			can_resize="false">
-			--><!--LUT Control--><!--
+			<!--Color Grading-->
             <check_box
                 follows="left|top"
                 height="15"
@@ -38,7 +38,7 @@
                 label="Colorgrading:"
                 tool_tip="What Colorgrading LUT (Look Up Texture) to be used to colorgrade the image. Custom LUTs require the full filename!"
                 control_name="RenderColorGrade" />
-			--><!--TODO: Make more flexible?--><!--
+			<!--TODO: Make more flexible?-->
 			<combo_box
 				allow_text_entry="true"
 				tool_tip="What Colorgrading LUT (Look Up Texture) to be used to colorgrade the image. Custom LUTs require the full filename!"
@@ -155,7 +155,8 @@
 					name="lut_AST5"
 					value="AESTHETICS_5.png" />
 			</combo_box>
-			<view_border
+            <!--Sharpen Controls--><!--
+            <view_border
 				bevel_style="none"
 				height="0"
 				layout="topleft"
@@ -163,7 +164,6 @@
 				name="cost_text_border"
 				top_pad="6"
 				width="500" />
-			--><!--Sharpen Controls--><!--
 			<text
 				follows="left|top"
 				height="15"
@@ -631,8 +631,8 @@
 				min_val="0.0"
 				width="55"
 				increment=".1"
-				name="tonemapper_dynamic_spinner7" />
-		</panel>-->
+				name="tonemapper_dynamic_spinner7" />-->
+		</panel>
 		<!--Rendering Panel-->
 		<panel
 			label="Rendering"
