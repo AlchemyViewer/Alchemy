@@ -3532,6 +3532,17 @@ LLSD LLAppViewer::getViewerInfo() const
     }
     info["VIEWER_RELEASE_NOTES_URL"] = url;
 
+#if LL_MSVC && !defined(LL_CLANG)
+    info["COMPILER"] = "MSVC";
+    info["COMPILER_VERSION"] = _MSC_FULL_VER;
+#elif LL_CLANG
+    info["COMPILER"] = "Clang";
+    info["COMPILER_VERSION"] = __clang_version__;
+#elif LL_GNUC
+    info["COMPILER"] = "GCC";
+    info["COMPILER_VERSION"] = GCC_VERSION;
+#endif
+
     // Position
     LLViewerRegion* region = gAgent.getRegion();
     if (region)
@@ -3565,6 +3576,7 @@ LLSD LLAppViewer::getViewerInfo() const
     info["CPU"] = gSysCPU.getCPUString();
     info["MEMORY_MB"] = LLSD::Integer(gSysMemory.getPhysicalMemoryKB().valueInUnits<LLUnits::Megabytes>());
     // Moved hack adjustment to Windows memory size into llsys.cpp
+    info["CONCURRENCY"] = LLSD::Integer((S32) std::thread::hardware_concurrency());
     info["OS_VERSION"] = LLOSInfo::instance().getOSString();
     info["GRAPHICS_CARD_VENDOR"] = ll_safe_string((const char*)(glGetString(GL_VENDOR)));
     info["GRAPHICS_CARD"] = ll_safe_string((const char*)(glGetString(GL_RENDERER)));
