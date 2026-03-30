@@ -105,8 +105,8 @@ cd ~/code/alchemy
 
 ## Checkout viewer code
 ```
-git clone https://github.com/secondlife/viewer.git
-cd ~/code/alchemy/viewer
+git clone https://github.com/AlchemyViewer/Alchemy.git alchemy
+cd ~/code/alchemy/alchemy
 ```
 
 ## Setup Virtual Environment and Python dependencies
@@ -122,7 +122,7 @@ dotnet tool restore
 ```
 
 ## Configure and install vcpkg dependencies
-Switch to the viewer repository you just checked out and run cmake to configure:
+Switch to the alchemy repository you just checked out and run cmake to configure:
 
 
 ### GCC
