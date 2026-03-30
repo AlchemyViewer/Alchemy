@@ -13,7 +13,13 @@ target_sources(SLPlugin
     slplugin.cpp
     )
 
-if (DARWIN)
+
+if (WINDOWS)
+  target_sources(SLPlugin
+    PRIVATE
+    slplugin.manifest
+  )
+elseif (DARWIN)
   target_sources(SLPlugin
     PRIVATE
     slplugin-objc.mm
@@ -29,7 +35,7 @@ if (DARWIN)
     PROPERTIES
     SKIP_PRECOMPILE_HEADERS TRUE
   )
-endif (DARWIN)
+endif ()
 
 target_link_libraries(SLPlugin
         llplugin

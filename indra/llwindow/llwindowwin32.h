@@ -131,7 +131,6 @@ public:
     static PROC WINAPI getProcAddress(const char* func);
     static std::vector<std::string> getDisplaysResolutionList();
     static std::vector<std::string> getDynamicFallbackFontList();
-    static void setDPIAwareness();
 
     void* getDirectInput8() override;
     bool getInputDevices(U32 device_type_filter,

@@ -81,6 +81,7 @@
 #pragma comment(lib, "Dwmapi.lib")
 #include <Uxtheme.h>
 #include <dwmapi.h> // needed for DwmSetWindowAttribute to set window theme
+#include <shellscalingapi.h>
 
 const S32   MAX_MESSAGE_PER_UPDATE = 20;
 const S32   BITS_PER_PIXEL = 32;
@@ -117,35 +118,6 @@ LPWSTR gIconResource = IDI_APPLICATION;
 LPDIRECTINPUT8 gDirectInput8;
 
 LLW32MsgCallback gAsyncMsgCallback = NULL;
-
-#ifndef DPI_ENUMS_DECLARED
-
-typedef enum PROCESS_DPI_AWARENESS {
-    PROCESS_DPI_UNAWARE = 0,
-    PROCESS_SYSTEM_DPI_AWARE = 1,
-    PROCESS_PER_MONITOR_DPI_AWARE = 2
-} PROCESS_DPI_AWARENESS;
-
-typedef enum MONITOR_DPI_TYPE {
-    MDT_EFFECTIVE_DPI = 0,
-    MDT_ANGULAR_DPI = 1,
-    MDT_RAW_DPI = 2,
-    MDT_DEFAULT = MDT_EFFECTIVE_DPI
-} MONITOR_DPI_TYPE;
-
-#endif
-
-typedef HRESULT(STDAPICALLTYPE *SetProcessDpiAwarenessType)(_In_ PROCESS_DPI_AWARENESS value);
-
-typedef HRESULT(STDAPICALLTYPE *GetProcessDpiAwarenessType)(
-    _In_ HANDLE hprocess,
-    _Out_ PROCESS_DPI_AWARENESS *value);
-
-typedef HRESULT(STDAPICALLTYPE *GetDpiForMonitorType)(
-    _In_ HMONITOR hmonitor,
-    _In_ MONITOR_DPI_TYPE dpiType,
-    _Out_ UINT *dpiX,
-    _Out_ UINT *dpiY);
 
 typedef enum PREFERRED_APP_MODE
 {
@@ -4570,31 +4542,6 @@ bool LLWindowWin32::handleImeRequests(WPARAM request, LPARAM param, LRESULT *res
     return false;
 }
 
-//static
-void LLWindowWin32::setDPIAwareness()
-{
-    HMODULE hShcore = LoadLibrary(L"shcore.dll");
-    if (hShcore != NULL)
-    {
-        SetProcessDpiAwarenessType pSPDA;
-        pSPDA = (SetProcessDpiAwarenessType)GetProcAddress(hShcore, "SetProcessDpiAwareness");
-        if (pSPDA)
-        {
-
-            HRESULT hr = pSPDA(PROCESS_PER_MONITOR_DPI_AWARE);
-            if (hr != S_OK)
-            {
-                LL_WARNS() << "SetProcessDpiAwareness() function returned an error. Will use legacy DPI awareness API of Win XP/7" << LL_ENDL;
-            }
-        }
-        FreeLibrary(hShcore);
-    }
-    else
-    {
-        LL_WARNS() << "Could not load shcore.dll library (included by <ShellScalingAPI.h> from Win 8.1 SDK. Will use legacy DPI awareness API of Win XP/7" << LL_ENDL;
-    }
-}
-
 void* LLWindowWin32::getDirectInput8()
 {
     return &gDirectInput8;
@@ -4629,60 +4576,39 @@ F32 LLWindowWin32::getSystemUISize()
 {
     F32 scale_value = 1.f;
     HWND hWnd = (HWND)getPlatformWindow();
-    HDC hdc = GetDC(hWnd);
-    HMONITOR hMonitor;
     HANDLE hProcess = GetCurrentProcess();
     PROCESS_DPI_AWARENESS dpi_awareness;
 
-    HMODULE hShcore = LoadLibrary(L"shcore.dll");
-
-    if (hShcore != NULL)
+    GetProcessDpiAwareness(hProcess, &dpi_awareness);
+    if (dpi_awareness == PROCESS_PER_MONITOR_DPI_AWARE)
     {
-        GetProcessDpiAwarenessType pGPDA;
-        pGPDA = (GetProcessDpiAwarenessType)GetProcAddress(hShcore, "GetProcessDpiAwareness");
-        GetDpiForMonitorType pGDFM;
-        pGDFM = (GetDpiForMonitorType)GetProcAddress(hShcore, "GetDpiForMonitor");
-        if (pGPDA != NULL && pGDFM != NULL)
-        {
-            pGPDA(hProcess, &dpi_awareness);
-            if (dpi_awareness == PROCESS_PER_MONITOR_DPI_AWARE)
-            {
-                POINT    pt;
-                UINT     dpix = 0, dpiy = 0;
-                HRESULT  hr = E_FAIL;
-                RECT     rect;
+        POINT    pt;
+        UINT     dpix = 0, dpiy = 0;
+        HRESULT  hr = E_FAIL;
+        RECT     rect;
 
-                GetWindowRect(hWnd, &rect);
-                // Get the DPI for the monitor, on which the center of window is displayed and set the scaling factor
-                pt.x = (rect.left + rect.right) / 2;
-                pt.y = (rect.top + rect.bottom) / 2;
-                hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-                hr = pGDFM(hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy);
-                if (hr == S_OK)
-                {
-                    scale_value = F32(dpix) / F32(USER_DEFAULT_SCREEN_DPI);
-                }
-                else
-                {
-                    LL_WARNS() << "Could not determine DPI for monitor. Setting scale to default 100 %" << LL_ENDL;
-                    scale_value = 1.0f;
-                }
-            }
-            else
-            {
-                LL_WARNS() << "Process is not per-monitor DPI-aware. Setting scale to default 100 %" << LL_ENDL;
-                scale_value = 1.0f;
-            }
+        GetWindowRect(hWnd, &rect);
+        // Get the DPI for the monitor, on which the center of window is displayed and set the scaling factor
+        pt.x = (rect.left + rect.right) / 2;
+        pt.y = (rect.top + rect.bottom) / 2;
+        HMONITOR hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        hr = GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy);
+        if (hr == S_OK)
+        {
+            scale_value = F32(dpix) / F32(USER_DEFAULT_SCREEN_DPI);
         }
-        FreeLibrary(hShcore);
+        else
+        {
+            LL_WARNS() << "Could not determine DPI for monitor. Setting scale to default 100 %" << LL_ENDL;
+            scale_value = 1.0f;
+        }
     }
     else
     {
-        LL_WARNS() << "Could not load shcore.dll library (included by <ShellScalingAPI.h> from Win 8.1 SDK). Using legacy DPI awareness API of Win XP/7" << LL_ENDL;
-        scale_value = F32(GetDeviceCaps(hdc, LOGPIXELSX)) / F32(USER_DEFAULT_SCREEN_DPI);
+        LL_WARNS() << "Process is not per-monitor DPI-aware. Setting scale to default 100 %" << LL_ENDL;
+        scale_value = 1.0f;
     }
 
-    ReleaseDC(hWnd, hdc);
     return scale_value;
 }
 
