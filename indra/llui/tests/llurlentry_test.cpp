@@ -36,12 +36,6 @@
 
 #include <boost/regex.hpp>
 
-#if LL_WINDOWS
-// because something pulls in window and lldxdiag dependencies which in turn need wbemuuid.lib
-    #pragma comment(lib, "wbemuuid.lib")
-#endif
-
-
 // namespace LLExperienceCache
 // {
 //     const LLSD& get( const LLUUID& key)

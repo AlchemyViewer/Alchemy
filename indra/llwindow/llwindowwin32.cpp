@@ -74,11 +74,6 @@
 #include <dinput.h>
 #include <Dbt.h.>
 #include <InitGuid.h> // needed for llurlentry test to build on some systems
-#pragma comment(lib, "dxguid.lib") // needed for llurlentry test to build on some systems
-#pragma comment(lib, "dinput8")
-
-#pragma comment(lib, "UxTheme.lib")
-#pragma comment(lib, "Dwmapi.lib")
 #include <Uxtheme.h>
 #include <dwmapi.h> // needed for DwmSetWindowAttribute to set window theme
 #include <shellscalingapi.h>

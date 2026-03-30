@@ -37,12 +37,16 @@ elseif(DARWIN)
           )
 elseif(WINDOWS)
   target_link_libraries(ll::uilibraries INTERFACE
+          UxTheme
+          Dwmapi
+          Shcore
           comdlg32 # Common Dialogs for ChooseColor
           ole32
           dxgi
           d3d9
-          opengl32
+          dinput8
           dxguid
+          opengl32
           kernel32
           odbc32
           odbccp32

@@ -52,10 +52,6 @@
 #include <shlwapi.h>
 #include <objbase.h>
 #include <filesystem>
-
-#pragma comment(lib, "shlwapi.lib")
-#pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "shell32.lib")
 #endif // LL_WINDOWS
 
 // Common state

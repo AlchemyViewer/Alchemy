@@ -35,6 +35,7 @@ if(LINUX)
 elseif (WINDOWS)
   target_link_libraries(ll::oslibraries INTERFACE
           advapi32
+          shlwapi
           shell32
           ws2_32
           mswsock
