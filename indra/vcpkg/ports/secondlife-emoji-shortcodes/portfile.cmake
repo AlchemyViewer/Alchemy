@@ -2,7 +2,7 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO milesj/emojibase
     REF emojibase-data@${VERSION}
-    SHA512 59e51c16f6580085b4ef80ff79ec164ebc9c982f302ba7677daf65097ceed78cfad17cf865d0e3194aa2115733112eb8d09c6b4b2397cbdb993d90c90c9a4826
+    SHA512 4b57ec44a1706f7a137cc06da744a03ec563f7fc3c6fc482cca7dccfd9ce89cd08bb26526ddaf753aaebb7c5cea8eec841752321ade0cd8fdfe5ad0caecc2ca4
     HEAD_REF master
 )
 
