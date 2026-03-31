@@ -117,34 +117,27 @@ uniform float exposure;
 uniform float tonemap_mix;
 uniform int tonemap_type;
 
-
 vec3 toneMap(vec3 color)
 {
 #ifndef NO_POST
-    vec3 linear_input_color = color;
-
     float exp_scale = texture(exposureMap, vec2(0.5,0.5)).r;
-    float final_exposure = exposure * exp_scale;
-    vec3 exposed_color = color * final_exposure;
 
-    vec3 tonemapped_color = exposed_color;
+    color *= exposure * exp_scale;
+
+    vec3 clamped_color = clamp(color.rgb, vec3(0.0), vec3(1.0));
+
     switch(tonemap_type)
     {
     case 0:
-        tonemapped_color = PBRNeutralToneMapping(exposed_color);
+        color = PBRNeutralToneMapping(color);
         break;
     case 1:
-        tonemapped_color = toneMapACES_Hill(exposed_color);
+        color = toneMapACES_Hill(color);
         break;
     }
 
-    vec3 exposed_linear_input = linear_input_color * final_exposure;
-    color = mix(exposed_linear_input, tonemapped_color, tonemap_mix);
-
-    color = clamp(color, 0.0, 1.0);
-#else
-    color *= exposure * texture(exposureMap, vec2(0.5,0.5)).r;
-    color = clamp(color, 0.0, 1.0);
+    // mix tonemapped and linear here to provide adjustment
+    color = mix(clamped_color, color, tonemap_mix);
 #endif
 
     return color;
@@ -154,24 +147,20 @@ vec3 toneMap(vec3 color)
 vec3 toneMapNoExposure(vec3 color)
 {
 #ifndef NO_POST
-    vec3 linear_input_color = color;
+    vec3 clamped_color = clamp(color.rgb, vec3(0.0), vec3(1.0));
 
-    vec3 tonemapped_color = color;
     switch(tonemap_type)
     {
     case 0:
-        tonemapped_color = PBRNeutralToneMapping(color);
+        color = PBRNeutralToneMapping(color);
         break;
     case 1:
-        tonemapped_color = toneMapACES_Hill(color);
+        color = toneMapACES_Hill(color);
         break;
     }
 
-    color = mix(linear_input_color, tonemapped_color, tonemap_mix);
-
-    color = clamp(color, 0.0, 1.0);
-#else
-     color = clamp(color, 0.0, 1.0);
+    // mix tonemapped and linear here to provide adjustment
+    color = mix(clamped_color, color, tonemap_mix);
 #endif
 
     return color;
