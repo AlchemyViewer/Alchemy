@@ -2,8 +2,9 @@
 <fonts>
 
   <font name="default" comment="default font files (global fallbacks)">
-    <file>TwemojiSVG.woff2</file>
+    <file>DejaVuSans.woff2</file>
     <file functor="is_emoji">TwemojiSVG.woff2</file>
+    <file load_collection="true">SourceHanSans-Regular.woff2</file>
     <os name="Windows">
       <file>meiryo.TTC</file>
       <file>MSGOTHIC.TTC</file>
@@ -34,6 +35,7 @@
   <font name="SansSerifBold"
 	comment="Name of bold sans-serif font">
     <file>DejaVuSans-Bold.woff2</file>
+    <file load_collection="true">SourceHanSans-Bold.woff2</file>
     <os name="Windows">
       <file>arialbd.ttf</file>
       </os>
@@ -43,7 +45,7 @@
   </font>
 
   <font name="SansSerif" comment="Name of san-serif font (Truetype file name)">
-    <file>TwemojiSVG.woff2</file>
+    <file>DejaVuSans.woff2</file>
     <os name="Windows">
       <file>arial.ttf</file>
       </os>
@@ -105,7 +107,7 @@
 
   <font name="Helvetica"
 	comment="Name of Helvetica font">
-    <file>TwemojiSVG.woff2</file>
+    <file>DejaVuSans.woff2</file>
     <os name="Windows">
       <file>arial.ttf</file>
       </os>
@@ -153,7 +155,7 @@
   <font name="OverrideTest"
 	comment="Name of font to test overriding">
     <file>times.ttf</file>
-    <file>TwemojiSVG.woff2</file>
+    <file>DejaVuSans.woff2</file>
   </font>
 
   <font_size name="Monospace"
