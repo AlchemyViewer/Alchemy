@@ -58,6 +58,7 @@
 	comment="Name of bold sans-serif font"
 	font_style="BOLD">
     <file>DejaVuSans-Bold.woff2</file>
+    <file load_collection="true">SourceHanSans-Bold.woff2</file>
   </font>
 
   <font name="SansSerif"
