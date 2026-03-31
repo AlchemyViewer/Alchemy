@@ -638,7 +638,7 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
     if (mFTFace == nullptr)
         return;
 
-    FT_Int32 load_flags = FT_LOAD_FORCE_AUTOHINT;
+    FT_Int32 load_flags = FT_LOAD_DEFAULT;
     if (EFontGlyphType::Color == bitmap_type)
     {
         // We may not actually get a color render so our caller should always examine mFTFace->glyph->bitmap.pixel_mode
@@ -664,7 +664,7 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
             || (FT_Err_Ok != error && LLStringOps::isEmoji(wch)))
         {
             // value~0 always corresponds to the 'missing glyph'
-            error = FT_Load_Glyph(mFTFace, 0, FT_LOAD_FORCE_AUTOHINT);
+            error = FT_Load_Glyph(mFTFace, 0, FT_LOAD_DEFAULT);
             if (FT_Err_Ok != error)
             {
                 LL_ERRS() << "Loading fallback for char '" << (U32)wch << "', glyph " << glyph_index << " failed with error : " << (S32)error << LL_ENDL;
