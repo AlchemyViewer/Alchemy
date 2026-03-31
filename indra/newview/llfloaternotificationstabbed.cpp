@@ -231,7 +231,7 @@ bool LLFloaterNotificationsTabbed::isWindowEmpty()
 
 //---------------------------------------------------------------------------------
 LLFloaterNotificationsTabbed::NotificationTabbedChannel::NotificationTabbedChannel(LLFloaterNotificationsTabbed* notifications_tabbed_window)
-    : LLNotificationChannel(LLNotificationChannel::Params().name(notifications_tabbed_window->getPathname())),
+    : LLNotificationChannel(LLNotificationChannel::Params().name(notifications_tabbed_window->getName())),
     mNotificationsTabbedWindow(notifications_tabbed_window)
 {
     connectToChannel("Notifications");

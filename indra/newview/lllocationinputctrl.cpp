@@ -948,39 +948,45 @@ void LLLocationInputCtrl::refreshMaturityButton()
     if (!region)
         return;
 
-    bool button_visible = true;
-    LLPointer<LLUIImage> rating_image = NULL;
-    std::string rating_tooltip;
-
     U8 sim_access = region->getSimAccess();
-    switch(sim_access)
+
+    if (mLastSimAccess != sim_access)
     {
-    case SIM_ACCESS_PG:
-        rating_image = mIconMaturityGeneral;
-        rating_tooltip = LLTrans::getString("LocationCtrlGeneralIconTooltip");
-        break;
+        mLastSimAccess = sim_access;
 
-    case SIM_ACCESS_ADULT:
-        rating_image = mIconMaturityAdult;
-        rating_tooltip = LLTrans::getString("LocationCtrlAdultIconTooltip");
-        break;
+        bool button_visible = true;
+        LLPointer<LLUIImage> rating_image = NULL;
+        std::string rating_tooltip;
 
-    case SIM_ACCESS_MATURE:
-        rating_image = mIconMaturityModerate;
-        rating_tooltip = LLTrans::getString("LocationCtrlModerateIconTooltip");
-        break;
+        switch(sim_access)
+        {
+        case SIM_ACCESS_PG:
+            rating_image = mIconMaturityGeneral;
+            rating_tooltip = LLTrans::getString("LocationCtrlGeneralIconTooltip");
+            break;
 
-    default:
-        button_visible = false;
-        break;
-    }
+        case SIM_ACCESS_ADULT:
+            rating_image = mIconMaturityAdult;
+            rating_tooltip = LLTrans::getString("LocationCtrlAdultIconTooltip");
+            break;
 
-    mMaturityButton->setVisible(button_visible);
-    mMaturityButton->setToolTip(rating_tooltip);
-    if(rating_image)
-    {
-        mMaturityButton->setImageUnselected(rating_image);
-        mMaturityButton->setImagePressed(rating_image);
+        case SIM_ACCESS_MATURE:
+            rating_image = mIconMaturityModerate;
+            rating_tooltip = LLTrans::getString("LocationCtrlModerateIconTooltip");
+            break;
+
+        default:
+            button_visible = false;
+            break;
+        }
+
+        mMaturityButton->setVisible(button_visible);
+        mMaturityButton->setToolTip(rating_tooltip);
+        if(rating_image)
+        {
+            mMaturityButton->setImageUnselected(rating_image);
+            mMaturityButton->setImagePressed(rating_image);
+        }
     }
     if (mMaturityButton->getVisible())
     {

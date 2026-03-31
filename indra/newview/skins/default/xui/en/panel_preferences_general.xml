@@ -91,6 +91,37 @@
          name="Traditional Chinese"
          value="zh" />
     </combo_box>
+   <text
+     type="string"
+     length="1"
+     follows="left|top"
+     height="15"
+     layout="topleft"
+     left="255"
+     name="time_format_textbox"
+     top="10"
+     width="200">
+        Time Format:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left="255"
+     max_chars="135"
+     name="time_format_combobox"
+     width="70">
+        <combo_box.item
+         enabled="true"
+         label="1:00 PM"
+         name="12H"
+         value="0" />
+        <combo_box.item
+         enabled="true"
+         label="13:00"
+         name="24H"
+         value="1" />
+    </combo_box>
     <text
  font="SansSerifSmall"
      type="string"
@@ -264,44 +295,47 @@
      tool_tip="Show username, like bobsmith123"
      top_delta="0" />
     <check_box
-     control_name="NameTagShowGroupTitles"
-	 enabled_control="AvatarNameTagMode"
+     control_name="UseDisplayNames"
+     follows="top|left"
      height="16"
-     label="Group titles"
+     label="Display names"
      layout="topleft"
      left="35"
-     width="100" 
-     name="show_all_title_checkbox1"
-     tool_tip="Show group titles, like Officer or Member"
-     top_pad="3" />
-    <check_box
-     control_name="RenderHideGroupTitle"
-     height="16"
-     label="Hide own group title"
-     layout="topleft"
-     left_pad="50"
-     name="RenderHideGroupTitle"
-     tool_tip="Shows or hides your own group title for yourself and everyone else."/>
+     name="display_names_check"
+     width="100"
+     tool_tip="Check to use display names in chat, IM, name tags, etc."
+     top_pad="3"/>
     <check_box
      control_name="NameTagShowFriends"
-     enabled_control="AvatarNameTagMode"
+	 enabled_control="AvatarNameTagMode"
      height="16"
      label="Highlight friends"
      layout="topleft"
+     left_pad="50"
      name="show_friends"
      tool_tip="Highlight the name tags of your friends"/>
-    <check_box
-	 control_name="UseDisplayNames"
-	 follows="top|left"
-	 height="16"
-	 label="View Display Names"
-	 layout="topleft"
-	 left="35"
-	 name="display_names_check"
-	 width="50"
-   top_delta="0"
-	 tool_tip="Check to use display names in chat, IM, name tags, etc."/>
-	 
+    <combo_box
+     height="23"
+     layout="topleft"
+     control_name="GroupTitlesTagMode"
+     enabled_control="AvatarNameTagMode"
+     left="39"
+     top_pad="3"
+     name="group_title"
+     width="130">
+        <combo_box.item
+         label="No group tags"
+         name="no_tags"
+         value="0" />
+        <combo_box.item
+         label="Only my group tag"
+         name="my_tag"
+         value="1" />
+        <combo_box.item
+         label="All group tags"
+         name="all_tags"
+         value="2" />
+    </combo_box>
 	<text
 	 type="string"
 	 length="1"
@@ -310,7 +344,7 @@
 	 layout="topleft"
 	 left="30"
 	 name="inworld_typing_rg_label"
-	 top_pad="5"
+	 top_pad="4"
 	 width="400">
        Pressing letter keys:
    </text>

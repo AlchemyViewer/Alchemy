@@ -4,4 +4,9 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
+
+  - package-ecosystem: vcpkg
+    directory: /indra # The location of vcpkg.json
+    schedule:
+      interval: weekly

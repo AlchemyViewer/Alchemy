@@ -156,9 +156,7 @@ public:
     // Attachment link management
     void unregisterAttachment(const LLUUID& item_id);
     void registerAttachment(const LLUUID& item_id);
-// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
-    bool getAttachmentInvLinkEnable() { return mAttachmentInvLinkEnabled; }
-// [/SL:KB]
+    bool getAttachmentInvLinkEnable() const { return mAttachmentInvLinkEnabled; }
     void setAttachmentInvLinkEnable(bool val);
 
     // Add COF link to individual item.
@@ -256,7 +254,7 @@ public:
     void setAppearanceServiceURL(const std::string& url) { mAppearanceServiceURL = url; }
     std::string getAppearanceServiceURL() const;
 
-    typedef boost::function<void ()> attachments_changed_callback_t;
+    typedef std::function<void()>            attachments_changed_callback_t;
     typedef boost::signals2::signal<void ()> attachments_changed_signal_t;
     boost::signals2::connection setAttachmentsChangedCallback(attachments_changed_callback_t cb);
 
@@ -270,7 +268,7 @@ private:
 
 private:
 
-    void filterWearableItems(LLInventoryModel::item_array_t& items, S32 max_per_type, S32 max_total);
+    void filterWearableItems(LLInventoryModel::item_array_t& items, S32 max_per_type, S32 max_total, bool skip_bodyparts = false);
 
     void getDescendentsOfAssetType(const LLUUID& category,
                                           LLInventoryModel::item_array_t& items,
@@ -282,6 +280,7 @@ private:
                                    LLInventoryModel::item_array_t& gest_items);
 
     static void onOutfitRename(const LLSD& notification, const LLSD& response);
+
 
     bool mAttachmentInvLinkEnabled;
     bool mOutfitIsDirty;

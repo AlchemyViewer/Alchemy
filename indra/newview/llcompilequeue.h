@@ -54,7 +54,7 @@ public:
     LLFloaterScriptQueue(const LLSD& key);
     virtual ~LLFloaterScriptQueue();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     void setCompileTarget(std::string target) { mCompileTarget = target; }
 
@@ -99,7 +99,7 @@ protected:
     std::string mStartString;
     std::string mCompileTarget { "lsl2" };
 
-    typedef boost::function<bool(const LLPointer<LLViewerObject> &, LLInventoryObject*, LLEventPump &)>   fnQueueAction_t;
+    typedef std::function<bool(const LLPointer<LLViewerObject> &, LLInventoryObject*, LLEventPump &)>   fnQueueAction_t;
     static void objectScriptProcessingQueueCoro(std::string action, LLHandle<LLFloaterScriptQueue> hfloater, object_data_list_t objectList, fnQueueAction_t func);
 };
 
@@ -208,7 +208,7 @@ class LLFloaterDeleteQueue final : public LLFloaterScriptQueue
     friend class LLFloaterReg;
 protected:
     LLFloaterDeleteQueue(const LLSD& key);
-    virtual ~LLFloaterDeleteQueue();
+    ~LLFloaterDeleteQueue() override = default;
 
     static bool deleteObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
 

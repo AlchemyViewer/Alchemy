@@ -37,6 +37,9 @@
 
 #include "llappviewer.h"
 #include "llbutton.h"
+#if LL_VELOPACK
+#include "llvelopack.h"
+#endif
 #include "llcheckboxctrl.h"
 #include "llcommandhandler.h"       // for secondlife:///app/login/
 #include "llcombobox.h"
@@ -183,12 +186,14 @@ LLPanelLogin::LLPanelLogin(const LLRect &rect,
 :   LLPanel(),
     mCallback(callback),
     mCallbackData(cb_data),
-    mListener(new LLPanelLoginListener(this)),
+    mListener(std::make_unique<LLPanelLoginListener>(this)),
     mFirstLoginThisInstall(gSavedSettings.getBOOL("FirstLoginThisInstall")),
     mUsernameLength(0),
     mPasswordLength(0),
     mLocationLength(0),
-    mShowFavorites(false)
+    mShowFavorites(false),
+    mAlertNotif(false),
+    mLoginBtn(nullptr)
 {
     setBackgroundVisible(false);
     setBackgroundOpaque(true);
@@ -218,6 +223,11 @@ LLPanelLogin::LLPanelLogin(const LLRect &rect,
     password_edit->setKeystrokeCallback(onPassKey, this);
     // STEAM-14: When user presses Enter with this field in focus, initiate login
     password_edit->setCommitCallback(boost::bind(&LLPanelLogin::onClickConnect, false));
+
+    childSetAction("connect_btn", onClickConnect, this);
+
+    mLoginBtn = getChild<LLButton>("connect_btn");
+    setDefaultBtn(mLoginBtn);
 
     // change z sort of clickable text to be behind buttons
     sendChildToBack(getChildView("forgot_password_text"));
@@ -295,11 +305,6 @@ LLPanelLogin::LLPanelLogin(const LLRect &rect,
         onUpdateStartSLURL(start_slurl); // updates grid if needed
     }
 
-    childSetAction("connect_btn", onClickConnect, this);
-
-    LLButton* def_btn = getChild<LLButton>("connect_btn");
-    setDefaultBtn(def_btn);
-
     std::string channel = LLVersionInfo::instance().getChannel();
     std::string version = stringize(LLVersionInfo::instance().getShortVersion(), " (",
                                     LLVersionInfo::instance().getBuild(), ')');
@@ -327,6 +332,8 @@ LLPanelLogin::LLPanelLogin(const LLRect &rect,
     LLCheckBoxCtrl* remember_name = getChild<LLCheckBoxCtrl>("remember_name");
     remember_name->setCommitCallback(boost::bind(&LLPanelLogin::onRememberUserCheck, this));
     getChild<LLCheckBoxCtrl>("remember_password")->setCommitCallback(boost::bind(&LLPanelLogin::onRememberPasswordCheck, this));
+
+    mAlertListener = LLNotifications::instance().getChannel("Alerts")->connectChanged([this](const LLSD& notify){ return onUpdateNotification(notify); });
 }
 
 void LLPanelLogin::addFavoritesToStartLocation()
@@ -409,7 +416,7 @@ void LLPanelLogin::addFavoritesToStartLocation()
                 gSavedSettings.setBOOL("RememberPassword", save_password);
                 if (!save_password)
                 {
-                    getChild<LLButton>("connect_btn")->setEnabled(false);
+                    mLoginBtn->setEnabled(false);
                 }
                 update_password_setting = false;
             }
@@ -936,7 +943,20 @@ void LLPanelLogin::handleMediaEvent(LLPluginClassMedia* /*self*/, EMediaEvent ev
 // static
 void LLPanelLogin::onClickConnect(bool commit_fields)
 {
-    if (sInstance && sInstance->mCallback)
+#if LL_VELOPACK
+    // In theory, you should never be able to get here.
+    // If there's a required update, try as you might you're not supposed to actually close the downloading update dialog.
+    // But just in case...
+    if (velopack_is_required_update_in_progress())
+    {
+        LLSD args;
+        args["VERSION"] = velopack_get_required_update_version();
+        LLNotificationsUtil::add("DownloadingUpdate", args);
+        return;
+    }
+#endif
+
+    if (sInstance && sInstance->mCallback && !sInstance->mAlertNotif)
     {
         if (commit_fields)
         {
@@ -1193,9 +1213,11 @@ void LLPanelLogin::updateServer()
 
 void LLPanelLogin::updateLoginButtons()
 {
-    LLButton* login_btn = getChild<LLButton>("connect_btn");
-
-    login_btn->setEnabled(mUsernameLength != 0 && mPasswordLength != 0);
+    if (!mLoginBtn)
+    {
+        return;
+    }
+    mLoginBtn->setEnabled(mUsernameLength != 0 && mPasswordLength != 0 && !mAlertNotif);
 
     if (!mFirstLoginThisInstall)
     {
@@ -1367,3 +1389,22 @@ std::string LLPanelLogin::getUserName(LLPointer<LLCredential> &cred)
     return "unknown";
 }
 
+bool LLPanelLogin::onUpdateNotification(const LLSD& notify)
+{
+    // disable Login button while alert notification is displayed
+    LLNotificationPtr notifyp = LLNotifications::instance().find(notify["id"].asUUID());
+    if (notifyp && notifyp->getName() == "PromptOptionalUpdate")
+    {
+        std::string sigtype = notify["sigtype"].asString();
+        if (sigtype == "add")
+        {
+            mAlertNotif = true;
+        }
+        else if (sigtype == "delete")
+        {
+            mAlertNotif = false;
+        }
+        updateLoginButtons();
+    }
+    return false;
+}

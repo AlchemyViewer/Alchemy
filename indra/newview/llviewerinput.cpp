@@ -47,7 +47,11 @@
 #include "llfloatercamera.h"
 #include "llinitparam.h"
 #include "llselectmgr.h"
-#include "llfloaterwebcontent.h"
+// [RLVa:KB] - Checked: 2021-07-29 (RLVa-1.4.4a)
+#include "rlvactions.h"
+#include "rlvhandler.h"
+#include "rlvhelper.h"
+// [/RLVa:KB]
 
 //
 // Constants
@@ -64,13 +68,13 @@ const LLKeyData agent_control_lbutton(CLICK_LEFT, KEY_NONE, MASK_NONE, true);
 
 struct LLKeybindFunctionData
 {
-    LLKeybindFunctionData(boost::function<bool(EKeystate keystate)> function, bool global)
+    LLKeybindFunctionData(std::function<bool(EKeystate keystate)> function, bool global)
         :
         mFunction(function),
         mIsGlobal(global)
     {
     }
-    boost::function<bool(EKeystate keystate)> mFunction;
+    std::function<bool(EKeystate keystate)> mFunction;
     // todo: might be good idea to make this into enum, like: global/inworld/menu
     bool mIsGlobal;
 };
@@ -692,12 +696,6 @@ bool start_chat( EKeystate s )
 
 bool start_gesture( EKeystate s )
 {
-    LLFloater* focused_floater = gFloaterView->getFocusedFloater();
-    if (focused_floater && dynamic_cast<LLFloaterWebContent*>(focused_floater))
-    {
-        return true;
-    }
-
     LLUICtrl* focus_ctrlp = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
     if (KEYSTATE_UP == s &&
         ! (focus_ctrlp && focus_ctrlp->acceptsTextInput()))
@@ -875,13 +873,17 @@ bool toggle_run(EKeystate s)
 bool toggle_sit(EKeystate s)
 {
     if (KEYSTATE_DOWN != s) return true;
-    if (gAgent.isSitting())
+    if (isAgentAvatarValid())
     {
-        gAgent.standUp();
-    }
-    else
-    {
-        gAgent.sitDown();
+        if (gAgent.isSitting() && RlvActions::canStand())
+        {
+            gAgent.standUp();
+        }
+        else if(!gAgentAvatarp->isSitting() && !gAgentAvatarp->isEditingAppearance() &&
+                !gAgent.getFlying() && !gRlvHandler.hasBehaviour(RLV_BHVR_SIT))
+        {
+            gAgent.sitDown();
+        }
     }
     return true;
 }
@@ -1257,8 +1259,8 @@ bool LLViewerInput::handleGlobalBindsMouse(EMouseClickType clicktype, MASK mask,
 bool LLViewerInput::bindKey(const S32 mode, const KEY key, const MASK mask, const std::string& function_name)
 {
     size_t index;
-    typedef boost::function<bool(EKeystate)> function_t;
-    function_t function = NULL;
+    typedef std::function<bool(EKeystate)> function_t;
+    function_t function = nullptr;
     std::string name;
 
     // Allow remapping of F2-F12
@@ -1347,8 +1349,8 @@ bool LLViewerInput::bindKey(const S32 mode, const KEY key, const MASK mask, cons
 bool LLViewerInput::bindMouse(const S32 mode, const EMouseClickType mouse, const MASK mask, const std::string& function_name)
 {
     size_t index;
-    typedef boost::function<bool(EKeystate)> function_t;
-    function_t function = NULL;
+    typedef std::function<bool(EKeystate)> function_t;
+    function_t function = nullptr;
 
     if (mouse == CLICK_LEFT
         && mask == MASK_NONE
@@ -1522,7 +1524,7 @@ S32 LLViewerInput::loadBindingsXML(const std::string& filename)
                 // file in app_settings is supposed to be up to date
                 // this is only for the file from user_settings
                 LL_INFOS("ViewerInput") << "Updating file " << filename << " to a newer version" << LL_ENDL;
-                LLFILE *fp = LLFile::fopen(filename, "w");
+                LLFILE *fp = LLFile::fopen(filename, LLFILE_MODE("w"));
                 if (fp != NULL)
                 {
                     LLXMLNode::writeHeaderToFile(fp);

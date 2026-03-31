@@ -43,7 +43,7 @@ public:
     typedef validate_signal_t::slot_type validate_callback_t;
 
     // The callback function will be called with an avatar name and UUID.
-    typedef boost::function<void (const uuid_vec_t&, const std::vector<LLAvatarName>&)> select_callback_t;
+    typedef std::function<void(const uuid_vec_t&, const std::vector<LLAvatarName>&)> select_callback_t;
     // Call this to select an avatar.
     static LLFloaterAvatarPicker* show(select_callback_t callback,
                                        bool allow_multiple = false,
@@ -86,7 +86,8 @@ private:
     void populateFriend();
     bool visibleItemsSelected() const; // Returns true if any items in the current tab are selected.
 
-    static void findCoro(std::string url, LLUUID mQueryID, std::string mName);
+    static void findByIdCoro(std::string url, LLUUID query_id, LLUUID agent_id, std::string floater_key);
+    static void findByNameCoro(std::string url, LLUUID mQueryID, std::string mName);
     void find();
     void setAllowMultiple(bool allow_multiple);
     LLScrollListCtrl* getActiveList();
@@ -94,8 +95,6 @@ private:
     void drawFrustum();
     virtual void draw();
     virtual bool handleKeyHere(KEY key, MASK mask);
-
-    void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
 
     LLUUID              mQueryID;
     int                 mNumResultsReturned;
@@ -110,8 +109,6 @@ private:
 
     validate_signal_t mOkButtonValidateSignal;
     select_callback_t mSelectionCallback;
-
-    boost::signals2::connection mAvatarNameCacheConnection;
 };
 
 #endif

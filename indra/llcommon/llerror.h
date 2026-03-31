@@ -53,13 +53,11 @@ const int LL_ERR_NOERR = 0;
 #define SHOW_WARN
 #define SHOW_INFO
 #define SHOW_ASSERT
-#define ENABLE_DEBUG_MACRO
 #else // _DEBUG
 
-#ifdef LL_RELEASE_WITH_DEBUG_INFO
+#if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO
 #define SHOW_ASSERT
-#define ENABLE_DEBUG_MACRO
-#endif // LL_RELEASE_WITH_DEBUG_INFO
+#endif // LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO
 
 #ifdef RELEASE_SHOW_DEBUG
 #define SHOW_DEBUG
@@ -386,35 +384,30 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
         static LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
         lllog_test_()
 
-#define lllog_test_()                           \
-        if (LL_UNLIKELY(_site.shouldLog()))     \
-        {                                       \
-            std::ostringstream _out;            \
-            _out
-
-#ifdef ENABLE_DEBUG_MACRO
-
-#define lllog_debug(level, once, ...)                                         \
-    do {                                                                \
-        const char* tags[] = {"", ##__VA_ARGS__};                       \
-        static LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
-        lllog_test_debug_()
-
-#define lllog_test_debug_()                                       \
-        if (LL_UNLIKELY(_site.shouldLog()))                 \
-        {                                                   \
-            std::ostringstream _out; \
+#ifdef LL_DISABLE_DEBUG_LOGGING
+#define lllog_debug(level, once, ...)                                      \
+    do                                                                     \
+    {                                                                      \
+        if (false)                                                         \
+        {                                                                  \
+            const char* tags[] = { "", ##__VA_ARGS__ };                    \
+            LLError::CallSite _site(lllog_site_args_(level, once, tags));  \
+            std::ostringstream _out;                                       \
             _out
 #else
-#define lllog_debug(level, once, ...)                                         \
-    do {                                                                \
-        if (false)                 \
-        {                                                   \
-            const char* tags[] = {"", ##__VA_ARGS__};                       \
-            LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
-            std::ostringstream _out; \
-            _out
+#define lllog_debug(level, once, ...)                                        \
+    do                                                                       \
+    {                                                                        \
+        const char* tags[] = { "", ##__VA_ARGS__ };                          \
+        static LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
+        lllog_test_()
 #endif
+
+#define lllog_test_()                   \
+    if (LL_UNLIKELY(_site.shouldLog())) \
+    {                                   \
+        std::ostringstream _out;        \
+        _out
 
 #define lllog_site_args_(level, once, tags)                 \
     level, __FILE__, __LINE__, typeid(_LL_CLASS_TO_LOG),    \

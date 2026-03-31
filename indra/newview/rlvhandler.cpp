@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2018, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -73,9 +74,6 @@
 
 // Boost includes
 #include <boost/algorithm/string.hpp>
-
-// llappviewer.cpp
-extern bool gDoDisconnect;
 
 // ============================================================================
 // Static variable initialization

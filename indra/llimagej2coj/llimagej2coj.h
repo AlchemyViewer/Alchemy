@@ -31,11 +31,11 @@
 
 const F32 LAST_TCP_RATE = 1.f/DEFAULT_COMPRESSION_RATE; // should be 8, giving a 1:8 ratio
 
-class LLImageJ2COJ final : public LLImageJ2CImpl
+class LLImageJ2COJ : public LLImageJ2CImpl
 {
 public:
     LLImageJ2COJ();
-    virtual ~LLImageJ2COJ() = default;
+    virtual ~LLImageJ2COJ();
 protected:
     virtual bool getMetadata(LLImageJ2C &base);
     virtual bool decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decode_time, S32 first_channel, S32 max_channel_count);

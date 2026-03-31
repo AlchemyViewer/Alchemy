@@ -31,13 +31,13 @@
 #include "lliconctrl.h"
 #include "lltextbox.h"
 #include "llflatlistview.h"
-#include "llbutton.h"
 
 class LLJoystickCameraRotate;
 class LLJoystickCameraTrack;
 class LLFloaterReg;
 class LLPanelCameraZoom;
 class LLComboBox;
+class LLButton;
 
 enum ECameraControlMode
 {
@@ -76,7 +76,7 @@ public:
     virtual void onOpen(const LLSD& key);
     virtual void onClose(bool app_quitting);
 
-    void onSavePreset();
+    static void onSavePreset();
     void onCustomPresetSelected();
 
     void populatePresetCombo();

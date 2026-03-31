@@ -115,9 +115,9 @@ LLToolBar::LLToolBar(const LLToolBar::Params& p)
     mPadBottom(p.pad_bottom),
     mPadBetween(p.pad_between),
     mMinGirth(p.min_girth),
-    mStartDragItemCallback(NULL),
-    mHandleDragItemCallback(NULL),
-    mHandleDropCallback(NULL),
+    mStartDragItemCallback(nullptr),
+    mHandleDragItemCallback(nullptr),
+    mHandleDropCallback(nullptr),
     mDragAndDropTarget(false),
     mButtonType(p.button_display_mode),
     mLayoutType(p.button_layout_mode),
@@ -128,10 +128,10 @@ LLToolBar::LLToolBar(const LLToolBar::Params& p)
     mRightMouseTargetButton(nullptr),
     mNeedsLayout(false),
     mModified(false),
-    mButtonAddSignal(NULL),
-    mButtonEnterSignal(NULL),
-    mButtonLeaveSignal(NULL),
-    mButtonRemoveSignal(NULL),
+    mButtonAddSignal(nullptr),
+    mButtonEnterSignal(nullptr),
+    mButtonLeaveSignal(nullptr),
+    mButtonRemoveSignal(nullptr),
     mCaretIcon(nullptr)
 {
     mButtonParams[LLToolBarEnums::BTNTYPE_ICONS_WITH_TEXT] = p.button_icon_and_text;
@@ -842,7 +842,6 @@ void LLToolBar::updateLayoutAsNeeded()
         S32 button_clamped_width = equalized_width ? equalized_width
                 : button->mWidthRange.clamp(button->getRect().getWidth());
 
-
         S32 button_length = (orientation == LLLayoutStack::HORIZONTAL)
                             ? button_clamped_width
                             : button->getRect().getHeight();
@@ -1202,7 +1201,7 @@ bool LLToolBar::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
     // if drop is set, it's time to call the callback to get the operation done
     if (handled && drop)
     {
-        handled = mHandleDropCallback(cargo_data, x, y, this);
+        handled = mHandleDropCallback(cargo_data, cargo_type, x, y, this);
     }
 
     // We accept only single tool drop on toolbars
@@ -1245,12 +1244,12 @@ LLToolBarButton::LLToolBarButton(const Params& p)
     mWidthRange(p.button_width),
     mDesiredHeight(p.desired_height),
     mId(""),
-    mIsEnabledSignal(NULL),
-    mIsRunningSignal(NULL),
-    mIsStartingSignal(NULL),
+    mIsEnabledSignal(nullptr),
+    mIsRunningSignal(nullptr),
+    mIsStartingSignal(nullptr),
     mIsDragged(false),
-    mStartDragItemCallback(NULL),
-    mHandleDragItemCallback(NULL),
+    mStartDragItemCallback(nullptr),
+    mHandleDragItemCallback(nullptr),
     mOriginalImageSelected(p.image_selected),
     mOriginalImageUnselected(p.image_unselected),
     mOriginalImagePressed(p.image_pressed),
@@ -1407,7 +1406,7 @@ void LLToolBar::LLCenterLayoutPanel::handleReshape(const LLRect& rect, bool by_u
 {
     LLLayoutPanel::handleReshape(rect, by_user);
 
-    if (!mReshapeCallback.empty())
+    if (mReshapeCallback != nullptr)
     {
         LLRect r;
         localRectToOtherView(mButtonPanel->getRect(), &r, gFloaterView);

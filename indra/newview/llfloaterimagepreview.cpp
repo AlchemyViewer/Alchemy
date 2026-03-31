@@ -267,12 +267,20 @@ void LLFloaterImagePreview::onBtnOK()
 
         LLPointer<LLImageJ2C> formatted = new LLImageJ2C;
 
+        if (mRawImagep->getWidth() * mRawImagep->getHeight() <= LL_IMAGE_REZ_LOSSLESS_CUTOFF * LL_IMAGE_REZ_LOSSLESS_CUTOFF)
+        {
+            if (gSavedSettings.getBOOL("LosslessJ2CUpload"))
+            {
+                formatted->setReversible(true);
+            }
+        }
+
         if (formatted->encode(mRawImagep, 0.0f))
         {
             LLFileSystem fmt_file(new_asset_id, LLAssetType::AT_TEXTURE, LLFileSystem::WRITE);
             fmt_file.write(formatted->getData(), formatted->getDataSize());
 
-            LLResourceUploadInfo::ptr_t assetUploadInfo(new LLResourceUploadInfo(
+            LLResourceUploadInfo::ptr_t assetUploadInfo = std::make_shared<LLResourceUploadInfo>(
                 tid, LLAssetType::AT_TEXTURE,
                 getChild<LLUICtrl>("name_form")->getValue().asString(),
                 getChild<LLUICtrl>("description_form")->getValue().asString(),
@@ -281,8 +289,9 @@ void LLFloaterImagePreview::onBtnOK()
                 LLFloaterPerms::getNextOwnerPerms("Uploads"),
                 LLFloaterPerms::getGroupPerms("Uploads"),
                 LLFloaterPerms::getEveryonePerms("Uploads"),
-                expected_upload_cost
-            ));
+                expected_upload_cost,
+                mDestinationFolderId
+            );
 
             upload_new_resource(assetUploadInfo);
         }

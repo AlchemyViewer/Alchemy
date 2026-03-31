@@ -31,12 +31,12 @@
 
 #include "message.h"
 
+#include "alfloatergroupprofile.h"
 #include "llagent.h"
 #include "llcommandhandler.h"
 #include "llfloaterreg.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llgroupmgr.h"
-#include "llfloatergroupprofile.h"
 #include "llfloaterimcontainer.h"
 #include "llimview.h" // for gIMMgr
 #include "llnotificationsutil.h"
@@ -240,7 +240,7 @@ LLFetchLeaveGroupData* gFetchLeaveGroupData = NULL;
 // static
 void LLGroupActions::search()
 {
-    LLFloaterReg::showInstance("search", LLSD().with("category", "groups"));
+    LLFloaterReg::showInstance("search", LLSD().with("collection", "groups"));
 }
 
 // static
@@ -448,7 +448,7 @@ void LLGroupActions::show(const LLUUID &group_id, bool expand_notices_tab)
 
     if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
-        LLFloaterGroupProfile::showInstance(params, true);
+        ALFloaterGroupProfile::showInstance(params, true);
     }
     else
     {
@@ -461,6 +461,35 @@ void LLGroupActions::show(const LLUUID &group_id, bool expand_notices_tab)
     }
 }
 
+
+// [SL:KB] - Patch: Notification-GroupCreateNotice | Checked: 2012-02-16 (Catznip-3.2)
+// static
+void LLGroupActions::showNotices(const LLUUID& group_id)
+{
+    if (group_id.isNull())
+        return;
+
+    LLSD sdParams;
+    sdParams["group_id"] = group_id;
+    sdParams["action"] = "view_notices";
+
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
+    {
+        ALFloaterGroupProfile::showInstance(sdParams, true);
+    }
+    else
+    {
+        LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", sdParams);
+    }
+}
+
+// static
+void LLGroupActions::viewChatHistory(const LLUUID& group_id)
+{
+    LLFloaterReg::showInstance("preview_conversation", group_id, true);
+}
+// [/SL:KB]
+
 void LLGroupActions::refresh_notices(const LLUUID& group_id)
 {
     LLSD params;
@@ -471,7 +500,7 @@ void LLGroupActions::refresh_notices(const LLUUID& group_id)
     {
         if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
         {
-            LLFloaterGroupProfile::showInstance(params, false);
+            ALFloaterGroupProfile::showInstance(params, false);
         }
     }
     else
@@ -494,7 +523,7 @@ void LLGroupActions::refresh(const LLUUID& group_id)
     {
         if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
         {
-            LLFloaterGroupProfile::showInstance(params, true);
+            ALFloaterGroupProfile::showInstance(params, true);
         }
     }
     else
@@ -515,7 +544,7 @@ void LLGroupActions::createGroup()
 
     if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
-        LLFloaterGroupProfile::showInstance(params, true);
+        ALFloaterGroupProfile::showInstance(params, true);
     }
     else
     {
@@ -554,6 +583,8 @@ LLUUID LLGroupActions::startIM(const LLUUID& group_id)
     LLGroupData group_data;
     if (gAgent.getGroupData(group_id, group_data))
     {
+        // Unmute the group if the user tries to start a session with it.
+        LLMuteList::instance().removeGroup(group_id);
         LLUUID session_id = gIMMgr->addSession(
             group_data.mName,
             IM_SESSION_GROUP_START,

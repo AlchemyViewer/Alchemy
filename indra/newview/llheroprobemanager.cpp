@@ -191,6 +191,18 @@ void LLHeroProbeManager::update()
 
             probe_pos.load3(point.mV);
 
+            // Detect visible faces of a cube based on camera direction and distance
+
+            // Define the cube faces
+            static LLVector3 cubeFaces[6] = {
+                LLVector3(1, 0, 0),
+                LLVector3(-1, 0, 0),
+                LLVector3(0, 1, 0),
+                LLVector3(0, -1, 0),
+                LLVector3(0, 0, 1),
+                LLVector3(0, 0, -1)
+            };
+
             mProbes[0]->mOrigin = probe_pos;
             mProbes[0]->mRadius = mNearestHero->getScale().magVec() * 0.5f;
         }
@@ -243,6 +255,8 @@ void LLHeroProbeManager::renderProbes()
         {
             rate = 6;
         }
+
+        S32 face = gFrameCount % 6;
 
         if (!mProbes.empty() && !mProbes[0].isNull() && !mProbes[0]->mOccluded)
         {

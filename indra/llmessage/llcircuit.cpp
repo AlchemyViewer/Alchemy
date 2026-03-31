@@ -71,8 +71,8 @@ LLCircuitData::LLCircuitData(const LLHost &host, TPACKETID in_id,
     mPacketsOutID(0),
     mPacketsInID(in_id),
     mHighestPacketID(in_id),
-    mTimeoutCallback(NULL),
-    mTimeoutUserData(NULL),
+    mTimeoutCallback(nullptr),
+    mTimeoutUserData(nullptr),
     mTrusted(false),
     mbAllowTimeout(true),
     mbAlive(true),
@@ -953,7 +953,7 @@ bool LLCircuitData::updateWatchDogTimers(LLMessageSystem *msgsys)
     // Send off the another ping.
     pingTimerStart();
     msgsys->newMessageFast(_PREHASH_StartPingCheck);
-    msgsys->nextBlock(_PREHASH_PingID);
+    msgsys->nextBlockFast(_PREHASH_PingID);
     msgsys->addU8Fast(_PREHASH_PingID, nextPingID());
     msgsys->addU32Fast(_PREHASH_OldestUnacked, packet_id);
     msgsys->sendMessage(mHost);

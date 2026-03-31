@@ -253,7 +253,7 @@ struct LLAvatarClassifiedInfo
 class LLAvatarPropertiesObserver
 {
 public:
-    virtual      ~LLAvatarPropertiesObserver() = default;
+    virtual ~LLAvatarPropertiesObserver() = default;
     virtual void processProperties(void* data, EAvatarProcessorType type) = 0;
 };
 
@@ -334,7 +334,7 @@ protected:
     void sendAvatarPropertiesRequestMessage(const LLUUID& avatar_id);
     void initAgentProfileCapRequest(const LLUUID& avatar_id, const std::string& cap_url, EAvatarProcessorType type);
 
-    void notifyObservers(const LLUUID& id,void* data, EAvatarProcessorType type) const;
+    void notifyObservers(const LLUUID& id,void* data, EAvatarProcessorType type);
 
     // Is there a pending, not timed out, request for this avatar's data?
     // Use this to suppress duplicate requests for data when a request is
@@ -346,9 +346,6 @@ protected:
 
     // Call this when the reply to the request is received
     void removePendingRequest(const LLUUID& avatar_id, EAvatarProcessorType type);
-
-    typedef void* (*processor_method_t)(LLMessageSystem*);
-    static processor_method_t getProcessor(EAvatarProcessorType type);
 
 protected:
 

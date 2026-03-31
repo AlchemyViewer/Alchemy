@@ -1,6 +1,6 @@
 /**
  * @file llsdl.h
- * @brief SDL2 initialization
+ * @brief SDL initialization
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -25,6 +25,10 @@
  */
 
 #pragma once
+
+#include "llpreprocessor.h"
+
+extern bool gSDLMainHandled;
 
 void init_sdl(const std::string& app_name);
 void quit_sdl();

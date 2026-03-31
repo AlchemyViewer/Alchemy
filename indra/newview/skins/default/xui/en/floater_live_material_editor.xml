@@ -20,6 +20,7 @@
    width="250"
    follows="all"
    layout="topleft"
+   color="DkGray2"
    opaque="true"
    tab_stop="true"
    border="false"

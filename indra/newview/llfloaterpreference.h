@@ -121,6 +121,7 @@ protected:
     void        onClickClearCache();            // Clear viewer texture cache, file cache on next startup
     void        onClickBrowserClearCache();     // Clear web history and caches as well as viewer caches above
     void        onLanguageChange();
+    void        onTimeFormatChange();
     void        onNotificationsChange(const std::string& OptionName);
     void        onNameTagOpacityChange(const LLSD& newvalue);
 
@@ -198,6 +199,7 @@ public:
     void onClickRenderExceptions();
     void onClickAutoAdjustments();
     void onClickAdvanced();
+    void onClickScriptingPerfs();
     void applyUIColor(LLUICtrl* ctrl, const LLSD& param);
     void getUIColor(LLUICtrl* ctrl, const LLSD& param);
     void onLogChatHistorySaved();
@@ -258,6 +260,8 @@ private:
     LLButton*       mDeleteTranscriptsBtn = nullptr;
     LLButton*       mEnablePopupBtn = nullptr;
     LLButton*       mDisablePopupBtn = nullptr;
+    LLComboBox*     mTimeFormatCombobox = nullptr;
+    LLComboBox*     mLanguageCombobox = nullptr;
     std::unique_ptr< ll::prefs::SearchData > mSearchData;
     bool mSearchDataDirty;
 

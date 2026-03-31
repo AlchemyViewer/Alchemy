@@ -25,7 +25,8 @@
  */
 
 #include "llgltfloader.h"
-#include "meshoptimizer.h"
+
+#include <meshoptimizer.h>
 #include <glm/gtc/packing.hpp>
 
 // Import & define single-header gltf import/export lib
@@ -45,7 +46,7 @@
 // Additionally, disable inclusion of STB header files entirely with
 // TINYGLTF_NO_INCLUDE_STB_IMAGE
 // TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
-#include "tinygltf/tiny_gltf.h"
+#include <tiny_gltf.h>
 
 
 // TODO: includes inherited from dae loader.  Validate / prune
@@ -412,17 +413,14 @@ void LLGLTFLoader::processNodeHierarchy(S32 node_idx, std::map<std::string, S32>
     // Process this node's mesh if it has one
     if (node.mMesh >= 0 && node.mMesh < mGLTFAsset.mMeshes.size())
     {
-        LLMatrix4    transformation;
-        material_map mats;
-
-        LLModel* pModel = new LLModel(volume_params, 0.f);
-        const LL::GLTF::Mesh& mesh = mGLTFAsset.mMeshes[node.mMesh];
-
-        // Get base mesh name and track usage
-        std::string base_name = getLodlessLabel(mesh);
+        // Get base node name and track usage
+        // Potentially multiple nodes can reuse the same mesh and Collada used
+        // node name instead of mesh name, so for consistency use node name if
+        // avaliable, node index otherwise.
+        std::string base_name = getLodlessLabel(node);
         if (base_name.empty())
         {
-            base_name = "mesh_" + std::to_string(node.mMesh);
+            base_name = "node_" + std::to_string(node_idx);
         }
 
         S32 instance_count = mesh_name_counts[base_name]++;
@@ -433,11 +431,35 @@ void LLGLTFLoader::processNodeHierarchy(S32 node_idx, std::map<std::string, S32>
             base_name = base_name + "_copy_" + std::to_string(instance_count);
         }
 
+        LLMatrix4    transformation;
+        material_map mats;
+
+        LLModel* pModel = new LLModel(volume_params, 0.f);
+        const LL::GLTF::Mesh& mesh = mGLTFAsset.mMeshes[node.mMesh];
+
         if (populateModelFromMesh(pModel, base_name, mesh, node, mats) &&
             (LLModel::NO_ERRORS == pModel->getStatus()) &&
             validate_model(pModel))
         {
-            mTransform.setIdentity();
+            // Build the scene transform.
+            // Non-skinned meshes: scene transform carries coord rotation + hierarchy,
+            // preserving the object's rotation/position/scale for upload.
+            // Skinned meshes: transform is already baked into vertices, so scene is identity.
+            if (node.mSkin >= 0)
+            {
+                mTransform.setIdentity();
+            }
+            else
+            {
+                glm::mat4 hierarchy_transform;
+                computeCombinedNodeTransform(mGLTFAsset, node_idx, hierarchy_transform);
+                glm::mat4 combined = coord_system_rotation * hierarchy_transform;
+                if (mApplyXYRotation)
+                {
+                    combined = coord_system_rotationxy * combined;
+                }
+                mTransform = LLMatrix4(glm::value_ptr(combined));
+            }
             transformation = mTransform;
 
             // adjust the transformation to compensate for mesh normalization
@@ -486,7 +508,7 @@ void LLGLTFLoader::processNodeHierarchy(S32 node_idx, std::map<std::string, S32>
         }
         else
         {
-            setLoadState((U32)ERROR_MODEL + (U32)pModel->getStatus());
+            setLoadState(static_cast<U32>(ERROR_MODEL) + static_cast<U32>(pModel->getStatus()));
             delete pModel;
             return;
         }
@@ -599,11 +621,12 @@ LLGLTFLoader::LLGLTFImportMaterial LLGLTFLoader::processMaterial(S32 material_in
         if (material->mPbrMetallicRoughness.mBaseColorTexture.mIndex >= 0)
         {
             S32 texIndex = material->mPbrMetallicRoughness.mBaseColorTexture.mIndex;
-            std::string filename = processTexture(texIndex, "base_color", material->mName);
+            std::string full_path;
+            std::string filename = processTexture(full_path, texIndex, "base_color", material->mName);
 
             if (!filename.empty())
             {
-                impMat.mDiffuseMapFilename = filename;
+                impMat.mDiffuseMapFilename = full_path;
                 impMat.mDiffuseMapLabel = material->mName.empty() ? filename : material->mName;
 
                 // Check if the texture is already loaded
@@ -634,7 +657,7 @@ LLGLTFLoader::LLGLTFImportMaterial LLGLTFLoader::processMaterial(S32 material_in
     return cachedMat;
 }
 
-std::string LLGLTFLoader::processTexture(S32 texture_index, const std::string& texture_type, const std::string& material_name)
+std::string LLGLTFLoader::processTexture(std::string& full_path_out, S32 texture_index, const std::string& texture_type, const std::string& material_name)
 {
     S32 sourceIndex;
     if (!validateTextureIndex(texture_index, sourceIndex))
@@ -652,6 +675,20 @@ std::string LLGLTFLoader::processTexture(S32 texture_index, const std::string& t
             filename = filename.substr(pos + 1);
         }
 
+        std::string dir = gDirUtilp->getDirName(mFilename);
+        std::string full_path = dir + gDirUtilp->getDirDelimiter() + filename;
+        if (!gDirUtilp->fileExists(full_path) && filename.find("data:") == std::string::npos)
+        {
+            // Uri might be escaped
+            filename = LLURI::unescape(filename);
+            full_path = dir + gDirUtilp->getDirDelimiter() + filename;
+        }
+
+        if (gDirUtilp->fileExists(full_path))
+        {
+            full_path_out = full_path;
+        }
+
         LL_INFOS("GLTF_IMPORT") << "Found texture: " << filename << " for material: " << material_name << LL_ENDL;
 
         LLSD args;
@@ -666,7 +703,12 @@ std::string LLGLTFLoader::processTexture(S32 texture_index, const std::string& t
     // Process embedded textures
     if (image.mBufferView >= 0)
     {
-        return extractTextureToTempFile(texture_index, texture_type);
+        std::string temp_path = extractTextureToTempFile(texture_index, texture_type);
+        if (!temp_path.empty())
+        {
+            full_path_out = temp_path;
+        }
+        return temp_path;
     }
 
     return "";
@@ -716,23 +758,47 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
 
     S32 skinIdx = nodeno.mSkin;
 
-    // Compute final combined transform matrix (hierarchy + coordinate rotation)
+    // Compute the vertex transform for this mesh.
+    // Non-skinned meshes: vertices are left untransformed; the node's hierarchy transform
+    // (rotation, translation, scale) is stored in the scene transform instead, matching
+    // the DAE loader. This ensures the uploaded object's bounding box and transform
+    // properties are correct. See: https://github.com/secondlife/viewer/issues/5431
+    // Skinned meshes: coord rotation + hierarchy are baked into vertex positions because
+    // inverse bind matrices and skin weights are already computed in that space.
+    // TODO: consider aligning skinned meshes with the DAE loader (scene transform instead
+    // of vertex baking), which would require adjusting inverse bind matrices, bind shape
+    // matrix, and weight keying to match.
     S32 node_index = static_cast<S32>(&nodeno - &mGLTFAsset.mNodes[0]);
     glm::mat4 hierarchy_transform;
     computeCombinedNodeTransform(mGLTFAsset, node_index, hierarchy_transform);
 
-    // Combine transforms: coordinate rotation applied to hierarchy transform
-    glm::mat4 final_transform = coord_system_rotation * hierarchy_transform;
-    if (mApplyXYRotation)
+    glm::mat4 vertex_transform;
+    if (skinIdx >= 0)
     {
-        final_transform = coord_system_rotationxy * final_transform;
+        // Skinned mesh: bake coord rotation + hierarchy into vertices.
+        // Inverse bind matrices and skin weights depend on this transform being applied.
+        vertex_transform = coord_system_rotation * hierarchy_transform;
+        if (mApplyXYRotation)
+        {
+            vertex_transform = coord_system_rotationxy * vertex_transform;
+        }
+    }
+    else
+    {
+        // Non-skinned mesh: don't apply any transform to vertices.
+        // The hierarchy transform will be stored in the scene transform matrix.
+        vertex_transform = glm::mat4(1.0f); // identity
     }
 
     // Check if we have a negative scale (flipped coordinate system)
-    bool hasNegativeScale = glm::determinant(final_transform) < 0.0f;
+    // coord_system_rotation and coord_system_rotationxy are pure rotations (det=1),
+    // so negative scale depends only on the hierarchy transform.
+    bool hasNegativeScale = glm::determinant(hierarchy_transform) < 0.0f;
+
+    bool hasVertexTransform = (vertex_transform != glm::mat4(1.0f));
 
     // Pre-compute normal transform matrix (transpose of inverse of upper-left 3x3)
-    const glm::mat3 normal_transform = glm::transpose(glm::inverse(glm::mat3(final_transform)));
+    const glm::mat3 normal_transform = glm::transpose(glm::inverse(glm::mat3(vertex_transform)));
 
     // Mark unsuported joints with '-1' so that they won't get added into weights
     // GLTF maps all joints onto all meshes. Gather use count per mesh to cut unused ones.
@@ -785,30 +851,49 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
             return false; // Skip this primitive
         }
 
-        // Apply the global scale and center offset to all vertices
+        // Apply vertex transform (if any) to all vertices.
+        // Skinned meshes: this bakes coord rotation + hierarchy into vertices.
+        // Non-skinned meshes: vertex_transform is identity (no baking).
         for (U32 i = 0; i < prim.getVertexCount(); i++)
         {
-            // Use pre-computed final_transform
-            glm::vec4 pos(prim.mPositions[i][0], prim.mPositions[i][1], prim.mPositions[i][2], 1.0f);
-            glm::vec4 transformed_pos = final_transform * pos;
-
             GLTFVertex vert;
-            vert.position = glm::vec3(transformed_pos);
 
-            if (!prim.mNormals.empty())
+            if (hasVertexTransform)
             {
-                // Use pre-computed normal_transform
-                glm::vec3 normal_vec(prim.mNormals[i][0], prim.mNormals[i][1], prim.mNormals[i][2]);
-                vert.normal = glm::normalize(normal_transform * normal_vec);
+                glm::vec4 pos(prim.mPositions[i][0], prim.mPositions[i][1], prim.mPositions[i][2], 1.0f);
+                glm::vec4 transformed_pos = vertex_transform * pos;
+                vert.position = glm::vec3(transformed_pos);
+
+                if (!prim.mNormals.empty())
+                {
+                    glm::vec3 normal_vec(prim.mNormals[i][0], prim.mNormals[i][1], prim.mNormals[i][2]);
+                    vert.normal = glm::normalize(normal_transform * normal_vec);
+                }
+                else
+                {
+                    vert.normal = glm::normalize(normal_transform * glm::vec3(0.0f, 0.0f, 1.0f));
+                    LL_DEBUGS("GLTF_IMPORT") << "No normals found for primitive, using default normal." << LL_ENDL;
+                }
             }
             else
             {
-                // Use default normal (pointing up in model space)
-                vert.normal = glm::normalize(normal_transform * glm::vec3(0.0f, 0.0f, 1.0f));
-                LL_DEBUGS("GLTF_IMPORT") << "No normals found for primitive, using default normal." << LL_ENDL;
+                // No transform: store raw GLTF positions and normals.
+                // The scene transform will carry coord rotation + hierarchy.
+                vert.position = glm::vec3(prim.mPositions[i][0], prim.mPositions[i][1], prim.mPositions[i][2]);
+
+                if (!prim.mNormals.empty())
+                {
+                    vert.normal = glm::vec3(prim.mNormals[i][0], prim.mNormals[i][1], prim.mNormals[i][2]);
+                }
+                else
+                {
+                    vert.normal = glm::vec3(0.0f, 0.0f, 1.0f);
+                    LL_DEBUGS("GLTF_IMPORT") << "No normals found for primitive, using default normal." << LL_ENDL;
+                }
             }
 
-            vert.uv0 = glm::vec2(prim.mTexCoords0[i][0], -prim.mTexCoords0[i][1]);
+            // Flip texture V coordinate
+            vert.uv0 = glm::vec2(prim.mTexCoords0[i][0], 1.f - prim.mTexCoords0[i][1]);
 
             if (skinIdx >= 0)
             {
@@ -1156,6 +1241,7 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
             for (size_t i = 0; i < jointCnt; ++i)
             {
                 // Process joint name and idnex
+                S32 joint = gltf_skin.mJoints[i];
                 if (gltf_joint_index_use[i] <= 0)
                 {
                     // unsupported (-1) joint, drop it
@@ -1176,6 +1262,7 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
             // Todo: sort and add by usecount
             for (size_t i = 0; i < jointCnt; ++i)
             {
+                S32 joint = gltf_skin.mJoints[i];
                 if (gltf_joint_index_use[i] != 0)
                 {
                     // this step needs only joints that have zero uses
@@ -1202,6 +1289,7 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
             for (size_t i = 0; i < jointCnt; ++i)
             {
                 // Process joint name and idnex
+                S32 joint = gltf_skin.mJoints[i];
                 if (gltf_joint_index_use[i] < 0)
                 {
                     // unsupported (-1) joint, drop it
@@ -1661,6 +1749,7 @@ void LLGLTFLoader::checkGlobalJointUsage()
         S32 used_joints = 0;
         for (S32 i = 0; i < joint_count; ++i)
         {
+            S32 joint = gltf_skin.mJoints[i];
             if (mJointUsage[skin_idx][i] == 0)
             {
                 // Joint is unused, log it
@@ -1747,7 +1836,7 @@ std::string LLGLTFLoader::extractTextureToTempFile(S32 textureIndex, const std::
                                                "gltf_embedded_" + texture_type + "_" + std::to_string(sourceIndex) + extension;
 
                     // Write the image data to the temporary file
-                    std::ofstream temp_file(temp_filename, std::ios::binary);
+                    llofstream temp_file(temp_filename, std::ios::binary);
                     if (temp_file.is_open())
                     {
                         temp_file.write(reinterpret_cast<const char*>(data_ptr), data_size);
@@ -1799,20 +1888,20 @@ void LLGLTFLoader::notifyUnsupportedExtension(bool unsupported)
 
 size_t LLGLTFLoader::getSuffixPosition(const std::string &label)
 {
-    if ((label.find("_LOD") != -1) || (label.find("_PHYS") != -1))
+    if ((label.find("_LOD") != std::string::npos) || (label.find("_PHYS") != std::string::npos))
     {
         return label.rfind('_');
     }
-    return -1;
+    return std::string::npos;
 }
 
-std::string LLGLTFLoader::getLodlessLabel(const LL::GLTF::Mesh& mesh)
+std::string LLGLTFLoader::getLodlessLabel(const LL::GLTF::Node& node)
 {
-    size_t ext_pos = getSuffixPosition(mesh.mName);
-    if (ext_pos != -1)
+    size_t ext_pos = getSuffixPosition(node.mName);
+    if (ext_pos != std::string::npos)
     {
-        return mesh.mName.substr(0, ext_pos);
+        return node.mName.substr(0, ext_pos);
     }
-    return mesh.mName;
+    return node.mName;
 }
 

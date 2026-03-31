@@ -178,6 +178,7 @@ private:
     void banSelectedMember(const LLUUID& participant_uuid);
     void openNearbyChat();
     bool isParticipantListExpanded();
+    bool isNearbyChatSpeakerSelected();
 
     void idleUpdate(); // for convenience (self) from static idle
     void idleProcessEvents();
@@ -207,6 +208,7 @@ public:
     void setNearbyDistances();
     void reSelectConversation();
     void updateSpeakBtnState();
+    void updateTypingState(const LLUUID& session_id, bool typing);
     static bool isConversationLoggingAllowed();
     void flashConversationItemWidget(const LLUUID& session_id, bool is_flashes, bool alternate_color = false);
     void highlightConversationItemWidget(const LLUUID& session_id, bool is_highlighted);

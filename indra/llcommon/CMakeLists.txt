@@ -1,19 +1,9 @@
 # -*- cmake -*-
 
-project(llcommon)
+add_library(llcommon STATIC)
 
-include(00-Common)
-include(LLCommon)
-include(bugsplat)
-include(Linking)
-include(Boost)
-include(LLSharedLibs)
-include(Copy3rdPartyLibs)
-include(ZLIBNG)
-include(Tracy)
-include(SSE2NEON)
-
-set(llcommon_SOURCE_FILES
+target_sources(llcommon
+    PRIVATE
     apply.cpp
     commoncontrol.cpp
     indra_constants.cpp
@@ -22,7 +12,6 @@ set(llcommon_SOURCE_FILES
     llapr.cpp
     llassettype.cpp
     llatomic.cpp
-    llbase32.cpp
     llbase64.cpp
     llbitpack.cpp
     llcallbacklist.cpp
@@ -68,7 +57,8 @@ set(llcommon_SOURCE_FILES
     llmetricperformancetester.cpp
     llmortician.cpp
     llmutex.cpp
-    llptrto.cpp 
+    llpointer.cpp
+    llptrto.cpp
     llpredicate.cpp
     llprocess.cpp
     llprocessor.cpp
@@ -85,7 +75,6 @@ set(llcommon_SOURCE_FILES
     llsdutil.cpp
     llsingleton.cpp
     llstacktrace.cpp
-    llstreamqueue.cpp
     llstreamtools.cpp
     llstring.cpp
     llstringtable.cpp
@@ -101,24 +90,23 @@ set(llcommon_SOURCE_FILES
     lluri.cpp
     lluriparser.cpp
     lluuid.cpp
+    llwatchdog.cpp
     llworkerthread.cpp
     hbxxh.cpp
     u64.cpp
     threadpool.cpp
     workqueue.cpp
-    StackWalker.cpp
-    )
-    
-set(llcommon_HEADER_FILES
-    CMakeLists.txt
+)
 
+target_sources(llcommon
+    PUBLIC
+    FILE_SET HEADERS
+    FILES
     always_return.h
     apply.h
     chrono.h
     classic_callback.h
     commoncontrol.h
-    ctype_workaround.h
-    fix_macros.h
     fsyspath.h
     function_types.h
     indra_constants.h
@@ -129,7 +117,6 @@ set(llcommon_HEADER_FILES
     llapr.h
     llassettype.h
     llatomic.h
-    llbase32.h
     llbase64.h
     llbitpack.h
     llboost.h
@@ -217,7 +204,6 @@ set(llcommon_HEADER_FILES
     llsingleton.h
     llstacktrace.h
     llstl.h
-    llstreamqueue.h
     llstreamtools.h
     llstrider.h
     llstring.h
@@ -240,6 +226,7 @@ set(llcommon_HEADER_FILES
     lluri.h
     lluriparser.h
     lluuid.h
+    llwatchdog.h
     llwin32headers.h
     llworkerthread.h
     hbxxh.h
@@ -249,16 +236,20 @@ set(llcommon_HEADER_FILES
     threadpool.h
     threadpool_fwd.h
     threadsafeschedule.h
-    timer.h
     tuple.h
     u64.h
     workqueue.h
-    StackWalker.h
     )
-    
+
 if (DARWIN)
-  list(APPEND llcommon_HEADER_FILES llsys_objc.h)
-  list(APPEND llcommon_SOURCE_FILES llsys_objc.mm)
+  target_sources(llcommon
+      PRIVATE
+      llsys_objc.mm
+      PUBLIC
+      FILE_SET HEADERS
+      FILES
+      llsys_objc.h
+  )
 
   set_source_files_properties(
     llsys_objc.mm
@@ -268,24 +259,17 @@ if (DARWIN)
 endif (DARWIN)
 
 if (USE_TRACY)
-  list(APPEND llcommon_SOURCE_FILES llprofiler.cpp)
-
-  # Skip precompiled headers on these files due to weird issues under GCC 13
+  # Skip precompiled headers on these files due to special compilation needs
   set_source_files_properties(
     llfasttimer.cpp
-    llprofiler.cpp
     PROPERTIES
     SKIP_PRECOMPILE_HEADERS TRUE
   )
 endif ()
 
-list(APPEND llcommon_SOURCE_FILES ${llcommon_HEADER_FILES})
-
-add_library (llcommon ${llcommon_SOURCE_FILES})
-
 target_link_libraries(
         llcommon
-        llmath
+        PUBLIC
         ll::apr
         ll::expat
         ll::zlib-ng
@@ -293,18 +277,20 @@ target_link_libraries(
         ll::oslibraries
         ll::tracy
         ll::sse2neon
+        ll::xxhash
+        ll::simdutf
+        ll::fmt
+        Threads::Threads
     )
 
-target_include_directories(llcommon INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(llcommon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(llcommon PRIVATE ${INDRA_SOURCE_DIR}/llmath)
 
-if (USE_PRECOMPILED_HEADERS)
-  target_precompile_headers(llcommon REUSE_FROM llprecompiled)
-endif ()
+target_precompile_headers(llcommon REUSE_FROM llprecompiled)
 
 add_dependencies(llcommon stage_third_party_libs)
 
-if (LL_TESTS)
-  include(LLAddBuildTest)
+if (BUILD_TESTING)
   SET(llcommon_TEST_SOURCE_FILES
     # unit-testing llcommon is not possible right now as the test-harness *itself* depends upon llcommon, causing a circular dependency.  Add your 'unit' tests as integration tests for now.
     )
@@ -312,46 +298,61 @@ if (LL_TESTS)
 
   #set(TEST_DEBUG on)
   set(test_libs llcommon)
-  LL_ADD_INTEGRATION_TEST(apply "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(bitpack "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(classic_callback "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(commonmisc "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lazyeventapi "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llbase64 "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llcond "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lldate "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lldeadmantimer "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lldependencies "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llerror "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lleventcoro "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lleventdispatcher "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lleventfilter "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llframetimer "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llheteromap "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llinstancetracker "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llleap "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llmainthreadtask "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llpounceable "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llprocess "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llprocessor "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llprocinfo "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llrand "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llsdserialize "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llsingleton "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llstreamqueue "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llstring "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lltrace "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lltreeiterators "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llunits "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lluri "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(stringize "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(threadsafeschedule "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(tuple "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(workqueue "" "${test_libs}")
+  set(test_project llcommon)
+  LL_ADD_INTEGRATION_TEST(apply "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(bitpack "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(classic_callback "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(commonmisc "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lazyeventapi "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llapp "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llbase64 "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llcond "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lldate "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lldeadmantimer "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lldependencies "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lldoubledispatch "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llerror "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lleventcoro "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lleventdispatcher "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lleventfilter "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llevents "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfile "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llframetimer "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llhttpdate "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llheteromap "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llinstancetracker "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llleap "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llmainthreadtask "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llpounceable "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llprocess "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llprocessor "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llprocinfo "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llrand "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llsd "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llsdserialize "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llsdutil "" "llcommon;llmath" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llsingleton "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llstreamtools "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llstring "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lltrace "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lltreeiterators "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llunits "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lluri "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(stringize "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(threadsafeschedule "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(tuple "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(workqueue "" "${test_libs}" "${test_project}")
 
 ## llexception_test.cpp isn't a regression test, and doesn't need to be run
 ## every build. It's to help a developer make implementation choices about
 ## throwing and catching exceptions.
-##LL_ADD_INTEGRATION_TEST(llexception "" "${test_libs}")
+##LL_ADD_INTEGRATION_TEST(llexception "" "${test_libs}" "${test_project}")
 
-endif (LL_TESTS)
+  # Skip precompiled header for tests that need special handling
+  set_source_files_properties(
+    tests/llsd_test.cpp
+    PROPERTIES
+    SKIP_PRECOMPILE_HEADERS TRUE
+  )
+
+endif ()

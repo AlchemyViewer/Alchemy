@@ -186,6 +186,8 @@ LLFloater::Params::Params()
     single_instance("single_instance", false),
     reuse_instance("reuse_instance", false),
     can_resize("can_resize", false),
+    can_resize_height("can_resize_height", true),
+    can_resize_width("can_resize_width", true),
     can_minimize("can_minimize", true),
 // [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
     can_collapse("can_collapse", true),
@@ -262,7 +264,7 @@ void LLFloater::initClass()
 }
 
 // defaults for floater param block pulled from widgets/floater.xml
-static LLWidgetNameRegistry::StaticRegistrar sRegisterFloaterParams(&typeid(LLFloater::Params), "floater");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterFloaterParams(typeid(LLFloater::Params), "floater");
 
 LLFloater::LLFloater(const LLSD& key, const LLFloater::Params& p)
 :   LLPanel(),  // intentionally do not pass params here, see initFromParams
@@ -270,8 +272,8 @@ LLFloater::LLFloater(const LLSD& key, const LLFloater::Params& p)
     mTitle(p.title),
     mShortTitle(p.short_title),
     mSingleInstance(p.single_instance),
-    mIsReuseInitialized(p.reuse_instance.isProvided()),
     mReuseInstance(p.reuse_instance.isProvided() ? p.reuse_instance : p.single_instance), // reuse single-instance floaters by default
+    mIsReuseInitialized(p.reuse_instance.isProvided()),
     mKey(key),
     mCanTearOff(p.can_tear_off),
     mCanMinimize(p.can_minimize),
@@ -281,6 +283,8 @@ LLFloater::LLFloater(const LLSD& key, const LLFloater::Params& p)
     mCanClose(p.can_close),
     mDragOnLeft(p.can_drag_on_left),
     mResizable(p.can_resize),
+    mResizableHeight(p.can_resize_height),
+    mResizableWidth(p.can_resize_width),
     mAutoClose(p.auto_close),
     mPositioning(p.positioning),
     mMinWidth(p.min_width),
@@ -1852,8 +1856,8 @@ bool LLFloater::handleDoubleClick(S32 x, S32 y, MASK mask)
     }
     return LLPanel::handleDoubleClick(x, y, mask);
 // [/SL:KB]
-//  BOOL was_minimized = mMinimized;
-//  setMinimized(FALSE);
+//  bool was_minimized = mMinimized;
+//  setMinimized(false);
 //  return was_minimized || LLPanel::handleDoubleClick(x, y, mask);
 }
 
@@ -2233,16 +2237,18 @@ void    LLFloater::drawShadow(LLPanel* panel)
 void LLFloater::updateTransparency(LLView* view, ETypeTransparency transparency_type)
 {
     if (!view) return;
+    child_list_t children = *view->getChildList();
+    child_list_t::iterator it = children.begin();
 
-    if (view->isCtrl())
+    LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(view);
+    if (ctrl)
     {
-        static_cast<LLUICtrl*>(view)->setTransparencyType(transparency_type);
+        ctrl->setTransparencyType(transparency_type);
     }
 
-    for (LLView* pChild : *view->getChildList())
+    for(; it != children.end(); ++it)
     {
-        if ((pChild->getChildCount()) || (pChild->isCtrl()))
-            updateTransparency(pChild, transparency_type);
+        updateTransparency(*it, transparency_type);
     }
 }
 
@@ -2300,7 +2306,7 @@ void    LLFloater::setCanTearOff(bool can_tear_off)
 void LLFloater::setCanResize(bool can_resize)
 {
     mResizable = can_resize;
-    enableResizeCtrls(can_resize);
+    enableResizeCtrls(can_resize, mResizableWidth, mResizableHeight);
 }
 
 void LLFloater::setCanDrag(bool can_drag)
@@ -2426,7 +2432,7 @@ void LLFloater::drawConeToOwner(F32 &context_cone_opacity,
         LLRect local_rect = getLocalRect();
 
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-        LLGLEnable(GL_CULL_FACE);
+        LLGLEnable cull_face(GL_CULL_FACE);
         gGL.begin(LLRender::TRIANGLE_STRIP);
         {
             gGL.color4f(0.f, 0.f, 0.f, contex_cone_in_alpha * context_cone_opacity);
@@ -3509,6 +3515,8 @@ void LLFloater::initFromParams(const LLFloater::Params& p)
 // [/SL:KB]
     setCanClose(p.can_close);
     setCanDock(p.can_dock);
+    mResizableWidth = p.can_resize_width;
+    mResizableHeight = p.can_resize_height;
     setCanResize(p.can_resize);
     setResizeLimits(p.min_width, p.min_height);
 
@@ -3516,8 +3524,8 @@ void LLFloater::initFromParams(const LLFloater::Params& p)
     mHeaderHeight = p.header_height;
     mLegacyHeaderHeight = p.legacy_header_height;
     mSingleInstance = p.single_instance;
-    mIsReuseInitialized = p.reuse_instance.isProvided();
     mReuseInstance = p.reuse_instance.isProvided() ? p.reuse_instance : p.single_instance;
+    mIsReuseInitialized = p.reuse_instance.isProvided();
 
     mDefaultRelativeX = p.rel_x;
     mDefaultRelativeY = p.rel_y;

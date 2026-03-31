@@ -30,14 +30,14 @@
 #define LL_LLCOROS_H
 
 #include "llexception.h"
+#include "llsingleton.h"
 #include <boost/fiber/fss.hpp>
 #include <boost/fiber/future/future.hpp>
 #include <boost/fiber/future/promise.hpp>
 #include <boost/fiber/recursive_mutex.hpp>
-#include "mutex.h"
-#include "llsingleton.h"
 #include "llinstancetracker.h"
-#include <boost/function.hpp>
+#include <functional>
+#include <mutex>
 #include <string>
 #include <exception>
 #include <queue>
@@ -88,13 +88,12 @@ namespace boost {
  * can provide diagnostic info: we can look up the name of the
  * currently-running coroutine.
  */
-class LL_COMMON_API LLCoros: public LLSingleton<LLCoros>
+class LL_COMMON_API LLCoros: public LLSimpleton<LLCoros>
 {
-    LLSINGLETON(LLCoros);
+public:
+    LLCoros();
     ~LLCoros();
 
-    void cleanupSingleton() override;
-public:
     // For debugging, return true if on the main coroutine for the current thread
     // Code that should not be executed from a coroutine should be protected by
     // llassert(LLCoros::on_main_coro())
@@ -112,7 +111,7 @@ public:
     /// stuck with the term "coroutine."
     typedef boost::fibers::fiber coro;
     /// Canonical callable type
-    typedef boost::function<void()> callable_t;
+    typedef std::function<void()> callable_t;
 
     /**
      * Create and start running a new coroutine with specified name. The name

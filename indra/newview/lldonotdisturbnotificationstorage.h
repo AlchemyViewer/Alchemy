@@ -45,13 +45,13 @@ public:
     bool tick();
 };
 
-class LLDoNotDisturbNotificationStorage : public LLParamSingleton<LLDoNotDisturbNotificationStorage>, public LLNotificationStorage
+class LLDoNotDisturbNotificationStorage : public LLSimpleton<LLDoNotDisturbNotificationStorage>, public LLNotificationStorage
 {
-    LLSINGLETON(LLDoNotDisturbNotificationStorage);
-    ~LLDoNotDisturbNotificationStorage();
-
     LOG_CLASS(LLDoNotDisturbNotificationStorage);
 public:
+    LLDoNotDisturbNotificationStorage();
+    ~LLDoNotDisturbNotificationStorage();
+
     static const char * toastName;
     static const char * offerName;
 

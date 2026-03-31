@@ -410,7 +410,7 @@ bool LLTextEditor::selectNext(const std::string& search_text_in, bool case_insen
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-29 (Catznip-2.3)
     size_t loc = (search_up) ? text.rfind(search_text, llmax(0, mCursorPos - (S32)search_text.size())) : text.find(search_text,mCursorPos);
 // [/SL:KB]
-//  S32 loc = text.find(search_text,mCursorPos);
+//  size_t loc = text.find(search_text,mCursorPos);
 
     // If Maybe we wrapped, search again
     if (wrap && (std::string::npos == loc))
@@ -637,7 +637,7 @@ S32 LLTextEditor::indentLine( S32 pos, S32 spaces )
             LLWString wtext = getWText();
             if (wtext[pos] == ' ')
             {
-                delta_spaces += remove( pos, 1, false );
+                delta_spaces -= remove( pos, 1, false );
             }
         }
     }
@@ -1298,7 +1298,7 @@ void LLTextEditor::addChar(llwchar wc)
     tryToShowEmojiHelper();
     tryToShowMentionHelper();
 
-    if (!mReadOnly && mAutoreplaceCallback != NULL)
+    if (!mReadOnly && mAutoreplaceCallback != nullptr)
     {
         // autoreplace the text, if necessary
         S32 replacement_start;
@@ -1745,10 +1745,10 @@ void LLTextEditor::cleanStringForPaste(LLWString & clean_string)
 
 void LLTextEditor::pasteTextWithLinebreaks(LLWString & clean_string)
 {
-    std::basic_string<llwchar>::size_type start = 0;
-    std::basic_string<llwchar>::size_type pos = clean_string.find('\n',start);
+    LLWString::size_type start = 0;
+    LLWString::size_type                  pos   = clean_string.find('\n', start);
 
-    while((pos != -1) && (pos != clean_string.length() -1))
+    while((pos != LLWString::npos) && (pos != clean_string.length() -1))
     {
         if(pos!=start)
         {
@@ -2043,10 +2043,10 @@ bool LLTextEditor::handleKeyHere(KEY key, MASK mask )
                     deleteSelection(true);
                 }
 
-                std::basic_string<llwchar>::size_type pos = tool_tip_text.find('\n',0);
-                if (pos != -1)
+                LLWString::size_type pos = tool_tip_text.find('\n',0);
+                if (pos != LLWString::npos)
                 {   // Extract the first line of the tooltip
-                    tool_tip_text = std::basic_string<llwchar>(tool_tip_text, 0, pos);
+                    tool_tip_text = LLWString(tool_tip_text, 0, pos);
                 }
 
                 // Add the text
@@ -2911,6 +2911,69 @@ bool LLTextEditor::exportBuffer(std::string &buffer )
 
     return true;
 }
+
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+
+// Copy/paste from LLScriptEdCore
+bool LLTextEditor::loadFromFile(const std::string& filename)
+{
+    if (filename.empty())
+    {
+        LL_WARNS() << "Empty file name" << LL_ENDL;
+        return false;
+    }
+
+    LLFILE* file = LLFile::fopen(filename, LLFILE_MODE("rb"));       /*Flawfinder: ignore*/
+    if (!file)
+    {
+        LL_WARNS() << "Error opening " << filename << LL_ENDL;
+        return false;
+    }
+
+    // read in the whole file
+    fseek(file, 0L, SEEK_END);
+    size_t file_length = (size_t) ftell(file);
+    fseek(file, 0L, SEEK_SET);
+    char* buffer = new char[file_length+1];
+    size_t nread = fread(buffer, 1, file_length, file);
+    if (nread < file_length)
+    {
+        LL_WARNS() << "Short read" << LL_ENDL;
+    }
+    buffer[nread] = '\0';
+    fclose(file);
+
+    std::string text = std::string(buffer);
+    LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
+
+    setText(LLStringExplicit(text));
+    delete[] buffer;
+
+    return true;
+}
+
+// Copy/paste from LLScriptEdCore
+bool LLTextEditor::writeToFile(const std::string& filename)
+{
+    LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("wb"));
+    if (!fp)
+    {
+        return false;
+    }
+
+    std::string utf8text = getText();
+
+    // Special case for a completely empty script - stuff in one space so it can store properly.  See SL-46889
+    if (utf8text.size() == 0)
+    {
+        utf8text = " ";
+    }
+
+    fputs(utf8text.c_str(), fp);
+    fclose(fp);
+    return true;
+}
+// [/SL:KB]
 
 void LLTextEditor::updateAllowingLanguageInput()
 {

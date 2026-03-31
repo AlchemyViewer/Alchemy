@@ -46,7 +46,7 @@ class LLFloaterIMNearbyChat
 public:
     // constructor for inline chat-bars (e.g. hosted in chat history window)
     LLFloaterIMNearbyChat(const LLSD& key = LLSD(LLUUID()));
-    ~LLFloaterIMNearbyChat() {}
+    ~LLFloaterIMNearbyChat();
 
     static LLFloaterIMNearbyChat* buildFloater(const LLSD& key);
 
@@ -62,6 +62,7 @@ public:
     void removeScreenChat();
 
     void show();
+    bool isMessagePanelVisible() const;
     bool isChatVisible() const;
 
     /** @param archive true - to save a message to the chat history log */
@@ -83,6 +84,7 @@ public:
     static bool isWordsName(const std::string& name);
 
     void showHistory();
+    void changeChannelLabel(S32 channel);
 
 protected:
     static bool matchChatTypeTrigger(const std::string& in_str, std::string* out_str);
@@ -102,6 +104,11 @@ protected:
 
     void displaySpeakingIndicator();
 
+// [RLVa:KB]
+    void setChatMentionPickerEnabled(bool enabled);
+    void updateRlvRestrictions(ERlvBehaviour behavior);
+// [/RLVa:KB]
+
     // Which non-zero channel did we last chat on?
     static S32 sLastSpecialChatChannel;
 
@@ -110,10 +117,16 @@ protected:
 
     S32 mExpandedHeight;
 
+// [RLVa:KB]
+    boost::signals2::connection mRlvBehaviorCallbackConnection{};
+// [/RLVa:KB]
+
 private:
     /*virtual*/ void refresh();
 
     std::vector<LLChat> mMessageArchive;
+
+    boost::signals2::connection mChatChannelConnection;
 };
 
 #endif // LL_LLFLOATERIMNEARBYCHAT_H

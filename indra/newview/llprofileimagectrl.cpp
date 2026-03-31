@@ -38,10 +38,10 @@ static LLDefaultChildRegistry::Register<LLProfileImageCtrl> r("profile_image");
 
 LLProfileImageCtrl::LLProfileImageCtrl(const LLProfileImageCtrl::Params& p)
     : LLIconCtrl(p)
-    , mImage(NULL)
+    , mImage(nullptr)
     , mImageOldBoostLevel(LLGLTexture::BOOST_NONE)
     , mWasNoDelete(false)
-    , mImageLoadedSignal(NULL)
+    , mImageLoadedSignal(nullptr)
 {
 }
 

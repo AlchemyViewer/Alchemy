@@ -109,7 +109,7 @@
     </panel>
     <panel
      follows="right|top"
-     height="126"
+     height="150"
      top_pad="4"
      width="238"
      left="1"
@@ -134,7 +134,7 @@
      follows="top|right"
      halign="left"
      height="13"
-     top_delta="3"
+     top_delta="6"
      left_pad="5"
      layout="topleft"
      name="me_label"
@@ -285,6 +285,30 @@
        by owner
     </text>
 
+    <check_box
+     name="grid_coords_chk"
+     control_name="MapShowGridCoords"
+     layout="topleft"
+     follows="top|right"
+     top_pad="2"
+     left="3"
+     height="16"
+     width="22"
+    />
+    <text
+     name="grid_coords_label"
+     type="string"
+     layout="topleft"
+     follows="top|right"
+     top_delta="2"
+     left_pad="3"
+     height="16"
+     width="220"
+     halign="left"
+     length="1" >
+       Show grid map coordinates
+     </text>
+
     <button
      follows="top|right"
      height="22"
@@ -306,7 +330,7 @@
      follows="top|right"
      halign="left"
      height="13"
-     top_delta="3"
+     top_delta="6"
      left_pad="5"
      layout="topleft"
      name="Home_label"
@@ -425,16 +449,6 @@
      width="66">
         Adult
     </text>
-    <check_box
-     control_name="AlchemyMapShowAgentCount"
-     follows="top|left"
-     height="16"
-     layout="topleft"
-     left="135"
-     name="AlchemyMapShowAgentCount"
-     top_pad="2"
-     width="22"
-     label="Agent Count"/>
 </panel>
 
 
@@ -444,7 +458,7 @@
   top_pad="0"
   width="238"
   background_visible="true"
-  bg_alpha_color="PanelDefaultBackgroundColor"
+  bg_alpha_color="DkGray2"
   name="layout_panel_3">
     <text
      text_color="White"
@@ -465,7 +479,7 @@
 
     <panel
      follows="right|top|bottom"
-	 height="235"
+	 height="220"
 	 top_pad="0"
 	 width="238"
 	 name="layout_panel_4">
@@ -583,7 +597,7 @@
      draw_stripes="false"
      bg_writeable_color="MouseGray"
      follows="all"
-     height="145"
+     height="130"
      layout="topleft"
      left="28"
      name="search_results"
@@ -729,7 +743,7 @@
   top_pad="0"
   width="238"
   background_visible="true"
-  bg_alpha_color="PanelDefaultBackgroundColor"
+  bg_alpha_color="DkGray2"
   name="layout_panel_5">
     <text
      text_color="White"

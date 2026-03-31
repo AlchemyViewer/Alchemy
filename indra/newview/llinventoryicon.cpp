@@ -36,20 +36,6 @@
 #include "llwearabletype.h"
 #include "llinventorysettings.h"
 
-struct IconEntry : public LLDictionaryEntry
-{
-    IconEntry(const std::string &item_name)
-        :
-        LLDictionaryEntry(item_name)
-    {}
-};
-
-class LLIconDictionary : public LLSingleton<LLIconDictionary>,
-                         public LLDictionary<LLInventoryType::EIconName, IconEntry>
-{
-    LLSINGLETON(LLIconDictionary);
-};
-
 typedef LLPointer<LLUIImage> LLUIImagePtr;
 
 LLIconDictionary::LLIconDictionary()

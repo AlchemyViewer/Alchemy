@@ -40,6 +40,9 @@ class LLViewerObject;
 class LLLineEditor;
 class LLRadioGroup;
 class LLPreview;
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+class LLEventTimer;
+// [/SL:KB]
 
 class LLMultiPreview : public LLMultiFloater
 {
@@ -109,6 +112,20 @@ public:
     static bool canModify(const LLUUID taskUUID, const LLInventoryItem* item);
     static bool canModify(const LLViewerObject* object, const LLInventoryItem* item);
 
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2012-02-06 (Catznip-3.2)
+    // Backup functionality
+public:
+    void startBackupTimer(F32 nInterval);
+    bool hasBackupFile() const   { return (!mBackupFilename.empty()); }
+    bool isBackupRunning() const { return (NULL != mBackupTimer); }
+    void removeBackupFile();
+protected:
+    virtual std::string getBackupFileName() const;
+    virtual void        onBackupTimer() {}
+
+    friend class LLPreviewBackupTimer;
+// [/SL:KB]
+
 protected:
     virtual void onCommit();
 
@@ -149,6 +166,11 @@ protected:
     // I am unsure if this is always the same as mObjectUUID, or why it exists
     // at the LLPreview level.  JC 2009-06-24
     LLUUID mNotecardObjectID;
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+    std::string   mBackupFilename;
+    LLEventTimer* mBackupTimer;
+// [/SL:KB]
 };
 
 

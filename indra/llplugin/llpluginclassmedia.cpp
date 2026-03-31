@@ -34,7 +34,7 @@
 #include "llcontrol.h"
 
 extern LLControlGroup gSavedSettings;
-#if LL_DARWIN
+#if LL_DARWIN || LL_LINUX
 extern bool gHiDPISupport;
 #endif
 
@@ -168,6 +168,7 @@ void LLPluginClassMedia::reset()
 
 void LLPluginClassMedia::idle(void)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     if(mPlugin)
     {
         mPlugin->idle();
@@ -370,14 +371,6 @@ void LLPluginClassMedia::setSizeInternal(void)
     {
         mRequestedMediaWidth = nextPowerOf2(mRequestedMediaWidth);
         mRequestedMediaHeight = nextPowerOf2(mRequestedMediaHeight);
-    }
-
-    {
-        if (mRequestedMediaWidth > 8192)
-            mRequestedMediaWidth = 8192;
-
-        if (mRequestedMediaHeight > 8192)
-            mRequestedMediaHeight = 8192;
     }
 }
 
@@ -1011,6 +1004,15 @@ void LLPluginClassMedia::enableMediaPluginDebugging( bool enable )
     message.setValueBoolean( "enable", enable );
     sendMessage( message );
 }
+
+#if LL_LINUX
+void LLPluginClassMedia::enablePipeWireVolumeCatcher( bool enable )
+{
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "enable_pipewire_volume_catcher");
+    message.setValueBoolean( "enable", enable );
+    sendMessage( message );
+}
+#endif
 
 void LLPluginClassMedia::setTarget(const std::string &target)
 {

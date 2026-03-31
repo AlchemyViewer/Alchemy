@@ -73,7 +73,7 @@ def proper_windows_path(path, current_platform = sys.platform):
     rel = None
     match = re.match(r"/cygdrive/([a-z])/(.*)", path)
     if not match:
-        match = re.match(r'([a-zA-Z]):\\\(.*)', path)
+        match = re.match(r'([a-zA-Z]):\\(.*)', path)
     if not match:
         return None         # not an absolute path
     drive_letter = match.group(1)
@@ -109,8 +109,8 @@ BASE_ARGUMENTS=[
     dict(name='arch',
          description="""This argument is appended to the platform string for
         determining which manifest class to run.
-        Example use: %(name)s --arch=i686
-        On Linux this would try to use Linux_i686Manifest.""",
+        Example use: %(name)s --arch=x86_64
+        On Linux this would try to use Linux_x86_64_Manifest.""",
          default=""),
     dict(name='artwork', description='Artwork directory.', default=DEFAULT_SRCTREE),
     dict(name='build', description='Build directory.', default=DEFAULT_SRCTREE),
@@ -129,6 +129,9 @@ BASE_ARGUMENTS=[
          description="""The build configurations sub directory used.""",
          default="Release"),
     dict(name='dest', description='Destination directory.', default=DEFAULT_SRCTREE),
+    dict(name='generator',
+         description="""Name of cmake generator used to create project""",
+         default=None),
     dict(name='grid',
          description="""Which grid the client will try to connect to.""",
          default=None),
@@ -139,6 +142,7 @@ BASE_ARGUMENTS=[
     dict(name='login_url',
          description="""The url that the login screen displays in the client.""",
          default=None),
+    dict(name='vcpkg_dir', description='vcpkg directory.', default=None),
     dict(name='platform',
          description="""The current platform, to be used for looking up which
         manifest class to run.""",
@@ -157,7 +161,8 @@ BASE_ARGUMENTS=[
         for use by a .bat file.""",
          default=None),
     dict(name='versionfile',
-         description="""The name of a file containing the full version number."""),
+         description="""The name of a file containing the full version number.""",
+         default=None),
     ]
 
 def usage(arguments, srctree=""):
@@ -658,11 +663,12 @@ class LLManifest(object, metaclass=LLManifestRegistry):
 
     def process_file(self, src, dst):
         if self.includes(src, dst):
-            for action in self.actions:
-                methodname = action + "_action"
-                method = getattr(self, methodname, None)
-                if method is not None:
-                    method(src, dst)
+            if src != dst:
+                for action in self.actions:
+                    methodname = action + "_action"
+                    method = getattr(self, methodname, None)
+                    if method is not None:
+                        method(src, dst)
             self.file_list.append([src, dst])
             return 1
         else:
@@ -848,7 +854,6 @@ class LLManifest(object, metaclass=LLManifestRegistry):
             count = 0
             if self.wildcard_pattern.search(src):
                 for s,d in self.expand_globs(src, dst):
-                    assert(s != d)
                     count += self.process_file(s, d)
             else:
                 # if we're specifying a single path (not a glob),

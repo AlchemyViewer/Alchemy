@@ -31,7 +31,7 @@
 #ifndef AL_UNZIP_H
 #define AL_UNZIP_H
 
-#include <minizip-ng/unzip.h>
+#include <minizip/unzip.h>
 
 class ALUnZip
 {

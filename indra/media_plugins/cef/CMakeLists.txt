@@ -1,14 +1,5 @@
 # -*- cmake -*-
-
-project(media_plugin_cef)
-
-include(Boost)
-include(00-Common)
-include(LLCommon)
-include(LLWindow)
-include(Linking)
 include(PluginAPI)
-
 include(CEFPlugin)
 include(GLIB)
 
@@ -23,7 +14,7 @@ set(media_plugin_cef_HEADER_FILES
     )
 
 # Select which VolumeCatcher implementation to use
-if (LINUX)
+if (FALSE) # Disable linux volume catcher due to issues dlopening with CEF 139
   foreach( PULSE_FILE pulse/introspect.h pulse/context.h pulse/subscribe.h pulse/glib-mainloop.h )
     find_path( PULSE_FILE_${PULSE_FILE}_FOUND ${PULSE_FILE} NO_CACHE)
     if( NOT PULSE_FILE_${PULSE_FILE}_FOUND )
@@ -50,11 +41,11 @@ if (LINUX)
   )
 
   list(APPEND media_plugin_cef_SOURCE_FILES ${LINUX_VOLUME_CATCHER})
-elseif (DARWIN)
-  list(APPEND media_plugin_cef_SOURCE_FILES volume_catcher_null.cpp)
 elseif (WINDOWS)
   list(APPEND media_plugin_cef_SOURCE_FILES windows_volume_catcher.cpp)
-endif (LINUX)
+else()
+  list(APPEND media_plugin_cef_SOURCE_FILES volume_catcher_null.cpp)
+endif ()
 
 list(APPEND media_plugin_cef_SOURCE_FILES ${media_plugin_cef_HEADER_FILES})
 
@@ -63,10 +54,6 @@ add_library(media_plugin_cef
     ${media_plugin_cef_SOURCE_FILES}
     )
 
-#add_dependencies(media_plugin_cef
-#  ${MEDIA_PLUGIN_BASE_LIBRARIES}
-#)
-
 target_link_libraries(media_plugin_cef
         media_plugin_base
         ll::cef
@@ -74,14 +61,38 @@ target_link_libraries(media_plugin_cef
 )
 
 if (WINDOWS)
-  set_target_properties(
-    media_plugin_cef
+  set_target_properties(media_plugin_cef
     PROPERTIES
-    LINK_FLAGS "/MANIFEST:NO /NODEFAULTLIB:LIBCMT /IGNORE:4099"
-    )
-endif (WINDOWS)
+    EXCLUDE_FROM_DEFAULT_BUILD_DEBUG ON
+    RUNTIME_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
+  )
+  target_link_options(media_plugin_cef PRIVATE /MANIFEST:NO /IGNORE:4099)
 
-if (DARWIN)
+  # Copy plugin files to packaging directory
+  set(DULLAHAN_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/dullahan-bin")
+  add_custom_command(
+    TARGET media_plugin_cef POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${DULLAHAN_DIR}/bin" "${VIEWER_STAGING_DIR}/llplugin"
+  )
+
+  set(CEF_RESOURCE_FILES
+    "${DULLAHAN_DIR}/resources/chrome_100_percent.pak"
+    "${DULLAHAN_DIR}/resources/chrome_200_percent.pak"
+    "${DULLAHAN_DIR}/resources/resources.pak"
+    "${DULLAHAN_DIR}/resources/icudtl.dat"
+  )
+  add_custom_command(
+    TARGET media_plugin_cef POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CEF_RESOURCE_FILES} "${VIEWER_STAGING_DIR}/llplugin"
+    COMMAND_EXPAND_LISTS
+  )
+
+  add_custom_command(
+    TARGET media_plugin_cef POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/dullahan-bin/resources/locales" "${VIEWER_STAGING_DIR}/llplugin/locales"
+  )
+
+elseif (DARWIN)
     find_library(CORESERVICES_LIBRARY CoreServices)
     find_library(AUDIOUNIT_LIBRARY AudioUnit)
 
@@ -97,7 +108,6 @@ if (DARWIN)
     PREFIX ""
     BUILD_WITH_INSTALL_RPATH 1
     INSTALL_RPATH "@executable_path/../Frameworks"
-    LINK_FLAGS "-exported_symbols_list ${CMAKE_CURRENT_SOURCE_DIR}/../base/media_plugin_base.exp"
   )
 
 elseif (LINUX)

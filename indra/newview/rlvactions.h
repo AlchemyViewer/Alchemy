@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -367,11 +368,7 @@ public:
     /*
      * Shows one of the blocked toast notifications (see rlva_strings.xml)
      */
-#ifdef CATZNIP_STRINGVIEW
-    static void notifyBlocked(const boost::string_view& strNotifcation, const LLSD& sdArgs = LLSD());
-#else
-    static void notifyBlocked(const std::string& strNotifcation, const LLSD& sdArgs = LLSD());
-#endif // CATZNIP_STRINGVIEW
+    static void notifyBlocked(std::string_view strNotifcation, const LLSD& sdArgs = LLSD());
 };
 
 // ============================================================================

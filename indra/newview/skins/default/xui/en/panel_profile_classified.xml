@@ -87,7 +87,7 @@
        width="310"
        follows="all"
        layout="topleft"
-       color="PanelDefaultBackgroundColor"
+       color="DkGray2"
        opaque="true"
        reserve_scroll_corner="false"
       >
@@ -485,6 +485,7 @@
                  max_length_bytes="30"
                  prevalidator="ascii"
                  commit_on_focus_lost="false"
+                 text_color="black"
                 />
                 <text
                  name="description_label"
@@ -511,6 +512,7 @@
                  follows="left|top|right"
                  layout="topleft"
                  max_length="256"
+                 text_color="black"
                  word_wrap="true"
                 />
                 <text
@@ -605,26 +607,26 @@
                     />
                     <icons_combo_box.item
                      name="mature_ci"
+                     label="Moderate Content"
                      value="Mature"
                     >
                         <item.columns
                          value="Parcel_M_Light"
                          width="20"
-                         halign="left"
-                         type="icontext"
-                         label="Moderate Content"
+                         halign="center"
+                         type="icon"
                         />
                     </icons_combo_box.item>
                     <icons_combo_box.item
                      name="pg_ci"
+                     label="General Content"
                      value="PG"
                     >
                         <item.columns
                          value="Parcel_PG_Light"
                          width="20"
-                         halign="left"
-                         type="icontext"
-                         label="General Content"
+                         halign="center"
+                         type="icon"
                         />
                     </icons_combo_box.item>
                 </icons_combo_box>

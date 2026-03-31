@@ -27,12 +27,13 @@
 #ifndef LL_LLFONTFREETYPE_H
 #define LL_LLFONTFREETYPE_H
 
-#include <boost/unordered_map.hpp>
 #include "llpointer.h"
 #include "llstl.h"
 
 #include "llimagegl.h"
 #include "llfontbitmapcache.h"
+
+#include <boost/unordered_map.hpp>
 
 // Hack.  FT_Face is just a typedef for a pointer to a struct,
 // but there's no simple forward declarations file for FreeType,

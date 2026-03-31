@@ -51,7 +51,7 @@ class LLLandImpactsObserver;
 
 typedef LLSafeHandle<LLObjectSelection> LLObjectSelectionHandle;
 
-class LLFloaterTools
+class LLFloaterTools final
 : public LLFloater
 {
 public:
@@ -108,6 +108,9 @@ private:
     static void setObjectType( LLPCode pcode );
     void onClickGridOptions();
 
+    void buildTreeGrassCombo();
+    void onSelectTreeGrassCombo();
+
 public:
     LLButton        *mBtnFocus;
     LLButton        *mBtnMove;
@@ -130,11 +133,15 @@ public:
     LLButton*       mBtnLink;
     LLButton*       mBtnUnlink;
 
+    LLButton*       mBtnPrevPart;
+    LLButton*       mBtnNextPart;
+
     LLCheckBoxCtrl* mCheckSnapToGrid;
     LLButton*       mBtnGridOptions;
     LLComboBox*     mComboGridMode;
     LLCheckBoxCtrl* mCheckStretchUniform;
     LLCheckBoxCtrl* mCheckStretchTexture;
+    LLCheckBoxCtrl* mCheckActualRoot;
 
     // !HACK! Replacement of mCheckStretchUniform label because LLCheckBoxCtrl
     //  doesn't support word_wrap of its label. Need to fix truncation bug EXT-6658
@@ -150,8 +157,9 @@ public:
 
     LLTextBox*  mTextSelectionCount = nullptr;
     LLTextBox*  mTextSelectionEmpty = nullptr;
-    LLTextBox*  mTextSelectionFaces = nullptr;
+    //LLTextBox*  mTextSelectionFaces = nullptr;
     LLSlider*   mSliderZoom = nullptr;
+    LLComboBox* mTreeGrassCombo = nullptr;
 
     // Create buttons
     LLCheckBoxCtrl  *mCheckSticky;

@@ -27,8 +27,8 @@
 #ifndef LL_MESH_REPOSITORY_H
 #define LL_MESH_REPOSITORY_H
 
-#include <unordered_map>
-#include <unordered_set>
+#include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 #include "llassettype.h"
 #include "llmodel.h"
 #include "lluuid.h"
@@ -290,7 +290,7 @@ private:
 class MeshLoadData
 {
 public:
-    MeshLoadData() {}
+    MeshLoadData() = default;
     ~MeshLoadData()
     {
         if (std::shared_ptr<PendingRequestBase> request = mRequest.lock())
@@ -300,19 +300,19 @@ public:
     }
     void initData(LLVOVolume* vol, std::shared_ptr<PendingRequestBase>& request)
     {
-        mVolumes.push_back(vol);
+        mVolumes.insert(vol);
         request->trackData(this);
         mRequest = request;
     }
     void addVolume(LLVOVolume* vol)
     {
-        mVolumes.push_back(vol);
+        mVolumes.insert(vol);
         if (std::shared_ptr<PendingRequestBase> request = mRequest.lock())
         {
             request->setScoreDirty();
         }
     }
-    std::vector<LLVOVolume*> mVolumes;
+    boost::unordered_set<LLVOVolume*> mVolumes;
 private:
     std::weak_ptr<PendingRequestBase> mRequest;
 };
@@ -671,11 +671,11 @@ public:
     LLPointer<DecompRequest> mFinalDecomp;
     volatile bool   mPhysicsComplete;
 
-    typedef std::map<LLPointer<LLModel>, std::vector<LLVector3> > hull_map;
-    hull_map        mHullMap;
+    typedef std::map<LLPointer<LLModel>, std::vector<LLVector3> > hull_map_t;
+    hull_map_t      mHullMap;
 
-    typedef std::vector<LLModelInstance> instance_list;
-    instance_list   mInstanceList;
+    typedef std::vector<LLModelInstance> instance_list_t;
+    instance_list_t mInstanceList;
 
     // Upload should happen in deterministic order, so sort instances by model name.
     struct LLUploadModelInstanceLess
@@ -689,11 +689,11 @@ public:
             }
             // Note: probably can sort by mBaseModel->mSubmodelID here as well to avoid
             // running over the list twice in wholeModelToLLSD.
-            return a->mLabel < b->mLabel;
+            return a->mLabel > b->mLabel;
         }
     };
-    typedef std::map<LLPointer<LLModel>, instance_list, LLUploadModelInstanceLess> instance_map;
-    instance_map    mInstance;
+    typedef std::map<LLPointer<LLModel>, instance_list_t, LLUploadModelInstanceLess> instance_map_t;
+    instance_map_t    mInstance;
     typedef std::map<std::string, std::string> lod_sources_map_t;
     lod_sources_map_t mLodSources;
 
@@ -712,7 +712,7 @@ public:
     std::string     mWholeModelUploadURL;
     LLUUID          mDestinationFolderId;
 
-    LLMeshUploadThread(instance_list& data, const lod_sources_map_t& sources_list,
+    LLMeshUploadThread(instance_list_t& data, const lod_sources_map_t& sources_list,
                        LLVector3& scale, bool upload_textures,
                        bool upload_skin, bool upload_joints, bool lock_scale_if_joint_position,
                        const std::string & upload_url,
@@ -747,6 +747,22 @@ public:
     virtual void onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response);
 
     static LLViewerFetchedTexture* FindViewerTexture(const LLImportMaterial& material);
+
+protected:
+    void packModelIntance(
+        LLModel* model,
+        LLMeshUploadThread::instance_list_t& instance_list,
+        std::string& model_name,
+        LLSD& res,
+        S32& mesh_num,
+        S32& texture_num,
+        S32& instance_num,
+        boost::unordered_set<LLViewerTexture* > &textures,
+        boost::unordered_map<LLViewerTexture*, S32> texture_index,
+        boost::unordered_map<LLModel*, S32>& mesh_index,
+        std::vector<std::string>& texture_list_dest,
+        bool include_textures
+        );
 
 private:
     LLHandle<LLWholeModelFeeObserver> mFeeObserverHandle;
@@ -846,10 +862,12 @@ public:
     LLMeshRepository();
 
     void init();
+    void unregisterAllMeshes();
     void shutdown();
     S32 update();
 
-    void unregisterMesh(LLVOVolume* volume);
+    void unregisterMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_params, S32 detail);
+    void unregisterSkinInfo(const LLUUID& mesh_id, LLVOVolume* vobj);
     //mesh management functions
     S32 loadMesh(LLVOVolume* volume, const LLVolumeParams& mesh_params, S32 new_lod = 0, S32 last_lod = -1);
 

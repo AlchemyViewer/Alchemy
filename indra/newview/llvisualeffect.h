@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2021&license=viewerlgpl$
  * Copyright (c) 2021, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -132,6 +133,7 @@ class LLTweenableValueLerp : public LLTweenableValue<T>
 {
 public:
     LLTweenableValueLerp(const T& defaultValue) : LLTweenableValue<T>(defaultValue) {}
+
     T    get() override;
     void start(const T& endValue, double duration) override
     {

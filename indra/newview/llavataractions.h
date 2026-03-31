@@ -101,6 +101,7 @@ public:
     static void showPicks(const LLUUID& avatar_id);
     static void showPick(const LLUUID& avatar_id, const LLUUID& pick_id);
     static void createPick();
+    static void createPick(const LLPickData& data);
     static void showClassifieds(const LLUUID& avatar_id);
     static void showClassified(const LLUUID& avatar_id, const LLUUID& classified_id, bool edit = false);
     static void createClassified();
@@ -108,8 +109,6 @@ public:
     static bool profileVisible(const LLUUID& avatar_id);
     static bool isPickTabSelected(const LLUUID& avatar_id);
     static LLFloater* findProfileFloater(const LLUUID& avatar_id);
-
-    static void createPick(const LLPickData& data);
 
     /**
      * Show avatar on world map.
@@ -238,11 +237,6 @@ public:
      * @return false if the selected items cannot be shared or the active inventory panel cannot be obtained
      */
     static bool canShareSelectedItems(LLInventoryPanel* inv_panel = NULL);
-
-    /**
-     * Checks whether agent is mappable
-     */
-    static bool isAgentMappable(const LLUUID& agent_id);
 
     /**
      * Builds a string of residents' display names separated by "words_separator" string.

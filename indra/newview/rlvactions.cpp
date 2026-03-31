@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -723,11 +724,7 @@ bool RlvActions::isRlvEnabled()
     return RlvHandler::isEnabled();
 }
 
-#ifdef CATZNIP_STRINGVIEW
-void RlvActions::notifyBlocked(const boost::string_view& strNotifcation, const LLSD& sdArgs)
-#else
-void RlvActions::notifyBlocked(const std::string& strNotifcation, const LLSD& sdArgs)
-#endif // CATZNIP_STRINGVIEW
+void RlvActions::notifyBlocked(std::string_view strNotifcation, const LLSD& sdArgs)
 {
     RlvUtil::notifyBlocked(strNotifcation, sdArgs);
 }

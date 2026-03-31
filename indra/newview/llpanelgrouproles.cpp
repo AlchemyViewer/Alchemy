@@ -1963,12 +1963,12 @@ void LLPanelGroupMembersSubTab::exportMembersToCSVCallback(const std::vector<std
     }
     std::string fullpath = filenames[0];
 
-    LLAPRFile outfile;
-    outfile.open(fullpath, LL_APR_WB );
-    apr_file_t* file = outfile.getFileHandle();
-    if (!file) return;
+    std::error_code ec;
+    LLFile outfile(fullpath, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+    if (!outfile)
+        return;
 
-    apr_file_printf(file, "Group membership record for %s", gdatap->mName.c_str());
+    outfile.printf("Group membership record for %s", gdatap->mName.c_str());
 
     LLSD memberlist;
     LLAvatarName av_name;
@@ -1977,12 +1977,12 @@ void LLPanelGroupMembersSubTab::exportMembersToCSVCallback(const std::vector<std
          ++member_itr)
     {
         LLAvatarNameCache::get(member_itr->first, &av_name);
-        apr_file_printf(file, "\n%s,%s,%s",
+        outfile.printf("\n%s,%s,%s",
                         member_itr->first.asString().c_str(),
                         av_name.getLegacyName().c_str(),
                         member_itr->second->getOnlineStatus().c_str());
     }
-    apr_file_printf(file, "\n");
+    outfile.printf("\n");
 }
 
 // LLPanelGroupRolesSubTab ///////////////////////////////////////////////

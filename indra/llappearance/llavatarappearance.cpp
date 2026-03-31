@@ -1706,7 +1706,7 @@ void LLAvatarSkeletonInfo::getJointMatricesAndHierarhy(
 }
 
 //Make aliases for joint and push to map.
-/* static */
+// static
 void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo* bone_info, joint_alias_map_t& joint_alias_map)
 {
     if (! bone_info->mIsJoint )
@@ -1719,15 +1719,15 @@ void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo* bone_info, joint_ali
 
     std::string aliases = bone_info->mAliases;
 
-    boost::char_separator<char> sep(" ");
-    boost::tokenizer<boost::char_separator<char> > tok(aliases, sep);
-    for(const std::string& i : tok)
+    boost::char_separator sep(" ");
+    boost::tokenizer tok(aliases, sep);
+    for(auto i = tok.begin(); i != tok.end(); ++i)
     {
-        if (joint_alias_map.find(i) != joint_alias_map.end())
+        if (joint_alias_map.find(*i) != joint_alias_map.end())
         {
-            LL_WARNS() << "avatar skeleton:  Joint alias \"" << i << "\" remapped from " << joint_alias_map[i] << " to " << bone_name << LL_ENDL;
+            LL_WARNS() << "avatar skeleton:  Joint alias \"" << *i << "\" remapped from " << joint_alias_map[*i] << " to " << bone_name << LL_ENDL;
         }
-        joint_alias_map[i] = bone_name;
+        joint_alias_map[*i] = bone_name;
     }
 
     for (LLAvatarBoneInfo* bone : bone_info->mChildren)
@@ -1736,7 +1736,7 @@ void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo* bone_info, joint_ali
     }
 }
 
-/* static */
+// static
 LLAvatarAppearance::joint_alias_map_t LLAvatarAppearance::buildJointAliases()
 {
     joint_alias_map_t map;
@@ -1762,7 +1762,7 @@ LLAvatarAppearance::joint_alias_map_t LLAvatarAppearance::buildJointAliases()
     return map;
 }
 
-const LLAvatarAppearance::joint_alias_map_t& LLAvatarAppearance::getJointAliases()
+const LLAvatarAppearance::joint_alias_map_t& LLAvatarAppearance::getJointAliases ()
 {
     if (mJointAliasMap.empty())
     {

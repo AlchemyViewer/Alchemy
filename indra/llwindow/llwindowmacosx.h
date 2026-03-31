@@ -36,11 +36,6 @@
 #include <ApplicationServices/ApplicationServices.h>
 #include <OpenGL/OpenGL.h>
 
-// AssertMacros.h does bad things.
-#include "fix_macros.h"
-#undef verify
-#undef require
-
 class LLWindowMacOSX : public LLWindow
 {
 public:
@@ -53,7 +48,7 @@ public:
     bool maximize() override;
     void minimize() override;
     void restore() override;
-    bool getFullscreen() override;
+    bool getFullscreen();
     bool getPosition(LLCoordScreen *position) override;
     bool getSize(LLCoordScreen *size) override;
     bool getSize(LLCoordWindow *size) override;
@@ -63,6 +58,7 @@ public:
     bool switchContext(bool fullscreen, const LLCoordScreen &size, bool enable_vsync, const LLCoordScreen * const posp = NULL) override;
     bool setCursorPosition(LLCoordWindow position) override;
     bool getCursorPosition(LLCoordWindow *position) override;
+    bool isWrapMouse() const override { return !mCursorDecoupled; };
     void showCursor() override;
     void hideCursor() override;
     void showCursorFromMouseMove() override;

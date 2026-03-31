@@ -2558,6 +2558,10 @@ vec3 legacyGamma(vec3 color)
 }
 #endif
 
+#ifdef COLOR_GRADE
+vec3 applyLUTGrading(vec3 diff);
+#endif
+
 void main()
 {
     vec4 diff = vec4(0.f);
@@ -2568,6 +2572,10 @@ void main()
 
 #ifdef LEGACY_GAMMA
     diff.rgb = legacyGamma(diff.rgb);
+#endif
+
+#ifdef COLOR_GRADE
+    diff.rgb = applyLUTGrading(diff.rgb);
 #endif
 
     frag_color = diff;

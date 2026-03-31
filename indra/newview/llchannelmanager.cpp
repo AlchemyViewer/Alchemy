@@ -28,6 +28,7 @@
 
 #include "llchannelmanager.h"
 
+#include "allegacynotificationwellwindow.h"
 #include "llappviewer.h"
 #include "lldonotdisturbnotificationstorage.h"
 #include "llpersistentnotificationstorage.h"
@@ -36,7 +37,6 @@
 #include "llrootview.h"
 #include "llsyswellwindow.h"
 #include "llfloaternotificationstabbed.h"
-#include "lllegacynotificationwellwindow.h"
 #include "llfloaterreg.h"
 
 #include <algorithm>
@@ -148,8 +148,8 @@ void LLChannelManager::onLoginCompleted()
             mStartUpChannel->init(channel_right_bound - NOTIFY_BOX_WIDTH, channel_right_bound);
             if (gSkinSettings.getBOOL("LegacyNotificationWell"))
             {
-                mStartUpChannel->setMouseDownCallback(boost::bind(&LLLegacyNotificationWellWindow::onStartUpToastClick,
-                    LLLegacyNotificationWellWindow::getInstance(), _2, _3, _4));
+                mStartUpChannel->setMouseDownCallback(boost::bind(&ALLegacyNotificationWellWindow::onStartUpToastClick,
+                    ALLegacyNotificationWellWindow::getInstance(), _2, _3, _4));
             }
             else
             {

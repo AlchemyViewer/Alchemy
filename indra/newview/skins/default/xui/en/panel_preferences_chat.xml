@@ -38,8 +38,8 @@
             layout="topleft"
             follows="top|left" />
         <panel
-            label="Autoresponses"
-            name="chat_pref_autoreponse"
+            label="Autoresponse"
+            name="chat_prefs_autoresponse"
             filename="panel_preferences_chat_autoresponse.xml"
             layout="topleft"
             follows="top|left" />

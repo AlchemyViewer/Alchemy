@@ -32,6 +32,7 @@
 #include "message.h"
 #include "lltracker.h"
 #include "lluistring.h"
+#include "llviewercontrol.h"
 #include "llviewertexturelist.h"
 #include "lltrans.h"
 #include "llgltexture.h"
@@ -39,6 +40,7 @@
 // Timers to temporise database requests
 const F32 AGENTS_UPDATE_TIMER = 60.0;           // Seconds between 2 agent requests for a region
 const F32 REQUEST_ITEMS_TIMER = 10.f * 60.f;    // Seconds before we consider re-requesting item data for the grid
+const F64 BLOCK_UPDATE_TIMER = 60.0;            // Periodically update sim info
 
 //---------------------------------------------------------------------------
 // LLItemInfo
@@ -117,6 +119,7 @@ LLVector3d LLSimInfo::getGlobalOrigin() const
 {
     return from_region_handle(mHandle);
 }
+
 LLVector3 LLSimInfo::getLocalPos(LLVector3d global_pos) const
 {
     LLVector3d sim_origin = from_region_handle(mHandle);
@@ -302,6 +305,7 @@ void LLWorldMap::clearSimFlags()
     {
         mMapBlockLoaded[idx] = false;
     }
+    mMapBlockLastUpdateOffsets.clear();
 }
 
 LLSimInfo* LLWorldMap::createSimInfoFromHandle(const U64 handle)
@@ -492,9 +496,20 @@ bool LLWorldMap::insertItem(U32 x_world, U32 y_world, std::string& name, LLUUID&
         case MAP_ITEM_MATURE_EVENT:
         case MAP_ITEM_ADULT_EVENT:
         {
-            std::string timeStr = "["+ LLTrans::getString ("TimeHour")+"]:["
-                                       +LLTrans::getString ("TimeMin")+"] ["
-                                       +LLTrans::getString ("TimeAMPM")+"]";
+            std::string timeStr;
+
+            static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+            if (use_24h)
+            {
+                timeStr = "[" + LLTrans::getString("TimeHour") + "]:["
+                    + LLTrans::getString("TimeMin") + "]";
+            }
+            else
+            {
+                timeStr = "[" + LLTrans::getString("TimeHour12") + "]:["
+                    + LLTrans::getString("TimeMin") + "] ["
+                    + LLTrans::getString("TimeAMPM") + "]";
+            }
             LLSD substitution;
             substitution["datetime"] = (S32) extra;
             LLStringUtil::format (timeStr, substitution);
@@ -596,17 +611,37 @@ void LLWorldMap::updateRegions(S32 x0, S32 y0, S32 x1, S32 y1)
     y0 = y0 / MAP_BLOCK_SIZE;
     y1 = y1 / MAP_BLOCK_SIZE;
 
+    block_last_update_map_t new_offsets;
+    F64 time_now = LLTimer::getElapsedSeconds();
+
+    // Remove blocks that have been request more than BLOCK_UPDATE_TIMER ago
+    // so we re-request them for an update
+    for (auto it = mMapBlockLastUpdateOffsets.begin(); it != mMapBlockLastUpdateOffsets.end();)
+    {
+        if ((time_now - it->second) > BLOCK_UPDATE_TIMER)
+        {
+            it = mMapBlockLastUpdateOffsets.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+    mMapBlockLastUpdateOffsets.swap(new_offsets);
+
     // Load the region info those blocks
+    auto& world_map_message = LLWorldMapMessage::instance();
     for (S32 block_x = llmax(x0, 0); block_x <= llmin(x1, MAP_BLOCK_RES-1); ++block_x)
     {
         for (S32 block_y = llmax(y0, 0); block_y <= llmin(y1, MAP_BLOCK_RES-1); ++block_y)
         {
             S32 offset = block_x | (block_y * MAP_BLOCK_RES);
-            if (!mMapBlockLoaded[offset])
+            if (!mMapBlockLoaded[offset] || mMapBlockLastUpdateOffsets.find(offset) == mMapBlockLastUpdateOffsets.end())
             {
                 //LL_INFOS("WorldMap") << "Loading Block (" << block_x << "," << block_y << ")" << LL_ENDL;
-                LLWorldMapMessage::getInstance()->sendMapBlockRequest(block_x * MAP_BLOCK_SIZE, block_y * MAP_BLOCK_SIZE, (block_x * MAP_BLOCK_SIZE) + MAP_BLOCK_SIZE - 1, (block_y * MAP_BLOCK_SIZE) + MAP_BLOCK_SIZE - 1);
+                world_map_message.sendMapBlockRequest(block_x * MAP_BLOCK_SIZE, block_y * MAP_BLOCK_SIZE, (block_x * MAP_BLOCK_SIZE) + MAP_BLOCK_SIZE - 1, (block_y * MAP_BLOCK_SIZE) + MAP_BLOCK_SIZE - 1);
                 mMapBlockLoaded[offset] = true;
+                mMapBlockLastUpdateOffsets[offset] = time_now;
             }
         }
     }

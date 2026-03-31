@@ -53,11 +53,11 @@ public:
     F32                 percentToWeight( F32 percent );
 
 public:
-    LLViewerVisualParam* mParam = nullptr;
+    LLViewerVisualParam* mParam;
 protected:
     LLUICtrl* mParamSlider = nullptr;
-    bool mAllowModify = false;
-    LLWearable *mWearable = nullptr;
+    bool mAllowModify;
+    LLWearable *mWearable;
 };
 
 #endif

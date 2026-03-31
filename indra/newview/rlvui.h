@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2011, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -46,6 +47,7 @@ protected:
     void onRefreshHoverText();                                          // showloc, shownames, showhovertext(all|world|hud)
     void onToggleMovement();                                            // fly, alwaysrun and temprun
     void onToggleShowLoc();                                             // showloc
+    void onToggleShowNames();                                           // shownames
     void onToggleShowMinimap();                                         // showminimap
     void onToggleShowWorldMap();                                        // showworldmap
     void onToggleTp();                                                  // tploc and tplm
@@ -57,11 +59,7 @@ protected:
      * Floater and sidebar validation callbacks
      */
 public:
-#ifdef CATZNIP_STRINGVIEW
-    bool addGenericFloaterFilter(const std::string& strFloaterName, const boost::string_view& strRlvNotification);
-#else
-    bool addGenericFloaterFilter(const std::string& strFloaterName, const std::string& strRlvNotification);
-#endif // CATZNIP_STRINGVIEW
+    bool addGenericFloaterFilter(const std::string& strFloaterName, std::string_view strRlvNotification);
     bool addGenericFloaterFilter(const std::string& strFloaterName, const std::function<void()>& fn = nullptr);
     bool removeGenericFloaterFilter(const std::string& strFloaterName);
 
@@ -89,7 +87,7 @@ public:
      * Member variables
      */
 protected:
-    typedef boost::function<void(bool)> behaviour_handler_t;
+    typedef std::function<void(bool)> behaviour_handler_t;
     typedef std::multimap<ERlvBehaviour, behaviour_handler_t> behaviour_handler_map_t;
     behaviour_handler_map_t m_Handlers;
 

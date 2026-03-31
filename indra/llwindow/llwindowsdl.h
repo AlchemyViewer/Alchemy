@@ -31,9 +31,19 @@
 
 #include "llwindow.h"
 #include "lltimer.h"
+#include "llmutex.h"
 
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_endian.h"
+
+#ifdef LL_WAYLAND
+#include <wayland-client-protocol.h>
+#endif
+
+#if LL_X11
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#endif
 
 class LLPreeditor;
 
@@ -71,7 +81,7 @@ public:
     bool setCursorPosition(LLCoordWindow position) override;
 
     bool getCursorPosition(LLCoordWindow *position) override;
-
+    bool isWrapMouse() const override { return true; }
     void showCursor() override;
     void hideCursor() override;
     bool isCursorHidden() override;
@@ -140,7 +150,6 @@ public:
 
     void bringToFront() override;
 
-    void allowLanguageTextInput(LLPreeditor *preeditor, bool b) override;
     void setLanguageTextInput(const LLCoordGL& pos) override;
 
     void spawnWebBrowser(const std::string &escaped_url, bool async) override;
@@ -155,8 +164,6 @@ public:
     void toggleVSync(bool enable_vsync) override;
 
     F32 getSystemUISize() override;
-
-    bool getFullscreen() override { return mFullscreen; };
 
     static std::vector<std::string> getDisplaysResolutionList();
 
@@ -200,13 +207,13 @@ protected:
     // Platform specific variables
     //
     U32 mGrabbyKeyFlags = 0;
-
+    S32 mReallyCapturedCount = 0;
     SDL_Window *mWindow = nullptr;
     SDL_GLContext mContext;
     SDL_Cursor *mSDLCursors[UI_CURSOR_COUNT];
 
     std::string mWindowTitle;
-    F32 mOriginalAspectRatio = 1.0f;
+    F32 mNativeAspectRatio = 0.0f;
     F32 mOverrideAspectRatio = 0.0f;
     F32 mGamma = 0.0f;
     U32 mFSAASamples = 0;
@@ -219,10 +226,35 @@ private:
     U32 mKeyVirtualKey = 0;
     U32 mKeyModifiers = SDL_KMOD_NONE;
 
-    bool mLanguageTextInputAllowed = false;
-    LLPreeditor* mPreeditor = nullptr;
+    LLMutex mOSRMutex;
+    std::unordered_map<SDL_GLContext, SDL_Window*> mOSRContexts;
+    std::list<SDL_Window*> mDeadOSRWindows;
 
     void tryFindFullscreenSize(int &aWidth, int &aHeight);
+
+    enum EServerProtocol{ X11, Wayland, Unknown };
+    EServerProtocol mServerProtocol = Unknown;
+public:
+#if LL_X11
+    // X11
+    struct X11_DATA
+    {
+        Display* xdisplay = nullptr;
+        Window xwindow = 0;
+        int xscreen = -1;
+    };
+    static X11_DATA sX11Data;
+#endif
+
+#if LL_WAYLAND
+    // Wayland
+    struct WAYLAND_DATA
+    {
+        struct wl_display* display = nullptr;
+        struct wl_surface* surface = nullptr;
+    };
+    static WAYLAND_DATA sWaylandData;
+#endif
 };
 
 class LLSplashScreenSDL : public LLSplashScreen
@@ -231,9 +263,9 @@ public:
     LLSplashScreenSDL();
     virtual ~LLSplashScreenSDL();
 
-    void showImpl();
-    void updateImpl(const std::string& mesg);
-    void hideImpl();
+    void showImpl() override;
+    void updateImpl(const std::string& mesg) override;
+    void hideImpl() override;
 };
 
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type);

@@ -40,50 +40,6 @@ public:
     LLMaterialID(const LLSD::Binary& pMaterialID);
     LLMaterialID(const void* pMemory);
     LLMaterialID(const LLUUID& lluid);
-private:
-    // Derived from Boost.UUID hash impl
-    inline std::uint64_t hash_mix_mx( std::uint64_t x ) const noexcept
-    {
-        x *= 0xD96AAA55;
-        x ^= x >> 16;
-        return x;
-    }
-
-    // prospector -p mul:0xD96AAA55,xorr:16,mul,xorr -t 1000
-    // score = 79.5223047689704
-    // (with mx prepended)
-    inline std::uint64_t hash_mix_fmx( std::uint64_t x ) const noexcept
-    {
-        x *= 0x7DF954AB;
-        x ^= x >> 16;
-        return x;
-    }
-
-    inline std::uint32_t load_little_u32( void const* p ) const noexcept
-    {
-        std::uint32_t tmp;
-        std::memcpy( &tmp, p, sizeof( tmp ) );
-        return tmp;
-    }
-public:
-    inline size_t getHash() const noexcept
-    {
-        std::uint64_t r = 0;
-
-        r = hash_mix_mx( r + load_little_u32( mID +  0 ) );
-        r = hash_mix_mx( r + load_little_u32( mID +  4 ) );
-        r = hash_mix_mx( r + load_little_u32( mID +  8 ) );
-        r = hash_mix_mx( r + load_little_u32( mID + 12 ) );
-
-        return static_cast<std::size_t>( hash_mix_fmx( r ) );
-    }
-
-    // For use with boost containers.
-    friend std::size_t hash_value(const LLMaterialID& id) noexcept
-    {
-        return (size_t)id.getHash();
-    }
-
 
     bool          operator == (const LLMaterialID& pOtherMaterialID) const;
     bool          operator != (const LLMaterialID& pOtherMaterialID) const;
@@ -107,15 +63,11 @@ public:
 
     static const LLMaterialID null;
 
-    // Returns a 64 bits digest of the material Id, by XORing its two 64 bits
-    // long words. HB
-    inline U64 getDigest64() const
-    {
-        U64* tmp = (U64*)mID;
-        return tmp[0] ^ tmp[1];
-    }
-
 private:
+    // definitions follow class
+    friend std::hash<LLMaterialID>;
+    friend size_t hash_value(const LLMaterialID&) noexcept;
+
     void parseFromBinary(const LLSD::Binary& pMaterialID);
     int  compareToOtherMaterialID(const LLMaterialID& pOtherMaterialID) const;
 
@@ -129,9 +81,39 @@ namespace std
     {
         inline size_t operator()(const LLMaterialID& id) const noexcept
         {
-            return (size_t)id.getHash();
+            size_t h = 0;
+            // Golden ratio hash with avalanche mixing
+            // Process 8 bytes at a time by manually constructing 64-bit values
+            // Shift by 31: mixes upper half into lower half for better bit distribution
+            // Shift by 47: ensures highest bits influence final hash output
+            for (int i = 0; i < MATERIAL_ID_SIZE; i += 8) {
+                size_t chunk = (size_t)id.mID[i] | ((size_t)id.mID[i + 1] << 8) |
+                               ((size_t)id.mID[i+2] << 16) | ((size_t)id.mID[i+3] << 24) |
+                               ((size_t)id.mID[i+4] << 32) | ((size_t)id.mID[i+5] << 40) |
+                               ((size_t)id.mID[i + 6] << 48) | ((size_t)id.mID[i + 7] << 56);
+                h ^= (chunk * 0x9e3779b97f4a7c15ULL) ^ (h >> 31) ^ (h >> 47);
+            }
+            return h;
         }
     };
+}
+
+// For use with boost::container_hash
+inline size_t hash_value(const LLMaterialID& id) noexcept
+{
+    size_t h = 0;
+    // Golden ratio hash with avalanche mixing
+    // Process 8 bytes at a time by manually constructing 64-bit values
+    // Shift by 31: mixes upper half into lower half for better bit distribution
+    // Shift by 47: ensures highest bits influence final hash output
+    for (int i = 0; i < MATERIAL_ID_SIZE; i += 8)
+    {
+        size_t chunk = (size_t)id.mID[i] | ((size_t)id.mID[i + 1] << 8) | ((size_t)id.mID[i + 2] << 16) | ((size_t)id.mID[i + 3] << 24) |
+                       ((size_t)id.mID[i + 4] << 32) | ((size_t)id.mID[i + 5] << 40) | ((size_t)id.mID[i + 6] << 48) |
+                       ((size_t)id.mID[i + 7] << 56);
+        h ^= (chunk * 0x9e3779b97f4a7c15ULL) ^ (h >> 31) ^ (h >> 47);
+    }
+    return h;
 }
 
 #endif // LL_LLMATERIALID_H

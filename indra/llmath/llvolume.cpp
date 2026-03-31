@@ -55,7 +55,7 @@
 
 #include "mikktspace/mikktspace.hh"
 
-#include "meshoptimizer.h"
+#include <meshoptimizer.h>
 
 #define DEBUG_SILHOUETTE_BINORMALS 0
 #define DEBUG_SILHOUETTE_NORMALS 0 // TomY: Use this to display normals using the silhouette
@@ -73,10 +73,10 @@ constexpr F32 TWIST_MAX =  1.f;
 constexpr F32 RATIO_MIN = 0.f;
 constexpr F32 RATIO_MAX = 2.f; // Tom Y: Inverted sense here: 0 = top taper, 2 = bottom taper
 
-constexpr F32 HOLE_X_MIN= 0.05f;
+constexpr F32 HOLE_X_MIN= 0.01f;
 constexpr F32 HOLE_X_MAX= 1.0f;
 
-constexpr F32 HOLE_Y_MIN= 0.05f;
+constexpr F32 HOLE_Y_MIN= 0.01f;
 constexpr F32 HOLE_Y_MAX= 0.5f;
 
 constexpr F32 SHEAR_MIN = -0.5f;
@@ -912,7 +912,7 @@ bool LLProfile::generate(const LLProfileParams& params, bool path_open,F32 detai
                 case LL_PCODE_HOLE_CIRCLE:
                 case LL_PCODE_HOLE_SAME:
                 default:
-                    addHole(params, true, circle_detail, 0, hollow, 1.f);
+                    addHole(params, false, circle_detail, 0, hollow, 1.f);
                     break;
                 }
             }
@@ -2032,7 +2032,6 @@ bool LLVolume::generate()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
 
-    LL_CHECK_MEMORY
     llassert_always(mProfilep);
 
     //Added 10.03.05 Dave Parks
@@ -2135,11 +2134,10 @@ bool LLVolume::generate()
             LLFaceID id = iter->mFaceID;
             mFaceMask |= id;
         }
-        LL_CHECK_MEMORY
+
         return true;
     }
 
-    LL_CHECK_MEMORY
     return false;
 }
 
@@ -3405,6 +3403,7 @@ bool LLVolumeParams::setHollow(const F32 h)
 
     F32 max_hollow = HOLLOW_MAX;
 
+#if 0 // Limit removal
     // Only square holes have trouble.
     if (LL_PCODE_HOLE_SQUARE == hole_type)
     {
@@ -3416,6 +3415,7 @@ bool LLVolumeParams::setHollow(const F32 h)
             max_hollow = HOLLOW_MAX_SQUARE;
         }
     }
+#endif
 
     F32 hollow = h;
     bool valid = limit_range(hollow, HOLLOW_MIN, max_hollow);
@@ -4945,9 +4945,17 @@ LLVolumeFace::LLVolumeFace(const LLVolumeFace& src)
     mOctree(NULL),
     mOctreeTriangles(NULL)
 {
-    mExtents = (LLVector4a*) ll_aligned_malloc_16(sizeof(LLVector4a)*3);
-    mCenter = mExtents+2;
-    *this = src;
+    try
+    {
+        mExtents = (LLVector4a*)ll_aligned_malloc_16(sizeof(LLVector4a) * 3);
+        mCenter = mExtents + 2;
+        *this = src;
+    }
+    catch (std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS("LLVolume") << "Bad memory allocation in LLVolumeFace" << LL_ENDL;
+    }
 }
 
 LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
@@ -5095,17 +5103,14 @@ bool LLVolumeFace::create(LLVolume* volume, bool partial_build)
     //tree for this face is no longer valid
     destroyOctree();
 
-    LL_CHECK_MEMORY
     bool ret = false ;
     if (mTypeMask & CAP_MASK)
     {
         ret = createCap(volume, partial_build);
-        LL_CHECK_MEMORY
     }
     else if ((mTypeMask & END_MASK) || (mTypeMask & SIDE_MASK))
     {
         ret = createSide(volume, partial_build);
-        LL_CHECK_MEMORY
     }
     else
     {
@@ -5165,7 +5170,7 @@ void LLVolumeFace::remap()
     // Documentation for meshopt_generateVertexRemapMulti claims that remap should use vertice count
     // but all examples use indice count. There are out of bounds crashes when using vertice count.
     // To be on the safe side use bigger of the two.
-    std::vector<unsigned int> remap(llmax(mNumIndices, mNumVertices));
+    std::vector<unsigned int> remap(llmax(mNumIndices, mNumVertices), 0);
     S32 remap_vertices_count = static_cast<S32>(LLMeshOptimizer::generateRemapMultiU16(&remap[0],
         mIndices,
         mNumIndices,
@@ -5683,7 +5688,12 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         catch (std::bad_alloc&)
         {
             LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS("LLCoros") << "Bad memory allocation in MikktData::genTangSpace" << LL_ENDL;
+            LL_ERRS("LLVolume") << "Bad memory allocation in MikktData::genTangSpace" << LL_ENDL;
+        }
+        catch (...)
+        {
+            LL_WARNS_ONCE("LLVolume") << "Mikktspace::genTangSpace() failed" << LL_ENDL;
+            return false;
         }
 
 
@@ -5705,7 +5715,7 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         catch (std::bad_alloc&)
         {
             LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS("LLCoros") << "Failed to allocate memory for remap: " << (S32)data.p.size() << LL_ENDL;
+            LL_ERRS("LLVOLUME") << "Failed to allocate memory for remap: " << (S32)data.p.size() << LL_ENDL;
         }
 
         U32 stream_count = data.w.empty() ? 4 : 5;
@@ -5715,19 +5725,27 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         {
             try
             {
+                // providing mIndices should help avoid unused vertices
+                // but those should have been filtered out on upload
                 vert_count = static_cast<S32>(meshopt_generateVertexRemapMulti(&remap[0], nullptr, data.p.size(), data.p.size(), mos, stream_count));
             }
             catch (std::bad_alloc&)
             {
                 LLError::LLUserWarningMsg::showOutOfMemory();
-                LL_ERRS("LLCoros") << "Failed to allocate memory for VertexRemap: " << (S32)data.p.size() << LL_ENDL;
+                LL_ERRS("LLVolume") << "Failed to allocate memory for VertexRemap: " << (S32)data.p.size() << LL_ENDL;
             }
         }
 
-        if (vert_count < 65535 && vert_count != 0)
+        // Probably should be using meshopt_remapVertexBuffer instead of remaping manually
+        if (vert_count < 65535 && vert_count > 0)
         {
             //copy results back into volume
             resizeVertices(vert_count);
+            if (mNumVertices == 0)
+            {
+                LLError::LLUserWarningMsg::showOutOfMemory();
+                LL_ERRS("LLVolume") << "Failed to allocate memory for resizeVertices(" << vert_count << ")" << LL_ENDL;
+            }
 
             if (!data.w.empty())
             {
@@ -5740,12 +5758,26 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
             {
                 U32 src_idx = i;
                 U32 dst_idx = remap[i];
-                if (dst_idx >= (U32)mNumVertices)
+                if (dst_idx == U32_MAX)
+                {
+                    // Unused indices? Probably need to resize mIndices
+                    dst_idx = mNumVertices - 1;
+                    llassert(false);
+                    LL_DEBUGS_ONCE("LLVOLUME") << "U32_MAX destination index, substituting" << LL_ENDL;
+                }
+                else if (dst_idx >= (U32)mNumVertices)
                 {
                     dst_idx = mNumVertices - 1;
                     // Shouldn't happen, figure out what gets returned in remap and why.
                     llassert(false);
                     LL_DEBUGS_ONCE("LLVOLUME") << "Invalid destination index, substituting" << LL_ENDL;
+                }
+                if (src_idx >= (U32)data.p.size())
+                {
+                    // data.p.size() is supposed to be equal to mNumIndices
+                    src_idx = (U32)(data.p.size() - 1);
+                    llassert(false);
+                    LL_DEBUGS_ONCE("LLVOLUME") << "Invalid source index, substituting" << LL_ENDL;
                 }
                 mIndices[i] = dst_idx;
 
@@ -5780,7 +5812,7 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         }
         else
         {
-            if (vert_count == 0)
+            if (vert_count <= 0)
             {
                 LL_WARNS_ONCE("LLVOLUME") << "meshopt_generateVertexRemapMulti failed to process a model or model was invalid" << LL_ENDL;
             }
@@ -5930,8 +5962,6 @@ void    LerpPlanarVertex(LLVolumeFace::VertexData& v0,
 
 bool LLVolumeFace::createUnCutCubeCap(LLVolume* volume, bool partial_build)
 {
-    LL_CHECK_MEMORY
-
     const LLAlignedArray<LLVector4a,64>& mesh = volume->getMesh();
     const LLAlignedArray<LLVector4a,64>& profile = volume->getProfile().mProfile;
     S32 max_s = volume->getProfile().getTotal();
@@ -6062,7 +6092,6 @@ bool LLVolumeFace::createUnCutCubeCap(LLVolume* volume, bool partial_build)
         }
     }
 
-    LL_CHECK_MEMORY
     return true;
 }
 
@@ -6105,8 +6134,6 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
             resizeIndices(num_indices);
         }
     }
-
-    LL_CHECK_MEMORY;
 
     S32 max_s = volume->getProfile().getTotal();
     S32 max_t = volume->getPath().mPath.size();
@@ -6201,8 +6228,6 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
         }
     }
 
-    LL_CHECK_MEMORY
-
     mCenter->setAdd(min, max);
     mCenter->mul(0.5f);
 
@@ -6219,8 +6244,6 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
         *tc++ = cuv;
         num_vertices++;
     }
-
-    LL_CHECK_MEMORY
 
     //if (partial_build)
     //{
@@ -6468,9 +6491,6 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
     }
 
     LLVector4a d0,d1;
-    LL_CHECK_MEMORY
-
-
     d0.setSub(mPositions[mIndices[1]], mPositions[mIndices[0]]);
     d1.setSub(mPositions[mIndices[2]], mPositions[mIndices[0]]);
 
@@ -6725,7 +6745,6 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
 
-    LL_CHECK_MEMORY
     bool flat = mTypeMask & FLAT_MASK;
 
     U8 sculpt_type = volume->getParams().getSculptType();
@@ -6755,8 +6774,6 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         resizeVertices(num_vertices);
         resizeIndices(num_indices);
     }
-
-    LL_CHECK_MEMORY
 
     LLVector4a* pos = (LLVector4a*) mPositions;
     LLVector2* tc = (LLVector2*) mTexCoords;
@@ -6854,7 +6871,6 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         }
     }
     }
-    LL_CHECK_MEMORY
 
     mCenter->clear();
 
@@ -6927,8 +6943,6 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         }
     }
 
-    LL_CHECK_MEMORY
-
     //clear normals
     F32* dst = (F32*) mNormals;
     F32* end = (F32*) (mNormals+mNumVertices);
@@ -6939,8 +6953,6 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         zero.store4a(dst);
         dst += 4;
     }
-
-    LL_CHECK_MEMORY
 
     //generate normals
     U32 count = mNumIndices/3;
@@ -7045,8 +7057,6 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         n1.store4a((F32*) n1p);
         n2.store4a((F32*) n2p);
     }
-
-    LL_CHECK_MEMORY
 
     // adjust normals based on wrapping and stitching
 
@@ -7178,8 +7188,6 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         }
 
     }
-
-    LL_CHECK_MEMORY
 
     return true;
 }

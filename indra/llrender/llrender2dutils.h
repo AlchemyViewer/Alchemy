@@ -137,7 +137,7 @@ public:
     static void setLineWidth(F32 width);
 
     LLPointer<LLUIImage> getUIImageByID(const LLUUID& image_id, S32 priority = 0);
-    LLPointer<LLUIImage> getUIImage(const std::string& name, S32 priority = 0);
+    LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority = 0);
 
 protected:
     // since LLRender2D has no control of image provider's lifecycle
@@ -155,7 +155,7 @@ protected:
     LLImageProviderInterface() {};
     virtual ~LLImageProviderInterface();
 public:
-    virtual LLPointer<LLUIImage> getUIImage(const std::string& name, S32 priority) = 0;
+    virtual LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority) = 0;
     virtual LLPointer<LLUIImage> getUIImageByID(const LLUUID& id, S32 priority) = 0;
     virtual void cleanUp() = 0;
 

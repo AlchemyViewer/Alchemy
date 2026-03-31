@@ -73,7 +73,6 @@ public:
 protected:
     void boostTerrainDetailTextures();
 
-    void renderSimple();
     void renderOwnership();
 
     void renderFullShader();

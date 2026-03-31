@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h" // must be first include
 #include "llchiclet.h"
 
+#include "allegacynotificationwellwindow.h"
 #include "llchicletbar.h"
 #include "llfloaterimsession.h"
 #include "llfloaterimcontainer.h"
@@ -37,7 +38,6 @@
 #include "llsyswellwindow.h"
 #include "llfloaternotificationstabbed.h"
 #include "llviewermenu.h"
-#include "lllegacynotificationwellwindow.h"
 // [SL:KB] - Patch: UI-Notifications | Checked: 2013-05-09 (Catznip-3.5)
 #include "llchannelmanager.h"
 // [/SL:KB]
@@ -180,7 +180,7 @@ LLNotificationChiclet::LLNotificationChiclet(const Params& p)
     // handle toast add/delete events.
     if (gSkinSettings.getBOOL("LegacyNotificationWell"))
     {
-        LLLegacyNotificationWellWindow::getInstance()->setSysWellChiclet(this);
+        ALLegacyNotificationWellWindow::getInstance()->setSysWellChiclet(this);
     }
     else
     {
@@ -200,7 +200,7 @@ void LLNotificationChiclet::onMenuItemClicked(const LLSD& user_data)
     {
         if (gSkinSettings.getBOOL("LegacyNotificationWell"))
         {
-            LLLegacyNotificationWellWindow::getInstance()->closeAll();
+            ALLegacyNotificationWellWindow::getInstance()->closeAll();
         }
         else
         {
@@ -261,7 +261,7 @@ bool LLNotificationChiclet::ChicletNotificationChannel::filterNotification( LLNo
     if (   (notification->getName() == "ScriptDialog") // special case for scripts
         // if there is no toast window for the notification, filter it
         || (gSkinSettings.getBOOL("LegacyNotificationWell")
-            && !LLLegacyNotificationWellWindow::getInstance()->findItemByID(notification->getID()))
+            && !ALLegacyNotificationWellWindow::getInstance()->findItemByID(notification->getID()))
         || (!gSkinSettings.getBOOL("LegacyNotificationWell")
             && !LLFloaterNotificationsTabbed::getInstance()->findItemByID(notification->getID(), notification->getName()))
         )
@@ -780,7 +780,7 @@ S32 LLChicletPanel::notifyParent(const LLSD& info)
 {
     if(info.has("notification"))
     {
-        std::string str_notification = info["notification"];
+        const std::string& str_notification = info["notification"].asStringRef();
         if(str_notification == "size_changes")
         {
             arrange();

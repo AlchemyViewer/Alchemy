@@ -30,16 +30,14 @@
 #include <iostream>
 #include <deque>
 
-#include "apr_base64.h"
+#include <simdutf.h>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 #include <boost/regex.hpp>
 
 extern "C"
 {
-#ifdef LL_USESYSTEMLIBS
 # include <expat.h>
-#else
-# include "expat/expat.h"
-#endif
 }
 
 /**
@@ -196,14 +194,10 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
             // *FIX: memory inefficient.
             // *TODO: convert to use LLBase64
             ostr << pre << "<binary encoding=\"base64\">";
-            int b64_buffer_length = apr_base64_encode_len(narrow<size_t>(buffer.size()));
-            char* b64_buffer = new char[b64_buffer_length];
-            b64_buffer_length = apr_base64_encode_binary(
-                b64_buffer,
-                &buffer[0],
-                narrow<size_t>(buffer.size()));
-            ostr.write(b64_buffer, b64_buffer_length - 1);
-            delete[] b64_buffer;
+            std::string output;
+            output.resize(simdutf::base64_length_from_binary(buffer.size()));
+            simdutf::binary_to_base64((const char*)buffer.data(), buffer.size(), output.data());
+            ostr.write(output.data(), output.size());
             ostr << "</binary>" << post;
         }
         break;
@@ -645,7 +639,7 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
         if (mCurrentKey.empty()) { return startSkipping(); }
 
         LLSD& map = *mStack.back();
-        LLSD& newElement = map[mCurrentKey];
+        LLSD& newElement = map[std::move(mCurrentKey)];
         mStack.push_back(&newElement);
 
         mCurrentKey.clear();
@@ -709,7 +703,8 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
             return;
 
         case ELEMENT_KEY:
-            mCurrentKey = mCurrentContent;
+            mCurrentKey = std::move(mCurrentContent); // This is safe to move as we are in the end element handler
+            mCurrentContent.clear(); // Ensure mCurrentContent is empty for subsequent use
             return;
 
         default:
@@ -742,14 +737,22 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
                 }
                 else
                 {
-                    value = LLSD(mCurrentContent).asInteger();
+                    // This must treat "1.23" not as an error, but as a number, which is
+                    // then truncated down to an integer.  Hence, this code doesn't call
+                    // std::istringstream::operator>>(int&), which would not consume the
+                    // ".23" portion.
+
+                    // Utilizes implementation used internally by LLSD::ImplString::asInteger
+                    value = (int)llsd::string_to_real(mCurrentContent);
                 }
             }
             break;
 
         case ELEMENT_REAL:
             {
-                value = LLSD(mCurrentContent).asReal();
+                // Utilizes implementation used internally by LLSD::ImplString::asReal
+                value = llsd::string_to_real(mCurrentContent);
+
                 // removed since this breaks when locale has decimal separator that isn't '.'
                 // investigated changing local to something compatible each time but deemed higher
                 // risk that just using LLSD.asReal() each time.
@@ -766,19 +769,19 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
             break;
 
         case ELEMENT_STRING:
-            value = mCurrentContent;
+            value = std::move(mCurrentContent);  // This is safe to move as we are in the end element handler and this is cleared below
             break;
 
         case ELEMENT_UUID:
-            value = LLSD(mCurrentContent).asUUID();
+            value = LLUUID(mCurrentContent);
             break;
 
         case ELEMENT_DATE:
-            value = LLSD(mCurrentContent).asDate();
+            value = LLDate(mCurrentContent);
             break;
 
         case ELEMENT_URI:
-            value = LLSD(mCurrentContent).asURI();
+            value = LLURI(mCurrentContent);
             break;
 
         case ELEMENT_BINARY:
@@ -787,15 +790,19 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
             // created by python and other non-linden systems - DEV-39358
             // Fortunately we have very little binary passing now,
             // so performance impact shold be negligible. + poppy 2009-09-04
-            boost::regex r;
-            r.assign("\\s");
+            static const boost::regex r("\\s");
             std::string stripped = boost::regex_replace(mCurrentContent, r, "");
-            S32 len = apr_base64_decode_len(stripped.c_str());
-            std::vector<U8> data;
-            data.resize(len);
-            len = apr_base64_decode_binary(&data[0], stripped.c_str());
-            data.resize(len);
-            value = data;
+            if(stripped.size() > 0)
+            {
+                // allocate enough memory for the maximal binary length
+                std::vector<U8> data(simdutf::binary_length_from_base64(stripped.data(), stripped.size()));
+                // convert to binary and check for errors
+                simdutf::result r = simdutf::base64_to_binary(stripped.data(), stripped.size(), (char*)data.data());
+                if(r.error == simdutf::error_code::SUCCESS)
+                {
+                    value = std::move(data);
+                }
+            }
             break;
         }
 

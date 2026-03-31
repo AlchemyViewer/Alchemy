@@ -108,11 +108,6 @@ class LLVector2
         friend LLVector2 operator-(const LLVector2 &a);                 // Return vector -a
 
         friend std::ostream& operator<<(std::ostream& s, const LLVector2 &a);       // Stream a
-
-        friend std::size_t hash_value(const LLVector2& vec)
-        {
-            return boost::hash_value(vec.mV);
-        }
 };
 
 static_assert(std::is_trivially_copyable<LLVector2>::value, "LLVector2 must be trivial copy");

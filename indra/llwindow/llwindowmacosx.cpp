@@ -110,9 +110,9 @@ bool check_for_card(const char* RENDERER, const char* bad_card)
     if (!strnicmp(RENDERER, bad_card, strlen(bad_card)))
     {
         std::string buffer = llformat(
-            "Your video card appears to be a %s, which Second Life does not support.\n"
+            "Your video card appears to be a %s, which Alchemy does not support.\n"
             "\n"
-            "Second Life requires a video card with 32 Mb of memory or more, as well as\n"
+            "Alchemy requires a video card with 32 Mb of memory or more, as well as\n"
             "multitexture support.  We explicitly support nVidia GeForce 2 or better, \n"
             "and ATI Radeon 8500 or better.\n"
             "\n"
@@ -120,7 +120,7 @@ bool check_for_card(const char* RENDERER, const char* bad_card)
             "updating to the latest video card drivers. Otherwise look in the\n"
             "secondlife.com support section or e-mail technical support\n"
             "\n"
-            "You can try to run Second Life, but it will probably crash or run\n"
+            "You can try to run Alchemy, but it will probably crash or run\n"
             "very slowly.  Try anyway?",
             bad_card);
         S32 button = OSMessageBox(buffer.c_str(), "Unsupported video card", OSMB_YESNO);
@@ -610,7 +610,7 @@ void callQuitHandler()
 {
     if (gWindowImplementation && gWindowImplementation->getCallbacks())
     {
-        if(gWindowImplementation->getCallbacks()->handleCloseRequest(gWindowImplementation))
+        if(gWindowImplementation->getCallbacks()->handleCloseRequest(gWindowImplementation, true))
         {
             gWindowImplementation->getCallbacks()->handleQuit(gWindowImplementation);
         }
@@ -1259,9 +1259,6 @@ bool LLWindowMacOSX::setCursorPosition(const LLCoordWindow position)
     // trigger mouse move callback
     LLCoordGL gl_pos;
     convertCoords(position, &gl_pos);
-    float scale = getSystemUISize();
-    gl_pos.mX *= scale;
-    gl_pos.mY *= scale;
     mCallbacks->handleMouseMove(this, gl_pos, (MASK)0);
 
     return result;

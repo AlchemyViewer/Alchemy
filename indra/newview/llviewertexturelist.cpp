@@ -403,7 +403,7 @@ void LLViewerTextureList::destroyGL()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-LLViewerFetchedTexture* LLViewerTextureList::getImageFromFile(const std::string& filename,
+LLViewerFetchedTexture* LLViewerTextureList::getImageFromFile(std::string_view filename,
                                                    FTType f_type,
                                                    bool usemipmaps,
                                                    LLViewerTexture::EBoostLevel boost_priority,
@@ -413,7 +413,7 @@ LLViewerFetchedTexture* LLViewerTextureList::getImageFromFile(const std::string&
                                                    const LLUUID& force_id)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    LL_PROFILE_ZONE_TEXT(filename.c_str(), filename.size());
+    LL_PROFILE_ZONE_TEXT(filename.data(), filename.size());
     if(!mInitialized)
     {
         return NULL ;
@@ -1102,7 +1102,17 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
 
     while (!mCreateTextureList.empty())
     {
-        LLViewerFetchedTexture* imagep = mCreateTextureList.front();
+        // Hold a smart pointer to keep the texture alive throughout processing,
+        // even if side effects (e.g. pipeline rebuilds, GL operations) indirectly
+        // cause other references to be released. (see: #5426)
+        LLPointer<LLViewerFetchedTexture> imagep = mCreateTextureList.front();
+        mCreateTextureList.pop();
+
+        if (!imagep)
+        {
+            continue;
+        }
+
         llassert(imagep->mCreatePending);
 
         // desired discard may change while an image is being decoded. If the texture in VRAM is sufficient
@@ -1117,7 +1127,6 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
 
         imagep->postCreateTexture();
         imagep->mCreatePending = false;
-        mCreateTextureList.pop();
 
         if (imagep->hasGLTexture() && imagep->getDiscardLevel() < imagep->getDesiredDiscardLevel() &&
            (imagep->getDesiredDiscardLevel() <= MAX_DISCARD_LEVEL))
@@ -1196,15 +1205,19 @@ F32 LLViewerTextureList::updateImagesLoadingFastCache(F32 max_time)
 
     LLTimer timer;
     image_list_t::iterator enditer = mFastCacheList.begin();
-    for (image_list_t::iterator iter = mFastCacheList.begin();
-         iter != mFastCacheList.end();)
     {
-        image_list_t::iterator curiter = iter++;
-        enditer = iter;
-        LLViewerFetchedTexture *imagep = *curiter;
-        imagep->loadFromFastCache();
-        if (timer.getElapsedTimeF32() > max_time)
-            break;
+        // prelock fast cache mutex to avoid waiting multiple times.
+        LLMutexLock cache_lock(LLAppViewer::getTextureCache()->getFastCacheMutex());
+        for (image_list_t::iterator iter = mFastCacheList.begin();
+            iter != mFastCacheList.end();)
+        {
+            image_list_t::iterator curiter = iter++;
+            enditer = iter;
+            LLViewerFetchedTexture* imagep = *curiter;
+            imagep->loadFromFastCache();
+            if (timer.getElapsedTimeF32() > max_time)
+                break;
+        }
     }
     mFastCacheList.erase(mFastCacheList.begin(), enditer);
     return timer.getElapsedTimeF32();
@@ -1228,7 +1241,8 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
     typedef std::vector<LLPointer<LLViewerFetchedTexture> > entries_list_t;
-    entries_list_t entries;
+    static entries_list_t entries;
+    entries.clear();
 
     // update N textures at beginning of mImageList
     U32 update_count = 0;
@@ -1400,11 +1414,6 @@ bool LLViewerTextureList::createUploadFile(LLPointer<LLImageRaw> raw_image,
         raw_image->getComponents());
 
     LLPointer<LLImageJ2C> compressedImage = LLViewerTextureList::convertToUploadFile(scale_image, max_image_dimentions);
-    if (compressedImage.isNull())
-    {
-        LL_INFOS() << "Couldn't convert to j2c, file : " << out_filename << LL_ENDL;
-        return false;
-    }
     if (compressedImage->getWidth() < min_image_dimentions || compressedImage->getHeight() < min_image_dimentions)
     {
         std::string reason = llformat("Images below %d x %d pixels are not allowed. Actual size: %d x %dpx",
@@ -1413,6 +1422,12 @@ bool LLViewerTextureList::createUploadFile(LLPointer<LLImageRaw> raw_image,
                                       compressedImage->getWidth(),
                                       compressedImage->getHeight());
         compressedImage->setLastError(reason);
+        return false;
+    }
+    if (compressedImage.isNull())
+    {
+        compressedImage->setLastError("Couldn't convert the image to jpeg2000.");
+        LL_INFOS() << "Couldn't convert to j2c, file : " << out_filename << LL_ENDL;
         return false;
     }
     if (!compressedImage->save(out_filename))
@@ -1614,7 +1629,7 @@ LLUIImagePtr LLUIImageList::getUIImageByID(const LLUUID& image_id, S32 priority)
     return loadUIImageByID(image_id, use_mips, scale_rect, clip_rect, (LLViewerTexture::EBoostLevel)priority);
 }
 
-LLUIImagePtr LLUIImageList::getUIImage(const std::string& image_name, S32 priority)
+LLUIImagePtr LLUIImageList::getUIImage(std::string_view image_name, S32 priority)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     // look for existing image
@@ -1630,7 +1645,7 @@ LLUIImagePtr LLUIImageList::getUIImage(const std::string& image_name, S32 priori
     return loadUIImageByName(image_name, image_name, use_mips, scale_rect, clip_rect, (LLViewerTexture::EBoostLevel)priority);
 }
 
-LLUIImagePtr LLUIImageList::loadUIImageByName(const std::string& name, const std::string& filename,
+LLUIImagePtr LLUIImageList::loadUIImageByName(std::string_view name, std::string_view filename,
                                               bool use_mips, const LLRect& scale_rect, const LLRect& clip_rect, LLViewerTexture::EBoostLevel boost_priority,
                                               LLUIImage::EScaleStyle scale_style)
 {
@@ -1656,7 +1671,7 @@ LLUIImagePtr LLUIImageList::loadUIImageByID(const LLUUID& id,
     return loadUIImage(imagep, id.asString(), use_mips, scale_rect, clip_rect, scale_style);
 }
 
-LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, const std::string& name, bool use_mips, const LLRect& scale_rect, const LLRect& clip_rect,
+LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, std::string_view name, bool use_mips, const LLRect& scale_rect, const LLRect& clip_rect,
                                         LLUIImage::EScaleStyle scale_style)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -1667,7 +1682,7 @@ LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, const st
     //don't compress UI images
     imagep->getGLTexture()->setAllowCompression(false);
 
-    LLUIImagePtr new_imagep = new LLUIImage(name, imagep);
+    LLUIImagePtr new_imagep = new LLUIImage(std::string(name), imagep);
     new_imagep->setScaleStyle(scale_style);
 
     if (imagep->getBoostLevel() != LLGLTexture::BOOST_ICON

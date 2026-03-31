@@ -225,14 +225,14 @@ public:
     static std::string regionFlagsToString(U64 flags);
 
     // Returns translated version of "Mature", "PG", "Adult", etc.
-    static std::string accessToString(U8 sim_access);
+    static const std::string& accessToString(U8 sim_access);
 
     // Returns "M", "PG", "A" etc.
-    static std::string accessToShortString(U8 sim_access);
+    static const std::string& accessToShortString(U8 sim_access);
     static U8          shortStringToAccess(const std::string &sim_access);
 
     // Return access icon name
-    static std::string getAccessIcon(U8 sim_access);
+    static const std::string& getAccessIcon(U8 sim_access);
 
     // helper function which just makes sure all interested parties
     // can process the message.
@@ -274,10 +274,10 @@ public:
     S32 getNumSeedCapRetries();
     void setCapability(const std::string& name, const std::string& url);
     void setCapabilityDebug(const std::string& name, const std::string& url);
-    bool isCapabilityAvailable(const std::string& name) const;
+    bool isCapabilityAvailable(std::string_view name) const;
     // implements LLCapabilityProvider
-    virtual std::string getCapability(const std::string& name) const;
-    std::string getCapabilityDebug(const std::string& name) const;
+    virtual std::string getCapability(std::string_view name) const;
+    std::string getCapabilityDebug(std::string_view name) const;
 
 
     virtual std::set<std::string> getCapURLNames(const std::string& cap_url);
@@ -291,7 +291,7 @@ public:
     void setCapabilitiesError();
     boost::signals2::connection setCapabilitiesReceivedCallback(const caps_received_signal_t::slot_type& cb);
 
-    static bool isSpecialCapabilityName(const std::string &name);
+    static bool isSpecialCapabilityName(std::string_view name);
     void logActiveCapabilities() const;
 
     // Utilities to post and get via
@@ -299,10 +299,10 @@ public:
     typedef LLCoreHttpUtil::HttpCoroutineAdapter::completionCallback_t httpCallback_t;
     bool requestPostCapability(const std::string &capName,
                                LLSD              &postData,
-                               httpCallback_t     cbSuccess = NULL,
-                               httpCallback_t     cbFailure = NULL);
-    bool requestGetCapability(const std::string &capName, httpCallback_t cbSuccess = NULL, httpCallback_t cbFailure = NULL);
-    bool requestDelCapability(const std::string &capName, httpCallback_t cbSuccess = NULL, httpCallback_t cbFailure = NULL);
+                               httpCallback_t     cbSuccess = nullptr,
+                               httpCallback_t     cbFailure = nullptr);
+    bool requestGetCapability(const std::string& capName, httpCallback_t cbSuccess = nullptr, httpCallback_t cbFailure = nullptr);
+    bool requestDelCapability(const std::string& capName, httpCallback_t cbSuccess = nullptr, httpCallback_t cbFailure = nullptr);
 
     /// implements LLCapabilityProvider
     /*virtual*/ const LLHost& getHost() const;
@@ -427,6 +427,8 @@ public:
     S32  getLastUpdate() const {return mLastUpdate;}
 
     std::string getSimHostName();
+
+    bool isRegionWebRTCEnabled();
 
     static bool isNewObjectCreationThrottleDisabled() {return sNewObjectCreationThrottle < 0;}
 

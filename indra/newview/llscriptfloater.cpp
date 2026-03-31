@@ -109,25 +109,27 @@ bool LLScriptFloater::toggle(const LLUUID& notification_id)
 LLScriptFloater* LLScriptFloater::show(const LLUUID& notification_id)
 {
     LLScriptFloater* floater = LLFloaterReg::getTypedInstance<LLScriptFloater>("script_floater", notification_id);
-    floater->setNotificationId(notification_id);
-    floater->createForm(notification_id);
-
-    //LLDialog(LLGiveInventory and LLLoadURL) should no longer steal focus (see EXT-5445)
-    floater->setAutoFocus(false);
-
-    if(LLScriptFloaterManager::OBJ_SCRIPT == LLScriptFloaterManager::getObjectType(notification_id))
+    if (floater)
     {
-        floater->setSavePosition(true);
-        floater->restorePosition();
-    }
-    else
-    {
-        floater->dockToChiclet(true);
-    }
+        floater->setNotificationId(notification_id);
+        floater->createForm(notification_id);
 
-    //LLDialog(LLGiveInventory and LLLoadURL) should no longer steal focus (see EXT-5445)
-    LLFloaterReg::showTypedInstance<LLScriptFloater>("script_floater", notification_id, false);
+        //LLDialog(LLGiveInventory and LLLoadURL) should no longer steal focus (see EXT-5445)
+        floater->setAutoFocus(false);
 
+        if (LLScriptFloaterManager::OBJ_SCRIPT == LLScriptFloaterManager::getObjectType(notification_id))
+        {
+            floater->setSavePosition(true);
+            floater->restorePosition();
+        }
+        else
+        {
+            floater->dockToChiclet(true);
+        }
+
+        //LLDialog(LLGiveInventory and LLLoadURL) should no longer steal focus (see EXT-5445)
+        LLFloaterReg::showTypedInstance<LLScriptFloater>("script_floater", notification_id, false);
+    }
     return floater;
 }
 
@@ -610,7 +612,7 @@ LLScriptFloaterManager::EObjectType LLScriptFloaterManager::getObjectType(const 
         return it->second;
     }
 
-    LL_WARNS() << "Unknown object type" << LL_ENDL;
+    LL_WARNS() << "Unknown object type: " << notification->getName() << LL_ENDL;
     return OBJ_UNKNOWN;
 }
 
@@ -654,6 +656,7 @@ LLScriptFloaterManager::object_type_map LLScriptFloaterManager::initObjectTypeMa
     type_map["ScriptDialogGroup"] = OBJ_SCRIPT;
     type_map["LoadWebPage"] = OBJ_LOAD_URL;
     type_map["ObjectGiveItem"] = OBJ_GIVE_INVENTORY;
+    type_map["OwnObjectGiveItem"] = OBJ_GIVE_INVENTORY;
     return type_map;
 }
 
@@ -691,7 +694,7 @@ void LLScriptFloaterManager::saveFloaterPosition(const LLUUID& object_id, const 
 {
     if(object_id.notNull())
     {
-        LLScriptFloaterManager::getInstance()->mFloaterPositions[object_id] = fpi;
+        mFloaterPositions[object_id] = fpi;
     }
     else
     {
@@ -702,7 +705,7 @@ void LLScriptFloaterManager::saveFloaterPosition(const LLUUID& object_id, const 
 bool LLScriptFloaterManager::getFloaterPosition(const LLUUID& object_id, FloaterPositionInfo& fpi)
 {
     floater_position_map_t::const_iterator it = mFloaterPositions.find(object_id);
-    if(LLScriptFloaterManager::getInstance()->mFloaterPositions.end() != it)
+    if(mFloaterPositions.end() != it)
     {
         fpi = it->second;
         return true;

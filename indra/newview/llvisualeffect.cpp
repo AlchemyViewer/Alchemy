@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2021&license=viewerlgpl$
  * Copyright (c) 2021, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the

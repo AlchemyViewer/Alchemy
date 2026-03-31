@@ -364,7 +364,7 @@ bool LLSettingsVOBase::exportFile(const LLSettingsBase::ptr_t &settings, const s
 {
     try
     {
-        std::ofstream file(filename, std::ios::out | std::ios::trunc);
+        llofstream file(filename, std::ios::out | std::ios::trunc);
         file.exceptions(std::ios_base::failbit | std::ios_base::badbit);
 
         if (!file)
@@ -390,7 +390,7 @@ LLSettingsBase::ptr_t LLSettingsVOBase::importFile(const std::string &filename)
 
     try
     {
-        std::ifstream file(filename, std::ios::in);
+        llifstream file(filename, std::ios::in);
         file.exceptions(std::ios_base::failbit | std::ios_base::badbit);
 
         if (!file)
@@ -869,7 +869,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
     shader->uniform1f(LLShaderMgr::GAMMA, g);
 }
 
-LLSettingsSky::parammapping_t LLSettingsVOSky::getParameterMap() const
+const LLSettingsSky::parammapping_t& LLSettingsVOSky::getParameterMap() const
 {
     static parammapping_t param_map;
 
@@ -1159,7 +1159,7 @@ void LLSettingsVOWater::updateSettings()
     }
 }
 
-LLSettingsWater::parammapping_t LLSettingsVOWater::getParameterMap() const
+const LLSettingsWater::parammapping_t& LLSettingsVOWater::getParameterMap() const
 {
     static parammapping_t param_map;
 

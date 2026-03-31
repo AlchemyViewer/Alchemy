@@ -304,7 +304,7 @@ bool LLTaskInvFVBridge::isItemRenameable() const
     if (gAgent.isGodlike())
         return true;
 
-//  LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID());
+//  if (LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID()))
     if(object)
     {
         if (LLInventoryItem* item = (LLInventoryItem*)(object->getInventoryObject(mUUID)))
@@ -321,16 +321,16 @@ bool LLTaskInvFVBridge::isItemRenameable() const
 
 bool LLTaskInvFVBridge::renameItem(const std::string& new_name)
 {
+//  if (LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID()))
 // [RLVa:KB] - Checked: 2010-09-28 (RLVa-1.2.1f) | Modified: RLVa-1.0.5a
     LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID());
     if ( (rlv_handler_t::isEnabled()) && (object) && (gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit())) )
     {
         return false;
     }
-// [/RLVa:KB]
 
-//  LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID());
     if(object)
+// [/RLVa:KB]
     {
         if (LLViewerInventoryItem* item = (LLViewerInventoryItem*)object->getInventoryObject(mUUID))
         {
@@ -442,10 +442,7 @@ bool LLTaskInvFVBridge::removeItem()
                 return true;
             }
 
-            LLSD payload;
-            payload["task_id"] = mPanel->getTaskUUID();
-            payload["inventory_ids"].append(mUUID);
-            LLNotificationsUtil::add("RemoveItemWarn", LLSD(), payload, boost::bind(&remove_task_inventory_callback, _1, _2, mPanel));
+            LLNotificationsUtil::add("CantModifyContentInNoModTask");
             return false;
         }
     }
@@ -468,13 +465,7 @@ void LLTaskInvFVBridge::removeBatch(std::vector<LLFolderViewModelItem*>& batch)
 
     if (!object->permModify())
     {
-        LLSD payload;
-        payload["task_id"] = mPanel->getTaskUUID();
-        for (LLFolderViewModelItem* item : batch)
-        {
-            payload["inventory_ids"].append(((LLTaskInvFVBridge*)item)->getUUID());
-        }
-        LLNotificationsUtil::add("RemoveItemWarn", LLSD(), payload, boost::bind(&remove_task_inventory_callback, _1, _2, mPanel));
+        LLNotificationsUtil::add("CantModifyContentInNoModTask");
     }
     else
     {
@@ -540,11 +531,11 @@ bool LLTaskInvFVBridge::startDrag(EDragAndDropType* type, LLUUID* id) const
             const LLPermissions& perm = inv->getPermissions();
             bool can_copy = gAgent.allowOperation(PERM_COPY, perm, GP_OBJECT_MANIPULATE);
 // [RLVa:KB] - Checked: 2009-10-10 (RLVa-1.2.1f) | Modified: RLVa-1.0.5a
-                // Kind of redundant due to the note below, but in case that ever gets fixed
-                if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit())) )
-                {
-                    return false;
-                }
+            // Kind of redundant due to the note below, but in case that ever gets fixed
+            if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit())) )
+            {
+                return false;
+            }
 // [/RLVa:KB]
             if (!can_copy && object->isAttachment())
             {
@@ -1940,7 +1931,7 @@ void LLPanelObjectInventory::onFocusReceived()
 
 LLFolderViewItem* LLPanelObjectInventory::getItemByID( const LLUUID& id )
 {
-    std::map<LLUUID, LLFolderViewItem*>::iterator map_it = mItemMap.find(id);
+    auto map_it = mItemMap.find(id);
     if (map_it != mItemMap.end())
     {
         return map_it->second;

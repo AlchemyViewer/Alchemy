@@ -46,8 +46,7 @@ typedef test_group<alignment_test> alignment_test_t;
 typedef alignment_test_t::object alignment_test_object_t;
 tut::alignment_test_t tut_alignment_test("LLAlignment");
 
-LL_ALIGN_PREFIX(16)
-class MyVector4a
+class alignas(16) MyVector4a
 {
 public:
     void* operator new(size_t size)
@@ -71,17 +70,13 @@ public:
     }
 
     LLQuad mQ;
-} LL_ALIGN_POSTFIX(16);
+};
 
 
 // Verify that aligned allocators perform as advertised.
 template<> template<>
 void alignment_test_object_t::test<1>()
 {
-#   ifdef LL_DEBUG
-//  skip("This test fails on Windows when compiled in debug mode.");
-#   endif
-
     const int num_tests = 7;
     void *align_ptr;
     for (int i=0; i<num_tests; i++)
@@ -115,10 +110,6 @@ void alignment_test_object_t::test<2>()
 template<> template<>
 void alignment_test_object_t::test<3>()
 {
-#   ifdef LL_DEBUG
-//  skip("This test fails on Windows when compiled in debug mode.");
-#   endif
-
     const int ARR_SIZE = 7;
     for(int i=0; i<ARR_SIZE; i++)
     {

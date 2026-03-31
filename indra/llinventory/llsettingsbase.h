@@ -49,8 +49,7 @@
 #define SETTINGS_OVERRIDE override
 
 class LLSettingsBase :
-    public PTR_NAMESPACE::enable_shared_from_this<LLSettingsBase>,
-    private boost::noncopyable
+    public PTR_NAMESPACE::enable_shared_from_this<LLSettingsBase>
 {
     friend class LLEnvironment;
     friend class LLSettingsDay;
@@ -96,7 +95,11 @@ public:
 
     typedef PTR_NAMESPACE::shared_ptr<LLSettingsBase> ptr_t;
 
-    virtual ~LLSettingsBase() { };
+    virtual ~LLSettingsBase() = default;
+
+    // Non-copyable
+    LLSettingsBase(const LLSettingsBase&) = delete;
+    LLSettingsBase& operator=(const LLSettingsBase&) = delete;
 
     //---------------------------------------------------------------------
     virtual std::string getSettingsType() const = 0;
@@ -285,7 +288,7 @@ public:
     public:
         static const U32 VALIDATION_PARTIAL;
 
-        typedef boost::function<bool(LLSD &, U32)> verify_pr;
+        typedef std::function<bool(LLSD &, U32)> verify_pr;
 
         Validator(std::string name, bool required, LLSD::Type type, verify_pr verify = verify_pr(), LLSD defval = LLSD())  :
             mName(name),
@@ -362,11 +365,11 @@ protected:
     /// when lerping between settings, some may require special handling.
     /// Get a list of these key to be skipped by the default settings lerp.
     /// (handling should be performed in the override of lerpSettings.
-    virtual stringset_t getSkipInterpolateKeys() const;
+    virtual const stringset_t& getSkipInterpolateKeys() const;
 
     // A list of settings that represent quaternions and should be slerped
     // rather than lerped.
-    virtual stringset_t getSlerpKeys() const { return stringset_t(); }
+    virtual const stringset_t& getSlerpKeys() const;
 
     virtual validation_list_t getValidationList() const = 0;
 
@@ -374,7 +377,7 @@ protected:
     virtual void applyToUniforms(void *) { };
     virtual void applySpecial(void*, bool force = false) { };
 
-    virtual parammapping_t getParameterMap() const { return parammapping_t(); }
+    virtual const parammapping_t& getParameterMap() const;
 
     inline void setBlendFactor(BlendFactor blendfactor)
     {
@@ -430,7 +433,7 @@ public:
             mFinal = mInitial;
     }
 
-    virtual ~LLSettingsBlender() {}
+    virtual ~LLSettingsBlender() = default;
 
     virtual void reset( LLSettingsBase::ptr_t &initsetting, const LLSettingsBase::ptr_t &endsetting, const LLSettingsBase::TrackPosition&)
     {

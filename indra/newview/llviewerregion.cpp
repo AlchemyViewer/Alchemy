@@ -106,7 +106,7 @@ S32  LLViewerRegion::sLastCameraUpdated = 0;
 S32  LLViewerRegion::sNewObjectCreationThrottle = -1;
 LLViewerRegion::vocache_entry_map_t LLViewerRegion::sRegionCacheCleanup;
 
-typedef std::map<std::string, std::string> CapabilityMap;
+typedef boost::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> CapabilityMap;
 
 static void log_capabilities(const CapabilityMap &capmap);
 
@@ -254,8 +254,8 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("BaseCapabilitiesRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("BaseCapabilitiesRequest", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result;
     LLViewerRegion *regionp = NULL;
@@ -408,8 +408,8 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCompleteCoro(U64 regionHandle)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("BaseCapabilitiesRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("BaseCapabilitiesRequest", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result;
     LLViewerRegion *regionp = NULL;
@@ -542,8 +542,8 @@ void LLViewerRegionImpl::requestSimulatorFeatureCoro(std::string url, U64 region
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("BaseCapabilitiesRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestSimulatorFeatureCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLViewerRegion *regionp = NULL;
     S32 attemptNumber = 0;
@@ -978,65 +978,93 @@ std::string LLViewerRegion::regionFlagsToString(U64 flags)
 }
 
 // static
-std::string LLViewerRegion::accessToString(U8 sim_access)
+const std::string& LLViewerRegion::accessToString(U8 sim_access)
 {
-    switch(sim_access)
+    static std::vector<std::string> sim_access_string;
+    if (sim_access_string.empty())
+    {
+        sim_access_string.resize(5);
+        sim_access_string[0] = LLTrans::getString("SIM_ACCESS_MIN");
+        sim_access_string[1] = LLTrans::getString("SIM_ACCESS_PG");
+        sim_access_string[2] = LLTrans::getString("SIM_ACCESS_MATURE");
+        sim_access_string[3] = LLTrans::getString("SIM_ACCESS_ADULT");
+        sim_access_string[4] = LLTrans::getString("SIM_ACCESS_DOWN");
+    }
+
+    switch (sim_access)
     {
     case SIM_ACCESS_PG:
-        return LLTrans::getString("SIM_ACCESS_PG");
+        return sim_access_string[1];
 
     case SIM_ACCESS_MATURE:
-        return LLTrans::getString("SIM_ACCESS_MATURE");
+        return sim_access_string[2];
 
     case SIM_ACCESS_ADULT:
-        return LLTrans::getString("SIM_ACCESS_ADULT");
+        return sim_access_string[3];
 
     case SIM_ACCESS_DOWN:
-        return LLTrans::getString("SIM_ACCESS_DOWN");
+        return sim_access_string[4];
 
     case SIM_ACCESS_MIN:
     default:
-        return LLTrans::getString("SIM_ACCESS_MIN");
+        return sim_access_string[0];
     }
 }
 
 // static
-std::string LLViewerRegion::getAccessIcon(U8 sim_access)
+const std::string& LLViewerRegion::getAccessIcon(U8 sim_access)
 {
+    static std::vector<std::string> sim_access_icon;
+    if (sim_access_icon.empty())
+    {
+        sim_access_icon.resize(3);
+        sim_access_icon[0] = "Parcel_PG_Light";
+        sim_access_icon[1] = "Parcel_M_Dark";
+        sim_access_icon[2] = "Parcel_R_Light";
+    }
     switch(sim_access)
     {
     case SIM_ACCESS_MATURE:
-        return "Parcel_M_Dark";
+        return sim_access_icon[1];
 
     case SIM_ACCESS_ADULT:
-        return "Parcel_R_Light";
+        return sim_access_icon[2];
 
     case SIM_ACCESS_PG:
-        return "Parcel_PG_Light";
+        return sim_access_icon[0];
 
     case SIM_ACCESS_MIN:
     default:
-        return "";
+        return LLStringUtil::null;
     }
 }
 
 // static
-std::string LLViewerRegion::accessToShortString(U8 sim_access)
+const std::string& LLViewerRegion::accessToShortString(U8 sim_access)
 {
+    static std::vector<std::string> short_access_strs;
+    if (short_access_strs.empty())
+    {
+        short_access_strs.resize(4);
+        short_access_strs[0] = "PG";
+        short_access_strs[1] = "M";
+        short_access_strs[2] = "A";
+        short_access_strs[3] = "U";
+    }
     switch(sim_access)      /* Flawfinder: ignore */
     {
     case SIM_ACCESS_PG:
-        return "PG";
+        return short_access_strs[0];
 
     case SIM_ACCESS_MATURE:
-        return "M";
+        return short_access_strs[1];
 
     case SIM_ACCESS_ADULT:
-        return "A";
+        return short_access_strs[2];
 
     case SIM_ACCESS_MIN:
     default:
-        return "U";
+        return short_access_strs[3];
     }
 }
 
@@ -2114,7 +2142,7 @@ void LLViewerRegion::updateNetStats()
     mLastPacketsLost =  mPacketsLost;
 
     mPacketsIn =                cdp->getPacketsIn();
-    mBitsIn =                   8 * cdp->getBytesIn();
+    mBitsIn =                   cdp->getBytesIn();
     mPacketsOut =               cdp->getPacketsOut();
     mPacketsLost =              cdp->getPacketsLost();
     mPingDelay =                cdp->getPingDelay();
@@ -2368,7 +2396,7 @@ void LLViewerRegion::updateCoarseLocations(LLMessageSystem* msg)
     msg->getS16Fast(_PREHASH_Index, _PREHASH_You, agent_index);
     msg->getS16Fast(_PREHASH_Index, _PREHASH_Prey, target_index);
 
-    bool has_agent_data = msg->has(_PREHASH_AgentData);
+    bool has_agent_data = msg->hasFast(_PREHASH_AgentData);
     S32 count = msg->getNumberOfBlocksFast(_PREHASH_Location);
     for(S32 i = 0; i < count; i++)
     {
@@ -3092,15 +3120,15 @@ void LLViewerRegion::unpackRegionHandshake()
     F32 billable_factor;
     LLUUID cache_id;
 
-    msg->getU8      ("RegionInfo", "SimAccess", sim_access);
-    msg->getString  ("RegionInfo", "SimName", sim_name);
-    msg->getUUID    ("RegionInfo", "SimOwner", sim_owner);
-    msg->getBOOL    ("RegionInfo", "IsEstateManager", is_estate_manager);
-    msg->getF32     ("RegionInfo", "WaterHeight", water_height);
-    msg->getF32     ("RegionInfo", "BillableFactor", billable_factor);
-    msg->getUUID    ("RegionInfo", "CacheID", cache_id );
+    msg->getU8Fast(_PREHASH_RegionInfo, _PREHASH_SimAccess, sim_access);
+    msg->getStringFast(_PREHASH_RegionInfo, _PREHASH_SimName, sim_name);
+    msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_SimOwner, sim_owner);
+    msg->getBOOLFast(_PREHASH_RegionInfo, _PREHASH_IsEstateManager, is_estate_manager);
+    msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_WaterHeight, water_height);
+    msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_BillableFactor, billable_factor);
+    msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_CacheID, cache_id);
 
-    if (msg->has(_PREHASH_RegionInfo4))
+    if (msg->hasFast(_PREHASH_RegionInfo4))
     {
         msg->getU64Fast(_PREHASH_RegionInfo4, _PREHASH_RegionFlagsExtended, region_flags);
         msg->getU64Fast(_PREHASH_RegionInfo4, _PREHASH_RegionProtocols, region_protocols);
@@ -3123,7 +3151,7 @@ void LLViewerRegion::unpackRegionHandshake()
     setCacheID(cache_id);
 
     LLUUID region_id;
-    msg->getUUID("RegionInfo2", "RegionID", region_id);
+    msg->getUUIDFast(_PREHASH_RegionInfo2, _PREHASH_RegionID, region_id);
     setRegionID(region_id);
 
     // Retrieve the CR-53 (Homestead/Land SKU) information
@@ -3135,15 +3163,15 @@ void LLViewerRegion::unpackRegionHandshake()
 
     // the only reasonable way to decide if we actually have any data is to
     // check to see if any of these fields have positive sizes
-    if (msg->getSize("RegionInfo3", "ColoName") > 0 ||
-        msg->getSize("RegionInfo3", "ProductSKU") > 0 ||
-        msg->getSize("RegionInfo3", "ProductName") > 0)
+    if (msg->getSizeFast(_PREHASH_RegionInfo3, _PREHASH_ColoName) > 0 ||
+        msg->getSizeFast(_PREHASH_RegionInfo3, _PREHASH_ProductSKU) > 0 ||
+        msg->getSizeFast(_PREHASH_RegionInfo3, _PREHASH_ProductName) > 0)
     {
-        msg->getS32     ("RegionInfo3", "CPUClassID",  classID);
-        msg->getS32     ("RegionInfo3", "CPURatio",    cpuRatio);
-        msg->getString  ("RegionInfo3", "ColoName",    coloName);
-        msg->getString  ("RegionInfo3", "ProductSKU",  productSKU);
-        msg->getString  ("RegionInfo3", "ProductName", productName);
+        msg->getS32Fast     (_PREHASH_RegionInfo3, _PREHASH_CPUClassID,  classID);
+        msg->getS32Fast     (_PREHASH_RegionInfo3, _PREHASH_CPURatio,    cpuRatio);
+        msg->getStringFast  (_PREHASH_RegionInfo3, _PREHASH_ColoName,    coloName);
+        msg->getStringFast  (_PREHASH_RegionInfo3, _PREHASH_ProductSKU,  productSKU);
+        msg->getStringFast  (_PREHASH_RegionInfo3, _PREHASH_ProductName, productName);
 
         mClassID = classID;
         mCPURatio = cpuRatio;
@@ -3161,54 +3189,54 @@ void LLViewerRegion::unpackRegionHandshake()
         bool changed = false;
 
         // Get the 4 textures for land
-        msg->getUUID("RegionInfo", "TerrainDetail0", tmp_id);
+        msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail0, tmp_id);
         changed |= (tmp_id != compp->getDetailAssetID(0));
         compp->setDetailAssetID(0, tmp_id);
 
-        msg->getUUID("RegionInfo", "TerrainDetail1", tmp_id);
+        msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail1, tmp_id);
         changed |= (tmp_id != compp->getDetailAssetID(1));
         compp->setDetailAssetID(1, tmp_id);
 
-        msg->getUUID("RegionInfo", "TerrainDetail2", tmp_id);
+        msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail2, tmp_id);
         changed |= (tmp_id != compp->getDetailAssetID(2));
         compp->setDetailAssetID(2, tmp_id);
 
-        msg->getUUID("RegionInfo", "TerrainDetail3", tmp_id);
+        msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail3, tmp_id);
         changed |= (tmp_id != compp->getDetailAssetID(3));
         compp->setDetailAssetID(3, tmp_id);
 
         // Get the start altitude and range values for land textures
         F32 tmp_f32;
-        msg->getF32("RegionInfo", "TerrainStartHeight00", tmp_f32);
+        msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainStartHeight00, tmp_f32);
         changed |= (tmp_f32 != compp->getStartHeight(0));
         compp->setStartHeight(0, tmp_f32);
 
-        msg->getF32("RegionInfo", "TerrainStartHeight01", tmp_f32);
+        msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainStartHeight01, tmp_f32);
         changed |= (tmp_f32 != compp->getStartHeight(1));
         compp->setStartHeight(1, tmp_f32);
 
-        msg->getF32("RegionInfo", "TerrainStartHeight10", tmp_f32);
+        msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainStartHeight10, tmp_f32);
         changed |= (tmp_f32 != compp->getStartHeight(2));
         compp->setStartHeight(2, tmp_f32);
 
-        msg->getF32("RegionInfo", "TerrainStartHeight11", tmp_f32);
+        msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainStartHeight11, tmp_f32);
         changed |= (tmp_f32 != compp->getStartHeight(3));
         compp->setStartHeight(3, tmp_f32);
 
 
-        msg->getF32("RegionInfo", "TerrainHeightRange00", tmp_f32);
+        msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainHeightRange00, tmp_f32);
         changed |= (tmp_f32 != compp->getHeightRange(0));
         compp->setHeightRange(0, tmp_f32);
 
-        msg->getF32("RegionInfo", "TerrainHeightRange01", tmp_f32);
+        msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainHeightRange01, tmp_f32);
         changed |= (tmp_f32 != compp->getHeightRange(1));
         compp->setHeightRange(1, tmp_f32);
 
-        msg->getF32("RegionInfo", "TerrainHeightRange10", tmp_f32);
+        msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainHeightRange10, tmp_f32);
         changed |= (tmp_f32 != compp->getHeightRange(2));
         compp->setHeightRange(2, tmp_f32);
 
-        msg->getF32("RegionInfo", "TerrainHeightRange11", tmp_f32);
+        msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainHeightRange11, tmp_f32);
         changed |= (tmp_f32 != compp->getHeightRange(3));
         compp->setHeightRange(3, tmp_f32);
 
@@ -3256,12 +3284,11 @@ void LLViewerRegion::unpackRegionHandshake()
     // sending data.
     // TODO: Send all upstream viewer->sim handshake info here.
     LLHost host = msg->getSender();
-    msg->newMessage("RegionHandshakeReply");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
-    msg->nextBlock("RegionInfo");
-
+    msg->newMessageFast(_PREHASH_RegionHandshakeReply);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_RegionInfo);
     U32 flags = 0;
     flags |= REGION_HANDSHAKE_SUPPORTS_SELF_APPEARANCE;
 
@@ -3273,7 +3300,7 @@ void LLViewerRegion::unpackRegionHandshake()
     {
         flags |= 0x00000002; //set the bit 1 to be 1 to tell sim the cache file is empty, no need to send cache probes.
     }
-    msg->addU32("Flags", flags );
+    msg->addU32Fast(_PREHASH_Flags, flags);
     msg->sendReliable(host);
 
     mRegionTimer.reset(); //reset region timer.
@@ -3372,6 +3399,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("SetDisplayName");
     capabilityNames.append("SimConsoleAsync");
     capabilityNames.append("SimulatorFeatures");
+    capabilityNames.append("SpatialVoiceModerationRequest");
     capabilityNames.append("StartGroupProposal");
     capabilityNames.append("TerrainNavMeshProperties");
     capabilityNames.append("TextureStats");
@@ -3533,7 +3561,7 @@ void LLViewerRegion::setCapabilityDebug(const std::string& name, const std::stri
     }
 }
 
-std::string LLViewerRegion::getCapabilityDebug(const std::string& name) const
+std::string LLViewerRegion::getCapabilityDebug(std::string_view name) const
 {
     CapabilityMap::const_iterator iter = mImpl->mSecondCapabilitiesTracker.find(name);
     if (iter == mImpl->mSecondCapabilitiesTracker.end())
@@ -3544,15 +3572,14 @@ std::string LLViewerRegion::getCapabilityDebug(const std::string& name) const
     return iter->second;
 }
 
-
-bool LLViewerRegion::isSpecialCapabilityName(const std::string &name)
+bool LLViewerRegion::isSpecialCapabilityName(std::string_view name)
 {
     return name == "EventQueueGet" || name == "UntrustedSimulatorMessage";
 }
 
-std::string LLViewerRegion::getCapability(const std::string& name) const
+std::string LLViewerRegion::getCapability(std::string_view name) const
 {
-    if (!capabilitiesReceived() && (name!=std::string("Seed")) && (name!=std::string("ObjectMedia")))
+    if (!capabilitiesReceived() && (name != "Seed") && (name != "ObjectMedia"))
     {
         LL_WARNS() << "getCapability called before caps received for " << name << LL_ENDL;
     }
@@ -3560,21 +3587,20 @@ std::string LLViewerRegion::getCapability(const std::string& name) const
     CapabilityMap::const_iterator iter = mImpl->mCapabilities.find(name);
     if(iter == mImpl->mCapabilities.end())
     {
-        return "";
+        return {};
     }
 
     return iter->second;
 }
 
-bool LLViewerRegion::isCapabilityAvailable(const std::string& name) const
+bool LLViewerRegion::isCapabilityAvailable(std::string_view name) const
 {
-    if (!capabilitiesReceived() && (name!=std::string("Seed")) && (name!=std::string("ObjectMedia")))
+    if (!capabilitiesReceived() && (name != "Seed") && (name != "ObjectMedia"))
     {
         LL_WARNS() << "isCapabilityAvailable called before caps received for " << name << LL_ENDL;
     }
 
-    CapabilityMap::const_iterator iter = mImpl->mCapabilities.find(name);
-    if(iter == mImpl->mCapabilities.end())
+    if (!mImpl->mCapabilities.contains(name))
     {
         return false;
     }
@@ -3861,9 +3887,14 @@ bool LLViewerRegion::avatarHoverHeightEnabled() const
 
 void log_capabilities(const CapabilityMap &capmap)
 {
+    // Copy into sorted map for ordered output
+    using SortedCapabilityMap = std::map<std::string, std::string>;
+    SortedCapabilityMap sorted_capmap;
+    sorted_capmap.insert(capmap.begin(), capmap.end());
+
     S32 count = 0;
-    CapabilityMap::const_iterator iter;
-    for (iter = capmap.begin(); iter != capmap.end(); ++iter, ++count)
+    SortedCapabilityMap::const_iterator iter;
+    for (iter = sorted_capmap.begin(); iter != sorted_capmap.end(); ++iter, ++count)
     {
         if (!iter->second.empty())
         {
@@ -3922,6 +3953,16 @@ std::string LLViewerRegion::getSimHostName()
         return mSimulatorFeatures.has("HostName") ? mSimulatorFeatures["HostName"].asString() : getHost().getHostName();
     }
     return std::string("...");
+}
+
+
+bool LLViewerRegion::isRegionWebRTCEnabled()
+{
+    if (mSimulatorFeaturesReceived && mSimulatorFeatures.has("VoiceServerType"))
+    {
+        return mSimulatorFeatures["VoiceServerType"].asString() == "webrtc";
+    }
+    return false;
 }
 
 void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj)

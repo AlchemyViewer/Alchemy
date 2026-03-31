@@ -34,11 +34,9 @@
 
 #include "llstl.h"
 
-#include "llexception.h"
 #include "llstring.h"
 #include "v3math.h"
 #include "v3dmath.h"
-#include "v4math.h"
 #include "v4coloru.h"
 #include "v4color.h"
 #include "v3color.h"
@@ -50,9 +48,7 @@
 #include "lltimer.h"
 #include "lldir.h"
 
-#include <boost/iostreams/stream.hpp>
-
-#if LL_RELEASE_WITH_DEBUG_INFO || LL_DEBUG
+#ifdef SHOW_ASSERT
 #define CONTROL_ERRS LL_ERRS("ControlErrors")
 #else
 #define CONTROL_ERRS LL_WARNS("ControlErrors")
@@ -67,20 +63,15 @@ template <> eControlType get_control_type<std::string>();
 
 template <> eControlType get_control_type<LLVector3>();
 template <> eControlType get_control_type<LLVector3d>();
-template <> eControlType get_control_type<LLVector4>();
-template <> eControlType get_control_type<LLQuaternion>();
 template <> eControlType get_control_type<LLRect>();
 template <> eControlType get_control_type<LLColor4>();
 template <> eControlType get_control_type<LLColor3>();
 template <> eControlType get_control_type<LLColor4U>();
-template <> eControlType get_control_type<LLUUID>();
 template <> eControlType get_control_type<LLSD>();
 
 template <> LLSD convert_to_llsd<U32>(const U32& in);
 template <> LLSD convert_to_llsd<LLVector3>(const LLVector3& in);
 template <> LLSD convert_to_llsd<LLVector3d>(const LLVector3d& in);
-template <> LLSD convert_to_llsd<LLVector4>(const LLVector4& in);
-template <> LLSD convert_to_llsd<LLQuaternion>(const LLQuaternion& in);
 template <> LLSD convert_to_llsd<LLRect>(const LLRect& in);
 template <> LLSD convert_to_llsd<LLColor4>(const LLColor4& in);
 template <> LLSD convert_to_llsd<LLColor3>(const LLColor3& in);
@@ -94,13 +85,10 @@ template <> std::string convert_from_llsd<std::string>(const LLSD& sd, eControlT
 template <> LLWString convert_from_llsd<LLWString>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLVector3 convert_from_llsd<LLVector3>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLVector3d convert_from_llsd<LLVector3d>(const LLSD& sd, eControlType type, std::string_view control_name);
-template <> LLVector4 convert_from_llsd<LLVector4>(const LLSD& sd, eControlType type, std::string_view control_name);
-template <> LLQuaternion convert_from_llsd<LLQuaternion>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLRect convert_from_llsd<LLRect>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLColor4 convert_from_llsd<LLColor4>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLColor4U convert_from_llsd<LLColor4U>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLColor3 convert_from_llsd<LLColor3>(const LLSD& sd, eControlType type, std::string_view control_name);
-template <> LLUUID convert_from_llsd<LLUUID>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLSD convert_from_llsd<LLSD>(const LLSD& sd, eControlType type, std::string_view control_name);
 
 //this defines the current version of the settings file
@@ -136,9 +124,6 @@ bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
     case TYPE_VEC3D:
         result = LLVector3d(a) == LLVector3d(b);
         break;
-    case TYPE_VEC4:
-        result = LLVector4(a) == LLVector4(b);
-        break;
     case TYPE_QUAT:
         result = LLQuaternion(a) == LLQuaternion(b);
         break;
@@ -150,9 +135,6 @@ bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
         break;
     case TYPE_COL3:
         result = LLColor3(a) == LLColor3(b);
-        break;
-    case TYPE_UUID:
-        result = a.asUUID() == b.asUUID();
         break;
     case TYPE_STRING:
         result = a.asString() == b.asString();
@@ -175,7 +157,13 @@ LLControlVariable::LLControlVariable(const std::string& name, eControlType type,
 {
     if ((persist != PERSIST_NO) && mComment.empty())
     {
-        LL_WARNS() << "Must supply a comment for control " << mName << LL_ENDL;
+        std::string error_string =
+            "Alchemy Viewer failed to initialize settings. Setting " + mName + " is invalid. "
+            "Either settings' files were supplied incorrectly or default files were corrupted."
+            "\n\nPlease reinstall viewer from https://www.alchemyviewer.org/downloads/ and "
+            "contact the Alchemy Viewer team if the issue persists after reinstall.";
+        LLError::LLUserWarningMsg::show(error_string);
+        LL_ERRS() << "Must supply a comment for control " << mName << LL_ENDL;
     }
     //Push back versus setValue'ing here, since we don't want to call a signal yet
     mValues.push_back(initial);
@@ -322,7 +310,7 @@ void LLControlVariable::resetToDefault(bool fire_signal)
 
     // don't fire if the value didn't actually change
     LLSD previous_value = getComparableValue(getValue());
-    bool value_changed = (!llsd_compare(originalValue, previous_value));
+    bool value_changed = !llsd_compare(originalValue, previous_value);
     if(fire_signal && value_changed)
     {
         firePropertyChanged(originalValue);
@@ -362,18 +350,6 @@ LLSD LLControlVariable::getSaveValue() const
     return mValues[0];
 }
 
-void LLControlVariable::firePropertyChanged(const LLSD &pPreviousValue)
-{
-    try
-    {
-        mCommitSignal(this, mValues.back(), pPreviousValue);
-    }
-    catch (const boost::exception&)
-    {
-        LOG_UNHANDLED_EXCEPTION(getName() + " commit signal threw exception.");
-    }
-}
-
 LLPointer<LLControlVariable> LLControlGroup::getControl(std::string_view name)
 {
     if (mSettingsProfile)
@@ -396,12 +372,10 @@ const std::string LLControlGroup::mTypeString[TYPE_COUNT] = { "U32"
                                                              ,"String"
                                                              ,"Vector3"
                                                              ,"Vector3D"
-                                                             ,"Vector4"
                                                              ,"Quaternion"
                                                              ,"Rect"
                                                              ,"Color4"
                                                              ,"Color3"
-                                                             ,"UUID"
                                                              ,"LLSD"
                                                              };
 
@@ -431,7 +405,7 @@ void LLControlGroup::cleanup()
     if(mSettingsProfile && getCount.size() != 0)
     {
         std::string file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, SETTINGS_PROFILE);
-        LLFILE* out = LLFile::fopen(file, "w"); /* Flawfinder: ignore */
+        LLFILE* out = LLFile::fopen(file, LLFILE_MODE("w")); /* Flawfinder: ignore */
         if(!out)
         {
             LL_WARNS("SettingsProfile") << "Error opening " << SETTINGS_PROFILE << LL_ENDL;
@@ -561,11 +535,6 @@ LLControlVariable* LLControlGroup::declareVec3d(const std::string& name, const L
     return declareControl(name, TYPE_VEC3D, initial_val.getValue(), comment, persist);
 }
 
-LLControlVariable* LLControlGroup::declareVec4(const std::string& name, const LLVector4& initial_val, const std::string& comment, LLControlVariable::ePersist persist)
-{
-    return declareControl(name, TYPE_VEC4, initial_val.getValue(), comment, persist);
-}
-
 LLControlVariable* LLControlGroup::declareQuat(const std::string& name, const LLQuaternion &initial_val, const std::string& comment, LLControlVariable::ePersist persist)
 {
     return declareControl(name, TYPE_QUAT, initial_val.getValue(), comment, persist);
@@ -584,11 +553,6 @@ LLControlVariable* LLControlGroup::declareColor4(const std::string& name, const 
 LLControlVariable* LLControlGroup::declareColor3(const std::string& name, const LLColor3 &initial_val, const std::string& comment, LLControlVariable::ePersist persist )
 {
     return declareControl(name, TYPE_COL3, initial_val.getValue(), comment, persist);
-}
-
-LLControlVariable* LLControlGroup::declareUUID(const std::string& name, const LLUUID& initial_val, const std::string& comment, LLControlVariable::ePersist persist)
-{
-    return declareControl(name, TYPE_UUID, initial_val, comment, persist);
 }
 
 LLControlVariable* LLControlGroup::declareLLSD(const std::string& name, const LLSD &initial_val, const std::string& comment, LLControlVariable::ePersist persist )
@@ -653,11 +617,6 @@ LLVector3d LLControlGroup::getVector3d(std::string_view name)
     return get<LLVector3d>(name);
 }
 
-LLVector4 LLControlGroup::getVector4(std::string_view name)
-{
-    return get<LLVector4>(name);
-}
-
 LLQuaternion LLControlGroup::getQuaternion(std::string_view name)
 {
     return get<LLQuaternion>(name);
@@ -683,12 +642,6 @@ LLColor3 LLControlGroup::getColor3(std::string_view name)
 {
     return get<LLColor3>(name);
 }
-
-LLUUID LLControlGroup::getUUID(std::string_view name)
-{
-    return get<LLUUID>(name);
-}
-
 
 LLSD LLControlGroup::getLLSD(std::string_view name)
 {
@@ -769,22 +722,12 @@ void LLControlGroup::setQuaternion(std::string_view name, const LLQuaternion &va
     set(name, val);
 }
 
-void LLControlGroup::setVector4(std::string_view name, const LLVector4& val)
-{
-    set(name, val);
-}
-
 void LLControlGroup::setRect(std::string_view name, const LLRect &val)
 {
     set(name, val);
 }
 
 void LLControlGroup::setColor4(std::string_view name, const LLColor4 &val)
-{
-    set(name, val);
-}
-
-void LLControlGroup::setUUID(std::string_view name, const LLUUID& val)
 {
     set(name, val);
 }
@@ -821,6 +764,7 @@ void LLControlGroup::setUntypedValue(std::string_view name, const LLSD& val)
 // Returns number of controls loaded, so 0 if failure
 U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, bool require_declaration, eControlType declare_as)
 {
+    LL_PROFILE_ZONE_SCOPED;
     std::string name;
 
     LLXmlTree xml_controls;
@@ -958,16 +902,6 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, bool require
                 validitems++;
             }
             break;
-        case TYPE_VEC4:
-            {
-                LLVector4 vector;
-
-                child_nodep->getAttributeVector4("value", vector);
-
-                control->set(vector.getValue());
-                validitems++;
-            }
-            break;
         case TYPE_QUAT:
             {
                 LLQuaternion quat;
@@ -1011,15 +945,6 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, bool require
 
                 child_nodep->getAttributeVector3("value", color);
                 control->set(LLColor3(color.mV).getValue());
-                validitems++;
-            }
-            break;
-        case TYPE_UUID:
-            {
-                LLUUID uuid;
-
-                child_nodep->getAttributeUUID("value", uuid);
-                control->set(uuid);
                 validitems++;
             }
             break;
@@ -1072,8 +997,15 @@ U32 LLControlGroup::saveToFile(const std::string& filename, bool nondefault_only
     return num_saved;
 }
 
-U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_values, bool save_values)
+U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_values, bool save_values, bool error_when_no_comment)
 {
+    LL_PROFILE_ZONE_SCOPED;
+
+    if (!mIncludedFiles.insert(filename).second && set_default_values)
+    {
+        return 0; //Already included this file.
+    }
+
     LLSD settings;
     llifstream infile;
     infile.open(filename.c_str());
@@ -1098,6 +1030,26 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
         LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT;
         std::string const & name = itr->first;
         LLSD const & control_map = itr->second;
+
+        if(name == "Include")
+        {
+            if(control_map.isArray())
+            {
+#if LL_WINDOWS
+                size_t pos = filename.find_last_of('\\');
+#else
+                size_t pos = filename.find_last_of('/');
+#endif
+                if(pos != std::string::npos)
+                {
+                    const std::string dir = filename.substr(0,++pos);
+                    for(LLSD::array_const_iterator array_itr = control_map.beginArray(), array_end = control_map.endArray();
+                        array_itr != array_end; ++array_itr)
+                        validitems+=loadFromFile(dir+(*array_itr).asString(),set_default_values);
+                }
+            }
+            continue;
+        }
 
         if(control_map.has("Persist"))
         {
@@ -1187,10 +1139,26 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
                 }
             }
 
+            std::string comment = control_map["Comment"].asString();
+            if (!error_when_no_comment
+                && !set_default_values
+                && comment.empty())
+            {
+                // Only error for default settings that should remind the developer to provide comments
+                // and otherwise indicate a problem with viewer's files.
+                // But permit this minor transgression in user's files.
+                // Otherwise user might have a hard time figuring out source of the error or how to fix it.
+                // Instead make setting to not persist so that unrecognized invalid settings won't be saved
+                // for the next run.
+                persist = LLControlVariable::PERSIST_NO;
+                comment = "Comment not provided, setting won't persist";
+                LL_WARNS() << "Control " << name << " is missing a comment value. Setting will be marked as PERSIST_NO" << LL_ENDL;
+            }
+
             declareControl(name,
                            typeStringToEnum(control_map["Type"].asString()),
                            control_map["Value"],
-                           control_map["Comment"].asString(),
+                           comment,
                            persist,
                            hidefromsettingseditor
                            );
@@ -1323,11 +1291,6 @@ template <> eControlType get_control_type<LLVector3d>()
     return TYPE_VEC3D;
 }
 
-template <> eControlType get_control_type<LLVector4>()
-{
-    return TYPE_VEC4;
-}
-
 template <> eControlType get_control_type<LLQuaternion>()
 {
     return TYPE_QUAT;
@@ -1346,11 +1309,6 @@ template <> eControlType get_control_type<LLColor4>()
 template <> eControlType get_control_type<LLColor3>()
 {
     return TYPE_COL3;
-}
-
-template <> eControlType get_control_type<LLUUID>()
-{
-    return TYPE_UUID;
 }
 
 template <> eControlType get_control_type<LLSD>()
@@ -1373,12 +1331,6 @@ template <> LLSD convert_to_llsd<LLVector3d>(const LLVector3d& in)
 {
     return in.getValue();
 }
-
-template <> LLSD convert_to_llsd<LLVector4>(const LLVector4& in)
-{
-    return in.getValue();
-}
-
 template <> LLSD convert_to_llsd<LLQuaternion>(const LLQuaternion& in)
 {
     return in.getValue();
@@ -1496,18 +1448,6 @@ LLVector3d convert_from_llsd<LLVector3d>(const LLSD& sd, eControlType type, std:
 }
 
 template<>
-LLVector4 convert_from_llsd<LLVector4>(const LLSD& sd, eControlType type, std::string_view control_name)
-{
-    if (type == TYPE_VEC4)
-        return (LLVector4)sd;
-    else
-    {
-        CONTROL_ERRS << "Invalid LLVector4 value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
-        return LLVector4::zero;
-    }
-}
-
-template<>
 LLQuaternion convert_from_llsd<LLQuaternion>(const LLSD& sd, eControlType type, std::string_view control_name)
 {
     if (type == TYPE_QUAT)
@@ -1573,18 +1513,6 @@ LLColor3 convert_from_llsd<LLColor3>(const LLSD& sd, eControlType type, std::str
     {
         CONTROL_ERRS << "Invalid LLColor3 value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
         return LLColor3::white;
-    }
-}
-
-template<>
-LLUUID convert_from_llsd<LLUUID>(const LLSD& sd, eControlType type, std::string_view control_name)
-{
-    if (type == TYPE_UUID)
-        return sd.asUUID();
-    else
-    {
-        CONTROL_ERRS << "Invalid LLUUID value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
-        return LLUUID::null;
     }
 }
 

@@ -896,7 +896,16 @@ bool LLSurfacePatch::updateTexture()
 void LLSurfacePatch::updateGL()
 {
     LL_PROFILE_ZONE_SCOPED;
+    F32 meters_per_grid = getSurface()->getMetersPerGrid();
+    F32 grids_per_patch_edge = (F32)getSurface()->getGridsPerPatchEdge();
+
+    LLViewerRegion *regionp = getSurface()->getRegion();
+    LLVector3d origin_region = getOriginGlobal() - getSurface()->getOriginGlobal();
+
+    LLVLComposition* comp = regionp->getComposition();
+
     updateCompositionStats();
+    F32 tex_patch_size = meters_per_grid*grids_per_patch_edge;
 
     mSTexUpdate = false;
 }

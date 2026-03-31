@@ -51,3 +51,9 @@ void VolumeCatcher::setPan(F32 pan)
 void VolumeCatcher::pump()
 {
 }
+
+#if LL_LINUX
+void VolumeCatcher::onEnablePipeWireVolumeCatcher(bool enable)
+{
+}
+#endif

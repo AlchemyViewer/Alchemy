@@ -149,6 +149,7 @@ bool LLPanelTopInfoBar::postBuild()
     mInfoBtn->setToolTip(LLTrans::getString("LocationCtrlInfoBtnTooltip"));
 
     mParcelInfoText = getChild<LLTextBox>("parcel_info_text");
+    mParcelInfoText->setClickedCallback(boost::bind(&LLPanelTopInfoBar::onParcelInfoTextClicked, this));
     mDamageText = getChild<LLTextBox>("damage_text");
 
     initParcelIcons();
@@ -288,7 +289,8 @@ void LLPanelTopInfoBar::updateParcelIcons()
     if (!agent_region || !agent_parcel)
         return;
 
-    if (gSavedSettings.getBOOL("NavBarShowParcelProperties"))
+    static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
+    if (show_icons)
     {
         LLParcel* current_parcel;
         LLViewerRegion* selection_region = vpm->getSelectionRegion();
@@ -499,4 +501,14 @@ void LLPanelTopInfoBar::onInfoButtonClicked()
 // [/RLVa:KB]
 
     LLFloaterSidePanelContainer::showPanel("places", LLSD().with("type", "agent"));
+}
+
+void LLPanelTopInfoBar::onParcelInfoTextClicked()
+{
+// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+        return;
+// [/RLVa:KB]
+
+    LLFloaterReg::showInstance("about_land");
 }

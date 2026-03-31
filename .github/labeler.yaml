@@ -78,6 +78,14 @@ llxml:
 - changed-files:
   - any-glob-to-any-file: indra/llxml/**
 
+viewer:
+- changed-files:
+  - any-glob-to-any-file: indra/newview/**
+
+skins:
+- changed-files:
+  - any-glob-to-any-file: indra/newview/skins/**
+
 cmake:
 - changed-files:
   - any-glob-to-any-file:

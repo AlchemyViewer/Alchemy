@@ -34,6 +34,7 @@
 #include "llfloaterreg.h"
 #include "llimview.h"           // for gIMMgr
 #include "lltooldraganddrop.h"  // for LLToolDragAndDrop
+#include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llviewerregion.h"     // getCapability()
 #include "llworld.h"
@@ -184,10 +185,6 @@ void LLFloaterAvatarPicker::onTabChanged()
 LLFloaterAvatarPicker::~LLFloaterAvatarPicker()
 {
     gFocusMgr.releaseFocusIfNeeded( this );
-    if (mAvatarNameCacheConnection.connected())
-    {
-        mAvatarNameCacheConnection.disconnect();
-    }
 }
 
 void LLFloaterAvatarPicker::onBtnFind()
@@ -315,9 +312,8 @@ void LLFloaterAvatarPicker::populateNearMe()
     LLScrollListCtrl* near_me_scroller = getChild<LLScrollListCtrl>("NearMe");
     near_me_scroller->deleteAllItems();
 
-    static LLCachedControl<F32> av_near_me_range(gSavedSettings, "AVPickerNearMeRange", 512.f);
     uuid_vec_t avatar_ids;
-    LLWorld::getInstance()->getAvatars(&avatar_ids, NULL, gAgent.getPositionGlobal(), av_near_me_range);
+    LLWorld::getInstance()->getAvatars(&avatar_ids, NULL, gAgent.getPositionGlobal(), gSavedSettings.getF32("AVPickerNearMeRange"));
     for(U32 i=0; i<avatar_ids.size(); i++)
     {
         LLUUID& av = avatar_ids[i];
@@ -434,15 +430,50 @@ bool LLFloaterAvatarPicker::visibleItemsSelected() const
 }
 
 /*static*/
-void LLFloaterAvatarPicker::findCoro(std::string url, LLUUID queryID, std::string name)
+void LLFloaterAvatarPicker::findByIdCoro(std::string url, LLUUID query_id, LLUUID agent_id, std::string floater_key)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("findByIdCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
-    LL_INFOS("HttpCoroutineAdapter", "genericPostCoro") << "Generic POST for " << url << LL_ENDL;
+    httpOpts->setTimeout(AVATAR_PICKER_SEARCH_TIMEOUT);
+
+    LLSD result = httpAdapter->getAndSuspend(httpRequest, url, httpOpts);
+
+    LL_DEBUGS("Agent") << result << LL_ENDL;
+
+    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+    if (status || (status == LLCore::HttpStatus(HTTP_BAD_REQUEST)))
+    {
+        result.erase(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+    }
+    else
+    {
+        result["failure_reason"] = status.toString();
+    }
+
+    LLFloaterAvatarPicker* floater =
+        LLFloaterReg::findTypedInstance<LLFloaterAvatarPicker>("avatar_picker", floater_key);
+    if (floater)
+    {
+        floater->processResponse(query_id, result);
+    }
+}
+
+/*static*/
+void LLFloaterAvatarPicker::findByNameCoro(std::string url, LLUUID queryID, std::string name)
+{
+    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("findByNameCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
+
+    LL_INFOS("HttpCoroutineAdapter", "genericPostCoro", "Agent") << "Generic POST for " << url << LL_ENDL;
 
     httpOpts->setTimeout(AVATAR_PICKER_SEARCH_TIMEOUT);
 
@@ -468,55 +499,15 @@ void LLFloaterAvatarPicker::findCoro(std::string url, LLUUID queryID, std::strin
     }
 }
 
-void LLFloaterAvatarPicker::onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name)
-{
-    mAvatarNameCacheConnection.disconnect();
-    sAvatarNameMap[agent_id] = av_name;
-
-    LLScrollListCtrl* search_results = getChild<LLScrollListCtrl>("SearchResults");
-
-    // clear "Searching" label on first results
-    search_results->deleteAllItems();
-
-    LLSD item;
-    item["id"] = agent_id;
-    LLSD& columns = item["columns"];
-    columns[0]["column"] = "name";
-    columns[0]["value"] = av_name.getDisplayName();
-    columns[1]["column"] = "username";
-    columns[1]["value"] = av_name.getAccountName();
-    search_results->addElement(item);
-
-    getChildView("ok_btn")->setEnabled(true);
-    search_results->setEnabled(true);
-    search_results->sortByColumnIndex(1, true);
-    search_results->selectFirstItem();
-
-    onList();
-    search_results->setFocus(true);
-}
 
 void LLFloaterAvatarPicker::find()
 {
     //clear our stored LLAvatarNames
     sAvatarNameMap.clear();
 
-    getChild<LLScrollListCtrl>("SearchResults")->deleteAllItems();
-    getChild<LLScrollListCtrl>("SearchResults")->setCommentText(getString("searching"));
-
-    getChildView("ok_btn")->setEnabled(false);
-    mNumResultsReturned = 0;
-
     std::string text = getChild<LLUICtrl>("Edit")->getValue().asString();
 
-    bool is_uuid = LLUUID::validate(text);
-    if(is_uuid)
-    {
-        LLUUID search_id(text);
-        mAvatarNameCacheConnection = LLAvatarNameCache::get(search_id, boost::bind(&LLFloaterAvatarPicker::onAvatarNameCache, this, _1, _2));
-        return;
-    }
-
+    LLUUID agent_id;
     size_t separator_index = text.find_first_of(" ._");
     if (separator_index != text.npos)
     {
@@ -528,44 +519,90 @@ void LLFloaterAvatarPicker::find()
             text = first;
         }
     }
+    else if (!text.empty())
+    {
+        agent_id.set(text);
+    }
 
     mQueryID.generate();
+    mNumResultsReturned = 0;
 
-    std::string url;
-    url.reserve(128); // avoid a memory allocation or two
+    getChild<LLScrollListCtrl>("SearchResults")->deleteAllItems();
+    getChild<LLScrollListCtrl>("SearchResults")->setCommentText(getString("searching"));
+    getChildView("ok_btn")->setEnabled(false);
 
-    LLViewerRegion* region = gAgent.getRegion();
-    if(region)
+    if (agent_id.notNull())
     {
-        url = region->getCapability("AvatarPickerSearch");
-        // Prefer use of capabilities to search on both SLID and display name
-        if (!url.empty())
+        // Search by uuid
+        // While cache could have been nicer, it neither has a failure callback, nor
+        // can cleanup in case of an invalid uuid. So we go directly to the capability.
+        LLViewerRegion* region = gAgent.getRegion();
+        if (region)
         {
-            // capability urls don't end in '/', but we need one to parse
-            // query parameters correctly
-            if (url.size() > 0 && url[url.size()-1] != '/')
+            std::string url;
+            url.reserve(128);
+            url = region->getCapability("GetDisplayNames");
+            if (!url.empty())
             {
-                url += "/";
-            }
-            url += "?page_size=100&names=";
-            std::replace(text.begin(), text.end(), '.', ' ');
-            url += LLURI::escape(text);
-            LL_INFOS() << "avatar picker " << url << LL_ENDL;
+                // capability urls don't end in '/', but we need one to parse
+                // query parameters correctly
+                if (url[url.size() - 1] != '/')
+                {
+                    url += "/";
+                }
+                url += "?ids=";
+                url += agent_id.asString();
+                LL_DEBUGS("Agent") << "avatar picker " << url << LL_ENDL;
 
-            LLCoros::instance().launch("LLFloaterAvatarPicker::findCoro",
-                boost::bind(&LLFloaterAvatarPicker::findCoro, url, mQueryID, getKey().asString()));
+                LLCoros::instance().launch("LLFloaterAvatarPicker::findCoro",
+                    boost::bind(&LLFloaterAvatarPicker::findByIdCoro, url, mQueryID, agent_id, getKey().asString()));
+            }
+            else
+            {
+                LLSD content;
+                content["failure_reason"] = LLTrans::getString("ServerUnavailable");
+                processResponse(mQueryID, content);
+            }
         }
-        else
+    }
+    else
+    {
+        std::string url;
+        url.reserve(128); // avoid a memory allocation or two
+
+        LLViewerRegion* region = gAgent.getRegion();
+        if (region)
         {
-            LLMessageSystem* msg = gMessageSystem;
-            msg->newMessage("AvatarPickerRequest");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgent.getID());
-            msg->addUUID("SessionID", gAgent.getSessionID());
-            msg->addUUID("QueryID", mQueryID);  // not used right now
-            msg->nextBlock("Data");
-            msg->addString("Name", text);
-            gAgent.sendReliableMessage();
+            url = region->getCapability("AvatarPickerSearch");
+            // Prefer use of capabilities to search on both SLID and display name
+            if (!url.empty())
+            {
+                // capability urls don't end in '/', but we need one to parse
+                // query parameters correctly
+                if (url.size() > 0 && url[url.size() - 1] != '/')
+                {
+                    url += "/";
+                }
+                url += "?page_size=100&names=";
+                std::replace(text.begin(), text.end(), '.', ' ');
+                url += LLURI::escape(text);
+                LL_DEBUGS("Agent") << "avatar picker " << url << LL_ENDL;
+
+                LLCoros::instance().launch("LLFloaterAvatarPicker::findCoro",
+                    boost::bind(&LLFloaterAvatarPicker::findByNameCoro, url, mQueryID, getKey().asString()));
+            }
+            else
+            {
+                LLMessageSystem* msg = gMessageSystem;
+                msg->newMessageFast(_PREHASH_AvatarPickerRequest);
+                msg->nextBlockFast(_PREHASH_AgentData);
+                msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+                msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+                msg->addUUIDFast(_PREHASH_QueryID, mQueryID);  // not used right now
+                msg->nextBlockFast(_PREHASH_Data);
+                msg->addStringFast(_PREHASH_Name, text);
+                gAgent.sendReliableMessage();
+            }
         }
     }
 }
@@ -664,8 +701,8 @@ void LLFloaterAvatarPicker::processAvatarPickerReply(LLMessageSystem* msg, void*
     std::string first_name;
     std::string last_name;
 
-    msg->getUUID("AgentData", "AgentID", agent_id);
-    msg->getUUID("AgentData", "QueryID", query_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_QueryID, query_id);
 
     // Not for us
     if (agent_id != gAgent.getID()) return;
@@ -687,7 +724,7 @@ void LLFloaterAvatarPicker::processAvatarPickerReply(LLMessageSystem* msg, void*
     }
 
     bool found_one = false;
-    S32 num_new_rows = msg->getNumberOfBlocks("Data");
+    S32 num_new_rows = msg->getNumberOfBlocksFast(_PREHASH_Data);
     for (S32 i = 0; i < num_new_rows; i++)
     {
         msg->getUUIDFast(  _PREHASH_Data,_PREHASH_AvatarID, avatar_id, i);

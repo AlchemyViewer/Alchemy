@@ -128,7 +128,8 @@ LLEmojiDictionary::LLEmojiDictionary()
 // static
 void LLEmojiDictionary::initClass()
 {
-    LLEmojiDictionary* pThis = &LLEmojiDictionary::initParamSingleton();
+    LLEmojiDictionary::createInstance();
+    LLEmojiDictionary* pThis = LLEmojiDictionary::getInstance();
 
     pThis->loadTranslations();
     pThis->loadGroups();
@@ -390,17 +391,22 @@ void LLEmojiDictionary::loadEmojis()
             continue;
         }
 
-        std::string category = "other";
+        std::string category;
         std::list<std::string> categories = loadCategories(sd);
-        if (!categories.empty())
+        if (categories.empty())
+        {
+            // Should already have a localization for "other symbols"
+            category = "other symbols";
+        }
+        else
         {
             category = categories.front();
+        }
 
-            if (std::find(mSkipCategories.begin(), mSkipCategories.end(), category) != mSkipCategories.end())
-            {
-                // This category is listed for skip
-                continue;
-            }
+        if (std::find(mSkipCategories.begin(), mSkipCategories.end(), category) != mSkipCategories.end())
+        {
+            // This category is listed for skip
+            continue;
         }
 
         std::list<std::string> shortCodes = loadShortCodes(sd);

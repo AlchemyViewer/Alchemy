@@ -86,6 +86,15 @@ Hover your mouse over the options for more help.
      name="btn_join"
      visible="true"
      width="120" />
+    <button
+     follows="left|top"
+     left_pad="6"
+     top_delta="0"
+     height="23"
+     label="Activate"
+     name="btn_activate"
+     visible="true"
+     width="120" />
     </panel>
     <text_editor
      type="string"
@@ -98,7 +107,7 @@ Hover your mouse over the options for more help.
      parse_urls="true"
      top="105"
      right="-4"
-    bg_readonly_color="PanelDefaultBackgroundColor"
+    bg_readonly_color="DkGray2"
     text_readonly_color="White"
      word_wrap="true"
      show_emoji_helper="true" >
@@ -139,12 +148,22 @@ Hover your mouse over the options for more help.
         <check_box
          height="16"
          font="SansSerifSmall"
+         label="Receive group instant messages"
+         layout="topleft"
+         left="10"
+         name="receive_chat"
+         tool_tip="Sets whether you want to participate in group chat for this group."
+         top_pad="7"
+         width="300" />
+        <check_box
+         height="16"
+         font="SansSerifSmall"
          label="Receive group notices"
          layout="topleft"
          left="10"
          name="receive_notices"
          tool_tip="Sets whether you want to receive Notices from this group.  Uncheck this box if this group is spamming you."
-         top_pad="5"
+         top_pad="4"
          width="300" />
         <check_box
          height="16"
@@ -153,7 +172,7 @@ Hover your mouse over the options for more help.
          left="10"
          name="list_groups_in_profile"
          tool_tip="Sets whether you want to show this group in your profile"
-         top_pad="5"
+         top_pad="4"
          width="295" />
    <panel
          background_visible="false"
@@ -194,7 +213,7 @@ Hover your mouse over the options for more help.
          left_delta="0"
          name="check_enrollment_fee"
          tool_tip="Sets whether to require an enrollment fee to join the group"
-         top_pad="5"
+         top_pad="4"
          width="300" />
         <spinner
          decimal_digits="0"

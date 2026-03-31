@@ -225,6 +225,7 @@ void LLAudioEngine::updateChannels()
 
 void LLAudioEngine::idle()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     // "Update" all of our audio sources, clean up dead ones.
     // Primarily does position updating, cleanup of unused audio sources.
     // Also does regeneration of the current priority of each audio source.
@@ -239,9 +240,8 @@ void LLAudioEngine::idle()
     }
 
     F32 max_priority = -1.f;
-    LLAudioSource *max_sourcep = NULL; // Maximum priority source without a channel
-    source_map::iterator iter;
-    for (iter = mAllSources.begin(); iter != mAllSources.end();)
+    LLAudioSource *max_sourcep = nullptr; // Maximum priority source without a channel
+    for (auto iter = mAllSources.begin(), iter_end = mAllSources.end(); iter != iter_end;)
     {
         LLAudioSource *sourcep = iter->second;
 
@@ -721,15 +721,13 @@ void LLAudioEngine::setMaxWindGain(F32 gain)
 
 F64 LLAudioEngine::mapWindVecToGain(LLVector3 wind_vec)
 {
-    F64 gain = 0.0;
-
-    gain = wind_vec.magVec();
+    F64 gain = static_cast<F64>(wind_vec.magVec());
 
     if (gain)
     {
-        if (gain > 20)
+        if (gain > 20.0)
         {
-            gain = 20;
+            gain = 20.0;
         }
         gain = gain/20.0;
     }
@@ -749,14 +747,14 @@ F64 LLAudioEngine::mapWindVecToPitch(LLVector3 wind_vec)
     listen_right.setVec(1.0,0.0,0.0);
 
     // measure angle between wind vec and listener right axis (on 0,PI)
-    theta = acos(norm_wind * listen_right);
+    theta = (F64)acos(norm_wind * listen_right);
 
     // put it on 0, 1
     theta /= F_PI;
 
     // put it on [0, 0.5, 0]
     if (theta > 0.5) theta = 1.0-theta;
-    if (theta < 0) theta = 0;
+    if (theta < 0.0) theta = 0.0;
 
     return (theta);
 }
@@ -774,7 +772,7 @@ F64 LLAudioEngine::mapWindVecToPan(LLVector3 wind_vec)
     norm_wind.normVec();
 
     // measure angle between wind vec and listener right axis (on 0,PI)
-    theta = acos(norm_wind * listen_right);
+    theta = (F64)acos(norm_wind * listen_right);
 
     // put it on 0, 1
     theta /= F_PI;
@@ -784,20 +782,24 @@ F64 LLAudioEngine::mapWindVecToPan(LLVector3 wind_vec)
 
 
 void LLAudioEngine::triggerSound(const LLUUID &audio_uuid, const LLUUID& owner_id, const F32 gain,
-                                 const S32 type, const LLVector3d &pos_global)
+                                 const S32 type, const LLVector3d &pos_global, const LLUUID& source_object, const LLUUID& audio_source_id)
 {
     // Create a new source (since this can't be associated with an existing source.
     //LL_INFOS() << "Localized: " << audio_uuid << LL_ENDL;
 
+    // Do not load muted or silent sounds.
     if (mMuted || gain <FLT_EPSILON*2)
     {
         return;
     }
 
-    LLUUID source_id;
-    source_id.generate();
+    LLUUID source_id = audio_source_id;
+    if (source_id.isNull())
+    {
+        source_id.generate();
+    }
 
-    LLAudioSource *asp = new LLAudioSource(source_id, owner_id, gain, type);
+    LLAudioSource *asp = new LLAudioSource(source_id, owner_id, gain, type, source_object, true);
     addAudioSource(asp);
     if (pos_global.isExactlyZero())
     {
@@ -812,7 +814,7 @@ void LLAudioEngine::triggerSound(const LLUUID &audio_uuid, const LLUUID& owner_i
     asp->play(audio_uuid);
 }
 
-void LLAudioEngine::triggerSound(SoundData& soundData)
+void LLAudioEngine::triggerSound(const SoundData& soundData)
 {
     triggerSound(soundData.audio_uuid, soundData.owner_id, soundData.gain, soundData.type, soundData.pos_global);
 }
@@ -906,15 +908,16 @@ F32 LLAudioEngine::getRolloffFactor()
 
 void LLAudioEngine::commitDeferredChanges()
 {
-    mListenerp->commitDeferredChanges();
+    if (mListenerp)
+    {
+        mListenerp->commitDeferredChanges();
+    }
 }
 
 
 LLAudioSource * LLAudioEngine::findAudioSource(const LLUUID &source_id)
 {
-    source_map::iterator iter;
-    iter = mAllSources.find(source_id);
-
+    auto iter = mAllSources.find(source_id);
     if (iter == mAllSources.end())
     {
         return NULL;
@@ -929,7 +932,7 @@ LLAudioSource * LLAudioEngine::findAudioSource(const LLUUID &source_id)
 LLAudioData * LLAudioEngine::getAudioData(const LLUUID &audio_uuid)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
-    if(isCorruptSound(audio_uuid))
+    if( isCorruptSound( audio_uuid ) )
         return nullptr;
 
     auto iter = mAllData.find(audio_uuid);
@@ -954,8 +957,7 @@ void LLAudioEngine::addAudioSource(LLAudioSource *asp)
 
 void LLAudioEngine::cleanupAudioSource(LLAudioSource *asp)
 {
-    source_map::iterator iter;
-    iter = mAllSources.find(asp->getID());
+    auto iter = mAllSources.find(asp->getID());
     if (iter == mAllSources.end())
     {
         LL_WARNS() << "Cleaning up unknown audio source!" << LL_ENDL;
@@ -978,7 +980,7 @@ bool LLAudioEngine::hasDecodedFile(const LLUUID &uuid)
     wav_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str);
     wav_path += ".dsf";
 
-    if (gDirUtilp->fileExists(wav_path))
+    if (LLFile::isfile(wav_path))
     {
         return true;
     }
@@ -1012,7 +1014,6 @@ void LLAudioEngine::startNextTransfer()
     S32 i;
     LLAudioSource *asp = NULL;
     LLAudioData *adp = NULL;
-    data_map::iterator data_iter;
 
     // Check all channels for currently playing sounds.
     F32 max_pri = -1.f;
@@ -1133,7 +1134,6 @@ void LLAudioEngine::startNextTransfer()
     if (asset_id.isNull())
     {
         max_pri = -1.f;
-        source_map::iterator source_iter;
         for (source_map::value_type& source_pair : mAllSources)
         {
             asp = source_pair.second;
@@ -1238,13 +1238,76 @@ void LLAudioEngine::assetCallback(const LLUUID &uuid, LLAssetType::EType type, v
     gAudiop->startNextTransfer();
 }
 
+void LLAudioEngine::logSoundPlay(const LLUUID& id, LLVector3d position, S32 type, const LLUUID& assetid, const LLUUID& ownerid, const LLUUID& sourceid, bool is_trigger, bool is_looped)
+{
+    if(isCorruptSound(assetid))
+        return;
+
+    pruneSoundLog();
+    if (mSoundHistory.size() > 2048)
+        return; // Might clear out oldest entries before giving up?
+
+    auto item = std::make_unique<LLSoundHistoryItem>();
+    item->mID = id;
+    item->mPosition = position;
+    item->mType = type;
+    item->mAssetID = assetid;
+    item->mOwnerID = ownerid;
+    item->mSourceID = sourceid;
+    item->mPlaying = true;
+    item->mTimeStarted = LLTimer::getElapsedSeconds();
+    item->mTimeStopped = F64_MAX;
+    item->mIsTrigger = is_trigger;
+    item->mIsLooped = is_looped;
+
+    item->mReviewed = false;
+    item->mReviewedCollision = false;
+
+    mSoundHistory.insert_or_assign(id, std::move(item));
+}
+
+void LLAudioEngine::logSoundStop(const LLUUID& id)
+{
+    auto iter = mSoundHistory.find(id);
+    if (iter != mSoundHistory.end())
+    {
+        LLSoundHistoryItem& hist_item = *iter->second;
+        hist_item.mPlaying = false;
+        hist_item.mTimeStopped = LLTimer::getElapsedSeconds();
+        pruneSoundLog();
+    }
+}
+
+void LLAudioEngine::pruneSoundLog()
+{
+    if (++mSoundHistoryPruneCounter >= 64)
+    {
+        mSoundHistoryPruneCounter = 0;
+        while (mSoundHistory.size() > 256)
+        {
+            auto iter = mSoundHistory.begin();
+            auto end = mSoundHistory.end();
+            F64 lowest_time = (*iter).second->mTimeStopped;
+            LLUUID lowest_id = (*iter).first;
+            for (; iter != end; ++iter)
+            {
+                if ((*iter).second->mTimeStopped < lowest_time)
+                {
+                    lowest_time = (*iter).second->mTimeStopped;
+                    lowest_id = (*iter).first;
+                }
+            }
+            mSoundHistory.erase(lowest_id);
+        }
+    }
+}
 
 //
 // LLAudioSource implementation
 //
 
 
-LLAudioSource::LLAudioSource(const LLUUID& id, const LLUUID& owner_id, const F32 gain, const S32 type)
+LLAudioSource::LLAudioSource(const LLUUID& id, const LLUUID& owner_id, const F32 gain, const S32 type, const LLUUID& source_id, const bool is_trigger)
 :   mID(id),
     mOwnerID(owner_id),
     mPriority(0.f),
@@ -1260,8 +1323,11 @@ LLAudioSource::LLAudioSource(const LLUUID& id, const LLUUID& owner_id, const F32
     mType(type),
     mChannelp(NULL),
     mCurrentDatap(NULL),
-    mQueuedDatap(NULL)
+    mQueuedDatap(NULL),
+    mSourceID(source_id),
+    mIsTrigger(is_trigger)
 {
+    mLogID.generate();
 }
 
 
@@ -1272,6 +1338,11 @@ LLAudioSource::~LLAudioSource()
         // Stop playback of this sound
         mChannelp->setSource(NULL);
         mChannelp = NULL;
+    }
+
+    if (mType != LLAudioEngine::AUDIO_TYPE_UI) // && mSourceID.notNull())
+    {
+        gAudiop->logSoundStop(mLogID);
     }
 }
 
@@ -1396,12 +1467,18 @@ void LLAudioSource::stop()
 
 bool LLAudioSource::play(const LLUUID &audio_uuid)
 {
+    if(mType != LLAudioEngine::AUDIO_TYPE_UI) //&& mSourceID.notNull())
+    {
+        gAudiop->logSoundPlay(mLogID, mPositionGlobal, mType, audio_uuid, mOwnerID, mSourceID, mIsTrigger, mLoop);
+    }
+
     // Special abuse of play(); don't play a sound, but kill it.
     if (audio_uuid.isNull())
     {
         if (getChannel())
         {
-            getChannel()->setSource(NULL);
+            if(getChannel()->getSource())
+                getChannel()->setSource(NULL);
             setChannel(NULL);
             if (!isMuted())
             {
@@ -1421,6 +1498,8 @@ bool LLAudioSource::play(const LLUUID &audio_uuid)
     }
 
     LLAudioData *adp = gAudiop->getAudioData(audio_uuid);
+    if( !adp )
+        return false;
     addAudioData(adp);
 
     if (isMuted())
@@ -1823,11 +1902,7 @@ bool LLAudioData::load()
         return true;
     }
 
-    std::string uuid_str;
-    std::string wav_path;
-    mID.toString(uuid_str);
-    wav_path= gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str) + ".dsf";
-
+    std::string wav_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, mID.asString()) + ".dsf";
     mHasWAVLoadFailed = !mBufferp->loadWAV(wav_path);
     if (mHasWAVLoadFailed)
     {
@@ -1851,7 +1926,7 @@ bool LLAudioData::load()
     return true;
 }
 
-const U32 MAX_SOUND_RETRIES = 25;
+const U32 MAX_SOUND_RETRIES = 5;
 
 void LLAudioEngine::markSoundCorrupt(const LLUUID& sound_id)
 {

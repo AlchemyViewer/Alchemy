@@ -263,6 +263,20 @@ LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  HUDS_FRAME_PCT("huds_
 LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  UI_FRAME_PCT("ui_frame_pct");
 LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  SWAP_FRAME_PCT("swap_frame_pct");
 LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  IDLE_FRAME_PCT("idle_frame_pct");
+
+
+
+LLTrace::SampleStatHandle<U32> WEBRTC_PACKETS_IN_LOST("webrtc_packets_in_lost", "Lost incoming packets"),
+    WEBRTC_PACKETS_IN_RECEIVED("webrtc_packets_in_recv", "Incoming packets received"),
+    WEBRTC_PACKETS_OUT_SENT("webrtc_packets_out_sent", "Outgoing packets sent"),
+    WEBRTC_PACKETS_OUT_LOST("webrtc_packets_out_lost", "Lost outgoing packets");
+
+LLTrace::SampleStatHandle<F32> WEBRTC_JITTER_OUT("webrtc_jitter_out", "Timing variation of outgoing audio"),
+    WEBRTC_JITTER_IN("webrtc_jitter_in", "Timing variation of incoming audio"),
+    WEBRTC_LATENCY("webrtc_latency", "Round-trip audio delay"),
+    WEBRTC_UPLOAD_BANDWIDTH("webrtc_upload_bandwidth", "Estimated upload bandwidth"),
+    WEBRTC_JITTER_BUFFER("webrtc_jitter_buffer", "Average delay added to smooth incoming audio");
+
 }
 
 LLViewerStats::LLViewerStats()
@@ -597,12 +611,12 @@ void update_statistics()
                 pct_scene_render_time = llclamp(pct_scene_render_time, 0., 100.);
                 if (tot_sleep_time_raw == 0)
                 {
-                    sample(LLStatViewer::SCENERY_FRAME_PCT, (U32)llround(pct_scene_render_time));
-                    sample(LLStatViewer::AVATAR_FRAME_PCT, (U32)llround(pct_avatar_time));
-                    sample(LLStatViewer::HUDS_FRAME_PCT, (U32)llround(pct_huds_time));
-                    sample(LLStatViewer::UI_FRAME_PCT, (U32)llround(pct_ui_time));
-                    sample(LLStatViewer::SWAP_FRAME_PCT, (U32)llround(pct_swap_time));
-                    sample(LLStatViewer::IDLE_FRAME_PCT, (U32)llround(pct_idle_time));
+                    sample(LLStatViewer::SCENERY_FRAME_PCT, (U32)ll_round(pct_scene_render_time));
+                    sample(LLStatViewer::AVATAR_FRAME_PCT, (U32)ll_round(pct_avatar_time));
+                    sample(LLStatViewer::HUDS_FRAME_PCT, (U32)ll_round(pct_huds_time));
+                    sample(LLStatViewer::UI_FRAME_PCT, (U32)ll_round(pct_ui_time));
+                    sample(LLStatViewer::SWAP_FRAME_PCT, (U32)ll_round(pct_swap_time));
+                    sample(LLStatViewer::IDLE_FRAME_PCT, (U32)ll_round(pct_idle_time));
                 }
             }
             else
@@ -783,7 +797,11 @@ void send_viewer_stats(bool include_preferences)
     fail["failed_resends"] = (S32) gMessageSystem->mFailedResendPackets;
     fail["off_circuit"] = (S32) gMessageSystem->mOffCircuitPackets;
     fail["invalid"] = (S32) gMessageSystem->mInvalidOnCircuitPackets;
-    fail["missing_updater"] = (S32) LLAppViewer::instance()->isUpdaterMissing();
+#if LL_VELOPACK
+    fail["missing_updater"] = false;
+#else
+    fail["missing_updater"] = true;
+#endif
 
     LLSD &inventory = body["inventory"];
     inventory["usable"] = gInventory.isInventoryUsable();

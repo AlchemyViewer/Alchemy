@@ -46,13 +46,14 @@ typedef enum e_joystick_driver_state
     JDS_INITIALIZING
 } EJoystickDriverState;
 
-class LLViewerJoystick : public LLSingleton<LLViewerJoystick>
+class LLViewerJoystick : public LLSimpleton<LLViewerJoystick>
 {
-    LLSINGLETON(LLViewerJoystick);
-    virtual ~LLViewerJoystick();
     LOG_CLASS(LLViewerJoystick);
 
 public:
+    LLViewerJoystick();
+    ~LLViewerJoystick();
+
     void init(bool autoenable);
     void initDevice(LLSD &guid);
     bool initDevice(void * preffered_device /*LPDIRECTINPUTDEVICE8*/);

@@ -108,6 +108,7 @@
         <menu_item_check.on_click
          function="World.SetDoNotDisturb"/>
       </menu_item_check>
+
       <menu_item_separator/>
 
       <menu_item_call
@@ -158,7 +159,6 @@
       </menu_item_call>
 
       <menu_item_separator/>
-
       <menu_item_call
          label="Preferences..."
          name="Preferences"
@@ -717,6 +717,17 @@
           <menu_item_call.on_click
            function="World.SyncAnimations" />
         </menu_item_call>
+        <menu_item_check
+         label="Sound Explorer"
+         name="Sound Explorer"
+         use_mac_ctrl="true">
+            <menu_item_check.on_check
+             function="Floater.Visible"
+             parameter="sound_explorer" />
+            <menu_item_check.on_click
+             function="Floater.Toggle"
+             parameter="sound_explorer" />
+        </menu_item_check>
         <menu_item_separator/>
         <menu_item_call
          label="Landmark This Place"
@@ -783,7 +794,7 @@
              parameter="search" />
             <menu_item_check.on_click
              function="Avatar.ToggleSearch"/>
-            </menu_item_check>
+        </menu_item_check>
         <menu_item_separator/>
         <menu_item_call
          label="Teleport home"
@@ -814,8 +825,7 @@
         
 <menu_item_call
          label="360 snapshot"
-         name="Capture 360"
-         shortcut="control|alt|shift|s">
+         name="Capture 360">
             <menu_item_call.on_click
              function="Floater.Show"
              parameter="360capture" />
@@ -989,8 +999,7 @@
           <menu_item_separator />
           <menu_item_check
              label="Advanced Menu"
-             name="Show Advanced Menu"
-             shortcut="control|alt|D">
+             name="Show Advanced Menu">
             <on_check
                function="CheckControl"
                parameter="UseDebugMenus" />
@@ -1067,7 +1076,8 @@
           </menu_item_check>
           <menu_item_check
              label="Midday (Legacy)"
-             name="legacy noon">
+             name="legacy noon"
+             shortcut="control|shift|T">
             <menu_item_check.on_click
              function="World.EnvSettings"
              parameter="legacy noon" />
@@ -1109,7 +1119,7 @@
             <menu_item_check
              label="Use Shared Environment"
              name="Use Shared Environment"
-			 shortcut="control|shift|X">
+             shortcut="control|shift|X">
                 <menu_item_check.on_click
                  function="World.EnvSettings"
                  parameter="region" />
@@ -1197,7 +1207,7 @@ function="World.EnvPreset"
             <menu_item_call.on_enable
             function="RLV.EnableIfNot"
             parameter="setenv" />
-          </menu_item_call>
+</menu_item_call>
 </menu>
 	     	 	 <menu
 name="Sky Presets"
@@ -1725,6 +1735,29 @@ function="World.EnvPreset"
                      parameter="ShowSelectionBeam" />
                 </menu_item_check>
                 <menu_item_check
+	         label="Show Parcel Boundary Outline"
+	         name="RenderParcelSelection">
+			  <menu_item_check.on_check
+				 function="CheckControl"
+				 parameter="RenderParcelSelection" />
+			  <menu_item_check.on_click
+				 function="ToggleControl"
+				 parameter="RenderParcelSelection" />
+			</menu_item_check>
+	        <menu_item_check
+	         label="Show Boundary up to maximum build height"
+	         name="RenderParcelSelectionToMaxHeight">
+			  <menu_item_check.on_check
+				 function="CheckControl"
+				 parameter="RenderParcelSelectionToMaxHeight" />
+			  <menu_item_check.on_click
+				 function="ToggleControl"
+				 parameter="RenderParcelSelectionToMaxHeight" />
+				<menu_item_check.on_enable
+				   function="CheckControl"
+				   parameter="RenderParcelSelection" />
+			</menu_item_check>
+                <menu_item_check
                        label="Highlight Transparent"
                        name="Highlight Transparent"
                        shortcut="control|alt|T"
@@ -1734,28 +1767,28 @@ function="World.EnvPreset"
                   <menu_item_check.on_click
                    function="View.HighlightTransparent" />
                 </menu_item_check>
-			<menu_item_check
-				   label="Highlight Transparent Probes"
-				   name="Highlight Transparent Probes"
-				   shortcut="alt|shift|T">
-				<menu_item_check.on_check
-				 function="CheckControl"
-				 parameter="RenderReflectionProbeShowTransparent" />
-				<menu_item_check.on_click
-				 function="View.HighlightTransparentProbe" />
-				<menu_item_check.on_enable
-				 function="View.CheckHighlightTransparent"/>
-			</menu_item_check>
-		    	<menu_item_separator/>
                 <menu_item_check
-                       label="Grab objects with Ctrl-Drag"
-                       name="EnableCtrlDragMovement">
-                    <menu_item_check.on_check
-                     function="CheckControl"
-                     parameter="EnableGrab" />
-                    <menu_item_check.on_click
-                     function="ToggleControl"
-                     parameter="EnableGrab" />
+                   label="Highlight Transparent Probes"
+                   name="Highlight Transparent Probes"
+                   shortcut="alt|shift|T">
+                  <menu_item_check.on_check
+                   function="CheckControl"
+                   parameter="RenderReflectionProbeShowTransparent" />
+                  <menu_item_check.on_click
+                   function="View.HighlightTransparentProbe" />
+                  <menu_item_check.on_enable
+                   function="View.CheckHighlightTransparent"/>
+                </menu_item_check>
+                <menu_item_separator/>
+                <menu_item_check
+                   label="Grab objects with Ctrl-Drag"
+                   name="EnableCtrlDragMovement">
+                  <menu_item_check.on_check
+                   function="CheckControl"
+                   parameter="EnableGrab" />
+                  <menu_item_check.on_click
+                   function="ToggleControl"
+                   parameter="EnableGrab" />
                 </menu_item_check>
         <menu_item_separator/>
           
@@ -2082,7 +2115,7 @@ function="World.EnvPreset"
      tear_off="true"
      visible="true">
       <menu
-       label="Debug"
+       label="Develop"
        name="Debug"
        tear_off="true">
         <menu_item_check
@@ -2974,8 +3007,7 @@ function="World.EnvPreset"
      <menu_item_check
          label="Show Develop Menu"
          name="Debug Mode"
-         shortcut="control|alt|Q"
-         use_mac_ctrl="true">
+         shortcut="control|alt|Q">
             <menu_item_check.on_check
              function="CheckControl"
              parameter="QAMode" />
@@ -3038,18 +3070,6 @@ function="World.EnvPreset"
                 <menu_item_check.on_click
                  function="Advanced.ToggleConsole"
                  parameter="fast timers" />
-            </menu_item_check>
-            <menu_item_check
-             label="Memory"
-             name="Memory"
-             shortcut="control|shift|0"
-             use_mac_ctrl="true">
-                <menu_item_check.on_check
-                 function="Advanced.CheckConsole"
-                 parameter="memory view" />
-                <menu_item_check.on_click
-                 function="Advanced.ToggleConsole"
-                 parameter="memory view" />
             </menu_item_check>
             <menu_item_check
                label="Scene Statistics"
@@ -3321,7 +3341,7 @@ function="World.EnvPreset"
                  function="Advanced.ForceErrorOSException" />
                 <menu_item_call.on_visible
                  function="Advanced.EnableErrorOSException" />
-            </menu_item_call>            
+            </menu_item_call>
             <menu_item_call
              label="Force a Crash in a Coroutine"
              name="Force a Crash in a Coroutine">
@@ -3834,9 +3854,7 @@ function="World.EnvPreset"
             </menu_item_check>
             <menu_item_check
              label="Object-Object Occlusion"
-             name="Object-Object Occlusion"
-             shortcut="control|alt|shift|O"
-             use_mac_ctrl="true">
+             name="Object-Object Occlusion">
                 <menu_item_check.on_check
                  function="CheckControl"
                  parameter="UseOcclusion" />
@@ -3963,6 +3981,16 @@ function="World.EnvPreset"
                  parameter="RenderAttachedParticles" />
             </menu_item_check>
             <menu_item_check
+              label="Render Avatar Cloth"
+             name="Render Avatar Cloth">
+                <menu_item_check.on_check
+                 function="CheckControl"
+                 parameter="RenderAvatarCloth" />
+                <menu_item_check.on_click
+                 function="ToggleControl"
+                 parameter="RenderAvatarCloth" />
+            </menu_item_check>
+            <menu_item_check
              label="Collect Font Vertex Buffers"
              name="Collect Font Vertex Buffers">
                 <menu_item_check.on_check
@@ -4016,6 +4044,30 @@ function="World.EnvPreset"
                  function="ToggleControl"
                  parameter="AgentPause" />
             </menu_item_check>
+
+	        <menu_item_separator/>
+
+			<menu_item_call
+				label="Message Log..."
+				name="Message Log">
+				<menu_item_call.on_click
+					function="Floater.Show"
+					parameter="message_log" />
+			</menu_item_call>
+			<menu_item_call
+				label="Message Builder..."
+				name="Message Builder">
+				<menu_item_call.on_click
+					function="Floater.Show"
+					parameter="message_builder" />
+			</menu_item_call>
+			<menu_item_call
+				label="Message Rewriter..."
+				name="Message Rewriter">
+				<menu_item_call.on_click
+					function="Floater.Show"
+					parameter="message_rewriter" />
+			</menu_item_call>
 
             <menu_item_separator/>
 
@@ -4780,13 +4832,6 @@ function="World.EnvPreset"
         <menu_item_call.on_click
          function="Advanced.CompressFileTest" />
       </menu_item_call>
-
-      <menu_item_call
-         label="Enable Visual Leak Detector"
-         name="Enable Visual Leak Detector">
-        <menu_item_call.on_click
-           function="Advanced.ToggleVisualLeakDetector" />
-        </menu_item_call>
       
         <menu_item_check
          label="Output Debug Minidump"

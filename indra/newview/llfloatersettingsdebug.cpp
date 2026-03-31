@@ -40,7 +40,7 @@
 
 
 LLFloaterSettingsDebug::LLFloaterSettingsDebug(const LLSD& key)
-:   LLFloater(key.asString().empty() ? LLSD("all") : key),
+:   LLFloater(key),
     mSettingList(NULL)
 {
     mCommitCallbackRegistrar.add("CommitSettings",  boost::bind(&LLFloaterSettingsDebug::onCommitSettings, this));
@@ -109,14 +109,12 @@ void LLFloaterSettingsDebug::onCommitSettings()
 
     LLVector3 vector;
     LLVector3d vectord;
-    LLVector4 vector4;
     LLQuaternion quat;
     LLRect rect;
     LLColor4 col4;
     LLColor3 col3;
     LLColor4U col4U;
     LLColor4 color_with_alpha;
-    LLUUID uuid;
 
     switch(controlp->type())
     {
@@ -147,13 +145,6 @@ void LLFloaterSettingsDebug::onCommitSettings()
         vectord.mdV[VZ] = mValSpinner3->getValue().asReal();
         controlp->set(vectord.getValue());
         break;
-      case TYPE_VEC4:
-        vector4.mV[VX] = (F32)mValSpinner1->getValue().asReal();
-        vector4.mV[VY] = (F32)mValSpinner2->getValue().asReal();
-        vector4.mV[VZ] = (F32)mValSpinner3->getValue().asReal();
-        vector4.mV[VW] = (F32)mValSpinner4->getValue().asReal();
-        controlp->set(vector4.getValue());
-        break;
       case TYPE_QUAT:
         quat.mQ[VX] = mValSpinner1->getValueF32();
         quat.mQ[VY] = mValSpinner2->getValueF32();
@@ -179,10 +170,6 @@ void LLFloaterSettingsDebug::onCommitSettings()
         //col3.mV[VGREEN] = (F32)floaterp->mValSpinner2->getValue().asReal();
         //col3.mV[VBLUE] = (F32)floaterp->mValSpinner3->getValue().asReal();
         //controlp->set(col3.getValue());
-        break;
-      case TYPE_UUID:
-        LLUUID::parseUUID(mValText->getValue().asString(), &uuid);
-        controlp->set(LLSD(uuid));
         break;
       default:
         break;
@@ -304,7 +291,7 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
             mValSpinner1->setLabel(std::string("value")); // Debug, don't translate
             if (!mValSpinner1->hasFocus())
             {
-                mValSpinner1->setPrecision(5);
+                mValSpinner1->setPrecision(3);
                 mValSpinner1->setValue(sd);
             }
             break;
@@ -340,17 +327,17 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
             mValSpinner3->setLabel(std::string("Z"));
             if (!mValSpinner1->hasFocus())
             {
-                mValSpinner1->setPrecision(4);
+                mValSpinner1->setPrecision(3);
                 mValSpinner1->setValue(v[VX]);
             }
             if (!mValSpinner2->hasFocus())
             {
-                mValSpinner2->setPrecision(4);
+                mValSpinner2->setPrecision(3);
                 mValSpinner2->setValue(v[VY]);
             }
             if (!mValSpinner3->hasFocus())
             {
-                mValSpinner3->setPrecision(4);
+                mValSpinner3->setPrecision(3);
                 mValSpinner3->setValue(v[VZ]);
             }
             break;
@@ -367,52 +354,18 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
             mValSpinner3->setLabel(std::string("Z"));
             if (!mValSpinner1->hasFocus())
             {
-                mValSpinner1->setPrecision(4);
+                mValSpinner1->setPrecision(3);
                 mValSpinner1->setValue(v[VX]);
             }
             if (!mValSpinner2->hasFocus())
             {
-                mValSpinner2->setPrecision(4);
+                mValSpinner2->setPrecision(3);
                 mValSpinner2->setValue(v[VY]);
             }
             if (!mValSpinner3->hasFocus())
             {
-                mValSpinner3->setPrecision(4);
+                mValSpinner3->setPrecision(3);
                 mValSpinner3->setValue(v[VZ]);
-            }
-            break;
-          }
-          case TYPE_VEC4:
-          {
-            LLVector4 v;
-            v.setValue(sd);
-            mValSpinner1->setVisible(true);
-            mValSpinner1->setLabel(std::string("X"));
-            mValSpinner2->setVisible(true);
-            mValSpinner2->setLabel(std::string("Y"));
-            mValSpinner3->setVisible(true);
-            mValSpinner3->setLabel(std::string("Z"));
-            mValSpinner4->setVisible(true);
-            mValSpinner4->setLabel(std::string("W"));
-            if (!mValSpinner1->hasFocus())
-            {
-                mValSpinner1->setPrecision(4);
-                mValSpinner1->setValue(v[VX]);
-            }
-            if (!mValSpinner2->hasFocus())
-            {
-                mValSpinner2->setPrecision(4);
-                mValSpinner2->setValue(v[VY]);
-            }
-            if (!mValSpinner3->hasFocus())
-            {
-                mValSpinner3->setPrecision(4);
-                mValSpinner3->setValue(v[VZ]);
-            }
-            if (!mValSpinner4->hasFocus())
-            {
-                mValSpinner4->setPrecision(4);
-                mValSpinner4->setValue(v[VW]);
             }
             break;
           }
@@ -529,13 +482,6 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
             mColorSwatch->setValue(sd);
             break;
           }
-          case TYPE_UUID:
-            mValText->setVisible(true);
-            if (!mValText->hasFocus())
-            {
-                mValText->setValue(sd);
-            }
-            break;
 // [RLVa:KB] - Patch: RLVa-2.1.0
           case TYPE_LLSD:
           {

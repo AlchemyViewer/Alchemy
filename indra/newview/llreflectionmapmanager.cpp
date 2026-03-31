@@ -46,9 +46,9 @@
 #pragma warning (disable : 4702) // compiler complains unreachable code
 #endif
 #define TINYEXR_USE_MINIZ 0
-#include "zlib.h"
+#include <zlib.h>
 #define TINYEXR_IMPLEMENTATION
-#include "tinyexr/tinyexr.h"
+#include <tinyexr.h>
 #if LL_WINDOWS
 #pragma warning (pop)
 #endif
@@ -274,7 +274,7 @@ void LLReflectionMapManager::update()
 
     if (!mRenderTarget.isComplete())
     {
-        U32 color_fmt = render_hdr ? GL_RGB16F : GL_RGB8;
+        U32 color_fmt = render_hdr ? GL_R11F_G11F_B10F : GL_RGB8;
         U32 targetRes = mProbeResolution * 4; // super sample
         mRenderTarget.allocate(targetRes, targetRes, color_fmt, true);
     }
@@ -287,7 +287,7 @@ void LLReflectionMapManager::update()
         mMipChain.resize(count);
         for (U32 i = 0; i < count; ++i)
         {
-            mMipChain[i].allocate(res, res, render_hdr ? GL_RGB16F : GL_RGB8);
+            mMipChain[i].allocate(res, res, render_hdr ? GL_R11F_G11F_B10F : GL_RGB8);
             res /= 2;
         }
     }
@@ -567,7 +567,7 @@ U32 LLReflectionMapManager::probeCount()
 
 U32 LLReflectionMapManager::probeMemory()
 {
-    return (mDynamicProbeCount * 6 * (mProbeResolution * mProbeResolution) * 4) / 1024 / 1024 + (mDynamicProbeCount * 6 * (LL_IRRADIANCE_MAP_RESOLUTION * LL_IRRADIANCE_MAP_RESOLUTION) * 4) / 1024 / 1024;
+    return (mDynamicProbeCount * 6 * (mProbeResolution * mProbeResolution) * 4) / 1024 / 1024 + (mDynamicProbeCount * 6 * (mIrradianceMapResolution * mIrradianceMapResolution) * 4) / 1024 / 1024;
 }
 
 struct CompareProbeDepth
@@ -970,7 +970,7 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
             // find the mip target to start with based on irradiance map resolution
             for (start_mip = 0; start_mip < mMipChain.size(); ++start_mip)
             {
-                if (mMipChain[start_mip].getWidth() == LL_IRRADIANCE_MAP_RESOLUTION)
+                if (mMipChain[start_mip].getWidth() == mIrradianceMapResolution)
                 {
                     break;
                 }
@@ -998,11 +998,11 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
                     mTexture->bind(channel);
                 }
             }
+
+            gIrradianceGenProgram.unbind();
         }
 
         mMipChain[0].flush();
-
-        gIrradianceGenProgram.unbind();
     }
 }
 
@@ -1423,8 +1423,12 @@ void LLReflectionMapManager::renderDebug()
 void LLReflectionMapManager::initReflectionMaps()
 {
     static LLCachedControl<U32> ref_probe_res(gSavedSettings, "RenderReflectionProbeResolution", 128U);
+    static LLCachedControl<U32> ref_probe_irradiance_res(gSavedSettings, "RenderReflectionProbeIrradianceResolution", 16U);
+    bool high_precision_post = gSavedSettings.getBOOL("RenderHighPrecisionPostProcess");
     U32 probe_resolution = nhpo2(llclamp(ref_probe_res(), (U32)64, (U32)512));
-    if (mTexture.isNull() || mReflectionProbeCount != mDynamicProbeCount || mProbeResolution != probe_resolution || mReset)
+    U32 irradiance_resolution = llmin(nhpo2(llclamp(ref_probe_irradiance_res(), (U32)16, (U32)256)), probe_resolution); // Must be equal or smaller then probe resolution
+    if (mTexture.isNull() || mReflectionProbeCount != mDynamicProbeCount || mProbeResolution != probe_resolution ||
+        mIrradianceMapResolution != irradiance_resolution || mReset)
     {
         if(mProbeResolution != probe_resolution)
         {
@@ -1436,18 +1440,19 @@ void LLReflectionMapManager::initReflectionMaps()
         mReset = false;
         mReflectionProbeCount = mDynamicProbeCount;
         mProbeResolution = probe_resolution;
+        mIrradianceMapResolution = irradiance_resolution;
         mMaxProbeLOD = log2f((F32)mProbeResolution) - 1.f; // number of mips - 1
 
         if (mTexture.isNull() ||
             mTexture->getWidth() != mProbeResolution ||
             mReflectionProbeCount + 2 != mTexture->getCount())
         {
-#if 0 // LLCubeMapArray copy critically flawed
+#if 0 // Cubemap copy critically flawed and overflows
             if (mTexture)
             {
                 mTexture = new LLCubeMapArray(*mTexture, mProbeResolution, mReflectionProbeCount + 2);
 
-                mIrradianceMaps = new LLCubeMapArray(*mIrradianceMaps, LL_IRRADIANCE_MAP_RESOLUTION, mReflectionProbeCount);
+                mIrradianceMaps = new LLCubeMapArray(*mIrradianceMaps, mIrradianceMapResolution, mReflectionProbeCount);
             }
             else
 #endif
@@ -1461,7 +1466,7 @@ void LLReflectionMapManager::initReflectionMaps()
                 mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, render_hdr);
 
                 mIrradianceMaps = new LLCubeMapArray();
-                mIrradianceMaps->allocate(LL_IRRADIANCE_MAP_RESOLUTION, 3, mReflectionProbeCount, false, render_hdr);
+                mIrradianceMaps->allocate(mIrradianceMapResolution, 3, mReflectionProbeCount, false, render_hdr);
             }
         }
 

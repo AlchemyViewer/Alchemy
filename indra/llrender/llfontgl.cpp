@@ -286,9 +286,9 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // See drawGlyph.
     // Ex: with shadows it's 6 glyps per char. 30 fits exactly 5 chars.
     static constexpr S32 GLYPH_BATCH_SIZE = 30;
-    static LLVector4a vertices[GLYPH_BATCH_SIZE * 6];
-    static LLVector2 uvs[GLYPH_BATCH_SIZE * 6];
-    static LLColor4U colors[GLYPH_BATCH_SIZE * 6];
+    static thread_local LLVector4a vertices[GLYPH_BATCH_SIZE * 6];
+    static thread_local LLVector2 uvs[GLYPH_BATCH_SIZE * 6];
+    static thread_local LLColor4U colors[GLYPH_BATCH_SIZE * 6];
 
     LLColor4U text_color(color);
     // Preserve the transparency to render fading emojis in fading text (e.g.

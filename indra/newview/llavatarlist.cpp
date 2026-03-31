@@ -53,7 +53,10 @@
 static LLDefaultChildRegistry::Register<LLAvatarList> r("avatar_list");
 
 // Last interaction time update period.
-static const F32 LIT_UPDATE_PERIOD = 2;
+static const F32 LIT_UPDATE_PERIOD = 5;
+
+// Distance update period.
+static const F32 DIST_UPDATE_PERIOD = 1;
 
 // Maximum number of avatars that can be added to a list in one pass.
 // Used to limit time spent for avatar list update per frame.
@@ -221,7 +224,7 @@ void LLAvatarList::draw()
     else if (mShowDistance && mLITUpdateTimer->hasExpired())
     {
         updateDistances();
-        mLITUpdateTimer->setTimerExpirySec(LIT_UPDATE_PERIOD);
+        mLITUpdateTimer->setTimerExpirySec(DIST_UPDATE_PERIOD); // restart the timer
     }
 }
 
@@ -288,7 +291,7 @@ void LLAvatarList::refresh()
 
     // Handle added items.
     unsigned nadded = 0;
-    static const std::string waiting_str = LLTrans::getString("AvatarNameWaiting");
+    const std::string waiting_str = LLTrans::getString("AvatarNameWaiting");
 
     for (uuid_vec_t::const_iterator it=added.begin(); it != added.end(); it++)
     {
@@ -582,6 +585,11 @@ void LLAvatarList::updateLastInteractionTimes()
 
 void LLAvatarList::updateDistances()
 {
+    if (gDisconnected)
+    {
+        return;
+    }
+
     std::vector<LLPanel*> items;
     getItems(items);
 

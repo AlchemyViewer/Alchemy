@@ -348,6 +348,8 @@ public:
         SMAA_AREA_TEX,                      //  "areaTex"
         SMAA_SEARCH_TEX,                    //  "searchTex"
         SMAA_BLEND_TEX,                     //  "blendTex"
+        COLOR_GRADE_LUT,                    //  "color_grade_lut"
+        COLOR_GRADE_LUT_SIZE,               //  "color_grade_lut_size"
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;

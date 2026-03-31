@@ -52,9 +52,6 @@
 
 
 const F32 SPRING_STRENGTH = 0.7f;
-const F32 HORIZONTAL_PADDING = 16.f;
-const F32 VERTICAL_PADDING = 12.f;
-const F32 LINE_PADDING = 3.f;           // aka "leading"
 const F32 BUFFER_SIZE = 2.f;
 const S32 NUM_OVERLAP_ITERATIONS = 10;
 const F32 POSITION_DAMPING_TC = 0.2f;
@@ -263,6 +260,10 @@ void LLHUDNameTag::renderText()
 
     mOffsetY = lltrunc(mHeight * ((mVertAlignment == ALIGN_VERT_CENTER) ? 0.5f : 1.f));
 
+    static LLCachedControl<F32> name_tag_hpad(gSavedSettings, "NameTagHPad", 16.f);
+    static LLCachedControl<F32> name_tag_vpad(gSavedSettings, "NameTagVPad", 12.f);
+    static LLCachedControl<F32> name_tag_linepad(gSavedSettings, "NameTagLinePad", 3.f); // aka "leading"
+
     // *TODO: make this a per-text setting
     static LLCachedControl<F32> bubble_opacity(gSavedSettings, "ChatBubbleOpacity");
     static LLUIColor nametag_bg_color = LLUIColorTable::instance().getColor("NameTagBackground");
@@ -298,10 +299,10 @@ void LLHUDNameTag::renderText()
     if (mLabelSegments.size())
     {
         LLRect label_top_rect = screen_rect;
-        const S32 label_height = ll_round((mFontp->getLineHeight() * (F32)mLabelSegments.size() + (VERTICAL_PADDING / 3.f)));
+        const S32 label_height = ll_round((mFontp->getLineHeight() * (F32)mLabelSegments.size() + (name_tag_vpad / 3.f)));
         label_top_rect.mBottom = label_top_rect.mTop - label_height;
         LLColor4 label_top_color = text_color;
-        label_top_color.mV[VALPHA] = gSavedSettings.getF32("ChatBubbleOpacity") * alpha_factor;
+        label_top_color.mV[VALPHA] = bubble_opacity() * alpha_factor;
 
         mRoundedRectTopImgp->draw3D(render_position, x_pixel_vec, y_pixel_vec, label_top_rect, label_top_color);
     }
@@ -324,7 +325,7 @@ void LLHUDNameTag::renderText()
             }
             else // ALIGN_LEFT
             {
-                x_offset = -0.5f * mWidth + (HORIZONTAL_PADDING / 2.f);
+                x_offset = -0.5f * mWidth + (name_tag_hpad / 2.f);
             }
 
             LLColor4 label_color(0.f, 0.f, 0.f, alpha_factor);
@@ -352,7 +353,7 @@ void LLHUDNameTag::renderText()
         {
             const LLFontGL* fontp = segment_iter->mFont;
             y_offset -= fontp->getLineHeight();
-            y_offset -= LINE_PADDING;
+            y_offset -= name_tag_linepad;
 
             U8 style = segment_iter->mStyle;
             LLFontGL::ShadowType shadow = LLFontGL::DROP_SHADOW;
@@ -364,7 +365,7 @@ void LLHUDNameTag::renderText()
             }
             else // ALIGN_LEFT
             {
-                x_offset = -0.5f * mWidth + (HORIZONTAL_PADDING / 2.f);
+                x_offset = -0.5f * mWidth + (name_tag_hpad / 2.f);
 
                 // *HACK
                 x_offset += 1;
@@ -663,6 +664,10 @@ LLVector2 LLHUDNameTag::updateScreenPos(LLVector2 &offset)
 
 void LLHUDNameTag::updateSize()
 {
+    static LLCachedControl<F32> name_tag_hpad(gSavedSettings, "NameTagHPad", 16.f);
+    static LLCachedControl<F32> name_tag_vpad(gSavedSettings, "NameTagVPad", 12.f);
+    static LLCachedControl<F32> name_tag_linepad(gSavedSettings, "NameTagLinePad", 3.f); // aka "leading"
+
     F32 height = 0.f;
     F32 width = 0.f;
 
@@ -679,7 +684,7 @@ void LLHUDNameTag::updateSize()
     {
         const LLFontGL* fontp = iter->mFont;
         height += fontp->getLineHeight();
-        height += LINE_PADDING;
+        height += name_tag_linepad;
         width = llmax(width, llmin(iter->getWidth(fontp), NAMETAG_MAX_WIDTH));
         ++iter;
     }
@@ -687,7 +692,7 @@ void LLHUDNameTag::updateSize()
     // Don't want line spacing under the last line
     if (height > 0.f)
     {
-        height -= LINE_PADDING;
+        height -= name_tag_linepad;
     }
 
     iter = mLabelSegments.begin();
@@ -703,8 +708,8 @@ void LLHUDNameTag::updateSize()
         return;
     }
 
-    width += HORIZONTAL_PADDING;
-    height += VERTICAL_PADDING;
+    width += name_tag_hpad;
+    height += name_tag_vpad;
 
     // *TODO: Could do a timer-based resize here
     //mWidth = llmax(width, lerp(mWidth, (F32)width, u));

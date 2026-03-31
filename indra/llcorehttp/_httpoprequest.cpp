@@ -125,6 +125,7 @@ static const char * const LOG_CORE("CoreHttp");
 namespace LLCore
 {
 
+std::function<void(LLCore::HttpResponse* response)> HttpOpRequest::sMessageLogFunc = nullptr;
 
 HttpOpRequest::HttpOpRequest()
     : HttpOperation(),
@@ -147,13 +148,15 @@ HttpOpRequest::HttpOpRequest()
       mReplyLength(0),
       mReplyFullLength(0),
       mReplyHeaders(),
+      mReplyRetryAfter(0),
       mPolicyRetries(0),
       mPolicy503Retries(0),
       mPolicyRetryAt(HttpTime(0)),
       mPolicyRetryLimit(HTTP_RETRY_COUNT_DEFAULT),
       mPolicyMinRetryBackoff(HttpTime(HTTP_RETRY_BACKOFF_MIN_DEFAULT)),
       mPolicyMaxRetryBackoff(HttpTime(HTTP_RETRY_BACKOFF_MAX_DEFAULT)),
-      mCallbackSSLVerify(NULL)
+      mCallbackSSLVerify(nullptr),
+      mRequestId(0)
 {
     // *NOTE:  As members are added, retry initialization/cleanup
     // may need to be extended in @see prepareRequest().
@@ -263,6 +266,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
         response->setRequestURL(mReqURL);
 
         response->setRequestMethod(methodToString(mReqMethod));
+        response->setRequestId(mRequestId);
 
         if (mReplyOffset || mReplyLength)
         {
@@ -272,7 +276,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
         response->setContentType(mReplyConType);
         response->setRetries(mPolicyRetries, mPolicy503Retries);
 
-        HttpResponse::TransferStats::ptr_t stats = HttpResponse::TransferStats::ptr_t(new HttpResponse::TransferStats);
+        HttpResponse::TransferStats::ptr_t stats = std::make_shared<HttpResponse::TransferStats>();
 
         curl_easy_getinfo(mCurlHandle, CURLINFO_SIZE_DOWNLOAD, &stats->mSizeDownload);
         curl_easy_getinfo(mCurlHandle, CURLINFO_TOTAL_TIME, &stats->mTotalTime);
@@ -281,7 +285,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
         response->setTransferStats(stats);
 
         mUserHandler->onCompleted(this->getHandle(), response);
-
+        if (sMessageLogFunc != nullptr) sMessageLogFunc(response);
         response->release();
     }
 }
@@ -419,6 +423,7 @@ HttpStatus HttpOpRequest::setupMove(HttpRequest::policy_t policy_id,
     return HttpStatus();
 }
 
+static U64 sRequestId = 0;
 
 void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
                                 const std::string & url,
@@ -427,6 +432,7 @@ void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
                                 const HttpHeaders::ptr_t & headers)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    mRequestId = sRequestId++;
     mProcFlags = 0U;
     mReqPolicy = policy_id;
     mReqURL = url;
@@ -664,10 +670,15 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
         break;
     }
 
-
-    // *TODO: Should this be 'Keep-Alive' ?
-    mCurlHeaders = curl_slist_append(mCurlHeaders, "Connection: keep-alive");
-    mCurlHeaders = curl_slist_append(mCurlHeaders, "Keep-alive: 300");
+    if (!mReqHeaders || !mReqHeaders->find(HTTP_OUT_HEADER_CONNECTION))
+    {
+        // *TODO: Should this be 'Keep-Alive' ?
+        mCurlHeaders = curl_slist_append(mCurlHeaders, "Connection: keep-alive");
+    }
+    if (!mReqHeaders || !mReqHeaders->find(HTTP_OUT_HEADER_KEEP_ALIVE))
+    {
+        mCurlHeaders = curl_slist_append(mCurlHeaders, "Keep-alive: 300");
+    }
 
     // Tracing
     if (mTracing >= HTTP_TRACE_CURL_HEADERS)
@@ -964,7 +975,7 @@ size_t HttpOpRequest::headerCallback(void * data, size_t size, size_t nmemb, voi
         // Save headers in response
         if (! op->mReplyHeaders)
         {
-            op->mReplyHeaders = HttpHeaders::ptr_t(new HttpHeaders);
+            op->mReplyHeaders = std::make_shared<HttpHeaders>();
         }
         op->mReplyHeaders->append(name, value ? value : "");
     }

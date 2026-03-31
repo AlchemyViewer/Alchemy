@@ -487,7 +487,7 @@ LLFloaterCamera::LLFloaterCamera(const LLSD& val)
 {
     LLHints::getInstance()->registerHintTarget("view_popup", getHandle());
     mCommitCallbackRegistrar.add("CameraPresets.ChangeView", boost::bind(&LLFloaterCamera::onClickCameraItem, _2));
-    mCommitCallbackRegistrar.add("CameraPresets.Save", boost::bind(&LLFloaterCamera::onSavePreset, this));
+    mCommitCallbackRegistrar.add("CameraPresets.Save", boost::bind(&LLFloaterCamera::onSavePreset));
     mCommitCallbackRegistrar.add("CameraPresets.ShowPresetsList", boost::bind(&LLFloaterReg::showInstance, "camera_presets", LLSD(), false));
 }
 
@@ -507,7 +507,7 @@ bool LLFloaterCamera::postBuild()
 
 //  mPreciseCtrls->setShowCursorHand(false);
 //  mPreciseCtrls->setSoundFlags(LLView::MOUSE_UP);
-//  mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), FALSE));
+//  mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), false));
 
     mPresetCombo->setCommitCallback(boost::bind(&LLFloaterCamera::onCustomPresetSelected, this));
     LLPresetsManager::getInstance()->setPresetListChangeCameraCallback(boost::bind(&LLFloaterCamera::populatePresetCombo, this));
@@ -756,6 +756,7 @@ void LLFloaterCamera::populatePresetCombo()
     updateItemsSelection();
 }
 
+// static
 void LLFloaterCamera::onSavePreset()
 {
     LLFloaterReg::hideInstance("delete_pref_preset", PRESETS_CAMERA);
@@ -775,15 +776,15 @@ void LLFloaterCamera::onCustomPresetSelected()
 
 void LLFloaterCamera::toggleCollapse()
 {
-    BOOL setting = !gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
+    bool setting = !gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
     gSavedSettings.setBOOL("AlchemyCameraFloaterExpanded", setting);
     collapse();
 }
 
 void LLFloaterCamera::collapse()
 {
-    BOOL collapse = gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
+    bool collapse = gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
     mBtnCollapse->setImageOverlay(collapse ? "Conv_toolbar_collapse" : "Conv_toolbar_expand");
     getChild<LLPanel>("buttons_panel")->setVisible(collapse);
-    reshape(collapse ? 370 : 210, getRect().getHeight(), FALSE);
+    reshape(collapse ? 370 : 210, getRect().getHeight(), false);
 }

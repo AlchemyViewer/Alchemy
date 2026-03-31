@@ -36,11 +36,7 @@
 #include "llbufferstream.h"
 #include "llfile.h"
 #include "llmenugl.h"
-#ifdef LL_USESYSTEMLIBS
-# include "expat.h"
-#else
-# include "expat/expat.h"
-#endif
+#include <expat.h>
 #include "llcallbacklist.h"
 #include "llviewerregion.h"
 #include "llviewernetwork.h"        // for gGridChoice
@@ -72,7 +68,7 @@
 #include "stringize.h"
 
 // for base64 decoding
-#include "apr_base64.h"
+#include <simdutf.h>
 
 #define USE_SESSION_GROUPS 0
 #define VX_NULL_POSITION -2147483648.0 /*The Silence*/
@@ -943,8 +939,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
         gDirUtilp->append(exe_path, "SLVoice");
 #endif
         // See if the vivox executable exists
-        llstat s;
-        if (!LLFile::stat(exe_path, &s))
+        if (LLFile::isfile(exe_path))
         {
             // vivox executable exists.  Build the command line and launch the daemon.
             LLProcess::Params params;
@@ -1014,7 +1009,6 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
             std::string old_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "SLVoice.old");
             if (gDirUtilp->fileExists(new_log))
             {
-                LLFile::remove(old_log, ENOENT);
                 LLFile::rename(new_log, old_log);
             }
 
@@ -1108,7 +1102,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
 
     while (!sPump && !sShuttingDown)
     {   // Can't use the pump until we have it available.
-        llcoro::suspend();
+        llcoro::suspendUntilNextFrame();
     }
 
     if (sShuttingDown)
@@ -1165,9 +1159,9 @@ bool LLVivoxVoiceClient::provisionVoiceAccount()
 
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("voiceAccountProvision", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("voiceAccountProvision", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     int retryCount(0);
 
     LLSD result;
@@ -1577,8 +1571,8 @@ bool LLVivoxVoiceClient::requestParcelVoiceInfo()
 
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("parcelVoiceInfoRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("parcelVoiceInfoRequest", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->postAndSuspend(httpRequest, url, LLSD());
 
@@ -4621,7 +4615,7 @@ LLVivoxVoiceClient::participantStatePtr_t LLVivoxVoiceClient::sessionState::addP
     if(!result)
     {
         // participant isn't already in one list or the other.
-        result.reset(new participantState(useAlternateURI?mSIPURI:uri));
+        result = std::make_shared<participantState>(useAlternateURI?mSIPURI:uri);
         mParticipantsByURI.insert(participantMap::value_type(result->mURI, result));
         mParticipantsChanged = true;
 
@@ -5249,16 +5243,18 @@ bool LLVivoxVoiceClient::IDFromName(const std::string inName, LLUUID &uuid)
         // The name appears to have the right form.
 
         // Reverse the transforms done by nameFromID
-        std::string temp = name;
+        std::string temp = name.substr(1); // Skip ahead one character to match how apr was used
         LLStringUtil::replaceChar(temp, '-', '+');
         LLStringUtil::replaceChar(temp, '_', '/');
 
-        U8 rawuuid[UUID_BYTES + 1];
-        int len = apr_base64_decode_binary(rawuuid, temp.c_str() + 1);
-        if(len == UUID_BYTES)
+        // allocate enough memory for the maximal binary length
+        std::vector<uint8_t> buffer(simdutf::binary_length_from_base64(temp.data(), temp.size()));
+        // convert to binary and check for errors
+        simdutf::result r = simdutf::base64_to_binary(temp.data(), temp.size(), (char*)buffer.data());
+        if(r.error == simdutf::error_code::SUCCESS && r.count == UUID_BYTES)
         {
             // The decode succeeded.  Stuff the bits into the result's UUID
-            memcpy(uuid.mData, rawuuid, UUID_BYTES);
+            memcpy(uuid.mData, buffer.data(), UUID_BYTES);
             result = true;
         }
     }

@@ -536,17 +536,8 @@ bool LLComboBox::setCurrentByIndex(S32 index)
         if (item->getEnabled())
         {
             mList->selectItem(item, -1, true);
-            LLSD::String label = item->getColumn(0)->getValue().asString();
-            if (mTextEntry)
-            {
-                mTextEntry->setText(label);
-                mTextEntry->setTentative(false);
-            }
-            if (!mAllowTextEntry)
-            {
-                mButton->setLabel(label);
-            }
             mLastSelectedIndex = index;
+            updateLabel();
             return true;
         }
     }
@@ -1024,7 +1015,7 @@ void LLComboBox::setKeystrokeOnEsc(bool enable)
 
 void LLComboBox::onTextEntry(LLLineEditor* line_editor)
 {
-    if (mTextEntryCallback != NULL)
+    if (mTextEntryCallback != nullptr)
     {
         (mTextEntryCallback)(line_editor, LLSD());
     }
@@ -1044,7 +1035,7 @@ void LLComboBox::onTextEntry(LLLineEditor* line_editor)
             mList->deselectAllItems();
             mLastSelectedIndex = -1;
         }
-        if (mTextChangedCallback != NULL)
+        if (mTextChangedCallback != nullptr)
         {
             (mTextChangedCallback)(line_editor, LLSD());
         }
@@ -1092,7 +1083,7 @@ void LLComboBox::onTextEntry(LLLineEditor* line_editor)
         // RN: presumably text entry
         updateSelection();
     }
-    if (mTextChangedCallback != NULL)
+    if (mTextChangedCallback != nullptr)
     {
         (mTextChangedCallback)(line_editor, LLSD());
     }

@@ -32,7 +32,6 @@
 #include "llfasttimer.h"
 #include "llrender.h"
 
-#include "llapr.h"
 #include "llbox.h"
 #include "lldrawable.h"
 #include "lldrawpoolavatar.h"

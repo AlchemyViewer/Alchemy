@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2011, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -17,6 +18,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "llagent.h"
 #include "llavataractions.h"            // LLAvatarActions::profileVisible()
+#include "llchatmentionhelper.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llhudtext.h"                  // LLHUDText::refreshAllObjectText()
 #include "llimview.h"                   // LLIMMgr::computeSessionID()
@@ -61,6 +63,7 @@ RlvUIEnabler::RlvUIEnabler()
 
     // onToggleXXX
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWLOC, boost::bind(&RlvUIEnabler::onToggleShowLoc, this)));
+    m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWNAMES, boost::bind(&RlvUIEnabler::onToggleShowNames, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWMINIMAP, boost::bind(&RlvUIEnabler::onToggleShowMinimap, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWWORLDMAP, boost::bind(&RlvUIEnabler::onToggleShowWorldMap, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_UNSIT, boost::bind(&RlvUIEnabler::onToggleUnsit, this)));
@@ -175,6 +178,16 @@ void RlvUIEnabler::onToggleShowLoc()
     }
 }
 
+// Checked: 2026-02-12 (RLVa-2.4.2)
+void RlvUIEnabler::onToggleShowNames()
+{
+    const bool can_show = !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES);
+    if (!can_show)
+    {
+        LLChatMentionHelper::instance().hideHelper();
+    }
+}
+
 // Checked: 2010-02-28 (RLVa-1.4.0a) | Added: RLVa-1.2.0a
 void RlvUIEnabler::onToggleShowMinimap()
 {
@@ -279,11 +292,7 @@ void RlvUIEnabler::onUpdateLoginLastLocation(bool fQuitting)
 
 // ============================================================================
 
-#ifdef CATZNIP_STRINGVIEW
-bool RlvUIEnabler::addGenericFloaterFilter(const std::string& strFloaterName, const boost::string_view& strRlvNotification)
-#else
-bool RlvUIEnabler::addGenericFloaterFilter(const std::string& strFloaterName, const std::string& strRlvNotification)
-#endif // CATZNIP_STRINGVIEW
+bool RlvUIEnabler::addGenericFloaterFilter(const std::string& strFloaterName, std::string_view strRlvNotification)
 {
     return addGenericFloaterFilter(strFloaterName, [strRlvNotification]() { RlvUtil::notifyBlocked(strRlvNotification); });
 }

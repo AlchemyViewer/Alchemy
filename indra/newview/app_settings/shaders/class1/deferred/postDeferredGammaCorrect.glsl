@@ -43,6 +43,10 @@ vec3 legacyGamma(vec3 color)
     return c;
 }
 
+#ifdef COLOR_GRADE
+vec3 applyLUTGrading(vec3 diff);
+#endif
+
 void main()
 {
     //this is the one of the rare spots where diffuseRect contains linear color values (not sRGB)
@@ -51,6 +55,10 @@ void main()
 
 #ifdef LEGACY_GAMMA
     diff.rgb = legacyGamma(diff.rgb);
+#endif
+
+#ifdef COLOR_GRADE
+    diff.rgb = applyLUTGrading(diff.rgb);
 #endif
 
     diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0));

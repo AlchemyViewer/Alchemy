@@ -144,14 +144,16 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     LLColor3 light_diffuse(0, 0, 0);
 
-    static LLCachedControl<bool> has_normal_mips(gSavedSettings, "RenderWaterMipNormal");
     LLEnvironment& environment = LLEnvironment::instance();
     LLSettingsWater::ptr_t pwater = environment.getCurrentWater();
     LLSettingsSky::ptr_t   psky   = environment.getCurrentSky();
     LLVector3              light_dir       = environment.getLightDirection();
     bool                   sun_up          = environment.getIsSunUp();
     bool                   moon_up         = environment.getIsMoonUp();
+    bool                   has_normal_mips = gSavedSettings.getBOOL("RenderWaterMipNormal");
     bool                   underwater      = LLViewerCamera::getInstance()->cameraUnderWater();
+    LLColor4               fog_color       = LLColor4(pwater->getWaterFogColor(), 0.f);
+    LLColor3               fog_color_linear = linearColor3(fog_color);
 
     if (sun_up)
     {
@@ -224,7 +226,14 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
 
+    F32      fog_density = pwater->getModifiedWaterFogDensity(underwater);
+
     shader->bindTexture(LLShaderMgr::WATER_SCREENTEX, &gPipeline.mWaterDis);
+
+    if (mShaderLevel == 1)
+    {
+        fog_color.mV[VALPHA] = (F32)(log(fog_density) / log(2));
+    }
 
     F32 water_height = environment.getWaterHeight();
     F32 camera_height = LLViewerCamera::getInstance()->getOrigin().mV[2];
@@ -258,6 +267,9 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     static LLCachedControl<U32> tonemap_type_setting(gSavedSettings, "RenderTonemapType", 0U);
     shader->uniform1i(tonemap_type, tonemap_type_setting);
     shader->uniform1f(tonemap_mix, psky->getTonemapMix(should_auto_adjust()));
+
+    F32 sunAngle = llmax(0.f, light_dir.mV[1]);
+    F32 scaledAngle = 1.f - sunAngle;
 
     shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up ? 1 : 0);
 

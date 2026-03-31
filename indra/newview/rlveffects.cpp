@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2021&license=viewerlgpl$
  * Copyright (c) 2021, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -300,6 +301,7 @@ void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 {
     pShader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)gPipeline.mRT->screen.getWidth(), (GLfloat)gPipeline.mRT->screen.getHeight());
     pShader->uniform1i(LLShaderMgr::RLV_EFFECT_MODE, llclamp((int)m_eMode, 0, (int)ESphereMode::Count));
+
     // Pass the sphere origin to the shader
     LLVector4 posSphereOrigin;
     switch (m_eOrigin)
@@ -351,7 +353,7 @@ void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectPara
     if (nDiffuseChannel > -1)
     {
         pParams->m_pSrcBuffer->bindTexture(0, nDiffuseChannel);
-        gGL.getTexUnit(nDiffuseChannel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+        gGL.getTexUnit(nDiffuseChannel)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
     }
 
     S32 nDepthChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mRT->deferredScreen.getUsage());

@@ -65,17 +65,14 @@
 #include "lltoolmgr.h"
 #include "lltoolpie.h"
 #include "llkeyboard.h"
+#include "llmeshrepository.h"
 #include "u64.h"
 #include "llviewertexturelist.h"
 #include "lldatapacker.h"
 // [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2.1)
-#include "llderenderlist.h"
+#include "alderenderlist.h"
 // [/SL:KB]
-#ifdef LL_USESYSTEMLIBS
 #include <zlib.h>
-#else
-#include "zlib-ng/zlib.h"
-#endif
 #include "object_flags.h"
 
 #include "llappviewer.h"
@@ -356,7 +353,7 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
 
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
     // Don't recreate derendered objects (also kill the cache entry so we don't do this per-frame)
-    if (LLDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, entry))
+    if (ALDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, entry))
     {
         regionp->killCacheEntry(local_id);  // NOTE: this will kill all child entries from the cache as well
         return NULL;
@@ -647,11 +644,11 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                 {
                     U32 idRootLocal = 0;
                     mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ParentID, idRootLocal, i);
-                    fBlockObject = LLDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, local_id, idRootLocal);
+                    fBlockObject = ALDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, local_id, idRootLocal);
                 }
                 else if (OUT_FULL_COMPRESSED == update_type)
                 {
-                    fBlockObject = LLDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, local_id, compressed_dp.getBuffer());
+                    fBlockObject = ALDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, local_id, compressed_dp.getBuffer());
                 }
 
                 if (fBlockObject)
@@ -887,22 +884,16 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 void LLViewerObjectList::update(LLAgent &agent)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
-    static LLCachedControl<bool> cc_velocity_interpolate(gSavedSettings, "VelocityInterpolate");
-    static LLCachedControl<bool> cc_ping_interpolate(gSavedSettings, "PingInterpolate");
-    static LLCachedControl<F32> cc_interpolation_time(gSavedSettings, "InterpolationTime");
-    static LLCachedControl<F32> cc_ping_region_cross_interp(gSavedSettings, "RegionCrossingInterpolationTime");
-    static LLCachedControl<F32> cc_interpolation_phase_out(gSavedSettings, "InterpolationPhaseOut");
-    static LLCachedControl<bool> cc_animate_textures(gSavedSettings, "AnimateTextures");
 
     // Update globals
-    LLViewerObject::setVelocityInterpolate( cc_velocity_interpolate );
-    LLViewerObject::setPingInterpolate( cc_ping_interpolate );
+    LLViewerObject::setVelocityInterpolate( gSavedSettings.getBOOL("VelocityInterpolate") );
+    LLViewerObject::setPingInterpolate( gSavedSettings.getBOOL("PingInterpolate") );
 
-    F32 interp_time = cc_interpolation_time;
-    F32 phase_out_time = cc_interpolation_phase_out;
-    F32 region_interp_time = llclamp(cc_ping_region_cross_interp(), 0.5f, 5.f);
-    if (interp_time < 0.0f ||
-        phase_out_time < 0.0f ||
+    F32 interp_time = gSavedSettings.getF32("InterpolationTime");
+    F32 phase_out_time = gSavedSettings.getF32("InterpolationPhaseOut");
+    F32 region_interp_time = llclamp(gSavedSettings.getF32("RegionCrossingInterpolationTime"), 0.5f, 5.f);
+    if (interp_time < 0.0 ||
+        phase_out_time < 0.0 ||
         phase_out_time > interp_time)
     {
         LL_WARNS() << "Invalid values for InterpolationTime or InterpolationPhaseOut, resetting to defaults" << LL_ENDL;
@@ -913,7 +904,7 @@ void LLViewerObjectList::update(LLAgent &agent)
     LLViewerObject::setMaxUpdateInterpolationTime( phase_out_time );
     LLViewerObject::setMaxRegionCrossingInterpolationTime(region_interp_time);
 
-    gAnimateTextures = cc_animate_textures;
+    gAnimateTextures = gSavedSettings.getBOOL("AnimateTextures");
 
     // update global timer
     F32 last_time = gFrameTimeSeconds;
@@ -976,8 +967,7 @@ void LLViewerObjectList::update(LLAgent &agent)
 
     std::vector<LLViewerObject*>::iterator idle_end = idle_list.begin()+idle_count;
 
-    static const LLCachedControl<bool> freezeTime(gSavedSettings, "FreezeTime");
-    if (freezeTime)
+    if (gSavedSettings.getBOOL("FreezeTime"))
     {
 
         for (std::vector<LLViewerObject*>::iterator iter = idle_list.begin();
@@ -1118,8 +1108,8 @@ void LLViewerObjectList::fetchObjectCostsCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("fetchObjectCostsCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
 
 
@@ -1242,8 +1232,8 @@ void LLViewerObjectList::fetchPhisicsFlagsCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("fetchPhisicsFlagsCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD idList;
     U32 objectIndex = 0;
@@ -1460,6 +1450,8 @@ void LLViewerObjectList::killAllObjects()
         // Object must be dead, or it's the LLVOAvatarSelf which never dies.
         llassert((objectp == gAgentAvatarp) || objectp->isDead());
     }
+
+    gMeshRepo.unregisterAllMeshes();
 
     cleanDeadObjects(false);
 

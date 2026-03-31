@@ -46,7 +46,7 @@ public:
     // mistake to shadow the base-class method with an LLWindowHeadless
     // override when called on the subclass, yet call the base-class method
     // when indirecting through a polymorphic pointer or reference?
-    bool getFullscreen() override {return false;}
+    bool getFullscreen() {return false;}
     /*virtual*/ bool getPosition(LLCoordScreen *position) override {return false;}
     /*virtual*/ bool getSize(LLCoordScreen *size) override {return false;}
     /*virtual*/ bool getSize(LLCoordWindow *size) override {return false;}
@@ -63,6 +63,7 @@ public:
 #if LL_WINDOWS && !LL_SDL_WINDOW
     /*virtual*/ bool getCursorDelta(LLCoordCommon* delta) override { return false; }
 #endif
+    /*virtual*/ bool isWrapMouse() const override { return true; }
     /*virtual*/ void showCursor() override {}
     /*virtual*/ void hideCursor() override {}
     /*virtual*/ void showCursorFromMouseMove() override {}

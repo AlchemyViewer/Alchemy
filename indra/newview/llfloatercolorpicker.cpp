@@ -173,7 +173,7 @@ void LLFloaterColorPicker::showUI ()
     setFocus ( true );
 
     // HACK: if system color picker is required - close the SL one we made and use default system dialog
-    if ( gSavedSettings.getBOOL( "UseDefaultColorPicker" ) )
+    if ( gSavedSettings.getBOOL ( "UseDefaultColorPicker" ) )
     {
         LLColorSwatchCtrl* swatch = getSwatch ();
 
@@ -242,8 +242,6 @@ bool LLFloaterColorPicker::postBuild()
     childSetCommitCallback("sspin", onTextCommit, (void*)this );
     childSetCommitCallback("lspin", onTextCommit, (void*)this );
     childSetCommitCallback("hex_value", onTextCommit, (void*)this );
-
-    LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _1));
 
     return true;
 }
@@ -430,6 +428,8 @@ void LLFloaterColorPicker::onClickPipette( )
     pipette_active = !pipette_active;
     if (pipette_active)
     {
+        LLToolMgr::getInstance()->clearTransientTool();
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _1, _3));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
     }
     else
@@ -465,10 +465,13 @@ void LLFloaterColorPicker::onImmediateCheck( LLUICtrl* ctrl, void* data)
     }
 }
 
-void LLFloaterColorPicker::onColorSelect( const LLTextureEntry& te )
+void LLFloaterColorPicker::onColorSelect(bool success, const LLTextureEntry& te)
 {
     // Pipete
-    selectCurRgb(te.getColor().mV[VRED], te.getColor().mV[VGREEN], te.getColor().mV[VBLUE]);
+    if (success)
+    {
+        selectCurRgb(te.getColor().mV[VRED], te.getColor().mV[VGREEN], te.getColor().mV[VBLUE]);
+    }
 }
 
 void LLFloaterColorPicker::onMouseCaptureLost()

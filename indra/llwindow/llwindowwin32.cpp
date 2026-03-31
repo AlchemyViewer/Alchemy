@@ -49,6 +49,7 @@
 #include "llthreadsafequeue.h"
 #include "stringize.h"
 #include "llframetimer.h"
+#include "llwatchdog.h"
 
 // System includes
 #include <commdlg.h>
@@ -73,13 +74,9 @@
 #include <dinput.h>
 #include <Dbt.h.>
 #include <InitGuid.h> // needed for llurlentry test to build on some systems
-#pragma comment(lib, "dxguid.lib") // needed for llurlentry test to build on some systems
-#pragma comment(lib, "dinput8")
-
-#pragma comment(lib, "UxTheme.lib")
-#pragma comment(lib, "Dwmapi.lib")
 #include <Uxtheme.h>
 #include <dwmapi.h> // needed for DwmSetWindowAttribute to set window theme
+#include <shellscalingapi.h>
 
 const S32   MAX_MESSAGE_PER_UPDATE = 20;
 const S32   BITS_PER_PIXEL = 32;
@@ -116,35 +113,6 @@ LPWSTR gIconResource = IDI_APPLICATION;
 LPDIRECTINPUT8 gDirectInput8;
 
 LLW32MsgCallback gAsyncMsgCallback = NULL;
-
-#ifndef DPI_ENUMS_DECLARED
-
-typedef enum PROCESS_DPI_AWARENESS {
-    PROCESS_DPI_UNAWARE = 0,
-    PROCESS_SYSTEM_DPI_AWARE = 1,
-    PROCESS_PER_MONITOR_DPI_AWARE = 2
-} PROCESS_DPI_AWARENESS;
-
-typedef enum MONITOR_DPI_TYPE {
-    MDT_EFFECTIVE_DPI = 0,
-    MDT_ANGULAR_DPI = 1,
-    MDT_RAW_DPI = 2,
-    MDT_DEFAULT = MDT_EFFECTIVE_DPI
-} MONITOR_DPI_TYPE;
-
-#endif
-
-typedef HRESULT(STDAPICALLTYPE *SetProcessDpiAwarenessType)(_In_ PROCESS_DPI_AWARENESS value);
-
-typedef HRESULT(STDAPICALLTYPE *GetProcessDpiAwarenessType)(
-    _In_ HANDLE hprocess,
-    _Out_ PROCESS_DPI_AWARENESS *value);
-
-typedef HRESULT(STDAPICALLTYPE *GetDpiForMonitorType)(
-    _In_ HMONITOR hmonitor,
-    _In_ MONITOR_DPI_TYPE dpiType,
-    _Out_ UINT *dpiX,
-    _Out_ UINT *dpiY);
 
 typedef enum PREFERRED_APP_MODE
 {
@@ -203,6 +171,7 @@ HKL     LLWindowWin32::sWinInputLocale = 0;
 DWORD   LLWindowWin32::sWinIMEConversionMode = IME_CMODE_NATIVE;
 DWORD   LLWindowWin32::sWinIMESentenceMode = IME_SMODE_AUTOMATIC;
 LLCoordWindow LLWindowWin32::sWinIMEWindowPosition(-1,-1);
+HMODULE LLWindowWin32::sGLDLLHandle = nullptr;
 
 static HWND sWindowHandleForMessageBox = NULL;
 
@@ -363,7 +332,8 @@ static LLMonitorInfo sMonitorInfo;
 // the containing class a friend.
 struct LLWindowWin32::LLWindowWin32Thread : public LL::ThreadPool
 {
-    static const int MAX_QUEUE_SIZE = 2048;
+    static constexpr int MAX_QUEUE_SIZE = 2048;
+    static constexpr F32 WINDOW_TIMEOUT_SEC = 90.f;
 
     LLThreadSafeQueue<MSG> mMessageQueue;
 
@@ -425,6 +395,50 @@ struct LLWindowWin32::LLWindowWin32Thread : public LL::ThreadPool
         PostMessage(windowHandle, WM_POST_FUNCTION_, wparam, LPARAM(ptr));
     }
 
+    // Call from main thread.
+    void initTimeout()
+    {
+        // post into thread's queue to avoid threading issues
+        post([this]()
+        {
+            if (!mWindowTimeout)
+            {
+                mWindowTimeout = std::make_unique<LLWatchdogTimeout>("WindowThread");
+                // supposed to be executed within run(),
+                // so no point checking if thread is alive
+                resumeTimeout("TimeoutInit");
+            }
+        });
+    }
+private:
+    // These timeout related functions are strictly for the thread.
+    void resumeTimeout(std::string_view state)
+    {
+        if (mWindowTimeout)
+        {
+            mWindowTimeout->setTimeout(WINDOW_TIMEOUT_SEC);
+            mWindowTimeout->start(state);
+        }
+    }
+
+    void pauseTimeout()
+    {
+        if (mWindowTimeout)
+        {
+            mWindowTimeout->stop();
+        }
+    }
+
+    void pingTimeout(std::string_view state)
+    {
+        if (mWindowTimeout)
+        {
+            mWindowTimeout->setTimeout(WINDOW_TIMEOUT_SEC);
+            mWindowTimeout->ping(state);
+        }
+    }
+
+public:
     using FuncType = std::function<void()>;
     // call GetMessage() and pull enqueue messages for later processing
     HWND mWindowHandleThrd = NULL;
@@ -435,6 +449,8 @@ struct LLWindowWin32::LLWindowWin32Thread : public LL::ThreadPool
     bool mGLReady = false;
     bool mGotGLBuffer = false;
     LLAtomicBool mDeleteOnExit = false;
+private:
+    std::unique_ptr<LLWatchdogTimeout> mWindowTimeout;
 };
 
 
@@ -449,6 +465,7 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
                              F32 max_gl_version)
     :
     LLWindow(callbacks, fullscreen, flags),
+    mAbsoluteCursorPosition(false),
     mMaxGLVersion(max_gl_version),
     mMaxCores(max_cores)
 {
@@ -456,7 +473,7 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
     mWindowThread = new LLWindowWin32Thread();
 
     //MAINT-516 -- force a load of opengl32.dll just in case windows went sideways
-    LoadLibrary(L"opengl32.dll");
+    sGLDLLHandle = LoadLibrary(L"opengl32.dll");
 
 
     if (mMaxCores != 0)
@@ -1039,7 +1056,7 @@ bool LLWindowWin32::maximize()
     bool success = false;
     if (!mWindowHandle) return success;
 
-    mWindowThread->post([=]
+    mWindowThread->post([=, this]
         {
             WINDOWPLACEMENT placement;
             placement.length = sizeof(WINDOWPLACEMENT);
@@ -1103,7 +1120,7 @@ bool LLWindowWin32::setSizeImpl(const LLCoordScreen size)
         return false;
     }
 
-    mWindowThread->post([=]()
+    mWindowThread->post([=, this]()
         {
             WINDOWPLACEMENT placement;
             placement.length = sizeof(WINDOWPLACEMENT);
@@ -1416,136 +1433,100 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
 
     if (wglChoosePixelFormatARB && wglGetPixelFormatAttribivARB)
     {
-        // OK, at this point, use the ARB wglChoosePixelFormatsARB function to see if we
-        // can get exactly what we want.
-        GLint attrib_list[256];
-        S32 cur_attrib = 0;
-
-        attrib_list[cur_attrib++] = WGL_DEPTH_BITS_ARB;
-        attrib_list[cur_attrib++] = 24;
-
-        //attrib_list[cur_attrib++] = WGL_STENCIL_BITS_ARB; //stencil buffer is deprecated (performance penalty)
-        //attrib_list[cur_attrib++] = 8;
-
-        attrib_list[cur_attrib++] = WGL_DRAW_TO_WINDOW_ARB;
-        attrib_list[cur_attrib++] = GL_TRUE;
-
-        attrib_list[cur_attrib++] = WGL_ACCELERATION_ARB;
-        attrib_list[cur_attrib++] = WGL_FULL_ACCELERATION_ARB;
-
-        attrib_list[cur_attrib++] = WGL_SUPPORT_OPENGL_ARB;
-        attrib_list[cur_attrib++] = GL_TRUE;
-
-        attrib_list[cur_attrib++] = WGL_DOUBLE_BUFFER_ARB;
-        attrib_list[cur_attrib++] = GL_TRUE;
-
-        attrib_list[cur_attrib++] = WGL_COLOR_BITS_ARB;
-        attrib_list[cur_attrib++] = 24;
-
-        attrib_list[cur_attrib++] = WGL_ALPHA_BITS_ARB;
-        attrib_list[cur_attrib++] = 0;
-
-        U32 end_attrib = 0;
-        if (mFSAASamples > 0)
-        {
-            end_attrib = cur_attrib;
-            attrib_list[cur_attrib++] = WGL_SAMPLE_BUFFERS_ARB;
-            attrib_list[cur_attrib++] = GL_TRUE;
-
-            attrib_list[cur_attrib++] = WGL_SAMPLES_ARB;
-            attrib_list[cur_attrib++] = mFSAASamples;
-        }
-
-        // End the list
-        attrib_list[cur_attrib++] = 0;
-
         GLint pixel_formats[256];
         U32 num_formats = 0;
 
         // First we try and get a 32 bit depth pixel format
-        BOOL result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
+        BOOL result = FALSE;
 
-        while(!result && mFSAASamples > 0)
+        // OK, at this point, use the ARB wglChoosePixelFormatsARB function to see if we
+        // can get exactly what we want.
+
+        // First we try 10-bit format if requested
+        if (LLRender::s10bitBackBuffer)
         {
-            LL_WARNS() << "FSAASamples: " << mFSAASamples << " not supported." << LL_ENDL ;
+            GLint attrib_list[256];
+            S32   cur_attrib = 0;
 
-            mFSAASamples /= 2 ; //try to decrease sample pixel number until to disable anti-aliasing
-            if(mFSAASamples < 2)
-            {
-                mFSAASamples = 0 ;
-            }
+            attrib_list[cur_attrib++] = WGL_DEPTH_BITS_ARB;
+            attrib_list[cur_attrib++] = 24;
 
-            if (mFSAASamples > 0)
-            {
-                attrib_list[end_attrib + 3] = mFSAASamples;
-            }
-            else
-            {
-                cur_attrib = end_attrib ;
-                end_attrib = 0 ;
-                attrib_list[cur_attrib++] = 0 ; //end
-            }
-            result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
+            //attrib_list[cur_attrib++] = WGL_STENCIL_BITS_ARB;
+            //attrib_list[cur_attrib++] = 8;
 
-            if(result)
-            {
-                LL_WARNS() << "Only support FSAASamples: " << mFSAASamples << LL_ENDL ;
-            }
+            attrib_list[cur_attrib++] = WGL_DRAW_TO_WINDOW_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_ACCELERATION_ARB;
+            attrib_list[cur_attrib++] = WGL_FULL_ACCELERATION_ARB;
+
+            attrib_list[cur_attrib++] = WGL_SUPPORT_OPENGL_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_DOUBLE_BUFFER_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_RED_BITS_ARB;
+            attrib_list[cur_attrib++] = 10;
+
+            attrib_list[cur_attrib++] = WGL_BLUE_BITS_ARB;
+            attrib_list[cur_attrib++] = 10;
+
+            attrib_list[cur_attrib++] = WGL_GREEN_BITS_ARB;
+            attrib_list[cur_attrib++] = 10;
+
+            // End the list
+            attrib_list[cur_attrib++] = 0;
+
+            result = wglChoosePixelFormatARB(mhDC, attrib_list, nullptr, 256, pixel_formats, &num_formats);
         }
 
-        if (!result)
+        // If that fails, try 8-bit format
+        if (!result || !num_formats)
         {
-            LL_WARNS() << "mFSAASamples: " << mFSAASamples << LL_ENDL ;
+            GLint attrib_list[256];
+            S32   cur_attrib = 0;
 
+            attrib_list[cur_attrib++] = WGL_DEPTH_BITS_ARB;
+            attrib_list[cur_attrib++] = 24;
+
+            //attrib_list[cur_attrib++] = WGL_STENCIL_BITS_ARB;
+            //attrib_list[cur_attrib++] = 8;
+
+            attrib_list[cur_attrib++] = WGL_DRAW_TO_WINDOW_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_ACCELERATION_ARB;
+            attrib_list[cur_attrib++] = WGL_FULL_ACCELERATION_ARB;
+
+            attrib_list[cur_attrib++] = WGL_SUPPORT_OPENGL_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_DOUBLE_BUFFER_ARB;
+            attrib_list[cur_attrib++] = GL_TRUE;
+
+            attrib_list[cur_attrib++] = WGL_RED_BITS_ARB;
+            attrib_list[cur_attrib++] = 8;
+
+            attrib_list[cur_attrib++] = WGL_BLUE_BITS_ARB;
+            attrib_list[cur_attrib++] = 8;
+
+            attrib_list[cur_attrib++] = WGL_GREEN_BITS_ARB;
+            attrib_list[cur_attrib++] = 8;
+
+            // End the list
+            attrib_list[cur_attrib++] = 0;
+
+            result = wglChoosePixelFormatARB(mhDC, attrib_list, nullptr, 256, pixel_formats, &num_formats);
+
+            LLRender::s10bitBackBuffer = false;
+        }
+
+        if (!result || ! num_formats)
+        {
             close();
             show_window_creation_error("Error after wglChoosePixelFormatARB 32-bit");
             return false;
-        }
-
-        if (!num_formats)
-        {
-            if (end_attrib > 0)
-            {
-                LL_INFOS("Window") << "No valid pixel format for " << mFSAASamples << "x anti-aliasing." << LL_ENDL;
-                attrib_list[end_attrib] = 0;
-
-                BOOL result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
-                if (!result)
-                {
-                    close();
-                    show_window_creation_error("Error after wglChoosePixelFormatARB 32-bit no AA");
-                    return false;
-                }
-            }
-
-            if (!num_formats)
-            {
-                LL_INFOS("Window") << "No 32 bit z-buffer, trying 24 bits instead" << LL_ENDL;
-                // Try 24-bit format
-                attrib_list[1] = 24;
-                BOOL result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
-                if (!result)
-                {
-                    close();
-                    show_window_creation_error("Error after wglChoosePixelFormatARB 24-bit");
-                    return false;
-                }
-
-                if (!num_formats)
-                {
-                    LL_WARNS("Window") << "Couldn't get 24 bit z-buffer,trying 16 bits instead!" << LL_ENDL;
-                    attrib_list[1] = 16;
-                    BOOL result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
-                    if (!result || !num_formats)
-                    {
-                        close();
-                        show_window_creation_error("Error after wglChoosePixelFormatARB 16-bit");
-                        return false;
-                    }
-                }
-            }
-
-            LL_INFOS("Window") << "Choosing pixel formats: " << num_formats << " pixel formats returned" << LL_ENDL;
         }
 
         LL_INFOS("Window") << "pixel formats done." << LL_ENDL ;
@@ -1563,11 +1544,17 @@ const   S32   max_format  = (S32)num_formats - 1;
         {
             if (swap_method == WGL_SWAP_UNDEFINED_ARB)
             {
+                LL_INFOS() << "Found pixel format with undefined swap method at index " << cur_format << LL_ENDL;
                 break;
             }
             else if (cur_format >= max_format)
             {
                 cur_format = 0;
+                if (wglGetPixelFormatAttribivARB(mhDC, pixel_formats[cur_format], 0, 1, &swap_query, &swap_method))
+                {
+                    LL_INFOS() << "No pixel format with undefined swap method found, using first format with swap method " << swap_method
+                               << " at index " << cur_format << LL_ENDL;
+                }
                 break;
             }
 
@@ -1718,7 +1705,7 @@ const   S32   max_format  = (S32)num_formats - 1;
 
     // *HACK: Attempt to prevent startup crashes by deferring memory accounting
     // until after some graphics setup. See SL-20177. -Cosmic,2023-09-18
-    mWindowThread->post([=]()
+    mWindowThread->post([=, this]()
     {
         mWindowThread->glReady();
     });
@@ -1853,7 +1840,7 @@ void* LLWindowWin32::createSharedContext()
     mMaxGLVersion = llclamp(mMaxGLVersion, 3.f, 4.6f);
 
     S32 version_major = llfloor(mMaxGLVersion);
-    S32 version_minor = (S32)llround((mMaxGLVersion-version_major)*10);
+    S32 version_minor = (S32)ll_round((mMaxGLVersion-version_major)*10);
 
     S32 attribs[] =
     {
@@ -1951,7 +1938,7 @@ void LLWindowWin32::moveWindow( const LLCoordScreen& position, const LLCoordScre
     // THIS CAUSES DEV-15484 and DEV-15949
     //ShowWindow(mWindowHandle, SW_RESTORE);
     // NOW we can call MoveWindow
-    mWindowThread->post([=]()
+    mWindowThread->post([=, this]()
         {
             MoveWindow(mWindowHandle, position.mX, position.mY, size.mX, size.mY, TRUE);
         });
@@ -1961,7 +1948,7 @@ void LLWindowWin32::setTitle(const std::string title)
 {
     // TODO: Do we need to use the wide string version of this call
     // to support non-ascii usernames (and region names?)
-    mWindowThread->post([=]()
+    mWindowThread->post([=, this]()
         {
             SetWindowText(mWindowHandle, ll_convert<std::wstring>(title).c_str());
         });
@@ -2463,10 +2450,13 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         case WM_CLOSE:
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_CLOSE");
+            // todo: WM_CLOSE can be caused by user and by task manager,
+            // distinguish these cases.
+            // For now assume it is always user.
             window_imp->post([=]()
                 {
                     // Will the app allow the window to close?
-                    if (window_imp->mCallbacks->handleCloseRequest(window_imp))
+                    if (window_imp->mCallbacks->handleCloseRequest(window_imp, true))
                     {
                         // Get the app to initiate cleanup.
                         window_imp->mCallbacks->handleQuit(window_imp);
@@ -2482,6 +2472,47 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
             {
                 PostQuitMessage(0);  // Posts WM_QUIT with an exit code of 0
             }
+            return 0;
+        }
+        case WM_QUERYENDSESSION:
+        {
+            // Generally means that OS is going to shut down or user is going to log off.
+            // Can use ShutdownBlockReasonCreate here.
+            LL_INFOS("Window") << "Received WM_QUERYENDSESSION with wParam: " << (U32)w_param << " lParam: " << (U32)l_param << LL_ENDL;
+            return TRUE; // 1 = ok to end session. 0 no longer works by itself, use ShutdownBlockReasonCreate
+        }
+        case WM_ENDSESSION:
+        {
+            // OS session is shutting down, initiate cleanup.
+            // Comes after WM_QUERYENDSESSION
+            LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_ENDSESSION");
+            LL_INFOS("Window") << "Received WM_ENDSESSION with wParam: " << (U32)w_param << " lParam: " << (U32)l_param << LL_ENDL;
+            unsigned int end_session_flags = (U32)l_param;
+
+            if (w_param == TRUE // if true, session is ending
+                || end_session_flags == 0 // not possible to determine type of the event
+                // || (end_session_flags & ENDSESSION_CLOSEAPP)) system update or low resources, must be acompanied by w_param == TRUE
+                || (end_session_flags & ENDSESSION_CRITICAL) // will shutdown regardless of app state
+                || (end_session_flags & ENDSESSION_LOGOFF)) // logoff, can delay shutdown
+            {
+                window_imp->post([=]()
+                {
+                    // Check if app needs cleanup or can be closed immediately.
+                    if (window_imp->mCallbacks->handleSessionExit(window_imp))
+                    {
+                        // Get the app to initiate cleanup.
+                        window_imp->mCallbacks->handleQuit(window_imp);
+                    }
+                });
+                // Give app a second to finish up. That's not enough for a clean exit,
+                // but better than nothing.
+                // Todo: sync this better, some kind of waitForResult? Can't wait forever,
+                // but for ENDSESSION_LOGOFF can potentially use ShutdownBlockReasonCreate
+                // for a bigger delay.
+                ms_sleep(1000);
+            }
+            // Don't need to post quit or destroy window,
+            // if session is ending OS is going to take care of it.
             return 0;
         }
         case WM_COMMAND:
@@ -3022,7 +3053,7 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
             {
                 // received a URL
                 PCOPYDATASTRUCT myCDS = (PCOPYDATASTRUCT)l_param;
-                void* data = new U8[myCDS->cbData];
+                U8* data = new U8[myCDS->cbData];
                 memcpy(data, myCDS->lpData, myCDS->cbData);
                 auto myType = myCDS->dwData;
 
@@ -3108,6 +3139,7 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
 
                         prev_absolute_x = absolute_x;
                         prev_absolute_y = absolute_y;
+                        window_imp->mAbsoluteCursorPosition = true;
                     }
                     else
                     {
@@ -3124,6 +3156,7 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
                             window_imp->mRawMouseDelta.mX += (S32)round((F32)raw->data.mouse.lLastX * (F32)speed / DEFAULT_SPEED);
                             window_imp->mRawMouseDelta.mY -= (S32)round((F32)raw->data.mouse.lLastY * (F32)speed / DEFAULT_SPEED);
                         }
+                        window_imp->mAbsoluteCursorPosition = false;
                     }
                 }
             }
@@ -3403,7 +3436,7 @@ bool LLWindowWin32::getClientRectInScreenSpace( RECT* rectp )
 
 void LLWindowWin32::flashIcon(F32 seconds)
 {
-    mWindowThread->post([=]()
+    mWindowThread->post([=, this]()
         {
             FLASHWINFO flash_info;
 
@@ -3884,7 +3917,7 @@ void *LLWindowWin32::getPlatformWindow()
 
 void LLWindowWin32::bringToFront()
 {
-    mWindowThread->post([=]()
+    mWindowThread->post([=, this]()
         {
             BringWindowToTop(mWindowHandle);
         });
@@ -3893,7 +3926,7 @@ void LLWindowWin32::bringToFront()
 // set (OS) window focus back to the client
 void LLWindowWin32::focusClient()
 {
-    mWindowThread->post([=]()
+    mWindowThread->post([=, this]()
         {
             SetFocus(mWindowHandle);
         });
@@ -3931,7 +3964,7 @@ void LLWindowWin32::allowLanguageTextInput(LLPreeditor *preeditor, bool b)
 
     if (sLanguageTextInputAllowed)
     {
-        mWindowThread->post([=]()
+        mWindowThread->post([=, this]()
         {
             // Allowing: Restore the previous IME status, so that the user has a feeling that the previous
             // text input continues naturally.  Be careful, however, the IME status is meaningful only during the user keeps
@@ -3947,7 +3980,7 @@ void LLWindowWin32::allowLanguageTextInput(LLPreeditor *preeditor, bool b)
     }
     else
     {
-        mWindowThread->post([=]()
+        mWindowThread->post([=, this]()
         {
             // Disallowing: Turn off the IME so that succeeding key events bypass IME and come to us directly.
             // However, do it after saving the current IME  status.  We need to restore the status when
@@ -4002,8 +4035,7 @@ void LLWindowWin32::setLanguageTextInput( const LLCoordGL & position )
         LLCoordWindow win_pos;
         convertCoords( position, &win_pos );
 
-        if ( win_pos.mX >= 0 && win_pos.mY >= 0 &&
-            (win_pos.mX != sWinIMEWindowPosition.mX) || (win_pos.mY != sWinIMEWindowPosition.mY) )
+        if ( win_pos.mX >= 0 && win_pos.mY >= 0 && ((win_pos.mX != sWinIMEWindowPosition.mX) || (win_pos.mY != sWinIMEWindowPosition.mY)))
         {
             COMPOSITIONFORM ime_form;
             memset( &ime_form, 0, sizeof(ime_form) );
@@ -4505,31 +4537,6 @@ bool LLWindowWin32::handleImeRequests(WPARAM request, LPARAM param, LRESULT *res
     return false;
 }
 
-//static
-void LLWindowWin32::setDPIAwareness()
-{
-    HMODULE hShcore = LoadLibrary(L"shcore.dll");
-    if (hShcore != NULL)
-    {
-        SetProcessDpiAwarenessType pSPDA;
-        pSPDA = (SetProcessDpiAwarenessType)GetProcAddress(hShcore, "SetProcessDpiAwareness");
-        if (pSPDA)
-        {
-
-            HRESULT hr = pSPDA(PROCESS_PER_MONITOR_DPI_AWARE);
-            if (hr != S_OK)
-            {
-                LL_WARNS() << "SetProcessDpiAwareness() function returned an error. Will use legacy DPI awareness API of Win XP/7" << LL_ENDL;
-            }
-        }
-        FreeLibrary(hShcore);
-    }
-    else
-    {
-        LL_WARNS() << "Could not load shcore.dll library (included by <ShellScalingAPI.h> from Win 8.1 SDK. Will use legacy DPI awareness API of Win XP/7" << LL_ENDL;
-    }
-}
-
 void* LLWindowWin32::getDirectInput8()
 {
     return &gDirectInput8;
@@ -4555,65 +4562,61 @@ bool LLWindowWin32::getInputDevices(U32 device_type_filter,
     return false;
 }
 
+void LLWindowWin32::initWatchdog()
+{
+    mWindowThread->initTimeout();
+}
+
 F32 LLWindowWin32::getSystemUISize()
 {
     F32 scale_value = 1.f;
     HWND hWnd = (HWND)getPlatformWindow();
-    HDC hdc = GetDC(hWnd);
-    HMONITOR hMonitor;
     HANDLE hProcess = GetCurrentProcess();
     PROCESS_DPI_AWARENESS dpi_awareness;
 
-    HMODULE hShcore = LoadLibrary(L"shcore.dll");
-
-    if (hShcore != NULL)
+    GetProcessDpiAwareness(hProcess, &dpi_awareness);
+    if (dpi_awareness == PROCESS_PER_MONITOR_DPI_AWARE)
     {
-        GetProcessDpiAwarenessType pGPDA;
-        pGPDA = (GetProcessDpiAwarenessType)GetProcAddress(hShcore, "GetProcessDpiAwareness");
-        GetDpiForMonitorType pGDFM;
-        pGDFM = (GetDpiForMonitorType)GetProcAddress(hShcore, "GetDpiForMonitor");
-        if (pGPDA != NULL && pGDFM != NULL)
-        {
-            pGPDA(hProcess, &dpi_awareness);
-            if (dpi_awareness == PROCESS_PER_MONITOR_DPI_AWARE)
-            {
-                POINT    pt;
-                UINT     dpix = 0, dpiy = 0;
-                HRESULT  hr = E_FAIL;
-                RECT     rect;
+        POINT    pt;
+        UINT     dpix = 0, dpiy = 0;
+        HRESULT  hr = E_FAIL;
+        RECT     rect;
 
-                GetWindowRect(hWnd, &rect);
-                // Get the DPI for the monitor, on which the center of window is displayed and set the scaling factor
-                pt.x = (rect.left + rect.right) / 2;
-                pt.y = (rect.top + rect.bottom) / 2;
-                hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-                hr = pGDFM(hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy);
-                if (hr == S_OK)
-                {
-                    scale_value = F32(dpix) / F32(USER_DEFAULT_SCREEN_DPI);
-                }
-                else
-                {
-                    LL_WARNS() << "Could not determine DPI for monitor. Setting scale to default 100 %" << LL_ENDL;
-                    scale_value = 1.0f;
-                }
-            }
-            else
-            {
-                LL_WARNS() << "Process is not per-monitor DPI-aware. Setting scale to default 100 %" << LL_ENDL;
-                scale_value = 1.0f;
-            }
+        GetWindowRect(hWnd, &rect);
+        // Get the DPI for the monitor, on which the center of window is displayed and set the scaling factor
+        pt.x = (rect.left + rect.right) / 2;
+        pt.y = (rect.top + rect.bottom) / 2;
+        HMONITOR hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        hr = GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy);
+        if (hr == S_OK)
+        {
+            scale_value = F32(dpix) / F32(USER_DEFAULT_SCREEN_DPI);
         }
-        FreeLibrary(hShcore);
+        else
+        {
+            LL_WARNS() << "Could not determine DPI for monitor. Setting scale to default 100 %" << LL_ENDL;
+            scale_value = 1.0f;
+        }
     }
     else
     {
-        LL_WARNS() << "Could not load shcore.dll library (included by <ShellScalingAPI.h> from Win 8.1 SDK). Using legacy DPI awareness API of Win XP/7" << LL_ENDL;
-        scale_value = F32(GetDeviceCaps(hdc, LOGPIXELSX)) / F32(USER_DEFAULT_SCREEN_DPI);
+        LL_WARNS() << "Process is not per-monitor DPI-aware. Setting scale to default 100 %" << LL_ENDL;
+        scale_value = 1.0f;
     }
 
-    ReleaseDC(hWnd, hdc);
     return scale_value;
+}
+
+//static
+PROC WINAPI LLWindowWin32::getProcAddress(const char* func)
+{
+    PROC ret_func = wglGetProcAddress(func);
+    if (!ret_func && sGLDLLHandle)
+    {
+        // Try to fallback to OpenGL32.dll
+        ret_func = GetProcAddress(sGLDLLHandle, func);
+    }
+    return ret_func;
 }
 
 //static
@@ -4691,6 +4694,8 @@ void LLWindowWin32::LLWindowWin32Thread::checkDXMem()
         mGotGLBuffer = true;
         return;
     }
+
+    pauseTimeout();
 
     IDXGIFactory4* p_factory = nullptr;
 
@@ -4795,12 +4800,16 @@ void LLWindowWin32::LLWindowWin32Thread::checkDXMem()
     }
 
     mGotGLBuffer = true;
+
+    resumeTimeout("checkDXMem");
 }
 
 void LLWindowWin32::LLWindowWin32Thread::run()
 {
     sWindowThreadId = std::this_thread::get_id();
+#ifndef LL_RELEASE_FOR_DOWNLOAD
     LogChange logger("Window");
+#endif
 
     //as good a place as any to up the MM timer resolution (see ms_sleep)
     //attempt to set timer resolution to 1ms
@@ -4809,6 +4818,9 @@ void LLWindowWin32::LLWindowWin32Thread::run()
     {
         timeBeginPeriod(llclamp((U32) 1, tc.wPeriodMin, tc.wPeriodMax));
     }
+
+    // Normally won't exist yet, but in case of re-init, make sure it's cleaned up
+    resumeTimeout("WindowThread");
 
     while (! getQueue().done())
     {
@@ -4819,24 +4831,29 @@ void LLWindowWin32::LLWindowWin32Thread::run()
 
         if (mWindowHandleThrd != 0)
         {
+            pingTimeout("messages");
             MSG msg;
             BOOL status;
             if (mhDCThrd == 0)
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("w32t - PeekMessage");
+#ifndef LL_RELEASE_FOR_DOWNLOAD
                 logger.onChange("PeekMessage(", std::hex, mWindowHandleThrd, ")");
+#endif
                 status = PeekMessage(&msg, mWindowHandleThrd, 0, 0, PM_REMOVE);
             }
             else
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("w32t - GetMessage");
+#ifndef LL_RELEASE_FOR_DOWNLOAD
                 logger.always("GetMessage(", std::hex, mWindowHandleThrd, ")");
+#endif
                 status = GetMessage(&msg, NULL, 0, 0);
             }
             if (status > 0)
             {
-                logger.always("got MSG (", std::hex, msg.hwnd, ", ", msg.message,
-                              ", ", msg.wParam, ")");
+                //logger.always("got MSG (", std::hex, msg.hwnd, ", ", msg.message,
+                //              ", ", msg.wParam, ")");
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
 
@@ -4846,7 +4863,10 @@ void LLWindowWin32::LLWindowWin32Thread::run()
 
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("w32t - Function Queue");
+            pingTimeout("queue");
+#ifndef LL_RELEASE_FOR_DOWNLOAD
             logger.onChange("runPending()");
+#endif
             //process any pending functions
             getQueue().runPending();
         }
@@ -4860,6 +4880,7 @@ void LLWindowWin32::LLWindowWin32Thread::run()
 #endif
     }
 
+    pauseTimeout();
     destroyWindow();
 
     if (mDeleteOnExit)
@@ -4994,7 +5015,7 @@ void LLWindowWin32::updateWindowRect()
     if (GetWindowRect(mWindowHandle, &rect) &&
         GetClientRect(mWindowHandle, &client_rect))
     {
-        post([=]
+        post([=, this]
             {
                 mRect = rect;
                 mClientRect = client_rect;

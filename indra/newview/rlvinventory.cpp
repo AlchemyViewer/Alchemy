@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -635,8 +636,7 @@ void RlvGiveToRLVTaskOffer::doneIdle()
 
 void RlvGiveToRLVTaskOffer::onDestinationCreated(const LLUUID& idDestFolder, const std::string& strName)
 {
-    const LLViewerInventoryCategory* pTarget = (idDestFolder.notNull()) ? gInventory.getCategory(idDestFolder) : nullptr;
-    if (pTarget)
+    if (idDestFolder.notNull())
     {
         moveAndRename(m_Folders.front(), idDestFolder, strName, new LLBoostFuncInventoryCallback(boost::bind(&RlvGiveToRLVTaskOffer::onOfferCompleted, this, _1)));
     }

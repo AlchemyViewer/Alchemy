@@ -187,17 +187,17 @@ void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
         msg->getStringFast(_PREHASH_ReportData, _PREHASH_TaskName, name_buf, block);
         msg->getStringFast(_PREHASH_ReportData, _PREHASH_OwnerName, owner_buf, block);
 
-        if(msg->has("DataExtended"))
+        if(msg->hasFast(_PREHASH_DataExtended))
         {
             have_extended_data = true;
-            msg->getU32("DataExtended", "TimeStamp", time_stamp, block);
-            msg->getF32("DataExtended", "MonoScore", mono_score, block);
-            msg->getS32("DataExtended", "PublicURLs", public_urls, block);
+            msg->getU32Fast(_PREHASH_DataExtended, _PREHASH_TimeStamp, time_stamp, block);
+            msg->getF32Fast(_PREHASH_DataExtended, _PREHASH_MonoScore, mono_score, block);
+            msg->getS32Fast(_PREHASH_DataExtended, _PREHASH_PublicURLs, public_urls, block);
 
             std::string parcel_name;
             F32 script_size = 0.f;
-            msg->getString("DataExtended", "ParcelName", parcel_name, block);
-            msg->getF32("DataExtended", "Size", script_size, block);
+            msg->getStringFast(_PREHASH_DataExtended, _PREHASH_ParcelName, parcel_name, block);
+            msg->getF32Fast(_PREHASH_DataExtended, _PREHASH_Size, script_size, block);
             if (parcel_name.size() > 0 || script_size > 0)
             {
                 parcel_buf = parcel_name;

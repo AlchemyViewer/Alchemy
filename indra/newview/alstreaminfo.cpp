@@ -102,7 +102,7 @@ void ALStreamInfo::handleMetadataUpdate(const LLSD& metadata)
         notify_params.substitutions = args;
         if (!station_url.empty())
         {
-            notify_params.payload = payload.with("respond_on_mousedown", TRUE);
+            notify_params.payload = payload.with("respond_on_mousedown", true);
 
             LLNotification::Params::Functor functor_p;
             functor_p.function = [=](const LLSD&, const LLSD&) {LLUrlAction::openURL(station_url); };

@@ -71,7 +71,6 @@ void LLDrawPoolTree::renderDeferred(S32 pass)
         return;
     }
 
-
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
     LLViewerTexture* pTexture = (LLPipeline::sRenderTextures) ? mTexturep.get() : LLViewerFetchedTexture::sDefaultDiffuseImagep.get();
     gGL.getTexUnit(sDiffTex)->bindFast(pTexture);

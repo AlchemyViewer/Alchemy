@@ -27,7 +27,6 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llhudeffectlookat.h"
-#include <utility>
 
 #include "llrender.h"
 
@@ -35,10 +34,10 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llvoavatar.h"
-#include "llvoavatarself.h" // for gAgentAvatarp
 #include "lldrawable.h"
 #include "llviewerobjectlist.h"
 #include "llviewercontrol.h"
+#include "llvoavatarself.h"
 #include "llrendersphere.h"
 #include "llselectmgr.h"
 #include "llglheaders.h"
@@ -646,7 +645,7 @@ void LLHUDEffectLookAt::render()
                 -0.5f * fontp->getWidthF32(wstr.c_str()),
                 0.0f,
                 (*mAttentions)[mTargetType].mColor,
-                FALSE
+                false
             );
             gGL.popMatrix();
         }

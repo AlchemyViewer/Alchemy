@@ -20,7 +20,6 @@
     name="behaviour_tab"
     height="266"
     right="-8"
-    tab_height="23"
     tab_min_width="120"
     tab_position="top"
     top="0" >

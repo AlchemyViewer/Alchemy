@@ -67,7 +67,7 @@
         <panel
          border="true"
          follows="all"
-         label="General"
+         label="GENERAL"
          layout="topleft"
          left="0"
          help_topic="land_general_tab"
@@ -124,6 +124,9 @@
             <panel.string
              name="no_selection_text">
                 No parcel selected.
+            </panel.string>
+            <panel.string name="time_stamp_template_ampm">
+              [wkday,datetime,slt] [mth,datetime,slt] [day,datetime,slt] [hour12,datetime,slt]:[min,datetime,slt]:[second,datetime,slt] [ampm,datetime,slt] [year,datetime,slt]
             </panel.string>
             <panel.string name="time_stamp_template">
               [wkday,datetime,slt] [mth,datetime,slt] [day,datetime,slt] [hour,datetime,slt]:[min,datetime,slt]:[second,datetime,slt] [year,datetime,slt]
@@ -582,7 +585,7 @@
         <panel
          border="true"
          follows="all"
-         label="Covenant"
+         label="COVENANT"
          layout="topleft"
          left="0"
          top="0"
@@ -816,7 +819,7 @@
         <panel
          border="true"
          follows="all"
-         label="Objects"
+         label="OBJECTS"
          layout="topleft"
          left="0"
          top="0"
@@ -1177,7 +1180,7 @@
         <panel
          border="true"
          follows="all"
-         label="Options"
+         label="OPTIONS"
          layout="topleft"
          help_topic="land_options_tab"
          name="land_options_panel"
@@ -1478,7 +1481,7 @@ Only large parcels can be listed in search.
              type="string"
              length="1"
              follows="left|top"
-			 text_color="LabelTextColor"
+             text_color="LtGray"
              text_readonly_color="LabelDisabledColor"
              height="32"
              layout="topleft"
@@ -1575,7 +1578,7 @@ Only large parcels can be listed in search.
         <panel
          border="true"
          follows="all"
-         label="Media"
+         label="MEDIA"
          layout="topleft"
          left="0"
          top="0"
@@ -1789,7 +1792,7 @@ Only large parcels can be listed in search.
         <panel
          border="true"
          follows="all"
-         label="Sound"
+         label="SOUND"
          layout="topleft"
          left="0"
          top="0"
@@ -1928,7 +1931,7 @@ Only large parcels can be listed in search.
         <panel
          border="true"
          follows="all"
-         label="Access"
+         label="ACCESS"
          layout="topleft"
          left="0"
          top="0"
@@ -2170,23 +2173,25 @@ Only large parcels can be listed in search.
        <panel
           border="true"
           follows="all"
-          label="Experiences"
+          label="EXPERIENCES"
           layout="topleft"
           left="0"
           top="0"
           help_topic="land_experiences_tab"
           name="land_experiences_panel"
+            class="land_experiences_panel"
           filename="panel_region_experiences.xml">
        </panel>
     <panel
           border="true"
           follows="all"
-          label="Environment"
+          label="ENVIRONMENT"
           layout="topleft"
           left="0"
           top="0"
           help_topic="land_environment_tab"
           name="land_environment_panel"
+          class="land_environment_panel"
           filename="panel_region_environment.xml">
        </panel>
     </tab_container>

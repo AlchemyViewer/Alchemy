@@ -60,7 +60,7 @@ class LLLineEditor
 {
 public:
 
-    typedef boost::function<void (LLLineEditor* caller)> keystroke_callback_t;
+    typedef std::function<void (LLLineEditor* caller)> keystroke_callback_t;
 
     struct MaxLength : public LLInitParam::ChoiceBlock<MaxLength>
     {
@@ -202,6 +202,7 @@ public:
     void            setLabel(const LLStringExplicit &new_label) { mLabel = new_label; }
     const std::string&  getLabel()  { return mLabel.getString(); }
 
+    void            setDefaultText() { setText(mDefaultText); }
     void            setText(const LLStringExplicit &new_text);
 
     const std::string& getText() const override { return mText.getString(); }
@@ -259,7 +260,7 @@ public:
     void            setSelectAllonCommit(bool b) { mSelectAllonCommit = b; }
 
     void            onKeystroke();
-    typedef boost::function<void (LLLineEditor* caller, void* user_data)> callback_t;
+    typedef std::function<void (LLLineEditor* caller, void* user_data)> callback_t;
     void            setKeystrokeCallback(callback_t callback, void* user_data);
 
     void            setMaxTextLength(S32 max_text_length);
@@ -294,12 +295,18 @@ public:
     void setShowContextMenu(bool show) { mShowContextMenu = show; }
     bool getShowContextMenu() const { return mShowContextMenu; }
 
+    // Autoreplace
+    typedef std::function<void(S32&, S32&, LLWString&, S32&, const LLWString&)> autoreplace_callback_t;
+    autoreplace_callback_t mAutoreplaceCallback;
+    void            setAutoreplaceCallback(autoreplace_callback_t cb) { mAutoreplaceCallback = cb; }
+
   private:
     // private helper methods
 
     void                    pasteHelper(bool is_primary);
 
     void            removeChar();
+    void            removeWord(bool prev);
     void            addChar(const llwchar c);
     void            setCursorAtLocalPos(S32 local_mouse_x);
     S32             findPixelNearestPos(S32 cursor_offset = 0) const;
@@ -347,6 +354,7 @@ protected:
     LLFontVertexBuffer mFontBufferSelection;
     LLFontVertexBuffer mFontBufferPostSelection;
     LLFontVertexBuffer mFontBufferLabel;
+    std::string mDefaultText;
     S32         mMaxLengthBytes;            // Max length of the UTF8 string in bytes
     S32         mMaxLengthChars;            // Maximum number of characters in the string
     S32         mCursorPos;                 // I-beam is just after the mCursorPos-th character.

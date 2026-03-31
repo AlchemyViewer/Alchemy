@@ -186,7 +186,7 @@ void LLSkinningUtil::initSkinningMatrixPalette(
 void LLSkinningUtil::checkSkinWeights(LLVector4a* weights, U32 num_vertices, const LLMeshSkinInfo* skin)
 {
 #if DEBUG_SKINNING
-    const S32 max_joints = skin->mJointNames.size();
+    const S32 max_joints = narrow(skin->mJointNames.size());
     for (U32 j=0; j<num_vertices; j++)
     {
         F32 *w = weights[j].getF32ptr();
@@ -341,6 +341,7 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                     F32 *weights = vol_face.mWeights[i].getF32ptr();
                     LLVector4 wght;
                     S32 idx[4];
+                    F32 scale = 0.0f;
                     // FIXME unpacking of weights should be pulled into a common function and optimized if possible.
                     for (U32 k = 0; k < 4; k++)
                     {

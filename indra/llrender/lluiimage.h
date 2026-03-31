@@ -30,13 +30,14 @@
 #include "v4color.h"
 #include "llpointer.h"
 #include "llrefcount.h"
-#include "llrefcount.h"
 #include "llrect.h"
-#include <boost/function.hpp>
-#include <boost/signals2.hpp>
 #include "llinitparam.h"
 #include "lltexture.h"
 #include "llrender2dutils.h"
+
+#include <boost/signals2.hpp>
+
+#include <type_traits>
 
 extern const LLColor4 UI_VERTEX_COLOR;
 
@@ -52,6 +53,7 @@ public:
     typedef boost::signals2::signal<void (void)> image_loaded_signal_t;
 
     LLUIImage(const std::string& name, LLPointer<LLTexture> image);
+    LLUIImage(std::string&& name, LLPointer<LLTexture> image);
     virtual ~LLUIImage();
 
     LL_FORCE_INLINE void setClipRegion(const LLRectf& region)
@@ -119,7 +121,7 @@ namespace LLInitParam
     class ParamValue<LLUIImage*>
     :   public CustomParamValue<LLUIImage*>
     {
-        typedef boost::add_reference<boost::add_const<LLUIImage*>::type>::type  T_const_ref;
+        typedef std::add_lvalue_reference<std::add_const<LLUIImage*>::type>::type  T_const_ref;
         typedef CustomParamValue<LLUIImage*> super_t;
     public:
         Optional<std::string> name;

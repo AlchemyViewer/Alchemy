@@ -548,6 +548,27 @@ LLInventoryItem* LLAgentWearables::getWearableInventoryItem(LLWearableType::ETyp
     return item;
 }
 
+const S32 LLAgentWearables::getWearableIdxFromItem(const LLViewerInventoryItem* item) const
+{
+    if (!item) return -1;
+    if (!item->isWearableType()) return -1;
+
+    LLWearableType::EType type = item->getWearableType();
+    U32 wearable_count = getWearableCount(type);
+    if (0 == wearable_count) return -1;
+
+    const LLUUID& asset_id = item->getAssetUUID();
+
+    for (U32 i = 0; i < wearable_count; ++i)
+    {
+        const LLViewerWearable* wearable = getViewerWearable(type, i);
+        if (!wearable) continue;
+        if (wearable->getAssetID() != asset_id) continue;
+        return i;
+    }
+
+    return -1;
+}
 const LLViewerWearable* LLAgentWearables::getWearableFromItemID(const LLUUID& item_id) const
 {
     const LLUUID& base_item_id = gInventory.getLinkedItemID(item_id);
@@ -1452,7 +1473,7 @@ void LLAgentWearables::userRemoveMultipleAttachments(llvo_vec_t& objects_to_remo
         return;
 
     LL_DEBUGS("Avatar") << "ATT [ObjectDetach] removing " << objects_to_remove.size() << " objects" << LL_ENDL;
-    gMessageSystem->newMessage("ObjectDetach");
+    gMessageSystem->newMessageFast(_PREHASH_ObjectDetach);
     gMessageSystem->nextBlockFast(_PREHASH_AgentData);
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
@@ -1546,7 +1567,7 @@ bool LLAgentWearables::moveWearable(const LLViewerInventoryItem* item, bool clos
 
     LLWearableType::EType type = item->getWearableType();
     U32 wearable_count = getWearableCount(type);
-    if (0 == wearable_count) return false;
+    if (wearable_count < 2) return false;
 
     const LLUUID& asset_id = item->getAssetUUID();
 

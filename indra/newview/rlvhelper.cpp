@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -1050,7 +1051,7 @@ RlvCommandOptionGetPath::RlvCommandOptionGetPath(const RlvCommand& rlvCmd, getpa
             if (pObj->isAttachment())
                 m_idItems.push_back(pObj->getAttachmentItemID());
         }
-        else if (!cb.empty())
+        else if (cb != nullptr)
         {
             new RlvCommandOptionGetPathCallback(rlvCmd.getObjectID(), cb);
             m_fCallback = true;
@@ -1063,7 +1064,7 @@ RlvCommandOptionGetPath::RlvCommandOptionGetPath(const RlvCommand& rlvCmd, getpa
         return;
     }
 
-    if (!cb.empty())
+    if (cb != nullptr)
     {
         cb(getItemIDs());
     }

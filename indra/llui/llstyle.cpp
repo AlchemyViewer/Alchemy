@@ -44,6 +44,7 @@ LLStyle::Params::Params()
     image("image"),
     link_href("href"),
     is_link("is_link"),
+    use_default_link_style("use_default_link_style", true),
     draw_highlight_bg("draw_highlight_bg", false)
 {}
 

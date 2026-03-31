@@ -109,7 +109,7 @@ protected:
     bool            isSelectionRemovable();
 
 private:
-    std::map<LLUUID, LLFolderViewItem*> mItemMap;
+    boost::unordered_map<LLUUID, LLFolderViewItem*> mItemMap;
 
     LLScrollContainer* mScroller;
     LLFolderView* mFolders;

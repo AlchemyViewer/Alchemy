@@ -70,8 +70,7 @@ namespace LLInitParam
         mValidationFunc(validation_func),
         mInspectFunc(inspect_func),
         mMinCount(min_count),
-        mMaxCount(max_count),
-        mUserData(NULL)
+        mMaxCount(max_count)
     {}
 
     ParamDescriptor::ParamDescriptor()
@@ -82,21 +81,12 @@ namespace LLInitParam
         mValidationFunc(NULL),
         mInspectFunc(NULL),
         mMinCount(0),
-        mMaxCount(0),
-        mUserData(NULL)
+        mMaxCount(0)
     {}
-
-    ParamDescriptor::~ParamDescriptor()
-    {
-        delete mUserData;
-    }
 
     //
     // Parser
     //
-    Parser::~Parser()
-    {}
-
     void Parser::parserWarning(const std::string& message)
     {
         if (mParseSilently) return;

@@ -179,7 +179,7 @@ private:
     LLPanel *mPanelUniversal;
     LLPanel *mPanelPhysics;
 
-    boost::unordered_map<std::string, LLAccordionCtrlTab*> mAccordionTabs;
+    boost::unordered_map<std::string, LLAccordionCtrlTab*>   mAccordionTabs;
     boost::unordered_map<std::string, LLScrollingPanelList*> mParamPanels;
 
     typedef std::vector<std::pair<LLCheckBoxCtrl*, LLAvatarAppearanceDefines::ETextureIndex>> checkbox_texture_index_vec_t;

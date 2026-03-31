@@ -27,80 +27,52 @@
 #ifndef LL_LLGLHEADERS_H
 #define LL_LLGLHEADERS_H
 
-#if LL_MESA
-//----------------------------------------------------------------------------
-// MESA headers
-// quotes so we get libraries/.../GL/ version
-#define GL_GLEXT_PROTOTYPES 1
-#include "GL/gl.h"
-#include "GL/glext.h"
-
-#elif LL_SDL_WINDOW
+#if LL_WINDOWS || LL_MESA_HEADLESS || LL_SDL_WINDOW || LL_LINUX
  //----------------------------------------------------------------------------
- // LL_SDL_WINDOW
+ // LL_WINDOWS || LL_MESA_HEADLESS || LL_SDL_WINDOW || LL_LINUX
 
+#if LL_MESA_HEADLESS
+#define GL_GLEXT_PROTOTYPES 1
+#else
 #define LL_GL_FUNC_POINTER 1
+#endif
 
  // windows gl headers depend on things like APIENTRY, so include windows.
 #include "llwin32headers.h"
 
+// quotes so we get libraries/.../GL/ version
 #include "GL/glcorearb.h"
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_MESA_HEADLESS
 #include "GL/wglext.h"
 #endif
 
-#define GL_COLOR_INDEX                    0x1900
-#define GL_ALPHA                          0x1906
-#define GL_ALPHA8                         0x803C
-#define GL_LUMINANCE                      0x1909
-#define GL_LUMINANCE_ALPHA                0x190A
-#define GL_LUMINANCE8                     0x8040
-#define GL_LUMINANCE8_ALPHA8              0x8045
-#define GL_COMPRESSED_ALPHA               0x84E9
-#define GL_COMPRESSED_LUMINANCE           0x84EA
-#define GL_COMPRESSED_LUMINANCE_ALPHA     0x84EB
+#if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
+#define GLX_GLXEXT_LEGACY
+#define __gl_h_ 1
+#include "GL/glx.h"
+#include "GL/glxext.h"
+#endif
 
-typedef GLboolean(APIENTRYP PFNGLARETEXTURESRESIDENTPROC) (GLsizei n,
-    const GLuint* textures,
-    GLboolean* residences);
-
-#elif LL_LINUX
-#define GL_GLEXT_PROTOTYPES
-
-#include "GL/gl.h"
-#include "GL/glext.h"
-
-#elif LL_WINDOWS
-//----------------------------------------------------------------------------
-// LL_WINDOWS
-
-#define LL_GL_FUNC_POINTER 1
-
-// windows gl headers depend on things like APIENTRY, so include windows.
-#include "llwin32headers.h"
-
-//----------------------------------------------------------------------------
-#include <GL/gl.h>
-
-// quotes so we get libraries/.../GL/ version
-#include "GL/glext.h"
-#include "GL/wglext.h"
+#if LL_LINUX && LL_WAYLAND && !LL_MESA_HEADLESS
+#define EGL_EGL_PROTOTYPES 0
+#include "EGL/egl.h"
+#endif
 
 #elif LL_DARWIN
 //----------------------------------------------------------------------------
 // LL_DARWIN
 
-#define GL_GLEXT_LEGACY
-#include <OpenGL/gl.h>
+#define GL_GLEXT_LEGACY 1
+#include <OpenGL/gl3.h>
 
 #define GL_EXT_separate_specular_color 1
-#define GL_GLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES 1
 #include "GL/glext.h"
 
-#endif // LL_MESA / LL_SDL_WINDOW // LL_LINUX / LL_WINDOWS / LL_DARWIN
+#endif // LL_MESA_HEADLESS / LL_SDL_WINDOW // LL_LINUX / LL_WINDOWS / LL_DARWIN
 
-//GL_NVX_gpu_memory_info constants
+// GL_NVX_gpu_memory_info constants
 #ifndef GL_NVX_gpu_memory_info
 #define GL_NVX_gpu_memory_info
 #define GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX          0x9047
@@ -110,7 +82,7 @@ typedef GLboolean(APIENTRYP PFNGLARETEXTURESRESIDENTPROC) (GLsizei n,
 #define GL_GPU_MEMORY_INFO_EVICTED_MEMORY_NVX            0x904B
 #endif
 
-//GL_ATI_meminfo constants
+// GL_ATI_meminfo constants
 #ifndef GL_ATI_meminfo
 #define GL_ATI_meminfo
 #define GL_VBO_FREE_MEMORY_ATI                     0x87FB
@@ -118,7 +90,7 @@ typedef GLboolean(APIENTRYP PFNGLARETEXTURESRESIDENTPROC) (GLsizei n,
 #define GL_RENDERBUFFER_FREE_MEMORY_ATI            0x87FD
 #endif
 
-//GL_EXT_texture_sRGB constants
+// GL_EXT_texture_sRGB constants
 #ifndef GL_EXT_texture_sRGB
 #define GL_EXT_texture_sRGB 1
 #define GL_SRGB_EXT                       0x8C40
@@ -138,6 +110,32 @@ typedef GLboolean(APIENTRYP PFNGLARETEXTURESRESIDENTPROC) (GLsizei n,
 #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT 0x8C4E
 #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT 0x8C4F
 #endif /* GL_EXT_texture_sRGB */
+
+// GL_ARB_vertex_buffer_object constants
+#ifndef GL_ARB_vertex_buffer_object
+#define GL_ARB_vertex_buffer_object 1
+#define GL_STREAM_DRAW_ARB  0x88E0
+#define GL_STREAM_READ_ARB  0x88E1
+#define GL_STREAM_COPY_ARB  0x88E2
+#define GL_STATIC_DRAW_ARB  0x88E4
+#define GL_STATIC_READ_ARB  0x88E5
+#define GL_STATIC_COPY_ARB  0x88E6
+#define GL_DYNAMIC_DRAW_ARB 0x88E8
+#define GL_DYNAMIC_READ_ARB 0x88E9
+#define GL_DYNAMIC_COPY_ARB 0x88EA
+#endif
+
+// Deprecated OpenGL defines we still use
+#define GL_COLOR_INDEX                    0x1900
+#define GL_ALPHA                          0x1906
+#define GL_ALPHA8                         0x803C
+#define GL_LUMINANCE                      0x1909
+#define GL_LUMINANCE_ALPHA                0x190A
+#define GL_LUMINANCE8                     0x8040
+#define GL_LUMINANCE8_ALPHA8              0x8045
+#define GL_COMPRESSED_ALPHA               0x84E9
+#define GL_COMPRESSED_LUMINANCE           0x84EA
+#define GL_COMPRESSED_LUMINANCE_ALPHA     0x84EB
 
 #if LL_GL_FUNC_POINTER
 
@@ -167,8 +165,19 @@ extern PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
 
 #endif // LL_WINDOWS
 
+#if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
+// GLX_MESA_query_renderer
+extern PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC glXQueryCurrentRendererIntegerMESA;
+extern PFNGLXQUERYCURRENTRENDERERSTRINGMESAPROC glXQueryCurrentRendererStringMESA;
+extern PFNGLXQUERYRENDERERINTEGERMESAPROC glXQueryRendererIntegerMESA;
+extern PFNGLXQUERYRENDERERSTRINGMESAPROC glXQueryRendererStringMESA;
+#endif
+
+#if LL_LINUX && LL_WAYLAND &&!LL_MESA_HEADLESS
+extern PFNEGLQUERYSTRINGPROC eglQueryString;
+#endif
+
 // We get all functions via getProcAddress when using SDL
-#if LL_SDL_WINDOW
 // GL_VERSION_1_0
 extern PFNGLCULLFACEPROC                    glCullFace;
 extern PFNGLFRONTFACEPROC                   glFrontFace;
@@ -218,8 +227,6 @@ extern PFNGLGETTEXLEVELPARAMETERIVPROC      glGetTexLevelParameteriv;
 extern PFNGLISENABLEDPROC                   glIsEnabled;
 extern PFNGLDEPTHRANGEPROC                  glDepthRange;
 extern PFNGLVIEWPORTPROC                    glViewport;
-//extern PFNGLPRIORITIZETEXTURESPROC          glPrioritizeTextures;
-extern PFNGLARETEXTURESRESIDENTPROC         glAreTexturesResident;
 
 // GL_VERSION_1_1
 extern PFNGLDRAWARRAYSPROC                  glDrawArrays;
@@ -236,7 +243,6 @@ extern PFNGLBINDTEXTUREPROC                 glBindTexture;
 extern PFNGLDELETETEXTURESPROC              glDeleteTextures;
 extern PFNGLGENTEXTURESPROC                 glGenTextures;
 extern PFNGLISTEXTUREPROC                   glIsTexture;
-#endif
 
 // GL_VERSION_1_2
 extern PFNGLDRAWRANGEELEMENTSPROC           glDrawRangeElements;

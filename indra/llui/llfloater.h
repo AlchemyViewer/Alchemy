@@ -162,6 +162,8 @@ public:
         Optional<bool>          single_instance,
                                 reuse_instance,
                                 can_resize,
+                                can_resize_height,
+                                can_resize_width,
                                 can_minimize,
 // [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
                                 can_collapse,
@@ -526,6 +528,8 @@ private:
     bool            mFocusStealsFrontmost = true;   // false if we don't want the currently focused floater to cover this floater without user interaction
     bool            mDragOnLeft;
     bool            mResizable;
+    bool            mResizableHeight;
+    bool            mResizableWidth;
     bool            mAutoClose;
 
     LLFloaterEnums::EOpenPositioning    mPositioning;

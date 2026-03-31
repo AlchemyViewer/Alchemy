@@ -33,8 +33,9 @@
 #include "llparcelselection.h"
 #include "llui.h"
 
-#include <boost/function.hpp>
 #include <boost/signals2.hpp>
+
+#include <functional>
 
 class LLUUID;
 class LLMessageSystem;
@@ -73,18 +74,18 @@ public:
     virtual void changed() = 0;
 };
 
-class LLViewerParcelMgr : public LLSingleton<LLViewerParcelMgr>
+class LLViewerParcelMgr : public LLSimpleton<LLViewerParcelMgr>
 {
-    LLSINGLETON(LLViewerParcelMgr);
+public:
+    LLViewerParcelMgr();
     ~LLViewerParcelMgr();
 
-public:
-    typedef boost::function<void (const LLVector3d&, const bool& local)> teleport_finished_callback_t;
+    typedef std::function<void (const LLVector3d&, const bool& local)> teleport_finished_callback_t;
     typedef boost::signals2::signal<void (const LLVector3d&, const bool&)> teleport_finished_signal_t;
-    typedef boost::function<void()> teleport_failed_callback_t;
+    typedef std::function<void()> teleport_failed_callback_t;
     typedef boost::signals2::signal<void()> teleport_failed_signal_t;
 // [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
-    typedef boost::function<void()> teleport_done_callback_t;
+    typedef std::function<void()> teleport_done_callback_t;
     typedef boost::signals2::signal<void()> teleport_done_signal_t;
 // [/SL:KB]
 
@@ -184,6 +185,12 @@ public:
     bool    allowAgentVoice() const;
     bool    allowAgentVoice(const LLViewerRegion* region, const LLParcel* parcel) const;
 
+    // Returns true if this parcel is using private voice channel
+    bool isVoiceRestricted() const;
+
+    // Can this agent moderate Nearby voice chat on this parcel?
+    bool allowVoiceModeration() const;
+
     // Can this agent start flying on this parcel?
     // Used for parcel property icons in nav bar.
     bool    allowAgentFly(const LLViewerRegion* region, const LLParcel* parcel) const;
@@ -212,7 +219,7 @@ public:
 
     void    renderRect( const LLVector3d &west_south_bottom,
                         const LLVector3d &east_north_top );
-    void    renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 height, U8 direction, LLViewerRegion* regionp);
+    void    renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 height, U8 direction, LLViewerRegion* regionp, bool absolute_height = false);
     void    renderHighlightSegments(const U8* segments, LLViewerRegion* regionp);
     void    renderCollisionSegments(U8* segments, bool use_pass, LLViewerRegion* regionp);
 

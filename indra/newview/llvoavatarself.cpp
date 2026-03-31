@@ -2318,9 +2318,9 @@ void LLVOAvatarSelf::appearanceChangeMetricsCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("appearanceChangeMetrics", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("appearanceChangeMetrics", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts  = std::make_shared<LLCore::HttpOptions>();
 
     S32 currentSequence = mMetricSequence;
     if (S32_MAX == ++mMetricSequence)
@@ -2842,7 +2842,7 @@ void LLVOAvatarSelf::onCustomizeEnd(bool disable_camera_switch)
         // Dereferencing the previous callback will cause
         // updateAppearanceFromCOF to be called, whenever all refs
         // have resolved.
-        gAgentAvatarp->mEndCustomizeCallback = NULL;
+        gAgentAvatarp->mEndCustomizeCallback = nullptr;
     }
 }
 
@@ -2983,16 +2983,14 @@ void LLVOAvatarSelf::dumpScratchTextureByteCount()
     LL_INFOS() << "Scratch Texture GL: " << (sScratchTexBytes/1024) << "KB" << LL_ENDL;
 }
 
-void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
+void LLVOAvatarSelf::dumpWearableInfo(LLFile& outfile)
 {
-    apr_file_t* file = outfile.getFileHandle();
-    if (!file)
+    if (!outfile)
     {
         return;
     }
 
-
-    apr_file_printf( file, "\n<wearable_info>\n" );
+    outfile.printf("\n<wearable_info>\n");
 
     LLWearableData *wd = getWearableData();
     LLWearableType *wr_inst = LLWearableType::getInstance();
@@ -3002,7 +3000,7 @@ void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
         for (U32 j=0; j< wd->getWearableCount((LLWearableType::EType)type); j++)
         {
             LLViewerWearable *wearable = gAgentWearables.getViewerWearable((LLWearableType::EType)type,j);
-            apr_file_printf( file, "\n\t    <wearable type=\"%s\" name=\"%s\"/>\n",
+            outfile.printf("\n\t    <wearable type=\"%s\" name=\"%s\"/>\n",
                              type_name.c_str(), wearable->getName().c_str() );
             LLWearable::visual_param_vec_t v_params;
             wearable->getVisualParams(v_params);
@@ -3010,11 +3008,11 @@ void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
                  it != v_params.end(); ++it)
             {
                 LLVisualParam *param = *it;
-                dump_visual_param(file, param, param->getWeight());
+                dump_visual_param(&outfile, param, param->getWeight());
             }
         }
     }
-    apr_file_printf( file, "\n</wearable_info>\n" );
+    outfile.printf("\n</wearable_info>\n");
 }
 
 //// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0

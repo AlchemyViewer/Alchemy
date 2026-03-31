@@ -62,8 +62,8 @@ private:
     };
     struct Entry
     {
-            Entry() :
-                mBodySize(0),
+        Entry() :
+            mBodySize(0),
             mImageSize(0),
             mTime(0)
         {
@@ -147,11 +147,11 @@ public:
     U32 getMaxEntries() { return sCacheMaxEntries; };
     bool isInCache(const LLUUID& id) ;
     bool isInLocal(const LLUUID& id) ; //not thread safe at the moment
-
+    LLMutex* getFastCacheMutex() { return &mFastCacheMutex; }
 protected:
     // Accessed by LLTextureCacheWorker
     std::string getLocalFileName(const LLUUID& id);
-    std::string getTextureFileName(const LLUUID& id);
+    std::filesystem::path getTextureFileName(const LLUUID& id);
     void addCompleted(Responder* responder, bool success);
 
 protected:
@@ -164,7 +164,7 @@ private:
     void purgeAllTextures(bool purge_directories);
     void purgeTexturesLazy(F32 time_limit_sec);
     void purgeTextures(bool validate);
-    LLAPRFile* openHeaderEntriesFile(bool readonly, S32 offset);
+    LLFile* openHeaderEntriesFile(bool readonly, S32 offset);
     void closeHeaderEntriesFile();
     void readEntriesHeader();
     void setEntriesHeader();
@@ -176,7 +176,7 @@ private:
     void writeEntriesAndClose(const std::vector<Entry>& entries);
     void readEntryFromHeaderImmediately(S32& idx, Entry& entry) ;
     void writeEntryToHeaderImmediately(S32& idx, Entry& entry, bool write_header = false) ;
-    void removeEntry(S32 idx, Entry& entry, std::string& filename);
+    void removeEntry(S32 idx, Entry& entry, const std::filesystem::path& filename);
     void removeCachedTexture(const LLUUID& id) ;
     S32 getHeaderCacheEntry(const LLUUID& id, Entry& entry);
     S32 setHeaderCacheEntry(const LLUUID& id, Entry& entry, S32 imagesize, S32 datasize);
@@ -193,15 +193,10 @@ private:
     // Internal
     LLMutex mWorkersMutex;
     LLMutex mHeaderMutex;
+    LLMutex mHeaderIDMapMutex; // To avoid deadlocks, never lock mFastCacheMutex after mHeaderIDMapMutex.
     LLMutex mListMutex;
     LLMutex mFastCacheMutex;
-    LLAPRFile* mHeaderAPRFile;
-    LLVolatileAPRPool* mFastCachePoolp;
-
-    // mLocalAPRFilePoolp is not thread safe and is meant only for workers
-    // howhever mHeaderEntriesFileName is accessed not from workers' threads
-    // so it needs own pool (not thread safe by itself, relies onto header's mutex)
-    LLVolatileAPRPool*   mHeaderAPRFilePoolp;
+    LLFile* mHeaderAPRFile;
 
     typedef std::map<handle_t, LLTextureCacheWorker*> handle_map_t;
     handle_map_t mReaders;
@@ -216,22 +211,22 @@ private:
     bool mReadOnly;
 
     // HEADERS (Include first mip)
-    std::string mHeaderEntriesFileName;
-    std::string mHeaderDataFileName;
-    std::string mFastCacheFileName;
+    std::filesystem::path mHeaderEntriesFilePath;
+    std::filesystem::path mHeaderDataFilePath;
+    std::filesystem::path mFastCacheFilePath;
     EntriesInfo mHeaderEntriesInfo;
     std::set<S32> mFreeList; // deleted entries
     std::set<LLUUID> mLRU;
-    typedef std::map<LLUUID, S32> id_map_t;
+    typedef boost::unordered_map<LLUUID, S32> id_map_t;
     id_map_t mHeaderIDMap;
 
-    LLAPRFile*   mFastCachep;
+    LLFile*      mFastCachep;
     LLFrameTimer mFastCacheTimer;
     U8*          mFastCachePadBuffer;
 
     // BODIES (TEXTURES minus headers)
-    std::string mTexturesDirName;
-    typedef std::map<LLUUID,S32> size_map_t;
+    std::filesystem::path mTexturesDirPath;
+    typedef boost::unordered_map<LLUUID,S32> size_map_t;
     size_map_t mTexturesSizeMap;
     S64 mTexturesSizeTotal;
     LLAtomicBool mDoPurge;

@@ -95,6 +95,7 @@
 #include "llwearablelist.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvactions.h"
+#include "rlvhandler.h"
 #include "rlvlocks.h"
 // [/RLVa:KB]
 
@@ -409,7 +410,7 @@ void update_all_marketplace_count(const LLUUID& cat_id)
 void update_all_marketplace_count()
 {
     // Get the marketplace root and launch the recursive exploration
-    const LLUUID marketplace_listings_uuid = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+    const LLUUID marketplace_listings_uuid = gInventory.getMarketplaceListingsUUID();
     if (!marketplace_listings_uuid.isNull())
     {
         update_all_marketplace_count(marketplace_listings_uuid);
@@ -643,13 +644,6 @@ bool get_is_item_worn(const LLUUID& id, const LLViewerInventoryItem* item)
     {
         return false;
     }
-
-    // Consider the item as worn if it has links in COF.
-// [SL:KB] - The code below causes problems across the board so it really just needs to go
-//  if (LLAppearanceMgr::instance().isLinkedInCOF(id))
-//  {
-//      return true;
-//  }
 
     switch(item->getType())
     {
@@ -997,6 +991,13 @@ void show_item_profile(const LLUUID& item_uuid)
 
 void show_item_original(const LLUUID& item_uuid)
 {
+// [RLVa:KB]
+    if (rlv_handler_t::isEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWINV))
+    {
+        return;
+    }
+// [/RLVa:KB]
+
     static LLUICachedControl<bool> find_original_new_floater("FindOriginalOpenWindow", false);
 
     //show in a new single-folder window
@@ -1087,11 +1088,7 @@ void open_marketplace_listings()
 
 S32 depth_nesting_in_marketplace(LLUUID cur_uuid)
 {
-    // Get the marketplace listings root, exit with -1 (i.e. not under the marketplace listings root) if none
-    // Todo: findCategoryUUIDForType is somewhat expensive with large
-    // flat root folders yet we use depth_nesting_in_marketplace at
-    // every turn, find a way to correctly cache this id.
-    const LLUUID marketplace_listings_uuid = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+    const LLUUID marketplace_listings_uuid = gInventory.getMarketplaceListingsUUID();
     if (marketplace_listings_uuid.isNull())
     {
         return -1;
@@ -1795,7 +1792,7 @@ bool sort_alpha(const LLViewerInventoryCategory* cat1, const LLViewerInventoryCa
 // The only inventory changes that are done is to move and sort folders containing no-copy items to stock folders.
 // @pending_callbacks - how many callbacks we are waiting for, must be inited before use
 // @result - true if things validate, false if issues are raised, must be inited before use
-typedef boost::function<void(S32 pending_callbacks, bool result)> validation_result_callback_t;
+typedef std::function<void(S32 pending_callbacks, bool result)> validation_result_callback_t;
 void validate_marketplacelistings(
     LLInventoryCategory* cat,
     validation_result_callback_t cb_result,
@@ -2596,7 +2593,7 @@ bool get_is_favorite(const LLUUID& obj_id)
         return obj && obj->getIsFavorite();
     }
 
-    return object->getIsFavorite();
+    return object && object->getIsFavorite();
 }
 
 void set_favorite(const LLUUID& obj_id, bool favorite)
@@ -3457,7 +3454,7 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
 
     if ("delete" == action)
     {
-        const LLUUID &marketplacelistings_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+        const LLUUID &marketplacelistings_id = gInventory.getMarketplaceListingsUUID();
         bool marketplacelistings_item = false;
         bool has_worn = false;
         bool needs_replacement = false;
@@ -3638,7 +3635,7 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
     if (action == "wear" || action == "wear_add")
     {
         const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
-        const LLUUID mp_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+        const LLUUID mp_id = gInventory.getMarketplaceListingsUUID();
         std::copy_if(selected_uuid_set.begin(),
             selected_uuid_set.end(),
             std::back_inserter(ids),
@@ -3927,6 +3924,31 @@ void LLInventoryAction::fileUploadLocation(const LLUUID& dest_id, const std::str
     }
 }
 
+bool LLInventoryAction::isFileUploadLocation(const LLUUID& dest_id, const std::string& action)
+{
+    if (action == "def_model")
+    {
+        return gInventory.findUserDefinedCategoryUUIDForType(LLFolderType::FT_OBJECT) == dest_id;
+    }
+    else if (action == "def_texture")
+    {
+        return gInventory.findUserDefinedCategoryUUIDForType(LLFolderType::FT_TEXTURE) == dest_id;
+    }
+    else if (action == "def_sound")
+    {
+        return gInventory.findUserDefinedCategoryUUIDForType(LLFolderType::FT_SOUND) == dest_id;
+    }
+    else if (action == "def_animation")
+    {
+        return gInventory.findUserDefinedCategoryUUIDForType(LLFolderType::FT_ANIMATION) == dest_id;
+    }
+    else if (action == "def_pbr_material")
+    {
+        return gInventory.findUserDefinedCategoryUUIDForType(LLFolderType::FT_MATERIAL) == dest_id;
+    }
+    return false;
+}
+
 void LLInventoryAction::onItemsRemovalConfirmation(const LLSD& notification, const LLSD& response, LLHandle<LLFolderView> root)
 {
     S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
@@ -4023,7 +4045,7 @@ void LLInventoryAction::buildMarketplaceFolders(LLFolderView* root)
     // target listing *and* the original listing. So we need to keep track of both.
     // Note: do not however put the marketplace listings root itself in this list or the whole marketplace data will be rebuilt.
     sMarketplaceFolders.clear();
-    const LLUUID &marketplacelistings_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+    const LLUUID& marketplacelistings_id = gInventory.getMarketplaceListingsUUID();
     if (marketplacelistings_id.isNull())
     {
         return;

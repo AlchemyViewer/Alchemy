@@ -28,18 +28,19 @@
 
 #include "lldiriterator.h"
 
-#include "fix_macros.h"
+#include "fsyspath.h"
 #include "llregex.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 static std::string glob_to_regex(const std::string& glob);
 
 class LLDirIterator::Impl
 {
 public:
-    Impl(const std::string &dirname, const std::string &mask);
+    Impl(const std::filesystem::path& dirname, const std::string& mask);
+
     ~Impl();
 
     bool next(std::string &fname);
@@ -50,15 +51,9 @@ private:
     bool                    mIsValid;
 };
 
-LLDirIterator::Impl::Impl(const std::string &dirname, const std::string &mask)
+LLDirIterator::Impl::Impl(const std::filesystem::path& dir_path, const std::string& mask)
     : mIsValid(false)
 {
-#ifdef LL_WINDOWS // or BOOST_WINDOWS_API
-    fs::path dir_path(ll_convert<std::wstring>(dirname));
-#else
-    fs::path dir_path(dirname);
-#endif
-
     bool is_dir = false;
 
     // Check if path is a directory.
@@ -132,7 +127,7 @@ bool LLDirIterator::Impl::next(std::string &fname)
         while (mIter != end_itr && !found)
         {
             boost::smatch match;
-            std::string name = mIter->path().filename().string();
+            std::string name = ll_convert<std::string>(mIter->path().filename().u8string());
             found = ll_regex_match(name, match, mFilterExp);
             if (found)
             {
@@ -229,9 +224,19 @@ std::string glob_to_regex(const std::string& glob)
     return regex;
 }
 
+LLDirIterator::LLDirIterator(const char* dirname, const std::string& mask)
+{
+    mImpl = new Impl(fsyspath(dirname), mask);
+}
+
 LLDirIterator::LLDirIterator(const std::string &dirname, const std::string &mask)
 {
-    mImpl = new Impl(dirname, mask);
+    mImpl = new Impl(fsyspath(dirname), mask);
+}
+
+LLDirIterator::LLDirIterator(const std::filesystem::path& dir_path, const std::string& mask)
+{
+    mImpl = new Impl(dir_path, mask);
 }
 
 LLDirIterator::~LLDirIterator()

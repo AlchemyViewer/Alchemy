@@ -299,6 +299,7 @@ void LLFloaterGLTFAssetEditor::loadFromSelection()
         setTitle(node->mName);
     }
 
+    LLUIColor item_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", DEFAULT_WHITE);
     for (S32 i = 0; i < mAsset->mScenes.size(); i++)
     {
         LL::GLTF::Scene& scene = mAsset->mScenes[i];

@@ -27,6 +27,8 @@
 #ifndef LL_LLDIR_H
 #define LL_LLDIR_H
 
+#include <string_view>
+
 // these numbers are read from settings_files.xml, so we need to be explicit
 typedef enum ELLPath
 {
@@ -66,12 +68,20 @@ class LLDir
     virtual void initAppDirs(const std::string &app_name,
         const std::string& app_read_only_data_dir = "") = 0;
 
-    virtual S32 deleteFilesInDir(const std::string &dirname, const std::string &mask);
-    U32 deleteDirAndContents(const std::string& dir_name);
+    S32 deleteFilesInDir(const std::string& dirname, const std::string& mask)
+    {
+        return deleteFilesInDir(fsyspath(dirname), mask);
+    };
+    S32 deleteFilesInDir(const std::filesystem::path &dirname, const std::string &mask);
+    U32 deleteDirAndContents(const std::string& dir_name)
+    {
+        return deleteDirAndContents(fsyspath(dir_name));
+    };
+    U32 deleteDirAndContents(const std::filesystem::path& dir_name);
     std::vector<std::string> getFilesInDir(const std::string &dirname);
 // pure virtual functions
     virtual std::string getCurPath() = 0;
-    virtual bool fileExists(const std::string &filename) const = 0;
+    virtual bool fileExists(const std::string &filename) const;
 
     const std::string findFile(const std::string& filename, const std::vector<std::string> filenames) const;
     const std::string findFile(const std::string& filename, const std::string& searchPath1 = "", const std::string& searchPath2 = "", const std::string& searchPath3 = "") const;
@@ -80,7 +90,7 @@ class LLDir
     virtual std::string getLLPluginFilename(std::string base_name) = 0; // full path and name to the plugin DSO for this base_name (i.e. 'FOO' -> '/bar/baz/libFOO.so')
 
     const std::string &getExecutablePathAndName() const;    // Full pathname of the executable
-    const std::string &getAppName() const;          // install directory under progams/ ie "Alchemy"
+    const std::string &getAppName() const;          // install directory under progams/ ie "AlchemyViewer"
     const std::string &getExecutableDir() const;    // Directory where the executable is located
     const std::string &getExecutableFilename() const;// Filename of .exe
     const std::string &getWorkingDir() const; // Current working directory
@@ -106,9 +116,9 @@ class LLDir
     const std::string &getUserName() const;
 
     // Expanded filename
-    std::string getExpandedFilename(ELLPath location, const std::string &filename) const;
-    std::string getExpandedFilename(ELLPath location, const std::string &subdir, const std::string &filename) const;
-    std::string getExpandedFilename(ELLPath location, const std::string &subdir1, const std::string &subdir2, const std::string &filename) const;
+    std::string getExpandedFilename(ELLPath location, std::string_view filename) const;
+    std::string getExpandedFilename(ELLPath location, std::string_view subdir, std::string_view filename) const;
+    std::string getExpandedFilename(ELLPath location, std::string_view subdir1, std::string_view subdir2, std::string_view filename) const;
 
     // Base and Directory name extraction
     std::string getBaseFileName(const std::string& filepath, bool strip_exten = false) const;
@@ -146,8 +156,8 @@ class LLDir
      * ".../<i>current_skin</i>/xui/en/strings.xml",
      * ".../<i>current_skin</i>/xui/<i>current_language</i>/strings.xml".
      */
-    std::vector<std::string> findSkinnedFilenames(const std::string& subdir,
-                                                  const std::string& filename,
+    std::vector<std::string> findSkinnedFilenames(std::string_view subdir,
+                                                  std::string_view filename,
                                                   ESkinConstraint constraint=CURRENT_SKIN) const;
     /// Values for findSkinnedFilenames(subdir) parameter
     static const char *XUI, *TEXTURES, *SKINBASE;
@@ -158,8 +168,8 @@ class LLDir
      * returned by findSkinnedFilenames(), checking for empty() and then
      * returning front().
      */
-    std::string findSkinnedFilenameBaseLang(const std::string &subdir,
-                                            const std::string &filename,
+    std::string findSkinnedFilenameBaseLang(std::string_view subdir,
+                                            std::string_view filename,
                                             ESkinConstraint constraint=CURRENT_SKIN) const;
     /**
      * Return the "most localized" pathname from findSkinnedFilenames(), or
@@ -168,8 +178,8 @@ class LLDir
      * returned by findSkinnedFilenames(), checking for empty() and then
      * returning back().
      */
-    std::string findSkinnedFilename(const std::string &subdir,
-                                    const std::string &filename,
+    std::string findSkinnedFilename(std::string_view subdir,
+                                    std::string_view filename,
                                     ESkinConstraint constraint=CURRENT_SKIN) const;
 
     // random filename in common temporary directory
@@ -194,16 +204,19 @@ class LLDir
 
     virtual void dumpCurrentDirectories(LLError::ELevel level = LLError::LEVEL_DEBUG);
 
+    // Open the system file browser to reveal a file or directory
+    void openDir(const std::string& filepath);
+
     // Utility routine
     std::string buildSLOSCacheDir() const;
 
     /// Append specified @a name to @a destpath, separated by getDirDelimiter()
     /// if both are non-empty.
-    void append(std::string& destpath, const std::string& name) const;
+    void append(std::string& destpath, std::string_view name) const;
     /// Variadic form: append @a name0 and @a name1 and arbitrary other @a
     /// names to @a destpath, separated by getDirDelimiter() as needed.
     template <typename... NAMES>
-    void append(std::string& destpath, const std::string& name0, const std::string& name1,
+    void append(std::string& destpath, std::string_view name0, std::string_view name1,
                 const NAMES& ... names) const
     {
         // In a typical recursion case, we'd accept (destpath, name0, names).
@@ -216,7 +229,7 @@ class LLDir
     /// Append specified @a names to @a path, separated by getDirDelimiter()
     /// as needed. Return result, leaving @a path unmodified.
     template <typename... NAMES>
-    std::string add(const std::string& path, const NAMES& ... names) const
+    std::string add(std::string_view path, const NAMES& ... names) const
     {
         std::string destpath(path);
         append(destpath, names...);
@@ -226,15 +239,15 @@ class LLDir
 protected:
     // Does an add() or append() call need a directory delimiter?
     typedef std::pair<bool, unsigned short> SepOff;
-    SepOff needSep(const std::string& path, const std::string& name) const;
+    SepOff needSep(const std::string& path, std::string_view name) const;
     // build mSearchSkinDirs without adding duplicates
     void addSearchSkinDir(const std::string& skindir);
 
     // Internal to findSkinnedFilenames()
     template <typename FUNCTION>
-    void walkSearchSkinDirs(const std::string& subdir,
+    void walkSearchSkinDirs(std::string_view subdir,
                             const std::vector<std::string>& subsubdirs,
-                            const std::string& filename,
+                            std::string_view filename,
                             const FUNCTION& function) const;
 
     std::string mAppName;               // install directory under progams/ ie "Alchemy"

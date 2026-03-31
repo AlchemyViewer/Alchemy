@@ -47,7 +47,6 @@
 #include "string.h"
 
 #include "llapp.h"
-#include "llapr.h"
 #include "llfile.h"
 #include "lllivefile.h"
 #include "llsd.h"
@@ -57,12 +56,8 @@
 #include "lltimer.h"
 #include "llprofiler.h"
 
-// On Mac, got:
-// #error "Boost.Stacktrace requires `_Unwind_Backtrace` function. Define
-// `_GNU_SOURCE` macro or `BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED` if
-// _Unwind_Backtrace is available without `_GNU_SOURCE`."
-#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
 #include <boost/stacktrace.hpp>
+#include <boost/unordered_map.hpp>
 
 namespace {
 #if LL_WINDOWS
@@ -134,7 +129,6 @@ namespace {
             mName(filename)
         {
             showMultiline(true);
-
             mFile.open(filename.c_str(), std::ios_base::out | std::ios_base::app);
             if (!mFile)
             {
@@ -346,6 +340,51 @@ namespace {
         }
     };
 #endif
+
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+    class RecordToTracy : public LLError::Recorder
+    {
+    public:
+        RecordToTracy()
+        {
+            this->showMultiline(true);
+            this->showTags(false);
+            this->showLocation(false);
+        }
+
+        virtual bool enabled() override { return LLError::getEnabledLogTypesMask() & 0x12; }
+
+        virtual void recordMessage(LLError::ELevel level, const std::string& message) override
+        {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
+            switch (level)
+            {
+                case LLError::LEVEL_DEBUG:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::Turquoise);
+                    break;
+                }
+                default:
+                case LLError::LEVEL_NONE:
+                case LLError::LEVEL_INFO:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::White);
+                    break;
+                }
+                case LLError::LEVEL_WARN:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::Yellow);
+                    break;
+                }
+                case LLError::LEVEL_ERROR:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::Red);
+                    break;
+                }
+            }
+        }
+    };
+#endif
 }
 
 
@@ -437,13 +476,9 @@ namespace
 
         std::string file = user_dir + "/logcontrol-dev.xml";
 
-        llstat stat_info;
-        if (LLFile::stat(file, &stat_info)) {
-            // NB: stat returns non-zero if it can't read the file, for example
-            // if it doesn't exist.  LLFile has no better abstraction for
-            // testing for file existence.
-
-            file = app_dir + "/logcontrol.xml";
+        if (!LLFile::isfile(file))
+        {
+             file = app_dir + "/logcontrol.xml";
         }
         return * new LogControlFile(file);
             // NB: This instance is never freed
@@ -482,7 +517,7 @@ namespace
     }
 
 
-    typedef std::map<std::string, LLError::ELevel> LevelMap;
+    typedef boost::unordered_map<std::string, LLError::ELevel> LevelMap;
     typedef std::vector<LLError::RecorderPtr> Recorders;
     typedef std::vector<LLError::CallSite*> CallSiteVector;
 
@@ -503,7 +538,7 @@ namespace
         LevelMap                            mClassLevelMap;
         LevelMap                            mFileLevelMap;
         LevelMap                            mTagLevelMap;
-        std::map<std::string, unsigned int> mUniqueLogMessages;
+        boost::unordered_map<std::string, unsigned int> mUniqueLogMessages;
 
         LLError::FatalFunction              mCrashFunction;
         LLError::TimeFunction               mTimeFunction;
@@ -529,8 +564,8 @@ namespace
         mFileLevelMap(),
         mTagLevelMap(),
         mUniqueLogMessages(),
-        mCrashFunction(NULL),
-        mTimeFunction(NULL),
+        mCrashFunction(nullptr),
+        mTimeFunction(nullptr),
         mRecorders(),
         mShouldLogCallCounter(0)
     {
@@ -759,6 +794,11 @@ namespace
 #if LL_WINDOWS
         LLError::RecorderPtr recordToWinDebug(new RecordToWinDebug());
         LLError::addRecorder(recordToWinDebug);
+#endif
+
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+        LLError::RecorderPtr recordToTracy(new RecordToTracy());
+        LLError::addRecorder(recordToTracy);
 #endif
 
         LogControlFile& e = LogControlFile::fromDirectory(user_dir, app_dir);
@@ -1233,7 +1273,7 @@ namespace
 
             std::ostringstream message_stream;
 
-            if (r->wantsTime() && s->mTimeFunction != NULL)
+            if (r->wantsTime() && s->mTimeFunction != nullptr)
             {
                 message_stream << s->mTimeFunction();
             }
@@ -1406,7 +1446,7 @@ namespace LLError
         {
             std::ostringstream message_stream;
 
-            std::map<std::string, unsigned int>::iterator messageIter = s->mUniqueLogMessages.find(message);
+            auto messageIter = s->mUniqueLogMessages.find(message);
             if (messageIter != s->mUniqueLogMessages.end())
             {
                 messageIter->second++;
@@ -1627,7 +1667,7 @@ namespace LLError
         // Files Are missing, likely can't localize.
         const std::string error_string =
             "Alchemy Viewer couldn't access some of the files it needs and will be closed."
-            "\n\nPlease reinstall viewer from  https://www.alchemyviewer.org/downloads and "
+            "\n\nPlease reinstall viewer from https://www.alchemyviewer.org/downloads and "
             "contact the Alchemy Viewer team if the issue persists after reinstall.";
         sHandler("Missing Files", error_string, ERROR_MISSING_FILES);
     }

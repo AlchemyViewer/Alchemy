@@ -28,7 +28,7 @@
 #include "linden_common.h"
 #include "llaudioengine.h"
 #include "lllistener_fmodstudio.h"
-#include "fmodstudio/fmod.hpp"
+#include <fmod.hpp>
 
 //-----------------------------------------------------------------------
 // constructor
@@ -58,7 +58,7 @@ void LLListener_FMODSTUDIO::translate(LLVector3 offset)
 {
     LLListener::translate(offset);
 
-    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, NULL, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
+    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
 }
 
 //-----------------------------------------------------------------------
@@ -66,7 +66,7 @@ void LLListener_FMODSTUDIO::setPosition(LLVector3 pos)
 {
     LLListener::setPosition(pos);
 
-    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, NULL, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
+    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
 }
 
 //-----------------------------------------------------------------------
@@ -74,7 +74,7 @@ void LLListener_FMODSTUDIO::setVelocity(LLVector3 vel)
 {
     LLListener::setVelocity(vel);
 
-    mSystem->set3DListenerAttributes(0, NULL, (FMOD_VECTOR*)mVelocity.mV, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
+    mSystem->set3DListenerAttributes(0, nullptr, (FMOD_VECTOR*)mVelocity.mV, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
 }
 
 //-----------------------------------------------------------------------
@@ -85,7 +85,7 @@ void LLListener_FMODSTUDIO::orient(LLVector3 up, LLVector3 at)
     // at = -at; by default Fmod studio is 'left-handed' but we are providing
     // flag FMOD_INIT_3D_RIGHTHANDED so no correction are needed
 
-    mSystem->set3DListenerAttributes(0, NULL, NULL, (FMOD_VECTOR*)at.mV, (FMOD_VECTOR*)up.mV);
+    mSystem->set3DListenerAttributes(0, nullptr, nullptr, (FMOD_VECTOR*)at.mV, (FMOD_VECTOR*)up.mV);
 }
 
 //-----------------------------------------------------------------------
@@ -109,8 +109,8 @@ void LLListener_FMODSTUDIO::setRolloffFactor(F32 factor)
     if (mRolloffFactor != factor)
     {
         LLVector3 pos = mPosition - LLVector3(0.f, 0.f, .1f);
-        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)pos.mV, NULL, NULL, NULL);
-        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, NULL, NULL, NULL);
+        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)pos.mV, nullptr, nullptr, nullptr);
+        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, nullptr, nullptr);
     }
     mRolloffFactor = factor;
     mSystem->set3DSettings(mDopplerFactor, 1.f, mRolloffFactor);

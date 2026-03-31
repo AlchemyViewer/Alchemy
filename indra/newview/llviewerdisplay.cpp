@@ -28,6 +28,7 @@
 
 #include "llviewerdisplay.h"
 
+#include "alfloaterprogressview.h"
 #include "fsyspath.h"
 #include "hexdump.h"
 #include "llagent.h"
@@ -44,7 +45,6 @@
 #include "llenvironment.h"
 #include "llfasttimer.h"
 #include "llfeaturemanager.h"
-#include "llfloaterprogressview.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
 #include "llfocusmgr.h"
@@ -246,8 +246,11 @@ void display_stats()
     if (gRecentFPSTime.getElapsedTimeF32() >= FPS_LOG_FREQUENCY)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("DS - FPS");
+        LLTrace::Recording& recording = LLTrace::get_frame_recording().getLastRecording();
+        F64 normalized_session_jitter = recording.getLastValue(LLStatViewer::NOTRMALIZED_FRAMETIME_JITTER_SESSION);
+        F64 normalized_period_jitter = recording.getLastValue(LLStatViewer::NORMALIZED_FRAMTIME_JITTER_PERIOD);
         F32 fps = gRecentFrameCount / FPS_LOG_FREQUENCY;
-        LL_INFOS() << llformat("FPS: %.02f", fps) << LL_ENDL;
+        LL_INFOS() << llformat("FPS: %.02f SESSION JITTER: %.4f PERIOD JITTER: %.4f", fps, normalized_session_jitter, normalized_period_jitter) << LL_ENDL;
         gRecentFrameCount = 0;
         gRecentFPSTime.reset();
     }
@@ -291,7 +294,7 @@ static void update_tp_display(bool minimized)
         gAgent.setTeleportMessage(std::string());
     }
 
-    LLFloaterProgressView* pProgFloater = LLFloaterReg::getTypedInstance<LLFloaterProgressView>("progress_view");
+    ALFloaterProgressView* pProgFloater = LLFloaterReg::getTypedInstance<ALFloaterProgressView>("progress_view");
 
     // Make sure the TP progress panel gets hidden in case the viewer window
     // is minimized *during* a TP. HB
@@ -474,6 +477,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             stop_glerror();
         }
 
+        // Process hud objects to prevent overflow when backgrounded or minimized.
+        LLHUDObject::renderAllForTimer();
+
         stop_glerror();
         gViewerWindow->returnEmptyPicks();
         stop_glerror();
@@ -581,9 +587,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     LLImageGL::updateStats(gFrameTimeSeconds);
 
     static LLCachedControl<S32> avatar_name_tag_mode(gSavedSettings, "AvatarNameTagMode", 1);
-    static LLCachedControl<bool> name_tag_show_group_titles(gSavedSettings, "NameTagShowGroupTitles", true);
+    static LLCachedControl<S32> name_tag_show_group_titles(gSavedSettings, "GroupTitlesTagMode", 2 /*all group tags*/);
     LLVOAvatar::sRenderName = avatar_name_tag_mode;
-    LLVOAvatar::sRenderGroupTitles = name_tag_show_group_titles && avatar_name_tag_mode > 0;
+    LLVOAvatar::sRenderGroupTitles = avatar_name_tag_mode > 0 ? name_tag_show_group_titles : 0;
 
     gPipeline.mBackfaceCull = true;
     gFrameCount++;
@@ -1000,6 +1006,8 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             static LLCachedControl<bool> render_depth_pre_pass(gSavedSettings, "RenderDepthPrePass", false);
             if (render_depth_pre_pass)
             {
+                LLGLDepthTest depth(GL_TRUE, GL_TRUE);
+                LLGLEnable cull_face(GL_CULL_FACE);
                 gGL.setColorMask(false, false);
 
                 constexpr U32 types[] = {
@@ -1082,7 +1090,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         LLGLSLShader::finishProfile(stats);
 
         auto report_name = getProfileStatsFilename();
-        std::ofstream outf(report_name);
+        llofstream outf(report_name);
         if (! outf)
         {
             LL_WARNS() << "Couldn't write to " << std::quoted(report_name) << LL_ENDL;
@@ -1148,15 +1156,12 @@ std::string getProfileStatsFilename()
     // same second), may produce (e.g.) sec==61, but avoids collisions and
     // preserves chronological filename sort order.
     std::string name;
-    std::error_code ec;
     do
     {
         // base + missing 2-digit seconds, append ".json"
         // post-increment sec in case we have to try again
         name = stringize(base, std::setw(2), std::setfill('0'), sec++, ".json");
-    } while (std::filesystem::exists(fsyspath(name), ec));
-    // Ignoring ec means we might potentially return a name that does already
-    // exist -- but if we can't check its existence, what more can we do?
+    } while (LLFile::exists(name));
     return name;
 }
 
@@ -1545,6 +1550,11 @@ void render_ui(F32 zoom_factor, int subfield)
                 render_disconnected_background();
             }
         }
+        else
+        {
+            // Make sure particle effects disappear
+            LLHUDObject::renderAllForTimer();
+        }
 
         if (render_ui)
         {
@@ -1769,6 +1779,14 @@ void render_ui_2d()
 
                 t_rect = LLView::sDirtyRect;
                 LLView::sDirtyRect = last_rect;
+                last_rect = t_rect;
+
+                last_rect.mLeft = LLRect::tCoordType(last_rect.mLeft / LLUI::getScaleFactor().mV[0]);
+                last_rect.mRight = LLRect::tCoordType(last_rect.mRight / LLUI::getScaleFactor().mV[0]);
+                last_rect.mTop = LLRect::tCoordType(last_rect.mTop / LLUI::getScaleFactor().mV[1]);
+                last_rect.mBottom = LLRect::tCoordType(last_rect.mBottom / LLUI::getScaleFactor().mV[1]);
+
+                LLRect clip_rect(last_rect);
 
                 glClear(GL_COLOR_BUFFER_BIT);
 

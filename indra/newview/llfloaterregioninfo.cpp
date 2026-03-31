@@ -83,7 +83,6 @@
 #include "llviewercontrol.h"
 #include "lluictrlfactory.h"
 #include "llviewerinventory.h"
-#include "llviewermenufile.h"
 #include "llviewertexture.h"
 #include "llviewertexturelist.h"
 #include "llviewerregion.h"
@@ -95,7 +94,6 @@
 #include "llmeshrepository.h"
 #include "llfloaterregionrestarting.h"
 #include "llpanelexperiencelisteditor.h"
-#include <boost/function.hpp>
 #include "llpanelexperiencepicker.h"
 #include "llexperiencecache.h"
 #include "llpanelexperiences.h"
@@ -271,10 +269,12 @@ bool LLFloaterRegionInfo::postBuild()
     static LLCachedControl<bool> feature_pbr_terrain_transforms_enabled(gSavedSettings, "RenderTerrainPBRTransformsEnabled", false);
     if (!feature_pbr_terrain_transforms_enabled() || !feature_pbr_terrain_enabled())
     {
+        LL_INFOS("Terrain") << "Building region terrain panel from panel_region_terrain.xml" << LL_ENDL;
         panel->buildFromFile("panel_region_terrain.xml");
     }
     else
     {
+        LL_INFOS("Terrain") << "Building region terrain panel from panel_region_terrain_texture_transform.xml" << LL_ENDL;
         panel->buildFromFile("panel_region_terrain_texture_transform.xml");
     }
     mTab->addTabPanel(panel);
@@ -302,8 +302,8 @@ bool LLFloaterRegionInfo::postBuild()
         mTab->addTabPanel(panel);
     }
 
-    gMessageSystem->setHandlerFunc(
-        "EstateOwnerMessage",
+    gMessageSystem->setHandlerFuncFast(
+        _PREHASH_EstateOwnerMessage,
         &processEstateOwnerRequest);
 
     // Request region info when agent region changes.
@@ -368,10 +368,10 @@ void LLFloaterRegionInfo::requestRegionInfo()
     // so non-owners/non-gods can see the values.
     // Therefore can't use an EstateOwnerMessage JC
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("RequestRegionInfo");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
+    msg->newMessageFast(_PREHASH_RequestRegionInfo);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     gAgent.sendReliableMessage();
 }
 
@@ -450,38 +450,38 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
     F32 terrain_lower_limit;
     bool use_estate_sun;
     F32 sun_hour;
-    msg->getString("RegionInfo", "SimName", sim_name);
-    msg->getU8("RegionInfo", "MaxAgents", agent_limit);
-    msg->getS32("RegionInfo2", "HardMaxAgents", hard_agent_limit);
-    msg->getF32("RegionInfo", "ObjectBonusFactor", object_bonus_factor);
-    msg->getU8("RegionInfo", "SimAccess", sim_access);
+    msg->getStringFast(_PREHASH_RegionInfo, _PREHASH_SimName, sim_name);
+    msg->getU8Fast(_PREHASH_RegionInfo, _PREHASH_MaxAgents, agent_limit);
+    msg->getS32Fast(_PREHASH_RegionInfo2, _PREHASH_HardMaxAgents, hard_agent_limit);
+    msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_ObjectBonusFactor, object_bonus_factor);
+    msg->getU8Fast(_PREHASH_RegionInfo, _PREHASH_SimAccess, sim_access);
     msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_WaterHeight, water_height);
     msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainRaiseLimit, terrain_raise_limit);
     msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainLowerLimit, terrain_lower_limit);
-    msg->getBOOL("RegionInfo", "UseEstateSun", use_estate_sun);
+    msg->getBOOLFast(_PREHASH_RegionInfo, _PREHASH_UseEstateSun, use_estate_sun);
     // actually the "last set" sun hour, not the current sun hour. JC
-    msg->getF32("RegionInfo", "SunHour", sun_hour);
+    msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_SunHour, sun_hour);
     // the only reasonable way to decide if we actually have any data is to
     // check to see if any of these fields have nonzero sizes
-    if (msg->getSize("RegionInfo2", "ProductSKU") > 0 ||
-        msg->getSize("RegionInfo2", "ProductName") > 0)
+    if (msg->getSizeFast(_PREHASH_RegionInfo2, _PREHASH_ProductSKU) > 0 ||
+        msg->getSizeFast(_PREHASH_RegionInfo2, _PREHASH_ProductName) > 0)
     {
-        msg->getString("RegionInfo2", "ProductName", sim_type);
+        msg->getStringFast(_PREHASH_RegionInfo2, _PREHASH_ProductName, sim_type);
         LLTrans::findString(sim_type, sim_type); // try localizing sim product name
     }
 
-    if (msg->has(_PREHASH_RegionInfo3))
+    if (msg->hasFast(_PREHASH_RegionInfo3))
     {
-        msg->getU64("RegionInfo3", "RegionFlagsExtended", region_flags);
+        msg->getU64Fast(_PREHASH_RegionInfo3, _PREHASH_RegionFlagsExtended, region_flags);
     }
     else
     {
         U32 flags = 0;
-        msg->getU32("RegionInfo", "RegionFlags", flags);
+        msg->getU32Fast(_PREHASH_RegionInfo, _PREHASH_RegionFlags, flags);
         region_flags = flags;
     }
 
-    if (msg->has(_PREHASH_RegionInfo5))
+    if (msg->hasFast(_PREHASH_RegionInfo5))
     {
         F32 chat_whisper_range;
         F32 chat_normal_range;
@@ -504,6 +504,30 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
             << " chat flags: " << chat_flags << LL_ENDL;
     }
 
+    U32 combat_flags = (REGION_COMBAT_FLAG_DAMAGE_ADJUST | REGION_COMBAT_FLAG_RESTORE_HEALTH);
+    U8  on_death = 0;
+    F32 damage_throttle = 0.0f;
+    F32 regeneration_rate = 0.1666f;
+    F32 invulnerability_time = 0.0f;
+    F32  damage_limit = 0.0f;
+    bool supports_combat2 = false;
+
+    if (msg->has(_PREHASH_CombatSettings))
+    {
+        supports_combat2 = true;
+
+        msg->getU32Fast(_PREHASH_CombatSettings, _PREHASH_CombatFlags, combat_flags);
+        msg->getU8Fast(_PREHASH_CombatSettings, _PREHASH_OnDeath, on_death);
+        msg->getF32Fast(_PREHASH_CombatSettings, _PREHASH_DamageThrottle, damage_throttle);
+        msg->getF32Fast(_PREHASH_CombatSettings, _PREHASH_RegenerationRate, regeneration_rate);
+        msg->getF32Fast(_PREHASH_CombatSettings, _PREHASH_InvulnerabilyTime, invulnerability_time);
+        msg->getF32Fast(_PREHASH_CombatSettings, _PREHASH_DamageLimit, damage_limit);
+
+        LL_INFOS() << "Combat flags: " << std::hex << combat_flags << std::dec << " on death: " << on_death
+                    << " damage throttle: " << damage_throttle << " regeneration rate: " << regeneration_rate
+                    << " invulnerability time: " << invulnerability_time << " damage limit: " << damage_limit << LL_ENDL;
+    }
+
     // GENERAL PANEL
     panel = tab->getChild<LLPanel>("General");
     panel->getChild<LLUICtrl>("region_text")->setValue(LLSD(sim_name));
@@ -513,7 +537,7 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
     panel->getChild<LLUICtrl>("block_terraform_check")->setValue(is_flag_set(region_flags, REGION_FLAGS_BLOCK_TERRAFORM));
     panel->getChild<LLUICtrl>("block_fly_check")->setValue(is_flag_set(region_flags, REGION_FLAGS_BLOCK_FLY));
     panel->getChild<LLUICtrl>("block_fly_over_check")->setValue(is_flag_set(region_flags, REGION_FLAGS_BLOCK_FLYOVER));
-    panel->getChild<LLUICtrl>("allow_damage_check")->setValue(is_flag_set(region_flags, REGION_FLAGS_ALLOW_DAMAGE));
+    panel->getChild<LLUICtrl>("allow_damage_check")->setValue((region_flags & REGION_FLAGS_ALLOW_DAMAGE));
     panel->getChild<LLUICtrl>("restrict_pushobject")->setValue(is_flag_set(region_flags, REGION_FLAGS_RESTRICT_PUSHOBJECT));
     panel->getChild<LLUICtrl>("allow_land_resell_check")->setValue(!is_flag_set(region_flags, REGION_FLAGS_BLOCK_LAND_RESELL));
     panel->getChild<LLUICtrl>("allow_parcel_changes_check")->setValue(is_flag_set(region_flags, REGION_FLAGS_ALLOW_PARCEL_CHANGES));
@@ -528,16 +552,51 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
     if (panel)
     {
         panel_general->setObjBonusFactor(object_bonus_factor);
+        panel_general->setCombatEnabled(supports_combat2);
     }
+
+    panel->getChild<LLUICtrl>("allow_damage_check")->setValue((region_flags & REGION_FLAGS_ALLOW_DAMAGE));
+
+    panel->getChild<LLUICtrl>("combat_restrict_log")->setValue((combat_flags & REGION_COMBAT_FLAG_RESTRICT_LOG));
+    panel->getChild<LLUICtrl>("combat_allow_damage_adjust")->setValue((combat_flags & REGION_COMBAT_FLAG_DAMAGE_ADJUST));
+    panel->getChild<LLUICtrl>("combat_restore_health")->setValue((combat_flags & REGION_COMBAT_FLAG_RESTORE_HEALTH));
+    panel->getChild<LLUICtrl>("combat_on_death")->setValue(on_death);
+    panel->getChild<LLUICtrl>("combat_dps_spin")->setValue(damage_throttle);
+    panel->getChild<LLUICtrl>("combat_hps_spin")->setValue(regeneration_rate);
+    panel->getChild<LLUICtrl>("combat_invuln_spin")->setValue(invulnerability_time);
+    panel->getChild<LLUICtrl>("combat_damage_limit")->setValue(damage_limit);
+
+    bool combat2_enabled = ((region_flags & REGION_FLAGS_ALLOW_DAMAGE) && supports_combat2);
+
+    panel->getChild<LLUICtrl>("combat_restrict_log")->setEnabled(combat2_enabled);
+    panel->getChild<LLUICtrl>("combat_allow_damage_adjust")->setEnabled(combat2_enabled);
+    panel->getChild<LLUICtrl>("combat_restore_health")->setEnabled(combat2_enabled);
+    panel->getChild<LLUICtrl>("combat_on_death")->setEnabled(combat2_enabled);
+    panel->getChild<LLUICtrl>("combat_dps_spin")->setEnabled(combat2_enabled);
+    panel->getChild<LLUICtrl>("combat_hps_spin")->setEnabled(combat2_enabled);
+    panel->getChild<LLUICtrl>("combat_invuln_spin")->setEnabled(combat2_enabled);
+    panel->getChild<LLUICtrl>("combat_damage_limit")->setEnabled(combat2_enabled);
 
     // detect teen grid for maturity
 
     U32 parent_estate_id;
-    msg->getU32("RegionInfo", "ParentEstateID", parent_estate_id);
+    msg->getU32Fast(_PREHASH_RegionInfo, _PREHASH_ParentEstateID, parent_estate_id);
     bool teen_grid = (parent_estate_id == 5);  // *TODO add field to estate table and test that
     panel->getChildView("access_combo")->setEnabled(gAgent.isGodlike() || (region && region->canManageEstate() && !teen_grid));
     panel->setCtrlsEnabled(allow_modify);
 
+    panel->getChild<LLLineEditor>("estate_id")->setValue((S32)region_info.mEstateID);
+
+    if (region)
+    {
+        panel->getChild<LLLineEditor>("grid_position_x")->setValue((S32)(region->getOriginGlobal()[VX] / 256));
+        panel->getChild<LLLineEditor>("grid_position_y")->setValue((S32)(region->getOriginGlobal()[VY] / 256));
+    }
+    else
+    {
+        panel->getChild<LLLineEditor>("grid_position_x")->setDefaultText();
+        panel->getChild<LLLineEditor>("grid_position_y")->setDefaultText();
+    }
 
     // DEBUG PANEL
     panel = tab->getChild<LLPanel>("Debug");
@@ -809,18 +868,18 @@ void LLPanelRegionInfo::sendEstateOwnerMessage(
     const strings_t& strings)
 {
     LL_INFOS() << "Sending estate request '" << request << "'" << LL_ENDL;
-    msg->newMessage("EstateOwnerMessage");
+    msg->newMessageFast(_PREHASH_EstateOwnerMessage);
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
-    msg->nextBlock("MethodData");
-    msg->addString("Method", request);
-    msg->addUUID("Invoice", invoice);
+    msg->nextBlockFast(_PREHASH_MethodData);
+    msg->addStringFast(_PREHASH_Method, request);
+    msg->addUUIDFast(_PREHASH_Invoice, invoice);
     if(strings.empty())
     {
-        msg->nextBlock("ParamList");
-        msg->addString("Parameter", NULL);
+        msg->nextBlockFast(_PREHASH_ParamList);
+        msg->addStringFast(_PREHASH_Parameter, NULL);
     }
     else
     {
@@ -828,8 +887,8 @@ void LLPanelRegionInfo::sendEstateOwnerMessage(
         strings_t::const_iterator end = strings.end();
         for(; it != end; ++it)
         {
-            msg->nextBlock("ParamList");
-            msg->addString("Parameter", *it);
+            msg->nextBlockFast(_PREHASH_ParamList);
+            msg->addStringFast(_PREHASH_Parameter, *it);
         }
     }
     msg->sendReliable(mHost);
@@ -902,6 +961,9 @@ bool LLPanelRegionGeneralInfo::refreshFromRegion(LLViewerRegion* region)
     getChildView("apply_btn")->setEnabled(false);
     getChildView("access_text")->setEnabled(allow_modify);
     // getChildView("access_combo")->setEnabled(allow_modify);
+    getChildView("estate_id")->setEnabled(false);
+    getChildView("grid_position_x")->setEnabled(false);
+    getChildView("grid_position_y")->setEnabled(false);
     // now set in processRegionInfo for teen grid detection
     getChildView("kick_btn")->setEnabled(allow_modify);
     getChildView("kick_all_btn")->setEnabled(allow_modify);
@@ -921,7 +983,6 @@ bool LLPanelRegionGeneralInfo::postBuild()
     initCtrl("block_terraform_check");
     initCtrl("block_fly_check");
     initCtrl("block_fly_over_check");
-    initCtrl("allow_damage_check");
     initCtrl("allow_land_resell_check");
     initCtrl("allow_parcel_changes_check");
     initCtrl("agent_limit_spin");
@@ -929,6 +990,16 @@ bool LLPanelRegionGeneralInfo::postBuild()
     initCtrl("access_combo");
     initCtrl("restrict_pushobject");
     initCtrl("block_parcel_search_check");
+
+    initCombatCtrl("allow_damage_check");
+    initCtrl("combat_restrict_log");
+    initCtrl("combat_allow_damage_adjust");
+    initCtrl("combat_restore_health");
+    initCtrl("combat_on_death");
+    initCtrl("combat_dps_spin");
+    initCtrl("combat_hps_spin");
+    initCtrl("combat_invuln_spin");
+    initCtrl("combat_damage_limit");
 
     childSetAction("kick_btn", boost::bind(&LLPanelRegionGeneralInfo::onClickKick, this));
     childSetAction("kick_all_btn", onClickKickAll, this);
@@ -943,6 +1014,11 @@ bool LLPanelRegionGeneralInfo::postBuild()
 
     refresh();
     return true;
+}
+
+void LLPanelRegionGeneralInfo::initCombatCtrl(const std::string &name)
+{
+    getChild<LLUICtrl>(name)->setCommitCallback(boost::bind(&LLPanelRegionGeneralInfo::onChangeCombatEnabled, this));
 }
 
 void LLPanelRegionGeneralInfo::onBtnSet()
@@ -971,6 +1047,22 @@ bool LLPanelRegionGeneralInfo::onChangeObjectBonus(const LLSD& notification, con
         }
     }
     return false;
+}
+
+void LLPanelRegionGeneralInfo::onChangeCombatEnabled()
+{
+    bool combat2_enabled = getChild<LLUICtrl>("allow_damage_check")->getValue().asBoolean() && mSupportsCombat2;
+
+    getChild<LLUICtrl>("combat_restrict_log")->setEnabled(combat2_enabled);
+    getChild<LLUICtrl>("combat_allow_damage_adjust")->setEnabled(combat2_enabled);
+    getChild<LLUICtrl>("combat_restore_health")->setEnabled(combat2_enabled);
+    getChild<LLUICtrl>("combat_on_death")->setEnabled(combat2_enabled);
+    getChild<LLUICtrl>("combat_dps_spin")->setEnabled(combat2_enabled);
+    getChild<LLUICtrl>("combat_hps_spin")->setEnabled(combat2_enabled);
+    getChild<LLUICtrl>("combat_invuln_spin")->setEnabled(combat2_enabled);
+    getChild<LLUICtrl>("combat_damage_limit")->setEnabled(combat2_enabled);
+
+    onChangeAnything();
 }
 
 void LLPanelRegionGeneralInfo::onClickKick()
@@ -1107,6 +1199,31 @@ bool LLPanelRegionGeneralInfo::sendUpdate()
         body["restrict_pushobject"] = getChild<LLUICtrl>("restrict_pushobject")->getValue();
         body["allow_parcel_changes"] = getChild<LLUICtrl>("allow_parcel_changes_check")->getValue();
         body["block_parcel_search"] = getChild<LLUICtrl>("block_parcel_search_check")->getValue();
+
+        if (mSupportsCombat2)
+        {
+            U32 combat_flags = 0;
+
+            if (getChild<LLUICtrl>("combat_restrict_log")->getValue().asBoolean())
+            {
+                combat_flags |= REGION_COMBAT_FLAG_RESTRICT_LOG;
+            }
+            if (getChild<LLUICtrl>("combat_allow_damage_adjust")->getValue().asBoolean())
+            {
+                combat_flags |= REGION_COMBAT_FLAG_DAMAGE_ADJUST;
+            }
+            if (getChild<LLUICtrl>("combat_restore_health")->getValue().asBoolean())
+            {
+                combat_flags |= REGION_COMBAT_FLAG_RESTORE_HEALTH;
+            }
+
+            body["combat_flags"] = LLSD::Integer(combat_flags);
+            body["combat_on_death"] = getChild<LLUICtrl>("combat_on_death")->getValue();
+            body["combat_dps_throttle"] = getChild<LLUICtrl>("combat_dps_spin")->getValue();
+            body["combat_hps_rate"] = getChild<LLUICtrl>("combat_hps_spin")->getValue();
+            body["combat_invuln_time"] = getChild<LLUICtrl>("combat_invuln_spin")->getValue();
+            body["combat_damage_limit"] = getChild<LLUICtrl>("combat_damage_limit")->getValue();
+        }
 
         LLCoreHttpUtil::HttpCoroutineAdapter::messageHttpPost(url, body,
             "Region info update posted.", "Region info update not posted.");
@@ -1494,6 +1611,11 @@ bool LLPanelRegionTerrainInfo::validateMaterials()
         const LLUUID& material_asset_id = material_ctrl->getImageAssetID();
         llassert(material_asset_id.notNull());
         if (material_asset_id.isNull()) { return false; }
+        if (material_asset_id == BLANK_MATERIAL_ASSET_ID)
+        {
+            // Default/Blank material is valid by default
+            continue;
+        }
         const LLFetchedGLTFMaterial* material = gGLTFMaterialList.getMaterial(material_asset_id);
         if (!material->isLoaded())
         {
@@ -2003,18 +2125,7 @@ void LLPanelRegionTerrainInfo::initMaterialCtrl(LLTextureCtrl*& ctrl, const std:
     ctrl->setCommitCallback(
         [this, index](LLUICtrl* ctrl, const LLSD& param)
     {
-        if (!mMaterialScaleUCtrl[index]
-            || !mMaterialScaleVCtrl[index]
-            || !mMaterialRotationCtrl[index]
-            || !mMaterialOffsetUCtrl[index]
-            || !mMaterialOffsetVCtrl[index]) return;
-
-        mMaterialScaleUCtrl[index]->setValue(1.f);
-        mMaterialScaleVCtrl[index]->setValue(1.f);
-        mMaterialRotationCtrl[index]->setValue(0.f);
-        mMaterialOffsetUCtrl[index]->setValue(0.f);
-        mMaterialOffsetVCtrl[index]->setValue(0.f);
-        onChangeAnything();
+        callbackMaterialCommit(index);
     });
 }
 
@@ -2044,14 +2155,13 @@ bool LLPanelRegionTerrainInfo::callbackTextureHeights(const LLSD& notification, 
 // static
 void LLPanelRegionTerrainInfo::onClickDownloadRaw(void* data)
 {
-    LLDir::getScrubbedFileName(LLRegionInfoModel::instance().mSimName+"_terrain.raw");
-    LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelRegionTerrainInfo::onClickDownloadRawCallback, _1, data), LLFilePicker::FFSAVE_RAW, LLDir::getScrubbedFileName(LLRegionInfoModel::instance().mSimName + "_terrain.raw"));
-}
-
-// static
-void LLPanelRegionTerrainInfo::onClickDownloadRawCallback(const std::vector<std::string>& filenames, void* data)
-{
-    std::string filepath = filenames[0];
+    LLFilePicker& picker = LLFilePicker::instance();
+    if (!picker.getSaveFile(LLFilePicker::FFSAVE_RAW, "terrain.raw"))
+    {
+        LL_WARNS() << "No file" << LL_ENDL;
+        return;
+    }
+    std::string filepath = picker.getFirstFile();
     gXferManager->expectFileForRequest(filepath);
 
     LLPanelRegionTerrainInfo* self = (LLPanelRegionTerrainInfo*)data;
@@ -2065,13 +2175,13 @@ void LLPanelRegionTerrainInfo::onClickDownloadRawCallback(const std::vector<std:
 // static
 void LLPanelRegionTerrainInfo::onClickUploadRaw(void* data)
 {
-    LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelRegionTerrainInfo::onClickUploadRawCallback, data, _1), LLFilePicker::FFLOAD_RAW, false);
-}
-
-// static
-void LLPanelRegionTerrainInfo::onClickUploadRawCallback(void* data, const std::vector<std::string>& filenames)
-{
-    std::string filepath = filenames[0];
+    LLFilePicker& picker = LLFilePicker::instance();
+    if (!picker.getOpenFile(LLFilePicker::FFLOAD_RAW))
+    {
+        LL_WARNS() << "No file" << LL_ENDL;
+        return;
+    }
+    std::string filepath = picker.getFirstFile();
     gXferManager->expectFileForTransfer(filepath);
 
     LLPanelRegionTerrainInfo* self = (LLPanelRegionTerrainInfo*)data;
@@ -2101,6 +2211,25 @@ bool LLPanelRegionTerrainInfo::callbackBakeTerrain(const LLSD& notification, con
     sendEstateOwnerMessage(gMessageSystem, "terrain", invoice, strings);
 
     return false;
+}
+
+void LLPanelRegionTerrainInfo::callbackMaterialCommit(S32 index)
+{
+    // These can be null if 'transforms' panel was not inited
+    if (mMaterialScaleUCtrl[index]
+        && mMaterialScaleVCtrl[index]
+        && mMaterialRotationCtrl[index]
+        && mMaterialOffsetUCtrl[index]
+        && mMaterialOffsetVCtrl[index])
+    {
+        mMaterialScaleUCtrl[index]->setValue(1.f);
+        mMaterialScaleVCtrl[index]->setValue(1.f);
+        mMaterialRotationCtrl[index]->setValue(0.f);
+        mMaterialOffsetUCtrl[index]->setValue(0.f);
+        mMaterialOffsetVCtrl[index]->setValue(0.f);
+    }
+
+    onChangeAnything();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2594,7 +2723,7 @@ bool LLPanelEstateCovenant::refreshFromRegion(LLViewerRegion* region)
     // let the parent class handle the general data collection.
     bool rv = LLPanelRegionInfo::refreshFromRegion(region);
     LLMessageSystem *msg = gMessageSystem;
-    msg->newMessage("EstateCovenantRequest");
+    msg->newMessageFast(_PREHASH_EstateCovenantRequest);
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID,  gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
@@ -2805,18 +2934,18 @@ void LLPanelEstateCovenant::sendChangeCovenantID(const LLUUID &asset_id)
         setCovenantID(asset_id);
 
         LLMessageSystem* msg = gMessageSystem;
-        msg->newMessage("EstateOwnerMessage");
+        msg->newMessageFast(_PREHASH_EstateOwnerMessage);
         msg->nextBlockFast(_PREHASH_AgentData);
         msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
         msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
         msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
 
-        msg->nextBlock("MethodData");
-        msg->addString("Method", "estatechangecovenantid");
-        msg->addUUID("Invoice", LLFloaterRegionInfo::getLastInvoice());
+        msg->nextBlockFast(_PREHASH_MethodData);
+        msg->addStringFast(_PREHASH_Method, "estatechangecovenantid");
+        msg->addUUIDFast(_PREHASH_Invoice, LLFloaterRegionInfo::getLastInvoice());
 
-        msg->nextBlock("ParamList");
-        msg->addString("Parameter", getCovenantID().asString());
+        msg->nextBlockFast(_PREHASH_ParamList);
+        msg->addStringFast(_PREHASH_Parameter, getCovenantID().asString());
         gAgent.sendReliableMessage();
     }
 }
@@ -2986,6 +3115,7 @@ bool LLDispatchSetEstateExperience::operator()(
     ++it; // U32 send_to_agent_only = strtoul((*(++it)).c_str(), NULL, 10);
 
     // Read 3 parameters
+    LLUUID id;
     S32 num_blocked = strtol((*(it++)).c_str(), NULL, 10);
     S32 num_trusted = strtol((*(it++)).c_str(), NULL, 10);
     S32 num_allowed = strtol((*(it++)).c_str(), NULL, 10);
@@ -3993,28 +4123,28 @@ bool LLPanelEstateAccess::accessCoreConfirm(const LLSD& notification, const LLSD
 void LLPanelEstateAccess::sendEstateAccessDelta(U32 flags, const LLUUID& agent_or_group_id)
 {
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("EstateOwnerMessage");
+    msg->newMessageFast(_PREHASH_EstateOwnerMessage);
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
 
-    msg->nextBlock("MethodData");
-    msg->addString("Method", "estateaccessdelta");
-    msg->addUUID("Invoice", LLFloaterRegionInfo::getLastInvoice());
+    msg->nextBlockFast(_PREHASH_MethodData);
+    msg->addStringFast(_PREHASH_Method, "estateaccessdelta");
+    msg->addUUIDFast(_PREHASH_Invoice, LLFloaterRegionInfo::getLastInvoice());
 
     std::string buf;
     gAgent.getID().toString(buf);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buf);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buf);
 
     buf = llformat("%u", flags);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buf);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buf);
 
     agent_or_group_id.toString(buf);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buf);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buf);
 
     gAgent.sendReliableMessage();
 }
@@ -4037,8 +4167,8 @@ void LLPanelEstateAccess::updateLists()
 void LLPanelEstateAccess::requestEstateGetAccessCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("requestEstateGetAccessoCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestEstateGetAccessoCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 

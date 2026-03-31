@@ -62,6 +62,12 @@
 #include "llnotificationmanager.h"
 #include "llautoreplace.h"
 #include "llcorehttputil.h"
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+#include "llfloatergroupinvite.h"
+#include "llgroupactions.h"
+#include "llslurl.h"
+#include <boost/lexical_cast.hpp>
+// [/SL:KB]
 // [RLVa:KB] - Checked: 2013-05-10 (RLVa-1.4.9)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -146,7 +152,7 @@ void LLFloaterIMSession::onClickCloseBtn(bool app_qutting)
 {
     if (app_qutting)
     {
-        LLFloaterIMSessionTab::onClickCloseBtn();
+        LLFloaterIMSessionTab::onClickCloseBtn(app_qutting);
         return;
     }
 
@@ -247,7 +253,45 @@ bool LLFloaterIMSession::checkGearMenuItem(const LLSD& userdata)
     return floater_container->checkContextMenuItem(command, selected_uuids);
 }
 
-void LLFloaterIMSession::sendMsgFromInputEditor()
+// [SL:KB] - Patch: Chat-BaseGearBtn | Checked: 2014-04-10 (Catznip-3.6)
+void LLFloaterIMSession::GearDoToSelectedGroup(const LLSD& userdata)
+{
+    const std::string action = userdata.asString();
+
+    if ("view_profile" == action)
+    {
+        LLGroupActions::show(mSessionID);
+    }
+    else if ("chat_history" == action)
+    {
+        LLGroupActions::viewChatHistory(mSessionID);
+    }
+    else if ("view_notices" == action)
+    {
+        LLGroupActions::showNotices(mSessionID);
+    }
+    else if ("end_session" == action)
+    {
+        LLGroupActions::endIM(mSessionID);
+    }
+}
+// [/SL:KB]
+
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+void LLFloaterIMSession::onTeleportClicked(const LLUICtrl* pCtrl)
+{
+    if (pCtrl)
+    {
+        const std::string strValue = pCtrl->getValue().asString();
+        if ( (strValue.empty()) || ("offer_teleport" == strValue) )
+            GearDoToSelected("offer_teleport");
+        else if ("request_teleport" == strValue)
+            GearDoToSelected("request_teleport");
+    }
+}
+// [/SL:KB]
+
+void LLFloaterIMSession::sendMsgFromInputEditor(bool ooc_chat)
 {
     if (gAgent.isGodlike()
         || (mDialog != IM_NOTHING_SPECIAL)
@@ -265,6 +309,13 @@ void LLFloaterIMSession::sendMsgFromInputEditor()
                 // Truncate and convert to UTF8 for transport
                 std::string utf8_text = wstring_to_utf8str(text);
 
+                if (ooc_chat)
+                {
+                    utf8_text = fmt::format("{} {} {}", gSavedSettings.getString("ChatOOCPrefix"), utf8_text, gSavedSettings.getString("ChatOOCPostfix"));
+                }
+
+                applyOOCClose(utf8_text);
+                applyMUPose(utf8_text);
                 sendMsg(utf8_text);
 
                 mInputEditor->setText(LLStringUtil::null);
@@ -281,7 +332,7 @@ void LLFloaterIMSession::sendMsg(const std::string& msg)
 {
 //  const std::string utf8_text = utf8str_truncate(msg, MAX_MSG_BUF_SIZE - 1);
 // [RLVa:KB] - Checked: 2010-11-30 (RLVa-1.3.0)
-    std::string utf8_text = utf8str_truncate(msg, MAX_MSG_BUF_SIZE - 1);
+    std::string utf8_text = utf8str_truncate(msg, (MAX_MSG_BUF_SIZE * 5) - 1);
 
     if ( (RlvActions::hasBehaviour(RLV_BHVR_SENDIM)) || (RlvActions::hasBehaviour(RLV_BHVR_SENDIMTO)) )
     {
@@ -408,9 +459,35 @@ void LLFloaterIMSession::initIMFloater()
 //virtual
 bool LLFloaterIMSession::postBuild()
 {
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+    if (mIsP2PChat)
+    {
+        mExtendedButtonPanel = getChild<LLPanel>("p2p_toolbar");
+        mExtendedButtonPanel->setVisible(true);
+
+        mExtendedButtonPanel->getChild<LLUICtrl>("profile_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelected, this, "view_profile"));
+        mExtendedButtonPanel->getChild<LLUICtrl>("teleport_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::onTeleportClicked, this, _1));
+        mExtendedButtonPanel->getChild<LLUICtrl>("chat_history_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelected, this, "chat_history"));
+        mExtendedButtonPanel->getChild<LLUICtrl>("pay_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelected, this, "pay"));
+    }
+    else if ( (mSession) && (mSession->isGroupSessionType()) )
+    {
+        mExtendedButtonPanel = getChild<LLPanel>("group_toolbar");
+        mExtendedButtonPanel->setVisible(true);
+
+        mExtendedButtonPanel->getChild<LLUICtrl>("profile_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "view_profile"));
+        mExtendedButtonPanel->getChild<LLUICtrl>("chat_history_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "chat_history"));
+        mExtendedButtonPanel->getChild<LLUICtrl>("view_notices_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "view_notices"));
+    }
+// [/SL:KB]
+
     bool result = LLFloaterIMSessionTab::postBuild();
 
-    mInputEditor->setMaxTextLength(1023);
+//  mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN);
+// [SL:KB]
+    mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN * 5);
+// [/SL:KB]
+
     mInputEditor->setAutoreplaceCallback(boost::bind(&LLAutoReplace::autoreplaceCallback, LLAutoReplace::getInstance(), _1, _2, _3, _4, _5));
     mInputEditor->setFocusReceivedCallback( boost::bind(onInputEditorFocusReceived, _1, this) );
     mInputEditor->setFocusLostCallback( boost::bind(onInputEditorFocusLost, _1, this) );
@@ -1315,6 +1392,10 @@ Note: OTHER_TYPING_TIMEOUT must be > ME_TYPING_TIMEOUT for proper operation of t
         // Save im_info so that removeTypingIndicator can be properly called because a timeout has occurred
         mImFromId = from_id;
 
+        LLFloaterIMContainer* im_container = LLFloaterIMContainer::getInstance();
+        if (im_container)
+            im_container->updateTypingState(mSessionID, true);
+
         // Update speaker
         LLIMSpeakerMgr* speaker_mgr = LLIMModel::getInstance()->getSpeakerManager(mSessionID);
         if ( speaker_mgr )
@@ -1329,6 +1410,10 @@ void LLFloaterIMSession::removeTypingIndicator(const LLUUID& from_id)
     if (mOtherTyping)
     {
         mOtherTyping = false;
+
+        LLFloaterIMContainer* im_container = LLFloaterIMContainer::getInstance();
+        if (im_container)
+            im_container->updateTypingState(mSessionID, false);
 
         if (from_id.notNull())
         {
@@ -1403,6 +1488,20 @@ void LLFloaterIMSession::sRemoveTypingIndicator(const LLSD& data)
 void LLFloaterIMSession::onIMChicletCreated( const LLUUID& session_id )
 {
     LLFloaterIMSession::addToHost(session_id);
+}
+
+// virtual
+bool LLFloaterIMSession::handleKeyHere(KEY key, MASK mask)
+{
+    bool handled = false;
+
+    if (KEY_RETURN == key && mask == MASK_ALT)
+    {
+        mInputEditor->updateHistory();
+        sendMsgFromInputEditor(true);
+        handled = true;
+    }
+    return handled;
 }
 
 boost::signals2::connection LLFloaterIMSession::setIMFloaterShowedCallback(const floater_showed_signal_t::slot_type& cb)

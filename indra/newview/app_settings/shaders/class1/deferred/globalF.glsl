@@ -73,3 +73,4 @@ vec4 decodeNormal(vec4 norm)
     n.xyz = normalize(n.xyz);
     return n;
 }
+

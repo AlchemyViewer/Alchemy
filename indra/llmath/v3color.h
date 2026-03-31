@@ -142,11 +142,6 @@ public:
 
     inline void clamp();
     inline void exp(); // Do an exponential on the color
-
-    friend std::size_t hash_value(const LLColor3& vec)
-    {
-        return boost::hash_value(vec.mV);
-    }
 };
 
 static_assert(std::is_trivially_copyable<LLColor3>::value, "LLColor3 must be trivial copy");

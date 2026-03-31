@@ -38,6 +38,7 @@
 #include "llimagej2c.h"
 #include "llimagejpeg.h"
 #include "llimagepng.h"
+#include "llimagewebp.h"
 #include "llimagedxt.h"
 #include "llmemory.h"
 
@@ -709,8 +710,20 @@ U8* LLImageBase::allocateData(S32 size)
         mData = (U8*)ll_aligned_malloc_16(size);
         if (!mData)
         {
-            LL_WARNS() << "Failed to allocate image data size [" << size << "]" << LL_ENDL;
-            mBadBufferAllocation = true;
+            constexpr S32 MAX_TOLERANCE = 1024 * 1024 * 4; // 4 MB
+            if (size > MAX_TOLERANCE)
+            {
+                // If a big image failed to allocate, tollerate it for now.
+                // It's insightfull when crash logs without obvious cause are being analyzed,
+                // so a crash in a random location that normally is a mystery can get proper handling.
+                LL_WARNS() << "Failed to allocate image data size [" << size << "]" << LL_ENDL;
+            }
+            else
+            {
+                // We are too far gone if we can't allocate a small buffer.
+                LLError::LLUserWarningMsg::showOutOfMemory();
+                LL_ERRS() << "Failed to allocate image data size [" << size << "]" << LL_ENDL;
+            }
         }
     }
 
@@ -2034,7 +2047,28 @@ file_extensions[] =
     { "jpeg", IMG_CODEC_JPEG },
     { "mip", IMG_CODEC_DXT },
     { "dxt", IMG_CODEC_DXT },
-    { "png", IMG_CODEC_PNG }
+    { "png", IMG_CODEC_PNG },
+    { "webp", IMG_CODEC_WEBP }
+};
+
+static struct
+{
+    const wchar_t* exten;
+    EImageCodec codec;
+}
+wide_file_extensions[] =
+{
+    { L"bmp", IMG_CODEC_BMP },
+    { L"tga", IMG_CODEC_TGA },
+    { L"j2c", IMG_CODEC_J2C },
+    { L"jp2", IMG_CODEC_J2C },
+    { L"texture", IMG_CODEC_J2C },
+    { L"jpg", IMG_CODEC_JPEG },
+    { L"jpeg", IMG_CODEC_JPEG },
+    { L"mip", IMG_CODEC_DXT },
+    { L"dxt", IMG_CODEC_DXT },
+    { L"png", IMG_CODEC_PNG },
+    { L"webp", IMG_CODEC_WEBP }
 };
 #define NUM_FILE_EXTENSIONS LL_ARRAY_SIZE(file_extensions)
 #if 0
@@ -2056,7 +2090,8 @@ static std::string find_file(std::string &name, S8 *codec)
     return std::string("");
 }
 #endif
-EImageCodec LLImageBase::getCodecFromExtension(const std::string& exten)
+
+EImageCodec LLImageBase::getCodecFromExtension(std::string_view exten)
 {
     if (!exten.empty())
     {
@@ -2068,6 +2103,20 @@ EImageCodec LLImageBase::getCodecFromExtension(const std::string& exten)
     }
     return IMG_CODEC_INVALID;
 }
+
+EImageCodec LLImageBase::getCodecFromExtension(std::wstring_view exten)
+{
+    if (!exten.empty())
+    {
+        for (int i = 0; i < (int)(NUM_FILE_EXTENSIONS); i++)
+        {
+            if (exten == wide_file_extensions[i].exten)
+                return wide_file_extensions[i].codec;
+        }
+    }
+    return IMG_CODEC_INVALID;
+}
+
 #if 0
 bool LLImageRaw::createFromFile(const std::string &filename, bool j2c_lowest_mip_only)
 {
@@ -2217,6 +2266,9 @@ LLImageFormatted* LLImageFormatted::createFromType(S8 codec)
       case IMG_CODEC_PNG:
         image = new LLImagePNG();
         break;
+      case IMG_CODEC_WEBP:
+        image = new LLImageWebP();
+        break;
       case IMG_CODEC_J2C:
         image = new LLImageJ2C();
         break;
@@ -2256,6 +2308,10 @@ S8 LLImageFormatted::getCodecFromMimeType(std::string_view mimetype)
     else if (mimetype == "image/dxt")
     {
         return IMG_CODEC_DXT;
+    }
+    else if (mimetype == "image/webp")
+    {
+        return IMG_CODEC_WEBP;
     }
     return IMG_CODEC_INVALID;
 }
@@ -2470,16 +2526,17 @@ bool LLImageFormatted::load(const std::string &filename, int load_size)
 {
     resetLastError();
 
-    S32 file_size = 0;
-    LLAPRFile infile ;
-    infile.open(filename, LL_APR_RB, NULL, &file_size);
-    apr_file_t* apr_file = infile.getFileHandle();
-    if (!apr_file)
+    std::error_code ec;
+    LLFile infile ;
+    infile.open(filename, LLFile::in|LLFile::binary, ec);
+    if (!infile || ec)
     {
         setLastError("Unable to open file for reading", filename);
         return false;
     }
-    if (file_size == 0)
+
+    S32 file_size = narrow(infile.size(ec));
+    if (file_size == 0 || ec)
     {
         setLastError("File is empty",filename);
         return false;
@@ -2497,9 +2554,8 @@ bool LLImageFormatted::load(const std::string &filename, int load_size)
     U8 *data = allocateData(load_size);
     if (data)
     {
-        apr_size_t bytes_read = load_size;
-        apr_status_t s = apr_file_read(apr_file, data, &bytes_read); // modifies bytes_read
-        if (s != APR_SUCCESS || (S32) bytes_read != load_size)
+        S64 bytes_read = infile.read(data, load_size, ec);
+        if (bytes_read != load_size || ec)
         {
             deleteData();
             setLastError("Unable to read file",filename);
@@ -2523,9 +2579,10 @@ bool LLImageFormatted::save(const std::string &filename)
 {
     resetLastError();
 
-    LLAPRFile outfile ;
-    outfile.open(filename, LL_APR_WB);
-    if (!outfile.getFileHandle())
+    std::error_code ec;
+    LLFile outfile ;
+    outfile.open(filename, LLFile::out|LLFile::binary|LLFile::trunc, ec);
+    if (!outfile || ec)
     {
         setLastError("Unable to open file for writing", filename);
         return false;
@@ -2533,7 +2590,7 @@ bool LLImageFormatted::save(const std::string &filename)
 
     LLImageDataSharedLock lock(this);
 
-    S32 result = outfile.write(getData(), getDataSize());
+    S64 result = outfile.write(getData(), getDataSize(), ec);
     outfile.close() ;
     return (result != 0);
 }

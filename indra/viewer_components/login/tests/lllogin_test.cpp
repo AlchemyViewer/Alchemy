@@ -206,9 +206,12 @@ namespace tut
     {
         llviewerlogin_data() :
             pumps(LLEventPumps::instance())
-        {}
+        {
+            LLCoros::createInstance();
+        }
         ~llviewerlogin_data()
         {
+            LLCoros::deleteSingleton();
             pumps.clear();
         }
         LLEventPumps& pumps;

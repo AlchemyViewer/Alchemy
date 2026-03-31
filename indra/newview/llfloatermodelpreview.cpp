@@ -275,9 +275,9 @@ bool LLFloaterModelPreview::postBuild()
 
     if (LLConvexDecomposition::getInstance() != NULL)
     {
-        mCalculateBtn->setClickedCallback(boost::bind(&LLFloaterModelPreview::onClickCalculateBtn, this));
+    mCalculateBtn->setClickedCallback(boost::bind(&LLFloaterModelPreview::onClickCalculateBtn, this));
 
-        toggleCalculateButton(true);
+    toggleCalculateButton(true);
     }
     else
     {

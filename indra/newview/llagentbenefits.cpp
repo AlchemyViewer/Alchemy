@@ -217,7 +217,7 @@ S32 LLAgentBenefits::get2KTextureUploadCost(S32 area) const
     return m_2k_texture_upload_cost[0];
 }
 
-bool LLAgentBenefits::findUploadCost(LLAssetType::EType& asset_type, S32& cost) const
+bool LLAgentBenefits::findUploadCost(const LLAssetType::EType& asset_type, S32& cost) const
 {
     bool succ = false;
     if (asset_type == LLAssetType::AT_TEXTURE)

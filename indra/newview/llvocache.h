@@ -31,10 +31,9 @@
 #include "lldatapacker.h"
 #include "lldir.h"
 #include "llvieweroctree.h"
-#include "llapr.h"
 #include "llgltfmaterial.h"
 
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 //---------------------------------------------------------------------------
 // Cache entries
@@ -102,7 +101,7 @@ protected:
     ~LLVOCacheEntry();
 public:
     LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &dp);
-    LLVOCacheEntry(LLAPRFile* apr_file);
+    LLVOCacheEntry(LLFile* apr_file);
     LLVOCacheEntry();
 
     void updateEntry(U32 crc, LLDataPackerBinaryBuffer &dp);
@@ -248,34 +247,28 @@ private:
 //
 //Note: LLVOCache is not thread-safe
 //
-class LLVOCache : public LLParamSingleton<LLVOCache>
+class LLVOCache : public LLSimpleton<LLVOCache>
 {
-    LLSINGLETON(LLVOCache, bool read_only);
+public:
+    LLVOCache(bool read_only);
     ~LLVOCache() ;
 
 private:
-#if LL_WINDOWS
-#pragma pack(push,1)
-#endif
     struct HeaderEntryInfo
     {
-        HeaderEntryInfo() = default;
-        U64 mHandle = 0;
-        S32 mIndex = 0;
-        U32 mTime = 0;
+        HeaderEntryInfo() : mHandle(0), mIndex(0), mTime(0) {}
+        U64 mHandle;
+        S32 mIndex;
+        U32 mTime ;
     };
 
     struct HeaderMetaInfo
     {
-        HeaderMetaInfo() = default;
+        HeaderMetaInfo() : mVersion(0), mAddressSize(0) {}
 
-        U32 mVersion = 0;
-        U32 mAddressSize = 0;
+        U32 mVersion;
+        U32 mAddressSize;
     };
-
-#if LL_WINDOWS
-#pragma pack(pop)
-#endif
 
     struct header_entry_less
     {
@@ -311,8 +304,8 @@ public:
 private:
     void setDirNames(ELLPath location);
     // determine the cache filename for the region from the region handle
-    void getObjectCacheFilename(U64 handle, std::string& filename);
-    std::string getObjectCacheExtrasFilename(U64 handle);
+    std::filesystem::path getObjectCacheFilename(U64 handle);
+    std::filesystem::path getObjectCacheExtrasFilename(U64 handle);
     void removeFromCache(HeaderEntryInfo* entry);
     void readCacheHeader();
     void writeCacheHeader();
@@ -329,9 +322,8 @@ private:
     HeaderMetaInfo       mMetaInfo;
     U32                  mCacheSize;
     U32                  mNumEntries;
-    std::string          mHeaderFileName ;
-    std::string          mObjectCacheDirName;
-    LLVolatileAPRPool*   mLocalAPRFilePoolp ;
+    std::filesystem::path          mHeaderFilePath;
+    std::filesystem::path          mObjectCacheDirPath;
     header_entry_queue_t mHeaderEntryQueue;
     handle_entry_map_t   mHandleEntryMap;
 };

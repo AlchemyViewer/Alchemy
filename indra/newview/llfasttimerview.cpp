@@ -1014,7 +1014,7 @@ void LLFastTimerView::drawLineGraph()
     LLLocalClipRect clip(mGraphRect);
 
     //normalize based on last frame's maximum
-    static F32Seconds max_time(0.000001);
+    static F32Seconds max_time(0.000001f);
     static U32 max_calls = 0;
     static F32 alpha_interp = 0.f;
 
@@ -1057,7 +1057,6 @@ void LLFastTimerView::drawLineGraph()
         //fatten highlighted timer
         if (mHoverID == idp)
         {
-            gGL.flush();
             gGL.setLineWidth(3);
         }
 
@@ -1118,8 +1117,7 @@ void LLFastTimerView::drawLineGraph()
 
         if (mHoverID == idp)
         {
-            gGL.flush();
-            gGL.setLineWidth(1);
+            gGL.setLineWidth(1.f);
         }
 
         if (idp->getTreeNode().mCollapsed)

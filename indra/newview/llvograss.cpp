@@ -134,6 +134,7 @@ void LLVOGrass::initClass()
         }
         F32 F32_val;
         LLUUID id;
+        std::string name;
 
         bool success{ true };
 
@@ -166,6 +167,10 @@ void LLVOGrass::initClass()
         success &= grass_def->getFastAttributeF32(blade_sizey_string, F32_val);
         newGrass->mBladeSizeY = F32_val;
 
+        static LLStdStringHandle name_string = LLXmlTree::addAttributeString("name");
+        grass_def->getFastAttributeString(name_string, name);
+        newGrass->mName = std::move(name);
+
         if (sSpeciesTable.count(species))
         {
             LL_INFOS() << "Grass species " << species << " already defined! Duplicate discarded." << LL_ENDL;
@@ -181,9 +186,6 @@ void LLVOGrass::initClass()
 
         if (!success)
         {
-            std::string name;
-            static LLStdStringHandle name_string = LLXmlTree::addAttributeString("name");
-            grass_def->getFastAttributeString(name_string, name);
             LL_WARNS() << "Incomplete definition of grass " << name << LL_ENDL;
         }
     }
@@ -736,7 +738,7 @@ void LLGrassPartition::getGeometry(LLSpatialGroup* group)
 void LLVOGrass::updateDrawable(bool force_damped)
 {
     // Force an immediate rebuild on any update
-    if (mDrawable.notNull())
+    if (mDrawable.notNull() && mDrawable->getVObj())
     {
         mDrawable->updateXform(true);
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);

@@ -608,6 +608,8 @@ void GLTFSceneManager::render(U8 variant)
         render((U8) (variant | LLGLSLShader::GLTFVariant::MULTI_UV));
     }
 
+    bool rigged = variant & LLGLSLShader::GLTFVariant::RIGGED;
+
     for (U32 i = 0; i < mObjects.size(); ++i)
     {
         if (mObjects[i]->isDead() || mObjects[i]->mGLTFAsset == nullptr)

@@ -29,26 +29,104 @@
 
 #include "linden_common.h"
 #include "llfile.h"
-#include "llstring.h"
 #include "llerror.h"
 #include "stringize.h"
 
 #if LL_WINDOWS
-#include "llwin32headers.h"
-#include <stdlib.h>                 // Windows errno
-#include <vector>
+#include <fcntl.h>
 #else
 #include <errno.h>
+#include <sys/file.h>
 #endif
 
-using namespace std;
-
-static std::string empty;
-
-// Many of the methods below use OS-level functions that mess with errno. Wrap
+// Some of the methods below use OS-level functions that mess with errno. Wrap
 // variants of strerror() to report errors.
 
 #if LL_WINDOWS
+// For the situations where we directly call into Windows API functions we need to translate
+// the Windows error codes into errno values
+namespace
+{
+    struct errentry
+    {
+        unsigned long oserr; // Windows OS error value
+        int errcode;         // System V error code
+    };
+}
+
+// translation table between Windows OS error value and System V errno code
+static errentry const errtable[]
+{
+    { ERROR_INVALID_FUNCTION,       EINVAL    },  //    1
+    { ERROR_FILE_NOT_FOUND,         ENOENT    },  //    2
+    { ERROR_PATH_NOT_FOUND,         ENOENT    },  //    3
+    { ERROR_TOO_MANY_OPEN_FILES,    EMFILE    },  //    4
+    { ERROR_ACCESS_DENIED,          EACCES    },  //    5
+    { ERROR_INVALID_HANDLE,         EBADF     },  //    6
+    { ERROR_ARENA_TRASHED,          ENOMEM    },  //    7
+    { ERROR_NOT_ENOUGH_MEMORY,      ENOMEM    },  //    8
+    { ERROR_INVALID_BLOCK,          ENOMEM    },  //    9
+    { ERROR_BAD_ENVIRONMENT,        E2BIG     },  //   10
+    { ERROR_BAD_FORMAT,             ENOEXEC   },  //   11
+    { ERROR_INVALID_ACCESS,         EINVAL    },  //   12
+    { ERROR_INVALID_DATA,           EINVAL    },  //   13
+    { ERROR_INVALID_DRIVE,          ENOENT    },  //   15
+    { ERROR_CURRENT_DIRECTORY,      EACCES    },  //   16
+    { ERROR_NOT_SAME_DEVICE,        EXDEV     },  //   17
+    { ERROR_NO_MORE_FILES,          ENOENT    },  //   18
+    { ERROR_SHARING_VIOLATION,      EACCES    },  //   32
+    { ERROR_LOCK_VIOLATION,         EACCES    },  //   33
+    { ERROR_BAD_NETPATH,            ENOENT    },  //   53
+    { ERROR_NETWORK_ACCESS_DENIED,  EACCES    },  //   65
+    { ERROR_BAD_NET_NAME,           ENOENT    },  //   67
+    { ERROR_FILE_EXISTS,            EEXIST    },  //   80
+    { ERROR_CANNOT_MAKE,            EACCES    },  //   82
+    { ERROR_FAIL_I24,               EACCES    },  //   83
+    { ERROR_INVALID_PARAMETER,      EINVAL    },  //   87
+    { ERROR_NO_PROC_SLOTS,          EAGAIN    },  //   89
+    { ERROR_DRIVE_LOCKED,           EACCES    },  //  108
+    { ERROR_BROKEN_PIPE,            EPIPE     },  //  109
+    { ERROR_DISK_FULL,              ENOSPC    },  //  112
+    { ERROR_INVALID_TARGET_HANDLE,  EBADF     },  //  114
+    { ERROR_WAIT_NO_CHILDREN,       ECHILD    },  //  128
+    { ERROR_CHILD_NOT_COMPLETE,     ECHILD    },  //  129
+    { ERROR_DIRECT_ACCESS_HANDLE,   EBADF     },  //  130
+    { ERROR_NEGATIVE_SEEK,          EINVAL    },  //  131
+    { ERROR_SEEK_ON_DEVICE,         EACCES    },  //  132
+    { ERROR_DIR_NOT_EMPTY,          ENOTEMPTY },  //  145
+    { ERROR_NOT_LOCKED,             EACCES    },  //  158
+    { ERROR_BAD_PATHNAME,           ENOENT    },  //  161
+    { ERROR_MAX_THRDS_REACHED,      EAGAIN    },  //  164
+    { ERROR_LOCK_FAILED,            EACCES    },  //  167
+    { ERROR_ALREADY_EXISTS,         EEXIST    },  //  183
+    { ERROR_FILENAME_EXCED_RANGE,   ENOENT    },  //  206
+    { ERROR_NESTING_NOT_ALLOWED,    EAGAIN    },  //  215
+    { ERROR_NO_UNICODE_TRANSLATION, EILSEQ    },  // 1113
+    { ERROR_NOT_ENOUGH_QUOTA,       ENOMEM    }   // 1816
+};
+
+static int get_errno_from_oserror(int oserr)
+{
+    if (!oserr)
+        return 0;
+
+    // Check the table for the Windows OS error code
+    for (const struct errentry& entry : errtable)
+    {
+        if (oserr == entry.oserr)
+        {
+            return entry.errcode;
+        }
+    }
+    return EINVAL;
+}
+
+static int set_errno_from_oserror(unsigned long oserr)
+{
+    _set_errno(get_errno_from_oserror(oserr));
+    return -1;
+}
+
 // On Windows, use strerror_s().
 std::string strerr(int errn)
 {
@@ -57,9 +135,8 @@ std::string strerr(int errn)
     return buffer;
 }
 
-typedef std::basic_ios<char,std::char_traits < char > > _Myios;
-
 #else
+
 // On Posix we want to call strerror_r(), but alarmingly, there are two
 // different variants. The one that returns int always populates the passed
 // buffer (except in case of error), whereas the other one always returns a
@@ -106,340 +183,894 @@ std::string strerr(int errn)
     return message_from(errn, buffer, sizeof(buffer),
                         strerror_r(errn, buffer, sizeof(buffer)));
 }
+
 #endif  // ! LL_WINDOWS
 
-// On either system, shorthand call just infers global 'errno'.
-std::string strerr()
+#if LL_WINDOWS && 0 // turn on to debug file-locking problems
+#define PROCESS_LOCKING_CHECK 1
+static void find_locking_process(const std::string& filename)
 {
-    return strerr(errno);
+    // Only do any of this stuff (before LL_ENDL) if it will be logged.
+    LL_DEBUGS("LLFile") << "";
+    // wrong way
+    std::string TEMP = LLFile::tmpdir();
+    if (TEMP.empty())
+    {
+        LL_CONT << "No $TEMP, not running 'handle'";
+    }
+    else
+    {
+        std::string tf(TEMP);
+        tf += "handle.tmp";
+        // http://technet.microsoft.com/en-us/sysinternals/bb896655
+        std::string cmd(STRINGIZE("handle \"" << filename
+                        // "openfiles /query /v | fgrep -i \"" << filename
+                        << "\" > \"" << tf << '"'));
+        LL_CONT << cmd;
+        if (system(cmd.c_str()) != 0)
+        {
+            LL_CONT << "\nDownload 'handle.exe' from http://technet.microsoft.com/en-us/sysinternals/bb896655";
+        }
+        else
+        {
+            std::ifstream inf(tf);
+            std::string   line;
+            while (std::getline(inf, line))
+            {
+                LL_CONT << '\n' << line;
+            }
+        }
+        LLFile::remove(tf);
+    }
+    LL_CONT << LL_ENDL;
 }
+#endif // LL_WINDOWS hack to identify processes holding file open
 
-int warnif(const std::string& desc, const std::string& filename, int rc, int accept=0)
+static int warnif(std::string_view desc, const std::filesystem::path& filename, int rc, int suppress_warning = 0)
 {
     if (rc < 0)
     {
         // Capture errno before we start emitting output
         int errn = errno;
+
         // For certain operations, a particular errno value might be
         // acceptable -- e.g. stat() could permit ENOENT, mkdir() could permit
-        // EEXIST. Don't warn if caller explicitly says this errno is okay.
-        if (errn != accept)
+        // EEXIST. Don't log a warning if caller explicitly says this errno is okay.
+        if (errn != suppress_warning)
         {
-            LL_WARNS("LLFile") << "Couldn't " << desc << " '" << filename
-                               << "' (errno " << errn << "): " << strerr(errn) << LL_ENDL;
+            LL_WARNS("LLFile") << "Couldn't " << desc << " '" << filename << "' (errno " << errn << "): " << strerr(errn) << LL_ENDL;
         }
-#if 0 && LL_WINDOWS                 // turn on to debug file-locking problems
+#if PROCESS_LOCKING_CHECK
         // If the problem is "Permission denied," maybe it's because another
         // process has the file open. Try to find out.
-        if (errn == EACCES)         // *not* EPERM
+        if (errn == EACCES) // *not* EPERM
         {
-            // Only do any of this stuff (before LL_ENDL) if it will be logged.
-            LL_DEBUGS("LLFile") << empty;
-            // would be nice to use LLDir for this, but dependency goes the
-            // wrong way
-            const char* TEMP = LLFile::tmpdir();
-            if (! (TEMP && *TEMP))
-            {
-                LL_CONT << "No $TEMP, not running 'handle'";
-            }
-            else
-            {
-                std::string tf(TEMP);
-                tf += "\\handle.tmp";
-                // http://technet.microsoft.com/en-us/sysinternals/bb896655
-                std::string cmd(STRINGIZE("handle \"" << filename
-                                          // "openfiles /query /v | fgrep -i \"" << filename
-                                          << "\" > \"" << tf << '"'));
-                LL_CONT << cmd;
-                if (system(cmd.c_str()) != 0)
-                {
-                    LL_CONT << "\nDownload 'handle.exe' from http://technet.microsoft.com/en-us/sysinternals/bb896655";
-                }
-                else
-                {
-                    std::ifstream inf(tf);
-                    std::string line;
-                    while (std::getline(inf, line))
-                    {
-                        LL_CONT << '\n' << line;
-                    }
-                }
-                LLFile::remove(tf);
-            }
-            LL_CONT << LL_ENDL;
+            find_locking_process(filename);
         }
-#endif  // LL_WINDOWS hack to identify processes holding file open
+#endif
     }
     return rc;
 }
 
-// static
-int LLFile::mkdir(const std::string& dirname, int perms)
+static int warnif(std::string_view desc, const std::filesystem::path& filename, const std::error_code& ec, int suppress_warning = 0)
 {
-#if LL_WINDOWS
-    // permissions are ignored on Windows
-    std::wstring utf16dirname = ll_convert<std::wstring>(dirname);
-    int rc = _wmkdir(utf16dirname.c_str());
-#else
-    int rc = ::mkdir(dirname.c_str(), (mode_t)perms);
-#endif
-    // We often use mkdir() to ensure the existence of a directory that might
-    // already exist. There is no known case in which we want to call out as
-    // an error the requested directory already existing.
-    if (rc < 0 && errno == EEXIST)
+    if (ec)
     {
-        // this is not the error you want, move along
-        return 0;
+        // get Posix errno from the std::error_code so we can compare it to the suppress_warning parameter
+        // to see when a caller wants us to not generate a warning for a particular error code
+#if LL_WINDOWS
+        int errn = get_errno_from_oserror(ec.value());
+#else
+        int errn = ec.value();
+#endif
+        // For certain operations, a particular errno value might be acceptable
+        // Don't warn if caller explicitly says this errno is okay.
+        if (errn != suppress_warning)
+        {
+            LL_WARNS("LLFile") << "Couldn't " << desc << " '" << filename << "' (errno " << errn << "): " << ec.message() << LL_ENDL;
+        }
+#if PROCESS_LOCKING_CHECK
+        // Try to detect locked files by other processes
+        if (ec.value() == ERROR_SHARING_VIOLATION || ec.value() == ERROR_LOCK_VIOLATION)
+        {
+            find_locking_process(filename);
+        }
+#endif
+        return -1;
     }
-    // anything else might be a problem
-    return warnif("mkdir", dirname, rc, EEXIST);
+    return 0;
+}
+
+#if LL_WINDOWS
+
+inline int set_ec_from_system_error(std::error_code& ec, DWORD error)
+{
+    ec.assign(error, std::system_category());
+    return -1;
+}
+
+static int set_ec_from_system_error(std::error_code& ec)
+{
+    return set_ec_from_system_error(ec, GetLastError());
+}
+
+inline int set_ec_to_parameter_error(std::error_code& ec)
+{
+    return set_ec_from_system_error(ec, ERROR_INVALID_PARAMETER);
+}
+
+inline int set_ec_to_outofmemory_error(std::error_code& ec)
+{
+    return set_ec_from_system_error(ec, ERROR_NOT_ENOUGH_MEMORY);
+}
+
+inline DWORD decode_access_mode(std::ios_base::openmode omode)
+{
+    switch (omode & (LLFile::in | LLFile::out))
+    {
+        case LLFile::in:
+            return GENERIC_READ;
+        case LLFile::out:
+            return GENERIC_WRITE;
+        case static_cast<std::ios_base::openmode>(LLFile::in | LLFile::out):
+            return GENERIC_READ | GENERIC_WRITE;
+    }
+    if (omode & LLFile::app)
+    {
+        return GENERIC_WRITE;
+    }
+    return 0;
+}
+
+inline DWORD decode_open_create_flags(std::ios_base::openmode omode)
+{
+    if (omode & LLFile::noreplace)
+    {
+        return CREATE_NEW; // create if it does not exist, otherwise fail
+    }
+    if (omode & LLFile::trunc)
+    {
+        if (!(omode & LLFile::out))
+        {
+            return TRUNCATE_EXISTING; // open and truncate if it exists, otherwise fail
+        }
+        return CREATE_ALWAYS; // open and truncate if it exists, otherwise create it
+    }
+    if (!(omode & LLFile::out))
+    {
+        return OPEN_EXISTING; // open if it exists, otherwise fail
+    }
+    // LLFile::app or (LLFile::out and (!LLFile::trunc or !LLFile::noreplace))
+    return OPEN_ALWAYS; // open if it exists, otherwise create it
+}
+
+inline DWORD decode_share_mode(int omode)
+{
+    if (omode & LLFile::exclusive)
+    {
+        return 0; // allow no other access
+    }
+    if (omode & LLFile::shared)
+    {
+        return FILE_SHARE_READ; // allow read access
+    }
+    return FILE_SHARE_READ | FILE_SHARE_WRITE; // allow read and write access to others
+}
+
+inline DWORD decode_attributes(std::ios_base::openmode omode, int perm)
+{
+    return (perm & S_IWRITE) ? FILE_ATTRIBUTE_NORMAL : FILE_ATTRIBUTE_READONLY;
+}
+
+// Under Windows the values for the std::ios_base::seekdir constants match the according FILE_BEGIN
+// and other constants but we do a programmatic translation for now to be sure
+static DWORD seek_mode_from_dir(std::ios_base::seekdir seekdir)
+{
+    switch (seekdir)
+    {
+        case LLFile::beg:
+            return FILE_BEGIN;
+        case LLFile::cur:
+            return FILE_CURRENT;
+        case LLFile::end:
+            return FILE_END;
+        default:
+            return FILE_BEGIN;
+    }
+}
+
+#else
+
+inline int set_ec_from_system_error(std::error_code& ec, int error)
+{
+    ec.assign(error, std::system_category());
+    return -1;
+}
+
+static int set_ec_from_system_error(std::error_code& ec)
+{
+    return set_ec_from_system_error(ec, errno);
+}
+
+inline int set_ec_to_parameter_error(std::error_code& ec)
+{
+    return set_ec_from_system_error(ec, EINVAL);
+}
+
+inline int set_ec_to_outofmemory_error(std::error_code& ec)
+{
+    return set_ec_from_system_error(ec, ENOMEM);
+}
+
+inline int decode_access_mode(std::ios_base::openmode omode)
+{
+    if (omode & LLFile::out)
+    {
+        if (omode & LLFile::in)
+        {
+            return O_RDWR;
+        }
+        return O_WRONLY;
+    }
+    return O_RDONLY;
+
+    /*switch (omode & (LLFile::in | LLFile::out))
+    {
+        case LLFile::out:
+            return O_WRONLY;
+        case static_cast<std::ios_base::openmode>(LLFile::in | LLFile::out):
+            return O_RDWR;
+    }
+    return O_RDONLY;*/
+}
+
+inline int decode_open_mode(std::ios_base::openmode omode)
+{
+    int flags = O_CREAT | decode_access_mode(omode);
+    if (omode & LLFile::app)
+    {
+        flags |= O_APPEND;
+    }
+    if (omode & LLFile::trunc)
+    {
+        flags |= O_TRUNC;
+    }
+    if (omode & LLFile::binary)
+    {
+        // Not a thing under *nix
+    }
+    if (omode & LLFile::noreplace)
+    {
+        flags |= O_EXCL;
+    }
+    return flags;
+}
+
+inline int decode_lock_mode(std::ios_base::openmode omode)
+{
+    int lmode = omode & LLFile::noblock ? LOCK_NB : 0;
+    if (omode & LLFile::lock_mask)
+    {
+        if (omode & LLFile::exclusive)
+        {
+            return lmode | LOCK_EX;
+        }
+        return lmode | LOCK_SH;
+    }
+    return lmode | LOCK_UN;
+}
+
+// Under Linux and Mac the values for the std::ios_base::seekdir constants match the according SEEK_SET
+// and other constants but we do a programmatic translation for now to be sure
+inline int seek_mode_from_dir(std::ios_base::seekdir seekdir)
+{
+    switch (seekdir)
+    {
+        case LLFile::beg:
+            return SEEK_SET;
+        case LLFile::cur:
+            return SEEK_CUR;
+        case LLFile::end:
+            return SEEK_END;
+        default:
+            return SEEK_SET;
+    }
+}
+
+#endif
+
+inline int clear_error(std::error_code& ec)
+{
+    ec.clear();
+    return 0;
+}
+
+inline bool are_open_mode_flags_invalid(std::ios_base::openmode omode)
+{
+    // at least one of input or output needs to be specified
+    if (!(omode & (LLFile::in | LLFile::out)))
+    {
+        return true;
+    }
+    // output must be possible for any of the extra options
+    if (!(omode & LLFile::out) && (omode & (LLFile::trunc | LLFile::app | LLFile::noreplace)))
+    {
+        return true;
+    }
+    // invalid combination, mutually exclusive
+    if ((omode & LLFile::app) && (omode & (LLFile::trunc | LLFile::noreplace)))
+    {
+        return true;
+    }
+    return false;
+}
+
+//----------------------------------------------------------------------------------------
+// class member functions
+//----------------------------------------------------------------------------------------
+int LLFile::open(const std::filesystem::path& file_path, std::ios_base::openmode omode, std::error_code& ec, int perm)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    close(ec);
+    if (are_open_mode_flags_invalid(omode))
+    {
+        return set_ec_to_parameter_error(ec);
+    }
+#if LL_WINDOWS
+    DWORD access = decode_access_mode(omode),
+          share = decode_share_mode(omode),
+          create = decode_open_create_flags(omode),
+          attributes = decode_attributes(omode, perm);
+
+    mHandle = CreateFileW(file_path.native().c_str(), access, share, nullptr, create, attributes, nullptr);
+    // The dwShareMode = share parameter takes care of locking the file for other processes if indicated,
+    // no need to do anything else for file locking here
+#else
+    int oflags = decode_open_mode(omode);
+    int lmode = omode & LLFile::lock_mask;
+    mHandle = ::open(file_path.native().c_str(), oflags, perm);
+    if (mHandle != InvalidHandle && lmode && lock(lmode | LLFile::noblock, ec) != 0)
+    {
+        close();
+        return -1;
+    }
+#endif
+    if (mHandle == InvalidHandle)
+    {
+        return set_ec_from_system_error(ec);
+    }
+
+    if (omode & LLFile::ate && seek(0, LLFile::end, ec) != 0)
+    {
+        close();
+        return -1;
+    }
+    mOpen = omode;
+    return clear_error(ec);
+}
+
+S64 LLFile::size(std::error_code& ec)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+#if LL_WINDOWS
+    LARGE_INTEGER value = { 0 };
+    if (GetFileSizeEx(mHandle, &value))
+    {
+        clear_error(ec);
+        return value.QuadPart;
+    }
+#else
+    struct stat statval;
+    if (fstat(mHandle, &statval) == 0)
+    {
+        clear_error(ec);
+        return statval.st_size;
+    }
+#endif
+    set_ec_from_system_error(ec);
+    return 0;
+}
+
+S64 LLFile::tell(std::error_code& ec)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+#if LL_WINDOWS
+    LARGE_INTEGER value = { 0 };
+    if (SetFilePointerEx(mHandle, value, &value, FILE_CURRENT))
+    {
+        clear_error(ec);
+        return value.QuadPart;
+    }
+#else
+    off_t offset = lseek(mHandle, 0, SEEK_CUR);
+    if (offset != -1)
+    {
+        clear_error(ec);
+        return offset;
+    }
+#endif
+    return set_ec_from_system_error(ec);
+}
+
+int LLFile::seek(S64 pos, std::error_code& ec)
+{
+    return seek(pos, LLFile::beg, ec);
+}
+
+int LLFile::seek(S64 offset, std::ios_base::seekdir dir, std::error_code& ec)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    S64 newOffset = 0;
+#if LL_WINDOWS
+    DWORD seekdir = seek_mode_from_dir(dir);
+    LARGE_INTEGER value;
+    value.QuadPart = offset;
+    if (SetFilePointerEx(mHandle, value, (PLARGE_INTEGER)&newOffset, seekdir))
+#else
+    newOffset = lseek(mHandle, offset, seek_mode_from_dir(dir));
+    if (newOffset != -1)
+#endif
+    {
+        return clear_error(ec);
+    }
+    return set_ec_from_system_error(ec);
+}
+
+#if LL_WINDOWS
+inline DWORD next_buffer_size(S64 nbytes)
+{
+    return nbytes > 0x80000000 ? 0x80000000 : (DWORD)nbytes;
+}
+#endif
+
+S64 LLFile::read(void* buffer, S64 nbytes, std::error_code& ec)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    if (nbytes == 0)
+    {
+        // Nothing to do
+        return clear_error(ec);
+    }
+    else if (!buffer || nbytes < 0)
+    {
+        return set_ec_to_parameter_error(ec);
+    }
+#if LL_WINDOWS
+    S64 totalBytes = 0;
+    char *ptr = (char*)buffer;
+    DWORD bytesRead, bytesToRead = next_buffer_size(nbytes);
+
+    // Read in chunks to support >4GB which the S64 nbytes value makes possible
+    while (ReadFile(mHandle, ptr, bytesToRead, &bytesRead, nullptr))
+    {
+        totalBytes += bytesRead;
+        if (nbytes <= totalBytes || // requested amount read
+            bytesRead < bytesToRead) // ReadFile encountered eof
+        {
+            clear_error(ec);
+            return totalBytes;
+        }
+        ptr += bytesRead;
+        bytesToRead = next_buffer_size(nbytes - totalBytes);
+    }
+#else
+    ssize_t bytesRead = ::read(mHandle, buffer, nbytes);
+    if (bytesRead != -1)
+    {
+        clear_error(ec);
+        return bytesRead;
+    }
+#endif
+    return set_ec_from_system_error(ec);
+}
+
+S64 LLFile::write(const void* buffer, S64 nbytes, std::error_code& ec)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    if (nbytes == 0)
+    {
+        // Nothing to do here
+        return clear_error(ec);
+    }
+    else if (!buffer || nbytes < 0)
+    {
+        return set_ec_to_parameter_error(ec);
+    }
+#if LL_WINDOWS
+    // If this was opened in append mode, we emulate it on Windows
+    if (mOpen & LLFile::app && seek(0, LLFile::end, ec) != 0)
+    {
+        return -1;
+    }
+
+    S64 totalBytes = 0;
+    char* ptr = (char*)buffer;
+    DWORD bytesWritten, bytesToWrite = next_buffer_size(nbytes);
+
+    // Write in chunks to support >4GB which the S64 nbytes value makes possible
+    while (WriteFile(mHandle, ptr, bytesToWrite, &bytesWritten, nullptr))
+    {
+        totalBytes += bytesWritten;
+        if (nbytes <= totalBytes)
+        {
+            clear_error(ec);
+            return totalBytes;
+        }
+        ptr += bytesWritten;
+        bytesToWrite = next_buffer_size(nbytes - totalBytes);
+    }
+#else
+    ssize_t bytesWritten = ::write(mHandle, buffer, nbytes);
+    if (bytesWritten != -1)
+    {
+        clear_error(ec);
+        return bytesWritten;
+    }
+#endif
+    return set_ec_from_system_error(ec);
+}
+
+S64 LLFile::printf(const char* fmt, ...)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    va_list args1;
+    va_start(args1, fmt);
+    va_list args2;
+    va_copy(args2, args1);
+    int length = vsnprintf(nullptr, 0, fmt, args1);
+    va_end(args1);
+    if (length < 0)
+    {
+        va_end(args2);
+        return -1;
+    }
+    void* buffer = malloc(length + 1);
+    if (!buffer)
+    {
+        va_end(args2);
+        return -1;
+    }
+    length = vsnprintf((char*)buffer, length + 1, fmt, args2);
+    va_end(args2);
+    std::error_code ec;
+    S64 written = write(buffer, length, ec);
+    free(buffer);
+    return written;
+}
+
+int LLFile::lock(int mode, std::error_code& ec)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+#if LL_WINDOWS
+    if (!(mode & LLFile::lock_mask))
+    {
+        if (UnlockFile(mHandle, 0, 0, MAXDWORD, MAXDWORD))
+        {
+            return clear_error(ec);
+        }
+    }
+    else
+    {
+        OVERLAPPED overlapped = { 0 };
+        DWORD flags = (mode & LLFile::noblock) ? LOCKFILE_FAIL_IMMEDIATELY : 0;
+        if (mode & LLFile::exclusive)
+        {
+            flags |= LOCKFILE_EXCLUSIVE_LOCK;
+        }
+        // We lock the maximum range, since flock only supports locking the entire file too
+        if (LockFileEx(mHandle, flags, 0, MAXDWORD, MAXDWORD, &overlapped))
+        {
+            return clear_error(ec);
+        }
+    }
+#else
+    if (flock(mHandle, decode_lock_mode(static_cast<std::ios_base::openmode>(mode))) == 0)
+    {
+        return clear_error(ec);
+    }
+#endif
+    return set_ec_from_system_error(ec);
+}
+
+int LLFile::close(std::error_code& ec)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    if (mHandle != InvalidHandle)
+    {
+        llfile_handle_t handle = InvalidHandle;
+        std::swap(handle, mHandle);
+#if LL_WINDOWS
+        if (!CloseHandle(handle))
+#else
+        if (::close(handle))
+#endif
+        {
+            return set_ec_from_system_error(ec);
+        }
+    }
+    return clear_error(ec);
+}
+
+int LLFile::close()
+{
+    std::error_code ec;
+    return close(ec);
+}
+
+//----------------------------------------------------------------------------------------
+// static member functions
+//----------------------------------------------------------------------------------------
+
+// static
+LLFILE* LLFile::fopen(const std::filesystem::path& file_path, const fopen_flags_t* mode, int lmode)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    LLFILE* file;
+#if LL_WINDOWS
+    int shflag = _SH_DENYNO;
+    switch (lmode)
+    {
+        case LLFile::exclusive:
+            shflag = _SH_DENYRW;
+            break;
+        case LLFile::shared:
+            shflag = _SH_DENYWR;
+            break;
+    }
+    file = _wfsopen(file_path.native().c_str(), mode, shflag);
+#else
+    file = ::fopen(file_path.native().c_str(), mode);
+    if (file && (lmode & (LLFile::lock_mask)))
+    {
+        // Rather fail on a sharing conflict than block
+        if (flock(fileno(file), decode_lock_mode(static_cast<std::ios_base::openmode>(lmode | LLFile::noblock))))
+        {
+            ::fclose(file);
+            file = nullptr;
+        }
+    }
+#endif
+    return file;
 }
 
 // static
-int LLFile::rmdir(const std::string& dirname)
+int LLFile::close(LLFILE* file)
 {
-#if LL_WINDOWS
-    // permissions are ignored on Windows
-    std::wstring utf16dirname = ll_convert<std::wstring>(dirname);
-    int rc = _wrmdir(utf16dirname.c_str());
-#else
-    int rc = ::rmdir(dirname.c_str());
-#endif
-    return warnif("rmdir", dirname, rc);
-}
-
-// static
-LLFILE* LLFile::fopen(const std::string& filename, const char* mode)    /* Flawfinder: ignore */
-{
-#if LL_WINDOWS
-    std::wstring utf16filename = ll_convert<std::wstring>(filename);
-    std::wstring utf16mode = ll_convert<std::wstring>(std::string(mode));
-    return _wfopen(utf16filename.c_str(),utf16mode.c_str());
-#else
-    return ::fopen(filename.c_str(),mode);  /* Flawfinder: ignore */
-#endif
-}
-
-LLFILE* LLFile::_fsopen(const std::string& filename, const char* mode, int sharingFlag)
-{
-#if LL_WINDOWS
-    std::wstring utf16filename = ll_convert<std::wstring>(filename);
-    std::wstring utf16mode = ll_convert<std::wstring>(std::string(mode));
-    return _wfsopen(utf16filename.c_str(),utf16mode.c_str(),sharingFlag);
-#else
-    llassert(0);//No corresponding function on non-windows
-    return NULL;
-#endif
-}
-
-int LLFile::close(LLFILE * file)
-{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
     int ret_value = 0;
     if (file)
     {
-        ret_value = fclose(file);
+        ret_value = ::fclose(file);
     }
     return ret_value;
 }
 
-std::string LLFile::getContents(const std::string& filename)
+// static
+std::string LLFile::getContents(const std::filesystem::path& file_path, std::error_code& ec)
 {
-    LLFILE* fp = fopen(filename, "rb"); /* Flawfinder: ignore */
-    if (fp)
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    std::string buffer;
+    LLFile file(file_path, LLFile::in | LLFile::binary, ec);
+    if (file)
     {
-        fseek(fp, 0, SEEK_END);
-        U32 length = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
+        S64 length = file.size(ec);
+        if (!ec && length > 0)
+        {
+            buffer = std::string(length, 0);
+            file.read(&buffer[0], length, ec);
+            if (ec)
+            {
+                buffer.clear();
+            }
+        }
+    }
+    return buffer;
+}
 
-        std::vector<char> buffer(length);
-        size_t nread = fread(buffer.data(), 1, length, fp);
-        fclose(fp);
+// static
+int LLFile::mkdir(const std::filesystem::path& file_path)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    std::error_code ec;
+    // We often use mkdir() to ensure the existence of a directory that might
+    // already exist. There is no known case in which we want to call out as
+    // an error the requested directory already existing.
+    std::filesystem::create_directory(file_path, ec);
+    // The return value is only true if the directory was actually created.
+    // But if it already existed, ec still indicates success.
+    return warnif("mkdir", file_path, ec);
+}
 
-        return std::string(buffer.data(), nread);
+// static
+int LLFile::remove(const std::filesystem::path& file_path, int suppress_warning)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    std::error_code ec;
+    std::filesystem::remove(file_path, ec);
+    return warnif("remove", file_path, ec, suppress_warning);
+}
+
+// static
+int LLFile::rename(const std::filesystem::path& file_path, const std::filesystem::path& new_path, int suppress_warning)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    std::error_code ec;
+    std::filesystem::rename(file_path, new_path, ec);
+    return warnif("rename", file_path, ec, suppress_warning);
+}
+
+// static
+S64 LLFile::read(const std::filesystem::path& file_path, void* buf, S64 offset, S64 nbytes, std::error_code& ec)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    // if number of bytes is 0 or less there is nothing to do here
+    if (nbytes <= 0)
+    {
+        clear_error(ec);
+        return 0;
     }
 
-    return LLStringUtil::null;
-}
-
-int LLFile::remove(const std::string& filename, int supress_error)
-{
-#if LL_WINDOWS
-    std::wstring utf16filename = ll_convert<std::wstring>(filename);
-    int rc = _wremove(utf16filename.c_str());
-#else
-    int rc = ::remove(filename.c_str());
-#endif
-    return warnif("remove", filename, rc, supress_error);
-}
-
-int LLFile::rename(const std::string& filename, const std::string& newname, int supress_error)
-{
-#if LL_WINDOWS
-    std::wstring utf16filename = ll_convert<std::wstring>(filename);
-    std::wstring utf16newname = ll_convert<std::wstring>(newname);
-    int rc = _wrename(utf16filename.c_str(),utf16newname.c_str());
-#else
-    int rc = ::rename(filename.c_str(),newname.c_str());
-#endif
-    return warnif(STRINGIZE("rename to '" << newname << "' from"), filename, rc, supress_error);
-}
-
-bool LLFile::copy(const std::string& from, const std::string& to)
-{
-    bool copied = false;
-    LLFILE* in = LLFile::fopen(from, "rb");     /* Flawfinder: ignore */
-    if (in)
+    if (!buf || offset < 0)
     {
-        LLFILE* out = LLFile::fopen(to, "wb");      /* Flawfinder: ignore */
-        if (out)
+        set_ec_to_parameter_error(ec);
+    }
+    else
+    {
+        std::ios_base::openmode omode = LLFile::in | LLFile::binary;
+
+        LLFile file(file_path, omode, ec);
+        if (!ec && (bool)file)
         {
-            char buf[16384];        /* Flawfinder: ignore */
-            size_t readbytes;
-            bool write_ok = true;
-            while(write_ok && (readbytes = fread(buf, 1, 16384, in))) /* Flawfinder: ignore */
+            if (offset > 0)
             {
-                if (fwrite(buf, 1, readbytes, out) != readbytes)
+                file.seek(offset, ec);
+            }
+            // else (offset == 0) file was just opened and should already be at 0.
+            if (!ec)
+            {
+                S64 bytes_read = file.read(buf, nbytes, ec);
+                if (!ec)
                 {
-                    LL_WARNS("LLFile") << "Short write" << LL_ENDL;
-                    write_ok = false;
+                    return bytes_read;
                 }
             }
-            if ( write_ok )
-            {
-                copied = true;
-            }
-            fclose(out);
         }
-        fclose(in);
+    }
+    return warnif("read from file failed", file_path, ec);
+}
+
+// static
+S64 LLFile::write(const std::filesystem::path& file_path, const void* buf, S64 offset, S64 nbytes, std::error_code& ec)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    // if number of bytes is 0 or less there is nothing to do here
+    if (nbytes <= 0)
+    {
+        clear_error(ec);
+        return 0;
+    }
+
+    if (!buf)
+    {
+        set_ec_to_parameter_error(ec);
+    }
+    else
+    {
+        std::ios_base::openmode omode = LLFile::out | LLFile::binary;
+        if (offset < 0)
+        {
+            omode |= LLFile::app;
+        }
+
+        LLFile file(file_path, omode, ec);
+        if (!ec && (bool)file)
+        {
+            if (offset > 0)
+            {
+                file.seek(offset, ec);
+            }
+            // else (offset == 0) we are not appending, file was just opened and should already be at 0.
+            if (!ec)
+            {
+                S64 bytes_written = file.write(buf, nbytes, ec);
+                if (!ec)
+                {
+                    return bytes_written;
+                }
+            }
+        }
+    }
+    return warnif("write to file failed", file_path, ec);
+}
+
+// static
+bool LLFile::copy(const std::filesystem::path& source_path, const std::filesystem::path& target_path, std::filesystem::copy_options options, std::error_code& ec)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    bool copied = std::filesystem::copy_file(source_path, target_path, options, ec);
+    if (!copied)
+    {
+        warnif(STRINGIZE("copy failed, to '" << target_path << "' from"), source_path, ec);
     }
     return copied;
 }
 
-int LLFile::stat(const std::string& filename, llstat* filestatus)
+// static
+int LLFile::stat(const std::filesystem::path& file_path, llstat* filestatus, const char *fname, int suppress_warning)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
 #if LL_WINDOWS
-    std::wstring utf16filename = ll_convert<std::wstring>(filename);
-    int rc = _wstat(utf16filename.c_str(),filestatus);
+    int rc = _wstat64(file_path.native().c_str(), filestatus);
 #else
-    int rc = ::stat(filename.c_str(),filestatus);
+    int rc = ::stat(file_path.native().c_str(), filestatus);
 #endif
-    // We use stat() to determine existence (see isfile(), isdir()).
-    // Don't spam the log if the subject pathname doesn't exist.
-    return warnif("stat", filename, rc, ENOENT);
+    return warnif(fname ? fname : "stat", file_path, rc, suppress_warning);
 }
 
-bool LLFile::isdir(const std::string& filename)
+// static
+S64 LLFile::size(const std::filesystem::path& file_path, int suppress_warning)
 {
-    llstat st;
-
-    return stat(filename, &st) == 0 && S_ISDIR(st.st_mode);
-}
-
-bool LLFile::isfile(const std::string& filename)
-{
-    llstat st;
-
-    return stat(filename, &st) == 0 && S_ISREG(st.st_mode);
-}
-
-const char *LLFile::tmpdir()
-{
-    static std::string utf8path;
-
-    if (utf8path.empty())
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    std::error_code ec;
+    std::intmax_t size = static_cast<std::intmax_t>(std::filesystem::file_size(file_path, ec));
+    if (ec)
     {
-        char sep;
+        warnif("size", file_path, ec, suppress_warning);
+        return 0;
+    }
+    return size;
+}
+
+// static
+std::filesystem::file_status LLFile::getStatus(const std::filesystem::path& file_path, bool dontFollowSymLink, int suppress_warning)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    std::error_code ec;
+    std::filesystem::file_status status;
+    if (dontFollowSymLink)
+    {
+        status = std::filesystem::symlink_status(file_path, ec);
+    }
+    else
+    {
+        status = std::filesystem::status(file_path, ec);
+    }
+    warnif("getStatus()", file_path, ec, suppress_warning);
+    return status;
+}
+
+// static
+const std::string& LLFile::tmpdir()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    static std::string temppath;
+    if (temppath.empty())
+    {
 #if LL_WINDOWS
-        sep = '\\';
-
-        std::vector<wchar_t> utf16path(MAX_PATH + 1);
-        GetTempPathW(static_cast<DWORD>(utf16path.size()), &utf16path[0]);
-        utf8path = ll_convert_wide_to_string(&utf16path[0]);
+        temppath = ll_convert<std::string>(std::filesystem::temp_directory_path().native());
+        char sep = '\\';
 #else
-        sep = '/';
-
-        utf8path = LLStringUtil::getenv("TMPDIR", "/tmp/");
+        temppath = std::filesystem::temp_directory_path().string();
+        char sep = '/';
 #endif
-        if (utf8path[utf8path.size() - 1] != sep)
+        if (temppath[temppath.size() - 1] != sep)
         {
-            utf8path += sep;
+            temppath += sep;
         }
     }
-    return utf8path.c_str();
+
+    return temppath;
 }
-
-
-/***************** Modified file stream created to overcome the incorrect behaviour of posix fopen in windows *******************/
 
 #if LL_WINDOWS
 
-LLFILE *    LLFile::_Fiopen(const std::string& filename,
-        std::ios::openmode mode)
-{   // open a file
-    static const char *mods[] =
-    {   // fopen mode strings corresponding to valid[i]
-    "r", "w", "w", "a", "rb", "wb", "wb", "ab",
-    "r+", "w+", "a+", "r+b", "w+b", "a+b",
-    0};
-    static const int valid[] =
-    {   // valid combinations of open flags
-        ios_base::in,
-        ios_base::out,
-        ios_base::out | ios_base::trunc,
-        ios_base::out | ios_base::app,
-        ios_base::in | ios_base::binary,
-        ios_base::out | ios_base::binary,
-        ios_base::out | ios_base::trunc | ios_base::binary,
-        ios_base::out | ios_base::app | ios_base::binary,
-        ios_base::in | ios_base::out,
-        ios_base::in | ios_base::out | ios_base::trunc,
-        ios_base::in | ios_base::out | ios_base::app,
-        ios_base::in | ios_base::out | ios_base::binary,
-        ios_base::in | ios_base::out | ios_base::trunc
-            | ios_base::binary,
-        ios_base::in | ios_base::out | ios_base::app
-            | ios_base::binary,
-    0};
-
-    LLFILE *fp = 0;
-    int n;
-    ios_base::openmode atendflag = mode & ios_base::ate;
-    ios_base::openmode norepflag = mode & ios_base::_Noreplace;
-
-    if (mode & ios_base::_Nocreate)
-        mode |= ios_base::in;   // file must exist
-    mode &= ~(ios_base::ate | ios_base::_Nocreate | ios_base::_Noreplace);
-    for (n = 0; valid[n] != 0 && valid[n] != mode; ++n)
-        ;   // look for a valid mode
-
-    if (valid[n] == 0)
-        return (0); // no valid mode
-    else if (norepflag && mode & (ios_base::out | ios_base::app)
-        && (fp = LLFile::fopen(filename, "r")) != 0)    /* Flawfinder: ignore */
-        {   // file must not exist, close and fail
-        fclose(fp);
-        return (0);
-        }
-    else if (fp != 0 && fclose(fp) != 0)
-        return (0); // can't close after test open
-// should open with protection here, if other than default
-    else if ((fp = LLFile::fopen(filename, mods[n])) == 0)  /* Flawfinder: ignore */
-        return (0); // open failed
-
-    if (!atendflag || fseek(fp, 0, SEEK_END) == 0)
-        return (fp);    // no need to seek to end, or seek succeeded
-
-    fclose(fp); // can't position at end
-    return (0);
-}
-
-#endif /* LL_WINDOWS */
-
-
-#if LL_WINDOWS
 /************** input file stream ********************************/
 
-llifstream::llifstream() {}
+// explicit
+llifstream::llifstream(const char* _Filename, ios_base::openmode _Mode) :
+    std::ifstream(ll_convert<std::wstring>(_Filename).c_str(), _Mode | ios_base::in)
+{
+}
 
 // explicit
 llifstream::llifstream(const std::string& _Filename, ios_base::openmode _Mode):
@@ -448,17 +1079,37 @@ llifstream::llifstream(const std::string& _Filename, ios_base::openmode _Mode):
 {
 }
 
+// explicit
+llifstream::llifstream(const std::filesystem::path& _Filepath, ios_base::openmode _Mode) :
+    std::ifstream(_Filepath, _Mode | ios_base::in)
+{
+}
+
+void llifstream::open(const char* _Filename, ios_base::openmode _Mode)
+{
+    std::ifstream::open(ll_convert<std::wstring>(_Filename).c_str(),
+                        _Mode | ios_base::in);
+}
+
 void llifstream::open(const std::string& _Filename, ios_base::openmode _Mode)
 {
     std::ifstream::open(ll_convert<std::wstring>(_Filename).c_str(),
                         _Mode | ios_base::in);
 }
 
+void llifstream::open(const std::filesystem::path& _Filepath, ios_base::openmode _Mode)
+{
+    std::ifstream::open(_Filepath,
+                        _Mode | ios_base::in);
+}
 
 /************** output file stream ********************************/
 
-
-llofstream::llofstream() {}
+// explicit
+llofstream::llofstream(const char* _Filename, ios_base::openmode _Mode) :
+    std::ofstream(ll_convert<std::wstring>(_Filename).c_str(), _Mode | ios_base::out)
+{
+}
 
 // explicit
 llofstream::llofstream(const std::string& _Filename, ios_base::openmode _Mode):
@@ -467,36 +1118,27 @@ llofstream::llofstream(const std::string& _Filename, ios_base::openmode _Mode):
 {
 }
 
+// explicit
+llofstream::llofstream(const std::filesystem::path& _Filepath, ios_base::openmode _Mode) :
+    std::ofstream(_Filepath, _Mode | ios_base::out)
+{
+}
+
+void llofstream::open(const char* _Filename, ios_base::openmode _Mode)
+{
+    std::ofstream::open(ll_convert<std::wstring>(_Filename).c_str(), _Mode | ios_base::out);
+}
+
 void llofstream::open(const std::string& _Filename, ios_base::openmode _Mode)
 {
     std::ofstream::open(ll_convert<std::wstring>( _Filename ).c_str(),
                         _Mode | ios_base::out);
 }
 
-/************** helper functions ********************************/
-
-std::streamsize llifstream_size(llifstream& ifstr)
+void llofstream::open(const std::filesystem::path& _Filepath, ios_base::openmode _Mode)
 {
-    if(!ifstr.is_open()) return 0;
-    std::streampos pos_old = ifstr.tellg();
-    ifstr.seekg(0, ios_base::beg);
-    std::streampos pos_beg = ifstr.tellg();
-    ifstr.seekg(0, ios_base::end);
-    std::streampos pos_end = ifstr.tellg();
-    ifstr.seekg(pos_old, ios_base::beg);
-    return pos_end - pos_beg;
-}
-
-std::streamsize llofstream_size(llofstream& ofstr)
-{
-    if(!ofstr.is_open()) return 0;
-    std::streampos pos_old = ofstr.tellp();
-    ofstr.seekp(0, ios_base::beg);
-    std::streampos pos_beg = ofstr.tellp();
-    ofstr.seekp(0, ios_base::end);
-    std::streampos pos_end = ofstr.tellp();
-    ofstr.seekp(pos_old, ios_base::beg);
-    return pos_end - pos_beg;
+    std::ofstream::open(_Filepath,
+                        _Mode | ios_base::out);
 }
 
 #endif  // LL_WINDOWS

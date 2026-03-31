@@ -44,9 +44,11 @@
 #include "llglheaders.h"
 
 // Viewer includes
+#include "alavatargroups.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h" // for gDisconnected
+#include "llavataractions.h"
 #include "llcallingcard.h" // LLAvatarTracker
 #include "llfloaterland.h"
 #include "llfloaterworldmap.h"
@@ -72,7 +74,6 @@
 #include "rlvactions.h"
 #include "rlvcommon.h"
 // [/RLVa:KB]
-#include "alavatargroups.h"
 
 static LLDefaultChildRegistry::Register<LLNetMap> r1("net_map");
 
@@ -491,22 +492,45 @@ void LLNetMap::draw()
 
         LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgentCamera.getCameraPositionGlobal());
 
-        // Draw avatars
+        std::vector<std::pair<U32, bool>> indexed_avatars;
+        indexed_avatars.reserve(avatar_ids.size());
         for (U32 i = 0; i < avatar_ids.size(); i++)
         {
-            LLUUID uuid = avatar_ids[i];
+            indexed_avatars.emplace_back(i, LLAvatarActions::isFriend(avatar_ids[i]));
+        }
+
+        // Sort avatars so non-friends are drawn first and friend dots will appear on top
+        std::sort(indexed_avatars.begin(), indexed_avatars.end(),
+                    [](const auto& a, const auto& b) { return a.second < b.second; });
+
+        uuid_vec_t sorted_avatar_ids;
+        std::vector<LLVector3d> sorted_positions;
+        sorted_avatar_ids.reserve(avatar_ids.size());
+        sorted_positions.reserve(positions.size());
+
+        // Reorder avatar_ids and positions based on sorted indices
+        for (const auto& indexed_avatar : indexed_avatars)
+        {
+            sorted_avatar_ids.push_back(avatar_ids[indexed_avatar.first]);
+            sorted_positions.push_back(positions[indexed_avatar.first]);
+        }
+
+        // Draw avatars
+        for (U32 i = 0; i < sorted_avatar_ids.size(); i++)
+        {
+            LLUUID uuid = sorted_avatar_ids[i];
             // Skip self, we'll draw it later
             if (uuid == gAgent.getID()) continue;
 
-            pos_map = globalPosToView(positions[i]);
+            pos_map = globalPosToView(sorted_positions[i]);
 
 // [RLVa:KB] - Checked: RLVa-1.2.0
 //            bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, uuid));
 // [/RLVa:KB]
 //          bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL);
+            LLColor4 color = ALAvatarGroups::instance().getAvatarColor(uuid, map_avatar_color, ALAvatarGroups::COLOR_MINIMAP);
 
-            const LLColor4 color = ALAvatarGroups::instance().getAvatarColor(uuid, map_avatar_color, ALAvatarGroups::COLOR_MINIMAP);
-            unknown_relative_z = positions[i].mdV[VZ] >= COARSEUPDATE_MAX_Z &&
+            unknown_relative_z = sorted_positions[i].mdV[VZ] >= COARSEUPDATE_MAX_Z &&
                     camera_position.mV[VZ] >= COARSEUPDATE_MAX_Z;
 
             LLWorldMapView::drawAvatar(
@@ -518,9 +542,10 @@ void LLNetMap::draw()
             if(uuid.notNull())
             {
                 bool selected = false;
-                for (const LLUUID& sel_uuid : gmSelected)
+                uuid_vec_t::iterator sel_iter = gmSelected.begin();
+                for (; sel_iter != gmSelected.end(); sel_iter++)
                 {
-                    if(sel_uuid == uuid)
+                    if(*sel_iter == uuid)
                     {
                         selected = true;
                         break;

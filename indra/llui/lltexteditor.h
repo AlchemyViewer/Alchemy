@@ -169,7 +169,7 @@ public:
     bool            allowsEmbeddedItems() const { return mAllowEmbeddedItems; }
 
     // Autoreplace (formerly part of LLLineEditor)
-    typedef boost::function<void(S32&, S32&, LLWString&, S32&, const LLWString&)> autoreplace_callback_t;
+    typedef std::function<void(S32&, S32&, LLWString&, S32&, const LLWString&)> autoreplace_callback_t;
     autoreplace_callback_t mAutoreplaceCallback;
     void            setAutoreplaceCallback(autoreplace_callback_t cb) { mAutoreplaceCallback = cb; }
 
@@ -206,6 +206,12 @@ public:
     virtual bool    importBuffer(const char* buffer, S32 length );
     virtual bool    exportBuffer(std::string& buffer );
 
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+    // NOTE-Catznip: doesn't save embedded items, text only
+    bool            loadFromFile(const std::string& filename);
+    bool            writeToFile(const std::string& filename);
+// [/SL:KB]
+
     const LLUUID&   getSourceID() const                     { return mSourceID; }
 
     const LLTextSegmentPtr  getPreviousSegment() const;
@@ -218,7 +224,10 @@ public:
     void            hideEmojiHelper();
     void            setShowEmojiHelper(bool show);
     bool            getShowEmojiHelper() const { return mShowEmojiHelper; }
-
+// [RLVa:KB]
+    void            setShowChatMentionPicker(bool show) { mShowChatMentionPicker = show; }
+    bool            getShowChatMentionPicker() const { return mShowChatMentionPicker; }
+// [/RLVa:KB]
     void            setPassDelete(bool b) { mPassDelete = b; }
 
     LLWString       getConvertedText() const;

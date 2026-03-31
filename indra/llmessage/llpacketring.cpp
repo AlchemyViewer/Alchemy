@@ -42,6 +42,7 @@
 #include "llrand.h"
 #include "message.h"
 #include "u64.h"
+#include "llmessagelog.h"
 
 constexpr S16 MAX_BUFFER_RING_SIZE = 1024;
 constexpr S16 DEFAULT_BUFFER_RING_SIZE = 256;
@@ -103,6 +104,9 @@ bool send_packet_helper(int socket, const char * datap, S32 data_size, LLHost ho
 
 bool LLPacketRing::sendPacket(int socket, const char * datap, S32 data_size, LLHost host)
 {
+#define LOCALHOST_ADDR 16777343
+    LLMessageLog::log(LLHost(LOCALHOST_ADDR, gMessageSystem->getListenPort()), host, (U8*)datap, data_size);
+#undef LOCALHOST_ADDR
     mActualBytesOut += data_size;
     return send_packet_helper(socket, datap, data_size, host);
 }
@@ -190,7 +194,8 @@ S32 LLPacketRing::receiveOrDropPacket(S32 socket, char *datap, bool drop)
 
 S32 LLPacketRing::receiveOrDropBufferedPacket(char *datap, bool drop)
 {
-    assert(mNumBufferedPackets > 0);
+    //llassert(mNumBufferedPackets > 0);
+
     S32 packet_size = 0;
 
     S16 ring_size = (S16)(mPacketRing.size());
@@ -204,7 +209,7 @@ S32 LLPacketRing::receiveOrDropBufferedPacket(char *datap, bool drop)
     mNumBufferedBytes -= packet_size;
     if (mNumBufferedPackets == 0)
     {
-        assert(mNumBufferedBytes == 0);
+        //llassert(mNumBufferedBytes == 0);
     }
 
     if (!drop)
@@ -215,7 +220,7 @@ S32 LLPacketRing::receiveOrDropBufferedPacket(char *datap, bool drop)
         }
         else
         {
-            assert(false);
+            //llassert(false); assertion disabled due to 0 size packets from server????
         }
     }
     else

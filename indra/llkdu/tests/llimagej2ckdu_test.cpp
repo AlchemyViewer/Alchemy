@@ -29,7 +29,7 @@
 // Class to test
 #include "llimagej2ckdu.h"
 
-#if __clang__
+#if LL_CLANG
 // For this source, it's true that private fields in llkdumem.h are unused.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-private-field"
@@ -152,7 +152,7 @@ void kdu_params::set(const char* , int , int , bool ) { }
 void kdu_params::set(const char* , int , int , int ) { }
 void kdu_params::finalize_all(bool ) { }
 void kdu_params::finalize_all(int, bool ) { }
-void kdu_params::copy_from(kdu_params*, int, int, int, int, int, bool, bool, bool) { }
+void kdu_params::copy_from(kdu_params*, int, int, int, int, int, bool, bool, bool, bool) { }
 bool kdu_params::parse_string(const char*) { return false; }
 bool kdu_params::get(const char*, int, int, bool&, bool, bool, bool) { return false; }
 bool kdu_params::get(const char*, int, int, float&, bool, bool, bool) { return false; }
@@ -161,13 +161,13 @@ kdu_params* kdu_params::access_relation(int, int, int, bool) { return NULL; }
 kdu_params* kdu_params::access_cluster(const char*) { return NULL; }
 void kdu_codestream::set_fast() { }
 void kdu_codestream::set_fussy() { }
-void kdu_codestream::get_dims(int, kdu_dims&, bool ) { }
+void kdu_codestream::get_dims(int, kdu_dims&, bool ) const { }
 int kdu_codestream::get_min_dwt_levels() { return 5; }
 int kdu_codestream::get_max_tile_layers() { return 1; }
 void kdu_codestream::change_appearance(bool, bool, bool, kdu_thread_env *) {}
 void kdu_codestream::get_tile_dims(kdu_coords, int, kdu_dims&, bool ) { }
 void kdu_codestream::destroy() { }
-void kdu_codestream::collect_timing_stats(int ) { }
+void kdu_codestream::collect_timing_stats(int ) const { }
 void kdu_codestream::set_max_bytes(kdu_long, bool, bool ) { }
 void kdu_codestream::get_valid_tiles(kdu_dims& ) { }
 void kdu_codestream::create(
@@ -184,10 +184,10 @@ void kdu_codestream::get_subsampling(int , kdu_coords&, bool ) { }
 void kdu_codestream::flush(kdu_long *, int, kdu_uint16 *, bool, bool, double, kdu_thread_env*, int) { }
 void kdu_codestream::set_resilient(bool ) { }
 int kdu_codestream::get_num_components(bool ) { return 0; }
-kdu_long kdu_codestream::get_total_bytes(bool ) { return 0; }
+kdu_long kdu_codestream::get_total_bytes(bool ) const { return 0; }
 kdu_long kdu_codestream::get_compressed_data_memory(bool ) const {return 0; }
 void kdu_codestream::share_buffering(kdu_codestream ) { }
-int kdu_codestream::get_num_tparts() { return 0; }
+int kdu_codestream::get_num_tparts() const { return 0; }
 int kdu_codestream::trans_out(kdu_long, kdu_long*, int, bool, kdu_thread_env* ) { return 0; }
 bool kdu_codestream::ready_for_flush(kdu_thread_env*) { return false; }
 siz_params* kdu_codestream::access_siz() { return NULL; }

@@ -28,6 +28,8 @@
 #ifndef LL_LLINSTANCETRACKER_H
 #define LL_LLINSTANCETRACKER_H
 
+#include "llpreprocessor.h"
+
 #include <map>
 #include <set>
 #include <vector>
@@ -35,7 +37,7 @@
 #include <memory>
 #include <type_traits>
 
-#include "mutex.h"
+#include <mutex>
 
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/indirect_iterator.hpp>
@@ -170,23 +172,7 @@ public:
         }
 
         // lock static data during construction
-#if ! LL_WINDOWS
         LockStatic mLock;
-#else  // LL_WINDOWS
-        // We want to be able to use (e.g.) our instance_snapshot subclass as:
-        // for (auto& inst : T::instance_snapshot()) ...
-        // But when this snapshot base class directly contains LockStatic, as
-        // above, Visual Studio 2017 requires us to code instead:
-        // for (auto& inst : std::move(T::instance_snapshot())) ...
-        // nat thinks this should be unnecessary, as an anonymous class
-        // instance is already a temporary. It shouldn't need to be cast to
-        // rvalue reference (the role of std::move()). clang evidently agrees,
-        // as the short form works fine with Xcode on Mac.
-        // To support the succinct usage, instead of directly storing
-        // LockStatic, store std::shared_ptr<LockStatic>, which is copyable.
-        std::shared_ptr<LockStatic> mLockp{std::make_shared<LockStatic>()};
-        LockStatic& mLock{*mLockp};
-#endif // LL_WINDOWS
         VectorType mData;
     };
     using snapshot = snapshot_of<T>;
@@ -244,6 +230,7 @@ public:
     }
 
 protected:
+    LL_UBSAN_SUPRESS_VPTR
     LLInstanceTracker(const KEY& key)
     {
         // We do not intend to manage the lifespan of this object with
@@ -254,6 +241,10 @@ protected:
         // save corresponding weak_ptr for future reference
         mSelf = ptr;
         LockStatic lock; LL_PROFILE_MUTEX_LOCK(lock->mMutex);
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+        std::string_view typeidname(typeid(T).name());
+        LockableName(lock->mMutex, typeidname.data(), typeidname.size());
+#endif
         add_(lock, key, ptr);
     }
 public:
@@ -434,23 +425,7 @@ public:
         }
 
         // lock static data during construction
-#if ! LL_WINDOWS
         LockStatic mLock;
-#else  // LL_WINDOWS
-        // We want to be able to use our instance_snapshot subclass as:
-        // for (auto& inst : T::instance_snapshot()) ...
-        // But when this snapshot base class directly contains LockStatic, as
-        // above, Visual Studio 2017 requires us to code instead:
-        // for (auto& inst : std::move(T::instance_snapshot())) ...
-        // nat thinks this should be unnecessary, as an anonymous class
-        // instance is already a temporary. It shouldn't need to be cast to
-        // rvalue reference (the role of std::move()). clang evidently agrees,
-        // as the short form works fine with Xcode on Mac.
-        // To support the succinct usage, instead of directly storing
-        // LockStatic, store std::shared_ptr<LockStatic>, which is copyable.
-        std::shared_ptr<LockStatic> mLockp{std::make_shared<LockStatic>()};
-        LockStatic& mLock{*mLockp};
-#endif // LL_WINDOWS
         VectorType mData;
     };
     using snapshot = snapshot_of<T>;
@@ -482,6 +457,7 @@ public:
     using key_snapshot_of = instance_snapshot_of<SUBCLASS>;
 
 protected:
+    LL_UBSAN_SUPRESS_VPTR
     LLInstanceTracker()
     {
         // Since we do not intend for this shared_ptr to manage lifespan, give
@@ -491,6 +467,10 @@ protected:
         mSelf = ptr;
         // Also store it in our class-static set to track this instance.
         LockStatic lock; LL_PROFILE_MUTEX_LOCK(lock->mMutex);
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+        std::string_view typeidname(typeid(T).name());
+        LockableName(lock->mMutex, typeidname.data(), typeidname.size());
+#endif
         lock->mSet.emplace(ptr);
     }
 public:

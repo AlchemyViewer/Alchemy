@@ -29,6 +29,11 @@
 #include "llappviewer.h"
 #include "llstartup.h"
 
+#if 0
+#include "llvelopack.h"
+#include <shellapi.h>
+#endif
+
 #if LL_WINDOWS
 #   include <process.h>     // _spawnl()
 #else
@@ -89,6 +94,7 @@
 #include "message.h"
 #include "v3math.h"
 
+#include "alfloaterdirectory.h"
 #include "alstreaminfo.h"
 #include "llagent.h"
 #include "llagentbenefits.h"
@@ -127,6 +133,7 @@
 #include "llpanellogin.h"
 #include "llmutelist.h"
 #include "llavatarpropertiesprocessor.h"
+#include "llpaneldirbrowser.h"
 #include "llpanelgrouplandmoney.h"
 #include "llpanelgroupnotices.h"
 #include "llparcel.h"
@@ -181,7 +188,6 @@
 #include "pipeline.h"
 #include "llappviewer.h"
 #include "llfasttimerview.h"
-#include "llfloaterdirectory.h"
 #include "llfloatermap.h"
 #include "llweb.h"
 #include "llvoiceclient.h"
@@ -196,6 +202,7 @@
 #include "llvoicechannel.h"
 #include "llpathfindingmanager.h"
 #include "llremoteparcelrequest.h"
+#include "llfloatersidepanelcontainer.h"
 // [RLVa:KB] - Checked: RLVa-1.2.0
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -214,7 +221,6 @@
 #include "threadpool.h"
 #include "llperfstats.h"
 
-#include "llfloatersidepanelcontainer.h"
 
 #if LL_WINDOWS
 #include "lldxhardware.h"
@@ -274,6 +280,7 @@ std::unique_ptr<LLViewerStats::PhaseMap> LLStartUp::sPhases(new LLViewerStats::P
 
 void login_show();
 void login_callback(S32 option, void* userdata);
+void uninstall_nsis_if_required();
 void show_release_notes_if_required();
 void show_first_run_dialog();
 bool first_run_dialog_callback(const LLSD& notification, const LLSD& response);
@@ -350,6 +357,8 @@ void do_startup_frame()
 
 void pump_idle_startup_network(void)
 {
+    // while there are message to process:
+    //     process one then call display_startup()
     {
         LockMessageChecker lmc(gMessageSystem);
         while (lmc.checkAllMessages(gFrameCount, gServicePump))
@@ -358,6 +367,7 @@ void pump_idle_startup_network(void)
         }
         lmc.processAcks();
     }
+    // finally call one last display_startup()
     display_startup();
 }
 
@@ -445,7 +455,52 @@ bool idle_startup()
     system = osString.substr (begIdx, endIdx - begIdx);
     system += "Locale";
 
-    LLStringUtil::setLocale (LLTrans::getString(system));
+    std::string locale = LLTrans::getString(system);
+    if (locale != LLStringUtil::getLocale()) // is there a reason to do this on repeat?
+    {
+        LLStringUtil::setLocale(locale);
+
+        // Not all locales have AMPM, test it
+        if (LLStringOps::sAM.empty()) // Might already be overriden from LLAppViewer::init()
+        {
+            LLDate datetime(0.0);
+            std::string val = datetime.toHTTPDateString("%p");
+            if (val.empty())
+            {
+                LL_DEBUGS("InitInfo") << "Current locale \"" << locale << "\" "
+                    << "doesn't support AM/PM time format" << LL_ENDL;
+                // fallback to declarations in strings.xml
+                LLStringOps::sAM = LLTrans::getString("dateTimeAM");
+                LLStringOps::sPM = LLTrans::getString("dateTimePM");
+            }
+            else
+            {
+                std::wstring utf16str = ll_convert<std::wstring>(val);
+                if (utf16str.size() > 4)
+                {
+                    LL_DEBUGS("InitInfo") << "Current locale \"" << locale << "\" "
+                        << "has impracitcally long AM/PM time format" << LL_ENDL;
+                    // fallback to declarations in strings.xml
+                    LLStringOps::sAM = LLTrans::getString("dateTimeAM");
+                    LLStringOps::sPM = LLTrans::getString("dateTimePM");
+                }
+            }
+        }
+
+        // Some locales (as well some of our own dateTimeAM/PM) return long
+        // strings for AM/PM which aren't practical to display in the UI.
+        // Hardcode to "AM"/"PM" in those cases.
+        std::wstring utf16str = ll_convert<std::wstring>(LLStringOps::sAM);
+        if (utf16str.size() > 4)
+        {
+            LLStringOps::sAM = "AM";
+        }
+        utf16str = ll_convert<std::wstring>(LLStringOps::sPM);
+        if (utf16str.size() > 4)
+        {
+            LLStringOps::sPM = "PM";
+        }
+    }
 
     //note: Removing this line will cause incorrect button size in the login screen. -- bao.
     gTextureList.updateImages(0.01f) ;
@@ -548,7 +603,7 @@ bool idle_startup()
         std::string message_template_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"message_template.msg");
 
         LLFILE* found_template = NULL;
-        found_template = LLFile::fopen(message_template_path, "r");     /* Flawfinder: ignore */
+        found_template = LLFile::fopen(message_template_path, LLFILE_MODE("r"));     /* Flawfinder: ignore */
 
         #if LL_WINDOWS
             // On the windows dev builds, unpackaged, the message_template.msg
@@ -557,7 +612,7 @@ bool idle_startup()
             if (!found_template)
             {
                 message_template_path = gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "app_settings", "message_template.msg");
-                found_template = LLFile::fopen(message_template_path.c_str(), "r");     /* Flawfinder: ignore */
+                found_template = LLFile::fopen(message_template_path.c_str(), LLFILE_MODE("r"));     /* Flawfinder: ignore */
             }
         #elif LL_DARWIN
             // On Mac dev builds, message_template.msg lives in:
@@ -567,7 +622,7 @@ bool idle_startup()
                 message_template_path =
                     gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,
                                                    "message_template.msg");
-                found_template = LLFile::fopen(message_template_path.c_str(), "r");     /* Flawfinder: ignore */
+                found_template = LLFile::fopen(message_template_path.c_str(), LLFILE_MODE("r"));     /* Flawfinder: ignore */
             }
         #endif
 
@@ -912,6 +967,7 @@ bool idle_startup()
         LL_DEBUGS("AppInit") << "PeekMessage processed" << LL_ENDL;
 #endif
         do_startup_frame();
+        uninstall_nsis_if_required();
         timeout.reset();
         return false;
     }
@@ -1004,8 +1060,8 @@ bool idle_startup()
         {
             // check existance since this part of code can be reached
             // twice due to login failures
-            LLPersistentNotificationStorage::initParamSingleton();
-            LLDoNotDisturbNotificationStorage::initParamSingleton();
+            LLPersistentNotificationStorage::createInstance();
+            LLDoNotDisturbNotificationStorage::createInstance();
         }
         else
         {
@@ -1619,11 +1675,9 @@ bool idle_startup()
         }
 
         gAgent.addRegionChangedCallback(boost::bind(&LLPerfStats::StatsRecorder::clearStats));
+
         // Create people views early enough to register with avatar tracker
         LLFloaterSidePanelContainer::getPanel("people", "panel_people");
-
-        // Create search early enough to not cause stutter
-        LLFloaterReg::getInstance("search");
 
         // *Note: this is where gWorldMap used to be initialized.
 
@@ -2051,6 +2105,15 @@ bool idle_startup()
             return false;
         }
 
+        // set up callbacks
+        LL_INFOS() << "Registering Callbacks" << LL_ENDL;
+        LLMessageSystem* msg = gMessageSystem;
+        LL_INFOS() << " Inventory" << LL_ENDL;
+        LLInventoryModel::registerCallbacks(msg);
+        LL_INFOS() << " Landmark" << LL_ENDL;
+        LLLandmark::registerCallbacks(msg);
+        do_startup_frame();
+
         LLInventoryModelBackgroundFetch::instance().start();
         LLAppearanceMgr::instance().initCOFID();
         LLUUID cof_id = LLAppearanceMgr::instance().getCOF();
@@ -2072,15 +2135,6 @@ bool idle_startup()
         gInventory.addChangedMask(LLInventoryObserver::ALL, LLUUID::null);
         gInventory.notifyObservers();
 
-        do_startup_frame();
-
-        // set up callbacks
-        LL_INFOS() << "Registering Callbacks" << LL_ENDL;
-        LLMessageSystem* msg = gMessageSystem;
-        LL_INFOS() << " Inventory" << LL_ENDL;
-        LLInventoryModel::registerCallbacks(msg);
-        LL_INFOS() << " Landmark" << LL_ENDL;
-        LLLandmark::registerCallbacks(msg);
         do_startup_frame();
 
         // request all group information
@@ -2601,9 +2655,9 @@ void release_notes_coro(const std::string url)
 
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("releaseNotesCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("releaseNotesCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     httpOpts->setHeadersOnly(true); // only making sure it isn't 404 or something like that
 
@@ -2618,6 +2672,67 @@ void release_notes_coro(const std::string url)
     }
 
     LLWeb::loadURLInternal(url);
+}
+
+/**
+* Check if this is a fresh velopack install and
+* if uninstallation of old viewer is needed.
+*/
+void uninstall_nsis_if_required()
+{
+#if 0
+    bool checked_for_legacy_install = gSavedSettings.getBOOL("PreviousInstallChecked");
+    if (checked_for_legacy_install)
+    {
+        return;
+    }
+    gSavedSettings.setBOOL("PreviousInstallChecked", true);
+
+    LL_INFOS() << "Looking for previous NSIS installs" << LL_ENDL;
+
+    S32 found_major = 0;
+    S32 found_minor = 0;
+    S32 found_patch = 0;
+    U64 found_build = 0;
+
+    if (!get_nsis_version(found_major, found_minor, found_patch, found_build))
+    {
+        return;
+    }
+
+    LLVersionInfo* ver_inst = LLVersionInfo::getInstance();
+
+    if (found_major > ver_inst->getMajor())
+    {
+        LL_INFOS() << "Found installed nsis version that is newer" << found_major << "." << found_minor << "." << found_patch << "." << found_build << LL_ENDL;
+        return;
+    }
+
+    if (found_major == ver_inst->getMajor()
+        && found_minor > ver_inst->getMinor())
+    {
+        LL_INFOS() << "Found installed nsis version that is newer" << found_major << "." << found_minor << "." << found_patch << "." << found_build << LL_ENDL;
+        return;
+    }
+
+    if (found_major == ver_inst->getMajor()
+        && found_minor == ver_inst->getMinor()
+        && found_patch > ver_inst->getPatch())
+    {
+        LL_INFOS() << "Found installed nsis version that is newer" << found_major << "." << found_minor << "." << found_patch << "." << found_build << LL_ENDL;
+        return;
+    }
+
+    // Assume that nsis is going to be something like x.x.x, while velopack is x.x.(x+1),
+    // so there is no point to check build.
+    LL_INFOS() << "Found NSIS install " << found_major << "." << found_minor << "." << found_patch << "." << found_build << LL_ENDL;
+
+    clear_nsis_links();
+
+    LLSD args;
+    args["VERSION"] = llformat("%d.%d.%d", found_major, found_minor, found_patch);
+    LLNotificationsUtil::add("FoundLegacyNsisInstallation", args);
+#endif
 }
 
 void validate_release_notes_coro(const std::string url)
@@ -2653,15 +2768,24 @@ void show_release_notes_if_required()
     // below. If viewer release notes stop working, might be because that
     // LLEventMailDrop got moved out of LLVersionInfo and hasn't yet been
     // instantiated.
-    if (!release_notes_shown && (LLVersionInfo::instance().getChannelAndVersion() != gLastRunVersion)
-        && LLVersionInfo::instance().getViewerMaturity() != LLVersionInfo::TEST_VIEWER // don't show Release Notes for the test builds
-        && gSavedSettings.getBOOL("UpdaterShowReleaseNotes")
-        && !gSavedSettings.getBOOL("FirstLoginThisInstall"))
+    if (release_notes_shown
+        || LLVersionInfo::instance().getChannelAndVersion() == gLastRunVersion
+        || gSavedSettings.getBOOL("FirstLoginThisInstall")) // New users don't need to see release notes
+    {
+        return;
+    }
+    S32 mode = gSavedSettings.getS32("UpdaterShowReleaseNotes");
+    if (mode == 0)
+    {
+        return;
+    }
+    if (mode == 2 // Show even for test builds
+        || LLVersionInfo::instance().getViewerMaturity() != LLVersionInfo::TEST_VIEWER) // don't show Release Notes for the test builds
+
     {
 
 #if LL_RELEASE_FOR_DOWNLOAD
-        if (!gSavedSettings.getBOOL("CmdLineSkipUpdater")
-            && !LLAppViewer::instance()->isUpdaterMissing())
+        if (!gSavedSettings.getBOOL("CmdLineSkipUpdater"))
         {
             // Instantiate a "relnotes" listener which assumes any arriving event
             // is the release notes URL string. Since "relnotes" is an
@@ -2877,15 +3001,26 @@ void register_viewer_callbacks(LLMessageSystem* msg)
     msg->setHandlerFuncFast(_PREHASH_PlacesReply,                   process_places_reply);
     msg->setHandlerFuncFast(_PREHASH_GroupNoticesListReply,         LLPanelGroupNotices::processGroupNoticesListReply);
 
-    // directory search
-    msg->setHandlerFunc("DirPeopleReply", LLFloaterDirectory::processSearchPeopleReply);
-    msg->setHandlerFunc("DirGroupsReply", LLFloaterDirectory::processSearchGroupsReply);
-    msg->setHandlerFunc("DirPlacesReply", LLFloaterDirectory::processSearchPlacesReply);
-    msg->setHandlerFunc("DirEventsReply", LLFloaterDirectory::processSearchEventsReply);
-    msg->setHandlerFunc("DirLandReply",   LLFloaterDirectory::processSearchLandReply);
-    msg->setHandlerFunc("DirClassifiedReply",  LLFloaterDirectory::processSearchClassifiedsReply);
-
     msg->setHandlerFuncFast(_PREHASH_AvatarPickerReply,             LLFloaterAvatarPicker::processAvatarPickerReply);
+
+    if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
+    {
+        msg->setHandlerFuncFast(_PREHASH_DirPlacesReply,            ALFloaterDirectory::processSearchPlacesReply);
+        msg->setHandlerFuncFast(_PREHASH_DirPeopleReply,            ALFloaterDirectory::processSearchPeopleReply);
+        msg->setHandlerFuncFast(_PREHASH_DirEventsReply,            ALFloaterDirectory::processSearchEventsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirGroupsReply,            ALFloaterDirectory::processSearchGroupsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirClassifiedReply,        ALFloaterDirectory::processSearchClassifiedsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirLandReply,              ALFloaterDirectory::processSearchLandReply);
+    }
+    else
+    {
+        msg->setHandlerFuncFast(_PREHASH_DirPlacesReply,            LLPanelDirBrowser::processDirPlacesReply);
+        msg->setHandlerFuncFast(_PREHASH_DirPeopleReply,            LLPanelDirBrowser::processDirPeopleReply);
+        msg->setHandlerFuncFast(_PREHASH_DirEventsReply,            LLPanelDirBrowser::processDirEventsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirGroupsReply,            LLPanelDirBrowser::processDirGroupsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirClassifiedReply,        LLPanelDirBrowser::processDirClassifiedReply);
+        msg->setHandlerFuncFast(_PREHASH_DirLandReply,              LLPanelDirBrowser::processDirLandReply);
+    }
 
     msg->setHandlerFuncFast(_PREHASH_MapBlockReply,                 LLWorldMapMessage::processMapBlockReply);
     msg->setHandlerFuncFast(_PREHASH_MapItemReply,                  LLWorldMapMessage::processMapItemReply);
@@ -3146,17 +3281,25 @@ void reset_login()
     if ( gViewerWindow )
     {   // Hide menus and normal buttons
         gViewerWindow->setNormalControlsVisible( false );
-        gLoginMenuBarView->setVisible( true );
-        gLoginMenuBarView->setEnabled( true );
+
+        if (gLoginMenuBarView)
+        {
+            gLoginMenuBarView->setVisible(true);
+            gLoginMenuBarView->setEnabled(true);
+        }
+        else
+        {
+            LL_WARNS("AppInit") << "gLoginMenuBarView not initialized" << LL_ENDL;
+        }
     }
 
     // Hide any other stuff
     LLFloaterReg::hideVisibleInstances();
 
-    if (LLStartUp::getStartupState() > STATE_WORLD_INIT)
-    {
-        gViewerWindow->resetStatusBarContainer();
-    }
+    //if (LLStartUp::getStartupState() > STATE_WORLD_INIT && gViewerWindow)
+    //{
+    //    gViewerWindow->resetStatusBarContainer();
+    //}
     LLStartUp::setStartupState( STATE_BROWSER_INIT );
 
     if (LLVoiceClient::instanceExists())

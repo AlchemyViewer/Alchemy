@@ -36,6 +36,7 @@
 #include "lluictrlfactory.h"
 
 // Viewer includes
+#include "alfloatergroupprofile.h"
 #include "llviewermessage.h"
 #include "llviewerwindow.h"
 #include "llappviewer.h"
@@ -43,7 +44,6 @@
 #include "llfloaterreg.h"
 #include "llfloater.h"
 #include "llgroupactions.h"
-#include "llfloatergroupprofile.h"
 #include "llslurl.h"
 
 #include "llagent.h"
@@ -201,6 +201,13 @@ bool LLPanelGroup::postBuild()
         mButtonJoin->setCommitCallback(boost::bind(&LLPanelGroup::onBtnJoin,this));
 
         mJoinText = panel_general->getChild<LLUICtrl>("join_cost_text");
+
+        mButtonActivate = panel_general->getChild<LLButton>("btn_activate");
+        mButtonActivate->setVisible(false);
+        mButtonActivate->setEnabled(gAgent.getGroupID() != mID);
+        mButtonActivate->setCommitCallback(boost::bind(&LLPanelGroup::onBtnActivate, this));
+
+        gAgent.addListener(this, "new group");
     }
 
     LLVoiceClient::addObserver(this);
@@ -234,7 +241,7 @@ void LLPanelGroup::reshape(S32 width, S32 height, bool called_from_parent )
 
 void LLPanelGroup::onBackBtnClick()
 {
-    LLFloaterGroupProfile* parent = dynamic_cast<LLFloaterGroupProfile*>(getParent());
+    ALFloaterGroupProfile* parent = dynamic_cast<ALFloaterGroupProfile*>(getParent());
     if (parent)
     {
         parent->closeHostedFloater();
@@ -247,6 +254,12 @@ void LLPanelGroup::onBackBtnClick()
             parent->openPreviousPanel();
         }
     }
+}
+
+void LLPanelGroup::hideBackBtn()
+{
+    childSetVisible("back", false);
+    setBackgroundVisible(false);
 }
 
 void LLPanelGroup::onBtnRefresh(void* user_data)
@@ -279,12 +292,19 @@ void LLPanelGroup::onBtnJoin()
     if (LLGroupActions::isInGroup(mID))
     {
         LLGroupActions::leave(mID);
+        mButtonActivate->setVisible(false);
     }
     else
     {
         LL_DEBUGS() << "joining group: " << mID << LL_ENDL;
         LLGroupActions::join(mID);
     }
+}
+
+void LLPanelGroup::onBtnActivate()
+{
+    LLGroupActions::activate(mID);
+    mButtonActivate->setEnabled(false);
 }
 
 void LLPanelGroup::changed(LLGroupChange gc)
@@ -315,9 +335,8 @@ void LLPanelGroup::update(LLGroupChange gc)
     LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mID);
     if(gdatap)
     {
-
         {
-            LLFloaterGroupProfile* parent = dynamic_cast<LLFloaterGroupProfile*>(getParent());
+            ALFloaterGroupProfile* parent = dynamic_cast<ALFloaterGroupProfile*>(getParent());
             if (parent)
             {
                 parent->setGroupName(gdatap->mName);
@@ -336,6 +355,8 @@ void LLPanelGroup::update(LLGroupChange gc)
         bool join_btn_visible = is_member || gdatap->mOpenEnrollment;
 
         mButtonJoin->setVisible(join_btn_visible);
+        mButtonActivate->setEnabled(gAgent.getGroupID() != mID);
+        mButtonActivate->setVisible(is_member);
         mJoinText->setVisible(join_btn_visible);
 
         if (is_member)
@@ -410,6 +431,8 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
 
     if(mButtonJoin)
         mButtonJoin->setVisible(false);
+    if (mButtonActivate)
+        mButtonActivate->setVisible(false);
 
 
     if(is_null_group_id)//creating new group
@@ -621,7 +644,7 @@ void LLPanelGroup::showNotice(const std::string& subject,
                        LLOfferInfo* inventory_offer)
 {
     LLPanelGroup* panel(NULL);
-    if (auto* floater = LLFloaterReg::findTypedInstance<LLFloaterGroupProfile>("group_profile", LLSD(group_id)))
+    if (auto* floater = LLFloaterReg::findTypedInstance<ALFloaterGroupProfile>("group_profile", LLSD(group_id)))
     {
         panel = floater->getGroupPanel();
     }
@@ -637,6 +660,23 @@ void LLPanelGroup::showNotice(const std::string& subject,
         return;
     panel->showNotice(subject,message,has_inventory,inventory_name,inventory_offer);
 
+}
+
+bool LLPanelGroup::handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& userdata)
+{
+    if (event->desc() == "new group")
+    {
+        mButtonActivate->setEnabled(gAgent.getGroupID() != mID);
+        return true;
+    }
+
+    if (event->desc() == "value_changed")
+    {
+        mButtonActivate->setEnabled(gAgent.getGroupID() != mID);
+        return true;
+    }
+
+    return false;
 }
 
 void LLPanelGroup::onCommitMenu(const LLSD& userdata)
@@ -662,3 +702,4 @@ void LLPanelGroup::onCommitMenu(const LLSD& userdata)
         }
     }
 }
+

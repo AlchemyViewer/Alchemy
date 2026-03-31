@@ -48,7 +48,7 @@ class LLDate;
  *
  *TODO: purge least recently added items?
  */
-class LLRecentPeople: public LLSingleton<LLRecentPeople>, public LLOldEvents::LLSimpleListener
+class LLRecentPeople final : public LLSingleton<LLRecentPeople>, public LLOldEvents::LLSimpleListener
 {
     LLSINGLETON(LLRecentPeople);
     ~LLRecentPeople();
@@ -67,7 +67,7 @@ public:
      *
      * @return false if the avatar is in the list already, true otherwise
      */
-    bool add(const LLUUID& id, LLSD& userdata = LLSD().with("date", LLDate::now()));
+    bool add(const LLUUID& id, LLSD userdata = LLSD().with("date", LLDate::now()));
 
     /**
      * @param id avatar to search.

@@ -589,7 +589,7 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
         }
         else
         {
-            LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << mID << LL_ENDL;
+            LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << " " << mID << LL_ENDL;
         }
         delete anim_file;
         anim_file = NULL;
@@ -1229,7 +1229,7 @@ void LLKeyframeMotion::applyConstraint(JointConstraint* constraint, F32 time, U8
 bool LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, bool allow_invalid_joints)
 {
     bool old_version = false;
-    std::unique_ptr<LLKeyframeMotion::JointMotionList> joint_motion_list(new LLKeyframeMotion::JointMotionList);
+    std::unique_ptr<LLKeyframeMotion::JointMotionList> joint_motion_list = std::make_unique<LLKeyframeMotion::JointMotionList>();
 
     //-------------------------------------------------------------------------
     // get base priority
@@ -1826,7 +1826,7 @@ bool LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
         for(S32 i = 0; i < num_constraints; ++i)
         {
             // read in constraint data
-            std::unique_ptr<JointConstraintSharedData> constraintp(new JointConstraintSharedData);
+            std::unique_ptr<JointConstraintSharedData> constraintp = std::make_unique<JointConstraintSharedData>();
             U8 byte = 0;
 
             if (!dp.unpackU8(byte, "chain_length"))
@@ -2238,11 +2238,12 @@ bool LLKeyframeMotion::dumpToFile(const std::string& name)
         LLDataPackerBinaryBuffer dp(buffer, file_size);
         if (serialize(dp))
         {
-            LLAPRFile outfile;
-            outfile.open(outfilename, LL_APR_WPB);
-            if (outfile.getFileHandle())
+            std::error_code ec;
+            LLFile outfile;
+            outfile.open(outfilename, LLFile::in|LLFile::out|LLFile::trunc|LLFile::binary, ec);
+            if (outfile && !ec)
             {
-                S32 wrote_bytes = outfile.write(buffer, file_size);
+                S32 wrote_bytes = narrow(outfile.write(buffer, file_size, ec));
                 succ = (wrote_bytes == file_size);
             }
         }

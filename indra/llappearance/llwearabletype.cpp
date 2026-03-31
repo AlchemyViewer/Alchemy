@@ -70,10 +70,6 @@ LLWearableType::~LLWearableType()
 {
 }
 
-void LLWearableType::initSingleton()
-{
-}
-
 LLWearableType::EType LLWearableType::typeNameToType(const std::string& type_name)
 {
     const LLWearableType::EType wearable = mDictionary.lookup(type_name);

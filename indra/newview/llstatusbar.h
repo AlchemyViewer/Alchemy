@@ -41,6 +41,8 @@ class LLUICtrl;
 class LLUUID;
 class LLFrameTimer;
 class LLStatGraph;
+class ALPanelAOPulldown;
+class ALPanelQuickSettingsPulldown;
 class LLPanelPresetsCameraPulldown;
 class LLPanelPresetsPulldown;
 class LLPanelVolumePulldown;
@@ -108,9 +110,12 @@ private:
 
     void onMouseEnterPresetsCamera();
     void onMouseEnterPresets();
+    void onMouseEnterQuickSettings();
+    void onMouseEnterAO();
     void onMouseEnterVolume();
     void onMouseEnterNearbyMedia();
 
+    static void onClickAOBtn(void* data);
     static void onClickMediaToggle(void* data);
     static void onClickRefreshBalance(void* data);
     void onClickToggleBalance();
@@ -125,18 +130,26 @@ private:
     void updateMenuSearchPosition(); // depends onto balance position
     void updateBalancePanelPosition();
 
+    void updateClock();
+    void onClickToggleClockStyle();
+
+    void onAOStateChanged();
+
 private:
     LLTextBox   *mTextTime;
+    LLTextBox   *mTextFPS;
 
-    LLStatGraph *mSGBandwidth;
-    LLStatGraph *mSGPacketLoss;
-
-    LLIconCtrl  *mIconPresetsCamera;
-    LLIconCtrl  *mIconPresetsGraphic;
+    LLView      *mPanelPopupHolder;
+    LLButton    *mIconPresetsCamera;
+    LLButton    *mIconPresetsGraphic;
+    LLButton    *mBtnQuickSettings;
+    LLButton    *mBtnAO;
     LLButton    *mBtnVolume;
     LLTextBox   *mBoxBalance;
     LLButton    *mMediaToggle;
+    LLView      *mBalanceBG;
     LLFrameTimer    mClockUpdateTimer;
+    LLFrameTimer    mFPSUpdateTimer;
 
     S32             mBalance;
     bool            mBalanceClicked;
@@ -147,6 +160,8 @@ private:
     S32             mSquareMetersCommitted;
     LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown;
     LLPanelPresetsPulldown* mPanelPresetsPulldown;
+    ALPanelAOPulldown* mPanelAOPulldown;
+    ALPanelQuickSettingsPulldown* mPanelQuickSettingsPulldown;
     LLPanelVolumePulldown* mPanelVolumePulldown;
     LLPanelNearByMedia* mPanelNearByMedia;
 };

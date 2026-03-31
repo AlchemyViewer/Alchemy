@@ -1,6 +1,6 @@
 /**
  * @file llsdl.cpp
- * @brief SDL2 initialization
+ * @brief SDL initialization
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -37,6 +37,8 @@
 #include "llerror.h"
 #include "llwindow.h"
 
+bool gSDLMainHandled = false;
+
 void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const char *message)
 {
     switch (priority)
@@ -63,18 +65,13 @@ void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const ch
 void init_sdl(const std::string& app_name)
 {
 #ifndef LL_SDL_APP
-    SDL_SetMainReady();
+    if (!gSDLMainHandled)
+    {
+        SDL_SetMainReady();
+    }
+#endif
 
     SDL_SetLogOutputFunction(&sdl_logger, nullptr);
-#endif
-
-#if LL_WINDOWS && defined(LL_SDL_WINDOW)
-    Uint32 style = 0;
-#if defined(CS_BYTEALIGNCLIENT) && defined(CS_OWNDC)
-    style = (CS_BYTEALIGNCLIENT | CS_OWNDC);
-#endif
-    SDL_RegisterApp(app_name.c_str(), style, nullptr);
-#endif
 
     const int c_sdl_version = SDL_VERSION;
     LL_INFOS() << "Compiled against SDL "
@@ -87,12 +84,23 @@ void init_sdl(const std::string& app_name)
                << SDL_VERSIONNUM_MINOR(r_sdl_version) << "."
                << SDL_VERSIONNUM_MICRO(r_sdl_version) << LL_ENDL;
 
+#if LL_WINDOWS && defined(LL_SDL_WINDOW)
+    Uint32 style = 0;
+#if defined(CS_BYTEALIGNCLIENT) && defined(CS_OWNDC)
+    style = (CS_BYTEALIGNCLIENT | CS_OWNDC);
+#endif
+    SDL_RegisterApp(app_name.c_str(), style, nullptr);
+#endif
+
 #if LL_SDL_WINDOW
     // For linux we SDL_INIT_VIDEO and _AUDIO
     std::initializer_list<std::tuple< char const*, char const * > > hintList =
             {
                     {SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR,"0"},
                     {SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH,"1"},
+                    {SDL_HINT_MOUSE_EMULATE_WARP_WITH_RELATIVE,"0"},
+                    {SDL_HINT_MOUSE_RELATIVE_WARP_MOTION,"1"},
+                    {SDL_HINT_KEYCODE_OPTIONS,"french_numbers,latin_letters"}
             };
 
     for (auto hint: hintList)
@@ -103,6 +111,8 @@ void init_sdl(const std::string& app_name)
     std::initializer_list<std::tuple<uint32_t, char const*, bool>> initList=
             {
                 {SDL_INIT_VIDEO,"SDL_INIT_VIDEO", true},
+                {SDL_INIT_JOYSTICK,"SDL_INIT_JOYSTICK", true},
+                {SDL_INIT_GAMEPAD,"SDL_INIT_GAMEPAD", true},
             };
 #else
     // For non-linux platforms we still SDL_INIT_VIDEO because it is a pre-requisite

@@ -73,7 +73,7 @@ public:
 // as simulators are connected to, viewer_regions are popped off the stack and connected as required
 // as simulators are removed, they are pushed back onto the stack
 
-class LLWorld final : public LLSimpleton<LLWorld>
+class LLWorld : public LLSimpleton<LLWorld>
 {
 public:
     LLWorld();

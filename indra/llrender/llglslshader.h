@@ -31,7 +31,7 @@
 #include "llrender.h"
 #include "llstaticstringtable.h"
 #include <boost/json.hpp>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 class LLShaderFeatures
 {
@@ -60,6 +60,7 @@ public:
     bool hasHeroProbes = false;
     bool isPBRTerrain = false;
     bool hasTonemap = false;
+    bool hasColorGrade = false;
 };
 
 // ============= Structure for caching shader uniforms ===============
@@ -160,6 +161,7 @@ public:
 
     static std::set<LLGLSLShader*> sInstances;
     static bool sProfileEnabled;
+    static bool sCanProfile;
 
     LLGLSLShader();
     ~LLGLSLShader();
@@ -288,7 +290,7 @@ public:
     U32 mLightHash;
 
     GLuint mProgramObject;
-#if LL_RELEASE_WITH_DEBUG_INFO
+#if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO
     struct attr_name
     {
         GLint loc;
@@ -303,7 +305,7 @@ public:
     U32 mAttributeMask;  //mask of which reserved attributes are set (lines up with LLVertexBuffer::getTypeMask())
     std::vector<GLint> mUniform;   //lookup table of uniform enum to uniform location
     LLStaticStringTable<GLint> mUniformMap; //lookup map of uniform name to uniform location
-    typedef boost::unordered_flat_map<GLint, LLVector4> uniform_value_map_t;
+    typedef boost::unordered_map<GLint, LLVector4>  uniform_value_map_t;
     uniform_value_map_t mValue; //lookup map of uniform location to last known value
     std::vector<GLint> mTexture;
     S32 mTotalUniformSize;

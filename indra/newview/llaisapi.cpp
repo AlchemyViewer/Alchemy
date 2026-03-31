@@ -861,8 +861,8 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
         return;
     }
 
-    LLCore::HttpOptions::ptr_t httpOptions(new LLCore::HttpOptions);
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest());
+    LLCore::HttpOptions::ptr_t httpOptions = std::make_shared<LLCore::HttpOptions>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpHeaders::ptr_t httpHeaders;
 
     httpOptions->setTimeout(HTTP_TIMEOUT);
@@ -950,7 +950,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
     LL_DEBUGS("Inventory", "AIS3") << "Result: " << result << LL_ENDL;
     onUpdateReceived(result, type, body);
 
-    if (callback && !callback.empty())
+    if (callback != nullptr)
     {
         bool needs_callback = true;
         LLUUID id(LLUUID::null);
@@ -979,7 +979,9 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 id = result["linked_id"];
             }
             break;
+// RLVa
         case COPYINVENTORY:
+// RLVa
         case CREATEINVENTORY:
             // CREATEINVENTORY can have multiple callbacks
             if (result.has("_created_categories"))
@@ -1005,6 +1007,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 }
             }
             break;
+// RLVa
         case UPDATECATEGORY:
             if (result.has("_updated_categories"))
             {
@@ -1022,6 +1025,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 id = result["category_id"];
             }
             break;
+// RLVa
         default:
             break;
         }
@@ -1037,6 +1041,9 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
 }
 
 //-------------------------------------------------------------------------
+U32 AISUpdate::sBatchFrameCount = 0;
+LLTimer AISUpdate::sBatchTimer;
+
 AISUpdate::AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& request_body)
 : mType(type)
 {
@@ -1054,8 +1061,16 @@ AISUpdate::AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& 
         mFetchDepth = request_body["depth"].asInteger();
     }
 
-    mTimer.setTimerExpirySec(AIS_EXPIRY_SECONDS);
-    mTimer.start();
+    mTaskTimer.setTimerExpirySec(AIS_TASK_EXPIRY_SECONDS);
+    mTaskTimer.start();
+
+    U32 current_frame = LLFrameTimer::getFrameCount();
+    if (sBatchFrameCount != current_frame)
+    {
+        sBatchTimer.setTimerExpirySec(AIS_BATCH_EXPIRY_SECONDS);
+        sBatchTimer.start();
+        sBatchFrameCount = current_frame;
+    }
     parseUpdate(update);
 }
 
@@ -1076,11 +1091,25 @@ void AISUpdate::clearParseResults()
 
 void AISUpdate::checkTimeout()
 {
-    if (mTimer.hasExpired())
+    if (mTaskTimer.hasExpired() || sBatchTimer.hasExpired())
     {
-        llcoro::suspend();
+        // If we are taking too long, don't starve other tasks,
+        // yield to mainloop.
+        // If we use normal suspend(), there will be a chance of
+        // waking up from other suspends, before main coro had
+        // a chance, so wait for a frame tick instead.
+        llcoro::suspendUntilNextFrame();
         LLCoros::checkStop();
-        mTimer.setTimerExpirySec(AIS_EXPIRY_SECONDS);
+        mTaskTimer.setTimerExpirySec(AIS_TASK_EXPIRY_SECONDS);
+
+        U32 current_frame = LLFrameTimer::getFrameCount();
+        if (sBatchFrameCount != current_frame)
+        {
+            // To give other tasks a chance batch timer
+            // has a longer delay.
+            sBatchTimer.setTimerExpirySec(AIS_BATCH_EXPIRY_SECONDS);
+            sBatchFrameCount = current_frame;
+        }
     }
 }
 

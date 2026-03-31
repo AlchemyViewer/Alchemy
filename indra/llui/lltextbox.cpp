@@ -43,7 +43,7 @@ template class LLTextBox* LLView::getChild<class LLTextBox>(
 
 LLTextBox::LLTextBox(const LLTextBox::Params& p)
 :   LLTextBase(p),
-    mClickedCallback(NULL),
+    mClickedCallback(nullptr),
     mShowCursorHand(true)
 {
     mSkipTripleClick = true;
@@ -135,14 +135,14 @@ void LLTextBox::setText(const LLStringExplicit& text , const LLStyle::Params& in
     LLTextBase::setText(mText.getString(), input_params );
 }
 
-void LLTextBox::setClickedCallback( boost::function<void (void*)> cb, void* userdata /*= NULL */ )
+void LLTextBox::setClickedCallback(std::function<void (void*)> cb, void* userdata /*= nullptr */)
 {
     mClickedCallback = boost::bind(cb, userdata);
 }
 
 void LLTextBox::clearClickedCallback()
 {
-    mClickedCallback.clear();
+    mClickedCallback = nullptr;
 }
 
 S32 LLTextBox::getTextPixelWidth()

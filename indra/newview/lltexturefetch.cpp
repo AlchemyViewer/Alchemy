@@ -743,10 +743,10 @@ public:
         : LLTextureFetch::TFRequest(),
           mRegionHandle(region_handle)
         {}
-    TFReqSetRegion & operator=(const TFReqSetRegion &); // Not defined
+    TFReqSetRegion(const TFReqSetRegion&) = delete;
+    TFReqSetRegion& operator=(const TFReqSetRegion&) = delete;
 
-    virtual ~TFReqSetRegion()
-        {}
+    virtual ~TFReqSetRegion() = default;
 
     virtual bool doWork(LLTextureFetch * fetcher);
 
@@ -793,7 +793,9 @@ public:
         const LLUUID & session_id,
         const LLUUID & agent_id,
         LLSD& stats_sd);
-    TFReqSendMetrics & operator=(const TFReqSendMetrics &); // Not defined
+
+    TFReqSendMetrics(const TFReqSendMetrics&) = delete;
+    TFReqSendMetrics& operator=(const TFReqSendMetrics&) = delete;
 
     virtual ~TFReqSendMetrics();
 
@@ -1295,10 +1297,19 @@ bool LLTextureFetchWorker::doWork(S32 param)
                 else
                 {
                     mCanUseCapability = false;
-                    mRegionRetryAttempt++;
-                    mRegionRetryTimer.setTimerExpirySec(CAP_MISSING_EXPIRATION_DELAY);
-                    // ex: waiting for caps
-                    LL_INFOS_ONCE(LOG_TXT) << "Texture not available via HTTP: empty URL." << LL_ENDL;
+                    if (gDisconnected)
+                    {
+                        // We lost connection or are shutting down.
+                        mCanUseHTTP = false;
+                        return true; // abort
+                    }
+                    else
+                    {
+                        // Ex: waiting for caps
+                        mRegionRetryAttempt++;
+                        mRegionRetryTimer.setTimerExpirySec(CAP_MISSING_EXPIRATION_DELAY);
+                        LL_INFOS_ONCE(LOG_TXT) << "Texture not available via HTTP: empty URL." << LL_ENDL;
+                    }
                 }
             }
             else
@@ -1694,10 +1705,10 @@ bool LLTextureFetchWorker::doWork(S32 param)
             mHttpReplyOffset = 0;
 
             mLoadedDiscard = mRequestedDiscard;
-            if (mLoadedDiscard < 0)
+            if (mLoadedDiscard < 0 || (mLoadedDiscard > MAX_DISCARD_LEVEL && mFormattedImage->getCodec() == IMG_CODEC_J2C))
             {
                 LL_WARNS(LOG_TXT) << mID << " mLoadedDiscard is " << mLoadedDiscard
-                                  << ", should be >=0" << LL_ENDL;
+                                  << ", should be >=0 and <=" << MAX_DISCARD_LEVEL << LL_ENDL;
             }
             setState(DECODE_IMAGE);
             if (mWriteToCacheState != NOT_WRITE)
@@ -1759,14 +1770,27 @@ bool LLTextureFetchWorker::doWork(S32 param)
             LL_DEBUGS(LOG_TXT) << mID << " DECODE_IMAGE abort: mLoadedDiscard < 0" << LL_ENDL;
             return true;
         }
+
+        llassert_always(mFormattedImage.notNull());
+        S32 discard = mHaveAllData && mFormattedImage->getCodec() != IMG_CODEC_J2C ? 0 : mLoadedDiscard;
+        if (discard > MAX_DISCARD_LEVEL) // only warn for j2c
+        {
+            // We encode j2c with fixed amount of discard levels,
+            // Trying to decode beyound that will fail.
+            LL_WARNS(LOG_TXT) << "Decode entered with invalid discard. ID = " << mID << LL_ENDL;
+
+            //abort, don't decode
+            setState(DONE);
+            LL_DEBUGS(LOG_TXT) << mID << " DECODE_IMAGE abort: mLoadedDiscard > MAX_DISCARD_LEVEL" << LL_ENDL;
+            return true;
+        }
+
         mDecodeTimer.reset();
         mRawImage = NULL;
         mAuxImage = NULL;
-        llassert_always(mFormattedImage.notNull());
 
         // if we have the entire image data (and the image is not J2C), decode the full res image
         // DO NOT decode a higher res j2c than was requested.  This is a waste of time and memory.
-        S32 discard = mHaveAllData && mFormattedImage->getCodec() != IMG_CODEC_J2C ? 0 : mLoadedDiscard;
         mDecoded  = false;
         setState(DECODE_IMAGE_UPDATE);
         LL_DEBUGS(LOG_TXT) << mID << ": Decoding. Bytes: " << mFormattedImage->getDataSize() << " Discard: " << discard
@@ -2440,13 +2464,13 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, bool threaded, bool qa_mod
 
     LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
     mHttpRequest = new LLCore::HttpRequest;
-    mHttpOptions = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
-    mHttpOptionsWithHeaders = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+    mHttpOptions  = std::make_shared<LLCore::HttpOptions>();
+    mHttpOptionsWithHeaders = std::make_shared<LLCore::HttpOptions>();
     mHttpOptionsWithHeaders->setWantHeaders(true);
-    mHttpHeaders = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders);
+    mHttpHeaders = std::make_shared<LLCore::HttpHeaders>();
     mHttpHeaders->append(HTTP_OUT_HEADER_ACCEPT, HTTP_CONTENT_IMAGE_X_J2C);
     mHttpPolicyClass = app_core_http.getPolicy(LLAppCoreHttp::AP_TEXTURE);
-    mHttpMetricsHeaders = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders);
+    mHttpMetricsHeaders = std::make_shared<LLCore::HttpHeaders>();
     mHttpMetricsHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_LLSD_XML);
     mHttpMetricsPolicyClass = app_core_http.getPolicy(LLAppCoreHttp::AP_REPORTING);
     mHttpHighWater = HTTP_NONPIPE_REQUESTS_HIGH_WATER;
@@ -2472,7 +2496,7 @@ LLTextureFetch::~LLTextureFetch()
     while (! mCommands.empty())
     {
         TFRequest * req(mCommands.front());
-        mCommands.erase(mCommands.begin());
+        mCommands.pop_front();
         delete req;
     }
 
@@ -3467,7 +3491,7 @@ LLTextureFetch::TFRequest * LLTextureFetch::cmdDequeue()
     if (! mCommands.empty())
     {
         ret = mCommands.front();
-        mCommands.erase(mCommands.begin());
+        mCommands.pop_front();
     }
     unlockQueue();                                                      // -Mfq
 
@@ -3550,7 +3574,7 @@ TFReqSendMetrics::TFReqSendMetrics(const std::string & caps_url,
     mSessionID(session_id),
     mAgentID(agent_id),
     mStatsSD(stats_sd),
-    mHandler(new AssetReportHandler)
+    mHandler(std::make_shared<AssetReportHandler>())
 {}
 
 

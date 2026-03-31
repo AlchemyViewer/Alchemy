@@ -55,8 +55,6 @@
 
 // static
 LLStandardBumpmap gStandardBumpmapList[TEM_BUMPMAP_COUNT];
-LL::WorkQueue::weak_t LLBumpImageList::sMainQueue;
-LL::WorkQueue::weak_t LLBumpImageList::sTexUpdateQueue;
 LLRenderTarget LLBumpImageList::sRenderTarget;
 
 // static
@@ -116,7 +114,7 @@ void LLStandardBumpmap::addstandard()
     gStandardBumpmapList[LLStandardBumpmap::sStandardBumpmapCount++] = LLStandardBumpmap("Darkness");   // BE_DARKNESS
 
     std::string file_name = gDirUtilp->getExpandedFilename( LL_PATH_APP_SETTINGS, "std_bump.ini" );
-    LLFILE* file = LLFile::fopen( file_name, "rt" );     /*Flawfinder: ignore*/
+    LLFILE* file = LLFile::fopen( file_name, LLFILE_MODE("rt") );     /*Flawfinder: ignore*/
     if( !file )
     {
         LL_WARNS() << "Could not open std_bump <" << file_name << ">" << LL_ENDL;
@@ -629,8 +627,6 @@ void LLBumpImageList::init()
     llassert( mDarknessEntries.size() == 0 );
 
     LLStandardBumpmap::restoreGL();
-    sMainQueue = LL::WorkQueue::getInstance("mainloop");
-    sTexUpdateQueue = LL::WorkQueue::getInstance("LLImageGL"); // Share work queue with tex loader.
 }
 
 void LLBumpImageList::clear()
@@ -802,7 +798,10 @@ void LLBumpImageList::onSourceStandardLoaded( bool success, LLViewerFetchedTextu
         }
         src_vi->setExplicitFormat(GL_RGBA, GL_RGBA);
         {
-            src_vi->createGLTexture(src_vi->getDiscardLevel(), nrm_image);
+            if (!src_vi->createGLTexture(src_vi->getDiscardLevel(), nrm_image))
+            {
+                LL_WARNS() << "Failed to create bump image texture for image " << src_vi->getID() << LL_ENDL;
+            }
         }
     }
 }
@@ -895,7 +894,10 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
         bump->setExplicitFormat(GL_RGBA, GL_RGBA);
 
         LLImageGL* dst_img = bump->getGLTexture();
-        dst_img->setSize(src->getWidth(), src->getHeight(), 4, 0);
+        if (!dst_img->setSize(src->getWidth(), src->getHeight(), 4, 0))
+        {
+            LL_WARNS() << "Failed to setSize for image " << bump->getID() << LL_ENDL;
+        }
         dst_img->setUseMipMaps(true);
         dst_img->setDiscardLevel(0);
         dst_img->createGLTexture();

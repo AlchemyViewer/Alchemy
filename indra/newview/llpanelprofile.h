@@ -33,8 +33,6 @@
 #include "llpanel.h"
 #include "llpanelavatar.h"
 #include "llmediactrl.h"
-#include "llprofileimagectrl.h"
-#include "llprofileimagepicker.h"
 #include "llvoiceclient.h"
 
 // class LLPanelProfileClassifieds;
@@ -112,6 +110,8 @@ public:
     void commitUnsavedChanges() override;
 
     void processProperties(void* data, EAvatarProcessorType type) override;
+
+    void setAllowEdit(bool allow_edit) { mAllowEdit = allow_edit; }
 
 protected:
     /**
@@ -209,8 +209,10 @@ private:
     bool                mWaitingForImageUpload;
     bool                mAllowPublish;
     bool                mHideAge;
+    bool                mAllowEdit;
     std::string         mDescriptionText;
     boost::signals2::connection mAvatarNameCacheConnection;
+    boost::signals2::connection mMenuNameCacheConnection;
 };
 
 

@@ -51,11 +51,9 @@ bool LLCrossParcelFunctor::apply(LLViewerObject* obj)
     mBoundingBox.addBBoxAgent(LLBBox(obj->getPositionRegion(), obj->getRotationRegion(), obj->getScale() * -0.5f, obj->getScale() * 0.5f).getAxisAligned());
 
     // Extend the bounding box across all the children.
-    LLViewerObject::const_child_list_t children = obj->getChildren();
-    for (LLViewerObject::const_child_list_t::const_iterator iter = children.begin();
-         iter != children.end(); iter++)
+    const LLViewerObject::const_child_list_t& children = obj->getChildren();
+    for (LLViewerObject* child : children)
     {
-        LLViewerObject* child = *iter;
         mBoundingBox.addBBoxAgent(LLBBox(child->getPositionRegion(), child->getRotationRegion(), child->getScale() * -0.5f, child->getScale() * 0.5f).getAxisAligned());
     }
 
@@ -208,7 +206,7 @@ void LLFloaterObjectWeights::draw()
             toggleRenderLoadingIndicators(false);
         }
         mTrianglesShown->setText(llformat("%d", total_tris));
-        mPixelArea->setText(llformat("%d", pixel_area));
+        mPixelArea->setText(llformat("%ld", (S64)pixel_area)); // value capped at 10M
     }
     LLFloater::draw();
 }

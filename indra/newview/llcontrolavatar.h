@@ -111,11 +111,11 @@ typedef std::map<LLUUID, S32> signaled_animation_map_t;
 typedef std::map<LLUUID, signaled_animation_map_t> object_signaled_animation_map_t;
 
 // Stores information about previously requested animations, by object id.
-class LLObjectSignaledAnimationMap: public LLSingleton<LLObjectSignaledAnimationMap>
+class LLObjectSignaledAnimationMap: public LLSimpleton<LLObjectSignaledAnimationMap>
 {
-    LLSINGLETON_EMPTY_CTOR(LLObjectSignaledAnimationMap);
-
 public:
+    LLObjectSignaledAnimationMap() = default;
+
     object_signaled_animation_map_t mMap;
 
     object_signaled_animation_map_t& getMap() { return mMap; }

@@ -41,7 +41,7 @@
 #include "llrender.h"
 #include "llwindow.h"
 #include "llframetimer.h"
-#include <unordered_set>
+#include <boost/unordered_map.hpp>
 
 extern LL_COMMON_API bool on_main_thread();
 
@@ -180,7 +180,6 @@ void LLImageGL::checkTexSize(bool forced) const
             //check viewport
             GLint vp[4] ;
             glGetIntegerv(GL_VIEWPORT, vp) ;
-            llcallstacks << "viewport: " << vp[0] << " : " << vp[1] << " : " << vp[2] << " : " << vp[3] << llcallstacksendl ;
         }
 
         GLint texname;
@@ -205,7 +204,6 @@ void LLImageGL::checkTexSize(bool forced) const
         glGetTexLevelParameteriv(mTarget, 0, GL_TEXTURE_WIDTH, (GLint*)&x);
         glGetTexLevelParameteriv(mTarget, 0, GL_TEXTURE_HEIGHT, (GLint*)&y) ;
         stop_glerror() ;
-        llcallstacks << "w: " << x << " h: " << y << llcallstacksendl ;
 
         if(!x || !y)
         {
@@ -593,25 +591,14 @@ void LLImageGL::cleanup()
 
 //----------------------------------------------------------------------------
 
-//this function is used to check the size of a texture image.
-//so dim should be a positive number
-static bool check_power_of_two(S32 dim)
-{
-    if(dim < 0)
-    {
-        return false ;
-    }
-    if(!dim)//0 is a power-of-two number
-    {
-        return true ;
-    }
-    return !(dim & (dim - 1)) ;
-}
-
 //static
 bool LLImageGL::checkSize(S32 width, S32 height)
 {
-    return check_power_of_two(width) && check_power_of_two(height);
+    if (width < 0 || height < 0)
+    {
+        return false;
+    }
+    return true;
 }
 
 bool LLImageGL::setSize(S32 width, S32 height, S32 ncomponents, S32 discard_level)
@@ -621,7 +608,7 @@ bool LLImageGL::setSize(S32 width, S32 height, S32 ncomponents, S32 discard_leve
         // Check if dimensions are a power of two!
         if (!checkSize(width, height))
         {
-            LL_WARNS() << llformat("Texture has non power of two dimension: %dx%d",width,height) << LL_ENDL;
+            LL_WARNS() << llformat("Texture has negative dimension: %dx%d",width,height) << LL_ENDL;
             return false;
         }
 
@@ -1043,10 +1030,12 @@ U32 type_width_from_pixtype(U32 pixtype)
 
 bool should_stagger_image_set(bool compressed)
 {
-#if LL_DARWIN
-    return !compressed && on_main_thread() && gGLManager.mIsAMD;
+#if LL_MESA_HEADLESS
+    return false;
 #elif LL_LINUX
-    return !compressed && on_main_thread() && !gGLManager.mIsAMD && !gGLManager.mIsIntel;
+    return !compressed && on_main_thread() && gGLManager.mIsNVIDIA;
+#elif LL_DARWIN
+    return !compressed && on_main_thread() && gGLManager.mIsAMD;
 #else
     // glTexSubImage2D doesn't work with compressed textures on select tested Nvidia GPUs on Windows 10 -Cosmic,2023-03-08
     // Setting media textures off-thread seems faster when not using sub_image_lines (Nvidia/Windows 10) -Cosmic,2023-03-31
@@ -1089,6 +1078,8 @@ void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 w
         // full width texture, do 32 lines at a time
         for (U32 y_pos = y_offset; y_pos < y_offset_end; y_pos += batch_size)
         {
+            // If this keeps crashing, pass down data_size, looks like it is using
+            // imageraw->getData(); for data, but goes way over allocated size limit
             glTexSubImage2D(target, miplevel, x_offset, y_pos, width, batch_size, pixformat, pixtype, src);
             src += line_width * batch_size;
         }
@@ -1098,6 +1089,8 @@ void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 w
         // partial width or strange height
         for (U32 y_pos = y_offset; y_pos < y_offset_end; y_pos += 1)
         {
+            // If this keeps crashing, pass down data_size, looks like it is using
+            // imageraw->getData(); for data, but goes way over allocated size limit
             glTexSubImage2D(target, miplevel, x_offset, y_pos, width, 1, pixformat, pixtype, src);
             src += line_width;
         }
@@ -1538,6 +1531,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
         llassert(mCurrentDiscardLevel >= 0);
         discard_level = mCurrentDiscardLevel;
     }
+    discard_level = llmin(discard_level, MAX_DISCARD_LEVEL);
 
     // Actual image width/height = raw image width/height * 2^discard_level
     S32 raw_w = imageraw->getWidth() ;
@@ -1636,6 +1630,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
         discard_level = mCurrentDiscardLevel;
     }
     discard_level = llclamp(discard_level, 0, (S32)mMaxDiscardLevel);
+    discard_level = llmin(discard_level, MAX_DISCARD_LEVEL);
 
     if (main_thread // <--- always force creation of new_texname when not on main thread ...
         && !defer_copy // <--- ... or defer copy is set
@@ -1992,7 +1987,7 @@ bool LLImageGL::getIsResident(bool test_now)
     {
         if (mTexName != 0)
         {
-            glAreTexturesResident(1, (GLuint*)&mTexName, &mIsResident);
+            mIsResident = true;
         }
         else
         {
@@ -2175,7 +2170,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
 
 void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
 {
-    if(sSkipAnalyzeAlpha || !mNeedsAlphaAndPickMask)
+    if(!data_in || sSkipAnalyzeAlpha || !mNeedsAlphaAndPickMask)
     {
         return ;
     }

@@ -76,12 +76,12 @@ LLViewerPart::LLViewerPart() :
     mPartID(0),
     mLastUpdateTime(0.f),
     mSkipOffset(0.f),
-    mVPCallback(NULL),
-    mImagep(NULL)
+    mVPCallback(nullptr),
+    mImagep(nullptr)
 {
-    mPartSourcep = NULL;
-    mParent = NULL;
-    mChild = NULL;
+    mPartSourcep = nullptr;
+    mParent      = nullptr;
+    mChild       = nullptr;
     ++LLViewerPartSim::sParticleCount2 ;
 }
 
@@ -716,15 +716,21 @@ void LLViewerPartSim::updateSimulation()
 
             if (upd && vobj && (vobj->getPCode() == LL_PCODE_VOLUME))
             {
-                if(vobj->getAvatar() && vobj->getAvatar()->isTooComplex() && vobj->getAvatar()->isTooSlow())
+                LLVOVolume* vvo = (LLVOVolume*)vobj;
+                if (vvo->isAttachment())
                 {
-                    upd = false;
-                }
-
-                LLVOVolume* vvo = (LLVOVolume *)vobj;
-                if (!LLPipeline::sRenderAttachedParticles && vvo && vvo->isAttachment())
-                {
-                    upd = false;
+                    if (!LLPipeline::sRenderAttachedParticles)
+                    {
+                        upd = false;
+                    }
+                    else
+                    {
+                        LLVOAvatar* avatarp = vobj->getAvatar();
+                        if (avatarp && avatarp->isTooComplex() && avatarp->isTooSlow())
+                        {
+                            upd = false;
+                        }
+                    }
                 }
             }
 

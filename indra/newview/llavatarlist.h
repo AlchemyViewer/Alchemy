@@ -56,7 +56,7 @@ public:
     {
         Optional<bool>  ignore_online_status, // show all items as online
                         show_last_interaction_time, // show most recent interaction time. *HACK: move this to a derived class
-                        show_distance,  // *HACK: my sinuses hurt and i want pizza.
+                        show_distance,
                         show_info_btn,
                         show_profile_btn,
                         show_speaking_indicator,

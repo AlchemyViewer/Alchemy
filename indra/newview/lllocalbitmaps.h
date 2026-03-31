@@ -32,6 +32,7 @@
 #include "lleventtimer.h"
 #include "llpointer.h"
 #include "llwearabletype.h"
+#include <filesystem>
 
 class LLScrollListCtrl;
 class LLImageRaw;
@@ -90,7 +91,8 @@ class LLLocalBitmap
             ET_IMG_TGA,
             ET_IMG_JPG,
             ET_IMG_J2C,
-            ET_IMG_PNG
+            ET_IMG_PNG,
+            ET_IMG_WEBP
         };
 
     private: /* members */
@@ -99,7 +101,7 @@ class LLLocalBitmap
         LLUUID      mTrackingID;
         LLUUID      mWorldID;
         bool        mValid;
-        LLSD        mLastModified;
+        std::filesystem::file_time_type        mLastModified;
         EExtension  mExtension;
         ELinkStatus mLinkStatus;
         S32         mUpdateRetries;

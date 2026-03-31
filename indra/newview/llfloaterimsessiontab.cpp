@@ -48,6 +48,7 @@
 #include "llfloaterimnearbychat.h"
 #include "llgroupiconctrl.h"
 #include "lllayoutstack.h"
+#include "llnotificationsutil.h"
 #include "llpanelemojicomplete.h"
 #include "lltoolbarview.h"
 
@@ -380,7 +381,8 @@ bool LLFloaterIMSessionTab::postBuild()
     mFloaterExtraWidth =
             getRect().getWidth()
             - mParticipantListAndHistoryStack->getRect().getWidth()
-            - (mParticipantListPanel->isCollapsed()? 0 : LLPANEL_BORDER_WIDTH);
+            - (mParticipantListPanel->isCollapsed()? 0 : LLPANEL_BORDER_WIDTH)
+            + (mExtendedButtonPanel ? mExtendedButtonPanel->getRect().getWidth() : 0);
 
     assignResizeLimits();
 
@@ -618,8 +620,19 @@ void LLFloaterIMSessionTab::deleteAllChildren()
 
 std::string LLFloaterIMSessionTab::appendTime()
 {
-    std::string timeStr = "[" + LLTrans::getString("TimeHour") + "]:"
-                          "[" + LLTrans::getString("TimeMin") + "]";
+    std::string timeStr;
+    static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+    if (use_24h)
+    {
+        timeStr = "[" + LLTrans::getString("TimeHour") + "]:"
+            "[" + LLTrans::getString("TimeMin") + "]";
+    }
+    else
+    {
+        timeStr = "[" + LLTrans::getString("TimeHour12") + "]:"
+            "[" + LLTrans::getString("TimeMin") + "] ["
+            + LLTrans::getString("TimeAMPM") + "]";
+    }
 
     LLSD substitution;
     substitution["datetime"] = (S32)time_corrected();
@@ -648,8 +661,7 @@ void LLFloaterIMSessionTab::appendMessage(const LLChat& chat, const LLSD& args)
     tmp_chat.mFromName = chat.mFromName;
 
     LLSD chat_args = args;
-    chat_args["use_plain_text_chat_history"] =
-            gSavedSettings.getBOOL("PlainTextChatHistory");
+    chat_args["chat_history_style"] = gSavedSettings.getS32("AlchemyChatHistoryStyle");
     chat_args["show_time"] = gSavedSettings.getBOOL("IMShowTime");
     chat_args["show_names_for_p2p_conv"] = !mIsP2PChat ||
             gSavedSettings.getBOOL("IMShowNamesForP2PConv");
@@ -871,9 +883,14 @@ void LLFloaterIMSessionTab::onIMSessionMenuItemClicked(const LLSD& userdata)
 {
     std::string item = userdata.asString();
 
-    if (item == "compact_view" || item == "expanded_view")
+    if (item == "fancy_compact_view" || item == "compact_view" || item == "expanded_view")
     {
-        gSavedSettings.setBOOL("PlainTextChatHistory", item == "compact_view");
+        S32 newset = 0;
+        if (item == "fancy_compact_view")
+            newset = 2;
+        else if (item == "compact_view")
+            newset = 1;
+        gSavedSettings.setS32("AlchemyChatHistoryStyle", newset);
     }
     else
     {
@@ -887,9 +904,17 @@ void LLFloaterIMSessionTab::onIMSessionMenuItemClicked(const LLSD& userdata)
 bool LLFloaterIMSessionTab::onIMCompactExpandedMenuItemCheck(const LLSD& userdata)
 {
     std::string item = userdata.asString();
-    bool is_plain_text_mode = gSavedSettings.getBOOL("PlainTextChatHistory");
-
-    return is_plain_text_mode? item == "compact_view" : item == "expanded_view";
+    S32 chat_history_mode = gSavedSettings.getS32("AlchemyChatHistoryStyle");
+    switch (chat_history_mode)
+    {
+    default:
+    case 0:
+        return item == "expanded_view";
+    case 1:
+        return item == "compact_view";
+    case 2:
+        return item == "fancy_compact_view";
+    }
 }
 
 
@@ -902,7 +927,7 @@ bool LLFloaterIMSessionTab::onIMShowModesMenuItemCheck(const LLSD& userdata)
 bool LLFloaterIMSessionTab::onIMShowModesMenuItemEnable(const LLSD& userdata)
 {
     std::string item = userdata.asString();
-    bool plain_text = gSavedSettings.getBOOL("PlainTextChatHistory");
+    bool plain_text = gSavedSettings.getS32("AlchemyChatHistoryStyle") >= 1;
     bool is_not_names = (item != "IMShowNamesForP2PConv");
     return (plain_text && (is_not_names || mIsP2PChat));
 }
@@ -1238,6 +1263,9 @@ void LLFloaterIMSessionTab::updateGearBtn()
         LLRect gear_btn_rect =  mGearBtn->getRect();
         LLRect add_btn_rect = mAddBtn->getRect();
         LLRect call_btn_rect = mVoiceButton->getRect();
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+        LLRect extended_toolbar_rect = (mExtendedButtonPanel) ? mExtendedButtonPanel->getRect() : LLRect();
+// [/SL:KB]
         S32 gap_width = call_btn_rect.mLeft - add_btn_rect.mRight;
         S32 right_shift = gear_btn_rect.getWidth() + gap_width;
         if(mGearBtn->getVisible())
@@ -1245,14 +1273,24 @@ void LLFloaterIMSessionTab::updateGearBtn()
             // Move buttons to the right to give space for Gear button
             add_btn_rect.translate(right_shift,0);
             call_btn_rect.translate(right_shift,0);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+            extended_toolbar_rect.translate(right_shift,0);
+// [/SL:KB]
         }
         else
         {
             add_btn_rect.translate(-right_shift,0);
             call_btn_rect.translate(-right_shift,0);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+            extended_toolbar_rect.translate(-right_shift,0);
+// [/SL:KB]
         }
         mAddBtn->setRect(add_btn_rect);
         mVoiceButton->setRect(call_btn_rect);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+        if (mExtendedButtonPanel)
+            mExtendedButtonPanel->setRect(extended_toolbar_rect);
+// [/SL:KB]
     }
 }
 
@@ -1261,14 +1299,22 @@ void LLFloaterIMSessionTab::initBtns()
     LLRect gear_btn_rect =  mGearBtn->getRect();
     LLRect add_btn_rect = mAddBtn->getRect();
     LLRect call_btn_rect = mVoiceButton->getRect();
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+    LLRect extended_toolbar_rect = (mExtendedButtonPanel) ? mExtendedButtonPanel->getRect() : LLRect();
+// [/SL:KB]
     S32 gap_width = call_btn_rect.mLeft - add_btn_rect.mRight;
     S32 right_shift = gear_btn_rect.getWidth() + gap_width;
 
     add_btn_rect.translate(-right_shift,0);
     call_btn_rect.translate(-right_shift,0);
+    extended_toolbar_rect.translate(-right_shift, 0);
 
     mAddBtn->setRect(add_btn_rect);
     mVoiceButton->setRect(call_btn_rect);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+    if (mExtendedButtonPanel)
+        mExtendedButtonPanel->setRect(extended_toolbar_rect);
+// [/SL:KB]
 }
 
 // static
@@ -1381,6 +1427,71 @@ void LLFloaterIMSessionTab::sessionRemoved(const LLUUID& session_id)
     }
 }
 
+void LLFloaterIMSessionTab::applyMUPose(std::string& text)
+{
+    if (!gSavedSettings.getBOOL("EnableMUPoseChat"))
+    {
+        return;
+    }
+    if (text.at(0) == ':'
+        && text.length() > 3)
+    {
+        if (text.find(":'") == 0)
+        {
+            text.replace(0, 1, "/me");
+        }
+        // Account for emotes and smilies
+        else if (!isdigit(text.at(1))
+                 && !ispunct(text.at(1))
+                 && !isspace(text.at(1)))
+        {
+            text.replace(0, 1, "/me ");
+        }
+    }
+}
+
+void LLFloaterIMSessionTab::applyOOCClose(std::string& message)
+{
+    if (!gSavedSettings.getBOOL("EnableAutoCloseOOC"))
+    {
+        return;
+    }
+
+    // Try to find any unclosed OOC chat (i.e. an opening
+    // double parenthesis without a matching closing double
+    // parenthesis.
+    if (message.find("(( ") != std::string::npos && message.find("))") == std::string::npos)
+    {
+        // add the missing closing double parenthesis.
+        message.append(" ))");
+    }
+    else if (message.find("((") != std::string::npos && message.find("))") == std::string::npos)
+    {
+        if (message.at(message.length() - 1) == ')')
+        {
+            // cosmetic: add a space first to avoid a closing triple parenthesis
+            message.append(" ");
+        }
+        // add the missing closing double parenthesis.
+        message.append("))");
+    }
+    else if (message.find("[[ ") != std::string::npos && message.find("]]") == std::string::npos)
+    {
+        // add the missing closing double parenthesis.
+        message.append(" ]]");
+    }
+    else if (message.find("[[") != std::string::npos && message.find("]]") == std::string::npos)
+    {
+        if (message.at(message.length() - 1) == ']')
+        {
+            // cosmetic: add a space first to avoid a closing triple parenthesis
+            message.append(" ");
+        }
+            // add the missing closing double parenthesis.
+        message.append("]]");
+    }
+}
+
 bool LLFloaterIMSessionTab::handleKeyHere(KEY key, MASK mask )
 {
     bool handled = false;
@@ -1405,4 +1516,21 @@ bool LLFloaterIMSessionTab::handleKeyHere(KEY key, MASK mask )
         }
     }
     return handled;
+}
+
+void LLFloaterIMSessionTab::onClickCloseBtn(bool app_quitting)
+{
+    bool is_ad_hoc = (mSession ? mSession->isAdHocSessionType() : false);
+    if (is_ad_hoc && !app_quitting)
+    {
+        LLNotificationsUtil::add("ConfirmLeaveAdhoc", LLSD(), LLSD(), [this](const LLSD& notification, const LLSD& response)
+        {
+            if (0 == LLNotificationsUtil::getSelectedOption(notification, response))
+                closeFloater();
+        });
+    }
+    else
+    {
+        closeFloater();
+    }
 }

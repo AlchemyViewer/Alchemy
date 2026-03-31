@@ -141,6 +141,42 @@ namespace LL
         }
 
         template<>
+        inline void copyScalar<U32, LLVector4a>(U32* src, LLVector4a& dst)
+        {
+            dst.set((F32)*src, 0.f, 0.f, 0.f);
+        }
+
+        template<>
+        inline void copyScalar<U16, LLVector4a>(U16* src, LLVector4a& dst)
+        {
+            dst.set((F32)*src, 0.f, 0.f, 0.f);
+        }
+
+        template<>
+        inline void copyScalar<U8, LLVector4a>(U8* src, LLVector4a& dst)
+        {
+            dst.set((F32)*src, 0.f, 0.f, 0.f);
+        }
+
+        template<>
+        inline void copyScalar<U32, LLVector2>(U32* src, LLVector2& dst)
+        {
+            dst.set((F32)*src, 0.f);
+        }
+
+        template<>
+        inline void copyScalar<U16, LLVector2>(U16* src, LLVector2& dst)
+        {
+            dst.set((F32)*src, 0.f);
+        }
+
+        template<>
+        inline void copyScalar<U8, LLVector2>(U8* src, LLVector2& dst)
+        {
+            dst.set((F32)*src, 0.f);
+        }
+
+        template<>
         inline void copyVec2<F32, LLVector2>(F32* src, LLVector2& dst)
         {
             dst.set(src[0], src[1]);
@@ -218,6 +254,12 @@ namespace LL
         inline void copyVec4<F32, LLVector4a>(F32* src, LLVector4a& dst)
         {
             dst.loadua(src);
+        }
+
+        template<>
+        inline void copyVec4<U32, LLVector4a>(U32* src, LLVector4a& dst)
+        {
+            dst.set((F32)src[0], (F32)src[1], (F32)src[2], (F32)src[3]);
         }
 
         template<>
@@ -373,7 +415,7 @@ namespace LL
             }
             else
             {
-                LL_ERRS("GLTF") << "Unsupported accessor type" << LL_ENDL;
+                LL_ERRS("GLTF") << "Unsupported accessor type " << (S32)accessor.mType << LL_ENDL;
             }
         }
 
@@ -455,7 +497,7 @@ namespace LL
         }
 
         template<typename T>
-        inline bool copy(const Value& src, boost::unordered_map<std::string, T>& dst)
+        inline bool copy(const Value& src, std::unordered_map<std::string, T>& dst)
         {
             if (src.is_object())
             {
@@ -470,7 +512,7 @@ namespace LL
         }
 
         template<typename T>
-        inline bool write(const boost::unordered_map<std::string, T>& src, Value& dst)
+        inline bool write(const std::unordered_map<std::string, T>& src, Value& dst)
         {
             boost::json::object obj;
             for (const auto& [key, value] : src)
@@ -663,7 +705,7 @@ namespace LL
         }
 
         template<typename T>
-        inline bool write(const boost::unordered_map<std::string, T>& src, string_view member, boost::json::object& dst, const std::unordered_map<std::string, T>& default_value = std::unordered_map<std::string, T>())
+        inline bool write(const std::unordered_map<std::string, T>& src, string_view member, boost::json::object& dst, const std::unordered_map<std::string, T>& default_value = std::unordered_map<std::string, T>())
         {
             if (!src.empty())
             {

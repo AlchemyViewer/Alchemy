@@ -425,8 +425,8 @@ void LLFloaterReporter::requestAbuseCategoriesCoro(std::string url, LLHandle<LLF
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("requestAbuseCategoriesCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestAbuseCategoriesCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -841,17 +841,17 @@ void LLFloaterReporter::sendReportViaLegacy(const LLSD & report)
 
     msg->nextBlockFast(_PREHASH_ReportData);
     msg->addU8Fast(_PREHASH_ReportType, report["report-type"].asInteger());
-    msg->addU8(_PREHASH_Category, report["category"].asInteger());
+    msg->addU8Fast(_PREHASH_Category, report["category"].asInteger());
     msg->addVector3Fast(_PREHASH_Position,  LLVector3(report["position"]));
     msg->addU8Fast(_PREHASH_CheckFlags, report["check-flags"].asInteger());
     msg->addUUIDFast(_PREHASH_ScreenshotID, report["screenshot-id"].asUUID());
     msg->addUUIDFast(_PREHASH_ObjectID, report["object-id"].asUUID());
-    msg->addUUID("AbuserID", report["abuser-id"].asUUID());
-    msg->addString("AbuseRegionName", report["abuse-region-name"].asString());
-    msg->addUUID("AbuseRegionID", report["abuse-region-id"].asUUID());
+    msg->addUUIDFast(_PREHASH_AbuserID, report["abuser-id"].asUUID());
+    msg->addStringFast(_PREHASH_AbuseRegionName, report["abuse-region-name"].asString());
+    msg->addUUIDFast(_PREHASH_AbuseRegionID, report["abuse-region-id"].asUUID());
 
     msg->addStringFast(_PREHASH_Summary, report["summary"].asString());
-    msg->addString("VersionString", report["version-string"]);
+    msg->addStringFast(_PREHASH_VersionString, report["version-string"].asString());
     msg->addStringFast(_PREHASH_Details, report["details"] );
 
     msg->sendReliable(regionp->getHost());
@@ -868,7 +868,7 @@ void LLFloaterReporter::sendReportViaCaps(std::string url, std::string sshot_url
     if(!sshot_url.empty())
     {
         // try to upload screenshot
-        LLResourceUploadInfo::ptr_t uploadInfo(new  LLARScreenShotUploader(report, mResourceDatap->mAssetInfo.mUuid, mResourceDatap->mAssetInfo.mType));
+        LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLARScreenShotUploader>(report, mResourceDatap->mAssetInfo.mUuid, mResourceDatap->mAssetInfo.mType);
         LLViewerAssetUpload::EnqueueInventoryUpload(sshot_url, uploadInfo);
     }
     else

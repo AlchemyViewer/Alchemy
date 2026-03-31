@@ -26,9 +26,6 @@
 
 #include "llquaternion2.h"
 
-static const LLQuad LL_V4A_PLUS_ONE = {1.f, 1.f, 1.f, 1.f};
-static const LLQuad LL_V4A_MINUS_ONE = {-1.f, -1.f, -1.f, -1.f};
-
 // Ctor from LLQuaternion
 inline LLQuaternion2::LLQuaternion2( const LLQuaternion& quat )
 {
@@ -57,7 +54,7 @@ inline LLVector4a& LLQuaternion2::getVector4aRw()
 // Set this quaternion to the conjugate of src
 inline void LLQuaternion2::setConjugate(const LLQuaternion2& src)
 {
-    static LL_ALIGN_16( const U32 F_QUAT_INV_MASK_4A[4] ) = { 0x80000000, 0x80000000, 0x80000000, 0x00000000 };
+    alignas(16) static const U32 F_QUAT_INV_MASK_4A[4] = { 0x80000000, 0x80000000, 0x80000000, 0x00000000 };
     mQ = _mm_xor_ps(src.mQ, *reinterpret_cast<const LLQuad*>(&F_QUAT_INV_MASK_4A));
 }
 
@@ -70,14 +67,14 @@ inline void LLQuaternion2::normalize()
 // Quantize this quaternion to 8 bit precision
 inline void LLQuaternion2::quantize8()
 {
-    mQ.quantize8( LL_V4A_MINUS_ONE, LL_V4A_PLUS_ONE );
+    mQ.quantize8(_mm_set_ps1(-1.f), _mm_set_ps1(1.f));
     normalize();
 }
 
 // Quantize this quaternion to 16 bit precision
 inline void LLQuaternion2::quantize16()
 {
-    mQ.quantize16( LL_V4A_MINUS_ONE, LL_V4A_PLUS_ONE );
+    mQ.quantize16(_mm_set_ps1(-1.f), _mm_set_ps1(1.f));
     normalize();
 }
 

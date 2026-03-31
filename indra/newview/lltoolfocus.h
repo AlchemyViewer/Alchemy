@@ -32,15 +32,17 @@
 class LLPickInfo;
 
 class LLToolCamera
-:   public LLTool, public LLSingleton<LLToolCamera>
+:   public LLTool, public LLSimpleton<LLToolCamera>
 {
-    LLSINGLETON(LLToolCamera);
-    virtual ~LLToolCamera();
 public:
+    LLToolCamera();
+    virtual ~LLToolCamera();
 
     virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
     virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
     virtual bool    handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleRightMouseUp(S32 x, S32 y, MASK mask) override;
 
     virtual void    onMouseCaptureLost() override;
 

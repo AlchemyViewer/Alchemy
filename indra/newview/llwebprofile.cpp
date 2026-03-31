@@ -37,11 +37,8 @@
 
 // newview
 #include "llavataractions.h" // for getProfileURL()
-#include "llcommandhandler.h"
-#include "llmediactrl.h"
-#include "llnotificationsutil.h"
 #include "llviewermedia.h" // FIXME: don't use LLViewerMedia internals
-#include "llweb.h"
+#include "llnotificationsutil.h"
 
 #include "llcorehttputil.h"
 
@@ -86,7 +83,7 @@ void LLWebProfile::setAuthCookie(const std::string& cookie)
 /*static*/
 LLCore::HttpHeaders::ptr_t LLWebProfile::buildDefaultHeaders()
 {
-    LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
     LLSD headers = LLViewerMedia::getInstance()->getHeaders();
 
     for (LLSD::map_iterator it = headers.beginMap(); it != headers.endMap(); ++it)
@@ -103,9 +100,9 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("uploadImageCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     LLCore::HttpHeaders::ptr_t httpHeaders;
 
     if (dynamic_cast<LLImagePNG*>(image.get()) == 0)
@@ -284,30 +281,3 @@ std::string LLWebProfile::getAuthCookie()
     // This is needed to test image uploads on Linux viewer built with OpenSSL 1.0.0 (0.9.8 works fine).
     return LLStringUtil::getenv("LL_SNAPSHOT_COOKIE", sAuthCookie);
 }
-
-//////////////////////////////////////////////////////////////////////////
-// LLWebProfileHandler
-
-class LLWebProfileHandler : public LLCommandHandler
-{
-public:
-    // requires trusted browser to trigger
-    LLWebProfileHandler() : LLCommandHandler("profile", UNTRUSTED_THROTTLE) {}
-
-    bool handle(const LLSD& params,
-                const LLSD& query_map,
-                const std::string& grid,
-                LLMediaCtrl* web)
-    {
-        if (params.size() < 1)
-            return false;
-        std::string agent_name = params[0];
-        LL_INFOS() << "Profile, agent_name " << agent_name << LL_ENDL;
-        std::string url = getProfileURL(agent_name);
-        LLWeb::loadURLInternal(url);
-
-        return true;
-    }
-};
-LLWebProfileHandler gWebProfileHandler;
-

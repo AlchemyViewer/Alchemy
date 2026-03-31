@@ -112,7 +112,7 @@ LLViewerFetchedTexture* bindMaterialDiffuseTexture(const LLImportMaterial& mater
 
 std::string stripSuffix(std::string name)
 {
-    if ((name.find("_LOD") != -1) || (name.find("_PHYS") != -1))
+    if ((name.find("_LOD") != std::string::npos) || (name.find("_PHYS") != std::string::npos))
     {
         return name.substr(0, name.rfind('_'));
     }
@@ -363,7 +363,7 @@ void LLModelPreview::rebuildUploadData()
 
                     std::string toAdd = getLodSuffix(extensionLOD);
 
-                    if (name_to_match.find(toAdd) == -1)
+                    if (name_to_match.find(toAdd) == std::string::npos)
                     {
                         name_to_match += toAdd;
                     }
@@ -390,7 +390,7 @@ void LLModelPreview::rebuildUploadData()
 
                             std::string toAdd = getLodSuffix(searchLOD);
 
-                            if (name_to_match.find(toAdd) == -1)
+                            if (name_to_match.find(toAdd) == std::string::npos)
                             {
                                 name_to_match += toAdd;
                             }
@@ -525,7 +525,7 @@ void LLModelPreview::rebuildUploadData()
                 {
                     LLQuaternion bind_rot = LLSkinningUtil::getUnscaledQuaternion(LLMatrix4(high_lod_model->mSkinInfo.mBindShapeMatrix));
                     LLQuaternion identity;
-                    if (!bind_rot.isEqualEps(identity, 0.01))
+                    if (!bind_rot.isEqualEps(identity, 0.01f))
                     {
                         // Bind shape matrix is not in standard X-forward orientation.
                         // Might be good idea to only show this once. It can be spammy.
@@ -576,7 +576,7 @@ void LLModelPreview::rebuildUploadData()
         for (U32 model_ind = 0; model_ind < mModel[lod].size(); ++model_ind)
         {
             bool found_model = false;
-            for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
+            for (LLMeshUploadThread::instance_list_t::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
             {
                 LLModelInstance& instance = *iter;
                 if (instance.mLOD[lod] == mModel[lod][model_ind])
@@ -2209,7 +2209,7 @@ void LLModelPreview::updateStatusMessages()
         total_submeshes[i] = 0;
     }
 
-    for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
+    for (LLMeshUploadThread::instance_list_t::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
     {
         LLModelInstance& instance = *iter;
 
@@ -3461,7 +3461,7 @@ bool LLModelPreview::render()
 
     LLViewerCamera::getInstance()->setAspect(aspect);
 
-    LLViewerCamera::getInstance()->setView(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
+    LLViewerCamera::getInstance()->setViewNoBroadcast(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
 
     LLVector3 offset = mCameraOffset;
     LLVector3 target_pos = mPreviewTarget + offset;
@@ -3542,7 +3542,7 @@ bool LLModelPreview::render()
 
         if (!show_skin_weight)
         {
-            for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
+            for (LLMeshUploadThread::instance_list_t::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
             {
                 LLModelInstance& instance = *iter;
 
@@ -3628,7 +3628,7 @@ bool LLModelPreview::render()
 
                     gGL.blendFunc(LLRender::BF_SOURCE_ALPHA, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
 
-                    for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
+                    for (LLMeshUploadThread::instance_list_t::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
                     {
                         LLModelInstance& instance = *iter;
 
@@ -3750,7 +3750,7 @@ bool LLModelPreview::render()
                         gGL.diffuseColor4f(1.f, 0.f, 0.f, 1.f);
                         const LLVector4a scale(0.5f);
 
-                        for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
+                        for (LLMeshUploadThread::instance_list_t::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
                         {
                             LLModelInstance& instance = *iter;
 

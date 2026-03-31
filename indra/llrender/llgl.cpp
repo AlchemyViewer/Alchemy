@@ -52,16 +52,13 @@
 #include <glm/gtc/matrix_access.hpp>
 #include "glm/gtc/type_ptr.hpp"
 
-#if LL_MESA
-#  include "GL/osmesa.h"
-#  define LL_GET_PROC_ADDRESS(func) OSMesaGetProcAddress(func)
-#elif LL_SDL_WINDOW
+#if LL_SDL_WINDOW
+#  include "llwindowsdl.h"
 #  include "SDL3/SDL.h"
 #  define LL_GET_PROC_ADDRESS(func) SDL_GL_GetProcAddress(func)
 #elif LL_WINDOWS
-#  define LL_GET_PROC_ADDRESS(p)   wglGetProcAddress(p)
-#elif LL_LINUX
-#  define LL_GET_PROC_ADDRESS(p)   glXGetProcAddressARB(p)
+#  include "llwindowwin32.h"
+#  define LL_GET_PROC_ADDRESS(func) LLWindowWin32::getProcAddress(func)
 #endif
 
 #if LL_WINDOWS
@@ -72,10 +69,8 @@
 //#define GL_STATE_VERIFY
 #endif
 
-
 bool gDebugSession = false;
 bool gDebugGLSession = false;
-bool gClothRipple = false;
 bool gHeadlessClient = false;
 bool gNonInteractive = false;
 bool gGLActive = false;
@@ -221,8 +216,6 @@ void ll_close_fail_log()
 
 LLMatrix4 gGLObliqueProjectionInverse;
 
-#define LL_GL_NAME_POOLING 0
-
 std::list<LLGLUpdate*> LLGLUpdate::sGLQ;
 
 #if LL_GL_FUNC_POINTER
@@ -252,9 +245,20 @@ PFNWGLSWAPINTERVALEXTPROC    wglSwapIntervalEXT = nullptr;
 PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = nullptr;
 #endif
 
-#if LL_SDL_WINDOW
+#if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
+// GLX_MESA_query_renderer
+PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC glXQueryCurrentRendererIntegerMESA = nullptr;
+PFNGLXQUERYCURRENTRENDERERSTRINGMESAPROC glXQueryCurrentRendererStringMESA = nullptr;
+PFNGLXQUERYRENDERERINTEGERMESAPROC glXQueryRendererIntegerMESA = nullptr;
+PFNGLXQUERYRENDERERSTRINGMESAPROC glXQueryRendererStringMESA = nullptr;
+#endif
 
-// GL_VERSION_1_1
+#if LL_LINUX && LL_WAYLAND &&!LL_MESA_HEADLESS
+// EGL_VERSION_1_0
+PFNEGLQUERYSTRINGPROC eglQueryString = nullptr;
+#endif
+
+// GL_VERSION_1_0
 PFNGLCLEARCOLORPROC                  glClearColor = nullptr;
 PFNGLCLEARPROC                       glClear = nullptr;
 PFNGLCOLORMASKPROC                   glColorMask = nullptr;
@@ -265,7 +269,6 @@ PFNGLCULLFACEPROC                    glCullFace = nullptr;
 PFNGLPOINTSIZEPROC                   glPointSize = nullptr;
 PFNGLLINEWIDTHPROC                   glLineWidth = nullptr;
 PFNGLPOLYGONMODEPROC                 glPolygonMode = nullptr;
-PFNGLPOLYGONOFFSETPROC               glPolygonOffset = nullptr;
 PFNGLSCISSORPROC                     glScissor = nullptr;
 PFNGLDRAWBUFFERPROC                  glDrawBuffer = nullptr;
 PFNGLREADBUFFERPROC                  glReadBuffer = nullptr;
@@ -286,9 +289,6 @@ PFNGLDEPTHFUNCPROC                   glDepthFunc = nullptr;
 PFNGLDEPTHMASKPROC                   glDepthMask = nullptr;
 PFNGLDEPTHRANGEPROC                  glDepthRange = nullptr;
 PFNGLVIEWPORTPROC                    glViewport = nullptr;
-PFNGLGETPOINTERVPROC                 glGetPointerv = nullptr;
-PFNGLDRAWARRAYSPROC                  glDrawArrays = nullptr;
-PFNGLDRAWELEMENTSPROC                glDrawElements = nullptr;
 PFNGLPIXELSTOREFPROC                 glPixelStoref = nullptr;
 PFNGLPIXELSTOREIPROC                 glPixelStorei = nullptr;
 PFNGLREADPIXELSPROC                  glReadPixels = nullptr;
@@ -307,24 +307,29 @@ PFNGLGETTEXLEVELPARAMETERIVPROC      glGetTexLevelParameteriv = nullptr;
 PFNGLTEXIMAGE1DPROC                  glTexImage1D = nullptr;
 PFNGLTEXIMAGE2DPROC                  glTexImage2D = nullptr;
 PFNGLGETTEXIMAGEPROC                 glGetTexImage = nullptr;
-PFNGLGENTEXTURESPROC                 glGenTextures = nullptr;
-PFNGLDELETETEXTURESPROC              glDeleteTextures = nullptr;
-PFNGLBINDTEXTUREPROC                 glBindTexture = nullptr;
-PFNGLARETEXTURESRESIDENTPROC         glAreTexturesResident = nullptr;
-PFNGLISTEXTUREPROC                   glIsTexture = nullptr;
-PFNGLTEXSUBIMAGE1DPROC               glTexSubImage1D = nullptr;
-PFNGLTEXSUBIMAGE2DPROC               glTexSubImage2D = nullptr;
-PFNGLCOPYTEXIMAGE1DPROC              glCopyTexImage1D = nullptr;
-PFNGLCOPYTEXIMAGE2DPROC              glCopyTexImage2D = nullptr;
-PFNGLCOPYTEXSUBIMAGE1DPROC           glCopyTexSubImage1D = nullptr;
-PFNGLCOPYTEXSUBIMAGE2DPROC           glCopyTexSubImage2D = nullptr;
-#endif
+
+// GL_VERSION_1_1
+PFNGLDRAWARRAYSPROC               glDrawArrays        = nullptr;
+PFNGLDRAWELEMENTSPROC             glDrawElements      = nullptr;
+PFNGLGETPOINTERVPROC              glGetPointerv       = nullptr;
+PFNGLPOLYGONOFFSETPROC            glPolygonOffset     = nullptr;
+PFNGLCOPYTEXIMAGE1DPROC           glCopyTexImage1D    = nullptr;
+PFNGLCOPYTEXIMAGE2DPROC           glCopyTexImage2D    = nullptr;
+PFNGLCOPYTEXSUBIMAGE1DPROC        glCopyTexSubImage1D = nullptr;
+PFNGLCOPYTEXSUBIMAGE2DPROC        glCopyTexSubImage2D = nullptr;
+PFNGLTEXSUBIMAGE1DPROC            glTexSubImage1D  = nullptr;
+PFNGLTEXSUBIMAGE2DPROC            glTexSubImage2D  = nullptr;
+PFNGLBINDTEXTUREPROC              glBindTexture = nullptr;
+PFNGLDELETETEXTURESPROC           glDeleteTextures = nullptr;
+PFNGLGENTEXTURESPROC              glGenTextures = nullptr;
+PFNGLISTEXTUREPROC                glIsTexture = nullptr;
+
 
 // GL_VERSION_1_2
-PFNGLDRAWRANGEELEMENTSPROC  glDrawRangeElements = nullptr;
-PFNGLTEXIMAGE3DPROC         glTexImage3D = nullptr;
-PFNGLTEXSUBIMAGE3DPROC      glTexSubImage3D = nullptr;
-PFNGLCOPYTEXSUBIMAGE3DPROC  glCopyTexSubImage3D = nullptr;
+PFNGLDRAWRANGEELEMENTSPROC           glDrawRangeElements = nullptr;
+PFNGLTEXIMAGE3DPROC                  glTexImage3D = nullptr;
+PFNGLTEXSUBIMAGE3DPROC               glTexSubImage3D = nullptr;
+PFNGLCOPYTEXSUBIMAGE3DPROC           glCopyTexSubImage3D = nullptr;
 
 // GL_VERSION_1_3
 PFNGLACTIVETEXTUREPROC               glActiveTexture = nullptr;
@@ -999,6 +1004,7 @@ void LLGLManager::initWGL()
         LL_WARNS("RenderInit") << "No ARB pixel format extensions" << LL_ENDL;
     }
 
+    // WGL_ARB_create_context
     if (mGLExtensions.contains("WGL_ARB_create_context"))
     {
         wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)LL_GET_PROC_ADDRESS("wglCreateContextAttribsARB");
@@ -1015,11 +1021,21 @@ void LLGLManager::initWGL()
     {
         wglGetGPUIDsAMD = (PFNWGLGETGPUIDSAMDPROC)LL_GET_PROC_ADDRESS("wglGetGPUIDsAMD");
         wglGetGPUInfoAMD = (PFNWGLGETGPUINFOAMDPROC)LL_GET_PROC_ADDRESS("wglGetGPUInfoAMD");
+        wglGetContextGPUIDAMD = (PFNWGLGETCONTEXTGPUIDAMDPROC)LL_GET_PROC_ADDRESS("wglGetContextGPUIDAMD");
+        wglCreateAssociatedContextAMD = (PFNWGLCREATEASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglCreateAssociatedContextAMD");
+        wglCreateAssociatedContextAttribsAMD = (PFNWGLCREATEASSOCIATEDCONTEXTATTRIBSAMDPROC)LL_GET_PROC_ADDRESS("wglCreateAssociatedContextAttribsAMD");
+        wglDeleteAssociatedContextAMD = (PFNWGLDELETEASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglDeleteAssociatedContextAMD");
+        wglMakeAssociatedContextCurrentAMD = (PFNWGLMAKEASSOCIATEDCONTEXTCURRENTAMDPROC)LL_GET_PROC_ADDRESS("wglMakeAssociatedContextCurrentAMD");
+        wglGetCurrentAssociatedContextAMD = (PFNWGLGETCURRENTASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglGetCurrentAssociatedContextAMD");
+        wglBlitContextFramebufferAMD = (PFNWGLBLITCONTEXTFRAMEBUFFERAMDPROC)LL_GET_PROC_ADDRESS("wglBlitContextFramebufferAMD");
+
     }
 
+    // WGL_EXT_swap_control
     if (mGLExtensions.contains("WGL_EXT_swap_control"))
     {
         wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglSwapIntervalEXT");
+        wglGetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglGetSwapIntervalEXT");
     }
 
     if(!mGLExtensions.contains("WGL_ARB_pbuffer"))
@@ -1034,6 +1050,42 @@ void LLGLManager::initWGL()
 #endif
 }
 
+void LLGLManager::initGLX()
+{
+#if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
+    if (!mIsX11)
+        return;
+
+    reloadExtensionsString();
+
+    mHasGLXMESAQueryRenderer = mGLExtensions.contains("GLX_MESA_query_renderer");
+    if (mHasGLXMESAQueryRenderer)
+    {
+        glXQueryCurrentRendererIntegerMESA = (PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC)LL_GET_PROC_ADDRESS("glXQueryCurrentRendererIntegerMESA");
+        glXQueryCurrentRendererStringMESA = (PFNGLXQUERYCURRENTRENDERERSTRINGMESAPROC)LL_GET_PROC_ADDRESS("glXQueryCurrentRendererStringMESA");
+        glXQueryRendererIntegerMESA = (PFNGLXQUERYRENDERERINTEGERMESAPROC)LL_GET_PROC_ADDRESS("glXQueryRendererIntegerMESA");
+        glXQueryRendererStringMESA = (PFNGLXQUERYRENDERERSTRINGMESAPROC)LL_GET_PROC_ADDRESS("glXQueryRendererStringMESA");
+    }
+#endif
+}
+
+void LLGLManager::initEGL()
+{
+#if LL_LINUX && LL_WAYLAND && !LL_MESA_HEADLESS
+    if (!mIsWayland)
+        return;
+
+    reloadExtensionsString();
+
+    // EGL_VERSION_1_0
+    eglQueryString = (PFNEGLQUERYSTRINGPROC)LL_GET_PROC_ADDRESS("eglQueryString");
+
+    LL_INFOS("RenderInit") << "EGL_VENDOR     " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VENDOR)) << LL_ENDL;
+    LL_INFOS("RenderInit") << "EGL_VERSION    " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VERSION)) << LL_ENDL;
+#endif
+}
+
+
 // return false if unable (or unwilling due to old drivers) to init GL
 bool LLGLManager::initGL()
 {
@@ -1042,8 +1094,9 @@ bool LLGLManager::initGL()
         LL_ERRS("RenderInit") << "Calling init on LLGLManager after already initialized!" << LL_ENDL;
     }
 
-#if LL_GL_FUNC_POINTER && LL_SDL_WINDOW
-    // Load OpenGL 1.0 Functions when using SDL
+#if LL_GL_FUNC_POINTER
+    // OpenGL 1.0 and 1.1 always exist
+    // GL_VERSION_1_0
     glClearColor = (PFNGLCLEARCOLORPROC)LL_GET_PROC_ADDRESS("glClearColor");
     glClear = (PFNGLCLEARPROC)LL_GET_PROC_ADDRESS("glClear");
     glColorMask = (PFNGLCOLORMASKPROC)LL_GET_PROC_ADDRESS("glColorMask");
@@ -1092,6 +1145,22 @@ bool LLGLManager::initGL()
     glTexImage1D = (PFNGLTEXIMAGE1DPROC)LL_GET_PROC_ADDRESS("glTexImage1D");
     glTexImage2D = (PFNGLTEXIMAGE2DPROC)LL_GET_PROC_ADDRESS("glTexImage2D");
     glGetTexImage = (PFNGLGETTEXIMAGEPROC)LL_GET_PROC_ADDRESS("glGetTexImage");
+
+    // GL_VERSION_1_1
+    glDrawArrays = (PFNGLDRAWARRAYSPROC)LL_GET_PROC_ADDRESS("glDrawArrays");
+    glDrawElements = (PFNGLDRAWELEMENTSPROC)LL_GET_PROC_ADDRESS("glDrawElements");
+    glGetPointerv = (PFNGLGETPOINTERVPROC)LL_GET_PROC_ADDRESS("glGetPointerv");
+    glPolygonOffset = (PFNGLPOLYGONOFFSETPROC)LL_GET_PROC_ADDRESS("glPolygonOffset");
+    glCopyTexImage1D = (PFNGLCOPYTEXIMAGE1DPROC)LL_GET_PROC_ADDRESS("glCopyTexImage1D");
+    glCopyTexImage2D = (PFNGLCOPYTEXIMAGE2DPROC)LL_GET_PROC_ADDRESS("glCopyTexImage2D");
+    glCopyTexSubImage1D = (PFNGLCOPYTEXSUBIMAGE1DPROC)LL_GET_PROC_ADDRESS("glCopyTexSubImage1D");
+    glCopyTexSubImage2D = (PFNGLCOPYTEXSUBIMAGE2DPROC)LL_GET_PROC_ADDRESS("glCopyTexSubImage2D");
+    glTexSubImage1D = (PFNGLTEXSUBIMAGE1DPROC)LL_GET_PROC_ADDRESS("glTexSubImage1D");
+    glTexSubImage2D = (PFNGLTEXSUBIMAGE2DPROC)LL_GET_PROC_ADDRESS("glTexSubImage2D");
+    glBindTexture = (PFNGLBINDTEXTUREPROC)LL_GET_PROC_ADDRESS("glBindTexture");
+    glDeleteTextures = (PFNGLDELETETEXTURESPROC)LL_GET_PROC_ADDRESS("glDeleteTextures");
+    glGenTextures = (PFNGLGENTEXTURESPROC)LL_GET_PROC_ADDRESS("glGenTextures");
+    glIsTexture = (PFNGLISTEXTUREPROC)LL_GET_PROC_ADDRESS("glIsTexture");
 #endif
 
     // Extract video card strings and convert to upper case to
@@ -1199,6 +1268,23 @@ bool LLGLManager::initGL()
         }
     } else
 #endif
+
+#if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
+    if(mHasGLXMESAQueryRenderer && mVRAM == 0)
+    {
+        unsigned int vram_val = 0;
+        if(glXQueryCurrentRendererIntegerMESA(GLX_RENDERER_VIDEO_MEMORY_MESA, &vram_val))
+        {
+            gGLManager.mVRAM = vram_val;
+
+            if (mVRAM != 0)
+            {
+                LL_WARNS("RenderInit") << "VRAM Detected (GLXMesaQueryRenderer):" << mVRAM << LL_ENDL;
+            }
+        }
+    }
+#endif
+
 #if LL_WINDOWS || LL_LINUX
     {
         if (mHasNVXGpuMemoryInfo && mVRAM == 0)
@@ -1238,6 +1324,9 @@ bool LLGLManager::initGL()
     glGetIntegerv(GL_MAX_SAMPLES, &mMaxSamples);
     glGetIntegerv(GL_MAX_VARYING_VECTORS, &mMaxVaryingVectors);
     glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &mMaxUniformBlockSize);
+
+    // If outside the allowed range, glLineWidth fails with "invalid value".
+    glGetFloatv(GL_ALIASED_LINE_WIDTH_RANGE, mAliasedLineRange.mV);
 
     // sanity clamp max uniform block size to 64k just in case
     // there's some implementation that reports a crazy value
@@ -1394,23 +1483,13 @@ void LLGLManager::reloadExtensionsString()
 
     //reload extensions string
     // I am deeply sorry for how ugly this is. - Rye
-#if LL_SDL_WINDOW
+#if LL_GL_FUNC_POINTER
     PFNGLGETSTRINGIPROC llglGetStringi = (PFNGLGETSTRINGIPROC)LL_GET_PROC_ADDRESS("glGetStringi");
     PFNGLGETINTEGERVPROC llglGetIntegerv = (PFNGLGETINTEGERVPROC)LL_GET_PROC_ADDRESS("glGetIntegerv");
     if (llglGetStringi && llglGetIntegerv)
     {
         GLint num_extensions = 0;
         llglGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
-        for (GLint i = 0; i < num_extensions; ++i) {
-            mGLExtensions.insert(ll_safe_string((char const*)llglGetStringi(GL_EXTENSIONS, i)));
-        }
-    }
-#elif LL_WINDOWS
-    PFNGLGETSTRINGIPROC llglGetStringi = (PFNGLGETSTRINGIPROC)LL_GET_PROC_ADDRESS("glGetStringi");
-    if (llglGetStringi)
-    {
-        GLint num_extensions = 0;
-        glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
         for (GLint i = 0; i < num_extensions; ++i) {
             mGLExtensions.insert(ll_safe_string((char const*)llglGetStringi(GL_EXTENSIONS, i)));
         }
@@ -1433,18 +1512,59 @@ void LLGLManager::reloadExtensionsString()
     }
 #endif
 
-
 #if LL_WINDOWS
     {
         PFNWGLGETEXTENSIONSSTRINGARBPROC wglGetExtensionsStringARB = (PFNWGLGETEXTENSIONSSTRINGARBPROC)LL_GET_PROC_ADDRESS("wglGetExtensionsStringARB");
         if (wglGetExtensionsStringARB)
         {
-            std::string wgl_exts = ll_safe_string((const char*)wglGetExtensionsStringARB(wglGetCurrentDC()));;
+            std::string wgl_exts = ll_safe_string((const char*)wglGetExtensionsStringARB(wglGetCurrentDC()));
             boost::char_separator<char> sep(" ");
             boost::tokenizer<boost::char_separator<char> > tok(wgl_exts, sep);
             for (boost::tokenizer<boost::char_separator<char> >::iterator i = tok.begin(); i != tok.end(); ++i)
             {
                 mGLExtensions.insert(*i);
+            }
+        }
+    }
+#endif
+
+#if LL_SDL_WINDOW && LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
+    if (mIsX11)
+    {
+        if (LLWindowSDL::sX11Data.xdisplay && LLWindowSDL::sX11Data.xwindow)
+        {
+            typedef const char *(*PFNEGLXQUERYEXTENSIONSSTRINGPROC) (Display *dpy, int screen );
+            PFNEGLXQUERYEXTENSIONSSTRINGPROC llglXQueryExtensionsString = (PFNEGLXQUERYEXTENSIONSSTRINGPROC)LL_GET_PROC_ADDRESS("glXQueryExtensionsString");
+            if (llglXQueryExtensionsString)
+            {
+                std::string glx_exts = ll_safe_string((const char*)llglXQueryExtensionsString(LLWindowSDL::sX11Data.xdisplay, LLWindowSDL::sX11Data.xscreen));
+                boost::char_separator<char> sep(" ");
+                boost::tokenizer<boost::char_separator<char> > tok(glx_exts, sep);
+                for (boost::tokenizer<boost::char_separator<char> >::iterator i = tok.begin(); i != tok.end(); ++i)
+                {
+                    mGLExtensions.insert(*i);
+                }
+            }
+        }
+    }
+#endif
+
+#if LL_SDL_WINDOW && LL_LINUX && LL_WAYLAND && !LL_MESA_HEADLESS
+    if (mIsWayland)
+    {
+        SDL_EGLDisplay egl_display = SDL_EGL_GetCurrentDisplay();
+        if (egl_display)
+        {
+            PFNEGLQUERYSTRINGPROC lleglQueryString = (PFNEGLQUERYSTRINGPROC)LL_GET_PROC_ADDRESS("eglQueryString");
+            if (lleglQueryString)
+            {
+                std::string egl_exts = ll_safe_string((const char*)lleglQueryString((EGLDisplay)egl_display, EGL_EXTENSIONS));
+                boost::char_separator<char> sep(" ");
+                boost::tokenizer<boost::char_separator<char> > tok(egl_exts, sep);
+                for (boost::tokenizer<boost::char_separator<char> >::iterator i = tok.begin(); i != tok.end(); ++i)
+                {
+                    mGLExtensions.insert(*i);
+                }
             }
         }
     }
@@ -1479,60 +1599,7 @@ void LLGLManager::initExtensions()
 
 #if LL_GL_FUNC_POINTER
     // Load entire OpenGL API through GetProcAddress, leaving sections beyond mGLVersion unloaded
-
-#if LL_WINDOWS
     LL_DEBUGS("RenderInit") << "GL Probe: Getting symbols" << LL_ENDL;
-
-    // WGL_AMD_gpu_association
-    mHasAMDAssociations = mGLExtensions.contains("WGL_AMD_gpu_association");
-    if(mHasAMDAssociations)
-    {
-        wglGetGPUIDsAMD = (PFNWGLGETGPUIDSAMDPROC)LL_GET_PROC_ADDRESS("wglGetGPUIDsAMD");
-        wglGetGPUInfoAMD = (PFNWGLGETGPUINFOAMDPROC)LL_GET_PROC_ADDRESS("wglGetGPUInfoAMD");
-        wglGetContextGPUIDAMD = (PFNWGLGETCONTEXTGPUIDAMDPROC)LL_GET_PROC_ADDRESS("wglGetContextGPUIDAMD");
-        wglCreateAssociatedContextAMD = (PFNWGLCREATEASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglCreateAssociatedContextAMD");
-        wglCreateAssociatedContextAttribsAMD = (PFNWGLCREATEASSOCIATEDCONTEXTATTRIBSAMDPROC)LL_GET_PROC_ADDRESS("wglCreateAssociatedContextAttribsAMD");
-        wglDeleteAssociatedContextAMD = (PFNWGLDELETEASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglDeleteAssociatedContextAMD");
-        wglMakeAssociatedContextCurrentAMD = (PFNWGLMAKEASSOCIATEDCONTEXTCURRENTAMDPROC)LL_GET_PROC_ADDRESS("wglMakeAssociatedContextCurrentAMD");
-        wglGetCurrentAssociatedContextAMD = (PFNWGLGETCURRENTASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglGetCurrentAssociatedContextAMD");
-        wglBlitContextFramebufferAMD = (PFNWGLBLITCONTEXTFRAMEBUFFERAMDPROC)LL_GET_PROC_ADDRESS("wglBlitContextFramebufferAMD");
-    }
-
-    // WGL_EXT_swap_control
-    if (mGLExtensions.contains("WGL_EXT_swap_control"))
-    {
-        wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglSwapIntervalEXT");
-        wglGetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglGetSwapIntervalEXT");
-    }
-    // WGL_ARB_create_context
-    if (mGLExtensions.contains("WGL_ARB_create_context"))
-    {
-        wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)LL_GET_PROC_ADDRESS("wglCreateContextAttribsARB");
-    }
-#endif
-
-#if LL_SDL_WINDOW
-    // GL_VERSION_1_1
-    if (mGLVersion < 1.09f)
-    {
-        return;
-    }
-    glDrawArrays = (PFNGLDRAWARRAYSPROC)LL_GET_PROC_ADDRESS("glDrawArrays");
-    glDrawElements = (PFNGLDRAWELEMENTSPROC)LL_GET_PROC_ADDRESS("glDrawElements");
-    glGetPointerv = (PFNGLGETPOINTERVPROC)LL_GET_PROC_ADDRESS("glGetPointerv");
-    glPolygonOffset = (PFNGLPOLYGONOFFSETPROC)LL_GET_PROC_ADDRESS("glPolygonOffset");
-    glCopyTexImage1D = (PFNGLCOPYTEXIMAGE1DPROC)LL_GET_PROC_ADDRESS("glCopyTexImage1D");
-    glCopyTexImage2D = (PFNGLCOPYTEXIMAGE2DPROC)LL_GET_PROC_ADDRESS("glCopyTexImage2D");
-    glCopyTexSubImage1D = (PFNGLCOPYTEXSUBIMAGE1DPROC)LL_GET_PROC_ADDRESS("glCopyTexSubImage1D");
-    glCopyTexSubImage2D = (PFNGLCOPYTEXSUBIMAGE2DPROC)LL_GET_PROC_ADDRESS("glCopyTexSubImage2D");
-    glTexSubImage1D = (PFNGLTEXSUBIMAGE1DPROC)LL_GET_PROC_ADDRESS("glTexSubImage1D");
-    glTexSubImage2D = (PFNGLTEXSUBIMAGE2DPROC)LL_GET_PROC_ADDRESS("glTexSubImage2D");
-    glBindTexture = (PFNGLBINDTEXTUREPROC)LL_GET_PROC_ADDRESS("glBindTexture");
-    glDeleteTextures = (PFNGLDELETETEXTURESPROC)LL_GET_PROC_ADDRESS("glDeleteTextures");
-    glGenTextures = (PFNGLGENTEXTURESPROC)LL_GET_PROC_ADDRESS("glGenTextures");
-    glIsTexture = (PFNGLISTEXTUREPROC)LL_GET_PROC_ADDRESS("glIsTexture");
-    glAreTexturesResident = (PFNGLARETEXTURESRESIDENTPROC)LL_GET_PROC_ADDRESS("glAreTexturesResident");
-#endif
 
     // GL_VERSION_1_2
     if (mGLVersion < 1.19f)
@@ -2260,10 +2327,14 @@ const std::string getGLErrorString(GLenum error)
         return "Invalid Framebuffer Operation";
     case GL_OUT_OF_MEMORY:
         return "Out of Memory";
+#ifdef GL_STACK_UNDERFLOW
     case GL_STACK_UNDERFLOW:
         return "Stack Underflow";
+#endif
+#ifdef GL_STACK_OVERFLOW
     case GL_STACK_OVERFLOW:
         return "Stack Overflow";
+#endif
 #ifdef GL_TABLE_TOO_LARGE
     case GL_TABLE_TOO_LARGE:
         return "Table too large";

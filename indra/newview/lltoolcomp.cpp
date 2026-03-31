@@ -482,6 +482,17 @@ void LLToolCompScale::render()
     }
 }
 
+bool LLToolCompScale::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
+{
+    LLToolCompScale::getInstance()->mManip->handleMiddleMouseDown(x,y,mask);
+    return handleMouseDown(x,y,mask);
+}
+
+bool LLToolCompScale::handleMiddleMouseUp(S32 x, S32 y, MASK mask)
+{
+    LLToolCompScale::getInstance()->mManip->handleMiddleMouseUp(x,y,mask);
+    return handleMouseUp(x,y,mask);
+}
 //-----------------------------------------------------------------------
 // LLToolCompCreate
 

@@ -74,6 +74,10 @@
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+#include "rlvhandler.h"
+// [/RLVa:KB]
 
 // Constants
 static const F32 PLACE_INFO_UPDATE_INTERVAL = 3.0;
@@ -221,7 +225,7 @@ public:
     }
     /*virtual*/ void setErrorStatus(S32 status, const std::string& reason)
     {
-        LL_ERRS() << "Can't complete remote parcel request. Http Status: "
+        LL_WARNS() << "Can't complete remote parcel request. Http Status: "
                << status << ". Reason : " << reason << LL_ENDL;
     }
 
@@ -651,7 +655,7 @@ void LLPanelPlaces::onFilterEdit(const std::string& search_string, bool force_fi
 void LLPanelPlaces::onTabSelected()
 {
     mActivePanel = dynamic_cast<LLPanelPlacesTab*>(mTabContainer->getCurrentPanel());
-    if (!mActivePanel)
+    if (!mActivePanel || !mTabsCreated)
         return;
 
     onFilterEdit(mActivePanel->getFilterSubString(), true);
@@ -1305,10 +1309,20 @@ void LLPanelPlaces::updateVerbs()
             mTeleportBtn->setEnabled(have_3d_pos &&
                                      !LLViewerParcelMgr::getInstance()->inAgentParcel(mPosGlobal));
         }
-        else if (mPlaceInfoType == LANDMARK_INFO_TYPE || mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+// [RLVa:KB]
+        else if (mPlaceInfoType == LANDMARK_INFO_TYPE)
         {
-            mTeleportBtn->setEnabled(have_3d_pos);
+            mTeleportBtn->setEnabled(have_3d_pos && !gRlvHandler.hasBehaviour(RLV_BHVR_TPLM));
         }
+        else if (mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+        {
+            mTeleportBtn->setEnabled(have_3d_pos && RlvActions::canTeleportToLocation());
+        }
+// [/RLVa:KB]
+//      else if (mPlaceInfoType == LANDMARK_INFO_TYPE || mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+//      {
+//          mTeleportBtn->setEnabled(have_3d_pos);
+//      }
     }
     else
     {
@@ -1335,6 +1349,13 @@ LLPanelPlaceInfo* LLPanelPlaces::getCurrentInfoPanel()
     return NULL;
 }
 
+void LLPanelPlaces::hideBackBtn()
+{
+    mPlaceProfileBackBtn->setVisible(false);
+    setBackgroundVisible(false);
+    mPlaceProfile->setBackgroundVisible(false);
+}
+
 static bool is_agent_in_selected_parcel(LLParcel* parcel)
 {
     LLViewerParcelMgr* parcel_mgr = LLViewerParcelMgr::getInstance();
@@ -1349,6 +1370,12 @@ static bool is_agent_in_selected_parcel(LLParcel* parcel)
 
 static void onSLURLBuilt(std::string& slurl)
 {
+    if (slurl.empty())
+    {
+        LLNotificationsUtil::add("LandmarkLocationUnknown");
+        return;
+    }
+
     LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(slurl));
 
     LLSD args;

@@ -42,6 +42,8 @@ class LLViewerInventoryCategory;
 class LLInventoryCallback;
 class LLAvatarName;
 
+constexpr U8 NO_INV_SUBTYPE{ 0 };
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLViewerInventoryItem
 //
@@ -84,6 +86,10 @@ public:
     virtual U32 getCRC32() const; // really more of a checksum.
 
     static bool extractSortFieldAndDisplayName(const std::string& name, S32* sortField, std::string* displayName);
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
+    static bool lookupLocalizedName(std::string& name);
+    static bool lookupSystemName(std::string& name);
+// [/SL:KB]
 
     // construct a complete viewer inventory item
     LLViewerInventoryItem(const LLUUID& uuid, const LLUUID& parent_uuid,
@@ -284,9 +290,9 @@ private:
     LLUUID mTargetLandmarkId;
 };
 
-typedef boost::function<void(const LLUUID&)> inventory_func_type;
-typedef boost::function<void(const LLSD&)> llsd_func_type;
-typedef boost::function<void()> nullary_func_type;
+typedef std::function<void(const LLUUID&)> inventory_func_type;
+typedef std::function<void(const LLSD&)> llsd_func_type;
+typedef std::function<void()> nullary_func_type;
 
 void no_op_inventory_func(const LLUUID&); // A do-nothing inventory_func
 void no_op_llsd_func(const LLSD&); // likewise for LLSD
@@ -358,8 +364,6 @@ public:
 };
 extern LLInventoryCallbackManager gInventoryCallbacks;
 
-
-const U8 NO_INV_SUBTYPE{ 0 };
 
 // *TODO: Find a home for these
 void create_inventory_item(const LLUUID& agent_id, const LLUUID& session_id,
@@ -470,7 +474,7 @@ void menu_create_inventory_item(LLInventoryPanel* root,
                                 const LLSD& userdata,
                                 const LLUUID& default_parent_uuid = LLUUID::null);
 
-void menu_create_inventory_item(LLInventoryPanel* panel, LLUUID dest_id, const LLSD& userdata, const LLUUID& default_parent_uuid = LLUUID::null, std::function<void(const LLUUID&)> folder_created_cb = NULL);
+void menu_create_inventory_item(LLInventoryPanel* panel, LLUUID dest_id, const LLSD& userdata, const LLUUID& default_parent_uuid = LLUUID::null, std::function<void(const LLUUID&)> folder_created_cb = nullptr);
 
 void slam_inventory_folder(const LLUUID& folder_id,
                            const LLSD& contents,

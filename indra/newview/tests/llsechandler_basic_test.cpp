@@ -34,7 +34,6 @@
 #include "lluuid.h"
 #include "lldate.h"
 #include "llxorcipher.h"
-#include "apr_base64.h"
 #include <vector>
 #include <ios>
 #include <llsdserialize.h>
@@ -49,7 +48,9 @@
 #include <openssl/asn1.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
+#include <openssl/provider.h>
 #include "../llmachineid.h"
+#include <simdutf.h>
 
 #define ensure_throws(str, exc_type, cert, func, ...) \
 try \
@@ -634,10 +635,28 @@ namespace tut
     {
         X509 *mX509TestCert, *mX509RootCert, *mX509IntermediateCert, *mX509ChildCert;
         LLSD mValidationDate;
+        OSSL_PROVIDER* mOSSLLegacyProvider  = nullptr;
 
         sechandler_basic_test()
         {
             LLMachineID::init();
+
+#if LL_WINDOWS
+            // We dynamiclly link openssl on windows
+            OSSL_PROVIDER_set_default_search_path(nullptr, gDirUtilp->getExecutableDir().c_str());
+#endif
+
+            /* Load Legacy provider into the default (nullptr) library context */
+            mOSSLLegacyProvider = OSSL_PROVIDER_try_load(nullptr, "legacy", 1);
+            if (!mOSSLLegacyProvider)
+            {
+                LL_WARNS() << "Failed to load OpenSSL legacy provider, expect problems." << LL_ENDL;
+            }
+
+            OpenSSL_add_all_algorithms();
+            OpenSSL_add_all_ciphers();
+            OpenSSL_add_all_digests();
+            ERR_load_crypto_strings();
             gFirstName = "";
             gLastName = "";
             mValidationDate[CERT_VALIDATION_DATE] = LLDate("2017-04-11T00:00:00.00Z");
@@ -676,6 +695,10 @@ namespace tut
             X509_free(mX509RootCert);
             X509_free(mX509IntermediateCert);
             X509_free(mX509ChildCert);
+            if (mOSSLLegacyProvider)
+            {
+                OSSL_PROVIDER_unload(mOSSLLegacyProvider);
+            }
         }
     };
 
@@ -754,16 +777,24 @@ namespace tut
     template<> template<>
     void sechandler_basic_test_object::test<3>()
     {
-        skip("Broken with openssl 3.0");
-
         std::string protected_data = "sUSh3wj77NG9oAMyt3XIhaej3KLZhLZWFZvI6rIGmwUUOmmelrRg0NI9rkOj8ZDpTPxpwToaBT5u"
         "GQhakdaGLJznr9bHr4/6HIC1bouKj4n2rs4TL6j2WSjto114QdlNfLsE8cbbE+ghww58g8SeyLQO"
         "nyzXoz+/PBz0HD5SMFDuObccoPW24gmqYySz8YoEWhSwO0pUtEEqOjVRsAJgF5wLAtJZDeuilGsq"
         "4ZT9Y4wZ9Rh8nnF3fDUL6IGamHe1ClXM1jgBu10F6UMhZbnH4C3aJ2E9+LiOntU+l3iCb2MpkEpr"
         "82r2ZAMwIrpnirL/xoYoyz7MJQYwUuMvBPToZJrxNSsjI+S2Z+I3iEJAELMAAA==";
 
-        std::vector<U8> binary_data(apr_base64_decode_len(protected_data.c_str()));
-        apr_base64_decode_binary(&binary_data[0], protected_data.c_str());
+        // allocate enough memory for the maximal binary length
+        std::vector<U8> binary_data(simdutf::maximal_binary_length_from_base64(protected_data.data(), protected_data.size()));
+        // convert to binary and check for errors
+        simdutf::result r = simdutf::base64_to_binary(protected_data.data(), protected_data.size(), (char*)binary_data.data());
+        if (r.error != simdutf::error_code::SUCCESS)
+        {
+            fail("base64 decode failed");
+        }
+        else
+        {
+            binary_data.resize(r.count); // in case of success, r.count contains the output length
+        }
 
         LLXORCipher cipher(gMACAddress, MAC_ADDRESS_BYTES);
         cipher.decrypt(&binary_data[0], 16);
@@ -771,7 +802,7 @@ namespace tut
         LLMachineID::getUniqueID(unique_id, sizeof(unique_id));
         LLXORCipher cipher2(unique_id, sizeof(unique_id));
         cipher2.encrypt(&binary_data[0], 16);
-        std::ofstream temp_file("sechandler_settings.tmp", std::ofstream::binary);
+        llofstream temp_file("sechandler_settings.tmp", std::ofstream::binary);
         temp_file.write((const char *)&binary_data[0], binary_data.size());
         temp_file.close();
 
@@ -844,7 +875,7 @@ namespace tut
 
         // rewrite the initial file to verify reloads
         handler = NULL;
-        std::ofstream temp_file2("sechandler_settings.tmp", std::ofstream::binary);
+        llofstream temp_file2("sechandler_settings.tmp", std::ofstream::binary);
         temp_file2.write((const char *)&binary_data[0], binary_data.size());
         temp_file2.close();
 
@@ -871,8 +902,6 @@ namespace tut
     template<> template<>
     void sechandler_basic_test_object::test<4>()
     {
-        skip("Broken with openssl 3.0");
-
         LLPointer<LLSecAPIBasicHandler> handler = new LLSecAPIBasicHandler("sechandler_settings.tmp", "test_password.dat");
         handler->init();
 
@@ -949,9 +978,22 @@ namespace tut
         // test loading of an unknown credential with legacy saved password and username
 
         std::string hashed_password = "fSQcLG03eyIWJmkzfyYaKm81dSweLmsxeSAYKGE7fSQ=";
-        int length = apr_base64_decode_len(hashed_password.c_str());
-        std::vector<char> decoded_password(length);
-        apr_base64_decode(&decoded_password[0], hashed_password.c_str());
+
+        // allocate enough memory for the maximal binary length
+        int length = 0;
+        std::vector<char> decoded_password(simdutf::maximal_binary_length_from_base64(hashed_password.data(), hashed_password.size()));
+        // convert to binary and check for errors
+        simdutf::result r = simdutf::base64_to_binary(hashed_password.data(), hashed_password.size(), decoded_password.data());
+        if (r.error != simdutf::error_code::SUCCESS)
+        {
+            fail("base64 decode failed");
+        }
+        else
+        {
+            length = narrow(r.count);
+            decoded_password.resize(r.count); // in case of success, r.count contains the output length
+        }
+
         LLXORCipher cipher(gMACAddress, MAC_ADDRESS_BYTES);
         cipher.decrypt((U8*)&decoded_password[0], length);
         unsigned char unique_id[MAC_ADDRESS_BYTES];

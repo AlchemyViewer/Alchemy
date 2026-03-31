@@ -48,7 +48,7 @@
 #pragma warning(disable: 4702)
 #endif
 
-LLCoreHttpUtil::HttpCoroutineAdapter::HttpCoroutineAdapter(std::string const&, unsigned int)
+LLCoreHttpUtil::HttpCoroutineAdapter::HttpCoroutineAdapter(std::string name, LLCore::HttpRequest::policy_t policyId)
 {
 }
 
@@ -74,11 +74,13 @@ namespace tut
     {
         coproceduremanager_test()
         {
+            LLCoros::createInstance();
         }
 
         ~coproceduremanager_test()
         {
             LLCoprocedureManager::instance().close();
+            LLCoros::deleteSingleton();
         }
     };
     typedef test_group<coproceduremanager_test> coproceduremanager_t;

@@ -26,6 +26,7 @@
 #ifndef LL_LLUUID_H
 #define LL_LLUUID_H
 
+#include <functional>
 #include <iostream>
 #include <set>
 #include <vector>
@@ -76,55 +77,11 @@ public:
     //
     // ACCESSORS
     //
-private:
-    // Derived from Boost.UUID hash impl
-    inline std::uint64_t hash_mix_mx( std::uint64_t x ) const noexcept
-    {
-        x *= 0xD96AAA55;
-        x ^= x >> 16;
-        return x;
-    }
-
-    // prospector -p mul:0xD96AAA55,xorr:16,mul,xorr -t 1000
-    // score = 79.5223047689704
-    // (with mx prepended)
-    inline std::uint64_t hash_mix_fmx( std::uint64_t x ) const noexcept
-    {
-        x *= 0x7DF954AB;
-        x ^= x >> 16;
-        return x;
-    }
-
-    inline std::uint32_t load_little_u32( void const* p ) const noexcept
-    {
-        std::uint32_t tmp;
-        std::memcpy( &tmp, p, sizeof( tmp ) );
-        return tmp;
-    }
-public:
-    inline size_t getHash() const noexcept
-    {
-        std::uint64_t r = 0;
-
-        r = hash_mix_mx( r + load_little_u32( mData +  0 ) );
-        r = hash_mix_mx( r + load_little_u32( mData +  4 ) );
-        r = hash_mix_mx( r + load_little_u32( mData +  8 ) );
-        r = hash_mix_mx( r + load_little_u32( mData + 12 ) );
-
-        return static_cast<std::size_t>( hash_mix_fmx( r ) );
-    }
-
-    friend std::size_t hash_value( const LLUUID& id ) noexcept
-    {
-        return id.getHash();
-    }
-
     bool    isNull() const;         // Faster than comparing to LLUUID::null.
     bool    notNull() const;        // Faster than comparing to LLUUID::null.
     // JC: This is dangerous.  It allows UUIDs to be cast automatically
     // to integers, among other things.  Use isNull() or notNull().
     //      operator bool() const;
-
 
     bool    operator==(const LLUUID &rhs) const;
     bool    operator!=(const LLUUID &rhs) const;
@@ -147,6 +104,8 @@ public:
     friend LL_COMMON_API std::ostream&   operator<<(std::ostream& s, const LLUUID &uuid);
     friend LL_COMMON_API std::istream&   operator>>(std::istream& s, LLUUID &uuid);
 
+    void to_chars(char* out) const;
+    void to_wchars(wchar_t* out) const;
     void toString(std::string& out) const;
     void toCompressedString(std::string& out) const;
 
@@ -220,9 +179,39 @@ namespace std
     {
         inline size_t operator()(const LLUUID& id) const noexcept
         {
-            return id.getHash();
+            size_t h = 0;
+            // Golden ratio hash with avalanche mixing
+            // Process 8 bytes at a time by manually constructing 64-bit values
+            // Shift by 31: mixes upper half into lower half for better bit distribution
+            // Shift by 47: ensures highest bits influence final hash output
+            for (int i = 0; i < UUID_BYTES; i += 8) {
+                size_t chunk = (size_t)id.mData[i] | ((size_t)id.mData[i+1] << 8) |
+                               ((size_t)id.mData[i+2] << 16) | ((size_t)id.mData[i+3] << 24) |
+                               ((size_t)id.mData[i+4] << 32) | ((size_t)id.mData[i+5] << 40) |
+                               ((size_t)id.mData[i+6] << 48) | ((size_t)id.mData[i+7] << 56);
+                h ^= (chunk * 0x9e3779b97f4a7c15ULL) ^ (h >> 31) ^ (h >> 47);
+            }
+            return h;
         }
     };
+}
+
+// For use with boost::container_hash
+inline size_t hash_value(const LLUUID& id) noexcept
+{
+    size_t h = 0;
+    // Golden ratio hash with avalanche mixing
+    // Process 8 bytes at a time by manually constructing 64-bit values
+    // Shift by 31: mixes upper half into lower half for better bit distribution
+    // Shift by 47: ensures highest bits influence final hash output
+    for (int i = 0; i < UUID_BYTES; i += 8)
+    {
+        size_t chunk = (size_t)id.mData[i] | ((size_t)id.mData[i + 1] << 8) | ((size_t)id.mData[i + 2] << 16) |
+                       ((size_t)id.mData[i + 3] << 24) | ((size_t)id.mData[i + 4] << 32) | ((size_t)id.mData[i + 5] << 40) |
+                       ((size_t)id.mData[i + 6] << 48) | ((size_t)id.mData[i + 7] << 56);
+        h ^= (chunk * 0x9e3779b97f4a7c15ULL) ^ (h >> 31) ^ (h >> 47);
+    }
+    return h;
 }
 
 #endif // LL_LLUUID_H

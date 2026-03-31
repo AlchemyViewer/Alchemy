@@ -47,6 +47,7 @@
 #include "llimagej2c.h"
 #include "llimagejpeg.h"
 #include "llimagetga.h"
+#include "llimagewebp.h"
 #include "llinventorymodel.h"   // gInventory
 #include "llpluginclassmedia.h"
 #include "llresourcedata.h"
@@ -379,7 +380,7 @@ void LLMediaFilePicker::notify(const std::vector<std::string>& filenames)
 
 #if LL_WINDOWS
 static std::string SOUND_EXTENSIONS = "wav";
-static std::string IMAGE_EXTENSIONS = "tga bmp jpg jpeg png";
+static std::string IMAGE_EXTENSIONS = "tga bmp jpg jpeg png webp";
 static std::string ANIM_EXTENSIONS =  "bvh anim";
 static std::string XML_EXTENSIONS = "xml";
 static std::string SLOBJECT_EXTENSIONS = "slobject";
@@ -523,10 +524,6 @@ void upload_single_file(
         case LLFilePicker::FFLOAD_WAV:
             floater_name = "upload_sound";
             break;
-        case LLFilePicker::FFLOAD_MODEL:
-            if (LLFloaterModelPreview* pFloaterModelPreview = LLFloaterReg::getTypedInstance<LLFloaterModelPreview>("upload_model"))
-                pFloaterModelPreview->loadModel(LLModel::LOD_HIGH, filename);
-            return;
         case LLFilePicker::FFLOAD_GLTF:
             LLMaterialEditor::loadMaterialFromFile(filename, -1);
             return;
@@ -539,10 +536,9 @@ void upload_single_file(
             LLFloaterReg::showInstance(floater_name, args);
         }
     }
-    return;
 }
 
-void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k)
+void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLUUID& dest)
 {
     for (std::vector<std::string>::const_iterator in_iter = filenames.begin(); in_iter != filenames.end(); ++in_iter)
     {
@@ -654,7 +650,7 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k)
                         LLFileSystem fmt_file(new_asset_id, LLAssetType::AT_TEXTURE, LLFileSystem::WRITE);
                         fmt_file.write(formatted->getData(), formatted->getDataSize());
 
-                        LLResourceUploadInfo::ptr_t assetUploadInfo(new LLResourceUploadInfo(
+                        LLResourceUploadInfo::ptr_t assetUploadInfo = std::make_shared<LLResourceUploadInfo>(
                             tid, LLAssetType::AT_TEXTURE,
                             asset_name,
                             asset_name, 0,
@@ -662,15 +658,16 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k)
                             LLFloaterPerms::getNextOwnerPerms("Uploads"),
                             LLFloaterPerms::getGroupPerms("Uploads"),
                             LLFloaterPerms::getEveryonePerms("Uploads"),
-                            LLAgentBenefitsMgr::current().getTextureUploadCost(raw_image->getWidth(), raw_image->getHeight())
-                        ));
+                            LLAgentBenefitsMgr::current().getTextureUploadCost(raw_image->getWidth(), raw_image->getHeight()),
+                            dest
+                        );
 
                         upload_new_resource(assetUploadInfo);
                     }
                 }
                 else
                 {
-                    LLNewFileResourceUploadInfo* info_p = new LLNewFileResourceUploadInfo(
+                    LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLNewFileResourceUploadInfo>(
                         filename,
                         asset_name,
                         asset_name, 0,
@@ -678,8 +675,8 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k)
                         LLFloaterPerms::getNextOwnerPerms("Uploads"),
                         LLFloaterPerms::getGroupPerms("Uploads"),
                         LLFloaterPerms::getEveryonePerms("Uploads"),
-                        expected_upload_cost);
-                    LLResourceUploadInfo::ptr_t uploadInfo(info_p);
+                        expected_upload_cost,
+                        dest);
 
                     upload_new_resource(uploadInfo);
                 }
@@ -699,14 +696,14 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k)
                     // Todo:
                     // 1. Decouple bulk upload from material editor
                     // 2. Take into account possiblity of identical textures
-                    LLMaterialEditor::uploadMaterialFromModel(filename, model, i);
+                    LLMaterialEditor::uploadMaterialFromModel(filename, model, i, dest);
                 }
             }
         }
     }
 }
 
-void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLSD& notification, const LLSD& response)
+void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLSD& notification, const LLSD& response, const LLUUID& dest)
 {
     S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
     if (option != 0)
@@ -715,7 +712,7 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLS
         return;
     }
 
-    do_bulk_upload(filenames, allow_2k);
+    do_bulk_upload(filenames, allow_2k, dest);
 }
 
 bool get_bulk_upload_expected_cost(
@@ -839,7 +836,7 @@ void upload_bulk(const std::vector<std::string>& filtered_filenames, bool allow_
         static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
         if (sPowerfulWizard && expected_upload_cost == 0)
         {
-            do_bulk_upload(filtered_filenames, allow_2k);
+            do_bulk_upload(filtered_filenames, allow_2k, dest);
         }
         else
         {
@@ -912,7 +909,23 @@ class LLFileUploadModel : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        LLFloaterModelPreview::showModelPreview();
+        if (LLConvexDecomposition::isFunctional())
+        {
+            LLFloaterModelPreview::showModelPreview();
+        }
+        else
+        {
+            if (gGLManager.mIsApple)
+            {
+                LLNotificationsUtil::add("ModelUploaderMissingPhysicsApple");
+            }
+            else
+            {
+                // TPV?
+                LLNotificationsUtil::add("ModelUploaderMissingPhysics");
+                LLFloaterModelPreview::showModelPreview();
+            }
+        }
         return true;
     }
 };
@@ -1088,6 +1101,9 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
             case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
                 formatted = new LLImageBMP;
                 break;
+            case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
+                formatted = new LLImageWebP;
+                break;
             }
             formatted->enableOverSize() ;
             formatted->encode(raw, 0);
@@ -1144,7 +1160,7 @@ void handle_compress_image()
 // so doing dirty, but OS independent fopen and fseek
 size_t get_file_size(std::string &filename)
 {
-    LLFILE* file = LLFile::fopen(filename, "rb");       /*Flawfinder: ignore*/
+    LLFILE* file = LLFile::fopen(filename, LLFILE_MODE("rb"));       /*Flawfinder: ignore*/
     if (!file)
     {
         LL_WARNS() << "Error opening " << filename << LL_ENDL;
@@ -1298,7 +1314,7 @@ void upload_done_callback(
                     msg->nextBlockFast(_PREHASH_MoneyData);
                     msg->addUUIDFast(_PREHASH_SourceID, gAgent.getID());
                     msg->addUUIDFast(_PREHASH_DestID, LLUUID::null);
-                    msg->addU8("Flags", 0);
+                    msg->addU8Fast(_PREHASH_Flags, 0);
                     // we tell the sim how much we were expecting to pay so it
                     // can respond to any discrepancy
                     msg->addS32Fast(_PREHASH_Amount, expected_upload_cost);

@@ -121,8 +121,8 @@ void LLSyntaxIdLSL::fetchKeywordsFileCoro(std::string url, std::string fileSpec)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("fetchKeywordsFileCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     std::pair<std::set<std::string>::iterator, bool> insrt = mInflightFetches.insert(fileSpec);
     if (!insrt.second)
@@ -148,9 +148,14 @@ void LLSyntaxIdLSL::fetchKeywordsFileCoro(std::string url, std::string fileSpec)
 
     if (isSupportedVersion(result))
     {
-        setKeywordsXml(result);
-        cacheFile(fileSpec, result);
-        loadKeywordsIntoLLSD();
+        // Shuttle this task to the main coro/worker.
+        // loadKeywordsIntoLLSD will attempt to get a mutex which is not coro aware.
+        LLAppViewer::instance()->postToMainCoro([this, result, fileSpec]()
+            {
+                setKeywordsXml(result);
+                cacheFile(fileSpec, result);
+                loadKeywordsIntoLLSD();
+            });
     }
     else
     {
@@ -343,7 +348,7 @@ void LLSyntaxLua::initialize()
     if (mInitialized) return;
 
     loadDefaultKeywordsIntoLLSD();
-
+    loadLuaTypesIntoLLSD();
     mInitialized = true;
 }
 
@@ -358,6 +363,21 @@ void LLSyntaxLua::loadDefaultKeywordsIntoLLSD()
         if (LLSDSerialize::fromXML(content, file) != LLSDParser::PARSE_FAILURE)
         {
             mKeywordsXml = content;
+        }
+    }
+}
+
+void LLSyntaxLua::loadLuaTypesIntoLLSD()
+{
+    std::string fullFileSpec = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "types_lua_default.xml");
+    llifstream  file(fullFileSpec.c_str());
+
+    if (file.good())
+    {
+        LLSD content;
+        if (LLSDSerialize::fromXML(content, file) != LLSDParser::PARSE_FAILURE)
+        {
+            mTypesXml = content;
         }
     }
 }

@@ -4,6 +4,16 @@
  left="0" bottom="0" visible="false"
  mouse_opaque="false">
     <menu_item_check
+       label="IRC view"
+       name="fancy_compact_view">
+		<menu_item_check.on_click
+		   function="IMSession.Menu.Action"
+		   parameter="fancy_compact_view"/>
+		<menu_item_check.on_check
+		   function="IMSession.Menu.CompactExpandedModes.CheckItem"
+		   parameter="fancy_compact_view"/>
+	</menu_item_check>
+    <menu_item_check
        label="Compact view"
        name="compact_view">
       <menu_item_check.on_click
@@ -22,6 +32,17 @@
       <menu_item_check.on_check
          function="IMSession.Menu.CompactExpandedModes.CheckItem"
          parameter="expanded_view"/>
+    </menu_item_check>
+    <menu_item_separator layout="topleft" />
+	<menu_item_check
+	 label="Show previous conversation history"
+	 name="LogShowHistory">
+		<menu_item_check.on_check
+		 function="CheckControlPerAccount"
+		 parameter="LogShowHistory" />
+		<menu_item_check.on_click
+		 function="ToggleControlPerAccount"
+		 parameter="LogShowHistory" />
     </menu_item_check>
     <menu_item_separator layout="topleft" />
     <menu_item_check name="IMShowTime" label="Show time">
@@ -45,5 +66,26 @@
         <menu_item_check.on_enable
          function="IMSession.Menu.ShowModes.Enable"
          parameter="IMShowNamesForP2PConv" />    
-    </menu_item_check>      
+    </menu_item_check>
+	<menu_item_separator />
+	<menu_item_check
+	 label="&quot;:&quot; as a synonym for &quot;/me&quot;"
+	 name="EnableMUPoseChat">
+		<menu_item_check.on_check
+		 function="CheckControl"
+		 parameter="EnableMUPoseChat" />
+		<menu_item_check.on_click
+		 function="ToggleControl"
+		 parameter="EnableMUPoseChat" />
+	</menu_item_check>
+	<menu_item_check
+	 label="Auto-close ((OOC)) parentheses"
+	 name="EnableAutoCloseOOC">
+		<menu_item_check.on_check
+		 function="CheckControl"
+		 parameter="EnableAutoCloseOOC" />
+		<menu_item_check.on_click
+		 function="ToggleControl"
+		 parameter="EnableAutoCloseOOC" />
+	</menu_item_check>
 </toggleable_menu>

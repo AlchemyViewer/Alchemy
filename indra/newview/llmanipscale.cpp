@@ -85,6 +85,8 @@ const LLManip::EManipPart MANIPULATOR_IDS[LLManipScale::NUM_MANIPULATORS] =
     LLManip::LL_FACE_NEGZ
 };
 
+bool LLManipScale::sInvertUniform = false;
+
 F32 get_default_max_prim_scale(bool is_flora)
 {
     // a bit of a hack, but if it's foilage, we don't want to use the
@@ -121,7 +123,7 @@ void LLManipScale::setStretchTextures(bool b)
 // static
 bool LLManipScale::getUniform()
 {
-    return gSavedSettings.getBOOL("ScaleUniform");
+    return (gSavedSettings.getBOOL("ScaleUniform") ^ sInvertUniform);
 }
 
 // static
@@ -2075,4 +2077,16 @@ bool LLManipScale::canAffectSelection()
         can_scale = mObjectSelection->applyToObjects(&func);
     }
     return can_scale;
+}
+
+bool LLManipScale::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
+{
+    sInvertUniform = true;
+    return handleMouseDown(x,y,mask);
+}
+
+bool LLManipScale::handleMiddleMouseUp(S32 x, S32 y, MASK mask)
+{
+    sInvertUniform = false;
+    return handleMouseUp(x, y, mask);
 }

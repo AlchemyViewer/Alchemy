@@ -28,7 +28,6 @@
 #define LL_LLWORLDMAP_H
 
 #include "llworldmipmap.h"
-#include <boost/function.hpp>
 
 #include "v3dmath.h"
 #include "lluuid.h"
@@ -37,18 +36,6 @@
 #include "llviewerregion.h"
 #include "llviewertexture.h"
 #include "llgltexture.h"
-
-// map item types
-const U32 MAP_ITEM_TELEHUB = 0x01;
-const U32 MAP_ITEM_PG_EVENT = 0x02;
-const U32 MAP_ITEM_MATURE_EVENT = 0x03;
-//const U32 MAP_ITEM_POPULAR = 0x04;        // No longer supported, 2009-03-02 KLW
-//const U32 MAP_ITEM_AGENT_COUNT = 0x05;
-const U32 MAP_ITEM_AGENT_LOCATIONS = 0x06;
-const U32 MAP_ITEM_LAND_FOR_SALE = 0x07;
-const U32 MAP_ITEM_CLASSIFIED = 0x08;
-const U32 MAP_ITEM_ADULT_EVENT = 0x09;
-const U32 MAP_ITEM_LAND_FOR_SALE_ADULT = 0x0a;
 
 // Description of objects like hubs, events, land for sale, people and more (TBD).
 // Note: we don't store a "type" in there so we need to store instances of this class in
@@ -120,11 +107,11 @@ public:
 //  void setWaterHeight (F32 water_height) { mWaterHeight = water_height; }
 
     // Accessors
-    std::string getName() const { return mName; }
+    const std::string& getName() const { return mName; }
     const std::string getFlagsString() const { return LLViewerRegion::regionFlagsToString(mRegionFlags); }
-    const std::string getAccessString() const { return LLViewerRegion::accessToString((U8)mAccess); }
-    const std::string getShortAccessString() const { return LLViewerRegion::accessToShortString(static_cast<U8>(mAccess)); }
-    const std::string getAccessIcon() const { return LLViewerRegion::getAccessIcon(static_cast<U8>(mAccess)); }
+    const std::string& getAccessString() const { return LLViewerRegion::accessToString((U8)mAccess); }
+    const std::string& getShortAccessString() const { return LLViewerRegion::accessToShortString(static_cast<U8>(mAccess)); }
+    const std::string& getAccessIcon() const { return LLViewerRegion::getAccessIcon(static_cast<U8>(mAccess)); }
 
     const S32 getAgentCount() const;                // Compute the total agents count
     LLPointer<LLViewerFetchedTexture> getLandForSaleImage();    // Get the overlay image, fetch it if necessary
@@ -195,12 +182,12 @@ const S32 MAP_MAX_SIZE = 2048;
 const S32 MAP_BLOCK_SIZE = 4;
 const S32 MAP_BLOCK_RES = (MAP_MAX_SIZE / MAP_BLOCK_SIZE);
 
-class LLWorldMap : public LLSingleton<LLWorldMap>
+class LLWorldMap : public LLSimpleton<LLWorldMap>
 {
-    LLSINGLETON(LLWorldMap);
+public:
+    LLWorldMap();
     ~LLWorldMap();
 
-public:
     // Clear all: list of region info, tiles, blocks and items
     void reset();
 
@@ -270,6 +257,9 @@ private:
     // Issue: Not sure this scheme is foolproof though as I've seen
     // cases where a block is never retrieved and, because of this boolean being set, never re-requested
     bool *          mMapBlockLoaded;        // Telling us if the block of regions has been requested or not
+
+    typedef boost::unordered_map<S32, F64> block_last_update_map_t;
+    block_last_update_map_t mMapBlockLastUpdateOffsets;
 
     // Track location data : used while there's nothing tracked yet by LLTracker
     bool            mIsTrackingLocation;    // True when we're tracking a point

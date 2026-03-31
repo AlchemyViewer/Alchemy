@@ -88,7 +88,7 @@ namespace LL
             U32 getVertexCount() const { return (U32) mPositions.size(); }
             U32 getIndexCount() const { return (U32) mIndexArray.size(); }
 
-            boost::unordered_map<std::string, S32> mAttributes;
+            std::unordered_map<std::string, S32> mAttributes;
 
             // create octree based on vertex buffer
             // must be called before buffer is unmapped and after buffer is populated with good data

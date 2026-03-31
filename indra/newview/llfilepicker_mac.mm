@@ -29,10 +29,8 @@
 #include <iostream>
 #include "llfilepicker_mac.h"
 
-#if LL_DARWIN
-#pragma clang diagnostic push
+// For setAllowedFileTypes deprecation
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
 
 NSOpenPanel *init_panel(const std::vector<std::string>* allowed_types, unsigned int flags)
 {
@@ -119,38 +117,73 @@ void doLoadDialogModeless(const std::vector<std::string>* allowed_types,
 
     @autoreleasepool
     {
-        // Note: might need to return and save this panel
-        // so that it does not close immediately
         NSOpenPanel *panel = init_panel(allowed_types,flags);
+        NSWindow *mainWindow = [NSApp mainWindow];
 
-        [panel beginWithCompletionHandler:^(NSModalResponse result)
+        if (mainWindow)
         {
-            std::vector<std::string> outfiles;
-            if (result == NSModalResponseOK)
+            [panel beginSheetModalForWindow:mainWindow
+                          completionHandler:^(NSModalResponse result)
             {
-                NSArray *filesToOpen = [panel URLs];
-                int i, count = [filesToOpen count];
-
-                if (count > 0)
+                std::vector<std::string> outfiles;
+                if (result == NSModalResponseOK)
                 {
+                    NSArray *filesToOpen = [panel URLs];
+                    int i, count = [filesToOpen count];
 
-                    for (i=0; i<count; i++) {
-                        NSString *aFile = [[filesToOpen objectAtIndex:i] path];
-                        std::string *afilestr = new std::string([aFile UTF8String]);
-                        outfiles.push_back(*afilestr);
+                    if (count > 0)
+                    {
+
+                        for (i=0; i<count; i++) {
+                            NSString *aFile = [[filesToOpen objectAtIndex:i] path];
+                            std::string *afilestr = new std::string([aFile UTF8String]);
+                            outfiles.push_back(*afilestr);
+                        }
+                        callback(true, outfiles, userdata);
                     }
-                    callback(true, outfiles, userdata);
+                    else // no valid result
+                    {
+                        callback(false, outfiles, userdata);
+                    }
                 }
-                else // no valid result
+                else // cancel
                 {
                     callback(false, outfiles, userdata);
                 }
-            }
-            else // cancel
+            }];
+        }
+        else
+        {
+            //present as modeless window
+            [panel beginWithCompletionHandler:^(NSModalResponse result)
             {
-                callback(false, outfiles, userdata);
-            }
-        }];
+                std::vector<std::string> outfiles;
+                if (result == NSModalResponseOK)
+                {
+                    NSArray *filesToOpen = [panel URLs];
+                    int i, count = [filesToOpen count];
+
+                    if (count > 0)
+                    {
+
+                        for (i=0; i<count; i++) {
+                            NSString *aFile = [[filesToOpen objectAtIndex:i] path];
+                            std::string *afilestr = new std::string([aFile UTF8String]);
+                            outfiles.push_back(*afilestr);
+                        }
+                        callback(true, outfiles, userdata);
+                    }
+                    else // no valid result
+                    {
+                        callback(false, outfiles, userdata);
+                    }
+                }
+                else // cancel
+                {
+                    callback(false, outfiles, userdata);
+                }
+            }];
+        }
     }
 }
 
@@ -211,8 +244,13 @@ void doSaveDialogModeless(const std::string* file,
 
         NSURL* url = [NSURL fileURLWithPath:fileName];
         [panel setNameFieldStringValue: fileName];
-        [panel setDirectoryURL: url];
 
+        NSURL *last_url = [[NSUserDefaults standardUserDefaults] URLForKey:@"NSNavLastRootDirectory"];
+        if(!last_url)
+        {
+            NSURL *downloads_url = [[NSFileManager defaultManager] URLsForDirectory:NSDownloadsDirectory inDomains:NSUserDomainMask].firstObject;
+            [panel setDirectoryURL:downloads_url];
+        }
 
         [panel beginWithCompletionHandler:^(NSModalResponse result)
         {
@@ -232,9 +270,5 @@ void doSaveDialogModeless(const std::string* file,
         }];
     }
 }
-
-#if LL_DARWIN
-#pragma clang diagnostic pop
-#endif
 
 #endif

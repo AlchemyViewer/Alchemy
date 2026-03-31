@@ -133,7 +133,7 @@ struct LLTextBase::line_end_compare
 //
 
 // register LLTextBase::Params under name "textbase"
-static LLWidgetNameRegistry::StaticRegistrar sRegisterTextBaseParams(&typeid(LLTextBase::Params), "textbase");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterTextBaseParams(typeid(LLTextBase::Params), "textbase");
 
 LLTextBase::LineSpacingParams::LineSpacingParams()
 :   multiple("multiple", 1.f),
@@ -192,6 +192,7 @@ LLTextBase::LLTextBase(const LLTextBase::Params &p)
     mURLClickSignal(NULL),
     mIsFriendSignal(NULL),
     mIsObjectBlockedSignal(NULL),
+    mIsObjectReachableSignal(NULL),
     mMaxTextByteLength( p.max_text_length ),
     mFont(p.font),
     mFontShadow(p.font_shadow),
@@ -300,6 +301,7 @@ LLTextBase::~LLTextBase()
     delete mURLClickSignal;
     delete mIsFriendSignal;
     delete mIsObjectBlockedSignal;
+    delete mIsObjectReachableSignal;
 }
 
 void LLTextBase::initFromParams(const LLTextBase::Params& p)
@@ -1087,8 +1089,37 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
     {
         LLStyleSP emoji_style;
         LLEmojiDictionary* ed = LLEmojiDictionary::instanceExists() ? LLEmojiDictionary::getInstance() : NULL;
+        LLTextSegment* segmentp = nullptr;
+        segment_vec_t::iterator seg_iter;
+        if (segments && segments->size() > 0)
+        {
+            seg_iter = segments->begin();
+            segmentp = *seg_iter;
+        }
         for (S32 text_kitty = 0, text_len = static_cast<S32>(wstr.size()); text_kitty < text_len; text_kitty++)
         {
+            if (segmentp)
+            {
+                if (segmentp->getEnd() <= pos + text_kitty)
+                {
+                    seg_iter++;
+                    if (seg_iter != segments->end())
+                    {
+                        segmentp = *seg_iter;
+                    }
+                    else
+                    {
+                        segmentp = nullptr;
+                    }
+                }
+                if (segmentp && !segmentp->getPermitsEmoji())
+                {
+                    // Some segments, like LLInlineViewSegment do not permit splitting
+                    // and should not be interrupted by emoji segments
+                    continue;
+                }
+            }
+
             llwchar code = wstr[text_kitty];
             bool isEmoji = ed ? ed->isEmoji(code) : LLStringOps::isEmoji(code);
             if (isEmoji)
@@ -1497,6 +1528,8 @@ void LLTextBase::reshape(S32 width, S32 height, bool called_from_parent)
         // up-to-date mVisibleTextRect
         updateRects();
 
+        // Todo: This might be wrong. updateRects already sets needsReflow conditionaly.
+        // Reflow is expensive and doing it at any twith can be too much.
         needsReflow();
     }
 }
@@ -2357,6 +2390,15 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
                 unblockButton->setVisible(is_blocked);
             }
         }
+
+        if (mIsObjectReachableSignal)
+        {
+            bool is_reachable = *(*mIsObjectReachableSignal)(LLUUID(LLUrlAction::getObjectId(url)));
+            if (LLView* zoom_btn = menu->getChild<LLView>("zoom_in"))
+            {
+                zoom_btn->setEnabled(is_reachable);
+            }
+        }
         menu->show(x, y);
         LLMenuGL::showPopup(this, menu, x, y);
     }
@@ -2427,7 +2469,10 @@ void LLTextBase::appendTextImpl(const std::string& new_text, const LLStyle::Para
             end = match.getEnd()+1;
 
             LLStyle::Params link_params(style_params);
-            link_params.overwriteFrom(match.getStyle());
+            if (link_params.use_default_link_style)
+            {
+                link_params.overwriteFrom(match.getStyle());
+            }
 
             // output the text before the Url
             if (start > 0)
@@ -3549,6 +3594,15 @@ boost::signals2::connection LLTextBase::setIsObjectBlockedCallback(const is_bloc
     return mIsObjectBlockedSignal->connect(cb);
 }
 
+boost::signals2::connection LLTextBase::setIsObjectReachableCallback(const is_obj_reachable_signal_t::slot_type& cb)
+{
+    if (!mIsObjectReachableSignal)
+    {
+        mIsObjectReachableSignal = new is_obj_reachable_signal_t();
+    }
+    return mIsObjectReachableSignal->connect(cb);
+}
+
 //
 // LLTextSegment
 //
@@ -3631,6 +3685,11 @@ LLNormalTextSegment::LLNormalTextSegment( LLStyleConstSP style, S32 start, S32 e
 {
     mFontHeight = mStyle->getFont()->getLineHeight();
     mCanEdit = !mStyle->getDrawHighlightBg();
+    if (!mCanEdit)
+    {
+        // Emoji shouldn't split the segment with the mention.
+        mPermitsEmoji = false;
+    }
 
     LLUIImagePtr image = mStyle->getImage();
     if (image.notNull())
@@ -4151,6 +4210,7 @@ LLInlineViewSegment::LLInlineViewSegment(const Params& p, S32 start, S32 end)
     mTopPad(p.top_pad),
     mBottomPad(p.bottom_pad)
 {
+    mPermitsEmoji = false;
 }
 
 LLInlineViewSegment::~LLInlineViewSegment()

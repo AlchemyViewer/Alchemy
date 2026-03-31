@@ -232,11 +232,6 @@ public:
     static bool parseColor4(const std::string& buf, LLColor4* color);
 
     inline void clamp();
-
-    friend std::size_t hash_value(const LLColor4& vec)
-    {
-        return boost::hash_value(vec.mV);
-    }
 };
 
 static_assert(std::is_trivially_copyable<LLColor4>::value, "LLColor4 must be trivial copy");

@@ -39,7 +39,6 @@ class LLAvatarName;
 class LLButton;
 class LLChatEntry;
 class LLTextEditor;
-class LLPanelChatControlPanel;
 class LLChatHistory;
 class LLInventoryItem;
 class LLInventoryCategory;
@@ -97,7 +96,7 @@ public:
     /*virtual*/ void updateMessages();
     void reloadMessages(bool clean_messages = false);
     static void onSendMsg(LLUICtrl*, void*);
-    void sendMsgFromInputEditor();
+    void sendMsgFromInputEditor(bool ooc_chat = false);
     void sendMsg(const std::string& msg);
 
     // callback for LLIMModel on new messages
@@ -111,6 +110,12 @@ public:
     bool enableGearMenuItem(const LLSD& userdata);
     void GearDoToSelected(const LLSD& userdata);
     bool checkGearMenuItem(const LLSD& userdata);
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+    void onTeleportClicked(const LLUICtrl* pCtrl);
+// [/SL:KB]
+// [SL:KB] - Patch: Chat-BaseGearBtn | Checked: 2014-04-10 (Catznip-3.6)
+    void GearDoToSelectedGroup(const LLSD& userdata);
+// [/SL:KB]
 
     // Implements LLVoiceClientStatusObserver::onChange() to enable the call
     // button when voice is available
@@ -135,6 +140,8 @@ public:
 
     bool needsTitleOverwrite() { return mSessionNameUpdatedForTyping && mOtherTyping; }
     S32 getLastChatMessageIndex() {return mLastMessageIndex;}
+
+    bool handleKeyHere(KEY key, MASK mask) override;
 private:
 
     /*virtual*/ void refresh();

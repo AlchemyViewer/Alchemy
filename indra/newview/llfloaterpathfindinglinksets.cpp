@@ -53,6 +53,10 @@
 #include "lluictrl.h"
 #include "v3math.h"
 #include "v4color.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 #define XUI_LINKSET_USE_NONE             0
 #define XUI_LINKSET_USE_WALKABLE         1
@@ -555,6 +559,29 @@ void LLFloaterPathfindingLinksets::updateStateOnEditFields()
 {
     int numSelectedItems = getNumSelectedObjects();
     bool isEditEnabled = (numSelectedItems > 0);
+
+// [RLVa:KB]
+    if (RlvActions::isRlvEnabled())
+    {
+        if (
+            !rlvCanDeleteOrReturn()
+            || RlvActions::hasBehaviour(RLV_BHVR_FARTOUCH)
+            || RlvActions::hasBehaviour(RLV_BHVR_TOUCHALL)
+            || RlvActions::hasBehaviour(RLV_BHVR_TOUCHWORLD)
+            || RlvActions::hasBehaviour(RLV_BHVR_TOUCHME)
+            || RlvActions::hasBehaviour(RLV_BHVR_TOUCHTHIS)
+            || RlvActions::hasBehaviour(RLV_BHVR_INTERACT)
+        )
+        {
+            isEditEnabled = false;
+        }
+
+        if (RlvActions::hasBehaviour(RLV_BHVR_TPLOCAL))
+        {
+            numSelectedItems = 0;
+        }
+    }
+// [/RLVa:KB]
 
     mEditLinksetUse->setEnabled(isEditEnabled);
 

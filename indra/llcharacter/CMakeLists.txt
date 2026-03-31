@@ -1,11 +1,9 @@
 # -*- cmake -*-
 
-project(llcharacter)
+add_library(llcharacter STATIC)
 
-include(00-Common)
-include(LLCommon)
-
-set(llcharacter_SOURCE_FILES
+target_sources(llcharacter
+    PRIVATE
     llanimationstates.cpp
     llbvhloader.cpp
     llcharacter.cpp
@@ -17,21 +15,21 @@ set(llcharacter_SOURCE_FILES
     lljointsolverrp3.cpp
     llkeyframefallmotion.cpp
     llkeyframemotion.cpp
-    llkeyframemotionparam.cpp
     llkeyframestandmotion.cpp
     llkeyframewalkmotion.cpp
     llmotioncontroller.cpp
     llmotion.cpp
     llmultigesture.cpp
     llpose.cpp
-    llstatemachine.cpp
     lltargetingmotion.cpp
     llvisualparam.cpp
     )
 
-set(llcharacter_HEADER_FILES
-    CMakeLists.txt
-
+target_sources(llcharacter
+    PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
+    FILES
     llanimationstates.h
     llbvhloader.h
     llbvhconsts.h
@@ -45,32 +43,37 @@ set(llcharacter_HEADER_FILES
     lljointstate.h
     llkeyframefallmotion.h
     llkeyframemotion.h
-    llkeyframemotionparam.h
     llkeyframestandmotion.h
     llkeyframewalkmotion.h
     llmotion.h
     llmotioncontroller.h
     llmultigesture.h
     llpose.h
-    llstatemachine.h
     lltargetingmotion.h
     llvisualparam.h
     )
 
-list(APPEND llcharacter_SOURCE_FILES ${llcharacter_HEADER_FILES})
-
-add_library (llcharacter ${llcharacter_SOURCE_FILES})
-target_include_directories( llcharacter  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(llcharacter INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(
-        llcharacter
-        llcommon
-        llmath
-        llmessage
-        llfilesystem
-        llxml
+    llcharacter
+    PUBLIC
+    llcommon
+    llmath
+    llmessage
+    llfilesystem
+    llxml
     )
 
-if (USE_PRECOMPILED_HEADERS)
-  target_precompile_headers(llcharacter REUSE_FROM llprecompiled)
-endif ()
+target_precompile_headers(llcharacter REUSE_FROM llprecompiled)
+
+if (BUILD_TESTING)
+#   SET(llcharacter_TEST_SOURCE_FILES
+#     )
+#   LL_ADD_PROJECT_UNIT_TESTS(llcharacter "${llcharacter_TEST_SOURCE_FILES}")
+
+  #set(TEST_DEBUG on)
+  set(test_libs llcommon llmath)
+  set(test_project llcharacter)
+  LL_ADD_INTEGRATION_TEST(lljoint "lljoint.cpp" "${test_libs}" "${test_project}")
+endif()

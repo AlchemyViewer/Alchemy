@@ -30,7 +30,6 @@
 #include <fstream>
 
 #include <boost/regex.hpp>
-#include <boost/assign/list_of.hpp>
 
 #include "llfeaturemanager.h"
 #include "lldir.h"
@@ -184,15 +183,15 @@ void LLFeatureList::dump()
     }
 }
 
-static const std::vector<std::string> sGraphicsLevelNames = boost::assign::list_of
-    ("Low")
-    ("LowMid")
-    ("Mid")
-    ("MidHigh")
-    ("High")
-    ("HighUltra")
-    ("Ultra")
-;
+static const std::vector<std::string> sGraphicsLevelNames = {
+    "Low",
+    "LowMid",
+    "Mid",
+    "MidHigh",
+    "High",
+    "HighUltra",
+    "Ultra"
+};
 
 U32 LLFeatureManager::getMaxGraphicsLevel() const
 {
@@ -403,6 +402,35 @@ F32 logExceptionBenchmark()
 }
 #endif
 
+bool checkRDNA35()
+{
+    // This checks if we're running on an RDNA3.5 GPU.  You're only going to see these on AMD's APUs.
+    // As of driver version 25, we're seeing stalls in some of our queries.
+    // This appears to be a driver bug, and appears to be specific RDNA3.5 APUs.
+    // There's multiples of these guys, so we just use this function to check if that GPU is on the list of known RDNA3.5 APUs.
+    // - Geenz 11/12/2025
+    std::array<std::string, 7> rdna35GPUs = {
+        "8060S",
+        "8050S",
+        "8040S",
+        "860M",
+        "840M",
+        "890M",
+        "880M"
+    };
+
+    for (const auto& gpu_name : rdna35GPUs)
+    {
+        if (gGLManager.getRawGLString().find(gpu_name) != std::string::npos)
+        {
+            LL_WARNS("RenderInit") << "Detected AMD RDNA3.5 GPU (" << gpu_name << ")." << LL_ENDL;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /**
  * Removes the Mesa information from the GPU model string.
  *
@@ -463,6 +491,22 @@ bool extractGLDeviceModel(std::string& device_name)
 
 bool LLFeatureManager::loadGPUClass()
 {
+    // This is a hack for certain AMD GPUs in newer driver versions on certain APUs.
+    // These GPUs will show inconsistent freezes when attempting to run shader profiles against them.
+    // This is extremely problematic as it can lead to:
+    // - Login freezes
+    // - Inability to start the client
+    // - Completely random avatars triggering a freeze
+    // As a result, we filter out these GPUs for shader profiling.
+    // - Geenz 11/11/2025
+
+    if (gGLManager.getRawGLString().find("Radeon") != std::string::npos && checkRDNA35() && gGLManager.mDriverVersionVendorString.find("25.") != std::string::npos)
+    {
+        LL_WARNS("RenderInit") << "Detected AMD RDNA3.5 GPU on a known bad driver; disabling benchmark and occlusion culling to prevent freezes." << LL_ENDL;
+        gSavedSettings.setBOOL("SkipBenchmark", true);
+        gSavedSettings.setBOOL("UseOcclusion", false);
+    }
+
     if (!gSavedSettings.getBOOL("SkipBenchmark"))
     {
         F32 class1_gbps = gSavedSettings.getF32("RenderClass1MemoryBandwidth");
@@ -508,7 +552,9 @@ bool LLFeatureManager::loadGPUClass()
         {
             mGPUClass = GPU_CLASS_2;
         }
-        else if (gbps <= class1_gbps*4.f)
+        else if ((gbps <= class1_gbps*4.f)
+                 // Cap silicon's GPUs at med+ as they have high throughput, low capability
+                 || gGLManager.mIsApple)
         {
             mGPUClass = GPU_CLASS_3;
         }
@@ -521,17 +567,16 @@ bool LLFeatureManager::loadGPUClass()
             mGPUClass = GPU_CLASS_5;
         }
 
-    #if LL_WINDOWS
-        const F32Gigabytes MIN_PHYSICAL_MEMORY(2);
-
         LLMemory::updateMemoryInfo();
+    #if LL_WINDOWS || LL_LINUX
+        const F32Gigabytes MIN_PHYSICAL_MEMORY(8);
         F32Gigabytes physical_mem = LLMemory::getMaxMemKB();
         if (MIN_PHYSICAL_MEMORY > physical_mem && mGPUClass > GPU_CLASS_1)
         {
             // reduce quality on systems that don't have enough memory
             mGPUClass = (EGPUClass)(mGPUClass - 1);
         }
-    #endif //LL_WINDOWS
+    #endif //LL_WINDOWS || LL_LINUX
     } //end if benchmark
     else
     {
@@ -542,7 +587,7 @@ bool LLFeatureManager::loadGPUClass()
     }
 
     if (extractGLDeviceModel(mGPUString)) {
-        LL_INFOS("RenderInit") << "GPU String has been stripped of their driver identification" << LL_ENDL;
+        LL_INFOS("RenderInit") << "GPU String has been stripped of driver identification" << LL_ENDL;
     }
     // defaults
     mGPUSupported = true;

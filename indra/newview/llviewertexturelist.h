@@ -33,7 +33,7 @@
 #include "llviewertexture.h"
 #include "llui.h"
 #include <list>
-#include <unordered_set>
+#include <boost/unordered_set.hpp>
 #include "lluiimage.h"
 
 const U32 LL_IMAGE_REZ_LOSSLESS_CUTOFF = 128;
@@ -169,7 +169,7 @@ private:
                                      LLHost request_from_host = LLHost()
                                      );
 
-    LLViewerFetchedTexture * getImageFromFile(const std::string& filename,
+    LLViewerFetchedTexture * getImageFromFile(std::string_view filename,
                                      FTType f_type = FTT_LOCAL_FILE,
                                      bool usemipmap = true,
                                      LLViewerTexture::EBoostLevel boost_priority = LLGLTexture::BOOST_NONE,     // Get the requested level immediately upon creation.
@@ -208,7 +208,7 @@ private:
     { return getImage(image_id, f_type, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE, 0, 0, host); }
 
 public:
-    typedef boost::unordered_set<LLPointer<LLViewerFetchedTexture> > image_list_t;
+    typedef boost::unordered_set<LLPointer<LLViewerFetchedTexture>> image_list_t;
     typedef std::queue<LLPointer<LLViewerFetchedTexture> > image_queue_t;
 
     // images that have been loaded but are waiting to be uploaded to GL
@@ -234,7 +234,7 @@ private:
     image_list_t mImageList;
 
     // simply holds on to LLViewerFetchedTexture references to stop them from being purged too soon
-    boost::unordered_set<LLPointer<LLViewerFetchedTexture> > mImagePreloads;
+    boost::unordered_set<LLPointer<LLViewerFetchedTexture>> mImagePreloads;
 
     bool mInitialized ;
     LLFrameTimer mForceDecodeTimer;
@@ -251,7 +251,7 @@ class LLUIImageList : public LLImageProviderInterface, public LLSingleton<LLUIIm
 public:
     // LLImageProviderInterface
     /*virtual*/ LLPointer<LLUIImage> getUIImageByID(const LLUUID& id, S32 priority) override;
-    /*virtual*/ LLPointer<LLUIImage> getUIImage(const std::string& name, S32 priority) override;
+    /*virtual*/ LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority) override;
     void cleanUp() override;
 
     bool initFromFile();
@@ -260,7 +260,7 @@ public:
 
     static void onUIImageLoaded( bool success, LLViewerFetchedTexture *src_vi, LLImageRaw* src, LLImageRaw* src_aux, S32 discard_level, bool final, void* userdata );
 private:
-    LLPointer<LLUIImage> loadUIImageByName(const std::string& name, const std::string& filename,
+    LLPointer<LLUIImage> loadUIImageByName(std::string_view name, std::string_view filename,
                                    bool use_mips = false, const LLRect& scale_rect = LLRect::null,
                                    const LLRect& clip_rect = LLRect::null,
                                    LLViewerTexture::EBoostLevel boost_priority = LLGLTexture::BOOST_UI,
@@ -271,7 +271,7 @@ private:
                                  LLViewerTexture::EBoostLevel boost_priority = LLGLTexture::BOOST_UI,
                                  LLUIImage::EScaleStyle = LLUIImage::SCALE_INNER);
 
-    LLPointer<LLUIImage> loadUIImage(LLViewerFetchedTexture* imagep, const std::string& name, bool use_mips = false, const LLRect& scale_rect = LLRect::null, const LLRect& clip_rect = LLRect::null, LLUIImage::EScaleStyle = LLUIImage::SCALE_INNER);
+    LLPointer<LLUIImage> loadUIImage(LLViewerFetchedTexture* imagep, std::string_view name, bool use_mips = false, const LLRect& scale_rect = LLRect::null, const LLRect& clip_rect = LLRect::null, LLUIImage::EScaleStyle = LLUIImage::SCALE_INNER);
 
 
     struct LLUIImageLoadData
@@ -281,7 +281,7 @@ private:
         LLRect mImageClipRegion;
     };
 
-    typedef std::map< std::string, LLPointer<LLUIImage> > uuid_ui_image_map_t;
+    typedef boost::unordered_map< std::string, LLPointer<LLUIImage>, ll::string_hash, std::equal_to<> > uuid_ui_image_map_t;
     uuid_ui_image_map_t mUIImages;
 
     //

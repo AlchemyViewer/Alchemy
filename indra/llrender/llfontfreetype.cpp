@@ -31,15 +31,12 @@
 
 // Freetype stuff
 #include <ft2build.h>
-#ifdef LL_WINDOWS
-#include <freetype2\freetype\ftsystem.h>
-#endif
+#include FT_SYSTEM_H
 #include "llfontfreetypesvg.h"
-
-// For some reason, this won't work if it's not wrapped in the ifdef
-#ifdef FT_FREETYPE_H
 #include FT_FREETYPE_H
-#endif
+
+// Harfbuzz
+#include <hb.h>
 
 #include "lldir.h"
 #include "llerror.h"
@@ -78,6 +75,8 @@ void LLFontManager::cleanupClass()
 
 LLFontManager::LLFontManager()
 {
+    LL_INFOS() << "Harfbuzz version: " << hb_version_string() << LL_ENDL;
+
     int error;
     error = FT_Init_FreeType(&gFTLibrary);
     if (error)
@@ -86,6 +85,10 @@ LLFontManager::LLFontManager()
         LL_ERRS() << "Freetype initialization failure!" << LL_ENDL;
         FT_Done_FreeType(gFTLibrary);
     }
+
+    FT_Int major, minor, patch;
+    FT_Library_Version(gFTLibrary, &major, &minor, &patch);
+    LL_INFOS() << "Freetype version: " << major << "." << minor << "." << patch << LL_ENDL;
 
 #ifdef ENABLE_OT_SVG_SUPPORT
     SVG_RendererHooks hooks = {

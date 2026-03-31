@@ -224,7 +224,7 @@ NSWindowRef createNSWindow(int x, int y, int width, int height)
 {
     LLNSWindow *window = [[LLNSWindow alloc]initWithContentRect:NSMakeRect(x, y, width, height)
                                                       styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskResizable | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
-                                                      backing:NSBackingStoreBuffered defer:NO];
+                                                        backing:NSBackingStoreBuffered defer:NO];
     [window makeKeyAndOrderFront:nil];
     [window setAcceptsMouseMovedEvents:TRUE];
     [window setRestorable:FALSE]; // Viewer manages state from own settings

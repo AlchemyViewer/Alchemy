@@ -59,6 +59,8 @@
 #include "rlvcommon.h"
 // [/RLVa:KB]
 
+//const char* const DEFAULT_DESC = "(No Description)";
+
 class PropertiesChangedCallback : public LLInventoryCallback
 {
 public:
@@ -428,7 +430,6 @@ void LLSidepanelItemInfo::refreshFromItem(LLViewerInventoryItem* item)
     ////////////////
     if(perm.isOwned())
     {
-// RYETODO FIXRLVA
 // [RLVa:KB] - Checked: RVLa-2.0.1
         bool fRlvCanShowOwner = true;
 // [/RLVa:KB]
@@ -524,7 +525,8 @@ void LLSidepanelItemInfo::refreshFromItem(LLViewerInventoryItem* item)
     }
     else
     {
-        std::string timeStr = getString("acquiredDate");
+        static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+        std::string timeStr = use_24h ? getString("acquiredDate") : getString("acquiredDateAMPM");
         LLSD substitution;
         substitution["datetime"] = (S32) time_utc;
         LLStringUtil::format (timeStr, substitution);

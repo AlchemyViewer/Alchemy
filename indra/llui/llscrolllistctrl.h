@@ -77,7 +77,7 @@ public:
     };
 
     // *TODO: Add callbacks to Params
-    typedef boost::function<void (void)> callback_t;
+    typedef std::function<void (void)> callback_t;
 
     template<typename T> struct maximum
     {
@@ -251,7 +251,7 @@ public:
     void            setMaximumSelectCallback( callback_t cb) { mOnMaximumSelectCallback = cb; }
     void            setSortChangedCallback( callback_t cb)  { mOnSortChangedCallback = cb; }
     // Convenience function; *TODO: replace with setter above + boost::bind() in calling code
-    void            setDoubleClickCallback( boost::function<void (void* userdata)> cb, void* userdata) { mOnDoubleClickCallback = boost::bind(cb, userdata); }
+    void            setDoubleClickCallback( std::function<void (void* userdata)> cb, void* userdata) { mOnDoubleClickCallback = boost::bind(cb, userdata); }
 
     void            swapWithNext(S32 index);
     void            swapWithPrevious(S32 index);
@@ -344,6 +344,10 @@ public:
     S32             getRowOffsetFromIndex(S32 index);
 
     void            clearSearchString() { mSearchString.clear(); }
+
+    void            setFilterString(const std::string& str);
+    void            setFilterColumn(S32 col) { mFilterColumn = col; }
+    bool            isFiltered(const LLScrollListItem* item) const;
 
     // support right-click context menus for avatar/group lists
     enum ContextMenuType { MENU_NONE, MENU_AVATAR, MENU_GROUP };
@@ -448,6 +452,7 @@ public:
 
     boost::signals2::connection setIsFriendCallback(const is_friend_signal_t::slot_type& cb);
 
+    std::vector<LLScrollListColumn::Params> getColumnInitParams() const { return mColumnInitParams; }
 
 protected:
     // "Full" interface: use this when you're creating a list that has one or more of the following:
@@ -558,11 +563,16 @@ private:
     LLWString       mSearchString;
     LLFrameTimer    mSearchTimer;
 
+    std::string     mFilterString;
+    S32             mFilterColumn;
+    bool            mIsFiltered;
+
     S32             mSearchColumn;
     S32             mNumDynamicWidthColumns;
     S32             mTotalStaticColumnWidth;
     S32             mTotalColumnPadding;
 
+    std::vector<LLScrollListColumn::Params> mColumnInitParams;
     mutable bool    mSorted;
 
     typedef std::map<std::string, LLScrollListColumn*> column_map_t;

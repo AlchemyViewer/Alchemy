@@ -2,6 +2,10 @@
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:noNamespaceSchemaLocation="llsd.xsd">
 <map>
+    <key>Include</key>
+    <array>
+      <string>settings_alchemy.xml</string>
+    </array>
     <key>RestrainedLove</key>
     <map>
       <key>Comment</key>
@@ -797,6 +801,17 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
+    <key>RecentJumpThresholdSecs</key>
+    <map>
+      <key>Comment</key>
+      <string>Seconds after a jump input during which finish-anim is suppressed to avoid interrupting rapid successive jumps.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
     <key>AvatarAxisDeadZone0</key>
     <map>
       <key>Comment</key>
@@ -949,7 +964,7 @@
         <key>Type</key>
         <string>String</string>
         <key>Value</key>
-        <string>http://lecs-viewer-web-components.s3.amazonaws.com/v3.0/[GRID_LOWERCASE]/vawp/index.html</string>
+        <string>https://lecs-viewer-web-components.s3.amazonaws.com/v3.0/[GRID_LOWERCASE]/vawp/index.html</string>
     </map>
     <!--AvatarBakedTextureUploadTimeout is in use by QA-->
     <key>AvatarBakedTextureUploadTimeout</key>
@@ -962,6 +977,28 @@
         <string>U32</string>
         <key>Value</key>
         <integer>60</integer>
+    </map>
+    <key>AvatarRotateThresholdSlow</key>
+    <map>
+      <key>Comment</key>
+      <string>Angle between avatar facing and camera facing at which avatar turns to face same direction as camera, when moving slowly (degrees)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <integer>60</integer>
+    </map>
+    <key>AvatarRotateThresholdFast</key>
+    <map>
+      <key>Comment</key>
+      <string>Angle between avatar facing and camera facing at which avatar turns to face same direction as camera, when moving fast (degrees)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <integer>2</integer>
     </map>
     <key>AvatarPhysics</key>
     <map>
@@ -2243,7 +2280,7 @@
     <key>Comment</key>
     <string>Allow left-click interaction with animated objects. Uncertain how much performance impact this will have.</string>
     <key>Persist</key>
-    <integer>1</integer>
+    <integer>0</integer>
     <key>Type</key>
     <string>Boolean</string>
     <key>Value</key>
@@ -2764,7 +2801,7 @@
       <key>Type</key>
       <string>String</string>
       <key>Value</key>
-      <string>http://lecs-viewer-web-components.s3.amazonaws.com/v3.0/[GRID_LOWERCASE]/guide.html</string>
+      <string>https://lecs-viewer-web-components.s3.amazonaws.com/v3.0/[GRID_LOWERCASE]/guide.html</string>
     </map>
   <key>DisableCameraConstraints</key>
     <map>
@@ -2788,16 +2825,16 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
-    <key>DisableMouseWarp</key>
+    <key>MouseWarpMode</key>
     <map>
       <key>Comment</key>
-      <string>Disable warping of the mouse to the center of the screen during alt-zoom and mouse look. Useful with certain input devices, mouse sharing programs like Synergy, or running under Parallels.</string>
+      <string>Controls warping of the mouse to the center of the screen during alt-zoom and mouse look. Useful with certain input devices, mouse sharing programs like Synergy, or running under Parallels. 0 - automatic, 1 - on, 2 - off</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>Boolean</string>
+      <string>S32</string>
       <key>Value</key>
-      <integer>0</integer>
+      <integer>1</integer>
     </map>
     <key>DisableExternalBrowser</key>
     <map>
@@ -2995,7 +3032,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>1</integer>
+      <integer>0</integer>
     </map>
     <key>EnableAltZoom</key>
     <map>
@@ -3072,7 +3109,7 @@
       <key>Type</key>
       <string>String</string>
       <key>Value</key>
-      <string>http://events.[GRID]/viewer/embed/event/[EVENT_ID]</string>
+      <string>https://events.[GRID]/viewer/embed/event/[EVENT_ID]</string>
     </map>
     <key>MainWorkTime</key>
     <map>
@@ -3740,7 +3777,7 @@
       <key>Type</key>
       <string>String</string>
       <key>Value</key>
-      <string>http://viewer-help.secondlife.com/[LANGUAGE]/[CHANNEL]/[VERSION]/[TOPIC][DEBUG_MODE]</string>
+      <string>https://viewer-help.secondlife.com/[LANGUAGE]/[CHANNEL]/[VERSION]/[TOPIC][DEBUG_MODE]</string>
     </map>
     <key>HowToHelpURL</key>
     <map>
@@ -3751,7 +3788,7 @@
       <key>Type</key>
       <string>String</string>
       <key>Value</key>
-      <string>http://lecs-viewer-web-components.s3.amazonaws.com/v3.0/[GRID_LOWERCASE]/howto/index.html</string>
+      <string>https://lecs-viewer-web-components.s3.amazonaws.com/v3.0/[GRID_LOWERCASE]/howto/index.html</string>
     </map>
     <key>HomeSidePanelURL</key>
     <map>
@@ -3967,7 +4004,7 @@
         <key>Comment</key>
         <string>Override received items inventory inbox display</string>
         <key>Persist</key>
-        <integer>1</integer>
+        <integer>0</integer>
         <key>Type</key>
         <string>Boolean</string>
         <key>Value</key>
@@ -4358,6 +4395,17 @@
         <key>Value</key>
             <integer>0</integer>
         </map>
+    <key>LSLFindDirection</key>
+    <map>
+        <key>Comment</key>
+        <string>Direction to search in LSL editor(true means up)</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>0</integer>
+    </map>
     <key>LSLHelpURL</key>
     <map>
       <key>Comment</key>
@@ -4367,7 +4415,7 @@
       <key>Type</key>
       <string>String</string>
       <key>Value</key>
-      <string>http://wiki.secondlife.com/wiki/[LSL_STRING]</string>
+      <string>https://wiki.secondlife.com/wiki/[LSL_STRING]</string>
     </map>
     <key>LSLFontSizeName</key>
     <map>
@@ -4545,7 +4593,17 @@
       <key>Value</key>
       <string>0.0.0</string>
     </map>
-
+    <key>PreviousInstallChecked</key>
+    <map>
+        <key>Comment</key>
+        <string>Whether viewer checked previous install on the same channel for NSIS</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>0</integer>
+    </map>
     <key>LimitDragDistance</key>
     <map>
       <key>Comment</key>
@@ -4710,7 +4768,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>40.0</real>
+    <real>90.0</real>
   </map>
   <key>LogMessages</key>
     <map>
@@ -4792,13 +4850,24 @@
     <key>MainloopTimeoutDefault</key>
     <map>
       <key>Comment</key>
-      <string>Timeout duration for mainloop lock detection, in seconds.</string>
+      <string>Timeout duration for mainloop lock detection during teleports, login and logout, in seconds.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>60.0</real>
+      <real>120.0</real>
+    </map>
+    <key>MainloopTimeoutStarted</key>
+    <map>
+        <key>Comment</key>
+        <string>Timeout duration for mainloop lock detection when logged in and not teleporting, in seconds.</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>F32</string>
+        <key>Value</key>
+        <real>60.0</real>
     </map>
     <key>MapScale</key>
     <map>
@@ -4887,6 +4956,17 @@
       <string>Boolean</string>
       <key>Value</key>
       <integer>1</integer>
+    </map>
+    <key>MapShowGridCoords</key>
+    <map>
+      <key>Comment</key>
+      <string>Shows/hides the grid coordinates of each region on the world map.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
     </map>
     <key>MiniMapAutoCenter</key>
     <map>
@@ -5383,6 +5463,28 @@
     <key>Value</key>
     <integer>0</integer>
   </map>
+  <key>MediaPluginPipeWireVolumeCatcher</key>
+  <map>
+    <key>Comment</key>
+    <string>Use PipeWire instead of PulseAudio for controlling web media volume.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
+  <key>MediaPluginForceVLC</key>
+  <map>
+    <key>Comment</key>
+    <string>Force use of VLC based media plugin. (Linux Only)</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>0</integer>
+  </map>
   <key>MediaControlFadeTime</key>
   <map>
     <key>Comment</key>
@@ -5625,7 +5727,7 @@
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>256.0</real>
+      <real>48.0</real>
     </map>
     <key>MiniMapRotate</key>
     <map>
@@ -6411,6 +6513,39 @@
       <string>Boolean</string>
       <key>Value</key>
       <integer>0</integer>
+    </map>
+    <key>OpenDebugStatVoice</key>
+    <map>
+      <key>Comment</key>
+      <string>Expand Voice (WebRTC) stats display</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>OpenDebugStatVoiceOutgoing</key>
+    <map>
+      <key>Comment</key>
+      <string>Expand Outgoing audio (Voice) stats display</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>OpenDebugStatVoiceIncoming</key>
+    <map>
+      <key>Comment</key>
+      <string>Expand Incoming audio (Voice) stats display</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
     </map>
     <key>OutBandwidth</key>
     <map>
@@ -7626,7 +7761,7 @@
   <key>RenderAvatarCloth</key>
     <map>
       <key>Comment</key>
-      <string>DEPRECATED - only false supported - Controls if avatars use wavy cloth</string>
+      <string>Controls if system avatar clothes use wavy cloth</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -7665,7 +7800,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>32.0</real>
+    <real>48.0</real>
   </map>
   <key>RenderCPUBasis</key>
   <map>
@@ -7806,7 +7941,7 @@
    <key>RenderHiDPI</key>
   <map>
     <key>Comment</key>
-    <string>Enable support for HiDPI displays, like Retina (macOS ONLY, requires restart)</string>
+    <string>Enable support for HiDPI displays, like Retina (macOS and Linux ONLY, requires restart)</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
@@ -7910,17 +8045,6 @@
     <string>S32</string>
     <key>Value</key>
     <integer>3</integer>
-  </map>
-  <key>RenderShadowHighPrecision</key>
-  <map>
-    <key>Comment</key>
-    <string>RGBA16F(true) or RGBA8(false) shadow buffers</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
   </map>
   <key>RenderSSAOScale</key>
   <map>
@@ -8237,7 +8361,7 @@
   <key>RenderMaxOpenGLVersion</key>
   <map>
     <key>Comment</key>
-    <string>Maximum OpenGL version to attempt use (minimum 3.1 maximum 4.6).  Requires restart.</string>
+    <string>Maximum OpenGL version to attempt use (minimum 3.1 maximum 4.6).  Requires restart. Windows only.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
@@ -9394,12 +9518,23 @@
     <key>Value</key>
     <integer>16</integer>
   </map>
+    <key>RenderReflectionProbeShowTransparent</key>
+    <map>
+        <key>Comment</key>
+        <string>Show reflection probes in the transparency debug view</string>
+        <key>Persist</key>
+        <integer>0</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>1</integer>
+    </map>
     <key>RenderReflectionProbeVolumes</key>
     <map>
       <key>Comment</key>
       <string>Render influence volumes of Reflection Probes</string>
       <key>Persist</key>
-      <integer>1</integer>
+      <integer>0</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
@@ -9485,13 +9620,24 @@
     <key>RenderQualityPerformance</key>
     <map>
       <key>Comment</key>
-      <string>Which graphics settings you've chosen</string>
+      <string>Which graphics settings you've chosen. Don't use this setting to change quality directly from debug settings.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>U32</string>
       <key>Value</key>
       <integer>1</integer>
+    </map>
+    <key>DebugQualityPerformance</key>
+    <map>
+        <key>Comment</key>
+        <string>Allows to change performance quality directly from debug settings.</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>U32</string>
+        <key>Value</key>
+        <integer>1</integer>
     </map>
 
   <key>RenderReflectionDetail</key>
@@ -9582,7 +9728,7 @@
     <key>Value</key>
     <real>1.0</real>
   </map>
-
+  
   <key>RenderReflectionProbeDrawDistance</key>
   <map>
     <key>Comment</key>
@@ -9647,7 +9793,7 @@
     <key>Type</key>
     <string>S32</string>
     <key>Value</key>
-    <integer>14</integer>
+    <integer>12</integer>
   </map>
   <key>RenderResolutionDivisor</key>
   <map>
@@ -9792,7 +9938,7 @@
     <key>Value</key>
     <real>1.0</real>
   </map>
-
+  
   <key>RenderReflectionProbeMaxLocalLightAmbiance</key>
   <map>
     <key>Comment</key>
@@ -10459,6 +10605,17 @@
         <key>Value</key>
         <integer>1</integer>
     </map>
+    <key>RenderHighPrecisionPostProcess</key>
+    <map>
+        <key>Comment</key>
+        <string>Use 16-bit floating point buffers for post process rendering</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>0</integer>
+    </map>
     <key>ReplaySession</key>
     <map>
       <key>Comment</key>
@@ -10715,13 +10872,13 @@
   <key>SceneLoadRearMaxRadiusFraction</key>
   <map>
     <key>Comment</key>
-    <string>a percentage of draw distance beyond which all objects outside of view frustum will be unloaded, regardless of pixel threshold</string>
+    <string>a fraction of draw distance beyond which all objects outside of view frustum will be unloaded, regardless of pixel threshold</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>75.0</real>
+    <real>0.75</real>
   </map>
     <key>SceneLoadRearPixelThreshold</key>
     <map>
@@ -10798,7 +10955,7 @@
       <key>Type</key>
       <string>U32</string>
       <key>Value</key>
-      <integer>0</integer>
+      <integer>1</integer>
     </map>
     <key>SelectMovableOnly</key>
     <map>
@@ -10953,6 +11110,17 @@
       <string>S32</string>
       <key>Value</key>
       <integer>1</integer>
+    </map>
+    <key>GroupTitlesTagMode</key>
+    <map>
+      <key>Comment</key>
+      <string>Select Group Titles tag mode: 0 - no group tags, 1 - only my group tag, 2 - all group tags</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>2</integer>
     </map>
     <key>ShowAxes</key>
     <map>
@@ -11481,6 +11649,45 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>ShowPGClassifieds</key>
+    <map>
+      <key>Comment</key>
+      <string>Display results of find classifieds that are flagged as general</string>
+      <key>Persist</key>
+      <integer>1</integer>
+	  <key>HideFromEditor</key>
+	  <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>ShowMatureClassifieds</key>
+    <map>
+      <key>Comment</key>
+      <string>Display results of find classifieds that are flagged as moderate</string>
+      <key>Persist</key>
+      <integer>1</integer>
+	  <key>HideFromEditor</key>
+	  <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>ShowAdultClassifieds</key>
+    <map>
+      <key>Comment</key>
+      <string>Display results of find classifieds that are flagged as adult</string>
+      <key>Persist</key>
+      <integer>1</integer>
+	  <key>HideFromEditor</key>
+	  <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>ShowPGSims</key>
     <map>
       <key>Comment</key>
@@ -11519,6 +11726,54 @@
       <string>Boolean</string>
       <key>Value</key>
       <integer>0</integer>
+    </map>
+    <key>ShowPGEvents</key>
+    <map>
+      <key>Comment</key>
+      <string>Display results of find events that are flagged as general</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>HideFromEditor</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>ShowMatureGroups</key>
+    <map>
+      <key>Comment</key>
+      <string>Include groups that are flagged as mature to Search results</string>
+      <key>Persist</key>
+      <integer>1</integer>
+	  <key>HideFromEditor</key>
+	  <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FindLandArea</key>
+    <map>
+      <key>Comment</key>
+      <string>Enables filtering of land search results by area</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>FindLandPrice</key>
+    <map>
+      <key>Comment</key>
+      <string>Enables filtering of land search results by price</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
     </map>
     <key>ShowNearClip</key>
     <map>
@@ -11799,7 +12054,7 @@
     <key>SnapshotFormat</key>
     <map>
       <key>Comment</key>
-      <string>Save snapshots in this format (0 = PNG, 1 = JPEG, 2 = BMP)</string>
+      <string>Save snapshots in this format (0 = PNG, 1 = JPEG, 2 = BMP, 3 = WebP)</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -12021,7 +12276,7 @@
       <key>Comment</key>
       <string>If TRUE, do not fetch and decode any textures</string>
       <key>Persist</key>
-      <integer>1</integer>
+      <integer>0</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
@@ -12032,7 +12287,7 @@
       <key>Comment</key>
       <string>If TRUE, do not load textures for in-world content</string>
       <key>Persist</key>
-      <integer>1</integer>
+      <integer>0</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
@@ -13300,11 +13555,11 @@
     <key>UpdaterShowReleaseNotes</key>
     <map>
         <key>Comment</key>
-        <string>Enables displaying of the Release notes in a web floater after update.</string>
+        <string>Enables displaying of the Release notes in a web floater after update. 0 - don't show, 1 - show, 2 - show even for test viewers</string>
         <key>Persist</key>
         <integer>1</integer>
         <key>Type</key>
-        <string>Boolean</string>
+        <string>S32</string>
         <key>Value</key>
         <integer>1</integer>
     </map>
@@ -13421,9 +13676,9 @@
     <key>Use24HourClock</key>
     <map>
         <key>Comment</key>
-        <string>12 vs 24. At the moment only for region restart schedule floater</string>
+        <string>12 vs 24. At the moment coverage is partial</string>
         <key>Persist</key>
-        <integer>0</integer>
+        <integer>1</integer>
         <key>Type</key>
         <string>Boolean</string>
         <key>Value</key>
@@ -14105,7 +14360,7 @@
     <key>WLSkyDetail</key>
     <map>
       <key>Comment</key>
-      <string>Controls vertex detail on the WindLight sky.  Lower numbers will give better performance and uglier skies.</string>
+      <string>[OBSOLETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -14116,7 +14371,7 @@
     <key>WatchdogEnabled</key>
     <map>
       <key>Comment</key>
-      <string>Controls whether the thread watchdog timer is activated. Value is boolean. Set to -1 to defer to built-in default.</string>
+      <string>Controls whether the thread watchdog timer is activated. Value is S32. Set to -1 to defer to built-in default.</string>
       <key>Persist</key>
       <integer>0</integer>
       <key>Type</key>
@@ -14299,6 +14554,50 @@
       <string>String</string>
       <key>Value</key>
       <string />
+    </map>
+    <key>ExternalWebsocketSyncEnable</key>
+    <map>
+        <key>Comment</key>
+        <string>Enables the Websocket JSONRPC server when doing external script editing.</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>1</integer>
+    </map>
+    <key>ExternalWebsocketSyncPort</key>
+    <map>
+        <key>Comment</key>
+        <string>Port that the JSONRPC server listens on when editing</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>S32</string>
+        <key>Value</key>
+        <integer>9020</integer>
+    </map>
+    <key>ExternalWebsocketSyncLocal</key>
+    <map>
+        <key>Comment</key>
+        <string>Should the JSONRPC server listen only for local connections.</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>1</integer>
+    </map>
+    <key>ExternalWebsocketForwardDebug</key>
+    <map>
+        <key>Comment</key>
+        <string>Forward messages and runtime errors for a script to JSONRPC client.</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>1</integer>
     </map>
     <key>YawFromMousePosition</key>
     <map>
@@ -14588,6 +14887,15 @@
         <map>
         <key>Comment</key>
             <string>Coroutine Pool size for Upload</string>
+        <key>Type</key>
+            <string>U32</string>
+        <key>Value</key>
+            <real>1</real>
+        </map>
+    <key>PoolSizeExpCache</key>
+        <map>
+        <key>Comment</key>
+            <string>Coroutine Pool size for Experience Cache</string>
         <key>Type</key>
             <string>U32</string>
         <key>Value</key>
@@ -14932,7 +15240,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>1</integer>
+      <integer>0</integer>
     </map>
     <key>ShowOfferedInventory</key>
     <map>
@@ -14954,7 +15262,7 @@
       <key>Type</key>
       <string>String</string>
       <key>Value</key>
-      <string>http://common-flash-secondlife-com.s3.amazonaws.com/viewer/v2.6/agni/404.html</string>
+      <string>https://common-flash-secondlife-com.s3.amazonaws.com/viewer/v2.6/agni/404.html</string>
     </map>
     <key>OpenIMOnVoice</key>
     <map>
@@ -15405,6 +15713,28 @@
       <string>Boolean</string>
       <key>Value</key>
       <integer>1</integer>
+    </map>
+    <key>SettingsEveryoneCopy</key>
+      <map>
+        <key>Comment</key>
+        <string>Everyone can copy the newly created Environment setting</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>0</integer>
+    </map>
+    <key>SettingsShareWithGroup</key>
+    <map>
+      <key>Comment</key>
+      <string>Newly created Environment setting are shared with the currently active group</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
     </map>
     <key>MaterialsNextOwnerCopy</key>
     <map>
@@ -16120,7 +16450,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>0</real>
+    <real>1.0</real>
   </map>
   <key>FMODExProfilerEnable</key>
   <map>
@@ -16653,6 +16983,39 @@
     <key>Value</key>
     <integer>0</integer>
   </map>
+  <key>InventoryShowRecentTab</key>
+  <map>
+    <key>Comment</key>
+    <string>Show/hide Recent tab in the Inventory floater</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
+  <key>InventoryShowWornTab</key>
+  <map>
+    <key>Comment</key>
+    <string>Show/hide Worn tab in the Inventory floater</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
+  <key>InventoryShowFavoritesTab</key>
+  <map>
+    <key>Comment</key>
+    <string>Show/hide Favorites tab in the Inventory floater</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
   <key>StatsReportMaxDuration</key>
   <map>
     <key>Comment</key>
@@ -16807,6 +17170,17 @@
       <key>Value</key>
       <integer>2</integer>
     </map>
+    <key>PurgeDiskCacheOnStartup</key>
+    <map>
+      <key>Comment</key>
+      <string>Whether or not to LRU purge the disk cache during startup on main thread</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
   <key>ScriptEditorDisableSyntaxHighlight</key>
   <map>
     <key>Comment</key>
@@ -16817,1009 +17191,6 @@
     <string>Boolean</string>
     <key>Value</key>
     <integer>0</integer>
-  </map>
-  <!-- ALCHEMY BELOW -->
-  <key>AlchemyCameraFloaterExpanded</key>
-  <map>
-      <key>Comment</key>
-      <string>Expanded camera floater</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyChatCommandAnimationOverride</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to control ao</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/ao</string>
-  </map>
-  <key>AlchemyChatCommandCalc</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to calculate expressions</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/calc</string>
-  </map>
-  <key>AlchemyChatCommandClearNearby</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to set clear nearby chat history for this session.</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/clr</string>
-  </map>
-  <key>AlchemyChatCommandDrawDistance</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to set draw distance</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/dd</string>
-  </map>
-  <key>AlchemyChatCommandEnable</key>
-  <map>
-      <key>Comment</key>
-      <string>Enable chat bar command line</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyChatCommandGround</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to teleport to ground</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/flr</string>
-  </map>
-  <key>AlchemyChatCommandHeight</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to teleport to specified height</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/gth</string>
-  </map>
-  <key>AlchemyChatCommandHoverHeight</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to hover your height or something</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/hover</string>
-  </map>
-  <key>AlchemyChatCommandHome</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to send avatar home</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/home</string>
-  </map>
-  <key>AlchemyChatCommandMapto</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to teleport to another region</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/mapto</string>
-  </map>
-  <key>AlchemyChatCommandPos</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to teleport to position</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/pos</string>
-  </map>
-  <key>AlchemyChatCommandSetChatChannel</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to set nearby chat channel</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/setchannel</string>
-  </map>
-  <key>AlchemyChatCommandRegionMessage</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to send a region message</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/regionmsg</string>
-  </map>
-  <key>AlchemyChatCommandResyncAnim</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to stop/start in order to resync animations</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/resync</string>
-  </map>
-  <key>AlchemyChatCommandRezPlat</key>
-  <map>
-      <key>Comment</key>
-      <string>Rez a platform</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/plat</string>
-  </map>
-  <key>AlchemyChatCommandRezPlatSize</key>
-  <map>
-      <key>Comment</key>
-      <string>Default size of platform to rez</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <string>20</string>
-  </map>
-  <key>AlchemyChatCommandSetHome</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to set the avatar home</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/sethome</string>
-  </map>
-  <key>AlchemyChatCommandTeleportToCam</key>
-  <map>
-      <key>Comment</key>
-      <string>Command to teleport to cam</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>/tp2cam</string>
-  </map>
-  <key>AlchemyCopySeperator</key>
-  <map>
-      <key>Comment</key>
-      <string>Seperator used for copy data functions</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>, </string>
-  </map>
-  <key>AlchemyLastDirectoryTab</key>
-  <map>
-      <key>Comment</key>
-      <string>Last active tab in directory floater</string>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>S32</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyLookAtShow</key>
-  <map>
-    <key>Comment</key>
-    <string>If true, avatar look at beacons will be displayed</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
-  <key>AlchemyLookAtLines</key>
-  <map>
-    <key>Comment</key>
-    <string>Render a line from Look At beacon to the originating avatar</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
-  <key>AlchemyLookAtNames</key>
-  <map>
-    <key>Comment</key>
-    <string>Render name of originating avatar under Look At beacon</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
-  <key>AlchemyLookAtHideSelf</key>
-  <map>
-    <key>Comment</key>
-    <string>Hide own Look At beacon when Look At render is enabled</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
-  <key>AlchemyMapShowAgentCount</key>
-  <map>
-      <key>Comment</key>
-      <string>Show count of users in region on world map</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyMinimapChatRings</key>
-  <map>
-      <key>Comment</key>
-      <string>Draw rings to denote chat range</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyMinimapGuideLine</key>
-  <map>
-      <key>Comment</key>
-      <string>Render a red line in the center of the camera view frustrum</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyMinimapObjectUpdateInterval</key>
-  <map>
-      <key>Comment</key>
-      <string>Rate at which to update minimap object layer</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.1</real>
-  </map>
-  <key>AlchemyMiniMapForSaleParcels</key>
-  <map>
-      <key>Comment</key>
-      <string>Draw for sale parcels</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyMiniMapCollisionParcels</key>
-  <map>
-      <key>Comment</key>
-      <string>Draw collision parcels</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyMinimapRenderObjects</key>
-  <map>
-      <key>Comment</key>
-      <string>>Render objects on minimap</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyMotionResetsCamera</key>
-  <map>
-      <key>Comment</key>
-      <string>Allow camera to reset when moving.</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyMouselookIFF</key>
-  <map>
-      <key>Comment</key>
-      <string>Display user that is currently focused upon by crosshair in mouselook</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyMouselookIFFMarkers</key>
-  <map>
-      <key>Comment</key>
-      <string>Display target markers for offscreen avatars in mouselook</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyMouselookIFFRange</key>
-  <map>
-      <key>Comment</key>
-      <string>Range of IFF display</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>380.0</real>
-  </map>
-  <key>AlchemyMouselookInstructions</key>
-  <map>
-      <key>Comment</key>
-      <string>Draw instructional overlay for mouselook - Press esc to leave</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyMouselookPosition</key>
-  <map>
-      <key>Comment</key>
-      <string>Draw position and health in mouselook</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyMouseLookZoomTime</key>
-  <map>
-    <key>Comment</key>
-    <string>Scalar for smooth mouselook zoom time</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>6.66</real>
-  </map>
-  <key>AlchemyMouseLookZoomTimeout</key>
-  <map>
-    <key>Comment</key>
-    <string>Cuttoff to force zoom to target fov</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>0.15</real>
-  </map>
-  <key>AlchemyNearbyColorize</key>
-  <map>
-      <key>Comment</key>
-      <string>Sync nearby list name colors to minimap</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyNearbyPeopleClickAction</key>
-  <map>
-      <key>Comment</key>
-      <string>0 - IM, 1 - Profile, 2 - Zoom In, 3 - Teleport To</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>U32</string>
-      <key>Value</key>
-      <integer>2</integer>
-  </map>
-  <key>AlchemyNimble</key>
-  <map>
-      <key>Comment</key>
-      <string>If true, disables prejump animation flags</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyNotifyIncomingMessage</key>
-  <map>
-      <key>Comment</key>
-      <string>Notify of incoming messages by looking for typing indicator</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyOnlineOfflineToChat</key>
-  <map>
-      <key>Comment</key>
-      <string>Log online and offline notifications to local chat</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyPointAtPrivate</key>
-  <map>
-      <key>Comment</key>
-      <string>Disable setting current point at target</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyPowerfulWizard</key>
-  <map>
-      <key>Comment</key>
-      <string>It's a surprise.</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyRadarAlerts</key>
-  <map>
-      <key>Comment</key>
-      <string>Display notification upon avatar entry or departure of current region</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyRadarAlertsToChat</key>
-  <map>
-      <key>Comment</key>
-      <string>Log radar alerts to local chat</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyRainbowEffects</key>
-  <map>
-      <key>Comment</key>
-      <string>Makes agent effects rainbows!</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AlchemyRealisticMouselook</key>
-  <map>
-      <key>Comment</key>
-      <string>Make the camera follow avatar body movements and animations while in mouselook</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AlchemyRezUnderLandGroup</key>
-  <map>
-      <key>Comment</key>
-      <string>Allows the agent to rez objects under the target locations land group. Must be a
-          member of the land group.</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>AllowNoCopyRezRestoreToWorld</key>
-  <map>
-      <key>Comment</key>
-      <string>Allow Restore to World of no-copy items</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>AVPickerNearMeRange</key>
-  <map>
-      <key>Comment</key>
-      <string>Search radius for nearby avatars</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>512.0</real>
-  </map>
-  <key>BlockMuteSortOrder</key>
-  <map>
-    <key>Comment</key>
-    <string>Specifies sort order for mute list</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
-  <key>BlockDerenderSortOrder</key>
-  <map>
-    <key>Comment</key>
-    <string>Specifies sort order for derender list</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
-<key>BlockAssetSortOrder</key>
-<map>
-  <key>Comment</key>
-  <string>Specifies sort order for asset list</string>
-  <key>Persist</key>
-  <integer>1</integer>
-  <key>Type</key>
-  <string>U32</string>
-  <key>Value</key>
-  <integer>0</integer>
-</map>
-  <key>BlockRenderingSortOrder</key>
-  <map>
-    <key>Comment</key>
-    <string>Specifies sort order for avatar rendering list</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
-  <key>DiskCacheSize</key>
-  <map>
-    <key>Comment</key>
-    <string>Controls amount of hard drive space reserved for asset file caching in MB</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>2048</integer>
-  </map>
-  <key>TextureCacheSize</key>
-  <map>
-    <key>Comment</key>
-    <string>Controls amount of hard drive space reserved for texture file caching in MB</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>2048</integer>
-  </map>
-  <key>RenderReflectionProbeShowTransparent</key>
-  <map>
-      <key>Comment</key>
-      <string>Show reflection probes in the transparency debug view</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-    <key>ShowFloaterCollapseButton</key>
-    <map>
-      <key>Comment</key>
-      <string>Show/hide the collapse button in the floater controls</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <boolean>1</boolean>
-    </map>
-  <key>ShowGroupFloaters</key>
-  <map>
-      <key>Comment</key>
-      <string>Show group profiles in floaters rather than the sidebar</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowPGGroups</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find groups that are flagged as general</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowMatureGroups</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find groups that are flagged as moderate</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowAdultGroups</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find groups that are flagged as adult</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>ShowPGClassifieds</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find classifieds that are flagged as general</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowMatureClassifieds</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find classifieds that are flagged as moderate</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowAdultClassifieds</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find classifieds that are flagged as adult</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>ShowPGEvents</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find events that are flagged as general</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowMatureEvents</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find events that are flagged as moderate</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowAdultEvents</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find events that are flagged as adult</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>ShowPGLand</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find land sales that are flagged as general</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowMatureLand</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find land sales that are flagged as moderate</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowAdultLand</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find land sales that are flagged as adult</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>ShowPGSims</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find places or find popular that are in general sims</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowMatureSims</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find places or find popular that are in moderate sims</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowAdultSims</key>
-  <map>
-      <key>Comment</key>
-      <string>Display results of find places or find popular that are in adult sims</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>HideFromEditor</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>FindLandArea</key>
-  <map>
-      <key>Comment</key>
-      <string>Enables filtering of land search results by area</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>FindLandPrice</key>
-  <map>
-      <key>Comment</key>
-      <string>Enables filtering of land search results by price</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>FindLandSort</key>
-  <map>
-      <key>Comment</key>
-      <string>Controls the sort order for land you are searching for ("Name", "Price", "PPM", "Area")</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>Name</string>
-  </map>
-  <key>FindLandSortAscending</key>
-  <map>
-      <key>Comment</key>
-      <string>Controls whether the sort order for land you are searching for is displayed in ascending or descending order</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <string>0</string>
-  </map>
-  <key>FindLandType</key>
-  <map>
-      <key>Comment</key>
-      <string>Controls which type of land you are searching for in Find Land interface ("All",
-          "Auction", "For Sale")</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string>All</string>
-  </map>
-  <key>SelectCopyOnly</key>
-  <map>
-    <key>Comment</key>
-    <string>Select only objects you can copy</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
-  <key>SnapshotDetection</key>
-  <map>
-      <key>Comment</key>
-      <string>Detect snapshot animation being played</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>ShowStreamInfo</key>
-  <map>
-      <key>Comment</key>
-      <string>Show audio stream info in toasts</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-  </map>
-  <key>ShowStreamInfoToChat</key>
-  <map>
-      <key>Comment</key>
-      <string>Show audio stream info in nearby chat</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-  </map>
-  <key>StreamList</key>
-  <map>
-      <key>Comment</key>
-      <string>Saved list of parcel audio streams</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>LLSD</string>
-      <key>Value</key>
-      <string />
   </map>
 </map>
 </llsd>

@@ -38,6 +38,8 @@
 #include "llmemory.h"
 #include <glm/gtc/type_ptr.hpp>
 
+#include <boost/unordered_map.hpp>
+
 //Next Highest Power Of Two
 //helper function, returns first number > v that is a power of 2, or v if v is already a power of 2
 U32 nhpo2(U32 v)
@@ -265,8 +267,8 @@ static GLuint gen_buffer()
     GLuint ret = 0;
     constexpr U32 pool_size = 4096;
 
-    static GLuint sNamePool[pool_size];
-    static U32 sIndex = 0;
+    thread_local static GLuint sNamePool[pool_size];
+    thread_local static U32 sIndex = 0;
 
     if (sIndex == 0)
     {
@@ -325,8 +327,8 @@ class LLVBOPool
 {
     public:
     virtual ~LLVBOPool() = default;
-    virtual void allocate(GLenum type, U32 size, GLuint& name, U8*& data) = 0;
-    virtual void free(GLenum type, U32 size, GLuint name, U8* data) = 0;
+    virtual void allocateVBO(GLenum type, U32 size, GLuint& name, U8*& data) = 0;
+    virtual void freeVBO(GLenum type, U32 size, GLuint name, U8* data) = 0;
     virtual U64 getVramBytesUsed() = 0;
 };
 
@@ -342,7 +344,7 @@ public:
         return mAllocated;
     }
 
-    void allocate(GLenum type, U32 size, GLuint& name, U8*& data) override
+    void allocateVBO(GLenum type, U32 size, GLuint& name, U8*& data) override
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
         STOP_GLERROR;
@@ -362,7 +364,7 @@ public:
         }
     }
 
-    void free(GLenum type, U32 size, GLuint name, U8* data) override
+    void freeVBO(GLenum type, U32 size, GLuint name, U8* data) override
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
         llassert(type == GL_ARRAY_BUFFER || type == GL_ELEMENT_ARRAY_BUFFER);
@@ -429,7 +431,7 @@ public:
         size += block_size - (size % block_size);
     }
 
-    void allocate(GLenum type, U32 size, GLuint& name, U8*& data) override
+    void allocateVBO(GLenum type, U32 size, GLuint& name, U8*& data) override
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
         llassert(type == GL_ARRAY_BUFFER || type == GL_ELEMENT_ARRAY_BUFFER);
@@ -485,7 +487,7 @@ public:
         clean();
     }
 
-    void free(GLenum type, U32 size, GLuint name, U8* data) override
+    void freeVBO(GLenum type, U32 size, GLuint name, U8* data) override
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
         llassert(type == GL_ARRAY_BUFFER || type == GL_ELEMENT_ARRAY_BUFFER);
@@ -1101,7 +1103,7 @@ void LLVertexBuffer::genBuffer(U32 size)
         llassert(mMappedData == nullptr);
 
         mSize = size;
-        sVBOPool->allocate(GL_ARRAY_BUFFER, mSize, mGLBuffer, mMappedData);
+        sVBOPool->allocateVBO(GL_ARRAY_BUFFER, mSize, mGLBuffer, mMappedData);
     }
 }
 
@@ -1116,7 +1118,7 @@ void LLVertexBuffer::genIndices(U32 size)
         llassert(mGLIndices == 0);
         llassert(mMappedIndexData == nullptr);
         mIndicesSize = size;
-        sVBOPool->allocate(GL_ELEMENT_ARRAY_BUFFER, mIndicesSize, mGLIndices, mMappedIndexData);
+        sVBOPool->allocateVBO(GL_ELEMENT_ARRAY_BUFFER, mIndicesSize, mGLIndices, mMappedIndexData);
     }
 }
 
@@ -1174,7 +1176,7 @@ void LLVertexBuffer::destroyGLBuffer()
         //llassert(sVBOPool);
         if (sVBOPool)
         {
-            sVBOPool->free(GL_ARRAY_BUFFER, mSize, mGLBuffer, mMappedData);
+            sVBOPool->freeVBO(GL_ARRAY_BUFFER, mSize, mGLBuffer, mMappedData);
         }
 
         mSize = 0;
@@ -1191,7 +1193,7 @@ void LLVertexBuffer::destroyGLIndices()
         //llassert(sVBOPool);
         if (sVBOPool)
         {
-            sVBOPool->free(GL_ELEMENT_ARRAY_BUFFER, mIndicesSize, mGLIndices, mMappedIndexData);
+            sVBOPool->freeVBO(GL_ELEMENT_ARRAY_BUFFER, mIndicesSize, mGLIndices, mMappedIndexData);
         }
 
         mIndicesSize = 0;

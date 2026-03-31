@@ -40,10 +40,16 @@ public:
     struct Params : public LLInitParam::Block<Params, LLComboBox::Params>
     {
         Optional<LLButton::Params> action_button;
+// [SL:KB] - Patch: Control-FlyoutButton | Checked: 2012-08-09 (Catznip-3.3)
+        Optional<S32>              arrow_button_width;
+// [/SL:KB]
         Deprecated                 allow_text_entry;
 
         Params()
         :   action_button("action_button"),
+// [SL:KB] - Patch: Control-FlyoutButton | Checked: 2012-08-09 (Catznip-3.3)
+            arrow_button_width("arrow_button_width", 24),
+// [/SL:KB]
             allow_text_entry("allow_text_entry")
         {
             changeDefault(LLComboBox::Params::allow_text_entry, false);
@@ -55,6 +61,13 @@ protected:
     friend class LLUICtrlFactory;
 public:
     void draw() override;
+
+    bool handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+
+// [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4
+    void    setLabel(const LLStringExplicit& name) override;
+    void    updateLabel() override;
+// [/SL:KB]
 
     void setToggleState(bool state);
 

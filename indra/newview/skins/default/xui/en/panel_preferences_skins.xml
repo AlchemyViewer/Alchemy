@@ -3,7 +3,7 @@
  border="true"
  follows="left|top|right|bottom"
  height="408"
- label="Skins"
+ label="Themes"
  layout="topleft"
  left="102"
  name="skins"
@@ -19,7 +19,7 @@
    name="select_skin_text"
    top="12"
    width="180">
-   Select a skin:
+   Select a Theme:
   </text>
   <!-- Chooser -->
   <scroll_list
@@ -59,7 +59,7 @@
    left_pad="52"
    name="add_skin"
    top_delta="0"
-   tool_tip="Add a new skin..."
+   tool_tip="Add a new theme..."
    width="19">
     <button.commit_callback
      function="Pref.AddSkin" />
@@ -75,7 +75,7 @@
    left_pad="4"
    name="remove_skin"
    top_delta="0"
-   tool_tip="Remove selected skin..."
+   tool_tip="Remove selected theme..."
    width="19">
     <button.commit_callback
      function="Pref.RemoveSkin" />
@@ -92,7 +92,7 @@
    name="skin_name"
    top="10"
    right="-10">
-   Boring skin!
+   Boring theme!
   </text>
   <text
    type="string"

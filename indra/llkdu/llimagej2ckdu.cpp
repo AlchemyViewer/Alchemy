@@ -301,7 +301,7 @@ void LLImageJ2CKDU::setupCodeStream(LLImageJ2C &base, bool keep_codestream, ECod
         {
             // The compressed data has been loaded
             // Setup the source for the codestream
-        mInputp = std::make_unique<LLKDUMemSource>(base.getData(), data_size);
+            mInputp = std::make_unique<LLKDUMemSource>(base.getData(), data_size);
         }
 
         if (mInputp)
@@ -618,6 +618,11 @@ bool LLImageJ2CKDU::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 deco
                     cleanupCodeStream();
                     return false;
                 }
+            }
+            catch (std::bad_alloc&)
+            {
+                LLError::LLUserWarningMsg::showOutOfMemory();
+                LL_ERRS() << "Bad memory allocation in J2C KDU" << LL_ENDL;
             }
             catch (const KDUError& msg)
             {

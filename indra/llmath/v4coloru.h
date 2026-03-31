@@ -121,11 +121,6 @@ public:
     static LLColor4U red;
     static LLColor4U green;
     static LLColor4U blue;
-
-    friend std::size_t hash_value(const LLColor4U& vec)
-    {
-        return boost::hash_value(vec.mV);
-    }
 };
 
 static_assert(std::is_trivially_copyable<LLColor4U>::value, "LLColor4U must be trivial copy");

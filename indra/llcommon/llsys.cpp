@@ -33,11 +33,7 @@
 #include "llsys.h"
 
 #include <iostream>
-#ifdef LL_USESYSTEMLIBS
-# include <zlib.h>
-#else
-# include "zlib-ng/zlib.h"
-#endif
+#include <zlib.h>
 
 #include "llprocessor.h"
 #include "llerrorcontrol.h"
@@ -51,9 +47,6 @@
 #include <boost/circular_buffer.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/range.hpp>
-#include <boost/utility/enable_if.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_float.hpp>
 #include "llfasttimer.h"
 
 using namespace llsd;
@@ -517,7 +510,7 @@ namespace {
 #if LL_LINUX
         constexpr U32 STATUS_SIZE  = 2048;
 
-        LLFILE* status_filep = LLFile::fopen("/proc/self/status", "rb");
+        LLFILE* status_filep = LLFile::fopen("/proc/self/status", LLFILE_MODE("rb"));
         if (status_filep)
         {
             char buff[STATUS_SIZE];     /* Flawfinder: ignore */
@@ -711,7 +704,7 @@ public:
     // Store every integer type as LLSD::Integer.
     template <class T>
     void add(const LLSD::String& name, const T& value,
-             typename boost::enable_if<boost::is_integral<T> >::type* = 0)
+             typename std::enable_if_t<std::is_integral_v<T> >* = 0)
     {
         mStats[name] = LLSD::Integer(llmin<T>(value, S32_MAX));
     }
@@ -719,7 +712,7 @@ public:
     // Store every floating-point type as LLSD::Real.
     template <class T>
     void add(const LLSD::String& name, const T& value,
-             typename boost::enable_if<boost::is_float<T> >::type* = 0)
+             typename std::enable_if_t<std::is_floating_point_v<T> >* = 0)
     {
         mStats[name] = LLSD::Real(value);
     }
@@ -824,57 +817,8 @@ void LLMemoryInfo::getAvailableMemoryKB(U32Kilobytes& avail_mem_kb)
     }
 
 #elif LL_LINUX
-    // mStatsMap is derived from MEMINFO_FILE:
-    // $ cat /proc/meminfo
-    // MemTotal:        4108424 kB
-    // MemFree:         1244064 kB
-    // Buffers:           85164 kB
-    // Cached:          1990264 kB
-    // SwapCached:            0 kB
-    // Active:          1176648 kB
-    // Inactive:        1427532 kB
-    // Active(anon):     529152 kB
-    // Inactive(anon):    15924 kB
-    // Active(file):     647496 kB
-    // Inactive(file):  1411608 kB
-    // Unevictable:          16 kB
-    // Mlocked:              16 kB
-    // HighTotal:       3266316 kB
-    // HighFree:         721308 kB
-    // LowTotal:         842108 kB
-    // LowFree:          522756 kB
-    // SwapTotal:       6384632 kB
-    // SwapFree:        6384632 kB
-    // Dirty:                28 kB
-    // Writeback:             0 kB
-    // AnonPages:        528820 kB
-    // Mapped:            89472 kB
-    // Shmem:             16324 kB
-    // Slab:             159624 kB
-    // SReclaimable:     145168 kB
-    // SUnreclaim:        14456 kB
-    // KernelStack:        2560 kB
-    // PageTables:         5560 kB
-    // NFS_Unstable:          0 kB
-    // Bounce:                0 kB
-    // WritebackTmp:          0 kB
-    // CommitLimit:     8438844 kB
-    // Committed_AS:    1271596 kB
-    // VmallocTotal:     122880 kB
-    // VmallocUsed:       65252 kB
-    // VmallocChunk:      52356 kB
-    // HardwareCorrupted:     0 kB
-    // HugePages_Total:       0
-    // HugePages_Free:        0
-    // HugePages_Rsvd:        0
-    // HugePages_Surp:        0
-    // Hugepagesize:       2048 kB
-    // DirectMap4k:      434168 kB
-    // DirectMap2M:      477184 kB
-    // (could also run 'free', but easier to read a file than run a program)
-    LLSD statsMap(loadStatsMap());
-
-    avail_mem_kb = (U32Kilobytes)statsMap["MemFree"].asInteger();
+    U64 phys = U64(getpagesize()) * U64(get_avphys_pages());
+    avail_mem_kb = U64Bytes(phys);
 #else
     //do not know how to collect available memory info for other systems.
     //leave it blank here for now.
@@ -1116,7 +1060,7 @@ LLSD LLMemoryInfo::loadStatsMap()
                 S64 intval = 0;
                 try
                 {
-                    intval = llclamp(boost::lexical_cast<S64>(value_str), 0, S32_MAX);
+                    intval = llclamp(boost::lexical_cast<S64>(value_str), S32_MIN, S32_MAX);
                 }
                 catch (const boost::bad_lexical_cast&)
                 {
@@ -1326,7 +1270,7 @@ bool gunzip_file(const std::string& srcfile, const std::string& dstfile)
     src = gzopen(srcfile.c_str(), "rb");
 #endif
     if (! src) goto err;
-    dst = LLFile::fopen(tmpfile, "wb");     /* Flawfinder: ignore */
+    dst = LLFile::fopen(tmpfile, LLFILE_MODE("wb")); /* Flawfinder: ignore */
     if (! dst) goto err;
     do
     {
@@ -1340,10 +1284,6 @@ bool gunzip_file(const std::string& srcfile, const std::string& dstfile)
     } while(gzeof(src) == 0);
     fclose(dst);
     dst = NULL;
-#if LL_WINDOWS
-    // Rename in windows needs the dstfile to not exist.
-    LLFile::remove(dstfile, ENOENT);
-#endif
     if (LLFile::rename(tmpfile, dstfile) == -1) goto err;       /* Flawfinder: ignore */
     retval = true;
 err:
@@ -1371,7 +1311,7 @@ bool gzip_file(const std::string& srcfile, const std::string& dstfile)
 #endif
 
     if (! dst) goto err;
-    src = LLFile::fopen(srcfile, "rb");     /* Flawfinder: ignore */
+    src = LLFile::fopen(srcfile, LLFILE_MODE("rb")); /* Flawfinder: ignore */
     if (! src) goto err;
 
     while ((bytes = (S32)fread(buffer, sizeof(U8), COMPRESS_BUFFER_SIZE, src)) > 0)
@@ -1391,10 +1331,6 @@ bool gzip_file(const std::string& srcfile, const std::string& dstfile)
 
     gzclose(dst);
     dst = NULL;
-#if LL_WINDOWS
-    // Rename in windows needs the dstfile to not exist.
-    LLFile::remove(dstfile);
-#endif
     if (LLFile::rename(tmpfile, dstfile) == -1) goto err;       /* Flawfinder: ignore */
     retval = true;
  err:

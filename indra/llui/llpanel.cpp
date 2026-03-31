@@ -439,7 +439,7 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
         it != p.strings.end();
         ++it)
     {
-        mUIStrings[it->name] = it->value;
+        mUIStrings[it->name()] = it->value;
     }
 
     setLabel(p.label());
@@ -660,7 +660,7 @@ bool LLPanel::childHasFocus(std::string_view id)
 // Prefer getChild<LLUICtrl>("foo")->setCommitCallback(boost:bind(...)),
 // which takes a generic slot.  Or use mCommitCallbackRegistrar.add() with
 // a named callback and reference it in XML.
-void LLPanel::childSetCommitCallback(std::string_view id, boost::function<void (LLUICtrl*,void*)> cb, void* data)
+void LLPanel::childSetCommitCallback(std::string_view id, std::function<void (LLUICtrl*,void*)> cb, void* data)
 {
     LLUICtrl* child = findChild<LLUICtrl>(id);
     if (child)
@@ -757,7 +757,7 @@ void LLPanel::childSetAction(std::string_view id, const commit_signal_t::slot_ty
     }
 }
 
-void LLPanel::childSetAction(std::string_view id, boost::function<void(void*)> function, void* value)
+void LLPanel::childSetAction(std::string_view id, std::function<void(void*)> function, void* value)
 {
     LLButton* button = findChild<LLButton>(id);
     if (button)

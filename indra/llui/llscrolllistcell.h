@@ -221,15 +221,16 @@ public:
     /*virtual*/ const LLSD      getValue() const;
     /*virtual*/ void    setColor(const LLColor4&);
     /*virtual*/ void    setValue(const LLSD& value);
+    void                setIconSize(S32 size);
 
     void setClickCallback(bool (*callback)(void*), void* user_data);
-    bool handleClick();
+    bool handleClick() override;
 
 private:
     LLPointer<LLUIImage>    mIcon;
     LLColor4                mColor;
     LLFontGL::HAlign        mAlignment;
-
+    S32                     mIconSize;
     bool (*mCallback)(void*);
     void* mUserData;
 };

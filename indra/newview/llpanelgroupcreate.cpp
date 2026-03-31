@@ -41,10 +41,10 @@
 #include "lluictrlfactory.h"
 
 // Viewer includes
+#include "alfloatergroupprofile.h"
 #include "llagentbenefits.h"
 #include "llfloaterreg.h"
 #include "llfloater.h"
-#include "llfloatergroupprofile.h"
 #include "llgroupmgr.h"
 #include "llstatusbar.h" // to re-request balance
 #include "lltrans.h"
@@ -120,7 +120,7 @@ void LLPanelGroupCreate::refreshCreatedGroup(const LLUUID& group_id)
     LLSD params;
     params["group_id"] = group_id;
 
-    auto* floater = LLFloaterReg::findTypedInstance<LLFloaterGroupProfile>("group_profile", LLSD(LLUUID::null));
+    auto* floater = LLFloaterReg::findTypedInstance<ALFloaterGroupProfile>("group_profile", LLSD(LLUUID::null));
     if (floater)
     {
         floater->openFloater(params);
@@ -128,7 +128,7 @@ void LLPanelGroupCreate::refreshCreatedGroup(const LLUUID& group_id)
     }
     else if(gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
-        LLFloaterGroupProfile::showInstance(params, true);
+        ALFloaterGroupProfile::showInstance(params, true);
     }
     else
     {
@@ -173,7 +173,7 @@ void LLPanelGroupCreate::addMembershipRow(const std::string &name)
 
 void LLPanelGroupCreate::onBackBtnClick()
 {
-    LLFloaterGroupProfile* parent = dynamic_cast<LLFloaterGroupProfile*>(getParent());
+    ALFloaterGroupProfile* parent = dynamic_cast<ALFloaterGroupProfile*>(getParent());
     if(parent)
     {
         parent->closeHostedFloater();

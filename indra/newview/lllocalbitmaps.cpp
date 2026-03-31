@@ -31,22 +31,16 @@
 /* own header */
 #include "lllocalbitmaps.h"
 
-/* boost: will not compile unless equivalent is undef'd, beware. */
-#include "fix_macros.h"
-#include <boost/filesystem.hpp>
-
 /* image compression headers. */
 #include "llimagebmp.h"
 #include "llimagetga.h"
 #include "llimagej2c.h"
 #include "llimagejpeg.h"
 #include "llimagepng.h"
-
-/* time headers */
-#include <time.h>
-#include <ctime>
+#include "llimagewebp.h"
 
 /* misc headers */
+#include "fsyspath.h"
 #include "llgltfmaterial.h"
 #include "llscrolllistctrl.h"
 #include "lllocaltextureobject.h"
@@ -114,6 +108,10 @@ LLLocalBitmap::LLLocalBitmap(std::string filename)
     else if (temp_exten == "png")
     {
         mExtension = ET_IMG_PNG;
+    }
+    else if (temp_exten == "webp")
+    {
+        mExtension = ET_IMG_WEBP;
     }
     else
     {
@@ -192,15 +190,8 @@ bool LLLocalBitmap::updateSelf(EUpdateType optional_firstupdate)
         if (gDirUtilp->fileExists(mFilename))
         {
             // verifying that the file has indeed been modified
-
-#ifndef LL_WINDOWS
-            const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(mFilename));
-#else
-            const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(ll_convert<std::wstring>(mFilename)));
-#endif
-            LLSD new_last_modified = asctime(localtime(&temp_time));
-
-            if (mLastModified.asString() != new_last_modified.asString())
+            const std::filesystem::file_time_type new_last_modified = std::filesystem::last_write_time(fsyspath(mFilename));
+            if (mLastModified != new_last_modified)
             {
                 /* loading the image file and decoding it, here is a critical point which,
                    if fails, invalidates the whole update (or unit creation) process. */
@@ -219,7 +210,10 @@ bool LLLocalBitmap::updateSelf(EUpdateType optional_firstupdate)
                     LLPointer<LLViewerFetchedTexture> texture = new LLViewerFetchedTexture
                         ("file://"+mFilename, FTT_LOCAL_FILE, mWorldID, LL_LOCAL_USE_MIPMAPS);
 
-                    texture->createGLTexture(LL_LOCAL_DISCARD_LEVEL, raw_image);
+                    if (!texture->createGLTexture(LL_LOCAL_DISCARD_LEVEL, raw_image))
+                    {
+                        LL_WARNS() << "Failed to create GL texture for local bitmap: " << mFilename << " " << mWorldID << LL_ENDL;
+                    }
                     texture->ref();
 
                     gTextureList.addImage(texture, TEX_LIST_STANDARD);
@@ -378,6 +372,17 @@ bool LLLocalBitmap::decodeBitmap(LLPointer<LLImageRaw> rawimg)
         {
             LLPointer<LLImagePNG> png_image = new LLImagePNG;
             if (png_image->load(mFilename) && png_image->decode(rawimg, 0.0f))
+            {
+                rawimg->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
+                decode_successful = true;
+            }
+            break;
+        }
+
+        case ET_IMG_WEBP:
+        {
+            LLPointer<LLImageWebP> webp_image = new LLImageWebP;
+            if (webp_image->load(mFilename) && webp_image->decode(rawimg, 0.0f))
             {
                 rawimg->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
                 decode_successful = true;
@@ -593,7 +598,7 @@ void LLLocalBitmap::updateUserVolumes(LLUUID old_id, LLUUID new_id, U32 channel)
             if (object->isSculpted() && object->getVolume() &&
                 object->getVolume()->getParams().getSculptID() == old_id)
             {
-                LLSculptParams* old_params = (LLSculptParams*)object->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+                LLSculptParams* old_params = object->getSculptParams();
                 LLSculptParams new_params(*old_params);
                 new_params.setSculptTexture(new_id, (*old_params).getSculptType());
                 object->setParameterEntry(LLNetworkData::PARAMS_SCULPT, new_params, true);

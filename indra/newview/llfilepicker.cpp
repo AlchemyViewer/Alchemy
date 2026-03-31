@@ -52,7 +52,7 @@ LLFilePicker LLFilePicker::sInstance;
 
 #if LL_WINDOWS && !LL_SDL_WINDOW
 #define SOUND_FILTER L"Sounds (*.wav)\0*.wav\0"
-#define IMAGE_FILTER L"Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png)\0*.tga;*.bmp;*.jpg;*.jpeg;*.png\0"
+#define IMAGE_FILTER L"Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)\0*.tga;*.bmp;*.jpg;*.jpeg;*.png;*.webp\0"
 #define ANIM_FILTER L"Animations (*.bvh; *.anim)\0*.bvh;*.anim\0"
 #define COLLADA_FILTER L"Scene (*.dae)\0*.dae\0"
 #define GLTF_FILTER L"glTF (*.gltf; *.glb)\0*.gltf;*.glb\0"
@@ -63,7 +63,7 @@ LLFilePicker LLFilePicker::sInstance;
 #define MATERIAL_FILTER L"GLTF Files (*.gltf; *.glb)\0*.gltf;*.glb\0"
 #define HDRI_FILTER L"HDRI Files (*.exr)\0*.exr\0"
 #define MATERIAL_TEXTURES_FILTER L"GLTF Import (*.gltf; *.glb; *.tga; *.bmp; *.jpg; *.jpeg; *.png)\0*.gltf;*.glb;*.tga;*.bmp;*.jpg;*.jpeg;*.png\0"
-#define SCRIPT_FILTER L"Script files (*.lsl)\0*.lsl\0"
+#define SCRIPT_FILTER L"Script files (*.lsl; *.lua; *.luau)\0*.lsl;*.lua;*.luau\0"
 #define DICTIONARY_FILTER L"Dictionary files (*.dic; *.xcu)\0*.dic;*.xcu\0"
 #define ZIP_FILTER L"ZIP files (*.zip)\0*.zip\0"
 #endif
@@ -190,7 +190,7 @@ namespace
             filter_vec.push_back({ "Sounds (*.wav)", "wav" });
             break;
         case LLFilePicker::FFLOAD_IMAGE:
-            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png)", "tga;bmp;jpg;jpeg;png" });
+            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)", "tga;bmp;jpg;jpeg;png;webp" });
             break;
         case LLFilePicker::FFLOAD_ANIM:
             filter_vec.push_back({ "Animations (*.bvh; *.anim)", "bvh;anim" });
@@ -211,7 +211,9 @@ namespace
             filter_vec.push_back({ "RAW files (*.raw)", "raw" });
             break;
         case LLFilePicker::FFLOAD_MODEL:
-            filter_vec.push_back({ "Model files (*.dae)", "dae" });
+            filter_vec.push_back({ "Model files (*.dae; *.gltf; *.glb)", "dae;gltf;glb" });
+            filter_vec.push_back({ "Collada files (*.dae)", "dae" });
+            filter_vec.push_back({ "GLTF Files (*.gltf; *.glb)", "gltf;glb" });
             break;
         case LLFilePicker::FFLOAD_MATERIAL:
             filter_vec.push_back({ "GLTF Files (*.gltf; *.glb)", "gltf;glb" });
@@ -219,20 +221,20 @@ namespace
         case LLFilePicker::FFLOAD_MATERIAL_TEXTURE:
             filter_vec.push_back({ "GLTF Import (*.gltf; *.glb; *.tga; *.bmp; *.jpg; *.jpeg; *.png)", "gltf;glb;tga;bmp;jpg;jpeg;png" });
             filter_vec.push_back({ "GLTF Files (*.gltf; *.glb)", "gltf;glb" });
-            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png)", "tga;bmp;jpg;jpeg;png" });
+            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)", "tga;bmp;jpg;jpeg;png;webp" });
             break;
         case LLFilePicker::FFLOAD_HDRI:
             filter_vec.push_back({ "HDRI Files (*.exr)", "exr" });
             break;
         case LLFilePicker::FFLOAD_SCRIPT:
-            filter_vec.push_back({ "Script files (*.lsl)", "lsl" });
+            filter_vec.push_back({ "Script files (*.lsl; *.lua; *.luau)", "lsl;lua;luau" });
             break;
         case LLFilePicker::FFLOAD_DICTIONARY:
             filter_vec.push_back({ "Dictionary files (*.dic; *.xcu)", "dic;xcu" });
             break;
         case LLFilePicker::FFLOAD_ZIP:
-            filter_vec.push_back({ "Zip files (*.zip)", "zip" });
-             break;
+            filter_vec.push_back({ "ZIP files (*.zip)", "zip" });
+            break;
         default:
             break;
         }
@@ -474,6 +476,13 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
         }
         file_filters.push_back({ "PNG Images (*.png)", "png" });
         break;
+    case FFSAVE_WEBP:
+        if (default_filename.empty())
+        {
+            default_filename = "untitled.webp";
+        }
+        file_filters.push_back({ "WebP Images (*.webp)", "webp" });
+        break;
     case FFSAVE_TGAPNG:
         if (default_filename.empty())
         {
@@ -482,6 +491,7 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
         }
         file_filters.push_back({ "PNG Images (*.png)", "png" });
         file_filters.push_back({ "Targa Images (*.tga)", "tga" });
+        file_filters.push_back({ "WebP Images (*.webp)", "webp" });
         break;
 
     case FFSAVE_JPEG:
@@ -552,7 +562,7 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
         {
             default_filename = "untitled.lsl";
         }
-        file_filters.push_back({ "LSL Files (*.lsl)", "lsl" });
+        file_filters.push_back({ "Script files (*.lsl; *.lua; *.luau)", "lsl;lua;luau" });
         break;
     default:
         return false;
@@ -607,10 +617,12 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
         SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, file_filters.data());
         SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, file_filters.size());
         SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, SDL_GL_GetCurrentWindow());
-        if(!default_filename.empty())
-        {
-            SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, default_filename.c_str());
-        }
+
+        // Disabled default file name functionality currently due to inconsistency between various SDL3 backends
+        // if(!default_filename.empty())
+        // {
+        //     SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, default_filename.c_str());
+        // }
         SDL_SetBooleanProperty(props, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, false);
 
         SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_SAVEFILE, sdl_callback, llfilecallback, props);
@@ -928,6 +940,16 @@ bool LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
             L"PNG Images (*.png)\0*.png\0" \
             L"\0";
         break;
+    case FFSAVE_WEBP:
+        if (filename.empty())
+        {
+            wcsncpy(mFilesW, L"untitled.webp", FILENAME_BUFFER_SIZE);   /*Flawfinder: ignore*/
+        }
+        mOFN.lpstrDefExt = L"webp";
+        mOFN.lpstrFilter =
+            L"WebP Images (*.webp)\0*.webp\0" \
+            L"\0";
+        break;
     case FFSAVE_TGAPNG:
         if (filename.empty())
         {
@@ -938,9 +960,7 @@ bool LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
         mOFN.lpstrFilter =
             L"PNG Images (*.png)\0*.png\0" \
             L"Targa Images (*.tga)\0*.tga\0" \
-            L"Jpeg Images (*.jpg)\0*.jpg\0" \
-            L"Jpeg2000 Images (*.j2c)\0*.j2c\0" \
-            L"Bitmap Images (*.bmp)\0*.bmp\0" \
+            L"WebP Images (*.webp)\0*.webp\0" \
             L"\0";
         break;
 
@@ -1127,6 +1147,7 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
             allowedv->push_back("bmpf");
             allowedv->push_back("tpic");
             allowedv->push_back("png");
+            allowedv->push_back("webp");
             break;
             break;
         case FFLOAD_WAV:
@@ -1157,13 +1178,15 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
             break;
         case FFLOAD_SCRIPT:
             allowedv->push_back("lsl");
+            allowedv->push_back("lua");
+            allowedv->push_back("luau");
             break;
         case FFLOAD_DICTIONARY:
             allowedv->push_back("dic");
             allowedv->push_back("xcu");
             break;
         case FFLOAD_ZIP:
-            allowedv->emplace_back("zip");
+            allowedv->push_back("zip");
             break;
         case FFLOAD_DIRECTORY:
             break;
@@ -1238,12 +1261,12 @@ void set_nav_save_data(LLFilePicker::ESaveFilter filter, std::string &extension,
         case LLFilePicker::FFSAVE_TGAPNG:
             type = "PNG";
             creator = "prvw";
-            extension = "png,tga,jpg,jpeg,j2c,bmp,bmpf,";
+            extension = "png,tga,webp";
             break;
         case LLFilePicker::FFSAVE_BMP:
             type = "BMPf";
             creator = "prvw";
-            extension = "bmp,bmpf";
+            extension = "bmp";
             break;
         case LLFilePicker::FFSAVE_JPEG:
             type = "JPEG";
@@ -1254,6 +1277,11 @@ void set_nav_save_data(LLFilePicker::ESaveFilter filter, std::string &extension,
             type = "PNG ";
             creator = "prvw";
             extension = "png";
+            break;
+        case LLFilePicker::FFSAVE_WEBP:
+            extension = "webp";
+            type = "WEBP";
+            creator = "prvw";
             break;
         case LLFilePicker::FFSAVE_AVI:
             type = "\?\?\?\?";
@@ -1297,7 +1325,7 @@ void set_nav_save_data(LLFilePicker::ESaveFilter filter, std::string &extension,
         case LLFilePicker::FFSAVE_SCRIPT:
             type = "LSL ";
             creator = "\?\?\?\?";
-            extension = "lsl";
+            extension = "lsl;lua;luau";
             break;
 
         case LLFilePicker::FFSAVE_ALL:

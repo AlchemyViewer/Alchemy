@@ -120,7 +120,7 @@ inline void LLVector4a::clear()
 
 inline void LLVector4a::splat(const F32 x)
 {
-    mQ = _mm_set1_ps(x);
+    mQ = _mm_set_ps1(x);
 }
 
 inline void LLVector4a::splat(const LLSimdScalar& x)
@@ -196,7 +196,7 @@ inline void LLVector4a::setDiv(const LLVector4a& a, const LLVector4a& b)
 // Set this to the element-wise absolute value of src
 inline void LLVector4a::setAbs(const LLVector4a& src)
 {
-    static const LL_ALIGN_16(U32 F_ABS_MASK_4A[4]) = { 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF };
+    alignas(16) static const U32 F_ABS_MASK_4A[4] = { 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF };
     mQ = _mm_and_ps(src.mQ, *reinterpret_cast<const LLQuad*>(F_ABS_MASK_4A));
 }
 
@@ -272,7 +272,7 @@ inline void LLVector4a::setCross3(const LLVector4a& a, const LLVector4a& b)
 // Set all elements to the dot product of the x, y, and z elements in a and b
 inline void LLVector4a::setAllDot3(const LLVector4a& a, const LLVector4a& b)
 {
-#if (defined(__AVX2__) || defined(__SSE4_1__) || defined(__arm64__) || defined(__aarch64__))
+#if (defined(__AVX__) || defined(__AVX2__) || defined(__arm64__) || defined(__aarch64__))
     mQ = _mm_dp_ps(a.mQ, b.mQ, 0x7f);
 #else
     // ab = { a[W]*b[W], a[Z]*b[Z], a[Y]*b[Y], a[X]*b[X] }
@@ -293,7 +293,7 @@ inline void LLVector4a::setAllDot3(const LLVector4a& a, const LLVector4a& b)
 // Set all elements to the dot product of the x, y, z, and w elements in a and b
 inline void LLVector4a::setAllDot4(const LLVector4a& a, const LLVector4a& b)
 {
-#if (defined(__AVX2__) || defined(__SSE4_1__) || defined(__arm64__) || defined(__aarch64__))
+#if (defined(__AVX__) || defined(__AVX2__) || defined(__arm64__) || defined(__aarch64__))
     mQ = _mm_dp_ps(a.mQ, b.mQ, 0xff);
 #else
     // ab = { a[W]*b[W], a[Z]*b[Z], a[Y]*b[Y], a[X]*b[X] }
@@ -314,7 +314,7 @@ inline void LLVector4a::setAllDot4(const LLVector4a& a, const LLVector4a& b)
 // Return the 3D dot product of this vector and b
 inline LLSimdScalar LLVector4a::dot3(const LLVector4a& b) const
 {
-#if (defined(__AVX2__) || defined(__SSE4_1__) || defined(__arm64__) || defined(__aarch64__))
+#if (defined(__AVX__) || defined(__AVX2__) || defined(__arm64__) || defined(__aarch64__))
     return _mm_dp_ps(mQ, b.mQ, 0x7f);
 #else
     const LLQuad ab = _mm_mul_ps( mQ, b.mQ );
@@ -328,7 +328,7 @@ inline LLSimdScalar LLVector4a::dot3(const LLVector4a& b) const
 // Return the 4D dot product of this vector and b
 inline LLSimdScalar LLVector4a::dot4(const LLVector4a& b) const
 {
-#if (defined(__AVX2__) || defined(__SSE4_1__) || defined(__arm64__) || defined(__aarch64__))
+#if (defined(__AVX__) || defined(__AVX2__) || defined(__arm64__) || defined(__aarch64__))
     return _mm_dp_ps(mQ, b.mQ, 0xff);
 #else
     // ab = { w, z, y, x }
@@ -360,7 +360,7 @@ inline void LLVector4a::normalize3()
     // which is actually lenSqrd). So out = a * [0.5*rsqrt * (3 - lenSqrd*rsqrt*rsqrt)]
     const LLQuad AtimesRsqrt = _mm_mul_ps( lenSqrd.mQ, rsqrt );
     const LLQuad AtimesRsqrtTimesRsqrt = _mm_mul_ps( AtimesRsqrt, rsqrt );
-    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt );
+    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt);
     const LLQuad nrApprox = _mm_mul_ps(_mm_set_ps1(0.5f), _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
     mQ = _mm_mul_ps( mQ, nrApprox );
 }
@@ -442,10 +442,11 @@ inline void LLVector4a::normalize3fast_checked(LLVector4a* d)
 // Return true if this vector is normalized with respect to x,y,z up to tolerance
 inline LLBool32 LLVector4a::isNormalized3( F32 tolerance ) const
 {
+    alignas(16) static const U32 ones[4] = { 0x3f800000, 0x3f800000, 0x3f800000, 0x3f800000 };
     LLSimdScalar tol = _mm_load_ss( &tolerance );
     tol = _mm_mul_ss( tol, tol );
     LLVector4a lenSquared; lenSquared.setAllDot3( *this, *this );
-    lenSquared.sub( _mm_set1_ps(1.f) );
+    lenSquared.sub( *reinterpret_cast<const LLVector4a*>(ones) );
     lenSquared.setAbs(lenSquared);
     return _mm_comile_ss( lenSquared, tol );
 }
@@ -453,10 +454,11 @@ inline LLBool32 LLVector4a::isNormalized3( F32 tolerance ) const
 // Return true if this vector is normalized with respect to all components up to tolerance
 inline LLBool32 LLVector4a::isNormalized4( F32 tolerance ) const
 {
+    alignas(16) static const U32 ones[4] = { 0x3f800000, 0x3f800000, 0x3f800000, 0x3f800000 };
     LLSimdScalar tol = _mm_load_ss( &tolerance );
     tol = _mm_mul_ss( tol, tol );
     LLVector4a lenSquared; lenSquared.setAllDot4( *this, *this );
-    lenSquared.sub(_mm_set1_ps(1.f));
+    lenSquared.sub( *reinterpret_cast<const LLVector4a*>(ones) );
     lenSquared.setAbs(lenSquared);
     return _mm_comile_ss( lenSquared, tol );
 }
@@ -499,7 +501,7 @@ inline void LLVector4a::setLerp(const LLVector4a& lhs, const LLVector4a& rhs, F3
 
 inline LLBool32 LLVector4a::isFinite3() const
 {
-    static LL_ALIGN_16(const U32 nanOrInfMask[4]) = { 0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000 };
+    alignas(16) static const U32 nanOrInfMask[4] = { 0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000 };
     ll_assert_aligned(nanOrInfMask,16);
     const __m128i nanOrInfMaskV = *reinterpret_cast<const __m128i*> (nanOrInfMask);
     const __m128i maskResult = _mm_and_si128( _mm_castps_si128(mQ), nanOrInfMaskV );
@@ -509,7 +511,7 @@ inline LLBool32 LLVector4a::isFinite3() const
 
 inline LLBool32 LLVector4a::isFinite4() const
 {
-    static LL_ALIGN_16(const U32 nanOrInfMask[4]) = { 0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000 };
+    alignas(16) static const U32 nanOrInfMask[4] = { 0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000 };
     const __m128i nanOrInfMaskV = *reinterpret_cast<const __m128i*> (nanOrInfMask);
     const __m128i maskResult = _mm_and_si128( _mm_castps_si128(mQ), nanOrInfMaskV );
     const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32( maskResult, nanOrInfMaskV ));
@@ -581,7 +583,7 @@ inline bool LLVector4a::equals4(const LLVector4a& rhs, F32 tolerance ) const
 {
     LLVector4a diff; diff.setSub( *this, rhs );
     diff.setAbs( diff );
-    const LLQuad tol = _mm_set1_ps( tolerance );
+    const LLQuad tol = _mm_set_ps1(tolerance);
     const LLQuad cmp = _mm_cmplt_ps( diff, tol );
     return (_mm_movemask_ps( cmp ) & LLVector4Logical::MASK_XYZW) == LLVector4Logical::MASK_XYZW;
 }
@@ -590,7 +592,7 @@ inline bool LLVector4a::equals3(const LLVector4a& rhs, F32 tolerance ) const
 {
     LLVector4a diff; diff.setSub( *this, rhs );
     diff.setAbs( diff );
-    const LLQuad tol = _mm_set1_ps( tolerance );
+    const LLQuad tol = _mm_set_ps1(tolerance);
     const LLQuad t = _mm_cmplt_ps( diff, tol );
     return (_mm_movemask_ps( t ) & LLVector4Logical::MASK_XYZ) == LLVector4Logical::MASK_XYZ;
 

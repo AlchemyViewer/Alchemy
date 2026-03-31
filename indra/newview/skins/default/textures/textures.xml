@@ -175,7 +175,6 @@ with the same filename but different name
   <texture name="Command_View_Icon"         file_name="toolbar_icons/view.png"         preload="true" />
   <texture name="Command_Voice_Icon"        file_name="toolbar_icons/nearbyvoice.png"  preload="true" />
   <texture name="Command_Webbrowser_Icon"   file_name="toolbar_icons/web.png"          preload="true" />
-  <texture name="Command_Poser_Icon"        file_name="toolbar_icons/poser.png"        preload="true" />
   <texture name="Caret_Top_Icon"            file_name="toolbar_icons/caret_top.png"    preload="true" scale.left="1" scale.top="28" scale.right="15" scale.bottom="5" />
   <texture name="Caret_Bottom_Icon"         file_name="toolbar_icons/caret_bottom.png" preload="true" scale.left="1" scale.top="23" scale.right="15" scale.bottom="1" />
   <texture name="Caret_Right_Icon"          file_name="toolbar_icons/caret_right.png"  preload="true" scale.left="5" scale.top="15" scale.right="28" scale.bottom="1" />
@@ -207,6 +206,7 @@ with the same filename but different name
   <texture name="Conv_toolbar_snooze" file_name="icons/Conv_toolbar_snooze.png" preload="true" />
   <texture name="Conv_toolbar_teleport" file_name="icons/Conv_toolbar_teleport.png" preload="true" />
   <texture name="Conv_log_inbox" file_name="icons/Conv_log_inbox.png" preload="false" />
+  <texture name="Conv_typing" file_name="icons/Conv_typing.png" preload="false" />
 
   <texture name="Copy" file_name="icons/Copy.png" preload="false" />
   <texture name="CopyBright" file_name="icons/CopyBright.png" preload="false" />
@@ -331,11 +331,7 @@ with the same filename but different name
   <texture name="Inv_Favorite_Star_Content" file_name="icons/Inv_Favorite_Star_Content.png" preload="false" />
   <texture name="Inv_Favorite_Star_Full" file_name="icons/Inv_Favorite_Star_Full.png" preload="false" />
   <texture name="Inv_FolderClosed" file_name="icons/Inv_FolderClosed.png" preload="false" />
-  <texture name="Inv_FolderClosedToxic" file_name="icons/Inv_FolderClosedToxic.png" preload="false" />
   <texture name="Inv_FolderOpen" file_name="icons/Inv_FolderOpen.png" preload="false" />
-  <texture name="Inv_FolderOpenToxic" file_name="icons/Inv_FolderOpenToxic.png" preload="false" />
-  <texture name="Inv_FolderClosed_WT" file_name="icons/Inv_FolderClosed_WT.png" preload="false" />
-  <texture name="Inv_FolderOpen_WT" file_name="icons/Inv_FolderOpen_WT.png" preload="false" />
   <texture name="Inv_Gesture" file_name="icons/Inv_Gesture.png" preload="false" />
   <texture name="Inv_Gloves" file_name="icons/Inv_Gloves.png" preload="false" />
   <texture name="Inv_Hair" file_name="icons/Inv_Hair.png" preload="false" />
@@ -874,11 +870,13 @@ with the same filename but different name
   <texture name="icon_avatar_online.tga" />
   <texture name="icon_diurnal.tga" />
   <texture name="icon_for_sale.tga" file_name="icons/Icon_For_Sale.png" />
+  <texture name="icon_auction.tga"/>
+  <texture name="icon_place.tga"/>
   <texture name="icon_top_pick.tga" />
-  <texture name="Icon_Place" file_name="icon_place.tga" preload="false" />
-  <texture name="Icon_Auction" file_name="icon_auction.tga" preload="false" />
-  <texture name="Icon_Group" file_name="icon_group.tga" preload="false" />
 
+  <texture name="icon_event.tga"/>
+  <texture name="icon_event_adult.tga"/>
+  <texture name="icon_event_mature.tga" />
 
   <texture name="lag_status_critical.tga" />
   <texture name="lag_status_good.tga" />
@@ -964,12 +962,8 @@ with the same filename but different name
   <texture name="AlchemyProject128" file_name="alchemy/alchemyproject_128.png" preload="false" />
   <texture name="AlchemyTest128" file_name="alchemy/alchemytest_128.png" preload="false" />
 
-  <texture name="social_discord" file_name="alchemy/discord_32.png" preload="false" />
-  <texture name="social_mastodon" file_name="alchemy/mastodon_32.png" preload="false" />
-    <texture name="social_bluesky" file_name="alchemy/bluesky.png" preload="false" />
-    <texture name="social_github" file_name="alchemy/github.png" preload="false" />
-
   <texture name="Cam_Recall" file_name="icons/Cam_Recall.png"/>
   <texture name="Cam_Save" file_name="icons/Cam_Save.png"/>
+
   <texture name="Icon_Pointer" file_name="icons/Icon_Pointer.png" preload="false"/>
 </textures>

@@ -41,7 +41,6 @@
 #include "rlvhelper.h"
 // [/RLVa:KB]
 
-class LLPanelChatControlPanel;
 class LLChatEntry;
 class LLChatHistory;
 class LLPanelEmojiComplete;
@@ -92,6 +91,8 @@ public:
     void closeFloater(bool app_quitting = false) override;
     void deleteAllChildren() override;
 
+    virtual void onClickCloseBtn(bool app_quitting = false) override;
+
     // Handle the left hand participant list widgets
     void addConversationViewParticipant(LLConversationItem* item, bool update_view = true);
     void removeConversationViewParticipant(const LLUUID& participant_id);
@@ -107,7 +108,7 @@ public:
     LLConversationItem* getCurSelectedViewModelItem();
     void forceReshape();
     virtual bool handleKeyHere( KEY key, MASK mask ) override;
-    bool isMessagePaneExpanded(){return mMessagePaneExpanded;}
+    bool isMessagePaneExpanded() const {return mMessagePaneExpanded;}
     void setMessagePaneExpanded(bool expanded){mMessagePaneExpanded = expanded;}
     void restoreFloater();
     void saveCollapsedState();
@@ -163,6 +164,9 @@ protected:
     std::string appendTime();
     void assignResizeLimits();
 
+    static void applyMUPose(std::string& text);
+    static void applyOOCClose(std::string& text);
+
     void updateUsedEmojis(LLWStringView text);
 
     S32  mFloaterExtraWidth;
@@ -212,6 +216,9 @@ protected:
     LLButton* mGearBtn;
     LLButton* mAddBtn;
     LLButton* mVoiceButton;
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+    LLPanel* mExtendedButtonPanel = nullptr;
+// [/SL:KB]
 
     // Since mVoiceButton can work in one of two modes, "Start call" or "Hang up",
     // (with different images and tooltips depending on the currently chosen mode)

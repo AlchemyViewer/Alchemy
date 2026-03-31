@@ -33,9 +33,10 @@
 #include "../llviewertexturelist.h"
 #include "../pipeline.h"
 #include "buffer_util.h"
-#include <boost/url.hpp>
 #include "llimagejpeg.h"
 #include "../llskinningutil.h"
+
+#include <future>
 
 using namespace LL::GLTF;
 using namespace boost::json;
@@ -45,12 +46,12 @@ namespace LL
 {
     namespace GLTF
     {
-        static boost::unordered_set<std::string> ExtensionsSupported = {
+        static std::unordered_set<std::string> ExtensionsSupported = {
             "KHR_materials_unlit",
             "KHR_texture_transform"
         };
 
-        static boost::unordered_set<std::string> ExtensionsIgnored = {
+        static std::unordered_set<std::string> ExtensionsIgnored = {
             "KHR_materials_pbrSpecularGlossiness"
         };
 
@@ -619,8 +620,8 @@ bool Asset::prep()
                     // allocate vertex buffer and pack it
                     if (vertex_count[variant] > 0)
                     {
-                        #if 0
                         U32 mat_idx = mat_id + 1;
+                        #if 0
                         LLVertexBuffer* vb = new LLVertexBuffer(attribute_mask);
 
                         rd.mBatches[variant][mat_idx].mVertexBuffer = vb;
@@ -647,7 +648,7 @@ bool Asset::prep()
                 }
             }
         }
-#if 0
+
         // sanity check that all primitives have a vertex buffer
         for (auto& mesh : mMeshes)
         {
@@ -656,7 +657,6 @@ bool Asset::prep()
                 //llassert(primitive.mVertexBuffer.notNull());
             }
         }
-#endif
     }
     #if 0
     // build render batches
@@ -929,7 +929,7 @@ bool Asset::save(const std::string& filename)
     object obj;
     serialize(obj);
     std::string buffer = boost::json::serialize(obj, {});
-    std::ofstream file(filename, std::ios::binary);
+    llofstream file(filename, std::ios::binary);
     file.write(buffer.c_str(), buffer.size());
 
     return true;
@@ -962,8 +962,40 @@ LLViewerFetchedTexture* fetch_texture(const LLUUID& id);
 bool Image::prep(Asset& asset, bool loadIntoVRAM)
 {
     mLoadIntoTexturePipe = loadIntoVRAM;
+
     LLUUID id;
     if (mUri.size() == UUID_STR_SIZE && LLUUID::parseUUID(mUri, &id) && id.notNull())
+    { // loaded from an asset, fetch the texture from the asset system
+        LL_DEBUGS("GLTF") << "Loading image from an id" << id<< LL_ENDL;
+    }
+    else if (mUri.find("data:") == 0)
+    { // embedded in a data URI, load the texture from the URI
+        LL_WARNS("GLTF") << "Data URIs not yet supported" << LL_ENDL;
+        return false;
+    }
+
+    // Image::prepImpl containes code that must run on the main thread
+    std::promise<bool> prep_promise;
+    std::future<bool> prep_future = prep_promise.get_future();
+
+    LLAppViewer::instance()->postToMainCoro([this, &asset, id, &prep_promise]() mutable {
+        try {
+            bool result = prepImpl(asset, id);
+            prep_promise.set_value(result);
+        }
+        catch (...) {
+            // Propagate exception to the waiting thread
+            prep_promise.set_exception(std::current_exception());
+        }
+    });
+
+    // Block until prep is done on the main thread
+    return prep_future.get();
+}
+
+bool Image::prepImpl(Asset& asset, const LLUUID& id)
+{
+    if (id.notNull())
     { // loaded from an asset, fetch the texture from the asset system
         mTexture = fetch_texture(id);
     }
@@ -994,6 +1026,12 @@ bool Image::prep(Asset& asset, bool loadIntoVRAM)
     { // loaded locally and not embedded, load the texture as a local preview
         std::string dir = gDirUtilp->getDirName(asset.mFilename);
         std::string img_file = dir + gDirUtilp->getDirDelimiter() + mUri;
+
+        if (!gDirUtilp->fileExists(img_file))
+        {
+            // URI might be escaped, unescape.
+            img_file = dir + gDirUtilp->getDirDelimiter() + LLURI::unescape(mUri);
+        }
 
         LLUUID tracking_id = LLLocalBitmapMgr::getInstance()->addUnit(img_file);
         if (tracking_id.notNull() && mLoadIntoTexturePipe)
@@ -1091,7 +1129,7 @@ bool Image::save(Asset& asset, const std::string& folder)
         // set URI to non-j2c file for now, but later we'll want to reference the j2c hash
         mUri = name + extension;
 
-        std::ofstream file(filename, std::ios::binary);
+        llofstream file(filename, std::ios::binary);
         file.write((const char*)buffer.mData.data() + bufferView.mByteOffset, bufferView.mByteLength);
     }
     else if (mTexture.notNull())

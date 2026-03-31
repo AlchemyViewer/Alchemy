@@ -37,9 +37,6 @@ class LLViewerObject;
 // number of reflection probes to keep in vram
 #define LL_MAX_REFLECTION_PROBE_COUNT 256
 
-// reflection probe resolution
-#define LL_IRRADIANCE_MAP_RESOLUTION 64
-
 // reflection probe mininum scale
 #define LL_REFLECTION_PROBE_MINIMUM_SCALE 1.f;
 
@@ -259,6 +256,9 @@ private:
     // resolution of reflection probes
     U32 mProbeResolution = 128;
 
+    // resolution of irradiance maps
+    U32 mIrradianceMapResolution = 16;
+
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;
 
@@ -269,6 +269,7 @@ private:
     bool mReset = false;
 
     float mResetFade = 1.f;
+    float mGlobalFadeTarget = 1.f;
 
     // if true, only update the default probe
     bool mPaused = false;

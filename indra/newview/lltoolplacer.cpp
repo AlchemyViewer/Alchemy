@@ -445,15 +445,12 @@ bool LLToolPlacer::addObject( LLPCode pcode, S32 x, S32 y, U8 use_physics )
         gViewerWindow->getWindow()->incBusyCount();
     }
 
-    if (!gSavedSettings.getBOOL("EnableSelectionHints"))
-    {
-        // VEFFECT: AddObject
-        LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
-        effectp->setSourceObject((LLViewerObject*)gAgentAvatarp);
-        effectp->setPositionGlobal(regionp->getPosGlobalFromRegion(ray_end_region));
-        effectp->setDuration(LL_HUD_DUR_SHORT);
-        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-    }
+    // VEFFECT: AddObject
+    LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+    effectp->setSourceObject((LLViewerObject*)gAgentAvatarp);
+    effectp->setPositionGlobal(regionp->getPosGlobalFromRegion(ray_end_region));
+    effectp->setDuration(LL_HUD_DUR_SHORT);
+    effectp->setColor(LLColor4U(gAgent.getEffectColor()));
 
     add(LLStatViewer::OBJECT_CREATE, 1);
 

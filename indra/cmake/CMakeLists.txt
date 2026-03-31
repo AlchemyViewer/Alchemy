@@ -1,31 +1,23 @@
 # -*- cmake -*-
 
-include(00-Common)
-
-project(cmake)
-
 set(cmake_SOURCE_FILES
-        CMakeLists.txt
         00-Common.cmake
         APR.cmake
-        Audio.cmake
         Boost.cmake
-        Brotli.cmake
+        BootstrapVcpkg.cmake
         bugsplat.cmake
         BuildPackagesInfo.cmake
         BuildVersion.cmake
         CEFPlugin.cmake
-        CEFPlugin.cmake
         CMakeCopyIfDifferent.cmake
+        Collada-Dom.cmake
         Copy3rdPartyLibs.cmake
         CURL.cmake
-        DeploySharedLibs.cmake
         Discord.cmake
-        DragDrop.cmake
         EXPAT.cmake
-        FindAutobuild.cmake
         FindPipeWire.cmake
         FMODSTUDIO.cmake
+        FontConfig.cmake
         FreeType.cmake
         GLEXT.cmake
         GLIB.cmake
@@ -33,29 +25,27 @@ set(cmake_SOURCE_FILES
         GStreamer10Plugin.cmake
         Havok.cmake
         Hunspell.cmake
+        JPEG.cmake
+        LibVLCPlugin.cmake
+        Linking.cmake
         LLAddBuildTest.cmake
-        LLAppearance.cmake
-        LLAudio.cmake
-        LLCommon.cmake
-        LLImage.cmake
         LLKDU.cmake
         LLPhysicsExtensions.cmake
-        LLPrimitive.cmake
-        LLSharedLibs.cmake
         LLTestCommand.cmake
-        LLWindow.cmake
-        Linking.cmake
         Meshoptimizer.cmake
+        Mikktspace.cmake
+        NanoSVG.cmake
         NDOF.cmake
-        OPENAL.cmake
+        NVAPI.cmake
+        OpenAL.cmake
         OpenGL.cmake
         OpenJPEG.cmake
         OpenSSL.cmake
-        PNG.cmake
+        OpenXR.cmake
         PluginAPI.cmake
-        Prebuilt.cmake
-        PulseAudio.cmake
+        PNG.cmake
         Python.cmake
+        run_build_test.py
         SDL3.cmake
         SSE2NEON.cmake
         TemplateCheck.cmake
@@ -66,19 +56,21 @@ set(cmake_SOURCE_FILES
         UI.cmake
         UnixInstall.cmake
         Variables.cmake
+        Velopack.cmake
         VHACD.cmake
-        ViewerMiscLibs.cmake
-        VisualLeakDetector.cmake
-        LibVLCPlugin.cmake
+        Vorbis.cmake
         WebRTC.cmake
+        websocketpp.cmake
         xxHash.cmake
         ZLIBNG.cmake
         )
 
 source_group("Shared Rules" FILES ${cmake_SOURCE_FILES})
 
+source_group("CMake Rules" FILES CMakeLists.txt)
+
 set(master_SOURCE_FILES
-        ../CMakeLists.txt
+        ${CMAKE_SOURCE_DIR}/CMakeLists.txt
         )
 
 source_group("Master Rules" FILES ${master_SOURCE_FILES})

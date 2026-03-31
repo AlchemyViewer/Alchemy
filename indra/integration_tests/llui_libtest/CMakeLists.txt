@@ -4,24 +4,6 @@
 # related to the viewer
 if (VIEWER)
 
-project (llui_libtest)
-
-include(00-Common)
-include(LLCommon)
-include(LLImage)
-include(LLImageJ2COJ)   # ugh, needed for images
-include(LLKDU)
-include(LLMath)
-include(LLMessage)
-include(LLRender)
-include(LLWindow)
-include(LLUI)
-include(LLFileSystem)
-include(LLXML)
-include(Hunspell)
-include(Linking)
-# include(Tut)
-
 set(llui_libtest_SOURCE_FILES
     llui_libtest.cpp
     llwidgetreg.cpp
@@ -49,9 +31,14 @@ target_link_libraries(llui_libtest
         llimagej2coj
         )
 
+set_target_properties(llui_libtest
+                    PROPERTIES
+                    FOLDER "Tests"
+                    )
+
 if (WINDOWS)
     set_target_properties(llui_libtest
-        PROPERTIES 
+        PROPERTIES
         LINK_FLAGS "/NODEFAULTLIB:LIBCMT"
         )
 

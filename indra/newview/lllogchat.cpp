@@ -80,8 +80,8 @@ const static std::string MULTI_LINE_PREFIX(" ");
  *
  * Note: "You" was used as an avatar names in viewers of previous versions
  */
-const static boost::regex TIMESTAMP_AND_STUFF("^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\]\\s+|\\[\\d{1,2}:\\d{2}\\]\\s+)?(.*)$");
-const static boost::regex TIMESTAMP("^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\]|\\[\\d{1,2}:\\d{2}\\]).*");
+const static boost::regex TIMESTAMP_AND_STUFF("^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\s[AaPp][Mm]\\]\\s+|\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\]\\s+|\\[\\d{1,2}:\\d{2}\\s[AaPp][Mm]\\]\\s+|\\[\\d{1,2}:\\d{2}\\]\\s+)?(.*)$");
+const static boost::regex TIMESTAMP("^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}(\\s[AaPp][Mm])?\\]|\\[\\d{1,2}:\\d{2}(\\s[AaPp][Mm])?\\]).*");
 
 /**
  *  Regular expression suitable to match names like
@@ -152,6 +152,10 @@ public:
 
     void checkAndCutOffDate(std::string& time_str)
     {
+        if (time_str.size() < 10) // not enough space for a date
+        {
+            return;
+        }
         // Cuts off the "%Y/%m/%d" from string for todays timestamps.
         // Assume that passed string has at least "%H:%M" time format.
         date log_date(not_a_date_time);
@@ -168,20 +172,12 @@ public:
 
         if ( days_alive == zero_days )
         {
-            // Yep, today's so strip "%Y/%m/%d" info
-            ptime stripped_time(not_a_date_time);
-
-            mTimeStream.str(LLStringUtil::null);
-            mTimeStream << time_str;
-            mTimeStream >> stripped_time;
-            mTimeStream.clear();
-
-            time_str.clear();
-
-            mTimeStream.str(LLStringUtil::null);
-            mTimeStream << stripped_time;
-            mTimeStream >> time_str;
-            mTimeStream.clear();
+            size_t pos = time_str.find_first_of(' ');
+            if (pos != std::string::npos)
+            {
+                time_str.erase(0, pos + 1);
+                LLStringUtil::trim(time_str);
+            }
         }
 
         LL_DEBUGS("LLChatLogParser")
@@ -310,16 +306,22 @@ std::string LLLogChat::timestamp2LogString(U32 timestamp, bool withdate)
     std::string timeStr;
     if (withdate)
     {
-        timeStr = "[" + LLTrans::getString ("TimeYear") + "]/["
-                  + LLTrans::getString ("TimeMonth") + "]/["
-                  + LLTrans::getString ("TimeDay") + "] ["
-                  + LLTrans::getString ("TimeHour") + "]:["
-                  + LLTrans::getString ("TimeMin") + "]";
+        timeStr = "[" + LLTrans::getString("TimeYear") + "]/["
+            + LLTrans::getString("TimeMonth") + "]/["
+            + LLTrans::getString("TimeDay") + "] ";
+    }
+
+    static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+    if (use_24h)
+    {
+        timeStr += "[" + LLTrans::getString("TimeHour") + "]:["
+            + LLTrans::getString("TimeMin") + "]";
     }
     else
     {
-        timeStr = "[" + LLTrans::getString("TimeHour") + "]:["
-                  + LLTrans::getString ("TimeMin")+"]";
+        timeStr += "[" + LLTrans::getString("TimeHour12") + "]:["
+            + LLTrans::getString("TimeMin") + "] ["
+            + LLTrans::getString("TimeAMPM") + "]";
     }
 
     LLSD substitution;
@@ -451,7 +453,7 @@ void LLLogChat::loadChatHistory(const std::string& file_name, std::list<LLSD>& m
 
     // If we got here, we managed to stat the file.
     // Open the file to read in binary mode to prevent interpreting other characters as EOF
-    LLFILE* fptr = LLFile::fopen(log_file_name, "rb");       /*Flawfinder: ignore*/
+    LLFILE* fptr = LLFile::fopen(log_file_name, LLFILE_MODE("rb"));       /*Flawfinder: ignore*/
     if (!fptr)
     {   // Ok, this is strange but not really tragic in the big picture of things
         LL_WARNS("ChatHistory") << "Unable to read file " << log_file_name << " after stat was successful" << LL_ENDL;
@@ -888,7 +890,7 @@ bool LLLogChat::isAdHocTranscriptExist(std::string file_name)
 bool LLLogChat::isTranscriptFileFound(std::string fullname)
 {
     bool result = false;
-    LLFILE * filep = LLFile::fopen(fullname, "rb");
+    LLFILE * filep = LLFile::fopen(fullname, LLFILE_MODE("rb"));
     if (NULL != filep)
     {
         if (makeLogFileName("chat") == fullname)
@@ -1181,7 +1183,7 @@ void LLLoadHistoryThread::loadHistory(const std::string& file_name, std::list<LL
     }
 
     bool load_all_history = load_params.has("load_all_history") ? load_params["load_all_history"].asBoolean() : false;
-    LLFILE* fptr = LLFile::fopen(LLLogChat::makeLogFileName(file_name), "rb");/*Flawfinder: ignore*/
+    LLFILE* fptr = LLFile::fopen(LLLogChat::makeLogFileName(file_name), LLFILE_MODE("rb"));/*Flawfinder: ignore*/
 
     if (!fptr)
     {
@@ -1190,17 +1192,17 @@ void LLLoadHistoryThread::loadHistory(const std::string& file_name, std::list<LL
         {
             std::string old_name(file_name);
             old_name.erase(old_name.size() - GROUP_CHAT_SUFFIX.size());
-            fptr = LLFile::fopen(LLLogChat::makeLogFileName(old_name), "rb");
+            fptr = LLFile::fopen(LLLogChat::makeLogFileName(old_name), LLFILE_MODE("rb"));
             if (fptr)
             {
                 fclose(fptr);
                 LLFile::copy(LLLogChat::makeLogFileName(old_name), LLLogChat::makeLogFileName(file_name));
             }
-            fptr = LLFile::fopen(LLLogChat::makeLogFileName(file_name), "rb");
+            fptr = LLFile::fopen(LLLogChat::makeLogFileName(file_name), LLFILE_MODE("rb"));
         }
         if (!fptr)
         {
-            fptr = LLFile::fopen(LLLogChat::oldLogFileName(file_name), "rb");/*Flawfinder: ignore*/
+            fptr = LLFile::fopen(LLLogChat::oldLogFileName(file_name), LLFILE_MODE("rb")); /*Flawfinder: ignore*/
             if (!fptr)
             {
                 mNewLoad = false;

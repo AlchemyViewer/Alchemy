@@ -193,11 +193,21 @@ No tutorial is currently available.
    icon="alertmodal.tga"
    name="BadInstallation"
    type="alertmodal">
- An error occurred while updating [APP_NAME].  Please [http://get.secondlife.com download the latest version] of the Viewer.
+ An error occurred while updating [APP_NAME].  Please [https://www.alchemyviewer.org download the latest version] of the Viewer.
     <tag>fail</tag>
     <usetemplate
      name="okbutton"
      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="FoundLegacyNsisInstallation"
+   type="alertmodal">
+      [APP_NAME] found an installation of an older version [VERSION]. To uninstall the older version, please follow [https://community.secondlife.com/knowledgebase/english/how-to-uninstall-and-reinstall-second-life-r524 this manual].
+      <usetemplate
+       name="okbutton"
+       yestext="OK"/>
   </notification>
 
   <notification
@@ -651,7 +661,7 @@ Save all changes to clothing/body parts?
    icon="alertmodal.tga"
    name="AllowMultipleViewers"
    type="alertmodal">
-    Running multiple [APP_NAME] viewers is not supported. It can lead to texture cache collisions, corruption and degraded visuals and performance.
+    Running multiple Second Life viewers is not supported. It can lead to texture cache collisions, corruption and degraded visuals and performance.
     <usetemplate
      name="okbutton"
      yestext="OK"/>
@@ -1677,7 +1687,7 @@ Would you like to reset modified colors back to their defaults?
    icon="alertmodal.tga"
    name="ChangeLanguage"
    type="alertmodal">
-Changing language will take effect after you restart [APP_NAME].
+Changing language or time format will take effect after you restart [APP_NAME].
   </notification>
 
   <notification
@@ -1844,7 +1854,7 @@ The object may be out of range or may have been deleted.
   type="alert">
     <unique/>
     <tag>confirm</tag>
-    You have requested a file download, which is not supported within [APP_NAME].
+    You have requested a file download, which is not supported within [SECOND_LIFE].
     <usetemplate
      ignoretext="Warn about unsupported file downloads"
      name="okignore"
@@ -2348,6 +2358,25 @@ Couldn&apos;t open uploaded sound file for reading:
 
   <notification
    icon="alertmodal.tga"
+   name="ModelUploaderMissingPhysicsApple"
+   type="alertmodal">
+Model upload is not yet available on Apple Silicon, but will be supported in an upcoming release.
+   
+Workaround: Right-click the Second Life app in Finder, select
+&apos;Get Info&apos;, then check &apos;Open using Rosetta&apos;
+  <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ModelUploaderMissingPhysics"
+   type="alertmodal">
+Physics library is not present, some of the model uploader's functionality might not work or might not work correctly.
+  <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="SoundFileNotRIFF"
    type="alertmodal">
 File does not appear to be a RIFF WAVE file:
@@ -2413,7 +2442,7 @@ Wrong chunk size in WAV file:
    icon="alertmodal.tga"
    name="SoundFileInvalidTooLong"
    type="alertmodal">
-Audio file is too long (60 second maximum):
+Audio file is too long (30 second maximum):
 [FILE]
   <tag>fail</tag>
   </notification>
@@ -2556,6 +2585,17 @@ You already have a landmark for this location.
   </notification>
 
   <notification
+   icon="alert.tga"
+   name="LandmarkLocationUnknown"
+   type="alert">
+Viewer wasn't able to get region's location. Region might be temporarily unavailable, was removed or landmark failed to load.
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  <tag>fail</tag>
+  </notification>
+
+  <notification
    icon="alertmodal.tga"
    name="CannotCreateLandmarkNotOwner"
    type="alertmodal">
@@ -2637,7 +2677,7 @@ Select objects with scripts.
 	
   <notification
    icon="alertmodal.tga"
-   name="CannotResetSelectObjectsNoPermission"
+   name="CannotDeleteSelectObjectsNoPermission"
    type="alertmodal">
 Not able to perform &apos;delete&apos;.
 
@@ -2701,9 +2741,9 @@ Your search terms were too short so no search was performed.
   <!-- Generic Teleport failure modes - strings will be inserted from
        teleport_strings.xml if available. -->
   <notification
-   icon="notify.tga"
+   icon="alertmodal.tga"
    name="CouldNotTeleportReason"
-   type="notify">
+   type="alertmodal">
     <unique/>
 Teleport failed.
 [REASON]
@@ -4522,6 +4562,14 @@ Click OK to download and install.
 
   <notification
    icon="alertmodal.tga"
+   name="DownloadingUpdate"
+   type="alertmodal">
+Downloading update [VERSION]...
+The viewer will restart once the download is complete.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="OptionalUpdateReady"
    type="alertmodal">
 Version [VERSION] has been downloaded and is ready to install.
@@ -4535,9 +4583,9 @@ Click OK to install.
   </notification>
 
   <notification
-   icon="alertmodal.tga"
+   icon="alert.tga"
    name="PromptOptionalUpdate"
-   type="alertmodal">
+   type="alert">
 Version [VERSION] has been downloaded and is ready to install.
 Release notes: [URL]
 
@@ -4894,7 +4942,7 @@ memberships allow up to [MAX_PREMIUM_PLUS]. [https://secondlife.com/my/account/m
    name="KickUser"
    type="alert">
    <tag>win</tag>
-Log out [AVATAR_NAME] with what message?
+Kick this Resident with what message?
     <tag>confirm</tag>
     <form name="form">
       <input name="message" type="text">
@@ -4941,7 +4989,7 @@ An administrator has logged you off.
    type="alert">
     <tag>win</tag>
     <tag>confirm</tag>
-Freeze [AVATAR_NAME] with what message?
+Freeze this Resident with what message?
     <form name="form">
       <input name="message" type="text">
 You have been frozen. You cannot move or chat. An administrator will contact you via instant message (IM).
@@ -4964,7 +5012,7 @@ You have been frozen. You cannot move or chat. An administrator will contact you
    type="alert">
    <tag>win</tag>
     <tag>confirm</tag>
-Unfreeze [AVATAR_NAME] with what message?
+Unfreeze this Resident with what message?
     <form name="form">
       <input name="message" type="text">
 You are no longer frozen.
@@ -5101,7 +5149,7 @@ Request a teleport to [NAME] with the following message
     <tag>confirm</tag>
     <form name="form">
       <input name="message" type="text">
-May I join you?
+
       </input>
       <button
        default="true"
@@ -6705,6 +6753,22 @@ Do you want to replace it with the selected object?
   </notification>
 
   <notification
+   icon="alertmodal.tga"
+   name="CantLinkNotecard"
+   type="alertmodal">
+    You must save the notecard before creating a link to it.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="CantLinkMaterial"
+   type="alertmodal">
+    You must save the material before creating a link to it.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
    icon="alert.tga"
    label="Do Not Disturb Mode Warning"
    name="DoNotDisturbModePay"
@@ -6779,8 +6843,7 @@ The folder &apos;[FOLDERNAME]&apos; is a system folder. Deleting system folders 
 [COUNT] item(s) will be permanently deleted. Are you sure you want to permanently delete selected item(s) from your Trash?
     <tag>confirm</tag>
     <usetemplate
-     ignoretext="Warn me before permanently deleting items from the Trash"
-     name="okcancelignore"
+     name="okcancelbuttons"
      notext="Cancel"
      yestext="OK"/>
   </notification>
@@ -6792,8 +6855,7 @@ The folder &apos;[FOLDERNAME]&apos; is a system folder. Deleting system folders 
 [COUNT] items and folders will be permanently deleted. Are you sure you want to permanently delete the contents of your Trash?
     <tag>confirm</tag>
     <usetemplate
-     ignoretext="Warn me before permanently deleting items and folders from the Trash"
-     name="okcancelignore"
+     name="okcancelbuttons"
      notext="Cancel"
      yestext="OK"/>
   </notification>
@@ -8693,10 +8755,10 @@ Scripts associated with this experience will be able to do the following on regi
    priority="critical"
    persist="true"
    type="notify">
-Warning: The object &apos;&lt;nolink&gt;[OBJECTNAME]&lt;/nolink&gt;&apos; wants total access to your Linden Dollars account. If you allow access, it can remove funds from your account at any time, or empty your account completely, on an ongoing basis with no additional warnings.
-  
-Do not allow access if you do not fully understand why it wants access to your account.
+Warning:
+[WARNINGS]
 
+Do not allow access if you do not fully understand why it wants access to your account.
   <tag>confirm</tag>
     <form name="form">
       <button
@@ -8709,9 +8771,7 @@ Do not allow access if you do not fully understand why it wants access to your a
        name="Deny"
        text="Deny"/>
     </form>
-    <footer>
-[FOOTERTEXT]
-    </footer>
+    <footer>[FOOTERTEXT]</footer>
   </notification>
 
 	<notification
@@ -8719,7 +8779,7 @@ Do not allow access if you do not fully understand why it wants access to your a
    name="ScriptDialog"
    show_toast="false"
    type="notify">
-[NAME]&apos;s &apos;&lt;nolink&gt;[TITLE]&lt;/nolink&gt;&apos; on channel [CHANNEL]
+[NAME]&apos;s &apos;&lt;nolink&gt;[TITLE]&lt;/nolink&gt;&apos; ([CHANNEL])
 [MESSAGE]
     <form name="form">
       <button
@@ -9226,6 +9286,14 @@ Failed to save snapshot to [PATH]: Disk is full. [NEED_MEMORY]KB is required but
 Failed to save snapshot to [PATH]: Directory does not exist.
   </notification>
 
+  <notification icon="notifytip.tga"
+    name="SnapshotSavedToComputer" type="notifytip">
+Screenshot saved to:
+    [FILEPATH]
+
+Click to open folder.
+  </notification>
+
   <notification
     icon="notifytip.tga"
     name="PresetNotSaved"
@@ -9300,6 +9368,23 @@ Your voice has been muted by moderator.
          yestext="OK"/>
     </notification>
 
+    <notification
+     icon="notifytip.tga"
+     name="NearbyVoiceMutedByModerator"
+     type="notifytip">
+        The moderator has muted your voice chat.
+People in this location will not hear you if you speak.
+     <tag>voice</tag>
+    </notification>
+
+    <notification
+     icon="notifytip.tga"
+     name="NearbyVoiceUnmutedByModerator"
+     type="notifytip">
+        Your voice chat can now be heard by people in this location.
+     <tag>voice</tag>
+    </notification>
+ 
     <notification
         icon="alertmodal.tga"
         name="FailedToGetBenefits"
@@ -9776,6 +9861,22 @@ Are you sure you want to leave this call?
     <tag>voice</tag>
     <usetemplate
      ignoretext="Confirm before I leave call"
+     name="okcancelignore"
+     notext="No"
+     yestext="Yes">
+      <unique/>
+    </usetemplate>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ConfirmLeaveAdhoc"
+   type="alertmodal">
+Are you sure you want to leave this conference chat?
+    <tag>confirm</tag>
+    <tag>voice</tag>
+    <usetemplate
+     ignoretext="Confirm before I leave conference chat"
      name="okcancelignore"
      notext="No"
      yestext="Yes">
@@ -10714,6 +10815,22 @@ Not enough script resources available to attach object!
    type="notify">
    <tag>fail</tag>
 You died and have been teleported to your home location
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="YouDiedAndGotTPLanding"
+   type="notify">
+   <tag>fail</tag>
+You died and have been teleported to the parcel landing point
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="YouDiedAndGotTPTelehub"
+   type="notify">
+   <tag>fail</tag>
+You died and have been teleported to the region telehub
   </notification>
 
   <notification
@@ -12237,7 +12354,7 @@ An internal error prevented us from properly updating your viewer.  The L$ balan
    <tag>fail</tag>
 Cannot create large prims that intersect other residents.  Please re-try when other residents have moved.
   </notification>
-
+  
   <notification
    icon="alertmodal.tga"
    name="RLVaChangeStrings"
@@ -12869,33 +12986,37 @@ are wearing now.
           name="okignore"
           yestext="OK"/>
   </notification>
- <!-- ALCHEMY BELOW THIS LINE -->
+  <!-- ALCHEMY BELOW THIS LINE -->
  
+  <notification
+   icon="notifytip.tga"
+   name="ChatCommandCalc"
+   type="notifytip"
+   log_to_im="true">
+   Calculation: [EXPRESSION] = [RESULT]
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ChatCommandCalcFailed"
+   type="notifytip"
+   log_to_im="true">
+   Calculation failed.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ChatCommandDiceRoll"
+   type="notifytip"
+   log_to_im="true">
+    Dice Roll: [RESULT]
+  </notification>
+
   <notification
    icon="notify.tga"
    name="DumpArchetypeSuccess"
    type="notify">
     Successfully saved appearance to [FILE_PATH].
-  </notification>
-  
-  <notification
-   icon="alertmodal.tga"
-   name="CannotDeleteSelectObjectsNoScripts"
-   type="alertmodal">
-Not able to perform &apos;delete&apos;.
-
-Select objects with scripts.
-  <tag>fail</tag>
-  </notification>
-	
-  <notification
-   icon="alertmodal.tga"
-   name="CannotResetSelectObjectsNoPermission"
-   type="alertmodal">
-Not able to perform &apos;delete&apos;.
-
-Select objects with scripts that you have permission to modify.
-  <tag>fail</tag>
   </notification>
 
   <notification
@@ -12992,6 +13113,173 @@ the region &quot;[REGION]&quot;?
   </notification>
 
   <notification
+   icon="alertmodal.tga"
+   name="NewAOSet"
+   type="alertmodal">
+Specify a name for the new AO set:
+(The name may contain any ASCII character, except for ":" or "|")
+    <form name="form">
+      <input name="message" type="text" default="true">
+New AO Set
+      </input>
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="OK"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="NewAOCantContainNonASCII"
+   type="alertmodal">
+Could not create new AO set "[AO_SET_NAME]".
+The name may only contain ASCII characters, excluding ":" and "|".
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="RenameAOMustBeASCII"
+   type="alertmodal">
+Could not rename AO set "[AO_SET_NAME]".
+The name may only contain ASCII characters, excluding ":" and "|".
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+<notification
+   icon="alertmodal.tga"
+   name="RemoveAOSet"
+   type="alertmodal">
+Remove AO set "[AO_SET_NAME]" from the list?
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Remove"/>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOForeignItemsFound"
+   type="alertmodal">
+The animation overrider found at least one item that did not belong in the configuration. Please check your &quot;Lost and Found&quot; folder for items that were moved out of the animation overrider configuration.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportSetAlreadyExists"
+   type="notifytip">
+An animation set with this name already exists.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportPermissionDenied"
+   type="notifytip">
+Insufficient permissions to read notecard.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportComplete"
+   type="notifytip">
+Animation Overrider notecard import complete!
+  </notification>
+	
+  <notification
+   icon="notifytip.tga"
+   name="AOImportCreateSetFailed"
+   type="notifytip">
+Error while creating import set.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportDownloadFailed"
+   type="notifytip">
+Could not download notecard.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoText"
+   type="notifytip">
+Notecard is empty or unreadable.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoFolder"
+   type="notifytip">
+Couldn't find folder to read the animations.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoStatePrefix"
+   type="notifytip">
+Notecard line [LINE] has no valid [ state prefix.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoValidDelimiter"
+   type="notifytip">
+Notecard line [LINE] has no valid ] delimiter.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportStateNameNotFound"
+   type="notifytip">
+State name [NAME] not found.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportAnimationNotFound"
+   type="notifytip">
+Couldn't find animation [NAME]. Please make sure it's present in the same folder as the import notecard.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportInvalid"
+   type="notifytip">
+Notecard didn't contain any usable data. Aborting import.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportRetryCreateSet"
+   type="notifytip">
+Could not create import folder for animation set [NAME]. Retrying ...
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportAbortCreateSet"
+   type="notifytip">
+Could not create import folder for animation set [NAME]. Giving up.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportLinkFailed"
+   type="notifytip">
+Creating animation link for animation "[NAME]" failed!
+  </notification>
+
+  <notification
    icon="notifytip.tga"
    name="StreamInfo"
    log_to_chat="false"
@@ -13014,7 +13302,7 @@ Inject with particle script before closing?
     notext="Don&apos;t Inject"
     yestext="Inject"/>
   </notification>
-    
+
   <notification
    icon="alertmodal.tga"
    name="ParticleScriptFindFolderFailed"
@@ -13077,6 +13365,7 @@ Your privilege to find [NAME]&apos;s map location has been revoked.
     type="notify">
 [NAME] has given you permission to find their location on the map.
   </notification>
+
   <notification
    icon="notifytip.tga"
    name="ShapeImportGenericFail"
@@ -13122,7 +13411,7 @@ Always Run disabled.
   persist="true"
   log_to_chat="true"
   type="notifytip">
-	 I’m sorry Dave, I’m afraid I can’t do that.
+	 I’m sorry Dave, I’m afraid I can’t do that
  </notification>
 	
  <notification
@@ -13142,6 +13431,21 @@ Always Run disabled.
   type="notifytip">
 	 Irrevocably destroying object. Hope you didn't need that.
  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="LoadCameraPositionNoneSaved"
+   type="notify">
+No camera view has been saved yet.
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="LoadCameraPositionOutsideDrawDistance"
+   type="notify">
+Can't restore the camera view because the camera position is beyond draw distance.
+  </notification>
+
   <notification
    icon="alertmodal.tga"
    name="CantRestoreToWorldNoCopy"

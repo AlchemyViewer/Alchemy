@@ -57,6 +57,7 @@
 #include "llviewermenu.h"
 #include "llviewerregion.h"
 // [RLVa:KB]
+#include "rlvactions.h"
 #include "rlvhandler.h"
 // [/RLVa:KB]
 
@@ -521,20 +522,20 @@ void LLLandmarksPanel::onAddAction(const LLSD& userdata) const
             }
             else
             {
-            LLSD args;
-            args["type"] = "create_landmark";
-            if ("add_landmark" == command_name
-                && view_model->getInventoryType() == LLInventoryType::IT_CATEGORY)
-            {
-                args["dest_folder"] = view_model->getUUID();
-            }
-            if ("add_landmark_root" == command_name
-                && mCurrentSelectedList == mLandmarksInventoryPanel)
-            {
-                args["dest_folder"] = mLandmarksInventoryPanel->getRootFolderID();
-            }
-            // else will end up in favorites
-            LLFloaterReg::showInstance("add_landmark", args);
+                LLSD args;
+                args["type"] = "create_landmark";
+                if ("add_landmark" == command_name
+                    && view_model->getInventoryType() == LLInventoryType::IT_CATEGORY)
+                {
+                    args["dest_folder"] = view_model->getUUID();
+                }
+                if ("add_landmark_root" == command_name
+                    && mCurrentSelectedList == mLandmarksInventoryPanel)
+                {
+                    args["dest_folder"] = mLandmarksInventoryPanel->getRootFolderID();
+                }
+                // else will end up in favorites
+                LLFloaterReg::showInstance("add_landmark", args);
             }
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
         }
@@ -734,7 +735,10 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
             if (asset_uuid.isNull()) return false;
 
             // Disable "Show on Map" if landmark loading is in progress.
-            return !gLandmarkList.isAssetInLoadedCallbackMap(asset_uuid);
+// [RLVa:KB]
+            return !gLandmarkList.isAssetInLoadedCallbackMap(asset_uuid) && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWWORLDMAP);
+// [/RLVa:KB]
+//          return !gLandmarkList.isAssetInLoadedCallbackMap(asset_uuid);
         }
         else if ("rename" == command_name)
         {
@@ -743,6 +747,12 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
 
             return canItemBeModified(command_name, selected_item);
         }
+// [RLVa:KB]
+        else if ("teleport" == command_name)
+        {
+            return !gRlvHandler.hasBehaviour(RLV_BHVR_TPLM);
+        }
+// [/RLVa:KB]
 
         return true;
     }
@@ -766,10 +776,10 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
     else if ("add_landmark" == command_name)
     {
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
-    if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
-    {
-        return false;
-    }
+        if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+        {
+            return false;
+        }
 // [/RLVa:KB]
 
         if (!is_single_selection)
@@ -793,10 +803,10 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
     else if ("add_landmark_root" == command_name)
     {
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
-    if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
-    {
-        return false;
-    }
+        if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+        {
+            return false;
+        }
 // [/RLVa:KB]
 
         LLViewerInventoryItem* landmark = LLLandmarkActions::findLandmarkForAgentPos();

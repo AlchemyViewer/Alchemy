@@ -35,6 +35,11 @@ class LLViewerObject;
 class LLMessageSystem;
 class LLMuteListObserver;
 
+#if LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfree-nonheap-object" // False positive in LLMuteList::compare_by_name
+#endif
+
 // An entry in the mute list.
 class LLMute
 {
@@ -69,11 +74,11 @@ public:
     U32         mFlags; // flags pertaining to this mute entry
 };
 
-class LLMuteList : public LLSingleton<LLMuteList>
+class LLMuteList : public LLSimpleton<LLMuteList>
 {
-    LLSINGLETON(LLMuteList);
+public:
+    LLMuteList();
     ~LLMuteList();
-    /*virtual*/ void cleanupSingleton() override;
 
     enum EMuteListState
     {
@@ -82,7 +87,7 @@ class LLMuteList : public LLSingleton<LLMuteList>
         ML_LOADED,
         ML_FAILED,
     };
-public:
+
     // reasons for auto-unmuting a resident
     enum EAutoReason
     {
@@ -126,6 +131,11 @@ public:
 
     // call this method on logout to save everything.
     void cache(const LLUUID& agent_id);
+
+    // group functions
+    bool addGroup(const LLUUID& group_id);
+    bool removeGroup(const LLUUID& group_id);
+    bool isGroupMuted(const LLUUID& group_id);
 
 private:
     bool loadFromFile(const std::string& filename);
@@ -214,5 +224,8 @@ private:
     observer_set_t mObservers;
 };
 
+#if LL_GNUC
+#pragma GCC diagnostic pop
+#endif
 
 #endif //LL_MUTELIST_H

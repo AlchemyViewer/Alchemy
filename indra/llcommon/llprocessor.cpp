@@ -739,32 +739,7 @@ private:
             }
         }
 
-        // *NOTE:Mani - I didn't find any docs that assure me that machdep.cpu.feature_bits will always be
-        // The feature bits I think it is. Here's a test:
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-    #if defined(__i386__) && defined(__PIC__)
-            /* %ebx may be the PIC register.  */
-        #define __cpuid(level, a, b, c, d)          \
-        __asm__ ("xchgl\t%%ebx, %1\n\t"         \
-                "cpuid\n\t"                 \
-                "xchgl\t%%ebx, %1\n\t"          \
-                : "=a" (a), "=r" (b), "=c" (c), "=d" (d)    \
-                : "0" (level))
-    #else
-        #define __cpuid(level, a, b, c, d)          \
-        __asm__ ("cpuid\n\t"                    \
-                 : "=a" (a), "=b" (b), "=c" (c), "=d" (d)   \
-                 : "0" (level))
-    #endif
-
-        unsigned int eax, ebx, ecx, edx;
-        __cpuid(0x1, eax, ebx, ecx, edx);
-        if(feature_infos[0] != (S32)edx)
-        {
-            LL_WARNS() << "machdep.cpu.feature_bits doesn't match expected cpuid result!" << LL_ENDL;
-        }
-#endif // LL_RELEASE_FOR_DOWNLOAD
-
+        // @TODO: Audit our usage of machdep.cpu.feature_bits.
 
         uint64_t ext_feature_info = getSysctlInt64("machdep.cpu.extfeature_bits");
         S32 *ext_feature_infos = (S32*)(&ext_feature_info);
@@ -841,7 +816,7 @@ private:
         // Nicky: We just look into cpu0. In theory we could iterate over all cores
         // "/sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_max_freq"
         // But those should not fluctuate that much?
-        std::ifstream fIn { "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq" };
+        llifstream fIn{ "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq" };
 
         if( !fIn.is_open() )
             return 0.0;
@@ -862,7 +837,7 @@ private:
     void get_proc_cpuinfo()
     {
         std::map< std::string, std::string > cpuinfo;
-        LLFILE* cpuinfo_fp = LLFile::fopen(CPUINFO_FILE, "rb");
+        LLFILE* cpuinfo_fp = LLFile::fopen(CPUINFO_FILE, LLFILE_MODE("rb"));
         if(cpuinfo_fp)
         {
             char line[MAX_STRING];
@@ -979,7 +954,7 @@ private:
         std::ostringstream s;
 
         // *NOTE:Mani - This is for linux only.
-        LLFILE* cpuinfo = LLFile::fopen(CPUINFO_FILE, "rb");
+        LLFILE* cpuinfo = LLFile::fopen(CPUINFO_FILE, LLFILE_MODE("rb"));
         if(cpuinfo)
         {
             char line[MAX_STRING];

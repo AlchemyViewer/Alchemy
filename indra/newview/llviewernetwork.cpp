@@ -69,7 +69,7 @@ const std::string MAIN_GRID_LOGIN_URI = "https://login.agni.lindenlab.com/cgi-bi
 
 const std::string SL_UPDATE_QUERY_URL = "https://update.secondlife.com/update";
 
-const std::string MAIN_GRID_SLURL_BASE = "http://maps.secondlife.com/secondlife/";
+const std::string MAIN_GRID_SLURL_BASE = "https://maps.secondlife.com/secondlife/";
 const std::string SYSTEM_GRID_APP_SLURL_BASE = "secondlife:///app";
 
 const std::string MAIN_GRID_WEB_PROFILE_URL = "https://my.secondlife.com/";
@@ -281,7 +281,7 @@ bool LLGridManager::addGrid(LLSD& grid_data)
                 // Populate to the default values
                 if (!grid_data.has(GRID_LOGIN_PAGE_VALUE))
                 {
-                    grid_data[GRID_LOGIN_PAGE_VALUE] = std::string("http://") + grid + "/app/login/";
+                    grid_data[GRID_LOGIN_PAGE_VALUE] = std::string("https://") + grid + "/app/login/";
                 }
                 if (!grid_data.has(GRID_HELPER_URI_VALUE))
                 {
@@ -575,11 +575,19 @@ std::string LLGridManager::getGridLoginID()
 
 std::string LLGridManager::getUpdateServiceURL()
 {
+    auto env_update_service = LLStringUtil::getoptenv("SL_UPDATE_SERVICE");
     std::string update_url_base = gSavedSettings.getString("CmdLineUpdateService");;
     if ( !update_url_base.empty() )
     {
         LL_INFOS("UpdaterService","GridManager")
             << "Update URL base overridden from command line: " << update_url_base
+            << LL_ENDL;
+    }
+    else if (env_update_service && env_update_service->find("http") != std::string::npos)
+    {
+        update_url_base = *env_update_service;
+        LL_INFOS("UpdaterService", "GridManager")
+            << "Update URL base overridden from SL_UPDATE_SERVICE environment variable: " << update_url_base
             << LL_ENDL;
     }
     else if ( mGridList[mGrid].has(GRID_UPDATE_SERVICE_URL) )

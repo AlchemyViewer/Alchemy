@@ -951,7 +951,7 @@ void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, bool send_to_s
         objects[i]->setAngularVelocity( 0,0,0 );
         objects[i]->setVelocity( 0,0,0 );
 
-        if(msg->isSendFull(NULL) || select_count >= MAX_OBJECTS_PER_PACKET)
+        if(msg->isSendFullFast(nullptr) || select_count >= MAX_OBJECTS_PER_PACKET)
         {
             msg->sendReliable(regionp->getHost() );
             select_count = 0;
@@ -1950,15 +1950,12 @@ bool LLSelectMgr::selectionSetImage(const LLUUID& imageid)
             if (!mItem)
             {
                 object->sendTEUpdate();
-                if (!gSavedSettings.getBOOL("EnableSelectionHints"))
-                {
-                    // 1 particle effect per object
-                    LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
-                    effectp->setSourceObject(gAgentAvatarp);
-                    effectp->setTargetObject(object);
-                    effectp->setDuration(LL_HUD_DUR_SHORT);
-                    effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-                }
+                // 1 particle effect per object
+                LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+                effectp->setSourceObject(gAgentAvatarp);
+                effectp->setTargetObject(object);
+                effectp->setDuration(LL_HUD_DUR_SHORT);
+                effectp->setColor(LLColor4U(gAgent.getEffectColor()));
             }
             return true;
         }
@@ -2029,9 +2026,95 @@ bool LLSelectMgr::selectionSetGLTFMaterial(const LLUUID& mat_id)
                     asset_id = BLANK_MATERIAL_ASSET_ID;
                 }
             }
+
+            // If this face already has the target material ID, do nothing.
+            // This prevents re-sending the same ID on OK, which can cause the server
+            // to drop overrides when queueApply is invoked with the OLD id.
+            if (objectp->getRenderMaterialID(te) == asset_id)
+            {
+                return true;
+            }
+
+            // Preserve existing texture transforms when switching to PBR material
+            LLTextureEntry* tep = objectp->getTE(te);
+            bool should_preserve_transforms = false;
+            LLGLTFMaterial* preserved_override = nullptr;
+
+            if (tep && asset_id.notNull())
+            {
+                // Only preserve transforms from existing GLTF material override
+                // Do not fall back to texture entry transforms when switching between PBR materials
+                LLGLTFMaterial* existing_override = tep->getGLTFMaterialOverride();
+                if (existing_override)
+                {
+                    // Check if existing override has non-default transforms
+                    const LLGLTFMaterial::TextureTransform& existing_transform = existing_override->mTextureTransform[0];
+                    const LLGLTFMaterial::TextureTransform& default_transform = LLGLTFMaterial::TextureTransform();
+
+                    if (existing_transform.mScale != default_transform.mScale ||
+                        existing_transform.mOffset != default_transform.mOffset ||
+                        existing_transform.mRotation != default_transform.mRotation)
+                    {
+                        // Preserve non-default transforms from current PBR material
+                        preserved_override = new LLGLTFMaterial();
+                        for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                        {
+                            preserved_override->mTextureTransform[i].mScale = existing_transform.mScale;
+                            preserved_override->mTextureTransform[i].mOffset = existing_transform.mOffset;
+                            preserved_override->mTextureTransform[i].mRotation = existing_transform.mRotation;
+                        }
+                        should_preserve_transforms = true;
+                    }
+                    // If existing override has default transforms, don't preserve anything
+                }
+                else
+                {
+                    // No existing PBR material override - check texture entry transforms
+                    // This handles the case of switching from Blinn-Phong to PBR material
+                    F32 existing_scale_s, existing_scale_t, existing_offset_s, existing_offset_t, existing_rotation;
+                    tep->getScale(&existing_scale_s, &existing_scale_t);
+                    tep->getOffset(&existing_offset_s, &existing_offset_t);
+                    existing_rotation = tep->getRotation();
+
+                    const LLGLTFMaterial::TextureTransform& default_transform = LLGLTFMaterial::TextureTransform();
+                    if (existing_scale_s != default_transform.mScale.mV[0] || existing_scale_t != default_transform.mScale.mV[1] ||
+                        existing_offset_s != default_transform.mOffset.mV[0] || existing_offset_t != default_transform.mOffset.mV[1] ||
+                        existing_rotation != default_transform.mRotation)
+                    {
+                        // Preserve non-default transforms from texture entry
+                        preserved_override = new LLGLTFMaterial();
+                        for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                        {
+                            LLVector2 pbr_scale, pbr_offset;
+                            F32 pbr_rotation;
+                            LLGLTFMaterial::convertTextureTransformToPBR(
+                                existing_scale_s, existing_scale_t,
+                                existing_offset_s, existing_offset_t,
+                                existing_rotation,
+                                pbr_scale, pbr_offset, pbr_rotation);
+                            preserved_override->mTextureTransform[i].mScale = pbr_scale;
+                            preserved_override->mTextureTransform[i].mOffset = pbr_offset;
+                            preserved_override->mTextureTransform[i].mRotation = pbr_rotation;
+                        }
+                        should_preserve_transforms = true;
+                    }
+                }
+            }
+
             objectp->clearTEWaterExclusion(te);
             // Blank out most override data on the object and send to server
-            objectp->setRenderMaterialID(te, asset_id);
+            if (should_preserve_transforms && preserved_override)
+            {
+                // Apply material with preserved transforms
+                LLGLTFMaterialList::queueApply(objectp, te, asset_id, preserved_override);
+                // Update local state
+                objectp->setRenderMaterialID(te, asset_id, false, true);
+                tep->setGLTFMaterialOverride(preserved_override);
+            }
+            else
+            {
+                objectp->setRenderMaterialID(te, asset_id);
+            }
 
             return true;
         }
@@ -2298,23 +2381,9 @@ void LLSelectMgr::selectionRevertGLTFMaterials()
                     //blank override out
                     LLGLTFMaterialList::queueApply(objectp, te, asset_id);
                 }
-                if (old_asset_id != asset_id)
-                {
-                    // Restore overrides and base material
-                    // Note: might not work reliably if asset is already there, might
-                    // have a server sided problem where servers applies override
-                    // first then resets it by adding asset, in which case need
-                    // to create a server ticket and chain asset then override
-                    // application.
-                    LLGLTFMaterialList::queueApply(objectp, te, asset_id, material);
-                }
                 else
                 {
-                    // Enqueue override update to server
-                    // Note: this is suboptimal, better to send asset id as well
-                    // but there seems to be a server problem with queueApply
-                    // that ignores override in some cases
-                    LLGLTFMaterialList::queueModify(objectp, te, material);
+                    LLGLTFMaterialList::queueApply(objectp, te, asset_id, material);
                 }
             }
             return true;
@@ -2989,11 +3058,11 @@ void LLSelectMgr::packGodlikeHead(void* user_data)
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-    msg->addUUID("TransactionID", LLUUID::null);
+    msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null);
     godlike_request_t* data = (godlike_request_t*)user_data;
-    msg->nextBlock("MethodData");
-    msg->addString("Method", data->first);
-    msg->addUUID("Invoice", LLUUID::null);
+    msg->nextBlockFast(_PREHASH_MethodData);
+    msg->addStringFast(_PREHASH_Method, data->first);
+    msg->addUUIDFast(_PREHASH_Invoice, LLUUID::null);
 
     // The parameters used to be restricted to either string or
     // integer. This mimics that behavior under the new 'string-only'
@@ -3002,8 +3071,8 @@ void LLSelectMgr::packGodlikeHead(void* user_data)
     // packObjectIDAsParam() method.
     if(data->second.size() > 0)
     {
-        msg->nextBlock("ParamList");
-        msg->addString("Parameter", data->second);
+        msg->nextBlockFast(_PREHASH_ParamList);
+        msg->addStringFast(_PREHASH_Parameter, data->second);
     }
 }
 
@@ -3015,7 +3084,6 @@ void LLSelectMgr::logNoOp(LLSelectNode* node, void *)
 // static
 void LLSelectMgr::logAttachmentRequest(LLSelectNode* node, void *)
 {
-//    LLAttachmentsMgr::instance().onAttachmentRequested(node->mItemID);
 }
 
 // static
@@ -3028,8 +3096,8 @@ void LLSelectMgr::logDetachRequest(LLSelectNode* node, void *)
 void LLSelectMgr::packObjectIDAsParam(LLSelectNode* node, void *)
 {
     std::string buf = llformat("%u", node->getObject()->getLocalID());
-    gMessageSystem->nextBlock("ParamList");
-    gMessageSystem->addString("Parameter", buf);
+    gMessageSystem->nextBlockFast(_PREHASH_ParamList);
+    gMessageSystem->addStringFast(_PREHASH_Parameter, buf);
 }
 
 //-----------------------------------------------------------------------------
@@ -4663,7 +4731,7 @@ void LLSelectMgr::packDuplicateOnRayHead(void *user_data)
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
-    msg->addUUIDFast(_PREHASH_GroupID, gAgent.getGroupForRezzing() );
+    msg->addUUIDFast(_PREHASH_GroupID, gAgent.getGroupForRezzing());
     msg->addVector3Fast(_PREHASH_RayStart, data->mRayStartRegion );
     msg->addVector3Fast(_PREHASH_RayEnd, data->mRayEndRegion );
     msg->addBOOLFast(_PREHASH_BypassRaycast, data->mBypassRaycast );
@@ -5037,7 +5105,7 @@ void LLSelectMgr::selectionSetObjectName(const std::string& name)
     std::string name_copy(name);
 
     // we only work correctly if 1 object is selected.
-    if(mSelectedObjects->getRootObjectCount() == 1)
+    if(mSelectedObjects->getRootObjectCount() >= 1)
     {
         sendListToRegions("ObjectName",
                           packAgentAndSessionID,
@@ -5046,7 +5114,7 @@ void LLSelectMgr::selectionSetObjectName(const std::string& name)
                           (void*)(&name_copy),
                           SEND_ONLY_ROOTS);
     }
-    else if(mSelectedObjects->getObjectCount() == 1)
+    else if(mSelectedObjects->getObjectCount() >= 1)
     {
         sendListToRegions("ObjectName",
                           packAgentAndSessionID,
@@ -5062,7 +5130,7 @@ void LLSelectMgr::selectionSetObjectDescription(const std::string& desc)
     std::string desc_copy(desc);
 
     // we only work correctly if 1 object is selected.
-    if(mSelectedObjects->getRootObjectCount() == 1)
+    if(mSelectedObjects->getRootObjectCount() >= 1)
     {
         sendListToRegions("ObjectDescription",
                           packAgentAndSessionID,
@@ -5071,7 +5139,7 @@ void LLSelectMgr::selectionSetObjectDescription(const std::string& desc)
                           (void*)(&desc_copy),
                           SEND_ONLY_ROOTS);
     }
-    else if(mSelectedObjects->getObjectCount() == 1)
+    else if(mSelectedObjects->getObjectCount() >= 1)
     {
         sendListToRegions("ObjectDescription",
                           packAgentAndSessionID,
@@ -5616,14 +5684,14 @@ void LLSelectMgr::packObjectClickAction(LLSelectNode* node, void *user_data)
 {
     gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
     gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, node->getObject()->getLocalID() );
-    gMessageSystem->addU8("ClickAction", node->getObject()->getClickAction());
+    gMessageSystem->addU8Fast(_PREHASH_ClickAction, node->getObject()->getClickAction());
 }
 
 void LLSelectMgr::packObjectIncludeInSearch(LLSelectNode* node, void *user_data)
 {
     gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
     gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, node->getObject()->getLocalID() );
-    gMessageSystem->addBOOL("IncludeInSearch", node->getObject()->getIncludeInSearch());
+    gMessageSystem->addBOOLFast(_PREHASH_IncludeInSearch, node->getObject()->getIncludeInSearch());
 }
 
 // static
@@ -5842,7 +5910,7 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
 
         // if to same simulator and message not too big
         if ((current_region == last_region)
-            && (! gMessageSystem->isSendFull(NULL))
+            && (! gMessageSystem->isSendFullFast(nullptr))
             && (objects_in_this_packet < MAX_OBJECTS_PER_PACKET))
         {
             if (link_operation && linkset_root == NULL)
@@ -6211,6 +6279,15 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
         node->mCategory = category;
         node->mName.assign(name);
         node->mDescription.assign(desc);
+
+        LLViewerObject* obj = node->getObject();
+        if (obj && LLViewerObject::isObjectInPendingUpdate(owner_id, obj))
+        {
+            // current response doesn't return modify permissions flags,
+            // so we should request it separately if needed
+            obj->requestObjectUpdate();
+        }
+
     }
 
     dialog_refresh_all();
@@ -6221,7 +6298,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 {
     bool reset_list;
-    msg->getBOOL("Header", "ResetList", reset_list);
+    msg->getBOOLFast(_PREHASH_Header, _PREHASH_ResetList, reset_list);
 
     if (reset_list)
     {
@@ -6233,11 +6310,11 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
     LLViewerObject* object;
     std::vector<LLViewerObject*> objects;
     S32 i;
-    S32 block_count = msg->getNumberOfBlocks("Data");
+    S32 block_count = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
     for (i = 0; i < block_count; i++)
     {
-        msg->getS32("Data", "LocalID", local_id, i);
+        msg->getS32Fast(_PREHASH_Data, _PREHASH_LocalID, local_id, i);
 
         gObjectList.getUUIDFromLocal(full_id,
                                      local_id,
@@ -6644,7 +6721,7 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
     if (mSelectedObjects->getNumNodes())
     {
         LLUUID inspect_item_id= LLUUID::null;
-        LLFloaterInspect* inspect_instance = LLFloaterReg::getTypedInstance<LLFloaterInspect>("inspect");
+        LLFloaterInspect* inspect_instance = LLFloaterReg::findTypedInstance<LLFloaterInspect>("inspect");
         if(inspect_instance && inspect_instance->getVisible())
         {
             inspect_item_id = inspect_instance->getSelectedUUID();
@@ -6940,7 +7017,7 @@ LLViewerObject* LLSelectNode::getObject() const
 {
     if (!mObject)
     {
-        return NULL;
+        return nullptr;
     }
     else if (mObject->isDead())
     {
@@ -7406,7 +7483,7 @@ void dialog_refresh_all()
         gMenuAttachmentOther->arrange();
     }
 
-    LLFloaterInspect* inspect_instance = LLFloaterReg::getTypedInstance<LLFloaterInspect>("inspect");
+    LLFloaterInspect* inspect_instance = LLFloaterReg::findTypedInstance<LLFloaterInspect>("inspect");
     if(inspect_instance)
     {
         inspect_instance->dirty();
@@ -8813,7 +8890,7 @@ void LLSelectMgr::sendSelectionMove()
     }
 
     // prepare first bulk message
-    gMessageSystem->newMessage("MultipleObjectUpdate");
+    gMessageSystem->newMessageFast(_PREHASH_MultipleObjectUpdate);
     packAgentAndSessionID(&update_type);
 
     LLViewerObject *obj = NULL;
@@ -8828,13 +8905,13 @@ void LLSelectMgr::sendSelectionMove()
 
         // if not simulator or message too big
         if (curr_region != last_region
-            || gMessageSystem->isSendFull(NULL)
+            || gMessageSystem->isSendFullFast(nullptr)
             || objects_in_this_packet >= MAX_OBJECTS_PER_PACKET)
         {
             // send sim the current message and start new one
             gMessageSystem->sendReliable(last_region->getHost());
             objects_in_this_packet = 0;
-            gMessageSystem->newMessage("MultipleObjectUpdate");
+            gMessageSystem->newMessageFast(_PREHASH_MultipleObjectUpdate);
             packAgentAndSessionID(&update_type);
         }
 

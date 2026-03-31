@@ -226,8 +226,18 @@ void inventory_offer_handler(LLOfferInfo* info)
     auto indx = msg.find(" ( http://slurl.com/secondlife/");
     if (indx == std::string::npos)
     {
-        // try to find new slurl host
+        // https
+        indx = msg.find(" ( https://slurl.com/secondlife/");
+    }
+    if (indx == std::string::npos)
+    {
+        // try to find new slurl http host
         indx = msg.find(" ( http://maps.secondlife.com/secondlife/");
+    }
+    if (indx == std::string::npos)
+    {
+        // try to find new slurl https host
+        indx = msg.find(" ( https://maps.secondlife.com/secondlife/");
     }
     if (indx >= 0)
     {
@@ -479,7 +489,8 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
     // make sure that we don't have an empty or all-whitespace name
     LLStringUtil::trim(name);
-    if (name.empty())
+    static const LLCachedControl<bool> sMarkUnnamedObjects(gSavedSettings, "AlchemyChatMarkUnnamedObjects", true);
+    if (sMarkUnnamedObjects && name.empty())
     {
         name = LLTrans::getString("Unnamed");
     }
@@ -495,9 +506,9 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     // NOTE: Not set on this
     // *TODO*: Revisit this
     // -- Fallen
-    static LLCachedControl<bool> AlchemyRejectTeleportOffers(gSavedPerAccountSettings, "AlchemyRejectTeleportOffersMode");
-    static LLCachedControl<bool> AlchemyDontRejectTeleportOffersFromFriends(gSavedPerAccountSettings, "AlchemyDontRejectTeleportOffersFromFriends");
-    static LLCachedControl<bool> AlchemyRejectFriendshipRequests(gSavedPerAccountSettings, "AlchemyRejectFriendshipRequestsMode");
+    static LLCachedControl<bool> AlchemyRejectTeleportOffers(gSavedPerAccountSettings, "ALRejectTeleportOffersMode");
+    static LLCachedControl<bool> AlchemyDontRejectTeleportOffersFromFriends(gSavedPerAccountSettings, "ALDontRejectTeleportOffersFromFriends");
+    static LLCachedControl<bool> AlchemyRejectFriendshipRequests(gSavedPerAccountSettings, "ALRejectFriendshipRequestsMode");
 
     // Resurrect AutoResponse from Alchemy Archive (Thanks Cinders!)
     // -- Fallen
@@ -658,7 +669,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     pack_instant_message(
                         gMessageSystem,
                         gAgent.getID(),
-                        FALSE,
+                        false,
                         gAgent.getSessionID(),
                         from_id,
                         my_name,
@@ -1236,7 +1247,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 // [SL:KB] - Checked: 2010-11-02 (RLVa-1.2.2a) | Added: RLVa-1.2.2a
             chat.mURL = LLSLURL("objectim", session_id, LLURI::mapToQueryString(query_string)).getSLURLString();
 // [/SL:KB]
-           chat.mText = message;
+            chat.mText = message;
 
             // Note: lie to Nearby Chat, pretending that this is NOT an IM, because
             // IMs from obejcts don't open IM sessions.
@@ -1394,7 +1405,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                   ((IM_TELEPORT_REQUEST == dialog) && (RlvActions::autoAcceptTeleportRequest(from_id))) );
 // [/RLVa:KB]
 
-           if (is_muted)
+            if (is_muted)
             {
                 return;
             }
@@ -1690,7 +1701,6 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 return;
             }
 
-
             bool add_notification = true;
             for (auto& panel : LLToastNotifyPanel::instance_snapshot())
             {
@@ -1806,8 +1816,8 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("requestOfflineMessagesCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestOfflineMessagesCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 

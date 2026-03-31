@@ -99,8 +99,10 @@ public:
         FFSAVE_PNG = 13,
         FFSAVE_JPEG = 14,
         FFSAVE_SCRIPT = 15,
-        FFSAVE_TGAPNG = 16,
-        FFSAVE_CSV
+        FFSAVE_WEBP,
+        FFSAVE_CSV,
+        FFSAVE_TGAPNG
+
     };
 
     // open the dialog. This is a modal operation

@@ -31,8 +31,8 @@
 #include "llmath.h"
 #include "llmutex.h"
 
-#include "fmodstudio/fmod.hpp"
-#include "fmodstudio/fmod_errors.h"
+#include <fmod.hpp>
+#include <fmod_errors.h>
 
 inline bool Check_FMOD_Stream_Error(FMOD_RESULT result, const char *string)
 {
@@ -48,11 +48,10 @@ public:
     LLAudioStreamManagerFMODSTUDIO(FMOD::System *system, FMOD::ChannelGroup *group, const std::string& url);
     FMOD::Channel* startStream();
     bool stopStream(); // Returns true if the stream was successfully stopped.
-    bool ready();
 
     const std::string& getURL()     { return mInternetStreamURL; }
 
-    FMOD_OPENSTATE getOpenState(unsigned int* percentbuffered = NULL, bool* starving = NULL, bool* diskbusy = NULL);
+    FMOD_OPENSTATE getOpenState(unsigned int* percentbuffered = nullptr, bool* starving = nullptr, bool* diskbusy = nullptr);
 protected:
     FMOD::System* mSystem;
     FMOD::ChannelGroup* mChannelGroup;
@@ -646,8 +645,8 @@ bool LLAudioStreamManagerFMODSTUDIO::stopStream()
         if (close)
         {
             mInternetStream->release();
-            mStreamChannel = NULL;
-            mInternetStream = NULL;
+            mStreamChannel = nullptr;
+            mInternetStream = nullptr;
             return true;
         }
         else

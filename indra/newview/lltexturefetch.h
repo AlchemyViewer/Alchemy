@@ -326,7 +326,7 @@ private:
     LLTextureCache* mTextureCache;
 
     // Map of all requests by UUID
-    typedef boost::unordered_map<LLUUID,LLTextureFetchWorker*> map_t;
+    typedef std::map<LLUUID,LLTextureFetchWorker*> map_t;
     map_t mRequestMap;                                                  // Mfq
 
     // Set of requests that require network data
@@ -349,7 +349,7 @@ private:
     // is logically tied to LLQueuedThread's list of
     // QueuedRequest instances and so must be covered by the
     // same locks.
-    typedef std::vector<TFRequest *> command_queue_t;
+    typedef std::deque<TFRequest *> command_queue_t;
     command_queue_t mCommands;                                          // Mfq
 
     // If true, modifies some behaviors that help with QA tasks.

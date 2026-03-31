@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2016, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -31,9 +32,23 @@
 #include "llfloaterreg.h"
 #include "llviewerfloaterreg.h"
 
+#include "ao.h"
+// [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
+#include "alfloaterblocked.h"
+// [/SL:KB]
+#include "alfloaterdirectory.h"
+#include "alfloaterevent.h"
+#include "alfloaterexploresounds.h"
 #include "alfloatergenerictext.h"
+#include "alfloatergroupprofile.h"
+#include "alfloaterlightbox.h"
 #include "alfloaterparticleeditor.h"
+#include "alfloaterprofilelegacy.h"
+#include "alfloaterprogressview.h"
 #include "alfloaterregiontracker.h"
+#include "alfloatertransactionlog.h"
+#include "alfloaterwebprofile.h"
+#include "allegacynotificationwellwindow.h"
 #include "llcommandhandler.h"
 #include "llcompilequeue.h"
 #include "llfasttimerview.h"
@@ -41,17 +56,16 @@
 #include "llfloaterabout.h"
 #include "llfloateraddpaymentmethod.h"
 #include "llfloaterauction.h"
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2011-11-24 (Catznip-3.2)
+#include "llfloaterassetrecovery.h"
+// [/SL:KB]
 #include "llfloaterautoreplacesettings.h"
 #include "llfloateravatarpicker.h"
 #include "llfloateravatarwelcomepack.h"
 #include "llfloateravatarrendersettings.h"
 #include "llfloateravatartextures.h"
 #include "llfloaterbanduration.h"
-#include "llfloaterbigpreview.h"
 #include "llfloaterbeacons.h"
-// [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
-#include "llfloaterblocked.h"
-// [/SL:KB]
 #include "llfloaterbuildoptions.h"
 #include "llfloaterbulkpermission.h"
 #include "llfloaterbulkupload.h"
@@ -89,9 +103,9 @@
 #include "llfloatergltfasseteditor.h"
 #include "llfloatergodtools.h"
 #include "llfloatergridstatus.h"
-#include "llfloatergroupprofile.h"
 #include "llfloatergroups.h"
 #include "llfloaterhelpbrowser.h"
+#include "llfloaterhexeditor.h"
 #include "llfloaterhoverheight.h"
 #include "llfloaterhowto.h"
 #include "llfloaterhud.h"
@@ -111,6 +125,9 @@
 #include "llfloatermarketplacelistings.h"
 #include "llfloatermediasettings.h"
 #include "llfloatermemleak.h"
+#include "llfloatermessagelog.h"
+#include "llfloatermessagebuilder.h"
+#include "llfloatermessagerewriter.h"
 #include "llfloatermodelpreview.h"
 #include "llfloatermyscripts.h"
 #include "llfloatermyenvironment.h"
@@ -132,8 +149,6 @@
 #include "llfloaterpreferenceviewadvanced.h"
 #include "llfloaterpreviewtrash.h"
 #include "llfloaterprofile.h"
-#include "llfloaterprofilelegacy.h"
-#include "llfloaterprogressview.h"
 #include "llfloaterpublishclassified.h"
 #include "llfloaterregiondebugconsole.h"
 #include "llfloaterregioninfo.h"
@@ -142,10 +157,10 @@
 #include "llfloatersavecamerapreset.h"
 #include "llfloatersaveprefpreset.h"
 #include "llfloatersceneloadstats.h"
+#include "llfloaterscripting.h"
 #include "llfloaterscriptdebug.h"
 #include "llfloaterscriptedprefs.h"
 #include "llfloaterscriptlimits.h"
-#include "llfloatersearch.h"
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
 #include "llfloatersearchreplace.h"
 // [/SL:KB]
@@ -155,7 +170,6 @@
 #include "llfloatersidepanelcontainer.h"
 #include "llfloaterslapptest.h"
 #include "llfloatersnapshot.h"
-#include "llfloatersounddevices.h"
 #include "llfloaterspellchecksettings.h"
 #include "llfloatertelehub.h"
 #include "llfloatertestinspectors.h"
@@ -164,12 +178,9 @@
 #include "llfloatertopobjects.h"
 #include "llfloatertos.h"
 #include "llfloatertoybox.h"
-#include "llfloatertransactionlog.h"
 #include "llfloatertranslationsettings.h"
 #include "llfloateruipreview.h"
-#include "llfloatervoiceeffect.h"
 #include "llfloaterwebcontent.h"
-#include "llfloaterwebprofile.h"
 #include "llfloatervoicevolume.h"
 #include "llfloaterwhitelistentry.h"
 #include "llfloaterwindowsize.h"
@@ -180,11 +191,11 @@
 #include "llinspectobject.h"
 #include "llinspectremoteobject.h"
 #include "llinspecttoast.h"
-#include "lllegacynotificationwellwindow.h"
 #include "llmaterialeditor.h"
 #include "llmoveview.h"
 #include "llfloaterimnearbychat.h"
 #include "llpanelblockedlist.h"
+#include "llpanelprofileclassifieds.h"
 #include "llpanelemojicomplete.h"
 #include "llpreviewanim.h"
 #include "llpreviewgesture.h"
@@ -352,14 +363,11 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("auction", "floater_auction.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAuction>);
     LLFloaterReg::add("avatar_picker", "floater_avatar_picker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAvatarPicker>);
     LLFloaterReg::add("avatar_welcome_pack", "floater_avatar_welcome_pack.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAvatarWelcomePack>);
-    LLFloaterReg::add("avatar_render_settings", "floater_avatar_render_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAvatarRenderSettings>);
+    //LLFloaterReg::add("avatar_render_settings", "floater_avatar_render_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAvatarRenderSettings>);
     LLFloaterReg::add("avatar_textures", "floater_avatar_textures.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAvatarTextures>);
 
     LLFloaterReg::add("ban_duration", "floater_ban_duration.xml", &LLFloaterReg::build<LLFloaterBanDuration>);
     LLFloaterReg::add("beacons", "floater_beacons.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBeacons>);
-// [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
-    LLFloaterReg::add("blocked", "floater_blocked.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBlocked>);
-// [/SL:KB]
     LLFloaterReg::add("bulk_perms", "floater_bulk_perms.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBulkPermission>);
     LLFloaterReg::add("buy_currency", "floater_buy_currency.xml", &LLFloaterBuyCurrency::buildFloater);
     LLFloaterReg::add("buy_currency_html", "floater_buy_currency_html.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBuyCurrencyHTML>);
@@ -396,7 +404,14 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("env_edit_extdaycycle", "floater_edit_ext_day_cycle.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEditExtDayCycle>);
     LLFloaterReg::add("my_environments", "floater_my_environments.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMyEnvironment>);
 
-    LLFloaterReg::add("event", "floater_event.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEvent>);
+    if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
+    {
+        LLFloaterReg::add("event", "floater_al_event.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterEvent>);
+    }
+    else
+    {
+        LLFloaterReg::add("event", "floater_event.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEvent>);
+    }
     LLFloaterReg::add("experiences", "floater_experiences.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperiences>);
     LLFloaterReg::add("experience_profile", "floater_experienceprofile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperienceProfile>);
     LLFloaterReg::add("experience_search", "floater_experience_search.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperiencePicker>);
@@ -452,13 +467,13 @@ void LLViewerFloaterReg::registerFloaters()
 
     LLFloaterReg::add("notifications_console", "floater_notifications_console.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationConsole>);
 
-    if(!gSkinSettings.getBOOL("LegacyNotificationWell"))
+    if (!gSkinSettings.getBOOL("LegacyNotificationWell"))
     {
         LLFloaterReg::add("notification_well_window", "floater_notifications_tabbed.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationsTabbed>);
     }
     else
     {
-        LLFloaterReg::add("legacy_notification_well_window", "floater_legacy_sys_well.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLLegacyNotificationWellWindow>);
+        LLFloaterReg::add("legacy_notification_well_window", "floater_legacy_sys_well.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALLegacyNotificationWellWindow>);
     }
 
     LLFloaterReg::add("object_weights", "floater_object_weights.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterObjectWeights>);
@@ -524,26 +539,29 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("script_debug_output", "floater_script_debug_panel.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptDebugOutput>);
     LLFloaterReg::add("script_floater", "floater_script.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLScriptFloater>);
     LLFloaterReg::add("script_limits", "floater_script_limits.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptLimits>);
+    LLFloaterReg::add("scripting_settings", "floater_scripting_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScripting>);
     LLFloaterReg::add("my_scripts", "floater_my_scripts.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMyScripts>);
     LLFloaterReg::add("sell_land", "floater_sell_land.xml", &LLFloaterSellLand::buildFloater);
     LLFloaterReg::add("settings_color", "floater_settings_color.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSettingsColor>);
     LLFloaterReg::add("settings_debug", "floater_settings_debug.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSettingsDebug>);
-    LLFloaterReg::add("sound_devices", "floater_sound_devices.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSoundDevices>);
     LLFloaterReg::add("stats", "floater_stats.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
     LLFloaterReg::add("start_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterRunQueue>);
     LLFloaterReg::add("scene_load_stats", "floater_scene_load_stats.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSceneLoadStats>);
     LLFloaterReg::add("stop_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotRunQueue>);
     LLFloaterReg::add("snapshot", "floater_snapshot.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSnapshot>);
     LLFloaterReg::add("simple_snapshot", "floater_simple_snapshot.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSimpleSnapshot>);
-    //LLFloaterReg::add("search", "floater_search.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSearch>);
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
-    LLFloaterReg::add("search_replace", "floater_search_replace.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSearchReplace>);
-// [/SL:KB]
+
+    if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
+    {
+        LLFloaterReg::add("search", "floater_al_directory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterDirectory>);
+    }
+    else
+    {
+        LLFloaterReg::add("search", "floater_directory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDirectory>);
+    }
     LLFloaterReg::add("profile", "floater_profile.xml",(LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProfile>);
     LLFloaterReg::add("guidebook", "floater_how_to.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterHowTo>);
     LLFloaterReg::add("slapp_test", "floater_test_slapp.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSLappTest>);
-
-    LLFloaterReg::add("big_preview", "floater_big_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBigPreview>);
 
     LLFloaterUIPreviewUtil::registerFloater();
     LLFloaterReg::add("upload_anim_bvh", "floater_animation_bvh_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBvhPreview>, "upload");
@@ -553,26 +571,41 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("upload_script", "floater_script_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptPreview>, "upload");
     LLFloaterReg::add("upload_sound", "floater_sound_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSoundPreview>, "upload");
 
-    LLFloaterReg::add("voice_effect", "floater_voice_effect.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterVoiceEffect>);
-
     LLFloaterReg::add("web_content", "floater_web_content.xml", (LLFloaterBuildFunc)&LLFloaterWebContent::create);
     LLFloaterReg::add("whitelist_entry", "floater_whitelist_entry.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterWhiteListEntry>);
     LLFloaterReg::add("window_size", "floater_window_size.xml", &LLFloaterReg::build<LLFloaterWindowSize>);
     LLFloaterReg::add("world_map", "floater_world_map.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterWorldMap>);
 
-    // *NOTE: Please keep these alphabetized for easier merges
-
+    // Alchemy Floaters
+    LLFloaterReg::add("ao", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterAO>);
+    LLFloaterReg::add("asset_hex_editor", "floater_hex_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterHexEditor>);
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2011-11-24 (Catznip-3.2)
+    LLFloaterReg::add("asset_recovery", "floater_asset_recovery.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAssetRecovery>);
+// [/SL:KB]
+// [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
+    LLFloaterReg::add("blocked", "floater_al_blocked.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterBlocked>);
+// [/SL:KB]
     LLFloaterReg::add("delete_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeleteQueue>);
-    LLFloaterReg::add("generic_text", "floater_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGenericText>);
-    LLFloaterReg::add("group_profile", "floater_group_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGroupProfile>);
-    LLFloaterReg::add("legacy_profile", "floater_profile_legacy.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<LLFloaterProfileLegacy>);
+    LLFloaterReg::add("generic_text", "floater_al_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGenericText>);
+    LLFloaterReg::add("group_profile", "floater_al_group_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGroupProfile>);
+    LLFloaterReg::add("legacy_profile", "floater_al_profile_legacy.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProfileLegacy>);
+    LLFloaterReg::add("lightbox", "floater_lightbox_settings.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<ALFloaterLightBox>);
+    LLFloaterReg::add("message_builder", "floater_message_builder.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageBuilder>);
+    LLFloaterReg::add("message_log", "floater_message_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageLog>);
+    LLFloaterReg::add("message_rewriter", "floater_message_rewriter.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageRewriter>);
     LLFloaterReg::add("music_ticker", "floater_music_ticker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
-    LLFloaterReg::add("particle_editor", "floater_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
-    LLFloaterReg::add("progress_view", "floater_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProgressView>);
-    LLFloaterReg::add("region_tracker", "floater_region_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterRegionTracker>);
-    LLFloaterReg::add("search", "floater_directory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDirectory>);
-    LLFloaterReg::add("transaction_log", "floater_transaction_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterTransactionLog>);
-    LLFloaterReg::add("webprofile", "floater_web_profile.xml", (LLFloaterBuildFunc)&LLFloaterWebProfile::create);
+    LLFloaterReg::add("particle_editor", "floater_al_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
+    LLFloaterReg::add("progress_view", "floater_al_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProgressView>);
+    LLFloaterReg::add("quick_settings", "floater_quick_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
+    LLFloaterReg::add("region_tracker", "floater_al_region_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterRegionTracker>);
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
+    LLFloaterReg::add("search_replace", "floater_search_replace.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSearchReplace>);
+// [/SL:KB]
+    LLFloaterReg::add("sound_explorer", "floater_explore_sounds.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterExploreSounds>);
+    LLFloaterReg::add("transaction_log", "floater_al_transaction_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterTransactionLog>);
+    LLFloaterReg::add("webprofile", "floater_al_web_profile.xml", (LLFloaterBuildFunc)&ALFloaterWebProfile::create);
+
+    // *NOTE: Please keep these alphabetized for easier merges
 
     LLFloaterReg::registerControlVariables(); // Make sure visibility and rect controls get preserved when saving
 }

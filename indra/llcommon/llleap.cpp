@@ -61,7 +61,7 @@ public:
         // Pass it a callback to our connect() method, so it can send events
         // from a particular LLEventPump to the plugin without having to know
         // this class or method name.
-        mListener(new LLLeapListener(
+        mListener(std::make_unique<LLLeapListener>(
                       [this](LLEventPump& pump, const std::string& listener)
                       { return connect(pump, listener); }))
     {
@@ -186,6 +186,17 @@ public:
                 peeklen((std::min)(LLProcess::ReadPipe::size_type(50), childout.size()));
             LL_WARNS("LLLeap") << "Discarding final " << childout.size() << " bytes: "
                                << childout.peek(0, peeklen) << "..." << LL_ENDL;
+        }
+
+        // Handle any remaining stderr data (partial lines) the same way as we do
+        // for stdout: log it.
+        LLProcess::ReadPipe& childerr(mChild->getReadPipe(LLProcess::STDERR));
+        if (childerr.size())
+        {
+            LLProcess::ReadPipe::size_type
+                peeklen((std::min)(LLProcess::ReadPipe::size_type(50), childerr.size()));
+            LL_WARNS("LLLeap") << "Final stderr " << childerr.size() << " bytes: "
+                               << childerr.peek(0, peeklen) << "..." << LL_ENDL;
         }
 
         // Kill this instance. MUST BE LAST before return!

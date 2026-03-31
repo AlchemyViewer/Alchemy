@@ -57,6 +57,7 @@ S32 LLGLSLShader::sIndexedTextureChannels = 0;
 U32 LLGLSLShader::sMaxGLTFMaterials = 0;
 U32 LLGLSLShader::sMaxGLTFNodes = 0;
 bool LLGLSLShader::sProfileEnabled = false;
+bool LLGLSLShader::sCanProfile = true;
 std::set<LLGLSLShader*> LLGLSLShader::sInstances;
 LLGLSLShader::defines_map_t LLGLSLShader::sGlobalDefines;
 U64 LLGLSLShader::sTotalTimeElapsed = 0;
@@ -267,7 +268,7 @@ void LLGLSLShader::placeProfileQuery(bool for_runtime)
 
 bool LLGLSLShader::readProfileQuery(bool for_runtime, bool force_read)
 {
-    if (sProfileEnabled || for_runtime)
+    if ((sProfileEnabled || for_runtime) && sCanProfile)
     {
         if (!mProfilePending)
         {
@@ -529,10 +530,10 @@ bool LLGLSLShader::createShader()
             mActiveTextureChannels = llmax(mActiveTextureChannels, tex + 1);
         }
 
-        // when indexed texture channels are used, enforce an upper limit of 16
+        // when indexed texture channels are used, enforce an upper limit of 32
         // this should act as a canary in the coal mine for adding textures
-        // and breaking machines that are limited to 16 texture channels
-        llassert(mActiveTextureChannels <= 16);
+        // and breaking machines that are limited to 32 texture channels
+        llassert(mActiveTextureChannels <= 32);
         unbind();
     }
 
@@ -666,7 +667,7 @@ bool LLGLSLShader::mapAttributes()
     }
 
     mAttribute.clear();
-#if LL_RELEASE_WITH_DEBUG_INFO
+#if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO
     mAttribute.resize(LLShaderMgr::instance()->mReservedAttribs.size(), { -1, NULL });
 #else
     mAttribute.resize(LLShaderMgr::instance()->mReservedAttribs.size(), -1);
@@ -684,7 +685,7 @@ bool LLGLSLShader::mapAttributes()
             S32 index = glGetAttribLocation(mProgramObject, (const GLchar*)name);
             if (index != -1)
             {
-#if LL_RELEASE_WITH_DEBUG_INFO
+#if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO
                 mAttribute[i] = { index, name };
 #else
                 mAttribute[i] = index;
@@ -831,9 +832,9 @@ GLint LLGLSLShader::mapUniformTextureChannel(GLint location, GLenum type, GLint 
         else
         {
             //is array of textures, make sequential after this texture
-            GLint channel[16]; // <=== only support up to 16 texture channels
-            llassert(size <= 16);
-            size = llmin(size, 16);
+            GLint channel[32]; // <=== only support up to 32 texture channels
+            llassert(size <= 32);
+            size = llmin(size, 32);
             for (int i = 0; i < size; ++i)
             {
                 channel[i] = mActiveTextureChannels++;
@@ -1303,7 +1304,7 @@ void LLGLSLShader::uniform1i(U32 index, GLint x)
         if (mUniform[index] >= 0)
         {
             const auto& iter = mValue.find(mUniform[index]);
-            if (iter == mValue.end() || iter->second.mV[0] != (F32)x)
+            if (iter == mValue.end() || iter->second.mV[0] != x)
             {
                 glUniform1i(mUniform[index], x);
                 mValue[mUniform[index]] = LLVector4((F32)x, 0.f, 0.f, 0.f);

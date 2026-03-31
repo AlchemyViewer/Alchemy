@@ -69,15 +69,16 @@ private:
 };
 
 class LLViewerMediaImpl;
+class LLMediaCtrl;
 
-class LLViewerMedia: public LLSingleton<LLViewerMedia>
+class LLViewerMedia: public LLSimpleton<LLViewerMedia>
 {
-    LLSINGLETON(LLViewerMedia);
-    ~LLViewerMedia();
-    void initSingleton() override;
     LOG_CLASS(LLViewerMedia);
 
 public:
+    LLViewerMedia();
+    ~LLViewerMedia();
+
     // String to get/set media autoplay in gSavedSettings
     static const char* AUTO_PLAY_MEDIA_SETTING;
     static const char* SHOW_MEDIA_ON_OTHERS_SETTING;
@@ -97,7 +98,7 @@ public:
                                        U8 media_auto_scale = false,
                                        U8 media_loop = false);
 
-    viewer_media_t updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self, bool is_hud_attachment);
+    viewer_media_t updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self);
     LLViewerMediaImpl* getMediaImplFromTextureID(const LLUUID& texture_id);
     std::string getCurrentUserAgent();
     void updateBrowserUserAgent();
@@ -162,22 +163,26 @@ public:
 
     LLSD getHeaders();
     LLCore::HttpHeaders::ptr_t getHttpHeaders();
+    bool getOpenIDCookie(LLMediaCtrl* media_instance) const;
 
 private:
     void onAuthSubmit(const LLSD& notification, const LLSD& response);
-    bool parseRawCookie(const std::string raw_cookie, std::string& name, std::string& value, std::string& path, bool& httponly, bool& secure);
+    static bool parseRawCookie(const std::string raw_cookie, std::string& name, std::string& value, std::string& path, bool& httponly, bool& secure);
     void setOpenIDCookie(const std::string& url);
     void onTeleportFinished();
 
     static void openIDSetupCoro(std::string openidUrl, std::string openidToken);
     static void getOpenIDCookieCoro(std::string url);
+    void setMaxInstances(S32 max_instances);
 
     bool mAnyMediaShowing;
     bool mAnyMediaPlaying;
+    S32 mMaxIntances = 8;
     LLURL mOpenIDURL;
     std::string mOpenIDCookie;
     LLPluginClassMedia* mSpareBrowserMediaSource;
     boost::signals2::connection mTeleportFinishConnection;
+    boost::signals2::connection mMaxInstancesConnection;
 };
 
 // Implementation functions not exported into header file
@@ -246,7 +251,7 @@ public:
     void navigateHome();
     void unload();
     void navigateTo(const std::string& url, const std::string& mime_type = "", bool rediscover_type = false, bool server_request = false, bool clean_browser = false);
-    void navigateInternal();
+    void navigateInternal(bool should_log = true);
     void navigateStop();
     bool handleKeyHere(KEY key, MASK mask);
     bool handleKeyUpHere(KEY key, MASK mask);
@@ -435,7 +440,7 @@ public:
     LLNotificationPtr getCurrentNotification() const;
 
 private:
-    bool isAutoPlayable(bool is_hud_attachment = false) const;
+    bool isAutoPlayable() const;
     bool shouldShowBasedOnClass() const;
     bool isObscured() const;
     static bool isObjectAttachedToAnotherAvatar(LLVOVolume *obj);

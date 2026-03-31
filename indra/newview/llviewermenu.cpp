@@ -26,10 +26,6 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#ifdef INCLUDE_VLD
-#include "vld.h"
-#endif
-
 #include "llviewermenu.h"
 
 // linden library includes
@@ -46,6 +42,7 @@
 
 // newview includes
 #include "alavataractions.h"
+#include "alfloaterblocked.h"
 #include "alviewermenu.h"
 #include "llagent.h"
 #include "llagentaccess.h"
@@ -60,9 +57,6 @@
 #include "llcompilequeue.h"
 #include "llconsole.h"
 #include "lldebugview.h"
-// [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2)
-#include "llderenderlist.h"
-// [/SL:KB]
 #include "lldiskcache.h"
 #include "llenvironment.h"
 #include "llfilepicker.h"
@@ -80,7 +74,6 @@
 #include "llfloaterpathfindinglinksets.h"
 #include "llfloaterpay.h"
 #include "llfloaterreporter.h"
-#include "llfloatersearch.h"
 #include "llfloaterscriptdebug.h"
 #include "llfloatersnapshot.h"
 #include "llfloatertools.h"
@@ -100,10 +93,7 @@
 #include "llinventorydefines.h"
 #include "llinventoryfunctions.h"
 #include "llpanellogin.h"
-// [SL:KB] - World-Mute | Checked: 2013-07-10 (Catznip-3.5)
-#include "llfloaterblocked.h"
-// [/SL:KB]
-//#include "llpanelblockedlist.h"
+#include "llpanelblockedlist.h"
 #include "llpanelmaininventory.h"
 #include "llmarketplacefunctions.h"
 #include "llmaterialeditor.h"
@@ -151,7 +141,7 @@
 #include "llwindow.h"
 #include "llpathfindingmanager.h"
 #include "llstartup.h"
-#include "boost/unordered_map.hpp"
+#include <unordered_map>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/json.hpp>
@@ -169,7 +159,7 @@ using namespace LLAvatarAppearanceDefines;
 
 typedef LLPointer<LLViewerObject> LLViewerObjectPtr;
 
-static boost::unordered_map<std::string, LLStringExplicit> sDefaultItemLabels;
+static std::unordered_map<std::string, LLStringExplicit> sDefaultItemLabels;
 
 LLVOAvatar* find_avatar_from_object(LLViewerObject* object);
 LLVOAvatar* find_avatar_from_object(const LLUUID& object_id);
@@ -255,7 +245,6 @@ void handle_buy_contents(LLSaleInfo sale_info);
 void near_sit_down_point(bool success, void*);
 
 // Debug menu
-void handle_visual_leak_detector_toggle();
 void handle_rebake_textures();
 bool check_admin_override();
 void handle_admin_override_toggle();
@@ -429,7 +418,23 @@ static LLSLMMenuUpdater* gSLMMenuUpdater = NULL;
 
 LLSLMMenuUpdater::LLSLMMenuUpdater()
 {
-    mMarketplaceListingsItem = gMenuHolder->getChild<LLView>("MarketplaceListings")->getHandle();
+    LLView* me_menu = gMenuHolder->findChild<LLView>("Me");
+    if (!me_menu)
+    {
+        LLError::LLUserWarningMsg::showMissingFiles();
+        LL_ERRS() << "Can't find 'Me' menu in 'menu_viewer'" << LL_ENDL;
+        return;
+    }
+
+    LLView* marketplace_listings = me_menu->findChild<LLView>("MarketplaceListings");
+    if (!marketplace_listings)
+    {
+        LLError::LLUserWarningMsg::showMissingFiles();
+        LL_ERRS() << "Can't find 'MarketplaceListings' in 'Me' menu" << LL_ENDL;
+        return;
+    }
+
+    mMarketplaceListingsItem = marketplace_listings->getHandle();
 }
 void LLSLMMenuUpdater::setMerchantMenu()
 {
@@ -441,7 +446,7 @@ void LLSLMMenuUpdater::setMerchantMenu()
     LLCommand* command = LLCommandManager::instance().getCommand("marketplacelistings");
     gToolBarView->enableCommand(command->id(), true);
 
-    const LLUUID marketplacelistings_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+    const LLUUID marketplacelistings_id = gInventory.getMarketplaceListingsUUID();
     if (marketplacelistings_id.isNull())
     {
         U32 mkt_status = LLMarketplaceData::instance().getSLMStatus();
@@ -489,6 +494,8 @@ void check_merchant_status(bool force)
 
 void init_menus()
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     // Initialize actions
     initialize_menus();
 
@@ -565,7 +572,29 @@ void init_menus()
         color = LLUIColorTable::instance().getColor( "MenuNonProductionBgColor" );
     }
 
-    LLView* menu_bar_holder = gViewerWindow->getRootView()->getChildView("menu_bar_holder");
+    LLView* menu_stack = gViewerWindow->getMainView()->findChildView("menu_stack");
+    if (!menu_stack)
+    {
+        LLError::LLUserWarningMsg::showMissingFiles();
+        LL_ERRS() << "Can't find menu_stack in main_view" << LL_ENDL;
+        return;
+    }
+
+    LLView* status_bar_container = menu_stack->findChildView("status_bar_container");
+    if (!status_bar_container)
+    {
+        LLError::LLUserWarningMsg::showMissingFiles();
+        LL_ERRS() << "Can't find status_bar_container in main_view" << LL_ENDL;
+        return;
+    }
+
+    LLView* menu_bar_holder = status_bar_container->findChildView("menu_bar_holder");
+    if (!menu_bar_holder)
+    {
+        LLError::LLUserWarningMsg::showMissingFiles();
+        LL_ERRS() << "Can't find status_bar_container in main_view" << LL_ENDL;
+        return;
+    }
 
     gMenuBarView = LLUICtrlFactory::getInstance()->createFromFile<LLMenuBarGL>("menu_viewer.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
     gMenuBarView->setRect(LLRect(0, menu_bar_holder->getRect().mTop, 0, menu_bar_holder->getRect().mTop - MENU_BAR_HEIGHT));
@@ -579,21 +608,39 @@ void init_menus()
     // *TODO:Also fix cost in llfolderview.cpp for Inventory menus
     const std::string sound_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getSoundUploadCost());
     const std::string animation_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getAnimationUploadCost());
-    gMenuHolder->childSetLabelArg("Upload Sound", "[COST]", sound_upload_cost_str);
-    gMenuHolder->childSetLabelArg("Upload Animation", "[COST]", animation_upload_cost_str);
+
+    LLView* main_upload_menu = gMenuHolder->findChild<LLView>("Upload");
+    if (!main_upload_menu)
+    {
+        LLError::LLUserWarningMsg::showMissingFiles();
+        LL_ERRS() << "Can't find 'Upload' menu in 'menu_viewer'" << LL_ENDL;
+        return;
+    }
+
+    LLView* upload_sound = main_upload_menu->findChild<LLView>("Upload Sound");
+    if (!upload_sound)
+    {
+        LLError::LLUserWarningMsg::showMissingFiles();
+        LL_ERRS() << "Can't find 'Upload Sound' menu item in 'Upload' menu" << LL_ENDL;
+        return;
+    }
+    upload_sound->setLabelArg("[COST]", sound_upload_cost_str);
+
+    LLView* upload_anim = main_upload_menu->findChild<LLView>("Upload Animation");
+    if (!upload_anim)
+    {
+        LLError::LLUserWarningMsg::showMissingFiles();
+        LL_ERRS() << "Can't find 'Upload Animation' menu item in 'Upload' menu" << LL_ENDL;
+        return;
+    }
+    upload_anim->setLabelArg("[COST]", animation_upload_cost_str);
+
 
     gAttachSubMenu = gMenuBarView->findChildMenuByName("Attach Object", true);
     gDetachSubMenu = gMenuBarView->findChildMenuByName("Detach Object", true);
 
     gDetachAvatarMenu = gMenuHolder->getChild<LLMenuGL>("Avatar Detach", true);
     gDetachHUDAvatarMenu = gMenuHolder->getChild<LLMenuGL>("Avatar Detach HUD", true);
-
-    // Don't display the Memory console menu if the feature is turned off
-    LLMenuItemCheckGL *memoryMenu = gMenuBarView->getChild<LLMenuItemCheckGL>("Memory", true);
-    if (memoryMenu)
-    {
-        memoryMenu->setVisible(false);
-    }
 
     gMenuBarView->createJumpKeys();
 
@@ -2529,15 +2576,6 @@ class LLAdvancedToggleViewAdminOptions : public view_listener_t
     }
 };
 
-class LLAdvancedToggleVisualLeakDetector : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        handle_visual_leak_detector_toggle();
-        return true;
-    }
-};
-
 class LLAdvancedCheckViewAdminOptions : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -3018,11 +3056,45 @@ void handle_object_show_original()
     show_item_original(object->getAttachmentItemID());
 }
 
+void handle_object_set_favorite(const LLSD& userdata)
+{
+    LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+    if (!object)
+    {
+        return;
+    }
+    LLViewerObject *parent = (LLViewerObject*)object->getParent();
+    while (parent)
+    {
+        if(parent->isAvatar())
+        {
+            break;
+        }
+        object = parent;
+        parent = (LLViewerObject*)parent->getParent();
+    }
+    if (!object || object->isAvatar())
+    {
+        return;
+    }
+
+    LLUUID item_id = gInventory.getLinkedItemID(object->getAttachmentItemID());
+
+    std::string action = userdata.asString();
+    if (action == "Add")
+    {
+        set_favorite(item_id, true);
+    }
+    if (action == "Remove")
+    {
+        set_favorite(item_id, false);
+    }
+}
 
 static void init_default_item_label(LLUICtrl* ctrl)
 {
     const std::string& item_name = ctrl->getName();
-    boost::unordered_map<std::string, LLStringExplicit>::iterator it = sDefaultItemLabels.find(item_name);
+    std::unordered_map<std::string, LLStringExplicit>::iterator it = sDefaultItemLabels.find(item_name);
     if (it == sDefaultItemLabels.end())
     {
         // *NOTE: This will not work for items of type LLMenuItemCheckGL because they return boolean value
@@ -3038,7 +3110,7 @@ static void init_default_item_label(LLUICtrl* ctrl)
 static LLStringExplicit get_default_item_label(const std::string& item_name)
 {
     LLStringExplicit res("");
-    boost::unordered_map<std::string, LLStringExplicit>::iterator it = sDefaultItemLabels.find(item_name);
+    std::unordered_map<std::string, LLStringExplicit>::iterator it = sDefaultItemLabels.find(item_name);
     if (it != sDefaultItemLabels.end())
     {
         res = it->second;
@@ -3081,6 +3153,41 @@ bool enable_object_touch(LLUICtrl* ctrl)
 
     return new_value;
 };
+
+bool enable_object_favorite(const LLSD& userdata)
+{
+    LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+    if (!object)
+    {
+        return false;
+    }
+    LLViewerObject* parent = (LLViewerObject*)object->getParent();
+    while (parent)
+    {
+        if (parent->isAvatar())
+        {
+            break;
+        }
+        object = parent;
+        parent = (LLViewerObject*)parent->getParent();
+    }
+    if (!object || object->isAvatar())
+    {
+        return false;
+    }
+
+    std::string action = userdata.asString();
+    LLUUID item_id = gInventory.getLinkedItemID(object->getAttachmentItemID());
+    if (action == "Add")
+    {
+        return !get_is_favorite(item_id);
+    }
+    if (action == "Remove")
+    {
+        return get_is_favorite(item_id);
+    }
+    return false;
+}
 
 //void label_touch(std::string& label, void*)
 //{
@@ -3737,8 +3844,7 @@ class LLObjectMute : public view_listener_t
         else
         {
             LLMuteList::getInstance()->add(mute);
-            LLFloaterBlocked::showMuteAndSelect(mute.mID);
-            //LLPanelBlockedList::showPanelAndSelect(mute.mID);
+            ALFloaterBlocked::showMuteAndSelect(mute.mID);
         }
 
         return true;
@@ -3791,7 +3897,7 @@ class LLAvatarReportAbuse : public view_listener_t
         LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstance()->getSelection()->getPrimaryObject() );
         if(avatar)
         {
-            LLFloaterReporter::showFromObject(avatar->getID());
+            ALAvatarActions::reportAbuse(avatar->getID());
         }
         return true;
     }
@@ -3820,13 +3926,13 @@ bool callback_freeze(const LLSD& notification, const LLSD& response)
 
         if (avatar)
         {
-            msg->newMessage("FreezeUser");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgent.getID());
-            msg->addUUID("SessionID", gAgent.getSessionID());
-            msg->nextBlock("Data");
-            msg->addUUID("TargetID", avatar_id );
-            msg->addU32("Flags", flags );
+            msg->newMessageFast(_PREHASH_FreezeUser);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->nextBlockFast(_PREHASH_Data);
+            msg->addUUIDFast(_PREHASH_TargetID, avatar_id );
+            msg->addU32Fast(_PREHASH_Flags, flags );
             msg->sendReliable( avatar->getRegion()->getHost() );
         }
     }
@@ -3850,6 +3956,9 @@ void handle_avatar_freeze(const LLSD& avatar_id)
 
         if( avatar )
         {
+#if 1
+            ALAvatarActions::parcelFreeze(avatar->getID());
+#else
             std::string fullname = avatar->getFullname();
             LLSD payload;
             payload["avatar_id"] = avatar->getID();
@@ -3873,6 +3982,7 @@ void handle_avatar_freeze(const LLSD& avatar_id)
                             payload,
                             callback_freeze);
             }
+#endif
         }
 }
 
@@ -3926,13 +4036,13 @@ bool callback_eject(const LLSD& notification, const LLSD& response)
         if (avatar)
         {
             U32 flags = 0x0;
-            msg->newMessage("EjectUser");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgent.getID() );
-            msg->addUUID("SessionID", gAgent.getSessionID() );
-            msg->nextBlock("Data");
-            msg->addUUID("TargetID", avatar_id );
-            msg->addU32("Flags", flags );
+            msg->newMessageFast(_PREHASH_EjectUser);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->nextBlockFast(_PREHASH_Data);
+            msg->addUUIDFast(_PREHASH_TargetID, avatar_id);
+            msg->addU32Fast(_PREHASH_Flags, flags);
             msg->sendReliable( avatar->getRegion()->getHost() );
         }
     }
@@ -3947,13 +4057,13 @@ bool callback_eject(const LLSD& notification, const LLSD& response)
         if (avatar)
         {
             U32 flags = 0x1;
-            msg->newMessage("EjectUser");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgent.getID() );
-            msg->addUUID("SessionID", gAgent.getSessionID() );
-            msg->nextBlock("Data");
-            msg->addUUID("TargetID", avatar_id );
-            msg->addU32("Flags", flags );
+            msg->newMessageFast(_PREHASH_EjectUser);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->nextBlockFast(_PREHASH_Data);
+            msg->addUUIDFast(_PREHASH_TargetID, avatar_id);
+            msg->addU32Fast(_PREHASH_Flags, flags);
             msg->sendReliable( avatar->getRegion()->getHost() );
         }
     }
@@ -3976,6 +4086,9 @@ void handle_avatar_eject(const LLSD& avatar_id)
 
         if( avatar )
         {
+#if 1
+            ALAvatarActions::parcelEject(avatar->getID());
+#else
             LLSD payload;
             payload["avatar_id"] = avatar->getID();
             std::string fullname = avatar->getFullname();
@@ -4029,6 +4142,7 @@ void handle_avatar_eject(const LLSD& avatar_id)
                                 callback_eject);
                 }
             }
+#endif
         }
 }
 
@@ -4061,6 +4175,9 @@ bool enable_freeze_eject(const LLSD& avatar_id)
     // Gods can always freeze
     if (gAgent.isGodlike()) return true;
 
+#if 1
+    return ALAvatarActions::canFreezeEject(avatar->getID());
+#else
     // Estate owners / managers can freeze
     // Parcel owners can also freeze
     const LLVector3& pos = avatar->getPositionRegion();
@@ -4075,6 +4192,7 @@ bool enable_freeze_eject(const LLSD& avatar_id)
         new_value = LLViewerParcelMgr::getInstance()->isParcelOwnedByAgent(parcel,GP_LAND_ADMIN);
     }
     return new_value;
+#endif
 }
 
 bool callback_leave_group(const LLSD& notification, const LLSD& response)
@@ -4400,35 +4518,6 @@ void handle_admin_override_toggle()
     show_debug_menus();
 }
 
-void handle_visual_leak_detector_toggle()
-{
-    static bool vld_enabled = false;
-
-    if ( vld_enabled )
-    {
-#ifdef INCLUDE_VLD
-        // only works for debug builds (hard coded into vld.h)
-#ifdef _DEBUG
-        // start with Visual Leak Detector turned off
-        VLDDisable();
-#endif // _DEBUG
-#endif // INCLUDE_VLD
-        vld_enabled = false;
-    }
-    else
-    {
-#ifdef INCLUDE_VLD
-        // only works for debug builds (hard coded into vld.h)
-    #ifdef _DEBUG
-        // start with Visual Leak Detector turned off
-        VLDEnable();
-    #endif // _DEBUG
-#endif // INCLUDE_VLD
-
-        vld_enabled = true;
-    };
-}
-
 void handle_god_mode()
 {
     gAgent.requestEnterGodMode();
@@ -4508,6 +4597,21 @@ void process_grant_godlike_powers(LLMessageSystem* msg, void**)
         LL_WARNS() << "Grant godlike for wrong agent " << agent_id << LL_ENDL;
     }
 }
+
+bool is_agent_mappable(const LLUUID& agent_id)
+{
+    const LLRelationship* buddy_info = NULL;
+    bool is_friend = LLAvatarActions::isFriend(agent_id);
+
+    if (is_friend)
+        buddy_info = LLAvatarTracker::instance().getBuddyInfo(agent_id);
+
+    return (buddy_info &&
+        buddy_info->isOnline() &&
+        buddy_info->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION)
+        );
+}
+
 
 // Enable a menu item when you don't have someone's card.
 class LLAvatarEnableAddFriend : public view_listener_t
@@ -4909,27 +5013,27 @@ void handle_claim_public_land()
     LLVector3 east_north = gAgent.getPosAgentFromGlobal(east_north_global);
 
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("GodlikeMessage");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
+    msg->newMessageFast(_PREHASH_GodlikeMessage);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
-    msg->nextBlock("MethodData");
-    msg->addString("Method", "claimpublicland");
-    msg->addUUID("Invoice", LLUUID::null);
+    msg->nextBlockFast(_PREHASH_MethodData);
+    msg->addStringFast(_PREHASH_Method, "claimpublicland");
+    msg->addUUIDFast(_PREHASH_Invoice, LLUUID::null);
     std::string buffer;
     buffer = llformat( "%f", west_south.mV[VX]);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buffer);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buffer);
     buffer = llformat( "%f", west_south.mV[VY]);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buffer);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buffer);
     buffer = llformat( "%f", east_north.mV[VX]);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buffer);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buffer);
     buffer = llformat( "%f", east_north.mV[VY]);
-    msg->nextBlock("ParamList");
-    msg->addString("Parameter", buffer);
+    msg->nextBlockFast(_PREHASH_ParamList);
+    msg->addStringFast(_PREHASH_Parameter, buffer);
     gAgent.sendReliableMessage();
 }
 
@@ -6082,7 +6186,6 @@ class LLToolsReleaseKeys : public view_listener_t
 // [/RLVa:KB]
 
         gAgent.forceReleaseControls();
-
         return true;
     }
 };
@@ -6350,42 +6453,6 @@ void handle_force_delete()
 {
     LLSelectMgr::getInstance()->selectForceDelete();
 }
-
-// [SL:KB] - Patch: World-Derender | Checked: 2012-06-08 (Catznip-3.3)
-void handle_view_blocked(const LLSD& sdParam)
-{
-    if (LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject()))
-    {
-        std::string strParam = sdParam.asString();
-        if (BLOCKED_TAB_NAME == strParam)
-            strParam = BLOCKED_PARAM_NAME;
-        else if (DERENDER_TAB_NAME == strParam)
-            strParam = DERENDER_PARAM_NAME;
-        else if (EXCEPTION_TAB_NAME == strParam)
-            strParam = EXCEPTION_PARAM_NAME;
-
-        LLFloaterReg::showInstance("blocked", LLSD().with(strParam, pAvatar->getID()));
-    }
-    else
-    {
-        LLFloaterReg::showInstance("blocked", sdParam);
-    }
-}
-
-void handle_object_derender(const LLSD& sdParam)
-{
-    std::vector<LLUUID> idList;
-    if (LLDerenderList::instance().addSelection("persistent" == sdParam.asString(), &idList))
-    {
-        LLFloaterReg::showInstance("blocked", LLSD().with("derender_to_select", idList.front()));
-    }
-}
-
-bool enable_object_derender()
-{
-    return LLDerenderList::canAddSelection();
-}
-// [/SL:KB]
 
 class LLViewEnableJoystickFlycam : public view_listener_t
 {
@@ -6680,115 +6747,6 @@ class LLWorldSetDoNotDisturb : public view_listener_t
         return true;
     }
 };
-class LLCommunicateSetRejectTeleportOffers : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("AlchemyRejectTeleportOffersMode");
-        if (is_rejecting_offers)
-        {
-            gSavedPerAccountSettings.setBOOL("AlchemyRejectTeleportOffersMode", false);
-        }
-        else
-        {
-            gSavedPerAccountSettings.setBOOL("AlchemyRejectTeleportOffersMode", true);
-            LLNotificationsUtil::add("RejectTeleportOffersModeSet");
-        }
-        return true;
-    }
-};
-
-class LLCommunicateGetRejectTeleportOffers : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("AlchemyRejectTeleportOffersMode");
-
-        return is_rejecting_offers;
-    }
-};
-
-class LLCommunicateSetRejectFriendshipRequests : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("AlchemyRejectFriendshipRequestsMode");
-        if (is_rejecting_offers)
-        {
-            gSavedPerAccountSettings.setBOOL("AlchemyRejectFriendshipRequestsMode", false);
-        }
-        else
-        {
-            gSavedPerAccountSettings.setBOOL("AlchemyRejectFriendshipRequestsMode", true);
-            LLNotificationsUtil::add("RejectFriendshipRequestsModeSet");
-        }
-        return true;
-    }
-};
-
-class LLCommunicateGetRejectFriendshipRequests  : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("AlchemyRejectFriendshipRequestsMode");
-
-        return is_rejecting_offers;
-    }
-};
-
-class LLCommunicateSetAutoRespond : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        bool is_autorespond_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseEnable");
-        if (is_autorespond_set)
-        {
-            gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseEnable", false);
-        }
-        else
-        {
-            gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseEnable", true);
-            LLNotificationsUtil::add("AutoRespondModeSet");
-        }
-        return true;
-    }
-};
-
-class LLCommunicateCheckAutoRespond : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        bool is_autorespond_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseEnable");
-        return is_autorespond_set;
-    }
-};
-
-class LLCommunicateSetAutoRespondNonFriends : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-       bool is_autorespond_nonfriends_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseNotFriendEnable");
-        if (is_autorespond_nonfriends_set)
-        {
-            gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendEnable", false);
-        }
-        else
-        {
-            gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendEnable", true);
-            LLNotificationsUtil::add("AutoRespondNonFriendsModeSet");
-        }
-        return true;
-    }
-};
-
-class LLCommunicateCheckAutoRespondNonFriends : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        bool is_autorespond_nonfriends_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseNotFriendEnable");
-        return is_autorespond_nonfriends_set;
-    }
-};
 
 class LLWorldCreateLandmark : public view_listener_t
 {
@@ -6871,7 +6829,7 @@ bool handle_zoom_to_object(const LLUUID& object_id)
 
     LLViewerObject* object = gObjectList.findObject(object_id);
 
-    if (object)
+    if (object && object->isReachable())
     {
         gAgentCamera.setFocusOnAvatar(false, ANIMATE);
 
@@ -7030,11 +6988,8 @@ class LLAvatarEnableResetSkeleton : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        if (find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject()))
-        {
-            return true;
-        }
-        return false;
+        LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+        return obj && obj->getAvatar();
     }
 };
 
@@ -7053,8 +7008,11 @@ class LLAvatarResetSkeletonAndAnimations : public view_listener_t
             }
             else
             {
-            avatar->resetSkeleton(true);
-        }
+                avatar->resetSkeleton(true);
+// [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
+                avatar->rebuildAttachments();
+// [/SL:KB]
+            }
         }
         return true;
     }
@@ -7094,10 +7052,13 @@ class LLAvatarResetSelfSkeletonAndAnimations : public view_listener_t
                 effectp->setSourceObject(gAgentAvatarp);
                 effectp->setTargetObject((LLViewerObject*)avatar);
                 effectp->setResetAnimations(true);
-        }
-        else
-        {
+            }
+            else
+            {
                 avatar->resetSkeleton(true);
+// [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
+                avatar->rebuildAttachments();
+// [/SL:KB]
             }
         }
         else
@@ -7619,8 +7580,7 @@ class LLMuteParticle : public view_listener_t
             else
             {
                 LLMuteList::getInstance()->add(mute);
-                LLFloaterBlocked::showMuteAndSelect(mute.mID);
-                //LLPanelBlockedList::showPanelAndSelect(mute.mID);
+                ALFloaterBlocked::showMuteAndSelect(mute.mID);
             }
         }
 
@@ -8642,6 +8602,45 @@ protected:
     }
 };
 
+class LLToggleControlPerAccount : public view_listener_t
+{
+protected:
+
+    bool handleEvent(const LLSD& userdata)
+    {
+        std::string control_name = userdata.asString();
+        bool checked = gSavedPerAccountSettings.getBOOL( control_name );
+        gSavedPerAccountSettings.setBOOL( control_name, !checked );
+        return true;
+    }
+};
+
+class LLCheckControlPerAccount : public view_listener_t
+{
+    bool handleEvent( const LLSD& userdata)
+    {
+        std::string callback_data = userdata.asString();
+        bool new_value = gSavedPerAccountSettings.getBOOL(callback_data);
+        return new_value;
+    }
+};
+
+class LLResetControlPerAccount : public view_listener_t
+{
+protected:
+
+    bool handleEvent(const LLSD& userdata)
+    {
+        std::string control_name = userdata.asString();
+        auto ctrlp = gSavedPerAccountSettings.getControl(control_name);
+        if (ctrlp)
+        {
+            ctrlp->resetToDefault(true);
+        }
+        return true;
+    }
+};
+
 // not so generic
 
 class LLAdvancedCheckRenderShadowOption: public view_listener_t
@@ -9319,6 +9318,12 @@ LLVOAvatar* find_avatar_from_object(LLViewerObject* object)
         }
         else if( !object->isAvatar() )
         {
+            // Check for animesh objects (animated objects with a control avatar)
+            LLVOAvatar* avatar = object->getAvatar();
+            if (avatar)
+            {
+                return avatar;
+            }
             object = NULL;
         }
     }
@@ -9602,8 +9607,6 @@ class LLViewHighlightTransparent : public view_listener_t
 // [RLVa:KB] - @edit and @viewtransparent
         LLDrawPoolAlpha::sShowDebugAlpha = (!LLDrawPoolAlpha::sShowDebugAlpha) && (RlvActions::canHighlightTransparent());
 // [/RLVa:KB]
-
-        // invisible objects skip building their render batches unless sShowDebugAlpha is true, so rebuild batches whenever toggling this flag
         gPipeline.rebuildDrawInfo();
         return true;
     }
@@ -10139,17 +10142,6 @@ class LLWorldEnableEnvPreset : public view_listener_t
     }
 };
 
-
-/// Post-Process callbacks
-class LLWorldPostProcess : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        LLFloaterReg::showInstance("env_post_process");
-        return true;
-    }
-};
-
 class LLWorldCheckBanLines : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -10335,6 +10327,8 @@ void initialize_spellcheck_menu()
 
 void initialize_menus()
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     // A parameterized event handler used as ctrl-8/9/0 zoom controls below.
     class LLZoomer : public view_listener_t
     {
@@ -10419,20 +10413,9 @@ void initialize_menus()
     view_listener_t::addMenu(new LLViewStatusAway(), "View.Status.CheckAway");
     view_listener_t::addMenu(new LLViewStatusDoNotDisturb(), "View.Status.CheckDoNotDisturb");
     view_listener_t::addMenu(new LLViewCheckHUDAttachments(), "View.CheckHUDAttachments");
-// [SL:KB] - Patch: World-RenderExceptions | Checked: Catznip-5.2
-    commit.add("View.Blocked", boost::bind(&handle_view_blocked, _2));
-// [/SL:KB]
 
     //Communicate Nearby chat
     view_listener_t::addMenu(new LLCommunicateNearbyChat(), "Communicate.NearbyChat");
-    view_listener_t::addMenu(new LLCommunicateSetRejectTeleportOffers(), "Communicate.SetRejectTeleportOffers");
-    view_listener_t::addMenu(new LLCommunicateGetRejectTeleportOffers(), "Communicate.GetRejectTeleportOffers");
-    view_listener_t::addMenu(new LLCommunicateSetRejectFriendshipRequests(), "Communicate.SetRejectFriendshipRequests");
-    view_listener_t::addMenu(new LLCommunicateGetRejectFriendshipRequests(), "Communicate.GetRejectFriendshipRequests");
-    view_listener_t::addMenu(new LLCommunicateSetAutoRespond(), "Communicate.SetAutoRespond");
-    view_listener_t::addMenu(new LLCommunicateSetAutoRespondNonFriends(), "Communicate.SetAutoRespondNonFriends");
-    view_listener_t::addMenu(new LLCommunicateCheckAutoRespond(), "Communicate.GetAutoRespond");
-    view_listener_t::addMenu(new LLCommunicateCheckAutoRespondNonFriends(), "Communicate.GetAutoRespondNonFriends");
 
     // World menu
     view_listener_t::addMenu(new LLWorldAlwaysRun(), "World.AlwaysRun");
@@ -10458,7 +10441,6 @@ void initialize_menus()
     view_listener_t::addMenu(new LLWorldEnableEnvSettings(), "World.EnableEnvSettings");
     view_listener_t::addMenu(new LLWorldEnvPreset(), "World.EnvPreset");
     view_listener_t::addMenu(new LLWorldEnableEnvPreset(), "World.EnableEnvPreset");
-    view_listener_t::addMenu(new LLWorldPostProcess(), "World.PostProcess");
     view_listener_t::addMenu(new LLWorldCheckBanLines() , "World.CheckBanLines");
     view_listener_t::addMenu(new LLWorldShowBanLines() , "World.ShowBanLines");
 
@@ -10693,7 +10675,6 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedEnableViewAdminOptions(), "Advanced.EnableViewAdminOptions");
     view_listener_t::addMenu(new LLAdvancedToggleViewAdminOptions(), "Advanced.ToggleViewAdminOptions");
     view_listener_t::addMenu(new LLAdvancedCheckViewAdminOptions(), "Advanced.CheckViewAdminOptions");
-    view_listener_t::addMenu(new LLAdvancedToggleVisualLeakDetector(), "Advanced.ToggleVisualLeakDetector");
 
     view_listener_t::addMenu(new LLAdvancedRequestAdminStatus(), "Advanced.RequestAdminStatus");
     view_listener_t::addMenu(new LLAdvancedLeaveAdminStatus(), "Advanced.LeaveAdminStatus");
@@ -10777,12 +10758,9 @@ void initialize_menus()
     view_listener_t::addMenu(new LLObjectBuild(), "Object.Build");
     commit.add("Object.Touch", boost::bind(&handle_object_touch));
     commit.add("Object.ShowOriginal", boost::bind(&handle_object_show_original));
+    commit.add("Object.SetFavorite", boost::bind(&handle_object_set_favorite, _2));
     commit.add("Object.SitOrStand", boost::bind(&handle_object_sit_or_stand));
     commit.add("Object.Delete", boost::bind(&handle_object_delete));
-// [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2)
-    commit.add("Object.Derender", boost::bind(&handle_object_derender, _2));
-    enable.add("Object.EnableDerender", boost::bind(&enable_object_derender));
-// [/SL:KB]
     view_listener_t::addMenu(new LLObjectAttachToAvatar(true), "Object.AttachToAvatar");
     view_listener_t::addMenu(new LLObjectAttachToAvatar(false), "Object.AttachAddToAvatar");
     view_listener_t::addMenu(new LLObjectReturn(), "Object.Return");
@@ -10809,6 +10787,7 @@ void initialize_menus()
     enable.add("Object.EnableEditGLTFMaterial", boost::bind(&enable_object_edit_gltf_material));
     enable.add("Object.EnableOpen", boost::bind(&enable_object_open));
     enable.add("Object.EnableTouch", boost::bind(&enable_object_touch, _1));
+    enable.add("Object.EnableFavorites", boost::bind(&enable_object_favorite, _2));
     enable.add("Object.EnableDelete", boost::bind(&enable_object_delete));
     enable.add("Object.EnableWear", boost::bind(&object_is_wearable));
 
@@ -10861,6 +10840,10 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToggleShaderControl(), "ToggleShaderControl");
     view_listener_t::addMenu(new LLCheckControl(), "CheckControl");
     view_listener_t::addMenu(new LLResetControl(), "ResetControl");
+
+    view_listener_t::addMenu(new LLToggleControlPerAccount(), "ToggleControlPerAccount");
+    view_listener_t::addMenu(new LLCheckControlPerAccount(), "CheckControlPerAccount");
+    view_listener_t::addMenu(new LLResetControlPerAccount(), "ResetControlPerAccount");
     view_listener_t::addMenu(new LLGoToObject(), "GoToObject");
     commit.add("PayObject", boost::bind(&handle_give_money_dialog));
 
@@ -10879,7 +10862,7 @@ void initialize_menus()
     enable.add("EnableGLTF", boost::bind(&enable_gltf));
     enable.add("EnableGLTFSaveAs", boost::bind(&enable_gltf_save_as));
     enable.add("EnableGLTFUpload", boost::bind(&enable_gltf_upload));
-    enable.add("EnableTerrainLocalPaintMap", std::bind(&enable_terrain_local_paintmap));
+    enable.add("EnableTerrainLocalPaintMap", boost::bind(&enable_terrain_local_paintmap));
 
     view_listener_t::addMenu(new LLFloaterVisible(), "FloaterVisible");
     view_listener_t::addMenu(new LLShowSidetrayPanel(), "ShowSidetrayPanel");

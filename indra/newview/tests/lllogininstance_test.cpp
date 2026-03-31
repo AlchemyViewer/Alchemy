@@ -123,7 +123,7 @@ void LLCredential::authenticatorType(std::string &idType)
 LLNotificationPtr LLNotificationsUtil::add(const std::string& name,
                                            const LLSD& substitutions,
                                            const LLSD& payload,
-                                           boost::function<void (const LLSD&, const LLSD&)> functor)
+                                           std::function<void (const LLSD&, const LLSD&)> functor)
 {
     return LLNotificationPtr((LLNotification*)NULL);
 }
@@ -209,7 +209,7 @@ LLControlVariable* LLControlGroup::declareBOOL(const std::string& name, bool ini
 LLControlVariable* LLControlGroup::declareString(const std::string& name, const std::string &initial_val, const std::string& comment, LLControlVariable::ePersist persist) { return NULL; }
 
 #include "lluicolortable.h"
-void LLUIColorTable::saveUserSettings(void)const {}
+void LLUIColorTable::saveUserSettings(bool scrub)const {}
 
 //-----------------------------------------------------------------------------
 #include "../llversioninfo.h"
@@ -223,8 +223,6 @@ bool llHashedUniqueID(unsigned char* id)
 //-----------------------------------------------------------------------------
 #include "../llappviewer.h"
 void LLAppViewer::forceQuit(void) {}
-bool LLAppViewer::isUpdaterMissing() { return true; }
-bool LLAppViewer::waitForUpdater() { return false; }
 LLAppViewer * LLAppViewer::sInstance = 0;
 
 //-----------------------------------------------------------------------------
@@ -253,7 +251,7 @@ void LLProgressView::setMessage(std::string const &){}
 // LLNotifications
 class MockNotifications : public LLNotificationsInterface
 {
-    boost::function<void (const LLSD&, const LLSD&)> mResponder;
+    std::function<void (const LLSD&, const LLSD&)> mResponder;
     int mAddedCount;
 
 public:

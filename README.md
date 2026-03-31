@@ -11,11 +11,33 @@ Most people use a pre-built release of Alchemy Viewer. Windows macOS, and Linux 
 
 ## Build Instructions
 
-[Windows](https://alchemyviewer.org/docs/build/Windows)
+Alchemy Viewer uses CMake for build system generation and vcpkg for dependency management. 
 
-Mac (todo)
+### Platform-specific setup guides
 
-[Linux](https://alchemyviewer.org/docs/build/Linux)
+[Windows](doc/BUILD.WINDOWS.md)
+
+[Mac](doc/BUILD.MAC.md)
+
+[Linux](doc/BUILD.LINUX.md)
+
+### Configuration Types
+| CMake                      | Description                                                                         |
+|:---------------------------|:------------------------------------------------------------------------------------|
+| Debug                      | A debug build linked against debug libraries                                        |
+| OptDebug                   | A debug build linked with release libraries                                         |
+| RelWithDebInfo             | A release optimized build with asserts linked with release libraries                |
+| Release                    | A release optimized build linked with release libraries                             |
+
+### Build Options
+
+| CMake                      | Description                                                                         | Default |
+|:---------------------------|:------------------------------------------------------------------------------------|---------|
+| BUILD_VIEWER               | Build viewer binaries                                                               | ON      |
+| BUILD_APPEARANCE_UTIL      | Build appearance utility                                                            | OFF     |
+| BUILD_TESTING              | Build test binries.                                                                 | OFF     |
+| PACKAGE                    | Build installer packages when viewer build enabled                                  | ON      |
+| USE_OPENAL                 | Build with support for the OpenAL audio engine                                      | ON      |
 
 ## Contribute
 

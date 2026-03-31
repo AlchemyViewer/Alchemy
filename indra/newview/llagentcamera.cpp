@@ -29,6 +29,7 @@
 
 #include "pipeline.h"
 
+#include "aoengine.h"
 #include "llagent.h"
 #include "llanimationstates.h"
 #include "llfloatercamera.h"
@@ -317,8 +318,7 @@ void LLAgentCamera::resetView(bool reset_camera, bool change_camera)
         gMenuHolder->hideMenus();
     }
 
-    static LLCachedControl<bool> freeze_time(gSavedSettings, "FreezeTime", false);
-    if (change_camera && !freeze_time)
+    if (change_camera && !gSavedSettings.getBOOL("FreezeTime"))
     {
         changeCameraToDefault();
 
@@ -347,7 +347,7 @@ void LLAgentCamera::resetView(bool reset_camera, bool change_camera)
     }
 
 
-    if (reset_camera && !freeze_time)
+    if (reset_camera && !gSavedSettings.getBOOL("FreezeTime"))
     {
         if (!gViewerWindow->getLeftMouseDown() && cameraThirdPerson())
         {
@@ -1007,6 +1007,10 @@ void LLAgentCamera::cameraZoomIn(const F32 fraction)
             new_distance = llclamp(new_distance, APPEARANCE_MIN_ZOOM, APPEARANCE_MAX_ZOOM);
         }
     }
+    else
+    {
+        new_distance = llmin(new_distance, getCameraMaxZoomDistance());
+    }
 
 // [RLVa:KB] - Checked: 2.0.0
     if ( (RlvActions::isRlvEnabled()) && (!allowFocusOffsetChange(new_distance * camera_offset_unit)) )
@@ -1030,8 +1034,7 @@ void LLAgentCamera::cameraOrbitIn(const F32 meters)
 
         mCameraZoomFraction = (mTargetCameraDistance - meters) / camera_offset_dist;
 
-        static LLCachedControl<bool> freeze_time(gSavedSettings, "FreezeTime", false);
-        if (!freeze_time && mCameraZoomFraction < MIN_ZOOM_FRACTION && meters > 0.f)
+        if (!gSavedSettings.getBOOL("FreezeTime") && mCameraZoomFraction < MIN_ZOOM_FRACTION && meters > 0.f)
         {
             // No need to animate, camera is already there.
             changeCameraToMouselook(false);
@@ -1076,6 +1079,11 @@ void LLAgentCamera::cameraOrbitIn(const F32 meters)
                 new_distance = llclamp(new_distance, APPEARANCE_MIN_ZOOM, APPEARANCE_MAX_ZOOM);
             }
         }
+        else
+        {
+            new_distance = llmin(new_distance, getCameraMaxZoomDistance());
+        }
+
 // [RLVa:KB] - Checked: 2.0.0
         if ( (RlvActions::isRlvEnabled()) && (!allowFocusOffsetChange(new_distance * camera_offset_unit)) )
             return;
@@ -1598,7 +1606,10 @@ void LLAgentCamera::updateCamera()
                 }
             }
 
-            LLViewerCamera::instance().updateCameraLocation(head_pos, mCameraUpVector, gAgentAvatarp->mHeadp->getWorldPosition() + LLVector3(1.0, 0.0, 0.0) * agent_rot);
+            LLViewerCamera::getInstance()->updateCameraLocation(head_pos,
+                                                               mCameraUpVector,
+                                                               gAgentAvatarp->mHeadp->getWorldPosition() +
+                                                                   LLVector3(1.0, 0.0, 0.0) * agent_rot);
         }
         else
         {
@@ -2303,7 +2314,7 @@ void LLAgentCamera::handleScrollWheel(S32 clicks)
         }
         else if (mFocusOnAvatar && (mCameraMode == CAMERA_MODE_THIRD_PERSON))
         {
-            MASK mask = gKeyboard->currentMask(TRUE);
+            MASK mask = gKeyboard->currentMask(true);
             if (mask & MASK_SHIFT)
             {
                 LLVector3d offset = gSavedSettings.getVector3d("FocusOffsetRearView");
@@ -2385,7 +2396,6 @@ void LLAgentCamera::changeCameraToMouselook(bool animate)
 // [RLVa:KB] - Checked: RLVa-2.0.0
         || ( (RlvActions::isRlvEnabled()) && (!RlvActions::canChangeToMouselook()) )
 // [/RLVa:KB]
-
         || LLViewerJoystick::getInstance()->getOverrideCamera())
     {
         return;
@@ -2420,6 +2430,7 @@ void LLAgentCamera::changeCameraToMouselook(bool animate)
 
         updateLastCamera();
         mCameraMode = CAMERA_MODE_MOUSELOOK;
+        AOEngine::getInstance()->inMouselook(true);
         gAgent.setControlFlags(AGENT_CONTROL_MOUSELOOK);
 
         if (animate)
@@ -2481,6 +2492,7 @@ void LLAgentCamera::changeCameraToFollow(bool animate)
 
         updateLastCamera();
         mCameraMode = CAMERA_MODE_FOLLOW;
+        AOEngine::getInstance()->inMouselook(false);
 
         // bang-in the current focus, position, and up vector of the follow cam
         const LLViewerCamera& camera = LLViewerCamera::instance();
@@ -2562,6 +2574,7 @@ void LLAgentCamera::changeCameraToThirdPerson(bool animate)
         }
         updateLastCamera();
         mCameraMode = CAMERA_MODE_THIRD_PERSON;
+        AOEngine::getInstance()->inMouselook(false);
         gAgent.clearControlFlags(AGENT_CONTROL_MOUSELOOK);
     }
 
@@ -2909,7 +2922,7 @@ void LLAgentCamera::setCameraPosAndFocusGlobal(const LLVector3d& camera_pos, con
 
     if (mCameraAnimating)
     {
-        const F64 ANIM_METERS_PER_SECOND = 10.0;
+        const F64 ANIM_METERS_PER_SECOND = 25.0;
         const F64 MIN_ANIM_SECONDS = 0.5;
         const F64 MAX_ANIM_SECONDS = 1.0;
         F64 anim_duration = llmax( MIN_ANIM_SECONDS, sqrt(focus_delta_squared) / ANIM_METERS_PER_SECOND );
@@ -3218,29 +3231,29 @@ S32 LLAgentCamera::directionToKey(S32 direction)
 
 void LLAgentCamera::storeCameraPosition()
 {
-    gSavedPerAccountSettings.setVector3d("AlchemyStoredCameraPos", getCameraPositionGlobal());
+    gSavedPerAccountSettings.setVector3d("ALStoredCameraPos", getCameraPositionGlobal());
 
     // get a vector pointing forward from the camera view manually, getFocusTargetGlobal() will
     // not return useful values if the camera is in flycam mode or was just switched out of
     // flycam  mode and not repositioned after
     LLVector3d forward = LLVector3d(1.0, 0.0, 0.0) * LLViewerCamera::getInstance()->getQuaternion() + getCameraPositionGlobal();
-    gSavedPerAccountSettings.setVector3d("AlchemyStoredCameraFocus", forward);
-    gSavedPerAccountSettings.setF32("AlchemyStoredCameraRoll", mRollAngle);
+    gSavedPerAccountSettings.setVector3d("ALStoredCameraFocus", forward);
+    gSavedPerAccountSettings.setF32("ALStoredCameraRoll", mRollAngle);
 
     LLUUID stored_camera_focus_object_id = LLUUID::null;
     if (mFocusObject)
     {
         stored_camera_focus_object_id = mFocusObject->getID();
     }
-    gSavedPerAccountSettings.setString("AlchemyStoredCameraFocusObjectId", stored_camera_focus_object_id.asString());
+    gSavedPerAccountSettings.setString("ALStoredCameraFocusObjectId", stored_camera_focus_object_id.asString());
 }
 
 void LLAgentCamera::loadCameraPosition()
 {
-    LLVector3d stored_camera_pos = gSavedPerAccountSettings.getVector3d("AlchemyStoredCameraPos");
-    LLVector3d stored_camera_focus = gSavedPerAccountSettings.getVector3d("AlchemyStoredCameraFocus");
-    F32 stored_camera_roll = gSavedPerAccountSettings.getF32("AlchemyStoredCameraRoll");
-    LLUUID stored_camera_focus_object_id = LLUUID(gSavedPerAccountSettings.getString("AlchemyStoredCameraFocusObjectId"));
+    LLVector3d stored_camera_pos = gSavedPerAccountSettings.getVector3d("ALStoredCameraPos");
+    LLVector3d stored_camera_focus = gSavedPerAccountSettings.getVector3d("ALStoredCameraFocus");
+    F32 stored_camera_roll = gSavedPerAccountSettings.getF32("ALStoredCameraRoll");
+    LLUUID stored_camera_focus_object_id = LLUUID(gSavedPerAccountSettings.getString("ALStoredCameraFocusObjectId"));
 
     F32 renderFarClip = gSavedSettings.getF32("RenderFarClip");
     F32 far_clip_squared = renderFarClip * renderFarClip;

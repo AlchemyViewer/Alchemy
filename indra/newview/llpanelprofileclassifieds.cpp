@@ -32,7 +32,6 @@
 #include "llavataractions.h"
 #include "llavatarpropertiesprocessor.h"
 #include "llclassifiedflags.h"
-#include "llclassifiedinfo.h"
 #include "llcombobox.h"
 #include "llcommandhandler.h" // for classified HTML detail page click tracking
 #include "llcorehttputil.h"
@@ -40,6 +39,7 @@
 #include "llfloaterclassified.h"
 #include "llfloaterreg.h"
 #include "llfloaterpublishclassified.h"
+#include "llfloatersidepanelcontainer.h"
 #include "llfloaterworldmap.h"
 #include "lliconctrl.h"
 #include "lllineeditor.h"
@@ -47,6 +47,7 @@
 #include "llnotificationsutil.h"
 #include "llpanelavatar.h"
 #include "llparcel.h"
+#include "llregistry.h"
 #include "llscrollcontainer.h"
 #include "llstartup.h"
 #include "llstatusbar.h"
@@ -57,8 +58,9 @@
 #include "llviewergenericmessage.h" // send_generic_message
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
-#include "rlvactions.h"
-#include "rlvhandler.h"
+#include "llviewertexture.h"
+#include "llviewertexture.h"
+
 
 //*TODO: verify this limit
 const S32 MAX_AVATAR_CLASSIFIEDS = 100;
@@ -228,10 +230,6 @@ LLPanelProfileClassifieds::LLPanelProfileClassifieds()
 
 LLPanelProfileClassifieds::~LLPanelProfileClassifieds()
 {
-    if (mRlvBehaviorConn.connected())
-    {
-        mRlvBehaviorConn.disconnect();
-    }
 }
 
 void LLPanelProfileClassifieds::onOpen(const LLSD& key)
@@ -247,14 +245,6 @@ void LLPanelProfileClassifieds::onOpen(const LLSD& key)
         mNewButton->setEnabled(false);
 
         mDeleteButton->setVisible(true);
-        mDeleteButton->setEnabled(false);
-    }
-    else
-    {
-        mNewButton->setVisible(false);
-        mNewButton->setEnabled(false);
-
-        mDeleteButton->setVisible(false);
         mDeleteButton->setEnabled(false);
     }
 
@@ -319,8 +309,6 @@ bool LLPanelProfileClassifieds::postBuild()
 
     mNewButton->setCommitCallback(boost::bind(&LLPanelProfileClassifieds::onClickNewBtn, this));
     mDeleteButton->setCommitCallback(boost::bind(&LLPanelProfileClassifieds::onClickDelete, this));
-
-    mRlvBehaviorConn = gRlvHandler.setBehaviourToggleCallback([this](ERlvBehaviour eBhvr, ERlvParamType eParam) { if (eBhvr == RLV_BHVR_SHOWLOC) updateButtons(); });
 
     return true;
 }
@@ -520,7 +508,7 @@ bool LLPanelProfileClassifieds::hasUnsavedChanges()
 
 bool LLPanelProfileClassifieds::canAddNewClassified()
 {
-    return (mTabContainer->getTabCount() < MAX_AVATAR_CLASSIFIEDS) && RlvActions::canShowLocation();
+    return (mTabContainer->getTabCount() < MAX_AVATAR_CLASSIFIEDS);
 }
 
 bool LLPanelProfileClassifieds::canDeleteClassified()
@@ -1522,3 +1510,48 @@ void LLPanelProfileClassified::updateTabLabel(const std::string& title)
         parent->setCurrentTabName(title);
     }
 }
+
+#if 0 // Moved to LLFloaterPublishClassified
+//-----------------------------------------------------------------------------
+// LLPublishClassifiedFloater
+//-----------------------------------------------------------------------------
+
+LLPublishClassifiedFloater::LLPublishClassifiedFloater(const LLSD& key)
+ : LLFloater(key)
+{
+}
+
+LLPublishClassifiedFloater::~LLPublishClassifiedFloater()
+{
+}
+
+bool LLPublishClassifiedFloater::postBuild()
+{
+    LLFloater::postBuild();
+
+    childSetAction("publish_btn", boost::bind(&LLFloater::closeFloater, this, false));
+    childSetAction("cancel_btn", boost::bind(&LLFloater::closeFloater, this, false));
+
+    return true;
+}
+
+void LLPublishClassifiedFloater::setPrice(S32 price)
+{
+    getChild<LLUICtrl>("price_for_listing")->setValue(price);
+}
+
+S32 LLPublishClassifiedFloater::getPrice()
+{
+    return getChild<LLUICtrl>("price_for_listing")->getValue().asInteger();
+}
+
+void LLPublishClassifiedFloater::setPublishClickedCallback(const commit_signal_t::slot_type& cb)
+{
+    getChild<LLButton>("publish_btn")->setClickedCallback(cb);
+}
+
+void LLPublishClassifiedFloater::setCancelClickedCallback(const commit_signal_t::slot_type& cb)
+{
+    getChild<LLButton>("cancel_btn")->setClickedCallback(cb);
+}
+#endif

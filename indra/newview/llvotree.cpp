@@ -134,6 +134,7 @@ void LLVOTree::initClass()
             F32 F32_val;
             LLUUID id;
             S32 S32_val;
+            std::string name;
 
             bool success{ true };
             S32 species;
@@ -234,15 +235,15 @@ void LLVOTree::initClass()
             success &= tree_def->getFastAttributeF32(repeat_z_string, F32_val);
             newTree->mRepeatTrunkZ = F32_val;
 
+            static LLStdStringHandle name_string = LLXmlTree::addAttributeString("name");
+            tree_def->getFastAttributeString(name_string, name);
+            newTree->mName = name;
             sSpeciesTable[species] = newTree;
 
             if (species >= sMaxTreeSpecies) sMaxTreeSpecies = species + 1;
 
             if (!success)
             {
-                std::string name;
-                static LLStdStringHandle name_string = LLXmlTree::addAttributeString("name");
-                tree_def->getFastAttributeString(name_string, name);
                 LL_WARNS() << "Incomplete definition of tree " << name << LL_ENDL;
             }
         }
@@ -306,35 +307,34 @@ U32 LLVOTree::processUpdateMessage(LLMessageSystem *mesgsys,
         mSpecies = ((U8 *)mData)[0];
     }
 
-    if (!sSpeciesTable.count(mSpecies))
+    if (!sSpeciesTable.empty() && !sSpeciesTable.count(mSpecies))
     {
-        if (sSpeciesTable.size())
-        {
-            SpeciesMap::const_iterator it = sSpeciesTable.begin();
-            mSpecies = (*it).first;
-        }
+        SpeciesMap::const_iterator it = sSpeciesTable.begin();
+        mSpecies = (*it).first;
     }
 
     //
     //  Load Species-Specific data
     //
+    const auto& species_data = sSpeciesTable[mSpecies];
+
     static const S32 MAX_TREE_TEXTURE_VIRTURE_SIZE_RESET_INTERVAL = 32 ; //frames.
-    mTreeImagep = LLViewerTextureManager::getFetchedTexture(sSpeciesTable[mSpecies]->mTextureID, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+    mTreeImagep = LLViewerTextureManager::getFetchedTexture(species_data->mTextureID, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
     mTreeImagep->setMaxVirtualSizeResetInterval(MAX_TREE_TEXTURE_VIRTURE_SIZE_RESET_INTERVAL); //allow to wait for at most 16 frames to reset virtual size.
 
-    mBranchLength = sSpeciesTable[mSpecies]->mBranchLength;
-    mTrunkLength = sSpeciesTable[mSpecies]->mTrunkLength;
-    mLeafScale = sSpeciesTable[mSpecies]->mLeafScale;
-    mDroop = sSpeciesTable[mSpecies]->mDroop;
-    mTwist = sSpeciesTable[mSpecies]->mTwist;
-    mBranches = sSpeciesTable[mSpecies]->mBranches;
-    mDepth = sSpeciesTable[mSpecies]->mDepth;
-    mScaleStep = sSpeciesTable[mSpecies]->mScaleStep;
-    mTrunkDepth = sSpeciesTable[mSpecies]->mTrunkDepth;
-    mBillboardScale = sSpeciesTable[mSpecies]->mBillboardScale;
-    mBillboardRatio = sSpeciesTable[mSpecies]->mBillboardRatio;
-    mTrunkAspect = sSpeciesTable[mSpecies]->mTrunkAspect;
-    mBranchAspect = sSpeciesTable[mSpecies]->mBranchAspect;
+    mBranchLength = species_data->mBranchLength;
+    mTrunkLength = species_data->mTrunkLength;
+    mLeafScale = species_data->mLeafScale;
+    mDroop = species_data->mDroop;
+    mTwist = species_data->mTwist;
+    mBranches = species_data->mBranches;
+    mDepth = species_data->mDepth;
+    mScaleStep = species_data->mScaleStep;
+    mTrunkDepth = species_data->mTrunkDepth;
+    mBillboardScale = species_data->mBillboardScale;
+    mBillboardRatio = species_data->mBillboardRatio;
+    mTrunkAspect = species_data->mTrunkAspect;
+    mBranchAspect = species_data->mBranchAspect;
 
     // position change not caused by us, etc.  make sure to rebuild.
     gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
@@ -723,11 +723,13 @@ bool LLVOTree::updateGeometry(LLDrawable *drawable)
         // Generate the vertices
         // Generate the indices
 
+        const auto& species_data = sSpeciesTable[mSpecies];
+
         for (lod = 0; lod < sMAX_NUM_TREE_LOD_LEVELS; lod++)
         {
             slices = sLODSlices[lod];
             F32 base_radius = 0.65f;
-            F32 top_radius = base_radius * sSpeciesTable[mSpecies]->mTaper;
+            F32 top_radius = base_radius * species_data->mTaper;
             //LL_INFOS() << "Species " << ((U32) mSpecies) << ", taper = " << sSpeciesTable[mSpecies].mTaper << LL_ENDL;
             //LL_INFOS() << "Droop " << mDroop << ", branchlength: " << mBranchLength << LL_ENDL;
             F32 angle = 0;
@@ -741,16 +743,16 @@ bool LLVOTree::updateGeometry(LLDrawable *drawable)
             F32 radius = base_radius;
 
             F32 x1,y1;
-            F32 noise_scale = sSpeciesTable[mSpecies]->mNoiseMag;
+            F32 noise_scale = species_data->mNoiseMag;
             LLVector3 nvec;
 
             const F32 cap_nudge = 0.1f;         // Height to 'peak' the caps on top/bottom of branch
 
             const S32 fractal_depth = 5;
-            F32 nvec_scale = 1.f * sSpeciesTable[mSpecies]->mNoiseScale;
-            F32 nvec_scalez = 4.f * sSpeciesTable[mSpecies]->mNoiseScale;
+            F32 nvec_scale = 1.f * species_data->mNoiseScale;
+            F32 nvec_scalez = 4.f * species_data->mNoiseScale;
 
-            F32 tex_z_repeat = sSpeciesTable[mSpecies]->mRepeatTrunkZ;
+            F32 tex_z_repeat = species_data->mRepeatTrunkZ;
 
             F32 start_radius;
             F32 nangle = 0;

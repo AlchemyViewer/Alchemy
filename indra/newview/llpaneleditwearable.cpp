@@ -440,7 +440,7 @@ template <typename T>
 const LLEditWearableDictionary::PickerControlEntry*
 get_picker_entry (const ETextureIndex index) { return NULL; }
 
-typedef boost::function<void(LLPanel* panel, const LLEditWearableDictionary::PickerControlEntry*)> function_t;
+typedef std::function<void(LLPanel* panel, const LLEditWearableDictionary::PickerControlEntry*)> function_t;
 
 typedef struct PickerControlEntryNamePredicate
 {
@@ -1371,7 +1371,7 @@ void LLPanelEditWearable::toggleTypeSpecificControls(LLWearableType::EType type)
 void LLPanelEditWearable::updateTypeSpecificControls(LLWearableType::EType type)
 {
         const F32 ONE_METER = 1.0;
-        const F32 ONE_FOOT = 0.3048 * ONE_METER; // in meters
+        const F32 ONE_FOOT = 0.3048f * ONE_METER; // in meters
         // Update controls specific to shape editing panel.
         if (type == LLWearableType::WT_SHAPE)
         {
@@ -1529,6 +1529,7 @@ void LLPanelEditWearable::getSortedParams(value_map_t &sorted_params, const std:
 
 void LLPanelEditWearable::buildParamList(LLScrollingPanelList *panel_list, value_map_t &sorted_params, LLAccordionCtrlTab *tab, LLJoint* jointp)
 {
+        bool show_hints = gSavedSettings.getBOOL("AlchemyAppearanceShowHints");
         // sorted_params is sorted according to magnitude of effect from
         // least to greatest.  Adding to the front of the child list
         // reverses that order.
@@ -1542,7 +1543,7 @@ void LLPanelEditWearable::buildParamList(LLScrollingPanelList *panel_list, value
                         p.name("LLScrollingPanelParam");
                         LLViewerWearable *wearable = this->getWearable();
                         LLScrollingPanelParamBase *panel_param = NULL;
-                        if (wearable && wearable->getType() == LLWearableType::WT_PHYSICS) // Hack to show a different panel for physics.  Should generalize this later.
+                        if (!show_hints || (wearable && wearable->getType() == LLWearableType::WT_PHYSICS)) // Hack to show a different panel for physics.  Should generalize this later.
                         {
                                 panel_param = new LLScrollingPanelParamBase( p, NULL, (*it).second, true, this->getWearable(), jointp);
                         }

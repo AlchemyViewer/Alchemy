@@ -197,8 +197,11 @@ public:
 
     void onBtnSet();
     void setObjBonusFactor(F32 object_bonus_factor) {mObjBonusFactor = object_bonus_factor;}
+    void setCombatEnabled(bool enabled) { mSupportsCombat2 = enabled; }
 
-protected:
+  protected:
+    void initCombatCtrl(const std::string &name);
+
     bool sendUpdate() override;
     void onClickKick();
     void onKickCommit(const uuid_vec_t& ids);
@@ -207,9 +210,10 @@ protected:
     static void onClickMessage(void* userdata);
     bool onMessageCommit(const LLSD& notification, const LLSD& response);
     bool onChangeObjectBonus(const LLSD& notification, const LLSD& response);
+    void onChangeCombatEnabled();
 
     F32 mObjBonusFactor;
-
+    bool mSupportsCombat2 {false};
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -268,12 +272,11 @@ public:
     void updateForMaterialType();
 
     static void onClickDownloadRaw(void*);
-    static void onClickDownloadRawCallback(const std::vector<std::string>& filenames, void* data);
     static void onClickUploadRaw(void*);
-    static void onClickUploadRawCallback(void* data, const std::vector<std::string>& filenames);
     static void onClickBakeTerrain(void*);
     bool callbackBakeTerrain(const LLSD& notification, const LLSD& response);
     bool callbackTextureHeights(const LLSD& notification, const LLSD& response);
+    void callbackMaterialCommit(S32 index);
 
 protected:
     bool sendUpdate() override;
@@ -508,8 +511,8 @@ private:
     // used for both add and remove operations
     static bool accessCoreConfirm(const LLSD& notification, const LLSD& response);
 
-    // Send the actual EstateOwnerRequest "estateaccessdelta" message
 public:
+    // Send the actual EstateOwnerRequest "estateaccessdelta" message
     static void sendEstateAccessDelta(U32 flags, const LLUUID& agent_id);
 
 private:
@@ -518,8 +521,8 @@ private:
     void searchAgent(LLNameListCtrl* listCtrl, const std::string& search_string);
     void copyListToClipboard(std::string list_name);
 
-    bool mPendingUpdate;
-    bool mCtrlsEnabled;
+    bool mPendingUpdate = false;
+    bool mCtrlsEnabled = false;
 };
 
 #endif

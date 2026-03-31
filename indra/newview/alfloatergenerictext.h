@@ -1,5 +1,5 @@
 /**
- * @file llfloatergenerictext.h
+ * @file alfloatergenerictext.h
  * @brief A generic text floater for dumping info (usually debug info)
  *
  * Copyright (c) 2015, Cinder Roxley <cinder@sdf.org>
@@ -28,18 +28,18 @@
  *
  */
 
-#ifndef LL_FLOATERGENERICTEXT_H
-#define LL_FLOATERGENERICTEXT_H
+#ifndef AL_FLOATERGENERICTEXT_H
+#define AL_FLOATERGENERICTEXT_H
 
 #include "llfloater.h"
 
-class LLFloaterGenericText final : public LLFloater
+class ALFloaterGenericText final : public LLFloater
 {
 public:
-    LLFloaterGenericText(const LLSD& key);
+    ALFloaterGenericText(const LLSD& key);
     bool postBuild() override;
 private:
-    ~LLFloaterGenericText() = default;
+    ~ALFloaterGenericText() = default;
     void onClickClose();
     void onClickCopy();
 
@@ -48,4 +48,4 @@ private:
 
 };
 
-#endif // LL_FLOATERGENERICTEXT_H
+#endif // AL_FLOATERGENERICTEXT_H

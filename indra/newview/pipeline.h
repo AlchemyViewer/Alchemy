@@ -111,6 +111,7 @@ public:
 
     void createGLBuffers();
     void createLUTBuffers();
+    void setupGradingLUT();
 
     //allocate the largest screen buffer possible up to resX, resY
     //returns true if full size buffer allocated, false if some other size is allocated
@@ -969,6 +970,10 @@ protected:
 
     // Note: no need to keep an quick-lookup to avatar pools, since there's only one per avatar
 
+    // Color grading lookup texture and size
+    U32       mCGLut{};
+    LLVector4 mCGLutSize{};
+
 public:
     std::vector<LLFace*>        mHighlightFaces;    // highlight faces on physical objects
 protected:
@@ -1053,7 +1058,6 @@ public:
     static F32 RenderGlowStrength;
     static bool RenderGlowNoise;
     static bool RenderDepthOfField;
-    static bool RenderDepthOfFieldInEditMode;
     static F32 CameraFocusTransitionTime;
     static F32 CameraFNumber;
     static F32 CameraFocalLength;
@@ -1096,6 +1100,7 @@ public:
     static bool RenderMirrors;
     static S32 RenderHeroProbeUpdateRate;
     static S32 RenderHeroProbeConservativeUpdateMultiplier;
+    static bool RenderAvatarCloth;
 };
 
 void render_bbox(const LLVector3 &min, const LLVector3 &max);

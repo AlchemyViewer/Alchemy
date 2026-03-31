@@ -3,7 +3,7 @@
 * @brief ALChatCommand implementation for chat input commands
 *
 * $LicenseInfo:firstyear=2013&license=viewerlgpl$
-* Copyright (C) 2013 Drake Arconis
+* Copyright (C) Rye Mutt <rye@alchemyviewer.org>
 *
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public
@@ -29,7 +29,7 @@
 #include "object_flags.h"
 
 // viewer includes
-//#include "aoengine.h"
+#include "aoengine.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llagentui.h"
@@ -288,44 +288,44 @@ bool ALChatCommand::parseCommand(std::string data)
             }
             return true;
         }
-        //else if (cmd == utf8str_tolower(sAOCommand()))
-        //{
-        //    std::string subcmd;
-        //    if (input >> subcmd)
-        //    {
-        //        if (subcmd == "on")
-        //        {
-        //            gSavedPerAccountSettings.setBOOL("AlchemyAOEnable", true);
-        //            return true;
-        //        }
-        //        else if (subcmd == "off")
-        //        {
-        //            gSavedPerAccountSettings.setBOOL("AlchemyAOEnable", false);
-        //            return true;
-        //        }
-        //        else if (subcmd == "sit")
-        //        {
-        //            auto ao_set = AOEngine::instance().getSetByName(AOEngine::instance().getCurrentSetName());
-        //            if (input >> subcmd)
-        //            {
-        //                if (subcmd == "on")
-        //                {
-        //                    AOEngine::instance().setOverrideSits(ao_set, true);
+        else if (cmd == utf8str_tolower(sAOCommand()))
+        {
+            std::string subcmd;
+            if (input >> subcmd)
+            {
+                if (subcmd == "on")
+                {
+                    gSavedPerAccountSettings.setBOOL("AlchemyAOEnable", true);
+                    return true;
+                }
+                else if (subcmd == "off")
+                {
+                    gSavedPerAccountSettings.setBOOL("AlchemyAOEnable", false);
+                    return true;
+                }
+                else if (subcmd == "sit")
+                {
+                    auto ao_set = AOEngine::instance().getSetByName(AOEngine::instance().getCurrentSetName());
+                    if (input >> subcmd)
+                    {
+                        if (subcmd == "on")
+                        {
+                            AOEngine::instance().setOverrideSits(ao_set, true);
 
-        //                }
-        //                else if (subcmd == "off")
-        //                {
-        //                    AOEngine::instance().setOverrideSits(ao_set, false);
-        //                }
-        //            }
-        //            else
-        //            {
-        //                AOEngine::instance().setOverrideSits(ao_set, !ao_set->getSitOverride());
-        //            }
-        //            return true;
-        //        }
-        //    }
-        //}
+                        }
+                        else if (subcmd == "off")
+                        {
+                            AOEngine::instance().setOverrideSits(ao_set, false);
+                        }
+                    }
+                    else
+                    {
+                        AOEngine::instance().setOverrideSits(ao_set, !ao_set->getSitOverride());
+                    }
+                    return true;
+                }
+            }
+        }
         else if (cmd == "/sendmenu")
         {
             S32 channel;

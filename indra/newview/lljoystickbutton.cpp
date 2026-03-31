@@ -496,7 +496,7 @@ bool LLJoystickCameraRotate::handleMouseDown(S32 x, S32 y, MASK mask)
     bool res = LLJoystick::handleMouseDown(x, y, mask);
     if (res)
     {
-        gAgent.setMovementLocked(TRUE);
+        gAgent.setMovementLocked(true);
     }
     return res;
 }

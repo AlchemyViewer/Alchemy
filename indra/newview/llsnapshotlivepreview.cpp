@@ -41,6 +41,7 @@
 #include "llimagej2c.h"
 #include "llimagejpeg.h"
 #include "llimagepng.h"
+#include "llimagewebp.h"
 #include "lllandmarkactions.h"
 #include "lllocalcliprect.h"
 #include "llresmgr.h"
@@ -54,7 +55,6 @@
 #include "llviewertexturelist.h"
 #include "llwindow.h"
 #include "llworld.h"
-#include <boost/filesystem.hpp>
 
 constexpr F32 AUTO_SNAPSHOT_TIME_DELAY = 1.f;
 
@@ -945,6 +945,9 @@ void LLSnapshotLivePreview::estimateDataSize()
             case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
                 ratio = 1.0;    // No compression with BMP
                 break;
+            case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
+                ratio = 4.0;    // Average observed WebP compression ratio
+                break;
         }
     }
     mDataSize = (S32)((F32)mPreviewImage->getDataSize() / ratio);
@@ -983,6 +986,9 @@ LLPointer<LLImageFormatted> LLSnapshotLivePreview::getFormattedImage()
                 break;
             case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
                 mFormattedImage = new LLImageBMP();
+                break;
+            case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
+                mFormattedImage = new LLImageWebP();
                 break;
         }
         if (mFormattedImage->encode(mPreviewImage, 0))
@@ -1064,11 +1070,11 @@ void LLSnapshotLivePreview::saveTexture(bool outfit_snapshot, std::string name)
         LLFolderType::EType folder_type = outfit_snapshot ? LLFolderType::FT_NONE : LLFolderType::FT_SNAPSHOT_CATEGORY;
         LLInventoryType::EType inv_type = outfit_snapshot ? LLInventoryType::IT_NONE : LLInventoryType::IT_SNAPSHOT;
 
-        LLResourceUploadInfo::ptr_t assetUploadInfo(new LLResourceUploadInfo(
+        LLResourceUploadInfo::ptr_t assetUploadInfo = std::make_shared<LLResourceUploadInfo>(
             tid, LLAssetType::AT_TEXTURE, res_name, res_desc, 0,
             folder_type, inv_type,
             PERM_ALL, LLFloaterPerms::getGroupPerms("Uploads"), LLFloaterPerms::getEveryonePerms("Uploads"),
-            expected_upload_cost, LLUUID::null, !outfit_snapshot));
+            expected_upload_cost, LLUUID::null, !outfit_snapshot);
 
         upload_new_resource(assetUploadInfo);
 

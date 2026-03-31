@@ -1,4 +1,4 @@
-version 33
+version 58
 // The version number above should be incremented IF AND ONLY IF some
 // change has been made that is sufficiently important to justify
 // resetting the graphics preferences of all users to the recommended
@@ -56,7 +56,6 @@ RenderVolumeLODFactor		1	2.0
 UseStartScreen				1	1
 UseOcclusion				1	1
 WindLightUseAtmosShaders	1	1
-WLSkyDetail					1	128
 Disregard128DefaultDrawDistance	1	1
 Disregard96DefaultDrawDistance	1	1
 RenderCompressTextures		1	1
@@ -87,6 +86,8 @@ RenderTonemapMix			1   1
 RenderDisableVintageMode           1   1
 RenderMaxTextureResolution         1   2048
 RenderReflectionProbeCount  1   256
+RenderHighPrecisionPostProcess 1 1
+RenderReflectionProbeIrradianceResolution 1 16
 
 //
 // Low Graphics Settings
@@ -113,7 +114,6 @@ RenderTreeLODFactor			1	0
 RenderVolumeLODFactor		1	1.125
 RenderDeferredSSAO			1	0
 RenderShadowDetail			1	0
-WLSkyDetail					1	96
 RenderFSAAType  			1	0
 RenderFSAASamples			1	0
 RenderScreenSpaceReflections 1  0
@@ -130,6 +130,7 @@ RenderTonemapMix			1   0.7
 RenderDisableVintageMode           1   0
 RenderMaxTextureResolution         1   512
 RenderReflectionProbeCount  1   1
+RenderHighPrecisionPostProcess 1 0
 
 //
 // Medium Low Graphics Settings
@@ -156,7 +157,6 @@ RenderTreeLODFactor			1	0.5
 RenderVolumeLODFactor		1	1.125
 RenderDeferredSSAO			1	0
 RenderShadowDetail			1	0
-WLSkyDetail					1	96
 RenderFSAAType  			1	0
 RenderFSAASamples			1	0
 RenderScreenSpaceReflections 1  0
@@ -173,6 +173,7 @@ RenderTonemapMix			1   0.7
 RenderDisableVintageMode           1   0
 RenderMaxTextureResolution         1   1024
 RenderReflectionProbeCount  1   32
+RenderHighPrecisionPostProcess 1 0
 
 //
 // Medium Graphics Settings (standard)
@@ -197,7 +198,6 @@ RenderTreeLODFactor			1	0.5
 RenderVolumeLODFactor		1	1.25
 RenderDeferredSSAO			1	0
 RenderShadowDetail			1	0
-WLSkyDetail					1	96
 RenderFSAAType  			1	1
 RenderFSAASamples			1	1
 RenderReflectionsEnabled    1   1
@@ -215,6 +215,7 @@ RenderTonemapType			1   1
 RenderTonemapMix			1   0.7
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   64
+RenderHighPrecisionPostProcess 1 0
 
 //
 // Medium High Graphics Settings
@@ -239,7 +240,6 @@ RenderTreeLODFactor			1	0.5
 RenderVolumeLODFactor		1	1.375
 RenderDeferredSSAO			1	0
 RenderShadowDetail			1	0
-WLSkyDetail					1	96
 RenderFSAAType  			1	1
 RenderFSAASamples			1	1
 RenderReflectionsEnabled    1   1
@@ -257,6 +257,7 @@ RenderTonemapType			1   1
 RenderTonemapMix			1   0.7
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   64
+RenderHighPrecisionPostProcess 1 0
 
 //
 // High Graphics Settings (SSAO + sun shadows)
@@ -281,7 +282,6 @@ RenderTreeLODFactor			1	0.5
 RenderVolumeLODFactor		1	1.5
 RenderDeferredSSAO			1	1
 RenderShadowDetail			1	1
-WLSkyDetail					1	96
 RenderFSAAType  			1	2
 RenderFSAASamples			1	2
 RenderReflectionsEnabled    1   1
@@ -299,6 +299,7 @@ RenderTonemapType			1   1
 RenderTonemapMix			1   0.7
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   128
+RenderHighPrecisionPostProcess 1 0
 
 //
 // High Ultra Graphics Settings (SSAO + all shadows)
@@ -323,7 +324,6 @@ RenderTreeLODFactor			1	0.5
 RenderVolumeLODFactor		1	1.75
 RenderDeferredSSAO			1	1
 RenderShadowDetail			1	2
-WLSkyDetail					1	96
 RenderFSAAType  			1	2
 RenderFSAASamples			1	2
 RenderReflectionsEnabled    1   1
@@ -341,6 +341,7 @@ RenderTonemapType			1   1
 RenderTonemapMix			1   0.7
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   256
+RenderHighPrecisionPostProcess 1 1
 
 //
 // Ultra graphics (REALLY PURTY!)
@@ -363,7 +364,6 @@ RenderTransparentWater		1	1
 RenderTreeLODFactor			1	1.0
 RenderVolumeLODFactor		1	2.0
 WindLightUseAtmosShaders	1	1
-WLSkyDetail					1	128
 RenderDeferredSSAO			1	1
 RenderShadowDetail			1	2
 RenderFSAAType  			1	2
@@ -383,6 +383,7 @@ RenderTonemapType			1   1
 RenderTonemapMix			1   0.7
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   256
+RenderHighPrecisionPostProcess 1 1
 
 //
 // Class Unknown Hardware (unknown)

@@ -145,7 +145,7 @@ void LLDrawPoolTerrain::renderDeferred(S32 pass)
     renderFullShader();
 
     // Special-case for land ownership feedback
-    static LLCachedControl<bool> show_parcel_owners(gSavedSettings, "ShowParcelOwners", false);
+    static const LLCachedControl<bool> show_parcel_owners(gSavedSettings, "ShowParcelOwners");
     if (show_parcel_owners)
     {
         hilightParcelOwners();
@@ -640,40 +640,6 @@ void LLDrawPoolTerrain::hilightParcelOwners()
         sShader->bind();
     }
 
-}
-
-void LLDrawPoolTerrain::renderSimple()
-{
-    LLVector4 tp0, tp1;
-
-    //----------------------------------------------------------------------------
-    // Pass 1/1
-
-    // Stage 0: Base terrain texture pass
-    mTexturep->addTextureStats(1024.f*1024.f);
-
-    gGL.getTexUnit(0)->activate();
-    gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(0)->bind(mTexturep);
-
-    LLVector3 origin_agent = mDrawFace[0]->getDrawable()->getVObj()->getRegion()->getOriginAgent();
-    F32 tscale = 1.f/256.f;
-    tp0.setVec(tscale, 0.f, 0.0f, -1.f*(origin_agent.mV[0]/256.f));
-    tp1.setVec(0.f, tscale, 0.0f, -1.f*(origin_agent.mV[1]/256.f));
-
-    sShader->uniform4fv(LLShaderMgr::OBJECT_PLANE_S, 1, tp0.mV);
-    sShader->uniform4fv(LLShaderMgr::OBJECT_PLANE_T, 1, tp1.mV);
-
-    drawLoop();
-
-    //----------------------------------------------------------------------------
-    // Restore Texture Unit 0 defaults
-
-    gGL.getTexUnit(0)->activate();
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-    gGL.matrixMode(LLRender::MM_TEXTURE);
-    gGL.loadIdentity();
-    gGL.matrixMode(LLRender::MM_MODELVIEW);
 }
 
 //============================================================================

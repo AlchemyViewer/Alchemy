@@ -63,8 +63,8 @@ public:
     class ItemComparator
     {
     public:
-        ItemComparator() {};
-        virtual ~ItemComparator() {};
+        ItemComparator() = default;
+        virtual ~ItemComparator() = default;
 
         /** Returns true if item1 < item2, false otherwise */
         virtual bool compare(const LLPanel* item1, const LLPanel* item2) const = 0;
@@ -77,7 +77,7 @@ public:
     {
     public:
         ItemReverseComparator(const ItemComparator& comparator) : mComparator(comparator) {};
-        virtual ~ItemReverseComparator() {};
+        virtual ~ItemReverseComparator() = default;
 
         virtual bool compare(const LLPanel* item1, const LLPanel* item2) const
         {
@@ -508,8 +508,9 @@ public:
     /**
      * Filters the list, rearranges and notifies parent about shape changes.
      * Derived classes may want to overload rearrangeItems() to exclude repeated separators after filtration.
+     * Returns true in case of changes
      */
-    void filterItems(bool re_sort, bool notify_parent);
+    bool filterItems(bool re_sort, bool notify_parent);
 
     /**
      * Returns true if last call of filterItems() found at least one matching item

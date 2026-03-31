@@ -907,8 +907,7 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 void LLFloaterWorldMap::enableTeleportCoordsDisplay( bool enabled )
 {
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
-    LLUICtrl* pCtrl = getChild<LLUICtrl>("events_label");
-    pCtrl->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+    getChild<LLUICtrl>("events_label")->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
 
     mTeleportCoordSpinX->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
     mTeleportCoordSpinX->setEnabled(enabled);

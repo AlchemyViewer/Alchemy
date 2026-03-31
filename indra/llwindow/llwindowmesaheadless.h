@@ -44,7 +44,7 @@ public:
     bool maximize() override {return false;};
     void minimize() override {};
     void restore() override {};
-    bool getFullscreen() override {return false;};
+    bool getFullscreen() {return false;};
     bool getPosition(LLCoordScreen *position) override {return false;};
     bool getSize(LLCoordScreen *size) override {return false;};
     bool getSize(LLCoordWindow *size) override {return false;};
@@ -53,6 +53,7 @@ public:
     bool switchContext(bool fullscreen, const LLCoordScreen &size, bool disable_vsync, const LLCoordScreen * const posp = NULL) override {return false;};
     bool setCursorPosition(LLCoordWindow position) override {return false;};
     bool getCursorPosition(LLCoordWindow *position) override {return false;};
+    bool isWrapMouse() const override { return true; }
     void showCursor() override {};
     void hideCursor() override {};
     void showCursorFromMouseMove() override {};

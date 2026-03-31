@@ -42,10 +42,15 @@
 #include "llnotificationsutil.h"
 #include "lltextbox.h"
 #include "lltoggleablemenu.h"
+#include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "lllandmarkactions.h"
 #include "llclipboard.h"
 #include "lltrans.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+#include "rlvhandler.h"
+// [/RLVa:KB]
 
 // Maximum number of items that can be added to a list in one pass.
 // Used to limit time spent for items list update per frame.
@@ -215,8 +220,18 @@ std::string LLTeleportHistoryFlatItem::getTimestamp()
     // Only show timestamp for today and yesterday
     if(time_diff < seconds_today + seconds_in_day)
     {
-        timestamp = "[" + LLTrans::getString("TimeHour12")+"]:["
-                        + LLTrans::getString("TimeMin")+"] ["+ LLTrans::getString("TimeAMPM")+"]";
+        static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+        if (use_24h)
+        {
+            timestamp = "[" + LLTrans::getString("TimeHour") + "]:["
+                + LLTrans::getString("TimeMin") + "]";
+        }
+        else
+        {
+            timestamp = "[" + LLTrans::getString("TimeHour12") + "]:["
+                + LLTrans::getString("TimeMin") + "] [" + LLTrans::getString("TimeAMPM") + "]";
+        }
+
         LLSD substitution;
         substitution["datetime"] = (S32) date.secondsSinceEpoch();
         LLStringUtil::format(timestamp, substitution);
@@ -1001,6 +1016,11 @@ LLFlatListView* LLTeleportHistoryPanel::getFlatListViewFromTab(LLAccordionCtrlTa
 
 void LLTeleportHistoryPanel::gotSLURLCallback(const std::string& slurl)
 {
+    if (slurl.empty())
+    {
+        LLNotificationsUtil::add("LandmarkLocationUnknown");
+        return;
+    }
     LLClipboard::instance().copyToClipboard(utf8str_to_wstring(slurl), 0, static_cast<S32>(slurl.size()));
 
     LLSD args;
@@ -1135,6 +1155,17 @@ bool LLTeleportHistoryPanel::isActionEnabled(const LLSD& userdata) const
             return false;
         }
         LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+// [RLVa:KB]
+        if ("teleport" == command_name)
+        {
+            return itemp && RlvActions::canTeleportToLocation();
+        }
+        else if ("show_on_map" == command_name)
+        {
+            return itemp && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWWORLDMAP);
+        }
+// [/RLVa:KB]
+
         return itemp != NULL;
     }
 

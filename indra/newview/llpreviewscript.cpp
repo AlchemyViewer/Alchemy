@@ -68,22 +68,12 @@
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
-#include "llkeyboard.h"
-#include "llscrollcontainer.h"
-#include "llcheckboxctrl.h"
 #include "llscripteditor.h"
-#include "llselectmgr.h"
-#include "lltooldraganddrop.h"
-#include "llscrolllistctrl.h"
 #include "lltextbox.h"
-#include "llslider.h"
-#include "lldir.h"
-#include "llcombobox.h"
 #include "llviewerstats.h"
 #include "llviewerwindow.h"
 #include "lluictrlfactory.h"
 #include "llmediactrl.h"
-#include "lluictrlfactory.h"
 #include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llappviewer.h"
@@ -94,15 +84,17 @@
 #include "lltoggleablemenu.h"
 #include "llmenubutton.h"
 #include "llinventoryfunctions.h"
+#include "llwebsocketmgr.h"
+#include "llscripteditorws.h"
 #include <regex>
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvhandler.h"
 #include "rlvlocks.h"
 // [/RLVa:KB]
-
 const std::string HELP_LSL_PORTAL_TOPIC = "LSL_Portal";
 
 const std::string DEFAULT_SCRIPT_NAME = "New Script"; // *TODO:Translate?
+const std::string DEFAULT_SCRIPT_DESC = "(No Description)"; // *TODO:Translate?
 
 // Description and header information
 const S32 MAX_HISTORY_COUNT = 10;
@@ -117,7 +109,7 @@ static bool have_script_upload_cap(LLUUID& object_id)
 static bool have_lua_enabled(const LLUUID& object_id)
 {
     LLViewerRegion* region = nullptr;
-    LLViewerObject* object = object_id.notNull() ? gObjectList.findObject(object_id) : nullptr;
+    LLViewerObject* object = gObjectList.findObject(object_id);
     if (object)
     {
         region = object->getRegion();
@@ -139,7 +131,7 @@ static bool have_lua_enabled(const LLUUID& object_id)
 
 // TEMPORARY: Quick check to see if the code is Lua
 // since we don't have another way to determine the language yet
-static bool is_lua_script(const std::string& code)
+bool is_lua_script(const std::string& code)
 {
     // Check for LSL's signature "default" state pattern
     std::regex lsl_pattern("\\s*default\\s*\\{");
@@ -178,7 +170,7 @@ bool LLLiveLSLFile::loadFile()
     return mOnChangeCallback(filename());
 }
 
-#if 0
+#if 0 // MOVED TO STANDALONE llfloatersearchreplace
 
 /// ---------------------------------------------------------------------------
 /// LLFloaterScriptSearch
@@ -418,7 +410,7 @@ LLScriptEdCore::LLScriptEdCore(
     LLPanel(),
     mSampleText(sample),
 // [SL:KB] - Patch: Build-ScriptEditor | Checked: 2014-01-29 (Catznip-3.6)
-    mMenuBar(NULL),
+    mMenuBar(nullptr),
 // [/SL:KB]
     mEditor( NULL ),
     mLoadCallback( load_callback ),
@@ -651,9 +643,9 @@ void LLScriptEdCore::initMenu()
     menuItem->setEnableCallback(boost::bind(&LLTextEditor::canDeselect, mEditor));
 
     menuItem = getChild<LLMenuItemCallGL>("Search / Replace...");
-    // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
     menuItem->setClickCallback(boost::bind(&LLFloaterSearchReplace::show, mEditor));
-    // [/SL:KB]
+// [/SL:KB]
 //  menuItem->setClickCallback(boost::bind(&LLFloaterScriptSearch::show, this));
 
     menuItem = getChild<LLMenuItemCallGL>("Go to line...");
@@ -690,44 +682,60 @@ void LLScriptEdCore::makeEditorPristine()
 
 bool LLScriptEdCore::loadScriptText(const std::string& filename)
 {
-    if (filename.empty())
-    {
-        LL_WARNS() << "Empty file name" << LL_ENDL;
-        return false;
-    }
-
-    LLFILE* file = LLFile::fopen(filename, "rb");       /*Flawfinder: ignore*/
-    if (!file)
-    {
-        LL_WARNS() << "Error opening " << filename << LL_ENDL;
-        return false;
-    }
-
-    // read in the whole file
-    fseek(file, 0L, SEEK_END);
-    size_t file_length = (size_t) ftell(file);
-    fseek(file, 0L, SEEK_SET);
-    char* buffer = new char[file_length+1];
-    size_t nread = fread(buffer, 1, file_length, file);
-    if (nread < file_length)
-    {
-        LL_WARNS() << "Short read" << LL_ENDL;
-    }
-    buffer[nread] = '\0';
-    fclose(file);
-
-    std::string text = std::string(buffer);
-    LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
-
-    mEditor->setText(text);
-    delete[] buffer;
-
-    return true;
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+    return mEditor->loadFromFile(filename);
+// [/SL:KB]
+//  if (filename.empty())
+//  {
+//      LL_WARNS() << "Empty file name" << LL_ENDL;
+//      return false;
+//  }
+//
+//  LLFILE* file = LLFile::fopen(filename, "rb");       /*Flawfinder: ignore*/
+//  if (!file)
+//  {
+//      LL_WARNS() << "Error opening " << filename << LL_ENDL;
+//      return false;
+//  }
+//
+//  // read in the whole file
+//  fseek(file, 0L, SEEK_END);
+//  size_t file_length = (size_t) ftell(file);
+//  fseek(file, 0L, SEEK_SET);
+//  char* buffer = new char[file_length+1];
+//  size_t nread = fread(buffer, 1, file_length, file);
+//  if (nread < file_length)
+//  {
+//      LL_WARNS() << "Short read" << LL_ENDL;
+//  }
+//  buffer[nread] = '\0';
+//  fclose(file);
+//
+//    std::string text = std::string(buffer);
+//    LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
+//
+//    mEditor->setText(text);
+//  delete[] buffer;
+//
+//  return true;
 }
 
 bool LLScriptEdCore::writeToFile(const std::string& filename)
 {
-    LLFILE* fp = LLFile::fopen(filename, "wb");
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+//  if (!mEditor->writeToFile(filename))
+//  {
+//      LL_WARNS() << "Unable to write to " << filename << LL_ENDL;
+//
+//      LLSD row;
+//      row["columns"][0]["value"] = "Error writing to local file. Is your hard drive full?";
+//      row["columns"][0]["font"] = "SANSSERIF_SMALL";
+//      mErrorList->addElement(row);
+//      return false;
+//  }
+//  return true;
+// [/SL:KB]
+    LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("wb"));
     if (!fp)
     {
         LL_WARNS() << "Unable to write to " << filename << LL_ENDL;
@@ -785,6 +793,8 @@ void LLScriptEdCore::draw()
         S32 line = 0;
         S32 column = 0;
         mEditor->getCurrentLineAndColumn( &line, &column, false );  // don't include wordwrap
+        line = mEditor->getIsLuauLanguage() ? (line + 1) : line;
+        column = mEditor->getIsLuauLanguage() ? (column + 1) : column;
         LLStringUtil::format_map_t args;
         std::string cursor_pos;
         args["[LINE]"] = llformat ("%d", line);
@@ -1147,19 +1157,21 @@ void LLScriptEdCore::doSave( bool close_after_save )
 
 void LLScriptEdCore::openInExternalEditor()
 {
-    if (mContainer->mLiveFile)
-    {
-        // If already open in an external editor, just return
-        return;
-    }
+    //if (mContainer->mLiveFile)
+    //{
+    //    // If already open in an external editor, just return
+    //    return;
+    //}
 
     // Generate a suitable filename
     std::string script_name = mScriptName;
-    std::string forbidden_chars = "<>:\"\\/|?*";
-    for (std::string::iterator c = forbidden_chars.begin(); c != forbidden_chars.end(); c++)
-    {
-        script_name.erase(std::remove(script_name.begin(), script_name.end(), *c), script_name.end());
-    }
+
+    static const std::set<char> forbidden_chars{ '<', '>', ':', '"', '\\', '/', '|', '?', '*' };
+    script_name.erase(
+        std::remove_if(script_name.begin(), script_name.end(), [](char c) {
+            return forbidden_chars.contains(c);
+        }), script_name.end());
+
     std::string filename = mContainer->getTmpFileName(script_name);
 
     // Save the script to a temporary file.
@@ -1173,9 +1185,18 @@ void LLScriptEdCore::openInExternalEditor()
         writeToFile(filename);
     }
 
+    if (mContainer->mLiveFile && mContainer->mLiveFile->filename() != filename)
+    { // The name may have changed if we changed the type of scipt being edited.
+        delete mContainer->mLiveFile;
+        mContainer->mLiveFile = NULL;
+    }
     // Start watching file changes.
-    mContainer->mLiveFile = new LLLiveLSLFile(filename, boost::bind(&LLScriptEdContainer::onExternalChange, mContainer, _1));
-    mContainer->mLiveFile->addToEventTimer();
+    if (!mContainer->mLiveFile)
+    {
+        mContainer->mLiveFile = new LLLiveLSLFile(filename, boost::bind(&LLScriptEdContainer::onExternalChange, mContainer, _1));
+        mContainer->mLiveFile->addToEventTimer();
+    }
+    mContainer->startWebsocketServer();
 
     // Open it in external editor.
     {
@@ -1234,6 +1255,7 @@ void LLScriptEdCore::onErrorList(LLUICtrl*, void* user_data)
         sscanf(line.c_str(), "%d %d", &row, &column);
         //LL_INFOS() << "LLScriptEdCore::onErrorList() - " << row << ", "
         //<< column << LL_ENDL;
+        row = (self->mEditor->getIsLuauLanguage() ? row - 1 : row);
 // [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
         self->mEditor->scrollTo(row, column);
 // [/SL:KB]
@@ -1541,8 +1563,6 @@ void LLScriptEdCore::setAssociatedExperience( const LLUUID& experience_id )
     mAssociatedExperience = experience_id;
 }
 
-
-
 void LLLiveLSLEditor::requestExperiences()
 {
     if (!getIsModifiable())
@@ -1594,20 +1614,28 @@ LLScriptEdContainer::~LLScriptEdContainer()
 
     delete mLiveLogFile;
     mLiveLogFile = nullptr;
+
+    if (!mWebSocketServer.expired())
+    {
+        unsubscribeScript();
+    }
 }
 
-std::string LLScriptEdContainer::getTmpFileName(const std::string& script_name)
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+void LLScriptEdContainer::onBackupTimer()
 {
-    // Take script inventory item id (within the object inventory)
-    // to consideration so that it's possible to edit multiple scripts
-    // in the same object inventory simultaneously (STORM-781).
-    std::string script_id = mObjectUUID.asString() + "_" + mItemUUID.asString();
+    if ( (mScriptEd) && (mScriptEd->hasChanged()) )
+    {
+        if (mBackupFilename.empty())
+            mBackupFilename = getBackupFileName();
+        mScriptEd->writeToFile(mBackupFilename);
+    }
+}
+// [/SL:KB]
 
-    // Use MD5 sum to make the file name shorter and not exceed maximum path length.
-    char script_id_hash_str[33];               /* Flawfinder: ignore */
-    LLMD5 script_id_hash((const U8 *)script_id.c_str());
-    script_id_hash.hex_digest(script_id_hash_str);
-
+std::string LLScriptEdContainer::getTmpFileName(const std::string& script_name) const
+{
+    std::string script_id_hash_str(getUniqueHash());
     std::string script_extension = mScriptEd->mEditor->getIsLuauLanguage() ? ".luau" : ".lsl";
 
     if (script_name.empty())
@@ -1618,6 +1646,21 @@ std::string LLScriptEdContainer::getTmpFileName(const std::string& script_name)
     {
         return std::string(LLFile::tmpdir()) + "sl_script_" + script_name + "_" + script_id_hash_str + script_extension;
     }
+}
+
+std::string LLScriptEdContainer::getUniqueHash() const
+{
+    // Take script inventory item id (within the object inventory)
+    // to consideration so that it's possible to edit multiple scripts
+    // in the same object inventory simultaneously (STORM-781).
+    std::string script_id = mObjectUUID.asString() + "_" + mItemUUID.asString();
+
+    // Use MD5 sum to make the file name shorter and not exceed maximum path length.
+    char  script_id_hash_str[33]; /* Flawfinder: ignore */
+    LLMD5 script_id_hash((const U8*)script_id.c_str());
+    script_id_hash.hex_digest(script_id_hash_str);
+
+    return std::string(script_id_hash_str);
 }
 
 std::string LLScriptEdContainer::getErrorLogFileName(const std::string& script_path)
@@ -1699,6 +1742,63 @@ bool LLScriptEdContainer::handleKeyHere(KEY key, MASK mask)
         return mScriptEd->handleKeyHere(key, mask);
     }
     return true;
+}
+
+void LLScriptEdContainer::startWebsocketServer()
+{
+    if (gSavedSettings.getBOOL("ExternalWebsocketSyncEnable"))
+    {
+        // Attempt to find an existing server
+        LLWebsocketMgr&               wsmgr  = LLWebsocketMgr::instance();
+        LLScriptEditorWSServer::ptr_t server =
+            std::static_pointer_cast<LLScriptEditorWSServer>(
+                wsmgr.findServerByName(LLScriptEditorWSServer::DEFAULT_SERVER_NAME));
+
+        if (!server)
+        {   // We couldn't find one, so create it
+            U16 server_port = static_cast<U16>(gSavedSettings.getS32("ExternalWebsocketSyncPort"));
+            bool server_localhost = gSavedSettings.getBOOL("ExternalWebsocketSyncLocal");
+            server = std::make_shared<LLScriptEditorWSServer>(LLScriptEditorWSServer::DEFAULT_SERVER_NAME, server_port, server_localhost);
+            wsmgr.addServer(server);
+        }
+
+        bool is_running = server->isRunning();
+        if (!is_running)
+        {   // Server isn't running, so start it
+            is_running = wsmgr.startServer(LLScriptEditorWSServer::DEFAULT_SERVER_NAME);
+        }
+
+        if (!is_running && !server->isRunning())
+        {   // Failed to start the server
+            LL_WARNS() << "Failed to start script editor websocket server" << LL_ENDL;
+            return;
+        }
+
+        std::string script_id_hash_str(getUniqueHash());
+        server->subscribeScriptEditor(mObjectUUID, mItemUUID, mScriptEd->mScriptName, getHandle(), script_id_hash_str);
+        mWebSocketServer = server;
+    }
+}
+
+void LLScriptEdContainer::unsubscribeScript()
+{
+    auto server = mWebSocketServer.lock();
+    if (server)
+    {
+        std::string script_id_hash_str(getUniqueHash());
+        server->sendUnsubscribeScriptEditor(script_id_hash_str);
+        server->unsubscribeEditor(script_id_hash_str);
+    }
+}
+
+void LLScriptEdContainer::sendCompileResults(LLSD& params)
+{
+    auto server = mWebSocketServer.lock();
+    if (server)
+    {
+        std::string script_id_hash_str(getUniqueHash());
+        server->sendCompileResults(script_id_hash_str, params);
+    }
 }
 
 /// ---------------------------------------------------------------------------
@@ -1806,6 +1906,14 @@ void LLPreviewLSL::callbackLSLCompileSucceeded()
         logErrorsToFile(success_msg);
     }
 
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
+    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
+    {
+        removeBackupFile();
+    }
+// [/SL:KB]
+
     closeIfNeeded();
 }
 
@@ -1832,6 +1940,15 @@ void LLPreviewLSL::callbackLSLCompileFailed(const LLSD& compile_errors)
     }
 
     mScriptEd->selectFirstError();
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
+    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
+    {
+        removeBackupFile();
+    }
+// [/SL:KB]
+
     closeIfNeeded();
 }
 
@@ -1941,6 +2058,7 @@ void LLPreviewLSL::finishedLSLUpload(LLUUID itemId, LLSD response)
         {
             preview->callbackLSLCompileFailed(response["errors"]);
         }
+        preview->sendCompileResults(response);
     }
 }
 
@@ -1964,6 +2082,12 @@ bool LLPreviewLSL::failedLSLUpload(LLUUID itemId, LLUUID taskId, LLSD response, 
         LLSD errors;
         errors.append(LLTrans::getString("UploadFailed") + reason);
         preview->callbackLSLCompileFailed(errors);
+
+        LLSD message;
+        message["compiled"] = false;
+        message["errors"]   = errors;
+        preview->sendCompileResults(message);
+
         return true;
     }
 
@@ -1975,7 +2099,10 @@ bool LLPreviewLSL::failedLSLUpload(LLUUID itemId, LLUUID taskId, LLSD response, 
 // fails, go ahead and save the text anyway.
 void LLPreviewLSL::saveIfNeeded(bool sync /*= true*/)
 {
-    if (!mScriptEd->hasChanged())
+//  if(!mScriptEd->hasChanged())
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2012-02-10 (Catznip-3.2)
+    if ( (!mScriptEd->hasChanged()) || (!gAgent.getRegion()) )
+// [/SL:KB]
     {
         return;
     }
@@ -2060,13 +2187,22 @@ void LLPreviewLSL::onLoadComplete(const LLUUID& asset_uuid, LLAssetType::EType t
             }
             preview->mScriptEd->setScriptName(script_name);
             preview->mScriptEd->setEnableEditing(is_modifiable);
+            preview->mScriptEd->setAssetID(asset_uuid);
             preview->mAssetStatus = PREVIEW_ASSET_LOADED;
 
             // Temporary hack to determine if the script is LSL or SLua when loaded from the inventory.
             bool is_lua = is_lua_script(std::string(buffer.begin(), buffer.end()));
             preview->mScriptEd->mEditor->setLuauLanguage(is_lua);
-            preview->mScriptEd->mCompileTarget->setValue(is_lua ? "luau" : "mono");
+            preview->mScriptEd->mCompileTarget->setValue(is_lua ? "luau" : "lsl-luau");
             preview->mScriptEd->processKeywords(is_lua);
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+            // Start the timer which will perform regular backup saves
+            if (!preview->isBackupRunning())
+            {
+                preview->startBackupTimer(60.0f);
+            }
+// [/SL:KB]
         }
         else
         {
@@ -2173,6 +2309,14 @@ void LLLiveLSLEditor::callbackLSLCompileSucceeded(const LLUUID& task_id,
         logErrorsToFile(success_msg);
     }
 
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
+    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
+    {
+        removeBackupFile();
+    }
+// [/SL:KB]
+
     mRunningCheckbox->set(is_script_running);
     mIsSaving = false;
     closeIfNeeded();
@@ -2203,6 +2347,15 @@ void LLLiveLSLEditor::callbackLSLCompileFailed(const LLSD& compile_errors)
 
     mScriptEd->selectFirstError();
     mIsSaving = false;
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
+    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
+    {
+        removeBackupFile();
+    }
+// [/SL:KB]
+
     closeIfNeeded();
 }
 
@@ -2316,6 +2469,15 @@ void LLLiveLSLEditor::onLoadComplete(const LLUUID& asset_id,
             instance->loadScriptText(asset_id, type);
             instance->mScriptEd->setEnableEditing(true);
             instance->mAssetStatus = PREVIEW_ASSET_LOADED;
+            instance->mScriptEd->setAssetID(asset_id);
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+            // Start the timer which will perform regular backup saves
+            if (!instance->isBackupRunning())
+            {
+                instance->startBackupTimer(60.0f);
+            }
+// [/SL:KB]
         }
         else
         {
@@ -2466,13 +2628,10 @@ void LLLiveLSLEditor::draw()
 
 //void LLLiveLSLEditor::onSearchReplace(void* userdata)
 //{
-//  LLLiveLSLEditor* self = (LLLiveLSLEditor*)userdata;
+//    LLLiveLSLEditor* self = (LLLiveLSLEditor*)userdata;
 //
-//  LLScriptEdCore* sec = self->mScriptEd;
-//// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
-//  LLFloaterSearchReplace::show(sec->mEditor);
-//// [/SL:KB]
-////    LLFloaterScriptSearch::show(sec);
+//    LLScriptEdCore* sec = self->mScriptEd;
+//    LLFloaterScriptSearch::show(sec);
 //}
 
 struct LLLiveLSLSaveData
@@ -2504,6 +2663,7 @@ void LLLiveLSLEditor::finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAs
     if (preview)
     {
         preview->mItem->setAssetUUID(newAssetId);
+        preview->mScriptEd->setAssetID(newAssetId);
 
         // Bytecode save completed
         if (response["compiled"])
@@ -2514,6 +2674,8 @@ void LLLiveLSLEditor::finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAs
         {
             preview->callbackLSLCompileFailed(response["errors"]);
         }
+        response["is_running"] = isRunning;
+        preview->sendCompileResults(response);
     }
 }
 
@@ -2651,11 +2813,8 @@ void LLLiveLSLEditor::processScriptRunningReply(LLMessageSystem* msg, void**)
 
         bool mono = false, luau = false, luau_language = false;
         msg->getBOOLFast(_PREHASH_Script, _PREHASH_Mono, mono);
-        if (have_lua_enabled(LLUUID::null))
-        {
-            msg->getBOOLFast(_PREHASH_Script, _PREHASH_Luau, luau); // Luau compiler is enabled
-            msg->getBOOLFast(_PREHASH_Script, _PREHASH_LuauLanguage, luau_language);
-        }
+        msg->getBOOLFast(_PREHASH_Script, _PREHASH_Luau, luau); // Luau compiler is enabled
+        msg->getBOOLFast(_PREHASH_Script, _PREHASH_LuauLanguage, luau_language);
 
         std::string compile_target;
         if (luau)

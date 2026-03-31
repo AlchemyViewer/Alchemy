@@ -84,7 +84,7 @@ bool LLFloaterPreferenceGraphicsAdvanced::postBuild()
         }
     }
 
-#if !LL_DARWIN
+#if !LL_DARWIN && !LL_SDL_WINDOW
     LLCheckBoxCtrl *use_HiDPI = getChild<LLCheckBoxCtrl>("use HiDPI");
     use_HiDPI->setVisible(false);
 #endif
@@ -161,7 +161,7 @@ void LLFloaterPreferenceGraphicsAdvanced::refresh()
     updateSliderText(getChild<LLSliderCtrl>("AvatarPhysicsDetail",  true), getChild<LLTextBox>("AvatarPhysicsDetailText",       true));
     updateSliderText(getChild<LLSliderCtrl>("TerrainMeshDetail",    true), getChild<LLTextBox>("TerrainMeshDetailText",     true));
     updateSliderText(getChild<LLSliderCtrl>("RenderPostProcess",    true), getChild<LLTextBox>("PostProcessText",           true));
-    updateSliderText(getChild<LLSliderCtrl>("SkyMeshDetail",        true), getChild<LLTextBox>("SkyMeshDetailText",         true));
+    updateSliderText(getChild<LLSliderCtrl>("GlowResolution",        true), getChild<LLTextBox>("GlowResolutionText",         true));
     LLAvatarComplexityControls::setIndirectControls();
     setMaxNonImpostorsText(
         gSavedSettings.getU32("RenderAvatarMaxNonImpostors"),
@@ -280,16 +280,11 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
     LLTextBox* shadows_text = getChild<LLTextBox>("RenderShadowDetailText");
     LLCheckBoxCtrl* ctrl_ssao = getChild<LLCheckBoxCtrl>("UseSSAO");
     LLCheckBoxCtrl* ctrl_dof = getChild<LLCheckBoxCtrl>("UseDoF");
-    LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
-    LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
     LLSliderCtrl* cas_slider = getChild<LLSliderCtrl>("RenderSharpness");
 
     // disabled windlight
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))
     {
-        sky->setEnabled(false);
-        sky_text->setEnabled(false);
-
         //deferred needs windlight, disable deferred
         ctrl_shadows->setEnabled(false);
         ctrl_shadows->setValue(0);
@@ -353,12 +348,6 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
 
 void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
 {
-    // WindLight
-    LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
-    LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
-    sky->setEnabled(true);
-    sky_text->setEnabled(true);
-
     bool enabled = true;
 
     LLCheckBoxCtrl* ctrl_ssao = getChild<LLCheckBoxCtrl>("UseSSAO");

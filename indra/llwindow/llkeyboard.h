@@ -27,10 +27,9 @@
 #ifndef LL_LLKEYBOARD_H
 #define LL_LLKEYBOARD_H
 
+#include <functional>
 #include <map>
-#include <boost/function.hpp>
 
-#include "llstringtable.h"
 #include "lltimer.h"
 #include "indra_constants.h"
 
@@ -41,7 +40,7 @@ enum EKeystate
     KEYSTATE_UP
 };
 
-typedef boost::function<bool(EKeystate keystate)> LLKeyFunc;
+typedef std::function<bool(EKeystate keystate)> LLKeyFunc;
 typedef std::string (LLKeyStringTranslatorFunc)(std::string_view);
 
 enum EKeyboardInsertMode
@@ -56,7 +55,7 @@ class LLKeyboard
 {
 public:
 #ifdef LL_SDL_WINDOW
-    // linux relies on SDL2 which uses U32 for its native key type
+    // linux relies on SDL which uses U32 for its native key type
     typedef U32 NATIVE_KEY_TYPE;
 #else
     // on non-linux platforms we can get by with a smaller native key type

@@ -108,18 +108,6 @@ public:
     virtual void changed() { LLFloaterLand::refreshAll(); }
 };
 
-// class needed to get full access to textbox inside checkbox, because LLCheckBoxCtrl::setLabel() has string as its argument.
-// It was introduced while implementing EXT-4706
-class LLCheckBoxWithTBAcess : public LLCheckBoxCtrl
-{
-public:
-    LLTextBox* getTextBox()
-    {
-        return mLabel;
-    }
-};
-
-
 class LLPanelLandExperiences
     :   public LLPanel
 {
@@ -733,7 +721,8 @@ void LLPanelLandGeneral::refresh()
 
             // Display claim date
             time_t claim_date = parcel->getClaimDate();
-            std::string claim_date_str = getString("time_stamp_template");
+            static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+            std::string claim_date_str = use_24h ? getString("time_stamp_template") : getString("time_stamp_template_ampm");
             LLSD substitution;
             substitution["datetime"] = (S32) claim_date;
             LLStringUtil::format (claim_date_str, substitution);
@@ -1438,8 +1427,8 @@ void send_return_objects_message(S32 parcel_local_id, S32 return_type,
     msg->addU32Fast(_PREHASH_ReturnType, (U32) return_type);
 
     // Dummy task id, not used
-    msg->nextBlock("TaskIDs");
-    msg->addUUID("TaskID", LLUUID::null);
+    msg->nextBlockFast(_PREHASH_TaskIDs);
+    msg->addUUIDFast(_PREHASH_TaskID, LLUUID::null);
 
     // Throw all return ids into the packet.
     // TODO: Check for too many ids.
@@ -1669,9 +1658,9 @@ void LLPanelLandObjects::processParcelObjectOwnersReply(LLMessageSystem *msg, vo
         msg->getBOOLFast(_PREHASH_Data, _PREHASH_IsGroupOwned,  is_group_owned, i);
         msg->getS32Fast (_PREHASH_Data, _PREHASH_Count,         object_count,   i);
         msg->getBOOLFast(_PREHASH_Data, _PREHASH_OnlineStatus,  is_online,      i);
-        if(msg->has("DataExtended"))
+        if(msg->hasFast(_PREHASH_DataExtended))
         {
-            msg->getU32("DataExtended", "TimeStamp", most_recent_time, i);
+            msg->getU32Fast(_PREHASH_DataExtended, _PREHASH_TimeStamp, most_recent_time, i);
         }
 
         if (owner_id.isNull())
@@ -2175,12 +2164,11 @@ void LLPanelLandOptions::refresh()
             mMatureCtrl->setVisible(true);
             LLStyle::Params style;
             style.image(LLUI::getUIImage(gFloaterView->getParentFloater(this)->getString("maturity_icon_moderate")));
-            LLCheckBoxWithTBAcess* fullaccess_mature_ctrl = (LLCheckBoxWithTBAcess*)mMatureCtrl;
-            fullaccess_mature_ctrl->getTextBox()->setText(LLStringExplicit(""));
-            fullaccess_mature_ctrl->getTextBox()->appendImageSegment(style);
-            fullaccess_mature_ctrl->getTextBox()->appendText(getString("mature_check_mature"), false);
-            fullaccess_mature_ctrl->setToolTip(getString("mature_check_mature_tooltip"));
-            fullaccess_mature_ctrl->reshape(fullaccess_mature_ctrl->getRect().getWidth(), fullaccess_mature_ctrl->getRect().getHeight(), false);
+            mMatureCtrl->getTextBox()->setText(LLStringExplicit(""));
+            mMatureCtrl->getTextBox()->appendImageSegment(style);
+            mMatureCtrl->getTextBox()->appendText(getString("mature_check_mature"), false);
+            mMatureCtrl->setToolTip(getString("mature_check_mature_tooltip"));
+            mMatureCtrl->reshape(mMatureCtrl->getRect().getWidth(), mMatureCtrl->getRect().getHeight(), false);
 
             // they can see the checkbox, but its disposition depends on the
             // state of the region
@@ -2721,8 +2709,10 @@ void LLPanelLandAccess::refresh_ui()
         bool public_access = mPublicAccessCheck->getValue().asBoolean();
         if (public_access)
         {
+            bool override = false;
             if(parcel->getRegionDenyAnonymousOverride())
             {
+                override = true;
                 mPaymentInfoCheck->setEnabled(false);
             }
             else
@@ -2731,6 +2721,7 @@ void LLPanelLandAccess::refresh_ui()
             }
             if(parcel->getRegionDenyAgeUnverifiedOverride())
             {
+                override = true;
                 mAgeVerifiedCheck->setEnabled(false);
             }
             else
@@ -3109,7 +3100,7 @@ void LLPanelLandCovenant::refresh()
         // Note: LLPanelLandCovenant doesn't change Covenant's content and any
         // changes made by Estate floater should be requested by Estate floater
         LLMessageSystem *msg = gMessageSystem;
-        msg->newMessage("EstateCovenantRequest");
+        msg->newMessageFast(_PREHASH_EstateCovenantRequest);
         msg->nextBlockFast(_PREHASH_AgentData);
         msg->addUUIDFast(_PREHASH_AgentID,  gAgent.getID());
         msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());

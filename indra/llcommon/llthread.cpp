@@ -24,9 +24,6 @@
  */
 
 #include "linden_common.h"
-#include "llapr.h"
-
-#include "apr_portable.h"
 
 #include "llapp.h"
 #include "llthread.h"
@@ -40,6 +37,10 @@
 
 #if LL_LINUX
 #include <sched.h>
+#endif
+
+#if LL_DARWIN || LL_LINUX
+#include <pthread.h>
 #endif
 
 
@@ -56,25 +57,32 @@ typedef struct tagTHREADNAME_INFO
     DWORD dwFlags; // Reserved for future use, must be zero.
 } THREADNAME_INFO;
 #pragma pack(pop)
+#endif
 
-void set_thread_name( DWORD dwThreadID, const char* threadName)
+void set_thread_name(const char* threadName)
 {
+#if LL_WINDOWS
     THREADNAME_INFO info;
-    info.dwType = 0x1000;
-    info.szName = threadName;
-    info.dwThreadID = dwThreadID;
-    info.dwFlags = 0;
+    info.dwType     = 0x1000;
+    info.szName     = threadName;
+    info.dwThreadID = GetCurrentThreadId();
+    info.dwFlags    = 0;
 
     __try
     {
-        ::RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(DWORD), (ULONG_PTR*)&info );
+        ::RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(DWORD), (ULONG_PTR*)&info);
     }
-    __except(EXCEPTION_CONTINUE_EXECUTION)
+    __except (EXCEPTION_CONTINUE_EXECUTION)
     {
     }
-}
+#elif LL_DARWIN
+    std::string truncated_name(std::string_view(threadName).substr(0, 15));
+    pthread_setname_np(truncated_name.c_str());
+#elif LL_LINUX
+    std::string truncated_name(std::string_view(threadName).substr(0, 15));
+    pthread_setname_np(pthread_self(), truncated_name.c_str());
 #endif
-
+}
 
 //----------------------------------------------------------------------------
 // Usage:
@@ -148,27 +156,12 @@ LL_COMMON_API bool assert_main_thread()
     return false;
 }
 
-// this function has become moot
-void LLThread::registerThreadID() {}
-
 //
 // Handed to the APR thread creation function
 //
 void LLThread::threadRun()
 {
-#ifdef LL_WINDOWS
-    set_thread_name(-1, mName.c_str());
-
-#if 0 // probably a bad idea, see usage of SetThreadIdealProcessor in LLWindowWin32)
-    HANDLE hThread = GetCurrentThread();
-    if (hThread)
-    {
-        SetThreadAffinityMask(hThread, (DWORD_PTR) 0xFFFFFFFFFFFFFFFE);
-    }
-#endif
-
-#endif
-
+    set_thread_name(mName.c_str());
     LL_PROFILER_SET_THREAD_NAME( mName.c_str() );
 
     // this is the first point at which we're actually running in the new thread
@@ -240,7 +233,11 @@ void LLThread::tryRun()
         LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
         main_queue->post(
             // Bind the current exception, rethrow it in main loop.
-            [exc = std::current_exception()]() { std::rethrow_exception(exc); });
+            [exc = std::current_exception(), name = mName]()
+        {
+            LL_INFOS("THREAD") << "Rethrowing exception from thread " << name << LL_ENDL;
+            std::rethrow_exception(exc);
+        });
     }
 #endif // else LL_WINDOWS
 }
@@ -265,7 +262,7 @@ void LLThread::sehHandle()
 }
 #endif
 
-LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
+LLThread::LLThread(const std::string& name) :
     mPaused(false),
     mName(name),
     mThreadp(NULL),
@@ -274,7 +271,6 @@ LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
 {
     mRunCondition = new LLCondition();
     mDataLock = new LLMutex();
-    mLocalAPRFilePoolp = NULL ;
 }
 
 
@@ -285,12 +281,6 @@ LLThread::~LLThread()
     if (isCrashed())
     {
         LL_WARNS("THREAD") << "Destroying crashed thread named '" << mName << "'" << LL_ENDL;
-    }
-
-    if(mLocalAPRFilePoolp)
-    {
-        delete mLocalAPRFilePoolp ;
-        mLocalAPRFilePoolp = NULL ;
     }
 }
 

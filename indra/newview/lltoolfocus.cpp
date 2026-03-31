@@ -62,6 +62,8 @@ bool gCameraBtnPan = false;
 
 const S32 SLOP_RANGE = 4;
 
+extern bool agent_push_forward(EKeystate s);
+
 //
 // Camera - shared functionality
 //
@@ -230,14 +232,13 @@ void LLToolCamera::pickCallback(const LLPickInfo& pick_info)
             gAgentCamera.setFocusGlobal(pick_info);
         }
 
-        static LLCachedControl<bool> freeze_time(gSavedSettings, "FreezeTime", false);
         bool zoom_tool = gCameraBtnZoom && (LLToolMgr::getInstance()->getBaseTool() == LLToolCamera::getInstance());
         if (!(pick_info.mKeyMask & MASK_ALT) &&
             !LLFloaterCamera::inFreeCameraMode() &&
             !zoom_tool &&
             gAgentCamera.cameraThirdPerson() &&
             gViewerWindow->getLeftMouseDown() &&
-            !freeze_time &&
+            !gSavedSettings.getBOOL("FreezeTime") &&
             (hit_obj == gAgentAvatarp ||
              (hit_obj && hit_obj->isAttachment() && LLVOAvatar::findAvatarFromAttachment(hit_obj)->isSelf())))
         {
@@ -338,6 +339,11 @@ bool LLToolCamera::handleMouseUp(S32 x, S32 y, MASK mask)
 
 bool LLToolCamera::handleHover(S32 x, S32 y, MASK mask)
 {
+    if (gViewerWindow->getRightMouseDown())
+    {
+        agent_push_forward(KEYSTATE_LEVEL);
+    }
+
     S32 dx = gViewerWindow->getCurrentMouseDX();
     S32 dy = gViewerWindow->getCurrentMouseDY();
 
@@ -472,8 +478,34 @@ bool LLToolCamera::handleHover(S32 x, S32 y, MASK mask)
     return true;
 }
 
+bool LLToolCamera::handleRightMouseDown(S32 x, S32 y, MASK mask)
+{
+    if(mMouseSteering)
+    {
+        agent_push_forward(KEYSTATE_DOWN);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+bool LLToolCamera::handleRightMouseUp(S32 x, S32 y, MASK mask)
+{
+    if (mMouseSteering)
+    {
+        agent_push_forward(KEYSTATE_UP);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
 
 void LLToolCamera::onMouseCaptureLost()
 {
     releaseMouse();
+    handleRightMouseUp(0, 0, 0);
 }

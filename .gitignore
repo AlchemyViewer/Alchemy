@@ -1,9 +1,7 @@
 # By extension
 *.DS_Store
 *.bak
-*.diff
 *.orig
-*.patch
 *.pyc
 *.rej
 *.swp
@@ -17,11 +15,14 @@
 *~
 
 # Specific paths and/or names
+.vs
 .venv
+.cache
+.zed
 CMakeCache.txt
 cmake_install.cmake
 LICENSES
-build-*
+build*
 debian/files
 debian/secondlife-appearance-utility*
 debian/secondlife-viewer*
@@ -29,11 +30,7 @@ indra/.distcc
 indra/out/*
 
 indra/packages/*
-build-vc80/
-build-vc100/
-build-vc120/
-build-vc*-32/
-build-vc*-64/
+build-*/
 indra/CMakeFiles
 indra/build-vc[0-9]*
 indra/lib/mono/1.0/*.dll
@@ -57,9 +54,10 @@ indra/newview/filters.xml
 indra/newview/fmod.dll
 indra/newview/fmod.log
 indra/newview/fonts
-indra/newview/installers/windows/*.ico
-indra/newview/installers/windows/*.bmp
-indra/newview/installers/windows/*.png
+indra/newview/installers/windows/install_icon.ico
+indra/newview/installers/windows/install_splash.gif
+indra/newview/installers/windows/uninstall_icon.ico
+indra/newview/installers/windows/install_wizard_small.png
 indra/newview/mozilla-theme
 indra/newview/mozilla-universal-darwin.tgz
 indra/newview/pilot.txt
@@ -91,6 +89,13 @@ trivial_change_force_build
 web/config.*
 web/locale.*
 web/secondlife.com.*
-/Pipfile.lock
+
+# Auto-generated from lsl_definitions package
+indra/newview/app_settings/keywords_lsl_default.xml
+indra/newview/app_settings/keywords_lua_default.xml
+
 .env
 .vscode
+.idea
+.vs
+.zed

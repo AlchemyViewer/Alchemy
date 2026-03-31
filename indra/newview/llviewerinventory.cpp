@@ -130,6 +130,25 @@ public:
         }
         return found;
     }
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
+    bool revertInventoryObjectName(std::string& object_name)
+    {
+        LL_DEBUGS("InventoryLocalize") << "Searching for localization: " << object_name << LL_ENDL;
+
+        for (auto itDict = mInventoryItemsDict.cbegin(); itDict != mInventoryItemsDict.cend(); ++itDict)
+        {
+            if (itDict->second == object_name)
+            {
+                object_name = itDict->first;
+                LL_DEBUGS("InventoryLocalize") << "Found, new name is: " << object_name << LL_ENDL;
+                return true;
+            }
+        }
+        return false;
+    }
+// [/SL:KB]
+
 };
 
 LLLocalizedInventoryItemsDictionary::LLLocalizedInventoryItemsDictionary()
@@ -423,7 +442,9 @@ void LLViewerInventoryItem::updateServer(bool is_new) const
                          << LL_ENDL;
         return;
     }
-    if(gAgent.getID() != mPermissions.getOwner())
+    LLUUID owner = mPermissions.getOwner();
+    if(gAgent.getID() != owner
+        && owner.notNull()) // incomplete?
     {
         // *FIX: deal with this better.
         LL_WARNS(LOG_INV) << "LLViewerInventoryItem::updateServer() - for unowned item "
@@ -493,7 +514,7 @@ void LLViewerInventoryItem::fetchFromServer(void) const
                 body["items"][0]["owner_id"] = mPermissions.getOwner();
                 body["items"][0]["item_id"] = mUUID;
 
-                LLCore::HttpHandler::ptr_t handler(new LLInventoryModel::FetchItemHttpHandler(body));
+                LLCore::HttpHandler::ptr_t handler = std::make_shared<LLInventoryModel::FetchItemHttpHandler>(body);
                 gInventory.requestPost(true, url, body, handler, "Inventory Item");
             }
         }
@@ -565,7 +586,7 @@ void LLViewerInventoryItem::updateParentOnServer(bool restamp) const
     msg->nextBlockFast(_PREHASH_InventoryData);
     msg->addUUIDFast(_PREHASH_ItemID, mUUID);
     msg->addUUIDFast(_PREHASH_FolderID, mParentUUID);
-    msg->addString("NewName", NULL);
+    msg->addStringFast(_PREHASH_NewName, nullptr);
     gAgent.sendReliableMessage();
 }
 
@@ -643,7 +664,7 @@ void LLViewerInventoryCategory::updateParentOnServer(bool restamp) const
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
-    msg->addBOOL("Stamp", restamp);
+    msg->addBOOLFast(_PREHASH_Stamp, restamp);
     msg->nextBlockFast(_PREHASH_InventoryData);
     msg->addUUIDFast(_PREHASH_FolderID, mUUID);
     msg->addUUIDFast(_PREHASH_ParentID, mParentUUID);
@@ -1024,53 +1045,6 @@ void create_script_cb(const LLUUID& inv_item)
         LLViewerInventoryItem* item = gInventory.getItem(inv_item);
         if (item)
         {
-            // ------------------------------------------------------------------------------------
-            // Begin hack
-            //
-            // The current state of the server doesn't allow specifying a default script template,
-            // so we have to update its code immediately after creation instead.
-            //
-            // This temporary workaround should be removed after a server-side fix.
-            // See https://github.com/secondlife/viewer/issues/3731 for more information.
-            //
-            LLViewerRegion* region = gAgent.getRegion();
-            if (region && region->simulatorFeaturesReceived())
-            {
-                LLSD simulatorFeatures;
-                region->getSimulatorFeatures(simulatorFeatures);
-                if (simulatorFeatures["LuaScriptsEnabled"].asBoolean())
-                {
-
-                    const std::string hello_lua_script =
-                        "function state_entry()\n"
-                        "   ll.Say(0, \"Hello, Avatar!\")\n"
-                        "end\n"
-                        "\n"
-                        "function touch_start(total_number)\n"
-                        "   ll.Say(0, \"Touched.\")\n"
-                        "end\n"
-                        "\n"
-                        "-- Simulate the state_entry event\n"
-                        "state_entry()\n";
-
-                    std::string url = gAgent.getRegion()->getCapability("UpdateScriptAgent");
-                    if (!url.empty())
-                    {
-                        LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLScriptAssetUpload>(
-                            item->getUUID(),
-                            "luau",
-                            hello_lua_script,
-                            nullptr,
-                            nullptr));
-
-                        LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
-                    }
-                }
-            }
-            //
-            // End hack
-            // ------------------------------------------------------------------------------------
-
             set_default_permissions(item, "Scripts");
 
             // item was just created, update even if permissions did not changed
@@ -1216,10 +1190,10 @@ void create_inventory_item(
 
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_CreateInventoryItem);
-    msg->nextBlock(_PREHASH_AgentData);
+    msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, agent_id);
     msg->addUUIDFast(_PREHASH_SessionID, session_id);
-    msg->nextBlock(_PREHASH_InventoryBlock);
+    msg->nextBlockFast(_PREHASH_InventoryBlock);
     msg->addU32Fast(_PREHASH_CallbackID, gInventoryCallbacks.registerCB(cb));
     msg->addUUIDFast(_PREHASH_FolderID, parent_id);
     msg->addUUIDFast(_PREHASH_TransactionID, transaction_id);
@@ -1761,9 +1735,10 @@ void create_new_item(const std::string& name,
                    LLAssetType::EType asset_type,
                    LLInventoryType::EType inv_type,
                    U32 next_owner_perm,
-                   std::function<void(const LLUUID&)> created_cb = NULL)
+                   std::function<void(const LLUUID&)> created_cb = nullptr)
 {
     std::string desc;
+    U8 subtype = NO_INV_SUBTYPE;
     LLViewerAssetType::generateDescriptionFor(asset_type, desc);
     next_owner_perm = (next_owner_perm) ? next_owner_perm : PERM_MOVE | PERM_TRANSFER;
 
@@ -1775,6 +1750,20 @@ void create_new_item(const std::string& name,
         {
             cb = new LLBoostFuncInventoryCallback(create_script_cb);
             next_owner_perm = LLFloaterPerms::getNextOwnerPerms("Scripts");
+
+            LLViewerRegion* region = gAgent.getRegion();
+            if (region && region->simulatorFeaturesReceived())
+            {
+                // *TODO* Setting the subtype for the script will cause the server to select
+                // either the LSL or Lua default script.  We should perhaps allow the user to
+                // select which type of script they want to create.
+                LLSD simulatorFeatures;
+                region->getSimulatorFeatures(simulatorFeatures);
+                if (simulatorFeatures["LuaScriptsEnabled"].asBoolean())
+                {
+                    subtype = SST_LUA;
+                }
+            }
             break;
         }
 
@@ -1817,7 +1806,7 @@ void create_new_item(const std::string& name,
                           desc,
                           asset_type,
                           inv_type,
-                          NO_INV_SUBTYPE,
+                          subtype,
                           next_owner_perm,
                           cb);
 }
@@ -1944,7 +1933,7 @@ void menu_create_inventory_item(LLInventoryPanel* panel, LLUUID dest_id, const L
             parent_id = gInventory.getRootFolderID();
         }
 
-        std::function<void(const LLUUID&)> callback_cat_created = NULL;
+        std::function<void(const LLUUID&)> callback_cat_created = nullptr;
         if (panel)
         {
             LLHandle<LLPanel> handle = panel->getHandle();
@@ -2297,6 +2286,18 @@ bool LLViewerInventoryItem::extractSortFieldAndDisplayName(const std::string& na
 
     return result;
 }
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
+bool LLViewerInventoryItem::lookupLocalizedName(std::string& name)
+{
+    return LLLocalizedInventoryItemsDictionary::instance().localizeInventoryObjectName(name);
+}
+
+bool LLViewerInventoryItem::lookupSystemName(std::string& name)
+{
+    return LLLocalizedInventoryItemsDictionary::instance().revertInventoryObjectName(name);
+}
+// [/SL:KB]
 
 // This returns true if the item that this item points to
 // doesn't exist in memory (i.e. LLInventoryModel).  The baseitem

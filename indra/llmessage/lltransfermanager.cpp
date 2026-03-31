@@ -81,10 +81,10 @@ void LLTransferManager::init()
     mValid = true;
 
     // Register message system handlers
-    gMessageSystem->setHandlerFuncFast(_PREHASH_TransferRequest, processTransferRequest, NULL);
-    gMessageSystem->setHandlerFuncFast(_PREHASH_TransferInfo, processTransferInfo, NULL);
-    gMessageSystem->setHandlerFuncFast(_PREHASH_TransferPacket, processTransferPacket, NULL);
-    gMessageSystem->setHandlerFuncFast(_PREHASH_TransferAbort, processTransferAbort, NULL);
+    gMessageSystem->setHandlerFunc("TransferRequest", processTransferRequest, NULL);
+    gMessageSystem->setHandlerFunc("TransferInfo", processTransferInfo, NULL);
+    gMessageSystem->setHandlerFunc("TransferPacket", processTransferPacket, NULL);
+    gMessageSystem->setHandlerFunc("TransferAbort", processTransferAbort, NULL);
 }
 
 

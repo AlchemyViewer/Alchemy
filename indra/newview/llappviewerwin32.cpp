@@ -26,23 +26,14 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#ifdef INCLUDE_VLD
-#include "vld.h"
-#endif
 #include "llwin32headers.h"
 
-#include "llwindow.h"
-
-#if !LL_SDL_WINDOW
 #include "llwindowwin32.h" // *FIX: for setting gIconResource.
-#endif
 
 #include "llappviewerwin32.h"
 
 #include "llgl.h"
-#if !LL_SDL_WINDOW
 #include "res/resource.h" // *FIX: for setting gIconResource.
-#endif
 
 #include <fcntl.h>      //_O_APPEND
 #include <io.h>         //_open_osfhandle()
@@ -78,9 +69,21 @@
 #include <fstream>
 #include <exception>
 
+#include "llversioninfovars.h"
+
+// Velopack installer and update framework
+#if LL_VELOPACK
+#include "llvelopack.h"
+#endif
+
+// Sentry (https://sentry.io) crash reporting tool
+#if AL_SENTRY
+#include <sentry.h>
+#endif
+
 // Bugsplat (http://bugsplat.com) crash reporting tool
 #ifdef LL_BUGSPLAT
-#include "BugSplat.h"
+#include "bugsplat/BugSplat.h"
 #include "boost/json.hpp"                 // Boost.Json
 #include "llagent.h"                // for agent location
 #include "llstartup.h"
@@ -120,6 +123,7 @@ namespace
     // MiniDmpSender pointer. As things stand, though, we must define an
     // actual function and store the pointer statically.
     static MiniDmpSender *sBugSplatSender = nullptr;
+    static std::string sBugsplatDesriptionField;
 
     bool bugsplatSendLog(UINT nCode, LPVOID lpVal1, LPVOID lpVal2)
     {
@@ -156,8 +160,21 @@ namespace
                     WCSTR(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "settings_per_account.xml")));
             }
 
-            // LL_ERRS message, when there is one
-            sBugSplatSender->setDefaultUserDescription(WCSTR(LLError::getFatalMessage()));
+            if (!sBugsplatDesriptionField.empty())
+            {
+                // Can be set by watchdog or other code that detects a problem
+                // and wants to add some context to the crash report.
+                // Will be visible in the BugSplat web UI.
+                sBugSplatSender->setDefaultUserDescription(WCSTR(LLError::getFatalMessage()));
+                // This type of crash is not nessesarily a crash, or final.
+                // Prepare for the next one.
+                sBugsplatDesriptionField.clear();
+            }
+            else
+            {
+                // LL_ERRS message, when there is one
+                sBugSplatSender->setDefaultUserDescription(WCSTR(LLError::getFatalMessage()));
+            }
 
             sBugSplatSender->setAttribute(WCSTR(L"OS"), WCSTR(LLOSInfo::instance().getOSStringSimple())); // In case we ever stop using email for this
             sBugSplatSender->setAttribute(WCSTR(L"AppState"), WCSTR(LLStartUp::getStartupStateString()));
@@ -177,6 +194,22 @@ namespace
                                     << '/' << loc.mV[0]
                                     << '/' << loc.mV[1]
                                     << '/' << loc.mV[2])));
+            }
+
+            LLAppViewer* app = LLAppViewer::instance();
+            if (!app->isSecondInstance() && !app->errorMarkerExists())
+            {
+                // If marker doesn't exist, create a marker with 'other' or 'logout' code for next launch
+                // otherwise don't override existing file
+                // Any unmarked crashes will be considered as freezes
+                if (app->logoutRequestSent())
+                {
+                    app->createErrorMarker(LAST_EXEC_LOGOUT_CRASH);
+                }
+                else
+                {
+                    app->createErrorMarker(LAST_EXEC_OTHER_CRASH);
+                }
             }
         } // MDSCB_EXCEPTIONCODE
 
@@ -212,20 +245,6 @@ LONG WINAPI catchallCrashHandler(EXCEPTION_POINTERS * /*ExceptionInfo*/)
 
 const std::string LLAppViewerWin32::sWindowClass = "Alchemy";
 
-/*
-    This function is used to print to the command line a text message
-    describing the nvapi error and quits
-*/
-void nvapi_error(NvAPI_Status status)
-{
-    NvAPI_ShortString szDesc = {0};
-    NvAPI_GetErrorMessage(status, szDesc);
-    LL_WARNS() << szDesc << LL_ENDL;
-
-    //should always trigger when asserts are enabled
-    //llassert(status == NVAPI_OK);
-}
-
 // Create app mutex creates a unique global windows object.
 // If the object can be created it returns true, otherwise
 // it returns false. The false result can be used to determine
@@ -247,6 +266,20 @@ bool create_app_mutex()
     return result;
 }
 
+/*
+    This function is used to print to the command line a text message
+    describing the nvapi error and quits
+*/
+void nvapi_error(NvAPI_Status status)
+{
+    NvAPI_ShortString szDesc = {0};
+    NvAPI_GetErrorMessage(status, szDesc);
+    LL_WARNS() << "nvapi error: " << szDesc << LL_ENDL;
+
+    //should always trigger when asserts are enabled
+    //llassert(status == NVAPI_OK);
+}
+
 void ll_nvapi_init(NvDRSSessionHandle hSession)
 {
     // (2) load all the system settings into the session
@@ -258,8 +291,7 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
     }
 
     NvAPI_UnicodeString profile_name;
-    std::string app_name = LLTrans::getString("APP_NAME");
-    std::wstring w_app_name = ll_convert<std::wstring>(app_name);
+    std::wstring w_app_name = TEXT("Alchemy Viewer");
     wsprintf(reinterpret_cast<wchar_t*>(profile_name), L"%s", w_app_name.c_str());
     NvDRSProfileHandle hProfile = 0;
     // (3) Check if we already have an application profile for the viewer
@@ -272,7 +304,7 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
     else if (status == NVAPI_PROFILE_NOT_FOUND)
     {
         // Don't have an application profile yet - create one
-        LL_INFOS() << "Creating NVIDIA application profile" << LL_ENDL;
+        LL_INFOS() << "Creating Alchemy Viewer profile for NVIDIA driver" << LL_ENDL;
 
         NVDRS_PROFILE profileInfo;
         profileInfo.version = NVDRS_PROFILE_VER;
@@ -285,11 +317,51 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
             nvapi_error(status);
             return;
         }
+
+        // set the preferred power management mode
+        {
+            NVDRS_SETTING drsSetting = {};
+            drsSetting.version = NVDRS_SETTING_VER;
+            drsSetting.settingId = PREFERRED_PSTATE_ID;
+            drsSetting.settingType = NVDRS_DWORD_TYPE;
+            drsSetting.u32CurrentValue = PREFERRED_PSTATE_PREFER_MAX;
+            status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
+            if (status != NVAPI_OK)
+            {
+                nvapi_error(status);
+                return;
+            }
+            LL_INFOS() << "Set preferred power management mode" << LL_ENDL;
+        }
+
+        // set the preferred opengl threading state
+        {
+            NVDRS_SETTING drsSetting = {};
+            drsSetting.version = NVDRS_SETTING_VER;
+            drsSetting.settingId = OGL_THREAD_CONTROL_ID;
+            drsSetting.settingType = NVDRS_DWORD_TYPE;
+            drsSetting.u32CurrentValue = OGL_THREAD_CONTROL_ENABLE;
+            status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
+            if (status != NVAPI_OK)
+            {
+                nvapi_error(status);
+                return;
+            }
+            LL_INFOS() << "Set preferred GL Threading mode" << LL_ENDL;
+        }
+
+        // apply our changes to the system
+        status = NvAPI_DRS_SaveSettings(hSession);
+        if (status != NVAPI_OK)
+        {
+            nvapi_error(status);
+            return;
+        }
     }
 
     // (4) Check if current exe is part of the profile
     std::string exe_name = gDirUtilp->getExecutableFilename();
-    NVDRS_APPLICATION profile_application;
+    NVDRS_APPLICATION profile_application = {};
     profile_application.version = NVDRS_APPLICATION_VER;
 
     std::wstring w_exe_name = ll_convert<std::wstring>(exe_name);
@@ -307,12 +379,12 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
         LL_INFOS() << "Creating application for " << exe_name << " for NVIDIA application profile" << LL_ENDL;
 
         // Add this exe to the profile
-        NVDRS_APPLICATION application;
+        NVDRS_APPLICATION application = {};
         application.version = NVDRS_APPLICATION_VER;
         application.isPredefined = 0;
         wsprintf(reinterpret_cast<wchar_t*>(application.appName), L"%s", w_exe_name.c_str());
-        wsprintf(reinterpret_cast<wchar_t*>(application.userFriendlyName), L"%s", w_exe_name.c_str());
         wsprintf(reinterpret_cast<wchar_t*>(application.launcher), L"%s", w_exe_name.c_str());
+        wsprintf(reinterpret_cast<wchar_t*>(application.userFriendlyName), L"%s", w_app_name.c_str());
         wsprintf(reinterpret_cast<wchar_t*>(application.fileInFolder), L"%s", "");
 
         status = NvAPI_DRS_CreateApplication(hSession, hProfile, &application);
@@ -339,63 +411,9 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
         return;
     }
 
-    //get the preferred power management mode for Second Life
-    NVDRS_SETTING drsSetting = {0};
-    drsSetting.version = NVDRS_SETTING_VER;
-    status = NvAPI_DRS_GetSetting(hSession, hProfile, PREFERRED_PSTATE_ID, &drsSetting);
-    if (status == NVAPI_SETTING_NOT_FOUND)
-    { //only override if the user hasn't specifically set this setting
-        // (5) Specify that we want to enable maximum performance setting
-        // first we fill the NVDRS_SETTING struct, then we call the function
-        drsSetting.version = NVDRS_SETTING_VER;
-        drsSetting.settingId = PREFERRED_PSTATE_ID;
-        drsSetting.settingType = NVDRS_DWORD_TYPE;
-        drsSetting.u32CurrentValue = PREFERRED_PSTATE_PREFER_MAX;
-        status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-
-        // (6) Now we apply (or save) our changes to the system
-        status = NvAPI_DRS_SaveSettings(hSession);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-    }
-    else if (status != NVAPI_OK)
-    {
-        nvapi_error(status);
-        return;
-    }
-
-    // enable Threaded Optimization instead of letting the driver decide
-    status = NvAPI_DRS_GetSetting(hSession, hProfile, OGL_THREAD_CONTROL_ID, &drsSetting);
-    if (status == NVAPI_SETTING_NOT_FOUND || (status == NVAPI_OK && drsSetting.u32CurrentValue != OGL_THREAD_CONTROL_ENABLE))
-    {
-        drsSetting.version = NVDRS_SETTING_VER;
-        drsSetting.settingId = OGL_THREAD_CONTROL_ID;
-        drsSetting.settingType = NVDRS_DWORD_TYPE;
-        drsSetting.u32CurrentValue = OGL_THREAD_CONTROL_ENABLE;
-        status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-
-        // Now we apply (or save) our changes to the system
-        status = NvAPI_DRS_SaveSettings(hSession);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-    }
-    else if (status != NVAPI_OK)
+    // apply our changes to the system
+    status = NvAPI_DRS_SaveSettings(hSession);
+    if (status != NVAPI_OK)
     {
         nvapi_error(status);
         return;
@@ -414,6 +432,31 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
                      PWSTR     pCmdLine,
                      int       nCmdShow)
 {
+#if LL_VELOPACK
+    // Velopack MUST be initialized first - it may handle install/uninstall
+    // commands and exit the process before we do anything else.
+    if (!velopack_initialize())
+    {
+        // Velopack handled the invocation (install/uninstall hook)
+
+        // Drop install related settings
+        gDirUtilp->initAppDirs("AlchemyNext");
+
+        std::string user_settings_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "settings.xml");
+        LLControlGroup settings("global");
+        if (settings.loadFromFile(user_settings_path))
+        {
+            // If user reinstalls or updates, we want to recheck for nsis leftovers.
+            if (settings.controlExists("PreviousInstallChecked"))
+            {
+                settings.setBOOL("PreviousInstallChecked", false);
+            }
+            settings.saveToFile(user_settings_path, true);
+        }
+        return 0;
+    }
+#endif
+
     // Call Tracy first thing to have it allocate memory
     // https://github.com/wolfpld/tracy/issues/196
     LL_PROFILER_FRAME_END;
@@ -423,11 +466,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     DWORD heap_enable_lfh_error[MAX_HEAPS];
     S32 num_heaps = 0;
 
-#if !LL_SDL_WINDOW
-    LLWindowWin32::setDPIAwareness();
-#endif
-
-#if WINDOWS_CRT_MEM_CHECKS && !INCLUDE_VLD
+#if WINDOWS_CRT_MEM_CHECKS
     _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // dump memory leaks on exit
 #elif 0
     // Experimental - enable the low fragmentation heap
@@ -454,10 +493,8 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 #endif
 #endif
 
-#if !LL_SDL_WINDOW
     // *FIX: global
     gIconResource = MAKEINTRESOURCE(IDI_LL_ICON);
-#endif
 
     LLAppViewerWin32* viewer_app_ptr = new LLAppViewerWin32(ll_convert_wide_to_string(pCmdLine).c_str());
 
@@ -698,12 +735,7 @@ bool LLAppViewerWin32::init()
 #endif
 
 #if LL_SEND_CRASH_REPORTS
-#if ! defined(LL_BUGSPLAT)
-#pragma message("Building without BugSplat")
-
-#else // LL_BUGSPLAT
-#pragma message("Building with BugSplat")
-
+#if defined(LL_BUGSPLAT)
     if (!isSecondInstance())
     {
         // Cleanup previous session
@@ -820,6 +852,38 @@ bool LLAppViewerWin32::reportCrashToBugsplat(void* pExcepInfo)
     if (sBugSplatSender)
     {
         sBugSplatSender->createReport((EXCEPTION_POINTERS*)pExcepInfo);
+        return true;
+    }
+#endif // LL_BUGSPLAT
+    return false;
+}
+
+#if defined(LL_BUGSPLAT)
+static int reportCustomToBugsplatFilter(EXCEPTION_POINTERS* pExcepInfo)
+{
+    if (sBugSplatSender)
+    {
+        sBugSplatSender->createReport(pExcepInfo);
+    }
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+#endif
+
+bool LLAppViewerWin32::reportCustomToBugsplat(const std::string &description)
+{
+#if defined(LL_BUGSPLAT)
+    if (sBugSplatSender)
+    {
+        sBugsplatDesriptionField = description;
+
+        __try
+        {
+            // Generate a custom exception code
+            RaiseException(0xE0000001, 0, 0, NULL);
+        }
+        __except (reportCustomToBugsplatFilter(GetExceptionInformation()))
+        {
+        }
         return true;
     }
 #endif // LL_BUGSPLAT

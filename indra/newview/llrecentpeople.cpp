@@ -48,7 +48,7 @@ LLRecentPeople::~LLRecentPeople()
     save();
 }
 
-bool LLRecentPeople::add(const LLUUID& id, LLSD& userdata)
+bool LLRecentPeople::add(const LLUUID& id, LLSD userdata)
 {
     if (id == gAgent.getID())
         return false;

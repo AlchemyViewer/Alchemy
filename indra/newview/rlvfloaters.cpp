@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2011, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -275,7 +276,7 @@ std::string RlvFloaterBehaviours::getFormattedBehaviourString(ERlvBehaviourFilte
 void RlvFloaterBehaviours::onBtnCopyToClipboard()
 {
     LLWString wstrRestrictions = utf8str_to_wstring(getFormattedBehaviourString(ERlvBehaviourFilter::ALL));
-    LLClipboard::instance().copyToClipboard(wstrRestrictions, 0, S32(wstrRestrictions.length()));
+    LLClipboard::instance().copyToClipboard(wstrRestrictions, 0, narrow(wstrRestrictions.length()));
 }
 
 // Checked: 2011-05-23 (RLVa-1.3.1c) | Modified: RLVa-1.3.1c
@@ -749,6 +750,7 @@ bool RlvFloaterConsole::postBuild()
     m_pInputEdit->setTextExpandedCallback(boost::bind(&RlvFloaterConsole::reshapeLayoutPanel, this));
     m_pInputEdit->setFocus(true);
     m_pInputEdit->setCommitOnFocusLost(false);
+    m_pInputEdit->setShowChatMentionPicker(false);
 
     m_pInputPanel = getChild<LLLayoutPanel>("input_panel");
     m_nInputEditPad = m_pInputPanel->getRect().getHeight() - m_pInputEdit->getRect().getHeight();

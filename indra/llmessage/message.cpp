@@ -77,6 +77,8 @@
 #include "v4math.h"
 #include "lltransfertargetvfile.h"
 #include "llcorehttputil.h"
+#include "llrand.h"
+#include "llmessagelog.h"
 #include "llpounceable.h"
 
 // Constants
@@ -384,7 +386,7 @@ bool LLMessageSystem::poll(F32 seconds)
 bool LLMessageSystem::isTrustedSender(const LLHost& host) const
 {
     LLCircuitData* cdp = mCircuitInfo.findCircuit(host);
-    if(NULL == cdp)
+    if(cdp == nullptr)
     {
         return false;
     }
@@ -484,7 +486,8 @@ LLCircuitData* LLMessageSystem::findCircuit(const LLHost& host,
 // Returns true if a valid, on-circuit message has been received.
 // Requiring a non-const LockMessageChecker reference ensures that
 // mMessageReader has been set to mTemplateMessageReader.
-bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
+bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
+    bool faked_message, U8 fake_buffer[MAX_BUFFER_SIZE], LLHost fake_host, S32 fake_size )
 {
     // Pump
     bool    valid_packet = false;
@@ -513,13 +516,30 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
 
         U8* buffer = mTrueReceiveBuffer;
 
-        mTrueReceiveSize = mPacketRing.receivePacket(mSocket, (char *)mTrueReceiveBuffer);
+        if(!faked_message)
+        {
+            mTrueReceiveSize = mPacketRing.receivePacket(mSocket, (char *)mTrueReceiveBuffer);
+
+            receive_size = mTrueReceiveSize;
+            mLastSender = mPacketRing.getLastSender();
+            mLastReceivingIF = mPacketRing.getLastReceivingInterface();
+        } else {
+            buffer = fake_buffer; //true my ass.
+            mTrueReceiveSize = fake_size;
+            receive_size = mTrueReceiveSize;
+            mLastSender = fake_host;
+            mLastReceivingIF = mPacketRing.getLastReceivingInterface(); //don't really give two tits about the interface, just leave it
+        }
+
         // If you want to dump all received packets into Alchemy.log, uncomment this
         //dumpPacketToLog();
 
-        receive_size = mTrueReceiveSize;
-        mLastSender = mPacketRing.getLastSender();
-        mLastReceivingIF = mPacketRing.getLastReceivingInterface();
+        if(mTrueReceiveSize && receive_size > (S32) LL_MINIMUM_VALID_PACKET_SIZE && !faked_message)
+        {
+#define LOCALHOST_ADDR 16777343
+            LLMessageLog::log(mLastSender, LLHost(LOCALHOST_ADDR, mPort), buffer, mTrueReceiveSize);
+#undef LOCALHOST_ADDR
+        }
 
         if (receive_size < (S32) LL_MINIMUM_VALID_PACKET_SIZE)
         {
@@ -539,7 +559,7 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
             LLCircuitData* cdp;
 
             // note if packet acks are appended.
-            if(buffer[0] & LL_ACK_FLAG)
+            if((buffer[0] & LL_ACK_FLAG) && !faked_message)
             {
                 acks += buffer[--receive_size];
                 true_rcv_size = receive_size;
@@ -571,7 +591,7 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
             // this message came in on if it's valid, and NULL if the
             // circuit was bogus.
 
-            if(cdp && (acks > 0) && ((S32)(acks * sizeof(TPACKETID)) < (true_rcv_size)))
+            if(cdp && (acks > 0) && ((S32)(acks * sizeof(TPACKETID)) < (true_rcv_size)) && !faked_message)
             {
                 TPACKETID packet_id;
                 U32 mem_id=0;
@@ -913,7 +933,7 @@ LLStoredMessagePtr LLMessageSystem::getReceivedMessage() const
     const std::string& name = mMessageReader->getMessageName();
     LLSD message = wrapReceivedTemplateData();
 
-    return LLStoredMessagePtr(new LLStoredMessage(name, message));
+    return std::make_shared<LLStoredMessage>(name, message);
 }
 
 LLStoredMessagePtr LLMessageSystem::getBuiltMessage() const
@@ -921,7 +941,7 @@ LLStoredMessagePtr LLMessageSystem::getBuiltMessage() const
     const std::string& name = mMessageBuilder->getMessageName();
     LLSD message = wrapBuiltTemplateData();
 
-    return LLStoredMessagePtr(new LLStoredMessage(name, message));
+    return std::make_shared<LLStoredMessage>(name, message);
 }
 
 S32 LLMessageSystem::sendMessage(const LLHost &host, LLStoredMessagePtr message)
@@ -1162,7 +1182,7 @@ S32 LLMessageSystem::sendMessage(const LLHost &host)
     {
         LLSD message = mLLSDMessageBuilder->getMessage();
 
-        UntrustedCallback_t cb = NULL;
+        UntrustedCallback_t cb = nullptr;
         if ((mSendReliable) && (mReliablePacketParams.mCallback))
         {
             cb = boost::bind(mReliablePacketParams.mCallback, mReliablePacketParams.mCallbackData, _1);
@@ -1359,7 +1379,7 @@ S32 LLMessageSystem::sendMessage(
         return 0;
     }
 
-    UntrustedCallback_t cb = NULL;
+    UntrustedCallback_t cb = nullptr;
     if ((mSendReliable) && (mReliablePacketParams.mCallback))
     {
         cb = boost::bind(mReliablePacketParams.mCallback, mReliablePacketParams.mCallbackData, _1);
@@ -1770,7 +1790,7 @@ void    process_start_ping_check(LLMessageSystem *msgsystem, void** /*user_data*
     // Send off the response
     msgsystem->newMessageFast(_PREHASH_CompletePingCheck);
     msgsystem->nextBlockFast(_PREHASH_PingID);
-    msgsystem->addU8(_PREHASH_PingID, ping_id);
+    msgsystem->addU8Fast(_PREHASH_PingID, ping_id);
     msgsystem->sendMessage(msgsystem->getSender());
 }
 
@@ -1959,25 +1979,25 @@ void LLMessageSystem::processUseCircuitCode(LLMessageSystem* msg,
         {
             cdp->setRemoteID(id);
             cdp->setRemoteSessionID(session_id);
-        }
 
-        if (!had_circuit_already)
-        {
-            //
-            // HACK HACK HACK HACK HACK!
-            //
-            // This would NORMALLY happen inside logValidMsg, but at the point that this happens
-            // inside logValidMsg, there's no circuit for this message yet.  So the awful thing that
-            // we do here is do it inside this message handler immediately AFTER the message is
-            // handled.
-            //
-            // We COULD not do this, but then what happens is that some of the circuit bookkeeping
-            // gets broken, especially the packets in count.  That causes some later packets to flush
-            // the RecentlyReceivedReliable list, resulting in an error in which UseCircuitCode
-            // doesn't get properly duplicate suppressed.  Not a BIG deal, but it's somewhat confusing
-            // (and bad from a state point of view).  DJS 9/23/04
-            //
-            cdp->checkPacketInID(gMessageSystem->mCurrentRecvPacketID, false ); // Since this is the first message on the circuit, by definition it's not resent.
+            if (!had_circuit_already)
+            {
+                //
+                // HACK HACK HACK HACK HACK!
+                    //
+                // This would NORMALLY happen inside logValidMsg, but at the point that this happens
+                // inside logValidMsg, there's no circuit for this message yet.  So the awful thing that
+                // we do here is do it inside this message handler immediately AFTER the message is
+                // handled.
+                //
+                // We COULD not do this, but then what happens is that some of the circuit bookkeeping
+                // gets broken, especially the packets in count.  That causes some later packets to flush
+                // the RecentlyReceivedReliable list, resulting in an error in which UseCircuitCode
+                // doesn't get properly duplicate suppressed.  Not a BIG deal, but it's somewhat confusing
+                // (and bad from a state point of view).  DJS 9/23/04
+                //
+                cdp->checkPacketInID(gMessageSystem->mCurrentRecvPacketID, false ); // Since this is the first message on the circuit, by definition it's not resent.
+            }
         }
 
         msg->mIPPortToCircuitCode[ip_port_in] = circuit_code_in;
@@ -2004,17 +2024,17 @@ void LLMessageSystem::processUseCircuitCode(LLMessageSystem* msg,
 void LLMessageSystem::processError(LLMessageSystem* msg, void**)
 {
     S32 error_code = 0;
-    msg->getS32("Data", "Code", error_code);
+    msg->getS32Fast(_PREHASH_Data, _PREHASH_Code, error_code);
     std::string error_token;
-    msg->getString("Data", "Token", error_token);
+    msg->getStringFast(_PREHASH_Data, _PREHASH_Token, error_token);
 
     LLUUID error_id;
-    msg->getUUID("Data", "ID", error_id);
+    msg->getUUIDFast(_PREHASH_Data, _PREHASH_ID, error_id);
     std::string error_system;
-    msg->getString("Data", "System", error_system);
+    msg->getStringFast(_PREHASH_Data, _PREHASH_System, error_system);
 
     std::string error_message;
-    msg->getString("Data", "Message", error_message);
+    msg->getStringFast(_PREHASH_Data, _PREHASH_Message, error_message);
 
     LL_WARNS("Messaging") << "Message error from " << msg->getSender() << " - "
         << error_code << " " << error_token << " " << error_id << " \""
@@ -2155,18 +2175,18 @@ S32 LLMessageSystem::sendError(
     const std::string& message,
     const LLSD& data)
 {
-    newMessage("Error");
+    newMessageFast(_PREHASH_Error);
     nextBlockFast(_PREHASH_AgentData);
     addUUIDFast(_PREHASH_AgentID, agent_id);
     nextBlockFast(_PREHASH_Data);
-    addS32("Code", code);
-    addString("Token", token);
-    addUUID("ID", id);
-    addString("System", system);
+    addS32Fast(_PREHASH_Code, code);
+    addStringFast(_PREHASH_Token, token);
+    addUUIDFast(_PREHASH_ID, id);
+    addStringFast(_PREHASH_System, system);
     std::string temp;
     temp = message;
     if(temp.size() > (size_t)MTUBYTES) temp.resize((size_t)MTUBYTES);
-    addString("Message", message);
+    addStringFast(_PREHASH_Message, message);
     LLPointer<LLSDBinaryFormatter> formatter = new LLSDBinaryFormatter;
     std::ostringstream ostr;
     formatter->format(data, ostr);
@@ -2184,13 +2204,13 @@ S32 LLMessageSystem::sendError(
     }
     if(pack_data)
     {
-        addBinaryData("Data", (void*)temp.c_str(), static_cast<S32>(temp.size()));
+        addBinaryDataFast(_PREHASH_Data, (void*)temp.c_str(), static_cast<S32>(temp.size()));
     }
     else
     {
         LL_WARNS("Messaging") << "Data and message were too large -- data removed."
             << LL_ENDL;
-        addBinaryData("Data", NULL, 0);
+        addBinaryDataFast(_PREHASH_Data, nullptr, 0);
     }
     return sendReliable(host);
 }
@@ -2376,7 +2396,7 @@ void dump_prehash_files()
 {
     U32 i;
     std::string filename("../../indra/llmessage/message_prehash.h");
-    LLFILE* fp = LLFile::fopen(filename, "w");  /* Flawfinder: ignore */
+    LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("w"));  /* Flawfinder: ignore */
     if (fp)
     {
         fprintf(
@@ -2407,7 +2427,7 @@ void dump_prehash_files()
         fclose(fp);
     }
     filename = std::string("../../indra/llmessage/message_prehash.cpp");
-    fp = LLFile::fopen(filename, "w");  /* Flawfinder: ignore */
+    fp = LLFile::fopen(filename, LLFILE_MODE("w"));  /* Flawfinder: ignore */
     if (fp)
     {
         fprintf(
@@ -2942,6 +2962,19 @@ void LLMessageSystem::setHandlerFuncFast(const char *name, void (*handler_func)(
     }
 }
 
+void LLMessageSystem::addHandlerFuncFast(const char *name, std::function<void (LLMessageSystem *msgsystem)> handler_slot)
+{
+    LLMessageTemplate* msgtemplate = get_ptr_in_map(mMessageTemplates, name);
+    if(msgtemplate)
+    {
+        msgtemplate->addHandlerFunc(handler_slot);
+    }
+    else
+    {
+        LL_ERRS("Messaging") << name << " is not a known message name!" << LL_ENDL;
+    }
+}
+
 bool LLMessageSystem::callHandler(const char *name,
         bool trustedSource, LLMessageSystem* msg)
 {
@@ -3311,7 +3344,7 @@ void LLMessageSystem::establishBidirectionalTrust(const LLHost &host, S64 frame_
 
     // Send a request, a deny, and give the host 2 seconds to complete
     // the trust handshake.
-    newMessage("RequestTrustedCircuit");
+    newMessageFast(_PREHASH_RequestTrustedCircuit);
     sendMessage(host);
     reallySendDenyTrustedCircuit(host);
     setHandlerFuncFast(_PREHASH_StartPingCheck, process_start_ping_check, NULL);
@@ -3927,7 +3960,12 @@ void LLMessageSystem::getString(const char *block, const char *var,
                   blocknum);
 }
 
-bool    LLMessageSystem::has(const char *blockname) const
+bool LLMessageSystem::hasFast(const char* blockname) const
+{
+    return getNumberOfBlocksFast(blockname) > 0;
+}
+
+bool LLMessageSystem::has(const char *blockname) const
 {
     return getNumberOfBlocks(blockname) > 0;
 }
@@ -4024,13 +4062,18 @@ const LLHost& LLMessageSystem::getSender() const
     return mLastSender;
 }
 
+LLCircuit* LLMessageSystem::getCircuit()
+{
+    return &mCircuitInfo;
+}
+
 void LLMessageSystem::sendUntrustedSimulatorMessageCoro(std::string url, std::string message, LLSD body, UntrustedCallback_t callback)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("untrustedSimulatorMessage", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("untrustedSimulatorMessage", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
 
     if (url.empty())
@@ -4049,8 +4092,10 @@ void LLMessageSystem::sendUntrustedSimulatorMessageCoro(std::string url, std::st
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
-    if ((callback) && (!callback.empty()))
+    if (callback != nullptr)
+    {
         callback((status) ? LL_ERR_NOERR : LL_ERR_TCP_TIMEOUT);
+    }
 }
 
 

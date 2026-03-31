@@ -65,17 +65,10 @@
 #include "llsingleton.h"
 
 class LLDiskCache :
-    public LLParamSingleton<LLDiskCache>
+    public LLSimpleton<LLDiskCache>
 {
     public:
-        /**
-         * Since this is using the LLSingleton pattern but we
-         * want to allow the constructor to be called first
-         * with various parameters, we also invoke the
-         * LLParamSingleton idiom and use it to initialize
-         * the class via a call in LLAppViewer.
-         */
-        LLSINGLETON(LLDiskCache,
+        LLDiskCache(
                     /**
                      * The full name of the cache folder - typically a
                      * a child of the main Viewer cache directory. Defined
@@ -104,7 +97,7 @@ class LLDiskCache :
          * so many things had to be pushed back there to accomodate it, that I
          * decided to move it here.  Still not sure that's completely right.
          */
-        static const std::string metaDataToFilepath(const LLUUID& id, LLAssetType::EType at);
+        static std::filesystem::path metaDataToFilepath(const LLUUID& id, LLAssetType::EType at);
 
         /**
          * Purge the oldest items in the cache so that the combined size of all files
@@ -139,7 +132,7 @@ class LLDiskCache :
          * directory. Primarily used here to determine the directory size
          * before and after the cache purge
          */
-        uintmax_t dirFileSize(const std::string& dir);
+        uintmax_t dirFileSize(const std::filesystem::path& dir);
 
     private:
         /**
@@ -155,7 +148,7 @@ class LLDiskCache :
          * setting could potentially point it at a non-cache directory (for example,
          * the Windows System dir) with disastrous results.
          */
-        static std::string sCacheDir;
+        static std::filesystem::path sCacheDir;
 
         /**
          * When enabled, displays additional debugging information in

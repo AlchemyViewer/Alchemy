@@ -90,6 +90,10 @@ public:
         S32 serial_num,
         void* user_data) override;
 
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+    void callbackSaveComplete();
+// [/SL:KB]
+
 protected:
 
     void updateTitleButtons() override;
@@ -97,6 +101,10 @@ protected:
     bool saveIfNeeded(LLInventoryItem* copyitem = NULL, bool sync = true);
 
     void deleteNotecard();
+
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+    /*virtual*/ void onBackupTimer() override;
+// [/SL:KB]
 
     static void onLoadComplete(const LLUUID& asset_uuid,
                                LLAssetType::EType type,
@@ -116,7 +124,8 @@ protected:
     bool onExternalChange(const std::string& filename);
     bool loadNotecardText(const std::string& filename);
     bool writeToFile(const std::string& filename);
-    std::string getTmpFileName();
+    std::string getCleanNameForTmpFile() const;
+    std::string getTmpFileName(const std::string& note_name) const;
 
 protected:
     LLViewerTextEditor* mEditor = nullptr;
@@ -125,6 +134,8 @@ protected:
     LLButton* mEditBtn = nullptr;
     LLButton* mDeleteBtn = nullptr;
     LLUICtrl* mLockBtn = nullptr;
+
+    std::string mNoteName;
 
     LLUUID mAssetID;
 

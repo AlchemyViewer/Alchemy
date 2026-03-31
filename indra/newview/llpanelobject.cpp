@@ -56,6 +56,7 @@
 #include "lltool.h"
 #include "lltoolcomp.h"
 #include "lltoolmgr.h"
+#include "lltoolpipette.h"
 #include "llui.h"
 #include "llviewerobject.h"
 #include "llviewerregion.h"
@@ -72,6 +73,7 @@
 // [/RLVa:KB]
 
 #include "lldrawpool.h"
+#include "llviewerjointattachment.h"
 
 //
 // Constants
@@ -85,6 +87,20 @@ enum {
     MI_TUBE,
     MI_RING,
     MI_SCULPT,
+    MI_PATH_LINE_PROFILE_CIRCLE_HALF,
+    MI_PATH_CIRCLE_PROFILE_CIRCLE_HALF,
+    MI_PATH_CIRCLE2_PROFILE_SQUARE,
+    MI_PATH_CIRCLE2_PROFILE_TRI,
+    MI_PATH_CIRCLE2_PROFILE_CIRCLE,
+    MI_PATH_CIRCLE2_PROFILE_CIRCLE_HALF,
+    MI_PATH_TEST_PROFILE_SQUARE,
+    MI_PATH_TEST_PROFILE_TRI,
+    MI_PATH_TEST_PROFILE_CIRCLE,
+    MI_PATH_TEST_PROFILE_CIRCLE_HALF,
+    MI_PATH_33_PROFILE_CIRCLE,
+    MI_PATH_33_PROFILE_SQUARE,
+    MI_PATH_33_PROFILE_TRIANGLE,
+    MI_PATH_33_PROFILE_HALFCIRCLE,
     MI_NONE,
     MI_VOLUME_COUNT
 };
@@ -96,8 +112,6 @@ enum {
     MI_HOLE_TRIANGLE,
     MI_HOLE_COUNT
 };
-
-const F32 MAX_ATTACHMENT_DIST = 3.5f; // meters
 
 //static const std::string LEGACY_FULLBRIGHT_DESC =LLTrans::getString("Fullbright");
 
@@ -126,8 +140,14 @@ bool    LLPanelObject::postBuild()
     childSetCommitCallback("Phantom Checkbox Ctrl",onCommitPhantom,this);
 
     // Position
-    mMenuClipboardPos = getChild<LLMenuButton>("clipboard_pos_btn");
     mLabelPosition = getChild<LLTextBox>("label position");
+    mBtnCopyPosition = findChild<LLButton>("copy_position_btn");
+    mBtnCopyPosition->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyPos(); });
+    mBtnPastePosition = findChild<LLButton>("paste_position_btn");
+    mBtnPastePosition->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPastePos(); });
+    mBtnPipettePosition = findChild<LLButton>("pipette_position_btn");
+    mBtnPipettePosition->setCommitCallback([this](LLUICtrl*, const LLSD&) { onClickPipettePos(); });
+
     mCtrlPosX = getChild<LLSpinCtrl>("Pos X");
     childSetCommitCallback("Pos X",onCommitPosition,this);
     mCtrlPosY = getChild<LLSpinCtrl>("Pos Y");
@@ -136,8 +156,14 @@ bool    LLPanelObject::postBuild()
     childSetCommitCallback("Pos Z",onCommitPosition,this);
 
     // Scale
-    mMenuClipboardSize = getChild<LLMenuButton>("clipboard_size_btn");
     mLabelSize = getChild<LLTextBox>("label size");
+    mBtnCopySize = findChild<LLButton>("copy_size_btn");
+    mBtnCopySize->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopySize(); });
+    mBtnPasteSize = findChild<LLButton>("paste_size_btn");
+    mBtnPasteSize->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteSize(); });
+    mBtnPipetteSize = findChild<LLButton>("pipette_size_btn");
+    mBtnPipetteSize->setCommitCallback([this](LLUICtrl*, const LLSD&) { onClickPipetteSize(); });
+
     mCtrlScaleX = getChild<LLSpinCtrl>("Scale X");
     childSetCommitCallback("Scale X",onCommitScale,this);
 
@@ -150,8 +176,14 @@ bool    LLPanelObject::postBuild()
     childSetCommitCallback("Scale Z",onCommitScale,this);
 
     // Rotation
-    mMenuClipboardRot = getChild<LLMenuButton>("clipboard_rot_btn");
     mLabelRotation = getChild<LLTextBox>("label rotation");
+    mBtnCopyRotation = findChild<LLButton>("copy_rotation_btn");
+    mBtnCopyRotation->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyRot(); });
+    mBtnPasteRotation = findChild<LLButton>("paste_rotation_btn");
+    mBtnPasteRotation->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteRot(); });
+    mBtnPipetteRotation = findChild<LLButton>("pipette_rotation_btn");
+    mBtnPipetteRotation->setCommitCallback([this](LLUICtrl*, const LLSD&) { onClickPipetteRot(); });
+
     mCtrlRotX = getChild<LLSpinCtrl>("Rot X");
     childSetCommitCallback("Rot X",onCommitRotation,this);
     mCtrlRotY = getChild<LLSpinCtrl>("Rot Y");
@@ -162,10 +194,15 @@ bool    LLPanelObject::postBuild()
     //--------------------------------------------------------
 
     // Base Type
+    mBtnCopyPrimParams = findChild<LLButton>("copy_primparams_btn");
+    mBtnCopyPrimParams->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyParams(); });
+    mBtnPastePrimParams = findChild<LLButton>("paste_primparams_btn");
+    mBtnPastePrimParams->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteParams(); });
+    mBtnPipettePrimParams = findChild<LLButton>("pipette_primparams_btn");
+    mBtnPipettePrimParams->setCommitCallback([this](LLUICtrl*, const LLSD&) { onClickPipetteParams(); });
+
     mComboBaseType = getChild<LLComboBox>("comboBaseType");
     childSetCommitCallback("comboBaseType",onCommitParametric,this);
-
-    mMenuClipboardParams = getChild<LLMenuButton>("clipboard_obj_params_btn");
 
     // Cut
     mLabelCut = getChild<LLTextBox>("text cut");
@@ -375,6 +412,18 @@ void LLPanelObject::getState( )
     }
 // [/RLVa:KB]
 
+    const F32 min_height = LLWorld::getInstance()->getMinAllowedZ(objectp, objectp->getPositionGlobal());
+    const F32 max_height = LLWorld::getInstance()->getRegionMaxHeight();
+    const F32 region_width = LLWorld::getInstance()->getRegionWidthInMeters();
+
+    const bool is_attachment = objectp->isAttachment();
+    mCtrlPosX->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -region_width);
+    mCtrlPosX->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : region_width);
+    mCtrlPosY->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -region_width);
+    mCtrlPosY->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : region_width);
+    mCtrlPosZ->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : min_height);
+    mCtrlPosZ->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : max_height);
+
     LLVector3 vec;
     if (enable_move)
     {
@@ -396,8 +445,10 @@ void LLPanelObject::getState( )
         calcp->clearVar(LLCalc::Z_POS);
     }
 
-    mMenuClipboardPos->setEnabled(enable_move);
     mLabelPosition->setEnabled( enable_move );
+    mBtnCopyPosition->setEnabled(enable_move);
+    mBtnPastePosition->setEnabled(enable_move && mHasClipboardPos);
+    mBtnPipettePosition->setEnabled(enable_move);
     mCtrlPosX->setEnabled(enable_move);
     mCtrlPosY->setEnabled(enable_move);
     mCtrlPosZ->setEnabled(enable_move);
@@ -422,8 +473,10 @@ void LLPanelObject::getState( )
         calcp->setVar(LLCalc::Z_SCALE, 0.f);
     }
 
-    mMenuClipboardSize->setEnabled(enable_scale);
     mLabelSize->setEnabled( enable_scale );
+    mBtnCopySize->setEnabled(enable_scale);
+    mBtnPasteSize->setEnabled(enable_scale && mHasClipboardSize);
+    mBtnPipetteSize->setEnabled(enable_scale);
     mCtrlScaleX->setEnabled( enable_scale );
     mCtrlScaleY->setEnabled( enable_scale );
     mCtrlScaleZ->setEnabled( enable_scale );
@@ -454,8 +507,10 @@ void LLPanelObject::getState( )
         calcp->clearVar(LLCalc::Z_ROT);
     }
 
-    mMenuClipboardRot->setEnabled(enable_rotate);
     mLabelRotation->setEnabled( enable_rotate );
+    mBtnCopyRotation->setEnabled(enable_rotate);
+    mBtnPasteRotation->setEnabled(enable_rotate && mHasClipboardRot);
+    mBtnPipetteRotation->setEnabled(enable_rotate);
     mCtrlRotX->setEnabled( enable_rotate );
     mCtrlRotY->setEnabled( enable_rotate );
     mCtrlRotZ->setEnabled( enable_rotate );
@@ -630,6 +685,54 @@ void LLPanelObject::getState( )
         {
             selected_item = MI_TUBE;
         }
+        else if ( path == LL_PCODE_PATH_CIRCLE2 && profile == LL_PCODE_PROFILE_EQUALTRI )
+        {
+            selected_item = MI_PATH_CIRCLE2_PROFILE_TRI;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE2 && profile == LL_PCODE_PROFILE_SQUARE )
+        {
+            selected_item = MI_PATH_CIRCLE2_PROFILE_SQUARE;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE2 && profile == LL_PCODE_PROFILE_CIRCLE_HALF )
+        {
+            selected_item = MI_PATH_CIRCLE2_PROFILE_CIRCLE_HALF;
+        }
+        else if ( path == LL_PCODE_PATH_TEST && profile == LL_PCODE_PROFILE_SQUARE )
+        {
+            selected_item = MI_PATH_TEST_PROFILE_SQUARE;
+        }
+        else if ( path == LL_PCODE_PATH_TEST && profile == LL_PCODE_PROFILE_EQUALTRI )
+        {
+            selected_item = MI_PATH_TEST_PROFILE_TRI;
+        }
+        else if ( path == LL_PCODE_PATH_TEST && profile == LL_PCODE_PROFILE_CIRCLE )
+        {
+            selected_item = MI_PATH_TEST_PROFILE_CIRCLE;
+        }
+        else if ( path == LL_PCODE_PATH_TEST && profile == LL_PCODE_PROFILE_CIRCLE_HALF )
+        {
+            selected_item = MI_PATH_TEST_PROFILE_CIRCLE_HALF;
+        }
+        else if ( path == LL_PCODE_PATH_LINE && profile == LL_PCODE_PROFILE_CIRCLE_HALF )
+        {
+            selected_item = MI_PATH_LINE_PROFILE_CIRCLE_HALF;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE_33 && profile == LL_PCODE_PROFILE_CIRCLE )
+        {
+            selected_item = MI_PATH_33_PROFILE_CIRCLE;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE_33 && profile == LL_PCODE_PROFILE_SQUARE )
+        {
+            selected_item = MI_PATH_33_PROFILE_SQUARE;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE_33 && profile == LL_PCODE_PROFILE_ISOTRI )
+        {
+            selected_item = MI_PATH_33_PROFILE_TRIANGLE;
+        }
+        else if ( path == LL_PCODE_PATH_CIRCLE_33 && profile == LL_PCODE_PROFILE_CIRCLE_HALF )
+        {
+            selected_item = MI_PATH_33_PROFILE_HALFCIRCLE;
+        }
         else
         {
             LL_INFOS("FloaterTools") << "Unknown path " << (S32) path << " profile " << (S32) profile << " in getState" << LL_ENDL;
@@ -637,7 +740,7 @@ void LLPanelObject::getState( )
         }
 
 
-        if (objectp->getParameterEntryInUse(LLNetworkData::PARAMS_SCULPT))
+        if (objectp->getSculptParams())
         {
             selected_item = MI_SCULPT;
             //LLFirstUse::useSculptedPrim();
@@ -754,6 +857,7 @@ void LLPanelObject::getState( )
         // Radius offset.
         F32 radius_offset = volume_params.getRadiusOffset();
         // Limit radius offset, based on taper and hole size y.
+#if 0 // Limit removal
         F32 radius_mag = fabs(radius_offset);
         F32 hole_y_mag = fabs(scale_y);
         F32 taper_y_mag  = fabs(taper_y);
@@ -778,6 +882,7 @@ void LLPanelObject::getState( )
                 radius_offset = max_radius_mag;
             }
         }
+#endif
         mSpinRadiusOffset->set( radius_offset);
         calcp->setVar(LLCalc::RADIUS_OFFSET, radius_offset);
 
@@ -789,6 +894,7 @@ void LLPanelObject::getState( )
         // Skew
         F32 skew    = volume_params.getSkew();
         // Limit skew, based on revolutions hole size x.
+#if 0 // Limit removal
         F32 skew_mag= fabs(skew);
         F32 min_skew_mag = 1.0f - 1.0f / (revolutions * scale_x + 1.0f);
         // Discontinuity; A revolution of 1 allows skews below 0.5.
@@ -808,6 +914,7 @@ void LLPanelObject::getState( )
                 skew = min_skew_mag;
             }
         }
+#endif
         mSpinSkew->set( skew );
         calcp->setVar(LLCalc::SKEW, skew);
     }
@@ -821,11 +928,11 @@ void LLPanelObject::getState( )
     bool top_shear_x_visible        = true;
     bool top_shear_y_visible        = true;
     bool twist_visible              = true;
-    bool advanced_cut_visible       = false;
-    bool taper_visible              = false;
-    bool skew_visible               = false;
-    bool radius_offset_visible      = false;
-    bool revolutions_visible        = false;
+    bool advanced_cut_visible       = true;
+    bool taper_visible              = true;
+    bool skew_visible               = true;
+    bool radius_offset_visible      = true;
+    bool revolutions_visible        = true;
     bool sculpt_texture_visible     = false;
     F32  twist_min                  = OBJECT_TWIST_LINEAR_MIN;
     F32  twist_max                  = OBJECT_TWIST_LINEAR_MAX;
@@ -839,11 +946,11 @@ void LLPanelObject::getState( )
     switch (selected_item)
     {
     case MI_SPHERE:
-        top_size_x_visible      = false;
-        top_size_y_visible      = false;
-        top_shear_x_visible     = false;
-        top_shear_y_visible     = false;
-        //twist_visible         = false;
+        top_size_x_visible      = true;
+        top_size_y_visible      = true;
+        top_shear_x_visible     = true;
+        top_shear_y_visible     = true;
+        twist_visible           = true;
         advanced_cut_visible    = true;
         advanced_is_dimple      = true;
         twist_min               = OBJECT_TWIST_MIN;
@@ -888,6 +995,7 @@ void LLPanelObject::getState( )
     case MI_BOX:
         advanced_cut_visible    = true;
         advanced_is_slice       = true;
+        taper_visible           = false;
         break;
 
     case MI_CYLINDER:
@@ -908,6 +1016,15 @@ void LLPanelObject::getState( )
     switch (selected_item)
     {
     case MI_SPHERE:
+        mSpinScaleX->set( scale_x );
+        mSpinScaleY->set( scale_y );
+        calcp->setVar(LLCalc::X_HOLE, scale_x);
+        calcp->setVar(LLCalc::Y_HOLE, scale_y);
+        mSpinScaleX->setMinValue(0.0f);
+        mSpinScaleX->setMaxValue(1.0f);
+        mSpinScaleY->setMinValue(0.0f);
+        mSpinScaleY->setMaxValue(1.0f);
+        break;
     case MI_TORUS:
     case MI_TUBE:
     case MI_RING:
@@ -923,12 +1040,24 @@ void LLPanelObject::getState( )
     default:
         if (editable && single_volume)
         {
-            mSpinScaleX->set( 1.f - scale_x );
-            mSpinScaleY->set( 1.f - scale_y );
-            mSpinScaleX->setMinValue(-1.f);
-            mSpinScaleX->setMaxValue(1.f);
-            mSpinScaleY->setMinValue(-1.f);
-            mSpinScaleY->setMaxValue(1.f);
+            if (selected_item == MI_BOX || selected_item == MI_CYLINDER || selected_item == MI_PRISM)
+            {
+                mSpinScaleX->set( 1.f - scale_x );
+                mSpinScaleY->set( 1.f - scale_y );
+                mSpinScaleX->setMinValue(-1.f);
+                mSpinScaleX->setMaxValue(1.f);
+                mSpinScaleY->setMinValue(-1.f);
+                mSpinScaleY->setMaxValue(1.f);
+            }
+            else
+            {
+                mSpinScaleX->set( scale_x );
+                mSpinScaleY->set( scale_x );
+                mSpinScaleX->setMinValue(-4000.f);
+                mSpinScaleX->setMaxValue(4000.f);
+                mSpinScaleY->setMinValue(-4000.f);
+                mSpinScaleY->setMaxValue(4000.f);
+            }
 
             // Torus' Hole Size is Box/Cyl/Prism's Taper
             calcp->setVar(LLCalc::X_TAPER, 1.f - scale_x);
@@ -942,6 +1071,7 @@ void LLPanelObject::getState( )
     }
 
     // Check if we need to limit the hollow based on the hole type.
+#if 0 // Limit removal
     if (  selected_hole == MI_HOLE_SQUARE &&
           ( selected_item == MI_CYLINDER || selected_item == MI_TORUS ||
             selected_item == MI_PRISM    || selected_item == MI_RING  ||
@@ -951,14 +1081,17 @@ void LLPanelObject::getState( )
         mSpinHollow->setMaxValue(70.f);
     }
     else
+#endif
     {
         mSpinHollow->setMinValue(0.f);
         mSpinHollow->setMaxValue(95.f);
     }
 
     // Update field enablement
+    mBtnCopyPrimParams->setEnabled(enabled);
+    mBtnPastePrimParams->setEnabled(enabled && mClipboardParams.isMap() && (mClipboardParams.size() != 0));
+    mBtnPipettePrimParams->setEnabled(enabled);
     mComboBaseType  ->setEnabled( enabled );
-    mMenuClipboardParams->setEnabled(enabled);
 
     mLabelCut       ->setEnabled( enabled );
     mSpinCutBegin   ->setEnabled( enabled );
@@ -1079,18 +1212,10 @@ void LLPanelObject::getState( )
     mLabelRevolutions->setVisible( revolutions_visible );
     mSpinRevolutions ->setVisible( revolutions_visible );
 
-    mCtrlSculptTexture->setVisible(sculpt_texture_visible);
-    mLabelSculptType->setVisible(sculpt_texture_visible);
-    mCtrlSculptType->setVisible(sculpt_texture_visible);
-
-
     // sculpt texture
     if (selected_item == MI_SCULPT)
     {
-
-
-        LLUUID id;
-        LLSculptParams *sculpt_params = (LLSculptParams *)objectp->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+        LLSculptParams *sculpt_params = objectp->getSculptParams();
 
 
         if (sculpt_params) // if we have a legal sculpt param block for this object:
@@ -1107,19 +1232,20 @@ void LLPanelObject::getState( )
             bool sculpt_mirror = sculpt_type & LL_SCULPT_FLAG_MIRROR;
             isMesh = (sculpt_stitching == LL_SCULPT_TYPE_MESH);
 
-            LLTextureCtrl*  mTextureCtrl = getChild<LLTextureCtrl>("sculpt texture control");
-            if(mTextureCtrl)
+            if (mCtrlSculptTexture)
             {
-                mTextureCtrl->setTentative(false);
-                mTextureCtrl->setEnabled(editable && !isMesh);
+                mCtrlSculptTexture->setTentative(false);
+                mCtrlSculptTexture->setEnabled(editable && !isMesh);
                 if (editable)
-                    mTextureCtrl->setImageAssetID(sculpt_params->getSculptTexture());
+                    mCtrlSculptTexture->setImageAssetID(sculpt_params->getSculptTexture());
                 else
-                    mTextureCtrl->setImageAssetID(LLUUID::null);
+                    mCtrlSculptTexture->setImageAssetID(LLUUID::null);
             }
 
             mComboBaseType->setEnabled(!isMesh);
-            mMenuClipboardParams->setEnabled(!isMesh);
+            mBtnCopyPrimParams->setEnabled(!isMesh);
+            mBtnPastePrimParams->setEnabled(!isMesh);
+            mBtnPipettePrimParams->setEnabled(!isMesh);
 
             if (mCtrlSculptType)
             {
@@ -1145,12 +1271,12 @@ void LLPanelObject::getState( )
             if (mCtrlSculptInvert)
             {
                 mCtrlSculptInvert->set(sculpt_invert);
-                mCtrlSculptInvert->setEnabled(editable);
+                mCtrlSculptInvert->setEnabled(editable && !isMesh);
             }
 
             if (mLabelSculptType)
             {
-                mLabelSculptType->setEnabled(true);
+                mLabelSculptType->setEnabled(!isMesh);
             }
 
         }
@@ -1160,6 +1286,9 @@ void LLPanelObject::getState( )
         mSculptTextureRevert = LLUUID::null;
     }
 
+    mCtrlSculptTexture->setVisible(sculpt_texture_visible && !isMesh);
+    mLabelSculptType->setVisible(sculpt_texture_visible && !isMesh);
+    mCtrlSculptType->setVisible(sculpt_texture_visible && !isMesh);
     mCtrlSculptMirror->setVisible(sculpt_texture_visible && !isMesh);
     mCtrlSculptInvert->setVisible(sculpt_texture_visible && !isMesh);
 
@@ -1258,13 +1387,13 @@ void LLPanelObject::onCommitParametric( LLUICtrl* ctrl, void* userdata )
     if (selected_type == MI_SCULPT)
     {
         self->mObject->setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, true, true);
-        LLSculptParams *sculpt_params = (LLSculptParams *)self->mObject->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+        LLSculptParams *sculpt_params = self->mObject->getSculptParams();
         if (sculpt_params)
             volume_params.setSculptID(sculpt_params->getSculptTexture(), sculpt_params->getSculptType());
     }
     else
     {
-        LLSculptParams *sculpt_params = (LLSculptParams *)self->mObject->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+        LLSculptParams *sculpt_params = self->mObject->getSculptParams();
         if (sculpt_params)
             self->mObject->setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, false, true);
     }
@@ -1328,6 +1457,76 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
     case MI_SCULPT:
         profile = LL_PCODE_PROFILE_CIRCLE;
         path = LL_PCODE_PATH_CIRCLE;
+        break;
+
+    case MI_PATH_LINE_PROFILE_CIRCLE_HALF:
+        profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+        path = LL_PCODE_PATH_LINE;
+        break;
+
+    case MI_PATH_CIRCLE_PROFILE_CIRCLE_HALF:
+        profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+        path = LL_PCODE_PATH_CIRCLE;
+        break;
+
+    case MI_PATH_CIRCLE2_PROFILE_SQUARE:
+        profile = LL_PCODE_PROFILE_SQUARE;
+        path = LL_PCODE_PATH_CIRCLE2;
+        break;
+
+    case MI_PATH_CIRCLE2_PROFILE_TRI:
+        profile = LL_PCODE_PROFILE_EQUALTRI;
+        path = LL_PCODE_PATH_CIRCLE2;
+        break;
+
+    case MI_PATH_CIRCLE2_PROFILE_CIRCLE:
+        profile = LL_PCODE_PROFILE_CIRCLE;
+        path = LL_PCODE_PATH_CIRCLE2;
+        break;
+
+    case MI_PATH_CIRCLE2_PROFILE_CIRCLE_HALF:
+        profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+        path = LL_PCODE_PATH_CIRCLE2;
+        break;
+
+    case MI_PATH_TEST_PROFILE_SQUARE:
+        profile = LL_PCODE_PROFILE_SQUARE;
+        path = LL_PCODE_PATH_TEST;
+        break;
+
+    case MI_PATH_TEST_PROFILE_TRI:
+        profile = LL_PCODE_PROFILE_EQUALTRI;
+        path = LL_PCODE_PATH_TEST;
+        break;
+
+    case MI_PATH_TEST_PROFILE_CIRCLE:
+        profile = LL_PCODE_PROFILE_CIRCLE;
+        path = LL_PCODE_PATH_TEST;
+        break;
+
+    case MI_PATH_TEST_PROFILE_CIRCLE_HALF:
+        profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+        path = LL_PCODE_PATH_TEST;
+        break;
+
+    case MI_PATH_33_PROFILE_CIRCLE:
+        profile = LL_PCODE_PROFILE_CIRCLE;
+        path = LL_PCODE_PATH_CIRCLE_33;
+        break;
+
+    case MI_PATH_33_PROFILE_SQUARE:
+        profile = LL_PCODE_PROFILE_SQUARE;
+        path = LL_PCODE_PATH_CIRCLE_33;
+        break;
+
+    case MI_PATH_33_PROFILE_TRIANGLE:
+        profile = LL_PCODE_PROFILE_ISOTRI;
+        path = LL_PCODE_PATH_CIRCLE_33;
+        break;
+
+    case MI_PATH_33_PROFILE_HALFCIRCLE:
+        profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+        path = LL_PCODE_PATH_CIRCLE_33;
         break;
 
     default:
@@ -1420,6 +1619,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
     // Hollowness
     F32 hollow = mSpinHollow->get() / 100.f;
 
+#if 0 // Limit removal
     if (  selected_hole == MI_HOLE_SQUARE &&
         ( selected_type == MI_CYLINDER || selected_type == MI_TORUS ||
           selected_type == MI_PRISM    || selected_type == MI_RING  ||
@@ -1427,6 +1627,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
     {
         if (hollow > 0.7f) hollow = 0.7f;
     }
+#endif
 
     volume_params.setHollow( hollow );
 
@@ -1470,6 +1671,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
     // Revolutions
     F32 revolutions   = mSpinRevolutions->get();
 
+#if 0 // Limit removal
     if ( selected_type == MI_SPHERE )
     {
         // Snap values to valid sphere parameters.
@@ -1540,6 +1742,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
             }
         }
     }
+#endif
 
     volume_params.setRatio( scale_x, scale_y );
     volume_params.setSkew(skew);
@@ -1583,7 +1786,8 @@ void LLPanelObject::sendRotation(bool btn_down)
     // Note: must compare before conversion to radians
     LLVector3 delta = new_rot - mCurEulerDegrees;
 
-    if (delta.magVec() >= 0.0005f)
+    // Rotated more then 1/20th of a millimeter
+    if (delta.magVec() >= 0.00005f)
     {
         mCurEulerDegrees = new_rot;
         new_rot *= DEG_TO_RAD;
@@ -1593,7 +1797,7 @@ void LLPanelObject::sendRotation(bool btn_down)
 
         if (mRootObject != mObject)
         {
-            rotation = rotation * ~mRootObject->getRotationRegion();
+            rotation = rotation * (mObject->isAttachment() ? ~mRootObject->getRotationEdit() : ~mRootObject->getRotationRegion());
         }
 
         // To include avatars into movements and rotation
@@ -1634,9 +1838,9 @@ void LLPanelObject::sendScale(bool btn_down)
     LLVector3 newscale(mCtrlScaleX->get(), mCtrlScaleY->get(), mCtrlScaleZ->get());
 
     LLVector3 delta = newscale - mObject->getScale();
-    if (delta.magVec() >= 0.0005f || (mSizeChanged && !btn_down))
+    if (delta.magVec() >= 0.00005f || (mSizeChanged && !btn_down))
     {
-        // scale changed by more than 1/2 millimeter
+        // scale changed by more than 1/20 millimeter
         mSizeChanged = btn_down;
 
         // check to see if we aren't scaling the textures
@@ -1669,6 +1873,7 @@ void LLPanelObject::sendPosition(bool btn_down)
     if (mObject.isNull()) return;
 
     LLVector3 newpos(mCtrlPosX->get(), mCtrlPosY->get(), mCtrlPosZ->get());
+    LLVector3d new_pos_global;
     LLViewerRegion* regionp = mObject->getRegion();
 
     if (!regionp) return;
@@ -1677,7 +1882,12 @@ void LLPanelObject::sendPosition(bool btn_down)
     {
         // Clamp the Z height
         const F32 height = newpos.mV[VZ];
-        const F32 min_height = LLWorld::getInstance()->getMinAllowedZ(mObject, mObject->getPositionGlobal());
+        LLVector3d height_check_pos = mObject->getPositionGlobal();
+        if (LLWorld::getInstance()->positionRegionValidGlobal(regionp->getPosGlobalFromRegion(newpos)))
+        {
+            height_check_pos = regionp->getPosGlobalFromRegion(newpos);
+        }
+        const F32 min_height = LLWorld::getInstance()->getMinAllowedZ(mObject, height_check_pos);
         const F32 max_height = LLWorld::getInstance()->getRegionMaxHeight();
 
         if ( height < min_height)
@@ -1696,6 +1906,10 @@ void LLPanelObject::sendPosition(bool btn_down)
         {
             mCtrlPosZ->set(LLWorld::getInstance()->resolveLandHeightAgent(newpos) + 1.f);
         }
+
+        // Make sure new position is in a valid region, so the object
+        // won't get dumped by the simulator.
+        new_pos_global = regionp->getPosGlobalFromRegion(newpos);
     }
     else
     {
@@ -1708,28 +1922,46 @@ void LLPanelObject::sendPosition(bool btn_down)
         }
     }
 
-    // Make sure new position is in a valid region, so the object
-    // won't get dumped by the simulator.
-    LLVector3d new_pos_global = regionp->getPosGlobalFromRegion(newpos);
-    bool is_valid_pos = true;
     if (mObject->isAttachment())
     {
-        LLVector3 delta_pos = mObject->getPositionEdit() - newpos;
-        LLVector3d attachment_pos = regionp->getPosGlobalFromRegion(mObject->getPositionRegion() + delta_pos);
-        is_valid_pos = LLWorld::getInstance()->positionRegionValidGlobal(attachment_pos);
-    }
-    else
-    {
-        is_valid_pos = LLWorld::getInstance()->positionRegionValidGlobal(new_pos_global);
-    }
+        const LLVector3& old_pos_local = mObject->getPosition();
 
-    if (is_valid_pos)
+        if (mRootObject != mObject)
+        {
+            newpos = newpos - mRootObject->getPosition();
+            newpos = newpos * ~mRootObject->getRotation();
+            mObject->setPositionParent(newpos);
+        }
+        else
+        {
+            mObject->setPosition(newpos);
+        }
+
+        LLManip::rebuild(mObject);
+        gAgentAvatarp->clampAttachmentPositions();
+
+        // for individually selected roots, we need to counter-translate all unselected children
+        if (mObject->isRootEdit())
+        {
+            const LLVector3& delta = mObject->getPosition();
+            // counter-translate child objects if we are moving the root as an individual
+            mObject->resetChildrenPosition(old_pos_local - delta, true);
+        }
+
+        if (!btn_down)
+        {
+            LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_POSITION);
+        }
+
+        LLSelectMgr::getInstance()->updateSelectionCenter();
+    }
+    else if (LLWorld::getInstance()->positionRegionValidGlobal(new_pos_global))
     {
         // send only if the position is changed, that is, the delta vector is not zero
         LLVector3d old_pos_global = mObject->getPositionGlobal();
         LLVector3d delta = new_pos_global - old_pos_global;
-        // moved more than 1/2 millimeter
-        if (delta.magVec() >= 0.0005f)
+        // moved more than 1/20 millimeter
+        if (delta.magVec() >= 0.00005f)
         {
             if (mRootObject != mObject)
             {
@@ -1838,69 +2070,64 @@ void LLPanelObject::refresh()
 
 void LLPanelObject::draw()
 {
-    const LLColor4  white(  1.0f,   1.0f,   1.0f,   1);
-    const LLColor4  red(    1.0f,   0.25f,  0.f,    1);
-    const LLColor4  green(  0.f,    1.0f,   0.f,    1);
-    const LLColor4  blue(   0.f,    0.5f,   1.0f,   1);
-
     // Tune the colors of the labels
     LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
 
     if (tool == LLToolCompTranslate::getInstance())
     {
-        mCtrlPosX   ->setLabelColor(red);
-        mCtrlPosY   ->setLabelColor(green);
-        mCtrlPosZ   ->setLabelColor(blue);
+        mCtrlPosX   ->setLabelColor(LLColor4::red);
+        mCtrlPosY   ->setLabelColor(LLColor4::green);
+        mCtrlPosZ   ->setLabelColor(LLColor4::blue);
 
-        mCtrlScaleX ->setLabelColor(white);
-        mCtrlScaleY ->setLabelColor(white);
-        mCtrlScaleZ ->setLabelColor(white);
+        mCtrlScaleX ->setLabelColor(LLColor4::white);
+        mCtrlScaleY ->setLabelColor(LLColor4::white);
+        mCtrlScaleZ ->setLabelColor(LLColor4::white);
 
-        mCtrlRotX   ->setLabelColor(white);
-        mCtrlRotY   ->setLabelColor(white);
-        mCtrlRotZ   ->setLabelColor(white);
+        mCtrlRotX   ->setLabelColor(LLColor4::white);
+        mCtrlRotY   ->setLabelColor(LLColor4::white);
+        mCtrlRotZ   ->setLabelColor(LLColor4::white);
     }
     else if ( tool == LLToolCompScale::getInstance() )
     {
-        mCtrlPosX   ->setLabelColor(white);
-        mCtrlPosY   ->setLabelColor(white);
-        mCtrlPosZ   ->setLabelColor(white);
+        mCtrlPosX   ->setLabelColor(LLColor4::white);
+        mCtrlPosY   ->setLabelColor(LLColor4::white);
+        mCtrlPosZ   ->setLabelColor(LLColor4::white);
 
-        mCtrlScaleX ->setLabelColor(red);
-        mCtrlScaleY ->setLabelColor(green);
-        mCtrlScaleZ ->setLabelColor(blue);
+        mCtrlScaleX ->setLabelColor(LLColor4::red);
+        mCtrlScaleY ->setLabelColor(LLColor4::green);
+        mCtrlScaleZ ->setLabelColor(LLColor4::blue);
 
-        mCtrlRotX   ->setLabelColor(white);
-        mCtrlRotY   ->setLabelColor(white);
-        mCtrlRotZ   ->setLabelColor(white);
+        mCtrlRotX   ->setLabelColor(LLColor4::white);
+        mCtrlRotY   ->setLabelColor(LLColor4::white);
+        mCtrlRotZ   ->setLabelColor(LLColor4::white);
     }
     else if ( tool == LLToolCompRotate::getInstance() )
     {
-        mCtrlPosX   ->setLabelColor(white);
-        mCtrlPosY   ->setLabelColor(white);
-        mCtrlPosZ   ->setLabelColor(white);
+        mCtrlPosX   ->setLabelColor(LLColor4::white);
+        mCtrlPosY   ->setLabelColor(LLColor4::white);
+        mCtrlPosZ   ->setLabelColor(LLColor4::white);
 
-        mCtrlScaleX ->setLabelColor(white);
-        mCtrlScaleY ->setLabelColor(white);
-        mCtrlScaleZ ->setLabelColor(white);
+        mCtrlScaleX ->setLabelColor(LLColor4::white);
+        mCtrlScaleY ->setLabelColor(LLColor4::white);
+        mCtrlScaleZ ->setLabelColor(LLColor4::white);
 
-        mCtrlRotX   ->setLabelColor(red);
-        mCtrlRotY   ->setLabelColor(green);
-        mCtrlRotZ   ->setLabelColor(blue);
+        mCtrlRotX   ->setLabelColor(LLColor4::red);
+        mCtrlRotY   ->setLabelColor(LLColor4::green);
+        mCtrlRotZ   ->setLabelColor(LLColor4::blue);
     }
     else
     {
-        mCtrlPosX   ->setLabelColor(white);
-        mCtrlPosY   ->setLabelColor(white);
-        mCtrlPosZ   ->setLabelColor(white);
+        mCtrlPosX   ->setLabelColor(LLColor4::white);
+        mCtrlPosY   ->setLabelColor(LLColor4::white);
+        mCtrlPosZ   ->setLabelColor(LLColor4::white);
 
-        mCtrlScaleX ->setLabelColor(white);
-        mCtrlScaleY ->setLabelColor(white);
-        mCtrlScaleZ ->setLabelColor(white);
+        mCtrlScaleX ->setLabelColor(LLColor4::white);
+        mCtrlScaleY ->setLabelColor(LLColor4::white);
+        mCtrlScaleZ ->setLabelColor(LLColor4::white);
 
-        mCtrlRotX   ->setLabelColor(white);
-        mCtrlRotY   ->setLabelColor(white);
-        mCtrlRotZ   ->setLabelColor(white);
+        mCtrlRotX   ->setLabelColor(LLColor4::white);
+        mCtrlRotY   ->setLabelColor(LLColor4::white);
+        mCtrlRotZ   ->setLabelColor(LLColor4::white);
     }
 
     LLPanel::draw();
@@ -1934,6 +2161,14 @@ void LLPanelObject::clearCtrls()
     mLabelRadiusOffset->setEnabled( false );
     mLabelRevolutions->setEnabled( false );
 
+    mBtnCopyPosition->setEnabled(false);
+    mBtnPastePosition->setEnabled(false);
+    mBtnCopySize->setEnabled(false);
+    mBtnPasteSize->setEnabled(false);
+    mBtnCopyRotation->setEnabled(false);
+    mBtnPasteRotation->setEnabled(false);
+    mBtnCopyPrimParams->setEnabled(false);
+    mBtnPastePrimParams->setEnabled(false);
     getChildView("scale_hole")->setEnabled(false);
     getChildView("scale_taper")->setEnabled(false);
     getChildView("advanced_cut")->setEnabled(false);
@@ -2005,11 +2240,9 @@ void LLPanelObject::onCommitPhantom( LLUICtrl* ctrl, void* userdata )
 
 void LLPanelObject::onSelectSculpt(const LLSD& data)
 {
-    LLTextureCtrl* mTextureCtrl = getChild<LLTextureCtrl>("sculpt texture control");
-
-    if (mTextureCtrl)
+    if (mCtrlSculptTexture)
     {
-        mSculptTextureRevert = mTextureCtrl->getImageAssetID();
+        mSculptTextureRevert = mCtrlSculptTexture->getImageAssetID();
     }
 
     sendSculpt();
@@ -2023,13 +2256,11 @@ void LLPanelObject::onCommitSculpt( const LLSD& data )
 
 bool LLPanelObject::onDropSculpt(LLInventoryItem* item)
 {
-    LLTextureCtrl* mTextureCtrl = getChild<LLTextureCtrl>("sculpt texture control");
-
-    if (mTextureCtrl)
+    if (mCtrlSculptTexture)
     {
         LLUUID asset = item->getAssetUUID();
 
-        mTextureCtrl->setImageAssetID(asset);
+        mCtrlSculptTexture->setImageAssetID(asset);
         mSculptTextureRevert = asset;
     }
 
@@ -2039,15 +2270,14 @@ bool LLPanelObject::onDropSculpt(LLInventoryItem* item)
 
 void LLPanelObject::onCancelSculpt(const LLSD& data)
 {
-    LLTextureCtrl* mTextureCtrl = getChild<LLTextureCtrl>("sculpt texture control");
-    if(!mTextureCtrl)
+    if(!mCtrlSculptTexture)
         return;
 
     if(mSculptTextureRevert == LLUUID::null)
     {
         mSculptTextureRevert = SCULPT_DEFAULT_TEXTURE;
     }
-    mTextureCtrl->setImageAssetID(mSculptTextureRevert);
+    mCtrlSculptTexture->setImageAssetID(mSculptTextureRevert);
 
     sendSculpt();
 }
@@ -2182,7 +2412,11 @@ void LLPanelObject::onCopyPos()
     std::string stringVec = llformat("<%g, %g, %g>", mClipboardPos.mV[VX], mClipboardPos.mV[VY], mClipboardPos.mV[VZ]);
     LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(stringVec));
 
+    LLStringUtil::format_map_t args;
+    args["VALUE"] = stringVec;
+    mBtnPastePosition->setToolTip(getString("paste_position", args));
     mHasClipboardPos = true;
+    refresh();
 }
 
 void LLPanelObject::onCopySize()
@@ -2192,7 +2426,12 @@ void LLPanelObject::onCopySize()
     std::string stringVec = llformat("<%g, %g, %g>", mClipboardSize.mV[VX], mClipboardSize.mV[VY], mClipboardSize.mV[VZ]);
     LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(stringVec));
 
+    LLStringUtil::format_map_t args;
+    args["VALUE"] = stringVec;
+    mBtnPasteSize->setToolTip(getString("paste_size", args));
+
     mHasClipboardSize = true;
+    refresh();
 }
 
 void LLPanelObject::onCopyRot()
@@ -2202,7 +2441,12 @@ void LLPanelObject::onCopyRot()
     std::string stringVec = llformat("<%g, %g, %g>", mClipboardRot.mV[VX], mClipboardRot.mV[VY], mClipboardRot.mV[VZ]);
     LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(stringVec));
 
+    LLStringUtil::format_map_t args;
+    args["VALUE"] = stringVec;
+    mBtnPasteRotation->setToolTip(getString("paste_rotation", args));
+
     mHasClipboardRot = true;
+    refresh();
 }
 
 void LLPanelObject::onPastePos()
@@ -2276,25 +2520,23 @@ void LLPanelObject::onCopyParams()
     mClipboardParams["volume_params"] = params.asLLSD();
 
     // Sculpted Prim
-    if (objectp->getParameterEntryInUse(LLNetworkData::PARAMS_SCULPT))
+    LLSculptParams *sculpt_params = objectp->getSculptParams();
+    if (sculpt_params)
     {
-        LLSculptParams *sculpt_params = (LLSculptParams *)objectp->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
-        if (sculpt_params)
+        LLUUID texture_id = sculpt_params->getSculptTexture();
+        if (get_can_copy_texture(texture_id))
         {
-            LLUUID texture_id = sculpt_params->getSculptTexture();
-            if (get_can_copy_texture(texture_id))
-            {
-                LL_DEBUGS("FloaterTools") << "Recording texture" << LL_ENDL;
-                mClipboardParams["sculpt"]["id"] = texture_id;
-            }
-            else
-            {
-                mClipboardParams["sculpt"]["id"] = SCULPT_DEFAULT_TEXTURE;
-            }
-
-            mClipboardParams["sculpt"]["type"] = sculpt_params->getSculptType();
+            LL_DEBUGS("FloaterTools") << "Recording texture" << LL_ENDL;
+            mClipboardParams["sculpt"]["id"] = texture_id;
         }
+        else
+        {
+            mClipboardParams["sculpt"]["id"] = SCULPT_DEFAULT_TEXTURE;
+        }
+
+        mClipboardParams["sculpt"]["type"] = sculpt_params->getSculptType();
     }
+    refresh();
 }
 
 void LLPanelObject::onPasteParams()
@@ -2316,7 +2558,7 @@ void LLPanelObject::onPasteParams()
     }
     else
     {
-        LLSculptParams *sculpt_params = (LLSculptParams *)objectp->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+        LLSculptParams *sculpt_params = objectp->getSculptParams();
         if (sculpt_params)
         {
             objectp->setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, false, true);
@@ -2344,4 +2586,192 @@ void LLPanelObject::onPasteParams()
 
         objectp->updateVolume(params);
     }
+}
+
+void LLPanelObject::onClickPipettePos()
+{
+    bool fEnabled = (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance()) && mBtnPipettePosition->getToggleState();
+    if (!fEnabled)
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onPosSelect, this, _1, _2, _3));
+        LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+        mBtnPipettePosition->setToggleState(true);
+    }
+    else
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+    }
+}
+
+void LLPanelObject::onClickPipetteSize()
+{
+    bool fEnabled = (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance()) && mBtnPipetteSize->getToggleState();
+    if (!fEnabled)
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onSizeSelect, this, _1, _2, _3));
+        LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+        mBtnPipetteSize->setToggleState(true);
+    }
+    else
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+    }
+}
+
+void LLPanelObject::onClickPipetteRot()
+{
+    bool fEnabled = (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance()) && mBtnPipetteRotation->getToggleState();
+    if (!fEnabled)
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onRotSelect, this, _1, _2, _3));
+        LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+        mBtnPipetteRotation->setToggleState(true);
+    }
+    else
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+    }
+}
+
+void LLPanelObject::onClickPipetteParams()
+{
+    bool fEnabled = (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance()) && mBtnPipettePrimParams->getToggleState();
+    if (!fEnabled)
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onParamsSelect, this, _1, _2, _3));
+        LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+        mBtnPipettePrimParams->setToggleState(true);
+    }
+    else
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+    }
+}
+
+void LLPanelObject::onPosSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
+{
+    if (success && obj && mObject && obj->permMove() && mObject->permMove())
+    {
+        LLVector3 selected_pos = obj->getPositionEdit();
+
+        // Clamp pos on non-attachments, just keep the prims within the region
+        if (!mObject->isAttachment())
+        {
+            F32 max_width = mObject->getRegion() ? mObject->getRegion()->getWidth() : REGION_WIDTH_METERS; // meters
+            selected_pos.mV[VX] = llclamp(selected_pos.mV[VX], 0.f, max_width);
+            selected_pos.mV[VY] = llclamp(selected_pos.mV[VY], 0.f, max_width);
+            //height will get properly clamped by sendPosition
+        }
+        else
+        {
+            selected_pos.clampLength(MAX_ATTACHMENT_DIST);
+        }
+
+        mCtrlPosX->set(selected_pos.mV[VX]);
+        mCtrlPosY->set(selected_pos.mV[VY]);
+        mCtrlPosZ->set(selected_pos.mV[VZ]);
+
+        sendPosition(false);
+    }
+    mBtnPipettePosition->setToggleState(false);
+}
+
+void LLPanelObject::onSizeSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
+{
+    if (success && obj && mObject && obj->permModify() && mObject->permModify())
+    {
+        LLVector3 selected_scale = obj->getScale();
+
+        F32 max_scale = get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
+
+        selected_scale.mV[VX] = llclamp(selected_scale.mV[VX], 0.01f, max_scale);
+        selected_scale.mV[VY] = llclamp(selected_scale.mV[VY], 0.01f, max_scale);
+        selected_scale.mV[VZ] = llclamp(selected_scale.mV[VZ], 0.01f, max_scale);
+
+        mCtrlScaleX->set(selected_scale.mV[VX]);
+        mCtrlScaleY->set(selected_scale.mV[VY]);
+        mCtrlScaleZ->set(selected_scale.mV[VZ]);
+
+        sendScale(false);
+    }
+    mBtnPipetteSize->setToggleState(false);
+}
+
+void LLPanelObject::onRotSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
+{
+    if (success && obj && mObject && obj->permMove() && mObject->permMove())
+    {
+        LLQuaternion selected_rot = obj->getRotationEdit();
+
+        LLVector3 new_euler_angles;
+        selected_rot.getEulerAngles(&(new_euler_angles.mV[VX]), &(new_euler_angles.mV[VY]), &(new_euler_angles.mV[VZ]));
+        new_euler_angles *= RAD_TO_DEG;
+        new_euler_angles.mV[VX] = fmod(ll_round(new_euler_angles.mV[VX], OBJECT_ROTATION_PRECISION) + 360.f, 360.f);
+        new_euler_angles.mV[VY] = fmod(ll_round(new_euler_angles.mV[VY], OBJECT_ROTATION_PRECISION) + 360.f, 360.f);
+        new_euler_angles.mV[VZ] = fmod(ll_round(new_euler_angles.mV[VZ], OBJECT_ROTATION_PRECISION) + 360.f, 360.f);
+
+        mCtrlRotX->set(new_euler_angles.mV[VX]);
+        mCtrlRotY->set(new_euler_angles.mV[VY]);
+        mCtrlRotZ->set(new_euler_angles.mV[VZ]);
+
+        sendRotation(false);
+    }
+    mBtnPipetteRotation->setToggleState(false);
+}
+
+void LLPanelObject::onParamsSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
+{
+    if (success && obj != mObject.get() && (obj && obj->permModify() && !obj->isMesh()) && (mObject && mObject->permModify() && !mObject->isMesh()))
+    {
+        if (obj->getVolume() && LL_PCODE_VOLUME == obj->getPCode())
+        {
+            LLSculptParams sculpt_params;
+            if (obj->getSculptParams())
+            {
+                const LLSculptParams* hit_sculpt_params = (LLSculptParams*)obj->getSculptParams();
+                LLUUID sculpt_texture = hit_sculpt_params->getSculptTexture();
+                if (!get_can_copy_texture(sculpt_texture))
+                {
+                    sculpt_texture = LLUUID(SCULPT_DEFAULT_TEXTURE);
+                }
+
+                LLSculptParams sculpt_params;
+                LLUUID sculpt_id = sculpt_texture;
+                U8 sculpt_type = hit_sculpt_params->getSculptType();;
+                sculpt_params.setSculptTexture(sculpt_id, sculpt_type);
+                mObject->setParameterEntry(LLNetworkData::PARAMS_SCULPT, sculpt_params, true);
+            }
+            else
+            {
+                LLSculptParams* sculpt_params = (LLSculptParams*)mObject->getSculptParams();
+                if (sculpt_params)
+                {
+                    mObject->setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, false, true);
+                }
+            }
+
+            LLVolumeParams new_params;
+            new_params.copyParams(obj->getVolume()->getParams());
+
+            LLVOVolume* volobjp = (LLVOVolume*)obj;
+            if (volobjp->isFlexible())
+            {
+                if (new_params.getPathParams().getCurveType() == LL_PCODE_PATH_LINE)
+                {
+                    new_params.getPathParams().setCurveType(LL_PCODE_PATH_FLEXIBLE);
+                }
+            }
+            else if (new_params.getPathParams().getCurveType() == LL_PCODE_PATH_FLEXIBLE)
+            {
+                new_params.getPathParams().setCurveType(LL_PCODE_PATH_LINE);
+            }
+
+            mObject->updateVolume(new_params);
+        }
+    }
+    mBtnPipettePrimParams->setToggleState(false);
 }

@@ -68,16 +68,16 @@
         label="Save to file..."
         layout="topleft"
         name="SaveToFile" />
-          <menu_item_separator
-           layout="topleft" />
-          <menu_item_call
-           label="Script Preferences..."
-           layout="topleft"
-           name="Colors">
-            <menu_item_call.on_click
-             function="Floater.Toggle"
-             parameter="script_colors"/>
-          </menu_item_call>
+      <menu_item_separator
+        layout="topleft" />
+      <menu_item_call
+        label="Script Preferences..."
+        layout="topleft"
+        name="Colors">
+        <menu_item_call.on_click
+          function="Floater.Toggle"
+          parameter="script_colors"/>
+      </menu_item_call>
     </menu>
     <menu
       top="0"
@@ -145,13 +145,13 @@
       <menu_item_call
         label="Search / Replace..."
         layout="topleft"
-             name="Search / Replace..."
-             shortcut="control|F" />
-            <menu_item_call
-             label="Go to line..."
-             layout="topleft"
-             name="Go to line..."
-             shortcut="control|G" />
+        name="Search / Replace..."
+        shortcut="control|F" />
+      <menu_item_call
+        label="Go to line..."
+        layout="topleft"
+        name="Go to line..."
+        shortcut="control|G" />
     </menu>
     <menu
       top="0"
@@ -165,8 +165,8 @@
       <menu_item_call
         label="Keyword Help..."
         layout="topleft"
-             name="Keyword Help..."
-             shortcut="shift|F1" />
+        name="Keyword Help..."
+        shortcut="shift|F1" />
     </menu>
   </menu_bar>
   <menu_button

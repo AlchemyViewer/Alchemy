@@ -44,7 +44,7 @@
 #include "llvocache.h"
 #include "llworld.h"
 
-#include "tinygltf/tiny_gltf.h"
+#include <tiny_gltf.h>
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
@@ -170,7 +170,7 @@ namespace
 
 void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::string& data_in)
 {
-    std::istringstream str(data_in);
+    boost::iostreams::stream<boost::iostreams::array_source> str(data_in.data(), data_in.size());
 
     LLSD data;
 
@@ -359,6 +359,7 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
 {
     if (asset_id.isNull() || override_json.empty())
     {
+        // If there is no asset, there can't be an override
         queueApply(obj, side, asset_id);
     }
     else
@@ -371,6 +372,7 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
 {
     if (asset_id.isNull() || material_override == nullptr)
     {
+        // If there is no asset, there can't be an override
         queueApply(obj, side, asset_id);
     }
     else
@@ -470,7 +472,7 @@ void LLGLTFMaterialList::flushUpdatesOnce(std::shared_ptr<CallbackHolder> callba
         {
             data[i]["gltf_json"] = e.override_data->asJSON();
         }
-        if (!e.override_json.empty())
+        else if (!e.override_json.empty())
         {
             data[i]["gltf_json"] = e.override_json;
         }
@@ -721,9 +723,9 @@ void LLGLTFMaterialList::modifyMaterialCoro(std::string cap_url, LLSD overrides,
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("modifyMaterialCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("modifyMaterialCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     LLCore::HttpHeaders::ptr_t httpHeaders;
 
     httpOpts->setFollowRedirects(true);

@@ -27,7 +27,7 @@
 #ifndef LL_LLUICOLORTABLE_H_
 #define LL_LLUICOLORTABLE_H_
 
-#include <map>
+#include <boost/unordered_map.hpp>
 
 #include "llinitparam.h"
 #include "llsingleton.h"
@@ -36,15 +36,16 @@
 
 class LLUIColor;
 
-class LLUIColorTable : public LLSingleton<LLUIColorTable>
+class LLUIColorTable : public LLSimpleton<LLUIColorTable>
 {
-    LLSINGLETON_EMPTY_CTOR(LLUIColorTable);
     LOG_CLASS(LLUIColorTable);
 
     // consider using sorted vector, can be much faster
-    typedef std::map<std::string, LLUIColor, std::less<>>  string_color_map_t;
+    typedef boost::unordered_map<std::string, LLUIColor, ll::string_hash, std::equal_to<>>  string_color_map_t;
 
 public:
+    LLUIColorTable() = default;
+
     struct ColorParams : LLInitParam::ChoiceBlock<ColorParams>
     {
         Alternative<LLColor4>    value;
@@ -91,7 +92,7 @@ public:
     bool loadFromSettings();
 
     // saves colors specified by the user to the users skin directory
-    void saveUserSettings() const;
+    void saveUserSettings(const bool scrub = false) const;
 
     const auto& getLoadedColors() { return mLoadedColors; }
     const auto& getUserColors() { return mUserSetColors; }

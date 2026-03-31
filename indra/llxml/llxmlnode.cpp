@@ -1234,11 +1234,14 @@ bool LLXMLNode::getAttribute(const char* name, LLXMLNodePtr& node, bool use_defa
 
 bool LLXMLNode::getAttribute(const LLStringTableEntry* name, LLXMLNodePtr& node, bool use_default_if_missing)
 {
-    LLXMLAttribList::const_iterator child_itr = mAttributes.find(name);
-    if (child_itr != mAttributes.end())
+    if (name)
     {
-        node = (*child_itr).second;
-        return true;
+        LLXMLAttribList::const_iterator child_itr = mAttributes.find(name);
+        if (child_itr != mAttributes.end())
+        {
+            node = (*child_itr).second;
+            return true;
+        }
     }
     if (use_default_if_missing && !mDefault.isNull())
     {
@@ -1367,12 +1370,6 @@ bool LLXMLNode::getAttributeVector3d(const char* name, LLVector3d& value )
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getDoubleValue(3, value.mdV));
-}
-
-bool LLXMLNode::getAttributeVector4(const char* name, LLVector4& value)
-{
-    LLXMLNodePtr node;
-    return (getAttribute(name, node) && node->getFloatValue(4, value.mV));
 }
 
 bool LLXMLNode::getAttributeQuat(const char* name, LLQuaternion& value )
@@ -1531,35 +1528,35 @@ const char *LLXMLNode::parseFloat(const char *str, F64 *dest, U32 precision, Enc
     {
         str = skipWhitespace(str);
 
-        if (strncmp(str, "inf", 3) == 0)
+        if (memcmp(str, "inf", 3) == 0)
         {
             *(U64 *)dest = 0x7FF0000000000000ll;
             return str + 3;
         }
-        if (strncmp(str, "-inf", 4) == 0)
+        if (memcmp(str, "-inf", 4) == 0)
         {
             *(U64 *)dest = 0xFFF0000000000000ll;
             return str + 4;
         }
-        if (strncmp(str, "1.#INF", 6) == 0)
+        if (memcmp(str, "1.#INF", 6) == 0)
         {
             *(U64 *)dest = 0x7FF0000000000000ll;
             return str + 6;
         }
-        if (strncmp(str, "-1.#INF", 7) == 0)
+        if (memcmp(str, "-1.#INF", 7) == 0)
         {
             *(U64 *)dest = 0xFFF0000000000000ll;
             return str + 7;
         }
 
-        F64 negative = 1.0;
+        F64 negative = 1.0f;
         if (str[0] == '+')
         {
             ++str;
         }
         if (str[0] == '-')
         {
-            negative = -1.0;
+            negative = -1.0f;
             ++str;
         }
 
@@ -1636,7 +1633,7 @@ const char *LLXMLNode::parseFloat(const char *str, F64 *dest, U32 precision, Enc
 
         F64 ret = F64(int_part) + (F64(f_part)/F64(1LL<<61));
 
-        F64 exponent = 1.0;
+        F64 exponent = 1.f;
         if (str[0] == 'e')
         {
             // Scientific notation!
@@ -2319,6 +2316,7 @@ void LLXMLNode::setUnsignedValue(U32 length, const U32* array, Encoding encoding
                 new_value.append(llformat("%08X", array[pos]));
             }
         }
+        mValue = new_value;
     }
     // TODO -- Handle Base32
 
@@ -2889,8 +2887,7 @@ void LLXMLNode::createUnitTest(S32 max_num_children)
                 {
                     random_node_array[value] = get_rand_node(root);
                     const char *node_name = random_node_array[value]->mName->mString;
-                    U32 node_name_size = U32(strlen(node_name));
-                    for (U32 pos=0; pos<node_name_size; ++pos)      /* Flawfinder: ignore */
+                    for (U32 pos=0; pos<strlen(node_name); ++pos)       /* Flawfinder: ignore */
                     {
                         U32 hash_contrib = U32(node_name[pos]) << ((pos % 4) * 8);
                         noderef_checksum ^= hash_contrib;

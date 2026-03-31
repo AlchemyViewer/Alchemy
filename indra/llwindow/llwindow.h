@@ -40,7 +40,7 @@ class LLWindowCallbacks;
 
 // Refer to llwindow_test in test/common/llwindow for usage example
 
-class LLWindow : public LLInstanceTracker<LLWindow>
+class LLWindow
 {
 public:
 
@@ -69,7 +69,7 @@ public:
     virtual bool maximize() = 0;
     virtual void minimize() = 0;
     virtual void restore() = 0;
-    virtual bool getFullscreen() = 0;
+    bool getFullscreen()    { return mFullscreen; };
     virtual bool getPosition(LLCoordScreen *position) = 0;
     virtual bool getSize(LLCoordScreen *size) = 0;
     virtual bool getSize(LLCoordWindow *size) = 0;
@@ -95,6 +95,7 @@ public:
 #if LL_WINDOWS && !LL_SDL_WINDOW
     virtual bool getCursorDelta(LLCoordCommon* delta) = 0;
 #endif
+    virtual bool isWrapMouse() const = 0;
     virtual void showCursor() = 0;
     virtual void hideCursor() = 0;
     virtual bool isCursorHidden() = 0;
@@ -170,7 +171,7 @@ public:
     // Returns true if valid color selected
     virtual bool dialogColorPicker(F32 *r, F32 *g, F32 *b);
 
-// return a platform-specific window reference (HWND on Windows, (__unsafe_unretained) NSWindow on the Mac, Gtk window on Linux)
+// return a platform-specific window reference (HWND on Windows, WindowRef on the Mac, Gtk window on Linux)
     virtual void *getPlatformWindow() = 0;
 
     // control platform's Language Text Input mechanisms.
@@ -201,6 +202,8 @@ public:
     };
 
     virtual S32 getRefreshRate() { return mRefreshRate; }
+
+    virtual void initWatchdog() {} // windows runs window as a thread and it needs a watchdog
 protected:
     LLWindow(LLWindowCallbacks* callbacks, bool fullscreen, U32 flags);
     virtual ~LLWindow();
@@ -314,6 +317,7 @@ public:
 //
 // helper funcs
 //
+extern LLWindow* gWindowp;
 extern bool gDebugWindowProc;
 
 // Protocols, like "http" and "https" we support in URLs

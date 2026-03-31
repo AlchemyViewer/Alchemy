@@ -150,6 +150,13 @@
          help_topic="preferences_input_tab"
          name="input" />
         <panel
+		 class="panel_preference"
+         filename="panel_preferences_advanced.xml"
+         label="Advanced"
+         layout="topleft"
+         help_topic="preferences_advanced1_tab"
+         name="advanced1" />
+        <panel
          class="panel_preference"
          filename="panel_preferences_uploads.xml"
          label="Uploads"
@@ -165,16 +172,14 @@
          name="controls" />
         <panel
          filename="panel_preferences_skins.xml"
-         label="Skins"
+         label="Themes"
          layout="topleft"
          name="skins" />
         <panel
-         class="panel_preference"
-         filename="panel_preferences_advanced.xml"
-         label="Advanced"
+         filename="panel_preferences_interface.xml"
+         label="Interface"
          layout="topleft"
-         help_topic="preferences_advanced1_tab"
-         name="advanced1" />
+         name="interface" />
     </tab_container>
 
 </floater>

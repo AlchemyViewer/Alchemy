@@ -87,6 +87,7 @@ public:
     LLConversationViewParticipant* findParticipant(const LLUUID& participant_id);
 
     void showVoiceIndicator(bool visible);
+    void showTypingIndicator(bool visible);
 
     virtual void refresh();
 
@@ -94,7 +95,8 @@ public:
     void setHighlightState(bool hihglight_state);
 
     LLFloater* getSessionFloater();
-    bool isInActiveVoiceChannel() { return mIsInActiveVoiceChannel; }
+    bool isInActiveVoiceChannel();
+    void updateConversationIndicators();
 
     bool highlightFriendTitle(LLConversationItem* vmi);
 
@@ -106,6 +108,7 @@ private:
 
     LLPanel*                mItemPanel;
     LLPanel*                mCallIconLayoutPanel;
+    LLPanel*                mTypingIconLayoutPanel;
     LLTextBox*              mSessionTitle;
     LLOutputMonitorCtrl*    mSpeakingIndicator;
     LLFlashTimer*           mFlashTimer;

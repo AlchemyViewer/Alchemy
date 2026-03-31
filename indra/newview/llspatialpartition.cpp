@@ -53,6 +53,7 @@
 #include "llvolumemgr.h"
 #include "llviewershadermgr.h"
 #include "llcontrolavatar.h"
+#include "lltoolmgr.h"
 
 extern bool gShiftFrame;
 
@@ -135,9 +136,13 @@ void LLSpatialGroup::clearDrawMap()
     mDrawMap.clear();
 }
 
-bool LLSpatialGroup::isHUDGroup()
+bool LLSpatialGroup::isHUDGroup() const
 {
-    return getSpatialPartition() && getSpatialPartition()->isHUDPartition() ;
+    if (hasState(DEAD))
+        return false;
+
+    LLSpatialPartition* part = (LLSpatialPartition*)mSpatialPartition;
+    return part && part->isHUDPartition();
 }
 
 void LLSpatialGroup::validate()
@@ -1658,12 +1663,10 @@ void renderOctree(LLSpatialGroup* group)
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
             gGL.diffuseColor4f(1,0,0,group->mBuilt);
-            gGL.flush();
             gGL.setLineWidth(5.f);
 
             const LLVector4a* bounds = group->getObjectBounds();
             drawBoxOutline(bounds[0], bounds[1]);
-            gGL.flush();
             gGL.setLineWidth(1.f);
             gGL.flush();
 
@@ -1973,12 +1976,10 @@ void renderBoundingBox(LLDrawable* drawable, bool set_color = true)
     LLViewerObject* vobj = drawable->getVObj();
     if (vobj && vobj->onActiveList())
     {
-        gGL.flush();
         gGL.setLineWidth(llmax(4.f*sinf(gFrameTimeSeconds*2.f)+1.f, 1.f));
         //gGL.setLineWidth(4.f*(sinf(gFrameTimeSeconds*2.f)*0.25f+0.75f));
         stop_glerror();
         drawBoxOutline(pos,size);
-        gGL.flush();
         gGL.setLineWidth(1.f);
     }
     else
@@ -2887,7 +2888,6 @@ public:
 
             if (i == 1)
             {
-                gGL.flush();
                 gGL.setLineWidth(3.f);
             }
 
@@ -2906,7 +2906,6 @@ public:
 
             if (i == 1)
             {
-                gGL.flush();
                 gGL.setLineWidth(1.f);
             }
         }
@@ -3624,12 +3623,11 @@ bool LLSpatialPartition::isVisible(const LLVector3& v)
     return true;
 }
 
-LL_ALIGN_PREFIX(16)
-class LLOctreeIntersect : public LLOctreeTraveler<LLViewerOctreeEntry, LLPointer<LLViewerOctreeEntry>>
+class alignas(16) LLOctreeIntersect : public LLOctreeTraveler<LLViewerOctreeEntry, LLPointer<LLViewerOctreeEntry>>
 {
 public:
-    LL_ALIGN_16(LLVector4a mStart);
-    LL_ALIGN_16(LLVector4a mEnd);
+    LLVector4a mStart;
+    LLVector4a mEnd;
 
     S32       *mFaceHit;
     LLVector4a *mIntersection;
@@ -3744,7 +3742,7 @@ public:
                 if (vobj->isAvatar())
                 {
                     LLVOAvatar* avatar = (LLVOAvatar*) vobj;
-                    if ((mPickRigged) || ((avatar->isSelf()) && (LLFloater::isVisible(gFloaterTools))))
+                    if ((mPickRigged) || LLToolMgr::getInstance()->inBuildMode())
                     {
                         LLViewerObject* hit = avatar->lineSegmentIntersectRiggedAttachments(mStart, mEnd, -1, mPickTransparent, mPickRigged, mPickUnselectable, mFaceHit, &intersection, mTexCoord, mNormal, mTangent);
                         if (hit)
@@ -3779,7 +3777,7 @@ public:
 
         return false;
     }
-} LL_ALIGN_POSTFIX(16);
+};
 
 LLDrawable* LLSpatialPartition::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
                                                      bool pick_transparent,

@@ -73,8 +73,8 @@ public:
     virtual ~HttpOpRequest();                           // Use release()
 
 private:
-    HttpOpRequest(const HttpOpRequest &);               // Not defined
-    void operator=(const HttpOpRequest &);              // Not defined
+    HttpOpRequest(const HttpOpRequest&)  = delete;
+    void operator=(const HttpOpRequest&) = delete;
 
 public:
     enum EMethod
@@ -226,6 +226,10 @@ public:
     int                 mPolicyRetryLimit;
     HttpTime            mPolicyMinRetryBackoff; // initial delay between retries (mcs)
     HttpTime            mPolicyMaxRetryBackoff;
+    U64                 mRequestId;
+
+    static void setMessageLogFunc(std::function<void(LLCore::HttpResponse* response)> func) { sMessageLogFunc = func;}
+    static std::function<void(LLCore::HttpResponse* response)> sMessageLogFunc;
 };  // end class HttpOpRequest
 
 

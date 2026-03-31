@@ -357,6 +357,8 @@ void LLVoiceChannel::suspend()
     {
         sSuspendedVoiceChannel = sCurrentVoiceChannel;
         sSuspended = true;
+
+        sCurrentVoiceChannelChangedSignal(sSuspendedVoiceChannel->mSessionID);
     }
 }
 
@@ -365,6 +367,7 @@ void LLVoiceChannel::resume()
 {
     if (sSuspended)
     {
+        sSuspended = false; // needs to be before activate() so that observers will be able to read state
         if (LLVoiceClient::getInstance()->voiceEnabled())
         {
             if (sSuspendedVoiceChannel)
@@ -382,7 +385,6 @@ void LLVoiceChannel::resume()
                 LLVoiceChannelProximal::getInstance()->activate();
             }
         }
-        sSuspended = false;
     }
 }
 
@@ -608,8 +610,8 @@ void LLVoiceChannelGroup::voiceCallCapCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("voiceCallCapCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("voiceCallCapCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD postData;
     postData["method"] = "call";

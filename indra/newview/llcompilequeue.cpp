@@ -62,6 +62,7 @@
 
 #include "llviewerassetupload.h"
 #include "llcorehttputil.h"
+#include "llpreviewscript.h"
 
 namespace
 {
@@ -380,11 +381,18 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     // Attempt to retrieve the experience
     LLUUID experienceId;
     {
-        LLExperienceCache::instance().fetchAssociatedExperience(inventory->getParentUUID(), inventory->getUUID(),
-            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _1));
+        if (object->getRegion() && object->getRegion()->isCapabilityAvailable("GetMetadata"))
+        {
+            LLExperienceCache::instance().fetchAssociatedExperience(inventory->getParentUUID(), inventory->getUUID(),
+                boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _1));
 
-        result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT,
-            LLSDMap("timeout", LLSD::Boolean(true)));
+            result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT,
+                LLSDMap("timeout", LLSD::Boolean(true)));
+        }
+        else
+        {
+            result = LLSD();
+        }
 
         floater.check();
 
@@ -463,10 +471,37 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
 
     LLUUID assetId = result["asset_id"];
 
+    // Check if this is a SLua script that shouldn't be recompiled to Mono/LSL
+    if (compile_target == "mono" || compile_target == "lsl2")
+    {
+        // Read the script from cache to check its type
+        LLFileSystem file(assetId, LLAssetType::AT_LSL_TEXT, LLFileSystem::READ);
+        if (file.getSize() > 0)
+        {
+            S32 file_length = file.getSize();
+            std::vector<char> buffer(file_length + 1);
+            file.read((U8*)&buffer[0], file_length);
+            buffer[file_length] = 0;
+            std::string script_text(&buffer[0]);
+
+            if (is_lua_script(script_text))
+            {
+                // This is a SLua script - skip it with a warning
+                LLStringUtil::format_map_t args;
+                args["[SCRIPT_NAME]"] = inventory->getName();
+                args["[TARGET]"] = (compile_target == "mono") ? "Mono" : "LSL";
+                std::string buffer = floater->getString("SkippingSluaScript", args);
+                floater->addStringMessage(buffer);
+                LL_INFOS("SCRIPTQ") << "Skipping SLua script: " << inventory->getName() << LL_ENDL;
+                return true;
+            }
+        }
+    }
+
     std::string url = object->getRegion()->getCapability("UpdateScriptTask");
 
     {
-        LLResourceUploadInfo::ptr_t uploadInfo(new LLQueuedScriptAssetUpload(object->getID(),
+        LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLQueuedScriptAssetUpload>(object->getID(),
             inventory->getUUID(),
             assetId,
             compile_target,
@@ -474,7 +509,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             inventory->getName(),
             LLUUID(),
             experienceId,
-            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _4)));
+            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _4));
 
         LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
     }
@@ -536,6 +571,10 @@ bool LLFloaterCompileQueue::startQueue()
             LLCoreHttpUtil::HttpCoroutineAdapter::callbackHttpGet(lookup_url,
                 success, failure);
             return true;
+        }
+        else
+        {
+            processExperienceIdResults(LLSD(), getKey().asUUID());
         }
     }
 
@@ -722,10 +761,6 @@ LLFloaterDeleteQueue::LLFloaterDeleteQueue(const LLSD& key)
 {
     setTitle(LLTrans::getString("DeleteQueueTitle"));
     setStartString(LLTrans::getString("DeleteQueueStart"));
-}
-
-LLFloaterDeleteQueue::~LLFloaterDeleteQueue()
-{
 }
 
 bool LLFloaterDeleteQueue::deleteObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater,

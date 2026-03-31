@@ -192,8 +192,8 @@ PICK: TEXTURE
      left_delta="0"
      name="inventory panel"
      top_pad="4"
-     filter_asset_types="texture|material"
-     width="231" />
+     width="231"
+     filter_asset_types="texture|material"/>
     <line_editor
      follows="left|bottom|right"
      layout="topleft"

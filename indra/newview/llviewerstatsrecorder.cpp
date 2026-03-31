@@ -41,7 +41,7 @@ LLViewerStatsRecorder::LLViewerStatsRecorder() :
     mLastSnapshotTime(0.0),
     mEnableStatsRecording(false),
     mEnableStatsLogging(false),
-    mInterval(0.2),
+    mInterval(0.2f),
     mMaxDuration(300.f),
     mSkipSaveIfZeros(false)
 {
@@ -194,7 +194,7 @@ void LLViewerStatsRecorder::writeToLog( F32 interval )
 
         // Open the data file
         makeStatsFileName();
-        mStatsFile = LLFile::fopen(mStatsFileName, "wb");
+        mStatsFile = LLFile::fopen(mStatsFileName, LLFILE_MODE("wb"));
 
         if (mStatsFile)
         {

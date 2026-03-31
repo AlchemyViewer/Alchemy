@@ -43,6 +43,7 @@
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
 
+#include "llhudtext.h"
 #include "llsky.h"
 #include "llvieweraudio.h"
 #include "llviewermenu.h"
@@ -68,6 +69,8 @@
 #include "llrender.h"
 #include "llnavigationbar.h"
 #include "llnotificationsutil.h"
+#include "llfloaterpreference.h"
+#include "llfloaterreg.h"
 #include "llfloatertools.h"
 #include "llpaneloutfitsinventory.h"
 #include "llpanellogin.h"
@@ -83,11 +86,7 @@
 // [/RLVa:KB]
 
 #if LL_DARWIN
-#if LL_WINDOW_SDL
-    #include "llwindowsdl.h "
-#else
-    #include "llwindowmacosx.h"
-#endif
+#include "llwindowmacosx.h"
 #endif
 
 // Third party library includes
@@ -159,6 +158,21 @@ static bool handleDebugAvatarJointsChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleDebugQualityPerformanceChanged(const LLSD& newvalue)
+{
+    // control was set directly or after adjusting Preference setting, no need to update
+    if (gSavedSettings.getU32("RenderQualityPerformance") != gSavedSettings.getU32("DebugQualityPerformance"))
+    {
+        LLFloaterPreference* instance = LLFloaterReg::getTypedInstance<LLFloaterPreference>("preferences");
+        if (instance)
+        {
+            gSavedSettings.setU32("RenderQualityPerformance", newvalue.asInteger());
+            instance->onChangeQuality(newvalue);
+        }
+    }
+    return true;
+}
+
 static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
 {
     if (isAgentAvatarValid())
@@ -171,15 +185,6 @@ static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
 
 static bool handleSetShaderChanged(const LLSD& newvalue)
 {
-// [RLVa:KB] - @setenv and @setsphere
-    if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canChangeEnvironment() || (LLVfxManager::instance().hasEffect(EVisualEffect::RlvSphere))) &&
-         (LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))&& (!gSavedSettings.getBOOL("WindLightUseAtmosShaders")) )
-    {
-        gSavedSettings.setBOOL("WindLightUseAtmosShaders", true);
-        return true;
-    }
-// [/RLVa:KB]
-
     // changing shader level may invalidate existing cached bump maps, as the shader type determines the format of the bump map it expects - clear and repopulate the bump cache
     gBumpImageList.destroyGL();
     gBumpImageList.restoreGL();
@@ -448,16 +453,6 @@ static bool handleUploadBakedTexOldChanged(const LLSD& newvalue)
     return true;
 }
 
-
-static bool handleWLSkyDetailChanged(const LLSD&)
-{
-    if (gSky.mVOWLSkyp.notNull())
-    {
-        gSky.mVOWLSkyp->updateGeometry(gSky.mVOWLSkyp->mDrawable);
-    }
-    return true;
-}
-
 static bool handleRepartition(const LLSD&)
 {
     if (gPipeline.isInit())
@@ -501,11 +496,7 @@ static bool handleAppleUseMultGLChanged(const LLSD& newvalue)
 {
     if (gGLManager.mInited)
     {
-#if LL_WINDOW_SDL
-        LLWindowSDL::setUseMultGL(newvalue.asBoolean());
-#else
         LLWindowMacOSX::setUseMultGL(newvalue.asBoolean());
-#endif
     }
     return true;
 }
@@ -657,25 +648,34 @@ bool toggle_agent_pause(const LLSD& newvalue)
     return true;
 }
 
-bool toggle_show_navigation_panel(const LLSD& newvalue)
+bool navigation_panel_change(const LLSD& newvalue)
 {
-    bool value = newvalue.asBoolean();
-
-    LLNavigationBar::getInstance()->setVisible(value);
-    gSavedSettings.setBOOL("ShowMiniLocationPanel", !value);
+    const U32 style = newvalue.asInteger();
+    LLPanelTopInfoBar::getInstance()->setVisible(style == 1);
+    LLNavigationBar::getInstance()->setVisible(style == 2);
     gViewerWindow->reshapeStatusBarContainer();
     return true;
 }
 
-bool toggle_show_mini_location_panel(const LLSD& newvalue)
-{
-    bool value = newvalue.asBoolean();
-
-    LLPanelTopInfoBar::getInstance()->setVisible(value);
-    gSavedSettings.setBOOL("ShowNavbarNavigationPanel", !value);
-
-    return true;
-}
+//bool toggle_show_navigation_panel(const LLSD& newvalue)
+//{
+//    bool value = newvalue.asBoolean();
+//
+//    LLNavigationBar::getInstance()->setVisible(value);
+//    gSavedSettings.setBOOL("ShowMiniLocationPanel", !value);
+//    gViewerWindow->reshapeStatusBarContainer();
+//    return true;
+//}
+//
+//bool toggle_show_mini_location_panel(const LLSD& newvalue)
+//{
+//    bool value = newvalue.asBoolean();
+//
+//    LLPanelTopInfoBar::getInstance()->setVisible(value);
+//    gSavedSettings.setBOOL("ShowNavbarNavigationPanel", !value);
+//
+//    return true;
+//}
 
 bool toggle_show_object_render_cost(const LLSD& newvalue)
 {
@@ -830,6 +830,7 @@ void setting_setup_signal_listener(LLControlGroup& group, const std::string& set
 
 void settings_setup_listeners()
 {
+    LL_PROFILE_ZONE_SCOPED;
     setting_setup_signal_listener(gSavedSettings, "FirstPersonAvatarVisible", handleRenderAvatarMouselookChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFarClip", handleRenderFarClipChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainScale", handleTerrainScaleChanged);
@@ -846,12 +847,12 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderUIBuffer", handleWindowResized);
     setting_setup_signal_listener(gSavedSettings, "RenderDepthOfField", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderHighPrecisionPostProcess", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSpecularResX", handleLUTBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSpecularResY", handleLUTBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleLUTBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
-    setting_setup_signal_listener(gSavedSettings, "RenderShadowHighPrecision", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleShadowsResized);
     setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleSetShaderChanged);
@@ -893,6 +894,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResolutionDivisorChanged);
 // [/SL:KB]
     setting_setup_signal_listener(gSavedSettings, "RenderPerformanceTest", handleRenderPerfTestChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderAvatarCloth", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "ChatFontSize", handleChatFontSizeChanged);
     setting_setup_signal_listener(gSavedSettings, "ConsoleMaxLines", handleConsoleMaxLinesChanged);
     setting_setup_signal_listener(gSavedSettings, "UploadBakedTexOld", handleUploadBakedTexOldChanged);
@@ -910,7 +912,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "MuteVoice", handleAudioVolumeChanged);
     setting_setup_signal_listener(gSavedSettings, "MuteAmbient", handleAudioVolumeChanged);
     setting_setup_signal_listener(gSavedSettings, "MuteUI", handleAudioVolumeChanged);
-    setting_setup_signal_listener(gSavedSettings, "WLSkyDetail", handleWLSkyDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis0", handleJoystickChanged);
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis1", handleJoystickChanged);
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis2", handleJoystickChanged);
@@ -976,8 +977,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "QAMode", show_debug_menus);
     setting_setup_signal_listener(gSavedSettings, "UseDebugMenus", show_debug_menus);
     setting_setup_signal_listener(gSavedSettings, "AgentPause", toggle_agent_pause);
-    setting_setup_signal_listener(gSavedSettings, "ShowNavbarNavigationPanel", toggle_show_navigation_panel);
-    setting_setup_signal_listener(gSavedSettings, "ShowMiniLocationPanel", toggle_show_mini_location_panel);
+    setting_setup_signal_listener(gSavedSettings, "NavigationBarStyle", navigation_panel_change);
+    //setting_setup_signal_listener(gSavedSettings, "ShowNavbarNavigationPanel", toggle_show_navigation_panel);
+    //setting_setup_signal_listener(gSavedSettings, "ShowMiniLocationPanel", toggle_show_mini_location_panel);
     setting_setup_signal_listener(gSavedSettings, "ShowObjectRenderingCost", toggle_show_object_render_cost);
     setting_setup_signal_listener(gSavedSettings, "ForceShowGrid", handleForceShowGrid);
     setting_setup_signal_listener(gSavedSettings, "RenderTransparentWater", handleRenderTransparentWaterChanged);
@@ -985,6 +987,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "SpellCheckDictionary", handleSpellCheckChanged);
     setting_setup_signal_listener(gSavedSettings, "LoginLocation", handleLoginLocationChanged);
     setting_setup_signal_listener(gSavedSettings, "DebugAvatarJoints", handleDebugAvatarJointsChanged);
+    setting_setup_signal_listener(gSavedSettings, "DebugQualityPerformance", handleDebugQualityPerformanceChanged);
 
     setting_setup_signal_listener(gSavedSettings, "TargetFPS", handleTargetFPSChanged);
     setting_setup_signal_listener(gSavedSettings, "AutoTuneFPS", handleAutoTuneFPSChanged);
@@ -1022,6 +1025,8 @@ void settings_setup_listeners()
 // [RLVa:KB] - Checked: 2015-12-27 (RLVa-1.5.0)
     gSavedSettings.getControl(RlvSettingNames::Main)->getSignal()->connect(boost::bind(&RlvSettings::onChangedSettingMain, _2));
 // [/RLVa:KB]
+    setting_setup_signal_listener(gSavedSettings, "AlchemyHudTextFadeDistance", LLHUDText::onFadeSettingsChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyHudTextFadeRange", LLHUDText::onFadeSettingsChanged);
 }
 
 #if TEST_CACHED_CONTROL

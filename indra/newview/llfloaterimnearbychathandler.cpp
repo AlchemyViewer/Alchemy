@@ -44,6 +44,7 @@
 #include "llfloaterimcontainer.h"
 #include "llrootview.h"
 #include "lllayoutstack.h"
+#include "llscripteditorws.h"
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvactions.h"
@@ -93,7 +94,7 @@ public:
     void addChat    (LLSD& chat);
     void arrangeToasts      ();
 
-    typedef boost::function<LLFloaterIMNearbyChatToastPanel* (void )> create_toast_panel_callback_t;
+    typedef std::function<LLFloaterIMNearbyChatToastPanel*(void)> create_toast_panel_callback_t;
     void setCreatePanelCallback(create_toast_panel_callback_t value) { m_create_toast_panel_callback_t = value;}
 
     void onToastDestroyed   (LLToast* toast, bool app_quitting);
@@ -341,6 +342,7 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
     {
         if (!gSavedSettings.getBOOL("ShowScriptErrors"))
             return;
+
         if (gSavedSettings.getS32("ShowScriptErrorsLocation") == 1)
             return;
     }
@@ -512,10 +514,10 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
             RlvUtil::filterNames(tmp_chat.mText);
             tmp_chat.mRlvNamesFiltered = true;
         }
+        RlvUtil::filterMentions(tmp_chat.mText);
     }
 // [/RLVa:KB]
 
-    LLFloaterReg::getInstance("im_container");
     LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
 
     // Build notification data
@@ -531,7 +533,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
 //  chat["sender_slurl"] = LLViewerChat::getSenderSLURL(chat_msg, args);
 // [RLVa:KB] - Checked: 2011-12-13 (RLVa-1.4.6) | Added: RLVa-1.4.6
     if ((CHAT_SOURCE_AGENT != chat_msg.mSourceType) || (!chat_msg.mRlvNamesFiltered))
-        chat["sender_slurl"] = LLViewerChat::getSenderSLURL(chat_msg, args);
+    chat["sender_slurl"] = LLViewerChat::getSenderSLURL(chat_msg, args);
 // [/RLVa:KB]
 
     if (chat_msg.mChatType == CHAT_TYPE_DIRECT &&
@@ -554,6 +556,15 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
         if (!gSavedSettings.getBOOL("ShowScriptErrors"))
             return;
 
+        if (gSavedSettings.getBOOL("ExternalWebsocketSyncEnable") && gSavedSettings.getBOOL("ExternalWebsocketForwardDebug"))
+        {
+            LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();
+            if (server)
+            {
+                server->forwardChatToIDE(chat_msg);
+            }
+        }
+
         // don't process debug messages from not owned objects, see EXT-7762
         if (gAgentID != chat_msg.mOwnerID)
         {
@@ -571,6 +582,16 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
                                                 txt_color % alpha,
                                                 chat_msg.mFromID);
             return;
+        }
+    }
+    else if ((chat_msg.mChatType == CHAT_TYPE_OWNER) &&
+        gSavedSettings.getBOOL("ExternalWebsocketSyncEnable") &&
+        gSavedSettings.getBOOL("ExternalWebsocketForwardDebug"))
+    {
+        LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();
+        if (server)
+        {
+            server->forwardChatToIDE(chat_msg);
         }
     }
 
@@ -598,13 +619,11 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
     // Send event on to LLEventStream
     sChatWatcher->post(chat);
 
-    LLFloaterIMContainer* im_box = LLFloaterReg::getTypedInstance<LLFloaterIMContainer>("im_container");
-
     if((  ( chat_msg.mSourceType == CHAT_SOURCE_AGENT
             && gSavedSettings.getBOOL("UseChatBubbles") )
         || mChannel.isDead()
         || !mChannel.get()->getShowToasts() )
-        && nearby_chat->isMessagePaneExpanded())
+        || nearby_chat->isMessagePanelVisible())
         // to prevent toasts in Do Not Disturb mode
         return;//no need in toast if chat is visible or if bubble chat is enabled
 
@@ -645,37 +664,38 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
             toast_msg = chat_msg.mText;
         }
 
-        bool chat_overlaps = false;
-        if(nearby_chat->getChatHistory())
-        {
-            LLRect chat_rect = nearby_chat->getChatHistory()->calcScreenRect();
-            for (std::list<LLView*>::const_iterator child_iter = gFloaterView->getChildList()->begin();
-                 child_iter != gFloaterView->getChildList()->end(); ++child_iter)
-            {
-                LLView *view = *child_iter;
-                const LLRect& rect = view->getRect();
-                if(view->isInVisibleChain() && (rect.overlaps(chat_rect)))
-                {
-                    if(!nearby_chat->getChatHistory()->hasAncestor(view))
-                    {
-                        chat_overlaps = true;
-                    }
-                    break;
-                }
-            }
-        }
-        //Don't show nearby toast, if conversation is visible and selected
-        if ((nearby_chat->hasFocus()) ||
-            (LLFloater::isVisible(nearby_chat) && nearby_chat->isTornOff() && !nearby_chat->isMinimized()) ||
-            ((im_box->getSelectedSession().isNull() && !chat_overlaps &&
-                ((LLFloater::isVisible(im_box) && !nearby_chat->isTornOff() && !im_box->isMinimized())
-                        || (LLFloater::isVisible(nearby_chat) && nearby_chat->isTornOff() && !nearby_chat->isMinimized())))))
-        {
-            if(nearby_chat->isMessagePaneExpanded())
-            {
-                return;
-            }
-        }
+        // This is insane.
+        //bool chat_overlaps = false;
+        //if(nearby_chat->getChatHistory())
+        //{
+        //  LLRect chat_rect = nearby_chat->getChatHistory()->calcScreenRect();
+        //  for (std::list<LLView*>::const_iterator child_iter = gFloaterView->getChildList()->begin();
+        //       child_iter != gFloaterView->getChildList()->end(); ++child_iter)
+        //  {
+        //      LLView *view = *child_iter;
+        //      const LLRect& rect = view->getRect();
+        //      if(view->isInVisibleChain() && (rect.overlaps(chat_rect)))
+        //      {
+        //          if(!nearby_chat->getChatHistory()->hasAncestor(view))
+        //          {
+        //              chat_overlaps = true;
+        //          }
+        //          break;
+        //      }
+        //  }
+        //}
+        ////Don't show nearby toast, if conversation is visible and selected
+        //if ((nearby_chat->hasFocus()) ||
+        //  (LLFloater::isVisible(nearby_chat) && nearby_chat->isTornOff() && !nearby_chat->isMinimized()) ||
+        //    ((im_box->getSelectedSession().isNull() && !chat_overlaps &&
+        //      ((LLFloater::isVisible(im_box) && !nearby_chat->isTornOff() && !im_box->isMinimized())
+        //              || (LLFloater::isVisible(nearby_chat) && nearby_chat->isTornOff() && !nearby_chat->isMinimized())))))
+        //{
+        //  if(nearby_chat->isMessagePaneExpanded())
+        //  {
+        //      return;
+        //  }
+        //}
 
         std::string user_preferences;
         if (chat_msg.mSourceType == CHAT_SOURCE_OBJECT)

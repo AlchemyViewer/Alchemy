@@ -25,11 +25,10 @@
  * $/LicenseInfo$
  */
 
-#ifndef LL_LLVIEWEROBJECT_H
-#define LL_LLVIEWEROBJECT_H
+#pragma once
 
 #include <map>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 #include "llassetstorage.h"
 //#include "llhudicon.h"
@@ -69,7 +68,6 @@ class LLMessageSystem;
 class LLNameValue;
 class LLPartSysData;
 class LLPipeline;
-class LLReflectionMap;
 class LLTextureEntry;
 class LLVOAvatar;
 class LLVOInventoryListener;
@@ -127,13 +125,15 @@ class LLViewerObject
 protected:
     virtual ~LLViewerObject(); // use unref()
 
+private:
     // TomY: Provide for a list of extra parameter structures, mapped by structure name
     struct ExtraParameter
     {
-        bool in_use;
-        LLNetworkData *data;
+        bool is_invalid = false;
+        bool* in_use = nullptr;
+        LLNetworkData* data = nullptr;
     };
-    boost::unordered_map<U16, ExtraParameter*> mExtraParameterList;
+    std::vector<ExtraParameter> mExtraParameterList;
 
 public:
     typedef std::list<LLPointer<LLViewerObject> > child_list_t;
@@ -221,6 +221,7 @@ public:
     virtual U32 getNumVertices() const;
     virtual U32 getNumIndices() const;
     S32 getNumFaces() const { return mNumFaces; }
+    S32 getNumVisibleFaces() const;
 
     // Graphical stuff for objects - maybe broken out into render class later?
     virtual void updateTextures();
@@ -249,6 +250,9 @@ public:
 
     // Accessor functions
     LLViewerRegion* getRegion() const               { return mRegionp; }
+
+    // Check if object is reachable from agent region by traversing loaded neighboring regions
+    bool isReachable();
 
     bool isSelected() const                         { return mUserSelected; }
     // Check whole linkset
@@ -393,6 +397,7 @@ public:
     /*virtual*/ S32     setTEGlow(const U8 te, const F32 glow);
     /*virtual*/ S32     setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID);
     /*virtual*/ S32     setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialParams);
+    S32 initRenderMaterial(const U8 te);
     virtual     S32     setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* mat);
 
     // Used by Materials update functions to properly kick off rebuilds
@@ -550,7 +555,10 @@ public:
     // save a script, which involves removing the old one, and rezzing
     // in the new one. This method should be called with the asset id
     // of the new and old script AFTER the bytecode has been saved.
-    void saveScript(const LLViewerInventoryItem* item, bool active, bool is_new);
+    // The simulator treats the script as new when item->getAssetUUID().isNull() is true; in that case
+    // template_id will be used (if non-null) to copy an existing script asset, otherwise the
+    // script subtype in the item will be used to select the correct template.
+    void saveScript(const LLViewerInventoryItem* item, bool active, bool is_new, const LLUUID& template_id);
 
     // move an inventory item out of the task and into agent
     // inventory. This operation is based on messaging. No permissions
@@ -623,6 +631,11 @@ public:
     void setPhysicsDensity(F32 density);
     void setPhysicsRestitution(F32 restitution);
 
+    static void markObjectsForUpdate(const LLUUID& owner_id);
+    static void removeObjectFromPendingUpdate(LLViewerObject* obj);
+    static bool isObjectInPendingUpdate(const LLUUID& owner_id, LLViewerObject* obj);
+    void requestObjectUpdate();
+
     virtual void dump() const;
     static U32      getNumZombieObjects()           { return sNumZombieObjects; }
 
@@ -633,10 +646,16 @@ public:
     void dirtySpatialGroup() const;
     virtual void dirtyMesh();
 
-    virtual LLNetworkData* getParameterEntry(U16 param_type) const;
-    virtual bool setParameterEntry(U16 param_type, const LLNetworkData& new_value, bool local_origin);
-    virtual bool getParameterEntryInUse(U16 param_type) const;
-    virtual bool setParameterEntryInUse(U16 param_type, bool in_use, bool local_origin);
+    LLFlexibleObjectData* getFlexibleObjectData() const { return mFlexibleObjectDataInUse ? mFlexibleObjectData.get() : nullptr; }
+    LLLightParams* getLightParams() const { return mLightParamsInUse ? mLightParams.get() : nullptr; }
+    LLSculptParams* getSculptParams() const { return mSculptParamsInUse ? mSculptParams.get() : nullptr; }
+    LLLightImageParams* getLightImageParams() const { return mLightImageParamsInUse ? mLightImageParams.get() : nullptr; }
+    LLExtendedMeshParams* getExtendedMeshParams() const { return mExtendedMeshParamsInUse ? mExtendedMeshParams.get() : nullptr; }
+    LLRenderMaterialParams* getRenderMaterialParams() const { return mRenderMaterialParamsInUse ? mRenderMaterialParams.get() : nullptr; }
+    LLReflectionProbeParams* getReflectionProbeParams() const { return mReflectionProbeParamsInUse ? mReflectionProbeParams.get() : nullptr; }
+
+    bool setParameterEntry(U16 param_type, const LLNetworkData& new_value, bool local_origin);
+    bool setParameterEntryInUse(U16 param_type, bool in_use, bool local_origin);
     // Called when a parameter is changed
     virtual void parameterChanged(U16 param_type, bool local_origin);
     virtual void parameterChanged(U16 param_type, LLNetworkData* data, bool in_use, bool local_origin);
@@ -678,8 +697,31 @@ private:
     bool isAssetInInventory(LLViewerInventoryItem* item, LLAssetType::EType type);
 
     ExtraParameter* createNewParameterEntry(U16 param_type);
-    ExtraParameter* getExtraParameterEntry(U16 param_type) const;
-    ExtraParameter* getExtraParameterEntryCreate(U16 param_type);
+    const ExtraParameter& getExtraParameterEntry(U16 param_type) const
+    {
+        return mExtraParameterList[U32(param_type >> 4) - 1];
+    }
+    ExtraParameter& getExtraParameterEntry(U16 param_type)
+    {
+        return mExtraParameterList[U32(param_type >> 4) - 1];
+    }
+    ExtraParameter* getExtraParameterEntryCreate(U16 param_type)
+    {
+        if (param_type <= LLNetworkData::PARAMS_MAX)
+        {
+            ExtraParameter& param = getExtraParameterEntry(param_type);
+            if (!param.is_invalid)
+            {
+                if (!param.data)
+                {
+                    ExtraParameter* new_entry = createNewParameterEntry(param_type);
+                    return new_entry;
+                }
+                return &param;
+            }
+        }
+        return nullptr;
+    }
     bool unpackParameterEntry(U16 param_type, LLDataPacker *dp);
 
     // This function checks to see if the given media URL has changed its version
@@ -752,7 +794,24 @@ private:
     // Grabbed from UPDATE_FLAGS
     U32             mFlags;
 
+    bool mFlexibleObjectDataInUse = false,
+        mLightParamsInUse = false,
+        mSculptParamsInUse = false,
+        mLightImageParamsInUse = false,
+        mExtendedMeshParamsInUse = false,
+        mRenderMaterialParamsInUse = false,
+        mReflectionProbeParamsInUse = false;
+    std::unique_ptr<LLFlexibleObjectData> mFlexibleObjectData;
+    std::unique_ptr<LLLightParams> mLightParams;
+    std::unique_ptr<LLSculptParams> mSculptParams;
+    std::unique_ptr<LLLightImageParams> mLightImageParams;
+    std::unique_ptr<LLExtendedMeshParams> mExtendedMeshParams;
+    std::unique_ptr<LLRenderMaterialParams> mRenderMaterialParams;
+    std::unique_ptr<LLReflectionProbeParams> mReflectionProbeParams;
+
     static std::map<std::string, U32> sObjectDataMap;
+    static boost::unordered_map<LLUUID, std::vector<LLViewerObject*>> sPendingUpdatesByOwner;
+
 public:
     // Sent to sim in UPDATE_FLAGS, received in ObjectPhysicsProperties
     U8              mPhysicsShapeType;
@@ -1059,5 +1118,3 @@ public:
     virtual void updateDrawable(bool force_damped);
 };
 
-
-#endif

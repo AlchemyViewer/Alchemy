@@ -34,6 +34,7 @@
 #include <vector>
 
 #include <boost/signals2/trackable.hpp>
+#include <boost/unordered_map.hpp>
 
 #include "llavatarappearance.h"
 #include "llchat.h"
@@ -264,7 +265,7 @@ public:
 
 
 private: //aligned members
-    LL_ALIGN_16(LLVector4a  mImpostorExtents[2]);
+    LLVector4a  mImpostorExtents[2];
 
     //--------------------------------------------------------------------
     // Updates
@@ -354,7 +355,7 @@ public:
     //--------------------------------------------------------------------
 public:
     static S32      sRenderName;
-    static bool     sRenderGroupTitles;
+    static S32      sRenderGroupTitles;
     static const U32 NON_IMPOSTORS_MAX_SLIDER; /* Must equal the maximum allowed the RenderAvatarMaxNonImpostors
                                                 * slider in panel_preferences_graphics1.xml */
     static U32      sMaxNonImpostors; // affected by control "RenderAvatarMaxNonImpostors"
@@ -497,7 +498,6 @@ public:
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
     bool        isRlvSilhouette() const;
 // [/RLVa:KB]
-
     // states for RenderAvatarComplexityMode
     enum ERenderComplexityMode
     {
@@ -1131,7 +1131,9 @@ private:
     bool            mNameFriend;
     bool            mNameCloud;
     F32             mNameAlpha;
-    bool            mRenderGroupTitles;
+    S32             mRenderGroupTitles;
+    LLColor4        mNameTagColor;
+    std::string     mDistanceString;
 
     //--------------------------------------------------------------------
     // Display the name (then optionally fade it out)
@@ -1143,6 +1145,7 @@ private:
     LLFrameTimer    mTimeVisible;
     std::deque<LLChat> mChats;
     bool            mTyping;
+    bool            mTypingLast;
     LLFrameTimer    mTypingTimer;
 
 /**                    Name
@@ -1269,7 +1272,7 @@ extern const F32 MIN_HOVER_Z;
 std::string get_sequential_numbered_file_name(const std::string& prefix,
                                               const std::string& suffix);
 void dump_sequential_xml(const std::string outprefix, const LLSD& content);
-void dump_visual_param(apr_file_t* file, LLVisualParam* viewer_param, F32 value);
+void dump_visual_param(LLFile* file, LLVisualParam* viewer_param, F32 value);
 
 #endif // LL_VOAVATAR_H
 

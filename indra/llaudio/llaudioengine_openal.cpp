@@ -476,6 +476,7 @@ void LLAudioEngine_OpenAL::updateWind(LLVector3 wind_vec, F32 camera_altitude)
         // wind comes in as Linden coordinate (+X = forward, +Y = left, +Z = up)
         // need to convert this to the conventional orientation DS3D and OpenAL use
         // where +X = right, +Y = up, +Z = backwards
+
         wind_vec.setVec(-wind_vec.mV[1], wind_vec.mV[2], -wind_vec.mV[0]);
 
         pitch = 1.0 + mapWindVecToPitch(wind_vec);

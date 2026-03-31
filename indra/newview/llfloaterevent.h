@@ -3,9 +3,8 @@
  * @brief Display for events in the finder
  *
  * $LicenseInfo:firstyear=2004&license=viewerlgpl$
- * Alchemy Viewer Source Code
+ * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * Copyright (C) 2014, Cinder Roxley @ Second Life
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,19 +28,35 @@
 #define LL_LLFLOATEREVENT_H
 
 #include "llfloater.h"
+#include "llviewermediaobserver.h"
 
-class LLFloaterEvent final : public LLFloater
+
+class LLMediaCtrl;
+class LLButton;
+
+class LLFloaterEvent : public LLFloater,
+                       public LLViewerMediaObserver
 
 {
 public:
     LLFloaterEvent(const LLSD& key);
-    /*virtual*/ ~LLFloaterEvent() = default;
+    /*virtual*/ ~LLFloaterEvent();
+
     bool postBuild() override;
-    void onOpen(const LLSD& key) override;
+
     void setEventID(const U32 event_id);
 
-private:
-    LLPanel* mPanel;
+    U32 getEventID() { return mEventID; }
+
+
+
+protected:
+    void handleMediaEvent(LLPluginClassMedia *self, EMediaEvent event) override;
+
+    U32             mEventID;
+
+    LLMediaCtrl*    mBrowser;
+
 };
 
 #endif // LL_LLFLOATEREVENT_H
