@@ -288,6 +288,17 @@ bool LLSlider::handleScrollWheel(S32 x, S32 y, S32 clicks)
     return LLF32UICtrl::handleScrollWheel(x,y,clicks);
 }
 
+bool LLSlider::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+{
+    if (mOrientation == HORIZONTAL)
+    {
+        F32 new_val = getValueF32() - clicks * getIncrement();
+        setValueAndCommit(new_val);
+        return true;
+    }
+    return LLF32UICtrl::handleScrollHWheel(x, y, clicks);
+}
+
 void LLSlider::draw()
 {
     F32 alpha = getDrawContext().mAlpha;
