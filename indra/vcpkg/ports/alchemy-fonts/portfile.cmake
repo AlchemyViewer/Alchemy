@@ -1,8 +1,8 @@
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO AlchemyViewer/alchemy-fonts
-    REF 41951feb4197ec183dcafa69ecee32f8042cbcb6
-    SHA512 93345a78cc3fbb1bd1446ba152d0f31fe61baddb4e262268099728b67536869fb0f853dac8235fe48b5c612abbc351ec4cfcdab05a6f9d5950bd4c6da7ca40a6
+    REF b6f7421556d52b1bc58fa303ac8a212816fe014d
+    SHA512 18733597fdc03262398a563c6f0bdc98558c1a7941615b0737475270192367a8c336de7cc1f841d30d576e22fb8008b68dcb362f25ad75e02919eff7aac2c1f0
     HEAD_REF main
 )
 
@@ -13,6 +13,7 @@ file(INSTALL
     PATTERN "*.ttc"
     PATTERN "*.ttf"
     PATTERN "*.otf"
+    PATTERN "*.woff2"
     PATTERN "*.txt"
 )
 
@@ -23,6 +24,7 @@ file(INSTALL
     PATTERN "*.ttc"
     PATTERN "*.ttf"
     PATTERN "*.otf"
+    PATTERN "*.woff2"
     PATTERN "*.txt"
 )
 

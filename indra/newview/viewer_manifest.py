@@ -148,6 +148,9 @@ class ViewerManifest(LLManifest):
             fonts_dir = os.path.join(self.args['vcpkg_dir'], 'share', 'secondlife-fonts', 'fonts')
             with self.prefix(src=fonts_dir,src_dst="fonts"):
                 self.path("*.ttf")
+                self.path("*.otf")
+                self.path("*.ttc")
+                self.path("*.woff2")
                 self.path("*.txt")
 
             # skins
