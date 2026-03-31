@@ -535,11 +535,13 @@ static void register_uninstall_info(const std::wstring& install_dir,
                                     const std::wstring& version)
 {
     std::wstring app_name_oneword = get_app_name_oneword();
-    // Clear previous 'alpha' name just in case, won't be needed after one-click releases.
+    // Clears velopack's recently created 'uninstall' registry entry.
+    // We are going to use a custom one.
+    // Note that velopack doesn't know about our custom entry.
     std::wstring key_path = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + app_name_oneword;
     RegDeleteTreeW(HKEY_CURRENT_USER, key_path.c_str());
     // Use a unique key name to avoid conflicts with any existing NSIS-based uninstall info,
-    // which can cause nly one of the two entries to show up in the Add/Remove Programs list.
+    // which can cause only one of the two entries to show up in the Add/Remove Programs list.
     // The UI will show DisplayName, so the key name itself is not important to be user-friendly.
     key_path = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Vlpk" + app_name_oneword;
     HKEY hkey;
@@ -579,7 +581,18 @@ static void register_uninstall_info(const std::wstring& install_dir,
         RegSetValueExW(hkey, L"NoModify", 0, REG_DWORD, (BYTE*)&no_modify, sizeof(DWORD));
         RegSetValueExW(hkey, L"NoRepair", 0, REG_DWORD, (BYTE*)&no_modify, sizeof(DWORD));
 
-        DWORD estimated_size = 120000;
+        // Format YYYYMMDD
+        wchar_t dateStr[9];
+        time_t t = time(NULL);
+        struct tm tm;
+        localtime_s(&tm, &t);
+        wcsftime(dateStr, 9, L"%Y%m%d", &tm);
+        RegSetValueExW(hkey, L"InstallDate", 0, REG_SZ, (BYTE*)dateStr, (DWORD)((wcslen(dateStr) + 1) * sizeof(wchar_t))); // Let Windows fill in the install date
+
+        // 800 MB, inaccurate, but for a rough idea.
+        // We can check folder size here, but it would take time and
+        // information is of low importance.
+        DWORD estimated_size = 800000;
         RegSetValueExW(hkey, L"EstimatedSize", 0, REG_DWORD, (BYTE*)&estimated_size, sizeof(DWORD));
 
         RegCloseKey(hkey);
@@ -618,19 +631,31 @@ static void remove_shortcuts(const std::wstring& app_name)
     DeleteFileW((desktop_path + L"\\" + app_name + L".lnk").c_str());
 }
 
+static void on_first_run(void* p_user_data, const char* app_version)
+{
+    // Velopack first executes 'after install' hook, then writes registry,
+    // then executes 'on first run' hook.
+    // As we need to clear velopack's 'uninstall' registry entry and use
+    // our own, clean it here instead of on_after_install.
+
+    std::wstring install_dir = get_install_dir();
+    std::wstring app_name = get_app_name();
+
+    int len = MultiByteToWideChar(CP_UTF8, 0, app_version, -1, NULL, 0);
+    std::wstring version(len, 0);
+    MultiByteToWideChar(CP_UTF8, 0, app_version, -1, &version[0], len);
+
+    register_uninstall_info(install_dir, app_name, version);
+}
+
 static void on_after_install(void* user_data, const char* app_version)
 {
     std::wstring install_dir = get_install_dir();
     std::wstring app_name = get_app_name();
     std::wstring exe_path = install_dir + L"\\" + get_viewer_exe_name();
 
-    int len = MultiByteToWideChar(CP_UTF8, 0, app_version, -1, NULL, 0);
-    std::wstring version(len, 0);
-    MultiByteToWideChar(CP_UTF8, 0, app_version, -1, &version[0], len);
-
     register_protocol_handler(PROTOCOL_SECONDLIFE, L"URL:Second Life", exe_path);
     register_protocol_handler(PROTOCOL_GRID_INFO, L"URL:Second Life", exe_path);
-    register_uninstall_info(install_dir, app_name, version);
     create_shortcuts(install_dir, app_name);
 }
 
@@ -658,6 +683,10 @@ static void on_log_message(void* user_data, const char* level, const char* messa
 // macOS-specific hooks
 // TODO: Implement protocol handler registration via Launch Services
 // TODO: Implement app bundle management
+
+static void on_first_run(void* user_data, const char* app_version)
+{
+}
 
 static void on_after_install(void* user_data, const char* app_version)
 {
@@ -847,6 +876,7 @@ bool velopack_initialize()
     vpkc_app_set_auto_apply_on_startup(false);
 
 #if LL_WINDOWS || LL_DARWIN
+    vpkc_app_set_hook_first_run(on_first_run);
     vpkc_app_set_hook_after_install(on_after_install);
     vpkc_app_set_hook_before_uninstall(on_before_uninstall);
 #endif
