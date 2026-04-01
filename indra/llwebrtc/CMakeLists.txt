@@ -17,11 +17,11 @@ set_target_properties(llwebrtc PROPERTIES PUBLIC_HEADER llwebrtc.h)
 if (WINDOWS)
     set_target_properties(llwebrtc
         PROPERTIES
-        LINK_FLAGS "/debug /LARGEADDRESSAWARE /NODEFAULTLIB:\"LIBCMTD;MSVCRT;MSVCRTD\" /MANIFEST:NO" # Intentionally override all link flags for llwebrtc
-        MSVC_RUNTIME_LIBRARY "MultiThreaded"
         EXCLUDE_FROM_DEFAULT_BUILD_DEBUG ON
         RUNTIME_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}"
         )
+
+    target_link_options(llwebrtc PRIVATE /MANIFEST:NO)
     target_link_libraries(llwebrtc PRIVATE ll::webrtc
                                        secur32
                                        winmm
@@ -29,8 +29,7 @@ if (WINDOWS)
                                        wmcodecdspuuid
                                        msdmo
                                        strmiids
-                                       iphlpapi
-                                       libcmt)
+                                       iphlpapi)
 
     if (USE_BUGSPLAT)
         set_target_properties(llwebrtc PROPERTIES PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}")
