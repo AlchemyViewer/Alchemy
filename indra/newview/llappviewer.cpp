@@ -418,10 +418,6 @@ const std::string LOGOUT_MARKER_FILE_NAME("Alchemy.logout_marker");
 const std::string WATCHDOG_MARKER_FILE_NAME("Alchemy.watchdog_marker");
 static std::string gLaunchFileOnQuit;
 
-// Used on Win32 for other apps to identify our window (eg, win_setup)
-const char* const VIEWER_WINDOW_CLASSNAME = "Alchemy";
-
-
 //----------------------------------------------------------------------------
 
 // List of entries from strings.xml to always replace
@@ -3303,7 +3299,7 @@ bool LLAppViewer::initWindow()
     LLViewerWindow::Params window_params;
     window_params
         .title(gWindowTitle)
-        .name(VIEWER_WINDOW_CLASSNAME)
+        .name(sWindowClass)
         .x(gSavedSettings.getS32("WindowX"))
         .y(gSavedSettings.getS32("WindowY"))
         .width(gSavedSettings.getU32("WindowWidth"))

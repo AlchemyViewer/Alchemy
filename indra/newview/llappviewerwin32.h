@@ -60,8 +60,6 @@ protected:
 
     std::string generateSerialNumber();
 
-    static const std::string sWindowClass;
-
 private:
     void disableWinErrorReporting();
 

@@ -243,7 +243,6 @@ LONG WINAPI catchallCrashHandler(EXCEPTION_POINTERS * /*ExceptionInfo*/)
     return 0;
 }
 
-const std::string LLAppViewerWin32::sWindowClass = "Alchemy";
 
 // Create app mutex creates a unique global windows object.
 // If the object can be created it returns true, otherwise
@@ -990,7 +989,7 @@ bool LLAppViewerWin32::restoreErrorTrap()
 bool LLAppViewerWin32::sendURLToOtherInstance(const std::string& url)
 {
     wchar_t window_class[256]; /* Flawfinder: ignore */   // Assume max length < 255 chars.
-    mbstowcs(window_class, sWindowClass.c_str(), 255);
+    mbstowcs(window_class, sWindowClass, 255);
     window_class[255] = 0;
     // Use the class instead of the window name.
     HWND other_window = FindWindow(window_class, NULL);
