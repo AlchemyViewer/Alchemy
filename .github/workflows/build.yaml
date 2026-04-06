@@ -443,152 +443,152 @@ jobs:
             ${{ steps.configure.outputs.build_directory }}/llappearanceutility/Release/appearance-utility-bin
             ${{ steps.configure.outputs.build_directory }}/llappearanceutility/Release/appearance-utility-headless-bin
 
-  sign-and-package-windows:
-    env:
-      AZURE_KEY_VAULT_URI: ${{ secrets.AZURE_KEY_VAULT_URI }}
-      AZURE_CERT_NAME: ${{ secrets.AZURE_CERT_NAME }}
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-    needs: [setup, build]
-    runs-on: windows-2022
-    if: needs.setup.outputs.build_type == 'proprietary'
-    steps:
-      - name: Sign and package Windows viewer
-        if: env.AZURE_KEY_VAULT_URI && env.AZURE_CERT_NAME && env.AZURE_CLIENT_ID && env.AZURE_CLIENT_SECRET && env.AZURE_TENANT_ID
-        uses: secondlife/viewer-build-util/sign-pkg-windows@geenz/velopack
-        with:
-          vault_uri: "${{ env.AZURE_KEY_VAULT_URI }}"
-          cert_name: "${{ env.AZURE_CERT_NAME }}"
-          client_id: "${{ env.AZURE_CLIENT_ID }}"
-          client_secret: "${{ env.AZURE_CLIENT_SECRET }}"
-          tenant_id: "${{ env.AZURE_TENANT_ID }}"
-          installer_type: "${{ github.event.inputs.installer_type || 'velopack' }}"
-          velopack_pack_id: "${{ needs.build.outputs.velopack_pack_id }}"
-          velopack_pack_version: "${{ needs.build.outputs.velopack_pack_version }}"
-          velopack_pack_title: "${{ needs.build.outputs.velopack_pack_title }}"
-          velopack_main_exe: "${{ needs.build.outputs.velopack_main_exe }}"
-          velopack_exclude: "${{ needs.build.outputs.velopack_exclude }}"
-          velopack_icon: "${{ needs.build.outputs.velopack_icon }}"
-          velopack_installer_base: "${{ needs.build.outputs.velopack_installer_base }}"
+  # sign-and-package-windows:
+  #   env:
+  #     AZURE_KEY_VAULT_URI: ${{ secrets.AZURE_KEY_VAULT_URI }}
+  #     AZURE_CERT_NAME: ${{ secrets.AZURE_CERT_NAME }}
+  #     AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  #     AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  #     AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  #   needs: [setup, build]
+  #   runs-on: windows-2022
+  #   if: needs.setup.outputs.build_type == 'proprietary'
+  #   steps:
+  #     - name: Sign and package Windows viewer
+  #       if: env.AZURE_KEY_VAULT_URI && env.AZURE_CERT_NAME && env.AZURE_CLIENT_ID && env.AZURE_CLIENT_SECRET && env.AZURE_TENANT_ID
+  #       uses: secondlife/viewer-build-util/sign-pkg-windows@geenz/velopack
+  #       with:
+  #         vault_uri: "${{ env.AZURE_KEY_VAULT_URI }}"
+  #         cert_name: "${{ env.AZURE_CERT_NAME }}"
+  #         client_id: "${{ env.AZURE_CLIENT_ID }}"
+  #         client_secret: "${{ env.AZURE_CLIENT_SECRET }}"
+  #         tenant_id: "${{ env.AZURE_TENANT_ID }}"
+  #         installer_type: "${{ github.event.inputs.installer_type || 'velopack' }}"
+  #         velopack_pack_id: "${{ needs.build.outputs.velopack_pack_id }}"
+  #         velopack_pack_version: "${{ needs.build.outputs.velopack_pack_version }}"
+  #         velopack_pack_title: "${{ needs.build.outputs.velopack_pack_title }}"
+  #         velopack_main_exe: "${{ needs.build.outputs.velopack_main_exe }}"
+  #         velopack_exclude: "${{ needs.build.outputs.velopack_exclude }}"
+  #         velopack_icon: "${{ needs.build.outputs.velopack_icon }}"
+  #         velopack_installer_base: "${{ needs.build.outputs.velopack_installer_base }}"
 
-  sign-and-package-mac:
-    env:
-      NOTARIZE_CREDS_MACOS: ${{ secrets.NOTARIZE_CREDS_MACOS }}
-      SIGNING_CERT_MACOS: ${{ secrets.SIGNING_CERT_MACOS }}
-      SIGNING_CERT_MACOS_IDENTITY: ${{ secrets.SIGNING_CERT_MACOS_IDENTITY }}
-      SIGNING_CERT_MACOS_PASSWORD: ${{ secrets.SIGNING_CERT_MACOS_PASSWORD }}
-    needs: [setup, build]
-    runs-on: macos-latest
-    if: needs.setup.outputs.build_type == 'proprietary'
-    steps:
-      - name: Unpack Mac notarization credentials
-        if: env.NOTARIZE_CREDS_MACOS
-        id: note-creds
-        shell: bash
-        run: |
-          # In NOTARIZE_CREDS_MACOS we expect to find:
-          # USERNAME="..."
-          # PASSWORD="..."
-          # TEAM_ID="..."
-          eval "${{ env.NOTARIZE_CREDS_MACOS }}"
-          echo "::add-mask::$USERNAME"
-          echo "::add-mask::$PASSWORD"
-          echo "::add-mask::$TEAM_ID"
-          echo "note_user=$USERNAME" >> "$GITHUB_OUTPUT"
-          echo "note_pass=$PASSWORD" >> "$GITHUB_OUTPUT"
-          echo "note_team=$TEAM_ID" >> "$GITHUB_OUTPUT"
-          # If we didn't manage to retrieve all of these credentials, better
-          # find out sooner than later.
-          [[ -n "$USERNAME" && -n "$PASSWORD" && -n "$TEAM_ID" ]]
+  # sign-and-package-mac:
+  #   env:
+  #     NOTARIZE_CREDS_MACOS: ${{ secrets.NOTARIZE_CREDS_MACOS }}
+  #     SIGNING_CERT_MACOS: ${{ secrets.SIGNING_CERT_MACOS }}
+  #     SIGNING_CERT_MACOS_IDENTITY: ${{ secrets.SIGNING_CERT_MACOS_IDENTITY }}
+  #     SIGNING_CERT_MACOS_PASSWORD: ${{ secrets.SIGNING_CERT_MACOS_PASSWORD }}
+  #   needs: [setup, build]
+  #   runs-on: macos-latest
+  #   if: needs.setup.outputs.build_type == 'proprietary'
+  #   steps:
+  #     - name: Unpack Mac notarization credentials
+  #       if: env.NOTARIZE_CREDS_MACOS
+  #       id: note-creds
+  #       shell: bash
+  #       run: |
+  #         # In NOTARIZE_CREDS_MACOS we expect to find:
+  #         # USERNAME="..."
+  #         # PASSWORD="..."
+  #         # TEAM_ID="..."
+  #         eval "${{ env.NOTARIZE_CREDS_MACOS }}"
+  #         echo "::add-mask::$USERNAME"
+  #         echo "::add-mask::$PASSWORD"
+  #         echo "::add-mask::$TEAM_ID"
+  #         echo "note_user=$USERNAME" >> "$GITHUB_OUTPUT"
+  #         echo "note_pass=$PASSWORD" >> "$GITHUB_OUTPUT"
+  #         echo "note_team=$TEAM_ID" >> "$GITHUB_OUTPUT"
+  #         # If we didn't manage to retrieve all of these credentials, better
+  #         # find out sooner than later.
+  #         [[ -n "$USERNAME" && -n "$PASSWORD" && -n "$TEAM_ID" ]]
 
-      - name: Sign and package Mac viewer
-        if: env.SIGNING_CERT_MACOS && env.SIGNING_CERT_MACOS_IDENTITY && env.SIGNING_CERT_MACOS_PASSWORD && steps.note-creds.outputs.note_user && steps.note-creds.outputs.note_pass && steps.note-creds.outputs.note_team
-        uses: secondlife/viewer-build-util/sign-pkg-mac@v2
-        with:
-          channel: ${{ needs.setup.outputs.viewer_channel }}
-          imagename: ${{ needs.build.outputs.imagename }}
-          cert_base64: ${{ env.SIGNING_CERT_MACOS }}
-          cert_name: ${{ env.SIGNING_CERT_MACOS_IDENTITY }}
-          cert_pass: ${{ env.SIGNING_CERT_MACOS_PASSWORD }}
-          note_user: ${{ steps.note-creds.outputs.note_user }}
-          note_pass: ${{ steps.note-creds.outputs.note_pass }}
-          note_team: ${{ steps.note-creds.outputs.note_team }}
+  #     - name: Sign and package Mac viewer
+  #       if: env.SIGNING_CERT_MACOS && env.SIGNING_CERT_MACOS_IDENTITY && env.SIGNING_CERT_MACOS_PASSWORD && steps.note-creds.outputs.note_user && steps.note-creds.outputs.note_pass && steps.note-creds.outputs.note_team
+  #       uses: secondlife/viewer-build-util/sign-pkg-mac@v2
+  #       with:
+  #         channel: ${{ needs.setup.outputs.viewer_channel }}
+  #         imagename: ${{ needs.build.outputs.imagename }}
+  #         cert_base64: ${{ env.SIGNING_CERT_MACOS }}
+  #         cert_name: ${{ env.SIGNING_CERT_MACOS_IDENTITY }}
+  #         cert_pass: ${{ env.SIGNING_CERT_MACOS_PASSWORD }}
+  #         note_user: ${{ steps.note-creds.outputs.note_user }}
+  #         note_pass: ${{ steps.note-creds.outputs.note_pass }}
+  #         note_team: ${{ steps.note-creds.outputs.note_team }}
 
-  post-windows-symbols:
-    env:
-      BUGSPLAT_DATABASE: "${{ secrets.BUGSPLAT_DATABASE }}"
-      SYMBOL_UPLOAD_CLIENT_ID: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_ID }}"
-      SYMBOL_UPLOAD_CLIENT_SECRET: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_SECRET }}"
-    needs: [setup, build]
-    if: needs.setup.outputs.build_type == 'proprietary'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download viewer exe
-        uses: actions/download-artifact@v8
-        with:
-          name: Windows-x64-app
-          path: _artifacts
-      - name: Download Windows Symbols
-        if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-        uses: actions/download-artifact@v8
-        with:
-          name: Windows-x64-symbols
-      - name: Extract viewer pdb
-        if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-        shell: bash
-        run: |
-          tar -xJf "${{ needs.setup.outputs.viewer_channel }}.sym.tar.xz" -C _artifacts
-      - name: Post Windows symbols
-        if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-        uses: BugSplat-Git/symbol-upload@2a0d2b8cf9c54c494144048f25da863d93a02ccd
-        with:
-          clientId: "${{ env.SYMBOL_UPLOAD_CLIENT_ID }}"
-          clientSecret: "${{ env.SYMBOL_UPLOAD_CLIENT_SECRET }}"
-          database: "${{ env.BUGSPLAT_DATABASE }}"
-          application: ${{ needs.setup.outputs.viewer_channel }}
-          version: ${{ needs.build.outputs.viewer_version }}
-          directory: _artifacts
-          files: "**/{SecondLifeViewer.exe,llwebrtc.dll,*.pdb}"
-          node-version: "22"
-          dumpSyms: false
+  # post-windows-symbols:
+  #   env:
+  #     BUGSPLAT_DATABASE: "${{ secrets.BUGSPLAT_DATABASE }}"
+  #     SYMBOL_UPLOAD_CLIENT_ID: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_ID }}"
+  #     SYMBOL_UPLOAD_CLIENT_SECRET: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_SECRET }}"
+  #   needs: [setup, build]
+  #   if: needs.setup.outputs.build_type == 'proprietary'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Download viewer exe
+  #       uses: actions/download-artifact@v8
+  #       with:
+  #         name: Windows-x64-app
+  #         path: _artifacts
+  #     - name: Download Windows Symbols
+  #       if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
+  #       uses: actions/download-artifact@v8
+  #       with:
+  #         name: Windows-x64-symbols
+  #     - name: Extract viewer pdb
+  #       if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
+  #       shell: bash
+  #       run: |
+  #         tar -xJf "${{ needs.setup.outputs.viewer_channel }}.sym.tar.xz" -C _artifacts
+  #     - name: Post Windows symbols
+  #       if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
+  #       uses: BugSplat-Git/symbol-upload@2a0d2b8cf9c54c494144048f25da863d93a02ccd
+  #       with:
+  #         clientId: "${{ env.SYMBOL_UPLOAD_CLIENT_ID }}"
+  #         clientSecret: "${{ env.SYMBOL_UPLOAD_CLIENT_SECRET }}"
+  #         database: "${{ env.BUGSPLAT_DATABASE }}"
+  #         application: ${{ needs.setup.outputs.viewer_channel }}
+  #         version: ${{ needs.build.outputs.viewer_version }}
+  #         directory: _artifacts
+  #         files: "**/{SecondLifeViewer.exe,llwebrtc.dll,*.pdb}"
+  #         node-version: "22"
+  #         dumpSyms: false
 
-  post-mac-symbols:
-    env:
-      BUGSPLAT_DATABASE: "${{ secrets.BUGSPLAT_DATABASE }}"
-      SYMBOL_UPLOAD_CLIENT_ID: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_ID }}"
-      SYMBOL_UPLOAD_CLIENT_SECRET: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_SECRET }}"
-    needs: [setup, build]
-    if: needs.setup.outputs.build_type == 'proprietary'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Mac Symbols
-        if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-        uses: actions/download-artifact@v8
-        with:
-          name: macOS-x64-symbols
-      - name: Post Mac symbols
-        if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-        uses: BugSplat-Git/symbol-upload@2a0d2b8cf9c54c494144048f25da863d93a02ccd
-        with:
-          clientId: "${{ env.SYMBOL_UPLOAD_CLIENT_ID }}"
-          clientSecret: "${{ env.SYMBOL_UPLOAD_CLIENT_SECRET }}"
-          database: "${{ env.BUGSPLAT_DATABASE }}"
-          application: ${{ needs.setup.outputs.viewer_channel }}
-          version: ${{ needs.build.outputs.viewer_version }} (${{ needs.build.outputs.viewer_version }})
-          directory: .
-          files: "**/*.xcarchive.zip"
-          node-version: "22"
-          dumpSyms: false
+  # post-mac-symbols:
+  #   env:
+  #     BUGSPLAT_DATABASE: "${{ secrets.BUGSPLAT_DATABASE }}"
+  #     SYMBOL_UPLOAD_CLIENT_ID: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_ID }}"
+  #     SYMBOL_UPLOAD_CLIENT_SECRET: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_SECRET }}"
+  #   needs: [setup, build]
+  #   if: needs.setup.outputs.build_type == 'proprietary'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Download Mac Symbols
+  #       if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
+  #       uses: actions/download-artifact@v8
+  #       with:
+  #         name: macOS-x64-symbols
+  #     - name: Post Mac symbols
+  #       if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
+  #       uses: BugSplat-Git/symbol-upload@2a0d2b8cf9c54c494144048f25da863d93a02ccd
+  #       with:
+  #         clientId: "${{ env.SYMBOL_UPLOAD_CLIENT_ID }}"
+  #         clientSecret: "${{ env.SYMBOL_UPLOAD_CLIENT_SECRET }}"
+  #         database: "${{ env.BUGSPLAT_DATABASE }}"
+  #         application: ${{ needs.setup.outputs.viewer_channel }}
+  #         version: ${{ needs.build.outputs.viewer_version }} (${{ needs.build.outputs.viewer_version }})
+  #         directory: .
+  #         files: "**/*.xcarchive.zip"
+  #         node-version: "22"
+  #         dumpSyms: false
 
   release:
     needs: [setup, build, sign-and-package-windows, sign-and-package-mac]
     runs-on: ubuntu-latest
     if: needs.setup.outputs.release_run
     steps:
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: "*-installer"
+      # - uses: actions/download-artifact@v8
+      #   with:
+      #     pattern: "*-installer"
 
       - uses: actions/download-artifact@v8
         with:
