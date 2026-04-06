@@ -1950,12 +1950,16 @@ bool LLSelectMgr::selectionSetImage(const LLUUID& imageid)
             if (!mItem)
             {
                 object->sendTEUpdate();
-                // 1 particle effect per object
-                LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
-                effectp->setSourceObject(gAgentAvatarp);
-                effectp->setTargetObject(object);
-                effectp->setDuration(LL_HUD_DUR_SHORT);
-                effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+                static LLCachedControl<bool> enable_selection_hints(gSavedSettings, "EnableSelectionHints", false);
+                if (enable_selection_hints)
+                {
+                    // 1 particle effect per object
+                    LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+                    effectp->setSourceObject(gAgentAvatarp);
+                    effectp->setTargetObject(object);
+                    effectp->setDuration(LL_HUD_DUR_SHORT);
+                    effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+                }
             }
             return true;
         }
@@ -2148,7 +2152,8 @@ bool LLSelectMgr::selectionSetGLTFMaterial(const LLUUID& mat_id)
                 return false;
             }
 
-            if (!mItem)
+            static LLCachedControl<bool> enable_selection_hints(gSavedSettings, "EnableSelectionHints", false);
+            if (enable_selection_hints && mItem)
             {
                 // 1 particle effect per object
                 LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
@@ -4311,7 +4316,8 @@ bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, 
                                                           (void*) &info,
                                                           SEND_ONLY_ROOTS);
             // VEFFECT: Delete Object - one effect for all deletes
-            if (LLSelectMgr::getInstance()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD)
+            static LLCachedControl<bool> enable_selection_hints(gSavedSettings, "EnableSelectionHints", false);
+            if (enable_selection_hints && LLSelectMgr::getInstance()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD)
             {
                 LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, true);
                 effectp->setPositionGlobal( LLSelectMgr::getInstance()->getSelectionCenterGlobal() );

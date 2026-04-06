@@ -2218,6 +2218,12 @@ bool LLToolPie::handleRightClickPick()
 
 void LLToolPie::showVisualContextMenuEffect()
 {
+    static LLCachedControl<bool> enable_selection_hints(gSavedSettings, "EnableSelectionHints", false);
+    if (!enable_selection_hints)
+    {
+        return;
+    }
+
     // VEFFECT: ShowPie
     LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_SPHERE, true);
     effectp->setPositionGlobal(mPick.mPosGlobal);
