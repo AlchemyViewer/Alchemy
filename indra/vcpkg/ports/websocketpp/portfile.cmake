@@ -7,8 +7,9 @@ vcpkg_from_github(
     SHA512 7ff63bac4c00a34d4db92dd0318dc38981f7ee2f45fcc24d6bde4baac2e099e90d96b26ec2c9f958d2ea44845b2cbcff02a2e376d0ee10975b02b7d26fc3d3bc
     HEAD_REF master
     PATCHES
-      boost187.patch
-      cpp23.patch
+    cpp20.patch
+    cpp23.patch
+    boost187.patch
 )
 
 file(MAKE_DIRECTORY ${CURRENT_PACKAGES_DIR}/share/${PORT})
