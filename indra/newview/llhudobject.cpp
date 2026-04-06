@@ -31,7 +31,6 @@
 
 #include "llhudtext.h"
 #include "llhudicon.h"
-#include "llhudeffectbeam.h"
 #include "llhudeffectblob.h"
 #include "llhudeffecttrail.h"
 #include "llhudeffectlookat.h"

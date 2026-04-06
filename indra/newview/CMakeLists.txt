@@ -400,7 +400,6 @@ set(viewer_SOURCE_FILES
     llhints.cpp
     llhttpretrypolicy.cpp
     llhudeffect.cpp
-    llhudeffectbeam.cpp
     llhudeffectlookat.cpp
     llhudeffectpointat.cpp
     llhudeffecttrail.cpp
@@ -1158,7 +1157,6 @@ set(viewer_HEADER_FILES
     llhints.h
     llhttpretrypolicy.h
     llhudeffect.h
-    llhudeffectbeam.h
     llhudeffectlookat.h
     llhudeffectpointat.h
     llhudeffecttrail.h
