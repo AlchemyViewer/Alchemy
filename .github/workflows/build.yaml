@@ -60,7 +60,7 @@ jobs:
 
       - name: Determine source branch
         id: which-branch
-        uses: secondlife/viewer-build-util/which-branch@v2
+        uses: AlchemyViewer/viewer-build-util/which-branch@v3
         with:
           token: ${{ github.token }}
 
@@ -73,13 +73,13 @@ jobs:
         run: |
           echo "release_run=$RELEASE_RUN" >> "$GITHUB_OUTPUT"
 
-          if [[ "x$GITHUB_REPOSITORY" == "xsecondlife/viewer-private" ]]; then
+          if [[ "x$GITHUB_REPOSITORY" == "xAlchemyViewer/AlchemyInternal" ]]; then
             echo 'is_private_build=true' >> $GITHUB_OUTPUT
           else
             echo 'is_private_build=false' >> $GITHUB_OUTPUT
           fi
 
-          if [[ "x$GITHUB_REPOSITORY" != "xsecondlife/viewer" && "x$GITHUB_REPOSITORY" != "xsecondlife/viewer-private" ]]; then
+          if [[ "x$GITHUB_REPOSITORY" != "xAlchemyViewer/Alchemy" || "x$GITHUB_REPOSITORY" != "xAlchemyViewer/AlchemyInternal" ]]; then
             # Non-linden viewer repository run OSS build
             echo 'build_type=opensource' >> $GITHUB_OUTPUT
             echo "bugsplat_db=" >> $GITHUB_OUTPUT
@@ -188,9 +188,9 @@ jobs:
       LOGFAIL: DEBUG
       master_message_template_checkout: ${{ github.workspace }}/.master-message-template
       # vcpkg Setup
-      # VCPKG_USERNAME: ${{ github.repository_owner }}
-      # VCPKG_FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-      # VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
+      VCPKG_USERNAME: ${{ github.repository_owner }}
+      VCPKG_FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - name: Linux Dependency Install and Disk Cleanup
         if: runner.os == 'Linux'
@@ -243,33 +243,33 @@ jobs:
       - name: Install Velopack CLI
         run: dotnet tool restore
 
-      # - name: Set up vcpkg nuget caching
-      #   shell: bash
-      #   run: |
-      #     if [[ "$RUNNER_OS" == "Windows" ]]
-      #     then
-      #       $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
-      #         sources add \
-      #         -Source "${{ env.VCPKG_FEED_URL }}" \
-      #         -StorePasswordInClearText \
-      #         -Name GitHubPackages \
-      #         -UserName "${{ env.VCPKG_USERNAME }}" \
-      #         -Password "${{ secrets.GITHUB_TOKEN }}"
-      #       $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
-      #         setapikey "${{ secrets.GITHUB_TOKEN }}" \
-      #         -Source "${{ env.VCPKG_FEED_URL }}"
-      #     else
-      #       mono $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
-      #         sources add \
-      #         -Source "${{ env.VCPKG_FEED_URL }}" \
-      #         -StorePasswordInClearText \
-      #         -Name GitHubPackages \
-      #         -UserName "${{ env.VCPKG_USERNAME }}" \
-      #         -Password "${{ secrets.GITHUB_TOKEN }}"
-      #       mono $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
-      #         setapikey "${{ secrets.GITHUB_TOKEN }}" \
-      #         -Source "${{ env.VCPKG_FEED_URL }}"
-      #     fi
+      - name: Set up vcpkg nuget caching
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]
+          then
+            $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
+              sources add \
+              -Source "${{ env.VCPKG_FEED_URL }}" \
+              -StorePasswordInClearText \
+              -Name GitHubPackages \
+              -UserName "${{ env.VCPKG_USERNAME }}" \
+              -Password "${{ secrets.GITHUB_TOKEN }}"
+            $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
+              setapikey "${{ secrets.GITHUB_TOKEN }}" \
+              -Source "${{ env.VCPKG_FEED_URL }}"
+          else
+            mono $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
+              sources add \
+              -Source "${{ env.VCPKG_FEED_URL }}" \
+              -StorePasswordInClearText \
+              -Name GitHubPackages \
+              -UserName "${{ env.VCPKG_USERNAME }}" \
+              -Password "${{ secrets.GITHUB_TOKEN }}"
+            mono $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
+              setapikey "${{ secrets.GITHUB_TOKEN }}" \
+              -Source "${{ env.VCPKG_FEED_URL }}"
+          fi
 
       - name: Cache Rust Dependencies
         uses: actions/cache@v5
@@ -394,42 +394,6 @@ jobs:
               echo "viewer_version=$viewer_version" >> "$GITHUB_OUTPUT"
           fi
 
-      # TODO: Disabled for now since we don't have the necessary Havok dependency available in our open-source vcpkg.
-      # - name: Build llphysicsextensions TPV package
-      #   id: physics_tpv
-      #   if: needs.setup.outputs.is_private_build == 'true' && needs.setup.outputs.build_type == 'proprietary' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
-      #   shell: bash
-      #   env:
-      #     BUILD_DIRECTORY: ${{ steps.configure.outputs.build_directory }}
-      #   run: |
-      #     tpv_status=0
-      #     # nat 2016-12-21: without HAVOK, can't build PhysicsExtensions_TPV.
-      #     if [[ "$BUILD_TYPE" == "proprietary" && "${HAVOK:-}" != "OFF" ]]
-      #     then
-      #         tpvconfig="$build_dir/packages/llphysicsextensions/autobuild-tpv.xml"
-      #         test -r "$tpvconfig" || fatal "No llphysicsextensions_tpv autobuild configuration found"
-      #         # SL-19942: autobuild ignores -c switch if AUTOBUILD_CONFIGURATION set
-      #         unset AUTOBUILD_CONFIGURATION
-      #         "$autobuild" build --quiet --config-file "$(native_path "$tpvconfig")" -c Tpv \
-      #             || fatal "failed to build llphysicsextensions_tpv"
-
-      #         # capture the package file name for use in upload later...
-      #         PKGTMP=`mktemp -t pgktpv.XXXXXX`
-      #         cleanup="$cleanup ; rm $PKGTMP* 2>/dev/null"
-      #         trap "$cleanup" EXIT
-      #         "$autobuild" package --quiet --config-file "$tpvconfig" --results-file "$(native_path $PKGTMP)" || fatal "failed to package llphysicsextensions_tpv"
-      #         tpv_status=$?
-      #         if [ -r "${PKGTMP}" ]
-      #         then
-      #             . "${PKGTMP}" # sets autobuild_package_{name,filename,md5}
-      #             echo "${autobuild_package_filename}" > $build_dir/llphysicsextensions_package
-      #         fi
-      #     else
-      #         echo "::debug::Do not provide llphysicsextensions_tpv for $BUILD_TYPE"
-      #         llphysicsextensions_package=""
-      #     fi
-      #     return $tpv_status
-
       - name: Upload executable
         uses: actions/upload-artifact@v7
         if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
@@ -469,15 +433,6 @@ jobs:
           compression-level: 9
           path: |
             ${{ steps.configure.outputs.build_directory }}/newview/viewer_version.txt
-
-      # - name: Upload physics package
-      #   uses: actions/upload-artifact@v6
-      #   # should only be set for viewer-private
-      #   if: needs.setup.outputs.is_private_build == 'true' && needs.setup.outputs.build_type == 'proprietary' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
-      #   with:
-      #     name: "${{ steps.build.outputs.artifact }}-physics"
-      #     path: |
-      #       ${{ steps.configure.outputs.build_directory }}/llphysicsextensions_package*.tar.xz
 
       - name: Upload appearance utility package
         uses: actions/upload-artifact@v7
@@ -639,7 +594,7 @@ jobs:
         with:
           pattern: "*-metadata"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: "*-releases"
 
@@ -656,7 +611,7 @@ jobs:
       # forked from softprops/action-gh-release
       - name: Create GitHub release
         id: release
-        uses: secondlife-3p/action-gh-release@v1
+        uses: AlchemyViewer/action-gh-release@v2
         with:
           # name the release page for the branch
           name: "${{ needs.setup.outputs.viewer_branch }}"
