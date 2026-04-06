@@ -93,7 +93,7 @@
     <check_box
      control_name="EnableSelectionHints"
      height="16"
-     label="Enable Selection Hints"
+     label="Show my selection beam and particle swirls"
      tool_tip="Enable reporting and tracking current selection using 'beam' particles and character animations"
      layout="topleft"
      left="30"

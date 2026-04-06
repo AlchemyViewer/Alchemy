@@ -3145,8 +3145,8 @@ bool LLAgentCamera::setPointAt(EPointAtType target_type, LLViewerObject *object,
         return false;
     }
 
-    static LLCachedControl<bool> disablePointAt(gSavedSettings, "EnableSelectionHints", false);
-    if (disablePointAt)
+    static LLCachedControl<bool> enable_selection_hints(gSavedSettings, "EnableSelectionHints", false);
+    if (!enable_selection_hints)
     {
         target_type = POINTAT_TARGET_CLEAR;
         object = nullptr;
