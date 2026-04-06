@@ -941,7 +941,7 @@ class DarwinManifest(ViewerManifest):
                         self.path( "libvlc*.dylib*" )
 
                     # copy LibVLC plugins folder
-                    with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'plugins', 'vlc-bin', 'plugins'), dst="plugins"):
+                    with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'plugins', 'vlc-bin'), dst="plugins"):
                         self.path( "*.dylib" )
                         self.path( "plugins.dat" )
 

@@ -31,7 +31,7 @@ if (WINDOWS)
   # Copy plugin dlls to packaging directory
   add_custom_command(
     TARGET media_plugin_libvlc POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/plugins/vlc-bin/plugins" "${VIEWER_STAGING_DIR}/llplugin/plugins"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/plugins/vlc-bin" "${VIEWER_STAGING_DIR}/llplugin/plugins"
   )
 elseif (DARWIN)
   # Don't prepend 'lib' to the executable name, and don't embed a full path in the library's install name
