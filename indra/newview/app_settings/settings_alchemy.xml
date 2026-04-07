@@ -890,6 +890,17 @@
             <key>Value</key>
             <string></string>
         </map>
+        <key>RenderColorGradeLUTStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the color grading LUT effect</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
         <key>RenderFocusPointLocked</key>
         <map>
             <key>Comment</key>

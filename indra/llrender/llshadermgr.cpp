@@ -1554,6 +1554,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("blendTex");
     mReservedUniforms.push_back("color_grade_lut");
     mReservedUniforms.push_back("color_grade_lut_size");
+    mReservedUniforms.push_back("color_grade_strength");
 
     llassert(mReservedUniforms.size() == END_RESERVED_UNIFORMS);
 

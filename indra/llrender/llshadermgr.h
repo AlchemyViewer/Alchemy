@@ -350,6 +350,7 @@ public:
         SMAA_BLEND_TEX,                     //  "blendTex"
         COLOR_GRADE_LUT,                    //  "color_grade_lut"
         COLOR_GRADE_LUT_SIZE,               //  "color_grade_lut_size"
+        COLOR_GRADE_STRENGTH,               //  "color_grade_strength"
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;

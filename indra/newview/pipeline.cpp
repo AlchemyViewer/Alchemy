@@ -7491,6 +7491,9 @@ void LLPipeline::tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_co
             }
 
             shader->uniform4fv(LLShaderMgr::COLOR_GRADE_LUT_SIZE, 1, mCGLutSize.mV);
+
+            static LLCachedControl<float> cglut_strength(gSavedSettings, "RenderColorGradeLUTStrength", 1.f);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_STRENGTH, cglut_strength);
         }
 
 
