@@ -27,7 +27,7 @@
 uniform sampler3D color_grade_lut;
 uniform vec4 color_grade_lut_size;
 
-uniform float color_grade_stength;
+uniform float color_grade_strength = 1.0;
 
 vec3 applyLUTGrading(vec3 diff)
 {
@@ -44,5 +44,5 @@ vec3 applyLUTGrading(vec3 diff)
     vec3 offset = 1.0 / (2.0 * vec3(color_grade_lut_size.x));
     diff = textureLod(color_grade_lut, scale * diff.rgb + offset, 0).rgb;
 
-    return mix(original_diff, diff, color_grade_stength);
+    return mix(original_diff, diff, color_grade_strength);
 }
