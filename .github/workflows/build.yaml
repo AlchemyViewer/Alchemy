@@ -135,12 +135,12 @@ jobs:
       packages: write
     strategy:
       matrix:
-        runner: ["windows-2025", "macos-26", "ubuntu-22.04"]
-        configuration: [release, relwithdebinfo, optdebug]
+        runner: ["windows-2025", "macos-26", "ubuntu-24.04"]
+        configuration: release
         arch: [x64, arm64]
         build_variant: [Viewer, Tests]
         exclude:
-          - runner: ubuntu-22.04
+          - runner: ubuntu-24.04
             arch: arm64
           - runner: windows-2025
             arch: arm64
@@ -171,7 +171,7 @@ jobs:
       BUGSPLAT_DB: ${{ needs.setup.outputs.bugsplat_db }}
       # Decide if we're building tests or the viewer
       BUILD_VIEWER: ${{ matrix.build_variant == 'Viewer' }}
-      BUILD_APPEARANCE_UTIL: ${{ startsWith(matrix.runner, 'ubuntu-') && matrix.build_variant == 'Viewer' }}
+      BUILD_APPEARANCE_UTIL: false # ${{ startsWith(matrix.runner, 'ubuntu-') && matrix.build_variant == 'Viewer' }}
       BUILD_TESTS: ${{ matrix.build_variant == 'Tests' }}
       # Build Config
       BUILD_ARCH: ${{ matrix.arch }}
@@ -182,6 +182,8 @@ jobs:
       # Viewer Channel
       VIEWER_CHANNEL: ${{ needs.setup.outputs.viewer_channel }}
       VIEWER_GRID: "agni"
+      # Link Time Optimization
+      USE_LTO: ${{ matrix.configuration == 'release' }}
       # Setting this variable directs Linden's TUT test driver code to capture
       # test-program log output at the specified level, but to display it only if
       # the individual test fails.
@@ -303,7 +305,7 @@ jobs:
           SIGNING=()
           case "$RUNNER_OS" in
             Windows)
-              cmake_preset_name="vs2022$cmake_preset_postfix"
+              cmake_preset_name="vs2026$cmake_preset_postfix"
               build_directory="build-Windows-$cmake_preset_name"
               vcpkg_triplet="x64-windows-secondlife-release"
               ;;
@@ -329,6 +331,8 @@ jobs:
             -DBUILD_TESTING:BOOL="$BUILD_TESTS" \
             -DPACKAGE:BOOL=ON \
             -DHAVOK:BOOL="$HAVOK" \
+            -DUSE_LTO:BOOL="$USE_LTO" \
+            -DDISABLE_RELEASE_DEBUG_LOGGING=ON \
             -DRELEASE_CRASH_REPORTING:BOOL="$RELEASE_CRASH_REPORTING" \
             -DBUGSPLAT_DB:STRING="${BUGSPLAT_DB:-}" \
             -DVIEWER_CHANNEL:STRING="${VIEWER_CHANNEL}" \
