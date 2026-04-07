@@ -21,9 +21,16 @@ on:
         required: true
         type: string
         default: "hippo"
+      installer_type:
+        description: 'Windows and Mac installer type'
+        type: choice
+        options:
+          - velopack
+          - nsis
+        default: 'velopack'
   pull_request:
   push:
-    branches: ["main", "release/*", "project/*"]
+    branches: ["main", "release/*", "beta/*", "project/*"]
     tags: ["Alchemy*"]
 
 jobs:
@@ -157,6 +164,7 @@ jobs:
     outputs:
       viewer_version: ${{ steps.build.outputs.viewer_version }}
       imagename: ${{ steps.build.outputs.imagename }}
+      # Windows Velopack outputs (passed to sign-pkg-windows)
       velopack_pack_id:       ${{ steps.build.outputs.velopack_pack_id }}
       velopack_pack_version:  ${{ steps.build.outputs.velopack_pack_version }}
       velopack_pack_title:    ${{ steps.build.outputs.velopack_pack_title }}
@@ -164,6 +172,12 @@ jobs:
       velopack_exclude:       ${{ steps.build.outputs.velopack_exclude }}
       velopack_icon:          ${{ steps.build.outputs.velopack_icon }}
       velopack_installer_base: ${{ steps.build.outputs.velopack_installer_base }}
+      # macOS Velopack outputs (passed to sign-pkg-mac)
+      velopack_mac_pack_id:      ${{ steps.build.outputs.velopack_mac_pack_id }}
+      velopack_mac_pack_version: ${{ steps.build.outputs.velopack_mac_pack_version }}
+      velopack_mac_pack_title:   ${{ steps.build.outputs.velopack_mac_pack_title }}
+      velopack_mac_main_exe:     ${{ steps.build.outputs.velopack_mac_main_exe }}
+      velopack_mac_bundle_id:    ${{ steps.build.outputs.velopack_mac_bundle_id }}
     env:
       # Sets Xcode version used for build
       DEVELOPER_DIR: "/Applications/Xcode_26.2.app/Contents/Developer"
@@ -184,6 +198,8 @@ jobs:
       VIEWER_GRID: "agni"
       # Link Time Optimization
       USE_LTO: ${{ matrix.configuration == 'release' }}
+      # Velopack Installer
+      USE_VELOPACK: ${{ (contains(matrix.runner, 'windows') || contains(matrix.runner, 'macos')) && github.event.inputs.installer_type == 'velopack' }}
       # Setting this variable directs Linden's TUT test driver code to capture
       # test-program log output at the specified level, but to display it only if
       # the individual test fails.
@@ -330,6 +346,7 @@ jobs:
             -DBUILD_APPEARANCE_UTIL:BOOL="$BUILD_APPEARANCE_UTIL" \
             -DBUILD_TESTING:BOOL="$BUILD_TESTS" \
             -DPACKAGE:BOOL=ON \
+            -DUSE_VELOPACK:BOOL="$USE_VELOPACK" \
             -DHAVOK:BOOL="$HAVOK" \
             -DUSE_LTO:BOOL="$USE_LTO" \
             -DDISABLE_RELEASE_DEBUG_LOGGING=ON \
