@@ -1735,7 +1735,7 @@ void LLTextBase::deselect()
 
 bool LLTextBase::getSpellCheck() const
 {
-    return (LLSpellChecker::getUseSpellCheck()) && (!mReadOnly) && (mSpellCheck);
+    return (!mReadOnly) && (LLSpellChecker::getUseSpellCheck()) && (mSpellCheck);
 }
 
 const std::string& LLTextBase::getSuggestion(U32 index) const
@@ -2960,7 +2960,7 @@ S32 LLTextBase::getDocIndexFromLocalCoord( S32 local_x, S32 local_y, bool round,
         line_seg_iter != mSegments.end();
         ++line_seg_iter, line_seg_offset = 0)
     {
-        const LLTextSegmentPtr segmentp = *line_seg_iter;
+        LLTextSegmentPtr segmentp = *line_seg_iter;
 
         S32 segment_line_start = segmentp->getStart() + line_seg_offset;
         S32 segment_line_length = llmin(segmentp->getEnd(), line_iter->mDocIndexEnd) - segment_line_start;
@@ -3051,7 +3051,7 @@ LLRect LLTextBase::getDocRectFromDocIndex(S32 pos) const
 
     while(line_seg_iter != mSegments.end())
     {
-        const LLTextSegmentPtr segmentp = *line_seg_iter;
+        LLTextSegmentPtr segmentp = *line_seg_iter;
 
         if (line_seg_iter == cursor_seg_iter)
         {
@@ -3703,8 +3703,8 @@ LLStyleSP LLTextSegment::cloneStyle(LLTextBase& target, const LLStyle* source)
 }
 
 
-bool LLTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const { width = 0; height = 0; return false; }
-bool LLTextSegment::getDimensions(S32 first_char, S32 num_chars, S32& width, S32& height) const
+bool LLTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) { width = 0; height = 0; return false; }
+bool LLTextSegment::getDimensions(S32 first_char, S32 num_chars, S32& width, S32& height)
 {
     F32 fwidth = 0;
     bool result = getDimensionsF32(first_char, num_chars, fwidth, height);
@@ -3805,6 +3805,7 @@ F32 LLNormalTextSegment::draw(S32 start, S32 end, S32 selection_start, S32 selec
         mFontBufferPreSelection.reset();
         mFontBufferSelection.reset();
         mFontBufferPostSelection.reset();
+        mFontWidthBuffer.reset();
     }
     return draw_rect.mLeft;
 }
@@ -3830,6 +3831,7 @@ F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 sele
         mFontBufferPreSelection.reset();
         mFontBufferSelection.reset();
         mFontBufferPostSelection.reset();
+        mFontWidthBuffer.reset();
     }
 
     const LLFontGL* font = mStyle->getFont();
@@ -4061,17 +4063,19 @@ LLTextSegmentPtr LLNormalTextSegment::clone(LLTextBase& target) const
     return new LLNormalTextSegment(sp, mStart, mEnd, target);
 }
 
-bool LLNormalTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
+bool LLNormalTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
 {
     height = 0;
     width = 0;
     if (num_chars > 0 && (mStart + first_char >= 0))
     {
         height = mFontHeight;
-        const LLWString &text = getWText();
-        // if last character is a newline, then return true, forcing line break
-        width = mStyle->getFont()->getWidthF32(text.c_str(), mStart + first_char, num_chars, true);
+
+            const LLWString& text = getWText();
+            const LLFontGL* font = mStyle->getFont();
+            width += mFontWidthBuffer.getWidth(font, text.c_str(), mStart + first_char, num_chars, true);
     }
+    // if last character is a newline, then return true, forcing line break
     return false;
 }
 
@@ -4153,6 +4157,7 @@ void LLNormalTextSegment::updateLayout(const class LLTextBase& editor)
     mFontBufferPreSelection.reset();
     mFontBufferSelection.reset();
     mFontBufferPostSelection.reset();
+    mFontWidthBuffer.reset();
 }
 
 void LLNormalTextSegment::dump() const
@@ -4307,7 +4312,7 @@ LLTextSegmentPtr LLInlineViewSegment::clone(LLTextBase& target) const
     return nullptr;
 }
 
-bool LLInlineViewSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
+bool LLInlineViewSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
 {
     if (first_char == 0 && num_chars == 0)
     {
@@ -4399,7 +4404,7 @@ LLTextSegmentPtr LLLineBreakTextSegment::clone(LLTextBase& target) const
     copy->mFontHeight = mFontHeight;
     return copy;
 }
-bool LLLineBreakTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
+bool LLLineBreakTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
 {
     width = 0;
     height = mFontHeight;
@@ -4436,7 +4441,7 @@ LLTextSegmentPtr LLImageTextSegment::clone(LLTextBase& target) const
 static const S32 IMAGE_HPAD = 3;
 
 // virtual
-bool LLImageTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
+bool LLImageTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
 {
     width = 0;
     height = mStyle->getFont()->getLineSpacing();
