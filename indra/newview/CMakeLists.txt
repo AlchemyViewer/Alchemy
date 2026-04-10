@@ -23,7 +23,7 @@ configure_file("${INDRA_SOURCE_DIR}/externals/js/OrbitControls.js" "${CMAKE_CURR
 # LSL Definitions
 configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/definitions/lsl_keywords_pretty.xml"
                "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lsl_default.xml" COPYONLY)
-configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/definitions/slua_keywords_pretty.xml"
+configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/definitions/lua_keywords_pretty.xml"
                "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lua_default.xml" COPYONLY)
 
 message(STATUS "Copying fonts")
