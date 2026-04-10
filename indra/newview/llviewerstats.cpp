@@ -64,7 +64,6 @@
 #include "llcorehttputil.h"
 #include "llvoicevivox.h"
 #include "llinventorymodel.h"
-#include "lluiusage.h"
 #include "lltranslate.h"
 
 // "Minimal Vulkan" to get max API Version
@@ -808,7 +807,7 @@ void send_viewer_stats(bool include_preferences)
     LLSD& validation_info = inventory["validation_info"];
     gInventory.mValidationInfo->asLLSD(validation_info);
 
-    body["ui"] = LLUIUsage::instance().asLLSD();
+    body["ui"] = LLSD();
 
     body["stats"]["voice"] = LLVoiceVivoxStats::getInstance()->read();
 

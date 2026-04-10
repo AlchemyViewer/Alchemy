@@ -38,7 +38,6 @@
 #include "llkeyboard.h"
 #include "llagent.h"
 #include "lltrans.h"
-#include "lluiusage.h"
 #include "llnearbyvoicemoderation.h"
 #include "llmutelist.h"
 
@@ -752,7 +751,6 @@ void LLVoiceClient::setUserPTTState(bool ptt)
         // Nearby chat is muted by moderator, don't toggle PTT
         if (!mUserPTTState && LLNearbyVoiceModeration::getInstance()->showNotificationIfNeeded())
             return;
-        LLUIUsage::instance().logCommand("Agent.EnableMicrophone");
     }
     mUserPTTState = ptt;
     updateMicMuteLogic();

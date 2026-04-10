@@ -63,7 +63,6 @@
 #include "llappviewer.h"
 #include "llcoros.h"
 #include "lleventcoro.h"
-#include "lluiusage.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1)
 #include "rlvactions.h"
 #include "rlvhandler.h"
@@ -1493,7 +1492,6 @@ void LLAppearanceMgr::wearItemsOnAvatar(const uuid_vec_t& item_ids_to_wear,
                                         LLPointer<LLInventoryCallback> cb)
 {
     LL_DEBUGS("UIUsage") << "wearItemsOnAvatar" << LL_ENDL;
-    LLUIUsage::instance().logCommand("Avatar.WearItem");
 
     bool first_for_object = true;
     std::vector<bool> first_for_type(LLWearableType::WT_COUNT, true);
@@ -3182,7 +3180,6 @@ void LLAppearanceMgr::wearInventoryCategoryOnAvatar( LLInventoryCategory* catego
 
     LL_INFOS("Avatar") << self_av_string() << "wearInventoryCategoryOnAvatar '" << category->getName()
              << "'" << LL_ENDL;
-    LLUIUsage::instance().logCommand("Avatar.WearCategory");
 
     if (gAgentCamera.cameraCustomizeAvatar())
     {
@@ -4424,8 +4421,6 @@ void LLAppearanceMgr::makeNewOutfitLinks(const std::string& new_folder_name, boo
 {
     if (!isAgentAvatarValid()) return;
 
-    LLUIUsage::instance().logCommand("Avatar.CreateNewOutfit");
-
     LL_DEBUGS("Avatar") << "creating new outfit" << LL_ENDL;
 
     gAgentWearables.notifyLoadingStarted();
@@ -4457,7 +4452,6 @@ void LLAppearanceMgr::removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, nul
 // [/SL:KB]
 {
     LL_DEBUGS("UIUsage") << "removeItemsFromAvatar" << LL_ENDL;
-    LLUIUsage::instance().logCommand("Avatar.RemoveItem");
 
     if (ids_to_remove.empty())
     {
@@ -5126,9 +5120,6 @@ public:
     {
         if (wear_category(query_map, false))
         {
-            // Assume this is coming from the predefined avatars web floater
-            LLUIUsage::instance().logCommand("Avatar.WearPredefinedAppearance");
-
             // *TODOw: This may not be necessary if initial outfit is chosen already -- josh
             gAgent.setOutfitChosen(true);
         }

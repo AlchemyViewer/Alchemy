@@ -69,7 +69,6 @@
 #include "llviewerchat.h"
 #include "lltranslate.h"
 #include "llautoreplace.h"
-#include "lluiusage.h"
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -1012,10 +1011,6 @@ void send_chat_from_viewer_impl(std::string utf8_out_text, EChatType type, S32 c
 // [/RLVa:KB]
 
     LL_DEBUGS("UIUsage") << "Nearby chat, text " << utf8_out_text << " type " << type << " channel " << channel << LL_ENDL;
-    if (type != CHAT_TYPE_START && type != CHAT_TYPE_STOP) // prune back some redundant logging
-    {
-        LLUIUsage::instance().logCommand("Chat.SendNearby"); // pseuo-command
-    }
 
     LLMessageSystem* msg = gMessageSystem;
 

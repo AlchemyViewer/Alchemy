@@ -49,7 +49,6 @@
 #include "llnotificationsutil.h"
 #include "llrender.h"
 #include "lluictrlfactory.h"
-#include "lluiusage.h"
 #include "llhelp.h"
 #include "lldockablefloater.h"
 #include "llviewereventrecorder.h"
@@ -486,8 +485,6 @@ bool LLButton::handleMouseDown(S32 x, S32 y, MASK mask)
         if (!mFunctionName.empty())
         {
             LL_DEBUGS("UIUsage") << "calling mouse down function " << mFunctionName << LL_ENDL;
-            LLUIUsage::instance().logCommand(mFunctionName);
-            LLUIUsage::instance().logControl(getPathname());
         }
 
         /*

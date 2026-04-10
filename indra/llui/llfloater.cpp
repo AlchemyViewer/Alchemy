@@ -59,8 +59,6 @@
 #include "llhelp.h"
 #include "llmultifloater.h"
 #include "llsdutil.h"
-#include "lluiusage.h"
-
 
 // use this to control "jumping" behavior when Ctrl-Tabbing
 const S32 TABBED_FLOATER_OFFSET = 0;
@@ -1894,7 +1892,6 @@ void LLFloater::goneFromFront()
 // virtual
 void LLFloater::setVisibleAndFrontmost(bool take_focus,const LLSD& key)
 {
-    LLUIUsage::instance().logFloater(getInstanceName());
     LLMultiFloater* hostp = getHost();
     if (hostp)
     {

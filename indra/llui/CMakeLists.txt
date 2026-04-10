@@ -94,7 +94,6 @@ target_sources(llui
     lluictrl.cpp
     lluictrlfactory.cpp
     lluistring.cpp
-    lluiusage.cpp
     llundo.cpp
     llurlaction.cpp
     llurlentry.cpp
@@ -216,7 +215,6 @@ target_sources(llui
     llui.h
     lluicolor.h
     lluistring.h
-    lluiusage.h
     llundo.h
     llurlaction.h
     llurlentry.h
