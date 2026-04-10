@@ -421,14 +421,6 @@ bool LLGLSLShader::createShader()
 
     llassert_always(!mShaderFiles.empty());
 
-#if LL_DARWIN
-    if(!gGLManager.mIsApple)
-    {
-        // work-around missing mix(vec3,vec3,bvec3)
-        mDefines["OLD_SELECT"] = "1";
-    }
-#endif
-
     mShaderHash = hash();
 
     // Create program

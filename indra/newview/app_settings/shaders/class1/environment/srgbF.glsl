@@ -29,16 +29,7 @@ vec3 srgb_to_linear(vec3 cs)
     vec3 high_range = pow((cs+vec3(0.055))/vec3(1.055), vec3(2.4));
     bvec3 lte = lessThanEqual(cs,vec3(0.04045));
 
-#ifdef OLD_SELECT
-    vec3 result;
-    result.r = lte.r ? low_range.r : high_range.r;
-    result.g = lte.g ? low_range.g : high_range.g;
-    result.b = lte.b ? low_range.b : high_range.b;
-    return result;
-#else
     return mix(high_range, low_range, lte);
-#endif
-
 }
 
 
@@ -48,17 +39,7 @@ vec4 srgb_to_linear4(vec4 cs)
     vec4 high_range = pow((cs+vec4(0.055))/vec4(1.055), vec4(2.4));
     bvec4 lte = lessThanEqual(cs,vec4(0.04045));
 
-#ifdef OLD_SELECT
-    vec4 result;
-    result.r = lte.r ? low_range.r : high_range.r;
-    result.g = lte.g ? low_range.g : high_range.g;
-    result.b = lte.b ? low_range.b : high_range.b;
-    result.a = lte.a ? low_range.a : high_range.a;
-    return result;
-#else
     return mix(high_range, low_range, lte);
-#endif
-
 }
 
 vec3 linear_to_srgb(vec3 cl)
@@ -68,16 +49,7 @@ vec3 linear_to_srgb(vec3 cl)
     vec3 high_range = 1.055 * pow(cl, vec3(0.41666)) - 0.055;
     bvec3 lt = lessThan(cl,vec3(0.0031308));
 
-#ifdef OLD_SELECT
-    vec3 result;
-    result.r = lt.r ? low_range.r : high_range.r;
-    result.g = lt.g ? low_range.g : high_range.g;
-    result.b = lt.b ? low_range.b : high_range.b;
-    return result;
-#else
     return mix(high_range, low_range, lt);
-#endif
-
 }
 
 vec3 ColorFromRadiance(vec3 radiance)
