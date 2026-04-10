@@ -538,7 +538,6 @@ bool LLScriptEdCore::postBuild()
         "menu_lsl_font_size.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
     getChild<LLMenuButton>("font_btn")->setMenu(context_menu, LLMenuButton::MP_BOTTOM_LEFT, true);
 
-
     bool lua_scripts_enabled = have_lua_enabled(LLUUID::null);
     mCompileTarget = getChild<LLComboBox>("compile_target");
     if (LLScrollListItem* luau_item = mCompileTarget->findItemByValue("luau"))
@@ -2145,7 +2144,9 @@ void LLPreviewLSL::saveIfNeeded(bool sync /*= true*/)
 
 void LLPreviewLSL::onCompileTargetChanged()
 {
-    mScriptEd->processKeywords(mScriptEd->mCompileTarget->getValue().asString() == "luau");
+    bool is_lua = (mScriptEd->mCompileTarget->getValue().asString() == "luau");
+    mScriptEd->mEditor->setLuauLanguage(is_lua);
+    mScriptEd->processKeywords(is_lua);
 }
 
 // static
@@ -2174,6 +2175,8 @@ void LLPreviewLSL::onLoadComplete(const LLUUID& asset_uuid, LLAssetType::EType t
             std::string script_name = DEFAULT_SCRIPT_NAME;
             LLInventoryItem* item = gInventory.getItem(*item_uuid);
             bool is_modifiable = false;
+            std::string compile_target;
+            bool is_lua = false;
             if (item)
             {
                 if (!item->getName().empty())
@@ -2184,16 +2187,38 @@ void LLPreviewLSL::onLoadComplete(const LLUUID& asset_uuid, LLAssetType::EType t
                 {
                     is_modifiable = true;
                 }
+
+                // subtype is the language that the script is written in,
+                // runtime is the VM that the script is running on.
+                // LSL scripts have 3 possible runtimes: "lsl2", "mono", and "luau".
+                // Lua scripts have 1 runtime: "luau".
+                U8          subtype = item->getInventorySubType();
+                std::string runtime = item->getRuntime();
+
+                is_lua = (subtype == SST_LUA);
+                if (!is_lua && (runtime == "luau"))
+                {   // an lsl script executing on the luau runtime
+                    compile_target = "lsl-luau";
+                }
+                else
+                {   // otherwise, use the runtime as the compile target
+                    // (this may be blank if the script has never been compiled)
+                    compile_target = runtime;
+                }
             }
+
+            if (compile_target.empty())
+            {
+                compile_target = is_lua ? "luau" : "mono";
+            }
+
             preview->mScriptEd->setScriptName(script_name);
             preview->mScriptEd->setEnableEditing(is_modifiable);
             preview->mScriptEd->setAssetID(asset_uuid);
             preview->mAssetStatus = PREVIEW_ASSET_LOADED;
 
-            // Temporary hack to determine if the script is LSL or SLua when loaded from the inventory.
-            bool is_lua = is_lua_script(std::string(buffer.begin(), buffer.end()));
+            preview->mScriptEd->mCompileTarget->setValue(compile_target);
             preview->mScriptEd->mEditor->setLuauLanguage(is_lua);
-            preview->mScriptEd->mCompileTarget->setValue(is_lua ? "luau" : "lsl-luau");
             preview->mScriptEd->processKeywords(is_lua);
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
@@ -2858,8 +2883,9 @@ void LLLiveLSLEditor::onCompileTargetChanged()
 {
     mScriptEd->mCompileTarget->setEnabled(have_script_upload_cap(mObjectUUID));
     mScriptEd->enableSave(getIsModifiable());
-
-    mScriptEd->processKeywords(mScriptEd->mCompileTarget->getValue().asString() == "luau");
+    bool is_lua = mScriptEd->mCompileTarget->getValue().asString() == "luau";
+    mScriptEd->mEditor->setLuauLanguage(is_lua);
+    mScriptEd->processKeywords(is_lua);
 }
 
 void LLLiveLSLEditor::setAssociatedExperience( LLHandle<LLLiveLSLEditor> editor, const LLSD& experience )
