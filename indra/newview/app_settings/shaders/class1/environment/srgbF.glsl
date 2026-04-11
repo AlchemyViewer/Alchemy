@@ -44,7 +44,6 @@ vec4 srgb_to_linear4(vec4 cs)
 
 vec3 linear_to_srgb(vec3 cl)
 {
-    cl = clamp(cl, vec3(0), vec3(1));
     vec3 low_range  = cl * 12.92;
     vec3 high_range = 1.055 * pow(cl, vec3(0.41666)) - 0.055;
     bvec3 lt = lessThan(cl,vec3(0.0031308));
