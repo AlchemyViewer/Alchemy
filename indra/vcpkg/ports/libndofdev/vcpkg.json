@@ -1,6 +1,7 @@
 {
   "name": "libndofdev",
   "version": "1.0.1",
+  "port-version": 1,
   "description": "3DConnexion SDK",
   "homepage": "https://github.com/secondlife/3p-libndofdev",
   "license": "BSD-3-Clause",
