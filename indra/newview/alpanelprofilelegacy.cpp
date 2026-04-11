@@ -812,7 +812,7 @@ void ALPanelProfileLegacy::onCommitChangeImage(LLProfileImageCtrl* ctrl)
                                        "SELECT IMAGE", PERM_NONE, PERM_NONE, false, nullptr, PICK_TEXTURE);
         mTexturePicker = picker->getHandle();
         picker->setOnFloaterCommitCallback(
-            [this, ctrl, picker](LLTextureCtrl::ETexturePickOp op, LLPickerSource source, const LLUUID& asset_id, const LLUUID&,
+            [this, ctrl](LLTextureCtrl::ETexturePickOp op, LLPickerSource source, const LLUUID& asset_id, const LLUUID&,
                                  const LLUUID&)
             {
                 if (op == LLTextureCtrl::TEXTURE_SELECT)
