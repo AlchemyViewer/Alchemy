@@ -7700,26 +7700,16 @@ void LLPipeline::applyCAS(LLRenderTarget* src, LLRenderTarget* dst)
 {
     static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
     LL_PROFILE_GPU_ZONE("cas");
-    if (cas_sharpness == 0.0f || !gCASProgram.isComplete() || !gCASLegacyGammaProgram.isComplete())
+    if (cas_sharpness == 0.0f || !gCASProgram.isComplete())
     {
         gPipeline.copyRenderTarget(src, dst);
         return;
-    }
-    bool color_grade = (mCGLut != 0);
-    LLGLSLShader* sharpen_shader = color_grade ? &gCASCGLutProgram : &gCASProgram;
-    static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
-
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-    bool legacy_gamma = psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f;
-    if(legacy_gamma)
-    {
-        sharpen_shader = color_grade ? &gCASLegacyGammaCGLutProgram : &gCASLegacyGammaProgram;
     }
 
     // Bind setup:
     dst->bindTarget();
 
-    sharpen_shader->bind();
+    gCASProgram.bind();
 
     {
         static LLStaticHashedString cas_param_0("cas_param_0");
@@ -7733,41 +7723,19 @@ void LLPipeline::applyCAS(LLRenderTarget* src, LLRenderTarget* dst)
             (AF1)src->getWidth(), (AF1)src->getHeight(),  // Input size.
             (AF1)dst->getWidth(), (AF1)dst->getHeight()); // Output size.
 
-        sharpen_shader->uniform4uiv(cas_param_0, 1, const0);
-        sharpen_shader->uniform4uiv(cas_param_1, 1, const1);
+        gCASProgram.uniform4uiv(cas_param_0, 1, const0);
+        gCASProgram.uniform4uiv(cas_param_1, 1, const1);
 
-        sharpen_shader->uniform2f(out_screen_res, (AF1)dst->getWidth(), (AF1)dst->getHeight());
+        gCASProgram.uniform2f(out_screen_res, (AF1)dst->getWidth(), (AF1)dst->getHeight());
     }
 
-    sharpen_shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
-
-    S32 cglut_channel = -1;
-    if (color_grade)
-    {
-        cglut_channel = sharpen_shader->getTextureChannel(LLShaderMgr::COLOR_GRADE_LUT);
-        if (cglut_channel > -1)
-        {
-            gGL.getTexUnit(cglut_channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
-            gGL.getTexUnit(cglut_channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-            gGL.getTexUnit(cglut_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-        }
-
-        sharpen_shader->uniform4fv(LLShaderMgr::COLOR_GRADE_LUT_SIZE, 1, mCGLutSize.mV);
-
-        static LLCachedControl<F32> cglut_strength(gSavedSettings, "RenderColorGradeLUTStrength", 1.f);
-        sharpen_shader->uniform1f(LLShaderMgr::COLOR_GRADE_STRENGTH, cglut_strength());
-    }
+    gCASProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
 
     // Draw
     gPipeline.mScreenTriangleVB->setBuffer();
     gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-    if (cglut_channel > -1)
-    {
-        gGL.getTexUnit(cglut_channel)->unbind(LLTexUnit::TT_TEXTURE_3D);
-    }
-
-    sharpen_shader->unbind();
+    gCASProgram.unbind();
 
     dst->flush();
 }
@@ -8320,16 +8288,7 @@ void LLPipeline::renderFinalize()
 
         generateExposure(&mLuminanceMap, &mExposureMap);
 
-        static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
-        bool apply_cas = cas_sharpness != 0.0f && gCASProgram.isComplete() && gCASLegacyGammaProgram.isComplete();
-
-        tonemap(&mRT->screen, apply_cas ? &mRT->deferredLight : &mPostPingMap, !apply_cas);
-
-        if (apply_cas)
-        {
-            // Gamma Corrects
-            applyCAS(&mRT->deferredLight, &mPostPingMap);
-        }
+        tonemap(&mRT->screen, &mPostPingMap, true);
     }
     else
     {
@@ -8343,25 +8302,7 @@ void LLPipeline::renderFinalize()
     LLRenderTarget* sourceBuffer = &mPostPingMap;
     LLRenderTarget* targetBuffer = &mPostPongMap;
 
-    combineGlow(sourceBuffer, targetBuffer);
-    std::swap(sourceBuffer, targetBuffer);
-
-    gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
-    gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
-    gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
-    gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
-    glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
-
-    static LLCachedControl<bool> RenderDepthOfFieldInEditMode(gSavedSettings, "RenderDepthOfFieldInEditMode", false);
-    if((RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
-        RenderDepthOfField &&
-        !gCubeSnapshot)
-    {
-        renderDoF(sourceBuffer, targetBuffer);
-        std::swap(sourceBuffer, targetBuffer);
-    }
-
-     if (RenderFSAAType == 1)
+    if (RenderFSAAType == 1)
     {
         applyFXAA(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
@@ -8372,6 +8313,35 @@ void LLPipeline::renderFinalize()
         applySMAA(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
+
+    static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
+    if (cas_sharpness > 0.0f && gCASProgram.isComplete())
+    {
+        applyCAS(sourceBuffer, targetBuffer);
+        std::swap(sourceBuffer, targetBuffer);
+    }
+
+    combineGlow(sourceBuffer, targetBuffer);
+    std::swap(sourceBuffer, targetBuffer);
+
+    gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
+    gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
+    gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
+    gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
+    glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+
+    static LLCachedControl<bool> RenderDepthOfFieldInEditMode(gSavedSettings, "RenderDepthOfFieldInEditMode", false);
+    if (RenderDepthOfField && (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) && !gCubeSnapshot)
+    {
+        renderDoF(sourceBuffer, targetBuffer);
+        std::swap(sourceBuffer, targetBuffer);
+    }
+
+    gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
+    gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
+    gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
+    gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
+    glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
 
 // [RLVa:KB] - @setsphere
     if (RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))

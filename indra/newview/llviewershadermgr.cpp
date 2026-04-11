@@ -216,9 +216,6 @@ LLGLSLShader            gSMAAEdgeDetectProgram[4];
 LLGLSLShader            gSMAABlendWeightsProgram[4];
 LLGLSLShader            gSMAANeighborhoodBlendProgram[4];
 LLGLSLShader            gCASProgram;
-LLGLSLShader            gCASCGLutProgram;
-LLGLSLShader            gCASLegacyGammaProgram;
-LLGLSLShader            gCASLegacyGammaCGLutProgram;
 LLGLSLShader            gDeferredPostNoDoFProgram;
 LLGLSLShader            gDeferredPostNoDoFNoiseProgram;
 LLGLSLShader            gDeferredWLSkyProgram;
@@ -470,8 +467,6 @@ void LLViewerShaderMgr::finalizeShaderList()
     mShaderList.push_back(&gDeferredPostTonemapLegacyGammaCorrectCGLutProgram);
     mShaderList.push_back(&gNoPostTonemapLegacyGammaCorrectProgram);
     mShaderList.push_back(&gNoPostTonemapLegacyGammaCorrectCGLutProgram);
-    mShaderList.push_back(&gCASLegacyGammaProgram);
-    mShaderList.push_back(&gCASLegacyGammaCGLutProgram);
     mShaderList.push_back(&gDeferredPostGammaCorrectProgram); // for gamma
     mShaderList.push_back(&gDeferredPostGammaCorrectCGLutProgram);
     mShaderList.push_back(&gLegacyPostGammaCorrectProgram);
@@ -1170,9 +1165,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gSMAANeighborhoodBlendProgram[i].unload();
         }
         gCASProgram.unload();
-        gCASCGLutProgram.unload();
-        gCASLegacyGammaCGLutProgram.unload();
-        gCASLegacyGammaProgram.unload();
         gEnvironmentMapProgram.unload();
         gDeferredWLSkyProgram.unload();
         gDeferredWLCloudProgram.unload();
@@ -2895,71 +2887,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCASProgram.mShaderFiles.push_back(make_pair("deferred/CASF.glsl", GL_FRAGMENT_SHADER));
         gCASProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCASProgram.createShader();
-        // llassert(success);
-        if (!success)
-        {
-            LL_WARNS() << "Failed to create shader '" << gCASProgram.mName << "', disabling!" << LL_ENDL;
-            // continue as if this shader never happened
-            success = true;
-        }
-    }
-
-    if (success && gGLManager.mGLVersion > 4.05f)
-    {
-        gCASCGLutProgram.mName = "Contrast Adaptive Sharpening CGLUT Shader";
-        gCASCGLutProgram.mFeatures.hasSrgb = true;
-        gCASCGLutProgram.mFeatures.hasColorGrade = true;
-        gCASCGLutProgram.mShaderFiles.clear();
-        gCASCGLutProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
-        gCASCGLutProgram.mShaderFiles.push_back(make_pair("deferred/CASF.glsl", GL_FRAGMENT_SHADER));
-        gCASCGLutProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gCASCGLutProgram.clearPermutations();
-        gCASCGLutProgram.addPermutation("COLOR_GRADE", "1");
-        success = gCASCGLutProgram.createShader();
-        // llassert(success);
-        if (!success)
-        {
-            LL_WARNS() << "Failed to create shader '" << gCASCGLutProgram.mName << "', disabling!" << LL_ENDL;
-            // continue as if this shader never happened
-            success = true;
-        }
-    }
-
-    if (success && gGLManager.mGLVersion > 4.05f)
-    {
-        gCASLegacyGammaProgram.mName = "Contrast Adaptive Sharpening Legacy Gamma Shader";
-        gCASLegacyGammaProgram.mFeatures.hasSrgb = true;
-        gCASLegacyGammaProgram.mShaderFiles.clear();
-        gCASLegacyGammaProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
-        gCASLegacyGammaProgram.mShaderFiles.push_back(make_pair("deferred/CASF.glsl", GL_FRAGMENT_SHADER));
-        gCASLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gCASLegacyGammaProgram.clearPermutations();
-        gCASLegacyGammaProgram.addPermutation("GAMMA_CORRECT", "1");
-        gCASLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
-        success = gCASLegacyGammaProgram.createShader();
-        // llassert(success);
-        if (!success)
-        {
-            LL_WARNS() << "Failed to create shader '" << gCASProgram.mName << "', disabling!" << LL_ENDL;
-            // continue as if this shader never happened
-            success = true;
-        }
-    }
-
-    if (success && gGLManager.mGLVersion > 4.05f)
-    {
-        gCASLegacyGammaCGLutProgram.mName = "Contrast Adaptive Sharpening Legacy Gamma CGLUT Shader";
-        gCASLegacyGammaCGLutProgram.mFeatures.hasSrgb = true;
-        gCASLegacyGammaCGLutProgram.mFeatures.hasColorGrade = true;
-        gCASLegacyGammaCGLutProgram.mShaderFiles.clear();
-        gCASLegacyGammaCGLutProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
-        gCASLegacyGammaCGLutProgram.mShaderFiles.push_back(make_pair("deferred/CASF.glsl", GL_FRAGMENT_SHADER));
-        gCASLegacyGammaCGLutProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gCASLegacyGammaCGLutProgram.clearPermutations();
-        gCASLegacyGammaCGLutProgram.addPermutation("GAMMA_CORRECT", "1");
-        gCASLegacyGammaCGLutProgram.addPermutation("LEGACY_GAMMA", "1");
-        gCASLegacyGammaCGLutProgram.addPermutation("COLOR_GRADE", "1");
-        success = gCASLegacyGammaCGLutProgram.createShader();
         // llassert(success);
         if (!success)
         {
