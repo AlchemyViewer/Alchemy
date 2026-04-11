@@ -120,7 +120,6 @@ vec3 linear_to_srgb(vec3 col);
 
 vec3 atmosLighting(vec3 light);
 vec3 scaleSoftClip(vec3 light);
-vec3 toneMapNoExposure(vec3 color);
 
 vec3 transform_normal(vec3 vN, vec3 vT, vec3 vB, vec3 vNt)
 {
@@ -322,7 +321,6 @@ void main()
 
     vec3 punctual = clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10)) * sunlit_linear * shadow * atten;
     radiance *= df2.y;
-    //radiance = toneMapNoExposure(radiance);
     vec3 color = vec3(0);
     color = mix(fb.rgb, radiance, min(1, df2.x)) + punctual.rgb;
 

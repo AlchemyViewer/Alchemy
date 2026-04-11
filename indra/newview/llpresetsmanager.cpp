@@ -308,7 +308,7 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
         "RenderShadowDetail",
         "RenderTerrainLODFactor",
         "RenderExposure",
-        "RenderTonemapType",
+        "AlchemyRenderTonemapType",
         "RenderTransparentWater",
         "RenderTreeLODFactor",
         "RenderVolumeLODFactor",

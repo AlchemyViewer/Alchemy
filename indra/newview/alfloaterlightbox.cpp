@@ -57,7 +57,7 @@ bool ALFloaterLightBox::postBuild()
     updateTonemapper();
     updateCAS();
 
-    mTonemapConnection = gSavedSettings.getControl("RenderTonemapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&) { updateTonemapper(); });
+    mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&) { updateTonemapper(); });
     //mCASConnection = gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&) { updateCAS(); });
 
     return LLFloater::postBuild();
@@ -158,7 +158,7 @@ void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
             }
         }
 
-        //U32 tone_map_type = gSavedSettings.getU32("RenderToneMapType");
+        //S32 tone_map_type = gSavedSettings.getS32("AlchemyRenderTonemapType");
         //switch (tone_map_type)
         //{
         //case ALRenderUtil::TONEMAP_AMD:
@@ -296,8 +296,8 @@ void ALFloaterLightBox::updateTonemapper()
     LLSliderCtrl* slider6 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider6");
     LLSliderCtrl* slider7 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider7");
 
-    // Check the state of RenderToneMapType
-    /* switch (gSavedSettings.getU32("RenderToneMapType"))
+    // Check the state of AlchemyRenderTonemapType
+    /* switch (gSavedSettings.getS32("AlchemyRenderTonemapType"))
     {
     default:
     {

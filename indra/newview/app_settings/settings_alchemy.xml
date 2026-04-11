@@ -700,6 +700,17 @@
             <key>Value</key>
             <integer>30</integer>
         </map>
+        <key>AlchemyRenderTonemapType</key>
+        <map>
+            <key>Comment</key>
+            <string>What tonemapper to use: 0 = Khronos Neutral, 1 = ACES Hill, 2 = ACES Godot, 3 = Reinhard, 4 = Filmic, 5 = GT, 6 = AgX</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRevokeObjectPerms</key>
         <map>
             <key>Comment</key>
@@ -955,6 +966,61 @@
             <string>U32</string>
             <key>Value</key>
             <integer>16</integer>
+        </map>
+        <key>RenderTonemapACESWhite</key>
+        <map>
+            <key>Comment</key>
+            <string>Point at which HDR colors cross over into being pure white</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>6.0</real>
+        </map>
+        <key>RenderTonemapAgxContrast</key>
+        <map>
+            <key>Comment</key>
+            <string>Contrast of tonemapped colors</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.3</real>
+        </map>
+        <key>RenderTonemapAgxWhite</key>
+        <map>
+            <key>Comment</key>
+            <string>Point at which HDR colors cross over into being pure white</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>16.29</real>
+        </map>
+        <key>RenderTonemapFilmicWhite</key>
+        <map>
+            <key>Comment</key>
+            <string>Point at which HDR colors cross over into being pure white</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>6.0</real>
+        </map>
+        <key>RenderTonemapReinhardWhite</key>
+        <map>
+            <key>Comment</key>
+            <string>Point at which HDR colors cross over into being pure white</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>6.0</real>
         </map>
         <key>ResetUserColorsOnLogout</key>
         <map>

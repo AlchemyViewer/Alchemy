@@ -264,7 +264,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
 
     shader->uniform1f(s_exposure, e);
-    static LLCachedControl<U32> tonemap_type_setting(gSavedSettings, "RenderTonemapType", 0U);
+    static LLCachedControl<S32> tonemap_type_setting(gSavedSettings, "AlchemyRenderTonemapType", 0U);
     shader->uniform1i(tonemap_type, tonemap_type_setting);
     shader->uniform1f(tonemap_mix, psky->getTonemapMix(should_auto_adjust()));
 
