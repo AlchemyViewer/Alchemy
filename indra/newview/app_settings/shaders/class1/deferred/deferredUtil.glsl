@@ -74,6 +74,8 @@ uniform vec2 screen_res;
 const float M_PI = 3.14159265;
 const float ONE_OVER_PI = 0.3183098861;
 
+const float MIN_PBR_ROUGHNESS = 0.045;
+
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cs);
 vec3 atmosFragLightingLinear(vec3 light, vec3 additive, vec3 atten);
@@ -371,6 +373,12 @@ vec2 BRDF(float NoV, float roughness)
     return texture(brdfLut, vec2(NoV, roughness)).rg;
 }
 
+// Lagarde and de Rousiers 2014, "Moving Frostbite to PBR"
+float computeSpecularAO(float NoV, float ao, float roughness)
+{
+    return clamp(pow(NoV + ao, exp2(-16.0 * roughness - 1.0)) - 1.0 + ao, 0.0, 1.0);
+}
+
 // set colorDiffuse and colorSpec to the results of GLTF PBR style IBL
 void pbrIbl(vec3 diffuseColor,
             vec3 specularColor,
@@ -391,7 +399,7 @@ void pbrIbl(vec3 diffuseColor,
     vec3 specular = specularLight * (specularColor * brdf.x + brdf.y);
 
     diffuseOut = diffuse * ao;
-    specularOut = specular * ao;
+    specularOut = specular * computeSpecularAO(nv, ao, perceptualRough * perceptualRough);
 }
 
 
@@ -465,7 +473,7 @@ void pbrPunctual(vec3 diffuseColor, vec3 specularColor,
                     out vec3 spec) //surface point to light
 {
     // make sure specular highlights from punctual lights don't fall off of polished surfaces
-    perceptualRoughness = max(perceptualRoughness, 8.0/255.0);
+    perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
 
     float alphaRoughness = perceptualRoughness * perceptualRoughness;
 
@@ -572,6 +580,7 @@ void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor
 
 vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v, vec3 norm, float perceptualRoughness, vec3 light_dir, vec3 sunlit, float scol, vec3 radiance, vec3 irradiance, vec3 colorEmissive, float ao, vec3 additive, vec3 atten)
 {
+    perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
     vec3 color = vec3(0);
 
     float NdotV = clamp(abs(dot(norm, v)), 0.001, 1.0);
