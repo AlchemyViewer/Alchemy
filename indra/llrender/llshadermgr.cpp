@@ -1543,9 +1543,49 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("areaTex");
     mReservedUniforms.push_back("searchTex");
     mReservedUniforms.push_back("blendTex");
+
+    // Alchemy Effects Stack
+    mReservedUniforms.push_back("uFrameId");
+    mReservedUniforms.push_back("uResolution");
+
+    // Color Correction LUT
     mReservedUniforms.push_back("color_grade_lut");
     mReservedUniforms.push_back("color_grade_lut_size");
     mReservedUniforms.push_back("color_grade_strength");
+
+    // Vignette
+    mReservedUniforms.push_back("uVignetteAmount");
+    mReservedUniforms.push_back("uVignetteRadius");
+    mReservedUniforms.push_back("uVignetteSoft");
+    mReservedUniforms.push_back("uVignetteShape");
+    mReservedUniforms.push_back("uVignetteColor");
+    mReservedUniforms.push_back("uVignetteMidColor");
+    mReservedUniforms.push_back("uVignetteMidPoint");
+    mReservedUniforms.push_back("uVignetteCenter");
+    mReservedUniforms.push_back("uVignetteAspect");
+    mReservedUniforms.push_back("uVignetteFeather");
+
+    // CVD
+    mReservedUniforms.push_back("uCompensateMode");
+    mReservedUniforms.push_back("uCompensateAmount");
+
+    // Film Grain
+    mReservedUniforms.push_back("uGrainAmount");
+    mReservedUniforms.push_back("uGrainStyle");
+    mReservedUniforms.push_back("uGrainSize");
+    mReservedUniforms.push_back("uGrainRange");
+    mReservedUniforms.push_back("uGrainTint");
+    mReservedUniforms.push_back("uGrainAnimate");
+
+    // Dithering
+    mReservedUniforms.push_back("uDitherAmount");
+    mReservedUniforms.push_back("uDitherBits");
+    mReservedUniforms.push_back("uDitherAnimate");
+
+    // Previews
+    mReservedUniforms.push_back("uPreviewMode");
+
+    // End Alchemy Effects Stack
 
     llassert(mReservedUniforms.size() == END_RESERVED_UNIFORMS);
 

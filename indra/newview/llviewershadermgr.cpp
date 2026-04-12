@@ -217,7 +217,6 @@ LLGLSLShader            gSMAABlendWeightsProgram[4];
 LLGLSLShader            gSMAANeighborhoodBlendProgram[4];
 LLGLSLShader            gCASProgram;
 LLGLSLShader            gDeferredPostNoDoFProgram;
-LLGLSLShader            gDeferredPostNoDoFNoiseProgram;
 LLGLSLShader            gDeferredWLSkyProgram;
 LLGLSLShader            gEnvironmentMapProgram;
 LLGLSLShader            gDeferredWLCloudProgram;
@@ -233,6 +232,7 @@ LLGLSLShader            gDeferredSkinnedFullbrightAlphaMaskAlphaProgram;
 LLGLSLShader            gNormalMapGenProgram;
 LLGLSLShader            gDeferredGenBrdfLutProgram;
 LLGLSLShader            gDeferredBufferVisualProgram;
+LLGLSLShader            gBlitWithEffectsProgram;
 // [RLVa:KB] - @setsphere
 LLGLSLShader            gRlvSphereProgram;
 // [/RLVa:KB]
@@ -2973,22 +2973,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        gDeferredPostNoDoFNoiseProgram.mName = "Deferred Post NoDoF Noise Shader";
-        gDeferredPostNoDoFNoiseProgram.mFeatures.isDeferred = true;
-        gDeferredPostNoDoFNoiseProgram.mShaderFiles.clear();
-        gDeferredPostNoDoFNoiseProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
-        gDeferredPostNoDoFNoiseProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoDoFF.glsl", GL_FRAGMENT_SHADER));
-
-        gDeferredPostNoDoFNoiseProgram.clearPermutations();
-        gDeferredPostNoDoFNoiseProgram.addPermutation("HAS_NOISE", "1");
-
-        gDeferredPostNoDoFNoiseProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = gDeferredPostNoDoFNoiseProgram.createShader();
-        llassert(success);
-    }
-
-    if (success)
-    {
         gEnvironmentMapProgram.mName = "Environment Map Program";
         gEnvironmentMapProgram.mShaderFiles.clear();
         gEnvironmentMapProgram.mFeatures.calculatesAtmospherics = true;
@@ -3150,6 +3134,20 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         success = gDeferredBufferVisualProgram.createShader();
     }
+
+    if (success)
+    {
+        gBlitWithEffectsProgram.mName = "Blit With Post Effects Shader";
+        gBlitWithEffectsProgram.mFeatures.isDeferred = true;
+        gBlitWithEffectsProgram.mShaderFiles.clear();
+        gBlitWithEffectsProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gBlitWithEffectsProgram.mShaderFiles.push_back(make_pair("alchemy/blitWithEffectsF.glsl", GL_FRAGMENT_SHADER));
+        gBlitWithEffectsProgram.clearPermutations();
+        gBlitWithEffectsProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = gBlitWithEffectsProgram.createShader();
+        llassert(success);
+    }
+
     // [RLVa:KB] - @setsphere
     if(success)
     {

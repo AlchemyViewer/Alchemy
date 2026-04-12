@@ -252,7 +252,7 @@ extern LLGLSLShader         gSMAABlendWeightsProgram[4];
 extern LLGLSLShader         gSMAANeighborhoodBlendProgram[4];
 extern LLGLSLShader         gCASProgram;
 extern LLGLSLShader         gDeferredPostNoDoFProgram;
-extern LLGLSLShader         gDeferredPostNoDoFNoiseProgram;
+extern LLGLSLShader         gBlitWithEffectsProgram;
 extern LLGLSLShader         gDeferredPostGammaCorrectProgram;
 extern LLGLSLShader         gDeferredPostGammaCorrectCGLutProgram;
 extern LLGLSLShader         gLegacyPostGammaCorrectProgram;

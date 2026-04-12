@@ -912,6 +912,131 @@
             <key>Value</key>
             <real>1.0</real>
         </map>
+        <key>RenderCVDMode</key>
+        <map>
+            <key>Comment</key>
+            <string>Color vision deficiency effect mode - 0 = off, 1 = protanopia (no L cones), 2 = deuteranopia (no M cones), 3 = tritanopia (no S cones)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderCVDAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Strength of applied color vision deficiency effect</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderDitherAnimated</key>
+        <map>
+            <key>Comment</key>
+            <string>Almost always want this true — animated dither is perceptually invisible, static dither can show as fixed grain.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderDitherEnabled</key>
+        <map>
+            <key>Comment</key>
+            <string>Dither final screen output for 8 or 10-bit display to reduce banding artifacts on gradients, shadows, and sky</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderEffectPreviewMode</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 7] 0 = off, 1 = protanopia (no L cones), 2 = deuteranopia (no M cones), 3 = tritanopia (no S cones), 4 = Achromatopsia (rod monochromacy), 5 = Blue cone monochromacy (blue-tinted near-gray), 6 = Achromatomaly (severely reduced saturation), 7 = false-color exposure map</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderFilmGrainAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Strength of applied film grain effect</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderFilmGrainAnimated</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether the film grain effect is animated between frames</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderFilmGrainRange</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] luma position where grain peaks. 0 = shadows only, 0.5 = midtones (classic film), 1 = highlights only</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>RenderFilmGrainSize</key>
+        <map>
+            <key>Comment</key>
+            <string>[1, 8] Size of film grain particles</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderFilmGrainStyle</key>
+        <map>
+            <key>Comment</key>
+            <string>Film grain effect style - 0 = mono luma, 1 = color (digital push), 2 = coarse (16mm feel), 3 = photon shot (CCD sensor)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderFilmGrainTint</key>
+        <map>
+            <key>Comment</key>
+            <string>color of the film grain. vec3(1) = neutral gray. Try vec3(1.0, 0.9, 0.8) for warm film grain, vec3(0.8, 0.9, 1.0) for cool video noise</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>1.0</real>
+                <real>1.0</real>
+            </array>
+        </map>
         <key>RenderFocusPointLocked</key>
         <map>
             <key>Comment</key>
@@ -1021,6 +1146,128 @@
             <string>F32</string>
             <key>Value</key>
             <real>6.0</real>
+        </map>
+        <key>RenderVignetteAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Opacity of applied vignette effect</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderVignetteCenter</key>
+        <map>
+            <key>Comment</key>
+            <string>[-0.5, 0.5] Offset of vignette center x and y, z component unused</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderVignetteColor</key>
+        <map>
+            <key>Comment</key>
+            <string>Vignette edge color</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderVignetteCorrectAspect</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether the vignette effect is corrected for aspect ratio</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderVignetteFeather</key>
+        <map>
+            <key>Comment</key>
+            <string>[0.2, 4.0] controls the shape of the darkening curve from edge to center. &lt;1 = spreads darkening inward (gentle haze across frame) 1 = linear smoothstep falloff (current behavior) &gt;1 = concentrates darkening at edges (sharp corner darkening only)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>RenderVignetteMidColor</key>
+        <map>
+            <key>Comment</key>
+            <string>Intermediate ramp color of vignette</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderVignetteMidPoint</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Mid point of vignette color shift for three-color ramp - 0 disables (two-color fallback)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderVignetteRadius</key>
+        <map>
+            <key>Comment</key>
+            <string>[0.25, 1.5] Measured in image-height units. 1.0 reaches top/bottom edges on any aspect.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderVignetteShape</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] 0 circular, 1 rounded square.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderVignetteSoft</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Softness of the vignette edge</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
         </map>
         <key>ResetUserColorsOnLogout</key>
         <map>

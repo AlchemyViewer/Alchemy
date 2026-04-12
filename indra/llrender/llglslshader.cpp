@@ -1341,6 +1341,31 @@ void LLGLSLShader::fastUniform1f(U32 index, GLfloat x)
     glUniform1f(mUniform[index], x);
 }
 
+void LLGLSLShader::uniform1ui(U32 index, GLuint x)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+    llassert(sCurBoundShaderPtr == this);
+    if (mProgramObject)
+    {
+        if (mUniform.size() <= index)
+        {
+            LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << index << LL_ENDL;
+            llassert(false);
+            return;
+        }
+
+        if (mUniform[index] >= 0)
+        {
+            const auto& iter = mValue.find(mUniform[index]);
+            if (iter == mValue.end() || iter->second.mV[0] != (F32)x)
+            {
+                glUniform1ui(mUniform[index], x);
+                mValue[mUniform[index]] = LLVector4((F32)x, 0.f, 0.f, 0.f);
+            }
+        }
+    }
+}
+
 void LLGLSLShader::uniform2f(U32 index, GLfloat x, GLfloat y)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;

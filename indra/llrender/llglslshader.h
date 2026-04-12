@@ -204,6 +204,7 @@ public:
     void uniform1i(U32 index, GLint i);
     void uniform1f(U32 index, GLfloat v);
     void fastUniform1f(U32 index, GLfloat v);
+    void uniform1ui(U32 index, GLuint i);
     void uniform2f(U32 index, GLfloat x, GLfloat y);
     void uniform3f(U32 index, GLfloat x, GLfloat y, GLfloat z);
     void uniform4f(U32 index, GLfloat x, GLfloat y, GLfloat z, GLfloat w);

@@ -348,9 +348,49 @@ public:
         SMAA_AREA_TEX,                      //  "areaTex"
         SMAA_SEARCH_TEX,                    //  "searchTex"
         SMAA_BLEND_TEX,                     //  "blendTex"
+
+        // Alchemy Effects Stack
+        FRAME_ID,                           //  "uFrameId"
+        SCREEN_RESOLUTION,                   //  "uResolution"
+
+        // Color Correction LUT
         COLOR_GRADE_LUT,                    //  "color_grade_lut"
         COLOR_GRADE_LUT_SIZE,               //  "color_grade_lut_size"
         COLOR_GRADE_STRENGTH,               //  "color_grade_strength"
+
+        // Vignette
+        VIGNETTE_AMOUNT,                    //  "uVignetteAmount"
+        VIGNETTE_RADIUS,                    //  "uVignetteRadius"
+        VIGNETTE_SOFT,                      //  "uVignetteSoft"
+        VIGNETTE_SHAPE,                     //  "uVignetteShape"
+        VIGNETTE_COLOR,                     //  "uVignetteColor"
+        VIGNETTE_MID_COLOR,                 //  "uVignetteMidColor"
+        VIGNETTE_MID_POINT,                 //  "uVignetteMidPoint"
+        VIGNETTE_CENTER,                    //  "uVignetteCenter"
+        VIGNETTE_ASPECT,                    //  "uVignetteAspect"
+        VIGNETTE_FEATHER,                   //  "uVignetteFeather"
+
+        // CVD Compensation
+        CVD_MODE,                           //  "uCompensateMode"
+        CVD_AMOUNT,                         //  "uCompensateAmount"
+
+        // Film Grain
+        GRAIN_AMOUNT,                      //  "uGrainAmount"
+        GRAIN_STYLE,                       //  "uGrainStyle"
+        GRAIN_SIZE,                        //  "uGrainSize"
+        GRAIN_RANGE,                       //  "uGrainRange"
+        GRAIN_TINT,                        //  "uGrainTint"
+        GRAIN_ANIMATE,                     //  "uGrainAnimate"
+
+        // Dithering
+        DITHER_AMOUNT,                      //  "uDitherAmount"
+        DITHER_BITS,                        //  "uDitherBits"
+        DITHER_ANIMATE,                     //  "uDitherAnimate"
+
+        // Previews
+        PREVIEW_MODE,                      //  "uPreviewMode"
+
+        // End Alchemy Effects Stack
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;

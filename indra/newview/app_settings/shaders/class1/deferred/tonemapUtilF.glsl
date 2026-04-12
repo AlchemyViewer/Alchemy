@@ -137,7 +137,7 @@ vec3 PBRNeutralToneMapping( vec3 color )
 //--------------------------------------------------------------------------------------
 
 uniform vec4 tonemapper_params;
-uniform float output_max_value = 1.0;
+const float output_max_value = 1.0;
 
 // Based on Reinhard's extended formula, see equation 4 in https://doi.org/cjbgrt
 vec3 tonemap_reinhard(vec3 color)

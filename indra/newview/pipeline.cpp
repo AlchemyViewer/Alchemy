@@ -8482,14 +8482,78 @@ void LLPipeline::renderFinalize()
 
     // Present the screen target.
     {
-        LLGLSLShader& final_shader = LLRender::s10bitBackBuffer ? gDeferredPostNoDoFProgram : gDeferredPostNoDoFNoiseProgram;
-        final_shader.bind(); // Add noise as part of final render to screen pass to avoid damaging other post effects
+        LL_PROFILE_ZONE_SCOPED("renderFinalize - final blit");
+        LL_PROFILE_GPU_ZONE("renderFinalize - final blit");
+
+        gBlitWithEffectsProgram.bind();
 
         // Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems.
-        final_shader.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, sourceBuffer);
-        final_shader.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+        gBlitWithEffectsProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, sourceBuffer);
+        gBlitWithEffectsProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
 
-        final_shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)sourceBuffer->getWidth(), (GLfloat)sourceBuffer->getHeight());
+        // Setup Uniforms
+        gBlitWithEffectsProgram.uniform1ui(LLShaderMgr::FRAME_ID, LLFrameTimer::getFrameCount());
+        gBlitWithEffectsProgram.uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (F32)gViewerWindow->getWorldViewRectRaw().getWidth(),
+                                          (F32)gViewerWindow->getWorldViewRectRaw().getHeight());
+
+        // Vignette
+        static LLCachedControl<F32> vignette_amount(gSavedSettings, "RenderVignetteAmount", 0.0f, "[0, 1] default 0.");
+        static LLCachedControl<F32> vignette_radius(gSavedSettings, "RenderVignetteRadius", 1.0f);
+        static LLCachedControl<F32> vignette_soft(gSavedSettings, "RenderVignetteSoft", 0.5f);
+        static LLCachedControl<F32> vignette_shape(gSavedSettings, "RenderVignetteShape", 0.0f, "[0, 1] 0 circular, 1 rounded square.");
+        static LLCachedControl<LLColor3>  vignette_color(gSavedSettings, "RenderVignetteColor", LLColor3(0.0f, 0.0f, 0.0f));
+        static LLCachedControl<LLColor3>  vignette_mid_color(gSavedSettings, "RenderVignetteMidColor", LLColor3(0.0f, 0.0f, 0.0f));
+        static LLCachedControl<F32>       vignette_mid_point(gSavedSettings, "RenderVignetteMidPoint", 0.0f);
+        static LLCachedControl<LLVector3> vignette_center(gSavedSettings, "RenderVignetteCenter", LLVector3(0.0f, 0.0f, 0.0f));
+        static LLCachedControl<bool>      vignette_correct_aspect(gSavedSettings, "RenderVignetteCorrectAspect", false);
+        static LLCachedControl<F32>       vignette_feather(gSavedSettings, "RenderVignetteFeather", 1.0f);
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_AMOUNT, llclamp(vignette_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_RADIUS, llclamp(vignette_radius(), 0.25f, 1.5f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_SOFT, llclamp(vignette_soft(), 0.05f, 1.0f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_SHAPE, llclamp(vignette_shape(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform3fv(LLShaderMgr::VIGNETTE_COLOR, 1, vignette_color().mV);
+        gBlitWithEffectsProgram.uniform3fv(LLShaderMgr::VIGNETTE_MID_COLOR, 1, vignette_mid_color().mV);
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_MID_POINT, llclamp(vignette_mid_point(), 0.0f, 1.0f));
+        if (vignette_correct_aspect)
+        {
+            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::VIGNETTE_ASPECT, (F32)sourceBuffer->getWidth(), (F32)sourceBuffer->getHeight());
+        }
+        else
+        {
+            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::VIGNETTE_ASPECT, 1.f, 1.f);
+        }
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_FEATHER, llclamp(vignette_feather(), 0.2f, 4.0f));
+
+        // CVD Compensation
+        static LLCachedControl<S32> cvd_mode(gSavedSettings, "RenderCVDMode", 0);
+        static LLCachedControl<F32> cvd_amount(gSavedSettings, "RenderCVDAmount", 0.0f);
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::CVD_MODE, llclamp(cvd_mode(), 0, 3));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::CVD_AMOUNT, llclamp(cvd_amount(), 0.0f, 1.0f));
+
+        // Film Grain
+        static LLCachedControl<bool>     film_grain_animated(gSavedSettings, "RenderFilmGrainAnimated", true);
+        static LLCachedControl<F32>      film_grain_amount(gSavedSettings, "RenderFilmGrainAmount", 0.0f);
+        static LLCachedControl<S32>      film_grain_style(gSavedSettings, "RenderFilmGrainStyle", 0);
+        static LLCachedControl<F32>      film_grain_size(gSavedSettings, "RenderFilmGrainSize", 1.0f);
+        static LLCachedControl<F32>      film_grain_range(gSavedSettings, "RenderFilmGrainRange", 0.5f);
+        static LLCachedControl<LLColor3> film_grain_tint(gSavedSettings, "RenderFilmGrainTint", LLColor3(1.0f, 1.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_AMOUNT, llclamp(film_grain_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::GRAIN_STYLE, llclamp(film_grain_style(), 0, 3));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_SIZE, llclamp(film_grain_size(), 1.0f, 8.0f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_RANGE, llclamp(film_grain_range(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform3fv(LLShaderMgr::GRAIN_TINT, 1, film_grain_tint().mV);
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::GRAIN_ANIMATE, film_grain_animated ? 1 : 0);
+
+        // Dithering
+        static LLCachedControl<bool> dither_enabled(gSavedSettings, "RenderDitherEnabled", true);
+        static LLCachedControl<bool> dither_animated(gSavedSettings, "RenderDitherAnimated", true);
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::DITHER_AMOUNT, dither_enabled() ? 1.0f : 0.0f);
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::DITHER_BITS, LLRender::s10bitBackBuffer ? 10 : 8);
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::DITHER_ANIMATE, dither_animated ? 1 : 0);
+
+        // Previews
+        static LLCachedControl<S32> preview_mode(gSavedSettings, "RenderEffectPreviewMode", 0);
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::PREVIEW_MODE, llclamp(preview_mode(), 0, 7));
 
         {
             LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);
@@ -8497,7 +8561,7 @@ void LLPipeline::renderFinalize()
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
         }
 
-        final_shader.unbind();
+        gBlitWithEffectsProgram.unbind();
     }
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
