@@ -922,11 +922,8 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
     mRT->deferredScreen.shareDepthBuffer(mRT->screen);
 
-//  if (hdr || shadow_detail > 0 || ssao || RenderDepthOfField)
-// [RLVa:KB] - @setsphere
-    if (hdr || shadow_detail > 0 || ssao || RenderDepthOfField || RlvActions::hasPostProcess())
-// [/RLVa:KB]
-    { //only need mRT->deferredLight for hdr OR shadows OR ssao OR dof
+    if (shadow_detail > 0 || ssao || RenderDepthOfField)
+    { //only need mRT->deferredLight for shadows OR ssao OR dof
         if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
     }
     else
