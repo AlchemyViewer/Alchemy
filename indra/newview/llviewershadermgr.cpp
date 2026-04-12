@@ -733,9 +733,18 @@ void LLViewerShaderMgr::setShaders()
 
     llassert(loaded);
     loaded = loaded && loadShadersDeferred();
-    llassert(loaded);
+    if (loaded)
+    {
+        LL_INFOS() << "Loaded deferred shaders." << LL_ENDL;
+    }
+    else
+    {
+        LL_WARNS() << "Failed to load deferred shaders." << LL_ENDL;
+        llassert(loaded);
+    }
 
-    if (!LLAppViewer::instance()->isSecondInstance())
+    // We only want to persist shader cache metadata if we successfully loaded shaders, otherwise we might be caching failure states
+    if (loaded && !LLAppViewer::instance()->isSecondInstance())
     {
         persistShaderCacheMetadata();
     }
