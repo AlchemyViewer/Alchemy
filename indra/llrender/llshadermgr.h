@@ -349,9 +349,22 @@ public:
         SMAA_SEARCH_TEX,                    //  "searchTex"
         SMAA_BLEND_TEX,                     //  "blendTex"
 
+        EXPOSURE,
+        TONEMAP_TYPE,
+        TONEMAP_MIX,
+        TONEMAP_PARAMS,
+
         // Alchemy Effects Stack
         FRAME_ID,                           //  "uFrameId"
-        SCREEN_RESOLUTION,                   //  "uResolution"
+        SCREEN_RESOLUTION,                  //  "uResolution"
+
+        // Chromatic Aberration
+        CA_AMOUNT,                          //  "uCAAmount"
+        CA_FALLOFF,                         //  "uCAFalloff"
+        CA_ANGLE,                           //  "uCAAngle"
+        CA_OFFSET_R,                        //  "uCAOffsetR"
+        CA_OFFSET_B,                        //  "uCAOffsetB"
+        CA_ANISOTROPY,                      //  "uCAAnisotropy"
 
         // Color Correction LUT
         COLOR_GRADE_LUT,                    //  "color_grade_lut"

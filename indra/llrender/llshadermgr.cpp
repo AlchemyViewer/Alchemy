@@ -1543,9 +1543,22 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("searchTex");
     mReservedUniforms.push_back("blendTex");
 
+    mReservedUniforms.push_back("exposure");
+    mReservedUniforms.push_back("tonemap_type");
+    mReservedUniforms.push_back("tonemap_mix");
+    mReservedUniforms.push_back("tonemap_params");
+
     // Alchemy Effects Stack
     mReservedUniforms.push_back("uFrameId");
     mReservedUniforms.push_back("uResolution");
+
+    // Chromatic Aberration
+    mReservedUniforms.push_back("uCAAmount");
+    mReservedUniforms.push_back("uCAFalloff");
+    mReservedUniforms.push_back("uCAAngle");
+    mReservedUniforms.push_back("uCAOffsetR");
+    mReservedUniforms.push_back("uCAOffsetB");
+    mReservedUniforms.push_back("uCAAnisotropy");
 
     // Color Correction LUT
     mReservedUniforms.push_back("color_grade_lut");

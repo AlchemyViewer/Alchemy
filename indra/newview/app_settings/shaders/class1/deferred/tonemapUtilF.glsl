@@ -136,13 +136,13 @@ vec3 PBRNeutralToneMapping( vec3 color )
 
 //--------------------------------------------------------------------------------------
 
-uniform vec4 tonemapper_params;
+uniform vec4 tonemap_params;
 const float output_max_value = 1.0;
 
 // Based on Reinhard's extended formula, see equation 4 in https://doi.org/cjbgrt
 vec3 tonemap_reinhard(vec3 color)
 {
-    float white_squared = tonemapper_params.x;
+    float white_squared = tonemap_params.x;
     // Updated version of the Reinhard tonemapper supporting HDR rendering.
     return color * (1.0f + color / white_squared) / (1.0f + color / output_max_value);
 }
@@ -165,7 +165,7 @@ vec3 tonemap_filmic(vec3 color)
 
     vec3 color_tonemapped = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
 
-    return color_tonemapped / tonemapper_params.x;
+    return color_tonemapped / tonemap_params.x;
 }
 
 //--------------------------------------------------------------------------------------
@@ -196,7 +196,7 @@ vec3 tonemap_aces_godot(vec3 color) {
     vec3 color_tonemapped = (color * (color + A) - B) / (color * (C * color + D) + E);
     color_tonemapped *= odt_to_rgb;
 
-    return color_tonemapped / tonemapper_params.x;
+    return color_tonemapped / tonemap_params.x;
 }
 
 //--------------------------------------------------------------------------------------
@@ -213,10 +213,10 @@ vec3 allenwp_curve(vec3 x)
     // awp_shoulder_max can be calculated on the CPU and passed in as params.tonemap_e.
     const float awp_shoulder_max = output_max_value - awp_crossover_point;
 
-    float awp_contrast = tonemapper_params.x;
-    float awp_toe_a = tonemapper_params.y;
-    float awp_slope = tonemapper_params.z;
-    float awp_w = tonemapper_params.w;
+    float awp_contrast = tonemap_params.x;
+    float awp_toe_a = tonemap_params.y;
+    float awp_slope = tonemap_params.z;
+    float awp_w = tonemap_params.w;
 
     // Reinhard-like shoulder:
     vec3 s = x - awp_crossover_point;

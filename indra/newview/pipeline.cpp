@@ -7410,168 +7410,175 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     }
 }
 
-void LLPipeline::tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_correct)
+void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade)
 {
-    LL_PROFILE_GPU_ZONE("tonemap");
+    LL_PROFILE_GPU_ZONE("colorcorrect");
 
     dst->bindTarget();
-    // gamma correct lighting
     {
-        static LLCachedControl<bool> buildNoPost(gSavedSettings, "RenderDisablePostProcessing", false);
-
         LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
         // Apply gamma correction to the frame here.
-
         static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
+        static LLCachedControl<bool> buildNoPost(gSavedSettings, "RenderDisablePostProcessing", false);
 
         LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
-        bool color_grade = false;
-        bool no_post = gSnapshotNoPost || psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f || (buildNoPost && gFloaterTools && gFloaterTools->isAvailable());
+        bool color_grade = colorgrade &&(mCGLut != 0);
+        bool legacy_gamma = psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f;
+        bool no_post = gSnapshotNoPost || legacy_gamma || (buildNoPost && gFloaterTools && gFloaterTools->isAvailable());
         LLGLSLShader* shader = nullptr;
-        if(gamma_correct)
+        if (tonemap)
         {
-            color_grade = (mCGLut != 0);
-            bool legacy_gamma = psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f;
-            if(legacy_gamma)
+            if (legacy_gamma)
             {
-                shader = no_post ?
-                    color_grade ? &gNoPostTonemapLegacyGammaCorrectCGLutProgram : &gNoPostTonemapLegacyGammaCorrectProgram :
-                    color_grade ? &gDeferredPostTonemapLegacyGammaCorrectCGLutProgram : &gDeferredPostTonemapLegacyGammaCorrectProgram;
+                shader = no_post       ? &gCGLegacyGammaProgram
+                         : color_grade ? &gCGTonemapColorgradeLegacyGammaProgram
+                                       : &gCGTonemapLegacyGammaProgram;
             }
             else
             {
-                shader = no_post ?
-                    color_grade ? &gNoPostTonemapGammaCorrectCGLutProgram : &gNoPostTonemapGammaCorrectProgram :
-                    color_grade ? &gDeferredPostTonemapGammaCorrectCGLutProgram: &gDeferredPostTonemapGammaCorrectProgram;
+                shader = no_post       ? &gCGGammaProgram
+                         : color_grade ? &gCGTonemapColorgradeProgram
+                                       : &gCGTonemapProgram;
             }
         }
         else
         {
-            shader = no_post ? &gNoPostTonemapProgram : &gDeferredPostTonemapProgram;
+            shader = legacy_gamma ? &gCGLegacyGammaProgram : &gCGGammaProgram;
         }
 
         shader->bind();
 
-        S32 channel = 0;
-
-        shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
-
-        shader->bindTexture(LLShaderMgr::EXPOSURE_MAP, &mExposureMap);
+        S32 diffuse_channel = shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
+        S32 exposure_channel = shader->bindTexture(LLShaderMgr::EXPOSURE_MAP, &mExposureMap);
 
         shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)src->getWidth(), (GLfloat)src->getHeight());
 
-        static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
+        // Chromatic aberration parameters
+        static LLCachedControl<F32> chromatic_aberration_strength(gSavedSettings, "RenderChromaticAberrationStrength", 0.f);
+        static LLCachedControl<F32> chromatic_aberration_falloff(gSavedSettings, "RenderChromaticAberrationFalloff", 1.f);
+        static LLCachedControl<F32> chromatic_aberration_angle(gSavedSettings, "RenderChromaticAberrationAngle", 0.f);
+        static LLCachedControl<F32> chromatic_aberration_offset_r_x(gSavedSettings, "RenderChromaticAberrationOffsetRX", -1.f);
+        static LLCachedControl<F32> chromatic_aberration_offset_r_y(gSavedSettings, "RenderChromaticAberrationOffsetRY", 0.f);
+        static LLCachedControl<F32> chromatic_aberration_offset_b_x(gSavedSettings, "RenderChromaticAberrationOffsetBX", 1.f);
+        static LLCachedControl<F32> chromatic_aberration_offset_b_y(gSavedSettings, "RenderChromaticAberrationOffsetBY", 0.f);
+        static LLCachedControl<F32> chromatic_aberration_anisotropy(gSavedSettings, "RenderChromaticAberrationAnisotropy", 0.f);
+        shader->uniform1f(LLShaderMgr::CA_AMOUNT, llclamp(chromatic_aberration_strength(), 0.f, 1.f));
+        shader->uniform1f(LLShaderMgr::CA_FALLOFF, llclamp(chromatic_aberration_falloff(), 0.5f, 4.f));
+        shader->uniform1f(LLShaderMgr::CA_ANGLE, llclamp(chromatic_aberration_angle(), 0.f, 360.f));
+        shader->uniform2f(LLShaderMgr::CA_OFFSET_R, llclamp(chromatic_aberration_offset_r_x(), -1.f, 1.f), llclamp(chromatic_aberration_offset_r_y(), -1.f, 1.f));
+        shader->uniform2f(LLShaderMgr::CA_OFFSET_B, llclamp(chromatic_aberration_offset_b_x(), -1.f, 1.f), llclamp(chromatic_aberration_offset_b_y(), -1.f, 1.f));
+        shader->uniform1f(LLShaderMgr::CA_ANISOTROPY, llclamp(chromatic_aberration_anisotropy(), -1.f, 1.f));
 
-        F32 e = llclamp(exposure(), 0.5f, 4.f);
-
-        static LLStaticHashedString s_exposure("exposure");
-        static LLStaticHashedString tonemap_mix("tonemap_mix");
-        static LLStaticHashedString tonemap_type("tonemap_type");
-
-        shader->uniform1f(s_exposure, e);
-
-        static LLCachedControl<S32> tonemap_type_setting(gSavedSettings, "AlchemyRenderTonemapType", 0U);
-        shader->uniform1i(tonemap_type, tonemap_type_setting);
-        shader->uniform1f(tonemap_mix, psky->getTonemapMix(should_auto_adjust()));
-
-        static LLStaticHashedString tonemapper_params("tonemapper_params");
-        constexpr F32 max_screen_brightness = 1.f;
-        switch (tonemap_type_setting)
+        if (tonemap)
         {
-            case 2: // ACES Godot
+            // Exposure parameters
+            static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
+            shader->uniform1f(LLShaderMgr::EXPOSURE, llclamp(exposure(), 0.5f, 4.f));
+
+            // Tonemap type and parameters
+            static LLCachedControl<S32> tonemap_type_setting(gSavedSettings, "AlchemyRenderTonemapType", 0U);
+            shader->uniform1i(LLShaderMgr::TONEMAP_TYPE, tonemap_type_setting);
+            shader->uniform1f(LLShaderMgr::TONEMAP_MIX, psky->getTonemapMix(should_auto_adjust()));
+
+            constexpr F32 max_screen_brightness = 1.f;
+            switch (tonemap_type_setting)
             {
-                static LLCachedControl<F32> tonemap_aces_white(gSavedSettings, "RenderTonemapACESWhite", 6.f);
-                F32 white = llmax(1.0f, tonemap_aces_white());
+                case 2: // ACES Godot
+                {
+                    static LLCachedControl<F32> tonemap_aces_white(gSavedSettings, "RenderTonemapACESWhite", 6.f);
+                    F32                         white = llmax(1.0f, tonemap_aces_white());
 
-                // These constants must match those in the shader code.
-                const float exposure_bias = 1.8f;
-                const float A             = 0.0245786f;
-                const float B             = 0.000090537f;
-                const float C             = 0.983729f;
-                const float D             = 0.432951f;
-                const float E             = 0.238081f;
+                    // These constants must match those in the shader code.
+                    const float exposure_bias = 1.8f;
+                    const float A             = 0.0245786f;
+                    const float B             = 0.000090537f;
+                    const float C             = 0.983729f;
+                    const float D             = 0.432951f;
+                    const float E             = 0.238081f;
 
-                white *= exposure_bias;
-                float white_tonemapped = (white * (white + A) - B) / (white * (C * white + D) + E);
-                shader->uniform4f(tonemapper_params, white_tonemapped, 0.f, 0.f, 0.f);
-                break;
+                    white *= exposure_bias;
+                    float white_tonemapped = (white * (white + A) - B) / (white * (C * white + D) + E);
+                    shader->uniform4f(LLShaderMgr::TONEMAP_PARAMS, white_tonemapped, 0.f, 0.f, 0.f);
+                    break;
+                }
+                case 3: // Reinhard
+                {
+                    // The Reinhard tonemapper is not designed to have a white parameter
+                    // that is less than the output max value. This is especially important
+                    // in the variable Extended Dynamic Range (EDR) paradigm where the
+                    // output max value may change to be greater or less than the white
+                    // parameter, depending on the available dynamic range.
+                    static LLCachedControl<F32> tonemap_reinhard_white(gSavedSettings, "RenderTonemapReinhardWhite", 6.f);
+
+                    F32 white         = llmax(max_screen_brightness, tonemap_reinhard_white());
+                    F32 white_squared = (white * white) / max_screen_brightness;
+
+                    shader->uniform4f(LLShaderMgr::TONEMAP_PARAMS, white_squared, 0.f, 0.f, 0.f);
+                    break;
+                }
+                case 4: // Filmic
+                {
+                    static LLCachedControl<F32> tonemap_filmic_white(gSavedSettings, "RenderTonemapFilmicWhite", 6.f);
+                    F32                         white = llmax(1.0f, tonemap_filmic_white());
+
+                    // These constants must match those in the shader code.
+                    const float exposure_bias = 2.0f;
+                    const float A             = 0.22f * exposure_bias * exposure_bias; // bias baked into constants for performance
+                    const float B             = 0.30f * exposure_bias;
+                    const float C             = 0.10f;
+                    const float D             = 0.20f;
+                    const float E             = 0.01f;
+                    const float F             = 0.30f;
+
+                    F32 white_tonemapped = ((white * (A * white + C * B) + D * E) / (white * (A * white + B) + D * F)) - E / F;
+
+                    shader->uniform4f(LLShaderMgr::TONEMAP_PARAMS, white_tonemapped, 0.f, 0.f, 0.f);
+                    break;
+                }
+                case 6: // AgX
+                {
+                    static LLCachedControl<F32> tonemap_agx_contrast(gSavedSettings, "RenderTonemapAgxContrast", 1.25f);
+                    static LLCachedControl<F32> tonemap_agx_white(gSavedSettings, "RenderTonemapAgxWhite", 16.29f);
+
+                    float agx_white = llmax(2.f, tonemap_agx_white());
+
+                    // Calculate allenwp tonemapping curve parameters on the CPU to improve shader performance.
+                    // Source and details: https://allenwp.com/blog/2025/05/29/allenwp-tonemapping-curve/
+
+                    // These constants must match the those in the shader code.
+                    // 18% "middle gray" is perceptually 50% of the brightness of reference white.
+                    const float awp_crossover_point = 0.18f;
+                    // When output_max_value and/or awp_crossover_point are no longer constant, awp_shoulder_max can
+                    // be calculated on the CPU and passed in as tonemap_parameters.tonemap_e.
+                    const float awp_shoulder_max = max_screen_brightness - awp_crossover_point;
+
+                    float awp_high_clip = agx_white;
+
+                    // awp_toe_a is a solution generated by Mathematica that ensures intersection at awp_crossover_point.
+                    float awp_toe_a = ((1.0f / awp_crossover_point) - 1.0f) * pow(awp_crossover_point, tonemap_agx_contrast);
+                    // Slope formula is simply the derivative of the toe function with an input of awp_crossover_point.
+                    float awp_slope_denom = pow(awp_crossover_point, tonemap_agx_contrast) + awp_toe_a;
+                    float awp_slope       = (tonemap_agx_contrast * pow(awp_crossover_point, tonemap_agx_contrast - 1.0f) * awp_toe_a) /
+                                      (awp_slope_denom * awp_slope_denom);
+
+                    float awp_w = awp_high_clip - awp_crossover_point;
+                    awp_w       = awp_w * awp_w;
+                    awp_w       = awp_w / awp_shoulder_max;
+                    awp_w       = awp_w * awp_slope;
+
+                    shader->uniform4f(LLShaderMgr::TONEMAP_PARAMS, tonemap_agx_contrast, awp_toe_a, awp_slope, awp_w);
+                    break;
+                }
+                default:
+                    break;
             }
-            case 3: // Reinhard
-            {
-                // The Reinhard tonemapper is not designed to have a white parameter
-                // that is less than the output max value. This is especially important
-                // in the variable Extended Dynamic Range (EDR) paradigm where the
-                // output max value may change to be greater or less than the white
-                // parameter, depending on the available dynamic range.
-                static LLCachedControl<F32> tonemap_reinhard_white(gSavedSettings, "RenderTonemapReinhardWhite", 6.f);
-
-                F32 white = llmax(max_screen_brightness, tonemap_reinhard_white());
-                F32 white_squared = (white * white) / max_screen_brightness;
-
-                shader->uniform4f(tonemapper_params, white_squared, 0.f, 0.f, 0.f);
-                break;
-            }
-            case 4: // Filmic
-            {
-                static LLCachedControl<F32> tonemap_filmic_white(gSavedSettings, "RenderTonemapFilmicWhite", 6.f);
-                F32 white = llmax(1.0f, tonemap_filmic_white());
-
-                // These constants must match those in the shader code.
-                const float exposure_bias = 2.0f;
-                const float A             = 0.22f * exposure_bias * exposure_bias; // bias baked into constants for performance
-                const float B             = 0.30f * exposure_bias;
-                const float C             = 0.10f;
-                const float D             = 0.20f;
-                const float E             = 0.01f;
-                const float F             = 0.30f;
-
-                F32 white_tonemapped = ((white * (A * white + C * B) + D * E) / (white * (A * white + B) + D * F)) - E / F;
-
-                shader->uniform4f(tonemapper_params, white_tonemapped, 0.f, 0.f, 0.f);
-                break;
-            }
-            case 6: // AgX
-            {
-                static LLCachedControl<F32> tonemap_agx_contrast(gSavedSettings, "RenderTonemapAgxContrast", 1.25f);
-                static LLCachedControl<F32> tonemap_agx_white(gSavedSettings, "RenderTonemapAgxWhite", 16.29f);
-
-                float agx_white = llmax(2.f, tonemap_agx_white());
-
-                // Calculate allenwp tonemapping curve parameters on the CPU to improve shader performance.
-                // Source and details: https://allenwp.com/blog/2025/05/29/allenwp-tonemapping-curve/
-
-                // These constants must match the those in the shader code.
-                // 18% "middle gray" is perceptually 50% of the brightness of reference white.
-                const float awp_crossover_point = 0.18f;
-                // When output_max_value and/or awp_crossover_point are no longer constant, awp_shoulder_max can
-                // be calculated on the CPU and passed in as tonemap_parameters.tonemap_e.
-                const float awp_shoulder_max = max_screen_brightness - awp_crossover_point;
-
-                float awp_high_clip = agx_white;
-
-                // awp_toe_a is a solution generated by Mathematica that ensures intersection at awp_crossover_point.
-                float awp_toe_a = ((1.0f / awp_crossover_point) - 1.0f) * pow(awp_crossover_point, tonemap_agx_contrast);
-                // Slope formula is simply the derivative of the toe function with an input of awp_crossover_point.
-                float awp_slope_denom = pow(awp_crossover_point, tonemap_agx_contrast) + awp_toe_a;
-                float awp_slope = (tonemap_agx_contrast * pow(awp_crossover_point, tonemap_agx_contrast - 1.0f) * awp_toe_a) /
-                                  (awp_slope_denom * awp_slope_denom);
-
-                float awp_w = awp_high_clip - awp_crossover_point;
-                awp_w       = awp_w * awp_w;
-                awp_w       = awp_w / awp_shoulder_max;
-                awp_w       = awp_w * awp_slope;
-
-                shader->uniform4f(tonemapper_params, tonemap_agx_contrast, awp_toe_a, awp_slope, awp_w);
-                break;
-            }
-            default:
-                break;
         }
 
+        // Color correction LUT
         S32 cglut_channel = -1;
-        if (gamma_correct && color_grade)
+        if (color_grade)
         {
             cglut_channel = shader->getTextureChannel(LLShaderMgr::COLOR_GRADE_LUT);
             if (cglut_channel > -1)
@@ -7587,7 +7594,6 @@ void LLPipeline::tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_co
             shader->uniform1f(LLShaderMgr::COLOR_GRADE_STRENGTH, cglut_strength);
         }
 
-
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
@@ -7595,57 +7601,12 @@ void LLPipeline::tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_co
         {
             gGL.getTexUnit(cglut_channel)->unbind(LLTexUnit::TT_TEXTURE_3D);
         }
-
-        gGL.getTexUnit(channel)->unbind(src->getUsage());
-        shader->unbind();
-    }
-    dst->flush();
-}
-
-void LLPipeline::gammaCorrect(LLRenderTarget* src, LLRenderTarget* dst)
-{
-    LL_PROFILE_GPU_ZONE("gamma correct");
-
-    dst->bindTarget();
-    // gamma correct lighting
-    {
-        LLGLDepthTest depth(GL_FALSE, GL_FALSE);
-
-        static LLCachedControl<bool> buildNoPost(gSavedSettings, "RenderDisablePostProcessing", false);
-        static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
-
-        LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-        bool color_grade = (mCGLut != 0);
-        LLGLSLShader& shader =
-            psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f ?
-            color_grade ? gLegacyPostGammaCorrectCGLutProgram : gLegacyPostGammaCorrectProgram :
-            color_grade ? gDeferredPostGammaCorrectCGLutProgram : gDeferredPostGammaCorrectProgram;
-
-        shader.bind();
-        shader.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
-        shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)src->getWidth(), (GLfloat)src->getHeight());
-
-        S32 cglut_channel = -1;
-        if (color_grade)
+        if (exposure_channel > -1)
         {
-            cglut_channel = shader.getTextureChannel(LLShaderMgr::COLOR_GRADE_LUT);
-            if (cglut_channel > -1)
-            {
-                gGL.getTexUnit(cglut_channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
-                gGL.getTexUnit(cglut_channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-                gGL.getTexUnit(cglut_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-            }
-
-            shader.uniform4fv(LLShaderMgr::COLOR_GRADE_LUT_SIZE, 1, mCGLutSize.mV);
-
-            static LLCachedControl<F32> cglut_strength(gSavedSettings, "RenderColorGradeLUTStrength", 1.f);
-            shader.uniform1f(LLShaderMgr::COLOR_GRADE_STRENGTH, cglut_strength());
+            gGL.getTexUnit(exposure_channel)->unbind(LLTexUnit::TT_TEXTURE);
         }
-
-        mScreenTriangleVB->setBuffer();
-        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-
-        shader.unbind();
+        gGL.getTexUnit(diffuse_channel)->unbind(src->getUsage());
+        shader->unbind();
     }
     dst->flush();
 }
@@ -8378,13 +8339,9 @@ void LLPipeline::renderFinalize()
         generateLuminance(&mRT->screen, &mLuminanceMap);
 
         generateExposure(&mLuminanceMap, &mExposureMap);
+    }
 
-        tonemap(&mRT->screen, &mPostPingMap, true);
-    }
-    else
-    {
-        gammaCorrect(&mRT->screen, &mPostPingMap);
-    }
+    colorCorrect(&mRT->screen, &mPostPingMap, hdr, true);
 
     LLVertexBuffer::unbind();
 
@@ -8519,6 +8476,7 @@ void LLPipeline::renderFinalize()
         {
             gBlitWithEffectsProgram.uniform2f(LLShaderMgr::VIGNETTE_ASPECT, 1.f, 1.f);
         }
+        gBlitWithEffectsProgram.uniform3fv(LLShaderMgr::VIGNETTE_CENTER, 1, vignette_center().mV);
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_FEATHER, llclamp(vignette_feather(), 0.2f, 4.0f));
 
         // CVD Compensation
