@@ -8479,7 +8479,7 @@ void LLPipeline::renderFinalize()
 
     // Present the screen target.
     {
-        LL_PROFILE_ZONE_SCOPED("renderFinalize - final blit");
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderFinalize - final blit");
         LL_PROFILE_GPU_ZONE("renderFinalize - final blit");
 
         gBlitWithEffectsProgram.bind();
