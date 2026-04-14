@@ -72,7 +72,8 @@ namespace {
     {
         if( !pRandomGenerator )
         {
-            pRandomGenerator.reset(new LLRandLagFib2281(LLUUID::getRandomSeed( ) ));
+            std::random_device rd;
+            pRandomGenerator.reset(new LLRandLagFib2281(rd()));
         }
 
         return(*pRandomGenerator)();

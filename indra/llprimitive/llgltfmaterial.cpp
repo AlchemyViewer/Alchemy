@@ -31,6 +31,8 @@
 
 #include "llsdserialize.h"
 
+#include "hbxxh.h"
+
 // NOTE -- this should be the one and only place tiny_gltf.h is included
 #include <tiny_gltf.h>
 #include "llgltfmaterial_templates.h"

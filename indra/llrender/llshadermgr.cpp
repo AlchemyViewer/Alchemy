@@ -31,7 +31,6 @@
 #include "lldir.h"
 #include "llsdutil.h"
 #include "llsdserialize.h"
-#include "hbxxh.h"
 
 #if LL_DARWIN
 #include "OpenGL/OpenGL.h"

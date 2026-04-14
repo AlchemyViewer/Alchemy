@@ -43,7 +43,6 @@
 #include "llthread.h"
 #include "llmutex.h"
 #include "llmd5.h"
-#include "hbxxh.h"
 
 const LLUUID LLUUID::null;
 const LLTransactionID LLTransactionID::tnull;
@@ -115,41 +114,6 @@ unsigned int decode( char const * fiveChars ) throw( bad_input_data )
     return ret;
 }
 */
-
-#define LL_USE_JANKY_RANDOM_NUMBER_GENERATOR 0
-#if LL_USE_JANKY_RANDOM_NUMBER_GENERATOR
-/**
- * @brief a global for
- */
-static U64 sJankyRandomSeed(LLUUID::getRandomSeed());
-
-/**
- * @brief generate a random U32.
- */
-U32 janky_fast_random_bytes()
-{
-    sJankyRandomSeed = U64L(1664525) * sJankyRandomSeed + U64L(1013904223);
-    return (U32)sJankyRandomSeed;
-}
-
-/**
- * @brief generate a random U32 from [0, val)
- */
-U32 janky_fast_random_byes_range(U32 val)
-{
-    sJankyRandomSeed = U64L(1664525) * sJankyRandomSeed + U64L(1013904223);
-    return (U32)(sJankyRandomSeed) % val;
-}
-
-/**
- * @brief generate a random U32 from [0, val)
- */
-U32 janky_fast_random_seeded_bytes(U32 seed, U32 val)
-{
-    seed = U64L(1664525) * (U64)(seed)+U64L(1013904223);
-    return (U32)(seed) % val;
-}
-#endif
 
 void LLUUID::to_chars(char* out) const
 {
@@ -476,11 +440,8 @@ static void get_random_bytes(void* buf, int nbytes)
     // RAND_MAX. This could be made more efficient by copying all the
     // bytes.
     for (i = 0; i < nbytes; i++)
-#if LL_USE_JANKY_RANDOM_NUMBER_GENERATOR
-        * cp++ = janky_fast_random_bytes() & 0xFF;
-#else
         * cp++ = ll_rand() & 0xFF;
-#endif
+
     return;
 }
 
@@ -815,9 +776,7 @@ void LLUUID::generate()
     // Create a UUID.
     static uuid_time_t time_last = { 0,0 };
     static U16 clock_seq = 0;
-#if LL_USE_JANKY_RANDOM_NUMBER_GENERATOR
-    static U32 seed = 0L; // dummy seed.  reset it below
-#endif
+
     if (!has_init)
     {
         has_init = 1;
@@ -833,15 +792,8 @@ void LLUUID::generate()
         }
 
         getCurrentTime(&time_last);
-#if LL_USE_JANKY_RANDOM_NUMBER_GENERATOR
-        seed = time_last.low;
-#endif
 
-#if LL_USE_JANKY_RANDOM_NUMBER_GENERATOR
-        clock_seq = (U16)janky_fast_random_seeded_bytes(seed, 65536);
-#else
         clock_seq = (U16)ll_rand(65536);
-#endif
     }
 
     // get current time
@@ -887,31 +839,17 @@ void LLUUID::generate()
     tmp >>= 8;
     mData[8] = (unsigned char)tmp;
 
-    HBXXH128::digest(*this, (const void*)mData, 16);
+    LLMD5 md5_uuid;
+
+    md5_uuid.update(mData, 16);
+    md5_uuid.finalize();
+    md5_uuid.raw_digest(mData);
 }
 
 void LLUUID::generate(const std::string& hash_string)
 {
-    HBXXH128::digest(*this, hash_string);
-}
-
-U32 LLUUID::getRandomSeed()
-{
-    static unsigned char seed[16];      /* Flawfinder: ignore */
-
-    getNodeID(&seed[0]);
-
-    // Incorporate the pid into the seed to prevent
-    // processes that start on the same host at the same
-    // time from generating the same seed.
-    int pid = LLApp::getPid();
-
-    seed[6] = (unsigned char)(pid >> 8);
-    seed[7] = (unsigned char)(pid);
-    getSystemTime((uuid_time_t*)(&seed[8]));
-
-   U64 seed64 = HBXXH64::digest((const void*)seed, 16);
-   return U32(seed64) ^ U32(seed64 >> 32);
+    LLMD5 md5_uuid((U8*)hash_string.c_str());
+    md5_uuid.raw_digest(mData);
 }
 
 bool LLUUID::parseUUID(const std::string& buf, LLUUID* value)
@@ -932,7 +870,15 @@ bool LLUUID::parseUUID(const std::string& buf, LLUUID* value)
 }
 
 //static
-LLUUID LLUUID::generateNewID(std::string hash_string)
+LLUUID LLUUID::generateNewID()
+{
+    LLUUID new_id;
+    new_id.generate();
+    return new_id;
+}
+
+//static
+LLUUID LLUUID::generateNewID(const std::string& hash_string)
 {
     LLUUID new_id;
     if (hash_string.empty())

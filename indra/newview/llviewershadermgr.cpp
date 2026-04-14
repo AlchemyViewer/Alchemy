@@ -29,6 +29,7 @@
 
 #include <boost/lexical_cast.hpp>
 
+#include "hbxxh.h"
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
 #include "llviewercontrol.h"
