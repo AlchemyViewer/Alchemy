@@ -9,8 +9,8 @@ if (WINDOWS)
   target_link_libraries( ll::pluginlibraries INTERFACE
       wsock32
       ws2_32
+      Iphlpapi
       psapi
-      netapi32
       advapi32
       user32
       )

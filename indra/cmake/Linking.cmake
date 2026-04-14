@@ -41,8 +41,7 @@ elseif (WINDOWS)
           mswsock
           psapi
           winmm
-          netapi32
-          wldap32
+          Iphlpapi
           gdi32
           user32
           ole32
