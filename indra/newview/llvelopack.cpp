@@ -250,7 +250,7 @@ static bool custom_download_asset(void* user_data,
         << " size=" << asset->Size << LL_ENDL;
     vpkc_source_report_progress(progress_callback_id, 0);
 
-    std::ifstream src(sPreDownloadedAssetPath, std::ios::binary);
+    llifstream src(sPreDownloadedAssetPath, std::ios::binary);
     llofstream dst(local_path, std::ios::binary | std::ios::trunc);
     if (!src.is_open() || !dst.is_open())
     {
