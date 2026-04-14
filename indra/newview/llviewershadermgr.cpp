@@ -2882,6 +2882,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gBlitWithEffectsProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gBlitWithEffectsProgram.mShaderFiles.push_back(make_pair("alchemy/blitWithEffectsF.glsl", GL_FRAGMENT_SHADER));
         gBlitWithEffectsProgram.clearPermutations();
+        if (gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        {
+            gBlitWithEffectsProgram.addPermutation("DITHER", "1");
+        }
         gBlitWithEffectsProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gBlitWithEffectsProgram.createShader();
         llassert(success);
@@ -2897,6 +2901,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGGammaProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
         gCGGammaProgram.clearPermutations();
         gCGGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
+        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        {
+            gCGGammaProgram.addPermutation("DITHER", "1");
+        }
         gCGGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGGammaProgram.createShader();
         llassert(success);
@@ -2913,6 +2921,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGLegacyGammaProgram.clearPermutations();
         gCGLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
+        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        {
+            gCGLegacyGammaProgram.addPermutation("DITHER", "1");
+        }
         gCGLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGLegacyGammaProgram.createShader();
         llassert(success);
@@ -2930,6 +2942,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapProgram.clearPermutations();
         gCGTonemapProgram.addPermutation("TONEMAP", "1");
         gCGTonemapProgram.addPermutation("HAS_POST_EFFECTS", "1");
+        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        {
+            gCGTonemapProgram.addPermutation("DITHER", "1");
+        }
         gCGTonemapProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapProgram.createShader();
         llassert(success);
@@ -2948,6 +2964,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGTonemapLegacyGammaProgram.addPermutation("TONEMAP", "1");
         gCGTonemapLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
+        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        {
+            gCGTonemapLegacyGammaProgram.addPermutation("DITHER", "1");
+        }
         gCGTonemapLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapLegacyGammaProgram.createShader();
         llassert(success);
@@ -2967,6 +2987,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapColorgradeProgram.addPermutation("COLOR_GRADE", "1");
         gCGTonemapColorgradeProgram.addPermutation("TONEMAP", "1");
         gCGTonemapColorgradeProgram.addPermutation("HAS_POST_EFFECTS", "1");
+        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        {
+            gCGTonemapColorgradeProgram.addPermutation("DITHER", "1");
+        }
         gCGTonemapColorgradeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapColorgradeProgram.createShader();
         llassert(success);
@@ -2987,6 +3011,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("TONEMAP", "1");
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
+        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        {
+            gCGTonemapColorgradeLegacyGammaProgram.addPermutation("DITHER", "1");
+        }
         gCGTonemapColorgradeLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapColorgradeLegacyGammaProgram.createShader();
         llassert(success);

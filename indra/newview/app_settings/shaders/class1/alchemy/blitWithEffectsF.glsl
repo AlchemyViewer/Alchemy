@@ -11,7 +11,10 @@
  * Vignette runs before CVD so the accessibility pass considers the final
  * darkening. Film grain runs after CVD so the grain stays neutral in tint.
  * Dither runs last (before preview) so quantization is resolved against
- * the true final color. Preview overlays are debug-only.
+ * the true final color. It is only active here when the post chain is
+ * high-precision (RenderHighPrecisionPostProcess = true); in the 8-bit
+ * case, colorCorrectF dithers earlier instead. Preview overlays are
+ * debug-only.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -56,7 +59,9 @@ vec3 clampHDRRange(vec3 color);
 vec3 applyVignette(vec3 color, vec2 uv);
 vec3 applyCVDCompensation(vec3 color);
 vec3 applyFilmGrain(vec3 color, vec2 fragCoord);
+#ifdef DITHER
 vec3 applyDither(vec3 color, vec2 fragCoord);
+#endif
 vec3 applyPreview(vec3 color);
 
 // =============================================================================
@@ -71,7 +76,9 @@ void main()
     diff.rgb = applyVignette(diff.rgb, vary_fragcoord.xy);
     diff.rgb = applyCVDCompensation(diff.rgb);
     diff.rgb = applyFilmGrain(diff.rgb, gl_FragCoord.xy);
+#ifdef DITHER
     diff.rgb = applyDither(diff.rgb, gl_FragCoord.xy);
+#endif
     diff.rgb = applyPreview(diff.rgb);   // debug only — no-op when uPreviewMode == 0
 
     diff.rgb = clampHDRRange(diff.rgb);

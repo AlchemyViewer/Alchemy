@@ -58,6 +58,10 @@ vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv);
 vec4 applyChromaticAberration(sampler2D tex, vec2 uv);
 #endif
 
+#ifdef DITHER
+vec3 applyDither(vec3 color, vec2 fragCoord);
+#endif
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -104,6 +108,12 @@ void main()
 #endif
 
     diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0)); // We should always be 0-1 past this point
+
+#ifdef DITHER
+    // Post chain is 8-bit — dither before the first quantization rather than
+    // waiting for the final blit.
+    diff.rgb = applyDither(diff.rgb, gl_FragCoord.xy);
+#endif
 
     //debugExposure(diff.rgb);
     frag_color = diff;
