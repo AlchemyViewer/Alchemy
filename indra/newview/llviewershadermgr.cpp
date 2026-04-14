@@ -471,8 +471,11 @@ void LLViewerShaderMgr::finalizeShaderList()
     mShaderList.push_back(&gDeferredNonIndexedDiffuseAlphaMaskProgram);
     mShaderList.push_back(&gDeferredTreeProgram);
 
+    mShaderList.push_back(&gCGGammaProgram);
     mShaderList.push_back(&gCGLegacyGammaProgram);
+    mShaderList.push_back(&gCGTonemapProgram);
     mShaderList.push_back(&gCGTonemapLegacyGammaProgram);
+    mShaderList.push_back(&gCGTonemapColorgradeProgram);
     mShaderList.push_back(&gCGTonemapColorgradeLegacyGammaProgram);
 
     // make sure there are no redundancies
@@ -904,6 +907,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/pbrterrainUtilF.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/tonemapUtilF.glsl",                    1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/colorGradeUtilF.glsl",                 1) );
+    index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/postEffectUtilsF.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/reflectionProbeF.glsl",                has_reflection_probes ? 3 : 2) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/screenSpaceReflUtil.glsl",             ssr ? 3 : 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "lighting/lightNonIndexedF.glsl",                    mShaderLevel[SHADER_LIGHTING] ) );
@@ -2886,10 +2890,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     {
         gCGGammaProgram.mName = "CG Gamma Shader";
         gCGGammaProgram.mFeatures.isDeferred = true;
+        gCGGammaProgram.mFeatures.hasPostEffects = true;
         gCGGammaProgram.mShaderFiles.clear();
         gCGGammaProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gCGGammaProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
         gCGGammaProgram.clearPermutations();
+        gCGGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
         gCGGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGGammaProgram.createShader();
         llassert(success);
@@ -2899,11 +2905,13 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     {
         gCGLegacyGammaProgram.mName = "CG Legacy Gamma Shader";
         gCGLegacyGammaProgram.mFeatures.isDeferred = true;
+        gCGLegacyGammaProgram.mFeatures.hasPostEffects = true;
         gCGLegacyGammaProgram.mShaderFiles.clear();
         gCGLegacyGammaProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gCGLegacyGammaProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
         gCGLegacyGammaProgram.clearPermutations();
         gCGLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
+        gCGLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
         gCGLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGLegacyGammaProgram.createShader();
         llassert(success);
@@ -2914,11 +2922,13 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapProgram.mName = "CG Tonemap Shader";
         gCGTonemapProgram.mFeatures.isDeferred = true;
         gCGTonemapProgram.mFeatures.hasTonemap = true;
+        gCGTonemapProgram.mFeatures.hasPostEffects = true;
         gCGTonemapProgram.mShaderFiles.clear();
         gCGTonemapProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gCGTonemapProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
         gCGTonemapProgram.clearPermutations();
         gCGTonemapProgram.addPermutation("TONEMAP", "1");
+        gCGTonemapProgram.addPermutation("HAS_POST_EFFECTS", "1");
         gCGTonemapProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapProgram.createShader();
         llassert(success);
@@ -2929,12 +2939,14 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapLegacyGammaProgram.mName = "CG Tonemap Legacy Gamma Shader";
         gCGTonemapLegacyGammaProgram.mFeatures.isDeferred = true;
         gCGTonemapLegacyGammaProgram.mFeatures.hasTonemap = true;
+        gCGTonemapLegacyGammaProgram.mFeatures.hasPostEffects = true;
         gCGTonemapLegacyGammaProgram.mShaderFiles.clear();
         gCGTonemapLegacyGammaProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gCGTonemapLegacyGammaProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
         gCGTonemapLegacyGammaProgram.clearPermutations();
         gCGTonemapLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGTonemapLegacyGammaProgram.addPermutation("TONEMAP", "1");
+        gCGTonemapLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
         gCGTonemapLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapLegacyGammaProgram.createShader();
         llassert(success);
@@ -2946,12 +2958,14 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapColorgradeProgram.mFeatures.isDeferred = true;
         gCGTonemapColorgradeProgram.mFeatures.hasTonemap = true;
         gCGTonemapColorgradeProgram.mFeatures.hasColorGrade = true;
+        gCGTonemapColorgradeProgram.mFeatures.hasPostEffects = true;
         gCGTonemapColorgradeProgram.mShaderFiles.clear();
         gCGTonemapColorgradeProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gCGTonemapColorgradeProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
         gCGTonemapColorgradeProgram.clearPermutations();
         gCGTonemapColorgradeProgram.addPermutation("COLOR_GRADE", "1");
         gCGTonemapColorgradeProgram.addPermutation("TONEMAP", "1");
+        gCGTonemapColorgradeProgram.addPermutation("HAS_POST_EFFECTS", "1");
         gCGTonemapColorgradeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapColorgradeProgram.createShader();
         llassert(success);
@@ -2963,6 +2977,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapColorgradeLegacyGammaProgram.mFeatures.isDeferred = true;
         gCGTonemapColorgradeLegacyGammaProgram.mFeatures.hasTonemap = true;
         gCGTonemapColorgradeLegacyGammaProgram.mFeatures.hasColorGrade = true;
+        gCGTonemapColorgradeLegacyGammaProgram.mFeatures.hasPostEffects = true;
         gCGTonemapColorgradeLegacyGammaProgram.mShaderFiles.clear();
         gCGTonemapColorgradeLegacyGammaProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gCGTonemapColorgradeLegacyGammaProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
@@ -2970,6 +2985,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("COLOR_GRADE", "1");
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("TONEMAP", "1");
+        gCGTonemapColorgradeLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
         gCGTonemapColorgradeLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapColorgradeLegacyGammaProgram.createShader();
         llassert(success);

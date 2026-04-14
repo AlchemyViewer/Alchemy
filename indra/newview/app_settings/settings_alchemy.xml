@@ -1070,6 +1070,252 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>RenderLensFlareStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Master intensity of the lens flare effect. 0 turns it off entirely; 1 is full strength. Use this as the on/off switch.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensFlareStreakLength</key>
+        <map>
+            <key>Comment</key>
+            <string>How far the horizontal anamorphic streak stretches across the screen. 0.5 reaches halfway; 1.0 crosses the full width. Range 0.01 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>RenderLensFlareStreakFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>How quickly the streak fades toward its tips. Lower values leave a longer visible tail; higher values make the streak fade in close to the sun. Range 0.1 to 10.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.5</real>
+        </map>
+        <key>RenderLensFlareStreakThickness</key>
+        <map>
+            <key>Comment</key>
+            <string>Vertical thickness of the streak as a fraction of the screen. Lower is a thin hairline, higher is a soft horizontal band. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.08</real>
+        </map>
+        <key>RenderLensFlareStreakIntensity</key>
+        <map>
+            <key>Comment</key>
+            <string>Brightness multiplier for just the streak, separate from the master strength. 1 is neutral; higher boosts the streak without affecting the glow/ghosts. Range 0 to 5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensFlareStreakTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Color of the horizontal streak. The default cool blue mimics coated anamorphic cinema lenses; try warm tones for sci-fi or golden hour looks.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.6</real>
+                <real>0.7</real>
+                <real>1.0</real>
+            </array>
+        </map>
+        <key>RenderLensFlareChromaticSpread</key>
+        <map>
+            <key>Comment</key>
+            <string>Red/blue color separation along the streak for a chromatic fringe look. 0 is clean; 1 gives a strong rainbow split. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.08</real>
+        </map>
+        <key>RenderLensFlareGlowRadius</key>
+        <map>
+            <key>Comment</key>
+            <string>Size of the soft glow bloom directly around the sun. Small values hug the light; larger values create a wider halo of brightness. Range 0.01 to 0.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.12</real>
+        </map>
+        <key>RenderLensFlareGlowFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>Softness of the central glow. Lower values give a gentle, spread-out bloom; higher values keep it tight and punchy. Range 1 to 30.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>8.0</real>
+        </map>
+        <key>RenderLensFlareGlow</key>
+        <map>
+            <key>Comment</key>
+            <string>Intensity of the soft central glow around the sun. 0 disables the glow; 1 is neutral; higher boosts it. Range 0 to 5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensFlareGhostCount</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of lens ghost circles placed along the line from the sun through the screen center. Shape control only; use RenderLensFlareGhost to toggle the effect. Range 0 to 8.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
+        <key>RenderLensFlareGhostSpacing</key>
+        <map>
+            <key>Comment</key>
+            <string>Distance between consecutive ghosts. Smaller packs them near the sun; larger spreads them across the screen. Range 0.1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.3</real>
+        </map>
+        <key>RenderLensFlareGhost</key>
+        <map>
+            <key>Comment</key>
+            <string>Intensity of the lens ghost circles. 0 disables ghosts; 1 is neutral; higher boosts them. Range 0 to 5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensFlareHaloRadius</key>
+        <map>
+            <key>Comment</key>
+            <string>Radius of the halo ring that appears opposite the sun through screen center. Shape control only; use RenderLensFlareHalo to toggle the effect. Range 0.01 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>RenderLensFlareHaloWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Thickness of the halo ring. Smaller is a crisp hoop; larger is a soft diffuse ring. Range 0.01 to 0.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.15</real>
+        </map>
+        <key>RenderLensFlareHalo</key>
+        <map>
+            <key>Comment</key>
+            <string>Intensity of the halo ring opposite the sun. 0 disables the halo; 1 is neutral; higher boosts it. Range 0 to 5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensFlareStarburst</key>
+        <map>
+            <key>Comment</key>
+            <string>Intensity of the starburst (diffraction-spike) pattern radiating from the sun, like aperture blades in a camera. 0 disables it. Range 0 to 5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensFlareStarburstSpikes</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of aperture-like spikes in the starburst. Real cameras typically show 2x the blade count (6-blade = 12 spikes, etc). Range 1 to 32.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
+        <key>RenderLensFlareStarburstSharpness</key>
+        <map>
+            <key>Comment</key>
+            <string>How crisp the starburst spikes look. Low values produce soft, wide rays; high values produce thin, needle-like beams. Range 1 to 256.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>24.0</real>
+        </map>
+        <key>RenderLensFlareStarburstLength</key>
+        <map>
+            <key>Comment</key>
+            <string>Length of the starburst spikes. 0 is short and tight to the sun; 1 lets them reach far across the screen. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.25</real>
+        </map>
+        <key>RenderLensFlareOcclusionRadius</key>
+        <map>
+            <key>Comment</key>
+            <string>How wide the sun-occlusion test samples the scene depth. Larger values let thin geometry (foliage, wires) dim the flare more gracefully. Range 0.005 to 0.1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.02</real>
+        </map>
+        <key>RenderLensFlareOcclusionTaps</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of depth samples for sun-occlusion testing. Higher values give smoother partial occlusion transitions at a small performance cost. Range 1 to 32.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>9</integer>
+        </map>
         <key>RenderParcelSelectionToMaxHeight</key>
         <map>
             <key>Comment</key>

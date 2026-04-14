@@ -306,6 +306,14 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
+    if (features->hasPostEffects)
+    {
+        if (!shader->attachFragmentObject("alchemy/postEffectUtilsF.glsl"))
+        {
+            return false;
+        }
+    }
+
     // NOTE order of shader object attaching is VERY IMPORTANT!!!
     if (features->hasAtmospherics)
     {
@@ -1559,6 +1567,33 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uCAOffsetR");
     mReservedUniforms.push_back("uCAOffsetB");
     mReservedUniforms.push_back("uCAAnisotropy");
+
+    // Lens Flare
+    mReservedUniforms.push_back("uLensFlareStrength");
+    mReservedUniforms.push_back("uLensFlareSunPos");
+    mReservedUniforms.push_back("uLensFlareSunVisibility");
+    mReservedUniforms.push_back("uLensFlareStreakLength");
+    mReservedUniforms.push_back("uLensFlareStreakFalloff");
+    mReservedUniforms.push_back("uLensFlareStreakWidth");
+    mReservedUniforms.push_back("uLensFlareStreakIntensity");
+    mReservedUniforms.push_back("uLensFlareStreakTint");
+    mReservedUniforms.push_back("uLensFlareChromaticSpread");
+    mReservedUniforms.push_back("uLensFlareGlowRadius");
+    mReservedUniforms.push_back("uLensFlareGlowFalloff");
+    mReservedUniforms.push_back("uLensFlareGlow");
+    mReservedUniforms.push_back("uLensFlareGhostCount");
+    mReservedUniforms.push_back("uLensFlareGhostSpacing");
+    mReservedUniforms.push_back("uLensFlareGhost");
+    mReservedUniforms.push_back("uLensFlareHaloRadius");
+    mReservedUniforms.push_back("uLensFlareHaloWidth");
+    mReservedUniforms.push_back("uLensFlareHalo");
+    mReservedUniforms.push_back("uLensFlareOcclusionRadius");
+    mReservedUniforms.push_back("uLensFlareStarburst");
+    mReservedUniforms.push_back("uLensFlareStarburstSpikes");
+    mReservedUniforms.push_back("uLensFlareStarburstSharpness");
+    mReservedUniforms.push_back("uLensFlareStarburstFalloff");
+    mReservedUniforms.push_back("uLensFlareOcclusionTaps");
+    mReservedUniforms.push_back("uLensFlareLightColor");
 
     // Color Correction LUT
     mReservedUniforms.push_back("color_grade_lut");

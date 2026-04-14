@@ -815,6 +815,8 @@ public:
     LLVector4           mTransformedSunDir;
     LLVector4           mTransformedMoonDir;
 
+    F32                 mLensFlareSunVisibility = 0.f;
+
     bool                    mInitialized;
     bool                    mShadersLoaded;
 

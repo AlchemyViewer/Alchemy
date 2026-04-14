@@ -61,6 +61,7 @@ public:
     bool isPBRTerrain = false;
     bool hasTonemap = false;
     bool hasColorGrade = false;
+    bool hasPostEffects = false;
 };
 
 // ============= Structure for caching shader uniforms ===============

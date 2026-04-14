@@ -33,7 +33,8 @@ out vec4 frag_color;
 
 // ---- Input ------------------------------------------------------------------
 uniform sampler2D diffuseRect;
-uniform vec2 screen_res;
+uniform sampler2D depthMap;
+uniform vec2 uResolution;
 #ifdef LEGACY_GAMMA
 uniform float gamma;
 #endif
@@ -75,6 +76,10 @@ vec3 toneMap(vec3 color);
 vec3 applyLUTGrading(vec3 diff);
 #endif
 
+#ifdef HAS_POST_EFFECTS
+vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv);
+#endif
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -106,7 +111,7 @@ void main()
         // Aspect-correct the distance calculation. Scale the longer axis
         // so the half-diagonal correctly represents the frame's actual
         // corner distance, not a square assumption.
-        float aspect = screen_res.x / max(screen_res.y, 1.0);
+        float aspect = uResolution.x / max(uResolution.y, 1.0);
         vec2 aspectDir = dir;
         if (aspect > 1.0) aspectDir.x *= aspect;
         else              aspectDir.y /= max(aspect, 1e-4);
@@ -137,6 +142,10 @@ void main()
     } else {
         diff = texture(diffuseRect, vary_fragcoord);
     }
+
+#ifdef HAS_POST_EFFECTS
+    diff.rgb += computeLensFlare(diffuseRect, depthMap, vary_fragcoord);
+#endif
 
 #ifdef TONEMAP
     diff.rgb = toneMap(diff.rgb);
