@@ -300,7 +300,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasColorGrade)
     {
-        if (!shader->attachFragmentObject("deferred/colorGradeUtilF.glsl"))
+        if (!shader->attachFragmentObject("alchemy/colorGradeUtilF.glsl"))
         {
             return false;
         }
