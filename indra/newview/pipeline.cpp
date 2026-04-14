@@ -7465,9 +7465,16 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool ton
         static LLCachedControl<F32> chromatic_aberration_offset_b_x(gSavedSettings, "RenderChromaticAberrationOffsetBX", 1.f);
         static LLCachedControl<F32> chromatic_aberration_offset_b_y(gSavedSettings, "RenderChromaticAberrationOffsetBY", 0.f);
         static LLCachedControl<F32> chromatic_aberration_anisotropy(gSavedSettings, "RenderChromaticAberrationAnisotropy", 0.f);
-        shader->uniform1f(LLShaderMgr::CA_AMOUNT, llclamp(chromatic_aberration_strength(), 0.f, 1.f));
-        shader->uniform1f(LLShaderMgr::CA_FALLOFF, llclamp(chromatic_aberration_falloff(), 0.5f, 4.f));
-        shader->uniform1f(LLShaderMgr::CA_ANGLE, llclamp(chromatic_aberration_angle(), 0.f, 360.f));
+        // Precompute shader-friendly forms once on the CPU: square the
+        // strength (and pre-apply the 0.02 peak-offset scale), take the
+        // reciprocal of falloff, and turn the angle into a (sin, cos) pair.
+        // Saves one mul, one div, and one sincos per fragment.
+        F32 ca_strength = llclamp(chromatic_aberration_strength(), 0.f, 1.f);
+        F32 ca_falloff  = llclamp(chromatic_aberration_falloff(),  0.5f, 4.f);
+        F32 ca_angle_rad = llclamp(chromatic_aberration_angle(), 0.f, 360.f) * 0.01745329252f;
+        shader->uniform1f(LLShaderMgr::CA_AMOUNT, ca_strength * ca_strength * 0.02f);
+        shader->uniform1f(LLShaderMgr::CA_FALLOFF, 1.f / ca_falloff);
+        shader->uniform2f(LLShaderMgr::CA_ANGLE_SIN_COS, sinf(ca_angle_rad), cosf(ca_angle_rad));
         shader->uniform2f(LLShaderMgr::CA_OFFSET_R, llclamp(chromatic_aberration_offset_r_x(), -1.f, 1.f), llclamp(chromatic_aberration_offset_r_y(), -1.f, 1.f));
         shader->uniform2f(LLShaderMgr::CA_OFFSET_B, llclamp(chromatic_aberration_offset_b_x(), -1.f, 1.f), llclamp(chromatic_aberration_offset_b_y(), -1.f, 1.f));
         shader->uniform1f(LLShaderMgr::CA_ANISOTROPY, llclamp(chromatic_aberration_anisotropy(), -1.f, 1.f));

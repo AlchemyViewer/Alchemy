@@ -1563,7 +1563,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     // Chromatic Aberration
     mReservedUniforms.push_back("uCAAmount");
     mReservedUniforms.push_back("uCAFalloff");
-    mReservedUniforms.push_back("uCAAngle");
+    mReservedUniforms.push_back("uCAAngleSinCos");
     mReservedUniforms.push_back("uCAOffsetR");
     mReservedUniforms.push_back("uCAOffsetB");
     mReservedUniforms.push_back("uCAAnisotropy");

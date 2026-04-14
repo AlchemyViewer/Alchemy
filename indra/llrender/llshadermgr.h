@@ -359,9 +359,9 @@ public:
         SCREEN_RESOLUTION,                  //  "uResolution"
 
         // Chromatic Aberration
-        CA_AMOUNT,                          //  "uCAAmount"
-        CA_FALLOFF,                         //  "uCAFalloff"
-        CA_ANGLE,                           //  "uCAAngle"
+        CA_AMOUNT,                          //  "uCAAmount"        (pre-squared × 0.02 on CPU)
+        CA_FALLOFF,                         //  "uCAFalloff"       (reciprocal on CPU)
+        CA_ANGLE_SIN_COS,                   //  "uCAAngleSinCos"   vec2(sin, cos) on CPU
         CA_OFFSET_R,                        //  "uCAOffsetR"
         CA_OFFSET_B,                        //  "uCAOffsetB"
         CA_ANISOTROPY,                      //  "uCAAnisotropy"

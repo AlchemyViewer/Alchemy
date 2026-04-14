@@ -2877,6 +2877,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     {
         gBlitWithEffectsProgram.mName = "Blit With Post Effects Shader";
         gBlitWithEffectsProgram.mFeatures.isDeferred = true;
+        gBlitWithEffectsProgram.mFeatures.hasPostEffects = true;
         gBlitWithEffectsProgram.mShaderFiles.clear();
         gBlitWithEffectsProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gBlitWithEffectsProgram.mShaderFiles.push_back(make_pair("alchemy/blitWithEffectsF.glsl", GL_FRAGMENT_SHADER));
