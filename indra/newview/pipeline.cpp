@@ -7630,7 +7630,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 F32 streak_thickness = llclamp(lens_flare_streak_thickness(), 0.f, 1.f) * 0.05f;
                 shader->uniform1f(LLShaderMgr::LENS_FLARE_STREAK_WIDTH, llmax(streak_thickness, 0.001f));
                 shader->uniform1f(LLShaderMgr::LENS_FLARE_STREAK_INTENSITY, llclamp(lens_flare_streak_intensity(), 0.f, 5.f));
-                LLColor3 tint = lens_flare_streak_tint();
+                LLColor3 tint = linearColor3(lens_flare_streak_tint());
                 shader->uniform3f(LLShaderMgr::LENS_FLARE_STREAK_TINT, tint.mV[0], tint.mV[1], tint.mV[2]);
                 // User-facing 0-1 spread maps to shader's internal UV offset (0-0.1).
                 shader->uniform1f(LLShaderMgr::LENS_FLARE_CHROMATIC_SPREAD, llclamp(lens_flare_chromatic_spread(), 0.f, 1.f) * 0.1f);
@@ -7659,7 +7659,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 shader->uniform1f(LLShaderMgr::LENS_FLARE_OCCLUSION_RADIUS, llclamp(lens_flare_occlusion_radius(), 0.005f, 0.1f));
                 shader->uniform1i(LLShaderMgr::LENS_FLARE_OCCLUSION_TAPS, llclamp(lens_flare_occlusion_taps(), 1, 32));
 
-                LLColor4 light_color = sun_up ? mSunDiffuse : mMoonDiffuse;
+                LLColor4 light_color = linearColor3(sun_up ? mSunDiffuse : mMoonDiffuse);
                 shader->uniform3f(LLShaderMgr::LENS_FLARE_LIGHT_COLOR, light_color.mV[0], light_color.mV[1], light_color.mV[2]);
             }
             else
