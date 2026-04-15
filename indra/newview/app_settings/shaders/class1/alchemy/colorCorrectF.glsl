@@ -51,6 +51,14 @@ vec3 toneMap(vec3 color);
 
 #ifdef COLOR_GRADE
 vec3 applyLUTGrading(vec3 diff);
+vec3 applySplitToning(vec3 diff);
+vec3 applyBlackWhitePoint(vec3 diff);
+vec3 applyBrightnessContrast(vec3 diff);
+vec3 applyShadowHighlightRecovery(vec3 diff);
+vec3 applySaturation(vec3 diff);
+vec3 applyVibrance(vec3 diff);
+vec3 applyHueShift(vec3 diff);
+vec3 applyChannelCurves(vec3 diff);
 #endif
 
 #ifdef HAS_POST_EFFECTS
@@ -95,6 +103,11 @@ void main()
     diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0));
 #endif
 
+#ifdef COLOR_GRADE
+    // Split toning after tonemap so tints apply to rolled-off values.
+    diff.rgb = applySplitToning(diff.rgb);
+#endif
+
     diff.rgb = linear_to_srgb(diff.rgb);
 
     // === DISPLAY SPACE =======================================================
@@ -104,7 +117,16 @@ void main()
 #endif
 
 #ifdef COLOR_GRADE
+    // 6.5 black/white point → 7 brightness+contrast → 7.5 hi/shadow recovery
+    // → 8 saturation → 9 vibrance → 10 hue shift → 11 LUT → 12 curves.
+    diff.rgb = applyBlackWhitePoint(diff.rgb);
+    diff.rgb = applyBrightnessContrast(diff.rgb);
+    diff.rgb = applyShadowHighlightRecovery(diff.rgb);
+    diff.rgb = applySaturation(diff.rgb);
+    diff.rgb = applyVibrance(diff.rgb);
+    diff.rgb = applyHueShift(diff.rgb);
     diff.rgb = applyLUTGrading(diff.rgb);
+    diff.rgb = applyChannelCurves(diff.rgb);
 #endif
 
     diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0)); // We should always be 0-1 past this point

@@ -394,9 +394,33 @@ public:
         LENS_FLARE_LIGHT_COLOR,             //  "uLensFlareLightColor"
 
         // Color Correction LUT
-        COLOR_GRADE_LUT,                    //  "color_grade_lut"
-        COLOR_GRADE_LUT_SIZE,               //  "color_grade_lut_size"
-        COLOR_GRADE_STRENGTH,               //  "color_grade_strength"
+        COLOR_GRADE_LUT,                    //  "uColorGradeLut"
+        COLOR_GRADE_LUT_SIZE,               //  "uColorGradeLutSize"
+        COLOR_GRADE_STRENGTH,               //  "uColorGradeStrength"
+
+        // Split toning
+        SPLIT_TONE_SHADOW_TINT,             //  "uShadowTint"
+        SPLIT_TONE_HIGHLIGHT_TINT,          //  "uHighlightTint"
+        SPLIT_TONE_MIDTONE_TINT,            //  "uMidtoneTint"
+        SPLIT_TONE_MIDTONE_AMOUNT,          //  "uMidtoneAmount"
+        SPLIT_TONE_BALANCE,                 //  "uToneBalance"
+        SPLIT_TONE_AMOUNT,                  //  "uToneAmount"
+
+        // Display-space grading
+        COLOR_GRADE_BLACK_POINT,            //  "uBlackPoint"
+        COLOR_GRADE_WHITE_POINT,            //  "uWhitePoint"
+        COLOR_GRADE_BRIGHTNESS,             //  "uBrightness"
+        COLOR_GRADE_CONTRAST,               //  "uContrast"
+        COLOR_GRADE_HIGHLIGHTS,             //  "uHighlights"
+        COLOR_GRADE_SHADOWS,                //  "uShadows"
+        COLOR_GRADE_SATURATION,             //  "uSaturation"
+        COLOR_GRADE_VIBRANCE,               //  "uVibrance"
+        COLOR_GRADE_HUE_SHIFT,              //  "uHueShift"
+
+        // Per-channel filmic curves
+        COLOR_GRADE_CURVE_TOE,              //  "uCurveToe"
+        COLOR_GRADE_CURVE_SHOULDER,         //  "uCurveShoulder"
+        COLOR_GRADE_CURVE_STRENGTH,         //  "uCurveStrength"
 
         // Vignette
         VIGNETTE_AMOUNT,                    //  "uVignetteAmount"

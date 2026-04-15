@@ -879,6 +879,94 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>RenderChromaticAberrationStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Overall intensity of the chromatic aberration fringe. 0 disables the effect. 0.15 gives a subtle cinema lens feel; 0.5 is heavy. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderChromaticAberrationFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>How quickly the aberration grows from the screen center outward. 1 is a linear ramp; higher values keep the center clean and push fringing to the edges. Range 0.5 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderChromaticAberrationAngle</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotates the red/blue split direction, in degrees. 0 is horizontal; 90 is vertical. Only meaningful when Anisotropy is nonzero. Range 0 to 360.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderChromaticAberrationAnisotropy</key>
+        <map>
+            <key>Comment</key>
+            <string>Stretches the fringe along the angle axis. 0 gives an even radial fringe; positive values elongate it into a directional smear for anamorphic-style aberration. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderChromaticAberrationOffsetRX</key>
+        <map>
+            <key>Comment</key>
+            <string>Red channel horizontal offset direction. -1 shifts red inward on the X axis, +1 outward. Combined with RY for per-channel fringe direction. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>-1.0</real>
+        </map>
+        <key>RenderChromaticAberrationOffsetRY</key>
+        <map>
+            <key>Comment</key>
+            <string>Red channel vertical offset direction. Pairs with OffsetRX. 0 keeps red split purely horizontal. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderChromaticAberrationOffsetBX</key>
+        <map>
+            <key>Comment</key>
+            <string>Blue channel horizontal offset direction. Typically opposite sign of OffsetRX for a standard red/blue split. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderChromaticAberrationOffsetBY</key>
+        <map>
+            <key>Comment</key>
+            <string>Blue channel vertical offset direction. Pairs with OffsetBX. 0 keeps blue split purely horizontal. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
         <key>RenderColorGrade</key>
         <map>
             <key>Comment</key>
@@ -911,6 +999,228 @@
             <string>F32</string>
             <key>Value</key>
             <real>1.0</real>
+        </map>
+        <key>RenderSplitToneAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Split toning strength for shadows and highlights. 0 disables the effect; 0.5 is a natural cinematic push. Tints shadows and highlights without shifting overall brightness.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderSplitToneBalance</key>
+        <map>
+            <key>Comment</key>
+            <string>Slides the midpoint between shadow and highlight tints. Negative values widen shadows (good for dark scenes); positive values widen highlights (good for bright scenes). Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderSplitToneShadowTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Target color for shadow tones. Neutral gray (0.5, 0.5, 0.5) is identity. Try cool teal (0.35, 0.5, 0.55) for classic teal-and-orange looks.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.5</real>
+                <real>0.5</real>
+                <real>0.5</real>
+            </array>
+        </map>
+        <key>RenderSplitToneHighlightTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Target color for highlight tones. Neutral gray (0.5, 0.5, 0.5) is identity. Try warm amber (0.6, 0.5, 0.4) to complement teal shadows.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.5</real>
+                <real>0.5</real>
+                <real>0.5</real>
+            </array>
+        </map>
+        <key>RenderSplitToneMidtoneTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Target color for midtones. Neutral gray (0.5, 0.5, 0.5) is identity. Warm tints like (0.55, 0.5, 0.45) flatter skin tones.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.5</real>
+                <real>0.5</real>
+                <real>0.5</real>
+            </array>
+        </map>
+        <key>RenderSplitToneMidtoneAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Midtone tint strength, independent from shadow/highlight amount. 0 disables; subtle values (0.15-0.35) add mood without muddying skin.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeBlackPoint</key>
+        <map>
+            <key>Comment</key>
+            <string>Crushes values at or below this level to pure black. 0 is identity, 0.05 deepens blacks cinematically, 0.1+ starts clipping shadow detail.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeWhitePoint</key>
+        <map>
+            <key>Comment</key>
+            <string>Clips values at or above this level to pure white. 1 is identity, 0.95 blooms highlights, 0.9 produces a washed bleach-bypass look.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderColorGradeBrightness</key>
+        <map>
+            <key>Comment</key>
+            <string>Shifts the whole image lighter or darker. Range -0.5 to 0.5; small values (±0.05) are already noticeable.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeContrast</key>
+        <map>
+            <key>Comment</key>
+            <string>S-curve around midgray. 1 is identity; less than 1 flattens (matte film look), greater than 1 punches (values above 1.3 start clipping).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderColorGradeHighlights</key>
+        <map>
+            <key>Comment</key>
+            <string>Recovers (negative) or boosts (positive) highlights without touching midtones. Use -0.3 to pull blown skies back from clipping.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeShadows</key>
+        <map>
+            <key>Comment</key>
+            <string>Lifts (positive) or crushes (negative) shadows without touching midtones. Use +0.2 to reveal shadow detail in dark scenes.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeSaturation</key>
+        <map>
+            <key>Comment</key>
+            <string>Uniform saturation. 1 is identity, 0 is black-and-white, 1.2 is punchy, 1.5 is heavily stylized.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderColorGradeVibrance</key>
+        <map>
+            <key>Comment</key>
+            <string>Smart saturation that pushes muted colors harder than already-saturated ones. Skin-friendly; range -1 to 1, 0.3 is a subtle lift.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeHueShift</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotates all hues around the color wheel in degrees. Range -180 to 180. 30 warms everything; 180 is a full complement (inverted).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeCurveToe</key>
+        <map>
+            <key>Comment</key>
+            <string>Per-channel filmic curve toe point (RGB). Pixels at or below this input level flatten toward black. Try (0.05, 0.05, 0.1) to lift shadow blues.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderColorGradeCurveShoulder</key>
+        <map>
+            <key>Comment</key>
+            <string>Per-channel filmic curve shoulder point (RGB). Pixels at or above this input level flatten toward white. Lower values (around 0.85) give a tighter roll-off.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>1.0</real>
+                <real>1.0</real>
+            </array>
+        </map>
+        <key>RenderColorGradeCurveStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Per-channel curve blend strength (RGB). 0 disables; 0.4 is typical film, differing values per channel create cross-process looks.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
         </map>
         <key>RenderCVDMode</key>
         <map>

@@ -7708,6 +7708,50 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool ton
 
             static LLCachedControl<F32> cglut_strength(gSavedSettings, "RenderColorGradeLUTStrength", 1.f);
             shader->uniform1f(LLShaderMgr::COLOR_GRADE_STRENGTH, cglut_strength);
+
+            // Split toning (Lightroom-style, luminance-preserving)
+            static LLCachedControl<LLColor3> split_shadow_tint(gSavedSettings, "RenderSplitToneShadowTint", LLColor3(0.5f, 0.5f, 0.5f));
+            static LLCachedControl<LLColor3> split_highlight_tint(gSavedSettings, "RenderSplitToneHighlightTint", LLColor3(0.5f, 0.5f, 0.5f));
+            static LLCachedControl<LLColor3> split_midtone_tint(gSavedSettings, "RenderSplitToneMidtoneTint", LLColor3(0.5f, 0.5f, 0.5f));
+            static LLCachedControl<F32>      split_midtone_amount(gSavedSettings, "RenderSplitToneMidtoneAmount", 0.f);
+            static LLCachedControl<F32>      split_balance(gSavedSettings, "RenderSplitToneBalance", 0.f);
+            static LLCachedControl<F32>      split_amount(gSavedSettings, "RenderSplitToneAmount", 0.f);
+            shader->uniform3fv(LLShaderMgr::SPLIT_TONE_SHADOW_TINT,    1, split_shadow_tint().mV);
+            shader->uniform3fv(LLShaderMgr::SPLIT_TONE_HIGHLIGHT_TINT, 1, split_highlight_tint().mV);
+            shader->uniform3fv(LLShaderMgr::SPLIT_TONE_MIDTONE_TINT,   1, split_midtone_tint().mV);
+            shader->uniform1f(LLShaderMgr::SPLIT_TONE_MIDTONE_AMOUNT, llclamp(split_midtone_amount(), 0.0f, 1.0f));
+            shader->uniform1f(LLShaderMgr::SPLIT_TONE_BALANCE,        llclamp(split_balance(), -1.0f, 1.0f));
+            shader->uniform1f(LLShaderMgr::SPLIT_TONE_AMOUNT,         llclamp(split_amount(), 0.0f, 1.0f));
+
+            // Display-space grading (black/white point, brightness, contrast,
+            // highlight/shadow recovery, saturation, vibrance, hue shift)
+            static LLCachedControl<F32> cg_black_point(gSavedSettings, "RenderColorGradeBlackPoint", 0.f);
+            static LLCachedControl<F32> cg_white_point(gSavedSettings, "RenderColorGradeWhitePoint", 1.f);
+            static LLCachedControl<F32> cg_brightness(gSavedSettings, "RenderColorGradeBrightness", 0.f);
+            static LLCachedControl<F32> cg_contrast(gSavedSettings, "RenderColorGradeContrast", 1.f);
+            static LLCachedControl<F32> cg_highlights(gSavedSettings, "RenderColorGradeHighlights", 0.f);
+            static LLCachedControl<F32> cg_shadows(gSavedSettings, "RenderColorGradeShadows", 0.f);
+            static LLCachedControl<F32> cg_saturation(gSavedSettings, "RenderColorGradeSaturation", 1.f);
+            static LLCachedControl<F32> cg_vibrance(gSavedSettings, "RenderColorGradeVibrance", 0.f);
+            static LLCachedControl<F32> cg_hue_shift(gSavedSettings, "RenderColorGradeHueShift", 0.f);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BLACK_POINT,  llclamp(cg_black_point(), 0.0f, 0.5f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_WHITE_POINT,  llclamp(cg_white_point(), 0.5f, 1.0f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BRIGHTNESS,   llclamp(cg_brightness(), -0.5f, 0.5f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_CONTRAST,     llclamp(cg_contrast(), 0.0f, 2.0f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_HIGHLIGHTS,   llclamp(cg_highlights(), -1.0f, 1.0f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_SHADOWS,      llclamp(cg_shadows(), -1.0f, 1.0f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_SATURATION,   llclamp(cg_saturation(), 0.0f, 2.0f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_VIBRANCE,     llclamp(cg_vibrance(), -1.0f, 1.0f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_HUE_SHIFT,    llclamp(cg_hue_shift(), -180.0f, 180.0f));
+
+            // Per-channel filmic curves. Toe/shoulder are per-channel input
+            // endpoints; strength blends each channel toward its S-curve.
+            static LLCachedControl<LLColor3> cg_curve_toe(gSavedSettings, "RenderColorGradeCurveToe", LLColor3(0.f, 0.f, 0.f));
+            static LLCachedControl<LLColor3> cg_curve_shoulder(gSavedSettings, "RenderColorGradeCurveShoulder", LLColor3(1.f, 1.f, 1.f));
+            static LLCachedControl<LLColor3> cg_curve_strength(gSavedSettings, "RenderColorGradeCurveStrength", LLColor3(0.f, 0.f, 0.f));
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_TOE,      1, cg_curve_toe().mV);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_SHOULDER, 1, cg_curve_shoulder().mV);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_STRENGTH, 1, cg_curve_strength().mV);
         }
 
         mScreenTriangleVB->setBuffer();

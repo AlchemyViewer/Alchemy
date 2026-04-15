@@ -1596,9 +1596,33 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uLensFlareLightColor");
 
     // Color Correction LUT
-    mReservedUniforms.push_back("color_grade_lut");
-    mReservedUniforms.push_back("color_grade_lut_size");
-    mReservedUniforms.push_back("color_grade_strength");
+    mReservedUniforms.push_back("uColorGradeLut");
+    mReservedUniforms.push_back("uColorGradeLutSize");
+    mReservedUniforms.push_back("uColorGradeStrength");
+
+    // Split toning
+    mReservedUniforms.push_back("uShadowTint");
+    mReservedUniforms.push_back("uHighlightTint");
+    mReservedUniforms.push_back("uMidtoneTint");
+    mReservedUniforms.push_back("uMidtoneAmount");
+    mReservedUniforms.push_back("uToneBalance");
+    mReservedUniforms.push_back("uToneAmount");
+
+    // Display-space grading
+    mReservedUniforms.push_back("uBlackPoint");
+    mReservedUniforms.push_back("uWhitePoint");
+    mReservedUniforms.push_back("uBrightness");
+    mReservedUniforms.push_back("uContrast");
+    mReservedUniforms.push_back("uHighlights");
+    mReservedUniforms.push_back("uShadows");
+    mReservedUniforms.push_back("uSaturation");
+    mReservedUniforms.push_back("uVibrance");
+    mReservedUniforms.push_back("uHueShift");
+
+    // Per-channel filmic curves
+    mReservedUniforms.push_back("uCurveToe");
+    mReservedUniforms.push_back("uCurveShoulder");
+    mReservedUniforms.push_back("uCurveStrength");
 
     // Vignette
     mReservedUniforms.push_back("uVignetteAmount");
