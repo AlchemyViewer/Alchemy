@@ -1600,28 +1600,34 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uColorGradeLutSize");
     mReservedUniforms.push_back("uColorGradeLutStrength");
 
+    // Linear-space grading (pre-tonemap)
+    mReservedUniforms.push_back("uWhiteBalanceGain");
+    mReservedUniforms.push_back("uLift");
+    mReservedUniforms.push_back("uInvGammaCC");
+    mReservedUniforms.push_back("uGain");
+
     // Split toning
-    mReservedUniforms.push_back("uShadowTint");
-    mReservedUniforms.push_back("uHighlightTint");
-    mReservedUniforms.push_back("uMidtoneTint");
+    mReservedUniforms.push_back("uShadowRatio");
+    mReservedUniforms.push_back("uHighlightRatio");
+    mReservedUniforms.push_back("uMidtoneRatio");
     mReservedUniforms.push_back("uMidtoneAmount");
-    mReservedUniforms.push_back("uToneBalance");
+    mReservedUniforms.push_back("uSplitToneMid");
     mReservedUniforms.push_back("uToneAmount");
 
     // Display-space grading
-    mReservedUniforms.push_back("uBlackPoint");
-    mReservedUniforms.push_back("uWhitePoint");
-    mReservedUniforms.push_back("uBrightness");
-    mReservedUniforms.push_back("uContrast");
-    mReservedUniforms.push_back("uHighlights");
-    mReservedUniforms.push_back("uShadows");
+    mReservedUniforms.push_back("uBWPScale");
+    mReservedUniforms.push_back("uBWPBias");
+    mReservedUniforms.push_back("uBCScale");
+    mReservedUniforms.push_back("uBCBias");
+    mReservedUniforms.push_back("uHighlightsScaled");
+    mReservedUniforms.push_back("uShadowsScaled");
     mReservedUniforms.push_back("uSaturation");
     mReservedUniforms.push_back("uVibrance");
-    mReservedUniforms.push_back("uHueShift");
+    mReservedUniforms.push_back("uHueShiftNorm");
 
     // Per-channel filmic curves
     mReservedUniforms.push_back("uCurveToe");
-    mReservedUniforms.push_back("uCurveShoulder");
+    mReservedUniforms.push_back("uCurveInvRange");
     mReservedUniforms.push_back("uCurveStrength");
 
     // Vignette

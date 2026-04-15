@@ -7410,6 +7410,86 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     }
 }
 
+namespace
+{
+    // Port of the Kim et al. 2002 Planckian-locus polynomial used by the
+    // original white-balance shader. Valid 1667K..25000K to ~1% of the true
+    // locus. Output is CIE xy chromaticity at Y = 1.
+    inline void cg_cct_to_xy(F32 cct, F32& out_x, F32& out_y)
+    {
+        F32 t = cct, t2 = t * t, t3 = t2 * t;
+        if (t <= 4000.0f)
+            out_x = -0.2661239e9f / t3 - 0.2343589e6f / t2 + 0.8776956e3f / t + 0.179910f;
+        else
+            out_x = -3.0258469e9f / t3 + 2.1070379e6f / t2 + 0.2226347e3f / t + 0.240390f;
+
+        F32 x2 = out_x * out_x, x3 = x2 * out_x;
+        if (t <= 2222.0f)
+            out_y = -1.1063814f  * x3 - 1.34811020f * x2 + 2.18555832f * out_x - 0.20219683f;
+        else if (t <= 4000.0f)
+            out_y = -0.9549476f  * x3 - 1.37418593f * x2 + 2.09137015f * out_x - 0.16748867f;
+        else
+            out_y =  3.0817580f  * x3 - 5.87338670f * x2 + 3.75112997f * out_x - 0.37001483f;
+    }
+
+    // Apply a Duv offset perpendicular to the Planckian locus via a central-
+    // difference tangent in CIE 1960 u,v space (O(h²) accurate). Returns the
+    // new CIE xy chromaticity.
+    inline void cg_apply_duv(F32 cct, F32 duv, F32& out_x, F32& out_y)
+    {
+        F32 xA, yA, xB, yB;
+        cg_cct_to_xy(cct - 1.0f, xA, yA);
+        cg_cct_to_xy(cct + 1.0f, xB, yB);
+
+        F32 dA  = -2.0f * xA + 12.0f * yA + 3.0f;
+        F32 uA  = 4.0f * xA / dA;
+        F32 vA  = 6.0f * yA / dA;
+        F32 dB  = -2.0f * xB + 12.0f * yB + 3.0f;
+        F32 uB  = 4.0f * xB / dB;
+        F32 vB  = 6.0f * yB / dB;
+
+        F32 uMid = 0.5f * (uA + uB);
+        F32 vMid = 0.5f * (vA + vB);
+        F32 tx = uB - uA;
+        F32 ty = vB - vA;
+        F32 tlen = sqrtf(tx * tx + ty * ty);
+        if (tlen > 1e-12f) { tx /= tlen; ty /= tlen; }
+
+        F32 u = uMid + (-ty) * duv;  // perp = (-tangent.y, tangent.x)
+        F32 v = vMid + ( tx) * duv;
+
+        F32 dBack = 2.0f * u - 8.0f * v + 4.0f;
+        out_x = 3.0f * u / dBack;
+        out_y = 2.0f * v / dBack;
+    }
+
+    // Resolve the artist's (CCT offset, Duv) pair into a linear-sRGB gain,
+    // normalised so green pins to 1 (preserves luminance). Duv sign is
+    // flipped to match the tint convention: +Duv pushes green, -Duv magenta.
+    inline LLVector3 cg_compute_white_balance_gain(F32 cct_offset, F32 duv)
+    {
+        if (fabsf(cct_offset) < 1e-3f && fabsf(duv) < 1e-5f)
+            return LLVector3(1.f, 1.f, 1.f);
+
+        constexpr F32 D65_CCT = 6504.0f;
+        F32 target_cct = llclamp(D65_CCT + cct_offset, 1667.0f, 25000.0f);
+
+        F32 x, y;
+        cg_apply_duv(target_cct, -duv, x, y);
+
+        F32 X = x / y;
+        F32 Y = 1.0f;
+        F32 Z = (1.0f - x - y) / y;
+
+        F32 r =  3.2404542f * X - 1.5371385f * Y - 0.4985314f * Z;
+        F32 g = -0.9692660f * X + 1.8760108f * Y + 0.0415560f * Z;
+        F32 b =  0.0556434f * X - 0.2040259f * Y + 1.0572252f * Z;
+
+        F32 inv_g = 1.0f / llmax(g, 1e-6f);
+        return LLVector3(r * inv_g, 1.0f, b * inv_g);
+    }
+}
+
 void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool apply_tonemap, bool apply_color_grade)
 {
     LL_PROFILE_GPU_ZONE("colorcorrect");
@@ -7717,22 +7797,74 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 shader->uniform1f(LLShaderMgr::COLOR_GRADE_LUT_STRENGTH, 0.f); // Disable lut path
             }
 
-            // Split toning (Lightroom-style, luminance-preserving)
+            // --- Linear-space grading (pre-tonemap) ---
+            // White balance: resolve (CCT offset, Duv) into a linear-sRGB gain
+            // on the CPU. Duv is exposed to artists on a friendly [-1, 1]
+            // scale and scaled into CIE 1960 uv units (±0.02) here.
+            static LLCachedControl<F32>       cg_wb_cct(gSavedSettings, "RenderColorGradeWhiteBalanceCCT", 0.f);
+            static LLCachedControl<F32>       cg_wb_duv(gSavedSettings, "RenderColorGradeWhiteBalanceDuv", 0.f);
+            const F32 wb_cct = llclamp((F32)cg_wb_cct(), -5000.0f, 5000.0f);
+            const F32 wb_duv = llclamp((F32)cg_wb_duv(), -1.0f, 1.0f) * 0.02f;
+            const LLVector3 wb_gain = cg_compute_white_balance_gain(wb_cct, wb_duv);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_WHITE_BALANCE_GAIN, 1, wb_gain.mV);
+
+            // Lift / Gamma / Gain — gamma is inverted on the CPU.
+            static LLCachedControl<LLVector3> cg_lift(gSavedSettings, "RenderColorGradeLift", LLVector3(0.f, 0.f, 0.f));
+            static LLCachedControl<LLVector3> cg_gamma_cc(gSavedSettings, "RenderColorGradeGamma", LLVector3(1.f, 1.f, 1.f));
+            static LLCachedControl<LLVector3> cg_gain(gSavedSettings, "RenderColorGradeGain", LLVector3(1.f, 1.f, 1.f));
+            const LLVector3 lift_v  = cg_lift();
+            const LLVector3 gamma_v = cg_gamma_cc();
+            const LLVector3 gain_v  = cg_gain();
+            const F32 lift_arr[3] = {
+                llclamp(lift_v.mV[0], -0.5f, 0.5f),
+                llclamp(lift_v.mV[1], -0.5f, 0.5f),
+                llclamp(lift_v.mV[2], -0.5f, 0.5f) };
+            const F32 gain_arr[3] = {
+                llclamp(gain_v.mV[0], 0.5f, 1.5f),
+                llclamp(gain_v.mV[1], 0.5f, 1.5f),
+                llclamp(gain_v.mV[2], 0.5f, 1.5f) };
+            const F32 inv_gamma_arr[3] = {
+                1.0f / llclamp(gamma_v.mV[0], 0.5f, 1.5f),
+                1.0f / llclamp(gamma_v.mV[1], 0.5f, 1.5f),
+                1.0f / llclamp(gamma_v.mV[2], 0.5f, 1.5f) };
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_LIFT,         1, lift_arr);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_INV_GAMMA_CC, 1, inv_gamma_arr);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_GAIN,         1, gain_arr);
+
+            // --- Split toning ---
+            // Tints → ratios: `tint / max(dot(tint, LUMA), 1e-4)` precomputed.
+            // Identity (tint == vec3(0.5)) maps to ratio == vec3(1).
             static LLCachedControl<LLColor3> split_shadow_tint(gSavedSettings, "RenderSplitToneShadowTint", LLColor3(0.5f, 0.5f, 0.5f));
             static LLCachedControl<LLColor3> split_highlight_tint(gSavedSettings, "RenderSplitToneHighlightTint", LLColor3(0.5f, 0.5f, 0.5f));
             static LLCachedControl<LLColor3> split_midtone_tint(gSavedSettings, "RenderSplitToneMidtoneTint", LLColor3(0.5f, 0.5f, 0.5f));
             static LLCachedControl<F32>      split_midtone_amount(gSavedSettings, "RenderSplitToneMidtoneAmount", 0.f);
             static LLCachedControl<F32>      split_balance(gSavedSettings, "RenderSplitToneBalance", 0.f);
             static LLCachedControl<F32>      split_amount(gSavedSettings, "RenderSplitToneAmount", 0.f);
-            shader->uniform3fv(LLShaderMgr::SPLIT_TONE_SHADOW_TINT,    1, split_shadow_tint().mV);
-            shader->uniform3fv(LLShaderMgr::SPLIT_TONE_HIGHLIGHT_TINT, 1, split_highlight_tint().mV);
-            shader->uniform3fv(LLShaderMgr::SPLIT_TONE_MIDTONE_TINT,   1, split_midtone_tint().mV);
+
+            constexpr F32 CG_LUMA_R = 0.2126f, CG_LUMA_G = 0.7152f, CG_LUMA_B = 0.0722f;
+            auto tint_to_ratio = [](const LLColor3& tint, F32 out[3]) {
+                F32 l = llmax(tint.mV[0] * CG_LUMA_R + tint.mV[1] * CG_LUMA_G + tint.mV[2] * CG_LUMA_B, 1e-4f);
+                F32 inv = 1.0f / l;
+                out[0] = tint.mV[0] * inv;
+                out[1] = tint.mV[1] * inv;
+                out[2] = tint.mV[2] * inv;
+            };
+            F32 shadow_ratio[3], highlight_ratio[3], midtone_ratio[3];
+            tint_to_ratio(split_shadow_tint(),    shadow_ratio);
+            tint_to_ratio(split_highlight_tint(), highlight_ratio);
+            tint_to_ratio(split_midtone_tint(),   midtone_ratio);
+            const F32 tone_balance = llclamp(split_balance(), -1.0f, 1.0f);
+            shader->uniform3fv(LLShaderMgr::SPLIT_TONE_SHADOW_RATIO,    1, shadow_ratio);
+            shader->uniform3fv(LLShaderMgr::SPLIT_TONE_HIGHLIGHT_RATIO, 1, highlight_ratio);
+            shader->uniform3fv(LLShaderMgr::SPLIT_TONE_MIDTONE_RATIO,   1, midtone_ratio);
             shader->uniform1f(LLShaderMgr::SPLIT_TONE_MIDTONE_AMOUNT, llclamp(split_midtone_amount(), 0.0f, 1.0f));
-            shader->uniform1f(LLShaderMgr::SPLIT_TONE_BALANCE,        llclamp(split_balance(), -1.0f, 1.0f));
+            shader->uniform1f(LLShaderMgr::SPLIT_TONE_MID,            0.5f + tone_balance * 0.4f);
             shader->uniform1f(LLShaderMgr::SPLIT_TONE_AMOUNT,         llclamp(split_amount(), 0.0f, 1.0f));
 
-            // Display-space grading (black/white point, brightness, contrast,
-            // highlight/shadow recovery, saturation, vibrance, hue shift)
+            // --- Display-space grading ---
+            // Every slider is folded into a {scale, bias} pair on the CPU
+            // so the shader is one FMA per helper. Identity defaults land
+            // exactly on the scale=1/bias=0 fast-path.
             static LLCachedControl<F32> cg_black_point(gSavedSettings, "RenderColorGradeBlackPoint", 0.f);
             static LLCachedControl<F32> cg_white_point(gSavedSettings, "RenderColorGradeWhitePoint", 1.f);
             static LLCachedControl<F32> cg_brightness(gSavedSettings, "RenderColorGradeBrightness", 0.f);
@@ -7742,24 +7874,44 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             static LLCachedControl<F32> cg_saturation(gSavedSettings, "RenderColorGradeSaturation", 1.f);
             static LLCachedControl<F32> cg_vibrance(gSavedSettings, "RenderColorGradeVibrance", 0.f);
             static LLCachedControl<F32> cg_hue_shift(gSavedSettings, "RenderColorGradeHueShift", 0.f);
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BLACK_POINT,  llclamp(cg_black_point(), 0.0f, 0.5f));
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_WHITE_POINT,  llclamp(cg_white_point(), 0.5f, 1.0f));
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BRIGHTNESS,   llclamp(cg_brightness(), -0.5f, 0.5f));
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_CONTRAST,     llclamp(cg_contrast(), 0.0f, 2.0f));
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_HIGHLIGHTS,   llclamp(cg_highlights(), -1.0f, 1.0f));
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_SHADOWS,      llclamp(cg_shadows(), -1.0f, 1.0f));
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_SATURATION,   llclamp(cg_saturation(), 0.0f, 2.0f));
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_VIBRANCE,     llclamp(cg_vibrance(), -1.0f, 1.0f));
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_HUE_SHIFT,    llclamp(cg_hue_shift(), -180.0f, 180.0f));
 
-            // Per-channel filmic curves. Toe/shoulder are per-channel input
-            // endpoints; strength blends each channel toward its S-curve.
+            const F32 black_point = llclamp(cg_black_point(), 0.0f, 0.5f);
+            const F32 white_point = llclamp(cg_white_point(), 0.5f, 1.0f);
+            const F32 bwp_scale   = 1.0f / llmax(white_point - black_point, 1e-4f);
+            const F32 bwp_bias    = -black_point * bwp_scale;
+            const F32 brightness  = llclamp(cg_brightness(), -0.5f, 0.5f);
+            const F32 contrast    = llclamp(cg_contrast(),    0.0f, 2.0f);
+            const F32 bc_scale    = contrast;
+            const F32 bc_bias     = (brightness - 0.5f) * contrast + 0.5f;
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BWP_SCALE,         bwp_scale);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BWP_BIAS,          bwp_bias);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BC_SCALE,          bc_scale);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BC_BIAS,           bc_bias);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_HIGHLIGHTS_SCALED, llclamp(cg_highlights(), -1.0f, 1.0f) * 0.3f);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_SHADOWS_SCALED,    llclamp(cg_shadows(),    -1.0f, 1.0f) * 0.3f);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_SATURATION,        llclamp(cg_saturation(),  0.0f, 2.0f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_VIBRANCE,          llclamp(cg_vibrance(),   -1.0f, 1.0f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_HUE_SHIFT_NORM,    llclamp(cg_hue_shift(), -180.0f, 180.0f) / 360.0f);
+
+            // Per-channel filmic curves. Per-channel `(shoulder - toe)` is
+            // pre-inverted on the CPU so the shader avoids three divisions.
             static LLCachedControl<LLColor3> cg_curve_toe(gSavedSettings, "RenderColorGradeCurveToe", LLColor3(0.f, 0.f, 0.f));
             static LLCachedControl<LLColor3> cg_curve_shoulder(gSavedSettings, "RenderColorGradeCurveShoulder", LLColor3(1.f, 1.f, 1.f));
             static LLCachedControl<LLColor3> cg_curve_strength(gSavedSettings, "RenderColorGradeCurveStrength", LLColor3(0.f, 0.f, 0.f));
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_TOE,      1, cg_curve_toe().mV);
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_SHOULDER, 1, cg_curve_shoulder().mV);
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_STRENGTH, 1, cg_curve_strength().mV);
+            const LLColor3 curve_toe      = cg_curve_toe();
+            const LLColor3 curve_shoulder = cg_curve_shoulder();
+            const LLColor3 curve_strength = cg_curve_strength();
+            const F32 curve_inv_range[3] = {
+                1.0f / llmax(curve_shoulder.mV[0] - curve_toe.mV[0], 1e-4f),
+                1.0f / llmax(curve_shoulder.mV[1] - curve_toe.mV[1], 1e-4f),
+                1.0f / llmax(curve_shoulder.mV[2] - curve_toe.mV[2], 1e-4f) };
+            const F32 curve_strength_arr[3] = {
+                llclamp(curve_strength.mV[0], 0.0f, 1.0f),
+                llclamp(curve_strength.mV[1], 0.0f, 1.0f),
+                llclamp(curve_strength.mV[2], 0.0f, 1.0f) };
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_TOE,       1, curve_toe.mV);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_INV_RANGE, 1, curve_inv_range);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_STRENGTH,  1, curve_strength_arr);
         }
 
         mScreenTriangleVB->setBuffer();

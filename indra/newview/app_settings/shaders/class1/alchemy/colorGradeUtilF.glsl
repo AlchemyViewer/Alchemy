@@ -1,16 +1,18 @@
 /**
  * @file colorGradeUtilF.glsl
- * @brief Display-space color grading helpers attached to every program whose
+ * @brief Colour-grading helpers attached to every program whose
  *        LLGLSLShader sets `mFeatures.hasColorGrade = true`
  *        (see llshadermgr.cpp:attachShaderFeatures).
  *
  * Consumer:
- *   - colorCorrectF.glsl — runs the full grading chain between tonemap and
- *                          the final dither/blit. Split toning runs in LINEAR
- *                          space right after tonemap; every other helper here
- *                          runs in DISPLAY space after the gamma encode.
+ *   - colorCorrectF.glsl — runs the full grading chain between exposure and
+ *                          the final dither/blit.
  *
  * Public entry points, in pipeline order:
+ *
+ *   LINEAR SPACE (pre-tonemap)
+ *     vec3 applyWhiteBalance         (vec3 col)   // step 2
+ *     vec3 applyLiftGammaGain        (vec3 col)   // step 3
  *
  *   LINEAR SPACE (post-tonemap, pre-gamma)
  *     vec3 applySplitToning          (vec3 col)   // step 5
@@ -25,19 +27,17 @@
  *     vec3 applyLUTGrading           (vec3 col)   // step 11
  *     vec3 applyChannelCurves        (vec3 col)   // step 12
  *
- * Conventions used throughout:
- *   - Every helper has a no-op fast-path for its identity uniform values
- *     (amount <= 0, strength <= 0, or untouched endpoints), so the call site
- *     can chain them unconditionally without paying for disabled effects.
- *   - Uniforms are CPU-clamped in pipeline.cpp to the artist-facing ranges
- *     shown in their inline comments; the shader still guards against
- *     divide-by-zero at boundary values.
- *   - Split toning lives here instead of in postEffectUtilsF because it is
- *     gated on the LUT-grading shader variant and shares the `CG_LUMA`
- *     Rec.709 weights with the display-space saturation/vibrance helpers.
- *   - Shared helpers (CG_LUMA, cg_rgb2hsv/cg_hsv2rgb, cg_sCurve) are prefixed
- *     `cg_` / `CG_` to avoid colliding with `LUMA` defined in postEffectUtilsF,
- *     which may be linked into the same program.
+ * Optimisation notes:
+ *   - Every uniform here is fed a PRECOMPUTED value from pipeline.cpp. The
+ *     per-pixel work reduces to one FMA (or one FMA + one `pow`) per helper
+ *     when effects are active — no per-pixel divides, max-guards, or ratio
+ *     derivations. Identity defaults land exactly on the fast-path compare.
+ *   - Fast-path identity checks still live shader-side because this file is
+ *     attached to multiple programs with different defaults; doing them on
+ *     the CPU would require shader-variant plumbing we don't have.
+ *   - Shared helpers (`CG_LUMA`, `cg_rgb2hsv`/`cg_hsv2rgb`, `cg_sCurve`) are
+ *     prefixed `cg_`/`CG_` to avoid colliding with `LUMA` in
+ *     postEffectUtilsF, which can be linked into the same program.
  *
  * $LicenseInfo:firstyear=2021&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -66,13 +66,10 @@
 // Shared helpers
 // =============================================================================
 
-// Rec.709 luma weights. Used by saturation, vibrance, recovery masks, and
-// split toning. Prefixed to avoid colliding with postEffectUtilsF::LUMA when
-// both utilities are linked into the same program.
+// Rec.709 luma weights.
 const vec3 CG_LUMA = vec3(0.2126, 0.7152, 0.0722);
 
-// HSV conversions (Sam Hocevar branchless form). Valid for display-space
-// values in [0, 1]; hue in hsv.x is a fraction on [0, 1).
+// HSV conversions (Sam Hocevar branchless form). Display-space values in [0,1].
 vec3 cg_rgb2hsv(vec3 c)
 {
     vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
@@ -90,71 +87,83 @@ vec3 cg_hsv2rgb(vec3 c)
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
-// Single-channel filmic S-curve. Maps x through a smoothstep between `toe`
-// and `shoulder`, then blends back toward the input by `strength`.
-float cg_sCurve(float x, float toe, float shoulder, float strength)
+
+// =============================================================================
+// Step 2 — White balance  (LINEAR space, pre-tonemap)
+// =============================================================================
+//
+// Von Kries tint. The CPU resolves (CCT offset, Duv) into a linear-sRGB gain
+// using the Kim et al. 2002 Planckian-locus polynomial, normalises the result
+// so green pins to 1 (preserves luminance), and uploads the vec3. The shader
+// is now a single multiply.
+
+uniform vec3 uWhiteBalanceGain;  // default vec3(1) — per-channel linear gain.
+
+vec3 applyWhiteBalance(vec3 col)
 {
-    float t = clamp((x - toe) / max(shoulder - toe, 1e-4), 0.0, 1.0);
-    float s = t * t * (3.0 - 2.0 * t);
-    return mix(x, s, clamp(strength, 0.0, 1.0));
+    if (all(equal(uWhiteBalanceGain, vec3(1.0))))
+        return col;
+    return col * uWhiteBalanceGain;
 }
 
 
 // =============================================================================
-// Step 5 — Split toning  (LINEAR space, after tonemap)
+// Step 3 — Lift / Gamma / Gain  (LINEAR space, pre-tonemap)
 // =============================================================================
 //
-// Lightroom-style split toning. For each pixel, build three luma-masked
-// versions of the input — one tinted toward uShadowTint, one toward
-// uMidtoneTint, one toward uHighlightTint — each scaled so its perceived
-// brightness matches the original (division by the tint's own luma). Blend
-// them back in proportional to their masks. The shadow/highlight amount is
-// shared (`uToneAmount`); midtones have their own amount so a full-strength
-// shadow/highlight grade can coexist with an untouched midtone range, or
-// vice versa.
-//
-// `uToneBalance` slides the split point across the luma histogram, giving
-// the artist control over whether "shadows" means the bottom 30% or the
-// bottom 70% of the tonal range.
+// Colorist's three-way. `uInvGammaCC` is `1.0 / max(gamma, 1e-4)` from the
+// CPU, so the per-pixel math is one FMA plus one `pow`.
 
-uniform vec3  uShadowTint;       // [0, 1] default vec3(0.5) — target color for
-                                 //   shadows. vec3(0.5) is the identity.
-uniform vec3  uHighlightTint;    // [0, 1] default vec3(0.5) — target color for
-                                 //   highlights.
-uniform vec3  uMidtoneTint;      // [0, 1] default vec3(0.5) — target color for
-                                 //   midtones.
-uniform float uMidtoneAmount;    // [0, 1] default 0 — midtone tint strength.
-uniform float uToneBalance;      // [-1, 1] default 0 — slides the luma midpoint.
-                                 //   -0.6 for dark scenes, +0.4 for bright.
+uniform vec3 uLift;          // default vec3(0) — additive shadow offset.
+uniform vec3 uInvGammaCC;    // default vec3(1) — pre-inverted midtone power.
+uniform vec3 uGain;          // default vec3(1) — highlight multiplier.
+
+vec3 applyLiftGammaGain(vec3 col)
+{
+    // Fast path: all three at identity. Compact bvec form collapses to a
+    // single uniform branch.
+    if (all(equal(uLift, vec3(0.0))) &&
+        all(equal(uGain, vec3(1.0))) &&
+        all(equal(uInvGammaCC, vec3(1.0))))
+        return col;
+
+    col = col * uGain + uLift;
+    return pow(max(col, 0.0), uInvGammaCC);
+}
+
+
+// =============================================================================
+// Step 5 — Split toning  (LINEAR space, post-tonemap)
+// =============================================================================
+//
+// Lightroom-style, luminance-preserving. The CPU computes
+// `tint / max(dot(tint, LUMA), 1e-4)` for each of the three tints and uploads
+// them as `*Ratio` uniforms, and also precomputes the luma split point
+// `uSplitToneMid = 0.5 + balance * 0.4`. The shader just multiplies ratios by
+// the pixel's luma and blends through the luma masks.
+
+uniform vec3  uShadowRatio;      // default vec3(1) — shadow tint / dot(tint, LUMA).
+uniform vec3  uMidtoneRatio;     // default vec3(1) — midtone  tint / dot(tint, LUMA).
+uniform vec3  uHighlightRatio;   // default vec3(1) — highlight tint / dot(tint, LUMA).
+uniform float uMidtoneAmount;    // [0, 1] default 0 — midtone strength.
+uniform float uSplitToneMid;     // default 0.5 — pre-slid luma split point.
 uniform float uToneAmount;       // [0, 1] default 0 — shadow/highlight strength.
-                                 //   0.5 is typical. 0 skips the effect entirely.
 
 vec3 applySplitToning(vec3 col)
 {
-    // Fast path: full feature disabled.
     if (uToneAmount <= 0.0)
         return col;
 
-    float l   = dot(col, CG_LUMA);
-    float mid = 0.5 + uToneBalance * 0.4;
+    float l = dot(col, CG_LUMA);
 
-    // Three masks over the luma axis — midtones peak at the slide point and
-    // fall off into shadow/highlight as luma departs from mid.
-    float hi = smoothstep(mid, mid + 0.35, l);
-    float lo = 1.0 - smoothstep(mid - 0.35, mid, l);
+    float hi = smoothstep(uSplitToneMid,        uSplitToneMid + 0.35, l);
+    float lo = 1.0 - smoothstep(uSplitToneMid - 0.35, uSplitToneMid,  l);
     float md = max(1.0 - hi - lo, 0.0);
 
-    // Tint / tint-luma ratios depend only on uniforms — driver hoists these
-    // divisions to per-draw constants. Scaling by source luma `l` then matches
-    // the tinted color's brightness to the pixel, preserving perceived value.
-    vec3 shadowRatio    = uShadowTint    / max(dot(uShadowTint,    CG_LUMA), 1e-4);
-    vec3 midtoneRatio   = uMidtoneTint   / max(dot(uMidtoneTint,   CG_LUMA), 1e-4);
-    vec3 highlightRatio = uHighlightTint / max(dot(uHighlightTint, CG_LUMA), 1e-4);
-
     vec3 result = col;
-    result = mix(result, shadowRatio    * l, lo * uToneAmount);
-    result = mix(result, midtoneRatio   * l, md * uMidtoneAmount);
-    result = mix(result, highlightRatio * l, hi * uToneAmount);
+    result = mix(result, uShadowRatio    * l, lo * uToneAmount);
+    result = mix(result, uMidtoneRatio   * l, md * uMidtoneAmount);
+    result = mix(result, uHighlightRatio * l, hi * uToneAmount);
     return result;
 }
 
@@ -163,22 +172,17 @@ vec3 applySplitToning(vec3 col)
 // Step 6.5 — Black / white point  (DISPLAY space)
 // =============================================================================
 //
-// Remap the tonal range to new endpoints. Any value at or below `uBlackPoint`
-// clips to 0; any value at or above `uWhitePoint` clips to 1; everything
-// between is linearly stretched. Use it to deepen blacks or bloom highlights
-// without resorting to contrast, which moves midtones too.
+// Remaps the tonal range. CPU sends `uBWPScale = 1 / (white - black)` and
+// `uBWPBias = -black * uBWPScale`; shader is one FMA.
 
-uniform float uBlackPoint;   // [0, 0.5] default 0 — crush threshold.
-uniform float uWhitePoint;   // [0.5, 1] default 1 — clip threshold.
+uniform float uBWPScale;     // default 1.0.
+uniform float uBWPBias;      // default 0.0.
 
 vec3 applyBlackWhitePoint(vec3 col)
 {
-    // Fast path: both endpoints at identity.
-    if (uBlackPoint <= 1e-4 && uWhitePoint >= 0.9999)
+    if (uBWPScale == 1.0 && uBWPBias == 0.0)
         return col;
-
-    float range = max(uWhitePoint - uBlackPoint, 1e-4);
-    return (col - vec3(uBlackPoint)) / range;
+    return col * uBWPScale + uBWPBias;
 }
 
 
@@ -186,22 +190,17 @@ vec3 applyBlackWhitePoint(vec3 col)
 // Step 7 — Brightness + contrast  (DISPLAY space)
 // =============================================================================
 //
-// Classic linear brightness offset followed by contrast around midgray. Kept
-// as one function because they are always applied together and share no
-// expensive work.
+// CPU sends `uBCScale = contrast` and `uBCBias = (brightness - 0.5) * contrast + 0.5`
+// so the shader is one FMA.
 
-uniform float uBrightness;   // [-0.5, 0.5] default 0 — additive offset.
-uniform float uContrast;     // [0, 2] default 1 — scale around 0.5. Less than
-                             //   1 flattens, greater than 1 punches.
+uniform float uBCScale;      // default 1.0.
+uniform float uBCBias;       // default 0.0.
 
 vec3 applyBrightnessContrast(vec3 col)
 {
-    // Fast path: both sliders at identity.
-    if (abs(uBrightness) <= 1e-4 && abs(uContrast - 1.0) <= 1e-4)
+    if (uBCScale == 1.0 && uBCBias == 0.0)
         return col;
-
-    // Folded `(col + B - 0.5) * C + 0.5` into one FMA per channel.
-    return col * uContrast + ((uBrightness - 0.5) * uContrast + 0.5);
+    return col * uBCScale + uBCBias;
 }
 
 
@@ -209,28 +208,24 @@ vec3 applyBrightnessContrast(vec3 col)
 // Step 7.5 — Highlight / shadow recovery  (DISPLAY space)
 // =============================================================================
 //
-// Compresses the top and bottom of the tonal range without disturbing the
-// midtones. Implemented as a luma-masked pull toward the opposite endpoint,
-// scaled by 0.3 so the slider range matches Lightroom's [-1, 1] feel.
-// Positive values boost; negative values recover — the convention artists
-// already know.
+// Luma-masked pull toward the opposite endpoint. CPU pre-multiplies the 0.3
+// Lightroom scaling into the sliders so per-pixel work is two masks plus two
+// FMAs.
 
-uniform float uHighlights;   // [-1, 1] default 0 — highlight recovery / boost.
-uniform float uShadows;      // [-1, 1] default 0 — shadow lift / crush.
+uniform float uHighlightsScaled;   // default 0 — highlight slider × 0.3.
+uniform float uShadowsScaled;      // default 0 — shadow   slider × 0.3.
 
 vec3 applyShadowHighlightRecovery(vec3 col)
 {
-    // Fast path: both sliders at identity.
-    if (abs(uHighlights) <= 1e-4 && abs(uShadows) <= 1e-4)
+    if (uHighlightsScaled == 0.0 && uShadowsScaled == 0.0)
         return col;
 
     float l     = dot(col, CG_LUMA);
     float hMask = smoothstep(0.5, 1.0, l);
     float sMask = 1.0 - smoothstep(0.0, 0.5, l);
 
-    // `(col - 1) * -H` collapses to `(1 - col) * H`; shadow lift is `col * S`.
-    col += (vec3(1.0) - col) * (uHighlights * hMask * 0.3);
-    col += col                * (uShadows    * sMask * 0.3);
+    col += (vec3(1.0) - col) * (uHighlightsScaled * hMask);
+    col +=              col  * (uShadowsScaled    * sMask);
     return col;
 }
 
@@ -238,18 +233,13 @@ vec3 applyShadowHighlightRecovery(vec3 col)
 // =============================================================================
 // Step 8 — Saturation  (DISPLAY space)
 // =============================================================================
-//
-// Uniform saturation scale around the luma axis. Applied in display space
-// because the Rec.709 luma weights are defined for gamma-encoded values.
 
-uniform float uSaturation;   // [0, 2] default 1 — 0 is B&W, 1 is identity.
+uniform float uSaturation;   // default 1.0 — 0 is B&W.
 
 vec3 applySaturation(vec3 col)
 {
-    // Fast path: slider at identity.
-    if (abs(uSaturation - 1.0) <= 1e-4)
+    if (uSaturation == 1.0)
         return col;
-
     float luma = dot(col, CG_LUMA);
     return mix(vec3(luma), col, uSaturation);
 }
@@ -258,25 +248,18 @@ vec3 applySaturation(vec3 col)
 // =============================================================================
 // Step 9 — Vibrance  (DISPLAY space)
 // =============================================================================
-//
-// "Smart saturation" — extrapolates away from the luma axis by an amount
-// that fades as the pixel's existing saturation approaches 1. Pushes muted
-// pixels harder than already-saturated pixels, which keeps skin tones from
-// going radioactive when global saturation would. Clamped after.
 
-uniform float uVibrance;     // [-1, 1] default 0 — 0.3 is a subtle lift.
+uniform float uVibrance;     // default 0 — fades as existing saturation rises.
 
 vec3 applyVibrance(vec3 col)
 {
-    // Fast path: slider at identity.
-    if (abs(uVibrance) <= 1e-4)
+    if (uVibrance == 0.0)
         return col;
 
     float luma = dot(col, CG_LUMA);
     float mx   = max(col.r, max(col.g, col.b));
     float mn   = min(col.r, min(col.g, col.b));
-    float sat  = mx - mn;
-    col = mix(vec3(luma), col, 1.0 + uVibrance * (1.0 - sat));
+    col = mix(vec3(luma), col, 1.0 + uVibrance * (1.0 - (mx - mn)));
     return clamp(col, 0.0, 1.0);
 }
 
@@ -285,20 +268,16 @@ vec3 applyVibrance(vec3 col)
 // Step 10 — Hue shift  (DISPLAY space)
 // =============================================================================
 //
-// Rotates every pixel around the HSV hue wheel by a signed degree amount.
-// Uses the branchless Hocevar conversions from the shared helpers; hue is
-// stored as a fraction so the shift is a plain `fract(h + deg/360)`.
+// `uHueShiftNorm` carries `degrees / 360` from the CPU.
 
-uniform float uHueShift;     // [-180, 180] default 0 — degrees.
+uniform float uHueShiftNorm; // default 0.
 
 vec3 applyHueShift(vec3 col)
 {
-    // Fast path: slider at identity.
-    if (abs(uHueShift) <= 1e-3)
+    if (uHueShiftNorm == 0.0)
         return col;
-
     vec3 hsv = cg_rgb2hsv(col);
-    hsv.x    = fract(hsv.x + uHueShift / 360.0);
+    hsv.x    = fract(hsv.x + uHueShiftNorm);
     return cg_hsv2rgb(hsv);
 }
 
@@ -307,38 +286,23 @@ vec3 applyHueShift(vec3 col)
 // Step 11 — LUT grading  (DISPLAY space)
 // =============================================================================
 //
-// Samples a 3D LUT built from an artist-authored image. `uColorGradeLutSize`
-// carries metadata alongside the edge length so a single uniform covers both
-// the scale/offset math and layout quirks of LUTs exported from tools that
-// disagree about axis orientation.
-//
-// See https://developer.nvidia.com/gpugems/GPUGems2/gpugems2_chapter24.html
-// for the scale/offset derivation.
+// Samples an artist-authored 3D LUT. `uColorGradeLutSize` packs edge length
+// (x), a green-axis inversion flag (y), and a B/G-swap flag (z).
 
 uniform sampler3D uColorGradeLut;
-uniform vec4      uColorGradeLutSize;     // x: LUT edge length (e.g. 16, 32),
-                                          // y: >0.5 inverts the green axis for
-                                          //    DX-style LUTs,
-                                          // z: >0.5 swaps blue / green.
-uniform float     uColorGradeLutStrength;    // [0, 1] default 1 — blend the LUT
-                                          //   result against the ungraded input.
+uniform vec4      uColorGradeLutSize;
+uniform float     uColorGradeLutStrength;
 
 vec3 applyLUTGrading(vec3 col)
 {
-    // Fast path: LUT fully ungraded.
     if (uColorGradeLutStrength <= 0.0)
         return col;
 
     vec3 original = col;
 
-    // DX-style LUTs invert green; some authoring tools swap B/G.
     col.g   = uColorGradeLutSize.y > 0.5 ? 1.0 - col.g : col.g;
     col.rgb = uColorGradeLutSize.z > 0.5 ? col.rbg     : col.rgb;
 
-    // Half-texel-inset sampling so the LUT's first/last slice aren't
-    // bilerped with phantom neighbors at the boundary. Scale/offset depend
-    // only on the uniform edge length; driver hoists them to per-draw
-    // constants.
     float invN   = 1.0 / uColorGradeLutSize.x;
     float scale  = 1.0 - invN;
     float offset = 0.5 * invN;
@@ -352,23 +316,27 @@ vec3 applyLUTGrading(vec3 col)
 // Step 12 — Per-channel filmic curves  (DISPLAY space)
 // =============================================================================
 //
-// Three independent filmic S-curves, one per channel. Useful after the LUT
-// as a "tune" stage — e.g. pinch the red shoulder separately from green /
-// blue to desaturate clipped highlights, or bias one channel's toe to
-// produce cross-processed shadows.
+// `uCurveInvRange` holds `1 / max(shoulder - toe, 1e-4)` from the CPU, so the
+// per-pixel inner loop is: subtract, multiply, clamp, cubic, mix — no divs.
 
-uniform vec3 uCurveToe;        // [0, 1] default 0 — per-channel curve toe.
-uniform vec3 uCurveShoulder;   // [0, 1] default 1 — per-channel curve shoulder.
-uniform vec3 uCurveStrength;   // [0, 1] default 0 — per-channel blend into curve.
+uniform vec3 uCurveToe;        // default vec3(0).
+uniform vec3 uCurveInvRange;   // default vec3(1) — 1 / (shoulder - toe).
+uniform vec3 uCurveStrength;   // default vec3(0) — per-channel blend.
+
+float cg_sCurve(float x, float toe, float invRange, float strength)
+{
+    float t = clamp((x - toe) * invRange, 0.0, 1.0);
+    float s = t * t * (3.0 - 2.0 * t);
+    return mix(x, s, strength);
+}
 
 vec3 applyChannelCurves(vec3 col)
 {
-    // Fast path: every channel at zero strength.
-    if (dot(uCurveStrength, vec3(1.0)) <= 0.0)
+    if (all(equal(uCurveStrength, vec3(0.0))))
         return col;
 
     return vec3(
-        cg_sCurve(col.r, uCurveToe.r, uCurveShoulder.r, uCurveStrength.r),
-        cg_sCurve(col.g, uCurveToe.g, uCurveShoulder.g, uCurveStrength.g),
-        cg_sCurve(col.b, uCurveToe.b, uCurveShoulder.b, uCurveStrength.b));
+        cg_sCurve(col.r, uCurveToe.r, uCurveInvRange.r, uCurveStrength.r),
+        cg_sCurve(col.g, uCurveToe.g, uCurveInvRange.g, uCurveStrength.g),
+        cg_sCurve(col.b, uCurveToe.b, uCurveInvRange.b, uCurveStrength.b));
 }

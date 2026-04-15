@@ -51,6 +51,8 @@ vec3 applyToneMap(vec3 color);
 #endif
 
 #ifdef COLOR_GRADE
+vec3 applyWhiteBalance(vec3 diff);
+vec3 applyLiftGammaGain(vec3 diff);
 vec3 applyLUTGrading(vec3 diff);
 vec3 applySplitToning(vec3 diff);
 vec3 applyBlackWhitePoint(vec3 diff);
@@ -100,6 +102,14 @@ void main()
 
 #ifdef TONEMAP
     diff.rgb = applyExposure(diff.rgb);
+#endif
+
+#ifdef COLOR_GRADE
+    // White balance and lift/gamma/gain run in linear light, between exposure
+    // and tonemap, so chromatic adaptation and the three-way grade act on
+    // physically meaningful HDR values rather than rolled-off display ones.
+    diff.rgb = applyWhiteBalance(diff.rgb);
+    diff.rgb = applyLiftGammaGain(diff.rgb);
 #endif
 
 #ifdef TONEMAP

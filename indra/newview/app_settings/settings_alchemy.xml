@@ -1078,6 +1078,73 @@
             <key>Value</key>
             <real>0.0</real>
         </map>
+        <key>RenderColorGradeWhiteBalanceCCT</key>
+        <map>
+            <key>Comment</key>
+            <string>White balance temperature shift, in Kelvin relative to neutral daylight. Negative warms the image, positive cools it. Range -5000 to +5000. Default 0. Try -2500 tungsten glow, -1000 golden hour, +1500 blue hour, +3000 moonlit.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeWhiteBalanceDuv</key>
+        <map>
+            <key>Comment</key>
+            <string>Green/magenta tint, perpendicular to the temperature axis. Negative pushes magenta, positive pushes green. Range -1 to +1. Default 0. Try -0.4 cyberpunk magenta, +0.4 fluorescent green, +0.75 Matrix green.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeLift</key>
+        <map>
+            <key>Comment</key>
+            <string>Shadow lift (R,G,B): adds to the darkest tones to raise the black floor and tint shadows. Per-channel range -0.5 to +0.5. Default (0,0,0). Try (0.02,0.02,0.05) cool shadow mist, (0.05,0.03,0) warm lift, negatives crush toward black.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderColorGradeGamma</key>
+        <map>
+            <key>Comment</key>
+            <string>Midtone gamma (R,G,B): bends the middle of the tonal range without moving blacks or whites. Below 1 brightens mids, above 1 darkens them. Per-channel range 0.5 to 1.5. Default (1,1,1). Try (0.9,0.9,0.9) open mids, (1.1,1.0,0.95) warm mids.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>1.0</real>
+                <real>1.0</real>
+            </array>
+        </map>
+        <key>RenderColorGradeGain</key>
+        <map>
+            <key>Comment</key>
+            <string>Highlight gain (R,G,B): multiplies the brightest tones to boost, clip, or tint whites. Per-channel range 0.5 to 1.5. Default (1,1,1). Try (1.05,1.02,0.95) warm highlights, (0.95,1.0,1.05) cool highlights, uniform &lt;1 to tame blowouts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>1.0</real>
+                <real>1.0</real>
+            </array>
+        </map>
         <key>RenderColorGradeBlackPoint</key>
         <map>
             <key>Comment</key>

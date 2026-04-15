@@ -398,28 +398,34 @@ public:
         COLOR_GRADE_LUT_SIZE,               //  "uColorGradeLutSize"
         COLOR_GRADE_LUT_STRENGTH,           //  "uColorGradeLutStrength"
 
-        // Split toning
-        SPLIT_TONE_SHADOW_TINT,             //  "uShadowTint"
-        SPLIT_TONE_HIGHLIGHT_TINT,          //  "uHighlightTint"
-        SPLIT_TONE_MIDTONE_TINT,            //  "uMidtoneTint"
+        // Linear-space grading (pre-tonemap) — CPU-precomputed
+        COLOR_GRADE_WHITE_BALANCE_GAIN,     //  "uWhiteBalanceGain"
+        COLOR_GRADE_LIFT,                   //  "uLift"
+        COLOR_GRADE_INV_GAMMA_CC,           //  "uInvGammaCC"       (1 / gamma)
+        COLOR_GRADE_GAIN,                   //  "uGain"
+
+        // Split toning (tints are pre-divided by dot(tint, LUMA) on the CPU)
+        SPLIT_TONE_SHADOW_RATIO,            //  "uShadowRatio"
+        SPLIT_TONE_HIGHLIGHT_RATIO,         //  "uHighlightRatio"
+        SPLIT_TONE_MIDTONE_RATIO,           //  "uMidtoneRatio"
         SPLIT_TONE_MIDTONE_AMOUNT,          //  "uMidtoneAmount"
-        SPLIT_TONE_BALANCE,                 //  "uToneBalance"
+        SPLIT_TONE_MID,                     //  "uSplitToneMid"     (0.5 + balance * 0.4)
         SPLIT_TONE_AMOUNT,                  //  "uToneAmount"
 
-        // Display-space grading
-        COLOR_GRADE_BLACK_POINT,            //  "uBlackPoint"
-        COLOR_GRADE_WHITE_POINT,            //  "uWhitePoint"
-        COLOR_GRADE_BRIGHTNESS,             //  "uBrightness"
-        COLOR_GRADE_CONTRAST,               //  "uContrast"
-        COLOR_GRADE_HIGHLIGHTS,             //  "uHighlights"
-        COLOR_GRADE_SHADOWS,                //  "uShadows"
+        // Display-space grading — all CPU-precomputed to scale/bias pairs
+        COLOR_GRADE_BWP_SCALE,              //  "uBWPScale"         (1 / (white - black))
+        COLOR_GRADE_BWP_BIAS,               //  "uBWPBias"          (-black * scale)
+        COLOR_GRADE_BC_SCALE,               //  "uBCScale"          (contrast)
+        COLOR_GRADE_BC_BIAS,                //  "uBCBias"           ((bright - 0.5) * c + 0.5)
+        COLOR_GRADE_HIGHLIGHTS_SCALED,      //  "uHighlightsScaled" (highlights * 0.3)
+        COLOR_GRADE_SHADOWS_SCALED,         //  "uShadowsScaled"    (shadows * 0.3)
         COLOR_GRADE_SATURATION,             //  "uSaturation"
         COLOR_GRADE_VIBRANCE,               //  "uVibrance"
-        COLOR_GRADE_HUE_SHIFT,              //  "uHueShift"
+        COLOR_GRADE_HUE_SHIFT_NORM,         //  "uHueShiftNorm"     (degrees / 360)
 
         // Per-channel filmic curves
         COLOR_GRADE_CURVE_TOE,              //  "uCurveToe"
-        COLOR_GRADE_CURVE_SHOULDER,         //  "uCurveShoulder"
+        COLOR_GRADE_CURVE_INV_RANGE,        //  "uCurveInvRange"    (1 / (shoulder - toe))
         COLOR_GRADE_CURVE_STRENGTH,         //  "uCurveStrength"
 
         // Vignette
