@@ -36,7 +36,8 @@ uniform float gamma;
 #endif
 
 vec3 linear_to_srgb(vec3 cl);
-vec3 toneMap(vec3 color);
+vec3 applyExposure(vec3 color);
+vec3 applyToneMap(vec3 color);
 
 vec3 clampHDRRange(vec3 color);
 
@@ -61,7 +62,8 @@ void main()
     vec4 diff = texture(diffuseRect, vary_fragcoord);
 
 #ifndef NO_POST
-    diff.rgb = toneMap(diff.rgb);
+    diff.rgb = applyExposure(diff.rgb);
+    diff.rgb = applyToneMap(diff.rgb);
 #else
     diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0));
 #endif

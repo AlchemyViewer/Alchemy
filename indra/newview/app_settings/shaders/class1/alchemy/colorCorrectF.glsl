@@ -46,7 +46,8 @@ vec3 linear_to_srgb(vec3 cl);
 vec3 clampHDRRange(vec3 color);
 
 #ifdef TONEMAP
-vec3 toneMap(vec3 color);
+vec3 applyExposure(vec3 color);
+vec3 applyToneMap(vec3 color);
 #endif
 
 #ifdef COLOR_GRADE
@@ -98,7 +99,11 @@ void main()
 #endif
 
 #ifdef TONEMAP
-    diff.rgb = toneMap(diff.rgb);
+    diff.rgb = applyExposure(diff.rgb);
+#endif
+
+#ifdef TONEMAP
+    diff.rgb = applyToneMap(diff.rgb);
 #else
     diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0));
 #endif

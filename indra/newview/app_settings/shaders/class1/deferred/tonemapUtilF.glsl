@@ -330,12 +330,14 @@ uniform float exposure;
 uniform float tonemap_mix;
 uniform int tonemap_type;
 
-vec3 toneMap(vec3 color)
+vec3 applyExposure(vec3 color)
 {
     float exp_scale = texture(exposureMap, vec2(0.5,0.5)).r;
+    return color * exposure * exp_scale;
+}
 
-    color *= exposure * exp_scale;
-
+vec3 applyToneMap(vec3 color)
+{
     color = max(color, vec3(0.0)); // avoid negative values for tonemapping
 
     vec3 clamped_color = clamp(color.rgb, vec3(0.0), vec3(1.0));
