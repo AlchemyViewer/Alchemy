@@ -7410,7 +7410,7 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     }
 }
 
-void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade)
+void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool apply_tonemap, bool apply_color_grade)
 {
     LL_PROFILE_GPU_ZONE("colorcorrect");
 
@@ -7419,16 +7419,17 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool ton
         LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
         // Apply gamma correction to the frame here.
+        static LLCachedControl<bool> color_grade_cc(gSavedSettings, "RenderColorGrade", false);
         static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
         static LLCachedControl<bool> buildNoPost(gSavedSettings, "RenderDisablePostProcessing", false);
 
         LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
-        bool color_grade = colorgrade &&(mCGLut != 0);
+        bool color_grade = apply_color_grade && color_grade_cc;
         bool legacy_gamma = psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f;
         bool no_post = gSnapshotNoPost || legacy_gamma || (buildNoPost && gFloaterTools && gFloaterTools->isAvailable());
         LLGLSLShader* shader = nullptr;
-        if (tonemap)
+        if (apply_tonemap)
         {
             if (legacy_gamma)
             {
@@ -7587,7 +7588,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool ton
             }
         }
 
-        if (tonemap)
+        if (apply_tonemap)
         {
             // Exposure parameters
             static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
@@ -7696,18 +7697,25 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool ton
         S32 cglut_channel = -1;
         if (color_grade)
         {
-            cglut_channel = shader->getTextureChannel(LLShaderMgr::COLOR_GRADE_LUT);
-            if (cglut_channel > -1)
+            if (mCGLut != 0)
             {
-                gGL.getTexUnit(cglut_channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
-                gGL.getTexUnit(cglut_channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-                gGL.getTexUnit(cglut_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                cglut_channel = shader->getTextureChannel(LLShaderMgr::COLOR_GRADE_LUT);
+                if (cglut_channel > -1)
+                {
+                    gGL.getTexUnit(cglut_channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
+                    gGL.getTexUnit(cglut_channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                    gGL.getTexUnit(cglut_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                }
+
+                shader->uniform4fv(LLShaderMgr::COLOR_GRADE_LUT_SIZE, 1, mCGLutSize.mV);
+
+                static LLCachedControl<F32> cglut_strength(gSavedSettings, "RenderColorGradeLUTStrength", 1.f);
+                shader->uniform1f(LLShaderMgr::COLOR_GRADE_LUT_STRENGTH, cglut_strength);
             }
-
-            shader->uniform4fv(LLShaderMgr::COLOR_GRADE_LUT_SIZE, 1, mCGLutSize.mV);
-
-            static LLCachedControl<F32> cglut_strength(gSavedSettings, "RenderColorGradeLUTStrength", 1.f);
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_STRENGTH, cglut_strength);
+            else
+            {
+                shader->uniform1f(LLShaderMgr::COLOR_GRADE_LUT_STRENGTH, 0.f); // Disable lut path
+            }
 
             // Split toning (Lightroom-style, luminance-preserving)
             static LLCachedControl<LLColor3> split_shadow_tint(gSavedSettings, "RenderSplitToneShadowTint", LLColor3(0.5f, 0.5f, 0.5f));

@@ -320,13 +320,13 @@ uniform vec4      uColorGradeLutSize;     // x: LUT edge length (e.g. 16, 32),
                                           // y: >0.5 inverts the green axis for
                                           //    DX-style LUTs,
                                           // z: >0.5 swaps blue / green.
-uniform float     uColorGradeStrength;    // [0, 1] default 1 — blend the LUT
+uniform float     uColorGradeLutStrength;    // [0, 1] default 1 — blend the LUT
                                           //   result against the ungraded input.
 
 vec3 applyLUTGrading(vec3 col)
 {
     // Fast path: LUT fully ungraded.
-    if (uColorGradeStrength <= 0.0)
+    if (uColorGradeLutStrength <= 0.0)
         return col;
 
     vec3 original = col;
@@ -344,7 +344,7 @@ vec3 applyLUTGrading(vec3 col)
     float offset = 0.5 * invN;
     col = textureLod(uColorGradeLut, col.rgb * scale + offset, 0).rgb;
 
-    return mix(original, col, uColorGradeStrength);
+    return mix(original, col, uColorGradeLutStrength);
 }
 
 

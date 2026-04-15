@@ -1598,7 +1598,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     // Color Correction LUT
     mReservedUniforms.push_back("uColorGradeLut");
     mReservedUniforms.push_back("uColorGradeLutSize");
-    mReservedUniforms.push_back("uColorGradeStrength");
+    mReservedUniforms.push_back("uColorGradeLutStrength");
 
     // Split toning
     mReservedUniforms.push_back("uShadowTint");

@@ -396,7 +396,7 @@ public:
         // Color Correction LUT
         COLOR_GRADE_LUT,                    //  "uColorGradeLut"
         COLOR_GRADE_LUT_SIZE,               //  "uColorGradeLutSize"
-        COLOR_GRADE_STRENGTH,               //  "uColorGradeStrength"
+        COLOR_GRADE_LUT_STRENGTH,           //  "uColorGradeLutStrength"
 
         // Split toning
         SPLIT_TONE_SHADOW_TINT,             //  "uShadowTint"
