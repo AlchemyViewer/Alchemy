@@ -48,6 +48,70 @@ foreach(elem ${country_codes})
    configure_file(${emoji_mapping_src_file} ${emoji_mapping_dst_file} COPYONLY)
 endforeach()
 
+# Copy Icons
+# Replace the icons with the appropriate ones for the channel
+# ('test' is the default)
+set(ICON_PATH "test")
+set(VIEWER_MACOSX_PHASE "d")
+string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
+if(channel_lower MATCHES "^alchemy release")
+    set(ICON_PATH "release")
+    set(VIEWER_MACOSX_PHASE "f")
+elseif(channel_lower MATCHES "^alchemy beta")
+    set(ICON_PATH "beta")
+    set(VIEWER_MACOSX_PHASE "b")
+elseif(channel_lower MATCHES "^alchemy project")
+    set(ICON_PATH "project")
+    set(VIEWER_MACOSX_PHASE "a")
+endif()
+message(STATUS "Copying icons for ${ICON_PATH}")
+
+set(BRANDING_SOURCE_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/alchemy-branding")
+if (WINDOWS)
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.ico"
+      "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico"
+    )
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+      "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP"
+    )
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${BRANDING_SOURCE_DIR}/installer/icons/install_icon.ico"
+      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico"
+    )
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${BRANDING_SOURCE_DIR}/installer/icons/uninstall_icon.ico"
+      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/uninstall_icon.ico"
+    )
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
+      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_wizard_small.png"
+    )
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${BRANDING_SOURCE_DIR}/installer/splash/${ICON_PATH}/install_splash.gif"
+      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif"
+    )
+elseif(DARWIN)
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.icns"
+      "${CMAKE_CURRENT_SOURCE_DIR}/alchemy.icns"
+    )
+elseif(LINUX)
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+      "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
+    )
+endif ()
+
 if (HAVOK)
    # When using HAVOK_TPV, the library is precompiled, so no need for this
 
@@ -1656,60 +1720,6 @@ if (WINDOWS)
          llwindebug.h
          )
 
-    # Replace the icons with the appropriate ones for the channel
-    # ('test' is the default)
-    set(ICON_PATH "test")
-    set(VIEWER_MACOSX_PHASE "d")
-    string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
-    if(channel_lower MATCHES "^alchemy release")
-        set(ICON_PATH "release")
-        set(VIEWER_MACOSX_PHASE "f")
-    elseif(channel_lower MATCHES "^alchemy beta")
-        set(ICON_PATH "beta")
-        set(VIEWER_MACOSX_PHASE "b")
-    elseif(channel_lower MATCHES "^alchemy project")
-        set(ICON_PATH "project")
-        set(VIEWER_MACOSX_PHASE "a")
-    endif()
-    message(STATUS "Copying icons for ${ICON_PATH}")
-
-   set(BRANDING_SOURCE_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/alchemy-branding")
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.ico"
-        "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico"
-      )
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
-        "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP"
-      )
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
-        "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
-      )
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${BRANDING_SOURCE_DIR}/installer/icons/install_icon.ico"
-        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico"
-      )
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${BRANDING_SOURCE_DIR}/installer/icons/uninstall_icon.ico"
-        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/uninstall_icon.ico"
-      )
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
-        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_wizard_small.png"
-      )
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${BRANDING_SOURCE_DIR}/installer/splash/${ICON_PATH}/install_splash.gif"
-        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif"
-      )
-
     # Add resource files to the project.
     # viewerRes.rc is the only buildable file, but
     # the rest are all dependencies of it.
@@ -1804,7 +1814,7 @@ set_source_files_properties(${viewer_SHADER_FILES}
                             PROPERTIES HEADER_FILE_ONLY TRUE)
 list(APPEND viewer_SOURCE_FILES ${viewer_SHADER_FILES})
 
-# note that the scripts which publish these files are sensitive to the file 
+# note that the scripts which publish these files are sensitive to the file
 # extensions. Be cautious about adding new file types here.
 set(viewer_APPSETTINGS_FILES
     app_settings/anim.ini
