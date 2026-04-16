@@ -57,32 +57,32 @@ class LLFloaterIMSession
 public:
     LLFloaterIMSession(const LLUUID& session_id);
 
-    virtual ~LLFloaterIMSession();
+    virtual ~LLFloaterIMSession() override;
 
     void initIMSession(const LLUUID& session_id);
     void initIMFloater();
 
     // LLView overrides
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void setMinimized(bool b);
-    /*virtual*/ void setVisible(bool visible);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void setMinimized(bool b) override;
+    /*virtual*/ void setVisible(bool visible) override;
     /*virtual*/ bool getVisible();
-    /*virtual*/ void setFocus(bool focus);
+    /*virtual*/ void setFocus(bool focus) override;
     // Check typing timeout timer.
 
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
     /*virtual*/ bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
         EDragAndDropType cargo_type,
         void* cargo_data,
         EAcceptance* accept,
-        std::string& tooltip_msg);
+        std::string& tooltip_msg) override;
 
     static LLFloaterIMSession* findInstance(const LLUUID& session_id);
     static LLFloaterIMSession* getInstance(const LLUUID& session_id);
 
     // LLFloater overrides
-    /*virtual*/ void onClose(bool app_quitting);
-    /*virtual*/ void setDocked(bool docked, bool pop_on_undock = true);
+    /*virtual*/ void onClose(bool app_quitting) override;
+    /*virtual*/ void setDocked(bool docked, bool pop_on_undock = true) override;
     // Make IM conversion visible and update the message history
     static LLFloaterIMSession* show(const LLUUID& session_id);
 
@@ -93,7 +93,7 @@ public:
     void sessionInitReplyReceived(const LLUUID& im_session_id);
 
     // get new messages from LLIMModel
-    /*virtual*/ void updateMessages();
+    /*virtual*/ void updateMessages() override;
     void reloadMessages(bool clean_messages = false);
     static void onSendMsg(LLUICtrl*, void*);
     void sendMsgFromInputEditor(bool ooc_chat = false);
@@ -119,10 +119,10 @@ public:
 
     // Implements LLVoiceClientStatusObserver::onChange() to enable the call
     // button when voice is available
-    void onChange(EStatusType status, const LLSD& channelInfo, bool proximal);
+        void onChange(EStatusType status, const LLSD& channelInfo, bool proximal) override;
 
-    virtual LLTransientFloaterMgr::ETransientGroup getGroup() { return LLTransientFloaterMgr::IM; }
-    virtual void onVoiceChannelStateChanged(
+        virtual LLTransientFloaterMgr::ETransientGroup getGroup() override { return LLTransientFloaterMgr::IM; }
+        virtual void onVoiceChannelStateChanged(
             const LLVoiceChannel::EState& old_state,
             const LLVoiceChannel::EState& new_state);
 
@@ -144,13 +144,13 @@ public:
     bool handleKeyHere(KEY key, MASK mask) override;
 private:
 
-    /*virtual*/ void refresh();
+    /*virtual*/ void refresh() override;
 
-    /*virtual*/ void onTearOffClicked();
-    /*virtual*/ void onClickCloseBtn(bool app_qutting);
+    /*virtual*/ void onTearOffClicked() override;
+    /*virtual*/ void onClickCloseBtn(bool app_qutting) override;
 
     // Update the window title and input field help text
-    /*virtual*/ void updateSessionName(const std::string& name);
+    /*virtual*/ void updateSessionName(const std::string& name) override;
 
     bool dropPerson(LLUUID* person_id, bool drop);
 

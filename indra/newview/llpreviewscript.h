@@ -235,7 +235,7 @@ public:
 protected:
     std::string     getTmpFileName(const std::string& script_name) const;
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-    /*virtual*/ void onBackupTimer();
+    /*virtual*/ void onBackupTimer() override;
 // [/SL:KB]
     std::string     getUniqueHash() const;
     std::string     getErrorLogFileName(const std::string& script_path);

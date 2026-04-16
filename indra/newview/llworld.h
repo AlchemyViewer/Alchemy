@@ -73,10 +73,11 @@ public:
 // as simulators are connected to, viewer_regions are popped off the stack and connected as required
 // as simulators are removed, they are pushed back onto the stack
 
-class LLWorld : public LLSimpleton<LLWorld>
+class LLWorld final : public LLSimpleton<LLWorld>
 {
 public:
     LLWorld();
+    ~LLWorld() = default;
 
     // Clear any objects, regions
     // Prepares class to be reused or destroyed
@@ -164,8 +165,8 @@ public:
 
     void clearAllVisibleObjects();
 
-    virtual CapUrlMatches getCapURLMatches(const std::string& cap_url);
-    virtual bool isCapURLMapped(const std::string& cap_url);
+    CapUrlMatches getCapURLMatches(const std::string& cap_url);
+    bool isCapURLMapped(const std::string& cap_url);
 
 public:
     typedef std::list<LLViewerRegion*> region_list_t;
