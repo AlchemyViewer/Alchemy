@@ -129,17 +129,17 @@ vec2 frameNoiseOffset(bool animate)
 // falloff, and a (sin, cos) pair — so the shader avoids redoing a per-pixel
 // mul / divide / sincos. The slider ranges shown in comments are the
 // *user-facing* values before baking.
-uniform float uCAAmount       = 0.0;              // artist range [0, 1]: 0.15 SLR, 0.35 vintage,
+uniform float uCAAmount;                           // artist range [0, 1]: 0.15 SLR, 0.35 vintage,
                                                   //   0.6 anamorphic, 0.9 VHS. Uploaded pre-squared × 0.02.
-uniform float uCAFalloff      = 1.0;              // artist range [0.5, 4]: 0.5 corners-only, 1.0 SLR,
+uniform float uCAFalloff;                          // artist range [0.5, 4]: 0.5 corners-only, 1.0 SLR,
                                                   //   2.0 broad, 4.0 nearly uniform. Uploaded as 1/value.
-uniform vec2  uCAAngleSinCos  = vec2(0.0, 1.0);   // artist range [0, 360°] rotating the fringe axis
+uniform vec2  uCAAngleSinCos;                      // artist range [0, 360°] rotating the fringe axis
                                                   //   (0 radial, 45 diagonal, 90 tangential).
                                                   //   Uploaded as (sin, cos) of the radian-converted angle.
-uniform vec2  uCAOffsetR      = vec2(-1.0, 0.0);  // R channel offset in (radial, tangential). Default: inward.
-uniform vec2  uCAOffsetB      = vec2( 1.0, 0.0);  // B channel offset in (radial, tangential). Default: outward.
+uniform vec2  uCAOffsetR;                          // R channel offset in (radial, tangential). Default: inward.
+uniform vec2  uCAOffsetB;                          // B channel offset in (radial, tangential). Default: outward.
                                                   // Glitch preset: vec2(1,0) / vec2(0,1) = R→B swap.
-uniform float uCAAnisotropy   = 0.0;              // [-1, 1] axis stretch of the falloff region.
+uniform float uCAAnisotropy;                       // [-1, 1] axis stretch of the falloff region.
                                                   //         -1 = horizontal band only
                                                   //         +1 = vertical band only
 
@@ -208,44 +208,44 @@ vec4 applyChromaticAberration(sampler2D tex, vec2 uv)
 // call site.
 
 // ---- Driver inputs (set by the viewer each frame) --------------------------
-uniform float uLensFlareStrength      = 0.0;     // master on/off + intensity
-uniform vec2  uLensFlareSunPos        = vec2(0.5); // sun position in UV space
-uniform float uLensFlareSunVisibility = 0.0;     // CPU-side on-screen fade
-uniform vec3  uLensFlareLightColor    = vec3(1.0); // artist tint applied to whole flare
+uniform float uLensFlareStrength;                 // master on/off + intensity
+uniform vec2  uLensFlareSunPos;                   // sun position in UV space
+uniform float uLensFlareSunVisibility;            // CPU-side on-screen fade
+uniform vec3  uLensFlareLightColor;               // artist tint applied to whole flare
 
 // ---- Depth occlusion -------------------------------------------------------
-uniform float uLensFlareOcclusionRadius = 0.02;  // Poisson disk radius in UV space
-uniform int   uLensFlareOcclusionTaps   = 9;     // 1..32 — more taps = smoother partial occlusion
+uniform float uLensFlareOcclusionRadius;          // Poisson disk radius in UV space
+uniform int   uLensFlareOcclusionTaps;            // 1..32 — more taps = smoother partial occlusion
 
 // ---- Anamorphic streak -----------------------------------------------------
-uniform float uLensFlareStreakLength    = 0.5;   // horizontal extent in UV space
-uniform float uLensFlareStreakFalloff   = 1.5;   // exponential falloff along the streak
-uniform float uLensFlareStreakWidth     = 0.004; // vertical half-thickness (gaussian sigma)
-uniform float uLensFlareStreakIntensity = 1.0;   // streak brightness multiplier
-uniform vec3  uLensFlareStreakTint      = vec3(0.6, 0.7, 1.0); // anamorphic blue
-uniform float uLensFlareChromaticSpread = 0.008; // vertical R/B offset for chromatic fringing
+uniform float uLensFlareStreakLength;             // horizontal extent in UV space
+uniform float uLensFlareStreakFalloff;            // exponential falloff along the streak
+uniform float uLensFlareStreakWidth;              // vertical half-thickness (gaussian sigma)
+uniform float uLensFlareStreakIntensity;          // streak brightness multiplier
+uniform vec3  uLensFlareStreakTint;               // anamorphic blue
+uniform float uLensFlareChromaticSpread;          // vertical R/B offset for chromatic fringing
 
 // ---- Central glow (intensity doubles as on/off) ----------------------------
-uniform float uLensFlareGlow        = 1.0;       // 0 = off, else brightness
-uniform float uLensFlareGlowRadius  = 0.12;      // falloff radius in UV space
-uniform float uLensFlareGlowFalloff = 8.0;       // gaussian exponent sharpness
+uniform float uLensFlareGlow;                     // 0 = off, else brightness
+uniform float uLensFlareGlowRadius;               // falloff radius in UV space
+uniform float uLensFlareGlowFalloff;              // gaussian exponent sharpness
 
 // ---- Ghosts: soft disks along the sun→center axis --------------------------
-uniform float uLensFlareGhost        = 0.0;      // 0 = off, else brightness
-uniform int   uLensFlareGhostCount   = 4;        // number of ghosts to place
-uniform float uLensFlareGhostSpacing = 0.3;      // step size along the axis
+uniform float uLensFlareGhost;                    // 0 = off, else brightness
+uniform int   uLensFlareGhostCount;               // number of ghosts to place
+uniform float uLensFlareGhostSpacing;             // step size along the axis
 
 // ---- Halo: ring opposite the sun -------------------------------------------
-uniform float uLensFlareHalo       = 0.0;        // 0 = off, else brightness
-uniform float uLensFlareHaloRadius = 0.5;        // ring radius in UV space
-uniform float uLensFlareHaloWidth  = 0.15;       // ring thickness
+uniform float uLensFlareHalo;                     // 0 = off, else brightness
+uniform float uLensFlareHaloRadius;               // ring radius in UV space
+uniform float uLensFlareHaloWidth;                // ring thickness
 
 // ---- Starburst: angular spikes radiating from the sun ----------------------
-uniform float uLensFlareStarburst          = 0.0;   // 0 = off, else brightness
-uniform int   uLensFlareStarburstSpikes    = 4;     // primary angular frequency — cos(θ·N) has 2N
-                                                    //   lobes per full turn, so 4 here = 8 visible spikes
-uniform float uLensFlareStarburstSharpness = 48.0;  // pow() exponent — higher = tighter spikes
-uniform float uLensFlareStarburstFalloff   = 30.0;  // radial decay rate from the sun
+uniform float uLensFlareStarburst;                // 0 = off, else brightness
+uniform int   uLensFlareStarburstSpikes;          // primary angular frequency — cos(θ·N) has 2N
+                                                  //   lobes per full turn, so 4 here = 8 visible spikes
+uniform float uLensFlareStarburstSharpness;       // pow() exponent — higher = tighter spikes
+uniform float uLensFlareStarburstFalloff;         // radial decay rate from the sun
 
 vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv)
 {
@@ -473,16 +473,16 @@ vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv)
 // uVignetteMidPoint lands strictly in (0, 1). Otherwise, the two-color
 // path is used, which is the common case.
 
-uniform float uVignetteAmount   = 0.0;          // [0, 1]   strength
-uniform float uVignetteRadius   = 1.0;          // [0.25, 1.5] edge distance in half-height units
-uniform float uVignetteSoft     = 0.5;          // [0.05, 1]   width of the falloff band
-uniform float uVignetteShape    = 0.0;          // [0, 1]   0 = circular, 1 = rounded square
-uniform vec3  uVignetteColor    = vec3(0.0);    // outer (corner) color
-uniform vec3  uVignetteMidColor = vec3(0.0);    // intermediate ramp color
-uniform float uVignetteMidPoint = 0.0;          // [0, 1]   0/1 = two-color fallback; else three-color
-uniform vec2  uVignetteCenter   = vec2(0.0);    // [-0.5, 0.5] offset from frame center
-uniform vec2  uVignetteAspect   = vec2(1.0);    // image (w, h); (1,1) disables aspect correction
-uniform float uVignetteFeather  = 1.0;          // [0.2, 4.0] shape of the darkening curve
+uniform float uVignetteAmount;                   // [0, 1]   strength
+uniform float uVignetteRadius;                   // [0.25, 1.5] edge distance in half-height units
+uniform float uVignetteSoft;                     // [0.05, 1]   width of the falloff band
+uniform float uVignetteShape;                    // [0, 1]   0 = circular, 1 = rounded square
+uniform vec3  uVignetteColor;                    // outer (corner) color
+uniform vec3  uVignetteMidColor;                 // intermediate ramp color
+uniform float uVignetteMidPoint;                 // [0, 1]   0/1 = two-color fallback; else three-color
+uniform vec2  uVignetteCenter;                   // [-0.5, 0.5] offset from frame center
+uniform vec2  uVignetteAspect;                   // image (w, h); (1,1) disables aspect correction
+uniform float uVignetteFeather;                  // [0.2, 4.0] shape of the darkening curve
                                                 //   <1 = spreads darkening inward (gentle haze)
                                                 //    1 = linear smoothstep falloff
                                                 //   >1 = concentrates darkening at the edges
@@ -551,13 +551,13 @@ vec3 applyVignette(vec3 color, vec2 uv)
 // it in-shader (vs. pre-baking on the CPU like the CA uniforms) lets a
 // future UI slider animate without rebinding on every change.
 
-uniform float uGrainAmount  = 0.0;              // [0, 1]   strength (squared internally)
-uniform int   uGrainStyle   = 0;                // 0 mono, 1 color, 2 coarse, 3 photon shot
-uniform float uGrainSize    = 1.0;              // [1, 8]   grain cell size in 1080p-equivalent pixels
-uniform float uGrainRange   = 0.5;              // [0, 1]   luma position where grain peaks
+uniform float uGrainAmount;                      // [0, 1]   strength (squared internally)
+uniform int   uGrainStyle;                       // 0 mono, 1 color, 2 coarse, 3 photon shot
+uniform float uGrainSize;                        // [1, 8]   grain cell size in 1080p-equivalent pixels
+uniform float uGrainRange;                       // [0, 1]   luma position where grain peaks
                                                 //          0 = shadows, 0.5 = midtones, 1 = highlights
-uniform vec3  uGrainTint    = vec3(1.0);        // neutral gray; try (1, 0.9, 0.8) warm, (0.8, 0.9, 1) cool
-uniform bool  uGrainAnimate = true;             // false = frozen pattern (static frame for stills)
+uniform vec3  uGrainTint;                        // neutral gray; try (1, 0.9, 0.8) warm, (0.8, 0.9, 1) cool
+uniform bool  uGrainAnimate;                     // false = frozen pattern (static frame for stills)
 
 // Noise sample in ~[-0.5, 0.5]. Style controls color vs luma and whether
 // cells are quantized for a coarser look. The caller scales by amplitude.
@@ -629,11 +629,11 @@ vec3 applyFilmGrain(vec3 color, vec2 fragCoord)
 // desaturation toward Rec.709 luma.
 
 // ---- Compensation (daltonization, output path) -----------------------------
-uniform int   uCompensateMode   = 0;    // [0, 3] — 0 off, 1 protan, 2 deutan, 3 tritan
-uniform float uCompensateAmount = 0.0;  // [0, 1]   strength of the channel redistribution
+uniform int   uCompensateMode;           // [0, 3] — 0 off, 1 protan, 2 deutan, 3 tritan
+uniform float uCompensateAmount;         // [0, 1]   strength of the channel redistribution
 
 // ---- Preview / debug --------------------------------------------------------
-uniform int   uPreviewMode      = 0;    // MUST be 0 for final output.
+uniform int   uPreviewMode;              // MUST be 0 for final output.
                                         // 1 = protanopia (no L cones)
                                         // 2 = deuteranopia (no M cones)
                                         // 3 = tritanopia (no S cones)
@@ -776,9 +776,9 @@ vec3 applyPreview(vec3 color)
 //
 // Amplitude scales to output bit depth: ±1/255 for 8-bit, ±1/1023 for 10-bit.
 
-uniform float uDitherAmount  = 1.0;     // [0, 1]   TPDF amplitude scale. Leave at 1.0.
-uniform int   uDitherBits    = 8;       // {8, 10}  output bit depth.
-uniform bool  uDitherAnimate = true;    // false = freeze pattern. Almost always want true —
+uniform float uDitherAmount;             // [0, 1]   TPDF amplitude scale. Leave at 1.0.
+uniform int   uDitherBits;              // {8, 10}  output bit depth.
+uniform bool  uDitherAnimate;           // false = freeze pattern. Almost always want true —
                                         // animated dither is perceptually invisible,
                                         // static dither can show as fixed-pattern grain.
 
