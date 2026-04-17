@@ -689,7 +689,10 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
         llassert_always_msg(FT_Err_Ok == error, message.c_str());
     }
 
-    llassert_always(! FT_Render_Glyph(mFTFace->glyph, gFontRenderMode) );
+    if (FT_Render_Glyph(mFTFace->glyph, FT_RENDER_MODE_NORMAL) != 0)
+    {
+        LL_WARNS() << "Failed to render glyph for character " << llformat("U+%xu", U32(wch)) << " at glyph index " << glyph_index << LL_ENDL;
+    }
 
     mRenderGlyphCount++;
 }
