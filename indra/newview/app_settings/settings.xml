@@ -8325,6 +8325,50 @@
     <key>Value</key>
     <real>0.0</real>
   </map>
+  <key>RenderAuroraIntensity</key>
+  <map>
+    <key>Comment</key>
+    <string>Strength of procedural aurora borealis effect at night. 0 disables.  Values 0..2.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>0.6</real>
+  </map>
+  <key>RenderMeteorsEnabled</key>
+  <map>
+    <key>Comment</key>
+    <string>Enable procedural meteor streaks at night.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
+  <key>RenderMeteorMaxCount</key>
+  <map>
+    <key>Comment</key>
+    <string>Maximum number of concurrent meteor streaks. Clamped to the VB capacity.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>S32</string>
+    <key>Value</key>
+    <integer>16</integer>
+  </map>
+  <key>RenderMeteorSpawnInterval</key>
+  <map>
+    <key>Comment</key>
+    <string>Mean seconds between meteor spawns (Poisson-sampled per frame). Higher = rarer.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>4.0</real>
+  </map>
   <key>RenderHDRIRotation</key>
   <map>
     <key>Comment</key>

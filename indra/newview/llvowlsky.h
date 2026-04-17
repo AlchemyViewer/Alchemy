@@ -35,8 +35,7 @@ private:
     inline static U32 getNumSlices(void);
     inline static U32 getStripsNumVerts(void);
     inline static U32 getStripsNumIndices(void);
-    inline static U32 getStarsNumVerts(void);
-    inline static U32 getStarsNumIndices(void);
+    static U32 getStarsNumVerts(void);
 
 public:
     LLVOWLSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
@@ -50,6 +49,13 @@ public:
     void drawDome(void);
     void drawFsSky(void); // fullscreen sky for advanced atmo
     void resetVertexBuffers(void);
+
+    // Meteors: CPU-side simulation of short-lived streaks. Tick once per
+    // frame, then updateMeteorGeometry to push state into the dynamic VB,
+    // then drawMeteors in a dedicated deferred pass.
+    void tickMeteors(F32 dt_seconds);
+    void updateMeteorGeometry();
+    void drawMeteors();
 
     void cleanupGL();
     void restoreGL();
@@ -71,9 +77,6 @@ private:
                                   const U32& num_slices,
                                   const U32& num_stacks);
 
-    // helper function for updating the stars colors.
-    void updateStarColors();
-
     // helper function for updating the stars geometry.
     bool updateStarGeometry(LLDrawable *drawable);
 
@@ -81,10 +84,24 @@ private:
     LLPointer<LLVertexBuffer>                   mFsSkyVerts;
     std::vector< LLPointer<LLVertexBuffer> >    mStripsVerts;
     LLPointer<LLVertexBuffer>                   mStarsVerts;
+    LLPointer<LLVertexBuffer>                   mMeteorVerts;
 
-    std::vector<LLVector3>  mStarVertices;              // Star verticies
-    std::vector<LLColor4>   mStarColors;                // Star colors
-    std::vector<F32>        mStarIntensities;           // Star intensities
+    // Per-star data. All three vectors stay in lock-step.
+    std::vector<LLVector3>  mStarPositions;    // Star centers (world-space, relative to camera)
+    std::vector<LLColor4>   mStarColors;       // RGB = black-body color (sRGB 0..1), A = intrinsic intensity (0..1)
+
+    struct MeteorState
+    {
+        LLVector3 origin_world;        // starting head position
+        LLVector3 direction_world;     // unit direction of travel
+        F32       path_length_world;   // distance head travels across its lifetime
+        F32       trail_length_world;  // length of the glowing trail behind the head
+        F32       age;                 // seconds since spawn
+        F32       lifetime;            // total seconds to live
+        LLColor3  color;               // sRGB color
+        F32       peak_intensity;      // 0..1 scale on the envelope peak
+    };
+    std::vector<MeteorState> mMeteors;
 };
 
 #endif // LL_VOWLSKY_H

@@ -210,6 +210,8 @@ LLGLSLShader            gDeferredWLCloudProgram;
 LLGLSLShader            gDeferredWLSunProgram;
 LLGLSLShader            gDeferredWLMoonProgram;
 LLGLSLShader            gDeferredStarProgram;
+LLGLSLShader            gDeferredMeteorProgram;
+LLGLSLShader            gDeferredAuroraProgram;
 LLGLSLShader            gDeferredFullbrightShinyProgram;
 LLGLSLShader            gHUDFullbrightShinyProgram;
 LLGLSLShader            gDeferredSkinnedFullbrightShinyProgram;
@@ -1155,6 +1157,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredWLSunProgram.unload();
         gDeferredWLMoonProgram.unload();
         gDeferredStarProgram.unload();
+        gDeferredMeteorProgram.unload();
+        gDeferredAuroraProgram.unload();
         gDeferredFullbrightShinyProgram.unload();
         gHUDFullbrightShinyProgram.unload();
         gDeferredSkinnedFullbrightShinyProgram.unload();
@@ -2826,6 +2830,36 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredStarProgram);
 
         success = gDeferredStarProgram.createShader();
+        llassert(success);
+    }
+
+    if (success)
+    {
+        gDeferredMeteorProgram.mName = "Deferred Meteor Program";
+        gDeferredMeteorProgram.mShaderFiles.clear();
+        gDeferredMeteorProgram.mShaderFiles.push_back(make_pair("deferred/meteorsV.glsl", GL_VERTEX_SHADER));
+        gDeferredMeteorProgram.mShaderFiles.push_back(make_pair("deferred/meteorsF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredMeteorProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredMeteorProgram.mShaderGroup = LLGLSLShader::SG_SKY;
+
+        add_common_permutations(&gDeferredMeteorProgram);
+
+        success = gDeferredMeteorProgram.createShader();
+        llassert(success);
+    }
+
+    if (success)
+    {
+        gDeferredAuroraProgram.mName = "Deferred Aurora Program";
+        gDeferredAuroraProgram.mShaderFiles.clear();
+        gDeferredAuroraProgram.mShaderFiles.push_back(make_pair("deferred/auroraV.glsl", GL_VERTEX_SHADER));
+        gDeferredAuroraProgram.mShaderFiles.push_back(make_pair("deferred/auroraF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredAuroraProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredAuroraProgram.mShaderGroup = LLGLSLShader::SG_SKY;
+
+        add_common_permutations(&gDeferredAuroraProgram);
+
+        success = gDeferredAuroraProgram.createShader();
         llassert(success);
     }
 

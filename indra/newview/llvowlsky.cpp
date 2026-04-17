@@ -38,6 +38,170 @@
 
 constexpr U32 SKY_DETAIL = 18; // Any lower and there will be artifacts
 
+// Three tiers of stars, layered at different simulated distances. The counts
+// stack to ~155k stars; the faint "dust" tier dominates density, giving the
+// eye a rich background without per-star cost dominating memory.
+namespace
+{
+    struct StarTier
+    {
+        U32 count;               // number of stars in this tier
+        F32 distance_factor;     // multiplies dome radius
+        F32 intensity_floor;     // minimum post-distribution intensity
+        F32 intensity_ceil;      // maximum post-distribution intensity
+        F32 milky_way_fraction;  // 0..1, fraction of this tier biased to galactic band
+    };
+
+    constexpr StarTier kStarTiers[] = {
+        //  count    dist    i_floor  i_ceil  mw_frac
+        {    5000,   1.00f,  0.55f,   1.00f,  0.25f },   // bright primary
+        {   30000,   1.60f,  0.18f,   0.60f,  0.35f },   // mid
+        {  120000,   3.00f,  0.05f,   0.22f,  0.55f },   // faint "star dust"
+    };
+
+    constexpr U32 kTotalStars =
+        kStarTiers[0].count + kStarTiers[1].count + kStarTiers[2].count;
+
+    // Meteor tuning. kMeteorHardMax is a fixed upper bound used for dynamic VB
+    // sizing — the user-facing RenderMeteorMaxCount setting is clamped to this
+    // so the VB never has to be reallocated at runtime.
+    constexpr U32 kMeteorHardMax        = 64;
+    constexpr U32 kMeteorVertsPerQuad   = 6;
+
+    // Arbitrary but fixed galactic pole - rotating this would rotate the Milky Way band.
+    // Chosen so the band runs across the sky at a slight incline.
+    inline LLVector3 getGalacticPole()
+    {
+        LLVector3 pole(0.30f, 0.72f, 0.62f);
+        pole.normVec();
+        return pole;
+    }
+
+    // Tanner Helland-style black-body color approximation from temperature in Kelvin.
+    // Returns sRGB 0..1. Accurate enough (within a few percent) for the visual range
+    // 1000K..40000K and matches the familiar red->white->blue stellar appearance.
+    LLColor3 blackBodyColor(F32 temperature_K)
+    {
+        const F32 t = temperature_K * 0.01f; // temperature in hundreds of K
+
+        F32 r, g, b;
+
+        if (t <= 66.0f)
+        {
+            r = 1.0f;
+        }
+        else
+        {
+            const F32 x = t - 60.0f;
+            r = 329.698727446f * powf(x, -0.1332047592f) / 255.0f;
+        }
+
+        if (t <= 66.0f)
+        {
+            g = (99.4708025861f * logf(llmax(1.0f, t)) - 161.1195681661f) / 255.0f;
+        }
+        else
+        {
+            const F32 x = t - 60.0f;
+            g = 288.1221695283f * powf(x, -0.0755148492f) / 255.0f;
+        }
+
+        if (t >= 66.0f)
+        {
+            b = 1.0f;
+        }
+        else if (t <= 19.0f)
+        {
+            b = 0.0f;
+        }
+        else
+        {
+            b = (138.5177312231f * logf(t - 10.0f) - 305.0447927307f) / 255.0f;
+        }
+
+        return LLColor3(llclamp(r, 0.0f, 1.0f),
+                        llclamp(g, 0.0f, 1.0f),
+                        llclamp(b, 0.0f, 1.0f));
+    }
+
+    // Sample a stellar temperature. The distribution roughly tracks stellar
+    // population statistics - dominated by cool M/K dwarfs with a long tail
+    // toward the blue.
+    F32 sampleStellarTemperature()
+    {
+        const F32 u = ll_frand();
+        if (u < 0.0025f)      return 18000.0f + ll_frand() * 22000.0f; // O/B class (rare, very blue)
+        if (u < 0.02f)        return 10000.0f + ll_frand() *  8000.0f; // late-B / A class (blue-white)
+        if (u < 0.10f)        return  7000.0f + ll_frand() *  3000.0f; // F class (yellow-white)
+        if (u < 0.30f)        return  5500.0f + ll_frand() *  1500.0f; // G class (sun-like)
+        if (u < 0.60f)        return  4000.0f + ll_frand() *  1500.0f; // K class (orange)
+        return                       2600.0f + ll_frand() *  1400.0f; // M class (cool red, majority)
+    }
+
+    // Power-law luminosity, biased heavily toward the faint end. Returned
+    // value is normalized to [0..1]. Callers remap to the tier's intensity
+    // range so the per-tier distribution forms a plausible magnitude scale.
+    F32 samplePowerLawIntensity()
+    {
+        const F32 u = ll_frand();
+        // Exponent 4 is a rough visual match to the Salpeter-like tail: most
+        // stars are near the floor, a few outliers reach the ceiling.
+        return powf(u, 4.0f);
+    }
+
+    // Uniformly sample a direction on the upper hemisphere (z >= 0).
+    LLVector3 uniformUpperHemisphere()
+    {
+        const F32 z = ll_frand();                         // area-weighted
+        const F32 phi = F_TWO_PI * ll_frand();
+        const F32 r = sqrtf(llmax(0.0f, 1.0f - z * z));
+        return LLVector3(r * cosf(phi), r * sinf(phi), z);
+    }
+
+    // Pick a random unit vector perpendicular to `n`. Uses a deterministic
+    // orthogonal basis built from `n` and a fixed "up" swap for robustness
+    // at the poles, then rotates around `n` by a uniform angle.
+    LLVector3 randomTangentTo(const LLVector3& n)
+    {
+        const LLVector3 fallback = (fabsf(n.mV[2]) < 0.9f)
+                                       ? LLVector3(0.f, 0.f, 1.f)
+                                       : LLVector3(1.f, 0.f, 0.f);
+        LLVector3 a = (n % fallback);   // cross
+        a.normVec();
+        LLVector3 b = (n % a);
+        b.normVec();
+        const F32 rot = F_TWO_PI * ll_frand();
+        return a * cosf(rot) + b * sinf(rot);
+    }
+
+    // Rejection-sampled direction with optional bias toward the galactic plane.
+    // A Gaussian density around cos(angle_from_plane)=0 yields a band a few
+    // tens of degrees wide, which reads as a believable Milky Way without
+    // relying on a texture.
+    LLVector3 generateStarDirection(const LLVector3& galactic_pole, bool milky_way_biased)
+    {
+        constexpr U32 MAX_ATTEMPTS = 24;
+
+        for (U32 attempt = 0; attempt < MAX_ATTEMPTS; ++attempt)
+        {
+            LLVector3 dir = uniformUpperHemisphere();
+
+            if (!milky_way_biased)
+                return dir;
+
+            // cos(angle-to-pole) == 0 at the plane, == 1 at the pole.
+            const F32 cos_to_pole = fabsf(dir * galactic_pole);
+            // Gaussian density peaking at the plane. sigma ~ 18 degrees.
+            const F32 density = expf(-cos_to_pole * cos_to_pole * 10.0f);
+            if (ll_frand() < density)
+                return dir;
+        }
+
+        // Unlikely to ever hit this fallback, but keeps the function total.
+        return uniformUpperHemisphere();
+    }
+}
+
 inline U32 LLVOWLSky::getNumStacks(void)
 {
     return SKY_DETAIL;
@@ -58,14 +222,9 @@ inline U32 LLVOWLSky::getStripsNumIndices(void)
     return 2 * ((getNumStacks() - 2) * (getNumSlices() + 1)) + 1 ;
 }
 
-inline U32 LLVOWLSky::getStarsNumVerts(void)
+U32 LLVOWLSky::getStarsNumVerts(void)
 {
-    return 1000;
-}
-
-inline U32 LLVOWLSky::getStarsNumIndices(void)
-{
-    return 1000;
+    return kTotalStars;
 }
 
 LLVOWLSky::LLVOWLSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
@@ -122,6 +281,7 @@ void LLVOWLSky::resetVertexBuffers()
     mStripsVerts.clear();
     mStarsVerts = nullptr;
     mFsSkyVerts = nullptr;
+    mMeteorVerts = nullptr;
 
     gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
 }
@@ -131,6 +291,7 @@ void LLVOWLSky::cleanupGL()
     mStripsVerts.clear();
     mStarsVerts = nullptr;
     mFsSkyVerts = nullptr;
+    mMeteorVerts = nullptr;
 
     LLDrawPoolWLSky::cleanupGL();
 }
@@ -274,7 +435,6 @@ bool LLVOWLSky::updateGeometry(LLDrawable * drawable)
 #endif
     }
 
-    updateStarColors();
     updateStarGeometry(drawable);
 
     LLPipeline::sCompiles++;
@@ -288,7 +448,7 @@ void LLVOWLSky::drawStars(void)
     if (mStarsVerts.notNull())
     {
         mStarsVerts->setBuffer();
-        mStarsVerts->drawArrays(LLRender::TRIANGLES, 0, getStarsNumVerts()*4);
+        mStarsVerts->drawArrays(LLRender::TRIANGLES, 0, (S32)(getStarsNumVerts() * 6));
     }
 }
 
@@ -337,38 +497,42 @@ void LLVOWLSky::drawDome(void)
 void LLVOWLSky::initStars()
 {
     const F32 DISTANCE_TO_STARS = LLEnvironment::instance().getCurrentSky()->getDomeRadius();
+    const LLVector3 galactic_pole = getGalacticPole();
 
-    // Initialize star map
-    mStarVertices.resize(getStarsNumVerts());
-    mStarColors.resize(getStarsNumVerts());
-    mStarIntensities.resize(getStarsNumVerts());
+    mStarPositions.clear();
+    mStarColors.clear();
+    mStarPositions.reserve(kTotalStars);
+    mStarColors.reserve(kTotalStars);
 
-    std::vector<LLVector3>::iterator v_p = mStarVertices.begin();
-    std::vector<LLColor4>::iterator v_c = mStarColors.begin();
-    std::vector<F32>::iterator v_i = mStarIntensities.begin();
-
-    U32 i;
-
-    for (i = 0; i < getStarsNumVerts(); ++i)
+    for (const StarTier& tier : kStarTiers)
     {
-        v_p->mV[VX] = ll_frand() - 0.5f;
-        v_p->mV[VY] = ll_frand() - 0.5f;
+        const F32 tier_radius = DISTANCE_TO_STARS * tier.distance_factor;
 
-        // we only want stars on the top half of the dome!
+        for (U32 i = 0; i < tier.count; ++i)
+        {
+            const bool in_milky_way = ll_frand() < tier.milky_way_fraction;
+            LLVector3 dir = generateStarDirection(galactic_pole, in_milky_way);
 
-        v_p->mV[VZ] = ll_frand()/2.f;
+            mStarPositions.push_back(dir * tier_radius);
 
-        v_p->normVec();
-        *v_p *= DISTANCE_TO_STARS;
-        *v_i = llmin((F32)pow(ll_frand(),2.f) + 0.1f, 1.f);
-        v_c->mV[VRED]   = 0.75f + ll_frand() * 0.25f ;
-        v_c->mV[VGREEN] = 1.f ;
-        v_c->mV[VBLUE]  = 0.75f + ll_frand() * 0.25f ;
-        v_c->mV[VALPHA] = 1.f;
-        v_c->clamp();
-        v_p++;
-        v_c++;
-        v_i++;
+            // Distance-tier dimming is baked into intensity_floor/ceil so the
+            // far "dust" tier naturally renders faint. We only remap the
+            // power-law sample into that range here.
+            const F32 raw = samplePowerLawIntensity();
+            const F32 intensity = llclamp(
+                tier.intensity_floor + raw * (tier.intensity_ceil - tier.intensity_floor),
+                0.0f, 1.0f);
+
+            const F32 temperature_K = sampleStellarTemperature();
+            const LLColor3 bb = blackBodyColor(temperature_K);
+
+            LLColor4 c;
+            c.mV[VRED]   = bb.mV[VRED];
+            c.mV[VGREEN] = bb.mV[VGREEN];
+            c.mV[VBLUE]  = bb.mV[VBLUE];
+            c.mV[VALPHA] = intensity;
+            mStarColors.push_back(c);
+        }
     }
 }
 
@@ -457,71 +621,30 @@ void LLVOWLSky::buildStripsBuffer(U32 begin_stack,
     }
 }
 
-void LLVOWLSky::updateStarColors()
-{
-    std::vector<LLColor4>::iterator v_c = mStarColors.begin();
-    std::vector<F32>::iterator v_i = mStarIntensities.begin();
-    std::vector<LLVector3>::iterator v_p = mStarVertices.begin();
-
-    const F32 var = 0.15f;
-    const F32 min = 0.5f; //0.75f;
-    //const F32 sunclose_max = 0.6f;
-    //const F32 sunclose_range = 1 - sunclose_max;
-
-    //F32 below_horizon = - llmin(0.0f, gSky.mVOSkyp->getToSunLast().mV[2]);
-    //F32 brightness_factor = llmin(1.0f, below_horizon * 20);
-
-    static S32 swap = 0;
-    swap++;
-
-    if ((swap % 2) == 1)
-    {
-        F32 intensity;                      //  max intensity of each star
-        U32 x;
-        for (x = 0; x < getStarsNumVerts(); ++x)
-        {
-            //F32 sundir_factor = 1;
-            LLVector3 tostar = *v_p;
-            tostar.normVec();
-            //const F32 how_close_to_sun = tostar * gSky.mVOSkyp->getToSunLast();
-            //if (how_close_to_sun > sunclose_max)
-            //{
-            //  sundir_factor = (1 - how_close_to_sun) / sunclose_range;
-            //}
-            intensity = *(v_i);
-            F32 alpha = v_c->mV[VALPHA] + (ll_frand() - 0.5f) * var * intensity;
-            if (alpha < min * intensity)
-            {
-                alpha = min * intensity;
-            }
-            if (alpha > intensity)
-            {
-                alpha = intensity;
-            }
-            //alpha *= brightness_factor * sundir_factor;
-
-            alpha = llclamp(alpha, 0.f, 1.f);
-            v_c->mV[VALPHA] = alpha;
-            v_c++;
-            v_i++;
-            v_p++;
-        }
-    }
-}
-
 bool LLVOWLSky::updateStarGeometry(LLDrawable *drawable)
 {
+    LL_PROFILE_ZONE_SCOPED;
+
+    // Star data is static after initStars(); skip re-upload if the buffer
+    // already exists. It's released on cleanupGL/resetVertexBuffers, so we'll
+    // rebuild it after a context loss.
+    if (mStarsVerts.notNull())
+    {
+        return true;
+    }
+
     LLStrider<LLVector3> verticesp;
     LLStrider<LLColor4U> colorsp;
     LLStrider<LLVector2> texcoordsp;
 
-    if (mStarsVerts.isNull())
+    const U32 num_stars = getStarsNumVerts();
+    const U32 num_verts = num_stars * 6;
+
+    mStarsVerts = new LLVertexBuffer(LLDrawPoolWLSky::STAR_VERTEX_DATA_MASK);
+    if (!mStarsVerts->allocateBuffer(num_verts, 0))
     {
-        mStarsVerts = new LLVertexBuffer(LLDrawPoolWLSky::STAR_VERTEX_DATA_MASK);
-        if (!mStarsVerts->allocateBuffer(getStarsNumVerts()*6, 0))
-        {
-            LL_WARNS() << "Failed to allocate Vertex Buffer for Sky to " << getStarsNumVerts() * 6 << " vertices" << LL_ENDL;
-        }
+        LL_WARNS() << "Failed to allocate Vertex Buffer for Sky to " << num_verts << " vertices" << LL_ENDL;
+        return false;
     }
 
     bool success = mStarsVerts->getVertexStrider(verticesp)
@@ -533,48 +656,205 @@ bool LLVOWLSky::updateStarGeometry(LLDrawable *drawable)
         LL_ERRS() << "Failed updating star geometry." << LL_ENDL;
     }
 
-    // *TODO: fix LLStrider with a real prefix increment operator so it can be
-    // used as a model of OutputIterator. -Brad
-    // std::copy(mStarVertices.begin(), mStarVertices.end(), verticesp);
-
-    if (mStarVertices.size() < getStarsNumVerts())
+    if (mStarPositions.size() < num_stars || mStarColors.size() < num_stars)
     {
         LL_ERRS() << "Star reference geometry insufficient." << LL_ENDL;
     }
 
-    for (U32 vtx = 0; vtx < getStarsNumVerts(); ++vtx)
+    // Two-triangle quad. Corner offsets are in [-1, 1] — the vertex shader
+    // turns them into pixel-sized screen-space offsets, so the actual CPU
+    // "position" of every vertex of a star is identical (the star center).
+    // This trades a small amount of memory for full resolution/FOV control on
+    // the GPU side.
+    static const LLVector2 kCornerOffsets[6] = {
+        LLVector2(-1.f, -1.f), // 0: BL
+        LLVector2( 1.f, -1.f), // 1: BR
+        LLVector2( 1.f,  1.f), // 2: TR
+        LLVector2(-1.f, -1.f), // 3: BL
+        LLVector2( 1.f,  1.f), // 4: TR
+        LLVector2(-1.f,  1.f), // 5: TL
+    };
+
+    for (U32 s = 0; s < num_stars; ++s)
     {
-        LLVector3 at = mStarVertices[vtx];
-        at.normVec();
-        LLVector3 left = at%LLVector3(0,0,1);
-        LLVector3 up = at%left;
+        const LLVector3& center = mStarPositions[s];
+        const LLColor4U  color_u(mStarColors[s]);
 
-        F32 sc = 16.0f + (ll_frand() * 20.0f);
-        left *= sc;
-        up *= sc;
-
-        *(verticesp++)  = mStarVertices[vtx];
-        *(verticesp++) = mStarVertices[vtx]+up;
-        *(verticesp++) = mStarVertices[vtx]+left+up;
-        *(verticesp++)  = mStarVertices[vtx];
-        *(verticesp++) = mStarVertices[vtx]+left+up;
-        *(verticesp++) = mStarVertices[vtx]+left;
-
-        *(texcoordsp++) = LLVector2(1,0);
-        *(texcoordsp++) = LLVector2(1,1);
-        *(texcoordsp++) = LLVector2(0,1);
-        *(texcoordsp++) = LLVector2(1,0);
-        *(texcoordsp++) = LLVector2(0,1);
-        *(texcoordsp++) = LLVector2(0,0);
-
-        *(colorsp++)    = LLColor4U(mStarColors[vtx]);
-        *(colorsp++)    = LLColor4U(mStarColors[vtx]);
-        *(colorsp++)    = LLColor4U(mStarColors[vtx]);
-        *(colorsp++)    = LLColor4U(mStarColors[vtx]);
-        *(colorsp++)    = LLColor4U(mStarColors[vtx]);
-        *(colorsp++)    = LLColor4U(mStarColors[vtx]);
+        for (U32 v = 0; v < 6; ++v)
+        {
+            *(verticesp++)  = center;
+            *(colorsp++)    = color_u;
+            *(texcoordsp++) = kCornerOffsets[v];
+        }
     }
 
     mStarsVerts->unmapBuffer();
     return true;
+}
+
+void LLVOWLSky::tickMeteors(F32 dt_seconds)
+{
+    LL_PROFILE_ZONE_SCOPED;
+
+    if (dt_seconds <= 0.0f) return;
+
+    // Age existing meteors and drop any that have run their course.
+    for (MeteorState& m : mMeteors)
+    {
+        m.age += dt_seconds;
+    }
+    mMeteors.erase(
+        std::remove_if(mMeteors.begin(), mMeteors.end(),
+                       [](const MeteorState& m) { return m.age >= m.lifetime; }),
+        mMeteors.end());
+
+    static LLCachedControl<S32> max_count_setting(gSavedSettings, "RenderMeteorMaxCount", 16);
+    static LLCachedControl<F32> spawn_secs_setting(gSavedSettings, "RenderMeteorSpawnInterval", 4.0f);
+    const U32 max_count  = (U32)llclamp((S32)max_count_setting, 0, (S32)kMeteorHardMax);
+    const F32 spawn_secs = llmax(0.05f, (F32)spawn_secs_setting);
+
+    // Poisson-ish spawn: per-frame probability = dt / mean_interval. At 60 FPS
+    // with a 4s mean, this produces a new meteor roughly every 240 frames.
+    if (mMeteors.size() < max_count
+        && ll_frand() < dt_seconds / spawn_secs)
+    {
+        const F32 dome_radius = LLEnvironment::instance().getCurrentSky()->getDomeRadius();
+
+        // Start point anywhere on the upper hemisphere, but prefer a bit above
+        // the horizon so meteors don't immediately pop out of view.
+        LLVector3 start_dir = uniformUpperHemisphere();
+        // Lift horizon-hugging starts slightly so short streaks stay visible.
+        if (start_dir.mV[2] < 0.1f)
+        {
+            start_dir.mV[2] = 0.1f;
+            start_dir.normVec();
+        }
+
+        // Travel direction is a random tangent in the sky tangent plane at
+        // start_dir. This gives great-circle-like paths.
+        LLVector3 travel_dir = randomTangentTo(start_dir);
+
+        MeteorState m;
+        m.origin_world      = start_dir * dome_radius;
+        m.direction_world   = travel_dir;
+        // Lifetime 0.6..1.6s. Fast streaks that don't overstay their welcome.
+        m.lifetime          = 0.6f + 1.0f * ll_frand();
+        // Angular path length 12..30 degrees. Trail is a fraction of that.
+        const F32 path_angle  = 0.21f + 0.31f * ll_frand();          // radians
+        const F32 trail_angle = path_angle * (0.35f + 0.25f * ll_frand());
+        m.path_length_world  = dome_radius * path_angle;
+        m.trail_length_world = dome_radius * trail_angle;
+        // Slight color variation centered on white-hot.
+        const F32 temperature_K = 4500.0f + 10000.0f * ll_frand();
+        m.color              = blackBodyColor(temperature_K);
+        m.peak_intensity     = 0.7f + 0.3f * ll_frand();
+        m.age                = 0.0f;
+
+        mMeteors.push_back(m);
+    }
+}
+
+void LLVOWLSky::updateMeteorGeometry()
+{
+    LL_PROFILE_ZONE_SCOPED;
+
+    constexpr U32 total_verts = kMeteorHardMax * kMeteorVertsPerQuad;
+
+    if (mMeteorVerts.isNull())
+    {
+        mMeteorVerts = new LLVertexBuffer(LLDrawPoolWLSky::METEOR_VERTEX_DATA_MASK);
+        if (!mMeteorVerts->allocateBuffer(total_verts, 0))
+        {
+            LL_WARNS() << "Failed to allocate meteor VB" << LL_ENDL;
+            mMeteorVerts = nullptr;
+            return;
+        }
+    }
+
+    LLStrider<LLVector3> positions;
+    LLStrider<LLVector3> normals;
+    LLStrider<LLColor4U> colors;
+    LLStrider<LLVector2> texcoords;
+    if (!mMeteorVerts->getVertexStrider(positions)
+        || !mMeteorVerts->getNormalStrider(normals)
+        || !mMeteorVerts->getColorStrider(colors)
+        || !mMeteorVerts->getTexCoord0Strider(texcoords))
+    {
+        LL_WARNS() << "Failed striding meteor VB" << LL_ENDL;
+        return;
+    }
+
+    // Six-vertex stretched quad: u in {-1,+1} (tail..head), v in {-1,+1} (side).
+    static const LLVector2 kUV[kMeteorVertsPerQuad] = {
+        LLVector2(-1.f, -1.f), // tail L
+        LLVector2( 1.f, -1.f), // head L
+        LLVector2( 1.f,  1.f), // head R
+        LLVector2(-1.f, -1.f), // tail L
+        LLVector2( 1.f,  1.f), // head R
+        LLVector2(-1.f,  1.f), // tail R
+    };
+
+    U32 written = 0;
+    for (const MeteorState& m : mMeteors)
+    {
+        if (written >= kMeteorHardMax) break;
+
+        // Envelope: quick fade in, steady, slower fade out. These ratios read
+        // as a meteor "blooming" and then trailing off.
+        const F32 frac = m.age / llmax(m.lifetime, 1e-4f);
+        F32 alpha = 1.0f;
+        if (frac < 0.10f)      alpha = frac / 0.10f;
+        else if (frac > 0.80f) alpha = (1.0f - frac) / 0.20f;
+        alpha = llclamp(alpha, 0.0f, 1.0f) * m.peak_intensity;
+        if (alpha <= 0.0f) continue;
+
+        // Head progresses linearly along the travel direction. Tail is a fixed
+        // length behind the head regardless of age — the trail doesn't grow,
+        // it just moves with the head.
+        const LLVector3 head = m.origin_world + m.direction_world * (m.path_length_world * frac);
+        const LLVector3 tail = head - m.direction_world * m.trail_length_world;
+        const LLVector3 midpoint = (head + tail) * 0.5f;
+        const LLVector3 half_vec = (head - tail) * 0.5f;
+
+        LLColor4 color4;
+        color4.mV[VRED]   = m.color.mV[VRED];
+        color4.mV[VGREEN] = m.color.mV[VGREEN];
+        color4.mV[VBLUE]  = m.color.mV[VBLUE];
+        color4.mV[VALPHA] = alpha;
+        const LLColor4U color_u(color4);
+
+        for (U32 v = 0; v < kMeteorVertsPerQuad; ++v)
+        {
+            *(positions++) = midpoint;
+            *(normals++)   = half_vec;
+            *(colors++)    = color_u;
+            *(texcoords++) = kUV[v];
+        }
+        ++written;
+    }
+
+    // Zero-fill the unused meteor slots so they produce degenerate triangles
+    // (all verts at origin) that rasterize to nothing.
+    const LLColor4U black_u(0, 0, 0, 0);
+    for (U32 i = written; i < kMeteorHardMax; ++i)
+    {
+        for (U32 v = 0; v < kMeteorVertsPerQuad; ++v)
+        {
+            *(positions++) = LLVector3::zero;
+            *(normals++)   = LLVector3::zero;
+            *(colors++)    = black_u;
+            *(texcoords++) = LLVector2(0.f, 0.f);
+        }
+    }
+
+    mMeteorVerts->unmapBuffer();
+}
+
+void LLVOWLSky::drawMeteors()
+{
+    if (mMeteorVerts.isNull()) return;
+    if (mMeteors.empty()) return;   // skip the GL call entirely when nothing's active
+
+    mMeteorVerts->setBuffer();
+    mMeteorVerts->drawArrays(LLRender::TRIANGLES, 0, (S32)(kMeteorHardMax * kMeteorVertsPerQuad));
 }
