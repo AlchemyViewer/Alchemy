@@ -459,7 +459,7 @@ bool LLFloaterIMNearbyChat::handleKeyHere( KEY key, MASK mask )
         sendChat(CHAT_TYPE_SHOUT);
         handled = true;
     }
-    else if (KEY_RETURN == key && mask == MASK_SHIFT)
+    else if (KEY_RETURN == key && mask == (MASK_SHIFT | MASK_CONTROL))
     {
         // whisper
         sendChat(CHAT_TYPE_WHISPER);
