@@ -2523,6 +2523,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                                                                              {"SMAA_PRESET_MEDIUM", "Medium"},
                                                                              {"SMAA_PRESET_HIGH", "High"},
                                                                           {"SMAA_PRESET_ULTRA", "Ultra"} };
+        const bool smaa_predication = gSavedSettings.getBOOL("RenderSMAAPredication");
+        const F32 smaa_pred_threshold = gSavedSettings.getF32("RenderSMAAPredicationThreshold");
+        const F32 smaa_pred_scale = llclamp(gSavedSettings.getF32("RenderSMAAPredicationScale"), 1.f, 5.f);
+        const F32 smaa_pred_strength = llclamp(gSavedSettings.getF32("RenderSMAAPredicationStrength"), 0.f, 1.f);
         int i = 0;
         bool failed = false;
         for (const auto& smaa_pair : quality_levels)
@@ -2534,7 +2538,13 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 defines.emplace("SMAA_GLSL_3", "1");
             else
                 defines.emplace("SMAA_GLSL_2", "1");
-            defines.emplace("SMAA_PREDICATION", "0");
+            defines.emplace("SMAA_PREDICATION", smaa_predication ? "1" : "0");
+            if (smaa_predication)
+            {
+                defines.emplace("SMAA_PREDICATION_THRESHOLD", llformat("%.6f", smaa_pred_threshold));
+                defines.emplace("SMAA_PREDICATION_SCALE", llformat("%.3f", smaa_pred_scale));
+                defines.emplace("SMAA_PREDICATION_STRENGTH", llformat("%.3f", smaa_pred_strength));
+            }
             defines.emplace("SMAA_REPROJECTION", "0");
             defines.emplace(smaa_pair.first, "1");
 

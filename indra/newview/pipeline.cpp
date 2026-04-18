@@ -8222,6 +8222,7 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
         LLGLDepthTest    depth(GL_FALSE, GL_FALSE);
 
         static LLCachedControl<bool> use_sample(gSavedSettings, "RenderSMAAUseSample", false);
+        static LLCachedControl<bool> use_predication(gSavedSettings, "RenderSMAAPredication", true);
         //static LLCachedControl<bool> use_stencil(gSavedSettings, "RenderSMAAUseStencil", true);
         {
             //LLGLState stencil(GL_STENCIL_TEST, use_stencil);
@@ -8251,6 +8252,18 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
                 gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
             }
 
+            S32 pred_channel = -1;
+            if (use_predication)
+            {
+                pred_channel = edge_shader.enableTexture(LLShaderMgr::SMAA_PREDICATION_TEX, mRT->deferredScreen.getUsage());
+                if (pred_channel > -1)
+                {
+                    gGL.getTexUnit(pred_channel)->bind(&mRT->deferredScreen, true);
+                    gGL.getTexUnit(pred_channel)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+                    gGL.getTexUnit(pred_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                }
+            }
+
             //if (use_stencil)
             //{
             //    glStencilFunc(GL_ALWAYS, 1, 0xFF);
@@ -8264,6 +8277,10 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
             dest.flush();
 
             gGL.getTexUnit(channel)->unbindFast(LLTexUnit::TT_TEXTURE);
+            if (pred_channel > -1)
+            {
+                gGL.getTexUnit(pred_channel)->unbindFast(LLTexUnit::TT_TEXTURE);
+            }
         }
 
         {

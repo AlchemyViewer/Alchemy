@@ -1550,6 +1550,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("areaTex");
     mReservedUniforms.push_back("searchTex");
     mReservedUniforms.push_back("blendTex");
+    mReservedUniforms.push_back("predicationTex");
 
     mReservedUniforms.push_back("exposure");
     mReservedUniforms.push_back("tonemap_type");

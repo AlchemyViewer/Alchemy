@@ -348,6 +348,7 @@ public:
         SMAA_AREA_TEX,                      //  "areaTex"
         SMAA_SEARCH_TEX,                    //  "searchTex"
         SMAA_BLEND_TEX,                     //  "blendTex"
+        SMAA_PREDICATION_TEX,               //  "predicationTex"
 
         EXPOSURE,
         TONEMAP_TYPE,
