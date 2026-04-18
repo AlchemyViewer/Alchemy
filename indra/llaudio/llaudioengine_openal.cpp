@@ -33,6 +33,7 @@
 #include "lllistener_openal.h"
 
 #include <cstring>
+#include <new>
 #include <vector>
 
 
@@ -207,13 +208,20 @@ LLAudioChannelOpenAL::LLAudioChannelOpenAL()
 LLAudioChannelOpenAL::~LLAudioChannelOpenAL()
 {
     cleanup();
-    alDeleteSources(1, &mALSource);
+    if (mALSource != AL_NONE)
+    {
+        alDeleteSources(1, &mALSource);
+        mALSource = AL_NONE;
+    }
 }
 
 void LLAudioChannelOpenAL::cleanup()
 {
-    alSourceStop(mALSource);
-    alSourcei(mALSource, AL_BUFFER, AL_NONE);
+    if (mALSource != AL_NONE)
+    {
+        alSourceStop(mALSource);
+        alSourcei(mALSource, AL_BUFFER, AL_NONE);
+    }
 
     mCurrentBufferp = NULL;
 }
@@ -285,8 +293,11 @@ bool LLAudioChannelOpenAL::updateBuffer()
         // Base class update returned true, which means that we need to actually
         // set up the source for a different buffer.
         LLAudioBufferOpenAL *bufferp = (LLAudioBufferOpenAL *)mCurrentSourcep->getCurrentBuffer();
-        ALuint buffer = bufferp->getBuffer();
-        alSourcei(mALSource, AL_BUFFER, buffer);
+        if (!bufferp)
+        {
+            return false;
+        }
+        alSourcei(mALSource, AL_BUFFER, bufferp->getBuffer());
         mLastSamplePos = 0;
     }
 
@@ -347,10 +358,7 @@ void LLAudioChannelOpenAL::update3DPosition()
     alSourcef(mALSource, AL_GAIN, mCurrentSourcep->getGain() * getSecondaryGain());
 }
 
-LLAudioBufferOpenAL::LLAudioBufferOpenAL()
-{
-    mALBuffer = AL_NONE;
-}
+LLAudioBufferOpenAL::LLAudioBufferOpenAL() = default;
 
 LLAudioBufferOpenAL::~LLAudioBufferOpenAL()
 {
@@ -372,6 +380,7 @@ void LLAudioBufferOpenAL::cleanup()
         }
         mALBuffer = AL_NONE;
     }
+    mBytesPerFrame = 0;
 }
 
 namespace
@@ -543,18 +552,19 @@ bool LLAudioBufferOpenAL::loadWAV(const std::string& filename)
         return false;
     }
 
+    mBytesPerFrame = static_cast<U16>(channels * (bits_per_sample / 8));
     return true;
 }
 
 U32 LLAudioBufferOpenAL::getLength()
 {
-    if(mALBuffer == AL_NONE)
+    if (mALBuffer == AL_NONE || mBytesPerFrame == 0)
     {
         return 0;
     }
-    ALint length;
+    ALint length = 0;
     alGetBufferi(mALBuffer, AL_SIZE, &length);
-    return length / 2; // convert size in bytes to size in (16-bit) samples
+    return static_cast<U32>(length) / mBytesPerFrame;
 }
 
 // ------------
@@ -581,9 +591,9 @@ bool LLAudioEngine_OpenAL::initWind()
     mWindBufSamples = llceil(mWindBufFreq * WIND_BUFFER_SIZE_SEC);
     mWindBufBytes = mWindBufSamples * 2 /*stereo*/ * sizeof(WIND_SAMPLE_T);
 
-    mWindBuf = new WIND_SAMPLE_T [mWindBufSamples * 2 /*stereo*/];
+    mWindBuf = new(std::nothrow) WIND_SAMPLE_T [mWindBufSamples * 2 /*stereo*/];
 
-    if(mWindBuf==NULL)
+    if(mWindBuf == NULL)
     {
         LL_ERRS() << "LLAudioEngine_OpenAL::initWind() Error creating wind memory buffer" << LL_ENDL;
         return false;
@@ -626,12 +636,6 @@ void LLAudioEngine_OpenAL::cleanupWind()
 
 void LLAudioEngine_OpenAL::updateWind(LLVector3 wind_vec, F32 camera_altitude)
 {
-    LLVector3 wind_pos;
-    F64 pitch;
-    F64 center_freq;
-    ALenum error;
-    ALuint *buffers = NULL;
-
     if (!mEnableWind)
         return;
 
@@ -640,15 +644,14 @@ void LLAudioEngine_OpenAL::updateWind(LLVector3 wind_vec, F32 camera_altitude)
 
     if (mWindUpdateTimer.checkExpirationAndReset(LL_WIND_UPDATE_INTERVAL))
     {
-
         // wind comes in as Linden coordinate (+X = forward, +Y = left, +Z = up)
         // need to convert this to the conventional orientation DS3D and OpenAL use
         // where +X = right, +Y = up, +Z = backwards
 
         wind_vec.setVec(-wind_vec.mV[1], wind_vec.mV[2], -wind_vec.mV[0]);
 
-        pitch = 1.0 + mapWindVecToPitch(wind_vec);
-        center_freq = 80.0 * pow(pitch,2.5*(mapWindVecToGain(wind_vec)+1.0));
+        F64 pitch = 1.0 + mapWindVecToPitch(wind_vec);
+        F64 center_freq = 80.0 * pow(pitch, 2.5 * (mapWindVecToGain(wind_vec) + 1.0));
 
         mWindGen->mTargetFreq = (F32)center_freq;
         mWindGen->mTargetGain = (F32)mapWindVecToGain(wind_vec) * mMaxWindGain;
@@ -663,82 +666,87 @@ void LLAudioEngine_OpenAL::updateWind(LLVector3 wind_vec, F32 camera_altitude)
 
     // ok lets make a wind buffer now
 
-    ALint processed, queued, unprocessed;
+    ALint processed = 0, queued = 0;
     alGetSourcei(mWindSource, AL_BUFFERS_PROCESSED, &processed);
     alGetSourcei(mWindSource, AL_BUFFERS_QUEUED, &queued);
-    unprocessed = queued - processed;
+    ALint unprocessed = queued - processed;
 
     // ensure that there are always at least 3x as many filled buffers
     // queued as we managed to empty since last time.
     mNumEmptyWindALBuffers = llmin(mNumEmptyWindALBuffers + processed * 3 - unprocessed, MAX_NUM_WIND_BUFFERS-unprocessed);
     mNumEmptyWindALBuffers = llmax(mNumEmptyWindALBuffers, 0);
 
-    //LL_INFOS() << "mNumEmptyWindALBuffers: " << mNumEmptyWindALBuffers    <<" (" << unprocessed << ":" << processed << ")" << LL_ENDL;
+    ALenum error;
 
-    //delete the old wind buffers
-    buffers = new ALuint[processed];
-    alGetError(); /* clear error */
-    alSourceUnqueueBuffers(mWindSource, processed, &buffers[0]);
-    error = alGetError();
-    if(error != AL_NO_ERROR)
+    // Recycle the processed buffers back into fresh allocations. Keeping a
+    // single member vector avoids per-frame heap churn.
+    if (processed > 0)
     {
-        LL_WARNS() << "LLAudioEngine_OpenAL::updateWind() error swapping (unqueuing) buffers" << LL_ENDL;
+        mWindRecycleBuffers.resize(processed);
+        alGetError(); // clear error
+        alSourceUnqueueBuffers(mWindSource, processed, mWindRecycleBuffers.data());
+        error = alGetError();
+        if (error != AL_NO_ERROR)
+        {
+            LL_WARNS() << "LLAudioEngine_OpenAL::updateWind() error unqueuing buffers" << LL_ENDL;
+        }
+        else
+        {
+            alDeleteBuffers(processed, mWindRecycleBuffers.data());
+        }
     }
-    else
-    {
-        alDeleteBuffers(processed, &buffers[0]);
-    }
-    // We dont need to keep track of the buffers' id now.
-    delete[] buffers;
-    buffers = NULL;
 
-    //create the buffers for the empty wind buffers
+    if (mNumEmptyWindALBuffers <= 0)
+    {
+        // Nothing to queue this frame.
+        ALint playing = 0;
+        alGetSourcei(mWindSource, AL_SOURCE_STATE, &playing);
+        if (playing != AL_PLAYING && unprocessed > 0)
+        {
+            alSourcePlay(mWindSource);
+        }
+        return;
+    }
+
     unprocessed += mNumEmptyWindALBuffers;
-    buffers = new ALuint[mNumEmptyWindALBuffers];
-    alGetError(); /* clear error */
-    alGenBuffers(mNumEmptyWindALBuffers,&buffers[0]);
-    if((error=alGetError()) != AL_NO_ERROR)
+    mWindQueueBuffers.resize(mNumEmptyWindALBuffers);
+    alGetError(); // clear error
+    alGenBuffers(mNumEmptyWindALBuffers, mWindQueueBuffers.data());
+    if ((error = alGetError()) != AL_NO_ERROR)
     {
         LL_WARNS() << "LLAudioEngine_OpenAL::updateWind() Error creating wind buffer: " << error << LL_ENDL;
-        //break;
     }
 
     //fill the buffers with generated wind.
     int errors = 0;
-    for(int i = 0; i < mNumEmptyWindALBuffers; i++)
+    for (int i = 0; i < mNumEmptyWindALBuffers; i++)
     {
-        alBufferData(buffers[i],
+        alBufferData(mWindQueueBuffers[i],
                     AL_FORMAT_STEREO_FLOAT32,
-                    mWindGen->windGenerate(mWindBuf,
-                            mWindBufSamples),
+                    mWindGen->windGenerate(mWindBuf, mWindBufSamples),
                     mWindBufBytes,
                     mWindBufFreq);
         error = alGetError();
-        if(error != AL_NO_ERROR)
+        if (error != AL_NO_ERROR)
         {
-            LL_WARNS() << "LLAudioEngine_OpenAL::updateWind() error swapping (bufferdata) buffers" << LL_ENDL;
+            LL_WARNS() << "LLAudioEngine_OpenAL::updateWind() error filling wind buffer" << LL_ENDL;
             errors++;
         }
     }
 
-    //queue the buffers
-    alSourceQueueBuffers(mWindSource, mNumEmptyWindALBuffers, &buffers[0]);
+    alSourceQueueBuffers(mWindSource, mNumEmptyWindALBuffers, mWindQueueBuffers.data());
     error = alGetError();
-    if(error != AL_NO_ERROR)
+    if (error != AL_NO_ERROR)
     {
-        LL_WARNS() << "LLAudioEngine_OpenAL::updateWind() error swapping (queuing) buffers" << LL_ENDL;
+        LL_WARNS() << "LLAudioEngine_OpenAL::updateWind() error queuing buffers" << LL_ENDL;
     }
 
     mNumEmptyWindALBuffers = errors;
-    // We dont need to keep track of the buffers' id now.
-    delete[] buffers;
-    buffers = NULL;
-
 
     //restart playing if not playing
-    ALint playing;
+    ALint playing = 0;
     alGetSourcei(mWindSource, AL_SOURCE_STATE, &playing);
-    if(playing != AL_PLAYING)
+    if (playing != AL_PLAYING)
     {
         alSourcePlay(mWindSource);
 
