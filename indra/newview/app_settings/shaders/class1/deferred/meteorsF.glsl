@@ -27,8 +27,8 @@
 
 out vec4 frag_data[4];
 
-in vec4 vary_color; // rgb linear, a = envelope alpha
-in vec2 vary_coord; // (u, v) — u in [-1,1] along streak, v in [-1,1] across
+in vec4 vary_color; // rgb = envelope-premultiplied linear color, a = width_scale (per meteor)
+in vec2 vary_coord; // (u, v) — u in [-1,1] along streak, v in [-width_scale, +width_scale] across
 
 void main()
 {
@@ -39,14 +39,18 @@ void main()
     float head_flash = pow(along_t, 6.0);
     float along = along_t + head_flash * 1.2;
 
-    // Across-streak: Gaussian falloff. Tight — meteors are narrow.
-    float across = exp(-vary_coord.y * vary_coord.y * 6.0);
+    // Across-streak: Gaussian falloff, normalized by the meteor's width_scale
+    // so that thick meteors stay solid in the middle instead of looking like a
+    // dim wide quad. y_norm is in [-1, +1] regardless of class.
+    float width_scale = max(vary_color.a, 1e-3);
+    float y_norm = vary_coord.y / width_scale;
+    float across = exp(-y_norm * y_norm * 6.0);
 
     float shape = along * across;
     if (shape < 0.003) discard;
 
-    // Scale by envelope alpha (set CPU-side from age curve).
-    vec3 color = vary_color.rgb * shape * vary_color.a;
+    // Envelope is already pre-multiplied into vary_color.rgb on the CPU side.
+    vec3 color = vary_color.rgb * shape;
 
     // Opt out of haze in the gbuffer flag, same as stars.
     frag_data[1] = vec4(0.0);

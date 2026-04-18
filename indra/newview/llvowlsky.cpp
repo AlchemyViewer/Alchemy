@@ -734,20 +734,84 @@ void LLVOWLSky::tickMeteors(F32 dt_seconds)
         // start_dir. This gives great-circle-like paths.
         LLVector3 travel_dir = randomTangentTo(start_dir);
 
+        // Classify each new meteor into a visual archetype. The weighted mix
+        // makes showers feel alive at high spawn rates — most meteors are
+        // faint and quick, but the occasional fireball with exotic chemistry
+        // colors draws the eye. The cumulative thresholds below are the
+        // probability cutoffs for each class.
+        const F32 roll = ll_frand();
+        F32 width_scale;
+        F32 path_mult  = 1.0f;       // multiplier on both path and trail length
+        F32 life_mult  = 1.0f;       // multiplier on lifetime (shorter = faster)
+        F32 peak;
+        LLColor3 color;
+
+        if (roll < 0.55f)
+        {
+            // Common: faint, thin, cool red-orange. These dominate by count
+            // (matching real meteor distributions) and give the eye a quiet
+            // background of activity.
+            width_scale = 0.55f + 0.25f * ll_frand();
+            peak        = 0.35f + 0.25f * ll_frand();
+            life_mult   = 0.75f + 0.25f * ll_frand();
+            const F32 tk = 2500.0f + 1500.0f * ll_frand();
+            color = blackBodyColor(tk);
+        }
+        else if (roll < 0.85f)
+        {
+            // Standard: yellow-white, the "average" visible meteor.
+            width_scale = 0.85f + 0.35f * ll_frand();
+            peak        = 0.6f + 0.3f * ll_frand();
+            const F32 tk = 4500.0f + 2500.0f * ll_frand();
+            color = blackBodyColor(tk);
+        }
+        else if (roll < 0.96f)
+        {
+            // Fast: hot blue-white, travels farther in the same time so
+            // apparent angular velocity is higher.
+            width_scale = 0.7f + 0.3f * ll_frand();
+            peak        = 0.8f + 0.2f * ll_frand();
+            path_mult   = 1.25f + 0.35f * ll_frand();
+            life_mult   = 0.6f + 0.25f * ll_frand();
+            const F32 tk = 8000.0f + 7000.0f * ll_frand();
+            color = blackBodyColor(tk);
+        }
+        else
+        {
+            // Fireball: thick, bright, persistent. Some roll to an exotic
+            // chemistry color from ablation (Mg, Na, N, Cu) rather than the
+            // usual blackbody curve.
+            width_scale = 1.8f + 1.4f * ll_frand();
+            peak        = 0.9f + 0.1f * ll_frand();
+            path_mult   = 1.3f + 0.4f * ll_frand();
+            life_mult   = 1.1f + 0.4f * ll_frand();
+
+            const F32 chem = ll_frand();
+            if (chem < 0.22f)       color = LLColor3(0.35f, 1.00f, 0.45f);  // magnesium green
+            else if (chem < 0.42f)  color = LLColor3(1.00f, 0.55f, 0.20f);  // sodium orange
+            else if (chem < 0.58f)  color = LLColor3(1.00f, 0.35f, 0.30f);  // nitrogen red
+            else if (chem < 0.72f)  color = LLColor3(0.40f, 0.55f, 1.00f);  // copper/Mg blue
+            else
+            {
+                // Hot white bolide, no exotic chemistry.
+                const F32 tk = 9000.0f + 6000.0f * ll_frand();
+                color = blackBodyColor(tk);
+            }
+        }
+
         MeteorState m;
         m.origin_world      = start_dir * dome_radius;
         m.direction_world   = travel_dir;
-        // Lifetime 0.6..1.6s. Fast streaks that don't overstay their welcome.
-        m.lifetime          = 0.6f + 1.0f * ll_frand();
-        // Angular path length 12..30 degrees. Trail is a fraction of that.
-        const F32 path_angle  = 0.21f + 0.31f * ll_frand();          // radians
+        // Base lifetime 1.1..2.5s. Fast class scales this down, fireballs up,
+        // so the full range across classes is roughly 0.7..3.7s.
+        m.lifetime          = (1.1f + 1.4f * ll_frand()) * life_mult;
+        const F32 path_angle  = (0.21f + 0.31f * ll_frand()) * path_mult;   // radians
         const F32 trail_angle = path_angle * (0.35f + 0.25f * ll_frand());
         m.path_length_world  = dome_radius * path_angle;
         m.trail_length_world = dome_radius * trail_angle;
-        // Slight color variation centered on white-hot.
-        const F32 temperature_K = 4500.0f + 10000.0f * ll_frand();
-        m.color              = blackBodyColor(temperature_K);
-        m.peak_intensity     = 0.7f + 0.3f * ll_frand();
+        m.color              = color;
+        m.peak_intensity     = peak;
+        m.width_scale        = width_scale;
         m.age                = 0.0f;
 
         mMeteors.push_back(m);
@@ -816,11 +880,18 @@ void LLVOWLSky::updateMeteorGeometry()
         const LLVector3 midpoint = (head + tail) * 0.5f;
         const LLVector3 half_vec = (head - tail) * 0.5f;
 
+        // Pack per-frame envelope alpha into the RGB channels (in sRGB space — a
+        // mild nonlinearity vs. linear-space premultiply, but the envelope is
+        // smooth enough that the difference isn't visible). This frees the
+        // color's alpha slot to carry the per-meteor width_scale, which the
+        // fragment shader needs to normalize its cross-streak Gaussian so
+        // thicker meteors are actually thicker (not just bigger empty quads).
         LLColor4 color4;
-        color4.mV[VRED]   = m.color.mV[VRED];
-        color4.mV[VGREEN] = m.color.mV[VGREEN];
-        color4.mV[VBLUE]  = m.color.mV[VBLUE];
-        color4.mV[VALPHA] = alpha;
+        color4.mV[VRED]   = m.color.mV[VRED]   * alpha;
+        color4.mV[VGREEN] = m.color.mV[VGREEN] * alpha;
+        color4.mV[VBLUE]  = m.color.mV[VBLUE]  * alpha;
+        // Width_scale range is [0, 4]; pack as /4 so it fits in 8-bit unsigned.
+        color4.mV[VALPHA] = llclamp(m.width_scale * 0.25f, 0.0f, 1.0f);
         const LLColor4U color_u(color4);
 
         for (U32 v = 0; v < kMeteorVertsPerQuad; ++v)
@@ -828,7 +899,11 @@ void LLVOWLSky::updateMeteorGeometry()
             *(positions++) = midpoint;
             *(normals++)   = half_vec;
             *(colors++)    = color_u;
-            *(texcoords++) = kUV[v];
+            // Scale the cross-streak coordinate by width_scale. The vertex
+            // shader multiplies this by meteor_width_pixels to get the
+            // screen-space half-width; the fragment shader divides by
+            // width_scale to keep the Gaussian shape constant across classes.
+            *(texcoords++) = LLVector2(kUV[v].mV[VX], kUV[v].mV[VY] * m.width_scale);
         }
         ++written;
     }

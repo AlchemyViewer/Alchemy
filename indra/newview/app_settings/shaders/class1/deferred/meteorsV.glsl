@@ -29,10 +29,10 @@ uniform float meteor_width_pixels;
 
 in vec3 position;      // midpoint of meteor in sky-local world space (shared across 6 verts)
 in vec3 normal;        // half-streak vector: position + normal = head, position - normal = tail
-in vec4 diffuse_color; // rgb = sRGB color, a = envelope alpha for this frame
-in vec2 texcoord0;     // (u, v) — u in [-1,1] along streak (tail..head), v in [-1,1] across streak
+in vec4 diffuse_color; // rgb = sRGB color pre-multiplied by envelope alpha, a = width_scale/4
+in vec2 texcoord0;     // (u, v) — u in [-1,1] along streak, v in [-width_scale, +width_scale] across
 
-out vec4 vary_color;
+out vec4 vary_color;   // rgb = envelope-premultiplied linear color, a = width_scale
 out vec2 vary_coord;
 
 vec3 srgb_to_linear(vec3 c)
@@ -47,10 +47,21 @@ void main()
     vec4 clip_mid  = modelview_projection_matrix * vec4(position, 1.0);
     vec4 clip_head = modelview_projection_matrix * vec4(position + normal, 1.0);
 
-    // NDC-space half-streak. Using perspective divide on both then subtracting
-    // gives the correct screen-space vector even under projection.
-    vec2 ndc_mid  = clip_mid.xy  / max(abs(clip_mid.w),  1e-6);
-    vec2 ndc_head = clip_head.xy / max(abs(clip_head.w), 1e-6);
+    // If either endpoint is at or behind the camera, the perspective divide
+    // produces a wildly wrong streak direction and the quad stretches across
+    // the whole screen. Collapse all six verts to the same off-frustum point
+    // so the triangles rasterize to nothing.
+    if (clip_mid.w < 0.01 || clip_head.w < 0.01)
+    {
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        vary_color = vec4(0.0);
+        vary_coord = vec2(0.0);
+        return;
+    }
+
+    // NDC-space half-streak. Both w are strictly positive here.
+    vec2 ndc_mid  = clip_mid.xy  / clip_mid.w;
+    vec2 ndc_head = clip_head.xy / clip_head.w;
     vec2 streak_ndc = ndc_head - ndc_mid;
 
     // Perpendicular in NDC, normalized, scaled to desired pixel width.
@@ -71,6 +82,8 @@ void main()
 
     gl_Position = clip;
 
-    vary_color = vec4(srgb_to_linear(diffuse_color.rgb), diffuse_color.a);
+    // Unpack: alpha channel carries width_scale / 4 (see CPU-side encoding).
+    // RGB is envelope-premultiplied sRGB — linearize and pass through.
+    vary_color = vec4(srgb_to_linear(diffuse_color.rgb), diffuse_color.a * 4.0);
     vary_coord = texcoord0;
 }

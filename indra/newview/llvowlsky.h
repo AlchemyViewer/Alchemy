@@ -100,6 +100,7 @@ private:
         F32       lifetime;            // total seconds to live
         LLColor3  color;               // sRGB color
         F32       peak_intensity;      // 0..1 scale on the envelope peak
+        F32       width_scale;         // per-meteor thickness multiplier (0..4, packed to color.a)
     };
     std::vector<MeteorState> mMeteors;
 };

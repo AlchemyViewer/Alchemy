@@ -321,7 +321,7 @@ void LLDrawPoolWLSky::renderMeteorsDeferred(const LLVector3& camPosLocal) const
     gDeferredMeteorProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
                                      (GLfloat)deferred_target->getWidth(),
                                      (GLfloat)deferred_target->getHeight());
-    gDeferredMeteorProgram.uniform1f(sMeteorWidth, 2.5f);
+    gDeferredMeteorProgram.uniform1f(sMeteorWidth, 1.5f);
 
     gSky.mVOWLSkyp->drawMeteors();
 
