@@ -71,8 +71,11 @@ void main()
     if (hlen < 1e-3) discard;
     vec2  az = horiz / hlen;
 
-    if (elev < 0.01) discard;
-    if (elev > 0.80) discard;   // cap below zenith to avoid azimuthal convergence
+    // Keep a generous performance cap but make sure the visible fade itself is
+    // driven by the smooth envelopes below — a tight discard near the visible
+    // edge produces a hard line where bloom amplifies sub-threshold values.
+    if (elev < -0.05) discard;
+    if (elev > 0.90) discard;
 
     float t = aurora_time;
 
@@ -83,8 +86,10 @@ void main()
     // side. Slow temporal drift reshapes the clusters over minutes.
     float cov_big = valueNoise3D(vec3(az * 1.0, t * 0.03));
     float cov_med = valueNoise3D(vec3(az * 2.8, t * 0.07));
-    float cov     = smoothstep(0.28, 0.85, cov_big * 0.62 + cov_med * 0.38);
-    if (cov < 0.01) discard;
+    // Wider smoothstep so the sub-threshold tail fades smoothly instead of
+    // cutting off at a cov=0.01 edge. Let the final strength discard handle
+    // the "no contribution" case.
+    float cov     = smoothstep(0.22, 0.90, cov_big * 0.62 + cov_med * 0.38);
 
     // ----- Base arc with traveling wave folds -----------------------------
     // The arc's elevation undulates as a sum of waves moving in opposite
@@ -115,24 +120,28 @@ void main()
     n       += 0.14 * valueNoise3D(p * 4.5       + vec3(drift * 1.4, t * 0.22));
     n       += 0.08 * valueNoise3D(p * 9.5       + vec3(drift * 1.9, t * 0.33));
 
-    float curtain_mask = pow(clamp(n * 1.20, 0.0, 1.0), 1.6);
+    // Soft smoothstep instead of clamp+pow so the brightest curtain peaks
+    // don't plateau at 1.0 — that plateau becomes a visible "ceiling" where
+    // the elevation fade then scales it down, producing the hard top edge
+    // the user was seeing.
+    float curtain_mask = pow(smoothstep(0.05, 0.92, n), 1.6);
 
-    // ----- Zenith fade ----------------------------------------------------
-    // Hides the azimuthal coordinate singularity — any ray pattern based
-    // on azimuth converges at zenith, and fading out keeps that region
-    // empty so the convergence never shows.
-    float zenith_fade = smoothstep(0.78, 0.50, elev);
+    // ----- Elevation envelope --------------------------------------------
+    // A single smooth factor for the horizon and zenith transitions,
+    // applied uniformly across body/halo/base_line. The ranges extend
+    // slightly past the visible regions so both ends ease out below the
+    // perceptual threshold rather than ending on a smoothstep knee.
+    float horizon_fade = smoothstep(-0.03, 0.28, elev);
+    float zenith_fade  = smoothstep(0.88, 0.38, elev);
+    float elev_env     = horizon_fade * zenith_fade;
 
     // ----- Body envelope --------------------------------------------------
     // Below-base fade rate softened further (was 7) so the green trails
-    // gradually toward the horizon with no visible edge. The horizon
-    // smoothstep range is widened to give an extended gradient zone
-    // rather than a step near zero elevation.
+    // gradually toward the horizon with no visible edge.
     float body_top = 0.30;
     float body_env = exp(min(d_above, 0.0) * 3.5)
                    * smoothstep(body_top, body_top * 0.15, d_above);
-    body_env *= smoothstep(0.005, 0.22, elev);
-    body_env *= zenith_fade;
+    body_env *= elev_env;
 
     // ----- Top halo -------------------------------------------------------
     // Diffuse pink/purple cap above the body. Overlaps the body top so
@@ -142,8 +151,7 @@ void main()
     float halo_hi  = 0.45;
     float halo_env = smoothstep(halo_lo * 0.40, halo_lo,        d_above)
                    * smoothstep(halo_hi * 1.15, halo_hi * 0.55, d_above);
-    halo_env *= smoothstep(0.005, 0.22, elev);
-    halo_env *= zenith_fade;
+    halo_env *= elev_env;
 
     // Halo modulation is a softened version of the curtain mask — some
     // structure is preserved so bright folds extend their colour up into
@@ -158,8 +166,7 @@ void main()
     float base_line = exp(-pow((d_above - 0.02) * 20.0, 2.0));
     base_line *= smoothstep(-0.22, -0.02, d_above);
     base_line *= 0.45 + 0.55 * valueNoise3D(vec3(az * 6.0, t * 0.10));
-    base_line *= smoothstep(0.005, 0.22, elev);
-    base_line *= zenith_fade;
+    base_line *= elev_env;
 
     // ----- Animation layers -----------------------------------------------
     // Three independent time scales: a slow global breath with an
