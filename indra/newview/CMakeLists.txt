@@ -80,6 +80,11 @@ if (WINDOWS)
     )
   execute_process(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+      "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
+    )
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${BRANDING_SOURCE_DIR}/installer/icons/install_icon.ico"
       "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico"
     )
