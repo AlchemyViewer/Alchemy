@@ -33,6 +33,36 @@
 LLRenderTarget* LLRenderTarget::sBoundTarget = NULL;
 U32 LLRenderTarget::sBytesAllocated = 0;
 
+namespace
+{
+    // Resolve the GL (internal_format, pixel_format, pixel_type, bytes_per_pixel)
+    // for a given depth format and stencil request.
+    struct DepthFormatInfo
+    {
+        U32 internal_format;
+        U32 pixel_format;
+        U32 pixel_type;
+        U32 bytes_per_pixel;
+    };
+
+    DepthFormatInfo get_depth_format_info(LLRenderTarget::eDepthFormat fmt, bool stencil)
+    {
+        if (stencil)
+        {
+            if (fmt == LLRenderTarget::DEPTH_FMT_32F)
+            {
+                return { GL_DEPTH32F_STENCIL8, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, 8 };
+            }
+            return { GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 4 };
+        }
+        if (fmt == LLRenderTarget::DEPTH_FMT_32F)
+        {
+            return { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, 4 };
+        }
+        return { GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 4 };
+    }
+}
+
 void check_framebuffer_status()
 {
     if (gDebugGL)
@@ -65,6 +95,8 @@ LLRenderTarget::LLRenderTarget() :
     mFBO(0),
     mDepth(0),
     mUseDepth(false),
+    mStencil(false),
+    mDepthFormat(DEPTH_FMT_24),
     mUsage(LLTexUnit::TT_TEXTURE)
 {
 }
@@ -95,18 +127,20 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
     {
         gGL.getTexUnit(0)->bindManual(mUsage, mDepth);
         U32 internal_type = LLTexUnit::getInternalType(mUsage);
-        LLImageGL::setManualImage(internal_type, 0, GL_DEPTH_COMPONENT24, mResX, mResY, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL, false);
+        const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
+        LLImageGL::setManualImage(internal_type, 0, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL, false);
 
-        sBytesAllocated += pix_diff*4;
+        sBytesAllocated += pix_diff * static_cast<S32>(info.bytes_per_pixel);
     }
 }
 
 
-bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, LLTexUnit::eTextureType usage, LLTexUnit::eTextureMipGeneration generateMipMaps)
+bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, LLTexUnit::eTextureType usage, LLTexUnit::eTextureMipGeneration generateMipMaps, eDepthFormat depth_fmt)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     llassert(usage == LLTexUnit::TT_TEXTURE);
     llassert(!isBoundInStack());
+    llassert(!stencil || depth); // stencil requires depth
 
     resx = llmin(resx, (U32) gGLManager.mGLMaxTextureSize);
     resy = llmin(resy, (U32) gGLManager.mGLMaxTextureSize);
@@ -118,6 +152,8 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, LLT
 
     mUsage = usage;
     mUseDepth = depth;
+    mStencil = depth && stencil;
+    mDepthFormat = depth_fmt;
 
     mGenerateMipMaps = generateMipMaps;
 
@@ -141,7 +177,8 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, LLT
     {
         glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
 
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, LLTexUnit::getInternalType(mUsage), mDepth, 0);
+        GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, LLTexUnit::getInternalType(mUsage), mDepth, 0);
 
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
     }
@@ -300,10 +337,11 @@ bool LLRenderTarget::allocateDepth()
     U32 internal_type = LLTexUnit::getInternalType(mUsage);
     stop_glerror();
     clear_glerror();
-    LLImageGL::setManualImage(internal_type, 0, GL_DEPTH_COMPONENT24, mResX, mResY, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL, false);
+    const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
+    LLImageGL::setManualImage(internal_type, 0, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL, false);
     gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 
-    sBytesAllocated += mResX*mResY*4;
+    sBytesAllocated += mResX * mResY * info.bytes_per_pixel;
 
     if (glGetError() != GL_NO_ERROR)
     {
@@ -337,13 +375,16 @@ void LLRenderTarget::shareDepthBuffer(LLRenderTarget& target)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, target.mFBO);
 
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, LLTexUnit::getInternalType(mUsage), mDepth, 0);
+        GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, LLTexUnit::getInternalType(mUsage), mDepth, 0);
 
         check_framebuffer_status();
 
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
 
         target.mUseDepth = true;
+        target.mStencil = mStencil;
+        target.mDepthFormat = mDepthFormat;
     }
 }
 
@@ -356,9 +397,12 @@ void LLRenderTarget::release()
     {
         LLImageGL::deleteTextures(1, &mDepth);
 
-        mDepth = 0;
+        const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
+        sBytesAllocated -= mResX * mResY * info.bytes_per_pixel;
 
-        sBytesAllocated -= mResX*mResY*4;
+        mDepth = 0;
+        mStencil = false;
+        mDepthFormat = DEPTH_FMT_24;
     }
     else if (mFBO)
     {
@@ -366,8 +410,11 @@ void LLRenderTarget::release()
 
         if (mUseDepth)
         { //detach shared depth buffer
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, LLTexUnit::getInternalType(mUsage), 0, 0);
+            GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, LLTexUnit::getInternalType(mUsage), 0, 0);
             mUseDepth = false;
+            mStencil = false;
+            mDepthFormat = DEPTH_FMT_24;
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
@@ -455,7 +502,10 @@ void LLRenderTarget::clear(U32 mask_in)
     if (mUseDepth)
     {
         mask |= GL_DEPTH_BUFFER_BIT;
-
+    }
+    if (mStencil)
+    {
+        mask |= GL_STENCIL_BUFFER_BIT;
     }
     if (mFBO)
     {
@@ -575,6 +625,8 @@ void LLRenderTarget::swapFBORefs(LLRenderTarget& other)
     llassert(mTex.size() == other.mTex.size());
     llassert(mDepth == other.mDepth);
     llassert(mUseDepth == other.mUseDepth);
+    llassert(mStencil == other.mStencil);
+    llassert(mDepthFormat == other.mDepthFormat);
     llassert(mGenerateMipMaps == other.mGenerateMipMaps);
     llassert(mMipLevels == other.mMipLevels);
     llassert(mUsage == other.mUsage);
