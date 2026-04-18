@@ -37,7 +37,6 @@
       "name": "fontconfig",
       "platform": "linux"
     },
-    "freealut",
     {
       "name": "freetype",
       "features": [

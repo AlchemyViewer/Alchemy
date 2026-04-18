@@ -12,6 +12,6 @@ if(PORT MATCHES "hunspell")
     set(VCPKG_LIBRARY_LINKAGE dynamic)
 endif()
 
-if(PORT MATCHES "freealut" OR PORT MATCHES "openal-soft")
+if(PORT MATCHES "openal-soft")
     set(VCPKG_LIBRARY_LINKAGE dynamic)
 endif()

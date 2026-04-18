@@ -27,9 +27,13 @@
 
 #include "linden_common.h"
 #include "lldir.h"
+#include "llfile.h"
 
 #include "llaudioengine_openal.h"
 #include "lllistener_openal.h"
+
+#include <cstring>
+#include <vector>
 
 
 const float LLAudioEngine_OpenAL::WIND_BUFFER_SIZE_SEC = 0.05f;
@@ -57,9 +61,31 @@ bool LLAudioEngine_OpenAL::init(void* userdata, const std::string &app_title)
     mWindGen = NULL;
     LLAudioEngine::init(userdata, app_title);
 
-    if(!alutInit(NULL, NULL))
+    mALCDevice = alcOpenDevice(NULL);
+    if (!mALCDevice)
     {
-        LL_WARNS() << "LLAudioEngine_OpenAL::init() ALUT initialization failed: " << alutGetErrorString (alutGetError ()) << LL_ENDL;
+        LL_WARNS() << "LLAudioEngine_OpenAL::init() Could not open default ALC device" << LL_ENDL;
+        return false;
+    }
+
+    mALCContext = alcCreateContext(mALCDevice, NULL);
+    if (!mALCContext)
+    {
+        LL_WARNS() << "LLAudioEngine_OpenAL::init() Could not create ALC context: 0x"
+                   << std::hex << alcGetError(mALCDevice) << std::dec << LL_ENDL;
+        alcCloseDevice(mALCDevice);
+        mALCDevice = NULL;
+        return false;
+    }
+
+    if (!alcMakeContextCurrent(mALCContext))
+    {
+        LL_WARNS() << "LLAudioEngine_OpenAL::init() Could not make ALC context current: 0x"
+                   << std::hex << alcGetError(mALCDevice) << std::dec << LL_ENDL;
+        alcDestroyContext(mALCContext);
+        alcCloseDevice(mALCDevice);
+        mALCContext = NULL;
+        mALCDevice = NULL;
         return false;
     }
 
@@ -72,18 +98,14 @@ bool LLAudioEngine_OpenAL::init(void* userdata, const std::string &app_title)
     LL_INFOS() << "OpenAL renderer: "
         << ll_safe_string(alGetString(AL_RENDERER)) << LL_ENDL;
 
-    ALint major = alutGetMajorVersion ();
-    ALint minor = alutGetMinorVersion ();
-    LL_INFOS() << "ALUT version: " << major << "." << minor << LL_ENDL;
-
-    ALCdevice *device = alcGetContextsDevice(alcGetCurrentContext());
-
-    alcGetIntegerv(device, ALC_MAJOR_VERSION, 1, &major);
-    alcGetIntegerv(device, ALC_MINOR_VERSION, 1, &minor);
+    ALint major = 0;
+    ALint minor = 0;
+    alcGetIntegerv(mALCDevice, ALC_MAJOR_VERSION, 1, &major);
+    alcGetIntegerv(mALCDevice, ALC_MINOR_VERSION, 1, &minor);
     LL_INFOS() << "ALC version: " << major << "." << minor << LL_ENDL;
 
     LL_INFOS() << "ALC default device: "
-        << ll_safe_string(alcGetString(device,
+        << ll_safe_string(alcGetString(mALCDevice,
                            ALC_DEFAULT_DEVICE_SPECIFIER))
         << LL_ENDL;
 
@@ -93,7 +115,6 @@ bool LLAudioEngine_OpenAL::init(void* userdata, const std::string &app_title)
 // virtual
 std::string LLAudioEngine_OpenAL::getDriverName(bool verbose)
 {
-    ALCdevice *device = alcGetContextsDevice(alcGetCurrentContext());
     std::ostringstream version;
 
     version <<
@@ -109,10 +130,10 @@ std::string LLAudioEngine_OpenAL::getDriverName(bool verbose)
             " / " <<
             ll_safe_string(alGetString(AL_RENDERER));
 
-        if (device)
+        if (mALCDevice)
             version <<
                 ": " <<
-                ll_safe_string(alcGetString(device,
+                ll_safe_string(alcGetString(mALCDevice,
                     ALC_DEFAULT_DEVICE_SPECIFIER));
     }
 
@@ -135,20 +156,22 @@ void LLAudioEngine_OpenAL::shutdown()
     LL_INFOS() << "About to LLAudioEngine::shutdown()" << LL_ENDL;
     LLAudioEngine::shutdown();
 
-    // If a subsequent error occurs while there is still an error recorded
-    // internally, the second error will simply be ignored.
-    // Clear previous error to make sure we will captuare a valid failure reason
-    ALenum error = alutGetError();
-    if (error != ALUT_ERROR_NO_ERROR)
-    {
-        LL_WARNS() << "Uncleared error state prior to shutdown: "
-            << alutGetErrorString(error) << LL_ENDL;
-    }
+    LL_INFOS() << "About to tear down OpenAL context/device" << LL_ENDL;
 
-    LL_INFOS() << "About to alutExit()" << LL_ENDL;
-    if(!alutExit())
+    if (mALCContext)
     {
-        LL_WARNS() << "LLAudioEngine_OpenAL::shutdown() ALUT shutdown failed: " << alutGetErrorString (alutGetError ()) << LL_ENDL;
+        alcMakeContextCurrent(NULL);
+        alcDestroyContext(mALCContext);
+        mALCContext = NULL;
+    }
+    if (mALCDevice)
+    {
+        if (!alcCloseDevice(mALCDevice))
+        {
+            LL_WARNS() << "LLAudioEngine_OpenAL::shutdown() alcCloseDevice failed: 0x"
+                       << std::hex << alcGetError(mALCDevice) << std::dec << LL_ENDL;
+        }
+        mALCDevice = NULL;
     }
 
     LL_INFOS() << "LLAudioEngine_OpenAL::shutdown() OpenAL successfully shut down" << LL_ENDL;
@@ -341,37 +364,182 @@ void LLAudioBufferOpenAL::cleanup()
         alGetError(); // clear error
         alDeleteBuffers(1, &mALBuffer);
 
-        ALenum error = alutGetError();
-        if(ALC_NO_ERROR != error)
+        ALenum error = alGetError();
+        if(AL_NO_ERROR != error)
         {
-            LL_WARNS("OpenAL") << "Error: " << alutGetErrorString( error ) << " when cleaning up a buffer" << LL_ENDL;
+            LL_WARNS("OpenAL") << "Error: 0x" << std::hex << error << std::dec
+                << " when cleaning up a buffer" << LL_ENDL;
         }
         mALBuffer = AL_NONE;
+    }
+}
+
+namespace
+{
+    inline U16 read_u16_le(const U8* p) { return (U16)p[0] | ((U16)p[1] << 8); }
+    inline U32 read_u32_le(const U8* p)
+    {
+        return (U32)p[0] | ((U32)p[1] << 8) | ((U32)p[2] << 16) | ((U32)p[3] << 24);
     }
 }
 
 bool LLAudioBufferOpenAL::loadWAV(const std::string& filename)
 {
     cleanup();
-    mALBuffer = alutCreateBufferFromFile(filename.c_str());
-    if(mALBuffer == AL_NONE)
+
+    if (filename.empty())
     {
-        ALenum error = alutGetError();
+        return false;
+    }
+
+    llifstream infile(filename, std::ios::in | std::ios::binary);
+    if (!infile)
+    {
         if (LLFile::isfile(filename))
         {
-            LL_WARNS() <<
-                "LLAudioBufferOpenAL::loadWAV() Error loading "
-                << filename
-                << " " << alutGetErrorString(error) << LL_ENDL;
+            LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Unable to open "
+                << filename << LL_ENDL;
         }
         else
         {
             // It's common for the file to not actually exist.
-            LL_DEBUGS() <<
-                "LLAudioBufferOpenAL::loadWAV() Error loading "
-                 << filename
-                 << " " << alutGetErrorString(error) << LL_ENDL;
+            LL_DEBUGS() << "LLAudioBufferOpenAL::loadWAV() File missing "
+                << filename << LL_ENDL;
         }
+        return false;
+    }
+
+    U8 riff[12];
+    infile.read(reinterpret_cast<char*>(riff), sizeof(riff));
+    if (!infile || static_cast<size_t>(infile.gcount()) != sizeof(riff)
+        || memcmp(riff, "RIFF", 4) != 0
+        || memcmp(riff + 8, "WAVE", 4) != 0)
+    {
+        LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Not a RIFF/WAVE file: "
+            << filename << LL_ENDL;
+        return false;
+    }
+
+    U16 format_tag = 0;
+    U16 channels = 0;
+    U32 sample_rate = 0;
+    U16 bits_per_sample = 0;
+    std::vector<U8> pcm_data;
+    bool have_fmt = false;
+    bool have_data = false;
+
+    while (infile)
+    {
+        U8 chunk_hdr[8];
+        infile.read(reinterpret_cast<char*>(chunk_hdr), sizeof(chunk_hdr));
+        if (static_cast<size_t>(infile.gcount()) != sizeof(chunk_hdr))
+        {
+            break;
+        }
+        U32 chunk_size = read_u32_le(chunk_hdr + 4);
+
+        if (memcmp(chunk_hdr, "fmt ", 4) == 0)
+        {
+            if (chunk_size < 16)
+            {
+                LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Malformed fmt chunk in "
+                    << filename << LL_ENDL;
+                return false;
+            }
+            std::vector<U8> fmt(chunk_size);
+            infile.read(reinterpret_cast<char*>(fmt.data()), chunk_size);
+            if (static_cast<U32>(infile.gcount()) != chunk_size)
+            {
+                LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Truncated fmt chunk in "
+                    << filename << LL_ENDL;
+                return false;
+            }
+            format_tag      = read_u16_le(fmt.data() + 0);
+            channels        = read_u16_le(fmt.data() + 2);
+            sample_rate     = read_u32_le(fmt.data() + 4);
+            bits_per_sample = read_u16_le(fmt.data() + 14);
+            have_fmt = true;
+        }
+        else if (memcmp(chunk_hdr, "data", 4) == 0)
+        {
+            pcm_data.resize(chunk_size);
+            if (chunk_size > 0)
+            {
+                infile.read(reinterpret_cast<char*>(pcm_data.data()), chunk_size);
+                if (static_cast<U32>(infile.gcount()) != chunk_size)
+                {
+                    LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Truncated data chunk in "
+                        << filename << LL_ENDL;
+                    return false;
+                }
+            }
+            have_data = true;
+            break;
+        }
+        else
+        {
+            U32 padded = chunk_size + (chunk_size & 1);
+            infile.seekg(padded, std::ios::cur);
+        }
+    }
+
+    if (!have_fmt || !have_data)
+    {
+        LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Missing fmt or data chunk in "
+            << filename << LL_ENDL;
+        return false;
+    }
+
+    if (format_tag != 1 /* WAVE_FORMAT_PCM */)
+    {
+        LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Unsupported WAV format 0x"
+            << std::hex << format_tag << std::dec
+            << " (only PCM is supported) in " << filename << LL_ENDL;
+        return false;
+    }
+
+    if (channels == 0 || sample_rate == 0)
+    {
+        LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Invalid fmt chunk ("
+            << channels << "ch @ " << sample_rate << "Hz) in "
+            << filename << LL_ENDL;
+        return false;
+    }
+
+    ALenum al_format = AL_NONE;
+    if (channels == 1 && bits_per_sample == 8)       al_format = AL_FORMAT_MONO8;
+    else if (channels == 1 && bits_per_sample == 16) al_format = AL_FORMAT_MONO16;
+    else if (channels == 2 && bits_per_sample == 8)  al_format = AL_FORMAT_STEREO8;
+    else if (channels == 2 && bits_per_sample == 16) al_format = AL_FORMAT_STEREO16;
+    else
+    {
+        LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Unsupported PCM layout: "
+            << channels << "ch " << bits_per_sample << "-bit in "
+            << filename << LL_ENDL;
+        return false;
+    }
+
+    alGetError(); // clear
+    alGenBuffers(1, &mALBuffer);
+    ALenum err = alGetError();
+    if (err != AL_NO_ERROR || mALBuffer == AL_NONE)
+    {
+        LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() alGenBuffers failed: 0x"
+            << std::hex << err << std::dec << LL_ENDL;
+        mALBuffer = AL_NONE;
+        return false;
+    }
+
+    alBufferData(mALBuffer, al_format, pcm_data.data(),
+                 static_cast<ALsizei>(pcm_data.size()),
+                 static_cast<ALsizei>(sample_rate));
+    err = alGetError();
+    if (err != AL_NO_ERROR)
+    {
+        LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() alBufferData failed: 0x"
+            << std::hex << err << std::dec << " for " << filename << LL_ENDL;
+        alDeleteBuffers(1, &mALBuffer);
+        mALBuffer = AL_NONE;
         return false;
     }
 

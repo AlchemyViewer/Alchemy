@@ -6,6 +6,5 @@ if (USE_OPENAL)
     target_compile_definitions( ll::openal INTERFACE LL_OPENAL=1)
 
     find_package(OpenAL CONFIG REQUIRED)
-    find_package(FreeALUT CONFIG REQUIRED)
-    target_link_libraries(ll::openal INTERFACE FreeALUT::alut OpenAL::OpenAL)
+    target_link_libraries(ll::openal INTERFACE OpenAL::OpenAL)
 endif ()
