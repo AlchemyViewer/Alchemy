@@ -335,6 +335,9 @@ S32 LLImageGL::dataFormatBits(S32 dataformat)
     case GL_BGRA:                                   return 32;      // Used for QuickTime media textures on the Mac
     case GL_DEPTH_COMPONENT:                        return 24;
     case GL_DEPTH_COMPONENT24:                      return 24;
+    case GL_DEPTH_COMPONENT32F:                     return 32;
+    case GL_DEPTH24_STENCIL8:                       return 32;
+    case GL_DEPTH32F_STENCIL8:                      return 64; // 32 for depth, 8 for stencil, stencil is still allocated as 24+8 internally GL_FLOAT_32_UNSIGNED_INT_24_8_REV
     case GL_RGBA16:                                 return 64;
     case GL_R16F:                                   return 16;
     case GL_RG16F:                                  return 32;

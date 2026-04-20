@@ -947,10 +947,17 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
         if (RenderFSAAType > 0)
         {
-            if (!mFXAAMap.allocate(resX, resY, post_color_fmt)) return false;
+            // SMAA benefits from a stencil buffer shared across its passes so the
+            // blend-weights pass can skip non-edge pixels marked during edge detect.
+            bool smaa_stencil = (RenderFSAAType == 2) && gSavedSettings.getBOOL("RenderSMAAUseStencil");
+            if (!mFXAAMap.allocate(resX, resY, post_color_fmt, smaa_stencil, smaa_stencil)) return false;
             if (RenderFSAAType == 2)
             {
                 if (!mSMAABlendBuffer.allocate(resX, resY, post_color_fmt, false)) return false;
+                if (smaa_stencil)
+                {
+                    mFXAAMap.shareDepthBuffer(mSMAABlendBuffer);
+                }
             }
         }
         else
@@ -1251,6 +1258,7 @@ void LLPipeline::releaseGLBuffers()
     mPostPongMap.release();
 
     mFXAAMap.release();
+    mSMAABlendBuffer.release();
 
     mUIScreen.release();
 
@@ -8219,20 +8227,21 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
 
         float rt_metrics[] = { 1.f / width, 1.f / height, (float)width, (float)height };
 
-        LLGLDepthTest    depth(GL_FALSE, GL_FALSE);
+        LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
         static LLCachedControl<bool> use_sample(gSavedSettings, "RenderSMAAUseSample", false);
         static LLCachedControl<bool> use_predication(gSavedSettings, "RenderSMAAPredication", true);
-        //static LLCachedControl<bool> use_stencil(gSavedSettings, "RenderSMAAUseStencil", true);
+        static LLCachedControl<bool> use_stencil_setting(gSavedSettings, "RenderSMAAUseStencil", true);
+        // Stencil optimization requires all three passes to share the same stencil attachment.
+        bool use_stencil = use_stencil_setting && mFXAAMap.hasStencil() && mSMAABlendBuffer.hasStencil();
+        LLGLState stencil(GL_STENCIL_TEST, use_stencil);
         {
-            //LLGLState stencil(GL_STENCIL_TEST, use_stencil);
-
             // Bind setup:
             LLRenderTarget& dest = mFXAAMap;
             LLGLSLShader& edge_shader = gSMAAEdgeDetectProgram[fsaa_quality];
 
             dest.bindTarget();
-            dest.clear(GL_COLOR_BUFFER_BIT);
+            dest.clear(use_stencil ? (GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT) : GL_COLOR_BUFFER_BIT);
 
             edge_shader.bind();
             edge_shader.uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
@@ -8264,12 +8273,12 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
                 }
             }
 
-            //if (use_stencil)
-            //{
-            //    glStencilFunc(GL_ALWAYS, 1, 0xFF);
-            //    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-            //    glStencilMask(0xFF);
-            //}
+            if (use_stencil)
+            {
+                glStencilFunc(GL_ALWAYS, 1, 0xFF);
+                glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+                glStencilMask(0xFF);
+            }
             mScreenTriangleVB->setBuffer();
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
@@ -8284,13 +8293,12 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
         }
 
         {
-            //LLGLState stencil(GL_STENCIL_TEST, use_stencil);
-
             // Bind setup:
             LLRenderTarget& dest = mSMAABlendBuffer;
             LLGLSLShader& blend_weights_shader = gSMAABlendWeightsProgram[fsaa_quality];
 
             dest.bindTarget();
+            // Preserve the stencil mask written by the edge-detect pass.
             dest.clear(GL_COLOR_BUFFER_BIT);
 
             blend_weights_shader.bind();
@@ -8317,17 +8325,18 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
                 gGL.getTexUnit(search_tex_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
             }
 
-            //if (use_stencil)
-            //{
-            //    glStencilFunc(GL_EQUAL, 1, 0xFF);
-            //    glStencilMask(0x00);
-            //}
+            if (use_stencil)
+            {
+                glStencilFunc(GL_EQUAL, 1, 0xFF);
+                glStencilMask(0x00);
+            }
             mScreenTriangleVB->setBuffer();
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-            //if (use_stencil)
-            //{
-            //    glStencilFunc(GL_ALWAYS, 0, 0xFF);
-            //}
+            if (use_stencil)
+            {
+                glStencilFunc(GL_ALWAYS, 0, 0xFF);
+                glStencilMask(0xFF);
+            }
             blend_weights_shader.unbind();
             dest.flush();
             gGL.getTexUnit(edge_tex_channel)->unbindFast(LLTexUnit::TT_TEXTURE);
@@ -8357,11 +8366,8 @@ void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst)
         LLGLDepthTest    depth(GL_FALSE, GL_FALSE);
 
         static LLCachedControl<bool> use_sample(gSavedSettings, "RenderSMAAUseSample", false);
-        //static LLCachedControl<bool> use_stencil(gSavedSettings, "RenderSMAAUseStencil", true);
 
         {
-            //LLGLDisable stencil(GL_STENCIL_TEST);
-
             // Bind setup:
             LLRenderTarget* bound_target = dst;
             LLGLSLShader& blend_shader = gSMAANeighborhoodBlendProgram[fsaa_quality];

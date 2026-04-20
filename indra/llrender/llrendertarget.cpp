@@ -61,21 +61,21 @@ namespace
         }
         return { GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 4 };
     }
-}
 
-void check_framebuffer_status()
-{
-    if (gDebugGL)
+    void check_framebuffer_status()
     {
-        GLenum status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
-        switch (status)
+        if (gDebugGL)
         {
-        case GL_FRAMEBUFFER_COMPLETE:
-            break;
-        default:
-            LL_WARNS() << "check_framebuffer_status failed -- " << std::hex << status << LL_ENDL;
-            ll_fail("check_framebuffer_status failed");
-            break;
+            GLenum status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+            switch (status)
+            {
+                case GL_FRAMEBUFFER_COMPLETE:
+                    break;
+                default:
+                    LL_WARNS() << "check_framebuffer_status failed -- " << std::hex << status << LL_ENDL;
+                    ll_fail("check_framebuffer_status failed");
+                    break;
+            }
         }
     }
 }

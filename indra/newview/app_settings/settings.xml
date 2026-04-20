@@ -9147,6 +9147,17 @@
       <key>Value</key>
       <real>0.4</real>
     </map>
+    <key>RenderSMAAUseStencil</key>
+    <map>
+      <key>Comment</key>
+      <string>Use a stencil mask written by SMAA edge detection to skip blend-weight computation on non-edge pixels.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>RenderFarClip</key>
     <map>
       <key>Comment</key>
