@@ -168,6 +168,7 @@ if(WINDOWS)
 
   # Options shared between all configurations
   add_compile_options(
+    /utf-8  # matches macOS and Linux behaviors and allows unicode in source files
     /bigobj # Generated template code can be large
     /EHsc
     /Gy
