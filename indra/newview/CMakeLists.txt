@@ -2210,6 +2210,7 @@ if(IS_DIRECTORY ${LOCAL_DIST_DIR})
       "--generator=${CMAKE_GENERATOR}"
       --grid=${GRID}
       --source=${CMAKE_CURRENT_SOURCE_DIR}
+      "--velopack=${USE_VELOPACK}"
       --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
       --touch=${LOCAL_DIST_DIR}/.${product}.copy_touched
       --vcpkg_dir=${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}

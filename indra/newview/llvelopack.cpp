@@ -558,8 +558,9 @@ static void register_uninstall_info(const std::wstring& install_dir,
                       (BYTE*)app_name.c_str(), (DWORD)((app_name.size() + 1) * sizeof(wchar_t)));
         RegSetValueExW(hkey, L"DisplayVersion", 0, REG_SZ,
                       (BYTE*)version.c_str(), (DWORD)((version.size() + 1) * sizeof(wchar_t)));
+        const std::wstring publisher_string(L"Alchemy Development Group");
         RegSetValueExW(hkey, L"Publisher", 0, REG_SZ,
-                      (BYTE*)L"Alchemy Development Group", 44);
+                      (BYTE*)publisher_string.c_str(), (DWORD)((publisher_string.size() + 1) * sizeof(wchar_t)));
         RegSetValueExW(hkey, L"UninstallString", 0, REG_SZ,
                       (BYTE*)uninstall_cmd.c_str(), (DWORD)((uninstall_cmd.size() + 1) * sizeof(wchar_t)));
         RegSetValueExW(hkey, L"DisplayIcon", 0, REG_SZ,

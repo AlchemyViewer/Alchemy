@@ -1197,6 +1197,9 @@ bool LLAppViewer::init()
         initVVMUpdateCheck();
     }
     else
+    {
+        LL_WARNS("InitInfo") << "Skipping updater check." << LL_ENDL;
+    }
 #endif //LL_RELEASE_FOR_DOWNLOAD
 
     {

@@ -2209,6 +2209,11 @@ void LLPreviewLSL::onLoadComplete(const LLUUID& asset_uuid, LLAssetType::EType t
 
             if (compile_target.empty())
             {
+                if (!is_lua)
+                {
+                    // No language info from inventory metadata; fall back to content analysis.
+                    is_lua = is_lua_script(std::string(&buffer[0], file_length));
+                }
                 compile_target = is_lua ? "luau" : "mono";
             }
 
@@ -2552,6 +2557,29 @@ void LLLiveLSLEditor::loadScriptText(const LLUUID &uuid, LLAssetType::EType type
         script_name = inv_item->getName();
     }
     mScriptEd->setScriptName(script_name);
+
+    // Detect language from inventory metadata, with content-based fallback.
+    bool is_lua = false;
+    std::string compile_target;
+    if (inv_item)
+    {
+        U8 subtype          = inv_item->getInventorySubType();
+        std::string runtime = inv_item->getRuntime();
+        is_lua = (subtype == SST_LUA);
+        if (!is_lua && (runtime == "luau"))
+            compile_target = "lsl-luau";
+        else
+            compile_target = runtime;
+    }
+    if (compile_target.empty())
+    {
+        if (!is_lua)
+            is_lua = is_lua_script(std::string(&buffer[0], file_length));
+        compile_target = is_lua ? "luau" : "mono";
+    }
+    mScriptEd->mCompileTarget->setValue(compile_target);
+    mScriptEd->mEditor->setLuauLanguage(is_lua);
+    mScriptEd->processKeywords(is_lua);
 }
 
 

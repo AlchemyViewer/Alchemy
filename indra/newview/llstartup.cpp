@@ -2677,7 +2677,7 @@ void release_notes_coro(const std::string url)
 */
 void uninstall_nsis_if_required()
 {
-#if 0
+#if 0 // Alchemy UNUSED
     bool checked_for_legacy_install = gSavedSettings.getBOOL("PreviousInstallChecked");
     if (checked_for_legacy_install)
     {
