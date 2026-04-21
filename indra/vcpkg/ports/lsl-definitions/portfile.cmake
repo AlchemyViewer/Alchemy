@@ -4,7 +4,7 @@ vcpkg_download_distfile(
     LSL_ARCHIVE
     URLS "https://github.com/secondlife/lsl-definitions/releases/download/v${VERSION}/lsl-definitions.zip"
     FILENAME lsl-definitions.${VERSION}.zip
-    SHA512 683fe6ced78863fdf24e552ce029f48753d3115a4d3f74df9067d81150abf4ef9b27a78674e4216d522fb3757a1c880e26ff517baec0a4c264ddb366c4dff8d4
+    SHA512 a12225cecb51ab0cb708a5bd0e80d85f43f086d3d1bf80c9166d014c4f207a783f792cad7db83da3f6d8b7478e9e07a15e45f32b45c5c2eb4069f4a0fbba89b9
 )
 
 vcpkg_extract_source_archive(LSL_DIR ARCHIVE ${LSL_ARCHIVE} NO_REMOVE_ONE_LEVEL)
