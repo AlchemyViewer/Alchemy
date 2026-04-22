@@ -1,4 +1,4 @@
-version 58
+version 59
 // The version number above should be incremented IF AND ONLY IF some
 // change has been made that is sufficiently important to justify
 // resetting the graphics preferences of all users to the recommended
@@ -81,7 +81,7 @@ RenderHeroProbeConservativeUpdateMultiplier 1 16
 RenderDownScaleMethod       1   0
 RenderCASSharpness          1   1
 RenderExposure				1   4
-AlchemyRenderTonemapType			1   1
+AlchemyRenderTonemapType	1   2
 RenderTonemapMix			1   1
 RenderDisableVintageMode           1   1
 RenderMaxTextureResolution         1   2048
@@ -124,8 +124,8 @@ RenderHeroProbeUpdateRate	1	6
 RenderHeroProbeConservativeUpdateMultiplier 1 16
 RenderCASSharpness          1   0
 RenderExposure				1   1
-AlchemyRenderTonemapType			1   1
-RenderTonemapMix			1   0.7
+AlchemyRenderTonemapType	1   2
+RenderTonemapMix			1   1
 RenderDisableVintageMode           1   0
 RenderMaxTextureResolution         1   512
 RenderReflectionProbeCount  1   1
@@ -166,8 +166,8 @@ RenderHeroProbeUpdateRate	1	3
 RenderHeroProbeConservativeUpdateMultiplier 1 16
 RenderCASSharpness          1   0
 RenderExposure				1   1
-AlchemyRenderTonemapType			1   1
-RenderTonemapMix			1   0.7
+AlchemyRenderTonemapType	1   2
+RenderTonemapMix			1   1
 RenderDisableVintageMode           1   0
 RenderMaxTextureResolution         1   1024
 RenderReflectionProbeCount  1   32
@@ -208,8 +208,8 @@ RenderHeroProbeUpdateRate	1	3
 RenderHeroProbeConservativeUpdateMultiplier 1 16
 RenderCASSharpness          1   0
 RenderExposure				1   1
-AlchemyRenderTonemapType			1   1
-RenderTonemapMix			1   0.7
+AlchemyRenderTonemapType	1   2
+RenderTonemapMix			1   1
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   64
 
@@ -249,8 +249,8 @@ RenderHeroProbeUpdateRate	1	2
 RenderHeroProbeConservativeUpdateMultiplier 1 8
 RenderCASSharpness          1   0
 RenderExposure				1   1
-AlchemyRenderTonemapType			1   1
-RenderTonemapMix			1   0.7
+AlchemyRenderTonemapType	1   2
+RenderTonemapMix			1   1
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   64
 
@@ -290,8 +290,8 @@ RenderHeroProbeUpdateRate	1	2
 RenderHeroProbeConservativeUpdateMultiplier 1 8
 RenderCASSharpness          1   0.4
 RenderExposure				1   1
-AlchemyRenderTonemapType			1   1
-RenderTonemapMix			1   0.7
+AlchemyRenderTonemapType	1   2
+RenderTonemapMix			1   1
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   128
 
@@ -331,8 +331,8 @@ RenderHeroProbeUpdateRate	1	1
 RenderHeroProbeConservativeUpdateMultiplier 1 4
 RenderCASSharpness          1   0.4
 RenderExposure				1   1
-AlchemyRenderTonemapType			1   1
-RenderTonemapMix			1   0.7
+AlchemyRenderTonemapType	1   2
+RenderTonemapMix			1   1
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   256
 
@@ -372,8 +372,8 @@ RenderHeroProbeUpdateRate	1	1
 RenderHeroProbeConservativeUpdateMultiplier 1 4
 RenderCASSharpness          1   0.4
 RenderExposure				1   1
-AlchemyRenderTonemapType			1   1
-RenderTonemapMix			1   0.7
+AlchemyRenderTonemapType	1   2
+RenderTonemapMix			1   1
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   256
 
