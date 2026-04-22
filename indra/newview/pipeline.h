@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -158,6 +161,8 @@ public:
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
     void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade);
     void generateGlow(LLRenderTarget* src);
+    void generateBloomHDR(LLRenderTarget* src);
+    void compositeBloomHDR(LLRenderTarget* scene);
     void applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
     void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
     void generateSMAABuffers(LLRenderTarget* src);
@@ -795,6 +800,12 @@ public:
 
     //texture for making the glow
     LLRenderTarget              mGlow[3];
+
+    // HDR bloom pyramid (RGB = bloom, A = halation intensity).
+    // mBloomMip[0] is full-res extract; subsequent levels are halved.
+    static const U32            BLOOM_MAX_MIPS = 7;
+    LLRenderTarget              mBloomMip[BLOOM_MAX_MIPS];
+    U32                         mBloomMipCount = 0;
 
     //noise map
     U32                 mNoiseMap;

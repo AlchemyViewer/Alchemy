@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -154,6 +157,18 @@ public:
         GLOW_DELTA,                         //  "glowDelta"
         GLOW_NOISE_MAP,                     //  "glowNoiseMap"
 
+        BLOOM_THRESHOLD,                    //  "bloom_threshold"
+        BLOOM_KNEE,                         //  "bloom_knee"
+        BLOOM_TEXEL_SIZE,                   //  "bloom_texel_size"
+        BLOOM_SCATTER,                      //  "bloom_scatter"
+        BLOOM_STRENGTH,                     //  "bloom_strength"
+        BLOOM_ALPHA_GLOW_BOOST,             //  "alpha_glow_boost"
+        BLOOM_SAMPLER,                      //  "bloomMap"
+        HALATION_SAMPLER,                   //  "halationMap"
+        HALATION_STRENGTH,                  //  "halation_strength"
+        HALATION_TINT,                      //  "halation_tint"
+        HALATION_LUM_WEIGHTS,               //  "halation_lum_weights"
+
         MINIMUM_ALPHA,                      //  "minimum_alpha"
         EMISSIVE_BRIGHTNESS,                //  "emissive_brightness"
 
@@ -224,7 +239,6 @@ public:
         DEFERRED_NOISE,                     //  "noiseMap"
         DEFERRED_LIGHTFUNC,                 //  "lightFunc"
         DEFERRED_LIGHT,                     //  "lightMap"
-        DEFERRED_BLOOM,                     //  "bloomMap"
         DEFERRED_PROJECTION,                //  "projectionMap"
         DEFERRED_NORM_MATRIX,               //  "norm_mat"
         SPECULAR_COLOR,                     //  "specular_color"

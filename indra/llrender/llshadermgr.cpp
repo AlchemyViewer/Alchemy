@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -1352,6 +1355,20 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     llassert(mReservedUniforms.size() == LLShaderMgr::GLOW_NOISE_MAP+1);
 
+    mReservedUniforms.push_back("bloom_threshold");
+    mReservedUniforms.push_back("bloom_knee");
+    mReservedUniforms.push_back("bloom_texel_size");
+    mReservedUniforms.push_back("bloom_scatter");
+    mReservedUniforms.push_back("bloom_strength");
+    mReservedUniforms.push_back("alpha_glow_boost");
+    mReservedUniforms.push_back("bloomMap");
+    mReservedUniforms.push_back("halationMap");
+    mReservedUniforms.push_back("halation_strength");
+    mReservedUniforms.push_back("halation_tint");
+    mReservedUniforms.push_back("halation_lum_weights");
+
+    llassert(mReservedUniforms.size() == LLShaderMgr::HALATION_LUM_WEIGHTS+1);
+
 
     mReservedUniforms.push_back("minimum_alpha");
     mReservedUniforms.push_back("emissive_brightness");
@@ -1429,7 +1446,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("noiseMap");
     mReservedUniforms.push_back("lightFunc");
     mReservedUniforms.push_back("lightMap");
-    mReservedUniforms.push_back("bloomMap");
     mReservedUniforms.push_back("projectionMap");
     mReservedUniforms.push_back("norm_mat");
 

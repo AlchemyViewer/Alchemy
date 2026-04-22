@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -981,6 +984,30 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         mPostPingMap.allocate(resX, resY, post_color_fmt);
         mPostPongMap.allocate(resX, resY, post_color_fmt);
 
+        // HDR bloom pyramid. Level 0 is full-res; each subsequent level halves.
+        // When halation is enabled the alpha channel carries the warmth signal, so
+        // we need RGBA16F. With halation off we drop to R11F_G11F_B10F for half the
+        // bandwidth on the pyramid hot path.
+        const S32 bloom_mip_setting = llclamp(gSavedSettings.getS32("RenderBloomMipCount"), 3, (S32)BLOOM_MAX_MIPS);
+        const bool bloom_halation = gSavedSettings.getBOOL("RenderBloomHalation");
+        const U32 bloom_format = bloom_halation ? GL_RGBA16F : GL_R11F_G11F_B10F;
+        mBloomMipCount = 0;
+        for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
+        {
+            mBloomMip[i].release();
+        }
+        for (S32 i = 0; i < bloom_mip_setting; i++)
+        {
+            U32 mw = llmax(1u, resX >> i);
+            U32 mh = llmax(1u, resY >> i);
+            if (!mBloomMip[i].allocate(mw, mh, bloom_format))
+            {
+                break;
+            }
+            ++mBloomMipCount;
+            if (mw == 1 && mh == 1) break;
+        }
+
         // The water exclusion mask needs its own depth buffer so we can take care of the problem of multiple water planes.
         // Should we ever make water not just a plane, it also aids with that as well as the water planes will be rendered into the mask.
         // Why do we do this? Because it saves us some janky logic in the exclusion shader when we generate the mask.
@@ -1270,6 +1297,12 @@ void LLPipeline::releaseGLBuffers()
     {
         mGlow[i].release();
     }
+
+    for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
+    {
+        mBloomMip[i].release();
+    }
+    mBloomMipCount = 0;
 
     mHeroProbeManager.cleanup(); // release hero probes
 
@@ -8080,6 +8113,155 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
     }
 }
 
+// HDR bloom pyramid: threshold-extract into mBloomMip[0], downsample down the
+// pyramid with a Karis-averaged 13-tap filter, then upsample back with an
+// additive 3x3 tent filter. Halation is carried alongside in the alpha channel.
+void LLPipeline::generateBloomHDR(LLRenderTarget* src)
+{
+    LL_PROFILE_GPU_ZONE("bloom hdr generate");
+
+    if (mBloomMipCount < 3 ||
+        !gBloomExtractProgram.isComplete() ||
+        !gBloomDownsampleProgram.isComplete() ||
+        !gBloomDownsampleFirstProgram.isComplete() ||
+        !gBloomUpsampleProgram.isComplete())
+    {
+        return;
+    }
+
+    static LLCachedControl<F32> bloom_threshold(gSavedSettings, "RenderBloomThreshold", 1.0f);
+    static LLCachedControl<F32> bloom_knee(gSavedSettings, "RenderBloomKnee", 0.5f);
+    static LLCachedControl<F32> bloom_scatter(gSavedSettings, "RenderBloomScatter", 0.7f);
+    static LLCachedControl<F32> alpha_glow_boost(gSavedSettings, "RenderBloomAlphaGlowBoost", 2.0f);
+
+    LLGLDepthTest depth(GL_FALSE);
+    LLGLDisable cull(GL_CULL_FACE);
+
+    // Extract pass: write thresholded bloom + halation into mip 0.
+    {
+        LLGLDisable blend(GL_BLEND);
+        mBloomMip[0].bindTarget();
+        mBloomMip[0].clear();
+
+        gBloomExtractProgram.bind();
+        gBloomExtractProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, src);
+        gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_THRESHOLD, bloom_threshold());
+        gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_KNEE, llmax(bloom_knee(), 0.0f));
+        gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_ALPHA_GLOW_BOOST, llmax(alpha_glow_boost(), 0.0f));
+
+        // Reuse the warmth weights from legacy glow so the halation red-bias
+        // matches artist expectations set by the old RenderGlowWarmthWeights knob.
+        LLVector3 warmth = RenderGlowWarmthWeights;
+        gBloomExtractProgram.uniform3f(LLShaderMgr::HALATION_LUM_WEIGHTS, warmth.mV[0], warmth.mV[1], warmth.mV[2]);
+
+        mScreenTriangleVB->setBuffer();
+        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+        mBloomMip[0].flush();
+        gBloomExtractProgram.unbind();
+    }
+
+    // Downsample chain: mip[i-1] -> mip[i]. The first downsample uses the
+    // partial-Karis variant (1 / (1 + lum) per 2x2 group) to suppress fireflies
+    // from full-res specular highlights before they bleed across the pyramid.
+    // Subsequent levels run the plain 13-tap since they operate on already-
+    // averaged data where firefly energy has been amortized out.
+    {
+        LLGLDisable blend(GL_BLEND);
+        for (U32 i = 1; i < mBloomMipCount; ++i)
+        {
+            LLGLSLShader* shader = (i == 1) ? &gBloomDownsampleFirstProgram
+                                            : &gBloomDownsampleProgram;
+            LLRenderTarget* srcMip = &mBloomMip[i - 1];
+
+            mBloomMip[i].bindTarget();
+            mBloomMip[i].clear();
+
+            shader->bind();
+            shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, srcMip, false, LLTexUnit::TFO_BILINEAR);
+            shader->uniform2f(LLShaderMgr::BLOOM_TEXEL_SIZE,
+                              1.0f / (F32)srcMip->getWidth(),
+                              1.0f / (F32)srcMip->getHeight());
+
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+            mBloomMip[i].flush();
+            shader->unbind();
+        }
+    }
+
+    // Upsample chain: mip[i] -> mip[i-1] with additive blend. Walks from the
+    // smallest mip back up to mip 0, leaving the final bloom in mBloomMip[0].
+    {
+        LLGLEnable blend(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ADD);
+
+        gBloomUpsampleProgram.bind();
+        gBloomUpsampleProgram.uniform1f(LLShaderMgr::BLOOM_SCATTER, llmax(bloom_scatter(), 0.0f));
+
+        for (S32 i = (S32)mBloomMipCount - 1; i > 0; --i)
+        {
+            LLRenderTarget* srcMip = &mBloomMip[i];
+            LLRenderTarget* dstMip = &mBloomMip[i - 1];
+
+            dstMip->bindTarget();
+
+            gBloomUpsampleProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, srcMip, false, LLTexUnit::TFO_BILINEAR);
+            gBloomUpsampleProgram.uniform2f(LLShaderMgr::BLOOM_TEXEL_SIZE,
+                                            1.0f / (F32)srcMip->getWidth(),
+                                            1.0f / (F32)srcMip->getHeight());
+
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+            dstMip->flush();
+        }
+
+        gBloomUpsampleProgram.unbind();
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    }
+}
+
+// Composite the bloom pyramid (mBloomMip[0]) additively into the pre-tonemap
+// scene buffer. Halation rides in the alpha channel and is tinted at composite.
+void LLPipeline::compositeBloomHDR(LLRenderTarget* scene)
+{
+    LL_PROFILE_GPU_ZONE("bloom hdr composite");
+
+    if (mBloomMipCount < 3 || !gBloomCompositeProgram.isComplete())
+    {
+        return;
+    }
+
+    static LLCachedControl<F32> bloom_strength(gSavedSettings, "RenderGlowStrength", 0.325f);
+    static LLCachedControl<F32> halation_strength(gSavedSettings, "RenderBloomHalationStrength", 0.0f);
+    static LLCachedControl<LLColor3> halation_tint(gSavedSettings, "RenderBloomHalationTint", LLColor3(1.0f, 0.35f, 0.15f));
+
+    LLGLDepthTest depth(GL_FALSE);
+    LLGLDisable cull(GL_CULL_FACE);
+    LLGLEnable blend(GL_BLEND);
+    gGL.setSceneBlendType(LLRender::BT_ADD);
+
+    scene->bindTarget();
+
+    gBloomCompositeProgram.bind();
+    gBloomCompositeProgram.bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mBloomMip[0], false, LLTexUnit::TFO_BILINEAR);
+    gBloomCompositeProgram.uniform1f(LLShaderMgr::BLOOM_STRENGTH, llmax(bloom_strength(), 0.0f));
+    gBloomCompositeProgram.uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f));
+    const LLColor3& tint = halation_tint();
+    gBloomCompositeProgram.uniform3f(LLShaderMgr::HALATION_TINT, tint.mV[0], tint.mV[1], tint.mV[2]);
+
+    mScreenTriangleVB->setBuffer();
+    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+    gBloomCompositeProgram.unbind();
+
+    scene->flush();
+
+    gGL.setSceneBlendType(LLRender::BT_ALPHA);
+}
+
 void LLPipeline::applyCAS(LLRenderTarget* src, LLRenderTarget* dst)
 {
     static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
@@ -8688,11 +8870,26 @@ void LLPipeline::renderFinalize()
         generateExposure(&mLuminanceMap, &mExposureMap);
     }
 
+    static LLCachedControl<bool> render_bloom_hdr(gSavedSettings, "RenderBloomHDR", false);
+    const bool use_bloom_hdr = render_bloom_hdr() && mBloomMipCount >= 3;
+
+    // HDR bloom runs pre-tonemap against the linear scene buffer, so it is
+    // composited before colorCorrect. The legacy alpha-tagged prim-glow signal
+    // is carried into the extract pass, so prim glow survives the migration.
+    if (use_bloom_hdr)
+    {
+        generateBloomHDR(&mRT->screen);
+        compositeBloomHDR(&mRT->screen);
+    }
+
     colorCorrect(&mRT->screen, &mPostPingMap, hdr, true);
 
     LLVertexBuffer::unbind();
 
-    generateGlow(&mPostPingMap);
+    if (!use_bloom_hdr)
+    {
+        generateGlow(&mPostPingMap);
+    }
 
     LLRenderTarget* sourceBuffer = &mPostPingMap;
     LLRenderTarget* targetBuffer = &mPostPongMap;
@@ -8716,8 +8913,11 @@ void LLPipeline::renderFinalize()
         std::swap(sourceBuffer, targetBuffer);
     }
 
-    combineGlow(sourceBuffer, targetBuffer);
-    std::swap(sourceBuffer, targetBuffer);
+    if (!use_bloom_hdr)
+    {
+        combineGlow(sourceBuffer, targetBuffer);
+        std::swap(sourceBuffer, targetBuffer);
+    }
 
     gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
     gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
@@ -10000,7 +10200,6 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
     shader.disableTexture(LLShaderMgr::DEFERRED_DEPTH, deferred_target->getUsage());
     shader.disableTexture(LLShaderMgr::DEFERRED_LIGHT, deferred_light_target->getUsage());
     shader.disableTexture(LLShaderMgr::DIFFUSE_MAP);
-    shader.disableTexture(LLShaderMgr::DEFERRED_BLOOM);
 
     for (U32 i = 0; i < 4; i++)
     {

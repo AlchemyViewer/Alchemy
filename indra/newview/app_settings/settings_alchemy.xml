@@ -879,6 +879,109 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>RenderBloomHDR</key>
+        <map>
+            <key>Comment</key>
+            <string>Replace legacy glow with HDR bloom pyramid (pre-tonemap). 0 = legacy glow, 1 = HDR bloom.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderBloomThreshold</key>
+        <map>
+            <key>Comment</key>
+            <string>HDR bloom luminance threshold in linear light. Values above this bloom; below, fall off softly via the knee. 1.0 = roughly "brighter than white".</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderBloomKnee</key>
+        <map>
+            <key>Comment</key>
+            <string>Soft-knee width below the bloom threshold. Wider values give a softer, more gradual bloom onset. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>RenderBloomMipCount</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of bloom pyramid mip levels. More mips = wider, softer bloom. Clamped to [3, 7].</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>6</integer>
+        </map>
+        <key>RenderBloomScatter</key>
+        <map>
+            <key>Comment</key>
+            <string>Bloom upsample tent-filter radius multiplier. 1.0 = adjacent-texel taps. Values >1 widen the bloom per octave; >~2.5 starts to alias because the tent skips source texels.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderBloomAlphaGlowBoost</key>
+        <map>
+            <key>Comment</key>
+            <string>Multiplier applied to alpha-tagged glow (legacy prim glow parameter) when fed into HDR bloom. Compensates for pre-tonemap composite so prim-glow halos match legacy brightness.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>4.0</real>
+        </map>
+        <key>RenderBloomHalation</key>
+        <map>
+            <key>Comment</key>
+            <string>Enable the halation signal in HDR bloom. When off, the bloom pyramid allocates as R11F_G11F_B10F (half the bandwidth of RGBA16F) and skips the warmth extract and tinted composite. Requires RenderBloomHDR.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderBloomHalationStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Photographic halation (warm halo around bright highlights). 0 disables. 0.25 is a gentle cinematic feel. Requires RenderBloomHalation.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBloomHalationTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Tint color for the halation halo (linear RGB). Default is a warm amber. Requires RenderBloomHalation.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>0.35</real>
+                <real>0.15</real>
+            </array>
+        </map>
         <key>RenderChromaticAberrationStrength</key>
         <map>
             <key>Comment</key>

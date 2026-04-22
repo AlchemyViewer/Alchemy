@@ -7,6 +7,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -272,6 +275,11 @@ static bool handleReleaseGLBufferChanged(const LLSD& newvalue)
 }
 
 static bool handleEnableEmissiveChanged(const LLSD& newvalue)
+{
+    return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
+}
+
+static bool handleHalationChanged(const LLSD& newvalue)
 {
     return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
 }
@@ -852,9 +860,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationThreshold", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationScale", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationStrength", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderHighPrecisionPostProcess", [](const LLSD& v) {
-        return handleReleaseGLBufferChanged(v) && handleSetShaderChanged(v);
-    });
     setting_setup_signal_listener(gSavedSettings, "RenderSpecularResX", handleLUTBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSpecularResY", handleLUTBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleLUTBufferChanged);
@@ -865,6 +870,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowResolutionPow", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowHDR", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderBloomMipCount", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderBloomResolutionScale", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderBloomHalation", handleHalationChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderEnableEmissiveBuffer", handleEnableEmissiveChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDisableVintageMode", handleDisableVintageMode);
     setting_setup_signal_listener(gSavedSettings, "RenderHDREnabled", handleEnableHDR);

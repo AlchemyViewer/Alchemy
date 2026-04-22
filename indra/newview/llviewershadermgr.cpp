@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -135,6 +138,11 @@ LLGLSLShader        gImpostorProgram;
 // Effects Shaders
 LLGLSLShader            gGlowProgram;
 LLGLSLShader            gGlowExtractProgram;
+LLGLSLShader            gBloomExtractProgram;
+LLGLSLShader            gBloomDownsampleProgram;
+LLGLSLShader            gBloomDownsampleFirstProgram;
+LLGLSLShader            gBloomUpsampleProgram;
+LLGLSLShader            gBloomCompositeProgram;
 LLGLSLShader            gPostScreenSpaceReflectionProgram;
 
 // Deferred rendering shaders
@@ -1035,6 +1043,11 @@ bool LLViewerShaderMgr::loadShadersEffects()
     {
         gGlowProgram.unload();
         gGlowExtractProgram.unload();
+        gBloomExtractProgram.unload();
+        gBloomDownsampleProgram.unload();
+        gBloomDownsampleFirstProgram.unload();
+        gBloomUpsampleProgram.unload();
+        gBloomCompositeProgram.unload();
         return true;
     }
 
@@ -1073,6 +1086,67 @@ bool LLViewerShaderMgr::loadShadersEffects()
         {
             LLPipeline::sRenderGlow = false;
         }
+    }
+
+    const bool bloom_halation = gSavedSettings.getBOOL("RenderBloomHalation");
+
+    if (success)
+    {
+        gBloomExtractProgram.mName = "HDR Bloom Extract";
+        gBloomExtractProgram.mShaderFiles.clear();
+        gBloomExtractProgram.mShaderFiles.push_back(make_pair("effects/glowExtractV.glsl", GL_VERTEX_SHADER));
+        gBloomExtractProgram.mShaderFiles.push_back(make_pair("effects/bloomExtractF.glsl", GL_FRAGMENT_SHADER));
+        gBloomExtractProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
+        if (bloom_halation)
+        {
+            gBloomExtractProgram.addPermutation("BLOOM_HALATION", "1");
+        }
+        success = gBloomExtractProgram.createShader();
+    }
+
+    if (success)
+    {
+        gBloomDownsampleFirstProgram.mName = "HDR Bloom Downsample (First)";
+        gBloomDownsampleFirstProgram.mShaderFiles.clear();
+        gBloomDownsampleFirstProgram.mShaderFiles.push_back(make_pair("effects/glowExtractV.glsl", GL_VERTEX_SHADER));
+        gBloomDownsampleFirstProgram.mShaderFiles.push_back(make_pair("effects/bloomDownsampleF.glsl", GL_FRAGMENT_SHADER));
+        gBloomDownsampleFirstProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
+        gBloomDownsampleFirstProgram.addPermutation("FIRST_DOWNSAMPLE", "1");
+        success = gBloomDownsampleFirstProgram.createShader();
+    }
+
+    if (success)
+    {
+        gBloomDownsampleProgram.mName = "HDR Bloom Downsample";
+        gBloomDownsampleProgram.mShaderFiles.clear();
+        gBloomDownsampleProgram.mShaderFiles.push_back(make_pair("effects/glowExtractV.glsl", GL_VERTEX_SHADER));
+        gBloomDownsampleProgram.mShaderFiles.push_back(make_pair("effects/bloomDownsampleF.glsl", GL_FRAGMENT_SHADER));
+        gBloomDownsampleProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
+        success = gBloomDownsampleProgram.createShader();
+    }
+
+    if (success)
+    {
+        gBloomUpsampleProgram.mName = "HDR Bloom Upsample";
+        gBloomUpsampleProgram.mShaderFiles.clear();
+        gBloomUpsampleProgram.mShaderFiles.push_back(make_pair("effects/glowExtractV.glsl", GL_VERTEX_SHADER));
+        gBloomUpsampleProgram.mShaderFiles.push_back(make_pair("effects/bloomUpsampleF.glsl", GL_FRAGMENT_SHADER));
+        gBloomUpsampleProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
+        success = gBloomUpsampleProgram.createShader();
+    }
+
+    if (success)
+    {
+        gBloomCompositeProgram.mName = "HDR Bloom Composite";
+        gBloomCompositeProgram.mShaderFiles.clear();
+        gBloomCompositeProgram.mShaderFiles.push_back(make_pair("effects/glowExtractV.glsl", GL_VERTEX_SHADER));
+        gBloomCompositeProgram.mShaderFiles.push_back(make_pair("effects/bloomCompositeF.glsl", GL_FRAGMENT_SHADER));
+        gBloomCompositeProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
+        if (bloom_halation)
+        {
+            gBloomCompositeProgram.addPermutation("BLOOM_HALATION", "1");
+        }
+        success = gBloomCompositeProgram.createShader();
     }
 
     return success;
