@@ -8334,7 +8334,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>0.6</real>
+    <real>0.0</real>
   </map>
   <key>RenderMeteorsEnabled</key>
   <map>
@@ -8345,7 +8345,7 @@
     <key>Type</key>
     <string>Boolean</string>
     <key>Value</key>
-    <integer>1</integer>
+    <integer>0</integer>
   </map>
   <key>RenderMeteorMaxCount</key>
   <map>
