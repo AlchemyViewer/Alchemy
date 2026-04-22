@@ -172,9 +172,9 @@ vec3 tonemap_filmic(vec3 color)
 
 // Adapted from https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
 // (MIT License).
-vec3 tonemap_aces_godot(vec3 color) {
+vec3 tonemap_aces_boosted(vec3 color) {
     // These constants must match the those in the C++ code that calculates the parameters.
-    const float exposure_bias = 1.8f;
+    const float exposure_bias = 1.2f;
     const float A = 0.0245786f;
     const float B = 0.000090537f;
     const float C = 0.983729f;
@@ -351,7 +351,7 @@ vec3 applyToneMap(vec3 color)
         color = toneMapACES_Hill(color);
         break;
     case 2:
-        color = tonemap_aces_godot(color);
+        color = tonemap_aces_boosted(color);
         break;
     case 3:
         color = tonemap_reinhard(color);

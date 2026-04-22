@@ -703,7 +703,7 @@
         <key>AlchemyRenderTonemapType</key>
         <map>
             <key>Comment</key>
-            <string>What tonemapper to use: 0 = Khronos Neutral, 1 = ACES Hill, 2 = ACES Godot, 3 = Reinhard, 4 = Filmic, 5 = GT, 6 = AgX</string>
+            <string>What tonemapper to use: 0 = Khronos Neutral, 1 = ACES Hill, 2 = ACES Boosted, 3 = Reinhard, 4 = Filmic, 5 = GT, 6 = AgX</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
