@@ -86,7 +86,6 @@ RenderDisableVintageMode           1   1
 RenderDownScaleMethod       1   0
 RenderMaxTextureResolution         1   2048
 RenderReflectionProbeCount  1   256
-RenderHighPrecisionPostProcess 1 1
 RenderReflectionProbeIrradianceResolution 1 16
 
 //
@@ -130,7 +129,6 @@ RenderTonemapMix			1   0.7
 RenderDisableVintageMode           1   0
 RenderMaxTextureResolution         1   512
 RenderReflectionProbeCount  1   1
-RenderHighPrecisionPostProcess 1 0
 
 //
 // Medium Low Graphics Settings
@@ -173,7 +171,6 @@ RenderTonemapMix			1   0.7
 RenderDisableVintageMode           1   0
 RenderMaxTextureResolution         1   1024
 RenderReflectionProbeCount  1   32
-RenderHighPrecisionPostProcess 1 0
 
 //
 // Medium Graphics Settings (standard)
@@ -215,7 +212,6 @@ AlchemyRenderTonemapType			1   1
 RenderTonemapMix			1   0.7
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   64
-RenderHighPrecisionPostProcess 1 0
 
 //
 // Medium High Graphics Settings
@@ -257,7 +253,6 @@ AlchemyRenderTonemapType			1   1
 RenderTonemapMix			1   0.7
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   64
-RenderHighPrecisionPostProcess 1 0
 
 //
 // High Graphics Settings (SSAO + sun shadows)
@@ -299,7 +294,6 @@ AlchemyRenderTonemapType			1   1
 RenderTonemapMix			1   0.7
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   128
-RenderHighPrecisionPostProcess 1 0
 
 //
 // High Ultra Graphics Settings (SSAO + all shadows)
@@ -341,7 +335,6 @@ AlchemyRenderTonemapType			1   1
 RenderTonemapMix			1   0.7
 RenderMaxTextureResolution  1   2048
 RenderReflectionProbeCount  1   256
-RenderHighPrecisionPostProcess 1 1
 
 //
 // Ultra graphics (REALLY PURTY!)

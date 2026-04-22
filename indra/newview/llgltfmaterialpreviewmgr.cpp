@@ -5,6 +5,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2023, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -520,12 +523,24 @@ bool LLGLTFPreviewTexture::render()
     // *HACK: Hide mExposureMap from generateExposure
     gPipeline.mExposureMap.swapFBORefs(gPipeline.mLastExposure);
 
-    gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);
-    gPipeline.generateExposure(&gPipeline.mLuminanceMap, &gPipeline.mExposureMap, /*use_history = */ false);
+    static LLCachedControl<bool> hdr(gSavedSettings, "RenderHDREnabled", false);
+    if (hdr)
+    {
+        gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);
+        gPipeline.generateExposure(&gPipeline.mLuminanceMap, &gPipeline.mExposureMap, /*use_history = */ false);
+
+        gPipeline.generateBloomHDR(&screen);
+        gPipeline.compositeBloomHDR(&screen);
+    }
+
     gPipeline.colorCorrect(&screen, &gPipeline.mPostPingMap, true, false);
     LLVertexBuffer::unbind();
-    gPipeline.generateGlow(&gPipeline.mPostPingMap);
-    gPipeline.combineGlow(&gPipeline.mPostPingMap, &screen);
+
+    if (!hdr)
+    {
+        gPipeline.generateGlow(&gPipeline.mPostPingMap);
+        gPipeline.combineGlow(&gPipeline.mPostPingMap, &screen);
+    }
 
     // *HACK: Restore mExposureMap (it will be consumed by generateExposure next frame)
     gPipeline.mExposureMap.swapFBORefs(gPipeline.mLastExposure);

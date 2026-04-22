@@ -12,8 +12,7 @@
  * darkening. Film grain runs after CVD so the grain stays neutral in tint.
  * Dither runs last (before preview) so quantization is resolved against
  * the true final color. It is only active here when the post chain is
- * high-precision (RenderHighPrecisionPostProcess = true); in the 8-bit
- * case, colorCorrectF dithers earlier instead. Preview overlays are
+ * HDR; in the 8-bit case, colorCorrectF dithers earlier instead. Preview overlays are
  * debug-only.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$

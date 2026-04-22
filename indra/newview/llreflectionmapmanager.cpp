@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2022, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -1423,7 +1426,6 @@ void LLReflectionMapManager::initReflectionMaps()
 {
     static LLCachedControl<U32> ref_probe_res(gSavedSettings, "RenderReflectionProbeResolution", 128U);
     static LLCachedControl<U32> ref_probe_irradiance_res(gSavedSettings, "RenderReflectionProbeIrradianceResolution", 16U);
-    bool high_precision_post = gSavedSettings.getBOOL("RenderHighPrecisionPostProcess");
     U32 probe_resolution = nhpo2(llclamp(ref_probe_res(), (U32)64, (U32)512));
     U32 irradiance_resolution = llmin(nhpo2(llclamp(ref_probe_irradiance_res(), (U32)16, (U32)256)), probe_resolution); // Must be equal or smaller then probe resolution
     if (mTexture.isNull() || mReflectionProbeCount != mDynamicProbeCount || mProbeResolution != probe_resolution ||

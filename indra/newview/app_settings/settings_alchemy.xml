@@ -921,7 +921,18 @@
             <key>Type</key>
             <string>S32</string>
             <key>Value</key>
-            <integer>6</integer>
+            <integer>5</integer>
+        </map>
+        <key>RenderBloomResolutionScale</key>
+        <map>
+            <key>Comment</key>
+            <string>Base bloom pyramid resolution relative to scene. 0 = full, 1 = 3/4, 2 = half, 3 = quarter, 4 = eighth. Higher = faster and wider bloom reach per mip, with bilinear upscale at composite. Clamped to [0, 4].</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
         </map>
         <key>RenderBloomScatter</key>
         <map>
@@ -943,7 +954,18 @@
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>4.0</real>
+            <real>5.0</real>
+        </map>
+        <key>RenderBloomStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>HDR bloom composite strength. Multiplies the final bloom pyramid before it is additively blended into the scene. Independent of RenderGlowStrength so HDR bloom and legacy glow can be tuned separately.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.325</real>
         </map>
         <key>RenderBloomHalation</key>
         <map>

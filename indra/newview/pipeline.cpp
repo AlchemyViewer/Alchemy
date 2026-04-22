@@ -938,7 +938,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
     if (!gCubeSnapshot) // hack to not re-allocate various targets for cube snapshots
     {
-        U32 post_color_fmt = (LLRender::s10bitBackBuffer || (hdr && gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))) ? GL_RGBA16 : GL_RGBA;
+        U32 post_color_fmt = hdr ? GL_RGB10_A2 : GL_RGBA;
 
         if (RenderUIBuffer)
         {
@@ -984,11 +984,22 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         mPostPingMap.allocate(resX, resY, post_color_fmt);
         mPostPongMap.allocate(resX, resY, post_color_fmt);
 
-        // HDR bloom pyramid. Level 0 is full-res; each subsequent level halves.
+        // HDR bloom pyramid. Level 0 starts at scene * (num/den); each subsequent
+        // level halves. Lowering the base resolution trades a bit of extract
+        // precision for linear savings on the whole pyramid plus wider bloom reach
+        // per mip, since the composite bilinearly upsamples mip 0 back to screen.
         // When halation is enabled the alpha channel carries the warmth signal, so
         // we need RGBA16F. With halation off we drop to R11F_G11F_B10F for half the
         // bandwidth on the pyramid hot path.
         const S32 bloom_mip_setting = llclamp(gSavedSettings.getS32("RenderBloomMipCount"), 3, (S32)BLOOM_MAX_MIPS);
+        const S32 bloom_scale_idx   = llclamp(gSavedSettings.getS32("RenderBloomResolutionScale"), 0, 4);
+        // (numerator, denominator) for each preset: full, 3/4, half, quarter, eighth.
+        static const U32 bloom_scale_num[5] = { 1, 3, 1, 1, 1 };
+        static const U32 bloom_scale_den[5] = { 1, 4, 2, 4, 8 };
+        const U32 base_num = bloom_scale_num[bloom_scale_idx];
+        const U32 base_den = bloom_scale_den[bloom_scale_idx];
+        const U32 base_w = llmax(1u, (resX * base_num) / base_den);
+        const U32 base_h = llmax(1u, (resY * base_num) / base_den);
         const bool bloom_halation = gSavedSettings.getBOOL("RenderBloomHalation");
         const U32 bloom_format = bloom_halation ? GL_RGBA16F : GL_R11F_G11F_B10F;
         mBloomMipCount = 0;
@@ -998,8 +1009,8 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         }
         for (S32 i = 0; i < bloom_mip_setting; i++)
         {
-            U32 mw = llmax(1u, resX >> i);
-            U32 mh = llmax(1u, resY >> i);
+            U32 mw = llmax(1u, base_w >> (U32)i);
+            U32 mh = llmax(1u, base_h >> (U32)i);
             if (!mBloomMip[i].allocate(mw, mh, bloom_format))
             {
                 break;
@@ -8234,7 +8245,7 @@ void LLPipeline::compositeBloomHDR(LLRenderTarget* scene)
         return;
     }
 
-    static LLCachedControl<F32> bloom_strength(gSavedSettings, "RenderGlowStrength", 0.325f);
+    static LLCachedControl<F32> bloom_strength(gSavedSettings, "RenderBloomStrength", 0.325f);
     static LLCachedControl<F32> halation_strength(gSavedSettings, "RenderBloomHalationStrength", 0.0f);
     static LLCachedControl<LLColor3> halation_tint(gSavedSettings, "RenderBloomHalationTint", LLColor3(1.0f, 0.35f, 0.15f));
 
@@ -8868,25 +8879,24 @@ void LLPipeline::renderFinalize()
         generateLuminance(&mRT->screen, &mLuminanceMap);
 
         generateExposure(&mLuminanceMap, &mExposureMap);
-    }
 
-    static LLCachedControl<bool> render_bloom_hdr(gSavedSettings, "RenderBloomHDR", false);
-    const bool use_bloom_hdr = render_bloom_hdr() && mBloomMipCount >= 3;
-
-    // HDR bloom runs pre-tonemap against the linear scene buffer, so it is
-    // composited before colorCorrect. The legacy alpha-tagged prim-glow signal
-    // is carried into the extract pass, so prim glow survives the migration.
-    if (use_bloom_hdr)
-    {
+        // HDR bloom runs pre-tonemap against the linear scene buffer, so it is
+        // composited before colorCorrect. The legacy alpha-tagged prim-glow signal
+        // is carried into the extract pass, so prim glow survives the migration.
         generateBloomHDR(&mRT->screen);
         compositeBloomHDR(&mRT->screen);
     }
 
+    // Handles tonemap, colorgrading, and gamma correction in one pass. In the HDR
+    // path, this also applies eye adaptation and bloom. In the non-HDR path, this \
+    // is just a linear copy with color correction.
     colorCorrect(&mRT->screen, &mPostPingMap, hdr, true);
 
     LLVertexBuffer::unbind();
 
-    if (!use_bloom_hdr)
+    // Legacy glow for non-HDR path.  In the HDR path, glow is extracted as part of the
+    // bloom process and composited back in after tonemapping.
+    if (!hdr)
     {
         generateGlow(&mPostPingMap);
     }
@@ -8913,7 +8923,7 @@ void LLPipeline::renderFinalize()
         std::swap(sourceBuffer, targetBuffer);
     }
 
-    if (!use_bloom_hdr)
+    if (!hdr)
     {
         combineGlow(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);

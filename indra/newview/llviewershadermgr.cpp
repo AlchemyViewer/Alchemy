@@ -3000,7 +3000,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gBlitWithEffectsProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gBlitWithEffectsProgram.mShaderFiles.push_back(make_pair("alchemy/blitWithEffectsF.glsl", GL_FRAGMENT_SHADER));
         gBlitWithEffectsProgram.clearPermutations();
-        if (gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        if (gSavedSettings.getBOOL("RenderHDREnabled"))
         {
             gBlitWithEffectsProgram.addPermutation("DITHER", "1");
         }
@@ -3019,7 +3019,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGGammaProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
         gCGGammaProgram.clearPermutations();
         gCGGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
         {
             gCGGammaProgram.addPermutation("DITHER", "1");
         }
@@ -3039,7 +3039,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGLegacyGammaProgram.clearPermutations();
         gCGLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
         {
             gCGLegacyGammaProgram.addPermutation("DITHER", "1");
         }
@@ -3060,7 +3060,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapProgram.clearPermutations();
         gCGTonemapProgram.addPermutation("TONEMAP", "1");
         gCGTonemapProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
         {
             gCGTonemapProgram.addPermutation("DITHER", "1");
         }
@@ -3082,7 +3082,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGTonemapLegacyGammaProgram.addPermutation("TONEMAP", "1");
         gCGTonemapLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
         {
             gCGTonemapLegacyGammaProgram.addPermutation("DITHER", "1");
         }
@@ -3105,7 +3105,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapColorgradeProgram.addPermutation("COLOR_GRADE", "1");
         gCGTonemapColorgradeProgram.addPermutation("TONEMAP", "1");
         gCGTonemapColorgradeProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
         {
             gCGTonemapColorgradeProgram.addPermutation("DITHER", "1");
         }
@@ -3129,7 +3129,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("TONEMAP", "1");
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHighPrecisionPostProcess"))
+        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
         {
             gCGTonemapColorgradeLegacyGammaProgram.addPermutation("DITHER", "1");
         }
