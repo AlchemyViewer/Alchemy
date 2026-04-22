@@ -689,6 +689,7 @@
   </check_box>
 
   <slider
+    visible="false"
     enabled_control="RenderDisableVintageMode"
     control_name="RenderBloomMipCount"
     decimal_digits="0"
@@ -711,6 +712,7 @@
       parameter="PostProcessText" />
   </slider>
   <text
+    visible="false"
     type="string"
     length="1"
     follows="left|top"
