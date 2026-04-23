@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2016, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -83,6 +84,13 @@ public:
 
     static bool isWordsName(const std::string& name);
 
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+
+    typedef boost::signals2::signal<void (LLUICtrl* ctrl, S32 width, S32 height)> reshape_signal_t;
+    boost::signals2::connection setReshapeCallback(const reshape_signal_t::slot_type& cb);
+// [/SL:KB]
+
     void showHistory();
     void changeChannelLabel(S32 channel);
 
@@ -115,6 +123,9 @@ protected:
     LLOutputMonitorCtrl*    mOutputMonitor;
     LLLocalSpeakerMgr*      mSpeakerMgr;
 
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+    reshape_signal_t*       mReshapeSignal;
+// [/SL:KB]
     S32 mExpandedHeight;
 
 // [RLVa:KB]

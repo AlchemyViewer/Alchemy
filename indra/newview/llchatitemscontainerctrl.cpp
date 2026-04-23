@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2016, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -160,16 +161,7 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
     LLUIColor textColor = LLUIColorTable::instance().getColor(color_name);
     F32 textAlpha = (F32)notification["color_alpha"].asReal();
 
-    S32 font_size = notification["font_size"].asInteger();
-
-    LLFontGL*       messageFont;
-    switch(font_size)
-    {
-        case 0: messageFont = LLFontGL::getFontSansSerifSmall(); break;
-        default:
-        case 1: messageFont = LLFontGL::getFontSansSerif();     break;
-        case 2: messageFont = LLFontGL::getFontSansSerifBig();  break;
-    }
+    LLFontGL* messageFont = LLViewerChat::getChatFont();
 
     //append text
     {
@@ -221,16 +213,7 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
     LLUIColor textColor = LLUIColorTable::instance().getColor(color_name);
     F32 textAlpha = (F32)notification["color_alpha"].asReal();
 
-    S32 font_size = notification["font_size"].asInteger();
-
-    LLFontGL*       messageFont;
-    switch(font_size)
-    {
-        case 0: messageFont = LLFontGL::getFontSansSerifSmall(); break;
-        default:
-        case 1: messageFont = LLFontGL::getFontSansSerif();     break;
-        case 2: messageFont = LLFontGL::getFontSansSerifBig();  break;
-    }
+    LLFontGL* messageFont = LLViewerChat::getChatFont();
 
     mMsgText = getChild<LLChatMsgBox>("msg_text", false);
     mMsgText->setContentTrusted(false);
@@ -341,7 +324,10 @@ void    LLFloaterIMNearbyChatToastPanel::snapToMessageHeight    ()
 
     panel_rect.setLeftTopAndSize( panel_rect.mLeft, panel_rect.mTop, panel_rect.getWidth(), new_height);
 
-    reshape( getRect().getWidth(), getRect().getHeight(), 1);
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-08-27 (Catznip-2.1)
+    reshape( panel_rect.getWidth(), panel_rect.getHeight(), 1);
+// [/SL:KB]
+//  reshape( getRect().getWidth(), getRect().getHeight(), 1);
 
     setRect(panel_rect);
 

@@ -109,6 +109,9 @@ LLFloaterIMNearbyChat::LLFloaterIMNearbyChat(const LLSD& llsd)
 :   LLFloaterIMSessionTab(LLSD(LLUUID::null)),
     //mOutputMonitor(NULL),
     mSpeakerMgr(NULL),
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+    mReshapeSignal(nullptr),
+// [/SL:KB]
     mExpandedHeight(COLLAPSED_HEIGHT + EXPANDED_HEIGHT)
 {
     mIsP2PChat = false;
@@ -129,6 +132,9 @@ LLFloaterIMNearbyChat::LLFloaterIMNearbyChat(const LLSD& llsd)
 // [RLVa:KB]
 LLFloaterIMNearbyChat::~LLFloaterIMNearbyChat()
 {
+    delete mReshapeSignal;
+
+    mChatChannelConnection.disconnect();
     mRlvBehaviorCallbackConnection.disconnect();
 }
 // [/RLVa:KB]
@@ -162,6 +168,7 @@ bool LLFloaterIMNearbyChat::postBuild()
     mInputEditor->setFocusLostCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxFocusLost, this));
     mInputEditor->setFocusReceivedCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxFocusReceived, this));
     changeChannelLabel(gSavedSettings.getS32("AlchemyNearbyChatChannel"));
+    mInputEditor->setFont(LLViewerChat::getChatFont());
 
 // [RLVa:KB]
     mInputEditor->setShowChatMentionPicker(!RlvActions::isRlvEnabled() || RlvActions::canShowName(RlvActions::SNC_DEFAULT));
@@ -247,6 +254,7 @@ void LLFloaterIMNearbyChat::reloadMessages(bool clean_messages/* = false*/)
         // Update the messages without re-writing them to a log file.
         addMessage(*it,false, do_not_log);
     }
+    mInputEditor->setFont(LLViewerChat::getChatFont());
 }
 
 void LLFloaterIMNearbyChat::loadHistory()
@@ -426,6 +434,28 @@ bool LLFloaterIMNearbyChat::isChatVisible() const
     return isVisible;
 }
 
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+// virtual
+void LLFloaterIMNearbyChat::reshape(S32 width, S32 height, bool called_from_parent)
+{
+    LLFloater::reshape(width, height, called_from_parent);
+
+    if (mReshapeSignal)
+    {
+        (*mReshapeSignal)(this, width, height);
+    }
+}
+
+boost::signals2::connection LLFloaterIMNearbyChat::setReshapeCallback(const reshape_signal_t::slot_type& cb)
+{
+    if (!mReshapeSignal)
+    {
+        mReshapeSignal = new reshape_signal_t();
+    }
+    return mReshapeSignal->connect(cb);
+}
+// [/SL:KB]
+
 void LLFloaterIMNearbyChat::showHistory()
 {
     openFloater();
@@ -465,7 +495,12 @@ bool LLFloaterIMNearbyChat::handleKeyHere( KEY key, MASK mask )
         sendChat(CHAT_TYPE_WHISPER);
         handled = true;
     }
-
+    else if (KEY_RETURN == key && mask == MASK_ALT)
+    {
+        // shout
+        sendChat(CHAT_TYPE_OOC);
+        handled = true;
+    }
 
     if((mask == MASK_ALT) && isTornOff())
     {
@@ -528,7 +563,10 @@ void LLFloaterIMNearbyChat::onChatBoxKeystroke()
 
     auto length = raw_text.length();
 
-    if( (length > 0) && (raw_text[0] != '/') )  // forward slash is used for escape (eg. emote) sequences
+    if ((length > 0)
+        && (raw_text[0] != '/')     // forward slash is used for escape (eg. emote) sequences
+        && (raw_text[0] != ':') // colon is used in for MUD poses
+        )
     {
         gAgent.startTyping();
     }
@@ -651,6 +689,12 @@ void LLFloaterIMNearbyChat::sendChat( EChatType type )
             updateUsedEmojis(text);
 
             std::string utf8text = wstring_to_utf8str(text);
+
+            if (type == CHAT_TYPE_OOC)
+            {
+                utf8text = fmt::format("{} {} {}", gSavedSettings.getString("ChatOOCPrefix"), utf8text, gSavedSettings.getString("ChatOOCPostfix"));
+            }
+
             // Try to trigger a gesture, if not chat to a script.
             std::string utf8_revised_text;
             if (0 == channel)
@@ -671,7 +715,8 @@ void LLFloaterIMNearbyChat::sendChat( EChatType type )
 
             utf8_revised_text = utf8str_trim(utf8_revised_text);
 
-            type = processChatTypeTriggers(type, utf8_revised_text);
+            EChatType nType = (type == CHAT_TYPE_OOC ? CHAT_TYPE_NORMAL : type);
+            type = processChatTypeTriggers(nType, utf8_revised_text);
 
             if (!utf8_revised_text.empty() && !ALChatCommand::parseCommand(utf8_revised_text))
             {
