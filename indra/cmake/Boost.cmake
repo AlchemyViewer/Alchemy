@@ -1,8 +1,8 @@
 include_guard()
 add_library(ll::boost INTERFACE IMPORTED)
 
-find_package(Boost CONFIG REQUIRED COMPONENTS context fiber filesystem json program_options url)
-target_link_libraries(ll::boost INTERFACE Boost::disable_autolinking Boost::headers Boost::fiber Boost::context Boost::filesystem Boost::program_options Boost::url Boost::json)
+find_package(Boost CONFIG REQUIRED COMPONENTS context dll fiber filesystem json program_options url)
+target_link_libraries(ll::boost INTERFACE Boost::disable_autolinking Boost::headers Boost::dll Boost::fiber Boost::context Boost::filesystem Boost::program_options Boost::url Boost::json)
 
 if(WINDOWS)
     find_package(Boost CONFIG REQUIRED COMPONENTS stacktrace_windbg)

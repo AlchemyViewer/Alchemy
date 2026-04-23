@@ -29,9 +29,8 @@
 #define LL_LLPLUGININSTANCE_H
 
 #include "llstring.h"
-#include "llapr.h"
 
-#include "apr_dso.h"
+#include <boost/dll/shared_library.hpp>
 
 /**
  * @brief LLPluginInstanceMessageListener receives messages sent from the plugin loader shell to the plugin.
@@ -88,7 +87,7 @@ private:
     static void staticReceiveMessage(const char *message_string, void **user_data);
     void receiveMessage(const char *message_string);
 
-    apr_dso_handle_t *mDSOHandle;
+    boost::dll::shared_library mDSOHandle;
 
     void *mPluginUserData;
     sendMessageFunction mPluginSendMessageFunction;

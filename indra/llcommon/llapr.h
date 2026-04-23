@@ -32,7 +32,6 @@
 #include "llwin32headers.h"
 #include "apr_thread_proc.h"
 
-struct apr_dso_handle_t;
 /**
  * @brief Function which appropriately logs error or remains quiet on
  * APR_SUCCESS.

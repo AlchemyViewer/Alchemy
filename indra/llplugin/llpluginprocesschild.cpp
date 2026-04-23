@@ -32,6 +32,7 @@
 #include "llplugininstance.h"
 #include "llpluginmessagepipe.h"
 #include "llpluginmessageclasses.h"
+#include "llapr.h"
 
 static const F32 GOODBYE_SECONDS = 12.0f; // Do not set it to be bigger than mPluginLockupTimeout or parent will kill LLPluginProcessChild
 static const F32 HEARTBEAT_SECONDS = 1.0f;
@@ -54,7 +55,7 @@ LLPluginProcessChild::~LLPluginProcessChild()
     {
         sendMessageToPlugin(LLPluginMessage("base", "cleanup"));
 
-        // IMPORTANT: under some (unknown) circumstances the apr_dso_unload() triggered when mInstance is deleted
+        // IMPORTANT: under some (unknown) circumstances the library unload triggered when mInstance is deleted
         // appears to fail and lock up which means that a given instance of the slplugin process never exits.
         // This is bad, especially when users try to update their version of SL - it fails because the slplugin
         // process as well as a bunch of plugin specific files are locked and cannot be overwritten.

@@ -30,7 +30,8 @@
 
 #include "llplugininstance.h"
 
-#include "llapr.h"
+#include <boost/dll/shared_library.hpp>
+#include <boost/dll/shared_library_load_mode.hpp>
 
 #if LL_WINDOWS
 #include "direct.h" // needed for _chdir()
@@ -52,7 +53,6 @@ const char *LLPluginInstance::PLUGIN_INIT_FUNCTION_NAME = "LLPluginInitEntryPoin
  * @param[in] owner Plugin instance. TODO:DOC is this a good description of what "owner" is?
  */
 LLPluginInstance::LLPluginInstance(LLPluginInstanceMessageListener *owner) :
-    mDSOHandle(NULL),
     mPluginUserData(NULL),
     mPluginSendMessageFunction(NULL)
 {
@@ -64,11 +64,7 @@ LLPluginInstance::LLPluginInstance(LLPluginInstanceMessageListener *owner) :
  */
 LLPluginInstance::~LLPluginInstance()
 {
-    if(mDSOHandle != NULL)
-    {
-        apr_dso_unload(mDSOHandle);
-        mDSOHandle = NULL;
-    }
+    // mDSOHandle's destructor unloads the shared library if loaded.
 }
 
 /**
@@ -95,41 +91,46 @@ int LLPluginInstance::load(const std::string& plugin_dir, std::string &plugin_fi
 #endif
     };
 
-    int result = apr_dso_load(&mDSOHandle,
-                      plugin_file.c_str(),
-                      gAPRPoolp);
-    if(result != APR_SUCCESS)
+    int result = 0;
+
+    try
     {
-        char buf[1024];
-        apr_dso_error(mDSOHandle, buf, sizeof(buf));
-
-        LL_WARNS("Plugin") << "apr_dso_load of " << plugin_file << " failed with error " << result << " , additional info string: " << buf << LL_ENDL;
-
+        mDSOHandle.load(boost::dll::fs::path(plugin_file),
+                        boost::dll::load_mode::rtld_now);
+    }
+    catch (const std::exception& e)
+    {
+        LL_WARNS("Plugin") << "boost::dll load of " << plugin_file
+                           << " failed: " << e.what() << LL_ENDL;
+        result = -1;
     }
 
-    if(result == APR_SUCCESS)
+    if(result == 0)
     {
-        result = apr_dso_sym((apr_dso_handle_sym_t*)&init_function,
-                         mDSOHandle,
-                         PLUGIN_INIT_FUNCTION_NAME);
-
-        if(result != APR_SUCCESS)
+        try
         {
-            LL_WARNS("Plugin") << "apr_dso_sym failed with error " << result << LL_ENDL;
+            init_function = &mDSOHandle.get<std::remove_pointer_t<pluginInitFunction>>(
+                PLUGIN_INIT_FUNCTION_NAME);
+        }
+        catch (const std::exception& e)
+        {
+            LL_WARNS("Plugin") << "symbol lookup for " << PLUGIN_INIT_FUNCTION_NAME
+                               << " failed: " << e.what() << LL_ENDL;
+            result = -1;
         }
     }
 
-    if(result == APR_SUCCESS)
+    if(result == 0)
     {
         result = init_function(staticReceiveMessage, (void*)this, &mPluginSendMessageFunction, &mPluginUserData);
 
-        if(result != APR_SUCCESS)
+        if(result != 0)
         {
             LL_WARNS("Plugin") << "call to init function failed with error " << result << LL_ENDL;
         }
     }
 
-    return (int)result;
+    return result;
 }
 
 /**
