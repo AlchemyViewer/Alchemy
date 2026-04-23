@@ -1925,6 +1925,11 @@ bool LLTextEditor::handleSpecialKey(const KEY key, const MASK mask)
                 autoIndent();
             }
         }
+        else if (mask == MASK_SHIFT)
+        {
+            addLineBreakChar();
+            handled = true;
+        }
         else
         {
             handled = false;
