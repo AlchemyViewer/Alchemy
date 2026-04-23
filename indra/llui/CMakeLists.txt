@@ -1,16 +1,9 @@
 # -*- cmake -*-
 
-project(llui)
+add_library (llui STATIC)
 
-include(00-Common)
-include(Hunspell)
-include(LLCommon)
-include(LLImage)
-include(LLCoreHttp)
-include(LLWindow)
-include(LLCoreHttp)
-
-set(llui_SOURCE_FILES
+target_sources(llui
+    PRIVATE
     llaccordionctrl.cpp
     llaccordionctrltab.cpp
     llbadge.cpp
@@ -18,6 +11,7 @@ set(llui_SOURCE_FILES
     llbadgeowner.cpp
     llbutton.cpp
     llchatentry.cpp
+    llchatmentionhelper.cpp
     llcheckboxctrl.cpp
     llclipboard.cpp
     llcombobox.cpp
@@ -38,7 +32,7 @@ set(llui_SOURCE_FILES
     llfloater.cpp
     llfloaterreg.cpp
     llfloaterreglistener.cpp
-    llflyoutbutton.cpp 
+    llflyoutbutton.cpp
     llfocusmgr.cpp
     llfolderview.cpp
     llfolderviewitem.cpp
@@ -52,7 +46,7 @@ set(llui_SOURCE_FILES
     llmenubutton.cpp
     llmenugl.cpp
     llmodaldialog.cpp
-    llmultifloater.cpp 
+    llmultifloater.cpp
     llmultislider.cpp
     llmultisliderctrl.cpp
     llnotifications.cpp
@@ -115,11 +109,10 @@ set(llui_SOURCE_FILES
     llwindowshade.cpp
     llxuiparser.cpp
     llxyvector.cpp
-    )
-    
-set(llui_HEADER_FILES
-    CMakeLists.txt
 
+    PUBLIC
+    FILE_SET HEADERS
+    FILES
     llaccordionctrl.h
     llaccordionctrltab.h
     llbadge.h
@@ -129,6 +122,7 @@ set(llui_HEADER_FILES
     llcallbackmap.h
     llchatentry.h
     llchat.h
+    llchatmentionhelper.h
     llcheckboxctrl.h
     llclipboard.h
     llcombobox.h
@@ -143,13 +137,13 @@ set(llui_HEADER_FILES
     llemojidictionary.h
     llemojihelper.h
     llf32uictrl.h
-    llfiltereditor.h 
+    llfiltereditor.h
     llflashtimer.h
     llflatlistview.h
     llfloater.h
     llfloaterreg.h
     llfloaterreglistener.h
-    llflyoutbutton.h 
+    llflyoutbutton.h
     llfocusmgr.h
     llfolderview.h
     llfolderviewitem.h
@@ -166,7 +160,7 @@ set(llui_HEADER_FILES
     llmenubutton.h
     llmenugl.h
     llmodaldialog.h
-    llmultifloater.h 
+    llmultifloater.h
     llmultisliderctrl.h
     llmultislider.h
     llnotificationptr.h
@@ -183,7 +177,7 @@ set(llui_HEADER_FILES
     llresmgr.h
     llrngwriter.h
     llsearchablecontrol.h
-    llsearcheditor.h 
+    llsearcheditor.h
     llscrollbar.h
     llscrollcontainer.h
     llscrollingpanellist.h
@@ -248,9 +242,6 @@ set_source_files_properties(llurlentry.cpp
     "${llurlentry_TEST_DEPENDENCIES}"
     )
 
-list(APPEND llui_SOURCE_FILES ${llui_HEADER_FILES})
-
-add_library (llui ${llui_SOURCE_FILES})
 target_include_directories( llui  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
@@ -265,48 +256,14 @@ target_link_libraries(llui
         llfilesystem
         llxml
         llmath
-        ll::hunspell
         llcommon
+        ll::hunspell
     )
 
-if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
-  target_precompile_headers(llui
-    PRIVATE
-    [["linden_common.h"]]
-    [["llcursortypes.h"]]
-    [["llframetimer.h"]]
-    [["llhandle.h"]]
-    [["llmortician.h"]]
-    [["llpointer.h"]]
-    [["llrefcount.h"]]
-    [["llregistry.h"]]
-    [["llsd.h"]]
-    [["lltrace.h"]]
-    [["llinitparam.h"]]
-    [["llstring.h"]]
-    [["llcoord.h"]]
-    [["llrect.h"]]
-    [["llfontgl.h"]]
-    [["llrender2dutils.h"]]
-    [["llmousehandler.h"]]
-    <map>
-    <limits>
-    <list>
-    <set>
-    <string>
-    <boost/function.hpp>
-    <boost/noncopyable.hpp>
-    <boost/signals2.hpp>
-    <boost/unordered/unordered_flat_map.hpp>
-    <boost/unordered/unordered_flat_set.hpp>
-    <boost/unordered/unordered_map.hpp>
-    <boost/unordered/unordered_set.hpp>
-    )
-endif()
+target_precompile_headers(llui REUSE_FROM llprecompiled)
 
 # Add tests
-if(LL_TESTS)
-  include(LLAddBuildTest)
+if(BUILD_TESTING)
   set(test_libs llmessage llcorehttp llxml llrender llcommon ll::hunspell)
 
   SET(llui_TEST_SOURCE_FILES
@@ -314,10 +271,9 @@ if(LL_TESTS)
       )
   set_property( SOURCE ${llui_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_LIBRARIES ${test_libs})
   LL_ADD_PROJECT_UNIT_TESTS(llui "${llui_TEST_SOURCE_FILES}")
-  # INTEGRATION TESTS
 
-  if(NOT LINUX AND NOT DARWIN)
-    set(test_libs llui llmessage llcorehttp llxml llrender llcommon ll::hunspell )
-    LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}")
-  endif()
-endif(LL_TESTS)
+  # INTEGRATION TESTS
+  set(test_libs llui llmessage llcorehttp llxml llrender llcommon ll::hunspell)
+  set(test_project llui)
+  LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}" "${test_project}")
+endif()

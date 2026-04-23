@@ -47,9 +47,6 @@
 #include "lleventcoro.h"
 #include "llcoros.h"
 
-#include "boost/unordered/unordered_map.hpp"
-#include "boost/unordered/unordered_flat_map.hpp"
-
 class LLInventoryObserver;
 class LLInventoryObject;
 class LLInventoryItem;
@@ -125,9 +122,8 @@ public:
         FetchItemHttpHandler(const LLSD & request_sd);
         virtual ~FetchItemHttpHandler();
 
-    protected:
-        FetchItemHttpHandler(const FetchItemHttpHandler &);             // Not defined
-        void operator=(const FetchItemHttpHandler &);                   // Not defined
+        FetchItemHttpHandler(const FetchItemHttpHandler&) = delete;
+        FetchItemHttpHandler& operator=(const FetchItemHttpHandler&) = delete;
 
     public:
         virtual void onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response);
@@ -205,13 +201,13 @@ private:
     // the inventory using several different identifiers.
     // mInventory member data is the 'master' list of inventory, and
     // mCategoryMap and mItemMap store uuid->object mappings.
-    typedef boost::unordered_flat_map<LLUUID, LLPointer<LLViewerInventoryCategory> > cat_map_t;
-    typedef boost::unordered_flat_map<LLUUID, LLPointer<LLViewerInventoryItem> > item_map_t;
+    typedef boost::unordered_map<LLUUID, LLPointer<LLViewerInventoryCategory>> cat_map_t;
+    typedef boost::unordered_map<LLUUID, LLPointer<LLViewerInventoryItem>>   item_map_t;
     cat_map_t mCategoryMap;
     item_map_t mItemMap;
     // This last set of indices is used to map parents to children.
-    typedef boost::unordered_flat_map<LLUUID, cat_array_t*> parent_cat_map_t;
-    typedef boost::unordered_flat_map<LLUUID, item_array_t*> parent_item_map_t;
+    typedef boost::unordered_map<LLUUID, cat_array_t*>  parent_cat_map_t;
+    typedef boost::unordered_map<LLUUID, item_array_t*> parent_item_map_t;
     parent_cat_map_t mParentChildCategoryTree;
     parent_item_map_t mParentChildItemTree;
 
@@ -228,11 +224,11 @@ private:
     // Login
     //--------------------------------------------------------------------
 public:
-    static BOOL getIsFirstTimeInViewer2();
+    static bool getIsFirstTimeInViewer2();
     static bool  isSysFoldersReady() { return (sPendingSystemFolders == 0); }
 
 private:
-    static BOOL sFirstTimeInViewer2;
+    static bool sFirstTimeInViewer2;
     const static S32 sCurrentInvCacheVersion; // expected inventory cache version
 
     static S32 sPendingSystemFolders;
@@ -275,8 +271,8 @@ public:
     //    Do not store a copy of the pointers collected - use them, and
     //    collect them again later if you need to reference the same objects.
     enum {
-        EXCLUDE_TRASH = FALSE,
-        INCLUDE_TRASH = TRUE
+        EXCLUDE_TRASH = false,
+        INCLUDE_TRASH = true
     };
     // Simpler existence test if matches don't actually need to be collected.
     bool hasMatchingDirectDescendent(const LLUUID& cat_id,
@@ -284,27 +280,30 @@ public:
     void collectDescendents(const LLUUID& id,
                             cat_array_t& categories,
                             item_array_t& items,
-                            BOOL include_trash);
+                            bool include_trash);
 // [RLVa:KB] - Checked: 2013-04-15 (RLVa-1.4.8)
     void collectDescendentsIf(const LLUUID& id,
                               cat_array_t& categories,
                               item_array_t& items,
-                              BOOL include_trash,
+                              bool include_trash,
                               LLInventoryCollectFunctor& add,
                               bool follow_folder_links = false);
 // [/RLVa:KB]
 //  void collectDescendentsIf(const LLUUID& id,
 //                            cat_array_t& categories,
 //                            item_array_t& items,
-//                            BOOL include_trash,
-//                            LLInventoryCollectFunctor& add);
+//                            bool include_trash);
+
+    bool hasMatchingDescendents(const LLUUID& id,
+        bool include_trash,
+        LLInventoryCollectFunctor& add);
 
     // Collect all items in inventory that are linked to item_id.
     // Assumes item_id is itself not a linked item.
     item_array_t collectLinksTo(const LLUUID& item_id);
 
     // Check if one object has a parent chain up to the category specified by UUID.
-    BOOL isObjectDescendentOf(const LLUUID& obj_id, const LLUUID& cat_id, const bool break_on_recursion = false) const;
+    bool isObjectDescendentOf(const LLUUID& obj_id, const LLUUID& cat_id) const;
 
     enum EAncestorResult{
         ANCESTOR_OK = 0,
@@ -343,9 +342,7 @@ public:
     // user specified one or it does not exist, creates default category if it is missing.
     const LLUUID findUserDefinedCategoryUUIDForType(LLFolderType::EType preferred_type) const;
 
-    // Returns the uuid of the category if found, LLUUID::null is not
-    const LLUUID findDescendentCategoryIDByName(const LLUUID& parent_id,
-                                                const std::string& name) const;
+    const LLUUID getMarketplaceListingsUUID();
 
     // Get whatever special folder this object is a child of, if any.
     const LLViewerInventoryCategory *getFirstNondefaultParent(const LLUUID& obj_id) const;
@@ -378,6 +375,8 @@ public:
 
 private:
     mutable LLPointer<LLViewerInventoryItem> mLastItem; // cache recent lookups
+
+    LLUUID mMarketplaceListingsUUID;
 
     //--------------------------------------------------------------------
     // Count
@@ -424,12 +423,12 @@ public:
     // Migrated from llinventoryfunctions
     void changeItemParent(LLViewerInventoryItem* item,
                           const LLUUID& new_parent_id,
-                          BOOL restamp);
+                          bool restamp);
 
     // Migrated from llinventoryfunctions
     void changeCategoryParent(LLViewerInventoryCategory* cat,
                               const LLUUID& new_parent_id,
-                              BOOL restamp);
+                              bool restamp);
 
     // Marks links from a "possibly" broken list for a rebuild
     // clears the list
@@ -506,7 +505,7 @@ public:
     void createNewCategory(const LLUUID& parent_id,
                              LLFolderType::EType preferred_type,
                              const std::string& name,
-                             inventory_func_type callback = NULL,
+                             inventory_func_type callback = nullptr,
                              const LLUUID& thumbnail_id = LLUUID::null);
 protected:
     // Internal methods that add inventory and make sure that all of
@@ -551,7 +550,7 @@ public:
         LLInitializedS32& operator++() { ++mValue; return *this; }
         LLInitializedS32& operator--() { --mValue; return *this; }
     };
-    typedef boost::unordered_map<LLUUID, LLInitializedS32> update_map_t;
+    typedef std::map<LLUUID, LLInitializedS32> update_map_t;
 
     // Call when there are category updates.  Call them *before* the
     // actual update so the method can do descendent accounting correctly.
@@ -603,7 +602,7 @@ protected:
 private:
     // Flag set when notifyObservers is being called, to look for bugs
     // where it's called recursively.
-    BOOL mIsNotifyObservers;
+    bool mIsNotifyObservers;
     // Variables used to track what has changed since the last notify.
     U32 mModifyMask;
     changed_items_t mChangedItemIDs;
@@ -615,7 +614,7 @@ private:
     U32 mModifyMaskBacklog;
     changed_items_t mChangedItemIDsBacklog;
     changed_items_t mAddedItemIDsBacklog;
-    typedef boost::unordered_map<LLUUID , changed_items_t> broken_links_t;
+    typedef std::map<LLUUID , changed_items_t> broken_links_t;
     broken_links_t mPossiblyBrockenLinks; // there can be multiple links per item
     changed_items_t mLinksRebuildList;
     boost::signals2::connection mBulkFecthCallbackSlot;
@@ -628,7 +627,7 @@ public:
     // If the observer is destroyed, be sure to remove it.
     void addObserver(LLInventoryObserver* observer);
     void removeObserver(LLInventoryObserver* observer);
-    BOOL containsObserver(LLInventoryObserver* observer) const;
+    bool containsObserver(LLInventoryObserver* observer) const;
 private:
     typedef std::set<LLInventoryObserver*> observer_list_t;
     observer_list_t mObservers;
@@ -726,8 +725,8 @@ protected:
     cat_array_t* getUnlockedCatArray(const LLUUID& id);
     item_array_t* getUnlockedItemArray(const LLUUID& id);
 private:
-    boost::unordered_map<LLUUID, bool> mCategoryLock;
-    boost::unordered_map<LLUUID, bool> mItemLock;
+    std::map<LLUUID, bool> mCategoryLock;
+    std::map<LLUUID, bool> mItemLock;
 
     //--------------------------------------------------------------------
     // Debugging

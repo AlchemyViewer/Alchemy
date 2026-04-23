@@ -53,7 +53,7 @@ public:
         LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest(gAgent.getID());
     }
 
-    typedef boost::function<void(LLAvatarData*)> server_respond_callback_t;
+    typedef std::function<void(LLAvatarData*)> server_respond_callback_t;
 
     void setServerRespondCallback(const server_respond_callback_t& cb)
     {
@@ -86,10 +86,9 @@ private:
 
 LLAgentPicksInfo::LLAgentPicksInfo()
  : mAgentPicksObserver(NULL)
- , mMaxNumberOfPicks(MAX_AVATAR_PICKS)
  // Disable Pick creation until we get number of Picks from server - in case
  // avatar has maximum number of Picks.
- , mNumberOfPicks(mMaxNumberOfPicks)
+ , mNumberOfPicks(S32_MAX)
 {
 }
 
@@ -111,9 +110,15 @@ void LLAgentPicksInfo::requestNumberOfPicks()
     mAgentPicksObserver->sendAgentPicksRequest();
 }
 
-bool LLAgentPicksInfo::isPickLimitReached()
+// static
+S32 LLAgentPicksInfo::getMaxNumberOfPicks()
 {
-    return getNumberOfPicks() >= LLAgentBenefitsMgr::current().getPicksLimit();
+    return LLAgentBenefitsMgr::current().getPicksLimit();
+}
+
+bool LLAgentPicksInfo::isPickLimitReached() const
+{
+    return getNumberOfPicks() >= getMaxNumberOfPicks();
 }
 
 void LLAgentPicksInfo::onServerRespond(LLAvatarData* picks)
@@ -124,5 +129,5 @@ void LLAgentPicksInfo::onServerRespond(LLAvatarData* picks)
         return;
     }
 
-    setNumberOfPicks(picks->picks_list.size());
+    setNumberOfPicks(static_cast<S32>(picks->picks_list.size()));
 }

@@ -1,70 +1,62 @@
-project(ALPlugin)
 
-include(00-Common)
-include(LLCommon)
-include(Linking)
 include(PluginAPI)
 
 ### SLPlugin
 
-set(SLPlugin_SOURCE_FILES
+add_executable(SLPlugin
+    WIN32
+    MACOSX_BUNDLE
+    )
+
+target_sources(SLPlugin
+    PRIVATE
     slplugin.cpp
     )
 
-if (DARWIN)
-  list(APPEND SLPlugin_SOURCE_FILES
-    slplugin-objc.mm
+
+if (WINDOWS)
+  target_sources(SLPlugin
+    PRIVATE
+    slplugin.manifest
   )
-  list(APPEND SLPlugin_HEADER_FILES
+elseif (DARWIN)
+  target_sources(SLPlugin
+    PRIVATE
+    slplugin-objc.mm
+
+    PUBLIC
+    FILE_SET HEADERS
+    FILES
     slplugin-objc.h
   )
-endif (DARWIN)
 
-if (SLPlugin_HEADER_FILES)
-  list(APPEND SLPlugin_SOURCE_FILES ${SLPlugin_HEADER_FILES})
-endif (SLPlugin_HEADER_FILES)
+  set_source_files_properties(
+    slplugin-objc.mm
+    PROPERTIES
+    SKIP_PRECOMPILE_HEADERS TRUE
+  )
+endif ()
 
-add_executable(ALPlugin
-    WIN32
-    MACOSX_BUNDLE
-    ${SLPlugin_SOURCE_FILES}
-    )
-
-target_link_libraries(ALPlugin
-        PUBLIC
+target_link_libraries(SLPlugin
         llplugin
         llmessage
         llcommon
         ll::pluginlibraries
         )
 
-if (WINDOWS)
-  set_target_properties(ALPlugin
+target_precompile_headers(SLPlugin REUSE_FROM llprecompiled_exe)
+
+if(WINDOWS)
+  set_target_properties(SLPlugin
     PROPERTIES
-    LINK_FLAGS_DEBUG "/NODEFAULTLIB:\"LIBCMTD\""
-    )
-elseif (LINUX)
-  set_target_properties(ALPlugin 
-    PROPERTIES
-    LINK_FLAGS "-Wl,--disable-new-dtags"
-    SKIP_BUILD_RPATH FALSE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/llplugin")
+    RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
+  )
 elseif (DARWIN)
-  set_target_properties(ALPlugin
+  set_target_properties(SLPlugin
     PROPERTIES
     BUILD_WITH_INSTALL_RPATH 1
     INSTALL_RPATH "@executable_path/../../../../Frameworks;@executable_path/../Frameworks;@executable_path/../Frameworks/plugins"
     MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/slplugin_info.plist
-    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.alchemyviewer.viewer.slplugin"
-    )
-
-  # Make sure the app bundle has a Resources directory (it will get populated by viewer-manifest.py later)
-  add_custom_command(
-    TARGET ALPlugin POST_BUILD
-    COMMAND mkdir
-    ARGS
-      -p
-      ${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/ALPlugin.app/Contents/Resources
+    XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
   )
 endif ()

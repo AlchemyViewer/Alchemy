@@ -48,18 +48,17 @@ class LLMutex ;
 #define LL_ALIGN_OF __align_of__
 #endif
 
-#if LL_WINDOWS || LL_LINUX
-#if ADDRESS_SIZE == 64
+#if defined(LL_X86_64) || defined(LL_ARM64)
 #define LL_DEFAULT_HEAP_ALIGN 16
 #else
+#if LL_WINDOWS
 #define LL_DEFAULT_HEAP_ALIGN 8
-#endif
 #elif LL_DARWIN
 #define LL_DEFAULT_HEAP_ALIGN 16
 #elif LL_LINUX
-#error "UNKNOWN PLATFORM HEAP SIZE"
+#define LL_DEFAULT_HEAP_ALIGN 8
 #endif
-
+#endif
 
 LL_COMMON_API void ll_assert_aligned_func(uintptr_t ptr,U32 alignment);
 
@@ -75,7 +74,11 @@ LL_COMMON_API void ll_assert_aligned_func(uintptr_t ptr,U32 alignment);
 #define ll_assert_aligned(ptr,alignment)
 #endif
 
+#if LL_ARM64
+#include "sse2neon/sse2neon.h"
+#else
 #include <xmmintrin.h>
+#endif
 
 template <typename T> T* LL_NEXT_ALIGNED_ADDRESS(T* address)
 {
@@ -88,22 +91,6 @@ template <typename T> T* LL_NEXT_ALIGNED_ADDRESS_64(T* address)
     return reinterpret_cast<T*>(
         (uintptr_t(address) + 0x3F) & ~0x3F);
 }
-
-#if LL_LINUX || LL_DARWIN
-
-#define         LL_ALIGN_PREFIX(x)
-#define         LL_ALIGN_POSTFIX(x)     __attribute__((aligned(x)))
-
-#elif LL_WINDOWS
-
-#define         LL_ALIGN_PREFIX(x)      __declspec(align(x))
-#define         LL_ALIGN_POSTFIX(x)
-
-#else
-#error "LL_ALIGN_PREFIX and LL_ALIGN_POSTFIX undefined"
-#endif
-
-#define LL_ALIGN_16(var) LL_ALIGN_PREFIX(16) var LL_ALIGN_POSTFIX(16)
 
 #define LL_ALIGN_NEW                        \
 public:                                     \
@@ -127,7 +114,6 @@ public:                                     \
         ll_aligned_free_16(ptr);            \
     }
 
-
 //------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------
     // for enable buffer overrun detection predefine LL_DEBUG_BUFFER_OVERRUN in current library
@@ -138,11 +124,15 @@ public:                                     \
     void ll_aligned_free_fallback( void* ptr );
 //------------------------------------------------------------------------------------------------
 #else
-    inline void* ll_aligned_malloc_fallback( size_t size, int align )
+    inline void* ll_aligned_malloc_fallback( size_t size, size_t align )
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
     #if defined(LL_WINDOWS)
         void* ret = _aligned_malloc(size, align);
+    #elif defined(LL_LINUX)
+        void *ret;
+        if (0 != posix_memalign(&ret, align, size))
+            return nullptr;
     #else
         char* aligned = NULL;
         void* mem = malloc( size + (align - 1) + sizeof(void*) );
@@ -165,6 +155,8 @@ public:                                     \
         LL_PROFILE_FREE(ptr);
     #if defined(LL_WINDOWS)
         _aligned_free(ptr);
+    #elif defined(LL_LINUX)
+        free(ptr);
     #else
         if (ptr)
         {
@@ -179,18 +171,14 @@ public:                                     \
 inline void* ll_aligned_malloc_16(size_t size) // returned hunk MUST be freed with ll_aligned_free_16().
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
-#if (ADDRESS_SIZE == 64 && (defined(LL_WINDOWS) || defined(LL_DARWIN) || defined(LL_LINUX)))
-    void* ret = malloc(size); // default x86_64 malloc alignment on windows, mac, and linux is 16 byte aligned
-#else
-#if defined(LL_WINDOWS)
+#if LL_DEFAULT_HEAP_ALIGN == 16
+    void* ret = malloc(size); // default osx and 64-bit malloc is 16 byte aligned.
+#elif defined(LL_WINDOWS)
     void* ret = _aligned_malloc(size, 16);
-#elif defined(LL_DARWIN)
-    void* ret = malloc(size); // default osx malloc is 16 byte aligned.
 #else
     void *ret;
     if (0 != posix_memalign(&ret, 16, size))
         return nullptr;
-#endif
 #endif
     LL_PROFILE_ALLOC(ret, size);
     return ret;
@@ -200,16 +188,12 @@ inline void ll_aligned_free_16(void *p)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
     LL_PROFILE_FREE(p);
-#if (ADDRESS_SIZE == 64 && (defined(LL_WINDOWS) || defined(LL_DARWIN) || defined(LL_LINUX)))
-    free(p); // default x86_64 malloc alignment on windows, mac, and linux is 16 byte aligned
-#else
-#if defined(LL_WINDOWS)
-    _aligned_free(p);
-#elif defined(LL_DARWIN)
+#if LL_DEFAULT_HEAP_ALIGN == 16
     free(p);
+#elif defined(LL_WINDOWS)
+    _aligned_free(p);
 #else
     free(p); // posix_memalign() is compatible with heap deallocator
-#endif
 #endif
 }
 
@@ -217,15 +201,12 @@ inline void* ll_aligned_realloc_16(void* ptr, size_t size, size_t old_size) // r
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
     LL_PROFILE_FREE(ptr);
-#if (ADDRESS_SIZE == 64 && (defined(LL_WINDOWS) || defined(LL_DARWIN) || defined(LL_LINUX)))
-    void* ret = realloc(ptr, size); // default x86_64 malloc alignment on windows, mac, and linux is 16 byte aligned
-#else
-#if defined(LL_WINDOWS)
+#if LL_DEFAULT_HEAP_ALIGN == 16
+    void* ret = realloc(ptr,size); // default osx and 64bit malloc is 16 byte aligned.
+#elif defined(LL_WINDOWS)
     void* ret = _aligned_realloc(ptr, size, 16);
-#elif defined(LL_DARWIN)
-    void* ret = realloc(ptr,size); // default osx malloc is 16 byte aligned.
 #else
-    //FIXME: memcpy is SLOW but posix lacks aligned realloc
+    //FIXME: memcpy is SLOW
     void* ret = ll_aligned_malloc_16(size);
     if (ptr)
     {
@@ -236,10 +217,8 @@ inline void* ll_aligned_realloc_16(void* ptr, size_t size, size_t old_size) // r
         }
         ll_aligned_free_16(ptr);
     }
-    return ret;
 #endif
-#endif
-    LL_PROFILE_ALLOC(ptr, size);
+    LL_PROFILE_ALLOC(ret, size);
     return ret;
 }
 
@@ -268,7 +247,7 @@ inline void ll_aligned_free_32(void *p)
 #endif
 }
 
-inline void* ll_aligned_malloc_64(size_t size) // returned hunk MUST be freed with ll_aligned_free_64().
+inline void* ll_aligned_malloc_64(size_t size) // returned hunk MUST be freed with ll_aligned_free_32().
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
 #if defined(LL_WINDOWS)
@@ -280,7 +259,6 @@ inline void* ll_aligned_malloc_64(size_t size) // returned hunk MUST be freed wi
 #endif
     LL_PROFILE_ALLOC(ret, size);
     return ret;
-
 }
 
 inline void ll_aligned_free_64(void *p)
@@ -300,20 +278,20 @@ LL_FORCE_INLINE void* ll_aligned_malloc(size_t size)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
     void* ret;
-    if (LL_DEFAULT_HEAP_ALIGN % ALIGNMENT == 0)
+    if constexpr (LL_DEFAULT_HEAP_ALIGN % ALIGNMENT == 0)
     {
         ret = malloc(size);
         LL_PROFILE_ALLOC(ret, size);
     }
-    else if (ALIGNMENT == 16)
+    else if constexpr (ALIGNMENT == 16)
     {
         ret = ll_aligned_malloc_16(size);
     }
-    else if (ALIGNMENT == 32)
+    else if constexpr (ALIGNMENT == 32)
     {
         ret = ll_aligned_malloc_32(size);
     }
-    else if (ALIGNMENT == 64)
+    else if constexpr (ALIGNMENT == 64)
     {
         ret = ll_aligned_malloc_64(size);
     }
@@ -328,22 +306,22 @@ template<size_t ALIGNMENT>
 LL_FORCE_INLINE void ll_aligned_free(void* ptr)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
-    if (ALIGNMENT == LL_DEFAULT_HEAP_ALIGN)
+    if constexpr (ALIGNMENT == LL_DEFAULT_HEAP_ALIGN)
     {
         LL_PROFILE_FREE(ptr);
         free(ptr);
     }
-    else if (ALIGNMENT == 16)
+    else if constexpr (ALIGNMENT == 16)
     {
         ll_aligned_free_16(ptr);
     }
-    else if (ALIGNMENT == 32)
+    else if constexpr (ALIGNMENT == 32)
     {
         return ll_aligned_free_32(ptr);
     }
-    else if (ALIGNMENT == 64)
+    else if constexpr (ALIGNMENT == 64)
     {
-        return ll_aligned_free_64(ptr);
+        return ll_aligned_free_32(ptr);
     }
     else
     {
@@ -357,6 +335,9 @@ LL_FORCE_INLINE void ll_aligned_free(void* ptr)
 inline void ll_memcpy_nonaliased_aligned_16(char* __restrict dst, const char* __restrict src, size_t bytes)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
+#if defined(LL_ARM64)
+    memcpy(dst, src, bytes);
+#else
     assert(src != NULL);
     assert(dst != NULL);
     assert(bytes > 0);
@@ -416,13 +397,13 @@ inline void ll_memcpy_nonaliased_aligned_16(char* __restrict dst, const char* __
 
     // Copy remainder 16b tail chunks (or ALL 16b chunks for sub-64b copies)
     //
-    llassert(0 == (((U8*) end - (U8*) dst) % 16));
     while (dst < end)
     {
         _mm_store_ps((F32*)dst, _mm_load_ps((F32*)src));
         dst += 16;
         src += 16;
     }
+#endif
 }
 
 #ifndef __DEBUG_PRIVATE_MEM__
@@ -438,7 +419,7 @@ public:
     static void* tryToAlloc(void* address, U32 size);
     static void initMaxHeapSizeGB(F32Gigabytes max_heap_size);
     static void updateMemoryInfo() ;
-    static void logMemoryInfo(BOOL update = FALSE);
+    static void logMemoryInfo(bool update = false);
 
     static U32Kilobytes getAvailableMemKB() ;
     static U32Kilobytes getMaxMemKB() ;

@@ -3,7 +3,7 @@
  name="menu_modes"
  left="0" bottom="0" visible="false"
  mouse_opaque="false">
-	<menu_item_check
+    <menu_item_check
        label="IRC view"
        name="fancy_compact_view">
 		<menu_item_check.on_click
@@ -38,13 +38,13 @@
 	 label="Show previous conversation history"
 	 name="LogShowHistory">
 		<menu_item_check.on_check
-		 function="CheckControl"
+		 function="CheckControlPerAccount"
 		 parameter="LogShowHistory" />
 		<menu_item_check.on_click
-		 function="ToggleControl"
+		 function="ToggleControlPerAccount"
 		 parameter="LogShowHistory" />
-	</menu_item_check>
-	<menu_item_separator layout="topleft" />
+    </menu_item_check>
+    <menu_item_separator layout="topleft" />
     <menu_item_check name="IMShowTime" label="Show time">
         <menu_item_check.on_click
          function="IMSession.Menu.Action"
@@ -87,16 +87,5 @@
 		<menu_item_check.on_click
 		 function="ToggleControl"
 		 parameter="EnableAutoCloseOOC" />
-	</menu_item_check>
-	<menu_item_separator layout="topleft" />
-	<menu_item_check
-	 label="Chat Alerts..."
-	 name="Chat Alerts">
-		<menu_item_check.on_check
-		 function="Floater.Visible"
-		 parameter="chat_alerts" />
-		<menu_item_check.on_click
-		 function="Floater.Toggle"
-		 parameter="chat_alerts" />
 	</menu_item_check>
 </toggleable_menu>

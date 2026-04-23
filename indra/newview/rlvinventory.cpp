@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -96,7 +97,7 @@ void RlvInventory::fetchSharedInventory()
 
     // Grab all the folders under the shared root
     LLInventoryModel::cat_array_t folders; LLInventoryModel::item_array_t items;
-    gInventory.collectDescendents(pRlvRoot->getUUID(), folders, items, FALSE);
+    gInventory.collectDescendents(pRlvRoot->getUUID(), folders, items, false);
 
     // Add them to the "to fetch" list
     uuid_vec_t idFolders;
@@ -127,7 +128,7 @@ void RlvInventory::fetchSharedLinks()
 
     // Grab all the inventory links under the shared root
     LLInventoryModel::cat_array_t folders; LLInventoryModel::item_array_t items; RlvIsLinkType f;
-    gInventory.collectDescendentsIf(pRlvRoot->getUUID(), folders, items, FALSE, f, false);
+    gInventory.collectDescendentsIf(pRlvRoot->getUUID(), folders, items, false, f, false);
 
     // Add them to the "to fetch" list based on link type
     uuid_vec_t idFolders, idItems;
@@ -174,13 +175,16 @@ void RlvInventory::fetchWornItems()
     // Fetch all currently worn attachments
     if (isAgentAvatarValid())
     {
-        for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
+        for (LLVOAvatar::attachment_map_t::const_iterator itAttachPt = gAgentAvatarp->mAttachmentPoints.begin();
+                itAttachPt != gAgentAvatarp->mAttachmentPoints.end(); ++itAttachPt)
         {
-            const LLViewerJointAttachment* pAttachPt = attach_pair.second;
+            const LLViewerJointAttachment* pAttachPt = itAttachPt->second;
             if (pAttachPt)
             {
-                for (const LLViewerObject* pAttachObj : pAttachPt->mAttachedObjects)
+                for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
+                     itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
                 {
+                    const LLViewerObject* pAttachObj = (*itAttachObj);
                     if ( (pAttachObj) && (pAttachObj->getAttachmentItemID().notNull()) )
                         idItems.push_back(pAttachObj->getAttachmentItemID());
                 }
@@ -203,7 +207,7 @@ bool RlvInventory::findSharedFolders(const std::string& strCriteria, LLInventory
     folders.clear();
     LLInventoryModel::item_array_t items;
     RlvCriteriaCategoryCollector f(strCriteria);
-    gInventory.collectDescendentsIf(pRlvRoot->getUUID(), folders, items, FALSE, f);
+    gInventory.collectDescendentsIf(pRlvRoot->getUUID(), folders, items, false, f);
 
     return (folders.size() != 0);
 }
@@ -340,7 +344,7 @@ S32 RlvInventory::getDirectDescendentsFolderCount(const LLInventoryCategory* pFo
     LLInventoryModel::cat_array_t* pFolders = NULL; LLInventoryModel::item_array_t* pItems = NULL;
     if (pFolder)
         gInventory.getDirectDescendentsOf(pFolder->getUUID(), pFolders, pItems);
-    return (pFolders) ? pFolders->size() : 0;
+    return (pFolders) ? static_cast<S32>(pFolders->size()) : 0;
 }
 
 // Checked: 2009-05-26 (RLVa-0.2.0d) | Modified: RLVa-0.2.0d
@@ -452,7 +456,7 @@ void RlvRenameOnWearObserver::doneIdle()
                 strName += " (" + strAttachPt + ")";
 
                 pItem->rename(strName);
-                pItem->updateServer(FALSE);
+                pItem->updateServer(false);
                 gInventory.addChangedMask(LLInventoryObserver::LABEL, pItem->getUUID());
             }
             else
@@ -469,7 +473,7 @@ void RlvRenameOnWearObserver::doneIdle()
                          (1 == RlvInventory::getDirectDescendentsItemCount(pFolder, LLAssetType::AT_OBJECT)) )
                     {
                         pFolder->rename(strFolderName);
-                        pFolder->updateServer(FALSE);
+                        pFolder->updateServer(false);
                         gInventory.addChangedMask(LLInventoryObserver::LABEL, pFolder->getUUID());
                     }
                     else
@@ -632,7 +636,7 @@ void RlvGiveToRLVTaskOffer::doneIdle()
 
 void RlvGiveToRLVTaskOffer::onDestinationCreated(const LLUUID& idDestFolder, const std::string& strName)
 {
-    if (const LLViewerInventoryCategory* pTarget = (idDestFolder.notNull()) ? gInventory.getCategory(idDestFolder) : nullptr)
+    if (idDestFolder.notNull())
     {
         moveAndRename(m_Folders.front(), idDestFolder, strName, new LLBoostFuncInventoryCallback(boost::bind(&RlvGiveToRLVTaskOffer::onOfferCompleted, this, _1)));
     }

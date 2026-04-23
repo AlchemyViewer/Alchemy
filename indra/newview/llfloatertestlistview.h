@@ -30,7 +30,7 @@
 
 class LLSD;
 
-class LLFloaterTestListView final : public LLFloater
+class LLFloaterTestListView : public LLFloater
 {
     friend class LLFloaterReg;
 

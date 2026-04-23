@@ -4,5 +4,5 @@
 		検索語句が短すぎるため、検索は実行されませんでした。
 	</panel.string>
 	<text name="search_title" value="検索語句を入力："/>
-	<search_editor label="Search" name="search_bar" tool_tip="検索語句を入力"/>
+	<search_editor label="検索" name="search_bar" tool_tip="検索語句を入力"/>
 </panel>

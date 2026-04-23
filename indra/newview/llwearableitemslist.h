@@ -32,6 +32,7 @@
 #include "llsingleton.h"
 
 // newview
+#include "llinventoryfunctions.h"
 #include "llinventoryitemslist.h"
 #include "llinventorylistitem.h"
 #include "lllistcontextmenu.h"
@@ -83,8 +84,8 @@ public:
         Params();
     };
 
-    BOOL postBuild();
-    BOOL handleDoubleClick(S32 x, S32 y, MASK mask);
+    bool postBuild();
+    bool handleDoubleClick(S32 x, S32 y, MASK mask);
 
     static LLPanelWearableOutfitItem* create(LLViewerInventoryItem* item,
                                              bool worn_indication_enabled,
@@ -94,6 +95,7 @@ public:
      * Updates item name and (worn) suffix.
      */
     /*virtual*/ void updateItem(const std::string& name,
+                                bool favorite,
                                 EItemState item_state = IS_DEFAULT);
 
     void onAddWearable();
@@ -104,6 +106,8 @@ protected:
                               bool worn_indication_enabled, const Params& params, bool show_widgets = false);
 
 private:
+    LLButton* mAddWearableBtn = nullptr;
+    LLButton* mRemoveWearableBtn = nullptr;
     bool    mWornIndicationEnabled;
     bool mShowWidgets;
 };
@@ -124,7 +128,7 @@ public:
 
     virtual ~LLPanelDeletableWearableListItem() {};
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     /**
      * Make button visible during mouse over event.
@@ -145,6 +149,7 @@ public:
 
     /** Set item title. Joint name is added to the title in parenthesis */
     /*virtual*/ void updateItem(const std::string& name,
+                                bool favorite,
                                 EItemState item_state = IS_DEFAULT);
 
 protected:
@@ -177,7 +182,7 @@ public:
 
     virtual ~LLPanelClothingListItem();
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     /**
      * Make button visible during mouse over event.
@@ -212,7 +217,7 @@ public:
 
     virtual ~LLPanelBodyPartsListItem();
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     /**
     * Make button visible during mouse over event.
@@ -241,7 +246,7 @@ public:
     };
     static LLPanelDummyClothingListItem* create(LLWearableType::EType w_type);
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     LLWearableType::EType getWearableType() const;
 
 protected:
@@ -414,7 +419,7 @@ protected:
  * an inventory category specified by UUID and displays them
  * as a flat list.
  */
-class LLWearableItemsList final : public LLInventoryItemsList
+class LLWearableItemsList : public LLInventoryItemsList
 {
 public:
     /**
@@ -424,7 +429,7 @@ public:
      * (e.g. for items selected across multiple wearable lists),
      * so making it a singleton.
      */
-    class ContextMenu final : public LLListContextMenu, public LLSingleton<ContextMenu>
+    class ContextMenu : public LLListContextMenu, public LLSingleton<ContextMenu>
     {
         LLSINGLETON(ContextMenu);
     public:
@@ -503,6 +508,14 @@ protected:
     ESortOrder      mSortOrder;
 
     LLWearableType::EType mMenuWearableType;
+};
+
+class LLFindOutfitItems : public LLInventoryCollectFunctor
+{
+public:
+    LLFindOutfitItems() {}
+    virtual ~LLFindOutfitItems() {}
+    virtual bool operator()(LLInventoryCategory* cat, LLInventoryItem* item);
 };
 
 #endif //LL_LLWEARABLEITEMSLIST_H

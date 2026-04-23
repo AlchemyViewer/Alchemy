@@ -97,17 +97,11 @@ class LLMatrix4
 public:
     F32 mMatrix[NUM_VALUES_IN_MAT4][NUM_VALUES_IN_MAT4];
 
-
-    enum InitType {
-        kUninitialized,
-    };
-
     // Initializes Matrix to identity matrix
     LLMatrix4()
     {
         setIdentity();
     }
-    explicit LLMatrix4(InitType) {};
     explicit LLMatrix4(const F32 *mat);                             // Initializes Matrix to values in mat
     explicit LLMatrix4(const LLMatrix3 &mat);                       // Initializes Matrix to values in mat and sets position to (0,0,0)
     explicit LLMatrix4(const LLQuaternion &q);                      // Initializes Matrix with rotation q and sets position to (0,0,0)
@@ -246,11 +240,9 @@ public:
     friend std::ostream&     operator<<(std::ostream& s, const LLMatrix4 &a);   // Stream a
 };
 
-#ifndef SHOW_ASSERT
-static_assert(std::is_trivially_copyable<LLMatrix4>::value, "LLMatrix4 must be trivially copyable");
-static_assert(std::is_trivially_destructible<LLMatrix4>::value, "LLMatrix4 must be trivially destructible");
+static_assert(std::is_trivially_copyable<LLMatrix4>::value, "LLMatrix4 must be trivial copy");
+static_assert(std::is_trivially_move_assignable<LLMatrix4>::value, "LLMatrix4 must be trivial move");
 static_assert(std::is_standard_layout<LLMatrix4>::value, "LLMatrix4 must be a standard layout type");
-#endif
 
 inline const LLMatrix4& LLMatrix4::setIdentity()
 {

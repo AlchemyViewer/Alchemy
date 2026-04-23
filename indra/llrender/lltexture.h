@@ -48,7 +48,7 @@ class LLTexture : public virtual LLRefCount
     friend class LLFontGL ;
 
 protected:
-    virtual ~LLTexture() = default;
+    virtual ~LLTexture();
 
 public:
     LLTexture()

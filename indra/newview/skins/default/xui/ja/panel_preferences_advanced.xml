@@ -6,12 +6,8 @@
 	<text name="Cache:">
 		キャッシュ：
 	</text>
-	<slider label="ディスクキャッシュサイズ（1～16㎇）" name="disk_cache_size"/>
-	<text name="disk_cache_mb_text">
-		㎆
-	</text>
-	<slider label="テクスチャのキャッシュサイズ（1～16㎇）" name="texture_cache_size"/>
-	<text name="tex_cache_mb_text">
+	<spinner label="キャッシュサイズ（896～32768㎆）" name="cachesizespinner"/>
+	<text name="text_box5">
 		㎆
 	</text>
 	<button label="クリア" label_selected="クリア" name="clear_cache"/>
@@ -32,7 +28,6 @@
 		<radio_item label="別ウィンドウ" name="1"/>
 	</radio_group>
 	<check_box label="複数のビューアを許可" name="allow_multiple_viewer_check"/>
-	<check_box label="ゲームモードを有効化" name="enable_game_mode_check"/>
 	<check_box label="ログイン時にグリッド選択を表示" name="show_grid_selection_check"/>
 	<check_box label="高度な操作メニューを表示" name="show_advanced_menu_check"/>
 	<check_box label="開発メニューを表示" name="show_develop_menu_check"/>

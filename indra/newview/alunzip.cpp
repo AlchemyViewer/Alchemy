@@ -125,7 +125,7 @@ S32 ALUnZip::extractCurrentFile(const std::string& path)
         LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
     }
 
-    LLFILE* outfile = LLFile::fopen(write_filename, "wb");
+    LLFILE* outfile = LLFile::fopen(write_filename, LLFILE_MODE("wb"));
     if (outfile == nullptr)
     {
         LL_WARNS("ALUNZIP") << "Error opening " << write_filename << " for writing" << LL_ENDL;
@@ -134,7 +134,7 @@ S32 ALUnZip::extractCurrentFile(const std::string& path)
     {
         do
         {
-            error = unzReadCurrentFile(mZipfile, buf.get(), size_buf);
+            error = unzReadCurrentFile(mZipfile, buf.get(), narrow(size_buf));
             if (error < UNZ_OK)
             {
                 LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
@@ -180,7 +180,7 @@ bool ALUnZip::extractFile(const std::string& file_to_extract, char *buf, size_t 
     unz_file_info64 file_info;
     error = unzGetCurrentFileInfo64(mZipfile, &file_info, filename_inzip, sizeof(filename_inzip), nullptr, 0, nullptr, 0);
     error = unzOpenCurrentFile(mZipfile);
-    error = unzReadCurrentFile(mZipfile, buf, bufsize);
+    error = unzReadCurrentFile(mZipfile, buf, narrow(bufsize));
     unzCloseCurrentFile(mZipfile);
     if (error != UNZ_OK)
     {

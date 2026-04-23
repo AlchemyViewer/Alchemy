@@ -30,8 +30,6 @@
 
 #include "llpointer.h"
 
-#include "boost/unordered_map.hpp"
-
 class LLFontGL;
 
 typedef std::vector<std::string> string_vec_t;
@@ -65,21 +63,6 @@ public:
     LLFontDescriptor normalize() const;
 
     bool operator<(const LLFontDescriptor& b) const;
-
-    bool operator==(const LLFontDescriptor& rhs) const
-    {
-        return mName == rhs.mName && mStyle == rhs.mStyle && mSize == rhs.mSize;
-    }
-
-    friend std::size_t hash_value(LLFontDescriptor const& font)
-    {
-        std::size_t seed = 0;
-        boost::hash_combine(seed, font.mName);
-        boost::hash_combine(seed, font.mStyle);
-        boost::hash_combine(seed, font.mSize);
-        return seed;
-    }
-
 
     bool isTemplate() const;
 
@@ -134,10 +117,7 @@ public:
     const LLFontDescriptor *getMatchingFontDesc(const LLFontDescriptor& desc);
     const LLFontDescriptor *getClosestFontTemplate(const LLFontDescriptor& desc);
 
-// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
-    bool nameToSize(const std::string& font_name, const std::string& size_name, F32& size);
-// [/SL:KB]
-//  bool nameToSize(const std::string& size_name, F32& size);
+    bool nameToSize(const std::string& size_name, F32& size);
 
     void dump();
     void dumpTextures();
@@ -147,11 +127,8 @@ public:
 private:
     LLFontRegistry(const LLFontRegistry& other); // no-copy
     LLFontGL *createFont(const LLFontDescriptor& desc);
-    typedef boost::unordered_map<LLFontDescriptor,LLFontGL*> font_reg_map_t;
-// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
-    typedef boost::unordered_map<std::pair<std::string, std::string>, F32> font_size_map_t;
-// [/SL:KB]
-//  typedef std::map<std::string,F32> font_size_map_t;
+    typedef std::map<LLFontDescriptor,LLFontGL*> font_reg_map_t;
+    typedef std::map<std::string,F32> font_size_map_t;
 
     // Given a descriptor, look up specific font instantiation.
     font_reg_map_t mFontMap;

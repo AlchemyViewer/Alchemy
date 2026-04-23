@@ -44,7 +44,7 @@
 #define LL_LLAPPVIEWER_H
 
 #include "llapp.h"
-#include "llapr.h"
+#include "llfile.h"
 #include "llcontrol.h"
 #include "llsys.h"          // for LLOSInfo
 #include "lltimer.h"
@@ -65,6 +65,22 @@ class LLPurgeDiskCacheThread;
 class LLViewerRegion;
 
 extern LLTrace::BlockTimerStatHandle FTM_FRAME;
+
+typedef enum
+{
+    LAST_EXEC_NORMAL = 0,
+    LAST_EXEC_FROZE,
+    LAST_EXEC_LLERROR_CRASH,
+    LAST_EXEC_OTHER_CRASH,
+    LAST_EXEC_LOGOUT_FROZE,
+    LAST_EXEC_LOGOUT_CRASH,
+    LAST_EXEC_BAD_ALLOC,
+    LAST_EXEC_MISSING_FILES,
+    LAST_EXEC_GRAPHICS_INIT,
+    LAST_EXEC_UNKNOWN,
+    LAST_EXEC_LOGOUT_UNKNOWN,
+    LAST_EXEC_COUNT
+} eLastExecEvent;
 
 class LLAppViewer : public LLApp
 {
@@ -101,9 +117,6 @@ public:
     bool quitRequested() { return mQuitRequested; }
     bool logoutRequestSent() { return mLogoutRequestSent; }
     bool isSecondInstance() { return mSecondInstance; }
-    bool isUpdaterMissing(); // In use by tests
-    bool waitForUpdater();
-
     void writeDebugInfo(bool isStatic=true);
 
     void setServerReleaseNotesURL(const std::string& url) { mServerReleaseNotesURL = url; }
@@ -115,7 +128,6 @@ public:
 
     virtual bool restoreErrorTrap() = 0; // Require platform specific override to reset error handling mechanism.
                                          // return false if the error trap needed restoration.
-    virtual void initCrashReporting(bool reportFreeze = false) = 0; // What to do with crash report?
     void checkForCrash();
 
     // Thread accessors
@@ -136,6 +148,12 @@ public:
     std::string getWindowTitle() const; // The window display name.
 
     void forceDisconnect(const std::string& msg); // Force disconnection, with a message to the user.
+
+    // sendSimpleLogoutRequest does not create a marker file.
+    // Meant for lost network case, and for forced shutdowns,
+    // to at least attempt to remove the ghost from the world.
+    void sendSimpleLogoutRequest();
+
     void badNetworkHandler(); // Cause a crash state due to bad network packet.
 
     bool hasSavedFinalSnapshot() { return mSavedFinalSnapshot; }
@@ -144,10 +162,8 @@ public:
     void loadNameCache();
     void saveNameCache();
 
-    void loadExperienceCache();
-    void saveExperienceCache();
-
     void removeMarkerFiles();
+    void recordSessionToMarker();
 
     void removeDumpDir();
     // LLAppViewer testing helpers.
@@ -161,7 +177,10 @@ public:
     virtual void forceErrorOSSpecificException();
     virtual void forceErrorDriverCrash();
     virtual void forceErrorCoroutineCrash();
+    virtual void forceErrorCoroprocedureCrash();
+    virtual void forceErrorWorkQueueCrash();
     virtual void forceErrorThreadCrash();
+    virtual void forceExceptionThreadCrash();
 
     // The list is found in app_settings/settings_files.xml
     // but since they are used explicitly in code,
@@ -184,11 +203,13 @@ public:
     // For thread debugging.
     // llstartup needs to control init.
     // llworld, send_agent_pause() also controls pause/resume.
-    void initMainloopTimeout(const std::string& state, F32 secs = -1.0f);
+    void initMainloopTimeout(std::string_view state);
     void destroyMainloopTimeout();
     void pauseMainloopTimeout();
-    void resumeMainloopTimeout(const std::string& state = "", F32 secs = -1.0f);
-    void pingMainloopTimeout(const std::string& state, F32 secs = -1.0f);
+    void resumeMainloopTimeout(std::string_view state = "");
+    void pingMainloopTimeout(std::string_view state);
+
+    F32 getMainloopTimeoutSec() const;
 
     // Handle the 'login completed' event.
     // *NOTE:Mani Fix this for login abstraction!!
@@ -202,13 +223,12 @@ public:
         return mOnLoginCompleted.connect(cb);
     }
 
-    void addOnIdleCallback(const boost::function<void()>& cb); // add a callback to fire (once) when idle
+    void addOnIdleCallback(const std::function<void()>& cb); // add a callback to fire (once) when idle
 
     void initGeneralThread();
     void purgeUserDataOnExit() { mPurgeUserDataOnExit = true; }
+    void purgeCefStaleCaches();  // Remove old, stale CEF cache folders
     void purgeCache(); // Clear the local cache.
-    void purgeCacheSelective(const LLSD& insd); // Clear the local cache.
-    void purgeWebCache(); // Clear the local cache.
     void purgeCacheImmediate(); //clear local cache immediately.
     S32  updateTextureThreads(F32 max_time);
 
@@ -230,6 +250,26 @@ public:
     // post given work to the "mainloop" work queue for handling on the main thread
     void postToMainCoro(const LL::WorkQueue::Work& work);
 
+    // Writes an error code into the error_marker file for use on next startup.
+    void createErrorMarker(eLastExecEvent error_code) const;
+    bool errorMarkerExists() const;
+
+    void createWatchdogMarker() const;
+    void removeWatchdogMarker() const;
+
+    // Attempt a 'soft' quit with disconnect and saving of settings/cache.
+    // Intended to be thread safe.
+    // Good chance of viewer crashing either way, but better than alternatives.
+    // Note: mQuitRequested can be aborted by user.
+    void outOfMemorySoftQuit();
+
+#ifdef LL_DISCORD
+    static void initDiscordSocial();
+    static void updateDiscordActivity();
+    static void updateDiscordPartyCurrentSize(int32_t size);
+    static void updateDiscordPartyMaxSize(int32_t size);
+#endif
+
 protected:
     virtual bool initWindow(); // Initialize the viewer's window.
     virtual void initLoggingAndGetLastDuration(); // Initialize log files, logging system
@@ -243,6 +283,18 @@ protected:
 
     virtual std::string generateSerialNumber() = 0; // Platforms specific classes generate this.
 
+    virtual bool meetsRequirementsForMaximizedStart(); // Used on first login to decide to launch maximized
+
+    virtual void sendOutOfDiskSpaceNotification();
+
+protected:
+
+    // NSIS relies on this to detect if viewer is up.
+    // NSIS's method is somewhat unreliable since window
+    // can close long before cleanup is done.
+    // sendURLToOtherInstance also relies on this to detect if viewer is up.
+    static constexpr const char* sWindowClass = "Alchemy";
+
 private:
 
     bool doFrame();
@@ -253,14 +305,21 @@ private:
     void initStrings();       // Initialize LLTrans machinery
     bool initCache(); // Initialize local client cache.
 
+    // We have switched locations of both Mac and Windows cache, make sure
+    // files migrate and old cache is cleared out.
+    void migrateCacheDirectory();
+
     void cleanupSavedSettings(); // Sets some config data to current or default values during cleanup.
     void removeCacheFiles(const std::string& filemask); // Deletes cached files the match the given wildcard.
 
     void writeSystemInfo(); // Write system info to "debug_info.log"
 
     void processMarkerFiles();
-    static void recordMarkerVersion(LLAPRFile& marker_file);
+    static void recordMarkerVersion(LLFile& marker_file);
     bool markerIsSameVersion(const std::string& marker_name) const;
+    LLUUID getMarkerSessionId(const std::string& marker_name) const;
+    S32 getMarkerErrorCode(const std::string& marker_name) const;
+    bool getMarkerData(const std::string& marker_name, std::string &data) const;
 
     void idle();
     void idleShutdown();
@@ -276,13 +335,12 @@ private:
     static LLAppViewer* sInstance;
 
     bool mSecondInstance; // Is this a second instance of the app?
-    bool mUpdaterNotFound; // True when attempt to start updater failed
 
     std::string mMarkerFileName;
-    LLAPRFile mMarkerFile; // A file created to indicate the app is running.
+    LLFile mMarkerFile; // A file created to indicate the app is running.
 
     std::string mLogoutMarkerFileName;
-    LLAPRFile mLogoutMarkerFile; // A file created to indicate the app is running.
+    LLFile mLogoutMarkerFile; // A file created to indicate the app is running.
 
     bool mReportedCrash;
 
@@ -309,9 +367,8 @@ private:
     boost::optional<U32> mForceGraphicsLevel;
 
     bool mQuitRequested;                // User wants to quit, may have modified documents open.
+    bool mClosingFloaters;
     bool mLogoutRequestSent;            // Disconnect message sent to simulator, no longer safe to send messages to the sim.
-    U32 mLastAgentControlFlags;
-    F32 mLastAgentForceUpdate;
     struct SettingsFiles* mSettingsLocationList;
 
     LLWatchdogTimeout* mMainloopTimeout;
@@ -329,30 +386,17 @@ private:
     bool mIsFirstRun;
 };
 
-// consts from viewer.h
-const S32 AGENT_UPDATES_PER_SECOND  = 125; // Value derived experimentally to avoid Input Delays with latest PBR-Capable Viewers when viewer FPS is highly volatile.
-const S32 AGENT_FORCE_UPDATES_PER_SECOND  = 1;
-
 // Globals with external linkage. From viewer.h
 // *NOTE:Mani - These will be removed as the Viewer App Cleanup project continues.
 //
 // "// llstartup" indicates that llstartup is the only client for this global.
 
 extern LLSD gDebugInfo;
-extern BOOL gShowObjectUpdates;
-
-typedef enum
-{
-    LAST_EXEC_NORMAL = 0,
-    LAST_EXEC_FROZE,
-    LAST_EXEC_LLERROR_CRASH,
-    LAST_EXEC_OTHER_CRASH,
-    LAST_EXEC_LOGOUT_FROZE,
-    LAST_EXEC_LOGOUT_CRASH
-} eLastExecEvent;
+extern bool gShowObjectUpdates;
 
 extern eLastExecEvent gLastExecEvent; // llstartup
 extern S32 gLastExecDuration; ///< the duration of the previous run in seconds (<0 indicates unknown)
+extern LLUUID gLastAgentSessionId; // will be set if agent logged in
 
 extern const char* gPlatform;
 
@@ -380,10 +424,8 @@ extern S32 gPendingMetricsUploads;
 extern F32 gSimLastTime;
 extern F32 gSimFrames;
 
-extern BOOL     gDisconnected;
-
 extern LLFrameTimer gRestoreGLTimer;
-extern BOOL         gRestoreGL;
+extern bool         gRestoreGL;
 extern bool     gUseWireframe;
 
 extern LLMemoryInfo gSysMemory;
@@ -393,14 +435,11 @@ extern std::string gLastVersionChannel;
 
 extern LLVector3 gWindVec;
 extern LLVector3 gRelativeWindVec;
-extern U32  gPacketsIn;
-extern BOOL gPrintMessagesThisFrame;
 
-extern LLUUID gBlackSquareID;
+extern bool gRandomizeFramerate;
+extern bool gPeriodicSlowFrame;
+extern bool gDoDisconnect;
 
-extern BOOL gRandomizeFramerate;
-extern BOOL gPeriodicSlowFrame;
-
-extern BOOL gSimulateMemLeak;
+extern bool gSimulateMemLeak;
 
 #endif // LL_LLAPPVIEWER_H

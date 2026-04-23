@@ -28,6 +28,8 @@
 #define LLINVENTORYTYPE_H
 
 #include "llassettype.h"
+#include "lldictionary.h"
+#include "llsingleton.h"
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLInventoryType
@@ -66,7 +68,9 @@ public:
         IT_PERSON = 24,
         IT_SETTINGS = 25,
         IT_MATERIAL = 26,
-        IT_COUNT = 27,
+        IT_GLTF = 27,
+        IT_GLTF_BIN = 28,
+        IT_COUNT = 29,
 
         IT_UNKNOWN = 255,
         IT_NONE = -1
@@ -129,7 +133,7 @@ public:
 
 
     // machine transation between type and strings
-    static EType lookup(const std::string_view name);
+    static EType lookup(const std::string& name);
     static const std::string &lookup(EType type);
     // translation from a type to a human readable form.
     static const std::string &lookupHumanReadable(EType type);
@@ -142,9 +146,17 @@ public:
 
     static bool showInWorldPermissions(EType type);
 
+private:
     // don't instantiate or derive one of these objects
-    LLInventoryType( void ) = delete;
-    ~LLInventoryType( void ) = delete;
+    LLInventoryType( void );
+    ~LLInventoryType( void );
+};
+
+// Subtypes for scripts, (inventory type IT_LSL).
+enum ScriptSubtype_t
+{
+    SST_LSL = 0,
+    SST_LUA = 1
 };
 
 // helper function that returns true if inventory type and asset type
@@ -152,5 +164,40 @@ public:
 // object, but a wearable can be a bodypart or clothing asset.
 bool inventory_and_asset_types_match(LLInventoryType::EType inventory_type,
                                      LLAssetType::EType asset_type);
+
+///----------------------------------------------------------------------------
+/// Class LLInventoryType
+///----------------------------------------------------------------------------
+struct InventoryEntry : public LLDictionaryEntry
+{
+    InventoryEntry(const std::string &name, // unlike asset type names, not limited to 8 characters; need not match asset type names
+                   const std::string &human_name, // for decoding to human readable form; put any and as many printable characters you want in each one.
+                   int num_asset_types = 0, ...)
+        :
+        LLDictionaryEntry(name),
+        mHumanName(human_name)
+    {
+        va_list argp;
+        va_start(argp, num_asset_types);
+        // Read in local textures
+        for (U8 i=0; i < num_asset_types; i++)
+        {
+            LLAssetType::EType t = (LLAssetType::EType)va_arg(argp,int);
+            mAssetTypes.push_back(t);
+        }
+        va_end(argp);
+    }
+
+    const std::string mHumanName;
+    typedef std::vector<LLAssetType::EType> asset_vec_t;
+    asset_vec_t mAssetTypes;
+};
+
+class LLInventoryDictionary : public LLSimpleton<LLInventoryDictionary>,
+                              public LLDictionary<LLInventoryType::EType, InventoryEntry>
+{
+public:
+    LLInventoryDictionary();
+};
 
 #endif

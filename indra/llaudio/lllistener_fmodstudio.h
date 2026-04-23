@@ -1,11 +1,11 @@
 /**
  * @file listener_fmodstudio.h
  * @brief Description of LISTENER class abstracting the audio support
- * as an FMOD Studio implementation (windows and Linux)
+ * as an FMOD 3D implementation
  *
- * $LicenseInfo:firstyear=2002&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2020&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2020, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,26 +37,27 @@ namespace FMOD
 }
 
 //Interfaces
-class LLListener_FMODSTUDIO final : public LLListener
+class LLListener_FMODSTUDIO : public LLListener
 {
- public:
+public:
     LLListener_FMODSTUDIO(FMOD::System *system);
-    virtual ~LLListener_FMODSTUDIO() = default;
+    virtual ~LLListener_FMODSTUDIO();
+    virtual void init();
 
-    void translate(const LLVector3& offset) final override;
-    void setPosition(const LLVector3& pos) final override;
-    void setVelocity(const LLVector3& vel) final override;
-    void orient(const LLVector3& up, const LLVector3& at) final override;
-    void commitDeferredChanges() final override;
+    virtual void translate(LLVector3 offset);
+    virtual void setPosition(LLVector3 pos);
+    virtual void setVelocity(LLVector3 vel);
+    virtual void orient(LLVector3 up, LLVector3 at);
+    virtual void commitDeferredChanges();
 
-    void setDopplerFactor(F32 factor) final override;
-    F32 getDopplerFactor() final override;
-    void setRolloffFactor(F32 factor) final override;
-    F32 getRolloffFactor() final override;
- protected:
-     FMOD::System *mSystem;
-     F32 mDopplerFactor;
-     F32 mRolloffFactor;
+    virtual void setDopplerFactor(F32 factor);
+    virtual F32 getDopplerFactor();
+    virtual void setRolloffFactor(F32 factor);
+    virtual F32 getRolloffFactor();
+protected:
+    FMOD::System *mSystem;
+    F32 mDopplerFactor;
+    F32 mRolloffFactor;
 };
 
 #endif

@@ -42,8 +42,7 @@
 //-----------------------------------------------------------------------------
 // class LLEditingMotion
 //-----------------------------------------------------------------------------
-LL_ALIGN_PREFIX(16)
-class LLEditingMotion final :
+class alignas(16) LLEditingMotion :
     public LLMotion
 {
     LL_ALIGN_NEW
@@ -52,7 +51,7 @@ public:
     LLEditingMotion(const LLUUID &id);
 
     // Destructor
-    virtual ~LLEditingMotion() = default;
+    virtual ~LLEditingMotion();
 
 public:
     //-------------------------------------------------------------------------
@@ -69,7 +68,7 @@ public:
     //-------------------------------------------------------------------------
 
     // motions must specify whether or not they loop
-    virtual BOOL getLoop() { return TRUE; }
+    virtual bool getLoop() { return true; }
 
     // motions must report their total duration
     virtual F32 getDuration() { return 0.0; }
@@ -94,14 +93,14 @@ public:
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
 
     // called when a motion is activated
-    // must return TRUE to indicate success, or else
+    // must return true to indicate success, or else
     // it will be deactivated
-    virtual BOOL onActivate();
+    virtual bool onActivate();
 
     // called per time step
-    // must return TRUE while it is active, and
-    // must return FALSE when the motion is completed.
-    virtual BOOL onUpdate(F32 time, U8* joint_mask);
+    // must return true while it is active, and
+    // must return false when the motion is completed.
+    virtual bool onUpdate(F32 time, U8* joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();
@@ -110,11 +109,11 @@ public:
     //-------------------------------------------------------------------------
     // joint states to be animated
     //-------------------------------------------------------------------------
-    LL_ALIGN_16(LLJoint             mParentJoint);
-    LL_ALIGN_16(LLJoint             mShoulderJoint);
-    LL_ALIGN_16(LLJoint             mElbowJoint);
-    LL_ALIGN_16(LLJoint             mWristJoint);
-    LL_ALIGN_16(LLJoint             mTarget);
+    LLJoint             mParentJoint;
+    LLJoint             mShoulderJoint;
+    LLJoint             mElbowJoint;
+    LLJoint             mWristJoint;
+    LLJoint             mTarget;
     LLJointSolverRP3    mIKSolver;
 
     LLCharacter         *mCharacter;
@@ -129,7 +128,7 @@ public:
     static S32          sHandPose;
     static S32          sHandPosePriority;
     LLVector3           mLastSelectPt;
-} LL_ALIGN_POSTFIX(16);
+};
 
 #endif // LL_LLKEYFRAMEMOTION_H
 

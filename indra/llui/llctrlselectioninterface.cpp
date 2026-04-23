@@ -29,15 +29,24 @@
 
 #include "llsd.h"
 
-BOOL LLCtrlSelectionInterface::selectByValue(LLSD value)
+// virtual
+LLCtrlSelectionInterface::~LLCtrlSelectionInterface()
+{ }
+
+bool LLCtrlSelectionInterface::selectByValue(LLSD value)
 {
-    return setSelectedByValue(value, TRUE);
+    return setSelectedByValue(value, true);
 }
 
-BOOL LLCtrlSelectionInterface::deselectByValue(LLSD value)
+bool LLCtrlSelectionInterface::deselectByValue(LLSD value)
 {
-    return setSelectedByValue(value, FALSE);
+    return setSelectedByValue(value, false);
 }
+
+
+// virtual
+LLCtrlListInterface::~LLCtrlListInterface()
+{ }
 
 LLScrollListItem* LLCtrlListInterface::addSimpleElement(const std::string& value)
 {
@@ -48,3 +57,7 @@ LLScrollListItem* LLCtrlListInterface::addSimpleElement(const std::string& value
 {
     return addSimpleElement(value, pos, LLSD());
 }
+
+// virtual
+LLCtrlScrollInterface::~LLCtrlScrollInterface()
+{ }

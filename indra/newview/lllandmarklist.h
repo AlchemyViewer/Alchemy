@@ -27,7 +27,7 @@
 #ifndef LL_LLLANDMARKLIST_H
 #define LL_LLLANDMARKLIST_H
 
-#include <boost/function.hpp>
+#include <functional>
 #include <map>
 #include "lllandmark.h"
 #include "lluuid.h"
@@ -40,7 +40,7 @@ class LLInventoryItem;
 class LLLandmarkList
 {
 public:
-    typedef boost::function<void(LLLandmark*)> loaded_callback_t;
+    typedef std::function<void(LLLandmark*)> loaded_callback_t;
 
     LLLandmarkList() {}
     ~LLLandmarkList();
@@ -49,8 +49,8 @@ public:
     //const LLLandmark* getFirst()  { return mList.getFirstData(); }
     //const LLLandmark* getNext()   { return mList.getNextData(); }
 
-    BOOL assetExists(const LLUUID& asset_uuid);
-    LLLandmark* getAsset(const LLUUID& asset_uuid, loaded_callback_t cb = NULL);
+    bool assetExists(const LLUUID& asset_uuid);
+    LLLandmark* getAsset(const LLUUID& asset_uuid, loaded_callback_t cb = nullptr);
     static void processGetAssetReply(
         const LLUUID& uuid,
         LLAssetType::EType type,
@@ -58,9 +58,9 @@ public:
         S32 status,
         LLExtStat ext_status );
 
-    // Returns TRUE if loading the landmark with given asset_uuid has been requested
+    // Returns true if loading the landmark with given asset_uuid has been requested
     // but is not complete yet.
-    BOOL isAssetInLoadedCallbackMap(const LLUUID& asset_uuid);
+    bool isAssetInLoadedCallbackMap(const LLUUID& asset_uuid);
 
 protected:
     void onRegionHandle(const LLUUID& landmark_id);
@@ -72,6 +72,7 @@ protected:
 
     typedef std::set<LLUUID> landmark_uuid_list_t;
     landmark_uuid_list_t mBadList;
+    landmark_uuid_list_t mRetryList;
 
     typedef std::map<LLUUID,F32> landmark_requested_list_t;
     landmark_requested_list_t mRequestedList;

@@ -49,7 +49,7 @@ public:
 };
 typedef std::map<std::string, LLJointOverrideData> joint_override_data_map_t;
 
-class LLFloaterModelPreview final : public LLFloaterModelUploadBase
+class LLFloaterModelPreview : public LLFloaterModelUploadBase
 {
 public:
 
@@ -69,16 +69,17 @@ public:
     LLFloaterModelPreview(const LLSD& key);
     virtual ~LLFloaterModelPreview();
 
-    virtual BOOL postBuild();
-    /*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+    virtual bool postBuild();
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
 
     void initModelPreview();
-    static bool showModelPreview();
+    void setUploadDestination(const LLUUID& dest_folder) { mDestinationFolderId = dest_folder; }
+    static void showModelPreview(const LLUUID& dest_folder = LLUUID::null);
 
-    BOOL handleMouseDown(S32 x, S32 y, MASK mask);
-    BOOL handleMouseUp(S32 x, S32 y, MASK mask);
-    BOOL handleHover(S32 x, S32 y, MASK mask);
-    BOOL handleScrollWheel(S32 x, S32 y, S32 clicks);
+    bool handleMouseDown(S32 x, S32 y, MASK mask);
+    bool handleMouseUp(S32 x, S32 y, MASK mask);
+    bool handleHover(S32 x, S32 y, MASK mask);
+    bool handleScrollWheel(S32 x, S32 y, S32 clicks);
 
     /*virtual*/ void onOpen(const LLSD& key);
     /*virtual*/ void onClose(bool app_quitting);
@@ -164,9 +165,6 @@ protected:
 
     static void onPhysicsBrowse(LLUICtrl* ctrl, void* userdata);
     static void onPhysicsUseLOD(LLUICtrl* ctrl, void* userdata);
-    static void onPhysicsOptimize(LLUICtrl* ctrl, void* userdata);
-    static void onPhysicsDecomposeBack(LLUICtrl* ctrl, void* userdata);
-    static void onPhysicsSimplifyBack(LLUICtrl* ctrl, void* userdata);
 
     void            draw();
 
@@ -200,7 +198,7 @@ protected:
     // See eLoDMode
     S32 mLODMode[4];
 
-    std::unique_ptr<LLMutex> mStatusLock;
+    LLMutex* mStatusLock;
 
     LLSD mModelPhysicsFee;
 
@@ -225,6 +223,11 @@ private:
 
     void createSmoothComboBox(LLComboBox* combo_box, float min, float max);
 
+    static std::string getBoundingBoxCubePath();
+    typedef std::map<std::string, std::string> lod_sources_map_t;
+    void fillLODSourceStatistics(lod_sources_map_t& lod_sources) const;
+
+    LLUUID mDestinationFolderId;
     LLButton* mUploadBtn;
     LLButton* mCalculateBtn;
     LLViewerTextEditor* mUploadLogText;

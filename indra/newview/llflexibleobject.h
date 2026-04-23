@@ -68,7 +68,7 @@ struct LLFlexibleObjectSection
 //---------------------------------------------------------
 // The LLVolumeImplFlexible class
 //---------------------------------------------------------
-class LLVolumeImplFlexible final : public LLVolumeInterface
+class LLVolumeImplFlexible : public LLVolumeInterface
 {
 private:
     static std::vector<LLVolumeImplFlexible*> sInstanceList;
@@ -87,16 +87,16 @@ private:
         LLVolumeInterfaceType getInterfaceType() const      { return INTERFACE_FLEXIBLE; }
         void updateRenderRes();
         void doIdleUpdate();
-        BOOL doUpdateGeometry(LLDrawable *drawable);
+        bool doUpdateGeometry(LLDrawable *drawable);
         LLVector3 getPivotPosition() const;
         void onSetVolume(const LLVolumeParams &volume_params, const S32 detail);
-        void onSetScale(const LLVector3 &scale, BOOL damped);
-        void onParameterChanged(U16 param_type, LLNetworkData *data, BOOL in_use, bool local_origin);
+        void onSetScale(const LLVector3 &scale, bool damped);
+        void onParameterChanged(U16 param_type, LLNetworkData *data, bool in_use, bool local_origin);
         void onShift(const LLVector4a &shift_vector);
         bool isVolumeUnique() const { return true; }
         bool isVolumeGlobal() const { return true; }
         bool isActive() const { return true; }
-        const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const;
+        const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const;
         void updateRelativeXform(bool force_identity);
         void doFlexibleUpdate(); // Called to update the simulation
         void doFlexibleRebuild(bool rebuild_volume); // Called to rebuild the geometry
@@ -125,8 +125,8 @@ private:
         LLQuaternion                mParentRotation;
         LLQuaternion                mLastFrameRotation;
         LLQuaternion                mLastSegmentRotation;
-        BOOL                        mInitialized;
-        BOOL                        mUpdated;
+        bool                        mInitialized;
+        bool                        mUpdated;
         LLFlexibleObjectData*       mAttributes;
         LLFlexibleObjectSection     mSection    [ (1<<FLEXIBLE_OBJECT_MAX_SECTIONS)+1 ];
         S32                         mInitializedRes;

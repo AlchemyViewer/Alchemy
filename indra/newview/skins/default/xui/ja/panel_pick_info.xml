@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="panel_pick_info">
-	<button name="back_btn"/>
 	<text name="title" value="ピック情報"/>
 	<scroll_container name="profile_scroll">
 		<panel name="scroll_content_panel">
-			<texture_picker name="pick_snapshot"/>
-			<text_editor name="pick_name" value="[name]"/>
-			<text_editor name="pick_location" value="[loading...]"/>
-			<text_editor name="pick_desc" value="[description]"/>
+			<text_editor name="pick_name" value="［名前］"/>
+			<text_editor name="pick_location" value="［読み込んでいます…］"/>
+			<text_editor name="pick_desc" value="［説明］"/>
 		</panel>
 	</scroll_container>
 	<panel name="buttons">

@@ -138,8 +138,8 @@ void LLEstateInfoModel::commitEstateInfoCapsCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EstateChangeInfo", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EstateChangeInfo", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD body;
     body["estate_name"] = getName();
@@ -154,7 +154,6 @@ void LLEstateInfoModel::commitEstateInfoCapsCoro(std::string url)
     body["allow_voice_chat"] = getAllowVoiceChat();
     body["override_public_access"] = getAllowAccessOverride();
 
-    body["override_environment"] = getAllowEnvironmentOverride();
     body["invoice"] = LLFloaterRegionInfo::getLastInvoice();
 
     LL_DEBUGS("WindlightSync") << "Sending estate caps: "

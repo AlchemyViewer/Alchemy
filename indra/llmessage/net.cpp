@@ -32,7 +32,7 @@
 #include <stdexcept>
 
 #if LL_WINDOWS
-#include "llwin32headerslean.h"
+#include "llwin32headers.h"
 #else
     #include <sys/types.h>
     #include <sys/socket.h>
@@ -76,8 +76,8 @@ static U32 gsnReceivingIFAddr = INVALID_HOST_IP_ADDRESS; // Address to which dat
 const char* LOOPBACK_ADDRESS_STRING = "127.0.0.1";
 const char* BROADCAST_ADDRESS_STRING = "255.255.255.255";
 
-const int   SEND_BUFFER_SIZE    = 400000;
-const int   RECEIVE_BUFFER_SIZE = 400000;
+const int   SEND_BUFFER_SIZE    = 200000;
+const int   RECEIVE_BUFFER_SIZE = 800000;
 
 // universal functions (cross-platform)
 
@@ -243,8 +243,6 @@ S32 start_net(S32& socket_out, int& nPort)
             if (nRet == SOCKET_ERROR)
             {
                 LL_WARNS("AppInit") << "startNet() : Couldn't find available network port." << LL_ENDL;
-                closesocket(hSocket);
-                WSACleanup();
                 // Fail gracefully here in release
                 return 3;
             }
@@ -253,8 +251,6 @@ S32 start_net(S32& socket_out, int& nPort)
         // Some other socket error
         {
             LL_WARNS("AppInit") << llformat("bind() port: %d failed, Err: %d\n", nPort, WSAGetLastError()) << LL_ENDL;
-            closesocket(hSocket);
-            WSACleanup();
             // Fail gracefully in release.
             return 4;
         }
@@ -336,8 +332,8 @@ S32 receive_packet(int hSocket, char * receiveBuffer)
     return nRet;
 }
 
-// Returns TRUE on success.
-BOOL send_packet(int hSocket, const char *sendBuffer, int size, U32 recipient, int nPort)
+// Returns true on success.
+bool send_packet(int hSocket, const char *sendBuffer, int size, U32 recipient, int nPort)
 {
     //  Sends a packet to the address set in initNet
     //
@@ -362,7 +358,7 @@ BOOL send_packet(int hSocket, const char *sendBuffer, int size, U32 recipient, i
                 // assume it is.  JNC 2002.01.18
                 if (WSAECONNRESET == WSAGetLastError())
                 {
-                    return TRUE;
+                    return true;
                 }
                 LL_INFOS() << "sendto() failed to " << u32_to_ip_string(recipient) << ":" << nPort
                     << ", Error " << last_error << LL_ENDL;
@@ -454,7 +450,6 @@ S32 start_net(S32& socket_out, int& nPort)
                 {
                     LL_WARNS() << "startNet() : Couldn't find available network port." << LL_ENDL;
                     // Fail gracefully in release.
-                    close(hSocket);
                     return 3;
                 }
             }
@@ -463,7 +458,6 @@ S32 start_net(S32& socket_out, int& nPort)
             {
                 LL_WARNS() << llformat ("bind() port: %d failed, Err: %s\n", nPort, strerror(errno)) << LL_ENDL;
                 // Fail gracefully in release.
-                close(hSocket);
                 return 4;
             }
         }
@@ -529,7 +523,7 @@ static int recvfrom_destip( int socket, void *buf, int len, struct sockaddr *fro
     struct iovec iov[1];
     char cmsg[CMSG_SPACE(sizeof(struct in_pktinfo))];
     struct cmsghdr *cmsgptr;
-    struct msghdr msg = {};
+    struct msghdr msg = {0};
 
     iov[0].iov_base = buf;
     iov[0].iov_len = len;
@@ -598,11 +592,11 @@ int receive_packet(int hSocket, char * receiveBuffer)
     return nRet;
 }
 
-BOOL send_packet(int hSocket, const char * sendBuffer, int size, U32 recipient, int nPort)
+bool send_packet(int hSocket, const char * sendBuffer, int size, U32 recipient, int nPort)
 {
     int     ret;
-    BOOL    success;
-    BOOL    resend;
+    bool    success;
+    bool    resend;
     S32     send_attempts = 0;
 
     stDstAddr.sin_addr.s_addr = recipient;
@@ -616,34 +610,34 @@ BOOL send_packet(int hSocket, const char * sendBuffer, int size, U32 recipient, 
         if (ret >= 0)
         {
             // successful send
-            success = TRUE;
-            resend = FALSE;
+            success = true;
+            resend = false;
         }
         else
         {
             // send failed, check to see if we should resend
-            success = FALSE;
+            success = false;
 
             if (errno == EAGAIN)
             {
                 // say nothing, just repeat send
                 LL_INFOS() << "sendto() reported buffer full, resending (attempt " << send_attempts << ")" << LL_ENDL;
                 LL_INFOS() << inet_ntoa(stDstAddr.sin_addr) << ":" << nPort << LL_ENDL;
-                resend = TRUE;
+                resend = true;
             }
             else if (errno == ECONNREFUSED)
             {
                 // response to ICMP connection refused message on earlier send
                 LL_INFOS() << "sendto() reported connection refused, resending (attempt " << send_attempts << ")" << LL_ENDL;
                 LL_INFOS() << inet_ntoa(stDstAddr.sin_addr) << ":" << nPort << LL_ENDL;
-                resend = TRUE;
+                resend = true;
             }
             else
             {
                 // some other error
                 LL_INFOS() << "sendto() failed: " << errno << ", " << strerror(errno) << LL_ENDL;
                 LL_INFOS() << inet_ntoa(stDstAddr.sin_addr) << ":" << nPort << LL_ENDL;
-                resend = FALSE;
+                resend = false;
             }
         }
     }
@@ -652,7 +646,7 @@ BOOL send_packet(int hSocket, const char * sendBuffer, int size, U32 recipient, 
     if (send_attempts >= 3)
     {
         LL_INFOS() << "sendPacket() bailed out of send!" << LL_ENDL;
-        return FALSE;
+        return false;
     }
 
     return success;

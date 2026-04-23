@@ -34,7 +34,6 @@
 #include <dxdiag.h>
 #undef INITGUID
 
-#include <dxgi.h>
 #include <wbemidl.h>
 #include <comdef.h>
 
@@ -48,7 +47,6 @@
 #include "llstl.h"
 #include "lltimer.h"
 
-void (*gWriteDebug)(const char* msg) = nullptr;
 LLDXHardware gDXHardware;
 
 //-----------------------------------------------------------------------------
@@ -61,6 +59,7 @@ LLDXHardware gDXHardware;
 typedef BOOL ( WINAPI* PfnCoSetProxyBlanket )( IUnknown* pProxy, DWORD dwAuthnSvc, DWORD dwAuthzSvc,
                                                OLECHAR* pServerPrincName, DWORD dwAuthnLevel, DWORD dwImpLevel,
                                                RPC_AUTH_IDENTITY_HANDLE pAuthInfo, DWORD dwCapabilities );
+
 
 //Getting the version of graphics controller driver via WMI
 std::string LLDXHardware::getDriverVersionWMI(EGPUVendor vendor)
@@ -179,7 +178,7 @@ std::string LLDXHardware::getDriverVersionWMI(EGPUVendor vendor)
 
             //convert BSTR to std::string
             std::wstring ws(caption, SysStringLen(caption));
-            std::string caption_str(ws.begin(), ws.end());
+            std::string caption_str = ll_convert_wide_to_string(ws);
             LLStringUtil::toLower(caption_str);
 
             bool found = false;
@@ -231,7 +230,7 @@ std::string LLDXHardware::getDriverVersionWMI(EGPUVendor vendor)
 
         //convert BSTR to std::string
         std::wstring ws(driverVersion, SysStringLen(driverVersion));
-        std::string str(ws.begin(), ws.end());
+        std::string str = ll_convert_wide_to_string(ws);
         LL_INFOS("AppInit") << " DriverVersion : " << str << LL_ENDL;
 
         if (mDriverVersion.empty())
@@ -277,7 +276,7 @@ std::string LLDXHardware::getDriverVersionWMI(EGPUVendor vendor)
     return mDriverVersion;
 }
 
-void get_wstring(IDxDiagContainer* containerp, const WCHAR* wszPropName, wchar_t* wszPropValue, int outputSize)
+void get_wstring(IDxDiagContainer* containerp, const WCHAR* wszPropName, WCHAR* wszPropValue, int outputSize)
 {
     HRESULT hr;
     VARIANT var;
@@ -290,16 +289,16 @@ void get_wstring(IDxDiagContainer* containerp, const WCHAR* wszPropName, wchar_t
         switch( var.vt )
         {
             case VT_UI4:
-                swprintf(wszPropValue, outputSize, L"%lu", var.ulVal);  /* Flawfinder: ignore */
+                swprintf( wszPropValue, outputSize, L"%d", var.ulVal ); /* Flawfinder: ignore */
                 break;
             case VT_I4:
-                swprintf(wszPropValue, outputSize, L"%li", var.lVal);   /* Flawfinder: ignore */
+                swprintf( wszPropValue, outputSize, L"%d", var.lVal );  /* Flawfinder: ignore */
                 break;
             case VT_BOOL:
-                wcscpy_s( wszPropValue, outputSize, (var.boolVal) ? L"true" : L"false");    /* Flawfinder: ignore */
+                wcscpy( wszPropValue, (var.boolVal) ? L"true" : L"false" ); /* Flawfinder: ignore */
                 break;
             case VT_BSTR:
-                wcsncpy_s( wszPropValue, outputSize, var.bstrVal, outputSize-1 );   /* Flawfinder: ignore */
+                wcsncpy( wszPropValue, var.bstrVal, outputSize-1 ); /* Flawfinder: ignore */
                 wszPropValue[outputSize-1] = 0;
                 break;
         }
@@ -310,211 +309,18 @@ void get_wstring(IDxDiagContainer* containerp, const WCHAR* wszPropName, wchar_t
 
 std::string get_string(IDxDiagContainer *containerp, const WCHAR *wszPropName)
 {
-    wchar_t wszPropValue[256];
-    get_wstring(containerp, wszPropName, wszPropValue, _countof(wszPropValue));
+    WCHAR wszPropValue[256];
+    get_wstring(containerp, wszPropName, wszPropValue, 256);
 
-    return ll_convert_wide_to_string(wszPropValue);
-}
-
-
-LLVersion::LLVersion()
-{
-    mValid = FALSE;
-    S32 i;
-    for (i = 0; i < 4; i++)
-    {
-        mFields[i] = 0;
-    }
-}
-
-BOOL LLVersion::set(const std::string &version_string)
-{
-    S32 i;
-    for (i = 0; i < 4; i++)
-    {
-        mFields[i] = 0;
-    }
-    // Split the version string.
-    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-    boost::char_separator<char> sep(".", "", boost::keep_empty_tokens);
-    tokenizer tokens(version_string, sep);
-
-
-    S32 count = 0;
-    for (auto iter = tokens.begin(); iter != tokens.end() && count < 4; ++iter)
-    {
-        mFields[count] = atoi(iter->c_str());
-        count++;
-    }
-    if (count < 4)
-    {
-        //LL_WARNS() << "Potentially bogus version string!" << version_string << LL_ENDL;
-        for (i = 0; i < 4; i++)
-        {
-            mFields[i] = 0;
-        }
-        mValid = FALSE;
-    }
-    else
-    {
-        mValid = TRUE;
-    }
-    return mValid;
-}
-
-S32 LLVersion::getField(const S32 field_num)
-{
-    if (!mValid)
-    {
-        return -1;
-    }
-    else
-    {
-        return mFields[field_num];
-    }
-}
-
-std::string LLDXDriverFile::dump()
-{
-    if (gWriteDebug)
-    {
-        gWriteDebug("Filename:");
-        gWriteDebug(mName.c_str());
-        gWriteDebug("\n");
-        gWriteDebug("Ver:");
-        gWriteDebug(mVersionString.c_str());
-        gWriteDebug("\n");
-        gWriteDebug("Date:");
-        gWriteDebug(mDateString.c_str());
-        gWriteDebug("\n");
-    }
-    LL_INFOS() << mFilepath << LL_ENDL;
-    LL_INFOS() << mName << LL_ENDL;
-    LL_INFOS() << mVersionString << LL_ENDL;
-    LL_INFOS() << mDateString << LL_ENDL;
-
-    return "";
-}
-
-LLDXDevice::~LLDXDevice()
-{
-    for_each(mDriverFiles.begin(), mDriverFiles.end(), DeletePairedPointer());
-    mDriverFiles.clear();
-}
-
-std::string LLDXDevice::dump()
-{
-    if (gWriteDebug)
-    {
-        gWriteDebug("StartDevice\n");
-        gWriteDebug("DeviceName:");
-        gWriteDebug(mName.c_str());
-        gWriteDebug("\n");
-        gWriteDebug("PCIString:");
-        gWriteDebug(mPCIString.c_str());
-        gWriteDebug("\n");
-    }
-    LL_INFOS() << LL_ENDL;
-    LL_INFOS() << "DeviceName:" << mName << LL_ENDL;
-    LL_INFOS() << "PCIString:" << mPCIString << LL_ENDL;
-    LL_INFOS() << "Drivers" << LL_ENDL;
-    LL_INFOS() << "-------" << LL_ENDL;
-    for (driver_file_map_t::iterator iter = mDriverFiles.begin(),
-             end = mDriverFiles.end();
-         iter != end; iter++)
-    {
-        LLDXDriverFile *filep = iter->second;
-        filep->dump();
-    }
-    if (gWriteDebug)
-    {
-        gWriteDebug("EndDevice\n");
-    }
-
-    return "";
-}
-
-LLDXDriverFile *LLDXDevice::findDriver(const std::string &driver)
-{
-    for (driver_file_map_t::iterator iter = mDriverFiles.begin(),
-             end = mDriverFiles.end();
-         iter != end; iter++)
-    {
-        LLDXDriverFile *filep = iter->second;
-        if (!utf8str_compare_insensitive(filep->mName,driver))
-        {
-            return filep;
-        }
-    }
-
-    return nullptr;
+    return ll_convert<std::string>(std::wstring(wszPropValue));
 }
 
 LLDXHardware::LLDXHardware()
 {
-    mVRAM = 0;
-    gWriteDebug = nullptr;
 }
 
 void LLDXHardware::cleanup()
 {
-}
-
-BOOL LLDXHardware::updateVRAM()
-{
-    U64 vram = getMBVideoMemoryViaDXGI();
-
-    if (vram > 0)
-    {
-        mVRAM = vram / (1024 * 1024);
-        return TRUE;
-    }
-    return FALSE;
-}
-
-U64 LLDXHardware::getMBVideoMemoryViaDXGI()
-{
-    HRESULT hr;
-    HRESULT hrCoInitialize = S_OK;
-    U64 vram = 0;
-
-    hrCoInitialize = CoInitialize(0);
-    if (SUCCEEDED(hrCoInitialize))
-    {
-        IDXGIFactory1* pDXGIFactory = nullptr;
-
-        hr = CreateDXGIFactory1(IID_PPV_ARGS(&pDXGIFactory));
-        if (SUCCEEDED(hr))
-        {
-            llassert(pDXGIFactory != 0);
-            IDXGIAdapter1* dxgiAdapter = nullptr;
-            IDXGIAdapter1* tmpDxgiAdapter = nullptr;
-            UINT adapterIndex = 0;
-            while (pDXGIFactory->EnumAdapters1(adapterIndex, &tmpDxgiAdapter) != DXGI_ERROR_NOT_FOUND)
-            {
-                DXGI_ADAPTER_DESC1 desc;
-                hr = tmpDxgiAdapter->GetDesc1(&desc);
-                if (SUCCEEDED(hr) && !dxgiAdapter && desc.Flags == 0 && tmpDxgiAdapter)
-                {
-                    tmpDxgiAdapter->QueryInterface(IID_PPV_ARGS(&dxgiAdapter));
-                }
-                SAFE_RELEASE(tmpDxgiAdapter);
-                ++adapterIndex;
-            }
-            if (dxgiAdapter != nullptr)
-            {
-                DXGI_ADAPTER_DESC1 desc;
-                dxgiAdapter->GetDesc1(&desc);
-                vram = desc.DedicatedVideoMemory;
-
-                SAFE_RELEASE(dxgiAdapter);
-            }
-
-            SAFE_RELEASE(pDXGIFactory);
-        }
-        CoUninitialize();
-    }
-    return vram;
 }
 
 LLSD LLDXHardware::getDisplayInfo()
@@ -522,7 +328,8 @@ LLSD LLDXHardware::getDisplayInfo()
     LLTimer hw_timer;
     HRESULT       hr;
     LLSD ret;
-    hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+
     IDxDiagProvider *dx_diag_providerp = NULL;
     IDxDiagContainer *dx_diag_rootp = NULL;
     IDxDiagContainer *devices_containerp = NULL;
@@ -531,17 +338,10 @@ LLSD LLDXHardware::getDisplayInfo()
     IDxDiagContainer *driver_containerp = NULL;
     DWORD dw_device_count;
 
-    if (FAILED(hr))
-    {
-        LL_WARNS() << "COM initialization failure!" << LL_ENDL;
-        gWriteDebug("COM initialization failure!\n");
-        goto LCleanup;
-    }
-
     // CoCreate a IDxDiagProvider*
     LL_INFOS() << "CoCreateInstance IID_IDxDiagProvider" << LL_ENDL;
     hr = CoCreateInstance(CLSID_DxDiagProvider,
-                          nullptr,
+                          NULL,
                           CLSCTX_INPROC_SERVER,
                           IID_IDxDiagProvider,
                           (LPVOID*) &dx_diag_providerp);
@@ -549,7 +349,6 @@ LLSD LLDXHardware::getDisplayInfo()
     if (FAILED(hr))
     {
         LL_WARNS() << "No DXDiag provider found!  DirectX 9 not installed!" << LL_ENDL;
-        gWriteDebug("No DXDiag provider found!  DirectX 9 not installed!\n");
         goto LCleanup;
     }
     if (SUCCEEDED(hr)) // if FAILED(hr) then dx9 is not installed
@@ -613,7 +412,7 @@ LLSD LLDXHardware::getDisplayInfo()
 
         // Dump the string as an int into the structure
         char *stopstring;
-        ret["VRAM"] = (LLSD::Integer)strtol(ram_str.c_str(), &stopstring, 10);
+        ret["VRAM"] = LLSD::Integer(strtol(ram_str.c_str(), &stopstring, 10));
         std::string device_name = get_string(device_containerp, L"szDescription");
         ret["DeviceName"] = device_name;
         std::string device_driver=  get_string(device_containerp, L"szDriverVersion");
@@ -636,12 +435,12 @@ LLSD LLDXHardware::getDisplayInfo()
                 DWORD dwType = REG_SZ;
                 DWORD dwSize = sizeof(WCHAR) * RV_SIZE;
                 if(ERROR_SUCCESS == RegQueryValueEx(hKey, TEXT("ReleaseVersion"),
-                    nullptr, &dwType, (LPBYTE)release_version, &dwSize))
+                    NULL, &dwType, (LPBYTE)release_version, &dwSize))
                 {
                     // print the value
                     // windows doesn't guarantee to be null terminated
                     release_version[RV_SIZE - 1] = NULL;
-                    ret["DriverVersion"] = ll_convert_wide_to_string(release_version);
+                    ret["DriverVersion"] = ll_convert<std::string>(std::wstring(release_version));
 
                 }
                 RegCloseKey(hKey);
@@ -663,11 +462,6 @@ LCleanup:
 
     CoUninitialize();
     return ret;
-}
-
-void LLDXHardware::setWriteDebugFunc(void (*func)(const char*))
-{
-    gWriteDebug = func;
 }
 
 #endif

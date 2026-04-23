@@ -34,7 +34,7 @@
 #include "llvolume.h"
 #include "llvector4a.h"
 
-class alignas(16) LLVolumeTriangle final : public LLRefCount
+class alignas(16) LLVolumeTriangle : public LLRefCount
 {
     LL_ALIGN_NEW
 public:
@@ -47,37 +47,13 @@ public:
     {
         *this = rhs;
     }
-    LLVolumeTriangle& operator=(const LLVolumeTriangle& rhs)
+
+    ~LLVolumeTriangle()
     {
-        LL_ERRS() << "Illegal operation!" << LL_ENDL;
-        return *this;
+
     }
 
-    LLVolumeTriangle(LLVolumeTriangle&& rhs) noexcept
-    {
-        *this = std::move(rhs);
-    }
-    LLVolumeTriangle& operator=(LLVolumeTriangle&& rhs) noexcept
-    {
-        mPositionGroup = rhs.mPositionGroup;
-        mV[0] = rhs.mV[0];
-        mV[0] = rhs.mV[0];
-        mV[0] = rhs.mV[0];
-
-        mIndex[0] = rhs.mIndex[2];
-        mIndex[1] = rhs.mIndex[2];
-        mIndex[2] = rhs.mIndex[2];
-
-        mRadius = rhs.mRadius;
-        mBinIndex = rhs.mBinIndex;
-
-        LLRefCount::operator=(std::move(rhs));
-        return *this;
-    }
-
-    ~LLVolumeTriangle() = default;
-
-    LL_ALIGN_16(LLVector4a mPositionGroup);
+    LLVector4a mPositionGroup;
 
     const LLVector4a* mV[3];
     U32 mIndex[3];
@@ -95,15 +71,15 @@ public:
 
 };
 
-class alignas(16) LLVolumeOctreeListener final : public LLOctreeListener<LLVolumeTriangle, LLVolumeTriangle*>
+class alignas(16) LLVolumeOctreeListener : public LLOctreeListener<LLVolumeTriangle, LLVolumeTriangle*>
 {
     LL_ALIGN_NEW
 public:
     LLVolumeOctreeListener(LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* node);
-    ~LLVolumeOctreeListener() = default;
+    ~LLVolumeOctreeListener();
 
     LLVolumeOctreeListener(const LLVolumeOctreeListener& rhs) = delete;
-    LLVolumeOctreeListener& operator=(const LLVolumeOctreeListener& rhs) = delete;
+    const LLVolumeOctreeListener& operator=(const LLVolumeOctreeListener& rhs) = delete;
 
      //LISTENER FUNCTIONS
     virtual void handleChildAddition(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* parent, LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* child);
@@ -115,8 +91,8 @@ public:
 
 
 public:
-    LL_ALIGN_16(LLVector4a mBounds[2]); // bounding box (center, size) of this node and all its children (tight fit to objects)
-    LL_ALIGN_16(LLVector4a mExtents[2]); // extents (min, max) of this node and all its children
+    LLVector4a mBounds[2]; // bounding box (center, size) of this node and all its children (tight fit to objects)
+    LLVector4a mExtents[2]; // extents (min, max) of this node and all its children
 };
 
 class LLOctreeTriangleRayIntersect : public LLOctreeTraveler<LLVolumeTriangle, LLVolumeTriangle*>
@@ -144,7 +120,7 @@ public:
     virtual void visit(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* node);
 };
 
-class LLVolumeOctreeValidate final : public LLOctreeTraveler<LLVolumeTriangle, LLVolumeTriangle*>
+class LLVolumeOctreeValidate : public LLOctreeTraveler<LLVolumeTriangle, LLVolumeTriangle*>
 {
     virtual void visit(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* branch);
 };
@@ -159,7 +135,7 @@ public:
     virtual void visit(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* branch)
     { //this is a depth first traversal, so it's safe to assum all children have complete
         //bounding data
-        LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
 
             LLVolumeOctreeListener* node = (LLVolumeOctreeListener*)branch->getListener(0);
 
@@ -202,7 +178,7 @@ public:
             llassert(!branch->isLeaf()); // Empty leaf
         }
 
-        for (S32 i = 0; i < branch->getChildCount(); ++i)
+        for (U32 i = 0; i < branch->getChildCount(); ++i)
         {  //stretch by child extents
             LLVolumeOctreeListener* child = (LLVolumeOctreeListener*)branch->getChild(i)->getListener(0);
             min.setMin(min, child->mExtents[0]);

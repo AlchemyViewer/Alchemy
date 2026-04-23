@@ -31,6 +31,7 @@
 #include "llimage_libtest.h"
 
 // Linden library includes
+#include "llapr.h"
 #include "llimage.h"
 #include "llimagefilter.h"
 #include "llimagejpeg.h"
@@ -43,6 +44,8 @@
 #include "v4coloru.h"
 #include "llsdserialize.h"
 #include "llcleanup.h"
+#include "lltrace.h"
+#include "llfasttimer.h"
 
 // system libraries
 #include <iostream>
@@ -239,7 +242,7 @@ void store_input_file(std::list<std::string> &input_filenames, const std::string
         return;
     }
 
-    if ((name.find('*') != -1) || ((name.find('?') != -1)))
+    if ((name.find('*') != std::string::npos) || ((name.find('?') != std::string::npos)))
     {
         // If file name is a pattern, iterate to get each file name and store
         std::string next_name;
@@ -327,7 +330,7 @@ public:
 
     void run()
     {
-        std::ofstream os(mFile.c_str());
+        llofstream os(mFile.c_str());
 
         while (!sAllDone)
         {
@@ -343,6 +346,11 @@ public:
 
 int main(int argc, char** argv)
 {
+    // Call Tracy first thing to have it allocate memory
+    // https://github.com/wolfpld/tracy/issues/196
+    LL_PROFILER_FRAME_END;
+    LL_PROFILER_SET_THREAD_NAME("App");
+
     // List of input and output files
     std::list<std::string> input_filenames;
     std::list<std::string> output_filenames;
@@ -523,7 +531,7 @@ int main(int argc, char** argv)
             }
             else
             {
-                LLFastTimer::sMetricLog = TRUE;
+                LLFastTimer::sMetricLog = true;
                 LLFastTimer::sLogName = test_name;
                 arg += 1;                   // Skip that arg now we know it's a valid test name
                 if ((arg + 1) == argc)      // Break out of the loop if we reach the end of the arg list
@@ -573,10 +581,10 @@ int main(int argc, char** argv)
 
 
     // Create the logging thread if required
-    if (LLFastTimer::sMetricLog)
+    if (LLTrace::BlockTimer::sMetricLog)
     {
-        LLFastTimer::sLogLock = new LLMutex(NULL);
-        fast_timer_log_thread = new LogThread(LLFastTimer::sLogName);
+        LLTrace::BlockTimer::setLogLock(new LLMutex());
+        fast_timer_log_thread = new LogThread(LLTrace::BlockTimer::sLogName);
         fast_timer_log_thread->start();
     }
 
@@ -618,9 +626,9 @@ int main(int argc, char** argv)
     // Output perf data if requested by user
     if (analyze_performance)
     {
-        std::string baseline_name = LLFastTimer::sLogName + "_baseline.slp";
-        std::string current_name  = LLFastTimer::sLogName + ".slp";
-        std::string report_name   = LLFastTimer::sLogName + "_report.csv";
+        std::string baseline_name = LLTrace::BlockTimer::sLogName + "_baseline.slp";
+        std::string current_name  = LLTrace::BlockTimer::sLogName + ".slp";
+        std::string report_name   = LLTrace::BlockTimer::sLogName + "_report.csv";
 
         std::cout << "Analyzing performance, check report in : " << report_name << std::endl;
 
@@ -628,9 +636,9 @@ int main(int argc, char** argv)
     }
 
     // Stop the perf gathering system if needed
-    if (LLFastTimer::sMetricLog)
+    if (LLTrace::BlockTimer::sMetricLog)
     {
-        LLMetricPerformanceTesterBasic::deleteTester(LLFastTimer::sLogName);
+        LLMetricPerformanceTesterBasic::deleteTester(LLTrace::BlockTimer::sLogName);
         sAllDone = true;
     }
 

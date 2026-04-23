@@ -137,6 +137,18 @@ void llcoro::suspendUntilTimeout(float seconds)
     suspendUntilEventOnWithTimeout(bogus, seconds, timedout);
 }
 
+void llcoro::suspendUntilNextFrame()
+{
+    LLCoros::checkStop();
+    LLCoros::TempStatus st("waiting for next frame");
+
+    // Listen for the next event on the "mainloop" event pump.
+    // Once per frame we get mainloop.post(newFrame);
+    LLEventPumpOrPumpName mainloop_pump("mainloop");
+    // Wait for the next event (the event data is ignored).
+    suspendUntilEventOn(mainloop_pump);
+}
+
 namespace
 {
 
@@ -208,7 +220,7 @@ postAndSuspendSetup(const std::string& callerName,
                     // we've consumed it, do so.
                     return consuming;
                 }
-                catch(const boost::fibers::promise_already_satisfied & ex)
+                catch(boost::fibers::promise_already_satisfied & ex)
                 {
                     LL_DEBUGS("lleventcoro") << "promise already satisfied in '"
                         << listenerName << "': "  << ex.what() << LL_ENDL;

@@ -86,7 +86,7 @@ bool LLGiveable::operator()(LLInventoryCategory* cat, LLInventoryItem* item)
            !item->getPermissions().allowOperationBy(PERM_TRANSFER,
                                 gAgent.getID()))
         {
-            allowed = FALSE;
+            allowed = false;
         }
         if (allowed &&
            !item->getPermissions().allowCopyBy(gAgent.getID()))
@@ -252,9 +252,9 @@ bool LLGiveInventory::doGiveInventoryCategory(const LLUUID& to_agent,
         items,
         LLInventoryModel::EXCLUDE_TRASH,
         giveable);
-    S32 count = cats.size();
+    auto count = cats.size();
     bool complete = true;
-    for(S32 i = 0; i < count; ++i)
+    for(size_t i = 0; i < count; ++i)
     {
         if (!gInventory.isCategoryComplete(cats.at(i)->getUUID()))
         {
@@ -350,7 +350,7 @@ void LLGiveInventory::logInventoryOffer(const LLUUID& to_agent, const LLUUID &im
             std::string full_name = LLCacheName::buildUsername(av_name.getUserName());
             LLUIString message = LLTrans::getString(message_name + "-im");
             message.setArgs(args);
-            LLIMModel::instance().logToFile(full_name, LLTrans::getString("APP_NAME"), im_session_id, message.getString());
+            LLIMModel::instance().logToFile(full_name, LLTrans::getString("SECOND_LIFE"), im_session_id, message.getString());
         }
     }
 }
@@ -436,7 +436,7 @@ bool LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
     pack_instant_message(
         gMessageSystem,
         gAgentID,
-        FALSE,
+        false,
         gAgentSessionID,
         to_agent,
         name,
@@ -453,15 +453,16 @@ bool LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
     gAgent.sendReliableMessage();
 
     // VEFFECT: giveInventory
-    if (!gSavedSettings.getBOOL("AlchemyPointAtPrivate"))
+    LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+    effectp->setSourceObject(gAgentAvatarp);
+    effectp->setTargetObject(gObjectList.findObject(to_agent));
+    effectp->setDuration(LL_HUD_DUR_SHORT);
+    effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+
+    if (gFloaterTools)
     {
-        LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, TRUE);
-        effectp->setSourceObject(gAgentAvatarp);
-        effectp->setTargetObject(gObjectList.findObject(to_agent));
-        effectp->setDuration(LL_HUD_DUR_SHORT);
-        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+        gFloaterTools->dirty();
     }
-    gFloaterTools->dirty();
 
     LLMuteList::getInstance()->autoRemove(to_agent, LLMuteList::AR_INVENTORY);
 
@@ -474,8 +475,8 @@ bool LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
     if ( (!RlvActions::isRlvEnabled()) ||
          (RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) || (im_session_id.notNull()) || (!RlvUtil::isNearbyAgent(to_agent)) || (RlvUIEnabler::hasOpenProfile(to_agent)) )
     {
-        LLRecentPeople::instance().add(to_agent);
-    }
+    LLRecentPeople::instance().add(to_agent);
+}
     return true;
 // [/RLVa:KB]
 }
@@ -510,8 +511,8 @@ bool LLGiveInventory::handleCopyProtectedCategory(const LLSD& notification, cons
                 items,
                 LLInventoryModel::EXCLUDE_TRASH,
                 remove);
-            S32 count = items.size();
-            for(S32 i = 0; i < count; ++i)
+            auto count = items.size();
+            for(size_t i = 0; i < count; ++i)
             {
                 gInventory.deleteObject(items.at(i)->getUUID());
             }
@@ -564,7 +565,7 @@ bool LLGiveInventory::commitGiveInventoryCategory(const LLUUID& to_agent,
     if ( (!RlvActions::isRlvEnabled()) ||
          (RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) || (im_session_id.notNull()) || (!RlvUtil::isNearbyAgent(to_agent)) || (RlvUIEnabler::hasOpenProfile(to_agent)) )
     {
-        LLRecentPeople::instance().add(to_agent);
+    LLRecentPeople::instance().add(to_agent);
     }
 // [/RLVa:KB]
 
@@ -582,7 +583,7 @@ bool LLGiveInventory::commitGiveInventoryCategory(const LLUUID& to_agent,
     // MAX ITEMS is based on (sizeof(uuid)+2) * count must be <
     // MTUBYTES or 18 * count < 1200 => count < 1200/18 =>
     // 66. I've cut it down a bit from there to give some pad.
-    S32 count = items.size() + cats.size();
+    auto count = items.size() + cats.size();
     if (count > MAX_ITEMS)
     {
         LLNotificationsUtil::add("TooManyItems");
@@ -599,7 +600,7 @@ bool LLGiveInventory::commitGiveInventoryCategory(const LLUUID& to_agent,
         LLAgentUI::buildFullname(name);
         LLUUID transaction_id;
         transaction_id.generate();
-        S32 bucket_size = (sizeof(U8) + UUID_BYTES) * (count + 1);
+        S32 bucket_size = (sizeof(U8) + UUID_BYTES) * (static_cast<S32>(count) + 1);
         U8* bucket = new U8[bucket_size];
         U8* pos = bucket;
         U8 type = (U8)cat->getType();
@@ -628,7 +629,7 @@ bool LLGiveInventory::commitGiveInventoryCategory(const LLUUID& to_agent,
         pack_instant_message(
             gMessageSystem,
             gAgent.getID(),
-            FALSE,
+            false,
             gAgent.getSessionID(),
             to_agent,
             name,
@@ -646,15 +647,16 @@ bool LLGiveInventory::commitGiveInventoryCategory(const LLUUID& to_agent,
         delete[] bucket;
 
         // VEFFECT: giveInventoryCategory
-        if (!gSavedSettings.getBOOL("AlchemyPointAtPrivate"))
+        LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+        effectp->setSourceObject(gAgentAvatarp);
+        effectp->setTargetObject(gObjectList.findObject(to_agent));
+        effectp->setDuration(LL_HUD_DUR_SHORT);
+        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+
+        if (gFloaterTools)
         {
-            LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, TRUE);
-            effectp->setSourceObject(gAgentAvatarp);
-            effectp->setTargetObject(gObjectList.findObject(to_agent));
-            effectp->setDuration(LL_HUD_DUR_SHORT);
-            effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+            gFloaterTools->dirty();
         }
-        gFloaterTools->dirty();
 
         LLMuteList::getInstance()->autoRemove(to_agent, LLMuteList::AR_INVENTORY);
 

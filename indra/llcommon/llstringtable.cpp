@@ -49,19 +49,19 @@ LLStringTableEntry::~LLStringTableEntry()
     mCount = 0;
 }
 
-LLStringTable::LLStringTable(U32 tablesize)
+LLStringTable::LLStringTable(int tablesize)
 : mUniqueEntries(0)
 {
-    U32 i;
+    S32 i;
     if (!tablesize)
-        tablesize = 4096U; // some arbitrary default
+        tablesize = 4096; // some arbitrary default
     // Make sure tablesize is power of 2
-    for (i = 31U; i > 0U; i--)
+    for (i = 31; i>0; i--)
     {
-        if (tablesize & (1U << i))
+        if (tablesize & (1<<i))
         {
-            if (tablesize >= (3U << (i - 1U)))
-                tablesize = (1U << (i + 1U));
+            if (tablesize >= (3<<(i-1)))
+                tablesize = (1<<(i+1));
             else
                 tablesize = (1<<i);
             break;
@@ -85,7 +85,7 @@ LLStringTable::~LLStringTable()
 #if !STRING_TABLE_HASH_MAP
     if (mStringList)
     {
-        for (U32 i = 0; i < mMaxEntries; i++)
+        for (S32 i = 0; i < mMaxEntries; i++)
         {
             if (mStringList[i])
             {
@@ -105,7 +105,7 @@ LLStringTable::~LLStringTable()
 }
 
 
-static U32 hash_my_string(const char *str, U32 max_entries)
+static U32 hash_my_string(const char *str, int max_entries)
 {
     U32 retval = 0;
 #if 0

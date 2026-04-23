@@ -87,9 +87,20 @@ void dump_avatar_and_skin_state(const std::string& reason, LLVOAvatar *avatar, c
 #endif
 }
 
+S32 LLSkinningUtil::getMaxJointCount()
+{
+    return (S32)LL_MAX_JOINTS_PER_MESH_OBJECT;
+}
+
 U32 LLSkinningUtil::getMeshJointCount(const LLMeshSkinInfo *skin)
 {
     return llmin((U32)getMaxJointCount(), (U32)skin->mJointNames.size());
+}
+
+S32 LLSkinningUtil::getMaxGLTFJointCount()
+{
+    // this is the maximum number of 3x4 matrices than can fit in a UBO
+    return gGLManager.mMaxUniformBlockSize / 48;
 }
 
 void LLSkinningUtil::scrubInvalidJoints(LLVOAvatar *avatar, LLMeshSkinInfo* skin)
@@ -105,7 +116,8 @@ void LLSkinningUtil::scrubInvalidJoints(LLVOAvatar *avatar, LLMeshSkinInfo* skin
         // needed for handling of any legacy bad data.
         if (!avatar->getJoint(skin->mJointNames[j]))
         {
-            LL_WARNS_ONCE("Avatar") << avatar->getFullname() << " mesh rigged to invalid joint" << skin->mJointNames[j] << LL_ENDL;
+            LL_DEBUGS("Avatar") << avatar->getDebugName() << " mesh rigged to invalid joint " << skin->mJointNames[j] << LL_ENDL;
+            LL_WARNS_ONCE("Avatar") << avatar->getDebugName() << " mesh rigged to invalid joint" << skin->mJointNames[j] << LL_ENDL;
             skin->mJointNames[j] = "mPelvis";
             skin->mJointNumsInitialized = false; // force update after names change.
         }
@@ -122,14 +134,23 @@ void LLSkinningUtil::initSkinningMatrixPalette(
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
     initJointNums(const_cast<LLMeshSkinInfo*>(skin), avatar);
-    for (U32 j = 0; j < count; ++j)
+
+    if (skin->mInvBindMatrix.size() < count )
+    {
+        // faulty model? mInvBindMatrix.size() should have matched mJointNames.size()
+        return;
+    }
+
+    LLMatrix4a world[LL_CHARACTER_MAX_ANIMATED_JOINTS];
+
+    for (S32 j = 0; j < count; ++j)
     {
         S32 joint_num = skin->mJointNums[j];
         LLJoint *joint = avatar->getJoint(joint_num);
 
         if (joint)
         {
-            mat[j].setMul(joint->getWorldMatrix(), skin->mInvBindMatrix[j]);
+            world[j] = joint->getWorldMatrix4a();
         }
         else
         {
@@ -140,21 +161,32 @@ void LLSkinningUtil::initSkinningMatrixPalette(
             // valid.  In other  cases of  skinned  rendering, invalid
             // joints should already have  been removed during scrubInvalidJoints().
             LL_WARNS_ONCE("Avatar") << avatar->getFullname()
-                                    << " rigged to invalid joint name " << skin->mJointNames[j]
-                                    << " num " << skin->mJointNums[j] << LL_ENDL;
+                << " rigged to invalid joint name " << skin->mJointNames[j]
+                << " num " << skin->mJointNums[j] << LL_ENDL;
             LL_WARNS_ONCE("Avatar") << avatar->getFullname()
-                                    << " avatar build state: isBuilt() " << avatar->isBuilt()
-                                    << " mInitFlags " << avatar->mInitFlags << LL_ENDL;
-            dump_avatar_and_skin_state("initSkinningMatrixPalette joint not found", avatar, skin);
+                << " avatar build state: isBuilt() " << avatar->isBuilt()
+                << " mInitFlags " << avatar->mInitFlags << LL_ENDL;
 #endif
+            dump_avatar_and_skin_state("initSkinningMatrixPalette joint not found", avatar, skin);
         }
+    }
+
+    //NOTE: pointer striders used here as a micro-optimization over vector/array lookups
+    const LLMatrix4a* invBind = &(skin->mInvBindMatrix[0]);
+    const LLMatrix4a* w = world;
+    LLMatrix4a* m = mat;
+    LLMatrix4a* end = m + count;
+
+    while (m < end)
+    {
+        matMulUnsafe(*(invBind++), *(w++), *(m++));
     }
 }
 
 void LLSkinningUtil::checkSkinWeights(LLVector4a* weights, U32 num_vertices, const LLMeshSkinInfo* skin)
 {
 #if DEBUG_SKINNING
-    const S32 max_joints = skin->mJointNames.size();
+    const S32 max_joints = narrow(skin->mJointNames.size());
     for (U32 j=0; j<num_vertices; j++)
     {
         F32 *w = weights[j].getF32ptr();
@@ -172,15 +204,32 @@ void LLSkinningUtil::checkSkinWeights(LLVector4a* weights, U32 num_vertices, con
 #endif
 }
 
+void LLSkinningUtil::scrubSkinWeights(LLVector4a* weights, U32 num_vertices, const LLMeshSkinInfo* skin)
+{
+    const S32 max_joints = static_cast<S32>(skin->mJointNames.size());
+    for (U32 j=0; j<num_vertices; j++)
+    {
+        F32 *w = weights[j].getF32ptr();
+
+        for (U32 k=0; k<4; ++k)
+        {
+            S32 i = llfloor(w[k]);
+            F32 f = w[k]-i;
+            i = llclamp(i,0,max_joints-1);
+            w[k] = i + f;
+        }
+    }
+    checkSkinWeights(weights, num_vertices, skin);
+}
+
 void LLSkinningUtil::getPerVertexSkinMatrix(
     F32* weights,
     const LLMatrix4a* mat,
     bool handle_bad_scale,
-    LLMatrix4a& final_mat)
+    LLMatrix4a& final_mat,
+    U32 max_joints)
 {
-#ifdef SHOW_ASSERT
     bool valid_weights = true;
-#endif
     final_mat.clear();
 
     S32 idx[4];
@@ -198,7 +247,7 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
         // >= 0.0, we can use int instead of floorf; the latter
         // allegedly has a lot of overhead due to ieeefp error
         // checking which we should not need.
-        idx[k] = llclamp((S32) floorf(w), (S32)0, (S32)getMaxJointCount() - 1);
+        idx[k] = llclamp((S32) floorf(w), (S32)0, (S32)max_joints-1);
 
         wght[k] = w - floorf(w);
         scale += wght[k];
@@ -206,9 +255,7 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
     if (handle_bad_scale && scale <= 0.f)
     {
         wght = LLVector4(1.0f, 0.0f, 0.0f, 0.0f);
-#ifdef SHOW_ASSERT
         valid_weights = false;
-#endif
     }
     else
     {
@@ -226,11 +273,12 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
 
         final_mat.add(src);
     }
-#ifdef SHOW_ASSERT
     // SL-366 - with weight validation/cleanup code, it should no longer be
     // possible to hit the bad scale case.
     llassert(valid_weights);
-#endif
+    // When building for Release, the above llassert() goes away. Ward off
+    // variable-set-but-unused error.
+    (void)valid_weights;
 }
 
 void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)
@@ -275,19 +323,16 @@ void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)
 
 void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *avatar, LLVolumeFace& vol_face)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
-
     if (vol_face.mJointRiggingInfoTab.needsUpdate())
     {
         S32 num_verts = vol_face.mNumVertices;
-        S32 num_joints = skin->mJointNames.size();
+        S32 num_joints = static_cast<S32>(skin->mJointNames.size());
         if (num_verts > 0 && vol_face.mWeights && num_joints > 0)
         {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
             initJointNums(const_cast<LLMeshSkinInfo*>(skin), avatar);
             if (vol_face.mJointRiggingInfoTab.size()==0)
             {
-                //std::set<S32> active_joints;
-                //S32 active_verts = 0;
                 vol_face.mJointRiggingInfoTab.resize(LL_CHARACTER_MAX_ANIMATED_JOINTS);
                 LLJointRiggingInfoTab &rig_info_tab = vol_face.mJointRiggingInfoTab;
                 for (S32 i=0; i<vol_face.mNumVertices; i++)
@@ -303,28 +348,23 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                         F32 w = weights[k];
                         idx[k] = llclamp((S32) floorf(w), (S32)0, (S32)LL_CHARACTER_MAX_ANIMATED_JOINTS-1);
                         wght[k] = w - idx[k];
-                        scale += wght[k];
                     }
-                    if (scale > 0.0f)
-                    {
-                        for (U32 k=0; k<4; ++k)
-                        {
-                            wght[k] /= scale;
-                        }
-                    }
+
                     for (U32 k=0; k<4; ++k)
                     {
                         S32 joint_index = idx[k];
-                        if (wght[k] > 0.0f && num_joints > joint_index)
+                        if (wght[k] > 0.2f && num_joints > joint_index)
                         {
                             S32 joint_num = skin->mJointNums[joint_index];
                             if (joint_num >= 0 && joint_num < LL_CHARACTER_MAX_ANIMATED_JOINTS)
                             {
                                 rig_info_tab[joint_num].setIsRiggedTo(true);
 
+                                size_t bind_poses_size = skin->mBindPoseMatrix.size();
+                                const LLMatrix4a& mat = bind_poses_size > joint_index ? skin->mBindPoseMatrix[joint_index] : LLMatrix4a::identity();
                                 LLVector4a pos_joint_space;
-                                skin->mInvBindShapeMatrix[joint_index].affineTransform(pos, pos_joint_space);
-                                pos_joint_space.mul(wght[k]);
+
+                                mat.affineTransform(pos, pos_joint_space);
 
                                 LLVector4a *extents = rig_info_tab[joint_num].getRiggedExtents();
                                 update_min_max(extents[0], extents[1], pos_joint_space);
@@ -332,27 +372,36 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                         }
                     }
                 }
-                //LL_DEBUGS("RigSpammish") << "built rigging info for vf " << &vol_face
-                //                         << " num_verts " << vol_face.mNumVertices
-                //                         << " active joints " << active_joints.size()
-                //                         << " active verts " << active_verts
-                //                         << LL_ENDL;
                 vol_face.mJointRiggingInfoTab.setNeedsUpdate(false);
             }
         }
-
-#if DEBUG_SKINNING
-        if (vol_face.mJointRiggingInfoTab.size()!=0)
-        {
-            LL_DEBUGS("RigSpammish") << "we have rigging info for vf " << &vol_face
-                                     << " num_verts " << vol_face.mNumVertices << LL_ENDL;
-        }
-        else
-        {
-            LL_DEBUGS("RigSpammish") << "no rigging info for vf " << &vol_face
-                                     << " num_verts " << vol_face.mNumVertices << LL_ENDL;
-        }
-#endif
-
     }
 }
+
+// This is used for extracting rotation from a bind shape matrix that
+// already has scales baked in
+LLQuaternion LLSkinningUtil::getUnscaledQuaternion(const LLMatrix4& mat4)
+{
+    LLMatrix3 bind_mat = mat4.getMat3();
+    for (auto i = 0; i < 3; i++)
+    {
+        F32 len = 0.0f;
+        for (auto j = 0; j < 3; j++)
+        {
+            len += bind_mat.mMatrix[i][j] * bind_mat.mMatrix[i][j];
+        }
+        if (len > 0.0f)
+        {
+            len = sqrt(len);
+            for (auto j = 0; j < 3; j++)
+            {
+                bind_mat.mMatrix[i][j] /= len;
+            }
+        }
+    }
+    bind_mat.invert();
+    LLQuaternion bind_rot = bind_mat.quaternion();
+    bind_rot.normalize();
+    return bind_rot;
+}
+

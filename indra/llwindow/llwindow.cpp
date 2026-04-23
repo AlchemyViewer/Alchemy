@@ -29,7 +29,7 @@
 
 #if LL_MESA_HEADLESS
 #include "llwindowmesaheadless.h"
-#elif LL_SDL
+#elif LL_SDL_WINDOW
 #include "llwindowsdl.h"
 #elif LL_WINDOWS
 #include "llwindowwin32.h"
@@ -39,15 +39,19 @@
 
 #include "llerror.h"
 #include "llkeyboard.h"
+#if LL_SDL_WINDOW && !defined(LL_MESA_HEADLESS)
+#include "llsdl.h"
+#endif
 #include "llwindowcallbacks.h"
 
 
 //
 // Globals
 //
+LLWindow* gWindowp = nullptr;
 LLSplashScreen *gSplashScreenp = NULL;
-BOOL gDebugClicks = FALSE;
-BOOL gDebugWindowProc = FALSE;
+bool gDebugClicks = false;
+bool gDebugWindowProc = false;
 
 const S32 gURLProtocolWhitelistCount = 5;
 const std::string gURLProtocolWhitelist[] = { "secondlife:", "http:", "https:", "data:", "mailto:" };
@@ -63,25 +67,26 @@ const std::string gURLProtocolWhitelist[] = { "secondlife:", "http:", "https:", 
 S32 OSMessageBox(const std::string& text, const std::string& caption, U32 type)
 {
     // Properly hide the splash screen when displaying the message box
-    BOOL was_visible = FALSE;
+    bool was_visible = false;
     if (LLSplashScreen::isVisible())
     {
-        was_visible = TRUE;
+        was_visible = true;
         LLSplashScreen::hide();
     }
 
     S32 result = 0;
-#if LL_MESA_HEADLESS // !!! *FIX: (?)
     LL_WARNS() << "OSMessageBox: " << text << LL_ENDL;
+#if LL_MESA_HEADLESS // !!! *FIX: (?)
     return OSBTN_OK;
-#elif LL_SDL
+#elif LL_SDL_WINDOW
     result = OSMessageBoxSDL(text, caption, type);
 #elif LL_WINDOWS
     result = OSMessageBoxWin32(text, caption, type);
 #elif LL_DARWIN
     result = OSMessageBoxMacOSX(text, caption, type);
 #else
-#error("OSMessageBox not implemented for this platform!")
+    LL_WARNS() << "OSMessageBox not implemented for this platform!" << LL_ENDL;
+    return OSBTN_OK;
 #endif
 
     if (was_visible)
@@ -97,41 +102,44 @@ S32 OSMessageBox(const std::string& text, const std::string& caption, U32 type)
 // LLWindow
 //
 
-LLWindow::LLWindow(LLWindowCallbacks* callbacks, BOOL fullscreen, U32 flags)
+LLWindow::LLWindow(LLWindowCallbacks* callbacks, bool fullscreen, U32 flags)
     : mCallbacks(callbacks),
-      mPostQuit(TRUE),
+      mPostQuit(true),
       mFullscreen(fullscreen),
       mFullscreenWidth(0),
       mFullscreenHeight(0),
-      mFullscreenBits(0),
       mFullscreenRefresh(0),
       mSupportedResolutions(NULL),
       mNumSupportedResolutions(0),
       mCurrentCursor(UI_CURSOR_ARROW),
       mNextCursor(UI_CURSOR_ARROW),
-      mCursorHidden(FALSE),
+      mCursorHidden(false),
       mBusyCount(0),
-      mIsMouseClipping(FALSE),
+      mIsMouseClipping(false),
       mMinWindowWidth(0),
       mMinWindowHeight(0),
       mSwapMethod(SWAP_METHOD_UNDEFINED),
-      mHideCursorPermanent(FALSE),
+      mHideCursorPermanent(false),
       mFlags(flags),
       mHighSurrogate(0),
       mRefreshRate(0)
 {
 }
 
-//virtual
-BOOL LLWindow::isValid()
+LLWindow::~LLWindow()
 {
-    return TRUE;
 }
 
 //virtual
-BOOL LLWindow::canDelete()
+bool LLWindow::isValid()
 {
-    return TRUE;
+    return true;
+}
+
+//virtual
+bool LLWindow::canDelete()
+{
+    return true;
 }
 
 //virtual
@@ -174,18 +182,12 @@ ECursorType LLWindow::getCursor() const
 }
 
 //virtual
-BOOL LLWindow::dialogColorPicker(F32 *r, F32 *g, F32 *b)
+bool LLWindow::dialogColorPicker(F32 *r, F32 *g, F32 *b)
 {
-    return FALSE;
+    return false;
 }
 
-void *LLWindow::getMediaWindow()
-{
-    // Default to returning the platform window.
-    return getPlatformWindow();
-}
-
-BOOL LLWindow::setSize(LLCoordScreen size)
+bool LLWindow::setSize(LLCoordScreen size)
 {
     if (!getMaximized())
     {
@@ -195,7 +197,7 @@ BOOL LLWindow::setSize(LLCoordScreen size)
     return setSizeImpl(size);
 }
 
-BOOL LLWindow::setSize(LLCoordWindow size)
+bool LLWindow::setSize(LLCoordWindow size)
 {
     //HACK: we are inconsistently using minimum window dimensions
     // in this case, we are constraining the inner "client" rect and other times
@@ -237,25 +239,25 @@ void LLWindow::processMiscNativeEvents()
 }
 
 //virtual
-BOOL LLWindow::isPrimaryTextAvailable()
+bool LLWindow::isPrimaryTextAvailable()
 {
-    return FALSE; // no
+    return false; // no
 }
 //virtual
-BOOL LLWindow::pasteTextFromPrimary(LLWString &dst)
+bool LLWindow::pasteTextFromPrimary(LLWString &dst)
 {
-    return FALSE; // fail
+    return false; // fail
 }
 // virtual
-BOOL LLWindow::copyTextToPrimary(const LLWString &src)
+bool LLWindow::copyTextToPrimary(const LLWString &src)
 {
-    return FALSE; // fail
+    return false; // fail
 }
 
 // static
 std::vector<std::string> LLWindow::getDynamicFallbackFontList()
 {
-#if LL_SDL
+#if LL_SDL_WINDOW && !LL_MESA_HEADLESS
     return LLWindowSDL::getDynamicFallbackFontList();
 #elif LL_WINDOWS
     return LLWindowWin32::getDynamicFallbackFontList();
@@ -269,8 +271,8 @@ std::vector<std::string> LLWindow::getDynamicFallbackFontList()
 // static
 std::vector<std::string> LLWindow::getDisplaysResolutionList()
 {
-#if LL_SDL
-    return std::vector<std::string>();
+#if LL_SDL_WINDOW && !LL_MESA_HEADLESS
+    return LLWindowSDL::getDisplaysResolutionList();
 #elif LL_WINDOWS
     return LLWindowWin32::getDisplaysResolutionList();
 #elif LL_DARWIN
@@ -334,22 +336,23 @@ void LLWindow::handleUnicodeUTF16(U16 utf16, MASK mask)
 // static
 bool LLSplashScreen::isVisible()
 {
-    return gSplashScreenp ? true: false;
+    return gSplashScreenp;
 }
 
 // static
 LLSplashScreen *LLSplashScreen::create()
 {
 #if LL_MESA_HEADLESS
-    return 0;
-#elif LL_SDL
+    return nullptr;
+#elif LL_SDL_WINDOW
     return new LLSplashScreenSDL;
 #elif LL_WINDOWS
     return new LLSplashScreenWin32;
 #elif LL_DARWIN
     return new LLSplashScreenMacOSX;
 #else
-#error("LLSplashScreen not implemented on this platform!")
+    LL_WARNS() << ("LLSplashScreen not implemented on this platform!") << LL_ENDL;
+    return nullptr;
 #endif
 }
 
@@ -359,7 +362,7 @@ void LLSplashScreen::show()
 {
     if (!gSplashScreenp)
     {
-#if LL_SDL && !LL_MESA_HEADLESS
+#if LL_SDL_WINDOW && !LL_MESA_HEADLESS
         gSplashScreenp = new LLSplashScreenSDL;
 #elif LL_WINDOWS && !LL_MESA_HEADLESS
         gSplashScreenp = new LLSplashScreenWin32;
@@ -404,17 +407,20 @@ static std::set<LLWindow*> sWindowList;
 LLWindow* LLWindowManager::createWindow(
     LLWindowCallbacks* callbacks,
     const std::string& title, const std::string& name, S32 x, S32 y, S32 width, S32 height, U32 flags,
-    BOOL fullscreen,
-    BOOL clearBg,
-    BOOL enable_vsync,
-    BOOL use_gl,
-    BOOL ignore_pixel_depth,
+    bool fullscreen,
+    bool clearBg,
+    bool enable_vsync,
+    bool use_gl,
+    bool ignore_pixel_depth,
     U32 fsaa_samples,
     U32 max_cores,
-    U32 max_vram,
     F32 max_gl_version)
 {
     LLWindow* new_window;
+
+#if LL_SDL_WINDOW && !defined(LL_MESA_HEADLESS)
+    init_sdl(name);
+#endif
 
     if (use_gl)
     {
@@ -422,14 +428,14 @@ LLWindow* LLWindowManager::createWindow(
         new_window = new LLWindowMesaHeadless(callbacks,
             title, name, x, y, width, height, flags,
             fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth);
-#elif LL_SDL
+#elif LL_SDL_WINDOW
         new_window = new LLWindowSDL(callbacks,
             title, name, x, y, width, height, flags,
-            fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth, fsaa_samples, max_cores, max_vram, max_gl_version);
+            fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth, fsaa_samples);
 #elif LL_WINDOWS
         new_window = new LLWindowWin32(callbacks,
             title, name, x, y, width, height, flags,
-            fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth, fsaa_samples, max_cores, max_vram, max_gl_version);
+            fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth, fsaa_samples, max_cores, max_gl_version);
 #elif LL_DARWIN
         new_window = new LLWindowMacOSX(callbacks,
             title, name, x, y, width, height, flags,
@@ -443,35 +449,39 @@ LLWindow* LLWindowManager::createWindow(
             fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth);
     }
 
-    if (FALSE == new_window->isValid())
+    if (false == new_window->isValid())
     {
         delete new_window;
         LL_WARNS() << "LLWindowManager::create() : Error creating window." << LL_ENDL;
         return NULL;
     }
+    gWindowp = new_window;
     sWindowList.insert(new_window);
     return new_window;
 }
 
-BOOL LLWindowManager::destroyWindow(LLWindow* window)
+bool LLWindowManager::destroyWindow(LLWindow* window)
 {
     if (sWindowList.find(window) == sWindowList.end())
     {
         LL_ERRS() << "LLWindowManager::destroyWindow() : Window pointer not valid, this window doesn't exist!"
             << LL_ENDL;
-        return FALSE;
+        return false;
     }
 
     window->close();
 
     sWindowList.erase(window);
+#if LL_SDL_WINDOW && !defined(LL_MESA_HEADLESS)
+    quit_sdl();
+#endif
 
     delete window;
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLWindowManager::isWindowValid(LLWindow *window)
+bool LLWindowManager::isWindowValid(LLWindow *window)
 {
     return sWindowList.find(window) != sWindowList.end();
 }
@@ -482,7 +492,10 @@ LLCoordCommon LL_COORD_TYPE_WINDOW::convertToCommon() const
     const LLCoordWindow& self = LLCoordWindow::getTypedCoords(*this);
 
     LLCoordGL out;
-    LLWindow::instance_snapshot().begin()->convertCoords(self, &out);
+    if (gWindowp)
+    {
+        gWindowp->convertCoords(self, &out);
+    }
     return out.convert();
 }
 
@@ -491,7 +504,10 @@ void LL_COORD_TYPE_WINDOW::convertFromCommon(const LLCoordCommon& from)
     LLCoordWindow& self = LLCoordWindow::getTypedCoords(*this);
 
     LLCoordGL from_gl(from);
-    LLWindow::instance_snapshot().begin()->convertCoords(from_gl, &self);
+    if (gWindowp)
+    {
+        gWindowp->convertCoords(from_gl, &self);
+    }
 }
 
 LLCoordCommon LL_COORD_TYPE_SCREEN::convertToCommon() const
@@ -499,7 +515,10 @@ LLCoordCommon LL_COORD_TYPE_SCREEN::convertToCommon() const
     const LLCoordScreen& self = LLCoordScreen::getTypedCoords(*this);
 
     LLCoordGL out;
-    LLWindow::instance_snapshot().begin()->convertCoords(self, &out);
+    if (gWindowp)
+    {
+        gWindowp->convertCoords(self, &out);
+    }
     return out.convert();
 }
 
@@ -508,5 +527,8 @@ void LL_COORD_TYPE_SCREEN::convertFromCommon(const LLCoordCommon& from)
     LLCoordScreen& self = LLCoordScreen::getTypedCoords(*this);
 
     LLCoordGL from_gl(from);
-    LLWindow::instance_snapshot().begin()->convertCoords(from_gl, &self);
+    if (gWindowp)
+    {
+        gWindowp->convertCoords(from_gl, &self);
+    }
 }

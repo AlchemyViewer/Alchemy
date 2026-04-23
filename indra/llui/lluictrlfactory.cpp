@@ -67,7 +67,7 @@ public:
 static LLDefaultChildRegistry::Register<LLUICtrlLocate> r1("locate");
 
 // Build time optimization, generate this once in .cpp file
-template class LLUICtrlFactory* LLSingleton<class LLUICtrlFactory>::getInstance();
+template class LLUICtrlFactory* LLSimpleton<class LLUICtrlFactory>::getInstance();
 
 //-----------------------------------------------------------------------------
 // LLUICtrlFactory()
@@ -100,16 +100,19 @@ void LLUICtrlFactory::loadWidgetTemplate(const std::string& widget_tag, LLInitPa
     std::string base_filename = search_paths.front();
     if (!base_filename.empty())
     {
-        LLUICtrlFactory::instance().pushFileName(base_filename);
+        LLUICtrlFactory *factory = LLUICtrlFactory::getInstance();
+        factory->mFileNames.push_back(base_filename);
 
-        if (!LLXMLNode::getLayeredXMLNode(root_node, search_paths))
+        if (LLXMLNode::getLayeredXMLNode(root_node, search_paths))
+        {
+            LLXUIParser parser;
+            parser.readXUI(root_node, block, base_filename);
+        }
+        else
         {
             LL_WARNS() << "Couldn't parse widget from: " << base_filename << LL_ENDL;
-            return;
         }
-        LLXUIParser parser;
-        parser.readXUI(root_node, block, base_filename);
-        LLUICtrlFactory::instance().popFileName();
+        factory->mFileNames.pop_back();
     }
 }
 
@@ -124,7 +127,7 @@ void LLUICtrlFactory::createChildren(LLView* viewp, LLXMLNodePtr node, const wid
         LLXMLNodePtr outputChild;
         if (output_node)
         {
-            outputChild = output_node->createChild("", FALSE);
+            outputChild = output_node->createChild("", false);
         }
 
         if (!instance().createFromXML(child_node, viewp, LLStringUtil::null, registry, outputChild))
@@ -250,7 +253,7 @@ const LLInitParam::BaseBlock& get_empty_param_block()
 
 // adds a widget and its param block to various registries
 //static
-void LLUICtrlFactory::registerWidget(const std::type_info* widget_type, const std::type_info* param_block_type, const std::string& name)
+void LLUICtrlFactory::registerWidget(std::type_index widget_type, std::type_index param_block_type, const std::string& name)
 {
     // associate parameter block type with template .xml file
     std::string* existing_name = LLWidgetNameRegistry::instance().getValue(param_block_type);

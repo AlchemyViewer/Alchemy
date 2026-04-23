@@ -46,9 +46,9 @@ LLFloaterPerms::LLFloaterPerms(const LLSD& seed)
 {
 }
 
-BOOL LLFloaterPerms::postBuild()
+bool LLFloaterPerms::postBuild()
 {
-    return TRUE;
+    return true;
 }
 
 //static
@@ -126,7 +126,7 @@ const std::string LLFloaterPermsDefault::sCategoryNames[CAT_LAST] =
     "Materials"
 };
 
-BOOL LLFloaterPermsDefault::postBuild()
+bool LLFloaterPermsDefault::postBuild()
 {
     if(!gSavedSettings.getBOOL("DefaultUploadPermissionsConverted"))
     {
@@ -162,17 +162,17 @@ void LLFloaterPermsDefault::onCommitCopy(const LLSD& user_data)
     // Implements fair use
     std::string prefix = user_data.asString();
 
-    BOOL copyable = gSavedSettings.getBOOL(prefix+"NextOwnerCopy");
+    bool copyable = gSavedSettings.getBOOL(prefix+"NextOwnerCopy");
     if(!copyable)
     {
-        gSavedSettings.setBOOL(prefix+"NextOwnerTransfer", TRUE);
+        gSavedSettings.setBOOL(prefix+"NextOwnerTransfer", true);
     }
     LLCheckBoxCtrl* xfer = getChild<LLCheckBoxCtrl>(prefix+"_transfer");
     xfer->setEnabled(copyable);
 }
 
-const int MAX_HTTP_RETRIES = 5;
-const float RETRY_TIMEOUT = 5.0;
+constexpr int MAX_HTTP_RETRIES = 5;
+constexpr float RETRY_TIMEOUT = 5.0;
 
 void LLFloaterPermsDefault::sendInitialPerms()
 {
@@ -209,8 +209,8 @@ void LLFloaterPermsDefault::updateCapCoro(std::string url)
     std::string previousReason;
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("updateCapCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD postData = LLSD::emptyMap();
     postData["default_object_perm_masks"]["Group"] =

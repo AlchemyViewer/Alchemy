@@ -6,7 +6,6 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * Copyright (C) 2010-2020, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -44,20 +43,14 @@ const S32 COMPUTE_STOCK_NOT_EVALUATED = -2;
  **/
 
 // Is this a parent folder to a worn item
-BOOL get_is_parent_to_worn_item(const LLUUID& id);
+bool get_is_parent_to_worn_item(const LLUUID& id);
 
 // Is this item or its baseitem is worn, attached, etc...
-BOOL get_is_item_worn(const LLUUID& id);
-BOOL get_is_item_worn(const LLViewerInventoryItem* item);
+bool get_is_item_worn(const LLUUID& id);
+bool get_is_item_worn(const LLViewerInventoryItem* item);
 
 // Could this item be worn (correct type + not already being worn)
-BOOL get_can_item_be_worn(const LLUUID& id);
-
-// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-08-18 (Catznip-3.3)
-BOOL get_is_item_movable(const LLInventoryModel* model, const LLUUID& id);
-
-BOOL get_is_category_movable(const LLInventoryModel* model, const LLUUID& id);
-// [/SL:KB]
+bool get_can_item_be_worn(const LLUUID& id);
 
 bool get_is_item_removable(const LLInventoryModel* model, const LLUUID& id, bool check_worn);
 
@@ -65,10 +58,10 @@ bool get_is_item_removable(const LLInventoryModel* model, const LLUUID& id, bool
 bool get_is_item_editable(const LLUUID& inv_item_id);
 void handle_item_edit(const LLUUID& inv_item_id);
 
-BOOL get_is_category_removable(const LLInventoryModel* model, const LLUUID& id);
+bool get_is_category_removable(const LLInventoryModel* model, const LLUUID& id);
 bool get_is_category_and_children_removable(LLInventoryModel* model, const LLUUID& folder_id, bool check_worn);
 
-BOOL get_is_category_renameable(const LLInventoryModel* model, const LLUUID& id);
+bool get_is_category_renameable(const LLInventoryModel* model, const LLUUID& id);
 
 void show_item_profile(const LLUUID& item_uuid);
 void show_task_item_profile(const LLUUID& item_uuid, const LLUUID& object_id);
@@ -88,6 +81,7 @@ void rename_category(LLInventoryModel* model, const LLUUID& cat_id, const std::s
 
 void copy_inventory_category(LLInventoryModel* model, LLViewerInventoryCategory* cat, const LLUUID& parent_id, const LLUUID& root_copy_id = LLUUID::null, bool move_no_copy_items = false);
 void copy_inventory_category(LLInventoryModel* model, LLViewerInventoryCategory* cat, const LLUUID& parent_id, const LLUUID& root_copy_id, bool move_no_copy_items, inventory_func_type callback);
+void copy_inventory_category(LLInventoryModel* model, LLViewerInventoryCategory* cat, const LLUUID& parent_id, const LLUUID& root_copy_id, bool move_no_copy_items, LLPointer<LLInventoryCallback> callback);
 
 void copy_inventory_category_content(const LLUUID& new_cat_uuid, LLInventoryModel* model, LLViewerInventoryCategory* cat, const LLUUID& root_copy_id, bool move_no_copy_items);
 
@@ -120,16 +114,34 @@ bool is_only_cats_selected(const uuid_vec_t& selected_uuids);
 bool is_only_items_selected(const uuid_vec_t& selected_uuids);
 std::string get_category_path(LLUUID cat_id);
 
-bool can_move_to_outfit(LLInventoryItem* inv_item, BOOL move_is_into_current_outfit);
+bool can_move_to_outfit(LLInventoryItem* inv_item, bool move_is_into_current_outfit);
 bool can_move_to_landmarks(LLInventoryItem* inv_item);
-bool can_move_to_my_outfits(LLInventoryModel* model, LLInventoryCategory* inv_cat, U32 wear_limit);
+bool can_move_to_my_outfits_as_outfit(LLInventoryModel* model, LLInventoryCategory* inv_cat, U32 wear_limit);
+bool can_move_to_my_outfits_as_subfolder(LLInventoryModel* model, LLInventoryCategory* inv_cat, S32 depth = 0);
 std::string get_localized_folder_name(LLUUID cat_uuid);
 void new_folder_window(const LLUUID& folder_id);
 void ungroup_folder_items(const LLUUID& folder_id);
+bool get_is_favorite(const LLInventoryObject* object);
+bool get_is_favorite(const LLUUID& obj_id);
+void set_favorite(const LLUUID& obj_id, bool favorite);
+void toggle_favorite(const LLUUID& obj_id);
+void toggle_favorites(const uuid_vec_t& ids);
 std::string get_searchable_description(LLInventoryModel* model, const LLUUID& item_id);
 std::string get_searchable_creator_name(LLInventoryModel* model, const LLUUID& item_id);
 std::string get_searchable_UUID(LLInventoryModel* model, const LLUUID& item_id);
 bool can_share_item(const LLUUID& item_id);
+
+enum EMyOutfitsSubfolderType
+{
+    MY_OUTFITS_NO,
+    MY_OUTFITS_SUBFOLDER,
+    MY_OUTFITS_OUTFIT,
+    MY_OUTFITS_SUBOUTFIT,
+};
+EMyOutfitsSubfolderType myoutfit_object_subfolder_type(
+    LLInventoryModel* model,
+    const LLUUID& obj_id,
+    const LLUUID& my_outfits_id);
 
 /**                    Miscellaneous global functions
  **                                                                            **
@@ -142,13 +154,13 @@ class LLMarketplaceValidator: public LLSingleton<LLMarketplaceValidator>
     LOG_CLASS(LLMarketplaceValidator);
 public:
 
-    typedef boost::function<void(std::string& validation_message, S32 depth, LLError::ELevel log_level)> validation_msg_callback_t;
-    typedef boost::function<void(bool result)> validation_done_callback_t;
+    typedef std::function<void(std::string& validation_message, S32 depth, LLError::ELevel log_level)> validation_msg_callback_t;
+    typedef std::function<void(bool result)> validation_done_callback_t;
 
     void validateMarketplaceListings(
         const LLUUID &category_id,
-        validation_done_callback_t cb_done = NULL,
-        validation_msg_callback_t cb_msg = NULL,
+        validation_done_callback_t cb_done = nullptr,
+        validation_msg_callback_t cb_msg = nullptr,
         bool fix_hierarchy = true,
         S32 depth = -1);
 
@@ -190,14 +202,16 @@ private:
 // Base class for LLInventoryModel::collectDescendentsIf() method
 // which accepts an instance of one of these objects to use as the
 // function to determine if it should be added. Derive from this class
-// and override the () operator to return TRUE if you want to collect
+// and override the () operator to return true if you want to collect
 // the category or item passed in.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class LLInventoryCollectFunctor
 {
 public:
     virtual ~LLInventoryCollectFunctor(){};
-    virtual bool operator()(LLInventoryCategory* cat, LLInventoryItem* item) = 0;
+        virtual bool operator()(LLInventoryCategory* cat, LLInventoryItem* item) = 0;
+
+        virtual bool exceedsLimit() { return false; }
 
     static bool itemTransferCommonlyAllowed(const LLInventoryItem* item);
 };
@@ -240,7 +254,25 @@ protected:
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLIsType
 //
-// Implementation of a LLInventoryCollectFunctor which returns TRUE if
+// Implementation of a LLInventoryCollectFunctor which returns true if
+// the type is the type passed in during construction.
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class LLIsFolderType : public LLInventoryCollectFunctor
+{
+public:
+    LLIsFolderType(LLFolderType::EType type) : mType(type) {}
+    virtual ~LLIsFolderType() {}
+    virtual bool operator()(LLInventoryCategory* cat,
+        LLInventoryItem* item);
+protected:
+    LLFolderType::EType mType;
+};
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Class LLIsType
+//
+// Implementation of a LLInventoryCollectFunctor which returns true if
 // the type is the type passed in during construction.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -256,9 +288,27 @@ protected:
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Class LLIsOneOfTypes
+//
+// Implementation of a LLInventoryCollectFunctor which returns true if
+// the type is one of the types passed in during construction.
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class LLIsOneOfTypes : public LLInventoryCollectFunctor
+{
+public:
+    LLIsOneOfTypes(const std::vector<LLAssetType::EType> &types) : mTypes(types) {}
+    virtual ~LLIsOneOfTypes() {}
+    virtual bool operator()(LLInventoryCategory* cat,
+        LLInventoryItem* item);
+protected:
+    std::vector <LLAssetType::EType> mTypes;
+};
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLIsNotType
 //
-// Implementation of a LLInventoryCollectFunctor which returns FALSE if the
+// Implementation of a LLInventoryCollectFunctor which returns false if the
 // type is the type passed in during construction, otherwise false.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class LLIsNotType : public LLInventoryCollectFunctor
@@ -275,7 +325,7 @@ protected:
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLIsOfAssetType
 //
-// Implementation of a LLInventoryCollectFunctor which returns TRUE if
+// Implementation of a LLInventoryCollectFunctor which returns true if
 // the item or category is of asset type passed in during construction.
 // Link types are treated as links, not as the types they point to.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -294,7 +344,7 @@ protected:
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLAssetIDAndTypeMatches
 //
-// Implementation of a LLInventoryCollectFunctor which returns TRUE if
+// Implementation of a LLInventoryCollectFunctor which returns true if
 // the item matches both asset type and asset id.
 // This is needed in case you are looking for a specific type with default id
 // (since null is default for multiple asset types)
@@ -333,6 +383,18 @@ protected:
     PermissionBit mPerm;
     LLUUID          mAgentID;
     LLUUID          mGroupID;
+};
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Class LLFavoritesCollector
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+class LLFavoritesCollector : public LLInventoryCollectFunctor
+{
+public:
+    LLFavoritesCollector() {}
+    virtual ~LLFavoritesCollector() {}
+    virtual bool operator()(LLInventoryCategory* cat,
+        LLInventoryItem* item);
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -582,17 +644,19 @@ class LLInventoryState
 {
 public:
     // HACK: Until we can route this info through the instant message hierarchy
-    static BOOL sWearNewClothing;
+    static bool sWearNewClothing;
     static LLUUID sWearNewClothingTransactionID;    // wear all clothing in this transaction
 };
 
 struct LLInventoryAction
 {
-    static void doToSelected(LLInventoryModel* model, LLFolderView* root, const std::string& action, BOOL user_confirm = TRUE);
+    static void doToSelected(LLInventoryModel* model, LLFolderView* root, const std::string& action, bool user_confirm = true);
     static void callback_doToSelected(const LLSD& notification, const LLSD& response, class LLInventoryModel* model, class LLFolderView* root, const std::string& action);
     static void callback_copySelected(const LLSD& notification, const LLSD& response, class LLInventoryModel* model, class LLFolderView* root, const std::string& action);
     static void onItemsRemovalConfirmation(const LLSD& notification, const LLSD& response, LLHandle<LLFolderView> root);
     static void removeItemFromDND(LLFolderView* root);
+    static void fileUploadLocation(const LLUUID& dest_id, const std::string& action);
+    static bool isFileUploadLocation(const LLUUID& dest_id, const std::string& action);
 
     static void saveMultipleTextures(const std::vector<std::string>& filenames, std::set<LLFolderViewItem*> selected_items, LLInventoryModel* model);
 

@@ -60,6 +60,7 @@ public:
         CREATE          = 512,  // With ADD, item has just been created.
         // unfortunately a particular message is still associated with some unique semantics.
         UPDATE_CREATE   = 1024,  // With ADD, item added via UpdateCreateInventoryItem
+        UPDATE_FAVORITE = 2048,  // With ADD, item added via UpdateCreateInventoryItem
         ALL             = 0xffffffff
     };
     LLInventoryObserver();
@@ -80,7 +81,7 @@ public:
     void setFetchID(const LLUUID& id);
     void setFetchIDs(const uuid_vec_t& ids);
 
-    BOOL isFinished() const;
+    bool isFinished() const;
 
     virtual void startFetch() = 0;
     virtual void changed(U32 mask) = 0;
@@ -131,7 +132,7 @@ public:
     virtual void startFetch();
     /*virtual*/ void changed(U32 mask);
 protected:
-    BOOL isCategoryComplete(const LLViewerInventoryCategory* cat) const;
+    bool isCategoryComplete(const LLViewerInventoryCategory* cat) const;
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -257,7 +258,7 @@ protected:
 class LLInventoryCategoriesObserver : public LLInventoryObserver
 {
 public:
-    typedef boost::function<void()> callback_t;
+    typedef std::function<void()> callback_t;
 
     LLInventoryCategoriesObserver() {};
     virtual void changed(U32 mask);
@@ -276,12 +277,26 @@ protected:
     typedef LLUUID digest_t; // To clarify the actual usage of this "UUID"
     struct LLCategoryData
     {
-        LLCategoryData(const LLUUID& cat_id, const LLUUID& thumbnail_id, callback_t cb, S32 version, S32 num_descendents);
-        LLCategoryData(const LLUUID& cat_id, const LLUUID& thumbnail_id, callback_t cb, S32 version, S32 num_descendents, const digest_t& name_hash);
+        LLCategoryData(
+            const LLUUID& cat_id,
+            const LLUUID& thumbnail_id,
+            bool is_favorite,
+            callback_t cb,
+            S32 version,
+            S32 num_descendents);
+        LLCategoryData(
+            const LLUUID& cat_id,
+            const LLUUID& thumbnail_id,
+            bool is_favorite,
+            callback_t cb,
+            S32 version,
+            S32 num_descendents,
+            const digest_t& name_hash);
         callback_t  mCallback;
         S32         mVersion;
         S32         mDescendentsCount;
         digest_t    mItemNameHash;
+        bool        mIsFavorite;
         bool        mIsNameHashInitialized;
         LLUUID      mCatID;
         LLUUID      mThumbnailId;

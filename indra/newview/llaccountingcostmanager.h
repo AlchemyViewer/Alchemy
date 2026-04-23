@@ -50,7 +50,7 @@ protected:
     LLUUID      mTransactionID;
 };
 //===============================================================================
-class LLAccountingCostManager final : public LLSingleton<LLAccountingCostManager>
+class LLAccountingCostManager : public LLSingleton<LLAccountingCostManager>
 {
     LLSINGLETON(LLAccountingCostManager);
 

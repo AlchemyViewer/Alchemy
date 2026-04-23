@@ -31,14 +31,14 @@
 
 class LLLineEditor;
 
-class LLFloaterWhiteListEntry final :
+class LLFloaterWhiteListEntry :
     public LLFloater
 {
     public:
         LLFloaterWhiteListEntry(const LLSD& key);
         ~LLFloaterWhiteListEntry();
 
-        BOOL postBuild();
+        bool postBuild() override;
 
     private:
         LLLineEditor* mWhiteListEdit;

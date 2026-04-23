@@ -1,9 +1,9 @@
 /**
- * @file toneMapF.glsl
+ * @file colorCorrectF.glsl
  *
- * $LicenseInfo:firstyear=2021&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
- * Copyright (C) 2021, Rye Mutt<rye@alchemyviewer.org>
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,92 +24,135 @@
 
 /*[EXTRA_CODE_HERE]*/
 
-out vec4 frag_color;
 in vec2 vary_fragcoord;
+out vec4 frag_color;
 
+// =============================================================================
+// Uniforms
+// =============================================================================
+
+// ---- Input ------------------------------------------------------------------
 uniform sampler2D diffuseRect;
-uniform vec2 screen_res;
-
-#if COLOR_GRADE_LUT != 0
-uniform sampler3D colorgrade_lut;
-uniform vec4 colorgrade_lut_size;
+uniform sampler2D depthMap;
+#ifdef LEGACY_GAMMA
+uniform float gamma;
 #endif
 
+// =============================================================================
+// Forward Declarations
+// =============================================================================
+
 vec3 linear_to_srgb(vec3 cl);
+vec3 clampHDRRange(vec3 color);
 
-//=================================
-// borrowed noise from:
-//  <https://www.shadertoy.com/view/4dS3Wd>
-//  By Morgan McGuire @morgan3d, http://graphicscodex.com
-//
-float hash(float n) { return fract(sin(n) * 1e4); }
-float hash(vec2 p) { return fract(1e4 * sin(17.0 * p.x + p.y * 0.1) * (0.1 + abs(sin(p.y * 13.0 + p.x)))); }
+#ifdef TONEMAP
+vec3 applyExposure(vec3 color);
+vec3 applyToneMap(vec3 color);
+#endif
 
-float noise(float x) {
-    float i = floor(x);
-    float f = fract(x);
-    float u = f * f * (3.0 - 2.0 * f);
-    return mix(hash(i), hash(i + 1.0), u);
-}
+#ifdef COLOR_GRADE
+vec3 applyWhiteBalance(vec3 diff);
+vec3 applyLiftGammaGain(vec3 diff);
+vec3 applyLUTGrading(vec3 diff);
+vec3 applySplitToning(vec3 diff);
+vec3 applyBlackWhitePoint(vec3 diff);
+vec3 applyBrightnessContrast(vec3 diff);
+vec3 applyShadowHighlightRecovery(vec3 diff);
+vec3 applySaturation(vec3 diff);
+vec3 applyVibrance(vec3 diff);
+vec3 applyHueShift(vec3 diff);
+vec3 applyChannelCurves(vec3 diff);
+#endif
 
-float noise(vec2 x) {
-    vec2 i = floor(x);
-    vec2 f = fract(x);
+#ifdef HAS_POST_EFFECTS
+vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv);
+vec4 applyChromaticAberration(sampler2D tex, vec2 uv);
+#endif
 
-    // Four corners in 2D of a tile
-    float a = hash(i);
-    float b = hash(i + vec2(1.0, 0.0));
-    float c = hash(i + vec2(0.0, 1.0));
-    float d = hash(i + vec2(1.0, 1.0));
+#ifdef DITHER
+vec3 applyDither(vec3 color, vec2 fragCoord);
+#endif
 
-    // Simple 2D lerp using smoothstep envelope between the values.
-    // return vec3(mix(mix(a, b, smoothstep(0.0, 1.0, f.x)),
-    //          mix(c, d, smoothstep(0.0, 1.0, f.x)),
-    //          smoothstep(0.0, 1.0, f.y)));
+// =============================================================================
+// Helpers
+// =============================================================================
 
-    // Same code, with the clamps in smoothstep and common subexpressions
-    // optimized away.
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-}
-//=============================
-
-uniform float gamma;
-vec3 legacyGamma(vec3 color)
-{
+#ifdef LEGACY_GAMMA
+vec3 legacyGamma(vec3 color) {
     vec3 c = 1. - clamp(color, vec3(0.), vec3(1.));
     c = 1. - pow(c, vec3(gamma)); // s/b inverted already CPU-side
 
     return c;
 }
+#endif
 
+// =============================================================================
+// Main
+// =============================================================================
 void main()
 {
+    // === LINEAR SPACE ========================================================
+
+#ifdef HAS_POST_EFFECTS
+    vec4 diff = applyChromaticAberration(diffuseRect, vary_fragcoord);
+    diff.rgb += computeLensFlare(diffuseRect, depthMap, vary_fragcoord);
+#else
     vec4 diff = texture(diffuseRect, vary_fragcoord);
+#endif
+
+#ifdef TONEMAP
+    diff.rgb = applyExposure(diff.rgb);
+#endif
+
+#ifdef COLOR_GRADE
+    // White balance and lift/gamma/gain run in linear light, between exposure
+    // and tonemap, so chromatic adaptation and the three-way grade act on
+    // physically meaningful HDR values rather than rolled-off display ones.
+    diff.rgb = applyWhiteBalance(diff.rgb);
+    diff.rgb = applyLiftGammaGain(diff.rgb);
+#endif
+
+#ifdef TONEMAP
+    diff.rgb = applyToneMap(diff.rgb);
+#else
+    diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0));
+#endif
+
+#ifdef COLOR_GRADE
+    // Split toning after tonemap so tints apply to rolled-off values.
+    diff.rgb = applySplitToning(diff.rgb);
+#endif
+
     diff.rgb = linear_to_srgb(diff.rgb);
+
+    // === DISPLAY SPACE =======================================================
 
 #ifdef LEGACY_GAMMA
     diff.rgb = legacyGamma(diff.rgb);
 #endif
 
-#if COLOR_GRADE_LUT != 0
-#ifndef NO_POST
-    // Invert coord for compat with DX-style LUT
-    diff.g = colorgrade_lut_size.y > 0.5 ? 1.0 - diff.g : diff.g;
-
-    // swap bluegreen if needed
-    diff.rgb = colorgrade_lut_size.z > 0.5 ? diff.rbg: diff.rgb;
-
-    //see https://developer.nvidia.com/gpugems/GPUGems2/gpugems2_chapter24.html
-    vec3 scale = (vec3(colorgrade_lut_size.x) - 1.0) / vec3(colorgrade_lut_size.x);
-    vec3 offset = 1.0 / (2.0 * vec3(colorgrade_lut_size.x));
-    diff = vec4(textureLod(colorgrade_lut, scale * diff.rgb + offset, 0).rgb, diff.a);
+#ifdef COLOR_GRADE
+    // 6.5 black/white point → 7 brightness+contrast → 7.5 hi/shadow recovery
+    // → 8 saturation → 9 vibrance → 10 hue shift → 11 LUT → 12 curves.
+    diff.rgb = applyBlackWhitePoint(diff.rgb);
+    diff.rgb = applyBrightnessContrast(diff.rgb);
+    diff.rgb = applyShadowHighlightRecovery(diff.rgb);
+    diff.rgb = applySaturation(diff.rgb);
+    diff.rgb = applyVibrance(diff.rgb);
+    diff.rgb = applyHueShift(diff.rgb);
+    diff.rgb = applyLUTGrading(diff.rgb);
+    diff.rgb = applyChannelCurves(diff.rgb);
 #endif
-#endif
-    vec2 tc = vary_fragcoord.xy*screen_res*4.0;
-    vec3 seed = (diff.rgb+vec3(1.0))*vec3(tc.xy, tc.x+tc.y);
-    vec3 nz = vec3(noise(seed.rg), noise(seed.gb), noise(seed.rb));
-    diff.rgb += nz*0.003;
 
-    frag_color = max(diff, vec4(0));;
+    diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0)); // We should always be 0-1 past this point
+
+#ifdef DITHER
+    // Post chain is 8-bit — dither before the first quantization rather than
+    // waiting for the final blit.
+    diff.rgb = applyDither(diff.rgb, gl_FragCoord.xy);
+#endif
+
+    //debugExposure(diff.rgb);
+    frag_color = diff;
 }
+

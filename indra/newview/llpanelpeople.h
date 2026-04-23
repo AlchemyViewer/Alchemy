@@ -33,8 +33,6 @@
 #include "llfloaterwebcontent.h"
 #include "llvoiceclient.h"
 
-class LLAccordionCtrl;
-class LLAccordionCtrlTab;
 class LLAvatarList;
 class LLAvatarName;
 class LLFilterEditor;
@@ -42,6 +40,8 @@ class LLGroupList;
 class LLMenuButton;
 class LLTabContainer;
 class LLNetMap;
+class LLAccordionCtrl;
+class LLAccordionCtrlTab;
 
 class LLPanelPeople
     : public LLPanel
@@ -52,12 +52,12 @@ public:
     LLPanelPeople();
     virtual ~LLPanelPeople();
 
-    /*virtual*/ BOOL    postBuild();
-    /*virtual*/ void    onOpen(const LLSD& key);
-    /*virtual*/ bool    notifyChildren(const LLSD& info);
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    bool notifyChildren(const LLSD& info) override;
     // Implements LLVoiceClientStatusObserver::onChange() to enable call buttons
     // when voice is available
-    /*virtual*/ void onChange(EStatusType status, const LLSD& channelInfo, bool proximal);
+    void onChange(EStatusType status, const LLSD& channelInfo, bool proximal) override;
 
 // [RLVa:KB] - Checked: RLVa-1.2.0
     LLAvatarList* getNearbyList() { return mNearbyList; }
@@ -92,7 +92,7 @@ private:
     // methods indirectly called by the updaters
     void                    updateFriendListHelpText();
     void                    updateFriendList();
-    void                    updateAccordionTabTitles();
+    void                    updateFriendAccordionTitles();
 //  void                    updateNearbyList();
     void                    updateRecentList();
 
@@ -102,7 +102,6 @@ private:
     const std::string&      getActiveTabName() const;
     LLUUID                  getCurrentItemID() const;
     void                    getCurrentItemIDs(uuid_vec_t& selected_uuids) const;
-    void                    showGroupMenu(LLMenuGL* menu);
     void                    setSortOrder(LLAvatarList* list, ESortOrder order, bool save = true);
 
     // UI callbacks
@@ -150,15 +149,16 @@ private:
     bool                    isAccordionCollapsedByUser(const std::string& name);
 
     LLTabContainer*         mTabContainer;
-    LLAccordionCtrl*        mFriendsAccordion = nullptr;
-    LLAccordionCtrlTab*     mAccordionAllTab = nullptr;
-    LLAccordionCtrlTab*     mAccordionOnlineTab = nullptr;
     LLAvatarList*           mOnlineFriendList;
     LLAvatarList*           mAllFriendList;
     LLAvatarList*           mNearbyList;
     LLAvatarList*           mRecentList;
     LLGroupList*            mGroupList;
     LLNetMap*               mMiniMap;
+
+    LLAccordionCtrl*        mFriendsAccordion = nullptr;
+    LLAccordionCtrlTab*     mFriendsAllTab = nullptr;
+    LLAccordionCtrlTab*     mFriendsOnlineTab = nullptr;
 
     LLButton*               mNearbyGearBtn = nullptr;
     LLButton*               mFriendsGearBtn = nullptr;
@@ -180,6 +180,11 @@ private:
     Updater*                mRecentListUpdater;
     Updater*                mButtonsUpdater;
     LLHandle< LLFloater >   mPicker;
+
+    boost::signals2::connection mNearbyFilterCommitConnection;
+    boost::signals2::connection mFriedsFilterCommitConnection;
+    boost::signals2::connection mGroupsFilterCommitConnection;
+    boost::signals2::connection mRecentFilterCommitConnection;
 };
 
 #endif //LL_LLPANELPEOPLE_H

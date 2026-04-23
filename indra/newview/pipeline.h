@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -41,10 +44,6 @@
 #include "llreflectionmapmanager.h"
 #include "llheroprobemanager.h"
 
-#include "alrenderutils.h"
-
-#include "glh/glh_linear.h"
-
 #include <stack>
 
 class LLViewerTexture;
@@ -69,6 +68,31 @@ bool LLRayAABB(const LLVector3 &center, const LLVector3 &size, const LLVector3& 
 bool setup_hud_matrices(); // use whole screen to render hud
 bool setup_hud_matrices(const LLRect& screen_region); // specify portion of screen (in pixels) to render hud attachments from (for picking)
 
+
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_GEOMETRY;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_GRASS;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_INVISIBLE;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_SHINY;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_SIMPLE;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_TERRAIN;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_TREES;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_UI;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_WATER;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_WL_SKY;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_ALPHA;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_CHARACTERS;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_BUMP;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_MATERIALS;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_FULLBRIGHT;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_GLOW;
+extern LLTrace::BlockTimerStatHandle FTM_STATESORT;
+extern LLTrace::BlockTimerStatHandle FTM_PIPELINE;
+extern LLTrace::BlockTimerStatHandle FTM_CLIENT_COPY;
+
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_UI_HUD;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_UI_3D;
+extern LLTrace::BlockTimerStatHandle FTM_RENDER_UI_2D;
+
 class LLPipeline
 {
 public:
@@ -90,6 +114,7 @@ public:
 
     void createGLBuffers();
     void createLUTBuffers();
+    void setupGradingLUT();
 
     //allocate the largest screen buffer possible up to resX, resY
     //returns true if full size buffer allocated, false if some other size is allocated
@@ -108,7 +133,7 @@ public:
 
     //attempt to allocate screen buffers at resX, resY
     //returns true if allocation successful, false otherwise
-    bool allocateScreenBuffer(U32 resX, U32 resY, U32 samples);
+    bool allocateScreenBufferInternal(U32 resX, U32 resY);
     bool allocateShadowBuffer(U32 resX, U32 resY);
 
     // rebuild all LLVOVolume render batches
@@ -134,9 +159,14 @@ public:
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);
     void generateLuminance(LLRenderTarget* src, LLRenderTarget* dst);
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
-    void gammaCorrect(LLRenderTarget* src, LLRenderTarget* dst);
+    void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade);
     void generateGlow(LLRenderTarget* src);
+    void generateBloomHDR(LLRenderTarget* src);
+    void compositeBloomHDR(LLRenderTarget* scene);
+    void applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
     void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
+    void generateSMAABuffers(LLRenderTarget* src);
+    void applySMAA(LLRenderTarget* src, LLRenderTarget* dst);
     void renderDoF(LLRenderTarget* src, LLRenderTarget* dst);
     void copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst);
     void combineGlow(LLRenderTarget* src, LLRenderTarget* dst);
@@ -256,7 +286,7 @@ public:
 
     void stateSort(LLCamera& camera, LLCullResult& result);
     void stateSort(LLSpatialGroup* group, LLCamera& camera);
-    void stateSort(LLSpatialBridge* bridge, LLCamera& camera, BOOL fov_changed = FALSE);
+    void stateSort(LLSpatialBridge* bridge, LLCamera& camera, bool fov_changed = false);
     void stateSort(LLDrawable* drawablep, LLCamera& camera);
     void postSort(LLCamera& camera);
 
@@ -312,6 +342,9 @@ public:
     // should be called just before rendering pre-water alpha objects
     void doWaterHaze();
 
+    // Generate the water exclusion surface mask.
+    void doWaterExclusionMask();
+
     void postDeferredGammaCorrect(LLRenderTarget* screen_target);
 
     void generateSunShadow(LLCamera& camera);
@@ -320,7 +353,8 @@ public:
 
     void renderHighlight(const LLViewerObject* obj, F32 fade);
 
-    void renderShadow(glh::matrix4f& view, glh::matrix4f& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp);
+    void renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp);
+    void renderSelectedFaces(const LLColor4& color);
     void renderHighlights();
     void renderDebug();
     void renderPhysicsDisplay();
@@ -330,7 +364,7 @@ public:
     void findReferences(LLDrawable *drawablep); // Find the lists which have references to this object
     bool verify();                      // Verify that all data in the pipeline is "correct"
 
-    S32  getLightCount() const { return mLights.size(); }
+    S32  getLightCount() const { return static_cast<S32>(mLights.size()); }
 
     void calcNearbyLights(LLCamera& camera);
     void setupHWLights();
@@ -474,6 +508,7 @@ public:
         RENDER_TYPE_AVATAR                      = LLDrawPool::POOL_AVATAR,
         RENDER_TYPE_CONTROL_AV                  = LLDrawPool::POOL_CONTROL_AV, // Animesh
         RENDER_TYPE_TREE                        = LLDrawPool::POOL_TREE,
+        RENDER_TYPE_WATEREXCLUSION              = LLDrawPool::POOL_WATEREXCLUSION,
         RENDER_TYPE_VOIDWATER                   = LLDrawPool::POOL_VOIDWATER,
         RENDER_TYPE_WATER                       = LLDrawPool::POOL_WATER,
         RENDER_TYPE_GLTF_PBR                    = LLDrawPool::POOL_GLTF_PBR,
@@ -622,7 +657,11 @@ public:
     S32                      mDebugSculptUploadCost;
     S32                      mDebugMeshUploadCost;
 
+    S32                      mNumVisibleFaces;
+
     S32                     mPoissonOffset;
+
+    static S32              sCompiles;
 
     static bool             sShowHUDAttachments;
     static bool             sForceOldBakedUpload; // If true will not use capabilities to upload baked textures.
@@ -659,8 +698,6 @@ public:
 
     static LLTrace::EventStatHandle<S64> sStatBatchSize;
 
-    std::unique_ptr<ALRenderUtil> mALRenderUtil;
-
     class RenderTargetPack
     {
     public:
@@ -669,7 +706,6 @@ public:
 
         //screen texture
         LLRenderTarget          screen;
-        LLRenderTarget          uiScreen;
         LLRenderTarget          deferredScreen;
         LLRenderTarget          deferredLight;
 
@@ -693,6 +729,7 @@ public:
     LLRenderTarget          mSpotShadow[2];
 
     LLRenderTarget          mPbrBrdfLut;
+    LLRenderTarget          mWaterExclusionMask;
 
     // copy of the color/depth buffer just before gamma correction
     // for use by SSR
@@ -704,9 +741,21 @@ public:
     LLRenderTarget          mLastExposure;
 
     // tonemapped and gamma corrected render ready for post
-    LLRenderTarget          mPostMap;
-    LLRenderTarget          mPostFXMap;
-     LLRenderTarget         mPostHelperMap;
+    LLRenderTarget          mPostPingMap;
+    LLRenderTarget          mPostPongMap;
+
+    // FXAA helper target
+    LLRenderTarget          mFXAAMap;
+    LLRenderTarget          mSMAABlendBuffer;
+
+    // render ui to buffer target
+    LLRenderTarget          mUIScreen;
+
+    // downres scratch space for GPU downscaling of textures
+    LLRenderTarget          mDownResMap;
+
+    // 2k bom scratch target
+    LLRenderTarget          mBakeMap;
 
     LLCullResult            mSky;
     LLCullResult            mReflectedObjects;
@@ -731,10 +780,10 @@ public:
     LLCamera                mShadowCamera[8];
     LLVector3               mShadowExtents[4][2];
     // TODO : separate Sun Shadow and Spot Shadow matrices
-    glh::matrix4f           mSunShadowMatrix[6];
-    glh::matrix4f           mShadowModelview[6];
-    glh::matrix4f           mShadowProjection[6];
-    glh::matrix4f           mReflectionModelView;
+    glm::mat4               mSunShadowMatrix[6];
+    glm::mat4               mShadowModelview[6];
+    glm::mat4               mShadowProjection[6];
+    glm::mat4               mReflectionModelView;
 
     LLPointer<LLDrawable>   mShadowSpotLight[2];
     F32                     mSpotLightFade[2];
@@ -747,20 +796,26 @@ public:
     //water distortion texture (refraction)
     LLRenderTarget              mWaterDis;
 
-    static const U32 MAX_BAKE_WIDTH;
-    LLRenderTarget              mBake;
+    static const U32 MAX_PREVIEW_WIDTH;
 
     //texture for making the glow
     LLRenderTarget              mGlow[3];
+
+    // HDR bloom pyramid (RGB = bloom, A = halation intensity).
+    // mBloomMip[0] is full-res extract; subsequent levels are halved.
+    static const U32            BLOOM_MAX_MIPS = 7;
+    LLRenderTarget              mBloomMip[BLOOM_MAX_MIPS];
+    U32                         mBloomMipCount = 0;
 
     //noise map
     U32                 mNoiseMap;
     U32                 mTrueNoiseMap;
     U32                 mLightFunc;
-    U32                 mAreaMap;
-    U32                 mSearchMap;
-    U32                 mSampleMap;
-    U32                 mStencilMap;
+
+    //smaa
+    U32                 mSMAAAreaMap = 0;
+    U32                 mSMAASearchMap = 0;
+    U32                 mSMAASampleMap = 0;
 
     LLColor4            mSunDiffuse;
     LLColor4            mMoonDiffuse;
@@ -768,8 +823,10 @@ public:
     LLVector4           mMoonDir;
     bool                mNeedsShadowTargetClear;
 
-    LLVector4a          mTransformedSunDir;
-    LLVector4a          mTransformedMoonDir;
+    LLVector4           mTransformedSunDir;
+    LLVector4           mTransformedMoonDir;
+
+    F32                 mLensFlareSunVisibility = 0.f;
 
     bool                    mInitialized;
     bool                    mShadersLoaded;
@@ -835,7 +892,7 @@ protected:
     LLSpatialGroup::sg_vector_t     mMeshDirtyGroup; //groups that need rebuildMesh called
     U32 mMeshDirtyQueryObject;
 
-    LLDrawable::drawable_vector_t   mPartitionQ; //drawables that need to update their spatial partition radius
+    LLDrawable::drawable_list_t     mPartitionQ; //drawables that need to update their spatial partition radius
 
     bool mGroupQ1Locked;
 
@@ -921,8 +978,13 @@ protected:
     LLDrawPool*                 mWLSkyPool = nullptr;
     LLDrawPool*                 mPBROpaquePool = nullptr;
     LLDrawPool*                 mPBRAlphaMaskPool = nullptr;
+    LLDrawPool*                 mWaterExclusionPool      = nullptr;
 
     // Note: no need to keep an quick-lookup to avatar pools, since there's only one per avatar
+
+    // Color grading lookup texture and size
+    U32       mCGLut{};
+    LLVector4 mCGLutSize{};
 
 public:
     std::vector<LLFace*>        mHighlightFaces;    // highlight faces on physical objects
@@ -969,7 +1031,7 @@ public:
     static bool WindLightUseAtmosShaders;
     static bool RenderDeferred;
     static F32 RenderDeferredSunWash;
-    static U32 RenderFSAASamples;
+    static U32 RenderFSAAType;
     static U32 RenderResolutionDivisor;
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
     static F32 RenderResolutionMultiplier;
@@ -1008,10 +1070,6 @@ public:
     static F32 RenderGlowStrength;
     static bool RenderGlowNoise;
     static bool RenderDepthOfField;
-    static bool RenderDepthOfFieldInEditMode;
-    static bool RenderDepthOfFieldNearBlur;
-    static bool RenderFocusPointLocked;
-    static bool RenderFocusPointFollowsPointer;
     static F32 CameraFocusTransitionTime;
     static F32 CameraFNumber;
     static F32 CameraFocalLength;
@@ -1054,7 +1112,7 @@ public:
     static bool RenderMirrors;
     static S32 RenderHeroProbeUpdateRate;
     static S32 RenderHeroProbeConservativeUpdateMultiplier;
-    static F32 RenderNormalMapScale;
+    static bool RenderAvatarCloth;
 };
 
 void render_bbox(const LLVector3 &min, const LLVector3 &max);
@@ -1062,6 +1120,6 @@ void render_hud_elements();
 
 extern LLPipeline gPipeline;
 extern bool gDebugPipeline;
-extern const LLMatrix4a* gGLLastMatrix;
+extern const LLMatrix4* gGLLastMatrix;
 
 #endif

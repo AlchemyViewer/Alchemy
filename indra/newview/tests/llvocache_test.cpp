@@ -103,6 +103,7 @@ namespace tut
         ~vocacheTestFactory()
         {
             LLVOCache::deleteSingleton();
+            ll_cleanup_apr();
         }
 
     };

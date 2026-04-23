@@ -69,9 +69,9 @@ public:
     LLSD getValue() const;
     void setValue(const LLSD& sd);
 
-    BOOL isIdentity() const;
-    BOOL isNotIdentity() const;
-    BOOL isFinite() const;                                  // checks to see if all values of LLQuaternion are finite
+    bool isIdentity() const;
+    bool isNotIdentity() const;
+    bool isFinite() const;                                  // checks to see if all values of LLQuaternion are finite
     void quantize16(F32 lower, F32 upper);                  // changes the vector to reflect quatization
     void quantize8(F32 lower, F32 upper);                           // changes the vector to reflect quatization
     void loadIdentity();                                            // Loads the quaternion that represents the identity rotation
@@ -168,11 +168,15 @@ public:
     friend const char *OrderToString( const Order order );
     friend Order StringToOrder( const char *str );
 
-    static BOOL parseQuat(const std::string& buf, LLQuaternion* value);
+    static bool parseQuat(const std::string& buf, LLQuaternion* value);
 
     // For debugging, only
     //static U32 mMultCount;
 };
+
+static_assert(std::is_trivially_copyable<LLQuaternion>::value, "LLQuaternion must be trivial copy");
+static_assert(std::is_trivially_move_assignable<LLQuaternion>::value, "LLQuaternion must be trivial move");
+static_assert(std::is_standard_layout<LLQuaternion>::value, "LLQuaternion must be a standard layout type");
 
 inline LLSD LLQuaternion::getValue() const
 {
@@ -186,19 +190,19 @@ inline LLSD LLQuaternion::getValue() const
 
 inline void LLQuaternion::setValue(const LLSD& sd)
 {
-    mQ[0] = sd[0].asReal();
-    mQ[1] = sd[1].asReal();
-    mQ[2] = sd[2].asReal();
-    mQ[3] = sd[3].asReal();
+    mQ[0] = (F32)sd[0].asReal();
+    mQ[1] = (F32)sd[1].asReal();
+    mQ[2] = (F32)sd[2].asReal();
+    mQ[3] = (F32)sd[3].asReal();
 }
 
 // checker
-inline BOOL LLQuaternion::isFinite() const
+inline bool LLQuaternion::isFinite() const
 {
     return (llfinite(mQ[VX]) && llfinite(mQ[VY]) && llfinite(mQ[VZ]) && llfinite(mQ[VS]));
 }
 
-inline BOOL LLQuaternion::isIdentity() const
+inline bool LLQuaternion::isIdentity() const
 {
     return
         ( mQ[VX] == 0.f ) &&
@@ -207,7 +211,7 @@ inline BOOL LLQuaternion::isIdentity() const
         ( mQ[VS] == 1.f );
 }
 
-inline BOOL LLQuaternion::isNotIdentity() const
+inline bool LLQuaternion::isNotIdentity() const
 {
     return
         ( mQ[VX] != 0.f ) ||

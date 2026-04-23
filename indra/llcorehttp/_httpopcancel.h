@@ -49,14 +49,14 @@ namespace LLCore
 /// its final status unchanged and *this* request will complete
 /// with an HE_HANDLE_NOT_FOUND error status.
 
-class HttpOpCancel final : public HttpOperation
+class HttpOpCancel : public HttpOperation
 {
 public:
     /// @param  handle  Handle of previously-issued request to
     ///                 be canceled.
     HttpOpCancel(HttpHandle handle);
 
-    virtual ~HttpOpCancel() = default;                          // Use release()
+    virtual ~HttpOpCancel();                            // Use release()
 
 public:
     virtual void stageFromRequest(HttpService *);

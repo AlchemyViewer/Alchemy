@@ -60,11 +60,9 @@ bool LLHandlerUtil::isIMFloaterOpened(const LLNotificationPtr& notification)
 
     LLUUID from_id = notification->getPayload()["from_id"];
     LLUUID session_id = LLIMMgr::computeSessionID(IM_NOTHING_SPECIAL, from_id);
-    LLFloaterIMSession* im_floater = LLFloaterReg::findTypedInstance<LLFloaterIMSession>("impanel", session_id);
-
-    if (im_floater != NULL)
+    if (LLFloaterIMSession* im_floater = LLFloaterReg::findTypedInstance<LLFloaterIMSession>("impanel", session_id))
     {
-        res = im_floater->getVisible() == TRUE;
+        res = im_floater->getVisible();
     }
 
     return res;
@@ -94,10 +92,18 @@ void LLHandlerUtil::logToIM(const EInstantMessage& session_type,
             from = SYSTEM_FROM;
         }
 
-        // Build a new format username or firstname_lastname for legacy names
-        // to use it for a history log filename.
-        std::string user_name = LLCacheName::buildUsername(session_name);
-        LLIMModel::instance().logToFile(user_name, from, from_id, message);
+        std::string file_name;
+        if (session_type == IM_SESSION_GROUP_START)
+        {
+            file_name = session_name + LLLogChat::getGroupChatSuffix();
+        }
+        else
+        {
+            // Build a new format username or firstname_lastname for legacy names
+            // to use it for a history log filename.
+            file_name = LLCacheName::buildUsername(session_name);
+        }
+        LLIMModel::instance().logToFile(file_name, from, from_id, message);
     }
     else
     {
@@ -283,7 +289,6 @@ void LLHandlerUtil::addNotifPanelToIM(const LLNotificationPtr& notification)
     // update IM floater and counters
     LLSD arg;
     arg["session_id"] = session_id;
-    arg["notification_id"] = notification->getID();
     arg["num_unread"] = ++(session->mNumUnread);
     arg["participant_unread"] = ++(session->mParticipantUnreadMessageCount);
     LLIMModel::getInstance()->mNewMsgSignal(arg);
@@ -322,7 +327,6 @@ void LLHandlerUtil::decIMMesageCounter(const LLNotificationPtr& notification)
     {
     LLSD arg;
     arg["session_id"] = session_id;
-    arg["notification_id"] = notification->getID();
     session->mNumUnread--;
     arg["num_unread"] = session->mNumUnread;
     session->mParticipantUnreadMessageCount--;

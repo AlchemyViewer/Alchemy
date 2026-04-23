@@ -11,7 +11,6 @@
 		<scroll_list.columns label="種別" name="persist"/>
 	</scroll_list>
 	<panel name="bottom_panel">
-		<icon name="asset_spacer_icon"/>
 		<button label="復元" name="asset_trash_btn" tool_tip="選択されたアセットを復元します。"/>
 	</panel>
 </panel>

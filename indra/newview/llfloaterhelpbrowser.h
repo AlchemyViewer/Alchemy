@@ -33,14 +33,14 @@
 
 class LLMediaCtrl;
 
-class LLFloaterHelpBrowser final :
+class LLFloaterHelpBrowser :
     public LLFloater,
     public LLViewerMediaObserver
 {
  public:
     LLFloaterHelpBrowser(const LLSD& key);
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     /*virtual*/ void onClose(bool app_quitting);
     /*virtual*/ void onOpen(const LLSD& key);
 

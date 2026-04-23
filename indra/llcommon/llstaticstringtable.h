@@ -29,8 +29,9 @@
 #define LL_STATIC_STRING_TABLE_H
 
 #include "lldefs.h"
-#include "boost/unordered/unordered_flat_map.hpp"
 #include "llstl.h"
+
+#include <boost/unordered_map.hpp>
 
 class LLStaticHashedString
 {
@@ -51,7 +52,14 @@ protected:
 
     size_t makehash(const std::string& s)
     {
-        return boost::hash<std::string>{}(s);
+        size_t len = s.size();
+        const char* c = s.c_str();
+        size_t hashval = 0;
+        for (size_t i=0; i<len; i++)
+        {
+            hashval = ((hashval<<5) + hashval) + *c++;
+        }
+        return hashval;
     }
 
     std::string string;
@@ -60,12 +68,16 @@ protected:
 
 struct LLStaticStringHasher
 {
+    enum { bucket_size = 8 };
     size_t operator()(const LLStaticHashedString& key_value) const { return key_value.Hash(); }
     bool   operator()(const LLStaticHashedString& left, const LLStaticHashedString& right) const { return left.Hash() < right.Hash(); }
 };
 
 template< typename MappedObject >
-using LLStaticStringTable = boost::unordered_flat_map<LLStaticHashedString, MappedObject, LLStaticStringHasher>;
+class LL_COMMON_API LLStaticStringTable
+    : public boost::unordered_map< LLStaticHashedString, MappedObject, LLStaticStringHasher >
+{
+};
 
 #endif
 

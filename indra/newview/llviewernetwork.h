@@ -31,6 +31,18 @@
 // @TODO this really should be private, but is used in llslurl
 #define MAINGRID "util.agni.lindenlab.com"
 
+/// Exception thrown when a grid is not valid
+class LLInvalidGridName
+{
+public:
+    LLInvalidGridName(std::string grid) : mGrid(grid)
+    {
+    }
+    std::string name() { return mGrid; }
+protected:
+    std::string mGrid;
+};
+
 /**
  * @brief A singleton class to manage the grids available to the viewer.
  *
@@ -44,13 +56,14 @@
  * This class maintains the currently selected grid, and provides short
  * form accessors for each of the properties of the selected grid.
  **/
-class LLGridManager final : public LLSingleton<LLGridManager>
+class LLGridManager : public LLSimpleton<LLGridManager>
 {
+public:
+
     /// Instantiate the grid manager, load default grids, selects the default grid
-    LLSINGLETON(LLGridManager);
+    LLGridManager();
     ~LLGridManager();
 
-  public:
     /* ================================================================
      * @name Initialization and Configuration
      * @{
@@ -70,37 +83,22 @@ class LLGridManager final : public LLSingleton<LLGridManager>
      * descriptive form (it is used in the login panel grid menu, for example).
      */
     /// Return the name of a grid, given either its name or its id
-    std::string getGrid(const std::string& grid) const;
-
-    /// Returns the grid value by probing attributes
-    std::string getGridByProbing(const std::string& identifier) const;
-
-    /// Return the grid value by attribute
-    std::string getGridByAttribute(const std::string& attribute, const std::string& value) const;
+    std::string getGrid( const std::string &grid );
 
     /// Get the id (short form selector) for a given grid
-    std::string getGridId(const std::string& grid) const;
+    std::string getGridId(const std::string& grid);
 
     /// Get the id (short form selector) for the selected grid
-    std::string getGridId() const { return getGridId(mGrid); }
+    std::string getGridId() { return getGridId(mGrid); }
 
     /// Get the user-friendly long form descriptor for a given grid
-    std::string getGridLabel(const std::string& grid) const;
+    std::string getGridLabel(const std::string& grid);
 
     /// Get the user-friendly long form descriptor for the selected grid
-    std::string getGridLabel() const { return getGridLabel(mGrid); }
-
-    /// Get the grid administrator for a given grid
-    std::string getGridAdministrator(const std::string& grid) const;
-
-    /// Get the grid administrator for the selected grid
-    std::string getGridAdministrator() const {return getGridAdministrator(mGrid); }
-
-    /// Returns gridInfo for a given grid as an LLSD map
-    LLSD getGridInfo(const std::string& grid) const;
+    std::string getGridLabel() { return getGridLabel(mGrid); }
 
     /// Retrieve a map of grid-name -> label
-    std::map<std::string, std::string> getKnownGrids() const;
+    std::map<std::string, std::string> getKnownGrids();
 
     //@}
 
@@ -114,51 +112,28 @@ class LLGridManager final : public LLSingleton<LLGridManager>
      * The login uri for a grid is the target of the authentication request.
      * A grid may have multple login uris, so they are returned as a vector.
      */
-    void getLoginURIs(const std::string& grid, std::vector<std::string>& uris) const;
+    void getLoginURIs(const std::string& grid, std::vector<std::string>& uris);
 
     /// Get the login uris for the selected grid
-    void getLoginURIs(std::vector<std::string>& uris) const;
-
-    /// Get the hypergrid gatekeeper uri for the specified grid
-    std::string getGatekeeper(const std::string& grid) const;
-
-    /// Get the uas service for the specified grid if available
-    std::string getUserAccountServiceURL(const std::string& grid) const;
+    void getLoginURIs(std::vector<std::string>& uris);
 
     /// Get the URI for webdev help functions for the specified grid
-    std::string getHelperURI(const std::string& grid) const;
+    std::string getHelperURI(const std::string& grid);
 
     /// Get the URI for webdev help functions for the selected grid
-    std::string getHelperURI() const { return getHelperURI(mGrid); }
+    std::string getHelperURI() { return getHelperURI(mGrid); }
 
     /// Get the url of the splash page to be displayed prior to login
-    std::string getLoginPage(const std::string& grid_name) const;
+    std::string getLoginPage(const std::string& grid_name);
 
     /// Get the URI for the login splash page for the selected grid
-    std::string getLoginPage() const;
-
-    /// Get the url for recovering a user's password for the selected grid
-    std::string getForgotPasswordURL() const;
-
-    /// Get the url for creating an account for the selected grid
-    std::string getCreateAccountURL() const;
-
-    /// Get the url for the grid status page
-    std::string getGridStatusURL(const std::string& grid) const;
-    std::string getGridStatusURL() const { return getGridStatusURL(mGrid); };
-
-    /// Get the url for the grid status rss feed
-    std::string getGridStatusRSSURL(const std::string& grid) const;
-    std::string getGridStatusRSSURL() const { return getGridStatusRSSURL(mGrid); };
+    std::string getLoginPage();
 
     /// Get the id to be used as a short name in url path components or parameters
-    std::string getGridLoginID() const;
-
-    /// Get the platform string for the selected grid
-    std::string getPlatformString() const;
+    std::string getGridLoginID();
 
     /// Get an array of the login types supported by the grid
-    void getLoginIdentifierTypes(LLSD& idTypes) const;
+    void getLoginIdentifierTypes(LLSD& idTypes);
     /**< the types are "agent" and "avatar";
      * one means single-name (someone Resident) accounts and other first/last name accounts
      * I am not sure which is which
@@ -170,7 +145,7 @@ class LLGridManager final : public LLSingleton<LLGridManager>
      * @{
      */
     /// Get the update service URL base (host and path) for the selected grid
-    std::string getUpdateServiceURL() const;
+    std::string getUpdateServiceURL();
 
     //@}
 
@@ -180,16 +155,16 @@ class LLGridManager final : public LLSingleton<LLGridManager>
      */
 
     /// Return the slurl prefix (everything up to but not including the region) for a given grid
-    std::string getSLURLBase(const std::string& grid) const;
+    std::string getSLURLBase(const std::string& grid);
 
     /// Return the slurl prefix (everything up to but not including the region) for the selected grid
-    std::string getSLURLBase() const { return getSLURLBase(mGrid); }
+    std::string getSLURLBase() { return getSLURLBase(mGrid); }
 
     /// Return the application URL prefix for the given grid
-    std::string getAppSLURLBase(const std::string& grid) const;
+    std::string getAppSLURLBase(const std::string& grid);
 
     /// Return the application URL prefix for the selected grid
-    std::string getAppSLURLBase() const { return getAppSLURLBase(mGrid); }
+    std::string getAppSLURLBase() { return getAppSLURLBase(mGrid); }
 
     /// Return the url of the resident profile web site for the given grid
     std::string getWebProfileURL(const std::string& grid);
@@ -199,20 +174,6 @@ class LLGridManager final : public LLSingleton<LLGridManager>
 
 
     //@}
-
-    typedef enum e_grid_platform {
-        NOPLATFORM = 0,
-        SLMAIN,
-        SLBETA,
-        OPENSIM,
-        HALCYON
-    } EGridPlatform;
-
-    typedef enum e_add_grid {
-        ADD_MANUAL = 0,
-        ADD_HYPERGRID,
-        ADD_LINK
-    } EAddGridType;
 
     /* ================================================================
      * @name Selecting the current grid
@@ -225,70 +186,33 @@ class LLGridManager final : public LLSingleton<LLGridManager>
      */
 
     /// Select a given grid as the current grid.
-    void setGridChoice(const std::string& grid, const bool only_select = true, const bool for_login = false);
+    void setGridChoice(const std::string& grid);
 
     /// Returns the name of the currently selected grid
-    const std::string& getGrid() const { return mGrid; }
+    std::string getGrid() const { return mGrid; }
 
     //@}
 
     /// Is the given grid one of the hard-coded default grids (Agni or Aditi)
-    bool isSystemGrid(const std::string& grid) const;
+    bool isSystemGrid(const std::string& grid);
 
     /// Is the selected grid one of the hard-coded default grids (Agni or Aditi)
-    bool isSystemGrid() const { return isSystemGrid(mGrid); }
+    bool isSystemGrid() { return isSystemGrid(mGrid); }
 
-    /// Is the selected grid Second Life?
-    bool isInSecondlife() const;
-
-    /// Is the selected grid OpenSim or OpenSim-derived?
-    bool isInOpenSim() const;
-
-    /// Is the selected grid OpenSimulator?
-    bool isInOpenSimulator() const;
-
-    /// Is the selected grid Halcyon?
-    bool isInHalcyon() const;
-
-    /// Is the selected grid agni?
-    bool isInSLMain() const;
-
-    /// Is the selected grid aditi?
-    bool isInSLBeta() const;
-
-#ifndef LL_HAVOK
-    /* ===============================================================
-     * @name User grid management functions
-     * @{
+    /// Is the selected grid a production grid?
+    bool isInProductionGrid();
+    /**
+     * yes, that's not a very helpful description.
+     * I don't really know why that is different from isSystemGrid()
+     * In practice, the implementation is that it
+     * @returns true if the login uri for the grid is the uri for MAINGRID
      */
 
-    /// Add a grid by fetching its gridInfo
-    void addRemoteGrid(const std::string& login_uri, const EAddGridType type);
-
-    /// Remove a grid from the grid list by key
-    bool removeGrid(const std::string& gridkey);
-    ///< @returns true if successfully removed
-
-    //@}
-#endif
-
-    /// Sets login lock so grid cannot be changed once we are logged in
-    void setLoggedIn(bool logged_in) { mLoggedIn = logged_in; }
-
-protected:
-#ifndef LL_HAVOK
-    void gridInfoResponderCoro(const std::string uri, bool hypergrid);
-#endif
-private:
+  private:
 
     /// Add a grid to the list of grids
     bool addGrid(LLSD& grid_info);
     ///< @returns true if successfully added
-
-#ifndef LL_HAVOK
-    /// Save grids list to file
-    void saveGridList();
-#endif
 
     void updateIsInProductionGrid();
 
@@ -298,37 +222,15 @@ private:
                        const std::string& login,
                        const std::string& helper,
                        const std::string& login_page,
-                       const std::string& password_url,
-                       const std::string& register_url,
                        const std::string& update_url_base,
                        const std::string& web_profile_url,
-                       const std::string& grid_status_url,
-                       const std::string& grid_status_rss_url,
-                       const std::string& administrator,
-                       const std::string& platform,
                        const std::string& login_id = "");
 
-    bool mLoggedIn;
+
     std::string mGrid;
+    std::string mGridFile;
     LLSD mGridList;
-    EGridPlatform mPlatform;
-
-
-    /* ===============================================================
-     * @name Grid list signal updates
-     * @{
-     */
-
-private:
-    typedef boost::signals2::signal<void()> grid_list_changed_signal_t;
-    grid_list_changed_signal_t mGridListChangedSignal;
-
-public:
-    /// Add grid list change callback
-    boost::signals2::connection addGridListChangedCallback(const grid_list_changed_signal_t::slot_type& cb)
-        { return mGridListChangedSignal.connect(cb); }
-
-    //@}
+    bool mIsInProductionGrid;
 };
 
 const S32 MAC_ADDRESS_BYTES = 6;

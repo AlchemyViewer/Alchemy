@@ -40,6 +40,8 @@ class LLCocoaPlugin
 public:
     LLCocoaPlugin();
     void setupCocoa();
+    void createAutoReleasePool();
+    void deleteAutoReleasePool();
     void setupGroup();
     void updateWindows();
     void processEvents();

@@ -2,7 +2,6 @@
 <toggleable_menu name="menu_group_plus">
 	<menu_item_check label="名前で並べ替え" name="sort_name"/>
 	<menu_item_check label="オンライン状況で並べ替え" name="sort_status"/>
-	<menu_item_separator/>
 	<context_menu label="権限を表示" name="People Show Permissions">
 		<menu_item_check name="view_permissions" label="表示しない"/>
 		<menu_item_check name="view_permissions" label="ホバー時"/>

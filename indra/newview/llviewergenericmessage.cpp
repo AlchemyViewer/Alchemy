@@ -56,7 +56,7 @@ void send_generic_message(const std::string& method,
     if(strings.empty())
     {
         msg->nextBlockFast(_PREHASH_ParamList);
-        msg->addStringFast(_PREHASH_Parameter, NULL);
+        msg->addStringFast(_PREHASH_Parameter, nullptr);
     }
     else
     {

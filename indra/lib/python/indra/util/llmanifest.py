@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """\
 @file llmanifest.py
 @author Ryan Williams
@@ -29,7 +28,6 @@ $/LicenseInfo$
 """
 
 from collections import namedtuple, defaultdict
-from io import open
 import subprocess
 import errno
 import filecmp
@@ -75,7 +73,7 @@ def proper_windows_path(path, current_platform = sys.platform):
     rel = None
     match = re.match(r"/cygdrive/([a-z])/(.*)", path)
     if not match:
-        match = re.match(r'([a-zA-Z]):\\\(.*)', path)
+        match = re.match(r'([a-zA-Z]):\\(.*)', path)
     if not match:
         return None         # not an absolute path
     drive_letter = match.group(1)
@@ -111,14 +109,14 @@ BASE_ARGUMENTS=[
     dict(name='arch',
          description="""This argument is appended to the platform string for
         determining which manifest class to run.
-        Example use: %(name)s --arch=i686
-        On Linux this would try to use Linux_i686Manifest.""",
+        Example use: %(name)s --arch=x86_64
+        On Linux this would try to use Linux_x86_64_Manifest.""",
          default=""),
     dict(name='artwork', description='Artwork directory.', default=DEFAULT_SRCTREE),
     dict(name='build', description='Build directory.', default=DEFAULT_SRCTREE),
     dict(name='buildtype', description='Build type (i.e. Debug, Release, RelWithDebInfo).', default=None),
     dict(name='bundleid',
-         description="""The Mac OS X Bundle identifier.""",
+         description="""The macOS Bundle identifier.""",
          default="org.alchemyviewer.viewer"),
     dict(name='channel',
          description="""The channel to use for updates, packaging, settings name, etc.""",
@@ -131,6 +129,9 @@ BASE_ARGUMENTS=[
          description="""The build configurations sub directory used.""",
          default="Release"),
     dict(name='dest', description='Destination directory.', default=DEFAULT_SRCTREE),
+    dict(name='generator',
+         description="""Name of cmake generator used to create project""",
+         default=None),
     dict(name='grid',
          description="""Which grid the client will try to connect to.""",
          default=None),
@@ -141,6 +142,7 @@ BASE_ARGUMENTS=[
     dict(name='login_url',
          description="""The url that the login screen displays in the client.""",
          default=None),
+    dict(name='vcpkg_dir', description='vcpkg directory.', default=None),
     dict(name='platform',
          description="""The current platform, to be used for looking up which
         manifest class to run.""",
@@ -148,7 +150,7 @@ BASE_ARGUMENTS=[
     dict(name='signature',
          description="""This specifies an identity to sign the viewer with, if any.
         If no value is supplied, the default signature will be used, if any. Currently
-        only used on Mac OS X.""",
+        only used on macOS.""",
          default=None),
     dict(name='source',
          description='Source directory.',
@@ -159,12 +161,7 @@ BASE_ARGUMENTS=[
         for use by a .bat file.""",
          default=None),
     dict(name='versionfile',
-         description="""The name of a file containing the full version number."""),
-    dict(name='updateurl',
-         description="""This specifies the updater service URL for delta package generation""",
-         default="https://update.alchemyviewer.org"),
-    dict(name='gendelta',
-         description="""Enable generation of delta updates on windows""",
+         description="""The name of a file containing the full version number.""",
          default=None),
     ]
 
@@ -231,8 +228,8 @@ def main(extra=[]):
     # fix up version
     if isinstance(args.get('versionfile'), str):
         try: # read in the version string
-            with open(args['versionfile'], 'r', encoding='utf-8') as vf:
-                args['version'] = vf.read().strip().split('.')
+            vf = open(args['versionfile'], 'r')
+            args['version'] = vf.read().strip().split('.')
         except:
             print("Unable to read versionfile '%s'" % args['versionfile'])
             raise
@@ -541,8 +538,8 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         return path
 
     def run_command(self, command, **kwds):
-        """ 
-        Runs an external command.  
+        """
+        Runs an external command.
         Raises ManifestError exception if the command returns a nonzero status.
         """
         print("Running command:", shlex.join(command))
@@ -576,16 +573,15 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         return dst_path
 
     def replace_in(self, src, dst=None, searchdict={}):
-        if dst is None:
+        if dst == None:
             dst = src
         # read src
-        with open(self.src_path_of(src), 'r', encoding='utf-8') as f:
+        with open(self.src_path_of(src), "r") as f:
             contents = f.read()
-
         # apply dict replacements
         for old, new in searchdict.items():
             contents = contents.replace(old, new)
-        self.put_in_file(contents.encode("utf-8"), dst)
+        self.put_in_file(contents.encode(), dst)
         self.created_paths.append(dst)
 
     def copy_action(self, src, dst):
@@ -646,9 +642,10 @@ class LLManifest(object, metaclass=LLManifestRegistry):
             'vers':'_'.join(self.args['version'])}
         print("Creating unpacked file:", unpacked_file_name)
         # could add a gz here but that doubles the time it takes to do this step
-        with tarfile.open(self.src_path_of(unpacked_file_name), 'w:') as tf:
-            # add the entire installation package, at the very top level
-            tf.add(self.get_dst_prefix(), "")
+        tf = tarfile.open(self.build_path_of(unpacked_file_name), 'w:')
+        # add the entire installation package, at the very top level
+        tf.add(self.get_dst_prefix(), "")
+        tf.close()
 
     def cleanup_finish(self):
         """ Delete paths that were specified to have been created by this script"""
@@ -666,11 +663,12 @@ class LLManifest(object, metaclass=LLManifestRegistry):
 
     def process_file(self, src, dst):
         if self.includes(src, dst):
-            for action in self.actions:
-                methodname = action + "_action"
-                method = getattr(self, methodname, None)
-                if method is not None:
-                    method(src, dst)
+            if src != dst:
+                for action in self.actions:
+                    methodname = action + "_action"
+                    method = getattr(self, methodname, None)
+                    if method is not None:
+                        method(src, dst)
             self.file_list.append([src, dst])
             return 1
         else:
@@ -792,21 +790,22 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         relative to the source prefix) into the directory
         specified relative to the destination directory."""
         self.check_file_exists(src_tar)
-        with tarfile.open(self.src_path_of(src_tar), 'r') as tf:
-            for member in tf.getmembers():
-                tf.extract(member, self.ensure_dst_dir(dst_dir))
-                # TODO get actions working on these dudes, perhaps we should extract to a temporary directory and then process_directory on it?
-                self.file_list.append([src_tar,
-                               self.dst_path_of(os.path.join(dst_dir,member.name))])
+        tf = tarfile.open(self.src_path_of(src_tar), 'r')
+        for member in tf.getmembers():
+            tf.extract(member, self.ensure_dst_dir(dst_dir))
+            # TODO get actions working on these dudes, perhaps we should extract to a temporary directory and then process_directory on it?
+            self.file_list.append([src_tar,
+                           self.dst_path_of(os.path.join(dst_dir,member.name))])
+        tf.close()
 
 
     def wildcard_regex(self, src_glob, dst_glob):
         src_re = re.escape(src_glob)
-        src_re = src_re.replace(r'\*', r'([-a-zA-Z0-9._ ]*)')
+        src_re = src_re.replace('\*', '([-a-zA-Z0-9._ ]*)')
         dst_temp = dst_glob
         i = 1
         while dst_temp.count("*") > 0:
-            dst_temp = dst_temp.replace(r'*', r'\g<' + str(i) + '>', 1)
+            dst_temp = dst_temp.replace('*', '\g<' + str(i) + '>', 1)
             i = i+1
         return re.compile(src_re), dst_temp
 
@@ -841,11 +840,11 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         """
         return self.path(os.path.join(path, file), file)
 
-    def path(self, src, dst=None, err_if_missing=True):
+    def path(self, src, dst=None):
         sys.stdout.flush()
-        if src is None:
+        if src == None:
             raise ManifestError("No source file, dst is " + dst)
-        if dst is None:
+        if dst == None:
             dst = src
         dst = os.path.join(self.get_dst_prefix(), dst)
         sys.stdout.write("Processing %s => %s ... " % (src, self._relative_dst_path(dst)))
@@ -855,7 +854,6 @@ class LLManifest(object, metaclass=LLManifestRegistry):
             count = 0
             if self.wildcard_pattern.search(src):
                 for s,d in self.expand_globs(src, dst):
-                    assert(s != d)
                     count += self.process_file(s, d)
             else:
                 # if we're specifying a single path (not a glob),
@@ -877,8 +875,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         else:
             # no more prefixes left to try
             print(("\nunable to find '%s'; looked in:\n  %s" % (src, '\n  '.join(try_prefixes))))
-            if err_if_missing == True:
-                self.missing.append(MissingFile(pattern=src, tried=try_prefixes))
+            self.missing.append(MissingFile(pattern=src, tried=try_prefixes))
             # At this point 'count' might never have been successfully
             # assigned! Even if it was, though, we can be sure it is 0.
             return 0

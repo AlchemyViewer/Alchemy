@@ -35,10 +35,10 @@
 #include "message.h"
 #include "llnotifications.h"
 #include "llextendedstatus.h"
-#include "llinventoryobserver.h"
 
-#include <boost/function.hpp>
 #include <boost/signals2.hpp>
+
+#include <functional>
 
 //
 // Forward declarations
@@ -63,8 +63,8 @@ enum InventoryOfferResponse
     IOR_SHOW
 };
 
-BOOL can_afford_transaction(S32 cost);
-void give_money(const LLUUID& uuid, LLViewerRegion* region, S32 amount, BOOL is_group = FALSE,
+bool can_afford_transaction(S32 cost);
+void give_money(const LLUUID& uuid, LLViewerRegion* region, S32 amount, bool is_group = false,
                 S32 trx_type = TRANS_GIFT, const std::string& desc = LLStringUtil::null);
 void send_join_group_response(LLUUID group_id,
                               LLUUID transaction_id,
@@ -82,7 +82,7 @@ void process_script_question(LLMessageSystem *msg, void **user_data);
 void process_chat_from_simulator(LLMessageSystem *mesgsys, void **user_data);
 
 //void process_agent_to_new_region(LLMessageSystem *mesgsys, void **user_data);
-void send_agent_update(BOOL force_send, BOOL send_reliable = FALSE);
+void send_agent_update(bool force_send, bool send_reliable = false);
 void process_object_update(LLMessageSystem *mesgsys, void **user_data);
 void process_compressed_object_update(LLMessageSystem *mesgsys, void **user_data);
 void process_cached_object_update(LLMessageSystem *mesgsys, void **user_data);
@@ -118,7 +118,7 @@ void process_adjust_balance(LLMessageSystem* msg_system, void**);
 bool attempt_standard_notification(LLMessageSystem* msg);
 void process_alert_message(LLMessageSystem* msg, void**);
 void process_agent_alert_message(LLMessageSystem* msgsystem, void** user_data);
-void process_alert_core(const std::string& message, BOOL modal);
+void process_alert_core(const std::string& message, bool modal);
 
 // "Mean" or player-vs-player abuse
 typedef std::list<LLMeanCollisionData*> mean_collision_list_t;
@@ -205,7 +205,7 @@ void invalid_message_callback(LLMessageSystem*, void*, EMessageException);
 
 void process_initiate_download(LLMessageSystem* msg, void**);
 void start_new_inventory_observer();
-void open_inventory_offer(const uuid_vec_t& items, const std::string& from_name, bool manual_offer = false);
+void open_inventory_offer(const uuid_vec_t& items, const std::string& from_name);
 
 // Returns true if item is not in certain "quiet" folder which don't need UI
 // notification (e.g. trash, cof, lost-and-found) and agent is not AFK, false otherwise.
@@ -219,7 +219,7 @@ class LLViewerMessage : public  LLSingleton<LLViewerMessage>
 {
     LLSINGLETON_EMPTY_CTOR(LLViewerMessage);
 public:
-    typedef boost::function<void()> teleport_started_callback_t;
+    typedef std::function<void()> teleport_started_callback_t;
     typedef boost::signals2::signal<void()> teleport_started_signal_t;
     boost::signals2::connection setTeleportStartedCallback(teleport_started_callback_t cb);
 
@@ -239,8 +239,8 @@ public:
     static std::string mResponderType;
     EInstantMessage mIM;
     LLUUID mFromID;
-    BOOL mFromGroup;
-    BOOL mFromObject;
+    bool mFromGroup;
+    bool mFromObject;
     LLUUID mTransactionID;
     LLUUID mFolderID;
     LLUUID mObjectID;
@@ -267,24 +267,10 @@ private:
     std::string getSanitizedDescription();
     void sendReceiveResponse(bool accept, const LLUUID &destination_folder_id);
 
-    typedef boost::function<bool (const LLSD&, const LLSD&)> respond_function_t;
+    typedef std::function<bool (const LLSD&, const LLSD&)> respond_function_t;
     typedef std::map<std::string, respond_function_t> respond_function_map_t;
 
     respond_function_map_t mRespondFunctions;
-};
-
-class LLOpenAgentOffer : public LLInventoryFetchItemsObserver
-{
-public:
-    LLOpenAgentOffer(const LLUUID& object_id, const std::string& from_name, bool is_manual_accept) :
-        LLInventoryFetchItemsObserver(object_id),
-        mFromName(from_name),
-        mIsManuallyAccepted(is_manual_accept) {}
-    /*virtual*/ void startFetch();
-    /*virtual*/ void done();
-private:
-    std::string mFromName;
-    bool        mIsManuallyAccepted;
 };
 
 void process_feature_disabled_message(LLMessageSystem* msg, void**);

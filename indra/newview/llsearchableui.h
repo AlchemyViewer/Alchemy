@@ -26,9 +26,8 @@
 #ifndef LL_SEARCHABLE_UI_H
 #define LL_SEARCHABLE_UI_H
 
-#include "llview.h"
-
 class LLMenuItemGL;
+class LLView;
 class LLPanel;
 class LLTabContainer;
 
@@ -53,7 +52,7 @@ namespace ll
         struct SearchableItem
         {
             LLWString mLabel;
-            const LLView*     mView;
+            LLView const *mView;
             ll::ui::SearchableControl const *mCtrl;
 
             std::vector< std::shared_ptr< SearchableItem >  > mChildren;

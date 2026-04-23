@@ -31,17 +31,54 @@
 #error "Please include llmath.h before this file."
 #endif
 
-#if ( ( LL_DARWIN || LL_LINUX ) && !(__SSE2__) ) || ( LL_WINDOWS && ( _M_IX86_FP < 2 && ADDRESS_SIZE == 32 ) )
-#error SSE2 not enabled. LLVector4a and related class will not compile.
+// the check for this error case must be split into multiple parts
+// because some versions of VS complain about '__SSE2__'
+#if ( ( LL_DARWIN || LL_LINUX ) )
+    #if !(__SSE2__) && !(__arm64__) && !(__aarch64__)
+        #error SSE2 not enabled. LLVector4a and related class will not compile.
+    #endif
+#elif ( LL_WINDOWS && ( _M_IX86_FP < 2 && ADDRESS_SIZE == 32 ) )
+    #error SSE2 not enabled. LLVector4a and related class will not compile.
 #endif
 
 #if !LL_WINDOWS
 #include <stdint.h>
 #endif
 
-#include <immintrin.h>
-#include <xmmintrin.h>
-#include <emmintrin.h>
+#if defined(__arm64__) || defined(__aarch64__)
+    #include "sse2neon/sse2neon.h"
+
+    #ifndef GLM_FORCE_NEON
+    #define GLM_FORCE_NEON 1
+    #endif
+#else
+    #include <xmmintrin.h>
+    #include <emmintrin.h>
+
+    #ifdef LL_DARWIN
+        #ifndef GLM_FORCE_SSE42
+        #define GLM_FORCE_SSE42 1
+        #endif // GLM_FORCE_SSE42
+    #else
+        #if defined(__AVX2__)
+            #include <smmintrin.h>
+
+            #ifndef GLM_FORCE_AVX2
+            #define GLM_FORCE_AVX2 1
+            #endif // GLM_FORCE_AVX2
+        #elif defined(__AVX__)
+            #include <smmintrin.h>
+
+            #ifndef GLM_FORCE_AVX
+            #define GLM_FORCE_AVX 1
+            #endif // GLM_FORCE_AVX
+        #else
+            #ifndef GLM_FORCE_SSE2
+            #define GLM_FORCE_SSE2 1
+            #endif // GLM_FORCE_SSE2
+        #endif // AVX2 vs AVX
+    #endif // LL_DARWIN
+#endif
 
 #include "llmemory.h"
 #include "llsimdtypes.h"

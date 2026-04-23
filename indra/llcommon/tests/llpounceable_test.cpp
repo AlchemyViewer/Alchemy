@@ -27,24 +27,24 @@ void append(std::string* dest, const std::string& src)
 }
 
 /*-------------------------- Data-struct testing ---------------------------*/
-struct PounceableData
+struct Data
 {
-    PounceableData(const std::string& data):
+    Data(const std::string& data):
         mData(data)
     {}
     const std::string mData;
 };
 
-void setter(PounceableData** dest, PounceableData* ptr)
+void setter(Data** dest, Data* ptr)
 {
     *dest = ptr;
 }
 
-static PounceableData* static_check = 0;
+static Data* static_check = 0;
 
 // Set up an extern pointer to an LLPounceableStatic so the linker will fill
 // in the forward reference from below, before runtime.
-extern LLPounceable<PounceableData*, LLPounceableStatic> gForward;
+extern LLPounceable<Data*, LLPounceableStatic> gForward;
 
 struct EnqueueCall
 {
@@ -64,7 +64,7 @@ struct EnqueueCall
 // to remark, we want this call not to crash.
 
 // Now declare gForward. Its constructor should not run until after nqcall's.
-LLPounceable<PounceableData*, LLPounceableStatic> gForward;
+LLPounceable<Data*, LLPounceableStatic> gForward;
 
 /*****************************************************************************
 *   TUT
@@ -78,9 +78,6 @@ namespace tut
     typedef llpounceable_group::object object;
     llpounceable_group llpounceablegrp("llpounceable");
 
-#if LL_MSVC
-#pragma optimize("", off)
-#endif
     template<> template<>
     void object::test<1>()
     {
@@ -90,13 +87,10 @@ namespace tut
         // implementing it with an LLSingleton queue. This models (say)
         // LLPounceableStatic<LLMessageSystem*, LLPounceableStatic>.
         ensure("static_check should still be null", ! static_check);
-        PounceableData myData("test<1>");
+        Data myData("test<1>");
         gForward = &myData;         // should run setter
         ensure_equals("static_check should be &myData", static_check, &myData);
     }
-#if LL_MSVC
-#pragma optimize("", on)
-#endif
 
     template<> template<>
     void object::test<2>()
@@ -105,13 +99,13 @@ namespace tut
         // We expect that LLPounceable<T, LLPounceableQueue> should have
         // different queues because that specialization stores the queue
         // directly in the LLPounceable instance.
-        PounceableData*aptr = 0, *bptr = 0;
-        LLPounceable<PounceableData*> a, b;
+        Data *aptr = 0, *bptr = 0;
+        LLPounceable<Data*> a, b;
         a.callWhenReady(boost::bind(setter, &aptr, _1));
         b.callWhenReady(boost::bind(setter, &bptr, _1));
         ensure("aptr should be null", ! aptr);
         ensure("bptr should be null", ! bptr);
-        PounceableData adata("a"), bdata("b");
+        Data adata("a"), bdata("b");
         a = &adata;
         ensure_equals("aptr should be &adata", aptr, &adata);
         // but we haven't yet set b
@@ -127,13 +121,13 @@ namespace tut
         // LLPounceable<T, LLPounceableStatic> should also have a distinct
         // queue for each instance, but that engages an additional map lookup
         // because there's only one LLSingleton for each T.
-        PounceableData*aptr = 0, *bptr = 0;
-        LLPounceable<PounceableData*, LLPounceableStatic> a, b;
+        Data *aptr = 0, *bptr = 0;
+        LLPounceable<Data*, LLPounceableStatic> a, b;
         a.callWhenReady(boost::bind(setter, &aptr, _1));
         b.callWhenReady(boost::bind(setter, &bptr, _1));
         ensure("aptr should be null", ! aptr);
         ensure("bptr should be null", ! bptr);
-        PounceableData adata("a"), bdata("b");
+        Data adata("a"), bdata("b");
         a = &adata;
         ensure_equals("aptr should be &adata", aptr, &adata);
         // but we haven't yet set b
@@ -149,11 +143,11 @@ namespace tut
         // We want LLPounceable<T, TAG> to be drop-in replaceable for a plain
         // T for read constructs. In particular, it should behave like a dumb
         // pointer -- and with zero abstraction cost for such usage.
-        PounceableData* aptr = 0;
-        PounceableData a("a");
+        Data* aptr = 0;
+        Data a("a");
         // should be able to initialize a pounceable (when its constructor
         // runs)
-        LLPounceable<PounceableData*> pounceable(&a);
+        LLPounceable<Data*> pounceable(&a);
         // should be able to pass LLPounceable<T> to function accepting T
         setter(&aptr, pounceable);
         ensure_equals("aptr should be &a", aptr, &a);
@@ -170,9 +164,9 @@ namespace tut
     void object::test<5>()
     {
         set_test_name("Multiple callWhenReady() queue items");
-        PounceableData*p1 = 0, *p2 = 0, *p3 = 0;
-        PounceableData a("a");
-        LLPounceable<PounceableData*> pounceable;
+        Data *p1 = 0, *p2 = 0, *p3 = 0;
+        Data a("a");
+        LLPounceable<Data*> pounceable;
         // queue up a couple setter() calls for later
         pounceable.callWhenReady(boost::bind(setter, &p1, _1));
         pounceable.callWhenReady(boost::bind(setter, &p2, _1));

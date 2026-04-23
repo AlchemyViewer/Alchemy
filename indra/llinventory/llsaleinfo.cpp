@@ -66,7 +66,7 @@ LLSaleInfo::LLSaleInfo(EForSale sale_type, S32 sale_price) :
     mSalePrice = llclamp(mSalePrice, 0, S32_MAX);
 }
 
-BOOL LLSaleInfo::isForSale() const
+bool LLSaleInfo::isForSale() const
 {
     return (FS_NOT != mSaleType);
 }
@@ -78,24 +78,35 @@ U32 LLSaleInfo::getCRC32() const
     return rv;
 }
 
-BOOL LLSaleInfo::exportLegacyStream(std::ostream& output_stream) const
+bool LLSaleInfo::exportLegacyStream(std::ostream& output_stream) const
 {
     output_stream << "\tsale_info\t0\n\t{\n";
     output_stream << "\t\tsale_type\t" << lookup(mSaleType) << "\n";
     output_stream << "\t\tsale_price\t" << mSalePrice << "\n";
     output_stream <<"\t}\n";
-    return TRUE;
+    return true;
 }
 
 LLSD LLSaleInfo::asLLSD() const
 {
-    LLSD sd = LLSD();
-    sd["sale_type"] = lookup(mSaleType);
-    sd["sale_price"] = mSalePrice;
+    LLSD sd;
+    asLLSD(sd);
     return sd;
 }
 
-bool LLSaleInfo::fromLLSD(const LLSD& sd, BOOL& has_perm_mask, U32& perm_mask)
+void LLSaleInfo::asLLSD(LLSD& sd) const
+{
+    const char* type = lookup(mSaleType);
+    if (!type)
+    {
+        LL_WARNS_ONCE() << "Unknown sale type: " << mSaleType << LL_ENDL;
+        type = lookup(LLSaleInfo::FS_NOT);
+    }
+    sd["sale_type"] = std::string(type);
+    sd["sale_price"] = mSalePrice;
+}
+
+bool LLSaleInfo::fromLLSD(const LLSD& sd, bool& has_perm_mask, U32& perm_mask)
 {
     const char *w;
 
@@ -113,22 +124,22 @@ bool LLSaleInfo::fromLLSD(const LLSD& sd, BOOL& has_perm_mask, U32& perm_mask)
     w = "perm_mask";
     if (sd.has(w))
     {
-        has_perm_mask = TRUE;
+        has_perm_mask = true;
         perm_mask = ll_U32_from_sd(sd[w]);
     }
     return true;
 }
 
-BOOL LLSaleInfo::importLegacyStream(std::istream& input_stream, BOOL& has_perm_mask, U32& perm_mask)
+bool LLSaleInfo::importLegacyStream(std::istream& input_stream, bool& has_perm_mask, U32& perm_mask)
 {
-    has_perm_mask = FALSE;
+    has_perm_mask = false;
 
     // *NOTE: Changing the buffer size will require changing the scanf
     // calls below.
     char buffer[MAX_STRING];    /* Flawfinder: ignore */
     char keyword[MAX_STRING];   /* Flawfinder: ignore */
     char valuestr[MAX_STRING];  /* Flawfinder: ignore */
-    BOOL success = TRUE;
+    bool success = true;
 
     keyword[0] = '\0';
     valuestr[0] = '\0';
@@ -163,7 +174,7 @@ BOOL LLSaleInfo::importLegacyStream(std::istream& input_stream, BOOL& has_perm_m
         else if (!strcmp("perm_mask", keyword))
         {
             //LL_INFOS() << "found deprecated keyword perm_mask" << LL_ENDL;
-            has_perm_mask = TRUE;
+            has_perm_mask = true;
             sscanf(valuestr, "%x", &perm_mask);
         }
         else

@@ -105,7 +105,8 @@ public:
     // New functions
     /// Get the stored value in string form
     const LLWString& getDisplay() const { return mDisplay; }
-    LLWString& getEditableDisplay() { mDirty = true; mUpdateFromDisplay = true; return mDisplay; }
+    S32 getDisplayGeneration() const { return mDisplayGeneration; }
+    LLWString& getEditableDisplay();
 
     /**
      * Set the display string directly (see LLTextEditor). What the user is
@@ -120,6 +121,7 @@ private:
     /// To avoid converting every widget's stored value from LLSD to LLWString
     /// every frame, cache the converted value
     LLWString mDisplay;
+    S32 mDisplayGeneration = -1;
 
     /// As the user edits individual characters (setDisplay()), defer
     /// LLWString-to-UTF8 conversions until s/he's done.
@@ -135,18 +137,18 @@ private:
 class LLListViewModel: public LLViewModel
 {
 public:
-    LLListViewModel() = default;
+    LLListViewModel() {}
     LLListViewModel(const LLSD& values);
 
     virtual void addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM);
     virtual void clearColumns();
-    virtual void setColumnLabel(std::string_view column, const std::string& label);
+    virtual void setColumnLabel(const std::string& column, const std::string& label);
     virtual LLScrollListItem* addElement(const LLSD& value, EAddPosition pos = ADD_BOTTOM,
                                          void* userdata = NULL);
     virtual LLScrollListItem* addSimpleElement(const std::string& value, EAddPosition pos,
                                                const LLSD& id);
     virtual void clearRows();
-    virtual void sortByColumn(std::string_view name, bool ascending);
+    virtual void sortByColumn(const std::string& name, bool ascending);
 };
 
 //namespace LLViewModel

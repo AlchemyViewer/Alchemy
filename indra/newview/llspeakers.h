@@ -70,16 +70,19 @@ public:
     F32             mLastSpokeTime;     // timestamp when this speaker last spoke
     F32             mSpeechVolume;      // current speech amplitude (timea average rms amplitude?)
     std::string     mDisplayName;       // cache user name for this speaker
-    BOOL            mHasSpoken;         // has this speaker said anything this session?
-    BOOL            mHasLeftCurrentCall;    // has this speaker left the current voice call?
+    bool            mHasSpoken;         // has this speaker said anything this session?
+    bool            mHasLeftCurrentCall;    // has this speaker left the current voice call?
     LLColor4        mDotColor;
     LLUUID          mID;
-    BOOL            mTyping;
+    bool            mTyping;
     S32             mSortIndex;
     ESpeakerType    mType;
     bool            mIsModerator;
     bool            mModeratorMutedVoice;
     bool            mModeratorMutedText;
+
+private:
+    boost::signals2::scoped_connection mAvatarNameCacheConnection;
 };
 
 class LLSpeakerUpdateSpeakerEvent : public LLOldEvents::LLEvent
@@ -98,7 +101,7 @@ public:
     /*virtual*/ LLSD getValue();
 private:
     const LLUUID& mSpeakerID;
-    BOOL mIsModerator;
+    bool mIsModerator;
 };
 
 class LLSpeakerTextModerationEvent : public LLOldEvents::LLEvent
@@ -138,7 +141,7 @@ private:
 class LLSpeakerActionTimer : public LLEventTimer
 {
 public:
-    typedef boost::function<bool(const LLUUID&)>    action_callback_t;
+    typedef std::function<bool(const LLUUID&)>      action_callback_t;
     typedef std::map<LLUUID, LLSpeakerActionTimer*> action_timers_map_t;
     typedef action_timers_map_t::value_type         action_value_t;
     typedef action_timers_map_t::const_iterator     action_timer_const_iter_t;
@@ -159,7 +162,7 @@ public:
      *
      * If action callback is not specified returns true. Instance will be deleted by LLEventTimer::updateClass().
      */
-    virtual BOOL tick();
+    virtual bool tick();
 
     /**
      * Clears the callback.
@@ -228,18 +231,18 @@ public:
     virtual ~LLSpeakerMgr();
 
     LLPointer<LLSpeaker> findSpeaker(const LLUUID& avatar_id);
-    void update(BOOL resort_ok);
-    void setSpeakerTyping(const LLUUID& speaker_id, BOOL typing);
+    void update(bool resort_ok);
+    void setSpeakerTyping(const LLUUID& speaker_id, bool typing);
     void speakerChatted(const LLUUID& speaker_id);
     LLPointer<LLSpeaker> setSpeaker(const LLUUID& id,
                     const std::string& name = LLStringUtil::null,
                     LLSpeaker::ESpeakerStatus status = LLSpeaker::STATUS_TEXT_ONLY,
                     LLSpeaker::ESpeakerType = LLSpeaker::SPEAKER_AGENT);
 
-    BOOL isVoiceActive();
+    bool isVoiceActive();
 
     typedef std::vector<LLPointer<LLSpeaker> > speaker_list_t;
-    void getSpeakerList(speaker_list_t* speaker_list, BOOL include_text);
+    void getSpeakerList(speaker_list_t* speaker_list, bool include_text);
     LLVoiceChannel* getVoiceChannel() { return mVoiceChannel; }
     void setVoiceChannel(LLVoiceChannel *voiceChannel) { mVoiceChannel = voiceChannel;  }
     const LLUUID getSessionID();
@@ -257,7 +260,7 @@ protected:
     void setSpeakerNotInChannel(LLPointer<LLSpeaker> speackerp);
     bool removeSpeaker(const LLUUID& speaker_id);
 
-    typedef boost::unordered_flat_map<LLUUID, LLPointer<LLSpeaker> > speaker_map_t;
+    typedef std::map<LLUUID, LLPointer<LLSpeaker> > speaker_map_t;
     speaker_map_t       mSpeakers;
     bool                mSpeakerListUpdated;
     LLTimer             mGetListTime;
@@ -333,7 +336,7 @@ protected:
 
 };
 
-class LLActiveSpeakerMgr final : public LLSpeakerMgr, public LLSingleton<LLActiveSpeakerMgr>
+class LLActiveSpeakerMgr : public LLSpeakerMgr, public LLSingleton<LLActiveSpeakerMgr>
 {
     LLSINGLETON(LLActiveSpeakerMgr);
     LOG_CLASS(LLActiveSpeakerMgr);
@@ -342,7 +345,7 @@ protected:
     virtual void updateSpeakerList() override;
 };
 
-class LLLocalSpeakerMgr final : public LLSpeakerMgr, public LLSingleton<LLLocalSpeakerMgr>
+class LLLocalSpeakerMgr : public LLSpeakerMgr, public LLSingleton<LLLocalSpeakerMgr>
 {
     LLSINGLETON(LLLocalSpeakerMgr);
     ~LLLocalSpeakerMgr ();

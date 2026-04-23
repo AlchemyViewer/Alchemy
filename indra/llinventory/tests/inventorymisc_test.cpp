@@ -28,7 +28,6 @@
 
 #include "linden_common.h"
 #include "llsd.h"
-#include "llrand.h"
 #include "llsdserialize.h"
 
 #include "../llinventory.h"
@@ -39,6 +38,34 @@
 // disable unreachable code warnings
 #pragma warning(disable: 4702)
 #endif
+
+void set_random_inventory_metadata(LLInventoryObject* obj)
+{
+    S32 extra = rand() % 4;
+    switch (extra)
+    {
+    case 0:
+    {
+        LLUUID thumbnail_id;
+        thumbnail_id.generate();
+        obj->setThumbnailUUID(thumbnail_id);
+        break;
+    }
+    case 1:
+        obj->setFavorite(true);
+        break;
+    case 2:
+    {
+        LLUUID thumbnail_id;
+        thumbnail_id.generate();
+        obj->setThumbnailUUID(thumbnail_id);
+        obj->setFavorite(true);
+        break;
+    }
+    default:
+        break;
+    }
+}
 
 LLPointer<LLInventoryItem> create_random_inventory_item()
 {
@@ -59,10 +86,10 @@ LLPointer<LLInventoryItem> create_random_inventory_item()
     perm.initMasks(PERM_ALL, PERM_ALL, PERM_COPY, PERM_COPY, PERM_MODIFY | PERM_COPY);
     LLUUID asset_id;
     asset_id.generate();
-    S32 price = ll_rand();
+    S32 price = rand();
     LLSaleInfo sale_info(LLSaleInfo::FS_COPY, price);
-    U32 flags = ll_rand();
-    S32 creation = time(NULL);
+    U32 flags = rand();
+    S32 creation = (S32)time(NULL);
 
     LLPointer<LLInventoryItem> item = new LLInventoryItem(
         item_id,
@@ -76,6 +103,7 @@ LLPointer<LLInventoryItem> create_random_inventory_item()
         sale_info,
         flags,
         creation);
+    set_random_inventory_metadata(item);
     return item;
 }
 
@@ -91,6 +119,7 @@ LLPointer<LLInventoryCategory> create_random_inventory_cat()
         parent_id,
         LLFolderType::FT_NONE,
         std::string("Sample category"));
+    set_random_inventory_metadata(cat);
     return cat;
 }
 
@@ -98,6 +127,18 @@ namespace tut
 {
     struct inventory_data
     {
+        inventory_data()
+        {
+            LLAssetDictionary::createInstance();
+            LLFolderDictionary::createInstance();
+            LLInventoryDictionary::createInstance();
+        }
+        ~inventory_data()
+        {
+            LLInventoryDictionary::deleteSingleton();
+            LLFolderDictionary::deleteSingleton();
+            LLAssetDictionary::deleteSingleton();
+        }
     };
     typedef test_group<inventory_data> inventory_test;
     typedef inventory_test::object inventory_object;
@@ -191,12 +232,12 @@ namespace tut
         std::string new_desc = "SecondLife Testing";
         src->setDescription(new_desc);
 
-        S32 new_price = ll_rand();
+        S32 new_price = rand();
         LLSaleInfo new_sale_info(LLSaleInfo::FS_COPY, new_price);
         src->setSaleInfo(new_sale_info);
 
-        U32 new_flags = ll_rand();
-        S32 new_creation = time(NULL);
+        U32 new_flags = rand();
+        S32 new_creation = (S32)time(NULL);
 
         LLPermissions new_perm;
 
@@ -262,12 +303,12 @@ namespace tut
         std::string new_desc = "SecondLife Testing";
         src->setDescription(new_desc);
 
-        S32 new_price = ll_rand();
+        S32 new_price = rand();
         LLSaleInfo new_sale_info(LLSaleInfo::FS_COPY, new_price);
         src->setSaleInfo(new_sale_info);
 
-        U32 new_flags = ll_rand();
-        S32 new_creation = time(NULL);
+        U32 new_flags = rand();
+        S32 new_creation = (S32)time(NULL);
 
         LLPermissions new_perm;
 
@@ -291,6 +332,7 @@ namespace tut
         src->setCreationDate(new_creation);
 
         // test a save/load cycle to LLSD and back again
+        // Note: ll_create_sd_from_inventory_item does not support metadata
         LLSD sd = ll_create_sd_from_inventory_item(src);
         LLPointer<LLInventoryItem> dst = new LLInventoryItem;
         bool successful_parse = dst->fromLLSD(sd);
@@ -330,7 +372,9 @@ namespace tut
         }
 
         LLPointer<LLInventoryItem> src1 = create_random_inventory_item();
-        fileXML << LLSDOStreamer<LLSDNotationFormatter>(src1->asLLSD()) << std::endl;
+        LLSD sd;
+        src1->asLLSD(sd);
+        fileXML << LLSDOStreamer<LLSDNotationFormatter>(sd) << std::endl;
         fileXML.close();
 
 
@@ -365,17 +409,17 @@ namespace tut
         ensure_equals("8.name::getName() failed", src1->getName(), src2->getName());
         ensure_equals("9.description::getDescription() failed", src1->getDescription(), src2->getDescription());
         ensure_equals("10.creation::getCreationDate() failed", src1->getCreationDate(), src2->getCreationDate());
-
+        ensure_equals("13.thumbnails::getThumbnailUUID() failed", src1->getThumbnailUUID(), src2->getThumbnailUUID());
+        ensure_equals("14.favorites::getIsFavorite() failed", src1->getIsFavorite(), src2->getIsFavorite());
     }
 
     template<> template<>
     void inventory_object::test<8>()
     {
-
         LLPointer<LLInventoryItem> src1 = create_random_inventory_item();
 
         std::ostringstream ostream;
-        src1->exportLegacyStream(ostream, TRUE);
+        src1->exportLegacyStream(ostream, true);
 
         std::istringstream istream(ostream.str());
         LLPointer<LLInventoryItem> src2 = new LLInventoryItem();
@@ -391,8 +435,8 @@ namespace tut
         ensure_equals("8.name::getName() failed", src1->getName(), src2->getName());
         ensure_equals("9.description::getDescription() failed", src1->getDescription(), src2->getDescription());
         ensure_equals("10.creation::getCreationDate() failed", src1->getCreationDate(), src2->getCreationDate());
-
-
+        ensure_equals("11.thumbnails::getThumbnailUUID() failed", src1->getThumbnailUUID(), src2->getThumbnailUUID());
+        ensure_equals("12.favorites::getIsFavorite() failed", false, src2->getIsFavorite()); // not supposed to carry over
     }
 
     template<> template<>
@@ -422,6 +466,8 @@ namespace tut
         ensure_equals("10.name::getName() failed", src1->getName(), src2->getName());
         ensure_equals("11.description::getDescription() failed", src1->getDescription(), src2->getDescription());
         ensure_equals("12.creation::getCreationDate() failed", src1->getCreationDate(), src2->getCreationDate());
+        ensure_equals("13.thumbnails::getThumbnailUUID() failed", src1->getThumbnailUUID(), src2->getThumbnailUUID());
+        ensure_equals("14.favorites::getIsFavorite() failed", src1->getIsFavorite(), src2->getIsFavorite());
     }
 
 //******class LLInventoryCategory*******//
@@ -459,7 +505,9 @@ namespace tut
         }
 
         LLPointer<LLInventoryCategory> src1 = create_random_inventory_cat();
-        fileXML << LLSDOStreamer<LLSDNotationFormatter>(src1->exportLLSD()) << std::endl;
+        LLSD sd;
+        src1->exportLLSD(sd);
+        fileXML << LLSDOStreamer<LLSDNotationFormatter>(sd) << std::endl;
         fileXML.close();
 
         llifstream file(filename.c_str());
@@ -482,13 +530,15 @@ namespace tut
         file.close();
 
         LLPointer<LLInventoryCategory> src2 = new LLInventoryCategory();
-        src2->importLLSD(s_item);
+        src2->importLLSDMap(s_item);
 
         ensure_equals("1.item id::getUUID() failed", src1->getUUID(), src2->getUUID());
         ensure_equals("2.parent::getParentUUID() failed", src1->getParentUUID(), src2->getParentUUID());
         ensure_equals("3.type::getType() failed", src1->getType(), src2->getType());
         ensure_equals("4.preferred type::getPreferredType() failed", src1->getPreferredType(), src2->getPreferredType());
         ensure_equals("5.name::getName() failed", src1->getName(), src2->getName());
+        ensure_equals("6.thumbnails::getThumbnailUUID() failed", src1->getThumbnailUUID(), src2->getThumbnailUUID());
+        ensure_equals("7.favorites::getIsFavorite() failed", src1->getIsFavorite(), src2->getIsFavorite());
     }
 
     template<> template<>
@@ -497,7 +547,7 @@ namespace tut
         LLPointer<LLInventoryCategory> src1 = create_random_inventory_cat();
 
         std::ostringstream ostream;
-        src1->exportLegacyStream(ostream, TRUE);
+        src1->exportLegacyStream(ostream, true);
 
         std::istringstream istream(ostream.str());
         LLPointer<LLInventoryCategory> src2 = new LLInventoryCategory();
@@ -508,6 +558,7 @@ namespace tut
         ensure_equals("3.type::getType() failed", src1->getType(), src2->getType());
         ensure_equals("4.preferred type::getPreferredType() failed", src1->getPreferredType(), src2->getPreferredType());
         ensure_equals("5.name::getName() failed", src1->getName(), src2->getName());
-
+        ensure_equals("13.thumbnails::getThumbnailUUID() failed", src1->getThumbnailUUID(), src2->getThumbnailUUID());
+        ensure_equals("14.favorites::getIsFavorite() failed", false, src2->getIsFavorite()); // currently not supposed to carry over
     }
 }

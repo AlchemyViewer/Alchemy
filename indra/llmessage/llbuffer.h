@@ -77,7 +77,7 @@ class LLSegment
 public:
     LLSegment();
     LLSegment(S32 channel, U8* data, S32 data_len);
-    ~LLSegment() = default;
+    ~LLSegment();
 
     /**
      * @brief Check if this segment is on the given channel.
@@ -120,8 +120,8 @@ public:
     bool operator==(const LLSegment& rhs) const;
 
 protected:
-    U8* mData;
     S32 mChannel;
+    U8* mData;
     S32 mSize;
 };
 
@@ -140,7 +140,7 @@ public:
      * @brief The buffer base class should have no responsibilities
      * other than an interface.
      */
-    virtual ~LLBuffer() = default;
+    virtual ~LLBuffer() {}
 
     /**
      * @brief Generate a segment for this buffer.

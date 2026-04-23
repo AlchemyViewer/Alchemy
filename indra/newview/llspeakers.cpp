@@ -50,16 +50,16 @@ LLSpeaker::LLSpeaker(const LLUUID& id, const std::string& name, const ESpeakerTy
     mStatus(LLSpeaker::STATUS_TEXT_ONLY),
     mLastSpokeTime(0.f),
     mSpeechVolume(0.f),
-    mHasSpoken(FALSE),
-    mHasLeftCurrentCall(FALSE),
+    mHasSpoken(false),
+    mHasLeftCurrentCall(false),
     mDotColor(LLColor4::white),
     mID(id),
-    mTyping(FALSE),
+    mTyping(false),
     mSortIndex(0),
     mType(type),
-    mIsModerator(FALSE),
-    mModeratorMutedVoice(FALSE),
-    mModeratorMutedText(FALSE)
+    mIsModerator(false),
+    mModeratorMutedVoice(false),
+    mModeratorMutedText(false)
 {
     if (name.empty() && type == SPEAKER_AGENT)
     {
@@ -76,7 +76,7 @@ void LLSpeaker::lookupName()
 {
     if (mDisplayName.empty())
     {
-        LLAvatarNameCache::get(mID, boost::bind(&LLSpeaker::onNameCache, this, _1, _2)); // todo: can be group???
+        mAvatarNameCacheConnection = LLAvatarNameCache::get(mID, boost::bind(&LLSpeaker::onNameCache, this, _1, _2)); // todo: can be group???
     }
 }
 
@@ -181,13 +181,13 @@ LLSpeakerActionTimer::LLSpeakerActionTimer(action_callback_t action_cb, F32 acti
 {
 }
 
-BOOL LLSpeakerActionTimer::tick()
+bool LLSpeakerActionTimer::tick()
 {
     if (mActionCallback)
     {
-        return (BOOL)mActionCallback(mSpeakerId);
+        return (bool)mActionCallback(mSpeakerId);
     }
-    return TRUE;
+    return true;
 }
 
 void LLSpeakerActionTimer::unset()
@@ -303,7 +303,7 @@ LLPointer<LLSpeaker> LLSpeakerMgr::setSpeaker(const LLUUID& id, const std::strin
     {
         speakerp = new LLSpeaker(id, name, type);
         speakerp->mStatus = status;
-        mSpeakers.emplace(speakerp->mID, speakerp);
+        mSpeakers.insert(std::make_pair(speakerp->mID, speakerp));
         mSpeakersSorted.push_back(speakerp);
         LL_DEBUGS("Speakers") << "Added speaker " << id << LL_ENDL;
         fireEvent(new LLSpeakerListChangeEvent(this, speakerp->mID), "add");
@@ -361,9 +361,9 @@ void LLSpeakerMgr::initVoiceModerateMode()
     }
 }
 
-void LLSpeakerMgr::update(BOOL resort_ok)
+void LLSpeakerMgr::update(bool resort_ok)
 {
-    if (!LLVoiceClient::instanceExists())
+    if (!LLVoiceClient::getInstance())
     {
         return;
     }
@@ -405,7 +405,7 @@ void LLSpeakerMgr::update(BOOL resort_ok)
                 if (speakerp->mStatus != LLSpeaker::STATUS_SPEAKING)
                 {
                     speakerp->mLastSpokeTime = mSpeechTimer.getElapsedTimeF32();
-                    speakerp->mHasSpoken = TRUE;
+                    speakerp->mHasSpoken = true;
                     fireEvent(new LLSpeakerUpdateSpeakerEvent(speakerp), "update_speaker");
                 }
                 speakerp->mStatus = LLSpeaker::STATUS_SPEAKING;
@@ -520,10 +520,10 @@ void LLSpeakerMgr::updateSpeakerList()
                     S32 updated = 0;
                     while (member_it != gdatap->mMembers.end())
                     {
-                        LLGroupMemberData* member = member_it->second.get();
+                        LLGroupMemberData* member = member_it->second;
                         LLUUID id = member_it->first;
                         // Add only members who are online and not already in the list
-                        if ((member && member->getOnlineStatus() == "Online") && (mSpeakers.find(id) == mSpeakers.end()))
+                        if ((member->getOnlineStatus() == "Online") && (mSpeakers.find(id) == mSpeakers.end()))
                         {
                             LLPointer<LLSpeaker> speakerp = setSpeaker(id, "", LLSpeaker::STATUS_VOICE_ACTIVE, LLSpeaker::SPEAKER_AGENT);
                             speakerp->mIsModerator = ((member->getAgentPowers() & GP_SESSION_MODERATOR) == GP_SESSION_MODERATOR);
@@ -590,7 +590,7 @@ bool LLSpeakerMgr::removeSpeaker(const LLUUID& speaker_id)
     LL_DEBUGS("Speakers") << "Removed speaker " << speaker_id << LL_ENDL;
     fireEvent(new LLSpeakerListChangeEvent(this, speaker_id), "remove");
 
-    update(TRUE);
+    update(true);
 
     return false;
 }
@@ -608,7 +608,7 @@ LLPointer<LLSpeaker> LLSpeakerMgr::findSpeaker(const LLUUID& speaker_id)
     return found_it->second;
 }
 
-void LLSpeakerMgr::getSpeakerList(speaker_list_t* speaker_list, BOOL include_text)
+void LLSpeakerMgr::getSpeakerList(speaker_list_t* speaker_list, bool include_text)
 {
     speaker_list->clear();
     for (speaker_map_t::iterator speaker_it = mSpeakers.begin(); speaker_it != mSpeakers.end(); ++speaker_it)
@@ -632,7 +632,7 @@ bool LLSpeakerMgr::isSpeakerToBeRemoved(const LLUUID& speaker_id)
     return mSpeakerDelayRemover && mSpeakerDelayRemover->isTimerStarted(speaker_id);
 }
 
-void LLSpeakerMgr::setSpeakerTyping(const LLUUID& speaker_id, BOOL typing)
+void LLSpeakerMgr::setSpeakerTyping(const LLUUID& speaker_id, bool typing)
 {
     LLPointer<LLSpeaker> speakerp = findSpeaker(speaker_id);
     if (speakerp.notNull())
@@ -648,12 +648,12 @@ void LLSpeakerMgr::speakerChatted(const LLUUID& speaker_id)
     if (speakerp.notNull())
     {
         speakerp->mLastSpokeTime = mSpeechTimer.getElapsedTimeF32();
-        speakerp->mHasSpoken = TRUE;
+        speakerp->mHasSpoken = true;
         fireEvent(new LLSpeakerUpdateSpeakerEvent(speakerp), "update_speaker");
     }
 }
 
-BOOL LLSpeakerMgr::isVoiceActive()
+bool LLSpeakerMgr::isVoiceActive()
 {
     // mVoiceChannel = NULL means current voice channel, whatever it is
     return LLVoiceClient::getInstance()->voiceEnabled() && mVoiceChannel && mVoiceChannel->isActive();
@@ -867,9 +867,9 @@ void LLIMSpeakerMgr::moderationActionCoro(std::string url, LLSD action)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("moderationActionCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("moderationActionCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     httpOpts->setWantHeaders(true);
 
@@ -1026,6 +1026,10 @@ void LLLocalSpeakerMgr::updateSpeakerList()
     uuid_vec_t avatar_ids;
     std::vector<LLVector3d> positions;
     LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), CHAT_NORMAL_RADIUS);
+#ifdef LL_DISCORD
+    if (gSavedSettings.getBOOL("EnableDiscord"))
+        LLAppViewer::updateDiscordPartyCurrentSize((S32)avatar_ids.size());
+#endif
     for(U32 i=0; i<avatar_ids.size(); i++)
     {
         setSpeaker(avatar_ids[i]);

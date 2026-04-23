@@ -82,9 +82,18 @@ void LLTextViewModel::setValue(const LLSD& value)
     // approximate LLSD storage usage
     LLViewModel::setValue(value);
     mDisplay = utf8str_to_wstring(mStringValue = value.asString());
+    mDisplayGeneration++;
 
     // mDisplay and mValue agree
     mUpdateFromDisplay = false;
+}
+
+LLWString& LLTextViewModel::getEditableDisplay()
+{
+    mDirty = true;
+    mDisplayGeneration++;
+    mUpdateFromDisplay = true;
+    return mDisplay;
 }
 
 void LLTextViewModel::setDisplay(const LLWString& value)
@@ -94,6 +103,7 @@ void LLTextViewModel::setDisplay(const LLWString& value)
     // value. But a text editor might want to edit the display string
     // directly, then convert back to UTF8 on commit.
     mDisplay = value;
+    mDisplayGeneration++;
     mDirty = true;
     // Don't immediately convert to UTF8 -- do it lazily -- we expect many
     // more setDisplay() calls than getValue() calls. Just flag that it needs
@@ -145,7 +155,7 @@ void LLListViewModel::clearColumns()
 {
 }
 
-void LLListViewModel::setColumnLabel(std::string_view column, const std::string& label)
+void LLListViewModel::setColumnLabel(const std::string& column, const std::string& label)
 {
 }
 
@@ -165,6 +175,6 @@ void LLListViewModel::clearRows()
 {
 }
 
-void LLListViewModel::sortByColumn(std::string_view name, bool ascending)
+void LLListViewModel::sortByColumn(const std::string& name, bool ascending)
 {
 }

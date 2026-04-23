@@ -27,8 +27,6 @@
 #ifndef LL_LLWIND_H
 #define LL_LLWIND_H
 
-#include <array>
-
 #include "llmath.h"
 #include "v3math.h"
 #include "v3dmath.h"
@@ -37,16 +35,15 @@ class LLVector3;
 class LLBitPack;
 class LLGroupHeader;
 
+const F32 WIND_SCALE_HACK       = 2.0f; // hack to make wind speeds more realistic
+
+
 class LLWind
 {
-    static constexpr size_t WIND_SIZE = 16;
-    static constexpr size_t ARRAY_SIZE = WIND_SIZE * WIND_SIZE;
 public:
-    static constexpr F32 WIND_SCALE_HACK = 2.0f; // hack to make wind speeds more realistic
-
     LLWind();
-    ~LLWind() = default;
-    void renderVectors(); // defined in llglsandbox.cpp
+    ~LLWind();
+    void renderVectors();
     LLVector3 getVelocity(const LLVector3 &location); // "location" is region-local
     LLVector3 getVelocityNoisy(const LLVector3 &location, const F32 dim);   // "location" is region-local
 
@@ -55,8 +52,9 @@ public:
 
     void setOriginGlobal(const LLVector3d &origin_global);
 private:
-    std::array<F32, ARRAY_SIZE> mVelX;
-    std::array<F32, ARRAY_SIZE> mVelY;
+    S32 mSize;
+    F32 * mVelX;
+    F32 * mVelY;
 
     LLVector3d mOriginGlobal;
     void init();

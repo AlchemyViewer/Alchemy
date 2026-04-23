@@ -23,6 +23,9 @@
  * $/LicenseInfo$
  */
 
+#extension GL_ARB_texture_rectangle : enable
+#extension GL_ARB_shader_texture_lod : enable
+
 /*[EXTRA_CODE_HERE]*/
 
 out vec4 frag_color;
@@ -350,12 +353,12 @@ A. Or use FXAA_GREEN_AS_LUMA.
         #define FXAA_GATHER4_ALPHA 1
     #endif
     #ifndef FXAA_GATHER4_ALPHA
-//        #ifdef GL_ARB_gpu_shader5
-//            #define FXAA_GATHER4_ALPHA 1
-//        #endif
-//        #ifdef GL_NV_gpu_shader5
-//            #define FXAA_GATHER4_ALPHA 1
-//        #endif
+        #ifdef GL_ARB_gpu_shader5
+            #define FXAA_GATHER4_ALPHA 1
+        #endif
+        #ifdef GL_NV_gpu_shader5
+            #define FXAA_GATHER4_ALPHA 1
+        #endif
         #ifndef FXAA_GATHER4_ALPHA
             #define FXAA_GATHER4_ALPHA 0
         #endif

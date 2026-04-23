@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2011, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -39,7 +40,7 @@ enum class ERlvBehaviourFilter {
     ALL
 };
 
-class RlvFloaterBehaviours final : public LLFloater
+class RlvFloaterBehaviours : public LLFloater
 {
     friend class LLFloaterReg;
 private:
@@ -51,7 +52,7 @@ private:
 public:
     /*virtual*/ void onOpen(const LLSD& sdKey);
     /*virtual*/ void onClose(bool fQuitting);
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     /*
      * Member functions
@@ -75,7 +76,7 @@ protected:
 // RlvFloaterLocks class declaration
 //
 
-class RlvFloaterLocks final : public LLFloater
+class RlvFloaterLocks : public LLFloater
 {
     friend class LLFloaterReg;
 private:
@@ -87,7 +88,7 @@ private:
 public:
     /*virtual*/ void onOpen(const LLSD& sdKey);
     /*virtual*/ void onClose(bool fQuitting);
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     /*
      * Member functions
@@ -107,7 +108,7 @@ protected:
 // RlvFloaterStrings class declaration
 //
 
-class RlvFloaterStrings final : public LLFloater
+class RlvFloaterStrings : public LLFloater
 {
     friend class LLFloaterReg;
 private:
@@ -116,7 +117,7 @@ private:
     // LLFloater overrides
 public:
     /*virtual*/ void onClose(bool fQuitting);
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     // Member functions
 protected:
@@ -136,7 +137,7 @@ protected:
 // RlvFloaterConsole - debug console to allow command execution without the need for a script
 //
 
-class RlvFloaterConsole final : public LLFloater
+class RlvFloaterConsole : public LLFloater
 {
     friend class LLFloaterReg;
     template<ERlvParamType> friend struct RlvCommandHandlerBaseImpl;
@@ -149,7 +150,7 @@ private:
      * LLFloater overrides
      */
 public:
-    BOOL postBuild() override;
+    bool postBuild() override;
     void onClose(bool fQuitting) override;
 
     /*

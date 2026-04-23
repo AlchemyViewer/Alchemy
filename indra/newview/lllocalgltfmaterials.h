@@ -30,6 +30,7 @@
 #include "lleventtimer.h"
 #include "llpointer.h"
 #include "llgltfmateriallist.h"
+#include <filesystem>
 
 class LLScrollListCtrl;
 class LLGLTFMaterial;
@@ -73,7 +74,7 @@ private: /* members */
     std::string mShortName;
     LLUUID      mTrackingID;
     LLUUID      mWorldID;
-    LLSD        mLastModified;
+    std::filesystem::file_time_type mLastModified;
     EExtension  mExtension;
     ELinkStatus mLinkStatus;
     S32         mUpdateRetries;
@@ -90,7 +91,7 @@ public:
     void startTimer();
     void stopTimer();
     bool isRunning();
-    BOOL tick();
+    bool tick();
 };
 
 class LLLocalGLTFMaterialMgr : public LLSingleton<LLLocalGLTFMaterialMgr>
@@ -99,7 +100,7 @@ class LLLocalGLTFMaterialMgr : public LLSingleton<LLLocalGLTFMaterialMgr>
     ~LLLocalGLTFMaterialMgr();
 public:
     S32          addUnit(const std::vector<std::string>& filenames);
-    S32          addUnit(const std::string& filename);
+    S32          addUnit(const std::string& filename); // file can hold multiple materials
     S32          addUnit(const std::string& filename, LLUUID& outID); // returns first material id as outID
 protected:
     S32          addUnitInternal(const std::string& filename, LLUUID& outID); // file can hold multiple materials

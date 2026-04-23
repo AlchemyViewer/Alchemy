@@ -44,9 +44,6 @@ static LLDefaultChildRegistry::Register<LLIconCtrl> r("icon");
 LLIconCtrl::Params::Params()
 :   image("image_name"),
     color("color"),
-// [SL:KB] - Patch: Control-IconCtrl | Checked: Catznip-3.6
-    commit_on_click("commit_on_click", false),
-// [/SL:KB]
     use_draw_context_alpha("use_draw_context_alpha", true),
     interactable("interactable", false),
     scale_image("scale_image"),
@@ -70,14 +67,6 @@ LLIconCtrl::LLIconCtrl(const LLIconCtrl::Params& p)
     {
         LLUICtrl::setValue(mImagep->getName());
     }
-
-// [SL:KB] - Patch: Control-IconCtrl | Checked: Catznip-3.6
-    if (p.commit_on_click)
-    {
-        // There's several ways we can do this but this just seems like the easiest
-        setMouseDownCallback(boost::bind(&LLIconCtrl::onCommit, this));
-    }
-// [/SL:KB]
 }
 
 LLIconCtrl::~LLIconCtrl()
@@ -97,17 +86,17 @@ void LLIconCtrl::draw()
     LLUICtrl::draw();
 }
 
-BOOL LLIconCtrl::handleHover(S32 x, S32 y, MASK mask)
+bool LLIconCtrl::handleHover(S32 x, S32 y, MASK mask)
 {
     if (mInteractable && getEnabled())
     {
         getWindow()->setCursor(UI_CURSOR_HAND);
-        return TRUE;
+        return true;
     }
     return LLUICtrl::handleHover(x, y, mask);
 }
 
-void LLIconCtrl::onVisibilityChange(BOOL new_visibility)
+void LLIconCtrl::onVisibilityChange(bool new_visibility)
 {
     LLUICtrl::onVisibilityChange(new_visibility);
     if (mPriority == LLGLTexture::BOOST_ICON)

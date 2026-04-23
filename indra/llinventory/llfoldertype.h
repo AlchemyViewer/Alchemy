@@ -29,10 +29,12 @@
 
 #include <string>
 #include "llassettype.h"
+#include "lldictionary.h"
+#include "llsingleton.h"
 
 // This class handles folder types (similar to assettype, except for folders)
 // and operations on those.
-class LLFolderType
+class LL_COMMON_API LLFolderType
 {
 public:
     // ! BACKWARDS COMPATIBILITY ! Folder type enums must match asset type enums.
@@ -96,13 +98,7 @@ public:
         FT_MATERIAL = 57,
 
         FT_ANIM_OVERRIDES = 58,
-        FT_TOXIC = 59,
         FT_RLV = 60,
-
-        FT_LOCAL = 69,
-
-        FT_SUITCASE = 100,
-
 
         FT_COUNT,
 
@@ -111,7 +107,7 @@ public:
         // When adding, see note at bottom of LLAssetType::Etype
     };
 
-    static EType                lookup(const std::string_view type_name);
+    static EType                lookup(const std::string& type_name);
     static const std::string&   lookup(EType folder_type);
 
     static bool                 lookupIsProtectedType(EType folder_type);
@@ -124,9 +120,43 @@ public:
 
     static const std::string&   badLookup(); // error string when a lookup fails
 
+    static LLSD getTypeNames();
+
 protected:
-    LLFolderType() = default;
-    ~LLFolderType() = default;
+    LLFolderType() {}
+    ~LLFolderType() {}
+};
+
+///----------------------------------------------------------------------------
+/// Class LLFolderType
+///----------------------------------------------------------------------------
+struct FolderEntry : public LLDictionaryEntry
+{
+    FolderEntry(const std::string& type_name,    // 8 character limit!
+                bool               is_protected, // can the viewer change categories of this type?
+                bool               is_automatic, // always made before first login?
+                bool               is_singleton  // should exist as a unique copy under root
+                ) :
+        LLDictionaryEntry(type_name),
+        mIsProtected(is_protected),
+        mIsAutomatic(is_automatic),
+        mIsSingleton(is_singleton)
+    {
+        llassert(type_name.length() <= 8);
+    }
+
+    const bool mIsProtected;
+    const bool mIsAutomatic;
+    const bool mIsSingleton;
+};
+
+class LLFolderDictionary : public LLSimpleton<LLFolderDictionary>, public LLDictionary<LLFolderType::EType, FolderEntry>
+{
+public:
+    LLFolderDictionary();
+
+protected:
+    virtual LLFolderType::EType notFound() const override { return LLFolderType::FT_NONE; }
 };
 
 #endif // LL_LLFOLDERTYPE_H

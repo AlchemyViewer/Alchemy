@@ -2,10 +2,8 @@
 <floater name="build options floater" title="グリッドオプション">
 	<spinner label="単位（メートル）" name="GridResolution"/>
 	<spinner label="範囲（メートル）" name="GridDrawSize"/>
-	<spinner label="角度（度）" name="RotationStep" tool_tip="回転ツールによるすべての回転は、この単位の倍数に制限されます。［デフォルト：1.0］"/>
 	<check_box label="より細かい単位でスナップフィット" name="GridSubUnit"/>
 	<text name="grid_opacity_label" tool_tip="グリッドの不透明度">
 		不透明度：
 	</text>
-	<slider name="GridOpacity"/>
 </floater>

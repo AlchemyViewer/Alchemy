@@ -38,6 +38,7 @@
 #ifndef LLWEBRTC_H
 #define LLWEBRTC_H
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,7 @@
 
 namespace llwebrtc
 {
+typedef std::map<std::string, std::map<std::string, std::string>> LLWebRTCStatsMap;
 
 class LLWebRTCLogCallback
 {
@@ -157,7 +159,10 @@ class LLWebRTCDeviceInterface
     virtual void setTuningMode(bool enable) = 0;
     virtual float getTuningAudioLevel() = 0; // for use during tuning
     virtual float getPeerConnectionAudioLevel() = 0; // for use when not tuning
-    virtual void setPeerConnectionGain(float gain) = 0;
+    virtual void setMicGain(float gain) = 0;
+    virtual void setTuningMicGain(float gain)        = 0;
+
+    virtual void setMute(bool mute, int delay_ms = 0) = 0;
 };
 
 // LLWebRTCAudioInterface provides the viewer with a way
@@ -235,6 +240,8 @@ class LLWebRTCSignalingObserver
     // Called when the data channel has been established and data
     // transfer can begin.
     virtual void OnDataChannelReady(LLWebRTCDataInterface *data_interface) = 0;
+
+    virtual void OnStatsDelivered(const LLWebRTCStatsMap& stats_data) {}
 };
 
 // LLWebRTCPeerConnectionInterface representsd a connection to a peer,
@@ -268,6 +275,8 @@ class LLWebRTCPeerConnectionInterface
     virtual void unsetSignalingObserver(LLWebRTCSignalingObserver* observer) = 0;
 
     virtual void AnswerAvailable(const std::string &sdp) = 0;
+
+    virtual void gatherConnectionStats() = 0;
 };
 
 // The following define the dynamic linked library

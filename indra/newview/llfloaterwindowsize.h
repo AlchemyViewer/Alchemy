@@ -31,7 +31,7 @@
 ///----------------------------------------------------------------------------
 /// Class LLFloaterWindowSize
 ///----------------------------------------------------------------------------
-class LLFloaterWindowSize final
+class LLFloaterWindowSize
     :   public LLFloater
 {
     friend class LLFloaterReg;
@@ -40,7 +40,7 @@ private:
     virtual ~LLFloaterWindowSize();
 
 public:
-    /*virtual*/ BOOL postBuild();
+    bool postBuild() override;
     void initWindowSizeControls();
     void onClickSet();
     void onClickCancel();

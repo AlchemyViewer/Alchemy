@@ -79,7 +79,7 @@ void LLFloaterTopObjects::show()
 LLFloaterTopObjects::LLFloaterTopObjects(const LLSD& key)
 :   LLFloater(key),
     mObjectsScrollList(nullptr),
-    mInitialized(FALSE),
+    mInitialized(false),
     mtotalScore(0.f)
 {
     mCommitCallbackRegistrar.add("TopObjects.ShowBeacon",       boost::bind(&LLFloaterTopObjects::onClickShowBeacon, this));
@@ -102,12 +102,12 @@ LLFloaterTopObjects::~LLFloaterTopObjects()
 }
 
 // virtual
-BOOL LLFloaterTopObjects::postBuild()
+bool LLFloaterTopObjects::postBuild()
 {
     mObjectsScrollList = getChild<LLScrollListCtrl>("objects_list");
-    mObjectsScrollList->setFocus(TRUE);
+    mObjectsScrollList->setFocus(true);
     mObjectsScrollList->setDoubleClickCallback(onDoubleClickObjectsList, this);
-    mObjectsScrollList->setCommitOnSelectionChange(TRUE);
+    mObjectsScrollList->setCommitOnSelectionChange(true);
     mObjectsScrollList->setCommitCallback(boost::bind(&LLFloaterTopObjects::onSelectionChanged, this));
 
     setDefaultBtn("show_beacon_btn");
@@ -116,7 +116,7 @@ BOOL LLFloaterTopObjects::postBuild()
     mFlags = 0;
     mFilter.clear();
 
-    return TRUE;
+    return true;
 }
 // static
 void LLFloaterTopObjects::setMode(U32 mode)
@@ -138,7 +138,7 @@ void LLFloaterTopObjects::handle_land_reply(LLMessageSystem* msg, void** data)
         if (!instance->mObjectListIDs.size() && !instance->mInitialized)
         {
             instance->onRefresh();
-            instance->mInitialized = TRUE;
+            instance->mInitialized = true;
         }
     }
     else
@@ -187,22 +187,22 @@ void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
         msg->getStringFast(_PREHASH_ReportData, _PREHASH_TaskName, name_buf, block);
         msg->getStringFast(_PREHASH_ReportData, _PREHASH_OwnerName, owner_buf, block);
 
-        if(msg->has("DataExtended"))
+        if(msg->hasFast(_PREHASH_DataExtended))
         {
             have_extended_data = true;
-            msg->getU32("DataExtended", "TimeStamp", time_stamp, block);
-            msg->getF32("DataExtended", "MonoScore", mono_score, block);
-            msg->getS32("DataExtended", "PublicURLs", public_urls, block);
+            msg->getU32Fast(_PREHASH_DataExtended, _PREHASH_TimeStamp, time_stamp, block);
+            msg->getF32Fast(_PREHASH_DataExtended, _PREHASH_MonoScore, mono_score, block);
+            msg->getS32Fast(_PREHASH_DataExtended, _PREHASH_PublicURLs, public_urls, block);
 
             std::string parcel_name;
             F32 script_size = 0.f;
-            msg->getString("DataExtended", "ParcelName", parcel_name, block);
-            msg->getF32("DataExtended", "Size", script_size, block);
+            msg->getStringFast(_PREHASH_DataExtended, _PREHASH_ParcelName, parcel_name, block);
+            msg->getF32Fast(_PREHASH_DataExtended, _PREHASH_Size, script_size, block);
             if (parcel_name.size() > 0 || script_size > 0)
             {
                 parcel_buf = parcel_name;
                 script_memory = script_size;
-                total_memory += script_size;
+                total_memory += (U64)script_size;
             }
         }
 
@@ -240,7 +240,7 @@ void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
 
         columns[column_num]["column"] = "time";
         columns[column_num]["type"] = "date";
-        columns[column_num]["value"] = LLDate((time_t)time_stamp);
+        columns[column_num]["value"] = LLDate((double)time_stamp);
         columns[column_num++]["font"] = "SANSSERIF";
 
         if (mCurrentMode == STAT_REPORT_TOP_SCRIPTS
@@ -325,9 +325,9 @@ void LLFloaterTopObjects::updateSelectionInfo()
     }
     else
     {
-        getChild<LLButton>("profile_btn")->setEnabled(FALSE);
-        getChild<LLButton>("estate_kick_btn")->setEnabled(FALSE);
-        getChild<LLButton>("estate_ban_btn")->setEnabled(FALSE);
+        getChild<LLButton>("profile_btn")->setEnabled(false);
+        getChild<LLButton>("estate_kick_btn")->setEnabled(false);
+        getChild<LLButton>("estate_ban_btn")->setEnabled(false);
         LLAvatarNameCache::get(object_id, boost::bind(&LLFloaterTopObjects::callbackAvatarName, this, _1, _2));
     }
 

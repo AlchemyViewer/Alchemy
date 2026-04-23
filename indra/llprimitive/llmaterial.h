@@ -33,7 +33,7 @@
 #include "llpointer.h"
 #include "llrefcount.h"
 
-class LLMaterial final : public LLRefCount
+class LLMaterial : public LLRefCount
 {
 public:
 
@@ -105,7 +105,7 @@ public:
     F32         getSpecularRotation() const;
     void        setSpecularRotation(F32 rot);
 
-    const LLColor4U& getSpecularLightColor() const;
+    const LLColor4U getSpecularLightColor() const;
     void        setSpecularLightColor(const LLColor4U& color);
     U8          getSpecularLightExponent() const;
     void        setSpecularLightExponent(U8 exponent);
@@ -122,7 +122,7 @@ public:
     bool        operator == (const LLMaterial& rhs) const;
     bool        operator != (const LLMaterial& rhs) const;
 
-    U32         getShaderMask(U32 alpha_mode, BOOL is_alpha);
+    U32         getShaderMask(U32 alpha_mode, bool is_alpha);
     LLUUID      getHash() const;
 
 protected:

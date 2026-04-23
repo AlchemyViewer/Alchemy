@@ -34,28 +34,28 @@ class LLPanelMediaSettingsGeneral;
 class LLPanelMediaSettingsSecurity;
 class LLPanelMediaSettingsPermissions;
 
-class LLFloaterMediaSettings final :
+class LLFloaterMediaSettings :
     public LLFloater
 {
 public:
     LLFloaterMediaSettings(const LLSD& key);
     ~LLFloaterMediaSettings();
 
-    /*virtual*/ BOOL postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void onClose(bool app_quitting);
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void onClose(bool app_quitting) override;
 
     static LLFloaterMediaSettings* getInstance();
     static bool instanceExists();
     static void apply();
-    static void initValues( const LLSD& media_settings , bool editable);
+    static void initValues( const LLSD& media_settings , bool editable, bool has_media_info, bool multiple_media, bool multiple_valid_media);
     static void clearValues( bool editable);
 
     LLPanelMediaSettingsSecurity* getPanelSecurity(){return mPanelMediaSettingsSecurity;};
     const std::string getHomeUrl();
     //bool passesWhiteList( const std::string& test_url );
 
-    virtual void    draw();
+    virtual void    draw() override;
 
     bool mIdenticalHasMediaInfo;
     bool mMultipleMedia;

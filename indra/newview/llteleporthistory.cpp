@@ -43,9 +43,6 @@
 #include "llviewerwindow.h"
 #include "llavatarname.h"
 #include "llavatarnamecache.h"
-
-#include "llviewernetwork.h"
-#include "llworldmapmessage.h"
 // [RLVa:KB] - Checked: 2010-09-03 (RLVa-1.2.1b)
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -99,51 +96,9 @@ void LLTeleportHistory::goToItem(int idx)
         return;
     }
 
-    auto& grid_mgr = LLGridManager::instance();
-    if (grid_mgr.isInSecondlife() || (gAgent.getRegion() && grid_mgr.getGridByProbing(mItems[idx].mGrid) == grid_mgr.getGridByProbing(gAgent.getRegion()->getHGGrid())))
-    {
-        // Attempt to teleport to the requested item.
-        gAgent.teleportViaLocation(mItems[idx].mGlobalPos);
-    }
-    else
-    {
-        std::string region_name = llformat("%s:%s", mItems[idx].mGrid.c_str(), mItems[idx].mRegion.c_str());
-
-        // Resolve the region name to its global coordinates.
-        // If resolution succeeds we'll teleport.
-        LLWorldMapMessage::url_callback_t cb = boost::bind(
-            &LLTeleportHistory::onRegionNameResponse, this,
-            region_name, mItems[idx].mLocalPos, _1, _2, _3, _4);
-        LLWorldMapMessage::getInstance()->sendNamedRegionRequest(region_name, cb, std::string("unused"), false);
-    }
-
+    // Attempt to teleport to the requested item.
+    gAgent.teleportViaLocation(mItems[idx].mGlobalPos);
     mRequestedItem = idx;
-}
-
-void LLTeleportHistory::onRegionNameResponse(
-    std::string region_name,
-    LLVector3 local_coords,
-    U64 region_handle, const std::string& url, const LLUUID& snapshot_id, bool teleport)
-{
-    // Invalid location?
-    if (region_handle)
-    {
-        // Teleport to the location.
-        LLVector3d region_pos = from_region_handle(region_handle);
-        LLVector3d global_pos = region_pos + (LLVector3d)local_coords;
-
-        LL_INFOS() << "Teleporting to: " << LLSLURL(region_name, local_coords).getSLURLString() << LL_ENDL;
-        gAgent.teleportViaLocation(global_pos);
-    }
-    else
-    {
-        // Are we trying to teleport within the history?
-        if (mRequestedItem != -1)
-        {
-            // Not anymore.
-            mRequestedItem = -1;
-        }
-    }
 }
 
 void LLTeleportHistory::onTeleportFailed()
@@ -182,8 +137,7 @@ static void on_avatar_name_update_title(const LLAvatarName& av_name)
 
 void LLTeleportHistory::updateCurrentLocation(const LLVector3d& new_pos)
 {
-    auto regionp = gAgent.getRegion();
-    if (!regionp) return;
+    if (!gAgent.getRegion()) return;
 
     if (!mTeleportHistoryStorage)
     {
@@ -224,7 +178,7 @@ void LLTeleportHistory::updateCurrentLocation(const LLVector3d& new_pos)
             // Only append a new item if the list is currently empty or if not @showloc=n restricted and the last entry wasn't zero'ed out
             if ( (mItems.size() == 0) || ((!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC)) && (!mItems.back().mGlobalPos.isExactlyZero())) )
             {
-                mItems.push_back(LLTeleportHistoryItem("", "", "", LLVector3d(), LLVector3()));
+                mItems.push_back(LLTeleportHistoryItem("", LLVector3d()));
                 mCurrentItem++;
             }
 // [RLVa:KB]
@@ -245,16 +199,13 @@ void LLTeleportHistory::updateCurrentLocation(const LLVector3d& new_pos)
             LLVector3 new_pos_local = gAgent.getPosAgentFromGlobal(new_pos);
             mItems[mCurrentItem].mFullTitle = getCurrentLocationTitle(true, new_pos_local);
             mItems[mCurrentItem].mTitle = getCurrentLocationTitle(false, new_pos_local);
-            mItems[mCurrentItem].mLocalPos = new_pos_local;
             mItems[mCurrentItem].mGlobalPos = new_pos;
-            mItems[mCurrentItem].mRegionID = regionp->getRegionID();
-            mItems[mCurrentItem].mGrid = regionp->getHGGrid();
-            mItems[mCurrentItem].mRegion = regionp->getName();
+            mItems[mCurrentItem].mRegionID = gAgent.getRegion()->getRegionID();
 // [RLVa:KB] - Checked: 2010-09-03 (RLVa-1.2.1b) | Added: RLVa-1.2.1b
         }
         else
         {
-            mItems[mCurrentItem] = LLTeleportHistoryItem(RlvStrings::getString(RlvStringKeys::Hidden::Grid), RlvStrings::getString(RlvStringKeys::Hidden::Region), RlvStrings::getString(RlvStringKeys::Hidden::Parcel), LLVector3d::zero, LLVector3::zero);
+            mItems[mCurrentItem] = LLTeleportHistoryItem(RlvStrings::getString(RlvStringKeys::Hidden::Parcel), LLVector3d::zero);
         }
 // [/RLVa:KB]
     }
@@ -329,11 +280,8 @@ void LLTeleportHistory::dump() const
         std::stringstream line;
         line << ((i == mCurrentItem) ? " * " : "   ");
         line << i << ": " << mItems[i].mTitle;
-        line << " Grid: " << mItems[i].mGrid;
-        line << " Region: " << mItems[i].mRegion;
         line << " REGION_ID: " << mItems[i].mRegionID;
-        line << ", pos: " << mItems[i].mLocalPos;
-        line << ", globalpos: " << mItems[i].mGlobalPos;
+        line << ", pos: " << mItems[i].mGlobalPos;
         LL_INFOS() << line.str() << LL_ENDL;
     }
 }

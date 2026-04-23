@@ -39,7 +39,7 @@
 // Threaded Local File System
 //============================================================================
 
-class LLLFSThread final : public LLQueuedThread
+class LLLFSThread : public LLQueuedThread
 {
     //------------------------------------------------------------------------
 public:
@@ -56,15 +56,15 @@ public:
     class Responder : public LLThreadSafeRefCount
     {
     protected:
-        ~Responder() = default;
+        ~Responder();
     public:
         virtual void completed(S32 bytes) = 0;
     };
 
-    class Request final : public QueuedRequest
+    class Request : public QueuedRequest
     {
     protected:
-        virtual ~Request() = default; // use deleteRequest()
+        virtual ~Request(); // use deleteRequest()
 
     public:
         Request(LLLFSThread* thread,
@@ -114,7 +114,7 @@ public:
 
     //------------------------------------------------------------------------
 public:
-    LLLFSThread(bool threaded = TRUE);
+    LLLFSThread(bool threaded = true);
     ~LLLFSThread();
 
     // Return a Request handle
@@ -126,7 +126,7 @@ public:
                    Responder* responder);
 
     // static initializers
-    static void initClass(bool local_is_threaded = TRUE); // Setup sLocal
+    static void initClass(bool local_is_threaded = true); // Setup sLocal
     static S32 updateClass(U32 ms_elapsed);
     static void cleanupClass();     // Delete sLocal
 

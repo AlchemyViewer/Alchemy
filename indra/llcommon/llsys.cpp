@@ -24,16 +24,16 @@
  * $/LicenseInfo$
  */
 
+#if LL_WINDOWS
+#pragma warning (disable : 4355) // 'this' used in initializer list: yes, intentionally
+#endif
+
 #include "linden_common.h"
 
 #include "llsys.h"
 
 #include <iostream>
-#if defined(LL_USESYSTEMLIBS) || defined(LL_LINUX)
-# include <zlib.h>
-#else
-# include "zlib/zlib.h"
-#endif
+#include <zlib.h>
 
 #include "llprocessor.h"
 #include "llerrorcontrol.h"
@@ -47,36 +47,14 @@
 #include <boost/circular_buffer.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/range.hpp>
-#include <boost/utility/enable_if.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_float.hpp>
 #include "llfasttimer.h"
 
 using namespace llsd;
 
 #if LL_WINDOWS
-#   include "llwin32headerslean.h"
+#   include "llwin32headers.h"
 #   include <psapi.h>               // GetPerformanceInfo() et al.
 #   include <VersionHelpers.h>
-
-VERSIONHELPERAPI
-IsWindows11OrGreater()
-{
-    OSVERSIONINFOEXW osvi = { sizeof(osvi), 0, 0, 0, 0, {0}, 0, 0 };
-    DWORDLONG const dwlConditionMask = VerSetConditionMask(
-        VerSetConditionMask(
-            VerSetConditionMask(
-                0, VER_MAJORVERSION, VER_GREATER_EQUAL),
-            VER_MINORVERSION, VER_GREATER_EQUAL),
-        VER_BUILDNUMBER, VER_GREATER_EQUAL);
-
-    osvi.dwMajorVersion = HIBYTE(_WIN32_WINNT_WIN10);
-    osvi.dwMinorVersion = LOBYTE(_WIN32_WINNT_WIN10);
-    osvi.dwBuildNumber = 22000;
-
-    return VerifyVersionInfoW(&osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, dwlConditionMask) != FALSE;
-}
-
 #elif LL_DARWIN
 #   include "llsys_objc.h"
 #   include <errno.h>
@@ -89,6 +67,8 @@ IsWindows11OrGreater()
 #   include <mach/mach_host.h>
 #   include <mach/task.h>
 #   include <mach/task_info.h>
+#   include <sys/types.h>
+#   include <mach/mach_init.h>
 #elif LL_LINUX
 #   include <errno.h>
 #   include <sys/utsname.h>
@@ -100,6 +80,7 @@ const char MEMINFO_FILE[] = "/proc/meminfo";
 #endif
 
 LLCPUInfo gSysCPU;
+LLMemoryInfo gSysMemory;
 
 // Don't log memory info any more often than this. It also serves as our
 // framerate sample size.
@@ -116,31 +97,11 @@ LLOSInfo::LLOSInfo() :
 
 #if LL_WINDOWS
 
-    if (IsWindows11OrGreater())
+    if (IsWindows10OrGreater())
     {
         mMajorVer = 10;
         mMinorVer = 0;
-        if (IsWindowsServer())
-        {
-            mOSStringSimple = "Windows Server ";
-        }
-        else
-        {
-            mOSStringSimple = "Microsoft Windows 11 ";
-        }
-    }
-    else if (IsWindows10OrGreater())
-    {
-        mMajorVer = 10;
-        mMinorVer = 0;
-        if (IsWindowsServer())
-        {
-            mOSStringSimple = "Windows Server ";
-        }
-        else
-        {
-            mOSStringSimple = "Microsoft Windows 10 ";
-        }
+        mOSStringSimple = "Microsoft Windows 10 ";
     }
     else if (IsWindows8Point1OrGreater())
     {
@@ -224,6 +185,9 @@ LLOSInfo::LLOSInfo() :
         GetSystemInfo(&si); //if it fails get regular system info
     //(Warning: If GetSystemInfo it may result in incorrect information in a WOW64 machine, if the kernel fails to load)
 
+#pragma warning(push)
+#pragma warning(disable : 4996) // ignore 'deprecated.' GetVersionEx is deprecated
+
     // Try calling GetVersionEx using the OSVERSIONINFOEX structure.
     OSVERSIONINFOEX osvi;
     ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
@@ -242,13 +206,15 @@ LLOSInfo::LLOSInfo() :
         }
     }
 
+#pragma warning(pop)
+
     S32 ubr = 0; // Windows 10 Update Build Revision, can be retrieved from a registry
     if (mMajorVer == 10)
     {
         DWORD cbData(sizeof(DWORD));
         DWORD data(0);
         HKEY key;
-        BOOL ret_code = RegOpenKeyExW(HKEY_LOCAL_MACHINE, TEXT("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"), 0, KEY_READ, &key);
+        LSTATUS ret_code = RegOpenKeyExW(HKEY_LOCAL_MACHINE, TEXT("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"), 0, KEY_READ, &key);
         if (ERROR_SUCCESS == ret_code)
         {
             ret_code = RegQueryValueExW(key, L"UBR", 0, NULL, reinterpret_cast<LPBYTE>(&data), &cbData);
@@ -256,6 +222,13 @@ LLOSInfo::LLOSInfo() :
             {
                 ubr = data;
             }
+        }
+
+        if (mBuild >= 22000)
+        {
+            // At release Windows 11 version was 10.0.22000.194
+            // According to microsoft win 10 won't ever get that far.
+            mOSStringSimple = "Microsoft Windows 11 ";
         }
     }
 
@@ -288,8 +261,10 @@ LLOSInfo::LLOSInfo() :
 #elif LL_DARWIN
 
     // Initialize mOSStringSimple to something like:
-    // "macOS 10.6.7"
+    // "macOS 10.13.1"
     {
+        const char * DARWIN_PRODUCT_NAME = "macOS";
+
         int64_t major_version, minor_version, bugfix_version = 0;
 
         if (LLGetDarwinOSInfo(major_version, minor_version, bugfix_version))
@@ -297,8 +272,6 @@ LLOSInfo::LLOSInfo() :
             mMajorVer = major_version;
             mMinorVer = minor_version;
             mBuild = bugfix_version;
-
-            const char * DARWIN_PRODUCT_NAME = "macOS";
 
             std::stringstream os_version_string;
             os_version_string << DARWIN_PRODUCT_NAME << " " << mMajorVer << "." << mMinorVer << "." << mBuild;
@@ -313,7 +286,7 @@ LLOSInfo::LLOSInfo() :
     }
 
     // Initialize mOSString to something like:
-    // "macOS 10.6.7 Darwin Kernel Version 10.7.0: Sat Jan 29 15:17:16 PST 2011; root:xnu-1504.9.37~1/RELEASE_I386 i386"
+    // "macOS 10.13.1 Darwin Kernel Version 10.7.0: Sat Jan 29 15:17:16 PST 2011; root:xnu-1504.9.37~1/RELEASE_I386 i386"
     struct utsname un;
     if(uname(&un) != -1)
     {
@@ -529,57 +502,46 @@ const S32 LLOSInfo::getOSBitness() const
     return mOSBitness;
 }
 
+namespace {
+
+    U32 readFromProcStat( std::string entryName )
+    {
+        U32 val{};
+#if LL_LINUX
+        constexpr U32 STATUS_SIZE  = 2048;
+
+        LLFILE* status_filep = LLFile::fopen("/proc/self/status", LLFILE_MODE("rb"));
+        if (status_filep)
+        {
+            char buff[STATUS_SIZE];     /* Flawfinder: ignore */
+
+            size_t nbytes = fread(buff, 1, STATUS_SIZE-1, status_filep);
+            buff[nbytes] = '\0';
+
+            // All these guys return numbers in KB
+            char *memp = strstr(buff, entryName.c_str());
+            if (memp)
+            {
+                (void) sscanf(memp, "%*s %u", &val);
+            }
+            fclose(status_filep);
+        }
+#endif
+        return val;
+    }
+
+}
+
 //static
 U32 LLOSInfo::getProcessVirtualSizeKB()
 {
-    U32 virtual_size = 0;
-#if LL_LINUX
-#   define STATUS_SIZE 2048
-    LLFILE* status_filep = LLFile::fopen("/proc/self/status", "rb");
-    if (status_filep)
-    {
-        S32 numRead = 0;
-        char buff[STATUS_SIZE];     /* Flawfinder: ignore */
-
-        size_t nbytes = fread(buff, 1, STATUS_SIZE-1, status_filep);
-        buff[nbytes] = '\0';
-
-        // All these guys return numbers in KB
-        char *memp = strstr(buff, "VmSize:");
-        if (memp)
-        {
-            numRead += sscanf(memp, "%*s %u", &virtual_size);
-        }
-        fclose(status_filep);
-    }
-#endif
-    return virtual_size;
+    return readFromProcStat( "VmSize:" );
 }
 
 //static
 U32 LLOSInfo::getProcessResidentSizeKB()
 {
-    U32 resident_size = 0;
-#if LL_LINUX
-    LLFILE* status_filep = LLFile::fopen("/proc/self/status", "rb");
-    if (status_filep != NULL)
-    {
-        S32 numRead = 0;
-        char buff[STATUS_SIZE];     /* Flawfinder: ignore */
-
-        size_t nbytes = fread(buff, 1, STATUS_SIZE-1, status_filep);
-        buff[nbytes] = '\0';
-
-        // All these guys return numbers in KB
-        char *memp = strstr(buff, "VmRSS:");
-        if (memp)
-        {
-            numRead += sscanf(memp, "%*s %u", &resident_size);
-        }
-        fclose(status_filep);
-    }
-#endif
-    return resident_size;
+    return readFromProcStat( "VmRSS:" );
 }
 
 //static
@@ -590,7 +552,7 @@ bool LLOSInfo::is64Bit()
     return true;
 #elif defined(_WIN32)
     // 32-bit viewer may be run on both 32-bit and 64-bit Windows, need to elaborate
-    BOOL f64 = FALSE;
+    bool f64 = false;
     return IsWow64Process(GetCurrentProcess(), &f64) && f64;
 #else
     return false;
@@ -742,7 +704,7 @@ public:
     // Store every integer type as LLSD::Integer.
     template <class T>
     void add(const LLSD::String& name, const T& value,
-             typename boost::enable_if<boost::is_integral<T> >::type* = 0)
+             typename std::enable_if_t<std::is_integral_v<T> >* = 0)
     {
         mStats[name] = LLSD::Integer(llmin<T>(value, S32_MAX));
     }
@@ -750,7 +712,7 @@ public:
     // Store every floating-point type as LLSD::Real.
     template <class T>
     void add(const LLSD::String& name, const T& value,
-             typename boost::enable_if<boost::is_float<T> >::type* = 0)
+             typename std::enable_if_t<std::is_floating_point_v<T> >* = 0)
     {
         mStats[name] = LLSD::Real(value);
     }
@@ -827,92 +789,41 @@ U32Kilobytes LLMemoryInfo::getPhysicalMemoryKB() const
 }
 
 //static
-void LLMemoryInfo::getAvailableMemoryKB(U32Kilobytes& avail_physical_mem_kb, U32Kilobytes& avail_virtual_mem_kb)
+void LLMemoryInfo::getAvailableMemoryKB(U32Kilobytes& avail_mem_kb)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
 #if LL_WINDOWS
     MEMORYSTATUSEX state = {};
     state.dwLength = sizeof(state);
     GlobalMemoryStatusEx(&state);
 
-    avail_physical_mem_kb = U64Bytes(state.ullAvailPhys);
-    avail_virtual_mem_kb  = U64Bytes(state.ullAvailVirtual);
+    avail_mem_kb = U64Bytes(state.ullAvailPhys);
 
 #elif LL_DARWIN
-    // mStatsMap is derived from vm_stat, look for (e.g.) "kb free":
-    // $ vm_stat
-    // Mach Virtual Memory Statistics: (page size of 4096 bytes)
-    // Pages free:                   462078.
-    // Pages active:                 142010.
-    // Pages inactive:               220007.
-    // Pages wired down:             159552.
-    // "Translation faults":      220825184.
-    // Pages copy-on-write:         2104153.
-    // Pages zero filled:         167034876.
-    // Pages reactivated:             65153.
-    // Pageins:                     2097212.
-    // Pageouts:                      41759.
-    // Object cache: 841598 hits of 7629869 lookups (11% hit rate)
-    avail_physical_mem_kb = (U32Kilobytes)-1 ;
-    avail_virtual_mem_kb = (U32Kilobytes)-1 ;
+    // use host_statistics64 to get memory info
+    vm_statistics64_data_t vmstat;
+    mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+    mach_port_t host = mach_host_self();
+    vm_size_t page_size;
+    host_page_size(host, &page_size);
+    kern_return_t result = host_statistics64(host, HOST_VM_INFO64, reinterpret_cast<host_info_t>(&vmstat), &count);
+    if (result == KERN_SUCCESS)
+    {
+        avail_mem_kb = U64Bytes((vmstat.free_count + vmstat.inactive_count) * page_size);
+    }
+    else
+    {
+        avail_mem_kb = (U32Kilobytes)-1;
+    }
 
 #elif LL_LINUX
-    // mStatsMap is derived from MEMINFO_FILE:
-    // $ cat /proc/meminfo
-    // MemTotal:        4108424 kB
-    // MemFree:         1244064 kB
-    // Buffers:           85164 kB
-    // Cached:          1990264 kB
-    // SwapCached:            0 kB
-    // Active:          1176648 kB
-    // Inactive:        1427532 kB
-    // Active(anon):     529152 kB
-    // Inactive(anon):    15924 kB
-    // Active(file):     647496 kB
-    // Inactive(file):  1411608 kB
-    // Unevictable:          16 kB
-    // Mlocked:              16 kB
-    // HighTotal:       3266316 kB
-    // HighFree:         721308 kB
-    // LowTotal:         842108 kB
-    // LowFree:          522756 kB
-    // SwapTotal:       6384632 kB
-    // SwapFree:        6384632 kB
-    // Dirty:                28 kB
-    // Writeback:             0 kB
-    // AnonPages:        528820 kB
-    // Mapped:            89472 kB
-    // Shmem:             16324 kB
-    // Slab:             159624 kB
-    // SReclaimable:     145168 kB
-    // SUnreclaim:        14456 kB
-    // KernelStack:        2560 kB
-    // PageTables:         5560 kB
-    // NFS_Unstable:          0 kB
-    // Bounce:                0 kB
-    // WritebackTmp:          0 kB
-    // CommitLimit:     8438844 kB
-    // Committed_AS:    1271596 kB
-    // VmallocTotal:     122880 kB
-    // VmallocUsed:       65252 kB
-    // VmallocChunk:      52356 kB
-    // HardwareCorrupted:     0 kB
-    // HugePages_Total:       0
-    // HugePages_Free:        0
-    // HugePages_Rsvd:        0
-    // HugePages_Surp:        0
-    // Hugepagesize:       2048 kB
-    // DirectMap4k:      434168 kB
-    // DirectMap2M:      477184 kB
-    // (could also run 'free', but easier to read a file than run a program)
-    avail_physical_mem_kb = (U32Kilobytes)-1 ;
-    avail_virtual_mem_kb = (U32Kilobytes)-1 ;
-
+    U64 phys = U64(getpagesize()) * U64(get_avphys_pages());
+    avail_mem_kb = U64Bytes(phys);
 #else
     //do not know how to collect available memory info for other systems.
     //leave it blank here for now.
 
-    avail_physical_mem_kb = (U32Kilobytes)-1 ;
-    avail_virtual_mem_kb = (U32Kilobytes)-1 ;
+    avail_mem_kb = (U32Kilobytes)-1 ;
 #endif
 }
 
@@ -958,14 +869,12 @@ LLSD LLMemoryInfo::getStatsMap() const
 
 LLMemoryInfo& LLMemoryInfo::refresh()
 {
-    LL_PROFILE_ZONE_SCOPED
+    LL_PROFILE_ZONE_SCOPED;
     mStatsMap = loadStatsMap();
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("LLMemoryInfo") << "Populated mStatsMap:\n";
     LLSDSerialize::toPrettyXML(mStatsMap, LL_CONT);
     LL_ENDL;
-#endif
 
     return *this;
 }
@@ -1008,7 +917,7 @@ LLSD LLMemoryInfo::loadStatsMap()
     // specifically accepts PROCESS_MEMORY_COUNTERS*, and since this is a
     // classic-C API, PROCESS_MEMORY_COUNTERS_EX isn't a subclass. Cast the
     // pointer.
-    GetProcessMemoryInfo(GetCurrentProcess(), PPROCESS_MEMORY_COUNTERS(&pmem), sizeof(pmem));
+    GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*) &pmem, sizeof(pmem));
 
     stats.add("Page Fault Count",              pmem.PageFaultCount);
     stats.add("PeakWorkingSetSize KB",         pmem.PeakWorkingSetSize/div);
@@ -1022,14 +931,8 @@ LLSD LLMemoryInfo::loadStatsMap()
     stats.add("PrivateUsage KB",               pmem.PrivateUsage/div);
 
 #elif LL_DARWIN
-    vm_size_t page_size_kb;
-    if (host_page_size(mach_host_self(), &page_size_kb) != KERN_SUCCESS)
-    {
-        LL_WARNS() << "Unable to get host page size. Using default value." << LL_ENDL;
-        page_size_kb = 4096;
-    }
 
-    page_size_kb = page_size_kb / 1024;
+    const vm_size_t pagekb(vm_page_size / 1024);
 
     //
     // Collect the vm_stat's
@@ -1045,10 +948,10 @@ LLSD LLMemoryInfo::loadStatsMap()
         }
         else
         {
-            stats.add("Pages free KB",      page_size_kb * vmstat.free_count);
-            stats.add("Pages active KB",    page_size_kb * vmstat.active_count);
-            stats.add("Pages inactive KB",  page_size_kb * vmstat.inactive_count);
-            stats.add("Pages wired KB",     page_size_kb * vmstat.wire_count);
+            stats.add("Pages free KB",      pagekb * vmstat.free_count);
+            stats.add("Pages active KB",    pagekb * vmstat.active_count);
+            stats.add("Pages inactive KB",  pagekb * vmstat.inactive_count);
+            stats.add("Pages wired KB",     pagekb * vmstat.wire_count);
 
             stats.add("Pages zero fill",        vmstat.zero_fill_count);
             stats.add("Page reactivations",     vmstat.reactivations);
@@ -1157,7 +1060,7 @@ LLSD LLMemoryInfo::loadStatsMap()
                 S64 intval = 0;
                 try
                 {
-                    intval = llclamp(boost::lexical_cast<S64>(value_str), 0, S32_MAX);
+                    intval = llclamp(boost::lexical_cast<S64>(value_str), S32_MIN, S32_MAX);
                 }
                 catch (const boost::bad_lexical_cast&)
                 {
@@ -1350,26 +1253,24 @@ private:
 // Need an instance of FrameWatcher before it does any good
 static FrameWatcher sFrameWatcher;
 
-BOOL gunzip_file(const std::string& srcfile, const std::string& dstfile)
+bool gunzip_file(const std::string& srcfile, const std::string& dstfile)
 {
     std::string tmpfile;
     const S32 UNCOMPRESS_BUFFER_SIZE = 32768;
-    BOOL retval = FALSE;
+    bool retval = false;
     gzFile src = NULL;
     U8 buffer[UNCOMPRESS_BUFFER_SIZE];
     LLFILE *dst = NULL;
     S32 bytes = 0;
     tmpfile = dstfile + ".t";
-
-#if LL_WINDOWS
-    std::wstring utf16filename = ll_convert_string_to_wide(srcfile);
+#ifdef LL_WINDOWS
+    std::wstring utf16filename = ll_convert<std::wstring>(srcfile);
     src = gzopen_w(utf16filename.c_str(), "rb");
 #else
     src = gzopen(srcfile.c_str(), "rb");
 #endif
-
     if (! src) goto err;
-    dst = LLFile::fopen(tmpfile, "wb");     /* Flawfinder: ignore */
+    dst = LLFile::fopen(tmpfile, LLFILE_MODE("wb")); /* Flawfinder: ignore */
     if (! dst) goto err;
     do
     {
@@ -1383,38 +1284,34 @@ BOOL gunzip_file(const std::string& srcfile, const std::string& dstfile)
     } while(gzeof(src) == 0);
     fclose(dst);
     dst = NULL;
-#if LL_WINDOWS
-    // Rename in windows needs the dstfile to not exist.
-    LLFile::remove(dstfile, ENOENT);
-#endif
     if (LLFile::rename(tmpfile, dstfile) == -1) goto err;       /* Flawfinder: ignore */
-    retval = TRUE;
+    retval = true;
 err:
     if (src != NULL) gzclose(src);
     if (dst != NULL) fclose(dst);
     return retval;
 }
 
-BOOL gzip_file(const std::string& srcfile, const std::string& dstfile)
+bool gzip_file(const std::string& srcfile, const std::string& dstfile)
 {
     const S32 COMPRESS_BUFFER_SIZE = 32768;
     std::string tmpfile;
-    BOOL retval = FALSE;
+    bool retval = false;
     U8 buffer[COMPRESS_BUFFER_SIZE];
     gzFile dst = NULL;
     LLFILE *src = NULL;
     S32 bytes = 0;
     tmpfile = dstfile + ".t";
 
-#if LL_WINDOWS
-    std::wstring utf16filename = ll_convert_string_to_wide(tmpfile);
+#ifdef LL_WINDOWS
+    std::wstring utf16filename = ll_convert<std::wstring>(tmpfile);
     dst = gzopen_w(utf16filename.c_str(), "wb");
 #else
     dst = gzopen(tmpfile.c_str(), "wb");
 #endif
 
     if (! dst) goto err;
-    src = LLFile::fopen(srcfile, "rb");     /* Flawfinder: ignore */
+    src = LLFile::fopen(srcfile, LLFILE_MODE("rb")); /* Flawfinder: ignore */
     if (! src) goto err;
 
     while ((bytes = (S32)fread(buffer, sizeof(U8), COMPRESS_BUFFER_SIZE, src)) > 0)
@@ -1434,12 +1331,8 @@ BOOL gzip_file(const std::string& srcfile, const std::string& dstfile)
 
     gzclose(dst);
     dst = NULL;
-#if LL_WINDOWS
-    // Rename in windows needs the dstfile to not exist.
-    LLFile::remove(dstfile);
-#endif
     if (LLFile::rename(tmpfile, dstfile) == -1) goto err;       /* Flawfinder: ignore */
-    retval = TRUE;
+    retval = true;
  err:
     if (src != NULL) fclose(src);
     if (dst != NULL) gzclose(dst);

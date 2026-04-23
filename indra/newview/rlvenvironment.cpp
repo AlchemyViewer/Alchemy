@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -344,7 +345,7 @@ RlvEnvironment::RlvEnvironment()
                                             [](LLSettingsSky::ptr_t pSky, const LLUUID& idTexture) { pSky->setMoonTextureId(idTexture); });
 
     // SETTING_GLOW
-    registerSkyFn<float>("sunglowsize",     [](LLSettingsSky::ptr_t pSky) { return 2.0 - (pSky->getGlow().mV[VRED] / SLIDER_SCALE_GLOW_R); },
+    registerSkyFn<float>("sunglowsize",     [](LLSettingsSky::ptr_t pSky) { return 2.0f - (pSky->getGlow().mV[VRED] / SLIDER_SCALE_GLOW_R); },
                                             [](LLSettingsSky::ptr_t pSky, const F32& nValue) { pSky->setGlow(LLColor3((2.0f - nValue) * SLIDER_SCALE_GLOW_R, .0f, pSky->getGlow().mV[VBLUE])); });
     registerSkyFn<float>("sunglowfocus",    [](LLSettingsSky::ptr_t pSky) { return pSky->getGlow().mV[VBLUE] / SLIDER_SCALE_GLOW_B; },
                                             [](LLSettingsSky::ptr_t pSky, const F32& nValue) { pSky->setGlow(LLColor3(pSky->getGlow().mV[VRED], .0f, nValue * SLIDER_SCALE_GLOW_B)); });
@@ -454,11 +455,11 @@ RlvEnvironment::RlvEnvironment()
                                                 // I forgot how much I hate this command... it literally makes no sense since time of day only has any meaning in an
                                                 // actively animating day cycle (but in that case we have to return -1).
                                                 if (!LLEnvironment::instance().getEnvironmentFixedSky(env)) {
-                                                    return fmt::to_string(-1.f);
+                                                    return std::to_string(-1.f);
                                                 }
 
                                                 // It's invalid input for @setenv_daytime (see above) so it can be fed in without changing the current environment
-                                                return fmt::to_string(2.f);
+                                                return std::to_string(2.f);
                                             });
 }
 
@@ -550,7 +551,7 @@ template<>
 std::string RlvEnvironment::handleGetFn<float>(const std::function<float(LLSettingsSky::ptr_t)>& fn)
 {
     LLSettingsSky::ptr_t pSky = getTargetSky();
-    return fmt::to_string(fn(pSky));
+    return std::to_string(fn(pSky));
 }
 
 template<>
@@ -594,7 +595,7 @@ std::string RlvEnvironment::handleLegacyGetFn<LLVector2>(const std::function<con
 {
     if (idxComponent >= 2)
         return LLStringUtil::null;
-    return fmt::to_string(getFn(getTargetSky()).mV[idxComponent]);
+    return std::to_string(getFn(getTargetSky()).mV[idxComponent]);
 }
 
 template<>
@@ -602,12 +603,12 @@ std::string RlvEnvironment::handleLegacyGetFn<LLColor3>(const std::function<cons
 {
     if ( (idxComponent >= VRED) && (idxComponent <= VBLUE) )
     {
-        return fmt::to_string(getFn(getTargetSky()).mV[idxComponent]);
+        return std::to_string(getFn(getTargetSky()).mV[idxComponent]);
     }
     else if (idxComponent == VALPHA)
     {
         const LLColor3& clr = getFn(getTargetSky());
-        return fmt::to_string(llmax(clr.mV[VRED], clr.mV[VGREEN], clr.mV[VBLUE]));
+        return std::to_string(llmax(clr.mV[VRED], clr.mV[VGREEN], clr.mV[VBLUE]));
     }
     return LLStringUtil::null;
 }

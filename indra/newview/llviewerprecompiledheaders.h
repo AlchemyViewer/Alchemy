@@ -29,26 +29,28 @@
 #ifndef LL_LLVIEWERPRECOMPILEDHEADERS_H
 #define LL_LLVIEWERPRECOMPILEDHEADERS_H
 
-#include "llwin32headerslean.h"
-
 // This file MUST be the first one included by each .cpp file
 // in viewer.
 // It is used to precompile headers for improved build speed.
 
 #include "linden_common.h"
 
+#include "llwin32headers.h"
+
 #include <algorithm>
 #include <deque>
 #include <functional>
+#include <list>
 #include <map>
 #include <set>
-#include <string>
+#include <vector>
 #include <string_view>
-
-#include "boost/unordered/unordered_flat_set.hpp"
-#include "boost/unordered/unordered_flat_map.hpp"
+#include <unordered_map>
+#include <unordered_set>
 
 // Library headers from llcommon project:
+#include "apply.h"
+#include "function_types.h"
 #include "indra_constants.h"
 #include "llinitparam.h"
 #include "llapp.h"
@@ -61,6 +63,7 @@
 #include "llinstancetracker.h"
 #include "llpointer.h"
 #include "llprocessor.h"
+#include "llrand.h"
 #include "llrefcount.h"
 #include "llsafehandle.h"
 #include "llsd.h"
@@ -70,12 +73,13 @@
 #include "llstring.h"
 #include "llsys.h"
 #include "lltimer.h"
-#include "lltrace.h"
+#include "lluuid.h"
 #include "stdtypes.h"
 #include "u64.h"
 
 // Library includes from llmath project
 #include "llmath.h"
+#include "llbbox.h"
 #include "llbboxlocal.h"
 #include "llcamera.h"
 #include "llcoord.h"
@@ -83,9 +87,7 @@
 #include "llcrc.h"
 #include "llplane.h"
 #include "llquantize.h"
-#include "llrand.h"
 #include "llrect.h"
-#include "lluuid.h"
 #include "m3math.h"
 #include "m4math.h"
 #include "llquaternion.h"
@@ -97,21 +99,39 @@
 #include "v4coloru.h"
 #include "v4math.h"
 #include "xform.h"
+#include "llvector4a.h"
+#include "llmatrix4a.h"
+#include "lloctree.h"
+#include "llvolume.h"
 
 // Library includes from llfilesystem project
 #include "lldir.h"
 
 // Library includes from llmessage project
+#include "llassetstorage.h"
 #include "llavatarnamecache.h"
 #include "llcachename.h"
+#include "llcorehttputil.h"
 
 // Library includes from llrender project
-#include "llglheaders.h"
+#include "llgl.h"
+#include "llrender.h"
+
+// Library includes from llrender project
+#include "llcharacter.h"
 
 // Library includes from llui project
-#include "llui.h"
-#include "lluictrl.h"
+#include "llnotifications.h"
 #include "llpanel.h"
 #include "llfloater.h"
+
+#include <boost/signals2.hpp>
+#include <boost/json.hpp>
+
+#include "glm/glm.hpp"
+#include "glm/gtc/type_ptr.hpp"
+#include "glm/ext/quaternion_float.hpp"
+#include "glm/gtx/quaternion.hpp"
+#include "glm/gtx/matrix_decompose.hpp"
 
 #endif

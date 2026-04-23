@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel
  label="General"
- height="490"
+ height="420"
  width="304"
  class="panel_group_general"
  name="general_tab">
@@ -86,6 +86,15 @@ Hover your mouse over the options for more help.
      name="btn_join"
      visible="true"
      width="120" />
+    <button
+     follows="left|top"
+     left_pad="6"
+     top_delta="0"
+     height="23"
+     label="Activate"
+     name="btn_activate"
+     visible="true"
+     width="120" />
     </panel>
     <text_editor
      type="string"
@@ -98,10 +107,10 @@ Hover your mouse over the options for more help.
      parse_urls="true"
      top="105"
      right="-4"
-    bg_readonly_color="PanelDefaultBackgroundColor"
+    bg_readonly_color="DkGray2"
     text_readonly_color="White"
      word_wrap="true"
-	 show_emoji_helper="true" >
+     show_emoji_helper="true" >
      Group Charter
     </text_editor>   
          <text
@@ -139,22 +148,22 @@ Hover your mouse over the options for more help.
         <check_box
          height="16"
          font="SansSerifSmall"
+         label="Receive group instant messages"
+         layout="topleft"
+         left="10"
+         name="receive_chat"
+         tool_tip="Sets whether you want to participate in group chat for this group."
+         top_pad="7"
+         width="300" />
+        <check_box
+         height="16"
+         font="SansSerifSmall"
          label="Receive group notices"
          layout="topleft"
          left="10"
          name="receive_notices"
          tool_tip="Sets whether you want to receive Notices from this group.  Uncheck this box if this group is spamming you."
-         top_pad="5"
-         width="300" />
-        <check_box
-         height="16"
-         font="SansSerifSmall"
-         label="Receive group chat"
-         layout="topleft"
-         left="10"
-         name="receive_chat"
-         tool_tip="Sets whether you want to receive chat from this group. You'll still be able to manually start a chat session."
-         top_pad="5"
+         top_pad="4"
          width="300" />
         <check_box
          height="16"
@@ -163,45 +172,8 @@ Hover your mouse over the options for more help.
          left="10"
          name="list_groups_in_profile"
          tool_tip="Sets whether you want to show this group in your profile"
-         top_pad="5"
+         top_pad="4"
          width="295" />
-        <check_box
-         height="16"
-         font="SansSerifSmall"
-         label="Snooze when closing group chat"
-         layout="topleft"
-         left="10"
-         name="snooze_chat"
-         tool_tip="Temporarily mutes this group for the specified number of minutes before you'll receive group chat again. When unchecked you'll not receive group chat until you relog after closing it."
-         top_pad="5"
-         width="210" />
-        <combo_box
-         follows="left|top"
-         height="22"
-         layout="topleft"
-         left="30"
-         name="snooze_chat_duration"
-         top_pad="2"
-         width="150">
-            <combo_box.item
-             label="Until next message"
-             value="0" />
-            <combo_box.item
-             label="Snooze for 5 minutes"
-             value="5" />
-            <combo_box.item
-             label="Snooze for 15 minutes"
-             value="15" />
-            <combo_box.item
-             label="Snooze for 30 minutes"
-             value="30" />
-            <combo_box.item
-             label="Snooze for 45 minutes"
-             value="45" />
-            <combo_box.item
-             label="Snooze for 1 hour"
-             value="60" />
-        </combo_box>
    <panel
          background_visible="false"
          bevel_style="none"
@@ -241,7 +213,7 @@ Hover your mouse over the options for more help.
          left_delta="0"
          name="check_enrollment_fee"
          tool_tip="Sets whether to require an enrollment fee to join the group"
-         top_pad="5"
+         top_pad="4"
          width="300" />
         <spinner
          decimal_digits="0"

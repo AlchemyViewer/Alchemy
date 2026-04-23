@@ -38,6 +38,7 @@
 #include "llprofiler.h"
 #include "llpreprocessor.h"
 
+#include <boost/static_assert.hpp>
 #include <functional> // std::function
 
 const int LL_ERR_NOERR = 0;
@@ -54,11 +55,9 @@ const int LL_ERR_NOERR = 0;
 #define SHOW_ASSERT
 #else // _DEBUG
 
-#ifdef LL_RELEASE_WITH_DEBUG_INFO
+#if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO
 #define SHOW_ASSERT
-#define SHOW_DEBUG
-#define ENABLE_DEBUG_MACRO
-#endif // LL_RELEASE_WITH_DEBUG_INFO
+#endif // LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO
 
 #ifdef RELEASE_SHOW_DEBUG
 #define SHOW_DEBUG
@@ -202,11 +201,7 @@ namespace LLError
     public:
         static bool shouldLog(CallSite&);
         static void flush(const std::ostringstream&, const CallSite&);
-#if LL_WINDOWS
-        static std::string demangle(const std::string_view mangled);
-#else
         static std::string demangle(const char* mangled);
-#endif
         /// classname<TYPE>()
         template <typename T>
         static std::string classname()             { return demangle(typeid(T).name()); }
@@ -308,7 +303,16 @@ namespace LLError
     class LLUserWarningMsg
     {
     public:
-        typedef std::function<void(const std::string&, const std::string&)> Handler;
+        // error codes, tranlates to last_exec states like LAST_EXEC_OTHER_CRASH
+        typedef enum
+        {
+            ERROR_OTHER = 0,
+            ERROR_BAD_ALLOC = 1,
+            ERROR_MISSING_FILES = 2,
+        } eLastExecEvent;
+
+        // tittle, message and error code to include in error marker file
+        typedef std::function<void(const std::string&, const std::string&, S32 error_code)> Handler;
         static void setHandler(const Handler&);
         static void setOutOfMemoryStrings(const std::string& title, const std::string& message);
 
@@ -316,7 +320,7 @@ namespace LLError
         static void showOutOfMemory();
         static void showMissingFiles();
         // Genering error
-        static void show(const std::string&);
+        static void show(const std::string&, S32 error_code = -1);
 
     private:
         // needs to be preallocated before viewer runs out of memory
@@ -327,7 +331,6 @@ namespace LLError
 }
 
 //this is cheaper than llcallstacks if no need to output other variables to call stacks.
-#if defined(SHOW_DEBUG) || defined(LL_RELEASE_WITH_DEBUG_INFO) || defined(_DEBUG)
 #define LL_PUSH_CALLSTACKS() LLError::LLCallStacks::push(__FUNCTION__, __LINE__)
 
 #define llcallstacks                                                    \
@@ -340,21 +343,6 @@ namespace LLError
         LLError::End();                    \
         LLError::LLCallStacks::end(_out) ; \
     }
-#else
-#define LL_PUSH_CALLSTACKS()
-
-#define llcallstacks                                                                      \
-    if (false)                                                                            \
-    {                                                                                     \
-        std::ostringstream _out;                                                          \
-        LLError::LLCallStacks::insert(_out, __FUNCTION__, __LINE__) ;                     \
-        _out
-
-#define llcallstacksendl                   \
-        LLError::End();                    \
-        LLError::LLCallStacks::end(_out) ; \
-    }
-#endif
 
 #define LL_CLEAR_CALLSTACKS() LLError::LLCallStacks::clear()
 #define LL_PRINT_CALLSTACKS() LLError::LLCallStacks::print()
@@ -396,35 +384,30 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
         static LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
         lllog_test_()
 
-#define lllog_test_()                           \
-        if (LL_UNLIKELY(_site.shouldLog()))     \
-        {                                       \
-            std::ostringstream _out;            \
-            _out
-
-#ifdef ENABLE_DEBUG_MACRO
-
-#define lllog_debug(level, once, ...)                                         \
-    do {                                                                \
-        const char* tags[] = {"", ##__VA_ARGS__};                       \
-        static LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
-        lllog_test_debug_()
-
-#define lllog_test_debug_()                                       \
-        if (LL_UNLIKELY(_site.shouldLog()))                 \
-        {                                                   \
-            std::ostringstream _out; \
+#ifdef LL_DISABLE_DEBUG_LOGGING
+#define lllog_debug(level, once, ...)                                      \
+    do                                                                     \
+    {                                                                      \
+        if (false)                                                         \
+        {                                                                  \
+            const char* tags[] = { "", ##__VA_ARGS__ };                    \
+            LLError::CallSite _site(lllog_site_args_(level, once, tags));  \
+            std::ostringstream _out;                                       \
             _out
 #else
-#define lllog_debug(level, once, ...)                                         \
-    do {                                                                \
-        if (false)                 \
-        {                                                   \
-            const char* tags[] = {"", ##__VA_ARGS__};                       \
-            LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
-            std::ostringstream _out; \
-            _out
+#define lllog_debug(level, once, ...)                                        \
+    do                                                                       \
+    {                                                                        \
+        const char* tags[] = { "", ##__VA_ARGS__ };                          \
+        static LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
+        lllog_test_()
 #endif
+
+#define lllog_test_()                   \
+    if (LL_UNLIKELY(_site.shouldLog())) \
+    {                                   \
+        std::ostringstream _out;        \
+        _out
 
 #define lllog_site_args_(level, once, tags)                 \
     level, __FILE__, __LINE__, typeid(_LL_CLASS_TO_LOG),    \
@@ -448,9 +431,11 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 #define LL_NEWLINE '\n'
 
 // Use this only in LL_ERRS or in a place that LL_ERRS may not be used
-#define LLERROR_CRASH                                   \
-{                                                       \
-    crashdriver([](int* ptr){ *ptr = 0; exit(*ptr); }); \
+#define LLERROR_CRASH                                \
+{                                                    \
+    int* make_me_crash = (int*)0xDEADBEEFDEADBEEFUL; \
+    *make_me_crash = 0;                              \
+    exit(*make_me_crash);                            \
 }
 
 #define LL_ENDL                                         \
@@ -484,6 +469,10 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 #define LL_DEBUGS_ONCE(...) lllog_debug(LLError::LEVEL_DEBUG, true, ##__VA_ARGS__)
 #define LL_INFOS_ONCE(...)  lllog(LLError::LEVEL_INFO, true, ##__VA_ARGS__)
 #define LL_WARNS_ONCE(...)  lllog(LLError::LEVEL_WARN, true, ##__VA_ARGS__)
+
+// Use this if you need to pass LLError::ELevel as a variable.
+#define LL_VLOGS(level, ...)      llvlog(level, false, ##__VA_ARGS__)
+#define LL_VLOGS_ONCE(level, ...) llvlog(level, true,  ##__VA_ARGS__)
 
 // The problem with using lllog() with a variable level is that the first time
 // through, it initializes a static CallSite instance with whatever level you
@@ -523,10 +512,6 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
         LLError::CallSite& _site(_sites[which]);                        \
         lllog_test_()
 
-// Use this if you need to pass LLError::ELevel as a variable.
-#define LL_VLOGS(level, ...)      llvlog(level, false, ##__VA_ARGS__)
-#define LL_VLOGS_ONCE(level, ...) llvlog(level, true,  ##__VA_ARGS__)
-
 /*
 // Check at run-time whether logging is enabled, without generating output.
 Resist the temptation to add a function like this because it incurs the
@@ -551,8 +536,5 @@ LL_ENDL;
 LL_DEBUGS("SomeTag") performs the locking and map-searching ONCE, then caches
 the result in a static variable.
 */
-
-// used by LLERROR_CRASH
-void crashdriver(void (*)(int*));
 
 #endif // LL_LLERROR_H

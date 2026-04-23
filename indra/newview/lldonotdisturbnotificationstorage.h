@@ -35,23 +35,23 @@
 
 class LLSD;
 
-class LLDoNotDisturbNotificationStorageTimer final : public LLEventTimer
+class LLDoNotDisturbNotificationStorageTimer : public LLEventTimer
 {
 public:
     LLDoNotDisturbNotificationStorageTimer();
     ~LLDoNotDisturbNotificationStorageTimer();
 
 public:
-    BOOL tick();
+    bool tick();
 };
 
-class LLDoNotDisturbNotificationStorage final : public LLParamSingleton<LLDoNotDisturbNotificationStorage>, public LLNotificationStorage
+class LLDoNotDisturbNotificationStorage : public LLSimpleton<LLDoNotDisturbNotificationStorage>, public LLNotificationStorage
 {
-    LLSINGLETON(LLDoNotDisturbNotificationStorage);
-    ~LLDoNotDisturbNotificationStorage();
-
     LOG_CLASS(LLDoNotDisturbNotificationStorage);
 public:
+    LLDoNotDisturbNotificationStorage();
+    ~LLDoNotDisturbNotificationStorage();
+
     static const char * toastName;
     static const char * offerName;
 

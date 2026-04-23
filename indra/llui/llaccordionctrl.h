@@ -88,12 +88,12 @@ public:
     LLAccordionCtrl();
     virtual ~LLAccordionCtrl();
 
-    virtual BOOL postBuild();
+    virtual bool postBuild();
 
-    virtual BOOL handleRightMouseDown   ( S32 x, S32 y, MASK mask);
-    virtual BOOL handleScrollWheel      ( S32 x, S32 y, S32 clicks );
-    virtual BOOL handleKeyHere          (KEY key, MASK mask);
-    virtual BOOL handleDragAndDrop      (S32 x, S32 y, MASK mask, BOOL drop,
+    virtual bool handleRightMouseDown   ( S32 x, S32 y, MASK mask);
+    virtual bool handleScrollWheel      ( S32 x, S32 y, S32 clicks );
+    virtual bool handleKeyHere          (KEY key, MASK mask);
+    virtual bool handleDragAndDrop      (S32 x, S32 y, MASK mask, bool drop,
                                          EDragAndDropType cargo_type,
                                          void* cargo_data,
                                          EAcceptance* accept,
@@ -101,7 +101,7 @@ public:
     //
 
     // Call reshape after changing splitter's size
-    virtual void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
 
     void addCollapsibleCtrl(LLAccordionCtrlTab* accordion_tab);
     void removeCollapsibleCtrl(LLAccordionCtrlTab* accordion_tab);
@@ -145,6 +145,9 @@ public:
 
     void setSkipScrollToChild(bool skip) { mSkipScrollToChild = skip; }
 
+    void scheduleArrange();
+    static void updateClass();
+
 private:
     void    initNoTabsWidget(const LLTextBox::Params& tb_params);
     void    updateNoTabsHelpTextVisibility();
@@ -164,7 +167,7 @@ private:
     void    showScrollbar           (S32 width, S32 height);
     void    hideScrollbar           (S32 width, S32 height);
 
-    BOOL    autoScroll              (S32 x, S32 y);
+    bool    autoScroll              (S32 x, S32 y);
 
     /**
      * An adaptor for LLTabComparator
@@ -183,20 +186,23 @@ private:
 
 private:
     LLRect          mInnerRect;
-    LLScrollbar*    mScrollbar;
-    bool            mSingleExpansion;
-    bool            mFitParent;
-    bool            mAutoScrolling;
-    F32             mAutoScrollRate;
-    LLTextBox*      mNoVisibleTabsHelpText;
+    LLScrollbar*    mScrollbar = nullptr;
+    bool            mSingleExpansion = false;
+    bool            mFitParent = false;
+    bool            mAutoScrolling = false;
+    F32             mAutoScrollRate = 0.f;
+    LLTextBox*      mNoVisibleTabsHelpText = nullptr;
 
-    bool            mSkipScrollToChild;
+    bool            mSkipScrollToChild = false;
+    bool            mArrangePending = false;
 
     std::string     mNoMatchedTabsOrigString;
     std::string     mNoVisibleTabsOrigString;
 
-    LLAccordionCtrlTab*     mSelectedTab;
-    const LLTabComparator*  mTabComparator;
+    LLAccordionCtrlTab*     mSelectedTab = nullptr;
+    const LLTabComparator*  mTabComparator = nullptr;
+
+    static std::set<LLAccordionCtrl*> sPendingArrange;
 };
 
 

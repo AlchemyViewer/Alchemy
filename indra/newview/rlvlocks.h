@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2011, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -138,9 +139,9 @@ extern RlvAttachmentLocks gRlvAttachmentLocks;
 //
 
 // TODO-RLVa: [RLVa-1.2.1] This class really looks rather cluttered so look into cleaning it up/simplifying it a bit
-class RlvAttachmentLockWatchdog final : public LLSingleton<RlvAttachmentLockWatchdog>
+class RlvAttachmentLockWatchdog : public LLSingleton<RlvAttachmentLockWatchdog>
 {
-    LLSINGLETON_EMPTY_CTOR(RlvAttachmentLockWatchdog);
+    LLSINGLETON(RlvAttachmentLockWatchdog);
 protected:
     ~RlvAttachmentLockWatchdog() { delete m_pTimer; }
 
@@ -162,7 +163,7 @@ public:
     void onAttach(const LLViewerObject* pAttachObj, const LLViewerJointAttachment* pAttachPt);
     void onDetach(const LLViewerObject* pAttachObj, const LLViewerJointAttachment* pAttachPt);
     void onSavedAssetIntoInventory(const LLUUID& idItem);
-    BOOL onTimer();
+    bool onTimer();
     void onWearAttachment(const LLInventoryItem* pItem, ERlvWearMask eWearAction);
     void onWearAttachment(const LLUUID& idItem, ERlvWearMask eWearAction);
 
@@ -211,7 +212,7 @@ protected:
     public:
         RlvAttachmentLockWatchdogTimer(RlvAttachmentLockWatchdog* pWatchdog) : LLEventTimer(10), m_pWatchdog(pWatchdog) {}
         virtual ~RlvAttachmentLockWatchdogTimer() { m_pWatchdog->m_pTimer = NULL; }
-        virtual BOOL tick() { return m_pWatchdog->onTimer(); }
+        virtual bool tick() { return m_pWatchdog->onTimer(); }
         RlvAttachmentLockWatchdog* m_pWatchdog;
     } *m_pTimer = nullptr;
 };
@@ -279,7 +280,7 @@ extern RlvWearableLocks gRlvWearableLocks;
 // RlvFolderLocks class declaration
 //
 
-class RlvFolderLocks final : public LLSingleton<RlvFolderLocks>
+class RlvFolderLocks : public LLSingleton<RlvFolderLocks>
 {
     friend class RlvLockedDescendentsCollector;
     LLSINGLETON(RlvFolderLocks);
@@ -379,6 +380,8 @@ protected:
     mutable uuid_vec_t       m_LockedAttachmentRem;
     mutable folderlock_map_t m_LockedFolderMap;
     mutable uuid_vec_t       m_LockedWearableRem;
+private:
+    friend class LLSingleton<RlvFolderLocks>;
 };
 
 // ============================================================================

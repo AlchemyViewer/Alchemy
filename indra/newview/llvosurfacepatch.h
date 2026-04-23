@@ -36,41 +36,36 @@ class LLVector2;
 class LLFacePool;
 class LLFace;
 
-class LLVOSurfacePatch final : public LLStaticViewerObject
+class LLVOSurfacePatch : public LLStaticViewerObject
 {
 public:
     static F32 sLODFactor;
 
-    enum
-    {
-        VERTEX_DATA_MASK =  (1 << LLVertexBuffer::TYPE_VERTEX) |
-                            (1 << LLVertexBuffer::TYPE_NORMAL) |
-                            (1 << LLVertexBuffer::TYPE_TEXCOORD0) |
-                            (1 << LLVertexBuffer::TYPE_TEXCOORD1)
-    };
-
     LLVOSurfacePatch(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
 
-    /*virtual*/ void markDead() override;
+    /*virtual*/ void markDead();
 
-    virtual U32 getPartitionType() const override;
+    // Initialize data that's only inited once per class.
+    static void initClass();
 
-    /*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline) override;
-    /*virtual*/ void        updateGL() override;
-    /*virtual*/ BOOL        updateGeometry(LLDrawable *drawable) override;
-    /*virtual*/ BOOL        updateLOD() override;
-    /*virtual*/ void        updateFaceSize(S32 idx) override;
+    virtual U32 getPartitionType() const;
+
+    /*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline);
+    /*virtual*/ void        updateGL();
+    /*virtual*/ bool        updateGeometry(LLDrawable *drawable);
+    /*virtual*/ bool        updateLOD();
+    /*virtual*/ void        updateFaceSize(S32 idx);
     void getTerrainGeometry(LLStrider<LLVector3> &verticesp,
                                 LLStrider<LLVector3> &normalsp,
                                 LLStrider<LLVector2> &texCoords0p,
                                 LLStrider<LLVector2> &texCoords1p,
                                 LLStrider<U16> &indicesp);
 
-    /*virtual*/ void updateTextures() override;
-    /*virtual*/ void setPixelAreaAndAngle(LLAgent &agent) override; // generate accurate apparent angle and area
+    /*virtual*/ void updateTextures();
+    /*virtual*/ void setPixelAreaAndAngle(LLAgent &agent); // generate accurate apparent angle and area
 
-    /*virtual*/ void updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax) override;
-    /*virtual*/ BOOL isActive() const override; // Whether this object needs to do an idleUpdate.
+    /*virtual*/ void updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax);
+    /*virtual*/ bool isActive() const; // Whether this object needs to do an idleUpdate.
 
     void setPatch(LLSurfacePatch *patchp);
     LLSurfacePatch  *getPatch() const       { return mPatchp; }
@@ -78,19 +73,19 @@ public:
     void dirtyPatch();
     void dirtyGeom();
 
-    /*virtual*/ BOOL lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
+    /*virtual*/ bool lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
                                           S32 face = -1,                        // which face to check, -1 = ALL_SIDES
-                                          BOOL pick_transparent = FALSE,
-                                          BOOL pick_rigged = FALSE,
-                                          BOOL pick_unselectable = TRUE,
+                                          bool pick_transparent = false,
+                                          bool pick_rigged = false,
+                                          bool pick_unselectable = true,
                                           S32* face_hit = NULL,                 // which face was hit
                                           LLVector4a* intersection = NULL,       // return the intersection point
                                           LLVector2* tex_coord = NULL,          // return the texture coordinates of the intersection point
                                           LLVector4a* normal = NULL,             // return the surface normal at the intersection point
                                           LLVector4a* tangent = NULL           // return the surface tangent at the intersection point
-        ) override;
+        );
 
-    BOOL            mDirtiedPatch;
+    bool            mDirtiedPatch;
 protected:
     ~LLVOSurfacePatch();
 
@@ -98,8 +93,8 @@ protected:
     LLFacePool      *getPool();
     S32             mBaseComp;
     LLSurfacePatch  *mPatchp;
-    BOOL            mDirtyTexture;
-    BOOL            mDirtyTerrain;
+    bool            mDirtyTexture;
+    bool            mDirtyTerrain;
 
     S32             mLastNorthStride;
     S32             mLastEastStride;

@@ -40,11 +40,11 @@ const MASK MASK_ORBIT           = MASK_CONTROL;
 const MASK MASK_PAN             = MASK_CONTROL | MASK_SHIFT;
 const MASK MASK_COPY            = MASK_SHIFT;
 
-class LLToolMgr final : public LLSingleton<LLToolMgr>
+class LLToolMgr : public LLSimpleton<LLToolMgr>
 {
-    LLSINGLETON(LLToolMgr);
-    ~LLToolMgr();
 public:
+    LLToolMgr();
+    ~LLToolMgr();
 
     // Must be called after gSavedSettings set up.
     void            initTools();
@@ -68,7 +68,7 @@ public:
 
     void            setTransientTool(LLTool* tool);
     void            clearTransientTool();
-    BOOL            usingTransientTool();
+    bool            usingTransientTool();
 
     void            setCurrentToolset(LLToolset* current);
     LLToolset*      getCurrentToolset();
@@ -110,7 +110,7 @@ public:
 
     void            handleScrollWheel(S32 clicks);
 
-    BOOL            isToolSelected( S32 index );
+    bool            isToolSelected( S32 index );
 
     void            setShowFloaterTools(bool pShowFloaterTools) {mIsShowFloaterTools = pShowFloaterTools;};
     bool            isShowFloaterTools() const                  {return mIsShowFloaterTools;};

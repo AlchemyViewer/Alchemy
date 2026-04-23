@@ -29,7 +29,7 @@
 
 #include "lldrawpool.h"
 
-class LLDrawPoolTerrain final : public LLFacePool
+class LLDrawPoolTerrain : public LLFacePool
 {
     LLPointer<LLViewerTexture> mTexturep;
 public:
@@ -38,7 +38,7 @@ public:
         VERTEX_DATA_MASK = LLVertexBuffer::MAP_VERTEX |
                     LLVertexBuffer::MAP_NORMAL |
                     LLVertexBuffer::MAP_TANGENT | // Only PBR terrain uses this currently
-                    LLVertexBuffer::MAP_TEXCOORD0 |
+                    LLVertexBuffer::MAP_TEXCOORD0 | // Ownership overlay
                     LLVertexBuffer::MAP_TEXCOORD1
     };
 
@@ -73,14 +73,11 @@ public:
 protected:
     void boostTerrainDetailTextures();
 
-    void renderSimple();
     void renderOwnership();
 
-    void renderFull2TU();
-    void renderFull4TU();
     void renderFullShader();
     void renderFullShaderTextures();
-    void renderFullShaderPBR(BOOL local_materials = false);
+    void renderFullShaderPBR(bool use_local_materials = false);
     void drawLoop();
 
 private:

@@ -31,9 +31,6 @@
 #include "llsdserialize.h"
 #include "llxmlnode.h"
 
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-
 std::string LLSearchHistory::SEARCH_QUERY = "search_query";
 std::string LLSearchHistory::SEARCH_HISTORY_FILE_NAME = "search_history.txt";
 
@@ -60,7 +57,7 @@ bool LLSearchHistory::load()
     while (std::getline(file, line))
     {
         LLSD s_item;
-        boost::iostreams::stream<boost::iostreams::array_source> iss(line.data(), line.size());
+        std::istringstream iss(line);
         if (parser->parse(iss, s_item, line.length()) == LLSDParser::PARSE_FAILURE)
         {
             break;

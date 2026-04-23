@@ -58,13 +58,13 @@ LLFloaterGotoLine::LLFloaterGotoLine(LLScriptEdCore* editor_core)
         }
 }
 
-BOOL LLFloaterGotoLine::postBuild()
+bool LLFloaterGotoLine::postBuild()
 {
     mGotoBox = getChild<LLLineEditor>("goto_line");
     mGotoBox->setCommitCallback(boost::bind(&LLFloaterGotoLine::onGotoBoxCommit, this));
-    mGotoBox->setCommitOnFocusLost(FALSE);
+    mGotoBox->setCommitOnFocusLost(false);
     mGotoBox->setPrevalidate(LLTextValidate::validateNonNegativeS32);
-    childSetAction("goto_btn", onBtnGoto, this);
+    childSetAction("goto_btn", onBtnGoto,this);
     setDefaultBtn("goto_btn");
 
     return LLFloater::postBuild();
@@ -107,14 +107,15 @@ void LLFloaterGotoLine::handleBtnGoto()
         row = getChild<LLUICtrl>("goto_line")->getValue().asInteger();
         if (row >= 0)
         {
-                if (mEditorCore && mEditorCore->mCurrentEditor)
+                if (mEditorCore && mEditorCore->mEditor)
                 {
-            mEditorCore->mCurrentEditor->deselect();
+                    S32 target_row = mEditorCore->mEditor->getIsLuauLanguage() ? (row - 1) : row;
+                    mEditorCore->mEditor->deselect();
 // [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
-            mEditorCore->mCurrentEditor->scrollTo(row, column);
+                    mEditorCore->mEditor->scrollTo(target_row, column);
 // [/SL:KB]
-//          mEditorCore->mCurrentEditor->setCursor(row, column);
-            mEditorCore->mCurrentEditor->setFocus(TRUE);
+//                  mEditorCore->mEditor->setCursor(target_row, column);
+                    mEditorCore->mEditor->setFocus(true);
                 }
         }
 }
@@ -125,17 +126,17 @@ bool LLFloaterGotoLine::hasAccelerators() const
         {
                 return mEditorCore->hasAccelerators();
         }
-        return FALSE;
+        return false;
 }
 
-BOOL LLFloaterGotoLine::handleKeyHere(KEY key, MASK mask)
+bool LLFloaterGotoLine::handleKeyHere(KEY key, MASK mask)
 {
         if (mEditorCore)
         {
                 return mEditorCore->handleKeyHere(key, mask);
         }
 
-        return FALSE;
+        return false;
 }
 
 void LLFloaterGotoLine::onGotoBoxCommit()
@@ -145,20 +146,21 @@ void LLFloaterGotoLine::onGotoBoxCommit()
         row = getChild<LLUICtrl>("goto_line")->getValue().asInteger();
         if (row >= 0)
         {
-                if (mEditorCore && mEditorCore->mCurrentEditor)
+                if (mEditorCore && mEditorCore->mEditor)
                 {
+                    S32 target_row = mEditorCore->mEditor->getIsLuauLanguage() ? (row - 1) : row;
 // [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
-            mEditorCore->mCurrentEditor->scrollTo(row, column);
+                    mEditorCore->mEditor->scrollTo(target_row, column);
 // [/SL:KB]
-//          mEditorCore->mCurrentEditor->setCursor(row, column);
+//                  mEditorCore->mEditor->setCursor(target_row, column);
 
             S32 rownew = 0;
             S32 columnnew = 0;
-            mEditorCore->mCurrentEditor->getCurrentLineAndColumn( &rownew, &columnnew, FALSE );  // don't include wordwrap
-            if (rownew == row && columnnew == column)
+            mEditorCore->mEditor->getCurrentLineAndColumn( &rownew, &columnnew, false );  // don't include wordwrap
+            if (rownew == target_row && columnnew == column)
             {
-                    mEditorCore->mCurrentEditor->deselect();
-                    mEditorCore->mCurrentEditor->setFocus(TRUE);
+                    mEditorCore->mEditor->deselect();
+                    mEditorCore->mEditor->setFocus(true);
                     sInstance->closeFloater();
             } //else do nothing (if the cursor-position didn't change)
                 }

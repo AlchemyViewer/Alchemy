@@ -64,6 +64,15 @@ void LLAdaptiveRetryPolicy::reset()
     init();
 }
 
+// [SL:KB] - Patch: Appearance-AISFilter | Checked: 2015-06-27 (Catznip-3.7)
+// virtual
+void LLAdaptiveRetryPolicy::cancelRetry()
+{
+    // This relies on the current implementation where mShouldRetry is set to true only on initialization
+    mShouldRetry = false;
+}
+// [/SL:KB]
+
 bool LLAdaptiveRetryPolicy::getRetryAfter(const LLSD& headers, F32& retry_header_time)
 {
     return (headers.has(HTTP_IN_HEADER_RETRY_AFTER)
@@ -91,14 +100,14 @@ void LLAdaptiveRetryPolicy::onSuccess()
 
 void LLAdaptiveRetryPolicy::onFailure(S32 status, const LLSD& headers)
 {
-    F32 retry_header_time = 0.f;
+    F32 retry_header_time;
     bool has_retry_header_time = getRetryAfter(headers,retry_header_time);
     onFailureCommon(status, has_retry_header_time, retry_header_time);
 }
 
 void LLAdaptiveRetryPolicy::onFailure(const LLCore::HttpResponse *response)
 {
-    F32 retry_header_time = 0.f;
+    F32 retry_header_time;
     const LLCore::HttpHeaders::ptr_t headers = response->getHeaders();
     bool has_retry_header_time = getRetryAfter(headers,retry_header_time);
     onFailureCommon(response->getStatus().getType(), has_retry_header_time, retry_header_time);
@@ -180,7 +189,7 @@ bool LLAdaptiveRetryPolicy::getSecondsUntilRetryAfter(const std::string& retry_a
     time_t date = curl_getdate(retry_after.c_str(), NULL);
     if (-1 == date) return false;
 
-    seconds_to_wait = (F64)date - LLTimer::getTotalSeconds();
+    seconds_to_wait = (F32)((F64)date - LLTimer::getTotalSeconds());
 
     return true;
 }

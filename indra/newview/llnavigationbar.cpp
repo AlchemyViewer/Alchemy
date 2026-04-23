@@ -47,12 +47,10 @@
 #include "llresizebar.h"
 #include "llsearchcombobox.h"
 #include "llslurl.h"
-#include "llurlaction.h"
 #include "llurlregistry.h"
 #include "llurldispatcher.h"
 #include "llviewerinventory.h"
 #include "llviewermenu.h"
-#include "llviewernetwork.h"
 #include "llviewerparcelmgr.h"
 #include "llworldmapmessage.h"
 #include "llappviewer.h"
@@ -66,7 +64,6 @@
 
 #include "llfavoritesbar.h"
 #include "llagentui.h"
-#include "llviewerregion.h"
 
 #include <boost/regex.hpp>
 
@@ -173,12 +170,12 @@ void LLTeleportHistoryMenuItem::draw()
 
 void LLTeleportHistoryMenuItem::onMouseEnter(S32 x, S32 y, MASK mask)
 {
-    mArrowIcon->setVisible(TRUE);
+    mArrowIcon->setVisible(true);
 }
 
 void LLTeleportHistoryMenuItem::onMouseLeave(S32 x, S32 y, MASK mask)
 {
-    mArrowIcon->setVisible(FALSE);
+    mArrowIcon->setVisible(false);
 }
 
 static LLDefaultChildRegistry::Register<LLPullButton> menu_button("pull_button");
@@ -216,9 +213,9 @@ void LLPullButton::onMouseLeave(S32 x, S32 y, MASK mask)
 }
 
 /*virtual*/
-BOOL LLPullButton::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLPullButton::handleMouseDown(S32 x, S32 y, MASK mask)
 {
-    BOOL handled = LLButton::handleMouseDown(x, y, mask);
+    bool handled = LLButton::handleMouseDown(x, y, mask);
     if (handled)
     {
         //if mouse down was handled by button,
@@ -229,7 +226,7 @@ BOOL LLPullButton::handleMouseDown(S32 x, S32 y, MASK mask)
 }
 
 /*virtual*/
-BOOL LLPullButton::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLPullButton::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     // reset data to get ready for next circle
     mLastMouseDown.clear();
@@ -289,7 +286,7 @@ LLNavigationBar::~LLNavigationBar()
     mTeleportFailedConnection.disconnect();
 }
 
-BOOL LLNavigationBar::postBuild()
+bool LLNavigationBar::postBuild()
 {
     mBtnBack    = getChild<LLPullButton>("back_btn");
     mBtnForward = getChild<LLPullButton>("forward_btn");
@@ -298,12 +295,12 @@ BOOL LLNavigationBar::postBuild()
 
     mCmbLocation= getChild<LLLocationInputCtrl>("location_combo");
 
-    mBtnBack->setEnabled(FALSE);
+    mBtnBack->setEnabled(false);
     mBtnBack->setClickedCallback(boost::bind(&LLNavigationBar::onBackButtonClicked, this));
     mBtnBack->setHeldDownCallback(boost::bind(&LLNavigationBar::onBackOrForwardButtonHeldDown, this,_1, _2));
     mBtnBack->setClickDraggingCallback(boost::bind(&LLNavigationBar::showTeleportHistoryMenu, this,_1));
 
-    mBtnForward->setEnabled(FALSE);
+    mBtnForward->setEnabled(false);
     mBtnForward->setClickedCallback(boost::bind(&LLNavigationBar::onForwardButtonClicked, this));
     mBtnForward->setHeldDownCallback(boost::bind(&LLNavigationBar::onBackOrForwardButtonHeldDown, this, _1, _2));
     mBtnForward->setClickDraggingCallback(boost::bind(&LLNavigationBar::showTeleportHistoryMenu, this,_1));
@@ -334,10 +331,10 @@ BOOL LLNavigationBar::postBuild()
     mNavigationPanel->getResizeBar()->setResizeListener(boost::bind(&LLNavigationBar::onNavbarResized, this));
     mFavoritePanel->getResizeBar()->setResizeListener(boost::bind(&LLNavigationBar::onNavbarResized, this));
 
-    return TRUE;
+    return true;
 }
 
-void LLNavigationBar::setVisible(BOOL visible)
+void LLNavigationBar::setVisible(bool visible)
 {
     // change visibility of grandparent layout_panel to animate in and out
     if (getParent())
@@ -363,9 +360,9 @@ void LLNavigationBar::draw()
     LLPanel::draw();
 }
 
-BOOL LLNavigationBar::handleRightMouseDown(S32 x, S32 y, MASK mask)
+bool LLNavigationBar::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
-    BOOL handled = childrenHandleRightMouseDown( x, y, mask) != NULL;
+    bool handled = childrenHandleRightMouseDown( x, y, mask) != NULL;
     if(!handled && !gMenuHolder->hasVisibleMenu())
     {
         show_navbar_context_menu(this,x,y);
@@ -462,7 +459,7 @@ void LLNavigationBar::onLocationSelection()
             {
                 LLInventoryModel::item_array_t landmark_items =
                         LLLandmarkActions::fetchLandmarksByName(typed_location,
-                                FALSE);
+                                false);
                 if (!landmark_items.empty())
                 {
                     gAgent.teleportViaLandmark( landmark_items[0]->getAssetUUID());
@@ -475,45 +472,13 @@ void LLNavigationBar::onLocationSelection()
         case TELEPORT_HISTORY:
             //in case of teleport item was selected, teleport by position too.
         case TYPED_REGION_SLURL:
-        {
-                const LLVector3d global_pos = value.has("global_pos") ? LLVector3d(value["global_pos"]) : LLVector3d();
-                const LLVector3 local_pos = value.has("local_pos") ? LLVector3(value["local_pos"]) : LLVector3();
-                const std::string grid_name = value["grid"].asString();
-                std::string region_name = value["region"].asString();
-
-                if (LLGridManager::instance().isInSecondlife() || (region_name.empty() || grid_name.empty() || local_pos.isExactlyZero()))
-                {
-                    if (!global_pos.isExactlyZero())
-                    {
-                        gAgent.teleportViaLocation(global_pos);
-                    }
-                    return;
-                }
-
-                std::string current_grid;
-                auto regionp = gAgent.getRegion();
-                if (regionp)
-                {
-                    current_grid = LLGridManager::getInstance()->getGridByProbing(regionp->getHGGrid());
-                }
-                else
-                {
-                    current_grid = LLGridManager::getInstance()->getGrid();
-                }
-
-                if (LLGridManager::getInstance()->getGridByProbing(grid_name) != current_grid)
-                {
-                    region_name.insert(0, llformat("%s:", grid_name.c_str()));
-                }
-
-                // Resolve the region name to its global coordinates.
-                // If resolution succeeds we'll teleport.
-                LLWorldMapMessage::url_callback_t cb = boost::bind(
-                    &LLNavigationBar::onRegionNameResponse, this,
-                    std::string(), region_name, local_pos, _1, _2, _3, _4);
-                LLWorldMapMessage::getInstance()->sendNamedRegionRequest(region_name, cb, std::string("unused"), false);
+            if(value.has("global_pos"))
+            {
+                gAgent.teleportViaLocation(LLVector3d(value["global_pos"]));
                 return;
-        }
+            }
+            break;
+
         default:
             break;
         }
@@ -528,11 +493,6 @@ void LLNavigationBar::onLocationSelection()
     {
       region_name = slurl.getRegion();
       local_coords = slurl.getPosition();
-    }
-    else if (slurl.getType() == LLSLURL::APP)
-    {
-        LLUrlAction::executeSLURL(typed_location);
-        return;
     }
     else if(!slurl.isValid())
     {
@@ -553,25 +513,8 @@ void LLNavigationBar::onLocationSelection()
     }
     else
     {
-      // Unknown slurl type, bail.
+      // was an app slurl, home, whatever.  Bail
       return;
-    }
-
-    std::string current_grid;
-    auto regionp = gAgent.getRegion();
-    if (regionp)
-    {
-        current_grid = LLGridManager::getInstance()->getGridByProbing(regionp->getHGGrid());
-    }
-    else
-    {
-        current_grid = LLGridManager::getInstance()->getGrid();
-    }
-
-    const std::string& grid = slurl.getGrid();
-    if (LLGridManager::getInstance()->getGridByProbing(grid) != current_grid)
-    {
-        region_name.insert(0, llformat("%s:", grid.c_str()));
     }
 
     // Resolve the region name to its global coordinates.
@@ -601,16 +544,12 @@ void LLNavigationBar::onTeleportFinished(const LLVector3d& global_agent_pos)
      * At this moment gAgent.getPositionAgent() contains previous coordinates.
      * according to EXT-65 agent position is being reseted on each frame.
      */
-    LLVector3 local_agent_pos = gAgent.getPosAgentFromGlobal(global_agent_pos);
         LLAgentUI::buildLocationString(location, LLAgentUI::LOCATION_FORMAT_NO_MATURITY,
-            local_agent_pos);
+                    gAgent.getPosAgentFromGlobal(global_agent_pos));
+    std::string tooltip (LLSLURL(gAgent.getRegion()->getName(), global_agent_pos).getSLURLString());
 
-    std::string grid = gAgent.getRegion()->getHGGrid();
-    std::string region_name = gAgent.getRegion()->getName();
-    std::string tooltip (LLSLURL(grid, region_name, local_agent_pos).getSLURLString());
-
-    LLLocationHistoryItem item (location, grid, region_name,
-        local_agent_pos, global_agent_pos, tooltip,TYPED_REGION_SLURL);// we can add into history only TYPED location
+    LLLocationHistoryItem item (location,
+            global_agent_pos, tooltip,TYPED_REGION_SLURL);// we can add into history only TYPED location
     //Touch it, if it is at list already, add new location otherwise
     if ( !lh->touchItem(item) ) {
         lh->addItem(item);
@@ -692,10 +631,10 @@ void LLNavigationBar::onRegionNameResponse(
         LLVector3d region_pos = from_region_handle(region_handle);
         LLVector3d global_pos = region_pos + (LLVector3d) local_coords;
 
-        LL_INFOS() << "Teleporting to: " << LLSLURL(region_name, local_coords).getSLURLString()  << LL_ENDL;
+        LL_INFOS() << "Teleporting to: " << LLSLURL(region_name,    global_pos).getSLURLString()  << LL_ENDL;
         gAgent.teleportViaLocation(global_pos);
     }
-    else if (!typed_location.empty() && gSavedSettings.getBOOL("SearchFromAddressBar"))
+    else if (gSavedSettings.getBOOL("SearchFromAddressBar"))
     {
         invokeSearch(typed_location);
     }
@@ -766,7 +705,7 @@ void LLNavigationBar::resizeLayoutPanel()
 {
     LLRect nav_bar_rect = mNavigationPanel->getRect();
 
-    S32 nav_panel_width = (nav_bar_rect.getWidth() + mFavoritePanel->getRect().getWidth()) * gSavedPerAccountSettings.getF32("NavigationBarRatio");
+    S32 nav_panel_width = (S32)((nav_bar_rect.getWidth() + mFavoritePanel->getRect().getWidth()) * gSavedPerAccountSettings.getF32("NavigationBarRatio"));
 
     nav_bar_rect.setLeftTopAndSize(nav_bar_rect.mLeft, nav_bar_rect.mTop, nav_panel_width, nav_bar_rect.getHeight());
     mNavigationPanel->handleReshape(nav_bar_rect,true);
@@ -782,7 +721,14 @@ void LLNavigationBar::refreshLocationCtrl()
 
 void LLNavigationBar::invokeSearch(std::string search_text)
 {
-    LLFloaterReg::showInstance("search", LLSD().with("category", "standard").with("query", LLSD(search_text)));
+    LLSD key;
+    key["category"] = "standard";
+    key["query"] = search_text;
+    LLSD collections = LLSD::emptyArray();
+    collections.append("destinations");
+    collections.append("places");
+    key["collections"] = collections;
+    LLFloaterReg::showInstance("search", key);
 }
 
 void LLNavigationBar::clearHistoryCache()

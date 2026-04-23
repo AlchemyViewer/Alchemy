@@ -24,9 +24,13 @@
  * $/LicenseInfo$
  */
 
+#include "linden_common.h"
+
 #define LLBADGE_CPP
 #include "llbadge.h"
 
+#include "llfontgl.h"
+#include "llfontvertexbuffer.h"
 #include "llscrollcontainer.h"
 #include "lluictrlfactory.h"
 
@@ -36,7 +40,7 @@ static LLDefaultChildRegistry::Register<LLBadge> r("badge");
 static const S32 BADGE_OFFSET_NOT_SPECIFIED = 0x7FFFFFFF;
 
 // Compiler optimization, generate extern template
-template class LLBadge* LLView::getChild<class LLBadge>(std::string_view name, BOOL recurse) const;
+template class LLBadge* LLView::getChild<class LLBadge>(std::string_view name, bool recurse) const;
 
 
 LLBadge::Params::Params()
@@ -90,7 +94,7 @@ LLBadge::LLBadge(const LLBadge::Params& p)
     , mGLFont(p.font)
     , mImage(p.image)
     , mImageColor(p.image_color)
-    , mLabel(utf8str_to_wstring(p.label))
+    , mLabel(p.label)
     , mLabelColor(p.label_color)
     , mLabelOffsetHoriz(p.label_offset_horiz)
     , mLabelOffsetVert(p.label_offset_vert)
@@ -151,6 +155,10 @@ LLBadge::LLBadge(const LLBadge::Params& p)
     }
 }
 
+LLBadge::~LLBadge()
+{
+}
+
 bool LLBadge::addToView(LLView * view)
 {
     bool child_added = view->addChild(this);
@@ -174,7 +182,7 @@ bool LLBadge::addToView(LLView * view)
 
 void LLBadge::setLabel(const LLStringExplicit& label)
 {
-    mLabel = utf8str_to_wstring(label);
+    mLabel = label;
 }
 
 //
@@ -193,25 +201,23 @@ void renderBadgeBackground(F32 centerX, F32 centerY, F32 width, F32 height, cons
     F32 x = LLFontGL::sCurOrigin.mX + centerX - width * 0.5f;
     F32 y = LLFontGL::sCurOrigin.mY + centerY - height * 0.5f;
 
-    LLRectf screen_rect(ll_round(x),
-                        ll_round(y),
-                        ll_round(x) + width,
-                        ll_round(y) + height);
+    LLRectf screen_rect((F32)ll_round(x),
+                        (F32)ll_round(y),
+                        (F32)ll_round(x) + width,
+                        (F32)ll_round(y) + height);
 
-    LLVector4a vertices[6];
-    vertices[0].set(screen_rect.mLeft, screen_rect.mTop, 1.0f);
-    vertices[1].set(screen_rect.mLeft, screen_rect.mBottom, 1.0f);
-    vertices[2].set(screen_rect.mRight, screen_rect.mTop, 1.0f);
-    vertices[3].set(screen_rect.mRight, screen_rect.mTop, 1.0f);
-    vertices[4].set(screen_rect.mLeft, screen_rect.mBottom, 1.0f);
-    vertices[5].set(screen_rect.mRight, screen_rect.mBottom, 1.0f);
+    LLVector4a vertices[4];
+    vertices[0].set(screen_rect.mLeft,  screen_rect.mTop,    1.0f);
+    vertices[1].set(screen_rect.mRight, screen_rect.mTop,    1.0f);
+    vertices[2].set(screen_rect.mLeft,  screen_rect.mBottom, 1.0f);
+    vertices[3].set(screen_rect.mRight, screen_rect.mBottom, 1.0f);
 
-    gGL.begin(LLRender::TRIANGLES);
+    gGL.begin(LLRender::TRIANGLE_STRIP);
     {
-        gGL.vertexBatchPreTransformed(vertices, 6);
+        gGL.vertexBatchPreTransformed(vertices, 4);
     }
     gGL.end();
-    gGL.setSceneBlendType(LLRender::BT_ALPHA);
+
     gGL.popUIMatrix();
 }
 
@@ -228,14 +234,15 @@ void LLBadge::draw()
             //
             // Calculate badge size based on label text
             //
+
             S32 badge_label_begin_offset = 0;
             S32 badge_char_length = S32_MAX;
             S32 badge_pixel_length = S32_MAX;
             F32 *right_position_out = NULL;
-            BOOL do_not_use_ellipses = false;
+            bool do_not_use_ellipses = false;
 
             F32 badge_width = (2.0f * mPaddingHoriz) +
-                mGLFont->getWidthF32(mLabel.c_str(), badge_label_begin_offset, badge_char_length);
+                mGLFont->getWidthF32(mLabel.getWString().c_str(), badge_label_begin_offset, badge_char_length);
 
             F32 badge_height = (2.0f * mPaddingVert) + mGLFont->getLineHeight();
 
@@ -297,7 +304,7 @@ void LLBadge::draw()
             }
             else
             {
-                badge_center_x = location_offset_horiz;
+                badge_center_x = (F32)location_offset_horiz;
             }
 
             // Compute y position
@@ -314,7 +321,7 @@ void LLBadge::draw()
             }
             else
             {
-                badge_center_y = location_offset_vert;
+                badge_center_y = (F32)location_offset_vert;
             }
 
             //
@@ -348,17 +355,17 @@ void LLBadge::draw()
             //
             // Draw the label
             //
-
-            mGLFont->render(mLabel,
-                            badge_label_begin_offset,
-                            badge_center_x + mLabelOffsetHoriz,
-                            badge_center_y + mLabelOffsetVert,
-                            mLabelColor % alpha,
-                            LLFontGL::HCENTER, LLFontGL::VCENTER, // centered around the position
-                            LLFontGL::NORMAL, // normal text (not bold, italics, etc.)
-                            LLFontGL::DROP_SHADOW_SOFT,
-                            badge_char_length, badge_pixel_length,
-                            right_position_out, do_not_use_ellipses);
+            mFontBuffer.render(mGLFont,
+                               mLabel.getWString(),
+                               badge_label_begin_offset,
+                               badge_center_x + mLabelOffsetHoriz,
+                               badge_center_y + mLabelOffsetVert,
+                               mLabelColor % alpha,
+                               LLFontGL::HCENTER, LLFontGL::VCENTER, // centered around the position
+                               LLFontGL::NORMAL, // normal text (not bold, italics, etc.)
+                               LLFontGL::DROP_SHADOW_SOFT,
+                               badge_char_length, badge_pixel_length,
+                               right_position_out, do_not_use_ellipses);
         }
     }
 }

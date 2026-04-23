@@ -36,7 +36,7 @@
 // example (don't try this at work kids):
 //
 //  LLCRC crc;
-//  FILE* fp = LLFile::fopen(filename,"rb");
+//  FILE* fp = LLFile::fopen(filename,LLFILE_MODE("rb"));
 //  while(!feof(fp)) {
 //    crc.update(fgetc(fp));
 //  }
@@ -59,8 +59,8 @@ public:
 
 #ifdef _DEBUG
     // This function runs tests to make sure the crc is
-    // working. Returns TRUE if it is.
-    static BOOL testHarness();
+    // working. Returns true if it is.
+    static bool testHarness();
 #endif
 };
 

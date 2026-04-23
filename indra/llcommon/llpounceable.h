@@ -36,12 +36,12 @@
 #define LL_LLPOUNCEABLE_H
 
 #include "llsingleton.h"
-#include <boost/noncopyable.hpp>
 #include <boost/call_traits.hpp>
-#include <boost/type_traits/remove_pointer.hpp>
 #include <boost/utility/value_init.hpp>
-#include <boost/unordered_map.hpp>
 #include <boost/signals2/signal.hpp>
+#include <boost/unordered_map.hpp>
+
+#include <type_traits>
 
 // Forward declare the user template, since we want to be able to point to it
 // in some of its implementation classes.
@@ -73,7 +73,7 @@ class LLPounceableQueueImpl;
 // because we can't count on a data member queue being initialized at the time
 // we start getting callWhenReady() calls. This is that LLSingleton.
 template <typename T>
-class LLPounceableQueueSingleton final :
+class LLPounceableQueueSingleton:
     public LLSingleton<LLPounceableQueueSingleton<T> >
 {
     LLSINGLETON_EMPTY_CTOR(LLPounceableQueueSingleton);
@@ -139,7 +139,7 @@ private:
 // LLPounceable<T> is for an LLPounceable instance on the heap or the stack.
 // LLPounceable<T, LLPounceableStatic> is for a static LLPounceable instance.
 template <typename T, class TAG=LLPounceableQueue>
-class LLPounceable: public boost::noncopyable
+class LLPounceable
 {
 private:
     typedef LLPounceableTraits<T, TAG> traits;
@@ -158,11 +158,16 @@ public:
         mEmpty(empty)
     {}
 
+    // Non-copyable
+    LLPounceable(const LLPounceable&) = delete;
+    LLPounceable& operator=(const LLPounceable&) = delete;
+
     // make read access to mHeld as cheap and transparent as possible
     operator T () const { return mHeld; }
-    typename boost::remove_pointer<T>::type operator*() const { return *mHeld; }
+    typename std::remove_pointer<T>::type operator*() const { return *mHeld; }
     typename boost::call_traits<T>::value_type operator->() const { return mHeld; }
-    explicit operator bool() const { return bool(mHeld); }
+    // uncomment 'explicit' as soon as we allow C++11 compilation
+    /*explicit*/ operator bool() const { return bool(mHeld); }
     bool operator!() const { return ! mHeld; }
 
     // support both assignment (dumb ptr idiom) and reset() (smart ptr)

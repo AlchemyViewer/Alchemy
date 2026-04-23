@@ -32,7 +32,7 @@
 #include "llinitdestroyclass.h"
 
 
-class LLHints final :  public LLSingleton<LLHints>
+class LLHints :  public LLSingleton<LLHints>
 {
     LLSINGLETON(LLHints);
     ~LLHints();

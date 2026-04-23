@@ -45,7 +45,7 @@
 class LLPluginProcessParentOwner : public std::enable_shared_from_this < LLPluginProcessParentOwner >
 {
 public:
-    virtual ~LLPluginProcessParentOwner() = default;
+    virtual ~LLPluginProcessParentOwner();
     virtual void receivePluginMessage(const LLPluginMessage &message) = 0;
     virtual bool receivePluginMessageEarly(const LLPluginMessage &message) {return false;};
     // This will only be called when the plugin has died unexpectedly
@@ -53,7 +53,7 @@ public:
     virtual void pluginDied() {};
 };
 
-class LLPluginProcessParent final : public LLPluginMessagePipeOwner
+class LLPluginProcessParent : public LLPluginMessagePipeOwner
 {
     LOG_CLASS(LLPluginProcessParent);
 
@@ -124,7 +124,7 @@ public:
 
     F64 getCPUUsage() { return mCPUUsage; };
 
-    static bool poll(F64 timeout);
+    static void poll(F64 timeout);
     static bool canPollThreadRun() { return (sPollSet || sPollsetNeedsRebuild || sUseReadThread); };
     static void setUseReadThread(bool use_read_thread);
     static bool getUseReadThread() { return sUseReadThread; };
@@ -199,7 +199,7 @@ private:
     apr_pollfd_t mPollFD;
     static apr_pollset_t *sPollSet;
     static bool sPollsetNeedsRebuild;
-    static LLMutex *sInstancesMutex;
+    static LLCoros::Mutex *sInstancesMutex;
     static mapInstances_t sInstances;
     static void dirtyPollSet();
     static void updatePollset();
@@ -210,7 +210,7 @@ private:
     bool pollTick();
 
     LLMutex mIncomingQueueMutex;
-    std::deque<LLPluginMessage> mIncomingQueue;
+    std::queue<LLPluginMessage> mIncomingQueue;
 };
 
 #endif // LL_LLPLUGINPROCESSPARENT_H

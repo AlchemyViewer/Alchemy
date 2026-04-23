@@ -113,7 +113,7 @@ public:
     };
 
     // disable traversal when finding widget to hand focus off to
-    /*virtual*/ BOOL canFocusChildren() const { return FALSE; }
+    /*virtual*/ bool canFocusChildren() const override { return false; }
 
     /**
      * Connects callback to signal called when Return key is pressed.
@@ -121,15 +121,15 @@ public:
     boost::signals2::connection setReturnCallback( const commit_signal_t::slot_type& cb ) { return mOnReturnSignal.connect(cb); }
 
     /** Overridden LLPanel's reshape, height is ignored, the list sets its height to accommodate all items */
-    virtual void reshape(S32 width, S32 height, BOOL called_from_parent  = TRUE);
+    virtual void reshape(S32 width, S32 height, bool called_from_parent  = true) override;
 
     /** Returns full rect of child panel */
     const LLRect& getItemsRect() const;
 
-    LLRect getRequiredRect() { return getItemsRect(); }
+    LLRect getRequiredRect() override { return getItemsRect(); }
 
     /** Returns distance between items */
-    const S32 getItemsPad() { return mItemPad; }
+    const S32 getItemsPad() const { return mItemPad; }
 
     /**
      * Adds and item and LLSD value associated with it to the list at specified position
@@ -270,13 +270,13 @@ public:
     void setCommitOnSelectionChange(bool b)     { mCommitOnSelectionChange = b; }
 
     /** Get number of selected items in the list */
-    U32 numSelected() const {return mSelectedItemPairs.size(); }
+    U32 numSelected() const { return static_cast<U32>(mSelectedItemPairs.size()); }
 
     /** Get number of (visible) items in the list */
     U32 size(const bool only_visible_items = true) const;
 
     /** Removes all items from the list */
-    virtual void clear();
+    virtual void clear() override;
 
     /**
      * Removes all items that can be detached from the list but doesn't destroy
@@ -300,10 +300,12 @@ public:
 
     void scrollToShowFirstSelectedItem();
 
-    void selectFirstItem    ();
-    void selectLastItem     ();
+    void selectFirstItem();
+    void selectLastItem();
 
-    virtual S32 notify(const LLSD& info) ;
+    virtual S32 notify(const LLSD& info) override;
+
+    void setFocusOnItemClicked(bool b) { mFocusOnItemClicked = b; }
 
     virtual ~LLFlatListView();
 
@@ -352,8 +354,8 @@ protected:
 
     virtual bool selectNextItemPair(bool is_up_direction, bool reset_selection);
 
-    virtual BOOL canSelectAll() const;
-    virtual void selectAll();
+    virtual bool canSelectAll() const override;
+    virtual void selectAll() override;
 
     virtual bool isSelected(item_pair_t* item_pair) const;
 
@@ -370,15 +372,15 @@ protected:
      */
     void notifyParentItemsRectChanged();
 
-    virtual BOOL handleKeyHere(KEY key, MASK mask);
+    virtual bool handleKeyHere(KEY key, MASK mask) override;
 
-    virtual BOOL postBuild();
+    virtual bool postBuild() override;
 
-    virtual void onFocusReceived();
+    virtual void onFocusReceived() override;
 
-    virtual void onFocusLost();
+    virtual void onFocusLost() override;
 
-    virtual void draw();
+    virtual void draw() override;
 
     LLRect getLastSelectedItemRect();
 
@@ -428,6 +430,8 @@ private:
     bool mIsConsecutiveSelection;
 
     bool mKeepSelectionVisibleOnReshape;
+
+    bool mFocusOnItemClicked;
 
     /** All pairs of the list */
     pairs_list_t mItemPairs;
@@ -487,21 +491,26 @@ public:
     void setNoItemsMsg(const std::string& msg) { mNoItemsMsg = msg; }
     void setNoFilteredItemsMsg(const std::string& msg) { mNoFilteredItemsMsg = msg; }
 
-    bool getForceShowingUnmatchedItems();
+    bool getForceShowingUnmatchedItems() const;
 
-    void setForceShowingUnmatchedItems(bool show);
+    /**
+     * Sets filtered out items to stay visible. Can result in rect changes,
+     * so can notify_parent if rect changes
+     */
+    void setForceShowingUnmatchedItems(bool show, bool notify_parent);
 
     /**
      * Sets up new filter string and filters the list.
      */
     void setFilterSubString(const std::string& filter_str, bool notify_parent);
-    std::string getFilterSubString() { return mFilterSubString; }
+    std::string getFilterSubString() const { return mFilterSubString; }
 
     /**
      * Filters the list, rearranges and notifies parent about shape changes.
      * Derived classes may want to overload rearrangeItems() to exclude repeated separators after filtration.
+     * Returns true in case of changes
      */
-    void filterItems(bool re_sort, bool notify_parent);
+    bool filterItems(bool re_sort, bool notify_parent);
 
     /**
      * Returns true if last call of filterItems() found at least one matching item

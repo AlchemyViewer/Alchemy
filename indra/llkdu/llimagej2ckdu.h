@@ -27,14 +27,13 @@
 #ifndef LL_LLIMAGEJ2CKDU_H
 #define LL_LLIMAGEJ2CKDU_H
 
+#include "llpreprocessor.h"
+
 #include "llimagej2c.h"
 
 //
 // KDU core header files
 //
-#ifndef KDU_NO_THREADS
-#define KDU_NO_THREADS
-#endif
 #include "kdu_elementary.h"
 #include "kdu_messaging.h"
 #include "kdu_params.h"

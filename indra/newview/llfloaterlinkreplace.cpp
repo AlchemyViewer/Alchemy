@@ -52,7 +52,7 @@ LLFloaterLinkReplace::~LLFloaterLinkReplace()
 {
 }
 
-BOOL LLFloaterLinkReplace::postBuild()
+bool LLFloaterLinkReplace::postBuild()
 {
     mStartBtn = getChild<LLButton>("btn_start");
     mStartBtn->setCommitCallback(boost::bind(&LLFloaterLinkReplace::onStartClicked, this));
@@ -68,7 +68,7 @@ BOOL LLFloaterLinkReplace::postBuild()
 
     mStatusText = getChild<LLTextBox>("status_text");
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterLinkReplace::onOpen(const LLSD& key)
@@ -199,8 +199,8 @@ void LLFloaterLinkReplace::onStartClickedResponse(const LLSD& notification, cons
                 args["NUM"] = llformat("%d", mRemainingItems);
                 mStatusText->setText(getString("ItemsRemaining", args));
 
-                mStartBtn->setEnabled(FALSE);
-                mRefreshBtn->setEnabled(FALSE);
+                mStartBtn->setEnabled(false);
+                mRefreshBtn->setEnabled(false);
 
                 mEventTimer.start();
                 tick();
@@ -225,6 +225,21 @@ void LLFloaterLinkReplace::linkCreatedCallback(LLHandle<LLFloaterLinkReplace> fl
         << " - description update = " << (needs_description_update ? "true" : "false") << LL_NEWLINE
         << " - outfit_folder_id = " << outfit_folder_id.asString() << LL_ENDL;
 
+    std::string old_description;
+    if (needs_wearable_ordering_update)
+    {
+        LLViewerInventoryItem* old_item = gInventory.getItem(old_item_id);
+        LLViewerInventoryItem* target_item = gInventory.getItem(target_item_id);
+        if (old_item && target_item &&
+            old_item->getType() == LLAssetType::AT_CLOTHING &&
+            target_item->getType() == LLAssetType::AT_CLOTHING &&
+            old_item->getWearableType() == target_item->getWearableType())
+        {
+            // Preserve the original description, which contains ordering info
+            old_description = old_item->getActualDescription();
+        }
+    }
+
     // If we are replacing an object, bodypart or gesture link within an outfit folder,
     // we need to change the actual description of the link itself. LLAppearanceMgr *should*
     // have created COF links that will be used to save the outfit with an empty description.
@@ -246,7 +261,14 @@ void LLFloaterLinkReplace::linkCreatedCallback(LLHandle<LLFloaterLinkReplace> fl
         {
             LLPointer<LLViewerInventoryItem> item = *it;
 
-            if ((item->getType() == LLAssetType::AT_BODYPART ||
+            if (item->getType() == LLAssetType::AT_CLOTHING && !old_description.empty())
+            {
+                // Use the old description to set ordering info
+                LLSD updates;
+                updates["desc"] = old_description;
+                update_inventory_item(item->getUUID(), updates, LLPointer<LLInventoryCallback>(NULL));
+            }
+            else if ((item->getType() == LLAssetType::AT_BODYPART ||
                 item->getType() == LLAssetType::AT_OBJECT ||
                 item->getType() == LLAssetType::AT_GESTURE)
                 && !item->getActualDescription().empty())
@@ -296,8 +318,8 @@ void LLFloaterLinkReplace::decreaseOpenItemCount()
     if (mRemainingItems == 0)
     {
         mStatusText->setText(getString("ReplaceFinished"));
-        mStartBtn->setEnabled(TRUE);
-        mRefreshBtn->setEnabled(TRUE);
+        mStartBtn->setEnabled(true);
+        mRefreshBtn->setEnabled(true);
         mEventTimer.stop();
         LL_INFOS() << "Inventory link replace finished." << LL_ENDL;
     }
@@ -310,7 +332,7 @@ void LLFloaterLinkReplace::decreaseOpenItemCount()
     }
 }
 
-BOOL LLFloaterLinkReplace::tick()
+bool LLFloaterLinkReplace::tick()
 {
     LL_DEBUGS() << "Calling tick - remaining items = " << mRemainingInventoryItems.size() << LL_ENDL;
 
@@ -329,7 +351,7 @@ BOOL LLFloaterLinkReplace::tick()
     }
     processBatch(current_batch);
 
-    return FALSE;
+    return false;
 }
 
 void LLFloaterLinkReplace::processBatch(LLInventoryModel::item_array_t items)
@@ -347,12 +369,9 @@ void LLFloaterLinkReplace::processBatch(LLInventoryModel::item_array_t items)
             bool is_outfit_folder = gInventory.isObjectDescendentOf(source_item->getParentUUID(), outfit_folder_id);
             // If either the new or old item in the COF is a wearable, we need to update wearable ordering after the link has been replaced
             bool needs_wearable_ordering_update = (is_outfit_folder && source_item->getType() == LLAssetType::AT_CLOTHING) || target_item->getType() == LLAssetType::AT_CLOTHING;
-            // Other items in the COF need a description update (description of the actual link item must be empty)
-            bool needs_description_update = is_outfit_folder && target_item->getType() != LLAssetType::AT_CLOTHING;
 
             LL_DEBUGS() << "is_outfit_folder = " << (is_outfit_folder ? "true" : "false") << LL_NEWLINE
-                << "needs_wearable_ordering_update = " << (needs_wearable_ordering_update ? "true" : "false") << LL_NEWLINE
-                << "needs_description_update = " << (needs_description_update ? "true" : "false") << LL_ENDL;
+                << "needs_wearable_ordering_update = " << (needs_wearable_ordering_update ? "true" : "false") << LL_ENDL;
 
             LLInventoryObject::const_object_list_t obj_array;
             obj_array.push_back(LLConstPointer<LLInventoryObject>(target_item));
@@ -361,7 +380,7 @@ void LLFloaterLinkReplace::processBatch(LLInventoryModel::item_array_t items)
                                                                                                             source_item->getUUID(),
                                                                                                             target_item->getUUID(),
                                                                                                             needs_wearable_ordering_update,
-                                                                                                            needs_description_update,
+                                                                                                            is_outfit_folder,
                                                                                                             (is_outfit_folder ? source_item->getParentUUID() : LLUUID::null) ));
             link_inventory_array(source_item->getParentUUID(), obj_array, cb);
         }
@@ -378,7 +397,7 @@ void LLFloaterLinkReplace::processBatch(LLInventoryModel::item_array_t items)
 
 static LLDefaultChildRegistry::Register<LLInventoryLinkReplaceDropTarget> r("inventory_link_replace_drop_target");
 
-BOOL LLInventoryLinkReplaceDropTarget::handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
+bool LLInventoryLinkReplaceDropTarget::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                                            EDragAndDropType cargo_type,
                                                            void* cargo_data,
                                                            EAcceptance* accept,
@@ -411,7 +430,7 @@ BOOL LLInventoryLinkReplaceDropTarget::handleDragAndDrop(S32 x, S32 y, MASK mask
         *accept = ACCEPT_NO;
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLInventoryLinkReplaceDropTarget::setItem(LLInventoryItem* item)

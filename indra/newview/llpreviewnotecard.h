@@ -41,11 +41,12 @@
 
 class LLViewerTextEditor;
 class LLButton;
+class LLLineEditor;
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
 class LLTextEditor;
 // [/SL:KB]
 
-class LLPreviewNotecard final : public LLPreview, public LLVOInventoryListener
+class LLPreviewNotecard : public LLPreview, public LLVOInventoryListener
 {
 public:
     LLPreviewNotecard(const LLSD& key);
@@ -59,14 +60,14 @@ public:
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
     virtual bool hasAccelerators() const override { return true; }
 // [/SL:KB]
-    BOOL handleKeyHere(KEY key, MASK mask) override;
-    void setEnabled( BOOL enabled ) override;
+    bool handleKeyHere(KEY key, MASK mask) override;
+    void setEnabled(bool enabled) override;
 
     // llfloater
-    BOOL canClose() override;
+    bool canClose() override;
 
     // llpanel
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     // reach into the text editor, and grab the drag item
     const LLInventoryItem* getDragItem();
@@ -109,12 +110,6 @@ protected:
                                LLAssetType::EType type,
                                void* user_data, S32 status, LLExtStat ext_status);
 
-    static void onClickSave(void* data);
-
-    static void onClickDelete(void* data);
-
-    static void onClickEdit(void* data);
-
     static void onSaveComplete(const LLUUID& asset_uuid,
                                void* user_data,
                                S32 status, LLExtStat ext_status);
@@ -129,20 +124,24 @@ protected:
     bool onExternalChange(const std::string& filename);
     bool loadNotecardText(const std::string& filename);
     bool writeToFile(const std::string& filename);
-    std::string getTmpFileName();
+    std::string getCleanNameForTmpFile() const;
+    std::string getTmpFileName(const std::string& note_name) const;
 
 protected:
-    LLViewerTextEditor* mEditor;
-    LLButton* mSaveBtn;
+    LLViewerTextEditor* mEditor = nullptr;
+    LLLineEditor* mDescEditor = nullptr;
+    LLButton* mSaveBtn = nullptr;
+    LLButton* mEditBtn = nullptr;
+    LLButton* mDeleteBtn = nullptr;
+    LLUICtrl* mLockBtn = nullptr;
+
+    std::string mNoteName;
 
     LLUUID mAssetID;
 
     LLUUID mObjectID;
 
-    LLLiveLSLFile* mLiveFile;
-
-    boost::signals2::connection mFontNameConnection;
-    boost::signals2::connection mFontSizeConnection;
+    LLLiveLSLFile* mLiveFile = nullptr;
 };
 
 

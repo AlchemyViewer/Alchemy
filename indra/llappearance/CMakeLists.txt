@@ -1,19 +1,11 @@
 # -*- cmake -*-
 
-project(llappearance)
-
-include(00-Common)
-include(LLCommon)
-include(LLImage)
-include(LLCoreHttp)
-include(LLWindow)
-include(Linking)
-
 set(llappearance_SOURCE_FILES
     llavatarappearance.cpp
     llavatarjoint.cpp
     llavatarjointmesh.cpp
     lldriverparam.cpp
+    lljointdata.h
     lllocaltextureobject.cpp
     llpolyskeletaldistortion.cpp
     llpolymesh.cpp
@@ -27,10 +19,8 @@ set(llappearance_SOURCE_FILES
     llviewervisualparam.cpp
     llavatarappearancedefines.cpp
     )
-    
-set(llappearance_HEADER_FILES
-    CMakeLists.txt
 
+set(llappearance_HEADER_FILES
     llavatarappearance.h
     llavatarjoint.h
     llavatarjointmesh.h
@@ -55,6 +45,7 @@ list(APPEND llappearance_SOURCE_FILES ${llappearance_HEADER_FILES})
 add_library (llappearance ${llappearance_SOURCE_FILES})
 
 target_link_libraries(llappearance
+        PUBLIC
         llcharacter
         llinventory
         llimage
@@ -67,22 +58,18 @@ target_link_libraries(llappearance
         llcommon
     )
 target_include_directories( llappearance  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
-
-if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
-    target_precompile_headers(llappearance
-        PRIVATE
-        [["linden_common.h"]]
-        )
-endif()
+target_precompile_headers(llappearance REUSE_FROM llprecompiled)
 
 if (BUILD_HEADLESS)
   add_library (llappearanceheadless ${llappearance_SOURCE_FILES})
   target_include_directories( llappearanceheadless  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
   target_link_libraries(llappearanceheadless
+          PUBLIC
           llcharacter
           llinventory
           llimage
+          llrenderheadless
           llfilesystem
           llmath
           llxml
@@ -90,4 +77,6 @@ if (BUILD_HEADLESS)
           llcorehttp
           llcommon
       )
+
+  target_precompile_headers(llappearanceheadless REUSE_FROM llprecompiled)
 endif (BUILD_HEADLESS)

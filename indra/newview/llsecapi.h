@@ -28,13 +28,14 @@
 #ifndef LLSECAPI_H
 #define LLSECAPI_H
 #include <vector>
-#include "llwin32headerslean.h"
+#include "llwin32headers.h"
 #include <openssl/x509.h>
 #include <ostream>
 #include "llpointer.h"
 #include "llexception.h"
 
 #ifdef LL_WINDOWS
+#pragma warning (push)
 #pragma warning(disable:4250)
 #endif // LL_WINDOWS
 
@@ -53,7 +54,6 @@
 #define CERT_VALID_FROM "valid_from"
 #define CERT_VALID_TO "valid_to"
 #define CERT_SHA1_DIGEST "sha1_digest"
-#define CERT_SHA256_DIGEST "sha256_digest"
 #define CERT_MD5_DIGEST "md5_digest"
 #define CERT_HOSTNAME "hostname"
 #define CERT_BASIC_CONSTRAINTS "basicConstraints"
@@ -550,5 +550,8 @@ void registerSecHandler(const std::string& handler_type,
 
 extern LLPointer<LLSecAPIHandler> gSecAPIHandler;
 
+#ifdef LL_WINDOWS
+#pragma warning (pop)
+#endif // LL_WINDOWS
 
 #endif // LL_SECAPI_H

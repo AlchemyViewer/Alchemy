@@ -75,12 +75,12 @@ namespace tut
 // overloads declared above.
 
 // turn off warnings about unused functions from clang for tut package
-#if __clang__
+#if LL_CLANG
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-function"
 #endif
 #include <tut/tut.hpp>
-#if __clang__
+#if LL_CLANG
 #pragma clang diagnostic pop
 #endif
 
@@ -135,7 +135,7 @@ namespace tut
 
     inline void ensure_memory_matches(const void* actual, U32 actual_len, const void* expected,U32 expected_len)
     {
-        ensure_memory_matches(NULL, actual, actual_len, expected, expected_len);
+        ensure_memory_matches("", actual, actual_len, expected, expected_len);
     }
 
     template <class T,class Q>

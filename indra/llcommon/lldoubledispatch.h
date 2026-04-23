@@ -30,7 +30,7 @@
 #define LL_LLDOUBLEDISPATCH_H
 
 #include <list>
-#include <memory>
+#include <functional>
 
 /**
  * This class supports function calls which are virtual on the dynamic type of
@@ -116,7 +116,7 @@ class LLDoubleDispatch
     typedef LLDoubleDispatch<ReturnType, ParamBaseType> self_type;
 
 public:
-    LLDoubleDispatch() = default;
+    LLDoubleDispatch() {}
 
     /**
      * Call the first matching entry.  If there's no registered Functor
@@ -221,7 +221,7 @@ private:
     /// This is the base class for each entry in our dispatch table.
     struct EntryBase
     {
-        virtual ~EntryBase() = default;
+        virtual ~EntryBase() {}
         virtual bool matches(const ParamBaseType& param1, const ParamBaseType& param2) const = 0;
         virtual ReturnType operator()(ParamBaseType& param1, ParamBaseType& param2) const = 0;
     };

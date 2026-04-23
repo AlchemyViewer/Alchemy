@@ -28,7 +28,7 @@
 
 #include "linden_common.h"
 
-#include "llwin32headerslean.h"
+#include "llwin32headers.h"
 #include "llkeyboardwin32.h"
 
 #include "llwindowcallbacks.h"
@@ -114,29 +114,30 @@ LLKeyboardWin32::LLKeyboardWin32()
     mTranslateKeyMap[VK_CLEAR] = KEY_PAD_CENTER;
 
     // Build inverse map
-    for (auto iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
+    std::map<U16, KEY>::iterator iter;
+    for (iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
     {
         mInvTranslateKeyMap[iter->second] = iter->first;
     }
 
     // numpad map
-    mTranslateNumpadMap[VK_NUMPAD0] = KEY_PAD_INS;  // keypad 0
-    mTranslateNumpadMap[VK_NUMPAD1] = KEY_PAD_END;  // keypad 1
-    mTranslateNumpadMap[VK_NUMPAD2] = KEY_PAD_DOWN; // keypad 2
-    mTranslateNumpadMap[VK_NUMPAD3] = KEY_PAD_PGDN; // keypad 3
-    mTranslateNumpadMap[VK_NUMPAD4] = KEY_PAD_LEFT; // keypad 4
-    mTranslateNumpadMap[VK_NUMPAD5] = KEY_PAD_CENTER;   // keypad 5
-    mTranslateNumpadMap[VK_NUMPAD6] = KEY_PAD_RIGHT;    // keypad 6
-    mTranslateNumpadMap[VK_NUMPAD7] = KEY_PAD_HOME; // keypad 7
-    mTranslateNumpadMap[VK_NUMPAD8] = KEY_PAD_UP;       // keypad 8
-    mTranslateNumpadMap[VK_NUMPAD9] = KEY_PAD_PGUP; // keypad 9
-    mTranslateNumpadMap[VK_MULTIPLY] = KEY_PAD_MULTIPLY;    // keypad *
-    mTranslateNumpadMap[VK_ADD] = KEY_PAD_ADD;  // keypad +
-    mTranslateNumpadMap[VK_SUBTRACT] = KEY_PAD_SUBTRACT;    // keypad -
-    mTranslateNumpadMap[VK_DECIMAL] = KEY_PAD_DEL;  // keypad .
-    mTranslateNumpadMap[VK_DIVIDE] = KEY_PAD_DIVIDE;    // keypad /
+    mTranslateNumpadMap[0x60] = KEY_PAD_INS;    // keypad 0
+    mTranslateNumpadMap[0x61] = KEY_PAD_END;    // keypad 1
+    mTranslateNumpadMap[0x62] = KEY_PAD_DOWN;   // keypad 2
+    mTranslateNumpadMap[0x63] = KEY_PAD_PGDN;   // keypad 3
+    mTranslateNumpadMap[0x64] = KEY_PAD_LEFT;   // keypad 4
+    mTranslateNumpadMap[0x65] = KEY_PAD_CENTER; // keypad 5
+    mTranslateNumpadMap[0x66] = KEY_PAD_RIGHT;  // keypad 6
+    mTranslateNumpadMap[0x67] = KEY_PAD_HOME;   // keypad 7
+    mTranslateNumpadMap[0x68] = KEY_PAD_UP;     // keypad 8
+    mTranslateNumpadMap[0x69] = KEY_PAD_PGUP;   // keypad 9
+    mTranslateNumpadMap[0x6A] = KEY_PAD_MULTIPLY;   // keypad *
+    mTranslateNumpadMap[0x6B] = KEY_PAD_ADD;    // keypad +
+    mTranslateNumpadMap[0x6D] = KEY_PAD_SUBTRACT;   // keypad -
+    mTranslateNumpadMap[0x6E] = KEY_PAD_DEL;    // keypad .
+    mTranslateNumpadMap[0x6F] = KEY_PAD_DIVIDE; // keypad /
 
-    for (auto iter = mTranslateNumpadMap.begin(); iter != mTranslateNumpadMap.end(); iter++)
+    for (iter = mTranslateNumpadMap.begin(); iter != mTranslateNumpadMap.end(); iter++)
     {
         mInvTranslateNumpadMap[iter->second] = iter->first;
     }
@@ -151,22 +152,22 @@ void LLKeyboardWin32::resetMaskKeys()
     // bit to indicate that the key is down.
     if (GetAsyncKeyState(VK_SHIFT) & 0x8000)
     {
-        mKeyLevel[KEY_SHIFT] = TRUE;
+        mKeyLevel[KEY_SHIFT] = true;
     }
 
     if (GetAsyncKeyState(VK_CONTROL) & 0x8000)
     {
-        mKeyLevel[KEY_CONTROL] = TRUE;
+        mKeyLevel[KEY_CONTROL] = true;
     }
 
     if (GetAsyncKeyState(VK_MENU) & 0x8000)
     {
-        mKeyLevel[KEY_ALT] = TRUE;
+        mKeyLevel[KEY_ALT] = true;
     }
 }
 
 
-//void LLKeyboardWin32::setModifierKeyLevel( KEY key, BOOL new_state )
+//void LLKeyboardWin32::setModifierKeyLevel( KEY key, bool new_state )
 //{
 //  if( mKeyLevel[key] != new_state )
 //  {
@@ -190,17 +191,17 @@ MASK LLKeyboardWin32::updateModifiers()
     // (keydown encoded in high order bit of short)
     mKeyLevel[KEY_CAPSLOCK] = (GetKeyState(VK_CAPITAL) & 0x0001) != 0; // Low order bit carries the toggle state.
     // Get mask for keyboard events
-    MASK mask = currentMask(FALSE);
+    MASK mask = currentMask(false);
     return mask;
 }
 
 
 // mask is ignored, except for extended flag -- we poll the modifier keys for the other flags
-BOOL LLKeyboardWin32::handleKeyDown(const U32 key, MASK mask)
+bool LLKeyboardWin32::handleKeyDown(const LLKeyboard::NATIVE_KEY_TYPE key, MASK mask)
 {
     KEY     translated_key;
     U32     translated_mask;
-    BOOL    handled = FALSE;
+    bool    handled = false;
 
     translated_mask = updateModifiers();
 
@@ -213,11 +214,11 @@ BOOL LLKeyboardWin32::handleKeyDown(const U32 key, MASK mask)
 }
 
 // mask is ignored, except for extended flag -- we poll the modifier keys for the other flags
-BOOL LLKeyboardWin32::handleKeyUp(const U32 key, MASK mask)
+bool LLKeyboardWin32::handleKeyUp(const LLKeyboard::NATIVE_KEY_TYPE key, MASK mask)
 {
     KEY     translated_key;
     U32     translated_mask;
-    BOOL    handled = FALSE;
+    bool    handled = false;
 
     translated_mask = updateModifiers();
 
@@ -230,7 +231,7 @@ BOOL LLKeyboardWin32::handleKeyUp(const U32 key, MASK mask)
 }
 
 
-MASK LLKeyboardWin32::currentMask(BOOL)
+MASK LLKeyboardWin32::currentMask(bool)
 {
     MASK mask = MASK_NONE;
 
@@ -262,8 +263,8 @@ void LLKeyboardWin32::scanKeyboard()
     // Reset edges for next frame
     for (key = 0; key < KEY_COUNT; key++)
     {
-        mKeyUp[key] = FALSE;
-        mKeyDown[key] = FALSE;
+        mKeyUp[key] = false;
+        mKeyDown[key] = false;
         if (mKeyLevel[key])
         {
             mKeyLevelFrameCount[key]++;
@@ -271,17 +272,17 @@ void LLKeyboardWin32::scanKeyboard()
     }
 }
 
-BOOL LLKeyboardWin32::translateExtendedKey(const U32 os_key, const MASK mask, KEY *translated_key)
+bool LLKeyboardWin32::translateExtendedKey(const U16 os_key, const MASK mask, KEY *translated_key)
 {
     return translateKey(os_key, translated_key);
 }
 
-U32  LLKeyboardWin32::inverseTranslateExtendedKey(const KEY translated_key)
+U16  LLKeyboardWin32::inverseTranslateExtendedKey(const KEY translated_key)
 {
     // if numlock is on, then we need to translate KEY_PAD_FOO to the corresponding number pad number
     if(GetKeyState(VK_NUMLOCK) & 1)
     {
-        auto iter = mInvTranslateNumpadMap.find(translated_key);
+        std::map<KEY, U16>::iterator iter = mInvTranslateNumpadMap.find(translated_key);
         if (iter != mInvTranslateNumpadMap.end())
         {
             return iter->second;

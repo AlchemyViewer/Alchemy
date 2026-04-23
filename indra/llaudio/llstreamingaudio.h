@@ -51,9 +51,8 @@ class LLStreamingAudioInterface
     virtual void setGain(F32 vol) = 0;
     virtual F32 getGain() = 0;
     virtual std::string getURL() = 0;
-
-    virtual bool supportsAdjustableBufferSizes() = 0;
-    virtual void setBufferSizes(U32 streambuffertime, U32 decodebuffertime) = 0;
+    virtual bool supportsAdjustableBufferSizes(){return false;}
+    virtual void setBufferSizes(U32 streambuffertime, U32 decodebuffertime){};
 
     virtual bool supportsMetaData() = 0;
     using metadata_signal_t = boost::signals2::signal<void(const LLSD& metadata)>;

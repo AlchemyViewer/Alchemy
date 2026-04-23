@@ -32,14 +32,14 @@ LLFloaterPublishClassified::LLFloaterPublishClassified(const LLSD& key)
 {
 }
 
-BOOL LLFloaterPublishClassified::postBuild()
+bool LLFloaterPublishClassified::postBuild()
 {
     LLFloater::postBuild();
 
     childSetAction("publish_btn", boost::bind(&LLFloater::closeFloater, this, false));
     childSetAction("cancel_btn", boost::bind(&LLFloater::closeFloater, this, false));
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterPublishClassified::setPrice(S32 price)

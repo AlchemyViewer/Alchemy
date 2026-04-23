@@ -44,7 +44,7 @@ public:
         LIBRARY
     } ITEM_TYPE;
 
-    typedef boost::function<void(const LLUUID &invItem)>    completion_t;
+    typedef std::function<void(const LLUUID& invItem)> completion_t;
 
     static bool isAvailable();
     static void getCapNames(LLSD& capNames);
@@ -89,7 +89,7 @@ private:
     static const std::string INVENTORY_CAP_NAME;
     static const std::string LIBRARY_CAP_NAME;
 
-    typedef boost::function < LLSD (LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t, LLCore::HttpRequest::ptr_t,
+    typedef std::function<LLSD(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t, LLCore::HttpRequest::ptr_t,
         const std::string, LLSD, LLCore::HttpOptions::ptr_t, LLCore::HttpHeaders::ptr_t) > invokationFn_t;
 
     static void EnqueueAISCommand(const std::string &procName, LLCoprocedureManager::CoProcedure_t proc);
@@ -114,7 +114,10 @@ public:
     void parseUpdate(const LLSD& update);
     void parseMeta(const LLSD& update);
     void parseContent(const LLSD& update);
-    void parseUUIDArray(const LLSD& content, const std::string_view name, uuid_list_t& ids);
+// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
+    static void parseUUIDArray(const LLSD& content, const std::string& name, uuid_list_t& ids);
+// [/SL:KB]
+//  void parseUUIDArray(const LLSD& content, const std::string& name, uuid_list_t& ids);
     void parseLink(const LLSD& link_map, S32 depth);
     void parseItem(const LLSD& link_map);
     void parseCategory(const LLSD& link_map, S32 depth);
@@ -130,11 +133,15 @@ private:
     void clearParseResults();
     void checkTimeout();
 
-    // Fetch can return large packets of data, throttle it to not cause lags
-    // Todo: make throttle work over all fetch requests isntead of per-request
-    const F32 AIS_EXPIRY_SECONDS = 0.008f;
+    // Fetches can return large packets of data,
+    // throttle them individually to not get stuck
+    // on a single large task. And throttle sum total
+    // to not cause lags when multiple large fetches
+    // returned results.
+    const F32 AIS_TASK_EXPIRY_SECONDS = 0.008f;
+    const F32 AIS_BATCH_EXPIRY_SECONDS = 0.010f;
 
-    typedef std::map<LLUUID,S32> uuid_int_map_t;
+    typedef std::map<LLUUID,size_t> uuid_int_map_t;
     uuid_int_map_t mCatDescendentDeltas;
     uuid_int_map_t mCatDescendentsKnown;
     uuid_int_map_t mCatVersionsUpdated;
@@ -154,7 +161,9 @@ private:
     uuid_list_t mCategoryIds;
     bool mFetch;
     S32 mFetchDepth;
-    LLTimer mTimer;
+    LLTimer mTaskTimer;
+    static LLTimer sBatchTimer;
+    static U32 sBatchFrameCount;
     AISAPI::COMMAND_TYPE mType;
 };
 

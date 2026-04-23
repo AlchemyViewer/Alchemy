@@ -46,19 +46,18 @@ public:
     // Maximum number of bytes this could hold once serialized.
     S32 getMaxSerialSize() const;
 
-    BOOL serialize(LLDataPacker& dp) const;
-    BOOL deserialize(LLDataPacker& dp);
+    bool serialize(LLDataPacker& dp) const;
+    bool deserialize(LLDataPacker& dp);
 
     void dump();
 
     void reset();
 
     const std::string& getTrigger() const { return mTrigger; }
-protected:
-    LLMultiGesture(const LLMultiGesture& gest);
-    const LLMultiGesture& operator=(const LLMultiGesture& rhs);
 
-public:
+    LLMultiGesture(const LLMultiGesture& gest) = delete;
+    const LLMultiGesture& operator=(const LLMultiGesture& rhs) = delete;
+
     KEY mKey { 0 };
     MASK mMask { 0 };
 
@@ -75,28 +74,28 @@ public:
     std::vector<LLGestureStep*> mSteps;
 
     // Is the gesture currently playing?
-    BOOL mPlaying { FALSE };
+    bool mPlaying { false };
 
     // "instruction pointer" for steps
     S32 mCurrentStep { 0 };
 
     // We're waiting for triggered animations to stop playing
-    BOOL mWaitingAnimations { FALSE };
+    bool mWaitingAnimations { false };
 
     // We're waiting for key release
-    BOOL mWaitingKeyRelease { FALSE };
+    bool mWaitingKeyRelease { false };
 
     // We're waiting a fixed amount of time
-    BOOL mWaitingTimer { FALSE };
+    bool mWaitingTimer { false };
 
     // We're waiting for triggered animations to stop playing
-    BOOL mTriggeredByKey { FALSE };
+    bool mTriggeredByKey { false };
 
     // Has the key been released?
-    BOOL mKeyReleased { FALSE };
+    bool mKeyReleased { false };
 
     // Waiting after the last step played for all animations to complete
-    BOOL mWaitingAtEnd { FALSE };
+    bool mWaitingAtEnd { false };
 
     // Timer for waiting
     LLFrameTimer mWaitTimer;
@@ -129,8 +128,8 @@ enum EStepType
 class LLGestureStep
 {
 public:
-    LLGestureStep() = default;
-    virtual ~LLGestureStep() = default;
+    LLGestureStep() {}
+    virtual ~LLGestureStep() {}
 
     virtual EStepType getType() = 0;
 
@@ -138,8 +137,8 @@ public:
     virtual std::vector<std::string> getLabel() const = 0;
 
     virtual S32 getMaxSerialSize() const = 0;
-    virtual BOOL serialize(LLDataPacker& dp) const = 0;
-    virtual BOOL deserialize(LLDataPacker& dp) = 0;
+    virtual bool serialize(LLDataPacker& dp) const = 0;
+    virtual bool deserialize(LLDataPacker& dp) = 0;
 
     virtual void dump() = 0;
 };
@@ -153,15 +152,15 @@ class LLGestureStepAnimation : public LLGestureStep
 {
 public:
     LLGestureStepAnimation();
-    virtual ~LLGestureStepAnimation() = default;
+    virtual ~LLGestureStepAnimation();
 
     virtual EStepType getType() { return STEP_ANIMATION; }
 
     virtual std::vector<std::string> getLabel() const;
 
     virtual S32 getMaxSerialSize() const;
-    virtual BOOL serialize(LLDataPacker& dp) const;
-    virtual BOOL deserialize(LLDataPacker& dp);
+    virtual bool serialize(LLDataPacker& dp) const;
+    virtual bool deserialize(LLDataPacker& dp);
 
     virtual void dump();
 
@@ -176,15 +175,15 @@ class LLGestureStepSound : public LLGestureStep
 {
 public:
     LLGestureStepSound();
-    virtual ~LLGestureStepSound() = default;
+    virtual ~LLGestureStepSound();
 
     virtual EStepType getType() { return STEP_SOUND; }
 
     virtual std::vector<std::string> getLabel() const;
 
     virtual S32 getMaxSerialSize() const;
-    virtual BOOL serialize(LLDataPacker& dp) const;
-    virtual BOOL deserialize(LLDataPacker& dp);
+    virtual bool serialize(LLDataPacker& dp) const;
+    virtual bool deserialize(LLDataPacker& dp);
 
     virtual void dump();
 
@@ -199,15 +198,15 @@ class LLGestureStepChat : public LLGestureStep
 {
 public:
     LLGestureStepChat();
-    virtual ~LLGestureStepChat() = default;
+    virtual ~LLGestureStepChat();
 
     virtual EStepType getType() { return STEP_CHAT; }
 
     virtual std::vector<std::string> getLabel() const;
 
     virtual S32 getMaxSerialSize() const;
-    virtual BOOL serialize(LLDataPacker& dp) const;
-    virtual BOOL deserialize(LLDataPacker& dp);
+    virtual bool serialize(LLDataPacker& dp) const;
+    virtual bool deserialize(LLDataPacker& dp);
 
     virtual void dump();
 
@@ -225,15 +224,15 @@ class LLGestureStepWait : public LLGestureStep
 {
 public:
     LLGestureStepWait();
-    virtual ~LLGestureStepWait() = default;
+    virtual ~LLGestureStepWait();
 
     virtual EStepType getType() { return STEP_WAIT; }
 
     virtual std::vector<std::string> getLabel() const;
 
     virtual S32 getMaxSerialSize() const;
-    virtual BOOL serialize(LLDataPacker& dp) const;
-    virtual BOOL deserialize(LLDataPacker& dp);
+    virtual bool serialize(LLDataPacker& dp) const;
+    virtual bool deserialize(LLDataPacker& dp);
 
     virtual void dump();
 

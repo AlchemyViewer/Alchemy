@@ -31,12 +31,14 @@
 #include "llnotificationsutil.h"
 #include "message.h"
 
+#include "alfloaterevent.h"
 #include "llfloaterreg.h"
 #include "llfloaterworldmap.h"
 #include "llfloaterevent.h"
 #include "llagent.h"
 #include "llcommandhandler.h"   // secondlife:///app/... support
 #include "lltrans.h"
+#include "llviewercontrol.h"
 
 class LLEventHandler : public LLCommandHandler
 {
@@ -46,7 +48,7 @@ public:
     bool handle(const LLSD& params,
                 const LLSD& query_map,
                 const std::string& grid,
-                LLMediaCtrl* web) override
+                LLMediaCtrl* web)
     {
         if (params.size() < 2)
         {
@@ -56,12 +58,25 @@ public:
         S32 event_id = params[0].asInteger();
         if(event_command == "details")
         {
-            LLFloaterEvent* floater = LLFloaterReg::getTypedInstance<LLFloaterEvent>("event");
-            if (floater)
+            if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
             {
-                floater->setEventID(event_id);
-                LLFloaterReg::showTypedInstance<LLFloaterEvent>("event");
-                return true;
+                ALFloaterEvent* floater = LLFloaterReg::getTypedInstance<ALFloaterEvent>("event");
+                if (floater)
+                {
+                    floater->setEventID(event_id);
+                    LLFloaterReg::showTypedInstance<ALFloaterEvent>("event");
+                    return true;
+                }
+            }
+            else
+            {
+                LLFloaterEvent* floater = LLFloaterReg::getTypedInstance<LLFloaterEvent>("event");
+                if (floater)
+                {
+                    floater->setEventID(event_id);
+                    LLFloaterReg::showTypedInstance<LLFloaterEvent>("event");
+                    return true;
+                }
             }
         }
         else if(event_command == "notify")
@@ -152,11 +167,24 @@ bool LLEventNotifier::handleResponse(U32 eventId, const LLSD& notification, cons
     {
         case 0:
         {
-            LLFloaterEvent* floater = LLFloaterReg::getTypedInstance<LLFloaterEvent>("event");
-            if (floater)
+            if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
             {
-                floater->setEventID(eventId);
-                LLFloaterReg::showTypedInstance<LLFloaterEvent>("event");
+                ALFloaterEvent* floater = LLFloaterReg::getTypedInstance<ALFloaterEvent>("event");
+                if (floater)
+                {
+                    floater->setEventID(eventId);
+                    LLFloaterReg::showTypedInstance<ALFloaterEvent>("event");
+                    return true;
+                }
+            }
+            else
+            {
+                LLFloaterEvent* floater = LLFloaterReg::getTypedInstance<LLFloaterEvent>("event");
+                if (floater)
+                {
+                    floater->setEventID(eventId);
+                    LLFloaterReg::showTypedInstance<LLFloaterEvent>("event");
+                }
             }
             break;
         }
@@ -166,13 +194,19 @@ bool LLEventNotifier::handleResponse(U32 eventId, const LLSD& notification, cons
     return true;
 }
 
-bool LLEventNotifier::add(const LLEventStruct& event)
+bool LLEventNotifier::add(LLEventInfo event)
 {
-    if (mNewEventSignal(event)) { return false; }
+    if (mEventInfoSignal(event))
+        return false;
 
-    LLEventNotification *new_enp = new LLEventNotification(event.eventId, event.eventEpoch, event.eventDateStr, event.eventName);
+    return add(event.mID, event.mUnixTime, event.mTimeStr, event.mName);
+}
 
-    LL_INFOS() << "Add event " << event.eventName << " id " << event.eventId << " date " << event.eventDateStr << LL_ENDL;
+bool LLEventNotifier::add(U32 eventId, F64 eventEpoch, const std::string& eventDateStr, const std::string &eventName)
+{
+    LLEventNotification *new_enp = new LLEventNotification(eventId, eventEpoch, eventDateStr, eventName);
+
+    LL_INFOS() << "Add event " << eventName << " id " << eventId << " date " << eventDateStr << LL_ENDL;
     if(!new_enp->isValid())
     {
         delete new_enp;
@@ -200,31 +234,9 @@ void LLEventNotifier::add(U32 eventId)
 //static
 void LLEventNotifier::processEventInfoReply(LLMessageSystem *msg, void **)
 {
-    // extract the agent id
-    LLUUID agent_id;
-    U32 event_id;
-    std::string event_name;
-    std::string eventd_date;
-    U32 event_time_utc;
-
-    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id );
-    msg->getU32Fast(_PREHASH_EventData, _PREHASH_EventID, event_id);
-    msg->getStringFast(_PREHASH_EventData, _PREHASH_Name, event_name);
-    msg->getStringFast(_PREHASH_EventData, _PREHASH_Date, eventd_date);
-    msg->getU32Fast(_PREHASH_EventData, _PREHASH_DateUTC, event_time_utc);
-
-    LLEventStruct event(event_id, (F64)event_time_utc, eventd_date, event_name);
-    msg->getString(_PREHASH_EventData, _PREHASH_Creator, event.creator);
-    msg->getString(_PREHASH_EventData, _PREHASH_Category, event.category);
-    msg->getString(_PREHASH_EventData, _PREHASH_Desc, event.desc);
-    msg->getU32(_PREHASH_EventData, _PREHASH_Duration, event.duration);
-    msg->getU32(_PREHASH_EventData, _PREHASH_Cover, event.cover);
-    msg->getU32(_PREHASH_EventData, _PREHASH_Amount, event.amount);
-    msg->getString(_PREHASH_EventData, _PREHASH_SimName, event.simName);
-    msg->getVector3d(_PREHASH_EventData, _PREHASH_GlobalPos, event.globalPos);
-    msg->getU32(_PREHASH_EventData, _PREHASH_EventFlags, event.flags);
-
-    gEventNotifier.add(event);
+    LLEventInfo info;
+    info.unpack(msg);
+    gEventNotifier.add(info);
 }
 
 
@@ -247,33 +259,38 @@ void LLEventNotifier::load(const LLSD& event_options)
             is_iso8601_date = true;
         }
 
-        std::string dateStr = response["event_date"].asString();
-
         if (is_iso8601_date)
         {
-            std::string iso8601date =
-                "[" + LLTrans::getString("LTimeYear") + "]-[" + LLTrans::getString("LTimeMthNum") + "]-["
-                    + LLTrans::getString("LTimeDay") + "] [" + LLTrans::getString("LTimeHour") + "]:["
-                    + LLTrans::getString("LTimeMin") + "]:[" + LLTrans::getString("LTimeSec") + "]";
+            std::string dateStr;
+
+            dateStr = "[" + LLTrans::getString("LTimeYear") + "]-["
+                + LLTrans::getString("LTimeMthNum") + "]-["
+                + LLTrans::getString("LTimeDay") + "] ["
+                + LLTrans::getString("LTimeHour") + "]:["
+                + LLTrans::getString("LTimeMin") + "]:["
+                + LLTrans::getString("LTimeSec") + "]";
 
             LLSD substitution;
             substitution["datetime"] = date;
-            LLStringUtil::format(iso8601date, substitution);
-            dateStr = iso8601date;
-        }
+            LLStringUtil::format(dateStr, substitution);
 
-        add(LLEventStruct(response["event_id"].asInteger(), response["event_date_ut"], dateStr, response["event_name"].asString()));
+            add(response["event_id"].asInteger(), response["event_date_ut"], dateStr, response["event_name"].asString());
+        }
+        else
+        {
+            add(response["event_id"].asInteger(), response["event_date_ut"], response["event_date"].asString(), response["event_name"].asString());
+        }
     }
 }
 
 
-BOOL LLEventNotifier::hasNotification(const U32 event_id)
+bool LLEventNotifier::hasNotification(const U32 event_id)
 {
     if (mEventNotifications.find(event_id) != mEventNotifications.end())
     {
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 void LLEventNotifier::remove(const U32 event_id)
@@ -304,6 +321,52 @@ void LLEventNotifier::serverPushRequest(U32 event_id, bool add)
     gAgent.sendReliableMessage();
 }
 
+void LLEventInfo::unpack(LLMessageSystem* msg)
+{
+    U32 event_id;
+    msg->getU32Fast(_PREHASH_EventData, _PREHASH_EventID, event_id);
+    mID = event_id;
+
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_Name, mName);
+
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_Category, mCategoryStr);
+
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_Date, mTimeStr);
+
+    U32 duration;
+    msg->getU32Fast(_PREHASH_EventData, _PREHASH_Duration, duration);
+    mDuration = duration;
+
+    U32 date;
+    msg->getU32Fast(_PREHASH_EventData, _PREHASH_DateUTC, date);
+    mUnixTime = date;
+
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_Desc, mDesc);
+
+    std::string buffer;
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_Creator, buffer);
+    mRunByID = LLUUID(buffer);
+
+    U32 foo;
+    msg->getU32Fast(_PREHASH_EventData, _PREHASH_Cover, foo);
+
+    mHasCover = foo ? true : false;
+    if (mHasCover)
+    {
+        U32 cover;
+        msg->getU32Fast(_PREHASH_EventData, _PREHASH_Amount, cover);
+        mCover = cover;
+    }
+
+    msg->getStringFast(_PREHASH_EventData, _PREHASH_SimName, mSimName);
+
+    msg->getVector3dFast(_PREHASH_EventData, _PREHASH_GlobalPos, mPosGlobal);
+
+    // Mature content
+    U32 event_flags;
+    msg->getU32Fast(_PREHASH_EventData, _PREHASH_EventFlags, event_flags);
+    mEventFlags = event_flags;
+}
 
 LLEventNotification::LLEventNotification(U32 eventId, F64 eventEpoch, const std::string& eventDateStr, const std::string &eventName) :
     mEventID(eventId),

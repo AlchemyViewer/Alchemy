@@ -28,7 +28,6 @@
 #define LL_LLANIMATIONSTATES_H
 
 #include <map>
-#include "boost/unordered/unordered_flat_map.hpp"
 
 #include "llstringtable.h"
 #include "lluuid.h"
@@ -204,12 +203,12 @@ class LLAnimationLibrary
 private:
     LLStringTable mAnimStringTable;
 
-    typedef boost::unordered_flat_map<LLUUID, char *> anim_map_t;
+    typedef std::map<LLUUID, char *> anim_map_t;
     anim_map_t mAnimMap;
 
 public:
     LLAnimationLibrary();
-    ~LLAnimationLibrary() = default;
+    ~LLAnimationLibrary();
 
     //-----------------------------------------------------------------------------
     // Return the text name of a single animation state,
@@ -221,7 +220,7 @@ public:
     // Return the animation state for the given name.
     // Retun NULL if the name is invalid.
     //-----------------------------------------------------------------------------
-    LLUUID stringToAnimState( const std::string& name, BOOL allow_ids = TRUE );
+    LLUUID stringToAnimState( const std::string& name, bool allow_ids = true );
 
     //-----------------------------------------------------------------------------
     // Associate an anim state with a name

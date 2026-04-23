@@ -43,6 +43,8 @@ LLDockControl::LLDockControl(LLView* dockWidget, LLFloater* dockableFloater,
         mDockWidgetHandle = dockWidget->getHandle();
     }
 
+    mNonToolbarPanelHandle = mDockableFloater->getRootView()->getChild<LLView>("non_toolbar_panel")->getHandle();
+
     if (dockableFloater->isDocked())
     {
         on();
@@ -76,6 +78,10 @@ LLDockControl::LLDockControl(LLView* dockWidget, LLFloater* dockableFloater,
     }
 }
 
+LLDockControl::~LLDockControl()
+{
+}
+
 void LLDockControl::setDock(LLView* dockWidget)
 {
     if (dockWidget != NULL)
@@ -93,11 +99,10 @@ void LLDockControl::setDock(LLView* dockWidget)
 
 void LLDockControl::getAllowedRect(LLRect& rect)
 {
-    if (!mNonToolbarPanelHandle.get())
+    if(!mNonToolbarPanelHandle.isDead())
     {
-        mNonToolbarPanelHandle = LLUI::getRootView()->getChild<LLLayoutPanel>("non_toolbar_panel")->getHandle();
+        rect = mNonToolbarPanelHandle.get()->getRect();
     }
-    rect = mNonToolbarPanelHandle.get()->getRect();
 }
 
 void LLDockControl::repositionDockable()
@@ -151,7 +156,7 @@ void LLDockControl::repositionDockable()
     }
 }
 
-bool LLDockControl::isDockVisible()
+bool LLDockControl::isDockVisible() const
 {
     bool res = true;
 

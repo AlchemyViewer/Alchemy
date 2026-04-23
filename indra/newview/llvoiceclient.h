@@ -344,13 +344,13 @@ public:
 };
 
 
-class LLVoiceClient: public LLParamSingleton<LLVoiceClient>
+class LLVoiceClient: public LLSimpleton<LLVoiceClient>
 {
-    LLSINGLETON(LLVoiceClient, LLPumpIO *pump);
     LOG_CLASS(LLVoiceClient);
+public:
+    LLVoiceClient(LLPumpIO* pump);
     ~LLVoiceClient();
 
-public:
     typedef boost::signals2::signal<void(void)> micro_changed_signal_t;
     micro_changed_signal_t mMicroChangedSignal;
 
@@ -495,7 +495,7 @@ public:
     /// @name Voice effects
     //@{
     bool getVoiceEffectEnabled() const { return mVoiceEffectEnabled; };
-    LLUUID getVoiceEffectDefault() const { return LLUUID(mVoiceEffectDefault()); };
+    LLUUID getVoiceEffectDefault() const { return LLUUID(mVoiceEffectDefault); };
 
     // Returns NULL if voice effects are not supported, or not enabled.
     LLVoiceEffectInterface* getVoiceEffectInterface() const;

@@ -41,7 +41,7 @@
        layout="topleft"
        halign="center"
     >
-        Tell everyone about your favorite places in [CURRENT_GRID].
+        Tell everyone about your favorite places in Second Life.
       </text>
       <button
        name="new_btn"

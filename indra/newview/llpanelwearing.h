@@ -41,7 +41,6 @@ class LLListContextMenu;
 class LLScrollListCtrl;
 class LLWearableItemsList;
 class LLWearingGearMenu;
-class LLTextBox;
 
 /**
  * @class LLPanelWearing
@@ -56,7 +55,7 @@ public:
     LLPanelWearing();
     virtual ~LLPanelWearing();
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     /*virtual*/ void draw();
 
@@ -85,7 +84,10 @@ public:
     void onEditAttachment();
     void onRemoveAttachment();
 
-    void updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity);
+    void updateMenuItemsVisibility() {};
+    LLToggleableMenu* getGearMenu();
+    LLToggleableMenu* getSortMenu();
+    bool getTrashMenuVisible() { return false; }
 
 private:
     void onWearableItemsListRightClick(LLUICtrl* ctrl, S32 x, S32 y);
@@ -96,15 +98,13 @@ private:
     LLWearableItemsList*            mCOFItemsList;
     LLScrollListCtrl*               mTempItemsList;
     LLWearingGearMenu*              mGearMenu;
+    boost::signals2::connection     mGearMenuConnection;
     LLListContextMenu*              mContextMenu;
     LLListContextMenu*              mAttachmentsMenu;
 
     LLAccordionCtrlTab*             mWearablesTab;
     LLAccordionCtrlTab*             mAttachmentsTab;
     LLAccordionCtrl*                mAccordionCtrl;
-
-    LLTextBox*                      mAvatarComplexityLabel;
-    std::map<LLUUID, U32>           mTempItemComplexityMap;
 
     std::map<LLUUID, LLViewerObject*> mAttachmentsMap;
 

@@ -30,14 +30,14 @@
 
 #include "llfloater.h"
 
-class LLFloaterDestinations final :
+class LLFloaterDestinations:
     public LLFloater
 {
     friend class LLFloaterReg;
 private:
     LLFloaterDestinations(const LLSD& key);
-    /*virtual*/ ~LLFloaterDestinations();
-    /*virtual*/ BOOL postBuild();
+    ~LLFloaterDestinations();
+    bool postBuild() override;
 };
 
 #endif

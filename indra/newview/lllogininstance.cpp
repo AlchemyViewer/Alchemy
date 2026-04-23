@@ -33,9 +33,6 @@
 #include "stringize.h"
 #include "llsdserialize.h"
 
-// llmessage (!)
-#include "llfiltersd2xmlrpc.h" // for xml_escape_string()
-
 // login
 #include "lllogin.h"
 
@@ -64,8 +61,8 @@
 #include <sstream>
 
 const S32 LOGIN_MAX_RETRIES = 0; // Viewer should not autmatically retry login
-const F32 LOGIN_SRV_TIMEOUT_MIN = 10.f;
-const F32 LOGIN_SRV_TIMEOUT_MAX = 120.f;
+const F32 LOGIN_SRV_TIMEOUT_MIN = 10;
+const F32 LOGIN_SRV_TIMEOUT_MAX = 180;
 const F32 LOGIN_DNS_TIMEOUT_FACTOR = 0.9f; // make DNS wait shorter then retry time
 
 class LLLoginInstance::Disposable {
@@ -83,7 +80,7 @@ std::string construct_start_string();
 
 
 LLLoginInstance::LLLoginInstance() :
-    mLoginModule(new LLLogin()),
+    mLoginModule(std::make_unique<LLLogin>()),
     mNotifications(NULL),
     mLoginState("offline"),
     mSaveMFA(true),
@@ -197,20 +194,8 @@ void LLLoginInstance::constructAuthParams(LLPointer<LLCredential> user_credentia
     requested_options.append("global-textures");
     if(gSavedSettings.getBOOL("ConnectAsGod"))
     {
-        gSavedSettings.setBOOL("UseDebugMenus", TRUE);
+        gSavedSettings.setBOOL("UseDebugMenus", true);
         requested_options.append("god-connect");
-    }
-
-    // Hey guys, let's stuff all the opensim options right here, ok?
-    if (LLGridManager::getInstance()->isInOpenSim())
-    {
-        requested_options.append("avatar_picker_url");
-        requested_options.append("classified_fee");
-        requested_options.append("currency");
-        requested_options.append("destination_guide_url");
-        requested_options.append("max_groups");
-        requested_options.append("profile-server-url");
-        requested_options.append("search");
     }
 
     LLSD request_params;
@@ -227,6 +212,7 @@ void LLLoginInstance::constructAuthParams(LLPointer<LLCredential> user_credentia
     request_params["read_critical"] = false; // handleTOSResponse
     request_params["last_exec_event"] = mLastExecEvent;
     request_params["last_exec_duration"] = mLastExecDuration;
+    request_params["last_exec_session_id"] = mLastAgentSessionId.asString();
     request_params["mac"] = (char*)hashed_unique_id_string;
     request_params["version"] = LLVersionInfo::instance().getVersion();
     request_params["channel"] = LLVersionInfo::instance().getChannel();
@@ -291,7 +277,6 @@ void LLLoginInstance::constructAuthParams(LLPointer<LLCredential> user_credentia
     mRequestData["params"] = request_params;
     mRequestData["options"] = requested_options;
     mRequestData["http_params"] = http_params;
-    mRequestData["wait_for_updater"] = false;
 }
 
 bool LLLoginInstance::handleLoginEvent(const LLSD& event)
@@ -326,19 +311,21 @@ void LLLoginInstance::handleLoginFailure(const LLSD& event)
     // Login has failed.
     // Figure out why and respond...
     LLSD response = event["data"];
-    LLSD updater  = response["updater"];
-
-    // Always provide a response to the updater, if in fact the updater
-    // contacted us, if in fact the ping contains a 'reply' key. Most code
-    // paths tell it not to proceed with updating.
-    ResponsePtr resp(std::make_shared<LLEventAPI::Response>
-                         (LLSDMap("update", false), updater));
 
     std::string reason_response = response["reason"].asString();
     std::string message_response = response["message"].asString();
     LL_DEBUGS("LLLogin") << "reason " << reason_response
                          << " message " << message_response
                          << LL_ENDL;
+
+    if (response.has("mfa_hash"))
+    {
+        mRequestData["params"]["mfa_hash"] = response["mfa_hash"];
+        mRequestData["params"]["token"] = "";
+
+        saveMFAHash(response);
+    }
+
     // For the cases of critical message or TOS agreement,
     // start the TOS dialog. The dialog response will be handled
     // by the LLLoginInstance::handleTOSResponse() callback.
@@ -352,7 +339,7 @@ void LLLoginInstance::handleLoginFailure(const LLSD& event)
         data["message"] = message_response;
         data["reply_pump"] = TOS_REPLY_PUMP;
         if (gViewerWindow)
-            gViewerWindow->setShowProgress(FALSE);
+            gViewerWindow->setShowProgress(false);
         LLFloaterReg::showInstance("message_tos", data);
         LLEventPumps::instance().obtain(TOS_REPLY_PUMP)
             .listen(TOS_LISTENER_NAME,
@@ -376,7 +363,7 @@ void LLLoginInstance::handleLoginFailure(const LLSD& event)
         }
 
         if (gViewerWindow)
-            gViewerWindow->setShowProgress(FALSE);
+            gViewerWindow->setShowProgress(false);
 
         LLFloaterReg::showInstance("message_critical", data);
         LLEventPumps::instance().obtain(TOS_REPLY_PUMP)
@@ -386,26 +373,15 @@ void LLLoginInstance::handleLoginFailure(const LLSD& event)
     }
     else if(reason_response == "update")
     {
-        // This can happen if the user clicked Login quickly, before we heard
-        // back from the Viewer Version Manager, but login failed because
-        // login.cgi is insisting on a required update. We were called with an
-        // event that bundles both the login.cgi 'response' and the
-        // synchronization event from the 'updater'.
+        // login.cgi rejected login and requires an update. Since Velopack
+        // handles updates now, the best we can do here is tell the user
+        // to download the update manually via the release notes URL.
         std::string login_version = response["message_args"]["VERSION"];
-        std::string vvm_version   = updater["VERSION"];
-        std::string relnotes      = updater["URL"];
         LL_WARNS("LLLogin") << "Login failed because an update to version " << login_version << " is required." << LL_ENDL;
-        // vvm_version might be empty because we might not have gotten
-        // SLVersionChecker's LoginSync handshake. But if it IS populated, it
-        // should (!) be the same as the version we got from login.cgi.
-        if ((! vvm_version.empty()) && vvm_version != login_version)
-        {
-            LL_WARNS("LLLogin") << "VVM update version " << vvm_version
-                                << " differs from login version " << login_version
-                                << "; presenting VVM version to match release notes URL"
-                                << LL_ENDL;
-            login_version = vvm_version;
-        }
+
+        // Try to use the release notes URL from the VVM query if available,
+        // otherwise fall back to constructing one from the version.
+        std::string relnotes = LLVersionInfo::instance().getReleaseNotes();
         if (relnotes.empty() || relnotes.find("://") == std::string::npos)
         {
             relnotes = LLTrans::getString("RELEASE_NOTES_BASE_URL");
@@ -415,38 +391,17 @@ void LLLoginInstance::handleLoginFailure(const LLSD& event)
         }
 
         if (gViewerWindow)
-            gViewerWindow->setShowProgress(FALSE);
+            gViewerWindow->setShowProgress(false);
 
         LLSD args;
         args["VERSION"] = login_version;
         args["URL"] = relnotes;
 
-        if (updater.isUndefined())
-        {
-            // If the updater failed to shake hands, better advise the user to
-            // download the update him/herself.
-            LLNotificationsUtil::add(
-                "RequiredUpdate",
-                args,
-                updater,
-                boost::bind(&LLLoginInstance::handleLoginDisallowed, this, _1, _2));
-        }
-        else
-        {
-            // If we've heard from the updater that an update is required,
-            // then display the prompt that assures the user we'll take care
-            // of it. This is the one case in which we bind 'resp':
-            // instead of destroying our Response object (and thus sending a
-            // negative reply to the updater) as soon as we exit this
-            // function, bind our shared_ptr so it gets passed into
-            // syncWithUpdater. That ensures that the response is delayed
-            // until the user has responded to the notification.
-            LLNotificationsUtil::add(
-                "PauseForUpdate",
-                args,
-                updater,
-                boost::bind(&LLLoginInstance::syncWithUpdater, this, resp, _1, _2));
-        }
+        LLNotificationsUtil::add(
+            "RequiredUpdate",
+            args,
+            LLSD(),
+            boost::bind(&LLLoginInstance::handleLoginDisallowed, this, _1, _2));
     }
     else if(reason_response == "mfa_challenge")
     {
@@ -454,7 +409,7 @@ void LLLoginInstance::handleLoginFailure(const LLSD& event)
 
         if (gViewerWindow)
         {
-            gViewerWindow->setShowProgress(FALSE);
+            gViewerWindow->setShowProgress(false);
         }
 
         showMFAChallange(LLTrans::getString(response["message_id"].asString()));
@@ -474,23 +429,10 @@ void LLLoginInstance::handleLoginFailure(const LLSD& event)
         LL_WARNS("LLLogin") << "Login failed for an unknown reason: " << LLSDOStreamer<LLSDNotationFormatter>(response) << LL_ENDL;
 
         if (gViewerWindow)
-            gViewerWindow->setShowProgress(FALSE);
+            gViewerWindow->setShowProgress(false);
 
         LLNotificationsUtil::add("LoginFailedUnknown", LLSD::emptyMap(), LLSD::emptyMap(), boost::bind(&LLLoginInstance::handleLoginDisallowed, this, _1, _2));
     }
-}
-
-void LLLoginInstance::syncWithUpdater(ResponsePtr resp, const LLSD& notification, const LLSD& response)
-{
-    LL_INFOS("LLLogin") << "LLLoginInstance::syncWithUpdater" << LL_ENDL;
-    // 'resp' points to an instance of LLEventAPI::Response that will be
-    // destroyed as soon as we return and the notification response functor is
-    // unregistered. Modify it so that it tells the updater to go ahead and
-    // perform the update. Naturally, if we allowed the user a choice as to
-    // whether to proceed or not, this assignment would reflect the user's
-    // selection.
-    (*resp)["update"] = true;
-    attemptComplete();
 }
 
 void LLLoginInstance::handleLoginDisallowed(const LLSD& notification, const LLSD& response)
@@ -603,10 +545,22 @@ bool LLLoginInstance::handleMFAChallenge(LLSD const & notif, LLSD const & respon
     return true;
 }
 
-void LLLoginInstance::attemptComplete()
+void LLLoginInstance::saveMFAHash(LLSD const& response)
 {
-    mAttemptComplete = true;
-    LLGridManager::getInstance()->setLoggedIn(mLoginState == LLStringExplicit("online"));
+    std::string grid(LLGridManager::getInstance()->getGridId());
+    std::string user_id(LLStartUp::getUserId());
+
+    // Only save mfa_hash for future logins if the user wants their info remembered.
+    if (response.has("mfa_hash") && gSavedSettings.getBOOL("RememberUser") && LLLoginInstance::getInstance()->saveMFA())
+    {
+        gSecAPIHandler->addToProtectedMap("mfa_hash", grid, user_id, response["mfa_hash"]);
+    }
+    else if (!LLLoginInstance::getInstance()->saveMFA())
+    {
+        gSecAPIHandler->removeFromProtectedMap("mfa_hash", grid, user_id);
+    }
+    // TODO(brad) - related to SL-17223 consider building a better interface that sync's automatically
+    gSecAPIHandler->syncProtectedMap();
 }
 
 std::string construct_start_string()
@@ -619,13 +573,14 @@ std::string construct_start_string()
         {
             // a startup URL was specified
             LLVector3 position = start_slurl.getPosition();
-            std::string unescaped_start =
+            // NOTE - do not xml escape here, will get escaped properly later by LLSD::asXMLRPCValue()
+            // see secondlife/viewer#2395
+            start =
             STRINGIZE(  "uri:"
                       << start_slurl.getRegion() << "&"
                         << position[VX] << "&"
                         << position[VY] << "&"
                         << position[VZ]);
-            start = xml_escape_string(unescaped_start);
             break;
         }
         case LLSLURL::HOME_LOCATION:

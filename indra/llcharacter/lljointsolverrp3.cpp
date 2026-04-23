@@ -53,9 +53,17 @@ LLJointSolverRP3::LLJointSolverRP3()
     mLengthAB = 1.0f;
     mLengthBC = 1.0f;
     mPoleVector.setVec( 1.0f, 0.0f, 0.0f );
-    mbUseBAxis = FALSE;
+    mbUseBAxis = false;
     mTwist = 0.0f;
-    mFirstTime = TRUE;
+    mFirstTime = true;
+}
+
+
+//-----------------------------------------------------------------------------
+// Destructor
+//-----------------------------------------------------------------------------
+/*virtual*/ LLJointSolverRP3::~LLJointSolverRP3()
+{
 }
 
 
@@ -106,7 +114,7 @@ void LLJointSolverRP3::setBAxis( const LLVector3& bAxis )
 {
     mBAxis = bAxis;
     mBAxis.normVec();
-    mbUseBAxis = TRUE;
+    mbUseBAxis = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -162,14 +170,12 @@ void LLJointSolverRP3::solve()
     //-------------------------------------------------------------------------
     // get the poleVector in world space
     //-------------------------------------------------------------------------
-    LLVector3 poleVec = mPoleVector;
+    LLMatrix4 worldJointAParentMat;
     if ( mJointA->getParent() )
     {
-        LLVector4a pole_veca;
-        pole_veca.load3(mPoleVector.mV);
-        mJointA->getParent()->getWorldMatrix().rotate(pole_veca,pole_veca);
-        poleVec.set(pole_veca.getF32ptr());
+        worldJointAParentMat = mJointA->getParent()->getWorldMatrix();
     }
+    LLVector3 poleVec = rotate_vector( mPoleVector, worldJointAParentMat );
 
     //-------------------------------------------------------------------------
     // compute the following:

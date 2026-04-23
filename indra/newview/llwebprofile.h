@@ -51,11 +51,13 @@ class LLWebProfile
     LOG_CLASS(LLWebProfile);
 
 public:
-    typedef boost::function<void(bool ok)> status_callback_t;
+    typedef std::function<void(bool ok)> status_callback_t;
 
     static void uploadImage(LLPointer<LLImageFormatted> image, const std::string& caption, bool add_location);
     static void setAuthCookie(const std::string& cookie);
     static void setImageUploadResultCallback(status_callback_t cb) { mStatusCallback = cb; }
+
+    static constexpr S32 MAX_WEB_DATASIZE = 8 * 1024 * 1024; // 8MB
 
 private:
     static LLCore::HttpHeaders::ptr_t buildDefaultHeaders();

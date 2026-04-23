@@ -1,40 +1,16 @@
-include(Linking)
-include(Prebuilt)
-
 include_guard()
-
-add_library( ll::apr INTERFACE IMPORTED )
-
-use_system_binary( apr apr-util )
-use_prebuilt_binary(apr_suite)
+add_library(ll::apr INTERFACE IMPORTED)
 
 if (WINDOWS)
-    set(APR_selector "")
-    target_link_libraries( ll::apr INTERFACE
-          debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}apr-1.lib
-          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}apr-1.lib
-          debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}apriconv-1.lib
-          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}apriconv-1.lib
-          debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}aprutil-1.lib
-          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}aprutil-1.lib
-          )
-    target_compile_definitions( ll::apr INTERFACE APR_DECLARE_STATIC=1 APU_DECLARE_STATIC=1 API_DECLARE_STATIC=1)
-elseif (DARWIN)
-  target_link_libraries( ll::apr INTERFACE
-          debug ${ARCH_PREBUILT_DIRS_DEBUG}/libapr-1.a
-          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libapr-1.a
-          debug ${ARCH_PREBUILT_DIRS_DEBUG}/libaprutil-1.a
-          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libaprutil-1.a
-          iconv
-          )
-
+  find_package(apr CONFIG REQUIRED)
+  target_link_libraries(ll::apr INTERFACE
+    $<$<TARGET_EXISTS:apr::apr-1>:apr::apr-1>
+    $<$<TARGET_EXISTS:apr::aprapp-1>:apr::aprapp-1>
+    $<$<TARGET_EXISTS:apr::libapr-1>:apr::libapr-1>
+    $<$<TARGET_EXISTS:apr::libaprapp-1>:apr::libaprapp-1>
+  )
 else()
-  target_link_libraries( ll::apr INTERFACE
-          debug ${ARCH_PREBUILT_DIRS_DEBUG}/libapr-1.a
-          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libapr-1.a
-          debug ${ARCH_PREBUILT_DIRS_DEBUG}/libaprutil-1.a
-          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libaprutil-1.a
-          rt
-          )
-endif ()
-target_include_directories( ll::apr SYSTEM INTERFACE  ${LIBS_PREBUILT_DIR}/include/apr-1 )
+  find_package(PkgConfig)
+  pkg_check_modules(APR REQUIRED IMPORTED_TARGET GLOBAL apr-1)
+  target_link_libraries(ll::apr INTERFACE PkgConfig::APR)
+endif()

@@ -40,6 +40,13 @@
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
+// LLPose
+//-----------------------------------------------------------------------------
+LLPose::~LLPose()
+{
+}
+
+//-----------------------------------------------------------------------------
 // getFirstJointState()
 //-----------------------------------------------------------------------------
 LLJointState* LLPose::getFirstJointState()
@@ -74,31 +81,31 @@ LLJointState *LLPose::getNextJointState()
 //-----------------------------------------------------------------------------
 // addJointState()
 //-----------------------------------------------------------------------------
-BOOL LLPose::addJointState(const LLPointer<LLJointState>& jointState)
+bool LLPose::addJointState(const LLPointer<LLJointState>& jointState)
 {
     if (mJointMap.find(jointState->getJoint()->getName()) == mJointMap.end())
     {
         mJointMap[jointState->getJoint()->getName()] = jointState;
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
 // removeJointState()
 //-----------------------------------------------------------------------------
-BOOL LLPose::removeJointState(const LLPointer<LLJointState>& jointState)
+bool LLPose::removeJointState(const LLPointer<LLJointState>& jointState)
 {
     mJointMap.erase(jointState->getJoint()->getName());
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
 // removeAllJointStates()
 //-----------------------------------------------------------------------------
-BOOL LLPose::removeAllJointStates()
+bool LLPose::removeAllJointStates()
 {
     mJointMap.clear();
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -174,20 +181,25 @@ LLJointStateBlender::LLJointStateBlender()
     {
         mJointStates[i] = NULL;
         mPriorities[i] = S32_MIN;
-        mAdditiveBlends[i] = FALSE;
+        mAdditiveBlends[i] = false;
     }
+}
+
+LLJointStateBlender::~LLJointStateBlender()
+{
+
 }
 
 //-----------------------------------------------------------------------------
 // addJointState()
 //-----------------------------------------------------------------------------
-BOOL LLJointStateBlender::addJointState(const LLPointer<LLJointState>& joint_state, S32 priority, BOOL additive_blend)
+bool LLJointStateBlender::addJointState(const LLPointer<LLJointState>& joint_state, S32 priority, bool additive_blend)
 {
     llassert(joint_state);
 
     if (!joint_state->getJoint())
         // this joint state doesn't point to an actual joint, so we don't care about applying it
-        return FALSE;
+        return false;
 
     for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
     {
@@ -196,7 +208,7 @@ BOOL LLJointStateBlender::addJointState(const LLPointer<LLJointState>& joint_sta
             mJointStates[i] = joint_state;
             mPriorities[i] = priority;
             mAdditiveBlends[i] = additive_blend;
-            return TRUE;
+            return true;
         }
         else if (priority > mPriorities[i])
         {
@@ -213,17 +225,17 @@ BOOL LLJointStateBlender::addJointState(const LLPointer<LLJointState>& joint_sta
             mJointStates[i] = joint_state;
             mPriorities[i] = priority;
             mAdditiveBlends[i] = additive_blend;
-            return TRUE;
+            return true;
         }
     }
 
-    return FALSE;
+    return false;
 }
 
 //-----------------------------------------------------------------------------
 // blendJointStates()
 //-----------------------------------------------------------------------------
-void LLJointStateBlender::blendJointStates(BOOL apply_now)
+void LLJointStateBlender::blendJointStates(bool apply_now)
 {
     // we need at least one joint to blend
     // if there is one, it will be in slot zero according to insertion logic
@@ -449,14 +461,14 @@ LLPoseBlender::LLPoseBlender()
 
 LLPoseBlender::~LLPoseBlender()
 {
-    std::for_each(mJointStateBlenderPool.begin(), mJointStateBlenderPool.end(), DeletePairedPointer());
+    for_each(mJointStateBlenderPool.begin(), mJointStateBlenderPool.end(), DeletePairedPointer());
     mJointStateBlenderPool.clear();
 }
 
 //-----------------------------------------------------------------------------
 // addMotion()
 //-----------------------------------------------------------------------------
-BOOL LLPoseBlender::addMotion(LLMotion* motion)
+bool LLPoseBlender::addMotion(LLMotion* motion)
 {
     LLPose* pose = motion->getPose();
 
@@ -464,8 +476,7 @@ BOOL LLPoseBlender::addMotion(LLMotion* motion)
     {
         LLJoint *jointp = jsp->getJoint();
         LLJointStateBlender* joint_blender;
-        auto joint_iter = mJointStateBlenderPool.find(jointp);
-        if (joint_iter == mJointStateBlenderPool.end())
+        if (mJointStateBlenderPool.find(jointp) == mJointStateBlenderPool.end())
         {
             // this is the first time we are animating this joint
             // so create new jointblender and add it to our pool
@@ -474,7 +485,7 @@ BOOL LLPoseBlender::addMotion(LLMotion* motion)
         }
         else
         {
-            joint_blender = joint_iter->second;
+            joint_blender = mJointStateBlenderPool[jointp];
         }
 
         if (jsp->getPriority() == LLJoint::USE_MOTION_PRIORITY)
@@ -489,10 +500,10 @@ BOOL LLPoseBlender::addMotion(LLMotion* motion)
         // add it to our list of active blenders
         if (std::find(mActiveBlenders.begin(), mActiveBlenders.end(), joint_blender) == mActiveBlenders.end())
         {
-            mActiveBlenders.push_front(joint_blender);
+            mActiveBlenders.push_back(joint_blender);
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -500,8 +511,10 @@ BOOL LLPoseBlender::addMotion(LLMotion* motion)
 //-----------------------------------------------------------------------------
 void LLPoseBlender::blendAndApply()
 {
-    for (LLJointStateBlender* jsbp : mActiveBlenders)
+    for (blender_list_t::reverse_iterator iter = mActiveBlenders.rbegin(), end = mActiveBlenders.rend();
+         iter != end; )
     {
+        LLJointStateBlender* jsbp = *iter++;
         jsbp->blendJointStates();
     }
 
@@ -512,17 +525,17 @@ void LLPoseBlender::blendAndApply()
 //-----------------------------------------------------------------------------
 // blendAndCache()
 //-----------------------------------------------------------------------------
-void LLPoseBlender::blendAndCache(BOOL reset_cached_joints)
+void LLPoseBlender::blendAndCache(bool reset_cached_joints)
 {
-    for (blender_list_t::iterator iter = mActiveBlenders.begin();
-         iter != mActiveBlenders.end(); ++iter)
+    for (blender_list_t::reverse_iterator iter = mActiveBlenders.rbegin(), end = mActiveBlenders.rend();
+         iter != end; ++iter)
     {
         LLJointStateBlender* jsbp = *iter;
         if (reset_cached_joints)
         {
             jsbp->resetCachedJoint();
         }
-        jsbp->blendJointStates(FALSE);
+        jsbp->blendJointStates(false);
     }
 }
 
@@ -531,8 +544,8 @@ void LLPoseBlender::blendAndCache(BOOL reset_cached_joints)
 //-----------------------------------------------------------------------------
 void LLPoseBlender::interpolate(F32 u)
 {
-    for (blender_list_t::iterator iter = mActiveBlenders.begin();
-         iter != mActiveBlenders.end(); ++iter)
+    for (blender_list_t::reverse_iterator iter = mActiveBlenders.rbegin(), end = mActiveBlenders.rend();
+         iter != end; ++iter)
     {
         LLJointStateBlender* jsbp = *iter;
         jsbp->interpolate(u);
@@ -544,8 +557,8 @@ void LLPoseBlender::interpolate(F32 u)
 //-----------------------------------------------------------------------------
 void LLPoseBlender::clearBlenders()
 {
-    for (blender_list_t::iterator iter = mActiveBlenders.begin();
-         iter != mActiveBlenders.end(); ++iter)
+    for (blender_list_t::reverse_iterator iter = mActiveBlenders.rbegin(), end = mActiveBlenders.rend();
+         iter != end; ++iter)
     {
         LLJointStateBlender* jsbp = *iter;
         jsbp->clear();

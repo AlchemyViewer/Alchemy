@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -203,7 +204,7 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SETCAM_EYEOFFSET, RLV_OPTION_MODIFIER, RlvBehaviourCamEyeFocusOffsetHandler>("setcam_eyeoffset"));
     addModifier(RLV_BHVR_SETCAM_EYEOFFSET, RLV_MODIFIER_SETCAM_EYEOFFSET, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_EYEOFFSET>("Camera - Eye Offset", LLVector3::zero, true, nullptr));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SETCAM_EYEOFFSETSCALE, RLV_OPTION_MODIFIER, RlvBehaviourCamEyeFocusOffsetHandler>("setcam_eyeoffsetscale"));
-    addModifier(RLV_BHVR_SETCAM_EYEOFFSETSCALE, RLV_MODIFIER_SETCAM_EYEOFFSETSCALE, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_EYEOFFSETSCALE>("Camera - Eye Offset Scale", 0, true, nullptr));
+    addModifier(RLV_BHVR_SETCAM_EYEOFFSETSCALE, RLV_MODIFIER_SETCAM_EYEOFFSETSCALE, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_EYEOFFSETSCALE>("Camera - Eye Offset Scale", 0.0f, true, nullptr));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SETCAM_FOCUSOFFSET, RLV_OPTION_MODIFIER, RlvBehaviourCamEyeFocusOffsetHandler>("setcam_focusoffset"));
     addModifier(RLV_BHVR_SETCAM_FOCUSOFFSET, RLV_MODIFIER_SETCAM_FOCUSOFFSET, new RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_FOCUSOFFSET>("Camera - Focus Offset", LLVector3d::zero, true, nullptr));
     addEntry(new RlvBehaviourProcessor<RLV_BHVR_SETCAM_FOVMIN, RlvBehaviourSetCamFovHandler>("setcam_fovmin"));
@@ -758,8 +759,8 @@ bool RlvCommand::parseCommand(const std::string& strCommand, std::string& strBeh
     // (See behaviour notes for the command parsing truth table)
 
     // Format: <behaviour>[:<option>]=<param>
-    int idxParam  = strCommand.find('=');
-    int idxOption = (idxParam > 0) ? strCommand.find(':') : -1;
+    int idxParam  = static_cast<int>(strCommand.find('='));
+    int idxOption = (idxParam > 0) ? static_cast<int>(strCommand.find(':')) : -1;
     if (idxOption > idxParam - 1)
         idxOption = -1;
 
@@ -1050,7 +1051,7 @@ RlvCommandOptionGetPath::RlvCommandOptionGetPath(const RlvCommand& rlvCmd, getpa
             if (pObj->isAttachment())
                 m_idItems.push_back(pObj->getAttachmentItemID());
         }
-        else if (!cb.empty())
+        else if (cb != nullptr)
         {
             new RlvCommandOptionGetPathCallback(rlvCmd.getObjectID(), cb);
             m_fCallback = true;
@@ -1063,7 +1064,7 @@ RlvCommandOptionGetPath::RlvCommandOptionGetPath(const RlvCommand& rlvCmd, getpa
         return;
     }
 
-    if (!cb.empty())
+    if (cb != nullptr)
     {
         cb(getItemIDs());
     }
@@ -1244,7 +1245,6 @@ void RlvObject::setModifierValue(ERlvLocalBhvrModifier eBhvrModifier, const RlvB
 // RlvForceWear
 //
 
-
 // Checked: 2010-04-05 (RLVa-1.2.0d) | Modified: RLVa-1.2.0d
 bool RlvForceWear::isWearingItem(const LLInventoryItem* pItem)
 {
@@ -1283,13 +1283,13 @@ void RlvForceWear::forceFolder(const LLViewerInventoryCategory* pFolder, EWearAc
     // Grab a list of all the items we'll be wearing/attaching
     LLInventoryModel::cat_array_t folders; LLInventoryModel::item_array_t items;
     RlvWearableItemCollector f(pFolder, eAction, eFlags);
-    gInventory.collectDescendentsIf(pFolder->getUUID(), folders, items, FALSE, f, true);
+    gInventory.collectDescendentsIf(pFolder->getUUID(), folders, items, false, f, true);
 
-    // TRUE if we've already encountered this LLWearableType::EType (used only on wear actions and only for AT_CLOTHING)
+    // true if we've already encountered this LLWearableType::EType (used only on wear actions and only for AT_CLOTHING)
     bool fSeenWType[LLWearableType::WT_COUNT] = { false };
 
     EWearAction eCurAction = eAction;
-    for (S32 idxItem = 0, cntItem = items.size(); idxItem < cntItem; idxItem++)
+    for (size_t idxItem = 0, cntItem = items.size(); idxItem < cntItem; idxItem++)
     {
         LLViewerInventoryItem* pRlvItem = items.at(idxItem);
         LLViewerInventoryItem* pItem = (LLAssetType::AT_LINK == pRlvItem->getActualType()) ? pRlvItem->getLinkedItem() : pRlvItem;
@@ -1421,9 +1421,10 @@ bool RlvForceWear::isForceDetachable(const LLViewerObject* pAttachObj, bool fChe
 bool RlvForceWear::isForceDetachable(const LLViewerJointAttachment* pAttachPt, bool fCheckComposite /*=true*/, const LLUUID& idExcept /*=LLUUID::null*/)
 {
     // Attachment point can be detached by an RLV command if there's at least one attachment that can be removed
-    for (LLViewerObject* pAttachObj : pAttachPt->mAttachedObjects)
+    for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
+            itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
     {
-        if (isForceDetachable(pAttachObj, fCheckComposite, idExcept))
+        if (isForceDetachable(*itAttachObj, fCheckComposite, idExcept))
             return true;
     }
     return false;
@@ -1458,9 +1459,10 @@ void RlvForceWear::forceDetach(const LLViewerObject* pAttachObj)
 // Checked: 2010-03-19 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
 void RlvForceWear::forceDetach(const LLViewerJointAttachment* pAttachPt)
 {
-    for (LLViewerObject* pAttachObj : pAttachPt->mAttachedObjects)
+    for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
+            itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
     {
-        forceDetach(pAttachObj);
+        forceDetach(*itAttachObj);
     }
 }
 
@@ -1797,7 +1799,7 @@ void RlvForceWear::done()
 
     if (!remItems.empty())
     {
-        LLAppearanceMgr::instance().removeItemsFromAvatar(remItems, no_op,cb, true);
+        LLAppearanceMgr::instance().removeItemsFromAvatar(remItems, no_op, cb, true);
     }
 
     if ( (addBodyParts.empty()) && (!addClothing.empty()) && (m_addGestures.empty()) )
@@ -1957,7 +1959,7 @@ void RlvBehaviourNotifyHandler::onStand(const LLUUID& idObj, bool fAllowed)
 //
 
 // Checked: 2010-03-13 (RLVa-1.2.0a) | Modified: RLVa-1.2.0a
-BOOL RlvGCTimer::tick()
+bool RlvGCTimer::tick()
 {
     bool fContinue = gRlvHandler.onGC();
     if (!fContinue)
@@ -2048,7 +2050,7 @@ std::string rlvGetLastParenthesisedText(const std::string& strText, std::string:
         *pidxStart = std::string::npos; // Assume we won't find anything
 
     // Extracts the last - matched - parenthesised text from the input string
-    std::string::size_type idxIt, idxEnd; int cntLevel = 1;
+    size_t idxIt; std::string::size_type idxEnd; int cntLevel = 1;
     if ((idxEnd = strText.find_last_of(')')) == std::string::npos)
         return std::string();
 
@@ -2081,7 +2083,7 @@ namespace Rlv
         if ( (LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders")) && (!LLPipeline::WindLightUseAtmosShaders) )
         {
             // Triggers handleSetShaderChanged() which will do the actual work for us
-            gSavedSettings.setBOOL("WindLightUseAtmosShaders", TRUE);
+            gSavedSettings.setBOOL("WindLightUseAtmosShaders", true);
         }
     }
 
@@ -2093,7 +2095,7 @@ namespace Rlv
             return 0;
         else if (pRootObj == pObj)
             return 1;
-        return 2 + std::distance(pRootObj->getChildren().begin(), std::find(pRootObj->getChildren().begin(), pRootObj->getChildren().end(), pObj));
+        return 2 + (int)std::distance(pRootObj->getChildren().begin(), std::find(pRootObj->getChildren().begin(), pRootObj->getChildren().end(), pObj));
     }
 
     const LLUUID& getObjectRootId(const LLUUID& idObj)

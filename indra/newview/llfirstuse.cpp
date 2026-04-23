@@ -94,12 +94,12 @@ void LLFirstUse::notUsingSidePanel(bool enable)
 void LLFirstUse::notMoving(bool enable)
 {
     // fire off 2 notifications and rely on filtering to select the relevant one
-    //firstUseNotification("FirstNotMoving", enable, "HintMove", LLSD(), LLSD().with("target", "move_btn").with("direction", "top"));
-    //firstUseNotification("FirstNotMoving", enable, "HintMoveClick", LLSD(), LLSD()
-    //  .with("target", "nav_bar")
-    //  .with("direction", "bottom")
-    //  .with("hint_image", "click_to_move.png")
-    //  .with("up_arrow", ""));
+    firstUseNotification("FirstNotMoving", enable, "HintMove", LLSD(), LLSD().with("target", "move_btn").with("direction", "top"));
+    firstUseNotification("FirstNotMoving", enable, "HintMoveClick", LLSD(), LLSD()
+        .with("target", "nav_bar")
+        .with("direction", "bottom")
+        .with("hint_image", "click_to_move.png")
+        .with("up_arrow", ""));
 }
 
 // static
@@ -128,8 +128,7 @@ void LLFirstUse::firstUseNotification(const std::string& control_var, bool enabl
 
     if (enable)
     {
-        static const LLCachedControl<bool> enable_ui_hints(gSavedSettings, "EnableUIHints");
-        if (enable_ui_hints)
+        if (gSavedSettings.getBOOL("EnableUIHints"))
         {
             LL_DEBUGS("LLFirstUse") << "Trigger first use notification " << notification_name << LL_ENDL;
 
@@ -145,7 +144,7 @@ void LLFirstUse::firstUseNotification(const std::string& control_var, bool enabl
         LL_DEBUGS("LLFirstUse") << "Disabling first use notification " << notification_name << LL_ENDL;
         LLNotifications::instance().cancelByName(notification_name);
         // redundantly clear settings var here, in case there are no notifications to cancel
-        gWarningSettings.setBOOL(control_var, FALSE);
+        gWarningSettings.setBOOL(control_var, false);
     }
 
 }
@@ -170,7 +169,7 @@ bool LLFirstUse::processNotification(const LLSD& notify)
         if (notification)
         {
             // disable any future notifications
-            gWarningSettings.setBOOL(notification->getPayload()["control_var"].asStringRef(), FALSE);
+            gWarningSettings.setBOOL((std::string)notification->getPayload()["control_var"], false);
         }
     }
     return false;

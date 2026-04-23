@@ -38,23 +38,23 @@ class LLUserOperation
 public:
     LLUserOperation(const LLUUID& agent_id);
     LLUserOperation(const LLUUID& agent_id, const LLUUID& transaction_id);
-    virtual ~LLUserOperation() = default;
+    virtual ~LLUserOperation();
 
     const LLUUID& getTransactionID() const { return mTransactionID; }
     const LLUUID& getAgentID() const { return mAgentID; }
 
     // Operation never got necessary data, so expired
-    virtual BOOL isExpired();
+    virtual bool isExpired();
 
     // ability to mark this operation as never expiring.
-    void SetNoExpireFlag(const BOOL flag);
+    void SetNoExpireFlag(const bool flag);
 
     // Send request to the dataserver
     virtual void sendRequest() = 0;
 
     // Run the operation. This will only be called in the case of an
     // actual success or failure of the operation.
-    virtual BOOL execute(BOOL transaction_success) = 0;
+    virtual bool execute(bool transaction_success) = 0;
 
     // This method is called when the user op has expired, and is
     // about to be deleted by the manager. This gives the user op the
@@ -68,19 +68,19 @@ protected:
     LLUUID mAgentID;
     LLUUID mTransactionID;
     LLFrameTimer mTimer;
-    BOOL   mNoExpire;           // this is used for operations that expect an answer and will wait till it gets one.
+    bool   mNoExpire;           // this is used for operations that expect an answer and will wait till it gets one.
 };
 
 
 class LLUserOperationMgr
 {
 public:
-    LLUserOperationMgr() = default;
+    LLUserOperationMgr();
     ~LLUserOperationMgr();
 
     void addOperation(LLUserOperation* op);
     LLUserOperation* findOperation(const LLUUID& transaction_id);
-    BOOL deleteOperation(LLUserOperation* op);
+    bool deleteOperation(LLUserOperation* op);
 
     // Call this method every once in a while to clean up old
     // transactions.

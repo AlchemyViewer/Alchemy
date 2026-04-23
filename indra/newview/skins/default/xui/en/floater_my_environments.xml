@@ -109,7 +109,7 @@
                     right="-2"
                     bottom="-2"
                     background_visible="true"
-                    bg_alpha_color="PanelDefaultBackgroundColor"
+                    bg_alpha_color="DkGray2"
                     border="true">
                 <asset_filtered_inv_panel
                        left="0"

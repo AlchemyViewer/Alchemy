@@ -31,16 +31,19 @@
 // libs
 #include "llbufferstream.h"
 #include "llimagepng.h"
+
 #include "llsdserialize.h"
 #include "llstring.h"
 
 // newview
 #include "llavataractions.h" // for getProfileURL()
-#include "llcommandhandler.h"
-#include "llcorehttputil.h"
-#include "llmediactrl.h"
 #include "llviewermedia.h" // FIXME: don't use LLViewerMedia internals
-#include "llweb.h"
+#include "llnotificationsutil.h"
+
+#include "llcorehttputil.h"
+
+// third-party
+
 
 /*
  * Workflow:
@@ -72,9 +75,7 @@ void LLWebProfile::uploadImage(LLPointer<LLImageFormatted> image, const std::str
 // static
 void LLWebProfile::setAuthCookie(const std::string& cookie)
 {
-#ifdef SHOW_DEBUG
     LL_DEBUGS("Snapshots") << "Setting auth cookie: " << cookie << LL_ENDL;
-#endif
     sAuthCookie = cookie;
 }
 
@@ -82,7 +83,7 @@ void LLWebProfile::setAuthCookie(const std::string& cookie)
 /*static*/
 LLCore::HttpHeaders::ptr_t LLWebProfile::buildDefaultHeaders()
 {
-    LLCore::HttpHeaders::ptr_t httpHeaders(std::make_shared<LLCore::HttpHeaders>());
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
     LLSD headers = LLViewerMedia::getInstance()->getHeaders();
 
     for (LLSD::map_iterator it = headers.beginMap(); it != headers.endMap(); ++it)
@@ -99,9 +100,9 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
-    LLCore::HttpOptions::ptr_t httpOpts(std::make_shared<LLCore::HttpOptions>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("uploadImageCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     LLCore::HttpHeaders::ptr_t httpHeaders;
 
     if (dynamic_cast<LLImagePNG*>(image.get()) == 0)
@@ -120,9 +121,7 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
     configUrl += "?caption=" + LLURI::escape(caption);
     configUrl += "&add_loc=" + std::string(addLocation ? "1" : "0");
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("Snapshots") << "Requesting " << configUrl << LL_ENDL;
-#endif
 
     httpHeaders = buildDefaultHeaders();
     httpHeaders->append(HTTP_OUT_HEADER_COOKIE, getAuthCookie());
@@ -136,6 +135,10 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
     {
         LL_WARNS("Snapshots") << "Failed to get image upload config" << LL_ENDL;
         LLWebProfile::reportImageUploadStatus(false);
+        if (image->getDataSize() > MAX_WEB_DATASIZE)
+        {
+            LLNotificationsUtil::add("CannotUploadSnapshotWebTooBig");
+        }
         return;
     }
 
@@ -163,6 +166,10 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
     {
         LL_WARNS("Snapshots") << "Failed to upload image data." << LL_ENDL;
         LLWebProfile::reportImageUploadStatus(false);
+        if (image->getDataSize() > MAX_WEB_DATASIZE)
+        {
+            LLNotificationsUtil::add("CannotUploadSnapshotWebTooBig");
+        }
         return;
     }
 
@@ -179,9 +186,7 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
         LLWebProfile::reportImageUploadStatus(false);
     }
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("Snapshots") << "Got redirection URL: " << redirUrl << LL_ENDL;
-#endif
 
     result = httpAdapter->getRawAndSuspend(httpRequest, redirUrl, httpOpts, httpHeaders);
 
@@ -192,6 +197,10 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
     {
         LL_WARNS("Snapshots") << "Failed to upload image." << LL_ENDL;
         LLWebProfile::reportImageUploadStatus(false);
+        if (image->getDataSize() > MAX_WEB_DATASIZE)
+        {
+            LLNotificationsUtil::add("CannotUploadSnapshotWebTooBig");
+        }
         return;
     }
 
@@ -200,8 +209,6 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
     LL_INFOS("Snapshots") << "Image uploaded." << LL_ENDL;
     //LL_DEBUGS("Snapshots") << "Uploading image succeeded. Response: [" << raw.asString() << "]" << LL_ENDL;
     LLWebProfile::reportImageUploadStatus(true);
-
-
 }
 
 /*static*/
@@ -243,10 +250,12 @@ LLCore::BufferArray::ptr_t LLWebProfile::buildPostData(const LLSD &data, LLPoint
         << "Content-Disposition: form-data; name=\"file\"; filename=\"snapshot.png\"\r\n"
         << "Content-Type: image/png\r\n\r\n";
 
+    LLImageDataSharedLock lock(image);
+
     // Insert the image data.
     //char *datap = (char *)(image->getData());
     //bas.write(datap, image->getDataSize());
-    U8* image_data = image->getData();
+    const U8* image_data = image->getData();
     for (S32 i = 0; i < image->getDataSize(); ++i)
     {
         bas << image_data[i];
@@ -272,26 +281,3 @@ std::string LLWebProfile::getAuthCookie()
     // This is needed to test image uploads on Linux viewer built with OpenSSL 1.0.0 (0.9.8 works fine).
     return LLStringUtil::getenv("LL_SNAPSHOT_COOKIE", sAuthCookie);
 }
-
-//////////////////////////////////////////////////////////////////////////
-// LLWebProfileHandler
-
-class LLWebProfileHandler : public LLCommandHandler
-{
-  public:
-    // requires trusted browser to trigger
-    LLWebProfileHandler() : LLCommandHandler("profile", UNTRUSTED_THROTTLE) {}
-
-    bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web)
-    {
-        if (params.size() < 1)
-            return false;
-        std::string agent_name = params[0];
-        LL_INFOS() << "Profile, agent_name " << agent_name << LL_ENDL;
-        std::string url = getProfileURL(agent_name);
-        LLWeb::loadURLInternal(url);
-
-        return true;
-    }
-};
-LLWebProfileHandler gWebProfileHandler;

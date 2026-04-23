@@ -50,7 +50,7 @@ public:
                             LLFloaterFixedEnvironment(const LLSD &key);
                             ~LLFloaterFixedEnvironment();
 
-    virtual BOOL            postBuild()                 override;
+    virtual bool            postBuild()                 override;
     virtual void            onOpen(const LLSD& key)     override;
     virtual void            onClose(bool app_quitting)  override;
 
@@ -94,14 +94,14 @@ private:
     void                    onPickerCommitSetting(LLUUID item_id);
 };
 
-class LLFloaterFixedEnvironmentWater final : public LLFloaterFixedEnvironment
+class LLFloaterFixedEnvironmentWater : public LLFloaterFixedEnvironment
 {
     LOG_CLASS(LLFloaterFixedEnvironmentWater);
 
 public:
     LLFloaterFixedEnvironmentWater(const LLSD &key);
 
-    BOOL                    postBuild()                 override;
+    bool                    postBuild()                 override;
 
     virtual void            onOpen(const LLSD& key)     override;
 
@@ -114,14 +114,14 @@ protected:
 private:
 };
 
-class LLFloaterFixedEnvironmentSky final : public LLFloaterFixedEnvironment
+class LLFloaterFixedEnvironmentSky : public LLFloaterFixedEnvironment
 {
     LOG_CLASS(LLFloaterFixedEnvironmentSky);
 
 public:
     LLFloaterFixedEnvironmentSky(const LLSD &key);
 
-    BOOL                    postBuild()                 override;
+    bool                    postBuild()                 override;
 
     virtual void            onOpen(const LLSD& key)     override;
     virtual void            onClose(bool app_quitting)  override;

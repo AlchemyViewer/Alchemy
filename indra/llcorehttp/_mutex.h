@@ -27,10 +27,8 @@
 #ifndef LLCOREINT_MUTEX_H_
 #define LLCOREINT_MUTEX_H_
 
-
-#include "mutex.h"
-#include <thread>
 #include <condition_variable>
+#include <mutex>
 
 namespace LLCoreInt
 {

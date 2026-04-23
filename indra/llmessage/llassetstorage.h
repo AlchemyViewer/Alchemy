@@ -57,6 +57,7 @@ const int LL_ERR_ASSET_REQUEST_FAILED = -1;
 const int LL_ERR_ASSET_REQUEST_NONEXISTENT_FILE = -3;
 const int LL_ERR_ASSET_REQUEST_NOT_IN_DATABASE = -4;
 const int LL_ERR_INSUFFICIENT_PERMISSIONS = -5;
+const int LL_ERR_NO_CAP = -6;
 const int LL_ERR_PRICE_MISMATCH = -23018;
 
 // *TODO: these typedefs are passed into the cache via a legacy C function pointer
@@ -103,7 +104,7 @@ class LLBaseDownloadRequest
 {
 public:
     LLBaseDownloadRequest(const LLUUID &uuid, const LLAssetType::EType at);
-    virtual ~LLBaseDownloadRequest() = default;
+    virtual ~LLBaseDownloadRequest();
 
     LLUUID getUUID() const                  { return mUUID; }
     LLAssetType::EType getType() const      { return mType; }
@@ -122,18 +123,18 @@ public:
 
     void    *mUserData;
     LLHost  mHost;
-    BOOL    mIsTemp;
+    bool    mIsTemp;
     F64Seconds      mTime;              // Message system time
-    BOOL    mIsPriority;
-    BOOL    mDataSentInFirstPacket;
-    BOOL    mDataIsInCache;
+    bool    mIsPriority;
+    bool    mDataSentInFirstPacket;
+    bool    mDataIsInCache;
 };
 
 class LLAssetRequest : public LLBaseDownloadRequest
 {
 public:
     LLAssetRequest(const LLUUID &uuid, const LLAssetType::EType at);
-    virtual ~LLAssetRequest() = default;
+    virtual ~LLAssetRequest();
 
     void setTimeout(F64Seconds timeout) { mTimeout = timeout; }
 
@@ -143,8 +144,8 @@ public:
 //  void    (*mUpCallback)(const LLUUID&, void *, S32, LLExtStat);
     void    (*mInfoCallback)(LLAssetInfo *, void *, S32);
 
-    BOOL    mIsLocal;
-    BOOL    mIsUserWaiting;     // We don't want to try forever if a user is waiting for a result.
+    bool    mIsLocal;
+    bool    mIsUserWaiting;     // We don't want to try forever if a user is waiting for a result.
     F64Seconds      mTimeout;           // Amount of time before timing out.
     LLUUID  mRequestingAgentID; // Only valid for uploads from an agent
     F64 mBytesFetched;
@@ -168,7 +169,7 @@ class LLInvItemRequest : public LLBaseDownloadRequest
 {
 public:
     LLInvItemRequest(const LLUUID &uuid, const LLAssetType::EType at);
-    virtual ~LLInvItemRequest() = default;
+    virtual ~LLInvItemRequest();
 
     virtual LLBaseDownloadRequest* getCopy();
 };
@@ -177,7 +178,7 @@ class LLEstateAssetRequest : public LLBaseDownloadRequest
 {
 public:
     LLEstateAssetRequest(const LLUUID &uuid, const LLAssetType::EType at, EstateAssetType et);
-    virtual ~LLEstateAssetRequest() = default;
+    virtual ~LLEstateAssetRequest();
 
     LLAssetType::EType getAType() const     { return mType; }
 
@@ -209,7 +210,7 @@ public:
     };
 
 protected:
-    BOOL mShutDown;
+    bool mShutDown;
     LLHost mUpstreamHost;
 
     LLMessageSystem *mMessageSys;
@@ -231,16 +232,12 @@ public:
     virtual ~LLAssetStorage();
 
     void setUpstream(const LLHost &upstream_host);
-    bool isUpstreamOK() const
-    {
-        return mUpstreamHost.isOk();
-    }
 
-    BOOL hasLocalAsset(const LLUUID &uuid, LLAssetType::EType type);
+    bool hasLocalAsset(const LLUUID &uuid, LLAssetType::EType type);
 
     // public interface methods
     // note that your callback may get called BEFORE the function returns
-    void getAssetData(const LLUUID uuid, LLAssetType::EType atype, LLGetAssetCallback cb, void *user_data, BOOL is_priority = FALSE);
+    void getAssetData(const LLUUID uuid, LLAssetType::EType atype, LLGetAssetCallback cb, void *user_data, bool is_priority = false);
 
     /*
      * TransactionID version
@@ -263,19 +260,19 @@ public:
 
     void getEstateAsset(const LLHost &object_sim, const LLUUID &agent_id, const LLUUID &session_id,
                                     const LLUUID &asset_id, LLAssetType::EType atype, EstateAssetType etype,
-                                     LLGetAssetCallback callback, void *user_data, BOOL is_priority);
+                                     LLGetAssetCallback callback, void *user_data, bool is_priority);
 
     void getInvItemAsset(const LLHost &object_sim,
                          const LLUUID &agent_id, const LLUUID &session_id,
                          const LLUUID &owner_id, const LLUUID &task_id, const LLUUID &item_id,
                          const LLUUID &asset_id, LLAssetType::EType atype,
-                         LLGetAssetCallback cb, void *user_data, BOOL is_priority = FALSE); // Get a particular inventory item.
+                         LLGetAssetCallback cb, void *user_data, bool is_priority = false); // Get a particular inventory item.
 
     // Check if an asset is in the toxic map.  If it is, the entry is updated
-    BOOL        isAssetToxic( const LLUUID& uuid );
+    bool        isAssetToxic( const LLUUID& uuid );
 
     // Clean the toxic asset list, remove old entries
-    void        flushOldToxicAssets( BOOL force_it );
+    void        flushOldToxicAssets( bool force_it );
 
     // Add an item to the toxic asset map
     void        markAssetToxic( const LLUUID& uuid );
@@ -328,7 +325,8 @@ public:
 
     static void removeAndCallbackPendingDownloads(const LLUUID& file_id, LLAssetType::EType file_type,
                                                   const LLUUID& callback_id, LLAssetType::EType callback_type,
-                                                  S32 result_code, LLExtStat ext_status);
+                                                  S32 result_code, LLExtStat ext_status,
+                                                  S32 bytes_fetched);
 
     // download process callbacks
     static void downloadCompleteCallback(
@@ -356,7 +354,7 @@ public:
 
     // deprecated file-based methods
     // Not overriden
-    void getAssetData(const LLUUID uuid, LLAssetType::EType type, void (*callback)(const char*, const LLUUID&, void *, S32, LLExtStat), void *user_data, BOOL is_priority = FALSE);
+    void getAssetData(const LLUUID uuid, LLAssetType::EType type, void (*callback)(const char*, const LLUUID&, void *, S32, LLExtStat), void *user_data, bool is_priority = false);
 
     /*
      * TransactionID version
@@ -378,12 +376,12 @@ public:
     // add extra methods to handle metadata
 
 protected:
-    void _cleanupRequests(BOOL all, S32 error);
-    void _callUploadCallbacks(const LLUUID &uuid, const LLAssetType::EType asset_type, BOOL success, LLExtStat ext_status);
+    void _cleanupRequests(bool all, S32 error);
+    void _callUploadCallbacks(const LLUUID &uuid, const LLAssetType::EType asset_type, bool success, LLExtStat ext_status);
 
     virtual void _queueDataRequest(const LLUUID& uuid, LLAssetType::EType type, LLGetAssetCallback callback,
-                                   void *user_data, BOOL duplicate,
-                                   BOOL is_priority) = 0;
+                                   void *user_data, bool duplicate,
+                                   bool is_priority) = 0;
 
 private:
     void _init(LLMessageSystem *msg,

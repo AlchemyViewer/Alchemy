@@ -39,7 +39,9 @@ public:
     {
     }
 
-    ~LLBitPack() = default;
+    ~LLBitPack()
+    {
+    }
 
     void resetBitPacking()
     {

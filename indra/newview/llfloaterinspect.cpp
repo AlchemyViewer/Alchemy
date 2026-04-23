@@ -61,7 +61,7 @@
 
 LLFloaterInspect::LLFloaterInspect(const LLSD& key)
   : LLFloater(key),
-    mDirty(FALSE),
+    mDirty(false),
     mOwnerNameCacheConnection(),
     mCreatorNameCacheConnection(),
     mOptionsButton(NULL),
@@ -87,7 +87,7 @@ LLFloaterInspect::LLFloaterInspect(const LLSD& key)
     mColumnBits["creation_date"] = 512;
 }
 
-BOOL LLFloaterInspect::postBuild()
+bool LLFloaterInspect::postBuild()
 {
     mObjectList = getChild<LLScrollListCtrl>("object_list");
 
@@ -96,7 +96,7 @@ BOOL LLFloaterInspect::postBuild()
 
     refresh();
 
-    return TRUE;
+    return true;
 }
 
 LLFloaterInspect::~LLFloaterInspect(void)
@@ -124,13 +124,13 @@ LLFloaterInspect::~LLFloaterInspect(void)
     }
     else
     {
-        LLFloaterReg::showInstance("build", LLSD(), TRUE);
+        LLFloaterReg::showInstance("build", LLSD(), true);
     }
 }
 
 void LLFloaterInspect::onOpen(const LLSD& key)
 {
-    BOOL forcesel = LLSelectMgr::getInstance()->setForceSelection(TRUE);
+    bool forcesel = LLSelectMgr::getInstance()->setForceSelection(true);
     LLToolMgr::getInstance()->setTransientTool(LLToolCompInspect::getInstance());
     LLSelectMgr::getInstance()->setForceSelection(forcesel);    // restore previouis value
     mObjectSelection = LLSelectMgr::getInstance()->getSelection();
@@ -164,38 +164,38 @@ const LLSelectNode* LLFloaterInspect::getSelectedNode() /*const*/
 
 void LLFloaterInspect::onClickCreatorProfile()
 {
-        const LLSelectNode* node = getSelectedNode();
-        if(node)
+    const LLSelectNode* node = getSelectedNode();
+    if(node)
+    {
+        // Only anonymize the creator if they're also the owner or if they're a nearby avie
+        const LLUUID& idCreator = node->mPermissions->getCreator();
+        if ( (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, idCreator)) && ((node->mPermissions->getOwner() == idCreator) || (RlvUtil::isNearbyAgent(idCreator))) )
         {
-            // Only anonymize the creator if they're also the owner or if they're a nearby avie
-            const LLUUID& idCreator = node->mPermissions->getCreator();
-            if ( (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, idCreator)) && ((node->mPermissions->getOwner() == idCreator) || (RlvUtil::isNearbyAgent(idCreator))) )
-            {
-                return;
-            }
-            LLAvatarActions::showProfile(idCreator);
+            return;
         }
+        LLAvatarActions::showProfile(idCreator);
+    }
 }
 
 void LLFloaterInspect::onClickOwnerProfile()
 {
-        const LLSelectNode* node = getSelectedNode();
-        if(node)
+    const LLSelectNode* node = getSelectedNode();
+    if(node)
+    {
+        if(node->mPermissions->isGroupOwned())
         {
-            if(node->mPermissions->isGroupOwned())
-            {
-                const LLUUID& idGroup = node->mPermissions->getGroup();
-                LLGroupActions::show(idGroup);
-            }
-            else
-            {
-                const LLUUID& owner_id = node->mPermissions->getOwner();
-                if (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, owner_id))
-                    return;
-                LLAvatarActions::showProfile(owner_id);
-            }
-
+            const LLUUID& idGroup = node->mPermissions->getGroup();
+            LLGroupActions::show(idGroup);
         }
+        else
+        {
+            const LLUUID& owner_id = node->mPermissions->getOwner();
+            if (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, owner_id))
+                return;
+            LLAvatarActions::showProfile(owner_id);
+        }
+
+    }
 }
 
 void LLFloaterInspect::onSelectObject()
@@ -358,7 +358,8 @@ void LLFloaterInspect::refresh()
         }
 
         time_t timestamp = (time_t) (obj->mCreationDate/1000000);
-        std::string timeStr = getString("timeStamp");
+        static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+        std::string timeStr = use_24h ? getString("timeStamp") : getString("timeStampAMPM");
         LLSD substitution;
         substitution["datetime"] = (S32) timestamp;
         LLStringUtil::format (timeStr, substitution);
@@ -581,7 +582,7 @@ void LLFloaterInspect::refresh()
     args["NUM_VERTICES"] = format_res_string;
     res_mgr.getIntegerString(format_res_string, tcount);
     args["NUM_TRIANGLES"] = format_res_string;
-    res_mgr.getIntegerString(format_res_string, mTextureList.size());
+    res_mgr.getIntegerString(format_res_string, narrow(mTextureList.size()));
     args["NUM_TEXTURES"] = format_res_string;
     res_mgr.getIntegerString(format_res_string, mTextureMemory / 1024);
     args["TEXTURE_MEMORY"] = format_res_string;
@@ -702,7 +703,7 @@ void LLFloaterInspect::draw()
     if (mDirty)
     {
         refresh();
-        mDirty = FALSE;
+        mDirty = false;
     }
 
     LLFloater::draw();
@@ -720,7 +721,7 @@ void LLFloaterInspect::onColumnDisplayModeChanged()
     getResizeLimits(&min_width, &min_height);
 
     std::string current_sort_col = mObjectList->getSortColumnName();
-    BOOL current_sort_asc = mObjectList->getSortAscending();
+    bool current_sort_asc = mObjectList->getSortAscending();
 
     mObjectList->clearRows();
     mObjectList->clearColumns();

@@ -4,15 +4,14 @@
 		ピック無し
 	</text>
 	<accordion name="accordion">
-		<accordion_tab name="tab_picks" title="ピック">
-			<flat_list_view name="picks_list"/>
-		</accordion_tab>
-		<accordion_tab name="tab_classifieds" title="クラシファイド">
-			<flat_list_view name="classifieds_list"/>
-		</accordion_tab>
+		<accordion_tab name="tab_picks" title="ピック"/>
+		<accordion_tab name="tab_classifieds" title="クラシファイド"/>
 	</accordion>
 	<panel name="buttons_cucks">
 		<layout_stack name="buttons_cucks_ls">
+			<layout_panel name="add_btn_lp">
+				<menu_button name="add_btn" tool_tip="エントリを追加します。"/>
+			</layout_panel>
 			<layout_panel name="info_btn_lp">
 				<button label="情報" name="info_btn" tool_tip="ピックの情報を表示します。"/>
 			</layout_panel>

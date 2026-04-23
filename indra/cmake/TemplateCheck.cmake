@@ -1,5 +1,10 @@
 # -*- cmake -*-
 
+include(Python)
+
+set(TEMPLATE_VERIFIER_OPTIONS "" CACHE STRING "Options for scripts/template_verifier.py")
+set(TEMPLATE_VERIFIER_MASTER_URL "https://github.com/secondlife/master-message-template/raw/master/message_template.msg" CACHE STRING "Location of the master message template")
+
 macro (check_message_template _target)
   add_custom_command(
       TARGET ${_target}

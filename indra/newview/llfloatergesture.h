@@ -48,7 +48,7 @@ class LLFloaterGestureInventoryObserver;
 class LLMultiGesture;
 class LLMenuGL;
 
-class LLFloaterGesture final
+class LLFloaterGesture
 :   public LLFloater, LLInventoryFetchDescendentsObserver
 {
     LOG_CLASS(LLFloaterGesture);
@@ -56,7 +56,7 @@ public:
     LLFloaterGesture(const LLSD& key);
     virtual ~LLFloaterGesture();
 
-    virtual BOOL postBuild();
+    virtual bool postBuild();
     virtual void done ();
     void refreshAll();
     /**

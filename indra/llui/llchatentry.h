@@ -86,7 +86,7 @@ public:
     void    updateHistory();
 
 private:
-    BOOL    handleSpecialKey(const KEY key, const MASK mask);
+    bool    handleSpecialKey(const KEY key, const MASK mask);
 
 
     // Fired when text height expanded to mExpandLinesCount
@@ -103,6 +103,8 @@ private:
     S32                                 mExpandLinesCount;
     S32                                 mPrevLinesCount;
     S32                                 mPrevExpandedLineCount;
+
+    std::string                         mCurrentInput;
 };
 
 #endif /* LLCHATENTRY_H_ */

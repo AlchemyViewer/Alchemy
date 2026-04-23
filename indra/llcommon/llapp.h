@@ -50,6 +50,8 @@ void clear_signals();
 
 #endif
 
+extern bool gDisconnected;
+
 class LL_COMMON_API LLApp
 {
 public:
@@ -202,6 +204,8 @@ public:
     static bool isExiting(); // Either quitting or error (app is exiting, cleanly or not)
     static int getPid();
 
+    static void notifyOutOfDiskSpace();
+
     //
     // Sleep for specified time while still running
     //
@@ -260,8 +264,13 @@ public:
     void setDebugFileNames(const std::string &path);
 
     // Return the Google Breakpad minidump filename after a crash.
+    char *getMiniDumpFilename() { return mMinidumpPath; }
     std::string* getStaticDebugFile() { return &mStaticDebugFileName; }
     std::string* getDynamicDebugFile() { return &mDynamicDebugFileName; }
+
+    // Write out a Google Breakpad minidump file.
+    void writeMiniDump();
+
 
     /**
       * @brief Get a reference to the application runner
@@ -274,7 +283,10 @@ public:
       */
     LLRunner& getRunner() { return mRunner; }
 
-    virtual void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) {};
+#ifdef LL_WINDOWS
+    virtual bool reportCrashToBugsplat(void* pExcepInfo /*EXCEPTION_POINTERS*/) { return false; }
+    virtual bool reportCustomToBugsplat(const std::string& desription) { return false; }
+#endif
 
 public:
     typedef std::map<std::string, std::string> string_map;
@@ -284,14 +296,22 @@ protected:
 
     static void setStatus(EAppStatus status);       // Use this to change the application status.
     static LLScalarCond<EAppStatus> sStatus; // Reflects current application status
-    static BOOL sDisableCrashlogger; // Let the OS handle crashes for us.
+    static bool sDisableCrashlogger; // Let the OS handle crashes for us.
+    std::wstring mCrashReportPipeStr;  //Name of pipe to use for crash reporting.
+
+    std::string mDumpPath;  //output path for google breakpad.  Dependency workaround.
 
     /**
       * @brief This method is called once a frame to do once a frame tasks.
       */
     void stepFrame();
 
+    virtual void sendOutOfDiskSpaceNotification();
+
 private:
+    // Contains the filename of the minidump file after a crash.
+    char mMinidumpPath[MAX_MINDUMP_PATH_LENGTH];
+
     std::string mStaticDebugFileName;
     std::string mDynamicDebugFileName;
 
@@ -322,8 +342,12 @@ private:
     friend void default_unix_signal_handler(int signum, siginfo_t *info, void *);
 #endif
 
-public:
-    static BOOL sLogInSignal;
+private:
+#ifdef LL_RELEASE_FOR_DOWNLOAD
+    static constexpr bool sLogInSignal = false;
+#else
+    static constexpr bool sLogInSignal = true;
+#endif
 };
 
 #endif // LL_LLAPP_H

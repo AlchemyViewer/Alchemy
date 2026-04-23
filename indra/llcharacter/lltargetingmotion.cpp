@@ -53,6 +53,14 @@ LLTargetingMotion::LLTargetingMotion(const LLUUID &id) : LLMotion(id)
 
 
 //-----------------------------------------------------------------------------
+// ~LLTargetingMotion()
+// Class Destructor
+//-----------------------------------------------------------------------------
+LLTargetingMotion::~LLTargetingMotion()
+{
+}
+
+//-----------------------------------------------------------------------------
 // LLTargetingMotion::onInitialize(LLCharacter *character)
 //-----------------------------------------------------------------------------
 LLMotion::LLMotionInitStatus LLTargetingMotion::onInitialize(LLCharacter *character)
@@ -85,15 +93,15 @@ LLMotion::LLMotionInitStatus LLTargetingMotion::onInitialize(LLCharacter *charac
 //-----------------------------------------------------------------------------
 // LLTargetingMotion::onActivate()
 //-----------------------------------------------------------------------------
-BOOL LLTargetingMotion::onActivate()
+bool LLTargetingMotion::onActivate()
 {
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
 // LLTargetingMotion::onUpdate()
 //-----------------------------------------------------------------------------
-BOOL LLTargetingMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLTargetingMotion::onUpdate(F32 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED;
     F32 slerp_amt = LLSmoothInterpolation::getInterpolant(TORSO_TARGET_HALF_LIFE);
@@ -101,11 +109,11 @@ BOOL LLTargetingMotion::onUpdate(F32 time, U8* joint_mask)
     LLVector3 target;
     LLVector3* lookAtPoint = (LLVector3*)mCharacter->getAnimationData("LookAtPoint");
 
-    BOOL result = TRUE;
+    bool result = true;
 
     if (!lookAtPoint)
     {
-        return TRUE;
+        return true;
     }
     else
     {

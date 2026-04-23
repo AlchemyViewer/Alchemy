@@ -38,23 +38,18 @@
 			<text name="minimap_dot_colors">
 				ミニマップのドット色：
 			</text>
-			<color_swatch name="user_minimap_color"/>
 			<text name="text_minimap_box1">
 				自分
 			</text>
-			<color_swatch name="agent_minimap_color"/>
 			<text name="text_minimap_box2">
 				他人
 			</text>
-			<color_swatch name="friends_minimap_color"/>
 			<text name="text_minimap_box3">
 				フレンド
 			</text>
-			<color_swatch name="linden_minimap_color"/>
 			<text name="text_minimap_box4">
 				リンデン
 			</text>
-			<color_swatch name="muted_minimap_color"/>
 			<text name="text_minimap_box5">
 				ミュート済み
 			</text>
@@ -68,43 +63,33 @@
 			<text name="font_colors">
 				チャットの文字色：
 			</text>
-			<color_swatch name="user"/>
 			<text name="text_box1">
 				自分
 			</text>
-			<color_swatch name="agent"/>
 			<text name="text_box2">
 				他人
 			</text>
-			<color_swatch name="friends"/>
 			<text name="text_box3">
 				フレンド
 			</text>
-			<color_swatch name="system"/>
 			<text name="text_box4">
 				システム
 			</text>
-			<color_swatch name="script_error"/>
 			<text name="text_box5">
 				エラー
 			</text>
-			<color_swatch name="direct"/>
 			<text name="text_box10">
 				直接
 			</text>
-			<color_swatch name="owner"/>
 			<text name="text_box7">
 				所有者
 			</text>
-			<color_swatch name="links"/>
 			<text name="text_box9">
 				ＵＲＬ
 			</text>
-			<color_swatch name="objects"/>
 			<text name="text_box10">
 				オブジェクト
 			</text>
-			<color_swatch name="linden"/>
 			<text name="text_box7">
 				リンデン
 			</text>

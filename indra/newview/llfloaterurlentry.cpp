@@ -60,7 +60,7 @@ LLFloaterURLEntry::~LLFloaterURLEntry()
     sInstance = NULL;
 }
 
-BOOL LLFloaterURLEntry::postBuild()
+bool LLFloaterURLEntry::postBuild()
 {
     mMediaURLEdit = getChild<LLComboBox>("media_entry");
 
@@ -71,7 +71,7 @@ BOOL LLFloaterURLEntry::postBuild()
     childSetAction("clear_btn", onBtnClear, this);
     // clear media list button
     LLSD parcel_history = LLURLHistory::getURLHistory("parcel");
-    bool enable_clear_button = parcel_history.size() > 0 ? true : false;
+    bool enable_clear_button = parcel_history.size() > 0;
     getChildView("clear_btn")->setEnabled(enable_clear_button );
 
     // OK button
@@ -80,7 +80,7 @@ BOOL LLFloaterURLEntry::postBuild()
     setDefaultBtn("ok_btn");
     buildURLHistory();
 
-    return TRUE;
+    return true;
 }
 void LLFloaterURLEntry::buildURLHistory()
 {
@@ -201,10 +201,10 @@ void LLFloaterURLEntry::getMediaTypeCoro(std::string url, LLHandle<LLFloater> pa
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMediaTypeCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
-    LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
-    LLCore::HttpOptions::ptr_t httpOpts(std::make_shared<LLCore::HttpOptions>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMediaTypeCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     httpOpts->setFollowRedirects(true);
     httpOpts->setHeadersOnly(true);
@@ -240,6 +240,16 @@ void LLFloaterURLEntry::getMediaTypeCoro(std::string url, LLHandle<LLFloater> pa
         if (!mimeType.empty())
         {
             resolvedMimeType = mimeType;
+        }
+    }
+    else if (resultHeaders.has(HTTP_IN_HEADER_X_CONTENT_TYPE_OPTIONS))
+    {
+        const std::string& val = resultHeaders[HTTP_IN_HEADER_X_CONTENT_TYPE_OPTIONS];
+        if (val == HTTP_NOSNIFF)
+        {
+            // Doesn't permit 'sniffing' mime type, default to either html or plain
+            // If this doesn't work user will have to choose something manually.
+            resolvedMimeType = HTTP_CONTENT_TEXT_HTML;
         }
     }
 

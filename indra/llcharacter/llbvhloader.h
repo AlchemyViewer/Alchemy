@@ -30,31 +30,11 @@
 #include "v3math.h"
 #include "m3math.h"
 #include "llmath.h"
-#include "llapr.h"
+#include "llfile.h"
 #include "llbvhconsts.h"
 
 const S32 BVH_PARSER_LINE_SIZE = 2048;
 class LLDataPacker;
-
-//------------------------------------------------------------------------
-// FileCloser
-//------------------------------------------------------------------------
-class FileCloser
-{
-public:
-    FileCloser( apr_file_t *file )
-    {
-        mFile = file;
-    }
-
-    ~FileCloser()
-    {
-        apr_file_close(mFile);
-    }
-protected:
-    apr_file_t* mFile;
-};
-
 
 //------------------------------------------------------------------------
 // Key
@@ -71,8 +51,8 @@ struct Key
 
     F32 mPos[3];
     F32 mRot[3];
-    BOOL    mIgnorePos;
-    BOOL    mIgnoreRot;
+    bool    mIgnorePos;
+    bool    mIgnoreRot;
 };
 
 
@@ -89,10 +69,10 @@ struct Joint
     Joint(const char *name)
     {
         mName = name;
-        mIgnore = FALSE;
-        mIgnorePositions = FALSE;
-        mRelativePositionKey = FALSE;
-        mRelativeRotationKey = FALSE;
+        mIgnore = false;
+        mIgnorePositions = false;
+        mRelativePositionKey = false;
+        mRelativeRotationKey = false;
         mOutName = name;
         mOrder[0] = 'X';
         mOrder[1] = 'Y';
@@ -111,10 +91,10 @@ struct Joint
     LLVector3       mRelativePosition;
     //
     std::string     mName;
-    BOOL            mIgnore;
-    BOOL            mIgnorePositions;
-    BOOL            mRelativePositionKey;
-    BOOL            mRelativeRotationKey;
+    bool            mIgnore;
+    bool            mIgnorePositions;
+    bool            mRelativePositionKey;
+    bool            mRelativeRotationKey;
     std::string     mOutName;
     std::string     mMergeParentName;
     std::string     mMergeChildName;
@@ -161,18 +141,18 @@ class Translation
 public:
     Translation()
     {
-        mIgnore = FALSE;
-        mIgnorePositions = FALSE;
-        mRelativePositionKey = FALSE;
-        mRelativeRotationKey = FALSE;
+        mIgnore = false;
+        mIgnorePositions = false;
+        mRelativePositionKey = false;
+        mRelativeRotationKey = false;
         mPriorityModifier = 0;
     }
 
     std::string mOutName;
-    BOOL        mIgnore;
-    BOOL        mIgnorePositions;
-    BOOL        mRelativePositionKey;
-    BOOL        mRelativeRotationKey;
+    bool        mIgnore;
+    bool        mIgnorePositions;
+    bool        mRelativePositionKey;
+    bool        mRelativeRotationKey;
     LLMatrix3   mFrameMatrix;
     LLMatrix3   mOffsetMatrix;
     LLVector3   mRelativePosition;
@@ -227,7 +207,7 @@ class LLBVHLoader
     friend class LLKeyframeMotion;
 public:
     // Constructor
-    LLBVHLoader(const char* buffer, ELoadStatus &loadStatus, S32 &errorLine, std::map<std::string, std::string>& joint_alias_map );
+    LLBVHLoader(const char* buffer, ELoadStatus &loadStatus, S32 &errorLine, std::map<std::string, std::string, std::less<>>& joint_alias_map );
     ~LLBVHLoader();
 
 /*
@@ -293,7 +273,7 @@ public:
     U32 getOutputSize();
 
     // writes contents to datapacker
-    BOOL serialize(LLDataPacker& dp);
+    bool serialize(LLDataPacker& dp);
 
     // flags redundant keyframe data
     void optimize();
@@ -302,13 +282,13 @@ public:
 
     F32 getDuration() { return mDuration; }
 
-    BOOL isInitialized() { return mInitialized; }
+    bool isInitialized() { return mInitialized; }
 
     ELoadStatus getStatus() { return mStatus; }
 
 protected:
     // Consumes one line of input from file.
-    BOOL getLine(apr_file_t *fp);
+    bool getLine(llifstream& fp);
 
     // parser state
     char        mLine[BVH_PARSER_LINE_SIZE];        /* Flawfinder: ignore */
@@ -322,7 +302,7 @@ protected:
     TranslationMap      mTranslations;
 
     S32                 mPriority;
-    BOOL                mLoop;
+    bool                mLoop;
     F32                 mLoopInPoint;
     F32                 mLoopOutPoint;
     F32                 mEaseIn;
@@ -330,7 +310,7 @@ protected:
     S32                 mHand;
     std::string         mEmoteName;
 
-    BOOL                mInitialized;
+    bool                mInitialized;
     ELoadStatus         mStatus;
 
     // computed values

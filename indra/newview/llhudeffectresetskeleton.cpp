@@ -56,6 +56,15 @@ LLHUDEffectResetSkeleton::~LLHUDEffectResetSkeleton()
 //-----------------------------------------------------------------------------
 // packData()
 //-----------------------------------------------------------------------------
+void LLHUDEffectResetSkeleton::render()
+{
+    // HUDEffectResetSkeleton is a fake effect meant to reset skeleton only.
+    // Just wait for an update() call to do its work and then die.
+}
+
+//-----------------------------------------------------------------------------
+// packData()
+//-----------------------------------------------------------------------------
 void LLHUDEffectResetSkeleton::packData(LLMessageSystem *mesgsys)
 {
     // Pack the default data
@@ -118,6 +127,12 @@ void LLHUDEffectResetSkeleton::unpackData(LLMessageSystem *mesgsys, S32 blocknum
 
     LLUUID target_id;
     htolememcpy(target_id.mData, &(packed_data[TARGET_OBJECT]), MVT_LLUUID, 16);
+
+    // The purpose for having a target ID is if we want to reset animesh, or
+    // other things in the future.
+    // I implemented this, but due to issues regarding various permission
+    // checks, I scrapped it for now. --Chaser Zaks
+    // See https://github.com/secondlife/viewer/pull/1212 for additional info
 
     if (target_id.isNull())
     {
@@ -185,28 +200,23 @@ void LLHUDEffectResetSkeleton::update()
         return;
     }
 
-    bool owned = false;
-    if (getOriginatedHere())
+    if (mTargetObject->isAvatar())
     {
-        // If we created the request, always reset the skeleton
-        // This fixes issues with resetting other skeletons locally
-        owned = true;
-    }
-    else if (mTargetObject->isAnimatedObject())
-    {
-        owned = mTargetObject->mOwnerID == mSourceObject->getID();
+        // Only the owner of a avatar can reset their skeleton like this
+        // Also allow reset if we created the effect (Local resetting)
+        if (mSourceObject->getID() == mTargetObject->getID() || getOriginatedHere())
+        {
+            LLVOAvatar* avatar = mTargetObject->asAvatar();
+            avatar->resetSkeleton(mResetAnimations);
+// [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
+            avatar->rebuildAttachments();
+// [/SL:KB]
+        }
     }
     else
     {
-        owned = mTargetObject->getID() == mSourceObject->getID();
-    }
-
-    if (owned)
-    {
-        if (mTargetObject->isAvatar() || mTargetObject->isAnimatedObject())
-        {
-            ((LLVOAvatar*)(LLViewerObject*)mTargetObject)->resetSkeleton(mResetAnimations);
-        }
+        LL_WARNS() << mSourceObject->getID() << " attempted to reset skeleton on "
+                << mTargetObject->getID() << ", but it is not a avatar!" << LL_ENDL;
     }
 
     markDead();

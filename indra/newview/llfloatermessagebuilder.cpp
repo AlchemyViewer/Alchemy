@@ -71,10 +71,10 @@ void LLFloaterMessageBuilder::onOpen(const LLSD& key)
         getChild<LLTextBase>("message_edit")->setText(mInitialText);
     }
 }
-BOOL LLFloaterMessageBuilder::tick()
+bool LLFloaterMessageBuilder::tick()
 {
     refreshNetList();
-    return FALSE;
+    return false;
 }
 LLNetListItem* LLFloaterMessageBuilder::findNetListItem(LLHost host)
 {
@@ -194,7 +194,7 @@ void LLFloaterMessageBuilder::refreshNetList()
         scrollp->setScrollPos(scroll_pos);
 }
 
-BOOL LLFloaterMessageBuilder::postBuild()
+bool LLFloaterMessageBuilder::postBuild()
 {
     string_vec_t untrusted_names;
     string_vec_t trusted_names;
@@ -281,12 +281,12 @@ void LLFloaterMessageBuilder::onCommitPacketCombo(LLUICtrl* ctrl)
                             ("ObjectLocalID" == var_name || "TaskLocalID" == var_name || ("LocalID" == var_name && ("ObjectData" == block_name || "UpdateData" == block_name || "InventoryData" == block_name))))
                     {
 
-                        value = fmt::to_string(selected_objectp->getLocalID());
+                        value = std::to_string(selected_objectp->getLocalID());
                     }
                     else if(agent_parcelp && "LocalID" == var_name
                             && ("ParcelData" == block_name || message.find("Parcel") != message.npos))
                     {
-                        value = fmt::to_string(agent_parcelp->getLocalID());
+                        value = std::to_string(agent_parcelp->getLocalID());
                     }
                     else if("PCode" == var_name)
                         value = "9";
@@ -380,17 +380,17 @@ void LLFloaterMessageBuilder::onClickSend()
     mMessageSender.sendMessage(end_point, getChild<LLTextBase>("message_edit")->getText());
 }
 
-BOOL LLFloaterMessageBuilder::handleKeyHere(KEY key, MASK mask)
+bool LLFloaterMessageBuilder::handleKeyHere(KEY key, MASK mask)
 {
     if(key == KEY_RETURN && (mask & MASK_CONTROL))
     {
         onClickSend();
-        return TRUE;
+        return true;
     }
     if(key == KEY_ESCAPE)
     {
         releaseFocus();
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }

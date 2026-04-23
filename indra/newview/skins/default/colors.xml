@@ -23,7 +23,7 @@
 	<color
 	 name="White_10"
 	 value="1 1 1 0.1" />
-  <color
+	<color
 	 name="White_20"
 	 value="1 1 1 0.20" />
 	<color
@@ -50,6 +50,9 @@
 	<color
 	 name="DkGray"
 	 value="0.125 0.125 0.125 1" />
+	<color
+	 name="DkGray_33"
+	 value="0.125 0.125 0.125 .33" />
 	<color
 	 name="DkGray_66"
 	 value="0.125 0.125 0.125 .66" />
@@ -134,7 +137,7 @@
   <color
       name="Orange"
       value="1 .82 .46 1" />
-	<color
+  <color
      name="LindenBlue"
      value="0.149 0.788 1.0 1.0" />
 
@@ -161,7 +164,7 @@
      value="0.24 0.24 0.24 1" />
     <color
      name="AlertCautionBoxColor"
-     reference="Unused?" />
+     value="1 0.82 0.46 1" />
     <color
      name="AlertCautionTextColor"
      reference="LtYellow" />
@@ -562,6 +565,9 @@
      name="InventoryBackgroundColor"
      reference="DkGray2" />
     <color
+     name="InventoryFavoriteColor"
+     reference="Yellow" />
+    <color
      name="InventoryFocusOutlineColor"
      reference="White_25" />
     <color
@@ -640,11 +646,8 @@
      name="MapFrustumRotatingColor"
      reference="White_20" />
     <color
-     name="MapParcelBoundryLine"
-     reference="White" />
-    <color
      name="MapParcelOutlineColor"
-     value="1 1 0 0.5" />
+     reference="White" />
     <color
      name="MapTrackColor"
      reference="Red" />
@@ -722,13 +725,13 @@
     <color
      name="NameTagFriend"
      value="0.447 0.784 0.663 1" />
-	<color
+    <color
      name="NameTagSelf"
      reference="White" />
-	<color
+    <color
      name="NameTagMuted"
      reference="Grey3" />
-	<color
+    <color
      name="NameTagLinden"
      reference="LindenBlue" />
     <color
@@ -795,9 +798,6 @@
      name="PanelNotificationBackground"
      value="1 0.3 0.3 0" />
     <color
-     name="PanelOutfitBg"
-     reference="FrogGreen" />
-	<color
      name="ParcelHoverColor"
      reference="White" />
     <color
@@ -899,6 +899,12 @@
     <color
      name="SelectedOutfitTextColor"
      reference="EmphasisColor" />
+    <color
+     name="SearchableControlHighlightFontColor"
+     value="1 0 0 1" />
+    <color
+     name="SearchableControlHighlightBgColor"
+     value="0.5 0.1 0.1 1" />
     <color
      name="SilhouetteChildColor"
      value="0.13 0.42 0.77 1" />
@@ -1043,7 +1049,7 @@
 	 name="ProfileOnlineIndicatorColor"
 	 reference="Green" />
 
-	<!-- dildo profiles -->
+	<!-- profiles -->
     <color
         name="StatusUserOnline"
         reference="White" />
@@ -1151,6 +1157,20 @@
   <color
     name="OutfitSnapshotMacMask2"
     value="0.1 0.1 0.1 1"/>
+  <color
+   name="ChatMentionFont"
+   value="0.3 0.82 1 1" />
+  <color
+    name="ChatMentionHighlight"
+    value="0.82 0.91 0.98 0.15" />
+  <color
+    name="ChatSelfMentionHighlight"
+    value="1 1 0 0.35" />
+  <color
+    name="MentionFlashBgColor"
+    value="1 1 0 0.5" />
+
+
   <!-- Alchemy -->
   <color
    name="AvatarListItemOnlineColor"

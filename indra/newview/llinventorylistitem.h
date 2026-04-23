@@ -117,7 +117,7 @@ public:
     /**
      * Inheritors need to call base implementation of postBuild()
      */
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     /**
      * Handles item selection
@@ -130,7 +130,7 @@ public:
     /*virtual*/ S32  notify(const LLSD& info);
 
     /* Highlights item */
-    /*virtual*/ BOOL handleHover(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
     /* Removes item highlight */
     /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask);
 
@@ -153,7 +153,7 @@ public:
     LLViewerInventoryItem* getItem() const;
 
     void setSeparatorVisible(bool visible) { mSeparatorVisible = visible; }
-    void resetHighlight() { mHovered = FALSE; }
+    void resetHighlight() { mHovered = false; }
 
     virtual ~LLPanelInventoryListItemBase(){}
 
@@ -167,6 +167,7 @@ protected:
      * Called after inventory item was updated, update panel widgets to reflect inventory changes.
      */
     virtual void updateItem(const std::string& name,
+                            bool favorite,
                             EItemState item_state = IS_DEFAULT);
 
     void setLeftWidgetsWidth(S32 width) { mLeftWidgetsWidth = width; }
@@ -194,7 +195,7 @@ protected:
     /**
      * Show tool tip if item name text size > panel size
      */
-    virtual BOOL handleToolTip( S32 x, S32 y, MASK mask);
+    virtual bool handleToolTip( S32 x, S32 y, MASK mask);
 
     const LLUUID mInventoryItemUUID;
     bool mHovered;
@@ -222,8 +223,9 @@ private:
     LLUIImagePtr    mSelectedImage;
     LLUIImagePtr    mSeparatorImage;
 
-    bool            mSelected;
-    bool            mSeparatorVisible;
+    bool            mSelected = false;
+    bool            mSeparatorVisible = false;
+    bool            mIsFavorite = false; // note that any setter needs to update tittle
 
     std::string     mHighlightedText;
 

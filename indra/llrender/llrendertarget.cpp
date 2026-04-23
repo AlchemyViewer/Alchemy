@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -33,19 +36,49 @@
 LLRenderTarget* LLRenderTarget::sBoundTarget = NULL;
 U32 LLRenderTarget::sBytesAllocated = 0;
 
-void check_framebuffer_status()
+namespace
 {
-    if (gDebugGL)
+    // Resolve the GL (internal_format, pixel_format, pixel_type, bytes_per_pixel)
+    // for a given depth format and stencil request.
+    struct DepthFormatInfo
     {
-        GLenum status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
-        switch (status)
+        U32 internal_format;
+        U32 pixel_format;
+        U32 pixel_type;
+        U32 bytes_per_pixel;
+    };
+
+    DepthFormatInfo get_depth_format_info(LLRenderTarget::eDepthFormat fmt, bool stencil)
+    {
+        if (stencil)
         {
-        case GL_FRAMEBUFFER_COMPLETE:
-            break;
-        default:
-            LL_WARNS() << "check_framebuffer_status failed -- " << std::hex << status << LL_ENDL;
-            ll_fail("check_framebuffer_status failed");
-            break;
+            if (fmt == LLRenderTarget::DEPTH_FMT_32F)
+            {
+                return { GL_DEPTH32F_STENCIL8, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, 8 };
+            }
+            return { GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 4 };
+        }
+        if (fmt == LLRenderTarget::DEPTH_FMT_32F)
+        {
+            return { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, 4 };
+        }
+        return { GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 4 };
+    }
+
+    void check_framebuffer_status()
+    {
+        if (gDebugGL)
+        {
+            GLenum status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+            switch (status)
+            {
+                case GL_FRAMEBUFFER_COMPLETE:
+                    break;
+                default:
+                    LL_WARNS() << "check_framebuffer_status failed -- " << std::hex << status << LL_ENDL;
+                    ll_fail("check_framebuffer_status failed");
+                    break;
+            }
         }
     }
 }
@@ -65,6 +98,8 @@ LLRenderTarget::LLRenderTarget() :
     mFBO(0),
     mDepth(0),
     mUseDepth(false),
+    mStencil(false),
+    mDepthFormat(DEPTH_FMT_24),
     mUsage(LLTexUnit::TT_TEXTURE)
 {
 }
@@ -95,18 +130,20 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
     {
         gGL.getTexUnit(0)->bindManual(mUsage, mDepth);
         U32 internal_type = LLTexUnit::getInternalType(mUsage);
-        LLImageGL::setManualImage(internal_type, 0, GL_DEPTH_COMPONENT24, mResX, mResY, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL, false);
+        const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
+        LLImageGL::setManualImage(internal_type, 0, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL, false);
 
-        sBytesAllocated += pix_diff*4;
+        sBytesAllocated += pix_diff * static_cast<S32>(info.bytes_per_pixel);
     }
 }
 
 
-bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, LLTexUnit::eTextureType usage, LLTexUnit::eTextureMipGeneration generateMipMaps)
+bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, LLTexUnit::eTextureType usage, LLTexUnit::eTextureMipGeneration generateMipMaps, eDepthFormat depth_fmt)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     llassert(usage == LLTexUnit::TT_TEXTURE);
     llassert(!isBoundInStack());
+    llassert(!stencil || depth); // stencil requires depth
 
     resx = llmin(resx, (U32) gGLManager.mGLMaxTextureSize);
     resy = llmin(resy, (U32) gGLManager.mGLMaxTextureSize);
@@ -118,12 +155,14 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, LLT
 
     mUsage = usage;
     mUseDepth = depth;
+    mStencil = depth && stencil;
+    mDepthFormat = depth_fmt;
 
     mGenerateMipMaps = generateMipMaps;
 
     if (mGenerateMipMaps != LLTexUnit::TMG_NONE) {
         // Calculate the number of mip levels based upon resolution that we should have.
-        mMipLevels = 1 + floor(log10((float)llmax(mResX, mResY))/log10(2.0));
+        mMipLevels = 1 + (U32)floor(log10((float)llmax(mResX, mResY)) / log10(2.0));
     }
 
     if (depth)
@@ -141,7 +180,8 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, LLT
     {
         glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
 
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, LLTexUnit::getInternalType(mUsage), mDepth, 0);
+        GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, LLTexUnit::getInternalType(mUsage), mDepth, 0);
 
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
     }
@@ -208,7 +248,7 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
         return true;
     }
 
-    U32 offset = mTex.size();
+    U32 offset = static_cast<U32>(mTex.size());
 
     if( offset >= 4 )
     {
@@ -300,10 +340,11 @@ bool LLRenderTarget::allocateDepth()
     U32 internal_type = LLTexUnit::getInternalType(mUsage);
     stop_glerror();
     clear_glerror();
-    LLImageGL::setManualImage(internal_type, 0, GL_DEPTH_COMPONENT24, mResX, mResY, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL, false);
+    const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
+    LLImageGL::setManualImage(internal_type, 0, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL, false);
     gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 
-    sBytesAllocated += mResX*mResY*4;
+    sBytesAllocated += mResX * mResY * info.bytes_per_pixel;
 
     if (glGetError() != GL_NO_ERROR)
     {
@@ -337,13 +378,16 @@ void LLRenderTarget::shareDepthBuffer(LLRenderTarget& target)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, target.mFBO);
 
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, LLTexUnit::getInternalType(mUsage), mDepth, 0);
+        GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, LLTexUnit::getInternalType(mUsage), mDepth, 0);
 
         check_framebuffer_status();
 
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
 
         target.mUseDepth = true;
+        target.mStencil = mStencil;
+        target.mDepthFormat = mDepthFormat;
     }
 }
 
@@ -356,9 +400,12 @@ void LLRenderTarget::release()
     {
         LLImageGL::deleteTextures(1, &mDepth);
 
-        mDepth = 0;
+        const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
+        sBytesAllocated -= mResX * mResY * info.bytes_per_pixel;
 
-        sBytesAllocated -= mResX*mResY*4;
+        mDepth = 0;
+        mStencil = false;
+        mDepthFormat = DEPTH_FMT_24;
     }
     else if (mFBO)
     {
@@ -366,8 +413,11 @@ void LLRenderTarget::release()
 
         if (mUseDepth)
         { //detach shared depth buffer
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, LLTexUnit::getInternalType(mUsage), 0, 0);
+            GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, LLTexUnit::getInternalType(mUsage), 0, 0);
             mUseDepth = false;
+            mStencil = false;
+            mDepthFormat = DEPTH_FMT_24;
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
@@ -378,11 +428,11 @@ void LLRenderTarget::release()
     if (mFBO && (mTex.size() > 1))
     {
         glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
-        S32 z;
+        size_t z;
         for (z = mTex.size() - 1; z >= 1; z--)
         {
             sBytesAllocated -= mResX*mResY*4;
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0+z, LLTexUnit::getInternalType(mUsage), 0, 0);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, static_cast<GLenum>(GL_COLOR_ATTACHMENT0+z), LLTexUnit::getInternalType(mUsage), 0, 0);
             LLImageGL::deleteTextures(1, &mTex[z]);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
@@ -426,14 +476,17 @@ void LLRenderTarget::bindTarget()
                             GL_COLOR_ATTACHMENT1,
                             GL_COLOR_ATTACHMENT2,
                             GL_COLOR_ATTACHMENT3};
-    glDrawBuffers(mTex.size(), drawbuffers);
 
     if (mTex.empty())
     { //no color buffer to draw to
         glDrawBuffer(GL_NONE);
         glReadBuffer(GL_NONE);
     }
-
+    else
+    {
+        glDrawBuffers(static_cast<GLsizei>(mTex.size()), drawbuffers);
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+    }
     check_framebuffer_status();
 
     glViewport(0, 0, mResX, mResY);
@@ -452,7 +505,10 @@ void LLRenderTarget::clear(U32 mask_in)
     if (mUseDepth)
     {
         mask |= GL_DEPTH_BUFFER_BIT;
-
+    }
+    if (mStencil)
+    {
+        mask |= GL_STENCIL_BUFFER_BIT;
     }
     if (mFBO)
     {
@@ -472,12 +528,10 @@ void LLRenderTarget::clear(U32 mask_in)
 
 U32 LLRenderTarget::getTexture(U32 attachment) const
 {
-    if (attachment > mTex.size()-1)
+    if (attachment >= mTex.size())
     {
-        LL_ERRS() << "Invalid attachment index." << LL_ENDL;
-    }
-    if (mTex.empty())
-    {
+        LL_WARNS() << "Invalid attachment index " << attachment << " for size " << mTex.size() << LL_ENDL;
+        llassert(false);
         return 0;
     }
     return mTex[attachment];
@@ -485,7 +539,7 @@ U32 LLRenderTarget::getTexture(U32 attachment) const
 
 U32 LLRenderTarget::getNumTextures() const
 {
-    return mTex.size();
+    return static_cast<U32>(mTex.size());
 }
 
 void LLRenderTarget::bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilterOptions filter_options)
@@ -502,7 +556,8 @@ void LLRenderTarget::flush()
     llassert(sCurFBO == mFBO);
     llassert(sBoundTarget == this);
 
-    if (mGenerateMipMaps == LLTexUnit::TMG_AUTO) {
+    if (mGenerateMipMaps == LLTexUnit::TMG_AUTO)
+    {
         LL_PROFILE_GPU_ZONE("rt generate mipmaps");
         bindTexture(0, 0, LLTexUnit::TFO_TRILINEAR);
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -523,12 +578,14 @@ void LLRenderTarget::flush()
         glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
         sCurResX = gGLViewport[2];
         sCurResY = gGLViewport[3];
+        glReadBuffer(GL_BACK);
+        glDrawBuffer(GL_BACK);
     }
 }
 
 bool LLRenderTarget::isComplete() const
 {
-    return (!mTex.empty() || mDepth) ? true : false;
+    return !mTex.empty() || mDepth;
 }
 
 void LLRenderTarget::getViewport(S32* viewport)
@@ -571,6 +628,8 @@ void LLRenderTarget::swapFBORefs(LLRenderTarget& other)
     llassert(mTex.size() == other.mTex.size());
     llassert(mDepth == other.mDepth);
     llassert(mUseDepth == other.mUseDepth);
+    llassert(mStencil == other.mStencil);
+    llassert(mDepthFormat == other.mDepthFormat);
     llassert(mGenerateMipMaps == other.mGenerateMipMaps);
     llassert(mMipLevels == other.mMipLevels);
     llassert(mUsage == other.mUsage);

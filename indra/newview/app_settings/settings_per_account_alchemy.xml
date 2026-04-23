@@ -11,6 +11,234 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyAutoresponse</key>
+        <map>
+            <key>Comment</key>
+            <string>Auto response to instant messages.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>This resident has turned on &apos;Autorespond mode&apos; like a boss.</string>
+        </map>
+        <key>AlchemyAutoresponseChanged</key>
+        <map>
+            <key>Comment</key>
+            <string>Does user's autoresponse response message differ from default?</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyAutoresponseEnable</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatically respond when someone messages you</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyAutoresponseNotFriend</key>
+        <map>
+            <key>Comment</key>
+            <string>Auto response to instant messages to strangers. Stranger danger!</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>This resident has turned on &apos;Autorespond mode&apos; like a boss.</string>
+        </map>
+        <key>AlchemyAutoresponseNotFriendChanged</key>
+        <map>
+            <key>Comment</key>
+            <string>Does user's autoresponse not friend response message differ from default?</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyAutoresponseNotFriendEnable</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatically respond when someone messages you</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyIgnoreAdHocSessions</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatically ignore and leave all conference (ad-hoc) chats.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyReportIgnoredAdHocSession</key>
+        <map>
+            <key>Comment</key>
+            <string>Reports to nearby chat if a conference (ad-hoc) has been ignored.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyMouselookAlternativeFOV</key>
+        <map>
+            <key>Comment</key>
+            <string>Adjusted when scrolling back and forth while holding rightclick in mouselook.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>ALDontRejectTeleportOffersFromFriends</key>
+        <map>
+            <key>Comment</key>
+            <string>Don't reject teleport offers and requests from friends.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALRejectFriendshipRequestsChanged</key>
+        <map>
+            <key>Comment</key>
+            <string>Does user's reject friendship requests response message differ from default?</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALRejectFriendshipRequestsMode</key>
+        <map>
+            <key>Comment</key>
+            <string>Reject all user friendship requests?</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALRejectFriendshipRequestsResponse</key>
+        <map>
+            <key>Comment</key>
+            <string>Auto response to instant message to all users while in rejct all friends request mode enabled</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>The resident you messaged has activated [APP_NAME]&apos;s &apos; reject all friendship requests mode&apos; which means they have requested not to be disturbed with friendship requests. You may still send an IM manually.</string>
+        </map>
+        <key>ALRejectTeleportOffersMode</key>
+        <map>
+            <key>Comment</key>
+            <string>Has the user selected reject all teleport offers and requests mode?</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALRejectTeleportOffersResponse</key>
+        <map>
+            <key>Comment</key>
+            <string>Auto response to instant messages from all avatars while in reject all teleport offers and requests mode.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>The Resident you messaged has activated [APP_NAME]&apos;s &apos;reject all teleport offers and requests mode&apos; which means they have requested not to be disturbed with teleport offers and requests. You may still send an IM message manually.</string>
+        </map>
+        <key>ALRejectTeleportOffersResponseChanged</key>
+        <map>
+            <key>Comment</key>
+            <string>Does user's reject teleport offers and requests response message differ from default?</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALStoredCameraPos</key>
+        <map>
+            <key>Comment</key>
+            <string>Stored camera position in camera tools</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3D</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>ALStoredCameraFocus</key>
+        <map>
+            <key>Comment</key>
+            <string>Stored camera focus position in camera tools</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3D</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>ALStoredCameraRoll</key>
+        <map>
+            <key>Comment</key>
+            <string>Stored camera roll in camera tools</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>ALStoredCameraFocusObjectId</key>
+        <map>
+            <key>Comment</key>
+            <string>Stored object ID of camera focus in camera tools</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
         <key>PauseAO</key>
         <map>
             <key>Comment</key>
@@ -68,256 +296,6 @@
                 <integer>0</integer>
                 <integer>0</integer>
             </array>
-        </map>
-        <key>ALDiscordIntegration</key>
-        <map>
-            <key>Comment</key>
-            <string>Enable discord integration</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ALDiscordShareLocationRegion</key>
-        <map>
-            <key>Comment</key>
-            <string>Share avatar region to discord</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ALDiscordShareRegionMaxMaturity</key>
-        <map>
-            <key>Comment</key>
-            <string>Maximum maturity of location shared to Discord</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>U32</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ALDiscordShareName</key>
-        <map>
-            <key>Comment</key>
-            <string>Share avatar name to discord</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyMouselookAlternativeFOV</key>
-        <map>
-            <key>Comment</key>
-            <string>Adjusted when scrolling back and forth while holding rightclick in mouselook.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.5</real>
-        </map>
-        <key>ALStoredCameraPos</key>
-        <map>
-            <key>Comment</key>
-            <string>Stored camera position in camera tools</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3D</string>
-            <key>Value</key>
-            <array>
-                <real>0.0</real>
-                <real>0.0</real>
-                <real>0.0</real>
-            </array>
-        </map>
-        <key>ALStoredCameraFocus</key>
-        <map>
-            <key>Comment</key>
-            <string>Stored camera focus position in camera tools</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3D</string>
-            <key>Value</key>
-            <array>
-                <real>0.0</real>
-                <real>0.0</real>
-                <real>0.0</real>
-            </array>
-        </map>
-        <key>ALStoredCameraRoll</key>
-        <map>
-            <key>Comment</key>
-            <string>Stored camera roll in camera tools</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.0</real>
-        </map>
-        <key>ALStoredCameraFocusObjectId</key>
-        <map>
-            <key>Comment</key>
-            <string>Stored object ID of camera focus in camera tools</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string />
-        </map>
-        <key>ALRejectFriendshipRequestsMode</key>
-        <map>
-            <key>Comment</key>
-            <string>Reject all user friendship requests?</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ALRejectFriendshipRequestsResponse</key>
-        <map>
-            <key>Comment</key>
-            <string>Auto response to instant message to all users while in rejct all friends request mode enabled</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string>The resident you messaged has activated [APP_NAME]&apos;s &apos; reject all friendship requests mode&apos; which means they have requested not to be disturbed with friendship requests. You may still send an IM manually.</string>
-        </map>
-        <key>ALRejectFriendshipRequestsChanged</key>
-        <map>
-            <key>Comment</key>
-            <string>Does user's reject friendship requests response message differ from default?</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ALRejectTeleportOffersMode</key>
-        <map>
-            <key>Comment</key>
-            <string>Has the user selected reject all teleport offers and requests mode?</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ALRejectTeleportOffersResponse</key>
-        <map>
-            <key>Comment</key>
-            <string>Auto response to instant messages from all avatars while in reject all teleport offers and requests mode.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string>The Resident you messaged has activated [APP_NAME]&apos;s &apos;reject all teleport offers and requests mode&apos; which means they have requested not to be disturbed with teleport offers and requests. You may still send an IM message manually.</string>
-        </map>
-        <key>ALRejectTeleportOffersResponseChanged</key>
-        <map>
-            <key>Comment</key>
-            <string>Does user's reject teleport offers and requests response message differ from default?</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ALDontRejectTeleportOffersFromFriends</key>
-        <map>
-            <key>Comment</key>
-            <string>Don't reject teleport offers and requests from friends.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyAutoresponseChanged</key>
-        <map>
-            <key>Comment</key>
-            <string>Does user's autoresponse response message differ from default?</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyAutoresponseEnable</key>
-        <map>
-            <key>Comment</key>
-            <string>Automatically respond when someone messages you</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyAutoresponseNotFriendEnable</key>
-        <map>
-            <key>Comment</key>
-            <string>Automatically respond when someone messages you</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyAutoresponse</key>
-        <map>
-            <key>Comment</key>
-            <string>Auto response to instant messages.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string>This resident has turned on &apos;Autorespond mode&apos; like a boss.</string>
-        </map>
-        <key>AlchemyAutoresponseNotFriendChanged</key>
-        <map>
-            <key>Comment</key>
-            <string>Does user's autoresponse not friend response message differ from default?</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyAutoresponseNotFriend</key>
-        <map>
-            <key>Comment</key>
-            <string>Auto response to instant messages to strangers. Stranger danger!</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string>This resident has turned on &apos;Autorespond mode&apos; like a boss.</string>
         </map>
     </map>
 </llsd>

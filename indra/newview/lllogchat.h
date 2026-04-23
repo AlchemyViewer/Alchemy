@@ -46,7 +46,7 @@ private:
     LLCondition mRunCondition;
 };
 
-class LLLoadHistoryThread final : public LLActionThread
+class LLLoadHistoryThread : public LLActionThread
 {
 private:
     const std::string& mFileName;
@@ -57,8 +57,8 @@ public:
     LLLoadHistoryThread(const std::string& file_name, std::list<LLSD>* messages, const LLSD& load_params);
     ~LLLoadHistoryThread();
     //void setHistoryParams(const std::string& file_name, const LLSD& load_params);
-    void loadHistory(const std::string& file_name, std::list<LLSD>* messages, const LLSD& load_params);
-    void run() override;
+    virtual void loadHistory(const std::string& file_name, std::list<LLSD>* messages, const LLSD& load_params);
+    virtual void run();
 
     typedef boost::signals2::signal<void (std::list<LLSD>* messages,const std::string& file_name)> load_end_signal_t;
     load_end_signal_t * mLoadEndSignal;
@@ -66,7 +66,7 @@ public:
     void removeLoadEndSignal(const load_end_signal_t::slot_type& cb);
 };
 
-class LLDeleteHistoryThread final : public LLActionThread
+class LLDeleteHistoryThread : public LLActionThread
 {
 private:
     std::list<LLSD>* mMessages;
@@ -75,11 +75,11 @@ public:
     LLDeleteHistoryThread(std::list<LLSD>* messages, LLLoadHistoryThread* loadThread);
     ~LLDeleteHistoryThread();
 
-    void run() override;
+    virtual void run();
     static void deleteHistory();
 };
 
-class LLLogChat final : public LLSingleton<LLLogChat>
+class LLLogChat : public LLSingleton<LLLogChat>
 {
     LLSINGLETON(LLLogChat);
     ~LLLogChat();
@@ -107,7 +107,6 @@ public:
     static void findTranscriptFiles(std::string pattern, std::vector<std::string>& list_of_transcriptions);
     static void getListOfTranscriptFiles(std::vector<std::string>& list);
     static void getListOfTranscriptBackupFiles(std::vector<std::string>& list_of_transcriptions);
-    static bool anyTranscriptsExist();
 
     static void loadChatHistory(const std::string& file_name, std::list<LLSD>& messages, const LLSD& load_params = LLSD(), bool is_group = false);
 
@@ -128,6 +127,8 @@ public:
     static bool isAdHocTranscriptExist(std::string file_name);
     static bool isTranscriptFileFound(std::string fullname);
 
+    static std::string getGroupChatSuffix();
+
     bool historyThreadsFinished(LLUUID session_id);
     LLLoadHistoryThread* getLoadHistoryThread(LLUUID session_id);
     LLDeleteHistoryThread* getDeleteHistoryThread(LLUUID session_id);
@@ -144,7 +145,7 @@ private:
     save_history_signal_t * mSaveHistorySignal;
     std::map<LLUUID,LLLoadHistoryThread *> mLoadHistoryThreads;
     std::map<LLUUID,LLDeleteHistoryThread *> mDeleteHistoryThreads;
-    LLMutex mHistoryThreadsMutex;
+    LLMutex* mHistoryThreadsMutex;
 };
 
 /**

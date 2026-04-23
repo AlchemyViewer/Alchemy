@@ -34,12 +34,14 @@
 #include "llstring.h"
 #include "lluiimage.h"
 #include "llview.h"
+#include "llfontvertexbuffer.h"
 
 //
 // Declarations
 //
 
 class LLFontGL;
+class LLFontVertexBuffer;
 class LLScrollContainer;
 class LLUICtrlFactory;
 
@@ -87,7 +89,7 @@ namespace LLInitParam
 // Classes
 //
 
-class LLBadge final
+class LLBadge
 : public LLUICtrl
 {
 public:
@@ -128,13 +130,13 @@ protected:
 
 public:
 
-    ~LLBadge() = default;
+    ~LLBadge();
 
     bool                addToView(LLView * view);
 
     virtual void        draw();
 
-    //const std::string&    getLabel() const { return mLabel.getString(); }
+    const std::string   getLabel() const { return wstring_to_utf8str(mLabel); }
     void                setLabel( const LLStringExplicit& label);
 
     void                setDrawAtParentTop(bool draw_at_top) { mDrawAtParentTop = draw_at_top;}
@@ -144,11 +146,12 @@ private:
     LLUIColor               mBorderColor;
 
     const LLFontGL*         mGLFont;
+    LLFontVertexBuffer      mFontBuffer;
 
     LLPointer< LLUIImage >  mImage;
     LLUIColor               mImageColor;
 
-    LLWString               mLabel;
+    LLUIString              mLabel;
     LLUIColor               mLabelColor;
 
     S32                     mLabelOffsetHoriz;
@@ -171,7 +174,7 @@ private:
 
 // Build time optimization, generate once in .cpp file
 #ifndef LLBADGE_CPP
-extern template class LLBadge* LLView::getChild<class LLBadge>(std::string_view name, BOOL recurse) const;
+extern template class LLBadge* LLView::getChild<class LLBadge>(std::string_view name, bool recurse) const;
 #endif
 
 #endif  // LL_LLBADGE_H

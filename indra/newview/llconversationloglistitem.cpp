@@ -53,7 +53,10 @@ LLConversationLogListItem::LLConversationLogListItem(const LLConversation* conve
 
     if (mConversation->hasOfflineMessages() && !ims_are_read)
     {
-        mIMFloaterShowedConnection = LLFloaterIMSession::setIMFloaterShowedCallback(boost::bind(&LLConversationLogListItem::onIMFloaterShown, this, _1));
+        mIMFloaterShowedConnection = LLFloaterIMSession::setIMFloaterShowedCallback([this](const LLUUID& session_id)
+        {
+            onIMFloaterShown(session_id);
+        });
     }
 }
 
@@ -62,7 +65,7 @@ LLConversationLogListItem::~LLConversationLogListItem()
     mIMFloaterShowedConnection.disconnect();
 }
 
-BOOL LLConversationLogListItem::postBuild()
+bool LLConversationLogListItem::postBuild()
 {
     initIcons();
 
@@ -77,7 +80,7 @@ BOOL LLConversationLogListItem::postBuild()
     getChild<LLButton>("delete_btn")->setClickedCallback(boost::bind(&LLConversationLogListItem::onRemoveBtnClicked, this));
     setDoubleClickCallback(boost::bind(&LLConversationLogListItem::onDoubleClick, this));
 
-    return TRUE;
+    return true;
 }
 
 void LLConversationLogListItem::initIcons()
@@ -88,14 +91,14 @@ void LLConversationLogListItem::initIcons()
         case LLIMModel::LLIMSession::ADHOC_SESSION:
         {
             LLAvatarIconCtrl* avatar_icon = getChild<LLAvatarIconCtrl>("avatar_icon");
-            avatar_icon->setVisible(TRUE);
+            avatar_icon->setVisible(true);
             avatar_icon->setValue(mConversation->getParticipantID());
             break;
         }
         case LLIMModel::LLIMSession::GROUP_SESSION:
         {
             LLGroupIconCtrl* group_icon = getChild<LLGroupIconCtrl>("group_icon");
-            group_icon->setVisible(TRUE);
+            group_icon->setVisible(true);
             group_icon->setValue(mConversation->getSessionID());
             break;
         }
@@ -105,7 +108,7 @@ void LLConversationLogListItem::initIcons()
 
     if (mConversation->hasOfflineMessages())
     {
-            getChild<LLIconCtrl>("unread_ims_icon")->setVisible(TRUE);
+            getChild<LLIconCtrl>("unread_ims_icon")->setVisible(true);
     }
 }
 
@@ -150,7 +153,7 @@ void LLConversationLogListItem::onIMFloaterShown(const LLUUID& session_id)
 {
     if (mConversation->getSessionID() == session_id)
     {
-        getChild<LLIconCtrl>("unread_ims_icon")->setVisible(FALSE);
+        getChild<LLIconCtrl>("unread_ims_icon")->setVisible(false);
     }
 }
 

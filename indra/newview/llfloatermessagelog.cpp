@@ -38,6 +38,8 @@
 #include <boost/range/algorithm/find.hpp>
 #include <boost/tokenizer.hpp>
 
+#include <fmt/format.h>
+
 const std::string DEFAULT_FILTER = "!StartPingCheck !CompletePingCheck !PacketAck !SimulatorViewerTimeMessage !SimStats !AgentUpdate !AgentAnimation !AvatarAnimation !ViewerEffect !CoarseLocationUpdate !LayerData !CameraConstraint !ObjectUpdateCached !RequestMultipleObjects !ObjectUpdate !ObjectUpdateCompressed !ImprovedTerseObjectUpdate !KillObject !ImagePacket !SendXferPacket !ConfirmXferPacket !TransferPacket !SoundTrigger !AttachedSound !PreloadSound !ViewerAsset";
 
 //TODO: replace all filtering code, esp start/stopApplyingFilter
@@ -84,10 +86,10 @@ LLFloaterMessageLog::LLMessageLogNetMan::LLMessageLogNetMan(LLFloaterMessageLog*
 {
 }
 
-BOOL LLFloaterMessageLog::LLMessageLogNetMan::tick()
+bool LLFloaterMessageLog::LLMessageLogNetMan::tick()
 {
     if (mParent) { mParent->updateGlobalNetList(); }
-    return FALSE;
+    return false;
 }
 
 ////////////////////////////////
@@ -140,7 +142,7 @@ LLFloaterMessageLog::~LLFloaterMessageLog()
     sIncompleteHTTPConvoMutex = nullptr;
 }
 
-BOOL LLFloaterMessageLog::postBuild()
+bool LLFloaterMessageLog::postBuild()
 {
     mStatusText = getChild<LLTextBase>("log_status_text");
     mMessagelogScrollListCtrl = getChild<LLScrollListCtrl>("message_log");
@@ -156,7 +158,7 @@ BOOL LLFloaterMessageLog::postBuild()
     getChild<LLUICtrl>("msg_builder_send_btn")->setCommitCallback(boost::bind(&LLFloaterMessageLog::onClickSendToMessageBuilder, this));
     getChild<LLLineEditor>("filter_edit")->setText(mMessageLogFilter.asString());
 
-    startApplyingFilter(mMessageLogFilter.asString(), TRUE);
+    startApplyingFilter(mMessageLogFilter.asString(), true);
 
     updateGlobalNetList(true);
     mNetListTimer.reset(new LLMessageLogNetMan(this));
@@ -164,7 +166,7 @@ BOOL LLFloaterMessageLog::postBuild()
     setInfoPaneMode(IPANE_NET);
     wrapInfoPaneText(true);
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterMessageLog::onOpen(const LLSD& key)
@@ -183,7 +185,7 @@ void LLFloaterMessageLog::draw()
     if (mStatusText)
     {
         LLStringUtil::format_map_t map;
-        map["TOTAL"] = fmt::to_string(mMessagesLogged);
+        map["TOTAL"] = std::to_string(mMessagesLogged);
 
         if (mMessageLogFilter.empty())
         {
@@ -191,7 +193,7 @@ void LLFloaterMessageLog::draw()
         }
         else
         {
-            map["MESSAGES"] = fmt::to_string(mFloaterMessageLogItems.size());
+            map["MESSAGES"] = std::to_string(mFloaterMessageLogItems.size());
             mStatusText->setText(getString("filter_status", map));
         }
     }
@@ -303,7 +305,7 @@ void LLFloaterMessageLog::refreshNetList()
                 std::string name = regionp->getName();
                 if (name.empty())
                 {
-                    name = fmt::format(FMT_STRING("{:s} (awaiting region name)"),
+                    name = fmt::format("{:s} (awaiting region name)",
                         itemp->mCircuitData->getHost().getString());
                 }
                 itemp->mName = name;
@@ -315,7 +317,7 @@ void LLFloaterMessageLog::refreshNetList()
                 itemp->mName = itemp->mCircuitData->getHost().getString();
                 if (!itemp->mPreviousRegionName.empty())
                 {
-                    itemp->mName.append(fmt::format(FMT_STRING(" (was {:s})"), itemp->mPreviousRegionName));
+                    itemp->mName.append(fmt::format(" (was {:s})", itemp->mPreviousRegionName));
                 }
             }
         }
@@ -350,7 +352,7 @@ void LLFloaterMessageLog::refreshNetList()
         for(S32 i = 0; i < 2; ++i)
         {
             LLSD& icon_column = element["columns"][i + 1];
-            icon_column["column"] = fmt::format(FMT_STRING("icon{:d}"), i);
+            icon_column["column"] = fmt::format("icon{:d}", i);
             icon_column["type"] = "icon";
             icon_column["value"] = "";
         }
@@ -385,7 +387,7 @@ void LLFloaterMessageLog::refreshNetList()
     }
 }
 
-void LLFloaterMessageLog::refreshNetInfo(BOOL force)
+void LLFloaterMessageLog::refreshNetInfo(bool force)
 {
     if (mInfoPaneMode != IPANE_NET) { return; }
     const LLScrollListCtrl* scrollp = getChild<LLScrollListCtrl>("net_list");
@@ -399,30 +401,30 @@ void LLFloaterMessageLog::refreshNetInfo(BOOL force)
         {
             std::string info;
             info.reserve(512);
-            info.append(fmt::format(FMT_STRING("{:s}, {:d}\n--------------------------------\n\n"), itemp->mName, itemp->mHandle));
+            info.append(fmt::format("{:s}, {:d}\n--------------------------------\n\n", itemp->mName, itemp->mHandle));
             if(itemp->mCircuitData)
             {
                 LLCircuitData* cdp = itemp->mCircuitData;
                 info.append("Circuit\n--------------------------------\n");
-                info.append(fmt::format(FMT_STRING(" * Host: {:s}\n"), cdp->getHost().getString()));
+                info.append(fmt::format(" * Host: {:s}\n", cdp->getHost().getString()));
                 S32 seconds = (S32)cdp->getAgeInSeconds();
                 S32 minutes = seconds / 60;
                 seconds = seconds % 60;
                 S32 hours = minutes / 60;
                 minutes = minutes % 60;
-                info.append(fmt::format(FMT_STRING(" * Age: {:d}h {:d}m {:d}s\n"), hours, minutes, seconds));
-                info.append(fmt::format(FMT_STRING(" * Alive: {:s}\n"), cdp->isAlive() ? "yes" : "no"));
-                info.append(fmt::format(FMT_STRING(" * Blocked: {:s}\n"), cdp->isBlocked() ? "yes" : "no"));
-                info.append(fmt::format(FMT_STRING(" * Allow timeout: {:s}\n"), cdp->getAllowTimeout() ? "yes" : "no"));
-                info.append(fmt::format(FMT_STRING(" * Trusted: {:s}\n"), cdp->getTrusted() ? "yes" : "no"));
-                info.append(fmt::format(FMT_STRING(" * Ping delay: {:d}\n"), cdp->getPingDelay().value()));
-                info.append(fmt::format(FMT_STRING(" * Packets out: {:d}\n"), cdp->getPacketsOut()));
-                info.append(fmt::format(FMT_STRING(" * Bytes out: {:d}\n"), cdp->getBytesOut().value()));
-                info.append(fmt::format(FMT_STRING(" * Packets in: {:d}\n"), cdp->getPacketsIn()));
-                info.append(fmt::format(FMT_STRING(" * Bytes in: {:d}\n"), cdp->getBytesIn().value()));
-                info.append(fmt::format(FMT_STRING(" * Endpoint ID: {:s}\n"), cdp->getLocalEndPointID().asString()));
-                info.append(fmt::format(FMT_STRING(" * Remote ID: {:s}\n"), cdp->getRemoteID().asString()));
-                info.append(fmt::format(FMT_STRING(" * Remote session ID: {:s}\n\n"), cdp->getRemoteSessionID().asString()));
+                info.append(fmt::format(" * Age: {:d}h {:d}m {:d}s\n", hours, minutes, seconds));
+                info.append(fmt::format(" * Alive: {:s}\n", cdp->isAlive() ? "yes" : "no"));
+                info.append(fmt::format(" * Blocked: {:s}\n", cdp->isBlocked() ? "yes" : "no"));
+                info.append(fmt::format(" * Allow timeout: {:s}\n", cdp->getAllowTimeout() ? "yes" : "no"));
+                info.append(fmt::format(" * Trusted: {:s}\n", cdp->getTrusted() ? "yes" : "no"));
+                info.append(fmt::format(" * Ping delay: {:d}\n", cdp->getPingDelay().value()));
+                info.append(fmt::format(" * Packets out: {:d}\n", cdp->getPacketsOut()));
+                info.append(fmt::format(" * Bytes out: {:d}\n", cdp->getBytesOut().value()));
+                info.append(fmt::format(" * Packets in: {:d}\n", cdp->getPacketsIn()));
+                info.append(fmt::format(" * Bytes in: {:d}\n", cdp->getBytesIn().value()));
+                info.append(fmt::format(" * Endpoint ID: {:s}\n", cdp->getLocalEndPointID().asString()));
+                info.append(fmt::format(" * Remote ID: {:s}\n", cdp->getRemoteID().asString()));
+                info.append(fmt::format(" * Remote session ID: {:s}\n\n", cdp->getRemoteSessionID().asString()));
             }
 
             getChild<LLTextBase>("net_info")->setText(info);
@@ -552,7 +554,7 @@ void LLFloaterMessageLog::conditionalLog(LogPayload entry)
     LLScrollListCell::Params net_column;
     LLScrollListCell::Params name_column;
 
-    sequence_column.column("sequence").type("text").value(fmt::to_string(item->mSequenceID));
+    sequence_column.column("sequence").type("text").value(std::to_string(item->mSequenceID));
 
     protocol_column.column("protocol").type("text");
     switch (message_type)
@@ -667,18 +669,18 @@ void LLFloaterMessageLog::showMessage(FloaterMessageItem item)
 }
 
 // static
-BOOL LLFloaterMessageLog::onClickCloseCircuit(void* user_data)
+bool LLFloaterMessageLog::onClickCloseCircuit(void* user_data)
 {
     LLNetListItem* itemp = static_cast<LLNetListItem*>(user_data);
     LLCircuitData* cdp = itemp->mCircuitData;
-    if(!cdp) return FALSE;
+    if(!cdp) return false;
     LLHost myhost = cdp->getHost();
     LLSD args;
     args["MESSAGE"] = "This will delete local circuit data.\nDo you want to tell the remote host to close the circuit too?";
     LLSD payload;
     payload["circuittoclose"] = myhost.getString();
     LLNotificationsUtil::add("GenericAlertYesCancel", args, payload, onConfirmCloseCircuit);
-    return TRUE;
+    return true;
 }
 
 // static
@@ -722,10 +724,10 @@ void LLFloaterMessageLog::onConfirmRemoveRegion(const LLSD& notification, const 
 
 void LLFloaterMessageLog::onClickFilterApply()
 {
-    startApplyingFilter(childGetValue("filter_edit"), TRUE);
+    startApplyingFilter(childGetValue("filter_edit"), true);
 }
 
-void LLFloaterMessageLog::startApplyingFilter(const std::string& filter, BOOL force)
+void LLFloaterMessageLog::startApplyingFilter(const std::string& filter, bool force)
 {
     const LLMessageLogFilter new_filter(filter);
     if (force
@@ -738,7 +740,7 @@ void LLFloaterMessageLog::startApplyingFilter(const std::string& filter, BOOL fo
         clearFloaterMessageItems();
 
         sMessageListMutex->lock();
-        mMessagesLogged = sMessageLogEntries.size();
+        mMessagesLogged = narrow(sMessageLogEntries.size());
         for (auto const& entry : sMessageLogEntries)
             conditionalLog(entry);
         sMessageListMutex->unlock();
@@ -756,7 +758,7 @@ void LLFloaterMessageLog::updateFilterStatus() const
 
 void LLFloaterMessageLog::onCommitFilter()
 {
-    startApplyingFilter(childGetValue("filter_edit"), FALSE);
+    startApplyingFilter(childGetValue("filter_edit"), false);
 }
 
 void LLFloaterMessageLog::onClickClearLog()
@@ -771,7 +773,7 @@ void LLFloaterMessageLog::onClickClearLog()
 void LLFloaterMessageLog::onClickFilterMenu(const LLSD& user_data)
 {
     getChild<LLLineEditor>("filter_edit")->setText(user_data.asString());
-    startApplyingFilter(user_data.asString(), FALSE);
+    startApplyingFilter(user_data.asString(), false);
 }
 
 void LLFloaterMessageLog::onClickSendToMessageBuilder() const

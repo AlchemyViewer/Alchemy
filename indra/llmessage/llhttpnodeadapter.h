@@ -30,7 +30,7 @@
 #include "llhttpnode.h"
 
 template<typename T>
-class LLHTTPNodeAdapter final : public LLHTTPNode
+class LLHTTPNodeAdapter : public LLHTTPNode
 {
 public:
 

@@ -1,18 +1,9 @@
 # -*- cmake -*-
 
-project(llimage)
+add_library (llimage STATIC)
 
-include(00-Common)
-include(LLCommon)
-include(LLImage)
-include(JPEG)
-include(LLKDU)
-include(WebP)
-include(ZLIBNG)
-include(LLAddBuildTest)
-include(Tut)
-
-set(llimage_SOURCE_FILES
+target_sources(llimage
+    PRIVATE
     llimagebmp.cpp
     llimage.cpp
     llimagedimensionsinfo.cpp
@@ -27,9 +18,10 @@ set(llimage_SOURCE_FILES
     llpngwrapper.cpp
     )
 
-set(llimage_HEADER_FILES
-    CMakeLists.txt
-
+target_sources(llimage
+    PUBLIC
+    FILE_SET HEADERS
+    FILES
     llimage.h
     llimagebmp.h
     llimagedimensionsinfo.h
@@ -45,35 +37,34 @@ set(llimage_HEADER_FILES
     llpngwrapper.h
     )
 
-list(APPEND llimage_SOURCE_FILES ${llimage_HEADER_FILES})
-
-add_library (llimage ${llimage_SOURCE_FILES})
 target_include_directories( llimage  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 if (USE_KDU)
-    target_link_libraries(llimage PUBLIC llkdu)
-else (USE_KDU)
-    target_link_libraries(llimage PUBLIC llimagej2coj)
-endif (USE_KDU)
+  target_link_libraries(llimage PUBLIC llkdu)
+else ()
+  target_link_libraries(llimage PUBLIC llimagej2coj)
+endif ()
 
 target_link_libraries(llimage
-        PUBLIC
-        llfilesystem
-        llmath
-        llcommon
-        ll::libwebp
-        ll::libpng
-        ll::libjpeg
+    PUBLIC
+    llfilesystem
+    llmath
+    llcommon
+    ll::libwebp
+    ll::libpng
+    ll::libjpeg
     )
 
+target_precompile_headers(llimage REUSE_FROM llprecompiled)
+
 # Add tests
-if (LL_TESTS)
+if (BUILD_TESTING)
   SET(llimage_TEST_SOURCE_FILES
     llimageworker.cpp
     )
   LL_ADD_PROJECT_UNIT_TESTS(llimage "${llimage_TEST_SOURCE_FILES}")
-endif (LL_TESTS)
+endif ()
 
 
 

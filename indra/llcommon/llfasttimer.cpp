@@ -64,7 +64,7 @@ bool        BlockTimer::sLog             = false;
 std::string BlockTimer::sLogName         = "";
 bool        BlockTimer::sMetricLog       = false;
 
-#if LL_LINUX
+#if LL_LINUX || (LL_DARWIN && LL_ARM64)
 U64         BlockTimer::sClockResolution = 1000000000; // Nanosecond resolution
 #else
 U64         BlockTimer::sClockResolution = 1000000; // Microsecond resolution
@@ -223,8 +223,8 @@ void BlockTimer::bootstrapTimerTree()
 void BlockTimer::incrementalUpdateTimerTree()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
-    for(block_timer_tree_df_post_iterator_t it = begin_block_timer_tree_df_post(BlockTimer::getRootTimeBlock()), end = end_block_timer_tree_df_post();
-        it != end;
+    for(block_timer_tree_df_post_iterator_t it = begin_block_timer_tree_df_post(BlockTimer::getRootTimeBlock());
+        it != end_block_timer_tree_df_post();
         ++it)
     {
         BlockTimerStatHandle* timerp = *it;
@@ -245,10 +245,8 @@ void BlockTimer::incrementalUpdateTimerTree()
 {
                 // since ancestors have already been visited, re-parenting won't affect tree traversal
             //step up tree, bringing our descendants with us
-#ifdef SHOW_DEBUG
             LL_DEBUGS("FastTimers") << "Moving " << timerp->getName() << " from child of " << timerp->getParent()->getName() <<
                 " to child of " << timerp->getParent()->getParent()->getName() << LL_ENDL;
-#endif
             timerp->setParent(timerp->getParent()->getParent());
                 accumulator.mParent = timerp->getParent();
                 accumulator.mMoveUpTree = false;
@@ -300,6 +298,7 @@ void BlockTimer::processTimes()
 {
 #if LL_TRACE_ENABLED
     LL_RECORD_BLOCK_TIME(FTM_PROCESS_TIMES);
+    get_clock_count(); // good place to calculate clock frequency
 
     // set up initial tree
     bootstrapTimerTree();
@@ -368,14 +367,12 @@ void BlockTimer::logStats()
                 // because of indirect derivation from LLInstanceTracker, have to downcast
                 BlockTimerStatHandle& timer = static_cast<BlockTimerStatHandle&>(base);
                 LLTrace::PeriodicRecording& frame_recording = LLTrace::get_frame_recording();
-                LLTrace::Recording& last_recording = frame_recording.getLastRecording();
-
-                sd[timer.getName()]["Time"] = (LLSD::Real) (last_recording.getSum(timer).value());
-                sd[timer.getName()]["Calls"] = (LLSD::Integer) (last_recording.getSum(timer.callCount()));
+                sd[timer.getName()]["Time"] = (LLSD::Real) (frame_recording.getLastRecording().getSum(timer).value());
+                sd[timer.getName()]["Calls"] = (LLSD::Integer) (frame_recording.getLastRecording().getSum(timer.callCount()));
 
                 // computing total time here because getting the root timer's getCountHistory
                 // doesn't work correctly on the first frame
-                total_time += last_recording.getSum(timer);
+                total_time += frame_recording.getLastRecording().getSum(timer);
             }
         }
 
@@ -390,6 +387,11 @@ void BlockTimer::logStats()
 
 }
 
+#if defined(LL_GNUC) && GCC_VERSION >= 130000
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wnonnull"
+#endif
+
 //static
 void BlockTimer::dumpCurTimes()
 {
@@ -397,8 +399,8 @@ void BlockTimer::dumpCurTimes()
     LLTrace::Recording& last_frame_recording = frame_recording.getLastRecording();
 
     // walk over timers in depth order and output timings
-    for(block_timer_tree_df_iterator_t it = begin_timer_tree(BlockTimer::getRootTimeBlock()), end = end_timer_tree();
-        it != end;
+    for(block_timer_tree_df_iterator_t it = begin_timer_tree(BlockTimer::getRootTimeBlock());
+        it != end_timer_tree();
         ++it)
     {
         BlockTimerStatHandle* timerp = (*it);
@@ -421,8 +423,12 @@ void BlockTimer::dumpCurTimes()
             << num_calls << " calls";
 
         LL_INFOS() << out_str.str() << LL_ENDL;
+    }
 }
-}
+
+#if defined(LL_GNUC) && GCC_VERSION >= 130000
+#   pragma GCC diagnostic push
+#endif
 
 //static
 void BlockTimer::writeLog(std::ostream& os)

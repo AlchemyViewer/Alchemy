@@ -25,6 +25,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "alavataractions.h"
 #include "llavataractions.h"
 #include "llagent.h"
 #include "llfloaterreg.h"
@@ -75,7 +76,6 @@ LLConversationLogList::~LLConversationLogList()
     if (mContextMenu.get())
     {
         mContextMenu.get()->die();
-        mContextMenu.markDead();
     }
 
     LLConversationLog::instance().removeObserver(this);
@@ -90,9 +90,9 @@ void LLConversationLogList::draw()
     LLFlatListViewEx::draw();
 }
 
-BOOL LLConversationLogList::handleRightMouseDown(S32 x, S32 y, MASK mask)
+bool LLConversationLogList::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
-    BOOL handled = LLUICtrl::handleRightMouseDown(x, y, mask);
+    bool handled = LLUICtrl::handleRightMouseDown(x, y, mask);
 
     LLToggleableMenu* context_menu = mContextMenu.get();
     if (context_menu && size())
@@ -373,7 +373,7 @@ bool LLConversationLogList::isActionEnabled(const LLSD& userdata)
 
     bool is_p2p   = LLIMModel::LLIMSession::P2P_SESSION == stype;
     bool is_group = LLIMModel::LLIMSession::GROUP_SESSION == stype;
-    bool is_group_member = is_group && gAgent.isInGroup(selected_id, TRUE);
+    bool is_group_member = is_group && gAgent.isInGroup(selected_id, true);
 
     if ("can_im" == command_name)
     {
@@ -412,7 +412,7 @@ bool LLConversationLogList::isActionEnabled(const LLSD& userdata)
     }
     else if ("can_show_on_map" == command_name)
     {
-        return is_p2p && ((LLAvatarTracker::instance().isBuddyOnline(selected_id) && LLAvatarActions::isAgentMappable(selected_id)) || gAgent.isGodlike());
+        return is_p2p && ((LLAvatarTracker::instance().isBuddyOnline(selected_id) && ALAvatarActions::isAgentMappable(selected_id)) || gAgent.isGodlike());
     }
 
     return false;

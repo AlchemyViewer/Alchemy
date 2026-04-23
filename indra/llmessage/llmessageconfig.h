@@ -80,12 +80,12 @@ public:
     static LLMessageConfigFile& instance();
         // return the singleton configuration file
 
-    /* virtual */ bool loadFile() override;
+    /* virtual */ bool loadFile();
     void loadServerDefaults(const LLSD& data);
     void loadMaxQueuedEvents(const LLSD& data);
     void loadMessages(const LLSD& data);
-    void loadCapBans(const LLSD& data);
-    void loadMessageBans(const LLSD& data);
+    void loadCapBans(const LLSD& blacklist);
+    void loadMessageBans(const LLSD& blacklist);
     bool isCapBanned(const std::string& cap_name) const;
 
 public:
@@ -93,6 +93,6 @@ public:
     S32 mMaxQueuedEvents;
 
 private:
-    static constexpr S32 DEFAULT_MAX_QUEUED_EVENTS = 100;
+    static const S32 DEFAULT_MAX_QUEUED_EVENTS = 100;
 };
 #endif // LL_MESSAGECONFIG_H

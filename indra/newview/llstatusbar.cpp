@@ -43,6 +43,7 @@
 #include "llpanelpresetscamerapulldown.h"
 #include "llpanelpresetspulldown.h"
 #include "llpanelvolumepulldown.h"
+#include "llfloatermarketplace.h"
 #include "llfloaterregioninfo.h"
 #include "llfloaterscriptdebug.h"
 #include "llhints.h"
@@ -87,6 +88,8 @@
 #include "llsearchableui.h"
 #include "llsearcheditor.h"
 
+#include <fmt/format.h>
+
 // system includes
 #include <iomanip>
 
@@ -105,16 +108,16 @@ const LLColor4 SIM_WARN_COLOR(1.f, 1.f, 0.f, 1.f);
 const LLColor4 SIM_FULL_COLOR(1.f, 0.f, 0.f, 1.f);
 const F32 ICON_TIMER_EXPIRY     = 3.f; // How long the balance and health icons should flash after a change.
 
+static void onClickVolume(void*);
+
 LLStatusBar::LLStatusBar(const LLRect& rect)
 :   LLPanel(),
     mTextTime(NULL),
-    mTextFPS(nullptr),
-    mPanelPopupHolder(nullptr),
-    mBtnQuickSettings(nullptr),
-    mBtnAO(nullptr),
     mBtnVolume(NULL),
     mBoxBalance(NULL),
     mBalance(0),
+    mBalanceClicked(false),
+    mObscureBalance(false),
     mHealth(100),
     mSquareMetersCredit(0),
     mSquareMetersCommitted(0),
@@ -124,23 +127,13 @@ LLStatusBar::LLStatusBar(const LLRect& rect)
     setRect(rect);
 
     // status bar can possible overlay menus?
-    setMouseOpaque(FALSE);
-
-    mBalanceTimer = new LLFrameTimer();
-    mHealthTimer = new LLFrameTimer();
-    mFPSUpdateTimer = new LLFrameTimer();
+    setMouseOpaque(false);
 
     buildFromFile("panel_status_bar.xml");
 }
 
 LLStatusBar::~LLStatusBar()
 {
-    delete mBalanceTimer;
-    mBalanceTimer = NULL;
-
-    delete mHealthTimer;
-    mHealthTimer = NULL;
-
     // LLView destructor cleans up children
 }
 
@@ -155,26 +148,30 @@ void LLStatusBar::draw()
     LLPanel::draw();
 }
 
-BOOL LLStatusBar::handleRightMouseDown(S32 x, S32 y, MASK mask)
+bool LLStatusBar::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
     show_navbar_context_menu(this,x,y);
-    return TRUE;
+    return true;
 }
 
-BOOL LLStatusBar::postBuild()
+bool LLStatusBar::postBuild()
 {
     gMenuBarView->setRightMouseDownCallback(boost::bind(&show_navbar_context_menu, _1, _2, _3));
 
     mPanelPopupHolder = gViewerWindow->getRootView()->getChildView("popup_holder");
 
-    mTextTime = getChild<LLTextBox>("TimeText");
-    mTextTime->setVisible(gSavedSettings.getBool("ShowStatusBarTime"));
+    mTextTime = getChild<LLTextBox>("TimeText" );
+    mTextTime->setClickedCallback(boost::bind(&LLStatusBar::onClickToggleClockStyle, this));
 
-    mBtnBuyL = getChild<LLButton>("buyL");
-    mBtnBuyL->setCommitCallback(boost::bind(&LLStatusBar::onClickBuyCurrency, this));
+    getChild<LLUICtrl>("buyL")->setCommitCallback(
+        boost::bind(&LLStatusBar::onClickBuyCurrency, this));
+
+    getChild<LLUICtrl>("goShop")->setCommitCallback(
+        boost::bind(&LLStatusBar::onClickShop, this));
 
     mBoxBalance = getChild<LLTextBox>("balance");
-    mBoxBalance->setClickedCallback( &LLStatusBar::onClickBalance, this );
+    mBoxBalance->setClickedCallback(&LLStatusBar::onClickRefreshBalance, this);
+    mBoxBalance->setDoubleClickCallback([this](LLUICtrl*, S32 x, S32 y, MASK mask) { onClickToggleBalance(); });
 
     mIconPresetsCamera = getChild<LLButton>( "presets_icon_camera" );
     mIconPresetsCamera->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterPresetsCamera, this));
@@ -191,7 +188,7 @@ BOOL LLStatusBar::postBuild()
     mBtnAO->setToggleState(gSavedPerAccountSettings.getBOOL("AlchemyAOEnable")); // shunt it into correct state - ALCH-368
 
     mBtnVolume = getChild<LLButton>( "volume_btn" );
-    mBtnVolume->setClickedCallback(&LLStatusBar::onClickVolume, this );
+    mBtnVolume->setClickedCallback( onClickVolume, this );
     mBtnVolume->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterVolume, this));
 
     mMediaToggle = getChild<LLButton>("media_toggle_btn");
@@ -200,53 +197,55 @@ BOOL LLStatusBar::postBuild()
 
     mBalanceBG = getChild<LLView>("balance_bg");
     LLHints::getInstance()->registerHintTarget("linden_balance", mBalanceBG->getHandle());
-    mBoxBalance->setVisible(gSavedSettings.getBool("ShowStatusBarBalance"));
 
     gSavedSettings.getControl("MuteAudio")->getSignal()->connect(boost::bind(&LLStatusBar::onVolumeChanged, this, _2));
-// [ALCHEMY]
-//    gSavedSettings.getControl("EnableVoiceChat")->getSignal()->connect(boost::bind(&LLStatusBar::onVoiceChanged, this, _2));
-//
-//    if (!gSavedSettings.getBOOL("EnableVoiceChat") && LLAppViewer::instance()->isSecondInstance())
-//    {
-//        // Indicate that second instance started without sound
-//        mBtnVolume->setImageUnselected(LLUI::getUIImage("VoiceMute_Off"));
-//    }
-    gSavedPerAccountSettings.getControl("AlchemyAOEnable")->getCommitSignal()->connect(boost::bind(&LLStatusBar::onAOStateChanged, this));
+    gSavedSettings.getControl("EnableVoiceChat")->getSignal()->connect(boost::bind(&LLStatusBar::onVoiceChanged, this, _2));
+    gSavedSettings.getControl("ObscureBalanceInStatusBar")->getSignal()->connect(boost::bind(&LLStatusBar::onObscureBalanceChanged, this, _2));
+    gSavedSettings.getControl("Use24HourClockInStatusBar")->getSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
+    gSavedSettings.getControl("ShowStatusBarSeconds")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
+    gSavedSettings.getControl("ShowStatusBarTime")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
+
+    if (!gSavedSettings.getBOOL("EnableVoiceChat") && LLAppViewer::instance()->isSecondInstance())
+    {
+        // Indicate that second instance started without sound
+        mBtnVolume->setImageUnselected(LLUI::getUIImage("VoiceMute_Off"));
+    }
+    mObscureBalance = gSavedSettings.getBOOL("ObscureBalanceInStatusBar");
 
     mTextFPS = getChild<LLTextBox>("FPSText");
     mTextFPS->setClickedCallback([](void*) { LLFloaterReg::showInstance("stats"); });
 
-    mTextFPS->setVisible(gSavedSettings.getBool("ShowStatusBarFPS"));
+    mTextFPS->setVisible(gSavedSettings.getBOOL("ShowStatusBarFPS"));
 
     mPanelPresetsCameraPulldown = new LLPanelPresetsCameraPulldown();
     addChild(mPanelPresetsCameraPulldown);
     mPanelPresetsCameraPulldown->setFollows(FOLLOWS_TOP|FOLLOWS_RIGHT);
-    mPanelPresetsCameraPulldown->setVisible(FALSE);
+    mPanelPresetsCameraPulldown->setVisible(false);
 
     mPanelPresetsPulldown = new LLPanelPresetsPulldown();
     addChild(mPanelPresetsPulldown);
     mPanelPresetsPulldown->setFollows(FOLLOWS_TOP|FOLLOWS_RIGHT);
-    mPanelPresetsPulldown->setVisible(FALSE);
+    mPanelPresetsPulldown->setVisible(false);
 
     mPanelVolumePulldown = new LLPanelVolumePulldown();
     addChild(mPanelVolumePulldown);
     mPanelVolumePulldown->setFollows(FOLLOWS_TOP|FOLLOWS_RIGHT);
-    mPanelVolumePulldown->setVisible(FALSE);
+    mPanelVolumePulldown->setVisible(false);
 
     mPanelAOPulldown = new ALPanelAOPulldown();
     addChild(mPanelAOPulldown);
     mPanelAOPulldown->setFollows(FOLLOWS_TOP | FOLLOWS_RIGHT);
-    mPanelAOPulldown->setVisible(FALSE);
+    mPanelAOPulldown->setVisible(false);
 
     mPanelQuickSettingsPulldown = new ALPanelQuickSettingsPulldown();
     addChild(mPanelQuickSettingsPulldown);
     mPanelQuickSettingsPulldown->setFollows(FOLLOWS_TOP | FOLLOWS_RIGHT);
-    mPanelQuickSettingsPulldown->setVisible(FALSE);
+    mPanelQuickSettingsPulldown->setVisible(false);
 
     mPanelNearByMedia = new LLPanelNearByMedia();
     addChild(mPanelNearByMedia);
     mPanelNearByMedia->setFollows(FOLLOWS_TOP|FOLLOWS_RIGHT);
-    mPanelNearByMedia->setVisible(FALSE);
+    mPanelNearByMedia->setVisible(false);
 
     updateBalancePanelPosition();
 
@@ -254,36 +253,40 @@ BOOL LLStatusBar::postBuild()
     mFilterEdit = getChild<LLSearchEditor>( "search_menu_edit" );
     mSearchPanel = getChild<LLPanel>( "menu_search_panel" );
 
-    BOOL search_panel_visible = gSavedSettings.getBOOL("MenuSearch");
+    bool search_panel_visible = gSavedSettings.getBOOL("MenuSearch");
     mSearchPanel->setVisible(search_panel_visible);
     mFilterEdit->setKeystrokeCallback(boost::bind(&LLStatusBar::onUpdateFilterTerm, this));
     mFilterEdit->setCommitCallback(boost::bind(&LLStatusBar::onUpdateFilterTerm, this));
     collectSearchableItems();
     gSavedSettings.getControl("MenuSearch")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateMenuSearchVisibility, this, _2));
-    gSavedSettings.getControl("ShowStatusBarTime")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
-    gSavedSettings.getControl("ShowStatusBarSeconds")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
 
     if (search_panel_visible)
     {
         updateMenuSearchPosition();
     }
 
-    return TRUE;
+    updateClock();
+
+    return true;
 }
 
 // Per-frame updates of visibility
 void LLStatusBar::refresh()
 {
-    static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
+    // update clock every 10 seconds
     static LLCachedControl<bool> show_clock(gSavedSettings, "ShowStatusBarTime", false);
     static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
-
-    // update clock every 10 seconds
-    if(show_clock && (mClockUpdateTimer.getElapsedTimeF32() > 10.f || (show_clock_seconds && mClockUpdateTimer.getElapsedTimeF32() > 1.f)))
+    if (show_clock && (mClockUpdateTimer.getElapsedTimeF32() > 10.f || (show_clock_seconds && mClockUpdateTimer.getElapsedTimeF32() > 1.f)))
     {
         mClockUpdateTimer.reset();
 
         updateClock();
+    }
+
+    if (mBalanceClicked && mBalanceClickTimer.getElapsedTimeF32() > 1.f)
+    {
+        mBalanceClicked = false;
+        sendMoneyBalanceRequest();
     }
 
     LLRect r;
@@ -314,22 +317,22 @@ void LLStatusBar::refresh()
                               media_inst->isParcelAudioPlaying());
     mMediaToggle->setValue(!any_media_playing);
 
-    if (show_fps && mFPSUpdateTimer->getElapsedTimeF32() > 0.125f)
+    static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
+    if (show_fps && mFPSUpdateTimer.getElapsedTimeF32() > 0.1f)
     {
-        mFPSUpdateTimer->reset();
+        mFPSUpdateTimer.reset();
         F32 fps = (F32)LLTrace::get_frame_recording().getLastRecording().getMean(LLStatViewer::FPS_SAMPLE);
-        mTextFPS->setText(fmt::format(FMT_STRING("{:d}"), llfloor(fps)));
+        mTextFPS->setText(fmt::format("{:d}", ll_round(fps)));
     }
 }
 
 void LLStatusBar::setVisibleForMouselook(bool visible)
 {
-    static LLCachedControl<bool> show_balance(gSavedSettings, "ShowStatusBarBalance", false);
-    static LLCachedControl<bool> show_clock(gSavedSettings, "ShowStatusBarTime", false);
     static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
     static LLCachedControl<bool> show_menu_search(gSavedSettings, "MenuSearch", false);
-    mTextTime->setVisible(visible && show_clock);
-    mBalanceBG->setVisible(visible && show_balance);
+    mTextTime->setVisible(visible);
+    mBalanceBG->setVisible(visible);
+    mBoxBalance->setVisible(visible);
     mBtnQuickSettings->setVisible(visible);
     mBtnAO->setVisible(visible);
     mBtnVolume->setVisible(visible);
@@ -358,12 +361,20 @@ void LLStatusBar::setBalance(S32 balance)
         LLFirstUse::receiveLindens();
     }
 
-    std::string money_str = LLResMgr::getMonetaryString( balance );
+    std::string money_str = LLResMgr::getInstance()->getMonetaryString( balance );
 
     LLStringUtil::format_map_t string_args;
-    string_args["[AMT]"] = llformat("%s", money_str.c_str());
+    if (mObscureBalance)
+    {
+        string_args["[AMT]"] = "****";
+    }
+    else
+    {
+        string_args["[AMT]"] = llformat("%s", money_str.c_str());
+    }
     std::string label_str = getString("buycurrencylabel", string_args);
     mBoxBalance->setValue(label_str);
+    mBoxBalance->setToolTipArg(LLStringExplicit("[AMT]"), llformat("%s", money_str.c_str()));
 
     updateBalancePanelPosition();
 
@@ -383,8 +394,6 @@ void LLStatusBar::setBalance(S32 balance)
 
     if( balance != mBalance )
     {
-        mBalanceTimer->reset();
-        mBalanceTimer->setTimerExpirySec( ICON_TIMER_EXPIRY );
         mBalance = balance;
     }
 }
@@ -413,7 +422,7 @@ void LLStatusBar::sendMoneyBalanceRequest()
     }
     // Double amount of retries due to this request initially happening during busy stage
     // Ideally this should be turned into a capability
-    gMessageSystem->sendReliable(gAgent.getRegionHost(), LL_DEFAULT_RELIABLE_RETRIES * 2, TRUE, LL_PING_BASED_TIMEOUT_DUMMY, NULL, NULL);
+    gMessageSystem->sendReliable(gAgent.getRegionHost(), LL_DEFAULT_RELIABLE_RETRIES * 2, true, LL_PING_BASED_TIMEOUT_DUMMY, NULL, NULL);
 }
 
 
@@ -436,9 +445,6 @@ void LLStatusBar::setHealth(S32 health)
                 }
             }
         }
-
-        mHealthTimer->reset();
-        mHealthTimer->setTimerExpirySec( ICON_TIMER_EXPIRY );
     }
 
     mHealth = health;
@@ -464,7 +470,7 @@ void LLStatusBar::setLandCommitted(S32 committed)
     mSquareMetersCommitted = committed;
 }
 
-BOOL LLStatusBar::isUserTiered() const
+bool LLStatusBar::isUserTiered() const
 {
     return (mSquareMetersCredit > 0);
 }
@@ -492,10 +498,18 @@ void LLStatusBar::onClickBuyCurrency()
     LLFirstUse::receiveLindens(false);
 }
 
+void LLStatusBar::onClickShop()
+{
+    LLFloaterReg::showInstanceOrBringToFront("marketplace");
+    if (LLFloaterMarketplace* marketplace = LLFloaterReg::getTypedInstance<LLFloaterMarketplace>("marketplace"))
+    {
+        marketplace->openMarketplace();
+    }
+}
+
 void LLStatusBar::onMouseEnterPresetsCamera()
 {
-    LLIconCtrl* icon =  getChild<LLIconCtrl>( "presets_icon_camera" );
-    LLRect icon_rect = icon->getRect();
+    LLRect icon_rect = mIconPresetsCamera->getRect();
     LLRect pulldown_rect = mPanelPresetsCameraPulldown->getRect();
     pulldown_rect.setLeftTopAndSize(icon_rect.mLeft -
          (pulldown_rect.getWidth() - icon_rect.getWidth()),
@@ -509,19 +523,17 @@ void LLStatusBar::onMouseEnterPresetsCamera()
     // show the master presets pull-down
     LLUI::getInstance()->clearPopups();
     LLUI::getInstance()->addPopup(mPanelPresetsCameraPulldown);
-    mPanelNearByMedia->setVisible(FALSE);
-    mPanelVolumePulldown->setVisible(FALSE);
-    mPanelPresetsPulldown->setVisible(FALSE);
-    mPanelAOPulldown->setVisible(FALSE);
-    // mPanelAvatarComplexityPulldown->setVisible(FALSE);
-    mPanelQuickSettingsPulldown->setVisible(FALSE);
-    mPanelPresetsCameraPulldown->setVisible(TRUE);
+    mPanelNearByMedia->setVisible(false);
+    mPanelVolumePulldown->setVisible(false);
+    mPanelPresetsPulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(false);
+    mPanelQuickSettingsPulldown->setVisible(false);
+    mPanelPresetsCameraPulldown->setVisible(true);
 }
 
 void LLStatusBar::onMouseEnterPresets()
 {
-    LLIconCtrl* icon =  getChild<LLIconCtrl>( "presets_icon_graphic" );
-    LLRect icon_rect = icon->getRect();
+    LLRect icon_rect = mIconPresetsGraphic->getRect();
     LLRect pulldown_rect = mPanelPresetsPulldown->getRect();
     pulldown_rect.setLeftTopAndSize(icon_rect.mLeft -
          (pulldown_rect.getWidth() - icon_rect.getWidth()),
@@ -535,14 +547,12 @@ void LLStatusBar::onMouseEnterPresets()
     // show the master presets pull-down
     LLUI::getInstance()->clearPopups();
     LLUI::getInstance()->addPopup(mPanelPresetsPulldown);
-
-    mPanelPresetsCameraPulldown->setVisible(FALSE);
-    mPanelNearByMedia->setVisible(FALSE);
-    mPanelVolumePulldown->setVisible(FALSE);
-    mPanelAOPulldown->setVisible(FALSE);
-    // mPanelAvatarComplexityPulldown->setVisible(FALSE);
-    mPanelQuickSettingsPulldown->setVisible(FALSE);
-    mPanelPresetsPulldown->setVisible(TRUE);
+    mPanelPresetsCameraPulldown->setVisible(false);
+    mPanelNearByMedia->setVisible(false);
+    mPanelVolumePulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(false);
+    mPanelQuickSettingsPulldown->setVisible(false);
+    mPanelPresetsPulldown->setVisible(true);
 }
 
 void LLStatusBar::onMouseEnterQuickSettings()
@@ -562,13 +572,12 @@ void LLStatusBar::onMouseEnterQuickSettings()
     LLUI::getInstance()->clearPopups();
     LLUI::getInstance()->addPopup(mPanelQuickSettingsPulldown);
 
-    mPanelPresetsCameraPulldown->setVisible(FALSE);
-    mPanelPresetsPulldown->setVisible(FALSE);
-    mPanelNearByMedia->setVisible(FALSE);
-    mPanelVolumePulldown->setVisible(FALSE);
-    mPanelAOPulldown->setVisible(FALSE);
-    //mPanelAvatarComplexityPulldown->setVisible(FALSE);
-    mPanelQuickSettingsPulldown->setVisible(TRUE);
+    mPanelPresetsCameraPulldown->setVisible(false);
+    mPanelPresetsPulldown->setVisible(false);
+    mPanelNearByMedia->setVisible(false);
+    mPanelVolumePulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(false);
+    mPanelQuickSettingsPulldown->setVisible(true);
 }
 
 void LLStatusBar::onMouseEnterAO()
@@ -587,13 +596,12 @@ void LLStatusBar::onMouseEnterAO()
     LLUI::getInstance()->clearPopups();
     LLUI::getInstance()->addPopup(mPanelAOPulldown);
 
-    mPanelPresetsCameraPulldown->setVisible(FALSE);
-    mPanelPresetsPulldown->setVisible(FALSE);
-    mPanelNearByMedia->setVisible(FALSE);
-    mPanelVolumePulldown->setVisible(FALSE);
-    mPanelQuickSettingsPulldown->setVisible(FALSE);
-    mPanelAOPulldown->setVisible(TRUE);
-    //mPanelAvatarComplexityPulldown->setVisible(FALSE);
+    mPanelPresetsCameraPulldown->setVisible(false);
+    mPanelPresetsPulldown->setVisible(false);
+    mPanelNearByMedia->setVisible(false);
+    mPanelVolumePulldown->setVisible(false);
+    mPanelQuickSettingsPulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(true);
 }
 
 void LLStatusBar::onMouseEnterVolume()
@@ -614,12 +622,12 @@ void LLStatusBar::onMouseEnterVolume()
     // show the master volume pull-down
     LLUI::getInstance()->clearPopups();
     LLUI::getInstance()->addPopup(mPanelVolumePulldown);
-    mPanelPresetsCameraPulldown->setVisible(FALSE);
-    mPanelPresetsPulldown->setVisible(FALSE);
-    mPanelNearByMedia->setVisible(FALSE);
-    mPanelQuickSettingsPulldown->setVisible(FALSE);
-    mPanelAOPulldown->setVisible(FALSE);
-    mPanelVolumePulldown->setVisible(TRUE);
+    mPanelPresetsCameraPulldown->setVisible(false);
+    mPanelPresetsPulldown->setVisible(false);
+    mPanelNearByMedia->setVisible(false);
+    mPanelQuickSettingsPulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(false);
+    mPanelVolumePulldown->setVisible(true);
 }
 
 void LLStatusBar::onMouseEnterNearbyMedia()
@@ -640,12 +648,12 @@ void LLStatusBar::onMouseEnterNearbyMedia()
     LLUI::getInstance()->clearPopups();
     LLUI::getInstance()->addPopup(mPanelNearByMedia);
 
-    mPanelPresetsCameraPulldown->setVisible(FALSE);
-    mPanelPresetsPulldown->setVisible(FALSE);
-    mPanelQuickSettingsPulldown->setVisible(FALSE);
-    mPanelVolumePulldown->setVisible(FALSE);
-    mPanelAOPulldown->setVisible(FALSE);
-    mPanelNearByMedia->setVisible(TRUE);
+    mPanelPresetsCameraPulldown->setVisible(false);
+    mPanelPresetsPulldown->setVisible(false);
+    mPanelQuickSettingsPulldown->setVisible(false);
+    mPanelVolumePulldown->setVisible(false);
+    mPanelAOPulldown->setVisible(false);
+    mPanelNearByMedia->setVisible(true);
 }
 
 
@@ -655,8 +663,7 @@ void LLStatusBar::onClickAOBtn(void* data)
     gSavedPerAccountSettings.set("AlchemyAOEnable", !gSavedPerAccountSettings.getBOOL("AlchemyAOEnable"));
 }
 
-// static
-void LLStatusBar::onClickVolume(void* data)
+static void onClickVolume(void* data)
 {
     // toggle the master mute setting
     bool mute_audio = LLAppViewer::instance()->getMasterSystemAudioMute();
@@ -664,11 +671,25 @@ void LLStatusBar::onClickVolume(void* data)
 }
 
 //static
-void LLStatusBar::onClickBalance(void* )
+void LLStatusBar::onClickRefreshBalance(void* data)
 {
-    // Force a balance request message:
-    LLStatusBar::sendMoneyBalanceRequest();
+    LLStatusBar* status_bar = (LLStatusBar*)data;
+
+    if (!status_bar->mBalanceClicked)
+    {
+        // Schedule a balance request message:
+        status_bar->mBalanceClicked = true;
+        status_bar->mBalanceClickTimer.reset();
+    }
     // The refresh of the display (call to setBalance()) will be done by process_money_balance_reply()
+}
+
+void LLStatusBar::onClickToggleBalance()
+{
+    mObscureBalance = !mObscureBalance;
+    gSavedSettings.setBOOL("ObscureBalanceInStatusBar", mObscureBalance);
+    setBalance(mBalance);
+    mBalanceClicked = false; // supress click
 }
 
 //static
@@ -685,7 +706,7 @@ void LLStatusBar::onAOStateChanged()
     mBtnAO->setToggleState(gSavedPerAccountSettings.getBOOL("AlchemyAOEnable"));
 }
 
-BOOL can_afford_transaction(S32 cost)
+bool can_afford_transaction(S32 cost)
 {
     return((cost <= 0)||((gStatusBar) && (gStatusBar->getBalance() >=cost)));
 }
@@ -695,20 +716,25 @@ void LLStatusBar::onVolumeChanged(const LLSD& newvalue)
     refresh();
 }
 
-// [ALCHEMY]
-//void LLStatusBar::onVoiceChanged(const LLSD& newvalue)
-//{
-//    if (newvalue.asBoolean())
-//    {
-//        // Second instance starts with "VoiceMute_Off" icon, fix it
-//        mBtnVolume->setImageUnselected(LLUI::getUIImage("Audio_Off"));
-//    }
-//    refresh();
-//}
+void LLStatusBar::onVoiceChanged(const LLSD& newvalue)
+{
+    if (newvalue.asBoolean())
+    {
+        // Second instance starts with "VoiceMute_Off" icon, fix it
+        mBtnVolume->setImageUnselected(LLUI::getUIImage("Audio_Off"));
+    }
+    refresh();
+}
+
+void LLStatusBar::onObscureBalanceChanged(const LLSD& newvalue)
+{
+    mObscureBalance = newvalue.asBoolean();
+    setBalance(mBalance);
+}
 
 void LLStatusBar::onUpdateFilterTerm()
 {
-    LLWString searchValue = utf8str_to_wstring( mFilterEdit->getValue().asString() );
+    LLWString searchValue = utf8str_to_wstring( mFilterEdit->getValue() );
     LLWStringUtil::toLower( searchValue );
 
     if( !mSearchData || mSearchData->mLastFilter == searchValue )
@@ -726,7 +752,7 @@ void collectChildren( LLMenuGL *aMenu, ll::statusbar::SearchableItemPtr aParentM
     {
         LLMenuItemGL *pMenu = aMenu->getItem( i );
 
-        ll::statusbar::SearchableItemPtr pItem( new ll::statusbar::SearchableItem );
+        ll::statusbar::SearchableItemPtr pItem = std::make_shared<ll::statusbar::SearchableItem>();
         pItem->mCtrl = pMenu;
         pItem->mMenu = pMenu;
         pItem->mLabel = utf8str_to_wstring( pMenu->ll::ui::SearchableControl::getSearchText() );
@@ -742,8 +768,8 @@ void collectChildren( LLMenuGL *aMenu, ll::statusbar::SearchableItemPtr aParentM
 
 void LLStatusBar::collectSearchableItems()
 {
-    mSearchData.reset( new ll::statusbar::SearchData );
-    ll::statusbar::SearchableItemPtr pItem( new ll::statusbar::SearchableItem );
+    mSearchData = std::make_unique<ll::statusbar::SearchData>();
+    ll::statusbar::SearchableItemPtr pItem = std::make_shared<ll::statusbar::SearchableItem>();
     mSearchData->mRootMenu = pItem;
     collectChildren( gMenuBarView, pItem );
 }
@@ -779,14 +805,21 @@ void LLStatusBar::updateBalancePanelPosition()
     // Resize the L$ balance background to be wide enough for your balance plus the buy button
     const S32 HPAD = 24;
     LLRect balance_rect = mBoxBalance->getTextBoundingRect();
-    LLRect buy_rect = mBtnBuyL->getRect();
+    LLRect buy_rect = getChildView("buyL")->getRect();
+    LLRect shop_rect = getChildView("goShop")->getRect();
     LLRect balance_bg_rect = mBalanceBG->getRect();
-    balance_bg_rect.mLeft = balance_bg_rect.mRight - (buy_rect.getWidth() + balance_rect.getWidth() + HPAD);
+    balance_bg_rect.mLeft = balance_bg_rect.mRight - (buy_rect.getWidth() + shop_rect.getWidth() + balance_rect.getWidth() + HPAD);
     mBalanceBG->setShape(balance_bg_rect);
+}
+
+void LLStatusBar::setBalanceVisible(bool visible)
+{
+    mBoxBalance->setVisible(visible);
 }
 
 void LLStatusBar::updateClock()
 {
+    static LLCachedControl<bool> use_24h(gSavedSettings, "Use24HourClockInStatusBar", false);
     static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
 
     // Get current UTC time, adjusted for the user's clock
@@ -794,19 +827,25 @@ void LLStatusBar::updateClock()
     time_t utc_time;
     utc_time = time_corrected();
 
-    static const std::string timeStrTemplate = getString("time");
-    static const std::string timeStrSecondsTemplate = getString("timeSeconds");
-    std::string timeStr = show_clock_seconds ? timeStrSecondsTemplate : timeStrTemplate;
+    std::string timeStr = show_clock_seconds ?
+    use_24h ? getString("time_sec") : getString("time_ampm_sec") :
+    use_24h ? getString("time") : getString("time_ampm");
+
     LLSD substitution;
-    substitution["datetime"] = (S32)utc_time;
-    LLStringUtil::format(timeStr, substitution);
+    substitution["datetime"] = (S32) utc_time;
+    LLStringUtil::format (timeStr, substitution);
     mTextTime->setText(timeStr);
 
     // set the tooltip to have the date
-    static const std::string dtStrTemplate = getString("timeTooltip");
-    std::string dtStr = dtStrTemplate;
-    LLStringUtil::format(dtStr, substitution);
-    mTextTime->setToolTip(dtStr);
+    std::string dtStr = getString("timeTooltip");
+    LLStringUtil::format (dtStr, substitution);
+    mTextTime->setToolTip (dtStr);
+}
+
+void LLStatusBar::onClickToggleClockStyle()
+{
+    gSavedSettings.setBOOL("Use24HourClockInStatusBar", !gSavedSettings.getBOOL("Use24HourClockInStatusBar"));
+    updateClock();
 }
 
 // Implements secondlife:///app/balance/request to request a L$ balance

@@ -35,9 +35,8 @@
 #include "llrendertarget.h"
 #include "lltexture.h"
 #include "llshadermgr.h"
-#include "llmatrix4a.h"
-#include "alglmath.h"
 #include "hbxxh.h"
+#include "glm/gtc/type_ptr.hpp"
 
 #if GL_ARB_debug_output
 #ifndef APIENTRY
@@ -57,16 +56,16 @@ extern void APIENTRY gl_debug_callback(GLenum source,
 thread_local LLRender gGL;
 
 // Handy copies of last good GL matrices
-LLMatrix4a  gGLModelView;
-LLMatrix4a  gGLLastModelView;
-LLMatrix4a  gGLLastProjection;
-LLMatrix4a  gGLProjection;
+F32 gGLModelView[16];
+F32 gGLLastModelView[16];
+F32 gGLLastProjection[16];
+F32 gGLProjection[16];
 
 // transform from last frame's camera space to this frame's camera space (and inverse)
-LLMatrix4a gGLDeltaModelView;
-LLMatrix4a gGLInverseDeltaModelView;
+glm::mat4 gGLDeltaModelView;
+glm::mat4 gGLInverseDeltaModelView;
 
-S32         gGLViewport[4];
+S32 gGLViewport[4];
 
 
 U32 LLRender::sUICalls = 0;
@@ -76,14 +75,8 @@ F32 LLRender::sAnisotropicFilteringLevel = 0.f;
 bool LLRender::sGLCoreProfile = false;
 bool LLRender::sNsightDebugSupport = false;
 LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
-
-struct LLVBCache
-{
-    LLPointer<LLVertexBuffer> vb;
-    std::chrono::steady_clock::time_point touched;
-};
-
-static boost::unordered_map<U64, LLVBCache> sVBCache;
+bool LLRender::sClassicMode = false;
+bool LLRender::s10bitBackBuffer = false;
 
 static const GLenum sGLTextureType[] =
 {
@@ -122,7 +115,7 @@ static const GLenum sGLBlendFactor[] =
 
 LLTexUnit::LLTexUnit(S32 index)
     : mCurrTexType(TT_NONE),
-    mCurrColorScale(1), mCurrAlphaScale(1), mCurrTexture(0),
+    mCurrTexture(0),
     mHasMipMaps(false),
     mIndex(index)
 {
@@ -211,6 +204,12 @@ void LLTexUnit::bindFast(LLTexture* texture)
     }
     glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
     mHasMipMaps = gl_tex->mHasMipMaps;
+    if (gl_tex->mTexOptionsDirty)
+    {
+        gl_tex->mTexOptionsDirty = false;
+        setTextureAddressModeFast(gl_tex->mAddressMode, gl_tex->getTarget());
+        setTextureFilteringOptionFast(gl_tex->mFilterOption, gl_tex->getTarget());
+    }
 }
 
 bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
@@ -259,7 +258,6 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
         }
         else
         {
-#ifdef SHOW_DEBUG
             if (texture)
             {
                 LL_DEBUGS() << "NULL LLTexUnit::bind GL image" << LL_ENDL;
@@ -268,7 +266,6 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
             {
                 LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
             }
-#endif
             return false;
         }
     }
@@ -289,9 +286,7 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32
 
     if(!texture)
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
-#endif
         return false;
     }
 
@@ -469,11 +464,16 @@ void LLTexUnit::setTextureAddressMode(eTextureAddressMode mode)
 
     activate();
 
-    glTexParameteri (sGLTextureType[mCurrTexType], GL_TEXTURE_WRAP_S, sGLAddressMode[mode]);
-    glTexParameteri (sGLTextureType[mCurrTexType], GL_TEXTURE_WRAP_T, sGLAddressMode[mode]);
-    if (mCurrTexType == TT_CUBE_MAP || mCurrTexType == TT_TEXTURE_3D)
+    setTextureAddressModeFast(mode, mCurrTexType);
+}
+
+void LLTexUnit::setTextureAddressModeFast(eTextureAddressMode mode, eTextureType tex_type)
+{
+    glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_S, sGLAddressMode[mode]);
+    glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_T, sGLAddressMode[mode]);
+    if (tex_type == TT_CUBE_MAP || tex_type == TT_CUBE_MAP_ARRAY || tex_type == TT_TEXTURE_3D)
     {
-        glTexParameteri (sGLTextureType[mCurrTexType], GL_TEXTURE_WRAP_R, sGLAddressMode[mode]);
+        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_R, sGLAddressMode[mode]);
     }
 }
 
@@ -483,149 +483,59 @@ void LLTexUnit::setTextureFilteringOption(LLTexUnit::eTextureFilterOptions optio
 
     gGL.flush();
 
+    setTextureFilteringOptionFast(option, mCurrTexType);
+}
+
+void LLTexUnit::setTextureFilteringOptionFast(LLTexUnit::eTextureFilterOptions option, eTextureType tex_type)
+{
     if (option == TFO_POINT)
     {
-        glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
     else
     {
-        glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
 
     if (option >= TFO_TRILINEAR && mHasMipMaps)
     {
-        glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     }
     else if (option >= TFO_BILINEAR)
     {
         if (mHasMipMaps)
         {
-            glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
         }
         else
         {
-            glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         }
     }
     else
     {
         if (mHasMipMaps)
         {
-            glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
         }
         else
         {
-            glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         }
     }
 
-    if (gGLManager.mHasTextureFilterAnisotropic)
+    if (gGLManager.mHasAnisotropic)
     {
         if (option == TFO_ANISOTROPIC && LLRender::sAnisotropicFilteringLevel > 1.f)
         {
             F32 aniso_level = llclamp(LLRender::sAnisotropicFilteringLevel, 1.f, gGLManager.mMaxAnisotropy);
-            glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY, aniso_level);
+            glTexParameterf(sGLTextureType[tex_type], GL_TEXTURE_MAX_ANISOTROPY, aniso_level);
+
         }
         else
         {
-            glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY, 1.f);
+            glTexParameterf(sGLTextureType[tex_type], GL_TEXTURE_MAX_ANISOTROPY, 1.f);
         }
-    }
-}
-
-GLint LLTexUnit::getTextureSource(eTextureBlendSrc src)
-{
-    switch(src)
-    {
-        // All four cases should return the same value.
-        case TBS_PREV_COLOR:
-        case TBS_PREV_ALPHA:
-        case TBS_ONE_MINUS_PREV_COLOR:
-        case TBS_ONE_MINUS_PREV_ALPHA:
-            return GL_PREVIOUS;
-
-        // All four cases should return the same value.
-        case TBS_TEX_COLOR:
-        case TBS_TEX_ALPHA:
-        case TBS_ONE_MINUS_TEX_COLOR:
-        case TBS_ONE_MINUS_TEX_ALPHA:
-            return GL_TEXTURE;
-
-        // All four cases should return the same value.
-        case TBS_VERT_COLOR:
-        case TBS_VERT_ALPHA:
-        case TBS_ONE_MINUS_VERT_COLOR:
-        case TBS_ONE_MINUS_VERT_ALPHA:
-            return GL_PRIMARY_COLOR;
-
-        // All four cases should return the same value.
-        case TBS_CONST_COLOR:
-        case TBS_CONST_ALPHA:
-        case TBS_ONE_MINUS_CONST_COLOR:
-        case TBS_ONE_MINUS_CONST_ALPHA:
-            return GL_CONSTANT;
-
-        default:
-            LL_WARNS() << "Unknown eTextureBlendSrc: " << src << ".  Using Vertex Color instead." << LL_ENDL;
-            return GL_PRIMARY_COLOR;
-    }
-}
-
-GLint LLTexUnit::getTextureSourceType(eTextureBlendSrc src, bool isAlpha)
-{
-    switch(src)
-    {
-        // All four cases should return the same value.
-        case TBS_PREV_COLOR:
-        case TBS_TEX_COLOR:
-        case TBS_VERT_COLOR:
-        case TBS_CONST_COLOR:
-            return (isAlpha) ? GL_SRC_ALPHA: GL_SRC_COLOR;
-
-        // All four cases should return the same value.
-        case TBS_PREV_ALPHA:
-        case TBS_TEX_ALPHA:
-        case TBS_VERT_ALPHA:
-        case TBS_CONST_ALPHA:
-            return GL_SRC_ALPHA;
-
-        // All four cases should return the same value.
-        case TBS_ONE_MINUS_PREV_COLOR:
-        case TBS_ONE_MINUS_TEX_COLOR:
-        case TBS_ONE_MINUS_VERT_COLOR:
-        case TBS_ONE_MINUS_CONST_COLOR:
-            return (isAlpha) ? GL_ONE_MINUS_SRC_ALPHA : GL_ONE_MINUS_SRC_COLOR;
-
-        // All four cases should return the same value.
-        case TBS_ONE_MINUS_PREV_ALPHA:
-        case TBS_ONE_MINUS_TEX_ALPHA:
-        case TBS_ONE_MINUS_VERT_ALPHA:
-        case TBS_ONE_MINUS_CONST_ALPHA:
-            return GL_ONE_MINUS_SRC_ALPHA;
-
-        default:
-            LL_WARNS() << "Unknown eTextureBlendSrc: " << src << ".  Using Source Color or Alpha instead." << LL_ENDL;
-            return (isAlpha) ? GL_SRC_ALPHA: GL_SRC_COLOR;
-    }
-}
-
-void LLTexUnit::setColorScale(S32 scale)
-{
-    if (mCurrColorScale != scale || gGL.mDirty)
-    {
-        mCurrColorScale = scale;
-        gGL.flush();
-        glTexEnvi( GL_TEXTURE_ENV, GL_RGB_SCALE, scale );
-    }
-}
-
-void LLTexUnit::setAlphaScale(S32 scale)
-{
-    if (mCurrAlphaScale != scale || gGL.mDirty)
-    {
-        mCurrAlphaScale = scale;
-        gGL.flush();
-        glTexEnvi( GL_TEXTURE_ENV, GL_ALPHA_SCALE, scale );
     }
 }
 
@@ -746,10 +656,9 @@ void LLLightState::setPosition(const LLVector4& position)
     ++gGL.mLightHash;
     mPosition = position;
     //transform position by current modelview matrix
-    LLVector4a pos;
-    pos.loadua(position.mV);
-    gGL.getModelviewMatrix().rotate4(pos,pos);
-    mPosition.set(pos.getF32ptr());
+    glm::vec4 pos(position);
+    pos = gGL.getModelviewMatrix() * pos;
+    mPosition.set(glm::value_ptr(pos));
 }
 
 void LLLightState::setConstantAttenuation(const F32& atten)
@@ -801,22 +710,20 @@ void LLLightState::setSpotDirection(const LLVector3& direction)
 {
     //always set direction because modelview matrix may have changed
     ++gGL.mLightHash;
-    mSpotDirection = direction;
-    //transform direction by current modelview matrix
-    LLVector4a dir;
-    dir.load3(direction.mV);
-    gGL.getModelviewMatrix().rotate(dir,dir);
 
-    mSpotDirection.set(dir.getF32ptr());
+    //transform direction by current modelview matrix
+    glm::vec3 dir(direction);
+    const glm::mat3 mat(gGL.getModelviewMatrix());
+    dir = mat * dir;
+
+    mSpotDirection.set(glm::value_ptr(dir));
 }
 
 LLRender::LLRender()
   : mDirty(false),
     mCount(0),
     mMode(LLRender::TRIANGLES),
-    mCurrTextureUnitIndex(0),
-    mLineWidth(1.f),
-    mPrimitiveReset(false)
+    mCurrTextureUnitIndex(0)
 {
     for (U32 i = 0; i < LL_NUM_TEXTURE_LAYERS; i++)
     {
@@ -842,19 +749,16 @@ LLRender::LLRender()
 
     for (U32 i = 0; i < NUM_MATRIX_MODES; ++i)
     {
+        for (U32 j = 0; j < LL_MATRIX_STACK_DEPTH; ++j)
+        {
+            mMatrix[i][j] = glm::identity<glm::mat4>();
+        }
         mMatIdx[i] = 0;
         mMatHash[i] = 0;
         mCurMatHash[i] = 0xFFFFFFFF;
     }
 
     mLightHash = 0;
-
-    //Init base matrix for each mode
-    for(U32 i = 0; i < NUM_MATRIX_MODES; ++i)
-    {
-        mMatrix[i][0].setIdentity();
-    }
-
 }
 
 LLRender::~LLRender()
@@ -891,6 +795,12 @@ bool LLRender::init(bool needs_vertex_buffer)
     }
 #endif
 
+    { //bind a dummy vertex array object so we're core profile compliant
+        U32 ret;
+        glGenVertexArrays(1, &ret);
+        glBindVertexArray(ret);
+    }
+
     if (needs_vertex_buffer)
     {
         initVertexBuffer();
@@ -903,20 +813,18 @@ void LLRender::initVertexBuffer()
     llassert_always(mBuffer.isNull());
     stop_glerror();
     mBuffer = new LLVertexBuffer(immediate_mask);
-    stop_glerror();
     mBuffer->allocateBuffer(4096, 0);
-    stop_glerror();
     mBuffer->getVertexStrider(mVerticesp);
-    stop_glerror();
     mBuffer->getTexCoord0Strider(mTexcoordsp);
-    stop_glerror();
     mBuffer->getColorStrider(mColorsp);
     stop_glerror();
 }
 
 void LLRender::resetVertexBuffer()
 {
-    mBuffer = NULL;
+    mBuffer = nullptr;
+    mBufferDataList = nullptr;
+    mVBCache.clear();
 }
 
 void LLRender::shutdown()
@@ -985,14 +893,21 @@ void LLRender::syncLightState()
         shader->uniform3fv(LLShaderMgr::LIGHT_DIFFUSE, LL_NUM_LIGHT_UNITS, diffuse[0].mV);
         shader->uniform3fv(LLShaderMgr::LIGHT_AMBIENT, 1, mAmbientLightColor.mV);
         shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_primary[0] ? 1 : 0);
-        //shader->uniform3fv(LLShaderMgr::AMBIENT, 1, mAmbientLightColor.mV);
-        //shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, diffuse[0].mV);
-        //shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, diffuse_b[0].mV);
+
+        if (sClassicMode)
+        {
+            shader->uniform3fv(LLShaderMgr::AMBIENT, 1, mAmbientLightColor.mV);
+            shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, diffuse[0].mV);
+            shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, diffuse_b[0].mV);
+        }
     }
 }
 
 void LLRender::syncMatrices()
 {
+    STOP_GLERROR;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+
     static const U32 name[] =
     {
         LLShaderMgr::MODELVIEW_MATRIX,
@@ -1005,33 +920,30 @@ void LLRender::syncMatrices()
 
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
-    static LLMatrix4a cached_mvp;
-    static LLMatrix4a cached_inv_mdv;
+    static glm::mat4 cached_mvp;
+    static glm::mat4 cached_inv_mdv;
     static U32 cached_mvp_mdv_hash = 0xFFFFFFFF;
     static U32 cached_mvp_proj_hash = 0xFFFFFFFF;
 
-    static LLMatrix4a cached_normal;
+    static glm::mat4 cached_normal;
     static U32 cached_normal_hash = 0xFFFFFFFF;
 
     if (shader)
     {
-        //llassert(shader);
-
         bool mvp_done = false;
 
         U32 i = MM_MODELVIEW;
         if (mMatHash[MM_MODELVIEW] != shader->mMatHash[MM_MODELVIEW])
         { //update modelview, normal, and MVP
-            const LLMatrix4a& mat = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
+            const glm::mat4& mat = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
 
             // if MDV has changed, update the cached inverse as well
             if (cached_mvp_mdv_hash != mMatHash[MM_MODELVIEW])
             {
-                cached_inv_mdv = mat;
-                cached_inv_mdv.invert();
+                cached_inv_mdv = glm::inverse(mat);
             }
 
-            shader->uniformMatrix4fv(name[MM_MODELVIEW], 1, GL_FALSE, mat.getF32ptr());
+            shader->uniformMatrix4fv(name[MM_MODELVIEW], 1, GL_FALSE, glm::value_ptr(mat));
             shader->mMatHash[MM_MODELVIEW] = mMatHash[MM_MODELVIEW];
 
             //update normal matrix
@@ -1040,24 +952,25 @@ void LLRender::syncMatrices()
             {
                 if (cached_normal_hash != mMatHash[i])
                 {
-                    cached_normal = cached_inv_mdv;
-                    cached_normal.transpose();
+                    cached_normal = glm::transpose(cached_inv_mdv);
                     cached_normal_hash = mMatHash[i];
                 }
 
-                const LLMatrix4a& norm = cached_normal;
+                auto norm = glm::value_ptr(cached_normal);
 
-                LLVector3 norms[3];
-                norms[0].set(norm.getRow<0>().getF32ptr());
-                norms[1].set(norm.getRow<1>().getF32ptr());
-                norms[2].set(norm.getRow<2>().getF32ptr());
+                F32 norm_mat[] =
+                {
+                    norm[0], norm[1], norm[2],
+                    norm[4], norm[5], norm[6],
+                    norm[8], norm[9], norm[10]
+                };
 
-                shader->uniformMatrix3fv(LLShaderMgr::NORMAL_MATRIX, 1, GL_FALSE, norms[0].mV);
+                shader->uniformMatrix3fv(LLShaderMgr::NORMAL_MATRIX, 1, GL_FALSE, norm_mat);
             }
 
             if (shader->getUniformLocation(LLShaderMgr::INVERSE_MODELVIEW_MATRIX))
             {
-                shader->uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_MATRIX, 1, GL_FALSE, cached_inv_mdv.getF32ptr());
+                shader->uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_MATRIX, 1, GL_FALSE, glm::value_ptr(cached_inv_mdv));
             }
 
             //update MVP matrix
@@ -1065,41 +978,41 @@ void LLRender::syncMatrices()
             loc = shader->getUniformLocation(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX);
             if (loc > -1)
             {
+                U32 proj = MM_PROJECTION;
+
                 if (cached_mvp_mdv_hash != mMatHash[i] || cached_mvp_proj_hash != mMatHash[MM_PROJECTION])
                 {
-                    cached_mvp.setMul(mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]], mat);
+                    cached_mvp = mat;
+                    cached_mvp = mMatrix[proj][mMatIdx[proj]] * cached_mvp;
                     cached_mvp_mdv_hash = mMatHash[i];
                     cached_mvp_proj_hash = mMatHash[MM_PROJECTION];
                 }
 
-                shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, 1, GL_FALSE, cached_mvp.getF32ptr());
+                shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, 1, GL_FALSE, glm::value_ptr(cached_mvp));
             }
         }
 
         i = MM_PROJECTION;
         if (mMatHash[MM_PROJECTION] != shader->mMatHash[MM_PROJECTION])
         { //update projection matrix, normal, and MVP
-            const LLMatrix4a& mat = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
+            const glm::mat4& mat = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
 
             // GZ: This was previously disabled seemingly due to a bug involving the deferred renderer's regular pushing and popping of mats.
             // We're reenabling this and cleaning up the code around that - that would've been the appropriate course initially.
             // Anything beyond the standard proj and inv proj mats are special cases.  Please setup special uniforms accordingly in the future.
             if (shader->getUniformLocation(LLShaderMgr::INVERSE_PROJECTION_MATRIX))
             {
-                LLMatrix4a inv_proj = mat;
-                inv_proj.invert();
-                shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, inv_proj.getF32ptr());
+                glm::mat4 inv_proj = glm::inverse(mat);
+                shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, false, glm::value_ptr(inv_proj));
             }
 
             // Used by some full screen effects - such as full screen lights, glow, etc.
             if (shader->getUniformLocation(LLShaderMgr::IDENTITY_MATRIX))
             {
-                LLMatrix4a identity;
-                identity.setIdentity();
-                shader->uniformMatrix4fv(LLShaderMgr::IDENTITY_MATRIX, 1, GL_FALSE, identity.getF32ptr());
+                shader->uniformMatrix4fv(LLShaderMgr::IDENTITY_MATRIX, 1, GL_FALSE, glm::value_ptr(glm::identity<glm::mat4>()));
             }
 
-            shader->uniformMatrix4fv(name[MM_PROJECTION], 1, GL_FALSE, mat.getF32ptr());
+            shader->uniformMatrix4fv(name[MM_PROJECTION], 1, GL_FALSE, glm::value_ptr(mat));
             shader->mMatHash[MM_PROJECTION] = mMatHash[MM_PROJECTION];
 
             if (!mvp_done)
@@ -1108,14 +1021,16 @@ void LLRender::syncMatrices()
                 S32 loc = shader->getUniformLocation(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX);
                 if (loc > -1)
                 {
-                    if (cached_mvp_mdv_hash != mMatHash[MM_PROJECTION] || cached_mvp_proj_hash != mMatHash[MM_PROJECTION])
+                    if (cached_mvp_mdv_hash != mMatHash[MM_MODELVIEW] || cached_mvp_proj_hash != mMatHash[MM_PROJECTION])
                     {
-                        cached_mvp.setMul(mat, mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]]);
+                        U32 mdv = MM_MODELVIEW;
+                        cached_mvp = mat;
+                        cached_mvp *= mMatrix[mdv][mMatIdx[mdv]];
                         cached_mvp_mdv_hash = mMatHash[MM_MODELVIEW];
                         cached_mvp_proj_hash = mMatHash[MM_PROJECTION];
                     }
 
-                    shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, 1, GL_FALSE, cached_mvp.getF32ptr());
+                    shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, 1, GL_FALSE, glm::value_ptr(cached_mvp));
                 }
             }
         }
@@ -1124,7 +1039,7 @@ void LLRender::syncMatrices()
         {
             if (mMatHash[i] != shader->mMatHash[i])
             {
-                shader->uniformMatrix4fv(name[i], 1, GL_FALSE, mMatrix[i][mMatIdx[i]].getF32ptr());
+                shader->uniformMatrix4fv(name[i], 1, GL_FALSE, glm::value_ptr(mMatrix[i][mMatIdx[i]]));
                 shader->mMatHash[i] = mMatHash[i];
             }
         }
@@ -1135,36 +1050,25 @@ void LLRender::syncMatrices()
             syncLightState();
         }
     }
+    STOP_GLERROR;
 }
 
 void LLRender::translatef(const GLfloat& x, const GLfloat& y, const GLfloat& z)
 {
-    if( llabs(x) < F_APPROXIMATELY_ZERO &&
-        llabs(y) < F_APPROXIMATELY_ZERO &&
-        llabs(z) < F_APPROXIMATELY_ZERO)
-    {
-        return;
-    }
-
     flush();
 
-    mMatrix[mMatrixMode][mMatIdx[mMatrixMode]].applyTranslation_affine(x,y,z);
-    mMatHash[mMatrixMode]++;
-
+    {
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::translate(mMatrix[mMatrixMode][mMatIdx[mMatrixMode]], glm::vec3(x, y, z));
+        mMatHash[mMatrixMode]++;
+    }
 }
 
 void LLRender::scalef(const GLfloat& x, const GLfloat& y, const GLfloat& z)
 {
-    if( (llabs(x-1.f)) < F_APPROXIMATELY_ZERO &&
-        (llabs(y-1.f)) < F_APPROXIMATELY_ZERO &&
-        (llabs(z-1.f)) < F_APPROXIMATELY_ZERO)
-    {
-        return;
-    }
     flush();
 
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]].applyScale_affine(x,y,z);
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::scale(mMatrix[mMatrixMode][mMatIdx[mMatrixMode]], glm::vec3(x, y, z));
         mMatHash[mMatrixMode]++;
     }
 }
@@ -1174,36 +1078,19 @@ void LLRender::ortho(F32 left, F32 right, F32 bottom, F32 top, F32 zNear, F32 zF
     flush();
 
     {
-        LLMatrix4a ortho_mat;
-        ortho_mat.setRow<0>(LLVector4a(2.f/(right-left),0,0));
-        ortho_mat.setRow<1>(LLVector4a(0,2.f/(top-bottom),0));
-        ortho_mat.setRow<2>(LLVector4a(0,0,-2.f/(zFar-zNear)));
-        ortho_mat.setRow<3>(LLVector4a(-(right+left)/(right-left),-(top+bottom)/(top-bottom),-(zFar+zNear)/(zFar-zNear),1));
-
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]].mul_affine(ortho_mat);
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] *= glm::ortho(left, right, bottom, top, zNear, zFar);
         mMatHash[mMatrixMode]++;
     }
 }
 
-void LLRender::rotatef(const LLMatrix4a& rot)
-{
-    flush();
-
-    mMatrix[mMatrixMode][mMatIdx[mMatrixMode]].mul_affine(rot);
-    mMatHash[mMatrixMode]++;
-}
-
 void LLRender::rotatef(const GLfloat& a, const GLfloat& x, const GLfloat& y, const GLfloat& z)
 {
-    if( llabs(a) < F_APPROXIMATELY_ZERO ||
-        llabs(a-360.f) < F_APPROXIMATELY_ZERO)
-    {
-        return;
-    }
-
     flush();
 
-    rotatef(ALGLMath::genRot(a,x,y,z));
+    {
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::rotate(mMatrix[mMatrixMode][mMatIdx[mMatrixMode]], glm::radians(a), glm::vec3(x,y,z));
+        mMatHash[mMatrixMode]++;
+    }
 }
 
 void LLRender::pushMatrix()
@@ -1225,47 +1112,34 @@ void LLRender::pushMatrix()
 
 void LLRender::popMatrix()
 {
+    flush();
     {
         if (mMatIdx[mMatrixMode] > 0)
         {
-            if ( memcmp(mMatrix[mMatrixMode][mMatIdx[mMatrixMode]].getF32ptr(), mMatrix[mMatrixMode][mMatIdx[mMatrixMode] - 1].getF32ptr(), sizeof(LLMatrix4a)) )
-            {
-                flush();
-            }
             --mMatIdx[mMatrixMode];
             mMatHash[mMatrixMode]++;
         }
         else
         {
-            flush();
             LL_WARNS() << "Matrix stack underflow." << LL_ENDL;
         }
     }
 }
 
-void LLRender::loadMatrix(const LLMatrix4a& mat)
+void LLRender::loadMatrix(const GLfloat* m)
 {
     flush();
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = mat;
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::make_mat4((GLfloat*) m);
         mMatHash[mMatrixMode]++;
     }
 }
 
-void LLRender::loadMatrix(const F32* mat)
+void LLRender::multMatrix(const GLfloat* m)
 {
     flush();
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]].loadu(mat);
-        mMatHash[mMatrixMode]++;
-    }
-}
-
-void LLRender::multMatrix(const LLMatrix4a& mat)
-{
-    flush();
-    {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]].mul_affine(mat);
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] *= glm::make_mat4(m);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -1308,17 +1182,17 @@ void LLRender::loadIdentity()
     {
         llassert_always(mMatrixMode < NUM_MATRIX_MODES) ;
 
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]].setIdentity();
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::identity<glm::mat4>();
         mMatHash[mMatrixMode]++;
     }
 }
 
-const LLMatrix4a& LLRender::getModelviewMatrix()
+const glm::mat4& LLRender::getModelviewMatrix()
 {
     return mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
 }
 
-const LLMatrix4a& LLRender::getProjectionMatrix()
+const glm::mat4& LLRender::getProjectionMatrix()
 {
     return mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
 }
@@ -1330,8 +1204,7 @@ void LLRender::translateUI(F32 x, F32 y, F32 z)
         LL_ERRS() << "Need to push a UI translation frame before offsetting" << LL_ENDL;
     }
 
-    LLVector4a add(x,y,z);
-    mUIOffset.back().add(add);
+    mUIOffset.back().add(LLVector4a(x, y, z));
 }
 
 void LLRender::scaleUI(F32 x, F32 y, F32 z)
@@ -1341,27 +1214,14 @@ void LLRender::scaleUI(F32 x, F32 y, F32 z)
         LL_ERRS() << "Need to push a UI transformation frame before scaling." << LL_ENDL;
     }
 
-    LLVector4a scale(x,y,z);
-    mUIScale.back().mul(scale);
-}
-
-void LLRender::rotateUI(LLQuaternion& rot)
-{
-    if (mUIRotation.empty())
-    {
-        mUIRotation.push_back(rot);
-    }
-    else
-    {
-        mUIRotation.push_back(mUIRotation.back()*rot);
-    }
+    mUIScale.back().mul(LLVector4a(x, y, z));
 }
 
 void LLRender::pushUIMatrix()
 {
     if (mUIOffset.empty())
     {
-        mUIOffset.emplace_back(LLVector4a::getZero());
+        mUIOffset.emplace_back(0.f);
     }
     else
     {
@@ -1370,39 +1230,31 @@ void LLRender::pushUIMatrix()
 
     if (mUIScale.empty())
     {
-        mUIScale.emplace_back(LLVector4a(1.f));
+        mUIScale.emplace_back(1.f);
     }
     else
     {
         mUIScale.push_back(mUIScale.back());
     }
-    if (!mUIRotation.empty())
-    {
-        mUIRotation.push_back(mUIRotation.back());
-    }
 }
 
 void LLRender::popUIMatrix()
 {
-    if (mUIOffset.empty() || mUIScale.empty())
+    if (mUIOffset.empty())
     {
-        LL_ERRS() << "UI offset or scale stack blown." << LL_ENDL;
+        LL_ERRS() << "UI offset stack blown." << LL_ENDL;
     }
-
     mUIOffset.pop_back();
     mUIScale.pop_back();
-    if (!mUIRotation.empty())
-    {
-        mUIRotation.pop_back();
-    }
 }
 
 LLVector3 LLRender::getUITranslation()
 {
     if (mUIOffset.empty())
     {
-        return LLVector3(0,0,0);
+        return LLVector3::zero;
     }
+
     return LLVector3(mUIOffset.back().getF32ptr());
 }
 
@@ -1410,22 +1262,22 @@ LLVector3 LLRender::getUIScale()
 {
     if (mUIScale.empty())
     {
-        return LLVector3(1,1,1);
+        return LLVector3::all_one;
     }
+
     return LLVector3(mUIScale.back().getF32ptr());
 }
 
 
 void LLRender::loadUIIdentity()
 {
-    if (mUIOffset.empty() || mUIScale.empty())
+    if (mUIOffset.empty())
     {
         LL_ERRS() << "Need to push UI translation frame before clearing offset." << LL_ENDL;
     }
-    mUIOffset.back().splat(0.f);
-    mUIScale.back().splat(1.f);
-    if (!mUIRotation.empty())
-        mUIRotation.push_back(LLQuaternion());
+
+    mUIOffset.back().clear();
+    mUIScale.back().splat(1);
 }
 
 void LLRender::setColorMask(bool writeColor, bool writeAlpha)
@@ -1531,9 +1383,7 @@ LLTexUnit* LLRender::getTexUnit(U32 index)
     }
     else
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS() << "Non-existing texture unit layer requested: " << index << LL_ENDL;
-#endif
         return &mDummyTexUnit;
     }
 }
@@ -1550,27 +1400,11 @@ LLLightState* LLRender::getLight(U32 index)
 
 void LLRender::setAmbientLightColor(const LLColor4& color)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     if (color != mAmbientLightColor)
     {
         ++mLightHash;
         mAmbientLightColor = color;
-    }
-}
-void LLRender::setLineWidth(F32 line_width)
-{
-    if (LLRender::sGLCoreProfile)
-    {
-        line_width = 1.f;
-    }
-    if (mLineWidth != line_width || mDirty)
-    {
-        if (mMode == LLRender::LINES || mMode == LLRender::LINE_STRIP)
-        {
-            flush();
-        }
-        mLineWidth = line_width;
-        glLineWidth(line_width);
     }
 }
 
@@ -1595,14 +1429,37 @@ void LLRender::clearErrors()
     }
 }
 
+void LLRender::beginList(std::list<LLVertexBufferData> *list)
+{
+    if (mBufferDataList)
+    {
+        LL_ERRS() << "beginList called while another list is open." << LL_ENDL;
+    }
+    llassert(LLGLSLShader::sCurBoundShaderPtr == &gUIProgram);
+    flush();
+    mBufferDataList = list;
+}
+
+void LLRender::endList()
+{
+    if (mBufferDataList)
+    {
+        flush();
+        mBufferDataList = nullptr;
+    }
+    else
+    {
+        llassert(false); // endList called without an open list
+    }
+}
+
 void LLRender::begin(const GLuint& mode)
 {
     if (mode != mMode)
     {
         if (mMode == LLRender::LINES ||
             mMode == LLRender::TRIANGLES ||
-            mMode == LLRender::POINTS ||
-            mMode == LLRender::TRIANGLE_STRIP )
+            mMode == LLRender::POINTS)
         {
             flush();
         }
@@ -1625,24 +1482,21 @@ void LLRender::end()
 
     if ((mMode != LLRender::LINES &&
         mMode != LLRender::TRIANGLES &&
-        mMode != LLRender::POINTS &&
-        mMode != LLRender::TRIANGLE_STRIP) ||
+        mMode != LLRender::POINTS) ||
         mCount > 2048)
     {
         flush();
-    }
-    else if (mMode == LLRender::TRIANGLE_STRIP)
-    {
-        mPrimitiveReset = true;
     }
 }
 
 void LLRender::flush()
 {
+    STOP_GLERROR;
     if (mCount > 0)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
-        llassert(LLGLSLShader::sCurBoundShaderPtr != nullptr);
+        llassert_always(LLGLSLShader::sCurBoundShaderPtr != nullptr);
+
         if (!mUIOffset.empty())
         {
             sUICalls++;
@@ -1652,19 +1506,19 @@ void LLRender::flush()
         //store mCount in a local variable to avoid re-entrance (drawArrays may call flush)
         U32 count = mCount;
 
-            if (mMode == LLRender::TRIANGLES)
+        if (mMode == LLRender::TRIANGLES)
+        {
+            if (mCount%3 != 0)
             {
-                if (mCount%3 != 0)
-                {
-                count -= (mCount % 3);
-                LL_WARNS() << "Incomplete triangle requested." << LL_ENDL;
-                }
+            count -= (mCount % 3);
+            LL_WARNS() << "Incomplete triangle requested." << LL_ENDL;
             }
+        }
 
-            if (mMode == LLRender::LINES)
+        if (mMode == LLRender::LINES)
+        {
+            if (mCount%2 != 0)
             {
-                if (mCount%2 != 0)
-                {
                 count -= (mCount % 2);
                 LL_WARNS() << "Incomplete line requested." << LL_ENDL;
             }
@@ -1675,100 +1529,29 @@ void LLRender::flush()
         if (mBuffer)
         {
 
-            HBXXH64 hash;
+            LLVertexBuffer *vb;
+
             U32 attribute_mask = LLGLSLShader::sCurBoundShaderPtr->mAttributeMask;
 
+            if (mBufferDataList)
             {
-                LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache hash");
-
-                hash.update((U8*)mVerticesp.get(), count * sizeof(LLVector4a));
-                if (attribute_mask & LLVertexBuffer::MAP_TEXCOORD0)
-                {
-                    hash.update((U8*)mTexcoordsp.get(), count * sizeof(LLVector2));
-                }
-
-                if (attribute_mask & LLVertexBuffer::MAP_COLOR)
-                {
-                    hash.update((U8*)mColorsp.get(), count * sizeof(LLColor4U));
-                }
-
-                hash.finalize();
-            }
-
-
-            U64 vhash = hash.digest();
-
-            // check the VB cache before making a new vertex buffer
-            // This is a giant hack to deal with (mostly) our terrible UI rendering code
-            // that was built on top of OpenGL immediate mode.  Huge performance wins
-            // can be had by not uploading geometry to VRAM unless absolutely necessary.
-            // Most of our usage of the "immediate mode" style draw calls is actually
-            // sending the same geometry over and over again.
-            // To leverage this, we maintain a running hash of the vertex stream being
-            // built up before a flush, and then check that hash against a VB
-            // cache just before creating a vertex buffer in VRAM
-            auto cache = sVBCache.find(vhash);
-
-            LLPointer<LLVertexBuffer> vb;
-
-            if (cache != sVBCache.end())
-            {
-                LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache hit");
-                // cache hit, just use the cached buffer
-                vb = cache->second.vb;
-                cache->second.touched = std::chrono::steady_clock::now();
+                vb = genBuffer(attribute_mask, count);
+                mBufferDataList->emplace_back(
+                    vb,
+                    mMode,
+                    count,
+                    gGL.getTexUnit(0)->mCurrTexture,
+                    mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]],
+                    mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]],
+                    mMatrix[MM_TEXTURE0][mMatIdx[MM_TEXTURE0]]
+                    );
             }
             else
             {
-                LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache miss");
-                vb = new LLVertexBuffer(attribute_mask);
-                vb->allocateBuffer(count, 0);
-
-                vb->setBuffer();
-
-                vb->setPositionData((LLVector4a*) mVerticesp.get());
-
-                if (attribute_mask & LLVertexBuffer::MAP_TEXCOORD0)
-                {
-                    vb->setTexCoordData(mTexcoordsp.get());
-                }
-
-                if (attribute_mask & LLVertexBuffer::MAP_COLOR)
-                {
-                    vb->setColorData(mColorsp.get());
-                }
-
-                vb->unbind();
-
-                sVBCache[vhash] = { vb , std::chrono::steady_clock::now() };
-
-                static U32 miss_count = 0;
-                miss_count++;
-                if (miss_count > 1024)
-                {
-                    LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache clean");
-                    miss_count = 0;
-                    auto now = std::chrono::steady_clock::now();
-
-                    using namespace std::chrono_literals;
-                    // every 1024 misses, clean the cache of any VBs that haven't been touched in the last second
-                    for (auto iter = sVBCache.begin(); iter != sVBCache.end(); )
-                    {
-                        if (now - iter->second.touched > 1s)
-                        {
-                            auto old_iter = iter++;
-                            sVBCache.erase(old_iter);
-                        }
-                        else
-                        {
-                            ++iter;
-                        }
-                    }
-                }
+                vb = bufferfromCache(attribute_mask, count);
             }
 
-            vb->setBuffer();
-            vb->drawArrays(mMode, 0, count);
+            drawBuffer(vb, mMode, count);
         }
         else
         {
@@ -1776,17 +1559,127 @@ void LLRender::flush()
             LL_ERRS() << "A flush call from outside main rendering thread" << LL_ENDL;
         }
 
-
-        mVerticesp[0] = mVerticesp[count];
-        mTexcoordsp[0] = mTexcoordsp[count];
-        mColorsp[0] = mColorsp[count];
-
-        mCount = 0;
-        mPrimitiveReset = false;
+        resetStriders(count);
     }
 }
 
-void LLRender::vertex4a(const LLVector4a& vertex)
+LLVertexBuffer* LLRender::bufferfromCache(U32 attribute_mask, U32 count)
+{
+    LLVertexBuffer *vb = nullptr;
+    HBXXH64 hash;
+
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache hash");
+
+        hash.update((U8*)mVerticesp.get(), count * sizeof(LLVector4a));
+        if (attribute_mask & LLVertexBuffer::MAP_TEXCOORD0)
+        {
+            hash.update((U8*)mTexcoordsp.get(), count * sizeof(LLVector2));
+        }
+
+        if (attribute_mask & LLVertexBuffer::MAP_COLOR)
+        {
+            hash.update((U8*)mColorsp.get(), count * sizeof(LLColor4U));
+        }
+
+        hash.finalize();
+    }
+
+    U64 vhash = hash.digest();
+
+    // check the VB cache before making a new vertex buffer
+    // This is a giant hack to deal with (mostly) our terrible UI rendering code
+    // that was built on top of OpenGL immediate mode.  Huge performance wins
+    // can be had by not uploading geometry to VRAM unless absolutely necessary.
+    // Most of our usage of the "immediate mode" style draw calls is actually
+    // sending the same geometry over and over again.
+    // To leverage this, we maintain a running hash of the vertex stream being
+    // built up before a flush, and then check that hash against a VB
+    // cache just before creating a vertex buffer in VRAM
+    boost::unordered_map<U64, LLVBCache>::iterator cache = mVBCache.find(vhash);
+    if (cache != mVBCache.end())
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache hit");
+        // cache hit, just use the cached buffer
+        vb = cache->second.vb;
+        cache->second.touched = std::chrono::steady_clock::now();
+    }
+    else
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache miss");
+        vb = genBuffer(attribute_mask, count);
+
+        mVBCache[vhash] = { vb , std::chrono::steady_clock::now() };
+
+        static U32 miss_count = 0;
+        miss_count++;
+        if (miss_count > 1024)
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache clean");
+            miss_count = 0;
+            auto now = std::chrono::steady_clock::now();
+
+            using namespace std::chrono_literals;
+            // every 1024 misses, clean the cache of any VBs that haven't been touched in the last second
+            for (boost::unordered_map<U64, LLVBCache>::iterator iter = mVBCache.begin(); iter != mVBCache.end();)
+            {
+                if (now - iter->second.touched > 1s)
+                {
+                    iter = mVBCache.erase(iter);
+                }
+                else
+                {
+                    ++iter;
+                }
+            }
+        }
+    }
+    return vb;
+}
+
+LLVertexBuffer* LLRender::genBuffer(U32 attribute_mask, S32 count)
+{
+    LLVertexBuffer * vb = new LLVertexBuffer(attribute_mask);
+    vb->allocateBuffer(count, 0);
+
+    vb->setBuffer();
+
+    vb->setPositionData(mVerticesp.get());
+
+    if (attribute_mask & LLVertexBuffer::MAP_TEXCOORD0)
+    {
+        vb->setTexCoord0Data(mTexcoordsp.get());
+    }
+
+    if (attribute_mask & LLVertexBuffer::MAP_COLOR)
+    {
+        vb->setColorData(mColorsp.get());
+    }
+
+#if LL_DARWIN
+    vb->unmapBuffer();
+#endif
+    vb->unbind();
+
+    return vb;
+}
+
+void LLRender::drawBuffer(LLVertexBuffer* vb, U32 mode, S32 count)
+{
+    vb->setBuffer();
+    vb->drawArrays(mode, 0, count);
+}
+
+void LLRender::resetStriders(S32 count)
+{
+    mVerticesp[0] = mVerticesp[count];
+    mTexcoordsp[0] = mTexcoordsp[count];
+    mColorsp[0] = mColorsp[count];
+
+    mCount = 0;
+}
+
+void LLRender::vertex3f(const GLfloat& x, const GLfloat& y, const GLfloat& z)
 {
     //the range of mVerticesp, mColorsp and mTexcoordsp is [0, 4095]
     if (mCount > 2048)
@@ -1796,21 +1689,6 @@ void LLRender::vertex4a(const LLVector4a& vertex)
             case LLRender::POINTS: flush(); break;
             case LLRender::TRIANGLES: if (mCount%3==0) flush(); break;
             case LLRender::LINES: if (mCount%2 == 0) flush(); break;
-            case LLRender::TRIANGLE_STRIP:
-            {
-                LLVector4a vert[] = { mVerticesp[mCount - 2], mVerticesp[mCount - 1], mVerticesp[mCount] };
-                LLColor4U col[] = { mColorsp[mCount - 2], mColorsp[mCount - 1], mColorsp[mCount] };
-                LLVector2 tc[] = { mTexcoordsp[mCount - 2], mTexcoordsp[mCount - 1], mTexcoordsp[mCount] };
-                flush();
-                for (int i = 0; i < LL_ARRAY_SIZE(vert); ++i)
-                {
-                    mVerticesp[i] = vert[i];
-                    mColorsp[i] = col[i];
-                    mTexcoordsp[i] = tc[i];
-                }
-                mCount = 2;
-                break;
-            }
         }
     }
 
@@ -1820,65 +1698,64 @@ void LLRender::vertex4a(const LLVector4a& vertex)
         return;
     }
 
-    if (mPrimitiveReset && mCount)
-    {
-        // Insert degenerate
-        ++mCount;
-        mVerticesp[mCount] = mVerticesp[mCount - 1];
-        mColorsp[mCount] = mColorsp[mCount - 1];
-        mTexcoordsp[mCount] = mTexcoordsp[mCount - 1];
-        mVerticesp[mCount - 1] = mVerticesp[mCount - 2];
-        mColorsp[mCount - 1] = mColorsp[mCount - 2];
-        mTexcoordsp[mCount - 1] = mTexcoordsp[mCount - 2];
-    }
-
-    if (mUIOffset.empty())
-    {
-        if (!mUIRotation.empty() && mUIRotation.back().isNotIdentity())
-        {
-            LLVector4 vert(vertex.getF32ptr());
-            mVerticesp[mCount].loadua((vert*mUIRotation.back()).mV);
-        }
-        else
-        {
-        mVerticesp[mCount] = vertex;
-        }
-    }
-    else
-    {
-        if (!mUIRotation.empty() && mUIRotation.back().isNotIdentity())
-        {
-            LLVector4 vert(vertex.getF32ptr());
-            vert = vert * mUIRotation.back();
-            LLVector4a postrot_vert;
-            postrot_vert.loadua(vert.mV);
-            mVerticesp[mCount].setAdd(postrot_vert, mUIOffset.back());
-            mVerticesp[mCount].mul(mUIScale.back());
-        }
-        else
-        {
-            mVerticesp[mCount].setAdd(vertex, mUIOffset.back());
-            mVerticesp[mCount].mul(mUIScale.back());
-        }
-    }
+    LLVector4a vert(x, y, z);
+    transform(vert);
+    mVerticesp[mCount] = vert;
 
     mCount++;
     mVerticesp[mCount] = mVerticesp[mCount-1];
     mColorsp[mCount] = mColorsp[mCount-1];
     mTexcoordsp[mCount] = mTexcoordsp[mCount-1];
-
-    if (mPrimitiveReset && mCount)
-    {
-        mCount++;
-        mVerticesp[mCount] = mVerticesp[mCount - 1];
-        mColorsp[mCount] = mColorsp[mCount - 1];
-        mTexcoordsp[mCount] = mTexcoordsp[mCount - 1];
-    }
-
-    mPrimitiveReset = false;
 }
 
-void LLRender::vertexBatchPreTransformed(LLVector4a* verts, S32 vert_count)
+void LLRender::transform(LLVector3& vert)
+{
+    if (!mUIOffset.empty())
+    {
+        vert += LLVector3(mUIOffset.back().getF32ptr());
+        vert *= LLVector3(mUIScale.back().getF32ptr());
+    }
+}
+
+void LLRender::transform(LLVector4a& vert)
+{
+    if (!mUIOffset.empty())
+    {
+        vert.add(mUIOffset.back());
+        vert.mul(mUIScale.back());
+    }
+}
+
+void LLRender::untransform(LLVector3& vert)
+{
+    if (!mUIOffset.empty())
+    {
+        vert /= LLVector3(mUIScale.back().getF32ptr());
+        vert -= LLVector3(mUIOffset.back().getF32ptr());
+    }
+}
+
+void LLRender::batchTransform(LLVector4a* verts, U32 vert_count)
+{
+    if (!mUIOffset.empty())
+    {
+        const LLVector4a& offset = mUIOffset.back();
+        const LLVector4a& scale = mUIScale.back();
+
+        for (U32 i = 0; i < vert_count; ++i)
+        {
+            verts[i].add(offset);
+            verts[i].mul(scale);
+        }
+    }
+}
+
+void LLRender::vertexBatchPreTransformed(const std::vector<LLVector4a>& verts)
+{
+    vertexBatchPreTransformed(verts.data(), narrow(verts.size()));
+}
+
+void LLRender::vertexBatchPreTransformed(const LLVector4a* verts, S32 vert_count)
 {
     if (mCount + vert_count > 4094)
     {
@@ -1886,38 +1763,20 @@ void LLRender::vertexBatchPreTransformed(LLVector4a* verts, S32 vert_count)
         return;
     }
 
+    for (S32 i = 0; i < vert_count; i++)
     {
-        if (mPrimitiveReset && mCount)
-        {
-            // Insert degenerate
-            ++mCount;
-            mVerticesp[mCount] = verts[0];
-            mColorsp[mCount] = mColorsp[mCount - 1];
-            mTexcoordsp[mCount] = mTexcoordsp[mCount - 1];
-            mVerticesp[mCount - 1] = mVerticesp[mCount - 2];
-            mColorsp[mCount - 1] = mColorsp[mCount - 2];
-            mTexcoordsp[mCount - 1] = mTexcoordsp[mCount - 2];
-            ++mCount;
-            mColorsp[mCount] = mColorsp[mCount - 1];
-            mTexcoordsp[mCount] = mTexcoordsp[mCount - 1];
-        }
+        mVerticesp[mCount] = verts[i];
 
-        mVerticesp.copyArray(mCount, verts, vert_count);
-        for (S32 i = 0; i < vert_count; i++)
-        {
-
-            mCount++;
-            mTexcoordsp[mCount] = mTexcoordsp[mCount-1];
-            mColorsp[mCount] = mColorsp[mCount-1];
-        }
+        mCount++;
+        mTexcoordsp[mCount] = mTexcoordsp[mCount-1];
+        mColorsp[mCount] = mColorsp[mCount-1];
     }
 
     if( mCount > 0 ) // ND: Guard against crashes if mCount is zero, yes it can happen
         mVerticesp[mCount] = mVerticesp[mCount-1];
-    mPrimitiveReset = false;
 }
 
-void LLRender::vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, S32 vert_count)
+void LLRender::vertexBatchPreTransformed(const LLVector4a* verts, const LLVector2* uvs, S32 vert_count)
 {
     if (mCount + vert_count > 4094)
     {
@@ -1925,30 +1784,13 @@ void LLRender::vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, S32 
         return;
     }
 
+    for (S32 i = 0; i < vert_count; i++)
     {
-        if (mPrimitiveReset && mCount)
-        {
-            // Insert degenerate
-            ++mCount;
-            mVerticesp[mCount] = verts[0];
-            mColorsp[mCount] = mColorsp[mCount - 1];
-            mTexcoordsp[mCount] = uvs[0];
-            mVerticesp[mCount - 1] = mVerticesp[mCount - 2];
-            mColorsp[mCount - 1] = mColorsp[mCount - 2];
-            mTexcoordsp[mCount - 1] = mTexcoordsp[mCount - 2];
-            ++mCount;
-            mColorsp[mCount] = mColorsp[mCount - 1];
-            mTexcoordsp[mCount] = mTexcoordsp[mCount - 1];
-        }
+        mVerticesp[mCount] = verts[i];
+        mTexcoordsp[mCount] = uvs[i];
 
-        mVerticesp.copyArray(mCount, verts, vert_count);
-        mTexcoordsp.copyArray(mCount, uvs, vert_count);
-
-        for (S32 i = 0; i < vert_count; i++)
-        {
-            mCount++;
-            mColorsp[mCount] = mColorsp[mCount-1];
-        }
+        mCount++;
+        mColorsp[mCount] = mColorsp[mCount-1];
     }
 
     if (mCount > 0)
@@ -1956,11 +1798,9 @@ void LLRender::vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, S32 
         mVerticesp[mCount] = mVerticesp[mCount - 1];
         mTexcoordsp[mCount] = mTexcoordsp[mCount - 1];
     }
-
-    mPrimitiveReset = false;
 }
 
-void LLRender::vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, LLColor4U* colors, S32 vert_count)
+void LLRender::vertexBatchPreTransformed(const LLVector4a* verts, const LLVector2* uvs, const LLColor4U* colors, S32 vert_count)
 {
     if (mCount + vert_count > 4094)
     {
@@ -1968,27 +1808,13 @@ void LLRender::vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, LLCo
         return;
     }
 
+    for (S32 i = 0; i < vert_count; i++)
     {
-        if (mPrimitiveReset && mCount)
-        {
-            // Insert degenerate
-            ++mCount;
-            mVerticesp[mCount] = verts[0];
-            mColorsp[mCount] = colors[mCount - 1];
-            mTexcoordsp[mCount] = uvs[0];
-            mVerticesp[mCount - 1] = mVerticesp[mCount - 2];
-            mColorsp[mCount - 1] = mColorsp[mCount - 2];
-            mTexcoordsp[mCount - 1] = mTexcoordsp[mCount - 2];
-            ++mCount;
-            mColorsp[mCount] = mColorsp[mCount - 1];
-            mTexcoordsp[mCount] = mTexcoordsp[mCount - 1];
-        }
+        mVerticesp[mCount] = verts[i];
+        mTexcoordsp[mCount] = uvs[i];
+        mColorsp[mCount] = colors[i];
 
-        // Note: Batch copies instead of iterating.
-        mVerticesp.copyArray(mCount, verts, vert_count);
-        mTexcoordsp.copyArray(mCount, uvs, vert_count);
-        mColorsp.copyArray(mCount, colors, vert_count);
-        mCount += vert_count;
+        mCount++;
     }
 
     if (mCount > 0)
@@ -1997,8 +1823,26 @@ void LLRender::vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, LLCo
         mTexcoordsp[mCount] = mTexcoordsp[mCount - 1];
         mColorsp[mCount] = mColorsp[mCount - 1];
     }
+}
 
-    mPrimitiveReset = false;
+void LLRender::vertex2i(const GLint& x, const GLint& y)
+{
+    vertex3f((GLfloat) x, (GLfloat) y, 0);
+}
+
+void LLRender::vertex2f(const GLfloat& x, const GLfloat& y)
+{
+    vertex3f(x,y,0);
+}
+
+void LLRender::vertex2fv(const GLfloat* v)
+{
+    vertex3f(v[0], v[1], 0);
+}
+
+void LLRender::vertex3fv(const GLfloat* v)
+{
+    vertex3f(v[0], v[1], v[2]);
 }
 
 void LLRender::texCoord2f(const GLfloat& x, const GLfloat& y)
@@ -2121,6 +1965,17 @@ void LLRender::diffuseColor4ub(U8 r, U8 g, U8 b, U8 a)
     }
 }
 
+void LLRender::setLineWidth(F32 width)
+{
+    gGL.flush();
+
+    width = llclamp(width, gGLManager.mAliasedLineRange[0], gGLManager.mAliasedLineRange[1]);
+    if(mLineWidth != width)
+    {
+        mLineWidth = width;
+        glLineWidth(width);
+    }
+}
 
 void LLRender::debugTexUnits(void)
 {
@@ -2144,9 +1999,6 @@ void LLRender::debugTexUnits(void)
                 case LLTexUnit::TT_CUBE_MAP:
                     LL_CONT << "Cube Map";
                     break;
-                case LLTexUnit::TT_TEXTURE_3D:
-                    LL_CONT << "Texture 3D";
-                    break;
                 default:
                     LL_CONT << "ARGH!!! NONE!";
                     break;
@@ -2157,42 +2009,93 @@ void LLRender::debugTexUnits(void)
     LL_INFOS("TextureUnit") << "Active TexUnit Enabled : " << active_enabled << LL_ENDL;
 }
 
-const LLMatrix4a& get_current_modelview()
+glm::mat4 get_current_modelview()
 {
-    return gGLModelView;
+    return glm::make_mat4(gGLModelView);
 }
 
-const LLMatrix4a& get_current_projection()
+glm::mat4 get_current_projection()
 {
-    return gGLProjection;
+    return glm::make_mat4(gGLProjection);
 }
 
-const LLMatrix4a& get_last_modelview()
+glm::mat4 get_last_modelview()
 {
-    return gGLLastModelView;
+    return glm::make_mat4(gGLLastModelView);
 }
 
-const LLMatrix4a& get_last_projection()
+glm::mat4 get_last_projection()
 {
-    return gGLLastProjection;
+    return glm::make_mat4(gGLLastProjection);
 }
 
-void set_current_modelview(const LLMatrix4a& mat)
+void copy_matrix(const glm::mat4& src, F32* dst)
 {
-    gGLModelView = mat;
+    auto matp = glm::value_ptr(src);
+    for (U32 i = 0; i < 16; i++)
+    {
+        dst[i] = matp[i];
+    }
 }
 
-void set_current_projection(const LLMatrix4a& mat)
+void set_current_modelview(const glm::mat4& mat)
 {
-    gGLProjection = mat;
+    copy_matrix(mat, gGLModelView);
 }
 
-void set_last_modelview(const LLMatrix4a& mat)
+void set_current_projection(const glm::mat4& mat)
 {
-    gGLLastModelView = mat;
+    copy_matrix(mat, gGLProjection);
 }
 
-void set_last_projection(const LLMatrix4a& mat)
+void set_last_modelview(const glm::mat4& mat)
 {
-    gGLLastProjection = mat;
+    copy_matrix(mat, gGLLastModelView);
+}
+
+void set_last_projection(const glm::mat4& mat)
+{
+    copy_matrix(mat, gGLLastProjection);
+}
+
+glm::vec3 mul_mat4_vec3(const glm::mat4& mat, const glm::vec3& vec)
+{
+#if 1 // SIMD path results in strange crashes. Fall back to scalar for now.
+    const float w = vec[0] * mat[0][3] + vec[1] * mat[1][3] + vec[2] * mat[2][3] + mat[3][3];
+    return glm::vec3(
+       (vec[0] * mat[0][0] + vec[1] * mat[1][0] + vec[2] * mat[2][0] + mat[3][0]) / w,
+       (vec[0] * mat[0][1] + vec[1] * mat[1][1] + vec[2] * mat[2][1] + mat[3][1]) / w,
+       (vec[0] * mat[0][2] + vec[1] * mat[1][2] + vec[2] * mat[2][2] + mat[3][2]) / w
+    );
+#else
+    LLVector4a x, y, z, s, t, p, q;
+
+    x.splat(vec.x);
+    y.splat(vec.y);
+    z.splat(vec.z);
+
+    s.splat<3>(mat[0].data);
+    t.splat<3>(mat[1].data);
+    p.splat<3>(mat[2].data);
+    q.splat<3>(mat[3].data);
+
+    s.mul(x);
+    t.mul(y);
+    p.mul(z);
+    q.add(s);
+    t.add(p);
+    q.add(t);
+
+    x.mul(mat[0].data);
+    y.mul(mat[1].data);
+    z.mul(mat[2].data);
+
+    x.add(y);
+    z.add(mat[3].data);
+    LLVector4a res;
+    res.load3(glm::value_ptr(vec));
+    res.setAdd(x, z);
+    res.div(q);
+    return glm::make_vec3(res.getF32ptr());
+#endif
 }

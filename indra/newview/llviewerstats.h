@@ -135,7 +135,6 @@ extern LLTrace::CountStatHandle<>           FPS,
                                             UPLOAD_TEXTURE,
                                             EDIT_TEXTURE,
                                             KILLED,
-                                            FRAMETIME_DOUBLED,
                                             TEX_BAKES,
                                             TEX_REBAKES,
                                             NUM_NEW_OBJECTS;
@@ -149,10 +148,6 @@ extern LLTrace::CountStatHandle<F64Kilobytes >  ACTIVE_MESSAGE_DATA_RECEIVED,
                                                                     TEXTURE_NETWORK_DATA_RECEIVED,
                                                                     MESSAGE_SYSTEM_DATA_IN,
                                                                     MESSAGE_SYSTEM_DATA_OUT;
-
-extern LLTrace::CountStatHandle<F64Seconds >        SIM_20_FPS_TIME,
-                                                                    SIM_PHYSICS_20_FPS_TIME,
-                                                                    LOSS_5_PERCENT_TIME;
 
 extern SimMeasurement<>                     SIM_TIME_DILATION,
                                             SIM_FPS,
@@ -194,8 +189,6 @@ extern LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> > PACKETS_LOST_PE
 
 extern LLTrace::SampleStatHandle<F64Megabytes > FORMATTED_MEM;
 
-extern LLTrace::SampleStatHandle<F64Kilobytes > DELTA_BANDWIDTH,
-                                                                    MAX_BANDWIDTH;
 extern SimMeasurement<F64Milliseconds > SIM_FRAME_TIME,
                                                             SIM_NET_TIME,
                                                             SIM_OTHER_TIME,
@@ -216,7 +209,6 @@ extern SimMeasurement<F64Megabytes >    SIM_PHYSICS_MEM;
 
 
 extern LLTrace::SampleStatHandle<F64Milliseconds >  FRAMETIME_JITTER,
-                                                    FRAMETIME_SLEW,
                                                     SIM_PING;
 
 extern LLTrace::EventStatHandle<LLUnit<F64, LLUnits::Meters> > AGENT_POSITION_SNAP;
@@ -233,16 +225,19 @@ extern LLTrace::EventStatHandle<F64Milliseconds >   REGION_CROSSING_TIME,
 
 extern LLTrace::EventStatHandle<F64Seconds >    AVATAR_EDIT_TIME,
                                                                 TOOLBOX_TIME,
-                                                                MOUSELOOK_TIME,
-                                                                FPS_10_TIME,
-                                                                FPS_8_TIME,
-                                                                FPS_2_TIME;
+                                                                MOUSELOOK_TIME;
 
 extern LLTrace::EventStatHandle<LLUnit<F32, LLUnits::Percent> > OBJECT_CACHE_HIT_RATE;
 
+extern LLTrace::SampleStatHandle<F64> NOTRMALIZED_FRAMETIME_JITTER_SESSION;
+extern LLTrace::SampleStatHandle<F64> NORMALIZED_FRAMTIME_JITTER_PERIOD;
+
+extern LLTrace::SampleStatHandle<U32> WEBRTC_PACKETS_IN_LOST, WEBRTC_PACKETS_IN_RECEIVED, WEBRTC_PACKETS_OUT_SENT, WEBRTC_PACKETS_OUT_LOST;
+extern LLTrace::SampleStatHandle<F32> WEBRTC_JITTER_OUT, WEBRTC_JITTER_IN, WEBRTC_LATENCY, WEBRTC_UPLOAD_BANDWIDTH, WEBRTC_JITTER_BUFFER;
+
 }
 
-class LLViewerStats final : public LLSingleton<LLViewerStats>
+class LLViewerStats : public LLSingleton<LLViewerStats>
 {
     LLSINGLETON(LLViewerStats);
     ~LLViewerStats();
@@ -282,10 +277,30 @@ public:
     LLTrace::Recording& getRecording() { return mRecording; }
     const LLTrace::Recording& getRecording() const { return mRecording; }
 
+    F64 getLastNormalizedSessionJitter() const { return mLastNoramlizedSessionJitter; }
+    F64 getLastNormalizedFrametimeVariance() const { return mLastNormalizedFrametimeVariance; }
+    F64 getLastNormalizedPeriodJitter() const { return mLastNormalizedPeriodJitter; }
+
 private:
     LLTrace::Recording              mRecording;
 
     F64Seconds mLastTimeDiff;  // used for time stat updates
+    F64Seconds mTotalFrametimeJitter;
+
+    U32 mFrameJitterEvents = 0;
+    U32 mFrameJitterEventsLastMinute = 0;
+    U32 mEventMinutes = 0;
+    F64Seconds mTotalTime;
+
+    F64Seconds              mLastFrameTimeSample; // used for frame time stats
+    F64Seconds              mTimeSinceLastEventSample;
+    std::vector<F64Seconds>      mFrameTimes;          // used for frame time stats
+    std::vector<F64Seconds> mFrameTimesJitter;    // used for frame time jitter stats
+
+    F64 mLastNoramlizedSessionJitter; // used for frame time jitter stats
+    F64 mLastNormalizedFrametimeVariance; // Used when submitting jitter stats
+    F64 mLastNormalizedPeriodJitter;
+
 };
 
 static const F32 SEND_STATS_PERIOD = 300.0f;
@@ -295,7 +310,7 @@ void update_statistics();
 void send_viewer_stats(bool include_preferences);
 void update_texture_time();
 
-extern U64Bytes gTotalTextureData;
-extern U64Bytes  gTotalObjectData;
-extern U64Bytes  gTotalTextureBytesPerBoostLevel[] ;
+extern U32Bytes gTotalTextureData;
+extern U32Bytes  gTotalObjectData;
+extern U32Bytes  gTotalTextureBytesPerBoostLevel[] ;
 #endif // LL_LLVIEWERSTATS_H

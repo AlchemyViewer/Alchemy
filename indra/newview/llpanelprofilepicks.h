@@ -50,7 +50,7 @@ public:
     LLPanelProfilePicks();
     /*virtual*/ ~LLPanelProfilePicks();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void onOpen(const LLSD& key) override;
 
@@ -109,7 +109,7 @@ public:
 
     /*virtual*/ ~LLPanelProfilePick();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void setAvatarId(const LLUUID& avatar_id) override;
 
@@ -118,6 +118,8 @@ public:
 
     virtual void setPickName(const std::string& name);
     const std::string getPickName();
+    virtual void setPickLocation(const LLUUID& parcel_id, const std::string& location);
+    std::string getPickLocation() { return mPickLocationStr; };
 
     void processProperties(void* data, EAvatarProcessorType type) override;
     void processProperties(const LLPickData* pick_data);
@@ -125,7 +127,7 @@ public:
     /**
      * Returns true if any of Pick properties was changed by user.
      */
-    BOOL isDirty() const override;
+    bool isDirty() const override;
 
     /**
      * Saves changes.
@@ -136,8 +138,11 @@ public:
 
     //This stuff we got from LLRemoteParcelObserver, in the last one we intentionally do nothing
     void processParcelInfo(const LLParcelData& parcel_data) override;
-    void setParcelID(const LLUUID& parcel_id) override { mParcelId = parcel_id; }
+    void setParcelID(const LLUUID& parcel_id) override;
+    LLUUID getParcelID() const { return mParcelId; }
     void setErrorStatus(S32 status, const std::string& reason) override {};
+
+    void addLocationChangedCallbacks();
 
   protected:
 
@@ -183,7 +188,7 @@ public:
     /**
      * Enables/disables "Save" button
      */
-    void enableSaveButton(BOOL enable);
+    void enableSaveButton(bool enable);
 
     /**
      * Called when snapshot image changes.
@@ -199,6 +204,11 @@ public:
      * Resets panel and all cantrols to unedited state
      */
     void resetDirty() override;
+
+    /**
+     * Callback for "Set Location" button click
+     */
+    void onClickSetLocation();
 
     /**
      * Callback for "Save" and "Create" button click
@@ -222,6 +232,7 @@ protected:
     LLTextureCtrl*      mSnapshotCtrl;
     LLLineEditor*       mPickName;
     LLTextEditor*       mPickDescription;
+    LLButton*           mSetCurrentLocationButton;
     LLButton*           mSaveButton;
     LLButton*           mCreateButton;
     LLButton*           mCancelButton;
@@ -231,13 +242,15 @@ protected:
     LLUUID mPickId;
     LLUUID mRequestedId;
     std::string mPickNameStr;
+    std::string mPickLocationStr;
+    LLTimer mLastRequestTimer;
 
     boost::signals2::connection mRegionCallbackConnection;
     boost::signals2::connection mParcelCallbackConnection;
 
     bool mLocationChanged;
     bool mNewPick;
-    bool                mIsEditing;
+    bool mIsEditing;
 
     void onDescriptionFocusReceived();
 };

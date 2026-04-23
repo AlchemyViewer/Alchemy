@@ -27,45 +27,8 @@
 #include "linden_common.h"
 
 #include "llinventorytype.h"
-#include "lldictionary.h"
-#include "llmemory.h"
-#include "llsingleton.h"
 
 static const std::string empty_string;
-
-///----------------------------------------------------------------------------
-/// Class LLInventoryType
-///----------------------------------------------------------------------------
-struct InventoryEntry final : public LLDictionaryEntry
-{
-    InventoryEntry(const std::string &name, // unlike asset type names, not limited to 8 characters; need not match asset type names
-                   const std::string &human_name, // for decoding to human readable form; put any and as many printable characters you want in each one.
-                   int num_asset_types = 0, ...)
-        :
-        LLDictionaryEntry(name),
-        mHumanName(human_name)
-    {
-        va_list argp;
-        va_start(argp, num_asset_types);
-        // Read in local textures
-        for (U8 i=0; i < num_asset_types; i++)
-        {
-            LLAssetType::EType t = (LLAssetType::EType)va_arg(argp,int);
-            mAssetTypes.push_back(t);
-        }
-        va_end(argp);
-    }
-
-    const std::string mHumanName;
-    typedef std::vector<LLAssetType::EType> asset_vec_t;
-    asset_vec_t mAssetTypes;
-};
-
-class LLInventoryDictionary final : public LLSingleton<LLInventoryDictionary>,
-                              public LLDictionary<LLInventoryType::EType, InventoryEntry>
-{
-    LLSINGLETON(LLInventoryDictionary);
-};
 
 LLInventoryDictionary::LLInventoryDictionary()
 {
@@ -84,6 +47,8 @@ LLInventoryDictionary::LLInventoryDictionary()
     addEntry(LLInventoryType::IT_ANIMATION,           new InventoryEntry("animation", "animation",     1, LLAssetType::AT_ANIMATION));
     addEntry(LLInventoryType::IT_GESTURE,             new InventoryEntry("gesture",   "gesture",       1, LLAssetType::AT_GESTURE));
     addEntry(LLInventoryType::IT_MESH,                new InventoryEntry("mesh",      "mesh",          1, LLAssetType::AT_MESH));
+    addEntry(LLInventoryType::IT_GLTF,                new InventoryEntry("gltf",      "gltf",          1, LLAssetType::AT_GLTF));
+    addEntry(LLInventoryType::IT_GLTF_BIN,            new InventoryEntry("glbin",     "glbin",         1, LLAssetType::AT_GLTF_BIN));
     addEntry(LLInventoryType::IT_WIDGET,              new InventoryEntry("widget",    "widget",        1, LLAssetType::AT_WIDGET));
     addEntry(LLInventoryType::IT_PERSON,              new InventoryEntry("person",    "person",        1, LLAssetType::AT_PERSON));
     addEntry(LLInventoryType::IT_SETTINGS,            new InventoryEntry("settings",  "settings",      1, LLAssetType::AT_SETTINGS));
@@ -154,9 +119,12 @@ DEFAULT_ASSET_FOR_INV_TYPE[LLAssetType::AT_COUNT] =
     LLInventoryType::IT_NONE,           // 52   AT_RESERVED_3
     LLInventoryType::IT_NONE,           // 53   AT_RESERVED_4
     LLInventoryType::IT_NONE,           // 54   AT_RESERVED_5
+    LLInventoryType::IT_NONE,           // 55   AT_RESERVED_6
 
-    LLInventoryType::IT_SETTINGS,       // 55   AT_SETTINGS <- why doesnt this match the value in llassettype.h? -brad
+    LLInventoryType::IT_SETTINGS,       // 56   AT_SETTINGS
     LLInventoryType::IT_MATERIAL,       // 57   AT_MATERIAL
+    LLInventoryType::IT_GLTF,           // 58   AT_GLTF
+    LLInventoryType::IT_GLTF_BIN,       // 59   AT_GLTF_BIN
 };
 
 // static
@@ -168,7 +136,7 @@ const std::string &LLInventoryType::lookup(EType type)
 }
 
 // static
-LLInventoryType::EType LLInventoryType::lookup(const std::string_view name)
+LLInventoryType::EType LLInventoryType::lookup(const std::string& name)
 {
     return LLInventoryDictionary::getInstance()->lookup(name);
 }

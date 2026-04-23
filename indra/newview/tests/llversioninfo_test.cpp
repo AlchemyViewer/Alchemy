@@ -29,7 +29,14 @@
 
 #include "../llversioninfo.h"
 
+#include "llversioninfovars.h"
+
  #include <iostream>
+
+// LL_VIEWER_CHANNEL is a macro defined on the compiler command line. The
+// macro expands to the string name of the channel, but without quotes. We
+// need to turn it into a quoted string. LL_TO_STRING() does that.
+#define ll_viewer_channel LL_TO_STRING(LL_VIEWER_CHANNEL)
 
 namespace tut
 {
@@ -52,7 +59,7 @@ namespace tut
             mShortVersion = stream.str();
             stream.str("");
 
-            stream << LL_VIEWER_CHANNEL
+            stream << ll_viewer_channel
                    << " "
                    << mVersion;
             mVersionAndChannel = stream.str();
@@ -62,20 +69,12 @@ namespace tut
                    << " "
                    << mVersion;
             mResetVersionAndChannel = stream.str();
-            stream.str("");
-
-            stream << LL_VIEWER_CHANNEL_CODENAME;
-            mCodename = stream.str();
-            stream.str("");
         }
         std::string mResetChannel;
         std::string mVersion;
         std::string mShortVersion;
         std::string mVersionAndChannel;
         std::string mResetVersionAndChannel;
-        std::string mCodename;
-        std::string mShortSHA;
-        std::string mLongSHA;
     };
 
     typedef test_group<versioninfo> versioninfo_t;
@@ -85,7 +84,7 @@ namespace tut
     template<> template<>
     void versioninfo_object_t::test<1>()
     {
-        std::cout << "What we parsed from CMake: " << LL_VIEWER_VERSION_PATCH << std::endl;
+        std::cout << "What we parsed from CMake: " << LL_VIEWER_VERSION_BUILD << std::endl;
         std::cout << "What we get from llversioninfo: " << LLVersionInfo::instance().getBuild() << std::endl;
         ensure_equals("Major version",
                       LLVersionInfo::instance().getMajor(),
@@ -101,7 +100,7 @@ namespace tut
                       LL_VIEWER_VERSION_BUILD);
         ensure_equals("Channel version",
                       LLVersionInfo::instance().getChannel(),
-                      LL_VIEWER_CHANNEL);
+                      ll_viewer_channel);
         ensure_equals("Version String",
                       LLVersionInfo::instance().getVersion(),
                       mVersion);
@@ -111,9 +110,6 @@ namespace tut
         ensure_equals("Version and channel String",
                       LLVersionInfo::instance().getChannelAndVersion(),
                       mVersionAndChannel);
-        ensure_equals("Channel codename",
-                      LLVersionInfo::instance().getCodename(),
-                      mCodename);
 
         LLVersionInfo::instance().resetChannel(mResetChannel);
         ensure_equals("Reset channel version",

@@ -41,14 +41,14 @@ public:
      * @param[in] name - Unique string identifying this tester instance.
      */
     LLMetricPerformanceTesterBasic(std::string name);
-    virtual ~LLMetricPerformanceTesterBasic() = default;
+    virtual ~LLMetricPerformanceTesterBasic();
 
     /**
      * @return Returns true if the instance has been added to the tester map.
      * Need to be tested after creation of a tester instance so to know if the tester is correctly handled.
      * A tester might not be added to the map if another tester with the same name already exists.
      */
-    BOOL isValid() const { return mValidInstance; }
+    bool isValid() const { return mValidInstance; }
 
     /**
      * @brief Write a set of test results to the log LLSD.
@@ -62,7 +62,7 @@ public:
      */
     virtual void analyzePerformance(llofstream* os, LLSD* base, LLSD* current) ;
 
-    static void doAnalysisMetrics(const std::string& baseline, const std::string& target, const std::string& output);
+    static void doAnalysisMetrics(std::string baseline, std::string target, std::string output) ;
 
     /**
      * @return Returns the number of the test metrics in this tester instance.
@@ -93,8 +93,8 @@ protected:
      * @param[in] v_base - Base value of the metric.
      * @param[in] v_current - Current value of the metric.
      */
-    virtual void compareTestResults(llofstream* os, std::string_view metric_string, S32 v_base, S32 v_current) ;
-    virtual void compareTestResults(llofstream* os, std::string_view metric_string, F32 v_base, F32 v_current) ;
+    virtual void compareTestResults(llofstream* os, std::string metric_string, S32 v_base, S32 v_current) ;
+    virtual void compareTestResults(llofstream* os, std::string metric_string, F32 v_base, F32 v_current) ;
 
     /**
      * @brief Reset internal record count. Count starts with 1.
@@ -122,37 +122,37 @@ private:
 
     std::string mName ;                         // Name of this tester instance
     S32 mCount ;                                // Current record count
-    BOOL mValidInstance;                        // TRUE if the instance is managed by the map
+    bool mValidInstance;                        // true if the instance is managed by the map
     std::vector< std::string > mMetricStrings ; // Metrics strings
 
 // Static members managing the collection of testers
 public:
     // Map of all the tester instances in use
-    typedef std::map< std::string, LLMetricPerformanceTesterBasic*, std::less<>> name_tester_map_t;
+    typedef std::map< std::string, LLMetricPerformanceTesterBasic* > name_tester_map_t;
     static name_tester_map_t sTesterMap ;
 
     /**
      * @return Returns a pointer to the tester
      * @param[in] name - Name of the tester instance queried.
      */
-    static LLMetricPerformanceTesterBasic* getTester(std::string_view name) ;
+    static LLMetricPerformanceTesterBasic* getTester(std::string name) ;
 
     /**
      * @return Delete the named tester from the list
      * @param[in] name - Name of the tester instance to delete.
      */
-    static void deleteTester(std::string_view name);
+    static void deleteTester(std::string name);
 
     /**
-     * @return Returns TRUE if that metric *or* the default catch all metric has been requested to be logged
+     * @return Returns true if that metric *or* the default catch all metric has been requested to be logged
      * @param[in] name - Name of the tester queried.
      */
-    static BOOL isMetricLogRequested(std::string_view name);
+    static bool isMetricLogRequested(std::string name);
 
     /**
-     * @return Returns TRUE if there's a tester defined, FALSE otherwise.
+     * @return Returns true if there's a tester defined, false otherwise.
      */
-    static BOOL hasMetricPerformanceTesters() { return !sTesterMap.empty() ;}
+    static bool hasMetricPerformanceTesters() { return !sTesterMap.empty() ;}
     /**
      * @brief Delete all testers and reset the tester map
      */
@@ -160,7 +160,7 @@ public:
 
 private:
     // Add a tester to the map. Returns false if adding fails.
-    static BOOL addTester(LLMetricPerformanceTesterBasic* tester) ;
+    static bool addTester(LLMetricPerformanceTesterBasic* tester) ;
 };
 
 /**
@@ -191,7 +191,7 @@ protected:
     class LL_COMMON_API LLTestSession
         {
         public:
-            virtual ~LLTestSession() = default;
+            virtual ~LLTestSession() ;
         };
 
     /**

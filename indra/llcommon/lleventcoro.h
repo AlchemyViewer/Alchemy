@@ -59,7 +59,7 @@ public:
         mPump(LLEventPumps::instance().obtain(pumpname))
     {}
     /// Unspecified: "I choose not to identify an LLEventPump."
-    LLEventPumpOrPumpName() = default;
+    LLEventPumpOrPumpName() {}
     operator LLEventPump& () const { return *mPump; }
     LLEventPump& getPump() const { return *mPump; }
     operator bool() const { return bool(mPump); }
@@ -83,6 +83,11 @@ void suspend();
  * Yield control from a coroutine for at least the specified number of seconds
  */
 void suspendUntilTimeout(float seconds);
+
+/**
+ * Yield control from a coroutine until the next mainloop's newFrame event.
+ */
+void suspendUntilNextFrame();
 
 /**
  * Post specified LLSD event on the specified LLEventPump, then suspend for a

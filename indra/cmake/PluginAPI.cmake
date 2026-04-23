@@ -1,6 +1,7 @@
 # -*- cmake -*-
-
 include_guard()
+
+include(OpenGL)
 
 add_library( ll::pluginlibraries INTERFACE IMPORTED )
 
@@ -8,16 +9,13 @@ if (WINDOWS)
   target_link_libraries( ll::pluginlibraries INTERFACE
       wsock32
       ws2_32
+      Iphlpapi
       psapi
       advapi32
       user32
-      wer
       )
-elseif (DARWIN)
-  find_library(COCOA_LIBRARY Cocoa)
-  target_link_libraries( ll::pluginlibraries INTERFACE
-      ${COCOA_LIBRARY}
-       )
 endif (WINDOWS)
 
+target_link_libraries( ll::pluginlibraries INTERFACE OpenGL::GL)
 
+target_include_directories( ll::pluginlibraries INTERFACE ${INDRA_SOURCE_DIR}/llimage ${INDRA_SOURCE_DIR}/llrender)

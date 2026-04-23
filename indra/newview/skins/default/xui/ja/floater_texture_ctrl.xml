@@ -12,15 +12,14 @@
 	<floater.string name="pick_texture">
 		ピック：テクスチャ
 	</floater.string>
-	<view name="preview_widget"/>
 	<text name="Multiple">
 		複数のテクスチャ
 	</text>
 	<!-- mode selector -->
 	<combo_box name="mode_selection">
-		<combo_box.item label="インベントリ" name="inventory" value="0"/>
-		<combo_box.item label="ローカル" name="local" value="1"/>
-		<combo_box.item label="ベイク" name="bake" value="2"/>
+		<combo_box.item label="インベントリ" name="inventory"/>
+		<combo_box.item label="ローカル" name="local"/>
+		<combo_box.item label="ベイク" name="bake"/>
 	</combo_box>
 	<text name="size_lbl">
 		[DIMENSIONS]
@@ -36,7 +35,6 @@
 	<button name="Pipette"/>
 	<text name="preview_disabled" value="プレビュー無効"/>
 	<filter_editor label="テクスチャをフィルタ" name="inventory search editor"/>
-	<asset_filtered_inv_panel name="inventory panel"/>
 	<line_editor name="uuid_editor" label="テクスチャのＵＵＩＤを入力"/>
 	<button name="apply_uuid_btn" label="キーを反映"/>
 	<!--  middle: local mode -->
@@ -44,7 +42,6 @@
 	<button label="削除" label_selected="削除" name="l_rem_btn"/>
 	<button label="アップロード" label_selected="アップロード" name="l_upl_btn"/>
 	<scroll_list name="l_name_list">
-		<column name="icon" label=""/>
 		<column name="unit_name" label="名前"/>
 	</scroll_list>
 	<!-- middle: bake mode -->

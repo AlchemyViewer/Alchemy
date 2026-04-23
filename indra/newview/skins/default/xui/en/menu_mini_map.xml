@@ -81,15 +81,6 @@
     </menu_item_check>
     <menu_item_separator />
   <menu_item_check
-   label="Use Map Tile"
-   name="Use Map Tile">
-    <menu_item_check.on_check
-       control="AlchemyMinimapTile" />
-    <menu_item_check.on_click
-       function="ToggleControl"
-       parameter="AlchemyMinimapTile" />
-  </menu_item_check>
-  <menu_item_check
    label="Render Objects"
    name="Render Objects">
     <menu_item_check.on_check

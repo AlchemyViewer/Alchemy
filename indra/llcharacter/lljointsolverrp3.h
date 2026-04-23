@@ -97,11 +97,11 @@ protected:
 
     LLVector3   mPoleVector;
     LLVector3   mBAxis;
-    BOOL        mbUseBAxis;
+    bool        mbUseBAxis;
 
     F32         mTwist;
 
-    BOOL        mFirstTime;
+    bool        mFirstTime;
     LLMatrix4   mSavedJointAMat;
     LLMatrix4   mSavedInvPlaneMat;
 
@@ -113,7 +113,7 @@ public:
     // Constructor/Destructor
     //-------------------------------------------------------------------------
     LLJointSolverRP3();
-    virtual ~LLJointSolverRP3() = default;
+    virtual ~LLJointSolverRP3();
 
     //-------------------------------------------------------------------------
     // setupJoints()

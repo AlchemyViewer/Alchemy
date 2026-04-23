@@ -30,7 +30,6 @@
 #include <fstream>
 
 #include <boost/regex.hpp>
-#include <boost/assign/list_of.hpp>
 
 #include "llfeaturemanager.h"
 #include "lldir.h"
@@ -70,8 +69,8 @@ const char FEATURE_TABLE_FILENAME[] = "featuretable.txt";
 
 #if 0                               // consuming code in #if 0 below
 #endif
-LLFeatureInfo::LLFeatureInfo(const std::string& name, const BOOL available, const F32 level)
-    : mValid(TRUE), mName(name), mAvailable(available), mRecommendedLevel(level)
+LLFeatureInfo::LLFeatureInfo(const std::string& name, const bool available, const F32 level)
+    : mValid(true), mName(name), mAvailable(available), mRecommendedLevel(level)
 {
 }
 
@@ -84,7 +83,7 @@ LLFeatureList::~LLFeatureList()
 {
 }
 
-void LLFeatureList::addFeature(const std::string& name, const BOOL available, const F32 level)
+void LLFeatureList::addFeature(const std::string& name, const bool available, const F32 level)
 {
     if (mFeatures.count(name))
     {
@@ -99,7 +98,7 @@ void LLFeatureList::addFeature(const std::string& name, const BOOL available, co
     mFeatures[name] = fi;
 }
 
-BOOL LLFeatureList::isFeatureAvailable(const std::string& name)
+bool LLFeatureList::isFeatureAvailable(const std::string& name)
 {
     if (mFeatures.count(name))
     {
@@ -108,9 +107,9 @@ BOOL LLFeatureList::isFeatureAvailable(const std::string& name)
 
     LL_WARNS_ONCE("RenderInit") << "Feature " << name << " not on feature list!" << LL_ENDL;
 
-    // changing this to TRUE so you have to explicitly disable
+    // changing this to true so you have to explicitly disable
     // something for it to be disabled
-    return TRUE;
+    return true;
 }
 
 F32 LLFeatureList::getRecommendedValue(const std::string& name)
@@ -125,7 +124,7 @@ F32 LLFeatureList::getRecommendedValue(const std::string& name)
     return 0;
 }
 
-BOOL LLFeatureList::maskList(LLFeatureList &mask)
+bool LLFeatureList::maskList(LLFeatureList &mask)
 {
     LL_DEBUGS_ONCE() << "Masking with " << mask.mName << LL_ENDL;
     //
@@ -168,7 +167,7 @@ BOOL LLFeatureList::maskList(LLFeatureList &mask)
         dump();
     LL_CONT << LL_ENDL;
 
-    return TRUE;
+    return true;
 }
 
 void LLFeatureList::dump()
@@ -184,19 +183,19 @@ void LLFeatureList::dump()
     }
 }
 
-static const std::vector<std::string> sGraphicsLevelNames = boost::assign::list_of
-    ("Low")
-    ("LowMid")
-    ("Mid")
-    ("MidHigh")
-    ("High")
-    ("HighUltra")
-    ("Ultra")
-;
+static const std::vector<std::string> sGraphicsLevelNames = {
+    "Low",
+    "LowMid",
+    "Mid",
+    "MidHigh",
+    "High",
+    "HighUltra",
+    "Ultra"
+};
 
 U32 LLFeatureManager::getMaxGraphicsLevel() const
 {
-    return sGraphicsLevelNames.size() - 1;
+    return static_cast<U32>(sGraphicsLevelNames.size()) - 1;
 }
 
 bool LLFeatureManager::isValidGraphicsLevel(U32 level) const
@@ -243,13 +242,13 @@ LLFeatureList *LLFeatureManager::findMask(const std::string& name)
     return NULL;
 }
 
-BOOL LLFeatureManager::maskFeatures(const std::string& name)
+bool LLFeatureManager::maskFeatures(const std::string& name)
 {
     LLFeatureList *maskp = findMask(name);
     if (!maskp)
     {
         LL_DEBUGS("RenderInit") << "Unknown feature mask " << name << LL_ENDL;
-        return FALSE;
+        return false;
     }
     LL_INFOS("RenderInit") << "Applying GPU Feature list: " << name << LL_ENDL;
     return maskList(*maskp);
@@ -293,7 +292,7 @@ bool LLFeatureManager::parseFeatureTable(std::string filename)
     if (!file)
     {
         LL_WARNS("RenderInit") << "Unable to open feature table " << filename << LL_ENDL;
-        return FALSE;
+        return false;
     }
 
     // Check file version
@@ -392,19 +391,122 @@ F32 logExceptionBenchmark()
     __except (msc_exception_filter(GetExceptionCode(), GetExceptionInformation()))
     {
         // HACK - ensure that profiling is disabled
-        LLGLSLShader::finishProfile(false);
+        LLGLSLShader::finishProfile();
 
         // convert to C++ styled exception
         char integer_string[32];
-        snprintf(integer_string, 32, "SEH, code: %lu\n", GetExceptionCode());
+        sprintf(integer_string, "SEH, code: %lu\n", GetExceptionCode());
         throw std::exception(integer_string);
     }
     return gbps;
 }
 #endif
 
+bool checkRDNA35()
+{
+    // This checks if we're running on an RDNA3.5 GPU.  You're only going to see these on AMD's APUs.
+    // As of driver version 25, we're seeing stalls in some of our queries.
+    // This appears to be a driver bug, and appears to be specific RDNA3.5 APUs.
+    // There's multiples of these guys, so we just use this function to check if that GPU is on the list of known RDNA3.5 APUs.
+    // - Geenz 11/12/2025
+    std::array<std::string, 7> rdna35GPUs = {
+        "8060S",
+        "8050S",
+        "8040S",
+        "860M",
+        "840M",
+        "890M",
+        "880M"
+    };
+
+    for (const auto& gpu_name : rdna35GPUs)
+    {
+        if (gGLManager.getRawGLString().find(gpu_name) != std::string::npos)
+        {
+            LL_WARNS("RenderInit") << "Detected AMD RDNA3.5 GPU (" << gpu_name << ")." << LL_ENDL;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Removes the Mesa information from the GPU model string.
+ *
+ * The Mesa graphics utilities injects the current kernel name and version,
+ * as well as Mesa's own name and version into the device name, which causes
+ * several usability headaches when doing A/B testing across kernel and Mesa
+ * releases, as the original behavior of the viewer is to reset the graphics
+ * settings every time this string changes.
+ * This function thus strips everything but the physical device information
+ * from the string to greatly aid both the developer and the end user
+ * experience.
+ *
+ * @param[out] device_name Contains the new GPU model string, after being cleaned if applicable.
+ */
+bool extractGLDeviceModel(std::string& device_name)
+{
+    const std::string gl_string = ll_safe_string((const char*)(glGetString(GL_RENDERER)));
+#if LL_LINUX
+    // Get the kernel version; essentially 'uname -r' on Linux
+    // TODO: *BSD
+    std::istringstream iss(LLOSInfo::instance().getOSString());
+    std::string first, second;
+    iss >> first >> second;
+    const std::string kernel_version = (first == "Linux") ? second : "";
+
+    if (!kernel_version.empty())
+    {
+        LL_WARNS("RenderInit") << "Linux detected, performing GPU String cleanup!" << LL_ENDL;
+        std::string new_gpu_string = gl_string;
+        if (new_gpu_string.find(kernel_version) != std::string::npos)
+        {
+            LL_WARNS("RenderInit") << "GPU String contains the kernel version, removing" << LL_ENDL;
+            // Strip the extra information on AMD adapters
+            if (const size_t paren_pos = new_gpu_string.find('('); paren_pos != std::string::npos)
+            {
+                std::string result = new_gpu_string.substr(0, paren_pos);
+                // Trim trailing whitespace
+                result.erase(std::find_if(result.rbegin(), result.rend(),
+                            [](unsigned char c) { return !std::isspace(c); }).base(),
+                        result.end());
+                new_gpu_string = result;
+            }
+        }
+        // Strip leading 'Mesa' keyword on Intel adapters
+        if (const size_t paren_pos = new_gpu_string.find("Mesa "); paren_pos != std::string::npos)
+        {
+            LL_WARNS("RenderInit") << "GPU String contains 'Mesa', removing" << LL_ENDL;
+            std::string result = new_gpu_string.substr(5, std::string::npos);
+            new_gpu_string = result;
+        }
+        device_name = new_gpu_string;
+        return true;
+    }
+#endif // LL_LINUX
+    device_name = gl_string;
+    return false;
+}
+
 bool LLFeatureManager::loadGPUClass()
 {
+    // This is a hack for certain AMD GPUs in newer driver versions on certain APUs.
+    // These GPUs will show inconsistent freezes when attempting to run shader profiles against them.
+    // This is extremely problematic as it can lead to:
+    // - Login freezes
+    // - Inability to start the client
+    // - Completely random avatars triggering a freeze
+    // As a result, we filter out these GPUs for shader profiling.
+    // - Geenz 11/11/2025
+
+    if (gGLManager.getRawGLString().find("Radeon") != std::string::npos && checkRDNA35() && gGLManager.mDriverVersionVendorString.find("25.") != std::string::npos)
+    {
+        LL_WARNS("RenderInit") << "Detected AMD RDNA3.5 GPU on a known bad driver; disabling benchmark and occlusion culling to prevent freezes." << LL_ENDL;
+        gSavedSettings.setBOOL("SkipBenchmark", true);
+        gSavedSettings.setBOOL("UseOcclusion", false);
+    }
+
     if (!gSavedSettings.getBOOL("SkipBenchmark"))
     {
         F32 class1_gbps = gSavedSettings.getF32("RenderClass1MemoryBandwidth");
@@ -450,7 +552,9 @@ bool LLFeatureManager::loadGPUClass()
         {
             mGPUClass = GPU_CLASS_2;
         }
-        else if (gbps <= class1_gbps*4.f)
+        else if ((gbps <= class1_gbps*4.f)
+                 // Cap silicon's GPUs at med+ as they have high throughput, low capability
+                 || gGLManager.mIsApple)
         {
             mGPUClass = GPU_CLASS_3;
         }
@@ -463,17 +567,16 @@ bool LLFeatureManager::loadGPUClass()
             mGPUClass = GPU_CLASS_5;
         }
 
-    #if LL_WINDOWS
-        const F32Gigabytes MIN_PHYSICAL_MEMORY(2);
-
         LLMemory::updateMemoryInfo();
+    #if LL_WINDOWS || LL_LINUX
+        const F32Gigabytes MIN_PHYSICAL_MEMORY(8);
         F32Gigabytes physical_mem = LLMemory::getMaxMemKB();
         if (MIN_PHYSICAL_MEMORY > physical_mem && mGPUClass > GPU_CLASS_1)
         {
             // reduce quality on systems that don't have enough memory
             mGPUClass = (EGPUClass)(mGPUClass - 1);
         }
-    #endif //LL_WINDOWS
+    #endif //LL_WINDOWS || LL_LINUX
     } //end if benchmark
     else
     {
@@ -483,9 +586,11 @@ bool LLFeatureManager::loadGPUClass()
         mGPUClass = GPU_CLASS_1;
     }
 
+    if (extractGLDeviceModel(mGPUString)) {
+        LL_INFOS("RenderInit") << "GPU String has been stripped of driver identification" << LL_ENDL;
+    }
     // defaults
-    mGPUString = gGLManager.getRawGLString();
-    mGPUSupported = TRUE;
+    mGPUSupported = true;
 
     return true; // indicates that a gpu value was established
 }
@@ -567,7 +672,7 @@ void LLFeatureManager::applyFeatures(bool skipFeatures)
         // handle all the different types
         if(ctrl->isType(TYPE_BOOLEAN))
         {
-            gSavedSettings.setBOOL(mIt->first, (BOOL)getRecommendedValue(mIt->first));
+            gSavedSettings.setBOOL(mIt->first, (bool)getRecommendedValue(mIt->first));
         }
         else if (ctrl->isType(TYPE_S32))
         {
@@ -654,6 +759,40 @@ void LLFeatureManager::applyBaseMasks()
     if (gGLManager.mIsIntel)
     {
         maskFeatures("Intel");
+
+        static constexpr F32 TARGET_GL_VERSION =
+#if LL_DARWIN
+            4.09f;
+#else
+            4.59f;
+#endif
+
+        // check against 3.33 to avoid applying this fallback twice
+        if (gGLManager.mGLVersion < TARGET_GL_VERSION && gGLManager.mGLVersion > 3.33f)
+        {
+            // if we don't have OpenGL 4.6 on intel, set it to OpenGL 3.3
+            // we also want to trigger the GL3 fallbacks on these chipsets
+            // this is expected to be mainly pre-Haswell Intel HD Graphics 4X00 and 5X00.
+            // A lot of these chips claim 4.3 or 4.4 support, but don't seem to work.
+            // https://code.blender.org/2019/04/supported-gpus-in-blender-2-80/
+            // https://docs.blender.org/manual/en/latest/troubleshooting/gpu/windows/intel.html#legacy-intel-hd-4000-5000
+            // https://www.intel.com/content/www/us/en/support/articles/000005524/graphics.html
+            // this will disable things like reflection probes, HDR, FXAA and SMAA
+            LL_INFOS("RenderInit") << "Applying Intel integrated pre-Haswell fallback.  Downgrading feature usage to OpenGL 3.3" << LL_ENDL;
+            gGLManager.mGLVersion = llmin(gGLManager.mGLVersion, 3.33f);
+            gGLManager.mGLVersionString += " 3.3 fallback";  // for ViewerStats reporting
+            // and select GLSL version for OpenGL 3.2
+            gGLManager.mGLSLVersionMajor = 3;
+            gGLManager.mGLSLVersionMinor = 20;
+        }
+    }
+    if (gGLManager.mIsApple)
+    {
+        maskFeatures("AppleGPU");
+    }
+    else
+    {
+        maskFeatures("NonAppleGPU");
     }
     if (gGLManager.mGLVersion < 3.f)
     {
@@ -675,13 +814,24 @@ void LLFeatureManager::applyBaseMasks()
     {
         maskFeatures("VRAMLT2GB");
     }
+    if (!gGLManager.mHasAnisotropic || 2.f > gGLManager.mMaxAnisotropy)
+    {
+        maskFeatures("AnisotropicMissing");
+    }
     if (gGLManager.mGLVersion < 3.99f)
     {
         maskFeatures("GL3");
+
+        // make sure to disable background context activity in GL3 mode
+        LLImageGLThread::sEnabledMedia = false;
+        LLImageGLThread::sEnabledTextures = false;
+
+        // Make extra sure that vintage mode also gets enabled.
+        gSavedSettings.setBOOL("RenderDisableVintageMode", false);
     }
-    if (2.f > gGLManager.mMaxAnisotropy)
+    if (gGLManager.mMaxVaryingVectors <= 16)
     {
-        maskFeatures("AnisotropicMissing");
+        maskFeatures("VaryingVectors16orLess");
     }
 
     // now mask by gpu string

@@ -75,7 +75,10 @@ enum EDragAndDropType
     DAD_PERSON          = 17,
     DAD_SETTINGS        = 18,
     DAD_MATERIAL        = 19,
-    DAD_COUNT           = 20,   // number of types in this enum
+    DAD_GLTF            = 20,
+    DAD_GLTF_BIN        = 21,
+
+    DAD_COUNT           = 22,   // number of types in this enum
 };
 
 // Reasons for drags to be denied.
@@ -107,20 +110,18 @@ class LLImageProviderInterface;
 
 typedef void (*LLUIAudioCallback)(const LLUUID& uuid);
 
-class LLUI final : public LLParamSingleton<LLUI>
+class LLUI : public LLSimpleton<LLUI>
 {
+    LOG_CLASS(LLUI);
 public:
-    typedef std::map<std::string, LLControlGroup*> settings_map_t;
+    typedef boost::unordered_map<std::string, LLControlGroup*, ll::string_hash, std::equal_to<>> settings_map_t;
 
-private:
-    LLSINGLETON(LLUI , const settings_map_t &settings,
+    LLUI(const settings_map_t &settings,
                            LLImageProviderInterface* image_provider,
                            LLUIAudioCallback audio_callback,
                            LLUIAudioCallback deferred_audio_callback);
     ~LLUI();
 
-    LOG_CLASS(LLUI);
-public:
     //
     // Classes
     //
@@ -153,7 +154,7 @@ public:
             sanitizeRange();
         }
 
-        S32 clamp(S32 input)
+        S32 clamp(S32 input) const
         {
             if (input < mMin) return mMin;
             if (input > mMax) return mMax;
@@ -167,8 +168,8 @@ public:
             sanitizeRange();
         }
 
-        S32 getMin() { return mMin; }
-        S32 getMax() { return mMax; }
+        S32 getMin() const { return mMin; }
+        S32 getMax() const { return mMax; }
 
         bool operator==(const RangeS32& other) const
         {
@@ -222,7 +223,7 @@ public:
             mValue = clamp(value);
         }
 
-        S32 get()
+        S32 get() const
         {
             return mValue;
         }
@@ -234,15 +235,15 @@ public:
 
 
     private:
-        S32 mValue;
+        S32 mValue{ 0 };
     };
 
     //
     // Methods
     //
-    typedef boost::function<void(LLView*)> add_popup_t;
-    typedef boost::function<void(LLView*)> remove_popup_t;
-    typedef boost::function<void(void)> clear_popups_t;
+    typedef std::function<void(LLView*)> add_popup_t;
+    typedef std::function<void(LLView*)> remove_popup_t;
+    typedef std::function<void(void)> clear_popups_t;
 
     void setPopupFuncs(const add_popup_t& add_popup, const remove_popup_t&, const clear_popups_t& );
 
@@ -252,8 +253,8 @@ public:
     static std::string getLanguage(); // static for lldateutil_test compatibility
 
     //helper functions (should probably move free standing rendering helper functions here)
-    static LLView* getRootView() { return sRootView; }
-    static void setRootView(LLView* view) { sRootView = view; }
+    LLView* getRootView() const { return mRootView; }
+    void setRootView(LLView* view) { mRootView = view; }
     /**
      * Walk the LLView tree to resolve a path
      * Paths can be discovered using Develop > XUI > Show XUI Paths
@@ -279,35 +280,35 @@ public:
      *      tree, the first "bar" anywhere under it, and "baz"
      *      as a direct child of that
      */
-    static const LLView* resolvePath(const LLView* context, const std::string& path);
-    static LLView* resolvePath(LLView* context, const std::string& path);
+    const LLView* resolvePath(const LLView* context, const std::string& path);
+    LLView* resolvePath(LLView* context, const std::string& path);
     static std::string locateSkin(const std::string& filename);
-    static void setMousePositionScreen(S32 x, S32 y);
-    static void getMousePositionScreen(S32 *x, S32 *y);
-    static void setMousePositionLocal(const LLView* viewp, S32 x, S32 y);
-    static void getMousePositionLocal(const LLView* viewp, S32 *x, S32 *y);
-    static LLVector2 getWindowSize();
-    static void screenPointToGL(S32 screen_x, S32 screen_y, S32 *gl_x, S32 *gl_y);
-    static void glPointToScreen(S32 gl_x, S32 gl_y, S32 *screen_x, S32 *screen_y);
-    static void screenRectToGL(const LLRect& screen, LLRect *gl);
-    static void glRectToScreen(const LLRect& gl, LLRect *screen);
+    void setMousePositionScreen(S32 x, S32 y);
+    void getMousePositionScreen(S32 *x, S32 *y);
+    void setMousePositionLocal(const LLView* viewp, S32 x, S32 y);
+    void getMousePositionLocal(const LLView* viewp, S32 *x, S32 *y);
+    LLVector2 getWindowSize();
+    void screenPointToGL(S32 screen_x, S32 screen_y, S32 *gl_x, S32 *gl_y);
+    void glPointToScreen(S32 gl_x, S32 gl_y, S32 *screen_x, S32 *screen_y);
+    void screenRectToGL(const LLRect& screen, LLRect *gl);
+    void glRectToScreen(const LLRect& gl, LLRect *screen);
     // Returns the control group containing the control name, or the default group
     LLControlGroup& getControlControlGroup (std::string_view controlname);
-    static F32 getMouseIdleTime() { return sMouseIdleTimer.getElapsedTimeF32(); }
-    static void resetMouseIdleTimer() { sMouseIdleTimer.reset(); }
-    static LLWindow* getWindow() { return sWindow; }
+    F32 getMouseIdleTime() { return mMouseIdleTimer.getElapsedTimeF32(); }
+    void resetMouseIdleTimer() { mMouseIdleTimer.reset(); }
+    LLWindow* getWindow() const { return mWindow; }
 
     void addPopup(LLView*);
     void removePopup(LLView*);
     void clearPopups();
 
-    static void reportBadKeystroke();
+    void reportBadKeystroke();
 
     // Ensures view does not overlap mouse cursor, but is inside
     // the view's parent rectangle.  Used for tooltips, inspectors.
     // Optionally override the view's default X/Y, which are relative to the
     // view's parent.
-    static void positionViewNearMouse(LLView* view, S32 spawn_x = S32_MAX, S32 spawn_y = S32_MAX);
+    void positionViewNearMouse(LLView* view,    S32 spawn_x = S32_MAX, S32 spawn_y = S32_MAX);
 
     // LLRender2D wrappers
     static void pushMatrix() { LLRender2D::pushMatrix(); }
@@ -320,7 +321,7 @@ public:
     static void setLineWidth(F32 width) { LLRender2D::setLineWidth(width); }
     static LLPointer<LLUIImage> getUIImageByID(const LLUUID& image_id, S32 priority = 0)
         { return LLRender2D::getInstance()->getUIImageByID(image_id, priority); }
-    static LLPointer<LLUIImage> getUIImage(const std::string& name, S32 priority = 0)
+    static LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority = 0)
         { return LLRender2D::getInstance()->getUIImage(name, priority); }
 
     //
@@ -329,12 +330,12 @@ public:
     settings_map_t mSettingGroups;
     LLUIAudioCallback mAudioCallback;
     LLUIAudioCallback mDeferredAudioCallback;
-    static LLWindow*        sWindow;
-    static LLView*          sRootView;
+    LLWindow*       mWindow;
+    LLView*         mRootView;
     LLHelp*         mHelpImpl;
 private:
     std::vector<std::string> mXUIPaths;
-    static LLFrameTimer     sMouseIdleTimer;
+    LLFrameTimer        mMouseIdleTimer;
     add_popup_t     mAddPopupFunc;
     remove_popup_t  mRemovePopupFunc;
     clear_popups_t  mClearPopupsFunc;

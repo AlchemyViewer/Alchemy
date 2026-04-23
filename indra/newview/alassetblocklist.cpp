@@ -1,10 +1,10 @@
 /**
- * @file alassetblocklist.h
+ * @file alassetblocklist.cpp
  * @brief
  *
  * $LicenseInfo:firstyear=2024&license=viewerlgpl$
  * Alchemy Viewer Source Code
- * Copyright (C) 2024, Rye Mutt <rye@alchemyviewer.org>
+ * Copyright (C) Rye Mutt <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -98,7 +98,7 @@ void ALAssetBlocklist::load()
         return;
     }
 
-    for (const auto& entry : inSD.asMap())
+    for (const auto& entry : llsd::inMap(inSD))
     {
         LLUUID shadow_id{ entry.first };
         LLXORCipher cipher(PERSIST_ID.mData, UUID_BYTES);
@@ -142,7 +142,7 @@ void ALAssetBlocklist::addEntry(const LLUUID& asset_id, const LLUUID& avatar_id,
     new_entry.mOwnerID = avatar_id;
     new_entry.mLocation = region;
     new_entry.mAssetType = type;
-    new_entry.mDate = LLDate(time_corrected());
+    new_entry.mDate = LLDate((F64)time_corrected());
     new_entry.mPersist = persist;
 
     mEntries.emplace(asset_id, new_entry);
@@ -184,7 +184,7 @@ void ALAssetBlocklist::removeEntries(const uuid_vec_t& asset_ids)
 
             mEntries.erase(it);
 
-            if (!changed) 
+            if (!changed)
             {
                 changed = true;
             }

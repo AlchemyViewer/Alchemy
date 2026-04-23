@@ -2,7 +2,7 @@
 <panel label="セカンドライフ" name="avatar_secondlife_tab">
 	<layout_stack>
 		<layout_panel name="avatar_info_top">
-			<profile_image label="" name="sl_profile_pic" tool_tip="Click to choose a picture">
+			<profile_image  name="sl_profile_pic" tool_tip="クリックして画像を選択してください。">
 				<!-- It would be cool if this worked someday!
 				<profile_image.commit_callback function="Profile.Profile.ModifyProfileImage" parameter="second_life"/>
 				-->
@@ -14,9 +14,6 @@
 			<text name="online">
 				オンライン
 			</text>
-			<icon name="account_type_internal"/>
-			<icon name="account_type_premium"/>
-			<icon name="account_type_plus"/>
 			<text name="rezday">
 				（不明）
 			</text>
@@ -29,9 +26,7 @@
 			</text>
 		</layout_panel>
 		<layout_panel name="avatar_desc">
-			<text_editor name="sl_about"/>
-			<text name="www"/>
-			<line_editor tool_tip="Website link" name="www_edit"/>
+			<line_editor tool_tip="Webサイトのリンク" name="www_edit"/>
 		</layout_panel>
 		<layout_panel name="avatar_perm">
 			<text name="permissions_label">

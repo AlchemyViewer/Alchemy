@@ -1,26 +1,37 @@
 # -*- cmake -*-
-include(Prebuilt)
-
-set(NDOF ON CACHE BOOL "Use NDOF space navigator joystick library.")
-
 include_guard()
-add_library( ll::ndof INTERFACE IMPORTED )
+add_library(ll::ndof INTERFACE IMPORTED)
 
-if (NDOF)
-  if (WINDOWS OR DARWIN)
-    use_prebuilt_binary(libndofdev)
-  elseif (LINUX)
-    use_prebuilt_binary(open-libndofdev)
-  endif (WINDOWS OR DARWIN)
+if (USE_NDOF)
+  target_compile_definitions(ll::ndof INTERFACE LIB_NDOF=1)
 
-  if (WINDOWS)
-      target_link_libraries( ll::ndof INTERFACE
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libndofdev.lib
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libndofdev.lib)
-  elseif (DARWIN OR LINUX)
-    target_link_libraries( ll::ndof INTERFACE ndofdev)
-  endif (WINDOWS)
-  target_compile_definitions( ll::ndof INTERFACE LIB_NDOF=1)
-endif (NDOF)
+  find_library(NDOF_LIBRARY_RELEASE
+    NAMES
+    libndofdev
+    ndofdev
+    PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib"
+    REQUIRED
+    NO_DEFAULT_PATH
+  )
+
+  target_link_libraries(ll::ndof INTERFACE optimized ${NDOF_LIBRARY_RELEASE})
+
+  find_library(NDOF_LIBRARY_DEBUG
+    NAMES
+    libndofdev
+    ndofdev
+    PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/debug/lib"
+    NO_DEFAULT_PATH
+  )
+
+  if (NOT NDOF_LIBRARY_DEBUG STREQUAL "NDOF_LIBRARY_DEBUG-NOTFOUND")
+    target_link_libraries(ll::ndof INTERFACE debug ${NDOF_LIBRARY_DEBUG})
+  endif()
+
+  if (LINUX)
+    include(SDL3)
+    target_link_libraries(ll::ndof INTERFACE ll::SDL3)
+  endif()
+endif (USE_NDOF)
 
 

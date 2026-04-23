@@ -34,6 +34,7 @@
 #include "llerror.h"
 #include "llxuiparser.h"
 
+
 //
 // LLCommandId class
 //
@@ -89,6 +90,11 @@ LLCommand::LLCommand(const LLCommand::Params& p)
 //
 // LLCommandManager class
 //
+
+LLCommandManager::LLCommandManager()
+{
+}
+
 LLCommandManager::~LLCommandManager()
 {
     for (CommandVector::iterator cmdIt = mCommands.begin(); cmdIt != mCommands.end(); ++cmdIt)
@@ -101,7 +107,7 @@ LLCommandManager::~LLCommandManager()
 
 U32 LLCommandManager::commandCount() const
 {
-    return mCommands.size();
+    return static_cast<U32>(mCommands.size());
 }
 
 LLCommand * LLCommandManager::getCommand(U32 commandIndex)
@@ -164,12 +170,14 @@ bool LLCommandManager::load()
 
     if (!parser.readXUI(commands_file, commandsParams))
     {
+        LLError::LLUserWarningMsg::showMissingFiles();
         LL_ERRS() << "Unable to load xml file: " << commands_file << LL_ENDL;
         return false;
     }
 
     if (!commandsParams.validateBlock())
     {
+        LLError::LLUserWarningMsg::showMissingFiles();
         LL_ERRS() << "Invalid commands file: " << commands_file << LL_ENDL;
         return false;
     }

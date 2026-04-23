@@ -28,9 +28,6 @@
 #define LL_LLLOGININSTANCE_H
 
 #include "lleventdispatcher.h"
-#include "lleventapi.h"
-#include <boost/function.hpp>
-#include <memory>                   // std::shared_ptr
 #include "llsecapi.h"
 class LLLogin;
 class LLEventStream;
@@ -38,7 +35,7 @@ class LLNotificationsInterface;
 
 // This class hosts the login module and is used to
 // negotiate user authentication attempts.
-class LLLoginInstance final : public LLSingleton<LLLoginInstance>
+class LLLoginInstance : public LLSingleton<LLLoginInstance>
 {
     LLSINGLETON(LLLoginInstance);
     ~LLLoginInstance();
@@ -56,7 +53,6 @@ public:
 
     const std::string& getLoginState() { return mLoginState; }
     bool saveMFA() const { return mSaveMFA; }
-    bool hasResponse(const std::string& key) { return getResponse().has(key); }
     LLSD getResponse(const std::string& key) { return getResponse()[key]; }
     LLSD getResponse();
 
@@ -65,16 +61,16 @@ public:
     void setSerialNumber(const std::string& sn) { mSerialNumber = sn; }
     void setLastExecEvent(int lee) { mLastExecEvent = lee; }
     void setLastExecDuration(S32 duration) { mLastExecDuration = duration; }
+    void setLastAgentSessionId(const LLUUID& id) { mLastAgentSessionId = id; }
     void setPlatformInfo(const std::string platform, const std::string platform_version, const std::string platform_name);
 
     void setNotificationsInterface(LLNotificationsInterface* ni) { mNotifications = ni; }
     LLNotificationsInterface& getNotificationsInterface() const { return *mNotifications; }
 
+    void saveMFAHash(LLSD const& response);
+
 private:
-    typedef std::shared_ptr<LLEventAPI::Response> ResponsePtr;
     void constructAuthParams(LLPointer<LLCredential> user_credentials);
-    void updateApp(bool mandatory, const std::string& message);
-    bool updateDialogCallback(const LLSD& notification, const LLSD& response);
 
     bool handleLoginEvent(const LLSD& event);
     void handleLoginFailure(const LLSD& event);
@@ -82,13 +78,12 @@ private:
     void handleDisconnect(const LLSD& event);
     void handleIndeterminate(const LLSD& event);
     void handleLoginDisallowed(const LLSD& notification, const LLSD& response);
-    void syncWithUpdater(ResponsePtr resp, const LLSD& notification, const LLSD& response);
 
     bool handleTOSResponse(bool v, const std::string& key);
     void showMFAChallange(const std::string& message);
     bool handleMFAChallenge(LLSD const & notif, LLSD const & response);
 
-    void attemptComplete();
+    void attemptComplete() { mAttemptComplete = true; } // In the future an event?
 
     std::unique_ptr<LLLogin> mLoginModule;
     LLNotificationsInterface* mNotifications;
@@ -102,6 +97,7 @@ private:
     std::string mSerialNumber;
     int mLastExecEvent;
     S32 mLastExecDuration;
+    LLUUID mLastAgentSessionId;
     std::string mPlatform;
     std::string mPlatformVersion;
     std::string mPlatformVersionName;

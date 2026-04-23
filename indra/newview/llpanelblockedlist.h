@@ -43,9 +43,9 @@ public:
     LLPanelBlockedList();
     ~LLPanelBlockedList(){};
 
-    virtual BOOL postBuild();
-    virtual void draw();
-    virtual void onOpen(const LLSD& key);
+    bool postBuild() override;
+    void draw() override;
+    void onOpen(const LLSD& key) override;
 
     void selectBlocked(const LLUUID& id);
 
@@ -75,7 +75,7 @@ private:
 
     // List commnads
     void onCustomAction(const LLSD& userdata);
-    BOOL isActionChecked(const LLSD& userdata);
+    bool isActionChecked(const LLSD& userdata);
 
     void callbackBlockPicked(const uuid_vec_t& ids, const std::vector<LLAvatarName> names);
     static void callbackBlockByName(const std::string& text);
@@ -93,15 +93,15 @@ private:
 // LLFloaterGetBlockedObjectName()
 //-----------------------------------------------------------------------------
 // Class for handling mute object by name floater.
-class LLFloaterGetBlockedObjectName final : public LLFloater
+class LLFloaterGetBlockedObjectName : public LLFloater
 {
     friend class LLFloaterReg;
 public:
-    typedef boost::function<void (const std::string&)> get_object_name_callback_t;
+    typedef std::function<void(const std::string&)> get_object_name_callback_t;
 
-    virtual BOOL postBuild();
+    bool postBuild() override;
 
-    virtual BOOL handleKeyHere(KEY key, MASK mask);
+    bool handleKeyHere(KEY key, MASK mask) override;
 
     static LLFloaterGetBlockedObjectName* show(get_object_name_callback_t callback);
 

@@ -1,7 +1,7 @@
 name: Bug report
 description: Viewer bug report
-title: "[Bug]: "
 labels: [bug, triage]
+type: 'Bug'
 body:
 - type: markdown
   attributes:
@@ -12,8 +12,8 @@ body:
 - type: textarea
   attributes:
     label: Environment
-    description: About Alchemy Text
-    placeholder: ex. Alchemy Test 7.1.3.240191747 (64bit) ...
+    description: "Please copy the info from the viewer's 'About Alchemy' window and paste it here:"
+    placeholder: 'ex. Alchemy Test 7.1.3.240191747 (64bit) ...'
   validations:
     required: true
 

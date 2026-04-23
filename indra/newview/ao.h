@@ -51,15 +51,15 @@ class FloaterAO
         ~FloaterAO();
 
     public:
-        /*virtual*/ BOOL postBuild();
-        virtual void onOpen(const LLSD& key);
-        virtual void onClose(bool app_quitting);
+        bool postBuild() override;
+        void onOpen(const LLSD& key) override;
+        void onClose(bool app_quitting) override;
         void updateList();
         void updateSetParameters();
         void updateAnimationList();
 
-        BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop, EDragAndDropType cargo_type, void* cargo_data,
-                                  EAcceptance* accept, std::string& tooltip_msg);
+        bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data,
+                                  EAcceptance* accept, std::string& tooltip_msg) override;
 
     protected:
         LLScrollListItem* addAnimation(const std::string& name);
@@ -97,13 +97,13 @@ class FloaterAO
         void updateSmart();
         void updateCycleParameters();
 
-        void enableSetControls(BOOL enable);
-        void enableStateControls(BOOL enable);
+        void enableSetControls(bool enable);
+        void enableStateControls(bool enable);
 
         bool newSetCallback(const LLSD& notification, const LLSD& response);
         bool removeSetCallback(const LLSD& notification, const LLSD& response);
 
-        virtual BOOL tick();
+        bool tick() override;
 
         std::vector<AOSet*> mSetList;
         AOSet* mSelectedSet;

@@ -30,7 +30,6 @@
 
 #include "llquaternion.h"
 
-//#include "vmath.h"
 #include "v3math.h"
 #include "v3dmath.h"
 #include "v4math.h"
@@ -58,10 +57,10 @@ LLQuaternion::LLQuaternion(const LLMatrix3 &mat)
 
 LLQuaternion::LLQuaternion(F32 angle, const LLVector4 &vec)
 {
-    F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
+    F32 mag = vec.length();
     if (mag > FP_MAG_THRESHOLD)
     {
-        angle *= 0.5f;
+        angle *= 0.5;
         F32 c = cosf(angle);
         F32 s = sinf(angle) / mag;
         mQ[VX] = vec.mV[VX] * s;
@@ -77,10 +76,10 @@ LLQuaternion::LLQuaternion(F32 angle, const LLVector4 &vec)
 
 LLQuaternion::LLQuaternion(F32 angle, const LLVector3 &vec)
 {
-    F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
+    F32 mag = vec.length();
     if (mag > FP_MAG_THRESHOLD)
     {
-        angle *= 0.5f;
+        angle *= 0.5;
         F32 c = cosf(angle);
         F32 s = sinf(angle) / mag;
         mQ[VX] = vec.mV[VX] * s;
@@ -150,7 +149,7 @@ const LLQuaternion& LLQuaternion::setAngleAxis(F32 angle, F32 x, F32 y, F32 z)
     F32 mag = sqrtf(x * x + y * y + z * z);
     if (mag > FP_MAG_THRESHOLD)
     {
-        angle *= 0.5f;
+        angle *= 0.5;
         F32 c = cosf(angle);
         F32 s = sinf(angle) / mag;
         mQ[VX] = x * s;
@@ -170,7 +169,7 @@ const LLQuaternion& LLQuaternion::setAngleAxis(F32 angle, const LLVector3 &vec)
     F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
     if (mag > FP_MAG_THRESHOLD)
     {
-        angle *= 0.5f;
+        angle *= 0.5;
         F32 c = cosf(angle);
         F32 s = sinf(angle) / mag;
         mQ[VX] = vec.mV[VX] * s;
@@ -190,7 +189,7 @@ const LLQuaternion& LLQuaternion::setAngleAxis(F32 angle, const LLVector4 &vec)
     F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
     if (mag > FP_MAG_THRESHOLD)
     {
-        angle *= 0.5f;
+        angle *= 0.5;
         F32 c = cosf(angle);
         F32 s = sinf(angle) / mag;
         mQ[VX] = vec.mV[VX] * s;
@@ -237,7 +236,7 @@ const LLQuaternion& LLQuaternion::setQuat(F32 angle, F32 x, F32 y, F32 z)
     F32 mag = sqrtf(x * x + y * y + z * z);
     if (mag > FP_MAG_THRESHOLD)
     {
-        angle *= 0.5f;
+        angle *= 0.5;
         F32 c = cosf(angle);
         F32 s = sinf(angle) / mag;
         mQ[VX] = x * s;
@@ -258,7 +257,7 @@ const LLQuaternion& LLQuaternion::setQuat(F32 angle, const LLVector3 &vec)
     F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
     if (mag > FP_MAG_THRESHOLD)
     {
-        angle *= 0.5f;
+        angle *= 0.5;
         F32 c = cosf(angle);
         F32 s = sinf(angle) / mag;
         mQ[VX] = vec.mV[VX] * s;
@@ -278,7 +277,7 @@ const LLQuaternion& LLQuaternion::setQuat(F32 angle, const LLVector4 &vec)
     F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
     if (mag > FP_MAG_THRESHOLD)
     {
-        angle *= 0.5f;
+        angle *= 0.5;
         F32 c = cosf(angle);
         F32 s = sinf(angle) / mag;
         mQ[VX] = vec.mV[VX] * s;
@@ -653,14 +652,14 @@ LLQuaternion slerp( F32 u, const LLQuaternion &a, const LLQuaternion &b )
     F32 cos_t = a.mQ[0]*b.mQ[0] + a.mQ[1]*b.mQ[1] + a.mQ[2]*b.mQ[2] + a.mQ[3]*b.mQ[3];
 
     // if b is on opposite hemisphere from a, use -a instead
-    int bflip;
+    bool bflip;
     if (cos_t < 0.0f)
     {
         cos_t = -cos_t;
-        bflip = TRUE;
+        bflip = true;
     }
     else
-        bflip = FALSE;
+        bflip = false;
 
     // if B is (within precision limits) the same as A,
     // just linear interpolate between A and B.
@@ -888,8 +887,8 @@ void LLQuaternion::getAzimuthAndAltitude(F32 &azimuthRadians, F32 &altitudeRadia
 // quaternion does not need to be normalized
 void LLQuaternion::getEulerAngles(F32 *roll, F32 *pitch, F32 *yaw) const
 {
-    F32 sx = 2.f * (mQ[VX] * mQ[VW] - mQ[VY] * mQ[VZ]); // sine of the roll
-    F32 sy = 2.f * (mQ[VY] * mQ[VW] + mQ[VX] * mQ[VZ]); // sine of the pitch
+    F32 sx = 2 * (mQ[VX] * mQ[VW] - mQ[VY] * mQ[VZ]); // sine of the roll
+    F32 sy = 2 * (mQ[VY] * mQ[VW] + mQ[VX] * mQ[VZ]); // sine of the pitch
     F32 ys = mQ[VW] * mQ[VW] - mQ[VY] * mQ[VY]; // intermediate cosine 1
     F32 xz = mQ[VX] * mQ[VX] - mQ[VZ] * mQ[VZ]; // intermediate cosine 2
     F32 cx = ys - xz; // cosine of the roll
@@ -902,17 +901,17 @@ void LLQuaternion::getEulerAngles(F32 *roll, F32 *pitch, F32 *yaw) const
     }
     else // gimbal lock
     {
-        if (sy > 0.0f)
+        if (sy > 0)
         {
             *pitch = F_PI_BY_TWO;
-            *yaw = 2.f * atan2f(mQ[VZ] + mQ[VX], mQ[VW] + mQ[VY]);
+            *yaw = 2 * atan2f(mQ[VZ] + mQ[VX], mQ[VW] + mQ[VY]);
         }
         else
         {
             *pitch = -F_PI_BY_TWO;
-            *yaw = 2.f * atan2f(mQ[VZ] - mQ[VX], mQ[VW] - mQ[VY]);
+            *yaw = 2 * atan2f(mQ[VZ] - mQ[VX], mQ[VW] - mQ[VY]);
         }
-        *roll = 0.0f;
+        *roll = 0;
     }
 }
 
@@ -930,7 +929,7 @@ LLVector3 LLQuaternion::packToVector3() const
         y /= mag;
         z /= mag; // no need to normalize w, it's not used
     }
-    if( mQ[VW] >= 0.0f)
+    if( mQ[VW] >= 0 )
     {
         return LLVector3( x, y , z );
     }
@@ -946,8 +945,8 @@ void LLQuaternion::unpackFromVector3( const LLVector3& vec )
     mQ[VX] = vec.mV[VX];
     mQ[VY] = vec.mV[VY];
     mQ[VZ] = vec.mV[VZ];
-    F32 t = 1.0f - vec.magVecSquared();
-    if( t > 0.0f)
+    F32 t = 1.f - vec.magVecSquared();
+    if( t > 0 )
     {
         mQ[VW] = sqrt( t );
     }
@@ -955,15 +954,15 @@ void LLQuaternion::unpackFromVector3( const LLVector3& vec )
     {
         // Need this to avoid trying to find the square root of a negative number due
         // to floating point error.
-        mQ[VW] = 0.0f;
+        mQ[VW] = 0;
     }
 }
 
-BOOL LLQuaternion::parseQuat(const std::string& buf, LLQuaternion* value)
+bool LLQuaternion::parseQuat(const std::string& buf, LLQuaternion* value)
 {
     if( buf.empty() || value == NULL)
     {
-        return FALSE;
+        return false;
     }
 
     LLQuaternion quat;
@@ -971,10 +970,10 @@ BOOL LLQuaternion::parseQuat(const std::string& buf, LLQuaternion* value)
     if( 4 == count )
     {
         value->set( quat );
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 

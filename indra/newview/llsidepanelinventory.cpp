@@ -98,7 +98,7 @@ public:
             switch (added_category_type)
             {
                 case LLFolderType::FT_INBOX:
-                    mSidepanelInventory->enableInbox(gSavedSettings.getBOOL("InventoryDisplayInbox"));
+                    mSidepanelInventory->enableInbox(true);
                     mSidepanelInventory->observeInboxModifications(added_category->getUUID());
                     break;
                 default:
@@ -153,7 +153,7 @@ void handleInventoryDisplayInboxChanged()
     }
 }
 
-BOOL LLSidepanelInventory::postBuild()
+bool LLSidepanelInventory::postBuild()
 {
     // UI elements from inventory panel
     {
@@ -161,6 +161,8 @@ BOOL LLSidepanelInventory::postBuild()
 
         mPanelMainInventory = mInventoryPanel->getChild<LLPanelMainInventory>("panel_main_inventory");
         mPanelMainInventory->setSelectCallback(boost::bind(&LLSidepanelInventory::onSelectionChange, this, _1, _2));
+        mPanelMainInventory->setParentSidepanel(this);
+        mPanelMainInventory->setInboxPanel(getChild<LLPanelMarketplaceInbox>("marketplace_inbox"));
         //LLTabContainer* tabs = mPanelMainInventory->getChild<LLTabContainer>("inventory filter tabs");
         //tabs->setCommitCallback(boost::bind(&LLSidepanelInventory::updateVerbs, this));
 
@@ -180,13 +182,13 @@ BOOL LLSidepanelInventory::postBuild()
         LLLayoutStack* inv_stack = getChild<LLLayoutStack>(INVENTORY_LAYOUT_STACK_NAME);
 
         // Set up button states and callbacks
-        mInboxBtn = getChild<LLButton>(INBOX_BUTTON_NAME);
+        LLButton * inbox_button = getChild<LLButton>(INBOX_BUTTON_NAME);
 
-        mInboxBtn->setCommitCallback(boost::bind(&LLSidepanelInventory::onToggleInboxBtn, this));
+        inbox_button->setCommitCallback(boost::bind(&LLSidepanelInventory::onToggleInboxBtn, this));
 
         // For main Inventory floater: Get the previous inbox state from "InventoryInboxToggleState" setting.
         // For additional Inventory floaters: Collapsed state is default.
-        bool is_inbox_collapsed = !mInboxBtn->getToggleState() || sLoginCompleted;
+        bool is_inbox_collapsed = !inbox_button->getToggleState() || sLoginCompleted;
 
         // Restore the collapsed inbox panel state
         mInboxLayoutPanel = getChild<LLLayoutPanel>(INBOX_LAYOUT_PANEL_NAME);
@@ -199,8 +201,8 @@ BOOL LLSidepanelInventory::postBuild()
         if (sLoginCompleted)
         {
             //save the state of Inbox panel only for main Inventory floater
-            mInboxBtn->removeControlVariable();
-            mInboxBtn->setToggleState(false);
+            inbox_button->removeControlVariable();
+            inbox_button->setToggleState(false);
             updateInbox();
         }
         else
@@ -223,7 +225,7 @@ BOOL LLSidepanelInventory::postBuild()
         initInventoryViews();
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLSidepanelInventory::updateInbox()
@@ -248,7 +250,7 @@ void LLSidepanelInventory::updateInbox()
         gInventory.consolidateForType(inbox_id, LLFolderType::FT_INBOX);
 
         // Enable the display of the inbox if it exists
-        enableInbox(gSavedSettings.getBOOL("InventoryDisplayInbox"));
+        enableInbox(true);
 
         observeInboxModifications(inbox_id);
     }
@@ -337,7 +339,7 @@ void LLSidepanelInventory::openInbox()
 {
     if (mInboxEnabled)
     {
-        mInboxBtn->setToggleState(true);
+        getChild<LLButton>(INBOX_BUTTON_NAME)->setToggleState(true);
         onToggleInboxBtn();
     }
 }
@@ -351,7 +353,7 @@ void LLSidepanelInventory::onInboxChanged(const LLUUID& inbox_id)
     // Expand the inbox since we have fresh items
     if (mInboxEnabled)
     {
-        mInboxBtn->setToggleState(true);
+        getChild<LLButton>(INBOX_BUTTON_NAME)->setToggleState(true);
         onToggleInboxBtn();
     }
 #endif
@@ -372,7 +374,7 @@ void LLSidepanelInventory::onToggleInboxBtn()
         mInboxLayoutPanel->setTargetDim(gSavedPerAccountSettings.getS32("InventoryInboxHeight"));
         if (mInboxLayoutPanel->isInVisibleChain())
     {
-        gSavedPerAccountSettings.setU32("LastInventoryInboxActivity", time_corrected());
+        gSavedPerAccountSettings.setU32("LastInventoryInboxActivity", (U32)time_corrected());
     }
 }
     else
@@ -385,23 +387,21 @@ void LLSidepanelInventory::onToggleInboxBtn()
 void LLSidepanelInventory::onOpen(const LLSD& key)
 {
     LLFirstUse::newInventory(false);
-    mPanelMainInventory->setFocusFilterEditor();
+    mPanelMainInventory->setFocusOnFilterEditor();
 #if AUTO_EXPAND_INBOX
     // Expand the inbox if we have fresh items
     LLPanelMarketplaceInbox * inbox = findChild<LLPanelMarketplaceInbox>(MARKETPLACE_INBOX_PANEL);
     if (inbox && (inbox->getFreshItemCount() > 0))
     {
-        mInboxBtn->setToggleState(true);
+        getChild<LLButton>(INBOX_BUTTON_NAME)->setToggleState(true);
         onToggleInboxBtn();
     }
 #else
-    if (mInboxEnabled && mInboxBtn->getToggleState())
+    if (mInboxEnabled && getChild<LLButton>(INBOX_BUTTON_NAME)->getToggleState())
     {
-        gSavedPerAccountSettings.setU32("LastInventoryInboxActivity", time_corrected());
+        gSavedPerAccountSettings.setU32("LastInventoryInboxActivity", (U32)time_corrected());
     }
 #endif
-
-    gAgent.showLatestFeatureNotification("inventory");
 }
 
 void LLSidepanelInventory::performActionOnSelection(const std::string &action)
@@ -428,14 +428,14 @@ void LLSidepanelInventory::onBackButtonClicked()
     showInventoryPanel();
 }
 
-void LLSidepanelInventory::onSelectionChange(const std::deque<LLFolderViewItem*> &items, BOOL user_action)
+void LLSidepanelInventory::onSelectionChange(const std::deque<LLFolderViewItem*> &items, bool user_action)
 {
 
 }
 
 void LLSidepanelInventory::showInventoryPanel()
 {
-    mInventoryPanel->setVisible(TRUE);
+    mInventoryPanel->setVisible(true);
 }
 
 void LLSidepanelInventory::initInventoryViews()
@@ -505,7 +505,7 @@ LLInventoryItem *LLSidepanelInventory::getSelectedItem()
 
 U32 LLSidepanelInventory::getSelectedCount()
 {
-    int count = 0;
+    size_t count = 0;
 
     std::set<LLFolderViewItem*> selection_list = mPanelMainInventory->getActivePanel()->getRootFolder()->getSelectionList();
     count += selection_list.size();
@@ -517,7 +517,7 @@ U32 LLSidepanelInventory::getSelectedCount()
         count += selection_list.size();
     }
 
-    return count;
+    return static_cast<U32>(count);
 }
 
 LLInventoryPanel *LLSidepanelInventory::getActivePanel()
@@ -546,7 +546,7 @@ void LLSidepanelInventory::selectAllItemsPanel()
 
 }
 
-BOOL LLSidepanelInventory::isMainInventoryPanelActive() const
+bool LLSidepanelInventory::isMainInventoryPanelActive() const
 {
     return mInventoryPanel->getVisible();
 }

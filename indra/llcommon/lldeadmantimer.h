@@ -99,11 +99,10 @@ public:
     ///                 during updates.  If false, cpu usage data isn't
     ///                 collected and will be zero if queried.
     LLDeadmanTimer(F64 horizon, bool inc_cpu);
-
     ~LLDeadmanTimer() = default;
 
-    LLDeadmanTimer(const LLDeadmanTimer &) = delete;                // Not defined
-    void operator=(const LLDeadmanTimer &) = delete;                // Not defined
+    LLDeadmanTimer(const LLDeadmanTimer &) = delete;
+    LLDeadmanTimer& operator=(const LLDeadmanTimer&) = delete;
 
 public:
     /// Get the current time.  Zero-basis for this time

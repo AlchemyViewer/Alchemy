@@ -32,12 +32,12 @@
 #include "lleventcoro.h"
 #include "llcoros.h"
 
-class LLFloaterPerms final : public LLFloater
+class LLFloaterPerms : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
-    /*virtual*/ BOOL postBuild();
+    bool postBuild() override;
 
     // Convenience methods to get current permission preference bitfields from saved settings:
     static U32 getEveryonePerms(std::string prefix=""); // prefix + "EveryoneCopy"
@@ -50,12 +50,12 @@ private:
 
 };
 
-class LLFloaterPermsDefault final : public LLFloater
+class LLFloaterPermsDefault : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
-    /*virtual*/ BOOL postBuild();
+    bool postBuild() override;
     void ok();
     void cancel();
     void onClickOK();
@@ -81,7 +81,7 @@ enum Categories
 
 private:
     LLFloaterPermsDefault(const LLSD& seed);
-    void refresh();
+    void refresh() override;
 
     static const std::string sCategoryNames[CAT_LAST];
     static void updateCapCoro(std::string url);

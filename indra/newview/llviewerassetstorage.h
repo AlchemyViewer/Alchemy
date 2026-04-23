@@ -30,9 +30,11 @@
 #include "llassetstorage.h"
 #include "llcorehttputil.h"
 
+class LLFileSystem;
+
 class LLViewerAssetRequest;
 
-class LLViewerAssetStorage final : public LLAssetStorage
+class LLViewerAssetStorage : public LLAssetStorage
 {
 public:
     LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *xfer, const LLHost &upstream_host);
@@ -49,7 +51,7 @@ public:
         bool temp_file = false,
         bool is_priority = false,
         bool store_local = false,
-        bool user_waiting=FALSE,
+        bool user_waiting=false,
         F64Seconds timeout=LL_ASSET_STORAGE_TIMEOUT) override;
 
     void storeAssetData(
@@ -60,7 +62,7 @@ public:
         void* user_data,
         bool temp_file = false,
         bool is_priority = false,
-        bool user_waiting=FALSE,
+        bool user_waiting=false,
         F64Seconds timeout=LL_ASSET_STORAGE_TIMEOUT) override;
 
 protected:
@@ -68,20 +70,19 @@ protected:
                            LLAssetType::EType type,
                            LLGetAssetCallback callback,
                            void *user_data,
-                           BOOL duplicate,
-                           BOOL is_priority) override;
+                           bool duplicate,
+                           bool is_priority) override;
 
     void queueRequestHttp(const LLUUID& uuid,
                           LLAssetType::EType type,
                           LLGetAssetCallback callback,
                           void *user_data,
-                          BOOL duplicate,
-                          BOOL is_priority);
+                          bool duplicate,
+                          bool is_priority);
 
     void capsRecvForRegion(const LLUUID& region_id, std::string pumpname);
 
-    void assetRequestCoro(LLViewerAssetRequest *req,
-                          const LLUUID uuid,
+    void assetRequestCoro(const LLUUID uuid,
                           LLAssetType::EType atype,
                           LLGetAssetCallback callback,
                           void *user_data);

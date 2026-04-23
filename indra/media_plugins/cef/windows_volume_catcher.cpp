@@ -30,7 +30,7 @@
 #include "llsingleton.h"
 #include <windows.h>
 #include <mmeapi.h>
-class VolumeCatcherImpl final : public LLSingleton<VolumeCatcherImpl>
+class VolumeCatcherImpl : public LLSingleton<VolumeCatcherImpl>
 {
     LLSINGLETON(VolumeCatcherImpl);
     // This is a singleton class -- both callers and the component implementation should use getInstance() to find the instance.
@@ -44,7 +44,6 @@ public:
 private:
     F32     mVolume;
     F32     mPan;
-    bool mSystemIsVistaOrHigher;
 };
 
 VolumeCatcherImpl::VolumeCatcherImpl()

@@ -1,6 +1,24 @@
 /**
- * @file qtoolalign.h
+ * @file altoolalign.h
  * @brief A tool to align objects
+ *
+ * $LicenseInfo:firstyear=2002&license=viewerlgpl$
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * $/LicenseInfo$
  */
 
 #ifndef AL_ALTOOLALIGN_H
@@ -15,18 +33,18 @@ class LLPickInfo;
 class LLToolSelectRect;
 
 class ALToolAlign final
-:   public LLTool, public LLSingleton<ALToolAlign>
+:   public LLTool, public LLSimpleton<ALToolAlign>
 {
-    LLSINGLETON(ALToolAlign);
+public:
+    ALToolAlign();
     ~ALToolAlign() = default;
 
-public:
     void    handleSelect() override;
     void    handleDeselect() override;
-    BOOL    handleMouseDown(S32 x, S32 y, MASK mask) override;
-    BOOL    handleHover(S32 x, S32 y, MASK mask) override;
+    bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool    handleHover(S32 x, S32 y, MASK mask) override;
     void    render() override;
-    BOOL    canAffectSelection();
+    bool    canAffectSelection();
 
     static void pickCallback(const LLPickInfo& pick_info);
 
@@ -34,7 +52,7 @@ private:
     void            align();
     void            computeManipulatorSize();
     void            renderManipulators();
-    BOOL            findSelectedManipulator(S32 x, S32 y);
+    bool            findSelectedManipulator(S32 x, S32 y);
 
     LLBBox          mBBox;
     F32             mManipulatorSize;

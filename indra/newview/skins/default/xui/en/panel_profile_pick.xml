@@ -101,7 +101,7 @@
        max_length="1023"
        v_pad="3"
        word_wrap="true"
-	   show_emoji_helper="true"
+       show_emoji_helper="true"
       />
       <text
        name="location_label"
@@ -190,6 +190,26 @@
           <button
            name="teleport_btn"
            label="Teleport"
+           left="0"
+           top="0"
+           height="23"
+           width="100"
+           follows="left|top"
+           layout="topleft"
+          />
+        </layout_panel>
+
+        <layout_panel
+         follows="all"
+         layout="bottomleft"
+         left_pad="2"
+         name="set_to_curr_location_btn_lp"
+         auto_resize="false"
+         width="100">
+          <button
+           name="set_to_curr_location_btn"
+           label="Set Location"
+           tool_tip="Set to Current Location"
            left="0"
            top="0"
            height="23"

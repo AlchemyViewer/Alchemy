@@ -180,7 +180,7 @@ LLAtmospherics::LLAtmospherics()
     mWorldScale(1.f)
 {
     /// WL PARAMS
-    mInitialized = FALSE;
+    mInitialized = false;
     mAmbientScale = gSavedSettings.getF32("SkyAmbientScale");
     mNightColorShift = gSavedSettings.getColor3("SkyNightColorShift");
     mFogColor.mV[VRED] = mFogColor.mV[VGREEN] = mFogColor.mV[VBLUE] = 0.5f;
@@ -421,8 +421,7 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
     // Sky colors, just slightly above the horizon in the direction of the sun, perpendicular to the sun, and at a 45 degree angle to the sun.
     AtmosphericsVars vars;
 
-    LLEnvironment& env = LLEnvironment::instance();
-    const LLSettingsSky::ptr_t& psky = env.getCurrentSky();
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
     // NOTE: This is very similar to LLVOSky::cacheEnvironment()
     // Differences:
@@ -436,16 +435,16 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
     vars.density_multiplier = psky->getDensityMultiplier();
     vars.distance_multiplier = psky->getDistanceMultiplier();
     vars.max_y = psky->getMaxY();
-    vars.sun_norm = env.getSunDirectionCFR();
+    vars.sun_norm = LLEnvironment::instance().getSunDirectionCFR();
     vars.sunlight = psky->getSunlightColor();
     vars.ambient = psky->getAmbientColor();
     vars.glow = psky->getGlow();
     vars.cloud_shadow = psky->getCloudShadow();
     vars.dome_radius = psky->getDomeRadius();
     vars.dome_offset = psky->getDomeOffset();
-    vars.total_density = psky->getTotalDensityFast(vars.blue_density, vars.haze_density);
-    vars.light_atten = psky->getLightAttenuationFast(vars.density_multiplier, vars.blue_density, vars.haze_density, vars.max_y);
-    vars.light_transmittance = psky->getLightTransmittanceFast(vars.total_density, vars.density_multiplier, vars.max_y);
+    vars.light_atten = psky->getLightAttenuation(vars.max_y);
+    vars.light_transmittance = psky->getLightTransmittance(vars.max_y);
+    vars.total_density = psky->getTotalDensity();
     vars.gamma = psky->getGamma();
 
     res_color[0] = calcSkyColorInDir(psky, vars, tosun);
@@ -481,7 +480,7 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
     }
     else
     {
-        const LLSettingsWater::ptr_t& pwater = env.getCurrentWater();
+        LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
         F32 depth = water_height - camera_height;
         LLColor4 water_fog_color(pwater->getWaterFogColor());
 
@@ -506,7 +505,7 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 }
 
 // Functions used a lot.
-F32 color_norm_pow(LLColor3& col, F32 e, BOOL postmultiply)
+F32 color_norm_pow(LLColor3& col, F32 e, bool postmultiply)
 {
     F32 mv = color_max(col);
     if (0 == mv)

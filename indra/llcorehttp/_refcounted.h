@@ -30,11 +30,8 @@
 
 #include "linden_common.h"
 
-#include "fix_macros.h"
 #include <boost/intrusive_ptr.hpp>
-
 #include "llatomic.h"
-
 
 namespace LLCoreInt
 {
@@ -42,12 +39,11 @@ namespace LLCoreInt
 
 class RefCounted
 {
-private:
+public:
     RefCounted() = delete;                              // Not defined - may not be default constructed
-    RefCounted(const RefCounted&) = delete;             // Not defined - may not be default constructed
+    RefCounted(const RefCounted&) = delete;             // Not defined - may not be copy constructed
     void operator=(const RefCounted&) = delete;         // Not defined
 
-public:
     explicit RefCounted(bool const implicit)
         : mRefCount(implicit)
         {}
@@ -62,7 +58,7 @@ public:
     static const S32            NOT_REF_COUNTED = -1;
 
 protected:
-    virtual ~RefCounted() = default;
+    virtual ~RefCounted();
     virtual void destroySelf();
 
 private:

@@ -40,9 +40,9 @@ void LLDockableFloater::init(LLDockableFloater* thiz)
     thiz->resetInstance();
 
     // all dockable floaters should have close, dock and minimize buttons
-    thiz->setCanClose(TRUE);
+    thiz->setCanClose(true);
     thiz->setCanDock(true);
-    thiz->setCanMinimize(TRUE);
+    thiz->setCanMinimize(true);
 // [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
     thiz->setCanCollapse(true);
 // [/SL:KB]
@@ -73,10 +73,14 @@ LLDockableFloater::LLDockableFloater(LLDockControl* dockControl, bool uniqueDock
     init(this);
 }
 
-BOOL LLDockableFloater::postBuild()
+LLDockableFloater::~LLDockableFloater()
+{
+}
+
+bool LLDockableFloater::postBuild()
 {
     // Remember we should force docking when the floater is opened for the first time
-    if (mIsDockedStateForcedCallback != NULL && mIsDockedStateForcedCallback())
+    if (mIsDockedStateForcedCallback != nullptr && mIsDockedStateForcedCallback())
     {
         mForceDocking = true;
     }
@@ -107,14 +111,14 @@ void LLDockableFloater::toggleInstance(const LLSD& sdname)
     // if floater undocked
     else if (instance != NULL)
     {
-        instance->setMinimized(FALSE);
+        instance->setMinimized(false);
         if (instance->getVisible())
         {
-            instance->setVisible(FALSE);
+            instance->setVisible(false);
         }
         else
         {
-            instance->setVisible(TRUE);
+            instance->setVisible(true);
             gFloaterView->bringToFront(instance);
         }
     }
@@ -126,13 +130,13 @@ void LLDockableFloater::resetInstance()
     {
         if (sInstanceHandle.get() != NULL && sInstanceHandle.get()->isDocked())
         {
-            sInstanceHandle.get()->setVisible(FALSE);
+            sInstanceHandle.get()->setVisible(false);
         }
         sInstanceHandle = getHandle();
     }
 }
 
-void LLDockableFloater::setVisible(BOOL visible)
+void LLDockableFloater::setVisible(bool visible)
 {
     // Force docking if requested
     if (visible && mForceDocking)
@@ -159,12 +163,12 @@ void LLDockableFloater::setVisible(BOOL visible)
     LLFloater::setVisible(visible);
 }
 
-void LLDockableFloater::setMinimized(BOOL minimize)
+void LLDockableFloater::setMinimized(bool minimize)
 {
     if(minimize && isDocked())
     {
         // minimizing a docked floater just hides it
-        setVisible(FALSE);
+        setVisible(false);
     }
     else
     {
@@ -184,14 +188,14 @@ LLView * LLDockableFloater::getDockWidget()
 
 void LLDockableFloater::onDockHidden()
 {
-    setCanDock(FALSE);
+    setCanDock(false);
 }
 
 void LLDockableFloater::onDockShown()
 {
     if (!isMinimized())
     {
-        setCanDock(TRUE);
+        setCanDock(true);
     }
 }
 

@@ -11,7 +11,6 @@
 	<check_box label="買う" name="wanna_buy"/>
 	<check_box label="売る" name="wanna_sell"/>
 	<check_box label="雇用" name="wanna_hire"/>
-	<line_editor name="wanna_something"/>
 	<text name="skills_label">
 		スキル：
 	</text>
@@ -21,9 +20,7 @@
 	<check_box label="イベント計画" name="can_event"/>
 	<check_box label="スクリプト" name="can_script"/>
 	<check_box label="カスタムキャラクター" name="can_characters"/>
-	<line_editor name="can_something"/>
 	<text name="language_label">
-        言語：
+		言語：
 	</text>
-	<line_editor name="languages"/>
 </panel>

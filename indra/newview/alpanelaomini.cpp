@@ -60,7 +60,7 @@ ALPanelAOMini::~ALPanelAOMini()
         mSetChangedCallback.disconnect();
 }
 
-BOOL ALPanelAOMini::postBuild()
+bool ALPanelAOMini::postBuild()
 {
     mSetList = getChild<LLComboBox>("set_list");
     mSetList->setCommitCallback(boost::bind(&ALPanelAOMini::onSelectSet, this, _2));

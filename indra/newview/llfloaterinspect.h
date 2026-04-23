@@ -31,7 +31,7 @@
 
 #include "llavatarname.h"
 #include "llfloater.h"
-#include "llviewerobject.h" // PoundLife - Improved Object Inspect
+#include "llviewerobject.h"
 
 //class LLTool;
 class LLObjectSelection;
@@ -40,7 +40,7 @@ class LLUICtrl;
 // [RLVa:KB] - Checked: RLVa-2.0.1
 class LLSelectNode;
 // [/RLVa:KB]
-class LLMenuButton; // <FS:Ansariel> FIRE-22292: Configurable columns
+class LLMenuButton;
 
 class LLFloaterInspect final : public LLFloater
 {
@@ -49,12 +49,12 @@ public:
 
 //  static void show(void* ignored = NULL);
     void onOpen(const LLSD& key);
-    virtual BOOL postBuild();
+    virtual bool postBuild();
     void dirty();
     LLUUID getSelectedUUID();
     virtual void draw();
     virtual void refresh();
-//  static BOOL isVisible();
+//  static bool isVisible();
     virtual void onFocusReceived();
     void onClickCreatorProfile();
     void onClickOwnerProfile();
@@ -64,7 +64,7 @@ public:
     LLScrollListCtrl* mObjectList;
 protected:
     // protected members
-    void setDirty() { mDirty = TRUE; }
+    void setDirty() { mDirty = true; }
     bool mDirty;
 
 // [RLVa:KB] - Checked: RLVa-2.0.1

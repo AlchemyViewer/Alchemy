@@ -32,6 +32,8 @@
 #include "lllogchat.h"
 #include "llregex.h"
 #include "lltrans.h"
+#include "llurlaction.h"
+#include "llurlentry.h"
 #include "llviewercontrol.h"
 
 #include "lldiriterator.h"
@@ -78,8 +80,8 @@ const static std::string MULTI_LINE_PREFIX(" ");
  *
  * Note: "You" was used as an avatar names in viewers of previous versions
  */
-const static boost::regex TIMESTAMP_AND_STUFF("^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\]\\s+|\\[\\d{1,2}:\\d{2}\\]\\s+)?(.*)$");
-const static boost::regex TIMESTAMP("^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\]|\\[\\d{1,2}:\\d{2}\\]).*");
+const static boost::regex TIMESTAMP_AND_STUFF("^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\s[AaPp][Mm]\\]\\s+|\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\]\\s+|\\[\\d{1,2}:\\d{2}\\s[AaPp][Mm]\\]\\s+|\\[\\d{1,2}:\\d{2}\\]\\s+)?(.*)$");
+const static boost::regex TIMESTAMP("^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}(\\s[AaPp][Mm])?\\]|\\[\\d{1,2}:\\d{2}(\\s[AaPp][Mm])?\\]).*");
 
 /**
  *  Regular expression suitable to match names like
@@ -131,7 +133,7 @@ const char* remove_utf8_bom(const char* buf)
     return start;
 }
 
-class LLLogChatTimeScanner final : public LLSingleton<LLLogChatTimeScanner>
+class LLLogChatTimeScanner: public LLSingleton<LLLogChatTimeScanner>
 {
     LLSINGLETON(LLLogChatTimeScanner);
 
@@ -150,6 +152,10 @@ public:
 
     void checkAndCutOffDate(std::string& time_str)
     {
+        if (time_str.size() < 10) // not enough space for a date
+        {
+            return;
+        }
         // Cuts off the "%Y/%m/%d" from string for todays timestamps.
         // Assume that passed string has at least "%H:%M" time format.
         date log_date(not_a_date_time);
@@ -166,20 +172,12 @@ public:
 
         if ( days_alive == zero_days )
         {
-            // Yep, today's so strip "%Y/%m/%d" info
-            ptime stripped_time(not_a_date_time);
-
-            mTimeStream.str(LLStringUtil::null);
-            mTimeStream << time_str;
-            mTimeStream >> stripped_time;
-            mTimeStream.clear();
-
-            time_str.clear();
-
-            mTimeStream.str(LLStringUtil::null);
-            mTimeStream << stripped_time;
-            mTimeStream >> time_str;
-            mTimeStream.clear();
+            size_t pos = time_str.find_first_of(' ');
+            if (pos != std::string::npos)
+            {
+                time_str.erase(0, pos + 1);
+                LLStringUtil::trim(time_str);
+            }
         }
 
         LL_DEBUGS("LLChatLogParser")
@@ -212,10 +210,14 @@ LLLogChatTimeScanner::LLLogChatTimeScanner()
 LLLogChat::LLLogChat()
 : mSaveHistorySignal(NULL) // only needed in preferences
 {
+    mHistoryThreadsMutex = new LLMutex();
 }
 
 LLLogChat::~LLLogChat()
 {
+    delete mHistoryThreadsMutex;
+    mHistoryThreadsMutex = NULL;
+
     if (mSaveHistorySignal)
     {
         mSaveHistorySignal->disconnect_all_slots();
@@ -301,20 +303,25 @@ std::string LLLogChat::cleanFileName(std::string filename)
 
 std::string LLLogChat::timestamp2LogString(U32 timestamp, bool withdate)
 {
-    static const LLCachedControl<bool> show_timestamp_seconds(gSavedSettings, "ChatTimestampSeconds", false);
-
     std::string timeStr;
     if (withdate)
     {
-        static const std::string timestamp_long_fmt = fmt::format(FMT_STRING("[{}]/[{}]/[{}] [{}]:[{}]"), LLTrans::getString("TimeYear"), LLTrans::getString("TimeMonth"), LLTrans::getString("TimeDay"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
-        static const std::string timestamp_long_sec_fmt = fmt::format(FMT_STRING("[{}]/[{}]/[{}] [{}]:[{}]:[{}]"), LLTrans::getString("TimeYear"), LLTrans::getString("TimeMonth"), LLTrans::getString("TimeDay"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"), LLTrans::getString("TimeSec"));
-        timeStr = show_timestamp_seconds ? timestamp_long_sec_fmt : timestamp_long_fmt;
+        timeStr = "[" + LLTrans::getString("TimeYear") + "]/["
+            + LLTrans::getString("TimeMonth") + "]/["
+            + LLTrans::getString("TimeDay") + "] ";
+    }
+
+    static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+    if (use_24h)
+    {
+        timeStr += "[" + LLTrans::getString("TimeHour") + "]:["
+            + LLTrans::getString("TimeMin") + "]";
     }
     else
     {
-        static const std::string timestamp_short_fmt = fmt::format(FMT_STRING("[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
-        static const std::string timestamp_short_sec_fmt = fmt::format(FMT_STRING("[{}]:[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"), LLTrans::getString("TimeSec"));
-        timeStr = show_timestamp_seconds ? timestamp_short_sec_fmt : timestamp_short_fmt;
+        timeStr += "[" + LLTrans::getString("TimeHour12") + "]:["
+            + LLTrans::getString("TimeMin") + "] ["
+            + LLTrans::getString("TimeAMPM") + "]";
     }
 
     LLSD substitution;
@@ -355,13 +362,29 @@ void LLLogChat::saveHistory(const std::string& filename,
         return;
     }
 
+    std::string altered_line = line;
+
+    // avoid costly regex calls
+    if (line.find("/mention") != std::string::npos)
+    {
+        static const boost::regex mention_regex(APP_HEADER_REGEX "/agent/[\\da-f-]+/mention", boost::regex::perl | boost::regex::icase);
+
+        // replace mention URL with [@username](URL)
+        altered_line = boost::regex_replace(line, mention_regex, [](const boost::smatch& match) -> std::string
+        {
+            std::string url = match[0].str();
+            std::string username = LLUrlAction::getURLLabel(url);
+            return "[" + username + "](" + url + ")";
+        });
+    }
+
     LLSD item;
 
     if (gSavedPerAccountSettings.getBOOL("LogTimestamp"))
          item["time"] = LLLogChat::timestamp2LogString(0, gSavedPerAccountSettings.getBOOL("LogTimestampDate"));
 
     item["from_id"] = from_id;
-    item["message"] = line;
+    item["message"] = altered_line;
 
     //adding "Second Life:" for all system messages to make chat log history parsing more reliable
     if (from.empty() && from_id.isNull())
@@ -429,24 +452,24 @@ void LLLogChat::loadChatHistory(const std::string& file_name, std::list<LLSD>& m
     }
 
     // If we got here, we managed to stat the file.
-    // Open the file to read
-    LLFILE* fptr = LLFile::fopen(log_file_name, "r");       /*Flawfinder: ignore*/
+    // Open the file to read in binary mode to prevent interpreting other characters as EOF
+    LLFILE* fptr = LLFile::fopen(log_file_name, LLFILE_MODE("rb"));       /*Flawfinder: ignore*/
     if (!fptr)
     {   // Ok, this is strange but not really tragic in the big picture of things
         LL_WARNS("ChatHistory") << "Unable to read file " << log_file_name << " after stat was successful" << LL_ENDL;
         return;
     }
 
-    S32 save_num_messages = messages.size();
+    auto save_num_messages = messages.size();
 
     char buffer[LOG_RECALL_SIZE];       /*Flawfinder: ignore*/
     char *bptr;
-    S32 len;
-    bool firstline = TRUE;
+    size_t len;
+    bool firstline = true;
 
     if (load_all_history || fseek(fptr, (LOG_RECALL_SIZE - 1) * -1  , SEEK_END))
     {   //We need to load the whole historyFile or it's smaller than recall size, so get it all.
-        firstline = FALSE;
+        firstline = false;
         if (fseek(fptr, 0, SEEK_SET))
         {
             fclose(fptr);
@@ -461,11 +484,24 @@ void LLLogChat::loadChatHistory(const std::string& file_name, std::list<LLSD>& m
 
         if (firstline)
         {
-            firstline = FALSE;
+            firstline = false;
             continue;
         }
 
         std::string line(remove_utf8_bom(buffer));
+
+
+        // fast heuristic test for a mention URL in a string
+        // this is used to avoid costly regex calls
+        if (line.find("/mention)") != std::string::npos)
+        {
+            // restore original mention URL from [@username](URL) format
+            static const boost::regex altered_mention_regex("\\[@([^\\]]+)\\]\\((" APP_HEADER_REGEX "/agent/[\\da-f-]+/mention)\\)",
+                                                            boost::regex::perl | boost::regex::icase);
+
+            // $2 captures the URL part
+            line = boost::regex_replace(line, altered_mention_regex, "$2");
+        }
 
         //updated 1.23 plain text log format requires a space added before subsequent lines in a multilined message
         if (' ' == line[0])
@@ -586,7 +622,7 @@ void LLLogChat::cleanupHistoryThreads()
 
 LLMutex* LLLogChat::historyThreadsMutex()
 {
-    return &mHistoryThreadsMutex;
+    return mHistoryThreadsMutex;
 }
 
 void LLLogChat::triggerHistorySignal()
@@ -691,29 +727,6 @@ void LLLogChat::getListOfTranscriptBackupFiles(std::vector<std::string>& list_of
     // create search pattern
     std::string pattern = "*." + LL_TRANSCRIPT_FILE_EXTENSION + ".backup*";
     findTranscriptFiles(pattern, list_of_transcriptions);
-}
-
-// static
-bool LLLogChat::anyTranscriptsExist()
-{
-    // get Users log directory
-    std::string dirname = gDirUtilp->getPerAccountChatLogsDir();
-
-    // add final OS dependent delimiter
-    dirname += gDirUtilp->getDirDelimiter();
-
-    std::string pattern = "*." + LL_TRANSCRIPT_FILE_EXTENSION;
-    LLDirIterator iter(dirname, pattern);
-    std::string filename;
-    while (iter.next(filename))
-    {
-        std::string fullname = gDirUtilp->add(dirname, filename);
-        if (isTranscriptFileFound(fullname))
-        {
-            return true;
-        }
-    }
-    return false;
 }
 
 boost::signals2::connection LLLogChat::setSaveHistorySignal(const save_history_signal_t::slot_type& cb)
@@ -877,7 +890,7 @@ bool LLLogChat::isAdHocTranscriptExist(std::string file_name)
 bool LLLogChat::isTranscriptFileFound(std::string fullname)
 {
     bool result = false;
-    LLFILE * filep = LLFile::fopen(fullname, "rb");
+    LLFILE * filep = LLFile::fopen(fullname, LLFILE_MODE("rb"));
     if (NULL != filep)
     {
         if (makeLogFileName("chat") == fullname)
@@ -910,6 +923,11 @@ bool LLLogChat::isTranscriptFileFound(std::string fullname)
         LLFile::close(filep);
     }
     return result;
+}
+
+std::string LLLogChat::getGroupChatSuffix()
+{
+    return GROUP_CHAT_SUFFIX;
 }
 
 //*TODO mark object's names in a special way so that they will be distinguishable form avatar name
@@ -1020,7 +1038,7 @@ bool LLChatLogParser::parse(std::string& raw, LLSD& im, const LLSD& parse_params
     if (!ll_regex_match(stuff, name_and_text, NAME_AND_TEXT)) return false;
 
     bool has_name = name_and_text[IDX_NAME].matched;
-    std::string name = LLURI::unescape(name_and_text[IDX_NAME].str());
+    std::string name = LLURI::unescape(name_and_text[IDX_NAME]);
 
     //we don't need a name/text separator
     if (has_name && name.length() && name[name.length()-1] == ':')
@@ -1150,7 +1168,7 @@ void LLLoadHistoryThread::run()
     if(mNewLoad)
     {
         loadHistory(mFileName, mMessages, mLoadParams);
-        int count = mMessages->size();
+        auto count = mMessages->size();
         LL_INFOS() << "mMessages->size(): " << count << LL_ENDL;
         setFinished();
     }
@@ -1165,7 +1183,7 @@ void LLLoadHistoryThread::loadHistory(const std::string& file_name, std::list<LL
     }
 
     bool load_all_history = load_params.has("load_all_history") ? load_params["load_all_history"].asBoolean() : false;
-    LLFILE* fptr = LLFile::fopen(LLLogChat::makeLogFileName(file_name), "r");/*Flawfinder: ignore*/
+    LLFILE* fptr = LLFile::fopen(LLLogChat::makeLogFileName(file_name), LLFILE_MODE("rb"));/*Flawfinder: ignore*/
 
     if (!fptr)
     {
@@ -1174,17 +1192,17 @@ void LLLoadHistoryThread::loadHistory(const std::string& file_name, std::list<LL
         {
             std::string old_name(file_name);
             old_name.erase(old_name.size() - GROUP_CHAT_SUFFIX.size());
-            fptr = LLFile::fopen(LLLogChat::makeLogFileName(old_name), "r");
+            fptr = LLFile::fopen(LLLogChat::makeLogFileName(old_name), LLFILE_MODE("rb"));
             if (fptr)
             {
                 fclose(fptr);
                 LLFile::copy(LLLogChat::makeLogFileName(old_name), LLLogChat::makeLogFileName(file_name));
             }
-            fptr = LLFile::fopen(LLLogChat::makeLogFileName(file_name), "r");
+            fptr = LLFile::fopen(LLLogChat::makeLogFileName(file_name), LLFILE_MODE("rb"));
         }
         if (!fptr)
         {
-            fptr = LLFile::fopen(LLLogChat::oldLogFileName(file_name), "r");/*Flawfinder: ignore*/
+            fptr = LLFile::fopen(LLLogChat::oldLogFileName(file_name), LLFILE_MODE("rb")); /*Flawfinder: ignore*/
             if (!fptr)
             {
                 mNewLoad = false;
@@ -1197,12 +1215,12 @@ void LLLoadHistoryThread::loadHistory(const std::string& file_name, std::list<LL
     char buffer[LOG_RECALL_SIZE];       /*Flawfinder: ignore*/
 
     char *bptr;
-    S32 len;
-    bool firstline = TRUE;
+    size_t len;
+    bool firstline = true;
 
     if (load_all_history || fseek(fptr, (LOG_RECALL_SIZE - 1) * -1  , SEEK_END))
     {   //We need to load the whole historyFile or it's smaller than recall size, so get it all.
-        firstline = FALSE;
+        firstline = false;
         if (fseek(fptr, 0, SEEK_SET))
         {
             fclose(fptr);
@@ -1222,7 +1240,7 @@ void LLLoadHistoryThread::loadHistory(const std::string& file_name, std::list<LL
 
         if (firstline)
         {
-            firstline = FALSE;
+            firstline = false;
             continue;
         }
         std::string line(remove_utf8_bom(buffer));

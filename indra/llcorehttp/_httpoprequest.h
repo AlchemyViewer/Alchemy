@@ -63,7 +63,7 @@ class BufferArray;
 /// the information needed to make a working request which can
 /// then be enqueued to a request queue.
 ///
-class HttpOpRequest final : public HttpOperation
+class HttpOpRequest : public HttpOperation
 {
 public:
     typedef std::shared_ptr<HttpOpRequest> ptr_t;
@@ -73,8 +73,8 @@ public:
     virtual ~HttpOpRequest();                           // Use release()
 
 private:
-    HttpOpRequest(const HttpOpRequest &);               // Not defined
-    void operator=(const HttpOpRequest &);              // Not defined
+    HttpOpRequest(const HttpOpRequest&)  = delete;
+    void operator=(const HttpOpRequest&) = delete;
 
 public:
     enum EMethod
@@ -226,7 +226,7 @@ public:
     int                 mPolicyRetryLimit;
     HttpTime            mPolicyMinRetryBackoff; // initial delay between retries (mcs)
     HttpTime            mPolicyMaxRetryBackoff;
-    U64             mRequestId;
+    U64                 mRequestId;
 
     static void setMessageLogFunc(std::function<void(LLCore::HttpResponse* response)> func) { sMessageLogFunc = func;}
     static std::function<void(LLCore::HttpResponse* response)> sMessageLogFunc;

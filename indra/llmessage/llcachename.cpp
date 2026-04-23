@@ -37,7 +37,8 @@
 #include "lluuid.h"
 #include "message.h"
 
-#include "boost/unordered/unordered_flat_map.hpp"
+#include <boost/regex.hpp>
+#include <boost/unordered_map.hpp>
 
 // llsd serialization constants
 static const std::string AGENTS("agents");
@@ -98,7 +99,7 @@ public:
     }
 
     void done()         { mID.setNull(); }
-    bool isDone() const { return mID.isNull() != FALSE; }
+    bool isDone() const { return mID.isNull(); }
 };
 
 class ReplySender
@@ -179,12 +180,11 @@ void ReplySender::flush()
     }
 }
 
-
-typedef std::set<LLUUID>                    AskQueue;
-typedef std::list<PendingReply*>            ReplyQueue;
-typedef boost::unordered_map<LLUUID,U32>                PendingQueue;
-typedef boost::unordered_flat_map<LLUUID, LLCacheNameEntry*> Cache;
-typedef boost::unordered_flat_map<std::string, LLUUID, al::string_hash, std::equal_to<>>        ReverseCache;
+using AskQueue     = std::set<LLUUID>;
+using ReplyQueue   = std::list<PendingReply*>;
+using PendingQueue = boost::unordered_map<LLUUID, U32>;
+using Cache        = boost::unordered_map<LLUUID, LLCacheNameEntry*>;
+using ReverseCache = boost::unordered_map<std::string, LLUUID>;
 
 class LLCacheName::Impl
 {
@@ -214,7 +214,7 @@ public:
     Impl(LLMessageSystem* msg);
     ~Impl();
 
-    BOOL getName(const LLUUID& id, std::string& first, std::string& last, const std::string& nobody, const std::string& waiting);
+    bool getName(const LLUUID& id, std::string& first, std::string& last, cache_map_t& default_names);
 
     boost::signals2::connection addPending(const LLUUID& id, const LLCacheNameCallback& callback);
     void addPending(const LLUUID& id, const LLHost& host);
@@ -246,9 +246,9 @@ LLCacheName::LLCacheName(LLMessageSystem* msg)
 LLCacheName::LLCacheName(LLMessageSystem* msg, const LLHost& upstream_host)
     : impl(* new Impl(msg))
 {
-    sCacheName["waiting"] = "(Loading...)";
-    sCacheName["nobody"] = "(nobody)";
-    sCacheName["none"] = "(none)";
+    mCacheName["waiting"] = "(Loading...)";
+    mCacheName["nobody"] = "(nobody)";
+    mCacheName["none"] = "(none)";
     setUpstream(upstream_host);
 }
 
@@ -401,13 +401,13 @@ void LLCacheName::exportFile(std::ostream& ostr)
 }
 
 
-BOOL LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::string& last, const std::string& nobody, const std::string& waiting)
+bool LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::string& last, cache_map_t &default_names)
 {
     if(id.isNull())
     {
-        first = nobody;
+        first = default_names["nobody"];
         last.clear();
-        return TRUE;
+        return true;
     }
 
     LLCacheNameEntry* entry = get_ptr_in_map(mCache, id );
@@ -415,17 +415,17 @@ BOOL LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::strin
     {
         first = entry->mFirstName;
         last =  entry->mLastName;
-        return TRUE;
+        return true;
     }
     else
     {
-        first = waiting;
+        first = default_names["waiting"];
         last.clear();
         if (!isRequestPending(id))
         {
             mAskNameQueue.insert(id);
         }
-        return FALSE;
+        return false;
     }
 
 }
@@ -434,27 +434,27 @@ BOOL LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::strin
 void LLCacheName::localizeCacheName(std::string key, std::string value)
 {
     if (!key.empty() && !value.empty())
-        sCacheName[key]=value;
+        mCacheName[key]=value;
     else
         LL_WARNS()<< " Error localizing cache key " << key << " To "<< value<<LL_ENDL;
 }
 
-BOOL LLCacheName::getFullName(const LLUUID& id, std::string& fullname)
+bool LLCacheName::getFullName(const LLUUID& id, std::string& fullname)
 {
     std::string first_name, last_name;
-    BOOL res = impl.getName(id, first_name, last_name, sCacheName["nobody"], sCacheName["waiting"]);
+    bool res = impl.getName(id, first_name, last_name, mCacheName);
     fullname = buildFullName(first_name, last_name);
     return res;
 }
 
 
 
-BOOL LLCacheName::getGroupName(const LLUUID& id, std::string& group)
+bool LLCacheName::getGroupName(const LLUUID& id, std::string& group)
 {
     if(id.isNull())
     {
-        group = sCacheName["none"];
-        return TRUE;
+        group = mCacheName["none"];
+        return true;
     }
 
     LLCacheNameEntry* entry = get_ptr_in_map(impl.mCache,id);
@@ -470,36 +470,36 @@ BOOL LLCacheName::getGroupName(const LLUUID& id, std::string& group)
     if (entry)
     {
         group = entry->mGroupName;
-        return TRUE;
+        return true;
     }
     else
     {
-        group = sCacheName["waiting"];
+        group = mCacheName["waiting"];
         if (!impl.isRequestPending(id))
         {
             impl.mAskGroupQueue.insert(id);
         }
-        return FALSE;
+        return false;
     }
 }
 
-BOOL LLCacheName::getUUID(const std::string& first, const std::string& last, LLUUID& id)
+bool LLCacheName::getUUID(const std::string& first, const std::string& last, LLUUID& id)
 {
     std::string full_name = buildFullName(first, last);
     return getUUID(full_name, id);
 }
 
-BOOL LLCacheName::getUUID(const std::string& full_name, LLUUID& id)
+bool LLCacheName::getUUID(const std::string& full_name, LLUUID& id)
 {
     ReverseCache::iterator iter = impl.mReverseCache.find(full_name);
     if (iter != impl.mReverseCache.end())
     {
         id = iter->second;
-        return TRUE;
+        return true;
     }
     else
     {
-        return FALSE;
+        return false;
     }
 }
 
@@ -542,8 +542,7 @@ std::string LLCacheName::buildUsername(const std::string& full_name)
 
         if (lastname != "Resident")
         {
-            username += ".";
-            username += lastname;
+            username = username + "." + lastname;
         }
 
         LLStringUtil::toLower(username);
@@ -562,13 +561,13 @@ std::string LLCacheName::buildLegacyName(const std::string& complete_name)
 {
     //boost::regexp was showing up in the crashreporter, so doing
     //painfully manual parsing using substr. LF
-    size_t open_paren = complete_name.rfind(" (");
-    size_t close_paren = complete_name.rfind(')');
+    auto open_paren = complete_name.rfind(" (");
+    auto close_paren = complete_name.rfind(')');
 
     if (open_paren != std::string::npos &&
         close_paren == complete_name.length()-1)
     {
-        size_t length = close_paren - open_paren - 2;
+        auto length = close_paren - open_paren - 2;
         std::string legacy_name = complete_name.substr(open_paren+2, length);
 
         if (legacy_name.length() > 0)
@@ -577,7 +576,7 @@ std::string LLCacheName::buildLegacyName(const std::string& complete_name)
             LLStringUtil::toUpper(cap_letter);
             legacy_name = cap_letter + legacy_name.substr(1);
 
-            size_t separator = legacy_name.find('.');
+            auto separator = legacy_name.find('.');
 
             if (separator != std::string::npos)
             {
@@ -588,7 +587,7 @@ std::string LLCacheName::buildLegacyName(const std::string& complete_name)
                 {
                     cap_letter = last_name.substr(0, 1);
                     LLStringUtil::toUpper(cap_letter);
-                    legacy_name = fmt::format("{} {}{}", legacy_name, cap_letter, last_name.substr(1));
+                    legacy_name = legacy_name + " " + cap_letter + last_name.substr(1);
                 }
             }
 
@@ -601,7 +600,7 @@ std::string LLCacheName::buildLegacyName(const std::string& complete_name)
 
 // This is a little bit kludgy. LLCacheNameCallback is a slot instead of a function pointer.
 //  The reason it is a slot is so that the legacy get() function below can bind an old callback
-//  and pass it as a slot. The reason it isn't a boost::function is so that trackable behavior
+//  and pass it as a slot. The reason it isn't a std::function is so that trackable behavior
 //  doesn't get lost. As a result, we have to bind the slot to a signal to call it, even when
 //  we call it immediately. -Steve
 // NOTE: Even though passing first and last name is a bit of extra overhead, it eliminates the
@@ -614,7 +613,7 @@ boost::signals2::connection LLCacheName::get(const LLUUID& id, bool is_group, co
     {
         LLCacheNameSignal signal;
         signal.connect(callback);
-        signal(id, sCacheName["nobody"], is_group);
+        signal(id, mCacheName["nobody"], is_group);
         return res;
     }
 
@@ -761,7 +760,7 @@ void LLCacheName::clear()
 //static
 std::string LLCacheName::getDefaultName()
 {
-    return sCacheName["waiting"];
+    return mCacheName["waiting"];
 }
 
 //static
@@ -781,6 +780,7 @@ void LLCacheName::Impl::processPendingAsks()
 void LLCacheName::Impl::processPendingReplies()
 {
     // First call all the callbacks, because they might send messages.
+    // Todo: needs cleanup logic, otherwise invalid ids might stay here indefinitely
     for(ReplyQueue::iterator it = mReplyQueue.begin(); it != mReplyQueue.end(); ++it)
     {
         PendingReply* reply = *it;

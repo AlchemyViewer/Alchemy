@@ -27,12 +27,13 @@
 #ifndef LL_TRANS_H
 #define LL_TRANS_H
 
-#include "llpointer.h"
+#include <map>
+#include <set>
+
+#include <boost/unordered_map.hpp>
+
 #include "llstring.h"
-
-#include <boost/unordered/unordered_map.hpp>
-
-class LLXMLNode;
+#include "llxmlnode.h"
 
 class LLSD;
 
@@ -42,7 +43,7 @@ class LLSD;
 class LLTransTemplate
 {
 public:
-    LLTransTemplate(std::string name = std::string(), std::string text = std::string()) : mName(std::move(name)), mText(std::move(text)) {}
+    LLTransTemplate(const std::string& name = LLStringUtil::null, const std::string& text = LLStringUtil::null) : mName(name), mText(text) {}
 
     std::string mName;
     std::string mText;
@@ -57,17 +58,17 @@ public:
 class LLTrans
 {
 public:
-    LLTrans();
+    LLTrans() = default;
 
     /**
      * @brief Parses the xml root that holds the strings. Used once on startup
-// *FIXME    * @param xml_filename Filename to parse
+     * @param root xml root node to parse
      * @param default_args Set of strings (expected to be in the file) to use as default replacement args, e.g. "SECOND_LIFE"
      * @returns true if the file was parsed successfully, true if something went wrong
      */
-    static bool parseStrings(LLPointer<LLXMLNode> & root, const std::set<std::string>& default_args);
+    static bool parseStrings(LLXMLNodePtr& root, const std::set<std::string>& default_args);
 
-    static bool parseLanguageStrings(LLPointer<LLXMLNode> & root);
+    static bool parseLanguageStrings(LLXMLNodePtr& root);
 
     /**
      * @brief Returns a translated string
@@ -79,14 +80,14 @@ public:
     static std::string getDefString(std::string_view xml_desc, const LLStringUtil::format_map_t& args);
     static std::string getString(std::string_view xml_desc, const LLSD& args, bool def_string = false);
     static std::string getDefString(std::string_view xml_desc, const LLSD& args);
-    static bool findString(std::string &result, std::string_view xml_desc, const LLStringUtil::format_map_t& args);
-    static bool findString(std::string &result, std::string_view xml_desc, const LLSD& args);
+    static bool findString(std::string& result, std::string_view xml_desc, const LLStringUtil::format_map_t& args);
+    static bool findString(std::string& result, std::string_view xml_desc, const LLSD& args);
 
     // Returns translated string with [COUNT] replaced with a number, following
     // special per-language logic for plural nouns.  For example, some languages
     // may have different plurals for 0, 1, 2 and > 2.
     // See "AgeWeeksA", "AgeWeeksB", etc. in strings.xml for examples.
-    static std::string getCountString(const std::string_view language, const std::string_view xml_desc, S32 count);
+    static std::string getCountString(std::string_view language, std::string_view xml_desc, S32 count);
 
     /**
      * @brief Returns a translated string
@@ -117,7 +118,7 @@ public:
         return sDefaultArgs;
     }
 
-    static void setDefaultArg(const std::string& name, std::string value);
+    static void setDefaultArg(const std::string& name, const std::string& value);
 
     // insert default args into an arg list
     static void getArgs(LLStringUtil::format_map_t& args)
@@ -126,7 +127,7 @@ public:
     }
 
 private:
-    typedef boost::unordered_map<std::string, LLTransTemplate, al::string_hash, std::equal_to<>> template_map_t;
+    typedef boost::unordered_map<std::string, LLTransTemplate, ll::string_hash, std::equal_to<>> template_map_t;
     static template_map_t sStringTemplates;
     static template_map_t sDefaultStringTemplates;
     static LLStringUtil::format_map_t sDefaultArgs;

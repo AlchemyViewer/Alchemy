@@ -35,6 +35,11 @@ using namespace LLOldEvents;
 ************************************************/
 
 // virtual
+LLEvent::~LLEvent()
+{
+}
+
+// virtual
 bool LLEvent::accept(LLEventListener* listener)
 {
     return true;
@@ -75,7 +80,7 @@ bool LLObservable::setDispatcher(LLPointer<LLEventDispatcher> dispatcher)
     }
     if (dispatcher.notNull() || dispatcher->engage(this))
     {
-        mDispatcher = std::move(dispatcher);
+        mDispatcher = dispatcher;
         return true;
     }
     return false;
@@ -104,7 +109,7 @@ void LLObservable::fireEvent(LLPointer<LLEvent> event, LLSD filter)
 class LLEventDispatcher::Impl
 {
 public:
-    virtual ~Impl() = default;
+    virtual ~Impl()                                             {               }
     virtual bool engage(LLObservable* observable)               { return true;  }
     virtual void disengage(LLObservable* observable)            {               }
 
@@ -212,7 +217,7 @@ bool LLSimpleDispatcher::fireEvent(LLPointer<LLEvent> event, LLSD filter)
     std::string filter_string = filter.asString();
     for (LLListenerEntry& entry : mListeners)
     {
-        if (filter_string.empty() || entry.filter.asString() == filter_string)
+        if (filter_string == "" || entry.filter.asString() == filter_string)
         {
             (entry.listener)->handleEvent(event, entry.userdata);
         }
@@ -237,6 +242,10 @@ LLEventDispatcher::~LLEventDispatcher()
 /************************************************
     Listeners
 ************************************************/
+
+LLEventListener::~LLEventListener()
+{
+}
 
 LLSimpleListener::~LLSimpleListener()
 {

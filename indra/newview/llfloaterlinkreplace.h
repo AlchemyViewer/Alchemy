@@ -56,13 +56,13 @@ public:
         return mDADSignal.connect(cb);
     }
 
-    virtual BOOL postBuild()
+    virtual bool postBuild()
     {
-        setEnabled(FALSE);
+        setEnabled(false);
         return LLLineEditor::postBuild();
     }
 
-    virtual BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
+    virtual bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
@@ -78,7 +78,7 @@ private:
 };
 
 
-class LLFloaterLinkReplace final : public LLFloater, LLEventTimer
+class LLFloaterLinkReplace : public LLFloater, LLEventTimer
 {
     LOG_CLASS(LLFloaterLinkReplace);
 
@@ -86,10 +86,10 @@ public:
     LLFloaterLinkReplace(const LLSD& key);
     virtual ~LLFloaterLinkReplace();
 
-    BOOL postBuild();
+    bool postBuild();
     virtual void onOpen(const LLSD& key);
 
-    virtual BOOL tick();
+    virtual bool tick();
 
 private:
     void checkEnableStart();

@@ -28,16 +28,12 @@
 #ifndef LL_LLPARAM_H
 #define LL_LLPARAM_H
 
+#include <functional>
+#include <type_traits>
 #include <vector>
 #include <list>
+#include <boost/unordered_map.hpp>
 #include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/type_traits/is_convertible.hpp>
-#include <boost/type_traits/is_enum.hpp>
-#include "boost/unordered/unordered_flat_map.hpp"
-#include "boost/unordered/unordered_flat_set.hpp"
-#include "boost/unordered/unordered_map.hpp"
-#include "boost/unordered/unordered_set.hpp"
 
 #include "llerror.h"
 #include "llstl.h"
@@ -109,6 +105,26 @@ namespace LLTypeTags
     };
 }
 
+namespace ll
+{
+    // Primary template: general case is false
+    template<typename T>
+    struct is_std_function : std::false_type
+    {
+    };
+
+    // Specialization for std::function
+    // R is the return type, Args is a parameter pack for argument types
+    template<typename R, typename... Args>
+    struct is_std_function<std::function<R(Args...)>> : std::true_type
+    {
+    };
+
+    // Helper variable template for convenience (C++14 onwards)
+    template<typename T>
+    constexpr bool is_std_function_v = is_std_function<T>::value;
+}
+
 namespace LLInitParam
 {
     // used to indicate no matching value to a given name when parsing
@@ -118,7 +134,7 @@ namespace LLInitParam
 
     // wraps comparison operator between any 2 values of the same type
     // specialize to handle cases where equality isn't defined well, or at all
-    template <typename T, bool IS_BOOST_FUNCTION = boost::is_convertible<T, boost::function_base>::value >
+    template <typename T, bool IS_BOOST_FUNCTION = std::is_constructible_v<T, boost::function_base> || ll::is_std_function_v<T>>
     struct ParamCompare
     {
         static bool equals(const T &a, const T &b)
@@ -127,7 +143,7 @@ namespace LLInitParam
         }
     };
 
-    // boost function types are not comparable
+    // boost and std function types are not comparable
     template<typename T>
     struct ParamCompare<T, true>
     {
@@ -183,18 +199,12 @@ namespace LLInitParam
         typedef T   default_value_t;
         typedef T   value_t;
 
-        ParamValue(): mValue() {}
+        ParamValue() = default;
         ParamValue(const default_value_t& other) : mValue(other) {}
-        ParamValue(default_value_t&& other) : mValue(std::move(other)) {}
 
         void setValue(const value_t& val)
         {
             mValue = val;
-        }
-
-        void setValue(value_t&& val)
-        {
-            mValue = std::move(val);
         }
 
         const value_t& getValue() const
@@ -210,7 +220,7 @@ namespace LLInitParam
         bool isValid() const { return true; }
 
     protected:
-        T mValue;
+        T mValue{};
     };
 
     template<typename T>
@@ -222,26 +232,15 @@ namespace LLInitParam
         typedef T   default_value_t;
         typedef T   value_t;
 
-        ParamValue()
-        :   T()
-        {}
+        ParamValue() = default;
 
         ParamValue(const default_value_t& other)
         :   T(other)
         {}
 
-        ParamValue(default_value_t&& other)
-        :   T(std::move(other))
-        {}
-
         void setValue(const value_t& val)
         {
             *this = val;
-        }
-
-        void setValue(value_t&& val)
-        {
-            *this = std::move(val);
         }
 
         const value_t& getValue() const
@@ -265,7 +264,7 @@ namespace LLInitParam
     private:
         struct Inaccessable{};
     public:
-        typedef boost::unordered_map<std::string, T, al::string_hash, std::equal_to<>> value_name_map_t;
+        typedef boost::unordered_map<std::string, T> value_name_map_t;
         typedef Inaccessable name_t;
         typedef TypeValues<T> type_value_t;
         typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t> param_value_t;
@@ -275,17 +274,12 @@ namespace LLInitParam
         :   param_value_t(val)
         {}
 
-        TypeValues(typename param_value_t::value_t&& val)
-        :   param_value_t(std::move(val))
-        {}
-
         void setValueName(const std::string& key) {}
-        void setValueName(std::string&& key) {}
-        std::string getValueName() const { return std::string(); }
-        std::string calcValueName(const value_t& value) const { return std::string(); }
+        std::string getValueName() const { return ""; }
+        std::string calcValueName(const value_t& value) const { return ""; }
         void clearValueName() const {}
 
-        static bool getValueFromName(std::string_view name, value_t& value)
+        static bool getValueFromName(const std::string& name, value_t& value)
         {
             return false;
         }
@@ -297,13 +291,10 @@ namespace LLInitParam
 
         static std::vector<std::string>* getPossibleValues()
         {
-            return NULL;
+            return nullptr;
         }
 
         void assignNamedValue(const Inaccessable& name)
-        {}
-
-        void assignNamedValue(Inaccessable&& name)
         {}
 
         operator const value_t&() const
@@ -316,7 +307,7 @@ namespace LLInitParam
             return param_value_t::getValue();
         }
 
-        static value_name_map_t* getValueNames() {return NULL;}
+        static value_name_map_t* getValueNames() { return nullptr; }
     };
 
     // helper class to implement name value lookups
@@ -327,7 +318,7 @@ namespace LLInitParam
     {
         typedef TypeValuesHelper<T, DERIVED_TYPE, IS_SPECIALIZED> self_t;
     public:
-        typedef typename boost::unordered_map<std::string, T, al::string_hash, std::equal_to<>> value_name_map_t;
+        typedef typename boost::unordered_map<std::string, T> value_name_map_t;
         typedef std::string name_t;
         typedef self_t type_value_t;
         typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t> param_value_t;
@@ -337,19 +328,10 @@ namespace LLInitParam
         :   param_value_t(val)
         {}
 
-        TypeValuesHelper(typename param_value_t::value_t&& val)
-        :   param_value_t(std::move(val))
-        {}
-
         //TODO: cache key by index to save on param block size
         void setValueName(const std::string& value_name)
         {
             mValueName = value_name;
-        }
-
-        void setValueName(std::string&& value_name)
-        {
-            mValueName = std::move(value_name);
         }
 
         std::string getValueName() const
@@ -368,7 +350,7 @@ namespace LLInitParam
                 }
             }
 
-            return {};
+            return "";
         }
 
         void clearValueName() const
@@ -376,7 +358,7 @@ namespace LLInitParam
             mValueName.clear();
         }
 
-        static bool getValueFromName(std::string_view name, value_t& value)
+        static bool getValueFromName(const std::string& name, value_t& value)
         {
             value_name_map_t* map = getValueNames();
             typename value_name_map_t::iterator found_it = map->find(name);
@@ -418,22 +400,7 @@ namespace LLInitParam
 
         static void declare(const std::string& name, const value_t& value)
         {
-            getValueNames()->insert_or_assign(name, value);
-        }
-
-        static void declare(const std::string& name, value_t&& value)
-        {
-            getValueNames()->insert_or_assign(name, std::move(value));
-        }
-
-        static void declare(std::string&& name, const value_t& value)
-        {
-            getValueNames()->insert_or_assign(std::move(name), value);
-        }
-
-        static void declare(std::string&& name, value_t&& value)
-        {
-            getValueNames()->insert_or_assign(std::move(name), std::move(value));
+            (*getValueNames())[name] = value;
         }
 
         void operator ()(const std::string& name)
@@ -446,14 +413,6 @@ namespace LLInitParam
             if (getValueFromName(name, param_value_t::getValue()))
             {
                 setValueName(name);
-            }
-        }
-
-        void assignNamedValue(std::string&& name)
-        {
-            if (getValueFromName(name, param_value_t::getValue()))
-            {
-                setValueName(std::move(name));
             }
         }
 
@@ -492,18 +451,9 @@ namespace LLInitParam
         :   base_t(val)
         {}
 
-        TypeValuesHelper(std::string&& val)
-        :   base_t(std::move(val))
-        {}
-
         void operator ()(const std::string& name)
-        {
+    {
             *this = name;
-        }
-
-        void operator ()(std::string&& name)
-        {
-            *this = std::move(name);
         }
 
         self_t& operator =(const std::string& name)
@@ -515,19 +465,6 @@ namespace LLInitParam
             else
             {
                 ParamValue<std::string>::setValue(name);
-            }
-            return *this;
-        }
-
-        self_t& operator =(std::string&& name)
-        {
-            if (base_t::getValueFromName(name, ParamValue<std::string>::getValue()))
-            {
-                base_t::setValueName(std::move(name));
-            }
-            else
-            {
-                ParamValue<std::string>::setValue(std::move(name));
             }
             return *this;
         }
@@ -555,11 +492,11 @@ namespace LLInitParam
 
         typedef bool (*parser_read_func_t)(Parser& parser, void* output);
         typedef bool (*parser_write_func_t)(Parser& parser, const void*, name_stack_t&);
-        typedef boost::function<void (name_stack_t&, S32, S32, const possible_values_t*)>   parser_inspect_func_t;
+        typedef std::function<void (name_stack_t&, S32, S32, const possible_values_t*)>   parser_inspect_func_t;
 
-        typedef boost::unordered_flat_map<const std::type_info*, parser_read_func_t>        parser_read_func_map_t;
-        typedef boost::unordered_flat_map<const std::type_info*, parser_write_func_t>       parser_write_func_map_t;
-        typedef boost::unordered_flat_map<const std::type_info*, parser_inspect_func_t>   parser_inspect_func_map_t;
+        typedef boost::unordered_map<std::type_index, parser_read_func_t>           parser_read_func_map_t;
+        typedef boost::unordered_map<std::type_index, parser_write_func_t>          parser_write_func_map_t;
+        typedef boost::unordered_map<std::type_index, parser_inspect_func_t>        parser_inspect_func_map_t;
 
     public:
 
@@ -572,9 +509,9 @@ namespace LLInitParam
 
         virtual ~Parser() = default;
 
-        template <typename T> bool readValue(T& param, typename boost::disable_if<boost::is_enum<T> >::type* dummy = 0)
+        template <typename T> bool readValue(T& param, typename std::enable_if_t<!std::is_enum_v<T>>* dummy = 0)
         {
-            parser_read_func_map_t::iterator found_it = mParserReadFuncs->find(&typeid(T));
+            parser_read_func_map_t::iterator found_it = mParserReadFuncs->find(typeid(T));
             if (found_it != mParserReadFuncs->end())
             {
                 return found_it->second(*this, (void*)&param);
@@ -583,16 +520,16 @@ namespace LLInitParam
             return false;
         }
 
-        template <typename T> bool readValue(T& param, typename boost::enable_if<boost::is_enum<T> >::type* dummy = 0)
+        template <typename T> bool readValue(T& param, typename std::enable_if_t<std::is_enum_v<T> >* dummy = 0)
         {
-            parser_read_func_map_t::iterator found_it = mParserReadFuncs->find(&typeid(T));
+            parser_read_func_map_t::iterator found_it = mParserReadFuncs->find(typeid(T));
             if (found_it != mParserReadFuncs->end())
             {
                 return found_it->second(*this, (void*)&param);
             }
             else
             {
-                found_it = mParserReadFuncs->find(&typeid(S32));
+                found_it = mParserReadFuncs->find(typeid(S32));
                 if (found_it != mParserReadFuncs->end())
                 {
                     S32 int_value;
@@ -606,7 +543,7 @@ namespace LLInitParam
 
         template <typename T> bool writeValue(const T& param, name_stack_t& name_stack)
         {
-            parser_write_func_map_t::iterator found_it = mParserWriteFuncs->find(&typeid(T));
+            parser_write_func_map_t::iterator found_it = mParserWriteFuncs->find(typeid(T));
             if (found_it != mParserWriteFuncs->end())
             {
                 return found_it->second(*this, (const void*)&param, name_stack);
@@ -617,7 +554,7 @@ namespace LLInitParam
         // dispatch inspection to registered inspection functions, for each parameter in a param block
         template <typename T> bool inspectValue(name_stack_t& name_stack, S32 min_count, S32 max_count, const possible_values_t* possible_values)
         {
-            parser_inspect_func_map_t::iterator found_it = mParserInspectFuncs->find(&typeid(T));
+            parser_inspect_func_map_t::iterator found_it = mParserInspectFuncs->find(typeid(T));
             if (found_it != mParserInspectFuncs->end())
             {
                 found_it->second(name_stack, min_count, max_count, possible_values);
@@ -634,16 +571,16 @@ namespace LLInitParam
 
     protected:
         template <typename T>
-        void registerParserFuncs(parser_read_func_t read_func, parser_write_func_t write_func = NULL)
+        void registerParserFuncs(parser_read_func_t read_func, parser_write_func_t write_func = nullptr)
         {
-            mParserReadFuncs->insert(std::make_pair(&typeid(T), read_func));
-            mParserWriteFuncs->insert(std::make_pair(&typeid(T), write_func));
+            mParserReadFuncs->emplace(typeid(T), read_func);
+            mParserWriteFuncs->emplace(typeid(T), write_func);
         }
 
         template <typename T>
         void registerInspectFunc(parser_inspect_func_t inspect_func)
         {
-            mParserInspectFuncs->insert(std::make_pair(&typeid(T), inspect_func));
+            mParserInspectFuncs->emplace(typeid(T), inspect_func);
         }
 
         bool                mParseSilently;
@@ -672,11 +609,6 @@ namespace LLInitParam
     // various callbacks and constraints associated with an individual param
     struct LL_COMMON_API ParamDescriptor
     {
-        struct UserData
-        {
-            virtual ~UserData() = default;
-        };
-
         typedef bool(*merge_func_t)(Param&, const Param&, bool);
         typedef bool(*deserialize_func_t)(Param&, Parser&, Parser::name_stack_range_t&, bool);
         typedef bool(*serialize_func_t)(const Param&, Parser&, Parser::name_stack_t&, const predicate_rule_t rules, const Param* diff_param);
@@ -693,7 +625,7 @@ namespace LLInitParam
                         S32 max_count);
 
         ParamDescriptor();
-        ~ParamDescriptor();
+        ~ParamDescriptor() = default;
 
         param_handle_t      mParamHandle;
         merge_func_t        mMergeFunc;
@@ -704,7 +636,6 @@ namespace LLInitParam
         S32                 mMinCount;
         S32                 mMaxCount;
         S32                 mNumRefs;
-        UserData*           mUserData;
     };
 
     typedef std::shared_ptr<ParamDescriptor> ParamDescriptorPtr;
@@ -725,7 +656,7 @@ namespace LLInitParam
         void aggregateBlockData(BlockDescriptor& src_block_data);
         void addParam(ParamDescriptorPtr param, const char* name);
 
-        typedef boost::unordered_map<std::string, ParamDescriptorPtr, al::string_hash, std::equal_to<>>                         param_map_t;
+        typedef boost::unordered_map<std::string, ParamDescriptorPtr, ll::string_hash, std::equal_to<>> param_map_t;
         typedef std::vector<ParamDescriptorPtr>                                                 param_list_t;
         typedef std::list<ParamDescriptorPtr>                                                   all_params_list_t;
         typedef std::vector<std::pair<param_handle_t, ParamDescriptor::validation_func_t> >     param_validation_list_t;
@@ -739,48 +670,36 @@ namespace LLInitParam
         class BaseBlock*                mCurrentBlockPtr;       // pointer to block currently being constructed
     };
 
-    template <typename T>
+    // TODO: implement in terms of owned_ptr
+    template<typename T>
     class LazyValue
     {
-      public:
+    public:
         LazyValue() = default;
-        ~LazyValue() = default;
 
-        LazyValue(const T& value) { mPtr = std::make_unique<T>(value); }
-        LazyValue(T&& value) { mPtr = std::make_unique<T>(std::move(value)); }
+        ~LazyValue() { delete mPtr; }
 
-        LazyValue(const LazyValue& other) { *this = other; }
-        LazyValue(LazyValue&& other) { *this = std::move(other); }
+        LazyValue(const T& value) { mPtr = new T(value); }
+
+        LazyValue(const LazyValue& other) : mPtr(nullptr) { *this = other; }
 
         LazyValue& operator=(const LazyValue& other)
         {
             if (!other.mPtr)
             {
-                mPtr.reset();
+                delete mPtr;
+                mPtr = nullptr;
             }
             else
             {
                 if (!mPtr)
                 {
-                    mPtr = std::make_unique<T>(*other.mPtr);
+                    mPtr = new T(*other.mPtr);
                 }
                 else
                 {
                     *mPtr = *(other.mPtr);
                 }
-            }
-            return *this;
-        }
-
-        LazyValue& operator=(LazyValue&& other)
-        {
-            if (!other.mPtr)
-            {
-                mPtr.reset();
-            }
-            else
-            {
-                mPtr = std::move(other.mPtr);
             }
             return *this;
         }
@@ -798,23 +717,11 @@ namespace LLInitParam
         {
             if (!mPtr)
             {
-                mPtr = std::make_unique<T>(other);
+                mPtr = new T(other);
             }
             else
             {
                 *mPtr = other;
-            }
-        }
-
-        void set(T&& other)
-        {
-            if (!mPtr)
-            {
-                mPtr = std::make_unique<T>(std::move(other));
-            }
-            else
-            {
-                *mPtr = std::move(other);
             }
         }
 
@@ -824,19 +731,19 @@ namespace LLInitParam
 
         operator const T&() const { return get(); }
 
-      private:
+    private:
         // lazily allocate an instance of T
         T* ensureInstance() const
         {
-            if (!mPtr)
+            if (mPtr == nullptr)
             {
-                mPtr = std::make_unique<T>();
+                mPtr = new T();
             }
-            return mPtr.get();
+            return mPtr;
         }
 
-      private:
-        mutable std::unique_ptr<T> mPtr;
+    private:
+        mutable T* mPtr = nullptr;
     };
 
     // root class of all parameter blocks
@@ -955,7 +862,7 @@ namespace LLInitParam
             return reinterpret_cast<const Param*>(baseblock_address + param_handle);
         }
 
-        void addSynonym(Param& param, std::string_view synonym);
+        void addSynonym(Param& param, const std::string& synonym);
 
         // Blocks can override this to do custom tracking of changes
         virtual void paramChanged(const Param& changed_param, bool user_provided)
@@ -1030,7 +937,6 @@ namespace LLInitParam
             // don't change mEnclosingblockoffset
             return *this;
         }
-
     protected:
 
         bool anyProvided() const { return mIsProvided; }
@@ -1044,17 +950,21 @@ namespace LLInitParam
             // get address of enclosing BLOCK class using stored offset to enclosing BaseBlock class
             return *const_cast<BaseBlock*>
                 (reinterpret_cast<const BaseBlock*>
-                    (my_addr - getEnclosingBlockOffset()));
+                    (my_addr - (ptrdiff_t)getEnclosingBlockOffset()));
         }
 
-        ptrdiff_t getEnclosingBlockOffset() const { return mEnclosingBlockOffset; }
+        U32 getEnclosingBlockOffset() const
+    {
+            return ((U32)mEnclosingBlockOffsetHigh << 16) | (U32)mEnclosingBlockOffsetLow;
+        }
 
     private:
         friend class BaseBlock;
 
-        //8 bytes for member offset, 1 bytes for flag
-        ptrdiff_t mEnclosingBlockOffset;
-        bool      mIsProvided;
+        //24 bits for member offset field and 1 bit for provided flag
+        U16     mEnclosingBlockOffsetLow;
+        U8      mEnclosingBlockOffsetHigh:7;
+        U8      mIsProvided:1;
 
     };
 
@@ -1116,7 +1026,7 @@ namespace LLInitParam
                     && parser.readValue(name)
                     && named_value_t::getValueFromName(name, typed_param.getValue()))
                 {
-                    typed_param.setValueName(std::move(name));
+                    typed_param.setValueName(name);
                     typed_param.setProvided();
                     return true;
                 }
@@ -1201,22 +1111,9 @@ namespace LLInitParam
             setProvided(flag_as_provided);
         }
 
-        void set(value_t&& val, bool flag_as_provided = true)
-        {
-            named_value_t::clearValueName();
-            named_value_t::setValue(std::move(val));
-            setProvided(flag_as_provided);
-        }
-
         self_t& operator =(const typename named_value_t::name_t& name)
         {
             named_value_t::assignNamedValue(name);
-            return *this;
-        }
-
-        self_t& operator=(typename named_value_t::name_t&& name)
-        {
-            named_value_t::assignNamedValue(std::move(name));
             return *this;
         }
 
@@ -1245,15 +1142,15 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            ParamDescriptorPtr param_descriptor = std::make_shared<ParamDescriptor>(
+            ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
                 block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
                 &mergeWith,
                 &deserializeParam,
                 &serializeParam,
                 validate_func,
                 &inspectParam,
-                min_count, max_count);
-            block_descriptor.addParam(std::move(param_descriptor), name);
+                min_count, max_count));
+            block_descriptor.addParam(param_descriptor, name);
         }
     };
 
@@ -1294,7 +1191,7 @@ namespace LLInitParam
                     && parser.readValue(name)
                     && named_value_t::getValueFromName(name, typed_param.getValue()))
             {
-                typed_param.setValueName(std::move(name));
+                typed_param.setValueName(name);
                 typed_param.setProvided();
                 return true;
             }
@@ -1379,22 +1276,9 @@ namespace LLInitParam
             setProvided(flag_as_provided);
         }
 
-        void set(value_t&& val, bool flag_as_provided = true)
-        {
-            named_value_t::setValue(std::move(val));
-            named_value_t::clearValueName();
-            setProvided(flag_as_provided);
-        }
-
         self_t& operator =(const typename named_value_t::name_t& name)
         {
             named_value_t::assignNamedValue(name);
-            return *this;
-        }
-
-        self_t& operator =(typename named_value_t::name_t&& name)
-        {
-            named_value_t::assignNamedValue(std::move(name));
             return *this;
         }
 
@@ -1443,15 +1327,15 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            ParamDescriptorPtr param_descriptor = std::make_shared<ParamDescriptor>(
+            ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
                 block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
                 &mergeWith,
                 &deserializeParam,
                 &serializeParam,
                 validate_func,
                 &inspectParam,
-                min_count, max_count);
-            block_descriptor.addParam(std::move(param_descriptor), name);
+                min_count, max_count));
+            block_descriptor.addParam(param_descriptor, name);
         }
     };
 
@@ -1515,7 +1399,7 @@ namespace LLInitParam
                     && named_value_t::getValueFromName(name, value))
                 {
                     typed_param.add(value);
-                    typed_param.mValues.back().setValueName(std::move(name));
+                    typed_param.mValues.back().setValueName(name);
                     return true;
                 }
                 else if (parser.readValue(value))   // attempt to read value directly
@@ -1596,12 +1480,6 @@ namespace LLInitParam
             setProvided(flag_as_provided);
         }
 
-        void set(container_t&& val, bool flag_as_provided = true)
-        {
-            mValues = std::move(val);
-            setProvided(flag_as_provided);
-        }
-
         param_value_t& add()
         {
             mValues.push_back(value_t());
@@ -1616,13 +1494,6 @@ namespace LLInitParam
             return *this;
         }
 
-        self_t& add(value_t&& item)
-        {
-            mValues.push_back(std::move(item));
-            setProvided();
-            return *this;
-        }
-
         self_t& add(const typename named_value_t::name_t& name)
         {
             value_t value;
@@ -1630,22 +1501,8 @@ namespace LLInitParam
             // try to parse a per type named value
             if (named_value_t::getValueFromName(name, value))
             {
-                add(std::move(value));
+                add(value);
                 mValues.back().setValueName(name);
-            }
-
-            return *this;
-        }
-
-        self_t& add(typename named_value_t::name_t&& name)
-        {
-            value_t value;
-
-            // try to parse a per type named value
-            if (named_value_t::getValueFromName(name, value))
-            {
-                add(std::move(value));
-                mValues.back().setValueName(std::move(name));
             }
 
             return *this;
@@ -1701,15 +1558,15 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            ParamDescriptorPtr param_descriptor = std::make_shared<ParamDescriptor>(
+            ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
                 block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
                 &mergeWith,
                 &deserializeParam,
                 &serializeParam,
                 validate_func,
                 &inspectParam,
-                min_count, max_count);
-            block_descriptor.addParam(std::move(param_descriptor), name);
+                min_count, max_count));
+            block_descriptor.addParam(param_descriptor, name);
         }
     };
 
@@ -1780,7 +1637,7 @@ namespace LLInitParam
                     && parser.readValue(name)
                     && named_value_t::getValueFromName(name, value.getValue()))
                 {
-                    typed_param.mValues.back().setValueName(std::move(name));
+                    typed_param.mValues.back().setValueName(name);
                     typed_param.setProvided();
                     if (new_array_value)
                     {
@@ -1875,21 +1732,14 @@ namespace LLInitParam
 
         param_value_t& add()
         {
-            mValues.emplace_back(value_t());
+            mValues.push_back(value_t());
             setProvided();
             return mValues.back();
         }
 
         self_t& add(const value_t& item)
         {
-            mValues.emplace_back(item);
-            setProvided();
-            return *this;
-        }
-
-        self_t& add(value_t&& item)
-        {
-            mValues.emplace_back(std::move(item));
+            mValues.push_back(item);
             setProvided();
             return *this;
         }
@@ -1901,21 +1751,8 @@ namespace LLInitParam
             // try to parse a per type named value
             if (named_value_t::getValueFromName(name, value))
             {
-                add(std::move(value));
+                add(value);
                 mValues.back().setValueName(name);
-            }
-            return *this;
-        }
-
-        self_t& add(typename named_value_t::name_t&& name)
-        {
-            value_t value;
-
-            // try to parse a per type named value
-            if (named_value_t::getValueFromName(name, value))
-            {
-                add(std::move(value));
-                mValues.back().setValueName(std::move(name));
             }
             return *this;
         }
@@ -1977,15 +1814,15 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            ParamDescriptorPtr param_descriptor = std::make_shared<ParamDescriptor>(
+            ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
                 block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
                 &mergeWith,
                 &deserializeParam,
                 &serializeParam,
                 validate_func,
                 &inspectParam,
-                min_count, max_count);
-            block_descriptor.addParam(std::move(param_descriptor), name);
+                min_count, max_count));
+            block_descriptor.addParam(param_descriptor, name);
         }
     };
 
@@ -2096,29 +1933,14 @@ namespace LLInitParam
                 super_t::set(val);
             }
 
-            void chooseAs(value_t&& val)
-            {
-                super_t::set(std::move(val));
-            }
-
             void operator =(const value_t& val)
             {
                 super_t::set(val);
             }
 
-            void operator =(value_t&& val)
-            {
-                super_t::set(std::move(val));
-            }
-
             void operator()(const value_t& val)
             {
                 super_t::set(val);
-            }
-
-            void operator()(value_t&& val)
-            {
-                super_t::set(std::move(val));
             }
 
             operator const value_t&() const
@@ -2220,21 +2042,9 @@ namespace LLInitParam
                 return *this;
             }
 
-            Optional& operator =(value_t&& val)
-            {
-                super_t::set(std::move(val));
-                return *this;
-            }
-
             DERIVED_BLOCK& operator()(const value_t& val)
             {
                 super_t::set(val);
-                return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
-            }
-
-            DERIVED_BLOCK& operator()(value_t&& val)
-            {
-                super_t::set(std::move(val));
                 return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
             }
         };
@@ -2262,21 +2072,9 @@ namespace LLInitParam
                 return *this;
             }
 
-            Mandatory& operator =(value_t&& val)
-            {
-                super_t::set(std::move(val));
-                return *this;
-            }
-
             DERIVED_BLOCK& operator()(const value_t& val)
             {
                 super_t::set(val);
-                return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
-            }
-
-            DERIVED_BLOCK& operator()(value_t&& val)
-            {
-                super_t::set(std::move(val));
                 return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
             }
 
@@ -2313,21 +2111,9 @@ namespace LLInitParam
                 return *this;
             }
 
-            Multiple& operator =(container_t&& val)
-            {
-                super_t::set(std::move(val));
-                return *this;
-            }
-
             DERIVED_BLOCK& operator()(const container_t& val)
             {
                 super_t::set(val);
-                return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
-            }
-
-            DERIVED_BLOCK& operator()(container_t&& val)
-            {
-                super_t::set(std::move(val));
                 return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
             }
 
@@ -2349,15 +2135,15 @@ namespace LLInitParam
                 BlockDescriptor& block_descriptor = DERIVED_BLOCK::getBlockDescriptor();
                 if (LL_UNLIKELY(block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING))
                 {
-                    ParamDescriptorPtr param_descriptor = std::make_shared<ParamDescriptor>(
+                    ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
                                                     block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
-                                                    nullptr,
+                                                    NULL,
                                                     &deserializeParam,
-                                                    nullptr,
-                                                    nullptr,
-                                                    nullptr,
-                                                    0, S32_MAX);
-                    block_descriptor.addParam(std::move(param_descriptor), name);
+                                                    NULL,
+                                                    NULL,
+                                                    NULL,
+                                                    0, S32_MAX));
+                    block_descriptor.addParam(param_descriptor, name);
                 }
             }
 
@@ -2384,28 +2170,13 @@ namespace LLInitParam
             // dummy writer interfaces
             template<typename T>
             Deprecated& operator =(const T& val)
-            {
-                // do nothing
-                return *this;
-            }
-
-            // dummy writer interfaces
-            template<typename T>
-            Deprecated& operator =(T&& val)
-            {
+        {
                 // do nothing
                 return *this;
             }
 
             template<typename T>
             DERIVED_BLOCK& operator()(const T& val)
-            {
-                // do nothing
-                return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
-            }
-
-            template<typename T>
-            DERIVED_BLOCK& operator()(T&& val)
             {
                 // do nothing
                 return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
@@ -2498,18 +2269,9 @@ namespace LLInitParam
         :   mValue(value)
         {}
 
-        ParamValue(default_value_t&& value)
-        :   mValue(std::move(value))
-        {}
-
         void setValue(const value_t& val)
         {
             mValue.setValue(val);
-        }
-
-        void setValue(value_t&& val)
-        {
-            mValue.setValue(std::move(val));
         }
 
         const value_t& getValue() const
@@ -2603,20 +2365,9 @@ namespace LLInitParam
             mCurParam = getBlockDescriptor().mAllParams.begin();
         }
 
-        ParamValue(default_value_t&& value)
-        :   mValue(std::move(value))
-        {
-            mCurParam = getBlockDescriptor().mAllParams.begin();
-        }
-
         void setValue(const value_t& val)
         {
             mValue.setValue(val);
-        }
-
-        void setValue(value_t&& val)
-        {
-            mValue.setValue(std::move(val));
         }
 
         const value_t& getValue() const
@@ -2738,26 +2489,13 @@ namespace LLInitParam
         :   mValue(other)
         {}
 
-        ParamValue(default_value_t&& other)
-        :   mValue(std::move(other))
-        {}
-
         ParamValue(const T& value)
         :   mValue(value)
-        {}
-
-        ParamValue(T&& value)
-        :   mValue(std::move(value))
         {}
 
         void setValue(const value_t& val)
         {
             mValue.set(val);
-        }
-
-        void setValue(value_t&& val)
-        {
-            mValue.set(std::move(val));
         }
 
         const value_t& getValue() const
@@ -2831,26 +2569,13 @@ namespace LLInitParam
         :   mValue(other)
         {}
 
-        ParamValue(default_value_t&& other)
-        :   mValue(std::move(other))
-        {}
-
         ParamValue(const T& value)
         :   mValue(value)
-        {}
-
-        ParamValue(T&& value)
-        :   mValue(std::move(value))
         {}
 
         void setValue(const value_t& val)
         {
             mValue.set(val);
-        }
-
-        void setValue(value_t&& val)
-        {
-            mValue.set(std::move(val));
         }
 
         const value_t& getValue() const
@@ -2880,18 +2605,14 @@ namespace LLInitParam
         typedef LLSD            value_t;
         typedef LLSD            default_value_t;
 
-        ParamValue() = default;
+        ParamValue()
+        {}
 
         ParamValue(const default_value_t& other)
         :   mValue(other)
         {}
 
-        ParamValue(default_value_t&& other)
-        :   mValue(std::move(other))
-        {}
-
         void setValue(const value_t& val) { mValue = val; }
-        void setValue(value_t&& val) { mValue = std::move(val); }
 
         const value_t& getValue() const { return mValue; }
         LLSD& getValue() { return mValue; }
@@ -2931,13 +2652,8 @@ namespace LLInitParam
         typedef void                    baseblock_base_class_t;
 
 
-        CustomParamValue(const default_value_t& value)
+        CustomParamValue(const default_value_t& value = T())
         :   mValue(value),
-            mValueAge(VALUE_AUTHORITATIVE)
-        {}
-
-        CustomParamValue(default_value_t&& value = T())
-        :   mValue(std::move(value)),
             mValueAge(VALUE_AUTHORITATIVE)
         {}
 
@@ -3052,14 +2768,6 @@ namespace LLInitParam
             // set param version number to be up to date, so we ignore block contents
             mValueAge = VALUE_AUTHORITATIVE;
             mValue = val;
-            static_cast<derived_t*>(this)->updateBlockFromValue(false);
-        }
-
-        void setValue(value_t&& val)
-        {
-            // set param version number to be up to date, so we ignore block contents
-            mValueAge = VALUE_AUTHORITATIVE;
-            mValue = std::move(val);
             static_cast<derived_t*>(this)->updateBlockFromValue(false);
         }
 

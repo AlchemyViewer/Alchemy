@@ -32,7 +32,7 @@
 //============================================================================
 // LLImageFiltersManager class
 
-class LLImageFiltersManager final : public LLSingleton<LLImageFiltersManager>
+class LLImageFiltersManager : public LLSingleton<LLImageFiltersManager>
 {
     LLSINGLETON(LLImageFiltersManager);
     ~LLImageFiltersManager();

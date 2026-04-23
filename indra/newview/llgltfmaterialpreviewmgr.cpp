@@ -5,6 +5,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2023, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -118,7 +121,7 @@ namespace
             }
             else
             {
-                img = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+                img = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
             }
         }
         if (img)
@@ -185,7 +188,7 @@ namespace
 };  // namespace
 
 LLGLTFPreviewTexture::LLGLTFPreviewTexture(LLPointer<LLFetchedGLTFMaterial> material, S32 width)
-    : LLViewerDynamicTexture(width, width, 4, EOrder::ORDER_MIDDLE, FALSE)
+    : LLViewerDynamicTexture(width, width, 4, EOrder::ORDER_MIDDLE, false)
     , mGLTFMaterial(material)
 {
 }
@@ -193,10 +196,10 @@ LLGLTFPreviewTexture::LLGLTFPreviewTexture(LLPointer<LLFetchedGLTFMaterial> mate
 // static
 LLPointer<LLGLTFPreviewTexture> LLGLTFPreviewTexture::create(LLPointer<LLFetchedGLTFMaterial> material)
 {
-    return new LLGLTFPreviewTexture(material, LLPipeline::MAX_BAKE_WIDTH);
+    return new LLGLTFPreviewTexture(material, LLPipeline::MAX_PREVIEW_WIDTH);
 }
 
-BOOL LLGLTFPreviewTexture::needsRender()
+bool LLGLTFPreviewTexture::needsRender()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
@@ -211,7 +214,7 @@ BOOL LLGLTFPreviewTexture::needsRender()
     return false;
 }
 
-void LLGLTFPreviewTexture::preRender(BOOL clear_depth)
+void LLGLTFPreviewTexture::preRender(bool clear_depth)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
@@ -240,7 +243,7 @@ struct GLTFPreviewModel
         gGLLastMatrix = nullptr;
     }
     LLPointer<LLDrawInfo> mDrawInfo;
-    LLMatrix4a mModelMatrix; // Referenced by mDrawInfo
+    LLMatrix4 mModelMatrix; // Referenced by mDrawInfo
 };
 
 using PreviewSpherePart = std::unique_ptr<GLTFPreviewModel>;
@@ -393,7 +396,7 @@ void fixup_shader_constants(LLGLSLShader& shader)
         const S32 channel = shader.getTextureChannel(LLShaderMgr::DEFERRED_SHADOW0+i);
         if (channel != -1)
         {
-            gGL.getTexUnit(channel)->bind(LLViewerFetchedTexture::sWhiteImagep, TRUE);
+            gGL.getTexUnit(channel)->bind(LLViewerFetchedTexture::sWhiteImagep, true);
         }
     }
 }
@@ -419,25 +422,27 @@ struct SetTemporarily
 
 }; // namespace
 
-BOOL LLGLTFPreviewTexture::render()
+bool LLGLTFPreviewTexture::render()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-    if (!mShouldRender) { return FALSE; }
+    if (!mShouldRender) { return false; }
 
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    LLGLDepthTest(GL_FALSE);
+    LLGLDepthTest depth(GL_FALSE);
     LLGLDisable stencil(GL_STENCIL_TEST);
     LLGLDisable scissor(GL_SCISSOR_TEST);
     SetTemporarily<bool> no_dof(&LLPipeline::RenderDepthOfField, false);
     SetTemporarily<bool> no_glow(&LLPipeline::sRenderGlow, false);
     SetTemporarily<bool> no_ssr(&LLPipeline::RenderScreenSpaceReflections, false);
-    SetTemporarily<U32> no_fxaa(&LLPipeline::RenderFSAASamples, U32(0));
+    SetTemporarily<U32> no_aa(&LLPipeline::RenderFSAAType, U32(0));
     SetTemporarily<LLPipeline::RenderTargetPack*> use_auxiliary_render_target(&gPipeline.mRT, &gPipeline.mAuxillaryRT);
 
-    const LLVector4a light_dir(1.0f, 1.0f, 1.0f, 0.f);
+    LLVector3 light_dir3(1.0f, 1.0f, 1.0f);
+    light_dir3.normalize();
+    const LLVector4 light_dir = LLVector4(light_dir3, 0);
     const S32 old_local_light_count = gSavedSettings.get<S32>("RenderLocalLightCount");
     gSavedSettings.set<S32>("RenderLocalLightCount", 0);
 
@@ -460,24 +465,24 @@ BOOL LLGLTFPreviewTexture::render()
     // Set up camera and viewport
     const LLVector3 origin(0.0, 0.0, 0.0);
     camera.lookAt(origin, object_position);
-    camera.setAspect(mFullHeight / mFullWidth);
+    camera.setAspect((F32)(mFullWidth / mFullHeight));
     const LLRect texture_rect(0, mFullHeight, mFullWidth, 0);
-    camera.setPerspective(NOT_FOR_SELECTION, texture_rect.mLeft, texture_rect.mBottom, texture_rect.getWidth(), texture_rect.getHeight(), FALSE, camera.getNear(), MAX_FAR_CLIP*2.f);
+    camera.setPerspective(NOT_FOR_SELECTION, texture_rect.mLeft, texture_rect.mBottom, texture_rect.getWidth(), texture_rect.getHeight(), false, camera.getNear(), MAX_FAR_CLIP*2.f);
 
     // Generate sphere object on-the-fly. Discard afterwards. (Vertex buffer is
     // discarded, but the sphere should be cached in LLVolumeMgr.)
     PreviewSphere& preview_sphere = get_preview_sphere(mGLTFMaterial, object_transform);
 
     gPipeline.setupHWLights();
-    const LLMatrix4a& mat = gGLModelView;
-    LLVector4a transformed_light_dir;
-    mat.rotate4(light_dir, transformed_light_dir);
-    SetTemporarily<LLVector4a> force_sun_direction_high_graphics(&gPipeline.mTransformedSunDir, transformed_light_dir);
+    glm::mat4 mat = get_current_modelview();
+    glm::vec4 transformed_light_dir(light_dir);
+    transformed_light_dir = mat * transformed_light_dir;
+    SetTemporarily<LLVector4> force_sun_direction_high_graphics(&gPipeline.mTransformedSunDir, LLVector4(transformed_light_dir));
     // Override lights to ensure the sun is always shining from a certain direction (low graphics)
     // See also force_sun_direction_high_graphics and fixup_shader_constants
     {
         LLLightState* light = gGL.getLight(0);
-        light->setPosition(LLVector4(light_dir.getF32ptr()));
+        light->setPosition(light_dir);
         constexpr bool sun_up = true;
         light->setSunPrimary(sun_up);
     }
@@ -518,21 +523,29 @@ BOOL LLGLTFPreviewTexture::render()
     // *HACK: Hide mExposureMap from generateExposure
     gPipeline.mExposureMap.swapFBORefs(gPipeline.mLastExposure);
 
-    gPipeline.copyScreenSpaceReflections(&screen, &gPipeline.mSceneMap);
-    gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);
-    gPipeline.generateExposure(&gPipeline.mLuminanceMap, &gPipeline.mExposureMap, /*use_history = */ false);
-    gPipeline.gammaCorrect(&screen, &gPipeline.mPostMap);
+    static LLCachedControl<bool> hdr(gSavedSettings, "RenderHDREnabled", false);
+    if (hdr)
+    {
+        gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);
+        gPipeline.generateExposure(&gPipeline.mLuminanceMap, &gPipeline.mExposureMap, /*use_history = */ false);
+
+        gPipeline.generateBloomHDR(&screen);
+        gPipeline.compositeBloomHDR(&screen);
+    }
+
+    gPipeline.colorCorrect(&screen, &gPipeline.mPostPingMap, true, false);
     LLVertexBuffer::unbind();
-    gPipeline.generateGlow(&gPipeline.mPostMap);
-    gPipeline.combineGlow(&gPipeline.mPostMap, &screen);
-    gPipeline.renderDoF(&screen, &gPipeline.mPostMap);
-    gPipeline.applyFXAA(&gPipeline.mPostMap, &screen);
+
+    if (!hdr)
+    {
+        gPipeline.generateGlow(&gPipeline.mPostPingMap);
+        gPipeline.combineGlow(&gPipeline.mPostPingMap, &screen);
+    }
 
     // *HACK: Restore mExposureMap (it will be consumed by generateExposure next frame)
     gPipeline.mExposureMap.swapFBORefs(gPipeline.mLastExposure);
 
     // Final render
-
     gDeferredPostNoDoFProgram.bind();
 
     // From LLPipeline::renderFinalize: "Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems."
@@ -552,10 +565,10 @@ BOOL LLGLTFPreviewTexture::render()
     gPipeline.mReflectionMapManager.forceDefaultProbeAndUpdateUniforms(false);
     gSavedSettings.set<S32>("RenderLocalLightCount", old_local_light_count);
 
-    return TRUE;
+    return true;
 }
 
-void LLGLTFPreviewTexture::postRender(BOOL success)
+void LLGLTFPreviewTexture::postRender(bool success)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 

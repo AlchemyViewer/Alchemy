@@ -53,7 +53,7 @@ class LLTextureFetchTester;
 
 // Interface class
 
-class LLTextureFetch final : public LLWorkerThread
+class LLTextureFetch : public LLWorkerThread
 {
     friend class LLTextureFetchWorker;
 
@@ -66,7 +66,7 @@ public:
     class TFRequest;
 
     // Threads:  Tmain
-    /*virtual*/ size_t update(F32 max_time_ms) override;
+    /*virtual*/ size_t update(F32 max_time_ms);
 
     // called in the main thread after the TextureCacheThread shuts down.
     // Threads:  Tmain
@@ -76,9 +76,18 @@ public:
     // Threads:  Tmain
     void shutDownImageDecodeThread();
 
+    enum e_crete_request_errors
+    {
+        CREATE_REQUEST_ERROR_DEFAULT = -1,
+        CREATE_REQUEST_ERROR_MHOSTS = -2,
+        CREATE_REQUEST_ERROR_ABORTED = -3,
+        CREATE_REQUEST_ERROR_TRANSITION = -4,
+    };
+
     // Threads:  T* (but Tmain mostly)
+    // returns discard on success, fail code otherwise
     S32 createRequest(FTType f_type, const std::string& url, const LLUUID& id, const LLHost& host, F32 priority,
-                       S32 w, S32 h, S32 c, S32 discard, bool needs_aux, bool can_use_http);
+                      S32 w, S32 h, S32 c, S32 discard, bool needs_aux, bool can_use_http);
 
     // Requests that a fetch operation be deleted from the queue.
     // If @cancel is true, also stops any I/O operations pending.
@@ -95,7 +104,7 @@ public:
 
     // Threads:  T*
     // keep in mind that if fetcher isn't done, it still might need original raw image
-    bool getRequestFinished(const LLUUID& id, S32& discard_level,
+    bool getRequestFinished(const LLUUID& id, S32& discard_level, S32& worker_state,
                             LLPointer<LLImageRaw>& raw, LLPointer<LLImageRaw>& aux,
                             LLCore::HttpStatus& last_http_get_status);
 
@@ -109,16 +118,24 @@ public:
     F32 getTextureBandwidth() { return mTextureBandwidth; }
 
     // Threads:  T*
-    BOOL isFromLocalCache(const LLUUID& id);
+    bool isFromLocalCache(const LLUUID& id);
 
     // get the current fetch state, if any, from the given UUID
     S32 getFetchState(const LLUUID& id);
 
-    // @return  Fetch state of given image and associates statistics
+    // @return  Fetch state of an active given image and associates statistics
     //          See also getStateString
     // Threads:  T*
     S32 getFetchState(const LLUUID& id, F32& decode_progress_p, F32& requested_priority_p,
                       U32& fetch_priority_p, F32& fetch_dtime_p, F32& request_dtime_p, bool& can_use_http);
+
+    // @return  Fetch last state of given image
+    // Threads:  T*
+    S32 getLastFetchState(const LLUUID& id, S32& requested_discard, S32 &decoded_discard, bool &decoded);
+
+    // @return  Fetch last raw image
+    // Threads:  T*
+    S32 getLastRawImage(const LLUUID& id, LLPointer<LLImageRaw>& raw, LLPointer<LLImageRaw>& aux);
 
     // Debug utility - generally not safe
     void dump();
@@ -133,7 +150,7 @@ public:
     U32 getTotalNumHTTPRequests();
 
     // Threads:  T*
-    size_t getPending() override;
+    size_t getPending();
 
     // Threads:  T*
     void lockQueue() { mQueueMutex.lock(); }
@@ -238,17 +255,17 @@ protected:
 
     // Overrides from the LLThread tree
     // Locks:  Ct
-    bool runCondition() override;
+    bool runCondition();
 
 private:
     // Threads:  Ttf
-    /*virtual*/ void startThread(void) override;
+    /*virtual*/ void startThread(void);
 
     // Threads:  Ttf
-    /*virtual*/ void endThread(void) override;
+    /*virtual*/ void endThread(void);
 
     // Threads:  Ttf
-    /*virtual*/ void threadedUpdate(void) override;
+    /*virtual*/ void threadedUpdate(void);
 
     // Threads:  Ttf
     void commonUpdate();
@@ -292,9 +309,7 @@ private:
 public:
     LLUUID mDebugID;
     S32 mDebugCount;
-    BOOL mDebugPause;
-    S32 mPacketCount;
-    S32 mBadPacketCount;
+    bool mDebugPause;
 
     static LLTrace::CountStatHandle<F64>        sCacheHit;
     static LLTrace::CountStatHandle<F64>        sCacheAttempt;
@@ -311,7 +326,7 @@ private:
     LLTextureCache* mTextureCache;
 
     // Map of all requests by UUID
-    typedef boost::unordered_map<LLUUID,LLTextureFetchWorker*> map_t;
+    typedef std::map<LLUUID,LLTextureFetchWorker*> map_t;
     map_t mRequestMap;                                                  // Mfq
 
     // Set of requests that require network data
@@ -319,14 +334,12 @@ private:
     queue_t mHTTPTextureQueue;                                          // Mfnq
     typedef std::map<LLHost,std::set<LLUUID> > cancel_queue_t;
     F32 mTextureBandwidth;                                              // <none>
-    std::atomic<F32> mMaxBandwidth;
-#ifndef LL_RELEASE_FOR_DOWNLOAD
+    F32 mMaxBandwidth;                                                  // Mfnq
     LLTextureInfo mTextureInfo;
     LLTextureInfo mTextureInfoMainThread;
-#endif
 
     // XXX possible delete
-    std::atomic<U32Bits> mHTTPTextureBits;
+    U32Bits mHTTPTextureBits;                                               // Mfnq
 
     // XXX possible delete
     //debug use
@@ -338,7 +351,6 @@ private:
     // same locks.
     typedef std::deque<TFRequest *> command_queue_t;
     command_queue_t mCommands;                                          // Mfq
-    std::atomic<S32> mCommandsSize;
 
     // If true, modifies some behaviors that help with QA tasks.
     const bool mQAMode;

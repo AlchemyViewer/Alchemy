@@ -84,7 +84,7 @@ LLFloaterWebContent::LLFloaterWebContent( const Params& params )
     mCommitCallbackRegistrar.add( "WebContent.TestURL", boost::bind(&LLFloaterWebContent::onTestURL, this, _2));
 }
 
-BOOL LLFloaterWebContent::postBuild()
+bool LLFloaterWebContent::postBuild()
 {
     // these are used in a bunch of places so cache them
     mWebBrowser        = getChild< LLMediaCtrl >( "webbrowser" );
@@ -111,7 +111,7 @@ BOOL LLFloaterWebContent::postBuild()
     // initialize the URL history using the system URL History manager
     initializeURLHistory();
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterWebContent::initializeURLHistory()
@@ -130,7 +130,7 @@ void LLFloaterWebContent::initializeURLHistory()
     for(; iter_history != end_history; ++iter_history)
     {
         std::string url = (*iter_history).asString();
-        if(! url.empty())
+        if(! url.empty() && url_list)
             url_list->addSimpleElement(url);
     }
 }

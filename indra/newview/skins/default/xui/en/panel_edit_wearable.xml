@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel
+ background_visible="true"
  bevel_style="in"
  follows="all"
  height="570"
@@ -179,8 +180,8 @@
     <panel
      background_opaque="true"
      background_visible="true"
-     bg_alpha_color="PanelDefaultBackgroundColor"
-     bg_opaque_color="PanelDefaultBackgroundColor"
+     bg_alpha_color="DkGray2"
+     bg_opaque_color="DkGray2"
      border="false"
      follows="top|left|right"
      height="60"

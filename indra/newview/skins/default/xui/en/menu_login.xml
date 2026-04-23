@@ -65,58 +65,29 @@
              parameter="" />
         </menu_item_call>
 		<menu_item_separator/>
-		<menu_item_call
-             label="Alchemy Website"
-             name="Alchemy Website">
-			<menu_item_call.on_click
-				function="Advanced.ShowURL"
-				parameter="https://www.alchemyviewer.org"/>
-		</menu_item_call>
-		<menu_item_call
-             label="Alchemy Downloads"
-             name="Alchemy Downloads">
-			<menu_item_call.on_click
-				function="Advanced.ShowURL"
-				parameter="https://www.alchemyviewer.org/downloads"/>
-		</menu_item_call>
         <menu_item_call
-             label="Report Alchemy Bug"
-             name="Report Alchemy Bug">
-            <menu_item_call.on_click
-				function="Advanced.ShowURL"
-				parameter="https://github.com/AlchemyViewer/Alchemy/issues/new?assignees=&amp;labels=bug%2Ctriage&amp;projects=&amp;template=10-bug.yaml"/>
-        </menu_item_call>
-        <menu_item_call
-             label="Request Alchemy Improvement"
-             name="Request Alchemy Improvement">
-            <menu_item_call.on_click
-				function="Advanced.ShowURL"
-				parameter="https://github.com/AlchemyViewer/Alchemy/issues/new?assignees=&amp;labels=enhancement%2C+triage&amp;projects=&amp;template=20-enhancement.md&amp;title=New+Feature"/>
-        </menu_item_call>
-		<menu_item_separator/>
-        <menu_item_call
-             label="Second Life Knowledge Base"
+             label="Knowledge Base"
              name="Knowledge Base">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
             parameter="http://community.secondlife.com/t5/English-Knowledge-Base/Second-Life-User-s-Guide/ta-p/1244857"/>
         </menu_item_call>
         <menu_item_call
-             label="Second Life Wiki"
+             label="Wiki"
              name="Wiki">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
                  parameter="http://wiki.secondlife.com"/>
         </menu_item_call>
         <menu_item_call
-             label="Second Life Community Forums"
+             label="Community Forums"
              name="Community Forums">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
                  parameter="http://community.secondlife.com/t5/Forums/ct-p/Forums"/>
         </menu_item_call>         
         <menu_item_call
-             label="Second Life Support portal"
+             label="Support portal"
              name="Support portal">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
@@ -124,22 +95,15 @@
         </menu_item_call>
         <menu_item_separator/>
         <menu_item_call
-             label="Second Life News"
-             name="Second Life News">
-             <menu_item_call.on_click
-                 function="Advanced.ShowURL"
-                 parameter="http://community.secondlife.com/t5/Featured-News/bg-p/blog_feature_news"/>  
-        </menu_item_call>
-        <menu_item_call
-             label="Second Life Blogs"
+             label="[SECOND_LIFE] Blogs"
              name="Second Life Blogs">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
-                 parameter="http://community.secondlife.com/t5/Blogs/ct-p/Blogs"/>
+                 parameter="https://community.secondlife.com/news/"/>
         </menu_item_call>
         <menu_item_separator/>       
         <menu_item_call
-             label="Report Second Life Bug"
+             label="Report Bug"
              name="Report Bug">
                 <menu_item_call.on_click
                  function="Advanced.ReportBug"/>
@@ -178,6 +142,13 @@
              function="Advanced.ShowDebugSettings"
              parameter="all" />
         </menu_item_call>
+        <menu_item_call
+         label="Show Color settings"
+         name="Color Settings">
+            <menu_item_call.on_click
+             function="Floater.Toggle"
+             parameter="settings_color" />
+        </menu_item_call>
         <menu_item_separator />
         <menu_item_call
          label="XUI Preview Tool"
@@ -187,13 +158,6 @@
              function="Floater.Toggle"
              parameter="ui_preview" />
         </menu_item_call>
-        <menu_item_call
-        label="Color Settings"
-        name="Color Settings">
-        <menu_item_call.on_click
-         function="Floater.Toggle"
-         parameter="settings_color" />
-       </menu_item_call>
       <menu_item_separator />
       <menu
        create_jump_keys="true"

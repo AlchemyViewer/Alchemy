@@ -7,34 +7,34 @@
 		見つかりませんでした。
 	</floater.string>
 	<floater.string name="result_spillover">
-        [TOTAL]件以上ヒットしました。[VISIBLE_BEGIN]～[VISIBLE_END]件を表示しています。
+		[TOTAL]件以上ヒットしました。[VISIBLE_BEGIN]～[VISIBLE_END]件を表示しています。
 	</floater.string>
 	<floater.string name="result_count">
-        [TOTAL]件ヒットしました。
+		[TOTAL]件ヒットしました。
 	</floater.string>
 	<floater.string name="searching">
-        検索しています…。
+		検索しています…。
 	</floater.string>
 	<floater.string name="all_categories">
-        全てのカテゴリ
+		全てのカテゴリ
 	</floater.string>
 	<floater.string name="search_banned">
-        コミュニティスタンダードに明記されているコンテンツ制限により、検索クエリ内の一部の用語は除外されました。
+		コミュニティスタンダードに明記されているコンテンツ制限により、検索クエリ内の一部の用語は除外されました。
 	</floater.string>
 	<floater.string name="search_short">
-        検索語句が短すぎるため、検索は実行されませんでした。
+		検索語句が短すぎるため、検索は実行されませんでした。
 	</floater.string>
 	<floater.string name="search_disabled">
-        このリージョンではディレクトリ検索は無効になっています。
+		このリージョンではディレクトリ検索は無効になっています。
 	</floater.string>
 	<floater.string name="search_no_date_offset">
-        検索語句に日付オフセットがありませんでした。
+		検索語句に日付オフセットがありませんでした。
 	</floater.string>
 	<floater.string name="search_no_catgory">
-        検索語句にカテゴリがありませんでした。
+		検索語句にカテゴリがありませんでした。
 	</floater.string>
 	<floater.string name="search_no_query">
-        検索語句にクエリ文字列がありませんでした。
+		検索語句にクエリ文字列がありませんでした。
 	</floater.string>
 	<tab_container name="search_tabs">
 		<panel label="人物" name="panel_search_people"/>
@@ -45,20 +45,6 @@
 		<panel label="クラシファイド" name="panel_search_classifieds"/>
 		<panel label="Web検索" name="panel_search_web"/>
 	</tab_container>
-	<layout_stack name="results_stack">
-		<layout_panel name="results_lp">
-			<scroll_list name="results"/>
-		</layout_panel>
-		<layout_panel name="detail_lp">
-			<panel name="detail_avatar"/>
-			<panel name="detail_group"/>
-			<panel name="detail_place"/>
-			<panel name="detail_event"/>
-			<panel name="detail_classified"/>
-		</layout_panel>
-	</layout_stack>
 	<text name="results_status" value="全[TOTAL]件"/>
-	<button name="PageDn"/>
-	<button name="PageUp"/>
-	<loading_indicator name="loading"/>
+	<button name="popout" tool_tip="検索結果を新しいウィンドウで開きます。"/>
 </floater>

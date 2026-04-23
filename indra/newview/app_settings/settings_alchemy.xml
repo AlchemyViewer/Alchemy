@@ -13,17 +13,6 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>AlchemyLinuxVoiceVariant</key>
-        <map>
-            <key>Comment</key>
-            <string>0 - native, 1 - 32bit wine voice, 2 - 64bit wine voice</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>U32</string>
-            <key>Value</key>
-            <integer>2</integer>
-        </map>
         <key>AlchemyDisableClickToSit</key>
         <map>
             <key>Comment</key>
@@ -35,7 +24,7 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>AlchemyCameraExpanded</key>
+        <key>AlchemyCameraFloaterExpanded</key>
         <map>
             <key>Comment</key>
             <string>Expanded camera floater</string>
@@ -45,17 +34,6 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>1</integer>
-        </map>
-        <key>AlchemyCameraNoZoomLimit</key>
-        <map>
-            <key>Comment</key>
-            <string>Disables the minimum zoom distance, allowing more camera freedom</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
         </map>
         <key>AlchemyChatCommandAnimationOverride</key>
         <map>
@@ -266,44 +244,13 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
-        <key>AlchemyCinematicModeHideHoverText</key>
-        <map>
-            <key>Comment</key>
-            <string>Hide Hover Text in cinematic mode.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyDisableCameraCollision</key>
-        <map>
-            <key>Comment</key>
-            <string>Disable collision of camera with objects and ground plane</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyDisableEffectSpiral</key>
-        <map>
-            <key>Comment</key>
-            <string>Disable spiral effects</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
         <key>AlchemyDisableMouseSteering</key>
         <map>
             <key>Comment</key>
-            <string>Disable mouse steering. Doing so will stop your camera from resetting, and your
-                avatar from rotating when you click yourself (escape key-like behaviour).</string>
+            <string>
+                Disable mouse steering. Doing so will stop your camera from resetting, and your
+                avatar from rotating when you click yourself (escape key-like behaviour).
+            </string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -321,28 +268,6 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
-        </map>
-        <key>AlchemyForceFly</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSELETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyGameModeEnable</key>
-        <map>
-            <key>Comment</key>
-            <string>Enables GameMode (Linux Only) for better performance.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
         </map>
         <key>AlchemyGlobalLightScale</key>
         <map>
@@ -377,62 +302,6 @@
             <key>Value</key>
             <real>8.0</real>
         </map>
-        <key>AlchemyIgnoreSimCameraConstraint</key>
-        <map>
-            <key>Comment</key>
-            <string>Ignore simulator collision plane for camera constraints</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyImageDecodeThreads</key>
-        <map>
-            <key>Comment</key>
-            <string>Amount of threads to use for image decoding. 0 = autodetect, 1 = 0ff, >1 number
-                of threads. Needs restart</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>U32</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyInventoryScriptsMono</key>
-        <map>
-            <key>Comment</key>
-            <string>Control whether new scripts in inventory are mono(true) or lsl(false)</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>AlchemyMoonWalk</key>
-        <map>
-            <key>Comment</key>
-            <string>Walking backwards when moving backwards</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyKeepSettingsOnGPUChange</key>
-        <map>
-            <key>Comment</key>
-            <string>Keep graphical preferences when GPU changes</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
         <key>AlchemyLastDirectoryTab</key>
         <map>
             <key>Comment</key>
@@ -446,10 +315,10 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>AlchemyLookAtClampEnabled</key>
+        <key>AlchemyLookAtShow</key>
         <map>
             <key>Comment</key>
-            <string>If true, own look at distance will be clamped to a determined distance</string>
+            <string>If true, avatar look at beacons will be displayed</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -457,21 +326,32 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>AlchemyLookAtClampDistance</key>
+        <key>AlchemyLookAtLines</key>
         <map>
             <key>Comment</key>
-            <string>Distance at which to clamp own avatar look at</string>
+            <string>Render a line from Look At beacon to the originating avatar</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>F32</string>
+            <string>Boolean</string>
             <key>Value</key>
-            <real>1.0</real>
+            <integer>0</integer>
         </map>
-        <key>AlchemyLookAtPrivate</key>
+        <key>AlchemyLookAtNames</key>
         <map>
             <key>Comment</key>
-            <string>Disable broadcast of own look at to other users.</string>
+            <string>Render name of originating avatar under Look At beacon</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyLookAtHideSelf</key>
+        <map>
+            <key>Comment</key>
+            <string>Hide own Look At beacon when Look At render is enabled</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -515,24 +395,13 @@
         <key>AlchemyMinimapObjectUpdateInterval</key>
         <map>
             <key>Comment</key>
-            <string>Render a red line in the center of the camera view frustrum</string>
+            <string>Rate at which to update minimap object layer</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
             <real>0.1</real>
-        </map>
-        <key>AlchemyMinimapParcelBoundries</key>
-        <map>
-            <key>Comment</key>
-            <string>Draw parcel boundry lines</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
         </map>
         <key>AlchemyMiniMapForSaleParcels</key>
         <map>
@@ -567,16 +436,16 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
-        <key>AlchemyMinimapTile</key>
+        <key>AlchemyMoonWalk</key>
         <map>
             <key>Comment</key>
-            <string>Use the world map tile as the minimap background</string>
+            <string>Disables walking backwards when moving backwards</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>Boolean</string>
             <key>Value</key>
-            <integer>1</integer>
+            <integer>0</integer>
         </map>
         <key>AlchemyMotionResetsCamera</key>
         <map>
@@ -622,6 +491,28 @@
             <key>Value</key>
             <real>380.0</real>
         </map>
+        <key>AlchemyMouselookInstructions</key>
+        <map>
+            <key>Comment</key>
+            <string>Draw instructional overlay for mouselook - Press esc to leave</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyMouselookPosition</key>
+        <map>
+            <key>Comment</key>
+            <string>Draw position and health in mouselook</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyMouseLookZoomTime</key>
         <map>
             <key>Comment</key>
@@ -654,17 +545,6 @@
             <string>S32</string>
             <key>Value</key>
             <integer>0</integer>
-        </map>
-        <key>AlchemyNearbyChatInput</key>
-        <map>
-            <key>Comment</key>
-            <string>Nearby chat input 0 - Conversations, 1 - Chatbar</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
         </map>
         <key>AlchemyNearbyColorize</key>
         <map>
@@ -721,17 +601,6 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>AlchemyLSLPreprocessor</key>
-        <map>
-            <key>Comment</key>
-            <string>LSL Preprocessor</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
         <key>AlchemyOnlineOfflineToChat</key>
         <map>
             <key>Comment</key>
@@ -743,87 +612,32 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>AlchemyPreProcLSLOptimizer</key>
-        <map>
-            <key>Comment</key>
-            <string>LSL Optimizer</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>AlchemyPreProcLSLTextCompress</key>
-        <map>
-            <key>Comment</key>
-            <string>LSL Text Compress</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyPreProcLSLLazyLists</key>
-        <map>
-            <key>Comment</key>
-            <string>LSL Lazy Lists</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>AlchemyPreProcLSLSwitch</key>
-        <map>
-            <key>Comment</key>
-            <string>LSL Switch Statements</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>AlchemyPreProcEnableHDDInclude</key>
-        <map>
-            <key>Comment</key>
-            <string>Enable #include from local disk</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyPreProcHDDIncludeLocation</key>
-        <map>
-            <key>Comment</key>
-            <string>Path for local disk includes</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string />
-        </map>
-        <key>AlchemyPointAtPrivate</key>
-        <map>
-            <key>Comment</key>
-            <string>Disable setting current point at target</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
         <key>AlchemyPowerfulWizard</key>
         <map>
             <key>Comment</key>
-            <string>It's a surprise.</string>
+            <string>You shall not pass!</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyPlayTeleportSound</key>
+        <map>
+            <key>Comment</key>
+            <string>Play teleport sound</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyPlayTypingSound</key>
+        <map>
+            <key>Comment</key>
+            <string>Play typing sound</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -886,14 +700,14 @@
             <key>Value</key>
             <integer>30</integer>
         </map>
-        <key>AlchemyRenderSMAA</key>
+        <key>AlchemyRenderTonemapType</key>
         <map>
             <key>Comment</key>
-            <string>Use Enhanced Subpixel Morphological Antialiasing in Deferred</string>
+            <string>What tonemapper to use: 0 = Khronos Neutral, 1 = ACES Hill, 2 = ACES Boosted, 3 = Reinhard, 4 = Filmic, 5 = GT, 6 = AgX</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Boolean</string>
+            <string>S32</string>
             <key>Value</key>
             <integer>1</integer>
         </map>
@@ -911,65 +725,10 @@
         <key>AlchemyRezUnderLandGroup</key>
         <map>
             <key>Comment</key>
-            <string>Allows the agent to rez objects under the target locations land group. Must be a
-                member of the land group.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ChatAlerts</key>
-        <map>
-            <key>Comment</key>
-            <string>Enable chat keyword alerts for nearby chat and instant messages</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ChatTimestampSeconds</key>
-        <map>
-            <key>Comment</key>
-            <string>Display seconds in chat log timestamp</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>CloseChatBarOnReturn</key>
-        <map>
-            <key>Comment</key>
-            <string>Close chat after hitting return</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>DoubleClickAttachmentAdd</key>
-        <map>
-            <key>Comment</key>
-            <string>Double-clicking an attachment in inventory will add wear it rather than replace
-                wear it</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>DoubleClickWearableAdd</key>
-        <map>
-            <key>Comment</key>
-            <string>Double-clicking a clothing wearable in inventory will add wear it rather than
-                replace wear it</string>
+            <string>
+                Allows the agent to rez objects under the target locations land group. Must be a
+                member of the land group.
+            </string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -999,17 +758,6 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
-        <key>GroupSnoozeTime</key>
-        <map>
-            <key>Comment</key>
-            <string>Amount of time (in seconds) group chat will be snoozed for</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>900</integer>
-        </map>
         <key>LastSelectedGrass</key>
         <map>
             <key>Comment</key>
@@ -1032,10 +780,87 @@
             <key>Value</key>
             <string />
         </map>
-        <key>LocalInventoryEnabled</key>
+        <key>AVPickerNearMeRange</key>
         <map>
             <key>Comment</key>
-            <string>This enables the local inventory system. (Requires restart.)</string>
+            <string>Search radius for nearby avatars</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>130.0</real>
+        </map>
+        <key>BlockMuteSortOrder</key>
+        <map>
+            <key>Comment</key>
+            <string>Specifies sort order for mute list</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>BlockDerenderSortOrder</key>
+        <map>
+            <key>Comment</key>
+            <string>Specifies sort order for derender list</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>BlockAssetSortOrder</key>
+        <map>
+            <key>Comment</key>
+            <string>Specifies sort order for asset list</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>BlockRenderingSortOrder</key>
+        <map>
+            <key>Comment</key>
+            <string>Specifies sort order for avatar rendering list</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>MiniMapPrimMaxVertDistance</key>
+        <map>
+            <key>Comment</key>
+            <string>Max height difference between avatar and prim to be shown on the MiniMap. Set to 0.0 to disable.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>256.0</real>
+        </map>
+        <key>MiniMapPrimScripted</key>
+        <map>
+            <key>Comment</key>
+            <string>Accent scripted objects on netmap in different colors.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>MiniMapPrimPhysical</key>
+        <map>
+            <key>Comment</key>
+            <string>Accent physical objects on netmap in different colors.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1043,23 +868,54 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
-        <key>OpenSimSearchURL</key>
+        <key>MiniMapPrimTempOnRez</key>
         <map>
             <key>Comment</key>
-            <string>OpenSim fallback search url</string>
+            <string>Accent temporary objects on netmap in different colors.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>String</string>
+            <string>Boolean</string>
             <key>Value</key>
-            <string>
-                http://search.metaverseink.com/opensim/results.jsp?query=[QUERY]&amp;submit=[CATEGORY]</string>
+            <integer>0</integer>
         </map>
-        <key>RenderAutoMaskAlphaUseRMSE</key>
+        <key>NearbyToastHeightRatio</key>
         <map>
             <key>Comment</key>
-            <string>Use alternative method of detecing suitable textures for alphamasking. Less
-                prone to excluding textures than standard method.</string>
+            <string>Percentage of the window height that nearby chat toasts can appear in</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>85</integer>
+        </map>
+        <key>NearbyToastOffset</key>
+        <map>
+            <key>Comment</key>
+            <string>Nearby chat toast offset from the bottom of the screen</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>70</integer>
+        </map>
+        <key>NearbyToastWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width of the nearby chat toasts (or 0 to have the toasts follow the width of the chat bar)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderBloomHDR</key>
+        <map>
+            <key>Comment</key>
+            <string>Replace legacy glow with HDR bloom pyramid (pre-tonemap). 0 = legacy glow, 1 = HDR bloom.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1067,30 +923,207 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
-        <key>RenderAutoMaskAlphaMaxRMSE</key>
+        <key>RenderBloomThreshold</key>
         <map>
             <key>Comment</key>
-            <string>Sets the maximum random mean square error cutoff used when detecting suitable
-                textures for alphamasking. (RenderAutoMaskAlphaUseRMSE must be TRUE for this to have
-                any effect)</string>
+            <string>HDR bloom luminance threshold in linear light. Values above this bloom; below, fall off softly via the knee. 1.0 = roughly "brighter than white".</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>0.18</real>
+            <real>1.0</real>
         </map>
-        <key>RenderAutoMaskAlphaMaxMid</key>
+        <key>RenderBloomKnee</key>
         <map>
             <key>Comment</key>
-            <string>Sets the maximum percent of mid-range alpha pixels textures for alphamasking.
-                (RenderAutoMaskAlphaUseRMSE must be TRUE for this to have any effect)</string>
+            <string>Soft-knee width below the bloom threshold. Wider values give a softer, more gradual bloom onset. Range 0 to 1.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>0.275</real>
+            <real>0.5</real>
+        </map>
+        <key>RenderBloomMipCount</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of bloom pyramid mip levels. More mips = wider, softer bloom. Clamped to [3, 7].</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>5</integer>
+        </map>
+        <key>RenderBloomResolutionScale</key>
+        <map>
+            <key>Comment</key>
+            <string>Base bloom pyramid resolution relative to scene. 0 = full, 1 = 3/4, 2 = half, 3 = quarter, 4 = eighth. Higher = faster and wider bloom reach per mip, with bilinear upscale at composite. Clamped to [0, 4].</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderBloomScatter</key>
+        <map>
+            <key>Comment</key>
+            <string>Bloom upsample tent-filter radius multiplier. 1.0 = adjacent-texel taps. Values >1 widen the bloom per octave; >~2.5 starts to alias because the tent skips source texels.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderBloomAlphaGlowBoost</key>
+        <map>
+            <key>Comment</key>
+            <string>Multiplier applied to alpha-tagged glow (legacy prim glow parameter) when fed into HDR bloom. Compensates for pre-tonemap composite so prim-glow halos match legacy brightness.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>5.0</real>
+        </map>
+        <key>RenderBloomStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>HDR bloom composite strength. Multiplies the final bloom pyramid before it is additively blended into the scene. Independent of RenderGlowStrength so HDR bloom and legacy glow can be tuned separately.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.325</real>
+        </map>
+        <key>RenderBloomHalation</key>
+        <map>
+            <key>Comment</key>
+            <string>Enable the halation signal in HDR bloom. When off, the bloom pyramid allocates as R11F_G11F_B10F (half the bandwidth of RGBA16F) and skips the warmth extract and tinted composite. Requires RenderBloomHDR.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderBloomHalationStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Photographic halation (warm halo around bright highlights). 0 disables. 0.25 is a gentle cinematic feel. Requires RenderBloomHalation.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBloomHalationTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Tint color for the halation halo (linear RGB). Default is a warm amber. Requires RenderBloomHalation.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>0.35</real>
+                <real>0.15</real>
+            </array>
+        </map>
+        <key>RenderChromaticAberrationStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Overall intensity of the chromatic aberration fringe. 0 disables the effect. 0.15 gives a subtle cinema lens feel; 0.5 is heavy. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderChromaticAberrationFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>How quickly the aberration grows from the screen center outward. 1 is a linear ramp; higher values keep the center clean and push fringing to the edges. Range 0.5 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderChromaticAberrationAngle</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotates the red/blue split direction, in degrees. 0 is horizontal; 90 is vertical. Only meaningful when Anisotropy is nonzero. Range 0 to 360.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderChromaticAberrationAnisotropy</key>
+        <map>
+            <key>Comment</key>
+            <string>Stretches the fringe along the angle axis. 0 gives an even radial fringe; positive values elongate it into a directional smear for anamorphic-style aberration. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderChromaticAberrationOffsetRX</key>
+        <map>
+            <key>Comment</key>
+            <string>Red channel horizontal offset direction. -1 shifts red inward on the X axis, +1 outward. Combined with RY for per-channel fringe direction. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>-1.0</real>
+        </map>
+        <key>RenderChromaticAberrationOffsetRY</key>
+        <map>
+            <key>Comment</key>
+            <string>Red channel vertical offset direction. Pairs with OffsetRX. 0 keeps red split purely horizontal. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderChromaticAberrationOffsetBX</key>
+        <map>
+            <key>Comment</key>
+            <string>Blue channel horizontal offset direction. Typically opposite sign of OffsetRX for a standard red/blue split. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderChromaticAberrationOffsetBY</key>
+        <map>
+            <key>Comment</key>
+            <string>Blue channel vertical offset direction. Pairs with OffsetBX. 0 keeps blue split purely horizontal. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
         </map>
         <key>RenderColorGrade</key>
         <map>
@@ -1114,6 +1147,431 @@
             <key>Value</key>
             <string></string>
         </map>
+        <key>RenderColorGradeLUTStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the color grading LUT effect</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderSplitToneAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Split toning strength for shadows and highlights. 0 disables the effect; 0.5 is a natural cinematic push. Tints shadows and highlights without shifting overall brightness.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderSplitToneBalance</key>
+        <map>
+            <key>Comment</key>
+            <string>Slides the midpoint between shadow and highlight tints. Negative values widen shadows (good for dark scenes); positive values widen highlights (good for bright scenes). Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderSplitToneShadowTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Target color for shadow tones. Neutral gray (0.5, 0.5, 0.5) is identity. Try cool teal (0.35, 0.5, 0.55) for classic teal-and-orange looks.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.5</real>
+                <real>0.5</real>
+                <real>0.5</real>
+            </array>
+        </map>
+        <key>RenderSplitToneHighlightTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Target color for highlight tones. Neutral gray (0.5, 0.5, 0.5) is identity. Try warm amber (0.6, 0.5, 0.4) to complement teal shadows.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.5</real>
+                <real>0.5</real>
+                <real>0.5</real>
+            </array>
+        </map>
+        <key>RenderSplitToneMidtoneTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Target color for midtones. Neutral gray (0.5, 0.5, 0.5) is identity. Warm tints like (0.55, 0.5, 0.45) flatter skin tones.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.5</real>
+                <real>0.5</real>
+                <real>0.5</real>
+            </array>
+        </map>
+        <key>RenderSplitToneMidtoneAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Midtone tint strength, independent from shadow/highlight amount. 0 disables; subtle values (0.15-0.35) add mood without muddying skin.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeWhiteBalanceCCT</key>
+        <map>
+            <key>Comment</key>
+            <string>White balance temperature shift, in Kelvin relative to neutral daylight. Negative warms the image, positive cools it. Range -5000 to +5000. Default 0. Try -2500 tungsten glow, -1000 golden hour, +1500 blue hour, +3000 moonlit.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeWhiteBalanceDuv</key>
+        <map>
+            <key>Comment</key>
+            <string>Green/magenta tint, perpendicular to the temperature axis. Negative pushes magenta, positive pushes green. Range -1 to +1. Default 0. Try -0.4 cyberpunk magenta, +0.4 fluorescent green, +0.75 Matrix green.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeLift</key>
+        <map>
+            <key>Comment</key>
+            <string>Shadow lift (R,G,B): adds to the darkest tones to raise the black floor and tint shadows. Per-channel range -0.5 to +0.5. Default (0,0,0). Try (0.02,0.02,0.05) cool shadow mist, (0.05,0.03,0) warm lift, negatives crush toward black.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderColorGradeGamma</key>
+        <map>
+            <key>Comment</key>
+            <string>Midtone gamma (R,G,B): bends the middle of the tonal range without moving blacks or whites. Below 1 brightens mids, above 1 darkens them. Per-channel range 0.5 to 1.5. Default (1,1,1). Try (0.9,0.9,0.9) open mids, (1.1,1.0,0.95) warm mids.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>1.0</real>
+                <real>1.0</real>
+            </array>
+        </map>
+        <key>RenderColorGradeGain</key>
+        <map>
+            <key>Comment</key>
+            <string>Highlight gain (R,G,B): multiplies the brightest tones to boost, clip, or tint whites. Per-channel range 0.5 to 1.5. Default (1,1,1). Try (1.05,1.02,0.95) warm highlights, (0.95,1.0,1.05) cool highlights, uniform &lt;1 to tame blowouts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>1.0</real>
+                <real>1.0</real>
+            </array>
+        </map>
+        <key>RenderColorGradeBlackPoint</key>
+        <map>
+            <key>Comment</key>
+            <string>Crushes values at or below this level to pure black. 0 is identity, 0.05 deepens blacks cinematically, 0.1+ starts clipping shadow detail.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeWhitePoint</key>
+        <map>
+            <key>Comment</key>
+            <string>Clips values at or above this level to pure white. 1 is identity, 0.95 blooms highlights, 0.9 produces a washed bleach-bypass look.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderColorGradeBrightness</key>
+        <map>
+            <key>Comment</key>
+            <string>Shifts the whole image lighter or darker. Range -0.5 to 0.5; small values (±0.05) are already noticeable.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeContrast</key>
+        <map>
+            <key>Comment</key>
+            <string>S-curve around midgray. 1 is identity; less than 1 flattens (matte film look), greater than 1 punches (values above 1.3 start clipping).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderColorGradeHighlights</key>
+        <map>
+            <key>Comment</key>
+            <string>Recovers (negative) or boosts (positive) highlights without touching midtones. Use -0.3 to pull blown skies back from clipping.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeShadows</key>
+        <map>
+            <key>Comment</key>
+            <string>Lifts (positive) or crushes (negative) shadows without touching midtones. Use +0.2 to reveal shadow detail in dark scenes.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeSaturation</key>
+        <map>
+            <key>Comment</key>
+            <string>Uniform saturation. 1 is identity, 0 is black-and-white, 1.2 is punchy, 1.5 is heavily stylized.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderColorGradeVibrance</key>
+        <map>
+            <key>Comment</key>
+            <string>Smart saturation that pushes muted colors harder than already-saturated ones. Skin-friendly; range -1 to 1, 0.3 is a subtle lift.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeHueShift</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotates all hues around the color wheel in degrees. Range -180 to 180. 30 warms everything; 180 is a full complement (inverted).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderColorGradeCurveToe</key>
+        <map>
+            <key>Comment</key>
+            <string>Per-channel filmic curve toe point (RGB). Pixels at or below this input level flatten toward black. Try (0.05, 0.05, 0.1) to lift shadow blues.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderColorGradeCurveShoulder</key>
+        <map>
+            <key>Comment</key>
+            <string>Per-channel filmic curve shoulder point (RGB). Pixels at or above this input level flatten toward white. Lower values (around 0.85) give a tighter roll-off.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>1.0</real>
+                <real>1.0</real>
+            </array>
+        </map>
+        <key>RenderColorGradeCurveStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Per-channel curve blend strength (RGB). 0 disables; 0.4 is typical film, differing values per channel create cross-process looks.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderCVDMode</key>
+        <map>
+            <key>Comment</key>
+            <string>Color vision deficiency effect mode - 0 = off, 1 = protanopia (no L cones), 2 = deuteranopia (no M cones), 3 = tritanopia (no S cones)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderCVDAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Strength of applied color vision deficiency effect</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderDitherAnimated</key>
+        <map>
+            <key>Comment</key>
+            <string>Almost always want this true — animated dither is perceptually invisible, static dither can show as fixed grain.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderDitherEnabled</key>
+        <map>
+            <key>Comment</key>
+            <string>Dither final screen output for 8 or 10-bit display to reduce banding artifacts on gradients, shadows, and sky</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderEffectPreviewMode</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 7] 0 = off, 1 = protanopia (no L cones), 2 = deuteranopia (no M cones), 3 = tritanopia (no S cones), 4 = Achromatopsia (rod monochromacy), 5 = Blue cone monochromacy (blue-tinted near-gray), 6 = Achromatomaly (severely reduced saturation), 7 = false-color exposure map</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderFilmGrainAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Strength of applied film grain effect</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderFilmGrainAnimated</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether the film grain effect is animated between frames</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderFilmGrainRange</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] luma position where grain peaks. 0 = shadows only, 0.5 = midtones (classic film), 1 = highlights only</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>RenderFilmGrainSize</key>
+        <map>
+            <key>Comment</key>
+            <string>[1, 8] Size of film grain particles</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderFilmGrainStyle</key>
+        <map>
+            <key>Comment</key>
+            <string>Film grain effect style - 0 = mono luma, 1 = color (digital push), 2 = coarse (16mm feel), 3 = photon shot (CCD sensor)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderFilmGrainTint</key>
+        <map>
+            <key>Comment</key>
+            <string>color of the film grain. vec3(1) = neutral gray. Try vec3(1.0, 0.9, 0.8) for warm film grain, vec3(0.8, 0.9, 1.0) for cool video noise</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>1.0</real>
+                <real>1.0</real>
+            </array>
+        </map>
         <key>RenderFocusPointLocked</key>
         <map>
             <key>Comment</key>
@@ -1136,65 +1594,10 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>RenderSharpenMethod</key>
+        <key>RenderGLContext10bitSDR</key>
         <map>
             <key>Comment</key>
-            <string>Sharpening Method - 0 (None), 1 (Contrast Adaptive Sharpening), 2 (DLS)</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>U32</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>RenderSharpenCASSharpness</key>
-        <map>
-            <key>Comment</key>
-            <string>Sharpening level for CAS 0 to 1 range.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.6</real>
-        </map>
-        <key>RenderSharpenDLSSharpness</key>
-        <map>
-            <key>Comment</key>
-            <string>Sharpening level for DLS 0 to 1 range.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.6</real>
-        </map>
-        <key>RenderSharpenDLSDenoise</key>
-        <map>
-            <key>Comment</key>
-            <string>Denoise level for DLS 0 to 1 range.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.17</real>
-        </map>
-        <key>RenderToneMapType</key>
-        <map>
-            <key>Comment</key>
-            <string>Tonemapping type 0 - HDR Debug, 1 - ACES, 2 - Uchimura, 3 - AMD, 4 - Uncharted</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>U32</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>RenderAlwaysSoftenShadows</key>
-        <map>
-            <key>Comment</key>
-            <string>Always soften shadows when shadows are enabled</string>
+            <string>[EXPERIMENTAL] - Use 10-bit SDR framebuffer if supported.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1202,44 +1605,21 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>AlchemyToneMapAMDHDRMax</key>
+        <key>RenderLensFlareStrength</key>
         <map>
             <key>Comment</key>
-            <string>Maximum input value.</string>
+            <string>Master intensity of the lens flare effect. 0 turns it off entirely; 1 is full strength. Use this as the on/off switch.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>256.0</real>
+            <real>0.0</real>
         </map>
-        <key>AlchemyToneMapAMDExposure</key>
+        <key>RenderLensFlareStreakLength</key>
         <map>
             <key>Comment</key>
-            <string>Number of stops between 'hdrMax' and 18% mid-level on input.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>8.0</real>
-        </map>
-        <key>AlchemyToneMapAMDContrast</key>
-        <map>
-            <key>Comment</key>
-            <string>Input range 0.0 (no extra contrast) to 1.0 (maximum contrast)</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.25</real>
-        </map>
-        <key>AlchemyToneMapAMDCrosstalkR</key>
-        <map>
-            <key>Comment</key>
-            <string>One channel must be 1.0, the rest can be greater than or equal to 1.0 but not
-                zero.</string>
+            <string>How far the horizontal anamorphic streak stretches across the screen. 0.5 reaches halfway; 1.0 crosses the full width. Range 0.01 to 2.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1247,11 +1627,32 @@
             <key>Value</key>
             <real>0.5</real>
         </map>
-        <key>AlchemyToneMapAMDCrosstalkG</key>
+        <key>RenderLensFlareStreakFalloff</key>
         <map>
             <key>Comment</key>
-            <string>One channel must be 1.0, the rest can be greater than or equal to 1.0 but not
-                zero.</string>
+            <string>How quickly the streak fades toward its tips. Lower values leave a longer visible tail; higher values make the streak fade in close to the sun. Range 0.1 to 10.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.5</real>
+        </map>
+        <key>RenderLensFlareStreakThickness</key>
+        <map>
+            <key>Comment</key>
+            <string>Vertical thickness of the streak as a fraction of the screen. Lower is a thin hairline, higher is a soft horizontal band. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.08</real>
+        </map>
+        <key>RenderLensFlareStreakIntensity</key>
+        <map>
+            <key>Comment</key>
+            <string>Brightness multiplier for just the streak, separate from the master strength. 1 is neutral; higher boosts the streak without affecting the glow/ghosts. Range 0 to 5.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1259,70 +1660,58 @@
             <key>Value</key>
             <real>1.0</real>
         </map>
-        <key>AlchemyToneMapAMDCrosstalkB</key>
+        <key>RenderLensFlareStreakTint</key>
         <map>
             <key>Comment</key>
-            <string> One channel must be 1.0, the rest can be greater than or equal to 1.0 but not
-                zero.</string>
+            <string>Color of the horizontal streak. The default cool blue mimics coated anamorphic cinema lenses; try warm tones for sci-fi or golden hour looks.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.6</real>
+                <real>0.7</real>
+                <real>1.0</real>
+            </array>
+        </map>
+        <key>RenderLensFlareChromaticSpread</key>
+        <map>
+            <key>Comment</key>
+            <string>Red/blue color separation along the streak for a chromatic fringe look. 0 is clean; 1 gives a strong rainbow split. Range 0 to 1.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>0.03125</real>
+            <real>0.08</real>
         </map>
-        <key>AlchemyToneMapAMDSaturationR</key>
+        <key>RenderLensFlareGlowRadius</key>
         <map>
             <key>Comment</key>
-            <string>A per channel adjustment, use less than 0 decrease, 0=no change, greater 0
-                increase.</string>
+            <string>Size of the soft glow bloom directly around the sun. Small values hug the light; larger values create a wider halo of brightness. Range 0.01 to 0.5.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>0.0</real>
+            <real>0.12</real>
         </map>
-        <key>AlchemyToneMapAMDSaturationG</key>
+        <key>RenderLensFlareGlowFalloff</key>
         <map>
             <key>Comment</key>
-            <string>A per channel adjustment, use less than 0 decrease, 0=no change, greater 0
-                increase.</string>
+            <string>Softness of the central glow. Lower values give a gentle, spread-out bloom; higher values keep it tight and punchy. Range 1 to 30.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>0.0</real>
+            <real>8.0</real>
         </map>
-        <key>AlchemyToneMapAMDSaturationB</key>
+        <key>RenderLensFlareGlow</key>
         <map>
             <key>Comment</key>
-            <string>A per channel adjustment, use less than 0 decrease, 0=no change, greater 0
-                increase.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.0</real>
-        </map>
-        <key>AlchemyToneMapAMDShoulderContrast</key>
-        <map>
-            <key>Comment</key>
-            <string>Use optional extra shoulderContrast tuning (set to false if shoulderContrast is
-                1.0).</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyToneMapAMDShoulderContrastRange</key>
-        <map>
-            <key>Comment</key>
-            <string>Shoulder shaping, 1.0 = no change (fast path)</string>
+            <string>Intensity of the soft central glow around the sun. 0 disables the glow; 1 is neutral; higher boosts it. Range 0 to 5.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1330,120 +1719,21 @@
             <key>Value</key>
             <real>1.0</real>
         </map>
-        <key>AlchemyToneMapUchimuraMaxBrightness</key>
+        <key>RenderLensFlareGhostCount</key>
         <map>
             <key>Comment</key>
-            <string>Maximum Possible Display Brightness</string>
+            <string>Number of lens ghost circles placed along the line from the sun through the screen center. Shape control only; use RenderLensFlareGhost to toggle the effect. Range 0 to 8.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>F32</string>
+            <string>S32</string>
             <key>Value</key>
-            <real>1.0</real>
+            <integer>4</integer>
         </map>
-        <key>AlchemyToneMapUchimuraContrast</key>
+        <key>RenderLensFlareGhostSpacing</key>
         <map>
             <key>Comment</key>
-            <string>Contrast Adjustment</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>1.0</real>
-        </map>
-        <key>AlchemyToneMapUchimuraLinearStart</key>
-        <map>
-            <key>Comment</key>
-            <string>Curve Linear Section Start</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.22</real>
-        </map>
-        <key>AlchemyToneMapUchimuraLinearLength</key>
-        <map>
-            <key>Comment</key>
-            <string>Length of linear section in tonemapping curve</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.44</real>
-        </map>
-        <key>AlchemyToneMapUchimuraBlackLevel</key>
-        <map>
-            <key>Comment</key>
-            <string>Adjust black range of curve</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>1.33</real>
-        </map>
-        <key>AlchemyToneMapFilmicToeStr</key>
-        <map>
-            <key>Comment</key>
-            <string>Toe Strength</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.22</real>
-        </map>
-        <key>AlchemyToneMapFilmicToeLen</key>
-        <map>
-            <key>Comment</key>
-            <string>Toe Length</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.30</real>
-        </map>
-        <key>AlchemyToneMapFilmicShoulderStr</key>
-        <map>
-            <key>Comment</key>
-            <string>Shoulder Strength</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.22</real>
-        </map>
-        <key>AlchemyToneMapFilmicShoulderLen</key>
-        <map>
-            <key>Comment</key>
-            <string>Shoulder Length</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.20</real>
-        </map>
-        <key>AlchemyToneMapFilmicShoulderAngle</key>
-        <map>
-            <key>Comment</key>
-            <string>Shoulder Angle</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>0.01</real>
-        </map>
-        <key>AlchemyToneMapFilmicGamma</key>
-        <map>
-            <key>Comment</key>
-            <string>Curve Gamma</string>
+            <string>Distance between consecutive ghosts. Smaller packs them near the sun; larger spreads them across the screen. Range 0.1 to 1.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1451,16 +1741,314 @@
             <key>Value</key>
             <real>0.3</real>
         </map>
-        <key>AlchemyToneMapFilmicWhitePoint</key>
+        <key>RenderLensFlareGhost</key>
         <map>
             <key>Comment</key>
-            <string>Curve White Point</string>
+            <string>Intensity of the lens ghost circles. 0 disables ghosts; 1 is neutral; higher boosts them. Range 0 to 5.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>8.0</real>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensFlareHaloRadius</key>
+        <map>
+            <key>Comment</key>
+            <string>Radius of the halo ring that appears opposite the sun through screen center. Shape control only; use RenderLensFlareHalo to toggle the effect. Range 0.01 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>RenderLensFlareHaloWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Thickness of the halo ring. Smaller is a crisp hoop; larger is a soft diffuse ring. Range 0.01 to 0.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.15</real>
+        </map>
+        <key>RenderLensFlareHalo</key>
+        <map>
+            <key>Comment</key>
+            <string>Intensity of the halo ring opposite the sun. 0 disables the halo; 1 is neutral; higher boosts it. Range 0 to 5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensFlareStarburst</key>
+        <map>
+            <key>Comment</key>
+            <string>Intensity of the starburst (diffraction-spike) pattern radiating from the sun, like aperture blades in a camera. 0 disables it. Range 0 to 5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensFlareStarburstSpikes</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of aperture-like spikes in the starburst. Real cameras typically show 2x the blade count (6-blade = 12 spikes, etc). Range 1 to 32.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
+        <key>RenderLensFlareStarburstSharpness</key>
+        <map>
+            <key>Comment</key>
+            <string>How crisp the starburst spikes look. Low values produce soft, wide rays; high values produce thin, needle-like beams. Range 1 to 256.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>24.0</real>
+        </map>
+        <key>RenderLensFlareStarburstLength</key>
+        <map>
+            <key>Comment</key>
+            <string>Length of the starburst spikes. 0 is short and tight to the sun; 1 lets them reach far across the screen. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.25</real>
+        </map>
+        <key>RenderLensFlareOcclusionRadius</key>
+        <map>
+            <key>Comment</key>
+            <string>How wide the sun-occlusion test samples the scene depth. Larger values let thin geometry (foliage, wires) dim the flare more gracefully. Range 0.005 to 0.1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.02</real>
+        </map>
+        <key>RenderLensFlareOcclusionTaps</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of depth samples for sun-occlusion testing. Higher values give smoother partial occlusion transitions at a small performance cost. Range 1 to 32.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>9</integer>
+        </map>
+        <key>RenderParcelSelectionToMaxHeight</key>
+        <map>
+            <key>Comment</key>
+            <string>Display selected parcel outline to max build height</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderReflectionProbeIrradianceResolution</key>
+        <map>
+            <key>Comment</key>
+            <string>Resolution of reflection probe irrradiance maps.  Will be set to the next highest power of two clamped to [16, 256].  Note that changing this value may consume a massive amount of video memory.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>16</integer>
+        </map>
+        <key>RenderTonemapACESWhite</key>
+        <map>
+            <key>Comment</key>
+            <string>Point at which HDR colors cross over into being pure white</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>6.0</real>
+        </map>
+        <key>RenderTonemapAgxContrast</key>
+        <map>
+            <key>Comment</key>
+            <string>Contrast of tonemapped colors</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.3</real>
+        </map>
+        <key>RenderTonemapAgxWhite</key>
+        <map>
+            <key>Comment</key>
+            <string>Point at which HDR colors cross over into being pure white</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>16.29</real>
+        </map>
+        <key>RenderTonemapFilmicWhite</key>
+        <map>
+            <key>Comment</key>
+            <string>Point at which HDR colors cross over into being pure white</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>6.0</real>
+        </map>
+        <key>RenderTonemapReinhardWhite</key>
+        <map>
+            <key>Comment</key>
+            <string>Point at which HDR colors cross over into being pure white</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>6.0</real>
+        </map>
+        <key>RenderVignetteAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Opacity of applied vignette effect</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderVignetteCenter</key>
+        <map>
+            <key>Comment</key>
+            <string>[-0.5, 0.5] Offset of vignette center x and y, z component unused</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderVignetteColor</key>
+        <map>
+            <key>Comment</key>
+            <string>Vignette edge color</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderVignetteCorrectAspect</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether the vignette effect is corrected for aspect ratio</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderVignetteFeather</key>
+        <map>
+            <key>Comment</key>
+            <string>[0.2, 4.0] controls the shape of the darkening curve from edge to center. &lt;1 = spreads darkening inward (gentle haze across frame) 1 = linear smoothstep falloff (current behavior) &gt;1 = concentrates darkening at edges (sharp corner darkening only)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>RenderVignetteMidColor</key>
+        <map>
+            <key>Comment</key>
+            <string>Intermediate ramp color of vignette</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderVignetteMidPoint</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Mid point of vignette color shift for three-color ramp - 0 disables (two-color fallback)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderVignetteRadius</key>
+        <map>
+            <key>Comment</key>
+            <string>[0.25, 1.5] Measured in image-height units. 1.0 reaches top/bottom edges on any aspect.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderVignetteShape</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] 0 circular, 1 rounded square.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderVignetteSoft</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Softness of the vignette edge</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
         </map>
         <key>ResetUserColorsOnLogout</key>
         <map>
@@ -1473,21 +2061,32 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>ShowGroupFloaters</key>
+        <key>SelectCopyOnly</key>
         <map>
             <key>Comment</key>
-            <string>Show group profiles in floaters rather than the sidebar</string>
+            <string>Select only objects you can copy</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>Boolean</string>
             <key>Value</key>
-            <integer>1</integer>
+            <integer>0</integer>
         </map>
-        <key>ShowStatusBarBalance</key>
+        <key>ShowFloaterCollapseButton</key>
         <map>
             <key>Comment</key>
-            <string>Show L$ Balance in Status Bar</string>
+            <string>Show/hide the collapse button in the floater controls</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <boolean>1</boolean>
+        </map>
+        <key>ShowGroupFloaters</key>
+        <map>
+            <key>Comment</key>
+            <string>Show group profiles in floaters rather than the sidebar</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1572,6 +2171,17 @@
             <key>Value</key>
             <string />
         </map>
+        <key>Use24HourClockInStatusBar</key>
+        <map>
+            <key>Comment</key>
+            <string>12 vs 24. At the moment coverage is partial</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALInspectColumnConfig</key>
         <map>
             <key>Comment</key>
@@ -1583,201 +2193,13 @@
             <key>Value</key>
             <integer>1023</integer>
         </map>
-        <key>AlchemyLookAtShow</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyLookAtLines</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyLookAtNames</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>U32</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyLookAtHideSelf</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>RenderToneMapExposure</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>1.0</real>
-        </map>
-        <key>RenderToneMapLottesA</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3</string>
-            <key>Value</key>
-            <array>
-                <real>1.4</real>
-                <real>1.0</real>
-                <real>16.0</real>
-            </array>
-        </map>
-        <key>RenderToneMapLottesB</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3</string>
-            <key>Value</key>
-            <array>
-                <real>0.18</real>
-                <real>0.18</real>
-                <real>0.0</real>
-            </array>
-        </map>
-        <key>RenderToneMapUchimuraA</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3</string>
-            <key>Value</key>
-            <array>
-                <real>1.0</real>
-                <real>1.0</real>
-                <real>0.22</real>
-            </array>
-        </map>
-        <key>RenderToneMapUchimuraB</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3</string>
-            <key>Value</key>
-            <array>
-                <real>0.4</real>
-                <real>1.13</real>
-                <real>0.0</real>
-            </array>
-        </map>
-        <key>RenderToneMapUnchartedA</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3</string>
-            <key>Value</key>
-            <array>
-                <real>0.22</real>
-                <real>0.30</real>
-                <real>0.10</real>
-            </array>
-        </map>
-        <key>RenderToneMapUnchartedB</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3</string>
-            <key>Value</key>
-            <array>
-                <real>0.20</real>
-                <real>0.01</real>
-                <real>0.30</real>
-            </array>
-        </map>
-        <key>RenderToneMapUnchartedC</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3</string>
-            <key>Value</key>
-            <array>
-                <real>6.5</real>
-                <real>2.0</real>
-                <real>0.0</real>
-            </array>
-        </map>
-        <key>RenderSharpenCASParams</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3</string>
-            <key>Value</key>
-            <array>
-                <real>1.0</real>
-                <real>0.6</real>
-                <real>0.0</real>
-            </array>
-        </map>
-        <key>RenderSharpenDLSParams</key>
-        <map>
-            <key>Comment</key>
-            <string>[OBSOLETE]</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Vector3</string>
-            <key>Value</key>
-            <array>
-                <real>0.6</real>
-                <real>0.17</real>
-                <real>0.0</real>
-            </array>
-        </map>
         <key>ClickingAvatarKeepsCamera</key>
         <map>
             <key>Comment</key>
-            <string>This option allows you to orbit your camera without your avatar rotating when
-                clicking on it or your nametag.</string>
+            <string>
+                This option allows you to orbit your camera without your avatar rotating when
+                clicking on it or your nametag.
+            </string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1795,28 +2217,6 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
-        </map>
-        <key>AlchemyMouselookInstructions</key>
-        <map>
-            <key>Comment</key>
-            <string>Draw instructional overlay for mouselook - Press esc to leave</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>AlchemyMouselookPosition</key>
-        <map>
-            <key>Comment</key>
-            <string>Draw position and health in mouselook</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
         </map>
         <key>AllowNoCopyRezRestoreToWorld</key>
         <map>
@@ -1873,83 +2273,6 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>ChatFontName</key>
-        <map>
-            <key>Comment</key>
-            <string>Name of font for Chat Editors and Messages</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string>SansSerif</string>
-        </map>
-        <key>NotecardFontName</key>
-        <map>
-            <key>Comment</key>
-            <string>Name of font for Notecard Editors</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string>SansSerif</string>
-        </map>
-        <key>NotecardFontSize</key>
-        <map>
-            <key>Comment</key>
-            <string>Size of font for Notecard Editors</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string>Medium</string>
-        </map>
-        <key>ScriptFontName</key>
-        <map>
-            <key>Comment</key>
-            <string>Name of font for Script Editors</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string>Monospace</string>
-        </map>
-        <key>ScriptFontSize</key>
-        <map>
-            <key>Comment</key>
-            <string>Size of font for Script Editors</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string>Monospace</string>
-        </map>
-        <key>FontOverrideMain</key>
-        <map>
-            <key>Comment</key>
-            <string>Global override xml for main font</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string></string>
-        </map>
-        <key>FontOverrideMonospace</key>
-        <map>
-            <key>Comment</key>
-            <string>Global override xml for monospace font</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string></string>
-        </map>
         <key>ChatOOCPrefix</key>
         <map>
             <key>Comment</key>
@@ -1972,16 +2295,27 @@
             <key>Value</key>
             <string>))</string>
         </map>
-        <key>RenderReflectionProbeShowTransparent</key>
+        <key>FindLandSort</key>
         <map>
             <key>Comment</key>
-            <string>Show reflection probes in the transparency debug view</string>
+            <string>Controls the sort order for land you are searching for ("Name", "Price", "PPM", "Area")</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>Name</string>
+        </map>
+        <key>FindLandSortAscending</key>
+        <map>
+            <key>Comment</key>
+            <string>Controls whether the sort order for land you are searching for is displayed in ascending or descending order</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>Boolean</string>
             <key>Value</key>
-            <integer>0</integer>
+            <string>0</string>
         </map>
         <key>NameTagShowDistance</key>
         <map>
@@ -2000,17 +2334,6 @@
             <string>Change the color of the name tag based on the distance of other avatars</string>
             <key>Persist</key>
             <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ColorSettingsHideDefault</key>
-        <map>
-            <key>Comment</key>
-            <string>Show non-default settings only in Color Settings list</string>
-            <key>Persist</key>
-            <integer>0</integer>
             <key>Type</key>
             <string>Boolean</string>
             <key>Value</key>
@@ -2049,17 +2372,6 @@
             <key>Value</key>
             <string>1.0</string>
         </map>
-        <key>MediaAutoPlayHuds</key>
-        <map>
-            <key>Comment</key>
-            <string>Auto play hud attached media.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
         <key>NavigationBarStyle</key>
         <map>
             <key>Comment</key>
@@ -2073,200 +2385,10 @@
             <key>Value</key>
             <integer>2</integer>
         </map>
-        <key>BlackDragonControls</key>
-        <map>
-            <key>Comment</key>
-            <string>Use BlackDragon style joystick controls</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>JoystickButtonFlycam</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>7</integer>
-        </map>
-        <key>JoystickButtonJump</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>JoystickButtonFly</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>2</integer>
-        </map>
-        <key>JoystickButtonCrouch</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>JoystickButtonRunToggle</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>8</integer>
-        </map>
-        <key>JoystickButtonMouselook</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>9</integer>
-        </map>
-        <key>JoystickButtonZoomIn</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>4</integer>
-        </map>
-        <key>JoystickButtonZoomOut</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>5</integer>
-        </map>
-        <key>JoystickButtonZoomDefault</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>6</integer>
-        </map>
-        <key>JoystickButtonRollLeft</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>-1</integer>
-        </map>
-        <key>JoystickButtonRollRight</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>-1</integer>
-        </map>
-        <key>JoystickButtonRollDefault</key>
-        <map>
-            <key>Comment</key>
-            <string>Test</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>-1</integer>
-        </map>
-        <key>JoystickInvertPitch</key>
-        <map>
-            <key>Comment</key>
-            <string>Invert pitch axis in all joystick modes.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>FSLastSearchTab</key>
-        <map>
-            <key>Comment</key>
-            <string>Last selected tab in search window</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>S32</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>FSLegacySearchActionOnTeleport</key>
-        <map>
-            <key>Comment</key>
-            <string>Controls what action Legacy Search should take when teleporting: 0 = No effect,
-                1 = Close floater, 2 Minimise floater</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>U32</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
         <key>ShowPGGroups</key>
         <map>
             <key>Comment</key>
             <string>Display results of find groups that are flagged as general</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ShowMatureGroups</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find groups that are flagged as moderate</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>HideFromEditor</key>
@@ -2288,184 +2410,6 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
-        </map>
-        <key>ShowPGClassifieds</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find classifieds that are flagged as general</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ShowMatureClassifieds</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find classifieds that are flagged as moderate</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ShowAdultClassifieds</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find classifieds that are flagged as adult</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ShowPGEvents</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find events that are flagged as general</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ShowMatureEvents</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find events that are flagged as moderate</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ShowAdultEvents</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find events that are flagged as adult</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ShowPGLand</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find land sales that are flagged as general</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ShowMatureLand</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find land sales that are flagged as moderate</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ShowAdultLand</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find land sales that are flagged as adult</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ShowPGSims</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find places or find popular that are in general sims</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ShowMatureSims</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find places or find popular that are in moderate sims</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
-        <key>ShowAdultSims</key>
-        <map>
-            <key>Comment</key>
-            <string>Display results of find places or find popular that are in adult sims</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>HideFromEditor</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>FindLandArea</key>
-        <map>
-            <key>Comment</key>
-            <string>Enables filtering of land search results by area</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>FindLandPrice</key>
-        <map>
-            <key>Comment</key>
-            <string>Enables filtering of land search results by price</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
         </map>
         <key>FindLandType</key>
         <map>

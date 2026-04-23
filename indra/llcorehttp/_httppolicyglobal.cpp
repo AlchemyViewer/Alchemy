@@ -40,6 +40,10 @@ HttpPolicyGlobal::HttpPolicyGlobal()
 {}
 
 
+HttpPolicyGlobal::~HttpPolicyGlobal()
+{}
+
+
 HttpPolicyGlobal & HttpPolicyGlobal::operator=(const HttpPolicyGlobal & other)
 {
     if (this != &other)
@@ -48,7 +52,6 @@ HttpPolicyGlobal & HttpPolicyGlobal::operator=(const HttpPolicyGlobal & other)
         mCAPath = other.mCAPath;
         mCAFile = other.mCAFile;
         mHttpProxy = other.mHttpProxy;
-        mUserAgent = other.mUserAgent;
         mTrace = other.mTrace;
         mUseLLProxy = other.mUseLLProxy;
     }
@@ -97,11 +100,6 @@ HttpStatus HttpPolicyGlobal::set(HttpRequest::EPolicyOption opt, const std::stri
     case HttpRequest::PO_HTTP_PROXY:
         LL_DEBUGS("CoreHttp") << "Setting global Proxy to " << value << LL_ENDL;
         mHttpProxy = value;
-        break;
-
-    case HttpRequest::PO_USER_AGENT:
-        LL_DEBUGS("CoreHttp") << "Setting useragent to " << value << LL_ENDL;
-        mUserAgent = value;
         break;
 
     default:
@@ -164,10 +162,6 @@ HttpStatus HttpPolicyGlobal::get(HttpRequest::EPolicyOption opt, std::string * v
 
     case HttpRequest::PO_HTTP_PROXY:
         *value = mHttpProxy;
-        break;
-
-    case HttpRequest::PO_USER_AGENT:
-        *value = mUserAgent;
         break;
 
     default:

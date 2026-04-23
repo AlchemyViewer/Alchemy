@@ -30,11 +30,151 @@
 
 #include "llbutton.h"
 #include "llfloaterreg.h"
-#include "llpreview.h" // for constants
+#include "llpreview.h" // fors constants
+#include "llprofileimagectrl.h"
 #include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llviewertexture.h"
+#include "llviewertexturelist.h"
 
+#if 0 // Alchemy: Moved to standalone handler in llprofileimagectrl.cpp
+ //////////////////////////////////////////////////////////////////////////
+ // LLProfileImageCtrl
+ //////////////////////////////////////////////////////////////////////////
+
+static LLDefaultChildRegistry::Register<LLProfileImageCtrl> r("profile_image");
+
+LLProfileImageCtrl::LLProfileImageCtrl(const LLProfileImageCtrl::Params& p)
+    : LLIconCtrl(p)
+    , mImage(NULL)
+    , mImageOldBoostLevel(LLGLTexture::BOOST_NONE)
+    , mWasNoDelete(false)
+    , mImageLoadedSignal(NULL)
+{
+}
+
+LLProfileImageCtrl::~LLProfileImageCtrl()
+{
+    LLLoadedCallbackEntry::cleanUpCallbackList(&mCallbackTextureList);
+    releaseTexture();
+
+    delete mImageLoadedSignal;
+}
+
+void LLProfileImageCtrl::releaseTexture()
+{
+    if (mImage.notNull())
+    {
+        mImage->setBoostLevel(mImageOldBoostLevel);
+        if (!mWasNoDelete)
+        {
+            // In most cases setBoostLevel marks images as NO_DELETE
+            mImage->forceActive();
+        }
+        mImage = NULL;
+    }
+}
+
+void LLProfileImageCtrl::setValue(const LLSD& value)
+{
+    LLUUID id = value.asUUID();
+    setImageAssetId(id);
+    if (id.isNull())
+    {
+        LLIconCtrl::setValue("Generic_Person_Large", LLGLTexture::BOOST_UI);
+    }
+    else
+    {
+        // called second to not change priority before it gets saved to mImageOldBoostLevel
+        LLIconCtrl::setValue(value, LLGLTexture::BOOST_PREVIEW);
+    }
+}
+
+void LLProfileImageCtrl::draw()
+{
+    if (mImage.notNull())
+    {
+        // Pump the texture priority
+        mImage->addTextureStats(MAX_IMAGE_AREA);
+        mImage->setKnownDrawSize(LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT, LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT);
+    }
+    LLIconCtrl::draw();
+}
+
+boost::signals2::connection LLProfileImageCtrl::setImageLoadedCallback(const image_loaded_signal_t::slot_type& cb)
+{
+    if (!mImageLoadedSignal) mImageLoadedSignal = new image_loaded_signal_t();
+
+    return mImageLoadedSignal->connect(cb);
+}
+
+void LLProfileImageCtrl::setImageAssetId(const LLUUID& asset_id)
+{
+    if (mImageID == asset_id)
+    {
+        return;
+    }
+
+    releaseTexture();
+
+    mImageID = asset_id;
+    if (mImageID.notNull())
+    {
+        mImage = LLViewerTextureManager::getFetchedTexture(mImageID, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+        mWasNoDelete = mImage->getTextureState() == LLGLTexture::NO_DELETE;
+        mImageOldBoostLevel = mImage->getBoostLevel();
+        mImage->setBoostLevel(LLGLTexture::BOOST_PREVIEW);
+        mImage->setKnownDrawSize(LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT, LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT);
+        mImage->forceToSaveRawImage(0);
+
+        if ((mImage->getFullWidth() * mImage->getFullHeight()) == 0)
+        {
+            mImage->setLoadedCallback(LLProfileImageCtrl::onImageLoaded,
+                                      0, true, false, new LLHandle<LLUICtrl>(getHandle()), &mCallbackTextureList);
+        }
+        else
+        {
+            onImageLoaded(true, mImage);
+        }
+    }
+}
+
+void LLProfileImageCtrl::onImageLoaded(bool success, LLViewerFetchedTexture* img)
+{
+    if (mImageLoadedSignal)
+    {
+        (*mImageLoadedSignal)(success, img);
+    }
+}
+
+// static
+void LLProfileImageCtrl::onImageLoaded(bool success,
+                                          LLViewerFetchedTexture* src_vi,
+                                          LLImageRaw* src,
+                                          LLImageRaw* aux_src,
+                                          S32 discard_level,
+                                          bool final,
+                                          void* userdata)
+{
+    if (!userdata) return;
+
+    LLHandle<LLUICtrl>* handle = (LLHandle<LLUICtrl>*)userdata;
+
+    if (!handle->isDead())
+    {
+        LLProfileImageCtrl* caller = static_cast<LLProfileImageCtrl*>(handle->get());
+        if (caller && caller->mImageLoadedSignal)
+        {
+            (*caller->mImageLoadedSignal)(success, src_vi);
+        }
+    }
+
+    if (final || !success)
+    {
+        delete handle;
+    }
+}
+#endif // 0
 
 //////////////////////////////////////////////////////////////////////////
 // LLFloaterProfileTexture
@@ -57,19 +197,19 @@ LLFloaterProfileTexture::~LLFloaterProfileTexture()
 }
 
 // virtual
-BOOL LLFloaterProfileTexture::postBuild()
+bool LLFloaterProfileTexture::postBuild()
 {
     mProfileIcon = getChild<LLProfileImageCtrl>("profile_pic");
-    mProfileIcon->setImageLoadedCallback([this](BOOL success, LLViewerFetchedTexture* imagep) {onImageLoaded(success, imagep); });
+    mProfileIcon->setImageLoadedCallback([this](bool success, LLViewerFetchedTexture* imagep) {onImageLoaded(success, imagep); });
 
     mCloseButton = getChild<LLButton>("close_btn");
     mCloseButton->setCommitCallback([this](LLUICtrl*, void*) { closeFloater(); }, nullptr);
 
-    return TRUE;
+    return true;
 }
 
 // virtual
-void LLFloaterProfileTexture::reshape(S32 width, S32 height, BOOL called_from_parent)
+void LLFloaterProfileTexture::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLFloater::reshape(width, height, called_from_parent);
 }
@@ -99,20 +239,20 @@ void LLFloaterProfileTexture::updateDimensions()
     S32 width = old_floater_rect.getWidth() - old_image_rect.getWidth() + mLastWidth;
     S32 height = old_floater_rect.getHeight() - old_image_rect.getHeight() + mLastHeight;
 
-    const F32 MAX_DIMENTIONS = 1024; // most profiles are supposed to be 256x256
+    const F32 MAX_DIMENTIONS = 512; // most profiles are supposed to be 256x256
 
     S32 biggest_dim = llmax(width, height);
     if (biggest_dim > MAX_DIMENTIONS)
     {
         F32 scale_down = MAX_DIMENTIONS / (F32)biggest_dim;
-        width *= scale_down;
-        height *= scale_down;
+        width = (S32)(width * scale_down);
+        height = (S32)(height * scale_down);
     }
 
     //reshape floater
     reshape(width, height);
 
-    gFloaterView->adjustToFitScreen(this, FALSE);
+    gFloaterView->adjustToFitScreen(this, false);
 }
 
 void LLFloaterProfileTexture::draw()
@@ -140,7 +280,7 @@ void LLFloaterProfileTexture::loadAsset(const LLUUID &image_id)
     updateDimensions();
 }
 
-void LLFloaterProfileTexture::onImageLoaded(BOOL success, LLViewerFetchedTexture* imagep)
+void LLFloaterProfileTexture::onImageLoaded(bool success, LLViewerFetchedTexture* imagep)
 {
     if (success)
     {

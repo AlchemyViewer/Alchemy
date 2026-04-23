@@ -98,15 +98,15 @@ std::string LLPluginSharedMemory::createName(void)
 class LLPluginSharedMemoryPlatformImpl
 {
 public:
-    LLPluginSharedMemoryPlatformImpl() = default;
-    ~LLPluginSharedMemoryPlatformImpl() = default;
+    LLPluginSharedMemoryPlatformImpl();
+    ~LLPluginSharedMemoryPlatformImpl();
 
 #if USE_APR_SHARED_MEMORY
-    apr_shm_t* mAprSharedMemory = nullptr;
+    apr_shm_t* mAprSharedMemory;
 #elif USE_SHM_OPEN_SHARED_MEMORY
-    int mSharedMemoryFD = -1;
+    int mSharedMemoryFD;
 #elif USE_WIN32_SHARED_MEMORY
-    HANDLE mMapFile = nullptr;
+    HANDLE mMapFile;
 #endif
 
 };
@@ -140,6 +140,17 @@ LLPluginSharedMemory::~LLPluginSharedMemory()
 
 #if USE_APR_SHARED_MEMORY
 // MARK: apr implementation
+
+LLPluginSharedMemoryPlatformImpl::LLPluginSharedMemoryPlatformImpl()
+{
+    mAprSharedMemory = NULL;
+}
+
+LLPluginSharedMemoryPlatformImpl::~LLPluginSharedMemoryPlatformImpl()
+{
+
+}
+
 bool LLPluginSharedMemory::map(void)
 {
     mMappedAddress = apr_shm_baseaddr_get(mImpl->mAprSharedMemory);
@@ -237,6 +248,16 @@ bool LLPluginSharedMemory::detach(void)
 
 #elif USE_SHM_OPEN_SHARED_MEMORY
 // MARK: shm_open/mmap implementation
+
+LLPluginSharedMemoryPlatformImpl::LLPluginSharedMemoryPlatformImpl()
+{
+    mSharedMemoryFD = -1;
+}
+
+LLPluginSharedMemoryPlatformImpl::~LLPluginSharedMemoryPlatformImpl()
+{
+}
+
 bool LLPluginSharedMemory::map(void)
 {
     mMappedAddress = ::mmap(NULL, mSize, PROT_READ | PROT_WRITE, MAP_SHARED, mImpl->mSharedMemoryFD, 0);
@@ -359,6 +380,16 @@ bool LLPluginSharedMemory::detach(void)
 
 // Reference: http://msdn.microsoft.com/en-us/library/aa366551(VS.85).aspx
 
+LLPluginSharedMemoryPlatformImpl::LLPluginSharedMemoryPlatformImpl()
+{
+    mMapFile = NULL;
+}
+
+LLPluginSharedMemoryPlatformImpl::~LLPluginSharedMemoryPlatformImpl()
+{
+
+}
+
 bool LLPluginSharedMemory::map(void)
 {
     mMappedAddress = MapViewOfFile(
@@ -419,7 +450,7 @@ bool LLPluginSharedMemory::create(size_t size)
                  NULL,                      // default security
                  PAGE_READWRITE,            // read/write access
                  0,                         // max. object size
-                 mSize,                     // buffer size
+                 static_cast<DWORD>(mSize), // buffer size
                  mName.c_str());            // name of mapping object
 
     if(mImpl->mMapFile == NULL)
@@ -447,7 +478,7 @@ bool LLPluginSharedMemory::attach(const std::string &name, size_t size)
 
     mImpl->mMapFile = OpenFileMappingA(
                 FILE_MAP_ALL_ACCESS,        // read/write access
-                FALSE,                      // do not inherit the name
+                false,                      // do not inherit the name
                 mName.c_str());             // name of mapping object
 
     if(mImpl->mMapFile == NULL)

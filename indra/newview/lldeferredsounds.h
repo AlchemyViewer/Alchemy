@@ -28,10 +28,9 @@
 #define LL_LLDEFERREDSOUNDS_H
 
 #include "llsingleton.h"
+#include "llaudioengine.h"
 
-struct SoundData;
-
-class LLDeferredSounds final : public LLSingleton<LLDeferredSounds>
+class LLDeferredSounds : public LLSingleton<LLDeferredSounds>
 {
     LLSINGLETON_EMPTY_CTOR(LLDeferredSounds);
     std::vector<SoundData> soundVector;

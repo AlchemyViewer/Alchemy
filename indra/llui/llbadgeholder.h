@@ -42,8 +42,6 @@ public:
     {
     }
 
-    virtual ~LLBadgeHolder() = default;
-
     void setAcceptsBadge(bool acceptsBadge) { mAcceptsBadge = acceptsBadge; }
     bool acceptsBadge() const { return mAcceptsBadge; }
 

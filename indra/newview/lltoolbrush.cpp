@@ -88,8 +88,8 @@ LLToolBrushLand::LLToolBrushLand()
     mStartingZ( 0.0f ),
     mMouseX( 0 ),
     mMouseY(0),
-    mGotHover(FALSE),
-    mBrushSelected(FALSE)
+    mGotHover(false),
+    mBrushSelected(false)
 {
     mBrushSize = gSavedSettings.getF32("LandBrushSize");
 }
@@ -122,7 +122,7 @@ void LLToolBrushLand::modifyLandAtPointGlobal(const LLVector3d &pos_global,
         iter != mLastAffectedRegions.end(); ++iter)
     {
         LLViewerRegion* regionp = *iter;
-        //BOOL is_changed = FALSE;
+        //bool is_changed = false;
         LLVector3 pos_region = regionp->getPosRegionFromGlobal(pos_global);
         LLSurface &land = regionp->getLand();
         char action = E_LAND_LEVEL;
@@ -249,7 +249,7 @@ void LLToolBrushLand::modifyLandInSelectionGlobal()
         iter != mLastAffectedRegions.end(); ++iter)
     {
         LLViewerRegion* regionp = *iter;
-        //BOOL is_changed = FALSE;
+        //bool is_changed = false;
         LLVector3 min_region = regionp->getPosRegionFromGlobal(min);
         LLVector3 max_region = regionp->getPosRegionFromGlobal(max);
 
@@ -318,7 +318,7 @@ void LLToolBrushLand::modifyLandInSelectionGlobal()
         msg->addF32Fast(_PREHASH_Seconds, seconds);
         msg->addF32Fast(_PREHASH_Height, mStartingZ);
 
-        BOOL parcel_selected = LLViewerParcelMgr::getInstance()->getParcelSelection()->getWholeParcelSelected();
+        bool parcel_selected = LLViewerParcelMgr::getInstance()->getParcelSelection()->getWholeParcelSelected();
         LLParcel* selected_parcel = LLViewerParcelMgr::getInstance()->getParcelSelection()->getParcel();
 
         if (parcel_selected && selected_parcel)
@@ -356,13 +356,13 @@ void LLToolBrushLand::brush( void )
         spot.mdV[VX] = floor( spot.mdV[VX] + 0.5 );
         spot.mdV[VY] = floor( spot.mdV[VY] + 0.5 );
 
-        modifyLandAtPointGlobal(spot, gKeyboard->currentMask(TRUE));
+        modifyLandAtPointGlobal(spot, gKeyboard->currentMask(true));
     }
 }
 
-BOOL LLToolBrushLand::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLToolBrushLand::handleMouseDown(S32 x, S32 y, MASK mask)
 {
-    BOOL handled = FALSE;
+    bool handled = false;
 
     // Find the z value of the initial click.
     LLVector3d spot;
@@ -378,7 +378,7 @@ BOOL LLToolBrushLand::handleMouseDown(S32 x, S32 y, MASK mask)
         if (!canTerraformRegion(regionp))
         {
             alertNoTerraformRegion(regionp);
-            return TRUE;
+            return true;
         }
 
         if (!canTerraformParcel(regionp))
@@ -394,25 +394,23 @@ BOOL LLToolBrushLand::handleMouseDown(S32 x, S32 y, MASK mask)
         mMouseX = x;
         mMouseY = y;
         gIdleCallbacks.addFunction( &LLToolBrushLand::onIdle, (void*)this );
-        setMouseCapture( TRUE );
+        setMouseCapture( true );
 
-        LLViewerParcelMgr::getInstance()->setSelectionVisible(FALSE);
-        handled = TRUE;
+        LLViewerParcelMgr::getInstance()->setSelectionVisible(false);
+        handled = true;
     }
 
     return handled;
 }
 
-BOOL LLToolBrushLand::handleHover( S32 x, S32 y, MASK mask )
+bool LLToolBrushLand::handleHover( S32 x, S32 y, MASK mask )
 {
-#ifdef SHOW_DEBUG
     LL_DEBUGS("UserInput") << "hover handled by LLToolBrushLand ("
                                 << (hasMouseCapture() ? "active":"inactive")
                                 << ")" << LL_ENDL;
-#endif
     mMouseX = x;
     mMouseY = y;
-    mGotHover = TRUE;
+    mGotHover = true;
     gViewerWindow->setCursor(UI_CURSOR_TOOLLAND);
 
     LLVector3d spot;
@@ -424,22 +422,22 @@ BOOL LLToolBrushLand::handleHover( S32 x, S32 y, MASK mask )
 
         LLViewerParcelMgr::getInstance()->setHoverParcel(spot);
     }
-    return TRUE;
+    return true;
 }
 
-BOOL LLToolBrushLand::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLToolBrushLand::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-    BOOL handled = FALSE;
+    bool handled = false;
     mLastAffectedRegions.clear();
     if( hasMouseCapture() )
     {
         // Release the mouse
-        setMouseCapture( FALSE );
+        setMouseCapture( false );
 
-        LLViewerParcelMgr::getInstance()->setSelectionVisible(TRUE);
+        LLViewerParcelMgr::getInstance()->setSelectionVisible(true);
 
         gIdleCallbacks.deleteFunction( &LLToolBrushLand::onIdle, (void*)this );
-        handled = TRUE;
+        handled = true;
     }
 
     return handled;
@@ -449,10 +447,13 @@ void LLToolBrushLand::handleSelect()
 {
     gEditMenuHandler = this;
 
-    gFloaterTools->setStatusText("modifyland");
+    if (gFloaterTools)
+    {
+        gFloaterTools->setStatusText("modifyland");
+    }
 //  if (!mBrushSelected)
     {
-        mBrushSelected = TRUE;
+        mBrushSelected = true;
     }
 }
 
@@ -463,8 +464,8 @@ void LLToolBrushLand::handleDeselect()
     {
         gEditMenuHandler = NULL;
     }
-    LLViewerParcelMgr::getInstance()->setSelectionVisible(TRUE);
-    mBrushSelected = FALSE;
+    LLViewerParcelMgr::getInstance()->setSelectionVisible(true);
+    mBrushSelected = false;
 }
 
 // Draw the area that will be affected.
@@ -495,7 +496,7 @@ void LLToolBrushLand::render()
                               pos_world);
             }
         }
-        mGotHover = FALSE;
+        mGotHover = false;
     }
 }
 
@@ -549,7 +550,7 @@ void LLToolBrushLand::renderOverlay(LLSurface& land, const LLVector3& pos_region
                 wz = land.getZ((i+di)+(j+dj)*land.mGridsPerEdge),
                 norm_dist = sqrt((float)di*di + dj*dj) / half_edge,
                 force_scale = sqrt(2.f) - norm_dist, // 1 at center, 0 at corner
-                wz2 = wz + .2 + (.2 + force/100) * force_scale, // top vertex
+                wz2 = wz + .2f + (.2f + force/100.f) * force_scale, // top vertex
                 tic = .075f; // arrowhead size
             // vertical line
             gGL.vertex3f(wx, wy, wz);
@@ -588,31 +589,29 @@ void LLToolBrushLand::renderOverlay(LLSurface& land, const LLVector3& pos_region
 void LLToolBrushLand::determineAffectedRegions(region_list_t& regions,
                                                const LLVector3d& spot ) const
 {
-    auto& world_inst = LLWorld::instance();
-
     LLVector3d corner(spot);
     corner.mdV[VX] -= (mBrushSize / 2);
     corner.mdV[VY] -= (mBrushSize / 2);
     LLViewerRegion* region = NULL;
-    region = world_inst.getRegionFromPosGlobal(corner);
+    region = LLWorld::getInstance()->getRegionFromPosGlobal(corner);
     if(region && regions.find(region) == regions.end())
     {
         regions.insert(region);
     }
     corner.mdV[VY] += mBrushSize;
-    region = world_inst.getRegionFromPosGlobal(corner);
+    region = LLWorld::getInstance()->getRegionFromPosGlobal(corner);
     if(region && regions.find(region) == regions.end())
     {
         regions.insert(region);
     }
     corner.mdV[VX] += mBrushSize;
-    region = world_inst.getRegionFromPosGlobal(corner);
+    region = LLWorld::getInstance()->getRegionFromPosGlobal(corner);
     if(region && regions.find(region) == regions.end())
     {
         regions.insert(region);
     }
     corner.mdV[VY] -= mBrushSize;
-    region = world_inst.getRegionFromPosGlobal(corner);
+    region = LLWorld::getInstance()->getRegionFromPosGlobal(corner);
     if(region && regions.find(region) == regions.end())
     {
         regions.insert(region);
@@ -622,7 +621,7 @@ void LLToolBrushLand::determineAffectedRegions(region_list_t& regions,
 // static
 void LLToolBrushLand::onIdle( void* brush_tool )
 {
-    LLToolBrushLand* self = static_cast<LLToolBrushLand*>(brush_tool);
+    LLToolBrushLand* self = reinterpret_cast<LLToolBrushLand*>(brush_tool);
 
     if( LLToolMgr::getInstance()->getCurrentTool() == self )
     {
@@ -685,7 +684,7 @@ bool LLToolBrushLand::canTerraformParcel(LLViewerRegion* regionp) const
     bool is_terraform_allowed = false;
     if (selected_parcel)
     {
-        BOOL owner_release = LLViewerParcelMgr::isParcelOwnedByAgent(selected_parcel, GP_LAND_ALLOW_EDIT_LAND);
+        bool owner_release = LLViewerParcelMgr::isParcelOwnedByAgent(selected_parcel, GP_LAND_ALLOW_EDIT_LAND);
         is_terraform_allowed = ( gAgent.canManageEstate() || (selected_parcel->getOwnerID() == regionp->getOwner()) || owner_release);
     }
 

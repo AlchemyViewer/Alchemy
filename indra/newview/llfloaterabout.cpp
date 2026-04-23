@@ -84,16 +84,23 @@ private:
     virtual ~LLFloaterAbout();
 
 public:
-    /*virtual*/ BOOL postBuild();
+    bool postBuild() override;
 
     /// Obtain the data used to fill out the contents string. This is
     /// separated so that we can programmatically access the same info.
     static LLSD getInfo();
     void onClickCopyToClipboard();
     void onClickUpdateCheck();
+    static void setUpdateListener();
 
 private:
     void setSupportText(const std::string& server_release_notes_url);
+
+    // notifications for user requested checks
+    static void showCheckUpdateNotification(S32 state);
+
+    // callback method for manual checks
+    static bool callbackCheckUpdate(LLSD const & event);
 
     // listener name for update checks
     static const std::string sCheckUpdateListenerName;
@@ -116,7 +123,7 @@ LLFloaterAbout::~LLFloaterAbout()
 {
 }
 
-BOOL LLFloaterAbout::postBuild()
+bool LLFloaterAbout::postBuild()
 {
     center();
     LLViewerTextEditor *support_widget =
@@ -174,7 +181,7 @@ BOOL LLFloaterAbout::postBuild()
     support_widget->blockUndo();
 
     // Fix views
-    support_widget->setEnabled(FALSE);
+    support_widget->setEnabled(false);
     support_widget->startOfDoc();
 
     {
@@ -193,7 +200,7 @@ BOOL LLFloaterAbout::postBuild()
             LL_WARNS("AboutInit") << "Could not read contributors file at " << contributors_path << LL_ENDL;
         }
         contrib_names_widget->setText(contributors);
-        contrib_names_widget->setEnabled(FALSE);
+        contrib_names_widget->setEnabled(false);
         contrib_names_widget->startOfDoc();
     }
 
@@ -213,7 +220,7 @@ BOOL LLFloaterAbout::postBuild()
             LL_WARNS("AboutInit") << "Could not read supporters file at " << supporters_path << LL_ENDL;
         }
         suppoter_names_widget->setText(supporters);
-        suppoter_names_widget->setEnabled(FALSE);
+        suppoter_names_widget->setEnabled(false);
         suppoter_names_widget->startOfDoc();
     }
 
@@ -227,7 +234,7 @@ BOOL LLFloaterAbout::postBuild()
         licenses_widget->clear();
         while ( std::getline(licenses_file, license_line) )
         {
-            licenses_widget->appendText(license_line+"\n", FALSE,
+            licenses_widget->appendText(license_line+"\n", false,
                                         LLStyle::Params() .color(about_color));
         }
         licenses_file.close();
@@ -237,10 +244,10 @@ BOOL LLFloaterAbout::postBuild()
         // this case will use the (out of date) hard coded value from the XUI
         LL_INFOS("AboutInit") << "Could not read licenses file at " << licenses_path << LL_ENDL;
     }
-    licenses_widget->setEnabled(FALSE);
+    licenses_widget->setEnabled(false);
     licenses_widget->startOfDoc();
 
-    return TRUE;
+    return true;
 }
 
 LLSD LLFloaterAbout::getInfo()
@@ -269,9 +276,9 @@ void LLFloaterAbout::startFetchServerReleaseNotes()
 void LLFloaterAbout::fetchServerReleaseNotesCoro(const std::string cap_url)
 {
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("fetchServerReleaseNotesCoro", LLCore::HttpRequest::DEFAULT_POLICY_ID));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
-    LLCore::HttpOptions::ptr_t httpOpts(std::make_shared<LLCore::HttpOptions>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("fetchServerReleaseNotesCoro", LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     httpOpts->setWantHeaders(true);
     httpOpts->setFollowRedirects(false);
@@ -356,7 +363,7 @@ void LLFloaterAbout::onClickCopyToClipboard()
 
 void LLFloaterAbout::onClickUpdateCheck()
 {
-
+    setUpdateListener();
 }
 
 void LLFloaterAbout::setSupportText(const std::string& server_release_notes_url)
@@ -376,7 +383,95 @@ void LLFloaterAbout::setSupportText(const std::string& server_release_notes_url)
     LLUIColor about_color = LLUIColorTable::instance().getColor("TextFgReadOnlyColor");
     support_widget->clear();
     support_widget->appendText(LLAppViewer::instance()->getViewerInfoString(),
-                               FALSE, LLStyle::Params() .color(about_color));
+                               false, LLStyle::Params() .color(about_color));
+}
+
+//This is bound as a callback in postBuild()
+void LLFloaterAbout::setUpdateListener()
+{
+    typedef std::vector<std::string> vec;
+
+    //There are four possibilities:
+    //no downloads directory or version directory in "getOSUserAppDir()/downloads"
+    //   => no update
+    //version directory exists and .done file is not present
+    //   => download in progress
+    //version directory exists and .done file exists
+    //   => update ready for install
+    //version directory, .done file and either .skip or .next file exists
+    //   => update deferred
+    bool downloads = false;
+    std::string downloadDir = "";
+    bool done = false;
+    bool next = false;
+    bool skip = false;
+
+    LLSD info(LLFloaterAbout::getInfo());
+    std::string version = info["VIEWER_VERSION_STR"].asString();
+    std::string appDir = gDirUtilp->getOSUserAppDir();
+
+    //drop down two directory levels so we aren't searching for markers among the log files and crash dumps
+    //or among other possible viewer upgrade directories if the resident is running multiple viewer versions
+    //we should end up with a path like ../downloads/1.2.3.456789
+    vec file_vec = gDirUtilp->getFilesInDir(appDir);
+
+    for(vec::const_iterator iter=file_vec.begin(); iter!=file_vec.end(); ++iter)
+    {
+        if ( (iter->rfind("downloads") ) )
+        {
+            vec dir_vec = gDirUtilp->getFilesInDir(*iter);
+            for(vec::const_iterator dir_iter=dir_vec.begin(); dir_iter!=dir_vec.end(); ++dir_iter)
+            {
+                if ( (dir_iter->rfind(version)))
+                {
+                    downloads = true;
+                    downloadDir = *dir_iter;
+                }
+            }
+        }
+    }
+
+    if ( downloads )
+    {
+        for(vec::const_iterator iter=file_vec.begin(); iter!=file_vec.end(); ++iter)
+        {
+            if ( (iter->rfind(version)))
+            {
+                if ( (iter->rfind(".done") ) )
+                {
+                    done = true;
+                }
+                else if ( (iter->rfind(".next") ) )
+                {
+                    next = true;
+                }
+                else if ( (iter->rfind(".skip") ) )
+                {
+                    skip = true;
+                }
+            }
+        }
+    }
+
+    if ( !downloads )
+    {
+        LLNotificationsUtil::add("UpdateViewerUpToDate");
+    }
+    else
+    {
+        if ( !done )
+        {
+            LLNotificationsUtil::add("UpdateDownloadInProgress");
+        }
+        else if ( (!next) && (!skip) )
+        {
+            LLNotificationsUtil::add("UpdateDownloadComplete");
+        }
+        else //done and there is a next or skip
+        {
+            LLNotificationsUtil::add("UpdateDeferred");
+        }
+    }
 }
 
 ///----------------------------------------------------------------------------
@@ -387,3 +482,9 @@ void LLFloaterAboutUtil::registerFloater()
     LLFloaterReg::add("sl_about", "floater_about.xml",
         &LLFloaterReg::build<LLFloaterAbout>);
 }
+
+void LLFloaterAboutUtil::checkUpdatesAndNotify()
+{
+    LLFloaterAbout::setUpdateListener();
+}
+

@@ -32,7 +32,7 @@
 #include "llgltfmaterial.h"
 #include "llpointer.h"
 
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 class LLFetchedGLTFMaterial;
 class LLGLTFOverrideCacheEntry;
@@ -58,15 +58,20 @@ public:
     // NOTE: do not use to revert to asset when applying a new asset id, use queueApply below
     static void queueModify(const LLViewerObject* obj, S32 side, const LLGLTFMaterial* mat);
 
-    // Queue an application of a material asset we want to send to the simulator.  Call "flushUpdates" to flush pending updates.
+    // Queue an application of a material asset we want to send to the simulator.
+    //  Call "flushUpdates" to flush pending updates immediately.
+    //  Will be flushed automatically if queue is full.
     //  object_id - ID of object to apply material asset to
     //  side - TextureEntry index to apply material to, or -1 for all sides
     //  asset_id - ID of material asset to apply, or LLUUID::null to disassociate current material asset
     //
     // NOTE: Implicitly clears most override data if present
     static void queueApply(const LLViewerObject* obj, S32 side, const LLUUID& asset_id);
+    static void queueApply(const LLViewerObject* obj, S32 side, const LLUUID& asset_id, const std::string& override_json);
 
-    // Queue an application of a material asset we want to send to the simulator.  Call "flushUpdates" to flush pending updates.
+    // Queue an application of a material asset we want to send to the simulator.
+    //  Call "flushUpdates" to flush pending updates immediately.
+    //  Will be flushed automatically if queue is full.
     //  object_id - ID of object to apply material asset to
     //  side - TextureEntry index to apply material to, or -1 for all sides
     //  asset_id - ID of material asset to apply, or LLUUID::null to disassociate current material asset
@@ -79,14 +84,14 @@ public:
     static void flushUpdates(void(*done_callback)(bool) = nullptr);
 
     static void addSelectionUpdateCallback(void(*update_callback)(const LLUUID& object_id, S32 side));
-    
+
     // Queue an explicit LLSD ModifyMaterialParams update apply given override data
     //  overrides -- LLSD map (or array of maps) in the format:
     //      object_id   UUID(required)      id of object
     //      side        integer(required)   TE index of face to set, or -1 for all faces
     //      gltf_json   string(optional)    override data to set, empty string nulls out override data, omissions of this parameter keeps existing data
     //      asset_id    UUID(optional)      id of material asset to set, omission of this parameter keeps existing material asset id
-    //    
+    //
     // NOTE: Unless you already have a gltf_json string you want to send, strongly prefer using queueModify
     // If the queue/flush API is insufficient, extend it.
     static void queueUpdate(const LLSD& data);
@@ -104,7 +109,22 @@ private:
     // NOTE: this is NOT for applying overrides from the UI, see queueModifyMaterial above
     void queueOverrideUpdate(const LLUUID& id, S32 side, LLGLTFMaterial* override_data);
 
-    static void modifyMaterialCoro(std::string cap_url, LLSD overrides, void(*done_callback)(bool));
+
+    class CallbackHolder
+    {
+    public:
+        CallbackHolder(void(*done_callback)(bool))
+            : mCallback(done_callback)
+        {}
+        ~CallbackHolder()
+        {
+            if (mCallback) mCallback(mSuccess);
+        }
+        std::function<void(bool)> mCallback = nullptr;
+        bool mSuccess = true;
+    };
+    static void flushUpdatesOnce(std::shared_ptr<CallbackHolder> callback_holder);
+    static void modifyMaterialCoro(std::string cap_url, LLSD overrides, std::shared_ptr<CallbackHolder> callback_holder);
 
 protected:
     static void onAssetLoadComplete(
@@ -114,11 +134,11 @@ protected:
         S32 status,
         LLExtStat ext_status);
 
-    typedef boost::unordered_map<LLUUID, LLPointer<LLFetchedGLTFMaterial > > uuid_mat_map_t;
+    typedef boost::unordered_map<LLUUID, LLPointer<LLFetchedGLTFMaterial>> uuid_mat_map_t;
     uuid_mat_map_t mList;
 
     typedef std::vector<LLPointer<LLGLTFMaterial> > override_list_t;
-    typedef std::unordered_map<LLUUID, override_list_t > queued_override_map_t;
+    typedef boost::unordered_map<LLUUID, override_list_t> queued_override_map_t;
     queued_override_map_t mQueuedOverrides;
 
     LLUUID mLastUpdateKey;
@@ -141,6 +161,7 @@ protected:
         S32 side = -1;
         LLUUID asset_id;
         LLPointer<LLGLTFMaterial> override_data;
+        std::string override_json;
     };
 
     typedef std::list<ApplyMaterialAssetData> apply_queue_t;

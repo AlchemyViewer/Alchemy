@@ -73,6 +73,11 @@ bool ll::prefs::PanelData::hightlightAndHide( LLWString const &aFilter )
     for (tPanelDataList::iterator itr = mChildPanel.begin(); itr != mChildPanel.end(); ++itr)
         (*itr)->setNotHighlighted();
 
+    if (aFilter.empty())
+    {
+        return true;
+    }
+
     bool bVisible(false);
     for( tSearchableItemList::iterator itr = mChildren.begin(); itr  != mChildren.end(); ++itr )
         bVisible |= (*itr)->hightlightAndHide( aFilter );
@@ -129,7 +134,7 @@ void ll::statusbar::SearchableItem::setNotHighlighted( )
 
         if (mWasHiddenBySearch)
         {
-            mMenu->setVisible(TRUE);
+            mMenu->setVisible(true);
             mWasHiddenBySearch = false;
         }
     }
@@ -164,7 +169,7 @@ bool ll::statusbar::SearchableItem::hightlightAndHide(LLWString const &aFilter, 
     if (mCtrl && !bVisible && !bHighlighted)
     {
         mWasHiddenBySearch = true;
-        mMenu->setVisible(FALSE);
+        mMenu->setVisible(false);
     }
     return bVisible || bHighlighted;
 }

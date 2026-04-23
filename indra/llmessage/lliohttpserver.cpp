@@ -90,7 +90,7 @@ private:
     public:
 
         static LLPointer<Response> create(LLHTTPPipe* pipe);
-        virtual ~Response() = default;
+        virtual ~Response();
 
         // from LLHTTPNode::Response
         virtual void result(const LLSD&);
@@ -311,6 +311,11 @@ LLPointer<LLHTTPPipe::Response> LLHTTPPipe::Response::create(LLHTTPPipe* pipe)
     return result;
 }
 
+// virtual
+LLHTTPPipe::Response::~Response()
+{
+}
+
 void LLHTTPPipe::Response::nullPipe()
 {
     mPipe = NULL;
@@ -414,7 +419,7 @@ class LLHTTPResponseHeader : public LLIOPipe
 {
 public:
     LLHTTPResponseHeader() : mCode(0) {}
-    virtual ~LLHTTPResponseHeader() = default;
+    virtual ~LLHTTPResponseHeader() {}
 
 protected:
     /* @name LLIOPipe virtual implementations
@@ -489,7 +494,7 @@ LLIOPipe::EStatus LLHTTPResponseHeader::process_impl(
         LLChangeChannel change(channels.in(), channels.out());
         std::for_each(buffer->beginSegment(), buffer->endSegment(), change);
         std::string header = ostr.str();
-        buffer->prepend(channels.out(), (U8*)header.c_str(), header.size());
+        buffer->prepend(channels.out(), (U8*)header.c_str(), static_cast<S32>(header.size()));
         PUMP_DEBUG;
         return STATUS_DONE;
     }
@@ -620,7 +625,7 @@ bool LLHTTPResponder::readHeaderLine(
         }
         return false;
     }
-    S32 offset = -((len - 1) - (newline - dest));
+    S32 offset = -((len - 1) - (S32)(newline - dest));
     ++newline;
     *newline = '\0';
     mLastRead = buffer->seek(channels.in(), last, offset);
@@ -706,7 +711,7 @@ LLIOPipe::EStatus LLHTTPResponder::process_impl(
                     if (delimiter == std::string::npos)
                     {
                         mPath = mAbsPathAndQuery;
-                        mQuery.clear();
+                        mQuery = "";
                     }
                     else
                     {

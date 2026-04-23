@@ -63,6 +63,10 @@
 #include "v3dmath.h"
 #include "v3math.h"
 #include "v4color.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 #define DEFAULT_BEACON_WIDTH 6
 
@@ -75,7 +79,7 @@ void LLFloaterPathfindingObjects::onOpen(const LLSD &pKey)
     LLFloater::onOpen(pKey);
 
     selectNoneObjects();
-    mObjectsScrollList->setCommitOnSelectionChange(TRUE);
+    mObjectsScrollList->setCommitOnSelectionChange(true);
 
     if (!mSelectionUpdateSlot.connected())
     {
@@ -112,7 +116,7 @@ void LLFloaterPathfindingObjects::onClose(bool pIsAppQuitting)
         mSelectionUpdateSlot.disconnect();
     }
 
-    mObjectsScrollList->setCommitOnSelectionChange(FALSE);
+    mObjectsScrollList->setCommitOnSelectionChange(false);
     selectNoneObjects();
 
     if (mObjectsSelection.notNull())
@@ -135,7 +139,7 @@ void LLFloaterPathfindingObjects::draw()
         std::vector<LLScrollListItem *> selectedItems = mObjectsScrollList->getAllSelected();
         if (!selectedItems.empty())
         {
-            int numSelectedItems = selectedItems.size();
+            auto numSelectedItems = selectedItems.size();
             S32 nameColumnIndex = getNameColumnIndex();
             const LLColor4 &beaconColor = getBeaconColor();
             const LLColor4 &beaconTextColor = getBeaconTextColor();
@@ -194,7 +198,7 @@ LLFloaterPathfindingObjects::~LLFloaterPathfindingObjects()
     clearAllObjects();
 }
 
-BOOL LLFloaterPathfindingObjects::postBuild()
+bool LLFloaterPathfindingObjects::postBuild()
 {
     mDefaultBeaconColor = LLUIColorTable::getInstance()->getColor("PathfindingDefaultBeaconColor");
     mDefaultBeaconTextColor = LLUIColorTable::getInstance()->getColor("PathfindingDefaultBeaconTextColor");
@@ -204,7 +208,7 @@ BOOL LLFloaterPathfindingObjects::postBuild()
     mObjectsScrollList = findChild<LLScrollListCtrl>("objects_scroll_list");
     llassert(mObjectsScrollList != NULL);
     mObjectsScrollList->setCommitCallback(boost::bind(&LLFloaterPathfindingObjects::onScrollListSelectionChanged, this));
-    mObjectsScrollList->sortByColumnIndex(static_cast<U32>(getNameColumnIndex()), TRUE);
+    mObjectsScrollList->sortByColumnIndex(static_cast<U32>(getNameColumnIndex()), true);
 
     mMessagingStatus = findChild<LLTextBase>("messaging_status");
     llassert(mMessagingStatus != NULL);
@@ -334,7 +338,7 @@ void LLFloaterPathfindingObjects::rebuildObjectsScrollList(bool update_if_needed
     if (!mHasObjectsToBeSelected)
     {
         std::vector<LLScrollListItem*> selectedItems = mObjectsScrollList->getAllSelected();
-        int numSelectedItems = selectedItems.size();
+        auto numSelectedItems = selectedItems.size();
         if (numSelectedItems > 0)
         {
             mObjectsToBeSelected.reserve(selectedItems.size());
@@ -494,14 +498,14 @@ void LLFloaterPathfindingObjects::showFloaterWithSelectionObjects()
         rebuildObjectsScrollList(true);
         if (isMinimized())
         {
-            setMinimized(FALSE);
+            setMinimized(false);
         }
         setVisibleAndFrontmost();
     }
-    setFocus(TRUE);
+    setFocus(true);
 }
 
-BOOL LLFloaterPathfindingObjects::isShowBeacons() const
+bool LLFloaterPathfindingObjects::isShowBeacons() const
 {
     return mShowBeaconCheckBox->get();
 }
@@ -756,10 +760,10 @@ void LLFloaterPathfindingObjects::updateMessagingStatus()
 
             LLLocale locale(LLStringUtil::getLocale());
             std::string numItemsString;
-            LLResMgr::getIntegerString(numItemsString, numItems);
+            LLResMgr::getInstance()->getIntegerString(numItemsString, numItems);
 
             std::string numSelectedItemsString;
-            LLResMgr::getIntegerString(numSelectedItemsString, numSelectedItems);
+            LLResMgr::getInstance()->getIntegerString(numSelectedItemsString, numSelectedItems);
 
             LLStringUtil::format_map_t string_args;
             string_args["[NUM_SELECTED]"] = numSelectedItemsString;
@@ -788,22 +792,22 @@ void LLFloaterPathfindingObjects::updateStateOnListControls()
     case kMessagingUnknown:
     case kMessagingGetRequestSent :
     case kMessagingSetRequestSent :
-        mRefreshListButton->setEnabled(FALSE);
-        mSelectAllButton->setEnabled(FALSE);
-        mSelectNoneButton->setEnabled(FALSE);
+        mRefreshListButton->setEnabled(false);
+        mSelectAllButton->setEnabled(false);
+        mSelectNoneButton->setEnabled(false);
         break;
     case kMessagingGetError :
     case kMessagingSetError :
     case kMessagingNotEnabled :
-        mRefreshListButton->setEnabled(TRUE);
-        mSelectAllButton->setEnabled(FALSE);
-        mSelectNoneButton->setEnabled(FALSE);
+        mRefreshListButton->setEnabled(true);
+        mSelectAllButton->setEnabled(false);
+        mSelectNoneButton->setEnabled(false);
         break;
     case kMessagingComplete :
         {
             int numItems = mObjectsScrollList->getItemCount();
             int numSelectedItems = mObjectsScrollList->getNumSelected();
-            mRefreshListButton->setEnabled(TRUE);
+            mRefreshListButton->setEnabled(true);
             mSelectAllButton->setEnabled(numSelectedItems < numItems);
             mSelectNoneButton->setEnabled(numSelectedItems > 0);
         }
@@ -818,6 +822,29 @@ void LLFloaterPathfindingObjects::updateStateOnActionControls()
 {
     int numSelectedItems = mObjectsScrollList->getNumSelected();
     bool isEditEnabled = (numSelectedItems > 0);
+
+// [RLVa:KB]
+    if (RlvActions::isRlvEnabled())
+    {
+        if (
+            !rlvCanDeleteOrReturn()
+            || RlvActions::hasBehaviour(RLV_BHVR_FARTOUCH)
+            || RlvActions::hasBehaviour(RLV_BHVR_TOUCHALL)
+            || RlvActions::hasBehaviour(RLV_BHVR_TOUCHWORLD)
+            || RlvActions::hasBehaviour(RLV_BHVR_TOUCHME)
+            || RlvActions::hasBehaviour(RLV_BHVR_TOUCHTHIS)
+            || RlvActions::hasBehaviour(RLV_BHVR_INTERACT)
+        )
+        {
+            isEditEnabled = false;
+        }
+
+        if (RlvActions::hasBehaviour(RLV_BHVR_TPLOCAL))
+        {
+            numSelectedItems = 0;
+        }
+    }
+// [/RLVa:KB]
 
     mShowBeaconCheckBox->setEnabled(isEditEnabled);
     mTakeButton->setEnabled(isEditEnabled && visible_take_object());
@@ -835,7 +862,7 @@ void LLFloaterPathfindingObjects::selectScrollListItemsInWorld()
     std::vector<LLScrollListItem *> selectedItems = mObjectsScrollList->getAllSelected();
     if (!selectedItems.empty())
     {
-        int numSelectedItems = selectedItems.size();
+        auto numSelectedItems = selectedItems.size();
 
         std::vector<LLViewerObject *>viewerObjects;
         viewerObjects.reserve(numSelectedItems);

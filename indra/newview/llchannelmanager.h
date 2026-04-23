@@ -33,7 +33,6 @@
 #include "lluuid.h"
 
 #include <map>
-#include <boost/shared_ptr.hpp>
 
 namespace LLNotificationsUI
 {
@@ -41,10 +40,10 @@ namespace LLNotificationsUI
  * Manager for screen channels.
  * Responsible for instantiating and retrieving screen channels.
  */
-class LLChannelManager final : public LLSingleton<LLChannelManager>
+class LLChannelManager : public LLSingleton<LLChannelManager>
 {
     LLSINGLETON(LLChannelManager);
-    virtual ~LLChannelManager() override;
+    virtual ~LLChannelManager();
 
     void cleanupSingleton() override;
 public:

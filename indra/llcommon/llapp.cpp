@@ -37,7 +37,7 @@
 #endif
 
 #include "llcommon.h"
-#include "llapr.h"
+
 #include "llerrorcontrol.h"
 #include "llframetimer.h"
 #include "lllivefile.h"
@@ -52,15 +52,9 @@
 
 //
 // Signal handling
-//
-// Windows uses structured exceptions, so it's handled a bit differently.
-//
-#if LL_WINDOWS
-#include "llwin32headerslean.h"
+#ifndef LL_WINDOWS
+#include "apr_signal.h"
 
-LONG WINAPI default_windows_exception_handler(struct _EXCEPTION_POINTERS *exception_infop);
-BOOL ConsoleCtrlHandler(DWORD fdwCtrlType);
-#else
 # include <signal.h>
 # include <unistd.h> // for fork()
 void setup_signals();
@@ -79,30 +73,24 @@ S32 LL_HEARTBEAT_SIGNAL = SIGUSR2;
 S32 LL_SMACKDOWN_SIGNAL = (SIGRTMAX >= 0) ? (SIGRTMAX-1) : SIGUSR1;
 S32 LL_HEARTBEAT_SIGNAL = (SIGRTMAX >= 0) ? (SIGRTMAX-0) : SIGUSR2;
 # endif // LL_DARWIN
-#endif // LL_WINDOWS
+#endif // !LL_WINDOWS
 
 // the static application instance
 LLApp* LLApp::sApplication = NULL;
 
 // Allows the generation of core files for post mortem under gdb
 // and disables crashlogger
-BOOL LLApp::sDisableCrashlogger = FALSE;
-
-// Local flag for whether or not to do logging in signal handlers.
-//static
-BOOL LLApp::sLogInSignal = FALSE;
+bool LLApp::sDisableCrashlogger = false;
 
 // static
 // Keeps track of application status
 LLScalarCond<LLApp::EAppStatus> LLApp::sStatus{LLApp::APP_STATUS_STOPPED};
 LLAppErrorHandler LLApp::sErrorHandler = NULL;
 
+bool gDisconnected = false;
 
 LLApp::LLApp()
 {
-    assert_main_thread();       // Make sure we record the main thread
-    on_main_thread();           // Make sure we record the main thread
-
     // Set our status to running
     setStatus(APP_STATUS_RUNNING);
 
@@ -124,6 +112,11 @@ LLApp::LLApp()
 
     // Set the application to this instance.
     sApplication = this;
+
+    // initialize the buffer to write the minidump filename to
+    // (this is used to avoid allocating memory in the crash handler)
+    memset(mMinidumpPath, 0, MAX_MINDUMP_PATH_LENGTH);
+    mCrashReportPipeStr = L"\\\\.\\pipe\\LLCrashReporterPipe";
 }
 
 
@@ -197,9 +190,9 @@ bool LLApp::parseCommandOptions(int argc, char** argv)
 
 #if LL_WINDOWS
         //Windows changed command line parsing.  Deal with it.
-        S32 slen = value.length() - 1;
-        S32 start = 0;
-        S32 end = slen;
+        size_t slen = value.length() - 1;
+        size_t start = 0;
+        size_t end = slen;
         if (argv[ii][start]=='"')start++;
         if (argv[ii][end]=='"')end--;
         if (start!=0 || end!=slen)
@@ -224,11 +217,7 @@ bool LLApp::parseCommandOptions(int argc, wchar_t** wargv)
         if(wargv[ii][0] != '-')
         {
             LL_INFOS() << "Did not find option identifier while parsing token: "
-#if LL_WINDOWS
-                << ll_convert_wide_to_string(wargv[ii]) << LL_ENDL;
-#else
-                << wstring_to_utf8str(wargv[ii]) << LL_ENDL;
-#endif
+                << (intptr_t)wargv[ii] << LL_ENDL;
             return false;
         }
         int offset = 1;
@@ -266,9 +255,9 @@ bool LLApp::parseCommandOptions(int argc, wchar_t** wargv)
 
 #if LL_WINDOWS
         //Windows changed command line parsing.  Deal with it.
-        S32 slen = value.length() - 1;
-        S32 start = 0;
-        S32 end = slen;
+        size_t slen = value.length() - 1;
+        size_t start = 0;
+        size_t end = slen;
         if (wargv[ii][start]=='"')start++;
         if (wargv[ii][end]=='"')end--;
         if (start!=0 || end!=slen)
@@ -320,50 +309,25 @@ void LLApp::stepFrame()
     mRunner.run();
 }
 
-#if LL_WINDOWS
-//The following code is needed for 32-bit apps on 64-bit windows to keep it from eating
-//crashes.   It is a lovely undocumented 'feature' in SP1 of Windows 7. An excellent
-//in-depth article on the issue may be found here:  http://randomascii.wordpress.com/2012/07/05/when-even-crashing-doesn-work/
-void EnableCrashingOnCrashes()
-{
-    typedef BOOL (WINAPI *tGetPolicy)(LPDWORD lpFlags);
-    typedef BOOL (WINAPI *tSetPolicy)(DWORD dwFlags);
-    const DWORD EXCEPTION_SWALLOWING = 0x1;
-
-    HMODULE kernel32 = LoadLibrary(TEXT("kernel32.dll"));
-    tGetPolicy pGetPolicy = (tGetPolicy)GetProcAddress(kernel32,
-        "GetProcessUserModeExceptionPolicy");
-    tSetPolicy pSetPolicy = (tSetPolicy)GetProcAddress(kernel32,
-        "SetProcessUserModeExceptionPolicy");
-    if (pGetPolicy && pSetPolicy)
-    {
-        DWORD dwFlags;
-        if (pGetPolicy(&dwFlags))
-        {
-            // Turn off the filter
-            pSetPolicy(dwFlags & ~EXCEPTION_SWALLOWING);
-        }
-    }
-}
-#endif
-
 void LLApp::setupErrorHandling(bool second_instance)
 {
     // Error handling is done by starting up an error handling thread, which just sleeps and
     // occasionally checks to see if the app is in an error state, and sees if it needs to be run.
 
-#if defined(LL_WINDOWS)
+#if LL_WINDOWS
 
 #else  // ! LL_WINDOWS
+
+#if ! defined(LL_BUGSPLAT)
     //
-#if ! defined(AL_SENTRY)
     // Start up signal handling.
     //
     // There are two different classes of signals.  Synchronous signals are delivered to a specific
     // thread, asynchronous signals can be delivered to any thread (in theory)
     //
     setup_signals();
-#endif // ! AL_SENTRY
+#endif // ! LL_BUGSPLAT
+
 #endif // ! LL_WINDOWS
 }
 
@@ -400,6 +364,9 @@ static std::map<LLApp::EAppStatus, const char*> statusDesc
 // static
 void LLApp::setStatus(EAppStatus status)
 {
+    auto status_it = statusDesc.find(status);
+    std::string status_text = status_it != statusDesc.end() ? std::string(status_it->second) : std::to_string(status);
+    LL_INFOS() << "status: " << status_text << LL_ENDL;
     // notify everyone waiting on sStatus any time its value changes
     sStatus.set_all(status);
 
@@ -408,18 +375,7 @@ void LLApp::setStatus(EAppStatus status)
     if (! LLEventPumps::wasDeleted())
     {
         // notify interested parties of status change
-        LLSD statsd;
-        auto found = statusDesc.find(status);
-        if (found != statusDesc.end())
-        {
-            statsd = found->second;
-        }
-        else
-        {
-            // unknown status? at least report value
-            statsd = LLSD::Integer(status);
-        }
-        LLEventPumps::instance().obtain("LLApp").post(llsd::map("status", statsd));
+        LLEventPumps::instance().obtain("LLApp").post(llsd::map("status", status_text));
     }
 }
 
@@ -435,6 +391,10 @@ void LLApp::setDebugFileNames(const std::string &path)
 {
     mStaticDebugFileName = path + "static_debug_info.log";
     mDynamicDebugFileName = path + "dynamic_debug_info.log";
+}
+
+void LLApp::writeMiniDump()
+{
 }
 
 // static
@@ -491,13 +451,13 @@ bool LLApp::isExiting()
 
 void LLApp::disableCrashlogger()
 {
-    sDisableCrashlogger = TRUE;
+    sDisableCrashlogger = true;
 }
 
 // static
 bool LLApp::isCrashloggerDisabled()
 {
-    return (sDisableCrashlogger == TRUE);
+    return sDisableCrashlogger;
 }
 
 // static
@@ -510,77 +470,34 @@ int LLApp::getPid()
 #endif
 }
 
-#if LL_WINDOWS
-LONG WINAPI default_windows_exception_handler(struct _EXCEPTION_POINTERS *exception_infop)
+// static
+void LLApp::notifyOutOfDiskSpace()
 {
-    // Translate the signals/exceptions into cross-platform stuff
-    // Windows implementation
+    static const U32Seconds min_interval = U32Seconds(60);
+    static U32Seconds min_time_to_send = U32Seconds(0);
+    U32Seconds now = LLTimer::getTotalTime();
+    if (now < min_time_to_send)
+        return;
 
-    // Make sure the user sees something to indicate that the app crashed.
-    LONG retval;
+    min_time_to_send = now + min_interval;
 
-    if (LLApp::isError())
+    if (LLApp* app = instance())
     {
-        LL_WARNS() << "Got another fatal signal while in the error handler, die now!" << LL_ENDL;
-        retval = EXCEPTION_EXECUTE_HANDLER;
-        return retval;
+        app->sendOutOfDiskSpaceNotification();
     }
-
-    // Flag status to error, so thread_error starts its work
-    LLApp::setError();
-
-    // Block in the exception handler until the app has stopped
-    // This is pretty sketchy, but appears to work just fine
-    while (!LLApp::isStopped())
+    else
     {
-        ms_sleep(10);
-    }
-
-    //
-    // Generate a minidump if we can.
-    //
-    // TODO: This needs to be ported over form the viewer-specific
-    // LLWinDebug class
-
-    //
-    // At this point, we always want to exit the app.  There's no graceful
-    // recovery for an unhandled exception.
-    //
-    // Just kill the process.
-    retval = EXCEPTION_EXECUTE_HANDLER;
-    return retval;
-}
-
-// Win32 doesn't support signals. This is used instead.
-BOOL ConsoleCtrlHandler(DWORD fdwCtrlType)
-{
-    switch (fdwCtrlType)
-    {
-        case CTRL_BREAK_EVENT:
-        case CTRL_LOGOFF_EVENT:
-        case CTRL_SHUTDOWN_EVENT:
-        case CTRL_CLOSE_EVENT: // From end task or the window close button.
-        case CTRL_C_EVENT:  // from CTRL-C on the keyboard
-            // Just set our state to quitting, not error
-            if (LLApp::isQuitting() || LLApp::isError())
-            {
-                // We're already trying to die, just ignore this signal
-                if (LLApp::sLogInSignal)
-                {
-                    LL_INFOS() << "Signal handler - Already trying to quit, ignoring signal!" << LL_ENDL;
-                }
-                return TRUE;
-            }
-            LLApp::setQuitting();
-            return TRUE;
-
-        default:
-            return FALSE;
+        LL_WARNS() << "No app instance" << LL_ENDL;
     }
 }
 
-#else //!LL_WINDOWS
+// virtual
+void LLApp::sendOutOfDiskSpaceNotification()
+{
+    LL_WARNS() << "Should never be called" << LL_ENDL; // Should be overridden
+}
 
+#ifndef LL_WINDOWS
 void setup_signals()
 {
     //
@@ -592,21 +509,17 @@ void setup_signals()
     act.sa_flags = SA_SIGINFO;
 
     // Synchronous signals
-#if !defined(AL_SENTRY)
+#   ifndef LL_BUGSPLAT
     sigaction(SIGABRT, &act, NULL);
-#endif
+#   endif
     sigaction(SIGALRM, &act, NULL);
-#if !defined(AL_SENTRY)
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGFPE, &act, NULL);
-#endif
     sigaction(SIGHUP, &act, NULL);
-#if !defined(AL_SENTRY)
     sigaction(SIGILL, &act, NULL);
     sigaction(SIGPIPE, &act, NULL);
     sigaction(SIGSEGV, &act, NULL);
     sigaction(SIGSYS, &act, NULL);
-#endif
 
     sigaction(LL_HEARTBEAT_SIGNAL, &act, NULL);
     sigaction(LL_SMACKDOWN_SIGNAL, &act, NULL);
@@ -635,21 +548,17 @@ void clear_signals()
     act.sa_flags = SA_SIGINFO;
 
     // Synchronous signals
-#if !defined(AL_SENTRY)
+#   ifndef LL_BUGSPLAT
     sigaction(SIGABRT, &act, NULL);
-#endif
+#   endif
     sigaction(SIGALRM, &act, NULL);
-#if !defined(AL_SENTRY)
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGFPE, &act, NULL);
-#endif
     sigaction(SIGHUP, &act, NULL);
-#if !defined(AL_SENTRY)
     sigaction(SIGILL, &act, NULL);
     sigaction(SIGPIPE, &act, NULL);
     sigaction(SIGSEGV, &act, NULL);
     sigaction(SIGSYS, &act, NULL);
-#endif
 
     sigaction(LL_HEARTBEAT_SIGNAL, &act, NULL);
     sigaction(LL_SMACKDOWN_SIGNAL, &act, NULL);
@@ -805,4 +714,5 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
         }
     }
 }
+
 #endif // !WINDOWS

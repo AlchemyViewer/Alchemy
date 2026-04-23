@@ -101,7 +101,6 @@ public:
     //const Type&   operator*() const           { return *nonNull(mPointer); }
     //Type& operator*()                         { return *nonNull(mPointer); }
 
-    operator BOOL()  const                      { return mPointer != NULL; }
     operator bool()  const                      { return mPointer != NULL; }
     bool operator!() const                      { return mPointer == NULL; }
     bool isNull() const                         { return mPointer == NULL; }
@@ -178,10 +177,10 @@ protected:
     // Of course, as with any LLSingleton, the "null instance" is only
     // instantiated on demand -- in this case, if you actually try to
     // dereference an LLSafeHandle containing null.
-    class NullInstanceHolder final : public LLSingleton<NullInstanceHolder>
+    class NullInstanceHolder: public LLSingleton<NullInstanceHolder>
     {
         LLSINGLETON_EMPTY_CTOR(NullInstanceHolder);
-        ~NullInstanceHolder() = default;
+        ~NullInstanceHolder() {}
     public:
         Type mNullInstance;
     };

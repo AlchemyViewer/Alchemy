@@ -24,13 +24,15 @@
  * $/LicenseInfo$
  */
 
+#include "linden_common.h"
+
 #include "lltextutil.h"
 
 #include "lluicolor.h"
 #include "lltextbox.h"
 #include "llurlmatch.h"
 
-boost::function<bool(LLUrlMatch*,LLTextBase*)>  LLTextUtil::TextHelpers::iconCallbackCreationFunction = 0;
+std::function<bool(LLUrlMatch*, LLTextBase*)> LLTextUtil::TextHelpers::iconCallbackCreationFunction = nullptr;
 
 void LLTextUtil::textboxSetHighlightedVal(LLTextBox *txtbox, const LLStyle::Params& normal_style, const std::string& text, const std::string& hl)
 {
@@ -81,7 +83,7 @@ bool LLTextUtil::processUrlMatch(LLUrlMatch* match,LLTextBase* text_base, bool i
     if (match == 0 || text_base == 0)
         return false;
 
-    if(match->getID().notNull() && TextHelpers::iconCallbackCreationFunction)
+    if(match->getID() != LLUUID::null && TextHelpers::iconCallbackCreationFunction)
     {
         bool segment_created = TextHelpers::iconCallbackCreationFunction(match,text_base);
         if(segment_created)

@@ -6,5 +6,4 @@
 	<string name="title_notification_well_window">
 		通知
 	</string>
-	<flat_list_view name="notification_list"/>
 </floater>

@@ -37,70 +37,6 @@
        name="viewer_logo"
        top="4"
        width="128" />
-      <icon
-       interactable="true"
-       commit_on_click="true"
-       height="42"
-       image_name="social_github"
-       layout="topleft"
-       left="25"
-       mouse_opaque="true"
-       name="github_icon"
-       tool_tip="[APP_NAME] on GitHub"
-       top="140"
-       width="41">
-        <icon.commit_callback
-         function="Advanced.ShowURL"
-         parameter="https://github.com/alchemyviewer" />
-      </icon>
-      <icon
-       interactable="true"
-       commit_on_click="true"
-       height="42"
-       image_name="social_bluesky"
-       layout="topleft"
-       left_pad="10"
-       mouse_opaque="true"
-       name="bsky_icon"
-       tool_tip="[APP_NAME] on Bluesky"
-       top="140"
-       width="42">
-        <icon.commit_callback
-         function="Advanced.ShowURL"
-         parameter="https://bsky.app/profile/alchemyviewer.org" />
-      </icon>
-      <icon
-       interactable="true"
-       commit_on_click="true"
-       height="32"
-       image_name="social_discord"
-       layout="topleft"
-       left="25"
-       mouse_opaque="true"
-       name="discord_icon"
-       tool_tip="[APP_NAME] on Discord"
-       top_pad="10"
-       width="42">
-        <icon.commit_callback
-         function="Advanced.ShowURL"
-         parameter="https://discordapp.com/invite/KugCgs6" />
-      </icon>
-      <icon
-       interactable="true"
-       commit_on_click="true"
-       height="32"
-       image_name="social_mastodon"
-       layout="topleft"
-       left_pad="16"
-       mouse_opaque="true"
-       name="mastodon_icon"
-       tool_tip="[APP_NAME] on Mastodon"
-       top_delta="0"
-       width="30">
-        <icon.commit_callback
-         function="Advanced.ShowURL"
-         parameter="https://mastodon.social/@alchemyviewer" />
-      </icon>
       <button
        visible="false"
        follows="bottom|left" 
@@ -304,13 +240,13 @@ google-perftools Copyright (c) 2005, Google Inc.
 Havok.com(TM) Copyright (C) 1999-2001, Telekinesys Research Limited.
 jpeg2000 Copyright (C) 2001, David Taubman, The University of New South Wales (UNSW)
 jpeglib Copyright (C) 1991-1998, Thomas G. Lane.
+luau Copyright (c) 1994–2019 Lua.org, PUC-Rio / Copyright (c) 2019-2024 Roblox Corporation
 meshoptimizer Copyright (c) 2016-2021 Arseny Kapoulkine
 ogg/vorbis Copyright (C) 2002, Xiphophorus
 OpenSSL Copyright (C) 1998-2008 The OpenSSL Project.
 PCRE Copyright (c) 1997-2012 University of Cambridge
 SDL Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002 Sam Lantinga
 SSLeay Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
-xmlrpc-epi Copyright (C) 2000 Epinions, Inc.
 xxHash Copyright (C) 2012-2020 Yann Collet.
 zlib Copyright (C) 1995-2012 Jean-loup Gailly and Mark Adler.
 

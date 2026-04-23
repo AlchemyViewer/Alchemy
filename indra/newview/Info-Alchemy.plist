@@ -28,6 +28,8 @@
 	<string>${VIEWER_VERSION_MAJOR}.${VIEWER_VERSION_MINOR}.${VIEWER_VERSION_PATCH}.${VIEWER_VERSION_REVISION}</string>
 	<key>CSResourcesFileMapped</key>
 	<true/>
+	<key>LSRequiresCarbon</key>
+	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>${MACOSX_BUNDLE_COPYRIGHT}</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -40,7 +42,7 @@
 				<string>slurl</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
-			<string>seconlife</string>
+			<string>alchemy.icns</string>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-grid-location-info</string>

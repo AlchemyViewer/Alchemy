@@ -1,15 +1,5 @@
 # -*- cmake -*-
 
-project(llrender)
-
-include(00-Common)
-include(OpenGL)
-include(SDL2)
-include(FreeType)
-include(LLCommon)
-include(LLImage)
-include(LLWindow)
-
 set(llrender_SOURCE_FILES
     llcubemap.cpp
     llcubemaparray.cpp
@@ -17,6 +7,7 @@ set(llrender_SOURCE_FILES
     llfontfreetype.cpp
     llfontfreetypesvg.cpp
     llfontgl.cpp
+    llfontvertexbuffer.cpp
     llfontregistry.cpp
     llgl.cpp
     llglslshader.cpp
@@ -34,13 +25,12 @@ set(llrender_SOURCE_FILES
     llvertexbuffer.cpp
     llglcommonfunc.cpp
     )
-    
-set(llrender_HEADER_FILES
-    CMakeLists.txt
 
+set(llrender_HEADER_FILES
     llcubemap.h
     llcubemaparray.h
     llfontgl.h
+    llfontvertexbuffer.h
     llfontfreetype.h
     llfontfreetypesvg.h
     llfontbitmapcache.h
@@ -68,31 +58,34 @@ set(llrender_HEADER_FILES
 list(APPEND llrender_SOURCE_FILES ${llrender_HEADER_FILES})
 
 if (BUILD_HEADLESS)
-  add_library (llrenderheadless
+  add_library (llrenderheadless STATIC
     ${llrender_SOURCE_FILES}
     )
-
-  set_property(TARGET llrenderheadless
-    PROPERTY COMPILE_DEFINITIONS LL_MESA=1 LL_MESA_HEADLESS=1
-      )
+  target_include_directories(llrenderheadless INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
   target_link_libraries(llrenderheadless
           llcommon
           llimage
           llmath
-          llrender
           llxml
           llfilesystem
+          llwindowheadless
+          ll::freetype
+          ll::harfbuzz
+          ll::nanosvg
+          ll::glext
+          OpenGL::GL
           )
+
+  target_precompile_headers(llrenderheadless REUSE_FROM llprecompiled)
 endif (BUILD_HEADLESS)
 
-add_library (llrender ${llrender_SOURCE_FILES})
-target_include_directories( llrender  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
+add_library (llrender STATIC ${llrender_SOURCE_FILES})
+target_include_directories(llrender INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 target_link_libraries(llrender
-        PUBLIC
         llcommon
         llimage
         llmath
@@ -100,6 +93,14 @@ target_link_libraries(llrender
         llxml
         llwindow
         ll::freetype
-        ll::opengl
+        ll::harfbuzz
+        ll::glext
         )
 
+target_precompile_headers(llrender REUSE_FROM llprecompiled)
+
+if (NOT USE_SDL_WINDOW)
+  target_link_libraries(llrender
+          OpenGL::GL
+          )
+endif()

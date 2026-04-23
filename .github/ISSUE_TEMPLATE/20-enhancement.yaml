@@ -2,6 +2,7 @@ name: Enhancement
 description: New feature or enhancement
 title: "[New Feature]: "
 labels: [enhancement, triage]
+type: 'Feature'
 body:
 - type: markdown
   attributes:

@@ -32,7 +32,7 @@
 #include "llversioninfo.h"
 #include "stringize.h"
 
-#include "compile_time.h"
+#include "llversioninfovars.h"
 
 #if ! defined(LL_VIEWER_CHANNEL)       \
  || ! defined(LL_VIEWER_VERSION_MAJOR) \
@@ -53,11 +53,9 @@ LLVersionInfo::LLVersionInfo():
     // LL_VIEWER_CHANNEL is a macro defined on the compiler command line. The
     // macro expands to the string name of the channel, but without quotes. We
     // need to turn it into a quoted string. LL_TO_STRING() does that.
-    mWorkingChannelName(LL_VIEWER_CHANNEL),
-    build_configuration(LLBUILD_CONFIG), // set in indra/cmake/BuildVersion.cmake
-    codename(LL_VIEWER_CHANNEL_CODENAME),
+    mWorkingChannelName(LL_TO_STRING(LL_VIEWER_CHANNEL)),
     // instantiate an LLEventMailDrop with canonical name to listen for news
-    // from SLVersionChecker
+    // from the Viewer Version Manager
     mPump{new LLEventMailDrop("relnotes")},
     // immediately listen on mPump, store arriving URL into mReleaseNotes
     mStore{new LLStoreListener<std::string>(*mPump, mReleaseNotes)}
@@ -79,37 +77,37 @@ LLVersionInfo::~LLVersionInfo()
 {
 }
 
-S32 LLVersionInfo::getMajor()
+S32 LLVersionInfo::getMajor() const
 {
     return LL_VIEWER_VERSION_MAJOR;
 }
 
-S32 LLVersionInfo::getMinor()
+S32 LLVersionInfo::getMinor() const
 {
     return LL_VIEWER_VERSION_MINOR;
 }
 
-S32 LLVersionInfo::getPatch()
+S32 LLVersionInfo::getPatch() const
 {
     return LL_VIEWER_VERSION_PATCH;
 }
 
-U64 LLVersionInfo::getBuild()
+U64 LLVersionInfo::getBuild() const
 {
     return LL_VIEWER_VERSION_BUILD;
 }
 
-const std::string& LLVersionInfo::getVersion()
+std::string LLVersionInfo::getVersion() const
 {
     return version;
 }
 
-const std::string& LLVersionInfo::getShortVersion()
+std::string LLVersionInfo::getShortVersion() const
 {
     return short_version;
 }
 
-const std::string& LLVersionInfo::getChannelAndVersion()
+std::string LLVersionInfo::getChannelAndVersion() const
 {
     if (mVersionChannel.empty())
     {
@@ -120,7 +118,7 @@ const std::string& LLVersionInfo::getChannelAndVersion()
     return mVersionChannel;
 }
 
-const std::string& LLVersionInfo::getChannel()
+std::string LLVersionInfo::getChannel() const
 {
     return mWorkingChannelName;
 }
@@ -131,14 +129,14 @@ void LLVersionInfo::resetChannel(const std::string& channel)
     mVersionChannel.clear(); // Reset version and channel string til next use.
 }
 
-LLVersionInfo::ViewerMaturity LLVersionInfo::getViewerMaturity()
+LLVersionInfo::ViewerMaturity LLVersionInfo::getViewerMaturity() const
 {
     ViewerMaturity maturity;
 
-    const std::string& channel = mWorkingChannelName;
+    std::string channel = getChannel();
 
     static const boost::regex is_test_channel("\\bTest\\b");
-    static const boost::regex is_beta_channel("\\bBeta\\b");
+    static const boost::regex is_beta_channel("\\b(Beta|Develop)\\b");  // Develop is an alias for Beta
     static const boost::regex is_project_channel("\\bProject\\b");
     static const boost::regex is_release_channel("\\bRelease\\b");
 
@@ -168,50 +166,23 @@ LLVersionInfo::ViewerMaturity LLVersionInfo::getViewerMaturity()
     return maturity;
 }
 
-const std::string& LLVersionInfo::getCodename()
+
+std::string LLVersionInfo::getBuildConfig() const
 {
-    return codename;
+#if LL_OPTDEBUG
+    return "OptDebug";
+#elif LL_DEBUG
+    return "Debug";
+#elif LL_RELEASE_WITH_DEBUG_INFO
+    return "RelWithDebInfo";
+#elif LL_RELEASE_FOR_DOWNLOAD
+    return "Release";
+#else
+    return "Unknown";
+#endif
 }
 
-const std::string& LLVersionInfo::getBuildConfig()
-{
-    return build_configuration;
-}
-
-std::string LLVersionInfo::getReleaseNotes()
+std::string LLVersionInfo::getReleaseNotes() const
 {
     return mReleaseNotes;
-}
-
-bool LLVersionInfo::isViewerExpired()
-{
-#ifdef BUILD_EXPIREY
-    static const U64 BUILD_TIME(UNIX_TIMESTAMP);
-    static const U64Seconds TEST_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 30)); // 30 days
-    static const U64Seconds PROJECT_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 60)); // 60 days
-    static const U64Seconds BETA_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 120)); // 120 days
-
-    switch (getViewerMaturity())
-    {
-    case RELEASE_VIEWER:
-        break;
-    case TEST_VIEWER:
-    {
-        if (LLTimer::getTotalSeconds() > TEST_EXPIREY) return true;
-        break;
-    }
-    case PROJECT_VIEWER:
-    {
-        if (LLTimer::getTotalSeconds() > PROJECT_EXPIREY) return true;
-        break;
-    }
-    case BETA_VIEWER:
-    {
-        if (LLTimer::getTotalSeconds() > BETA_EXPIREY) return true;
-        break;
-    }
-    }
-#endif
-    return false;
-
 }

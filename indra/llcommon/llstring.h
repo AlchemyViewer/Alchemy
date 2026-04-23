@@ -27,17 +27,12 @@
 #ifndef LL_LLSTRING_H
 #define LL_LLSTRING_H
 
-#if LL_GNUC && GCC_VERSION >= 90000
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-copy-dtor"
-#endif
 #include <boost/call_traits.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/unordered/unordered_flat_map.hpp>
-#if LL_GNUC && GCC_VERSION >= 90000
-#pragma GCC diagnostic pop
-#endif
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <cstdio>
 #include <cwchar>                   // std::wcslen()
 //#include <locale>
@@ -56,6 +51,7 @@
 #endif
 
 #include <string.h>
+
 const char LL_UNKNOWN_CHAR = '?';
 class LLSD;
 
@@ -152,22 +148,6 @@ struct char_traits<U16>
 };
 #endif
 
-namespace al
-{
-    struct string_hash
-    {
-        using hash_type = boost::hash<std::string_view>;
-        using is_transparent = void;
-        [[nodiscard]] size_t operator()(const char* txt) const { return hash_type{}(txt); }
-        [[nodiscard]] size_t operator()(std::string_view txt) const { return hash_type{}(txt); }
-        [[nodiscard]] size_t operator()(const std::string& txt) const { return hash_type{}(txt); }
-    };
-
-    inline std::string_view safe_string_view(const char* p) {
-        return p ? std::string_view(p) : std::string_view();
-    }
-}
-
 class LL_COMMON_API LLStringOps
 {
 private:
@@ -175,7 +155,7 @@ private:
     static long sLocalTimeOffset;
     static bool sPacificDaylightTime;
 
-    static boost::unordered_flat_map<std::string, std::string, al::string_hash, std::equal_to<>> datetimeToCodes;
+    static std::map<std::string, std::string> datetimeToCodes;
 
 public:
     static std::vector<std::string> sWeekDayList;
@@ -235,7 +215,7 @@ public:
     // currently in daylight savings time?
     static bool getPacificDaylightTime(void) { return sPacificDaylightTime;}
 
-    static std::string getDatetimeCode (std::string_view key);
+    static std::string getDatetimeCode (std::string key);
 
     // Express a value like 1234567 as "1.23M"
     static std::string getReadableNumber(F64 num);
@@ -256,9 +236,9 @@ class LLFormatMapString
 public:
     LLFormatMapString() = default;
     LLFormatMapString(const char* s) : mString(ll_safe_string(s)) {};
-    LLFormatMapString(std::string s) : mString(std::move(s)) {};
-    operator std::string() const { return mString; }
-    operator std::string_view() const { return mString; }
+    LLFormatMapString(const std::string& s) : mString(s) {};
+    operator const std::string&() const { return mString; }
+    const std::string& operator()() const { return mString; }
     bool operator<(const LLFormatMapString& rhs) const { return mString < rhs.mString; }
     std::size_t length() const { return mString.length(); }
 
@@ -274,6 +254,7 @@ private:
 
 public:
     typedef std::basic_string<T> string_type;
+    typedef std::basic_string_view<T> string_view_type;
     typedef typename string_type::size_type size_type;
 
 public:
@@ -338,13 +319,18 @@ public:
     static void trimTail(string_type& string);
     static void trimTail(string_type& string, const string_type& tokens);
     static void trim(string_type& string)   { trimHead(string); trimTail(string); }
+
+    static void trimHead(string_view_type& string);
+    static void trimTail(string_view_type& string);
+    static void trim(string_view_type& string)   { trimHead(string); trimTail(string); }
+
     static void truncate(string_type& string, size_type count);
 
     static void toUpper(string_type& string);
     static void toLower(string_type& string);
 
     // True if this is the head of s.
-    static BOOL isHead( const string_type& string, const T* s );
+    static bool isHead( const string_type& string, const T* s );
 
     /**
      * @brief Returns true if string starts with substr
@@ -352,8 +338,8 @@ public:
      * If etither string or substr are empty, this method returns false.
      */
     static bool startsWith(
-        const string_type& string,
-        const string_type& substr);
+        string_view_type string,
+        string_view_type substr);
 
     /**
      * @brief Returns true if string ends in substr
@@ -361,8 +347,8 @@ public:
      * If etither string or substr are empty, this method returns false.
      */
     static bool endsWith(
-        const string_type& string,
-        const string_type& substr);
+        string_view_type string,
+        string_view_type substr);
 
     /**
      * get environment string value with proper Unicode handling
@@ -375,7 +361,7 @@ public:
      * (key is always UTF-8)
      * detect absence by (! return value)
      */
-    static boost::optional<string_type> getoptenv(const std::string& key);
+    static std::optional<string_type> getoptenv(const std::string& key);
 
     static void addCRLF(string_type& string);
     static void removeCRLF(string_type& string);
@@ -388,7 +374,7 @@ public:
     static string_type capitalize(const string_type& str);
     static void capitalize(string_type& str);
 
-    static BOOL containsNonprintable(const string_type& string);
+    static bool containsNonprintable(string_view_type string);
     static void stripNonprintable(string_type& string);
 
     /**
@@ -414,15 +400,15 @@ public:
     static void _makeASCII(string_type& string);
 
     // Conversion to other data types
-    static BOOL convertToBOOL(const string_type& string, BOOL& value);
-    static BOOL convertToU8(const string_type& string, U8& value);
-    static BOOL convertToS8(const string_type& string, S8& value);
-    static BOOL convertToS16(const string_type& string, S16& value);
-    static BOOL convertToU16(const string_type& string, U16& value);
-    static BOOL convertToU32(const string_type& string, U32& value);
-    static BOOL convertToS32(const string_type& string, S32& value);
-    static BOOL convertToF32(const string_type& string, F32& value);
-    static BOOL convertToF64(const string_type& string, F64& value);
+    static bool convertToBOOL(string_view_type string, bool& value);
+    static bool convertToU8(string_view_type string, U8& value);
+    static bool convertToS8(string_view_type string, S8& value);
+    static bool convertToS16(string_view_type string, S16& value);
+    static bool convertToU16(string_view_type string, U16& value);
+    static bool convertToU32(string_view_type string, U32& value);
+    static bool convertToS32(string_view_type string, S32& value);
+    static bool convertToF32(string_view_type string, F32& value);
+    static bool convertToF64(string_view_type string, F64& value);
 
     /////////////////////////////////////////////////////////////////////////////////////////
     // Utility functions for working with char*'s and strings
@@ -447,7 +433,7 @@ public:
     static S32      compareDictInsensitive(const string_type& a, const string_type& b);
 
     // Puts compareDict() in a form appropriate for LL container classes to use for sorting.
-    static BOOL     precedesDict( const string_type& a, const string_type& b );
+    static bool     precedesDict( const string_type& a, const string_type& b );
 
     // A replacement for strncpy.
     // If the dst buffer is dst_size bytes long or more, ensures that dst is null terminated and holds
@@ -492,7 +478,7 @@ struct LLDictionaryLess
 public:
     bool operator()(const std::string& a, const std::string& b) const
     {
-        return (LLStringUtil::precedesDict(a, b) ? true : false);
+        return (LLStringUtil::precedesDict(a, b));
     }
 };
 
@@ -705,6 +691,10 @@ ll_convert_forms(ll_convert_u16_alias, std::string, llutf16string, utf16str_to_u
 // an older alias for utf16str_to_utf8str(llutf16string)
 inline std::string wstring_to_utf8str(const llutf16string &utf16str) { return utf16str_to_utf8str(utf16str);}
 
+// Convert to/from u8string
+ll_convert_forms(ll_convert_alias, std::string, std::u8string, u8str_to_str);
+ll_convert_forms(ll_convert_alias, std::u8string, std::string, str_to_u8str);
+
 // Length of this UTF32 string in bytes when transformed to UTF8
 LL_COMMON_API S32 wstring_utf8_length(const LLWString& wstr);
 
@@ -722,7 +712,7 @@ LL_COMMON_API S32 utf16str_wstring_length(const llutf16string &utf16str, S32 len
 LL_COMMON_API S32 wstring_utf16_length(const LLWString & wstr, S32 woffset, S32 wlen);
 
 // Length in wstring (i.e., llwchar count) of a part of a wstring specified by utf16 length (i.e., utf16 units.)
-LL_COMMON_API S32 wstring_wstring_length_from_utf16_length(const LLWString & wstr, S32 woffset, S32 utf16_length, BOOL *unaligned = NULL);
+LL_COMMON_API S32 wstring_wstring_length_from_utf16_length(const LLWString & wstr, S32 woffset, S32 utf16_length, bool *unaligned = nullptr);
 
 /**
  * @brief Properly truncate a utf8 string to a maximum byte count.
@@ -777,11 +767,11 @@ LL_COMMON_API std::string mbcsstring_makeASCII(const std::string& str);
 
 LL_COMMON_API std::string utf8str_removeCRLF(const std::string& utf8str);
 
-LL_COMMON_API llwchar utf8str_to_wchar(std::string_view utf8str, size_t offset, size_t length);
+LL_COMMON_API llwchar utf8str_to_wchar(const std::string& utf8str, size_t offset, size_t length);
 
 LL_COMMON_API std::string utf8str_showBytesUTF8(const std::string& utf8str);
 
-LL_COMMON_API bool wstring_has_emoji(const LLWString& wstr);
+LL_COMMON_API bool wstring_has_emoji(LLWStringView wstr);
 
 LL_COMMON_API bool wstring_remove_emojis(LLWString& wstr);
 
@@ -862,13 +852,19 @@ STRING windows_message(unsigned long error)
 template<>
 LL_COMMON_API std::wstring windows_message<std::wstring>(unsigned long error);
 
+/// Get Windows message string, implicitly calling GetLastError()
+LL_COMMON_API unsigned long windows_get_last_error();
+
+template<typename STRING>
+STRING windows_message() { return windows_message<STRING>(windows_get_last_error()); }
+
 //@}
 
-LL_COMMON_API boost::optional<std::wstring> llstring_getoptenv(const std::string& key);
+LL_COMMON_API std::optional<std::wstring> llstring_getoptenv(const std::string& key);
 
 #else // ! LL_WINDOWS
 
-LL_COMMON_API boost::optional<std::string>  llstring_getoptenv(const std::string& key);
+LL_COMMON_API std::optional<std::string>  llstring_getoptenv(const std::string& key);
 
 #endif // ! LL_WINDOWS
 
@@ -914,6 +910,20 @@ namespace LLStringFn
      * Works with US ASCII and UTF-8 encoded strings.  JC
      */
     LL_COMMON_API std::string strip_invalid_xml(const std::string& input);
+
+
+    /**
+     * @brief Replace all characters that are not allowed in XML 1.0
+     * with corresponding literals: [ < > & ] => [ &lt; &gt; &amp; ]
+     */
+    LL_COMMON_API std::string xml_encode(const std::string& input, bool for_attribute = false);
+
+
+    /**
+     * @brief Replace some of XML literals that are defined in XML 1.0
+     * with corresponding characters: [ &lt; &gt; &amp; ] => [ < > & ]
+     */
+    LL_COMMON_API std::string xml_decode(const std::string& input, bool for_attribute = false);
 
 
     /**
@@ -993,7 +1003,7 @@ struct InString
         mIter(b),
         mEnd(e)
     {}
-    virtual ~InString() = default;
+    virtual ~InString() {}
 
     bool done() const { return mIter == mEnd; }
     /// Is the current character (*mIter) escaped? This implementation can
@@ -1246,9 +1256,9 @@ void LLStringUtilBase<T>::getTokens(const string_type& string, std::vector<strin
     // (unless there ARE no escapes).
     std::unique_ptr< LLStringUtilBaseImpl::InString<T> > instrp;
     if (escapes.empty())
-        instrp.reset(new LLStringUtilBaseImpl::InString<T>(string.begin(), string.end()));
+        instrp = std::make_unique<LLStringUtilBaseImpl::InString<T>>(string.begin(), string.end());
     else
-        instrp.reset(new LLStringUtilBaseImpl::InEscString<T>(string.begin(), string.end(), escapes));
+        instrp = std::make_unique<LLStringUtilBaseImpl::InEscString<T>>(string.begin(), string.end(), escapes);
     LLStringUtilBaseImpl::getTokens(*instrp, tokens, drop_delims, keep_delims, quotes);
 }
 
@@ -1407,11 +1417,11 @@ S32 LLStringUtilBase<T>::compareDictInsensitive(const string_type& astr, const s
 // Puts compareDict() in a form appropriate for LL container classes to use for sorting.
 // static
 template<class T>
-BOOL LLStringUtilBase<T>::precedesDict( const string_type& a, const string_type& b )
+bool LLStringUtilBase<T>::precedesDict( const string_type& a, const string_type& b )
 {
     if( a.size() && b.size() )
     {
-        return (LLStringUtilBase<T>::compareDict(a, b) < 0);
+        return (LLStringUtilBase<T>::compareDict(a.c_str(), b.c_str()) < 0);
     }
     else
     {
@@ -1495,15 +1505,44 @@ void LLStringUtilBase<T>::trimTail(string_type& string, const string_type& token
     }
 }
 
+// static
+template<class T>
+void LLStringUtilBase<T>::trimHead(string_view_type& string)
+{
+    if (!string.empty())
+    {
+        size_type i = 0;
+        while (i < string.length() && LLStringOps::isSpace(string[i]))
+        {
+            i++;
+        }
+        string = string.substr(i);
+    }
+}
+
+// static
+template<class T>
+void LLStringUtilBase<T>::trimTail(string_view_type& string)
+{
+    if (string.size())
+    {
+        size_type len = string.length();
+        size_type i   = len;
+        while (i > 0 && LLStringOps::isSpace(string[i - 1]))
+        {
+            i--;
+        }
+
+        string = string.substr(0, i);
+    }
+}
+
 
 // Replace line feeds with carriage return-line feed pairs.
 //static
 template<class T>
 void LLStringUtilBase<T>::addCRLF(string_type& string)
 {
-    if (string.empty())
-        return;
-
     const T LF = 10;
     const T CR = 13;
 
@@ -1546,9 +1585,6 @@ void LLStringUtilBase<T>::addCRLF(string_type& string)
 template<class T>
 void LLStringUtilBase<T>::removeCRLF(string_type& string)
 {
-    if (string.empty())
-        return;
-
     const T CR = 13;
 
     size_type cr_count = 0;
@@ -1685,15 +1721,15 @@ void LLStringUtilBase<T>::capitalize(string_type& str)
 
 //static
 template<class T>
-BOOL LLStringUtilBase<T>::containsNonprintable(const string_type& string)
+bool LLStringUtilBase<T>::containsNonprintable(string_view_type string)
 {
     const char MIN = 32;
-    BOOL rv = FALSE;
+    bool rv = false;
     for (size_type i = 0; i < string.size(); i++)
     {
         if(string[i] < MIN)
         {
-            rv = TRUE;
+            rv = true;
             break;
         }
     }
@@ -1822,12 +1858,12 @@ void LLStringUtilBase<T>::copyInto(string_type& dst, const string_type& src, siz
 // True if this is the head of s.
 //static
 template<class T>
-BOOL LLStringUtilBase<T>::isHead( const string_type& string, const T* s )
+bool LLStringUtilBase<T>::isHead( const string_type& string, const T* s )
 {
     if( string.empty() )
     {
         // Early exit
-        return FALSE;
+        return false;
     }
     else
     {
@@ -1838,8 +1874,8 @@ BOOL LLStringUtilBase<T>::isHead( const string_type& string, const T* s )
 // static
 template<class T>
 bool LLStringUtilBase<T>::startsWith(
-    const string_type& string,
-    const string_type& substr)
+    string_view_type string,
+    string_view_type substr)
 {
     if(string.empty() || (substr.empty())) return false;
     if (substr.length() > string.length()) return false;
@@ -1850,8 +1886,8 @@ bool LLStringUtilBase<T>::startsWith(
 // static
 template<class T>
 bool LLStringUtilBase<T>::endsWith(
-    const string_type& string,
-    const string_type& substr)
+    string_view_type string,
+    string_view_type substr)
 {
     if(string.empty() || (substr.empty())) return false;
     size_t sub_len = substr.length();
@@ -1863,17 +1899,17 @@ bool LLStringUtilBase<T>::endsWith(
 
 // static
 template<class T>
-auto LLStringUtilBase<T>::getoptenv(const std::string& key) -> boost::optional<string_type>
+auto LLStringUtilBase<T>::getoptenv(const std::string& key) -> std::optional<string_type>
 {
     auto found(llstring_getoptenv(key));
     if (found)
     {
-        // return populated boost::optional
+        // return populated std::optional
         return { ll_convert<string_type>(*found) };
     }
     else
     {
-        // empty boost::optional
+        // empty std::optional
         return {};
     }
 }
@@ -1894,179 +1930,175 @@ auto LLStringUtilBase<T>::getenv(const std::string& key, const string_type& dflt
 }
 
 template<class T>
-BOOL LLStringUtilBase<T>::convertToBOOL(const string_type& string, BOOL& value)
+bool LLStringUtilBase<T>::convertToBOOL(string_view_type string, bool& value)
 {
     if( string.empty() )
     {
-        return FALSE;
+        return false;
     }
 
-    string_type temp( string );
-    trim(temp);
+    trim(string);
     if(
-        (temp == "1") ||
-        (temp == "T") ||
-        (temp == "t") ||
-        (temp == "TRUE") ||
-        (temp == "true") ||
-        (temp == "True") )
+        (string == "1") ||
+        (string == "T") ||
+        (string == "t") ||
+        (string == "TRUE") ||
+        (string == "true") ||
+        (string == "True") )
     {
-        value = TRUE;
-        return TRUE;
+        value = true;
+        return true;
     }
     else
     if(
-        (temp == "0") ||
-        (temp == "F") ||
-        (temp == "f") ||
-        (temp == "FALSE") ||
-        (temp == "false") ||
-        (temp == "False") )
+        (string == "0") ||
+        (string == "F") ||
+        (string == "f") ||
+        (string == "FALSE") ||
+        (string == "false") ||
+        (string == "False") )
     {
-        value = FALSE;
-        return TRUE;
+        value = false;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 template<class T>
-BOOL LLStringUtilBase<T>::convertToU8(const string_type& string, U8& value)
+bool LLStringUtilBase<T>::convertToU8(string_view_type string, U8& value)
 {
     S32 value32 = 0;
-    BOOL success = convertToS32(string, value32);
+    bool success = convertToS32(string, value32);
     if( success && (U8_MIN <= value32) && (value32 <= U8_MAX) )
     {
         value = (U8) value32;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 template<class T>
-BOOL LLStringUtilBase<T>::convertToS8(const string_type& string, S8& value)
+bool LLStringUtilBase<T>::convertToS8(string_view_type string, S8& value)
 {
     S32 value32 = 0;
-    BOOL success = convertToS32(string, value32);
+    bool success = convertToS32(string, value32);
     if( success && (S8_MIN <= value32) && (value32 <= S8_MAX) )
     {
         value = (S8) value32;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 template<class T>
-BOOL LLStringUtilBase<T>::convertToS16(const string_type& string, S16& value)
+bool LLStringUtilBase<T>::convertToS16(string_view_type string, S16& value)
 {
     S32 value32 = 0;
-    BOOL success = convertToS32(string, value32);
+    bool success = convertToS32(string, value32);
     if( success && (S16_MIN <= value32) && (value32 <= S16_MAX) )
     {
         value = (S16) value32;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 template<class T>
-BOOL LLStringUtilBase<T>::convertToU16(const string_type& string, U16& value)
+bool LLStringUtilBase<T>::convertToU16(string_view_type string, U16& value)
 {
     S32 value32 = 0;
-    BOOL success = convertToS32(string, value32);
+    bool success = convertToS32(string, value32);
     if( success && (U16_MIN <= value32) && (value32 <= U16_MAX) )
     {
         value = (U16) value32;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 template<class T>
-BOOL LLStringUtilBase<T>::convertToU32(const string_type& string, U32& value)
+bool LLStringUtilBase<T>::convertToU32(string_view_type string, U32& value)
 {
     if( string.empty() )
     {
-        return FALSE;
+        return false;
     }
 
-    string_type temp( string );
-    trim(temp);
+    trim(string);
     U32 v;
-    std::basic_istringstream<T> i_stream((string_type)temp);
+    boost::iostreams::stream<boost::iostreams::array_source> i_stream(string.data(), string.size());
     if(i_stream >> v)
     {
         value = v;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 template<class T>
-BOOL LLStringUtilBase<T>::convertToS32(const string_type& string, S32& value)
+bool LLStringUtilBase<T>::convertToS32(string_view_type string, S32& value)
 {
     if( string.empty() )
     {
-        return FALSE;
+        return false;
     }
 
-    string_type temp( string );
-    trim(temp);
+    trim(string);
     S32 v;
-    std::basic_istringstream<T> i_stream((string_type)temp);
+    boost::iostreams::stream<boost::iostreams::array_source> i_stream(string.data(), string.size());
     if(i_stream >> v)
     {
         //TODO: figure out overflow and underflow reporting here
         //if((LONG_MAX == v) || (LONG_MIN == v))
         //{
         //  // Underflow or overflow
-        //  return FALSE;
+        //  return false;
         //}
 
         value = v;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 template<class T>
-BOOL LLStringUtilBase<T>::convertToF32(const string_type& string, F32& value)
+bool LLStringUtilBase<T>::convertToF32(string_view_type string, F32& value)
 {
     F64 value64 = 0.0;
-    BOOL success = convertToF64(string, value64);
+    bool success = convertToF64(string, value64);
     if( success && (-F32_MAX <= value64) && (value64 <= F32_MAX) )
     {
         value = (F32) value64;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 template<class T>
-BOOL LLStringUtilBase<T>::convertToF64(const string_type& string, F64& value)
+bool LLStringUtilBase<T>::convertToF64(string_view_type string, F64& value)
 {
     if( string.empty() )
     {
-        return FALSE;
+        return false;
     }
 
-    string_type temp( string );
-    trim(temp);
+    trim(string);
     F64 v;
-    std::basic_istringstream<T> i_stream((string_type)temp);
+    boost::iostreams::stream<boost::iostreams::array_source> i_stream(string.data(), string.size());
     if(i_stream >> v)
     {
         //TODO: figure out overflow and underflow reporting here
         //if( ((-HUGE_VAL == v) || (HUGE_VAL == v))) )
         //{
         //  // Underflow or overflow
-        //  return FALSE;
+        //  return false;
         //}
 
         value = v;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 template<class T>

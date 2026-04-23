@@ -58,8 +58,8 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
 	<string
 	 name="GroupCountWithInfo"
 	 value="You belong to [COUNT] groups, and can join [REMAINING] more.  [secondlife:/// Raise your limit]"/>
-	<string name="online_friends_count">Online ([COUNT])</string>
-	<string name="all_friends_count">All ([COUNT])</string>
+   <string name="online_friends_count">Online ([COUNT])</string>
+   <string name="all_friends_count">All ([COUNT])</string>
     <tab_container
      bottom="-10"
      follows="all"
@@ -184,17 +184,17 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                skip_link_underline="true"
                name="nearbycount">
             There are [TOTAL] avatars total and [COUNT] in [REGION].
-            </text>
+         </text>
          <layout_stack
            clip="false"
            follows="all"
-           height="394"
+           height="410"
            layout="topleft"
            left="0"
            mouse_opaque="false"
            orientation="vertical"
            right="-1"
-           top_pad="0">
+           top_pad="1">
            <layout_panel
              height="142"
              layout="topleft"
@@ -226,13 +226,13 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                show_distance="true"
                allow_select="true"
                follows="all"
-               height="211"
+               height="195"
                ignore_online_status="true"
                layout="topleft"
                left="3"
                keep_one_selected="false"
                multi_select="true"
-			   use_colorizer="true"
+               use_colorizer="true"
                name="avatar_list"
                right="-1"
                top="2" />
@@ -638,35 +638,5 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
              right="-2"
              top_pad="4" />
         </panel>
-
-<!-- ================================= BLOCKED tab ========================== -->
-
-        <!--<panel
-         background_opaque="true"
-         background_visible="true"
-         bg_alpha_color="DkGray"
-         bg_opaque_color="DkGray"
-         follows="all"
-         height="383"
-         label="BLOCKED"
-         layout="topleft"
-         left="0"
-         help_topic="people_blocked_tab"
-         name="blocked_panel"
-         right="-1"
-         top="0">
-          <panel
-           class="panel_block_list_sidetray"
-           height="383"
-           name="panel_block_list_sidetray"
-           filename="panel_block_list_sidetray.xml"
-           follows="all"
-           label="Blocked Residents &amp; Objects"
-           layout="topleft"
-           left="0"
-           font="SansSerifBold"
-           top="0"
-           right="-1" />
-        </panel>-->
     </tab_container>
 </panel>

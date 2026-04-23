@@ -30,7 +30,6 @@
 #include "llinitparam.h"
 #include "llsingleton.h"
 
-#include <boost/unordered/unordered_flat_map.hpp>
 
 class LLCommand;
 class LLCommandManager;
@@ -171,13 +170,13 @@ private:
 };
 
 
-class LLCommandManager final
-:   public LLSingleton<LLCommandManager>
+class LLCommandManager
+:   public LLSimpleton<LLCommandManager>
 {
-    LLSINGLETON_EMPTY_CTOR(LLCommandManager);
+public:
+    LLCommandManager();
     ~LLCommandManager();
 
-public:
     struct Params : public LLInitParam::Block<Params>
     {
         Multiple< LLCommand::Params, AtLeast<1> > commands;
@@ -199,7 +198,7 @@ protected:
     void addCommand(LLCommand * command);
 
 private:
-    typedef boost::unordered_flat_map<LLUUID, U32>      CommandIndexMap;
+    typedef std::map<LLUUID, size_t>    CommandIndexMap;
     typedef std::vector<LLCommand *>    CommandVector;
 
     CommandVector   mCommands;

@@ -27,10 +27,10 @@
 #ifndef LL_LLCONVERSATIONVIEW_H
 #define LL_LLCONVERSATIONVIEW_H
 
-#include "llfolderviewitem.h"
+#include "../llui/llfolderviewitem.h"
 
 #include "llavatariconctrl.h"
-#include "llbutton.h"
+#include "../llui/llbutton.h"
 #include "lloutputmonitorctrl.h"
 
 class LLTextBox;
@@ -69,11 +69,11 @@ public:
 
     /*virtual*/ void destroyView();
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     /*virtual*/ void draw();
-    /*virtual*/ BOOL handleMouseDown( S32 x, S32 y, MASK mask );
-    /*virtual*/ BOOL handleRightMouseDown( S32 x, S32 y, MASK mask );
-    /*virtual*/ BOOL handleMouseUp( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool handleRightMouseDown( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool handleMouseUp( S32 x, S32 y, MASK mask );
 
     /*virtual*/ S32 arrange(S32* width, S32* height);
 
@@ -83,18 +83,20 @@ public:
 
     void toggleCollapsedMode(bool is_collapsed);
 
-    void setVisibleIfDetached(BOOL visible);
+    void setVisibleIfDetached(bool visible);
     LLConversationViewParticipant* findParticipant(const LLUUID& participant_id);
 
     void showVoiceIndicator(bool visible);
+    void showTypingIndicator(bool visible);
 
     virtual void refresh();
 
-    /*virtual*/ void setFlashState(bool flash_state);
+    /*virtual*/ void setFlashState(bool flash_state, bool alternate_color = false);
     void setHighlightState(bool hihglight_state);
 
     LLFloater* getSessionFloater();
-    bool isInActiveVoiceChannel() { return mIsInActiveVoiceChannel; }
+    bool isInActiveVoiceChannel();
+    void updateConversationIndicators();
 
     bool highlightFriendTitle(LLConversationItem* vmi);
 
@@ -106,11 +108,13 @@ private:
 
     LLPanel*                mItemPanel;
     LLPanel*                mCallIconLayoutPanel;
+    LLPanel*                mTypingIconLayoutPanel;
     LLTextBox*              mSessionTitle;
     LLOutputMonitorCtrl*    mSpeakingIndicator;
     LLFlashTimer*           mFlashTimer;
     bool                    mFlashStateOn;
     bool                    mFlashStarted;
+    bool                    mIsAltFlashColor;
 
     bool                    mCollapsedMode;
     bool                    mHasArrow;
@@ -151,14 +155,14 @@ public:
     void onMouseLeave(S32 x, S32 y, MASK mask);
 
     /*virtual*/ S32 getLabelXPos();
-    /*virtual*/ BOOL handleMouseDown( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
     void allowSpeakingIndicator(bool val);
 
 protected:
     friend class LLUICtrlFactory;
     LLConversationViewParticipant( const Params& p );
     void initFromParams(const Params& params);
-    BOOL postBuild();
+    bool postBuild();
     /*virtual*/ void draw();
     /*virtual*/ S32 arrange(S32* width, S32* height);
 

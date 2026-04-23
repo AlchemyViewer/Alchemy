@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="Notes" name="avatar_notes_tab">
+<panel label="ノート" name="avatar_notes_tab">
 	<text name="notes_label">
 		プライベートノート：
 	</text>
-	<text_editor name="notes"/>
 </panel>

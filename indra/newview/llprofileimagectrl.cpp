@@ -36,12 +36,12 @@
 
 static LLDefaultChildRegistry::Register<LLProfileImageCtrl> r("profile_image");
 
-LLProfileImageCtrl::LLProfileImageCtrl(const LLProfileImageCtrl::Params& p) :
-    LLIconCtrl(p),
-    mImage(NULL),
-    mImageOldBoostLevel(LLGLTexture::BOOST_NONE),
-    mWasNoDelete(false),
-    mImageLoadedSignal(NULL)
+LLProfileImageCtrl::LLProfileImageCtrl(const LLProfileImageCtrl::Params& p)
+    : LLIconCtrl(p)
+    , mImage(nullptr)
+    , mImageOldBoostLevel(LLGLTexture::BOOST_NONE)
+    , mWasNoDelete(false)
+    , mImageLoadedSignal(nullptr)
 {
 }
 
@@ -95,8 +95,7 @@ void LLProfileImageCtrl::draw()
 
 boost::signals2::connection LLProfileImageCtrl::setImageLoadedCallback(const image_loaded_signal_t::slot_type& cb)
 {
-    if (!mImageLoadedSignal)
-        mImageLoadedSignal = new image_loaded_signal_t();
+    if (!mImageLoadedSignal) mImageLoadedSignal = new image_loaded_signal_t();
 
     return mImageLoadedSignal->connect(cb);
 }
@@ -113,9 +112,8 @@ void LLProfileImageCtrl::setImageAssetId(const LLUUID& asset_id)
     mImageID = asset_id;
     if (mImageID.notNull())
     {
-        mImage              = LLViewerTextureManager::getFetchedTexture(mImageID, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_NONE,
-                                                                        LLViewerTexture::LOD_TEXTURE);
-        mWasNoDelete        = mImage->getTextureState() == LLGLTexture::NO_DELETE;
+        mImage = LLViewerTextureManager::getFetchedTexture(mImageID, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+        mWasNoDelete = mImage->getTextureState() == LLGLTexture::NO_DELETE;
         mImageOldBoostLevel = mImage->getBoostLevel();
         mImage->setBoostLevel(LLGLTexture::BOOST_PREVIEW);
         mImage->setKnownDrawSize(LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT, LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT);
@@ -123,8 +121,8 @@ void LLProfileImageCtrl::setImageAssetId(const LLUUID& asset_id)
 
         if ((mImage->getFullWidth() * mImage->getFullHeight()) == 0)
         {
-            mImage->setLoadedCallback(LLProfileImageCtrl::onImageLoaded, 0, TRUE, FALSE, new LLHandle<LLUICtrl>(getHandle()),
-                                      &mCallbackTextureList);
+            mImage->setLoadedCallback(LLProfileImageCtrl::onImageLoaded,
+                                      0, true, false, new LLHandle<LLUICtrl>(getHandle()), &mCallbackTextureList);
         }
         else
         {
@@ -142,18 +140,17 @@ void LLProfileImageCtrl::onImageLoaded(bool success, LLViewerFetchedTexture* img
 }
 
 // static
-void LLProfileImageCtrl::onImageLoaded(BOOL                    success,
-                                       LLViewerFetchedTexture* src_vi,
-                                       LLImageRaw*             src,
-                                       LLImageRaw*             aux_src,
-                                       S32                     discard_level,
-                                       BOOL                    final,
-                                       void*                   userdata)
+void LLProfileImageCtrl::onImageLoaded(bool success,
+                                          LLViewerFetchedTexture* src_vi,
+                                          LLImageRaw* src,
+                                          LLImageRaw* aux_src,
+                                          S32 discard_level,
+                                          bool final,
+                                          void* userdata)
 {
-    if (!userdata)
-        return;
+    if (!userdata) return;
 
-    LLHandle<LLUICtrl>* handle = (LLHandle<LLUICtrl>*) userdata;
+    LLHandle<LLUICtrl>* handle = (LLHandle<LLUICtrl>*)userdata;
 
     if (!handle->isDead())
     {

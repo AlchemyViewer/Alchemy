@@ -72,7 +72,7 @@ LL_COMMON_API std::string ll_stream_notation_sd(const LLSD& sd);
 //Returns false if the test is of same type but values differ in type
 //Otherwise, returns true
 
-LL_COMMON_API BOOL compare_llsd_with_template(
+LL_COMMON_API bool compare_llsd_with_template(
     const LLSD& llsd_to_test,
     const LLSD& template_llsd,
     LLSD& resultant_llsd);
@@ -553,6 +553,100 @@ LLSD shallow(LLSD value, LLSD filter=LLSD()) { return llsd_shallow(value, filter
 
 } // namespace llsd
 
+/*****************************************************************************
+*   LLSDParam<std::vector<T>>
+*****************************************************************************/
+// Given an LLSD array, return a const std::vector<T>&, where T is a type
+// supported by LLSDParam. Bonus: if the LLSD value is actually a scalar,
+// return a single-element vector containing the converted value.
+template <typename T>
+class LLSDParam<std::vector<T>>: public LLSDParamBase
+{
+public:
+    LLSDParam(const LLSD& array)
+    {
+        // treat undefined "array" as empty vector
+        if (array.isDefined())
+        {
+            // what if it's a scalar?
+            if (! array.isArray())
+            {
+                v.push_back(LLSDParam<T>(array));
+            }
+            else                        // really is an array
+            {
+                // reserve space for the array entries
+                v.reserve(array.size());
+                for (const auto& item : llsd::inArray(array))
+                {
+                    v.push_back(LLSDParam<T>(item));
+                }
+            }
+        }
+    }
+
+    operator const std::vector<T>&() const { return v; }
+
+private:
+    std::vector<T> v;
+};
+
+
+/*****************************************************************************
+ *   toArray(), toMap()
+ *****************************************************************************/
+namespace llsd
+{
+
+// For some T convertible to LLSD, given std::vector<T> myVec,
+// toArray(myVec) returns an LLSD array whose entries correspond to the
+// items in myVec.
+// For some U convertible to LLSD, given function U xform(const T&),
+// toArray(myVec, xform) returns an LLSD array whose every entry is
+// xform(item) of the corresponding item in myVec.
+// toArray() actually works with any container<C> usable with range
+// 'for', not just std::vector.
+// (Once we get C++20 we can use std::identity instead of this default lambda.)
+template<typename C, typename FUNC>
+LLSD toArray(const C& container, FUNC&& func = [](const auto& arg) { return arg; })
+{
+    LLSD array;
+    for (const auto& item : container)
+    {
+        array.append(std::forward<FUNC>(func)(item));
+    }
+    return array;
+}
+
+// For some T convertible to LLSD, given std::map<std::string, T> myMap,
+// toMap(myMap) returns an LLSD map whose entries correspond to the
+// (key, value) pairs in myMap.
+// For some U convertible to LLSD, given function
+// std::pair<std::string, U> xform(const std::pair<std::string, T>&),
+// toMap(myMap, xform) returns an LLSD map whose every entry is
+// xform(pair) of the corresponding (key, value) pair in myMap.
+// toMap() actually works with any container usable with range 'for', not
+// just std::map. It need not even be an associative container, as long as
+// you pass an xform function that returns std::pair<std::string, U>.
+// (Once we get C++20 we can use std::identity instead of this default lambda.)
+template<typename C, typename FUNC>
+LLSD toMap(const C& container, FUNC&& func = [](const auto& arg) { return arg; })
+{
+    LLSD map;
+    for (const auto& pair : container)
+    {
+        const auto& [key, value] = std::forward<FUNC>(func)(pair);
+        map[key] = value;
+    }
+    return map;
+}
+
+} // namespace llsd
+
+/*****************************************************************************
+ *   boost::hash<LLSD>
+ *****************************************************************************/
+
 // Specialization for generating a hash value from an LLSD block.
 namespace boost
 {
@@ -597,16 +691,19 @@ struct hash<LLSD>
         }
         case LLSD::TypeMap:
         {
-            const auto& sdmap(s.asMap());
-            boost::hash_unordered_range(seed, sdmap.begin(), sdmap.end());
+            for (LLSD::map_const_iterator itm = s.beginMap(); itm != s.endMap(); ++itm)
+            {
+                boost::hash_combine(seed, (*itm).first);
+                boost::hash_combine(seed, (*itm).second);
+            }
             break;
         }
         case LLSD::TypeArray:
-        {
-            const auto& ar(s.asArray());
-            boost::hash_range(seed, ar.begin(), ar.end());
+            for (LLSD::array_const_iterator ita = s.beginArray(); ita != s.endArray(); ++ita)
+            {
+                boost::hash_combine(seed, (*ita));
+            }
             break;
-        }
         case LLSD::TypeUndefined:
         default:
             break;

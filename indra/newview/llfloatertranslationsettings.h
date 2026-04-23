@@ -35,17 +35,17 @@ class LLComboBox;
 class LLLineEditor;
 class LLRadioGroup;
 
-class LLFloaterTranslationSettings final : public LLFloater
+class LLFloaterTranslationSettings : public LLFloater
 {
 public:
     LLFloaterTranslationSettings(const LLSD& key);
-    /*virtual*/ BOOL postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
 
     void setAzureVerified(bool ok, bool alert, S32 status);
     void setGoogleVerified(bool ok, bool alert, S32 status);
     void setDeepLVerified(bool ok, bool alert, S32 status);
-    void onClose(bool app_quitting);
+    void onClose(bool app_quitting) override;
 
 private:
     std::string getSelectedService() const;

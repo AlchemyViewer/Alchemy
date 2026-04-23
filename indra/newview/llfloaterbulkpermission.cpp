@@ -53,7 +53,7 @@
 
 LLFloaterBulkPermission::LLFloaterBulkPermission(const LLSD& seed)
 :   LLFloater(seed),
-    mDone(FALSE)
+    mDone(false)
 {
     mID.generate();
     mCommitCallbackRegistrar.add("BulkPermission.Ok",       boost::bind(&LLFloaterBulkPermission::onOkBtn, this));
@@ -64,7 +64,7 @@ LLFloaterBulkPermission::LLFloaterBulkPermission(const LLSD& seed)
     mCommitCallbackRegistrar.add("BulkPermission.CommitCopy",   boost::bind(&LLFloaterBulkPermission::onCommitCopy, this));
 }
 
-BOOL LLFloaterBulkPermission::postBuild()
+bool LLFloaterBulkPermission::postBuild()
 {
     mBulkChangeIncludeAnimations = gSavedSettings.getBOOL("BulkChangeIncludeAnimations");
     mBulkChangeIncludeBodyParts = gSavedSettings.getBOOL("BulkChangeIncludeBodyParts");
@@ -89,7 +89,15 @@ BOOL LLFloaterBulkPermission::postBuild()
     {
         mBulkChangeNextOwnerTransfer = true;
     }
-    return TRUE;
+
+    mQueueOutputList = getChild<LLScrollListCtrl>("queue output");
+    return true;
+}
+
+void LLFloaterBulkPermission::onClose(bool app_quitting)
+{
+    removeVOInventoryListener();
+    LLFloater::onClose(app_quitting);
 }
 
 void LLFloaterBulkPermission::doApply()
@@ -120,7 +128,7 @@ void LLFloaterBulkPermission::doApply()
     }
     else
     {
-        mDone = FALSE;
+        mDone = false;
         if (!start())
         {
             LL_WARNS() << "Unexpected bulk permission change failure." << LL_ENDL;
@@ -204,27 +212,27 @@ void LLFloaterBulkPermission::onCloseBtn()
 void LLFloaterBulkPermission::onCommitCopy()
 {
     // Implements fair use
-    BOOL copyable = gSavedSettings.getBOOL("BulkChangeNextOwnerCopy");
+    bool copyable = gSavedSettings.getBOOL("BulkChangeNextOwnerCopy");
     if(!copyable)
     {
-        gSavedSettings.setBOOL("BulkChangeNextOwnerTransfer", TRUE);
+        gSavedSettings.setBOOL("BulkChangeNextOwnerTransfer", true);
     }
     LLCheckBoxCtrl* xfer =getChild<LLCheckBoxCtrl>("next_owner_transfer");
     xfer->setEnabled(copyable);
 }
 
-BOOL LLFloaterBulkPermission::start()
+bool LLFloaterBulkPermission::start()
 {
     // note: number of top-level objects to modify is mObjectIDs.size().
-    getChild<LLScrollListCtrl>("queue output")->setCommentText(getString("start_text"));
+    mQueueOutputList->setCommentText(getString("start_text"));
     return nextObject();
 }
 
 // Go to the next object and start if found. Returns false if no objects left, true otherwise.
-BOOL LLFloaterBulkPermission::nextObject()
+bool LLFloaterBulkPermission::nextObject()
 {
-    S32 count;
-    BOOL successful_start = FALSE;
+    size_t count;
+    bool successful_start = false;
     do
     {
         count = mObjectIDs.size();
@@ -239,19 +247,19 @@ BOOL LLFloaterBulkPermission::nextObject()
 
     if(isDone() && !mDone)
     {
-        getChild<LLScrollListCtrl>("queue output")->setCommentText(getString("done_text"));
-        mDone = TRUE;
+        mQueueOutputList->setCommentText(getString("done_text"));
+        mDone = true;
     }
     return successful_start;
 }
 
 // Pop the top object off of the queue.
-// Return TRUE if the queue has started, otherwise FALSE.
-BOOL LLFloaterBulkPermission::popNext()
+// Return true if the queue has started, otherwise false.
+bool LLFloaterBulkPermission::popNext()
 {
     // get the head element from the container, and attempt to get its inventory.
-    BOOL rv = FALSE;
-    S32 count = mObjectIDs.size();
+    bool rv = false;
+    auto count = mObjectIDs.size();
     if(mCurrentObjectID.isNull() && (count > 0))
     {
         mCurrentObjectID = mObjectIDs.at(0);
@@ -264,7 +272,7 @@ BOOL LLFloaterBulkPermission::popNext()
             LLUUID* id = new LLUUID(mID);
             registerVOInventoryListener(obj,id);
             requestVOInventory();
-            rv = TRUE;
+            rv = true;
         }
         else
         {
@@ -276,7 +284,7 @@ BOOL LLFloaterBulkPermission::popNext()
 }
 
 
-void LLFloaterBulkPermission::doCheckUncheckAll(BOOL check)
+void LLFloaterBulkPermission::doCheckUncheckAll(bool check)
 {
     gSavedSettings.setBOOL("BulkChangeIncludeAnimations", check);
     gSavedSettings.setBOOL("BulkChangeIncludeBodyParts" , check);
@@ -294,8 +302,6 @@ void LLFloaterBulkPermission::doCheckUncheckAll(BOOL check)
 
 void LLFloaterBulkPermission::handleInventory(LLViewerObject* viewer_obj, LLInventoryObject::object_list_t* inv)
 {
-    LLScrollListCtrl* list = getChild<LLScrollListCtrl>("queue output");
-
     LLInventoryObject::object_list_t::const_iterator it = inv->begin();
     LLInventoryObject::object_list_t::const_iterator end = inv->end();
     for ( ; it != end; ++it)
@@ -352,7 +358,7 @@ void LLFloaterBulkPermission::handleInventory(LLViewerObject* viewer_obj, LLInve
                     perm.setMaskEveryone(LLFloaterPerms::getEveryonePerms("BulkChange"));
                     perm.setMaskGroup(LLFloaterPerms::getGroupPerms("BulkChange"));
                     new_item->setPermissions(perm); // here's the beef
-                    updateInventory(object,new_item,TASK_INVENTORY_ITEM_KEY,FALSE);
+                    updateInventory(object,new_item,TASK_INVENTORY_ITEM_KEY,false);
                     //status_text.setArg("[STATUS]", getString("status_ok_text"));
                     status_text.setArg("[STATUS]", "");
                 }
@@ -362,7 +368,7 @@ void LLFloaterBulkPermission::handleInventory(LLViewerObject* viewer_obj, LLInve
                     status_text.setArg("[STATUS]", "");
                 }
 
-                list->setCommentText(status_text.getString());
+                mQueueOutputList->setCommentText(status_text.getString());
 
                 //TODO if we are an object inside an object we should check a recuse flag and if set
                 //open the inventory of the object and recurse - Michelle2 Zenovka

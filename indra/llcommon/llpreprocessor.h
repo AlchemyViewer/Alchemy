@@ -61,17 +61,24 @@
 # define LL_UNLIKELY(EXPR) (EXPR)
 #endif
 
-
 // Figure out differences between compilers
-#if defined(__clang__)
-    #define GCC_VERSION (__GNUC__ * 10000 \
-                        + __GNUC_MINOR__ * 100 \
-                        + __GNUC_PATCHLEVEL__)
+#if defined(__MSVC_VER__) || defined(_MSC_VER)
+    #ifndef LL_MSVC
+        #define LL_MSVC 1
+    #endif
+
+    // Clang CL is MSVC-like but also supports its own macros
+    #if defined(__clang__)
+        #ifndef LL_CLANG
+            #define LL_CLANG 1
+        #endif
+    #endif
+#elif defined(__clang__)
+    #define CLANG_VERSION (__clang_major__ * 10000 \
+                        + __clang_minor__ * 100 \
+                        + __clang_patchlevel__)
     #ifndef LL_CLANG
         #define LL_CLANG 1
-    #endif
-    #ifndef LL_GNUC
-        #define LL_GNUC 1
     #endif
 #elif defined(__GNUC__)
     #define GCC_VERSION (__GNUC__ * 10000 \
@@ -80,10 +87,23 @@
     #ifndef LL_GNUC
         #define LL_GNUC 1
     #endif
-#elif defined(__MSVC_VER__) || defined(_MSC_VER)
-    #ifndef LL_MSVC
-        #define LL_MSVC 1
-    #endif
+#endif
+
+// Set up CPU architecture defines
+#if LL_MSVC && defined(_M_ARM64)
+#      define LL_ARM64 1
+#elif (LL_GNUC || LL_CLANG) && (defined(__arm64__) || defined(__aarch64__))
+#      define LL_ARM64 1
+#elif LL_MSVC && _M_X64
+#      define LL_X86_64 1
+#      define LL_X86 1
+#elif LL_MSVC && _M_IX86
+#      define LL_X86 1
+#elif (LL_GNUC || LL_CLANG) && ( defined(__amd64__) || defined(__x86_64__) )
+#      define LL_X86_64 1
+#      define LL_X86 1
+#elif (LL_GNUC || LL_CLANG) && ( defined(__i386__) )
+#      define LL_X86 1
 #endif
 
 // Deal with minor differences on Unixy OSes.
@@ -99,65 +119,22 @@
 
 #endif
 
-// Although thread_local is now a standard storage class, we can't just
-// #define LL_THREAD_LOCAL as thread_local because the *usage* is different.
-// We'll have to take the time to change LL_THREAD_LOCAL declarations by hand.
-#if LL_WINDOWS
-# define LL_THREAD_LOCAL __declspec(thread)
-#else
-# define LL_THREAD_LOCAL __thread
-#endif
-
-// Deal with VC6 problems
+// Deal with VC++ problems
 #if LL_MSVC
-#pragma warning( 3       : 4701 )   // "local variable used without being initialized"  Treat this as level 3, not level 4.
-#pragma warning( 3       : 4702 )   // "unreachable code"  Treat this as level 3, not level 4.
-#pragma warning( 3       : 4189 )   // "local variable initialized but not referenced"  Treat this as level 3, not level 4.
-//#pragma warning( 3    : 4018 )    // "signed/unsigned mismatch"  Treat this as level 3, not level 4.
-#pragma warning( 3      :  4263 )   // 'function' : member function does not override any base class virtual member function
-#pragma warning( 3      :  4264 )   // "'virtual_function' : no override available for virtual member function from base 'class'; function is hidden"
-#pragma warning( 3       : 4265 )   // "class has virtual functions, but destructor is not virtual"
-#pragma warning( 3      :  4266 )   // 'function' : no override available for virtual member function from base 'type'; function is hidden
-#pragma warning (disable : 4180)    // qualifier applied to function type has no meaning; ignored
-//#pragma warning( disable : 4284 ) // silly MS warning deep inside their <map> include file
-
-#if ADDRESS_SIZE == 64
-// That one is all over the place for x64 builds.
-#pragma warning( disable : 4267 )   // 'var' : conversion from 'size_t' to 'type', possible loss of data)
-#endif
-
-#pragma warning( disable : 4503 )   // 'decorated name length exceeded, name was truncated'. Does not seem to affect compilation.
-#pragma warning( disable : 4800 )   // 'BOOL' : forcing value to bool 'true' or 'false' (performance warning)
-// Linker optimization with "extern template" generates these warnings
-#pragma warning( disable : 4231 )   // nonstandard extension used : 'extern' before template explicit instantiation
-#pragma warning( disable : 4506 )   // no definition for inline function
-
 // level 4 warnings that we need to disable:
-#pragma warning (disable : 4100) // unreferenced formal parameter
-#pragma warning (disable : 4127) // conditional expression is constant (e.g. while(1) )
-#pragma warning (disable : 4244) // possible loss of data on conversions
-#pragma warning (disable : 4396) // the inline specifier cannot be used when a friend declaration refers to a specialization of a function template
-#pragma warning (disable : 4512) // assignment operator could not be generated
-#pragma warning (disable : 4706) // assignment within conditional (even if((x = y)) )
-
 #pragma warning (disable : 4251) // member needs to have dll-interface to be used by clients of class
 #pragma warning (disable : 4275) // non dll-interface class used as base for dll-interface class
-#pragma warning (disable : 4018) // '<' : signed/unsigned mismatch
-
 #endif  //  LL_MSVC
 
 #if LL_WINDOWS
 #define LL_DLLEXPORT __declspec(dllexport)
 #define LL_DLLIMPORT __declspec(dllimport)
-#elif LL_LINUX
-#define LL_DLLEXPORT __attribute__ ((visibility("default")))
-#define LL_DLLIMPORT
 #else
-#define LL_DLLEXPORT
+#define LL_DLLEXPORT __attribute__ ((visibility("default")))
 #define LL_DLLIMPORT
 #endif // LL_WINDOWS
 
-#if __clang__ || ! defined(LL_WINDOWS)
+#if LL_CLANG || ! defined(LL_WINDOWS)
 // Only on Windows, and only with the Microsoft compiler (vs. clang) is
 // wchar_t potentially not a distinct type.
 #define LL_WCHAR_T_NATIVE 1
@@ -216,6 +193,46 @@
 #define LL_PRETTY_FUNCTION __FUNCSIG__
 #else
 #define LL_PRETTY_FUNCTION __PRETTY_FUNCTION__
+#endif
+
+// vptr warning supression funtionality for undefined behavior sanitizer
+#if LL_CLANG || LL_GNUC
+#   define LL_UBSAN_SUPRESS_VPTR __attribute__((no_sanitize("vptr")))
+#else
+#   define LL_UBSAN_SUPRESS_VPTR
+#endif
+
+#if LL_ARM64
+    #ifndef GLM_FORCE_NEON
+    #define GLM_FORCE_NEON 1
+    #endif
+#else
+    #ifdef LL_DARWIN
+        #ifndef GLM_FORCE_SSE42
+        #define GLM_FORCE_SSE42 1
+        #endif // GLM_FORCE_SSE42
+    #else
+        #if defined(__AVX2__)
+            #ifndef GLM_FORCE_AVX2
+            #define GLM_FORCE_AVX2 1
+            #endif // GLM_FORCE_AVX2
+        #elif defined(__AVX__)
+            #ifndef GLM_FORCE_AVX
+            #define GLM_FORCE_AVX 1
+            #endif // GLM_FORCE_AVX
+        #else
+            #ifndef GLM_FORCE_SSE2
+            #define GLM_FORCE_SSE2 1
+            #endif // GLM_FORCE_SSE2
+        #endif // AVX2 vs AVX
+    #endif // LL_DARWIN
+#endif // LL_ARM64
+
+#if LL_ARM64
+#define KDU_NEON_INTRINSICS 1
+#else
+#define KDU_X86_INTRINSICS 1
+
 #endif
 
 #endif  //  not LL_LINDEN_PREPROCESSOR_H

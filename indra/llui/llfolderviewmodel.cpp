@@ -38,8 +38,7 @@ std::string LLFolderViewModelCommon::getStatusText(bool is_empty_folder)
 {
     if (!contentsReady() || mFolderView->getViewModelItem()->getLastFilterGeneration() < getFilter().getCurrentGeneration())
     {
-        static const std::string SEARCHING_STR = LLTrans::getString("Searching");
-        return SEARCHING_STR;
+        return LLTrans::getString("Searching");
     }
     else
     {

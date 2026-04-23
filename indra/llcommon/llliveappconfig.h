@@ -57,7 +57,7 @@ public:
         F32 refresh_period,
         LLApp::OptionPriority priority);
 
-    ~LLLiveAppConfig() = default; ///< Destructor
+    ~LLLiveAppConfig(); ///< Destructor
 
 protected:
     /*virtual*/ bool loadFile();

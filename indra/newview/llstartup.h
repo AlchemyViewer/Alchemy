@@ -28,6 +28,7 @@
 #define LL_LLSTARTUP_H
 
 #include <memory>                   // unique_ptr
+
 class LLViewerTexture ;
 class LLEventPump;
 class LLStartupListener;
@@ -83,7 +84,6 @@ typedef enum {
 
 // exported symbols
 extern bool gAgentMovementCompleted;
-extern S32  gMaxAgentGroups;
 extern LLPointer<LLViewerTexture> gStartTexture;
 
 class LLStartUp

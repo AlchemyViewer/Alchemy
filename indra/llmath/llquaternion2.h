@@ -40,8 +40,9 @@
 /////////////////////////////
 #include "llquaternion.h"
 
-class LLQuaternion2
+class alignas(16) LLQuaternion2
 {
+    LL_ALIGN_NEW
 public:
 
     //////////////////////////
@@ -84,8 +85,6 @@ public:
     // Quantize this quaternion to 16 bit precision
     inline void quantize16();
 
-    inline void mul(const LLQuaternion2& b);
-
     /////////////////////////
     // Quaternion inspection
     /////////////////////////
@@ -100,12 +99,10 @@ public:
 
 protected:
 
-    LL_ALIGN_16(LLVector4a mQ);
+    LLVector4a mQ;
 
 };
-#ifndef SHOW_ASSERT
+
 static_assert(std::is_trivial<LLQuaternion2>::value, "LLQuaternion2 must be a trivial type");
-static_assert(std::is_standard_layout<LLQuaternion2>::value, "LLQuaternion2 must be a standard layout type");
-#endif
 
 #endif

@@ -52,6 +52,9 @@ LLReflectionMap::~LLReflectionMap()
 void LLReflectionMap::update(U32 resolution, U32 face, bool force_dynamic, F32 near_clip, bool useClipPlane, LLPlane clipPlane)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    if (!mCubeArray.notNull())
+        return;
+
     mLastUpdateTime = gFrameTimeSeconds;
     llassert(mCubeArray.notNull());
     llassert(mCubeIndex != -1);
@@ -65,8 +68,9 @@ void LLReflectionMap::update(U32 resolution, U32 face, bool force_dynamic, F32 n
     }
 
     F32 clip = (near_clip > 0) ? near_clip : getNearClip();
+    bool dynamic = force_dynamic || getIsDynamic();
 
-    gViewerWindow->cubeSnapshot(LLVector3(mOrigin), mCubeArray, mCubeIndex, face, clip, getIsDynamic() || force_dynamic, useClipPlane, clipPlane);
+    gViewerWindow->cubeSnapshot(LLVector3(mOrigin), mCubeArray, mCubeIndex, face, clip, dynamic, useClipPlane, clipPlane);
 }
 
 void LLReflectionMap::autoAdjustOrigin()
@@ -173,7 +177,7 @@ void LLReflectionMap::autoAdjustOrigin()
         mPriority = 1;
         mOrigin.load3(mViewerObject->getPositionAgent().mV);
 
-        if (mViewerObject->getVolume() && ((LLVOVolume*)mViewerObject)->getReflectionProbeIsBox())
+        if (mViewerObject->getVolume() && ((LLVOVolume*)mViewerObject.get())->getReflectionProbeIsBox())
         {
             LLVector3 s = mViewerObject->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
             mRadius = s.magVec();
@@ -185,7 +189,7 @@ void LLReflectionMap::autoAdjustOrigin()
     }
 }
 
-bool LLReflectionMap::intersects(LLReflectionMap* other)
+bool LLReflectionMap::intersects(LLReflectionMap* other) const
 {
     LLVector4a delta;
     delta.setSub(other->mOrigin, mOrigin);
@@ -201,24 +205,24 @@ bool LLReflectionMap::intersects(LLReflectionMap* other)
 
 extern LLControlGroup gSavedSettings;
 
-F32 LLReflectionMap::getAmbiance()
+F32 LLReflectionMap::getAmbiance() const
 {
     F32 ret = 0.f;
-    if (mViewerObject && mViewerObject->getVolume())
+    if (mViewerObject && mViewerObject->getVolumeConst())
     {
-        ret = ((LLVOVolume*)mViewerObject)->getReflectionProbeAmbiance();
+        ret = mViewerObject->getReflectionProbeAmbiance();
     }
 
     return ret;
 }
 
-F32 LLReflectionMap::getNearClip()
+F32 LLReflectionMap::getNearClip() const
 {
     const F32 MINIMUM_NEAR_CLIP = 0.1f;
 
     F32 ret = 0.f;
 
-    if (mViewerObject && mViewerObject->getVolume())
+    if (mViewerObject && mViewerObject->getVolumeConst())
     {
         ret = mViewerObject->getReflectionProbeNearClip();
     }
@@ -234,12 +238,13 @@ F32 LLReflectionMap::getNearClip()
     return llmax(ret, MINIMUM_NEAR_CLIP);
 }
 
-bool LLReflectionMap::getIsDynamic()
+bool LLReflectionMap::getIsDynamic() const
 {
-    static LLCachedControl<S32> sProbeDetail(gSavedSettings, "RenderReflectionProbeDetail", -1);
-    if (sProbeDetail > (S32) LLReflectionMapManager::DetailLevel::STATIC_ONLY &&
+    static LLCachedControl<S32> detail(gSavedSettings, "RenderReflectionProbeDetail", 1);
+    if (detail() > (S32)LLReflectionMapManager::DetailLevel::STATIC_ONLY &&
         mViewerObject &&
-        mViewerObject->getVolume())
+        !mViewerObject->isDead() &&
+        mViewerObject->getVolumeConst())
     {
         return mViewerObject->getReflectionProbeIsDynamic();
     }
@@ -252,32 +257,26 @@ bool LLReflectionMap::getBox(LLMatrix4& box)
     if (mViewerObject)
     {
         LLVolume* volume = mViewerObject->getVolume();
-        if (volume)
+        if (volume && mViewerObject->getReflectionProbeIsBox())
         {
-            LLVOVolume* vobjp = (LLVOVolume*)mViewerObject;
-
-            if (vobjp->getReflectionProbeIsBox())
+            glm::mat4 mv(get_current_modelview());
+            LLVector3 s = mViewerObject->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
+            mRadius = s.magVec();
+            glm::mat4 scale = glm::scale(glm::vec3(s));
+            if (mViewerObject->mDrawable != nullptr)
             {
-                LLVector3 s = vobjp->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
-                mRadius = s.magVec();
-                if (vobjp->mDrawable != nullptr)
-                {
-                    // object to agent space (no scale)
-                    LLMatrix4a scale;
-                    scale.setIdentity();
-                    scale.applyScale_affine(s);
-                    scale.transpose();
+                // object to agent space (no scale)
+                glm::mat4 rm(glm::make_mat4((F32*)mViewerObject->mDrawable->getWorldMatrix().mMatrix));
 
-                    // construct object to camera space (with scale)
-                    LLMatrix4a mv = gGLModelView;
-                    mv.mul(vobjp->mDrawable->getWorldMatrix());
-                    mv.mul(scale);
+                // construct object to camera space (with scale)
+                mv = mv * rm * scale;
 
-                    // inverse is camera space to object unit cube
-                    mv.invert();
-                    box = LLMatrix4(mv);
-                    return true;
-                }
+                // inverse is camera space to object unit cube
+                mv = glm::inverse(mv);
+
+                box = LLMatrix4(glm::value_ptr(mv));
+
+                return true;
             }
         }
     }
@@ -285,12 +284,12 @@ bool LLReflectionMap::getBox(LLMatrix4& box)
     return false;
 }
 
-bool LLReflectionMap::isActive()
+bool LLReflectionMap::isActive() const
 {
     return mCubeIndex != -1;
 }
 
-bool LLReflectionMap::isRelevant()
+bool LLReflectionMap::isRelevant() const
 {
     static LLCachedControl<S32> RenderReflectionProbeLevel(gSavedSettings, "RenderReflectionProbeLevel", 3);
 

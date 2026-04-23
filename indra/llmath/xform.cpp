@@ -32,6 +32,10 @@ LLXform::LLXform()
     init();
 }
 
+LLXform::~LLXform()
+{
+}
+
 // Link optimization - don't inline these LL_WARNS()
 void LLXform::warn(const char* const msg)
 {
@@ -48,14 +52,18 @@ LLXform* LLXform::getRoot() const
     return (LLXform*)root;
 }
 
-BOOL LLXform::isRoot() const
+bool LLXform::isRoot() const
 {
     return (!mParent);
 }
 
-BOOL LLXform::isRootEdit() const
+bool LLXform::isRootEdit() const
 {
     return (!mParent);
+}
+
+LLXformMatrix::~LLXformMatrix()
+{
 }
 
 void LLXformMatrix::update()
@@ -78,33 +86,34 @@ void LLXformMatrix::update()
     }
 }
 
-void LLXformMatrix::updateMatrix(BOOL update_bounds)
+void LLXformMatrix::updateMatrix(bool update_bounds)
 {
     update();
 
-    LLMatrix4 world_matrix;
-    world_matrix.initAll(mScale, mWorldRotation, mWorldPosition);
-    mWorldMatrix.loadu(world_matrix);
+    mWorldMatrix.initAll(mScale, mWorldRotation, mWorldPosition);
 
     if (update_bounds && (mChanged & MOVED))
     {
-        mMax = mMin = mWorldMatrix.getRow<3>();
+        mMin.mV[0] = mMax.mV[0] = mWorldMatrix.mMatrix[3][0];
+        mMin.mV[1] = mMax.mV[1] = mWorldMatrix.mMatrix[3][1];
+        mMin.mV[2] = mMax.mV[2] = mWorldMatrix.mMatrix[3][2];
 
-        LLVector4a total_sum,sum1,sum2;
-        total_sum.setAbs(mWorldMatrix.getRow<0>());
-        sum1.setAbs(mWorldMatrix.getRow<1>());
-        sum2.setAbs(mWorldMatrix.getRow<2>());
-        sum1.add(sum2);
-        total_sum.add(sum1);
-        total_sum.mul(.5f);
+        F32 f0 = (fabs(mWorldMatrix.mMatrix[0][0])+fabs(mWorldMatrix.mMatrix[1][0])+fabs(mWorldMatrix.mMatrix[2][0])) * 0.5f;
+        F32 f1 = (fabs(mWorldMatrix.mMatrix[0][1])+fabs(mWorldMatrix.mMatrix[1][1])+fabs(mWorldMatrix.mMatrix[2][1])) * 0.5f;
+        F32 f2 = (fabs(mWorldMatrix.mMatrix[0][2])+fabs(mWorldMatrix.mMatrix[1][2])+fabs(mWorldMatrix.mMatrix[2][2])) * 0.5f;
 
-        mMax.add(total_sum);
-        mMin.sub(total_sum);
+        mMin.mV[0] -= f0;
+        mMin.mV[1] -= f1;
+        mMin.mV[2] -= f2;
+
+        mMax.mV[0] += f0;
+        mMax.mV[1] += f1;
+        mMax.mV[2] += f2;
     }
 }
 
 void LLXformMatrix::getMinMax(LLVector3& min, LLVector3& max) const
 {
-    min.set(mMin.getF32ptr());
-    max.set(mMax.getF32ptr());
+    min = mMin;
+    max = mMax;
 }

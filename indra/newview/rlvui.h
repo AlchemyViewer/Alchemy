@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2011, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -26,11 +27,13 @@
 // RlvUIEnabler - self-contained class that handles disabling or reenabling certain aspects of the viewer's UI
 //
 
-class RlvUIEnabler final : public LLSingleton<RlvUIEnabler>
+class RlvUIEnabler : public LLSingleton<RlvUIEnabler>
 {
-    friend class RlvHandler;
     LLSINGLETON(RlvUIEnabler);
+
 protected:
+    friend class RlvHandler;
+
     /*
      * Signal callbacks
      */
@@ -44,6 +47,7 @@ protected:
     void onRefreshHoverText();                                          // showloc, shownames, showhovertext(all|world|hud)
     void onToggleMovement();                                            // fly, alwaysrun and temprun
     void onToggleShowLoc();                                             // showloc
+    void onToggleShowNames();                                           // shownames
     void onToggleShowMinimap();                                         // showminimap
     void onToggleShowWorldMap();                                        // showworldmap
     void onToggleTp();                                                  // tploc and tplm
@@ -60,14 +64,14 @@ public:
     bool removeGenericFloaterFilter(const std::string& strFloaterName);
 
 protected:
-    bool filterFloaterGeneric(std::string_view, const LLSD&);
+    bool filterFloaterGeneric(const std::string&, const LLSD&);
     boost::signals2::connection m_ConnFloaterGeneric;
-    bool filterFloaterShowLoc(std::string_view, const LLSD& );
+    bool filterFloaterShowLoc(const std::string&, const LLSD& );
     boost::signals2::connection m_ConnFloaterShowLoc;                   // showloc
-    bool filterFloaterViewXXX(std::string_view, const LLSD&);
+    bool filterFloaterViewXXX(const std::string&, const LLSD&);
     boost::signals2::connection m_ConnFloaterViewXXX;                   // viewnote, viewscript, viewtexture
 
-    bool filterPanelShowLoc(std::string_view, std::string_view, const LLSD& );
+    bool filterPanelShowLoc(const std::string&, const std::string&, const LLSD& );
     boost::signals2::connection m_ConnPanelShowLoc;                     // showloc
 
     /*
@@ -83,11 +87,11 @@ public:
      * Member variables
      */
 protected:
-    typedef boost::function<void(bool)> behaviour_handler_t;
+    typedef std::function<void(bool)> behaviour_handler_t;
     typedef std::multimap<ERlvBehaviour, behaviour_handler_t> behaviour_handler_map_t;
     behaviour_handler_map_t m_Handlers;
 
-    boost::unordered_node_map<std::string, std::function<void()>, al::string_hash, std::equal_to<>> m_FilteredFloaterMap;
+    std::map<std::string, std::function<void()>, std::less<>> m_FilteredFloaterMap;
 };
 
 // ============================================================================

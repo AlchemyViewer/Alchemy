@@ -42,9 +42,6 @@
 #include "v3dmath.h"
 #include "v3math.h"
 #include "llbvhconsts.h"
-#include "llsortedvector.h"
-
-#include "boost/unordered/unordered_flat_map.hpp"
 
 class LLKeyframeDataCache;
 class LLDataPacker;
@@ -58,22 +55,6 @@ const S32 KEYFRAME_MOTION_SUBVERSION = 0;
 //-----------------------------------------------------------------------------
 // class LLKeyframeMotion
 //-----------------------------------------------------------------------------
-
-namespace LLKeyframeMotionLerp
-{
-    template<typename T>
-    inline T lerp(F32 t, const T& before, const T& after)
-    {
-        return ::lerp(before, after, t);
-    }
-
-    template<>
-    inline LLQuaternion lerp(F32 t, const LLQuaternion& before, const LLQuaternion& after)
-    {
-        return nlerp(t, before, after);
-    }
-}
-
 class LLKeyframeMotion :
     public LLMotion
 {
@@ -105,9 +86,9 @@ public:
     //-------------------------------------------------------------------------
 
     // motions must specify whether or not they loop
-    virtual BOOL getLoop() {
+    virtual bool getLoop() {
         if (mJointMotionList) return mJointMotionList->mLoop;
-        else return FALSE;
+        else return false;
     }
 
     // motions must report their total duration
@@ -154,14 +135,14 @@ public:
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
 
     // called when a motion is activated
-    // must return TRUE to indicate success, or else
+    // must return true to indicate success, or else
     // it will be deactivated
-    virtual BOOL onActivate();
+    virtual bool onActivate();
 
     // called per time step
-    // must return TRUE while it is active, and
-    // must return FALSE when the motion is completed.
-    virtual BOOL onUpdate(F32 time, U8* joint_mask);
+    // must return true while it is active, and
+    // must return false when the motion is completed.
+    virtual bool onUpdate(F32 time, U8* joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();
@@ -174,14 +155,14 @@ public:
 
 public:
     U32     getFileSize();
-    BOOL    serialize(LLDataPacker& dp) const;
-    BOOL    deserialize(LLDataPacker& dp, const LLUUID& asset_id, bool allow_invalid_joints = true);
-    BOOL    isLoaded() { return mJointMotionList != NULL; }
+    bool    serialize(LLDataPacker& dp) const;
+    bool    deserialize(LLDataPacker& dp, const LLUUID& asset_id, bool allow_invalid_joints = true);
+    bool    isLoaded() { return mJointMotionList != NULL; }
     bool    dumpToFile(const std::string& name);
 
 
     // setters for modifying a keyframe animation
-    void setLoop(BOOL loop);
+    void setLoop(bool loop);
 
     F32 getLoopIn() {
         return (mJointMotionList) ? mJointMotionList->mLoopInPoint : 0.f;
@@ -230,7 +211,7 @@ protected:
             mEaseInStopTime(0.f),
             mEaseOutStartTime(0.f),
             mEaseOutStopTime(0.f),
-            mUseTargetOffset(FALSE),
+            mUseTargetOffset(false),
             mConstraintType(CONSTRAINT_TYPE_POINT),
             mConstraintTargetType(CONSTRAINT_TARGET_TYPE_BODY),
             mSourceConstraintVolume(0),
@@ -250,7 +231,7 @@ protected:
         F32                     mEaseInStopTime;
         F32                     mEaseOutStartTime;
         F32                     mEaseOutStopTime;
-        BOOL                    mUseTargetOffset;
+        bool                    mUseTargetOffset;
         EConstraintType         mConstraintType;
         EConstraintTargetType   mConstraintTargetType;
     };
@@ -262,7 +243,7 @@ protected:
     {
     public:
         JointConstraint(JointConstraintSharedData* shared_data);
-        ~JointConstraint() = default;
+        ~JointConstraint();
 
         JointConstraintSharedData*  mSharedData;
         F32                         mWeight;
@@ -270,7 +251,7 @@ protected:
         LLVector3                   mPositions[MAX_CHAIN_LENGTH];
         F32                         mJointLengths[MAX_CHAIN_LENGTH];
         F32                         mJointLengthFractions[MAX_CHAIN_LENGTH];
-        BOOL                        mActive;
+        bool                        mActive;
         LLVector3d                  mGroundPos;
         LLVector3                   mGroundNorm;
         LLJoint*                    mSourceVolume;
@@ -290,91 +271,108 @@ protected:
 
     void applyConstraint(JointConstraint* constraintp, F32 time, U8* joint_mask);
 
-    BOOL    setupPose();
+    bool    setupPose();
 
 public:
     enum AssetStatus { ASSET_LOADED, ASSET_FETCHED, ASSET_NEEDS_FETCH, ASSET_FETCH_FAILED, ASSET_UNDEFINED };
 
     enum InterpolationType { IT_STEP, IT_LINEAR, IT_SPLINE };
 
-    template<typename T>
-    struct Curve
+    //-------------------------------------------------------------------------
+    // ScaleKey
+    //-------------------------------------------------------------------------
+    class ScaleKey
     {
-        struct Key
-        {
-            Key() = default;
-            Key(F32 time, const T& value) { mTime = time; mValue = value; }
-            F32         mTime = 0;
-            T           mValue;
-        };
+    public:
+        ScaleKey() { mTime = 0.0f; }
+        ScaleKey(F32 time, const LLVector3 &scale) { mTime = time; mScale = scale; }
 
-        T interp(F32 u, Key& before, Key& after)
-        {
-            switch (mInterpolationType)
-            {
-            case IT_STEP:
-                return before.mValue;
-            default:
-            case IT_LINEAR:
-            case IT_SPLINE:
-                return LLKeyframeMotionLerp::lerp(u, before.mValue, after.mValue);
-            }
-        }
-
-        T getValue(F32 time, F32 duration)
-        {
-            if (mKeys.empty())
-            {
-                return T();
-            }
-
-            T value;
-            typename key_map_t::iterator right = std::lower_bound(mKeys.begin(), mKeys.end(), time, [](const auto& a, const auto& b) { return a.first < b; });
-            if (right == mKeys.end())
-            {
-                // Past last key
-                --right;
-                value = right->second.mValue;
-            }
-            else if (right == mKeys.begin() || right->first == time)
-            {
-                // Before first key or exactly on a key
-                value = right->second.mValue;
-            }
-            else
-            {
-                // Between two keys
-                typename key_map_t::iterator left = right; --left;
-                F32 index_before = left->first;
-                F32 index_after = right->first;
-                Key& pos_before = left->second;
-                Key& pos_after = right->second;
-                if (right == mKeys.end())
-                {
-                    pos_after = mLoopInKey;
-                    index_after = duration;
-                }
-
-                F32 u = (time - index_before) / (index_after - index_before);
-                value = interp(u, pos_before, pos_after);
-            }
-            return value;
-        }
-
-        InterpolationType   mInterpolationType = LLKeyframeMotion::IT_LINEAR;
-        S32                 mNumKeys = 0;
-        typedef LLSortedVector<F32, Key> key_map_t;
-        key_map_t           mKeys;
-        Key                 mLoopInKey;
-        Key                 mLoopOutKey;
+        F32         mTime;
+        LLVector3   mScale;
     };
 
-    typedef Curve<LLVector3> ScaleCurve;
-    typedef ScaleCurve::Key ScaleKey;
-    typedef Curve<LLQuaternion> RotationCurve;
-    typedef RotationCurve::Key RotationKey;
-    typedef Curve<LLVector3> PositionCurve;
-    typedef PositionCurve::Key PositionKey;
+    //-------------------------------------------------------------------------
+    // RotationKey
+    //-------------------------------------------------------------------------
+    class RotationKey
+    {
+    public:
+        RotationKey() { mTime = 0.0f; }
+        RotationKey(F32 time, const LLQuaternion &rotation) { mTime = time; mRotation = rotation; }
+
+        F32             mTime;
+        LLQuaternion    mRotation;
+    };
+
+    //-------------------------------------------------------------------------
+    // PositionKey
+    //-------------------------------------------------------------------------
+    class PositionKey
+    {
+    public:
+        PositionKey() { mTime = 0.0f; }
+        PositionKey(F32 time, const LLVector3 &position) { mTime = time; mPosition = position; }
+
+        F32         mTime;
+        LLVector3   mPosition;
+    };
+
+    //-------------------------------------------------------------------------
+    // ScaleCurve
+    //-------------------------------------------------------------------------
+    class ScaleCurve
+    {
+    public:
+        ScaleCurve();
+        ~ScaleCurve();
+        LLVector3 getValue(F32 time, F32 duration);
+        LLVector3 interp(F32 u, ScaleKey& before, ScaleKey& after);
+
+        InterpolationType   mInterpolationType;
+        S32                 mNumKeys;
+        typedef std::map<F32, ScaleKey> key_map_t;
+        key_map_t           mKeys;
+        ScaleKey            mLoopInKey;
+        ScaleKey            mLoopOutKey;
+    };
+
+    //-------------------------------------------------------------------------
+    // RotationCurve
+    //-------------------------------------------------------------------------
+    class RotationCurve
+    {
+    public:
+        RotationCurve();
+        ~RotationCurve();
+        LLQuaternion getValue(F32 time, F32 duration);
+        LLQuaternion interp(F32 u, RotationKey& before, RotationKey& after);
+
+        InterpolationType   mInterpolationType;
+        S32                 mNumKeys;
+        typedef std::map<F32, RotationKey> key_map_t;
+        key_map_t       mKeys;
+        RotationKey     mLoopInKey;
+        RotationKey     mLoopOutKey;
+    };
+
+    //-------------------------------------------------------------------------
+    // PositionCurve
+    //-------------------------------------------------------------------------
+    class PositionCurve
+    {
+    public:
+        PositionCurve();
+        ~PositionCurve();
+        LLVector3 getValue(F32 time, F32 duration);
+        LLVector3 interp(F32 u, PositionKey& before, PositionKey& after);
+
+        InterpolationType   mInterpolationType;
+        S32                 mNumKeys;
+        typedef std::map<F32, PositionKey> key_map_t;
+        key_map_t       mKeys;
+        PositionKey     mLoopInKey;
+        PositionKey     mLoopOutKey;
+    };
 
     //-------------------------------------------------------------------------
     // JointMotion
@@ -400,7 +398,7 @@ public:
     public:
         std::vector<JointMotion*> mJointMotionArray;
         F32                     mDuration;
-        BOOL                    mLoop;
+        bool                    mLoop;
         F32                     mLoopInPoint;
         F32                     mLoopOutPoint;
         F32                     mEaseInDuration;
@@ -415,12 +413,14 @@ public:
         // TODO: LLKeyframeDataCache::getKeyframeData should probably return a class containing
         // JointMotionList and mEmoteName, see LLKeyframeMotion::onInitialize.
         std::string             mEmoteName;
+        LLUUID                  mEmoteID;
+
     public:
         JointMotionList();
         ~JointMotionList();
         U32 dumpDiagInfo();
         JointMotion* getJointMotion(U32 index) const { llassert(index < mJointMotionArray.size()); return mJointMotionArray[index]; }
-        U32 getNumJointMotions() const { return mJointMotionArray.size(); }
+        U32 getNumJointMotions() const { return static_cast<U32>(mJointMotionArray.size()); }
     };
 
 protected:
@@ -437,20 +437,16 @@ protected:
 
 public:
     void setCharacter(LLCharacter* character) { mCharacter = character; }
-
-    //BD - Poser
-    JointMotionList* getJointMotionList() const { return mJointMotionList; }
-    void setJointMotionList(JointMotionList* list) { mJointMotionList = list; }
 };
 
 class LLKeyframeDataCache
 {
 public:
     // *FIX: implement this as an actual singleton member of LLKeyframeMotion
-    LLKeyframeDataCache() = default;
+    LLKeyframeDataCache(){};
     ~LLKeyframeDataCache();
 
-    typedef boost::unordered_flat_map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t;
+    typedef std::map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t;
     static keyframe_data_map_t sKeyframeDataMap;
 
     static void addKeyframeData(const LLUUID& id, LLKeyframeMotion::JointMotionList*);

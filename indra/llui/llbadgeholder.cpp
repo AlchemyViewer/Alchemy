@@ -24,6 +24,8 @@
  * $/LicenseInfo$
  */
 
+#include "linden_common.h"
+
 #include "llbadgeholder.h"
 
 #include "llbadge.h"

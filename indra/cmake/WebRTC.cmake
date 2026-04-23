@@ -1,32 +1,16 @@
 # -*- cmake -*-
-include(Linking)
-include(Prebuilt)
-
 include_guard()
 
-add_library( ll::webrtc INTERFACE IMPORTED )
-target_include_directories( ll::webrtc SYSTEM INTERFACE "${LIBS_PREBUILT_DIR}/include/webrtc" "${LIBS_PREBUILT_DIR}/include/webrtc/third_party/abseil-cpp")
-use_prebuilt_binary(webrtc)
+add_library(ll::webrtc INTERFACE IMPORTED)
 
-if (WINDOWS)
-    target_link_libraries( ll::webrtc INTERFACE webrtc.lib )
-elseif (DARWIN)
-    FIND_LIBRARY(COREAUDIO_LIBRARY CoreAudio)
-    FIND_LIBRARY(COREGRAPHICS_LIBRARY CoreGraphics)
-    FIND_LIBRARY(AUDIOTOOLBOX_LIBRARY AudioToolbox)
-    FIND_LIBRARY(COREFOUNDATION_LIBRARY CoreFoundation)
-    FIND_LIBRARY(COCOA_LIBRARY Cocoa)
-    
-    target_link_libraries( ll::webrtc INTERFACE
-        libwebrtc.a
-        ${COREAUDIO_LIBRARY}
-        ${AUDIOTOOLBOX_LIBRARY}
-        ${COREGRAPHICS_LIBRARY}
-        ${COREFOUNDATION_LIBRARY}
-        ${COCOA_LIBRARY}
-    )
+find_library(WEBRTC_LIBRARY_RELEASE NAMES webrtc PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib" REQUIRED NO_DEFAULT_PATH)
+target_link_libraries(ll::webrtc INTERFACE ${WEBRTC_LIBRARY_RELEASE})
+target_include_directories(ll::webrtc SYSTEM INTERFACE "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/webrtc" "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/webrtc/third_party/abseil-cpp")
+
+if (DARWIN)
+    target_link_libraries(ll::webrtc INTERFACE ll::oslibraries)
 elseif (LINUX)
-    target_link_libraries( ll::webrtc INTERFACE ${ARCH_PREBUILT_DIRS_RELEASE}/libwebrtc.a X11 )
-endif (WINDOWS)
+    target_link_libraries(ll::webrtc INTERFACE X11)
+endif ()
 
 

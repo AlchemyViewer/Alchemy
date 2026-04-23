@@ -32,7 +32,7 @@
 #include "llpaneltopinfobar.h"
 #include "llsyswellwindow.h"
 #include "llfloaternotificationstabbed.h"
-#include "lllegacynotificationwellwindow.h"
+#include "allegacynotificationwellwindow.h"
 
 namespace
 {
@@ -46,14 +46,14 @@ LLChicletBar::LLChicletBar()
     buildFromFile("panel_chiclet_bar.xml");
 }
 
-BOOL LLChicletBar::postBuild()
+bool LLChicletBar::postBuild()
 {
     mToolbarStack = getChild<LLLayoutStack>("toolbar_stack");
     mChicletPanel = getChild<LLChicletPanel>("chiclet_list");
 
-    if (gSkinSettings.getBool("LegacyNotificationWell"))
+    if (gSkinSettings.getBOOL("LegacyNotificationWell"))
     {
-        showWellButton("notification_well", !LLLegacyNotificationWellWindow::getInstance()->isWindowEmpty());
+        showWellButton("notification_well", !ALLegacyNotificationWellWindow::getInstance()->isWindowEmpty());
     }
     else
     {
@@ -62,7 +62,7 @@ BOOL LLChicletBar::postBuild()
     LLPanelTopInfoBar::instance().setResizeCallback(boost::bind(&LLChicletBar::fitWithTopInfoBar, this));
     LLPanelTopInfoBar::instance().setVisibleCallback(boost::bind(&LLChicletBar::fitWithTopInfoBar, this));
 
-    return TRUE;
+    return true;
 }
 
 void LLChicletBar::showWellButton(const std::string& well_name, bool visible)
@@ -85,7 +85,7 @@ void LLChicletBar::log(LLView* panel, const std::string& descr)
         << LL_ENDL;
 }
 
-void LLChicletBar::reshape(S32 width, S32 height, BOOL called_from_parent)
+void LLChicletBar::reshape(S32 width, S32 height, bool called_from_parent)
 {
     static S32 debug_calling_number = 0;
     LL_DEBUGS() << "**************************************** " << ++debug_calling_number << LL_ENDL;

@@ -54,6 +54,27 @@
                   label="jitter"
                   decimal_digits="1"
                   stat="frametimejitter"/>
+          <stat_bar name="normalized_cumulative_frametime"
+                    label="normalized sess. jitter"
+                    decimal_digits="4"
+                    stat="normalizedframetimejitter"/>
+          <stat_bar name="normalized_period_jitter"
+                    label="normalized period jitter"
+                    decimal_digits="4"
+                    stat="normalizedframetimejitterperiod"/>
+          <stat_bar name="normalized_frametime_variation"
+                    label="normalized frametime variation"
+                    decimal_digits="4"
+                    stat="nftv"/>
+          <stat_bar name="frame_events_per_minute"
+                    label="frame events/minute"
+                    decimal_digits="2"
+                    stat="frametimeeventspm"/>
+          <stat_bar name="frame_events_last_minute"
+                    label="frame events last min."
+                    decimal_digits="0"
+                    stat="frametimeeventslastmin"/>
+          
         <stat_bar name="bandwidth"
                   label="UDP Data Received"
                   stat="activemessagedatareceived"
@@ -74,6 +95,38 @@
         <stat_view name="render"
                    label="Render"
                    setting="OpenDebugStatRender">
+            <stat_bar name="framet_cumulative"
+                    label="jitter cumulative"
+                    decimal_digits="1"
+                    stat="frametimejitcumulative"/>
+            <stat_bar name="framet_jitter_99th"
+                      label="jitter 99th percentile"
+                      decimal_digits="1"
+                      stat="frametimejitter99"/>
+            <stat_bar name="framet_jitter_95th"
+                      label="jitter 95th percentile"
+                      decimal_digits="1"
+                      stat="frametimejitter95"/>
+            <stat_bar name="framet_jitter_stddev"
+                      label="frametime jitter std dev"
+                      decimal_digits="1"
+                      stat="frametimejitterstddev"/>
+            <stat_bar name="framet_99th"
+                      label="frametime 99th percentile"
+                      decimal_digits="1"
+                      stat="frametime99"/>
+            <stat_bar name="framet_95th"
+                      label="frametime 95th percentile"
+                      decimal_digits="1"
+                      stat="frametime95"/>
+            <stat_bar name="framet_stddev"
+                      label="frametime std dev"
+                      decimal_digits="1"
+                      stat="frametimestddev"/>
+            <stat_bar name="framet_events"
+                      label="frametime events"
+                      decimal_digits="0"
+                      stat="frametimeevents"/>
           <stat_bar name="ktrisframe"
                     label="KTris per Frame"
                     unit_label="ktris/fr"
@@ -317,6 +370,64 @@
           </stat_view>
         </stat_view>
       </stat_view>
+      <stat_view name="voice"
+       label="Voice"
+       setting="OpenDebugStatVoice">
+          <stat_bar
+           name="webrtc_latency"
+           label="Latency"
+           stat="webrtc_latency"
+           unit_label="ms"
+           decimal_digits="1"/>
+          <stat_bar
+           name="webrtc_upload_bandwidth"
+           label="Upload bandwidth"
+           stat="webrtc_upload_bandwidth"
+           unit_label="kbps"
+           decimal_digits="0"/>
+          <stat_view name="incoming_audio"
+           label="Incoming audio"
+           setting="OpenDebugStatVoiceIncoming">
+            <stat_bar
+             name="incoming_packet_recv"
+             label="Packets received"
+             stat="webrtc_packets_in_recv"/>
+            <stat_bar
+             name="packets_in_lost"
+             label="Packets lost"
+             stat="webrtc_packets_in_lost"/>
+            <stat_bar
+             name="jitter_in"
+             label="Jitter"
+             stat="webrtc_jitter_in"
+             unit_label="ms"
+             decimal_digits="1"/>
+            <stat_bar
+             name="jitter_buffer"
+             label="Jitter buffer"
+             stat="webrtc_jitter_buffer"
+             unit_label="ms"
+             decimal_digits="1"/>
+          </stat_view>
+          <stat_view name="outgoing_audio"
+           label="Outgoing audio"
+           setting="OpenDebugStatVoiceOutgoing">
+            <stat_bar
+             name="packets_out_sent"
+             label="Packets sent"
+             stat="webrtc_packets_out_sent"/>
+            <stat_bar
+             name="packets_out_lost"
+             label="Packets lost"
+             stat="webrtc_packets_out_lost"/>
+            <stat_bar
+             name="jitter_out"
+             label="Jitter"
+             stat="webrtc_jitter_out"
+             unit_label="ms"
+             decimal_digits="1"/>
+          </stat_view>
+       </stat_view>
     </container_view>
   </scroll_container>
 </floater>

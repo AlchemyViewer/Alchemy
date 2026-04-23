@@ -5,6 +5,6 @@
 		<panel label="ブロック" name="mute_tab"/>
 		<panel label="描画解除" name="derender_tab"/>
 		<panel label="アセット" name="asset_tab"/>
-		<panel label="アバターの描画" name="avatar_rendering_tab"/>
+		<panel label="アバターのレンダリング" name="avatar_rendering_tab"/>
 	</tab_container>
 </floater>

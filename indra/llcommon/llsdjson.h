@@ -27,7 +27,11 @@
 #ifndef LL_LLSDJSON_H
 #define LL_LLSDJSON_H
 
+#include <map>
+#include <string>
+#include <vector>
 
+#include "stdtypes.h"
 
 #include "llsd.h"
 #include <boost/json.hpp>

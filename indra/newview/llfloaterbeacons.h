@@ -30,13 +30,13 @@
 
 #include "llfloater.h"
 
-class LLFloaterBeacons final : public LLFloater
+class LLFloaterBeacons : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
 
-    /*virtual*/ BOOL postBuild();
+    bool postBuild() override;
 
     // Needed to make the floater visibility toggle the beacons.
     // Too bad we can't just add control_name="BeaconAlwaysOn" to the XML.

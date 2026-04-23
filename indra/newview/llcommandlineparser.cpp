@@ -28,25 +28,10 @@
 #include "llcommandlineparser.h"
 #include "llexception.h"
 
-// *NOTE: The boost::lexical_cast generates
-// the warning C4701(local used with out assignment) in VC7.1.
-// Disable the warning for the boost includes.
-#if _MSC_VER
-#   pragma warning(push)
-#   pragma warning( disable : 4701 )
-#else
-// NOTE: For the other platforms?
-#endif
-
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
 #include <boost/tokenizer.hpp>
-#include <boost/assign/list_of.hpp>
-
-#if _MSC_VER
-#   pragma warning(pop)
-#endif
 
 #include "llsdserialize.h"
 #include "llerror.h"
@@ -75,14 +60,7 @@ namespace
     // List of command-line switches that can't map-to settings variables.
     // Going forward, we want every new command-line switch to map-to some
     // settings variable. This list is used to validate that.
-    const std::set<std::string> unmapped_options = boost::assign::list_of
-        ("help")
-        ("set")
-        ("setdefault")
-        ("settings")
-        ("sessionsettings")
-        ("usersessionsettings")
-    ;
+    const std::set<std::string> unmapped_options = { "help", "set", "setdefault", "settings", "sessionsettings", "usersessionsettings" };
 
     po::options_description gOptionsDesc;
     po::positional_options_description gPositionalOptions;
@@ -115,7 +93,7 @@ class LLCLPValue : public po::value_semantic_codecvt_helper<char>
     unsigned mMinTokens;
     unsigned mMaxTokens;
     bool mIsComposing;
-    typedef boost::function1<void, const LLCommandLineParser::token_vector_t&> notify_callback_t;
+    typedef std::function<void(const LLCommandLineParser::token_vector_t&)> notify_callback_t;
     notify_callback_t mNotifyCallback;
     bool mLastOption;
 
@@ -240,7 +218,7 @@ protected:
 // LLCommandLineParser defintions
 //----------------------------------------------------------------------------
 void LLCommandLineParser::addOptionDesc(const std::string& option_name,
-                                        boost::function1<void, const token_vector_t&> notify_callback,
+                                        std::function<void(const token_vector_t&)> notify_callback,
                                         unsigned int token_count,
                                         const std::string& description,
                                         const std::string& short_name,
@@ -269,7 +247,7 @@ void LLCommandLineParser::addOptionDesc(const std::string& option_name,
                                     value_desc,
                                     description.c_str()));
 
-    if(!notify_callback.empty())
+    if(notify_callback)
     {
         value_desc->setNotifyCallback(notify_callback);
     }
@@ -302,19 +280,19 @@ bool LLCommandLineParser::parseAndStoreResults(po::command_line_parser& clp)
         po::basic_parsed_options<char> opts = clp.run();
         po::store(opts, gVariableMap);
     }
-    catch(const po::error& e)
+    catch(po::error& e)
     {
         LL_WARNS() << "Caught Error:" << e.what() << LL_ENDL;
         mErrorMsg = e.what();
         return false;
     }
-    catch(const LLCLPError& e)
+    catch(LLCLPError& e)
     {
         LL_WARNS() << "Caught Error:" << e.what() << LL_ENDL;
         mErrorMsg = e.what();
         return false;
     }
-    catch(const LLCLPLastOption&)
+    catch(LLCLPLastOption&)
     {
         // This exception means a token was read after an option
         // that must be the last option was reached (see url and slurl options)
@@ -378,8 +356,8 @@ bool LLCommandLineParser::parseCommandLineString(const std::string& str)
     if (!str.empty())
     {
         bool add_last_c = true;
-        S32 last_c_pos = str.size() - 1; //don't get out of bounds on pos+1, last char will be processed separately
-        for (S32 pos = 0; pos < last_c_pos; ++pos)
+        auto last_c_pos = str.size() - 1; //don't get out of bounds on pos+1, last char will be processed separately
+        for (size_t pos = 0; pos < last_c_pos; ++pos)
         {
             cmd_line_string.append(&str[pos], 1);
             if (str[pos] == '\\')
@@ -571,8 +549,8 @@ void setControlValueCB(const LLCommandLineParser::token_vector_t& value,
                 std::string token(onevalue(option, value));
 
                 // There's a token. check the string for true/false/1/0 etc.
-                BOOL result = false;
-                BOOL gotSet = LLStringUtil::convertToBOOL(token, result);
+                bool result = false;
+                bool gotSet = LLStringUtil::convertToBOOL(token, result);
                 if (gotSet)
                 {
                     ctrl->setValue(LLSD(result), false);
@@ -707,7 +685,7 @@ void LLControlGroupCLP::configure(const std::string& config_filename, LLControlG
                 last_option = option_params["last_option"].asBoolean();
             }
 
-            boost::function1<void, const token_vector_t&> callback;
+            std::function<void(const token_vector_t&)> callback;
             if (! option_params.has("map-to"))
             {
                 // If this option isn't mapped to a settings variable, is it

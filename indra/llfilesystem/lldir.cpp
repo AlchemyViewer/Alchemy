@@ -30,8 +30,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
-#else
-#include <direct.h>
 #endif
 
 #include "lldir.h"
@@ -43,16 +41,9 @@
 #include "lldiriterator.h"
 #include "stringize.h"
 #include "llstring.h"
-#include <boost/filesystem.hpp>
-#include <boost/range/begin.hpp>
-#include <boost/range/end.hpp>
-#include <boost/assign/list_of.hpp>
+#include "llprocess.h"
 #include <boost/bind.hpp>
-#include <boost/ref.hpp>
 #include <algorithm>
-
-using boost::assign::list_of;
-using boost::assign::map_list_of;
 
 #if LL_WINDOWS
 #include "lldir_win32.h"
@@ -73,6 +64,7 @@ const char
     *LLDir::TEXTURES = "textures",
     *LLDir::SKINBASE = "";
 
+static const char* const empty = "";
 std::string LLDir::sDumpDir = "";
 
 LLDir::LLDir()
@@ -89,45 +81,37 @@ LLDir::LLDir()
     mTempDir(""),
     mDirDelimiter("/"), // fallback to forward slash if not overridden
     mLanguage("en"),
-    mUserName("undefined"),
-    mGrid("")
+    mUserName("undefined")
+{
+}
+
+LLDir::~LLDir()
 {
 }
 
 std::vector<std::string> LLDir::getFilesInDir(const std::string &dirname)
 {
-    //Returns a vector of fullpath filenames.
-
-#ifdef LL_WINDOWS // or BOOST_WINDOWS_API
-    boost::filesystem::path p(ll_convert_string_to_wide(dirname));
-#else
-    boost::filesystem::path p(dirname);
-#endif
-
+    // Returns a vector of filenames in the directory.
+    fsyspath dir_path(dirname);
     std::vector<std::string> v;
-
-    boost::system::error_code ec;
-    if (boost::filesystem::exists(p, ec) && !ec.failed())
+    std::error_code ec;
+    if (std::filesystem::is_directory(dir_path, ec))
     {
-        if (boost::filesystem::is_directory(p, ec) && !ec.failed())
+        std::filesystem::directory_iterator end_iter;
+        for (std::filesystem::directory_iterator dir_itr(dir_path);
+             dir_itr != end_iter;
+             ++dir_itr)
         {
-            boost::filesystem::directory_iterator end_iter;
-            boost::filesystem::directory_iterator dir_itr(p, ec);
-            if (ec.failed()) return v;
-            for (; dir_itr != end_iter;
-                 ++dir_itr)
+            if (std::filesystem::is_regular_file(dir_itr->status()))
             {
-                if (boost::filesystem::is_regular_file(dir_itr->status()))
-                {
-                    v.push_back(dir_itr->path().filename().string());
-                }
+                v.push_back(ll_convert<std::string>(dir_itr->path().filename().u8string()));
             }
         }
     }
     return v;
 }
 
-S32 LLDir::deleteFilesInDir(const std::string &dirname, const std::string &mask)
+S32 LLDir::deleteFilesInDir(const std::filesystem::path& dirname, const std::string& mask)
 {
     S32 count = 0;
     std::string filename;
@@ -144,7 +128,7 @@ S32 LLDir::deleteFilesInDir(const std::string &dirname, const std::string &mask)
     LLDirIterator iter(dirname, mask);
     while (iter.next(filename))
     {
-        fullpath = add(dirname, filename);
+        std::filesystem::path fullpath = dirname / fsyspath(filename);
 
         if(LLFile::isdir(fullpath))
         {
@@ -185,44 +169,36 @@ S32 LLDir::deleteFilesInDir(const std::string &dirname, const std::string &mask)
     return count;
 }
 
-U32 LLDir::deleteDirAndContents(const std::string& dir_name)
+U32 LLDir::deleteDirAndContents(const std::filesystem::path& dir_path)
 {
     //Removes the directory and its contents.  Returns number of files deleted.
 
     U32 num_deleted = 0;
-    boost::system::error_code ec;
-#ifdef LL_WINDOWS // or BOOST_WINDOWS_API
-    boost::filesystem::path dir_path(ll_convert_string_to_wide(dir_name));
-#else
-    boost::filesystem::path dir_path(dir_name);
-#endif
-    bool exists = boost::filesystem::exists(dir_path, ec);
-    if (ec.failed())
-    {
-        LL_WARNS() << "Failed to delete path " << dir_path << ": " << ec.message() << LL_ENDL;
-        return num_deleted;
-    }
-    if (exists)
-    {
-        if (!boost::filesystem::is_empty(dir_path, ec) && !ec.failed())
-        {   // Directory has content
 
-            num_deleted = boost::filesystem::remove_all(dir_path, ec);
-            if (ec.failed())
-            {
-                LL_WARNS() << "Failed to delete file " << dir_path << ": " << ec.message() << LL_ENDL;
-            }
-        }
-        else if(!ec.failed())
-        {   // Directory is empty
-            num_deleted = boost::filesystem::remove(dir_path, ec);
-            if (ec.failed())
-            {
-                LL_WARNS() << "Failed to delete folder " << dir_path << ": " << ec.message() << LL_ENDL;
-            }
-        }
+    try
+    {
+       if (std::filesystem::is_directory(dir_path))
+       {
+          if (!std::filesystem::is_empty(dir_path))
+          {   // Directory has content
+             num_deleted = (U32)std::filesystem::remove_all(dir_path);
+          }
+          else
+          {   // Directory is empty
+             std::filesystem::remove(dir_path);
+          }
+       }
+    }
+    catch (std::filesystem::filesystem_error &er)
+    {
+        LL_WARNS() << "Failed to delete " << dir_path << " with error " << er.code().message() << LL_ENDL;
     }
     return num_deleted;
+}
+
+bool LLDir::fileExists(const std::string& filename) const
+{
+    return LLFile::exists(filename);
 }
 
 const std::string LLDir::findFile(const std::string &filename,
@@ -452,28 +428,28 @@ const std::string &LLDir::getUserName() const
 static std::string ELLPathToString(ELLPath location)
 {
     typedef std::map<ELLPath, const char*> ELLPathMap;
-#define ENT(symbol) (symbol, #symbol)
-    static const ELLPathMap sMap = map_list_of
-        ENT(LL_PATH_NONE)
-        ENT(LL_PATH_USER_SETTINGS)
-        ENT(LL_PATH_APP_SETTINGS)
-        ENT(LL_PATH_PER_SL_ACCOUNT) // returns/expands to blank string if we don't know the account name yet
-        ENT(LL_PATH_CACHE)
-        ENT(LL_PATH_CHARACTER)
-        ENT(LL_PATH_HELP)
-        ENT(LL_PATH_LOGS)
-        ENT(LL_PATH_TEMP)
-        ENT(LL_PATH_SKINS)
-        ENT(LL_PATH_TOP_SKIN)
-        ENT(LL_PATH_CHAT_LOGS)
-        ENT(LL_PATH_PER_ACCOUNT_CHAT_LOGS)
-        ENT(LL_PATH_USER_SKIN)
-        ENT(LL_PATH_LOCAL_ASSETS)
-        ENT(LL_PATH_EXECUTABLE)
-        ENT(LL_PATH_DEFAULT_SKIN)
-        ENT(LL_PATH_FONTS)
-        ENT(LL_PATH_LAST)
-    ;
+#define ENT(symbol) { symbol, #symbol }
+    static const ELLPathMap sMap = {
+        ENT(LL_PATH_NONE),
+        ENT(LL_PATH_USER_SETTINGS),
+        ENT(LL_PATH_APP_SETTINGS),
+        ENT(LL_PATH_PER_SL_ACCOUNT), // returns/expands to blank string if we don't know the account name yet
+        ENT(LL_PATH_CACHE),
+        ENT(LL_PATH_CHARACTER),
+        ENT(LL_PATH_HELP),
+        ENT(LL_PATH_LOGS),
+        ENT(LL_PATH_TEMP),
+        ENT(LL_PATH_SKINS),
+        ENT(LL_PATH_TOP_SKIN),
+        ENT(LL_PATH_CHAT_LOGS),
+        ENT(LL_PATH_PER_ACCOUNT_CHAT_LOGS),
+        ENT(LL_PATH_USER_SKIN),
+        ENT(LL_PATH_LOCAL_ASSETS),
+        ENT(LL_PATH_EXECUTABLE),
+        ENT(LL_PATH_DEFAULT_SKIN),
+        ENT(LL_PATH_FONTS),
+        ENT(LL_PATH_LAST),
+    };
 #undef ENT
 
     ELLPathMap::const_iterator found = sMap.find(location);
@@ -482,17 +458,17 @@ static std::string ELLPathToString(ELLPath location)
     return STRINGIZE("Invalid ELLPath value " << location);
 }
 
-std::string LLDir::getExpandedFilename(ELLPath location, const std::string& filename) const
+std::string LLDir::getExpandedFilename(ELLPath location, std::string_view filename) const
 {
     return getExpandedFilename(location, "", filename);
 }
 
-std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subdir, const std::string& filename) const
+std::string LLDir::getExpandedFilename(ELLPath location, std::string_view subdir, std::string_view filename) const
 {
     return getExpandedFilename(location, "", subdir, filename);
 }
 
-std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subdir1, const std::string& subdir2, const std::string& in_filename) const
+std::string LLDir::getExpandedFilename(ELLPath location, std::string_view subdir1, std::string_view subdir2, std::string_view in_filename) const
 {
     std::string prefix;
     switch (location)
@@ -534,12 +510,10 @@ std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subd
             // which to build this string), then intentionally return a blank
             // string to the caller and skip the below warning about a blank
             // prefix.
-#ifdef SHOW_DEBUG
             LL_DEBUGS("LLDir") << "getLindenUserDir() not yet set: "
                                << ELLPathToString(location)
                                << ", '" << subdir1 << "', '" << subdir2 << "', '" << in_filename
                                << "' => ''" << LL_ENDL;
-#endif
             return std::string();
         }
         break;
@@ -595,14 +569,6 @@ std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subd
         prefix = add(getAppRODataDir(), "fonts");
         break;
 
-    case LL_PATH_POSES:
-        prefix = add(getOSUserAppDir(), "user_settings", "poses");
-        break;
-
-    case LL_PATH_ANIMATIONS:
-        prefix = add(getOSUserAppDir(), "user_settings", "animations");
-        break;
-
     default:
         llassert(0);
     }
@@ -627,11 +593,9 @@ std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subd
     expanded_filename += mDirDelimiter;
     expanded_filename += in_filename;
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("LLDir") << ELLPathToString(location)
                        << ", '" << subdir1 << "', '" << subdir2 << "', '" << in_filename
                        << "' => '" << expanded_filename << "'" << LL_ENDL;
-#endif
     return expanded_filename;
 }
 
@@ -655,7 +619,7 @@ std::string LLDir::getBaseFileName(const std::string& filepath, bool strip_exten
 std::string LLDir::getDirName(const std::string& filepath) const
 {
     std::size_t offset = filepath.find_last_of(getDirDelimiter());
-    S32 len = (offset == std::string::npos) ? 0 : offset;
+    auto len = (offset == std::string::npos) ? 0 : offset;
     std::string dirname = filepath.substr(0, len);
     return dirname;
 }
@@ -671,8 +635,8 @@ std::string LLDir::getExtension(const std::string& filepath) const
     return exten;
 }
 
-std::string LLDir::findSkinnedFilenameBaseLang(const std::string &subdir,
-                                               const std::string &filename,
+std::string LLDir::findSkinnedFilenameBaseLang(std::string_view subdir,
+                                               std::string_view filename,
                                                ESkinConstraint constraint) const
 {
     // This implementation is basically just as described in the declaration comments.
@@ -684,15 +648,15 @@ std::string LLDir::findSkinnedFilenameBaseLang(const std::string &subdir,
     return found.front();
 }
 
-std::string LLDir::findSkinnedFilename(const std::string &subdir,
-                                       const std::string &filename,
+std::string LLDir::findSkinnedFilename(std::string_view subdir,
+                                       std::string_view filename,
                                        ESkinConstraint constraint) const
 {
     // This implementation is basically just as described in the declaration comments.
     std::vector<std::string> found(findSkinnedFilenames(subdir, filename, constraint));
     if (found.empty())
     {
-        return std::string();
+        return "";
     }
     return found.back();
 }
@@ -702,9 +666,9 @@ std::string LLDir::findSkinnedFilename(const std::string &subdir,
 // generate the list of candidate pathnames in identical ways. The only
 // difference is in the body of the inner loop.
 template <typename FUNCTION>
-void LLDir::walkSearchSkinDirs(const std::string& subdir,
+void LLDir::walkSearchSkinDirs(std::string_view subdir,
                                const std::vector<std::string>& subsubdirs,
-                               const std::string& filename,
+                               std::string_view filename,
                                const FUNCTION& function) const
 {
     for (const std::string& skindir : mSearchSkinDirs)
@@ -727,29 +691,29 @@ inline void push_back(std::vector<std::string>& vector, const std::string& value
     vector.push_back(value);
 }
 
-typedef std::map<std::string, std::string> StringMap;
+typedef std::map<std::string, std::string, std::less<>> StringMap;
 // ridiculous little helper function that should go away when we can use lambda
 inline void store_in_map(StringMap& map, const std::string& key, const std::string& value)
 {
     map[key] = value;
 }
 
-std::vector<std::string> LLDir::findSkinnedFilenames(const std::string& subdir,
-                                                     const std::string& filename,
+std::vector<std::string> LLDir::findSkinnedFilenames(std::string_view subdir,
+                                                     std::string_view filename,
                                                      ESkinConstraint constraint) const
 {
-    // Recognize subdirs that have no localization.
-    static const std::set<std::string> sUnlocalized = list_of
-        ("")                        // top-level directory not localized
-        ("textures")                // textures not localized
-    ;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-#ifdef SHOW_DEBUG
+    // Recognize subdirs that have no localization.
+    static const std::set<std::string, std::less<>> sUnlocalized = {
+        "",        // top-level directory not localized
+        "textures" // textures not localized
+    };
+
     LL_DEBUGS("LLDir") << "subdir '" << subdir << "', filename '" << filename
                        << "', constraint "
                        << ((constraint == CURRENT_SKIN)? "CURRENT_SKIN" : "ALL_SKINS")
                        << LL_ENDL;
-#endif
 
     // Build results vector.
     std::vector<std::string> results;
@@ -871,8 +835,7 @@ std::vector<std::string> LLDir::findSkinnedFilenames(const std::string& subdir,
         }
     }
 
-#ifdef SHOW_DEBUG
-    LL_DEBUGS("LLDir") << std::string();
+    LL_DEBUGS("LLDir") << empty;
     const char* comma = "";
     for (const std::string& path : results)
     {
@@ -880,7 +843,6 @@ std::vector<std::string> LLDir::findSkinnedFilenames(const std::string& subdir,
         comma = ", ";
     }
     LL_CONT << LL_ENDL;
-#endif
 
     return results;
 }
@@ -924,7 +886,7 @@ std::string LLDir::getForbiddenFileChars()
     return "\\/:*?\"<>|";
 }
 
-void LLDir::setLindenUserDir(const std::string &username, const std::string &gridname)
+void LLDir::setLindenUserDir(const std::string &username)
 {
     // if the username isn't set, that's bad
     if (!username.empty())
@@ -934,13 +896,7 @@ void LLDir::setLindenUserDir(const std::string &username, const std::string &gri
         std::string userlower(username);
         LLStringUtil::toLower(userlower);
         LLStringUtil::replaceChar(userlower, ' ', '_');
-        std::string gridlower(gridname);
-        LLStringUtil::toLower(gridlower);
-        LLStringUtil::replaceChar(gridlower, ' ', '_');
-        const std::string& logname = (gridlower.empty())
-            ? userlower : userlower.append(".").append(gridlower);
-
-        mLindenUserDir = add(getOSUserAppDir(), logname);
+        mLindenUserDir = add(getOSUserAppDir(), userlower);
     }
     else
     {
@@ -964,12 +920,10 @@ void LLDir::setChatLogsDir(const std::string &path)
 
 void LLDir::updatePerAccountChatLogsDir()
 {
-    const std::string& logname = (mGrid.empty())
-        ? mUserName : mUserName.append(".").append(mGrid);
-    mPerAccountChatLogsDir = add(getChatLogsDir(), logname);
+    mPerAccountChatLogsDir = add(getChatLogsDir(), mUserName);
 }
 
-void LLDir::setPerAccountChatLogsDir(const std::string &username, const std::string &gridname)
+void LLDir::setPerAccountChatLogsDir(const std::string &username)
 {
     // if both first and last aren't set, assume we're grabbing the cached dir
     if (!username.empty())
@@ -979,12 +933,8 @@ void LLDir::setPerAccountChatLogsDir(const std::string &username, const std::str
         std::string userlower(username);
         LLStringUtil::toLower(userlower);
         LLStringUtil::replaceChar(userlower, ' ', '_');
-        std::string gridlower(gridname);
-        LLStringUtil::toLower(gridlower);
-        LLStringUtil::replaceChar(gridlower, ' ', '_');
 
         mUserName = userlower;
-        mGrid = gridlower;
         updatePerAccountChatLogsDir();
     }
     else
@@ -1053,14 +1003,14 @@ bool LLDir::setCacheDir(const std::string &path)
     if (path.empty() )
     {
         // reset to default
-        mCacheDir.clear();
+        mCacheDir = "";
         return true;
     }
     else
     {
         LLFile::mkdir(path);
         std::string tempname = add(path, "temp");
-        LLFILE* file = LLFile::fopen(tempname,"wt");
+        LLFILE* file = LLFile::fopen(tempname, LLFILE_MODE("wt"));
         if (file)
         {
             fclose(file);
@@ -1099,47 +1049,14 @@ void LLDir::append(std::string& destpath, std::string_view name) const
     SepOff sepoff(needSep(destpath, name));
     if (sepoff.first)               // do we need a separator?
     {
-        destpath.append(mDirDelimiter);
+        destpath += mDirDelimiter;
     }
     // If destpath ends with a separator, AND name starts with one, skip
     // name's leading separator.
-    destpath.append(name.substr(sepoff.second));
+    destpath += name.substr(sepoff.second);
 }
 
-// static
-std::string LLDir::escapePathString(std::string_view str)
-{
-    //BD - Don't use LLURI::escape() because it doesn't encode '-' characters
-    //     which may break handling of some poses.
-    //     From Singularity Viewer.
-    static const char hex[] = "0123456789ABCDEF";
-    std::stringstream escaped_str;
-    for (auto cha : str)
-    {
-        switch (cha) {
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
-        case 'a': case 'b': case 'c': case 'd': case 'e':
-        case 'f': case 'g': case 'h': case 'i': case 'j':
-        case 'k': case 'l': case 'm': case 'n': case 'o':
-        case 'p': case 'q': case 'r': case 's': case 't':
-        case 'u': case 'v': case 'w': case 'x': case 'y': case 'z':
-        case 'A': case 'B': case 'C': case 'D': case 'E':
-        case 'F': case 'G': case 'H': case 'I': case 'J':
-        case 'K': case 'L': case 'M': case 'N': case 'O':
-        case 'P': case 'Q': case 'R': case 'S': case 'T':
-        case 'U': case 'V': case 'W': case 'X': case 'Y': case 'Z':
-            escaped_str << (cha);
-            break;
-        default:
-            unsigned char c = (unsigned char)(cha);
-            escaped_str << '%' << hex[c >> 4] << hex[c & 0xF];
-        }
-    }
-    return escaped_str.str();
-}
-
-LLDir::SepOff LLDir::needSep(std::string_view path, std::string_view name) const
+LLDir::SepOff LLDir::needSep(const std::string& path, std::string_view name) const
 {
     if (path.empty() || name.empty())
     {
@@ -1171,20 +1088,75 @@ LLDir::SepOff LLDir::needSep(std::string_view path, std::string_view name) const
     return SepOff(false, 0);
 }
 
+void LLDir::openDir(const std::string& filepath)
+{
+    if (filepath.empty())
+    {
+        LL_WARNS() << "Cannot open file browser: filepath is empty" << LL_ENDL;
+        return;
+    }
+
+    // Extract directory path from full filepath
+    std::string dir_path = getDirName(filepath);
+
+    LLProcess::Params params;
+
+#if LL_WINDOWS
+    // Windows: Use explorer.exe with /select flag to highlight the file
+    std::string system_root = LLStringUtil::getenv("SystemRoot");
+    if (system_root.empty())
+    {
+        system_root = LLStringUtil::getenv("WINDIR");
+    }
+    if (system_root.empty())
+    {
+        LL_WARNS() << "Neither SystemRoot nor WINDIR environment variable is set" << LL_ENDL;
+        system_root = "C:\\Windows"; // Last resort fallback
+    }
+    params.executable = system_root + "\\explorer.exe";
+    params.args.add("/select,");
+    params.args.add(filepath);
+#elif LL_DARWIN
+    // macOS: Use 'open' command with -R flag to reveal in Finder
+    params.executable = "/usr/bin/open";
+    params.args.add("-R");
+    params.args.add(filepath);
+#elif LL_LINUX
+    // Linux: Use xdg-open to open the directory
+    // Note: Most file managers don't support file selection, so we open the directory
+    params.executable = "/usr/bin/xdg-open";
+    params.args.add(dir_path);
+#else
+    LL_WARNS() << "Platform not supported for file browser opening" << LL_ENDL;
+    return;
+#endif
+
+    params.autokill = false; // Don't kill the file browser when viewer exits
+
+    if (!LLProcess::create(params))
+    {
+        LL_WARNS() << "Failed to open file browser for: " << filepath << LL_ENDL;
+    }
+    else
+    {
+        LL_INFOS() << "Opened file browser for: " << filepath << LL_ENDL;
+    }
+}
+
 void dir_exists_or_crash(const std::string &dir_name)
 {
 #if LL_WINDOWS
     // *FIX: lame - it doesn't do the same thing on windows. not so
     // important since we don't deploy simulator to windows boxes.
-    LLFile::mkdir(dir_name, 0700);
+    LLFile::mkdir(dir_name);
 #else
-    struct stat dir_stat;
+    llstat dir_stat;
     if(0 != LLFile::stat(dir_name, &dir_stat))
     {
         S32 stat_rv = errno;
         if(ENOENT == stat_rv)
         {
-           if(0 != LLFile::mkdir(dir_name, 0700))       // octal
+           if(0 != LLFile::mkdir(dir_name))
            {
                LL_ERRS() << "Unable to create directory: " << dir_name << LL_ENDL;
            }

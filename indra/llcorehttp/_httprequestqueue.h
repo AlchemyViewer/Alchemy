@@ -47,18 +47,18 @@ class HttpOperation;
 /// requests from all HttpRequest instances into the
 /// singleton HttpService instance.
 
-class HttpRequestQueue final : public LLCoreInt::RefCounted
+class HttpRequestQueue : public LLCoreInt::RefCounted
 {
 protected:
     /// Caller acquires a Refcount on construction
     HttpRequestQueue();
 
 protected:
-    ~HttpRequestQueue() override;                       // Use release()
+    virtual ~HttpRequestQueue();                        // Use release()
 
 private:
-    HttpRequestQueue(const HttpRequestQueue &) = delete;            // Not defined
-    void operator=(const HttpRequestQueue &) = delete;          // Not defined
+    HttpRequestQueue(const HttpRequestQueue&) = delete;
+    void operator=(const HttpRequestQueue&)   = delete;
 
 public:
     typedef std::shared_ptr<HttpOperation> opPtr_t;

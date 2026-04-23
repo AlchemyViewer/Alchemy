@@ -62,7 +62,7 @@
       width="348"
       name="panel_experience_info">
       <scroll_container
-        color="PanelDefaultBackgroundColor"
+        color="DkGray2"
         follows="all"
         height="520"
         layout="topleft"
@@ -72,7 +72,7 @@
         top_pad="10"
         width="330">
         <panel
-          bg_alpha_color="PanelDefaultBackgroundColor"
+          bg_alpha_color="DkGray2"
           follows="top|left|right"
           height="550"
           layout="topleft"
@@ -435,7 +435,7 @@
       width="348"
       name="edit_panel_experience_info">
       <scroll_container
-        color="PanelDefaultBackgroundColor"
+        color="DkGray2"
         follows="all"
         height="520"
         layout="topleft"
@@ -445,7 +445,7 @@
         top_pad="10"
         width="330">
         <panel
-          bg_alpha_color="PanelDefaultBackgroundColor"
+          bg_alpha_color="DkGray2"
           follows="top|left|right"
           height="590"
           layout="topleft"
@@ -479,6 +479,7 @@
             left="10"
             name="edit_experience_title"
             max_length_bytes="63"
+            text_color="black"
             right="-10"/>
           <text
             follows="left|top|right"
@@ -498,6 +499,7 @@
             name="edit_experience_description"
             spellcheck="true"
             max_length="2048"
+            text_color="black"
             right="-11"
             word_wrap="true"/>
           <button
@@ -547,32 +549,32 @@
               imgoverlay_label_space="3"
               pad_left="3"/>
             <icons_combo_box.item
+              label="Adult"
               name="Adult"
               value="42">
               <item.columns
-                halign="left"
-                type="icontext"
-                label="Adult"
+                halign="center"
+                type="icon"
                 value="Parcel_R_Light"
                 width="20"/>
             </icons_combo_box.item>
             <icons_combo_box.item
+              label="Moderate"
               name="Mature"
               value="21">
               <item.columns
-                halign="left"
-                type="icontext"
-                label="Moderate"
+                halign="center"
+                type="icon"
                 value="Parcel_M_Light"
                 width="20"/>
             </icons_combo_box.item>
             <icons_combo_box.item
+              label="General"
               name="PG"
               value="13">
               <item.columns
-                halign="left"
-                type="icontext"
-                label="General"
+                halign="center"
+                type="icon"
                 value="Parcel_PG_Light"
                 width="20"/>
             </icons_combo_box.item>

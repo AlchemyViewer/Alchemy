@@ -31,7 +31,7 @@
 
 // This class compresses and decompressed TGA (targa) files
 
-class LLImageTGA final : public LLImageFormatted
+class LLImageTGA : public LLImageFormatted
 {
 protected:
     virtual ~LLImageTGA();

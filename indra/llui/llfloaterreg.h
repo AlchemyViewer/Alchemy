@@ -29,13 +29,12 @@
 /// llcommon
 #include "llrect.h"
 #include "llsd.h"
+#include "llstl.h"
 
+#include <functional>
 #include <list>
-#include <boost/function.hpp>
-#include <boost/unordered/unordered_flat_map.hpp>
-#include <boost/unordered/unordered_flat_set.hpp>
-#include <boost/unordered/unordered_node_map.hpp>
-#include <boost/unordered/unordered_map.hpp>
+#include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 // [RLVa:KB] - Checked: 2011-05-25 (RLVa-1.4.0a)
 #include <boost/signals2.hpp>
 #include "llboost.h"
@@ -49,7 +48,7 @@
 class LLFloater;
 class LLUICtrl;
 
-typedef boost::function<LLFloater* (const LLSD& key)> LLFloaterBuildFunc;
+typedef std::function<LLFloater* (const LLSD& key)> LLFloaterBuildFunc;
 
 class LLFloaterReg
 {
@@ -59,32 +58,34 @@ public:
     // 2) We can change the key of a floater without altering the list.
     typedef std::list<LLFloater*> instance_list_t;
     typedef const instance_list_t const_instance_list_t;
-    typedef boost::unordered_node_map<std::string, instance_list_t, al::string_hash, std::equal_to<>> instance_map_t;
+    typedef boost::unordered_map<std::string, instance_list_t, ll::string_hash, std::equal_to<>> instance_map_t;
 
     struct BuildData
     {
         LLFloaterBuildFunc mFunc;
         std::string mFile;
     };
-    typedef boost::unordered_node_map<std::string, BuildData, al::string_hash, std::equal_to<>> build_map_t;
-    typedef boost::unordered_node_map<std::string, std::string, al::string_hash, std::equal_to<>> group_map_t;
+    typedef boost::unordered_map<std::string, BuildData, ll::string_hash, std::equal_to<>> build_map_t;
 
 private:
     friend class LLFloaterRegListener;
     static instance_list_t sNullInstanceList;
     static instance_map_t sInstanceMap;
     static build_map_t sBuildMap;
+
+    using group_map_t = boost::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>>;
     static group_map_t sGroupMap;
     static bool sBlockShowFloaters;
     /**
      * Defines list of floater names that can be shown despite state of sBlockShowFloaters.
      */
-    static boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>> sAlwaysShowableList;
+    using always_showable_t = boost::unordered_set<std::string, ll::string_hash, std::equal_to<>>;
+    static always_showable_t sAlwaysShowableList;
 
 // [RLVa:KB] - Checked: 2010-02-28 (RLVa-1.4.0a) | Modified: RLVa-1.2.0a
     // Used to determine whether a floater can be shown
 public:
-    typedef boost::signals2::signal<bool(std::string_view, const LLSD&), boost_boolean_combiner> validate_signal_t;
+    typedef boost::signals2::signal<bool(const std::string&, const LLSD&), boost_boolean_combiner> validate_signal_t;
     static boost::signals2::connection setValidateCallback(const validate_signal_t::slot_type& cb) { return mValidateSignal.connect(cb); }
 private:
     static validate_signal_t mValidateSignal;
@@ -102,8 +103,8 @@ public:
     }
 
     static void add(const std::string& name, const std::string& file, const LLFloaterBuildFunc& func,
-                    const std::string& groupname = std::string());
-    static bool isRegistered(const std::string& name);
+                    const std::string& groupname = LLStringUtil::null);
+    static bool isRegistered(std::string_view name);
 
     // Helpers
     static LLFloater* getLastFloaterInGroup(std::string_view name);
@@ -121,10 +122,10 @@ public:
     // Visibility Management
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
     // return false if floater can not be shown (=doesn't pass the validation filter)
-    static bool canShowInstance(std::string_view name, const LLSD& key = LLSD());
+    static bool canShowInstance(const std::string& name, const LLSD& key = LLSD());
 // [/RLVa:KB]
     // return NULL if instance not found or can't create instance (no builder)
-    static LLFloater* showInstance(std::string_view name, const LLSD& key = LLSD(), BOOL focus = FALSE);
+    static LLFloater* showInstance(std::string_view name, const LLSD& key = LLSD(), bool focus = false);
     // Close a floater (may destroy or set invisible)
     // return false if can't find instance
     static bool hideInstance(std::string_view name, const LLSD& key = LLSD());
@@ -157,19 +158,19 @@ public:
     template <class T>
     static T* findTypedInstance(std::string_view name, const LLSD& key = LLSD())
     {
-        return static_cast<T*>(findInstance(name, key));
+        return dynamic_cast<T*>(findInstance(name, key));
     }
 
     template <class T>
     static T* getTypedInstance(std::string_view name, const LLSD& key = LLSD())
     {
-        return static_cast<T*>(getInstance(name, key));
+        return dynamic_cast<T*>(getInstance(name, key));
     }
 
     template <class T>
-    static T* showTypedInstance(std::string_view name, const LLSD& key = LLSD(), BOOL focus = FALSE)
+    static T* showTypedInstance(std::string_view name, const LLSD& key = LLSD(), bool focus = false)
     {
-        return static_cast<T*>(showInstance(name, key, focus));
+        return dynamic_cast<T*>(showInstance(name, key, focus));
     }
 
     static void blockShowFloaters(bool value) { sBlockShowFloaters = value;}

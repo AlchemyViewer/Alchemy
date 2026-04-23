@@ -1,10 +1,10 @@
 /**
  * @file llpanelclassified.h
- * @brief LLPanelClassified class definition
+ * @brief LLPanelClassifiedInfo class definition
  *
- * $LicenseInfo:firstyear=2005&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2021&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2021, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,36 +27,33 @@
 // Display of a classified used both for the global view in the
 // Find directory, and also for each individual user's classified in their
 // profile.
-
 #ifndef LL_LLPANELCLASSIFIED_H
 #define LL_LLPANELCLASSIFIED_H
 
 #include "llavatarpropertiesprocessor.h"
-#include "llfloaterpublishclassified.h"
+#include "llclassifiedinfo.h"
+#include "llfloater.h"
 #include "llpanel.h"
 #include "llrect.h"
 
 class LLScrollContainer;
 class LLTextureCtrl;
-class LLUICtrl;
 
 class LLPanelClassifiedInfo : public LLPanel, public LLAvatarPropertiesObserver
 {
     LOG_CLASS(LLPanelClassifiedInfo);
 public:
 
-    static LLPanelClassifiedInfo* create();
-
     LLPanelClassifiedInfo();
     virtual ~LLPanelClassifiedInfo();
 
-    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ void onOpen(const LLSD& key);
 
-    /*virtual*/ BOOL postBuild() override;
+    /*virtual*/ bool postBuild();
 
-    /*virtual*/ void processProperties(void* data, EAvatarProcessorType type) override;
+    /*virtual*/ void processProperties(void* data, EAvatarProcessorType type);
 
-    void setAvatarId(const LLUUID& avatar_id) { mAvatarId = avatar_id; }
+    void setAvatarId(const LLUUID& avatar_id);
 
     LLUUID& getAvatarId() { return mAvatarId; }
 
@@ -115,13 +112,9 @@ public:
             const LLVector3d& global_pos,
             const std::string& sim_name);
 
-    void setExitCallback(const commit_callback_t& cb);
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
 
-    void setEditClassifiedCallback(const commit_callback_t& cb);
-
-    /*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
-
-    /*virtual*/ void draw() override;
+    /*virtual*/ void draw();
 
 protected:
 
@@ -143,7 +136,6 @@ protected:
 
     void onMapClick();
     void onTeleportClick();
-    void onExit();
 
     bool mSnapshotStreched;
     LLRect mSnapshotRect;

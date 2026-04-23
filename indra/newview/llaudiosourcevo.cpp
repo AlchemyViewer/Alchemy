@@ -172,12 +172,11 @@ void LLAudioSourceVO::updateMute()
 
     if (!mute)
     {
-        auto& mute_list = LLMuteList::instance();
-        if (mute_list.isMuted(mObjectp->getID()))
+        if (LLMuteList::getInstance()->isMuted(mObjectp->getID()))
         {
             mute = true;
         }
-        else if (mute_list.isMuted(mOwnerID, LLMute::flagObjectSounds))
+        else if (LLMuteList::getInstance()->isMuted(mOwnerID, LLMute::flagObjectSounds))
         {
             mute = true;
         }
@@ -189,7 +188,7 @@ void LLAudioSourceVO::updateMute()
                 parent = (LLViewerObject*)parent->getParent();
             }
             if (parent
-                && mute_list.isMuted(parent->getID()))
+                && LLMuteList::getInstance()->isMuted(parent->getID()))
             {
                 mute = true;
             }

@@ -73,29 +73,32 @@ typedef enum
     } EGraphicsSettings;
 
 // Floater to control preferences (display, audio, bandwidth, general.
-class LLFloaterPreference final : public LLFloater, public LLAvatarPropertiesObserver, public LLConversationLogObserver
+class LLFloaterPreference : public LLFloater, public LLAvatarPropertiesObserver, public LLConversationLogObserver
 {
 public:
     LLFloaterPreference(const LLSD& key);
     ~LLFloaterPreference();
 
     void apply();
-    void cancel();
+    void cancel(const std::vector<std::string> settings_to_skip = {});
     /*virtual*/ void draw();
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     /*virtual*/ void onOpen(const LLSD& key);
     /*virtual*/ void onClose(bool app_quitting);
     /*virtual*/ void changed();
     /*virtual*/ void changed(const LLUUID& session_id, U32 mask) {};
 
     // static data update, called from message handler
-    static void updateUserInfo(const std::string& visibility, bool im_via_email, bool is_verified_email, const std::string& email);
+    static void updateUserInfo(const std::string& visibility);
 
     // refresh all the graphics preferences menus
     static void refreshEnabledGraphics();
 
     // translate user's do not disturb response message according to current locale if message is default, otherwise do nothing
-    static void initDoNotDisturbResponse();
+    // static void initDoNotDisturbResponse();
+    // NOTE Commenting the above in favour of a more streamlined function that's more of a "catchall"
+    // -- Fallen
+    static void initAutoResponses();
 
     // update Show Favorites checkbox
     static void updateShowFavoritesCheckbox(bool val);
@@ -118,6 +121,7 @@ protected:
     void        onClickClearCache();            // Clear viewer texture cache, file cache on next startup
     void        onClickBrowserClearCache();     // Clear web history and caches as well as viewer caches above
     void        onLanguageChange();
+    void        onTimeFormatChange();
     void        onNotificationsChange(const std::string& OptionName);
     void        onNameTagOpacityChange(const LLSD& newvalue);
 
@@ -125,6 +129,8 @@ protected:
     // string differs from default after user changes.
     void onDoNotDisturbResponseChanged();
     void onRejectTeleportOffersResponseChanged();
+    void onRejectFriendshipRequestResponseChanged();
+    void onAdHocSelectionChanged(const LLSD& newValue);
     void onAutoRespondResponseChanged();
     void onAutoRespondNonFriendsResponseChanged();
 
@@ -143,6 +149,8 @@ protected:
     void onClickActionChange();
     // updates click/double-click action keybindngs depending on view values
     void updateClickActionControls();
+
+    void onAtmosShaderChange();
 
 public:
     // This function squirrels away the current values of the controls so that
@@ -165,8 +173,7 @@ public:
     void onClickLogPath();
     void changeLogPath(const std::vector<std::string>& filenames, std::string proposed_name);
     bool moveTranscriptsAndLog();
-    void enableHistory();
-    void setPersonalInfo(const std::string& visibility, bool im_via_email, bool is_verified_email, const std::string& email);
+    void setPersonalInfo(const std::string& visibility);
     void refreshEnabledState();
     void onCommitWindowedMode();
     void refresh(); // Refresh enable/disable
@@ -175,10 +182,8 @@ public:
 
     void refreshUI();
 
-    void onCommitMediaEnabled();
-    void onCommitMusicEnabled();
-    void applyResolution();
     void onChangeMaturity();
+    void onChangeComplexityMode(const LLSD& newvalue);
     void onChangeModelFolder();
     void onChangePBRFolder();
     void onChangeTextureFolder();
@@ -194,13 +199,13 @@ public:
     void onClickRenderExceptions();
     void onClickAutoAdjustments();
     void onClickAdvanced();
+    void onClickScriptingPerfs();
     void applyUIColor(LLUICtrl* ctrl, const LLSD& param);
     void getUIColor(LLUICtrl* ctrl, const LLSD& param);
     void onLogChatHistorySaved();
     void buildPopupLists();
     static void refreshSkin(void* data);
     void selectPanel(const LLSD& name);
-    void saveCameraPreset(std::string& preset);
     void saveGraphicsPreset(std::string& preset);
 
     void setRecommendedSettings();
@@ -211,20 +216,12 @@ private:
     void onDeleteTranscripts();
     void onDeleteTranscriptsResponse(const LLSD& notification, const LLSD& response);
     void updateDeleteTranscriptsButton();
+    void updateMaxNonImpostors();
+    void updateIndirectMaxNonImpostors(const LLSD& newvalue);
+    void setMaxNonImpostorsText(U32 value, LLTextBox* text_box);
     void updateMaxComplexity();
     void updateComplexityText();
     static bool loadFromFilename(const std::string& filename, std::map<std::string, std::string> &label_map);
-
-#ifndef LL_HAVOK
-    void refreshGridList();
-    void onClickAddGrid();
-    void onClickActivateGrid();
-    void onClickRemoveGrid();
-    void onClickRefreshGrid();
-    void onClickDebugGrid();
-    void onSelectGrid(const LLSD& data);
-    bool handleRemoveGridCB(const LLSD& notification, const LLSD& response);
-#endif
 
     void loadUserSkins();
     void reloadSkinList();
@@ -240,9 +237,9 @@ private:
     static std::string sSkin;
     notifications_map mNotificationOptions;
     bool mGotPersonalInfo;
-    bool mOriginalIMViaEmail;
     bool mLanguageChanged;
     bool mAvatarDataInitialized;
+    U32 mLastQualityLevel = 0;
     std::string mPriorInstantMessageLogPath;
 
     bool mOriginalHideOnlineStatus;
@@ -255,25 +252,25 @@ private:
     typedef std::map<std::string, skin_t> skinmap_t;
     skinmap_t mUserSkins;
 
-#if !LL_HAVOK
-    boost::signals2::connection mGridListChangedConnection;
-#endif
-
     LOG_CLASS(LLFloaterPreference);
 
-    LLSearchEditor *mFilterEdit;
+    LLSearchEditor* mFilterEdit = nullptr;
+    LLScrollListCtrl* mEnabledPopups = nullptr;
+    LLScrollListCtrl* mDisabledPopups = nullptr;
+    LLButton*       mDeleteTranscriptsBtn = nullptr;
+    LLButton*       mEnablePopupBtn = nullptr;
+    LLButton*       mDisablePopupBtn = nullptr;
+    LLComboBox*     mTimeFormatCombobox = nullptr;
+    LLComboBox*     mLanguageCombobox = nullptr;
     std::unique_ptr< ll::prefs::SearchData > mSearchData;
     bool mSearchDataDirty;
 
+    boost::signals2::connection mImpostorsChangedSignal;
     boost::signals2::connection mComplexityChangedSignal;
-    boost::signals2::connection mDnDModeConnection;
     boost::signals2::connection mRejectTeleportConnection;
-    boost::signals2::connection mChatBubbleOpacityConnection;
-    boost::signals2::connection mPreferredMaturityConnection;
+    boost::signals2::connection mRejectFriendshipRequestsConnection;
     boost::signals2::connection mAutoResponseConnection;
     boost::signals2::connection mAutoResponseNonFriendsConnection;
-
-    bool mDnDInit = false;
 
     void onUpdateFilterTerm( bool force = false );
     void collectSearchableItems();
@@ -286,12 +283,12 @@ class LLPanelPreference : public LLPanel
 {
 public:
     LLPanelPreference();
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     virtual ~LLPanelPreference();
 
     virtual void apply();
-    virtual void cancel();
+    virtual void cancel(const std::vector<std::string> settings_to_skip = {});
     void setControlFalse(const LLSD& user_data);
     virtual void setHardwareDefaults();
 
@@ -326,22 +323,19 @@ private:
     string_color_map_t mSavedColors;
 
     Updater* mBandWidthUpdater;
-    boost::signals2::connection mBandwithConnection;
     LOG_CLASS(LLPanelPreference);
 };
 
-class LLPanelPreferenceGraphics final : public LLPanelPreference
+class LLPanelPreferenceGraphics : public LLPanelPreference
 {
 public:
-    BOOL postBuild();
+    bool postBuild();
     void draw();
-    void cancel();
+    void cancel(const std::vector<std::string> settings_to_skip = {});
     void saveSettings();
     void resetDirtyChilds();
     void setHardwareDefaults();
     void setPresetText();
-
-    static const std::string getPresetsPath();
 
 protected:
     bool hasDirtyChilds();
@@ -351,17 +345,17 @@ private:
     LOG_CLASS(LLPanelPreferenceGraphics);
 };
 
-class LLPanelPreferenceControls final : public LLPanelPreference, public LLKeyBindResponderInterface
+class LLPanelPreferenceControls : public LLPanelPreference, public LLKeyBindResponderInterface
 {
     LOG_CLASS(LLPanelPreferenceControls);
 public:
     LLPanelPreferenceControls();
     virtual ~LLPanelPreferenceControls();
 
-    BOOL postBuild();
+    bool postBuild();
 
     void apply();
-    void cancel();
+    void cancel(const std::vector<std::string> settings_to_skip = {});
     void saveSettings();
     void resetDirtyChilds();
 
@@ -418,7 +412,7 @@ class LLAvatarComplexityControls
     LOG_CLASS(LLAvatarComplexityControls);
 };
 
-class LLFloaterPreferenceProxy final : public LLFloater
+class LLFloaterPreferenceProxy : public LLFloater
 {
 public:
     LLFloaterPreferenceProxy(const LLSD& key);
@@ -429,7 +423,7 @@ public:
     void cancel();
 
 protected:
-    BOOL postBuild();
+    bool postBuild();
     void onOpen(const LLSD& key);
     void onClose(bool app_quitting);
     void saveSettings();

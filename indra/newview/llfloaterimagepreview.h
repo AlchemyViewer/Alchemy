@@ -40,7 +40,7 @@ class LLTextBox;
 class LLVertexBuffer;
 class LLVolume;
 
-class LLImagePreviewSculpted final : public LLViewerDynamicTexture
+class LLImagePreviewSculpted : public LLViewerDynamicTexture
 {
 protected:
     virtual ~LLImagePreviewSculpted();
@@ -53,15 +53,15 @@ protected:
     void setPreviewTarget(LLImageRaw *imagep, F32 distance);
     void setTexture(U32 name) { mTextureName = name; }
 
-    BOOL render() override;
+    bool render() override;
     void refresh();
     void rotate(F32 yaw_radians, F32 pitch_radians);
     void zoom(F32 zoom_amt);
     void pan(F32 right, F32 up);
-    virtual BOOL needsRender() override { return mNeedsUpdate; }
+    virtual bool needsRender() override { return mNeedsUpdate; }
 
  protected:
-    BOOL        mNeedsUpdate;
+    bool        mNeedsUpdate;
     U32         mTextureName;
     F32         mCameraDistance;
     F32         mCameraYaw;
@@ -73,7 +73,7 @@ protected:
 };
 
 
-class LLImagePreviewAvatar final : public LLViewerDynamicTexture
+class LLImagePreviewAvatar : public LLViewerDynamicTexture
 {
 protected:
     virtual ~LLImagePreviewAvatar();
@@ -83,19 +83,19 @@ public:
 
     S8 getType() const override;
 
-    void setPreviewTarget(const std::string& joint_name, const std::string& mesh_name, LLImageRaw* imagep, F32 distance, BOOL male);
+    void setPreviewTarget(const std::string& joint_name, const std::string& mesh_name, LLImageRaw* imagep, F32 distance, bool male);
     void setTexture(U32 name) { mTextureName = name; }
     void clearPreviewTexture(const std::string& mesh_name);
 
-    BOOL    render() override;
+    bool    render() override;
     void    refresh();
     void    rotate(F32 yaw_radians, F32 pitch_radians);
     void    zoom(F32 zoom_amt);
     void    pan(F32 right, F32 up);
-    virtual BOOL needsRender() override { return mNeedsUpdate; }
+    virtual bool needsRender() override { return mNeedsUpdate; }
 
 protected:
-    BOOL        mNeedsUpdate;
+    bool        mNeedsUpdate;
     LLJoint*    mTargetJoint;
     LLViewerJointMesh*  mTargetMesh;
     F32         mCameraDistance;
@@ -107,24 +107,26 @@ protected:
     U32         mTextureName;
 };
 
-class LLFloaterImagePreview final : public LLFloaterNameDesc
+class LLFloaterImagePreview : public LLFloaterNameDesc
 {
 public:
-    LLFloaterImagePreview(const std::string& filename);
+    LLFloaterImagePreview(const LLSD& args);
     virtual ~LLFloaterImagePreview();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     S32 getExpectedUploadCost() const override;
 
-    BOOL handleMouseDown(S32 x, S32 y, MASK mask) override;
-    BOOL handleMouseUp(S32 x, S32 y, MASK mask) override;
-    BOOL handleHover(S32 x, S32 y, MASK mask) override;
-    BOOL handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
+    bool handleScrollWheel(S32 x, S32 y, S32 clicks) override;
 
     static void onMouseCaptureLostImagePreview(LLMouseHandler*);
 
     void clearAllPreviewTextures();
+
+    void onBtnOK();
 
 protected:
     static void     onPreviewTypeCommit(LLUICtrl*,void*);

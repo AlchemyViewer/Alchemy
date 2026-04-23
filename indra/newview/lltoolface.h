@@ -32,15 +32,15 @@
 class LLViewerObject;
 class LLPickInfo;
 
-class LLToolFace final
-:   public LLTool, public LLSingleton<LLToolFace>
+class LLToolFace
+:   public LLTool, public LLSimpleton<LLToolFace>
 {
-    LLSINGLETON(LLToolFace);
-    virtual ~LLToolFace();
 public:
+    LLToolFace();
+    virtual ~LLToolFace();
 
-    virtual BOOL    handleMouseDown(S32 x, S32 y, MASK mask) override;
-    virtual BOOL    handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask) override;
     virtual void    handleSelect() override;
     virtual void    handleDeselect() override;
     virtual void    render() override;          // draw face highlights

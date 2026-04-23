@@ -39,27 +39,6 @@ inline U64 to_region_handle(const U32 x_origin, const U32 y_origin)
     return region_handle;
 }
 
-inline U64 to_region_handle(const LLVector3d& pos_global, const LLVector3d& agent_region_origin, const F32 width)
-{
-    U32 global_x { static_cast<U32>( pos_global.mdV[VX] ) };
-    U32 global_y { static_cast<U32>( pos_global.mdV[VY] ) };
-
-    U32 agent_region_origin_x { static_cast<U32>( agent_region_origin.mdV[VX] ) };
-    U32 agent_region_origin_y { static_cast<U32>( agent_region_origin.mdV[VY] ) };
-
-    if( agent_region_origin_x <  global_x && ( agent_region_origin_x + width ) > global_x &&
-        agent_region_origin_y <  global_y && ( agent_region_origin_y + width ) > global_y )
-    {
-        // target is local to current region we can make a more informed guess
-        return to_region_handle( agent_region_origin_x, agent_region_origin_y );
-    }
-    // fallback to legacy 256m tile-based guess and let the region server / map work it out.
-    global_x -= global_x % 256;
-    global_y -= global_y % 256;
-
-    return to_region_handle( global_x, global_y );
-}
-
 inline U64 to_region_handle(const LLVector3d& pos_global)
 {
     U32 global_x = (U32)pos_global.mdV[VX];
@@ -84,13 +63,13 @@ inline U64 to_region_handle_global(const F32 x_global, const F32 y_global)
     return region_handle;
 }
 
-inline BOOL to_region_handle(const F32 x_pos, const F32 y_pos, U64 *region_handle)
+inline bool to_region_handle(const F32 x_pos, const F32 y_pos, U64 *region_handle)
 {
     U32 x_int, y_int;
     if (x_pos < 0.f)
     {
 //      LL_WARNS() << "to_region_handle:Clamping negative x position " << x_pos << " to zero!" << LL_ENDL;
-        return FALSE;
+        return false;
     }
     else
     {
@@ -99,14 +78,14 @@ inline BOOL to_region_handle(const F32 x_pos, const F32 y_pos, U64 *region_handl
     if (y_pos < 0.f)
     {
 //      LL_WARNS() << "to_region_handle:Clamping negative y position " << y_pos << " to zero!" << LL_ENDL;
-        return FALSE;
+        return false;
     }
     else
     {
         y_int = (U32)ll_round(y_pos);
     }
     *region_handle = to_region_handle(x_int, y_int);
-    return TRUE;
+    return true;
 }
 
 // stuff the word-frame XY location of sim's SouthWest corner in x_pos, y_pos

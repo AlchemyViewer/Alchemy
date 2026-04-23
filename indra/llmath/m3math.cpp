@@ -26,7 +26,6 @@
 
 #include "linden_common.h"
 
-//#include "vmath.h"
 #include "v3math.h"
 #include "v3dmath.h"
 #include "v4math.h"
@@ -244,6 +243,7 @@ LLQuaternion    LLMatrix3::quaternion() const
     LLQuaternion    quat;
     F32     tr, s, q[4];
     U32     i, j, k;
+    U32     nxt[3] = {1, 2, 0};
 
     tr = mMatrix[0][0] + mMatrix[1][1] + mMatrix[2][2];
 
@@ -259,8 +259,6 @@ LLQuaternion    LLMatrix3::quaternion() const
     }
     else
     {
-        const U32 nxt[3] = { 1, 2, 0 };
-
         // diagonal is negative
         i = 0;
         if (mMatrix[1][1] > mMatrix[0][0])
@@ -529,10 +527,10 @@ bool operator==(const LLMatrix3 &a, const LLMatrix3 &b)
         for (j = 0; j < NUM_VALUES_IN_MAT3; j++)
         {
             if (a.mMatrix[j][i] != b.mMatrix[j][i])
-                return FALSE;
+                return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 bool operator!=(const LLMatrix3 &a, const LLMatrix3 &b)
@@ -543,10 +541,10 @@ bool operator!=(const LLMatrix3 &a, const LLMatrix3 &b)
         for (j = 0; j < NUM_VALUES_IN_MAT3; j++)
         {
             if (a.mMatrix[j][i] != b.mMatrix[j][i])
-                return TRUE;
+                return true;
         }
     }
-    return FALSE;
+    return false;
 }
 
 const LLMatrix3& operator*=(LLMatrix3 &a, const LLMatrix3 &b)

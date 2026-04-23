@@ -2,9 +2,9 @@
  * @file streamingaudio_fmodstudio.h
  * @brief Definition of LLStreamingAudio_FMODSTUDIO implementation
  *
- * $LicenseInfo:firstyear=2002&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2020&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2020, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -48,7 +48,7 @@ namespace FMOD
 //Interfaces
 class LLStreamingAudio_FMODSTUDIO final : public LLStreamingAudioInterface
 {
- public:
+public:
     LLStreamingAudio_FMODSTUDIO(FMOD::System *system);
     /*virtual*/ ~LLStreamingAudio_FMODSTUDIO();
 
@@ -69,7 +69,7 @@ class LLStreamingAudio_FMODSTUDIO final : public LLStreamingAudioInterface
     /*virtual*/ bool supportsWaveData() override {return true;}
     /*virtual*/ bool getWaveData(float* arr, S32 count, S32 stride = 1) override;
 private:
-    bool releaseDeadStreams();
+    void killDeadStreams();
     void cleanupWaveData();
 
     FMOD::System *mSystem;
@@ -81,10 +81,8 @@ private:
     std::list<LLAudioStreamManagerFMODSTUDIO *> mDeadStreams;
 
     std::string mURL;
-    std::string mPendingURL;
     F32 mGain;
-
-    bool mWasAlreadyPlaying;
+    S32 mRetryCount;
 
     LLSD mMetadata;
 };

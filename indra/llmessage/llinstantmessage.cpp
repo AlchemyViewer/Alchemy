@@ -46,7 +46,7 @@ const U8 IM_OFFLINE = 1;
 const char EMPTY_BINARY_BUCKET[] = "";
 const S32 EMPTY_BINARY_BUCKET_SIZE = 1;
 const U32 NO_TIMESTAMP = 0;
-std::string SYSTEM_FROM("Second Life");
+const std::string SYSTEM_FROM("Second Life");
 const std::string INTERACTIVE_SYSTEM_FROM("F387446C-37C4-45f2-A438-D99CBDBB563B");
 const S32 IM_TTL = 1;
 
@@ -54,7 +54,7 @@ const S32 IM_TTL = 1;
 void pack_instant_message(
     LLMessageSystem* msg,
     const LLUUID& from_id,
-    BOOL from_group,
+    bool from_group,
     const LLUUID& session_id,
     const LLUUID& to_id,
     const std::string& name,
@@ -93,7 +93,7 @@ void pack_instant_message(
 void pack_instant_message_block(
     LLMessageSystem* msg,
     const LLUUID& from_id,
-    BOOL from_group,
+    bool from_group,
     const LLUUID& session_id,
     const LLUUID& to_id,
     const std::string& name,

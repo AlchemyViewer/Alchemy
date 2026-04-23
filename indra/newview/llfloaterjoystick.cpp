@@ -78,7 +78,7 @@ BOOL CALLBACK di8_list_devices_callback(LPCDIDEVICEINSTANCE device_instance_ptr,
     // Capable of detecting devices like Oculus Rift
     if (device_instance_ptr && pvRef)
     {
-        std::string product_name = ll_convert_wide_to_string(std::wstring(device_instance_ptr->tszProductName));
+        std::string product_name = ll_convert<std::string>(std::wstring(device_instance_ptr->tszProductName));
         S32 size = sizeof(GUID);
         LLSD::Binary data; //just an std::vector
         data.resize(size);
@@ -93,8 +93,9 @@ BOOL CALLBACK di8_list_devices_callback(LPCDIDEVICEINSTANCE device_instance_ptr,
 #endif
 
 LLFloaterJoystick::LLFloaterJoystick(const LLSD& data)
-    : LLFloater(data),
-    mHasDeviceList(false)
+    : LLFloater(data)
+    , mHasDeviceList(false)
+    , mJoystickInitialized(false)
 {
     if (!LLViewerJoystick::getInstance()->isJoystickInitialized())
     {
@@ -108,48 +109,37 @@ void LLFloaterJoystick::draw()
 {
     LLViewerJoystick* joystick(LLViewerJoystick::getInstance());
     bool joystick_inited = joystick->isJoystickInitialized();
-    if (joystick_inited != mHasDeviceList)
+    if (!mHasDeviceList
+        || mJoystickInitialized != joystick_inited
+        || (joystick->isDeviceUUIDSet() && joystick->getDeviceUUID().asUUID() != mCurrentDeviceId)
+        || (!joystick->isDeviceUUIDSet() && mCurrentDeviceId.notNull()))
     {
         refreshListOfDevices();
-    }
-
-    if (gFrameIntervalSeconds.value() == 0.0f)
-    {
-        joystick->updateStatus();
     }
 
     for (U32 i = 0; i < 6; i++)
     {
         F32 value = joystick->getJoystickAxis(i);
-        sample(*sJoystickAxes[i], value);
+        sample(*sJoystickAxes[i], value * gFrameIntervalSeconds.value());
         if (mAxisStatsBar[i])
         {
             F32 minbar, maxbar;
             mAxisStatsBar[i]->getRange(minbar, maxbar);
-            F32 range = llabs(value);
-            if (range > maxbar)
+            if (llabs(value) > maxbar)
             {
+                F32 range = llabs(value);
                 mAxisStatsBar[i]->setRange(-range, range);
             }
         }
     }
 
-    for (U32 i = 0; i < 16; i++)
-    {
-        U32 value = joystick->getJoystickButton(i);
-        if (!mAxisButton[i]->getEnabled() && value)
-        {
-            mAxisButton[i]->setEnabled(TRUE);
-        }
-        mAxisButton[i]->setToggleState(value);
-    }
     LLFloater::draw();
 }
 
-BOOL LLFloaterJoystick::postBuild()
+bool LLFloaterJoystick::postBuild()
 {
     center();
-    F32 range = gSavedSettings.getBOOL("Cursor3D") ? 128.f : 0.5f;
+    F32 range = gSavedSettings.getBOOL("Cursor3D") ? 128.f : 2.f;
 
     for (U32 i = 0; i < 6; i++)
     {
@@ -163,25 +153,18 @@ BOOL LLFloaterJoystick::postBuild()
         }
     }
 
-    for (U32 i = 0; i < 16; i++)
-    {
-        std::string btn_name = llformat("btn%d", i);
-        mAxisButton[i] = getChild<LLButton>(btn_name);
-    }
-
     mJoysticksCombo = getChild<LLComboBox>("joystick_combo");
     childSetCommitCallback("joystick_combo",onCommitJoystickEnabled,this);
     mCheckFlycamEnabled = getChild<LLCheckBoxCtrl>("JoystickFlycamEnabled");
     childSetCommitCallback("JoystickFlycamEnabled",onCommitJoystickEnabled,this);
 
     childSetAction("SpaceNavigatorDefaults", onClickRestoreSNDefaults, this);
-    childSetAction("XboxDefaults", onClickRestoreXboxDefaults, this);
     childSetAction("cancel_btn", onClickCancel, this);
     childSetAction("ok_btn", onClickOK, this);
 
     refresh();
     refreshListOfDevices();
-    return TRUE;
+    return true;
 }
 
 LLFloaterJoystick::~LLFloaterJoystick()
@@ -311,15 +294,16 @@ void LLFloaterJoystick::refreshListOfDevices()
         mHasDeviceList = true;
     }
 
-    bool is_device_id_set = LLViewerJoystick::getInstance()->isDeviceUUIDSet();
+    LLViewerJoystick* joystick = LLViewerJoystick::getInstance();
+    bool is_device_id_set = joystick->isDeviceUUIDSet();
 
-    if (LLViewerJoystick::getInstance()->isJoystickInitialized() &&
+    if (joystick->isJoystickInitialized() &&
         (!mHasDeviceList || !is_device_id_set))
     {
 #if LL_WINDOWS && !LL_MESA_HEADLESS
         LL_WARNS() << "NDOF connected to device without using SL provided handle" << LL_ENDL;
 #endif
-        std::string desc = LLViewerJoystick::getInstance()->getDescription();
+        std::string desc = joystick->getDescription();
         if (!desc.empty())
         {
             LLSD value = LLSD::Integer(1); // value for selection
@@ -332,11 +316,13 @@ void LLFloaterJoystick::refreshListOfDevices()
     {
         if (is_device_id_set)
         {
-            LLSD guid = LLViewerJoystick::getInstance()->getDeviceUUID();
+            LLSD guid = joystick->getDeviceUUID();
+            mCurrentDeviceId = guid.asUUID();
             mJoysticksCombo->selectByValue(guid);
         }
         else
         {
+            mCurrentDeviceId.setNull();
             mJoysticksCombo->selectByValue(LLSD::Integer(1));
         }
     }
@@ -344,6 +330,18 @@ void LLFloaterJoystick::refreshListOfDevices()
     {
         mJoysticksCombo->selectByValue(LLSD::Integer(0));
     }
+
+    // Update tracking
+    if (is_device_id_set)
+    {
+        LLSD guid = joystick->getDeviceUUID();
+        mCurrentDeviceId = guid.asUUID();
+    }
+    else
+    {
+        mCurrentDeviceId.setNull();
+    }
+    mJoystickInitialized = joystick->isJoystickInitialized();
 }
 
 void LLFloaterJoystick::cancel()
@@ -437,7 +435,7 @@ void LLFloaterJoystick::onCommitJoystickEnabled(LLUICtrl*, void *joy_panel)
         joystick_enabled = true;
     }
     gSavedSettings.setBOOL("JoystickEnabled", joystick_enabled);
-    BOOL flycam_enabled = self->mCheckFlycamEnabled->get();
+    bool flycam_enabled = self->mCheckFlycamEnabled->get();
 
     if (!joystick_enabled || !flycam_enabled)
     {
@@ -460,11 +458,6 @@ void LLFloaterJoystick::onCommitJoystickEnabled(LLUICtrl*, void *joy_panel)
 void LLFloaterJoystick::onClickRestoreSNDefaults(void *joy_panel)
 {
     setSNDefaults();
-}
-
-void LLFloaterJoystick::onClickRestoreXboxDefaults(void* joy_panel)
-{
-    setXboxDefaults();
 }
 
 void LLFloaterJoystick::onClickCancel(void *joy_panel)
@@ -503,11 +496,6 @@ void LLFloaterJoystick::onClickCloseBtn(bool app_quitting)
 void LLFloaterJoystick::setSNDefaults()
 {
     LLViewerJoystick::getInstance()->setSNDefaults();
-}
-
-void LLFloaterJoystick::setXboxDefaults()
-{
-    LLViewerJoystick::getInstance()->setXboxDefaults();
 }
 
 void LLFloaterJoystick::onClose(bool app_quitting)

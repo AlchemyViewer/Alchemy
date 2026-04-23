@@ -58,7 +58,7 @@ class LLGroupMgrObserver
 public:
     LLGroupMgrObserver(const LLUUID& id) : mID(id){};
     LLGroupMgrObserver() : mID(LLUUID::null){};
-    virtual ~LLGroupMgrObserver() = default;
+    virtual ~LLGroupMgrObserver(){};
     virtual void changed(LLGroupChange gc) = 0;
     const LLUUID& getID() { return mID; }
 protected:
@@ -68,7 +68,7 @@ protected:
 class LLParticularGroupObserver
 {
 public:
-    virtual ~LLParticularGroupObserver() = default;
+    virtual ~LLParticularGroupObserver(){}
     virtual void changed(const LLUUID& group_id, LLGroupChange gc) = 0;
 };
 
@@ -77,21 +77,21 @@ class LLGroupMemberData
 friend class LLGroupMgrGroupData;
 
 public:
-    typedef boost::unordered_map<LLUUID,LLGroupRoleData*> role_list_t;
+    typedef std::map<LLUUID,LLGroupRoleData*> role_list_t;
 
     LLGroupMemberData(const LLUUID& id,
                         S32 contribution,
                         U64 agent_powers,
                         const std::string& title,
                         const std::string& online_status,
-                        BOOL is_owner);
+                        bool is_owner);
 
-    ~LLGroupMemberData() = default;
+    ~LLGroupMemberData();
 
     const LLUUID& getID() const { return mID; }
     S32 getContribution() const { return mContribution; }
     U64 getAgentPowers() const { return mAgentPowers; }
-    BOOL isOwner() const { return mIsOwner; }
+    bool isOwner() const { return mIsOwner; }
     const std::string& getTitle() const { return mTitle; }
     const std::string& getOnlineStatus() const { return mOnlineStatus; }
     void addRole(const LLUUID& role, LLGroupRoleData* rd);
@@ -100,50 +100,27 @@ public:
     role_list_t::iterator roleBegin() { return mRolesList.begin(); }
     role_list_t::iterator roleEnd() { return mRolesList.end(); }
 
-    BOOL isInRole(const LLUUID& role_id) { return (mRolesList.find(role_id) != mRolesList.end()); }
+    bool isInRole(const LLUUID& role_id) { return (mRolesList.find(role_id) != mRolesList.end()); }
 
+private:
     LLUUID  mID;
     S32     mContribution;
     U64     mAgentPowers;
     std::string mTitle;
     std::string mOnlineStatus;
-    BOOL    mIsOwner;
+    bool    mIsOwner;
     role_list_t mRolesList;
 };
 
 struct LLRoleData
 {
     LLRoleData() : mRolePowers(0), mChangeType(RC_UPDATE_NONE) { }
-
     LLRoleData(const LLRoleData& rd)
-    {
-        *this = rd;
-    }
-
-    LLRoleData(LLRoleData&& rd)
-    {
-        *this = std::move(rd);
-    }
-
-    LLRoleData& operator=(const LLRoleData& rd)
-    {
-        mRoleName = rd.mRoleName;
-        mRoleTitle = rd.mRoleTitle;
-        mRoleDescription = rd.mRoleDescription;
-        mRolePowers = rd.mRolePowers;
-        mChangeType = rd.mChangeType;
-        return *this;
-    };
-
-    LLRoleData& operator=(LLRoleData&& rd) noexcept
-    {
-        mRoleName = std::move(rd.mRoleName);
-        mRoleTitle = std::move(rd.mRoleTitle);
-        mRoleDescription = std::move(rd.mRoleDescription);
-        mRolePowers = rd.mRolePowers;
-        mChangeType = rd.mChangeType;
-        return *this;
-    };
+    :   mRoleName(rd.mRoleName),
+        mRoleTitle(rd.mRoleTitle),
+        mRoleDescription(rd.mRoleDescription),
+        mRolePowers(rd.mRolePowers),
+        mChangeType(rd.mChangeType) { }
 
     std::string mRoleName;
     std::string mRoleTitle;
@@ -168,16 +145,16 @@ public:
                     LLRoleData role_data,
                     const S32 member_count);
 
-    ~LLGroupRoleData() = default;
+    ~LLGroupRoleData();
 
     const LLUUID& getID() const { return mRoleID; }
 
     const uuid_vec_t& getRoleMembers() const { return mMemberIDs; }
-    S32 getMembersInRole(uuid_vec_t members, BOOL needs_sort = TRUE);
-    S32 getTotalMembersInRole() { return mMemberCount ? mMemberCount : mMemberIDs.size(); } //FIXME: Returns 0 for Everyone role when Member list isn't yet loaded, see MAINT-5225
+    S32 getMembersInRole(uuid_vec_t members, bool needs_sort = true);
+    S32 getTotalMembersInRole() { return mMemberCount ? mMemberCount : static_cast<S32>(mMemberIDs.size()); } //FIXME: Returns 0 for Everyone role when Member list isn't yet loaded, see MAINT-5225
 
     LLRoleData getRoleData() const { return mRoleData; }
-    void setRoleData(LLRoleData data) { mRoleData = std::move(data); }
+    void setRoleData(LLRoleData data) { mRoleData = data; }
 
     void addMember(const LLUUID& member);
     bool removeMember(const LLUUID& member);
@@ -192,7 +169,7 @@ public:
 
 protected:
     LLGroupRoleData()
-    : mMemberCount(0), mMembersNeedsSort(FALSE) {}
+    : mMemberCount(0), mMembersNeedsSort(false) {}
 
     LLUUID mRoleID;
     LLRoleData  mRoleData;
@@ -201,7 +178,7 @@ protected:
     S32 mMemberCount;
 
 private:
-    BOOL mMembersNeedsSort;
+    bool mMembersNeedsSort;
 };
 
 struct LLRoleMemberChange
@@ -233,7 +210,7 @@ struct lluuid_pair_less
 struct LLGroupBanData
 {
     LLGroupBanData(): mBanDate()    {}
-    ~LLGroupBanData() = default;
+    ~LLGroupBanData()   {}
 
     LLDate mBanDate;
     // TODO: std:string ban_reason;
@@ -244,7 +221,7 @@ struct LLGroupTitle
 {
     std::string mTitle;
     LLUUID      mRoleID;
-    BOOL        mSelected;
+    bool        mSelected;
 };
 
 class LLGroupMgrGroupData
@@ -257,11 +234,11 @@ public:
 
     const LLUUID& getID() { return mID; }
 
-    BOOL getRoleData(const LLUUID& role_id, LLRoleData& role_data);
+    bool getRoleData(const LLUUID& role_id, LLRoleData& role_data);
     void setRoleData(const LLUUID& role_id, LLRoleData role_data);
     void createRole(const LLUUID& role_id, LLRoleData role_data);
     void deleteRole(const LLUUID& role_id);
-    BOOL pendingRoleChanges();
+    bool pendingRoleChanges();
 
     void addRolePower(const LLUUID& role_id, U64 power);
     void removeRolePower(const LLUUID& role_id, U64 power);
@@ -302,11 +279,11 @@ public:
     void banMemberById(const LLUUID& participant_uuid);
 
 public:
-    typedef boost::unordered_map<LLUUID, std::unique_ptr<LLGroupMemberData>> member_list_t;
-    typedef boost::unordered_map<LLUUID, std::unique_ptr<LLGroupRoleData>> role_list_t;
+    typedef std::map<LLUUID,LLGroupMemberData*> member_list_t;
+    typedef std::map<LLUUID,LLGroupRoleData*> role_list_t;
     typedef std::map<lluuid_pair,LLRoleMemberChange,lluuid_pair_less> change_map_t;
-    typedef boost::unordered_map<LLUUID,LLRoleData> role_data_map_t;
-    typedef boost::unordered_map<LLUUID,LLGroupBanData> ban_list_t;
+    typedef std::map<LLUUID,LLRoleData> role_data_map_t;
+    typedef std::map<LLUUID,LLGroupBanData> ban_list_t;
 
     member_list_t       mMembers;
     role_list_t         mRoles;
@@ -320,15 +297,15 @@ public:
     LLUUID              mOwnerRole;
     std::string         mName;
     std::string         mCharter;
-    BOOL                mShowInList;
+    bool                mShowInList;
     LLUUID              mInsigniaID;
     LLUUID              mFounderID;
-    BOOL                mOpenEnrollment;
+    bool                mOpenEnrollment;
     S32                 mMembershipFee;
-    BOOL                mAllowPublish;
-    BOOL                mListInProfile;
-    BOOL                mMaturePublish;
-    BOOL                mChanged;
+    bool                mAllowPublish;
+    bool                mListInProfile;
+    bool                mMaturePublish;
+    bool                mChanged;
     S32                 mMemberCount;
     S32                 mRoleCount;
 
@@ -374,7 +351,7 @@ struct LLRoleActionSet
     std::vector<LLRoleAction*> mActions;
 };
 
-class LLGroupMgr final : public LLSingleton<LLGroupMgr>
+class LLGroupMgr : public LLSingleton<LLGroupMgr>
 {
     LLSINGLETON(LLGroupMgr);
     ~LLGroupMgr();
@@ -421,12 +398,12 @@ public:
                                        U8 show_in_list,
                                        const LLUUID& insignia,
                                        S32 membership_fee,
-                                       BOOL open_enrollment,
-                                       BOOL allow_publish,
-                                       BOOL mature_publish);
+                                       bool open_enrollment,
+                                       bool allow_publish,
+                                       bool mature_publish);
 
     static void sendGroupMemberJoin(const LLUUID& group_id);
-    static void sendGroupMemberInvites(const LLUUID& group_id, std::map<LLUUID,LLUUID>& role_member_pairs);
+    static void sendGroupMemberInvites(const LLUUID& group_id, std::map<LLUUID, LLUUID>& role_member_pairs);
     static void sendGroupMemberEjects(const LLUUID& group_id,
                                       uuid_vec_t& member_ids);
 
@@ -436,7 +413,8 @@ public:
                                     const uuid_vec_t &ban_list = uuid_vec_t());
 
 
-    void sendCapGroupMembersRequest(const LLUUID& group_id);
+    void sendCapGroupMembersRequest(const LLUUID& group_id,
+        U32 page_size = 0, U32 page_start = 0, const std::string& sort_column_name = LLStringUtil::null, bool sort_descending = false);
 
     void cancelGroupRoleChanges(const LLUUID& group_id);
 
@@ -459,16 +437,15 @@ public:
     void clearGroupData(const LLUUID& group_id);
 
 private:
-    void groupMembersRequestCoro(std::string url, LLUUID groupId);
-    void processCapGroupMembersRequest(const LLSD& content);
+    void groupMembersRequestCoro(std::string url, LLUUID group_id, U32 page_size, U32 page_start, U32 sort_column, bool sort_descending);
+    void processCapGroupMembersResponse(const LLSD& response, const std::string& url, U32 page_size, U32 page_start, U32 sort_column, bool sort_descending);
 
-    void getGroupBanRequestCoro(std::string url, LLUUID groupId);
-    void postGroupBanRequestCoro(std::string url, LLUUID groupId, U32 action, uuid_vec_t banList, bool update);
+    void getGroupBanRequestCoro(std::string url, LLUUID group_id);
+    void postGroupBanRequestCoro(std::string url, LLUUID group_id, U32 action, uuid_vec_t ban_list, bool update);
 
     static void processGroupBanRequest(const LLSD& content);
 
     void notifyObservers(LLGroupChange gc);
-    void notifyObserver(const LLUUID& group_id, LLGroupChange gc);
     void addGroup(LLGroupMgrGroupData* group_datap);
     LLGroupMgrGroupData* createGroupData(const LLUUID &id);
     bool hasPendingPropertyRequest(const LLUUID& id);
@@ -477,18 +454,18 @@ private:
     typedef std::multimap<LLUUID,LLGroupMgrObserver*> observer_multimap_t;
     observer_multimap_t mObservers;
 
-    typedef boost::unordered_flat_map<LLUUID, LLGroupMgrGroupData*> group_map_t;
+    typedef std::map<LLUUID, LLGroupMgrGroupData*> group_map_t;
     group_map_t mGroups;
 
     const U64MicrosecondsImplicit MIN_GROUP_PROPERTY_REQUEST_FREQ = 100000;//100ms between requests should be enough to avoid spamming.
-    typedef boost::unordered_flat_map<LLUUID, U64MicrosecondsImplicit> properties_request_map_t;
+    typedef std::map<LLUUID, U64MicrosecondsImplicit> properties_request_map_t;
     properties_request_map_t mPropRequests;
 
     typedef std::set<LLParticularGroupObserver*> observer_set_t;
     typedef std::map<LLUUID,observer_set_t> observer_map_t;
     observer_map_t mParticularObservers;
 
-    bool mMemberRequestInFlight;
+    bool mMemberRequestInFlight { false };
 };
 
 

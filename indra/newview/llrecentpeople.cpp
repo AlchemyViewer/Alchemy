@@ -48,7 +48,7 @@ LLRecentPeople::~LLRecentPeople()
     save();
 }
 
-bool LLRecentPeople::add(const LLUUID& id, LLSD& userdata)
+bool LLRecentPeople::add(const LLUUID& id, LLSD userdata)
 {
     if (id == gAgent.getID())
         return false;
@@ -132,9 +132,9 @@ F32 LLRecentPeople::getArrivalTimeByID(const LLUUID& id)
 
     if (it != mAvatarsArrivalTime.end())
     {
-        return it->second;
+        return (F32)(it->second);
     }
-    return LLDate::now().secondsSinceEpoch();
+    return (F32)LLDate::now().secondsSinceEpoch();
 }
 
 bool LLRecentPeople::save() const

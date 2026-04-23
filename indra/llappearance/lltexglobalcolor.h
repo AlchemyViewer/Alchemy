@@ -38,13 +38,11 @@ class LLTexGlobalColor
 {
 public:
     LLTexGlobalColor( LLAvatarAppearance* appearance );
-
-    // mParamColorList are LLViewerVisualParam's and get deleted with ~LLCharacter()
-    ~LLTexGlobalColor() = default;
+    ~LLTexGlobalColor();
 
     LLTexGlobalColorInfo*   getInfo() const { return mInfo; }
     //   This sets mInfo and calls initialization functions
-    BOOL                    setInfo(LLTexGlobalColorInfo *info);
+    bool                    setInfo(LLTexGlobalColorInfo *info);
 
     LLAvatarAppearance*     getAvatarAppearance()   const       { return mAvatarAppearance; }
     LLColor4                getColor() const;
@@ -61,25 +59,25 @@ class LLTexGlobalColorInfo
 {
     friend class LLTexGlobalColor;
 public:
-    LLTexGlobalColorInfo() = default;
+    LLTexGlobalColorInfo();
     ~LLTexGlobalColorInfo();
 
-    BOOL parseXml(LLXmlTreeNode* node);
+    bool parseXml(LLXmlTreeNode* node);
 
 private:
     param_color_info_list_t     mParamColorInfoList;
     std::string             mName;
 };
 
-class LLTexParamGlobalColor final : public LLTexLayerParamColor
+class LLTexParamGlobalColor : public LLTexLayerParamColor
 {
 public:
     LLTexParamGlobalColor(LLTexGlobalColor *tex_color);
-    virtual ~LLTexParamGlobalColor() = default;
-    /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const override;
+    virtual ~LLTexParamGlobalColor();
+    /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const;
 protected:
-    LLTexParamGlobalColor(const LLTexParamGlobalColor& pOther) = default;
-    /*virtual*/ void onGlobalColorChanged() override;
+    LLTexParamGlobalColor(const LLTexParamGlobalColor& pOther);
+    /*virtual*/ void onGlobalColorChanged();
 private:
     LLTexGlobalColor*       mTexGlobalColor;
 };

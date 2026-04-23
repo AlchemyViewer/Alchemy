@@ -36,7 +36,7 @@
 #include "llthread.h"
 #include <queue>
 
-#if LL_WINDOWS && !LL_NFD
+#if LL_WINDOWS
 #include <shlobj.h>
 #endif
 
@@ -57,10 +57,10 @@ class LLFilePicker;
 class LLDirPicker
 {
 public:
-    // calling this before main() is undefined
-    static LLDirPicker& instance( void ) { return sInstance; }
-
-    BOOL getDir(std::string* filename, bool blocking = true);
+    bool getDir(std::string* filename, bool blocking = true);
+    bool getDirModeless(std::string* filename,
+        void (*callback)(bool, std::string&, void*),
+        void* userdata);
     std::string getDirName();
 
     // clear any lists of buffers or whatever, and make sure the dir
@@ -87,11 +87,8 @@ private:
     std::string* mFileName;
     std::string  mDir;
     bool mLocked;
-
-    static LLDirPicker sInstance;
-#if LL_WINDOWS && !LL_NFD
-    BROWSEINFO bi;
-#endif
+    void *pDialog;
+    boost::signals2::connection mEventListener;
 
 public:
     // don't call these directly please.
@@ -99,7 +96,7 @@ public:
     ~LLDirPicker();
 };
 
-class LLDirPickerThread final : public LLThread
+class LLDirPickerThread : public LLThread
 {
 public:
 
@@ -121,6 +118,11 @@ public:
     void getFile();
 
     virtual void run();
+
+    void runModeless();
+    static void modelessStringCallback(bool success,
+        std::string& response,
+        void* user_data);
 
     virtual void notify(const std::vector<std::string>& filenames);
 

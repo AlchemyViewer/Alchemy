@@ -24,10 +24,12 @@
  * $/LicenseInfo$
  */
 
+#include "linden_common.h"
+
 #include "llvolumeoctree.h"
 #include "llvector4a.h"
 
-BOOL LLLineSegmentBoxIntersect(const LLVector4a& start, const LLVector4a& end, const LLVector4a& center, const LLVector4a& size)
+bool LLLineSegmentBoxIntersect(const LLVector4a& start, const LLVector4a& end, const LLVector4a& center, const LLVector4a& size)
 {
     LLVector4a fAWdU;
     LLVector4a dir;
@@ -71,13 +73,17 @@ BOOL LLLineSegmentBoxIntersect(const LLVector4a& start, const LLVector4a& end, c
 
     grt = f.greaterThan(rhs).getGatheredBits();
 
-    return (grt & 0x7) ? false : true;
+    return (grt & 0x7) == 0;
 }
-
 
 LLVolumeOctreeListener::LLVolumeOctreeListener(LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* node)
 {
     node->addListener(this);
+}
+
+LLVolumeOctreeListener::~LLVolumeOctreeListener()
+{
+
 }
 
 void LLVolumeOctreeListener::handleChildAddition(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* parent,
@@ -109,7 +115,7 @@ void LLOctreeTriangleRayIntersect::traverse(const LLOctreeNode<LLVolumeTriangle,
     if (LLLineSegmentBoxIntersect(mStart, mEnd, vl->mBounds[0], vl->mBounds[1]))
     {
         node->accept(this);
-        for (S32 i = 0; i < node->getChildCount(); ++i)
+        for (U32 i = 0; i < node->getChildCount(); ++i)
         {
             traverse(node->getChild(i));
         }
@@ -119,7 +125,7 @@ void LLOctreeTriangleRayIntersect::traverse(const LLOctreeNode<LLVolumeTriangle,
 void LLOctreeTriangleRayIntersect::visit(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* node)
 {
     for (typename LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>::const_element_iter iter =
-            node->getDataBegin(), iter_end = node->getDataEnd(); iter != iter_end; ++iter)
+            node->getDataBegin(); iter != node->getDataEnd(); ++iter)
     {
         const LLVolumeTriangle* tri = *iter;
 
@@ -147,7 +153,7 @@ void LLOctreeTriangleRayIntersect::visit(const LLOctreeNode<LLVolumeTriangle, LL
                 U32 idx1 = tri->mIndex[1];
                 U32 idx2 = tri->mIndex[2];
 
-                if (mTexCoord != NULL)
+                if (mTexCoord != NULL && mFace->mTexCoords)
                 {
                     LLVector2* tc = (LLVector2*) mFace->mTexCoords;
                     *mTexCoord = ((1.f - a - b)  * tc[idx0] +
@@ -156,7 +162,7 @@ void LLOctreeTriangleRayIntersect::visit(const LLOctreeNode<LLVolumeTriangle, LL
 
                 }
 
-                if (mNormal != NULL)
+                if (mNormal != NULL && mFace->mNormals)
                 {
                     LLVector4a* norm = mFace->mNormals;
 
@@ -176,7 +182,7 @@ void LLOctreeTriangleRayIntersect::visit(const LLOctreeNode<LLVolumeTriangle, LL
                     *mNormal        = n1;
                 }
 
-                if (mTangent != NULL)
+                if (mTangent != NULL && mFace->mTangents)
                 {
                     LLVector4a* tangents = mFace->mTangents;
 
@@ -250,8 +256,8 @@ void LLVolumeOctreeValidate::visit(const LLOctreeNode<LLVolumeTriangle, LLVolume
     }
 
     //children fit, check data
-    for (typename LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>::const_element_iter iter = branch->getDataBegin(), iter_end = branch->getDataEnd();
-            iter != iter_end; ++iter)
+    for (typename LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>::const_element_iter iter = branch->getDataBegin();
+            iter != branch->getDataEnd(); ++iter)
     {
         const LLVolumeTriangle* tri = *iter;
 

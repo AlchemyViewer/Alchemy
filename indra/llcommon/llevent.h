@@ -44,7 +44,7 @@ class LLObservable;
 class LL_COMMON_API LLEvent : public LLThreadSafeRefCount
 {
 protected:
-    virtual ~LLEvent() = default;
+    virtual ~LLEvent();
 
 public:
     LLEvent(LLObservable* source, const std::string& desc = "") : mSource(source), mDesc(desc) { }
@@ -72,7 +72,7 @@ private:
 class LL_COMMON_API LLEventListener : public LLThreadSafeRefCount
 {
 protected:
-    virtual ~LLEventListener() = default;
+    virtual ~LLEventListener();
 
 public:
 

@@ -1,35 +1,52 @@
 # -*- cmake -*-
-include(Prebuilt)
-include(FreeType)
+include_guard()
 
-add_library( ll::uilibraries INTERFACE IMPORTED )
+include(FreeType)
+include(GLIB)
+
+add_library(ll::uilibraries INTERFACE IMPORTED)
 
 if (LINUX)
-  option(USE_NFD "Enable NFD universal filepicker library" ON)
-  option(USE_X11 "Enable undefined behavior sanitizer" OFF)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(WAYLAND_CLIENT wayland-client)
 
-  if(USE_X11)
-    target_compile_definitions(ll::uilibraries INTERFACE LL_X11=1 )
+  if(WAYLAND_CLIENT_FOUND)
+      target_include_directories(ll::uilibraries SYSTEM INTERFACE ${WAYLAND_CLIENT_INCLUDE_DIRS})
+      target_compile_definitions(ll::uilibraries INTERFACE LL_WAYLAND=1)
+  else()
+      message("pkgconfig could not find wayland client, compiling without full wayland support")
   endif()
 
-  include(FindPkgConfig)
+  find_package(X11)
+  if(X11_FOUND)
+      target_compile_definitions(ll::uilibraries INTERFACE LL_X11=1)
+  else()
+      message("Could not find X11, compiling without full X11 support")
+  endif()
 
-  if(USE_X11)
-    set(PKGCONFIG_PACKAGES
-          x11
+
+  target_link_libraries(ll::uilibraries INTERFACE
+          ll::fontconfig
+          ll::freetype
+          ll::glib
+          ll::gio
+  )
+elseif(DARWIN)
+  target_link_libraries(ll::uilibraries INTERFACE
+          ${CARBON_LIBRARY}
           )
-  endif()
-
-  foreach(pkg ${PKGCONFIG_PACKAGES})
-    pkg_check_modules(${pkg} REQUIRED IMPORTED_TARGET ${pkg})
-    target_link_libraries( ll::uilibraries INTERFACE PkgConfig::${pkg})
-  endforeach(pkg)
-endif (LINUX)
-if( WINDOWS )
-  target_link_libraries( ll::uilibraries INTERFACE
-          opengl32
-          comdlg32
+elseif(WINDOWS)
+  target_link_libraries(ll::uilibraries INTERFACE
+          UxTheme
+          Dwmapi
+          Shcore
+          comdlg32 # Common Dialogs for ChooseColor
+          ole32
+          dxgi
+          d3d9
+          dinput8
           dxguid
+          opengl32
           kernel32
           odbc32
           odbccp32
@@ -41,12 +58,3 @@ if( WINDOWS )
           imm32
           )
 endif()
-
-if(USE_NFD)
-  target_compile_definitions(ll::uilibraries INTERFACE LL_NFD=1 )
-endif()
-
-target_include_directories( ll::uilibraries SYSTEM INTERFACE
-        ${LIBS_PREBUILT_DIR}/include
-        )
-

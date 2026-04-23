@@ -31,6 +31,7 @@
 #include "llviewercontrol.h"
 #include "llstatusbar.h"
 
+#include "llagentcamera.h"
 #include "llbutton.h"
 #include "lltabcontainer.h"
 #include "llfloatercamera.h"
@@ -39,6 +40,7 @@
 #include "llpresetsmanager.h"
 #include "llsliderctrl.h"
 #include "llscrolllistctrl.h"
+#include "llspinctrl.h"
 #include "lltrans.h"
 
 ///----------------------------------------------------------------------------
@@ -49,13 +51,16 @@
 LLPanelPresetsCameraPulldown::LLPanelPresetsCameraPulldown()
 {
     mCommitCallbackRegistrar.add("Presets.toggleCameraFloater", boost::bind(&LLPanelPresetsCameraPulldown::onViewButtonClick, this, _2));
-    mCommitCallbackRegistrar.add("PresetsCamera.RowClick", boost::bind(&LLPanelPresetsCameraPulldown::onRowClick, this, _2));
-    mCommitCallbackRegistrar.add("PresetsCamera.Save", boost::bind(&LLFloaterCamera::onSavePreset));
+    mCommitCallbackRegistrar.add("CameraPresets.ChangeView", boost::bind(&LLFloaterCamera::onClickCameraItem, _2));
+    mCommitCallbackRegistrar.add("CameraPresets.RowClick", boost::bind(&LLPanelPresetsCameraPulldown::onRowClick, this, _2));
+    mCommitCallbackRegistrar.add("CameraPresets.Save", boost::bind(&LLFloaterCamera::onSavePreset));
+    mCommitCallbackRegistrar.add("CommitSettings", boost::bind(&LLPanelPresetsCameraPulldown::onCommitSettings, this));
+
 
     buildFromFile( "panel_presets_camera_pulldown.xml");
 }
 
-BOOL LLPanelPresetsCameraPulldown::postBuild()
+bool LLPanelPresetsCameraPulldown::postBuild()
 {
     LLPresetsManager* presetsMgr = LLPresetsManager::getInstance();
     if (presetsMgr)
@@ -127,9 +132,9 @@ void LLPanelPresetsCameraPulldown::onRowClick(const LLSD& user_data)
             LLFloaterCamera::switchToPreset(name);
 
             // Scroll grabbed focus, drop it to prevent selection of parent menu
-            setFocus(FALSE);
+            setFocus(false);
 
-            setVisible(FALSE);
+            setVisible(false);
         }
         else
         {
@@ -145,7 +150,45 @@ void LLPanelPresetsCameraPulldown::onRowClick(const LLSD& user_data)
 void LLPanelPresetsCameraPulldown::onViewButtonClick(const LLSD& user_data)
 {
     // close the minicontrol, we're bringing up the big one
-    setVisible(FALSE);
+    setVisible(false);
 
     LLFloaterReg::toggleInstanceOrBringToFront("camera");
+}
+
+void LLPanelPresetsCameraPulldown::updateCameraControl(const LLVector3& vector)
+{
+    getChild<LLSpinCtrl>("camera_x")->setValue(vector[VX]);
+    getChild<LLSpinCtrl>("camera_y")->setValue(vector[VY]);
+    getChild<LLSpinCtrl>("camera_z")->setValue(vector[VZ]);
+}
+
+void LLPanelPresetsCameraPulldown::updateFocusControl(const LLVector3d& vector3d)
+{
+    getChild<LLSpinCtrl>("focus_x")->setValue(vector3d[VX]);
+    getChild<LLSpinCtrl>("focus_y")->setValue(vector3d[VY]);
+    getChild<LLSpinCtrl>("focus_z")->setValue(vector3d[VZ]);
+}
+
+void LLPanelPresetsCameraPulldown::draw()
+{
+    updateCameraControl(gAgentCamera.getCameraOffsetInitial());
+    updateFocusControl(gAgentCamera.getFocusOffsetInitial());
+
+    LLPanel::draw();
+}
+
+void LLPanelPresetsCameraPulldown::onCommitSettings()
+{
+    LLVector3  vector;
+    LLVector3d vector3d;
+
+    vector.mV[VX] = (F32)getChild<LLUICtrl>("camera_x")->getValue().asReal();
+    vector.mV[VY] = (F32)getChild<LLUICtrl>("camera_y")->getValue().asReal();
+    vector.mV[VZ] = (F32)getChild<LLUICtrl>("camera_z")->getValue().asReal();
+    gSavedSettings.setVector3("CameraOffsetRearView", vector);
+
+    vector3d.mdV[VX] = (F32)getChild<LLUICtrl>("focus_x")->getValue().asReal();
+    vector3d.mdV[VY] = (F32)getChild<LLUICtrl>("focus_y")->getValue().asReal();
+    vector3d.mdV[VZ] = (F32)getChild<LLUICtrl>("focus_z")->getValue().asReal();
+    gSavedSettings.setVector3d("FocusOffsetRearView", vector3d);
 }

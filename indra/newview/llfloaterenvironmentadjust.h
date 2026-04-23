@@ -40,7 +40,7 @@ class LLLineEditor;
 /**
  * Floater container for taking a snapshot of the current environment and making minor adjustments.
  */
-class LLFloaterEnvironmentAdjust final : public LLFloater
+class LLFloaterEnvironmentAdjust : public LLFloater
 {
     LOG_CLASS(LLFloaterEnvironmentAdjust);
 
@@ -49,7 +49,7 @@ public:
     virtual                     ~LLFloaterEnvironmentAdjust();
 
 
-    virtual BOOL                postBuild() override;
+    virtual bool                postBuild() override;
     virtual void                onOpen(const LLSD& key) override;
     virtual void                onClose(bool app_quitting) override;
 

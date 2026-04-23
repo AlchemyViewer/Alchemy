@@ -98,10 +98,12 @@
            width="132">
             <columns
               label="Name"
-              name="name" />
+              name="name"
+              width="150" />
             <columns
               label="Username"
-              name="username" />
+              name="username"
+              width="150" />
           </scroll_list>
         </panel>
         <panel
@@ -215,10 +217,12 @@
              width="132">
             <columns
               label="Name"
-              name="name" />
+              name="name"
+              width="150" />
             <columns
               label="Username"
-              name="username"  />
+              name="username"
+              width="150" />
           </scroll_list>
         </panel>
     </tab_container>

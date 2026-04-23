@@ -44,13 +44,9 @@
 # include <io.h>
 #endif // !LL_WINDOWS
 #include <vector>
-#include <string_view>
 #include "string.h"
 
-#include "boost/unordered/unordered_flat_map.hpp"
-
 #include "llapp.h"
-#include "llapr.h"
 #include "llfile.h"
 #include "lllivefile.h"
 #include "llsd.h"
@@ -58,20 +54,10 @@
 #include "llsingleton.h"
 #include "llstl.h"
 #include "lltimer.h"
+#include "llprofiler.h"
 
-#include <boost/make_shared.hpp>
-
-// On Mac, got:
-// #error "Boost.Stacktrace requires `_Unwind_Backtrace` function. Define
-// `_GNU_SOURCE` macro or `BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED` if
-// _Unwind_Backtrace is available without `_GNU_SOURCE`."
-#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
-#if LL_WINDOWS
-// On Windows, header-only implementation causes macro collisions -- use
-// prebuilt library
-#define BOOST_STACKTRACE_LINK
-#endif // LL_WINDOWS
 #include <boost/stacktrace.hpp>
+#include <boost/unordered_map.hpp>
 
 namespace {
 #if LL_WINDOWS
@@ -88,13 +74,13 @@ namespace {
             //
             if (s.size())
             {
-                OutputDebugString(ll_convert_string_to_wide(s).c_str());
+                OutputDebugString(ll_convert<std::wstring>(s).c_str());
                 OutputDebugString(TEXT("\n"));
             }
         }
     }
 #else
-    class RecordToSyslog final : public LLError::Recorder
+    class RecordToSyslog : public LLError::Recorder
     {
     public:
         RecordToSyslog(const std::string& identity)
@@ -119,7 +105,7 @@ namespace {
         virtual void recordMessage(LLError::ELevel level,
                                     const std::string& message) override
         {
-            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
             int syslogPriority = LOG_CRIT;
             switch (level) {
                 case LLError::LEVEL_DEBUG:  syslogPriority = LOG_DEBUG; break;
@@ -136,15 +122,14 @@ namespace {
     };
 #endif
 
-    class RecordToFile final : public LLError::Recorder
+    class RecordToFile : public LLError::Recorder
     {
     public:
         RecordToFile(const std::string& filename):
             mName(filename)
         {
             showMultiline(true);
-
-            mFile.open(filename, std::ios_base::out | std::ios_base::app);
+            mFile.open(filename.c_str(), std::ios_base::out | std::ios_base::app);
             if (!mFile)
             {
                 LL_INFOS() << "Error setting log file to " << filename << LL_ENDL;
@@ -179,7 +164,7 @@ namespace {
         virtual void recordMessage(LLError::ELevel level,
                                     const std::string& message) override
         {
-            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
             if (LLError::getAlwaysFlush())
             {
                 mFile << message << std::endl;
@@ -196,7 +181,7 @@ namespace {
     };
 
 
-    class RecordToStderr final : public LLError::Recorder
+    class RecordToStderr : public LLError::Recorder
     {
     public:
         RecordToStderr(bool timestamp) : mUseANSI(checkANSI())
@@ -246,7 +231,7 @@ namespace {
         virtual void recordMessage(LLError::ELevel level,
                        const std::string& message) override
         {
-            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
             // The default colors for error, warn and debug are now a bit more pastel
             // and easier to read on the default (black) terminal background but you
             // now have the option to set the color of each via an environment variables:
@@ -286,7 +271,7 @@ namespace {
 
         LL_FORCE_INLINE void writeANSI(const std::string& ansi_code, const std::string& message)
         {
-            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
             static std::string s_ansi_bold = createBoldANSI();  // bold text
             static std::string s_ansi_reset = createResetANSI();  // reset
             // ANSI color code escape sequence, message, and reset in one fprintf call
@@ -304,7 +289,7 @@ namespace {
         }
     };
 
-    class RecordToFixedBuffer final : public LLError::Recorder
+    class RecordToFixedBuffer : public LLError::Recorder
     {
     public:
         RecordToFixedBuffer(LLLineBuffer* buffer)
@@ -323,7 +308,7 @@ namespace {
         virtual void recordMessage(LLError::ELevel level,
                                    const std::string& message) override
         {
-            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
             mBuffer->addLine(message);
         }
 
@@ -332,7 +317,7 @@ namespace {
     };
 
 #if LL_WINDOWS
-    class RecordToWinDebug final : public LLError::Recorder
+    class RecordToWinDebug: public LLError::Recorder
     {
     public:
         RecordToWinDebug()
@@ -350,8 +335,53 @@ namespace {
         virtual void recordMessage(LLError::ELevel level,
                                    const std::string& message) override
         {
-            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
             debugger_print(message);
+        }
+    };
+#endif
+
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+    class RecordToTracy : public LLError::Recorder
+    {
+    public:
+        RecordToTracy()
+        {
+            this->showMultiline(true);
+            this->showTags(false);
+            this->showLocation(false);
+        }
+
+        virtual bool enabled() override { return LLError::getEnabledLogTypesMask() & 0x12; }
+
+        virtual void recordMessage(LLError::ELevel level, const std::string& message) override
+        {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
+            switch (level)
+            {
+                case LLError::LEVEL_DEBUG:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::Turquoise);
+                    break;
+                }
+                default:
+                case LLError::LEVEL_NONE:
+                case LLError::LEVEL_INFO:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::White);
+                    break;
+                }
+                case LLError::LEVEL_WARN:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::Yellow);
+                    break;
+                }
+                case LLError::LEVEL_ERROR:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::Red);
+                    break;
+                }
+            }
         }
     };
 #endif
@@ -368,11 +398,7 @@ namespace
 
 namespace LLError
 {
-#if LL_WINDOWS
-    std::string Log::demangle(const std::string_view mangled)
-#else
     std::string Log::demangle(const char* mangled)
-#endif
     {
 #ifdef __GNUC__
         // GCC: type_info::name() returns a mangled class name,st demangle
@@ -385,25 +411,21 @@ namespace LLError
         return result;
 
 #elif LL_WINDOWS
-        using namespace std::literals;
         // Visual Studio: type_info::name() includes the text "class " at the start
-        static constexpr auto class_prefix = "class "sv;
-        static constexpr auto struct_prefix = "struct "sv;
-        if (0 == mangled.compare(0, class_prefix.length(), class_prefix))
+        std::string name = mangled;
+        for (const auto& prefix : std::vector<std::string>{ "class ", "struct " })
         {
-            return std::string(mangled.substr(class_prefix.length()));
+            if (0 == name.compare(0, prefix.length(), prefix))
+            {
+                return name.substr(prefix.length());
+            }
         }
-        else if (0 == mangled.compare(0, struct_prefix.length(), struct_prefix))
-        {
-            return std::string(mangled.substr(struct_prefix.length()));
-        }
-
         // huh, that's odd, we should see one or the other prefix -- but don't
         // try to log unless logging is already initialized
         // in Python, " or ".join(vector) -- but in C++, a PITB
         LL_DEBUGS() << "Did not see 'class' or 'struct' prefix on '"
-            << mangled << "'" << LL_ENDL;
-        return std::string(mangled);
+            << name << "'" << LL_ENDL;
+        return name;
 
 #else  // neither GCC nor Visual Studio
         return mangled;
@@ -454,13 +476,9 @@ namespace
 
         std::string file = user_dir + "/logcontrol-dev.xml";
 
-        llstat stat_info;
-        if (LLFile::stat(file, &stat_info)) {
-            // NB: stat returns non-zero if it can't read the file, for example
-            // if it doesn't exist.  LLFile has no better abstraction for
-            // testing for file existence.
-
-            file = app_dir + "/logcontrol.xml";
+        if (!LLFile::isfile(file))
+        {
+             file = app_dir + "/logcontrol.xml";
         }
         return * new LogControlFile(file);
             // NB: This instance is never freed
@@ -499,7 +517,7 @@ namespace
     }
 
 
-    typedef boost::unordered_flat_map<std::string, LLError::ELevel, al::string_hash, std::equal_to<>> LevelMap;
+    typedef boost::unordered_map<std::string, LLError::ELevel> LevelMap;
     typedef std::vector<LLError::RecorderPtr> Recorders;
     typedef std::vector<LLError::CallSite*> CallSiteVector;
 
@@ -520,13 +538,13 @@ namespace
         LevelMap                            mClassLevelMap;
         LevelMap                            mFileLevelMap;
         LevelMap                            mTagLevelMap;
-        std::map<std::string, unsigned int> mUniqueLogMessages;
+        boost::unordered_map<std::string, unsigned int> mUniqueLogMessages;
 
         LLError::FatalFunction              mCrashFunction;
         LLError::TimeFunction               mTimeFunction;
 
         Recorders                           mRecorders;
-        LLCoros::RMutex                     mRecorderMutex;
+        LL_PROFILE_MUTEX_NAMED(LLCoros::RMutex, mRecorderMutex, "Log Recorders");
 
         int                                 mShouldLogCallCounter;
 
@@ -546,8 +564,8 @@ namespace
         mFileLevelMap(),
         mTagLevelMap(),
         mUniqueLogMessages(),
-        mCrashFunction(NULL),
-        mTimeFunction(NULL),
+        mCrashFunction(nullptr),
+        mTimeFunction(nullptr),
         mRecorders(),
         mShouldLogCallCounter(0)
     {
@@ -647,7 +665,7 @@ namespace LLError
                     const std::type_info& class_info,
                     const char* function,
                     bool printOnce,
-                    const char** tags_in,
+                    const char** tags,
                     size_t tag_count)
     :   mLevel(level),
         mFile(file),
@@ -687,11 +705,11 @@ namespace LLError
 
         for (int i = 0; i < tag_count; i++)
         {
-            if (strchr(tags_in[i], ' '))
+            if (strchr(tags[i], ' '))
             {
                 LL_ERRS() << "Space is not allowed in a log tag at " << mLocationString << LL_ENDL;
             }
-            mTags[i] = tags_in[i];
+            mTags[i] = tags[i];
         }
 
         mTagString.append("#");
@@ -774,8 +792,13 @@ namespace
         }
 
 #if LL_WINDOWS
-        LLError::RecorderPtr recordToWinDebug = std::make_shared<RecordToWinDebug>();
-        LLError::addRecorder(std::move(recordToWinDebug));
+        LLError::RecorderPtr recordToWinDebug(new RecordToWinDebug());
+        LLError::addRecorder(recordToWinDebug);
+#endif
+
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+        LLError::RecorderPtr recordToTracy(new RecordToTracy());
+        LLError::addRecorder(recordToTracy);
 #endif
 
         LogControlFile& e = LogControlFile::fromDirectory(user_dir, app_dir);
@@ -921,9 +944,10 @@ namespace LLError
 namespace {
     void setLevels(LevelMap& map, const LLSD& list, LLError::ELevel level)
     {
-        for (const auto& i : list.asArray())
+        LLSD::array_const_iterator i, end;
+        for (i = list.beginArray(), end = list.endArray(); i != end; ++i)
         {
-            map[i.asString()] = level;
+            map[*i] = level;
         }
     }
 }
@@ -983,6 +1007,10 @@ namespace LLError
         , mWantsLocation(true)
         , mWantsFunctionName(true)
         , mWantsMultiline(false)
+    {
+    }
+
+    Recorder::~Recorder()
     {
     }
 
@@ -1058,8 +1086,8 @@ namespace LLError
             return;
         }
         SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
-        std::unique_lock lock(s->mRecorderMutex);
-        s->mRecorders.push_back(std::move(recorder));
+        std::unique_lock lock(s->mRecorderMutex); LL_PROFILE_MUTEX_LOCK(s->mRecorderMutex);
+        s->mRecorders.push_back(recorder);
     }
 
     void removeRecorder(RecorderPtr recorder)
@@ -1069,7 +1097,7 @@ namespace LLError
             return;
         }
         SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
-        std::unique_lock lock(s->mRecorderMutex);
+        std::unique_lock lock(s->mRecorderMutex); LL_PROFILE_MUTEX_LOCK(s->mRecorderMutex);
         s->mRecorders.erase(std::remove(s->mRecorders.begin(), s->mRecorders.end(), recorder),
                             s->mRecorders.end());
     }
@@ -1118,7 +1146,7 @@ namespace LLError
     std::shared_ptr<RECORDER> findRecorder()
     {
         SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
-        std::unique_lock lock(s->mRecorderMutex);
+        std::unique_lock lock(s->mRecorderMutex); LL_PROFILE_MUTEX_LOCK(s->mRecorderMutex);
         return findRecorderPos<RECORDER>(s).first;
     }
 
@@ -1129,7 +1157,7 @@ namespace LLError
     bool removeRecorder()
     {
         SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
-        std::unique_lock lock(s->mRecorderMutex);
+        std::unique_lock lock(s->mRecorderMutex); LL_PROFILE_MUTEX_LOCK(s->mRecorderMutex);
         auto found = findRecorderPos<RECORDER>(s);
         if (found.first)
         {
@@ -1151,7 +1179,7 @@ namespace LLError
             std::shared_ptr<RecordToFile> recordToFile(new RecordToFile(file_name));
             if (recordToFile->okay())
             {
-                addRecorder(std::move(recordToFile));
+                addRecorder(recordToFile);
             }
         }
     }
@@ -1166,8 +1194,8 @@ namespace LLError
     {
         if (! findRecorder<RecordToStderr>())
         {
-            RecorderPtr recordToStdErr = std::make_shared<RecordToStderr>(stderrLogWantsTime());
-            addRecorder(std::move(recordToStdErr));
+            RecorderPtr recordToStdErr(new RecordToStderr(stderrLogWantsTime()));
+            addRecorder(recordToStdErr);
         }
     }
 
@@ -1178,8 +1206,8 @@ namespace LLError
 
         if (fixedBuffer)
         {
-            RecorderPtr recordToFixedBuffer = std::make_shared<RecordToFixedBuffer>(fixedBuffer);
-            addRecorder(std::move(recordToFixedBuffer));
+            RecorderPtr recordToFixedBuffer(new RecordToFixedBuffer(fixedBuffer));
+            addRecorder(recordToFixedBuffer);
         }
     }
 }
@@ -1229,13 +1257,13 @@ namespace
 
     void writeToRecorders(const LLError::CallSite& site, const std::string& message)
     {
-        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
         LLError::ELevel level = site.mLevel;
         SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
 
         std::string escaped_message;
 
-        std::unique_lock lock(s->mRecorderMutex);
+        std::unique_lock lock(s->mRecorderMutex); LL_PROFILE_MUTEX_LOCK(s->mRecorderMutex);
         for (LLError::RecorderPtr& r : s->mRecorders)
         {
             if (!r->enabled())
@@ -1245,7 +1273,7 @@ namespace
 
             std::ostringstream message_stream;
 
-            if (r->wantsTime() && s->mTimeFunction != NULL)
+            if (r->wantsTime() && s->mTimeFunction != nullptr)
             {
                 message_stream << s->mTimeFunction();
             }
@@ -1294,37 +1322,35 @@ namespace
 }
 
 namespace {
-    // We need a couple different mutexes, but we want to use the same mechanism
-    // for both. Make getMutex() a template function with different instances
-    // for different MutexDiscriminator values.
-    enum MutexDiscriminator
-    {
-        LOG_MUTEX,
-        STACKS_MUTEX
-    };
     // Some logging calls happen very early in processing -- so early that our
     // module-static variables aren't yet initialized. getMutex() wraps a
     // function-static LLMutex so that early calls can still have a valid
     // LLMutex instance.
-    template <MutexDiscriminator MTX>
-    LLMutex* getMutex()
+    auto getLogMutex()
     {
         // guaranteed to be initialized the first time control reaches here
-        static LLMutex sMutex;
-        return &sMutex;
+        static LL_PROFILE_MUTEX_NAMED(std::recursive_mutex, sLogMutex, "Log Mutex");
+        return &sLogMutex;
+    }
+    auto getStacksMutex()
+    {
+        // guaranteed to be initialized the first time control reaches here
+        static LL_PROFILE_MUTEX_NAMED(std::recursive_mutex, sStacksMutex, "Stacks Mutex");
+        return &sStacksMutex;
     }
 
     bool checkLevelMap(const LevelMap& map, const std::string& key,
                         LLError::ELevel& level)
     {
+        bool stop_checking;
         LevelMap::const_iterator i = map.find(key);
         if (i == map.end())
         {
-            return false;
+            return stop_checking = false;
         }
 
             level = i->second;
-        return true;
+        return stop_checking = true;
     }
 
     bool checkLevelMap( const LevelMap& map,
@@ -1359,9 +1385,9 @@ namespace LLError
 
     bool Log::shouldLog(CallSite& site)
     {
-        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
-        LLMutexTrylock lock(getMutex<LOG_MUTEX>(), 5);
-        if (!lock.isLocked())
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
+        std::unique_lock lock(*getLogMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getLogMutex());
+        if (!lock)
         {
             return false;
         }
@@ -1380,7 +1406,7 @@ namespace LLError
         if (site.mClassInfo != typeid(NoClassInfo))
 #endif // LL_LINUX
         {
-            function_name = fmt::format(FMT_COMPILE("{}::{}"), class_name, function_name);
+            function_name = class_name + "::" + function_name;
         }
 
         ELevel compareLevel = s->mDefaultLevel;
@@ -1404,9 +1430,9 @@ namespace LLError
 
     void Log::flush(const std::ostringstream& out, const CallSite& site)
     {
-        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
-        LLMutexTrylock lock(getMutex<LOG_MUTEX>(),5);
-        if (!lock.isLocked())
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
+        std::unique_lock lock(*getLogMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getLogMutex());
+        if (!lock)
         {
             return;
         }
@@ -1492,8 +1518,9 @@ namespace LLError
         }
     }
 
-    std::string abbreviateFile(std::string f)
+    std::string abbreviateFile(const std::string& filePath)
     {
+        std::string f = filePath;
 #if LL_WINDOWS
         replaceChar(f, '\\', '/');
 #endif
@@ -1535,8 +1562,8 @@ namespace LLError
     //static
     void LLCallStacks::push(const char* function, const int line)
     {
-        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
-        if (!lock.isLocked())
+        std::unique_lock lock(*getStacksMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getStacksMutex());
+        if (!lock)
         {
             return;
         }
@@ -1560,8 +1587,8 @@ namespace LLError
     //static
     void LLCallStacks::end(const std::ostringstream& out)
     {
-        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
-        if (!lock.isLocked())
+        std::unique_lock lock(*getStacksMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getStacksMutex());
+        if (!lock)
         {
             return;
         }
@@ -1577,8 +1604,8 @@ namespace LLError
     //static
     void LLCallStacks::print()
     {
-        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
-        if (!lock.isLocked())
+        std::unique_lock lock(*getStacksMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getStacksMutex());
+        if (!lock)
         {
             return;
         }
@@ -1619,11 +1646,11 @@ namespace LLError
     std::string LLUserWarningMsg::sLocalizedOutOfMemoryWarning;
     LLUserWarningMsg::Handler LLUserWarningMsg::sHandler;
 
-    void LLUserWarningMsg::show(const std::string& message)
+    void LLUserWarningMsg::show(const std::string& message, S32 error_code)
     {
         if (sHandler)
         {
-            sHandler(std::string(), message);
+            sHandler(std::string(), message, error_code);
         }
     }
 
@@ -1631,7 +1658,7 @@ namespace LLError
     {
         if (sHandler && !sLocalizedOutOfMemoryTitle.empty())
         {
-            sHandler(sLocalizedOutOfMemoryTitle, sLocalizedOutOfMemoryWarning);
+            sHandler(sLocalizedOutOfMemoryTitle, sLocalizedOutOfMemoryWarning, ERROR_BAD_ALLOC);
         }
     }
 
@@ -1640,9 +1667,9 @@ namespace LLError
         // Files Are missing, likely can't localize.
         const std::string error_string =
             "Alchemy Viewer couldn't access some of the files it needs and will be closed."
-            "\n\nPlease reinstall viewer from  https://alchemyviewer.org/downloads and "
-            "contact the Alchemy Viewer Team if the issue persists after reinstall.";
-        sHandler("Missing Files", error_string);
+            "\n\nPlease reinstall viewer from https://www.alchemyviewer.org/downloads and "
+            "contact the Alchemy Viewer team if the issue persists after reinstall.";
+        sHandler("Missing Files", error_string, ERROR_MISSING_FILES);
     }
 
     void LLUserWarningMsg::setHandler(const LLUserWarningMsg::Handler &handler)
@@ -1655,20 +1682,4 @@ namespace LLError
         sLocalizedOutOfMemoryTitle = title;
         sLocalizedOutOfMemoryWarning = message;
     }
-}
-
-void crashdriver(void (*callback)(int*))
-{
-    // The LLERROR_CRASH macro used to have inline code of the form:
-    //int* make_me_crash = NULL;
-    //*make_me_crash = 0;
-
-    // But compilers are getting smart enough to recognize that, so we must
-    // assign to an address supplied by a separate source file. We could do
-    // the assignment here in crashdriver() -- but then BugSplat would group
-    // all LL_ERRS() crashes as the fault of this one function, instead of
-    // identifying the specific LL_ERRS() source line. So instead, do the
-    // assignment in a lambda in the caller's source. We just provide the
-    // nullptr target.
-    callback(nullptr);
 }

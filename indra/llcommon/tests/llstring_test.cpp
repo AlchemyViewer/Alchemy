@@ -28,12 +28,9 @@
 
 #include "linden_common.h"
 
-#include <boost/assign/list_of.hpp>
 #include "../llstring.h"
 #include "StringVec.h"                  // must come BEFORE lltut.h
 #include "../test/lltut.h"
-
-using boost::assign::list_of;
 
 namespace tut
 {
@@ -80,12 +77,12 @@ namespace tut
     void string_index_object_t::test<3>()
     {
         std::string str("Len=5");
-        ensure("isValidIndex failed", LLStringUtil::isValidIndex(str, 0) == TRUE &&
-                                      LLStringUtil::isValidIndex(str, 5) == TRUE &&
-                                      LLStringUtil::isValidIndex(str, 6) == FALSE);
+        ensure("isValidIndex failed", LLStringUtil::isValidIndex(str, 0) == true &&
+                                      LLStringUtil::isValidIndex(str, 5) == true &&
+                                      LLStringUtil::isValidIndex(str, 6) == false);
 
         std::string str1;
-        ensure("isValidIndex failed fo rempty string", LLStringUtil::isValidIndex(str1, 0) == FALSE);
+        ensure("isValidIndex failed fo rempty string", LLStringUtil::isValidIndex(str1, 0) == false);
     }
 
     template<> template<>
@@ -153,10 +150,10 @@ namespace tut
     void string_index_object_t::test<10>()
     {
         std::string str_val("Second");
-        ensure("1. isHead failed", LLStringUtil::isHead(str_val, "SecondLife Source") == TRUE);
-        ensure("2. isHead failed", LLStringUtil::isHead(str_val, " SecondLife Source") == FALSE);
+        ensure("1. isHead failed", LLStringUtil::isHead(str_val, "SecondLife Source") == true);
+        ensure("2. isHead failed", LLStringUtil::isHead(str_val, " SecondLife Source") == false);
         std::string str_val2("");
-        ensure("3. isHead failed", LLStringUtil::isHead(str_val2, "") == FALSE);
+        ensure("3. isHead failed", LLStringUtil::isHead(str_val2, "") == false);
     }
 
     template<> template<>
@@ -206,10 +203,10 @@ namespace tut
     void string_index_object_t::test<15>()
     {
         std::string str_val("Hello.\n\r\t");
-        ensure("containsNonprintable failed", LLStringUtil::containsNonprintable(str_val) == TRUE);
+        ensure("containsNonprintable failed", LLStringUtil::containsNonprintable(str_val) == true);
 
         str_val = "ABC ";
-        ensure("containsNonprintable failed", LLStringUtil::containsNonprintable(str_val) == FALSE);
+        ensure("containsNonprintable failed", LLStringUtil::containsNonprintable(str_val) == false);
     }
 
     template<> template<>
@@ -231,7 +228,7 @@ namespace tut
     template<> template<>
     void string_index_object_t::test<17>()
     {
-        BOOL value;
+        bool value;
         std::string str_val("1");
         ensure("convertToBOOL 1 failed", LLStringUtil::convertToBOOL(str_val, value) && value);
         str_val = "T";
@@ -377,7 +374,7 @@ namespace tut
     {
         F32 value;
         std::string str_val("2147483647"); //0x7FFFFFFF
-        ensure("1: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 2147483647);
+        ensure("1: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 2147483647.f);
 
         str_val = "0";
         ensure("2: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 0);
@@ -399,7 +396,7 @@ namespace tut
     {
         F64 value;
         std::string str_val("9223372036854775807"); //0x7FFFFFFFFFFFFFFF
-        ensure("1: convertToF64 failed", LLStringUtil::convertToF64(str_val, value) && value == 9223372036854775807LL);
+        ensure("1: convertToF64 failed", LLStringUtil::convertToF64(str_val, value) && value == 9223372036854775807.0);
 
         str_val = "0";
         ensure("2: convertToF64 failed", LLStringUtil::convertToF64(str_val, value) && value == 0.0F);
@@ -457,17 +454,17 @@ namespace tut
         std::string lhs_str("PROgraM12files");
         std::string rhs_str("PROgram12Files");
         ensure("compareDict 1 failed", LLStringUtil::compareDict(lhs_str, rhs_str) < 0);
-        ensure("precedesDict 1 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == TRUE);
+        ensure("precedesDict 1 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == true);
 
         lhs_str = "PROgram12Files";
         rhs_str = "PROgram12Files";
         ensure("compareDict 2 failed", LLStringUtil::compareDict(lhs_str, rhs_str) == 0);
-        ensure("precedesDict 2 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == FALSE);
+        ensure("precedesDict 2 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == false);
 
         lhs_str = "PROgram12Files";
         rhs_str = "PROgRAM12FILES";
         ensure("compareDict 3 failed", LLStringUtil::compareDict(lhs_str, rhs_str) > 0);
-        ensure("precedesDict 3 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == FALSE);
+        ensure("precedesDict 3 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == false);
     }
 
     template<> template<>
@@ -763,14 +760,14 @@ namespace tut
         ensure_equals("only delims",
                       LLStringUtil::getTokens("   \r\n   ", " \r\n"), StringVec());
         ensure_equals("sequence of delims",
-                      LLStringUtil::getTokens(",,, one ,,,", ","), list_of("one"));
+                      LLStringUtil::getTokens(",,, one ,,,", ","), StringVec{"one"});
         // nat considers this a dubious implementation side effect, but I'd
         // hate to change it now...
         ensure_equals("noncontiguous tokens",
-                      LLStringUtil::getTokens(", ,, , one ,,,", ","), list_of("")("")("one"));
+                      LLStringUtil::getTokens(", ,, , one ,,,", ","), StringVec{ "", "", "one" });
         ensure_equals("space-padded tokens",
-                      LLStringUtil::getTokens(",    one  ,  two  ,", ","), list_of("one")("two"));
-        ensure_equals("no delims", LLStringUtil::getTokens("one", ","), list_of("one"));
+                      LLStringUtil::getTokens(",    one  ,  two  ,", ","), StringVec{"one", "two"});
+        ensure_equals("no delims", LLStringUtil::getTokens("one", ","), StringVec{ "one" });
     }
 
     // Shorthand for verifying that getTokens() behaves the same when you
@@ -817,39 +814,33 @@ namespace tut
         ensure_getTokens("only delims",
                          "   \r\n   ", " \r\n", "", StringVec());
         ensure_getTokens("sequence of delims",
-                         ",,, one ,,,", ", ", "", list_of("one"));
+                         ",,, one ,,,", ", ", "", StringVec{"one"});
         // Note contrast with the case in the previous method
         ensure_getTokens("noncontiguous tokens",
-                         ", ,, , one ,,,", ", ", "", list_of("one"));
+                         ", ,, , one ,,,", ", ", "", StringVec{"one"});
         ensure_getTokens("space-padded tokens",
                          ",    one  ,  two  ,", ", ", "",
-                         list_of("one")("two"));
-        ensure_getTokens("no delims", "one", ",", "", list_of("one"));
+                         StringVec{"one", "two"});
+        ensure_getTokens("no delims", "one", ",", "", StringVec{ "one" });
 
         // drop_delims vs. keep_delims
         ensure_getTokens("arithmetic",
-                         " ab+def  / xx*  yy ", " ", "+-*/",
-                         list_of("ab")("+")("def")("/")("xx")("*")("yy"));
+                         " ab+def  / xx*  yy ", " ", "+-*/", { "ab", "+", "def", "/", "xx", "*", "yy" });
 
         // quotes
         ensure_getTokens("no quotes",
-                         "She said, \"Don't go.\"", " ", ",", "",
-                         list_of("She")("said")(",")("\"Don't")("go.\""));
+                         "She said, \"Don't go.\"", " ", ",", "", { "She", "said", ",", "\"Don't", "go.\"" });
         ensure_getTokens("quotes",
-                         "She said, \"Don't go.\"", " ", ",", "\"",
-                         list_of("She")("said")(",")("Don't go."));
+                         "She said, \"Don't go.\"", " ", ",", "\"", { "She", "said", ",", "Don't go." });
         ensure_getTokens("quotes and delims",
                          "run c:/'Documents and Settings'/someone", " ", "", "'",
-                         list_of("run")("c:/Documents and Settings/someone"));
+                         { "run", "c:/Documents and Settings/someone" });
         ensure_getTokens("unmatched quote",
-                         "baby don't leave", " ", "", "'",
-                         list_of("baby")("don't")("leave"));
+                         "baby don't leave", " ", "", "'", { "baby", "don't", "leave" });
         ensure_getTokens("adjacent quoted",
-                         "abc'def \"ghi'\"jkl' mno\"pqr", " ", "", "\"'",
-                         list_of("abcdef \"ghijkl' mnopqr"));
+                         "abc'def \"ghi'\"jkl' mno\"pqr", " ", "", "\"'", { "abcdef \"ghijkl' mnopqr" });
         ensure_getTokens("quoted empty string",
-                         "--set SomeVar ''", " ", "", "'",
-                         list_of("--set")("SomeVar")(""));
+                         "--set SomeVar ''", " ", "", "'", { "--set", "SomeVar", "" });
 
         // escapes
         // Don't use backslash as an escape for these tests -- you'll go nuts
@@ -857,15 +848,12 @@ namespace tut
         // something else!
         ensure_equals("escaped delims",
                       LLStringUtil::getTokens("^ a - dog^-gone^ phrase", " ", "-", "", "^"),
-                      list_of(" a")("-")("dog-gone phrase"));
+                      StringVec{ " a", "-", "dog-gone phrase" });
         ensure_equals("escaped quotes",
                       LLStringUtil::getTokens("say: 'this isn^'t w^orking'.", " ", "", "'", "^"),
-                      list_of("say:")("this isn't working."));
+                      StringVec{ "say:", "this isn't working." });
         ensure_equals("escaped escape",
-                      LLStringUtil::getTokens("want x^^2", " ", "", "", "^"),
-                      list_of("want")("x^2"));
-        ensure_equals("escape at end",
-                      LLStringUtil::getTokens("it's^ up there^", " ", "", "'", "^"),
-                      list_of("it's up")("there^"));
+                      LLStringUtil::getTokens("want x^^2", " ", "", "", "^"), StringVec{ "want", "x^2" });
+        ensure_equals("escape at end", LLStringUtil::getTokens("it's^ up there^", " ", "", "'", "^"), StringVec{ "it's up", "there^" });
     }
 }

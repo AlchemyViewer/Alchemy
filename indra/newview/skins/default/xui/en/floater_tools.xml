@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater
- positioning="none"
+ positioning="cascading"
  legacy_header_height="18"
  height="688"
  layout="topleft"
@@ -74,14 +74,14 @@
      name="status_remaining_capacity">
         Remaining capacity [LAND_CAPACITY].
     </floater.string>
-	<floater.string
-	  name="link_number">
-		Link number:
-	</floater.string>
-	<floater.string
-	  name="selected_faces">
-		Faces:
-	</floater.string>
+    <floater.string
+     name="link_number">
+        Link number:
+    </floater.string>
+    <floater.string
+     name="selected_faces">
+        Faces:
+    </floater.string>
     <button
      follows="left|top"
      height="25"
@@ -274,7 +274,7 @@
      height="19"
 	 control_name="EditLinkedParts"
      label="Edit linked"
-     layout="topleft"     
+     layout="topleft"
      name="checkbox edit linked parts"
      top_pad="0">
 		  <check_box.commit_callback
@@ -414,7 +414,7 @@
     <button
      left_pad="0"
      image_selected="ForwardArrow_Press"
-     image_unselected="ForwardArrow_Off"   
+     image_unselected="ForwardArrow_Off"
      layout="topleft"
      follows="top|left"
      name="Options..."
@@ -882,7 +882,7 @@
      left="0"
      name="Object Info Tabs"
      tab_max_width="100"
-     tab_min_width="40"
+     tab_min_width="59"
      tab_position="top"
      open_tabs_on_drag_and_drop="true"
      top="209"
@@ -1276,13 +1276,6 @@ even though the user gets a free copy.
              left_pad="0"
              name="checkbox allow everyone copy"
              tool_tip="Anyone can take a copy of the object. Object and all of its contents must be copy and transfer permissive."
-             width="90" />
-            <check_box
-             height="19"
-             label="Export"
-             layout="topleft"
-             left_pad="0"
-             name="checkbox allow export"
              width="90" />
             <text
                type="string"
@@ -2768,7 +2761,7 @@ even though the user gets a free copy.
              name="Reflection Probe"
              tool_tip="Adjusts how objects within this volume receive reflections when PBR is enabled"
              top_pad="10"
-             width="75" />
+             width="60" />
           <combo_box
 			   height="19"
 			   top_delta="0"
@@ -2776,7 +2769,7 @@ even though the user gets a free copy.
 			   follows="left|top"
 			   name="Probe Volume Type"
 			   tool_tip="Choose the probe influence volume"
-			   width="108">
+			   width="140">
             <combo_box.item
              label="Sphere"
              name="Sphere"
@@ -2795,16 +2788,46 @@ even though the user gets a free copy.
            name="Probe Dynamic"
            tool_tip="When enabled, Avatars will appear in reflections within this probe's influence volume."
            bottom_delta="19"
-           width="100" />
-           <check_box
-           height="16"
-           label="Mirror"
-           layout="topleft"
-           left_pad="30"
-           name="Probe Mirror"
-           tool_tip="When enabled, Mirror turns this probe into a realtime planar projected mirror probe, but does not calculate ambiance."
-           top_delta="0"
            width="60" />
+          
+          <text
+            bottom_delta="-8"
+             type="string"
+             length="1"
+             follows="left|top"
+             height="10"
+             layout="topleft"
+             left="10"
+             name="Probe Update Label"
+             text_readonly_color="LabelDisabledColor"
+             width="100">
+            Probe Update
+          </text>
+          <combo_box
+			   height="19"
+			   top_delta="0"
+         left="144"
+			   follows="left|top"
+			   name="Probe Update Type"
+			   tool_tip="Determines how the probe updates.  Static updates the slowest and without avatars.  Dynamic updates more frequently, with avatars visible in the probes.  Mirror (Environment) turns this probe into a realtime planar projected probe that only reflects the environment, but does not calculate ambiance.  Mirror (Everything) is similar to Mirror (Environment), but it reflects particles and avatars."
+			   width="140">
+            <combo_box.item
+             label="Static"
+             name="Static"
+             value="Static" />
+            <combo_box.item
+             label="Dynamic"
+             name="Dynamic"
+             value="Dynamic"/>
+            <combo_box.item
+             label="Mirror (Environment)"
+             name="Mirror"
+             value="Mirror"/>
+            <combo_box.item
+             label="Mirror (Everything)"
+             name="Dynamic Mirror"
+             value="Dynamic Mirror"/>
+          </combo_box>
           <spinner bottom_delta="17"
                    decimal_digits="3"
                    follows="left|top"
@@ -2965,7 +2988,7 @@ even though the user gets a free copy.
          help_topic="toolbox_contents_tab"
          name="Contents"
          top_delta="0"
-         width="295">
+         width="300">
             <button
              follows="left|top"
              height="23"
@@ -2975,7 +2998,7 @@ even though the user gets a free copy.
              left="10"
              name="button new script"
              top="10"
-             width="134" />
+             width="140" />
             <button
              follows="left|top"
              height="23"
@@ -2983,7 +3006,19 @@ even though the user gets a free copy.
              layout="topleft"
              left_pad="8"
              name="button permissions"
-             width="134" />
+             width="140" />
+            <filter_editor
+             follows="left|top|right"
+             label="Enter filter text"
+             layout="topleft"
+             top="40"
+             left="10"
+             text_pad_left="10"
+             max_length_chars="300"
+             highlight_text_field="true"
+             name="contents_filter"
+             height="23"
+             width="280" />
             <panel_inventory_object
              border="true"
              border_visible="true"
@@ -2993,12 +3028,12 @@ even though the user gets a free copy.
              layout="topleft"
              left="10"
              name="contents_inventory"
-             top="50"
-             width="275" />
+             top="65"
+             width="280" />
 		</panel>
         </tab_container>
 	<panel
-   visible="false"
+	 visible="false"
 	 follows="left|top"
      height="384"
      layout="topleft"

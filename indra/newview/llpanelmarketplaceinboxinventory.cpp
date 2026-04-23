@@ -78,7 +78,7 @@ void LLInboxInventoryPanel::initFromParams(const LLInventoryPanel::Params& param
 
 LLFolderViewFolder * LLInboxInventoryPanel::createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop)
 {
-    static LLUIColor item_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", LLColor4::white);
+    LLUIColor item_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", DEFAULT_WHITE);
 
     LLInboxFolderViewFolder::Params params;
 
@@ -95,7 +95,7 @@ LLFolderViewFolder * LLInboxInventoryPanel::createFolderViewFolder(LLInvFVBridge
 
 LLFolderViewItem * LLInboxInventoryPanel::createFolderViewItem(LLInvFVBridge * bridge)
 {
-    static LLUIColor item_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", LLColor4::white);
+    LLUIColor item_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", DEFAULT_WHITE);
 
     LLInboxFolderViewItem::Params params;
 
@@ -176,13 +176,13 @@ void LLInboxFolderViewFolder::draw()
 
 }
 
-BOOL LLInboxFolderViewFolder::handleMouseDown( S32 x, S32 y, MASK mask )
+bool LLInboxFolderViewFolder::handleMouseDown( S32 x, S32 y, MASK mask )
 {
     deFreshify();
     return LLFolderViewFolder::handleMouseDown(x, y, mask);
 }
 
-BOOL LLInboxFolderViewFolder::handleDoubleClick( S32 x, S32 y, MASK mask )
+bool LLInboxFolderViewFolder::handleDoubleClick( S32 x, S32 y, MASK mask )
 {
     deFreshify();
     return LLFolderViewFolder::handleDoubleClick(x, y, mask);
@@ -197,7 +197,7 @@ void LLInboxFolderViewFolder::selectItem()
 void LLInboxFolderViewFolder::computeFreshness()
 {
     LLFolderViewModelItemInventory* view_model = static_cast<LLFolderViewModelItemInventory*>(getViewModelItem());
-    static const LLCachedControl<U32> last_expansion_utc(gSavedPerAccountSettings, "LastInventoryInboxActivity");
+    const U32 last_expansion_utc = gSavedPerAccountSettings.getU32("LastInventoryInboxActivity");
 
     if (last_expansion_utc > 0)
     {
@@ -225,7 +225,7 @@ void LLInboxFolderViewFolder::deFreshify()
 {
     mFresh = false;
 
-    gSavedPerAccountSettings.setU32("LastInventoryInboxActivity", time_corrected());
+    gSavedPerAccountSettings.setU32("LastInventoryInboxActivity", (U32)time_corrected());
     LLInboxNewItemsStorage::getInstance()->removeItem(static_cast<LLFolderViewModelItemInventory*>(getViewModelItem())->getUUID());
 }
 
@@ -252,7 +252,7 @@ void LLInboxFolderViewItem::addToFolder(LLFolderViewFolder* folder)
     }
 }
 
-BOOL LLInboxFolderViewItem::handleDoubleClick(S32 x, S32 y, MASK mask)
+bool LLInboxFolderViewItem::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
     deFreshify();
 
@@ -281,7 +281,7 @@ void LLInboxFolderViewItem::selectItem()
 
 void LLInboxFolderViewItem::computeFreshness()
 {
-    static const LLCachedControl<U32> last_expansion_utc(gSavedPerAccountSettings, "LastInventoryInboxActivity");
+    const U32 last_expansion_utc = gSavedPerAccountSettings.getU32("LastInventoryInboxActivity");
 
     if (last_expansion_utc > 0)
     {
@@ -304,7 +304,7 @@ void LLInboxFolderViewItem::deFreshify()
 {
     mFresh = false;
 
-    gSavedPerAccountSettings.setU32("LastInventoryInboxActivity", time_corrected());
+    gSavedPerAccountSettings.setU32("LastInventoryInboxActivity", (U32)time_corrected());
 }
 
 LLInboxNewItemsStorage::LLInboxNewItemsStorage()

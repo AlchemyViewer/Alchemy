@@ -26,7 +26,8 @@
      layout="topleft"
      name="System Volume"
      show_text="false"
-     top="10">
+     top="10"
+     volume="true">
         <slider.commit_callback
          function="Vol.setControlFalse"
          parameter="MuteAudio" />
@@ -57,7 +58,8 @@
         layout="topleft"
         name="UI Volume"
         show_text="false"
-        top_pad="4">
+        top_pad="4"
+        volume="true">
     <slider.commit_callback
         function="Vol.setControlFalse"
         parameter="MuteUI" />
@@ -89,7 +91,8 @@
      layout="topleft"
      name="Wind Volume"
      show_text="false"
-     top_pad="4">
+     top_pad="4"
+     volume="true">
         <slider.commit_callback
          function="Vol.setControlFalse"
          parameter="MuteAmbient" />
@@ -121,7 +124,8 @@
      layout="topleft"
      name="SFX Volume"
      show_text="false"
-     top_pad="4">
+     top_pad="4"
+     volume="true">
         <slider.commit_callback
          function="Vol.setControlFalse"
          parameter="MuteSounds" />
@@ -166,7 +170,8 @@
      layout="topleft"
      name="Music Volume"
      show_text="false"
-     top_pad="4">
+     top_pad="4"
+     volume="true">
         <slider.commit_callback
          function="Vol.setControlFalse"
          parameter="MuteMusic" />
@@ -211,7 +216,8 @@
         layout="topleft"
         name="Media Volume"
         show_text="false"
-        top_pad="4">
+        top_pad="4"
+        volume="true">
       <slider.commit_callback
         function="Vol.setControlFalse"
         parameter="MuteMedia" />
@@ -258,7 +264,8 @@
         layout="topleft"
         top_pad="4"
         name="Voice Volume"
-        show_text="false">
+        show_text="false"
+        volume="true">
     <slider.commit_callback
         function="Vol.setControlFalse"
         parameter="MuteVoice" />

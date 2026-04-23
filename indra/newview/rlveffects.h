@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2021&license=viewerlgpl$
  * Copyright (c) 2021, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -29,7 +30,7 @@ class LLViewerFetchedTexture;
 // RlvOverlayEffect class
 //
 
-class RlvOverlayEffect final : public LLVisualEffect
+class RlvOverlayEffect : public LLVisualEffect
 {
 public:
     RlvOverlayEffect(const LLUUID& idRlvObj);
@@ -65,7 +66,7 @@ protected:
 // RlvSphereEffect class
 //
 
-class RlvSphereEffect final : public LLVisualEffect
+class RlvSphereEffect : public LLVisualEffect
 {
 public:
     RlvSphereEffect(const LLUUID& idRlvObj);

@@ -31,7 +31,7 @@
 #include "llregistry.h"
 #include "llxmlnode.h"
 
-#include <boost/function.hpp>
+#include <functional>
 #include <iosfwd>
 #include <stack>
 #include <set>
@@ -39,20 +39,20 @@
 class LLView;
 
 // lookup widget type by name
-class LLWidgetTypeRegistry final
-:   public LLRegistrySingleton<std::string, const std::type_info*, LLWidgetTypeRegistry>
+class LLWidgetTypeRegistry
+:   public LLRegistrySingleton<std::string, std::type_index, LLWidgetTypeRegistry>
 {
     LLSINGLETON_EMPTY_CTOR(LLWidgetTypeRegistry);
 };
 
 
 // global static instance for registering all widget types
-typedef boost::function<LLView* (LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node)> LLWidgetCreatorFunc;
+typedef std::function<LLView* (LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node)> LLWidgetCreatorFunc;
 
 typedef LLRegistry<std::string, LLWidgetCreatorFunc> widget_registry_t;
 
 class LLChildRegistryRegistry
-: public LLRegistrySingleton<const std::type_info*, widget_registry_t, LLChildRegistryRegistry>
+: public LLRegistrySingleton<std::type_index, widget_registry_t, LLChildRegistryRegistry>
 {
     LLSINGLETON_EMPTY_CTOR(LLChildRegistryRegistry);
 };
@@ -66,7 +66,7 @@ public:
     /*virtual*/ std::string getCurrentElementName() { return LLStringUtil::null; }
     /*virtual*/ std::string getCurrentFileName() { return LLStringUtil::null; }
     LLXSDWriter();
-    ~LLXSDWriter() = default;
+    ~LLXSDWriter();
 
 protected:
     void writeAttribute(const std::string& type, const Parser::name_stack_t&, S32 min_count, S32 max_count, const std::vector<std::string>* possible_values);
@@ -202,7 +202,7 @@ public:
     typedef LLInitParam::BaseBlock* (*element_start_callback_t)(LLSimpleXUIParser&, const char* block_name);
 
     LLSimpleXUIParser(element_start_callback_t element_cb = NULL);
-    virtual ~LLSimpleXUIParser() = default;
+    virtual ~LLSimpleXUIParser();
 
     /*virtual*/ std::string getCurrentElementName();
     /*virtual*/ std::string getCurrentFileName() { return mCurFileName; }
@@ -247,7 +247,7 @@ private:
     S32                             mCurReadDepth;
     std::string                     mCurFileName;
     std::string                     mTextContents;
-    const char*                     mCurAttributeValueBegin;
+    std::string                     mCurAttributeValueBegin;
     std::vector<S32>                mTokenSizeStack;
     std::vector<std::string>        mScope;
     std::vector<bool>               mEmptyLeafNode;

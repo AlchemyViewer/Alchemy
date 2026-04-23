@@ -41,11 +41,7 @@ class LLVivoxProtocolParser;
 #include "llcoros.h"
 #include <queue>
 
-#if defined(LL_USESYSTEMLIBS)
-# include <expat.h>
-#else
-# include "expat/expat.h"
-#endif
+#include <expat.h>
 #include "llvoiceclient.h"
 
 class LLAvatarName;
@@ -66,16 +62,17 @@ class LLVivoxVoiceP2PIncomingCall : public LLVoiceP2PIncomingCallInterface
     LLSD mCallInfo;
 };
 
-class LLVivoxVoiceClient final : public LLSingleton<LLVivoxVoiceClient>,
+class LLVivoxVoiceClient :  public LLSimpleton<LLVivoxVoiceClient>,
                             virtual public LLVoiceModuleInterface,
                             virtual public LLVoiceEffectInterface,
                             virtual public LLVoiceP2POutgoingCallInterface
 {
-    LLSINGLETON(LLVivoxVoiceClient);
     LOG_CLASS(LLVivoxVoiceClient);
-    virtual ~LLVivoxVoiceClient();
 
 public:
+    LLVivoxVoiceClient();
+    virtual ~LLVivoxVoiceClient();
+
     /// @name LLVoiceModuleInterface virtual implementations
     ///  @see LLVoiceModuleInterface
     //@{
@@ -618,11 +615,7 @@ protected:
     void avatarNameResolved(const LLUUID &id, const std::string &name);
     static void predAvatarNameResolution(const LLVivoxVoiceClient::sessionStatePtr_t &session, LLUUID id, std::string name);
 
-    boost::signals2::scoped_connection mAvatarNameCacheConnection;
-    boost::signals2::scoped_connection mVivoxVadAutoCon;
-    boost::signals2::scoped_connection mVivoxVadAHangoverCon;
-    boost::signals2::scoped_connection mVivoxVadNoiseCon;
-    boost::signals2::scoped_connection mVivoxVadSensitivityCon;
+    boost::signals2::connection mAvatarNameCacheConnection;
 
     /////////////////////////////
     // Voice fonts
@@ -1047,7 +1040,7 @@ protected:
 
 };
 
-class LLVivoxSecurity final : public LLSingleton<LLVivoxSecurity>
+class LLVivoxSecurity : public LLSingleton<LLVivoxSecurity>
 {
     LLSINGLETON(LLVivoxSecurity);
     virtual ~LLVivoxSecurity();
@@ -1056,15 +1049,12 @@ class LLVivoxSecurity final : public LLSingleton<LLVivoxSecurity>
     std::string     connectorHandle() { return mConnectorHandle; };
     std::string     accountHandle()    { return mAccountHandle;    };
 
-    void setConnectorHandle(const std::string& handle) { mConnectorHandle = handle; }
-    void setAccountHandle(const std::string& handle) { mAccountHandle = handle; }
-
   private:
     std::string     mConnectorHandle;
     std::string     mAccountHandle;
 };
 
-class LLVoiceVivoxStats final : public LLSingleton<LLVoiceVivoxStats>
+class LLVoiceVivoxStats : public LLSingleton<LLVoiceVivoxStats>
 {
     LLSINGLETON(LLVoiceVivoxStats);
     LOG_CLASS(LLVoiceVivoxStats);

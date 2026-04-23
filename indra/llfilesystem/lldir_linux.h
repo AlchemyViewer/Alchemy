@@ -36,18 +36,17 @@
 #include <dirent.h>
 #include <errno.h>
 
-class LLDir_Linux final : public LLDir
+class LLDir_Linux : public LLDir
 {
 public:
     LLDir_Linux();
-    virtual ~LLDir_Linux() = default;
+    virtual ~LLDir_Linux();
 
     /*virtual*/ void initAppDirs(const std::string &app_name,
         const std::string& app_read_only_data_dir);
 
     virtual std::string getCurPath();
     virtual U32 countFilesInDir(const std::string &dirname, const std::string &mask);
-    /*virtual*/ bool fileExists(const std::string &filename) const;
 
     /*virtual*/ std::string getLLPluginLauncher();
     /*virtual*/ std::string getLLPluginFilename(std::string base_name);

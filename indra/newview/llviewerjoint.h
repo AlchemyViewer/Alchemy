@@ -39,9 +39,10 @@ class LLViewerJointMesh;
 //-----------------------------------------------------------------------------
 // class LLViewerJoint
 //-----------------------------------------------------------------------------
-class LLViewerJoint :
+class alignas(16) LLViewerJoint :
     public virtual LLAvatarJoint
 {
+    LL_ALIGN_NEW
 public:
     LLViewerJoint();
     LLViewerJoint(S32 joint_num);
@@ -54,11 +55,11 @@ public:
     // Traverses the entire joint hierarchy, setting up
     // transforms and calling the drawShape().
     // Derived classes may add text/graphic output.
-    virtual U32 render( F32 pixelArea, BOOL first_pass = TRUE, BOOL is_dummy = FALSE ) override;    // Returns triangle count
+    virtual U32 render( F32 pixelArea, bool first_pass = true, bool is_dummy = false ); // Returns triangle count
 
     // Draws the shape attached to a joint.
     // Called by render().
-    virtual U32 drawShape( F32 pixelArea, BOOL first_pass = TRUE, BOOL is_dummy = FALSE );
+    virtual U32 drawShape( F32 pixelArea, bool first_pass = true, bool is_dummy = false );
     virtual void drawNormals() {}
 };
 

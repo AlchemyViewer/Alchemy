@@ -58,7 +58,7 @@ LLReliablePacket::LLReliablePacket(
     else
     {
         mRetries = 0;
-        mPingBasedRetry = TRUE;
+        mPingBasedRetry = true;
         mTimeout = F32Seconds(0.f);
         mCallback = NULL;
         mCallbackData = NULL;
@@ -66,9 +66,7 @@ LLReliablePacket::LLReliablePacket(
     }
 
     mExpirationTime = (F64Seconds)totalTime() + mTimeout;
-    U32 buf_packet_id = 0U;
-    memcpy(&buf_packet_id, buf_ptr + PHL_PACKET_ID, sizeof(buf_packet_id));
-    mPacketID = ntohl(buf_packet_id);
+    mPacketID = ntohl(*((U32*)(&buf_ptr[PHL_PACKET_ID])));
 
     mSocket = socket;
     if (mRetries)

@@ -49,7 +49,7 @@ public:
     ~LLPolyMorphData();
     LLPolyMorphData(const LLPolyMorphData &rhs);
 
-    BOOL            loadBinary(LLFILE* fp, LLPolyMeshSharedData *mesh);
+    bool            loadBinary(LLFILE* fp, LLPolyMeshSharedData *mesh);
     const std::string& getName() { return mName; }
 
 public:
@@ -71,7 +71,7 @@ public:
 
 private:
     void freeData();
-} LL_ALIGN_POSTFIX(16);
+};
 
 
 //-----------------------------------------------------------------------------
@@ -84,14 +84,14 @@ public:
     LLPolyVertexMask(const LLPolyVertexMask& pOther);
     ~LLPolyVertexMask();
 
-    void generateMask(U8 *maskData, S32 width, S32 height, S32 num_components, BOOL invert, LLVector4a *clothing_weights);
+    void generateMask(const U8 *maskData, S32 width, S32 height, S32 num_components, bool invert, LLVector4a *clothing_weights);
     F32* getMorphMaskWeights();
 
 
 protected:
     F32*        mWeights;
     LLPolyMorphData *mMorphData;
-    BOOL            mWeightsGenerated;
+    bool            mWeightsGenerated;
 
 };
 
@@ -127,13 +127,13 @@ class LLPolyMorphTargetInfo : public LLViewerVisualParamInfo
     friend class LLPolyMorphTarget;
 public:
     LLPolyMorphTargetInfo();
-    /*virtual*/ ~LLPolyMorphTargetInfo() = default;
+    /*virtual*/ ~LLPolyMorphTargetInfo() {};
 
-    /*virtual*/ BOOL parseXml(LLXmlTreeNode* node);
+    /*virtual*/ bool parseXml(LLXmlTreeNode* node);
 
 protected:
     std::string     mMorphName;
-    BOOL            mIsClothingMorph;
+    bool            mIsClothingMorph;
     typedef std::vector<LLPolyVolumeMorphInfo> volume_info_list_t;
     volume_info_list_t mVolumeInfoList;
 };
@@ -154,23 +154,23 @@ public:
     // Special: These functions are overridden by child classes
     LLPolyMorphTargetInfo*  getInfo() const { return (LLPolyMorphTargetInfo*)mInfo; }
     //   This sets mInfo and calls initialization functions
-    BOOL                    setInfo(LLPolyMorphTargetInfo *info);
+    bool                    setInfo(LLPolyMorphTargetInfo *info);
 
-    /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const override;
+    /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const;
 
     // LLVisualParam Virtual functions
-    ///*virtual*/ BOOL              parseData(LLXmlTreeNode* node);
-    /*virtual*/ void                apply( ESex sex ) override;
+    ///*virtual*/ bool              parseData(LLXmlTreeNode* node);
+    /*virtual*/ void                apply( ESex sex );
 
     // LLViewerVisualParam Virtual functions
-    /*virtual*/ F32                 getTotalDistortion() override;
-    /*virtual*/ const LLVector4a&   getAvgDistortion() override;
-    /*virtual*/ F32                 getMaxDistortion() override;
-    /*virtual*/ LLVector4a          getVertexDistortion(S32 index, LLPolyMesh *poly_mesh) override;
-    /*virtual*/ const LLVector4a*   getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh) override;
-    /*virtual*/ const LLVector4a*   getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override;
+    /*virtual*/ F32                 getTotalDistortion();
+    /*virtual*/ const LLVector4a&   getAvgDistortion();
+    /*virtual*/ F32                 getMaxDistortion();
+    /*virtual*/ LLVector4a          getVertexDistortion(S32 index, LLPolyMesh *poly_mesh);
+    /*virtual*/ const LLVector4a*   getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh);
+    /*virtual*/ const LLVector4a*   getNextDistortion(U32 *index, LLPolyMesh **poly_mesh);
 
-    void    applyMask(U8 *maskData, S32 width, S32 height, S32 num_components, BOOL invert);
+    void    applyMask(const U8 *maskData, S32 width, S32 height, S32 num_components, bool invert);
     void    addPendingMorphMask() { mNumMorphMasksPending++; }
 
     void    applyVolumeChanges(F32 delta_weight); // SL-315 - for resetSkeleton()
@@ -183,7 +183,7 @@ protected:
     LLPolyVertexMask *              mVertMask;
     ESex                            mLastSex;
     // number of morph masks that haven't been generated, must be 0 before this morph is applied
-    BOOL                            mNumMorphMasksPending;
+    S32                             mNumMorphMasksPending;
 
     typedef std::vector<LLPolyVolumeMorph> volume_list_t;
     volume_list_t                   mVolumeMorphs;

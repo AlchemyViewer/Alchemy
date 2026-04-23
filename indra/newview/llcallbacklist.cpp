@@ -70,33 +70,33 @@ void LLCallbackList::addFunction( callback_t func, void *data)
 }
 
 
-BOOL LLCallbackList::containsFunction( callback_t func, void *data)
+bool LLCallbackList::containsFunction( callback_t func, void *data)
 {
     callback_pair_t t(func, data);
     callback_list_t::iterator iter = std::find(mCallbackList.begin(), mCallbackList.end(), t);
     if (iter != mCallbackList.end())
     {
-        return TRUE;
+        return true;
     }
     else
     {
-        return FALSE;
+        return false;
     }
 }
 
 
-BOOL LLCallbackList::deleteFunction( callback_t func, void *data)
+bool LLCallbackList::deleteFunction( callback_t func, void *data)
 {
     callback_pair_t t(func, data);
     callback_list_t::iterator iter = std::find(mCallbackList.begin(), mCallbackList.end(), t);
     if (iter != mCallbackList.end())
     {
         mCallbackList.erase(iter);
-        return TRUE;
+        return true;
     }
     else
     {
-        return FALSE;
+        return false;
     }
 }
 
@@ -128,7 +128,7 @@ public:
     static void onIdle(void *data)
     {
         gIdleCallbacks.deleteFunction(onIdle, data);
-        OnIdleCallbackOneTime* self = static_cast<OnIdleCallbackOneTime*>(data);
+        OnIdleCallbackOneTime* self = reinterpret_cast<OnIdleCallbackOneTime*>(data);
         self->call();
         delete self;
     }
@@ -159,7 +159,7 @@ public:
     // Will keep getting called until the callable returns true.
     static void onIdle(void *data)
     {
-        OnIdleCallbackRepeating* self = static_cast<OnIdleCallbackRepeating*>(data);
+        OnIdleCallbackRepeating* self = reinterpret_cast<OnIdleCallbackRepeating*>(data);
         bool done = self->call();
         if (done)
         {
@@ -191,10 +191,10 @@ public:
     }
 
 private:
-    BOOL tick()
+    bool tick()
     {
         mCallable();
-        return TRUE;
+        return true;
     }
 
     nullary_func_t mCallable;
@@ -215,7 +215,7 @@ public:
     {
     }
 private:
-    BOOL tick()
+    bool tick()
     {
         return mCallable();
     }

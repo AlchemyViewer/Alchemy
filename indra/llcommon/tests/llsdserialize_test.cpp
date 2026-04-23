@@ -52,7 +52,7 @@ typedef U32 uint32_t;
 #include "llformat.h"
 #include "llmemorystream.h"
 
-#include "../test/hexdump.h"
+#include "hexdump.h"
 #include "../test/lltut.h"
 #include "../test/namedtempfile.h"
 #include "stringize.h"
@@ -501,7 +501,7 @@ namespace tut
     template<> template<>
     void TestLLSDSerializeObject::test<1>()
     {
-        setFormatterParser(new LLSDNotationFormatter(false, false, "", LLSDFormatter::OPTIONS_PRETTY_BINARY),
+        setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_PRETTY_BINARY),
                            new LLSDNotationParser());
         doRoundTripTests("pretty binary notation serialization");
     }
@@ -509,7 +509,7 @@ namespace tut
     template<> template<>
     void TestLLSDSerializeObject::test<2>()
     {
-        setFormatterParser(new LLSDNotationFormatter(false, false, "", LLSDFormatter::OPTIONS_NONE),
+        setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
                            new LLSDNotationParser());
         doRoundTripTests("raw binary notation serialization");
     }
@@ -566,7 +566,7 @@ namespace tut
     template<> template<>
     void TestLLSDSerializeObject::test<8>()
     {
-        setFormatterParser(new LLSDNotationFormatter(false, false, "", LLSDFormatter::OPTIONS_NONE),
+        setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
                            new LLSDNotationParser());
         setParser(LLSDSerialize::deserialize);
         // This is an interesting test because LLSDNotationFormatter does not
@@ -577,7 +577,7 @@ namespace tut
     template<> template<>
     void TestLLSDSerializeObject::test<9>()
     {
-        setFormatterParser(new LLSDXMLFormatter(false, false, "", LLSDFormatter::OPTIONS_NONE),
+        setFormatterParser(new LLSDXMLFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
                            new LLSDXMLParser());
         setParser(LLSDSerialize::deserialize);
         // This is an interesting test because LLSDXMLFormatter does not
@@ -701,7 +701,7 @@ namespace tut
                 "<key>cam</key><real>1.23</real>"
             "</map></llsd>",
             v,
-            v.size() + 1);
+            static_cast<S32>(v.size()) + 1);
     }
 
     template<> template<>
@@ -721,7 +721,7 @@ namespace tut
                 "<key>cam</key><real>1.23</real>"
             "</map></llsd>",
             v,
-            v.size() + 1);
+            static_cast<S32>(v.size()) + 1);
 
         v.clear();
         v["amy"] = 23;
@@ -734,7 +734,7 @@ namespace tut
                 "<key>cam</key><real>1.23</real>"
             "</map></llsd>",
             v,
-            v.size() + 1);
+            static_cast<S32>(v.size()) + 1);
 
         v.clear();
         v["amy"] = 23;
@@ -751,7 +751,7 @@ namespace tut
                 "<key>cam</key><real>1.23</real>"
             "</map></llsd>",
             v,
-            v.size() + 1);
+            static_cast<S32>(v.size()) + 1);
 
         v.clear();
         v[0] = 23;
@@ -766,7 +766,7 @@ namespace tut
                 "<real>1.23</real>"
             "</array></llsd>",
             v,
-            v.size() + 1);
+            static_cast<S32>(v.size()) + 1);
 
         v.clear();
         v[0] = 23;
@@ -782,7 +782,7 @@ namespace tut
                 "<real>1.23</real>"
             "</array></llsd>",
             v,
-            v.size() + 1);
+            static_cast<S32>(v.size()) + 1);
     }
 
     template<> template<>
@@ -1405,13 +1405,13 @@ namespace tut
         uint32_t size = htonl(1);
         memcpy(&vec[1], &size, sizeof(uint32_t));
         vec.push_back('k');
-        int key_size_loc = vec.size();
+        auto key_size_loc = vec.size();
         size = htonl(1); // 1 too short
         vec.resize(vec.size() + 4);
         memcpy(&vec[key_size_loc], &size, sizeof(uint32_t));
         vec.push_back('a'); vec.push_back('m'); vec.push_back('y');
         vec.push_back('i');
-        int integer_loc = vec.size();
+        auto integer_loc = vec.size();
         vec.resize(vec.size() + 4);
         uint32_t val_int = htonl(23);
         memcpy(&vec[integer_loc], &val_int, sizeof(uint32_t));
@@ -1473,7 +1473,7 @@ namespace tut
         memcpy(&vec[1], &size, sizeof(uint32_t));
         vec.push_back('"'); vec.push_back('a'); vec.push_back('m');
         vec.push_back('y'); vec.push_back('"'); vec.push_back('i');
-        int integer_loc = vec.size();
+        auto integer_loc = vec.size();
         vec.resize(vec.size() + 4);
         uint32_t val_int = htonl(23);
         memcpy(&vec[integer_loc], &val_int, sizeof(uint32_t));
@@ -1808,8 +1808,8 @@ namespace tut
 #if LL_WINDOWS
         std::string q("\"");
         std::string qPYTHON(q + PYTHON + q);
-        std::string qscript(q + scriptfile.getName() + q);
-        int rc = _spawnl(_P_WAIT, PYTHON.c_str(), qPYTHON.c_str(), qscript.c_str(),
+        std::string qscript(q + scriptfile.getPath().string() + q);
+        int rc = (int)_spawnl(_P_WAIT, PYTHON.c_str(), qPYTHON.c_str(), qscript.c_str(),
                          std::forward<ARGS>(args)..., NULL);
         if (rc == -1)
         {
@@ -1825,7 +1825,7 @@ namespace tut
 #else  // LL_DARWIN, LL_LINUX
         LLProcess::Params params;
         params.executable = PYTHON;
-        params.args.add(scriptfile.getName());
+        params.args.add(scriptfile.getPath().string());
         for (const std::string& arg : StringVec{ std::forward<ARGS>(args)... })
         {
             params.args.add(arg);
@@ -1921,12 +1921,12 @@ namespace tut
             int bufflen{ static_cast<int>(buffstr.length()) };
             out.write(reinterpret_cast<const char*>(&bufflen), sizeof(bufflen));
             LL_DEBUGS() << "Wrote length: "
-                        << hexdump(reinterpret_cast<const char*>(&bufflen),
+                        << LL::hexdump(reinterpret_cast<const char*>(&bufflen),
                                    sizeof(bufflen))
                         << LL_ENDL;
             out.write(buffstr.c_str(), buffstr.length());
             LL_DEBUGS() << "Wrote data:   "
-                        << hexmix(buffstr.c_str(), buffstr.length())
+                        << LL::hexmix(buffstr.c_str(), buffstr.length())
                         << LL_ENDL;
         }
     }
@@ -2002,8 +2002,8 @@ namespace tut
                    "        yield frombytes\n"
                    << pydata <<
                    // Don't forget raw-string syntax for Windows pathnames.
-                   "debug = open(r'" << debug.getName() << "', 'w')\n"
-                   "verify(parse_each(open(r'" << file.getName() << "', 'rb')))\n";});
+                   "debug = open(r'" << debug.getPath().string() << "', 'w')\n"
+                   "verify(parse_each(open(r'" << file.getPath().string() << "', 'rb')))\n";});
         }
         catch (const failure&)
         {
@@ -2111,13 +2111,13 @@ namespace tut
                "]\n"
                // Don't forget raw-string syntax for Windows pathnames.
                // N.B. Using 'print' implicitly adds newlines.
-               "with open(r'" << file.getName() << "', 'wb') as f:\n"
+               "with open(r'" << ll_convert<std::string>(file.getPath().u8string()).c_str() << "', 'wb') as f:\n"
                "    for item in DATA:\n"
                "        serialized = llsd." << pyformatter << "(item)\n"
                "        f.write(lenformat.pack(len(serialized)))\n"
                "        f.write(serialized)\n";});
 
-        std::ifstream inf(file.getName().c_str());
+        llifstream inf(file.getPath());
         LLSD item;
         try
         {

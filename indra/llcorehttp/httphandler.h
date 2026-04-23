@@ -61,7 +61,8 @@ public:
     typedef std::shared_ptr<HttpHandler>  ptr_t;
     typedef std::weak_ptr<HttpHandler>    wptr_t;
 
-    virtual ~HttpHandler() = default;
+    virtual ~HttpHandler()
+    { }
 
     /// Method invoked during calls to @see update().  Each invocation
     /// represents the completion of some requested operation.  Caller

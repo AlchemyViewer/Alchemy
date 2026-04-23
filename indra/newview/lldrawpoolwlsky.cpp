@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -44,11 +47,15 @@
 #include "llvowlsky.h"
 #include "llsettingsvo.h"
 #include "llviewercontrol.h"
+#include "llappviewer.h" // gFrameIntervalSeconds
 
-extern BOOL gCubeSnapshot;
+extern bool gCubeSnapshot;
 
 static LLStaticHashedString sCamPosLocal("camPosLocal");
 static LLStaticHashedString sCustomAlpha("custom_alpha");
+static LLStaticHashedString sMeteorWidth("meteor_width_pixels");
+static LLStaticHashedString sAuroraIntensity("aurora_intensity");
+static LLStaticHashedString sAuroraTime("aurora_time");
 
 static LLGLSLShader* cloud_shader = NULL;
 static LLGLSLShader* sky_shader   = NULL;
@@ -225,7 +232,10 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
 
     LLGLSPipelineBlendSkyBox gls_sky(true, false);
 
-    gGL.setSceneBlendType(LLRender::BT_ADD_WITH_ALPHA);
+    // Pre-multiplied additive blend: the shader multiplies the star's RGB by
+    // its shape/alpha before output, so the framebuffer operation is a simple
+    // screen-space add rather than an alpha-blend.
+    gGL.setSceneBlendType(LLRender::BT_ADD);
 
     F32 star_alpha = LLEnvironment::instance().getCurrentSky()->getStarBrightness() / 500.0f;
 
@@ -238,34 +248,10 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
 
     gDeferredStarProgram.bind();
 
-    LLViewerTexture* tex_a = gSky.mVOSkyp->getBloomTex();
-    LLViewerTexture* tex_b = gSky.mVOSkyp->getBloomTexNext();
-
-    F32 blend_factor = LLEnvironment::instance().getCurrentSky()->getBlendFactor();
-
-    if (tex_a && (!tex_b || (tex_a == tex_b)))
-    {
-        // Bind current and next sun textures
-        gGL.getTexUnit(0)->bind(tex_a);
-        gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
-        blend_factor = 0;
-    }
-    else if (tex_b && !tex_a)
-    {
-        gGL.getTexUnit(0)->bind(tex_b);
-        gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
-        blend_factor = 0;
-    }
-    else if (tex_b != tex_a)
-    {
-        gGL.getTexUnit(0)->bind(tex_a);
-        gGL.getTexUnit(1)->bind(tex_b);
-    }
-
     gGL.pushMatrix();
     gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
-    gGL.rotatef(gFrameTimeSeconds*0.01f, 0.f, 0.f, 1.f);
-    gDeferredStarProgram.uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
+    // Subtle rotation so fixed patterns drift over long time scales.
+    gGL.rotatef(gFrameTimeSeconds * 0.01f, 0.f, 0.f, 1.f);
 
     if (LLPipeline::sReflectionRender)
     {
@@ -273,18 +259,116 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
     }
     gDeferredStarProgram.uniform1f(sCustomAlpha, star_alpha);
 
-    sStarTime = (F32)LLFrameTimer::getElapsedSeconds() * 0.5f;
+    // Screen resolution for GPU-side pixel-sized billboarding.
+    LLRenderTarget* deferred_target = &gPipeline.mRT->deferredScreen;
+    gDeferredStarProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
+                                   (GLfloat)deferred_target->getWidth(),
+                                   (GLfloat)deferred_target->getHeight());
+
+    // Moon glare inputs. moon_dir is in world space; vary_world_dir in the
+    // fragment is the pre-rotation star direction, so there's a very slow
+    // drift (0.01 deg/sec of sky rotation) between the visual moon position
+    // and where the glare halo lands. That drift is imperceptible over any
+    // realistic session length and keeps the uniform path simple.
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+    const LLVector3 moon_dir = psky->getMoonDirection();
+    gDeferredStarProgram.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, moon_dir.mV);
+    gDeferredStarProgram.uniform1f(LLShaderMgr::MOON_BRIGHTNESS,
+                                   psky->getIsMoonUp() ? (F32)psky->getMoonBrightness() : 0.0f);
+
+    // Wrapped time for scintillation noise. 86400s is long enough that a
+    // typical session never hits the wrap boundary (where the non-periodic
+    // noise would show a one-frame jump), and short enough that 32-bit float
+    // precision stays good for the scaled time term in the shader.
+    sStarTime = (F32)fmod(LLFrameTimer::getElapsedSeconds() * 0.5, 86400.0);
 
     gDeferredStarProgram.uniform1f(LLShaderMgr::WATER_TIME, sStarTime);
 
     gSky.mVOWLSkyp->drawStars();
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
-
     gDeferredStarProgram.unbind();
 
     gGL.popMatrix();
+}
+
+void LLDrawPoolWLSky::renderMeteorsDeferred(const LLVector3& camPosLocal) const
+{
+    if (!gSky.mVOSkyp || use_hdri_sky() || !gSky.mVOWLSkyp) return;
+
+    static LLCachedControl<bool> meteors_enabled(gSavedSettings, "RenderMeteorsEnabled", true);
+    if (!meteors_enabled) return;
+
+    // Gate on the same star-brightness threshold as stars — meteors are a
+    // night-sky phenomenon and should disappear when daytime suppresses stars.
+    // Also freezes the CPU-side meteor state so we don't accumulate work off-screen.
+    F32 star_alpha = LLEnvironment::instance().getCurrentSky()->getStarBrightness() / 500.0f;
+    if (star_alpha < 0.001f) return;
+
+    // Tick and upload state once per frame before drawing. gFrameIntervalSeconds
+    // is zero when paused (dt <= 0 bails out of the tick), so the meteor list
+    // naturally freezes with the rest of the world.
+    F32 dt = (F32)gFrameIntervalSeconds.value();
+    if (dt > 0.1f) dt = 0.1f;   // clamp after long frames so a new meteor doesn't snap to end-of-life
+    gSky.mVOWLSkyp->tickMeteors(dt);
+    gSky.mVOWLSkyp->updateMeteorGeometry();
+
+    LLGLSPipelineBlendSkyBox gls_sky(true, false);
+    gGL.setSceneBlendType(LLRender::BT_ADD);
+
+    gDeferredMeteorProgram.bind();
+
+    gGL.pushMatrix();
+    gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
+
+    LLRenderTarget* deferred_target = &gPipeline.mRT->deferredScreen;
+    gDeferredMeteorProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
+                                     (GLfloat)deferred_target->getWidth(),
+                                     (GLfloat)deferred_target->getHeight());
+    gDeferredMeteorProgram.uniform1f(sMeteorWidth, 1.5f);
+
+    gSky.mVOWLSkyp->drawMeteors();
+
+    gDeferredMeteorProgram.unbind();
+    gGL.popMatrix();
+}
+
+void LLDrawPoolWLSky::renderAuroraDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const
+{
+    if (!gSky.mVOSkyp || use_hdri_sky() || !gSky.mVOWLSkyp) return;
+
+    static LLCachedControl<F32> aurora_intensity(gSavedSettings, "RenderAuroraIntensity", 0.6f);
+    if (aurora_intensity <= 0.0f) return;
+
+    // Aurora is a night phenomenon — gate on star brightness for consistency
+    // with the rest of the night sky (stars, meteors).
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+    const F32 star_alpha = psky->getStarBrightness() / 500.0f;
+    if (star_alpha < 0.001f) return;
+
+    // Suppress aurora when the moon is up and bright (scattered moonlight
+    // would wash out the faint emission anyway).
+    const F32 moon_wash = psky->getIsMoonUp() ? (F32)psky->getMoonBrightness() : 0.0f;
+    const F32 intensity = aurora_intensity * llmax(0.0f, 1.0f - moon_wash * 0.85f);
+    if (intensity <= 0.001f) return;
+
+    LLGLSPipelineBlendSkyBox gls_sky(true, false);
+    gGL.setSceneBlendType(LLRender::BT_ADD);
+
+    gDeferredAuroraProgram.bind();
+
+    static F32 s_aurora_time = 0.0f;
+    F32 dt = (F32)gFrameIntervalSeconds.value();
+    if (dt > 0.1f) dt = 0.1f;
+    s_aurora_time = (F32)fmod(s_aurora_time + dt, 86400.0);
+
+    gDeferredAuroraProgram.uniform1f(sAuroraIntensity, intensity);
+    gDeferredAuroraProgram.uniform1f(sAuroraTime, s_aurora_time);
+
+    // Re-use the WL sky dome mesh — a ready-made hemisphere. Aurora shader
+    // discards the zenith cap and below-horizon region.
+    renderDome(camPosLocal, camHeightLocal, &gDeferredAuroraProgram);
+
+    gDeferredAuroraProgram.unbind();
 }
 
 void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const
@@ -308,8 +392,8 @@ void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
         gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
 
-        F32 cloud_variance = psky ? psky->getCloudVariance() : 0.0f;
-        F32 blend_factor   = psky ? psky->getBlendFactor() : 0.0f;
+        F32 cloud_variance = psky ? (F32)psky->getCloudVariance() : 0.0f;
+        F32 blend_factor   = psky ? (F32)psky->getBlendFactor() : 0.0f;
 
         if (psky->getCloudScrollRate().isExactlyZero())
         {
@@ -363,7 +447,7 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 
     LLFace * face = gSky.mVOSkyp->mFace[LLVOSky::FACE_SUN];
 
-    F32 blend_factor = LLEnvironment::instance().getCurrentSky()->getBlendFactor();
+    F32 blend_factor = (F32)LLEnvironment::instance().getCurrentSky()->getBlendFactor();
     bool can_use_vertex_shaders = gPipeline.shadersLoaded();
     bool can_use_windlight_shaders = gPipeline.canUseWindLightShaders();
 
@@ -490,6 +574,8 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
         if (!gCubeSnapshot)
         {
             renderStarsDeferred(origin);
+            renderAuroraDeferred(origin, camHeightLocal);
+            renderMeteorsDeferred(origin);
         }
 
         if (!gCubeSnapshot || gPipeline.mReflectionMapManager.isRadiancePass()) // don't draw clouds in irradiance maps to avoid popping

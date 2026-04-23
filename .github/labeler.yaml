@@ -1,0 +1,117 @@
+llappearance:
+- changed-files:
+  - any-glob-to-any-file: indra/llappearance/**
+
+llaudio:
+- changed-files:
+  - any-glob-to-any-file: indra/llaudio/**
+
+llcharacter:
+- changed-files:
+  - any-glob-to-any-file: indra/llcharacter/**
+
+llcommon:
+- changed-files:
+  - any-glob-to-any-file: indra/llcommon/**
+
+llcorehttp:
+- changed-files:
+  - any-glob-to-any-file: indra/llcorehttp/**
+
+llcrashlogger:
+- changed-files:
+  - any-glob-to-any-file: indra/llcrashlogger/**
+
+llfilesystem:
+- changed-files:
+  - any-glob-to-any-file: indra/llfilesystem/**
+
+llimage:
+- changed-files:
+  - any-glob-to-any-file: indra/llimage/**
+
+llimagej2coj:
+- changed-files:
+  - any-glob-to-any-file: indra/llimagej2coj/**
+
+llinventory:
+- changed-files:
+  - any-glob-to-any-file: indra/llinventory/**
+
+llkdu:
+- changed-files:
+  - any-glob-to-any-file: indra/llkdu/**
+
+llmath:
+- changed-files:
+  - any-glob-to-any-file: indra/llmath/**
+
+llmeshoptimizer:
+- changed-files:
+  - any-glob-to-any-file: indra/llmeshoptimizer/**
+
+llmessage:
+- changed-files:
+  - any-glob-to-any-file: indra/llmessage/**
+
+llplugin:
+- changed-files:
+  - any-glob-to-any-file: indra/llplugin/**
+
+llprimitive:
+- changed-files:
+  - any-glob-to-any-file: indra/llprimitive/**
+
+llrender:
+- changed-files:
+  - any-glob-to-any-file: indra/llrender/**
+
+llui:
+- changed-files:
+  - any-glob-to-any-file: indra/llui/**
+
+llwindow:
+- changed-files:
+  - any-glob-to-any-file: indra/llwindow/**
+
+llxml:
+- changed-files:
+  - any-glob-to-any-file: indra/llxml/**
+
+viewer:
+- changed-files:
+  - any-glob-to-any-file: indra/newview/**
+
+skins:
+- changed-files:
+  - any-glob-to-any-file: indra/newview/skins/**
+
+cmake:
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/*.cmake'
+    - '**/*/cmake/*'
+    - '**/CMakeLists.txt'
+
+python:
+- changed-files:
+  - any-glob-to-any-file: '**/*.py'
+
+c/cpp:
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/*.c'
+    - '**/*.cpp'
+    - '**/*.cxx'
+    - '**/*.h'
+    - '**/*.hpp'
+    - '**/*.hxx'
+    - '**/*.i'
+    - '**/*.inl'
+    - '**/*.y'
+
+objc:
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/*.m'
+    - '**/*.mm'

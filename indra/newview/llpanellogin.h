@@ -37,7 +37,7 @@ class LLPanelLoginListener;
 class LLSLURL;
 class LLCredential;
 
-class LLPanelLogin final :
+class LLPanelLogin:
     public LLPanel,
     public LLViewerMediaObserver
 {
@@ -48,7 +48,7 @@ public:
                 void *callback_data);
     ~LLPanelLogin();
 
-    void setFocus( BOOL b ) override;
+    virtual void setFocus( bool b );
 
     static void show(const LLRect &rect,
         void (*callback)(S32 option, void* user_data),
@@ -59,9 +59,9 @@ public:
     static void resetFields();
     static void getFields(LLPointer<LLCredential>& credential, bool& remember_user, bool& remember_psswrd);
 
-    static BOOL isCredentialSet() { return sCredentialSet; }
+    static bool isCredentialSet() { return sCredentialSet; }
 
-    static BOOL areCredentialFieldsDirty();
+    static bool areCredentialFieldsDirty();
     static void setLocation(const LLSLURL& slurl);
     static void autologinToLocation(const LLSLURL& slurl);
 
@@ -70,13 +70,12 @@ public:
 
     static void closePanel();
 
-
     static void loadLoginPage();
     static void giveFocus();
     static void setAlwaysRefresh(bool refresh);
 
     // inherited from LLViewerMediaObserver
-    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
+    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event);
     static void updateServer();  // update the combo box, change the login page to the new server, clear the combo
 
     /// to be called from LLStartUp::setStartSLURL
@@ -91,10 +90,8 @@ public:
 private:
     friend class LLPanelLoginListener;
     void addFavoritesToStartLocation();
-    void addUsersWithFavoritesToUsername();
     void onSelectServer();
     void onLocationSLURL();
-    void refreshGridList();
 
     static void setFields(LLPointer<LLCredential> credential);
 
@@ -108,11 +105,11 @@ private:
     static void onRememberPasswordCheck(void*);
     static void onPassKey(LLLineEditor* caller, void* user_data);
 
-    static void connectCallback(const LLSD& notification, const LLSD& response);
-    static void connect();
+    bool onUpdateNotification(const LLSD& notify);
 
 private:
     std::unique_ptr<LLPanelLoginListener> mListener;
+    LLTempBoundListener mAlertListener;
 
     void updateLoginButtons();
     void populateUserList(LLPointer<LLCredential> credential);
@@ -120,20 +117,21 @@ private:
     void            (*mCallback)(S32 option, void *userdata);
     void*           mCallbackData;
 
-    BOOL            mPasswordModified;
+    bool            mPasswordModified;
     bool            mShowFavorites;
 
     static LLPanelLogin* sInstance;
-    static BOOL     sCapslockDidNotification;
+    static bool     sCapslockDidNotification;
     bool            mFirstLoginThisInstall;
 
-    static BOOL sCredentialSet;
+    static bool sCredentialSet;
 
     unsigned int mUsernameLength;
     unsigned int mPasswordLength;
     unsigned int mLocationLength;
 
-    boost::signals2::connection mGridListChangedConnection;
+    bool mAlertNotif;
+    LLButton* mLoginBtn;
 };
 
 #endif

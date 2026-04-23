@@ -132,28 +132,28 @@ protected:
 
 public:
     //LLTabContainer( const std::string& name, const LLRect& rect, TabPosition pos,
-    //              BOOL bordered, BOOL is_vertical);
+    //              bool bordered, bool is_vertical);
 
     /*virtual*/ ~LLTabContainer();
 
     // from LLView
     /*virtual*/ void setValue(const LLSD& value);
 
-    /*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
     /*virtual*/ void draw();
-    /*virtual*/ BOOL handleMouseDown( S32 x, S32 y, MASK mask );
-    /*virtual*/ BOOL handleHover( S32 x, S32 y, MASK mask );
-    /*virtual*/ BOOL handleMouseUp( S32 x, S32 y, MASK mask );
-    /*virtual*/ BOOL handleToolTip(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL handleKeyHere(KEY key, MASK mask);
-    /*virtual*/ BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
+    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool handleMouseUp( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
+    /*virtual*/ bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                        EDragAndDropType type, void* cargo_data,
                                        EAcceptance* accept, std::string& tooltip);
-    /*virtual*/ LLView* getChildView(std::string_view name, BOOL recurse = TRUE) const final;
-    /*virtual*/ LLView* findChildView(std::string_view name, BOOL recurse = TRUE) const final;
+    /*virtual*/ LLView* getChildView(std::string_view name, bool recurse = true) const;
+    /*virtual*/ LLView* findChildView(std::string_view name, bool recurse = true) const;
     /*virtual*/ void initFromParams(const LLPanel::Params& p);
     /*virtual*/ bool addChild(LLView* view, S32 tab_group = 0);
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     struct TabPanelParams : public LLInitParam::Block<TabPanelParams>
     {
@@ -182,33 +182,30 @@ public:
     void        removeTabPanel( LLPanel* child );
     void        lockTabs(S32 num_tabs = 0);
     void        unlockTabs();
-    S32         getNumLockedTabs() { return mLockedTabCount; }
-    void        enableTabButton(S32 which, BOOL enable);
+    S32         getNumLockedTabs() const { return mLockedTabCount; }
+    void        enableTabButton(S32 which, bool enable);
     void        deleteAllTabs();
     LLPanel*    getCurrentPanel();
-    S32         getCurrentPanelIndex();
-    S32         getTabCount();
-    LLPanel*    getPanelByIndex(S32 index);
-    S32         getIndexForPanel(LLPanel* panel);
-    S32         getPanelIndexByTitle(std::string_view title);
+    S32         getCurrentPanelIndex() const;
+    S32         getTabCount() const;
+    LLPanel*    getPanelByIndex(S32 index) const;
+    S32         getIndexForPanel(LLPanel* panel) const;
+    S32         getPanelIndexByTitle(std::string_view title) const;
     LLPanel*    getPanelByName(std::string_view name);
     S32         getTotalTabWidth() const;
     void        setCurrentTabName(const std::string& name);
-
-    //BD
-    BOOL        getTabButtonEnabled(S32 which);
 
     void        selectFirstTab();
     void        selectLastTab();
     void        selectNextTab();
     void        selectPrevTab();
-    BOOL        selectTabPanel( LLPanel* child );
-    BOOL        selectTab(S32 which);
-    BOOL        selectTabByName(std::string_view title);
+    bool        selectTabPanel( LLPanel* child );
+    bool        selectTab(S32 which);
+    bool        selectTabByName(std::string_view title);
     void        setCurrentPanelIndex(S32 index) { mCurrentTabIdx = index; }
 
-    BOOL        getTabPanelFlashing(LLPanel* child);
-    void        setTabPanelFlashing(LLPanel* child, BOOL state);
+    bool        getTabPanelFlashing(LLPanel* child);
+    void        setTabPanelFlashing(LLPanel* child, bool state);
     void        setTabImage(LLPanel* child, std::string img_name, const LLColor4& color = LLColor4::white);
     void        setTabImage(LLPanel* child, const LLUUID& img_id, const LLColor4& color = LLColor4::white);
     void        setTabImage(LLPanel* child, LLIconCtrl* icon);
@@ -228,6 +225,7 @@ public:
     S32         getMaxTabWidth() const { return mMaxTabWidth; }
 
     void setTabVisibility( LLPanel const *aPanel, bool );
+    bool getTabVisibility(const LLPanel* panel) const;
 
     void        startDragAndDropDelayTimer() { mDragAndDropDelayTimer.start(); }
 
@@ -243,7 +241,7 @@ private:
 
     void initButtons();
 
-    BOOL        setTab(S32 which);
+    bool        setTab(S32 which);
 
     LLTabTuple* getTab(S32 index)       { return mTabList[index]; }
     LLTabTuple* getTabByPanel(LLPanel* child);
@@ -256,8 +254,8 @@ private:
     S32 getScrollPosPixels() const      { return mScrollPosPixels; }
     void setScrollPosPixels(S32 pixels) { mScrollPosPixels = pixels; }
 
-    void setTabsHidden(BOOL hidden)     { mTabsHidden = hidden; }
-    BOOL getTabsHidden() const          { return mTabsHidden; }
+    void setTabsHidden(bool hidden)     { mTabsHidden = hidden; }
+    bool getTabsHidden() const          { return mTabsHidden; }
 
     void scrollPrev() { mScrollPos = llmax(0, mScrollPos-1); } // No wrap
     void scrollNext() { mScrollPos = llmin(mScrollPos+1, mMaxScrollPos); } // No wrap
@@ -266,7 +264,7 @@ private:
     void commitHoveredButton(S32 x, S32 y);
 
     // updates tab button images given the tuple, tab position and the corresponding params
-    void update_images(LLTabTuple* tuple, const TabParams& params, LLTabContainer::TabPosition pos);
+    void update_images(LLTabTuple* tuple, TabParams params, LLTabContainer::TabPosition pos);
     void reshapeTuple(LLTabTuple* tuple);
 
     // Variables
@@ -275,10 +273,10 @@ private:
     tuple_list_t                    mTabList;
 
     S32                             mCurrentTabIdx;
-    BOOL                            mTabsHidden;
-    BOOL                            mHideScrollArrows;
+    bool                            mTabsHidden;
+    bool                            mHideScrollArrows;
 
-    BOOL                            mScrolled;
+    bool                            mScrolled;
     LLFrameTimer                    mScrollTimer;
     S32                             mScrollPos;
     S32                             mScrollPosPixels;
@@ -293,7 +291,7 @@ private:
     LLButton*                       mPrevArrowBtn;
     LLButton*                       mNextArrowBtn;
 
-    BOOL                            mIsVertical;
+    bool                            mIsVertical;
 
     // Horizontal specific
     LLButton*                       mJumpPrevArrowBtn;

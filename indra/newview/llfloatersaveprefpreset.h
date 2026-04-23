@@ -32,14 +32,14 @@
 
 class LLComboBox;
 
-class LLFloaterSavePrefPreset final : public LLFloater
+class LLFloaterSavePrefPreset : public LLFloater
 {
 
 public:
     LLFloaterSavePrefPreset(const LLSD &key);
 
-    /*virtual*/ BOOL    postBuild();
-    /*virtual*/ void    onOpen(const LLSD& key);
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
 
     void onBtnSave();
     void onBtnCancel();

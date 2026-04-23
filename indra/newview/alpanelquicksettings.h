@@ -40,7 +40,7 @@ public:
     ALPanelQuickSettings();
     ~ALPanelQuickSettings();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
     void refresh() override;
 
 private:

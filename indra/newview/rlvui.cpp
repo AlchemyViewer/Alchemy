@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2011, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -17,6 +18,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "llagent.h"
 #include "llavataractions.h"            // LLAvatarActions::profileVisible()
+#include "llchatmentionhelper.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llhudtext.h"                  // LLHUDText::refreshAllObjectText()
 #include "llimview.h"                   // LLIMMgr::computeSessionID()
@@ -61,6 +63,7 @@ RlvUIEnabler::RlvUIEnabler()
 
     // onToggleXXX
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWLOC, boost::bind(&RlvUIEnabler::onToggleShowLoc, this)));
+    m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWNAMES, boost::bind(&RlvUIEnabler::onToggleShowNames, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWMINIMAP, boost::bind(&RlvUIEnabler::onToggleShowMinimap, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_SHOWWORLDMAP, boost::bind(&RlvUIEnabler::onToggleShowWorldMap, this)));
     m_Handlers.insert(std::pair<ERlvBehaviour, behaviour_handler_t>(RLV_BHVR_UNSIT, boost::bind(&RlvUIEnabler::onToggleUnsit, this)));
@@ -98,7 +101,7 @@ void RlvUIEnabler::onRefreshHoverText()
 void RlvUIEnabler::onToggleMovement()
 {
     if ( (gRlvHandler.hasBehaviour(RLV_BHVR_FLY)) && (gAgent.getFlying()) )
-        gAgent.setFlying(FALSE);
+        gAgent.setFlying(false);
     if ( (gRlvHandler.hasBehaviour(RLV_BHVR_ALWAYSRUN)) && (gAgent.getAlwaysRun()) )
         gAgent.clearAlwaysRun();
     if ( (gRlvHandler.hasBehaviour(RLV_BHVR_TEMPRUN)) && (gAgent.getTempRun()) )
@@ -142,10 +145,10 @@ void RlvUIEnabler::onToggleShowLoc()
         {
             const LLTeleportHistoryItem& tpItem = pTpHistory->getItems().back();
             const LLTeleportHistoryPersistentItem& tpItemStg = pTpHistoryStg->getItems().back();
-            if (pTpHistoryStg->compareByTitleAndGlobalPos(tpItemStg, LLTeleportHistoryPersistentItem(tpItem.mGrid, tpItem.mRegion, tpItem.mTitle, tpItem.mLocalPos, tpItem.mGlobalPos)))
+            if (pTpHistoryStg->compareByTitleAndGlobalPos(tpItemStg, LLTeleportHistoryPersistentItem(tpItem.mTitle, tpItem.mGlobalPos)))
             {
                 // TODO-RLVa: [RLVa-1.2.2] Is there a reason why LLTeleportHistoryStorage::removeItem() doesn't trigger history changed?
-                pTpHistoryStg->removeItem(pTpHistoryStg->getItems().size() - 1);
+                pTpHistoryStg->removeItem(static_cast<S32>(pTpHistoryStg->getItems().size()) - 1);
                 pTpHistoryStg->mHistoryChangedSignal(-1);
             }
         }
@@ -175,6 +178,16 @@ void RlvUIEnabler::onToggleShowLoc()
     }
 }
 
+// Checked: 2026-02-12 (RLVa-2.4.2)
+void RlvUIEnabler::onToggleShowNames()
+{
+    const bool can_show = !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES);
+    if (!can_show)
+    {
+        LLChatMentionHelper::instance().hideHelper();
+    }
+}
+
 // Checked: 2010-02-28 (RLVa-1.4.0a) | Added: RLVa-1.2.0a
 void RlvUIEnabler::onToggleShowMinimap()
 {
@@ -199,7 +212,7 @@ void RlvUIEnabler::onToggleShowMinimap()
 
     // Break/reestablish the visibility connection for the nearby people panel embedded minimap instance
     LLPanel* pPeoplePanel = LLFloaterSidePanelContainer::getPanel("people", "panel_people");
-    LLPanel* pNetMapPanel = (pPeoplePanel) ? pPeoplePanel->findChild<LLPanel>("Net Map Panel", TRUE) : NULL;
+    LLPanel* pNetMapPanel = (pPeoplePanel) ? pPeoplePanel->findChild<LLPanel>("Net Map Panel", true) : NULL;
     RLV_ASSERT( (pPeoplePanel) && (pNetMapPanel) );
     if (pNetMapPanel)
     {
@@ -315,7 +328,7 @@ bool RlvUIEnabler::removeGenericFloaterFilter(const std::string& strFloaterName)
     return true;
 }
 
-bool RlvUIEnabler::filterFloaterGeneric(std::string_view strFloaterName, const LLSD&)
+bool RlvUIEnabler::filterFloaterGeneric(const std::string& strFloaterName, const LLSD&)
 {
     auto itFloater = m_FilteredFloaterMap.find(strFloaterName);
     if (m_FilteredFloaterMap.end() != itFloater)
@@ -329,7 +342,7 @@ bool RlvUIEnabler::filterFloaterGeneric(std::string_view strFloaterName, const L
 }
 
 // Checked: 2010-04-22 (RLVa-1.4.5) | Added: RLVa-1.2.0
-bool RlvUIEnabler::filterFloaterShowLoc(std::string_view strName, const LLSD&)
+bool RlvUIEnabler::filterFloaterShowLoc(const std::string& strName, const LLSD&)
 {
     if ("about_land" == strName)
         return canViewParcelProperties();
@@ -341,7 +354,7 @@ bool RlvUIEnabler::filterFloaterShowLoc(std::string_view strName, const LLSD&)
 }
 
 // Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
-bool RlvUIEnabler::filterPanelShowLoc(std::string_view strFloater, std::string_view, const LLSD& sdKey)
+bool RlvUIEnabler::filterPanelShowLoc(const std::string& strFloater, const std::string&, const LLSD& sdKey)
 {
     if ("places" == strFloater)
     {
@@ -355,7 +368,7 @@ bool RlvUIEnabler::filterPanelShowLoc(std::string_view strFloater, std::string_v
 }
 
 // Checked: 2010-03-01 (RLVa-1.2.0b) | Added: RLVa-1.2.0a
-bool RlvUIEnabler::filterFloaterViewXXX(std::string_view strName, const LLSD&)
+bool RlvUIEnabler::filterFloaterViewXXX(const std::string& strName, const LLSD&)
 {
     if ( (gRlvHandler.hasBehaviour(RLV_BHVR_VIEWNOTE)) && ("preview_notecard" == strName) )
     {
@@ -404,8 +417,8 @@ bool RlvUIEnabler::canViewParcelProperties()
             const LLUUID& idOwner = pParcel->getOwnerID();
             if ( (idOwner != gAgent.getID()) )
             {
-                S32 count = gAgent.mGroups.size();
-                for (S32 i = 0; i < count; ++i)
+                size_t count = gAgent.mGroups.size();
+                for (size_t i = 0; i < count; ++i)
                 {
                     if (gAgent.mGroups.at(i).mID == idOwner)
                     {

@@ -30,14 +30,14 @@
 #include "llfloater.h"
 #include "llmediactrl.h"
 
-class LLFloaterBuyCurrencyHTML final :
+class LLFloaterBuyCurrencyHTML :
     public LLFloater,
     public LLViewerMediaObserver
 {
     public:
         LLFloaterBuyCurrencyHTML( const LLSD& key );
 
-        /*virtual*/ BOOL postBuild();
+        /*virtual*/ bool postBuild();
         /*virtual*/ void onClose( bool app_quitting );
 
         // inherited from LLViewerMediaObserver

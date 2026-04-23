@@ -38,20 +38,13 @@
 #include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
 
-// These are loaded from saved settings.
-LLColor4 LLHUDManager::sParentColor;
-LLColor4 LLHUDManager::sChildColor;
-
 LLHUDManager::LLHUDManager()
 {
-
-    LLHUDManager::sParentColor = LLUIColorTable::instance().getColor("FocusColor");
-    // rdw commented out since it's not used.  Also removed from colors_base.xml
-    //LLHUDManager::sChildColor =LLUIColorTable::instance().getColor("FocusSecondaryColor");
 }
 
 LLHUDManager::~LLHUDManager()
 {
+    mHUDEffects.clear();
 }
 
 static LLTrace::BlockTimerStatHandle FTM_UPDATE_HUD_EFFECTS("Update Hud Effects");
@@ -96,16 +89,10 @@ void LLHUDManager::sendEffects()
             msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
             msg->nextBlockFast(_PREHASH_Effect);
             hep->packData(msg);
-            hep->setNeedsSendToSim(FALSE);
+            hep->setNeedsSendToSim(false);
             gAgent.sendMessage();
         }
     }
-}
-
-//static
-void LLHUDManager::shutdownClass()
-{
-    getInstance()->mHUDEffects.clear();
 }
 
 void LLHUDManager::cleanupEffects()
@@ -125,7 +112,7 @@ void LLHUDManager::cleanupEffects()
     }
 }
 
-LLHUDEffect *LLHUDManager::createViewerEffect(const U8 type, BOOL send_to_sim, BOOL originated_here)
+LLHUDEffect *LLHUDManager::createViewerEffect(const U8 type, bool send_to_sim, bool originated_here)
 {
     // SJB: DO NOT USE addHUDObject!!! Not all LLHUDObjects are LLHUDEffects!
     LLHUDEffect *hep = LLHUDObject::addHUDEffect(type);
@@ -154,27 +141,25 @@ void LLHUDManager::processViewerEffect(LLMessageSystem *mesgsys, void **user_dat
     S32 number_blocks = mesgsys->getNumberOfBlocksFast(_PREHASH_Effect);
     S32 k;
 
-    auto& hudMgr = LLHUDManager::instance();
-
     for (k = 0; k < number_blocks; k++)
     {
         effectp = NULL;
         LLHUDEffect::getIDType(mesgsys, k, effect_id, effect_type);
         S32 i;
-        for (i = 0; i < hudMgr.mHUDEffects.size(); i++)
+        for (i = 0; i < LLHUDManager::getInstance()->mHUDEffects.size(); i++)
         {
-            LLHUDEffect *cur_effectp = hudMgr.mHUDEffects[i];
+            LLHUDEffect *cur_effectp = LLHUDManager::getInstance()->mHUDEffects[i];
             if (!cur_effectp)
             {
                 LL_WARNS() << "Null effect in effect manager, skipping" << LL_ENDL;
-                hudMgr.mHUDEffects.erase(hudMgr.mHUDEffects.begin() + i);
+                LLHUDManager::getInstance()->mHUDEffects.erase(LLHUDManager::getInstance()->mHUDEffects.begin() + i);
                 i--;
                 continue;
             }
             if (cur_effectp->isDead())
             {
     //          LL_WARNS() << "Dead effect in effect manager, removing" << LL_ENDL;
-                hudMgr.mHUDEffects.erase(hudMgr.mHUDEffects.begin() + i);
+                LLHUDManager::getInstance()->mHUDEffects.erase(LLHUDManager::getInstance()->mHUDEffects.begin() + i);
                 i--;
                 continue;
             }
@@ -193,7 +178,7 @@ void LLHUDManager::processViewerEffect(LLMessageSystem *mesgsys, void **user_dat
         {
             if (!effectp)
             {
-                effectp = hudMgr.createViewerEffect(effect_type, FALSE, FALSE);
+                effectp = LLHUDManager::getInstance()->createViewerEffect(effect_type, false, false);
             }
 
             if (effectp)

@@ -29,18 +29,7 @@
 #include "llgltfmaterial.h"
 #include "llgltfmateriallist.h"
 #include "llpointer.h"
-
-#include <boost/json.hpp>
-
-#ifndef TINYGLTF_USE_BOOSTJSON
-#define TINYGLTF_USE_BOOSTJSON 1
-#endif
-
-#ifndef TINYGLTF_NO_INCLUDE_BOOSTJSON
-#define TINYGLTF_NO_INCLUDE_BOOSTJSON 1
-#endif
-#undef STRICT
-#include "tinygltf/tiny_gltf.h"
+#include <tiny_gltf.h>
 
 class LLImageRaw;
 class LLViewerFetchedTexture;
@@ -53,6 +42,7 @@ namespace LLTinyGLTFHelper
     LLImageRaw* getTexture(const std::string& folder, const tinygltf::Model& model, S32 texture_index, bool flip = true);
 
     bool loadModel(const std::string& filename, tinygltf::Model& model_out);
+    bool saveModel(const std::string& filename, tinygltf::Model& model_in);
 
     bool getMaterialFromModel(
         const std::string& filename,

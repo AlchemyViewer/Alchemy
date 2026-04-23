@@ -28,13 +28,17 @@
 #define LL_PANELPROFILECLASSIFIEDS_H
 
 #include "llavatarpropertiesprocessor.h"
-#include "llfloaterpublishclassified.h"
+#include "llclassifiedinfo.h"
+#include "llfloater.h"
 #include "llpanel.h"
 #include "llpanelavatar.h"
+#include "llrect.h"
 #include "lluuid.h"
 #include "v3dmath.h"
+#include "llcoros.h"
 #include "lleventcoro.h"
 
+class LLFloaterPublishClassified;
 class LLCheckBoxCtrl;
 class LLLineEditor;
 class LLMediaCtrl;
@@ -43,6 +47,23 @@ class LLTabContainer;
 class LLTextEditor;
 class LLTextureCtrl;
 class LLUICtrl;
+
+#if 0 // Moved to LLFloaterPublishClassified
+class LLPublishClassifiedFloater : public LLFloater
+{
+public:
+    LLPublishClassifiedFloater(const LLSD& key);
+    virtual ~LLPublishClassifiedFloater();
+
+    bool postBuild() override;
+
+    void setPrice(S32 price);
+    S32 getPrice();
+
+    void setPublishClickedCallback(const commit_signal_t::slot_type& cb);
+    void setCancelClickedCallback(const commit_signal_t::slot_type& cb);
+};
+#endif
 
 /**
 * Panel for displaying Avatar's picks.
@@ -54,7 +75,7 @@ public:
     LLPanelProfileClassifieds();
     /*virtual*/ ~LLPanelProfileClassifieds();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void onOpen(const LLSD& key) override;
 
@@ -91,7 +112,6 @@ private:
     LLUUID          mClassifiedToSelectOnLoad;
     bool            mClassifiedEditOnLoad;
     bool            mSheduledClassifiedCreation;
-    boost::signals2::connection mRlvBehaviorConn;
 };
 
 
@@ -106,7 +126,7 @@ public:
 
     /*virtual*/ ~LLPanelProfileClassified();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void onOpen(const LLSD& key) override;
 
@@ -138,27 +158,27 @@ public:
 
     void setParcelId(const LLUUID& id) { mParcelId = id; }
 
-    LLUUID getParcelId() { return mParcelId; }
+    LLUUID getParcelId() const { return mParcelId; }
 
     void setSimName(const std::string& sim_name) { mSimName = sim_name; }
 
-    std::string getSimName() { return mSimName; }
+    std::string getSimName() const { return mSimName; }
 
     void setFromSearch(bool val) { mFromSearch = val; }
 
-    bool fromSearch() { return mFromSearch; }
+    bool fromSearch() const { return mFromSearch; }
 
-    bool getInfoLoaded() { return mInfoLoaded; }
+    bool getInfoLoaded() const { return mInfoLoaded; }
 
     void setInfoLoaded(bool loaded) { mInfoLoaded = loaded; }
 
-    BOOL isDirty() const override;
+    bool isDirty() const override;
 
     void resetDirty() override;
 
-    bool isNew() { return mIsNew; }
+    bool isNew() const { return mIsNew; }
 
-    bool isNewWithErrors() { return mIsNewWithErrors; }
+    bool isNewWithErrors() const { return mIsNewWithErrors; }
 
     bool canClose();
 
@@ -172,10 +192,10 @@ public:
 
     bool getAutoRenew();
 
-    S32 getPriceForListing() { return mPriceForListing; }
+    S32 getPriceForListing() const { return mPriceForListing; }
 
-    void setEditMode(BOOL edit_mode);
-    bool getEditMode() {return mEditMode;}
+    void setEditMode(bool edit_mode);
+    bool getEditMode() const { return mEditMode; }
 
     static void setClickThrough(
         const LLUUID& classified_id,

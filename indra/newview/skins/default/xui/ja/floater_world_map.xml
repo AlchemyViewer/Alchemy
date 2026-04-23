@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="worldmap" title="ワールドマップ">
 	<floater.string name="UnnamedParcel">（名前のない区画）</floater.string>
-	<layout_stack name="control_stack">
+	<string name="collapse_tooltip" value="マップ操作を隠します。"/>
+	<string name="expand_tooltip" value="マップ操作を表示します。"/>
+	<layout_stack name="floater_map_stack">
 		<layout_panel name="map_lp">
-			<panel name="objects_mapview"/>
+			<panel name="expand_btn_panel" tool_tip="マップ操作を隠します。">
+				<icon name="expand_collapse_icon" tool_tip="マップ操作を隠します。"/>
+			</panel>
 		</layout_panel>
-		<layout_panel name="control_lp">
+		<layout_panel name="controls_lp">
 			<panel name="layout_panel_1">
-				<text name="legends_label">
+				<text name="events_label">
 					凡例
 				</text>
 			</panel>
@@ -16,26 +20,18 @@
 				<text name="me_label">
 					自分
 				</text>
-				<check_box name="people_chk"/>
-				<icon name="person"/>
 				<text name="person_label">
 					人物
 				</text>
-				<check_box name="infohub_chk"/>
-				<icon name="infohub"/>
 				<text name="infohub_label">
 					情報ハブ
 				</text>
-				<check_box name="land_for_sale_chk"/>
-				<icon name="landforsale"/>
 				<text name="land_sale_label">
 					販売中
 				</text>
-				<icon name="square2_auction"/>
 				<text name="auction_label">
 					オークション中
 				</text>
-				<icon name="square2_owner"/>
 				<text name="by_owner_label">
 					所有者で
 				</text>
@@ -46,18 +42,12 @@
 				<text name="events_label">
 					イベント：
 				</text>
-				<check_box name="event_chk"/>
-				<icon name="event"/>
 				<text name="pg_label">
 					General
 				</text>
-				<check_box name="events_mature_chk"/>
-				<icon name="events_mature_icon"/>
 				<text name="events_mature_label">
 					Moderate
 				</text>
-				<check_box name="events_adult_chk"/>
-				<icon name="events_adult_icon"/>
 				<text name="events_adult_label">
 					Adult
 				</text>
@@ -69,28 +59,20 @@
 				</text>
 			</panel>
 			<panel name="layout_panel_4">
-				<icon name="friends_icon"/>
 				<combo_box label="オンラインのフレンド" name="friend combo" tool_tip="マップにフレンドを表示します。">
 					<combo_box.item label="オンラインのフレンド" name="item1" value="None"/>
 				</combo_box>
-				<icon name="landmark_icon"/>
 				<combo_box label="ランドマーク" name="landmark combo" tool_tip="マップにランドマークを表示します。">
 					<combo_box.item label="ランドマーク" name="item1" value="None"/>
 				</combo_box>
-				<icon name="location_icon"/>
 				<search_editor label="リージョン名で" name="location" tool_tip="リージョン名を入力してください。"/>
 				<button label="探す" name="DoSearch" tool_tip="リージョンを検索します。"/>
 				<button name="Clear" tool_tip="追跡ラインをクリアしてマップをリセットします。"/>
-				<scroll_list name="search_results">
-					<scroll_list.columns label="" name="icon"/>
-					<scroll_list.columns label="" name="sim_name"/>
-				</scroll_list>
-				<text name="locations_label">
-					場所：
+			</panel>
+			<panel name="layout_panel_7">
+				<text name="events_label">
+					場所
 				</text>
-				<spinner name="teleport_coordinate_x"/>
-				<spinner name="teleport_coordinate_y"/>
-				<spinner name="teleport_coordinate_z"/>
 				<button label="テレポート" name="Teleport" tool_tip="選択した場所にテレポートします。"/>
 				<button label="SLurlをコピー" name="copy_slurl" tool_tip="現在の場所をWebで使えるSLurlにしてコピーします。"/>
 				<button label="選択を表示" name="Show Destination" tool_tip="選択した場所をマップの中心にします。"/>
@@ -100,11 +82,6 @@
 				<text name="zoom_label">
 					縮尺
 				</text>
-			</panel>
-			<panel name="layout_panel_6">
-				<icon name="zoom_icon"/>
-				<!-- NOTE: min_val for zoom slider is hardcoded for performance reasons -->
-				<slider name="zoom slider"/>
 			</panel>
 		</layout_panel>
 	</layout_stack>

@@ -24,9 +24,22 @@
  * $/LicenseInfo$
  */
 
+#include "linden_common.h"
+
 #include "llmemory.h"
 #include "llmath.h"
 #include "llquantize.h"
+
+extern const LLQuad F_ZERO_4A       = { 0, 0, 0, 0 };
+extern const LLQuad F_APPROXIMATELY_ZERO_4A = {
+    F_APPROXIMATELY_ZERO,
+    F_APPROXIMATELY_ZERO,
+    F_APPROXIMATELY_ZERO,
+    F_APPROXIMATELY_ZERO
+};
+
+extern const LLVector4a LL_V4A_ZERO = reinterpret_cast<const LLVector4a&> ( F_ZERO_4A );
+extern const LLVector4a LL_V4A_EPSILON = reinterpret_cast<const LLVector4a&> ( F_APPROXIMATELY_ZERO_4A );
 
 /*static */void LLVector4a::memcpyNonAliased16(F32* __restrict dst, const F32* __restrict src, size_t bytes)
 {
@@ -88,7 +101,7 @@ void LLVector4a::quantize8( const LLVector4a& low, const LLVector4a& high )
         // 8-bit quantization means we can do with just 12 bits of reciprocal accuracy
         const LLVector4a oneOverDelta = _mm_rcp_ps(delta.mQ);
 //      {
-//          static LL_ALIGN_16( const F32 F_TWO_4A[4] ) = { 2.f, 2.f, 2.f, 2.f };
+//          alignas(16) static const F32 F_TWO_4A[4] = { 2.f, 2.f, 2.f, 2.f };
 //          LLVector4a two; two.load4a( F_TWO_4A );
 //
 //          // Here we use _mm_rcp_ps plus one round of newton-raphson
@@ -117,7 +130,7 @@ void LLVector4a::quantize8( const LLVector4a& low, const LLVector4a& high )
     {
         LLVector4a maxError; maxError.setMul(delta, *reinterpret_cast<const LLVector4a*>(F_OOU8MAX_4A));
         LLVector4a absVal; absVal.setAbs( val );
-        setSelectWithMask( absVal.lessThan( maxError ), getZero(), val );
+        setSelectWithMask( absVal.lessThan( maxError ), F_ZERO_4A, val );
     }
 }
 
@@ -133,8 +146,8 @@ void LLVector4a::quantize16( const LLVector4a& low, const LLVector4a& high )
         // 16-bit quantization means we need a round of Newton-Raphson
         LLVector4a oneOverDelta;
         {
-
-            const LLVector4a two = _mm_set_ps1(2.f);
+            LLVector4a two;
+            two.splat(2.f);
 
             // Here we use _mm_rcp_ps plus one round of newton-raphson
             // We wish to find 'x' such that x = 1/delta
@@ -162,6 +175,6 @@ void LLVector4a::quantize16( const LLVector4a& low, const LLVector4a& high )
     {
         LLVector4a maxError; maxError.setMul(delta, *reinterpret_cast<const LLVector4a*>(F_OOU16MAX_4A));
         LLVector4a absVal; absVal.setAbs( val );
-        setSelectWithMask( absVal.lessThan( maxError ), getZero(), val );
+        setSelectWithMask( absVal.lessThan( maxError ), F_ZERO_4A, val );
     }
 }

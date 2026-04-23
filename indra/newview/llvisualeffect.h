@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2021&license=viewerlgpl$
  * Copyright (c) 2021, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -17,6 +18,8 @@
 #pragma once
 
 #include "llsingleton.h"
+#include <boost/optional.hpp>
+#include <boost/none.hpp>
 
 // ============================================================================
 //
@@ -50,7 +53,7 @@ struct LLVisualEffectParams
     virtual void step(bool isLast) = 0;
 };
 
-struct LLShaderEffectParams final : LLVisualEffectParams
+struct LLShaderEffectParams : LLVisualEffectParams
 {
     explicit LLShaderEffectParams(LLRenderTarget* pSrcBuffer, LLRenderTarget* pScratchBuffer, bool fBindLast) : m_pSrcBuffer(pScratchBuffer), m_pDstBuffer(pSrcBuffer), m_fBindLast(fBindLast) {}
 
@@ -111,7 +114,7 @@ class LLTweenableValue
 {
 public:
     LLTweenableValue(const T& defaultValue) : m_CurValue(defaultValue) {}
-    virtual ~LLTweenableValue() = default;
+    virtual ~LLTweenableValue() {}
 
     virtual T    get() = 0;
     virtual void start(const T& endValue, double duration) = 0;
@@ -126,7 +129,7 @@ protected:
 };
 
 template<typename T>
-class LLTweenableValueLerp final : public LLTweenableValue<T>
+class LLTweenableValueLerp : public LLTweenableValue<T>
 {
 public:
     LLTweenableValueLerp(const T& defaultValue) : LLTweenableValue<T>(defaultValue) {}
@@ -156,11 +159,11 @@ protected:
 //
 //
 
-class LLVfxManager final : public LLSingleton<LLVfxManager>
+class LLVfxManager : public LLSingleton<LLVfxManager>
 {
     LLSINGLETON(LLVfxManager);
 protected:
-    ~LLVfxManager() = default;
+    ~LLVfxManager() {}
 
     /*
      * Member functions

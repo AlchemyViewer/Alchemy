@@ -30,9 +30,6 @@
 #include <string>
 #include <vector>
 
-//Why?  Because BOOL
-void setCrashUserMetadataWrapper(const std::string& userid, const std::string& username);
-
 void force_ns_sxeption();
 
 #endif // LL_LLAPPVIEWERMACOSX_OBJC_H

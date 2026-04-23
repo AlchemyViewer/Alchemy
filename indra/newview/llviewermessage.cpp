@@ -32,7 +32,6 @@
 #include "llaudioengine.h"
 #include "llavataractions.h"
 #include "llavatarnamecache.h"      // IDEVO HACK
-#include "lleconomy.h"
 #include "lleventtimer.h"
 #include "llfloatercreatelandmark.h"
 #include "llfloaterreg.h"
@@ -52,6 +51,8 @@
 #include "mean_collision_data.h"
 
 #include "alassetblocklist.h"
+#include "alfloaterblocked.h"
+#include "alfloatertransactionlog.h"
 #include "llagent.h"
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -67,7 +68,6 @@
 #include "llfloaterpreference.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llfloatersnapshot.h"
-#include "llfloatertransactionlog.h"
 #include "llhudeffecttrail.h"
 #include "llhudmanager.h"
 #include "llimprocessing.h"
@@ -98,7 +98,6 @@
 #include "lluri.h"
 #include "llviewergenericmessage.h"
 #include "llviewermenu.h"
-#include "llviewernetwork.h"
 #include "llviewerinventory.h"
 #include "llviewerjoystick.h"
 #include "llviewerobjectlist.h"
@@ -118,8 +117,7 @@
 #include "llkeythrottle.h"
 #include "llgroupactions.h"
 #include "llagentui.h"
-//#include "llpanelblockedlist.h"
-#include "llfloaterblocked.h"
+#include "llpanelblockedlist.h"
 #include "llpanelplaceprofile.h"
 #include "llviewerregion.h"
 #include "llfloaterregionrestarting.h"
@@ -130,7 +128,6 @@
 #include "rlvui.h"
 // [/RLVa:KB]
 
-
 #include "llnotificationmanager.h" //
 #include "llexperiencecache.h"
 
@@ -138,7 +135,7 @@
 
 extern void on_new_message(const LLSD& msg);
 
-extern BOOL gCubeSnapshot;
+extern bool gCubeSnapshot;
 
 //
 // Constants
@@ -150,7 +147,7 @@ const F32 CAMERA_POSITION_THRESHOLD_SQUARED = 0.001f * 0.001f;
 static const U32 LLREQUEST_PERMISSION_THROTTLE_LIMIT    = 5;     // requests
 static const F32 LLREQUEST_PERMISSION_THROTTLE_INTERVAL = 10.0f; // seconds
 
-extern BOOL gDebugClicks;
+extern bool gDebugClicks;
 extern bool gShiftFrame;
 
 // function prototypes
@@ -173,8 +170,8 @@ void accept_friendship_coro(std::string url, LLSD notification)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("friendshipResponceErrorProcessing", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("friendshipResponceErrorProcessing", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     if (url.empty())
     {
         LL_WARNS("Friendship") << "Empty capability!" << LL_ENDL;
@@ -198,7 +195,7 @@ void accept_friendship_coro(std::string url, LLSD notification)
     }
     else
     {
-        if (!result.has("success") || result["success"].asBoolean() == false)
+        if (!result.has("success") || !result["success"].asBoolean())
         {
             LL_WARNS("Friendship") << "Server failed to process accepted friendship. " << httpResults << LL_ENDL;
         }
@@ -223,8 +220,8 @@ void decline_friendship_coro(std::string url, LLSD notification, S32 option)
     }
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("friendshipResponceErrorProcessing", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("friendshipResponceErrorProcessing", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD payload = notification["payload"];
     url += "?from=" + payload["from_id"].asString();
@@ -241,7 +238,7 @@ void decline_friendship_coro(std::string url, LLSD notification, S32 option)
     }
     else
     {
-        if (!result.has("success") || result["success"].asBoolean() == false)
+        if (!result.has("success") || !result["success"].asBoolean())
         {
             LL_WARNS("Friendship") << "Server failed to process declined friendship. " << httpResults << LL_ENDL;
         }
@@ -284,7 +281,7 @@ bool friendship_offer_callback(const LLSD& notification, const LLSD& response)
             // This will also trigger an onlinenotification if the user is online
             std::string url = gAgent.getRegionCapability("AcceptFriendship");
             LL_DEBUGS("Friendship") << "Cap string: " << url << LL_ENDL;
-            if (!url.empty() && payload.has("online") && payload["online"].asBoolean() == false)
+            if (!url.empty() && payload.has("online") && !payload["online"].asBoolean())
             {
                 LL_DEBUGS("Friendship") << "Accepting friendship via capability" << LL_ENDL;
                 LLCoros::instance().launch("LLMessageSystem::acceptFriendshipOffer",
@@ -323,7 +320,7 @@ bool friendship_offer_callback(const LLSD& notification, const LLSD& response)
                 // the rejection to the simulator to delete the pending userop.
                 std::string url = gAgent.getRegionCapability("DeclineFriendship");
                 LL_DEBUGS("Friendship") << "Cap string: " << url << LL_ENDL;
-                if (!url.empty() && payload.has("online") && payload["online"].asBoolean() == false)
+                if (!url.empty() && payload.has("online") && !payload["online"].asBoolean())
                 {
                     LL_DEBUGS("Friendship") << "Declining friendship via capability" << LL_ENDL;
                     LLCoros::instance().launch("LLMessageSystem::declineFriendshipOffer",
@@ -391,7 +388,7 @@ static LLNotificationFunctorRegistration friendship_offer_callback_reg_nm("Offer
 // Functions
 //
 
-void give_money(const LLUUID& uuid, LLViewerRegion* region, S32 amount, BOOL is_group,
+void give_money(const LLUUID& uuid, LLViewerRegion* region, S32 amount, bool is_group,
                 S32 trx_type, const std::string& desc)
 {
     if(0 == amount || !region) return;
@@ -413,7 +410,7 @@ void give_money(const LLUUID& uuid, LLViewerRegion* region, S32 amount, BOOL is_
         msg->nextBlockFast(_PREHASH_MoneyData);
         msg->addUUIDFast(_PREHASH_SourceID, gAgent.getID() );
         msg->addUUIDFast(_PREHASH_DestID, uuid);
-        msg->addU8Fast(_PREHASH_Flags, pack_transaction_flags(FALSE, is_group));
+        msg->addU8Fast(_PREHASH_Flags, pack_transaction_flags(false, is_group));
         msg->addS32Fast(_PREHASH_Amount, amount);
         msg->addU8Fast(_PREHASH_AggregatePermNextOwner, (U8)LLAggregatePermissions::AP_EMPTY);
         msg->addU8Fast(_PREHASH_AggregatePermInventory, (U8)LLAggregatePermissions::AP_EMPTY);
@@ -527,192 +524,6 @@ void process_layer_data(LLMessageSystem *mesgsys, void **user_data)
     }
 }
 
-// S32 exported_object_count = 0;
-// S32 exported_image_count = 0;
-// S32 current_object_count = 0;
-// S32 current_image_count = 0;
-
-// extern LLNotifyBox *gExporterNotify;
-// extern LLUUID gExporterRequestID;
-// extern std::string gExportDirectory;
-
-// extern LLUploadDialog *gExportDialog;
-
-// std::string gExportedFile;
-
-// std::map<LLUUID, std::string> gImageChecksums;
-
-// void export_complete()
-// {
-//      LLUploadDialog::modalUploadFinished();
-//      gExporterRequestID.setNull();
-//      gExportDirectory = "";
-
-//      LLFILE* fXML = LLFile::fopen(gExportedFile, "rb");      /* Flawfinder: ignore */
-//      fseek(fXML, 0, SEEK_END);
-//      long length = ftell(fXML);
-//      fseek(fXML, 0, SEEK_SET);
-//      U8 *buffer = new U8[length + 1];
-//      size_t nread = fread(buffer, 1, length, fXML);
-//      if (nread < (size_t) length)
-//      {
-//          LL_WARNS("Messaging") << "Short read" << LL_ENDL;
-//      }
-//      buffer[nread] = '\0';
-//      fclose(fXML);
-
-//      char *pos = (char *)buffer;
-//      while ((pos = strstr(pos+1, "<sl:image ")) != 0)
-//      {
-//          char *pos_check = strstr(pos, "checksum=\"");
-
-//          if (pos_check)
-//          {
-//              char *pos_uuid = strstr(pos_check, "\">");
-
-//              if (pos_uuid)
-//              {
-//                  char image_uuid_str[UUID_STR_SIZE];     /* Flawfinder: ignore */
-//                  memcpy(image_uuid_str, pos_uuid+2, UUID_STR_SIZE-1);        /* Flawfinder: ignore */
-//                  image_uuid_str[UUID_STR_SIZE-1] = 0;
-
-//                  LLUUID image_uuid(image_uuid_str);
-
-//                  LL_INFOS("Messaging") << "Found UUID: " << image_uuid << LL_ENDL;
-
-//                  std::map<LLUUID, std::string>::iterator itor = gImageChecksums.find(image_uuid);
-//                  if (itor != gImageChecksums.end())
-//                  {
-//                      LL_INFOS("Messaging") << "Replacing with checksum: " << itor->second << LL_ENDL;
-//                      if (!itor->second.empty())
-//                      {
-//                          memcpy(&pos_check[10], itor->second.c_str(), 32);       /* Flawfinder: ignore */
-//                      }
-//                  }
-//              }
-//          }
-//      }
-
-//      LLFILE* fXMLOut = LLFile::fopen(gExportedFile, "wb");       /* Flawfinder: ignore */
-//      if (fwrite(buffer, 1, length, fXMLOut) != length)
-//      {
-//          LL_WARNS("Messaging") << "Short write" << LL_ENDL;
-//      }
-//      fclose(fXMLOut);
-
-//      delete [] buffer;
-// }
-
-
-// void exported_item_complete(const LLTSCode status, void *user_data)
-// {
-//  //std::string *filename = (std::string *)user_data;
-
-//  if (status < LLTS_OK)
-//  {
-//      LL_WARNS("Messaging") << "Export failed!" << LL_ENDL;
-//  }
-//  else
-//  {
-//      ++current_object_count;
-//      if (current_image_count == exported_image_count && current_object_count == exported_object_count)
-//      {
-//          LL_INFOS("Messaging") << "*** Export complete ***" << LL_ENDL;
-
-//          export_complete();
-//      }
-//      else
-//      {
-//          gExportDialog->setMessage(llformat("Exported %d/%d object files, %d/%d textures.", current_object_count, exported_object_count, current_image_count, exported_image_count));
-//      }
-//  }
-// }
-
-// struct exported_image_info
-// {
-//  LLUUID image_id;
-//  std::string filename;
-//  U32 image_num;
-// };
-
-// void exported_j2c_complete(const LLTSCode status, void *user_data)
-// {
-//  exported_image_info *info = (exported_image_info *)user_data;
-//  LLUUID image_id = info->image_id;
-//  U32 image_num = info->image_num;
-//  std::string filename = info->filename;
-//  delete info;
-
-//  if (status < LLTS_OK)
-//  {
-//      LL_WARNS("Messaging") << "Image download failed!" << LL_ENDL;
-//  }
-//  else
-//  {
-//      LLFILE* fIn = LLFile::fopen(filename, "rb");        /* Flawfinder: ignore */
-//      if (fIn)
-//      {
-//          LLPointer<LLImageJ2C> ImageUtility = new LLImageJ2C;
-//          LLPointer<LLImageTGA> TargaUtility = new LLImageTGA;
-
-//          fseek(fIn, 0, SEEK_END);
-//          S32 length = ftell(fIn);
-//          fseek(fIn, 0, SEEK_SET);
-//          U8 *buffer = ImageUtility->allocateData(length);
-//          if (fread(buffer, 1, length, fIn) != length)
-//          {
-//              LL_WARNS("Messaging") << "Short read" << LL_ENDL;
-//          }
-//          fclose(fIn);
-//          LLFile::remove(filename);
-
-//          // Convert to TGA
-//          LLPointer<LLImageRaw> image = new LLImageRaw();
-
-//          ImageUtility->updateData();
-//          ImageUtility->decode(image, 100000.0f);
-
-//          TargaUtility->encode(image);
-//          U8 *data = TargaUtility->getData();
-//          S32 data_size = TargaUtility->getDataSize();
-
-//          std::string file_path = gDirUtilp->getDirName(filename);
-
-//          std::string output_file = llformat("%s/image-%03d.tga", file_path.c_str(), image_num);//filename;
-//          //S32 name_len = output_file.length();
-//          //strcpy(&output_file[name_len-3], "tga");
-//          LLFILE* fOut = LLFile::fopen(output_file, "wb");        /* Flawfinder: ignore */
-//          char md5_hash_string[33];       /* Flawfinder: ignore */
-//          strcpy(md5_hash_string, "00000000000000000000000000000000");        /* Flawfinder: ignore */
-//          if (fOut)
-//          {
-//              if (fwrite(data, 1, data_size, fOut) != data_size)
-//              {
-//                  LL_WARNS("Messaging") << "Short write" << LL_ENDL;
-//              }
-//              fseek(fOut, 0, SEEK_SET);
-//              fclose(fOut);
-//              fOut = LLFile::fopen(output_file, "rb");        /* Flawfinder: ignore */
-//              LLMD5 my_md5_hash(fOut);
-//              my_md5_hash.hex_digest(md5_hash_string);
-//          }
-
-//          gImageChecksums.insert(std::pair<LLUUID, std::string>(image_id, md5_hash_string));
-//      }
-//  }
-
-//  ++current_image_count;
-//  if (current_image_count == exported_image_count && current_object_count == exported_object_count)
-//  {
-//      LL_INFOS("Messaging") << "*** Export textures complete ***" << LL_ENDL;
-//          export_complete();
-//  }
-//  else
-//  {
-//      gExportDialog->setMessage(llformat("Exported %d/%d object files, %d/%d textures.", current_object_count, exported_object_count, current_image_count, exported_image_count));
-//  }
-//}
-
 void process_derez_ack(LLMessageSystem*, void**)
 {
     if(gViewerWindow) gViewerWindow->getWindow()->decBusyCount();
@@ -722,7 +533,7 @@ void process_places_reply(LLMessageSystem* msg, void** data)
 {
     LLUUID query_id;
 
-    msg->getUUID("AgentData", "QueryID", query_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_QueryID, query_id);
     if (query_id.isNull())
     {
         LLFloaterLandHoldings::processPlacesReply(msg, data);
@@ -776,8 +587,8 @@ void response_group_invitation_coro(std::string url, LLUUID group_id, bool notif
 
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("responseGroupInvitation", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("responseGroupInvitation", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD payload;
     payload["group"] = group_id;
@@ -794,7 +605,7 @@ void response_group_invitation_coro(std::string url, LLUUID group_id, bool notif
     }
     else
     {
-        if (!result.has("success") || result["success"].asBoolean() == false)
+        if (!result.has("success") || !result["success"].asBoolean())
         {
             LL_WARNS("GroupInvite") << "Server failed to process group " << group_id << " invitation response. " << httpResults << LL_ENDL;
         }
@@ -989,13 +800,13 @@ static void highlight_inventory_objects_in_panel(const std::vector<LLUUID>& item
                     // Parent folders can be different in case of 2 consecutive drag and drop
                     // operations when the second one is started before the first one completes.
                     LL_DEBUGS("Inventory_Move") << "Open folder: " << fv_folder->getName() << LL_ENDL;
-                    fv_folder->setOpen(TRUE);
+                    fv_folder->setOpen(true);
                     if (fv_folder->isSelected())
                     {
-                        fv->changeSelection(fv_folder, FALSE);
+                        fv->changeSelection(fv_folder, false);
                     }
                 }
-                fv->changeSelection(fv_item, TRUE);
+                fv->changeSelection(fv_item, true);
             }
         }
     }
@@ -1009,24 +820,34 @@ static LLNotificationFunctorRegistration jgr_3("JoinGroupCanAfford", join_group_
 //-----------------------------------------------------------------------------
 // Instant Message
 //-----------------------------------------------------------------------------
-/*virtual*/ void LLOpenAgentOffer::startFetch()
+class LLOpenAgentOffer : public LLInventoryFetchItemsObserver
 {
-    for (uuid_vec_t::const_iterator it = mIDs.begin(); it < mIDs.end(); ++it)
+public:
+    LLOpenAgentOffer(const LLUUID& object_id,
+                     const std::string& from_name) :
+        LLInventoryFetchItemsObserver(object_id),
+        mFromName(from_name) {}
+    /*virtual*/ void startFetch()
     {
-        LLViewerInventoryCategory* cat = gInventory.getCategory(*it);
-        if (cat)
+        for (uuid_vec_t::const_iterator it = mIDs.begin(); it < mIDs.end(); ++it)
         {
-            mComplete.push_back((*it));
+            LLViewerInventoryCategory* cat = gInventory.getCategory(*it);
+            if (cat)
+            {
+                mComplete.push_back((*it));
+            }
         }
+        LLInventoryFetchItemsObserver::startFetch();
     }
-    LLInventoryFetchItemsObserver::startFetch();
-}
-/*virtual*/ void LLOpenAgentOffer::done()
-{
-    open_inventory_offer(mComplete, mFromName, mIsManuallyAccepted);
-    gInventory.removeObserver(this);
-    delete this;
-}
+    /*virtual*/ void done()
+    {
+        open_inventory_offer(mComplete, mFromName);
+        gInventory.removeObserver(this);
+        delete this;
+    }
+private:
+    std::string mFromName;
+};
 
 /**
  * Class to observe adding of new items moved from the world to user's inventory to select them in inventory.
@@ -1261,14 +1082,7 @@ protected:
             else ++it;
         }
 
-        if (gSavedSettings.getBOOL("ShowNewInventory"))
-        {
-            open_inventory_offer(added, "");
-        }
-        else if (!added.empty() && gSavedSettings.getBOOL("ShowInInventory") && highlight_offered_object(added.back()))
-        {
-            LLInventoryPanel::openInventoryPanelAndSetSelection(TRUE, added.back());
-        }
+        open_inventory_offer(added, "");
     }
  };
 
@@ -1282,14 +1096,7 @@ protected:
         {
             added.push_back(*it);
         }
-        if (gSavedSettings.getBOOL("ShowNewInventory"))
-        {
-            open_inventory_offer(added, "group_offer");
-        }
-        else if (!added.empty() && gSavedSettings.getBOOL("ShowInInventory"))
-        {
-            LLInventoryPanel::openInventoryPanelAndSetSelection(TRUE, added.back());
-        }
+        open_inventory_offer(added, "group_offer");
         gInventory.removeObserver(this);
         delete this;
     }
@@ -1363,7 +1170,7 @@ protected:
 };
 
 
-//Returns TRUE if we are OK, FALSE if we are throttled
+//Returns true if we are OK, false if we are throttled
 //Set check_only true if you want to know the throttle status
 //without registering a hit
 bool check_offer_throttle(const std::string& from_name, bool check_only)
@@ -1373,8 +1180,8 @@ bool check_offer_throttle(const std::string& from_name, bool check_only)
     LLChat chat;
     std::string log_message;
 
-    //if (!gSavedSettings.getBOOL("ShowNewInventory"))
-    //  return false;
+    if (!gSavedSettings.getBOOL("ShowNewInventory"))
+        return false;
 
     if (check_only)
     {
@@ -1448,7 +1255,7 @@ bool check_asset_previewable(const LLAssetType::EType asset_type)
             (asset_type == LLAssetType::AT_MATERIAL);
 }
 
-void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_name, bool manual_offer /* = false*/)
+void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_name)
 {
     for (uuid_vec_t::const_iterator obj_iter = objects.begin();
          obj_iter != objects.end();
@@ -1484,7 +1291,7 @@ void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_nam
             {
                 LL_DEBUGS("Messaging") << "Highlighting inventory item: " << item->getUUID()  << LL_ENDL;
                 // If we opened this ourselves, focus it
-                const BOOL take_focus = from_name.empty() ? TAKE_FOCUS_YES : TAKE_FOCUS_NO;
+                const bool take_focus = from_name.empty() ? TAKE_FOCUS_YES : TAKE_FOCUS_NO;
                 switch(asset_type)
                 {
                     case LLAssetType::AT_NOTECARD:
@@ -1581,28 +1388,21 @@ void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_nam
         else
         {
             // Highlight item
-// [ALCHEMY]
-//            bool show_in_inventory = gSavedSettings.get<bool>("ShowInInventory");
-//            bool auto_open =
-//                show_in_inventory && // don't open if ShowInInventory is FALSE
-//                !from_name.empty();  // don't open if it's not from anyone
-//
-//            // SL-20419 : Don't change active tab if floater is visible
-//           LLFloater* instance = LLFloaterReg::findInstance("inventory");
-//            bool use_main_panel = instance && instance->getVisible();
-//
-//            if (auto_open)
-//            {
-//                LLFloaterReg::showInstance("inventory");
-//            }
-//
-//            LLInventoryPanel::openInventoryPanelAndSetSelection(auto_open, obj_id, use_main_panel);
-            const BOOL auto_open = gSavedSettings.getBOOL("ShowInInventory") || (manual_offer && !check_asset_previewable(asset_type));
-            if(auto_open)
+            bool show_in_inventory = gSavedSettings.get<bool>("ShowInInventory");
+            bool auto_open =
+                show_in_inventory && // don't open if ShowInInventory is false
+                !from_name.empty();  // don't open if it's not from anyone
+
+            // SL-20419 : Don't change active tab if floater is visible
+            LLFloater* instance = LLFloaterReg::findInstance("inventory");
+            bool use_main_panel = instance && instance->getVisible();
+
+            if (auto_open)
             {
                 LLFloaterReg::showInstance("inventory");
             }
-            if (auto_open) LLInventoryPanel::openInventoryPanelAndSetSelection(auto_open, obj_id, true);
+
+            LLInventoryPanel::openInventoryPanelAndSetSelection(auto_open, obj_id, use_main_panel);
         }
     }
 }
@@ -1656,8 +1456,7 @@ void inventory_offer_mute_callback(const LLUUID& blocked_id,
     LLMute mute(blocked_id, full_name, mute_type);
     if (LLMuteList::getInstance()->add(mute))
     {
-        LLFloaterBlocked::showMuteAndSelect(blocked_id);
-        //LLPanelBlockedList::showPanelAndSelect(blocked_id);
+        ALFloaterBlocked::showMuteAndSelect(blocked_id);
     }
 
     // purge the message queue of any previously queued inventory offers from the same source.
@@ -1673,7 +1472,7 @@ void inventory_offer_mute_callback(const LLUUID& blocked_id,
             {
                 return (notification->getPayload()["from_id"].asUUID() == blocked_id);
             }
-            return FALSE;
+            return false;
         }
     private:
         const LLUUID& blocked_id;
@@ -1696,8 +1495,8 @@ std::string LLOfferInfo::mResponderType = "offer_info";
 
 LLOfferInfo::LLOfferInfo()
  : LLNotificationResponderInterface()
- , mFromGroup(FALSE)
- , mFromObject(FALSE)
+ , mFromGroup(false)
+ , mFromObject(false)
  , mIM(IM_NOTHING_SPECIAL)
  , mType(LLAssetType::AT_NONE)
  , mPersist(false)
@@ -1778,6 +1577,7 @@ void LLOfferInfo::sendReceiveResponse(bool accept, const LLUUID &destination_fol
     if (mTransactionID.isNull())
     {
         // Not provided, message won't work
+        LL_WARNS("Messaging") << "Missing transaction id, response for " << mIM << " won't work" << LL_ENDL;
         return;
     }
 
@@ -1787,7 +1587,7 @@ void LLOfferInfo::sendReceiveResponse(bool accept, const LLUUID &destination_fol
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->nextBlockFast(_PREHASH_MessageBlock);
-    msg->addBOOLFast(_PREHASH_FromGroup, FALSE);
+    msg->addBOOLFast(_PREHASH_FromGroup, false);
     msg->addUUIDFast(_PREHASH_ToAgentID, mFromID);
     msg->addU8Fast(_PREHASH_Offline, IM_ONLINE);
     msg->addUUIDFast(_PREHASH_ID, mTransactionID);
@@ -1820,6 +1620,8 @@ void LLOfferInfo::sendReceiveResponse(bool accept, const LLUUID &destination_fol
         msg->addU8Fast(_PREHASH_Dialog, (U8)(im + 1));
         msg->addBinaryDataFast(_PREHASH_BinaryBucket, &(destination_folder_id.mData),
                                 sizeof(destination_folder_id.mData));
+
+        LL_DEBUGS("Messaging") << "Processing" << (U8)(im + 1) << " with transaction id " << mTransactionID << LL_ENDL;
     }
     else
     {
@@ -1925,8 +1727,9 @@ bool LLOfferInfo::inventory_offer_callback(const LLSD& notification, const LLSD&
                 }
 // [/RLVa:KB]
 
+                if (gSavedSettings.getBOOL("ShowOfferedInventory"))
                 {
-                    LLOpenAgentOffer* open_agent_offer = new LLOpenAgentOffer(mObjectID, from_string, true);
+                    LLOpenAgentOffer* open_agent_offer = new LLOpenAgentOffer(mObjectID, from_string);
                     open_agent_offer->startFetch();
                     if(catp || (itemp && itemp->isFinished()))
                     {
@@ -1966,7 +1769,7 @@ bool LLOfferInfo::inventory_offer_callback(const LLSD& notification, const LLSD&
         //don't spam them if they are getting flooded
         if (check_offer_throttle(mFromName, true))
         {
-            log_message = chatHistory_string + " " + LLTrans::getString("InvOfferGaveYou") + " " + getSanitizedDescription() + LLTrans::getString(".");
+            log_message = "<nolink>" + chatHistory_string + "</nolink> " + LLTrans::getString("InvOfferGaveYou") + " " + getSanitizedDescription() + LLTrans::getString(".");
             LLSD args;
             args["MESSAGE"] = log_message;
             LLNotificationsUtil::add("SystemMessageTip", args);
@@ -1992,7 +1795,7 @@ bool LLOfferInfo::inventory_offer_callback(const LLSD& notification, const LLSD&
             chat.mText = log_message;
             if( LLMuteList::getInstance()->isMuted(mFromID ) && ! LLMuteList::isLinden(mFromName) )  // muting for SL-42269
             {
-                chat.mMuted = TRUE;
+                chat.mMuted = true;
                 accept_to_trash = false; // will send decline message
             }
 
@@ -2087,25 +1890,29 @@ bool LLOfferInfo::inventory_task_offer_callback(const LLSD& notification, const 
     std::string from_string; // Used in the pop-up.
     std::string chatHistory_string;  // Used in chat history.
 
-    if (mFromObject == TRUE)
+    if (mFromObject)
     {
+        std::string quot = LLTrans::getString("'");
         if (mFromGroup)
         {
             std::string group_name;
             if (gCacheName->getGroupName(mFromID, group_name))
             {
-                from_string = LLTrans::getString("InvOfferAnObjectNamed") + " "+"'"
-                + mFromName + LLTrans::getString("'") +" " + LLTrans::getString("InvOfferOwnedByGroup")
-                + " "+ "'" + group_name + "'";
-
-                chatHistory_string = mFromName + " " + LLTrans::getString("InvOfferOwnedByGroup")
-                + " " + group_name + "'";
+                from_string = LLTrans::getString("InvOfferAnObjectNamed") + " " +
+                    quot + mFromName + quot + " " +
+                    LLTrans::getString("InvOfferOwnedByGroup") + " " +
+                    quot + group_name + quot;
+                chatHistory_string = mFromName + " " +
+                    LLTrans::getString("InvOfferOwnedByGroup") + " " +
+                    quot + group_name + quot;
             }
             else
             {
-                from_string = LLTrans::getString("InvOfferAnObjectNamed") + " "+"'"
-                + mFromName +"'"+ " " + LLTrans::getString("InvOfferOwnedByUnknownGroup");
-                chatHistory_string = mFromName + " " + LLTrans::getString("InvOfferOwnedByUnknownGroup");
+                from_string = LLTrans::getString("InvOfferAnObjectNamed") + " " +
+                    quot + mFromName + quot + " " +
+                    LLTrans::getString("InvOfferOwnedByUnknownGroup");
+                chatHistory_string = mFromName + " " +
+                    LLTrans::getString("InvOfferOwnedByUnknownGroup");
             }
         }
         else
@@ -2114,16 +1921,21 @@ bool LLOfferInfo::inventory_task_offer_callback(const LLSD& notification, const 
             LLAvatarName av_name;
             if (LLAvatarNameCache::get(mFromID, &av_name))
             {
-                from_string = LLTrans::getString("InvOfferAnObjectNamed") + " "+ LLTrans::getString("'") + mFromName
-                    + LLTrans::getString("'")+" " + LLTrans::getString("InvOfferOwnedBy") + av_name.getUserName();
-                chatHistory_string = mFromName + " " + LLTrans::getString("InvOfferOwnedBy") + " " + av_name.getUserName();
+                from_string = LLTrans::getString("InvOfferAnObjectNamed") + " " +
+                    quot + mFromName + quot + " " +
+                    LLTrans::getString("InvOfferOwnedBy") + " " + av_name.getUserName();
+                chatHistory_string = mFromName + " " +
+                    LLTrans::getString("InvOfferOwnedBy") + " " + av_name.getUserName();
             }
             else
             {
-                from_string = LLTrans::getString("InvOfferAnObjectNamed") + " "+LLTrans::getString("'")
-                + mFromName + LLTrans::getString("'")+" " + LLTrans::getString("InvOfferOwnedByUnknownUser");
-                chatHistory_string = mFromName + " " + LLTrans::getString("InvOfferOwnedByUnknownUser");
+                from_string = LLTrans::getString("InvOfferAnObjectNamed") + " " +
+                    quot + mFromName + quot + " " +
+                    LLTrans::getString("InvOfferOwnedByUnknownUser");
+                chatHistory_string = mFromName + " " +
+                    LLTrans::getString("InvOfferOwnedByUnknownUser");
             }
+
 */
 // [SL:KB] - Checked: 2010-11-02 (RLVa-1.2.2a) | Added: RLVa-1.2.2a
             std::string name_slurl = LLSLURL("agent", mFromID, "about").getSLURLString();
@@ -2186,7 +1998,7 @@ bool LLOfferInfo::inventory_task_offer_callback(const LLSD& notification, const 
             //don't spam user if flooded
             if (check_offer_throttle(mFromName, true))
             {
-                log_message = chatHistory_string + " " + LLTrans::getString("InvOfferGaveYou") + " " + getSanitizedDescription() + LLTrans::getString(".");
+                log_message = "<nolink>" + chatHistory_string + "</nolink> " + LLTrans::getString("InvOfferGaveYou") + " " + getSanitizedDescription() + LLTrans::getString(".");
                 LLSD args;
                 args["MESSAGE"] = log_message;
                 LLNotificationsUtil::add("SystemMessageTip", args);
@@ -2269,7 +2081,7 @@ bool lure_callback(const LLSD& notification, const LLSD& response)
 
     LLUUID from_id = notification["payload"]["from_id"].asUUID();
     LLUUID lure_id = notification["payload"]["lure_id"].asUUID();
-    BOOL godlike = notification["payload"]["godlike"].asBoolean();
+    bool godlike = notification["payload"]["godlike"].asBoolean();
 
     switch(option)
     {
@@ -2293,7 +2105,7 @@ bool lure_callback(const LLSD& notification, const LLSD& response)
 
     if (notification_ptr)
     {
-        LLNotificationFormPtr modified_form(new LLNotificationForm(*notification_ptr->getForm()));
+        LLNotificationFormPtr modified_form = std::make_shared<LLNotificationForm>(*notification_ptr->getForm());
         modified_form->setElementEnabled("Teleport", false);
         modified_form->setElementEnabled("Cancel", false);
         notification_ptr->updateForm(modified_form);
@@ -2329,7 +2141,7 @@ bool mature_lure_callback(const LLSD& notification, const LLSD& response)
 
     LLUUID from_id = notification["payload"]["from_id"].asUUID();
     LLUUID lure_id = notification["payload"]["lure_id"].asUUID();
-    BOOL godlike = notification["payload"]["godlike"].asBoolean();
+    bool godlike = notification["payload"]["godlike"].asBoolean();
     U8 region_access = static_cast<U8>(notification["payload"]["region_maturity"].asInteger());
 
     switch(option)
@@ -2394,7 +2206,7 @@ void process_improved_im(LLMessageSystem *msg, void **user_data)
     LL_PROFILE_ZONE_SCOPED;
 
     LLUUID from_id;
-    BOOL from_group;
+    bool from_group;
     LLUUID to_id;
     U8 offline;
     U8 d = 0;
@@ -2416,7 +2228,7 @@ void process_improved_im(LLMessageSystem *msg, void **user_data)
     msg->getU8Fast(_PREHASH_MessageBlock, _PREHASH_Dialog, d);
     msg->getUUIDFast(_PREHASH_MessageBlock, _PREHASH_ID, session_id);
     msg->getU32Fast(_PREHASH_MessageBlock, _PREHASH_Timestamp, timestamp);
-    //msg->getDataFast(_PREHASH_MessageBlock, _PREHASH_Count,       &count);
+    //msg->getData("MessageBlock", "Count",     &count);
     msg->getStringFast(_PREHASH_MessageBlock, _PREHASH_FromAgentName, agentName);
     msg->getStringFast(_PREHASH_MessageBlock, _PREHASH_Message, message);
     msg->getU32Fast(_PREHASH_MessageBlock, _PREHASH_ParentEstateID, parent_estate_id);
@@ -2427,22 +2239,37 @@ void process_improved_im(LLMessageSystem *msg, void **user_data)
     EInstantMessage dialog = (EInstantMessage)d;
     LLHost sender = msg->getSender();
 
-    LLIMProcessing::processNewMessage(
-        std::move(from_id),
+    LLSD metadata;
+    if (msg->getNumberOfBlocksFast(_PREHASH_MetaData) > 0)
+    {
+        S32 metadata_size = msg->getSizeFast(_PREHASH_MetaData, 0, _PREHASH_Data);
+        std::string metadata_buffer;
+        metadata_buffer.resize(metadata_size, 0);
+
+        msg->getBinaryDataFast(_PREHASH_MetaData, _PREHASH_Data, &metadata_buffer[0], metadata_size, 0, metadata_size );
+        std::stringstream metadata_stream(metadata_buffer);
+        if (LLSDSerialize::fromBinary(metadata, metadata_stream, metadata_size) == LLSDParser::PARSE_FAILURE)
+        {
+            metadata.clear();
+        }
+    }
+
+    LLIMProcessing::processNewMessage(from_id,
         from_group,
-        std::move(to_id),
+        to_id,
         offline,
         dialog,
-        std::move(session_id),
+        session_id,
         timestamp,
-        std::move(agentName),
-        std::move(message),
+        agentName,
+        message,
         parent_estate_id,
-        std::move(region_id),
-        std::move(position),
+        region_id,
+        position,
         binary_bucket,
         binary_bucket_size,
-        sender);
+        sender,
+        metadata);
 }
 
 void send_do_not_disturb_message (LLMessageSystem* msg, const LLUUID& from_id, const LLUUID& session_id)
@@ -2455,7 +2282,7 @@ void send_do_not_disturb_message (LLMessageSystem* msg, const LLUUID& from_id, c
         pack_instant_message(
             msg,
             gAgent.getID(),
-            FALSE,
+            false,
             gAgent.getSessionID(),
             from_id,
             my_name,
@@ -2475,7 +2302,7 @@ void send_rejecting_tp_offers_message (LLMessageSystem* msg, const LLUUID& from_
     pack_instant_message(
         msg,
         gAgent.getID(),
-        FALSE,
+        false,
         gAgent.getSessionID(),
         from_id,
         my_name,
@@ -2486,32 +2313,30 @@ void send_rejecting_tp_offers_message (LLMessageSystem* msg, const LLUUID& from_
     gAgent.sendReliableMessage();
 }
 
-void send_rejecting_friendship_requests_message (LLMessageSystem* msg, const LLUUID& from_id, const LLUUID& session_id)
+void send_rejecting_friendship_requests_message  (LLMessageSystem* msg, const LLUUID& from_id, const LLUUID& session_id)
 {
-    if (gAgent.getRejectFriendshipRequests())
-    {
-        std::string my_name;
-        LLAgentUI::buildFullname(my_name);
-        std::string response = gSavedPerAccountSettings.getString("ALRejectFriendshipRequestsResponse");
-        pack_instant_message(
-            msg,
-            gAgent.getID(),
-            FALSE,
-            gAgent.getSessionID(),
-            from_id,
-            my_name,
-            response,
-            IM_ONLINE,
-            IM_DO_NOT_DISTURB_AUTO_RESPONSE,
-            session_id);
-        gAgent.sendReliableMessage();
-    }
+    std::string my_name;
+    LLAgentUI::buildFullname(my_name);
+    std::string response = gSavedPerAccountSettings.getString("ALRejectFriendshipRequestsResponse");
+    pack_instant_message(
+        msg,
+        gAgent.getID(),
+        false,
+        gAgent.getSessionID(),
+        from_id,
+        my_name,
+        response,
+        IM_ONLINE,
+        IM_DO_NOT_DISTURB_AUTO_RESPONSE,
+        session_id);
+    gAgent.sendReliableMessage();
 }
 
 bool callingcard_offer_callback(const LLSD& notification, const LLSD& response)
 {
     S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
     LLUUID fid;
+    LLUUID from_id;
     LLMessageSystem* msg = gMessageSystem;
     switch(option)
     {
@@ -2696,10 +2521,10 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
         chat.mFromName = from_name;
     }
 
-    BOOL is_do_not_disturb = gAgent.isDoNotDisturb();
+    bool is_do_not_disturb = gAgent.isDoNotDisturb();
 
-    BOOL is_muted = FALSE;
-    BOOL is_linden = FALSE;
+    bool is_muted = false;
+    bool is_linden = false;
     is_muted = LLMuteList::getInstance()->isMuted(
         from_id,
         from_name,
@@ -2713,7 +2538,7 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
         return;
     }
 
-    BOOL is_audible = (CHAT_AUDIBLE_FULLY == chat.mAudible);
+    bool is_audible = (CHAT_AUDIBLE_FULLY == chat.mAudible);
     chatter = gObjectList.findObject(from_id);
     if (chatter)
     {
@@ -2752,17 +2577,19 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
 
     if (is_audible)
     {
-        //BOOL visible_in_chat_bubble = FALSE;
+        //bool visible_in_chat_bubble = false;
 
         color.setVec(1.f,1.f,1.f,1.f);
         msg->getStringFast(_PREHASH_ChatData, _PREHASH_Message, mesg);
+        // Preserve tabs from scripts by expanding them to spaces before any sanitization/formatting.
+        LLStringUtil::replaceTabsWithSpaces(mesg, 4);
 
 // [RLVa:KB] - Checked: 2010-04-23 (RLVa-1.2.0f) | Modified: RLVa-1.2.0f
         if ( (rlv_handler_t::isEnabled()) && (CHAT_TYPE_START != chat.mChatType) && (CHAT_TYPE_STOP != chat.mChatType) )
         {
             // NOTE: chatter can be NULL (may not have rezzed yet, or could be another avie's HUD attachment)
-            BOOL is_attachment = (chatter) ? chatter->isAttachment() : FALSE;
-            BOOL is_owned_by_me = (chatter) ? chatter->permYouOwner() : FALSE;
+            bool is_attachment = (chatter) ? chatter->isAttachment() : false;
+            bool is_owned_by_me = (chatter) ? chatter->permYouOwner() : false;
 
             // Filtering "rules":
             //   avatar  => filter all avie text (unless it's this avie or they're an exemption)
@@ -2801,7 +2628,7 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
                 else if (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, chat.mFromID))
                 {
                     chat.mFromName = RlvStrings::getAnonym(chat.mFromName);
-                    chat.mRlvNamesFiltered = TRUE;
+                    chat.mRlvNamesFiltered = true;
                 }
             }
 
@@ -2826,20 +2653,20 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
         }
 // [/RLVa:KB]
 
-        BOOL ircstyle = FALSE;
+        bool ircstyle = false;
 
         // Look for IRC-style emotes here so chatbubbles work
         std::string prefix = mesg.substr(0, 4);
         if (prefix == "/me " || prefix == "/me'")
         {
-            ircstyle = TRUE;
+            ircstyle = true;
         }
         chat.mText = mesg;
 
         // Look for the start of typing so we can put "..." in the bubbles.
         if (CHAT_TYPE_START == chat.mChatType)
         {
-            LLLocalSpeakerMgr::getInstance()->setSpeakerTyping(from_id, TRUE);
+            LLLocalSpeakerMgr::getInstance()->setSpeakerTyping(from_id, true);
 
             // Might not have the avatar constructed yet, eg on login.
             if (chatter && chatter->isAvatar())
@@ -2850,7 +2677,7 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
         }
         else if (CHAT_TYPE_STOP == chat.mChatType)
         {
-            LLLocalSpeakerMgr::getInstance()->setSpeakerTyping(from_id, FALSE);
+            LLLocalSpeakerMgr::getInstance()->setSpeakerTyping(from_id, false);
 
             // Might not have the avatar constructed yet, eg on login.
             if (chatter && chatter->isAvatar())
@@ -2991,7 +2818,7 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
         // We have a real utterance now, so can stop showing "..." and proceed.
         if (chatter && chatter->isAvatar())
         {
-            LLLocalSpeakerMgr::getInstance()->setSpeakerTyping(from_id, FALSE);
+            LLLocalSpeakerMgr::getInstance()->setSpeakerTyping(from_id, false);
             ((LLVOAvatar*)chatter)->stopTyping();
 
             if (!is_muted && !is_do_not_disturb)
@@ -3065,6 +2892,8 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
             msg_notify["session_id"] = LLUUID();
             msg_notify["from_id"] = chat.mFromID;
             msg_notify["source_type"] = chat.mSourceType;
+            // used to check if there is agent mention in the message
+            msg_notify["message"] = mesg;
             on_new_message(msg_notify);
         }
 
@@ -3101,11 +2930,11 @@ void process_teleport_start(LLMessageSystem *msg, void**)
     if ( (teleport_flags & TELEPORT_FLAGS_DISABLE_CANCEL) || (!gRlvHandler.getCanCancelTp()) )
 // [/RLVa:KB]
     {
-        gViewerWindow->setProgressCancelButtonVisible(FALSE);
+        gViewerWindow->setProgressCancelButtonVisible(false);
     }
     else
     {
-        gViewerWindow->setProgressCancelButtonVisible(TRUE, LLTrans::getString("Cancel"));
+        gViewerWindow->setProgressCancelButtonVisible(true, LLTrans::getString("Cancel"));
     }
 
     // Freeze the UI and show progress bar
@@ -3113,9 +2942,13 @@ void process_teleport_start(LLMessageSystem *msg, void**)
 
     if( gAgent.getTeleportState() == LLAgent::TELEPORT_NONE )
     {
-        gTeleportDisplay = TRUE;
+        gTeleportDisplay = true;
         gAgent.setTeleportState( LLAgent::TELEPORT_START );
-        make_ui_sound("UISndTeleportOut");
+
+        if (gSavedSettings.getBOOL("AlchemyPlayTeleportSound"))
+        {
+            make_ui_sound("UISndTeleportOut");
+        }
 
         LL_INFOS("Messaging") << "Teleport initiated by remote TeleportStart message with TeleportFlags: " <<  teleport_flags << LL_ENDL;
 
@@ -3146,11 +2979,11 @@ void process_teleport_progress(LLMessageSystem* msg, void**)
     if ( (teleport_flags & TELEPORT_FLAGS_DISABLE_CANCEL) || (!gRlvHandler.getCanCancelTp()) )
 // [/RLVa:KB]
     {
-        gViewerWindow->setProgressCancelButtonVisible(FALSE);
+        gViewerWindow->setProgressCancelButtonVisible(false);
     }
     else
     {
-        gViewerWindow->setProgressCancelButtonVisible(TRUE, LLTrans::getString("Cancel"));
+        gViewerWindow->setProgressCancelButtonVisible(true, LLTrans::getString("Cancel"));
     }
     std::string buffer;
     msg->getStringFast(_PREHASH_Info, _PREHASH_Message, buffer);
@@ -3217,7 +3050,7 @@ public:
     virtual ~LLPostTeleportNotifiers();
 
     //function to be called at the supplied frequency
-    virtual BOOL tick();
+    virtual bool tick();
 };
 
 LLPostTeleportNotifiers::LLPostTeleportNotifiers() : LLEventTimer( 2.0 )
@@ -3228,9 +3061,9 @@ LLPostTeleportNotifiers::~LLPostTeleportNotifiers()
 {
 }
 
-BOOL LLPostTeleportNotifiers::tick()
+bool LLPostTeleportNotifiers::tick()
 {
-    BOOL all_done = FALSE;
+    bool all_done = false;
     if ( gAgent.getTeleportState() == LLAgent::TELEPORT_NONE )
     {
         // get callingcards and landmarks available to the user arriving.
@@ -3254,7 +3087,7 @@ BOOL LLPostTeleportNotifiers::tick()
                 gInventory.addObserver(fetcher);
             }
         }
-        all_done = TRUE;
+        all_done = true;
     }
 
     return all_done;
@@ -3288,7 +3121,7 @@ void process_teleport_finish(LLMessageSystem* msg, void**)
         {
             // Race condition? Make sure all variables are set correctly for teleport to work
             LL_WARNS("Teleport","Messaging") << "Teleport 'finish' message without 'start'. Setting state to TELEPORT_REQUESTED" << LL_ENDL;
-            gTeleportDisplay = TRUE;
+            gTeleportDisplay = true;
             LLViewerMessage::getInstance()->mTeleportStartedSignal();
             gAgent.setTeleportState(LLAgent::TELEPORT_REQUESTED);
             make_ui_sound("UISndTeleportOut");
@@ -3300,17 +3133,14 @@ void process_teleport_finish(LLMessageSystem* msg, void**)
     }
 
     // Teleport is finished; it can't be cancelled now.
-    gViewerWindow->setProgressCancelButtonVisible(FALSE);
+    gViewerWindow->setProgressCancelButtonVisible(false);
 
     // Do teleport effect for where you're leaving
     // VEFFECT: TeleportStart
-    if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral"))
-    {
-        LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
-        effectp->setPositionGlobal(gAgent.getPositionGlobal());
-        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-        LLHUDManager::getInstance()->sendEffects();
-    }
+    LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, true);
+    effectp->setPositionGlobal(gAgent.getPositionGlobal());
+    effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+    LLHUDManager::getInstance()->sendEffects();
 
     U32 location_id;
     U32 sim_ip;
@@ -3351,23 +3181,15 @@ void process_teleport_finish(LLMessageSystem* msg, void**)
     LLHost sim_host(sim_ip, sim_port);
 
     // Viewer trusts the simulator.
-    gMessageSystem->enableCircuit(sim_host, TRUE);
-    if (LLGridManager::getInstance()->isInOpenSim())
-    {
-        U32 region_size_x = 256;
-        msg->getU32Fast(_PREHASH_Info, _PREHASH_RegionSizeX, region_size_x);
-        U32 region_size_y = 256;
-        msg->getU32Fast(_PREHASH_Info, _PREHASH_RegionSizeY, region_size_y);
-        LLWorld::getInstance()->setRegionSize(region_size_x, region_size_y);
-    }
-    LLViewerRegion* regionp = LLWorld::getInstance()->addRegion(region_handle, sim_host);
+    gMessageSystem->enableCircuit(sim_host, true);
+    LLViewerRegion* regionp =  LLWorld::getInstance()->addRegion(region_handle, sim_host);
 
 /*
     // send camera update to new region
     gAgentCamera.updateCamera();
 
     // likewise make sure the camera is behind the avatar
-    gAgentCamera.resetView(TRUE);
+    gAgentCamera.resetView(true);
     LLVector3 shift_vector = regionp->getPosRegionFromGlobal(gAgent.getRegion()->getOriginGlobal());
     gAgent.setRegion(regionp);
     gObjectList.shiftObjects(shift_vector);
@@ -3410,18 +3232,15 @@ void process_teleport_finish(LLMessageSystem* msg, void**)
 
     // Now do teleport effect for where you're going.
     // VEFFECT: TeleportEnd
-    if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral"))
-    {
-        auto effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
-        effectp->setPositionGlobal(gAgent.getPositionGlobal());
+    effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, true);
+    effectp->setPositionGlobal(gAgent.getPositionGlobal());
 
-        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-        LLHUDManager::getInstance()->sendEffects();
-    }
+    effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+    LLHUDManager::getInstance()->sendEffects();
 
-//  gTeleportDisplay = TRUE;
+//  gTeleportDisplay = true;
 //  gTeleportDisplayTimer.reset();
-//  gViewerWindow->setShowProgress(TRUE);
+//  gViewerWindow->setShowProgress(true);
 }
 
 // stuff we have to do every time we get an AvatarInitComplete from a sim
@@ -3502,22 +3321,6 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
         gAgent.getRegion()->getOriginGlobal());
     gAgent.setRegion(regionp);
     gObjectList.shiftObjects(shift_vector);
-
-    // Is this a really long jump?
-    if (shift_vector.length() > 2048.f * 256.f)
-    {
-        regionp->reInitPartitions();
-        gAgent.setRegion(regionp);
-        // Kill objects in the regions we left behind
-        for (LLViewerRegion* r : LLWorld::getInstance()->getRegionList())
-        {
-            if (r != regionp)
-            {
-                gObjectList.killObjects(r);
-            }
-        }
-    }
-
     gAssetStorage->setUpstream(msg->getSender());
     gCacheName->setUpstream(msg->getSender());
     gViewerThrottle.sendToSim();
@@ -3534,7 +3337,7 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
             look_at = LLViewerCamera::getInstance()->getAtAxis();
         }
         // Force the camera back onto the agent, don't animate.
-        gAgentCamera.setFocusOnAvatar(TRUE, FALSE);
+        gAgentCamera.setFocusOnAvatar(true, false);
         gAgentCamera.slamLookAt(look_at);
         gAgentCamera.updateCamera();
 
@@ -3568,6 +3371,11 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
         }
     }
 
+#ifdef LL_DISCORD
+    if (gSavedSettings.getBOOL("EnableDiscord"))
+        LLAppViewer::updateDiscordActivity();
+#endif
+
     if ( LLTracker::isTracking(NULL) )
     {
         // Check distance to beacon, if < 5m, remove beacon
@@ -3594,20 +3402,20 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
     /*
     if (teleport_flags & TELEPORT_FLAGS_IS_FLYING)
     {
-        gAgent.setFlying(TRUE);
+        gAgent.setFlying(true);
     }
     else
     {
-        gAgent.setFlying(FALSE);
+        gAgent.setFlying(false);
     }
     */
 
-    send_agent_update(TRUE, TRUE);
+    send_agent_update(true, true);
 
-    //if (gAgent.getRegion()->getBlockFly())
-    //{
-    //  gAgent.setFlying(gAgent.canFly());
-    //}
+    if (gAgent.getFlying() && gAgent.getRegion()->getBlockFly())
+    {
+        gAgent.setFlying(gAgent.canFly());
+    }
 
     // force simulator to recognize do not disturb state
     if (gAgent.isDoNotDisturb())
@@ -3653,7 +3461,10 @@ void process_crossed_region(LLMessageSystem* msg, void**)
         return;
     }
     LL_INFOS("Messaging") << "process_crossed_region()" << LL_ENDL;
-    gAgentAvatarp->resetRegionCrossingTimer();
+    if (isAgentAvatarValid())
+    {
+        gAgentAvatarp->resetRegionCrossingTimer();
+    }
 
     U32 sim_ip;
     msg->getIPAddrFast(_PREHASH_RegionData, _PREHASH_SimIP, sim_ip);
@@ -3668,103 +3479,67 @@ void process_crossed_region(LLMessageSystem* msg, void**)
 
     send_complete_agent_movement(sim_host);
 
-    if (LLGridManager::getInstance()->isInOpenSim())
-    {
-        U32 region_size_x = 256;
-        msg->getU32(_PREHASH_RegionData, _PREHASH_RegionSizeX, region_size_x);
-        U32 region_size_y = 256;
-        msg->getU32(_PREHASH_RegionData, _PREHASH_RegionSizeY, region_size_y);
-        LLWorld::getInstance()->setRegionSize(region_size_x, region_size_y);
-    }
     LLViewerRegion* regionp = LLWorld::getInstance()->addRegion(region_handle, sim_host);
 
     LL_DEBUGS("CrossingCaps") << "Calling setSeedCapability from process_crossed_region(). Seed cap == "
-        << seedCap << LL_ENDL;
+            << seedCap << LL_ENDL;
     regionp->setSeedCapability(seedCap);
 }
 
 
-
-// Sends avatar and camera information to simulator.
-// Sent roughly once per frame, or 20 times per second, whichever is less often
-
-const F32 THRESHOLD_HEAD_ROT_QDOT = 0.9997f;    // ~= 2.5 degrees -- if its less than this we need to update head_rot
-const F32 MAX_HEAD_ROT_QDOT = 0.99999f;         // ~= 0.5 degrees -- if its greater than this then no need to update head_rot
-                                                // between these values we delay the updates (but no more than one second)
-
-void send_agent_update(BOOL force_send, BOOL send_reliable)
+// sends an AgentUpdate message to the server... or not:
+// only when force_send is 'true' OR
+// something changed AND the update is not being throttled
+void send_agent_update(bool force_send, bool send_reliable)
 {
     LL_PROFILE_ZONE_SCOPED;
     llassert(!gCubeSnapshot);
 
-    if (gAgent.getTeleportState() != LLAgent::TELEPORT_NONE)
+    LLAgent::ETeleportState tp_state = gAgent.getTeleportState();
+    if (tp_state != LLAgent::TELEPORT_NONE
+        && tp_state != LLAgent::TELEPORT_ARRIVING)
     {
-        // We don't care if they want to send an agent update, they're not allowed to until the simulator
-        // that's the target is ready to receive them (after avatar_init_complete is received)
+        // We don't care if they want to send an agent update, they're not allowed
+        // until the target simulator is ready to receive them
+        // (e.g. after avatar_init_complete is received)
         return;
     }
 
-    // We have already requested to log out.  Don't send agent updates.
-    if(LLAppViewer::instance()->logoutRequestSent())
+    if (LLAppViewer::instance()->logoutRequestSent())
     {
+        // We have already requested to log out.  Don't send agent updates.
         return;
     }
 
-    // no region to send update to
-    if(gAgent.getRegion() == NULL)
+    if (gAgent.getRegion() == nullptr || gDisconnected)
     {
+        // no region to send update to
         return;
     }
 
-    const F32 TRANSLATE_THRESHOLD = 0.01f;
+    static F64          last_send_time = 0.0;
+    static U32          last_control_flags = 0;
+    static bool         control_flags_follow_up = false;
+    static U8           last_render_state = 0;
+    static U8           last_flags = AU_FLAGS_NONE;
+    static LLQuaternion last_body_rot,
+                        last_head_rot;
+    static LLVector3    last_camera_pos_agent,
+                        last_camera_at;
 
-    // NOTA BENE: This is (intentionally?) using the small angle sine approximation to test for rotation
-    //            Plus, there is an extra 0.5 in the mix since the perpendicular between last_camera_at and getAtAxis() bisects cam_rot_change
-    //            Thus, we're actually testing against 0.2 degrees
-    const F32 ROTATION_THRESHOLD = 0.1f * 2.f*F_PI/360.f;           //  Rotation thresh 0.2 deg, see note above
-
-    const U8 DUP_MSGS = 1;              //  HACK!  number of times to repeat data on motionless agent
-
-    //  Store data on last sent update so that if no changes, no send
-    static LLVector3 last_camera_pos_agent,
-                     last_camera_at,
-                     last_camera_left,
-                     last_camera_up;
-
-    static LLVector3 cam_center_chg,
-                     cam_rot_chg;
-
-    static LLQuaternion last_head_rot;
-    static U32 last_control_flags = 0;
-    static U8 last_render_state;
-    static U8 duplicate_count = 0;
-    static F32 head_rot_chg = 1.0;
-    static U8 last_flags;
-
-    LLMessageSystem *msg = gMessageSystem;
-    LLVector3       camera_pos_agent;               // local to avatar's region
-    U8              render_state;
-
-    LLQuaternion body_rotation = gAgent.getFrameAgent().getQuaternion();
-    LLQuaternion head_rotation = gAgent.getHeadRotation();
-
-    camera_pos_agent = gAgentCamera.getCameraPositionAgent();
-
-    render_state = gAgent.getRenderState();
-
-    U32     control_flag_change = 0;
-    U8      flag_change = 0;
-
-    cam_center_chg = last_camera_pos_agent - camera_pos_agent;
-    cam_rot_chg = last_camera_at - LLViewerCamera::getInstance()->getAtAxis();
+    // compute sec_since_last_send
+    constexpr F64 MAX_AGENT_UPDATES_PER_SECOND = 125.0; // Value derived experimentally to avoid Input Delays with latest PBR-Capable Viewers when viewer FPS is highly volatile.
+    constexpr F64 MIN_AGENT_UPDATES_PER_SECOND = 1.0; // keep-alive rate
+    constexpr F64 MIN_AGENT_UPDATE_PERIOD = 1.0 / MAX_AGENT_UPDATES_PER_SECOND;
+    constexpr F64 MAX_AGENT_UPDATE_PERIOD = 1.0 / MIN_AGENT_UPDATES_PER_SECOND;
+    F64 now =  LLFrameTimer::getTotalSeconds();
+    F64 sec_since_last_send = now - last_send_time;
 
     // If a modifier key is held down, turn off
     // LBUTTON and ML_LBUTTON so that using the camera (alt-key) doesn't
     // trigger a control event.
     U32 control_flags = gAgent.getControlFlags();
-
-    MASK    key_mask = gKeyboard->currentMask(TRUE);
-
+    MASK key_mask = gKeyboard->currentMask(true);
     if (key_mask & MASK_ALT || key_mask & MASK_CONTROL)
     {
         control_flags &= ~( AGENT_CONTROL_LBUTTON_DOWN |
@@ -3773,7 +3548,22 @@ void send_agent_update(BOOL force_send, BOOL send_reliable)
                             AGENT_CONTROL_ML_LBUTTON_UP ;
     }
 
-    control_flag_change = last_control_flags ^ control_flags;
+    // any change in control_flags should be sent ASAP, so we fold that into force_send
+    force_send = force_send || (control_flags != last_control_flags);
+
+    if (! force_send && sec_since_last_send < MIN_AGENT_UPDATE_PERIOD)
+    {
+        // throttle less-important AgentUpdates
+        return;
+    }
+
+    bool send_update = force_send || sec_since_last_send > MAX_AGENT_UPDATE_PERIOD;
+
+    LLVector3 camera_pos_agent = gAgentCamera.getCameraPositionAgent(); // local to avatar's region
+    LLVector3 camera_at = LLViewerCamera::getInstance()->getAtAxis();
+    LLQuaternion body_rotation = gAgent.getFrameAgent().getQuaternion();
+    LLQuaternion head_rotation = gAgent.getHeadRotation();
+    U8 render_state = gAgent.getRenderState();
 
     U8 flags = AU_FLAGS_NONE;
     if (gAgent.isGroupTitleHidden())
@@ -3785,159 +3575,192 @@ void send_agent_update(BOOL force_send, BOOL send_reliable)
         flags |= AU_FLAGS_CLIENT_AUTOPILOT;
     }
 
-    flag_change = last_flags ^ flags;
-
-    head_rot_chg = dot(last_head_rot, head_rotation);
-
-    //static S32 msg_number = 0;        // Used for diagnostic log messages
-
-    if (force_send ||
-        (cam_center_chg.magVec() > TRANSLATE_THRESHOLD) ||
-        (head_rot_chg < THRESHOLD_HEAD_ROT_QDOT) ||
-        (last_render_state != render_state) ||
-        (cam_rot_chg.magVec() > ROTATION_THRESHOLD) ||
-        control_flag_change != 0 ||
-        flag_change != 0)
+    if (!send_update)
     {
-        /* Diagnotics to show why we send the AgentUpdate message.  Also un-commment the msg_number code above and below this block
-        msg_number += 1;
-        if (head_rot_chg < THRESHOLD_HEAD_ROT_QDOT)
+        // check to see if anything changed
+        // use a do-while-false to provide easy way to break out as soon as we find something changed
+        do
         {
-            //LL_INFOS("Messaging") << "head rot " << head_rotation << LL_ENDL;
-            LL_INFOS("Messaging") << "msg " << msg_number << ", frame " << LLFrameTimer::getFrameCount() << ", head_rot_chg " << head_rot_chg << LL_ENDL;
-        }
-        if (cam_rot_chg.magVec() > ROTATION_THRESHOLD)
-        {
-            LL_INFOS("Messaging") << "msg " << msg_number << ", frame " << LLFrameTimer::getFrameCount() << ", cam rot " <<  cam_rot_chg.magVec() << LL_ENDL;
-        }
-        if (cam_center_chg.magVec() > TRANSLATE_THRESHOLD)
-        {
-            LL_INFOS("Messaging") << "msg " << msg_number << ", frame " << LLFrameTimer::getFrameCount() << ", cam center " << cam_center_chg.magVec() << LL_ENDL;
-        }
-//      if (drag_delta_chg.magVec() > TRANSLATE_THRESHOLD)
-//      {
-//          LL_INFOS("Messaging") << "drag delta " << drag_delta_chg.magVec() << LL_ENDL;
-//      }
-        if (control_flag_change)
-        {
-            LL_INFOS("Messaging") << "msg " << msg_number << ", frame " << LLFrameTimer::getFrameCount() << ", dcf = " << control_flag_change << LL_ENDL;
-        }
-*/
+            // start with the easy evaluations and progress to more complicated
 
-        duplicate_count = 0;
-    }
-    else
-    {
-        duplicate_count++;
+            // check render_state
+            if (last_render_state != render_state)
+            {
+                send_update = true;
+                break;
+            }
 
-        if (head_rot_chg < MAX_HEAD_ROT_QDOT  &&  duplicate_count < AGENT_UPDATES_PER_SECOND)
-        {
+            // check flags
+            if (last_flags != flags)
+            {
+                send_update = true;
+                break;
+            }
+
+            // example:
+            // user taps crouch (control_flags 4128), viewer sends 4128 then immediately 0
+            // server starts crouching motion but does not stop it, only once viewer sends 0
+            // second time will server stop the motion. follow_up exists to make sure all
+            // states like 'crouch' motion are properly cleared server side.
+            //
+            // P.S. Server probably shouldn't require a reminder to stop a motion,
+            // but at the moment it does.
+            if (control_flags_follow_up)
+            {
+                send_update = true;
+                break;
+            }
+
+            // check translation
+            constexpr F32 TRANSLATE_THRESHOLD = 0.01f;
+            if ((last_camera_pos_agent - camera_pos_agent).magVec() > TRANSLATE_THRESHOLD)
+            {
+                send_update = true;
+                break;
+            }
+
+            // check camera rotation
+            // Note: we are using the sine small angle approximation trick here
+            constexpr F32 RADIANS_PER_DEGREE = F_PI / 360.f;
+            constexpr F32 CAMERA_AT_THRESHOLD = 0.2f * RADIANS_PER_DEGREE;
+            if ((last_camera_at - camera_at).magVec() > CAMERA_AT_THRESHOLD)
+            {
+                send_update = true;
+                break;
+            }
+
+            // check head rotation
+            constexpr F64 MIN_HEAD_ROT_QDOT = 0.9997;    // ~= 2.5 degrees -- if its less than this we need to update head_rot
+            constexpr F64 MAX_HEAD_ROT_QDOT = 0.99999;   // ~= 0.5 degrees -- if its greater than this then we consider it close enough
+
+            if (fabs((F64)(dot(last_body_rot, body_rotation))) < MIN_HEAD_ROT_QDOT)
+            {
+                send_update = true;
+                break;
+            }
+
+            F64 head_rot_qdot = fabs((F64)(dot(last_head_rot, head_rotation)));
+            if (head_rot_qdot > MAX_HEAD_ROT_QDOT)
+            {
+                // close enough
+                return;
+            }
+            else if (head_rot_qdot < MIN_HEAD_ROT_QDOT)
+            {
+                // way off
+                send_update = true;
+                break;
+            }
+
+            // Finally, if we get here then head_rot_qdot is somewhere between MIN_ and MAX_HEAD_ROT_QDOT
+
             // The head_rotation is sent for updating things like attached guns.
             // We only trigger a new update when head_rotation deviates beyond
             // some threshold from the last update, however this can break fine
             // adjustments when trying to aim an attached gun, so what we do here
             // (where we would normally skip sending an update when nothing has changed)
-            // is gradually reduce the threshold to allow a better update to
-            // eventually get sent... should update to within 0.5 degrees in less
-            // than a second.
-            if (head_rot_chg < THRESHOLD_HEAD_ROT_QDOT + (MAX_HEAD_ROT_QDOT - THRESHOLD_HEAD_ROT_QDOT) * duplicate_count / AGENT_UPDATES_PER_SECOND)
-            {
-                duplicate_count = 0;
-            }
-            else
-            {
-                return;
-            }
-        }
-        else
-        {
-            return;
-        }
+            // is linearly increase the min threshold until an update is sent.
+            // Min threshold should update to MAX_HEAD_ROT_QDOT within THRESHOLD_GROWTH_PERIOD.
+            constexpr F64 THRESHOLD_GROWTH_PERIOD = 0.5;
+            constexpr F64 threshold_growth_per_sec = (MAX_HEAD_ROT_QDOT - MIN_HEAD_ROT_QDOT) / THRESHOLD_GROWTH_PERIOD;
+            send_update = head_rot_qdot < MIN_HEAD_ROT_QDOT + sec_since_last_send * threshold_growth_per_sec;
+        } while (false);
     }
 
-    if (duplicate_count < DUP_MSGS && !gDisconnected)
+    if (!send_update)
     {
-        /* More diagnostics to count AgentUpdate messages
-        static S32 update_sec = 0;
-        static S32 update_count = 0;
-        static S32 max_update_count = 0;
-        S32 cur_sec = lltrunc( LLTimer::getTotalSeconds() );
-        update_count += 1;
-        if (cur_sec != update_sec)
-        {
-            if (update_sec != 0)
-            {
-                update_sec = cur_sec;
-                //msg_number = 0;
-                max_update_count = llmax(max_update_count, update_count);
-                LL_INFOS() << "Sent " << update_count << " AgentUpdate messages per second, max is " << max_update_count << LL_ENDL;
-            }
-            update_sec = cur_sec;
-            update_count = 0;
-        }
-        */
-
-        // Build the message
-        msg->newMessageFast(_PREHASH_AgentUpdate);
-        msg->nextBlockFast(_PREHASH_AgentData);
-        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
-        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-        msg->addQuatFast(_PREHASH_BodyRotation, body_rotation);
-        msg->addQuatFast(_PREHASH_HeadRotation, head_rotation);
-        msg->addU8Fast(_PREHASH_State, render_state);
-        msg->addU8Fast(_PREHASH_Flags, flags);
-
-//      if (camera_pos_agent.mV[VY] > 255.f)
-//      {
-//          LL_INFOS("Messaging") << "Sending camera center " << camera_pos_agent << LL_ENDL;
-//      }
-
-        msg->addVector3Fast(_PREHASH_CameraCenter, camera_pos_agent);
-        msg->addVector3Fast(_PREHASH_CameraAtAxis, LLViewerCamera::getInstance()->getAtAxis());
-        msg->addVector3Fast(_PREHASH_CameraLeftAxis, LLViewerCamera::getInstance()->getLeftAxis());
-        msg->addVector3Fast(_PREHASH_CameraUpAxis, LLViewerCamera::getInstance()->getUpAxis());
-        msg->addF32Fast(_PREHASH_Far, gAgentCamera.mDrawDistance);
-
-        msg->addU32Fast(_PREHASH_ControlFlags, control_flags);
-
-        if (gDebugClicks)
-        {
-            if (control_flags & AGENT_CONTROL_LBUTTON_DOWN)
-            {
-                LL_INFOS("Messaging") << "AgentUpdate left button down" << LL_ENDL;
-            }
-
-            if (control_flags & AGENT_CONTROL_LBUTTON_UP)
-            {
-                LL_INFOS("Messaging") << "AgentUpdate left button up" << LL_ENDL;
-            }
-        }
-
-        gAgent.enableControlFlagReset();
-
-        if (!send_reliable)
-        {
-            gAgent.sendMessage();
-        }
-        else
-        {
-            gAgent.sendReliableMessage();
-        }
-
-//      LL_DEBUGS("Messaging") << "agent " << avatar_pos_agent << " cam " << camera_pos_agent << LL_ENDL;
-
-        // Copy the old data
-        last_head_rot = head_rotation;
-        last_render_state = render_state;
-        last_camera_pos_agent = camera_pos_agent;
-        last_camera_at = LLViewerCamera::getInstance()->getAtAxis();
-        last_camera_left = LLViewerCamera::getInstance()->getLeftAxis();
-        last_camera_up = LLViewerCamera::getInstance()->getUpAxis();
-        last_control_flags = control_flags;
-        last_flags = flags;
+        return;
     }
-}
 
+    // Build the message
+    LLMessageSystem* msg = gMessageSystem;
+    msg->newMessageFast(_PREHASH_AgentUpdate);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->addQuatFast(_PREHASH_BodyRotation, body_rotation);
+    msg->addQuatFast(_PREHASH_HeadRotation, head_rotation);
+    msg->addU8Fast(_PREHASH_State, render_state);
+    msg->addU8Fast(_PREHASH_Flags, flags);
+
+    msg->addVector3Fast(_PREHASH_CameraCenter, camera_pos_agent);
+    msg->addVector3Fast(_PREHASH_CameraAtAxis, camera_at);
+    msg->addVector3Fast(_PREHASH_CameraLeftAxis, LLViewerCamera::getInstance()->getLeftAxis());
+    msg->addVector3Fast(_PREHASH_CameraUpAxis, LLViewerCamera::getInstance()->getUpAxis());
+
+    static F32 last_draw_disatance_step = 1024;
+    F32 memory_limited_draw_distance = gAgentCamera.mDrawDistance;
+
+    if (LLViewerTexture::isSystemMemoryCritical())
+    {
+        // If we are low on memory, reduce requested draw distance
+        memory_limited_draw_distance = llmax(gAgentCamera.mDrawDistance / LLViewerTexture::getSystemMemoryBudgetFactor(), gAgentCamera.mDrawDistance / 2.f);
+    }
+
+    if (tp_state == LLAgent::TELEPORT_ARRIVING || LLStartUp::getStartupState() < STATE_MISC)
+    {
+        // Inform interest list, prioritize closer area.
+        // Reason: currently server doesn't distance sort attachments, by restricting range
+        // we reduce the number of attachments sent to the viewer, thus prioritizing
+        // closer ones.
+        // Todo: revise and remove once server gets distance sorting.
+        last_draw_disatance_step = llmax((F32)(gAgentCamera.mDrawDistance / 2.f), 50.f);
+        last_draw_disatance_step = llmin(last_draw_disatance_step, memory_limited_draw_distance);
+        msg->addF32Fast(_PREHASH_Far, last_draw_disatance_step);
+    }
+    else if (last_draw_disatance_step < memory_limited_draw_distance)
+    {
+        static LLFrameTimer last_step_time;
+        if (last_step_time.getElapsedTimeF32() > 1.f)
+        {
+            // gradually increase draw distance
+            last_step_time.reset();
+            F32 step = memory_limited_draw_distance * 0.1f;
+            last_draw_disatance_step = llmin(last_draw_disatance_step + step, memory_limited_draw_distance);
+        }
+        msg->addF32Fast(_PREHASH_Far, last_draw_disatance_step);
+    }
+    else
+    {
+        last_draw_disatance_step = memory_limited_draw_distance;
+        msg->addF32Fast(_PREHASH_Far, memory_limited_draw_distance);
+    }
+
+    msg->addU32Fast(_PREHASH_ControlFlags, control_flags);
+
+    if (gDebugClicks)
+    {
+        if (control_flags & AGENT_CONTROL_LBUTTON_DOWN)
+        {
+            LL_INFOS("Messaging") << "AgentUpdate left button down" << LL_ENDL;
+        }
+
+        if (control_flags & AGENT_CONTROL_LBUTTON_UP)
+        {
+            LL_INFOS("Messaging") << "AgentUpdate left button up" << LL_ENDL;
+        }
+    }
+
+    if (send_reliable)
+    {
+        gAgent.sendReliableMessage();
+    }
+    else
+    {
+        gAgent.sendMessage();
+    }
+
+    // remember last update data
+    last_send_time = now;
+    control_flags_follow_up = last_control_flags != control_flags;
+    last_control_flags = control_flags;
+    last_render_state = render_state;
+    last_flags = flags;
+    last_body_rot = body_rotation;
+    last_head_rot = head_rotation;
+    last_camera_pos_agent = camera_pos_agent;
+    last_camera_at = camera_at;
+}
 
 // sounds can arrive before objects, store them for a short time
 // Note: this is a workaround for MAINT-4743, real fix would be to make
@@ -4148,7 +3971,7 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
         mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ID, local_id, i);
 
         gObjectList.getUUIDFromLocal(id, local_id, ip, port);
-        if (id.isNull())
+        if (id == LLUUID::null)
         {
             LL_DEBUGS("Messaging") << "Unknown kill for local " << local_id << LL_ENDL;
             continue;
@@ -4168,12 +3991,12 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
         if (objectp)
         {
 // [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
-            if ( (objectp->isAttachment()) && (!objectp->isTempAttachment()) && (LLAgent::TELEPORT_NONE != gAgent.getTeleportState()) &&
-                 (gAgentAvatarp) && (objectp->permYouOwner()) && (gSavedSettings.getBOOL("BlockAttachmentKillsOnTeleport")) )
-            {
-                //gAgentAvatarp->addPendingDetach(objectp->getRootEdit()->getID());
-                continue;
-            }
+                if ( (objectp->isAttachment()) && (!objectp->isTempAttachment()) && (LLAgent::TELEPORT_NONE != gAgent.getTeleportState()) &&
+                     (gAgentAvatarp) && (objectp->permYouOwner()) && (gSavedSettings.getBOOL("BlockAttachmentKillsOnTeleport")) )
+                {
+                    //gAgentAvatarp->addPendingDetach(objectp->getRootEdit()->getID());
+                    continue;
+                }
 // [/SL:KB]
 
             // Display green bubble on kill
@@ -4188,7 +4011,7 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
             gObjectList.killObject(objectp);
         }
 
-        if(delete_object)
+        if(delete_object && regionp)
         {
             regionp->killCacheEntry(local_id);
         }
@@ -4226,7 +4049,7 @@ void process_time_synch(LLMessageSystem *mesgsys, void **user_data)
 
     LLWorld::getInstance()->setSpaceTimeUSec(space_time_usec);
 
-    LL_DEBUGS("WindlightSync") << "Sun phase: " << phase << " rad = " << fmodf(phase / F_TWO_PI + 0.25, 1.f) * 24.f << " h" << LL_ENDL;
+    LL_DEBUGS("WindlightSync") << "Sun phase: " << phase << " rad = " << fmodf(phase / F_TWO_PI + 0.25f, 1.f) * 24.f << " h" << LL_ENDL;
 
     /* LAPRAS
         We decode these parts of the message but ignore them
@@ -4238,14 +4061,12 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
 {
     if (!gAudiop)
     {
-#if !LL_LINUX
         LL_WARNS("AudioEngine") << "LLAudioEngine instance doesn't exist!" << LL_ENDL;
-#endif
         return;
     }
 
     U64     region_handle = 0;
-    F32     gain = 0;
+    F32     gain = 0.f;
     LLUUID  sound_id;
     LLUUID  owner_id;
     LLUUID  object_id;
@@ -4253,6 +4074,7 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
     LLVector3   pos_local;
 
     msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_SoundID, sound_id);
+
     if (gAudiop && gAudiop->isCorruptSound(sound_id))
         return;
 
@@ -4261,7 +4083,6 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
 
     msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_OwnerID, owner_id);
     msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_ObjectID, object_id);
-
     msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_ParentID, parent_id);
     msg->getU64Fast(_PREHASH_SoundData, _PREHASH_Handle, region_handle);
     msg->getVector3Fast(_PREHASH_SoundData, _PREHASH_Position, pos_local);
@@ -4307,7 +4128,7 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
         return;
     }
 
-    if ((LLMaterialTable::basic.isCollisionSound(sound_id) || LLMaterialTable::basic.getGroundCollisionSoundUUID(0) == sound_id) && !gSavedSettings.getBOOL("EnableCollisionSounds"))
+    if (LLMaterialTable::basic.isCollisionSound(sound_id) && !gSavedSettings.getBOOL("EnableCollisionSounds"))
     {
         return;
     }
@@ -4319,9 +4140,7 @@ void process_preload_sound(LLMessageSystem *msg, void **user_data)
 {
     if (!gAudiop)
     {
-#if !LL_LINUX
         LL_WARNS("AudioEngine") << "LLAudioEngine instance doesn't exist!" << LL_ENDL;
-#endif
         return;
     }
 
@@ -4359,7 +4178,7 @@ void process_preload_sound(LLMessageSystem *msg, void **user_data)
     if (gAgent.canAccessMaturityAtGlobal(pos_global))
     {
         // Add audioData starts a transfer internally.
-        sourcep->addAudioData(datap, FALSE);
+        sourcep->addAudioData(datap, false);
     }
 }
 
@@ -4453,6 +4272,10 @@ void process_sim_stats(LLMessageSystem *msg, void **user_data)
         {
             measurementp->sample(stat_value);
         }
+        else
+        {
+            LL_WARNS() << "Unknown sim stat identifier: " << stat_id << LL_ENDL;
+        }
     }
 
     //
@@ -4476,7 +4299,7 @@ void process_sim_stats(LLMessageSystem *msg, void **user_data)
     LLViewerRegion* regionp = gAgent.getRegion();
     if (regionp)
     {
-        BOOL was_flying = gAgent.getFlying();
+        bool was_flying = gAgent.getFlying();
         regionp->setRegionFlags(region_flags);
         regionp->setMaxTasks(max_tasks_per_region);
         // HACK: This makes agents drop from the sky if the region is
@@ -4515,9 +4338,7 @@ void process_avatar_animation(LLMessageSystem *mesgsys, void **user_data)
     S32 num_blocks = mesgsys->getNumberOfBlocksFast(_PREHASH_AnimationList);
     S32 num_source_blocks = mesgsys->getNumberOfBlocksFast(_PREHASH_AnimationSourceList);
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("Messaging", "Motion") << "Processing " << num_blocks << " Animations" << LL_ENDL;
-#endif
 
     //clear animation flags
     avatarp->mSignaledAnimations.clear();
@@ -4541,7 +4362,7 @@ void process_avatar_animation(LLMessageSystem *mesgsys, void **user_data)
             // See EXT-2781.
             if (animation_id == ANIM_AGENT_STANDUP && gAgent.getFlying())
             {
-                gAgent.setFlying(FALSE);
+                gAgent.setFlying(false);
             }
 
             if (i < num_source_blocks)
@@ -4551,9 +4372,9 @@ void process_avatar_animation(LLMessageSystem *mesgsys, void **user_data)
                 LLViewerObject* object = gObjectList.findObject(object_id);
                 if (object)
                 {
-                    object->setFlagsWithoutUpdate(FLAGS_ANIM_SOURCE, TRUE);
+                    object->setFlagsWithoutUpdate(FLAGS_ANIM_SOURCE, true);
 
-                    BOOL anim_found = FALSE;
+                    bool anim_found = false;
                     LLVOAvatar::AnimSourceIterator anim_it = avatarp->mAnimationSources.find(object_id);
                     for (;anim_it != avatarp->mAnimationSources.end(); ++anim_it)
                     {
@@ -4565,7 +4386,7 @@ void process_avatar_animation(LLMessageSystem *mesgsys, void **user_data)
                         }
                         if (anim_it->second == animation_id)
                         {
-                            anim_found = TRUE;
+                            anim_found = true;
                             break;
                         }
                     }
@@ -4575,19 +4396,15 @@ void process_avatar_animation(LLMessageSystem *mesgsys, void **user_data)
                         avatarp->mAnimationSources.insert(LLVOAvatar::AnimationSourceMap::value_type(object_id, animation_id));
                     }
                 }
-#ifdef SHOW_DEBUG
                 LL_DEBUGS("Messaging", "Motion") << "Anim sequence ID: " << anim_sequence_id
                                     << " Animation id: " << animation_id
                                     << " From block: " << object_id << LL_ENDL;
-#endif
             }
-#ifdef SHOW_DEBUG
             else
             {
                 LL_DEBUGS("Messaging", "Motion") << "Anim sequence ID: " << anim_sequence_id
                                     << " Animation id: " << animation_id << LL_ENDL;
             }
-#endif
         }
     }
     else
@@ -4615,50 +4432,38 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
 
     mesgsys->getUUIDFast(_PREHASH_Sender, _PREHASH_ID, uuid);
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("AnimatedObjectsNotify") << "Received animation state for object " << uuid << LL_ENDL;
-#endif
 
     signaled_animation_map_t signaled_anims;
     S32 num_blocks = mesgsys->getNumberOfBlocksFast(_PREHASH_AnimationList);
-#ifdef SHOW_DEBUG
     LL_DEBUGS("AnimatedObjectsNotify") << "processing object animation requests, num_blocks " << num_blocks << " uuid " << uuid << LL_ENDL;
-#endif
     for( S32 i = 0; i < num_blocks; i++ )
     {
         mesgsys->getUUIDFast(_PREHASH_AnimationList, _PREHASH_AnimID, animation_id, i);
         mesgsys->getS32Fast(_PREHASH_AnimationList, _PREHASH_AnimSequenceID, anim_sequence_id, i);
         signaled_anims[animation_id] = anim_sequence_id;
-#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjectsNotify") << "added signaled_anims animation request for object "
                                     << uuid << " animation id " << animation_id << LL_ENDL;
-#endif
     }
     LLObjectSignaledAnimationMap::instance().getMap()[uuid] = signaled_anims;
 
     LLViewerObject *objp = gObjectList.findObject(uuid);
     if (!objp || objp->isDead())
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjectsNotify") << "Received animation state for unknown object " << uuid << LL_ENDL;
-#endif
         return;
     }
 
-    LLVOVolume *volp = objp->asVolume();
+    LLVOVolume *volp = dynamic_cast<LLVOVolume*>(objp);
     if (!volp)
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjectsNotify") << "Received animation state for non-volume object " << uuid << LL_ENDL;
-#endif
         return;
     }
 
     if (!volp->isAnimatedObject())
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjectsNotify") << "Received animation state for non-animated object " << uuid << LL_ENDL;
-#endif
         return;
     }
 
@@ -4666,9 +4471,7 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
     LLControlAvatar *avatarp = volp->getControlAvatar();
     if (!avatarp)
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjectsNotify") << "Received animation request for object with no control avatar, ignoring " << uuid << LL_ENDL;
-#endif
         return;
     }
 
@@ -4704,21 +4507,13 @@ void process_avatar_appearance(LLMessageSystem *mesgsys, void **user_data)
 
 void process_camera_constraint(LLMessageSystem *mesgsys, void **user_data)
 {
-    static LLCachedControl<bool> disable_sim_cam_constraint(gSavedSettings, "AlchemyIgnoreSimCameraConstraint", false);
     LLVector4 cameraCollidePlane;
-    if(disable_sim_cam_constraint)
-    {
-        cameraCollidePlane.zeroVec();
-    }
-    else
-    {
-        mesgsys->getVector4Fast(_PREHASH_CameraCollidePlane, _PREHASH_Plane, cameraCollidePlane);
-    }
+    mesgsys->getVector4Fast(_PREHASH_CameraCollidePlane, _PREHASH_Plane, cameraCollidePlane);
 
     gAgentCamera.setCameraCollidePlane(cameraCollidePlane);
 }
 
-void near_sit_object(BOOL success, void *data)
+void near_sit_object(bool success, void *data)
 {
     if (success)
     {
@@ -4736,7 +4531,7 @@ void process_avatar_sit_response(LLMessageSystem *mesgsys, void **user_data)
     LLVector3 sitPosition;
     LLQuaternion sitRotation;
     LLUUID sitObjectID;
-    BOOL use_autopilot;
+    bool use_autopilot;
     mesgsys->getUUIDFast(_PREHASH_SitObject, _PREHASH_ID, sitObjectID);
     mesgsys->getBOOLFast(_PREHASH_SitTransform, _PREHASH_AutoPilot, use_autopilot);
     mesgsys->getVector3Fast(_PREHASH_SitTransform, _PREHASH_SitPosition, sitPosition);
@@ -4745,7 +4540,7 @@ void process_avatar_sit_response(LLMessageSystem *mesgsys, void **user_data)
     mesgsys->getVector3Fast(_PREHASH_SitTransform, _PREHASH_CameraEyeOffset, camera_eye);
     LLVector3 camera_at;
     mesgsys->getVector3Fast(_PREHASH_SitTransform, _PREHASH_CameraAtOffset, camera_at);
-    BOOL force_mouselook;
+    bool force_mouselook;
     mesgsys->getBOOLFast(_PREHASH_SitTransform, _PREHASH_ForceMouselook, force_mouselook);
 
     if (isAgentAvatarValid() && dist_vec_squared(camera_eye, camera_at) > CAMERA_POSITION_THRESHOLD_SQUARED)
@@ -4756,7 +4551,7 @@ void process_avatar_sit_response(LLMessageSystem *mesgsys, void **user_data)
     gAgentCamera.setForceMouselook(force_mouselook);
     // Forcing turning off flying here to prevent flying after pressing "Stand"
     // to stand up from an object. See EXT-1655.
-    gAgent.setFlying(FALSE);
+    gAgent.setFlying(false);
 
     LLViewerObject* object = gObjectList.findObject(sitObjectID);
     if (object)
@@ -4804,7 +4599,7 @@ void process_set_follow_cam_properties(LLMessageSystem *mesgsys, void **user_dat
     LLViewerObject* objectp = gObjectList.findObject(source_id);
     if (objectp)
     {
-        objectp->setFlagsWithoutUpdate(FLAGS_CAMERA_SOURCE, TRUE);
+        objectp->setFlagsWithoutUpdate(FLAGS_CAMERA_SOURCE, true);
     }
 
     S32 num_objects = mesgsys->getNumberOfBlocksFast(_PREHASH_CameraProperty);
@@ -4989,11 +4784,11 @@ void process_user_list_reply(LLMessageSystem *msg, void **user_data)
 
         if (status & 0x01)
         {
-            dialog_friends_add_friend(buffer, TRUE);
+            dialog_friends_add_friend(buffer, true);
         }
         else
         {
-            dialog_friends_add_friend(buffer, FALSE);
+            dialog_friends_add_friend(buffer, false);
         }
     }
 
@@ -5170,12 +4965,12 @@ static void process_money_balance_reply_extended(LLMessageSystem* msg)
     // and agent ids for name lookup.
     S32 transaction_type = 0;
     LLUUID source_id;
-    BOOL is_source_group = FALSE;
+    bool is_source_group = false;
     LLUUID dest_id;
-    BOOL is_dest_group = FALSE;
+    bool is_dest_group = false;
     S32 amount = 0;
     std::string item_description;
-    BOOL success = FALSE;
+    bool success = false;
 
     msg->getS32Fast(_PREHASH_TransactionInfo, _PREHASH_TransactionType, transaction_type);
     msg->getUUIDFast(_PREHASH_TransactionInfo, _PREHASH_SourceID, source_id);
@@ -5305,7 +5100,7 @@ static void process_money_balance_reply_extended(LLMessageSystem* msg)
         notification = "PaymentReceived";
     }
 
-    LLFloaterTransactionLog* floater = LLFloaterReg::findTypedInstance<LLFloaterTransactionLog>("transaction_log");
+    ALFloaterTransactionLog* floater = LLFloaterReg::findTypedInstance<ALFloaterTransactionLog>("transaction_log");
     // only log the successful transactions --FLN
     if (success && floater)
     {
@@ -5557,7 +5352,7 @@ bool handle_teleport_access_blocked(LLSD& llsdBlock, const std::string & notific
 bool attempt_standard_notification(LLMessageSystem* msgsystem)
 {
     // if we have additional alert data
-    if (msgsystem->has(_PREHASH_AlertInfo) && msgsystem->getNumberOfBlocksFast(_PREHASH_AlertInfo) > 0)
+    if (msgsystem->hasFast(_PREHASH_AlertInfo) && msgsystem->getNumberOfBlocksFast(_PREHASH_AlertInfo) > 0)
     {
         // notification was specified using the new mechanism, so we can just handle it here
         std::string notificationID;
@@ -5644,9 +5439,10 @@ bool attempt_standard_notification(LLMessageSystem* msgsystem)
             gViewerWindow->saveSnapshot(snap_filename,
                                         gViewerWindow->getWindowWidthRaw(),
                                         gViewerWindow->getWindowHeightRaw(),
-                                        FALSE, //UI
+                                        false, //UI
                                         gSavedSettings.getBOOL("RenderHUDInSnapshot"),
-                                        FALSE,
+                                        false,
+                                        false,
                                         LLSnapshotModel::SNAPSHOT_TYPE_COLOR,
                                         LLSnapshotModel::SNAPSHOT_FORMAT_PNG);
         }
@@ -5749,9 +5545,10 @@ static void process_special_alert_messages(const std::string & message)
         gViewerWindow->saveSnapshot(snap_filename,
                                     gViewerWindow->getWindowWidthRaw(),
                                     gViewerWindow->getWindowHeightRaw(),
-                                    FALSE,
+                                    false,
                                     gSavedSettings.getBOOL("RenderHUDInSnapshot"),
-                                    FALSE,
+                                    false,
+                                    false,
                                     LLSnapshotModel::SNAPSHOT_TYPE_COLOR,
                                     LLSnapshotModel::SNAPSHOT_FORMAT_PNG);
     }
@@ -5772,7 +5569,7 @@ void process_agent_alert_message(LLMessageSystem* msgsystem, void** user_data)
 
     if (!attempt_standard_notification(msgsystem))
     {
-        BOOL modal = FALSE;
+        bool modal = false;
         msgsystem->getBOOLFast(_PREHASH_AlertData, _PREHASH_Modal, modal);
         process_alert_core(message, modal);
     }
@@ -5795,7 +5592,7 @@ void process_alert_message(LLMessageSystem *msgsystem, void **user_data)
 
     if (!attempt_standard_notification(msgsystem))
     {
-        BOOL modal = FALSE;
+        bool modal = false;
         process_alert_core(message, modal);
 
         static LLCachedControl<S32> ban_lines_mode(gSavedSettings , "ShowBanLines" , LLViewerParcelMgr::PARCEL_BAN_LINES_ON_COLLISION);
@@ -5830,7 +5627,7 @@ bool handle_special_alerts(const std::string &pAlertName)
     return isHandled;
 }
 
-void process_alert_core(const std::string& message, BOOL modal)
+void process_alert_core(const std::string& message, bool modal)
 {
     const std::string ALERT_PREFIX("ALERT: ");
     const std::string NOTIFY_PREFIX("NOTIFY: ");
@@ -5947,7 +5744,10 @@ void mean_name_callback(const LLUUID &id, const LLAvatarName& av_name)
         LLMeanCollisionData *mcd = *iter;
         if (mcd->mPerp == id)
         {
-            mcd->mFullName = av_name.getUserName();
+//          mcd->mFullName = av_name.getUserName();
+// [RLVa:KB]
+            mcd->mFullName = gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES) ? RlvStrings::getAnonym(av_name) : av_name.getUserName();
+// [/RLVa:KB]
         }
     }
 }
@@ -5982,7 +5782,7 @@ void process_mean_collision_alert_message(LLMessageSystem *msgsystem, void **use
 
         type = (EMeanCollisionType)u8type;
 
-        BOOL b_found = FALSE;
+        bool b_found = false;
 
         for (mean_collision_list_t::iterator iter = gMeanCollisionList.begin();
              iter != gMeanCollisionList.end(); ++iter)
@@ -5992,7 +5792,7 @@ void process_mean_collision_alert_message(LLMessageSystem *msgsystem, void **use
             {
                 mcd->mTime = time;
                 mcd->mMag = mag;
-                b_found = TRUE;
+                b_found = true;
                 break;
             }
         }
@@ -6016,7 +5816,7 @@ void process_frozen_message(LLMessageSystem *msgsystem, void **user_data)
     // make sure the cursor is back to the usual default since the
     // alert is probably due to some kind of error.
     gViewerWindow->getWindow()->resetBusyCount();
-    BOOL b_frozen;
+    bool b_frozen;
 
     msgsystem->getBOOLFast(_PREHASH_FrozenData, _PREHASH_Data, b_frozen);
 
@@ -6032,24 +5832,10 @@ void process_frozen_message(LLMessageSystem *msgsystem, void **user_data)
 // do some extra stuff once we get our economy data
 void process_economy_data(LLMessageSystem *msg, void** /*user_data*/)
 {
-    if (!LLGridManager::getInstance()->isInSecondlife())
-    {
-        LLGlobalEconomy::processEconomyData(msg, LLGlobalEconomy::getInstance());
-
-        const std::string texture_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getTextureUploadCost());
-        const std::string sound_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getSoundUploadCost());
-        const std::string animation_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getAnimationUploadCost());
-        gMenuHolder->getChild<LLUICtrl>("Upload Image")->setLabelArg("[COST]",  texture_upload_cost_str);
-        gMenuHolder->getChild<LLUICtrl>("Upload Sound")->setLabelArg("[COST]",  sound_upload_cost_str);
-        gMenuHolder->getChild<LLUICtrl>("Upload Animation")->setLabelArg("[COST]", animation_upload_cost_str);
-    }
-    else
-    {
-        LL_DEBUGS("Benefits") << "Received economy data, not currently used" << LL_ENDL;
-    }
+    LL_DEBUGS("Benefits") << "Received economy data, not currently used" << LL_ENDL;
 }
 
-void notify_cautioned_script_question(const LLSD& notification, const LLSD& response, S32 orig_questions, BOOL granted)
+void notify_cautioned_script_question(const LLSD& notification, const LLSD& response, S32 orig_questions, bool granted)
 {
     // only continue if at least some permissions were requested
     if (orig_questions)
@@ -6068,7 +5854,7 @@ void notify_cautioned_script_question(const LLSD& notification, const LLSD& resp
 
         // try to lookup viewerobject that corresponds to the object that
         // requested permissions (here, taskid->requesting object id)
-        BOOL foundpos = FALSE;
+        bool foundpos = false;
         LLViewerObject* viewobj = gObjectList.findObject(notification["payload"]["task_id"].asUUID());
         if (viewobj)
         {
@@ -6084,7 +5870,7 @@ void notify_cautioned_script_question(const LLSD& notification, const LLSD& resp
                 std::string formatpos = llformat("%.1f, %.1f,%.1f", objpos[VX], objpos[VY], objpos[VZ]);
                 notice.setArg("[REGIONPOS]", formatpos);
 
-                foundpos = TRUE;
+                foundpos = true;
             }
         }
 
@@ -6105,7 +5891,7 @@ void notify_cautioned_script_question(const LLSD& notification, const LLSD& resp
 
         // check each permission that was requested, and list each
         // permission that has been flagged as a caution permission
-        BOOL caution = FALSE;
+        bool caution = false;
         S32 count = 0;
         std::string perms;
         for (const script_perm_t& script_perm : SCRIPT_PERMISSIONS)
@@ -6118,7 +5904,7 @@ void notify_cautioned_script_question(const LLSD& notification, const LLSD& resp
 // [/RLVa:KB]
             {
                 count++;
-                caution = TRUE;
+                caution = true;
 
                 // add a comma before the permission description if it is not the first permission
                 // added to the list or the last permission to check
@@ -6152,7 +5938,7 @@ void notify_cautioned_script_question(const LLSD& notification, const LLSD& resp
 //      if (caution)
 //      {
 //          LLChat chat(notice.getString());
-//  //      LLFloaterChat::addChat(chat, FALSE, FALSE);
+//  //      LLFloaterChat::addChat(chat, false, false);
 //      }
     }
 }
@@ -6193,13 +5979,13 @@ bool script_question_cb(const LLSD& notification, const LLSD& response)
     }
 
     // check whether permissions were granted or denied
-    BOOL allowed = TRUE;
+    bool allowed = true;
     // the "yes/accept" button is the first button in the template, making it button 0
     // if any other button was clicked, the permissions were denied
     if (option != 0)
     {
         new_questions = 0;
-        allowed = FALSE;
+        allowed = false;
     }
     else if(experience.notNull())
     {
@@ -6239,7 +6025,8 @@ bool script_question_cb(const LLSD& notification, const LLSD& response)
 // [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
     if ( (allowed) && (notification["payload"].has("rlv_blocked")) )
     {
-        RlvUtil::notifyBlocked(notification["payload"]["rlv_blocked"].asStringRef(), LLSD().with("OBJECT", notification["payload"]["object_name"]));
+        RlvUtil::notifyBlocked(notification["payload"]["rlv_blocked"].asString(),
+                               LLSD().with("OBJECT", notification["payload"]["object_name"]));
     }
 // [/RLVa:KB]
 
@@ -6380,26 +6167,38 @@ void process_script_question(LLMessageSystem *msg, void **user_data)
         args["NAME"] = clean_owner_name;
         S32 known_questions = 0;
         bool has_not_only_debit = questions ^ SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_DEBIT].permbit;
+        bool caution_enabled    = gSavedSettings.getBOOL("PermissionsCautionEnabled");
         // check the received permission flags against each permission
+        std::string warning_msg;
         for (const script_perm_t& script_perm : SCRIPT_PERMISSIONS)
         {
             if (questions & script_perm.permbit)
             {
-                count++;
                 known_questions |= script_perm.permbit;
                 // check whether permission question should cause special caution dialog
                 caution |= (script_perm.caution);
 
-                if (("ScriptTakeMoney" == script_perm.question) && has_not_only_debit)
+                // Cautions go into top part of the dialog, questions go into the footer
+                if (caution_enabled && script_perm.caution)
+                {
+                    warning_msg += "\n" + LLTrans::getString(script_perm.question + "Caution") + "\n";
                     continue;
+                }
 
                 if (LLTrans::getString(script_perm.question).empty())
                 {
                     continue;
                 }
 
-                script_question += "    " + LLTrans::getString(script_perm.question) + "\n";
+                count++;
+                script_question += "\n    " + LLTrans::getString(script_perm.question);
             }
+        }
+
+        if (!warning_msg.empty())
+        {
+            LLStringUtil::format(warning_msg, args);
+            args["WARNINGS"] = warning_msg;
         }
 
         args["QUESTIONS"] = script_question;
@@ -6458,12 +6257,12 @@ void process_script_question(LLMessageSystem *msg, void **user_data)
             // check whether cautions are even enabled or not
             const char* notification = "ScriptQuestion";
 
-            if(caution && gSavedSettings.getBOOL("PermissionsCautionEnabled"))
+            if(caution && caution_enabled)
             {
-                args["FOOTERTEXT"] = (count > 1) ? LLTrans::getString("AdditionalPermissionsRequestHeader") + "\n\n" + script_question : "";
+                args["FOOTERTEXT"] = (count > 0) ? LLTrans::getString("AdditionalPermissionsRequestHeader") + "\n" + script_question : "";
                 notification = "ScriptQuestionCaution";
             }
-            else if(experienceid.notNull())
+            else if (experienceid.notNull())
             {
                 payload["experience"]=experienceid;
                 LLExperienceCache::instance().get(experienceid, boost::bind(process_script_experience_details, _1, args, payload));
@@ -6527,7 +6326,7 @@ void container_inventory_arrived(LLViewerObject* object,
                             LLSaleInfo::DEFAULT,
                             item->getFlags(),
                             creation_date_utc);
-                    new_item->updateServer(TRUE);
+                    new_item->updateServer(true);
                     gInventory.updateItem(new_item);
                 }
             }
@@ -6568,7 +6367,7 @@ void container_inventory_arrived(LLViewerObject* object,
                                         LLSaleInfo::DEFAULT,
                                         item->getFlags(),
                                         creation_date_utc);
-        new_item->updateServer(TRUE);
+        new_item->updateServer(true);
         gInventory.updateItem(new_item);
         gInventory.notifyObservers();
         if(active_panel)
@@ -6578,7 +6377,7 @@ void container_inventory_arrived(LLViewerObject* object,
     }
 
     // we've got the inventory, now delete this object if this was a take
-    BOOL delete_object = (BOOL)(intptr_t)data;
+    bool delete_object = (bool)(intptr_t)data;
     LLViewerRegion *region = gAgent.getRegion();
     if (delete_object && region)
     {
@@ -6624,7 +6423,7 @@ void process_teleport_failed(LLMessageSystem *msg, void**)
     LLViewerParcelMgr::getInstance()->onTeleportFailed();
 
     // if we have additional alert data
-    if (msg->has(_PREHASH_AlertInfo) && msg->getSizeFast(_PREHASH_AlertInfo, _PREHASH_Message) > 0)
+    if (msg->hasFast(_PREHASH_AlertInfo) && msg->getSizeFast(_PREHASH_AlertInfo, _PREHASH_Message) > 0)
     {
         // Get the message ID
         msg->getStringFast(_PREHASH_AlertInfo, _PREHASH_Message, message_id);
@@ -6728,7 +6527,7 @@ void process_teleport_local(LLMessageSystem *msg,void**)
             // after tp, keep the teleport state and let progress screen clear it after a short delay
             // (progress screen is active but not visible)  *TODO: remove when SVC-5290 is fixed
             gTeleportDisplayTimer.reset();
-            gTeleportDisplay = TRUE;
+            gTeleportDisplay = true;
         }
         else
         {
@@ -6741,11 +6540,11 @@ void process_teleport_local(LLMessageSystem *msg,void**)
     // Sim tells us whether the new position is off the ground
     if (teleport_flags & TELEPORT_FLAGS_IS_FLYING)
     {
-        gAgent.setFlying(TRUE);
+        gAgent.setFlying(true);
     }
     else
     {
-        gAgent.setFlying(FALSE);
+        gAgent.setFlying(false);
     }
 
     gAgent.setPositionAgent(pos);
@@ -6753,13 +6552,13 @@ void process_teleport_local(LLMessageSystem *msg,void**)
 
     if ( !(gAgent.getTeleportKeepsLookAt() && LLViewerJoystick::getInstance()->getOverrideCamera()) )
     {
-        gAgentCamera.resetView(TRUE, TRUE);
+        gAgentCamera.resetView(true, true);
     }
 
     // send camera update to new region
     gAgentCamera.updateCamera();
 
-    send_agent_update(TRUE, TRUE);
+    send_agent_update(true, true);
 
     // Let the interested parties know we've teleported.
     // Vadim *HACK: Agent position seems to get reset (to render position?)
@@ -6814,8 +6613,8 @@ void send_group_notice(const LLUUID& group_id,
         item_def["owner_id"] = item->getPermissions().getOwner();
         std::ostringstream ostr;
         LLSDSerialize::serialize(item_def, ostr, LLSDSerialize::LLSD_XML);
-        bin_bucket_size = ostr.str().copy(
-            (char*)bin_bucket, ostr.str().size());
+        bin_bucket_size = static_cast<S32>(ostr.str().copy(
+            (char*)bin_bucket, ostr.str().size()));
         bin_bucket[bin_bucket_size] = '\0';
     }
     else
@@ -6861,9 +6660,11 @@ void send_lures(const LLSD& notification, const LLSD& response)
     msg->nextBlockFast(_PREHASH_Info);
     msg->addU8Fast(_PREHASH_LureType, (U8)0); // sim will fill this in.
     msg->addStringFast(_PREHASH_Message, text);
-    for(const auto& llsd_val : notification["payload"]["ids"].asArray())
+    for(LLSD::array_const_iterator it = notification["payload"]["ids"].beginArray();
+        it != notification["payload"]["ids"].endArray();
+        ++it)
     {
-        LLUUID target_id = llsd_val.asUUID();
+        LLUUID target_id = it->asUUID();
 
         msg->nextBlockFast(_PREHASH_TargetData);
         msg->addUUIDFast(_PREHASH_TargetID, target_id);
@@ -7050,7 +6851,7 @@ void send_improved_im(const LLUUID& to_id,
     pack_instant_message(
         gMessageSystem,
         gAgent.getID(),
-        FALSE,
+        false,
         gAgent.getSessionID(),
         to_id,
         name,
@@ -7103,16 +6904,12 @@ void process_user_info_reply(LLMessageSystem* msg, void**)
                 << "wrong agent id." << LL_ENDL;
     }
 
-    BOOL im_via_email = FALSE;
-    if (!LLGridManager::instance().isInSecondlife())
-        msg->getBOOLFast(_PREHASH_UserData, _PREHASH_IMViaEMail, im_via_email);
     std::string email;
     msg->getStringFast(_PREHASH_UserData, _PREHASH_EMail, email);
     std::string dir_visibility;
     msg->getStringFast(_PREHASH_UserData, _PREHASH_DirectoryVisibility, dir_visibility);
 
-    // For Message based user info information the is_verified is assumed to be false.
-    LLFloaterPreference::updateUserInfo(dir_visibility, im_via_email, false, email);
+    LLFloaterPreference::updateUserInfo(dir_visibility);
     LLFloaterSnapshot::setAgentEmail(email);
 }
 
@@ -7156,8 +6953,7 @@ bool callback_script_dialog(const LLSD& notification, const LLSD& response)
         {
             // This call opens the sidebar, displays the block list, and highlights the newly blocked
             // object in the list so the user can see that their block click has taken effect.
-            //LLPanelBlockedList::showPanelAndSelect(object_id);
-            LLFloaterBlocked::showMuteAndSelect(object_id);
+            ALFloaterBlocked::showMuteAndSelect(object_id);
         }
     }
 
@@ -7227,7 +7023,7 @@ void process_script_dialog(LLMessageSystem* msg, void**)
     msg->getStringFast(_PREHASH_Data, _PREHASH_Message, message);
     msg->getS32Fast(_PREHASH_Data, _PREHASH_ChatChannel, chat_channel);
 
-        // unused for now
+    // unused for now
     LLUUID image_id;
     msg->getUUIDFast(_PREHASH_Data, _PREHASH_ImageID, image_id);
 
@@ -7341,7 +7137,7 @@ void process_load_url(LLMessageSystem* msg, void**)
 {
     LLUUID object_id;
     LLUUID owner_id;
-    BOOL owner_is_group;
+    bool owner_is_group;
     char object_name[256];      /* Flawfinder: ignore */
     char message[256];      /* Flawfinder: ignore */
     char url[256];      /* Flawfinder: ignore */
@@ -7419,11 +7215,10 @@ void process_initiate_download(LLMessageSystem* msg, void**)
         sim_filename,
         LL_PATH_NONE,
         msg->getSender(),
-        FALSE,  // don't delete remote
+        false,  // don't delete remote
         callback_download_complete,
         (void**)new std::string(viewer_filename));
 }
-
 
 void process_script_teleport_request(LLMessageSystem* msg, void**)
 {
@@ -7438,6 +7233,11 @@ void process_script_teleport_request(LLMessageSystem* msg, void**)
     msg->getStringFast(_PREHASH_Data, _PREHASH_SimName, sim_name);
     msg->getVector3Fast(_PREHASH_Data, _PREHASH_SimPosition, pos);
     msg->getVector3Fast(_PREHASH_Data, _PREHASH_LookAt, look_at);
+    U32 flags = (BEACON_SHOW_MAP | BEACON_FOCUS_MAP);
+    if (msg->hasFast(_PREHASH_Options))
+    {
+        msg->getU32Fast(_PREHASH_Options, _PREHASH_Flags, flags);
+    }
 
     LLFloaterWorldMap* instance = LLFloaterWorldMap::getInstance();
     if(instance)
@@ -7448,12 +7248,18 @@ void process_script_teleport_request(LLMessageSystem* msg, void**)
             << LL_ENDL;
 
         instance->trackURL(sim_name, (S32)pos.mV[VX], (S32)pos.mV[VY], (S32)pos.mV[VZ]);
-        LLFloaterReg::showInstance("world_map", "center");
+        if (flags & BEACON_SHOW_MAP)
+        {
+            bool old_auto_focus = instance->getAutoFocus();
+            instance->setAutoFocus(flags & BEACON_FOCUS_MAP);
+            instance->openFloater("center");
+            instance->setAutoFocus(old_auto_focus);
+        }
     }
 
     // remove above two lines and replace with below line
     // to re-enable parcel browser for llMapDestination()
-    // LLURLDispatcher::dispatch(LLSLURL::buildSLURL(sim_name, (S32)pos.mV[VX], (S32)pos.mV[VY], (S32)pos.mV[VZ]), FALSE);
+    // LLURLDispatcher::dispatch(LLSLURL::buildSLURL(sim_name, (S32)pos.mV[VX], (S32)pos.mV[VY], (S32)pos.mV[VZ]), false);
 
 }
 
@@ -7512,7 +7318,7 @@ void process_covenant_reply(LLMessageSystem* msg, void**)
     LLFloaterBuyLand::updateLastModified(last_modified);
 
     // load the actual covenant asset data
-    const BOOL high_priority = TRUE;
+    const bool high_priority = true;
     if (covenant_id.notNull())
     {
         gAssetStorage->getEstateAsset(gAgent.getRegionHost(),
@@ -7553,7 +7359,8 @@ void onCovenantLoadComplete(const LLUUID& asset_uuid,
 {
     LL_DEBUGS("Messaging") << "onCovenantLoadComplete()" << LL_ENDL;
     std::string covenant_text;
-    if(0 == status)
+    std::unique_ptr<LLViewerTextEditor> editorp;
+    if (0 == status)
     {
         LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
 
@@ -7574,13 +7381,13 @@ void onCovenantLoadComplete(const LLUUID& asset_uuid,
             {
                 LL_WARNS("Messaging") << "Problem importing estate covenant." << LL_ENDL;
                 covenant_text = "Problem importing estate covenant.";
+                delete editor;
             }
             else
             {
                 // Version 0 (just text, doesn't include version number)
-                covenant_text = editor->getText();
+                editorp.reset(editor); // Use covenant from editorp;
             }
-            delete editor;
         }
         else
         {
@@ -7606,17 +7413,32 @@ void onCovenantLoadComplete(const LLUUID& asset_uuid,
 
         LL_WARNS("Messaging") << "Problem loading notecard: " << status << LL_ENDL;
     }
-    LLPanelEstateCovenant::updateCovenantText(covenant_text, asset_uuid);
-    LLPanelLandCovenant::updateCovenantText(covenant_text);
-    LLFloaterBuyLand::updateCovenantText(covenant_text, asset_uuid);
 
-    LLPanelPlaceProfile* panel = LLFloaterSidePanelContainer::getPanel<LLPanelPlaceProfile>("places", "panel_place_profile");
-    if (panel)
+    if (editorp)
     {
-        panel->updateCovenantText(covenant_text);
+        LLPanelEstateCovenant::updateCovenant(editorp.get(), asset_uuid);
+        LLPanelLandCovenant::updateCovenant(editorp.get());
+        LLFloaterBuyLand::updateCovenant(editorp.get(), asset_uuid);
+    }
+    else
+    {
+        LLPanelEstateCovenant::updateCovenantText(covenant_text, asset_uuid);
+        LLPanelLandCovenant::updateCovenantText(covenant_text);
+        LLFloaterBuyLand::updateCovenantText(covenant_text, asset_uuid);
+    }
+
+    if (LLPanelPlaceProfile* panel = LLFloaterSidePanelContainer::getPanel<LLPanelPlaceProfile>("places", "panel_place_profile"))
+    {
+        if (editorp)
+        {
+            panel->updateCovenant(editorp.get());
+        }
+        else
+        {
+            panel->updateCovenantText(covenant_text);
+        }
     }
 }
-
 
 void process_feature_disabled_message(LLMessageSystem* msg, void**)
 {

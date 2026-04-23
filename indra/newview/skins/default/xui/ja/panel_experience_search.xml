@@ -12,32 +12,15 @@
 	<string name="loading">
 		読み込みんでいます…。
 	</string>
-	<string name="maturity_icon_general">
-		"Parcel_PG_Light"
-	</string>
-	<string name="maturity_icon_moderate">
-		"Parcel_M_Light"
-	</string>
-	<string name="maturity_icon_adult">
-		"Parcel_R_Light"
-	</string>
 	<panel name="search_panel">
 		<text name="lbl name part">
 			名前の一部を入力してください：
 		</text>
-		<line_editor name="edit"/>
 		<button label="進む" name="find"/>
 		<text name="lbl max content rating">
 			コンテンツの最大レーティング：
 		</text>
-		<icons_combo_box label="Moderate" name="maturity">
-			<icons_combo_box.drop_down_button/>
-			<icons_combo_box.item name="Adult" value="42"/>
-			<icons_combo_box.item name="Mature" value="21"/>
-			<icons_combo_box.item name="PG" value="13"/>
-		</icons_combo_box>
 		<scroll_list name="search_results">
-			<columns name="maturity" label=""/>
 			<columns name="experience_name" label="名前"/>
 			<columns name="owner" label="所有者"/>
 		</scroll_list>

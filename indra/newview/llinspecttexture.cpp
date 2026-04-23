@@ -32,7 +32,9 @@
 #include "lltexturectrl.h"
 #include "lltrans.h"
 #include "llviewertexturelist.h"
-
+// [RLVa:KB]
+#include "rlvactions.h"
+// [/RLVa:KB]
 
 // ============================================================================
 // Helper functions
@@ -41,6 +43,11 @@
 LLToolTip* LLInspectTextureUtil::createInventoryToolTip(LLToolTip::Params p)
 {
     const LLSD& sdTooltip = p.create_params;
+
+// [RLVa:KB]
+    if (!RlvActions::canPreviewTextures())
+        return LLUICtrlFactory::create<LLToolTip>(p);
+// [/RLVa:KB]
 
     if (sdTooltip.has("thumbnail_id") && sdTooltip["thumbnail_id"].asUUID().notNull())
     {
@@ -115,7 +122,6 @@ public:
 
 protected:
     LLPointer<LLViewerFetchedTexture> m_Image;
-    S32         mImageBoostLevel = LLGLTexture::BOOST_NONE;
     std::string mLoadingText;
 };
 
@@ -128,12 +134,8 @@ LLTexturePreviewView::LLTexturePreviewView(const LLView::Params& p)
 
 LLTexturePreviewView::~LLTexturePreviewView()
 {
-    if (m_Image)
-    {
-        m_Image->setBoostLevel(mImageBoostLevel);
         m_Image = nullptr;
     }
-}
 
 void LLTexturePreviewView::draw()
 {
@@ -146,25 +148,25 @@ void LLTexturePreviewView::draw()
         if (4 == m_Image->getComponents())
         {
             const LLColor4 color(.098f, .098f, .098f);
-            gl_rect_2d(rctClient, color, TRUE);
+            gl_rect_2d(rctClient, color, true);
         }
         gl_draw_scaled_image(rctClient.mLeft, rctClient.mBottom, rctClient.getWidth(), rctClient.getHeight(), m_Image);
 
         bool isLoading = (!m_Image->isFullyLoaded()) && (m_Image->getDiscardLevel() > 0);
         if (isLoading)
-            LLFontGL::getFontSansSerif()->renderUTF8(mLoadingText, 0, llfloor(rctClient.mLeft + 3),  llfloor(rctClient.mTop - 25), LLColor4::white, LLFontGL::LEFT, LLFontGL::BASELINE, LLFontGL::DROP_SHADOW);
-        m_Image->addTextureStats((isLoading) ? MAX_IMAGE_AREA : (F32)(rctClient.getWidth() * rctClient.getHeight()));
+            LLFontGL::getFontSansSerif()->renderUTF8(mLoadingText, 0, rctClient.mLeft + 3, rctClient.mTop - 25, LLColor4::white, LLFontGL::LEFT, LLFontGL::BASELINE, LLFontGL::DROP_SHADOW);
+
+        m_Image->setKnownDrawSize(MAX_IMAGE_SIZE, MAX_IMAGE_SIZE);
     }
 }
 
 void LLTexturePreviewView::setImageFromAssetId(const LLUUID& idAsset)
 {
-    m_Image = LLViewerTextureManager::getFetchedTexture(idAsset, FTT_DEFAULT, MIPMAP_TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+    m_Image = LLViewerTextureManager::getFetchedTexture(idAsset, FTT_DEFAULT, MIPMAP_TRUE, LLGLTexture::BOOST_THUMBNAIL);
     if (m_Image)
     {
-        mImageBoostLevel = m_Image->getBoostLevel();
-        m_Image->setBoostLevel(LLGLTexture::BOOST_PREVIEW);
         m_Image->forceToSaveRawImage(0);
+        m_Image->setKnownDrawSize(MAX_IMAGE_SIZE, MAX_IMAGE_SIZE);
         if ( (!m_Image->isFullyLoaded()) && (!m_Image->hasFetcher()) )
         {
             if (m_Image->isInFastCacheList())
@@ -194,8 +196,10 @@ LLTextureToolTip::LLTextureToolTip(const LLToolTip::Params& p)
     mMaxWidth = llmax(mMaxWidth, mPreviewSize);
 
     // Currently has to share params with LLToolTip, override values
+#if 0
     setBackgroundColor(LLColor4::black);
     setTransparentColor(LLColor4::black);
+#endif
     setBorderVisible(true);
 }
 
@@ -229,6 +233,7 @@ void LLTextureToolTip::initFromParams(const LLToolTip::Params& p)
 
     // Currently has to share params with LLToolTip, override values manually
     // Todo: provide from own params instead, may be like object inspector does it
+#if 0
     LLViewBorder::Params border_params;
     border_params.border_thickness(LLPANEL_BORDER_WIDTH);
     border_params.highlight_light_color(LLColor4::white);
@@ -237,14 +242,21 @@ void LLTextureToolTip::initFromParams(const LLToolTip::Params& p)
     border_params.shadow_dark_color(LLColor4::white);
     addBorder(border_params);
     setBorderVisible(true);
+#endif
 
+#if 0
     setBackgroundColor(LLColor4::black);
+#endif
     setBackgroundVisible(true);
     setBackgroundOpaque(true);
+#if 0
     setBackgroundImage(nullptr);
+#endif
     setTransparentImage(nullptr);
 
+#if 0
     mTextBox->setColor(LLColor4::white);
+#endif
 
     snapToChildren();
 }

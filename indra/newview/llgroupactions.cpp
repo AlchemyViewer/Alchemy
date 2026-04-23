@@ -31,12 +31,12 @@
 
 #include "message.h"
 
+#include "alfloatergroupprofile.h"
 #include "llagent.h"
 #include "llcommandhandler.h"
 #include "llfloaterreg.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llgroupmgr.h"
-#include "llfloatergroupprofile.h"
 #include "llfloaterimcontainer.h"
 #include "llimview.h" // for gIMMgr
 #include "llnotificationsutil.h"
@@ -53,7 +53,7 @@
 //
 // Globals
 //
-static GroupChatListener sGroupChatListener;
+static LLGroupChatListener sGroupChatListener;
 
 class LLGroupCommandHandler : public LLCommandHandler
 {
@@ -125,7 +125,7 @@ public:
         }
 
         LLUUID group_id;
-        if (!group_id.set(tokens[0].asStringRef(), FALSE))
+        if (!group_id.set(tokens[0], false))
         {
             return false;
         }
@@ -193,7 +193,7 @@ public:
             }
             else if (!gdatap->isMemberDataComplete())
             {
-                LL_WARNS() << "LLGroupMgr::getInstance()->getGroupData()->isMemberDataComplete() was FALSE" << LL_ENDL;
+                LL_WARNS() << "LLGroupMgr::getInstance()->getGroupData()->isMemberDataComplete() was false" << LL_ENDL;
                 processGroupData();
                 mRequestProcessed = true;
             }
@@ -240,7 +240,7 @@ LLFetchLeaveGroupData* gFetchLeaveGroupData = NULL;
 // static
 void LLGroupActions::search()
 {
-    LLFloaterReg::showInstance("search", LLSD().with("category", "groups"));
+    LLFloaterReg::showInstance("search", LLSD().with("collection", "groups"));
 }
 
 // static
@@ -374,7 +374,7 @@ void LLGroupActions::processLeaveGroupDataResponse(const LLUUID group_id)
     //get the member data for the group
     if ( mit != gdatap->mMembers.end() )
     {
-        LLGroupMemberData* member_data = (*mit).second.get();
+        LLGroupMemberData* member_data = (*mit).second;
 
         if ( member_data && member_data->isOwner() && gdatap->mMemberCount == 1)
         {
@@ -446,9 +446,9 @@ void LLGroupActions::show(const LLUUID &group_id, bool expand_notices_tab)
         params["action"] = "show_notices";
     }
 
-    if (gSavedSettings.getBool("ShowGroupFloaters"))
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
-        LLFloaterGroupProfile::showInstance(params, TRUE);
+        ALFloaterGroupProfile::showInstance(params, true);
     }
     else
     {
@@ -456,7 +456,7 @@ void LLGroupActions::show(const LLUUID &group_id, bool expand_notices_tab)
         LLFloater *floater = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>("people");
         if (!floater->isFrontmost())
         {
-            floater->setVisibleAndFrontmost(TRUE, params);
+            floater->setVisibleAndFrontmost(true, params);
         }
     }
 }
@@ -473,9 +473,9 @@ void LLGroupActions::showNotices(const LLUUID& group_id)
     sdParams["group_id"] = group_id;
     sdParams["action"] = "view_notices";
 
-    if (gSavedSettings.getBool("ShowGroupFloaters"))
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
-        LLFloaterGroupProfile::showInstance(sdParams, TRUE);
+        ALFloaterGroupProfile::showInstance(sdParams, true);
     }
     else
     {
@@ -496,11 +496,11 @@ void LLGroupActions::refresh_notices(const LLUUID& group_id)
     params["group_id"] = group_id;
     params["action"] = "refresh_notices";
 
-    if (gSavedSettings.getBool("ShowGroupFloaters"))
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
         if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
         {
-            LLFloaterGroupProfile::showInstance(params, FALSE);
+            ALFloaterGroupProfile::showInstance(params, false);
         }
     }
     else
@@ -519,11 +519,11 @@ void LLGroupActions::refresh(const LLUUID& group_id)
     params["group_id"] = group_id;
     params["action"] = "refresh";
 
-    if (gSavedSettings.getBool("ShowGroupFloaters"))
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
         if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
         {
-            LLFloaterGroupProfile::showInstance(params, TRUE);
+            ALFloaterGroupProfile::showInstance(params, true);
         }
     }
     else
@@ -542,9 +542,9 @@ void LLGroupActions::createGroup()
     params["group_id"] = LLUUID::null;
     params["action"] = "create";
 
-    if (gSavedSettings.getBool("ShowGroupFloaters"))
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
-        LLFloaterGroupProfile::showInstance(params, TRUE);
+        ALFloaterGroupProfile::showInstance(params, true);
     }
     else
     {
@@ -589,7 +589,7 @@ LLUUID LLGroupActions::startIM(const LLUUID& group_id)
             group_data.mName,
             IM_SESSION_GROUP_START,
             group_id);
-        if (session_id.notNull())
+        if (session_id != LLUUID::null)
         {
             LLFloaterIMContainer::getInstance()->showConversation(session_id);
         }
@@ -605,56 +605,18 @@ LLUUID LLGroupActions::startIM(const LLUUID& group_id)
     }
 }
 
-// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
-
-static void close_group_im(const LLUUID& group_id, LLIMModel::LLIMSession::SCloseAction close_action, int snooze_duration = -1)
+// static
+void LLGroupActions::endIM(const LLUUID& group_id)
 {
     if (group_id.isNull())
         return;
 
     LLUUID session_id = gIMMgr->computeSessionID(IM_SESSION_GROUP_START, group_id);
-    if (session_id.notNull())
+    if (session_id != LLUUID::null)
     {
-        LLIMModel::LLIMSession* pIMSession = LLIMModel::getInstance()->findIMSession(session_id);
-        if (pIMSession)
-        {
-            pIMSession->mCloseAction = close_action;
-            pIMSession->mSnoozeDuration = snooze_duration;
-        }
-
         gIMMgr->leaveSession(session_id);
     }
 }
-
-void LLGroupActions::leaveIM(const LLUUID& group_id)
-{
-    close_group_im(group_id, LLIMModel::LLIMSession::SCloseAction::CLOSE_LEAVE);
-}
-
-void LLGroupActions::snoozeIM(const LLUUID& group_id, int snooze_duration /*=-1*/)
-{
-    close_group_im(group_id, LLIMModel::LLIMSession::SCloseAction::CLOSE_SNOOZE, snooze_duration);
-}
-
-void LLGroupActions::endIM(const LLUUID& group_id)
-{
-    close_group_im(group_id, LLIMModel::LLIMSession::SCloseAction::CLOSE_DEFAULT);
-}
-
-// [/SL:KB]
-
-// static
-//void LLGroupActions::endIM(const LLUUID& group_id)
-//{
-//  if (group_id.isNull())
-//      return;
-//
-//  LLUUID session_id = gIMMgr->computeSessionID(IM_SESSION_GROUP_START, group_id);
-//  if (session_id.notNull())
-//  {
-//      gIMMgr->leaveSession(session_id);
-//  }
-//}
 
 // static
 bool LLGroupActions::isInGroup(const LLUUID& group_id)

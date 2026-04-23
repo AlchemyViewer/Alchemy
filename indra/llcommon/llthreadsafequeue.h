@@ -32,7 +32,7 @@
 #include <boost/fiber/timed_mutex.hpp>
 #include LLCOROS_CONDVAR_HEADER
 #include "llexception.h"
-#include "mutex.h"
+#include <mutex>
 #include <chrono>
 #include <queue>
 #include <string>
@@ -452,6 +452,8 @@ ElementT LLThreadSafeQueue<ElementT, QueueT>::pop(void)
         // so we can finish draining the queue.
         pop_result popped = pop_(lock1, value);
         if (popped == POPPED)
+            // don't use std::move when returning local value because
+            // it prevents the compiler from optimizing with copy elision
             return value;
 
         // Once the queue is DONE, there will never be any more coming.

@@ -75,6 +75,7 @@
  *
  */
 
+#include <functional>
 #include <string>
 #include <list>
 #include <vector>
@@ -83,16 +84,16 @@
 #include <iomanip>
 #include <sstream>
 
-#include <boost/utility.hpp>
-#include <boost/type_traits.hpp>
 #include <boost/signals2.hpp>
 #include <boost/range.hpp>
+#include <boost/intrusive_ptr.hpp>
 
 #include "llevents.h"
 #include "llfunctorregistry.h"
 #include "llinitparam.h"
 #include "llinstancetracker.h"
 #include "llmortician.h"
+#include "llmutex.h"
 #include "llnotificationptr.h"
 #include "llpointer.h"
 #include "llrefcount.h"
@@ -118,8 +119,8 @@ struct NotificationPriorityValues : public LLInitParam::TypeValuesHelper<ENotifi
 class LLNotificationResponderInterface
 {
 public:
-    LLNotificationResponderInterface()= default;
-    virtual ~LLNotificationResponderInterface()= default;
+    LLNotificationResponderInterface(){};
+    virtual ~LLNotificationResponderInterface(){};
 
     virtual void handleRespond(const LLSD& notification, const LLSD& response) = 0;
 
@@ -128,7 +129,7 @@ public:
     virtual void fromLLSD(const LLSD& params) = 0;
 };
 
-typedef boost::function<void (const LLSD&, const LLSD&)> LLNotificationResponder;
+typedef std::function<void (const LLSD&, const LLSD&)> LLNotificationResponder;
 
 typedef std::shared_ptr<LLNotificationResponderInterface> LLNotificationResponderPtr;
 
@@ -145,7 +146,7 @@ public:
     {
     }
 
-    virtual ~LLNotificationContext() = default;
+    virtual ~LLNotificationContext() {}
 
     LLSD asLLSD() const
     {
@@ -246,10 +247,9 @@ public:
     LLNotificationForm(const LLSD& sd);
     LLNotificationForm(const std::string& name, const Params& p);
 
-    void fromLLSD(const LLSD& sd);
     LLSD asLLSD() const;
 
-    S32 getNumElements() { return mFormData.size(); }
+    S32 getNumElements() { return static_cast<S32>(mFormData.size()); }
     LLSD getElement(S32 index) { return mFormData.get(index); }
     LLSD getElement(std::string_view element_name);
     void getElements(LLSD& elements, S32 offset = 0);
@@ -265,8 +265,8 @@ public:
     bool getIgnored();
     void setIgnored(bool ignored);
 
-    EIgnoreType getIgnoreType() { return mIgnore; }
-    std::string getIgnoreMessage() { return mIgnoreMsg; }
+    EIgnoreType getIgnoreType()const { return mIgnore; }
+    std::string getIgnoreMessage() const { return mIgnoreMsg; }
 
 private:
     LLSD                                mFormData;
@@ -303,7 +303,6 @@ typedef std::shared_ptr<LLNotificationVisibilityRule> LLNotificationVisibilityRu
  * shared pointer.
  */
 class LLNotification  :
-    boost::noncopyable,
     public std::enable_shared_from_this<LLNotification>
 {
 LOG_CLASS(LLNotification);
@@ -360,7 +359,7 @@ public:
             force_to_chat("force_to_chat", false)
         {
             time_stamp = LLDate::now();
-            responder = nullptr;
+            responder = NULL;
         }
 
         Params(const std::string& _name)
@@ -378,7 +377,7 @@ public:
             functor.name = _name;
             name = _name;
             time_stamp = LLDate::now();
-            responder = nullptr;
+            responder = NULL;
         }
     };
 
@@ -433,6 +432,10 @@ private:
 public:
     LLNotification(const LLSDParamAdapter<Params>& p);
 
+    // Non-copyable
+    LLNotification(const LLNotification&) = delete;
+    LLNotification& operator=(const LLNotification&) = delete;
+
     void setResponseFunctor(std::string const &responseFunctorName);
 
     void setResponseFunctor(const LLNotificationFunctorRegistry::ResponseFunctor& cb);
@@ -448,11 +451,11 @@ public:
     // return response LLSD filled in with default form contents and (optionally) the default button selected
     LLSD getResponseTemplate(EResponseTemplateType type = WITHOUT_DEFAULT_BUTTON);
 
-    // returns index of first button with value==TRUE
+    // returns index of first button with value==true
     // usually this the button the user clicked on
     // returns -1 if no button clicked (e.g. form has not been displayed)
     static S32 getSelectedOption(const LLSD& notification, const LLSD& response);
-    // returns name of first button with value==TRUE
+    // returns name of first button with value==true
     static std::string getSelectedOptionName(const LLSD& notification);
 
     // after someone responds to a notification (usually by clicking a button,
@@ -661,7 +664,7 @@ public:
 
     bool matchesTag(std::string_view tag);
 
-    virtual ~LLNotification() = default;
+    virtual ~LLNotification() {}
 };
 
 std::ostream& operator<<(std::ostream& s, const LLNotification& notification);
@@ -684,8 +687,8 @@ namespace LLNotificationFilters
     template<typename T>
     struct filterBy
     {
-        typedef boost::function<T (LLNotificationPtr)>  field_t;
-        typedef typename boost::remove_reference<T>::type       value_t;
+        typedef std::function<T (LLNotificationPtr)>  field_t;
+        typedef typename std::remove_reference<T>::type       value_t;
 
         filterBy(field_t field, value_t value, EComparison comparison = EQUAL)
             :   mField(field),
@@ -730,7 +733,7 @@ namespace LLNotificationComparators
     };
 };
 
-typedef boost::function<bool (LLNotificationPtr)> LLNotificationFilter;
+typedef std::function<bool (LLNotificationPtr)> LLNotificationFilter;
 typedef std::set<LLNotificationPtr, LLNotificationComparators::orderByUUID> LLNotificationSet;
 typedef std::multimap<std::string, LLNotificationPtr> LLNotificationMap;
 
@@ -835,10 +838,9 @@ typedef boost::intrusive_ptr<LLNotificationChannel> LLNotificationChannelPtr;
 // manages a list of notifications
 // Note that if this is ever copied around, we might find ourselves with multiple copies
 // of a queue with notifications being added to different nonequivalent copies. So we
-// make it inherit from boost::noncopyable, and then create a map of LLPointer to manage it.
+// delete the copy operator and constructor, and then create a map of LLPointer to manage it.
 //
 class LLNotificationChannel :
-    boost::noncopyable,
     public LLNotificationChannelBase,
     public LLInstanceTracker<LLNotificationChannel, std::string>
 {
@@ -861,6 +863,10 @@ public:
     virtual ~LLNotificationChannel();
     typedef LLNotificationSet::iterator Iterator;
 
+    // Non-copyable
+    LLNotificationChannel(const LLNotificationChannel&) = delete;
+    LLNotificationChannel& operator=(const LLNotificationChannel&) = delete;
+
     std::string getName() const { return mName; }
     typedef std::vector<std::string>::const_iterator parents_iter;
     boost::iterator_range<parents_iter> getParents() const
@@ -872,7 +878,7 @@ public:
     S32 size() const;
     size_t size();
 
-    typedef boost::function<void(LLNotificationPtr)> NotificationProcess;
+    typedef std::function<void(LLNotificationPtr)> NotificationProcess;
     void forEachNotification(NotificationProcess process);
 
     std::string summarize();
@@ -891,22 +897,20 @@ private:
 class LLNotificationsInterface
 {
 public:
-    virtual ~LLNotificationsInterface() = default;
-
     virtual LLNotificationPtr add(const std::string& name,
                         const LLSD& substitutions,
                         const LLSD& payload,
                         LLNotificationFunctorRegistry::ResponseFunctor functor) = 0;
 };
 
-class LLNotifications final :
+class LLNotifications :
     public LLNotificationsInterface,
     public LLSingleton<LLNotifications>,
     public LLNotificationChannelBase
 {
     LLSINGLETON(LLNotifications);
     LOG_CLASS(LLNotifications);
-    virtual ~LLNotifications() = default;
+    virtual ~LLNotifications();
 
 public:
 
@@ -960,7 +964,7 @@ public:
     typedef std::vector<std::string> TemplateNames;
     TemplateNames getTemplateNames() const;  // returns a list of notification names
 
-    typedef std::map<std::string, LLNotificationTemplatePtr, std::less<>> TemplateMap;
+    typedef boost::unordered_map<std::string, LLNotificationTemplatePtr, ll::string_hash, std::equal_to<>> TemplateMap;
 
     TemplateMap::const_iterator templatesBegin() { return mTemplates.begin(); }
     TemplateMap::const_iterator templatesEnd() { return mTemplates.end(); }
@@ -990,8 +994,6 @@ private:
     /*virtual*/ void initSingleton() override;
     /*virtual*/ void cleanupSingleton() override;
 
-    void loadPersistentNotifications();
-
     bool expirationFilter(LLNotificationPtr pNotification);
     bool expirationHandler(const LLSD& payload);
     bool uniqueFilter(LLNotificationPtr pNotification);
@@ -1008,7 +1010,7 @@ private:
 
     LLNotificationMap mUniqueNotifications;
 
-    typedef std::map<std::string, std::string, std::less<>> GlobalStringMap;
+    typedef boost::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> GlobalStringMap;
     GlobalStringMap mGlobalStrings;
 
     bool mIgnoreAllNotifications;

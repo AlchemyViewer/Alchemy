@@ -39,6 +39,8 @@
 #include "llfloaterreg.h"
 #include "llfloaterworldmap.h"
 #include "llfolderviewmodel.h"
+#include "llloadingindicator.h"
+#include "llmenubutton.h"
 #include "lloutfitobserver.h"
 #include "llpaneleditwearable.h"
 #include "llpaneloutfitsinventory.h"
@@ -76,8 +78,7 @@ LLSidepanelAppearance::LLSidepanelAppearance() :
     mFilterEditor(NULL),
     mOutfitEdit(NULL),
     mCurrOutfitPanel(NULL),
-    mOpened(false),
-    mLastAvatarComplexity(0)
+    mOpened(false)
 {
     LLOutfitObserver& outfit_observer =  LLOutfitObserver::instance();
     outfit_observer.addBOFReplacedCallback(boost::bind(&LLSidepanelAppearance::refreshCurrentOutfitName, this, ""));
@@ -93,7 +94,7 @@ LLSidepanelAppearance::~LLSidepanelAppearance()
 }
 
 // virtual
-BOOL LLSidepanelAppearance::postBuild()
+bool LLSidepanelAppearance::postBuild()
 {
     mOpenOutfitBtn = getChild<LLButton>("openoutfit_btn");
     mOpenOutfitBtn->setClickedCallback(boost::bind(&LLSidepanelAppearance::onOpenOutfitButtonClicked, this));
@@ -103,7 +104,7 @@ BOOL LLSidepanelAppearance::postBuild()
 
     childSetAction("edit_outfit_btn", boost::bind(&LLSidepanelAppearance::showOutfitEditPanel, this));
 
-    mFilterEditor = findChild<LLSearchEditor>("Filter");
+    mFilterEditor = getChild<LLFilterEditor>("Filter");
     if (mFilterEditor)
     {
         mFilterEditor->setCommitCallback(boost::bind(&LLSidepanelAppearance::onFilterEdit, this, _2));
@@ -138,12 +139,22 @@ BOOL LLSidepanelAppearance::postBuild()
 
     mCurrOutfitPanel = getChild<LLPanel>("panel_currentlook");
 
+    mWearableLoadingIndicator = getChild<LLLoadingIndicator>("wearables_loading_indicator");
+    mEditOutfitBtn = getChild<LLButton>("edit_outfit_btn");
 
     setVisibleCallback(boost::bind(&LLSidepanelAppearance::onVisibilityChanged,this,_2));
 
     setWearablesLoading(gAgentWearables.isCOFChangeInProgress());
 
-    return TRUE;
+
+    LLMenuButton* menu_gear_btn = getChild<LLMenuButton>("options_gear_btn");
+    LLMenuButton* menu_sort_btn = getChild<LLMenuButton>("sorting_menu_btn");
+    LLButton* menu_trash_btn = getChild<LLButton>("trash_btn");
+    LLPanel* menu_sort_btn_panel = getChild<LLPanel>("options_sort_btn_panel");
+    LLPanel* menu_trash_btn_panel = getChild<LLPanel>("trash_btn_panel");
+    mPanelOutfitsInventory->setMenuButtons(menu_gear_btn, menu_sort_btn, menu_trash_btn, menu_sort_btn_panel, menu_trash_btn_panel);
+
+    return true;
 }
 
 // virtual
@@ -196,8 +207,8 @@ void LLSidepanelAppearance::updateToVisibility(const LLSD &new_visibility)
 {
     if (new_visibility["visible"].asBoolean())
     {
-        const BOOL is_outfit_edit_visible = mOutfitEdit && mOutfitEdit->getVisible();
-        const BOOL is_wearable_edit_visible = mEditWearable && mEditWearable->getVisible();
+        const bool is_outfit_edit_visible = mOutfitEdit && mOutfitEdit->getVisible();
+        const bool is_wearable_edit_visible = mEditWearable && mEditWearable->getVisible();
 
         if (is_outfit_edit_visible || is_wearable_edit_visible)
         {
@@ -263,7 +274,7 @@ void LLSidepanelAppearance::onOpenOutfitButtonClicked()
     LLAccordionCtrlTab* tab_outfits = mPanelOutfitsInventory->findChild<LLAccordionCtrlTab>("tab_outfits");
     if (tab_outfits)
     {
-        tab_outfits->changeOpenClose(FALSE);
+        tab_outfits->changeOpenClose(false);
         LLInventoryPanel *inventory_panel = tab_outfits->findChild<LLInventoryPanel>("outfitslist_tab");
         if (inventory_panel)
         {
@@ -272,7 +283,7 @@ void LLSidepanelAppearance::onOpenOutfitButtonClicked()
             if (outfit_folder)
             {
                 outfit_folder->setOpen(!outfit_folder->isOpen());
-                root->setSelection(outfit_folder,TRUE);
+                root->setSelection(outfit_folder,true);
                 root->scrollToShowSelection();
             }
         }
@@ -290,16 +301,16 @@ void LLSidepanelAppearance::onEditAppearanceButtonClicked()
 
 void LLSidepanelAppearance::showOutfitsInventoryPanel()
 {
-    toggleWearableEditPanel(FALSE);
-    toggleOutfitEditPanel(FALSE);
-    toggleMyOutfitsPanel(TRUE, "");
+    toggleWearableEditPanel(false);
+    toggleOutfitEditPanel(false);
+    toggleMyOutfitsPanel(true, "");
 }
 
 void LLSidepanelAppearance::showOutfitsInventoryPanel(const std::string &tab_name)
 {
-    toggleWearableEditPanel(FALSE);
-    toggleOutfitEditPanel(FALSE);
-    toggleMyOutfitsPanel(TRUE, tab_name);
+    toggleWearableEditPanel(false);
+    toggleOutfitEditPanel(false);
+    toggleMyOutfitsPanel(true, tab_name);
 }
 
 void LLSidepanelAppearance::showOutfitEditPanel()
@@ -309,7 +320,7 @@ void LLSidepanelAppearance::showOutfitEditPanel()
     // Accordion's state must be reset in all cases except the one when user
     // is returning back to the mOutfitEdit panel from the mEditWearable panel.
     // The simplest way to control this is to check the visibility state of the mEditWearable
-    // BEFORE it is changed by the call to the toggleWearableEditPanel(FALSE, NULL, TRUE).
+    // BEFORE it is changed by the call to the toggleWearableEditPanel(false, NULL, true).
     if (mEditWearable != NULL && !mEditWearable->getVisible() && mOutfitEdit != NULL)
     {
         mOutfitEdit->resetAccordionState();
@@ -324,19 +335,19 @@ void LLSidepanelAppearance::showOutfitEditPanel()
         return;
     }
 
-    toggleMyOutfitsPanel(FALSE, "");
-    toggleWearableEditPanel(FALSE, NULL, TRUE); // don't switch out of edit appearance mode
-    toggleOutfitEditPanel(TRUE);
+    toggleMyOutfitsPanel(false, "");
+    toggleWearableEditPanel(false, NULL, true); // don't switch out of edit appearance mode
+    toggleOutfitEditPanel(true);
 }
 
-void LLSidepanelAppearance::showWearableEditPanel(LLViewerWearable *wearable /* = NULL*/, BOOL disable_camera_switch)
+void LLSidepanelAppearance::showWearableEditPanel(LLViewerWearable *wearable /* = NULL*/, bool disable_camera_switch)
 {
-    toggleMyOutfitsPanel(FALSE, "");
-    toggleOutfitEditPanel(FALSE, TRUE); // don't switch out of edit appearance mode
-    toggleWearableEditPanel(TRUE, wearable, disable_camera_switch);
+    toggleMyOutfitsPanel(false, "");
+    toggleOutfitEditPanel(false, true); // don't switch out of edit appearance mode
+    toggleWearableEditPanel(true, wearable, disable_camera_switch);
 }
 
-void LLSidepanelAppearance::toggleMyOutfitsPanel(BOOL visible, const std::string& tab_name)
+void LLSidepanelAppearance::toggleMyOutfitsPanel(bool visible, const std::string& tab_name)
 {
     if (!mPanelOutfitsInventory
         || (mPanelOutfitsInventory->getVisible() == visible && tab_name.empty()))
@@ -371,7 +382,7 @@ bool LLSidepanelAppearance::isCOFPanelVisible()
     return false;
 }
 
-void LLSidepanelAppearance::toggleOutfitEditPanel(BOOL visible, BOOL disable_camera_switch)
+void LLSidepanelAppearance::toggleOutfitEditPanel(bool visible, bool disable_camera_switch)
 {
     if (!mOutfitEdit || mOutfitEdit->getVisible() == visible)
     {
@@ -396,7 +407,7 @@ void LLSidepanelAppearance::toggleOutfitEditPanel(BOOL visible, BOOL disable_cam
     }
 }
 
-void LLSidepanelAppearance::toggleWearableEditPanel(BOOL visible, LLViewerWearable *wearable, BOOL disable_camera_switch)
+void LLSidepanelAppearance::toggleWearableEditPanel(bool visible, LLViewerWearable *wearable, bool disable_camera_switch)
 {
     if (!mEditWearable)
     {
@@ -412,7 +423,7 @@ void LLSidepanelAppearance::toggleWearableEditPanel(BOOL visible, LLViewerWearab
     // If we're just switching between outfit and wearable editing or updating item,
     // don't end customization and don't switch camera
     // Don't end customization and don't switch camera without visibility change
-    BOOL change_state = !disable_camera_switch && mEditWearable->getVisible() != visible;
+    bool change_state = !disable_camera_switch && mEditWearable->getVisible() != visible;
 
     if (!wearable)
     {
@@ -463,18 +474,18 @@ void LLSidepanelAppearance::refreshCurrentOutfitName(const std::string& name)
 
         std::string string_name = gAgentWearables.isCOFChangeInProgress() ? "Changing outfits" : "No Outfit";
         mCurrentLookName->setText(getString(string_name));
-        mOpenOutfitBtn->setEnabled(FALSE);
+        mOpenOutfitBtn->setEnabled(false);
     }
     else
     {
         mCurrentLookName->setText(name);
         // Can't just call update verbs since the folder link may not have been created yet.
-        mOpenOutfitBtn->setEnabled(TRUE);
+        mOpenOutfitBtn->setEnabled(true);
     }
 }
 
 //static
-void LLSidepanelAppearance::editWearable(LLViewerWearable *wearable, LLView *data, BOOL disable_camera_switch)
+void LLSidepanelAppearance::editWearable(LLViewerWearable *wearable, LLView *data, bool disable_camera_switch)
 {
     LLFloaterSidePanelContainer::showPanel("appearance", LLSD());
     LLSidepanelAppearance *panel = dynamic_cast<LLSidepanelAppearance*>(data);
@@ -504,12 +515,16 @@ void LLSidepanelAppearance::fetchInventory()
 
     if (isAgentAvatarValid())
     {
-        for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
+        for (LLVOAvatar::attachment_map_t::const_iterator iter = gAgentAvatarp->mAttachmentPoints.begin();
+             iter != gAgentAvatarp->mAttachmentPoints.end(); ++iter)
         {
-            LLViewerJointAttachment* attachment = attach_pair.second;
+            LLViewerJointAttachment* attachment = iter->second;
             if (!attachment) continue;
-            for (LLViewerObject* attached_object : attachment->mAttachedObjects)
+            for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
+                 attachment_iter != attachment->mAttachedObjects.end();
+                 ++attachment_iter)
             {
+                LLViewerObject* attached_object = attachment_iter->get();
                 if (!attached_object) continue;
                 const LLUUID& item_id = attached_object->getAttachmentItemID();
                 if (item_id.isNull()) continue;
@@ -538,8 +553,8 @@ void LLSidepanelAppearance::inventoryFetched()
 
 void LLSidepanelAppearance::setWearablesLoading(bool val)
 {
-    getChildView("wearables_loading_indicator")->setVisible( val);
-    getChildView("edit_outfit_btn")->setVisible( !val);
+    mWearableLoadingIndicator->setVisible(val);
+    mEditOutfitBtn->setVisible(!val);
 
     if (!val)
     {
@@ -575,18 +590,3 @@ bool LLSidepanelAppearance::isWearableEditPanelVisible() const
     return (mEditWearable) && (mEditWearable->getVisible());
 }
 // [/RLVa:KB]
-
-// static
-void LLSidepanelAppearance::updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity)
-{
-    LLSidepanelAppearance* instance = LLFloaterSidePanelContainer::getPanel<LLSidepanelAppearance>("appearance");
-    if(instance)
-    {
-        if (instance->mLastAvatarComplexity != complexity)
-        {
-            instance->mPanelOutfitsInventory->updateAvatarComplexity(complexity, item_complexity, temp_item_complexity, body_parts_complexity);
-            instance->mOutfitEdit->updateAvatarComplexity(complexity);
-        }
-        instance->mLastAvatarComplexity = complexity;
-    }
-}

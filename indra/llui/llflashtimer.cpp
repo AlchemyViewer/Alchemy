@@ -23,6 +23,8 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
+#include "linden_common.h"
+
 #include "llflashtimer.h"
 #include "lleventtimer.h"
 #include "llui.h"
@@ -50,10 +52,10 @@ LLFlashTimer::LLFlashTimer(callback_t cb, S32 count, F32 period)
 void LLFlashTimer::unset()
 {
     mUnset = true;
-    mCallback = NULL;
+    mCallback = nullptr;
 }
 
-BOOL LLFlashTimer::tick()
+bool LLFlashTimer::tick()
 {
     mIsCurrentlyHighlighted = !mIsCurrentlyHighlighted;
 
@@ -85,12 +87,12 @@ void LLFlashTimer::stopFlashing()
     mCurrentTickCount = 0;
 }
 
-bool LLFlashTimer::isFlashingInProgress()
+bool LLFlashTimer::isFlashingInProgress() const
 {
     return mIsFlashingInProgress;
 }
 
-bool LLFlashTimer::isCurrentlyHighlighted()
+bool LLFlashTimer::isCurrentlyHighlighted() const
 {
     return mIsCurrentlyHighlighted;
 }

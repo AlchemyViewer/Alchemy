@@ -155,10 +155,10 @@ void LLTranslationAPIHandler::verifyKeyCoro(LLTranslate::EService service, LLSD 
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMerchantStatusCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
-    LLCore::HttpOptions::ptr_t httpOpts(std::make_shared<LLCore::HttpOptions>());
-    LLCore::HttpHeaders::ptr_t httpHeaders(std::make_shared<LLCore::HttpHeaders>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMerchantStatusCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
 
 
     std::string user_agent = stringize(
@@ -199,7 +199,7 @@ void LLTranslationAPIHandler::verifyKeyCoro(LLTranslate::EService service, LLSD 
         bOk = false;
     }
 
-    if (!fnc.empty())
+    if (fnc != nullptr)
     {
         fnc(service, bOk, parseResult);
     }
@@ -210,10 +210,10 @@ void LLTranslationAPIHandler::translateMessageCoro(LanguagePair_t fromTo, std::s
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMerchantStatusCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
-    LLCore::HttpOptions::ptr_t httpOpts(std::make_shared<LLCore::HttpOptions>());
-    LLCore::HttpHeaders::ptr_t httpHeaders(std::make_shared<LLCore::HttpHeaders>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMerchantStatusCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
 
 
     std::string user_agent = stringize(
@@ -275,7 +275,7 @@ void LLTranslationAPIHandler::translateMessageCoro(LanguagePair_t fromTo, std::s
         LLStringUtil::replaceString(translation, "&amp;", "&");
         LLStringUtil::replaceString(translation, "&apos;", "'");
 
-        if (!success.empty())
+        if (success != nullptr)
             success(translation, detected_lang);
     }
     else
@@ -291,7 +291,7 @@ void LLTranslationAPIHandler::translateMessageCoro(LanguagePair_t fromTo, std::s
         }
 
         LL_WARNS() << "Translation request failed: " << err_msg << LL_ENDL;
-        if (!failure.empty())
+        if (failure != nullptr)
             failure(status, err_msg);
     }
 }
@@ -397,6 +397,7 @@ bool LLGoogleTranslationHandler::parseResponse(
     std::string& err_msg) const
 {
     const std::string& text = !body.empty() ? body : http_response["error_body"].asStringRef();
+
     boost::system::error_code ec;
     boost::json::value root = boost::json::parse(text, ec);
     if (ec.failed())
@@ -405,15 +406,17 @@ bool LLGoogleTranslationHandler::parseResponse(
         return false;
     }
 
-    if (status != HTTP_OK)
+    if (root.is_object())
     {
-        // Request failed. Extract error message from the response.
+        // Request succeeded, extract translation from the XML body.
+        if (parseTranslation(root, translation, detected_lang))
+            return true;
+
+        // Request failed. Extract error message from the XML body.
         parseErrorResponse(root, status, err_msg);
-        return false;
     }
 
-    // Request succeeded, extract translation from the response.
-    return parseTranslation(root, translation, detected_lang);
+    return false;
 }
 
 // virtual
@@ -705,7 +708,7 @@ bool LLAzureTranslationHandler::parseResponse(
     }
 
     detected_lang = lang_val.value();
-    translation = LLURI::unescape(text_val.value());
+    translation = text_val.value();
 
     return true;
 }
@@ -1145,7 +1148,7 @@ std::string LLTranslate::addNoTranslateTags(std::string mesg)
             upd_msg.insert(dif + match.getStart(), AZURE_NOTRANSLATE_OPENING_TAG);
             upd_msg.insert(dif + AZURE_NOTRANSLATE_OPENING_TAG.size() + match.getEnd() + 1, AZURE_NOTRANSLATE_CLOSING_TAG);
             mesg.erase(match.getStart(), match.getEnd() - match.getStart());
-            dif += match.getEnd() - match.getStart() + AZURE_NOTRANSLATE_OPENING_TAG.size() + AZURE_NOTRANSLATE_CLOSING_TAG.size();
+            dif += match.getEnd() - match.getStart() + static_cast<S32>(AZURE_NOTRANSLATE_OPENING_TAG.size() + AZURE_NOTRANSLATE_CLOSING_TAG.size());
         }
         return upd_msg;
     }
@@ -1167,9 +1170,9 @@ std::string LLTranslate::removeNoTranslateTags(std::string mesg)
     {
         std::string upd_msg(mesg);
         LLUrlMatch match;
-        S32 opening_tag_size = AZURE_NOTRANSLATE_OPENING_TAG.size();
-        S32 closing_tag_size = AZURE_NOTRANSLATE_CLOSING_TAG.size();
-        S32 dif = 0;
+        auto opening_tag_size = AZURE_NOTRANSLATE_OPENING_TAG.size();
+        auto closing_tag_size = AZURE_NOTRANSLATE_CLOSING_TAG.size();
+        size_t dif = 0;
         //remove 'no-translate' tags we added to the links before
         while (LLUrlRegistry::instance().findUrl(mesg, match))
         {

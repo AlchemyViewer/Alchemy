@@ -85,9 +85,9 @@ class AOSet
             LLUUID mRemapID;
             bool mCycle;
             bool mRandom;
-            S32 mCycleTime;
+            F32 mCycleTime;
             std::vector<AOAnimation> mAnimations;
-            U32 mCurrentAnimation;
+            size_t mCurrentAnimation;
             LLUUID mCurrentAnimationID;
             LLUUID mInventoryUUID;
             bool mDirty;
@@ -124,7 +124,7 @@ class AOSet
 
         void startTimer(F32 timeout);
         void stopTimer();
-        virtual BOOL tick();
+        bool tick() override;
 
         std::vector<std::string> mStateNames;
 

@@ -14,7 +14,6 @@
 	<text name="desc local">
 		あなただけに見えます。
 	</text>
-	<line_editor name="desc"/>
 	<text name="adv_trigger">
 		高度な設定
 	</text>

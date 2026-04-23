@@ -56,6 +56,7 @@
 #include "llattachmentsmgr.h"
 #include "llviewerwindow.h"
 #include "lldrawable.h"
+#include "llfloatergltfasseteditor.h"
 #include "llfloaterinspect.h"
 #include "llfloaterreporter.h"
 #include "llfloaterreg.h"
@@ -91,7 +92,6 @@
 #include "llviewerstats.h"
 #include "llvoavatarself.h"
 #include "llvovolume.h"
-#include "llworld.h"
 #include "pipeline.h"
 #include "llviewershadermgr.h"
 #include "llpanelface.h"
@@ -108,24 +108,16 @@ LLViewerObject* getSelectedParentObject(LLViewerObject *object) ;
 // Consts
 //
 
-const F32 SILHOUETTE_UPDATE_THRESHOLD_SQUARED = 0.02f;
-const S32 MAX_SILS_PER_FRAME = 50;
-const S32 MAX_OBJECTS_PER_PACKET = 254;
+constexpr F32 SILHOUETTE_UPDATE_THRESHOLD_SQUARED = 0.02f;
+constexpr S32 MAX_SILS_PER_FRAME = 50;
+constexpr S32 MAX_OBJECTS_PER_PACKET = 254;
 // For linked sets
-//const S32 MAX_CHILDREN_PER_TASK = 255;
+constexpr S32 MAX_CHILDREN_PER_TASK = 255;
 
-//
-// Globals
-//
 
-//BOOL gDebugSelectMgr = FALSE;
-
-//BOOL gHideSelectedObjects = FALSE;
-//BOOL gAllowSelectAvatar = FALSE;
-
-BOOL LLSelectMgr::sRectSelectInclusive = TRUE;
-BOOL LLSelectMgr::sRenderHiddenSelections = TRUE;
-BOOL LLSelectMgr::sRenderLightRadius = FALSE;
+bool LLSelectMgr::sRectSelectInclusive = true;
+bool LLSelectMgr::sRenderHiddenSelections = true;
+bool LLSelectMgr::sRenderLightRadius = false;
 F32 LLSelectMgr::sHighlightThickness = 0.f;
 F32 LLSelectMgr::sHighlightUScale = 0.f;
 F32 LLSelectMgr::sHighlightVScale = 0.f;
@@ -133,6 +125,12 @@ F32 LLSelectMgr::sHighlightAlpha = 0.f;
 F32 LLSelectMgr::sHighlightAlphaTest = 0.f;
 F32 LLSelectMgr::sHighlightUAnim = 0.f;
 F32 LLSelectMgr::sHighlightVAnim = 0.f;
+LLUIColor LLSelectMgr::sSilhouetteParentColor;
+LLUIColor LLSelectMgr::sSilhouetteChildColor;
+LLUIColor LLSelectMgr::sHighlightInspectColor;
+LLUIColor LLSelectMgr::sHighlightParentColor;
+LLUIColor LLSelectMgr::sHighlightChildColor;
+LLUIColor LLSelectMgr::sContextSilhouetteColor;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // struct LLDeRezInfo
@@ -213,12 +211,12 @@ void LLSelectMgr::cleanupGlobals()
 // LLSelectMgr()
 //-----------------------------------------------------------------------------
 LLSelectMgr::LLSelectMgr()
- : mHideSelectedObjects(LLCachedControl<bool>(gSavedSettings, "HideSelectedObjects", FALSE)),
-   mRenderHighlightSelections(LLCachedControl<bool>(gSavedSettings, "RenderHighlightSelections", TRUE)),
-   mAllowSelectAvatar( LLCachedControl<bool>(gSavedSettings, "AllowSelectAvatar", FALSE)),
-   mDebugSelectMgr(LLCachedControl<bool>(gSavedSettings, "DebugSelectMgr", FALSE))
+ : mHideSelectedObjects(LLCachedControl<bool>(gSavedSettings, "HideSelectedObjects", false)),
+   mRenderHighlightSelections(LLCachedControl<bool>(gSavedSettings, "RenderHighlightSelections", true)),
+   mAllowSelectAvatar( LLCachedControl<bool>(gSavedSettings, "AllowSelectAvatar", false)),
+   mDebugSelectMgr(LLCachedControl<bool>(gSavedSettings, "DebugSelectMgr", false))
 {
-    mTEMode = FALSE;
+    mTEMode = false;
     mTextureChannel = LLRender::DIFFUSE_MAP;
     mLastCameraPos.clearVec();
 
@@ -230,16 +228,16 @@ LLSelectMgr::LLSelectMgr()
     sHighlightUAnim     = gSavedSettings.getF32("SelectionHighlightUAnim");
     sHighlightVAnim     = gSavedSettings.getF32("SelectionHighlightVAnim");
 
-    sSilhouetteParentColor = LLUIColorTable::instance().getColor("SilhouetteParentColor");
+    sSilhouetteParentColor =LLUIColorTable::instance().getColor("SilhouetteParentColor");
     sSilhouetteChildColor = LLUIColorTable::instance().getColor("SilhouetteChildColor");
     sHighlightParentColor = LLUIColorTable::instance().getColor("HighlightParentColor");
     sHighlightChildColor = LLUIColorTable::instance().getColor("HighlightChildColor");
     sHighlightInspectColor = LLUIColorTable::instance().getColor("HighlightInspectColor");
-    sContextSilhouetteColor = LLUIColorTable::instance().getColor("ContextSilhouetteColor");
+    sContextSilhouetteColor = LLUIColorTable::instance().getColor("ContextSilhouetteColor")*0.5f;
 
     sRenderLightRadius = gSavedSettings.getBOOL("RenderLightRadius");
 
-    mRenderSilhouettes = TRUE;
+    mRenderSilhouettes = true;
 
     mGridMode = GRID_MODE_WORLD;
     gSavedSettings.setS32("GridMode", (S32)GRID_MODE_WORLD);
@@ -248,8 +246,8 @@ LLSelectMgr::LLSelectMgr()
     mHoverObjects = new LLObjectSelection();
     mHighlightedObjects = new LLObjectSelection();
 
-    mForceSelection = FALSE;
-    mShowSelection = FALSE;
+    mForceSelection = false;
+    mShowSelection = false;
 }
 
 
@@ -259,6 +257,7 @@ LLSelectMgr::LLSelectMgr()
 LLSelectMgr::~LLSelectMgr()
 {
     clearSelections();
+    mSlectionLodModChangedConnection.disconnect();
 }
 
 void LLSelectMgr::clearSelections()
@@ -467,6 +466,11 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectOnly(LLViewerObject* object, S3
     if (object->isSelected() ) {
         // make sure point at position is updated
         updatePointAt();
+        LLSelectNode* nodep = mSelectedObjects->findNode(object);
+        if (nodep)
+        {
+            nodep->selectGLTFNode(gltf_node, gltf_primitive, true);
+        }
         gEditMenuHandler = this;
         return NULL;
     }
@@ -481,7 +485,7 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectOnly(LLViewerObject* object, S3
 
     // Place it in the list and tag it.
     // This will refresh dialogs.
-    addAsIndividual(object, face, TRUE, gltf_node, gltf_primitive);
+    addAsIndividual(object, face, true, gltf_node, gltf_primitive);
 
     // Stop the object from moving (this anticipates changes on the
     // simulator in LLTask::userSelect)
@@ -519,7 +523,7 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectOnly(LLViewerObject* object, S3
 //-----------------------------------------------------------------------------
 // Select the object, parents and children.
 //-----------------------------------------------------------------------------
-LLObjectSelectionHandle LLSelectMgr::selectObjectAndFamily(LLViewerObject* obj, BOOL add_to_end, BOOL ignore_select_owned)
+LLObjectSelectionHandle LLSelectMgr::selectObjectAndFamily(LLViewerObject* obj, bool add_to_end, bool ignore_select_owned)
 {
     llassert( obj );
 
@@ -580,9 +584,9 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectAndFamily(LLViewerObject* obj, 
     root->resetRot();
 
     // leave component mode
-    if (ALControlCache::EditLinkedParts)
+    if (gSavedSettings.getBOOL("EditLinkedParts"))
     {
-        gSavedSettings.setBOOL("EditLinkedParts", FALSE);
+        gSavedSettings.setBOOL("EditLinkedParts", false);
         promoteSelectionToRoot();
     }
 
@@ -600,7 +604,7 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectAndFamily(LLViewerObject* obj, 
 // Select the object, parents and children.
 //-----------------------------------------------------------------------------
 LLObjectSelectionHandle LLSelectMgr::selectObjectAndFamily(const std::vector<LLViewerObject*>& object_list,
-                                                           BOOL send_to_sim)
+                                                           bool send_to_sim)
 {
     // Collect all of the objects, children included
     std::vector<LLViewerObject*> objects;
@@ -650,9 +654,9 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectAndFamily(const std::vector<LLV
     }
 
     // leave component mode
-    if (ALControlCache::EditLinkedParts)
+    if (gSavedSettings.getBOOL("EditLinkedParts"))
     {
-        gSavedSettings.setBOOL("EditLinkedParts", FALSE);
+        gSavedSettings.setBOOL("EditLinkedParts", false);
         promoteSelectionToRoot();
     }
 
@@ -670,9 +674,9 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectAndFamily(const std::vector<LLV
 // handles informing the current tool of the object's deletion.
 //
 // Caller needs to call dialog_refresh_all if necessary.
-BOOL LLSelectMgr::removeObjectFromSelections(const LLUUID &id)
+bool LLSelectMgr::removeObjectFromSelections(const LLUUID &id)
 {
-    BOOL object_found = FALSE;
+    bool object_found = false;
     LLTool *tool = NULL;
 
     tool = LLToolMgr::getInstance()->getCurrentTool();
@@ -682,7 +686,7 @@ BOOL LLSelectMgr::removeObjectFromSelections(const LLUUID &id)
     if( tool_editing_object && tool_editing_object->mID == id)
     {
         tool->stopEditing();
-        object_found = TRUE;
+        object_found = true;
     }
 
     // Iterate through selected objects list and kill the object
@@ -701,15 +705,15 @@ BOOL LLSelectMgr::removeObjectFromSelections(const LLUUID &id)
                 }
 
                 // lose the selection, don't tell simulator, it knows
-                deselectObjectAndFamily(object, FALSE);
-                object_found = TRUE;
+                deselectObjectAndFamily(object, false);
+                object_found = true;
                 break; // must break here, may have removed multiple objects from list
             }
             else if (object->isAvatar() && object->getParent() && ((LLViewerObject*)object->getParent())->mID == id)
             {
                 // It's possible the item being removed has an avatar sitting on it
                 // So remove the avatar that is sitting on the object.
-                deselectObjectAndFamily(object, FALSE);
+                deselectObjectAndFamily(object, false);
                 break; // must break here, may have removed multiple objects from list
             }
         }
@@ -720,37 +724,36 @@ BOOL LLSelectMgr::removeObjectFromSelections(const LLUUID &id)
 
 bool LLSelectMgr::linkObjects()
 {
-    if (!selectGetAllRootsValid())
+    if (!LLSelectMgr::getInstance()->selectGetAllRootsValid())
     {
         LLNotificationsUtil::add("UnableToLinkWhileDownloading");
         return true;
     }
 
-    S32 object_count = getSelection()->getObjectCount();
-    S32 max_objects = LLWorld::getInstance()->getRegionMaxLinkObjects();
-    if (object_count > max_objects + 1)
+    S32 object_count = LLSelectMgr::getInstance()->getSelection()->getObjectCount();
+    if (object_count > MAX_CHILDREN_PER_TASK + 1)
     {
         LLSD args;
         args["COUNT"] = llformat("%d", object_count);
-        int max = max_objects + 1;
+        int max = MAX_CHILDREN_PER_TASK+1;
         args["MAX"] = llformat("%d", max);
         LLNotificationsUtil::add("UnableToLinkObjects", args);
         return true;
     }
 
-    if (getSelection()->getRootObjectCount() < 2)
+    if (LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() < 2)
     {
         LLNotificationsUtil::add("CannotLinkIncompleteSet");
         return true;
     }
 
-    if (!selectGetRootsModify())
+    if (!LLSelectMgr::getInstance()->selectGetRootsModify())
     {
         LLNotificationsUtil::add("CannotLinkModify");
         return true;
     }
 
-    if (!selectGetRootsNonPermanentEnforced())
+    if (!LLSelectMgr::getInstance()->selectGetRootsNonPermanentEnforced())
     {
         LLNotificationsUtil::add("CannotLinkPermanent");
         return true;
@@ -758,7 +761,7 @@ bool LLSelectMgr::linkObjects()
 
     LLUUID owner_id;
     std::string owner_name;
-    if (!selectGetOwner(owner_id, owner_name))
+    if (!LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name))
     {
         // we don't actually care if you're the owner, but novices are
         // the most likely to be stumped by this one, so offer the
@@ -767,13 +770,13 @@ bool LLSelectMgr::linkObjects()
         return true;
     }
 
-    if (!selectGetSameRegion())
+    if (!LLSelectMgr::getInstance()->selectGetSameRegion())
     {
         LLNotificationsUtil::add("CannotLinkAcrossRegions");
         return true;
     }
 
-    sendLink();
+    LLSelectMgr::getInstance()->sendLink();
 
     return true;
 }
@@ -790,7 +793,7 @@ bool LLSelectMgr::unlinkObjects()
         return true;
     }
 
-    sendDelink();
+    LLSelectMgr::getInstance()->sendDelink();
     return true;
 }
 
@@ -803,7 +806,7 @@ void LLSelectMgr::confirmUnlinkObjects(const LLSD& notification, const LLSD& res
         return;
     }
 
-    sendDelink();
+    LLSelectMgr::getInstance()->sendDelink();
     return;
 }
 
@@ -826,9 +829,9 @@ bool LLSelectMgr::enableLinkObjects()
     // user can modify at least one of the selected objects.
 
     // in component mode, can't link
-    if (!ALControlCache::EditLinkedParts)
+    if (!gSavedSettings.getBOOL("EditLinkedParts"))
     {
-        if(selectGetAllRootsValid() && getSelection()->getRootObjectCount() >= 2)
+        if(LLSelectMgr::getInstance()->selectGetAllRootsValid() && LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() >= 2)
         {
             struct f : public LLSelectedObjectFunctor
             {
@@ -840,10 +843,10 @@ bool LLSelectMgr::enableLinkObjects()
                 }
             } func;
             const bool firstonly = true;
-            new_value = getSelection()->applyToRootObjects(&func, firstonly);
+            new_value = LLSelectMgr::getInstance()->getSelection()->applyToRootObjects(&func, firstonly);
         }
     }
-    if (!getSelection()->checkAnimatedObjectLinkable())
+    if (!LLSelectMgr::getInstance()->getSelection()->checkAnimatedObjectLinkable())
     {
         new_value = false;
     }
@@ -851,9 +854,9 @@ bool LLSelectMgr::enableLinkObjects()
     if ( (new_value) && ((rlv_handler_t::isEnabled()) && (!RlvActions::canStand())) )
     {
         // Allow only if the avie isn't sitting on any of the selected objects
-        LLObjectSelectionHandle hSel = getSelection();
+        LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
         RlvSelectIsSittingOn f(gAgentAvatarp);
-        if (hSel->getFirstRootNode(&f, TRUE) != NULL)
+        if (hSel->getFirstRootNode(&f, true) != nullptr)
             new_value = false;
     }
 // [/RLVa:KB]
@@ -862,10 +865,10 @@ bool LLSelectMgr::enableLinkObjects()
 
 bool LLSelectMgr::enableUnlinkObjects()
 {
-    LLViewerObject* first_editable_object = getSelection()->getFirstEditableObject();
+    LLViewerObject* first_editable_object = LLSelectMgr::getInstance()->getSelection()->getFirstEditableObject();
     LLViewerObject *root_object = (first_editable_object == NULL) ? NULL : first_editable_object->getRootEdit();
 
-    bool new_value = selectGetAllRootsValid() &&
+    bool new_value = LLSelectMgr::getInstance()->selectGetAllRootsValid() &&
         first_editable_object &&
         !first_editable_object->isAttachment() && !first_editable_object->isPermanentEnforced() &&
         ((root_object == NULL) || !root_object->isPermanentEnforced());
@@ -873,16 +876,16 @@ bool LLSelectMgr::enableUnlinkObjects()
     if ( (new_value) && ((rlv_handler_t::isEnabled()) && (!RlvActions::canStand())) )
     {
         // Allow only if the avie isn't sitting on any of the selected objects
-        LLObjectSelectionHandle hSel = getSelection();
+        LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
         RlvSelectIsSittingOn f(gAgentAvatarp);
-        if (hSel->getFirstRootNode(&f, TRUE) != NULL)
+        if (hSel->getFirstRootNode(&f, true) != nullptr)
             new_value = false;
     }
 // [/RLVa:KB]
     return new_value;
 }
 
-void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, BOOL send_to_sim, BOOL include_entire_object)
+void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, bool send_to_sim, bool include_entire_object)
 {
     // bail if nothing selected or if object wasn't selected in the first place
     if(!object) return;
@@ -924,7 +927,7 @@ void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, BOOL send_to_s
     //-----------------------------------------------------------
     LLViewerRegion* regionp = object->getRegion();
 
-    BOOL start_new_message = TRUE;
+    bool start_new_message = true;
     S32 select_count = 0;
 
     LLMessageSystem* msg = gMessageSystem;
@@ -937,7 +940,7 @@ void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, BOOL send_to_s
             msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
             msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
             select_count++;
-            start_new_message = FALSE;
+            start_new_message = false;
         }
 
         msg->nextBlockFast(_PREHASH_ObjectData);
@@ -952,7 +955,7 @@ void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, BOOL send_to_s
         {
             msg->sendReliable(regionp->getHost() );
             select_count = 0;
-            start_new_message = TRUE;
+            start_new_message = true;
         }
     }
 
@@ -965,7 +968,7 @@ void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, BOOL send_to_s
     updateSelectionCenter();
 }
 
-void LLSelectMgr::deselectObjectOnly(LLViewerObject* object, BOOL send_to_sim)
+void LLSelectMgr::deselectObjectOnly(LLViewerObject* object, bool send_to_sim)
 {
     // bail if nothing selected or if object wasn't selected in the first place
     if (!object) return;
@@ -999,10 +1002,13 @@ void LLSelectMgr::deselectObjectOnly(LLViewerObject* object, BOOL send_to_sim)
 // addAsFamily
 //-----------------------------------------------------------------------------
 
-void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, BOOL add_to_end)
+void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, bool add_to_end)
 {
-    for (LLViewerObject* objectp : objects)
+    for (std::vector<LLViewerObject*>::iterator iter = objects.begin();
+         iter != objects.end(); ++iter)
     {
+        LLViewerObject* objectp = *iter;
+
         // Can't select yourself
         if (objectp->mID == gAgentID
             && !mAllowSelectAvatar)
@@ -1012,7 +1018,7 @@ void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, BOOL add_to
 
         if (!objectp->isSelected())
         {
-            LLSelectNode *nodep = new LLSelectNode(objectp, TRUE);
+            LLSelectNode *nodep = new LLSelectNode(objectp, true);
             if (add_to_end)
             {
                 mSelectedObjects->addNodeAtEnd(nodep);
@@ -1021,11 +1027,11 @@ void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, BOOL add_to
             {
                 mSelectedObjects->addNode(nodep);
             }
-            objectp->setSelected(TRUE);
+            objectp->setSelected(true);
 
             if (objectp->getNumTEs() > 0)
             {
-                nodep->selectAllTEs(TRUE);
+                nodep->selectAllTEs(true);
                 objectp->setAllTESelected(true);
             }
             else
@@ -1040,7 +1046,7 @@ void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, BOOL add_to
             LLSelectNode* select_node = mSelectedObjects->findNode(objectp);
             if (select_node)
             {
-                select_node->setTransient(FALSE);
+                select_node->setTransient(false);
             }
         }
     }
@@ -1050,7 +1056,7 @@ void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, BOOL add_to
 //-----------------------------------------------------------------------------
 // addAsIndividual() - a single object, face, etc
 //-----------------------------------------------------------------------------
-void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, BOOL undoable, S32 gltf_node, S32 gltf_primitive)
+void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, bool undoable, S32 gltf_node, S32 gltf_primitive)
 {
     // check to see if object is already in list
     LLSelectNode *nodep = mSelectedObjects->findNode(objectp);
@@ -1058,23 +1064,23 @@ void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, BOOL undoab
     // if not in list, add it
     if (!nodep)
     {
-        nodep = new LLSelectNode(objectp, TRUE);
+        nodep = new LLSelectNode(objectp, true);
         mSelectedObjects->addNode(nodep);
         llassert_always(nodep->getObject());
     }
     else
     {
         // make this a full-fledged selection
-        nodep->setTransient(FALSE);
+        nodep->setTransient(false);
         // Move it to the front of the list
         mSelectedObjects->moveNodeToFront(nodep);
     }
 
     // Make sure the object is tagged as selected
-    objectp->setSelected( TRUE );
+    objectp->setSelected( true );
 
     // And make sure we don't consider it as part of a family
-    nodep->mIndividualSelection = TRUE;
+    nodep->mIndividualSelection = true;
 
     // Handle face selection
     if (objectp->getNumTEs() <= 0)
@@ -1083,12 +1089,12 @@ void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, BOOL undoab
     }
     else if (face == SELECT_ALL_TES)
     {
-        nodep->selectAllTEs(TRUE);
+        nodep->selectAllTEs(true);
         objectp->setAllTESelected(true);
     }
     else if (0 <= face && face < SELECT_MAX_TES)
     {
-        nodep->selectTE(face, TRUE);
+        nodep->selectTE(face, true);
         objectp->setTESelected(face, true);
     }
     else
@@ -1100,7 +1106,7 @@ void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, BOOL undoab
     // Handle glTF node selection
     if (gltf_node >= 0)
     {
-        nodep->selectGLTFNode(gltf_node, gltf_primitive, TRUE);
+        nodep->selectGLTFNode(gltf_node, gltf_primitive, true);
 
     }
 
@@ -1147,14 +1153,16 @@ LLObjectSelectionHandle LLSelectMgr::setHoverObject(LLViewerObject *objectp, S32
         objectp->addThisAndNonJointChildren(objects);
 
         mHoverObjects->deleteAllNodes();
-        for (LLViewerObject* cur_objectp : objects)
+        for (std::vector<LLViewerObject*>::iterator iter = objects.begin();
+             iter != objects.end(); ++iter)
         {
+            LLViewerObject* cur_objectp = *iter;
             if(!cur_objectp || cur_objectp->isDead())
             {
                 continue;
             }
-            LLSelectNode* nodep = new LLSelectNode(cur_objectp, FALSE);
-            nodep->selectTE(face, TRUE);
+            LLSelectNode* nodep = new LLSelectNode(cur_objectp, false);
+            nodep->selectTE(face, true);
             mHoverObjects->addNodeAtEnd(nodep);
         }
 
@@ -1209,8 +1217,10 @@ void LLSelectMgr::highlightObjectAndFamily(LLViewerObject* objectp)
     highlightObjectOnly(root_obj);
 
     LLViewerObject::const_child_list_t& child_list = root_obj->getChildren();
-    for (LLViewerObject* child : child_list)
+    for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
+         iter != child_list.end(); iter++)
     {
+        LLViewerObject* child = *iter;
         highlightObjectOnly(child);
     }
 }
@@ -1219,8 +1229,11 @@ void LLSelectMgr::highlightObjectAndFamily(LLViewerObject* objectp)
 // It's also more efficient than calling the single-object version over and over.
 void LLSelectMgr::highlightObjectAndFamily(const std::vector<LLViewerObject*>& objects)
 {
-    for (LLViewerObject* object : objects)
+    for (std::vector<LLViewerObject*>::const_iterator iter1 = objects.begin();
+         iter1 != objects.end(); ++iter1)
     {
+        LLViewerObject* object = *iter1;
+
         if (!object)
         {
             continue;
@@ -1234,8 +1247,10 @@ void LLSelectMgr::highlightObjectAndFamily(const std::vector<LLViewerObject*>& o
         mRectSelectedObjects.insert(root);
 
         LLViewerObject::const_child_list_t& child_list = root->getChildren();
-        for (LLViewerObject* child : child_list)
+        for (LLViewerObject::child_list_t::const_iterator iter2 = child_list.begin();
+             iter2 != child_list.end(); iter2++)
         {
+            LLViewerObject* child = *iter2;
             mRectSelectedObjects.insert(child);
         }
     }
@@ -1263,8 +1278,10 @@ void LLSelectMgr::unhighlightObjectAndFamily(LLViewerObject* objectp)
     unhighlightObjectOnly(root_obj);
 
     LLViewerObject::const_child_list_t& child_list = root_obj->getChildren();
-    for (LLViewerObject* child : child_list)
+    for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
+         iter != child_list.end(); iter++)
     {
+        LLViewerObject* child = *iter;
         unhighlightObjectOnly(child);
     }
 }
@@ -1309,7 +1326,7 @@ LLObjectSelectionHandle LLSelectMgr::selectHighlightedObjects()
         mSelectedObjects->addNode(new_nodep);
 
         // flag this object as selected
-        objectp->setSelected(TRUE);
+        objectp->setSelected(true);
         objectp->setAllTESelected(true);
 
         mSelectedObjects->mSelectType = getSelectTypeForObject(objectp);
@@ -1338,9 +1355,11 @@ LLObjectSelectionHandle LLSelectMgr::selectHighlightedObjects()
 
 void LLSelectMgr::deselectHighlightedObjects()
 {
-    BOOL select_linked_set = !ALControlCache::EditLinkedParts;
-    for (LLViewerObject* objectp : mRectSelectedObjects)
+    bool select_linked_set = !gSavedSettings.getBOOL("EditLinkedParts");
+    for (std::set<LLPointer<LLViewerObject> >::iterator iter = mRectSelectedObjects.begin();
+         iter != mRectSelectedObjects.end(); iter++)
     {
+        LLViewerObject *objectp = *iter;
         if (!select_linked_set)
         {
             deselectObjectOnly(objectp);
@@ -1360,13 +1379,15 @@ void LLSelectMgr::deselectHighlightedObjects()
 
 void LLSelectMgr::addGridObject(LLViewerObject* objectp)
 {
-    LLSelectNode* nodep = new LLSelectNode(objectp, FALSE);
+    LLSelectNode* nodep = new LLSelectNode(objectp, false);
     mGridObjects.addNodeAtEnd(nodep);
 
     LLViewerObject::const_child_list_t& child_list = objectp->getChildren();
-    for (LLViewerObject* child : child_list)
+    for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
+         iter != child_list.end(); iter++)
     {
-        nodep = new LLSelectNode(child, FALSE);
+        LLViewerObject* child = *iter;
+        nodep = new LLSelectNode(child, false);
         mGridObjects.addNodeAtEnd(nodep);
     }
 }
@@ -1420,17 +1441,18 @@ void LLSelectMgr::getGrid(LLVector3& origin, LLQuaternion &rotation, LLVector3 &
 
         LLVector4a min_extents(F32_MAX);
         LLVector4a max_extents(-F32_MAX);
-        BOOL grid_changed = FALSE;
-        for (LLSelectNode* nodep : mGridObjects)
+        bool grid_changed = false;
+        for (LLObjectSelection::iterator iter = mGridObjects.begin();
+             iter != mGridObjects.end(); ++iter)
         {
-            LLViewerObject* object = nodep->getObject();
+            LLViewerObject* object = (*iter)->getObject();
             LLDrawable* drawable = object->mDrawable;
             if (drawable)
             {
                 const LLVector4a* ext = drawable->getSpatialExtents();
                 update_min_max(min_extents, max_extents, ext[0]);
                 update_min_max(min_extents, max_extents, ext[1]);
-                grid_changed = TRUE;
+                grid_changed = true;
             }
         }
         if (grid_changed)
@@ -1441,18 +1463,18 @@ void LLSelectMgr::getGrid(LLVector3& origin, LLQuaternion &rotation, LLVector3 &
             size.setSub(max_extents, min_extents);
             size.mul(0.5f);
 
+            mGridOrigin.set(center.getF32ptr());
             LLDrawable* drawable = first_grid_object->mDrawable;
             if (drawable && drawable->isActive())
             {
-                first_grid_object->getRenderMatrix().affineTransform(center,center);
+                mGridOrigin = mGridOrigin * first_grid_object->getRenderMatrix();
             }
-            mGridOrigin.set(center.getF32ptr());
             mGridScale.set(size.getF32ptr());
         }
     }
     else // GRID_MODE_WORLD or just plain default
     {
-        const BOOL non_root_ok = TRUE;
+        const bool non_root_ok = true;
         LLViewerObject* first_object = mSelectedObjects->getFirstRootObject(non_root_ok);
 
         mGridOrigin.clearVec();
@@ -1469,14 +1491,14 @@ void LLSelectMgr::getGrid(LLVector3& origin, LLQuaternion &rotation, LLVector3 &
                 LLXform* attachment_point_xform = first_object->getRootEdit()->mDrawable->mXform.getParent();
                 mGridOrigin = attachment_point_xform->getWorldPosition();
                 mGridRotation = attachment_point_xform->getWorldRotation();
-                mGridScale = LLVector3(1.f, 1.f, 1.f) * ALControlCache::GridResolution;
+                mGridScale = LLVector3(1.f, 1.f, 1.f) * gSavedSettings.getF32("GridResolution");
             }
             break;
         case SELECT_TYPE_HUD:
-            mGridScale = LLVector3(1.f, 1.f, 1.f) * llmin(ALControlCache::GridResolution, 0.5f);
+            mGridScale = LLVector3(1.f, 1.f, 1.f) * llmin(gSavedSettings.getF32("GridResolution"), 0.5f);
             break;
         case SELECT_TYPE_WORLD:
-            mGridScale = LLVector3(1.f, 1.f, 1.f) * ALControlCache::GridResolution;
+            mGridScale = LLVector3(1.f, 1.f, 1.f) * gSavedSettings.getF32("GridResolution");
             break;
         }
     }
@@ -1493,12 +1515,14 @@ void LLSelectMgr::getGrid(LLVector3& origin, LLQuaternion &rotation, LLVector3 &
 
 void LLSelectMgr::remove(std::vector<LLViewerObject*>& objects)
 {
-    for (LLViewerObject* objectp : objects)
+    for (std::vector<LLViewerObject*>::iterator iter = objects.begin();
+         iter != objects.end(); ++iter)
     {
+        LLViewerObject* objectp = *iter;
         LLSelectNode* nodep = mSelectedObjects->findNode(objectp);
         if (nodep)
         {
-            objectp->setSelected(FALSE);
+            objectp->setSelected(false);
             mSelectedObjects->removeNode(nodep);
             nodep = NULL;
         }
@@ -1511,7 +1535,7 @@ void LLSelectMgr::remove(std::vector<LLViewerObject*>& objects)
 //-----------------------------------------------------------------------------
 // remove() - a single object
 //-----------------------------------------------------------------------------
-void LLSelectMgr::remove(LLViewerObject *objectp, S32 te, BOOL undoable)
+void LLSelectMgr::remove(LLViewerObject *objectp, S32 te, bool undoable)
 {
     // get object node (and verify it is in the selected list)
     LLSelectNode *nodep = mSelectedObjects->findNode(objectp);
@@ -1526,14 +1550,14 @@ void LLSelectMgr::remove(LLViewerObject *objectp, S32 te, BOOL undoable)
         // Remove all faces (or the object doesn't have faces) so remove the node
         mSelectedObjects->removeNode(nodep);
         nodep = NULL;
-        objectp->setSelected( FALSE );
+        objectp->setSelected( false );
     }
     else if (0 <= te && te < SELECT_MAX_TES)
     {
         // ...valid face, check to see if it was on
         if (nodep->isTESelected(te))
         {
-            nodep->selectTE(te, FALSE);
+            nodep->selectTE(te, false);
             objectp->setTESelected(te, false);
         }
         else
@@ -1543,7 +1567,7 @@ void LLSelectMgr::remove(LLViewerObject *objectp, S32 te, BOOL undoable)
         }
 
         // ...check to see if this operation turned off all faces
-        BOOL found = FALSE;
+        bool found = false;
         for (S32 i = 0; i < nodep->getObject()->getNumTEs(); i++)
         {
             found = found || nodep->isTESelected(i);
@@ -1554,7 +1578,7 @@ void LLSelectMgr::remove(LLViewerObject *objectp, S32 te, BOOL undoable)
         {
             mSelectedObjects->removeNode(nodep);
             nodep = NULL;
-            objectp->setSelected( FALSE );
+            objectp->setSelected( false );
             // *FIXME: Doesn't update simulator that object is no longer selected
         }
     }
@@ -1578,7 +1602,7 @@ void LLSelectMgr::removeAll()
          iter != mSelectedObjects->end(); iter++ )
     {
         LLViewerObject *objectp = (*iter)->getObject();
-        objectp->setSelected( FALSE );
+        objectp->setSelected( false );
     }
 
     mSelectedObjects->deleteAllNodes();
@@ -1594,7 +1618,7 @@ void LLSelectMgr::promoteSelectionToRoot()
 {
     std::set<LLViewerObject*> selection_set;
 
-    BOOL selection_changed = FALSE;
+    bool selection_changed = false;
 
     for (LLObjectSelection::iterator iter = getSelection()->begin();
          iter != getSelection()->end(); )
@@ -1605,7 +1629,7 @@ void LLSelectMgr::promoteSelectionToRoot()
 
         if (nodep->mIndividualSelection)
         {
-            selection_changed = TRUE;
+            selection_changed = true;
         }
 
         LLViewerObject* parentp = object;
@@ -1621,9 +1645,10 @@ void LLSelectMgr::promoteSelectionToRoot()
     {
         deselectAll();
 
-        for (LLViewerObject* object : selection_set)
+        std::set<LLViewerObject*>::iterator set_iter;
+        for (set_iter = selection_set.begin(); set_iter != selection_set.end(); ++set_iter)
         {
-            selectObjectAndFamily(object);
+            selectObjectAndFamily(*set_iter);
         }
     }
 }
@@ -1635,17 +1660,20 @@ void LLSelectMgr::demoteSelectionToIndividuals()
 {
     std::vector<LLViewerObject*> objects;
 
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++)
     {
-        LLViewerObject* object = node->getObject();
+        LLViewerObject* object = (*iter)->getObject();
         object->addThisAndNonJointChildren(objects);
     }
 
     if (!objects.empty())
     {
         deselectAll();
-        for (LLViewerObject* objectp : objects)
+        for (std::vector<LLViewerObject*>::iterator iter = objects.begin();
+             iter != objects.end(); ++iter)
         {
+            LLViewerObject* objectp = *iter;
             selectObjectOnly(objectp);
         }
     }
@@ -1739,9 +1767,10 @@ void LLObjectSelection::applyNoCopyTextureToTEs(LLViewerInventoryItem* item)
     }
     LLViewerTexture* image = LLViewerTextureManager::getFetchedTexture(item->getAssetUUID());
 
-    for (LLSelectNode* node : begin_end())
+    for (iterator iter = begin(); iter != end(); ++iter)
     {
-        LLViewerObject* object = node->getObject();
+        LLSelectNode* node = *iter;
+        LLViewerObject* object = (*iter)->getObject();
         if (!object)
         {
             continue;
@@ -1871,7 +1900,7 @@ bool LLSelectMgr::selectionSetImage(const LLUUID& imageid)
             if (mItem && objectp->isAttachment())
             {
                 const LLPermissions& perm = mItem->getPermissions();
-                BOOL unrestricted = ((perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED) ? TRUE : FALSE;
+                bool unrestricted = (perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED;
                 if (!unrestricted)
                 {
                     // Attachments are in world and in inventory simultaneously,
@@ -1894,7 +1923,7 @@ bool LLSelectMgr::selectionSetImage(const LLUUID& imageid)
                 // Texture picker defaults aren't inventory items
                 // * Don't need to worry about permissions for them
                 // * Can just apply the texture and be done with it.
-                objectp->setTEImage(te, LLViewerTextureManager::getFetchedTexture(mImageID, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE));
+                objectp->setTEImage(te, LLViewerTextureManager::getFetchedTexture(mImageID, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE));
             }
 
             return true;
@@ -1921,10 +1950,11 @@ bool LLSelectMgr::selectionSetImage(const LLUUID& imageid)
             if (!mItem)
             {
                 object->sendTEUpdate();
-                if (!gSavedSettings.getBOOL("AlchemyPointAtPrivate"))
+                static LLCachedControl<bool> enable_selection_hints(gSavedSettings, "EnableSelectionHints", false);
+                if (enable_selection_hints)
                 {
                     // 1 particle effect per object
-                    LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, TRUE);
+                    LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
                     effectp->setSourceObject(gAgentAvatarp);
                     effectp->setTargetObject(object);
                     effectp->setDuration(LL_HUD_DUR_SHORT);
@@ -2001,8 +2031,94 @@ bool LLSelectMgr::selectionSetGLTFMaterial(const LLUUID& mat_id)
                 }
             }
 
+            // If this face already has the target material ID, do nothing.
+            // This prevents re-sending the same ID on OK, which can cause the server
+            // to drop overrides when queueApply is invoked with the OLD id.
+            if (objectp->getRenderMaterialID(te) == asset_id)
+            {
+                return true;
+            }
+
+            // Preserve existing texture transforms when switching to PBR material
+            LLTextureEntry* tep = objectp->getTE(te);
+            bool should_preserve_transforms = false;
+            LLGLTFMaterial* preserved_override = nullptr;
+
+            if (tep && asset_id.notNull())
+            {
+                // Only preserve transforms from existing GLTF material override
+                // Do not fall back to texture entry transforms when switching between PBR materials
+                LLGLTFMaterial* existing_override = tep->getGLTFMaterialOverride();
+                if (existing_override)
+                {
+                    // Check if existing override has non-default transforms
+                    const LLGLTFMaterial::TextureTransform& existing_transform = existing_override->mTextureTransform[0];
+                    const LLGLTFMaterial::TextureTransform& default_transform = LLGLTFMaterial::TextureTransform();
+
+                    if (existing_transform.mScale != default_transform.mScale ||
+                        existing_transform.mOffset != default_transform.mOffset ||
+                        existing_transform.mRotation != default_transform.mRotation)
+                    {
+                        // Preserve non-default transforms from current PBR material
+                        preserved_override = new LLGLTFMaterial();
+                        for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                        {
+                            preserved_override->mTextureTransform[i].mScale = existing_transform.mScale;
+                            preserved_override->mTextureTransform[i].mOffset = existing_transform.mOffset;
+                            preserved_override->mTextureTransform[i].mRotation = existing_transform.mRotation;
+                        }
+                        should_preserve_transforms = true;
+                    }
+                    // If existing override has default transforms, don't preserve anything
+                }
+                else
+                {
+                    // No existing PBR material override - check texture entry transforms
+                    // This handles the case of switching from Blinn-Phong to PBR material
+                    F32 existing_scale_s, existing_scale_t, existing_offset_s, existing_offset_t, existing_rotation;
+                    tep->getScale(&existing_scale_s, &existing_scale_t);
+                    tep->getOffset(&existing_offset_s, &existing_offset_t);
+                    existing_rotation = tep->getRotation();
+
+                    const LLGLTFMaterial::TextureTransform& default_transform = LLGLTFMaterial::TextureTransform();
+                    if (existing_scale_s != default_transform.mScale.mV[0] || existing_scale_t != default_transform.mScale.mV[1] ||
+                        existing_offset_s != default_transform.mOffset.mV[0] || existing_offset_t != default_transform.mOffset.mV[1] ||
+                        existing_rotation != default_transform.mRotation)
+                    {
+                        // Preserve non-default transforms from texture entry
+                        preserved_override = new LLGLTFMaterial();
+                        for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                        {
+                            LLVector2 pbr_scale, pbr_offset;
+                            F32 pbr_rotation;
+                            LLGLTFMaterial::convertTextureTransformToPBR(
+                                existing_scale_s, existing_scale_t,
+                                existing_offset_s, existing_offset_t,
+                                existing_rotation,
+                                pbr_scale, pbr_offset, pbr_rotation);
+                            preserved_override->mTextureTransform[i].mScale = pbr_scale;
+                            preserved_override->mTextureTransform[i].mOffset = pbr_offset;
+                            preserved_override->mTextureTransform[i].mRotation = pbr_rotation;
+                        }
+                        should_preserve_transforms = true;
+                    }
+                }
+            }
+
+            objectp->clearTEWaterExclusion(te);
             // Blank out most override data on the object and send to server
-            objectp->setRenderMaterialID(te, asset_id);
+            if (should_preserve_transforms && preserved_override)
+            {
+                // Apply material with preserved transforms
+                LLGLTFMaterialList::queueApply(objectp, te, asset_id, preserved_override);
+                // Update local state
+                objectp->setRenderMaterialID(te, asset_id, false, true);
+                tep->setGLTFMaterialOverride(preserved_override);
+            }
+            else
+            {
+                objectp->setRenderMaterialID(te, asset_id);
+            }
 
             return true;
         }
@@ -2036,10 +2152,11 @@ bool LLSelectMgr::selectionSetGLTFMaterial(const LLUUID& mat_id)
                 return false;
             }
 
-            if (!mItem)
+            static LLCachedControl<bool> enable_selection_hints(gSavedSettings, "EnableSelectionHints", false);
+            if (enable_selection_hints && mItem)
             {
                 // 1 particle effect per object
-                LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, TRUE);
+                LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
                 effectp->setSourceObject(gAgentAvatarp);
                 effectp->setTargetObject(object);
                 effectp->setDuration(LL_HUD_DUR_SHORT);
@@ -2197,7 +2314,7 @@ void LLSelectMgr::selectionRevertShinyColors()
     getSelection()->applyToObjects(&sendfunc);
 }
 
-BOOL LLSelectMgr::selectionRevertTextures()
+bool LLSelectMgr::selectionRevertTextures()
 {
     struct f : public LLSelectedTEFunctor
     {
@@ -2215,11 +2332,11 @@ BOOL LLSelectMgr::selectionRevertTextures()
                     if (id.isNull())
                     {
                         // this was probably a no-copy texture, leave image as-is
-                        return FALSE;
+                        return false;
                     }
                     else
                     {
-                        object->setTEImage(te, LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE));
+                        object->setTEImage(te, LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE));
 
                     }
                 }
@@ -2227,7 +2344,7 @@ BOOL LLSelectMgr::selectionRevertTextures()
             return true;
         }
     } setfunc(mSelectedObjects);
-    BOOL revert_successful = getSelection()->applyToTEs(&setfunc);
+    bool revert_successful = getSelection()->applyToTEs(&setfunc);
 
     LLSelectMgrSendFunctor sendfunc;
     getSelection()->applyToObjects(&sendfunc);
@@ -2253,23 +2370,26 @@ void LLSelectMgr::selectionRevertGLTFMaterials()
             {
                 // Restore base material
                 LLUUID asset_id = nodep->mSavedGLTFMaterialIds[te];
+                LLUUID old_asset_id = objectp->getRenderMaterialID(te);
 
                 // Update material locally
                 objectp->setRenderMaterialID(te, asset_id, false /*wait for LLGLTFMaterialList update*/);
-                objectp->setTEGLTFMaterialOverride(te, nodep->mSavedGLTFOverrideMaterials[te]);
-
-                // Enqueue update to server
-                if (asset_id.notNull())
+                LLGLTFMaterial* material = nodep->mSavedGLTFOverrideMaterials[te];
+                if (material)
                 {
-                    // Restore overrides and base material
-                    LLGLTFMaterialList::queueApply(objectp, te, asset_id, nodep->mSavedGLTFOverrideMaterials[te]);
+                    material = new LLGLTFMaterial(*material);
+                    objectp->setTEGLTFMaterialOverride(te, material);
                 }
-                else
+
+                if (asset_id.isNull() || !material)
                 {
                     //blank override out
                     LLGLTFMaterialList::queueApply(objectp, te, asset_id);
                 }
-
+                else
+                {
+                    LLGLTFMaterialList::queueApply(objectp, te, asset_id, material);
+                }
             }
             return true;
         }
@@ -2302,6 +2422,7 @@ void LLSelectMgr::selectionSetBumpmap(U8 bumpmap, const LLUUID &image_id)
         LL_WARNS() << "Attempted to apply no-copy texture to multiple objects" << LL_ENDL;
         return;
     }
+
     if (item && !item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID()))
     {
         LLViewerObject *object = mSelectedObjects->getFirstRootObject();
@@ -2310,8 +2431,8 @@ void LLSelectMgr::selectionSetBumpmap(U8 bumpmap, const LLUUID &image_id)
             return;
         }
         const LLPermissions& perm = item->getPermissions();
-        BOOL unrestricted = ((perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED) ? TRUE : FALSE;
-        BOOL attached = object->isAttachment();
+        bool unrestricted = (perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED;
+        bool attached = object->isAttachment();
         if (attached && !unrestricted)
         {
             // Attachments are in world and in inventory simultaneously,
@@ -2374,6 +2495,7 @@ void LLSelectMgr::selectionSetShiny(U8 shiny, const LLUUID &image_id)
         LL_WARNS() << "Attempted to apply no-copy texture to multiple objects" << LL_ENDL;
         return;
     }
+
     if (item && !item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID()))
     {
         LLViewerObject *object = mSelectedObjects->getFirstRootObject();
@@ -2382,8 +2504,8 @@ void LLSelectMgr::selectionSetShiny(U8 shiny, const LLUUID &image_id)
             return;
         }
         const LLPermissions& perm = item->getPermissions();
-        BOOL unrestricted = ((perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED) ? TRUE : FALSE;
-        BOOL attached = object->isAttachment();
+        bool unrestricted = (perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED;
+        bool attached = object->isAttachment();
         if (attached && !unrestricted)
         {
             // Attachments are in world and in inventory simultaneously,
@@ -2475,8 +2597,9 @@ void LLSelectMgr::selectionSetMedia(U8 media_type, const LLSD &media_data)
                     }
                     else {
                         // Add/update media
+                        object->clearTEWaterExclusion(te);
                         object->setTEMediaFlags(te, mMediaFlags);
-                        LLVOVolume *vo = object->asVolume();
+                        LLVOVolume *vo = dynamic_cast<LLVOVolume*>(object);
                         llassert(NULL != vo);
                         if (NULL != vo)
                         {
@@ -2502,7 +2625,7 @@ void LLSelectMgr::selectionSetMedia(U8 media_type, const LLSD &media_data)
             if (object->permModify())
             {
                 object->sendTEUpdate();
-                LLVOVolume *vo = object->asVolume();
+                LLVOVolume *vo = dynamic_cast<LLVOVolume*>(object);
                 llassert(NULL != vo);
                 // It's okay to skip this object if hasMedia() is false...
                 // the sendTEUpdate() above would remove all media data if it were
@@ -2631,8 +2754,10 @@ void LLSelectMgr::selectionRemoveMaterial()
 //-----------------------------------------------------------------------------
 LLPermissions* LLSelectMgr::findObjectPermissions(const LLViewerObject* object)
 {
-    for (LLSelectNode* nodep : getSelection()->valid_begin_end())
+    for (LLObjectSelection::valid_iterator iter = getSelection()->valid_begin();
+         iter != getSelection()->valid_end(); iter++ )
     {
+        LLSelectNode* nodep = *iter;
         if (nodep->getObject() == object)
         {
             return nodep->mPermissions;
@@ -2646,9 +2771,9 @@ LLPermissions* LLSelectMgr::findObjectPermissions(const LLViewerObject* object)
 //-----------------------------------------------------------------------------
 // selectionGetGlow()
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectionGetGlow(F32 *glow)
+bool LLSelectMgr::selectionGetGlow(F32 *glow)
 {
-    BOOL identical;
+    bool identical;
     F32 lglow = 0.f;
     struct f1 : public LLSelectedTEGetFunctor<F32>
     {
@@ -2675,7 +2800,7 @@ void LLSelectMgr::selectionSetPhysicsType(U8 type)
             if (object->permModify())
             {
                 object->setPhysicsShapeType(mType);
-                object->updateFlags(TRUE);
+                object->updateFlags(true);
             }
             return true;
         }
@@ -2694,7 +2819,7 @@ void LLSelectMgr::selectionSetFriction(F32 friction)
             if (object->permModify())
             {
                 object->setPhysicsFriction(mFriction);
-                object->updateFlags(TRUE);
+                object->updateFlags(true);
             }
             return true;
         }
@@ -2713,7 +2838,7 @@ void LLSelectMgr::selectionSetGravity(F32 gravity )
             if (object->permModify())
             {
                 object->setPhysicsGravity(mGravity);
-                object->updateFlags(TRUE);
+                object->updateFlags(true);
             }
             return true;
         }
@@ -2732,7 +2857,7 @@ void LLSelectMgr::selectionSetDensity(F32 density )
             if (object->permModify())
             {
                 object->setPhysicsDensity(mDensity);
-                object->updateFlags(TRUE);
+                object->updateFlags(true);
             }
             return true;
         }
@@ -2751,7 +2876,7 @@ void LLSelectMgr::selectionSetRestitution(F32 restitution)
             if (object->permModify())
             {
                 object->setPhysicsRestitution(mRestitution);
-                object->updateFlags(TRUE);
+                object->updateFlags(true);
             }
             return true;
         }
@@ -2784,8 +2909,8 @@ void LLSelectMgr::selectionSetMaterial(U8 material)
     getSelection()->applyToObjects(&sendfunc);
 }
 
-// TRUE if all selected objects have this PCode
-BOOL LLSelectMgr::selectionAllPCode(LLPCode code)
+// true if all selected objects have this PCode
+bool LLSelectMgr::selectionAllPCode(LLPCode code)
 {
     struct f : public LLSelectedObjectFunctor
     {
@@ -2795,27 +2920,28 @@ BOOL LLSelectMgr::selectionAllPCode(LLPCode code)
         {
             if (object->getPCode() != mCode)
             {
-                return FALSE;
+                return false;
             }
             return true;
         }
     } func(code);
-    BOOL res = getSelection()->applyToObjects(&func);
+    bool res = getSelection()->applyToObjects(&func);
     return res;
 }
 
 bool LLSelectMgr::selectionGetIncludeInSearch(bool* include_in_search_out)
 {
     LLViewerObject *object = mSelectedObjects->getFirstRootObject();
-    if (!object) return FALSE;
+    if (!object) return false;
 
     bool include_in_search = object->getIncludeInSearch();
 
     bool identical = true;
 
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++)
     {
-        LLViewerObject* object = node->getObject();
+        LLViewerObject* object = (*iter)->getObject();
 
         if ( include_in_search != object->getIncludeInSearch())
         {
@@ -2831,9 +2957,10 @@ bool LLSelectMgr::selectionGetIncludeInSearch(bool* include_in_search_out)
 void LLSelectMgr::selectionSetIncludeInSearch(bool include_in_search)
 {
     LLViewerObject* object = NULL;
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++)
     {
-        object = node->getObject();
+        object = (*iter)->getObject();
         object->setIncludeInSearch(include_in_search);
     }
     sendListToRegions(
@@ -2845,12 +2972,12 @@ void LLSelectMgr::selectionSetIncludeInSearch(bool include_in_search)
         SEND_ONLY_ROOTS);
 }
 
-BOOL LLSelectMgr::selectionGetClickAction(U8 *out_action)
+bool LLSelectMgr::selectionGetClickAction(U8 *out_action)
 {
     LLViewerObject *object = mSelectedObjects->getFirstObject();
     if (!object)
     {
-        return FALSE;
+        return false;
     }
 
     U8 action = object->getClickAction();
@@ -2869,7 +2996,7 @@ BOOL LLSelectMgr::selectionGetClickAction(U8 *out_action)
             return true;
         }
     } func(action);
-    BOOL res = getSelection()->applyToObjects(&func);
+    bool res = getSelection()->applyToObjects(&func);
     return res;
 }
 
@@ -2906,21 +3033,21 @@ void LLSelectMgr::sendGodlikeRequest(const std::string& request, const std::stri
 {
     // If the agent is neither godlike nor an estate owner, the server
     // will reject the request.
-    const char* message_type;
+    std::string message_type;
     if (gAgent.isGodlike())
     {
-        message_type = _PREHASH_GodlikeMessage;
+        message_type = "GodlikeMessage";
     }
     else
     {
-        message_type = _PREHASH_EstateOwnerMessage;
+        message_type = "EstateOwnerMessage";
     }
 
     godlike_request_t data(request, param);
     if(!mSelectedObjects->getRootObjectCount())
     {
         LLMessageSystem* msg = gMessageSystem;
-        msg->newMessageFast(message_type);
+        msg->newMessage(message_type.c_str());
         LLSelectMgr::packGodlikeHead(&data);
         gAgent.sendReliableMessage();
     }
@@ -2962,7 +3089,6 @@ void LLSelectMgr::logNoOp(LLSelectNode* node, void *)
 // static
 void LLSelectMgr::logAttachmentRequest(LLSelectNode* node, void *)
 {
-    LLAttachmentsMgr::instance().onAttachmentRequested(node->mItemID);
 }
 
 // static
@@ -2997,7 +3123,7 @@ void LLSelectMgr::selectionTexScaleAutofit(F32 repeats_per_meter)
                 U32 s_axis, t_axis;
                 if (!LLPrimitive::getTESTAxes(te, &s_axis, &t_axis))
                 {
-                    return TRUE;
+                    return true;
                 }
 
                 F32 new_s = object->getScale().mV[s_axis] * mRepeatsPerMeter;
@@ -3022,10 +3148,12 @@ void LLSelectMgr::selectionTexScaleAutofit(F32 repeats_per_meter)
 //-----------------------------------------------------------------------------
 // adjustTexturesByScale()
 //-----------------------------------------------------------------------------
-void LLSelectMgr::adjustTexturesByScale(BOOL send_to_sim, BOOL stretch)
+void LLSelectMgr::adjustTexturesByScale(bool send_to_sim, bool stretch)
 {
-    for (LLSelectNode* selectNode : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++)
     {
+        LLSelectNode* selectNode = *iter;
         LLViewerObject* object = selectNode->getObject();
 
         if (!object)
@@ -3043,13 +3171,13 @@ void LLSelectMgr::adjustTexturesByScale(BOOL send_to_sim, BOOL stretch)
             continue;
         }
 
-        BOOL send = FALSE;
+        bool send = false;
 
         for (U8 te_num = 0; te_num < object->getNumTEs(); te_num++)
         {
-            const LLTextureEntry* tep = object->getTE(te_num);
+            LLTextureEntry* tep = object->getTE(te_num);
 
-            BOOL planar = tep->getTexGen() == LLTextureEntry::TEX_GEN_PLANAR;
+            bool planar = tep->getTexGen() == LLTextureEntry::TEX_GEN_PLANAR;
             if (planar == stretch)
             {
                 // Figure out how S,T changed with scale operation
@@ -3080,8 +3208,6 @@ void LLSelectMgr::adjustTexturesByScale(BOOL send_to_sim, BOOL stretch)
                     F32 specular_scale_t = specular_scale_ratio.mV[t_axis]/object_scale.mV[t_axis];
 
                     object->setTEScale(te_num, diffuse_scale_s, diffuse_scale_t);
-
-                    LLTextureEntry* tep = object->getTE(te_num);
 
                     if (tep && !tep->getMaterialParams().isNull())
                     {
@@ -3120,6 +3246,76 @@ void LLSelectMgr::adjustTexturesByScale(BOOL send_to_sim, BOOL stretch)
                         LLMaterialMgr::getInstance()->put(object->getID(), te_num, *p);
                     }
                 }
+
+                if (tep->getGLTFMaterial())
+                {
+                    LLPointer<LLGLTFMaterial> material = tep->getGLTFMaterialOverride();
+                    if (!material)
+                    {
+                        material = new LLGLTFMaterial();
+                        tep->setGLTFMaterialOverride(material);
+                    }
+
+                    F32 scale_x = 1;
+                    F32 scale_y = 1;
+                    F32 offset_x = 0;
+                    F32 offset_y = 0;
+
+                    if (te_num < selectNode->mGLTFScaleRatios.size())
+                    {
+                        for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                        {
+                            LLVector3 scale_ratio = selectNode->mGLTFScaleRatios[te_num][i];
+
+                            if (planar)
+                            {
+                                scale_x = scale_ratio.mV[s_axis] / object_scale.mV[s_axis];
+                                scale_y = scale_ratio.mV[t_axis] / object_scale.mV[t_axis];
+                            }
+                            else
+                            {
+                                scale_x = scale_ratio.mV[s_axis] * object_scale.mV[s_axis];
+                                scale_y = scale_ratio.mV[t_axis] * object_scale.mV[t_axis];
+                            }
+                            material->mTextureTransform[i].mScale.set(scale_x, scale_y);
+
+                            LLVector2 scales = selectNode->mGLTFScales[te_num][i];
+                            LLVector2 offsets = selectNode->mGLTFOffsets[te_num][i];
+                            F64 int_part = 0;
+                            offset_x = (F32)modf((offsets[VX] + (scales[VX] - scale_x)) / 2, &int_part);
+                            if (offset_x < 0)
+                            {
+                                offset_x++;
+                            }
+                            offset_y = (F32)modf((offsets[VY] + (scales[VY] - scale_y)) / 2, &int_part);
+                            if (offset_y < 0)
+                            {
+                                offset_y++;
+                            }
+                            material->mTextureTransform[i].mOffset.set(offset_x, offset_y);
+                        }
+                    }
+                    else
+                    {
+                        llassert(false); // make sure mGLTFScaleRatios is filled
+                    }
+
+                    const LLGLTFMaterial* base_material = tep->getGLTFMaterial();
+                    if (base_material)
+                    {
+                        LLGLTFMaterial* render_material = new LLFetchedGLTFMaterial();
+                        *render_material = *base_material;
+                        render_material->applyOverride(*material);
+                        tep->setGLTFRenderMaterial(render_material);
+                    }
+
+                    if (send_to_sim)
+                    {
+                        LLGLTFMaterial new_override;
+                        new_override = *material;
+                        LLGLTFMaterialList::queueModify(object, te_num, &new_override);
+                    }
+                }
                 send = send_to_sim;
             }
         }
@@ -3133,393 +3329,431 @@ void LLSelectMgr::adjustTexturesByScale(BOOL send_to_sim, BOOL stretch)
 
 //-----------------------------------------------------------------------------
 // selectGetAllRootsValid()
-// Returns TRUE if the viewer has information on all selected objects
+// Returns true if the viewer has information on all selected objects
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetAllRootsValid()
+bool LLSelectMgr::selectGetAllRootsValid()
 {
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); ++iter )
     {
+        LLSelectNode* node = *iter;
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 
 //-----------------------------------------------------------------------------
 // selectGetAllValid()
-// Returns TRUE if the viewer has information on all selected objects
+// Returns true if the viewer has information on all selected objects
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetAllValid()
+bool LLSelectMgr::selectGetAllValid()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); ++iter )
     {
+        LLSelectNode* node = *iter;
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetAllValidAndObjectsFound() - return TRUE if selections are
+// selectGetAllValidAndObjectsFound() - return true if selections are
 // valid and objects are found.
 //
 // For EXT-3114 - same as selectGetModify() without the modify check.
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetAllValidAndObjectsFound()
+bool LLSelectMgr::selectGetAllValidAndObjectsFound()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !object || !node->mValid )
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetModify() - return TRUE if current agent can modify all
+// selectGetModify() - return true if current agent can modify all
 // selected objects.
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetModify()
+bool LLSelectMgr::selectGetModify()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !object || !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( !object->permModify() )
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetRootsModify() - return TRUE if current agent can modify all
+// selectGetRootsModify() - return true if current agent can modify all
 // selected root objects.
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetRootsModify()
+bool LLSelectMgr::selectGetRootsModify()
 {
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( !object->permModify() )
         {
-            return FALSE;
+            return false;
         }
     }
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetSameRegion() - return TRUE if all objects are in same region
+// selectGetSameRegion() - return true if all objects are in same region
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetSameRegion()
+bool LLSelectMgr::selectGetSameRegion()
 {
     if (getSelection()->isEmpty())
     {
-        return TRUE;
+        return true;
     }
     LLViewerObject* object = getSelection()->getFirstObject();
     if (!object)
     {
-        return FALSE;
+        return false;
     }
     LLViewerRegion* current_region = object->getRegion();
 
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+        iter != getSelection()->root_end(); iter++)
     {
+        LLSelectNode* node = *iter;
         object = node->getObject();
         if (!node->mValid || !object || current_region != object->getRegion())
         {
-            return FALSE;
+            return false;
         }
     }
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetNonPermanentEnforced() - return TRUE if all objects are not
+// selectGetNonPermanentEnforced() - return true if all objects are not
 // permanent enforced
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetNonPermanentEnforced()
+bool LLSelectMgr::selectGetNonPermanentEnforced()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !object || !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( object->isPermanentEnforced())
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetRootsNonPermanentEnforced() - return TRUE if all root objects are
+// selectGetRootsNonPermanentEnforced() - return true if all root objects are
 // not permanent enforced
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetRootsNonPermanentEnforced()
+bool LLSelectMgr::selectGetRootsNonPermanentEnforced()
 {
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( object->isPermanentEnforced())
         {
-            return FALSE;
+            return false;
         }
     }
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetPermanent() - return TRUE if all objects are permanent
+// selectGetPermanent() - return true if all objects are permanent
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetPermanent()
+bool LLSelectMgr::selectGetPermanent()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !object || !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( !object->flagObjectPermanent())
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetRootsPermanent() - return TRUE if all root objects are
+// selectGetRootsPermanent() - return true if all root objects are
 // permanent
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetRootsPermanent()
+bool LLSelectMgr::selectGetRootsPermanent()
 {
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( !object->flagObjectPermanent())
         {
-            return FALSE;
+            return false;
         }
     }
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetCharacter() - return TRUE if all objects are character
+// selectGetCharacter() - return true if all objects are character
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetCharacter()
+bool LLSelectMgr::selectGetCharacter()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !object || !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( !object->flagCharacter())
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetRootsCharacter() - return TRUE if all root objects are
+// selectGetRootsCharacter() - return true if all root objects are
 // character
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetRootsCharacter()
+bool LLSelectMgr::selectGetRootsCharacter()
 {
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( !object->flagCharacter())
         {
-            return FALSE;
+            return false;
         }
     }
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetNonPathfinding() - return TRUE if all objects are not pathfinding
+// selectGetNonPathfinding() - return true if all objects are not pathfinding
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetNonPathfinding()
+bool LLSelectMgr::selectGetNonPathfinding()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !object || !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( object->flagObjectPermanent() || object->flagCharacter())
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetRootsNonPathfinding() - return TRUE if all root objects are not
+// selectGetRootsNonPathfinding() - return true if all root objects are not
 // pathfinding
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetRootsNonPathfinding()
+bool LLSelectMgr::selectGetRootsNonPathfinding()
 {
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( object->flagObjectPermanent() || object->flagCharacter())
         {
-            return FALSE;
+            return false;
         }
     }
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetNonPermanent() - return TRUE if all objects are not permanent
+// selectGetNonPermanent() - return true if all objects are not permanent
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetNonPermanent()
+bool LLSelectMgr::selectGetNonPermanent()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !object || !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( object->flagObjectPermanent())
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetRootsNonPermanent() - return TRUE if all root objects are not
+// selectGetRootsNonPermanent() - return true if all root objects are not
 // permanent
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetRootsNonPermanent()
+bool LLSelectMgr::selectGetRootsNonPermanent()
 {
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( object->flagObjectPermanent())
         {
-            return FALSE;
+            return false;
         }
     }
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetNonCharacter() - return TRUE if all objects are not character
+// selectGetNonCharacter() - return true if all objects are not character
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetNonCharacter()
+bool LLSelectMgr::selectGetNonCharacter()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !object || !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( object->flagCharacter())
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetRootsNonCharacter() - return TRUE if all root objects are not
+// selectGetRootsNonCharacter() - return true if all root objects are not
 // character
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetRootsNonCharacter()
+bool LLSelectMgr::selectGetRootsNonCharacter()
 {
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( object->flagCharacter())
         {
-            return FALSE;
+            return false;
         }
     }
 
-    return TRUE;
+    return true;
 }
 
 
 //-----------------------------------------------------------------------------
-// selectGetEditableLinksets() - return TRUE if all objects are editable
+// selectGetEditableLinksets() - return true if all objects are editable
 //                               pathfinding linksets
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetEditableLinksets()
+bool LLSelectMgr::selectGetEditableLinksets()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !object || !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if (object->flagUsePhysics() ||
             object->flagTemporaryOnRez() ||
@@ -3532,74 +3766,80 @@ BOOL LLSelectMgr::selectGetEditableLinksets()
             !object->permYouOwner() &&
             !object->permMove()))
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetViewableCharacters() - return TRUE if all objects are characters
+// selectGetViewableCharacters() - return true if all objects are characters
 //                        viewable within the pathfinding characters floater
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetViewableCharacters()
+bool LLSelectMgr::selectGetViewableCharacters()
 {
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !object || !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if( !object->flagCharacter() ||
             (object->getRegion() != gAgent.getRegion()))
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetRootsTransfer() - return TRUE if current agent can transfer all
+// selectGetRootsTransfer() - return true if current agent can transfer all
 // selected root objects.
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetRootsTransfer()
+bool LLSelectMgr::selectGetRootsTransfer()
 {
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if(!object->permTransfer())
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// selectGetRootsCopy() - return TRUE if current agent can copy all
+// selectGetRootsCopy() - return true if current agent can copy all
 // selected root objects.
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetRootsCopy()
+bool LLSelectMgr::selectGetRootsCopy()
 {
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if( !node->mValid )
         {
-            return FALSE;
+            return false;
         }
         if(!object->permCopy())
         {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 struct LLSelectGetFirstTest
@@ -3645,11 +3885,12 @@ private:
 
 void LLSelectMgr::getFirst(LLSelectGetFirstTest* test)
 {
-    if (ALControlCache::EditLinkedParts)
+    if (gSavedSettings.getBOOL("EditLinkedParts"))
     {
-        for (LLSelectNode* nodep : getSelection()->valid_begin_end())
+        for (LLObjectSelection::valid_iterator iter = getSelection()->valid_begin();
+            iter != getSelection()->valid_end(); ++iter )
         {
-            if (!test->checkMatchingNode(nodep))
+            if (!test->checkMatchingNode(*iter))
             {
                 break;
             }
@@ -3657,9 +3898,10 @@ void LLSelectMgr::getFirst(LLSelectGetFirstTest* test)
     }
     else
     {
-        for (LLSelectNode* nodep : getSelection()->root_object_begin_end())
+        for (LLObjectSelection::root_object_iterator iter = getSelection()->root_object_begin();
+            iter != getSelection()->root_object_end(); ++iter )
         {
-            if (!test->checkMatchingNode(nodep))
+            if (!test->checkMatchingNode(*iter))
             {
                 break;
             }
@@ -3680,7 +3922,7 @@ protected:
     }
 };
 
-BOOL LLSelectMgr::selectGetCreator(LLUUID& result_id, std::string& name)
+bool LLSelectMgr::selectGetCreator(LLUUID& result_id, std::string& name)
 {
     LLSelectGetFirstCreator test;
     getFirst(&test);
@@ -3688,7 +3930,7 @@ BOOL LLSelectMgr::selectGetCreator(LLUUID& result_id, std::string& name)
     if (test.mFirstValue.isNull())
     {
         name = LLTrans::getString("AvatarNameNobody");
-        return FALSE;
+        return false;
     }
 
     result_id = test.mFirstValue;
@@ -3720,14 +3962,14 @@ protected:
     }
 };
 
-BOOL LLSelectMgr::selectGetOwner(LLUUID& result_id, std::string& name)
+bool LLSelectMgr::selectGetOwner(LLUUID& result_id, std::string& name)
 {
     LLSelectGetFirstOwner test;
     getFirst(&test);
 
     if (test.mFirstValue.isNull())
     {
-        return FALSE;
+        return false;
     }
 
     result_id = test.mFirstValue;
@@ -3765,14 +4007,14 @@ protected:
     }
 };
 
-BOOL LLSelectMgr::selectGetLastOwner(LLUUID& result_id, std::string& name)
+bool LLSelectMgr::selectGetLastOwner(LLUUID& result_id, std::string& name)
 {
     LLSelectGetFirstLastOwner test;
     getFirst(&test);
 
     if (test.mFirstValue.isNull())
     {
-        return FALSE;
+        return false;
     }
 
     result_id = test.mFirstValue;
@@ -3802,7 +4044,7 @@ protected:
     }
 };
 
-BOOL LLSelectMgr::selectGetGroup(LLUUID& result_id)
+bool LLSelectMgr::selectGetGroup(LLUUID& result_id)
 {
     LLSelectGetFirstGroup test;
     getFirst(&test);
@@ -3814,7 +4056,7 @@ BOOL LLSelectMgr::selectGetGroup(LLUUID& result_id)
 //-----------------------------------------------------------------------------
 // selectIsGroupOwned()
 // Only operates on root nodes unless editing linked parts.
-// Returns TRUE if the first selected is group owned.
+// Returns true if the first selected is group owned.
 //-----------------------------------------------------------------------------
 struct LLSelectGetFirstGroupOwner : public LLSelectGetFirstTest
 {
@@ -3829,39 +4071,42 @@ protected:
     }
 };
 
-BOOL LLSelectMgr::selectIsGroupOwned()
+bool LLSelectMgr::selectIsGroupOwned()
 {
     LLSelectGetFirstGroupOwner test;
     getFirst(&test);
 
-    return test.mFirstValue.notNull() ? TRUE : FALSE;
+    return test.mFirstValue.notNull();
 }
 
 //-----------------------------------------------------------------------------
 // selectGetPerm()
 // Only operates on root nodes.
-// Returns TRUE if all have valid data.
-// mask_on has bits set to TRUE where all permissions are TRUE
-// mask_off has bits set to TRUE where all permissions are FALSE
+// Returns true if all have valid data.
+// mask_on has bits set to true where all permissions are true
+// mask_off has bits set to true where all permissions are false
 // if a bit is off both in mask_on and mask_off, the values differ within
 // the selection.
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::selectGetPerm(U8 which_perm, U32* mask_on, U32* mask_off)
+bool LLSelectMgr::selectGetPerm(U8 which_perm, U32* mask_on, U32* mask_off)
 {
     U32 mask;
     U32 mask_and    = 0xffffffff;
     U32 mask_or     = 0x00000000;
-    BOOL all_valid  = FALSE;
+    bool all_valid  = false;
 
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++)
     {
+        LLSelectNode* node = *iter;
+
         if (!node->mValid)
         {
-            all_valid = FALSE;
+            all_valid = false;
             break;
         }
 
-        all_valid = TRUE;
+        all_valid = true;
 
         switch( which_perm )
         {
@@ -3890,38 +4135,40 @@ BOOL LLSelectMgr::selectGetPerm(U8 which_perm, U32* mask_on, U32* mask_off)
 
     if (all_valid)
     {
-        // ...TRUE through all ANDs means all TRUE
+        // ...true through all ANDs means all true
         *mask_on  = mask_and;
 
-        // ...FALSE through all ORs means all FALSE
+        // ...false through all ORs means all false
         *mask_off = ~mask_or;
-        return TRUE;
+        return true;
     }
     else
     {
         *mask_on  = 0;
         *mask_off = 0;
-        return FALSE;
+        return false;
     }
 }
 
 
 
-BOOL LLSelectMgr::selectGetPermissions(LLPermissions& result_perm)
+bool LLSelectMgr::selectGetPermissions(LLPermissions& result_perm)
 {
-    BOOL first = TRUE;
+    bool first = true;
     LLPermissions perm;
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         if (!node->mValid)
         {
-            return FALSE;
+            return false;
         }
 
         if (first)
         {
             perm = *(node->mPermissions);
-            first = FALSE;
+            first = false;
         }
         else
         {
@@ -3931,7 +4178,7 @@ BOOL LLSelectMgr::selectGetPermissions(LLPermissions& result_perm)
 
     result_perm = perm;
 
-    return TRUE;
+    return true;
 }
 
 
@@ -3949,13 +4196,14 @@ void LLSelectMgr::selectDelete()
 
     S32 deleteable_count = 0;
 
-    BOOL locked_but_deleteable_object = FALSE;
-    BOOL no_copy_but_deleteable_object = FALSE;
-    BOOL all_owned_by_you = TRUE;
+    bool locked_but_deleteable_object = false;
+    bool no_copy_but_deleteable_object = false;
+    bool all_owned_by_you = true;
 
-    for (LLSelectNode* node : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+         iter != getSelection()->end(); iter++)
     {
-        LLViewerObject* obj = node->getObject();
+        LLViewerObject* obj = (*iter)->getObject();
 
         if( obj->isAttachment() )
         {
@@ -3967,15 +4215,15 @@ void LLSelectMgr::selectDelete()
         // Check to see if you can delete objects which are locked.
         if(!obj->permMove())
         {
-            locked_but_deleteable_object = TRUE;
+            locked_but_deleteable_object = true;
         }
         if(!obj->permCopy())
         {
-            no_copy_but_deleteable_object = TRUE;
+            no_copy_but_deleteable_object = true;
         }
         if(!obj->permYouOwner())
         {
-            all_owned_by_you = FALSE;
+            all_owned_by_you = false;
         }
     }
 
@@ -4068,9 +4316,10 @@ bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, 
                                                           (void*) &info,
                                                           SEND_ONLY_ROOTS);
             // VEFFECT: Delete Object - one effect for all deletes
-            if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral") && (LLSelectMgr::getInstance()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD))
+            static LLCachedControl<bool> enable_selection_hints(gSavedSettings, "EnableSelectionHints", false);
+            if (enable_selection_hints && LLSelectMgr::getInstance()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD)
             {
-                LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
+                LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, true);
                 effectp->setPositionGlobal( LLSelectMgr::getInstance()->getSelectionCenterGlobal() );
                 effectp->setColor(LLColor4U(gAgent.getEffectColor()));
                 F32 duration = 0.5f;
@@ -4099,24 +4348,26 @@ void LLSelectMgr::selectForceDelete()
         packDeleteHeader,
         packObjectLocalID,
         logNoOp,
-        (void*)TRUE,
+        (void*)true,
         SEND_ONLY_ROOTS);
 }
 
-BOOL LLSelectMgr::selectGetEditMoveLinksetPermissions(bool &move, bool &modify)
+bool LLSelectMgr::selectGetEditMoveLinksetPermissions(bool &move, bool &modify)
 {
     move = true;
     modify = true;
-    bool selecting_linked_set = !ALControlCache::EditLinkedParts;
+    bool selecting_linked_set = !gSavedSettings.getBOOL("EditLinkedParts");
 
-    for (LLSelectNode* nodep : getSelection()->begin_end())
+    for (LLObjectSelection::iterator iter = getSelection()->begin();
+        iter != getSelection()->end(); iter++)
     {
+        LLSelectNode* nodep = *iter;
         LLViewerObject* object = nodep->getObject();
         if (!object || !nodep->mValid)
         {
             move = false;
             modify = false;
-            return FALSE;
+            return false;
         }
 
         LLViewerObject *root_object = object->getRootEdit();
@@ -4140,41 +4391,42 @@ BOOL LLSelectMgr::selectGetEditMoveLinksetPermissions(bool &move, bool &modify)
         modify = modify && object->permModify();
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLSelectMgr::selectGetAggregateSaleInfo(U32 &num_for_sale,
-                                             BOOL &is_for_sale_mixed,
-                                             BOOL &is_sale_price_mixed,
+                                             bool &is_for_sale_mixed,
+                                             bool &is_sale_price_mixed,
                                              S32 &total_sale_price,
                                              S32 &individual_sale_price)
 {
     num_for_sale = 0;
-    is_for_sale_mixed = FALSE;
-    is_sale_price_mixed = FALSE;
+    is_for_sale_mixed = false;
+    is_sale_price_mixed = false;
     total_sale_price = 0;
     individual_sale_price = 0;
 
 
     // Empty set.
-    auto selection = getSelection();
-    if (selection->root_begin() == selection->root_end())
+    if (getSelection()->root_begin() == getSelection()->root_end())
         return;
 
-    LLSelectNode *node = *(selection->root_begin());
-    const BOOL first_node_for_sale = node->mSaleInfo.isForSale();
+    LLSelectNode *node = *(getSelection()->root_begin());
+    const bool first_node_for_sale = node->mSaleInfo.isForSale();
     const S32 first_node_sale_price = node->mSaleInfo.getSalePrice();
 
-    for (LLSelectNode* node : selection->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++)
     {
-        const BOOL node_for_sale = node->mSaleInfo.isForSale();
+        LLSelectNode* node = *iter;
+        const bool node_for_sale = node->mSaleInfo.isForSale();
         const S32 node_sale_price = node->mSaleInfo.getSalePrice();
 
         // Set mixed if the fields don't match the first node's fields.
         if (node_for_sale != first_node_for_sale)
-            is_for_sale_mixed = TRUE;
+            is_for_sale_mixed = true;
         if (node_sale_price != first_node_sale_price)
-            is_sale_price_mixed = TRUE;
+            is_sale_price_mixed = true;
 
         if (node_for_sale)
         {
@@ -4186,28 +4438,30 @@ void LLSelectMgr::selectGetAggregateSaleInfo(U32 &num_for_sale,
     individual_sale_price = first_node_sale_price;
     if (is_for_sale_mixed)
     {
-        is_sale_price_mixed = TRUE;
+        is_sale_price_mixed = true;
         individual_sale_price = 0;
     }
 }
 
-// returns TRUE if all nodes are valid. method also stores an
+// returns true if all nodes are valid. method also stores an
 // accumulated sale info.
-BOOL LLSelectMgr::selectGetSaleInfo(LLSaleInfo& result_sale_info)
+bool LLSelectMgr::selectGetSaleInfo(LLSaleInfo& result_sale_info)
 {
-    BOOL first = TRUE;
+    bool first = true;
     LLSaleInfo sale_info;
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         if (!node->mValid)
         {
-            return FALSE;
+            return false;
         }
 
         if (first)
         {
             sale_info = node->mSaleInfo;
-            first = FALSE;
+            first = false;
         }
         else
         {
@@ -4217,24 +4471,26 @@ BOOL LLSelectMgr::selectGetSaleInfo(LLSaleInfo& result_sale_info)
 
     result_sale_info = sale_info;
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLSelectMgr::selectGetAggregatePermissions(LLAggregatePermissions& result_perm)
+bool LLSelectMgr::selectGetAggregatePermissions(LLAggregatePermissions& result_perm)
 {
-    BOOL first = TRUE;
+    bool first = true;
     LLAggregatePermissions perm;
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         if (!node->mValid)
         {
-            return FALSE;
+            return false;
         }
 
         if (first)
         {
             perm = node->mAggregatePerm;
-            first = FALSE;
+            first = false;
         }
         else
         {
@@ -4244,25 +4500,27 @@ BOOL LLSelectMgr::selectGetAggregatePermissions(LLAggregatePermissions& result_p
 
     result_perm = perm;
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLSelectMgr::selectGetAggregateTexturePermissions(LLAggregatePermissions& result_perm)
+bool LLSelectMgr::selectGetAggregateTexturePermissions(LLAggregatePermissions& result_perm)
 {
-    BOOL first = TRUE;
+    bool first = true;
     LLAggregatePermissions perm;
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         if (!node->mValid)
         {
-            return FALSE;
+            return false;
         }
 
         LLAggregatePermissions t_perm = node->getObject()->permYouOwner() ? node->mAggregateTexturePermOwner : node->mAggregateTexturePerm;
         if (first)
         {
             perm = t_perm;
-            first = FALSE;
+            first = false;
         }
         else
         {
@@ -4272,19 +4530,19 @@ BOOL LLSelectMgr::selectGetAggregateTexturePermissions(LLAggregatePermissions& r
 
     result_perm = perm;
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLSelectMgr::isMovableAvatarSelected()
+bool LLSelectMgr::isMovableAvatarSelected()
 {
     if (mAllowSelectAvatar && getSelection()->getObjectCount() == 1)
     {
         // nothing but avatar should be selected, so check that
         // there is only one selected object and it is a root
         LLViewerObject* obj = getSelection()->getFirstRootObject();
-        return obj && obj->isAvatar() && getSelection()->getFirstMoveableNode(TRUE);
+        return obj && obj->isAvatar() && getSelection()->getFirstMoveableNode(true);
     }
-    return FALSE;
+    return false;
 }
 
 //--------------------------------------------------------------------
@@ -4300,7 +4558,7 @@ struct LLDuplicateData
     U32         flags;
 };
 
-void LLSelectMgr::selectDuplicate(const LLVector3& offset, BOOL select_copy)
+void LLSelectMgr::selectDuplicate(const LLVector3& offset, bool select_copy)
 {
 //  if (mSelectedObjects->isAttachment())
 // [RLVa:KB] - Checked: 2010-03-24 (RLVa-1.2.0e) | Added: RLVa-1.2.0a
@@ -4336,9 +4594,11 @@ void LLSelectMgr::selectDuplicate(const LLVector3& offset, BOOL select_copy)
     }
     else
     {
-        for (LLSelectNode* node : getSelection()->root_begin_end())
+        for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+             iter != getSelection()->root_end(); iter++ )
         {
-            node->mDuplicated = TRUE;
+            LLSelectNode* node = *iter;
+            node->mDuplicated = true;
             node->mDuplicatePos = node->getObject()->getPositionGlobal();
             node->mDuplicateRot = node->getObject()->getRotation();
         }
@@ -4356,8 +4616,10 @@ void LLSelectMgr::repeatDuplicate()
 
     std::vector<LLViewerObject*> non_duplicated_objects;
 
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         if (!node->mDuplicated)
         {
             non_duplicated_objects.push_back(node->getObject());
@@ -4365,8 +4627,10 @@ void LLSelectMgr::repeatDuplicate()
     }
 
     // make sure only previously duplicated objects are selected
-    for (LLViewerObject* objectp : non_duplicated_objects)
+    for (std::vector<LLViewerObject*>::iterator iter = non_duplicated_objects.begin();
+         iter != non_duplicated_objects.end(); ++iter)
     {
+        LLViewerObject* objectp = *iter;
         deselectObjectAndFamily(objectp);
     }
 
@@ -4379,8 +4643,10 @@ void LLSelectMgr::repeatDuplicate()
     sendListToRegions("ObjectDuplicate", packDuplicateHeader, packDuplicate, logNoOp, &data, SEND_ONLY_ROOTS);
 
     // move current selection based on delta from duplication position and update duplication position
-    for (LLSelectNode* node : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+         iter != getSelection()->root_end(); iter++ )
     {
+        LLSelectNode* node = *iter;
         if (node->mDuplicated)
         {
             LLQuaternion cur_rot = node->getObject()->getRotation();
@@ -4417,22 +4683,22 @@ struct LLDuplicateOnRayData
 {
     LLVector3   mRayStartRegion;
     LLVector3   mRayEndRegion;
-    BOOL        mBypassRaycast;
-    BOOL        mRayEndIsIntersection;
+    bool        mBypassRaycast;
+    bool        mRayEndIsIntersection;
     LLUUID      mRayTargetID;
-    BOOL        mCopyCenters;
-    BOOL        mCopyRotates;
+    bool        mCopyCenters;
+    bool        mCopyRotates;
     U32         mFlags;
 };
 
 void LLSelectMgr::selectDuplicateOnRay(const LLVector3 &ray_start_region,
                                        const LLVector3 &ray_end_region,
-                                       BOOL bypass_raycast,
-                                       BOOL ray_end_is_intersection,
+                                       bool bypass_raycast,
+                                       bool ray_end_is_intersection,
                                        const LLUUID &ray_target_id,
-                                       BOOL copy_centers,
-                                       BOOL copy_rotates,
-                                       BOOL select_copy)
+                                       bool copy_centers,
+                                       bool copy_rotates,
+                                       bool select_copy)
 {
     if (mSelectedObjects->isAttachment())
     {
@@ -4471,7 +4737,7 @@ void LLSelectMgr::packDuplicateOnRayHead(void *user_data)
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
-    msg->addUUIDFast(_PREHASH_GroupID, gAgent.getGroupForRezzing() );
+    msg->addUUIDFast(_PREHASH_GroupID, gAgent.getGroupForRezzing());
     msg->addVector3Fast(_PREHASH_RayStart, data->mRayStartRegion );
     msg->addVector3Fast(_PREHASH_RayEnd, data->mRayEndRegion );
     msg->addBOOLFast(_PREHASH_BypassRaycast, data->mBypassRaycast );
@@ -4492,7 +4758,7 @@ void LLSelectMgr::sendMultipleUpdate(U32 type)
 {
     if (type == UPD_NONE) return;
     // send individual updates when selecting textures or individual objects
-    ESendType send_type = (!ALControlCache::EditLinkedParts && !getTEMode()) ? SEND_ONLY_ROOTS : SEND_ROOTS_FIRST;
+    ESendType send_type = (!gSavedSettings.getBOOL("EditLinkedParts") && !getTEMode()) ? SEND_ONLY_ROOTS : SEND_ROOTS_FIRST;
     if (send_type == SEND_ONLY_ROOTS)
     {
         // tell simulator to apply to whole linked sets
@@ -4554,12 +4820,12 @@ struct LLOwnerData
 {
     LLUUID  owner_id;
     LLUUID  group_id;
-    BOOL    override;
+    bool    override;
 };
 
 void LLSelectMgr::sendOwner(const LLUUID& owner_id,
                             const LLUUID& group_id,
-                            BOOL override)
+                            bool override)
 {
     LLOwnerData data;
 
@@ -4641,16 +4907,16 @@ void LLSelectMgr::packBuyObjectIDs(LLSelectNode* node, void* data)
 struct LLPermData
 {
     U8 mField;
-    BOOL mSet;
+    bool mSet;
     U32 mMask;
-    BOOL mOverride;
+    bool mOverride;
 };
 
 // TODO: Make this able to fail elegantly.
 void LLSelectMgr::selectionSetObjectPermissions(U8 field,
-                                       BOOL set,
+                                       bool set,
                                        U32 mask,
-                                       BOOL override)
+                                       bool override)
 {
     LLPermData data;
 
@@ -4690,9 +4956,10 @@ void LLSelectMgr::deselectAll()
     }
 
     // Zap the angular velocity, as the sim will set it to zero
-    for (LLSelectNode* node : mSelectedObjects->begin_end())
+    for (LLObjectSelection::iterator iter = mSelectedObjects->begin();
+         iter != mSelectedObjects->end(); iter++ )
     {
-        LLViewerObject *objectp = node->getObject();
+        LLViewerObject *objectp = (*iter)->getObject();
         objectp->setAngularVelocity( 0,0,0 );
         objectp->setVelocity( 0,0,0 );
     }
@@ -4720,9 +4987,10 @@ void LLSelectMgr::deselectAllForStandingUp()
     */
 
     // Zap the angular velocity, as the sim will set it to zero
-    for (LLSelectNode* node : mSelectedObjects->begin_end())
+    for (LLObjectSelection::iterator iter = mSelectedObjects->begin();
+         iter != mSelectedObjects->end(); iter++ )
     {
-        LLViewerObject *objectp = node->getObject();
+        LLViewerObject *objectp = (*iter)->getObject();
         objectp->setAngularVelocity( 0,0,0 );
         objectp->setVelocity( 0,0,0 );
     }
@@ -4753,9 +5021,11 @@ void LLSelectMgr::deselectUnused()
 
 void LLSelectMgr::convertTransient()
 {
-    for (LLSelectNode* nodep : mSelectedObjects->begin_end())
+    LLObjectSelection::iterator node_it;
+    for (node_it = mSelectedObjects->begin(); node_it != mSelectedObjects->end(); ++node_it)
     {
-        nodep->setTransient(FALSE);
+        LLSelectNode *nodep = *node_it;
+        nodep->setTransient(false);
     }
 }
 
@@ -4773,7 +5043,7 @@ void LLSelectMgr::deselectAllIfTooFar()
                 return (!pNode->isTransient()) && (pObj) && (!RlvActions::canEdit(pObj)) && (pObj->getID() != LLViewerMediaFocus::getInstance()->getFocusedObjectID());
             }
         } f;
-        if (mSelectedObjects->getFirstRootNode(&f, TRUE))
+        if (mSelectedObjects->getFirstRootNode(&f, true))
             deselectAll();
     }
 // [/RLVa:KB]
@@ -4804,17 +5074,17 @@ void LLSelectMgr::deselectAllIfTooFar()
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-0.2.0f
     static RlvCachedBehaviourModifier<float> s_nFartouchDist(RLV_MODIFIER_FARTOUCHDIST);
 
-    BOOL fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instance().inEdit();
-    if ( (ALControlCache::LimitSelectDistance || (fRlvFartouch) )
+    bool fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instance().inEdit();
+    if ( (gSavedSettings.getBOOL("LimitSelectDistance") || (fRlvFartouch) )
 // [/RLVa:KB]
         && (!mSelectedObjects->getPrimaryObject() || !mSelectedObjects->getPrimaryObject()->isAvatar())
         && (mSelectedObjects->getPrimaryObject() != LLViewerMediaFocus::getInstance()->getFocusedObject())
         && !mSelectedObjects->isAttachment()
         && !selectionCenter.isExactlyZero())
     {
-//      F32 deselect_dist = ALControlCache::MaxSelectDistance;
+//      F32 deselect_dist = gSavedSettings.getF32("MaxSelectDistance");
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-0.2.0f
-        F32 deselect_dist = (!fRlvFartouch) ? ALControlCache::MaxSelectDistance : s_nFartouchDist;
+        F32 deselect_dist = (!fRlvFartouch) ? gSavedSettings.getF32("MaxSelectDistance") : s_nFartouchDist;
 // [/RLVa:KB]
         F32 deselect_dist_sq = deselect_dist * deselect_dist;
 
@@ -4932,7 +5202,7 @@ void LLSelectMgr::sendAttach(LLObjectSelectionHandle selection_handle, U8 attach
         return;
     }
 
-    BOOL build_mode = LLToolMgr::getInstance()->inEdit();
+    bool build_mode = LLToolMgr::getInstance()->inEdit();
     // Special case: Attach to default location for this object.
     if (0 == attachment_point ||
         get_if_there(gAgentAvatarp->mAttachmentPoints, (S32)attachment_point, (LLViewerJointAttachment*)NULL))
@@ -5166,7 +5436,7 @@ void LLSelectMgr::saveSelectedObjectTextures()
     {
         virtual bool apply(LLSelectNode* node)
         {
-            node->mValid = FALSE;
+            node->mValid = false;
             return true;
         }
     } func;
@@ -5260,9 +5530,9 @@ void LLSelectMgr::saveSelectedObjectTransform(EActionType action_type)
 
 struct LLSelectMgrApplyFlags : public LLSelectedObjectFunctor
 {
-    LLSelectMgrApplyFlags(U32 flags, BOOL state) : mFlags(flags), mState(state) {}
+    LLSelectMgrApplyFlags(U32 flags, bool state) : mFlags(flags), mState(state) {}
     U32 mFlags;
-    BOOL mState;
+    bool mState;
     virtual bool apply(LLViewerObject* object)
     {
         if ( object->permModify())
@@ -5281,19 +5551,19 @@ struct LLSelectMgrApplyFlags : public LLSelectedObjectFunctor
     }
 };
 
-void LLSelectMgr::selectionUpdatePhysics(BOOL physics)
+void LLSelectMgr::selectionUpdatePhysics(bool physics)
 {
     LLSelectMgrApplyFlags func( FLAGS_USE_PHYSICS, physics);
     getSelection()->applyToObjects(&func);
 }
 
-void LLSelectMgr::selectionUpdateTemporary(BOOL is_temporary)
+void LLSelectMgr::selectionUpdateTemporary(bool is_temporary)
 {
     LLSelectMgrApplyFlags func( FLAGS_TEMPORARY_ON_REZ, is_temporary);
     getSelection()->applyToObjects(&func);
 }
 
-void LLSelectMgr::selectionUpdatePhantom(BOOL is_phantom)
+void LLSelectMgr::selectionUpdatePhantom(bool is_phantom)
 {
     LLSelectMgrApplyFlags func( FLAGS_PHANTOM, is_phantom);
     getSelection()->applyToObjects(&func);
@@ -5364,7 +5634,7 @@ void LLSelectMgr::packDuplicateHeader(void* data)
 // static
 void LLSelectMgr::packDeleteHeader(void* userdata)
 {
-    BOOL force = (BOOL)(intptr_t)userdata;
+    bool force = (bool)(intptr_t)userdata;
 
     gMessageSystem->nextBlockFast(_PREHASH_AgentData);
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
@@ -5500,7 +5770,7 @@ void LLSelectMgr::packPermissions(LLSelectNode* node, void *user_data)
     gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, node->getObject()->getLocalID());
 
     gMessageSystem->addU8Fast(_PREHASH_Field,   data->mField);
-    gMessageSystem->addU8Fast(_PREHASH_Set,     data->mSet);
+    gMessageSystem->addBOOLFast(_PREHASH_Set,       data->mSet);
     gMessageSystem->addU32Fast(_PREHASH_Mask,       data->mMask);
 }
 
@@ -5578,7 +5848,7 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
         {
             if (node->getObject())
             {
-                BOOL is_root = node->getObject()->isRootEdit();
+                bool is_root = node->getObject()->isRootEdit();
                 if ((mRoots && is_root) || (!mRoots && !is_root))
                 {
                     nodes_to_send.push(node);
@@ -5588,8 +5858,8 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
         }
     };
     struct push_all  pushall(nodes_to_send);
-    struct push_some pushroots(nodes_to_send, TRUE);
-    struct push_some pushnonroots(nodes_to_send, FALSE);
+    struct push_some pushroots(nodes_to_send, true);
+    struct push_some pushnonroots(nodes_to_send, false);
 
     switch(send_type)
     {
@@ -5751,6 +6021,7 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
         LLUUID group_id;
         LLUUID last_owner_id;
         U64 creation_date;
+        LLUUID extra_id;
         U32 base_mask, owner_mask, group_mask, everyone_mask, next_owner_mask;
         LLSaleInfo sale_info;
         LLCategory category;
@@ -5845,8 +6116,8 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
 
             if (save_textures)
             {
-                BOOL can_copy = FALSE;
-                BOOL can_transfer = FALSE;
+                bool can_copy = false;
+                bool can_transfer = false;
 
                 LLAggregatePermissions::EValue value = LLAggregatePermissions::AP_NONE;
                 if(node->getObject()->permYouOwner())
@@ -5854,12 +6125,12 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
                     value = ag_texture_perms_owner.getValue(PERM_COPY);
                     if (value == LLAggregatePermissions::AP_EMPTY || value == LLAggregatePermissions::AP_ALL)
                     {
-                        can_copy = TRUE;
+                        can_copy = true;
                     }
                     value = ag_texture_perms_owner.getValue(PERM_TRANSFER);
                     if (value == LLAggregatePermissions::AP_EMPTY || value == LLAggregatePermissions::AP_ALL)
                     {
-                        can_transfer = TRUE;
+                        can_transfer = true;
                     }
                 }
                 else
@@ -5867,12 +6138,12 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
                     value = ag_texture_perms.getValue(PERM_COPY);
                     if (value == LLAggregatePermissions::AP_EMPTY || value == LLAggregatePermissions::AP_ALL)
                     {
-                        can_copy = TRUE;
+                        can_copy = true;
                     }
                     value = ag_texture_perms.getValue(PERM_TRANSFER);
                     if (value == LLAggregatePermissions::AP_EMPTY || value == LLAggregatePermissions::AP_ALL)
                     {
-                        can_transfer = TRUE;
+                        can_transfer = true;
                     }
                 }
 
@@ -5898,12 +6169,12 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
                         LLGLTFMaterial* old_override = node->getObject()->getTE(i)->getGLTFMaterialOverride();
                         if (old_override)
                         {
-                            LLPointer<LLGLTFMaterial> mat = new LLGLTFMaterial(*old_override);
-                            override_materials.push_back(mat);
+                            // saveGLTFMaterials will make a copy
+                            override_materials.emplace_back(old_override);
                         }
                         else
                         {
-                            override_materials.push_back(nullptr);
+                            override_materials.emplace_back(nullptr);
                         }
                     }
                     // processObjectProperties does not include overrides so this
@@ -5912,7 +6183,7 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
                 }
             }
 
-            node->mValid = TRUE;
+            node->mValid = true;
             node->mPermissions->init(creator_id, owner_id,
                                      last_owner_id, group_id);
             node->mPermissions->initMasks(base_mask, owner_mask, everyone_mask, group_mask, next_owner_mask);
@@ -5945,8 +6216,10 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
     LLUUID id;
 
     U32 request_flags;
+    LLUUID creator_id;
     LLUUID owner_id;
     LLUUID group_id;
+    LLUUID extra_id;
     U32 base_mask, owner_mask, group_mask, everyone_mask, next_owner_mask;
     LLSaleInfo sale_info;
     LLCategory category;
@@ -6004,7 +6277,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 
     if (node)
     {
-        node->mValid = TRUE;
+        node->mValid = true;
         node->mPermissions->init(LLUUID::null, owner_id,
                                  last_owner_id, group_id);
         node->mPermissions->initMasks(base_mask, owner_mask, everyone_mask, group_mask, next_owner_mask);
@@ -6012,6 +6285,15 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
         node->mCategory = category;
         node->mName.assign(name);
         node->mDescription.assign(desc);
+
+        LLViewerObject* obj = node->getObject();
+        if (obj && LLViewerObject::isObjectInPendingUpdate(owner_id, obj))
+        {
+            // current response doesn't return modify permissions flags,
+            // so we should request it separately if needed
+            obj->requestObjectUpdate();
+        }
+
     }
 
     dialog_refresh_all();
@@ -6021,7 +6303,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 // static
 void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 {
-    BOOL reset_list;
+    bool reset_list;
     msg->getBOOLFast(_PREHASH_Header, _PREHASH_ResetList, reset_list);
 
     if (reset_list)
@@ -6055,6 +6337,8 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
     LLSelectMgr::getInstance()->highlightObjectAndFamily(objects);
 }
 
+extern F32  gGLModelView[16];
+
 void LLSelectMgr::updateSilhouettes()
 {
     S32 num_sils_genned = 0;
@@ -6064,7 +6348,7 @@ void LLSelectMgr::updateSilhouettes()
 
     if (!mSilhouetteImagep)
     {
-        mSilhouetteImagep = LLViewerTextureManager::getFetchedTextureFromFile("silhouette.j2c", FTT_LOCAL_FILE, TRUE, LLGLTexture::BOOST_UI);
+        mSilhouetteImagep = LLViewerTextureManager::getFetchedTextureFromFile("silhouette.j2c", FTT_LOCAL_FILE, true, LLGLTexture::BOOST_UI);
     }
 
     mHighlightedObjects->cleanupNodes();
@@ -6100,11 +6384,13 @@ void LLSelectMgr::updateSilhouettes()
         // persists from frame to frame to avoid regenerating object silhouettes
         // mHighlightedObjects includes all siblings of rect selected objects
 
-        BOOL select_linked_set = !ALControlCache::EditLinkedParts;
+        bool select_linked_set = !gSavedSettings.getBOOL("EditLinkedParts");
 
         // generate list of roots from current object selection
-        for (LLViewerObject* objectp : mRectSelectedObjects)
+        for (std::set<LLPointer<LLViewerObject> >::iterator iter = mRectSelectedObjects.begin();
+             iter != mRectSelectedObjects.end(); iter++)
         {
+            LLViewerObject *objectp = *iter;
             if (select_linked_set)
             {
                 LLViewerObject *rootp = (LLViewerObject*)objectp->getRoot();
@@ -6120,8 +6406,10 @@ void LLSelectMgr::updateSilhouettes()
         std::vector<LLSelectNode*> remove_these_nodes;
         std::vector<LLViewerObject*> remove_these_roots;
 
-        for (LLSelectNode* node : mHighlightedObjects->begin_end())
+        for (LLObjectSelection::iterator iter = mHighlightedObjects->begin();
+             iter != mHighlightedObjects->end(); iter++)
         {
+            LLSelectNode* node = *iter;
             LLViewerObject* objectp = node->getObject();
             if (!objectp)
                 continue;
@@ -6148,44 +6436,53 @@ void LLSelectMgr::updateSilhouettes()
         }
 
         // remove all highlight nodes no longer in rectangle selection
-        for (LLSelectNode* nodep : remove_these_nodes)
+        for (std::vector<LLSelectNode*>::iterator iter = remove_these_nodes.begin();
+             iter != remove_these_nodes.end(); ++iter)
         {
+            LLSelectNode* nodep = *iter;
             mHighlightedObjects->removeNode(nodep);
         }
 
         // remove all root objects already being highlighted
-        for (LLViewerObject* objectp : remove_these_roots)
+        for (std::vector<LLViewerObject*>::iterator iter = remove_these_roots.begin();
+             iter != remove_these_roots.end(); ++iter)
         {
+            LLViewerObject* objectp = *iter;
             roots.erase(objectp);
         }
 
         // add all new objects in rectangle selection
-        for (LLViewerObject* objectp : roots)
+        for (std::set<LLViewerObject*>::iterator iter = roots.begin();
+             iter != roots.end(); iter++)
         {
+            LLViewerObject* objectp = *iter;
             if (!canSelectObject(objectp))
             {
                 continue;
             }
 
-            LLSelectNode* rect_select_root_node = new LLSelectNode(objectp, TRUE);
-            rect_select_root_node->selectAllTEs(TRUE);
+            LLSelectNode* rect_select_root_node = new LLSelectNode(objectp, true);
+            rect_select_root_node->selectAllTEs(true);
 
             if (!select_linked_set)
             {
-                rect_select_root_node->mIndividualSelection = TRUE;
+                rect_select_root_node->mIndividualSelection = true;
             }
             else
             {
                 LLViewerObject::const_child_list_t& child_list = objectp->getChildren();
-                for (LLViewerObject* child_objectp : child_list)
+                for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
+                     iter != child_list.end(); iter++)
                 {
+                    LLViewerObject* child_objectp = *iter;
+
                     if (!canSelectObject(child_objectp))
                     {
                         continue;
                     }
 
-                    LLSelectNode* rect_select_node = new LLSelectNode(child_objectp, TRUE);
-                    rect_select_node->selectAllTEs(TRUE);
+                    LLSelectNode* rect_select_node = new LLSelectNode(child_objectp, true);
+                    rect_select_node->selectAllTEs(true);
                     mHighlightedObjects->addNodeAtEnd(rect_select_node);
                 }
             }
@@ -6197,19 +6494,20 @@ void LLSelectMgr::updateSilhouettes()
         num_sils_genned = 0;
 
         // render silhouettes for highlighted objects
-        const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
-        //BOOL subtracting_from_selection = (gKeyboard->currentMask(TRUE) == MASK_CONTROL);
+        //bool subtracting_from_selection = (gKeyboard->currentMask(true) == MASK_CONTROL);
         for (S32 pass = 0; pass < 2; pass++)
         {
-            for (LLSelectNode* node :mHighlightedObjects->begin_end())
+            for (LLObjectSelection::iterator iter = mHighlightedObjects->begin();
+                 iter != mHighlightedObjects->end(); iter++)
             {
+                LLSelectNode* node = *iter;
                 LLViewerObject* objectp = node->getObject();
                 if (!objectp)
                     continue;
 
                 // do roots first, then children so that root flags are cleared ASAP
-                BOOL roots_only = (pass == 0);
-                BOOL is_root = objectp->isRootEdit();
+                bool roots_only = (pass == 0);
+                bool is_root = objectp->isRootEdit();
                 if (roots_only != is_root)
                 {
                     continue;
@@ -6221,7 +6519,7 @@ void LLSelectMgr::updateSilhouettes()
                 {
                     if (num_sils_genned++ < MAX_SILS_PER_FRAME)
                     {
-                        generateSilhouette(node, viewer_cam_origin);
+                        generateSilhouette(node, LLViewerCamera::getInstance()->getOrigin());
                         changed_objects.push_back(objectp);
                     }
                     else if (objectp->isAttachment() && objectp->getRootEdit()->mDrawable.notNull())
@@ -6255,9 +6553,11 @@ void LLSelectMgr::updateSilhouettes()
         mHighlightedObjects->deleteAllNodes();
     }
 
-    for (LLViewerObject* objectp : changed_objects)
+    for (std::vector<LLViewerObject*>::iterator iter = changed_objects.begin();
+         iter != changed_objects.end(); ++iter)
     {
         // clear flags after traversing node list (as child objects need to refer to parent flags, etc)
+        LLViewerObject* objectp = *iter;
         objectp->clearChanged(LLXform::MOVED | LLXform::SILHOUETTE);
     }
 }
@@ -6270,17 +6570,19 @@ void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handl
 
         //mSilhouetteImagep->bindTexture();
         //glAlphaFunc(GL_GREATER, sHighlightAlphaTest);
-        const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
+
         for (S32 pass = 0; pass < 2; pass++)
         {
-            for (LLSelectNode* node : object_handle->begin_end())
+            for (LLObjectSelection::iterator iter = object_handle->begin();
+                iter != object_handle->end(); iter++)
             {
+                LLSelectNode* node = *iter;
                 LLViewerObject* objectp = node->getObject();
                 if (!objectp)
                     continue;
                 // do roots first, then children so that root flags are cleared ASAP
-                BOOL roots_only = (pass == 0);
-                BOOL is_root = (objectp->isRootEdit());
+                bool roots_only = (pass == 0);
+                bool is_root = (objectp->isRootEdit());
                 if (roots_only != is_root || objectp->mDrawable.isNull())
                 {
                     continue;
@@ -6292,7 +6594,7 @@ void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handl
                 {
                     if (num_sils_genned++ < MAX_SILS_PER_FRAME)// && objectp->mDrawable->isVisible())
                     {
-                        generateSilhouette(node, viewer_cam_origin);
+                        generateSilhouette(node, LLViewerCamera::getInstance()->getOrigin());
                         changed_objects.push_back(objectp);
                     }
                     else if (objectp->isAttachment())
@@ -6310,7 +6612,7 @@ void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handl
         }
     }
 }
-void LLSelectMgr::renderSilhouettes(BOOL for_hud)
+void LLSelectMgr::renderSilhouettes(bool for_hud)
 {
     if (!mRenderSilhouettes || !mRenderHighlightSelections)
     {
@@ -6333,26 +6635,25 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
         gGL.pushMatrix();
         gGL.loadIdentity();
         F32 depth = llmax(1.f, hud_bbox.getExtentLocal().mV[VX] * 1.1f);
-        auto& viewerCamera = LLViewerCamera::instance();
-        gGL.ortho(-0.5f * viewerCamera.getAspect(), 0.5f * viewerCamera.getAspect(), -0.5f, 0.5f, 0.f, depth);
+        gGL.ortho(-0.5f * LLViewerCamera::getInstance()->getAspect(), 0.5f * LLViewerCamera::getInstance()->getAspect(), -0.5f, 0.5f, 0.f, depth);
 
         gGL.matrixMode(LLRender::MM_MODELVIEW);
         gGL.pushMatrix();
         gGL.pushUIMatrix();
         gGL.loadUIIdentity();
         gGL.loadIdentity();
-        gGL.loadMatrix(OGL_TO_CFR_ROTATION_4A);     // Load Cory's favorite reference frame
+        gGL.loadMatrix(OGL_TO_CFR_ROTATION);        // Load Cory's favorite reference frame
         gGL.translatef(-hud_bbox.getCenterLocal().mV[VX] + (depth *0.5f), 0.f, 0.f);
         gGL.scalef(cur_zoom, cur_zoom, cur_zoom);
     }
 
     bool wireframe_selection = (gFloaterTools && gFloaterTools->getVisible()) || LLSelectMgr::sRenderHiddenSelections;
-    F32 fogCfx = (F32)llclamp((getSelectionCenterGlobal() - gAgentCamera.getCameraPositionGlobal()).magVec() / (getBBoxOfSelection().getExtentLocal().magVec() * 4), 0.0, 1.0);
+    F32 fogCfx = (F32)llclamp((LLSelectMgr::getInstance()->getSelectionCenterGlobal() - gAgentCamera.getCameraPositionGlobal()).magVec() / (LLSelectMgr::getInstance()->getBBoxOfSelection().getExtentLocal().magVec() * 4), 0.0, 1.0);
 
     LLColor4 sParentColor = sSilhouetteParentColor;
-    sParentColor.mV[3] = LLSelectMgr::sHighlightAlpha;
+    sParentColor.mV[VALPHA] = LLSelectMgr::sHighlightAlpha;
     LLColor4 sChildColor = sSilhouetteChildColor;
-    sChildColor.mV[3] = LLSelectMgr::sHighlightAlpha;
+    sChildColor.mV[VALPHA] = LLSelectMgr::sHighlightAlpha;
 
     auto renderMeshSelection_f = [fogCfx, wireframe_selection](LLSelectNode* node, LLViewerObject* objectp, LLColor4 hlColor)
     {
@@ -6366,7 +6667,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
         gGL.matrixMode(LLRender::MM_MODELVIEW);
         gGL.pushMatrix();
 
-        BOOL is_hud_object = objectp->isHUDAttachment();
+        bool is_hud_object = objectp->isHUDAttachment();
 
         if (!is_hud_object)
         {
@@ -6376,7 +6677,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 
         if (objectp->mDrawable->isActive())
         {
-            gGL.multMatrix(objectp->getRenderMatrix());
+            gGL.multMatrix((F32*)objectp->getRenderMatrix().mMatrix);
         }
         else if (!is_hud_object)
         {
@@ -6392,7 +6693,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
         {
             LLVertexBuffer::unbind();
             gGL.pushMatrix();
-            gGL.multMatrix(vobj->getRelativeXform());
+            gGL.multMatrix((F32*)vobj->getRelativeXform().mMatrix);
 
             if (objectp->mDrawable->isState(LLDrawable::RIGGED))
             {
@@ -6441,9 +6742,13 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
         }
 
         LLUUID focus_item_id = LLViewerMediaFocus::getInstance()->getFocusedObjectID();
+        for (S32 pass = 0; pass < 2; pass++)
         {
-            for (LLSelectNode* node : mSelectedObjects->begin_end())
+            for (LLObjectSelection::iterator iter = mSelectedObjects->begin();
+                 iter != mSelectedObjects->end(); iter++)
             {
+                LLSelectNode* node = *iter;
+
                 if (getTEMode() && !node->hasSelectedTE())
                     continue;
 
@@ -6462,7 +6767,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
                     }
                     else if (node->isTransient())
                     {
-                        hlColor = sContextSilhouetteColor.get() * 0.5f;
+                        hlColor = sContextSilhouetteColor;
                     }
                     renderMeshSelection_f(node, objectp, hlColor);
                 }
@@ -6482,9 +6787,9 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
                     }
                     else if (node->isTransient())
                     {
-                        BOOL oldHidden = LLSelectMgr::sRenderHiddenSelections;
-                        LLSelectMgr::sRenderHiddenSelections = FALSE;
-                        node->renderOneSilhouette(sContextSilhouetteColor.get() * 0.5f);
+                        bool oldHidden = LLSelectMgr::sRenderHiddenSelections;
+                        LLSelectMgr::sRenderHiddenSelections = false;
+                        node->renderOneSilhouette(sContextSilhouetteColor);
                         LLSelectMgr::sRenderHiddenSelections = oldHidden;
                     }
                     else if (objectp->isRootEdit())
@@ -6503,11 +6808,13 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
     if (mHighlightedObjects->getNumNodes())
     {
         // render silhouettes for highlighted objects
-        BOOL subtracting_from_selection = (gKeyboard->currentMask(TRUE) == MASK_CONTROL);
+        bool subtracting_from_selection = (gKeyboard->currentMask(true) == MASK_CONTROL);
         for (S32 pass = 0; pass < 2; pass++)
         {
-            for (LLSelectNode* node : mHighlightedObjects->begin_end())
+            for (LLObjectSelection::iterator iter = mHighlightedObjects->begin();
+                 iter != mHighlightedObjects->end(); iter++)
             {
+                LLSelectNode* node = *iter;
                 LLViewerObject* objectp = node->getObject();
                 if (!objectp)
                     continue;
@@ -6562,15 +6869,15 @@ void LLSelectMgr::generateSilhouette(LLSelectNode* nodep, const LLVector3& view_
 //
 // Utility classes
 //
-LLSelectNode::LLSelectNode(LLViewerObject* object, BOOL glow)
+LLSelectNode::LLSelectNode(LLViewerObject* object, bool glow)
 :   mObject(object),
-    mIndividualSelection(FALSE),
-    mTransient(FALSE),
-    mValid(FALSE),
+    mIndividualSelection(false),
+    mTransient(false),
+    mValid(false),
     mPermissions(new LLPermissions()),
     mInventorySerial(0),
-    mSilhouetteExists(FALSE),
-    mDuplicated(FALSE),
+    mSilhouetteExists(false),
+    mDuplicated(false),
     mTESelectMask(0),
     mLastTESelected(0),
     mName(LLStringUtil::null),
@@ -6620,8 +6927,17 @@ LLSelectNode::LLSelectNode(const LLSelectNode& nodep)
     mSilhouetteExists = nodep.mSilhouetteExists;
     mObject = nodep.mObject;
 
-    mSavedColors = nodep.mSavedColors;
-    mSavedShinyColors = nodep.mSavedShinyColors;
+    std::vector<LLColor4>::const_iterator color_iter;
+    mSavedColors.clear();
+    for (color_iter = nodep.mSavedColors.begin(); color_iter != nodep.mSavedColors.end(); ++color_iter)
+    {
+        mSavedColors.push_back(*color_iter);
+    }
+    mSavedShinyColors.clear();
+    for (color_iter = nodep.mSavedShinyColors.begin(); color_iter != nodep.mSavedShinyColors.end(); ++color_iter)
+    {
+        mSavedShinyColors.push_back(*color_iter);
+    }
 
     saveTextures(nodep.mSavedTextures);
     saveGLTFMaterials(nodep.mSavedGLTFMaterialIds, nodep.mSavedGLTFOverrideMaterials);
@@ -6650,13 +6966,13 @@ LLSelectNode::~LLSelectNode()
     mPermissions = NULL;
 }
 
-void LLSelectNode::selectAllTEs(BOOL b)
+void LLSelectNode::selectAllTEs(bool b)
 {
     mTESelectMask = b ? TE_SELECT_MASK_ALL : 0x0;
     mLastTESelected = 0;
 }
 
-void LLSelectNode::selectTE(S32 te_index, BOOL selected)
+void LLSelectNode::selectTE(S32 te_index, bool selected)
 {
     if (te_index < 0 || te_index >= SELECT_MAX_TES)
     {
@@ -6685,11 +7001,11 @@ void LLSelectNode::selectGLTFNode(S32 node_index, S32 primitive_index, bool sele
     mSelectedGLTFPrimitive = primitive_index;
 }
 
-BOOL LLSelectNode::isTESelected(S32 te_index) const
+bool LLSelectNode::isTESelected(S32 te_index) const
 {
     if (te_index < 0 || te_index >= mObject->getNumTEs())
     {
-        return FALSE;
+        return false;
     }
     return (mTESelectMask & (0x1 << te_index)) != 0;
 }
@@ -6707,7 +7023,7 @@ LLViewerObject* LLSelectNode::getObject() const
 {
     if (!mObject)
     {
-        return NULL;
+        return nullptr;
     }
     else if (mObject->isDead())
     {
@@ -6758,7 +7074,13 @@ void LLSelectNode::saveTextures(const uuid_vec_t& textures)
 {
     if (mObject.notNull())
     {
-        mSavedTextures = textures;
+        mSavedTextures.clear();
+
+        for (uuid_vec_t::const_iterator texture_it = textures.begin();
+             texture_it != textures.end(); ++texture_it)
+        {
+            mSavedTextures.push_back(*texture_it);
+        }
     }
 }
 
@@ -6769,16 +7091,22 @@ void LLSelectNode::saveGLTFMaterials(const uuid_vec_t& materials, const gltf_mat
         mSavedGLTFMaterialIds.clear();
         mSavedGLTFOverrideMaterials.clear();
 
-        for (uuid_vec_t::const_iterator materials_it = materials.begin();
-            materials_it != materials.end(); ++materials_it)
+        for (const LLUUID& id : materials)
         {
-            mSavedGLTFMaterialIds.push_back(*materials_it);
+            mSavedGLTFMaterialIds.push_back(id);
         }
 
-        for (gltf_materials_vec_t::const_iterator mat_it = override_materials.begin();
-            mat_it != override_materials.end(); ++mat_it)
+        for (const LLPointer<LLGLTFMaterial> &mat : override_materials)
         {
-            mSavedGLTFOverrideMaterials.push_back(*mat_it);
+            if (mat.notNull())
+            {
+                LLGLTFMaterial* copy = new LLGLTFMaterial(*mat);
+                mSavedGLTFOverrideMaterials.emplace_back(copy);
+            }
+            else
+            {
+                mSavedGLTFOverrideMaterials.emplace_back(nullptr);
+            }
         }
     }
 }
@@ -6786,10 +7114,12 @@ void LLSelectNode::saveGLTFMaterials(const uuid_vec_t& materials, const gltf_mat
 void LLSelectNode::saveTextureScaleRatios(LLRender::eTexIndex index_to_query)
 {
     mTextureScaleRatios.clear();
+    mGLTFScaleRatios.clear();
+    mGLTFScales.clear();
+    mGLTFOffsets.clear();
 
     if (mObject.notNull())
     {
-
         LLVector3 scale = mObject->getScale();
 
         for (U8 i = 0; i < mObject->getNumTEs(); i++)
@@ -6820,23 +7150,65 @@ void LLSelectNode::saveTextureScaleRatios(LLRender::eTexIndex index_to_query)
                 v.mV[t_axis] = diffuse_t/scale.mV[t_axis];
                 mTextureScaleRatios.push_back(v);
             }
+
+            LLGLTFMaterial* material = tep->getGLTFMaterialOverride();
+            LLVector3 material_v;
+            F32 scale_x = 1;
+            F32 scale_y = 1;
+            std::vector<LLVector3> material_v_vec;
+            std::vector<LLVector2> material_scales_vec;
+            std::vector<LLVector2> material_offset_vec;
+            for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+            {
+                if (material)
+                {
+                    LLGLTFMaterial::TextureTransform& transform = material->mTextureTransform[i];
+                    scale_x = transform.mScale[VX];
+                    scale_y = transform.mScale[VY];
+                    material_scales_vec.push_back(transform.mScale);
+                    material_offset_vec.push_back(transform.mOffset);
+                }
+                else
+                {
+                    // Not having an override doesn't mean that there is no material
+                    scale_x = 1;
+                    scale_y = 1;
+                    material_scales_vec.emplace_back(scale_x, scale_y);
+                    material_offset_vec.emplace_back(0.f, 0.f);
+                }
+
+                if (tep->getTexGen() == LLTextureEntry::TEX_GEN_PLANAR)
+                {
+                    material_v.mV[s_axis] = scale_x * scale.mV[s_axis];
+                    material_v.mV[t_axis] = scale_y * scale.mV[t_axis];
+                }
+                else
+                {
+                    material_v.mV[s_axis] = scale_x / scale.mV[s_axis];
+                    material_v.mV[t_axis] = scale_y / scale.mV[t_axis];
+                }
+                material_v_vec.push_back(material_v);
+            }
+            mGLTFScaleRatios.push_back(material_v_vec);
+            mGLTFScales.push_back(material_scales_vec);
+            mGLTFOffsets.push_back(material_offset_vec);
         }
     }
 }
 
 
 // This implementation should be similar to LLTask::allowOperationOnTask
-BOOL LLSelectNode::allowOperationOnNode(PermissionBit op, U64 group_proxy_power) const
+bool LLSelectNode::allowOperationOnNode(PermissionBit op, U64 group_proxy_power) const
 {
     // Extract ownership.
-    BOOL object_is_group_owned = FALSE;
+    bool object_is_group_owned = false;
     LLUUID object_owner_id;
     mPermissions->getOwnership(object_owner_id, object_is_group_owned);
 
     // Operations on invalid or public objects is not allowed.
     if (!mObject || (mObject->isDead()) || !mPermissions->isOwned())
     {
-        return FALSE;
+        return false;
     }
 
     // The transfer permissions can never be given through proxy.
@@ -6846,7 +7218,7 @@ BOOL LLSelectNode::allowOperationOnNode(PermissionBit op, U64 group_proxy_power)
         if ( !object_is_group_owned
             && (gAgent.getID() == object_owner_id) )
         {
-            return TRUE;
+            return true;
         }
         else
         {
@@ -6862,7 +7234,7 @@ BOOL LLSelectNode::allowOperationOnNode(PermissionBit op, U64 group_proxy_power)
         // no proxy allowed.
         if (mObject->isAttachment() && object_owner_id != gAgent.getID())
         {
-            return FALSE;
+            return false;
         }
     }
 
@@ -6875,7 +7247,7 @@ BOOL LLSelectNode::allowOperationOnNode(PermissionBit op, U64 group_proxy_power)
     // Gods can always operate.
     if (gAgent.isGodlike())
     {
-        return TRUE;
+        return true;
     }
 
     // Check if the agent is in the same group as the object.
@@ -6910,7 +7282,7 @@ BOOL LLSelectNode::allowOperationOnNode(PermissionBit op, U64 group_proxy_power)
     if (PERM_OWNER == op)
     {
         // This this was just a check for ownership, we can now return the answer.
-        return (proxy_agent_id == object_owner_id ? TRUE : FALSE);
+        return proxy_agent_id == object_owner_id;
     }
 
     // check permissions to see if the agent can operate
@@ -6947,7 +7319,7 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
         return;
     }
 
-    BOOL is_hud_object = objectp->isHUDAttachment();
+    bool is_hud_object = objectp->isHUDAttachment();
 
     if (mSilhouetteVertices.size() == 0 || mSilhouetteNormals.size() != mSilhouetteVertices.size())
     {
@@ -6976,14 +7348,12 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 
     if (drawable->isActive())
     {
-        gGL.multMatrix(objectp->getRenderMatrix());
+        gGL.multMatrix((F32*) objectp->getRenderMatrix().mMatrix);
     }
 
     LLVolume *volume = objectp->getVolume();
     if (volume)
     {
-        auto& viewerCamera = LLViewerCamera::instance();
-
         F32 silhouette_thickness;
         if (isAgentAvatarValid() && is_hud_object)
         {
@@ -6991,8 +7361,8 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
         }
         else
         {
-            LLVector3 view_vector = viewerCamera.getOrigin() - objectp->getRenderPosition();
-            silhouette_thickness = view_vector.magVec() * LLSelectMgr::sHighlightThickness * (viewerCamera.getView() / viewerCamera.getDefaultFOV());
+            LLVector3 view_vector = LLViewerCamera::getInstance()->getOrigin() - objectp->getRenderPosition();
+            silhouette_thickness = view_vector.magVec() * LLSelectMgr::sHighlightThickness * (LLViewerCamera::getInstance()->getView() / LLViewerCamera::getInstance()->getDefaultFOV());
         }
         F32 animationTime = (F32)LLFrameTimer::getElapsedSeconds();
 
@@ -7103,7 +7473,10 @@ void dialog_refresh_all()
     // *TODO: Eliminate all calls into outside classes below, make those
     // objects register with the update signal.
 
-    gFloaterTools->dirty();
+    if (gFloaterTools)
+    {
+        gFloaterTools->dirty();
+    }
 
     gMenuObject->needsArrange();
 
@@ -7127,6 +7500,12 @@ void dialog_refresh_all()
     {
         panel_task_info->dirty();
     }
+
+    LLFloaterGLTFAssetEditor * gltf_editor = LLFloaterReg::findTypedInstance<LLFloaterGLTFAssetEditor>("gltf_asset_editor");
+    if (gltf_editor)
+    {
+        gltf_editor->dirty();
+    }
 }
 
 S32 get_family_count(LLViewerObject *parent)
@@ -7134,12 +7513,14 @@ S32 get_family_count(LLViewerObject *parent)
     if (!parent)
     {
         LL_WARNS() << "Trying to get_family_count on null parent!" << LL_ENDL;
-        return 1;
     }
     S32 count = 1;  // for this object
-    const LLViewerObject::const_child_list_t& child_list = parent->getChildren();
-    for (LLViewerObject* child : child_list)
+    LLViewerObject::const_child_list_t& child_list = parent->getChildren();
+    for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
+         iter != child_list.end(); iter++)
     {
+        LLViewerObject* child = *iter;
+
         if (!child)
         {
             LL_WARNS() << "Family object has NULL child!  Show Doug." << LL_ENDL;
@@ -7184,7 +7565,7 @@ void LLSelectMgr::updateSelectionCenter()
         // nothing selected, probably grabbing
         // Ignore by setting to avatar origin.
         mSelectionCenterGlobal.clearVec();
-        mShowSelection = FALSE;
+        mShowSelection = false;
         mSelectionBBox = LLBBox();
         resetAgentHUDZoom();
     }
@@ -7198,7 +7579,7 @@ void LLSelectMgr::updateSelectionCenter()
             resetAgentHUDZoom();
         }
 
-        mShowSelection = FALSE;
+        mShowSelection = false;
         LLBBox bbox;
 
         // have stuff selected
@@ -7207,10 +7588,12 @@ void LLSelectMgr::updateSelectionCenter()
 
         // Initialize the bounding box to the root prim, so the BBox orientation
         // matches the root prim's (affecting the orientation of the manipulators).
-        bbox.addBBoxAgent( (mSelectedObjects->getFirstRootObject(TRUE))->getBoundingBoxAgent() );
+        bbox.addBBoxAgent( (mSelectedObjects->getFirstRootObject(true))->getBoundingBoxAgent() );
 
-        for (LLSelectNode* node : mSelectedObjects->begin_end())
+        for (LLObjectSelection::iterator iter = mSelectedObjects->begin();
+             iter != mSelectedObjects->end(); iter++)
         {
+            LLSelectNode* node = *iter;
             LLViewerObject* object = node->getObject();
             if (!object)
                 continue;
@@ -7220,7 +7603,7 @@ void LLSelectMgr::updateSelectionCenter()
                 !root->isChild(gAgentAvatarp) && // not the object you're sitting on
                 !object->isAvatar()) // not another avatar
             {
-                mShowSelection = TRUE;
+                mShowSelection = true;
             }
 
             bbox.addBBoxAgent( object->getBoundingBoxAgent() );
@@ -7232,7 +7615,7 @@ void LLSelectMgr::updateSelectionCenter()
 
     }
 
-    if (gAgentID.notNull())
+    if ( !(gAgentID == LLUUID::null))
     {
         LLTool      *tool = LLToolMgr::getInstance()->getCurrentTool();
         if (mShowSelection)
@@ -7280,8 +7663,10 @@ void LLSelectMgr::pauseAssociatedAvatars()
 {
     mPauseRequests.clear();
 
-    for (LLSelectNode* node : mSelectedObjects->begin_end())
+    for (LLObjectSelection::iterator iter = mSelectedObjects->begin();
+         iter != mSelectedObjects->end(); iter++)
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if (!object)
             continue;
@@ -7320,7 +7705,8 @@ void LLSelectMgr::updatePointAt()
             LLVector3 select_offset;
             const LLPickInfo& pick = gViewerWindow->getLastPick();
             LLViewerObject *click_object = pick.getObject();
-            if (click_object && click_object->isSelected())
+            bool was_hud = pick.mPickHUD && click_object && !click_object->isHUDAttachment();
+            if (click_object && click_object->isSelected() && !was_hud)
             {
                 // clicked on another object in our selection group, use that as target
                 select_offset.setVec(pick.mObjectOffset);
@@ -7361,7 +7747,7 @@ LLBBox LLSelectMgr::getBBoxOfSelection() const
 //-----------------------------------------------------------------------------
 // canUndo()
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::canUndo() const
+bool LLSelectMgr::canUndo() const
 {
     // Can edit or can move
     return const_cast<LLSelectMgr*>(this)->mSelectedObjects->getFirstUndoEnabledObject() != NULL; // HACK: casting away constness - MG;
@@ -7372,7 +7758,7 @@ BOOL LLSelectMgr::canUndo() const
 //-----------------------------------------------------------------------------
 void LLSelectMgr::undo()
 {
-    BOOL select_linked_set = !ALControlCache::EditLinkedParts;
+    bool select_linked_set = !gSavedSettings.getBOOL("EditLinkedParts");
     LLUUID group_id(gAgent.getGroupID());
     sendListToRegions("Undo", packAgentAndSessionAndGroupID, packObjectID, logNoOp, &group_id, select_linked_set ? SEND_ONLY_ROOTS : SEND_CHILDREN_FIRST);
 }
@@ -7380,7 +7766,7 @@ void LLSelectMgr::undo()
 //-----------------------------------------------------------------------------
 // canRedo()
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::canRedo() const
+bool LLSelectMgr::canRedo() const
 {
     return const_cast<LLSelectMgr*>(this)->mSelectedObjects->getFirstEditableObject() != NULL; // HACK: casting away constness - MG
 }
@@ -7390,7 +7776,7 @@ BOOL LLSelectMgr::canRedo() const
 //-----------------------------------------------------------------------------
 void LLSelectMgr::redo()
 {
-    BOOL select_linked_set = !ALControlCache::EditLinkedParts;
+    bool select_linked_set = !gSavedSettings.getBOOL("EditLinkedParts");
     LLUUID group_id(gAgent.getGroupID());
     sendListToRegions("Redo", packAgentAndSessionAndGroupID, packObjectID, logNoOp, &group_id, select_linked_set ? SEND_ONLY_ROOTS : SEND_CHILDREN_FIRST);
 }
@@ -7398,7 +7784,7 @@ void LLSelectMgr::redo()
 //-----------------------------------------------------------------------------
 // canDoDelete()
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::canDoDelete() const
+bool LLSelectMgr::canDoDelete() const
 {
     bool can_delete = false;
     // This function is "logically const" - it does not change state in
@@ -7432,7 +7818,7 @@ void LLSelectMgr::doDelete()
 //-----------------------------------------------------------------------------
 // canDeselect()
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::canDeselect() const
+bool LLSelectMgr::canDeselect() const
 {
     return !mSelectedObjects->isEmpty();
 }
@@ -7447,7 +7833,7 @@ void LLSelectMgr::deselect()
 //-----------------------------------------------------------------------------
 // canDuplicate()
 //-----------------------------------------------------------------------------
-BOOL LLSelectMgr::canDuplicate() const
+bool LLSelectMgr::canDuplicate() const
 {
 //  return const_cast<LLSelectMgr*>(this)->mSelectedObjects->getFirstCopyableObject() != NULL; // HACK: casting away constness - MG
 // [RLVa:KB] - Checked: 2010-03-24 (RLVa-1.2.0e) | Added: RLVa-1.2.0a
@@ -7462,7 +7848,7 @@ BOOL LLSelectMgr::canDuplicate() const
 void LLSelectMgr::duplicate()
 {
     LLVector3 offset(0.5f, 0.5f, 0.f);
-    selectDuplicate(offset, TRUE);
+    selectDuplicate(offset, true);
 }
 
 ESelectType LLSelectMgr::getSelectTypeForObject(LLViewerObject* object)
@@ -7491,9 +7877,9 @@ void LLSelectMgr::validateSelection()
     {
         virtual bool apply(LLViewerObject* object)
         {
-            if (!instance().canSelectObject(object))
+            if (!LLSelectMgr::getInstance()->canSelectObject(object))
             {
-                instance().deselectObjectOnly(object);
+                LLSelectMgr::getInstance()->deselectObjectOnly(object);
             }
             return true;
         }
@@ -7501,17 +7887,17 @@ void LLSelectMgr::validateSelection()
     getSelection()->applyToObjects(&func);
 }
 
-BOOL LLSelectMgr::canSelectObject(LLViewerObject* object, BOOL ignore_select_owned)
+bool LLSelectMgr::canSelectObject(LLViewerObject* object, bool ignore_select_owned)
 {
     // Never select dead objects
     if (!object || object->isDead())
     {
-        return FALSE;
+        return false;
     }
 
     if (mForceSelection)
     {
-        return TRUE;
+        return true;
     }
 
     if(!ignore_select_owned)
@@ -7521,26 +7907,26 @@ BOOL LLSelectMgr::canSelectObject(LLViewerObject* object, BOOL ignore_select_own
                 (gSavedSettings.getBOOL("SelectMovableOnly") && (!object->permMove() ||  object->isPermanentEnforced())))
         {
             // only select my own objects
-            return FALSE;
+            return false;
         }
     }
 
     // Can't select orphans
-    if (object->isOrphaned()) return FALSE;
+    if (object->isOrphaned()) return false;
 
     // Can't select avatars
-    if (object->isAvatar()) return FALSE;
+    if (object->isAvatar()) return false;
 
     // Can't select land
-    if (object->getPCode() == LLViewerObject::LL_VO_SURFACE_PATCH) return FALSE;
+    if (object->getPCode() == LLViewerObject::LL_VO_SURFACE_PATCH) return false;
 
     ESelectType selection_type = getSelectTypeForObject(object);
-    if (mSelectedObjects->getObjectCount() > 0 && mSelectedObjects->mSelectType != selection_type) return FALSE;
+    if (mSelectedObjects->getObjectCount() > 0 && mSelectedObjects->mSelectType != selection_type) return false;
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLSelectMgr::setForceSelection(BOOL force)
+bool LLSelectMgr::setForceSelection(bool force)
 {
     std::swap(mForceSelection,force);
     return force;
@@ -7565,6 +7951,14 @@ void LLSelectMgr::setAgentHUDZoom(F32 target_zoom, F32 current_zoom)
 {
     gAgentCamera.mHUDTargetZoom = target_zoom;
     gAgentCamera.mHUDCurZoom = current_zoom;
+}
+
+void LLSelectMgr::clearWaterExclusion()
+{
+    // reset texture to default plywood
+    LLSelectMgr::getInstance()->selectionSetImage(DEFAULT_OBJECT_TEXTURE);
+    // reset texture repeats, that might be altered by invisiprim script from wiki
+    LLSelectMgr::getInstance()->selectionTexScaleAutofit(2.f);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -7619,7 +8013,7 @@ void LLObjectSelection::updateEffects()
 
 S32 LLObjectSelection::getNumNodes()
 {
-    return mList.size();
+    return static_cast<S32>(mList.size());
 }
 
 void LLObjectSelection::addNode(LLSelectNode *nodep)
@@ -7645,7 +8039,7 @@ void LLObjectSelection::moveNodeToFront(LLSelectNode *nodep)
 void LLObjectSelection::removeNode(LLSelectNode *nodep)
 {
     mSelectNodeMap.erase(nodep->getObject());
-    if (nodep->getObject() == mPrimaryObject.get())
+    if (nodep->getObject() == mPrimaryObject)
     {
         mPrimaryObject = NULL;
     }
@@ -7674,7 +8068,7 @@ LLSelectNode* LLObjectSelection::findNode(LLViewerObject* objectp)
 //-----------------------------------------------------------------------------
 // isEmpty()
 //-----------------------------------------------------------------------------
-BOOL LLObjectSelection::isEmpty() const
+bool LLObjectSelection::isEmpty() const
 {
     return (mList.size() == 0);
 }
@@ -7686,7 +8080,7 @@ BOOL LLObjectSelection::isEmpty() const
 S32 LLObjectSelection::getObjectCount()
 {
     cleanupNodes();
-    S32 count = mList.size();
+    S32 count = static_cast<S32>(mList.size());
 
     return count;
 }
@@ -7696,8 +8090,9 @@ F32 LLObjectSelection::getSelectedObjectCost()
     cleanupNodes();
     F32 cost = 0.f;
 
-    for (LLSelectNode* node : mList)
+    for (list_t::iterator iter = mList.begin(); iter != mList.end(); ++iter)
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
 
         if (object)
@@ -7716,8 +8111,9 @@ F32 LLObjectSelection::getSelectedLinksetCost()
 
     std::set<LLViewerObject*> me_roots;
 
-    for (LLSelectNode* node : mList)
+    for (list_t::iterator iter = mList.begin(); iter != mList.end(); ++iter)
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
 
         if (object && !object->isAttachment())
@@ -7742,8 +8138,9 @@ F32 LLObjectSelection::getSelectedPhysicsCost()
     cleanupNodes();
     F32 cost = 0.f;
 
-    for (LLSelectNode* node : mList)
+    for (list_t::iterator iter = mList.begin(); iter != mList.end(); ++iter)
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
 
         if (object)
@@ -7762,8 +8159,9 @@ F32 LLObjectSelection::getSelectedLinksetPhysicsCost()
 
     std::set<LLViewerObject*> me_roots;
 
-    for (LLSelectNode* node : mList)
+    for (list_t::iterator iter = mList.begin(); iter != mList.end(); ++iter)
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
 
         if (object)
@@ -7786,8 +8184,9 @@ F32 LLObjectSelection::getSelectedLinksetPhysicsCost()
 F32 LLObjectSelection::getSelectedObjectStreamingCost(S32* total_bytes, S32* visible_bytes)
 {
     F32 cost = 0.f;
-    for (LLSelectNode* node : mList)
+    for (list_t::iterator iter = mList.begin(); iter != mList.end(); ++iter)
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
 
         if (object)
@@ -7820,8 +8219,9 @@ F32 LLObjectSelection::getSelectedObjectStreamingCost(S32* total_bytes, S32* vis
 U32 LLObjectSelection::getSelectedObjectTriangleCount(S32* vcount)
 {
     U32 count = 0;
-    for (LLSelectNode* node : mList)
+    for (list_t::iterator iter = mList.begin(); iter != mList.end(); ++iter)
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
 
         if (object)
@@ -7842,9 +8242,14 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
        typedef std::set<LLUUID> uuid_list_t;
        uuid_list_t computed_objects;
 
+       typedef std::list<LLPointer<LLViewerObject> > child_list_t;
+       typedef const child_list_t const_child_list_t;
+
        // add render cost of complete linksets first, to get accurate texture counts
-       for (LLSelectNode* node : mList)
+       for (list_t::iterator iter = mList.begin(); iter != mList.end(); ++iter)
        {
+               LLSelectNode* node = *iter;
+
                LLVOVolume* object = (LLVOVolume*)node->getObject();
 
                if (object && object->isRootEdit())
@@ -7852,10 +8257,10 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
                    cost += object->getRenderCost(textures);
                    computed_objects.insert(object->getID());
 
-                   LLViewerObject::const_child_list_t& children = object->getChildren();
+                   const const_child_list_t& children = object->getChildren();
                    for (LLViewerObject* child_obj : children)
                    {
-                       LLVOVolume *child = child_obj ? child_obj->asVolume() : nullptr;
+                       LLVOVolume *child = dynamic_cast<LLVOVolume*>( child_obj );
                        if (child)
                        {
                            cost += child->getRenderCost(textures);
@@ -7874,8 +8279,9 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
        }
 
        // add any partial linkset objects, texture cost may be slightly misleading
-       for (LLSelectNode* node : mList)
-       {
+        for (list_t::iterator iter = mList.begin(); iter != mList.end(); ++iter)
+        {
+            LLSelectNode* node = *iter;
             LLVOVolume* object = (LLVOVolume*)node->getObject();
 
             if (object && computed_objects.find(object->getID()) == computed_objects.end()  )
@@ -7902,8 +8308,9 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
 S32 LLObjectSelection::getTECount()
 {
     S32 count = 0;
-    for (LLSelectNode* node : begin_end())
+    for (LLObjectSelection::iterator iter = begin(); iter != end(); iter++)
     {
+        LLSelectNode* node = *iter;
         LLViewerObject* object = node->getObject();
         if (!object)
             continue;
@@ -7925,7 +8332,7 @@ S32 LLObjectSelection::getTECount()
 S32 LLObjectSelection::getRootObjectCount()
 {
     S32 count = 0;
-    for (auto begin_it = root_begin(), end_it = root_end(); begin_it != end_it; ++begin_it)
+    for (LLObjectSelection::root_iterator iter = root_begin(); iter != root_end(); iter++)
     {
         ++count;
     }
@@ -7952,9 +8359,9 @@ bool LLObjectSelection::checkAnimatedObjectEstTris()
     F32 est_tris = 0;
     F32 max_tris = 0;
     S32 anim_count = 0;
-    for (LLSelectNode* node : root_begin_end())
+    for (root_iterator iter = root_begin(); iter != root_end(); ++iter)
     {
-        LLViewerObject* object = node->getObject();
+        LLViewerObject* object = (*iter)->getObject();
         if (!object)
             continue;
         if (object->isAnimatedObject())
@@ -7974,7 +8381,7 @@ bool LLObjectSelection::checkAnimatedObjectLinkable()
 
 bool LLObjectSelection::applyToRootObjects(LLSelectedObjectFunctor* func, bool firstonly)
 {
-    bool result = firstonly ? false : true;
+    bool result = !firstonly;
     for (root_iterator iter = root_begin(); iter != root_end(); )
     {
         root_iterator nextiter = iter++;
@@ -7992,7 +8399,7 @@ bool LLObjectSelection::applyToRootObjects(LLSelectedObjectFunctor* func, bool f
 
 bool LLObjectSelection::applyToTEs(LLSelectedTEFunctor* func, bool firstonly)
 {
-    bool result = firstonly ? false : true;
+    bool result = !firstonly;
     for (iterator iter = begin(); iter != end(); )
     {
         iterator nextiter = iter++;
@@ -8018,7 +8425,7 @@ bool LLObjectSelection::applyToTEs(LLSelectedTEFunctor* func, bool firstonly)
 
 bool LLObjectSelection::applyToNodes(LLSelectedNodeFunctor *func, bool firstonly)
 {
-    bool result = firstonly ? false : true;
+    bool result = !firstonly;
     for (iterator iter = begin(); iter != end(); )
     {
         iterator nextiter = iter++;
@@ -8034,7 +8441,7 @@ bool LLObjectSelection::applyToNodes(LLSelectedNodeFunctor *func, bool firstonly
 
 bool LLObjectSelection::applyToRootNodes(LLSelectedNodeFunctor *func, bool firstonly)
 {
-    bool result = firstonly ? false : true;
+    bool result = !firstonly;
     for (root_iterator iter = root_begin(); iter != root_end(); )
     {
         root_iterator nextiter = iter++;
@@ -8048,31 +8455,33 @@ bool LLObjectSelection::applyToRootNodes(LLSelectedNodeFunctor *func, bool first
     return result;
 }
 
-BOOL LLObjectSelection::isMultipleTESelected()
+bool LLObjectSelection::isMultipleTESelected()
 {
-    BOOL te_selected = FALSE;
+    bool te_selected = false;
     // ...all faces
-    for (LLSelectNode* nodep : begin_end())
+    for (LLObjectSelection::iterator iter = begin();
+         iter != end(); iter++)
     {
+        LLSelectNode* nodep = *iter;
         for (S32 i = 0; i < SELECT_MAX_TES; i++)
         {
             if(nodep->isTESelected(i))
             {
                 if(te_selected)
                 {
-                    return TRUE;
+                    return true;
                 }
-                te_selected = TRUE;
+                te_selected = true;
             }
         }
     }
-    return FALSE;
+    return false;
 }
 
 //-----------------------------------------------------------------------------
 // contains()
 //-----------------------------------------------------------------------------
-BOOL LLObjectSelection::contains(LLViewerObject* object)
+bool LLObjectSelection::contains(LLViewerObject* object)
 {
     return findNode(object) != NULL;
 }
@@ -8081,22 +8490,24 @@ BOOL LLObjectSelection::contains(LLViewerObject* object)
 //-----------------------------------------------------------------------------
 // contains()
 //-----------------------------------------------------------------------------
-BOOL LLObjectSelection::contains(LLViewerObject* object, S32 te)
+bool LLObjectSelection::contains(LLViewerObject* object, S32 te)
 {
     if (te == SELECT_ALL_TES)
     {
         // ...all faces
-        for (LLSelectNode* nodep : begin_end())
+        for (LLObjectSelection::iterator iter = begin();
+             iter != end(); iter++)
         {
+            LLSelectNode* nodep = *iter;
             if (nodep->getObject() == object)
             {
                 // Optimization
                 if (nodep->getTESelectMask() == TE_SELECT_MASK_ALL)
                 {
-                    return TRUE;
+                    return true;
                 }
 
-                BOOL all_selected = TRUE;
+                bool all_selected = true;
                 for (S32 i = 0; i < object->getNumTEs(); i++)
                 {
                     all_selected = all_selected && nodep->isTESelected(i);
@@ -8104,24 +8515,25 @@ BOOL LLObjectSelection::contains(LLViewerObject* object, S32 te)
                 return all_selected;
             }
         }
-        return FALSE;
+        return false;
     }
     else
     {
         // ...one face
-        for (LLSelectNode* nodep : begin_end())
+        for (LLObjectSelection::iterator iter = begin(); iter != end(); iter++)
         {
+            LLSelectNode* nodep = *iter;
             if (nodep->getObject() == object && nodep->isTESelected(te))
             {
-                return TRUE;
+                return true;
             }
         }
-        return FALSE;
+        return false;
     }
 }
 
-// returns TRUE is any node is currenly worn as an attachment
-BOOL LLObjectSelection::isAttachment()
+// returns true is any node is currenly worn as an attachment
+bool LLObjectSelection::isAttachment()
 {
     return (mSelectType == SELECT_TYPE_ATTACHMENT || mSelectType == SELECT_TYPE_HUD);
 }
@@ -8151,8 +8563,9 @@ LLViewerObject* getSelectedParentObject(LLViewerObject *object)
 //-----------------------------------------------------------------------------
 LLSelectNode* LLObjectSelection::getFirstNode(LLSelectedNodeFunctor* func)
 {
-    for (LLSelectNode* node : begin_end())
+    for (iterator iter = begin(); iter != end(); ++iter)
     {
+        LLSelectNode* node = *iter;
         if (func == NULL || func->apply(node))
         {
             return node;
@@ -8161,10 +8574,11 @@ LLSelectNode* LLObjectSelection::getFirstNode(LLSelectedNodeFunctor* func)
     return NULL;
 }
 
-LLSelectNode* LLObjectSelection::getFirstRootNode(LLSelectedNodeFunctor* func, BOOL non_root_ok)
+LLSelectNode* LLObjectSelection::getFirstRootNode(LLSelectedNodeFunctor* func, bool non_root_ok)
 {
-    for (LLSelectNode* node : root_begin_end())
+    for (root_iterator iter = root_begin(); iter != root_end(); ++iter)
     {
+        LLSelectNode* node = *iter;
         if (func == NULL || func->apply(node))
         {
             return node;
@@ -8182,7 +8596,7 @@ LLSelectNode* LLObjectSelection::getFirstRootNode(LLSelectedNodeFunctor* func, B
 //-----------------------------------------------------------------------------
 // getFirstSelectedObject
 //-----------------------------------------------------------------------------
-LLViewerObject* LLObjectSelection::getFirstSelectedObject(LLSelectedNodeFunctor* func, BOOL get_parent)
+LLViewerObject* LLObjectSelection::getFirstSelectedObject(LLSelectedNodeFunctor* func, bool get_parent)
 {
     LLSelectNode* res = getFirstNode(func);
     if (res && get_parent)
@@ -8208,7 +8622,7 @@ LLViewerObject* LLObjectSelection::getFirstObject()
 //-----------------------------------------------------------------------------
 // getFirstRootObject()
 //-----------------------------------------------------------------------------
-LLViewerObject* LLObjectSelection::getFirstRootObject(BOOL non_root_ok)
+LLViewerObject* LLObjectSelection::getFirstRootObject(bool non_root_ok)
 {
     LLSelectNode* res = getFirstRootNode(NULL, non_root_ok);
     return res ? res->getObject() : NULL;
@@ -8217,7 +8631,7 @@ LLViewerObject* LLObjectSelection::getFirstRootObject(BOOL non_root_ok)
 //-----------------------------------------------------------------------------
 // getFirstMoveableNode()
 //-----------------------------------------------------------------------------
-LLSelectNode* LLObjectSelection::getFirstMoveableNode(BOOL get_root_first)
+LLSelectNode* LLObjectSelection::getFirstMoveableNode(bool get_root_first)
 {
     struct f : public LLSelectedNodeFunctor
     {
@@ -8227,14 +8641,14 @@ LLSelectNode* LLObjectSelection::getFirstMoveableNode(BOOL get_root_first)
             return obj && obj->permMove() && !obj->isPermanentEnforced();
         }
     } func;
-    LLSelectNode* res = get_root_first ? getFirstRootNode(&func, TRUE) : getFirstNode(&func);
+    LLSelectNode* res = get_root_first ? getFirstRootNode(&func, true) : getFirstNode(&func);
     return res;
 }
 
 //-----------------------------------------------------------------------------
 // getFirstCopyableObject()
 //-----------------------------------------------------------------------------
-LLViewerObject* LLObjectSelection::getFirstCopyableObject(BOOL get_parent)
+LLViewerObject* LLObjectSelection::getFirstCopyableObject(bool get_parent)
 {
     struct f : public LLSelectedNodeFunctor
     {
@@ -8282,7 +8696,7 @@ LLViewerObject* LLObjectSelection::getFirstDeleteableObject()
 //-----------------------------------------------------------------------------
 // getFirstEditableObject()
 //-----------------------------------------------------------------------------
-LLViewerObject* LLObjectSelection::getFirstEditableObject(BOOL get_parent)
+LLViewerObject* LLObjectSelection::getFirstEditableObject(bool get_parent)
 {
     struct f : public LLSelectedNodeFunctor
     {
@@ -8298,7 +8712,7 @@ LLViewerObject* LLObjectSelection::getFirstEditableObject(BOOL get_parent)
 //-----------------------------------------------------------------------------
 // getFirstMoveableObject()
 //-----------------------------------------------------------------------------
-LLViewerObject* LLObjectSelection::getFirstMoveableObject(BOOL get_parent)
+LLViewerObject* LLObjectSelection::getFirstMoveableObject(bool get_parent)
 {
     struct f : public LLSelectedNodeFunctor
     {
@@ -8314,7 +8728,7 @@ LLViewerObject* LLObjectSelection::getFirstMoveableObject(BOOL get_parent)
 //-----------------------------------------------------------------------------
 // getFirstUndoEnabledObject()
 //-----------------------------------------------------------------------------
-LLViewerObject* LLObjectSelection::getFirstUndoEnabledObject(BOOL get_parent)
+LLViewerObject* LLObjectSelection::getFirstUndoEnabledObject(bool get_parent)
 {
     struct f : public LLSelectedNodeFunctor
     {
@@ -8342,23 +8756,20 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
     bool update_success = true;
     bool update_position = update_type & UPD_POSITION;
     bool update_rotation = update_type & UPD_ROTATION;
-    const bool noedit_linked_parts = !ALControlCache::EditLinkedParts;
-
-    LLObjectSelectionHandle selection = getSelection();
+    const bool noedit_linked_parts = !gSavedSettings.getBOOL("EditLinkedParts");
 
     if (update_position)
     {
         // calculate the distance of the object closest to the camera origin
         F32 min_dist_squared = F32_MAX; // value will be overridden in the loop
 
-        const auto& origin = LLViewerCamera::getInstance()->getOrigin();
-
         LLVector3 obj_pos;
-        for (LLSelectNode* nodep : selection->root_begin_end())
+        for (LLObjectSelection::root_iterator it = getSelection()->root_begin();
+             it != getSelection()->root_end(); ++it)
         {
-            obj_pos = nodep->getObject()->getPositionEdit();
+            obj_pos = (*it)->getObject()->getPositionEdit();
 
-            F32 obj_dist_squared = dist_vec_squared(obj_pos, origin);
+            F32 obj_dist_squared = dist_vec_squared(obj_pos, LLViewerCamera::getInstance()->getOrigin());
             if (obj_dist_squared < min_dist_squared)
             {
                 min_dist_squared = obj_dist_squared;
@@ -8388,9 +8799,10 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 
     LLViewerObject *obj;
     S32 obj_count = getSelection()->getObjectCount();
-    for (LLSelectNode* nodep : selection->root_begin_end())
+    for (LLObjectSelection::root_iterator it = getSelection()->root_begin();
+         it != getSelection()->root_end(); ++it )
     {
-        obj = nodep->getObject();
+        obj = (*it)->getObject();
         bool enable_pos = false, enable_rot = false;
         bool perm_move = obj->permMove() && !obj->isPermanentEnforced();
         bool perm_mod = obj->permModify();
@@ -8404,7 +8816,7 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 
             if (enable_rot)
             {
-                int children_count = obj->getChildren().size();
+                auto children_count = obj->getChildren().size();
                 if (obj_count > 1 && children_count > 0)
                 {
                     // for linked sets, rotate around the group center
@@ -8450,7 +8862,7 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 
         if (enable_pos && enable_rot && obj->mDrawable.notNull())
         {
-            gPipeline.markMoved(obj->mDrawable, TRUE);
+            gPipeline.markMoved(obj->mDrawable, true);
         }
     }
 
@@ -8477,7 +8889,7 @@ void LLSelectMgr::sendSelectionMove()
     S32 objects_in_this_packet = 0;
 
     // apply to linked objects if unable to select their individual parts
-    if (!ALControlCache::EditLinkedParts && !getTEMode())
+    if (!gSavedSettings.getBOOL("EditLinkedParts") && !getTEMode())
     {
         // tell simulator to apply to whole linked sets
         update_type |= UPD_LINKED_SETS;
@@ -8488,9 +8900,10 @@ void LLSelectMgr::sendSelectionMove()
     packAgentAndSessionID(&update_type);
 
     LLViewerObject *obj = NULL;
-    for (LLSelectNode* nodep : getSelection()->root_begin_end())
+    for (LLObjectSelection::root_iterator it = getSelection()->root_begin();
+         it != getSelection()->root_end(); ++it)
     {
-        obj = nodep->getObject();
+        obj = (*it)->getObject();
 
         // note: following code adapted from sendListToRegions() (@3924)
         last_region = curr_region;
@@ -8509,7 +8922,7 @@ void LLSelectMgr::sendSelectionMove()
         }
 
         // add another instance of the body of data
-        packMultipleUpdate(nodep, &update_type);
+        packMultipleUpdate(*it, &update_type);
         ++objects_in_this_packet;
     }
 

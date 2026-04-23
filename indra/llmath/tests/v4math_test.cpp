@@ -123,9 +123,9 @@ namespace tut
         vec4.abs();
         ensure("abs:Fail " ,((x == vec4.mV[VX]) && (-y == vec4.mV[VY]) && (-z == vec4.mV[VZ])&& (-w == vec4.mV[VW])));
         vec4.clearVec();
-        ensure("isExactlyClear:Fail " ,(TRUE == vec4.isExactlyClear()));
+        ensure("isExactlyClear:Fail " ,(true == vec4.isExactlyClear()));
         vec4.zeroVec();
-        ensure("isExactlyZero:Fail " ,(TRUE == vec4.isExactlyZero()));
+        ensure("isExactlyZero:Fail " ,(true == vec4.isExactlyZero()));
     }
 
     template<> template<>
@@ -303,19 +303,16 @@ namespace tut
     {
         F32 x = 1.f, y = 2.f, z = -1.1f,epsilon = .23425f;
         LLVector4 vec4(x,y,z), vec4a(x,y,z);
-        ensure("1:are_parallel: Fail " ,(TRUE == are_parallel(vec4a,vec4,epsilon)));
+        ensure("1:are_parallel: Fail " ,(true == are_parallel(vec4a,vec4,epsilon)));
         x = 21.f, y = 12.f, z = -123.1f;
         vec4a.clearVec();
         vec4a.setVec(x,y,z);
-        ensure("2:are_parallel: Fail " ,(FALSE == are_parallel(vec4a,vec4,epsilon)));
+        ensure("2:are_parallel: Fail " ,(false == are_parallel(vec4a,vec4,epsilon)));
     }
 
     template<> template<>
     void v4math_object::test<18>()
     {
-#if LL_LINUX
-        skip("This test fails depending on architecture. Need to fix comparison operation, is_approx_equal, to work on more than one platform.");
-#endif
         F32 x = 1.f, y = 2.f, z = -1.1f;
         F32 angle1, angle2;
         LLVector4 vec4(x,y,z), vec4a(x,y,z);

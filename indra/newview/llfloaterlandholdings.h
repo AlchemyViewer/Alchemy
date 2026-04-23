@@ -34,14 +34,14 @@ class LLTextBox;
 class LLScrollListCtrl;
 class LLButton;
 
-class LLFloaterLandHoldings final
+class LLFloaterLandHoldings
 :   public LLFloater
 {
 public:
     LLFloaterLandHoldings(const LLSD& key);
     virtual ~LLFloaterLandHoldings();
 
-    virtual BOOL postBuild();
+    virtual bool postBuild();
     virtual void onOpen(const LLSD& key);
     virtual void draw();
 
@@ -69,10 +69,10 @@ protected:
 
     // Has a packet of data been received?
     // Used to clear out the mParcelList's "Loading..." indicator
-    BOOL mFirstPacketReceived;
+    bool mFirstPacketReceived;
 
     std::string mSortColumn;
-    BOOL mSortAscending;
+    bool mSortAscending;
 };
 
 #endif

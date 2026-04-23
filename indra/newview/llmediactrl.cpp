@@ -47,7 +47,6 @@
 #include "llkeyboard.h"
 #include "llviewermenu.h"
 #include "llviewermenufile.h" // LLFilePickerThread
-#include "llwindow.h"
 
 // linden library includes
 #include "llfocusmgr.h"
@@ -64,7 +63,7 @@
 #include "llfloaterwebcontent.h"
 #include "llwindowshade.h"
 
-extern BOOL gRestoreGL;
+extern bool gRestoreGL;
 
 static LLDefaultChildRegistry::Register<LLMediaCtrl> r("web_browser");
 
@@ -167,7 +166,7 @@ LLMediaCtrl::~LLMediaCtrl()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-void LLMediaCtrl::setBorderVisible( BOOL border_visible )
+void LLMediaCtrl::setBorderVisible( bool border_visible )
 {
     if ( mBorder )
     {
@@ -184,9 +183,9 @@ void LLMediaCtrl::setTakeFocusOnClick( bool take_focus )
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleHover( S32 x, S32 y, MASK mask )
+bool LLMediaCtrl::handleHover( S32 x, S32 y, MASK mask )
 {
-    if (LLPanel::handleHover(x, y, mask)) return TRUE;
+    if (LLPanel::handleHover(x, y, mask)) return true;
     convertInputCoords(x, y);
 
     if (mMediaSource)
@@ -202,40 +201,40 @@ BOOL LLMediaCtrl::handleHover( S32 x, S32 y, MASK mask )
         handleToolTip(x, y, mask);
     }
 
-    return TRUE;
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleScrollWheel( S32 x, S32 y, S32 clicks )
+bool LLMediaCtrl::handleScrollWheel( S32 x, S32 y, S32 clicks )
 {
-    if (LLPanel::handleScrollWheel(x, y, clicks)) return TRUE;
+    if (LLPanel::handleScrollWheel(x, y, clicks)) return true;
     if (mMediaSource && mMediaSource->hasMedia())
     {
         convertInputCoords(x, y);
-        mMediaSource->scrollWheel(x, y, 0, clicks, gKeyboard->currentMask(TRUE));
+        mMediaSource->scrollWheel(x, y, 0, clicks, gKeyboard->currentMask(true));
     }
 
-    return TRUE;
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLMediaCtrl::handleScrollHWheel(S32 x, S32 y, S32 clicks)
 {
-    if (LLPanel::handleScrollHWheel(x, y, clicks)) return TRUE;
+    if (LLPanel::handleScrollHWheel(x, y, clicks)) return true;
     if (mMediaSource && mMediaSource->hasMedia())
     {
         convertInputCoords(x, y);
-        mMediaSource->scrollWheel(x, y, clicks, 0, gKeyboard->currentMask(TRUE));
+        mMediaSource->scrollWheel(x, y, clicks, 0, gKeyboard->currentMask(true));
     }
 
-    return TRUE;
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //  virtual
-BOOL LLMediaCtrl::handleToolTip(S32 x, S32 y, MASK mask)
+bool LLMediaCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 {
     std::string hover_text;
 
@@ -244,7 +243,7 @@ BOOL LLMediaCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 
     if(hover_text.empty())
     {
-        return FALSE;
+        return false;
     }
     else
     {
@@ -259,14 +258,14 @@ BOOL LLMediaCtrl::handleToolTip(S32 x, S32 y, MASK mask)
             .sticky_rect(sticky_rect_screen));
     }
 
-    return TRUE;
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleMouseUp( S32 x, S32 y, MASK mask )
+bool LLMediaCtrl::handleMouseUp( S32 x, S32 y, MASK mask )
 {
-    if (LLPanel::handleMouseUp(x, y, mask)) return TRUE;
+    if (LLPanel::handleMouseUp(x, y, mask)) return true;
     convertInputCoords(x, y);
 
     if (mMediaSource)
@@ -276,14 +275,14 @@ BOOL LLMediaCtrl::handleMouseUp( S32 x, S32 y, MASK mask )
 
     gFocusMgr.setMouseCapture( NULL );
 
-    return TRUE;
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleMouseDown( S32 x, S32 y, MASK mask )
+bool LLMediaCtrl::handleMouseDown( S32 x, S32 y, MASK mask )
 {
-    if (LLPanel::handleMouseDown(x, y, mask)) return TRUE;
+    if (LLPanel::handleMouseDown(x, y, mask)) return true;
     convertInputCoords(x, y);
 
     if (mMediaSource)
@@ -293,17 +292,17 @@ BOOL LLMediaCtrl::handleMouseDown( S32 x, S32 y, MASK mask )
 
     if (mTakeFocusOnClick)
     {
-        setFocus( TRUE );
+        setFocus( true );
     }
 
-    return TRUE;
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleRightMouseUp( S32 x, S32 y, MASK mask )
+bool LLMediaCtrl::handleRightMouseUp( S32 x, S32 y, MASK mask )
 {
-    if (LLPanel::handleRightMouseUp(x, y, mask)) return TRUE;
+    if (LLPanel::handleRightMouseUp(x, y, mask)) return true;
     convertInputCoords(x, y);
 
     if (mMediaSource)
@@ -321,14 +320,14 @@ BOOL LLMediaCtrl::handleRightMouseUp( S32 x, S32 y, MASK mask )
 
     gFocusMgr.setMouseCapture( NULL );
 
-    return TRUE;
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
+bool LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
 {
-    if (LLPanel::handleRightMouseDown(x, y, mask)) return TRUE;
+    if (LLPanel::handleRightMouseDown(x, y, mask)) return true;
 
     S32 media_x = x, media_y = y;
     convertInputCoords(media_x, media_y);
@@ -340,7 +339,7 @@ BOOL LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
 
     if (mTakeFocusOnClick)
     {
-        setFocus( TRUE );
+        setFocus( true );
     }
 
     auto menu = mContextMenuHandle.get();
@@ -374,30 +373,27 @@ BOOL LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
         LLMenuGL::showPopup(this, menu, x, y);
     }
 
-    return TRUE;
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleDoubleClick( S32 x, S32 y, MASK mask )
+bool LLMediaCtrl::handleDoubleClick( S32 x, S32 y, MASK mask )
 {
-    if (LLPanel::handleDoubleClick(x, y, mask)) return TRUE;
+    if (LLPanel::handleDoubleClick(x, y, mask)) return true;
     convertInputCoords(x, y);
 
     if (mMediaSource)
         mMediaSource->mouseDoubleClick( x, y, mask);
 
     gFocusMgr.setMouseCapture( this );
-#if LL_LINUX
-    gFocusMgr.setKeyboardFocus( this );
-#endif
 
     if (mTakeFocusOnClick)
     {
-        setFocus( TRUE );
+        setFocus( true );
     }
 
-    return TRUE;
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -407,9 +403,6 @@ void LLMediaCtrl::onFocusReceived()
     if (mMediaSource)
     {
         mMediaSource->focus(true);
-#if LL_LINUX
-        getWindow()->allowLanguageTextInput(NULL, TRUE);
-#endif
 
         // Set focus for edit menu items
         LLEditMenuHandler::gEditMenuHandler = mMediaSource;
@@ -425,9 +418,6 @@ void LLMediaCtrl::onFocusLost()
     if (mMediaSource)
     {
         mMediaSource->focus(false);
-#if LL_LINUX
-        getWindow()->allowLanguageTextInput(NULL, FALSE);
-#endif
 
         if( LLEditMenuHandler::gEditMenuHandler == mMediaSource )
         {
@@ -443,11 +433,11 @@ void LLMediaCtrl::onFocusLost()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::postBuild ()
+bool LLMediaCtrl::postBuild ()
 {
     setVisibleCallback(boost::bind(&LLMediaCtrl::onVisibilityChanged, this, _2));
 
-    return TRUE;
+    return true;
 }
 
 void LLMediaCtrl::onOpenWebInspector()
@@ -464,9 +454,9 @@ void LLMediaCtrl::onShowSource()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleKeyHere( KEY key, MASK mask )
+bool LLMediaCtrl::handleKeyHere( KEY key, MASK mask )
 {
-    BOOL result = FALSE;
+    bool result = false;
 
     if (mMediaSource)
     {
@@ -481,9 +471,9 @@ BOOL LLMediaCtrl::handleKeyHere( KEY key, MASK mask )
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleKeyUpHere(KEY key, MASK mask)
+bool LLMediaCtrl::handleKeyUpHere(KEY key, MASK mask)
 {
-    BOOL result = FALSE;
+    bool result = false;
 
     if (mMediaSource)
     {
@@ -498,7 +488,7 @@ BOOL LLMediaCtrl::handleKeyUpHere(KEY key, MASK mask)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-void LLMediaCtrl::onVisibilityChange ( BOOL new_visibility )
+void LLMediaCtrl::onVisibilityChange ( bool new_visibility )
 {
     LL_INFOS() << "visibility changed to " << (new_visibility?"true":"false") << LL_ENDL;
     if(mMediaSource)
@@ -509,9 +499,9 @@ void LLMediaCtrl::onVisibilityChange ( BOOL new_visibility )
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLMediaCtrl::handleUnicodeCharHere(llwchar uni_char)
+bool LLMediaCtrl::handleUnicodeCharHere(llwchar uni_char)
 {
-    BOOL result = FALSE;
+    bool result = false;
 
     if (mMediaSource)
     {
@@ -541,7 +531,7 @@ void LLMediaCtrl::onVisibilityChanged ( const LLSD& new_visibility )
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-void LLMediaCtrl::reshape( S32 width, S32 height, BOOL called_from_parent )
+void LLMediaCtrl::reshape( S32 width, S32 height, bool called_from_parent )
 {
     if(!getDecoupleTextureSize())
     {
@@ -800,7 +790,7 @@ void LLMediaCtrl::draw()
     if ( gRestoreGL == 1 || mUpdateScrolls)
     {
         LLRect r = getRect();
-        reshape( r.getWidth(), r.getHeight(), FALSE );
+        reshape( r.getWidth(), r.getHeight(), false );
         mUpdateScrolls = false;
         return;
     }
@@ -861,7 +851,7 @@ void LLMediaCtrl::draw()
             calcOffsetsAndSize(&x_offset, &y_offset, &width, &height);
 
             // draw the browser
-            gGL.begin( LLRender::TRIANGLE_STRIP );
+            gGL.begin(LLRender::TRIANGLES);
             if (! media_plugin->getTextureCoordsOpenGL())
             {
                 // render using web browser reported width and height, instead of trying to invert GL scale
@@ -871,11 +861,17 @@ void LLMediaCtrl::draw()
                 gGL.texCoord2f( 0.f, 0.f );
                 gGL.vertex2i( x_offset, y_offset + height );
 
-                gGL.texCoord2f(max_u, max_v);
-                gGL.vertex2i(x_offset + width, y_offset);
-
                 gGL.texCoord2f( 0.f, max_v );
                 gGL.vertex2i( x_offset, y_offset );
+
+                gGL.texCoord2f(max_u, 0.f);
+                gGL.vertex2i(x_offset + width, y_offset + height);
+
+                gGL.texCoord2f(0.f, max_v);
+                gGL.vertex2i(x_offset, y_offset);
+
+                gGL.texCoord2f( max_u, max_v );
+                gGL.vertex2i( x_offset + width, y_offset );
             }
             else
             {
@@ -886,11 +882,17 @@ void LLMediaCtrl::draw()
                 gGL.texCoord2f( 0.f, max_v );
                 gGL.vertex2i( x_offset, y_offset + height );
 
-                gGL.texCoord2f(max_u, 0.f);
-                gGL.vertex2i(x_offset + width, y_offset);
-
                 gGL.texCoord2f( 0.f, 0.f );
                 gGL.vertex2i( x_offset, y_offset );
+
+                gGL.texCoord2f(max_u, max_v);
+                gGL.vertex2i(x_offset + width, y_offset + height);
+
+                gGL.texCoord2f(0.f, 0.f);
+                gGL.vertex2i(x_offset, y_offset);
+
+                gGL.texCoord2f( max_u, 0.f );
+                gGL.vertex2i( x_offset + width, y_offset );
             }
             gGL.end();
         }
@@ -1008,7 +1010,7 @@ void LLMediaCtrl::handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event)
         {
             LL_DEBUGS("Media") <<  "Media event:  MEDIA_EVENT_SIZE_CHANGED " << LL_ENDL;
             LLRect r = getRect();
-            reshape( r.getWidth(), r.getHeight(), FALSE );
+            reshape( r.getWidth(), r.getHeight(), false );
         };
         break;
 
@@ -1187,20 +1189,7 @@ void LLMediaCtrl::handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event)
 
         case MEDIA_EVENT_DEBUG_MESSAGE:
         {
-            std::string level = self->getDebugMessageLevel();
-            if (level == "debug")
-            {
-                LL_DEBUGS("Media") << self->getDebugMessageText() << LL_ENDL;
-            }
-            else if (level == "info")
-            {
-                LL_INFOS("Media") << self->getDebugMessageText() << LL_ENDL;
-            }
-            else
-            {
-                LL_WARNS("Media") << self->getDebugMessageText() << LL_ENDL;
-            }
-
+            LL_INFOS("media") << self->getDebugMessageText() << LL_ENDL;
         };
         break;
     };

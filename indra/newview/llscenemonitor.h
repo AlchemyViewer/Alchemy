@@ -37,7 +37,7 @@ class LLCharacter;
 class LLRenderTarget;
 class LLViewerTexture;
 
-class LLSceneMonitor final : public LLSingleton<LLSceneMonitor>
+class LLSceneMonitor : public LLSingleton<LLSceneMonitor>
 {
     LLSINGLETON(LLSceneMonitor);
     ~LLSceneMonitor();
@@ -107,14 +107,14 @@ private:
     LLTrace::Recording                      mMonitorRecording;
 };
 
-class LLSceneMonitorView final : public LLFloater
+class LLSceneMonitorView : public LLFloater
 {
 public:
     LLSceneMonitorView(const LLRect& rect);
     ~LLSceneMonitorView();
     virtual void draw();
 
-    virtual void onVisibilityChange(BOOL visible);
+    virtual void onVisibilityChange(bool visible);
 
 protected:
     virtual void onClose(bool app_quitting=false);

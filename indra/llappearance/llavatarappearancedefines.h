@@ -40,7 +40,7 @@ namespace LLAvatarAppearanceDefines
 extern const S32 SCRATCH_TEX_WIDTH;
 extern const S32 SCRATCH_TEX_HEIGHT;
 
-static const U32 AVATAR_HOVER = 11001;
+static constexpr U32 AVATAR_HOVER = 11001;
 
 //--------------------------------------------------------------------
 // Enums
@@ -149,7 +149,7 @@ class LLAvatarAppearanceDictionary
     //--------------------------------------------------------------------
 public:
     LLAvatarAppearanceDictionary();
-    ~LLAvatarAppearanceDictionary() = default;
+    ~LLAvatarAppearanceDictionary();
 private:
     void createAssociations();
 
@@ -167,10 +167,10 @@ public:
         const std::string   mDefaultImageName;
         const LLWearableType::EType mWearableType;
         // It's either a local texture xor baked
-        BOOL                mIsLocalTexture;
-        BOOL                mIsBakedTexture;
+        bool                mIsLocalTexture;
+        bool                mIsBakedTexture;
         // If it's a local texture, it may be used by a baked texture
-        BOOL                mIsUsedByBakedTexture;
+        bool                mIsUsedByBakedTexture;
         EBakedTextureIndex  mBakedTextureIndex;
     };
 
@@ -238,13 +238,13 @@ public:
     ETextureIndex       bakedToLocalTextureIndex(EBakedTextureIndex t) const;
 
     // find a baked texture index based on its name
-    EBakedTextureIndex  findBakedByRegionName(std::string_view name);
-    EBakedTextureIndex  findBakedByImageName(std::string_view name);
+    EBakedTextureIndex  findBakedByRegionName(const std::string& name) const;
+    EBakedTextureIndex  findBakedByImageName(const std::string& name) const;
 
     // Given a texture entry, determine which wearable type owns it.
     LLWearableType::EType       getTEWearableType(ETextureIndex index) const;
 
-    static BOOL                         isBakedImageId(const LLUUID& id);
+    static bool                         isBakedImageId(const LLUUID& id);
     static EBakedTextureIndex           assetIdToBakedTextureIndex(const LLUUID& id);
     static LLUUID                       localTextureIndexToMagicId(ETextureIndex t);
 

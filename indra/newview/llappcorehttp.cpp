@@ -41,8 +41,6 @@
 #include "llcorehttputil.h"
 #include "httpstats.h"
 
-#include "llviewermedia.h"
-
 // Here is where we begin to get our connection usage under control.
 // This establishes llcorehttp policy classes that, among other
 // things, limit the maximum number of connections to outside
@@ -69,11 +67,6 @@ static const struct
         8,      8,      8,      0,      false,
         "",
         "other"
-    },
-    { // AP_ASSET
-        8,      1,      16,     0,      true,
-        "AssetFetchConcurrency",
-        "asset fetch"
     },
     { // AP_TEXTURE
         8,      1,      12,     0,      true,
@@ -151,9 +144,11 @@ LLAppCoreHttp::~LLAppCoreHttp()
 
 void LLAppCoreHttp::init()
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     LLCoreHttpUtil::setPropertyMethods(
-        boost::bind(&LLControlGroup::getBOOL, boost::ref(gSavedSettings), _1),
-        boost::bind(&LLControlGroup::declareBOOL, boost::ref(gSavedSettings), _1, _2, _3, LLControlVariable::PERSIST_NONDFT));
+        std::bind(&LLControlGroup::getBOOL, std::ref(gSavedSettings), std::placeholders::_1),
+        std::bind(&LLControlGroup::declareBOOL, std::ref(gSavedSettings), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, LLControlVariable::PERSIST_NONDFT));
 
     LLCore::LLHttp::initialize();
 
@@ -162,16 +157,6 @@ void LLAppCoreHttp::init()
     {
         LL_ERRS("Init") << "Failed to initialize HTTP services.  Reason:  " << status.toString()
                         << LL_ENDL;
-    }
-
-    // Set user agent.
-    status = LLCore::HttpRequest::setStaticPolicyOption(LLCore::HttpRequest::PO_USER_AGENT,
-                                                        LLCore::HttpRequest::GLOBAL_POLICY_ID,
-                                                        LLViewerMedia::getCurrentUserAgent(), NULL);
-    if (! status)
-    {
-        LL_WARNS("Init") << "Failed to set user agent for HTTP services.  Reason:  " << status.toString()
-                         << LL_ENDL;
     }
 
     // Point to our certs or SSH/https: will fail on connect
@@ -564,7 +549,7 @@ LLCore::HttpStatus LLAppCoreHttp::sslVerify(const std::string &url,
         // don't validate hostname.  Let libcurl do it instead.  That way, it'll handle redirects
         store->validate(VALIDATION_POLICY_SSL & (~VALIDATION_POLICY_HOSTNAME), chain, validation_params);
     }
-    catch (const LLCertValidationTrustException &cert_exception)
+    catch (LLCertValidationTrustException &cert_exception)
     {
         // this exception is is handled differently than the general cert
         // exceptions, as we allow the user to actually add the certificate
@@ -580,7 +565,7 @@ LLCore::HttpStatus LLAppCoreHttp::sslVerify(const std::string &url,
         // We should probably have a more generic way of passing information
         // back to the error handlers.
     }
-    catch (const LLCertException &cert_exception)
+    catch (LLCertException &cert_exception)
     {
         result = LLCore::HttpStatus(LLCore::HttpStatus::EXT_CURL_EASY, CURLE_SSL_PEER_CERTIFICATE);
         result.setMessage(cert_exception.what());

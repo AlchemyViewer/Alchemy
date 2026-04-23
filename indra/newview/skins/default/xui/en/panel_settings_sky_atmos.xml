@@ -35,7 +35,7 @@
                     layout="topleft"
                     left_delta="15"
                     top_pad="15"
-                    width="86">
+                    width="80">
                 Ambient Color:
             </text>
             <color_swatch
@@ -53,7 +53,7 @@
                     follows="left"
                     height="10"
                     layout="topleft"
-                    left_delta="95"
+                    left_delta="90"
                     top_delta="-15"
                     width="80">
                 Blue Horizon:
@@ -73,7 +73,7 @@
                     follows="left"
                     height="10"
                     layout="topleft"
-                    left_delta="95"
+                    left_delta="90"
                     top_delta="-15"
                     width="80">
                 Blue Density:
@@ -118,7 +118,7 @@
                             layout="topleft"
                             left_delta="15"
                             top_pad="15"
-                            width="140">
+                            width="80">
                         Haze Horizon:
                     </text>
                     <slider
@@ -142,7 +142,7 @@
                             layout="topleft"
                             left_delta="-5"
                             top_delta="25"
-                            width="140">
+                            width="80">
                         Haze Density:
                     </text>
                     <slider
@@ -166,7 +166,7 @@
                             layout="topleft"
                             left_delta="-5"
                             top_delta="25"
-                            width="140">
+                            width="80">
                         Moisture Level:
                     </text>
                      <slider
@@ -190,7 +190,7 @@
                             layout="topleft"
                             left_delta="-5"
                             top_delta="25"
-                            width="140">
+                            width="80">
                         Droplet Radius:
                     </text>
                     <slider
@@ -214,7 +214,7 @@
                             layout="topleft"
                             left_delta="-5"
                             top_delta="25"
-                            width="140">
+                            width="80">
                         Ice Level:
                     </text>
                     <slider
@@ -319,7 +319,7 @@
                             left_delta="-5"
                             top_delta="25"
                             name="probe_ambiance_label"
-                            tool_tip="Irradiance control.  When not zero, enables HDR lighting model."
+                            tool_tip="Irradiance control. When not zero, enables HDR lighting model."
                             width="200">
                     Reflection Probe Ambiance (HDR):
                   </text>
@@ -345,7 +345,7 @@
                             layout="topleft"
                             left_delta="-5"
                             top_delta="25"
-                            width="140">
+                            width="80">
                     Brightness:
                   </text>
                   <slider

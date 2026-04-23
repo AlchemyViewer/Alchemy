@@ -178,7 +178,7 @@ const LLUUID& AOSet::getAnimationForState(AOState* state) const
             {
                 if (state->mRandom)
                 {
-                    state->mCurrentAnimation = ll_frand() * numOfAnimations;
+                    state->mCurrentAnimation = static_cast<size_t>(ll_frand() * numOfAnimations);
                     LL_DEBUGS("AOEngine") << "randomly chosen " << state->mCurrentAnimation << " of " << numOfAnimations << LL_ENDL;
                 }
                 else
@@ -233,10 +233,10 @@ void AOSet::stopTimer()
     mEventTimer.stop();
 }
 
-BOOL AOSet::tick()
+bool AOSet::tick()
 {
     AOEngine::instance().cycleTimeout(this);
-    return FALSE;
+    return false;
 }
 
 const LLUUID& AOSet::getInventoryUUID() const

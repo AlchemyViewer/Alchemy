@@ -33,7 +33,7 @@
 
 #include "lldir.h"
 
-class LLDir_Win32 final : public LLDir
+class LLDir_Win32 : public LLDir
 {
 public:
     LLDir_Win32();
@@ -44,14 +44,13 @@ public:
 
     /*virtual*/ std::string getCurPath();
     /*virtual*/ U32 countFilesInDir(const std::string &dirname, const std::string &mask);
-    /*virtual*/ bool fileExists(const std::string &filename) const;
 
     /*virtual*/ std::string getLLPluginLauncher();
     /*virtual*/ std::string getLLPluginFilename(std::string base_name);
 
 private:
-    void* mDirSearch_h;
-    llutf16string mCurrentDir;
+    void* mDirSearch_h{ nullptr };
+    std::wstring mCurrentDir;
 };
 
 #endif // LL_LLDIR_WIN32_H

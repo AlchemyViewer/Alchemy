@@ -53,9 +53,9 @@ LLFloaterTelehub::LLFloaterTelehub(const LLSD& key)
 {
 }
 
-BOOL LLFloaterTelehub::postBuild()
+bool LLFloaterTelehub::postBuild()
 {
-    gMessageSystem->setHandlerFuncFast(_PREHASH_TelehubInfo, processTelehubInfo);
+    gMessageSystem->setHandlerFunc("TelehubInfo", processTelehubInfo);
 
     getChild<LLUICtrl>("connect_btn")->setCommitCallback(boost::bind(&LLFloaterTelehub::onClickConnect, this));
     getChild<LLUICtrl>("disconnect_btn")->setCommitCallback(boost::bind(&LLFloaterTelehub::onClickDisconnect, this));
@@ -66,10 +66,10 @@ BOOL LLFloaterTelehub::postBuild()
     if (list)
     {
         // otherwise you can't walk with arrow keys while floater is up
-        list->setAllowKeyboardMovement(FALSE);
+        list->setAllowKeyboardMovement(false);
     }
 
-    return TRUE;
+    return true;
 }
 void LLFloaterTelehub::onOpen(const LLSD& key)
 {
@@ -85,7 +85,7 @@ void LLFloaterTelehub::onOpen(const LLSD& key)
 LLFloaterTelehub::~LLFloaterTelehub()
 {
     // no longer interested in this message
-    gMessageSystem->setHandlerFuncFast(_PREHASH_TelehubInfo, NULL);
+    gMessageSystem->setHandlerFunc("TelehubInfo", NULL);
 }
 
 void LLFloaterTelehub::draw()
@@ -100,29 +100,29 @@ void LLFloaterTelehub::draw()
 // Per-frame updates, because we don't have a selection manager observer.
 void LLFloaterTelehub::refresh()
 {
-    const BOOL children_ok = TRUE;
+    constexpr bool children_ok = true;
     LLViewerObject* object = mObjectSelection->getFirstRootObject(children_ok);
 
-    BOOL have_selection = (object != NULL);
-    BOOL all_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME );
+    bool have_selection = (object != NULL);
+    bool all_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME );
     getChildView("connect_btn")->setEnabled(have_selection && all_volume);
 
-    BOOL have_telehub = mTelehubObjectID.notNull();
+    bool have_telehub = mTelehubObjectID.notNull();
     getChildView("disconnect_btn")->setEnabled(have_telehub);
 
-    BOOL space_avail = (mNumSpawn < MAX_SPAWNPOINTS_PER_TELEHUB);
+    bool space_avail = (mNumSpawn < MAX_SPAWNPOINTS_PER_TELEHUB);
     getChildView("add_spawn_point_btn")->setEnabled(have_selection && all_volume && space_avail);
 
     LLScrollListCtrl* list = getChild<LLScrollListCtrl>("spawn_points_list");
     if (list)
     {
-        BOOL enable_remove = (list->getFirstSelected() != NULL);
+        bool enable_remove = (list->getFirstSelected() != NULL);
         getChildView("remove_spawn_point_btn")->setEnabled(enable_remove);
     }
 }
 
 // static
-BOOL LLFloaterTelehub::renderBeacons()
+bool LLFloaterTelehub::renderBeacons()
 {
     // only render if we've got a telehub
     LLFloaterTelehub* floater = LLFloaterReg::findTypedInstance<LLFloaterTelehub>("telehubs");
@@ -233,15 +233,15 @@ void LLFloaterTelehub::processTelehubInfo(LLMessageSystem* msg, void**)
 
 void LLFloaterTelehub::unpackTelehubInfo(LLMessageSystem* msg)
 {
-    msg->getUUIDFast(_PREHASH_TelehubBlock, _PREHASH_ObjectID, mTelehubObjectID);
-    msg->getStringFast(_PREHASH_TelehubBlock, _PREHASH_ObjectName, mTelehubObjectName);
-    msg->getVector3Fast(_PREHASH_TelehubBlock, _PREHASH_TelehubPos, mTelehubPos);
-    msg->getQuatFast(_PREHASH_TelehubBlock, _PREHASH_TelehubRot, mTelehubRot);
+    msg->getUUID("TelehubBlock", "ObjectID", mTelehubObjectID);
+    msg->getString("TelehubBlock", "ObjectName", mTelehubObjectName);
+    msg->getVector3("TelehubBlock", "TelehubPos", mTelehubPos);
+    msg->getQuat("TelehubBlock", "TelehubRot", mTelehubRot);
 
-    mNumSpawn = msg->getNumberOfBlocksFast(_PREHASH_SpawnPointBlock);
+    mNumSpawn = msg->getNumberOfBlocks("SpawnPointBlock");
     for (S32 i = 0; i < mNumSpawn; i++)
     {
-        msg->getVector3Fast(_PREHASH_SpawnPointBlock, _PREHASH_SpawnPointPos, mSpawnPointPos[i], i);
+        msg->getVector3("SpawnPointBlock", "SpawnPointPos", mSpawnPointPos[i], i);
     }
 
     // Update parts of the UI that change only when message received.

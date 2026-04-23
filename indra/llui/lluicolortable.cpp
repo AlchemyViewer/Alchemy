@@ -63,7 +63,7 @@ void LLUIColorTable::insertFromParams(const Params& p, string_color_map_t& table
         ColorEntryParams color_entry = *it;
         if(color_entry.color.value.isChosen())
         {
-            setColor(color_entry.name.getValue(), color_entry.color.value, table);
+            setColor(color_entry.name(), color_entry.color.value, table);
         }
         else
         {
@@ -199,7 +199,7 @@ LLUIColor LLUIColorTable::getColor(std::string_view name, const LLColor4& defaul
 void LLUIColorTable::setColor(std::string_view name, const LLColor4& color)
 {
     auto it = mUserSetColors.find(name);
-    if (it != mUserSetColors.end())
+    if(it != mUserSetColors.end())
     {
         it->second = color;
     }
@@ -216,7 +216,7 @@ void LLUIColorTable::setColor(std::string_view name, const LLColor4& color)
         }
         else
         {
-            mUserSetColors.emplace(name, color);
+            mUserSetColors.insert(it, std::make_pair(name, color));
         }
     }
 }
@@ -301,7 +301,7 @@ void LLUIColorTable::saveUserSettings(const bool scrub /* = false */) const
     if(!output_node->isNull())
     {
         const std::string& filename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colors.xml");
-        LLFILE *fp = LLFile::fopen(filename, "w");
+        LLFILE *fp = LLFile::fopen(filename, LLFILE_MODE("w"));
 
         if(fp != NULL)
         {
@@ -340,7 +340,7 @@ void LLUIColorTable::setColor(std::string_view name, const LLColor4& color, stri
     }
     else
     {
-        table.emplace(name, color);
+        table.insert(it, string_color_map_t::value_type(name, color));
     }
 }
 

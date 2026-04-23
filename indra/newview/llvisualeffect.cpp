@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2021&license=viewerlgpl$
  * Copyright (c) 2021, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -30,9 +31,9 @@ float LLTweenableValueLerp<float>::get()
 {
     if (!m_CurValue)
     {
-        float curFactor = (LLTimer::getElapsedSeconds() - m_StartTime) / m_Duration;
-        if (curFactor < 1.0)
-            return ll_lerp(m_StartValue, m_EndValue, curFactor);
+        float curFactor = (F32)((LLTimer::getElapsedSeconds() - m_StartTime) / m_Duration);
+        if (curFactor < 1.0f)
+            return lerp(m_StartValue, m_EndValue, curFactor);
         m_CurValue = m_EndValue;
     }
     return m_CurValue.get();
@@ -43,8 +44,8 @@ LLColor3 LLTweenableValueLerp<LLColor3>::get()
 {
     if (!m_CurValue)
     {
-        float curFactor = (LLTimer::getElapsedSeconds() - m_StartTime) / m_Duration;
-        if (curFactor < 1.0)
+        float curFactor = (F32)((LLTimer::getElapsedSeconds() - m_StartTime) / m_Duration);
+        if (curFactor < 1.0f)
             return lerp(m_StartValue, m_EndValue, curFactor);
         m_CurValue = m_EndValue;
     }
@@ -56,8 +57,8 @@ LLVector4 LLTweenableValueLerp<LLVector4>::get()
 {
     if (!m_CurValue)
     {
-        float curFactor = (LLTimer::getElapsedSeconds() - m_StartTime) / m_Duration;
-        if (curFactor < 1.0)
+        float curFactor = (F32)((LLTimer::getElapsedSeconds() - m_StartTime) / m_Duration);
+        if (curFactor < 1.0f)
             return lerp(m_StartValue, m_EndValue, curFactor);
         m_CurValue = m_EndValue;
     }

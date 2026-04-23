@@ -29,11 +29,11 @@
 #include "png.h"
 #include "llimage.h"
 
-class LLPngWrapper final
+class LLPngWrapper
 {
 public:
     LLPngWrapper();
-    ~LLPngWrapper();
+    virtual ~LLPngWrapper();
 
 public:
     struct ImageInfo
@@ -43,9 +43,9 @@ public:
         S8  mComponents;
     };
 
-    BOOL isValidPng(U8* src);
-    BOOL readPng(U8* src, S32 dataSize, LLImageRaw* rawImage, ImageInfo *infop = NULL);
-    BOOL writePng(const LLImageRaw* rawImage, U8* dst, size_t destSize);
+    bool isValidPng(U8* src);
+    bool readPng(U8* src, S32 dataSize, LLImageRaw* rawImage, ImageInfo *infop = NULL);
+    bool writePng(const LLImageRaw* rawImage, U8* dst, size_t destSize);
     U32  getFinalSize();
     const std::string& getErrorMessage();
 

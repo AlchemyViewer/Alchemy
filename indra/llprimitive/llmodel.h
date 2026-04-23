@@ -33,23 +33,19 @@
 #include "m4math.h"
 #include <queue>
 
-#include <boost/align/aligned_allocator.hpp>
-
 class daeElement;
 class domMesh;
 
 #define MAX_MODEL_FACES 8
 
-LL_ALIGN_PREFIX(16)
-class LLMeshSkinInfo : public LLRefCount
+class alignas(16) LLMeshSkinInfo : public LLRefCount
 {
     LL_ALIGN_NEW
 public:
     LLMeshSkinInfo();
-    LLMeshSkinInfo(const LLSD& data);
-    LLMeshSkinInfo(const LLUUID& mesh_id, const LLSD& skin);
-    ~LLMeshSkinInfo() = default;
-    void fromLLSD(const LLSD& data);
+    LLMeshSkinInfo(LLSD& data);
+    LLMeshSkinInfo(const LLUUID& mesh_id, LLSD& data);
+    void fromLLSD(LLSD& data);
     LLSD asLLSD(bool include_joints, bool lock_scale_if_joint_position) const;
     void updateHash();
     U32 sizeBytes() const;
@@ -57,24 +53,25 @@ public:
     LLUUID mMeshID;
     std::vector<std::string> mJointNames;
     mutable std::vector<S32> mJointNums;
-    typedef std::vector<LLMatrix4a, boost::alignment::aligned_allocator<LLMatrix4a, 16>> matrix_list_t;
+    typedef std::vector<LLMatrix4a> matrix_list_t;
     matrix_list_t mInvBindMatrix;
 
     // bones/joints position overrides
     matrix_list_t mAlternateBindMatrix;
-    matrix_list_t mInvBindShapeMatrix;
 
-    LL_ALIGN_16(LLMatrix4a mBindShapeMatrix);
+    // cached multiply of mBindShapeMatrix and mInvBindMatrix
+    matrix_list_t mBindPoseMatrix;
+
+    LLMatrix4a mBindShapeMatrix;
 
     float mPelvisOffset;
     bool mLockScaleIfJointPosition;
     bool mInvalidJointsScrubbed;
     bool mJointNumsInitialized;
     U64 mHash = 0;
-} LL_ALIGN_POSTFIX(16);
+};
 
-LL_ALIGN_PREFIX(16)
-class LLModel final : public LLVolume
+class alignas(16) LLModel : public LLVolume
 {
     LL_ALIGN_NEW
 public:
@@ -124,8 +121,8 @@ public:
         U32 sizeBytes() const
         {
             U32 res = sizeof(std::vector<LLVector3>) * 2;
-            res += sizeof(LLVector3) * mPositions.size();
-            res += sizeof(LLVector3) * mNormals.size();
+            res += sizeof(LLVector3) * static_cast<U32>(mPositions.size());
+            res += sizeof(LLVector3) * static_cast<U32>(mNormals.size());
             return res;
         }
     };
@@ -133,7 +130,7 @@ public:
     class Decomposition
     {
     public:
-        Decomposition() = default;
+        Decomposition() { }
         Decomposition(LLSD& data);
         ~Decomposition() { }
         void fromLLSD(LLSD& data);
@@ -159,6 +156,12 @@ public:
     bool loadSkinInfo(LLSD& header, std::istream& is);
     bool loadDecomposition(LLSD& header, std::istream& is);
 
+    enum EWriteModelMode
+    {
+        WRITE_NO = 0,
+        WRITE_BINARY,
+        WRITE_HUMAN,
+    };
     static LLSD writeModel(
         std::ostream& ostr,
         LLModel* physics,
@@ -167,17 +170,17 @@ public:
         LLModel* low,
         LLModel* imposotr,
         const LLModel::Decomposition& decomp,
-        BOOL upload_skin,
-        BOOL upload_joints,
-        BOOL lock_scale_if_joint_position,
-        BOOL nowrite = FALSE,
-        BOOL as_slm = FALSE,
+        bool upload_skin,
+        bool upload_joints,
+        bool lock_scale_if_joint_position,
+        EWriteModelMode write_mode = WRITE_BINARY,
+        bool as_slm = false,
         int submodel_id = 0);
 
     static LLSD writeModelToStream(
         std::ostream& ostr,
         LLSD& mdl,
-        BOOL nowrite = FALSE, BOOL as_slm = FALSE);
+        EWriteModelMode write_mode = WRITE_BINARY, bool as_slm = false);
 
     void ClearFacesAndMaterials() { mVolumeFaces.clear(); mMaterialList.clear(); }
 
@@ -201,11 +204,12 @@ public:
 
     void sortVolumeFacesByMaterialName();
     void normalizeVolumeFaces();
+    void normalizeVolumeFacesAndWeights();
     void trimVolumeFacesToSize(U32 new_count = LL_SCULPT_MESH_MAX_FACES, LLVolume::face_list_t* remainder = NULL);
     void remapVolumeFaces();
     void optimizeVolumeFaces();
     void offsetMesh( const LLVector3& pivotPoint );
-    void getNormalizedScaleTranslation(LLVector3& scale_out, LLVector3& translation_out);
+    void getNormalizedScaleTranslation(LLVector3& scale_out, LLVector3& translation_out) const;
     LLVector3 getTransformedCenter(const LLMatrix4& mat);
 
     //reorder face list based on mMaterialList in this and reference so
@@ -258,17 +262,18 @@ public:
         }
     };
 
-
     //Are the doubles the same w/in epsilon specified tolerance
     bool areEqual( double a, double b )
     {
         const float epsilon = 1e-5f;
-        return (fabs((a - b)) < epsilon) ? true : false ;
+        return fabs(a - b) < epsilon;
     }
+
     //Make sure that we return false for any values that are within the tolerance for equivalence
     bool jointPositionalLookup( const LLVector3& a, const LLVector3& b )
     {
-         return ( areEqual( a[0],b[0]) && areEqual( a[1],b[1] ) && areEqual( a[2],b[2]) ) ? true : false;
+        const float epsilon = 1e-5f;
+        return (a - b).length() < epsilon;
     }
 
     //copy of position array for this model -- mPosition[idx].mV[X,Y,Z]
@@ -296,7 +301,8 @@ public:
     S32 mDecompID;
 
     void setConvexHullDecomposition(
-        const convex_hull_decomposition& decomp);
+        const convex_hull_decomposition& decomp,
+        const std::vector<LLModel::PhysicsMesh>& decomp_mesh);
     void updateHullCenters();
 
     LLVector3 mCenterOfHullCenters;
@@ -313,7 +319,7 @@ public:
     // A model/object can only have 8 faces, spillover faces will
     // be moved to new model/object and assigned a submodel id.
     int mSubmodelID;
-} LL_ALIGN_POSTFIX(16);
+};
 
 typedef std::vector<LLPointer<LLModel> >    model_list;
 typedef std::queue<LLPointer<LLModel> > model_queue;
@@ -334,7 +340,7 @@ public:
     }
 };
 
-class LLImportMaterial final : public LLModelMaterialBase
+class LLImportMaterial : public LLModelMaterialBase
 {
 public:
     friend class LLMeshUploadThread;
@@ -348,7 +354,7 @@ public:
     }
 
     LLImportMaterial(LLSD& data);
-    virtual ~LLImportMaterial() = default;
+    virtual ~LLImportMaterial();
 
     LLSD asLLSD();
 
@@ -358,7 +364,7 @@ public:
 protected:
 
     LLUUID      mDiffuseMapID;
-    void*       mOpaqueData = nullptr;  // allow refs to viewer/platform-specific structs for each material
+    void*       mOpaqueData{ nullptr };    // allow refs to viewer/platform-specific structs for each material
     // currently only stores an LLPointer< LLViewerFetchedTexture > > to
     // maintain refs to textures associated with each material for free
     // ref counting.
@@ -398,7 +404,7 @@ public:
 
 typedef std::vector<LLModelInstanceBase> model_instance_list;
 
-class LLModelInstance final : public LLModelInstanceBase
+class LLModelInstance : public LLModelInstanceBase
 {
 public:
     std::string mLabel;

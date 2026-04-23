@@ -33,7 +33,7 @@
  * Outfit observer facade that provides simple possibility to subscribe on
  * BOF(base outfit) replaced, BOF changed, COF(current outfit) changed events.
  */
-class LLOutfitObserver final : public LLInventoryObserver, public LLSingleton<LLOutfitObserver>
+class LLOutfitObserver: public LLInventoryObserver, public LLSingleton<LLOutfitObserver>
 {
     LLSINGLETON(LLOutfitObserver);
     virtual ~LLOutfitObserver();
@@ -75,7 +75,7 @@ protected:
     S32 mBaseOutfitLastVersion;
     std::string mLastBaseOutfitName;
 
-    bool mLastOutfitDirtiness;
+    bool mLastOutfitDirtiness = false;
 
     LLUUID mItemNameHash;
 

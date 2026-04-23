@@ -50,17 +50,18 @@ namespace LLCore
 /// *TODO:  Can't return values to caller yet.  Need to do
 /// something better with HttpResponse and visitNotifier().
 ///
-class HttpOpSetGet final : public HttpOperation
+class HttpOpSetGet : public HttpOperation
 {
 public:
     typedef std::shared_ptr<HttpOpSetGet> ptr_t;
 
     HttpOpSetGet();
 
-    virtual ~HttpOpSetGet() = default;                          // Use release()
+    virtual ~HttpOpSetGet();                            // Use release()
 
-    HttpOpSetGet(const HttpOpSetGet &) = delete;                    // Not defined
-    void operator=(const HttpOpSetGet &) = delete;              // Not defined
+private:
+    HttpOpSetGet(const HttpOpSetGet&)   = delete;
+    void operator=(const HttpOpSetGet&) = delete;
 
 public:
     /// Threading:  called by application thread

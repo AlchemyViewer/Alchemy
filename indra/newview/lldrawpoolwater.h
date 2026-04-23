@@ -44,9 +44,9 @@ protected:
     LLPointer<LLViewerTexture> mOpaqueWaterImagep;
 
 public:
-    static BOOL sSkipScreenCopy;
-    static BOOL sNeedsReflectionUpdate;
-    static BOOL sNeedsDistortionUpdate;
+    static bool sSkipScreenCopy;
+    static bool sNeedsReflectionUpdate;
+    static bool sNeedsDistortionUpdate;
     static F32 sWaterFogEnd;
 
     enum
@@ -73,6 +73,8 @@ public:
     void setTransparentTextures(const LLUUID& transparentTextureId, const LLUUID& nextTransparentTextureId);
     void setOpaqueTexture(const LLUUID& opaqueTextureId);
     void setNormalMaps(const LLUUID& normalMapId, const LLUUID& nextNormalMapId);
+
+    void pushWaterPlanes(int pass);
 
 protected:
     void renderOpaqueLegacyWater();

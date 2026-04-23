@@ -26,8 +26,6 @@
 #ifndef LL_VIEWER_EVENT_RECORDER
 #define LL_VIEWER_EVENT_RECORDER
 
-// Global
-#define AL_VIEWER_EVENT_RECORDER 0
 
 #include "linden_common.h"
 
@@ -43,7 +41,7 @@
 
 #include "llsingleton.h" // includes llerror which we need here so we can skip the include here
 
-class LLViewerEventRecorder final : public LLSimpleton<LLViewerEventRecorder>
+class LLViewerEventRecorder : public LLSimpleton<LLViewerEventRecorder>
 {
 public:
     LLViewerEventRecorder();
@@ -57,13 +55,13 @@ public:
   void logKeyEvent(KEY key, MASK mask);
   void logKeyUnicodeEvent(llwchar uni_char);
 
-  void logVisibilityChange(std::string xui, std::string name, BOOL visibility, std::string event_subtype);
+  void logVisibilityChange(std::string xui, std::string name, bool visibility, std::string event_subtype);
 
   void clear_xui();
   std::string get_xui();
   void update_xui(std::string xui);
 
-  static bool getLoggingStatus(){return sLogEvents;};
+  bool getLoggingStatus() const { return logEvents; }
   void setEventLoggingOn();
   void setEventLoggingOff();
 
@@ -74,10 +72,10 @@ public:
 
  protected:
   // On if we wish to log events at the moment - toggle via Develop/Recorder submenu
-  static bool sLogEvents;
+  bool logEvents;
 
   std::string mLogFilename;
-  llofstream  mLog;
+  llofstream mLog;
 
 
  private:

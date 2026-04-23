@@ -262,7 +262,7 @@ void LLFloaterEditEnvironmentBase::onSaveAsCommit(const LLSD& notification, cons
         }
         else if (mInventoryItem)
         {
-            const LLUUID &marketplacelistings_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+            const LLUUID& marketplacelistings_id = gInventory.getMarketplaceListingsUUID();
             LLUUID parent_id = mInventoryItem->getParentUUID();
             if (marketplacelistings_id == parent_id || gInventory.isObjectDescendentOf(mInventoryItem->getUUID(), gInventory.getLibraryRootFolderID()))
             {
@@ -441,7 +441,7 @@ void LLFloaterEditEnvironmentBase::onInventoryCreated(LLUUID asset_id, LLUUID in
     }
 
     clearDirtyFlag();
-    setFocus(TRUE);                 // Call back the focus...
+    setFocus(true);                 // Call back the focus...
     loadInventoryItem(inventory_id, can_trans);
 }
 

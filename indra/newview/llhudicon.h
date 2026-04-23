@@ -42,7 +42,7 @@
 // Renders a 2D icon billboard floating at the location specified.
 class LLViewerTexture;
 
-class LLHUDIcon final : public LLHUDObject
+class LLHUDIcon : public LLHUDObject
 {
 friend class LLHUDObject;
 
@@ -62,12 +62,12 @@ public:
     static void cleanupDeadIcons();
     static S32 getNumInstances();
 
-    static BOOL iconsNearby();
+    static bool iconsNearby();
 
-    BOOL getHidden() const { return mHidden; }
-    void setHidden( BOOL hide ) { mHidden = hide; }
+    bool getHidden() const { return mHidden; }
+    void setHidden( bool hide ) { mHidden = hide; }
 
-    BOOL lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, LLVector4a* intersection);
+    bool lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, LLVector4a* intersection);
 
 protected:
     LLHUDIcon(const U8 type);
@@ -79,7 +79,7 @@ private:
     LLFrameTimer    mLifeTimer;
     F32             mDistance;
     F32             mScale;
-    BOOL            mHidden;
+    bool            mHidden;
 
     typedef std::vector<LLPointer<LLHUDIcon> > icon_instance_t;
     static icon_instance_t sIconInstances;

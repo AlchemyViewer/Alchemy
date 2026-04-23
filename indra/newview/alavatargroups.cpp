@@ -1,9 +1,9 @@
 /**
-* @file alavatarcolormgr.cpp
-* @brief ALChatCommand implementation for chat input commands
+* @file alavatargroups.cpp
+ * @brief ALAvatarGroups implementation for central color control of avatar names, chat, and map blips
 *
 * $LicenseInfo:firstyear=2013&license=viewerlgpl$
-* Copyright (C) 2013 Drake Arconis
+* Copyright (C) Rye Mutt <rye@alchemyviewer.org>
 *
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public

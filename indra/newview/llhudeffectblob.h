@@ -30,7 +30,7 @@
 #include "llhudeffect.h"
 #include "lluiimage.h"
 
-class LLHUDEffectBlob final : public LLHUDEffect
+class LLHUDEffectBlob : public LLHUDEffect
 {
 public:
     friend class LLHUDObject;

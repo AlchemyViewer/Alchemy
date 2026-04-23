@@ -55,7 +55,7 @@ LLPanelVolumePulldown::LLPanelVolumePulldown()
     buildFromFile( "panel_volume_pulldown.xml");
 }
 
-BOOL LLPanelVolumePulldown::postBuild()
+bool LLPanelVolumePulldown::postBuild()
 {
     return LLPanelPulldown::postBuild();
 }
@@ -63,10 +63,11 @@ BOOL LLPanelVolumePulldown::postBuild()
 void LLPanelVolumePulldown::onAdvancedButtonClick(const LLSD& user_data)
 {
     // close the global volume minicontrol, we're bringing up the big one
-    setVisible(FALSE);
+    setVisible(false);
 
     // bring up the prefs floater
-    LLFloaterPreference* prefsfloater = LLFloaterReg::showTypedInstance<LLFloaterPreference>("preferences");
+    LLFloaterPreference* prefsfloater = dynamic_cast<LLFloaterPreference*>
+        (LLFloaterReg::showInstance("preferences"));
     if (prefsfloater)
     {
         // grab the 'audio' panel from the preferences floater and
@@ -86,7 +87,7 @@ void LLPanelVolumePulldown::setControlFalse(const LLSD& user_data)
     LLControlVariable* control = findControl(control_name);
 
     if (control)
-        control->set(LLSD(FALSE));
+        control->set(LLSD(false));
 }
 
 void LLPanelVolumePulldown::updateCheckbox(LLUICtrl* ctrl, const LLSD& user_data)

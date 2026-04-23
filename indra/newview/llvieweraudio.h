@@ -39,7 +39,7 @@ void audio_update_volume(bool force_update = true);
 void audio_update_listener();
 void audio_update_wind(bool force_update = true);
 
-class LLViewerAudio final : public LLSingleton<LLViewerAudio>
+class LLViewerAudio : public LLSingleton<LLViewerAudio>
 {
     LLSINGLETON(LLViewerAudio);
     virtual ~LLViewerAudio();

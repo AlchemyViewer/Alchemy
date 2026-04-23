@@ -37,7 +37,7 @@
 class LLVOAvatar;
 class LLViewerJointMesh;
 
-class LLPreviewAnimation final : public LLViewerDynamicTexture
+class LLPreviewAnimation : public LLViewerDynamicTexture
 {
 protected:
     virtual ~LLPreviewAnimation();
@@ -47,18 +47,18 @@ public:
 
     /*virtual*/ S8 getType() const ;
 
-    BOOL    render();
+    bool    render();
     void    requestUpdate();
     void    rotate(F32 yaw_radians, F32 pitch_radians);
     void    zoom(F32 zoom_delta);
     void    setZoom(F32 zoom_amt);
     void    pan(F32 right, F32 up);
-    virtual BOOL needsUpdate() { return mNeedsUpdate; }
+    virtual bool needsUpdate() { return mNeedsUpdate; }
 
     LLVOAvatar* getDummyAvatar() { return mDummyAvatar; }
 
 protected:
-    BOOL                mNeedsUpdate;
+    bool                mNeedsUpdate;
     F32                 mCameraDistance;
     F32                 mCameraYaw;
     F32                 mCameraPitch;
@@ -67,18 +67,18 @@ protected:
     LLPointer<LLVOAvatar>           mDummyAvatar;
 };
 
-class LLFloaterBvhPreview final : public LLFloaterNameDesc
+class LLFloaterBvhPreview : public LLFloaterNameDesc
 {
 public:
-    LLFloaterBvhPreview(const std::string& filename);
+    LLFloaterBvhPreview(const LLSD& args);
     virtual ~LLFloaterBvhPreview();
 
-    BOOL postBuild();
+    bool postBuild();
 
-    BOOL handleMouseDown(S32 x, S32 y, MASK mask);
-    BOOL handleMouseUp(S32 x, S32 y, MASK mask);
-    BOOL handleHover(S32 x, S32 y, MASK mask);
-    BOOL handleScrollWheel(S32 x, S32 y, S32 clicks);
+    bool handleMouseDown(S32 x, S32 y, MASK mask);
+    bool handleMouseUp(S32 x, S32 y, MASK mask);
+    bool handleHover(S32 x, S32 y, MASK mask);
+    bool handleScrollWheel(S32 x, S32 y, S32 clicks);
     void onMouseCaptureLost();
 
     void refresh();
@@ -108,7 +108,7 @@ public:
                                        S32 status, LLExtStat ext_status);
 private:
     void setAnimCallbacks() ;
-    std::map <std::string, std::string> getJointAliases();
+    std::map<std::string, std::string, std::less<>> getJointAliases();
 
 
 protected:

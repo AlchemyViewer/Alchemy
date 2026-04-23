@@ -29,10 +29,9 @@
 #define LL_LLFUNCTORREGISTRY_H
 
 #include <string>
-#include <map>
+#include <boost/unordered_map.hpp>
 
-#include <boost/function.hpp>
-
+#include "llstring.h"
 #include "llsd.h"
 #include "llsingleton.h"
 
@@ -51,19 +50,19 @@
  */
 
 template <typename FUNCTOR_TYPE>
-class LLFunctorRegistry final : public LLSingleton<LLFunctorRegistry<FUNCTOR_TYPE> >
+class LLFunctorRegistry : public LLSingleton<LLFunctorRegistry<FUNCTOR_TYPE> >
 {
     LLSINGLETON(LLFunctorRegistry);
     LOG_CLASS(LLFunctorRegistry);
 
 public:
     typedef FUNCTOR_TYPE ResponseFunctor;
-    typedef typename boost::unordered_map<std::string, FUNCTOR_TYPE> FunctorMap;
+    typedef typename boost::unordered_map<std::string, FUNCTOR_TYPE, ll::string_hash, std::equal_to<>> FunctorMap;
 
     bool registerFunctor(const std::string& name, ResponseFunctor f)
     {
         bool retval = true;
-        if (!mMap.contains(name))
+        if (mMap.count(name) == 0)
         {
             mMap[name] = f;
         }
@@ -78,7 +77,7 @@ public:
 
     bool unregisterFunctor(const std::string& name)
     {
-        if (!mMap.contains(name))
+        if (mMap.count(name) == 0)
         {
             LL_WARNS() << "trying to remove '" << name << "' from LLFunctorRegistry but it's not there." << LL_ENDL;
             return false;
@@ -89,7 +88,7 @@ public:
 
     FUNCTOR_TYPE getFunctor(const std::string& name)
     {
-        if (mMap.contains(name))
+        if (mMap.count(name) != 0)
         {
             return mMap[name];
         }

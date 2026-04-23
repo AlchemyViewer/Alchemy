@@ -34,13 +34,11 @@
 
 #include "llworkerthread.h"
 
-#include <boost/unordered/unordered_flat_map.hpp>
-
 class LLImageFormatted;
 class LLTextureCacheWorker;
 class LLImageRaw;
 
-class LLTextureCache final : public LLWorkerThread
+class LLTextureCache : public LLWorkerThread
 {
     friend class LLTextureCacheWorker;
     friend class LLTextureCacheRemoteWorker;
@@ -64,8 +62,8 @@ private:
     };
     struct Entry
     {
-            Entry() :
-                mBodySize(0),
+        Entry() :
+            mBodySize(0),
             mImageSize(0),
             mTime(0)
         {
@@ -73,7 +71,6 @@ private:
         Entry(const LLUUID& id, S32 imagesize, S32 bodysize, U32 time) :
             mID(id), mImageSize(imagesize), mBodySize(bodysize), mTime(time) {}
         void init(const LLUUID& id, U32 time) { mID = id, mImageSize = 0; mBodySize = 0; mTime = time; }
-
         LLUUID mID; // 16 bytes
         S32 mImageSize; // total size of image if known
         S32 mBodySize; // size of body file in body cache
@@ -89,24 +86,24 @@ public:
     class Responder : public LLResponder
     {
     public:
-        virtual void setData(U8* data, S32 datasize, S32 imagesize, S32 imageformat, BOOL imagelocal) = 0;
+        virtual void setData(U8* data, S32 datasize, S32 imagesize, S32 imageformat, bool imagelocal) = 0;
     };
 
     class ReadResponder : public Responder
     {
     public:
         ReadResponder();
-        void setData(U8* data, S32 datasize, S32 imagesize, S32 imageformat, BOOL imagelocal);
+        void setData(U8* data, S32 datasize, S32 imagesize, S32 imageformat, bool imagelocal);
         void setImage(LLImageFormatted* image) { mFormattedImage = image; }
     protected:
         LLPointer<LLImageFormatted> mFormattedImage;
         S32 mImageSize;
-        BOOL mImageLocal;
+        bool mImageLocal;
     };
 
     class WriteResponder : public Responder
     {
-        void setData(U8* data, S32 datasize, S32 imagesize, S32 imageformat, BOOL imagelocal)
+        void setData(U8* data, S32 datasize, S32 imagesize, S32 imageformat, bool imagelocal)
         {
             // not used
         }
@@ -118,8 +115,8 @@ public:
     /*virtual*/ size_t update(F32 max_time_ms);
 
     void purgeCache(ELLPath location, bool remove_dir = true);
-    void setReadOnly(BOOL read_only) ;
-    S64 initCache(ELLPath location, S64 maxsize, BOOL texture_cache_mismatch);
+    void setReadOnly(bool read_only) ;
+    S64 initCache(ELLPath location, S64 maxsize, bool texture_cache_mismatch);
 
     handle_t readFromCache(const std::string& local_filename, const LLUUID& id, S32 offset, S32 size,
                            ReadResponder* responder);
@@ -127,7 +124,7 @@ public:
     handle_t readFromCache(const LLUUID& id, S32 offset, S32 size,
                            ReadResponder* responder);
     bool readComplete(handle_t handle, bool abort);
-    handle_t writeToCache(const LLUUID& id, U8* data, S32 datasize, S32 imagesize, LLPointer<LLImageRaw> rawimage, S32 discardlevel,
+    handle_t writeToCache(const LLUUID& id, const U8* data, S32 datasize, S32 imagesize, LLPointer<LLImageRaw> rawimage, S32 discardlevel,
                           WriteResponder* responder);
     LLPointer<LLImageRaw> readFromFastCache(const LLUUID& id, S32& discardlevel);
     bool writeComplete(handle_t handle, bool abort = false);
@@ -142,19 +139,19 @@ public:
     void unlockWorkers() { mWorkersMutex.unlock(); }
 
     // debug
-    S32 getNumReads() { return mReaders.size(); }
-    S32 getNumWrites() { return mWriters.size(); }
+    S32 getNumReads() { return static_cast<S32>(mReaders.size()); }
+    S32 getNumWrites() { return static_cast<S32>(mWriters.size()); }
     S64Bytes getUsage() { return S64Bytes(mTexturesSizeTotal); }
     S64Bytes getMaxUsage() { return S64Bytes(sCacheMaxTexturesSize); }
     U32 getEntries() { return mHeaderEntriesInfo.mEntries; }
     U32 getMaxEntries() { return sCacheMaxEntries; };
-    BOOL isInCache(const LLUUID& id) ;
-    BOOL isInLocal(const LLUUID& id) ; //not thread safe at the moment
-
+    bool isInCache(const LLUUID& id) ;
+    bool isInLocal(const LLUUID& id) ; //not thread safe at the moment
+    LLMutex* getFastCacheMutex() { return &mFastCacheMutex; }
 protected:
     // Accessed by LLTextureCacheWorker
     std::string getLocalFileName(const LLUUID& id);
-    std::string getTextureFileName(const LLUUID& id);
+    std::filesystem::path getTextureFileName(const LLUUID& id);
     void addCompleted(Responder* responder, bool success);
 
 protected:
@@ -167,7 +164,7 @@ private:
     void purgeAllTextures(bool purge_directories);
     void purgeTexturesLazy(F32 time_limit_sec);
     void purgeTextures(bool validate);
-    LLAPRFile* openHeaderEntriesFile(bool readonly, S32 offset);
+    LLFile* openHeaderEntriesFile(bool readonly, S32 offset);
     void closeHeaderEntriesFile();
     void readEntriesHeader();
     void setEntriesHeader();
@@ -179,7 +176,7 @@ private:
     void writeEntriesAndClose(const std::vector<Entry>& entries);
     void readEntryFromHeaderImmediately(S32& idx, Entry& entry) ;
     void writeEntryToHeaderImmediately(S32& idx, Entry& entry, bool write_header = false) ;
-    void removeEntry(S32 idx, Entry& entry, std::string& filename);
+    void removeEntry(S32 idx, Entry& entry, const std::filesystem::path& filename);
     void removeCachedTexture(const LLUUID& id) ;
     S32 getHeaderCacheEntry(const LLUUID& id, Entry& entry);
     S32 setHeaderCacheEntry(const LLUUID& id, Entry& entry, S32 imagesize, S32 datasize);
@@ -196,46 +193,39 @@ private:
     // Internal
     LLMutex mWorkersMutex;
     LLMutex mHeaderMutex;
+    LLMutex mHeaderIDMapMutex; // To avoid deadlocks, never lock mFastCacheMutex after mHeaderIDMapMutex.
     LLMutex mListMutex;
     LLMutex mFastCacheMutex;
-    LLAPRFile* mHeaderAPRFile;
-    LLVolatileAPRPool* mFastCachePoolp;
+    LLFile* mHeaderAPRFile;
 
-    // mLocalAPRFilePoolp is not thread safe and is meant only for workers
-    // howhever mHeaderEntriesFileName is accessed not from workers' threads
-    // so it needs own pool (not thread safe by itself, relies onto header's mutex)
-    LLVolatileAPRPool*   mHeaderAPRFilePoolp;
-
-    typedef boost::unordered_flat_map<handle_t, LLTextureCacheWorker*> handle_map_t;
+    typedef std::map<handle_t, LLTextureCacheWorker*> handle_map_t;
     handle_map_t mReaders;
     handle_map_t mWriters;
 
     typedef std::vector<handle_t> handle_list_t;
     handle_list_t mPrioritizeWriteList;
-    std::atomic<bool> mPrioritizeWriteListEmpty;
 
     typedef std::vector<std::pair<LLPointer<Responder>, bool> > responder_list_t;
     responder_list_t mCompletedList;
-    std::atomic<bool> mCompletedListEmpty;
 
-    BOOL mReadOnly;
+    bool mReadOnly;
 
     // HEADERS (Include first mip)
-    std::string mHeaderEntriesFileName;
-    std::string mHeaderDataFileName;
-    std::string mFastCacheFileName;
+    std::filesystem::path mHeaderEntriesFilePath;
+    std::filesystem::path mHeaderDataFilePath;
+    std::filesystem::path mFastCacheFilePath;
     EntriesInfo mHeaderEntriesInfo;
     std::set<S32> mFreeList; // deleted entries
     std::set<LLUUID> mLRU;
-    typedef boost::unordered_flat_map<LLUUID, S32> id_map_t;
+    typedef boost::unordered_map<LLUUID, S32> id_map_t;
     id_map_t mHeaderIDMap;
 
-    LLAPRFile*   mFastCachep;
+    LLFile*      mFastCachep;
     LLFrameTimer mFastCacheTimer;
     U8*          mFastCachePadBuffer;
 
     // BODIES (TEXTURES minus headers)
-    std::string mTexturesDirName;
+    std::filesystem::path mTexturesDirPath;
     typedef boost::unordered_map<LLUUID,S32> size_map_t;
     size_map_t mTexturesSizeMap;
     S64 mTexturesSizeTotal;

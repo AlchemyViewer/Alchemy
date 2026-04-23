@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """\
 @file template_verifier.py
@@ -74,8 +73,8 @@ from indra.ipc import tokenstream
 from indra.ipc import llmessage
 
 def getstatusall(command):
-    """ Like commands.getstatusoutput, but returns stdout and 
-    stderr separately(to get around "killed by signal 15" getting 
+    """ Like commands.getstatusoutput, but returns stdout and
+    stderr separately(to get around "killed by signal 15" getting
     included as part of the file).  Also, works on Windows."""
     (input, out, err) = os.popen3(command, 't')
     status = input.close() # send no input to the command
@@ -233,14 +232,14 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
 """)
     parser.add_option(
         '-u', '--master_url', type='string', dest='master_url',
-        default='https://github.com/AlchemyViewer/master-message-template/raw/master/message_template.msg',
+        default='https://github.com/secondlife/master-message-template/raw/master/message_template.msg',
         help="""The url of the master message template.""")
     parser.add_option(
         '-c', '--cache_master', action='store_true', dest='cache_master',
         default=False,  help="""Set to true to attempt use local cached copy of the master template.""")
     parser.add_option(
         '-f', '--force', action='store_true', dest='force_verification',
-        default=False, help="""Set to true to skip the blake2 check and force template verification.""")
+        default=False, help="""Set to true to skip the sha_1 check and force template verification.""")
 
     options, args = parser.parse_args(sysargs)
 
@@ -258,7 +257,7 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
     elif len(args) == 1:
         master_url = None
         current_filename = args[0]
-        print("master:", options.master_url) 
+        print("master:", options.master_url)
         print("current:", current_filename)
         current_url = 'file://%s' % current_filename
     # nothing specified, use defaults for everything
@@ -270,7 +269,7 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
 
     if master_url is None:
         master_url = options.master_url
-        
+
     if current_url is None:
         current_filename = local_template_filename()
         print("master:", options.master_url)
@@ -279,13 +278,13 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
 
     # retrieve the contents of the local template
     current = fetch(current_url)
-    hexdigest = hashlib.blake2b(current).hexdigest()
-    if options.force_verification == False:
+    hexdigest = hashlib.sha1(current).hexdigest()
+    if not options.force_verification:
         # Early exist if the template hasn't changed.
-        b2_url = "%s.b2" % current_url
-        current_b2b = fetch(b2_url).decode("utf-8")
-        if hexdigest == current_b2b:
-            print("Message template BLAKE2 has not changed.")
+        sha_url = "%s.sha1" % current_url
+        current_sha = fetch(sha_url).decode("utf-8")
+        if hexdigest == current_sha:
+            print("Message template SHA_1 has not changed.")
             sys.exit(0)
 
     # and check for syntax
@@ -308,7 +307,7 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
             print("Syntax-checking the local template ONLY, no compatibility check is being run.")
             print("Cause: %s\n\n" % e)
             return 0
-        
+
     acceptable, compat = compare(
         master_parsed, current_parsed, options.mode)
 
@@ -320,10 +319,11 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
     if acceptable:
         explain("--- PASS ---", compat)
         if options.force_verification == False:
-            print("Updating blake2 hash to %s" % hexdigest)
-            b2_filename = "%s.b2" % current_filename
-            with open(b2_filename, 'w') as b2_file:
-                b2_file.write(hexdigest)
+            print("Updating sha1 to %s" % hexdigest)
+            sha_filename = "%s.sha1" % current_filename
+            sha_file = open(sha_filename, 'w')
+            sha_file.write(hexdigest)
+            sha_file.close()
     else:
         explain("*** FAIL ***", compat)
         return 1

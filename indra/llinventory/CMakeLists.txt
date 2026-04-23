@@ -1,14 +1,10 @@
 # -*- cmake -*-
 
-project(llinventory)
+add_library(llinventory STATIC)
 
-include(00-Common)
-include(LLCommon)
-include(LLCoreHttp)
-
-set(llinventory_SOURCE_FILES
+target_sources(llinventory
+    PRIVATE
     llcategory.cpp
-    lleconomy.cpp
     llfoldertype.cpp
     llinventory.cpp
     llinventorydefines.cpp
@@ -26,12 +22,12 @@ set(llinventory_SOURCE_FILES
     lltransactionflags.cpp
     lluserrelations.cpp
     )
-    
-set(llinventory_HEADER_FILES
-    CMakeLists.txt
 
+target_sources(llinventory
+    PUBLIC
+    FILE_SET HEADERS
+    FILES
     llcategory.h
-    lleconomy.h
     llfoldertype.h
     llinventory.h
     llinventorydefines.h
@@ -54,15 +50,12 @@ set(llinventory_HEADER_FILES
     lluserrelations.h
     )
 
-list(APPEND llinventory_SOURCE_FILES ${llinventory_HEADER_FILES})
-
-add_library (llinventory ${llinventory_SOURCE_FILES})
-
-target_link_libraries( llinventory llcommon llmath llmessage llxml )
+target_link_libraries(llinventory PUBLIC llcommon llmath llmessage llxml)
 target_include_directories( llinventory  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
+target_precompile_headers(llinventory REUSE_FROM llprecompiled)
 
-#add unit tests
-if (LL_TESTS)
+# add unit tests
+if (BUILD_TESTING)
     INCLUDE(LLAddBuildTest)
     SET(llinventory_TEST_SOURCE_FILES
       # no real unit tests yet!
@@ -71,6 +64,10 @@ if (LL_TESTS)
 
     #set(TEST_DEBUG on)
     set(test_libs llinventory llmath llcorehttp llfilesystem )
-    LL_ADD_INTEGRATION_TEST(inventorymisc "" "${test_libs}")
-    LL_ADD_INTEGRATION_TEST(llparcel "" "${test_libs}")
-endif (LL_TESTS)
+    set(test_project llinventory)
+    LL_ADD_INTEGRATION_TEST(inventorymisc "" "${test_libs}" "${test_project}")
+    LL_ADD_INTEGRATION_TEST(llparcel "" "${test_libs}" "${test_project}")
+    LL_ADD_INTEGRATION_TEST(llpermissions "" "${test_libs}" "${test_project}")
+    LL_ADD_INTEGRATION_TEST(llsaleinfo "" "${test_libs}" "${test_project}")
+    LL_ADD_INTEGRATION_TEST(lluserrelations "" "${test_libs}" "${test_project}")
+endif ()

@@ -40,7 +40,7 @@ class LLButton;
  *
  * Replaces class LLGroupNotifyBox.
  */
-class LLToastGroupNotifyPanel final
+class LLToastGroupNotifyPanel
 :   public LLToastPanel
 {
 public:

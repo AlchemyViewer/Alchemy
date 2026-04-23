@@ -31,13 +31,13 @@
 
 class LLTextBox;
 
-class LLFloaterLagMeter final : public LLFloater
+class LLFloaterLagMeter : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
     /*virtual*/ void draw();
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 private:
 
     LLFloaterLagMeter(const LLSD& key);
@@ -46,7 +46,7 @@ private:
     void determineNetwork();
     void determineServer();
     void updateControls(bool shrink);
-    BOOL isShrunk();
+    bool isShrunk();
 
     void onClickShrink();
 

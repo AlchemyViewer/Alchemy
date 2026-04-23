@@ -69,15 +69,16 @@ private:
 };
 
 class LLViewerMediaImpl;
+class LLMediaCtrl;
 
-class LLViewerMedia final : public LLSingleton<LLViewerMedia>
+class LLViewerMedia: public LLSimpleton<LLViewerMedia>
 {
-    LLSINGLETON(LLViewerMedia);
-    ~LLViewerMedia();
-    void initSingleton() override;
     LOG_CLASS(LLViewerMedia);
 
 public:
+    LLViewerMedia();
+    ~LLViewerMedia();
+
     // String to get/set media autoplay in gSavedSettings
     static const char* AUTO_PLAY_MEDIA_SETTING;
     static const char* SHOW_MEDIA_ON_OTHERS_SETTING;
@@ -97,9 +98,9 @@ public:
                                        U8 media_auto_scale = false,
                                        U8 media_loop = false);
 
-    viewer_media_t updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self, bool is_hud_attachment);
+    viewer_media_t updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self);
     LLViewerMediaImpl* getMediaImplFromTextureID(const LLUUID& texture_id);
-    static std::string getCurrentUserAgent();
+    std::string getCurrentUserAgent();
     void updateBrowserUserAgent();
     bool handleSkinCurrentChanged(const LLSD& /*newvalue*/);
     bool textureHasMedia(const LLUUID& texture_id);
@@ -162,27 +163,31 @@ public:
 
     LLSD getHeaders();
     LLCore::HttpHeaders::ptr_t getHttpHeaders();
+    bool getOpenIDCookie(LLMediaCtrl* media_instance) const;
 
 private:
     void onAuthSubmit(const LLSD& notification, const LLSD& response);
-    bool parseRawCookie(const std::string raw_cookie, std::string& name, std::string& value, std::string& path, bool& httponly, bool& secure);
+    static bool parseRawCookie(const std::string raw_cookie, std::string& name, std::string& value, std::string& path, bool& httponly, bool& secure);
     void setOpenIDCookie(const std::string& url);
     void onTeleportFinished();
 
     static void openIDSetupCoro(std::string openidUrl, std::string openidToken);
     static void getOpenIDCookieCoro(std::string url);
+    void setMaxInstances(S32 max_instances);
 
     bool mAnyMediaShowing;
     bool mAnyMediaPlaying;
+    S32 mMaxIntances = 8;
     LLURL mOpenIDURL;
     std::string mOpenIDCookie;
     LLPluginClassMedia* mSpareBrowserMediaSource;
     boost::signals2::connection mTeleportFinishConnection;
+    boost::signals2::connection mMaxInstancesConnection;
 };
 
 // Implementation functions not exported into header file
 class LLViewerMediaImpl
-    :   public LLMouseHandler, public LLRefCount, public LLPluginClassMediaOwner, public LLViewerMediaEventEmitter, public LLEditMenuHandler
+    :   public LLMouseHandler, public LLThreadSafeRefCount, public LLPluginClassMediaOwner, public LLViewerMediaEventEmitter, public LLEditMenuHandler
 {
     LOG_CLASS(LLViewerMediaImpl);
 public:
@@ -199,7 +204,7 @@ public:
     ~LLViewerMediaImpl();
 
     // Override inherited version from LLViewerMediaEventEmitter
-    virtual void emitEvent(LLPluginClassMedia* self, LLViewerMediaObserver::EMediaEvent event) override;
+    virtual void emitEvent(LLPluginClassMedia* self, LLViewerMediaObserver::EMediaEvent event);
 
     void createMediaSource();
     void destroyMediaSource();
@@ -246,7 +251,7 @@ public:
     void navigateHome();
     void unload();
     void navigateTo(const std::string& url, const std::string& mime_type = "", bool rediscover_type = false, bool server_request = false, bool clean_browser = false);
-    void navigateInternal();
+    void navigateInternal(bool should_log = true);
     void navigateStop();
     bool handleKeyHere(KEY key, MASK mask);
     bool handleKeyUpHere(KEY key, MASK mask);
@@ -316,58 +321,58 @@ public:
     static bool handleSkinCurrentChanged(const LLSD& newvalue);
 
     // need these to handle mouseup...
-    /*virtual*/ void    onMouseCaptureLost() override;
-    /*virtual*/ BOOL    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ void    onMouseCaptureLost();
+    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask);
 
     // Grr... the only thing I want as an LLMouseHandler are the onMouseCaptureLost and handleMouseUp calls.
     // Sadly, these are all pure virtual, so I have to supply implementations here:
-    /*virtual*/ BOOL    handleMouseDown(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleHover(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleScrollWheel(S32 x, S32 y, S32 clicks) override { return FALSE; };
-    /*virtual*/ BOOL    handleScrollHWheel(S32 x, S32 y, S32 clicks) override { return FALSE; };
-    /*virtual*/ BOOL    handleDoubleClick(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleRightMouseDown(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleRightMouseUp(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleToolTip(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleMiddleMouseDown(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleMiddleMouseUp(S32 x, S32 y, MASK mask) override {return FALSE; };
-    /*virtual*/ const std::string& getName() const override;
+    /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) { return false; };
+    /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask) { return false; };
+    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, S32 clicks) { return false; };
+    /*virtual*/ bool    handleScrollHWheel(S32 x, S32 y, S32 clicks) { return false; };
+    /*virtual*/ bool    handleDoubleClick(S32 x, S32 y, MASK mask) { return false; };
+    /*virtual*/ bool    handleRightMouseDown(S32 x, S32 y, MASK mask) { return false; };
+    /*virtual*/ bool    handleRightMouseUp(S32 x, S32 y, MASK mask) { return false; };
+    /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask) { return false; };
+    /*virtual*/ bool    handleMiddleMouseDown(S32 x, S32 y, MASK mask) { return false; };
+    /*virtual*/ bool    handleMiddleMouseUp(S32 x, S32 y, MASK mask) {return false; };
+    /*virtual*/ const std::string& getName() const;
 
-    /*virtual*/ void    screenPointToLocal(S32 screen_x, S32 screen_y, S32* local_x, S32* local_y) const override {};
-    /*virtual*/ void    localPointToScreen(S32 local_x, S32 local_y, S32* screen_x, S32* screen_y) const override {};
-    /*virtual*/ BOOL hasMouseCapture() override { return gFocusMgr.getMouseCapture() == this; };
+    /*virtual*/ void    screenPointToLocal(S32 screen_x, S32 screen_y, S32* local_x, S32* local_y) const {};
+    /*virtual*/ void    localPointToScreen(S32 local_x, S32 local_y, S32* screen_x, S32* screen_y) const {};
+    /*virtual*/ bool hasMouseCapture() { return gFocusMgr.getMouseCapture() == this; };
 
     // Inherited from LLPluginClassMediaOwner
-    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* plugin, LLPluginClassMediaOwner::EMediaEvent) override;
+    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* plugin, LLPluginClassMediaOwner::EMediaEvent);
 
     // LLEditMenuHandler overrides
-    /*virtual*/ void    undo() override;
-    /*virtual*/ BOOL    canUndo() const override;
+    /*virtual*/ void    undo();
+    /*virtual*/ bool    canUndo() const;
 
-    /*virtual*/ void    redo() override;
-    /*virtual*/ BOOL    canRedo() const override;
+    /*virtual*/ void    redo();
+    /*virtual*/ bool    canRedo() const;
 
-    /*virtual*/ void    cut() override;
-    /*virtual*/ BOOL    canCut() const override;
+    /*virtual*/ void    cut();
+    /*virtual*/ bool    canCut() const;
 
-    /*virtual*/ void    copy() override;
-    /*virtual*/ BOOL    canCopy() const override;
+    /*virtual*/ void    copy();
+    /*virtual*/ bool    canCopy() const;
 
-    /*virtual*/ void    paste() override;
-    /*virtual*/ BOOL    canPaste() const override;
+    /*virtual*/ void    paste();
+    /*virtual*/ bool    canPaste() const;
 
-    /*virtual*/ void    doDelete() override;
-    /*virtual*/ BOOL    canDoDelete() const override;
+    /*virtual*/ void    doDelete();
+    /*virtual*/ bool    canDoDelete() const;
 
-    /*virtual*/ void    selectAll() override;
-    /*virtual*/ BOOL    canSelectAll() const override;
+    /*virtual*/ void    selectAll();
+    /*virtual*/ bool    canSelectAll() const;
 
     void addObject(LLVOVolume* obj) ;
     void removeObject(LLVOVolume* obj) ;
     const std::list< LLVOVolume* >* getObjectList() const ;
     LLVOVolume *getSomeObject();
-    void setUpdated(BOOL updated) ;
-    BOOL isUpdated() ;
+    void setUpdated(bool updated) ;
+    bool isUpdated() ;
 
     // updates the javascript object in the embedded browser with viewer values
     void updateJavascriptObject();
@@ -435,7 +440,7 @@ public:
     LLNotificationPtr getCurrentNotification() const;
 
 private:
-    bool isAutoPlayable(bool is_hud_attachment = false) const;
+    bool isAutoPlayable() const;
     bool shouldShowBasedOnClass() const;
     bool isObscured() const;
     static bool isObjectAttachedToAnotherAvatar(LLVOVolume *obj);
@@ -444,7 +449,7 @@ private:
 private:
     // a single media url with some data and an impl.
     std::shared_ptr<LLPluginClassMedia> mMediaSource;
-    LLMutex mLock;
+    LLCoros::Mutex mLock;
     F64     mZoomFactor;
     LLUUID mTextureId;
     bool  mMovieImageHasMips;
@@ -500,7 +505,7 @@ private:
     static std::vector<std::string> sMimeTypesFailed;
     LLPointer<LLImageRaw> mRawImage; //backing buffer for texture updates
 private:
-    BOOL mIsUpdated ;
+    bool mIsUpdated ;
     std::list< LLVOVolume* > mObjectList ;
 
     void mimeDiscoveryCoro(std::string url);

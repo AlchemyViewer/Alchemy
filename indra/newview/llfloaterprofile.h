@@ -33,14 +33,14 @@
 
 class LLPanelProfile;
 
-class LLFloaterProfile final : public LLFloater
+class LLFloaterProfile : public LLFloater
 {
     LOG_CLASS(LLFloaterProfile);
 public:
     LLFloaterProfile(const LLSD& key);
     virtual ~LLFloaterProfile();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void onOpen(const LLSD& key) override;
     void onClickCloseBtn(bool app_quitting = false) override;

@@ -27,7 +27,6 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llhudeffectlookat.h"
-#include <utility>
 
 #include "llrender.h"
 
@@ -35,18 +34,18 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llvoavatar.h"
-#include "llvoavatarself.h" // for gAgentAvatarp
 #include "lldrawable.h"
 #include "llviewerobjectlist.h"
+#include "llviewercontrol.h"
+#include "llvoavatarself.h"
 #include "llrendersphere.h"
 #include "llselectmgr.h"
 #include "llglheaders.h"
 #include "llxmltree.h"
 
+#include "llavatarnamecache.h"
+#include "llhudrender.h"
 #include "llviewercontrol.h"
-
-
-BOOL LLHUDEffectLookAt::sDebugLookAt = FALSE;
 
 // packet layout
 const S32 SOURCE_AVATAR = 0;
@@ -75,8 +74,8 @@ public:
         : mTimeout(0.f),
           mPriority(0.f)
     {}
-    LLAttention(F32 timeout, F32 priority, std::string name, LLColor3 color) :
-      mTimeout(timeout), mPriority(priority), mName(std::move(name)), mColor(color)
+    LLAttention(F32 timeout, F32 priority, const std::string& name, LLColor3 color) :
+      mTimeout(timeout), mPriority(priority), mName(name), mColor(color)
     {
     }
     F32 mTimeout, mPriority;
@@ -142,11 +141,11 @@ static LLAttentionSet
     gGirlAttentions(GIRL_ATTS);
 
 
-static BOOL loadGender(LLXmlTreeNode* gender)
+static bool loadGender(LLXmlTreeNode* gender)
 {
     if( !gender)
     {
-        return FALSE;
+        return false;
     }
     std::string str;
     gender->getAttributeString("name", str);
@@ -166,7 +165,7 @@ static BOOL loadGender(LLXmlTreeNode* gender)
         else if(str == "select")       attention = &attentions[LOOKAT_TARGET_SELECT];
         else if(str == "focus")        attention = &attentions[LOOKAT_TARGET_FOCUS];
         else if(str == "mouselook")    attention = &attentions[LOOKAT_TARGET_MOUSELOOK];
-        else return FALSE;
+        else return false;
 
         F32 priority, timeout;
         attention_node->getAttributeF32("priority", priority);
@@ -175,30 +174,30 @@ static BOOL loadGender(LLXmlTreeNode* gender)
         attention->mPriority = priority;
         attention->mTimeout = timeout;
     }
-    return TRUE;
+    return true;
 }
 
-static BOOL loadAttentions()
+static bool loadAttentions()
 {
-    static BOOL first_time = TRUE;
+    static bool first_time = true;
     if( ! first_time)
     {
-        return TRUE; // maybe not ideal but otherwise it can continue to fail forever.
+        return true; // maybe not ideal but otherwise it can continue to fail forever.
     }
-    first_time = FALSE;
+    first_time = false;
 
     std::string filename;
     filename = gDirUtilp->getExpandedFilename(LL_PATH_CHARACTER,"attentions.xml");
     LLXmlTree xml_tree;
-    BOOL success = xml_tree.parseFile( filename, FALSE );
+    bool success = xml_tree.parseFile( filename, false );
     if( !success )
     {
-        return FALSE;
+        return false;
     }
     LLXmlTreeNode* root = xml_tree.getRoot();
     if( !root )
     {
-        return FALSE;
+        return false;
     }
 
     //-------------------------------------------------------------------------
@@ -207,7 +206,7 @@ static BOOL loadAttentions()
     if( !root->hasName( "linden_attentions" ) )
     {
         LL_WARNS() << "Invalid linden_attentions file header: " << filename << LL_ENDL;
-        return FALSE;
+        return false;
     }
 
     std::string version;
@@ -215,7 +214,7 @@ static BOOL loadAttentions()
     if( !root->getFastAttributeString( version_string, version ) || (version != "1.0") )
     {
         LL_WARNS() << "Invalid linden_attentions file version: " << version << LL_ENDL;
-        return FALSE;
+        return false;
     }
 
     //-------------------------------------------------------------------------
@@ -227,11 +226,11 @@ static BOOL loadAttentions()
     {
         if( !loadGender( child ) )
         {
-            return FALSE;
+            return false;
         }
     }
 
-    return TRUE;
+    return true;
 }
 
 
@@ -268,7 +267,8 @@ void LLHUDEffectLookAt::packData(LLMessageSystem *mesgsys)
     LLHUDEffect::packData(mesgsys);
 
     // Pack the type-specific data.  Uses a fun packed binary format.  Whee!
-    U8 packed_data[PKT_SIZE] = {0};
+    U8 packed_data[PKT_SIZE];
+    memset(packed_data, 0, PKT_SIZE);
 
     if (mSourceObject)
     {
@@ -399,23 +399,23 @@ void LLHUDEffectLookAt::setTargetPosGlobal(const LLVector3d &target_pos_global)
 // setLookAt()
 // called by agent logic to set look at behavior locally, and propagate to sim
 //-----------------------------------------------------------------------------
-BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *object, LLVector3 position)
+bool LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *object, LLVector3 position)
 {
     if (!mSourceObject)
     {
-        return FALSE;
+        return false;
     }
 
     if (target_type >= LOOKAT_NUM_TARGETS)
     {
         LL_WARNS() << "Bad target_type " << (int)target_type << " - ignoring." << LL_ENDL;
-        return FALSE;
+        return false;
     }
 
     // must be same or higher priority than existing effect
     if ((*mAttentions)[target_type].mPriority < (*mAttentions)[mTargetType].mPriority)
     {
-        return FALSE;
+        return false;
     }
 
     F32 current_time  = mTimer.getElapsedTimeF32();
@@ -431,7 +431,7 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
             }
         }
     }
-    static LLCachedControl<bool> clamp_lookat_enabled(gSavedSettings, "AlchemyLookAtClampEnabled", false);
+    static LLCachedControl<bool> clamp_lookat_enabled(gSavedSettings, "LimitLookAtTarget", false);
     bool clamp_lookat = clamp_lookat_enabled && isAgentAvatarValid() && !looking_at_self &&
                         (*mAttentions)[target_type].mName != "Respond" &&
                         (*mAttentions)[target_type].mName != "Conversation" &&
@@ -451,7 +451,7 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
             mLastSentOffsetGlobal = position;
             F32 timeout = (*mAttentions)[target_type].mTimeout;
             setDuration(timeout);
-            setNeedsSendToSim(TRUE);
+            setNeedsSendToSim(true);
         }
     }
 
@@ -483,7 +483,7 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
 
         if (clamp_lookat)
         {
-            static LLCachedControl<F32> lookat_clamp_distance(gSavedSettings, "AlchemyLookAtClampDistance", 1.0f);
+            static LLCachedControl<F32> lookat_clamp_distance(gSavedSettings, "LimitLookAtTargetDistance", 1.0f);
             auto head_position = gAgent.getPosGlobalFromAgent(gAgentAvatarp->mHeadp->getWorldPosition());
             auto distance = dist_vec(mTargetOffsetGlobal, head_position);
 
@@ -510,14 +510,14 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
                 mLastSentOffsetGlobal = gAgent.getPosAgentFromGlobal(mTargetOffsetGlobal);
                 F32 timeout = (*mAttentions)[target_type].mTimeout;
                 setDuration(timeout);
-                setNeedsSendToSim(TRUE);
+                setNeedsSendToSim(true);
             }
         }
         mKillTime = mTimer.getElapsedTimeF32() + mDuration;
 
         update();
     }
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -563,17 +563,24 @@ void LLHUDEffectLookAt::setSourceObject(LLViewerObject* objectp)
 //-----------------------------------------------------------------------------
 void LLHUDEffectLookAt::render()
 {
-    if (sDebugLookAt && mSourceObject.notNull())
+    static LLCachedControl<bool> show_lookat(gSavedSettings, "AlchemyLookAtShow", false);
+    if (show_lookat && mSourceObject.notNull())
     {
+        static LLCachedControl<bool> isOwnHidden(gSavedSettings, "AlchemyLookAtHideSelf", true);
+        static LLCachedControl<bool> isPrivate(gSavedSettings, "EnableLookAtTarget", false);
+
+        if ((isOwnHidden || isPrivate || gAgentCamera.cameraMouselook()) && static_cast<LLVOAvatar*>(mSourceObject.get())->isSelf())
+            return;
+
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
-        //LLGLDisable gls_stencil(GL_STENCIL_TEST);
+        LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
 
         LLVector3 target = mTargetPos + ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->mHeadp->getWorldPosition();
         gGL.matrixMode(LLRender::MM_MODELVIEW);
         gGL.pushMatrix();
         gGL.translatef(target.mV[VX], target.mV[VY], target.mV[VZ]);
-        gGL.scalef(0.3f, 0.3f, 0.3f);
+        gGL.scalef(0.1f, 0.1f, 0.1f);
         gGL.begin(LLRender::LINES);
         {
             LLColor3 color = (*mAttentions)[mTargetType].mColor;
@@ -586,8 +593,62 @@ void LLHUDEffectLookAt::render()
 
             gGL.vertex3f(0.f, 0.f, -1.f);
             gGL.vertex3f(0.f, 0.f, 1.f);
-        } gGL.end();
+
+            static LLCachedControl<bool> lookAtLines(gSavedSettings, "AlchemyLookAtLines", false);
+            if(lookAtLines)
+            {
+                const std::string targname = (*mAttentions)[mTargetType].mName;
+                if(targname != "None" && targname != "Idle" && targname != "AutoListen")
+                {
+                    LLVector3 dist = (mSourceObject->getWorldPosition() - mTargetPos) * 10;
+                    gGL.vertex3f(0.f, 0.f, 0.f);
+                    gGL.vertex3f(dist.mV[VX], dist.mV[VY], dist.mV[VZ] + 0.5f);
+                }
+            }
+        }
+        gGL.end();
         gGL.popMatrix();
+
+        static LLCachedControl<U32> lookAtNames(gSavedSettings, "AlchemyLookAtNames", 0);
+        if(lookAtNames > 0)
+        {
+            std::string text;
+            LLAvatarName av_name;
+            LLAvatarNameCache::get(static_cast<LLVOAvatar*>(mSourceObject.get())->getID(), &av_name);
+            switch (lookAtNames)
+            {
+                case 1: // Display Name (user.name)
+                    text = av_name.getCompleteName();
+                    break;
+                case 2: // Display Name
+                    text = av_name.getDisplayName();
+                    break;
+                case 3: // First Last
+                    text = av_name.getUserName();
+                    break;
+                default: //user.name
+                    text = av_name.getAccountName();
+                    break;
+            }
+
+            const LLFontGL* fontp = LLFontGL::getFontSansSerif();
+            gGL.pushMatrix();
+
+            LLWString wstr(utf8str_to_wstring(text));
+
+            hud_render_text(
+                wstr,
+                target + LLVector3(0.f, 0.f, 0.15f),
+                *fontp,
+                LLFontGL::NORMAL,
+                LLFontGL::NO_SHADOW,
+                -0.5f * fontp->getWidthF32(wstr.c_str()),
+                0.0f,
+                (*mAttentions)[mTargetType].mColor,
+                false
+            );
+            gGL.popMatrix();
+        }
     }
 }
 
@@ -625,7 +686,7 @@ void LLHUDEffectLookAt::update()
         {
             clearLookAtTarget();
             // look at timed out (only happens on own avatar), so tell everyone
-            setNeedsSendToSim(TRUE);
+            setNeedsSendToSim(true);
         }
     }
 
@@ -633,15 +694,24 @@ void LLHUDEffectLookAt::update()
     {
         if (calcTargetPosition())
         {
+            static LLCachedControl<bool> disable_look_at(gSavedSettings, "DisableLookAtAnimation", true);
             LLMotion* head_motion = ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->findMotion(ANIM_AGENT_HEAD_ROT);
-            if (!head_motion || head_motion->isStopped())
+            if (disable_look_at())
+            {
+                if (head_motion)
+                {
+                    ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->stopMotion(ANIM_AGENT_HEAD_ROT);
+                }
+            }
+            else if (!head_motion || head_motion->isStopped())
             {
                 ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->startMotion(ANIM_AGENT_HEAD_ROT);
             }
         }
     }
 
-    if (sDebugLookAt)
+    static LLCachedControl<bool> alchemyLookAtDebug(gSavedSettings, "AlchemyLookAtDebug", false);
+    if (alchemyLookAtDebug)
     {
         ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->addDebugText((*mAttentions)[mTargetType].mName);
     }
@@ -682,7 +752,7 @@ bool LLHUDEffectLookAt::calcTargetPosition()
         {
             LLVOAvatar *target_av = (LLVOAvatar *)target_obj;
 
-            BOOL looking_at_self = source_avatar->isSelf() && target_av->isSelf();
+            bool looking_at_self = source_avatar->isSelf() && target_av->isSelf();
 
             // if selecting self, stare forward
             if (looking_at_self && mTargetOffsetGlobal.magVecSquared() < MIN_TARGET_OFFSET_SQUARED)
@@ -737,7 +807,15 @@ bool LLHUDEffectLookAt::calcTargetPosition()
     if (!mTargetPos.isFinite())
         return false;
 
-    source_avatar->setAnimationData("LookAtPoint", (void *)&mTargetPos);
+    static LLCachedControl<bool> disable_look_at(gSavedSettings, "DisableLookAtAnimation", true);
+    if (disable_look_at())
+    {
+        source_avatar->removeAnimationData("LookAtPoint");
+    }
+    else
+    {
+        source_avatar->setAnimationData("LookAtPoint", (void*)&mTargetPos);
+    }
 
     return true;
 }

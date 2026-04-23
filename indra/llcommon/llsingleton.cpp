@@ -32,7 +32,6 @@
 #include "lldependencies.h"
 #include "llexception.h"
 #include "llcoros.h"
-#include "llmutex.h"
 #include <algorithm>
 #include <iostream>                 // std::cerr in dire emergency
 #include <sstream>
@@ -45,7 +44,7 @@
 // list is to help track inter-LLSingleton dependencies, and since we have
 // this implicit dependency from every LLSingleton to the master list, make it
 // an LLSingleton.
-class LLSingletonBase::MasterList final :
+class LLSingletonBase::MasterList:
     public LLSingleton<LLSingletonBase::MasterList>
 {
 private:
@@ -60,9 +59,8 @@ private:
     // it's safe to log -- which involves querying a different LLSingleton --
     // which requires accessing the master list.
     typedef std::recursive_mutex mutex_t;
-    typedef std::unique_lock<mutex_t> lock_t;
-
-    mutex_t mMutex;
+    LL_PROFILE_MUTEX_NAMED(mutex_t, mMutex, "Singleton MasterList");
+    typedef std::unique_lock<decltype(mMutex)> lock_t;
 
 public:
     // Instantiate this to both obtain a reference to MasterList::instance()
@@ -195,6 +193,8 @@ LLSingletonBase::list_t::size_type LLSingletonBase::get_initializing_size()
     return MasterList::LockedInitializing().get().size();
 }
 
+LLSingletonBase::~LLSingletonBase() {}
+
 void LLSingletonBase::push_initializing(const char* name)
 {
     MasterList::LockedInitializing locked_list;
@@ -270,7 +270,6 @@ void LLSingletonBase::reset_initializing(list_t::size_type size)
 
 void LLSingletonBase::MasterList::LockedInitializing::log(const char* verb, const char* name)
 {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("LLSingleton") << verb << ' ' << demangle(name) << ';';
         if (mList)
         {
@@ -282,7 +281,6 @@ void LLSingletonBase::MasterList::LockedInitializing::log(const char* verb, cons
             }
         }
         LL_ENDL;
-#endif
 }
 
 void LLSingletonBase::capture_dependency()
@@ -473,9 +471,7 @@ void LLSingletonBase::loginfos(const string_params& args)
 //static
 void LLSingletonBase::logdebugs(const string_params& args)
 {
-#ifdef SHOW_DEBUG
     LL_DEBUGS("LLSingleton") << args << LL_ENDL;
-#endif
 }
 
 //static

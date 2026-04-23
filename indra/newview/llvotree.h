@@ -57,46 +57,46 @@ public:
     /*virtual*/ U32 processUpdateMessage(LLMessageSystem *mesgsys,
                                             void **user_data,
                                             U32 block_num, const EObjectUpdateType update_type,
-                                            LLDataPacker *dp) override;
-    /*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time) override;
+                                            LLDataPacker *dp);
+    /*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time);
 
     // Graphical stuff for objects - maybe broken out into render class later?
-    /*virtual*/ void setPixelAreaAndAngle(LLAgent &agent) override;
-    /*virtual*/ void updateTextures() override;
+    /*virtual*/ void render(LLAgent &agent);
+    /*virtual*/ void setPixelAreaAndAngle(LLAgent &agent);
+    /*virtual*/ void updateTextures();
 
-    /*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline) override;
-    /*virtual*/ BOOL        updateGeometry(LLDrawable *drawable) override;
-    /*virtual*/ void        updateSpatialExtents(LLVector4a &min, LLVector4a &max) override;
+    /*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline);
+    /*virtual*/ bool        updateGeometry(LLDrawable *drawable);
+    /*virtual*/ void        updateSpatialExtents(LLVector4a &min, LLVector4a &max);
 
-    void resetVertexBuffers() override;
-    U32 getPartitionType() const override;
+    virtual U32 getPartitionType() const;
 
-    void updateRadius() override;
+    void updateRadius();
 
     void calcNumVerts(U32& vert_count, U32& index_count, S32 trunk_LOD, S32 stop_level, U16 depth, U16 trunk_depth, F32 branches);
 
     void updateMesh();
 
-    void appendMesh(LLStrider<LLVector4a>& vertices,
-                         LLStrider<LLVector4a>& normals,
+    void appendMesh(LLStrider<LLVector3>& vertices,
+                         LLStrider<LLVector3>& normals,
                          LLStrider<LLVector2>& tex_coords,
                          LLStrider<LLColor4U>& colors,
                          LLStrider<U16>& indices,
                          U16& idx_offset,
-                         LLMatrix4a& matrix,
-                         LLMatrix4a& norm_mat,
+                         LLMatrix4& matrix,
+                         LLMatrix4& norm_mat,
                          S32 vertex_offset,
                          S32 vertex_count,
                          S32 index_count,
                          S32 index_offset);
 
-    void genBranchPipeline(LLStrider<LLVector4a>& vertices,
-                                 LLStrider<LLVector4a>& normals,
+    void genBranchPipeline(LLStrider<LLVector3>& vertices,
+                                 LLStrider<LLVector3>& normals,
                                  LLStrider<LLVector2>& tex_coords,
                                  LLStrider<LLColor4U>& colors,
                                  LLStrider<U16>& indices,
                                  U16& index_offset,
-                                 LLMatrix4a& matrix,
+                                 LLMatrix4& matrix,
                                  S32 trunk_LOD,
                                  S32 stop_level,
                                  U16 depth,
@@ -107,17 +107,17 @@ public:
                                  F32 branches,
                                  F32 alpha);
 
-     /*virtual*/ BOOL lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
+     /*virtual*/ bool lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
                                           S32 face = -1,                        // which face to check, -1 = ALL_SIDES
-                                          BOOL pick_transparent = FALSE,
-                                          BOOL pick_rigged = FALSE,
-                                          BOOL pick_unselectable = TRUE,
+                                          bool pick_transparent = false,
+                                          bool pick_rigged = false,
+                                          bool pick_unselectable = true,
                                           S32* face_hit = NULL,                 // which face was hit
                                           LLVector4a* intersection = NULL,       // return the intersection point
                                           LLVector2* tex_coord = NULL,          // return the texture coordinates of the intersection point
                                           LLVector4a* normal = NULL,             // return the surface normal at the intersection point
                                           LLVector4a* tangent = NULL           // return the surface tangent at the intersection point
-        ) override;
+        );
 
     static S32 sMaxTreeSpecies;
 

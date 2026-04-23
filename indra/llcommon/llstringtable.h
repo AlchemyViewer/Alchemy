@@ -51,7 +51,7 @@ public:
     ~LLStringTableEntry();
 
     void incCount()     { mCount++; }
-    BOOL decCount()     { return --mCount; }
+    bool decCount()     { return --mCount != 0; }
 
     char *mString;
     S32  mCount;
@@ -60,7 +60,7 @@ public:
 class LL_COMMON_API LLStringTable
 {
 public:
-    LLStringTable(U32 tablesize);
+    LLStringTable(int tablesize);
     ~LLStringTable();
 
     char *checkString(const char *str);
@@ -74,7 +74,7 @@ public:
     LLStringTableEntry *addStringEntry(const std::string& str);
     void  removeString(const char *str);
 
-    U32 mMaxEntries;
+    S32 mMaxEntries;
     S32 mUniqueEntries;
 
 #if STRING_TABLE_HASH_MAP

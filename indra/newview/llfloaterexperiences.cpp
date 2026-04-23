@@ -58,7 +58,7 @@ LLPanelExperiences* LLFloaterExperiences::addTab(const std::string& name, bool s
     return newPanel;
 }
 
-BOOL LLFloaterExperiences::postBuild()
+bool LLFloaterExperiences::postBuild()
 {
     getChild<LLTabContainer>("xp_tabs")->addTabPanel(new LLPanelExperiencePicker());
     addTab("Allowed_Experiences_Tab", true);
@@ -74,7 +74,7 @@ BOOL LLFloaterExperiences::postBuild()
     getChild<LLTabContainer>("xp_tabs")->addTabPanel(new LLPanelExperienceLog());
     resizeToTabs();
 
-    return TRUE;
+    return true;
 }
 
 
@@ -129,7 +129,7 @@ void LLFloaterExperiences::resizeToTabs()
     {
         rect.mRight = rect.mLeft + tabs->getTotalTabWidth() + TAB_WIDTH_PADDING;
     }
-    reshape(rect.getWidth(), rect.getHeight(), FALSE);
+    reshape(rect.getWidth(), rect.getHeight(), false);
 }
 
 void LLFloaterExperiences::refreshContents()
@@ -171,7 +171,7 @@ void LLFloaterExperiences::onOpen( const LLSD& key )
             refreshContents();
             return;
         }
-        region->setCapabilitiesReceivedCallback(boost::bind(&LLFloaterExperiences::refreshContents, this));
+        mCapsReceivedConnection = region->setCapabilitiesReceivedCallback(boost::bind(&LLFloaterExperiences::refreshContents, this));
         return;
     }
 }
@@ -231,6 +231,7 @@ bool LLFloaterExperiences::updatePermissions( const LLSD& permission )
 
 void LLFloaterExperiences::onClose( bool app_quitting )
 {
+    mCapsReceivedConnection.disconnect();
     LLEventPumps::instance().obtain("experience_permission").stopListening("LLFloaterExperiences");
     LLFloater::onClose(app_quitting);
 }
@@ -365,10 +366,10 @@ void LLFloaterExperiences::retrieveExperienceListCoro(std::string url,
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("retrieveExperienceListCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
-    LLCore::HttpOptions::ptr_t httpOptions(std::make_shared<LLCore::HttpOptions>());
-    LLCore::HttpHeaders::ptr_t httpHeaders(std::make_shared<LLCore::HttpHeaders>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("retrieveExperienceListCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOptions = std::make_shared<LLCore::HttpOptions>();
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
 
 
     if (url.empty())
@@ -384,8 +385,11 @@ void LLFloaterExperiences::retrieveExperienceListCoro(std::string url,
 
     if (!status)
     {
+        LL_WARNS("Experience") << "Failed to retrieve list. Error: " << status.toTerseString()
+            << ". Type: " << errorNotify << " Message: " << status.getMessage() << LL_ENDL;
+
         LLSD subs;
-        subs["ERROR_MESSAGE"] = status.getType();
+        subs["ERROR_MESSAGE"] = llformat(" %d\n %s", (S32)status.getType(), status.getMessage().c_str());
         LLNotificationsUtil::add(errorNotify, subs);
 
         return;
@@ -406,7 +410,7 @@ void LLFloaterExperiences::retrieveExperienceListCoro(std::string url,
             {
                 const LLSD& ids = result[it->first];
                 tab->setExperienceList(ids);
-                if (!cback.empty())
+                if (cback != nullptr)
                 {
                     cback(tab, result);
                 }

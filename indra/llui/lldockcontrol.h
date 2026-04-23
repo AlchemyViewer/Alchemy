@@ -49,31 +49,31 @@ public:
 
 public:
     // callback for a function getting a rect valid for control's position
-    typedef boost::function<void (LLRect& )> get_allowed_rect_callback_t;
+    typedef std::function<void (LLRect& )> get_allowed_rect_callback_t;
 
     LOG_CLASS(LLDockControl);
     LLDockControl(LLView* dockWidget, LLFloater* dockableFloater,
-            const LLUIImagePtr& dockTongue, DocAt dockAt, get_allowed_rect_callback_t get_rect_callback = NULL);
-    virtual ~LLDockControl() = default;
+            const LLUIImagePtr& dockTongue, DocAt dockAt, get_allowed_rect_callback_t get_rect_callback = nullptr);
+    virtual ~LLDockControl();
 
 public:
     void on();
     void off();
     void forceRecalculatePosition();
     void setDock(LLView* dockWidget);
-    LLView* getDock()
+    LLView* getDock() const
     {
         return mDockWidgetHandle.get();
     }
     void repositionDockable();
     void drawToungue();
-    bool isDockVisible();
+    bool isDockVisible() const;
 
     // gets a rect that bounds possible positions for a dockable control (EXT-1111)
     void getAllowedRect(LLRect& rect);
 
-    S32 getTongueWidth() { return mDockTongue->getWidth(); }
-    S32 getTongueHeight() { return mDockTongue->getHeight(); }
+    S32 getTongueWidth() const { return mDockTongue->getWidth(); }
+    S32 getTongueHeight() const { return mDockTongue->getHeight(); }
 
 private:
     virtual void moveDockable();

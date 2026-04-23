@@ -32,6 +32,8 @@
 #include "llnotificationsutil.h"
 #include "lltrans.h"
 
+#include "boost/lexical_cast.hpp"
+
 const S32Days CONVERSATION_LIFETIME = (S32Days)30; // lifetime of LLConversation is 30 days by spec
 
 struct ConversationParams : public LLInitParam::Block<ConversationParams>
@@ -116,11 +118,21 @@ const std::string LLConversation::createTimestamp(const U64Seconds& utc_time)
     LLSD substitution;
     substitution["datetime"] = (S32)utc_time.value();
 
-    timeStr = "["+LLTrans::getString ("TimeMonth")+"]/["
-                 +LLTrans::getString ("TimeDay")+"]/["
-                 +LLTrans::getString ("TimeYear")+"] ["
-                 +LLTrans::getString ("TimeHour")+"]:["
-                 +LLTrans::getString ("TimeMin")+"]";
+    static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+    timeStr = "[" + LLTrans::getString("TimeMonth") + "]/["
+        + LLTrans::getString("TimeDay") + "]/["
+        + LLTrans::getString("TimeYear") + "] [";
+    if (use_24h)
+    {
+        timeStr += LLTrans::getString("TimeHour") + "]:["
+            + LLTrans::getString("TimeMin") + "]";
+    }
+    else
+    {
+        timeStr += LLTrans::getString("TimeHour12") + "]:["
+            + LLTrans::getString("TimeMin") + "] ["
+            + LLTrans::getString("TimeAMPM") + "]";
+    }
 
 
     LLStringUtil::format (timeStr, substitution);
@@ -145,7 +157,10 @@ void LLConversation::setListenIMFloaterOpened()
     // if floater is already opened or this conversation doesn't have unread offline messages
     if (mHasOfflineIMs && !offline_ims_visible)
     {
-        mIMFloaterShowedConnection = LLFloaterIMSession::setIMFloaterShowedCallback(boost::bind(&LLConversation::onIMFloaterShown, this, _1));
+        mIMFloaterShowedConnection = LLFloaterIMSession::setIMFloaterShowedCallback([this](const LLUUID& session_id)
+        {
+            onIMFloaterShown(session_id);
+        });
     }
     else
     {
@@ -229,7 +244,7 @@ void LLConversationLog::enableLogging(S32 log_mode)
     notifyObservers();
 }
 
-void LLConversationLog::logConversation(const LLUUID& session_id, BOOL has_offline_msg)
+void LLConversationLog::logConversation(const LLUUID& session_id, bool has_offline_msg)
 {
     const LLIMModel::LLIMSession* session = LLIMModel::instance().findIMSession(session_id);
     LLConversation* conversation = findConversation(session);
@@ -286,7 +301,7 @@ void LLConversationLog::updateConversationName(const LLIMModel::LLIMSession* ses
     }
 }
 
-void LLConversationLog::updateOfflineIMs(const LLIMModel::LLIMSession* session, BOOL new_messages)
+void LLConversationLog::updateOfflineIMs(const LLIMModel::LLIMSession* session, bool new_messages)
 {
     if (!session)
     {
@@ -368,7 +383,7 @@ void LLConversationLog::removeObserver(LLConversationLogObserver* observer)
     mObservers.erase(observer);
 }
 
-void LLConversationLog::sessionAdded(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id, BOOL has_offline_msg)
+void LLConversationLog::sessionAdded(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id, bool has_offline_msg)
 {
     logConversation(session_id, has_offline_msg);
 }
@@ -497,7 +512,7 @@ bool LLConversationLog::saveToFile(const std::string& filename)
         return false;
     }
 
-    LLFILE* fp = LLFile::fopen(filename, "wb");
+    LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("wb"));
     if (!fp)
     {
         LL_WARNS() << "Couldn't open call log list" << filename << LL_ENDL;
@@ -541,7 +556,7 @@ bool LLConversationLog::loadFromFile(const std::string& filename)
         return false;
     }
 
-    LLFILE* fp = LLFile::fopen(filename, "rb");
+    LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("rb"));
     if (!fp)
     {
         LL_WARNS() << "Couldn't open call log list" << filename << LL_ENDL;
@@ -661,7 +676,7 @@ void LLConversationLog::onClearLogResponse(const LLSD& notification, const LLSD&
     {
         mConversations.clear();
         notifyObservers();
-        cache();
+        saveToFile(getFileName());
         deleteBackupLogs();
     }
 }

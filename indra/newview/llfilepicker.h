@@ -35,26 +35,24 @@
 
 #include "stdtypes.h"
 
+#include <vector>
+
 #if LL_DARWIN
+#include <Carbon/Carbon.h>
 
 // AssertMacros.h does bad things.
 #undef verify
 #undef check
 #undef require
 
-#include <vector>
 #include "llstring.h"
 
 #endif
 
 // Need commdlg.h for OPENFILENAMEA
-#if LL_WINDOWS && !LL_NFD
-#include "llwin32headerslean.h"
+#ifdef LL_WINDOWS
+#include "llwin32headers.h"
 #include <commdlg.h>
-#endif
-
-#if LL_NFD
-#include "nfd.hpp"
 #endif
 
 class LLFilePicker
@@ -101,23 +99,24 @@ public:
         FFSAVE_PNG = 13,
         FFSAVE_JPEG = 14,
         FFSAVE_SCRIPT = 15,
-        FFSAVE_TGAPNGWEBP = 16,
-        FFSAVE_WEBP = 17,
-        FFSAVE_CSV
+        FFSAVE_WEBP,
+        FFSAVE_CSV,
+        FFSAVE_TGAPNG
+
     };
 
     // open the dialog. This is a modal operation
-    BOOL getSaveFile( ESaveFilter filter = FFSAVE_ALL, const std::string& filename = LLStringUtil::null, bool blocking = true);
-    BOOL getSaveFileModeless(ESaveFilter filter,
+    bool getSaveFile( ESaveFilter filter = FFSAVE_ALL, const std::string& filename = LLStringUtil::null, bool blocking = true);
+    bool getSaveFileModeless(ESaveFilter filter,
                              const std::string& filename,
                              void (*callback)(bool, std::string&, void*),
                              void *userdata);
-    BOOL getOpenFile( ELoadFilter filter = FFLOAD_ALL, bool blocking = true  );
+    bool getOpenFile( ELoadFilter filter = FFLOAD_ALL, bool blocking = true  );
     // Todo: implement getOpenFileModeless and getMultipleOpenFilesModeless
     // for windows and use directly instead of ugly LLFilePickerThread
-    BOOL getOpenFileModeless( ELoadFilter filter, void (*callback)(bool, std::vector<std::string> &, void*), void *userdata); // MAC only.
-    BOOL getMultipleOpenFiles( ELoadFilter filter = FFLOAD_ALL, bool blocking = true );
-    BOOL getMultipleOpenFilesModeless( ELoadFilter filter, void (*callback)(bool, std::vector<std::string> &, void*), void *userdata ); // MAC only
+    bool getOpenFileModeless( ELoadFilter filter, void (*callback)(bool, std::vector<std::string> &, void*), void *userdata); // MAC only.
+    bool getMultipleOpenFiles( ELoadFilter filter = FFLOAD_ALL, bool blocking = true );
+    bool getMultipleOpenFilesModeless( ELoadFilter filter, void (*callback)(bool, std::vector<std::string> &, void*), void *userdata ); // MAC only
 
     // Get the filename(s) found. getFirstFile() sets the pointer to
     // the start of the structure and allows the start of iteration.
@@ -156,18 +155,14 @@ private:
     // is enabled and if not, tidy up and indicate we're not allowed to do this.
     bool check_local_file_access_enabled();
 
-#if LL_NFD
-    std::vector<nfdfilteritem_t> setupFilter(ELoadFilter filter);
-#endif
-
-#if LL_WINDOWS && !LL_NFD
+#if LL_WINDOWS && !LL_SDL_WINDOW
     OPENFILENAMEW mOFN;             // for open and save dialogs
     WCHAR mFilesW[FILENAME_BUFFER_SIZE];
 
-    BOOL setupFilter(ELoadFilter filter);
+    bool setupFilter(ELoadFilter filter);
 #endif
 
-#if LL_DARWIN && !LL_NFD
+#if LL_DARWIN && !LL_SDL_WINDOW
     S32 mPickOptions;
     std::vector<std::string> mFileVector;
 

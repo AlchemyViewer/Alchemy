@@ -37,10 +37,10 @@ const F32 DEFAULT_COMPRESSION_RATE = 1.f/8.f;
 class LLImageJ2CImpl;
 class LLImageCompressionTester ;
 
-class LLImageJ2C final : public LLImageFormatted
+class LLImageJ2C : public LLImageFormatted
 {
 protected:
-    virtual ~LLImageJ2C() = default;
+    virtual ~LLImageJ2C();
 
 public:
     LLImageJ2C();
@@ -105,7 +105,7 @@ protected:
 class LLImageJ2CImpl
 {
 public:
-    virtual ~LLImageJ2CImpl() = default;
+    virtual ~LLImageJ2CImpl();
 protected:
     // Find out the image size and number of channels.
     // Return value:
@@ -136,7 +136,7 @@ protected:
 // Tracks the image compression / decompression data,
 // records and outputs them to the log file.
 //
-class LLImageCompressionTester final : public LLMetricPerformanceTesterBasic
+class LLImageCompressionTester : public LLMetricPerformanceTesterBasic
 {
     public:
         LLImageCompressionTester();

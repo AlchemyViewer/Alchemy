@@ -31,7 +31,9 @@
 #include "llerror.h"
 #include "llexception.h"
 
+#if !LL_ARM64
 jmp_buf LLImageJPEG::sSetjmpBuffer ;
+#endif
 LLImageJPEG::LLImageJPEG(S32 quality)
 :   LLImageFormatted(IMG_CODEC_JPEG),
     mOutputBuffer( NULL ),
@@ -49,6 +51,8 @@ LLImageJPEG::~LLImageJPEG()
 bool LLImageJPEG::updateData()
 {
     resetLastError();
+
+    LLImageDataLock lock(this);
 
     // Check to make sure that this instance has been initialized with data
     if (!getData() || (0 == getDataSize()))
@@ -76,12 +80,15 @@ bool LLImageJPEG::updateData()
     //
     //try/catch will crash on Mac and Linux if LLImageJPEG::errorExit throws an error
     //so as instead, we use setjmp/longjmp to avoid this crash, which is the best we can get. --bao
+    //except in the case of AARCH64/ARM64 where setjmp will crash
     //
+#if !LL_ARM64
     if(setjmp(sSetjmpBuffer))
     {
         jpeg_destroy_decompress(&cinfo);
         return false;
     }
+#endif
     try
     {
         // Now we can initialize the JPEG decompression object.
@@ -189,6 +196,9 @@ bool LLImageJPEG::decode(LLImageRaw* raw_image, F32 decode_time)
 
     resetLastError();
 
+    LLImageDataLock lockIn(this);
+    LLImageDataLock lockOut(raw_image);
+
     // Check to make sure that this instance has been initialized with data
     if (!getData() || (0 == getDataSize()))
     {
@@ -218,11 +228,13 @@ bool LLImageJPEG::decode(LLImageRaw* raw_image, F32 decode_time)
     //try/catch will crash on Mac and Linux if LLImageJPEG::errorExit throws an error
     //so as instead, we use setjmp/longjmp to avoid this crash, which is the best we can get. --bao
     //
+#if !LL_ARM64
     if(setjmp(sSetjmpBuffer))
     {
         jpeg_destroy_decompress(&cinfo);
         return true; // done
     }
+#endif
     try
     {
         // Now we can initialize the JPEG decompression object.
@@ -315,7 +327,7 @@ bool LLImageJPEG::decode(LLImageRaw* raw_image, F32 decode_time)
         jpeg_destroy_decompress(&cinfo);
     }
 
-    catch (const std::bad_alloc&)
+    catch (std::bad_alloc&)
     {
         setLastError( "Out of memory");
         jpeg_destroy_decompress(&cinfo);
@@ -408,6 +420,8 @@ void LLImageJPEG::encodeTermDestination( j_compress_ptr cinfo )
 {
     LLImageJPEG* self = (LLImageJPEG*) cinfo->client_data;
 
+    LLImageDataLock lock(self);
+
     S32 file_bytes = (S32)(self->mOutputBufferSize - cinfo->dest->free_in_buffer);
     self->allocateData(file_bytes);
 
@@ -424,9 +438,10 @@ void LLImageJPEG::errorExit( j_common_ptr cinfo )
 
     // Let the memory manager delete any temp files
     jpeg_destroy(cinfo);
-
+#if !LL_ARM64
     // Return control to the setjmp point
     longjmp(sSetjmpBuffer, 1) ;
+#endif
 }
 
 // Decide whether to emit a trace or warning message.
@@ -484,6 +499,15 @@ bool LLImageJPEG::encode( const LLImageRaw* raw_image, F32 encode_time )
 
     resetLastError();
 
+    if (raw_image->isBufferInvalid())
+    {
+        setLastError("Invalid input, no buffer");
+        return false;
+    }
+
+    LLImageDataSharedLock lockIn(raw_image);
+    LLImageDataLock lockOut(this);
+
     switch( raw_image->getComponents() )
     {
     case 1:
@@ -535,6 +559,7 @@ bool LLImageJPEG::encode( const LLImageRaw* raw_image, F32 encode_time )
     //try/catch will crash on Mac and Linux if LLImageJPEG::errorExit throws an error
     //so as instead, we use setjmp/longjmp to avoid this crash, which is the best we can get. --bao
     //
+#if !LL_ARM64
     if( setjmp(sSetjmpBuffer) )
     {
         // If we get here, the JPEG code has signaled an error.
@@ -545,7 +570,7 @@ bool LLImageJPEG::encode( const LLImageRaw* raw_image, F32 encode_time )
         mOutputBufferSize = 0;
         return false;
     }
-
+#endif
     try
     {
 

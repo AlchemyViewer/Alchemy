@@ -31,15 +31,11 @@
 #include "llsd.h"
 #include "lltrans.h"
 
+LLTrace::BlockTimerStatHandle FTM_UI_STRING("UI String");
+
+
 LLUIString::LLUIString(const std::string& instring, const LLStringUtil::format_map_t& args)
 :   mOrig(instring),
-    mArgs(new LLStringUtil::format_map_t(args))
-{
-    dirty();
-}
-
-LLUIString::LLUIString(std::string&& instring, const LLStringUtil::format_map_t& args)
-:   mOrig(std::move(instring)),
     mArgs(new LLStringUtil::format_map_t(args))
 {
     dirty();
@@ -51,9 +47,9 @@ void LLUIString::assign(const std::string& s)
     dirty();
 }
 
-void LLUIString::assign(std::string&& s)
+void LLUIString::assign(const LLWString& instring)
 {
-    mOrig = std::move(s);
+    mOrig = wstring_to_utf8str(instring);
     dirty();
 }
 
@@ -66,12 +62,14 @@ void LLUIString::setArgList(const LLStringUtil::format_map_t& args)
 
 void LLUIString::setArgs(const LLSD& sd)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_RECORD_BLOCK_TIME(FTM_UI_STRING);
 
     if (!sd.isMap()) return;
-    for(const auto& llsd_pair : sd.asMap())
+    for(LLSD::map_const_iterator sd_it = sd.beginMap();
+        sd_it != sd.endMap();
+        ++sd_it)
     {
-        setArg(llsd_pair.first, llsd_pair.second.asString());
+        setArg(sd_it->first, sd_it->second.asString());
     }
     dirty();
 }
@@ -127,7 +125,7 @@ void LLUIString::updateResult() const
 {
     mNeedsResult = false;
 
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_RECORD_BLOCK_TIME(FTM_UI_STRING);
 
     // optimize for empty strings (don't attempt string replacement)
     if (mOrig.empty())

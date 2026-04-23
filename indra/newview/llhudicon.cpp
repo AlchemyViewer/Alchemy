@@ -65,7 +65,7 @@ LLHUDIcon::LLHUDIcon(const U8 type) :
             LLHUDObject(type),
             mImagep(NULL),
             mScale(0.1f),
-            mHidden(FALSE)
+            mHidden(false)
 {
     sIconInstances.push_back(this);
 }
@@ -104,7 +104,7 @@ void LLHUDIcon::render()
     F32 up_distance = 0.5f * distance_scale;
     LLVector3 icon_position = obj_position + (up_distance * camera->getUpAxis()) * 1.2f;
 
-    LLVector3 icon_to_cam = camera->getOrigin() - icon_position;
+    LLVector3 icon_to_cam = LLViewerCamera::getInstance()->getOrigin() - icon_position;
     icon_to_cam.normVec();
 
     icon_position += icon_to_cam * mSourceObject->mDrawable->getRadius() * 1.1f;
@@ -152,16 +152,21 @@ void LLHUDIcon::render()
         gGL.getTexUnit(0)->bind(mImagep);
     }
 
-    gGL.begin(LLRender::TRIANGLE_STRIP);
+    gGL.begin(LLRender::TRIANGLES);
     {
         gGL.texCoord2f(0.f, 1.f);
         gGL.vertex3fv(upper_left.mV);
         gGL.texCoord2f(0.f, 0.f);
         gGL.vertex3fv(lower_left.mV);
-        gGL.texCoord2f(1.f, 1.f);
-        gGL.vertex3fv(upper_right.mV);
         gGL.texCoord2f(1.f, 0.f);
         gGL.vertex3fv(lower_right.mV);
+
+        gGL.texCoord2f(0.f, 1.f);
+        gGL.vertex3fv(upper_left.mV);
+        gGL.texCoord2f(1.f, 0.f);
+        gGL.vertex3fv(lower_right.mV);
+        gGL.texCoord2f(1.f, 1.f);
+        gGL.vertex3fv(upper_right.mV);
     }
     gGL.end();
 }
@@ -186,15 +191,15 @@ void LLHUDIcon::markDead()
     LLHUDObject::markDead();
 }
 
-BOOL LLHUDIcon::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, LLVector4a* intersection)
+bool LLHUDIcon::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, LLVector4a* intersection)
 {
     if (mHidden)
-        return FALSE;
+        return false;
 
     if (mSourceObject.isNull() || mImagep.isNull())
     {
         markDead();
-        return FALSE;
+        return false;
     }
 
     LLVector3 obj_position = mSourceObject->getRenderPosition();
@@ -211,7 +216,7 @@ BOOL LLHUDIcon::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& 
     F32 up_distance = 0.5f * distance_scale;
     LLVector3 icon_position = obj_position + (up_distance * camera->getUpAxis()) * 1.2f;
 
-    LLVector3 icon_to_cam = camera->getOrigin() - icon_position;
+    LLVector3 icon_to_cam = LLViewerCamera::getInstance()->getOrigin() - icon_position;
     icon_to_cam.normVec();
 
     icon_position += icon_to_cam * mSourceObject->mDrawable->getRadius() * 1.1f;
@@ -233,7 +238,7 @@ BOOL LLHUDIcon::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& 
     if (time_elapsed > MAX_VISIBLE_TIME)
     {
         markDead();
-        return FALSE;
+        return false;
     }
 
     F32 image_aspect = (F32)mImagep->getFullWidth() / (F32)mImagep->getFullHeight() ;
@@ -272,10 +277,10 @@ BOOL LLHUDIcon::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& 
             dir.mul(t);
             intersection->setAdd(start, dir);
         }
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 //static
@@ -312,7 +317,7 @@ void LLHUDIcon::updateAll()
 }
 
 //static
-BOOL LLHUDIcon::iconsNearby()
+bool LLHUDIcon::iconsNearby()
 {
     return !sIconInstances.empty();
 }

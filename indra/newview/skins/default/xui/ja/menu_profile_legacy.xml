@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <toggleable_menu name="menu_profile_legacy">
 	<menu_item_call label="Webプロフィールを開く…" name="webprofile"/>
-	<menu_item_separator/>
 	<!--
 	<menu label="プロフィール画像をアップロード" name="upload_image_menu">
 		<menu_item_call label="セカンドライフ…" name="upload_second_life"/>
@@ -15,7 +14,6 @@
 	<menu_item_call label="マップ上に表示…" name="map"/>
 	<menu_item_call label="支払う…" name="pay"/>
 	<menu_item_call label="嫌がらせの報告…" name="report_abuse"/>
-	<menu_item_separator/>
 	<menu_item_call label="名前をコピー" name="Copy Name"/>
 	<menu_item_call label="SLurlをコピー" name="Copy SLurl"/>
 	<menu_item_call label="ＵＵＩＤをコピー" name="Copy ID"/>

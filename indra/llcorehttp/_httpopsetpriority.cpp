@@ -43,6 +43,10 @@ HttpOpSetPriority::HttpOpSetPriority(HttpHandle handle, HttpRequest::priority_t 
 {}
 
 
+HttpOpSetPriority::~HttpOpSetPriority()
+{}
+
+
 void HttpOpSetPriority::stageFromRequest(HttpService * service)
 {
     // Do operations

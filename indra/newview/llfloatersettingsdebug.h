@@ -42,7 +42,7 @@ class LLFloaterSettingsDebug final
 
 public:
 
-    virtual BOOL postBuild();
+    virtual bool postBuild();
     virtual void draw();
 
     void updateControl(LLControlVariable* control);
@@ -82,6 +82,7 @@ protected:
     LLColorSwatchCtrl* mColorSwatch = nullptr;
 
     std::string mSearchFilter;
+    std::string mOldText;
 };
 
 #endif //LLFLOATERDEBUGSETTINGS_H

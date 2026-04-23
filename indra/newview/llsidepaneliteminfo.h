@@ -46,6 +46,7 @@ class LLObjectInventoryObserver;
 class LLViewerObject;
 class LLPermissions;
 class LLTextBox;
+class LLTextEditor;
 
 class LLSidepanelItemInfo : public LLPanel, public LLInventoryObserver
 {
@@ -53,7 +54,7 @@ public:
     LLSidepanelItemInfo(const LLPanel::Params& p = getDefaultParams());
     virtual ~LLSidepanelItemInfo();
 
-    /*virtual*/ BOOL postBuild() override;
+    /*virtual*/ bool postBuild() override;
     /*virtual*/ void reset();
 
     void setObjectID(const LLUUID& object_id);
@@ -70,8 +71,12 @@ public:
     void dirty();
 
     static void onIdle( void* user_data );
-    void updateOwnerName(const LLUUID& owner_id, const LLAvatarName& owner_name, const LLStyle::Params& style_params);
-    void updateCreatorName(const LLUUID& creator_id, const LLAvatarName& creator_name, const LLStyle::Params& style_params);
+// [RLVa:KB] - Checked: RLVa-2.0.1
+//  void updateOwnerName(const LLUUID& owner_id, const LLAvatarName& owner_name, const LLStyle::Params& style_params);
+//  void updateCreatorName(const LLUUID& creator_id, const LLAvatarName& creator_name, const LLStyle::Params& style_params);
+    void updateOwnerName(const LLUUID& owner_id, const LLAvatarName& owner_name, const LLStyle::Params& style_params, bool rlv_restricted);
+    void updateCreatorName(const LLUUID& creator_id, const LLAvatarName& creator_name, const LLStyle::Params& style_params, bool rlv_restricted);
+// [/RLVa:KB]
 
 protected:
     void refresh() override;
@@ -105,6 +110,7 @@ private:
     LLIconCtrl* mItemTypeIcon;
     LLTextBox* mLabelOwnerName;
     LLTextBox* mLabelCreatorName;
+    LLTextEditor* mLabelItemDesc;
 
     //
     // UI Elements

@@ -41,16 +41,17 @@ bool LLImageDimensionsInfo::load(const std::string& src_filename,U32 codec)
 
     mSrcFilename = src_filename;
 
-    S32 file_size = 0;
-    apr_status_t s = mInfile.open(src_filename, LL_APR_RB, NULL, &file_size);
+    std::error_code ec;
+    mInfile.open(src_filename, LLFile::in|LLFile::binary, ec);
 
-    if (s != APR_SUCCESS)
+    if (!mInfile || ec)
     {
         setLastError("Unable to open file for reading", src_filename);
         return false;
     }
 
-    if (file_size == 0)
+    S64 file_size = mInfile.size(ec);
+    if (file_size == 0 || ec)
     {
         mWarning = "texture_load_empty_file";
         setLastError("File is empty",src_filename);
@@ -79,7 +80,7 @@ bool LLImageDimensionsInfo::load(const std::string& src_filename,U32 codec)
 bool LLImageDimensionsInfo::getImageDimensionsBmp()
 {
     // Make sure the file is long enough.
-    const S32 DATA_LEN = 26; // BMP header (14) + DIB header size (4) + width (4) + height (4)
+    constexpr S32 DATA_LEN = 26; // BMP header (14) + DIB header size (4) + width (4) + height (4)
     if (!checkFileLength(DATA_LEN))
     {
         LL_WARNS() << "Premature end of file" << LL_ENDL;
@@ -87,12 +88,13 @@ bool LLImageDimensionsInfo::getImageDimensionsBmp()
     }
 
     // Read BMP signature.
+    std::error_code ec;
     U8 signature[2];
-    mInfile.read((void*)signature, sizeof(signature)/sizeof(signature[0]));
+    mInfile.read((void*)signature, sizeof(signature)/sizeof(signature[0]), ec);
 
     // Make sure this is actually a BMP file.
     // We only support Windows bitmaps (BM), according to LLImageBMP::updateData().
-    if (signature[0] != 'B' || signature[1] != 'M')
+    if (signature[0] != 'B' || signature[1] != 'M' || ec)
     {
         LL_WARNS() << "Not a BMP" << LL_ENDL;
         mWarning = "texture_load_format_error";
@@ -100,7 +102,7 @@ bool LLImageDimensionsInfo::getImageDimensionsBmp()
     }
 
     // Read image dimensions.
-    mInfile.seek(APR_CUR, 16);
+    mInfile.seek(16, LLFile::cur, ec);
     mWidth = read_reverse_s32();
     mHeight = read_reverse_s32();
 
@@ -109,7 +111,7 @@ bool LLImageDimensionsInfo::getImageDimensionsBmp()
 
 bool LLImageDimensionsInfo::getImageDimensionsTga()
 {
-    const S32 TGA_FILE_HEADER_SIZE = 12;
+    constexpr S32 TGA_FILE_HEADER_SIZE = 12;
 
     // Make sure the file is long enough.
     if (!checkFileLength(TGA_FILE_HEADER_SIZE + 1 /* width */ + 1 /* height */))
@@ -119,7 +121,8 @@ bool LLImageDimensionsInfo::getImageDimensionsTga()
     }
 
     // *TODO: Detect non-TGA files somehow.
-    mInfile.seek(APR_CUR,TGA_FILE_HEADER_SIZE);
+    std::error_code ec;
+    mInfile.seek(TGA_FILE_HEADER_SIZE, LLFile::cur, ec);
     mWidth = read_byte() | read_byte() << 8;
     mHeight = read_byte() | read_byte() << 8;
 
@@ -128,7 +131,7 @@ bool LLImageDimensionsInfo::getImageDimensionsTga()
 
 bool LLImageDimensionsInfo::getImageDimensionsPng()
 {
-    const S32 PNG_MAGIC_SIZE = 8;
+    constexpr S32 PNG_MAGIC_SIZE = 8;
 
     // Make sure the file is long enough.
     if (!checkFileLength(PNG_MAGIC_SIZE + 8 + sizeof(S32) * 2 /* width, height */))
@@ -138,12 +141,13 @@ bool LLImageDimensionsInfo::getImageDimensionsPng()
     }
 
     // Read PNG signature.
-    const U8 png_magic[PNG_MAGIC_SIZE] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    std::error_code ec;
+    constexpr U8 png_magic[PNG_MAGIC_SIZE] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
     U8 signature[PNG_MAGIC_SIZE];
-    mInfile.read((void*)signature, PNG_MAGIC_SIZE);
+    S64 bytes_read = mInfile.read((void*)signature, PNG_MAGIC_SIZE, ec);
 
     // Make sure it's a PNG file.
-    if (memcmp(signature, png_magic, PNG_MAGIC_SIZE) != 0)
+    if (bytes_read != PNG_MAGIC_SIZE || ec || memcmp(signature, png_magic, PNG_MAGIC_SIZE) != 0)
     {
         LL_WARNS() << "Not a PNG" << LL_ENDL;
         mWarning = "texture_load_format_error";
@@ -151,7 +155,7 @@ bool LLImageDimensionsInfo::getImageDimensionsPng()
     }
 
     // Read image dimensions.
-    mInfile.seek(APR_CUR, 8 /* chunk length + chunk type */);
+    mInfile.seek(8, LLFile::cur, ec); // chunk length + chunk type
     mWidth = read_s32();
     mHeight = read_s32();
 
@@ -169,12 +173,13 @@ bool LLImageDimensionsInfo::getImageDimensionsWebP()
         return false;
     }
 
-    auto image_size = LLAPRFile::size(mSrcFilename);
+    auto image_size = LLFile::size(mSrcFilename);
     if(image_size > 0)
     {
         auto image_buf = std::make_unique<U8[]>(image_size);
 
-        mInfile.read(image_buf.get(), image_size);
+        std::error_code ec;
+        mInfile.read(image_buf.get(), image_size, ec);
 
         WebPBitstreamFeatures features;
         // Decode the WebP data and extract sizing information
@@ -204,22 +209,21 @@ bool LLImageDimensionsInfo::getImageDimensionsJpeg()
 {
     sJpegErrorEncountered = false;
     clean();
-    FILE *fp = LLFile::fopen(mSrcFilename, "rb");
-    if (fp == NULL)
+    FILE* fp = LLFile::fopen(mSrcFilename, LLFILE_MODE("rb"));
+    if (!fp)
     {
         setLastError("Unable to open file for reading", mSrcFilename);
         return false;
     }
 
     /* Make sure this is a JPEG file. */
-    const size_t JPEG_MAGIC_SIZE = 2;
-    const U8 jpeg_magic[JPEG_MAGIC_SIZE] = {0xFF, 0xD8};
+    constexpr size_t JPEG_MAGIC_SIZE = 2;
+    constexpr U8 jpeg_magic[JPEG_MAGIC_SIZE] = {0xFF, 0xD8};
     U8 signature[JPEG_MAGIC_SIZE];
 
     if (fread(signature, sizeof(signature), 1, fp) != 1)
     {
         LL_WARNS() << "Premature end of file" << LL_ENDL;
-        mWarning = "texture_load_format_error";
         fclose(fp);
         return false;
     }
@@ -234,7 +238,7 @@ bool LLImageDimensionsInfo::getImageDimensionsJpeg()
 
     /* Init jpeg */
     jpeg_error_mgr jerr;
-    jpeg_decompress_struct cinfo;
+    jpeg_decompress_struct cinfo{};
     cinfo.err = jpeg_std_error(&jerr);
     // Call our function instead of exit() if Libjpeg encounters an error.
     // This is done to avoid crash in this case (STORM-472).
@@ -242,7 +246,7 @@ bool LLImageDimensionsInfo::getImageDimensionsJpeg()
 
     jpeg_create_decompress  (&cinfo);
     jpeg_stdio_src      (&cinfo, fp);
-    jpeg_read_header    (&cinfo, TRUE);
+    jpeg_read_header    (&cinfo, true);
     cinfo.out_color_space = JCS_RGB;
     jpeg_start_decompress   (&cinfo);
 
@@ -259,9 +263,10 @@ bool LLImageDimensionsInfo::checkFileLength(S32 min_len)
 {
     // Make sure the file is not shorter than min_len bytes.
     // so that we don't have to check value returned by each read() or seek().
+    std::error_code ec;
     char* buf = new char[min_len];
-    int nread = mInfile.read(buf, min_len);
+    S64 nread = mInfile.read(buf, min_len, ec);
     delete[] buf;
-    mInfile.seek(APR_SET, 0);
+    mInfile.seek(0, LLFile::beg, ec);
     return nread == min_len;
 }

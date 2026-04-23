@@ -57,15 +57,12 @@
 #include "llstatusbar.h"            // getHealth()
 #include "lltrans.h"
 #include "llviewerinventory.h"
-#include "llviewernetwork.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llurllineeditorctrl.h"
 #include "llagentui.h"
-#include "llworld.h"
-#include "llworldmap.h"
 // [RLVa:KB] - Checked: 2010-04-05 (RLVa-1.2.0d)
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -228,8 +225,7 @@ LLLocationInputCtrl::LLLocationInputCtrl(const LLLocationInputCtrl::Params& p)
     mIconMaturityGeneral(NULL),
     mIconMaturityAdult(NULL),
     mIconMaturityModerate(NULL),
-    mMaturityHelpTopic(p.maturity_help_topic),
-    isHumanReadableLocationVisible(true)
+    mMaturityHelpTopic(p.maturity_help_topic)
 {
     // Lets replace default LLLineEditor with LLLocationLineEditor
     // to make needed escaping while copying and cutting url
@@ -461,7 +457,7 @@ LLLocationInputCtrl::~LLLocationInputCtrl()
     mLocationHistoryConnection.disconnect();
 }
 
-void LLLocationInputCtrl::setEnabled(BOOL enabled)
+void LLLocationInputCtrl::setEnabled(bool enabled)
 {
     LLComboBox::setEnabled(enabled);
     mAddLandmarkBtn->setEnabled(enabled);
@@ -474,7 +470,7 @@ void LLLocationInputCtrl::hideList()
         focusTextEntry();
 }
 
-BOOL LLLocationInputCtrl::handleToolTip(S32 x, S32 y, MASK mask)
+bool LLLocationInputCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 {
 
     if(mAddLandmarkBtn->parentPointInView(x,y))
@@ -502,15 +498,15 @@ BOOL LLLocationInputCtrl::handleToolTip(S32 x, S32 y, MASK mask)
             }
         }
 
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
-BOOL LLLocationInputCtrl::handleKeyHere(KEY key, MASK mask)
+bool LLLocationInputCtrl::handleKeyHere(KEY key, MASK mask)
 {
-    BOOL result = LLComboBox::handleKeyHere(key, mask);
+    bool result = LLComboBox::handleKeyHere(key, mask);
 
     if (key == KEY_DOWN && hasFocus() && mList->getItemCount() != 0 && !mList->getVisible())
     {
@@ -523,7 +519,7 @@ BOOL LLLocationInputCtrl::handleKeyHere(KEY key, MASK mask)
 void LLLocationInputCtrl::onTextEntry(LLLineEditor* line_editor)
 {
     KEY key = gKeyboard->currentKey();
-    MASK mask = gKeyboard->currentMask(TRUE);
+    MASK mask = gKeyboard->currentMask(true);
 
     // Typing? (moving cursor should not affect showing the list)
     bool typing = mask != MASK_CONTROL && key != KEY_LEFT && key != KEY_RIGHT && key != KEY_HOME && key != KEY_END;
@@ -563,16 +559,16 @@ void LLLocationInputCtrl::setText(const LLStringExplicit& text)
     {
         mTextEntry->setText(text);
     }
-    mHasAutocompletedText = FALSE;
+    mHasAutocompletedText = false;
 }
 
-void LLLocationInputCtrl::setFocus(BOOL b)
+void LLLocationInputCtrl::setFocus(bool b)
 {
     LLComboBox::setFocus(b);
 
     if (mTextEntry && b && !mList->getVisible())
     {
-        mTextEntry->setFocus(TRUE);
+        mTextEntry->setFocus(true);
     }
 }
 
@@ -611,14 +607,15 @@ void LLLocationInputCtrl::draw()
         refreshLocation();
     }
 
-    if (ALControlCache::NavBarShowParcelProperties)
+    static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
+    if (show_icons)
     {
         refreshHealth();
     }
     LLComboBox::draw();
 }
 
-void LLLocationInputCtrl::reshape(S32 width, S32 height, BOOL called_from_parent)
+void LLLocationInputCtrl::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLComboBox::reshape(width, height, called_from_parent);
 
@@ -719,7 +716,7 @@ void LLLocationInputCtrl::onLocationPrearrange(const LLSD& data)
     //Let's add landmarks to the top of the list if any
     if(!filter.empty() )
     {
-        LLInventoryModel::item_array_t landmark_items = LLLandmarkActions::fetchLandmarksByName(filter, TRUE);
+        LLInventoryModel::item_array_t landmark_items = LLLandmarkActions::fetchLandmarksByName(filter, true);
 
         for(U32 i=0; i < landmark_items.size(); i++)
         {
@@ -750,11 +747,9 @@ void LLLocationInputCtrl::onLocationPrearrange(const LLSD& data)
                 LLSD value;
                 value["item_type"] = TELEPORT_HISTORY;
                 value["global_pos"] = result->mGlobalPos.getValue();
-                value["local_pos"] = result->mLocalPos.getValue();
-                value["grid"] = result->mGrid;
-                value["region"] = result->mRegion;
-                value["tooltip"] = LLSLURL(result->mGrid, result->mRegion, result->mLocalPos).getSLURLString();
-
+                std::string region_name = result->mTitle.substr(0, result->mTitle.find(','));
+                //TODO*: add Surl to teleportitem or parse region name from title
+                value["tooltip"] = LLSLURL(region_name, result->mGlobalPos).getSLURLString();
                 addLocationHistoryEntry(result->getTitle(), value);
             }
             result = std::find_if(result + 1, th_items.end(), boost::bind(
@@ -809,10 +804,9 @@ void LLLocationInputCtrl::refreshLocation()
     }
 
     // Update location field.
-    static LLUICachedControl<bool> show_coords("NavBarShowCoordinates", false);
     std::string location_name;
     LLAgentUI::ELocationFormat format =
-        (show_coords
+        (gSavedSettings.getBOOL("NavBarShowCoordinates")
             ? LLAgentUI::LOCATION_FORMAT_FULL
             : LLAgentUI::LOCATION_FORMAT_NO_COORDS);
 
@@ -858,7 +852,7 @@ void LLLocationInputCtrl::refreshParcelIcons()
 
     x = layout_widget(mForSaleBtn, x);
 
-    if (ALControlCache::NavBarShowParcelProperties)
+    if (gSavedSettings.getBOOL("NavBarShowParcelProperties"))
     {
         LLParcel* current_parcel;
         LLViewerRegion* selection_region = vpm->getSelectionRegion();
@@ -896,7 +890,7 @@ void LLLocationInputCtrl::refreshParcelIcons()
         mParcelIcon[SCRIPTS_ICON]->setVisible( !allow_scripts );
         mParcelIcon[DAMAGE_ICON]->setVisible(  allow_damage );
         mParcelIcon[PATHFINDING_DIRTY_ICON]->setVisible(mIsNavMeshDirty);
-        mParcelIcon[PATHFINDING_DISABLED_ICON]->setVisible(!mIsNavMeshDirty && !pathfinding_dynamic_enabled && !LLGridManager::getInstance()->isInOpenSim());
+        mParcelIcon[PATHFINDING_DISABLED_ICON]->setVisible(!mIsNavMeshDirty && !pathfinding_dynamic_enabled);
 
         mDamageText->setVisible(allow_damage);
         mParcelIcon[SEE_AVATARS_ICON]->setVisible( !see_avs );
@@ -954,43 +948,45 @@ void LLLocationInputCtrl::refreshMaturityButton()
     if (!region)
         return;
 
-    bool button_visible = true;
-    LLPointer<LLUIImage> rating_image = NULL;
-    std::string rating_tooltip;
-
-    static const std::string loc_ctrl_gen_icon_tooltip = LLTrans::getString("LocationCtrlGeneralIconTooltip");
-    static const std::string loc_ctrl_adult_icon_tooltip = LLTrans::getString("LocationCtrlAdultIconTooltip");
-    static const std::string loc_ctrl_moderate_icon_tooltip = LLTrans::getString("LocationCtrlModerateIconTooltip");
-
     U8 sim_access = region->getSimAccess();
-    switch(sim_access)
+
+    if (mLastSimAccess != sim_access)
     {
-    case SIM_ACCESS_PG:
-        rating_image = mIconMaturityGeneral;
-        rating_tooltip = loc_ctrl_gen_icon_tooltip;
-        break;
+        mLastSimAccess = sim_access;
 
-    case SIM_ACCESS_ADULT:
-        rating_image = mIconMaturityAdult;
-        rating_tooltip = loc_ctrl_adult_icon_tooltip;
-        break;
+        bool button_visible = true;
+        LLPointer<LLUIImage> rating_image = NULL;
+        std::string rating_tooltip;
 
-    case SIM_ACCESS_MATURE:
-        rating_image = mIconMaturityModerate;
-        rating_tooltip = loc_ctrl_moderate_icon_tooltip;
-        break;
+        switch(sim_access)
+        {
+        case SIM_ACCESS_PG:
+            rating_image = mIconMaturityGeneral;
+            rating_tooltip = LLTrans::getString("LocationCtrlGeneralIconTooltip");
+            break;
 
-    default:
-        button_visible = false;
-        break;
-    }
+        case SIM_ACCESS_ADULT:
+            rating_image = mIconMaturityAdult;
+            rating_tooltip = LLTrans::getString("LocationCtrlAdultIconTooltip");
+            break;
 
-    mMaturityButton->setVisible(button_visible);
-    mMaturityButton->setToolTip(rating_tooltip);
-    if(rating_image)
-    {
-        mMaturityButton->setImageUnselected(rating_image);
-        mMaturityButton->setImagePressed(rating_image);
+        case SIM_ACCESS_MATURE:
+            rating_image = mIconMaturityModerate;
+            rating_tooltip = LLTrans::getString("LocationCtrlModerateIconTooltip");
+            break;
+
+        default:
+            button_visible = false;
+            break;
+        }
+
+        mMaturityButton->setVisible(button_visible);
+        mMaturityButton->setToolTip(rating_tooltip);
+        if(rating_image)
+        {
+            mMaturityButton->setImageUnselected(rating_image);
+            mMaturityButton->setImagePressed(rating_image);
+        }
     }
     if (mMaturityButton->getVisible())
     {
@@ -1052,17 +1048,13 @@ void LLLocationInputCtrl::rebuildLocationHistory(const std::string& filter)
         //location history can contain only typed locations
         value["item_type"] = TYPED_REGION_SLURL;
         value["global_pos"] = it->mGlobalPos.getValue();
-        value["local_pos"] = it->mLocalPos.getValue();
-        value["grid"] = it->mGrid;
-        value["region"] = it->mRegion;
-        value["tooltip"] = LLSLURL(it->mGrid, it->mRegion, it->mLocalPos).getSLURLString();
         addLocationHistoryEntry(it->getLocation(), value);
     }
 }
 
 void LLLocationInputCtrl::focusTextEntry()
 {
-    // We can't use "mTextEntry->setFocus(TRUE)" instead because
+    // We can't use "mTextEntry->setFocus(true)" instead because
     // if the "select_on_focus" parameter is true it places the cursor
     // at the beginning (after selecting text), thus screwing up updateSelection().
     if (mTextEntry)
@@ -1153,10 +1145,10 @@ void LLLocationInputCtrl::changeLocationPresentation()
         //needs unescaped one
         LLSLURL slurl;
         LLAgentUI::buildSLURL(slurl, false);
-        mTextEntry->setText(slurl.getSLURLString());
+        mTextEntry->setText(LLURI::unescape(slurl.getSLURLString()));
         mTextEntry->selectAll();
 
-        mMaturityButton->setVisible(FALSE);
+        mMaturityButton->setVisible(false);
 
         isHumanReadableLocationVisible = false;
     }

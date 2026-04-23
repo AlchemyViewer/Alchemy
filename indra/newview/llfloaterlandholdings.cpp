@@ -60,24 +60,24 @@ LLFloaterLandHoldings::LLFloaterLandHoldings(const LLSD& key)
 :   LLFloater(key),
     mActualArea(0),
     mBillableArea(0),
-    mFirstPacketReceived(FALSE),
+    mFirstPacketReceived(false),
     mSortColumn(""),
-    mSortAscending(TRUE)
+    mSortAscending(true)
 {
 }
 
-BOOL LLFloaterLandHoldings::postBuild()
+bool LLFloaterLandHoldings::postBuild()
 {
     childSetAction("Teleport", onClickTeleport, this);
     childSetAction("Show on Map", onClickMap, this);
 
     // Grant list
     LLScrollListCtrl* grant_list = getChild<LLScrollListCtrl>("grant list");
-    grant_list->sortByColumnIndex(0, TRUE);
+    grant_list->sortByColumnIndex(0, true);
     grant_list->setDoubleClickCallback(onGrantList, this);
 
-    S32 count = gAgent.mGroups.size();
-    for(S32 i = 0; i < count; ++i)
+    auto count = gAgent.mGroups.size();
+    for(size_t i = 0; i < count; ++i)
     {
         LLUUID id(gAgent.mGroups.at(i).mID);
         LLUIString areastr = getString("area_string");
@@ -99,7 +99,7 @@ BOOL LLFloaterLandHoldings::postBuild()
 
     center();
 
-    return TRUE;
+    return true;
 }
 
 
@@ -139,10 +139,10 @@ void LLFloaterLandHoldings::draw()
 void LLFloaterLandHoldings::refresh()
 {
     LLCtrlSelectionInterface *list = childGetSelectionInterface("parcel list");
-    BOOL enable_btns = FALSE;
+    bool enable_btns = false;
     if (list && list->getFirstSelectedIndex()> -1)
     {
-        enable_btns = TRUE;
+        enable_btns = true;
     }
 
     getChildView("Teleport")->setEnabled(enable_btns);
@@ -183,7 +183,7 @@ void LLFloaterLandHoldings::processPlacesReply(LLMessageSystem* msg, void**)
     // If this is the first packet, clear out the "loading..." indicator
     if (!self->mFirstPacketReceived)
     {
-        self->mFirstPacketReceived = TRUE;
+        self->mFirstPacketReceived = true;
         list->operateOnAll(LLCtrlSelectionInterface::OP_DELETE);
     }
 
@@ -200,15 +200,15 @@ void LLFloaterLandHoldings::processPlacesReply(LLMessageSystem* msg, void**)
 
     for (S32 i = 0; i < count; i++)
     {
-        msg->getUUID("QueryData", "OwnerID", owner_id, i);
-        msg->getString("QueryData", "Name", name, i);
-        msg->getString("QueryData", "Desc", desc, i);
-        msg->getS32("QueryData", "ActualArea", actual_area, i);
-        msg->getS32("QueryData", "BillableArea", billable_area, i);
-        msg->getU8("QueryData", "Flags", flags, i);
-        msg->getF32("QueryData", "GlobalX", global_x, i);
-        msg->getF32("QueryData", "GlobalY", global_y, i);
-        msg->getString("QueryData", "SimName", sim_name, i);
+        msg->getUUIDFast(_PREHASH_QueryData, _PREHASH_OwnerID, owner_id, i);
+        msg->getStringFast(_PREHASH_QueryData, _PREHASH_Name, name, i);
+        msg->getStringFast(_PREHASH_QueryData, _PREHASH_Desc, desc, i);
+        msg->getS32Fast(_PREHASH_QueryData, _PREHASH_ActualArea, actual_area, i);
+        msg->getS32Fast(_PREHASH_QueryData, _PREHASH_BillableArea, billable_area, i);
+        msg->getU8Fast(_PREHASH_QueryData, _PREHASH_Flags, flags, i);
+        msg->getF32Fast(_PREHASH_QueryData, _PREHASH_GlobalX, global_x, i);
+        msg->getF32Fast(_PREHASH_QueryData, _PREHASH_GlobalY, global_y, i);
+        msg->getStringFast(_PREHASH_QueryData, _PREHASH_SimName, sim_name, i);
 
         if ( msg->getSizeFast(_PREHASH_QueryData, i, _PREHASH_ProductSKU) > 0 )
         {

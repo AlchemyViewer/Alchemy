@@ -57,6 +57,7 @@
 #include "llviewermenu.h"
 #include "llviewerregion.h"
 // [RLVa:KB]
+#include "rlvactions.h"
 #include "rlvhandler.h"
 // [/RLVa:KB]
 
@@ -69,7 +70,7 @@ static void collapse_all_folders(LLFolderView* root_folder);
 static void expand_all_folders(LLFolderView* root_folder);
 static bool has_expanded_folders(LLFolderView* root_folder);
 static bool has_collapsed_folders(LLFolderView* root_folder);
-static void toggle_restore_menu(LLMenuGL* menu, BOOL visible, BOOL enabled);
+static void toggle_restore_menu(LLMenuGL* menu, bool visible, bool enabled);
 
 /**
  * Functor counting expanded and collapsed folders in folder view tree to know
@@ -139,7 +140,7 @@ void LLOpenFolderByID::doFolder(LLFolderViewFolder* folder)
     {
         if (!folder->isOpen())
         {
-            folder->setOpen(TRUE);
+            folder->setOpen(true);
             mIsFolderOpen = true;
         }
     }
@@ -178,16 +179,16 @@ LLLandmarksPanel::~LLLandmarksPanel()
 {
 }
 
-BOOL LLLandmarksPanel::postBuild()
+bool LLLandmarksPanel::postBuild()
 {
     if (!gInventory.isInventoryUsable())
-        return FALSE;
+        return false;
 
     // mast be called before any other initXXX methods to init Gear menu
     initListCommandsHandlers();
     initLandmarksInventoryPanel();
 
-    return TRUE;
+    return true;
 }
 
 // virtual
@@ -295,7 +296,7 @@ void LLLandmarksPanel::updateVerbs()
     }
 }
 
-void LLLandmarksPanel::setItemSelected(const LLUUID& obj_id, BOOL take_keyboard_focus)
+void LLLandmarksPanel::setItemSelected(const LLUUID& obj_id, bool take_keyboard_focus)
 {
     if (!mCurrentSelectedList)
         return;
@@ -304,7 +305,7 @@ void LLLandmarksPanel::setItemSelected(const LLUUID& obj_id, BOOL take_keyboard_
     LLFolderViewItem* item = mCurrentSelectedList->getItemByID(obj_id);
     if (!item)
         return;
-    root->setSelection(item, FALSE, take_keyboard_focus);
+    root->setSelection(item, false, take_keyboard_focus);
     root->scrollToShowSelection();
 }
 
@@ -476,18 +477,18 @@ void LLLandmarksPanel::initListCommandsHandlers()
     {
         mGearLandmarkMenu->setVisibilityChangeCallback(boost::bind(&LLLandmarksPanel::onMenuVisibilityChange, this, _1, _2));
         // show menus even if all items are disabled
-        mGearLandmarkMenu->setAlwaysShowMenu(TRUE);
+        mGearLandmarkMenu->setAlwaysShowMenu(true);
     } // Else corrupted files?
 
     if (mGearFolderMenu)
     {
         mGearFolderMenu->setVisibilityChangeCallback(boost::bind(&LLLandmarksPanel::onMenuVisibilityChange, this, _1, _2));
-        mGearFolderMenu->setAlwaysShowMenu(TRUE);
+        mGearFolderMenu->setAlwaysShowMenu(true);
     }
 
     if (mAddMenu)
     {
-        mAddMenu->setAlwaysShowMenu(TRUE);
+        mAddMenu->setAlwaysShowMenu(true);
     }
 }
 
@@ -657,11 +658,19 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
 
     if ("collapse_all" == command_name)
     {
-        return mCurrentSelectedList && has_expanded_folders(mCurrentSelectedList->getRootFolder());
+        if (!mCurrentSelectedList)
+        {
+            return false;
+        }
+        return has_expanded_folders(mCurrentSelectedList->getRootFolder());
     }
     else if ("expand_all" == command_name)
     {
-        return mCurrentSelectedList && has_collapsed_folders(mCurrentSelectedList->getRootFolder());
+        if (!mCurrentSelectedList)
+        {
+            return false;
+        }
+        return has_collapsed_folders(mCurrentSelectedList->getRootFolder());
     }
     else if ("sort_by_date" == command_name)
     {
@@ -726,7 +735,10 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
             if (asset_uuid.isNull()) return false;
 
             // Disable "Show on Map" if landmark loading is in progress.
-            return !gLandmarkList.isAssetInLoadedCallbackMap(asset_uuid);
+// [RLVa:KB]
+            return !gLandmarkList.isAssetInLoadedCallbackMap(asset_uuid) && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWWORLDMAP);
+// [/RLVa:KB]
+//          return !gLandmarkList.isAssetInLoadedCallbackMap(asset_uuid);
         }
         else if ("rename" == command_name)
         {
@@ -735,6 +747,12 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
 
             return canItemBeModified(command_name, selected_item);
         }
+// [RLVa:KB]
+        else if ("teleport" == command_name)
+        {
+            return !gRlvHandler.hasBehaviour(RLV_BHVR_TPLM);
+        }
+// [/RLVa:KB]
 
         return true;
     }
@@ -911,8 +929,8 @@ void LLLandmarksPanel::onMenuVisibilityChange(LLUICtrl* ctrl, const LLSD& param)
     // We don't have to update items visibility if the menu is hiding.
     if (!new_visibility) return;
 
-    BOOL are_any_items_in_trash = FALSE;
-    BOOL are_all_items_in_trash = TRUE;
+    bool are_any_items_in_trash = false;
+    bool are_all_items_in_trash = true;
 
     LLFolderView* root_folder_view = mCurrentSelectedList ? mCurrentSelectedList->getRootFolder() : NULL;
     if(root_folder_view)
@@ -1028,7 +1046,7 @@ bool LLLandmarksPanel::canItemBeModified(const std::string& command_name, LLFold
     return can_be_modified;
 }
 
-bool LLLandmarksPanel::handleDragAndDropToTrash(BOOL drop, EDragAndDropType cargo_type, void* cargo_data , EAcceptance* accept)
+bool LLLandmarksPanel::handleDragAndDropToTrash(bool drop, EDragAndDropType cargo_type, void* cargo_data , EAcceptance* accept)
 {
     *accept = ACCEPT_NO;
 
@@ -1086,7 +1104,7 @@ void LLLandmarksPanel::doShowOnMap(LLLandmark* landmark)
 
     if (mGearLandmarkMenu)
     {
-        mGearLandmarkMenu->setItemEnabled("show_on_map", TRUE);
+        mGearLandmarkMenu->setItemEnabled("show_on_map", true);
     }
 }
 
@@ -1104,7 +1122,11 @@ void LLLandmarksPanel::doProcessParcelInfo(LLLandmark* landmark,
     data.snapshot_id = parcel_data.snapshot_id;
     data.parcel_id = parcel_data.parcel_id;
 
-    LLAvatarActions::createPick(data);
+    LLFloaterProfile* profile_floater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgentID)));
+    if (profile_floater)
+    {
+        profile_floater->createPick(data);
+    }
 }
 
 void LLLandmarksPanel::doCreatePick(LLLandmark* landmark, const LLUUID &item_id)
@@ -1118,13 +1140,9 @@ void LLLandmarksPanel::doCreatePick(LLLandmark* landmark, const LLUUID &item_id)
     LLUUID region_id;
     landmark->getGlobalPos(pos_global);
     landmark->getRegionID(region_id);
-    LLVector3 region_pos = landmark->getRegionPos();
-    if (region_pos.isNull())
-    {
-        region_pos.set((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
-            (F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
-            (F32)pos_global.mdV[VZ]);
-    }
+    LLVector3 region_pos((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
+                      (F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
+                      (F32)pos_global.mdV[VZ]);
 
     LLSD body;
     std::string url = region->getCapability("RemoteParcelRequest");
@@ -1175,7 +1193,7 @@ static void collapse_all_folders(LLFolderView* root_folder)
     if (!root_folder)
         return;
 
-    root_folder->setOpenArrangeRecursively(FALSE, LLFolderViewFolder::RECURSE_DOWN);
+    root_folder->setOpenArrangeRecursively(false, LLFolderViewFolder::RECURSE_DOWN);
     root_folder->arrangeAll();
 }
 
@@ -1184,7 +1202,7 @@ static void expand_all_folders(LLFolderView* root_folder)
     if (!root_folder)
         return;
 
-    root_folder->setOpenArrangeRecursively(TRUE, LLFolderViewFolder::RECURSE_DOWN);
+    root_folder->setOpenArrangeRecursively(true, LLFolderViewFolder::RECURSE_DOWN);
     root_folder->arrangeAll();
 }
 
@@ -1219,7 +1237,7 @@ static bool has_collapsed_folders(LLFolderView* root_folder)
 // Displays "Restore Item" context menu entry while hiding
 // all other entries or vice versa.
 // Sets "Restore Item" enabled state.
-void toggle_restore_menu(LLMenuGL *menu, BOOL visible, BOOL enabled)
+void toggle_restore_menu(LLMenuGL *menu, bool visible, bool enabled)
 {
     if (!menu) return;
 
@@ -1249,17 +1267,17 @@ LLFavoritesPanel::LLFavoritesPanel()
     buildFromFile("panel_favorites.xml");
 }
 
-BOOL LLFavoritesPanel::postBuild()
+bool LLFavoritesPanel::postBuild()
 {
     if (!gInventory.isInventoryUsable())
-        return FALSE;
+        return false;
 
     // mast be called before any other initXXX methods to init Gear menu
     LLLandmarksPanel::initListCommandsHandlers();
 
     initFavoritesInventoryPanel();
 
-    return TRUE;
+    return true;
 }
 
 void LLFavoritesPanel::initFavoritesInventoryPanel()

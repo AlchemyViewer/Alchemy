@@ -39,7 +39,7 @@ class LLViewerObject;
 const U32 NUM_TRAIL_POINTS = 40;
 
 
-class LLHUDEffectSpiral final : public LLHUDEffect
+class LLHUDEffectSpiral : public LLHUDEffect
 {
 public:
     /*virtual*/ void markDead();
@@ -76,7 +76,7 @@ private:
     F32                             mOffset[NUM_TRAIL_POINTS];
     */
 
-    BOOL                            mbInit;
+    bool                            mbInit;
     LLPointer<LLViewerPartSource>   mPartSourcep;
 
     F32                             mKillTime;

@@ -40,7 +40,6 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <shlwapi.h>
 
 // Utility stuff to get versions of the sh
 #define PACKVERSION(major,minor) MAKELONG(minor,major)
@@ -49,14 +48,15 @@ DWORD GetDllVersion(LPCTSTR lpszDllName);
 namespace
 { // anonymous
     enum class prst { INIT, OPEN, SKIP };
-    prst state = prst::INIT;
+    prst state{ prst::INIT };
+
     // This is called so early that we can't count on static objects being
     // properly constructed yet, so declare a pointer instead of an instance.
     llofstream* prelogf = nullptr;
 
     void prelog(const std::string& message)
     {
-        boost::optional<std::string> prelog_name;
+        std::optional<std::string> prelog_name;
 
         switch (state)
         {
@@ -77,6 +77,7 @@ namespace
             (*prelogf) << "========================================================================"
                        << std::endl;
             // fall through, don't break
+            [[fallthrough]];
 
         case prst::OPEN:
             (*prelogf) << message << std::endl;
@@ -171,7 +172,7 @@ LLDir_Win32::LLDir_Win32()
         {
             w_str[wcslen(w_str)-1] = '\0'; /* Flawfinder: ignore */ // remove trailing slash
         }
-        mTempDir = ll_convert_wide_to_string(w_str);
+        mTempDir = ll_convert<std::string>(std::wstring(w_str));
 
         if (mOSUserDir.empty())
         {
@@ -207,7 +208,7 @@ LLDir_Win32::LLDir_Win32()
         {
             // successfully created logdir, plunk a log file there
             std::string logfilename(add(mOSUserDir, "lldir.log"));
-            std::ofstream logfile(logfilename.c_str());
+            llofstream logfile(logfilename.c_str());
             if (! logfile.is_open())
             {
                 report(std::cerr);
@@ -224,15 +225,15 @@ LLDir_Win32::LLDir_Win32()
 
     // Set working directory, for LLDir::getWorkingDir()
     GetCurrentDirectory(MAX_PATH, w_str);
-    mWorkingDir = ll_convert_wide_to_string(w_str);
+    mWorkingDir = ll_convert<std::string>(std::wstring(w_str));
 
     // Set the executable directory
     S32 size = GetModuleFileName(NULL, w_str, MAX_PATH);
     if (size)
     {
         w_str[size] = '\0';
-        mExecutablePathAndName = ll_convert_wide_to_string(w_str);
-        std::string::size_type path_end = mExecutablePathAndName.find_last_of('\\');
+        mExecutablePathAndName = ll_convert<std::string>(std::wstring(w_str));
+        auto path_end = mExecutablePathAndName.find_last_of('\\');
         if (path_end != std::string::npos)
         {
             mExecutableDir = mExecutablePathAndName.substr(0, path_end);
@@ -246,7 +247,7 @@ LLDir_Win32::LLDir_Win32()
     }
     else
     {
-        PRELOG("Couldn't get APP path, assuming current directory!");
+        fprintf(stderr, "Couldn't get APP path, assuming current directory!");
         mExecutableDir = mWorkingDir;
         // Assume it's the current directory
     }
@@ -255,20 +256,8 @@ LLDir_Win32::LLDir_Win32()
 
     // Determine the location of the App-Read-Only-Data
     // Try the working directory then the exe's dir.
-#ifndef AL_SENTRY
-    std::string::size_type build_dir_pos = mExecutableDir.rfind(mDirDelimiter + "build-vc-");
-    if (build_dir_pos != std::string::npos)
-    {
-        // ...we're in a dev checkout
-        mAppRODataDir = add(mExecutableDir.substr(0, build_dir_pos), "indra", "newview");
-        PRELOG("Running in dev checkout with mAppRODataDir " << mAppRODataDir);
-    }
-    else
-#endif
-    {
-        // ...normal installation running
-        mAppRODataDir = mWorkingDir;
-    }
+    mAppRODataDir = mWorkingDir;
+
 
 //  if (mExecutableDir.find("indra") == std::string::npos)
 
@@ -358,8 +347,8 @@ U32 LLDir_Win32::countFilesInDir(const std::string &dirname, const std::string &
 
     WIN32_FIND_DATA FileData;
 
-    std::wstring pathname = ll_convert_string_to_wide(dirname);
-    pathname += ll_convert_string_to_wide(mask);
+    std::wstring pathname = ll_convert<std::wstring>(dirname);
+    pathname += ll_convert<std::wstring>(mask);
 
     if ((count_search_h = FindFirstFile(pathname.c_str(), &FileData)) != INVALID_HANDLE_VALUE)
     {
@@ -381,20 +370,13 @@ std::string LLDir_Win32::getCurPath()
     WCHAR w_str[MAX_PATH];
     GetCurrentDirectory(MAX_PATH, w_str);
 
-    return ll_convert_wide_to_string(w_str);
+    return ll_convert<std::string>(std::wstring(w_str));
 }
-
-
-bool LLDir_Win32::fileExists(const std::string& filename) const
-{
-    return PathFileExists(ll_convert_string_to_wide(filename).c_str());
-}
-
 
 /*virtual*/ std::string LLDir_Win32::getLLPluginLauncher()
 {
     return gDirUtilp->getExecutableDir() + gDirUtilp->getDirDelimiter() +
-        "ALPlugin.exe";
+        "SLPlugin.exe";
 }
 
 /*virtual*/ std::string LLDir_Win32::getLLPluginFilename(std::string base_name)

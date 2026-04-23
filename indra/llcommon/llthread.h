@@ -27,9 +27,10 @@
 #ifndef LL_LLTHREAD_H
 #define LL_LLTHREAD_H
 
-#include "llapr.h"
 #include "llrefcount.h"
 #include <thread>
+
+extern void set_thread_name(const char* threadName);
 
 namespace LLTrace
 {
@@ -49,10 +50,9 @@ public:
         QUITTING= 2,    // Someone wants this thread to quit
         CRASHED = -1    // An uncaught exception was thrown by the thread
     } EThreadStatus;
-
     typedef std::thread::id id_t;
 
-    LLThread(const std::string& name, apr_pool_t *poolp = NULL);
+    LLThread(const std::string& name);
     virtual ~LLThread(); // Warning!  You almost NEVER want to destroy a thread unless it's in the STOPPED state.
     virtual void shutdown(); // stops the thread
 
@@ -68,7 +68,7 @@ public:
     // Called from MAIN THREAD.
     void pause();
     void unpause();
-    bool isPaused() { return isStopped() || mPaused == TRUE; }
+    bool isPaused() const { return isStopped() || mPaused; }
 
     // Cause the thread to wake up and check its condition
     void wake();
@@ -82,30 +82,29 @@ public:
     // this kicks off the apr thread
     void start(void);
 
-    LLVolatileAPRPool* getLocalAPRFilePool() { return mLocalAPRFilePoolp ; }
-
-    id_t getID() const;
+    id_t getID() const { return mID; }
 
 private:
     bool                mPaused;
+    std::thread::native_handle_type mNativeHandle; // for termination in case of issues
 
     // static function passed to APR thread creation routine
     void threadRun();
+    void tryRun();
+
+#ifdef LL_WINDOWS
+    void sehHandle();
+#endif
 
 protected:
     std::string         mName;
-    std::unique_ptr<class LLCondition>  mRunCondition;
-    std::unique_ptr<LLMutex>            mDataLock;
-    std::unique_ptr<std::thread>        mThreadp;
-    std::atomic_int                     mStatus;
-    std::thread::native_handle_type     mNativeHandle;
-#ifdef SHOW_ASSERT
-    std::unique_ptr<LLTrace::ThreadRecorder> mRecorder;
-#endif
-    //a local apr_pool for APRFile operations in this thread. If it exists, LLAPRFile::sAPRFilePoolp should not be used.
-    //Note: this pool is used by APRFile ONLY, do NOT use it for any other purposes.
-    //      otherwise it will cause severe memory leaking!!! --bao
-    LLVolatileAPRPool  *mLocalAPRFilePoolp ;
+    class LLCondition*  mRunCondition;
+    LLMutex*            mDataLock;
+
+    std::thread        *mThreadp;
+    EThreadStatus       mStatus;
+    id_t                mID;
+    LLTrace::ThreadRecorder* mRecorder;
 
     void setQuitting();
 
@@ -139,7 +138,7 @@ protected:
 class LL_COMMON_API LLResponder : public LLThreadSafeRefCount
 {
 protected:
-    virtual ~LLResponder() = default;
+    virtual ~LLResponder();
 public:
     virtual void completed(bool success) = 0;
 };

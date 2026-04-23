@@ -28,7 +28,6 @@
 #ifndef LL_AUDIOENGINE_H
 #define LL_AUDIOENGINE_H
 
-#include <array>
 #include <list>
 #include <map>
 #include <array>
@@ -42,8 +41,8 @@
 #include "llextendedstatus.h"
 
 #include "lllistener.h"
-#include "boost/unordered/unordered_flat_map.hpp"
-#include "boost/unordered_map.hpp"
+
+#include <boost/unordered_map.hpp>
 
 const F32 LL_WIND_UPDATE_INTERVAL = 0.1f;
 const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
@@ -51,8 +50,8 @@ const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
 const F32 ATTACHED_OBJECT_TIMEOUT = 5.0f;
 const F32 DEFAULT_MIN_DISTANCE = 2.0f;
 
-#define LL_MAX_AUDIO_CHANNELS 30
-#define LL_MAX_AUDIO_BUFFERS 60 // Some extra for preloading, maybe?
+#define LL_MAX_AUDIO_CHANNELS 120
+#define LL_MAX_AUDIO_BUFFERS 140 // Some extra for preloading, maybe?
 
 class LLAudioSource;
 class LLAudioData;
@@ -90,7 +89,7 @@ public:
     };
 
     LLAudioEngine();
-    virtual ~LLAudioEngine() = default;
+    virtual ~LLAudioEngine();
 
     // initialization/startup/shutdown
     virtual bool init(void *userdata, const std::string &app_title);
@@ -100,7 +99,7 @@ public:
 
     // Used by the mechanics of the engine
     //virtual void processQueue(const LLUUID &sound_guid);
-    virtual void setListener(const LLVector3& pos, const LLVector3& vel, const LLVector3& up, const LLVector3& at);
+    virtual void setListener(LLVector3 pos,LLVector3 vel,LLVector3 up,LLVector3 at);
     virtual void updateWind(LLVector3 direction, F32 camera_height_above_water) = 0;
     virtual void idle();
     virtual void updateChannels();
@@ -199,15 +198,15 @@ protected:
 
 
     // listener methods
-    virtual void setListenerPos(const LLVector3& vec);
-    virtual void setListenerVelocity(const LLVector3& vec);
-    virtual void orientListener(const LLVector3& up, const LLVector3& at);
-    virtual void translateListener(const LLVector3& vec);
+    virtual void setListenerPos(LLVector3 vec);
+    virtual void setListenerVelocity(LLVector3 vec);
+    virtual void orientListener(LLVector3 up, LLVector3 at);
+    virtual void translateListener(LLVector3 vec);
 
 
-    F64 mapWindVecToGain(const LLVector3& wind_vec);
-    F64 mapWindVecToPitch(const LLVector3& wind_vec);
-    F64 mapWindVecToPan(const LLVector3& wind_vec);
+    F64 mapWindVecToGain(LLVector3 wind_vec);
+    F64 mapWindVecToPitch(LLVector3 wind_vec);
+    F64 mapWindVecToPan(LLVector3 wind_vec);
 
 protected:
     LLListener *mListenerp;
@@ -225,8 +224,8 @@ protected:
     // A list of all audio sources that are known to the viewer at this time.
     // This is most likely a superset of the ones that we actually have audio
     // data for, or are playing back.
-    typedef boost::unordered_flat_map<LLUUID, LLAudioSource *> source_map;
-    typedef boost::unordered_flat_map<LLUUID, LLAudioData *> data_map;
+    typedef std::map<LLUUID, LLAudioSource *> source_map;
+    typedef std::map<LLUUID, LLAudioData *> data_map;
 
     source_map mAllSources;
     data_map mAllData;
@@ -254,7 +253,7 @@ public:
 private:
     S32 mSoundHistoryPruneCounter = 0;
 
-    using sound_history_map = boost::unordered_flat_map<LLUUID, std::unique_ptr<LLSoundHistoryItem>>;
+    using sound_history_map = boost::unordered_map<LLUUID, std::unique_ptr<LLSoundHistoryItem>>;
     sound_history_map mSoundHistory;
 private:
     void setDefaults();
@@ -281,7 +280,7 @@ class LLAudioSource
 public:
     // owner_id is the id of the agent responsible for making this sound
     // play, for example, the owner of the object currently playing it
-    LLAudioSource(const LLUUID &id, const LLUUID& owner_id, const F32 gain, const S32 type = LLAudioEngine::AUDIO_TYPE_NONE, const LLUUID& source_id = LLUUID::null, const bool isTrigger = true);
+    LLAudioSource(const LLUUID &id, const LLUUID& owner_id, const F32 gain, const S32 type = LLAudioEngine::AUDIO_TYPE_NONE, const LLUUID& source_id = LLUUID::null, const bool is_trigger = true);
     virtual ~LLAudioSource();
 
     virtual void update();                      // Update this audio source
@@ -289,7 +288,7 @@ public:
 
     void preload(const LLUUID &audio_id); // Only used for preloading UI sounds, now.
 
-    void addAudioData(LLAudioData *adp, bool set_current = TRUE);
+    void addAudioData(LLAudioData *adp, bool set_current = true);
 
     void setForcedPriority(const bool ambient)                      { mForcedPriority = ambient; }
     bool isForcedPriority() const                                   { return mForcedPriority; }
@@ -372,7 +371,7 @@ protected:
     LLAudioData     *mCurrentDatap;
     LLAudioData     *mQueuedDatap;
 
-    typedef boost::unordered_flat_map<LLUUID, LLAudioData *> data_map;
+    typedef std::map<LLUUID, LLAudioData *> data_map;
     data_map mPreloadMap;
 
     LLFrameTimer mAgeTimer;
@@ -474,7 +473,7 @@ protected:
 class LLAudioBuffer
 {
 public:
-    virtual ~LLAudioBuffer() = default;
+    virtual ~LLAudioBuffer() {};
     virtual bool loadWAV(const std::string& filename) = 0;
     virtual U32 getLength() = 0;
 

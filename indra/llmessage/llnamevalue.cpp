@@ -35,10 +35,6 @@
 #include "llstring.h"
 #include "llstringtable.h"
 
-#if LL_GNUC && GCC_VERSION >= 80000
-#pragma GCC diagnostic ignored "-Wstringop-truncation"
-#endif
-
 // Anonymous enumeration to provide constants in this file.
 // *NOTE: These values may be used in sscanf statements below as their
 // value-1, so search for '2047' if you cange NV_BUFFER_LEN or '63' if
@@ -680,13 +676,13 @@ LLVector3   *LLNameValue::getVec3()
 }
 
 
-BOOL LLNameValue::sendToData() const
+bool LLNameValue::sendToData() const
 {
     return (mSendto == NVS_DATA_SIM || mSendto == NVS_DATA_SIM_VIEWER);
 }
 
 
-BOOL LLNameValue::sendToViewer() const
+bool LLNameValue::sendToViewer() const
 {
     return (mSendto == NVS_SIM_VIEWER || mSendto == NVS_DATA_SIM_VIEWER);
 }

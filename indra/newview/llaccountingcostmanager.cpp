@@ -26,11 +26,7 @@
 
 #include "llviewerprecompiledheaders.h"
 #include "llaccountingcostmanager.h"
-
 #include "llagent.h"
-#include "llviewerobjectlist.h"
-#include "llviewerregion.h"
-
 #include "httpcommon.h"
 #include "llcoros.h"
 #include "lleventcoro.h"
@@ -57,8 +53,8 @@ void LLAccountingCostManager::accountingCostCoro(std::string url,
 
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("AccountingCost", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("accountingCostCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     try
     {
@@ -154,9 +150,9 @@ void LLAccountingCostManager::accountingCostCoro(std::string url,
                 F32 networkCost = 0.0f;
                 F32 simulationCost = 0.0f;
 
-                physicsCost = selected["physics"].asReal();
-                networkCost = selected["streaming"].asReal();
-                simulationCost = selected["simulation"].asReal();
+                physicsCost = (F32)selected["physics"].asReal();
+                networkCost = (F32)selected["streaming"].asReal();
+                simulationCost = (F32)selected["simulation"].asReal();
 
                 SelectionCost selectionCost( physicsCost, networkCost, simulationCost);
 

@@ -29,14 +29,14 @@
 
 #include "llfloater.h"
 
-class LLFloaterSceneLoadStats final : public LLFloater
+class LLFloaterSceneLoadStats : public LLFloater
 {
     friend class LLFloaterReg;
 private:
     LLFloaterSceneLoadStats(const LLSD& key);
 
 public:
-    BOOL postBuild();
+    bool postBuild() override;
 
 };
 

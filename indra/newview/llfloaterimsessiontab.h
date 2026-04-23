@@ -41,7 +41,6 @@
 #include "rlvhelper.h"
 // [/RLVa:KB]
 
-class LLPanelChatControlPanel;
 class LLChatEntry;
 class LLChatHistory;
 class LLPanelEmojiComplete;
@@ -50,11 +49,11 @@ class LLFloaterIMSessionTab
     : public LLTransientDockableFloater
     , public LLIMSessionObserver
 {
+    using super = LLTransientDockableFloater;
 // [RLVa:KB] - @shownames
     friend struct RlvCommandHandler<RLV_TYPE_ADDREM, RLV_BHVR_SHOWNAMES>;
     friend struct RlvCommandHandler<RLV_TYPE_ADDREM, RLV_BHVR_SHOWNEARBY>;
 // [/RLVa:KB]
-    using super = LLTransientDockableFloater;
 
 public:
     LOG_CLASS(LLFloaterIMSessionTab);
@@ -85,12 +84,14 @@ public:
 
     // LLFloater overrides
     void onOpen(const LLSD& key) override;
-    BOOL postBuild() override;
+    bool postBuild() override;
     void draw() override;
-    void setVisible(BOOL visible) override;
-    void setFocus(BOOL focus) override;
+    void setVisible(bool visible) override;
+    void setFocus(bool focus) override;
     void closeFloater(bool app_quitting = false) override;
     void deleteAllChildren() override;
+
+    virtual void onClickCloseBtn(bool app_quitting = false) override;
 
     // Handle the left hand participant list widgets
     void addConversationViewParticipant(LLConversationItem* item, bool update_view = true);
@@ -106,7 +107,7 @@ public:
     virtual void updateMessages() {}
     LLConversationItem* getCurSelectedViewModelItem();
     void forceReshape();
-    virtual BOOL handleKeyHere( KEY key, MASK mask );
+    virtual bool handleKeyHere( KEY key, MASK mask ) override;
     bool isMessagePaneExpanded() const {return mMessagePaneExpanded;}
     void setMessagePaneExpanded(bool expanded){mMessagePaneExpanded = expanded;}
     void restoreFloater();
@@ -117,7 +118,7 @@ public:
     LLView* getChatHistory();
 
     // LLIMSessionObserver triggers
-    virtual void sessionAdded(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id, BOOL has_offline_msg) override {}; // Stub
+    virtual void sessionAdded(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id, bool has_offline_msg) override {}; // Stub
     virtual void sessionActivated(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id) override {}; // Stub
     virtual void sessionRemoved(const LLUUID& session_id) override;
     virtual void sessionVoiceOrIMStarted(const LLUUID& session_id) override {};                              // Stub
@@ -166,7 +167,7 @@ protected:
     static void applyMUPose(std::string& text);
     static void applyOOCClose(std::string& text);
 
-    void updateUsedEmojis(const LLWString& text);
+    void updateUsedEmojis(LLWStringView text);
 
     S32  mFloaterExtraWidth;
 
@@ -248,6 +249,8 @@ private:
 
     void onEmojiRecentPanelToggleBtnClicked();
     void onEmojiPickerShowBtnClicked();
+    void onEmojiPickerShowBtnDown();
+    void onEmojiPickerClosed();
     void initEmojiRecentPanel();
     void onEmojiRecentPanelFocusReceived();
     void onEmojiRecentPanelFocusLost();
@@ -262,6 +265,9 @@ private:
     S32 mInputEditorPad;
     S32 mChatLayoutPanelHeight;
     S32 mFloaterHeight;
+
+    boost::signals2::connection mEmojiCloseConn;
+    U32 mEmojiHelperLastCallbackFrame = { 0 };
 };
 
 

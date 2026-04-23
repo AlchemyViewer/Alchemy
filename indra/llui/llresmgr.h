@@ -40,7 +40,7 @@ enum LLLOCALE_ID
     LLLOCALE_COUNT  // Number of values in this enum.  Keep at end.
 };
 
-class LLResMgr final : public LLSingleton<LLResMgr>
+class LLResMgr : public LLSingleton<LLResMgr>
 {
     LLSINGLETON(LLResMgr);
 
@@ -48,13 +48,13 @@ public:
     void                setLocale( LLLOCALE_ID locale_id );
     LLLOCALE_ID         getLocale() const                       { return mLocale; }
 
-    static char         getDecimalPoint();
-    static char         getThousandsSeparator();
+    char                getDecimalPoint() const;
+    std::string         getThousandsSeparator() const;
 
-    static char         getMonetaryDecimalPoint();
-    static char         getMonetaryThousandsSeparator();
-    static std::string  getMonetaryString( S32 input );
-    static void         getIntegerString( std::string& output, S32 input );
+    char                getMonetaryDecimalPoint() const;
+    std::string         getMonetaryThousandsSeparator() const;
+    std::string         getMonetaryString( S32 input ) const;
+    void                getIntegerString( std::string& output, S32 input ) const;
 
 
 private:

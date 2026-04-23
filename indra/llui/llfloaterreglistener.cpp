@@ -94,22 +94,22 @@ void LLFloaterRegListener::getBuildMap(const LLSD& event) const
 
 void LLFloaterRegListener::showInstance(const LLSD& event) const
 {
-    LLFloaterReg::showInstance(event["name"].asStringRef(), event["key"], event["focus"]);
+    LLFloaterReg::showInstance(event["name"].asString(), event["key"], event["focus"]);
 }
 
 void LLFloaterRegListener::hideInstance(const LLSD& event) const
 {
-    LLFloaterReg::hideInstance(event["name"].asStringRef(), event["key"]);
+    LLFloaterReg::hideInstance(event["name"].asString(), event["key"]);
 }
 
 void LLFloaterRegListener::toggleInstance(const LLSD& event) const
 {
-    LLFloaterReg::toggleInstance(event["name"].asStringRef(), event["key"]);
+    LLFloaterReg::toggleInstance(event["name"].asString(), event["key"]);
 }
 
 void LLFloaterRegListener::instanceVisible(const LLSD& event) const
 {
-    sendReply(LLSDMap("visible", LLFloaterReg::instanceVisible(event["name"].asStringRef(), event["key"])),
+    sendReply(LLSDMap("visible", LLFloaterReg::instanceVisible(event["name"].asString(), event["key"])),
               event);
 }
 
@@ -119,7 +119,7 @@ void LLFloaterRegListener::clickButton(const LLSD& event) const
     LLReqID reqID(event);
     LLSD reply(reqID.makeResponse());
 
-    LLFloater* floater = LLFloaterReg::findInstance(event["name"].asStringRef(), event["key"]);
+    LLFloater* floater = LLFloaterReg::findInstance(event["name"].asString(), event["key"]);
     if (! LLFloater::isShown(floater))
     {
         reply["type"]  = "LLFloater";

@@ -57,13 +57,13 @@ bool compare_localized_command_labels(LLCommand * cmd1, LLCommand * cmd2)
     return (lab1 < lab2);
 }
 
-BOOL LLFloaterToybox::postBuild()
+bool LLFloaterToybox::postBuild()
 {
     mToolBar = getChild<LLToolBar>("toybox_toolbar");
 
     mToolBar->setStartDragCallback(boost::bind(LLToolBarView::startDragTool,_1,_2,_3));
     mToolBar->setHandleDragCallback(boost::bind(LLToolBarView::handleDragTool,_1,_2,_3,_4));
-    mToolBar->setHandleDropCallback(boost::bind(LLToolBarView::handleDropTool,_1,_2,_3,_4));
+    mToolBar->setHandleDropCallback(boost::bind(LLToolBarView::handleDropTool,_1,_2,_3,_4,_5));
     mToolBar->setButtonEnterCallback(boost::bind(&LLFloaterToybox::onToolBarButtonEnter,this,_1));
 
     //
@@ -94,7 +94,7 @@ BOOL LLFloaterToybox::postBuild()
         mToolBar->addCommand((*it)->id());
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterToybox::draw()
@@ -151,7 +151,7 @@ void LLFloaterToybox::onBtnClearAll()
     LLNotificationsUtil::add("ConfirmClearAllToybox");
 }
 
-BOOL LLFloaterToybox::handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
+bool LLFloaterToybox::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
     EDragAndDropType cargo_type,
     void* cargo_data,
     EAcceptance* accept,

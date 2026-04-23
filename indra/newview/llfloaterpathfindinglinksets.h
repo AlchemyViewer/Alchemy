@@ -44,7 +44,7 @@ class LLUICtrl;
 class LLVector3;
 class LLSearchEditor;
 
-class LLFloaterPathfindingLinksets final : public LLFloaterPathfindingObjects
+class LLFloaterPathfindingLinksets : public LLFloaterPathfindingObjects
 {
 public:
     static void  openLinksetsWithSelectedObjects();
@@ -55,7 +55,7 @@ protected:
     LLFloaterPathfindingLinksets(const LLSD& pSeed);
     virtual ~LLFloaterPathfindingLinksets();
 
-    virtual BOOL                       postBuild();
+    virtual bool                       postBuild();
 
     virtual void                       requestGetObjects();
 

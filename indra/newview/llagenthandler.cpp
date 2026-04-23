@@ -26,14 +26,16 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "alfloaterblocked.h"
 #include "llavataractions.h"
 #include "llcommandhandler.h"
 #include "llfloaterreg.h"
 #include "llfloaterreporter.h"
 #include "llmutelist.h"
 #include "llnotificationsutil.h"
-//#include "llpanelblockedlist.h"
-#include "llfloaterblocked.h"
+
+//////////////////////////////////////////////////////////////////////////
+// LLAgentHandler
 
 class LLAgentHandler : public LLCommandHandler
 {
@@ -66,18 +68,20 @@ public:
         return false;
     }
 
-    bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid,
-        LLMediaCtrl* web)
+    bool handle(const LLSD& params,
+                const LLSD& query_map,
+                const std::string& grid,
+                LLMediaCtrl* web)
     {
         if (params.size() < 2) return false;
         LLUUID avatar_id;
-        if (!avatar_id.set(params[0].asStringRef(), FALSE))
+        if (!avatar_id.set(params[0], false))
         {
             return false;
         }
 
         const std::string verb = params[1].asString();
-        if (verb == "about")
+        if (verb == "about" || verb == "mention")
         {
             LLAvatarActions::showProfile(avatar_id);
             return true;
@@ -150,8 +154,7 @@ public:
                 const std::string object_name = LLURI::unescape(params[2].asString());
                 LLMute mute(avatar_id, object_name, LLMute::OBJECT);
                 LLMuteList::getInstance()->add(mute);
-                LLFloaterBlocked::showMuteAndSelect(mute.mID);
-                //LLPanelBlockedList::showPanelAndSelect(mute.mID);
+                ALFloaterBlocked::showMuteAndSelect(mute.mID);
             }
             return true;
         }

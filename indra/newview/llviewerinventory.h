@@ -42,8 +42,7 @@ class LLViewerInventoryCategory;
 class LLInventoryCallback;
 class LLAvatarName;
 
-extern LLUUID gLocalInventory;
-extern const char* const LOCAL_INVENTORY_FOLDER_NAME;
+constexpr U8 NO_INV_SUBTYPE{ 0 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLViewerInventoryItem
@@ -59,7 +58,7 @@ public:
 
 protected:
     ~LLViewerInventoryItem( void ); // ref counted
-    BOOL extractSortFieldAndDisplayName(S32* sortField, std::string* displayName) const { return extractSortFieldAndDisplayName(mName, sortField, displayName); }
+    bool extractSortFieldAndDisplayName(S32* sortField, std::string* displayName) const { return extractSortFieldAndDisplayName(mName, sortField, displayName); }
     mutable std::string mDisplayName;
 
 public:
@@ -86,7 +85,7 @@ public:
     virtual time_t getCreationDate() const;
     virtual U32 getCRC32() const; // really more of a checksum.
 
-    static BOOL extractSortFieldAndDisplayName(const std::string& name, S32* sortField, std::string* displayName);
+    static bool extractSortFieldAndDisplayName(const std::string& name, S32* sortField, std::string* displayName);
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
     static bool lookupLocalizedName(std::string& name);
     static bool lookupSystemName(std::string& name);
@@ -132,14 +131,14 @@ public:
     void cloneViewerItem(LLPointer<LLViewerInventoryItem>& newitem) const;
 
     // virtual methods
-    virtual void updateParentOnServer(BOOL restamp) const;
-    virtual void updateServer(BOOL is_new) const;
+    virtual void updateParentOnServer(bool restamp) const;
+    virtual void updateServer(bool is_new) const;
     void fetchFromServer(void) const;
 
     virtual void packMessage(LLMessageSystem* msg) const;
-    virtual BOOL unpackMessage(LLMessageSystem* msg, const char* block, S32 block_num = 0);
-    virtual BOOL unpackMessage(const LLSD& item);
-    virtual BOOL importLegacyStream(std::istream& input_stream);
+    virtual bool unpackMessage(LLMessageSystem* msg, const char* block, S32 block_num = 0);
+    virtual bool unpackMessage(const LLSD& item);
+    virtual bool importLegacyStream(std::istream& input_stream);
 
     // new methods
     bool isFinished() const { return mIsComplete; }
@@ -168,7 +167,7 @@ public:
     void onCallingCardNameLookup(const LLUUID& id, const LLAvatarName& name);
 
     // If this is a broken link, try to fix it and any other identical link.
-    BOOL regenerateLink();
+    bool regenerateLink();
 
 public:
     bool mIsComplete;
@@ -204,8 +203,8 @@ public:
     LLViewerInventoryCategory(const LLViewerInventoryCategory* other);
     void copyViewerCategory(const LLViewerInventoryCategory* other);
 
-    virtual void updateParentOnServer(BOOL restamp_children) const;
-    virtual void updateServer(BOOL is_new) const;
+    virtual void updateParentOnServer(bool restamp_children) const;
+    virtual void updateServer(bool is_new) const;
 
     virtual void packMessage(LLMessageSystem* msg) const;
 
@@ -239,13 +238,13 @@ public:
     // How many descendents do we currently have information for in the InventoryModel?
     S32 getViewerDescendentCount() const;
 
-    LLSD exportLLSD() const;
-    bool importLLSD(const LLSD& cat_data);
+    virtual void exportLLSD(LLSD &sd) const;
+    virtual bool importLLSD(const std::string& label, const LLSD& value);
 
     void determineFolderType();
     void changeType(LLFolderType::EType new_folder_type);
     virtual void unpackMessage(LLMessageSystem* msg, const char* block, S32 block_num = 0);
-    virtual BOOL unpackMessage(const LLSD& category);
+    virtual bool unpackMessage(const LLSD& category);
 
     // returns true if the category object will accept the incoming item
     bool acceptItem(LLInventoryItem* inv_item);
@@ -271,10 +270,7 @@ public:
 
 class LLViewerJointAttachment;
 
-// [SL:KB] - Patch: Appearance-DnDWear | Checked: 2010-09-28 (Catznip-3.4)
 void rez_attachment_cb(const LLUUID& inv_item, LLViewerJointAttachment *attachmentp, bool replace);
-// [/SL:KB]
-//void rez_attachment_cb(const LLUUID& inv_item, LLViewerJointAttachment *attachmentp);
 
 void activate_gesture_cb(const LLUUID& inv_item);
 
@@ -294,9 +290,9 @@ private:
     LLUUID mTargetLandmarkId;
 };
 
-typedef boost::function<void(const LLUUID&)> inventory_func_type;
-typedef boost::function<void(const LLSD&)> llsd_func_type;
-typedef boost::function<void()> nullary_func_type;
+typedef std::function<void(const LLUUID&)> inventory_func_type;
+typedef std::function<void(const LLSD&)> llsd_func_type;
+typedef std::function<void()> nullary_func_type;
 
 void no_op_inventory_func(const LLUUID&); // A do-nothing inventory_func
 void no_op_llsd_func(const LLSD&); // likewise for LLSD
@@ -368,8 +364,6 @@ public:
 };
 extern LLInventoryCallbackManager gInventoryCallbacks;
 
-
-const U8 NO_INV_SUBTYPE{ 0 };
 
 // *TODO: Find a home for these
 void create_inventory_item(const LLUUID& agent_id, const LLUUID& session_id,
@@ -480,7 +474,7 @@ void menu_create_inventory_item(LLInventoryPanel* root,
                                 const LLSD& userdata,
                                 const LLUUID& default_parent_uuid = LLUUID::null);
 
-void menu_create_inventory_item(LLInventoryPanel* panel, LLUUID dest_id, const LLSD& userdata, const LLUUID& default_parent_uuid = LLUUID::null, std::function<void(const LLUUID&)> folder_created_cb = NULL);
+void menu_create_inventory_item(LLInventoryPanel* panel, LLUUID dest_id, const LLSD& userdata, const LLUUID& default_parent_uuid = LLUUID::null, std::function<void(const LLUUID&)> folder_created_cb = nullptr);
 
 void slam_inventory_folder(const LLUUID& folder_id,
                            const LLSD& contents,

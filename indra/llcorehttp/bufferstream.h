@@ -82,7 +82,7 @@ namespace LLCore
 /// sometime.
 ///
 
-class BufferArrayStreamBuf final : public std::streambuf
+class BufferArrayStreamBuf : public std::streambuf
 {
 public:
     /// Constructor increments the reference count on the
@@ -91,8 +91,8 @@ public:
     virtual ~BufferArrayStreamBuf();
 
 private:
-    BufferArrayStreamBuf(const BufferArrayStreamBuf &); // Not defined
-    void operator=(const BufferArrayStreamBuf &);       // Not defined
+    BufferArrayStreamBuf(const BufferArrayStreamBuf&) = delete;
+    void operator=(const BufferArrayStreamBuf&) = delete;
 
 public:
     // Input interfaces from std::streambuf
@@ -131,13 +131,13 @@ protected:
 /// can be applied to a BufferArray.  Very convenient for LLSD
 /// serialization and parsing as well.
 
-class BufferArrayStream final : public std::iostream
+class BufferArrayStream : public std::iostream
 {
 public:
     /// Constructor increments the reference count on the
     /// BufferArray argument and calls release() on destruction.
     BufferArrayStream(BufferArray * ba);
-    ~BufferArrayStream() = default;
+    ~BufferArrayStream();
 
 protected:
     BufferArrayStream(const BufferArrayStream &);

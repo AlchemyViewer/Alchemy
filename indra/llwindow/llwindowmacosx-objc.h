@@ -29,27 +29,27 @@
 #define LL_LLWINDOWMACOSX_OBJC_H
 
 #include <map>
-#include <string>
 #include <vector>
-#include <OpenGL/CGLTypes.h>
+#include <deque>
 
-//for CGSize
+//fir CGSize
 #include <CoreGraphics/CGGeometry.h>
+
+typedef std::vector<std::pair<int, bool> > segment_t;
+
+typedef std::vector<int> segment_lengths;
+typedef std::deque<bool> segment_standouts;
+
+struct attributedStringInfo {
+    segment_lengths seg_lengths;
+    segment_standouts seg_standouts;
+};
 
 // This will actually hold an NSCursor*, but that type is only available in objective C.
 typedef void *CursorRef;
 typedef void *NSWindowRef;
 typedef void *GLViewRef;
 
-typedef std::vector<std::pair<int, bool> > segment_t;
-
-typedef std::vector<int> segment_lengths;
-typedef std::vector<int> segment_standouts;
-
-struct attributedStringInfo {
-    segment_lengths seg_lengths;
-    segment_standouts seg_standouts;
-};
 
 struct NativeKeyEventData {
     enum EventType {
@@ -78,6 +78,8 @@ void initMainLoop();
 void cleanupViewer();
 void handleUrl(const char* url);
 void dispatchUrl(std::string url);
+void startWatchdog(std::string_view state);
+void stopWatchdog();
 
 /* Defined in llwindowmacosx-objc.mm: */
 int createNSApp(int argc, const char **argv);
@@ -103,13 +105,15 @@ long showAlert(std::string title, std::string text, int type);
 
 NSWindowRef createNSWindow(int x, int y, int width, int height);
 
+#include <OpenGL/OpenGL.h>
+
 GLViewRef createOpenGLView(NSWindowRef window, unsigned int samples, bool vsync);
 void glSwapBuffers(void* context);
 CGLContextObj getCGLContextObj(GLViewRef view);
 unsigned long getVramSize(GLViewRef view);
 float getDeviceUnitSize(GLViewRef view);
-void getContentViewBounds(NSWindowRef window, float* bounds);
-void getScaledContentViewBounds(NSWindowRef window, GLViewRef view, float* bounds);
+CGRect getContentViewRect(NSWindowRef window);
+CGRect getBackingViewRect(NSWindowRef window, GLViewRef view);
 void getWindowSize(NSWindowRef window, float* size);
 void setWindowSize(NSWindowRef window, int width, int height);
 void getCursorPos(NSWindowRef window, float* pos);
@@ -126,8 +130,8 @@ void setupInputWindow(NSWindowRef window, GLViewRef view);
 
 // These are all implemented in llwindowmacosx.cpp.
 // This is largely for easier interop between Obj-C and C++ (at least in the viewer's case due to the BOOL vs. BOOL conflict)
-bool callKeyUp(NSKeyEventRef event, unsigned int key, unsigned int mask);
-bool callKeyDown(NSKeyEventRef event, unsigned int key, unsigned int mask, wchar_t character);
+bool callKeyUp(NSKeyEventRef event, unsigned short key, unsigned int mask);
+bool callKeyDown(NSKeyEventRef event, unsigned short key, unsigned int mask, wchar_t character);
 void callResetKeys();
 bool callUnicodeCallback(wchar_t character, unsigned int mask);
 void callRightMouseDown(float *pos, unsigned int mask);
@@ -137,13 +141,14 @@ void callLeftMouseUp(float *pos, unsigned int mask);
 void callDoubleClick(float *pos, unsigned int mask);
 void callResize(unsigned int width, unsigned int height);
 void callMouseMoved(float *pos, unsigned int mask);
+void callMouseDragged(float *pos, unsigned int mask);
 void callScrollMoved(float deltaX, float deltaY);
 void callMouseExit();
 void callWindowFocus();
 void callWindowUnfocus();
 void callWindowHide();
 void callWindowUnhide();
-void callHandleDPIChanged(unsigned int width, unsigned int height, float scale_factor);
+void callWindowDidChangeScreen();
 void callDeltaUpdate(float *delta, unsigned int mask);
 void callOtherMouseDown(float *pos, unsigned int mask, int button);
 void callOtherMouseUp(float *pos, unsigned int mask, int button);
@@ -153,6 +158,7 @@ void callModifier(unsigned int mask);
 void callQuitHandler();
 void commitCurrentPreedit(GLViewRef glView);
 
+#include <string>
 void callHandleDragEntered(std::string url);
 void callHandleDragExited(std::string url);
 void callHandleDragUpdated(std::string url);
@@ -175,6 +181,5 @@ NSWindowRef getMainAppWindow();
 GLViewRef getGLView();
 
 unsigned int getModifiers();
-void setWindowTitle(const std::string& title);
 
 #endif // LL_LLWINDOWMACOSX_OBJC_H

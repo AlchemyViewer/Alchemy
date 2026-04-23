@@ -126,7 +126,7 @@ void LLHTTPNode::get(LLHTTPNode::ResponsePtr response, const LLSD& context) cons
     {
         response->result(simpleGet());
     }
-    catch (const NotImplemented&)
+    catch (NotImplemented&)
     {
         response->methodNotAllowed();
     }
@@ -140,7 +140,7 @@ void LLHTTPNode::put(LLHTTPNode::ResponsePtr response, const LLSD& context, cons
     {
         response->result(simplePut(input));
     }
-    catch (const NotImplemented&)
+    catch (NotImplemented&)
     {
         response->methodNotAllowed();
     }
@@ -154,7 +154,7 @@ void LLHTTPNode::post(LLHTTPNode::ResponsePtr response, const LLSD& context, con
     {
         response->result(simplePost(input));
     }
-    catch (const NotImplemented&)
+    catch (NotImplemented&)
     {
         response->methodNotAllowed();
     }
@@ -168,7 +168,7 @@ void LLHTTPNode::del(LLHTTPNode::ResponsePtr response, const LLSD& context) cons
     {
     response->result(simpleDel(context));
     }
-    catch (const NotImplemented&)
+    catch (NotImplemented&)
     {
     response->methodNotAllowed();
     }
@@ -392,6 +392,10 @@ const LLHTTPNode* LLHTTPNode::findNode(const std::string& name) const
     return impl.findNamedChild(name);
 }
 
+LLHTTPNode::Response::~Response()
+{
+}
+
 void LLHTTPNode::Response::statusUnknownError(S32 code)
 {
     status(code, "Unknown Error");
@@ -443,6 +447,8 @@ namespace
     }
 }
 
+LLHTTPRegistrar::NodeFactory::~NodeFactory() { }
+
 void LLHTTPRegistrar::registerFactory(
     const std::string& path, NodeFactory& factory)
 {
@@ -467,6 +473,10 @@ void LLHTTPRegistrar::buildAllServices(LLHTTPNode& root)
 LLPointer<LLSimpleResponse> LLSimpleResponse::create()
 {
     return new LLSimpleResponse();
+}
+
+LLSimpleResponse::~LLSimpleResponse()
+{
 }
 
 void LLSimpleResponse::result(const LLSD& result)

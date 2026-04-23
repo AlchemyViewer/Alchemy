@@ -37,14 +37,13 @@ class LLTextEditor;
 typedef boost::signals2::signal<
     void (const std::string& output)> console_reply_signal_t;
 
-class LLFloaterRegionDebugConsole final : public LLFloater
+class LLFloaterRegionDebugConsole : public LLFloater
 {
 public:
     LLFloaterRegionDebugConsole(LLSD const & key);
     virtual ~LLFloaterRegionDebugConsole();
 
-    // virtual
-    BOOL postBuild();
+    bool postBuild() override;
 
     void onInput(LLUICtrl* ctrl, const LLSD& param);
 

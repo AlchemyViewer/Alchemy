@@ -47,14 +47,14 @@ static LLPanelInjector<LLPanelExperienceLog> register_experiences_panel("experie
 
 
 LLPanelExperienceLog::LLPanelExperienceLog(  )
-    : mEventList(nullptr)
+    : mEventList(NULL)
     , mPageSize(25)
     , mCurrentPage(0)
 {
     buildFromFile("panel_experience_log.xml");
 }
 
-BOOL LLPanelExperienceLog::postBuild( void )
+bool LLPanelExperienceLog::postBuild()
 {
     LLExperienceLog* log = LLExperienceLog::getInstance();
     mEventList = getChild<LLScrollListCtrl>("experience_log_list");
@@ -76,13 +76,13 @@ BOOL LLPanelExperienceLog::postBuild( void )
 
 
     LLSpinCtrl* spin = getChild<LLSpinCtrl>("logsizespinner");
-    spin->set(log->getMaxDays());
+    spin->set((F32)log->getMaxDays());
     spin->setCommitCallback(boost::bind(&LLPanelExperienceLog::logSizeChanged, this));
 
     mPageSize = log->getPageSize();
     refresh();
     mNewEvent = LLExperienceLog::instance().addUpdateSignal(boost::bind(&LLPanelExperienceLog::refresh, this));
-    return TRUE;
+    return true;
 }
 
 LLPanelExperienceLog* LLPanelExperienceLog::create()
@@ -102,7 +102,7 @@ void LLPanelExperienceLog::refresh()
         return;
     }
 
-    setAllChildrenEnabled(FALSE);
+    setAllChildrenEnabled(false);
 
     LLSD item;
     bool waiting = false;
@@ -120,48 +120,48 @@ void LLPanelExperienceLog::refresh()
                 continue;
         }
         const LLSD& dayArray = day->second;
-            int size = dayArray.size();
-            if(itemsToSkip > size)
-            {
-                itemsToSkip -= size;
-                continue;
-            }
-            if(items >= mPageSize && size > 0)
+        int size = narrow(dayArray.size());
+        if(itemsToSkip > size)
+        {
+            itemsToSkip -= size;
+            continue;
+        }
+        if(items >= mPageSize && size > 0)
+        {
+            moreItems = true;
+            break;
+        }
+        for(int i = static_cast<int>(dayArray.size()) - itemsToSkip - 1; i >= 0; i--)
+        {
+            if(items >= mPageSize)
             {
                 moreItems = true;
                 break;
             }
-            for(int i = dayArray.size() - itemsToSkip - 1; i >= 0; i--)
-            {
-                if(items >= mPageSize)
-                {
-                    moreItems = true;
-                    break;
-                }
-                const LLSD event = dayArray[i];
-                LLUUID id = event[LLExperienceCache::EXPERIENCE_ID].asUUID();
-                const LLSD& experience = LLExperienceCache::instance().get(id);
-                if(experience.isUndefined()){
-                    waiting = true;
-                    waiting_id = id;
-                }
-                if(!waiting)
-                {
-                    item["id"] = event;
-
-                    LLSD& columns = item["columns"];
-                    columns[0]["column"] = "time";
-                    columns[0]["value"] = day->first+event["Time"].asString();
-                    columns[1]["column"] = "event";
-                    columns[1]["value"] = LLExperienceLog::getPermissionString(event, "ExperiencePermissionShort");
-                    columns[2]["column"] = "experience_name";
-                    columns[2]["value"] = experience[LLExperienceCache::NAME].asString();
-                    columns[3]["column"] = "object_name";
-                    columns[3]["value"] = event["ObjectName"].asString();
-                    mEventList->addElement(item);
-                }
-                ++items;
+            const LLSD event = dayArray[i];
+            LLUUID id = event[LLExperienceCache::EXPERIENCE_ID].asUUID();
+            const LLSD& experience = LLExperienceCache::instance().get(id);
+            if(experience.isUndefined()){
+                waiting = true;
+                waiting_id = id;
             }
+            if(!waiting)
+            {
+                item["id"] = event;
+
+                LLSD& columns = item["columns"];
+                columns[0]["column"] = "time";
+                columns[0]["value"] = day->first+event["Time"].asString();
+                columns[1]["column"] = "event";
+                columns[1]["value"] = LLExperienceLog::getPermissionString(event, "ExperiencePermissionShort");
+                columns[2]["column"] = "experience_name";
+                columns[2]["value"] = experience[LLExperienceCache::NAME].asString();
+                columns[3]["column"] = "object_name";
+                columns[3]["value"] = event["ObjectName"].asString();
+                mEventList->addElement(item);
+            }
+            ++items;
+        }
     }
 
     if(waiting)
@@ -172,9 +172,9 @@ void LLPanelExperienceLog::refresh()
     }
     else
     {
-        setAllChildrenEnabled(TRUE);
+        setAllChildrenEnabled(true);
 
-        mEventList->setEnabled(TRUE);
+        mEventList->setEnabled(true);
         getChild<LLButton>("btn_next")->setEnabled(moreItems);
         getChild<LLButton>("btn_prev")->setEnabled(mCurrentPage>0);
         getChild<LLButton>("btn_clear")->setEnabled(mEventList->getItemCount()>0);

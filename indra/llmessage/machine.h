@@ -55,7 +55,7 @@ public:
     LLMachine(EMachineType machine_type, const LLHost &host)
         : mMachineType(machine_type) {mHost = host; mControlPort = 0;}
 
-    ~LLMachine() = default;
+    ~LLMachine()    {}
 
     // get functions
     EMachineType    getMachineType()    const { return mMachineType; }
@@ -65,7 +65,7 @@ public:
     // The control port is the listen port of the parent process that
     // launched this machine. 0 means none or not known.
     const S32       &getControlPort()   const { return mControlPort; }
-    BOOL            isValid()           const { return (mHost.getPort() != 0); }    // TRUE if corresponds to functioning machine
+    bool            isValid()           const { return (mHost.getPort() != 0); }    // true if corresponds to functioning machine
 
     // set functions
     void            setMachineType(EMachineType machine_type)   { mMachineType = machine_type; }

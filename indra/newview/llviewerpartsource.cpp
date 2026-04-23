@@ -66,8 +66,8 @@ LLViewerPartSource::LLViewerPartSource(const U32 type) :
 {
     mLastUpdateTime = 0.f;
     mLastPartTime = 0.f;
-    mIsDead = FALSE;
-    mIsSuspended = FALSE;
+    mIsDead = false;
+    mIsSuspended = false;
     static U32 id_seed = 0;
     mID = ++id_seed;
 
@@ -78,7 +78,7 @@ LLViewerPartSource::LLViewerPartSource(const U32 type) :
 
 void LLViewerPartSource::setDead()
 {
-    mIsDead = TRUE;
+    mIsDead = true;
 }
 
 
@@ -114,7 +114,7 @@ LLViewerPartSourceScript::LLViewerPartSourceScript(LLViewerObject *source_objp) 
     llassert(source_objp);
     mSourceObjectp = source_objp;
     mPosAgent = mSourceObjectp->getPositionAgent();
-    mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
+    mImagep = LLViewerFetchedTexture::sDefaultParticleImagep;
 
     mImagep->setAddressMode(LLTexUnit::TAM_CLAMP);
 }
@@ -122,7 +122,7 @@ LLViewerPartSourceScript::LLViewerPartSourceScript(LLViewerObject *source_objp) 
 
 void LLViewerPartSourceScript::setDead()
 {
-    mIsDead = TRUE;
+    mIsDead = true;
     mSourceObjectp = NULL;
     mTargetObjectp = NULL;
 }
@@ -132,7 +132,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
     if( mIsSuspended )
         return;
 
-    if (mOwnerAvatarp.isNull() && mOwnerUUID.notNull())
+    if (mOwnerAvatarp.isNull() && mOwnerUUID != LLUUID::null)
     {
         mOwnerAvatarp = find_avatar(mOwnerUUID);
     }
@@ -141,12 +141,10 @@ void LLViewerPartSourceScript::update(const F32 dt)
         return;
     }
 
-    LLViewerPartSim& vwrPartSim = LLViewerPartSim::instance();
-
     F32 old_update_time = mLastUpdateTime;
     mLastUpdateTime += dt;
 
-    F32 ref_rate_travelspeed = llmin(vwrPartSim.getRefRate(), 1.f);
+    F32 ref_rate_travelspeed = llmin(LLViewerPartSim::getInstance()->getRefRate(), 1.f);
 
     F32 dt_update = mLastUpdateTime - mLastPartTime;
 
@@ -209,19 +207,17 @@ void LLViewerPartSourceScript::update(const F32 dt)
         }
     }
 
-    BOOL first_run = FALSE;
+    bool first_run = false;
     if (old_update_time <= 0.f)
     {
-        first_run = TRUE;
+        first_run = true;
     }
-
-    LLViewerCamera& vwrCamera = LLViewerCamera::instance();
 
     F32 max_time = llmax(1.f, 10.f*mPartSysData.mBurstRate);
     dt_update = llmin(max_time, dt_update);
     while ((dt_update > mPartSysData.mBurstRate) || first_run)
     {
-        first_run = FALSE;
+        first_run = false;
 
         // Update the rotation of the particle source by the angular velocity
         // First check to see if there is still an angular velocity.
@@ -238,7 +234,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
             mRotation.setQuat(0, 0, 0);
         }
 
-        if (vwrPartSim.aboveParticleLimit())
+        if (LLViewerPartSim::getInstance()->aboveParticleLimit())
         {
             // Don't bother doing any more updates if we're above the particle limit,
             // just give up.
@@ -260,7 +256,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
                     (mPartSysData.mPartData.mStartScale[1]
                      + mPartSysData.mPartData.mEndScale[1])/2));
 
-        F32 pixel_meter_ratio = vwrCamera.getPixelMeterRatio();
+        F32 pixel_meter_ratio = LLViewerCamera::getInstance()->getPixelMeterRatio();
 
         // Maximum distance at which spawned particles will be viewable
         F32 max_dist = max_short_side * pixel_meter_ratio;
@@ -275,7 +271,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
         }
 
         // Distance from camera
-        F32 dist = (mPosAgent - vwrCamera.getOrigin()).magVec();
+        F32 dist = (mPosAgent - LLViewerCamera::getInstance()->getOrigin()).magVec();
 
         // Particle size vs distance vs maxage throttling
 
@@ -299,7 +295,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
         S32 i;
         for (i = 0; i < mPartSysData.mBurstPartCount; i++)
         {
-            if (ll_frand() < llmax(1.0f - vwrPartSim.getBurstRate(), limited_rate))
+            if (ll_frand() < llmax(1.0f - LLViewerPartSim::getInstance()->getBurstRate(), limited_rate))
             {
                 // Limit particle generation
                 continue;
@@ -379,7 +375,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
                 part->mPosAgent = mPosAgent;
 
                 // original implemenetation for part_dir_vector was just:
-                LLVector3 part_dir_vector(0.0f, 0.0f, 1.0f);
+                LLVector3 part_dir_vector(0.0, 0.0, 1.0);
                 // params from the script...
                 // outer = outer cone angle
                 // inner = inner cone angle
@@ -390,24 +386,24 @@ void LLViewerPartSourceScript::update(const F32 dt)
                 // generate a random angle within the given space...
                 F32 angle = innerAngle + ll_frand(outerAngle - innerAngle);
                 // split which side it will go on randomly...
-                if (ll_frand() < 0.5f)
+                if (ll_frand() < 0.5)
                 {
                     angle = -angle;
                 }
                 // Both patterns rotate around the x-axis first:
-                part_dir_vector.rotVec(angle, 1.0f, 0.0f, 0.0f);
+                part_dir_vector.rotVec(angle, 1.0, 0.0, 0.0);
 
                 // If this is a cone pattern, rotate again to create the cone.
                 if (mPartSysData.mPattern & LLPartSysData::LL_PART_SRC_PATTERN_ANGLE_CONE)
                 {
-                    part_dir_vector.rotVec(ll_frand(4.f*F_PI), 0.0f, 0.0f, 1.0f);
+                    part_dir_vector.rotVec(ll_frand(4*F_PI), 0.0, 0.0, 1.0);
                 }
 
                 // Only apply this rotation if using the deprecated angles.
                 if (! (mPartSysData.mFlags & LLPartSysData::LL_PART_USE_NEW_ANGLE))
                 {
                     // Deprecated...
-                    part_dir_vector.rotVec(outerAngle, 1.0f, 0.0f, 0.0f);
+                    part_dir_vector.rotVec(outerAngle, 1.0, 0.0, 0.0);
                 }
 
                 if (mSourceObjectp)
@@ -434,10 +430,10 @@ void LLViewerPartSourceScript::update(const F32 dt)
             if (part->mFlags & LLPartData::LL_PART_FOLLOW_SRC_MASK ||   // SVC-193, VWR-717
                 part->mFlags & LLPartData::LL_PART_TARGET_LINEAR_MASK)
             {
-                mPartSysData.mBurstRadius = 0.f;
+                mPartSysData.mBurstRadius = 0;
             }
 
-            vwrPartSim.addPart(part);
+            LLViewerPartSim::getInstance()->addPart(part);
         }
 
         mLastPartTime = mLastUpdateTime;
@@ -590,7 +586,7 @@ LLViewerPartSourceSpiral::LLViewerPartSourceSpiral(const LLVector3 &pos) :
 
 void LLViewerPartSourceSpiral::setDead()
 {
-    mIsDead = TRUE;
+    mIsDead = true;
     mSourceObjectp = NULL;
 }
 
@@ -623,7 +619,7 @@ void LLViewerPartSourceSpiral::update(const F32 dt)
 {
     if (!mImagep)
     {
-        mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
+        mImagep = LLViewerFetchedTexture::sDefaultParticleImagep;
     }
 
     const F32 RATE = 0.025f;
@@ -637,9 +633,7 @@ void LLViewerPartSourceSpiral::update(const F32 dt)
     if (dt_update > RATE)
     {
         mLastPartTime = mLastUpdateTime;
-
-        LLViewerPartSim& vwrPartSim = LLViewerPartSim::instance();
-        if (!vwrPartSim.shouldAddPart())
+        if (!LLViewerPartSim::getInstance()->shouldAddPart())
         {
             // Particle simulation says we have too many particles, skip all this
             return;
@@ -667,7 +661,7 @@ void LLViewerPartSourceSpiral::update(const F32 dt)
         part->mEndGlow = 0.f;
         part->mGlow = LLColor4U(0, 0, 0, 0);
 
-        vwrPartSim.addPart(part);
+        LLViewerPartSim::getInstance()->addPart(part);
     }
 }
 
@@ -696,7 +690,7 @@ LLViewerPartSourceBeam::~LLViewerPartSourceBeam()
 
 void LLViewerPartSourceBeam::setDead()
 {
-    mIsDead = TRUE;
+    mIsDead = true;
     mSourceObjectp = NULL;
     mTargetObjectp = NULL;
 }
@@ -709,6 +703,8 @@ void LLViewerPartSourceBeam::setColor(const LLColor4 &color)
 
 void LLViewerPartSourceBeam::updatePart(LLViewerPart &part, const F32 dt)
 {
+    F32 frac = part.mLastUpdateTime/part.mMaxAge;
+
     LLViewerPartSource *ps = (LLViewerPartSource*)part.mPartSourcep;
     LLViewerPartSourceBeam *psb = (LLViewerPartSourceBeam *)ps;
     if (psb->mSourceObjectp.isNull())
@@ -737,7 +733,6 @@ void LLViewerPartSourceBeam::updatePart(LLViewerPart &part, const F32 dt)
         target_pos_agent = psb->mTargetObjectp->getRenderPosition();
     }
 
-    F32 frac = part.mLastUpdateTime / part.mMaxAge;
     part.mPosAgent = (1.f - frac) * source_pos_agent;
     if (psb->mTargetObjectp.isNull())
     {
@@ -786,9 +781,7 @@ void LLViewerPartSourceBeam::update(const F32 dt)
     if (dt_update > RATE)
     {
         mLastPartTime = mLastUpdateTime;
-
-        LLViewerPartSim& vwrPartSim = LLViewerPartSim::instance();
-        if (!vwrPartSim.shouldAddPart())
+        if (!LLViewerPartSim::getInstance()->shouldAddPart())
         {
             // Particle simulation says we have too many particles, skip all this
             return;
@@ -796,7 +789,7 @@ void LLViewerPartSourceBeam::update(const F32 dt)
 
         if (!mImagep)
         {
-            mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
+            mImagep = LLViewerFetchedTexture::sDefaultParticleImagep;
         }
 
         LLViewerPart* part = new LLViewerPart();
@@ -825,7 +818,7 @@ void LLViewerPartSourceBeam::update(const F32 dt)
         part->mEndGlow = 0.f;
         part->mGlow = LLColor4U(0, 0, 0, 0);
 
-        vwrPartSim.addPart(part);
+        LLViewerPartSim::getInstance()->addPart(part);
     }
 }
 
@@ -850,7 +843,7 @@ LLViewerPartSourceChat::LLViewerPartSourceChat(const LLVector3 &pos) :
 
 void LLViewerPartSourceChat::setDead()
 {
-    mIsDead = TRUE;
+    mIsDead = true;
     mSourceObjectp = NULL;
 }
 
@@ -883,7 +876,7 @@ void LLViewerPartSourceChat::update(const F32 dt)
 {
     if (!mImagep)
     {
-        mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
+        mImagep = LLViewerFetchedTexture::sDefaultParticleImagep;
     }
 
 
@@ -907,9 +900,7 @@ void LLViewerPartSourceChat::update(const F32 dt)
     if (dt_update > RATE)
     {
         mLastPartTime = mLastUpdateTime;
-
-        LLViewerPartSim& vwrPartSim = LLViewerPartSim::instance();
-        if (!vwrPartSim.shouldAddPart())
+        if (!LLViewerPartSim::getInstance()->shouldAddPart())
         {
             // Particle simulation says we have too many particles, skip all this
             return;
@@ -938,7 +929,7 @@ void LLViewerPartSourceChat::update(const F32 dt)
         part->mGlow = LLColor4U(0, 0, 0, 0);
 
 
-        vwrPartSim.addPart(part);
+        LLViewerPartSim::getInstance()->addPart(part);
     }
 }
 

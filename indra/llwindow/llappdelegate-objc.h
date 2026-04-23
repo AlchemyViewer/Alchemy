@@ -27,27 +27,27 @@
 #import <Cocoa/Cocoa.h>
 #import "llopenglview-objc.h"
 
-@interface LLApplication : NSApplication
-@end
-
 @interface LLAppDelegate : NSObject <NSApplicationDelegate> {
-    LLNSWindow __unsafe_unretained *window;
-    NSWindow __unsafe_unretained *inputWindow;
-    LLNonInlineTextView __unsafe_unretained *inputView;
+    LLNSWindow *window;
+    NSWindow *inputWindow;
+    LLNonInlineTextView *inputView;
     NSTimer *frameTimer;
     NSString *currentInputLanguage;
     std::string secondLogPath;
 }
 
-@property (assign) IBOutlet LLNSWindow *window;
-@property (assign) IBOutlet NSWindow *inputWindow;
-@property (assign) IBOutlet LLNonInlineTextView *inputView;
+@property (assign) IBOutlet LLNSWindow * _Nullable window;
+@property (assign) IBOutlet NSWindow * _Nullable inputWindow;
+@property (assign) IBOutlet LLNonInlineTextView * _Nullable inputView;
 
-@property (retain) NSString *currentInputLanguage;
+@property (retain) NSString * _Nullable currentInputLanguage;
 
 - (void) oneFrame;
-- (void) showInputWindow:(bool)show withEvent:(NSEvent*)textEvent;
+- (void) showInputWindow:(bool)show withEvent:(nullable NSEvent *)textEvent;
 - (void) languageUpdated;
 - (bool) romanScript;
+- (void) setBugsplatValue:(nullable NSString *)value forAttribute:(nullable NSString *)attribute;
 @end
 
+@interface LLApplication : NSApplication
+@end

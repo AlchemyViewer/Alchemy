@@ -32,6 +32,7 @@
 #include <string>
 #include <sstream>
 
+
 namespace LLCore
 {
 
@@ -50,7 +51,7 @@ std::string HttpStatus::toHex() const
     std::ostringstream result;
     result.width(8);
     result.fill('0');
-    result << std::hex << operator U32() << std::dec;
+    result << std::hex << operator U32();
     return result.str();
 }
 
@@ -176,7 +177,7 @@ std::string HttpStatus::toString() const
         }
         break;
     }
-    return LLStringExplicit("Unknown error");
+    return std::string("Unknown error");
 }
 
 
@@ -284,6 +285,8 @@ CURL *getCurlTemplateHandle()
             check_curl_code(result, CURLOPT_NOSIGNAL);
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_NOPROGRESS, 1);
             check_curl_code(result, CURLOPT_NOPROGRESS);
+            result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_ENCODING, "");
+            check_curl_code(result, CURLOPT_ENCODING);
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_AUTOREFERER, 1);
             check_curl_code(result, CURLOPT_AUTOREFERER);
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_FOLLOWLOCATION, 1);
@@ -299,7 +302,7 @@ CURL *getCurlTemplateHandle()
             // about 700 or so requests and starts issuing TCP RSTs to
             // new connections.  Reuse the DNS lookups for even a few
             // seconds and no RSTs.
-            result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_DNS_CACHE_TIMEOUT, 600); // Refetch dns after 600 seconds
+            result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_DNS_CACHE_TIMEOUT, 15);
             check_curl_code(result, CURLOPT_DNS_CACHE_TIMEOUT);
         }
     }
@@ -309,8 +312,14 @@ CURL *getCurlTemplateHandle()
 
 LLMutex *getCurlMutex()
 {
-    static LLMutex sHandleMutex;
-    return &sHandleMutex;
+    static LLMutex* sHandleMutexp = NULL;
+
+    if (!sHandleMutexp)
+    {
+        sHandleMutexp = new LLMutex();
+    }
+
+    return sHandleMutexp;
 }
 
 void deallocateEasyCurl(CURL *curlp)
@@ -319,6 +328,7 @@ void deallocateEasyCurl(CURL *curlp)
 
     curl_easy_cleanup(curlp);
 }
+
 
 }
 
@@ -330,6 +340,7 @@ void initialize()
     CURLcode code = curl_global_init(CURL_GLOBAL_ALL);
 
     check_curl_code(code, CURL_GLOBAL_ALL);
+
 }
 
 

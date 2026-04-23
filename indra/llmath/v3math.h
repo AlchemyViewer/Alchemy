@@ -31,6 +31,11 @@
 #include "llmath.h"
 
 #include "llsd.h"
+
+#include "glm/vec3.hpp"
+#include "glm/vec4.hpp"
+#include "glm/gtc/type_ptr.hpp"
+
 class LLVector2;
 class LLVector4;
 class LLVector4a;
@@ -41,7 +46,7 @@ class LLQuaternion;
 
 //  LLvector3 = |x y z w|
 
-static const U32 LENGTHOFVECTOR3 = 3;
+static constexpr U32 LENGTHOFVECTOR3 = 3;
 
 class LLVector3
 {
@@ -66,21 +71,26 @@ class LLVector3
         explicit LLVector3(const LLVector4a& vec);              // Initializes LLVector4 to (vec[0]. vec[1], vec[2])
         explicit LLVector3(const LLSD& sd);
 
+        // GLM interop
+        explicit LLVector3(const glm::vec3& vec);   // Initializes LLVector3 to (vec[0]. vec[1], vec[2])
+        explicit LLVector3(const glm::vec4& vec);   // Initializes LLVector3 to (vec[0]. vec[1], vec[2])
+        explicit inline operator glm::vec3() const; // Initializes glm::vec3 to (vec[0]. vec[1], vec[2])
+        explicit inline operator glm::vec4() const; // Initializes glm::vec4 to (vec[0]. vec[1], vec[2], 1)
 
         LLSD getValue() const;
 
         void setValue(const LLSD& sd);
 
-        inline BOOL isFinite() const;                                   // checks to see if all values of LLVector3 are finite
-        BOOL        clamp(F32 min, F32 max);        // Clamps all values to (min,max), returns TRUE if data changed
-        BOOL        clamp(const LLVector3 &min_vec, const LLVector3 &max_vec); // Scales vector by another vector
-        BOOL        clampLength( F32 length_limit );                    // Scales vector to limit length to a value
+        inline bool isFinite() const;                                   // checks to see if all values of LLVector3 are finite
+        bool        clamp(F32 min, F32 max);        // Clamps all values to (min,max), returns true if data changed
+        bool        clamp(const LLVector3 &min_vec, const LLVector3 &max_vec); // Scales vector by another vector
+        bool        clampLength( F32 length_limit );                    // Scales vector to limit length to a value
 
         void        quantize16(F32 lowerxy, F32 upperxy, F32 lowerz, F32 upperz);   // changes the vector to reflect quatization
         void        quantize8(F32 lowerxy, F32 upperxy, F32 lowerz, F32 upperz);    // changes the vector to reflect quatization
         void        snap(S32 sig_digits);                                           // snaps x,y,z to sig_digits decimal places
 
-        BOOL        abs();                      // sets all values to absolute value of original value (first octant), returns TRUE if changed
+        bool        abs();                      // sets all values to absolute value of original value (first octant), returns true if changed
 
         inline void clear();                        // Clears LLVector3 to (0, 0, 0)
         inline void setZero();                      // Clears LLVector3 to (0, 0, 0)
@@ -92,6 +102,8 @@ class LLVector3
         inline void set(const F32 *vec);            // Sets LLVector3 to vec
         const LLVector3& set(const LLVector4 &vec);
         const LLVector3& set(const LLVector3d &vec);// Sets LLVector3 to vec
+        inline void set(const glm::vec4& vec); // Sets LLVector3 to vec
+        inline void set(const glm::vec3& vec); // Sets LLVector3 to vec
 
         inline void setVec(F32 x, F32 y, F32 z);    // deprecated
         inline void setVec(const LLVector3 &vec);   // deprecated
@@ -100,27 +112,27 @@ class LLVector3
         const LLVector3& setVec(const LLVector4 &vec);  // deprecated
         const LLVector3& setVec(const LLVector3d &vec); // deprecated
 
-        F32     length() const;         // Returns magnitude of LLVector3
-        F32     lengthSquared() const;  // Returns magnitude squared of LLVector3
-        F32     magVec() const;         // deprecated
-        F32     magVecSquared() const;  // deprecated
+        F32 length() const;         // Returns magnitude of LLVector3
+        F32 lengthSquared() const;  // Returns magnitude squared of LLVector3
+        F32 magVec() const;         // deprecated
+        F32 magVecSquared() const;  // deprecated
 
-        inline F32      normalize();    // Normalizes and returns the magnitude of LLVector3
-        inline F32      normVec();      // deprecated
+        inline F32 normalize();    // Normalizes and returns the magnitude of LLVector3
+        inline F32 normVec();      // deprecated
 
-        inline BOOL inRange( F32 min, F32 max ) const; // Returns true if all values of the vector are between min and max
+        inline bool inRange(F32 min, F32 max) const; // Returns true if all values of the vector are between min and max
 
-        const LLVector3&    rotVec(F32 angle, const LLVector3 &vec);    // Rotates about vec by angle radians
-        const LLVector3&    rotVec(F32 angle, F32 x, F32 y, F32 z);     // Rotates about x,y,z by angle radians
-        const LLVector3&    rotVec(const LLMatrix3 &mat);               // Rotates by LLMatrix4 mat
-        const LLVector3&    rotVec(const LLQuaternion &q);              // Rotates by LLQuaternion q
-        const LLVector3&    transVec(const LLMatrix4& mat);             // Transforms by LLMatrix4 mat (mat * v)
+        const LLVector3& rotVec(F32 angle, const LLVector3 &vec);    // Rotates about vec by angle radians
+        const LLVector3& rotVec(F32 angle, F32 x, F32 y, F32 z);     // Rotates about x,y,z by angle radians
+        const LLVector3& rotVec(const LLMatrix3 &mat);               // Rotates by LLMatrix4 mat
+        const LLVector3& rotVec(const LLQuaternion &q);              // Rotates by LLQuaternion q
+        const LLVector3& transVec(const LLMatrix4& mat);             // Transforms by LLMatrix4 mat (mat * v)
 
-        const LLVector3&    scaleVec(const LLVector3& vec);             // scales per component by vec
-        LLVector3           scaledVec(const LLVector3& vec) const;          // get a copy of this vector scaled by vec
+        const LLVector3& scaleVec(const LLVector3& vec);             // scales per component by vec
+        LLVector3 scaledVec(const LLVector3& vec) const;             // get a copy of this vector scaled by vec
 
-        BOOL isNull() const;            // Returns TRUE if vector has a _very_small_ length
-        BOOL isExactlyZero() const      { return !mV[VX] && !mV[VY] && !mV[VZ]; }
+        bool isNull() const;            // Returns true if vector has a _very_small_ length
+        bool isExactlyZero() const      { return !mV[VX] && !mV[VY] && !mV[VZ]; }
 
         F32 operator[](int idx) const { return mV[idx]; }
         F32 &operator[](int idx) { return mV[idx]; }
@@ -143,16 +155,18 @@ class LLVector3
         friend const LLVector3& operator*=(LLVector3 &a, const LLVector3 &b);   // Returns a * b;
         friend const LLVector3& operator*=(LLVector3 &a, F32 k);                // Return a times scaler k
         friend const LLVector3& operator/=(LLVector3 &a, F32 k);                // Return a divided by scaler k
+        friend const LLVector3& operator/=(LLVector3& a, const LLVector3& b);
         friend const LLVector3& operator*=(LLVector3 &a, const LLQuaternion &b);    // Returns a * b;
 
         friend LLVector3 operator-(const LLVector3 &a);                 // Return vector -a
 
         friend std::ostream&     operator<<(std::ostream& s, const LLVector3 &a);       // Stream a
 
-        static BOOL parseVector3(const std::string& buf, LLVector3* value);
+        static bool parseVector3(const std::string& buf, LLVector3* value);
 };
-static_assert(std::is_trivially_copyable<LLVector3>::value, "LLVector3 must be trivially copyable");
-static_assert(std::is_trivially_destructible<LLVector3>::value, "LLVector3 must be trivially destructible");
+
+static_assert(std::is_trivially_copyable<LLVector3>::value, "LLVector3 must be trivial copy");
+static_assert(std::is_trivially_move_assignable<LLVector3>::value, "LLVector3 must be trivial move");
 static_assert(std::is_standard_layout<LLVector3>::value, "LLVector3 must be a standard layout type");
 
 typedef LLVector3 LLSimLocalVec;
@@ -160,7 +174,7 @@ typedef LLVector3 LLSimLocalVec;
 // Non-member functions
 
 F32 angle_between(const LLVector3 &a, const LLVector3 &b);  // Returns angle (radians) between a and b
-BOOL are_parallel(const LLVector3 &a, const LLVector3 &b, F32 epsilon=F_APPROXIMATELY_ZERO);    // Returns TRUE if a and b are very close to parallel
+bool are_parallel(const LLVector3 &a, const LLVector3 &b, F32 epsilon=F_APPROXIMATELY_ZERO);    // Returns true if a and b are very close to parallel
 F32 dist_vec(const LLVector3 &a, const LLVector3 &b);       // Returns distance between a and b
 F32 dist_vec_squared(const LLVector3 &a, const LLVector3 &b);// Returns distance squared between a and b
 F32 dist_vec_squared2D(const LLVector3 &a, const LLVector3 &b);// Returns distance squared between a and b ignoring Z component
@@ -172,25 +186,33 @@ LLVector3 lerp(const LLVector3 &a, const LLVector3 &b, F32 u); // Returns a vect
 LLVector3 point_to_box_offset(LLVector3& pos, const LLVector3* box); // Displacement from query point to nearest point on bounding box.
 bool box_valid_and_non_zero(const LLVector3* box);
 
-inline LLVector3::LLVector3(void)
+inline LLVector3::LLVector3()
 {
-    mV[0] = 0.f;
-    mV[1] = 0.f;
-    mV[2] = 0.f;
+    clear();
 }
 
 inline LLVector3::LLVector3(const F32 x, const F32 y, const F32 z)
 {
-    mV[VX] = x;
-    mV[VY] = y;
-    mV[VZ] = z;
+    set(x, y, z);
 }
 
 inline LLVector3::LLVector3(const F32 *vec)
 {
-    mV[VX] = vec[VX];
-    mV[VY] = vec[VY];
-    mV[VZ] = vec[VZ];
+    set(vec);
+}
+
+inline LLVector3::LLVector3(const glm::vec3& vec)
+{
+    mV[VX] = vec.x;
+    mV[VY] = vec.y;
+    mV[VZ] = vec.z;
+}
+
+inline LLVector3::LLVector3(const glm::vec4& vec)
+{
+    mV[VX] = vec.x;
+    mV[VY] = vec.y;
+    mV[VZ] = vec.z;
 }
 
 /*
@@ -205,40 +227,32 @@ inline LLVector3::LLVector3(const LLVector3 &copy)
 // Destructors
 
 // checker
-inline BOOL LLVector3::isFinite() const
+inline bool LLVector3::isFinite() const
 {
-    return (llfinite(mV[VX]) && llfinite(mV[VY]) && llfinite(mV[VZ]));
+    return llfinite(mV[VX]) && llfinite(mV[VY]) && llfinite(mV[VZ]);
 }
 
 
 // Clear and Assignment Functions
 
-inline void LLVector3::clear(void)
+inline void LLVector3::clear()
 {
-    mV[0] = 0.f;
-    mV[1] = 0.f;
-    mV[2] = 0.f;
+    set(0.f, 0.f, 0.f);
 }
 
-inline void LLVector3::setZero(void)
+inline void LLVector3::setZero()
 {
-    mV[0] = 0.f;
-    mV[1] = 0.f;
-    mV[2] = 0.f;
+    clear();
 }
 
-inline void LLVector3::clearVec(void)
+inline void LLVector3::clearVec()
 {
-    mV[0] = 0.f;
-    mV[1] = 0.f;
-    mV[2] = 0.f;
+    clear();
 }
 
-inline void LLVector3::zeroVec(void)
+inline void LLVector3::zeroVec()
 {
-    mV[0] = 0.f;
-    mV[1] = 0.f;
-    mV[2] = 0.f;
+    clear();
 }
 
 inline void LLVector3::set(F32 x, F32 y, F32 z)
@@ -248,266 +262,260 @@ inline void LLVector3::set(F32 x, F32 y, F32 z)
     mV[VZ] = z;
 }
 
-inline void LLVector3::set(const LLVector3 &vec)
+inline void LLVector3::set(const LLVector3& vec)
 {
-    mV[0] = vec.mV[0];
-    mV[1] = vec.mV[1];
-    mV[2] = vec.mV[2];
+    set(vec.mV[VX], vec.mV[VY], vec.mV[VZ]);
 }
 
-inline void LLVector3::set(const F32 *vec)
+inline void LLVector3::set(const F32* vec)
 {
-    mV[0] = vec[0];
-    mV[1] = vec[1];
-    mV[2] = vec[2];
+    set(vec[VX], vec[VY], vec[VZ]);
+}
+
+inline void LLVector3::set(const glm::vec4& vec)
+{
+    mV[VX] = vec.x;
+    mV[VY] = vec.y;
+    mV[VZ] = vec.z;
+}
+
+inline void LLVector3::set(const glm::vec3& vec)
+{
+    mV[VX] = vec.x;
+    mV[VY] = vec.y;
+    mV[VZ] = vec.z;
 }
 
 // deprecated
 inline void LLVector3::setVec(F32 x, F32 y, F32 z)
 {
-    mV[VX] = x;
-    mV[VY] = y;
-    mV[VZ] = z;
+    set(x, y, z);
 }
 
 // deprecated
-inline void LLVector3::setVec(const LLVector3 &vec)
+inline void LLVector3::setVec(const LLVector3& vec)
 {
-    mV[0] = vec.mV[0];
-    mV[1] = vec.mV[1];
-    mV[2] = vec.mV[2];
+    set(vec);
 }
 
 // deprecated
-inline void LLVector3::setVec(const F32 *vec)
+inline void LLVector3::setVec(const F32* vec)
 {
-    mV[0] = vec[0];
-    mV[1] = vec[1];
-    mV[2] = vec[2];
+    set(vec);
 }
 
-inline F32 LLVector3::normalize(void)
+inline F32 LLVector3::normalize()
 {
-    F32 mag = (F32) sqrt(mV[0]*mV[0] + mV[1]*mV[1] + mV[2]*mV[2]);
-    F32 oomag;
+    F32 mag = (F32) sqrt(mV[VX]*mV[VX] + mV[VY]*mV[VY] + mV[VZ]*mV[VZ]);
 
     if (mag > FP_MAG_THRESHOLD)
     {
-        oomag = 1.f/mag;
-        mV[0] *= oomag;
-        mV[1] *= oomag;
-        mV[2] *= oomag;
+        *this /= mag;
     }
     else
     {
-        mV[0] = 0.f;
-        mV[1] = 0.f;
-        mV[2] = 0.f;
+        clear();
         mag = 0;
     }
-    return (mag);
+    return mag;
 }
 
 // deprecated
-inline F32 LLVector3::normVec(void)
+inline F32 LLVector3::normVec()
 {
-    F32 mag = (F32) sqrt(mV[0]*mV[0] + mV[1]*mV[1] + mV[2]*mV[2]);
-    F32 oomag;
-
-    if (mag > FP_MAG_THRESHOLD)
-    {
-        oomag = 1.f/mag;
-        mV[0] *= oomag;
-        mV[1] *= oomag;
-        mV[2] *= oomag;
-    }
-    else
-    {
-        mV[0] = 0.f;
-        mV[1] = 0.f;
-        mV[2] = 0.f;
-        mag = 0;
-    }
-    return (mag);
+    return normalize();
 }
 
 // LLVector3 Magnitude and Normalization Functions
 
-inline F32  LLVector3::length(void) const
+inline F32 LLVector3::length() const
 {
-    return (F32) sqrt(mV[0]*mV[0] + mV[1]*mV[1] + mV[2]*mV[2]);
+    return sqrt(lengthSquared());
 }
 
-inline F32  LLVector3::lengthSquared(void) const
+inline F32 LLVector3::lengthSquared() const
 {
-    return mV[0]*mV[0] + mV[1]*mV[1] + mV[2]*mV[2];
+    return mV[VX]*mV[VX] + mV[VY]*mV[VY] + mV[VZ]*mV[VZ];
 }
 
-inline F32  LLVector3::magVec(void) const
+inline F32 LLVector3::magVec() const
 {
-    return (F32) sqrt(mV[0]*mV[0] + mV[1]*mV[1] + mV[2]*mV[2]);
+    return length();
 }
 
-inline F32  LLVector3::magVecSquared(void) const
+inline F32 LLVector3::magVecSquared() const
 {
-    return mV[0]*mV[0] + mV[1]*mV[1] + mV[2]*mV[2];
+    return lengthSquared();
 }
 
-inline BOOL LLVector3::inRange( F32 min, F32 max ) const
+inline bool LLVector3::inRange(F32 min, F32 max) const
 {
-    return mV[0] >= min && mV[0] <= max &&
-           mV[1] >= min && mV[1] <= max &&
-           mV[2] >= min && mV[2] <= max;
+    return mV[VX] >= min && mV[VX] <= max &&
+           mV[VY] >= min && mV[VY] <= max &&
+           mV[VZ] >= min && mV[VZ] <= max;
 }
 
-inline LLVector3 operator+(const LLVector3 &a, const LLVector3 &b)
+inline LLVector3 operator+(const LLVector3& a, const LLVector3& b)
 {
     LLVector3 c(a);
     return c += b;
 }
 
-inline LLVector3 operator-(const LLVector3 &a, const LLVector3 &b)
+inline LLVector3 operator-(const LLVector3& a, const LLVector3& b)
 {
     LLVector3 c(a);
     return c -= b;
 }
 
-inline F32  operator*(const LLVector3 &a, const LLVector3 &b)
+inline F32  operator*(const LLVector3& a, const LLVector3& b)
 {
-    return (a.mV[0]*b.mV[0] + a.mV[1]*b.mV[1] + a.mV[2]*b.mV[2]);
+    return (a.mV[VX]*b.mV[VX] + a.mV[VY]*b.mV[VY] + a.mV[VZ]*b.mV[VZ]);
 }
 
-inline LLVector3 operator%(const LLVector3 &a, const LLVector3 &b)
+inline LLVector3 operator%(const LLVector3& a, const LLVector3& b)
 {
-    return LLVector3( a.mV[1]*b.mV[2] - b.mV[1]*a.mV[2], a.mV[2]*b.mV[0] - b.mV[2]*a.mV[0], a.mV[0]*b.mV[1] - b.mV[0]*a.mV[1] );
+    return LLVector3(a.mV[VY]*b.mV[VZ] - b.mV[VY]*a.mV[VZ], a.mV[VZ]*b.mV[VX] - b.mV[VZ]*a.mV[VX], a.mV[VX]*b.mV[VY] - b.mV[VX]*a.mV[VY]);
 }
 
-inline LLVector3 operator/(const LLVector3 &a, F32 k)
+inline LLVector3 operator/(const LLVector3& a, F32 k)
 {
     F32 t = 1.f / k;
-    return LLVector3( a.mV[0] * t, a.mV[1] * t, a.mV[2] * t );
+    return LLVector3( a.mV[VX] * t, a.mV[VY] * t, a.mV[VZ] * t );
 }
 
-inline LLVector3 operator*(const LLVector3 &a, F32 k)
+inline LLVector3 operator*(const LLVector3& a, F32 k)
 {
-    return LLVector3( a.mV[0] * k, a.mV[1] * k, a.mV[2] * k );
+    return LLVector3( a.mV[VX] * k, a.mV[VY] * k, a.mV[VZ] * k );
 }
 
-inline LLVector3 operator*(F32 k, const LLVector3 &a)
+inline LLVector3 operator*(F32 k, const LLVector3& a)
 {
-    return LLVector3( a.mV[0] * k, a.mV[1] * k, a.mV[2] * k );
+    return LLVector3( a.mV[VX] * k, a.mV[VY] * k, a.mV[VZ] * k );
 }
 
-inline bool operator==(const LLVector3 &a, const LLVector3 &b)
+inline bool operator==(const LLVector3& a, const LLVector3& b)
 {
-    return (  (a.mV[0] == b.mV[0])
-            &&(a.mV[1] == b.mV[1])
-            &&(a.mV[2] == b.mV[2]));
+    return (  (a.mV[VX] == b.mV[VX])
+            &&(a.mV[VY] == b.mV[VY])
+            &&(a.mV[VZ] == b.mV[VZ]));
 }
 
-inline bool operator!=(const LLVector3 &a, const LLVector3 &b)
+inline bool operator!=(const LLVector3& a, const LLVector3& b)
 {
-    return (  (a.mV[0] != b.mV[0])
-            ||(a.mV[1] != b.mV[1])
-            ||(a.mV[2] != b.mV[2]));
+    return (  (a.mV[VX] != b.mV[VX])
+            ||(a.mV[VY] != b.mV[VY])
+            ||(a.mV[VZ] != b.mV[VZ]));
 }
 
-inline bool operator<(const LLVector3 &a, const LLVector3 &b)
+inline bool operator<(const LLVector3& a, const LLVector3& b)
 {
-    return (a.mV[0] < b.mV[0]
-            || (a.mV[0] == b.mV[0]
-                && (a.mV[1] < b.mV[1]
-                    || ((a.mV[1] == b.mV[1])
-                        && a.mV[2] < b.mV[2]))));
+    return (a.mV[VX] < b.mV[VX]
+            || (a.mV[VX] == b.mV[VX]
+                && (a.mV[VY] < b.mV[VY]
+                    || ((a.mV[VY] == b.mV[VY])
+                        && a.mV[VZ] < b.mV[VZ]))));
 }
 
-inline const LLVector3& operator+=(LLVector3 &a, const LLVector3 &b)
+inline const LLVector3& operator+=(LLVector3& a, const LLVector3& b)
 {
-    a.mV[0] += b.mV[0];
-    a.mV[1] += b.mV[1];
-    a.mV[2] += b.mV[2];
+    a.mV[VX] += b.mV[VX];
+    a.mV[VY] += b.mV[VY];
+    a.mV[VZ] += b.mV[VZ];
     return a;
 }
 
-inline const LLVector3& operator-=(LLVector3 &a, const LLVector3 &b)
+inline const LLVector3& operator-=(LLVector3& a, const LLVector3& b)
 {
-    a.mV[0] -= b.mV[0];
-    a.mV[1] -= b.mV[1];
-    a.mV[2] -= b.mV[2];
+    a.mV[VX] -= b.mV[VX];
+    a.mV[VY] -= b.mV[VY];
+    a.mV[VZ] -= b.mV[VZ];
     return a;
 }
 
-inline const LLVector3& operator%=(LLVector3 &a, const LLVector3 &b)
+inline const LLVector3& operator%=(LLVector3& a, const LLVector3& b)
 {
-    LLVector3 ret( a.mV[1]*b.mV[2] - b.mV[1]*a.mV[2], a.mV[2]*b.mV[0] - b.mV[2]*a.mV[0], a.mV[0]*b.mV[1] - b.mV[0]*a.mV[1]);
+    LLVector3 ret(a.mV[VY]*b.mV[VZ] - b.mV[VY]*a.mV[VZ], a.mV[VZ]*b.mV[VX] - b.mV[VZ]*a.mV[VX], a.mV[VX]*b.mV[VY] - b.mV[VX]*a.mV[VY]);
     a = ret;
     return a;
 }
 
-inline const LLVector3& operator*=(LLVector3 &a, F32 k)
+inline const LLVector3& operator*=(LLVector3& a, F32 k)
 {
-    a.mV[0] *= k;
-    a.mV[1] *= k;
-    a.mV[2] *= k;
+    a.mV[VX] *= k;
+    a.mV[VY] *= k;
+    a.mV[VZ] *= k;
     return a;
 }
 
-inline const LLVector3& operator*=(LLVector3 &a, const LLVector3 &b)
+inline const LLVector3& operator*=(LLVector3& a, const LLVector3& b)
 {
-    a.mV[0] *= b.mV[0];
-    a.mV[1] *= b.mV[1];
-    a.mV[2] *= b.mV[2];
+    a.mV[VX] *= b.mV[VX];
+    a.mV[VY] *= b.mV[VY];
+    a.mV[VZ] *= b.mV[VZ];
     return a;
 }
 
-inline const LLVector3& operator/=(LLVector3 &a, F32 k)
+inline const LLVector3& operator/=(LLVector3& a, F32 k)
 {
-    F32 t = 1.f / k;
-    a.mV[0] *= t;
-    a.mV[1] *= t;
-    a.mV[2] *= t;
+    a *= 1.f / k;
     return a;
 }
 
-inline LLVector3 operator-(const LLVector3 &a)
+inline const LLVector3& operator/=(LLVector3& a, const LLVector3& b)
 {
-    return LLVector3( -a.mV[0], -a.mV[1], -a.mV[2] );
+    a.mV[VX] /= b.mV[VX];
+    a.mV[VY] /= b.mV[VY];
+    a.mV[VZ] /= b.mV[VZ];
+    return a;
 }
 
-inline F32  dist_vec(const LLVector3 &a, const LLVector3 &b)
+inline LLVector3 operator-(const LLVector3& a)
 {
-    F32 x = a.mV[0] - b.mV[0];
-    F32 y = a.mV[1] - b.mV[1];
-    F32 z = a.mV[2] - b.mV[2];
-    return (F32) sqrt( x*x + y*y + z*z );
+    return LLVector3(-a.mV[VX], -a.mV[VY], -a.mV[VZ]);
 }
 
-inline F32  dist_vec_squared(const LLVector3 &a, const LLVector3 &b)
+inline LLVector3::operator glm::vec3() const
 {
-    F32 x = a.mV[0] - b.mV[0];
-    F32 y = a.mV[1] - b.mV[1];
-    F32 z = a.mV[2] - b.mV[2];
+    // Do not use glm::make_vec3 it can result in a buffer overrun on some platforms due to glm::vec3 being a simd vector internally
+    return glm::vec3(mV[VX], mV[VY], mV[VZ]);
+}
+
+inline LLVector3::operator glm::vec4() const
+{
+    return glm::vec4(mV[VX], mV[VY], mV[VZ], 1.f);
+}
+
+inline F32 dist_vec(const LLVector3& a, const LLVector3& b)
+{
+    F32 x = a.mV[VX] - b.mV[VX];
+    F32 y = a.mV[VY] - b.mV[VY];
+    F32 z = a.mV[VZ] - b.mV[VZ];
+    return sqrt(x*x + y*y + z*z);
+}
+
+inline F32 dist_vec_squared(const LLVector3& a, const LLVector3& b)
+{
+    F32 x = a.mV[VX] - b.mV[VX];
+    F32 y = a.mV[VY] - b.mV[VY];
+    F32 z = a.mV[VZ] - b.mV[VZ];
     return x*x + y*y + z*z;
 }
 
-inline F32  dist_vec_squared2D(const LLVector3 &a, const LLVector3 &b)
+inline F32 dist_vec_squared2D(const LLVector3& a, const LLVector3& b)
 {
-    F32 x = a.mV[0] - b.mV[0];
-    F32 y = a.mV[1] - b.mV[1];
+    F32 x = a.mV[VX] - b.mV[VX];
+    F32 y = a.mV[VY] - b.mV[VY];
     return x*x + y*y;
 }
 
-inline LLVector3 projected_vec(const LLVector3 &a, const LLVector3 &b)
+inline LLVector3 projected_vec(const LLVector3& a, const LLVector3& b)
 {
     F32 bb = b * b;
     if (bb > FP_MAG_THRESHOLD * FP_MAG_THRESHOLD)
     {
         return ((a * b) / bb) * b;
     }
-    else
-    {
-        return b.zero;
-    }
+    return b.zero;
 }
 
 inline LLVector3 inverse_projected_vec(const LLVector3& a, const LLVector3& b)
@@ -522,18 +530,18 @@ inline LLVector3 inverse_projected_vec(const LLVector3& a, const LLVector3& b)
     return normalized_a * (b_length / dot_product);
 }
 
-inline LLVector3 parallel_component(const LLVector3 &a, const LLVector3 &b)
+inline LLVector3 parallel_component(const LLVector3& a, const LLVector3& b)
 {
     return projected_vec(a, b);
 }
 
-inline LLVector3 orthogonal_component(const LLVector3 &a, const LLVector3 &b)
+inline LLVector3 orthogonal_component(const LLVector3& a, const LLVector3& b)
 {
     return a - projected_vec(a, b);
 }
 
 
-inline LLVector3 lerp(const LLVector3 &a, const LLVector3 &b, F32 u)
+inline LLVector3 lerp(const LLVector3& a, const LLVector3& b, F32 u)
 {
     return LLVector3(
         a.mV[VX] + (b.mV[VX] - a.mV[VX]) * u,
@@ -542,13 +550,9 @@ inline LLVector3 lerp(const LLVector3 &a, const LLVector3 &b, F32 u)
 }
 
 
-inline BOOL LLVector3::isNull() const
+inline bool LLVector3::isNull() const
 {
-    if ( F_APPROXIMATELY_ZERO > mV[VX]*mV[VX] + mV[VY]*mV[VY] + mV[VZ]*mV[VZ] )
-    {
-        return TRUE;
-    }
-    return FALSE;
+    return F_APPROXIMATELY_ZERO > mV[VX]*mV[VX] + mV[VY]*mV[VY] + mV[VZ]*mV[VZ];
 }
 
 inline void update_min_max(LLVector3& min, LLVector3& max, const LLVector3& pos)
@@ -589,21 +593,21 @@ inline F32 angle_between(const LLVector3& a, const LLVector3& b)
         ab = 0.0f; // get rid of negative zero
     }
     LLVector3 c = a % b; // crossproduct
-    return atan2f(sqrtf(c * c), ab); // return the angle
+    return atan2f(c.length(), ab); // return the angle
 }
 
-inline BOOL are_parallel(const LLVector3 &a, const LLVector3 &b, F32 epsilon)
+inline bool are_parallel(const LLVector3& a, const LLVector3& b, F32 epsilon)
 {
     LLVector3 an = a;
     LLVector3 bn = b;
     an.normalize();
     bn.normalize();
     F32 dot = an * bn;
-    if ( (1.0f - fabs(dot)) < epsilon)
+    if (1.0f - fabs(dot) < epsilon)
     {
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 inline std::ostream& operator<<(std::ostream& s, const LLVector3 &a)

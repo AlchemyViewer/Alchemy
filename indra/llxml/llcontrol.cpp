@@ -34,11 +34,9 @@
 
 #include "llstl.h"
 
-#include "llexception.h"
 #include "llstring.h"
 #include "v3math.h"
 #include "v3dmath.h"
-#include "v4math.h"
 #include "v4coloru.h"
 #include "v4color.h"
 #include "v3color.h"
@@ -50,9 +48,7 @@
 #include "lltimer.h"
 #include "lldir.h"
 
-#include <boost/iostreams/stream.hpp>
-
-#if LL_RELEASE_WITH_DEBUG_INFO || LL_DEBUG
+#ifdef SHOW_ASSERT
 #define CONTROL_ERRS LL_ERRS("ControlErrors")
 #else
 #define CONTROL_ERRS LL_WARNS("ControlErrors")
@@ -63,26 +59,19 @@ template <> eControlType get_control_type<U32>();
 template <> eControlType get_control_type<S32>();
 template <> eControlType get_control_type<F32>();
 template <> eControlType get_control_type<bool>();
-// Yay BOOL, its really an S32.
-//template <> eControlType get_control_type<BOOL> () ;
 template <> eControlType get_control_type<std::string>();
 
 template <> eControlType get_control_type<LLVector3>();
 template <> eControlType get_control_type<LLVector3d>();
-template <> eControlType get_control_type<LLVector4>();
-template <> eControlType get_control_type<LLQuaternion>();
 template <> eControlType get_control_type<LLRect>();
 template <> eControlType get_control_type<LLColor4>();
 template <> eControlType get_control_type<LLColor3>();
 template <> eControlType get_control_type<LLColor4U>();
-template <> eControlType get_control_type<LLUUID>();
 template <> eControlType get_control_type<LLSD>();
 
 template <> LLSD convert_to_llsd<U32>(const U32& in);
 template <> LLSD convert_to_llsd<LLVector3>(const LLVector3& in);
 template <> LLSD convert_to_llsd<LLVector3d>(const LLVector3d& in);
-template <> LLSD convert_to_llsd<LLVector4>(const LLVector4& in);
-template <> LLSD convert_to_llsd<LLQuaternion>(const LLQuaternion& in);
 template <> LLSD convert_to_llsd<LLRect>(const LLRect& in);
 template <> LLSD convert_to_llsd<LLColor4>(const LLColor4& in);
 template <> LLSD convert_to_llsd<LLColor3>(const LLColor3& in);
@@ -96,13 +85,10 @@ template <> std::string convert_from_llsd<std::string>(const LLSD& sd, eControlT
 template <> LLWString convert_from_llsd<LLWString>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLVector3 convert_from_llsd<LLVector3>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLVector3d convert_from_llsd<LLVector3d>(const LLSD& sd, eControlType type, std::string_view control_name);
-template <> LLVector4 convert_from_llsd<LLVector4>(const LLSD& sd, eControlType type, std::string_view control_name);
-template <> LLQuaternion convert_from_llsd<LLQuaternion>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLRect convert_from_llsd<LLRect>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLColor4 convert_from_llsd<LLColor4>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLColor4U convert_from_llsd<LLColor4U>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLColor3 convert_from_llsd<LLColor3>(const LLSD& sd, eControlType type, std::string_view control_name);
-template <> LLUUID convert_from_llsd<LLUUID>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLSD convert_from_llsd<LLSD>(const LLSD& sd, eControlType type, std::string_view control_name);
 
 //this defines the current version of the settings file
@@ -114,7 +100,8 @@ const S32 CURRENT_VERSION = 101;
 // by SETTINGS_PROFILE below.  Only settings with an average access rate >= 2/second are output.
 typedef std::pair<std::string, U32> settings_pair_t;
 typedef std::vector<settings_pair_t> settings_vec_t;
-std::map<std::string, int, std::less<>> getCount;
+LLSD getCount;
+settings_vec_t getCount_v;
 F64 start_time = 0;
 std::string SETTINGS_PROFILE = "settings_profile.log";
 
@@ -137,9 +124,6 @@ bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
     case TYPE_VEC3D:
         result = LLVector3d(a) == LLVector3d(b);
         break;
-    case TYPE_VEC4:
-        result = LLVector4(a) == LLVector4(b);
-        break;
     case TYPE_QUAT:
         result = LLQuaternion(a) == LLQuaternion(b);
         break;
@@ -152,9 +136,6 @@ bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
     case TYPE_COL3:
         result = LLColor3(a) == LLColor3(b);
         break;
-    case TYPE_UUID:
-        result = a.asUUID() == b.asUUID();
-        break;
     case TYPE_STRING:
         result = a.asString() == b.asString();
         break;
@@ -165,24 +146,34 @@ bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
     return result;
 }
 
-LLControlVariable::LLControlVariable(const std::string name, eControlType type,
-                             LLSD initial, const std::string comment,
+LLControlVariable::LLControlVariable(const std::string& name, eControlType type,
+                             LLSD initial, const std::string& comment,
                              ePersist persist, bool hidefromsettingseditor)
-    : mName(std::move(name)),
-      mComment(std::move(comment)),
+    : mName(name),
+      mComment(comment),
       mType(type),
       mPersist(persist),
       mHideFromSettingsEditor(hidefromsettingseditor)
 {
     if ((persist != PERSIST_NO) && mComment.empty())
     {
-        LL_WARNS() << "Must supply a comment for control " << mName << LL_ENDL;
+        std::string error_string =
+            "Alchemy Viewer failed to initialize settings. Setting " + mName + " is invalid. "
+            "Either settings' files were supplied incorrectly or default files were corrupted."
+            "\n\nPlease reinstall viewer from https://www.alchemyviewer.org/downloads/ and "
+            "contact the Alchemy Viewer team if the issue persists after reinstall.";
+        LLError::LLUserWarningMsg::show(error_string);
+        LL_ERRS() << "Must supply a comment for control " << mName << LL_ENDL;
     }
     //Push back versus setValue'ing here, since we don't want to call a signal yet
     mValues.push_back(initial);
 }
 
 
+
+LLControlVariable::~LLControlVariable()
+{
+}
 
 LLSD LLControlVariable::getComparableValue(const LLSD& value)
 {
@@ -191,10 +182,10 @@ LLSD LLControlVariable::getComparableValue(const LLSD& value)
     LLSD storable_value;
     if(TYPE_BOOLEAN == type() && value.isString())
     {
-        BOOL temp;
+        bool temp;
         if(LLStringUtil::convertToBOOL(value.asString(), temp))
         {
-            storable_value = (bool)temp;
+            storable_value = temp;
         }
         else
         {
@@ -205,8 +196,7 @@ LLSD LLControlVariable::getComparableValue(const LLSD& value)
     {
         LLPointer<LLSDNotationParser> parser = new LLSDNotationParser;
         LLSD result;
-        const auto& llsd_str = value.asStringRef();
-        boost::iostreams::stream<boost::iostreams::array_source> value_stream(llsd_str.data(), llsd_str.size());
+        std::stringstream value_stream(value.asString());
         if (parser->parse(value_stream, result, LLSDSerialize::SIZE_UNLIMITED) != LLSDParser::PARSE_FAILURE)
         {
             storable_value = result;
@@ -226,7 +216,7 @@ LLSD LLControlVariable::getComparableValue(const LLSD& value)
 
 void LLControlVariable::setValue(const LLSD& new_value, bool saved_value)
 {
-    if (mValidateSignal(this, new_value) == false)
+    if (!mValidateSignal(this, new_value))
     {
         // can not set new value, exit
         return;
@@ -234,12 +224,12 @@ void LLControlVariable::setValue(const LLSD& new_value, bool saved_value)
 
     LLSD storable_value = getComparableValue(new_value);
     LLSD original_value = getValue();
-    bool value_changed = llsd_compare(original_value, storable_value) == FALSE;
+    bool value_changed = !llsd_compare(original_value, storable_value);
     if(saved_value)
     {
         // If we're going to save this value, return to default but don't fire
         resetToDefault(false);
-        if (llsd_compare(mValues.back(), storable_value) == FALSE)
+        if (!llsd_compare(mValues.back(), storable_value))
         {
             mValues.push_back(storable_value);
         }
@@ -249,7 +239,7 @@ void LLControlVariable::setValue(const LLSD& new_value, bool saved_value)
         // This is an unsaved value. Its needs to reside at
         // mValues[2] (or greater). It must not affect
         // the result of getSaveValue()
-        if (llsd_compare(mValues.back(), storable_value) == FALSE)
+        if (!llsd_compare(mValues.back(), storable_value))
         {
             while(mValues.size() > 2)
             {
@@ -283,10 +273,10 @@ void LLControlVariable::setDefaultValue(const LLSD& value)
 
     LLSD comparable_value = getComparableValue(value);
     LLSD original_value = getValue();
-    bool value_changed = (llsd_compare(original_value, comparable_value) == FALSE);
+    bool value_changed = !llsd_compare(original_value, comparable_value);
     resetToDefault(false);
     mValues[0] = comparable_value;
-    if(value_changed)
+    if (value_changed)
     {
         firePropertyChanged(original_value);
     }
@@ -302,9 +292,9 @@ void LLControlVariable::setHiddenFromSettingsEditor(bool hide)
     mHideFromSettingsEditor = hide;
 }
 
-void LLControlVariable::setComment(const std::string comment)
+void LLControlVariable::setComment(const std::string& comment)
 {
-    mComment = std::move(comment);
+    mComment = comment;
 }
 
 void LLControlVariable::resetToDefault(bool fire_signal)
@@ -320,7 +310,7 @@ void LLControlVariable::resetToDefault(bool fire_signal)
 
     // don't fire if the value didn't actually change
     LLSD previous_value = getComparableValue(getValue());
-    bool value_changed = (llsd_compare(originalValue, previous_value) == FALSE);
+    bool value_changed = !llsd_compare(originalValue, previous_value);
     if(fire_signal && value_changed)
     {
         firePropertyChanged(originalValue);
@@ -360,18 +350,6 @@ LLSD LLControlVariable::getSaveValue() const
     return mValues[0];
 }
 
-void LLControlVariable::firePropertyChanged(const LLSD &pPreviousValue)
-{
-    try
-    {
-        mCommitSignal(this, mValues.back(), pPreviousValue);
-    }
-    catch (const boost::exception&)
-    {
-        LOG_UNHANDLED_EXCEPTION(getName() + " commit signal threw exception.");
-    }
-}
-
 LLPointer<LLControlVariable> LLControlGroup::getControl(std::string_view name)
 {
     if (mSettingsProfile)
@@ -394,12 +372,10 @@ const std::string LLControlGroup::mTypeString[TYPE_COUNT] = { "U32"
                                                              ,"String"
                                                              ,"Vector3"
                                                              ,"Vector3D"
-                                                             ,"Vector4"
                                                              ,"Quaternion"
                                                              ,"Rect"
                                                              ,"Color4"
                                                              ,"Color3"
-                                                             ,"UUID"
                                                              ,"LLSD"
                                                              };
 
@@ -429,28 +405,29 @@ void LLControlGroup::cleanup()
     if(mSettingsProfile && getCount.size() != 0)
     {
         std::string file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, SETTINGS_PROFILE);
-        LLFILE* out = LLFile::fopen(file, "w"); /* Flawfinder: ignore */
+        LLFILE* out = LLFile::fopen(file, LLFILE_MODE("w")); /* Flawfinder: ignore */
         if(!out)
         {
             LL_WARNS("SettingsProfile") << "Error opening " << SETTINGS_PROFILE << LL_ENDL;
         }
         else
         {
-            static settings_vec_t getCount_v;
-
             F64 end_time = LLTimer::getTotalSeconds();
             U32 total_seconds = (U32)(end_time - start_time);
 
             std::string msg = llformat("Runtime (seconds): %d\n\n No. accesses   Avg. accesses/sec  Name\n", total_seconds);
-            size_t data_size = msg.size();
-            if (fwrite(msg.c_str(), 1, data_size, out) != data_size)
+            std::ostringstream data_msg;
+
+            data_msg << msg;
+            size_t data_size = data_msg.str().size();
+            if (fwrite(data_msg.str().c_str(), 1, data_size, out) != data_size)
             {
                 LL_WARNS("SettingsProfile") << "Failed to write settings profile header" << LL_ENDL;
             }
 
-            for (const auto& [first, second] : getCount)
+            for (LLSD::map_const_iterator iter = getCount.beginMap(); iter != getCount.endMap(); ++iter)
             {
-                getCount_v.emplace_back(first, second);
+                getCount_v.push_back(settings_pair_t(iter->first, iter->second.asInteger()));
             }
             sort(getCount_v.begin(), getCount_v.end(), compareRoutine);
 
@@ -463,15 +440,17 @@ void LLControlGroup::cleanup()
                 }
                 if (access_rate >= 2)
                 {
-                    msg = llformat("%13d        %7d       %s\n", iter->second, access_rate, iter->first.c_str());
-                    data_size = msg.size();
-                    if (fwrite(msg.c_str(), 1, data_size, out) != data_size)
+                    std::ostringstream data_msg;
+                    msg = llformat("%13d        %7d       %s", iter->second, access_rate, iter->first.c_str());
+                    data_msg << msg << "\n";
+                    size_t data_size = data_msg.str().size();
+                    if (fwrite(data_msg.str().c_str(), 1, data_size, out) != data_size)
                     {
                         LL_WARNS("SettingsProfile") << "Failed to write settings profile" << LL_ENDL;
                     }
                 }
             }
-            getCount.clear();
+            getCount = LLSD::emptyMap();
             fclose(out);
         }
     }
@@ -493,7 +472,7 @@ std::string LLControlGroup::typeEnumToString(eControlType typeenum)
     return mTypeString[typeenum];
 }
 
-LLControlVariable* LLControlGroup::declareControl(const std::string& name, eControlType type, const LLSD initial_val, const std::string& comment, LLControlVariable::ePersist persist, BOOL hidefromsettingseditor)
+LLControlVariable* LLControlGroup::declareControl(const std::string& name, eControlType type, const LLSD initial_val, const std::string& comment, LLControlVariable::ePersist persist, bool hidefromsettingseditor)
 {
     LLControlVariable* existing_control = getControl(name);
     if (existing_control)
@@ -536,7 +515,7 @@ LLControlVariable* LLControlGroup::declareF32(const std::string& name, const F32
     return declareControl(name, TYPE_F32, initial_val, comment, persist);
 }
 
-LLControlVariable* LLControlGroup::declareBOOL(const std::string& name, const BOOL initial_val, const std::string& comment, LLControlVariable::ePersist persist)
+LLControlVariable* LLControlGroup::declareBOOL(const std::string& name, const bool initial_val, const std::string& comment, LLControlVariable::ePersist persist)
 {
     return declareControl(name, TYPE_BOOLEAN, initial_val, comment, persist);
 }
@@ -554,11 +533,6 @@ LLControlVariable* LLControlGroup::declareVec3(const std::string& name, const LL
 LLControlVariable* LLControlGroup::declareVec3d(const std::string& name, const LLVector3d &initial_val, const std::string& comment, LLControlVariable::ePersist persist)
 {
     return declareControl(name, TYPE_VEC3D, initial_val.getValue(), comment, persist);
-}
-
-LLControlVariable* LLControlGroup::declareVec4(const std::string& name, const LLVector4& initial_val, const std::string& comment, LLControlVariable::ePersist persist)
-{
-    return declareControl(name, TYPE_VEC4, initial_val.getValue(), comment, persist);
 }
 
 LLControlVariable* LLControlGroup::declareQuat(const std::string& name, const LLQuaternion &initial_val, const std::string& comment, LLControlVariable::ePersist persist)
@@ -581,11 +555,6 @@ LLControlVariable* LLControlGroup::declareColor3(const std::string& name, const 
     return declareControl(name, TYPE_COL3, initial_val.getValue(), comment, persist);
 }
 
-LLControlVariable* LLControlGroup::declareUUID(const std::string& name, const LLUUID& initial_val, const std::string& comment, LLControlVariable::ePersist persist)
-{
-    return declareControl(name, TYPE_UUID, initial_val, comment, persist);
-}
-
 LLControlVariable* LLControlGroup::declareLLSD(const std::string& name, const LLSD &initial_val, const std::string& comment, LLControlVariable::ePersist persist )
 {
     return declareControl(name, TYPE_LLSD, initial_val, comment, persist);
@@ -597,23 +566,10 @@ void LLControlGroup::incrCount(std::string_view name)
     {
         start_time = LLTimer::getTotalSeconds();
     }
-    auto it = getCount.find(name);
-    if (it != getCount.end())
-    {
-        it->second = it->second + 1;
-    }
-    else
-    {
-        getCount.emplace(name, 1);
-    }
+    getCount[name.data()] = getCount[name.data()].asInteger() + 1;
 }
 
-BOOL LLControlGroup::getBOOL(std::string_view name)
-{
-    return (BOOL)get<bool>(name);
-}
-
-bool LLControlGroup::getBool(std::string_view name)
+bool LLControlGroup::getBOOL(std::string_view name)
 {
     return get<bool>(name);
 }
@@ -661,11 +617,6 @@ LLVector3d LLControlGroup::getVector3d(std::string_view name)
     return get<LLVector3d>(name);
 }
 
-LLVector4 LLControlGroup::getVector4(std::string_view name)
-{
-    return get<LLVector4>(name);
-}
-
 LLQuaternion LLControlGroup::getQuaternion(std::string_view name)
 {
     return get<LLQuaternion>(name);
@@ -692,12 +643,6 @@ LLColor3 LLControlGroup::getColor3(std::string_view name)
     return get<LLColor3>(name);
 }
 
-LLUUID LLControlGroup::getUUID(std::string_view name)
-{
-    return get<LLUUID>(name);
-}
-
-
 LLSD LLControlGroup::getLLSD(std::string_view name)
 {
     return get<LLSD>(name);
@@ -721,7 +666,7 @@ LLSD LLControlGroup::asLLSD(bool diffs_only)
     return result;
 }
 
-BOOL LLControlGroup::controlExists(std::string_view name)
+bool LLControlGroup::controlExists(std::string_view name)
 {
     ctrl_name_table_t::iterator iter = mNameTable.find(name);
     return iter != mNameTable.end();
@@ -732,7 +677,7 @@ BOOL LLControlGroup::controlExists(std::string_view name)
 // Set functions
 //-------------------------------------------------------------------
 
-void LLControlGroup::setBOOL(std::string_view name, BOOL val)
+void LLControlGroup::setBOOL(std::string_view name, bool val)
 {
     set<bool>(name, val);
 }
@@ -777,22 +722,12 @@ void LLControlGroup::setQuaternion(std::string_view name, const LLQuaternion &va
     set(name, val);
 }
 
-void LLControlGroup::setVector4(std::string_view name, const LLVector4& val)
-{
-    set(name, val);
-}
-
 void LLControlGroup::setRect(std::string_view name, const LLRect &val)
 {
     set(name, val);
 }
 
 void LLControlGroup::setColor4(std::string_view name, const LLColor4 &val)
-{
-    set(name, val);
-}
-
-void LLControlGroup::setUUID(std::string_view name, const LLUUID& val)
 {
     set(name, val);
 }
@@ -827,8 +762,9 @@ void LLControlGroup::setUntypedValue(std::string_view name, const LLSD& val)
 //---------------------------------------------------------------
 
 // Returns number of controls loaded, so 0 if failure
-U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require_declaration, eControlType declare_as)
+U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, bool require_declaration, eControlType declare_as)
 {
+    LL_PROFILE_ZONE_SCOPED;
     std::string name;
 
     LLXmlTree xml_controls;
@@ -863,7 +799,7 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
     {
         name = child_nodep->getName();
 
-        BOOL declared = controlExists(name);
+        bool declared = controlExists(name);
 
         if (require_declaration && !declared)
         {
@@ -931,7 +867,7 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
             break;
         case TYPE_BOOLEAN:
             {
-                BOOL initial = FALSE;
+                bool initial = false;
 
                 child_nodep->getAttributeBOOL("value", initial);
                 control->set(initial);
@@ -961,16 +897,6 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
                 LLVector3d vector;
 
                 child_nodep->getAttributeVector3d("value", vector);
-
-                control->set(vector.getValue());
-                validitems++;
-            }
-            break;
-        case TYPE_VEC4:
-            {
-                LLVector4 vector;
-
-                child_nodep->getAttributeVector4("value", vector);
 
                 control->set(vector.getValue());
                 validitems++;
@@ -1022,15 +948,6 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
                 validitems++;
             }
             break;
-        case TYPE_UUID:
-            {
-                LLUUID uuid;
-
-                child_nodep->getAttributeUUID("value", uuid);
-                control->set(uuid);
-                validitems++;
-            }
-            break;
 
         default:
           break;
@@ -1043,7 +960,7 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
     return validitems;
 }
 
-U32 LLControlGroup::saveToFile(const std::string& filename, BOOL nondefault_only)
+U32 LLControlGroup::saveToFile(const std::string& filename, bool nondefault_only)
 {
     LLSD settings;
     int num_saved = 0;
@@ -1064,11 +981,10 @@ U32 LLControlGroup::saveToFile(const std::string& filename, BOOL nondefault_only
         }
     }
     llofstream file;
-    file.open(filename);
+    file.open(filename.c_str());
     if (file.is_open())
     {
-        LLPointer<LLSDXMLFormatter> f = new LLSDXMLFormatter(false, true);
-        f->format(settings, file, LLSDFormatter::OPTIONS_PRETTY);
+        LLSDSerialize::toPrettyXML(settings, file);
         file.close();
         LL_INFOS("Settings") << "Saved to " << filename << LL_ENDL;
     }
@@ -1081,8 +997,10 @@ U32 LLControlGroup::saveToFile(const std::string& filename, BOOL nondefault_only
     return num_saved;
 }
 
-U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_values, bool save_values)
+U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_values, bool save_values, bool error_when_no_comment)
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     if (!mIncludedFiles.insert(filename).second && set_default_values)
     {
         return 0; //Already included this file.
@@ -1090,7 +1008,7 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
 
     LLSD settings;
     llifstream infile;
-    infile.open(filename);
+    infile.open(filename.c_str());
     if(!infile.is_open())
     {
         LL_WARNS("Settings") << "Cannot find file " << filename << " to load." << LL_ENDL;
@@ -1101,17 +1019,17 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
     {
         infile.close();
         LL_WARNS("Settings") << "Unable to parse LLSD control file " << filename << ". Trying Legacy Method." << LL_ENDL;
-        return loadFromFileLegacy(filename, TRUE, TYPE_STRING);
+        return loadFromFileLegacy(filename, true, TYPE_STRING);
     }
 
     U32 validitems = 0;
     bool hidefromsettingseditor = false;
 
-    for(const auto& e : settings.asMap())
+    for(LLSD::map_const_iterator itr = settings.beginMap(); itr != settings.endMap(); ++itr)
     {
         LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT;
-        std::string const & name = e.first;
-        LLSD const & control_map = e.second;
+        std::string const & name = itr->first;
+        LLSD const & control_map = itr->second;
 
         if(name == "Include")
         {
@@ -1221,10 +1139,26 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
                 }
             }
 
+            std::string comment = control_map["Comment"].asString();
+            if (!error_when_no_comment
+                && !set_default_values
+                && comment.empty())
+            {
+                // Only error for default settings that should remind the developer to provide comments
+                // and otherwise indicate a problem with viewer's files.
+                // But permit this minor transgression in user's files.
+                // Otherwise user might have a hard time figuring out source of the error or how to fix it.
+                // Instead make setting to not persist so that unrecognized invalid settings won't be saved
+                // for the next run.
+                persist = LLControlVariable::PERSIST_NO;
+                comment = "Comment not provided, setting won't persist";
+                LL_WARNS() << "Control " << name << " is missing a comment value. Setting will be marked as PERSIST_NO" << LL_ENDL;
+            }
+
             declareControl(name,
                            typeStringToEnum(control_map["Type"].asString()),
                            control_map["Value"],
-                           control_map["Comment"].asString(),
+                           comment,
                            persist,
                            hidefromsettingseditor
                            );
@@ -1279,7 +1213,7 @@ void main()
     bar = new LLControlVariable<S32>("gBar", 10, 2, 22);
     gGlobals.addEntry("gBar", bar);
 
-    baz = new LLControlVariable<BOOL>("gBaz", FALSE);
+    baz = new LLControlVariable<bool>("gBaz", false);
     gGlobals.addEntry("gBaz", baz);
 
     // test retrieval
@@ -1307,7 +1241,7 @@ void main()
 
     // ...invalid data type
     getfoo = (F32_CONTROL) gGlobals.resolveName("gFoo");
-    getfoo->set(TRUE);
+    getfoo->set(true);
     getfoo->dump();
 
     // ...out of range data
@@ -1341,13 +1275,7 @@ template <> eControlType get_control_type<bool> ()
 {
     return TYPE_BOOLEAN;
 }
-/*
-// Yay BOOL, its really an S32.
-template <> eControlType get_control_type<BOOL> ()
-{
-    return TYPE_BOOLEAN;
-}
-*/
+
 template <> eControlType get_control_type<std::string>()
 {
     return TYPE_STRING;
@@ -1361,11 +1289,6 @@ template <> eControlType get_control_type<LLVector3>()
 template <> eControlType get_control_type<LLVector3d>()
 {
     return TYPE_VEC3D;
-}
-
-template <> eControlType get_control_type<LLVector4>()
-{
-    return TYPE_VEC4;
 }
 
 template <> eControlType get_control_type<LLQuaternion>()
@@ -1388,11 +1311,6 @@ template <> eControlType get_control_type<LLColor3>()
     return TYPE_COL3;
 }
 
-template <> eControlType get_control_type<LLUUID>()
-{
-    return TYPE_UUID;
-}
-
 template <> eControlType get_control_type<LLSD>()
 {
     return TYPE_LLSD;
@@ -1413,12 +1331,6 @@ template <> LLSD convert_to_llsd<LLVector3d>(const LLVector3d& in)
 {
     return in.getValue();
 }
-
-template <> LLSD convert_to_llsd<LLVector4>(const LLVector4& in)
-{
-    return in.getValue();
-}
-
 template <> LLSD convert_to_llsd<LLQuaternion>(const LLQuaternion& in)
 {
     return in.getValue();
@@ -1452,8 +1364,8 @@ bool convert_from_llsd<bool>(const LLSD& sd, eControlType type, std::string_view
         return sd.asBoolean();
     else
     {
-        CONTROL_ERRS << "Invalid BOOL value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
-        return FALSE;
+        CONTROL_ERRS << "Invalid bool value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
+        return false;
     }
 }
 
@@ -1536,18 +1448,6 @@ LLVector3d convert_from_llsd<LLVector3d>(const LLSD& sd, eControlType type, std:
 }
 
 template<>
-LLVector4 convert_from_llsd<LLVector4>(const LLSD& sd, eControlType type, std::string_view control_name)
-{
-    if (type == TYPE_VEC4)
-        return (LLVector4)sd;
-    else
-    {
-        CONTROL_ERRS << "Invalid LLVector4 value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
-        return LLVector4::zero;
-    }
-}
-
-template<>
 LLQuaternion convert_from_llsd<LLQuaternion>(const LLSD& sd, eControlType type, std::string_view control_name)
 {
     if (type == TYPE_QUAT)
@@ -1617,18 +1517,6 @@ LLColor3 convert_from_llsd<LLColor3>(const LLSD& sd, eControlType type, std::str
 }
 
 template<>
-LLUUID convert_from_llsd<LLUUID>(const LLSD& sd, eControlType type, std::string_view control_name)
-{
-    if (type == TYPE_UUID)
-        return sd.asUUID();
-    else
-    {
-        CONTROL_ERRS << "Invalid LLUUID value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
-        return LLUUID::null;
-    }
-}
-
-template<>
 LLSD convert_from_llsd<LLSD>(const LLSD& sd, eControlType type, std::string_view control_name)
 {
     return sd;
@@ -1642,7 +1530,6 @@ DECL_LLCC(U32, (U32)666);
 DECL_LLCC(S32, (S32)-666);
 DECL_LLCC(F32, (F32)-666.666);
 DECL_LLCC(bool, true);
-DECL_LLCC(BOOL, FALSE);
 static LLCachedControl<std::string> mySetting_string("TestCachedControlstring", "Default String Value");
 DECL_LLCC(LLVector3, LLVector3(1.0f, 2.0f, 3.0f));
 DECL_LLCC(LLVector3d, LLVector3d(6.0f, 5.0f, 4.0f));
@@ -1661,7 +1548,6 @@ void test_cached_control()
     TEST_LLCC(S32, (S32)-666);
     TEST_LLCC(F32, (F32)-666.666);
     TEST_LLCC(bool, true);
-    TEST_LLCC(BOOL, FALSE);
     if((std::string)mySetting_string != "Default String Value") LL_ERRS() << "Fail string" << LL_ENDL;
     TEST_LLCC(LLVector3, LLVector3(1.0f, 2.0f, 3.0f));
     TEST_LLCC(LLVector3d, LLVector3d(6.0f, 5.0f, 4.0f));

@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2020&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2020, Rye Mutt <rye@alchemyviewer.org>
+ * Copyright (C) Rye Mutt <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,6 +37,7 @@
 
 #include "llagent.h"
 #include "llavataractions.h"
+#include "llcallingcard.h"
 #include "llfloaterreg.h"
 #include "llfloaterregioninfo.h"
 #include "llfloaterreporter.h"
@@ -62,11 +63,11 @@ void ALAvatarActions::copyData(const LLUUID& id, ECopyDataType type)
 
     uuid_vec_t ids;
     ids.push_back(id);
-    copyData(ids, type);
+    copyDataMultiple(ids, type);
 }
 
 // static
-void ALAvatarActions::copyData(const uuid_vec_t& ids, ECopyDataType type)
+void ALAvatarActions::copyDataMultiple(const uuid_vec_t& ids, ECopyDataType type)
 {
     if (!ids.empty())
     {
@@ -124,13 +125,13 @@ void ALAvatarActions::copyData(const uuid_vec_t& ids, ECopyDataType type)
         if (!data_string.empty())
         {
             LLWString wdata_str = utf8str_to_wstring(data_string);
-            LLClipboard::instance().copyToClipboard(wdata_str, 0, wdata_str.length());
+            LLClipboard::instance().copyToClipboard(wdata_str, 0, narrow(wdata_str.length()));
         }
     }
 }
 
 // static
-void ALAvatarActions::copyData(const LLUUID& id, const LLSD& userdata)
+void ALAvatarActions::copyDataUI(const LLUUID& id, const LLSD& userdata)
 {
     const std::string item_name = userdata.asString();
     if (item_name == "user_name")
@@ -160,28 +161,28 @@ void ALAvatarActions::copyData(const LLUUID& id, const LLSD& userdata)
 }
 
 // static
-void ALAvatarActions::copyData(const uuid_vec_t& ids, const LLSD& userdata)
+void ALAvatarActions::copyDataMultipleUI(const uuid_vec_t& ids, const LLSD& userdata)
 {
     const std::string item_name = userdata.asString();
     if (item_name == "user_name")
     {
-        copyData(ids, E_DATA_USER_NAME);
+        copyDataMultiple(ids, E_DATA_USER_NAME);
     }
     else if (item_name == "account_name")
     {
-        copyData(ids, E_DATA_ACCOUNT_NAME);
+        copyDataMultiple(ids, E_DATA_ACCOUNT_NAME);
     }
     else if (item_name == "display_name")
     {
-        copyData(ids, E_DATA_DISPLAY_NAME);
+        copyDataMultiple(ids, E_DATA_DISPLAY_NAME);
     }
     else if (item_name == "id")
     {
-        copyData(ids, E_DATA_UUID);
+        copyDataMultiple(ids, E_DATA_UUID);
     }
     else if (item_name == "slurl")
     {
-        copyData(ids, E_DATA_SLURL);
+        copyDataMultiple(ids, E_DATA_SLURL);
     }
 }
 
@@ -253,11 +254,11 @@ bool ALAvatarActions::canFreezeEject(const LLUUID& avatar_id)
         return false;
 
     uuid_vec_t ids = { avatar_id };
-    return canFreezeEject(ids);
+    return canFreezeEjectMultiple(ids);
 }
 
 // static
-bool ALAvatarActions::canFreezeEject(const uuid_vec_t& ids)
+bool ALAvatarActions::canFreezeEjectMultiple(const uuid_vec_t& ids)
 {
     if (ids.empty())
         return false;
@@ -317,11 +318,11 @@ void ALAvatarActions::parcelFreeze(const LLUUID& avatar_id)
         return;
 
     uuid_vec_t ids = { avatar_id };
-    return parcelFreeze(ids);
+    return parcelFreezeMultiple(ids);
 }
 
 // static
-void ALAvatarActions::parcelFreeze(const uuid_vec_t& ids)
+void ALAvatarActions::parcelFreezeMultiple(const uuid_vec_t& ids)
 {
     if (ids.empty())
         return;
@@ -355,11 +356,11 @@ void ALAvatarActions::parcelEject(const LLUUID& avatar_id)
         return;
 
     uuid_vec_t ids = { avatar_id };
-    return parcelEject(ids);
+    return parcelEjectMultiple(ids);
 }
 
 // static
-void ALAvatarActions::parcelEject(const uuid_vec_t& ids)
+void ALAvatarActions::parcelEjectMultiple(const uuid_vec_t& ids)
 {
     if (ids.empty())
         return;
@@ -426,11 +427,11 @@ bool ALAvatarActions::canManageAvatarsEstate(const LLUUID& avatar_id)
         return false;
 
     uuid_vec_t ids = { avatar_id };
-    return canManageAvatarsEstate(ids);
+    return canManageAvatarsEstateMultiple(ids);
 }
 
 // static
-bool ALAvatarActions::canManageAvatarsEstate(const uuid_vec_t& ids)
+bool ALAvatarActions::canManageAvatarsEstateMultiple(const uuid_vec_t& ids)
 {
     if (ids.empty())
         return false;
@@ -481,11 +482,11 @@ void ALAvatarActions::estateTeleportHome(const LLUUID& avatar_id)
         return;
 
     uuid_vec_t ids = { avatar_id };
-    estateTeleportHome(ids);
+    estateTeleportHomeMultiple(ids);
 }
 
 // static
-void ALAvatarActions::estateTeleportHome(const uuid_vec_t& ids)
+void ALAvatarActions::estateTeleportHomeMultiple(const uuid_vec_t& ids)
 {
     if (ids.empty())
         return;
@@ -519,11 +520,11 @@ void ALAvatarActions::estateKick(const LLUUID& avatar_id)
         return;
 
     uuid_vec_t ids = { avatar_id };
-    estateKick(ids);
+    estateKickMultiple(ids);
 }
 
 // static
-void ALAvatarActions::estateKick(const uuid_vec_t& ids)
+void ALAvatarActions::estateKickMultiple(const uuid_vec_t& ids)
 {
     if (ids.empty())
         return;
@@ -557,11 +558,11 @@ void ALAvatarActions::estateBan(const LLUUID& avatar_id)
         return;
 
     uuid_vec_t ids = { avatar_id };
-    estateBan(ids);
+    estateBanMultiple(ids);
 }
 
 // static
-void ALAvatarActions::estateBan(const uuid_vec_t& ids)
+void ALAvatarActions::estateBanMultiple(const uuid_vec_t& ids)
 {
     if (ids.empty())
         return;
@@ -873,4 +874,17 @@ void ALAvatarActions::showWebProfile(const LLUUID& id)
     {
         LLAvatarNameCache::get(id, boost::bind(&on_avatar_name_show_profile, _1, _2));
     }
+}
+
+// static
+bool ALAvatarActions::isAgentMappable(const LLUUID& agent_id)
+{
+    if (gAgent.isGodlike())
+    {
+        return true;
+    }
+
+    const LLRelationship* buddy_info = LLAvatarTracker::instance().getBuddyInfo(agent_id);
+
+    return (buddy_info && buddy_info->isOnline() && buddy_info->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION));
 }

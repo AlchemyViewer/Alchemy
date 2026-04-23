@@ -30,7 +30,6 @@
 
 #include <cstdlib>
 #include <vector>
-#include "boost/intrusive_ptr.hpp"
 
 #include "_refcounted.h"
 
@@ -64,7 +63,7 @@ class BufferArrayStreamBuf;
 /// Allocation:  Refcounted, heap only.  Caller of the constructor
 /// is given a single refcount.
 ///
-class BufferArray final : public LLCoreInt::RefCounted
+class BufferArray : public LLCoreInt::RefCounted
 {
 public:
     // BufferArrayStreamBuf has intimate knowledge of this
@@ -80,8 +79,8 @@ protected:
     virtual ~BufferArray();                     // Use release()
 
 private:
-    BufferArray(const BufferArray &);           // Not defined
-    void operator=(const BufferArray &);        // Not defined
+    BufferArray(const BufferArray&) = delete;
+    void operator=(const BufferArray&) = delete;
 
 public:
     // Internal magic number, may be used by unit tests.

@@ -28,11 +28,11 @@
 #define LL_LLWINDEBUG_H
 
 #include "stdtypes.h"
-#include "llwin32headerslean.h"
+#include "llwin32headers.h"
 
 #include <dbghelp.h>
 
-class LLWinDebug final :
+class LLWinDebug:
     public LLSingleton<LLWinDebug>
 {
     LLSINGLETON_EMPTY_CTOR(LLWinDebug);

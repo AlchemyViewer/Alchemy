@@ -37,9 +37,8 @@
 #include "llinventorymodel.h"
 #include "llscrollcontainer.h"
 #include "lluictrlfactory.h"
+#include <functional>
 #include <set>
-
-#include "boost/unordered/unordered_flat_map.hpp"
 
 class LLInvFVBridge;
 class LLInventoryFolderViewModelBuilder;
@@ -163,16 +162,16 @@ public:
     LLFolderViewModelInventory& getRootViewModel() { return mInventoryViewModel; }
 
     // LLView methods
-    /*virtual*/ void onVisibilityChange(BOOL new_visibility) override;
+    /*virtual*/ void onVisibilityChange(bool new_visibility) override;
     void draw() override;
-    /*virtual*/ BOOL handleKeyHere( KEY key, MASK mask ) override;
-    BOOL handleHover(S32 x, S32 y, MASK mask) override;
-    /*virtual*/ BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
+    /*virtual*/ bool handleKeyHere( KEY key, MASK mask ) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
                                    std::string& tooltip_msg) override;
-                BOOL handleToolTip(S32 x, S32 y, MASK mask) override;
+                bool handleToolTip(S32 x, S32 y, MASK mask) override;
     // LLUICtrl methods
      /*virtual*/ void onFocusLost() override;
      /*virtual*/ void onFocusReceived() override;
@@ -183,8 +182,8 @@ public:
 
     // Call this method to set the selection.
     void openAllFolders();
-    void setSelection(const LLUUID& obj_id, BOOL take_keyboard_focus);
-    void setSelectCallback(const boost::function<void (const std::deque<LLFolderViewItem*>& items, BOOL user_action)>& cb);
+    void setSelection(const LLUUID& obj_id, bool take_keyboard_focus);
+    void setSelectCallback(const std::function<void (const std::deque<LLFolderViewItem*>& items, bool user_action)>& cb);
     void clearSelection();
     selected_items_t getSelectedItems() const;
 
@@ -200,10 +199,10 @@ public:
     void setFilterSettingsTypes(U64 filter);
     void setFilterSubString(const std::string& string);
     const std::string getFilterSubString();
-    void setSinceLogoff(BOOL sl);
+    void setSinceLogoff(bool sl);
     void setHoursAgo(U32 hours);
     void setDateSearchDirection(U32 direction);
-    BOOL getSinceLogoff();
+    bool getSinceLogoff();
     void setFilterLinks(U64 filter_links);
     void setSearchType(LLInventoryFilter::ESearchType type);
     LLInventoryFilter::ESearchType getSearchType();
@@ -218,7 +217,7 @@ public:
     bool getAllowDropOnRoot() { return mParams.allow_drop_on_root; }
     bool areViewsInitialized() { return mViewsInitialized == VIEWS_INITIALIZED && mFolderRoot.get() && !mFolderRoot.get()->needsArrange(); }
 
-    void onSelectionChange(const std::deque<LLFolderViewItem*> &items, BOOL user_action);
+    void onSelectionChange(const std::deque<LLFolderViewItem*> &items, bool user_action);
 
     LLHandle<LLInventoryPanel> getInventoryPanelHandle() const { return getDerivedHandle<LLInventoryPanel>(); }
 
@@ -227,6 +226,7 @@ public:
     void doCreate(const LLSD& userdata);
     bool beginIMSession();
     void fileUploadLocation(const LLSD& userdata);
+    bool isUploadLocationSelected(const LLSD& userdata);
     void openSingleViewInventory(LLUUID folder_id = LLUUID());
     void purgeSelectedItems();
     bool attachObject(const LLSD& userdata);
@@ -244,7 +244,7 @@ public:
 
     // Find whichever inventory panel is active / on top.
     // "Auto_open" determines if we open an inventory panel if none are open.
-    static LLInventoryPanel *getActiveInventoryPanel(BOOL auto_open = TRUE);
+    static LLInventoryPanel *getActiveInventoryPanel(bool auto_open = true);
 
     static void openInventoryPanelAndSetSelection(bool auto_open,
                                                     const LLUUID& obj_id,
@@ -253,10 +253,11 @@ public:
                                                     bool reset_filter = false);
     static void setSFViewAndOpenFolder(const LLInventoryPanel* panel, const LLUUID& folder_id);
     void addItemID(const LLUUID& id, LLFolderViewItem* itemp);
-    void removeItemID(const LLUUID& id);
+    virtual void removeItemID(const LLUUID& id);
+    virtual bool isInRootContent(const LLUUID& id, LLFolderViewItem* view_item) { return false; }
     LLFolderViewItem* getItemByID(const LLUUID& id);
     LLFolderViewFolder* getFolderByID(const LLUUID& id);
-    void setSelectionByID(const LLUUID& obj_id, BOOL take_keyboard_focus);
+    void setSelectionByID(const LLUUID& obj_id, bool take_keyboard_focus);
     void updateSelection();
 
     void setSuppressOpenItemAction(bool supress_open_item) { mSuppressOpenItemAction = supress_open_item; }
@@ -299,7 +300,7 @@ protected:
     LLPointer<LLFolderViewGroupedItemBridge> mGroupedItemBridge;
     Params                      mParams;    // stored copy of parameter block
 
-    boost::unordered_flat_map<LLUUID, LLFolderViewItem*> mItemMap;
+    boost::unordered_map<LLUUID, LLFolderViewItem*> mItemMap;
     /**
      * Pointer to LLInventoryFolderViewModelBuilder.
      *
@@ -336,6 +337,8 @@ public:
 protected:
     // Builds the UI.  Call this once the inventory is usable.
     void                initializeViews(F64 max_time);
+    virtual void        initRootContent();
+    virtual void        findAndInitRootContent(const LLUUID& root_id) {};
 
     // Specific inventory colors
     static bool                 sColorSetInitialized;
@@ -366,14 +369,14 @@ protected:
     virtual bool                typedViewsFilter(const LLUUID& id, LLInventoryObject const* objectp) { return true; }
 
     virtual void                itemChanged(const LLUUID& item_id, U32 mask, const LLInventoryObject* model_item);
-    BOOL                getIsHiddenFolderType(LLFolderType::EType folder_type) const;
+    bool                getIsHiddenFolderType(LLFolderType::EType folder_type) const;
 
     virtual LLFolderView * createFolderRoot(LLUUID root_id );
     virtual LLFolderViewFolder* createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop);
     virtual LLFolderViewItem*   createFolderViewItem(LLInvFVBridge * bridge);
 
-    boost::function<void(const std::deque<LLFolderViewItem*>& items, BOOL user_action)> mSelectionCallback;
-private:
+    std::function<void(const std::deque<LLFolderViewItem*>& items, bool user_action)> mSelectionCallback;
+
     // buildViewsTree does not include some checks and is meant
     // for recursive use, use buildNewViews() for first call
     LLFolderViewItem*           buildViewsTree(const LLUUID& id,
@@ -396,6 +399,8 @@ private:
     EViewsInitializationState   mViewsInitialized; // Whether views have been generated
     F64                         mBuildViewsEndTime; // Stop building views past this timestamp
     std::deque<LLUUID>          mBuildViewsQueue;
+    std::deque<LLUUID>          mBuildRootQueue;
+
 };
 
 
@@ -422,17 +427,17 @@ public:
     void doToSelected(const LLSD& userdata);
     void doShare();
 
-    bool isBackwardAvailable();
-    bool isForwardAvailable();
+    bool isBackwardAvailable() const;
+    bool isForwardAvailable() const;
 
-    bool hasVisibleItems();
+    bool hasVisibleItems() const;
 
     void setNavBackwardList(std::list<LLUUID> backward_list) { mBackwardFolders = backward_list; }
     void setNavForwardList(std::list<LLUUID> forward_list) { mForwardFolders = forward_list; }
     std::list<LLUUID> getNavBackwardList() { return mBackwardFolders; }
     std::list<LLUUID> getNavForwardList() { return mForwardFolders; }
 
-    typedef boost::function<void()> root_changed_callback_t;
+    typedef std::function<void()> root_changed_callback_t;
     boost::signals2::connection setRootChangedCallback(root_changed_callback_t cb);
 
 protected:
@@ -473,7 +478,7 @@ protected:
 public:
     ~LLAssetFilteredInventoryPanel() {}
 
-    /*virtual*/ BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
+    /*virtual*/ bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
         EDragAndDropType cargo_type,
         void* cargo_data,
         EAcceptance* accept,

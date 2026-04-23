@@ -31,7 +31,7 @@ struct LLNetListItem
 {
     LLNetListItem(LLUUID id);
     LLUUID mID;
-    BOOL mAutoName;
+    bool mAutoName;
     std::string mName;
     std::string mPreviousRegionName;
     U64 mHandle;
@@ -43,19 +43,19 @@ class LLFloaterMessageBuilder final : public LLFloater, public LLEventTimer
 public:
     LLFloaterMessageBuilder(const LLSD &);
     ~LLFloaterMessageBuilder() = default;
-    BOOL postBuild() override;
+    bool postBuild() override;
     void onOpen(const LLSD& key) override;
     static void show(const std::string& initial_text);
 
 private:
     static std::list<LLNetListItem*> sNetListItems;
 
-    BOOL tick() override;
+    bool tick() override;
     void onClickSend();
     void onCommitPacketCombo(LLUICtrl* ctrl);
 
     static LLFloaterMessageBuilder* sInstance;
-    BOOL handleKeyHere(KEY key, MASK mask) override;
+    bool handleKeyHere(KEY key, MASK mask) override;
     std::string mInitialText;
 
     static LLNetListItem* findNetListItem(LLHost host);

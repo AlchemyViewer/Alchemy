@@ -47,7 +47,7 @@ typedef void (*LLVPCallback)(LLViewerPart &part, const F32 dt);
 //
 
 
-class LLViewerPart final : public LLPartData
+class LLViewerPart : public LLPartData
 {
 public:
     ~LLViewerPart();
@@ -95,11 +95,11 @@ public:
 
     void cleanup();
 
-    BOOL addPart(LLViewerPart* part, const F32 desired_size = -1.f);
+    bool addPart(LLViewerPart* part, const F32 desired_size = -1.f);
 
     void updateParticles(const F32 lastdt);
 
-    BOOL posInGroup(const LLVector3 &pos, const F32 desired_size = -1.f);
+    bool posInGroup(const LLVector3 &pos, const F32 desired_size = -1.f);
 
     void shift(const LLVector3 &offset);
 
@@ -117,7 +117,7 @@ public:
 
     LLPointer<LLVOPartGroup> mVOPartGroupp;
 
-    BOOL mUniformParticles;
+    bool mUniformParticles;
     U32 mID;
 
     F32 mSkippedTime;
@@ -133,10 +133,11 @@ protected:
     LLViewerRegion *mRegionp;
 };
 
-class LLViewerPartSim final : public LLSingleton<LLViewerPartSim>
+class LLViewerPartSim : public LLSimpleton<LLViewerPartSim>
 {
-    LLSINGLETON(LLViewerPartSim);
 public:
+    LLViewerPartSim();
+
     void destroyClass();
 
     typedef std::vector<LLViewerPartGroup *> group_list_t;
@@ -152,7 +153,7 @@ public:
 
     void cleanupRegion(LLViewerRegion *regionp);
 
-    static BOOL shouldAddPart(); // Just decides whether this particle should be added or not (for particle count capping)
+    static bool shouldAddPart(); // Just decides whether this particle should be added or not (for particle count capping)
     F32 maxRate() // Return maximum particle generation rate
     {
         if (sParticleCount >= MAX_PART_COUNT)
@@ -177,7 +178,7 @@ public:
 
     friend class LLViewerPartGroup;
 
-    BOOL aboveParticleLimit() const { return sParticleCount > sMaxParticleCount; }
+    bool aboveParticleLimit() const { return sParticleCount > sMaxParticleCount; }
 
     static void setMaxPartCount(const S32 max_parts)    { sMaxParticleCount = max_parts; }
     static S32  getMaxPartCount()                       { return sMaxParticleCount; }

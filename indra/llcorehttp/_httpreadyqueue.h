@@ -66,18 +66,19 @@ typedef std::priority_queue<HttpOpRequest::ptr_t,
 
 #endif // LLCORE_HTTP_READY_QUEUE_IGNORES_PRIORITY
 
-class HttpReadyQueue final : public HttpReadyQueueBase
+class HttpReadyQueue : public HttpReadyQueueBase
 {
 public:
     HttpReadyQueue()
         : HttpReadyQueueBase()
         {}
 
-    ~HttpReadyQueue() = default;
+    ~HttpReadyQueue()
+        {}
 
 protected:
-    HttpReadyQueue(const HttpReadyQueue &);     // Not defined
-    void operator=(const HttpReadyQueue &);     // Not defined
+    HttpReadyQueue(const HttpReadyQueue&) = delete;
+    void operator=(const HttpReadyQueue&) = delete;
 
 public:
 

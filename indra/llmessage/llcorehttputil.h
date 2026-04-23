@@ -46,8 +46,6 @@
 #include "llassettype.h"
 #include "lluuid.h"
 
-#include <boost/make_shared.hpp>
-
 ///
 /// The base llcorehttp library implements many HTTP idioms
 /// used in the viewer but not all.  That library intentionally
@@ -60,8 +58,8 @@
 namespace LLCoreHttpUtil
 {
 /// Allow access to to the property settings methods.
-typedef boost::function<bool(const std::string &)> BoolSettingQuery_t;
-typedef boost::function<void(const std::string &, bool, const std::string &)> BoolSettingUpdate_t;
+typedef std::function<bool(const std::string &)> BoolSettingQuery_t;
+typedef std::function<void(const std::string &, bool, const std::string &)> BoolSettingUpdate_t;
 
 void setPropertyMethods(BoolSettingQuery_t queryfn, BoolSettingUpdate_t updatefn);
 
@@ -261,7 +259,7 @@ inline LLCore::HttpHandle requestPatchWithLLSD(LLCore::HttpRequest::ptr_t & requ
 ///                      +- ["url"]     - The URL used to make the call.
 ///                      +- ["headers"] - A map of name name value pairs with the HTTP headers.
 ///
-class HttpCoroHandler : public LLCore::HttpHandler
+class HttpCoroHandler : public LLCore::HttpHandler, public std::enable_shared_from_this<HttpCoroHandler>
 {
 public:
 
@@ -281,11 +279,12 @@ public:
 
 protected:
     /// this method may modify the status value
-    virtual LLSD handleSuccess(LLCore::HttpResponse * response, LLCore::HttpStatus &status) = 0;
-    virtual LLSD parseBody(LLCore::HttpResponse *response, bool &success) = 0;
+    virtual LLSD handleSuccess(LLCore::HttpResponse * response, LLCore::HttpStatus &status) const = 0;
+    virtual LLSD parseBody(LLCore::HttpResponse *response, bool &success) const = 0;
 
 private:
-    void buildStatusEntry(LLCore::HttpResponse *response, LLCore::HttpStatus status, LLSD &result);
+    void buildStatusEntry(LLCore::HttpResponse *response, LLCore::HttpStatus status, LLSD &result) const;
+    void replyPost(LLCore::HttpResponse* response, LLCore::HttpStatus& status, LLSD& result);
 
     LLEventStream &mReplyPump;
 };
@@ -322,7 +321,7 @@ public:
     typedef std::shared_ptr<HttpCoroutineAdapter> ptr_t;
     typedef std::weak_ptr<HttpCoroutineAdapter>   wptr_t;
 
-    HttpCoroutineAdapter(const std::string &name, LLCore::HttpRequest::policy_t policyId);
+    HttpCoroutineAdapter(std::string name, LLCore::HttpRequest::policy_t policyId);
     ~HttpCoroutineAdapter();
 
     /// Execute a Post transaction on the supplied URL and yield execution of
@@ -377,7 +376,7 @@ public:
         const std::string & url, std::string fileName,
         LLCore::HttpHeaders::ptr_t &headers)
     {
-        return postFileAndSuspend(request, url, std::move(fileName),
+        return postFileAndSuspend(request, url, fileName,
             std::make_shared<LLCore::HttpOptions>(), headers);
     }
 
@@ -391,7 +390,7 @@ public:
         const std::string & url, LLUUID assetId, LLAssetType::EType assetType,
         LLCore::HttpHeaders::ptr_t &headers)
     {
-        return postFileAndSuspend(request, url, std::move(assetId), assetType,
+        return postFileAndSuspend(request, url, assetId, assetType,
             std::make_shared<LLCore::HttpOptions>(), headers);
     }
 
@@ -587,21 +586,21 @@ public:
     /// should match this form.
     /// @sa callbackHttpGet
     /// @sa callbackHttpPost
-    typedef boost::function<void(const LLSD &)> completionCallback_t;
+    typedef std::function<void(const LLSD &)> completionCallback_t;
 
-    static void callbackHttpGet(const std::string &url, LLCore::HttpRequest::policy_t policyId, completionCallback_t success = NULL, completionCallback_t failure = NULL);
-    static void callbackHttpGet(const std::string &url, completionCallback_t success = NULL, completionCallback_t failure = NULL)
+    static void callbackHttpGet(const std::string &url, LLCore::HttpRequest::policy_t policyId, completionCallback_t success = nullptr, completionCallback_t failure = nullptr);
+    static void callbackHttpGet(const std::string &url, completionCallback_t success = nullptr, completionCallback_t failure = nullptr)
     {
         callbackHttpGet(url, LLCore::HttpRequest::DEFAULT_POLICY_ID, success, failure);
     }
-    static void callbackHttpPost(const std::string &url, LLCore::HttpRequest::policy_t policyId, const LLSD &postData, completionCallback_t success = NULL, completionCallback_t failure = NULL);
-    static void callbackHttpPost(const std::string &url, const LLSD &postData, completionCallback_t success = NULL, completionCallback_t failure = NULL)
+    static void callbackHttpPost(const std::string &url, LLCore::HttpRequest::policy_t policyId, const LLSD &postData, completionCallback_t success = nullptr, completionCallback_t failure = nullptr);
+    static void callbackHttpPost(const std::string &url, const LLSD &postData, completionCallback_t success = nullptr, completionCallback_t failure = nullptr)
     {
         callbackHttpPost(url, LLCore::HttpRequest::DEFAULT_POLICY_ID, postData, success, failure);
     }
 
-    static void callbackHttpDel(const std::string &url, LLCore::HttpRequest::policy_t policyId, completionCallback_t success = NULL,
-                            completionCallback_t failure = NULL);
+    static void callbackHttpDel(const std::string& url, LLCore::HttpRequest::policy_t policyId, completionCallback_t success = nullptr,
+                            completionCallback_t failure = nullptr);
 
     /// Generic Get and post routines for HTTP via coroutines.
     /// These static methods do all required setup for the GET or POST operation.

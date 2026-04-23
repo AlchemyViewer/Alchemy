@@ -31,9 +31,7 @@
 // that are in to a particular region.
 #include <string>
 #include <boost/signals2.hpp>
-#include <boost/unordered/unordered_flat_set.hpp>
 
-#include "xform.h"
 #include "llcorehttputil.h"
 #include "llwind.h"
 #include "v3dmath.h"
@@ -46,7 +44,6 @@
 #include "llframetimer.h"
 #include "llreflectionmap.h"
 #include "llpointer.h"
-#include "lleasymessagesender.h"
 
 // Surface id's
 #define LAND  1
@@ -56,10 +53,14 @@ const U32   MAX_OBJECT_CACHE_ENTRIES = 50000;
 // Region handshake flags
 const U32 REGION_HANDSHAKE_SUPPORTS_SELF_APPEARANCE = 1U << 2;
 
+// Interest list mode,
+// in use by agent and region classes so must exist before region classes
+const std::string IL_MODE_DEFAULT = "default";
+const std::string IL_MODE_360 = "360";
+
 class LLEventPoll;
 class LLVLComposition;
 class LLViewerObject;
-class LLViewerTexture;
 class LLMessageSystem;
 class LLNetMap;
 class LLViewerParcelOverlay;
@@ -79,7 +80,7 @@ class LLViewerRegionImpl;
 class LLViewerOctreeGroup;
 class LLVOCachePartition;
 
-class LLViewerRegion final : public LLCapabilityProvider // implements this interface
+class LLViewerRegion: public LLCapabilityProvider // implements this interface
 {
 public:
     //MUST MATCH THE ORDER OF DECLARATION IN CONSTRUCTOR
@@ -122,34 +123,34 @@ public:
     //void setAgentOffset(const LLVector3d &offset);
     void updateRenderMatrix();
 
-    void setAllowDamage(BOOL b) { setRegionFlag(REGION_FLAGS_ALLOW_DAMAGE, b); }
-    void setAllowLandmark(BOOL b) { setRegionFlag(REGION_FLAGS_ALLOW_LANDMARK, b); }
-    void setAllowSetHome(BOOL b) { setRegionFlag(REGION_FLAGS_ALLOW_SET_HOME, b); }
-    void setResetHomeOnTeleport(BOOL b) { setRegionFlag(REGION_FLAGS_RESET_HOME_ON_TELEPORT, b); }
-    void setSunFixed(BOOL b) { setRegionFlag(REGION_FLAGS_SUN_FIXED, b); }
-    //void setBlockFly(BOOL b) { setRegionFlag(REGION_FLAGS_BLOCK_FLY, b); }        Never used
-    void setAllowDirectTeleport(BOOL b) { setRegionFlag(REGION_FLAGS_ALLOW_DIRECT_TELEPORT, b); }
+    void setAllowDamage(bool b) { setRegionFlag(REGION_FLAGS_ALLOW_DAMAGE, b); }
+    void setAllowLandmark(bool b) { setRegionFlag(REGION_FLAGS_ALLOW_LANDMARK, b); }
+    void setAllowSetHome(bool b) { setRegionFlag(REGION_FLAGS_ALLOW_SET_HOME, b); }
+    void setResetHomeOnTeleport(bool b) { setRegionFlag(REGION_FLAGS_RESET_HOME_ON_TELEPORT, b); }
+    void setSunFixed(bool b) { setRegionFlag(REGION_FLAGS_SUN_FIXED, b); }
+    //void setBlockFly(bool b) { setRegionFlag(REGION_FLAGS_BLOCK_FLY, b); }        Never used
+    void setAllowDirectTeleport(bool b) { setRegionFlag(REGION_FLAGS_ALLOW_DIRECT_TELEPORT, b); }
 
 
-    inline BOOL getAllowDamage()            const;
-    inline BOOL getAllowLandmark()          const;
-    inline BOOL getAllowSetHome()           const;
-    inline BOOL getResetHomeOnTeleport()    const;
-    inline BOOL getSunFixed()               const;
-    inline BOOL getBlockFly()               const;
-    inline BOOL getAllowDirectTeleport()    const;
-    inline BOOL isPrelude()                 const;
-    inline BOOL getAllowTerraform()         const;
-    inline BOOL getRestrictPushObject()     const;
-    inline BOOL getAllowEnvironmentOverride()   const;
-    inline BOOL getReleaseNotesRequested()      const;
+    inline bool getAllowDamage()            const;
+    inline bool getAllowLandmark()          const;
+    inline bool getAllowSetHome()           const;
+    inline bool getResetHomeOnTeleport()    const;
+    inline bool getSunFixed()               const;
+    inline bool getBlockFly()               const;
+    inline bool getAllowDirectTeleport()    const;
+    inline bool isPrelude()                 const;
+    inline bool getAllowTerraform()         const;
+    inline bool getRestrictPushObject()     const;
+    inline bool getAllowEnvironmentOverride()   const;
+    inline bool getReleaseNotesRequested()      const;
 
     bool isAlive(); // can become false if circuit disconnects
 
     void setWaterHeight(F32 water_level);
     F32 getWaterHeight() const;
 
-    BOOL isVoiceEnabled() const;
+    bool isVoiceEnabled() const;
 
     void setBillableFactor(F32 billable_factor) { mBillableFactor = billable_factor; }
     F32 getBillableFactor()         const   { return mBillableFactor; }
@@ -175,13 +176,13 @@ public:
     LLViewerParcelOverlay *getParcelOverlay() const
             { return mParcelOverlay; }
 
-    inline void setRegionFlag(U64 flag, BOOL on);
-    inline BOOL getRegionFlag(U64 flag) const;
+    inline void setRegionFlag(U64 flag, bool on);
+    inline bool getRegionFlag(U64 flag) const;
     void setRegionFlags(U64 flags);
     U64 getRegionFlags() const                  { return mRegionFlags; }
 
-    inline void setRegionProtocol(U64 protocol, BOOL on);
-    BOOL getRegionProtocol(U64 protocol) const;
+    inline void setRegionProtocol(U64 protocol, bool on);
+    bool getRegionProtocol(U64 protocol) const;
     void setRegionProtocols(U64 protocols)          { mRegionProtocols = protocols; }
     U64 getRegionProtocols() const                  { return mRegionProtocols; }
 
@@ -204,9 +205,9 @@ public:
     const LLUUID& getOwner() const;
 
     // Is the current agent on the estate manager list for this region?
-    void setIsEstateManager(BOOL b) { mIsEstateManager = b; }
-    BOOL isEstateManager() const { return mIsEstateManager; }
-    BOOL canManageEstate() const;
+    void setIsEstateManager(bool b) { mIsEstateManager = b; }
+    bool isEstateManager() const { return mIsEstateManager; }
+    bool canManageEstate() const;
 
     void setSimAccess(U8 sim_access)            { mSimAccess = sim_access; }
     U8 getSimAccess() const                     { return mSimAccess; }
@@ -227,18 +228,18 @@ public:
     static const std::string& accessToString(U8 sim_access);
 
     // Returns "M", "PG", "A" etc.
-    static std::string accessToShortString(U8 sim_access);
+    static const std::string& accessToShortString(U8 sim_access);
     static U8          shortStringToAccess(const std::string &sim_access);
 
     // Return access icon name
-    static std::string getAccessIcon(U8 sim_access);
+    static const std::string& getAccessIcon(U8 sim_access);
 
     // helper function which just makes sure all interested parties
     // can process the message.
     static void processRegionInfo(LLMessageSystem* msg, void**);
 
     //check if the viewer camera is static
-    static BOOL isViewerCameraStatic();
+    static bool isViewerCameraStatic();
     static void calcNewObjectCreationThrottle();
 
     void setCacheID(const LLUUID& id);
@@ -247,7 +248,6 @@ public:
 
     // regions are expensive to release, this function gradually releases cache from memory
     static void idleCleanup(F32 max_update_time);
-    F32 getWidthScaleFactor() const             { return mWidthScaleFactor; } // Scaling for OpenSim VarRegions
 
     void idleUpdate(F32 max_update_time);
     void lightIdleUpdate();
@@ -276,8 +276,8 @@ public:
     void setCapabilityDebug(const std::string& name, const std::string& url);
     bool isCapabilityAvailable(std::string_view name) const;
     // implements LLCapabilityProvider
-    const std::string& getCapability(std::string_view name) const override;
-    const std::string& getCapabilityDebug(std::string_view name) const;
+    virtual std::string getCapability(std::string_view name) const;
+    std::string getCapabilityDebug(std::string_view name) const;
 
 
     virtual std::set<std::string> getCapURLNames(const std::string& cap_url);
@@ -299,13 +299,13 @@ public:
     typedef LLCoreHttpUtil::HttpCoroutineAdapter::completionCallback_t httpCallback_t;
     bool requestPostCapability(const std::string &capName,
                                LLSD              &postData,
-                               httpCallback_t     cbSuccess = NULL,
-                               httpCallback_t     cbFailure = NULL);
-    bool requestGetCapability(const std::string &capName, httpCallback_t cbSuccess = NULL, httpCallback_t cbFailure = NULL);
-    bool requestDelCapability(const std::string &capName, httpCallback_t cbSuccess = NULL, httpCallback_t cbFailure = NULL);
+                               httpCallback_t     cbSuccess = nullptr,
+                               httpCallback_t     cbFailure = nullptr);
+    bool requestGetCapability(const std::string& capName, httpCallback_t cbSuccess = nullptr, httpCallback_t cbFailure = nullptr);
+    bool requestDelCapability(const std::string& capName, httpCallback_t cbSuccess = nullptr, httpCallback_t cbFailure = nullptr);
 
     /// implements LLCapabilityProvider
-    /*virtual*/ const LLHost& getHost() const override;
+    /*virtual*/ const LLHost& getHost() const;
     const U64       &getHandle() const          { return mHandle; }
 
     LLSurface       &getLand() const;
@@ -314,7 +314,7 @@ public:
     const LLUUID& getRegionID() const;
     void setRegionID(const LLUUID& region_id);
 
-    BOOL pointInRegionGlobal(const LLVector3d &point_global) const;
+    bool pointInRegionGlobal(const LLVector3d &point_global) const;
     LLVector3   getPosRegionFromGlobal(const LLVector3d &point_global) const;
     LLVector3   getPosRegionFromAgent(const LLVector3 &agent_pos) const;
     LLVector3   getPosAgentFromRegion(const LLVector3 &region_pos) const;
@@ -323,10 +323,10 @@ public:
     LLVLComposition *getComposition() const;
     F32 getCompositionXY(const S32 x, const S32 y) const;
 
-    BOOL isOwnedSelf(const LLVector3& pos) const;
+    bool isOwnedSelf(const LLVector3& pos) const;
 
     // Owned by a group you belong to?  (officer OR member)
-    BOOL isOwnedGroup(const LLVector3& pos) const;
+    bool isOwnedGroup(const LLVector3& pos) const;
 
     // deal with map object updates in the world.
     void updateCoarseLocations(LLMessageSystem* msg);
@@ -337,7 +337,6 @@ public:
 
     void getInfo(LLSD& info);
 
-    bool meshRezEnabled() const;
     bool meshUploadEnabled() const;
 
     bool bakesOnMeshEnabled() const;
@@ -398,9 +397,8 @@ public:
 
     friend std::ostream& operator<<(std::ostream &s, const LLViewerRegion &region);
     /// implements LLCapabilityProvider
-    virtual std::string getDescription() const override;
-    const std::string& getLegacyHttpUrl() const { return mLegacyHttpUrl; }
-    const std::string& getViewerAssetUrl() const { return mViewerAssetUrl; }
+    virtual std::string getDescription() const;
+    std::string getViewerAssetUrl() const { return mViewerAssetUrl; }
 
     U32 getNumOfVisibleGroups() const;
     U32 getNumOfActiveCachedObjects() const;
@@ -425,59 +423,23 @@ public:
     void removeFromCreatedList(U32 local_id);
     void addToCreatedList(U32 local_id);
 
-    BOOL isPaused() const {return mPaused;}
+    bool isPaused() const {return mPaused;}
     S32  getLastUpdate() const {return mLastUpdate;}
 
     std::string getSimHostName();
 
-    static BOOL isNewObjectCreationThrottleDisabled() {return sNewObjectCreationThrottle < 0;}
+    bool isRegionWebRTCEnabled();
+
+    static bool isNewObjectCreationThrottleDisabled() {return sNewObjectCreationThrottle < 0;}
 
     // rebuild reflection probe list
-    void updateReflectionProbes();
-
-    /* ================================================================
-     * @name OpenSimExtras Simulator Features capability
-     * @{
-     */
-    /// Get region allows export
-    bool getRegionAllowsExport() const;
-    /// Avatar picker url
-    std::string getAvatarPickerURL() const;
-    /// Destination guide url
-    std::string getDestinationGuideURL() const;
-    /// Hypergrid map server url
-    std::string getMapServerURL() const;
-    /// Hypergrid search server url
-    std::string getSearchServerURL() const;
-    /// Buy currency server url
-    std::string getBuyCurrencyServerURL() const;
-    /// Grid login/gateway authority (0.8.1)
-    std::string getHGGrid() const;
-    /// Grid name (0.8.1)
-    std::string getHGGridName() const;
-    /// Grid nick (0.8.1)
-    std::string getHGGridNick() const;
+    void updateReflectionProbes(bool full_update);
     /// Chat Range (0.8.1)
     U32 getChatRange() const;
     /// Shout Range (0.8.1)
     U32 getShoutRange() const;
     /// Whisper Range (0.8.1)
     U32 getWhisperRange() const;
-    /// Prim Scale
-    F32 getMinPrimScale() const;
-    F32 getMaxPrimScale() const;
-    F32 getMinPhysPrimScale() const;
-    F32 getMaxPhysPrimScale() const;
-    /// Sim Z
-    F32 getMinRegionHeight() const;
-    F32 getMaxRegionHeight() const;
-
-    /// "God names" surname and full account names map
-    const auto& getGods() const { return mGodNames; };
-    //@}
-
-    typedef std::vector<LLPointer<LLViewerTexture> > tex_matrix_t;
-    const tex_matrix_t& getWorldMapTiles() const;
 
 private:
     void addToVOCacheTree(LLVOCacheEntry* entry);
@@ -492,7 +454,6 @@ private:
     void addCacheMiss(U32 id, LLViewerRegion::eCacheMissType miss_type);
     void decodeBoundingInfo(LLVOCacheEntry* entry);
     bool isNonCacheableObjectCreated(U32 local_id);
-    void setGodnames();
 
 public:
     void applyCacheMiscExtras(LLViewerObject* obj);
@@ -506,12 +467,10 @@ public:
     };
 
     void showReleaseNotes();
-    void reInitPartitions();
 
 protected:
     void disconnectAllNeighbors();
     void initStats();
-    void initPartitions();
 
 public:
     LLWind  mWind;
@@ -520,7 +479,7 @@ public:
     F32Bits mBitsReceived;
     F32     mPacketsReceived;
 
-    LL_ALIGN_16(LLMatrix4a mRenderMatrix);
+    LLMatrix4 mRenderMatrix;
 
     // These arrays are maintained in parallel. Ideally they'd be combined into a
     // single array of an aggrigate data type but for compatibility with the old
@@ -530,7 +489,7 @@ public:
     std::vector<U32> mMapAvatars;
     std::vector<LLUUID> mMapAvatarIDs;
 
-    static BOOL sVOCacheCullingEnabled; //vo cache culling enabled or not.
+    static bool sVOCacheCullingEnabled; //vo cache culling enabled or not.
     static S32  sLastCameraUpdated;
 
     LLFrameTimer &  getRenderInfoRequestTimer() { return mRenderInfoRequestTimer; };
@@ -565,9 +524,6 @@ public:
 
     void resetInterestList();
 
-    static const std::string IL_MODE_DEFAULT;
-    static const std::string IL_MODE_360;
-
   private:
     static S32  sNewObjectCreationThrottle;
     LLViewerRegionImpl * mImpl;
@@ -577,16 +533,13 @@ public:
     U64         mHandle;
     F32         mTimeDilation;  // time dilation of physics simulation on simulator
     S32         mLastUpdate; //last time called idleUpdate()
-    F32         mWidthScaleFactor; // Scaling for OpenSim VarRegions
-    S32         mMaxBakes; // store max bakes on the region
-    S32         mMaxTEs; // store max TEs on the region
 
     // simulator name
     std::string mName;
     std::string mZoning;
 
     // Is this agent on the estate managers list for this region?
-    BOOL mIsEstateManager;
+    bool mIsEstateManager;
 
     U32     mPacketsIn;
     U32Bits mBitsIn,
@@ -617,19 +570,18 @@ public:
     std::string mColoName;
     std::string mProductSKU;
     std::string mProductName;
-    std::string mLegacyHttpUrl;
-    std::string mViewerAssetUrl;
+    std::string mViewerAssetUrl ;
 
     // Maps local ids to cache entries.
     // Regions can have order 10,000 objects, so assume
     // a structure of size 2^14 = 16,000
-    BOOL                                    mCacheLoaded;
-    BOOL                                    mCacheDirty;
-    BOOL    mAlive;                 // can become false if circuit disconnects
-    BOOL    mSimulatorFeaturesReceived;
-    BOOL    mReleaseNotesRequested;
-    BOOL    mDead;  //if true, this region is in the process of deleting.
-    BOOL    mPaused; //pause processing the objects in the region
+    bool                                    mCacheLoaded;
+    bool                                    mCacheDirty;
+    bool    mAlive;                 // can become false if circuit disconnects
+    bool    mSimulatorFeaturesReceived;
+    bool    mReleaseNotesRequested;
+    bool    mDead;  //if true, this region is in the process of deleting.
+    bool    mPaused; //pause processing the objects in the region
 
     typedef enum
     {
@@ -661,26 +613,9 @@ public:
     caps_received_signal_t mSimulatorFeaturesReceivedSignal;
 
     LLSD mSimulatorFeatures;
-    U32 mMaxMaterialsPerTrans = 0;
-    bool mMeshUploadEnabled = false;
-    bool mBakesOnMeshEnabled = false;
-    bool mMeshRezEnabled = false;
-    bool mDynamicPathfindingEnabled = false;
-    bool mAvatarHoverHeightEnabled = false;
-    F32  mMinSimHeight = SL_MIN_OBJECT_Z;
-    F32  mMaxSimHeight = SL_MAX_OBJECT_Z;
-    F32  mMinPrimScale = SL_MIN_PRIM_SCALE;
-    F32  mMaxPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
-    F32  mMaxPrimScaleNoMesh = SL_DEFAULT_MAX_PRIM_SCALE_NO_MESH;
-    F32  mMinPhysPrimScale = SL_MIN_PRIM_SCALE;
-    F32  mMaxPhysPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
     U32  mWhisperRange = 10;
     U32  mSayRange = 20;
     U32  mShoutRange = 100;
-    std::string mHGMapServerURL;
-    std::string mHGGridName;
-    std::string mHGGridNick;
-    std::string mHGGridURL;
 
     typedef std::map<U32, LLPointer<LLVOCacheEntry> >      vocache_entry_map_t;
     static vocache_entry_map_t sRegionCacheCleanup;
@@ -695,21 +630,16 @@ public:
 
     // list of reflection maps being managed by this llviewer region
     std::vector<LLPointer<LLReflectionMap> > mReflectionMaps;
-
-    mutable tex_matrix_t mWorldMapTiles;
-    boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>> mGodNames;
-
-    LLEasyMessageSender mMessageSender;
     using url_mapping_t = boost::unordered_multimap<std::string, std::string>;
     url_mapping_t mCapURLMappings;
 };
 
-inline BOOL LLViewerRegion::getRegionProtocol(U64 protocol) const
+inline bool LLViewerRegion::getRegionProtocol(U64 protocol) const
 {
     return ((mRegionProtocols & protocol) != 0);
 }
 
-inline void LLViewerRegion::setRegionProtocol(U64 protocol, BOOL on)
+inline void LLViewerRegion::setRegionProtocol(U64 protocol, bool on)
 {
     if (on)
     {
@@ -721,12 +651,12 @@ inline void LLViewerRegion::setRegionProtocol(U64 protocol, BOOL on)
     }
 }
 
-inline BOOL LLViewerRegion::getRegionFlag(U64 flag) const
+inline bool LLViewerRegion::getRegionFlag(U64 flag) const
 {
     return ((mRegionFlags & flag) != 0);
 }
 
-inline void LLViewerRegion::setRegionFlag(U64 flag, BOOL on)
+inline void LLViewerRegion::setRegionFlag(U64 flag, bool on)
 {
     if (on)
     {
@@ -738,62 +668,62 @@ inline void LLViewerRegion::setRegionFlag(U64 flag, BOOL on)
     }
 }
 
-inline BOOL LLViewerRegion::getAllowDamage() const
+inline bool LLViewerRegion::getAllowDamage() const
 {
     return ((mRegionFlags & REGION_FLAGS_ALLOW_DAMAGE) !=0);
 }
 
-inline BOOL LLViewerRegion::getAllowLandmark() const
+inline bool LLViewerRegion::getAllowLandmark() const
 {
     return ((mRegionFlags & REGION_FLAGS_ALLOW_LANDMARK) !=0);
 }
 
-inline BOOL LLViewerRegion::getAllowSetHome() const
+inline bool LLViewerRegion::getAllowSetHome() const
 {
     return ((mRegionFlags & REGION_FLAGS_ALLOW_SET_HOME) != 0);
 }
 
-inline BOOL LLViewerRegion::getResetHomeOnTeleport() const
+inline bool LLViewerRegion::getResetHomeOnTeleport() const
 {
     return ((mRegionFlags & REGION_FLAGS_RESET_HOME_ON_TELEPORT) !=0);
 }
 
-inline BOOL LLViewerRegion::getSunFixed() const
+inline bool LLViewerRegion::getSunFixed() const
 {
     return ((mRegionFlags & REGION_FLAGS_SUN_FIXED) !=0);
 }
 
-inline BOOL LLViewerRegion::getBlockFly() const
+inline bool LLViewerRegion::getBlockFly() const
 {
     return ((mRegionFlags & REGION_FLAGS_BLOCK_FLY) !=0);
 }
 
-inline BOOL LLViewerRegion::getAllowDirectTeleport() const
+inline bool LLViewerRegion::getAllowDirectTeleport() const
 {
     return ((mRegionFlags & REGION_FLAGS_ALLOW_DIRECT_TELEPORT) !=0);
 }
 
-inline BOOL LLViewerRegion::isPrelude() const
+inline bool LLViewerRegion::isPrelude() const
 {
     return is_prelude( mRegionFlags );
 }
 
-inline BOOL LLViewerRegion::getAllowTerraform() const
+inline bool LLViewerRegion::getAllowTerraform() const
 {
     return ((mRegionFlags & REGION_FLAGS_BLOCK_TERRAFORM) == 0);
 }
 
-inline BOOL LLViewerRegion::getRestrictPushObject() const
+inline bool LLViewerRegion::getRestrictPushObject() const
 {
     return ((mRegionFlags & REGION_FLAGS_RESTRICT_PUSHOBJECT) != 0);
 }
 
-inline BOOL LLViewerRegion::getAllowEnvironmentOverride() const
+inline bool LLViewerRegion::getAllowEnvironmentOverride() const
 {
     return ((mRegionFlags & REGION_FLAGS_ALLOW_ENVIRONMENT_OVERRIDE) != 0);
 }
 
-inline BOOL LLViewerRegion::getReleaseNotesRequested() const
+inline bool LLViewerRegion::getReleaseNotesRequested() const
 {
     return mReleaseNotesRequested;
 }

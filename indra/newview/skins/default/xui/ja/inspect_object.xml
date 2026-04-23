@@ -23,7 +23,6 @@ Single instance - only have one at a time, recycle it each spawn
 	<string name="Sit">
 		座る
 	</string>
-	<text name="object_name"/>
 	<text name="object_creator">
 		by secondlife:///app/agent/0e346d8b-4433-4d66-a6b0-fd37083abc4c/about
 owner secondlife:///app/agent/0e346d8b-4433-4d66-a6b0-fd37083abc4c/about

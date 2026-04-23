@@ -29,8 +29,7 @@
 #include "llinspectremoteobject.h"
 #include "llinspect.h"
 #include "llmutelist.h"
-#include "llfloaterblocked.h"
-//#include "llpanelblockedlist.h"
+#include "alfloaterblocked.h"
 #include "llslurl.h"
 #include "lltrans.h"
 #include "llui.h"
@@ -55,7 +54,7 @@ public:
     LLInspectRemoteObject(const LLSD& object_id);
     virtual ~LLInspectRemoteObject() {};
 
-    /*virtual*/ BOOL postBuild(void);
+    /*virtual*/ bool postBuild(void);
     /*virtual*/ void onOpen(const LLSD& avatar_id);
 
     void onClickMap();
@@ -90,7 +89,7 @@ LLInspectRemoteObject::LLInspectRemoteObject(const LLSD& sd) :
 }
 
 /*virtual*/
-BOOL LLInspectRemoteObject::postBuild(void)
+bool LLInspectRemoteObject::postBuild(void)
 {
     // hook up the inspector's buttons
     getChild<LLUICtrl>("map_btn")->setCommitCallback(
@@ -100,7 +99,7 @@ BOOL LLInspectRemoteObject::postBuild(void)
     getChild<LLUICtrl>("close_btn")->setCommitCallback(
         boost::bind(&LLInspectRemoteObject::onClickClose, this));
 
-    return TRUE;
+    return true;
 }
 
 /*virtual*/
@@ -139,8 +138,7 @@ void LLInspectRemoteObject::onClickBlock()
 {
     LLMute mute(mObjectID, mName, LLMute::OBJECT);
     LLMuteList::getInstance()->add(mute);
-    LLFloaterBlocked::showMuteAndSelect(mute.mID);
-    //LLPanelBlockedList::showPanelAndSelect(mute.mID);
+    ALFloaterBlocked::showMuteAndSelect(mute.mID);
     closeFloater();
 }
 

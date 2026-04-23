@@ -34,7 +34,7 @@ class LLMessageSystem;
 /**
  * Contains region info, notifies interested parties of its changes.
  */
-class LLRegionInfoModel final : public LLSingleton<LLRegionInfoModel>
+class LLRegionInfoModel : public LLSingleton<LLRegionInfoModel>
 {
     LLSINGLETON(LLRegionInfoModel);
     LOG_CLASS(LLRegionInfoModel);
@@ -70,7 +70,7 @@ public:
     F32         mTerrainLowerLimit;
     F32         mSunHour; // 6..30
 
-    BOOL        mUseEstateSun;
+    bool        mUseEstateSun;
 
     std::string mSimName;
     std::string mSimType;
@@ -88,12 +88,14 @@ private:
     void reset();
 
 public:
+    // *FIXME: Duplicated code from LLPanelRegionInfo
     static void sendEstateOwnerMessage(
         LLMessageSystem* msg,
         const std::string& request,
         const LLUUID& invoice,
         const std::vector<std::string>& strings);
 
+private:
     update_signal_t mUpdateSignal;
 };
 

@@ -54,16 +54,23 @@ void LLPanelPlacesTab::onRegionResponse(const LLVector3d& landmark_global_pos,
                                         const LLUUID& snapshot_id,
                                         bool teleport)
 {
-    LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(landmark_global_pos);
+    std::string sim_name;
+    bool gotSimName = LLWorldMap::getInstance()->simNameFromPosGlobal( landmark_global_pos, sim_name );
 
     std::string sl_url;
-    if (sim_info)
+    if ( gotSimName )
     {
-        sl_url = LLSLURL(sim_info->getName(), sim_info->getLocalPos(landmark_global_pos)).getSLURLString();
+        sl_url = LLSLURL(sim_name, landmark_global_pos).getSLURLString();
     }
     else
     {
         sl_url = "";
+    }
+
+    if (sl_url.empty())
+    {
+        LLNotificationsUtil::add("LandmarkLocationUnknown");
+        return;
     }
 
     LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(sl_url));

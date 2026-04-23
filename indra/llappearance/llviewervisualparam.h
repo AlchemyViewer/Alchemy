@@ -41,21 +41,21 @@ class LLViewerVisualParamInfo : public LLVisualParamInfo
     friend class LLViewerVisualParam;
 public:
     LLViewerVisualParamInfo();
-    /*virtual*/ ~LLViewerVisualParamInfo() = default;
+    /*virtual*/ ~LLViewerVisualParamInfo();
 
-    /*virtual*/ BOOL parseXml(LLXmlTreeNode* node) override;
+    /*virtual*/ bool parseXml(LLXmlTreeNode* node);
 
-    /*virtual*/ void toStream(std::ostream &out) override;
+    /*virtual*/ void toStream(std::ostream &out);
 
 protected:
     S32         mWearableType;
-    BOOL        mCrossWearable;
+    bool        mCrossWearable;
     std::string mEditGroup;
     F32         mCamDist;
     F32         mCamAngle;      // degrees
     F32         mCamElevation;
     F32         mEditGroupDisplayOrder;
-    BOOL        mShowSimple;    // show edit controls when in "simple ui" mode?
+    bool        mShowSimple;    // show edit controls when in "simple ui" mode?
     F32         mSimpleMin;     // when in simple UI, apply this minimum, range 0.f to 100.f
     F32         mSimpleMax;     // when in simple UI, apply this maximum, range 0.f to 100.f
 };
@@ -65,22 +65,21 @@ protected:
 // VIRTUAL CLASS
 // a viewer side interface class for a generalized parametric modification of the avatar mesh
 //-----------------------------------------------------------------------------
-LL_ALIGN_PREFIX(16)
-class LLViewerVisualParam : public LLVisualParam
+class alignas(16) LLViewerVisualParam : public LLVisualParam
 {
 public:
     LLViewerVisualParam();
-    virtual ~LLViewerVisualParam() = default;
+    virtual ~LLViewerVisualParam();
 
     // Special: These functions are overridden by child classes
     LLViewerVisualParamInfo     *getInfo() const { return (LLViewerVisualParamInfo*)mInfo; };
     //   This sets mInfo and calls initialization functions
-    BOOL                        setInfo(LLViewerVisualParamInfo *info);
+    bool                        setInfo(LLViewerVisualParamInfo *info);
 
     virtual LLViewerVisualParam* cloneParam(LLWearable* wearable) const = 0;
 
     // LLVisualParam Virtual functions
-    ///*virtual*/ BOOL          parseData(LLXmlTreeNode* node);
+    ///*virtual*/ bool          parseData(LLXmlTreeNode* node);
 
     // New Virtual functions
     virtual F32                 getTotalDistortion() = 0;
@@ -99,14 +98,14 @@ public:
     F32                 getCameraAngle() const      { return getInfo()->mCamAngle; }  // degrees
     F32                 getCameraElevation() const  { return getInfo()->mCamElevation; }
 
-    BOOL                getShowSimple() const       { return getInfo()->mShowSimple; }
+    bool                getShowSimple() const       { return getInfo()->mShowSimple; }
     F32                 getSimpleMin() const        { return getInfo()->mSimpleMin; }
     F32                 getSimpleMax() const        { return getInfo()->mSimpleMax; }
 
-    BOOL                getCrossWearable() const    { return getInfo()->mCrossWearable; }
+    bool                getCrossWearable() const    { return getInfo()->mCrossWearable; }
 
 protected:
-    LLViewerVisualParam(const LLViewerVisualParam& pOther) = default;
-} LL_ALIGN_POSTFIX(16);
+    LLViewerVisualParam(const LLViewerVisualParam& pOther);
+};
 
 #endif // LL_LLViewerVisualParam_H

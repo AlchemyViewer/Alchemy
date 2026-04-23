@@ -41,7 +41,7 @@ class LLNotificationsListener : public LLEventAPI
 {
 public:
     LLNotificationsListener(LLNotifications & notifications);
-    ~LLNotificationsListener() = default;
+    ~LLNotificationsListener();
 
 private:
     void requestAdd(LLSD const & event_data) const;

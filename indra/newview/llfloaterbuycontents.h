@@ -40,7 +40,7 @@
 class LLViewerObject;
 class LLObjectSelection;
 
-class LLFloaterBuyContents final
+class LLFloaterBuyContents
 : public LLFloater, public LLVOInventoryListener
 {
 public:
@@ -48,14 +48,13 @@ public:
 
     LLFloaterBuyContents(const LLSD& key);
     ~LLFloaterBuyContents();
-    /*virtual*/ BOOL    postBuild();
+    bool postBuild() override;
 
 protected:
-    void requestObjectInventories();
-    /*virtual*/ void inventoryChanged(LLViewerObject* obj,
-                                 LLInventoryObject::object_list_t* inv,
-                                 S32 serial_num,
-                                 void* data);
+    void inventoryChanged(LLViewerObject* obj,
+        LLInventoryObject::object_list_t* inv,
+        S32 serial_num,
+        void* data) override;
 
     void onClickBuy();
     void onClickCancel();

@@ -49,11 +49,6 @@ public:
         mIP(INVALID_HOST_IP_ADDRESS)
     { } // STL's hash_map expect this T()
 
-    LLHost(const LLHost& rhs)
-    {
-        *this = rhs;
-    }
-
     LLHost( U32 ipv4_addr, U32 port )
     :   mPort( port )
     {
@@ -68,7 +63,7 @@ public:
 
     explicit LLHost(const U64 ip_port)
     {
-        U32 ip = (U32)(ip_port >> 32U);
+        U32 ip = (U32)(ip_port >> 32);
         U32 port = (U32)(ip_port & (U64)0xFFFFFFFF);
         mIP = ip;
         mPort = port;
@@ -76,7 +71,8 @@ public:
 
     explicit LLHost(const std::string& ip_and_port);
 
-    ~LLHost() = default;
+    ~LLHost()
+    { }
 
     // MANIPULATORS
     void    set( U32 ip, U32 port )             { mIP = ip; mPort = port; }
@@ -84,7 +80,7 @@ public:
     void    setAddress( const std::string& ipstr )      { mIP = ip_string_to_u32(ipstr.c_str()); }
     void    setAddress( U32 ip )                { mIP = ip; }
     void    setPort( U32 port )                 { mPort = port; }
-    BOOL    setHostByName(const std::string& hname);
+    bool    setHostByName(const std::string& hname);
 
     LLHost& operator=(const LLHost &rhs);
     void    invalidate()                        { mIP = INVALID_HOST_IP_ADDRESS; mPort = INVALID_PORT;};
@@ -93,8 +89,8 @@ public:
     U32     getAddress() const                          { return mIP; }
     U32     getPort() const                             { return mPort; }
     bool    isOk() const                                { return (mIP != INVALID_HOST_IP_ADDRESS) && (mPort != INVALID_PORT); }
-    bool    isInvalid() const                                { return (mIP == INVALID_HOST_IP_ADDRESS) || (mPort == INVALID_PORT); }
-    size_t  hash() const                                { return (mIP << 16U) | (mPort & 0xffffU); }
+    bool    isInvalid()                                 { return (mIP == INVALID_HOST_IP_ADDRESS) || (mPort == INVALID_PORT); }
+    size_t  hash() const                                { return (mIP << 16) | (mPort & 0xffff); }
     std::string getString() const;
     std::string getIPString() const;
     std::string getHostName() const;
@@ -113,6 +109,7 @@ public:
     friend bool operator!=( const LLHost &lhs, const LLHost &rhs );
     friend bool operator<(const LLHost &lhs, const LLHost &rhs);
 };
+
 
 // Function Object required for STL templates using LLHost as key
 class LLHostHash

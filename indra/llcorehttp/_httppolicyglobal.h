@@ -50,12 +50,12 @@ class HttpPolicyGlobal
 {
 public:
     HttpPolicyGlobal();
-    ~HttpPolicyGlobal() = default;
+    ~HttpPolicyGlobal();
 
     HttpPolicyGlobal & operator=(const HttpPolicyGlobal &);
 
 private:
-    HttpPolicyGlobal(const HttpPolicyGlobal &);         // Not defined
+    HttpPolicyGlobal(const HttpPolicyGlobal &) = delete;
 
 public:
     HttpStatus set(HttpRequest::EPolicyOption opt, long value);
@@ -70,7 +70,6 @@ public:
     std::string         mCAPath;
     std::string         mCAFile;
     std::string         mHttpProxy;
-    std::string         mUserAgent;
     long                mTrace;
     long                mUseLLProxy;
     HttpRequest::policyCallback_t   mSslCtxCallback;

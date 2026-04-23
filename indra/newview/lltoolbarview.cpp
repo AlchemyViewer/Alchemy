@@ -95,7 +95,7 @@ LLToolBarView::~LLToolBarView()
     saveToolbars();
 }
 
-BOOL LLToolBarView::postBuild()
+bool LLToolBarView::postBuild()
 {
     mToolbars[LLToolBarEnums::TOOLBAR_LEFT] = getChild<LLToolBar>("toolbar_left");
     mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_LEFT);
@@ -115,12 +115,12 @@ BOOL LLToolBarView::postBuild()
     {
         mToolbars[i]->setStartDragCallback(boost::bind(LLToolBarView::startDragTool,_1,_2,_3));
         mToolbars[i]->setHandleDragCallback(boost::bind(LLToolBarView::handleDragTool,_1,_2,_3,_4));
-        mToolbars[i]->setHandleDropCallback(boost::bind(LLToolBarView::handleDropTool,_1,_2,_3,_4));
+        mToolbars[i]->setHandleDropCallback(boost::bind(LLToolBarView::handleDropTool,_1,_2,_3,_4,_5));
         mToolbars[i]->setButtonAddCallback(boost::bind(LLToolBarView::onToolBarButtonAdded,_1));
         mToolbars[i]->setButtonRemoveCallback(boost::bind(LLToolBarView::onToolBarButtonRemoved,_1));
     }
 
-    return TRUE;
+    return true;
 }
 
 S32 LLToolBarView::hasCommand(const LLCommandId& commandId) const
@@ -469,8 +469,8 @@ void LLToolBarView::saveToolbars() const
     if(!output_node->isNull())
     {
         const std::string& filename = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "toolbars.xml");
-        LLFILE *fp = LLFile::fopen(filename, "w");
-        if (fp != nullptr)
+        LLFILE *fp = LLFile::fopen(filename, LLFILE_MODE("w"));
+        if (fp != NULL)
         {
             LLXMLNode::writeHeaderToFile(fp);
             output_node->writeToFile(fp);
@@ -619,7 +619,7 @@ void LLToolBarView::draw()
 
         for (S32 i = LLToolBarEnums::TOOLBAR_FIRST; i <= LLToolBarEnums::TOOLBAR_LAST; i++)
         {
-            gl_rect_2d(toolbar_rects[i], drop_color, TRUE);
+            gl_rect_2d(toolbar_rects[i], drop_color, true);
         }
     }
 
@@ -640,7 +640,7 @@ void LLToolBarView::startDragTool(S32 x, S32 y, LLToolBarButton* toolbarButton)
     LLToolDragAndDrop::getInstance()->setDragStart( x, y );
 }
 
-BOOL LLToolBarView::handleDragTool( S32 x, S32 y, const LLUUID& uuid, LLAssetType::EType type)
+bool LLToolBarView::handleDragTool( S32 x, S32 y, const LLUUID& uuid, LLAssetType::EType type)
 {
     if (LLToolDragAndDrop::getInstance()->isOverThreshold( x, y ))
     {
@@ -662,7 +662,7 @@ BOOL LLToolBarView::handleDragTool( S32 x, S32 y, const LLUUID& uuid, LLAssetTyp
             gToolBarView->stopCommandInProgress(command_id);
 
             gToolBarView->mDragStarted = true;
-            return TRUE;
+            return true;
         }
         else
         {
@@ -670,18 +670,24 @@ BOOL LLToolBarView::handleDragTool( S32 x, S32 y, const LLUUID& uuid, LLAssetTyp
             return LLToolDragAndDrop::getInstance()->handleHover( x, y, mask );
         }
     }
-    return FALSE;
+    return false;
 }
 
-BOOL LLToolBarView::handleDropTool( void* cargo_data, S32 x, S32 y, LLToolBar* toolbar)
+bool LLToolBarView::handleDropTool( void* cargo_data, EDragAndDropType cargo_type, S32 x, S32 y, LLToolBar* toolbar)
 {
-    BOOL handled = FALSE;
+    if (cargo_type == DAD_PERSON)
+    {
+        // DAD_PERSON means that cargo_data contains an uuid, not an LLInventoryObject
+        resetDragTool(NULL);
+        return false;
+    }
+    bool handled = false;
     LLInventoryObject* inv_item = static_cast<LLInventoryObject*>(cargo_data);
 
     LLAssetType::EType type = inv_item->getType();
     if (type == LLAssetType::AT_WIDGET)
     {
-        handled = TRUE;
+        handled = true;
         // Get the command from its uuid
         LLCommandManager& mgr = LLCommandManager::instance();
         LLCommandId command_id(inv_item->getUUID());
@@ -696,15 +702,18 @@ BOOL LLToolBarView::handleDropTool( void* cargo_data, S32 x, S32 y, LLToolBar* t
             if (old_toolbar_loc != LLToolBarEnums::TOOLBAR_NONE)
             {
                 llassert(gToolBarView->mDragToolbarButton);
-                old_toolbar = gToolBarView->mDragToolbarButton->getParentByType<LLToolBar>();
-                if (old_toolbar->isReadOnly() && toolbar->isReadOnly())
+                if (gToolBarView->mDragToolbarButton)
                 {
-                    // do nothing
-                }
-                else
-                {
-                    int old_rank = LLToolBar::RANK_NONE;
-                    gToolBarView->removeCommand(command_id, old_rank);
+                    old_toolbar = gToolBarView->mDragToolbarButton->getParentByType<LLToolBar>();
+                    if (old_toolbar->isReadOnly() && toolbar->isReadOnly())
+                    {
+                        // do nothing
+                    }
+                    else
+                    {
+                        int old_rank = LLToolBar::RANK_NONE;
+                        gToolBarView->removeCommand(command_id, old_rank);
+                    }
                 }
             }
 

@@ -42,7 +42,6 @@ class LLComboBox;
 class LLNameBox;
 class LLViewerObject;
 class LLTextBase;
-class LLTextBox;
 
 class LLSidepanelTaskInfo : public LLPanel
 {
@@ -50,8 +49,8 @@ public:
     LLSidepanelTaskInfo();
     virtual ~LLSidepanelTaskInfo();
 
-    BOOL postBuild() override;
-    void onVisibilityChange ( BOOL new_visibility ) override;
+    bool postBuild() override;
+    void onVisibilityChange (bool new_visibility) override;
 
     void setObjectSelection(LLObjectSelectionHandle selection);
 
@@ -101,7 +100,7 @@ protected:
     void disablePermissions();
 
 private:
-    LLTextBox*      mLabelGroupName;        // group name
+    LLNameBox*      mLabelGroupName;        // group name
 
     LLUUID          mCreatorID;
     LLUUID          mOwnerID;

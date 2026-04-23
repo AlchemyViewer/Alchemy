@@ -39,14 +39,14 @@ class LLObjectSelection;
 
 typedef LLSafeHandle<LLObjectSelection> LLObjectSelectionHandle;
 
-class LLFloaterBuildOptions final
+class LLFloaterBuildOptions
     :   public LLFloater
 {
 public:
-    virtual BOOL postBuild();
+    bool postBuild() override;
 
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void onClose(bool app_quitting);
+    void onOpen(const LLSD& key) override;
+    void onClose(bool app_quitting) override;
 
 private:
     friend class LLFloaterReg;

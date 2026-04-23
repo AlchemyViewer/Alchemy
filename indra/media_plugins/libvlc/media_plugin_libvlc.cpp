@@ -34,8 +34,9 @@
 #include "llpluginmessageclasses.h"
 #include "media_plugin_base.h"
 
-#if LL_WINDOWS
-#define ssize_t SSIZE_T
+#if defined(_MSC_VER)
+#include <basetsd.h>
+typedef SSIZE_T ssize_t;
 #endif
 
 #include "vlc/vlc.h"
@@ -559,7 +560,7 @@ void MediaPluginLibVLC::receiveMessage(const char* message_string)
                 message.setValueS32("default_height", 1024);
                 message.setValueS32("depth", mDepth);
                 message.setValueU32("internalformat", GL_RGB);
-                message.setValueU32("format", GL_BGRA_EXT);
+                message.setValueU32("format", GL_BGRA);
                 message.setValueU32("type", GL_UNSIGNED_BYTE);
                 message.setValueBoolean("coords_opengl", true);
                 sendMessage(message);
@@ -584,7 +585,7 @@ void MediaPluginLibVLC::receiveMessage(const char* message_string)
                         mTextureWidth = texture_width;
                         mTextureHeight = texture_height;
 
-                        libvlc_time_t time = 1000.0 * mCurTime;
+                        libvlc_time_t time = (libvlc_time_t)(1000.0 * mCurTime);
 
                         playMedia();
 
@@ -654,7 +655,7 @@ void MediaPluginLibVLC::receiveMessage(const char* message_string)
                 {
                     if (mLibVLCMediaPlayer)
                     {
-                        libvlc_time_t time = 1000.0 * message_in.getValueReal("time");
+                        libvlc_time_t time = (libvlc_time_t)(1000.0 * message_in.getValueReal("time"));
                         libvlc_media_player_set_time(mLibVLCMediaPlayer, time);
                         time = libvlc_media_player_get_time(mLibVLCMediaPlayer);
                         if (time < 0)

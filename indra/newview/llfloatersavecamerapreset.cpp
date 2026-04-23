@@ -47,7 +47,7 @@ LLFloaterSaveCameraPreset::LLFloaterSaveCameraPreset(const LLSD &key)
 }
 
 // virtual
-BOOL LLFloaterSaveCameraPreset::postBuild()
+bool LLFloaterSaveCameraPreset::postBuild()
 {
     mPresetCombo = getChild<LLComboBox>("preset_combo");
 
@@ -64,7 +64,7 @@ BOOL LLFloaterSaveCameraPreset::postBuild()
 
     LLPresetsManager::instance().setPresetListChangeCallback(boost::bind(&LLFloaterSaveCameraPreset::onPresetsListChange, this));
 
-    return LLModalDialog::postBuild();
+    return true;
 }
 
 void LLFloaterSaveCameraPreset::onPresetNameEdited()
@@ -106,14 +106,14 @@ void LLFloaterSaveCameraPreset::onBtnSave()
     {
         if (isAgentAvatarValid() && gAgentAvatarp->getParent())
         {
-            gSavedSettings.setQuaternion("AvatarSitRotation", gAgent.getFrameAgent().getQuaternion());
+            gSavedSettings.setLLSD("AvatarSitRotation", gAgent.getFrameAgent().getQuaternion().getValue());
         }
         if (gAgentCamera.isJoystickCameraUsed())
         {
             gSavedSettings.setVector3("CameraOffsetRearView", gAgentCamera.getCurrentCameraOffset());
             gSavedSettings.setVector3d("FocusOffsetRearView", gAgentCamera.getCurrentFocusOffset());
             gAgentCamera.resetCameraZoomFraction();
-            gAgentCamera.setFocusOnAvatar(TRUE, TRUE, FALSE);
+            gAgentCamera.setFocusOnAvatar(true, true, false);
         }
         else
         {

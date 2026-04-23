@@ -1,0 +1,93 @@
+# Building on Windows
+
+## Step 1: Install Build Tools
+
+* [CMake](https://cmake.org/download/)
+* [Git for Windows](https://git-scm.com/install/windows)
+* [Visual Studio 2026](https://visualstudio.microsoft.com/vs/community/) - Select "Desktop development with C++" workload
+* [Python 3.13+](https://www.python.org/downloads/) - Be sure to "Add Python to PATH"
+* [Rust](https://rust-lang.org/tools/install/) - `Download and install RUSTUP-INIT.exe`
+* [dotnet SDK](https://dotnet.microsoft.com/en-us/download)
+
+### Intermediate Check
+
+Confirm things are installed properly so far by typing the following in a Terminal:
+
+```
+cmake --version
+python --version
+git --version
+```
+
+If everything reported sensible values and not "Command not found" errors, then you are in good shape!
+
+## Step 2: Checkout Viewer Code
+Open a `Powershell` from the `Start Menu` and checkout the viewer source code:
+
+```git clone https://github.com/alchemyviewer/alchemy.git```
+
+## Step 3: Setup Build Tooling
+
+Please follow the below steps to set up the required tools to build and package the viewer
+
+### Setup Virtual Environment and Python dependencies
+```
+cd alchemy
+python3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+### Install VPK package tool
+```
+dotnet tool restore
+```
+
+## Step 4: Configure and install vcpkg dependencies
+Switch to the viewer repository you just checked out and run cmake to configure and install dependencies:
+
+```
+cmake -S indra --preset vs2026-os
+```
+
+The --preset argument determines which build configuration to create, generally either an individual build configuration or a multi-config IDE such as Visual Studio.
+
+To list availiable presets:
+
+```cmake -S indra --list-presets```
+
+
+For the Linden viewer build, this usage:
+
+```cmake -S indra --preset vs2026-os [other options]...```
+
+passes [other options] to CMake. This can be used to override different CMake variables, e.g.:
+
+```cmake -S indra --preset vs2026-os -DSOME_VARIABLE:BOOL=TRUE```
+
+The set of applicable CMake variables is still evolving. Please consult the CMake source files in indra/cmake, as well as the individual CMakeLists.txt files in the indra directory tree, to learn their effects.
+
+## Step 5: Build
+When that completes, you can either build within Visual Studio or from the command line:
+
+### Visual Studio:
+The command below will open the generated solution in Visual Studio
+
+```
+explorer.exe .\build-Windows-vs2026-os\SecondLife.slnx
+```
+
+### Command Line:
+Build by running:
+
+```
+cmake --build build-Windows-vs2026-os --config Release
+```
+
+the resulting viewer executable will be at:
+
+```
+build-Windows-vs2026-os/newview/<CONFIGURATION>/SecondLifeViewer.exe
+```
+
+

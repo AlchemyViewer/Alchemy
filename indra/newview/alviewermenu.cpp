@@ -29,9 +29,12 @@
 
 // newview
 #include "alavataractions.h"
-#include "alcinematicmode.h"
+//#include "alcinematicmode.h"
+#include "alderenderlist.h"
+#include "alfloaterblocked.h"
 #include "alfloaterparticleeditor.h"
 #include "llagent.h"
+#include "llagentcamera.h"
 #include "llappviewer.h"
 #include "llavatarpropertiesprocessor.h"
 #include "llhudobject.h"
@@ -46,6 +49,9 @@
 #include "llviewerregion.h"
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
+
+// llviewermenu.cpp
+LLVOAvatar* find_avatar_from_object(LLViewerObject* object);
 
 namespace
 {
@@ -92,7 +98,7 @@ namespace
                 {
                     for (const auto& playpair : avatarp->mPlayingAnimations)
                     {
-                        avatarp->stopMotion(playpair.first, TRUE);
+                        avatarp->stopMotion(playpair.first, true);
                         avatarp->startMotion(playpair.first);
                     }
                 }
@@ -109,7 +115,7 @@ namespace
         LLVOAvatar* avatarp = find_avatar_from_object(objectp);
         if (avatarp)
         {
-            ALAvatarActions::copyData(avatarp->getID(), userdata);
+            ALAvatarActions::copyDataUI(avatarp->getID(), userdata);
         }
     }
 
@@ -126,16 +132,16 @@ namespace
         msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
         msg->nextBlockFast(_PREHASH_AnimationList);
         msg->addUUIDFast(_PREHASH_AnimID, LLUUID("e5afcabe-1601-934b-7e89-b0c78cac373a"));
-        msg->addBOOLFast(_PREHASH_StartAnim, TRUE);
+        msg->addBOOLFast(_PREHASH_StartAnim, true);
         msg->nextBlockFast(_PREHASH_AnimationList);
         msg->addUUIDFast(_PREHASH_AnimID, LLUUID("d307c056-636e-dda6-4a3c-b3a43c431ca8"));
-        msg->addBOOLFast(_PREHASH_StartAnim, TRUE);
+        msg->addBOOLFast(_PREHASH_StartAnim, true);
         msg->nextBlockFast(_PREHASH_AnimationList);
         msg->addUUIDFast(_PREHASH_AnimID, LLUUID("319b4e7a-18fc-1f9e-6411-dd10326c0c7e"));
-        msg->addBOOLFast(_PREHASH_StartAnim, TRUE);
+        msg->addBOOLFast(_PREHASH_StartAnim, true);
         msg->nextBlockFast(_PREHASH_AnimationList);
         msg->addUUIDFast(_PREHASH_AnimID, LLUUID("f05d765d-0e01-5f9a-bfc2-fdc054757e55"));
-        msg->addBOOLFast(_PREHASH_StartAnim, TRUE);
+        msg->addBOOLFast(_PREHASH_StartAnim, true);
         msg->nextBlockFast(_PREHASH_PhysicalAvatarEventList);
         msg->addBinaryDataFast(_PREHASH_TypeData, nullptr, 0);
         msg->sendReliable(gAgent.getRegion()->getHost());
@@ -149,7 +155,7 @@ namespace
 
         const LLUUID& object_id = objectp->getID();
         LLWString idwstr = utf8string_to_wstring(object_id.asString());
-        LLClipboard::instance().copyToClipboard(idwstr,0, idwstr.size());
+        LLClipboard::instance().copyToClipboard(idwstr,0, narrow(idwstr.size()));
     }
 
     bool can_teleport_to()
@@ -202,33 +208,33 @@ namespace
         }
     }
 
-    void confirm_cinematic_mode(const LLSD& notification, const LLSD& response)
-    {
-        S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
-        if (option == 0) // OK
-        {
-            ALCinematicMode::toggle();
-        }
-    }
+    //void confirm_cinematic_mode(const LLSD& notification, const LLSD& response)
+    //{
+    //    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    //    if (option == 0) // OK
+    //    {
+    //        ALCinematicMode::toggle();
+    //    }
+    //}
 
-    bool toggle_cinematic_mode()
-    {
-        LLNotification::Params params("CinematicConfirmHideUI");
-        params.functor.function(boost::bind(&confirm_cinematic_mode, _1, _2));
-        LLSD substitutions;
-        substitutions["SHORTCUT"] = "Alt+Shift+C";
-        params.substitutions = substitutions;
-        if (!ALCinematicMode::isEnabled())
-        {
-            // hiding, so show notification
-            LLNotifications::instance().add(params);
-        }
-        else
-        {
-            LLNotifications::instance().forceResponse(params, 0);
-        }
-        return true;
-    }
+    //bool toggle_cinematic_mode()
+    //{
+    //    LLNotification::Params params("CinematicConfirmHideUI");
+    //    params.functor.function(boost::bind(&confirm_cinematic_mode, _1, _2));
+    //    LLSD substitutions;
+    //    substitutions["SHORTCUT"] = "Alt+Shift+C";
+    //    params.substitutions = substitutions;
+    //    if (!ALCinematicMode::isEnabled())
+    //    {
+    //        // hiding, so show notification
+    //        LLNotifications::instance().add(params);
+    //    }
+    //    else
+    //    {
+    //        LLNotifications::instance().forceResponse(params, 0);
+    //    }
+    //    return true;
+    //}
 
     bool get_saved_setting(const LLSD& userdata)
     {
@@ -379,7 +385,7 @@ namespace
 
             if (node->getObject()->isSculpted() && !node->getObject()->isMesh())
             {
-                const LLSculptParams* sculpt_params = node->getObject()->getSculptParams();
+                const LLSculptParams* sculpt_params = (LLSculptParams*)node->getObject()->getSculptParams();
                 if (sculpt_params)
                 {
                 LLUUID                  sculptie = sculpt_params->getSculptTexture();
@@ -434,6 +440,152 @@ namespace
             return userdata.asInteger() == (S32)gSavedSettings.getU32("NavigationBarStyle");
         }
     };
+
+    class LLCommunicateSetRejectTeleportOffers : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersMode");
+            if (is_rejecting_offers)
+            {
+                gSavedPerAccountSettings.setBOOL("ALRejectTeleportOffersMode", false);
+            }
+            else
+            {
+                gSavedPerAccountSettings.setBOOL("ALRejectTeleportOffersMode", true);
+                LLNotificationsUtil::add("RejectTeleportOffersModeSet");
+            }
+            return true;
+        }
+    };
+
+    class LLCommunicateGetRejectTeleportOffers : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersMode");
+
+            return is_rejecting_offers;
+        }
+    };
+
+    class LLCommunicateSetRejectFriendshipRequests : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsMode");
+            if (is_rejecting_offers)
+            {
+                gSavedPerAccountSettings.setBOOL("ALRejectFriendshipRequestsMode", false);
+            }
+            else
+            {
+                gSavedPerAccountSettings.setBOOL("ALRejectFriendshipRequestsMode", true);
+                LLNotificationsUtil::add("RejectFriendshipRequestsModeSet");
+            }
+            return true;
+        }
+    };
+
+    class LLCommunicateGetRejectFriendshipRequests : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_rejecting_offers = gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsMode");
+
+            return is_rejecting_offers;
+        }
+    };
+
+    class LLCommunicateSetAutoRespond : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_autorespond_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseEnable");
+            if (is_autorespond_set)
+            {
+                gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseEnable", false);
+            }
+            else
+            {
+                gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseEnable", true);
+                LLNotificationsUtil::add("AutoRespondModeSet");
+            }
+            return true;
+        }
+    };
+
+    class LLCommunicateCheckAutoRespond : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_autorespond_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseEnable");
+            return is_autorespond_set;
+        }
+    };
+
+    class LLCommunicateSetAutoRespondNonFriends : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_autorespond_nonfriends_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseNotFriendEnable");
+            if (is_autorespond_nonfriends_set)
+            {
+                gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendEnable", false);
+            }
+            else
+            {
+                gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendEnable", true);
+                LLNotificationsUtil::add("AutoRespondNonFriendsModeSet");
+            }
+            return true;
+        }
+    };
+
+    class LLCommunicateCheckAutoRespondNonFriends : public view_listener_t
+    {
+        bool handleEvent(const LLSD& userdata)
+        {
+            bool is_autorespond_nonfriends_set = gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseNotFriendEnable");
+            return is_autorespond_nonfriends_set;
+        }
+    };
+
+// [SL:KB] - Patch: World-Derender | Checked: 2012-06-08 (Catznip-3.3)
+    void handle_view_blocked(const LLSD& sdParam)
+    {
+        if (LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject()))
+        {
+            std::string strParam = sdParam.asString();
+            if (BLOCKED_TAB_NAME == strParam)
+                strParam = BLOCKED_PARAM_NAME;
+            else if (DERENDER_TAB_NAME == strParam)
+                strParam = DERENDER_PARAM_NAME;
+            else if (EXCEPTION_TAB_NAME == strParam)
+                strParam = EXCEPTION_PARAM_NAME;
+
+            LLFloaterReg::showInstance("blocked", LLSD().with(strParam, pAvatar->getID()));
+        }
+        else
+        {
+            LLFloaterReg::showInstance("blocked", sdParam);
+        }
+    }
+
+    void handle_object_derender(const LLSD& sdParam)
+    {
+        std::vector<LLUUID> idList;
+        if (ALDerenderList::instance().addSelection("persistent" == sdParam.asString(), &idList))
+        {
+            LLFloaterReg::showInstance("blocked", LLSD().with("derender_to_select", idList.front()));
+        }
+    }
+
+    bool enable_object_derender()
+    {
+        return ALDerenderList::canAddSelection();
+    }
+// [/SL:KB]
 }
 
 ////////////////////////////////////////////////////////
@@ -455,6 +607,18 @@ void ALViewerMenu::initialize_menus()
 
     commit.add("Advanced.DebugSimFeatures", [](LLUICtrl* ctrl, const LLSD& param) { spawn_debug_simfeatures(); });
 
+    commit.add("Camera.SavePosition", [](LLUICtrl* ctrl, const LLSD& param) { gAgentCamera.storeCameraPosition(); });
+    commit.add("Camera.RestorePosition", [](LLUICtrl* ctrl, const LLSD& param) { gAgentCamera.loadCameraPosition(); });
+
+    view_listener_t::addMenu(new LLCommunicateSetRejectTeleportOffers(), "Communicate.SetRejectTeleportOffers");
+    view_listener_t::addMenu(new LLCommunicateGetRejectTeleportOffers(), "Communicate.GetRejectTeleportOffers");
+    view_listener_t::addMenu(new LLCommunicateSetRejectFriendshipRequests(), "Communicate.SetRejectFriendshipRequests");
+    view_listener_t::addMenu(new LLCommunicateGetRejectFriendshipRequests(), "Communicate.GetRejectFriendshipRequests");
+    view_listener_t::addMenu(new LLCommunicateSetAutoRespond(), "Communicate.SetAutoRespond");
+    view_listener_t::addMenu(new LLCommunicateSetAutoRespondNonFriends(), "Communicate.SetAutoRespondNonFriends");
+    view_listener_t::addMenu(new LLCommunicateCheckAutoRespond(), "Communicate.GetAutoRespond");
+    view_listener_t::addMenu(new LLCommunicateCheckAutoRespondNonFriends(), "Communicate.GetAutoRespondNonFriends");
+
     commit.add("Object.CopyID", [](LLUICtrl* ctrl, const LLSD& param) { object_copy_key(); });
     commit.add("Object.EditParticles",  [](LLUICtrl* ctrl, const LLSD& param) { edit_particle_source(); });
     commit.add("Object.AlchemyExplode", [](LLUICtrl* ctrl, const LLSD& param) { object_explode(); });
@@ -462,12 +626,21 @@ void ALViewerMenu::initialize_menus()
     commit.add("Object.AlchemyForceDelete", [](LLUICtrl* ctrl, const LLSD& param) { object_force_delete(); });
     commit.add("Object.RefreshTexture", [](LLUICtrl* ctrl, const LLSD& param) { object_texture_refresh(); });
 
+// [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2)
+    commit.add("Object.Derender", boost::bind(&handle_object_derender, _2));
+    enable.add("Object.EnableDerender", boost::bind(&enable_object_derender));
+    // [/SL:KB]
+
+    // [SL:KB] - Patch: World-RenderExceptions | Checked: Catznip-5.2
+    commit.add("View.Blocked", boost::bind(&handle_view_blocked, _2));
+    // [/SL:KB]
+
     commit.add("Tools.UndeformSelf", [](LLUICtrl* ctrl, const LLSD& param) { avatar_undeform_self(); });
 
     commit.add("World.ClearEffects",    [](LLUICtrl* ctrl, const LLSD& param) { world_clear_effects(); });
     commit.add("World.SyncAnimations",  [](LLUICtrl* ctrl, const LLSD& param) { world_sync_animations(); });
 
-    commit.add("View.ToggleCinematicMode", [](LLUICtrl* ctrl, const LLSD& param) { toggle_cinematic_mode(); });
+    //commit.add("View.ToggleCinematicMode", [](LLUICtrl* ctrl, const LLSD& param) { toggle_cinematic_mode(); });
 
     view_listener_t::addMenu(new ALToggleLocationBar(), "ToggleLocationBar");
     view_listener_t::addMenu(new ALCheckLocationBar(), "CheckLocationBar");

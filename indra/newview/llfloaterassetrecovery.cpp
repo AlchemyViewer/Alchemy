@@ -66,12 +66,12 @@ void LLFloaterAssetRecovery::onOpen(const LLSD& sdKey)
     }
 }
 
-BOOL LLFloaterAssetRecovery::postBuild()
+bool LLFloaterAssetRecovery::postBuild()
 {
     findChild<LLUICtrl>("recover_btn")->setCommitCallback(boost::bind(&LLFloaterAssetRecovery::onBtnRecover, this));
     findChild<LLUICtrl>("cancel_btn")->setCommitCallback(boost::bind(&LLFloaterAssetRecovery::onBtnCancel, this));
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterAssetRecovery::onBtnCancel()
@@ -141,7 +141,7 @@ protected:
 // static
 static bool removeEmbeddedMarkers(const std::string& strFilename)
 {
-    llifstream inNotecardFile(strFilename.c_str(), std::ios::in | std::ios::binary);
+    llifstream inNotecardFile(strFilename, std::ios::in | std::ios::binary);
     if (!inNotecardFile.is_open())
         return false;
 
@@ -279,14 +279,14 @@ bool LLAssetRecoverQueue::recoverNext()
     // Empty queue - pop-up inventory floater
     if (m_RecoveryQueue.cend() == itItem)
     {
-        LLInventoryPanel* pInvPanel = LLInventoryPanel::getActiveInventoryPanel(TRUE);
+        LLInventoryPanel* pInvPanel = LLInventoryPanel::getActiveInventoryPanel(true);
         if (pInvPanel)
         {
             LLFolderViewFolder* pFVF = dynamic_cast<LLFolderViewFolder*>(pInvPanel->getItemByID(idFNF));
             if (pFVF)
             {
-                pFVF->setOpenArrangeRecursively(TRUE, LLFolderViewFolder::RECURSE_UP);
-                pInvPanel->setSelection(idFNF, TRUE);
+                pFVF->setOpenArrangeRecursively(true, LLFolderViewFolder::RECURSE_UP);
+                pInvPanel->setSelection(idFNF, true);
             }
         }
 
@@ -340,7 +340,7 @@ void LLAssetRecoverQueue::onCreateItem(const LLUUID& idItem)
         {
             case LLAssetType::AT_LSL_TEXT:
                 strCapsUrl = gAgent.getRegion()->getCapability("UpdateScriptAgent");
-                uploadInfo = std::make_shared<LLScriptAssetUpload>(idItem, strBuffer,
+                uploadInfo = std::make_shared<LLScriptAssetUpload>(idItem, "mono", strBuffer,
                                                                    boost::bind(&LLAssetRecoverQueue::onSavedAsset, this, _1, _4), nullptr);
                 break;
             case LLAssetType::AT_NOTECARD:
@@ -387,7 +387,7 @@ void LLAssetRecoverQueue::onUploadError(const LLUUID& idItem)
     {
         LLViewerInventoryItem* pItem = gInventory.getItem(itItem->idItem);
         if (pItem)
-            gInventory.changeItemParent(pItem, gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH), FALSE);
+            gInventory.changeItemParent(pItem, gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH), false);
         m_RecoveryQueue.erase(itItem);
     }
     recoverNext();

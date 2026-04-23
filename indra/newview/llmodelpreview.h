@@ -38,15 +38,6 @@ class LLJoint;
 class LLVOAvatar;
 class LLTextBox;
 class LLVertexBuffer;
-class DAE;
-class daeElement;
-class domProfile_COMMON;
-class domInstance_geometry;
-class domNode;
-class domTranslate;
-class domController;
-class domSkin;
-class domMesh;
 
 // const strings needed by classes that use model preivew
 static const std::string lod_name[NUM_LOD + 1] =
@@ -111,7 +102,7 @@ static const std::string lod_label_name[NUM_LOD + 1] =
     "I went off the end of the lod_label_name array.  Me so smart."
 };
 
-class LLModelPreview final : public LLViewerDynamicTexture, public LLMutex
+class LLModelPreview : public LLViewerDynamicTexture, public LLMutex, public LLHandleProvider<LLModelPreview>
 {
     LOG_CLASS(LLModelPreview);
 
@@ -147,7 +138,7 @@ public:
     void setTexture(U32 name) { mTextureName = name; }
 
     void setPhysicsFromLOD(S32 lod);
-    BOOL render();
+    bool render();
     void update();
     void genBuffers(S32 lod, bool skinned);
     void clearBuffers();
@@ -155,7 +146,7 @@ public:
     void rotate(F32 yaw_radians, F32 pitch_radians);
     void zoom(F32 zoom_amt);
     void pan(F32 right, F32 up);
-    virtual BOOL needsRender() { return mNeedsUpdate; }
+    virtual bool needsRender() { return mNeedsUpdate; }
     void setPreviewLOD(S32 lod);
     void clearModel(S32 lod);
     void getJointAliases(JointMap& joint_map);
@@ -190,7 +181,7 @@ public:
     U32 getLegacyRigFlags() const { return mLegacyRigFlags; }
     void setLegacyRigFlags(U32 rigFlags) { mLegacyRigFlags = rigFlags; }
 
-    static void textureLoadedCallback(BOOL success, LLViewerFetchedTexture *src_vi, LLImageRaw* src, LLImageRaw* src_aux, S32 discard_level, BOOL final, void* userdata);
+    static void textureLoadedCallback(bool success, LLViewerFetchedTexture *src_vi, LLImageRaw* src, LLImageRaw* src_aux, S32 discard_level, bool final, void* userdata);
     static bool lodQueryCallback();
 
     boost::signals2::connection setDetailsCallback(const details_signal_t::slot_type& cb){ return mDetailsSignal.connect(cb); }
@@ -204,6 +195,7 @@ public:
     std::vector<S32> mLodsQuery;
     std::vector<S32> mLodsWithParsingError;
     bool mHasDegenerate;
+    bool areTexturesReady() { return !mNumOfFetchingTextures; }
 
 protected:
 
@@ -211,8 +203,9 @@ protected:
     static void         stateChangedCallback(U32 state, void* opaque);
 
     static LLJoint* lookupJointByName(const std::string&, void* opaque);
-    static U32          loadTextures(LLImportMaterial& material, void* opaque);
+    static U32          loadTextures(LLImportMaterial& material, LLHandle<LLModelPreview> handle);
 
+    void warnTextureScaling();
     void lookupLODModelFiles(S32 lod);
 
 private:
@@ -242,6 +235,9 @@ private:
     /// Not read unless mWarnOfUnmatchedPhyicsMeshes is true.
     LLPointer<LLModel> mDefaultPhysicsShapeP;
 
+    S32 mNumOfFetchingTextures;
+    bool mTexturesNeedScaling;
+
     typedef enum
     {
         MESH_OPTIMIZER_FULL,
@@ -266,7 +262,7 @@ protected:
 
     LLFloater*  mFMP;
 
-    BOOL        mNeedsUpdate;
+    bool        mNeedsUpdate;
     bool        mDirty;
     bool        mGenLOD;
     U32         mTextureName;
@@ -314,8 +310,9 @@ protected:
     // Amount of triangles in original(base) model
     U32 mMaxTriangleLimit;
 
-    LLMeshUploadThread::instance_list mUploadData;
+    LLMeshUploadThread::instance_list_t mUploadData;
     std::set<LLViewerFetchedTexture * > mTextureSet;
+    LLLoadedCallbackEntry::source_callback_list_t mCallbackTextureList;
 
     //map of vertex buffers to models (one vertex buffer in vector per face in model
     std::map<LLModel*, std::vector<LLPointer<LLVertexBuffer> > > mVertexBuffer[LLModel::NUM_LODS + 1];

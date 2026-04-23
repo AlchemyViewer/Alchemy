@@ -54,9 +54,10 @@ public:
     S32 getTextureUploadCost() const;
     S32 getTextureUploadCost(const LLViewerTexture* tex) const;
     S32 getTextureUploadCost(const LLImageBase* tex) const;
+    S32 getTextureUploadCost(S32 w, S32 h) const;
     S32 get2KTextureUploadCost(S32 area) const;
 
-    bool findUploadCost(LLAssetType::EType& asset_type, S32& cost) const;
+    bool findUploadCost(const LLAssetType::EType& asset_type, S32& cost) const;
 
 private:
     S32 m_animated_object_limit;
@@ -72,7 +73,7 @@ private:
     bool m_initalized;
 };
 
-class LLAgentBenefitsMgr final : public LLSingleton<LLAgentBenefitsMgr>
+class LLAgentBenefitsMgr: public LLSingleton<LLAgentBenefitsMgr>
 {
     LLSINGLETON(LLAgentBenefitsMgr);
     ~LLAgentBenefitsMgr();

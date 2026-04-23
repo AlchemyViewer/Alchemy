@@ -4,7 +4,7 @@
 *
 * $LicenseInfo:firstyear=2015&license=viewerlgpl$
 * Copyright (C) Shyotl Kuhr
-* Copyright (C) 2015 Drake Arconis
+* Copyright (C) Rye Mutt <rye@alchemyviewer.org>
 *
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public
@@ -32,9 +32,9 @@ public:
     ALPanelMusicTicker();   //ctor
     ~ALPanelMusicTicker();
 
-    BOOL postBuild() final override;
+    bool postBuild() final override;
     void draw() final override;
-    void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) final override;
+    void reshape(S32 width, S32 height, bool called_from_parent = true) final override;
 private:
     void updateTickerText(); //called via draw.
     void drawOscilloscope(); //called via draw.

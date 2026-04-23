@@ -54,7 +54,7 @@ public:
         LLCOFCallbacks() {};
         virtual ~LLCOFCallbacks() {};
 
-        typedef boost::function<void ()> cof_callback_t;
+        typedef std::function<void()> cof_callback_t;
 
         cof_callback_t mAddWearable;
         cof_callback_t mMoveWearableCloser;
@@ -68,7 +68,7 @@ public:
     LLCOFWearables();
     virtual ~LLCOFWearables();
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     LLUUID getSelectedUUID();
     bool getSelectedUUIDs(uuid_vec_t& selected_ids);

@@ -131,7 +131,7 @@ void LLPanelTopInfoBar::handleLoginComplete()
     update();
 }
 
-BOOL LLPanelTopInfoBar::handleRightMouseDown(S32 x, S32 y, MASK mask)
+bool LLPanelTopInfoBar::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
     if(!LLUICtrl::CommitCallbackRegistry::getValue("TopInfoBar.Action"))
     {
@@ -139,10 +139,10 @@ BOOL LLPanelTopInfoBar::handleRightMouseDown(S32 x, S32 y, MASK mask)
                 .add("TopInfoBar.Action", boost::bind(&LLPanelTopInfoBar::onContextMenuItemClicked, this, _2));
     }
     show_topinfobar_context_menu(this, x, y);
-    return TRUE;
+    return true;
 }
 
-BOOL LLPanelTopInfoBar::postBuild()
+bool LLPanelTopInfoBar::postBuild()
 {
     mInfoBtn = getChild<LLButton>("place_info_btn");
     mInfoBtn->setClickedCallback(boost::bind(&LLPanelTopInfoBar::onInfoButtonClicked, this));
@@ -176,7 +176,7 @@ BOOL LLPanelTopInfoBar::postBuild()
 
     setVisibleCallback(boost::bind(&LLPanelTopInfoBar::onVisibilityChanged, this, _2));
 
-    return TRUE;
+    return true;
 }
 
 void LLPanelTopInfoBar::onNavBarShowParcelPropertiesCtrlChanged()
@@ -245,7 +245,7 @@ void LLPanelTopInfoBar::setParcelInfoText(const std::string& new_text)
     LLRect rect = mParcelInfoText->getRect();
     rect.setOriginAndSize(rect.mLeft, rect.mBottom, new_text_width, rect.getHeight());
 
-    mParcelInfoText->reshape(rect.getWidth(), rect.getHeight(), TRUE);
+    mParcelInfoText->reshape(rect.getWidth(), rect.getHeight(), true);
     mParcelInfoText->setRect(rect);
     layoutParcelIcons();
 
@@ -289,7 +289,8 @@ void LLPanelTopInfoBar::updateParcelIcons()
     if (!agent_region || !agent_parcel)
         return;
 
-    if (ALControlCache::NavBarShowParcelProperties)
+    static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
+    if (show_icons)
     {
         LLParcel* current_parcel;
         LLViewerRegion* selection_region = vpm->getSelectionRegion();
@@ -342,8 +343,10 @@ void LLPanelTopInfoBar::updateParcelIcons()
 
 void LLPanelTopInfoBar::updateHealth()
 {
+    static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
+
     // *FIXME: Status bar owns health information, should be in agent
-    if (ALControlCache::NavBarShowParcelProperties && gStatusBar)
+    if (show_icons && gStatusBar)
     {
         static S32 last_health = -1;
         S32 health = gStatusBar->getHealth();
@@ -499,7 +502,6 @@ void LLPanelTopInfoBar::onInfoButtonClicked()
 
     LLFloaterSidePanelContainer::showPanel("places", LLSD().with("type", "agent"));
 }
-
 
 void LLPanelTopInfoBar::onParcelInfoTextClicked()
 {

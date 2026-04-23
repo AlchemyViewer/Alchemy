@@ -67,7 +67,7 @@ public:
      *
      * @return false if the avatar is in the list already, true otherwise
      */
-    bool add(const LLUUID& id, LLSD& userdata = LLSD().with("date", LLDate::now()));
+    bool add(const LLUUID& id, LLSD userdata = LLSD().with("date", LLDate::now()));
 
     /**
      * @param id avatar to search.
@@ -128,6 +128,7 @@ public:
     F32 getArrivalTimeByID(const LLUUID& id);
 
 private:
+
     typedef std::map<LLUUID, LLSD> recent_people_t;
     recent_people_t     mPeople;
     signal_t            mChangedSignal;

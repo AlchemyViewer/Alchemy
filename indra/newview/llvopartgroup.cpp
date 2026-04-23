@@ -54,63 +54,6 @@ void LLVOPartGroup::initClass()
 void LLVOPartGroup::restoreGL()
 {
 
-    //TODO: optimize out binormal mask here.  Specular and normal coords as well.
-#if 0
-    sVB = new LLVertexBuffer(VERTEX_DATA_MASK | LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2);
-    U32 count = LL_MAX_PARTICLE_COUNT;
-    if (!sVB->allocateBuffer(count*4, count*6))
-    {
-        LL_WARNS() << "Failed to allocate Vertex Buffer to "
-            << count*4 << " vertices and "
-            << count * 6 << " indices" << LL_ENDL;
-        // we are likelly to crash at following getTexCoord0Strider(), so unref and return
-        sVB = NULL;
-        return;
-    }
-
-    //indices and texcoords are always the same, set once
-    LLStrider<U16> indicesp;
-
-    LLStrider<LLVector4a> verticesp;
-
-    sVB->getIndexStrider(indicesp);
-    sVB->getVertexStrider(verticesp);
-
-    LLVector4a v;
-    v.set(0,0,0,0);
-
-
-    U16 vert_offset = 0;
-
-    for (U32 i = 0; i < LL_MAX_PARTICLE_COUNT; i++)
-    {
-        *indicesp++ = vert_offset + 0;
-        *indicesp++ = vert_offset + 1;
-        *indicesp++ = vert_offset + 2;
-
-        *indicesp++ = vert_offset + 1;
-        *indicesp++ = vert_offset + 3;
-        *indicesp++ = vert_offset + 2;
-
-        *verticesp++ = v;
-
-        vert_offset += 4;
-    }
-
-    LLStrider<LLVector2> texcoordsp;
-    sVB->getTexCoord0Strider(texcoordsp);
-
-    for (U32 i = 0; i < LL_MAX_PARTICLE_COUNT; i++)
-    {
-        *texcoordsp++ = LLVector2(0.f, 1.f);
-        *texcoordsp++ = LLVector2(0.f, 0.f);
-        *texcoordsp++ = LLVector2(1.f, 1.f);
-        *texcoordsp++ = LLVector2(1.f, 0.f);
-    }
-
-    sVB->unmapBuffer();
-#endif
-
 }
 
 //static
@@ -139,7 +82,7 @@ LLVOPartGroup::LLVOPartGroup(const LLUUID &id, const LLPCode pcode, LLViewerRegi
 {
     setNumTEs(1);
     setTETexture(0, LLUUID::null);
-    mbCanSelect = FALSE;            // users can't select particle systems
+    mbCanSelect = false;            // users can't select particle systems
 }
 
 
@@ -147,9 +90,9 @@ LLVOPartGroup::~LLVOPartGroup()
 {
 }
 
-BOOL LLVOPartGroup::isActive() const
+bool LLVOPartGroup::isActive() const
 {
-    return FALSE;
+    return false;
 }
 
 F32 LLVOPartGroup::getBinRadius()
@@ -207,7 +150,7 @@ void LLVOPartGroup::updateTextures()
 LLDrawable* LLVOPartGroup::createDrawable(LLPipeline *pipeline)
 {
     pipeline->allocDrawable(this);
-    mDrawable->setLit(FALSE);
+    mDrawable->setLit(false);
     mDrawable->setRenderType(LLPipeline::RENDER_TYPE_PARTICLES);
     return mDrawable;
 }
@@ -270,7 +213,7 @@ LLVector3 LLVOPartGroup::getCameraPosition() const
     return gAgentCamera.getCameraPositionAgent();
 }
 
-BOOL LLVOPartGroup::updateGeometry(LLDrawable *drawable)
+bool LLVOPartGroup::updateGeometry(LLDrawable *drawable)
 {
     LL_PROFILE_ZONE_SCOPED;
 
@@ -297,12 +240,13 @@ BOOL LLVOPartGroup::updateGeometry(LLDrawable *drawable)
             group->setState(LLSpatialGroup::GEOM_DIRTY);
         }
         drawable->setNumFaces(0, NULL, getTEImage(0));
-        return TRUE;
+        LLPipeline::sCompiles++;
+        return true;
     }
 
     if (!(gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_PARTICLES)))
     {
-        return TRUE;
+        return true;
     }
 
     if (num_parts > drawable->getNumFaces())
@@ -316,7 +260,7 @@ BOOL LLVOPartGroup::updateGeometry(LLDrawable *drawable)
     F32 pixel_meter_ratio = LLViewerCamera::getInstance()->getPixelMeterRatio();
     pixel_meter_ratio *= pixel_meter_ratio;
 
-    LLViewerPartSim::checkParticleCount(mViewerPartGroupp->mParticles.size()) ;
+    LLViewerPartSim::checkParticleCount(static_cast<U32>(mViewerPartGroupp->mParticles.size()));
 
     S32 count=0;
     mDepth = 0.f;
@@ -439,15 +383,16 @@ BOOL LLVOPartGroup::updateGeometry(LLDrawable *drawable)
     mScale.set(max_scale, max_scale, max_scale);
 
     mDrawable->movePartition();
-    return TRUE;
+    LLPipeline::sCompiles++;
+    return true;
 }
 
 
-BOOL LLVOPartGroup::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
+bool LLVOPartGroup::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
                                           S32 face,
-                                          BOOL pick_transparent,
-                                          BOOL pick_rigged,
-                                          BOOL pick_unselectable,
+                                          bool pick_transparent,
+                                          bool pick_rigged,
+                                          bool pick_unselectable,
                                           S32* face_hit,
                                           LLVector4a* intersection,
                                           LLVector2* tex_coord,
@@ -458,7 +403,7 @@ BOOL LLVOPartGroup::lineSegmentIntersect(const LLVector4a& start, const LLVector
     dir.setSub(end, start);
 
     F32 closest_t = 2.f;
-    BOOL ret = FALSE;
+    bool ret = false;
 
     for (U32 idx = 0; idx < mViewerPartGroupp->mParticles.size(); ++idx)
     {
@@ -478,7 +423,7 @@ BOOL LLVOPartGroup::lineSegmentIntersect(const LLVector4a& start, const LLVector
                 t <= 1.f &&
                 t < closest_t)
             {
-                ret = TRUE;
+                ret = true;
                 closest_t = t;
                 if (face_hit)
                 {
@@ -675,8 +620,7 @@ void LLVOPartGroup::getGeometry(S32 idx,
     *colorsp++ = color;
     *colorsp++ = color;
 
-    //Only add emissive attributes if glowing (doing it for all particles is INCREDIBLY inefficient as it leads to a second, slower, render pass.)
-    if (pglow.mV[3] > 0 || part.mGlow.mV[3] > 0)
+    //if (pglow.mV[3] || part.mGlow.mV[3])
     { //only write glow if it is not zero
         *emissivep++ = pglow;
         *emissivep++ = pglow;
@@ -701,7 +645,7 @@ U32 LLVOPartGroup::getPartitionType() const
 }
 
 LLParticlePartition::LLParticlePartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, regionp)
+: LLSpatialPartition(static_cast<U32>(LLDrawPoolAlpha::VERTEX_DATA_MASK) | static_cast<U32>(LLVertexBuffer::MAP_TEXTURE_INDEX), true, regionp)
 {
     mRenderPass = LLRenderPass::PASS_ALPHA;
     mDrawableType = LLPipeline::RENDER_TYPE_PARTICLES;
@@ -799,7 +743,7 @@ void LLParticlePartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_co
     mFaceList.clear();
 
     LLViewerCamera* camera = LLViewerCamera::getInstance();
-    for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
+    for (LLSpatialGroup::element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
     {
         LLDrawable* drawablep = (LLDrawable*)(*i)->getDrawable();
 
@@ -862,8 +806,10 @@ void LLParticlePartition::getGeometry(LLSpatialGroup* group)
     S32 indices_idx = 0;
 
     LLSpatialGroup::drawmap_elem_t& draw_vec = group->mDrawMap[mRenderPass];
-    for (LLFace* facep : mFaceList)
+
+    for (std::vector<LLFace*>::iterator i = mFaceList.begin(); i != mFaceList.end(); ++i)
     {
+        LLFace* facep = *i;
         LLAlphaObject* object = (LLAlphaObject*) facep->getViewerObject();
 
         facep->setGeomIndex(geom_idx);
@@ -886,7 +832,7 @@ void LLParticlePartition::getGeometry(LLSpatialGroup* group)
 
         object->getGeometry(facep->getTEOffset(), cur_vert, cur_norm, cur_tc, cur_col, cur_glow, cur_idx);
 
-        bool has_glow = FALSE;
+        bool has_glow = false;
 
         if (cur_glow.get() != start_glow)
         {
@@ -896,7 +842,7 @@ void LLParticlePartition::getGeometry(LLSpatialGroup* group)
         llassert(facep->getGeomCount() == 4);
         llassert(facep->getIndicesCount() == 6);
 
-        S32 idx = draw_vec.size()-1;
+        S32 idx = static_cast<S32>(draw_vec.size()) - 1;
 
         bool fullbright = facep->isState(LLFace::FULLBRIGHT);
 
@@ -952,7 +898,6 @@ void LLParticlePartition::getGeometry(LLSpatialGroup* group)
         }
     }
 
-    buffer->unmapBuffer();
     mFaceList.clear();
 }
 
@@ -969,7 +914,7 @@ U32 LLVOHUDPartGroup::getPartitionType() const
 LLDrawable* LLVOHUDPartGroup::createDrawable(LLPipeline *pipeline)
 {
     pipeline->allocDrawable(this);
-    mDrawable->setLit(FALSE);
+    mDrawable->setLit(false);
     mDrawable->setRenderType(LLPipeline::RENDER_TYPE_HUD_PARTICLES);
     return mDrawable;
 }

@@ -41,9 +41,9 @@ LLFloaterLoadPrefPreset::LLFloaterLoadPrefPreset(const LLSD &key)
 }
 
 // virtual
-BOOL LLFloaterLoadPrefPreset::postBuild()
+bool LLFloaterLoadPrefPreset::postBuild()
 {
-    LLFloaterPreference* preferences = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
+    LLFloaterPreference* preferences = LLFloaterReg::getTypedInstance<LLFloaterPreference>("preferences");
     if (preferences)
     {
         preferences->addDependentFloater(this);
@@ -52,7 +52,7 @@ BOOL LLFloaterLoadPrefPreset::postBuild()
     getChild<LLButton>("cancel")->setCommitCallback(boost::bind(&LLFloaterLoadPrefPreset::onBtnCancel, this));
     LLPresetsManager::instance().setPresetListChangeCallback(boost::bind(&LLFloaterLoadPrefPreset::onPresetsListChange, this));
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterLoadPrefPreset::onOpen(const LLSD& key)

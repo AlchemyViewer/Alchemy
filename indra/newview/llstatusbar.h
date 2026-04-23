@@ -57,24 +57,25 @@ namespace ll
         struct SearchData;
     }
 }
-class LLStatusBar final
+class LLStatusBar
 :   public LLPanel
 {
 public:
     LLStatusBar(const LLRect& rect );
     /*virtual*/ ~LLStatusBar();
 
-    /*virtual*/ void draw() override;
+    /*virtual*/ void draw();
 
-    /*virtual*/ BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
-    /*virtual*/ BOOL postBuild() override;
+    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool postBuild();
 
     // MANIPULATORS
     void        setBalance(S32 balance);
     void        debitBalance(S32 debit);
     void        creditBalance(S32 credit);
 
-    // Request the latest currency balance from the server
+    // Request the latest currency balance from the server.
+    // Reply at process_money_balance_reply()
     static void sendMoneyBalanceRequest();
 
     void        setHealth(S32 percent);
@@ -82,7 +83,7 @@ public:
     void setLandCredit(S32 credit);
     void setLandCommitted(S32 committed);
 
-    void        refresh() override;
+    void        refresh();
     void setVisibleForMouselook(bool visible);
         // some elements should hide in mouselook
 
@@ -90,18 +91,22 @@ public:
     S32         getBalance() const;
     S32         getHealth() const;
 
-    BOOL isUserTiered() const;
+    bool isUserTiered() const;
     S32 getSquareMetersCredit() const;
     S32 getSquareMetersCommitted() const;
     S32 getSquareMetersLeft() const;
 
-    LLPanelNearByMedia* getNearbyMediaPanel() const { return mPanelNearByMedia; }
+    void setBalanceVisible(bool visible);
+
+    LLPanelNearByMedia* getNearbyMediaPanel() { return mPanelNearByMedia; }
 
 private:
 
     void onClickBuyCurrency();
+    void onClickShop();
     void onVolumeChanged(const LLSD& newvalue);
     void onVoiceChanged(const LLSD& newvalue);
+    void onObscureBalanceChanged(const LLSD& newvalue);
 
     void onMouseEnterPresetsCamera();
     void onMouseEnterPresets();
@@ -111,9 +116,9 @@ private:
     void onMouseEnterNearbyMedia();
 
     static void onClickAOBtn(void* data);
-    static void onClickVolume(void* data);
     static void onClickMediaToggle(void* data);
-    static void onClickBalance(void* data);
+    static void onClickRefreshBalance(void* data);
+    void onClickToggleBalance();
 
     LLSearchEditor *mFilterEdit;
     LLPanel *mSearchPanel;
@@ -126,9 +131,11 @@ private:
     void updateBalancePanelPosition();
 
     void updateClock();
+    void onClickToggleClockStyle();
 
     void onAOStateChanged();
 
+private:
     LLTextBox   *mTextTime;
     LLTextBox   *mTextFPS;
 
@@ -139,18 +146,18 @@ private:
     LLButton    *mBtnAO;
     LLButton    *mBtnVolume;
     LLTextBox   *mBoxBalance;
-    LLButton    *mBtnBuyL;
     LLButton    *mMediaToggle;
     LLView      *mBalanceBG;
     LLFrameTimer    mClockUpdateTimer;
-    LLFrameTimer*   mFPSUpdateTimer;
+    LLFrameTimer    mFPSUpdateTimer;
 
     S32             mBalance;
+    bool            mBalanceClicked;
+    bool            mObscureBalance;
+    LLTimer         mBalanceClickTimer;
     S32             mHealth;
     S32             mSquareMetersCredit;
     S32             mSquareMetersCommitted;
-    LLFrameTimer*   mBalanceTimer;
-    LLFrameTimer*   mHealthTimer;
     LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown;
     LLPanelPresetsPulldown* mPanelPresetsPulldown;
     ALPanelAOPulldown* mPanelAOPulldown;
@@ -160,7 +167,7 @@ private:
 };
 
 // *HACK: Status bar owns your cached money balance. JC
-BOOL can_afford_transaction(S32 cost);
+bool can_afford_transaction(S32 cost);
 
 extern LLStatusBar *gStatusBar;
 

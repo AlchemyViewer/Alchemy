@@ -98,7 +98,7 @@ HttpPolicy::~HttpPolicy()
 
 HttpRequest::policy_t HttpPolicy::createPolicyClass()
 {
-    const HttpRequest::policy_t policy_class(mClasses.size());
+    const HttpRequest::policy_t policy_class(static_cast<HttpRequest::policy_t>(mClasses.size()));
     if (policy_class >= HTTP_POLICY_CLASS_LIMIT)
     {
         return HttpRequest::INVALID_POLICY_ID;
@@ -162,16 +162,12 @@ void HttpPolicy::retryOp(const HttpOpRequest::ptr_t &op)
     // mPolicyRetries limited to 100
     U32 delta_factor = op->mPolicyRetries <= 10 ? 1 << op->mPolicyRetries : 1024;
     HttpTime delta = llmin(delta_min * delta_factor, delta_max);
-#ifdef SHOW_DEBUG
     bool external_delta(false);
-#endif
 
     if (op->mReplyRetryAfter > 0 && op->mReplyRetryAfter < 30)
     {
         delta = op->mReplyRetryAfter * U64L(1000000);
-#ifdef SHOW_DEBUG
         external_delta = true;
-#endif
     }
     op->mPolicyRetryAt = now + delta;
     ++op->mPolicyRetries;
@@ -179,14 +175,12 @@ void HttpPolicy::retryOp(const HttpOpRequest::ptr_t &op)
     {
         ++op->mPolicy503Retries;
     }
-#ifdef SHOW_DEBUG
     LL_DEBUGS(LOG_CORE) << "HTTP request " << op->getHandle()
                         << " retry " << op->mPolicyRetries
                         << " scheduled in " << (delta / HttpTime(1000))
                         << " mS (" << (external_delta ? "external" : "internal")
                         << ").  Status:  " << op->mStatus.toTerseString()
                         << LL_ENDL;
-#endif
     if (op->mTracing > HTTP_TRACE_OFF)
     {
         LL_INFOS(LOG_CORE) << "TRACE, ToRetryQueue, Handle:  "
@@ -281,11 +275,9 @@ HttpService::ELoopSpeed HttpPolicy::processReadyQueue()
                     if (now >= state.mThrottleEnd)
                     {
                         // Throttle expired, move to next window
-#ifdef SHOW_DEBUG
                         LL_DEBUGS(LOG_CORE) << "Throttle expired with " << state.mThrottleLeft
                                             << " requests to go and " << state.mRequestCount
                                             << " requests issued." << LL_ENDL;
-#endif
                         state.mThrottleLeft = state.mOptions.mThrottleRate;
                         state.mThrottleEnd = now + HttpTime(1000000);
                     }
@@ -312,11 +304,9 @@ HttpService::ELoopSpeed HttpPolicy::processReadyQueue()
                     if (now >= state.mThrottleEnd)
                     {
                         // Throttle expired, move to next window
-#ifdef SHOW_DEBUG
                         LL_DEBUGS(LOG_CORE) << "Throttle expired with " << state.mThrottleLeft
                                             << " requests to go and " << state.mRequestCount
                                             << " requests issued." << LL_ENDL;
-#endif
                         state.mThrottleLeft = state.mOptions.mThrottleRate;
                         state.mThrottleEnd = now + HttpTime(1000000);
                     }
@@ -416,14 +406,12 @@ bool HttpPolicy::stageAfterCompletion(const HttpOpRequest::ptr_t &op)
                            << " (" << op->mStatus.toTerseString() << ")"
                            << LL_ENDL;
     }
-#ifdef SHOW_DEBUG
     else if (op->mPolicyRetries)
     {
         LL_DEBUGS(LOG_CORE) << "HTTP request " << op->getHandle()
                             << " succeeded on retry " << op->mPolicyRetries << "."
                             << LL_ENDL;
     }
-#endif
 
     op->stageFromActive(mService);
 
@@ -434,7 +422,7 @@ bool HttpPolicy::stageAfterCompletion(const HttpOpRequest::ptr_t &op)
 
 HttpPolicyClass & HttpPolicy::getClassOptions(HttpRequest::policy_t pclass)
 {
-    llassert_always(pclass < mClasses.size());
+    llassert_always(pclass >= 0 && pclass < mClasses.size());
 
     return mClasses[pclass]->mOptions;
 }
@@ -444,8 +432,8 @@ int HttpPolicy::getReadyCount(HttpRequest::policy_t policy_class) const
 {
     if (policy_class < mClasses.size())
     {
-        return (mClasses[policy_class]->mReadyQueue.size()
-                + mClasses[policy_class]->mRetryQueue.size());
+        return static_cast<int>((mClasses[policy_class]->mReadyQueue.size()
+            + mClasses[policy_class]->mRetryQueue.size()));
     }
     return 0;
 }

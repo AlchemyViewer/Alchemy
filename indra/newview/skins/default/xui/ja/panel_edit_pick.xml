@@ -3,22 +3,18 @@
 	<panel.string name="location_notice">
 		（保存後に更新されます）
 	</panel.string>
-	<button name="back_btn"/>
 	<text name="title">
-        ピックを編集
+		ピックを編集
 	</text>
 	<scroll_container name="profile_scroll">
 		<panel name="scroll_content_panel">
-			<texture_picker name="pick_snapshot"/>
-			<icon name="edit_icon" label="" tool_tip="クリックで画像を選択します。"/>
+			<icon name="edit_icon"  tool_tip="クリックで画像を選択します。"/>
 			<text name="Name:">
 				タイトル：
 			</text>
-			<line_editor name="pick_name"/>
 			<text name="description_label">
 				説明：
 			</text>
-			<text_editor name="pick_desc"/>
 			<text name="location_label">
 				場所：
 			</text>

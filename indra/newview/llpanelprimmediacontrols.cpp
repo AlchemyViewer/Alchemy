@@ -63,8 +63,10 @@
 #include "llfloatertools.h"  // to enable hide if build tools are up
 #include "llvector4a.h"
 
+#include <glm/gtx/transform2.hpp>
+
 // Functions pulled from llviewerdisplay.cpp
-bool get_hud_matrices(LLMatrix4a& proj, LLMatrix4a& model);
+bool get_hud_matrices(glm::mat4 &proj, glm::mat4 &model);
 
 // Warning: make sure these two match!
 const LLPanelPrimMediaControls::EZoomLevel LLPanelPrimMediaControls::kZoomLevels[] = { ZOOM_NONE, ZOOM_MEDIUM };
@@ -138,7 +140,7 @@ LLPanelPrimMediaControls::~LLPanelPrimMediaControls()
 {
 }
 
-BOOL LLPanelPrimMediaControls::postBuild()
+bool LLPanelPrimMediaControls::postBuild()
 {
     mMediaRegion            = getChild<LLView>("media_region");
     mBackCtrl               = getChild<LLUICtrl>("back");
@@ -220,8 +222,8 @@ BOOL LLPanelPrimMediaControls::postBuild()
 
     mCurrentZoom = ZOOM_NONE;
     // clicks on buttons do not remove keyboard focus from media
-    setIsChrome(TRUE);
-    return TRUE;
+    setIsChrome(true);
+    return true;
 }
 
 void LLPanelPrimMediaControls::setMediaFace(LLPointer<LLViewerObject> objectp, S32 face, viewer_media_t media_impl, LLVector3 pick_normal)
@@ -292,9 +294,9 @@ void LLPanelPrimMediaControls::updateShape()
     LLViewerMediaImpl* media_impl = getTargetMediaImpl();
     LLViewerObject* objectp = getTargetObject();
 
-    if(!media_impl || gFloaterTools->getVisible())
+    if(!media_impl || (gFloaterTools && gFloaterTools->getVisible()))
     {
-        setVisible(FALSE);
+        setVisible(false);
         return;
     }
 
@@ -321,12 +323,11 @@ void LLPanelPrimMediaControls::updateShape()
         bool hasPermsControl = true;
         bool mini_controls = false;
         LLMediaEntry *media_data = objectp->getTE(mTargetObjectFace)->getMediaData();
-        LLVOVolume *vol = objectp ? objectp->asVolume() : nullptr;
-        if (media_data && vol)
+        if (media_data && NULL != dynamic_cast<LLVOVolume*>(objectp))
         {
             // Don't show the media controls if we do not have permissions
-            enabled = vol->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL);
-            hasPermsControl = vol->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL);
+            enabled = dynamic_cast<LLVOVolume*>(objectp)->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL);
+            hasPermsControl = dynamic_cast<LLVOVolume*>(objectp)->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL);
             mini_controls = (LLMediaEntry::MINI == media_data->getControls());
         }
         const bool is_hud = objectp->isHUDAttachment();
@@ -419,7 +420,7 @@ void LLPanelPrimMediaControls::updateShape()
             if(mUpdateSlider && mMovieDuration!= 0)
             {
                 F64 current_time =  media_plugin->getCurrentTime();
-                F32 percent = current_time / mMovieDuration;
+                F32 percent = (F32)(current_time / mMovieDuration);
                 mMediaPlaySliderCtrl->setValue(percent);
                 mMediaPlaySliderCtrl->setEnabled(true);
             }
@@ -441,17 +442,17 @@ void LLPanelPrimMediaControls::updateShape()
             switch(result)
             {
                 case LLPluginClassMediaOwner::MEDIA_PLAYING:
-                    mPlayCtrl->setEnabled(FALSE);
-                    mPlayCtrl->setVisible(FALSE);
-                    mPauseCtrl->setEnabled(TRUE);
+                    mPlayCtrl->setEnabled(false);
+                    mPlayCtrl->setVisible(false);
+                    mPauseCtrl->setEnabled(true);
                     mPauseCtrl->setVisible(has_focus);
 
                     break;
                 case LLPluginClassMediaOwner::MEDIA_PAUSED:
                 default:
-                    mPauseCtrl->setEnabled(FALSE);
-                    mPauseCtrl->setVisible(FALSE);
-                    mPlayCtrl->setEnabled(TRUE);
+                    mPauseCtrl->setEnabled(false);
+                    mPauseCtrl->setVisible(false);
+                    mPlayCtrl->setEnabled(true);
                     mPlayCtrl->setVisible(has_focus);
                     break;
             }
@@ -467,17 +468,17 @@ void LLPanelPrimMediaControls::updateShape()
                 mCurrentURL.clear();
             }
 
-            mPlayCtrl->setVisible(FALSE);
-            mPauseCtrl->setVisible(FALSE);
-            mMediaStopCtrl->setVisible(FALSE);
+            mPlayCtrl->setVisible(false);
+            mPauseCtrl->setVisible(false);
+            mMediaStopCtrl->setVisible(false);
             mMediaAddressCtrl->setVisible(has_focus && !mini_controls);
             mMediaAddressCtrl->setEnabled(has_focus && !mini_controls);
-            mMediaPlaySliderPanel->setVisible(FALSE);
-            mMediaPlaySliderPanel->setEnabled(FALSE);
-            mSkipFwdCtrl->setVisible(FALSE);
-            mSkipFwdCtrl->setEnabled(FALSE);
-            mSkipBackCtrl->setVisible(FALSE);
-            mSkipBackCtrl->setEnabled(FALSE);
+            mMediaPlaySliderPanel->setVisible(false);
+            mMediaPlaySliderPanel->setEnabled(false);
+            mSkipFwdCtrl->setVisible(false);
+            mSkipFwdCtrl->setEnabled(false);
+            mSkipBackCtrl->setVisible(false);
+            mSkipBackCtrl->setEnabled(false);
 
             if(media_impl->getVolume() <= 0.0)
             {
@@ -513,17 +514,17 @@ void LLPanelPrimMediaControls::updateShape()
 
             if(result == LLPluginClassMediaOwner::MEDIA_LOADING)
             {
-                mReloadCtrl->setEnabled(FALSE);
-                mReloadCtrl->setVisible(FALSE);
-                mStopCtrl->setEnabled(TRUE);
+                mReloadCtrl->setEnabled(false);
+                mReloadCtrl->setVisible(false);
+                mStopCtrl->setEnabled(true);
                 mStopCtrl->setVisible(has_focus);
             }
             else
             {
-                mReloadCtrl->setEnabled(TRUE);
+                mReloadCtrl->setEnabled(true);
                 mReloadCtrl->setVisible(has_focus);
-                mStopCtrl->setEnabled(FALSE);
-                mStopCtrl->setVisible(FALSE);
+                mStopCtrl->setEnabled(false);
+                mStopCtrl->setVisible(false);
             }
         }
 
@@ -644,44 +645,37 @@ void LLPanelPrimMediaControls::updateShape()
         vert_it = vect_face.begin();
         vert_end = vect_face.end();
 
-        LLMatrix4a mat;
+        glm::mat4 mat = glm::identity<glm::mat4>();
         if (!is_hud)
         {
-            mat.setMul(get_current_projection(), get_current_modelview());
+            mat = get_current_projection() * get_current_modelview();
         }
         else {
-            LLMatrix4a proj, modelview;
+            glm::mat4 proj, modelview;
             if (get_hud_matrices(proj, modelview))
-            {
-                mat.setMul(proj,modelview);
-            }
+                mat = proj * modelview;
         }
-        LLVector4a min;
-        min.splat(1.f);
-        LLVector4a max;
-        max.splat(-1.f);
+        LLVector3 min = LLVector3(1,1,1);
+        LLVector3 max = LLVector3(-1,-1,-1);
         for(; vert_it != vert_end; ++vert_it)
         {
             // project silhouette vertices into screen space
-            LLVector4a screen_vert;
-            screen_vert.load3(vert_it->mV,1.f);
-
-            mat.perspectiveTransform(screen_vert,screen_vert);
+            glm::vec3 screen_vert(*vert_it);
+            screen_vert = mul_mat4_vec3(mat, screen_vert);
 
             // add to screenspace bounding box
-            min.setMin(screen_vert,min);
-            max.setMax(screen_vert,max);
+            update_min_max(min, max, LLVector3(screen_vert));
         }
 
         // convert screenspace bbox to pixels (in screen coords)
         LLRect window_rect = gViewerWindow->getWorldViewRectScaled();
         LLCoordGL screen_min;
-        screen_min.mX = ll_round((F32)window_rect.mLeft + (F32)window_rect.getWidth() * (min.getF32ptr()[VX] + 1.f) * 0.5f);
-        screen_min.mY = ll_round((F32)window_rect.mBottom + (F32)window_rect.getHeight() * (min.getF32ptr()[VY] + 1.f) * 0.5f);
+        screen_min.mX = ll_round((F32)window_rect.mLeft + (F32)window_rect.getWidth() * (min.mV[VX] + 1.f) * 0.5f);
+        screen_min.mY = ll_round((F32)window_rect.mBottom + (F32)window_rect.getHeight() * (min.mV[VY] + 1.f) * 0.5f);
 
         LLCoordGL screen_max;
-        screen_max.mX = ll_round((F32)window_rect.mLeft + (F32)window_rect.getWidth() * (max.getF32ptr()[VX] + 1.f) * 0.5f);
-        screen_max.mY = ll_round((F32)window_rect.mBottom + (F32)window_rect.getHeight() * (max.getF32ptr()[VY] + 1.f) * 0.5f);
+        screen_max.mX = ll_round((F32)window_rect.mLeft + (F32)window_rect.getWidth() * (max.mV[VX] + 1.f) * 0.5f);
+        screen_max.mY = ll_round((F32)window_rect.mBottom + (F32)window_rect.getHeight() * (max.mV[VY] + 1.f) * 0.5f);
 
         // grow panel so that screenspace bounding box fits inside "media_region" element of panel
         LLRect media_panel_rect;
@@ -746,7 +740,7 @@ void LLPanelPrimMediaControls::updateShape()
         else
         {
             // I don't think this is correct anymore.  This is done in draw() after the fade has completed.
-            //          setVisible(FALSE);
+            //          setVisible(false);
         }
     }
 }
@@ -783,7 +777,7 @@ void LLPanelPrimMediaControls::draw()
     else if(mFadeTimer.getStarted())
     {
         F32 time = mFadeTimer.getElapsedTimeF32();
-        alpha *= llmax(ll_lerp(1.0, 0.0, time / mControlFadeTime), 0.0f);
+        alpha *= llmax(lerp(1.f, 0.f, time / mControlFadeTime), 0.0f);
 
         if(time >= mControlFadeTime)
         {
@@ -817,16 +811,12 @@ void LLPanelPrimMediaControls::draw()
     // draw control background UI image
 
     LLViewerObject* objectp = getTargetObject();
-    LLMediaEntry *media_data = nullptr;
-    LLVOVolume* volumep = nullptr;
+    LLMediaEntry *media_data(0);
 
     if( objectp )
-    {
         media_data = objectp->getTE(mTargetObjectFace)->getMediaData();
-        volumep = objectp->asVolume();
-    }
 
-    if( !volumep || !media_data || volumep->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL) )
+    if( !dynamic_cast<LLVOVolume*>(objectp) || !media_data || dynamic_cast<LLVOVolume*>(objectp)->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL) )
         mBackgroundImage->draw( controls_bg_area, UI_VERTEX_COLOR % alpha);
 
     // draw volume slider background UI image
@@ -843,10 +833,10 @@ void LLPanelPrimMediaControls::draw()
     }
 }
 
-BOOL LLPanelPrimMediaControls::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLPanelPrimMediaControls::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
     mInactivityTimer.start();
-    BOOL res = FALSE;
+    bool res = false;
 
     // Unlike other mouse events, we need to handle scroll here otherwise
     // it will be intercepted by camera and won't reach toolpie
@@ -859,10 +849,10 @@ BOOL LLPanelPrimMediaControls::handleScrollWheel(S32 x, S32 y, S32 clicks)
     return res;
 }
 
-BOOL LLPanelPrimMediaControls::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLPanelPrimMediaControls::handleScrollHWheel(S32 x, S32 y, S32 clicks)
 {
     mInactivityTimer.start();
-    BOOL res = FALSE;
+    bool res = false;
 
     if (LLViewerMediaFocus::getInstance()->isHoveringOverFocused())
     {
@@ -873,19 +863,19 @@ BOOL LLPanelPrimMediaControls::handleScrollHWheel(S32 x, S32 y, S32 clicks)
     return res;
 }
 
-BOOL LLPanelPrimMediaControls::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLPanelPrimMediaControls::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     mInactivityTimer.start();
     return LLPanel::handleMouseDown(x, y, mask);
 }
 
-BOOL LLPanelPrimMediaControls::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLPanelPrimMediaControls::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     mInactivityTimer.start();
     return LLPanel::handleMouseUp(x, y, mask);
 }
 
-BOOL LLPanelPrimMediaControls::handleKeyHere( KEY key, MASK mask )
+bool LLPanelPrimMediaControls::handleKeyHere( KEY key, MASK mask )
 {
     mInactivityTimer.start();
     return LLPanel::handleKeyHere(key, mask);
@@ -943,7 +933,7 @@ void LLPanelPrimMediaControls::close()
 {
     resetZoomLevel(true);
     LLViewerMediaFocus::getInstance()->clearFocus();
-    setVisible(FALSE);
+    setVisible(false);
 }
 
 
@@ -1129,7 +1119,7 @@ void LLPanelPrimMediaControls::updateZoom()
     {
     case ZOOM_NONE:
         {
-            gAgentCamera.setFocusOnAvatar(TRUE, ANIMATE);
+            gAgentCamera.setFocusOnAvatar(true, ANIMATE);
             break;
         }
     case ZOOM_FAR:
@@ -1149,7 +1139,7 @@ void LLPanelPrimMediaControls::updateZoom()
         }
     default:
         {
-            gAgentCamera.setFocusOnAvatar(TRUE, ANIMATE);
+            gAgentCamera.setFocusOnAvatar(true, ANIMATE);
             break;
         }
     }
@@ -1318,7 +1308,7 @@ void LLPanelPrimMediaControls::onMediaPlaySliderCtrlMouseUp()
             }
             else
             {
-                media_impl->seek(cur_value * mMovieDuration);
+                media_impl->seek((F32)(cur_value * mMovieDuration));
             }
         }
 
@@ -1429,7 +1419,7 @@ void LLPanelPrimMediaControls::clearFaceOnFade()
         // Hiding this object makes scroll events go missing after it fades out
         // (see DEV-41755 for a full description of the train wreck).
         // Only hide the controls when we're untargeting.
-        setVisible(FALSE);
+        setVisible(false);
 
         mClearFaceOnFade = false;
         mVolumeSliderVisible = 0;

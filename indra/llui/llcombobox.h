@@ -36,7 +36,6 @@
 #include "llrect.h"
 #include "llscrolllistctrl.h"
 #include "lllineeditor.h"
-#include <boost/function.hpp>
 
 // Classes
 
@@ -94,7 +93,7 @@ public:
 
 
     virtual ~LLComboBox();
-    /*virtual*/ BOOL postBuild() override;
+    /*virtual*/ bool postBuild();
 
 protected:
     friend class LLUICtrlFactory;
@@ -102,53 +101,56 @@ protected:
     void    initFromParams(const Params&);
     void    prearrangeList(std::string filter = "");
 
-    std::string _getSearchText() const override;
-    void onSetHighlight() const override;
+    virtual std::string _getSearchText() const;
+    virtual void onSetHighlight() const;
 
     void imageLoaded();
 
 public:
     // LLView interface
-    void    onFocusLost() override;
+    virtual void    onFocusLost();
 
-    BOOL    handleToolTip(S32 x, S32 y, MASK mask) override;
-    BOOL    handleKeyHere(KEY key, MASK mask) override;
-    BOOL    handleUnicodeCharHere(llwchar uni_char) override;
-    BOOL    handleScrollWheel(S32 x, S32 y, S32 clicks) final override;
+    virtual bool    handleToolTip(S32 x, S32 y, MASK mask);
+    virtual bool    handleKeyHere(KEY key, MASK mask);
+    virtual bool    handleUnicodeCharHere(llwchar uni_char);
+    virtual bool    handleScrollWheel(S32 x, S32 y, S32 clicks);
 
     // LLUICtrl interface
-    void    clear() override;                   // select nothing
-    void    onCommit() override;
-    BOOL    acceptsTextInput() const override { return mAllowTextEntry; }
-    BOOL    isDirty() const override;           // Returns TRUE if the user has modified this control.
-    void    resetDirty() override;              // Clear dirty state
+    virtual void    clear();                    // select nothing
+    virtual void    onCommit();
+    virtual bool    acceptsTextInput() const        { return mAllowTextEntry; }
+    virtual bool    isDirty() const;            // Returns true if the user has modified this control.
+    virtual void    resetDirty();               // Clear dirty state
 
-    void    setFocus(BOOL b) override;
+    virtual void    setFocus(bool b);
 
     // Selects item by underlying LLSD value, using LLSD::asString() matching.
     // For simple items, this is just the name of the label.
-    void    setValue(const LLSD& value) override;
+    virtual void    setValue(const LLSD& value );
 
     // Gets underlying LLSD value for currently selected items.  For simple
     // items, this is just the label.
-    LLSD    getValue() const override;
+    virtual LLSD    getValue() const;
 
     void            setTextEntry(const LLStringExplicit& text);
-    void            setKeystrokeOnEsc(BOOL enable);
+    void            setKeystrokeOnEsc(bool enable);
 
-    LLScrollListItem*   add(const std::string& name, EAddPosition pos = ADD_BOTTOM, BOOL enabled = TRUE);   // add item "name" to menu
-    LLScrollListItem*   add(const std::string& name, const LLUUID& id, EAddPosition pos = ADD_BOTTOM, BOOL enabled = TRUE);
-    LLScrollListItem*   add(const std::string& name, void* userdata, EAddPosition pos = ADD_BOTTOM, BOOL enabled = TRUE);
-    LLScrollListItem*   add(const std::string& name, LLSD value, EAddPosition pos = ADD_BOTTOM, BOOL enabled = TRUE);
+    LLScrollListItem*   add(const std::string& name, EAddPosition pos = ADD_BOTTOM, bool enabled = true);   // add item "name" to menu
+    LLScrollListItem*   add(const std::string& name, const LLUUID& id, EAddPosition pos = ADD_BOTTOM, bool enabled = true);
+    LLScrollListItem*   add(const std::string& name, void* userdata, EAddPosition pos = ADD_BOTTOM, bool enabled = true);
+    LLScrollListItem*   add(const std::string& name, LLSD value, EAddPosition pos = ADD_BOTTOM, bool enabled = true);
     LLScrollListItem*   addSeparator(EAddPosition pos = ADD_BOTTOM);
-    BOOL            remove( S32 index );    // remove item by index, return TRUE if found and removed
+    bool            remove( S32 index );    // remove item by index, return true if found and removed
     void            removeall() { clearRows(); }
-    bool            itemExists(const std::string& name);
+    bool            itemExists(const std::string& name) const;
+    bool            valueExists(const std::string& value) const;
+    LLScrollListItem* findItemByValue(const std::string& value) const;
+    std::vector<LLScrollListItem*> getAllData() const;
 
-    void            sortByName(BOOL ascending = TRUE); // Sort the entries in the combobox by name
+    void            sortByName(bool ascending = true); // Sort the entries in the combobox by name
 
-    // Select current item by name using selectItemByLabel.  Returns FALSE if not found.
-    BOOL            setSimple(const LLStringExplicit& name);
+    // Select current item by name using selectItemByLabel.  Returns false if not found.
+    bool            setSimple(const LLStringExplicit& name);
     // Get name of current item. Returns an empty string if not found.
     const std::string   getSimple() const;
     // Get contents of column x of selected row
@@ -167,44 +169,47 @@ public:
 // [/SL:KB]
 //  void            updateLabel();
 
-    BOOL            remove(const std::string& name);    // remove item "name", return TRUE if found and removed
+    bool            remove(const std::string& name);    // remove item "name", return true if found and removed
 
-    BOOL            setCurrentByIndex( S32 index );
+    bool            setCurrentByIndex(S32 index);
     S32             getCurrentIndex() const;
 
-    void            setEnabledByValue(const LLSD& value, BOOL enabled);
+    bool            selectNextItem();
+    bool            selectPrevItem();
+
+    void            setEnabledByValue(const LLSD& value, bool enabled);
 
     void            createLineEditor(const Params&);
 
     //========================================================================
-    LLCtrlSelectionInterface* getSelectionInterface() override  { return (LLCtrlSelectionInterface*)this; };
-    LLCtrlListInterface* getListInterface() override            { return (LLCtrlListInterface*)this; };
+    LLCtrlSelectionInterface* getSelectionInterface()   { return (LLCtrlSelectionInterface*)this; };
+    LLCtrlListInterface* getListInterface()             { return (LLCtrlListInterface*)this; };
 
     // LLCtrlListInterface functions
     // See llscrolllistctrl.h
-    S32     getItemCount() const override;
+    virtual S32     getItemCount() const;
     // Overwrites the default column (See LLScrollListCtrl for format)
-    void    addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM) override;
-    void    clearColumns() override;
-    void    setColumnLabel(std::string_view column, const std::string& label) override;
-    LLScrollListItem* addElement(const LLSD& value, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL) override;
-    LLScrollListItem* addSimpleElement(const std::string& value, EAddPosition pos = ADD_BOTTOM, const LLSD& id = LLSD()) override;
-    void    clearRows() override;
-    void    sortByColumn(std::string_view name, BOOL ascending) override;
+    virtual void    addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM);
+    virtual void    clearColumns();
+    virtual void    setColumnLabel(const std::string& column, const std::string& label);
+    virtual LLScrollListItem* addElement(const LLSD& value, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL);
+    virtual LLScrollListItem* addSimpleElement(const std::string& value, EAddPosition pos = ADD_BOTTOM, const LLSD& id = LLSD());
+    virtual void    clearRows();
+    virtual void    sortByColumn(const std::string& name, bool ascending);
 
     // LLCtrlSelectionInterface functions
-    BOOL    getCanSelect() const override               { return TRUE; }
-    BOOL    selectFirstItem() override                  { return setCurrentByIndex(0); }
-    BOOL    selectNthItem( S32 index ) override         { return setCurrentByIndex(index); }
-    BOOL    selectItemRange(S32 first, S32 last) override;
-    S32     getFirstSelectedIndex() const override      { return getCurrentIndex(); }
-    BOOL    setCurrentByID( const LLUUID& id ) override;
-    LLUUID  getCurrentID() const override;              // LLUUID::null if no items in menu
-    BOOL    setSelectedByValue(const LLSD& value, BOOL selected) override;
-    LLSD    getSelectedValue() override;
-    BOOL    isSelected(const LLSD& value) const override;
-    BOOL    operateOnSelection(EOperation op) override;
-    BOOL    operateOnAll(EOperation op) override;
+    virtual bool    getCanSelect() const                { return true; }
+    virtual bool    selectFirstItem()                   { return setCurrentByIndex(0); }
+    virtual bool    selectNthItem( S32 index )          { return setCurrentByIndex(index); }
+    virtual bool    selectItemRange( S32 first, S32 last );
+    virtual S32     getFirstSelectedIndex() const       { return getCurrentIndex(); }
+    virtual bool    setCurrentByID( const LLUUID& id );
+    virtual LLUUID  getCurrentID() const;               // LLUUID::null if no items in menu
+    virtual bool    setSelectedByValue(const LLSD& value, bool selected);
+    virtual LLSD    getSelectedValue();
+    virtual bool    isSelected(const LLSD& value) const;
+    virtual bool    operateOnSelection(EOperation op);
+    virtual bool    operateOnAll(EOperation op);
 
     //========================================================================
 
@@ -221,7 +226,7 @@ public:
     */
     boost::signals2::connection setReturnCallback( const commit_signal_t::slot_type& cb ) { return mOnReturnSignal.connect(cb); }
 
-    void            setButtonVisible(BOOL visible);
+    void            setButtonVisible(bool visible);
 
     void            onButtonMouseDown();
     void            onListMouseUp();
@@ -241,13 +246,13 @@ protected:
     EPreferredPosition  mListPosition;
     LLPointer<LLUIImage>    mArrowImage;
     LLUIString          mLabel;
-    BOOL                mHasAutocompletedText;
+    bool                mHasAutocompletedText;
 
 private:
-    BOOL                mAllowTextEntry;
-    BOOL                mAllowNewValues;
+    bool                mAllowTextEntry;
+    bool                mAllowNewValues;
     S32                 mMaxChars;
-    BOOL                mTextEntryTentative;
+    bool                mTextEntryTentative;
     commit_callback_t   mPrearrangeCallback;
     commit_callback_t   mTextEntryCallback;
     commit_callback_t   mTextChangedCallback;
@@ -271,7 +276,7 @@ public:
         Params();
     };
 
-    /*virtual*/ const std::string getSelectedItemLabel(S32 column = 0) const override;
+    /*virtual*/ const std::string getSelectedItemLabel(S32 column = 0) const;
 
 private:
     enum EColumnIndex
@@ -282,7 +287,7 @@ private:
 
     friend class LLUICtrlFactory;
     LLIconsComboBox(const Params&);
-    virtual ~LLIconsComboBox() = default;
+    virtual ~LLIconsComboBox() {};
 
     S32         mIconColumnIndex;
     S32         mLabelColumnIndex;

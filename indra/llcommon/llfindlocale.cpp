@@ -33,7 +33,7 @@
 #include <ctype.h>
 
 #ifdef WIN32
-#include "llwin32headerslean.h"
+#include "llwin32headers.h"
 #include <winnt.h>
 #endif
 
@@ -130,23 +130,23 @@ accumulate_locstring(const char *str, FL_Locale *l) {
       return 1;
     }
   }
-  if (lang)
-      free(lang);
-  if (country)
-      free(country);
-  if (variant)
-      free(variant);
+  free(lang); free(country); free(variant);
   return 0;
 }
 
-#ifndef WIN32
+#ifndef LL_WINDOWS
 static int
-accumulate_env(const char* name, FL_Locale* l) {
-    char* env = getenv(name);
-    if (env) {
-        return accumulate_locstring(env, l);
-    }
-    return 0;
+accumulate_env(const char *name, FL_Locale *l) {
+  char *env;
+  char *lang = NULL;
+  char *country = NULL;
+  char *variant = NULL;
+  env = getenv(name);
+  if (env) {
+    return accumulate_locstring(env, l);
+  }
+  free(lang); free(country); free(variant);
+  return 0;
 }
 #endif
 
@@ -157,14 +157,22 @@ canonise_fl(FL_Locale *l) {
   if (l->lang && 0 == strcmp(l->lang, "en")) {
     if (l->country && 0 == strcmp(l->country, "UK")) {
       free((void*)l->country);
+#ifdef LL_WINDOWS
+      l->country = _strdup("GB");
+#else
       l->country = strdup("GB");
+#endif
     }
   }
   /* ja_JA -> ja_JP */
   if (l->lang && 0 == strcmp(l->lang, "ja")) {
     if (l->country && 0 == strcmp(l->country, "JA")) {
       free((void*)l->country);
+#ifdef LL_WINDOWS
+      l->country = _strdup("JP");
+#else
       l->country = strdup("JP");
+#endif
     }
   }
 }

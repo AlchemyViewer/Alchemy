@@ -58,7 +58,7 @@ LLPanelMediaSettingsSecurity::LLPanelMediaSettingsSecurity() :
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-BOOL LLPanelMediaSettingsSecurity::postBuild()
+bool LLPanelMediaSettingsSecurity::postBuild()
 {
     mEnableWhiteList = getChild< LLCheckBoxCtrl >( LLMediaEntry::WHITELIST_ENABLE_KEY );
     mWhiteListList = getChild< LLScrollListCtrl >( LLMediaEntry::WHITELIST_KEY );
@@ -220,7 +220,7 @@ const std::string LLPanelMediaSettingsSecurity::makeValidUrl( const std::string&
     if ( candidate_url.scheme().empty() )
     {
         // build a URL comprised of default scheme and the original fragment
-        const std::string default_scheme( "http://" );
+        const std::string default_scheme( "https://" );
         return default_scheme + src_url;
     };
 

@@ -33,7 +33,7 @@
 
 class LLNotification;
 
-class LLFloaterNotificationConsole final :
+class LLFloaterNotificationConsole :
     public LLFloater
 {
     friend class LLFloaterReg;
@@ -41,7 +41,7 @@ class LLFloaterNotificationConsole final :
 public:
 
     // LLPanel
-    BOOL postBuild();
+    bool postBuild();
 
     void addChannel(const std::string& type, bool open = false);
     void updateResizeLimits(LLLayoutStack &stack);
@@ -58,13 +58,13 @@ private:
 /*
  * @brief Pop-up debugging view of a generic new notification.
  */
-class LLFloaterNotification final : public LLFloater
+class LLFloaterNotification : public LLFloater
 {
 public:
     LLFloaterNotification(LLNotification* note);
 
     // LLPanel
-    BOOL postBuild();
+    bool postBuild();
     void respond();
 
 private:

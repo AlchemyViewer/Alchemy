@@ -117,6 +117,7 @@ public:
     virtual ~LLQueuedThread();
     virtual void shutdown();
 
+    // No copy constructor or copy assignment
     LLQueuedThread(const LLQueuedThread&) = delete;
     LLQueuedThread& operator=(const LLQueuedThread&) = delete;
 
@@ -143,7 +144,7 @@ public:
     void printQueueStats();
 
     virtual size_t getPending();
-    bool getThreaded() const { return mThreaded ? true : false; }
+    bool getThreaded() { return mThreaded; }
 
     // Request accessors
     status_t getRequestStatus(handle_t handle);

@@ -1,18 +1,20 @@
-ci:
-    autofix_prs: false
 repos:
-  - repo: https://github.com/secondlife/git-hooks.git 
-    rev: v1.0.2
+  - repo: https://github.com/alchemyviewer/git-hooks.git
+    rev: v1.0.4
     hooks:
       - id: llsd
       - id: no-trigraphs
       - id: end-of-file
-        files: \.(cpp|c|h|py|glsl|cmake|txt)$
+        files: \.(cpp|c|m|mm|h|py|glsl|cmake|txt)$
         exclude: language.txt
       - id: indent-with-spaces
-        files: \.(cpp|c|h|inl|py|glsl|cmake)$
+        files: \.(cpp|c|m|mm|h|inl|py|glsl|cmake)$
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
+      - id: check-merge-conflict
       - id: check-xml
+      - id: fix-byte-order-marker
       - id: mixed-line-ending
+      - id: trailing-whitespace
+        files: \.(cpp|c|m|mm|h|inl|py|glsl|cmake|yaml|sh)$

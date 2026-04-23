@@ -81,6 +81,10 @@ LLNotificationsListener::LLNotificationsListener(LLNotifications & notifications
 
 // This is here in the .cpp file so we don't need the definition of class
 // Forwarder in the header file.
+LLNotificationsListener::~LLNotificationsListener()
+{
+}
+
 void LLNotificationsListener::requestAdd(const LLSD& event_data) const
 {
     if(event_data.has("reply"))
@@ -187,7 +191,7 @@ void LLNotificationsListener::ignore(const LLSD& params) const
     if (params["name"].isDefined())
     {
         // ["name"] was passed: ignore just that notification
-        LLNotificationTemplatePtr templatep = mNotifications.getTemplate(params["name"].asString());
+        LLNotificationTemplatePtr templatep = mNotifications.getTemplate(params["name"].asStringRef());
         if (templatep)
         {
             templatep->mForm->setIgnored(ignore);
@@ -249,7 +253,7 @@ void LLNotificationsListener::forward(const LLSD& params)
     {
         // This is a request to stop forwarding notifications on the specified
         // channel. The rest of the params don't matter.
-        // Because mForwarders contains unique_ptrs, erasing the map entry
+        // Because mForwarders contains scoped_ptrs, erasing the map entry
         // DOES delete the heap Forwarder object. Because Forwarder derives
         // from LLEventTrackable, destroying it disconnects it from the
         // channel.
@@ -262,7 +266,7 @@ void LLNotificationsListener::forward(const LLSD& params)
         entry(mForwarders.insert(ForwarderMap::value_type(channel, ForwarderMap::mapped_type())).first);
     if (! entry->second)
     {
-        entry->second.reset(new Forwarder(mNotifications, channel));
+        entry->second = std::make_shared<Forwarder>(mNotifications, channel);
     }
     // Now, whether this Forwarder is brand-new or not, update it with the new
     // request info.

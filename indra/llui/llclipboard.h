@@ -27,8 +27,6 @@
 #ifndef LL_LLCLIPBOARD_H
 #define LL_LLCLIPBOARD_H
 
-#include <boost/function.hpp>
-
 #include "llstring.h"
 #include "lluuid.h"
 #include "llsingleton.h"
@@ -46,7 +44,7 @@
 // In all other cases, the text and the UUIDs are very much independent.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLClipboard final : public LLSingleton<LLClipboard>
+class LLClipboard : public LLSingleton<LLClipboard>
 {
     LLSINGLETON(LLClipboard);
     ~LLClipboard();

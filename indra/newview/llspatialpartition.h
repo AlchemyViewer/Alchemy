@@ -43,11 +43,10 @@
 #include "llvoavatar.h"
 #include "llfetchedgltfmaterial.h"
 
-#include <queue>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 #define SG_STATE_INHERIT_MASK (OCCLUDED)
-#define SG_INITIAL_STATE_MASK (DIRTY | GEOM_DIRTY)
+#define SG_INITIAL_STATE_MASK (static_cast<U32>(DIRTY) | static_cast<U32>(GEOM_DIRTY))
 
 class LLViewerOctreePartition;
 class LLSpatialPartition;
@@ -64,7 +63,7 @@ void pushVerts(LLFace* face);
     Make every effort to keep size minimal.
     Member ordering is important for cache coherency
 */
-class LLDrawInfo final : public LLRefCount
+class alignas(16) LLDrawInfo final : public LLRefCount
 {
     LL_ALIGN_NEW;
 protected:
@@ -72,7 +71,7 @@ protected:
 
 public:
     LLDrawInfo(const LLDrawInfo& rhs) = delete;
-    LLDrawInfo& operator=(const LLDrawInfo& rhs) = delete;
+    const LLDrawInfo& operator=(const LLDrawInfo& rhs) = delete;
 
     // return a hash of this LLDrawInfo as a debug color
     LLColor4U getDebugColor() const;
@@ -99,11 +98,11 @@ public:
 
     const LLMatrix4* mSpecularMapMatrix = nullptr;
     const LLMatrix4* mNormalMapMatrix = nullptr;
-    const LLMatrix4a* mTextureMatrix = nullptr;
-    const LLMatrix4a* mModelMatrix = nullptr;
+    const LLMatrix4* mTextureMatrix = nullptr;
+    const LLMatrix4* mModelMatrix = nullptr;
 
     LLPointer<LLVOAvatar> mAvatar = nullptr;
-    LLPointer<LLMeshSkinInfo> mSkinInfo = nullptr;
+    LLMeshSkinInfo* mSkinInfo = nullptr;
 
     // Material pointer here is likely for debugging only and are immaterial (zing!)
     LLPointer<LLMaterial> mMaterial;
@@ -190,19 +189,20 @@ public:
     };
 };
 
-LL_ALIGN_PREFIX(16)
-class LLSpatialGroup final : public LLOcclusionCullingGroup
+class alignas(16) LLSpatialGroup : public LLOcclusionCullingGroup
 {
     using super = LLOcclusionCullingGroup;
     friend class LLSpatialPartition;
     friend class LLOctreeStateCheck;
+
+    LL_ALIGN_NEW
 public:
 
     LLSpatialGroup(const LLSpatialGroup& rhs) = delete;
-    LLSpatialGroup& operator=(const LLSpatialGroup& rhs) = delete;
+    const LLSpatialGroup& operator=(const LLSpatialGroup& rhs) = delete;
 
     static U32 sNodeCount;
-    static bool sNoDelete; //deletion of spatial groups and draw info not allowed if TRUE
+    static bool sNoDelete; //deletion of spatial groups and draw info not allowed if true
 
     typedef std::vector<LLPointer<LLSpatialGroup> > sg_vector_t;
     typedef std::vector<LLPointer<LLSpatialBridge> > bridge_list_t;
@@ -264,7 +264,7 @@ public:
 
     LLSpatialGroup(OctreeNode* node, LLSpatialPartition* part);
 
-    BOOL isHUDGroup() ;
+    bool isHUDGroup() const;
 
     void clearDrawMap();
     void validate();
@@ -276,9 +276,9 @@ public:
 
     LLSpatialGroup* getParent();
 
-    BOOL addObject(LLDrawable *drawablep);
-    BOOL removeObject(LLDrawable *drawablep, BOOL from_octree = FALSE);
-    BOOL updateInGroup(LLDrawable *drawablep, BOOL immediate = FALSE); // Update position if it's in the group
+    bool addObject(LLDrawable *drawablep);
+    bool removeObject(LLDrawable *drawablep, bool from_octree = false);
+    bool updateInGroup(LLDrawable *drawablep, bool immediate = false); // Update position if it's in the group
     void expandExtents(const LLVector4a* addingExtents, const LLXformMatrix& currentTransform);
     void shift(const LLVector4a &offset);
 
@@ -287,7 +287,7 @@ public:
 
     void updateDistance(LLCamera& camera);
     F32 getUpdateUrgency() const;
-    BOOL changeLOD();
+    bool changeLOD();
     void rebuildGeom();
     void rebuildMesh();
 
@@ -298,10 +298,10 @@ public:
     void drawObjectBox(LLColor4 col);
 
     LLDrawable* lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
-        BOOL pick_transparent,
-        BOOL pick_rigged,
-        BOOL pick_unselectable,
-        BOOL pick_reflection_probe,
+        bool pick_transparent,
+        bool pick_rigged,
+        bool pick_unselectable,
+        bool pick_reflection_probe,
         S32* face_hit,                          // return the face hit
         LLVector4a* intersection = NULL,         // return the intersection point
         LLVector2* tex_coord = NULL,            // return the texture coordinates of the intersection point
@@ -322,8 +322,8 @@ public:
     virtual void rebound();
 
 public:
-    LL_ALIGN_16(LLVector4a mViewAngle);
-    LL_ALIGN_16(LLVector4a mLastUpdateViewAngle);
+    LLVector4a mViewAngle;
+    LLVector4a mLastUpdateViewAngle;
 
 protected:
     virtual ~LLSpatialGroup();
@@ -353,7 +353,7 @@ public:
     U32 mRenderOrder = 0;
     // Reflection Probe associated with this node (if any)
     LLPointer<LLReflectionMap> mReflectionProbe = nullptr;
-} LL_ALIGN_POSTFIX(16);
+};
 
 class LLGeometryManager
 {
@@ -369,17 +369,17 @@ public:
 class LLSpatialPartition: public LLViewerOctreePartition, public LLGeometryManager
 {
 public:
-    LLSpatialPartition(U32 data_mask,  BOOL render_by_group, LLViewerRegion* regionp);
+    LLSpatialPartition(U32 data_mask,  bool render_by_group, LLViewerRegion* regionp);
     virtual ~LLSpatialPartition();
 
-    LLSpatialGroup *put(LLDrawable *drawablep, BOOL was_visible = FALSE);
-    BOOL remove(LLDrawable *drawablep, LLSpatialGroup *curp);
+    LLSpatialGroup *put(LLDrawable *drawablep, bool was_visible = false);
+    bool remove(LLDrawable *drawablep, LLSpatialGroup *curp);
 
     LLDrawable* lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
-                                     BOOL pick_transparent,
-                                     BOOL pick_rigged,
-                                     BOOL pick_unselectable,
-                                     BOOL pick_reflection_probe,
+                                     bool pick_transparent,
+                                     bool pick_rigged,
+                                     bool pick_unselectable,
+                                     bool pick_reflection_probe,
                                      S32* face_hit,                          // return the face hit
                                      LLVector4a* intersection = NULL,         // return the intersection point
                                      LLVector2* tex_coord = NULL,            // return the texture coordinates of the intersection point
@@ -389,7 +389,7 @@ public:
 
 
     // If the drawable moves, move it here.
-    virtual void move(LLDrawable *drawablep, LLSpatialGroup *curp, BOOL immediate = FALSE);
+    virtual void move(LLDrawable *drawablep, LLSpatialGroup *curp, bool immediate = false);
     virtual void shift(const LLVector4a &offset);
 
     virtual F32 calcDistance(LLSpatialGroup* group, LLCamera& camera);
@@ -398,33 +398,33 @@ public:
     virtual void rebuildGeom(LLSpatialGroup* group);
     virtual void rebuildMesh(LLSpatialGroup* group);
 
-    BOOL visibleObjectsInFrustum(LLCamera& camera);
+    bool visibleObjectsInFrustum(LLCamera& camera);
     /*virtual*/ S32 cull(LLCamera &camera, bool do_occlusion=false); // Cull on arbitrary frustum
-    S32 cull(LLCamera &camera, std::vector<LLDrawable *>* results, BOOL for_select); // Cull on arbitrary frustum
+    S32 cull(LLCamera &camera, std::vector<LLDrawable *>* results, bool for_select); // Cull on arbitrary frustum
 
-    BOOL isVisible(const LLVector3& v);
+    bool isVisible(const LLVector3& v);
     bool isHUDPartition() ;
 
     LLSpatialBridge* asBridge() { return mBridge; }
-    BOOL isBridge() { return asBridge() != NULL; }
+    bool isBridge() { return asBridge() != NULL; }
 
     void renderPhysicsShapes(bool depth_only);
     void renderDebug();
     void renderIntersectingBBoxes(LLCamera* camera);
     void restoreGL();
 
-    BOOL getVisibleExtents(LLCamera& camera, LLVector3& visMin, LLVector3& visMax);
+    bool getVisibleExtents(LLCamera& camera, LLVector3& visMin, LLVector3& visMax);
 
 public:
     LLSpatialBridge* mBridge; // NULL for non-LLSpatialBridge instances, otherwise, mBridge == this
                             // use a pointer instead of making "isBridge" and "asBridge" virtual so it's safe
                             // to call asBridge() from the destructor
 
-    bool mInfiniteFarClip; // if TRUE, frustum culling ignores far clip plane
+    bool mInfiniteFarClip; // if true, frustum culling ignores far clip plane
     const bool mRenderByGroup;
     U32 mVertexDataMask;
     F32 mSlopRatio; //percentage distance must change before drawables receive LOD update (default is 0.25);
-    bool mDepthMask; //if TRUE, objects in this partition will be written to depth during alpha rendering
+    bool mDepthMask; //if true, objects in this partition will be written to depth during alpha rendering
 };
 
 // class for creating bridges between spatial partitions
@@ -436,24 +436,24 @@ protected:
 public:
     typedef std::vector<LLPointer<LLSpatialBridge> > bridge_vector_t;
 
-    LLSpatialBridge(LLDrawable* root, BOOL render_by_group, U32 data_mask, LLViewerRegion* regionp);
+    LLSpatialBridge(LLDrawable* root, bool render_by_group, U32 data_mask, LLViewerRegion* regionp);
 
     void destroyTree();
 
-    BOOL isSpatialBridge() const final      { return TRUE; }
-    void updateSpatialExtents() override;
-    void updateBinRadius() final;
-    void setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* results = NULL, BOOL for_select = FALSE) final;
-    void updateDistance(LLCamera& camera_in, bool force_update) final;
-    void makeActive() final;
-    void move(LLDrawable *drawablep, LLSpatialGroup *curp, BOOL immediate = FALSE) final;
-    BOOL updateMove() final;
-    void shiftPos(const LLVector4a& vec) override;
-    void cleanupReferences() final;
-    LLSpatialPartition* asPartition() final     { return this; }
+    virtual bool isSpatialBridge() const        { return true; }
+    virtual void updateSpatialExtents();
+    virtual void updateBinRadius();
+    virtual void setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* results = NULL, bool for_select = false);
+    virtual void updateDistance(LLCamera& camera_in, bool force_update);
+    virtual void makeActive();
+    virtual void move(LLDrawable *drawablep, LLSpatialGroup *curp, bool immediate = false);
+    virtual bool updateMove();
+    virtual void shiftPos(const LLVector4a& vec);
+    virtual void cleanupReferences();
+    virtual LLSpatialPartition* asPartition()       { return this; }
 
     //transform agent space camera into this Spatial Bridge's coordinate frame
-    LLCamera transformCamera(LLCamera& camera);
+    virtual LLCamera transformCamera(LLCamera& camera);
 
     //transform agent space bounding box into this Spatial Bridge's coordinate frame
     void transformExtents(const LLVector4a* src, LLVector4a* dst);
@@ -586,19 +586,19 @@ class LLWaterPartition : public LLSpatialPartition
 {
 public:
     LLWaterPartition(LLViewerRegion* regionp);
-    void getGeometry(LLSpatialGroup* group) final {  }
-    void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) final { }
+    virtual void getGeometry(LLSpatialGroup* group) {  }
+    virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) { }
 };
 
 //spatial partition for hole and edge water (implemented in LLVOWater.cpp)
-class LLVoidWaterPartition final : public LLWaterPartition
+class LLVoidWaterPartition : public LLWaterPartition
 {
 public:
     LLVoidWaterPartition(LLViewerRegion* regionp);
 };
 
 //spatial partition for terrain (impelmented in LLVOSurfacePatch.cpp)
-class LLTerrainPartition final : public LLSpatialPartition
+class LLTerrainPartition : public LLSpatialPartition
 {
 public:
     LLTerrainPartition(LLViewerRegion* regionp);
@@ -606,7 +606,7 @@ public:
 };
 
 //spatial partition for trees
-class LLTreePartition final : public LLSpatialPartition
+class LLTreePartition : public LLSpatialPartition
 {
 public:
     LLTreePartition(LLViewerRegion* regionp);
@@ -620,27 +620,27 @@ class LLParticlePartition : public LLSpatialPartition
 {
 public:
     LLParticlePartition(LLViewerRegion* regionp);
-    void rebuildGeom(LLSpatialGroup* group) final;
-    void getGeometry(LLSpatialGroup* group) final;
-    void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) final;
-    F32 calcPixelArea(LLSpatialGroup* group, LLCamera& camera) final;
+    virtual void rebuildGeom(LLSpatialGroup* group);
+    virtual void getGeometry(LLSpatialGroup* group);
+    virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count);
+    virtual F32 calcPixelArea(LLSpatialGroup* group, LLCamera& camera);
 protected:
     U32 mRenderPass;
 };
 
-class LLHUDParticlePartition final : public LLParticlePartition
+class LLHUDParticlePartition : public LLParticlePartition
 {
 public:
     LLHUDParticlePartition(LLViewerRegion* regionp);
 };
 
 //spatial partition for grass (implemented in LLVOGrass.cpp)
-class LLGrassPartition final : public LLSpatialPartition
+class LLGrassPartition : public LLSpatialPartition
 {
 public:
     LLGrassPartition(LLViewerRegion* regionp);
-    void getGeometry(LLSpatialGroup* group) override;
-    void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) override;
+    virtual void getGeometry(LLSpatialGroup* group);
+    virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count);
 protected:
     U32 mRenderPass;
 };
@@ -662,7 +662,7 @@ class LLVolumeGeometryManager: public LLGeometryManager
     virtual void rebuildMesh(LLSpatialGroup* group);
     virtual void getGeometry(LLSpatialGroup* group);
     virtual void addGeometryCount(LLSpatialGroup* group, U32& vertex_count, U32& index_count);
-    U32 genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, BOOL distance_sort = FALSE, BOOL batch_textures = FALSE, BOOL rigged = FALSE);
+    U32 genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort = false, bool batch_textures = false, bool rigged = false);
     void registerFace(LLSpatialGroup* group, LLFace* facep, U32 type);
 
 private:
@@ -681,14 +681,14 @@ private:
 };
 
 //spatial partition that uses volume geometry manager (implemented in LLVOVolume.cpp)
-class LLVolumePartition final : public LLSpatialPartition, public LLVolumeGeometryManager
+class LLVolumePartition : public LLSpatialPartition, public LLVolumeGeometryManager
 {
 public:
     LLVolumePartition(LLViewerRegion* regionp);
-    void rebuildGeom(LLSpatialGroup* group) override { LLVolumeGeometryManager::rebuildGeom(group); }
-    void getGeometry(LLSpatialGroup* group) override { LLVolumeGeometryManager::getGeometry(group); }
-    void rebuildMesh(LLSpatialGroup* group) override { LLVolumeGeometryManager::rebuildMesh(group); }
-    void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) override { LLVolumeGeometryManager::addGeometryCount(group, vertex_count, index_count); }
+    virtual void rebuildGeom(LLSpatialGroup* group) { LLVolumeGeometryManager::rebuildGeom(group); }
+    virtual void getGeometry(LLSpatialGroup* group) { LLVolumeGeometryManager::getGeometry(group); }
+    virtual void rebuildMesh(LLSpatialGroup* group) { LLVolumeGeometryManager::rebuildMesh(group); }
+    virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) { LLVolumeGeometryManager::addGeometryCount(group, vertex_count, index_count); }
 };
 
 //spatial bridge that uses volume geometry manager (implemented in LLVOVolume.cpp)
@@ -696,27 +696,26 @@ class LLVolumeBridge : public LLSpatialBridge, public LLVolumeGeometryManager
 {
 public:
     LLVolumeBridge(LLDrawable* drawable, LLViewerRegion* regionp);
-    virtual void rebuildGeom(LLSpatialGroup* group) final { LLVolumeGeometryManager::rebuildGeom(group); }
-    virtual void getGeometry(LLSpatialGroup* group) final { LLVolumeGeometryManager::getGeometry(group); }
-    virtual void rebuildMesh(LLSpatialGroup* group) final { LLVolumeGeometryManager::rebuildMesh(group); }
-    virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) final { LLVolumeGeometryManager::addGeometryCount(group, vertex_count, index_count); }
+    virtual void rebuildGeom(LLSpatialGroup* group) { LLVolumeGeometryManager::rebuildGeom(group); }
+    virtual void getGeometry(LLSpatialGroup* group) { LLVolumeGeometryManager::getGeometry(group); }
+    virtual void rebuildMesh(LLSpatialGroup* group) { LLVolumeGeometryManager::rebuildMesh(group); }
+    virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) { LLVolumeGeometryManager::addGeometryCount(group, vertex_count, index_count); }
 };
 
-class LLAvatarBridge final : public LLVolumeBridge
+class LLAvatarBridge : public LLVolumeBridge
 {
 public:
     LLAvatarBridge(LLDrawable* drawablep, LLViewerRegion* regionp);
 };
 
-class LLControlAVBridge final : public LLVolumeBridge
+class LLControlAVBridge : public LLVolumeBridge
 {
     using super = LLVolumeBridge;
 public:
     LLControlAVBridge(LLDrawable* drawablep, LLViewerRegion* regionp);
-    void updateSpatialExtents() override;
 };
 
-class LLHUDBridge final : public LLVolumeBridge
+class LLHUDBridge : public LLVolumeBridge
 {
 public:
     LLHUDBridge(LLDrawable* drawablep, LLViewerRegion* regionp);
@@ -729,23 +728,23 @@ class LLBridgePartition : public LLSpatialPartition
 {
 public:
     LLBridgePartition(LLViewerRegion* regionp);
-    virtual void getGeometry(LLSpatialGroup* group) final { }
-    virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) final {  }
+    virtual void getGeometry(LLSpatialGroup* group) { }
+    virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) {  }
 };
 
-class LLAvatarPartition final : public LLBridgePartition
+class LLAvatarPartition : public LLBridgePartition
 {
 public:
     LLAvatarPartition(LLViewerRegion* regionp);
 };
 
-class LLControlAVPartition final : public LLBridgePartition
+class LLControlAVPartition : public LLBridgePartition
 {
 public:
     LLControlAVPartition(LLViewerRegion* regionp);
 };
 
-class LLHUDPartition final : public LLBridgePartition
+class LLHUDPartition : public LLBridgePartition
 {
 public:
     LLHUDPartition(LLViewerRegion* regionp);

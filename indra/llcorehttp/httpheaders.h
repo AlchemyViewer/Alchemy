@@ -29,7 +29,6 @@
 
 
 #include "httpcommon.h"
-#include <boost/noncopyable.hpp>
 #include <string>
 #include "_refcounted.h"
 
@@ -75,7 +74,7 @@ namespace LLCore
 /// constructor is given a refcount.
 ///
 
-class HttpHeaders: private boost::noncopyable
+class HttpHeaders
 {
 public:
     typedef std::pair<std::string, std::string> header_t;
@@ -92,13 +91,14 @@ public:
     /// @post In addition to the instance, caller has a refcount
     /// to the instance.  A call to @see release() will destroy
     /// the instance.
-    HttpHeaders() = default;
-    virtual ~HttpHeaders() = default;                       // Use release()
+    HttpHeaders();
+    virtual ~HttpHeaders();                     // Use release()
+
+    // Non-copyable
+    HttpHeaders(const HttpHeaders&) = delete;
+    HttpHeaders& operator=(const HttpHeaders&) = delete;
 
     //typedef LLCoreInt::IntrusivePtr<HttpHeaders> ptr_t;
-
-    HttpHeaders(const HttpHeaders &) = delete;          // Not defined
-    void operator=(const HttpHeaders &) = delete;       // Not defined
 
 public:
     // Empty the list of headers.

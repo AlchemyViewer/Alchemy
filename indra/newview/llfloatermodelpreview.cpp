@@ -64,6 +64,7 @@
 #include "llcallbacklist.h"
 #include "llviewertexteditor.h"
 #include "llviewernetwork.h"
+#include "llmaterialeditor.h"
 
 
 //static
@@ -75,17 +76,17 @@ LLFloaterModelPreview* LLFloaterModelPreview::sInstance = NULL;
 // should be represented by Retain spinner with values from 1 to 100 by 1.
 // To achieve this, RETAIN_COEFFICIENT is used while creating spinner
 // and when value is requested from spinner.
-const double RETAIN_COEFFICIENT = 100;
+constexpr double RETAIN_COEFFICIENT = 100;
 
 // "Cosine%" decomp parameter has values from 0.9 to 1 by 0.001
 // But according to the UI spec for upload model floater, this parameter
 // should be represented by Smooth combobox with only 10 values.
 // So this const is used as a size of Smooth combobox list.
-const S32 SMOOTH_VALUES_NUMBER = 10;
-const S32 PREVIEW_RENDER_SIZE = 1024;
-const F32 PREVIEW_CAMERA_DISTANCE = 16.f;
+constexpr S32 SMOOTH_VALUES_NUMBER = 10;
+constexpr S32 PREVIEW_RENDER_SIZE = 1024;
+constexpr F32 PREVIEW_CAMERA_DISTANCE = 16.f;
 
-class LLMeshFilePicker final : public LLFilePickerThread
+class LLMeshFilePicker : public LLFilePickerThread
 {
 public:
     LLMeshFilePicker(LLModelPreview* mp, S32 lod);
@@ -135,7 +136,7 @@ mAvatarTabIndex(0)
     sInstance = this;
     mLastMouseX = 0;
     mLastMouseY = 0;
-    mStatusLock = std::make_unique<LLMutex>();
+    mStatusLock = new LLMutex();
     mModelPreview = NULL;
 
     mLODMode[LLModel::LOD_HIGH] = LLModelPreview::LOD_FROM_FILE;
@@ -148,11 +149,11 @@ mAvatarTabIndex(0)
 //-----------------------------------------------------------------------------
 // postBuild()
 //-----------------------------------------------------------------------------
-BOOL LLFloaterModelPreview::postBuild()
+bool LLFloaterModelPreview::postBuild()
 {
     if (!LLFloater::postBuild())
     {
-        return FALSE;
+        return false;
     }
 
     childSetCommitCallback("cancel_btn", onCancel, this);
@@ -283,14 +284,14 @@ BOOL LLFloaterModelPreview::postBuild()
         mCalculateBtn->setEnabled(false);
     }
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
 // reshape()
 //-----------------------------------------------------------------------------
 
-void LLFloaterModelPreview::reshape(S32 width, S32 height, BOOL called_from_parent)
+void LLFloaterModelPreview::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLFloaterModelUploadBase::reshape(width, height, called_from_parent);
 
@@ -316,7 +317,8 @@ LLFloaterModelPreview::~LLFloaterModelPreview()
         delete mModelPreview;
     }
 
-    mStatusLock.reset();
+    delete mStatusLock;
+    mStatusLock = NULL;
 }
 
 void LLFloaterModelPreview::initModelPreview()
@@ -348,14 +350,14 @@ void LLFloaterModelPreview::initModelPreview()
 }
 
 //static
-bool LLFloaterModelPreview::showModelPreview()
+void LLFloaterModelPreview::showModelPreview(const LLUUID& dest_folder)
 {
     LLFloaterModelPreview* fmp = (LLFloaterModelPreview*)LLFloaterReg::getInstance("upload_model");
     if (fmp && !fmp->isModelLoading())
     {
+        fmp->setUploadDestination(dest_folder);
         fmp->loadHighLodModel();
     }
-    return true;
 }
 
 void LLFloaterModelPreview::onUploadOptionChecked(LLUICtrl* ctrl)
@@ -501,10 +503,13 @@ void LLFloaterModelPreview::onClickCalculateBtn()
     mUploadModelUrl.clear();
     mModelPhysicsFee.clear();
 
-    gMeshRepo.uploadModel(mModelPreview->mUploadData, mModelPreview->mPreviewScale,
+    lod_sources_map_t lod_sources;
+    fillLODSourceStatistics(lod_sources);
+
+    gMeshRepo.uploadModel(mModelPreview->mUploadData, lod_sources, mModelPreview->mPreviewScale,
                           childGetValue("upload_textures").asBoolean(),
                           upload_skinweights, upload_joint_positions, lock_scale_if_joint_position,
-                          mUploadModelUrl, false,
+                          mUploadModelUrl, mDestinationFolderId, false,
                           getWholeModelFeeObserverHandle());
 
     toggleCalculateButton(false);
@@ -618,11 +623,9 @@ void LLFloaterModelPreview::onJointListSelection()
     LLPanel *panel = mTabContainer->getPanelByName("rigging_panel");
     LLScrollListCtrl *joints_list = panel->getChild<LLScrollListCtrl>("joints_list");
     LLScrollListCtrl *joints_pos = panel->getChild<LLScrollListCtrl>("pos_overrides_list");
-    LLScrollListCtrl *joints_scale = panel->getChild<LLScrollListCtrl>("scale_overrides_list");
     LLTextBox *joint_pos_descr = panel->getChild<LLTextBox>("pos_overrides_descr");
 
     joints_pos->deleteAllItems();
-    joints_scale->deleteAllItems();
 
     LLScrollListItem *selected = joints_list->getFirstSelected();
     if (selected)
@@ -784,15 +787,16 @@ void LLFloaterModelPreview::draw3dPreview()
     gGL.begin(LLRender::TRIANGLES);
     {
         gGL.texCoord2f(0.f, 1.f);
-        gGL.vertex2i(mPreviewRect.mLeft+1, mPreviewRect.mTop-1);
+        gGL.vertex2i(mPreviewRect.mLeft + 1, mPreviewRect.mTop - 1);
         gGL.texCoord2f(0.f, 0.f);
-        gGL.vertex2i(mPreviewRect.mLeft+1, mPreviewRect.mBottom+1);
+        gGL.vertex2i(mPreviewRect.mLeft + 1, mPreviewRect.mBottom + 1);
         gGL.texCoord2f(1.f, 0.f);
-        gGL.vertex2i(mPreviewRect.mRight-1, mPreviewRect.mBottom+1);
+        gGL.vertex2i(mPreviewRect.mRight - 1, mPreviewRect.mBottom + 1);
+
         gGL.texCoord2f(1.f, 0.f);
         gGL.vertex2i(mPreviewRect.mRight - 1, mPreviewRect.mBottom + 1);
         gGL.texCoord2f(1.f, 1.f);
-        gGL.vertex2i(mPreviewRect.mRight-1, mPreviewRect.mTop-1);
+        gGL.vertex2i(mPreviewRect.mRight - 1, mPreviewRect.mTop - 1);
         gGL.texCoord2f(0.f, 1.f);
         gGL.vertex2i(mPreviewRect.mLeft + 1, mPreviewRect.mTop - 1);
     }
@@ -852,7 +856,7 @@ void LLFloaterModelPreview::draw()
 //-----------------------------------------------------------------------------
 // handleMouseDown()
 //-----------------------------------------------------------------------------
-BOOL LLFloaterModelPreview::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLFloaterModelPreview::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     if (mPreviewRect.pointInRect(x, y))
     {
@@ -861,7 +865,7 @@ BOOL LLFloaterModelPreview::handleMouseDown(S32 x, S32 y, MASK mask)
         gViewerWindow->hideCursor();
         mLastMouseX = x;
         mLastMouseY = y;
-        return TRUE;
+        return true;
     }
 
     return LLFloater::handleMouseDown(x, y, mask);
@@ -870,9 +874,9 @@ BOOL LLFloaterModelPreview::handleMouseDown(S32 x, S32 y, MASK mask)
 //-----------------------------------------------------------------------------
 // handleMouseUp()
 //-----------------------------------------------------------------------------
-BOOL LLFloaterModelPreview::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLFloaterModelPreview::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-    gFocusMgr.setMouseCapture(FALSE);
+    gFocusMgr.setMouseCapture(nullptr);
     gViewerWindow->showCursor();
     return LLFloater::handleMouseUp(x, y, mask);
 }
@@ -880,7 +884,7 @@ BOOL LLFloaterModelPreview::handleMouseUp(S32 x, S32 y, MASK mask)
 //-----------------------------------------------------------------------------
 // handleHover()
 //-----------------------------------------------------------------------------
-BOOL LLFloaterModelPreview::handleHover (S32 x, S32 y, MASK mask)
+bool LLFloaterModelPreview::handleHover (S32 x, S32 y, MASK mask)
 {
     MASK local_mask = mask & ~MASK_ALT;
 
@@ -911,7 +915,7 @@ BOOL LLFloaterModelPreview::handleHover (S32 x, S32 y, MASK mask)
 
         mModelPreview->refresh();
 
-        LLUI::setMousePositionLocal(this, mLastMouseX, mLastMouseY);
+        LLUI::getInstance()->setMousePositionLocal(this, mLastMouseX, mLastMouseY);
     }
 
     if (!mPreviewRect.pointInRect(x, y) || !mModelPreview)
@@ -931,13 +935,13 @@ BOOL LLFloaterModelPreview::handleHover (S32 x, S32 y, MASK mask)
         gViewerWindow->setCursor(UI_CURSOR_TOOLZOOMIN);
     }
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
 // handleScrollWheel()
 //-----------------------------------------------------------------------------
-BOOL LLFloaterModelPreview::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLFloaterModelPreview::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
     if (mPreviewRect.pointInRect(x, y) && mModelPreview)
     {
@@ -948,7 +952,7 @@ BOOL LLFloaterModelPreview::handleScrollWheel(S32 x, S32 y, S32 clicks)
     {
         LLFloaterModelUploadBase::handleScrollWheel(x, y, clicks);
     }
-    return TRUE;
+    return true;
 }
 
 /*virtual*/
@@ -1031,8 +1035,13 @@ void LLFloaterModelPreview::onPhysicsStageExecute(LLUICtrl* ctrl, void* data)
                 gMeshRepo.mDecompThread->submitRequest(request);
             }
         }
-
-        if (stage == "Decompose")
+        if (stage == "Analyze")
+        {
+            sInstance->setStatusMessage(sInstance->getString("decomposing"));
+            sInstance->childSetVisible("Analyze", false);
+            sInstance->childSetVisible("analyze_cancel", true);
+        }
+        else if (stage == "Decompose")
         {
             sInstance->setStatusMessage(sInstance->getString("decomposing"));
             sInstance->childSetVisible("Decompose", false);
@@ -1086,9 +1095,7 @@ void LLFloaterModelPreview::onPhysicsUseLOD(LLUICtrl* ctrl, void* userdata)
     }
     else if (which_mode == cube_mode)
     {
-
-        std::string path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "cube.dae");
-        sInstance->loadModel(LLModel::LOD_PHYSICS, path);
+        sInstance->loadModel(LLModel::LOD_PHYSICS, getBoundingBoxCubePath());
     }
 
     LLModelPreview *model_preview = sInstance->mModelPreview;
@@ -1135,6 +1142,7 @@ void LLFloaterModelPreview::initDecompControls()
 
     childSetCommitCallback("simplify_cancel", onPhysicsStageCancel, NULL);
     childSetCommitCallback("decompose_cancel", onPhysicsStageCancel, NULL);
+    childSetCommitCallback("analyze_cancel", onPhysicsStageCancel, NULL);
 
     childSetCommitCallback("physics_lod_combo", onPhysicsUseLOD, NULL);
     childSetCommitCallback("physics_browse", onPhysicsBrowse, NULL);
@@ -1201,7 +1209,7 @@ void LLFloaterModelPreview::initDecompControls()
                 else if (LLSpinCtrl* spinner = dynamic_cast<LLSpinCtrl*>(ctrl))
                 {
                     bool is_retain_ctrl = "Retain%" == name;
-                    double coefficient = is_retain_ctrl ? RETAIN_COEFFICIENT : 1.f;
+                    float coefficient = is_retain_ctrl ? (F32)RETAIN_COEFFICIENT : 1.f;
 
                     spinner->setMinValue(param[i].mDetails.mRange.mLow.mFloat * coefficient);
                     spinner->setMaxValue(param[i].mDetails.mRange.mHigh.mFloat * coefficient);
@@ -1241,10 +1249,10 @@ void LLFloaterModelPreview::initDecompControls()
                 LLUICtrl* ctrl = getChild<LLUICtrl>(name);
                 if (LLSliderCtrl* slider = dynamic_cast<LLSliderCtrl*>(ctrl))
                 {
-                    slider->setMinValue(param[i].mDetails.mRange.mLow.mIntOrEnumValue);
-                    slider->setMaxValue(param[i].mDetails.mRange.mHigh.mIntOrEnumValue);
-                    slider->setIncrement(param[i].mDetails.mRange.mDelta.mIntOrEnumValue);
-                    slider->setValue(param[i].mDefault.mIntOrEnumValue);
+                    slider->setMinValue((F32)param[i].mDetails.mRange.mLow.mIntOrEnumValue);
+                    slider->setMaxValue((F32)param[i].mDetails.mRange.mHigh.mIntOrEnumValue);
+                    slider->setIncrement((F32)param[i].mDetails.mRange.mDelta.mIntOrEnumValue);
+                    slider->setValue((F32)param[i].mDefault.mIntOrEnumValue);
                     slider->setCommitCallback(onPhysicsParamCommit, (void*) &param[i]);
                 }
                 else if (LLComboBox* combo_box = dynamic_cast<LLComboBox*>(ctrl))
@@ -1316,8 +1324,91 @@ void LLFloaterModelPreview::createSmoothComboBox(LLComboBox* combo_box, float mi
         std::string label = (++ilabel == SMOOTH_VALUES_NUMBER) ? "10 (max)" : llformat("%.1d", ilabel);
         combo_box->add(label, value, ADD_BOTTOM, true);
     }
+}
 
+std::string get_source_file_format(const std::string& filename)
+{
+    const std::string extension = gDirUtilp->getExtension(filename);
+    if (extension == "gltf"
+        || extension == "glb")
+    {
+        return "gltf";
+    }
+    else if (extension == "dae")
+    {
+        return "dae";
+    }
+    else if (extension == "slm")
+    {
+        return "slm";
+    }
+    else
+    {
+        return "unknown file";
+    }
+}
 
+std::string LLFloaterModelPreview::getBoundingBoxCubePath()
+{
+    std::string path = gDirUtilp->getAppRODataDir();
+    gDirUtilp->append(path, "cube.dae");
+    return path;
+}
+
+void LLFloaterModelPreview::fillLODSourceStatistics(LLFloaterModelPreview::lod_sources_map_t& lod_sources) const
+{
+    lod_sources.clear();
+
+    // This doesn't nessesarily reflect the actual source of meshes, just user choices,
+    // some meshes could have been matched from different lods, but should be good
+    // enough for statistics.
+    for (S32 lod = 0; lod <= LLModel::LOD_HIGH; ++lod)
+    {
+        const std::string &lod_string = lod_name[lod];
+        if (mLODMode[lod] == LLModelPreview::USE_LOD_ABOVE)
+        {
+            lod_sources[lod_string] = "lod above";
+        }
+        else if (mLODMode[lod] == LLModelPreview::MESH_OPTIMIZER_AUTO
+            || mLODMode[lod] == LLModelPreview::MESH_OPTIMIZER_PRECISE
+            || mLODMode[lod] == LLModelPreview::MESH_OPTIMIZER_SLOPPY)
+        {
+            lod_sources[lod_string] = "generated";
+        }
+        else if (mLODMode[lod] == LLModelPreview::LOD_FROM_FILE)
+        {
+            const std::string& file = mModelPreview->mLODFile[lod];
+            lod_sources[lod_string] = get_source_file_format(file);
+        }
+        else
+        {
+            lod_sources[lod_string] = "unknown source";
+        }
+    }
+    if (mModelPreview->mLODFile[LLModel::LOD_PHYSICS].empty())
+    {
+        if (mModelPreview->mPhysicsSearchLOD >= 0 && mModelPreview->mPhysicsSearchLOD <= 3)
+        {
+            lod_sources["physics"] = lod_name[mModelPreview->mPhysicsSearchLOD];
+        }
+        else
+        {
+            lod_sources["physics"] = "none";
+        }
+    }
+    else
+    {
+        const std::string& file = mModelPreview->mLODFile[LLModel::LOD_PHYSICS];
+        const std::string cube = getBoundingBoxCubePath();
+        if (cube != file) // check for "cube.dae"
+        {
+            lod_sources["physics"] = get_source_file_format(file);
+        }
+        else
+        {
+            lod_sources["physics"] = "bounding box";
+        }
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -1339,26 +1430,26 @@ void LLFloaterModelPreview::addStringToLog(const std::string& message, const LLS
     {
         std::string str;
         switch (lod)
-{
+        {
         case LLModel::LOD_IMPOSTOR: str = "LOD0 "; break;
         case LLModel::LOD_LOW:      str = "LOD1 "; break;
         case LLModel::LOD_MEDIUM:   str = "LOD2 "; break;
         case LLModel::LOD_PHYSICS:  str = "PHYS "; break;
         case LLModel::LOD_HIGH:     str = "LOD3 ";   break;
         default: break;
-}
+        }
 
         LLStringUtil::format_map_t args_msg;
         LLSD::map_const_iterator iter = args.beginMap();
         LLSD::map_const_iterator end = args.endMap();
         for (; iter != end; ++iter)
-{
+        {
             args_msg[iter->first] = iter->second.asString();
         }
         str += sInstance->getString(message, args_msg);
         sInstance->addStringToLogTab(str, flash);
     }
-    }
+}
 
 // static
 void LLFloaterModelPreview::addStringToLog(const std::string& str, bool flash)
@@ -1423,7 +1514,7 @@ void LLFloaterModelPreview::updateAvatarTab(bool highlight_overrides)
                 LLModel* model = instance.mModel;
                 const LLMeshSkinInfo *skin = &model->mSkinInfo;
                 U32 joint_count = LLSkinningUtil::getMeshJointCount(skin);
-                U32 bind_count = highlight_overrides ? skin->mAlternateBindMatrix.size() : 0; // simply do not include overrides if data is not needed
+                U32 bind_count = highlight_overrides ? static_cast<U32>(skin->mAlternateBindMatrix.size()) : 0; // simply do not include overrides if data is not needed
                 if (bind_count > 0 && bind_count != joint_count)
                 {
                     std::ostringstream out;
@@ -1486,7 +1577,7 @@ void LLFloaterModelPreview::updateAvatarTab(bool highlight_overrides)
     {
         // Populate table
 
-        std::map<std::string, std::string> joint_alias_map;
+        std::map<std::string, std::string, std::less<>> joint_alias_map;
         mModelPreview->getJointAliases(joint_alias_map);
 
         S32 conflicts = 0;
@@ -1547,7 +1638,7 @@ void LLFloaterModelPreview::addStringToLogTab(const std::string& str, bool flash
     }
 
     LLWString text = utf8str_to_wstring(str);
-    S32 add_text_len = text.length() + 1; // newline
+    S32 add_text_len = static_cast<S32>(text.length()) + 1; // newline
     S32 editor_max_len = mUploadLogText->getMaxTextLength();
     if (add_text_len > editor_max_len)
         {
@@ -1655,10 +1746,13 @@ void LLFloaterModelPreview::onUpload(void* user_data)
         mp->mModelPreview->saveUploadData(upload_skinweights, upload_joint_positions, lock_scale_if_joint_position);
     }
 
-    gMeshRepo.uploadModel(mp->mModelPreview->mUploadData, mp->mModelPreview->mPreviewScale,
+    lod_sources_map_t lod_sources;
+    mp->fillLODSourceStatistics(lod_sources);
+
+    gMeshRepo.uploadModel(mp->mModelPreview->mUploadData, lod_sources, mp->mModelPreview->mPreviewScale,
                           mp->childGetValue("upload_textures").asBoolean(),
                           upload_skinweights, upload_joint_positions, lock_scale_if_joint_position,
-                          mp->mUploadModelUrl,
+                          mp->mUploadModelUrl, mp->mDestinationFolderId,
                           true, LLHandle<LLWholeModelFeeObserver>(), mp->getWholeModelUploadObserverHandle());
 }
 
@@ -1703,7 +1797,7 @@ void LLFloaterModelPreview::setCtrlLoadFromFile(S32 lod)
 
 void LLFloaterModelPreview::setStatusMessage(const std::string& msg)
 {
-    LLMutexLock lock(mStatusLock.get());
+    LLMutexLock lock(mStatusLock);
     mStatusMessage = msg;
 }
 
@@ -1930,7 +2024,7 @@ void LLFloaterModelPreview::DecompRequest::completed()
 { //called from the main thread
     if (mContinue)
     {
-        mModel->setConvexHullDecomposition(mHull);
+        mModel->setConvexHullDecomposition(mHull, mHullMesh);
 
         if (sInstance)
         {

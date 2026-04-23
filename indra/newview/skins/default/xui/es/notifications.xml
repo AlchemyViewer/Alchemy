@@ -2526,10 +2526,10 @@ Por tu seguridad, serán bloqueadas durante unos segundos.</notification>
 Se mostrará cuando haya suficiente espacio.</notification>
 	<notification name="ShareNotification">Selecciona los residentes con quienes deseas compartir.</notification>
 	<notification name="MeshUploadErrorDetails">[LABEL] error de carga: [MESSAGE] 
-[DETAILS]Consulta SecondLife.log para más detalles</notification>
+[DETAILS]Consulta Alchemy.log para más detalles</notification>
 	<notification name="MeshUploadError">[LABEL] error de carga: [MESSAGE] 
 
-Consulta SecondLife.log para más detalles</notification>
+Consulta Alchemy.log para más detalles</notification>
 	<notification name="MeshUploadPermError">Error al solicitar los permisos para subir la malla.</notification>
 	<notification name="RegionCapabilityRequestError">No se ha podido obtener la capacidad de la región '[CAPABILITY]'.</notification>
 	<notification name="ShareItemsConfirmation">

@@ -26,6 +26,7 @@
 #ifndef LL_LLPANELGROUP_H
 #define LL_LLPANELGROUP_H
 
+#include "llevent.h"
 #include "llgroupmgr.h"
 #include "llpanel.h"
 #include "lltimer.h"
@@ -44,13 +45,14 @@ class LLAgent;
 
 class LLPanelGroup : public LLPanel,
                      public LLGroupMgrObserver,
-                     public LLVoiceClientStatusObserver
+                     public LLVoiceClientStatusObserver,
+                     public LLOldEvents::LLSimpleListener
 {
 public:
     LLPanelGroup();
     virtual ~LLPanelGroup();
 
-    virtual BOOL postBuild();
+    virtual bool postBuild();
 
     void setGroupID(const LLUUID& group_id);
 
@@ -78,7 +80,7 @@ public:
     void callGroup();
     void chatGroup();
 
-    virtual void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
 
     static void showNotice(const std::string& subject,
                            const std::string& message,
@@ -87,12 +89,14 @@ public:
                            const std::string& inventory_name,
                            LLOfferInfo* inventory_offer);
 
+    void hideBackBtn();
 
 protected:
     virtual void update(LLGroupChange gc);
 
     void onBackBtnClick();
     void onBtnJoin();
+    void onBtnActivate();
 
     static void onBtnApply(void*);
     static void onBtnRefresh(void*);
@@ -109,7 +113,7 @@ protected:
 
     LLTimer mRefreshTimer;
 
-    BOOL mSkipRefresh;
+    bool mSkipRefresh;
 
     std::string mDefaultNeedsApplyMesg;
     std::string mWantApplyMesg;
@@ -118,13 +122,17 @@ protected:
 
     LLAccordionCtrl* mGroupsAccordion = nullptr;
 
+    LLUICtrl*       mGroupNameCtrl = nullptr;
     LLButton*       mButtonJoin = nullptr;
+    LLButton*       mButtonActivate = nullptr;
     LLButton*       mButtonApply = nullptr;
     LLButton*       mButtonCall = nullptr;
     LLButton*       mButtonChat = nullptr;
     LLButton*       mButtonRefresh = nullptr;
-    LLButton*       mButtonCancel = nullptr;
     LLUICtrl*       mJoinText;
+
+private:
+    bool handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& userdata); // for agent group list changes
 };
 
 class LLPanelGroupTab : public LLPanel
@@ -144,7 +152,7 @@ public:
     virtual bool needsApply(std::string& mesg) { return false; }
 
     // Asks if there is currently a modal dialog being shown.
-    virtual BOOL hasModal() { return mHasModal; }
+    virtual bool hasModal() { return mHasModal; }
 
     // Request to apply current data.
     // If returning fail, this function should modify the message to the user.
@@ -157,9 +165,9 @@ public:
     virtual void update(LLGroupChange gc) { }
 
     // This just connects the help button callback.
-    virtual BOOL postBuild();
+    virtual bool postBuild();
 
-    virtual BOOL isVisibleByAgent(LLAgent* agentp);
+    virtual bool isVisibleByAgent(LLAgent* agentp);
 
     virtual void setGroupID(const LLUUID& id) {mGroupID = id;};
 
@@ -173,8 +181,8 @@ public:
 
 protected:
     LLUUID  mGroupID;
-    BOOL mAllowEdit;
-    BOOL mHasModal;
+    bool mAllowEdit;
+    bool mHasModal;
 };
 
 #endif // LL_LLPANELGROUP_H

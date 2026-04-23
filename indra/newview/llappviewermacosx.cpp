@@ -27,8 +27,10 @@
 #include "llviewerprecompiledheaders.h"
 
 #if !defined LL_DARWIN
-    #error "Use only with Mac OS X"
+    #error "Use only with macOS"
 #endif
+
+#define LL_CARBON_CRASH_HANDLER 1
 
 #include "llwindowmacosx.h"
 #include "llappviewermacosx-objc.h"
@@ -47,6 +49,9 @@
 #include "llerrorcontrol.h"
 #include "llvoavatarself.h"         // for gAgentAvatarp->getFullname()
 #include <ApplicationServices/ApplicationServices.h>
+#ifdef LL_CARBON_CRASH_HANDLER
+#include <Carbon/Carbon.h>
+#endif
 #include <vector>
 #include <exception>
 #include <fstream>
@@ -130,6 +135,16 @@ void cleanupViewer()
     gViewerAppPtr = NULL;
 }
 
+void startWatchdog(std::string_view state)
+{
+    gViewerAppPtr->resumeMainloopTimeout(state);
+}
+
+void stopWatchdog()
+{
+    gViewerAppPtr->pauseMainloopTimeout();
+}
+
 void clearDumpLogsDir()
 {
     if (!LLAppViewer::instance()->isSecondInstance())
@@ -167,6 +182,8 @@ CrashMetadataSingleton::CrashMetadataSingleton()
     // Note: we depend on being able to read the static_debug_info.log file
     // from the *previous* run before we overwrite it with the new one for
     // *this* run. LLAppViewer initialization must happen in the Right Order.
+
+    // Todo: consider converting static file into bugspalt attributes file
     staticDebugPathname = *gViewerAppPtr->getStaticDebugFile();
     std::ifstream static_file(staticDebugPathname);
     LLSD info;
@@ -210,7 +227,32 @@ CrashMetadataSingleton::CrashMetadataSingleton()
                 }
             }
         }
+
+        // Populate bugsplat attributes
+        LLXMLNodePtr out_node = new LLXMLNode("XmlCrashContext", false);
+
+        out_node->createChild("OS", false)->setValue(OSInfo);
+        out_node->createChild("AppState", false)->setValue(info["StartupState"].asString());
+        out_node->createChild("GraphicsCard", false)->setValue(info["GraphicsCard"].asString());
+        out_node->createChild("GLVersion", false)->setValue(info["GLInfo"]["GLVersion"].asString());
+        out_node->createChild("GLRenderer", false)->setValue(info["GLInfo"]["GLRenderer"].asString());
+        out_node->createChild("RAM", false)->setValue(info["RAMInfo"]["Physical"].asString());
+
+        if (!out_node->isNull())
+        {
+            attributesPathname = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "CrashContext.xml");
+            LLFILE* fp = LLFile::fopen(attributesPathname, "w");
+
+            if (fp != NULL)
+            {
+                LLXMLNode::writeHeaderToFile(fp);
+                out_node->writeToFile(fp);
+
+                fclose(fp);
+            }
+        }
     }
+    // else Todo: consider fillig at least some values, like OS
 }
 
 // Avoid having to compile all of our LLSingleton machinery in Objective-C++.
@@ -226,6 +268,11 @@ void infos(const std::string& message)
 
 int main( int argc, char **argv )
 {
+    // Call Tracy first thing to have it allocate memory
+    // https://github.com/wolfpld/tracy/issues/196
+    LL_PROFILER_FRAME_END;
+    LL_PROFILER_SET_THREAD_NAME("App");
+
     // Store off the command line args for use later.
     gArgC = argc;
     gArgV = argv;
@@ -242,19 +289,7 @@ LLAppViewerMacOSX::~LLAppViewerMacOSX()
 
 bool LLAppViewerMacOSX::init()
 {
-    bool success = LLAppViewer::init();
-
-    if (success)
-    {
-        LLAppViewer* pApp = LLAppViewer::instance();
-        pApp->initCrashReporting();
-    }
-    return success;
-}
-
-void LLAppViewerMacOSX::setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name)
-{
-    setCrashUserMetadataWrapper(user_id.asString(), avatar_name);
+    return LLAppViewer::init();
 }
 
 void LLAppViewerMacOSX::forceErrorOSSpecificException()
@@ -346,21 +381,17 @@ bool LLAppViewerMacOSX::restoreErrorTrap()
 #define SET_SIG(SIGNAL) sigaction(SIGNAL, &act, &old_act); \
                         if(act.sa_sigaction != old_act.sa_sigaction) ++reset_count;
     // Synchronous signals
-#if !defined(AL_SENTRY)
+#   ifndef LL_BUGSPLAT
     SET_SIG(SIGABRT) // let bugsplat catch this
-#endif
+#   endif
     SET_SIG(SIGALRM)
-#if !defined(AL_SENTRY)
     SET_SIG(SIGBUS)
     SET_SIG(SIGFPE)
-#endif
     SET_SIG(SIGHUP)
-#if !defined(AL_SENTRY)
     SET_SIG(SIGILL)
     SET_SIG(SIGPIPE)
     SET_SIG(SIGSEGV)
     SET_SIG(SIGSYS)
-#endif
 
     SET_SIG(LL_HEARTBEAT_SIGNAL)
     SET_SIG(LL_SMACKDOWN_SIGNAL)
@@ -381,15 +412,6 @@ bool LLAppViewerMacOSX::restoreErrorTrap()
     return reset_count == 0;
 }
 
-void LLAppViewerMacOSX::initCrashReporting(bool reportFreeze)
-{
-#if defined(AL_SENTRY)
-    LL_DEBUGS("InitOSX", "Sentry") << "using Sentry crash logger" << LL_ENDL;
-#else
-    LL_DEBUGS("InitOSX") << "No crash logger enabled" << LL_ENDL;
-#endif // ! LL_BUGSPLAT
-}
-
 std::string LLAppViewerMacOSX::generateSerialNumber()
 {
     char serial_md5[MD5HEX_STR_SIZE];       // Flawfinder: ignore
@@ -397,15 +419,8 @@ std::string LLAppViewerMacOSX::generateSerialNumber()
 
     // JC: Sample code from http://developer.apple.com/technotes/tn/tn1103.html
     CFStringRef serialNumber = NULL;
-    io_service_t platformExpert = NULL;
-    if (__builtin_available(macOS 12.0, *)) {
-        platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,
-                                                                     IOServiceMatching("IOPlatformExpertDevice"));
-    } else {
-        platformExpert = IOServiceGetMatchingService(kIOMasterPortDefault,
-                                                                     IOServiceMatching("IOPlatformExpertDevice"));
-    }
-
+    io_service_t    platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,
+                                                                 IOServiceMatching("IOPlatformExpertDevice"));
     if (platformExpert)
     {
         serialNumber = (CFStringRef) IORegistryEntryCreateCFProperty(platformExpert,

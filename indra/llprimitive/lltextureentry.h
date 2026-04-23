@@ -68,7 +68,7 @@ const S32 TEM_TEX_GEN_SHIFT     = 1;
 // forward declarations
 class LLMediaEntry;
 
-class LLTextureEntry final
+class LLTextureEntry
 {
 public:
     static LLTextureEntry* newTextureEntry();
@@ -85,8 +85,8 @@ public:
     LLTextureEntry(const LLUUID& tex_id);
     LLTextureEntry(const LLTextureEntry &rhs);
 
-    LLTextureEntry& operator=(const LLTextureEntry &rhs);
-    ~LLTextureEntry();
+    LLTextureEntry &operator=(const LLTextureEntry &rhs);
+    virtual ~LLTextureEntry();
 
     bool operator==(const LLTextureEntry &rhs) const;
     bool operator!=(const LLTextureEntry &rhs) const;
@@ -100,8 +100,8 @@ public:
     operator LLSD() const { return asLLSD(); }
     bool fromLLSD(const LLSD& sd);
 
-    LLTextureEntry* newBlank() const;
-    LLTextureEntry* newCopy() const;
+    virtual LLTextureEntry* newBlank() const;
+    virtual LLTextureEntry* newCopy() const;
 
     void init(const LLUUID& tex_id, F32 scale_s, F32 scale_t, F32 offset_s, F32 offset_t, F32 rotation, U8 bump);
 
@@ -135,7 +135,7 @@ public:
     S32  setMaterialID(const LLMaterialID& pMaterialID);
     S32  setMaterialParams(const LLMaterialPtr pMaterialParams);
 
-    const LLUUID &getID() const { return mID; }
+    virtual const LLUUID &getID() const { return mID; }
     const LLColor4 &getColor() const { return mColor; }
     const F32 getAlpha() const { return mColor.mV[VALPHA]; }
 
@@ -161,7 +161,7 @@ public:
     U8   getMediaTexGen() const { return mMediaFlags; }
     F32  getGlow() const { return mGlow; }
     const LLMaterialID& getMaterialID() const { return mMaterialID; };
-    const LLMaterialPtr& getMaterialParams() const { return mMaterial; };
+    const LLMaterialPtr getMaterialParams() const { return mMaterial; };
 
     // *NOTE: it is possible for hasMedia() to return true, but getMediaData() to return NULL.
     // CONVERSELY, it is also possible for hasMedia() to return false, but getMediaData()

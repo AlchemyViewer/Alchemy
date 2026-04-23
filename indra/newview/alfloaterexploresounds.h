@@ -18,9 +18,9 @@ class ALFloaterExploreSounds final
 {
 public:
     ALFloaterExploreSounds(const LLSD& key);
-    BOOL postBuild();
+    bool postBuild();
 
-    BOOL tick();
+    bool tick();
 
     LLSoundHistoryItem getItem(const LLUUID& itemID);
 

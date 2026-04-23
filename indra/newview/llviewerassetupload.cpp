@@ -43,14 +43,9 @@
 #include "llsdutil.h"
 #include "llviewerassetupload.h"
 #include "llappviewer.h"
-#include "llavatarappearance.h"
 #include "llviewerstats.h"
 #include "llfilesystem.h"
-#include "llgesturemgr.h"
-#include "llpreviewnotecard.h"
-#include "llpreviewgesture.h"
 #include "llcoproceduremanager.h"
-#include "llthread.h"
 #include "llkeyframemotion.h"
 #include "lldatapacker.h"
 #include "llvoavatarself.h"
@@ -66,7 +61,8 @@ LLResourceUploadInfo::LLResourceUploadInfo(LLTransactionID transactId,
         LLAssetType::EType assetType, std::string name, std::string description,
         S32 compressionInfo, LLFolderType::EType destinationType,
         LLInventoryType::EType inventoryType, U32 nextOWnerPerms,
-        U32 groupPerms, U32 everyonePerms, S32 expectedCost, bool showInventory) :
+        U32 groupPerms, U32 everyonePerms, S32 expectedCost,
+        const LLUUID& destFolderId, bool showInventory) :
     mTransactionId(transactId),
     mAssetType(assetType),
     mName(name),
@@ -79,7 +75,7 @@ LLResourceUploadInfo::LLResourceUploadInfo(LLTransactionID transactId,
     mEveryonePerms(everyonePerms),
     mExpectedUploadCost(expectedCost),
     mShowInventory(showInventory),
-    mFolderId(LLUUID::null),
+    mFolderId(destFolderId),
     mItemId(LLUUID::null),
     mAssetId(LLAssetID::null)
 { }
@@ -88,7 +84,8 @@ LLResourceUploadInfo::LLResourceUploadInfo(LLTransactionID transactId,
 LLResourceUploadInfo::LLResourceUploadInfo(std::string name,
         std::string description, S32 compressionInfo,
         LLFolderType::EType destinationType, LLInventoryType::EType inventoryType,
-        U32 nextOWnerPerms, U32 groupPerms, U32 everyonePerms, S32 expectedCost, bool showInventory) :
+        U32 nextOWnerPerms, U32 groupPerms, U32 everyonePerms, S32 expectedCost,
+        const LLUUID& destFolderId, bool showInventory) :
     mName(name),
     mDescription(description),
     mCompressionInfo(compressionInfo),
@@ -101,7 +98,7 @@ LLResourceUploadInfo::LLResourceUploadInfo(std::string name,
     mShowInventory(showInventory),
     mTransactionId(),
     mAssetType(LLAssetType::AT_NONE),
-    mFolderId(LLUUID::null),
+    mFolderId(destFolderId),
     mItemId(LLUUID::null),
     mAssetId(LLAssetID::null)
 {
@@ -230,7 +227,7 @@ LLUUID LLResourceUploadInfo::finishUpload(LLSD &result)
             LL_INFOS() << "inventory_item_flags " << flagsInventoryItem << LL_ENDL;
         }
     }
-    S32 creationDate = time_corrected();
+    S32 creationDate = (S32)time_corrected();
 
     LLUUID serverInventoryItem = result["new_inventory_item"].asUUID();
     LLUUID serverAssetId = result["new_asset"].asUUID();
@@ -302,10 +299,20 @@ void LLResourceUploadInfo::assignDefaults()
     {
         mDescription = "(No Description)";
     }
-
-    mFolderId = gInventory.findUserDefinedCategoryUUIDForType(
-        (mDestinationFolderType == LLFolderType::FT_NONE) ?
-        (LLFolderType::EType)mAssetType : mDestinationFolderType);
+    if (mFolderId.isNull()) // don't overwrite if destination is already specified
+    {
+        if (mAssetType == LLAssetType::AT_GLTF ||
+            mAssetType == LLAssetType::AT_GLTF_BIN)
+        {
+            mFolderId = LLUUID::null;
+        }
+        else
+        {
+            mFolderId = gInventory.findUserDefinedCategoryUUIDForType(
+                (mDestinationFolderType == LLFolderType::FT_NONE) ?
+                (LLFolderType::EType)mAssetType : mDestinationFolderType);
+        }
+    }
 }
 
 std::string LLResourceUploadInfo::getDisplayName() const
@@ -362,11 +369,14 @@ LLNewFileResourceUploadInfo::LLNewFileResourceUploadInfo(
     U32 groupPerms,
     U32 everyonePerms,
     S32 expectedCost,
+    const LLUUID& destFolderId,
     bool show_inventory) :
     LLResourceUploadInfo(name, description, compressionInfo,
     destinationType, inventoryType,
-    nextOWnerPerms, groupPerms, everyonePerms, expectedCost, show_inventory),
-    mFileName(fileName)
+    nextOWnerPerms, groupPerms, everyonePerms, expectedCost,
+    destFolderId, show_inventory),
+    mFileName(fileName),
+    mMaxImageSize(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT)
 {
 }
 
@@ -394,6 +404,7 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
 
     std::string errorMessage;
     std::string errorLabel;
+    std::error_code ec;
 
     bool error = false;
 
@@ -413,12 +424,12 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
         // Unknown extension
         errorMessage = llformat(LLTrans::getString("UnknownFileExtension").c_str(), exten.c_str());
         errorLabel = "ErrorMessage";
-        error = TRUE;;
+        error = true;;
     }
     else if (assetType == LLAssetType::AT_TEXTURE)
     {
         // It's an image file, the upload procedure is the same for all
-        if (!LLViewerTextureList::createUploadFile(getFileName(), filename, codec))
+        if (!LLViewerTextureList::createUploadFile(getFileName(), filename, codec, mMaxImageSize))
         {
             errorMessage = llformat("Problem with file %s:\n\n%s\n",
                 getFileName().c_str(), LLImage::getLastThreadError().c_str());
@@ -454,43 +465,56 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
     else if (exten == "bvh")
     {
         assetType = LLAssetType::AT_ANIMATION;
-        S32 file_size;
-        LLAPRFile infile;
-        infile.open(filename, LL_APR_RB, nullptr, &file_size);
-        if (!infile.getFileHandle())
+        S64 file_size;
+        LLFile infile(getFileName(), LLFile::in | LLFile::binary, ec);
+        if (ec || !infile)
         {
-            LL_WARNS() << "Can't open BVH file:" << filename << LL_ENDL;
+            errorMessage = llformat("Couldn't open animation file for reading: %s\n", getFileName().c_str());
+            errorLabel = "ProblemWithFile";
+            error = true;
         }
         else
         {
-            auto joint_aliases = LLAvatarAppearance::buildJointAliases();
-
-            char*        file_buffer = new char[file_size + 1];
-            ELoadStatus  load_status = E_ST_OK;
-            S32          line_number = 0;
-            LLBVHLoader* loaderp     = new LLBVHLoader(file_buffer, load_status, line_number, joint_aliases);
-
-            if (load_status == E_ST_NO_XLT_FILE)
+            file_size = infile.size(ec);
+            if (!ec && file_size > 0)
             {
-            LL_WARNS() << "NOTE: No translation table found." << LL_ENDL;
+                auto joint_aliases = LLAvatarAppearance::buildJointAliases();
+
+                char* file_buffer = new char[file_size + 1];
+                ELoadStatus  load_status = E_ST_OK;
+                S32 line_number = 0;
+                LLBVHLoader* loaderp = new LLBVHLoader(file_buffer, load_status, line_number, joint_aliases);
+
+                if (load_status == E_ST_NO_XLT_FILE)
+                {
+                    LL_WARNS() << "NOTE: No translation table found." << LL_ENDL;
+                }
+                else
+                {
+                    LL_WARNS() << "ERROR: [line: " << line_number << "] " << BVHSTATUS[load_status] << LL_ENDL;
+                }
+                // create data buffer for keyframe initialization
+                S32 buffer_size = loaderp->getOutputSize();
+                U8* buffer = new U8[buffer_size];
+                LLDataPackerBinaryBuffer dp(buffer, buffer_size);
+
+                // pass animation data through memory buffer
+                loaderp->serialize(dp);
+
+                std::error_code ec;
+                LLFile apr_file(filename, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+                apr_file.write(buffer, buffer_size, ec);
+                apr_file.close();
+                delete[] file_buffer;
+                delete[] buffer;
+                delete loaderp;
             }
             else
             {
-            LL_WARNS() << "ERROR: [line: " << line_number << "] " << BVHSTATUS[load_status] << LL_ENDL;
+                errorMessage = llformat("Couldn't open animation file for reading: %s\n", getFileName().c_str());
+                errorLabel = "ProblemWithFile";
+                error = true;
             }
-            // create data buffer for keyframe initialization
-            S32                      buffer_size = loaderp->getOutputSize();
-            U8*                      buffer      = new U8[buffer_size];
-            LLDataPackerBinaryBuffer dp(buffer, buffer_size);
-
-            // pass animation data through memory buffer
-            loaderp->serialize(dp);
-            LLAPRFile apr_file(filename, LL_APR_WB);
-            apr_file.write(buffer, buffer_size);
-            apr_file.close();
-            delete[] file_buffer;
-            delete[] buffer;
-            delete loaderp;
         }
         infile.close();
     }
@@ -501,45 +525,59 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
         error = true;
 
         // read from getFileName()
-        LLAPRFile infile;
-        infile.open(getFileName(),LL_APR_RB);
-        if (!infile.getFileHandle())
+        LLFile infile(getFileName(), LLFile::in | LLFile::binary, ec);
+        if (ec || !infile)
         {
-            LL_WARNS() << "Couldn't open file for reading: " << getFileName() << LL_ENDL;
-            errorMessage = llformat("Failed to open animation file %s\n", getFileName().c_str());
+            errorMessage = llformat("Couldn't open file for reading: %s", getFileName().c_str());
         }
         else
         {
-            S32 size = LLAPRFile::size(getFileName());
-            U8* buffer = new U8[size];
-            S32 size_read = infile.read(buffer,size);
-            if (size_read != size)
+            S64 size = infile.size(ec);
+            if (ec || size <= 0)
             {
-                errorMessage = llformat("Failed to read animation file %s: wanted %d bytes, got %d\n", getFileName().c_str(), size, size_read);
+                errorMessage = llformat("Invalid file: %s", getFileName().c_str());
+            }
+            else if (size > INT_MAX)
+            {
+                errorMessage = llformat("File %s is too big, size: %d", getFileName().c_str(), size);
             }
             else
             {
-                LLDataPackerBinaryBuffer dp(buffer, size);
-                LLKeyframeMotion *motionp = new LLKeyframeMotion(getAssetId());
-                motionp->setCharacter(gAgentAvatarp);
-                if (motionp->deserialize(dp, getAssetId(), false))
+                U8* buffer = new (std::nothrow) U8[size];
+                if (!buffer)
                 {
-                    // write to temp file
-                    bool succ = motionp->dumpToFile(filename);
-                    if (succ)
-                    {
-                        assetType = LLAssetType::AT_ANIMATION;
-                        errorLabel = "";
-                        error = false;
-                    }
-                    else
-                    {
-                        errorMessage = "Failed saving temporary animation file";
-                    }
+                    errorMessage = llformat("Bad memory allocation for buffer, size: %d", size);
+                }
+                S64 size_read = infile.read(buffer, size, ec);
+                if (ec || size_read != size)
+                {
+                    errorMessage =
+                        llformat("Failed to read animation file %s: wanted %d bytes, got %d\n", getFileName().c_str(), size, size_read);
                 }
                 else
                 {
-                    errorMessage = "Failed reading animation file";
+                    LLDataPackerBinaryBuffer dp(buffer, (S32)size);
+                    LLKeyframeMotion*        motionp = new LLKeyframeMotion(getAssetId());
+                    motionp->setCharacter(gAgentAvatarp);
+                    if (motionp->deserialize(dp, getAssetId(), false))
+                    {
+                        // write to temp file
+                        bool succ = motionp->dumpToFile(filename);
+                        if (succ)
+                        {
+                            assetType  = LLAssetType::AT_ANIMATION;
+                            errorLabel = "";
+                            error      = false;
+                        }
+                        else
+                        {
+                            errorMessage = "Failed saving temporary animation file";
+                        }
+                    }
+                    else
+                    {
+                        errorMessage = "Failed reading animation file";
+                    }
                 }
             }
         }
@@ -549,7 +587,7 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
         // Unknown extension
         errorMessage = llformat(LLTrans::getString("UnknownFileExtension").c_str(), exten.c_str());
         errorLabel = "ErrorMessage";
-        error = TRUE;;
+        error = true;
     }
 
     if (error)
@@ -565,18 +603,17 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
     setAssetType(assetType);
 
     // copy this file into the cache for upload
-    S32 file_size;
-    LLAPRFile infile;
-    infile.open(filename, LL_APR_RB, NULL, &file_size);
-    if (infile.getFileHandle())
+    LLFile infile(filename, LLFile::in | LLFile::binary, ec);
+    if (!ec && infile.size(ec) > 0)
     {
         LLFileSystem file(getAssetId(), assetType, LLFileSystem::APPEND);
 
+        S64 read_bytes;
         const S32 buf_size = 65536;
         U8 copy_buf[buf_size];
-        while ((file_size = infile.read(copy_buf, buf_size)))
+        while (((read_bytes = infile.read(copy_buf, buf_size, ec))) > 0)
         {
-            file.write(copy_buf, file_size);
+            file.write(copy_buf, (S32)read_bytes);
         }
     }
     else
@@ -590,7 +627,6 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
     }
 
     return LLSD();
-
 }
 
 //=========================================================================
@@ -607,12 +643,13 @@ LLNewBufferedResourceUploadInfo::LLNewBufferedResourceUploadInfo(
     U32 groupPerms,
     U32 everyonePerms,
     S32 expectedCost,
+    const LLUUID& destFolderId,
     bool show_inventory,
     uploadFinish_f finish,
     uploadFailure_f failure)
     : LLResourceUploadInfo(name, description, compressionInfo,
         destinationType, inventoryType,
-        nextOWnerPerms, groupPerms, everyonePerms, expectedCost, show_inventory)
+        nextOWnerPerms, groupPerms, everyonePerms, expectedCost, destFolderId, show_inventory)
     , mBuffer(buffer)
     , mFinishFn(finish)
     , mFailureFn(failure)
@@ -639,7 +676,7 @@ LLSD LLNewBufferedResourceUploadInfo::exportTempFile()
 
     // copy buffer to the cache for upload
     LLFileSystem file(getAssetId(), getAssetType(), LLFileSystem::APPEND);
-    file.write((U8*) mBuffer.c_str(), mBuffer.size());
+    file.write((U8*) mBuffer.c_str(), static_cast<S32>(mBuffer.size()));
 
     return LLSD();
 }
@@ -695,6 +732,8 @@ LLBufferedAssetUploadInfo::LLBufferedAssetUploadInfo(LLUUID itemId, LLPointer<LL
 {
     setItemId(itemId);
 
+    LLImageDataSharedLock lock(image);
+
     EImageCodec codec = static_cast<EImageCodec>(image->getCodec());
 
     switch (codec)
@@ -739,7 +778,7 @@ LLSD LLBufferedAssetUploadInfo::prepareUpload()
 
     LLFileSystem file(getAssetId(), getAssetType(), LLFileSystem::APPEND);
 
-    S32 size = mContents.length() + 1;
+    S32 size = static_cast<S32>(mContents.length()) + 1;
     file.write((U8*)mContents.c_str(), size);
 
     mStoredToCache = true;
@@ -826,19 +865,19 @@ bool LLBufferedAssetUploadInfo::failedUpload(LLSD &result, std::string &reason)
 
 //=========================================================================
 
-LLScriptAssetUpload::LLScriptAssetUpload(LLUUID itemId, std::string buffer, invnUploadFinish_f finish, uploadFailed_f failed, TargetType_t targetType):
+LLScriptAssetUpload::LLScriptAssetUpload(LLUUID itemId, std::string compileTarget, std::string buffer, invnUploadFinish_f finish, uploadFailed_f failed) :
     LLBufferedAssetUploadInfo(itemId, LLAssetType::AT_LSL_TEXT, buffer, finish, failed),
     mExerienceId(),
-    mTargetType(targetType),
+    mCompileTarget(compileTarget),
     mIsRunning(false)
 {
 }
 
-LLScriptAssetUpload::LLScriptAssetUpload(LLUUID taskId, LLUUID itemId, TargetType_t targetType,
+LLScriptAssetUpload::LLScriptAssetUpload(LLUUID taskId, LLUUID itemId, std::string compileTarget,
         bool isRunning, LLUUID exerienceId, std::string buffer, taskUploadFinish_f finish, uploadFailed_f failed):
     LLBufferedAssetUploadInfo(taskId, itemId, LLAssetType::AT_LSL_TEXT, buffer, finish, failed),
     mExerienceId(exerienceId),
-    mTargetType(targetType),
+    mCompileTarget(compileTarget),
     mIsRunning(isRunning)
 {
 }
@@ -850,14 +889,14 @@ LLSD LLScriptAssetUpload::generatePostBody()
     if (getTaskId().isNull())
     {
         body["item_id"] = getItemId();
-        body["target"] = (getTargetType() == MONO) ? "mono" : "lsl2";
+        body["target"] = getCompileTarget();
     }
     else
     {
         body["task_id"] = getTaskId();
         body["item_id"] = getItemId();
         body["is_script_running"] = getIsRunning();
-        body["target"] = (getTargetType() == MONO) ? "mono" : "lsl2";
+        body["target"] = getCompileTarget();
         body["experience"] = getExerienceId();
     }
 
@@ -882,8 +921,8 @@ LLUUID LLViewerAssetUpload::EnqueueInventoryUpload(const std::string &url, const
 void LLViewerAssetUpload::AssetInventoryUploadCoproc(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter,
     const LLUUID &id, std::string url, LLResourceUploadInfo::ptr_t uploadInfo)
 {
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
-    LLCore::HttpOptions::ptr_t httpOptions(std::make_shared<LLCore::HttpOptions>());
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOptions = std::make_shared<LLCore::HttpOptions>();
     httpOptions->setTimeout(LL_ASSET_UPLOAD_TIMEOUT_SEC);
 
     LLSD result = uploadInfo->prepareUpload();
@@ -971,7 +1010,7 @@ void LLViewerAssetUpload::AssetInventoryUploadCoproc(LLCoreHttpUtil::HttpCorouti
 
             // Show the preview panel for textures and sounds to let
             // user know that the image (or snapshot) arrived intact.
-            LLInventoryPanel* panel = LLInventoryPanel::getActiveInventoryPanel(FALSE);
+            LLInventoryPanel* panel = LLInventoryPanel::getActiveInventoryPanel(false);
             LLInventoryPanel::openInventoryPanelAndSetSelection(true, serverInventoryItem, false, false, !panel);
 
             // restore keyboard focus
@@ -1009,6 +1048,7 @@ void LLViewerAssetUpload::HandleUploadError(LLCore::HttpStatus status, LLSD &res
         label = result["label"].asString();
     }
 
+    LLFloaterSnapshot* floater_snapshot = LLFloaterSnapshot::findInstance();
     if (result.has("message"))
     {
         reason = result["message"].asString();
@@ -1019,6 +1059,12 @@ void LLViewerAssetUpload::HandleUploadError(LLCore::HttpStatus status, LLSD &res
         {
         case 404:
             reason = LLTrans::getString("AssetUploadServerUnreacheble");
+            if (floater_snapshot
+                && floater_snapshot->isWaitingState()
+                && uploadInfo->getAssetType() == LLAssetType::AT_IMAGE_JPEG)
+            {
+                label = "CannotUploadSnapshotEmailTooBig";
+            }
             break;
         case 499:
             reason = LLTrans::getString("AssetUploadServerDifficulties");
@@ -1058,9 +1104,7 @@ void LLViewerAssetUpload::HandleUploadError(LLCore::HttpStatus status, LLSD &res
 
     // Todo: move these floater specific actions into proper callbacks
 
-
     // Let the Snapshot floater know we have failed uploading.
-    LLFloaterSnapshot* floater_snapshot = LLFloaterSnapshot::findInstance();
     if (floater_snapshot && floater_snapshot->isWaitingState())
     {
         if (uploadInfo->getAssetType() == LLAssetType::AT_IMAGE_JPEG)

@@ -40,7 +40,7 @@
 //-----------------------------------------------------------------------------
 // class LLKeyframeWalkMotion
 //-----------------------------------------------------------------------------
-class LLKeyframeWalkMotion final :
+class LLKeyframeWalkMotion :
     public LLKeyframeMotion
 {
     friend class LLWalkAdjustMotion;
@@ -49,7 +49,7 @@ public:
     LLKeyframeWalkMotion(const LLUUID &id);
 
     // Destructor
-    virtual ~LLKeyframeWalkMotion() = default;
+    virtual ~LLKeyframeWalkMotion();
 
 public:
     //-------------------------------------------------------------------------
@@ -65,9 +65,9 @@ public:
     // animation callbacks to be implemented by subclasses
     //-------------------------------------------------------------------------
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
-    virtual BOOL onActivate();
+    virtual bool onActivate();
     virtual void onDeactivate();
-    virtual BOOL onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F32 time, U8* joint_mask);
 
 public:
     //-------------------------------------------------------------------------
@@ -80,7 +80,7 @@ public:
     S32         mDownFoot;
 };
 
-class LLWalkAdjustMotion final : public LLMotion
+class LLWalkAdjustMotion : public LLMotion
 {
 public:
     // Constructor
@@ -100,11 +100,11 @@ public:
     // animation callbacks to be implemented by subclasses
     //-------------------------------------------------------------------------
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
-    virtual BOOL onActivate();
+    virtual bool onActivate();
     virtual void onDeactivate();
-    virtual BOOL onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F32 time, U8* joint_mask);
     virtual LLJoint::JointPriority getPriority(){return LLJoint::HIGH_PRIORITY;}
-    virtual BOOL getLoop() { return TRUE; }
+    virtual bool getLoop() { return true; }
     virtual F32 getDuration() { return 0.f; }
     virtual F32 getEaseInDuration() { return 0.f; }
     virtual F32 getEaseOutDuration() { return 0.f; }
@@ -130,7 +130,7 @@ public:
     F32             mAnkleOffset;
 };
 
-class LLFlyAdjustMotion final : public LLMotion
+class LLFlyAdjustMotion : public LLMotion
 {
 public:
     // Constructor
@@ -150,11 +150,11 @@ public:
     // animation callbacks to be implemented by subclasses
     //-------------------------------------------------------------------------
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
-    virtual BOOL onActivate();
+    virtual bool onActivate();
     virtual void onDeactivate() {};
-    virtual BOOL onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F32 time, U8* joint_mask);
     virtual LLJoint::JointPriority getPriority(){return LLJoint::HIGHER_PRIORITY;}
-    virtual BOOL getLoop() { return TRUE; }
+    virtual bool getLoop() { return true; }
     virtual F32 getDuration() { return 0.f; }
     virtual F32 getEaseInDuration() { return 0.f; }
     virtual F32 getEaseOutDuration() { return 0.f; }

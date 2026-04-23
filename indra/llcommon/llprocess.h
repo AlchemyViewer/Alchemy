@@ -29,16 +29,14 @@
 
 #include "llinitparam.h"
 #include "llsdparam.h"
-#include "llwin32headerslean.h" // for HANDLE
 #include "llexception.h"
 #include "apr_thread_proc.h"
-#include <boost/shared_ptr.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
 #include <boost/optional.hpp>
-#include <boost/noncopyable.hpp>
 #include <iosfwd>                   // std::ostream
 
-#if LL_LINUX
+#if LL_WINDOWS
+#include "llwin32headers.h" // for HANDLE
+#elif LL_LINUX
 #if defined(Status)
 #undef Status
 #endif
@@ -67,7 +65,7 @@ typedef std::shared_ptr<LLProcess> LLProcessPtr;
  * indra/llcommon/tests/llprocess_test.cpp for an example of waiting for
  * child-process termination in a standalone test context.
  */
-class LL_COMMON_API LLProcess: public boost::noncopyable
+class LL_COMMON_API LLProcess
 {
     LOG_CLASS(LLProcess);
 public:
@@ -364,7 +362,7 @@ public:
     class LL_COMMON_API BasePipe
     {
     public:
-        virtual ~BasePipe() = default;
+        virtual ~BasePipe() = 0;
 
         typedef std::size_t size_type;
         static const size_type npos;
@@ -470,7 +468,7 @@ public:
          * - "len" entire length of pending data, regardless of setLimit()
          * - "slot" this ReadPipe's FILESLOT, e.g. LLProcess::STDOUT
          * - "name" e.g. "stdout"
-         * - "desc" e.g. "ALPlugin (pid) stdout"
+         * - "desc" e.g. "SLPlugin (pid) stdout"
          * - "eof" @c true means there no more data will arrive on this pipe,
          *   therefore no more events on this pump
          *
@@ -542,6 +540,10 @@ public:
     static std::string basename(const std::string& path);
     static std::string getline(std::istream&);
 
+    // Non-copyable
+    LLProcess(const LLProcess&) = delete;
+    LLProcess& operator=(const LLProcess&) = delete;
+
 private:
     /// constructor is private: use create() instead
     LLProcess(const LLSDOrParams& params);
@@ -564,7 +566,7 @@ private:
     bool mAutokill, mAttached;
     Status mStatus;
     // explicitly want this ptr_vector to be able to store NULLs
-    typedef boost::ptr_vector< boost::nullable<BasePipe> > PipeVector;
+    typedef std::vector<std::unique_ptr<BasePipe>> PipeVector;
     PipeVector mPipes;
     apr_pool_t* mPool;
 };

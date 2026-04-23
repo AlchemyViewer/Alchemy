@@ -6,7 +6,7 @@
 	<panel.string name="bandwidth_tooltip">
 		Larghezza di banda
 	</panel.string>
-	<panel.string name="time">
+	<panel.string name="time_ampm">
 		[hour12, datetime, slt]:[min, datetime, slt] [ampm, datetime, slt] [timezone,datetime, slt]
 	</panel.string>
 	<panel.string name="timeTooltip">
@@ -18,7 +18,7 @@
 	<panel name="menu_search_panel">
 		<search_editor label="Ricerca Menu" name="search_menu_edit" tool_tip="Digita qui il termine della tua ricerca. I risultati verranno mostrati secondo la concordanza parziale o totale con il menú."/>
 	</panel>
-	<panel left="-426" name="balance_bg">
+	<panel left="-426" name="balance_bg" width="195">
 		<text name="balance" tool_tip="Clicca per aggiornare il tuo saldo in L$" value="L$ ??"/>
 		<button label="Acquista L$" name="buyL" tool_tip="Clicca per acquistare più L$"/>
 		<button label="Acquisti" name="goShop" tool_tip="Apri Mercato Second Life" width="75"/>

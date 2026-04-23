@@ -30,7 +30,7 @@
 
 #include "llfloater.h"
 
-class LLFloaterPreviewTrash final
+class LLFloaterPreviewTrash
 : public LLFloater
 {
 public:
@@ -39,7 +39,7 @@ public:
 
     LLFloaterPreviewTrash(const LLSD& key);
     ~LLFloaterPreviewTrash();
-    /*virtual*/ BOOL    postBuild();
+    bool postBuild() override;
 
 protected:
     void onClickEmpty();

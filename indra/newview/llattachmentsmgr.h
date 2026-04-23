@@ -58,7 +58,7 @@
 // To handle attachments that never arrive, we forget about requests
 // that exceed a timeout value.
 //--------------------------------------------------------------------------------
-class LLAttachmentsMgr final : public LLSingleton<LLAttachmentsMgr>
+class LLAttachmentsMgr: public LLSingleton<LLAttachmentsMgr>
 {
     LLSINGLETON(LLAttachmentsMgr);
     virtual ~LLAttachmentsMgr();
@@ -69,18 +69,18 @@ public:
     {
         LLUUID mItemID;
         U8 mAttachmentPt;
-        BOOL mAdd;
+        bool mAdd;
     };
     typedef std::deque<AttachmentsInfo> attachments_vec_t;
 
 // [RLVa:KB] - Checked: 2010-09-13 (RLVa-1.2.1)
     void addAttachmentRequest(const LLUUID& item_id,
                               const U8 attachment_pt,
-                              const BOOL add, const BOOL fRlvForce = FALSE);
+                              const bool add, const bool fRlvForce = false);
 // [/RLVa:KB]
 //  void addAttachmentRequest(const LLUUID& item_id,
 //                              const U8 attachment_pt,
-//                              const BOOL add);
+//                              const bool add);
     void onAttachmentRequested(const LLUUID& item_id);
     void requestAttachments(attachments_vec_t& attachment_requests);
     static void onIdle(void *);
@@ -90,10 +90,15 @@ public:
     void onDetachRequested(const LLUUID& inv_item_id);
     void onDetachCompleted(const LLUUID& inv_item_id);
 
+    void clearPendingAttachmentLink(const LLUUID& idItem);
+    bool getPendingAttachments(std::set<LLUUID>& ids) const;
     bool isAttachmentStateComplete() const;
-
-    // [SL:KB] - Patch: Appearance-PhantomAttach | Checked: Catznip-5.0
+// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-2.1
     void refreshAttachments();
+// [/SL:KB]
+protected:
+    void onRegisterAttachmentComplete(const LLUUID& id_item_link);
+    friend class LLRegisterAttachmentCallback;
 
 private:
 
@@ -103,8 +108,8 @@ private:
         LLItemRequestTimes(const std::string& op_name, F32 timeout);
         void addTime(const LLUUID& inv_item_id);
         void removeTime(const LLUUID& inv_item_id);
-        BOOL wasRequestedRecently(const LLUUID& item_id) const;
-        BOOL getTime(const LLUUID& inv_item_id, LLTimer& timer) const;
+        bool wasRequestedRecently(const LLUUID& item_id) const;
+        bool getTime(const LLUUID& inv_item_id, LLTimer& timer) const;
 
     private:
         F32 mTimeout;
@@ -117,7 +122,6 @@ private:
     void linkRecentlyArrivedAttachments();
     void expireOldAttachmentRequests();
     void expireOldDetachRequests();
-    void checkInvalidCOFLinks();
     void spamStatusInfo();
 
     // Attachments that we are planning to rez but haven't requested from the server yet.
@@ -132,9 +136,8 @@ private:
     // Attachments that have arrived but have not been linked in the COF yet.
     std::set<LLUUID> mRecentlyArrivedAttachments;
     LLTimer mCOFLinkBatchTimer;
-
-    // Attachments that are linked in the COF but may be invalid.
-    LLItemRequestTimes mQuestionableCOFLinks;
+    // Attachments that have pending COF link creation
+    std::set<LLUUID> mPendingAttachLinks;
 };
 
 #endif

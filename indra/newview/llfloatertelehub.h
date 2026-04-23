@@ -35,21 +35,21 @@ class LLObjectSelection;
 
 const S32 MAX_SPAWNPOINTS_PER_TELEHUB = 16;
 
-class LLFloaterTelehub final : public LLFloater
+class LLFloaterTelehub : public LLFloater
 {
 public:
     LLFloaterTelehub(const LLSD& key);
     ~LLFloaterTelehub();
 
-    /*virtual*/ BOOL postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
 
-    /*virtual*/ void draw();
+    void draw() override;
 
-    static BOOL renderBeacons();
+    static bool renderBeacons();
     static void addBeacons();
 
-    void refresh();
+    void refresh() override;
     void sendTelehubInfoRequest();
 
     void onClickConnect();

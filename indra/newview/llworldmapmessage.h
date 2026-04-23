@@ -27,12 +27,12 @@
 #ifndef LL_LLWORLDMAPMESSAGE_H
 #define LL_LLWORLDMAPMESSAGE_H
 
-#include "boost/function.hpp"
+#include <functional>
 
 // Handling of messages (send and process) as well as SLURL callback if necessary
 class LLMessageSystem;
 
-class LLWorldMapMessage final : public LLSingleton<LLWorldMapMessage>
+class LLWorldMapMessage : public LLSingleton<LLWorldMapMessage>
 {
     LLSINGLETON(LLWorldMapMessage);
     ~LLWorldMapMessage();

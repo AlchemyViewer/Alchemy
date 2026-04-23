@@ -27,8 +27,10 @@
 #ifndef LL_LLASSETTYPE_H
 #define LL_LLASSETTYPE_H
 
+#include "lldictionary.h"
+#include "llsingleton.h"
+
 #include <string>
-#include <vector>
 
 class LL_COMMON_API LLAssetType
 {
@@ -129,8 +131,10 @@ public:
 
         AT_SETTINGS = 56,   // Collection of settings
         AT_MATERIAL = 57,   // Render Material
+        AT_GLTF = 58,   // gltf json document
+        AT_GLTF_BIN = 59, // gltf binary data
 
-        AT_COUNT = 58,
+        AT_COUNT = 60,
 
             // +*********************************************************+
             // |  TO ADD AN ELEMENT TO THIS ENUM:                        |
@@ -147,15 +151,15 @@ public:
 
     // machine transation between type and strings
     static EType                lookup(const char* name); // safe conversion to std::string, *TODO: deprecate
-    static EType                lookup(const std::string_view type_name);
+    static EType                lookup(const std::string& type_name);
     static const char*          lookup(EType asset_type);
 
     // translation from a type to a human readable form.
     static EType                lookupHumanReadable(const char* desc_name); // safe conversion to std::string, *TODO: deprecate
-    static EType                lookupHumanReadable(const std::string_view readable_name);
+    static EType                lookupHumanReadable(const std::string& readable_name);
     static const char*          lookupHumanReadable(EType asset_type);
 
-    static EType                getType(std::string desc_name);
+    static EType                getType(const std::string& desc_name);
     static const std::string&   getDesc(EType asset_type);
 
     static bool                 lookupCanLink(EType asset_type);
@@ -164,12 +168,49 @@ public:
     static bool                 lookupIsAssetFetchByIDAllowed(EType asset_type); // the asset allows direct download
     static bool                 lookupIsAssetIDKnowable(EType asset_type); // asset data can be known by the viewer
 
-    static std::vector<std::string> getAssetTypeNames();
+    static LLSD getTypeNames();
 
     static const std::string    BADLOOKUP;
 
-    LLAssetType() = delete;
-    ~LLAssetType() = delete;
+protected:
+    LLAssetType() {}
+    ~LLAssetType() {}
+};
+
+///----------------------------------------------------------------------------
+/// Class LLAssetType
+///----------------------------------------------------------------------------
+struct AssetEntry : public LLDictionaryEntry
+{
+    AssetEntry(const char *desc_name,
+               const char *type_name,   // 8 character limit!
+               const char *human_name,  // for decoding to human readable form; put any and as many printable characters you want in each one
+               bool can_link,           // can you create a link to this type?
+               bool can_fetch,          // can you fetch this asset by ID?
+               bool can_know)           // can you see this asset's ID?
+        :
+        LLDictionaryEntry(desc_name),
+        mTypeName(type_name),
+        mHumanName(human_name),
+        mCanLink(can_link),
+        mCanFetch(can_fetch),
+        mCanKnow(can_know)
+    {
+        llassert(strlen(mTypeName) <= 8);
+    }
+
+    const char *mTypeName;
+    const char *mHumanName;
+    bool mCanLink;
+    bool mCanFetch;
+    bool mCanKnow;
+};
+
+class LLAssetDictionary : public LLSimpleton<LLAssetDictionary>,
+                          public LLDictionary<LLAssetType::EType, AssetEntry>
+{
+public:
+    LLAssetDictionary();
 };
 
 #endif // LL_LLASSETTYPE_H

@@ -27,13 +27,13 @@
 #include "llgltexture.h"
 
 
-LLGLTexture::LLGLTexture(BOOL usemipmaps)
+LLGLTexture::LLGLTexture(bool usemipmaps)
 {
     init();
     mUseMipMaps = usemipmaps;
 }
 
-LLGLTexture::LLGLTexture(const U32 width, const U32 height, const U8 components, BOOL usemipmaps)
+LLGLTexture::LLGLTexture(const U32 width, const U32 height, const U8 components, bool usemipmaps)
 {
     init();
     mFullWidth = width ;
@@ -43,14 +43,14 @@ LLGLTexture::LLGLTexture(const U32 width, const U32 height, const U8 components,
     setTexelsPerImage();
 }
 
-LLGLTexture::LLGLTexture(const LLImageRaw* raw, BOOL usemipmaps)
+LLGLTexture::LLGLTexture(const LLImageRaw* raw, bool usemipmaps)
 {
     init();
     mUseMipMaps = usemipmaps ;
     // Create an empty image of the specified size and width
     mGLTexturep = new LLImageGL(raw, usemipmaps) ;
-    mFullWidth = mGLTexturep->getCurrentWidth();
-    mFullHeight = mGLTexturep->getCurrentHeight();
+    mFullWidth = mGLTexturep->getWidth();
+    mFullHeight = mGLTexturep->getHeight();
     mComponents = mGLTexturep->getComponents();
     setTexelsPerImage();
 }
@@ -67,12 +67,12 @@ void LLGLTexture::init()
     mFullWidth = 0;
     mFullHeight = 0;
     mTexelsPerImage = 0 ;
-    mUseMipMaps = FALSE ;
+    mUseMipMaps = false ;
     mComponents = 0 ;
 
     mTextureState = NO_DELETE ;
-    mDontDiscard = FALSE;
-    mNeedsGLTexture = FALSE ;
+    mDontDiscard = false;
+    mNeedsGLTexture = false ;
 }
 
 void LLGLTexture::cleanup()
@@ -97,8 +97,7 @@ void LLGLTexture::setBoostLevel(S32 level)
     if(mBoostLevel != level)
     {
         mBoostLevel = level ;
-        if(mBoostLevel != LLGLTexture::BOOST_NONE &&
-            mBoostLevel != LLGLTexture::BOOST_SELECTED
+        if(mBoostLevel != LLGLTexture::BOOST_NONE
            && mBoostLevel != LLGLTexture::BOOST_ICON
            && mBoostLevel != LLGLTexture::BOOST_THUMBNAIL
            && mBoostLevel != LLGLTexture::BOOST_TERRAIN)
@@ -142,7 +141,7 @@ LLImageGL* LLGLTexture::getGLTexture() const
     return mGLTexturep ;
 }
 
-BOOL LLGLTexture::createGLTexture()
+bool LLGLTexture::createGLTexture()
 {
     if(mGLTexturep.isNull())
     {
@@ -152,11 +151,11 @@ BOOL LLGLTexture::createGLTexture()
     return mGLTexturep->createGLTexture() ;
 }
 
-BOOL LLGLTexture::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S32 usename, BOOL to_create, S32 category, bool defer_copy, LLGLuint* tex_name)
+bool LLGLTexture::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S32 usename, bool to_create, S32 category, bool defer_copy, LLGLuint* tex_name)
 {
     llassert(mGLTexturep.notNull());
 
-    BOOL ret = mGLTexturep->createGLTexture(discard_level, imageraw, usename, to_create, category, defer_copy, tex_name) ;
+    bool ret = mGLTexturep->createGLTexture(discard_level, imageraw, usename, to_create, category, defer_copy, tex_name) ;
 
     if(ret)
     {
@@ -169,7 +168,7 @@ BOOL LLGLTexture::createGLTexture(S32 discard_level, const LLImageRaw* imageraw,
     return ret ;
 }
 
-void LLGLTexture::setExplicitFormat(LLGLint internal_format, LLGLenum primary_format, LLGLenum type_format, BOOL swap_bytes)
+void LLGLTexture::setExplicitFormat(LLGLint internal_format, LLGLenum primary_format, LLGLenum type_format, bool swap_bytes)
 {
     llassert(mGLTexturep.notNull()) ;
 
@@ -224,22 +223,22 @@ LLGLuint LLGLTexture::getTexName() const
     return mGLTexturep->getTexName() ;
 }
 
-BOOL LLGLTexture::hasGLTexture() const
+bool LLGLTexture::hasGLTexture() const
 {
     if(mGLTexturep.notNull())
     {
         return mGLTexturep->getHasGLTexture() ;
     }
-    return FALSE ;
+    return false ;
 }
 
-BOOL LLGLTexture::getBoundRecently() const
+bool LLGLTexture::getBoundRecently() const
 {
     if(mGLTexturep.notNull())
     {
         return mGLTexturep->getBoundRecently() ;
     }
-    return FALSE ;
+    return false ;
 }
 
 LLTexUnit::eTextureType LLGLTexture::getTarget(void) const
@@ -248,7 +247,7 @@ LLTexUnit::eTextureType LLGLTexture::getTarget(void) const
     return mGLTexturep->getTarget() ;
 }
 
-BOOL LLGLTexture::setSubImage(const LLImageRaw* imageraw, S32 x_pos, S32 y_pos, S32 width, S32 height, LLGLuint use_name)
+bool LLGLTexture::setSubImage(const LLImageRaw* imageraw, S32 x_pos, S32 y_pos, S32 width, S32 height, LLGLuint use_name)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(mGLTexturep.notNull()) ;
@@ -256,7 +255,7 @@ BOOL LLGLTexture::setSubImage(const LLImageRaw* imageraw, S32 x_pos, S32 y_pos, 
     return mGLTexturep->setSubImage(imageraw, x_pos, y_pos, width, height, 0, use_name) ;
 }
 
-BOOL LLGLTexture::setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, LLGLuint use_name)
+bool LLGLTexture::setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, LLGLuint use_name)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(mGLTexturep.notNull()) ;
@@ -297,7 +296,7 @@ LLTexUnit::eTextureAddressMode LLGLTexture::getAddressMode(void) const
     return mGLTexturep->getAddressMode() ;
 }
 
-S64Bytes LLGLTexture::getTextureMemory() const
+S32Bytes LLGLTexture::getTextureMemory() const
 {
     llassert(mGLTexturep.notNull()) ;
 
@@ -311,14 +310,14 @@ LLGLenum LLGLTexture::getPrimaryFormat() const
     return mGLTexturep->getPrimaryFormat() ;
 }
 
-BOOL LLGLTexture::getIsAlphaMask(const F32 max_rmse, const F32 max_mid) const
+bool LLGLTexture::getIsAlphaMask() const
 {
     llassert(mGLTexturep.notNull()) ;
 
-    return mGLTexturep->getIsAlphaMask(max_rmse, max_mid) ;
+    return mGLTexturep->getIsAlphaMask() ;
 }
 
-//BOOL LLGLTexture::getMask(const LLVector2 &tc)
+//bool LLGLTexture::getMask(const LLVector2 &tc)
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
 bool LLGLTexture::getMask(const LLVector2 &tc) const
 // [/RLVa:KB]
@@ -334,14 +333,14 @@ F32 LLGLTexture::getTimePassedSinceLastBound()
 
     return mGLTexturep->getTimePassedSinceLastBound() ;
 }
-BOOL LLGLTexture::getMissed() const
+bool LLGLTexture::getMissed() const
 {
     llassert(mGLTexturep.notNull()) ;
 
     return mGLTexturep->getMissed() ;
 }
 
-BOOL LLGLTexture::isJustBound() const
+bool LLGLTexture::isJustBound() const
 {
     llassert(mGLTexturep.notNull()) ;
 
@@ -355,32 +354,11 @@ void LLGLTexture::forceUpdateBindStats(void) const
     return mGLTexturep->forceUpdateBindStats() ;
 }
 
-U32 LLGLTexture::getTexelsInAtlas() const
-{
-    llassert(mGLTexturep.notNull()) ;
-
-    return mGLTexturep->getTexelsInAtlas() ;
-}
-
-U32 LLGLTexture::getTexelsInGLTexture() const
-{
-    llassert(mGLTexturep.notNull()) ;
-
-    return mGLTexturep->getTexelsInGLTexture() ;
-}
-
-BOOL LLGLTexture::isGLTextureCreated() const
+bool LLGLTexture::isGLTextureCreated() const
 {
     llassert(mGLTexturep.notNull()) ;
 
     return mGLTexturep->isGLTextureCreated() ;
-}
-
-S32  LLGLTexture::getDiscardLevelInAtlas() const
-{
-    llassert(mGLTexturep.notNull()) ;
-
-    return mGLTexturep->getDiscardLevelInAtlas() ;
 }
 
 void LLGLTexture::destroyGLTexture()
@@ -394,8 +372,8 @@ void LLGLTexture::destroyGLTexture()
 
 void LLGLTexture::setTexelsPerImage()
 {
-    U32 fullwidth = llmin(mFullWidth,U32(MAX_IMAGE_SIZE));
-    U32 fullheight = llmin(mFullHeight,U32(MAX_IMAGE_SIZE));
+    U32 fullwidth = llmin(mFullWidth,U32(MAX_IMAGE_SIZE_DEFAULT));
+    U32 fullheight = llmin(mFullHeight,U32(MAX_IMAGE_SIZE_DEFAULT));
     mTexelsPerImage = (U32)fullwidth * fullheight;
 }
 

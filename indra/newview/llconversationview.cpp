@@ -59,11 +59,18 @@ public:
 
     virtual void onChange(EStatusType status, const LLSD& channelInfo, bool proximal)
     {
+        bool voice_enabled = LLVoiceClient::getInstance()->voiceEnabled() && LLVoiceClient::getInstance()->isVoiceWorking();
         conversation->showVoiceIndicator(conversation
             && status != STATUS_JOINING
             && status != STATUS_LEFT_CHANNEL
-            && LLVoiceClient::getInstance()->voiceEnabled()
-            && LLVoiceClient::getInstance()->isVoiceWorking());
+            && voice_enabled);
+
+        static bool s_voice_enabled(false);
+        if (s_voice_enabled != voice_enabled)
+        {
+            s_voice_enabled = voice_enabled;
+            conversation->updateConversationIndicators();
+        }
     }
 
 private:
@@ -79,6 +86,7 @@ LLConversationViewSession::LLConversationViewSession(const LLConversationViewSes
     mContainer(p.container),
     mItemPanel(NULL),
     mCallIconLayoutPanel(NULL),
+    mTypingIconLayoutPanel(nullptr),
     mSessionTitle(NULL),
     mSpeakingIndicator(NULL),
     mVoiceClientObserver(NULL),
@@ -86,7 +94,8 @@ LLConversationViewSession::LLConversationViewSession(const LLConversationViewSes
     mHasArrow(true),
     mIsInActiveVoiceChannel(false),
     mFlashStateOn(false),
-    mFlashStarted(false)
+    mFlashStarted(false),
+    mIsAltFlashColor(false)
 {
     mFlashTimer = new LLFlashTimer();
     mAreChildrenInited = true; // inventory only
@@ -157,7 +166,7 @@ void LLConversationViewSession::destroyView()
     LLFolderViewFolder::destroyView();
 }
 
-void LLConversationViewSession::setFlashState(bool flash_state)
+void LLConversationViewSession::setFlashState(bool flash_state, bool alternate_color)
 {
     if (flash_state && !mFlashStateOn)
     {
@@ -170,6 +179,7 @@ void LLConversationViewSession::setFlashState(bool flash_state)
 
     mFlashStateOn = flash_state;
     mFlashStarted = false;
+    mIsAltFlashColor = mFlashStateOn && (alternate_color || mIsAltFlashColor);
     mFlashTimer->stopFlashing();
 }
 
@@ -203,14 +213,21 @@ bool LLConversationViewSession::isHighlightActive()
     return (mFlashStateOn ? (mFlashTimer->isFlashingInProgress() ? mFlashTimer->isCurrentlyHighlighted() : true) : mIsCurSelection);
 }
 
-BOOL LLConversationViewSession::postBuild()
+bool LLConversationViewSession::postBuild()
 {
     LLFolderViewItem::postBuild();
 
     mItemPanel = LLUICtrlFactory::getInstance()->createFromFile<LLPanel>("panel_conversation_list_item.xml", NULL, LLPanel::child_registry_t::instance());
+
+    if (!mItemPanel)
+    {
+        LLError::LLUserWarningMsg::showMissingFiles();
+        LL_ERRS() << "Failed to construct mItemPanel from panel_conversation_list_item.xml" << LL_ENDL;
+    }
     addChild(mItemPanel);
 
     mCallIconLayoutPanel = mItemPanel->getChild<LLPanel>("call_icon_panel");
+    mTypingIconLayoutPanel = mItemPanel->getChild<LLPanel>("typing_icon_panel");
     mSessionTitle = mItemPanel->getChild<LLTextBox>("conversation_title");
 
     mActiveVoiceChannelConnection = LLVoiceChannel::setCurrentVoiceChannelChangedCallback(boost::bind(&LLConversationViewSession::onCurrentVoiceSessionChanged, this, _1));
@@ -257,12 +274,12 @@ BOOL LLConversationViewSession::postBuild()
             mSpeakingIndicator->setSpeakerId(gAgentID, LLUUID::null, true);
             mIsInActiveVoiceChannel = true;
 
-            if (mVoiceClientObserver)
-            {
+                if (mVoiceClientObserver)
+                {
                 LLVoiceClient::removeObserver(mVoiceClientObserver);
-                delete mVoiceClientObserver;
-            }
-            mVoiceClientObserver = new LLNearbyVoiceClientStatusObserver(this);
+                    delete mVoiceClientObserver;
+                }
+                mVoiceClientObserver = new LLNearbyVoiceClientStatusObserver(this);
             LLVoiceClient::addObserver(mVoiceClientObserver);
 
             break;
@@ -274,34 +291,38 @@ BOOL LLConversationViewSession::postBuild()
         refresh(); // requires vmi
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLConversationViewSession::draw()
 {
     getViewModelItem()->update();
 
-    const LLFolderViewItem::Params& default_params = LLUICtrlFactory::getDefaultParams<LLFolderViewItem>();
-    const BOOL show_context = (getRoot() ? getRoot()->getShowSelectionContext() : FALSE);
+    const bool show_context = (getRoot() ? getRoot()->getShowSelectionContext() : false);
 
     // Indicate that flash can start (moot operation if already started, done or not flashing)
     startFlashing();
 
     // draw highlight for selected items
-    drawHighlight(show_context, true, sHighlightBgColor, sFlashBgColor, sFocusOutlineColor, sMouseOverColor);
+    static LLUIColor alt_color = LLUIColorTable::instance().getColor("MentionFlashBgColor", DEFAULT_WHITE);
+    drawHighlight(show_context, true, sHighlightBgColor, mIsAltFlashColor ? alt_color : sFlashBgColor, sFocusOutlineColor, sMouseOverColor);
 
     // Draw children if root folder, or any other folder that is open. Do not draw children when animating to closed state or you get rendering overlap.
     bool draw_children = getRoot() == static_cast<LLFolderViewFolder*>(this) || isOpen();
 
     // Todo/fix this: arrange hides children 'out of bonds', session 'slowly' adjusts container size, unhides children
     // this process repeats until children fit
-    for (LLFolderViewFolder* folderp : mFolders)
+    for (folders_t::iterator iter = mFolders.begin();
+        iter != mFolders.end();)
     {
-        folderp->setVisible(draw_children);
+        folders_t::iterator fit = iter++;
+        (*fit)->setVisible(draw_children);
     }
-    for (LLFolderViewItem* itemp : mItems)
+    for (items_t::iterator iter = mItems.begin();
+        iter != mItems.end();)
     {
-        itemp->setVisible(draw_children);
+        items_t::iterator iit = iter++;
+        (*iit)->setVisible(draw_children);
     }
 
     // we don't draw the open folder arrow in minimized mode
@@ -309,15 +330,15 @@ void LLConversationViewSession::draw()
     {
         // update the rotation angle of open folder arrow
         updateLabelRotation();
-        drawOpenFolderArrow(default_params, sFgColor);
+        drawOpenFolderArrow();
     }
     LLView::draw();
 }
 
-BOOL LLConversationViewSession::handleMouseDown( S32 x, S32 y, MASK mask )
+bool LLConversationViewSession::handleMouseDown( S32 x, S32 y, MASK mask )
 {
     //Will try to select a child node and then itself (if a child was not selected)
-    BOOL result = LLFolderViewFolder::handleMouseDown(x, y, mask);
+    bool result = LLFolderViewFolder::handleMouseDown(x, y, mask);
 
     //This node (conversation) was selected and a child (participant) was not
     if(result && getRoot())
@@ -343,9 +364,9 @@ BOOL LLConversationViewSession::handleMouseDown( S32 x, S32 y, MASK mask )
     return result;
 }
 
-BOOL LLConversationViewSession::handleMouseUp( S32 x, S32 y, MASK mask )
+bool LLConversationViewSession::handleMouseUp( S32 x, S32 y, MASK mask )
 {
-    BOOL result = LLFolderViewFolder::handleMouseUp(x, y, mask);
+    bool result = LLFolderViewFolder::handleMouseUp(x, y, mask);
 
     LLFloater* volume_floater = LLFloaterReg::findInstance("floater_voice_volume");
     LLFloater* chat_volume_floater = LLFloaterReg::findInstance("chat_voice");
@@ -366,9 +387,9 @@ BOOL LLConversationViewSession::handleMouseUp( S32 x, S32 y, MASK mask )
     return result;
 }
 
-BOOL LLConversationViewSession::handleRightMouseDown( S32 x, S32 y, MASK mask )
+bool LLConversationViewSession::handleRightMouseDown( S32 x, S32 y, MASK mask )
 {
-    BOOL result = LLFolderViewFolder::handleRightMouseDown(x, y, mask);
+    bool result = LLFolderViewFolder::handleRightMouseDown(x, y, mask);
 
     if(result)
     {
@@ -438,7 +459,7 @@ void LLConversationViewSession::toggleCollapsedMode(bool is_collapsed)
     mItemPanel->translate(mCollapsedMode ? -h_pad : h_pad, 0);
 }
 
-void LLConversationViewSession::setVisibleIfDetached(BOOL visible)
+void LLConversationViewSession::setVisibleIfDetached(bool visible)
 {
     // Do this only if the conversation floater has been torn off (i.e. no multi floater host) and is not minimized
     // Note: minimized dockable floaters are brought to front hence unminimized when made visible and we don't want that here
@@ -480,6 +501,12 @@ void LLConversationViewSession::showVoiceIndicator(bool visible)
     requestArrange();
 }
 
+void LLConversationViewSession::showTypingIndicator(bool visible)
+{
+    mTypingIconLayoutPanel->setVisible(visible);
+    requestArrange();
+}
+
 void LLConversationViewSession::refresh()
 {
     // Refresh the session view from its model data
@@ -502,11 +529,25 @@ void LLConversationViewSession::refresh()
     // Update all speaking indicators
     LLSpeakingIndicatorManager::updateSpeakingIndicators();
 
+    updateConversationIndicators();
+
+    requestArrange();
+    if (vmi)
+    {
+        // Do the regular upstream refresh
+        LLFolderViewFolder::refresh();
+    }
+}
+
+void LLConversationViewSession::updateConversationIndicators()
+{
+    bool is_active_channel = isInActiveVoiceChannel();
+
     // we should show indicator for specified voice session only if this is current channel. EXT-5562.
     if (mSpeakingIndicator)
     {
-        mSpeakingIndicator->setIsActiveChannel(mIsInActiveVoiceChannel);
-        mSpeakingIndicator->setShowParticipantsSpeaking(mIsInActiveVoiceChannel);
+        mSpeakingIndicator->setIsActiveChannel(is_active_channel);
+        mSpeakingIndicator->setShowParticipantsSpeaking(is_active_channel);
     }
 
     LLConversationViewParticipant* participant = NULL;
@@ -516,15 +557,8 @@ void LLConversationViewSession::refresh()
         participant = dynamic_cast<LLConversationViewParticipant*>(*iter);
         if (participant)
         {
-            participant->allowSpeakingIndicator(mIsInActiveVoiceChannel);
+            participant->allowSpeakingIndicator(is_active_channel);
         }
-    }
-
-    requestArrange();
-    if (vmi)
-    {
-        // Do the regular upstream refresh
-        LLFolderViewFolder::refresh();
     }
 }
 
@@ -536,7 +570,7 @@ void LLConversationViewSession::onCurrentVoiceSessionChanged(const LLUUID& sessi
     {
         bool old_value = mIsInActiveVoiceChannel;
         mIsInActiveVoiceChannel = vmi->getUUID() == session_id;
-        mCallIconLayoutPanel->setVisible(mIsInActiveVoiceChannel);
+        mCallIconLayoutPanel->setVisible(isInActiveVoiceChannel() && !LLVoiceChannel::isSuspended());
         if (old_value != mIsInActiveVoiceChannel)
         {
             refresh();
@@ -558,6 +592,13 @@ bool LLConversationViewSession::highlightFriendTitle(LLConversationItem* vmi)
         }
     }
     return false;
+}
+
+bool LLConversationViewSession::isInActiveVoiceChannel()
+{
+    return mIsInActiveVoiceChannel &&
+           LLVoiceClient::getInstance()->voiceEnabled() &&
+           LLVoiceClient::getInstance()->isVoiceWorking();
 }
 
 //
@@ -608,7 +649,7 @@ void LLConversationViewParticipant::initFromParams(const LLConversationViewParti
     addChild(outputMonitor);
 }
 
-BOOL LLConversationViewParticipant::postBuild()
+bool LLConversationViewParticipant::postBuild()
 {
     mAvatarIcon = getChild<LLAvatarIconCtrl>("avatar_icon");
 
@@ -632,20 +673,21 @@ BOOL LLConversationViewParticipant::postBuild()
         LLFolderViewItem::postBuild();
         refresh();
     }
-    return TRUE;
+    return true;
 }
 
 void LLConversationViewParticipant::draw()
 {
-    static LLUIColor sFgColor = LLUIColorTable::instance().getColor("MenuItemEnabledColor", DEFAULT_WHITE);
-    static LLUIColor sFgDisabledColor = LLUIColorTable::instance().getColor("MenuItemDisabledColor", DEFAULT_WHITE);
-    static LLUIColor sHighlightFgColor = LLUIColorTable::instance().getColor("MenuItemHighlightFgColor", DEFAULT_WHITE);
-    static LLUIColor sHighlightBgColor = LLUIColorTable::instance().getColor("MenuItemHighlightBgColor", DEFAULT_WHITE);
-    static LLUIColor sFlashBgColor = LLUIColorTable::instance().getColor("MenuItemFlashBgColor", DEFAULT_WHITE);
-    static LLUIColor sFocusOutlineColor = LLUIColorTable::instance().getColor("InventoryFocusOutlineColor", DEFAULT_WHITE);
-    static LLUIColor sMouseOverColor = LLUIColorTable::instance().getColor("InventoryMouseOverColor", DEFAULT_WHITE);
+    static LLUIColor sFgColor = LLUIColorTable::instance().getColor("MenuItemEnabledColor", LLColor4::white);
+    static LLUIColor sFgDisabledColor = LLUIColorTable::instance().getColor("MenuItemDisabledColor", LLColor4::white);
+    static LLUIColor sHighlightFgColor = LLUIColorTable::instance().getColor("MenuItemHighlightFgColor", LLColor4::white);
+    static LLUIColor sHighlightBgColor = LLUIColorTable::instance().getColor("MenuItemHighlightBgColor", LLColor4::white);
+    static LLUIColor sFlashBgColor = LLUIColorTable::instance().getColor("MenuItemFlashBgColor", LLColor4::white);
+    static LLUIColor sFocusOutlineColor = LLUIColorTable::instance().getColor("InventoryFocusOutlineColor", LLColor4::white);
+    static LLUIColor sMouseOverColor = LLUIColorTable::instance().getColor("InventoryMouseOverColor", LLColor4::white);
+    static LLUIColor sFriendColor = LLUIColorTable::instance().getColor("ConversationFriendColor");
 
-    const BOOL show_context = (getRoot() ? getRoot()->getShowSelectionContext() : FALSE);
+    const bool show_context = (getRoot() ? getRoot()->getShowSelectionContext() : false);
 
     const LLFontGL* font = getLabelFontForStyle(mLabelStyle);
     F32 right_x  = 0;
@@ -653,23 +695,23 @@ void LLConversationViewParticipant::draw()
     F32 y = (F32)getRect().getHeight() - font->getLineHeight() - (F32)mTextPad;
     F32 text_left = (F32)getLabelXPos();
 
-    LLColor4 color;
+    LLUIColor* color;
 
     LLLocalSpeakerMgr *speakerMgr = LLLocalSpeakerMgr::getInstance();
 
     if (speakerMgr && speakerMgr->isSpeakerToBeRemoved(mUUID))
     {
-        color = sFgDisabledColor;
+        color = &sFgDisabledColor;
     }
     else
     {
         if (LLAvatarActions::isFriend(mUUID))
         {
-            color = LLUIColorTable::instance().getColor("ConversationFriendColor");
+            color = &sFriendColor;
         }
         else
         {
-            color = mIsSelected ? sHighlightFgColor : sFgColor;
+            color = mIsSelected ? &sHighlightFgColor : &sFgColor;
         }
     }
 
@@ -680,7 +722,7 @@ void LLConversationViewParticipant::draw()
     }
 
     drawHighlight(show_context, mIsSelected, sHighlightBgColor, sFlashBgColor, sFocusOutlineColor, sMouseOverColor);
-    drawLabel(font, text_left, y, color, right_x);
+    drawLabel(font, text_left, y, color->get(), right_x);
 
     LLView::draw();
 }
@@ -757,9 +799,9 @@ void LLConversationViewParticipant::onInfoBtnClick()
     LLFloaterReg::showInstance("inspect_avatar", LLSD().with("avatar_id", mUUID));
 }
 
-BOOL LLConversationViewParticipant::handleMouseDown( S32 x, S32 y, MASK mask )
+bool LLConversationViewParticipant::handleMouseDown( S32 x, S32 y, MASK mask )
 {
-    BOOL result = LLFolderViewItem::handleMouseDown(x, y, mask);
+    bool result = LLFolderViewItem::handleMouseDown(x, y, mask);
 
     if(result && getRoot())
     {

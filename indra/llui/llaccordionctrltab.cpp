@@ -48,25 +48,25 @@ static const S32 PARENT_BORDER_MARGIN = 5;
 
 static LLDefaultChildRegistry::Register<LLAccordionCtrlTab> t1("accordion_tab");
 
-class LLAccordionCtrlTab::LLAccordionCtrlTabHeader final : public LLUICtrl
+class LLAccordionCtrlTab::LLAccordionCtrlTabHeader : public LLUICtrl
 {
 public:
     friend class LLUICtrlFactory;
 
     struct Params : public LLInitParam::Block<Params, LLAccordionCtrlTab::Params>
     {
-        Params() = default;
+        Params();
     };
 
     LLAccordionCtrlTabHeader(const LLAccordionCtrlTabHeader::Params& p);
 
-    virtual ~LLAccordionCtrlTabHeader() = default;
+    virtual ~LLAccordionCtrlTabHeader();
 
     virtual void draw();
 
-    virtual void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
 
-    virtual BOOL postBuild();
+    virtual bool postBuild();
 
     std::string getTitle();
     void setTitle(const std::string& title, const std::string& hl);
@@ -79,8 +79,8 @@ public:
 
     virtual void onMouseEnter(S32 x, S32 y, MASK mask);
     virtual void onMouseLeave(S32 x, S32 y, MASK mask);
-    virtual BOOL handleKey(KEY key, MASK mask, BOOL called_from_parent);
-    virtual BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
+    virtual bool handleKey(KEY key, MASK mask, bool called_from_parent);
+    virtual bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
@@ -112,6 +112,10 @@ private:
     LLFrameTimer mAutoOpenTimer;
 };
 
+LLAccordionCtrlTab::LLAccordionCtrlTabHeader::Params::Params()
+{
+}
+
 LLAccordionCtrlTab::LLAccordionCtrlTabHeader::LLAccordionCtrlTabHeader(
     const LLAccordionCtrlTabHeader::Params& p)
 : LLUICtrl(p)
@@ -142,9 +146,13 @@ LLAccordionCtrlTab::LLAccordionCtrlTabHeader::LLAccordionCtrlTabHeader(
     addChild(mHeaderTextbox);
 }
 
-BOOL LLAccordionCtrlTab::LLAccordionCtrlTabHeader::postBuild()
+LLAccordionCtrlTab::LLAccordionCtrlTabHeader::~LLAccordionCtrlTabHeader()
 {
-    return TRUE;
+}
+
+bool LLAccordionCtrlTab::LLAccordionCtrlTabHeader::postBuild()
+{
+    return true;
 }
 
 std::string LLAccordionCtrlTab::LLAccordionCtrlTabHeader::getTitle()
@@ -194,9 +202,9 @@ void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::draw()
     S32 height = getRect().getHeight();
 
     F32 alpha = getCurrentTransparency();
-    gl_rect_2d(0, 0, width - 1, height - 1, mHeaderBGColor.get() % alpha, TRUE);
+    gl_rect_2d(0, 0, width - 1, height - 1, mHeaderBGColor.get() % alpha, true);
 
-    LLAccordionCtrlTab* parent = static_cast<LLAccordionCtrlTab*>(getParent());
+    LLAccordionCtrlTab* parent = dynamic_cast<LLAccordionCtrlTab*>(getParent());
     bool collapsible = parent && parent->getCollapsible();
     bool expanded = parent && parent->getDisplayChildren();
 
@@ -237,13 +245,25 @@ void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::draw()
     LLUICtrl::draw();
 }
 
-void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::reshape(S32 width, S32 height, BOOL called_from_parent /* = TRUE */)
+void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::reshape(S32 width, S32 height, bool called_from_parent /* = true */)
 {
     S32 header_height = mHeaderTextbox->getTextPixelHeight();
+    LLRect old_header_rect = mHeaderTextbox->getRect();
 
     LLRect textboxRect(HEADER_TEXT_LEFT_OFFSET, (height + header_height) / 2, width, (height - header_height) / 2);
-    mHeaderTextbox->reshape(textboxRect.getWidth(), textboxRect.getHeight());
-    mHeaderTextbox->setRect(textboxRect);
+    if (old_header_rect.getHeight() != textboxRect.getHeight()
+        || old_header_rect.mLeft != textboxRect.mLeft
+        || old_header_rect.mTop != textboxRect.mTop
+        || old_header_rect.getWidth() > textboxRect.getWidth() // reducing header's width
+        || (old_header_rect.getWidth() < textboxRect.getWidth() && old_header_rect.getWidth() < mHeaderTextbox->getTextPixelWidth()))
+    {
+        // Expensive text reflow
+        // Update if position or height changes
+        // Update if width reduces
+        // But do not update if text already fits and width increases (arguably LLTextBox::reshape should be smarter, not Accordion)
+        mHeaderTextbox->reshape(textboxRect.getWidth(), textboxRect.getHeight());
+        mHeaderTextbox->setRect(textboxRect);
+    }
 
     if (mHeaderTextbox->getTextPixelWidth() > mHeaderTextbox->getRect().getWidth())
     {
@@ -268,7 +288,7 @@ void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::onMouseLeave(S32 x, S32 y, MA
     mAutoOpenTimer.stop();
 }
 
-BOOL LLAccordionCtrlTab::LLAccordionCtrlTabHeader::handleKey(KEY key, MASK mask, BOOL called_from_parent)
+bool LLAccordionCtrlTab::LLAccordionCtrlTabHeader::handleKey(KEY key, MASK mask, bool called_from_parent)
 {
     if ((key == KEY_LEFT || key == KEY_RIGHT) && mask == MASK_NONE)
     {
@@ -278,8 +298,8 @@ BOOL LLAccordionCtrlTab::LLAccordionCtrlTabHeader::handleKey(KEY key, MASK mask,
     return LLUICtrl::handleKey(key, mask, called_from_parent);
 }
 
-BOOL LLAccordionCtrlTab::LLAccordionCtrlTabHeader::handleDragAndDrop(S32 x, S32 y, MASK mask,
-                                                                     BOOL drop,
+bool LLAccordionCtrlTab::LLAccordionCtrlTabHeader::handleDragAndDrop(S32 x, S32 y, MASK mask,
+                                                                     bool drop,
                                                                      EDragAndDropType cargo_type,
                                                                      void* cargo_data,
                                                                      EAcceptance* accept,
@@ -295,7 +315,7 @@ BOOL LLAccordionCtrlTab::LLAccordionCtrlTabHeader::handleDragAndDrop(S32 x, S32 
             {
                 parent->changeOpenClose(false);
                 mAutoOpenTimer.stop();
-                return TRUE;
+                return true;
             }
         }
         else
@@ -372,7 +392,11 @@ LLAccordionCtrlTab::LLAccordionCtrlTab(const LLAccordionCtrlTab::Params&p)
         LLFocusableElement::setFocusLostCallback(boost::bind(&LLAccordionCtrlTab::deselectOnFocusLost, this));
     }
 
-    reshape(100, 200,FALSE);
+    reshape(100, 200,false);
+}
+
+LLAccordionCtrlTab::~LLAccordionCtrlTab()
+{
 }
 
 void LLAccordionCtrlTab::setDisplayChildren(bool display)
@@ -395,17 +419,20 @@ void LLAccordionCtrlTab::setDisplayChildren(bool display)
     else
     {
         if (mScrollbar)
-            mScrollbar->setVisible(FALSE);
+            mScrollbar->setVisible(false);
     }
 }
 
-void LLAccordionCtrlTab::reshape(S32 width, S32 height, BOOL called_from_parent /* = TRUE */)
+void LLAccordionCtrlTab::reshape(S32 width, S32 height, bool called_from_parent /* = true */)
 {
     LLRect headerRect;
 
     headerRect.setLeftTopAndSize(0, height, width, HEADER_HEIGHT);
-    mHeader->setRect(headerRect);
-    mHeader->reshape(headerRect.getWidth(), headerRect.getHeight());
+    if (mHeader->getRect() != headerRect)
+    {
+        mHeader->setRect(headerRect);
+        mHeader->reshape(headerRect.getWidth(), headerRect.getHeight());
+    }
 
     if (!mDisplayChildren)
         return;
@@ -427,14 +454,14 @@ void LLAccordionCtrlTab::changeOpenClose(bool is_open)
         mExpandedHeight = getRect().getHeight();
 
     setDisplayChildren(!is_open);
-    reshape(getRect().getWidth(), getRect().getHeight(), FALSE);
+    reshape(getRect().getWidth(), getRect().getHeight(), false);
     if (mCommitSignal)
     {
         (*mCommitSignal)(this, getDisplayChildren());
     }
 }
 
-void LLAccordionCtrlTab::onVisibilityChange(BOOL new_visibility)
+void LLAccordionCtrlTab::onVisibilityChange(bool new_visibility)
 {
     LLUICtrl::onVisibilityChange(new_visibility);
 
@@ -452,7 +479,34 @@ void LLAccordionCtrlTab::onUpdateScrollToChild(const LLUICtrl *cntrl)
         // Translate to parent coordinatess to check if we are in visible rectangle
         rect.translate(getRect().mLeft, getRect().mBottom);
 
-        if (!getRect().contains(rect))
+        bool needs_to_scroll = false;
+        const LLRect &acc_rect = getRect();
+        if (!acc_rect.contains(rect))
+        {
+            if (acc_rect.mTop < rect.mBottom || acc_rect.mBottom > rect.mTop)
+            {
+                // Content fully not in view
+                needs_to_scroll = true;
+            }
+            else if (acc_rect.getHeight() >= rect.getHeight())
+            {
+                // Content can be displayed fully, but only partially in view
+                needs_to_scroll = true;
+            }
+            else if (acc_rect.mTop <= rect.mTop || acc_rect.mBottom >= rect.mBottom)
+            {
+                // Intersects, but too big to be displayed fully
+                S32 covered_height = acc_rect.mTop > rect.mTop ? rect.mTop - acc_rect.mBottom : acc_rect.mTop - rect.mBottom;
+                constexpr F32 covered_ratio = 0.7f;
+                if (covered_height < covered_ratio * acc_rect.getHeight())
+                {
+                    // Try to show bigger portion of the content
+                    needs_to_scroll = true;
+                }
+            }
+            // else too big and in the middle of the view as is
+        }
+        if (needs_to_scroll)
         {
             // for accordition's scroll, height is in pixels
             // Back to local coords and calculate position for scroller
@@ -470,7 +524,7 @@ void LLAccordionCtrlTab::onUpdateScrollToChild(const LLUICtrl *cntrl)
     LLUICtrl::onUpdateScrollToChild(cntrl);
 }
 
-BOOL LLAccordionCtrlTab::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLAccordionCtrlTab::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     if (mCollapsible && mHeaderVisible && mCanOpenClose)
     {
@@ -481,13 +535,13 @@ BOOL LLAccordionCtrlTab::handleMouseDown(S32 x, S32 y, MASK mask)
 
             // Reset stored state
             mWasStateStored = false;
-            return TRUE;
+            return true;
         }
     }
     return LLUICtrl::handleMouseDown(x,y,mask);
 }
 
-BOOL LLAccordionCtrlTab::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLAccordionCtrlTab::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     return LLUICtrl::handleMouseUp(x,y,mask);
 }
@@ -590,14 +644,13 @@ void LLAccordionCtrlTab::setSelected(bool is_selected)
 
 LLView* LLAccordionCtrlTab::findContainerView()
 {
-    for (LLView* child : *getChildList())
+    for (auto child : *getChildList())
     {
-
         if (DD_HEADER_NAME != child->getName() && child->getVisible())
             return child;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 void LLAccordionCtrlTab::selectOnFocusReceived()
@@ -630,14 +683,14 @@ void LLAccordionCtrlTab::setHeaderVisible(bool value)
 
     if (mHeader)
     {
-        mHeader->setVisible(value ? TRUE : FALSE);
+        mHeader->setVisible(value);
     }
 
-    reshape(getRect().getWidth(), getRect().getHeight(), FALSE);
+    reshape(getRect().getWidth(), getRect().getHeight(), false);
 };
 
 //virtual
-BOOL LLAccordionCtrlTab::postBuild()
+bool LLAccordionCtrlTab::postBuild()
 {
     if (mHeader)
     {
@@ -689,7 +742,7 @@ bool LLAccordionCtrlTab::notifyChildren (const LLSD& info)
 {
     if (info.has("action"))
     {
-        std::string str_action = info["action"];
+        const std::string& str_action = info["action"].asStringRef();
         if (str_action == "store_state")
         {
             storeOpenCloseState();
@@ -710,7 +763,7 @@ S32 LLAccordionCtrlTab::notifyParent(const LLSD& info)
 {
     if (info.has("action"))
     {
-        std::string str_action = info["action"];
+        const std::string& str_action = info["action"].asStringRef();
         if (str_action == "size_changes")
         {
             S32 height = info["height"];
@@ -799,7 +852,7 @@ S32 LLAccordionCtrlTab::notify(const LLSD& info)
     return 0;
 }
 
-BOOL LLAccordionCtrlTab::handleKey(KEY key, MASK mask, BOOL called_from_parent)
+bool LLAccordionCtrlTab::handleKey(KEY key, MASK mask, bool called_from_parent)
 {
     if (!mHeader->hasFocus())
         return LLUICtrl::handleKey(key, mask, called_from_parent);
@@ -807,7 +860,7 @@ BOOL LLAccordionCtrlTab::handleKey(KEY key, MASK mask, BOOL called_from_parent)
     if ((key == KEY_RETURN) && mask == MASK_NONE)
     {
         changeOpenClose(getDisplayChildren());
-        return TRUE;
+        return true;
     }
 
     if ((key == KEY_ADD || key == KEY_RIGHT) && mask == MASK_NONE)
@@ -815,7 +868,7 @@ BOOL LLAccordionCtrlTab::handleKey(KEY key, MASK mask, BOOL called_from_parent)
         if (!getDisplayChildren())
         {
             changeOpenClose(getDisplayChildren());
-            return TRUE;
+            return true;
         }
     }
 
@@ -824,7 +877,7 @@ BOOL LLAccordionCtrlTab::handleKey(KEY key, MASK mask, BOOL called_from_parent)
         if (getDisplayChildren())
         {
             changeOpenClose(getDisplayChildren());
-            return TRUE;
+            return true;
         }
     }
 
@@ -840,7 +893,7 @@ BOOL LLAccordionCtrlTab::handleKey(KEY key, MASK mask, BOOL called_from_parent)
         {
             getAccordionView()->notify(LLSD().with("action", "select_first"));
         }
-        return TRUE;
+        return true;
     }
 
     if (key == KEY_UP && mask == MASK_NONE)
@@ -849,7 +902,7 @@ BOOL LLAccordionCtrlTab::handleKey(KEY key, MASK mask, BOOL called_from_parent)
 
         // we're processing notifyParent so let call parent directly
         getParent()->notifyParent(LLSD().with("action", "select_prev"));
-        return TRUE;
+        return true;
     }
 
     return LLUICtrl::handleKey(key, mask, called_from_parent);
@@ -921,7 +974,7 @@ void LLAccordionCtrlTab::adjustContainerPanel(const LLRect& child_rect)
         show_hide_scrollbar(child_rect);
         updateLayout(child_rect);
     }
-    else
+    else if (mContainerPanel->getRect() != child_rect)
     {
         mContainerPanel->reshape(child_rect.getWidth(), child_rect.getHeight());
         mContainerPanel->setRect(child_rect);
@@ -979,10 +1032,10 @@ void LLAccordionCtrlTab::hideScrollbar(const LLRect& child_rect)
     if (!mContainerPanel || !mScrollbar)
         return;
 
-    if (mScrollbar->getVisible() == FALSE)
+    if (!mScrollbar->getVisible())
         return;
 
-    mScrollbar->setVisible(FALSE);
+    mScrollbar->setVisible(false);
     mScrollbar->setDocPos(0);
 
     //shrink child panel
@@ -1084,7 +1137,7 @@ void LLAccordionCtrlTab::ctrlSetLeftTopAndSize(LLView* panel, S32 left, S32 top,
     panel->setRect(panel_rect);
 }
 
-BOOL LLAccordionCtrlTab::handleToolTip(S32 x, S32 y, MASK mask)
+bool LLAccordionCtrlTab::handleToolTip(S32 x, S32 y, MASK mask)
 {
     //header may be not the first child but we need to process it first
     if (y >= (getRect().getHeight() - HEADER_HEIGHT - HEADER_HEIGHT / 2))
@@ -1092,22 +1145,22 @@ BOOL LLAccordionCtrlTab::handleToolTip(S32 x, S32 y, MASK mask)
         //inside tab header
         //fix for EXT-6619
         mHeader->handleToolTip(x, y, mask);
-        return TRUE;
+        return true;
     }
     return LLUICtrl::handleToolTip(x, y, mask);
 }
 
-BOOL LLAccordionCtrlTab::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLAccordionCtrlTab::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
     if (LLUICtrl::handleScrollWheel(x, y, clicks))
     {
-        return TRUE;
+        return true;
     }
 
     if (mScrollbar && mScrollbar->getVisible() && mScrollbar->handleScrollWheel(0, 0, clicks))
     {
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }

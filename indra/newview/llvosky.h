@@ -38,15 +38,14 @@
 #include "llsettingssky.h"
 #include "lllegacyatmospherics.h"
 
-constexpr F32 SKY_BOX_MULT          = 16.0f;
-constexpr F32 HEAVENLY_BODY_DIST    = HORIZON_DIST - 20.f;
-constexpr F32 HEAVENLY_BODY_FACTOR  = 0.1f;
-constexpr F32 HEAVENLY_BODY_SCALE   = HEAVENLY_BODY_DIST * HEAVENLY_BODY_FACTOR;
+const F32 SKY_BOX_MULT          = 16.0f;
+const F32 HEAVENLY_BODY_DIST    = HORIZON_DIST - 20.f;
+const F32 HEAVENLY_BODY_FACTOR  = 0.1f;
+const F32 HEAVENLY_BODY_SCALE   = HEAVENLY_BODY_DIST * HEAVENLY_BODY_FACTOR;
 
-constexpr S32 SKYTEX_COMPONENTS = 4;
-constexpr S32 SKYTEX_RESOLUTION = 64;
+const F32 SKYTEX_COMPONENTS = 4;
+const F32 SKYTEX_RESOLUTION = 64;
 
-class LLEnvironment;
 class LLFace;
 class LLHaze;
 
@@ -61,7 +60,7 @@ private:
     static S32      sCurrent;
 
 public:
-    void bindTexture(BOOL curr = TRUE);
+    void bindTexture(bool curr = true);
 
 protected:
     LLSkyTex();
@@ -76,7 +75,7 @@ protected:
     static S32 getCurrent();
     static S32 stepCurrent();
     static S32 getNext();
-    static S32 getWhich(const BOOL curr);
+    static S32 getWhich(const bool curr);
 
     void initEmpty(const S32 tex);
 
@@ -84,25 +83,26 @@ protected:
 
     void setDir(const LLVector3 &dir, const S32 i, const S32 j)
     {
-        S32 offset = i * SKYTEX_RESOLUTION + j;
+        S32 offset = (S32)(i * SKYTEX_RESOLUTION + j);
         mSkyDirs[offset] = dir;
     }
 
     const LLVector3 &getDir(const S32 i, const S32 j) const
     {
-        S32 offset = i * SKYTEX_RESOLUTION + j;
+        S32 offset = (S32)(i * SKYTEX_RESOLUTION + j);
         return mSkyDirs[offset];
     }
 
     void setPixel(const LLColor4 &col, const S32 i, const S32 j)
     {
-        S32 offset = i * SKYTEX_RESOLUTION + j;
+        S32 offset = (S32)(i * SKYTEX_RESOLUTION + j);
         mSkyData[offset] = col;
     }
 
     void setPixel(const LLColor4U &col, const S32 i, const S32 j)
     {
-        S32 offset = (i * SKYTEX_RESOLUTION + j) * SKYTEX_COMPONENTS;
+        LLImageDataSharedLock lock(mImageRaw[sCurrent]);
+        S32 offset = (S32)((i * SKYTEX_RESOLUTION + j) * SKYTEX_COMPONENTS);
         U32* pix = (U32*) &(mImageRaw[sCurrent]->getData()[offset]);
         *pix = col.asRGBA();
     }
@@ -110,14 +110,15 @@ protected:
     LLColor4U getPixel(const S32 i, const S32 j)
     {
         LLColor4U col;
-        S32 offset = (i * SKYTEX_RESOLUTION + j) * SKYTEX_COMPONENTS;
+        LLImageDataSharedLock lock(mImageRaw[sCurrent]);
+        S32 offset = (S32)((i * SKYTEX_RESOLUTION + j) * SKYTEX_COMPONENTS);
         U32* pix = (U32*) &(mImageRaw[sCurrent]->getData()[offset]);
         col.fromRGBA( *pix );
         return col;
     }
 
-    LLImageRaw* getImageRaw(BOOL curr=TRUE);
-    void createGLImage(BOOL curr=TRUE);
+    LLImageRaw* getImageRaw(bool curr=true);
+    void createGLImage(S32 which);
 
     bool mIsShiny;
 };
@@ -136,7 +137,7 @@ protected:
     LLVector3       mAngularVelocity;       // velocity of the local heavenly body
 
     F32             mDiskRadius;
-    bool            mDraw;                  // FALSE - do not draw.
+    bool            mDraw;                  // false - do not draw.
     F32             mHorizonVisibility;     // number [0, 1] due to how horizon
     F32             mVisibility;            // same but due to other objects being in throng.
     bool            mVisible;
@@ -193,7 +194,7 @@ public:
 
 class LLCubeMap;
 
-class LLVOSky final : public LLStaticViewerObject
+class LLVOSky : public LLStaticViewerObject
 {
 public:
     enum
@@ -223,14 +224,14 @@ public:
     void calc();
     void cacheEnvironment(LLSettingsSky::ptr_t psky, AtmosphericsVars& atmosphericsVars);
 
-    /*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time) override;
+    /*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time);
     bool updateSky();
 
     // Graphical stuff for objects - maybe broken out into render class
     // later?
-    /*virtual*/ void updateTextures() override;
-    /*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline) override;
-    /*virtual*/ BOOL        updateGeometry(LLDrawable *drawable) override;
+    /*virtual*/ void updateTextures();
+    /*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline);
+    /*virtual*/ bool        updateGeometry(LLDrawable *drawable);
 
     const LLHeavenBody& getSun() const                      { return mSun;  }
     const LLHeavenBody& getMoon() const                     { return mMoon; }
@@ -247,7 +248,7 @@ public:
 
     F32 getWorldScale() const                           { return mWorldScale; }
     void setWorldScale(const F32 s)                     { mWorldScale = s; }
-    void updateFog(LLEnvironment* environment, const LLSettingsSky::ptr_t& psky, const F32 distance);
+    void updateFog(const F32 distance);
 
     void setFogRatio(const F32 fog_ratio)               { m_legacyAtmospherics.setFogRatio(fog_ratio); }
     F32  getFogRatio() const                            { return m_legacyAtmospherics.getFogRatio(); }
@@ -299,7 +300,7 @@ public:
 protected:
     ~LLVOSky();
 
-    void updateDirections(const LLSettingsSky::ptr_t& psky);
+    void updateDirections(LLSettingsSky::ptr_t psky);
 
     void initSkyTextureDirs(const S32 side, const S32 tile);
     void createSkyTexture(const LLSettingsSky::ptr_t &psky, AtmosphericsVars& vars, const S32 side, const S32 tile);
@@ -314,6 +315,9 @@ protected:
     F32 mSunScale  = 1.0f;
     F32 mMoonScale = 1.0f;
 
+    static S32          sResolution;
+    static S32          sTileResX;
+    static S32          sTileResY;
     LLSkyTex            mSkyTex[6];
     LLSkyTex            mShinyTex[6];
     LLHeavenBody        mSun;

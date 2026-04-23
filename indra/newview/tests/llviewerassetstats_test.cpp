@@ -43,12 +43,15 @@ namespace LLStatViewer
     LLTrace::SampleStatHandle<>     FPS_SAMPLE("fpssample");
 }
 
-void LLVOAvatar::getNearbyRezzedStats(std::vector<S32>& counts)
+void LLVOAvatar::getNearbyRezzedStats(std::vector<S32>& counts, F32& avg_cloud_time, S32& cloud_avatars, S32& pending_meshes, S32& control_avatars)
 {
     counts.resize(3);
     counts[0] = 0;
     counts[1] = 0;
     counts[2] = 1;
+    cloud_avatars = 0;
+    pending_meshes = 0;
+    control_avatars = 0;
 }
 
 // static
@@ -217,16 +220,18 @@ get_region(const LLSD & sd, U64 region_handle1)
     U32 grid_x(0), grid_y(0);
     grid_from_region_handle(region_handle1, &grid_x, &grid_y);
 
-    for (const LLSD& llsd_val : sd["regions"].asArray())
+    for (LLSD::array_const_iterator it(sd["regions"].beginArray());
+         sd["regions"].endArray() != it;
+         ++it)
     {
-        if (llsd_val.has("grid_x") &&
-            llsd_val.has("grid_y") &&
-            llsd_val["grid_x"].isInteger() &&
-            llsd_val["grid_y"].isInteger() &&
-            llsd_val["grid_x"].asInteger() == grid_x &&
-            llsd_val["grid_y"].asInteger() == grid_y)
+        if ((*it).has("grid_x") &&
+            (*it).has("grid_y") &&
+            (*it)["grid_x"].isInteger() &&
+            (*it)["grid_y"].isInteger() &&
+            (*it)["grid_x"].asInteger() == grid_x &&
+            (*it)["grid_y"].asInteger() == grid_y)
         {
-            return llsd_val;
+            return *it;
         }
     }
     return LLSD();

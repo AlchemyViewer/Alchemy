@@ -30,16 +30,16 @@
 #ifndef LLTOASTSCRIPTQUESTION_H_
 #define LLTOASTSCRIPTQUESTION_H_
 
-class LLToastScriptQuestion final : public LLToastPanel
+class LLToastScriptQuestion : public LLToastPanel
 {
     LOG_CLASS(LLToastScriptQuestion);
 
 public:
     LLToastScriptQuestion(const LLNotificationPtr& notification);
-    virtual BOOL postBuild();
+    bool postBuild() override;
     virtual ~LLToastScriptQuestion(){};
 
-    /*virtual*/ void setFocus(BOOL b);
+    void setFocus(bool b) override;
 
 private:
     void snapToMessageHeight();

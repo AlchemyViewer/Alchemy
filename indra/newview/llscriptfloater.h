@@ -36,7 +36,7 @@ class LLToastPanel;
  * Handles script notifications ("ScriptDialog" and "ScriptDialogGroup")
  * and manages Script Floaters.
  */
-class LLScriptFloaterManager final : public LLSingleton<LLScriptFloaterManager>
+class LLScriptFloaterManager : public LLSingleton<LLScriptFloaterManager>
 {
     // *TODO
     // LLScriptFloaterManager and LLScriptFloater will need some refactoring after we
@@ -185,7 +185,7 @@ public:
     /**
      * Hide all notification toasts when we show dockable floater
      */
-    /*virtual*/ void setVisible(BOOL visible);
+    /*virtual*/ void setVisible(bool visible);
 
     bool getSavePosition() { return mSaveFloaterPosition; }
 

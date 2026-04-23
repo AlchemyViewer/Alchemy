@@ -38,6 +38,13 @@
 #include "volume_catcher.h"
 #include "media_plugin_base.h"
 
+// _getpid()/getpid()
+#if LL_WINDOWS
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
 #include "dullahan.h"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -64,10 +71,10 @@ private:
     void onLoadStartCallback();
     void onRequestExitCallback();
     void onLoadEndCallback(int httpStatusCode, std::string url);
-    void onLoadError(int status, const std::string error_text);
+    void onLoadError(int status, const std::string error_text, const std::string error_url);
     void onAddressChangeCallback(std::string url);
     void onOpenPopupCallback(std::string url, std::string target);
-    bool onHTTPAuthCallback(const std::string host, const std::string realm, bool isproxy, std::string& username, std::string& password);
+    bool onHTTPAuthCallback(const std::string host, const std::string realm, std::string& username, std::string& password);
     void onCursorChangedCallback(dullahan::ECursorType type);
     const std::vector<std::string> onFileDialog(dullahan::EFileDialogType dialog_type, const std::string dialog_title, const std::string default_file, const std::string dialog_accept_filter, bool& use_default);
     bool onJSDialogCallback(const std::string origin_url, const std::string message_text, const std::string default_prompt_text);
@@ -77,19 +84,19 @@ private:
     void authResponse(LLPluginMessage &message);
 
     void keyEvent(dullahan::EKeyEvent key_event, LLSD native_key_data);
-    void unicodeInput(std::string event, LLSD native_key_data, std::string text);
+    void unicodeInput(std::string event, LLSD native_key_data);
 
     void checkEditState();
     void setVolume();
 
-    std::string mHelperPath;
-    std::string mResourcesPath;
-    std::string mLocalesPath;
     bool mEnableMediaPluginDebugging;
     std::string mHostLanguage;
     bool mCookiesEnabled;
     bool mPluginsEnabled;
     bool mJavascriptEnabled;
+    bool mProxyEnabled;
+    std::string mProxyHost;
+    int mProxyPort;
     bool mDisableGPU;
     bool mDisableNetworkService;
     bool mUseMockKeyChain;
@@ -106,19 +113,10 @@ private:
     bool mCanPaste;
     bool mCanDelete;
     bool mCanSelectAll;
-    std::string mUserDataPath;
     std::string mRootCachePath;
-    std::string mCachePath;
-    std::string mContextCachePath;
     std::string mCefLogFile;
     bool mCefLogVerbose;
     std::vector<std::string> mPickedFiles;
-    bool mProxyEnabled;
-    int mProxyType;
-    std::string mProxyHost;
-    int mProxyPort;
-    std::string mProxyUsername;
-    std::string mProxyPassword;
     VolumeCatcher mVolumeCatcher;
     F32 mCurVolume;
     dullahan* mCEFLib;
@@ -157,15 +155,10 @@ MediaPluginBase(host_send_func, host_user_data)
     mCanPaste = false;
     mCanDelete = false;
     mCanSelectAll = false;
-    mCachePath = "";
     mCefLogFile = "";
     mCefLogVerbose = false;
     mPickedFiles.clear();
-    mCurVolume = 0.0f;
-
-    mProxyEnabled = false;
-    mProxyType = 0;
-    mProxyPort = 3128;
+    mCurVolume = 0.0;
 
     mCEFLib = new dullahan();
 
@@ -261,15 +254,17 @@ void MediaPluginCEF::onLoadStartCallback()
 
 /////////////////////////////////////////////////////////////////////////////////
 //
-void MediaPluginCEF::onLoadError(int status, const std::string error_text)
+void MediaPluginCEF::onLoadError(int status, const std::string error_text, const std::string error_url)
 {
     std::stringstream msg;
 
-    msg << "<b>Loading error!</b>";
+    msg << "<b>Loading error</b>";
     msg << "<p>";
-    msg << "Message: " << error_text;
-    msg << "<br>";
-    msg << "Code: " << status;
+    msg << "Error message: " << error_text;
+    msg << "<p>";
+    msg << "Error URL: <tt>" << error_url << "</tt>";
+    msg << "<p>";
+    msg << "Error code: " << status;
 
     mCEFLib->showBrowserMessage(msg.str());
 }
@@ -336,16 +331,8 @@ void MediaPluginCEF::onCustomSchemeURLCallback(std::string url, bool user_gestur
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-bool MediaPluginCEF::onHTTPAuthCallback(const std::string host, const std::string realm, bool isproxy, std::string& username, std::string& password)
+bool MediaPluginCEF::onHTTPAuthCallback(const std::string host, const std::string realm, std::string& username, std::string& password)
 {
-    // For proxy auth
-    if (isproxy)
-    {
-        username = mProxyUsername;
-        password = mProxyPassword;
-        return true;
-    }
-    // Otherwise fall through for other auth routines
     mAuthOK = false;
 
     LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "auth_request");
@@ -634,10 +621,15 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 mCEFLib->setOnTooltipCallback(std::bind(&MediaPluginCEF::onTooltipCallback, this, std::placeholders::_1));
                 mCEFLib->setOnLoadStartCallback(std::bind(&MediaPluginCEF::onLoadStartCallback, this));
                 mCEFLib->setOnLoadEndCallback(std::bind(&MediaPluginCEF::onLoadEndCallback, this, std::placeholders::_1, std::placeholders::_2));
-                mCEFLib->setOnLoadErrorCallback(std::bind(&MediaPluginCEF::onLoadError, this, std::placeholders::_1, std::placeholders::_2));
+
+                // CEF 139 seems to have introduced a loading failure at the login page (only?) I haven't seen it on
+                // any other page and it only happens about 1 in 8 times. Without this handler for the error page
+                // (red box, error message/code/url) the page load recovers after display a brief built in error.
+                // Not ideal but better than stopping altgoether. Will restore this once I discover the error.
+                //mCEFLib->setOnLoadErrorCallback(std::bind(&MediaPluginCEF::onLoadError, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
                 mCEFLib->setOnAddressChangeCallback(std::bind(&MediaPluginCEF::onAddressChangeCallback, this, std::placeholders::_1));
                 mCEFLib->setOnOpenPopupCallback(std::bind(&MediaPluginCEF::onOpenPopupCallback, this, std::placeholders::_1, std::placeholders::_2));
-                mCEFLib->setOnHTTPAuthCallback(std::bind(&MediaPluginCEF::onHTTPAuthCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
+                mCEFLib->setOnHTTPAuthCallback(std::bind(&MediaPluginCEF::onHTTPAuthCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
                 mCEFLib->setOnFileDialogCallback(std::bind(&MediaPluginCEF::onFileDialog, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
                 mCEFLib->setOnCursorChangedCallback(std::bind(&MediaPluginCEF::onCursorChangedCallback, this, std::placeholders::_1));
                 mCEFLib->setOnRequestExitCallback(std::bind(&MediaPluginCEF::onRequestExitCallback, this));
@@ -648,11 +640,12 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 #if LL_WINDOWS
                 // As of CEF version 83+, for Windows versions, we need to tell CEF
                 // where the host helper process is since this DLL is not in the same
-                // dir as the executable that loaded it (ALPlugin.exe). The code in
+                // dir as the executable that loaded it (SLPlugin.exe). The code in
                 // Dullahan that tried to figure out the location automatically uses
                 // the location of the exe which isn't helpful so we tell it explicitly.
-                settings.host_process_path = mHelperPath;
-
+                std::vector<wchar_t> buffer(MAX_PATH + 1);
+                GetCurrentDirectoryW(MAX_PATH, &buffer[0]);
+                settings.host_process_path = ll_convert_wide_to_string(&buffer[0]);
 #endif
                 settings.accept_language_list = mHostLanguage;
 
@@ -661,21 +654,16 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 // and set it to white
                 settings.background_color = 0xffffffff; // white
 
-                settings.user_data_path = mUserDataPath;
-
-                settings.cache_enabled = true;
                 settings.root_cache_path = mRootCachePath;
-                settings.cache_path = mCachePath;
-                settings.context_cache_path = mContextCachePath;
                 settings.cookies_enabled = mCookiesEnabled;
 
-                //// configure proxy argument if enabled and valid
-                //if (mProxyEnabled && mProxyHost.length())
-                //{
-                //    std::ostringstream proxy_url;
-                //    proxy_url << mProxyHost << ":" << mProxyPort;
-                //    settings.proxy_host_port = proxy_url.str();
-                //}
+                // configure proxy argument if enabled and valid
+                if (mProxyEnabled && mProxyHost.length())
+                {
+                    std::ostringstream proxy_url;
+                    proxy_url << mProxyHost << ":" << mProxyPort;
+                    settings.proxy_host_port = proxy_url.str();
+                }
                 settings.disable_gpu = mDisableGPU;
 #if LL_DARWIN
                 settings.disable_network_service = mDisableNetworkService;
@@ -692,12 +680,28 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 settings.disable_web_security = false;
                 settings.file_access_from_file_urls = false;
 
+                settings.flash_enabled = mPluginsEnabled;
+
+                // This setting applies to all plugins, not just Flash
+                // Regarding, SL-15559 PDF files do not load in CEF v91,
+                // it turns out that on Windows, PDF support is treated
+                // as a plugin on Windows only so turning all plugins
+                // off, disabled built in PDF support.  (Works okay in
+                // macOS surprisingly). To mitigrate this, we set the global
+                // media enabled flag to whatever the consumer wants and
+                // explicitly disable Flash with a different setting (below)
+                settings.plugins_enabled = mPluginsEnabled;
+
+                // SL-14897 Disable Flash support in the embedded browser
+                settings.flash_enabled = false;
+
                 settings.flip_mouse_y = false;
                 settings.flip_pixels_y = true;
                 settings.frame_rate = 60;
                 settings.force_wave_audio = true;
                 settings.initial_height = 1024;
                 settings.initial_width = 1024;
+                settings.java_enabled = false;
                 settings.javascript_enabled = mJavascriptEnabled;
                 settings.media_stream_enabled = false; // MAINT-6060 - WebRTC media removed until we can add granularity/query UI
 
@@ -706,18 +710,6 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 settings.log_file = mCefLogFile;
                 settings.log_verbose = mCefLogVerbose;
                 settings.autoplay_without_gesture = true;
-
-                // Setup proxy config for CEF startup
-                settings.proxy_enabled = mProxyEnabled;
-                settings.proxy_type = mProxyType;
-                settings.proxy_host = mProxyHost;
-                settings.proxy_port = mProxyPort;
-
-                // Set subprocess helper and cef app data paths
-#if !LL_DARWIN
-                settings.resources_dir_path = mResourcesPath;
-#endif
-                settings.locales_dir_path = mLocalesPath;
 
                 std::vector<std::string> custom_schemes(1, "secondlife");
                 mCEFLib->setCustomSchemes(custom_schemes);
@@ -748,47 +740,36 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 message.setValueBoolean("coords_opengl", true);
                 sendMessage(message);
             }
-            else if (message_name == "set_cef_data_path")
-            {
-                std::string data_path_helper = message_in.getValue("helper_path");
-                std::string data_path_resources = message_in.getValue("resources_path");
-                std::string data_path_locales = message_in.getValue("locales_path");
-
-                mHelperPath = data_path_helper;
-                mResourcesPath = data_path_resources;
-                mLocalesPath = data_path_locales;
-            }
             else if (message_name == "set_user_data_path")
             {
                 std::string user_data_path_cache = message_in.getValue("cache_path");
                 std::string subfolder = message_in.getValue("username");
 
-                std::string delim;
-#if LL_WINDOWS
                 // media plugin doesn't have access to gDirUtilp
-                delim = "\\";
+                std::string path_separator;
+#if LL_WINDOWS
+                path_separator = "\\";
 #else
-                delim = "/";
+                path_separator = "/";
 #endif
 
                 mRootCachePath = user_data_path_cache + "cef_cache";
-                if (!subfolder.empty())
-                {
 
-                    mCachePath = mRootCachePath + delim + subfolder;
-                }
-                else
-                {
-                    mCachePath = mRootCachePath;
-                }
-                mContextCachePath = ""; // disabled by ""
+                // Issue #4498 Introduce an additional sub-folder underneath the main cache
+                // folder so that each CEF media instance gets its own (as per the CEF API
+                // official position). These folders will be removed at startup by Viewer code
+                // so that their non-trivial size does not exhaust available disk space. This
+                // begs the question - why turn on the cache at all? There are 2 reasons - firstly
+                // some of the instances will benefit from per Viewer session caching and will
+                // use the injected SL cookie and secondly, it's not clear how having no cache
+                // interacts with the multiple simultaneous paradigm we use.
+                mRootCachePath += path_separator;
+# if LL_WINDOWS
+                mRootCachePath += std::to_string(_getpid());
+# else
+                mRootCachePath += std::to_string(getpid());
+# endif
 
-                mUserDataPath = user_data_path_cache + "cef_data";
-                if (!subfolder.empty())
-                {
-
-                    mUserDataPath += delim + subfolder;
-                }
 
                 mCefLogFile = message_in.getValue("cef_log_file");
                 mCefLogVerbose = message_in.getValueBoolean("cef_verbose_log");
@@ -860,7 +841,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 S32 y = message_in.getValueS32("y");
 
                 // only even send left mouse button events to the CEF library
-                // (partially prompted by crash in OS X CEF when sending right button events)
+                // (partially prompted by crash in macOS CEF when sending right button events)
                 // we catch the right click in viewer and display our own context menu anyway
                 S32 button = message_in.getValueS32("button");
                 dullahan::EMouseButton btn = dullahan::MB_MOUSE_BUTTON_LEFT;
@@ -870,23 +851,17 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                     mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_DOWN, x, y);
                     mCEFLib->setFocus();
 
-                    if(mEnableMediaPluginDebugging)
-                    {
-                        std::stringstream str;
-                        str << "Mouse down at = " << x << ", " << y;
-                        postDebugMessage(str.str());
-                    }
+                    std::stringstream str;
+                    str << "Mouse down at = " << x << ", " << y;
+                    postDebugMessage(str.str());
                 }
                 else if (event == "up" && button == 0)
                 {
                     mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_UP, x, y);
 
-                    if (mEnableMediaPluginDebugging)
-                    {
-                        std::stringstream str;
-                        str << "Mouse up at = " << x << ", " << y;
-                        postDebugMessage(str.str());
-                    }
+                    std::stringstream str;
+                    str << "Mouse up at = " << x << ", " << y;
+                    postDebugMessage(str.str());
                 }
                 else if (event == "double_click")
                 {
@@ -916,8 +891,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
             {
                 std::string event = message_in.getValue("event");
                 LLSD native_key_data = message_in.getValueLLSD("native_key_data");
-                std::string text = message_in.getValue("text");
-                unicodeInput(event, native_key_data, text);
+                unicodeInput(event, native_key_data);
             }
             else if (message_name == "key_event")
             {
@@ -937,24 +911,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 
                 keyEvent(key_event, native_key_data);
 
-#elif LL_WINDOWS
-                std::string event = message_in.getValue("event");
-                LLSD native_key_data = message_in.getValueLLSD("native_key_data");
-
-                // Treat unknown events as key-up for safety.
-                dullahan::EKeyEvent key_event = dullahan::KE_KEY_UP;
-                if (event == "down")
-                {
-                    key_event = dullahan::KE_KEY_DOWN;
-                }
-                else if (event == "repeat")
-                {
-                    key_event = dullahan::KE_KEY_REPEAT;
-                }
-
-                keyEvent(key_event, native_key_data);
-
-#elif LL_LINUX
+#else
                 std::string event = message_in.getValue("event");
                 LLSD native_key_data = message_in.getValueLLSD("native_key_data");
 
@@ -976,6 +933,13 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
             {
                 mEnableMediaPluginDebugging = message_in.getValueBoolean("enable");
             }
+#if LL_LINUX
+            else if (message_name == "enable_pipewire_volume_catcher")
+            {
+                bool enable = message_in.getValueBoolean("enable");
+                mVolumeCatcher.onEnablePipeWireVolumeCatcher(enable);
+            }
+#endif
             if (message_name == "pick_file_response")
             {
                 LLSD file_list_llsd = message_in.getValueLLSD("file_list");
@@ -1094,15 +1058,6 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
             {
                 mFileAccessFromFileUrls = message_in.getValueBoolean("enabled");
             }
-            else if (message_name == "proxy_setup")
-            {
-                mProxyEnabled = message_in.getValueBoolean("enable");
-                mProxyType = message_in.getValueS32("proxy_type");
-                mProxyHost = message_in.getValue("host");
-                mProxyPort = message_in.getValueS32("port");
-                mProxyUsername = message_in.getValue("username");
-                mProxyPassword = message_in.getValue("password");
-            }
         }
         else if (message_class == LLPLUGIN_MESSAGE_CLASS_MEDIA_TIME)
         {
@@ -1146,14 +1101,32 @@ void MediaPluginCEF::keyEvent(dullahan::EKeyEvent key_event, LLSD native_key_dat
     U64 lparam = ll_U32_from_sd(native_key_data["l_param"]);
 
     mCEFLib->nativeKeyboardEventWin(msg, wparam, lparam);
-#elif LL_LINUX
-    uint32_t native_virtual_key = (uint32_t)(native_key_data["virtual_key"].asInteger());
-    uint32_t native_modifiers = (uint32_t)(native_key_data["modifiers"].asInteger());
-    mCEFLib->nativeKeyboardEventSDL2(key_event, native_virtual_key, native_modifiers, 0, false);
 #endif
+
+#if LL_LINUX
+
+    uint32_t native_virtual_key = (uint32_t)(native_key_data["virtual_key"].asInteger());       // this is actually the SDL event.key.keysym.sym;
+    uint32_t native_virtual_key_win = (uint32_t)(native_key_data["virtual_key_win"].asInteger());
+    uint32_t native_modifiers = (uint32_t)(native_key_data["modifiers"].asInteger());
+
+    // only for non-printable keysyms, the actual text input is done in unicodeInput() below
+    if (native_virtual_key <= 0x1b || native_virtual_key >= 0x7f)
+    {
+        // set keypad flag, not sure if this even does anything
+        bool keypad = false;
+        if (native_virtual_key_win >= 0x60 && native_virtual_key_win <= 0x6f)
+        {
+            keypad = true;
+        }
+
+        // yes, we send native_virtual_key_win twice because native_virtual_key breaks it
+        mCEFLib->nativeKeyboardEventSDL2(key_event, native_virtual_key, native_modifiers, keypad);
+    }
+
+#endif // LL_LINUX
 };
 
-void MediaPluginCEF::unicodeInput(std::string event, LLSD native_key_data = LLSD::emptyMap(), std::string text = "")
+void MediaPluginCEF::unicodeInput(std::string event, LLSD native_key_data = LLSD::emptyMap())
 {
 #if LL_DARWIN
     // i didn't think this code was needed for macOS but without it, the IME
@@ -1180,11 +1153,17 @@ void MediaPluginCEF::unicodeInput(std::string event, LLSD native_key_data = LLSD
     U32 wparam = ll_U32_from_sd(native_key_data["w_param"]);
     U64 lparam = ll_U32_from_sd(native_key_data["l_param"]);
     mCEFLib->nativeKeyboardEventWin(msg, wparam, lparam);
-#elif LL_LINUX
+#endif
+
+#if LL_LINUX
+
+    uint32_t native_scan_code = (uint32_t)(native_key_data["sdl_sym"].asInteger());
     uint32_t native_virtual_key = (uint32_t)(native_key_data["virtual_key"].asInteger());
     uint32_t native_modifiers = (uint32_t)(native_key_data["modifiers"].asInteger());
-    mCEFLib->nativeKeyboardEventSDL2(dullahan::KE_KEY_CHAR, native_virtual_key, native_modifiers, utf8str_to_wstring(text)[0], false);
-#endif
+
+    mCEFLib->nativeKeyboardEvent(dullahan::KE_KEY_DOWN, native_scan_code, native_virtual_key, native_modifiers);
+
+#endif // LL_LINUX
 };
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -35,7 +35,7 @@
 
 class LLPathfindingNavMeshStatus;
 
-class LLMenuOptionPathfindingRebakeNavmesh final : public LLSingleton<LLMenuOptionPathfindingRebakeNavmesh>
+class LLMenuOptionPathfindingRebakeNavmesh : public LLSingleton<LLMenuOptionPathfindingRebakeNavmesh>
 {
     LLSINGLETON(LLMenuOptionPathfindingRebakeNavmesh);
     virtual ~LLMenuOptionPathfindingRebakeNavmesh();
@@ -65,7 +65,7 @@ protected:
 private:
     void setMode(ERebakeNavMeshMode pRebakeNavMeshMode);
 
-    void handleAgentState(BOOL pCanRebakeRegion);
+    void handleAgentState(bool pCanRebakeRegion);
     void handleRebakeNavMeshResponse(bool pResponseStatus);
     void handleNavMeshStatus(const LLPathfindingNavMeshStatus &pNavMeshStatus);
     void handleRegionBoundaryCrossed();

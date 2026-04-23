@@ -25,13 +25,15 @@
 * $/LicenseInfo$
 */
 
+#include "linden_common.h"
 
 #include "llprocinfo.h"
 
 #if LL_WINDOWS
 
-#include "llwin32headerslean.h"
-#include <psapi.h>
+#define PSAPI_VERSION   1
+#include "windows.h"
+#include "psapi.h"
 
 #elif LL_DARWIN
 

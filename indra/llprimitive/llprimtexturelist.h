@@ -54,7 +54,7 @@ public:
     static void setNewTextureEntryCallback( LLTextureEntry* (*callback)() );
     static LLTextureEntry* (*sNewTextureEntryCallback)();
 
-    LLPrimTextureList() = default;
+    LLPrimTextureList();
     virtual ~LLPrimTextureList();
 
     void clear();
@@ -118,7 +118,10 @@ public:
 protected:
     texture_list_t mEntryList;
 private:
-    LLPrimTextureList(const LLPrimTextureList& other_list) = delete;
+    LLPrimTextureList(const LLPrimTextureList& other_list)
+    {
+        // private so that it can't be used
+    }
 };
 
 #endif

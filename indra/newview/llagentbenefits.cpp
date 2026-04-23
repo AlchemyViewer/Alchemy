@@ -27,14 +27,6 @@
 #include "llagentbenefits.h"
 #include "llviewertexture.h"
 
-#include "llagent.h"
-#include "llagentpicksinfo.h"
-#include "lleconomy.h"
-#include "llstartup.h"
-#include "llviewercontrol.h"
-#include "llviewernetwork.h"
-#include "llviewerregion.h"
-
 LLAgentBenefits::LLAgentBenefits():
     m_initalized(false),
     m_animated_object_limit(-1),
@@ -43,8 +35,7 @@ LLAgentBenefits::LLAgentBenefits():
     m_group_membership_limit(-1),
     m_picks_limit(-1),
     m_sound_upload_cost(-1),
-    m_texture_upload_cost(-1),
-    m_create_group_cost(-1)
+    m_texture_upload_cost(-1)
 {
 }
 
@@ -132,86 +123,42 @@ bool LLAgentBenefits::init(const LLSD& benefits_sd)
 
 S32 LLAgentBenefits::getAnimatedObjectLimit() const
 {
-    if (LLGridManager::instance().isInSecondlife())
-    {
-        return m_animated_object_limit;
-    }
-    else
-    {
-        S32 max_attach = 0;
-        if (gSavedSettings.getBOOL("AnimatedObjectsIgnoreLimits"))
-        {
-            max_attach = getAttachmentLimit();
-        }
-        else
-        {
-            if (gAgent.getRegion())
-            {
-                LLSD features;
-                gAgent.getRegion()->getSimulatorFeatures(features);
-                if (features.has("AnimatedObjects"))
-                {
-                    max_attach = features["AnimatedObjects"]["MaxAgentAnimatedObjectAttachments"].asInteger();
-                }
-            }
-        }
-        return max_attach;
-    }
+    return m_animated_object_limit;
 }
 
 S32 LLAgentBenefits::getAnimationUploadCost() const
 {
-    return LLGridManager::instance().isInSecondlife() ? m_animation_upload_cost : LLGlobalEconomy::instance().getPriceUpload();
+    return m_animation_upload_cost;
 }
 
 S32 LLAgentBenefits::getAttachmentLimit() const
 {
-    if (LLGridManager::instance().isInSecondlife())
-    {
-        return m_attachment_limit;
-    }
-    else
-    {
-        const S32 MAX_AGENT_ATTACHMENTS = 38;
-
-        S32 max_attach = MAX_AGENT_ATTACHMENTS;
-
-        if (gAgent.getRegion())
-        {
-            LLSD features;
-            gAgent.getRegion()->getSimulatorFeatures(features);
-            if (features.has("MaxAgentAttachments"))
-            {
-                max_attach = features["MaxAgentAttachments"].asInteger();
-            }
-        }
-        return max_attach;
-    }
+    return m_attachment_limit;
 }
 
 S32 LLAgentBenefits::getCreateGroupCost() const
 {
-    return LLGridManager::instance().isInSecondlife() ? m_create_group_cost : 0;
+    return m_create_group_cost;
 }
 
 S32 LLAgentBenefits::getGroupMembershipLimit() const
 {
-    return LLGridManager::instance().isInSecondlife() ? m_group_membership_limit : gMaxAgentGroups;
+    return m_group_membership_limit;
 }
 
 S32 LLAgentBenefits::getPicksLimit() const
 {
-    return LLGridManager::instance().isInSecondlife() ? m_picks_limit : LLAgentPicksInfo::instance().getMaxNumberOfPicks();
+    return m_picks_limit;
 }
 
 S32 LLAgentBenefits::getSoundUploadCost() const
 {
-    return LLGridManager::instance().isInSecondlife() ? m_sound_upload_cost : LLGlobalEconomy::instance().getPriceUpload();
+    return m_sound_upload_cost;
 }
 
 S32 LLAgentBenefits::getTextureUploadCost() const
 {
-    return LLGridManager::instance().isInSecondlife() ? m_texture_upload_cost : LLGlobalEconomy::instance().getPriceUpload();
+    return m_texture_upload_cost;
 }
 
 S32 LLAgentBenefits::getTextureUploadCost(const LLViewerTexture* tex) const
@@ -248,6 +195,19 @@ S32 LLAgentBenefits::getTextureUploadCost(const LLImageBase* tex) const
     return getTextureUploadCost();
 }
 
+S32 LLAgentBenefits::getTextureUploadCost(S32 w, S32 h) const
+{
+    if (w > 0 && h > 0)
+    {
+        S32 area = w * h;
+        if (area >= MIN_2K_TEXTURE_AREA)
+        {
+            return get2KTextureUploadCost(area);
+        }
+    }
+    return getTextureUploadCost();
+}
+
 S32 LLAgentBenefits::get2KTextureUploadCost(S32 area) const
 {
     if (m_2k_texture_upload_cost.empty())
@@ -257,7 +217,7 @@ S32 LLAgentBenefits::get2KTextureUploadCost(S32 area) const
     return m_2k_texture_upload_cost[0];
 }
 
-bool LLAgentBenefits::findUploadCost(LLAssetType::EType& asset_type, S32& cost) const
+bool LLAgentBenefits::findUploadCost(const LLAssetType::EType& asset_type, S32& cost) const
 {
     bool succ = false;
     if (asset_type == LLAssetType::AT_TEXTURE)

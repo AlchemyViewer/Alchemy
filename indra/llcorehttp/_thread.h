@@ -39,16 +39,17 @@ namespace LLCoreInt
 
 class HttpThread
 {
-private:
-    HttpThread() = delete;                  // Not defined
+public:
+    HttpThread() = delete;                              // Not defined
+    HttpThread(const HttpThread&) = delete;             // Not defined
     void operator=(const HttpThread &) = delete;        // Not defined
 
+private:
     void run()
-        { // THREAD CONTEXT
-            LL_PROFILER_SET_THREAD_NAME("HTTP Service");
-            // run the thread function
-            mThreadFunc(this);
-        } // THREAD CONTEXT
+    { // THREAD CONTEXT
+        // run the thread function
+        mThreadFunc(this);
+    } // THREAD CONTEXT
 
 public:
     /// Constructs a thread object for concurrent execution but does
@@ -57,40 +58,46 @@ public:
     /// out for the exit handler.
     explicit HttpThread(std::function<void (HttpThread *)> threadFunc)
           : mThreadFunc(threadFunc)
-        {
-            // this creates a std thread that will call HttpThread::run on this instance
-            // and pass it the threadfunc callable...
-            std::function<void()> f = std::bind(&HttpThread::run, this);
+    {
+        // this creates a std thread that will call HttpThread::run on this instance
+        // and pass it the threadfunc callable...
+        std::function<void()> f = std::bind(&HttpThread::run, this);
 
-            mThread = std::make_unique<std::thread>(f);
-        }
+        mThread = std::make_unique<std::thread>(f);
+        mNativeHandle = mThread->native_handle();
+    }
 
     ~HttpThread() = default;
 
     inline void join()
-        {
-            mThread->join();
-        }
+    {
+        mThread->join();
+    }
 
     inline bool joinable() const
-        {
-            return mThread->joinable();
-        }
+    {
+        return mThread->joinable();
+    }
+
+    inline void detach()
+    {
+        mThread->detach();
+    }
 
     // A very hostile method to force a thread to quit
     inline void cancel()
-        {
-            std::thread::native_handle_type thread(mThread->native_handle());
-#if     LL_WINDOWS
-            TerminateThread(thread, 0);
+    {
+#if LL_WINDOWS
+        TerminateThread(mNativeHandle, 0);
 #else
-            pthread_cancel(thread);
+        pthread_cancel(mNativeHandle);
 #endif
-        }
+    }
 
 private:
     std::function<void(HttpThread *)> mThreadFunc;
     std::unique_ptr<std::thread> mThread;
+    std::thread::native_handle_type mNativeHandle;
 }; // end class HttpThread
 
 } // end namespace LLCoreInt

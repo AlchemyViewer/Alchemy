@@ -84,7 +84,7 @@ public:
     class LineColorSegment
     {
         public:
-            LineColorSegment(LLWString text, LLColor4 color, F32 xpos) : mText(std::move(text)), mColor(std::move(color)), mXPosition(xpos) {}
+            LineColorSegment(LLWString text, LLColor4 color, F32 xpos) : mText(text), mColor(color), mXPosition(xpos) {}
         public:
             LLWString mText;
             LLColor4  mColor;
@@ -127,12 +127,12 @@ public:
     typedef std::deque<Paragraph> paragraph_t;
     paragraph_t mParagraphs;
 
-    ~LLConsole()= default;
+    ~LLConsole(){};
 
     // each line lasts this long after being added
     void            setLinePersistTime(F32 seconds);
 
-    void            reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+    void            reshape(S32 width, S32 height, bool called_from_parent = true);
 
     // -1 = monospace, 0 means small, font size = 1 means big
     void            setFontSize(S32 size_index);
@@ -143,7 +143,6 @@ public:
 private:
     void        update();
 
-    LLUIImagePtr mBackgroundImagep;
     F32         mLinePersistTime; // Age at which to stop drawing.
     F32         mFadeTime; // Age at which to start fading
     const LLFontGL* mFont;

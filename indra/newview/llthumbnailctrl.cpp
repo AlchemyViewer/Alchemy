@@ -48,7 +48,6 @@ LLThumbnailCtrl::Params::Params()
 , border_visible("show_visible", false)
 , interactable("interactable", false)
 , show_loading("show_loading", true)
-, for_profile("for_profile", false)
 {}
 
 LLThumbnailCtrl::LLThumbnailCtrl(const LLThumbnailCtrl::Params& p)
@@ -60,7 +59,6 @@ LLThumbnailCtrl::LLThumbnailCtrl(const LLThumbnailCtrl::Params& p)
 ,   mShowLoadingPlaceholder(p.show_loading())
 ,   mInited(false)
 ,   mInitImmediately(true)
-,   mForProfile(p.for_profile)
 {
     mLoadingPlaceholderString = LLTrans::getString("texture_loading");
 
@@ -97,7 +95,7 @@ void LLThumbnailCtrl::draw()
     {
         mBorder->setKeyboardFocusHighlight(hasFocus());
 
-        gl_rect_2d( draw_rect, mBorderColor.get(), FALSE );
+        gl_rect_2d( draw_rect, mBorderColor.get(), false );
         draw_rect.stretch( -1 );
     }
 
@@ -108,12 +106,14 @@ void LLThumbnailCtrl::draw()
         if( mTexturep->getComponents() == 4 )
         {
             const LLColor4 color(.098f, .098f, .098f);
-            gl_rect_2d( draw_rect, color, TRUE);
+            gl_rect_2d( draw_rect, color, true);
         }
 
         gl_draw_scaled_image( draw_rect.mLeft, draw_rect.mBottom, draw_rect.getWidth(), draw_rect.getHeight(), mTexturep, UI_VERTEX_COLOR % alpha);
 
-        mTexturep->setKnownDrawSize(draw_rect.getWidth(), draw_rect.getHeight());
+        // Thumbnails are usually 256x256 or smaller, either report that or
+        // some high value to get image with higher priority
+        mTexturep->setKnownDrawSize(MAX_IMAGE_SIZE, MAX_IMAGE_SIZE);
     }
     else if( mImagep.notNull() )
     {
@@ -144,7 +144,7 @@ void LLThumbnailCtrl::draw()
     }
     else
     {
-        gl_rect_2d( draw_rect, LLColor4::grey % alpha, TRUE );
+        gl_rect_2d( draw_rect, LLColor4::grey % alpha, true );
 
         // Draw X
         gl_draw_x( draw_rect, LLColor4::black );
@@ -166,8 +166,8 @@ void LLThumbnailCtrl::draw()
             font->renderUTF8(
                 mLoadingPlaceholderString,
                 0,
-                llfloor(draw_rect.mLeft+3),
-                llfloor(draw_rect.mTop-v_offset),
+                (draw_rect.mLeft+3),
+                (draw_rect.mTop-v_offset),
                 LLColor4::white,
                 LLFontGL::LEFT,
                 LLFontGL::BASELINE,
@@ -176,6 +176,15 @@ void LLThumbnailCtrl::draw()
     }
 
     LLUICtrl::draw();
+}
+
+void LLThumbnailCtrl::setVisible(bool visible)
+{
+    if (!visible && mInited)
+    {
+        unloadImage();
+    }
+    LLUICtrl::setVisible(visible);
 }
 
 void LLThumbnailCtrl::clearTexture()
@@ -205,12 +214,12 @@ void LLThumbnailCtrl::setValue(const LLSD& value)
     }
 }
 
-BOOL LLThumbnailCtrl::handleHover(S32 x, S32 y, MASK mask)
+bool LLThumbnailCtrl::handleHover(S32 x, S32 y, MASK mask)
 {
     if (mInteractable && getEnabled())
     {
         getWindow()->setCursor(UI_CURSOR_HAND);
-        return TRUE;
+        return true;
     }
     return LLUICtrl::handleHover(x, y, mask);
 }
@@ -226,17 +235,13 @@ void LLThumbnailCtrl::initImage()
 
     if (tvalue.isUUID())
     {
-        auto imageAssetID = tvalue.asUUID();
-        if (imageAssetID.notNull())
+        mImageAssetID = tvalue.asUUID();
+        if (mImageAssetID.notNull())
         {
             // Should it support baked textures?
-            mTexturep = LLViewerTextureManager::getFetchedTexture(imageAssetID, FTT_DEFAULT, MIPMAP_YES, mForProfile ? LLGLTexture::BOOST_PREVIEW : LLGLTexture::BOOST_THUMBNAIL);
-
+            mTexturep = LLViewerTextureManager::getFetchedTexture(mImageAssetID, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_THUMBNAIL);
             mTexturep->forceToSaveRawImage(0);
-
-            S32 desired_draw_width = MAX_IMAGE_SIZE;
-            S32 desired_draw_height = MAX_IMAGE_SIZE;
-            mTexturep->setKnownDrawSize(desired_draw_width, desired_draw_height);
+            mTexturep->setKnownDrawSize(MAX_IMAGE_SIZE, MAX_IMAGE_SIZE);
         }
     }
     else if (tvalue.isString())
@@ -244,31 +249,21 @@ void LLThumbnailCtrl::initImage()
         mImagep = LLUI::getUIImage(tvalue.asString(), LLGLTexture::BOOST_UI);
         if (mImagep)
         {
-            LLRect draw_rect = getLocalRect();
-            if (mBorderVisible)
+            LLViewerFetchedTexture* texture = dynamic_cast<LLViewerFetchedTexture*>(mImagep->getImage().get());
+            if (texture)
             {
-                draw_rect.stretch(-1);
+                mImageAssetID = texture->getID();
             }
-            mImagep->getImage()->setKnownDrawSize(draw_rect.getWidth(), draw_rect.getHeight());
         }
     }
 }
 
 void LLThumbnailCtrl::unloadImage()
 {
+    mImageAssetID = LLUUID::null;
     mTexturep = nullptr;
     mImagep = nullptr;
     mInited = false;
-}
-
-void LLThumbnailCtrl::onVisibilityChange(BOOL new_visibility)
-{
-    if (!new_visibility && mInited)
-    {
-        unloadImage();
-    }
-
-    LLUICtrl::onVisibilityChange(new_visibility);
 }
 
 

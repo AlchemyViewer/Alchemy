@@ -54,6 +54,7 @@ public:
         U32 groupPerms,
         U32 everyonePerms,
         S32 expectedCost,
+        const LLUUID &destFolderId = LLUUID::null,
         bool showInventory = true);
 
     virtual ~LLResourceUploadInfo()
@@ -94,9 +95,9 @@ public:
     static bool         findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec);
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: Catznip-4.0
-    typedef boost::function<void(LLUUID itemId)> upload_error_f;
+    typedef std::function<void(LLUUID itemId)> upload_error_f;
     // Should add this as a parameter to the constructor but this requires less code changes
-    void callUploadErrorCb() { if (mUploadErrorFn) { mUploadErrorFn(mItemId); } }
+    void callUploadErrorCb() { if (mUploadErrorFn != nullptr) { mUploadErrorFn(mItemId); } }
     void setUploadErrorCb(upload_error_f fnUploadError) { mUploadErrorFn = fnUploadError; }
 // [/SL:KLB]
 protected:
@@ -110,6 +111,7 @@ protected:
         U32 groupPerms,
         U32 everyonePerms,
         S32 expectedCost,
+        const LLUUID& destFolderId = LLUUID::null,
         bool showInventory = true);
 
     LLResourceUploadInfo(
@@ -164,11 +166,14 @@ public:
         U32 groupPerms,
         U32 everyonePerms,
         S32 expectedCost,
+        const LLUUID &destFolderId = LLUUID::null,
         bool show_inventory = true);
 
-    LLSD                prepareUpload() override;
+    virtual LLSD        prepareUpload();
 
     std::string         getFileName() const { return mFileName; };
+
+    void setMaxImageSize(U32 maxUploadSize) { mMaxImageSize = maxUploadSize; }
 
 protected:
 
@@ -176,7 +181,7 @@ protected:
 
 private:
     std::string         mFileName;
-
+    S32                 mMaxImageSize;
 };
 
 //-------------------------------------------------------------------------
@@ -200,6 +205,7 @@ public:
         U32 groupPerms,
         U32 everyonePerms,
         S32 expectedCost,
+        const LLUUID& destFolderId, // use null for default
         bool show_inventory,
         uploadFinish_f finish,
         uploadFailure_f failure);
@@ -226,6 +232,7 @@ public:
     typedef std::function<void(LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response)> taskUploadFinish_f;
     typedef std::function<bool(LLUUID itemId, LLUUID taskId, LLSD response, std::string reason)> uploadFailed_f;
 
+    // destFolderId is the folder to put the new item in, leave null for default
     LLBufferedAssetUploadInfo(LLUUID itemId, LLAssetType::EType assetType, std::string buffer, invnUploadFinish_f finish, uploadFailed_f failed);
     LLBufferedAssetUploadInfo(LLUUID itemId, LLPointer<LLImageFormatted> image, invnUploadFinish_f finish);
     LLBufferedAssetUploadInfo(LLUUID taskId, LLUUID itemId, LLAssetType::EType assetType, std::string buffer, taskUploadFinish_f finish, uploadFailed_f failed);
@@ -258,25 +265,19 @@ private:
 class LLScriptAssetUpload : public LLBufferedAssetUploadInfo
 {
 public:
-    enum TargetType_t
-    {
-        LSL2,
-        MONO
-    };
-
-    LLScriptAssetUpload(LLUUID itemId, std::string buffer, invnUploadFinish_f finish, uploadFailed_f failed, TargetType_t targetType = MONO);
-    LLScriptAssetUpload(LLUUID taskId, LLUUID itemId, TargetType_t targetType,
+    LLScriptAssetUpload(LLUUID itemId, std::string compileTarget, std::string buffer, invnUploadFinish_f finish, uploadFailed_f failed);
+    LLScriptAssetUpload(LLUUID taskId, LLUUID itemId, std::string compileTarget,
             bool isRunning, LLUUID exerienceId, std::string buffer, taskUploadFinish_f finish, uploadFailed_f failed);
 
     virtual LLSD        generatePostBody();
 
     LLUUID              getExerienceId() const { return mExerienceId; }
-    TargetType_t        getTargetType() const { return mTargetType; }
+    const std::string&  getCompileTarget() const { return mCompileTarget; }
     bool                getIsRunning() const { return mIsRunning; }
 
 private:
     LLUUID              mExerienceId;
-    TargetType_t        mTargetType;
+    std::string         mCompileTarget;
     bool                mIsRunning;
 
 };

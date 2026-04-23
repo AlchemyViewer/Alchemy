@@ -1,5 +1,5 @@
 /**
- * @file llfloatergenerictext.cpp
+ * @file alfloatergenerictext.cpp
  * @brief A generic text floater for dumping info (usually debug info)
  *
  * Copyright (c) 2015, Cinder Roxley <cinder@sdf.org>
@@ -33,29 +33,29 @@
 #include "llclipboard.h"
 #include "lltexteditor.h"
 
-LLFloaterGenericText::LLFloaterGenericText(const LLSD& key)
+ALFloaterGenericText::ALFloaterGenericText(const LLSD& key)
 :   LLFloater(key)
 {
     mTitle = key["title"].asString();
     mContents = key["data"].asString();
 
-    mCommitCallbackRegistrar.add("GenericText.Close", boost::bind(&LLFloaterGenericText::onClickClose, this));
-    mCommitCallbackRegistrar.add("GenericText.Copy", boost::bind(&LLFloaterGenericText::onClickCopy, this));
+    mCommitCallbackRegistrar.add("GenericText.Close", boost::bind(&ALFloaterGenericText::onClickClose, this));
+    mCommitCallbackRegistrar.add("GenericText.Copy", boost::bind(&ALFloaterGenericText::onClickCopy, this));
 }
 
-BOOL LLFloaterGenericText::postBuild()
+bool ALFloaterGenericText::postBuild()
 {
     setTitle(mTitle);
     getChild<LLTextEditor>("payload")->setText(mContents);
     return LLFloater::postBuild();
 }
 
-void LLFloaterGenericText::onClickClose()
+void ALFloaterGenericText::onClickClose()
 {
     closeFloater();
 }
 
-void LLFloaterGenericText::onClickCopy()
+void ALFloaterGenericText::onClickCopy()
 {
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(mContents, mContents.length()), 0, mContents.length());
+    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(mContents, mContents.length()), 0, narrow(mContents.length()));
 }

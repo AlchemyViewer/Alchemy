@@ -60,16 +60,13 @@ public:
     // and modify mOrig where appropriate
     LLUIString() : mArgs(NULL), mNeedsResult(false), mNeedsWResult(false) {}
     LLUIString(const std::string& instring, const LLStringUtil::format_map_t& args);
-    LLUIString(std::string&& instring, const LLStringUtil::format_map_t& args);
     LLUIString(const std::string& instring) : mArgs(NULL) { assign(instring); }
-    LLUIString(const LLWString& instring) : mArgs(NULL) { insert(0, instring); }
-    LLUIString(std::string&& instring) : mArgs(NULL) { assign(std::move(instring)); }
+    LLUIString(const LLWString& instring) : mArgs(NULL) { assign(instring); }
     ~LLUIString() { delete mArgs; }
 
     void assign(const std::string& instring);
-    void assign(std::string&& instring);
+    void assign(const LLWString& instring);
     LLUIString& operator=(const std::string& s) { assign(s); return *this; }
-    LLUIString& operator=(std::string&& s) { assign(std::move(s)); return *this; }
 
     void setArgList(const LLStringUtil::format_map_t& args);
     void setArgs(const LLStringUtil::format_map_t& args) { setArgList(args); }
@@ -83,7 +80,7 @@ public:
     operator LLWString() const { return getUpdatedWResult(); }
 
     bool empty() const { return getUpdatedResult().empty(); }
-    S32 length() const { return getUpdatedWResult().size(); }
+    S32 length() const { return static_cast<S32>(getUpdatedWResult().size()); }
 
     void clear();
     void clearArgs() { if (mArgs) mArgs->clear(); }
@@ -113,8 +110,8 @@ private:
     LLStringUtil::format_map_t* mArgs;
 
     // controls lazy evaluation
-    mutable bool    mNeedsResult;
-    mutable bool    mNeedsWResult;
+    mutable bool    mNeedsResult { true };
+    mutable bool    mNeedsWResult { true };
 };
 
 #endif // LL_LLUISTRING_H

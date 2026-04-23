@@ -53,7 +53,10 @@
 static LLDefaultChildRegistry::Register<LLAvatarList> r("avatar_list");
 
 // Last interaction time update period.
-static const F32 LIT_UPDATE_PERIOD = 2;
+static const F32 LIT_UPDATE_PERIOD = 5;
+
+// Distance update period.
+static const F32 DIST_UPDATE_PERIOD = 1;
 
 // Maximum number of avatars that can be added to a list in one pass.
 // Used to limit time spent for avatar list update per frame.
@@ -153,6 +156,7 @@ LLAvatarList::LLAvatarList(const Params& p)
 , mShowSpeakingIndicator(p.show_speaking_indicator)
 , mShowPermissions(p.show_permissions_granted)
 , mShowCompleteName(false)
+, mForceCompleteName(false)
 // [RLVa:KB] - Checked: RLVa-1.2.0
 , mRlvCheckShowNames(false)
 // [/RLVa:KB]
@@ -191,9 +195,9 @@ void LLAvatarList::setShowIcons(std::string param_name)
     mShowIcons = gSavedSettings.getBOOL(mIconParamName);
 }
 
-std::string LLAvatarList::getAvatarName(const LLAvatarName& av_name)
+std::string LLAvatarList::getAvatarName(LLAvatarName av_name)
 {
-    return mShowCompleteName? av_name.getCompleteName(false) : av_name.getDisplayName();
+    return mShowCompleteName? av_name.getCompleteName(false, mForceCompleteName) : av_name.getDisplayName();
 }
 
 // virtual
@@ -220,7 +224,7 @@ void LLAvatarList::draw()
     else if (mShowDistance && mLITUpdateTimer->hasExpired())
     {
         updateDistances();
-        mLITUpdateTimer->setTimerExpirySec(LIT_UPDATE_PERIOD);
+        mLITUpdateTimer->setTimerExpirySec(DIST_UPDATE_PERIOD); // restart the timer
     }
 }
 
@@ -271,7 +275,7 @@ void LLAvatarList::setDirty(bool val /*= true*/, bool force_refresh /*= false*/)
 //////////////////////////////////////////////////////////////////////////
 void LLAvatarList::refresh()
 {
-    bool have_names         = TRUE;
+    bool have_names         = true;
     bool add_limit_exceeded = false;
     bool modified           = false;
     bool have_filter        = !mNameFilter.empty();
@@ -287,10 +291,11 @@ void LLAvatarList::refresh()
 
     // Handle added items.
     unsigned nadded = 0;
-    static const std::string waiting_str = LLTrans::getString("AvatarNameWaiting");
+    const std::string waiting_str = LLTrans::getString("AvatarNameWaiting");
 
-    for (const LLUUID& buddy_id : added)
+    for (uuid_vec_t::const_iterator it=added.begin(); it != added.end(); it++)
     {
+        const LLUUID& buddy_id = *it;
         LLAvatarName av_name;
         have_names &= LLAvatarNameCache::get(buddy_id, &av_name);
 
@@ -303,6 +308,8 @@ void LLAvatarList::refresh()
             }
             else
             {
+                // *NOTE: If you change the UI to show a different string,
+                // be sure to change the filter code below.
                 std::string display_name = getAvatarName(av_name);
                 addNewItem(buddy_id,
                     display_name.empty() ? waiting_str : display_name,
@@ -315,9 +322,9 @@ void LLAvatarList::refresh()
     }
 
     // Handle removed items.
-    for (const LLUUID& rem_id : removed)
+    for (uuid_vec_t::const_iterator it=removed.begin(); it != removed.end(); it++)
     {
-        removeItemByUUID(rem_id);
+        removeItemByUUID(*it);
         modified = true;
     }
 
@@ -386,7 +393,7 @@ void LLAvatarList::updateAvatarNames()
     for( std::vector<LLPanel*>::const_iterator it = items.begin(); it != items.end(); it++)
     {
         LLAvatarListItem* item = static_cast<LLAvatarListItem*>(*it);
-        item->setShowCompleteName(mShowCompleteName);
+        item->setShowCompleteName(mShowCompleteName, mForceCompleteName);
         item->updateAvatarName();
     }
     mNeedUpdateNames = false;
@@ -397,8 +404,9 @@ bool LLAvatarList::filterHasMatches()
 {
     uuid_vec_t values = getIDs();
 
-    for (const auto& buddy_id : values)
+    for (uuid_vec_t::const_iterator it=values.begin(); it != values.end(); it++)
     {
+        const LLUUID& buddy_id = *it;
         LLAvatarName av_name;
         bool have_name = LLAvatarNameCache::get(buddy_id, &av_name);
 
@@ -425,6 +433,11 @@ boost::signals2::connection LLAvatarList::setItemDoubleClickCallback(const mouse
     return mItemDoubleClickSignal.connect(cb);
 }
 
+boost::signals2::connection LLAvatarList::setItemClickedCallback(const mouse_signal_t::slot_type& cb)
+{
+    return mItemClickedSignal.connect(cb);
+}
+
 //virtual
 S32 LLAvatarList::notifyParent(const LLSD& info)
 {
@@ -436,10 +449,10 @@ S32 LLAvatarList::notifyParent(const LLSD& info)
     return LLFlatListViewEx::notifyParent(info);
 }
 
-void LLAvatarList::addNewItem(const LLUUID& id, const std::string& name, BOOL is_online, EAddPosition pos)
+void LLAvatarList::addNewItem(const LLUUID& id, const std::string& name, bool is_online, EAddPosition pos)
 {
     LLAvatarListItem* item = new LLAvatarListItem();
-    item->setShowCompleteName(mShowCompleteName);
+    item->setShowCompleteName(mShowCompleteName, mForceCompleteName);
 // [RLVa:KB] - Checked: RLVa-1.2.0
     item->setRlvCheckShowNames(mRlvCheckShowNames);
 // [/RLVa:KB]
@@ -456,14 +469,15 @@ void LLAvatarList::addNewItem(const LLUUID& id, const std::string& name, BOOL is
 
 
     item->setDoubleClickCallback(boost::bind(&LLAvatarList::onItemDoubleClicked, this, _1, _2, _3, _4));
+    item->setMouseDownCallback(boost::bind(&LLAvatarList::onItemClicked, this, _1, _2, _3, _4));
 
     addItem(item, id, pos);
 }
 
 // virtual
-BOOL LLAvatarList::handleRightMouseDown(S32 x, S32 y, MASK mask)
+bool LLAvatarList::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
-    BOOL handled = LLUICtrl::handleRightMouseDown(x, y, mask);
+    bool handled = LLUICtrl::handleRightMouseDown(x, y, mask);
     if ( mContextMenu)
     {
         uuid_vec_t selected_uuids;
@@ -473,7 +487,7 @@ BOOL LLAvatarList::handleRightMouseDown(S32 x, S32 y, MASK mask)
     return handled;
 }
 
-BOOL LLAvatarList::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLAvatarList::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     gFocusMgr.setMouseCapture(this);
 
@@ -485,7 +499,7 @@ BOOL LLAvatarList::handleMouseDown(S32 x, S32 y, MASK mask)
     return LLFlatListViewEx::handleMouseDown(x, y, mask);
 }
 
-BOOL LLAvatarList::handleMouseUp( S32 x, S32 y, MASK mask )
+bool LLAvatarList::handleMouseUp( S32 x, S32 y, MASK mask )
 {
     if(hasMouseCapture())
     {
@@ -495,7 +509,7 @@ BOOL LLAvatarList::handleMouseUp( S32 x, S32 y, MASK mask )
     return LLFlatListViewEx::handleMouseUp(x, y, mask);
 }
 
-BOOL LLAvatarList::handleHover(S32 x, S32 y, MASK mask)
+bool LLAvatarList::handleHover(S32 x, S32 y, MASK mask)
 {
     bool handled = hasMouseCapture();
     if(handled)
@@ -524,9 +538,9 @@ BOOL LLAvatarList::handleHover(S32 x, S32 y, MASK mask)
     return handled;
 }
 
-void LLAvatarList::setVisible(BOOL visible)
+void LLAvatarList::setVisible(bool visible)
 {
-    if ( visible == FALSE && mContextMenu )
+    if (!visible && mContextMenu )
     {
         mContextMenu->hide();
     }
@@ -571,6 +585,11 @@ void LLAvatarList::updateLastInteractionTimes()
 
 void LLAvatarList::updateDistances()
 {
+    if (gDisconnected)
+    {
+        return;
+    }
+
     std::vector<LLPanel*> items;
     getItems(items);
 
@@ -589,7 +608,7 @@ void LLAvatarList::updateDistances()
 
         LLWorld::pos_map_t::iterator iter = positions.find(item->getAvatarId());
         if (iter != positions.end())
-            item->setTextFieldDistance((iter->second - gAgent.getPositionGlobal()).magVec());
+            item->setTextFieldDistance(F32((iter->second - gAgent.getPositionGlobal()).magVec()));
         else
             item->setTextFieldDistance(0.f);
     }
@@ -598,6 +617,11 @@ void LLAvatarList::updateDistances()
 void LLAvatarList::onItemDoubleClicked(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
 {
     mItemDoubleClickSignal(ctrl, x, y, mask);
+}
+
+void LLAvatarList::onItemClicked(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
+{
+    mItemClickedSignal(ctrl, x, y, mask);
 }
 
 bool LLAvatarItemComparator::compare(const LLPanel* item1, const LLPanel* item2) const

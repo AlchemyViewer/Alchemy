@@ -52,36 +52,33 @@ public:
 
     LLVOWater(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
 
-    /*virtual*/ void markDead() final;
+    /*virtual*/ void markDead();
 
     // Initialize data that's only inited once per class.
     static void initClass();
     static void cleanupClass();
 
-    /*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time) final;
-    /*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline) final;
-    /*virtual*/ BOOL        updateGeometry(LLDrawable *drawable) final;
-    /*virtual*/ void        updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax) final;
+    /*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time);
+    /*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline);
+    /*virtual*/ bool        updateGeometry(LLDrawable *drawable);
+    /*virtual*/ void        updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax);
 
-    /*virtual*/ void updateTextures() final;
-    /*virtual*/ void setPixelAreaAndAngle(LLAgent &agent) final; // generate accurate apparent angle and area
+    /*virtual*/ void updateTextures();
+    /*virtual*/ void setPixelAreaAndAngle(LLAgent &agent); // generate accurate apparent angle and area
 
-    /*virtual*/ U32 getPartitionType() const override;
+    virtual U32 getPartitionType() const;
 
-    /*virtual*/ BOOL isActive() const final; // Whether this object needs to do an idleUpdate.
+    /*virtual*/ bool isActive() const; // Whether this object needs to do an idleUpdate.
 
-    void setUseTexture(const BOOL use_texture);
-    void setIsEdgePatch(const BOOL edge_patch);
-    BOOL getUseTexture() const { return mUseTexture; }
-    BOOL getIsEdgePatch() const { return mIsEdgePatch; }
+    void setIsEdgePatch(const bool edge_patch);
+    bool getIsEdgePatch() const { return mIsEdgePatch; }
 
 protected:
-    BOOL mUseTexture;
-    BOOL mIsEdgePatch;
+    bool mIsEdgePatch;
     S32  mRenderType;
 };
 
-class LLVOVoidWater final : public LLVOWater
+class LLVOVoidWater : public LLVOWater
 {
 public:
     LLVOVoidWater(LLUUID const& id, LLPCode pcode, LLViewerRegion* regionp) : LLVOWater(id, pcode, regionp)
@@ -89,7 +86,7 @@ public:
         mRenderType = LLPipeline::RENDER_TYPE_VOIDWATER;
     }
 
-    /*virtual*/ U32 getPartitionType() const override;
+    /*virtual*/ U32 getPartitionType() const;
 };
 
 

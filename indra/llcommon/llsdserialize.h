@@ -44,7 +44,7 @@ protected:
     /**
      * @brief Destructor
      */
-    virtual ~LLSDParser() = default;
+    virtual ~LLSDParser();
 
 public:
     /**
@@ -223,13 +223,13 @@ protected:
     /**
      * @brief Destructor
      */
-    virtual ~LLSDNotationParser() = default;
+    virtual ~LLSDNotationParser();
 
 public:
     /**
      * @brief Constructor
      */
-    LLSDNotationParser() = default;
+    LLSDNotationParser();
 
 protected:
     /**
@@ -350,13 +350,13 @@ protected:
     /**
      * @brief Destructor
      */
-    virtual ~LLSDBinaryParser() = default;
+    virtual ~LLSDBinaryParser();
 
 public:
     /**
      * @brief Constructor
      */
-    LLSDBinaryParser() = default;
+    LLSDBinaryParser();
 
 protected:
     /**
@@ -419,7 +419,7 @@ protected:
     /**
      * @brief Destructor
      */
-    virtual ~LLSDFormatter() = default;
+    virtual ~LLSDFormatter();
 
 public:
     /**
@@ -435,7 +435,7 @@ public:
     /**
      * @brief Constructor
      */
-    LLSDFormatter(bool boolAlpha=false, bool orderedMap=false, const std::string& realFormat="",
+    LLSDFormatter(bool boolAlpha=false, const std::string& realFormat="",
                   EFormatterOptions options=OPTIONS_PRETTY_BINARY);
 
     /**
@@ -500,7 +500,6 @@ protected:
     void formatReal(LLSD::Real real, std::ostream& ostr) const;
 
     bool mBoolAlpha;
-    bool mOrderedMap;
     std::string mRealFormat;
     EFormatterOptions mOptions;
 };
@@ -516,13 +515,13 @@ protected:
     /**
      * @brief Destructor
      */
-    virtual ~LLSDNotationFormatter() = default;
+    virtual ~LLSDNotationFormatter();
 
 public:
     /**
      * @brief Constructor
      */
-    LLSDNotationFormatter(bool boolAlpha=false, bool orderedMap = false, const std::string& realFormat="",
+    LLSDNotationFormatter(bool boolAlpha=false, const std::string& realFormat="",
                           EFormatterOptions options=OPTIONS_PRETTY_BINARY);
 
     /**
@@ -560,13 +559,13 @@ protected:
     /**
      * @brief Destructor
      */
-    virtual ~LLSDXMLFormatter() = default;
+    virtual ~LLSDXMLFormatter();
 
 public:
     /**
      * @brief Constructor
      */
-    LLSDXMLFormatter(bool boolAlpha=false, bool orderedMap=false, const std::string& realFormat="",
+    LLSDXMLFormatter(bool boolAlpha=false, const std::string& realFormat="",
                      EFormatterOptions options=OPTIONS_PRETTY_BINARY);
 
     /**
@@ -632,13 +631,13 @@ protected:
     /**
      * @brief Destructor
      */
-    virtual ~LLSDBinaryFormatter() = default;
+    virtual ~LLSDBinaryFormatter();
 
 public:
     /**
      * @brief Constructor
      */
-    LLSDBinaryFormatter(bool boolAlpha=false, bool orderedMap = false, const std::string& realFormat="",
+    LLSDBinaryFormatter(bool boolAlpha=false, const std::string& realFormat="",
                         EFormatterOptions options=OPTIONS_PRETTY_BINARY);
 
 protected:
@@ -872,7 +871,6 @@ LL_COMMON_API std::string zip_llsd(LLSD& data);
 
 
 LL_COMMON_API U8* unzip_llsdNavMesh( bool& valid, size_t& outsize,std::istream& is, S32 size);
-LL_COMMON_API U8* unzip_llsdNavMesh(bool& valid, size_t& outsize, const U8* in, S32 size);
 
 // returns a pointer to the array or past the array if the deprecated header exists
 LL_COMMON_API char* strip_deprecated_header(char* in, llssize& cur_size, llssize* header_size = nullptr);

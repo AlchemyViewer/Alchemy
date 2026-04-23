@@ -31,6 +31,7 @@
 
 // linden library includes
 #include "llerror.h"
+#include "llfiltereditor.h"
 #include "llfloaterreg.h"
 #include "llfontgl.h"
 #include "llinventorydefines.h"
@@ -59,6 +60,7 @@
 #include "llviewerwindow.h"
 #include "llworld.h"
 #include "llfloaterperms.h"
+#include "llviewerassetupload.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvhandler.h"
 #include "rlvlocks.h"
@@ -80,16 +82,22 @@ const char* LLPanelContents::PERMS_GROUP_CONTROL_KEY = "perms_group_control";
 const char* LLPanelContents::PERMS_ANYONE_INTERACT_KEY = "perms_anyone_interact";
 const char* LLPanelContents::PERMS_ANYONE_CONTROL_KEY = "perms_anyone_control";
 
-BOOL LLPanelContents::postBuild()
+bool LLPanelContents::postBuild()
 {
-    setMouseOpaque(FALSE);
+    setMouseOpaque(false);
 
     childSetAction("button new script",&LLPanelContents::onClickNewScript, this);
     childSetAction("button permissions",&LLPanelContents::onClickPermissions, this);
 
+    mFilterEditor = getChild<LLFilterEditor>("contents_filter");
+    mFilterEditor->setCommitCallback([&](LLUICtrl*, const LLSD&) { onFilterEdit(); });
+
     mPanelInventoryObject = getChild<LLPanelObjectInventory>("contents_inventory");
 
-    return TRUE;
+    // update permission filter once UI is fully initialized
+    mSavedFolderState.setApply(false);
+
+    return true;
 }
 
 LLPanelContents::LLPanelContents()
@@ -109,7 +117,7 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 {
     if( !objectp )
     {
-        getChildView("button new script")->setEnabled(FALSE);
+        getChildView("button new script")->setEnabled(false);
         return;
     }
 
@@ -120,7 +128,7 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     bool editable = gAgent.isGodlike()
                     || (objectp->permModify() && !objectp->isPermanentEnforced()
                            && ( objectp->permYouOwner() || ( !group_id.isNull() && gAgent.isInGroup(group_id) )));  // solves SL-23488
-    BOOL all_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME );
+    bool all_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME );
 
 // [RLVa:KB] - Checked: 2010-04-01 (RLVa-1.2.0c) | Modified: RLVa-1.0.5a
     if ( (rlv_handler_t::isEnabled()) && (editable) )
@@ -133,7 +141,7 @@ void LLPanelContents::getState(LLViewerObject *objectp )
         if ( (editable) && ((gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (gRlvHandler.hasBehaviour(RLV_BHVR_SITTP))) )
         {
             // Only check the first (non-)root object because nothing else would result in enabling the button (see below)
-            LLViewerObject* pObj = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(TRUE);
+            LLViewerObject* pObj = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(true);
 
             editable =
                 (pObj) && (isAgentAvatarValid()) && ((!gAgentAvatarp->isSitting()) || (gAgentAvatarp->getRoot() != pObj->getRootEdit()));
@@ -152,9 +160,69 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     mPanelInventoryObject->setEnabled(!objectp->isPermanentEnforced());
 }
 
+void LLPanelContents::onFilterEdit()
+{
+    const std::string& filter_substring = mFilterEditor->getText();
+    if (!mPanelInventoryObject->hasInventory())
+    {
+        mDirtyFilter = true;
+    }
+    else
+    {
+        LLFolderView* root_folder = mPanelInventoryObject->getRootFolder();
+        if (filter_substring.empty())
+        {
+            if (mPanelInventoryObject->getFilter().getFilterSubString().empty())
+            {
+                // The current filter and the new filter are empty, nothing to do
+                return;
+            }
+
+            if (mDirtyFilter && !mSavedFolderState.hasOpenFolders())
+            {
+                if (root_folder)
+                {
+                    root_folder->setOpenArrangeRecursively(true, LLFolderViewFolder::ERecurseType::RECURSE_DOWN);
+                }
+            }
+            else
+            {
+                mSavedFolderState.setApply(true);
+                if (root_folder)
+                {
+                    root_folder->applyFunctorRecursively(mSavedFolderState);
+                }
+            }
+            mDirtyFilter = false;
+
+            // Add a folder with the current item to the list of previously opened folders
+            if (root_folder)
+            {
+                LLOpenFoldersWithSelection opener;
+                root_folder->applyFunctorRecursively(opener);
+                root_folder->scrollToShowSelection();
+            }
+        }
+        else if (mPanelInventoryObject->getFilter().getFilterSubString().empty())
+        {
+            // The first letter in search term, save existing folder open state
+            if (!mPanelInventoryObject->getFilter().isNotDefault())
+            {
+                mSavedFolderState.setApply(false);
+                if (root_folder)
+                {
+                    root_folder->applyFunctorRecursively(mSavedFolderState);
+                }
+                mDirtyFilter = false;
+            }
+        }
+    }
+    mPanelInventoryObject->getFilter().setFilterSubString(filter_substring);
+}
+
 void LLPanelContents::refresh()
 {
-    const BOOL children_ok = TRUE;
+    const bool children_ok = true;
     LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
 
     getState(object);
@@ -172,7 +240,6 @@ void LLPanelContents::clearContents()
     }
 }
 
-
 //
 // Static functions
 //
@@ -180,9 +247,9 @@ void LLPanelContents::clearContents()
 // static
 void LLPanelContents::onClickNewScript(void *userdata)
 {
-    const BOOL children_ok = TRUE;
+    const bool children_ok = true;
     LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
-    if(object)
+    if (object)
     {
 // [RLVa:KB] - Checked: 2010-03-31 (RLVa-1.2.0c) | Modified: RLVa-1.0.5a
         if (rlv_handler_t::isEnabled()) // Fallback code [see LLPanelContents::getState()]
@@ -211,6 +278,23 @@ void LLPanelContents::onClickNewScript(void *userdata)
             PERM_MOVE | LLFloaterPerms::getNextOwnerPerms("Scripts"));
         std::string desc;
         LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_LSL_TEXT, desc);
+
+        U8 script_language = SST_LSL;
+        LLUUID template_id;
+
+        LLViewerRegion* region = object->getRegion();
+        if (region && region->simulatorFeaturesReceived())
+        {
+            LLSD simulatorFeatures;
+            region->getSimulatorFeatures(simulatorFeatures);
+            if (simulatorFeatures["LuaScriptsEnabled"].asBoolean())
+            {
+                script_language = SST_LUA;
+            }
+        }
+        // *TODO* Get a template ID and script_language based on user preferences.  Template ID is the inventory item UUID of a script
+        // in the user's inventory that is used as a template for new scripts.
+
         LLPointer<LLViewerInventoryItem> new_item =
             new LLViewerInventoryItem(
                 LLUUID::null,
@@ -222,9 +306,9 @@ void LLPanelContents::onClickNewScript(void *userdata)
                 "New Script",
                 desc,
                 LLSaleInfo::DEFAULT,
-                LLInventoryItemFlags::II_FLAGS_NONE,
+                LLInventoryItemFlags::II_FLAGS_SUBTYPE_MASK & script_language,
                 time_corrected());
-        object->saveScript(new_item, TRUE, true);
+        object->saveScript(new_item, true, true, template_id);
 
         std::string name = new_item->getName();
 
@@ -236,7 +320,6 @@ void LLPanelContents::onClickNewScript(void *userdata)
         // editing ASAP.
     }
 }
-
 
 // static
 void LLPanelContents::onClickPermissions(void *userdata)

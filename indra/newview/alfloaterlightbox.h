@@ -2,7 +2,7 @@
  * @file alfloaterlightbox.h
  * @brief A generic text floater for dumping info (usually debug info)
  *
- * Copyright (c) 2022, Rye Mutt <rye@alchemyviewer.org>
+ * Copyright (c) Rye Mutt <rye@alchemyviewer.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
@@ -41,7 +41,7 @@ class ALFloaterLightBox final : public LLFloater
 public:
     ALFloaterLightBox(const LLSD& key);
     ~ALFloaterLightBox() override;
-    BOOL postBuild() override;
+    bool postBuild() override;
     virtual void draw() override;
 
   private:

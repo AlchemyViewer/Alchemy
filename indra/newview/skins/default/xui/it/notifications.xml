@@ -2528,10 +2528,10 @@ Per sicurezza, verranno bloccati per alcuni secondi.</notification>
 Il pulsante verrà visualizzato quando lo spazio sarà sufficiente.</notification>
 	<notification name="ShareNotification">Scegli i residenti con i quali condividere.</notification>
 	<notification name="MeshUploadErrorDetails">[LABEL] caricamento fallito: [MESSAGE]
-[DETAILS]Vedi SecondLife.log per ulteriori dettagli</notification>
+[DETAILS]Vedi Alchemy.log per ulteriori dettagli</notification>
 	<notification name="MeshUploadError">[LABEL] caricamento fallito: [MESSAGE] 
 
-Vedi SecondLife.log per ulteriori dettagli</notification>
+Vedi Alchemy.log per ulteriori dettagli</notification>
 	<notification name="MeshUploadPermError">Errore durante la richiesta di autorizzazione al caricamento del reticolo.</notification>
 	<notification name="RegionCapabilityRequestError">Non è stata ottenuta la capacità della regione '[CAPABILITY]'.</notification>
 	<notification name="ShareItemsConfirmation">

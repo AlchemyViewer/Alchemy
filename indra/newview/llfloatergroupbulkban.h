@@ -31,7 +31,7 @@
 #include "llfloater.h"
 #include "lluuid.h"
 
-class LLFloaterGroupBulkBan final : public LLFloater
+class LLFloaterGroupBulkBan : public LLFloater
 {
 public:
     virtual ~LLFloaterGroupBulkBan();

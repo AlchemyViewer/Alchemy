@@ -77,14 +77,14 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoGetCoro(std::string url, U64 
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("AvatarRenderInfoAccountant", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("AvatarRenderInfoAccountant", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     // Going to request each 15 seconds either way, so don't wait
     // too long and don't repeat
     httpOpts->setRetries(0);
-    httpOpts->setTimeout(SECS_BETWEEN_REGION_REQUEST);
+    httpOpts->setTimeout((unsigned int)SECS_BETWEEN_REGION_REQUEST);
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url, httpOpts);
 
@@ -194,9 +194,9 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoReportCoro(std::string url, U
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("AvatarRenderInfoAccountant", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("AvatarRenderInfoAccountant", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     // Going to request each 60+ seconds, timeout is 30s.
     // Don't repeat too often, will be sending newer data soon
@@ -226,12 +226,10 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoReportCoro(std::string url, U
     // Build the render info to POST to the region
     LLSD agents = LLSD::emptyMap();
 
-    std::vector<LLCharacter*>::iterator iter = LLCharacter::sInstances.begin();
-    while( iter != LLCharacter::sInstances.end() )
+    for (LLCharacter* character : LLCharacter::sInstances)
     {
-        LLVOAvatar* avatar = static_cast<LLVOAvatar*>(*iter);
-        if (avatar &&
-            !avatar->isDead() &&                                // Not dead yet
+        LLVOAvatar* avatar = (LLVOAvatar*)character;
+        if (!avatar->isDead() &&                                // Not dead yet
             !avatar->isControlAvatar() &&                       // Not part of an animated object
             avatar->getRezzedStatus() >= 2 &&                   // Mostly rezzed (maybe without baked textures downloaded)
             avatar->getObjectHost() == regionp->getHost())      // Ensure it's on the same region
@@ -251,7 +249,6 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoReportCoro(std::string url, U
                 num_avs++;
             }
         }
-        iter++;
     }
 
     // Reset this regions timer, moving to longer intervals if there are lots of avatars around
@@ -384,8 +381,11 @@ void LLAvatarRenderInfoAccountant::idle()
                                       << LL_ENDL;
 
         // Check all regions
-        for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+        for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin();
+             iter != LLWorld::getInstance()->getRegionList().end();
+             ++iter)
         {
+            LLViewerRegion* regionp = *iter;
             if (   regionp
                 && regionp->isAlive()
                 && regionp->capabilitiesReceived())

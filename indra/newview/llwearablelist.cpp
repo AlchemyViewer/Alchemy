@@ -91,7 +91,7 @@ void LLWearableList::getAsset(const LLAssetID& assetID, const std::string& weara
             asset_type,
             LLWearableList::processGetAssetReply,
             (void*)new LLWearableArrivedData( asset_type, wearable_name, avatarp, asset_arrived_callback, userdata ),
-            TRUE);
+            true);
     }
 }
 
@@ -114,17 +114,15 @@ void LLWearableList::processGetAssetReply( const char* filename, const LLAssetID
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
-    BOOL isNewWearable = FALSE;
+    bool isNewWearable = false;
     LLWearableArrivedData* data = (LLWearableArrivedData*) userdata;
 //  LLViewerWearable* wearable = NULL; // NULL indicates failure
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2010-08-13 (Catznip-2.1)
     LLViewerWearable* wearable = get_if_there(LLWearableList::instance().mList, uuid, (LLViewerWearable*)NULL);
     if (wearable)
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("Wearable") << "processGetAssetReply()" << LL_ENDL;
         LL_DEBUGS("Wearable") << wearable << LL_ENDL;
-#endif
 
         if(data->mCallback)
         {
@@ -162,7 +160,7 @@ void LLWearableList::processGetAssetReply( const char* filename, const LLAssetID
             {
                 if (wearable->getType() == LLWearableType::WT_COUNT)
                 {
-                    isNewWearable = TRUE;
+                    isNewWearable = true;
                 }
                 delete wearable;
                 wearable = NULL;

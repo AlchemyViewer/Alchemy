@@ -38,11 +38,6 @@ LLWorkerThread::LLWorkerThread(const std::string& name, bool threaded, bool shou
     LLQueuedThread(name, threaded, should_pause)
 {
     mDeleteMutex = new LLMutex();
-
-    if(!mLocalAPRFilePoolp)
-    {
-        mLocalAPRFilePoolp = new LLVolatileAPRPool(name + " Pool");
-    }
 }
 
 LLWorkerThread::~LLWorkerThread()
@@ -88,27 +83,27 @@ size_t LLWorkerThread::update(F32 max_time_ms)
     // Delete scheduled workers
     std::vector<LLWorkerClass*> delete_list;
     std::vector<LLWorkerClass*> abort_list;
-        mDeleteMutex->lock();
-        for (delete_list_t::iterator iter = mDeleteList.begin();
-             iter != mDeleteList.end(); )
+    mDeleteMutex->lock();
+    for (delete_list_t::iterator iter = mDeleteList.begin();
+         iter != mDeleteList.end(); )
+    {
+        delete_list_t::iterator curiter = iter++;
+        LLWorkerClass* worker = *curiter;
+        if (worker->deleteOK())
         {
-            delete_list_t::iterator curiter = iter++;
-            LLWorkerClass* worker = *curiter;
-            if (worker->deleteOK())
+            if (worker->getFlags(LLWorkerClass::WCF_WORK_FINISHED))
             {
-                if (worker->getFlags(LLWorkerClass::WCF_WORK_FINISHED))
-                {
-                    worker->setFlags(LLWorkerClass::WCF_DELETE_REQUESTED);
-                    delete_list.push_back(worker);
-                    mDeleteList.erase(curiter);
-                }
-                else if (!worker->getFlags(LLWorkerClass::WCF_ABORT_REQUESTED))
-                {
-                    abort_list.push_back(worker);
-                }
+                worker->setFlags(LLWorkerClass::WCF_DELETE_REQUESTED);
+                delete_list.push_back(worker);
+                mDeleteList.erase(curiter);
+            }
+            else if (!worker->getFlags(LLWorkerClass::WCF_ABORT_REQUESTED))
+            {
+                abort_list.push_back(worker);
             }
         }
-        mDeleteMutex->unlock();
+    }
+    mDeleteMutex->unlock();
     // abort and delete after releasing mutex
     for (LLWorkerClass* worker : abort_list)
     {
@@ -163,6 +158,10 @@ LLWorkerThread::WorkRequest::WorkRequest(handle_t handle, LLWorkerClass* workerc
     LLQueuedThread::QueuedRequest(handle),
     mWorkerClass(workerclass),
     mParam(param)
+{
+}
+
+LLWorkerThread::WorkRequest::~WorkRequest()
 {
 }
 
@@ -280,7 +279,7 @@ bool LLWorkerClass::yield()
     mWorkerThread->checkPause();
     bool res;
     mMutex.lock();
-    res = (getFlags() & WCF_ABORT_REQUESTED) ? true : false;
+    res = (getFlags() & WCF_ABORT_REQUESTED) != 0;
     mMutex.unlock();
     return res;
 }

@@ -40,7 +40,7 @@
 #include "rlvactions.h"
 // [/RLVa:KB]
 
-#include "llregex.h"
+#include <boost/regex.hpp>
 
 using namespace LLNotificationsUI;
 
@@ -72,20 +72,19 @@ void LLOfferHandler::initChannel()
 //--------------------------------------------------------------------------
 bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, bool should_log)
 {
-    if(mChannel.isDead())
+    if (mChannel.isDead())
     {
         return false;
     }
 
     // arrange a channel on a screen
-    if(!mChannel.get()->getVisible())
+    if (!mChannel.get()->getVisible())
     {
         initChannel();
     }
 
-
-    if( notification->getPayload().has("give_inventory_notification")
-        && notification->getPayload()["give_inventory_notification"].asBoolean() == false)
+    if (notification->getPayload().has("give_inventory_notification") &&
+        !notification->getPayload()["give_inventory_notification"].asBoolean())
     {
         // This is an original inventory offer, so add a script floater
         LLScriptFloaterManager::instance().onAddNotification(notification->getID());
@@ -163,8 +162,9 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
                 || notification->getName() == "TeleportOffered_MaturityExceeded"
                 || notification->getName() == "TeleportOffered_MaturityBlocked"))
             {
-                static const boost::regex r("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>( - )?", boost::regex::perl|boost::regex::icase);
-                std::string stripped_msg = ll_regex_replace(notification->getMessage(), r, "");
+                boost::regex r("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>( - )?",
+                    boost::regex::perl|boost::regex::icase);
+                std::string stripped_msg = boost::regex_replace(notification->getMessage(), r, "");
                 LLHandlerUtil::logToIMP2P(notification->getPayload()["from_id"], stripped_msg,file_only);
             }
             else

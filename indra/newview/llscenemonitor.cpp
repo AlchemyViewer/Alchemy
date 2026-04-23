@@ -154,7 +154,7 @@ void LLSceneMonitor::generateDitheringTexture(S32 width, S32 height)
         }
     }
 
-    mDitheringTexture = LLViewerTextureManager::getLocalTexture(image_raw.get(), FALSE) ;
+    mDitheringTexture = LLViewerTextureManager::getLocalTexture(image_raw.get(), false) ;
     mDitheringTexture->setAddressMode(LLTexUnit::TAM_WRAP);
     mDitheringTexture->setFilteringOption(LLTexUnit::TFO_POINT);
 
@@ -225,15 +225,14 @@ void LLSceneMonitor::freezeScene()
         return;
     }
 
-    //freeze all avatars
-    for (std::vector<LLCharacter*>::iterator iter = LLCharacter::sInstances.begin();
-        iter != LLCharacter::sInstances.end(); ++iter)
+    // freeze all avatars
+    for (LLCharacter* character : LLCharacter::sInstances)
     {
-        freezeAvatar((LLCharacter*)(*iter));
+        freezeAvatar((LLCharacter*)character);
     }
 
     // freeze everything else
-    gSavedSettings.setBOOL("FreezeTime", TRUE);
+    gSavedSettings.setBOOL("FreezeTime", true);
 
     //disable sky, water and clouds
     gPipeline.clearRenderTypeMask(LLPipeline::RENDER_TYPE_SKY, LLPipeline::RENDER_TYPE_WL_SKY,
@@ -254,7 +253,7 @@ void LLSceneMonitor::unfreezeScene()
     }
 
     // thaw everything else
-    gSavedSettings.setBOOL("FreezeTime", FALSE);
+    gSavedSettings.setBOOL("FreezeTime", false);
 
     //enable sky, water and clouds
     gPipeline.setRenderTypeMask(LLPipeline::RENDER_TYPE_SKY, LLPipeline::RENDER_TYPE_WL_SKY,
@@ -473,6 +472,10 @@ void LLSceneMonitor::calcDiffAggregate()
 static LLTrace::EventStatHandle<> sFramePixelDiff("FramePixelDifference");
 void LLSceneMonitor::fetchQueryResult()
 {
+    // also throttle timing here, to avoid going below sample time due to phasing with frame capture
+    static LLCachedControl<F32>  scene_load_sample_time_control(gSavedSettings, "SceneLoadingMonitorSampleTime");
+    F32Seconds scene_load_sample_time = (F32Seconds)scene_load_sample_time_control();
+
     if(mDiffState == WAIT_ON_RESULT
         && !LLAppViewer::instance()->quitRequested())
     {
@@ -492,10 +495,6 @@ void LLSceneMonitor::fetchQueryResult()
 
             static LLCachedControl<F32> diff_threshold(gSavedSettings,"SceneLoadingMonitorPixelDiffThreshold");
             F32Seconds elapsed_time = mRecordingTimer.getElapsedTimeF32();
-
-            // also throttle timing here, to avoid going below sample time due to phasing with frame capture
-            static LLCachedControl<F32>  scene_load_sample_time_control(gSavedSettings, "SceneLoadingMonitorSampleTime");
-            F32Seconds scene_load_sample_time = (F32Seconds)scene_load_sample_time_control();
 
             if (elapsed_time > scene_load_sample_time)
             {
@@ -527,7 +526,7 @@ void LLSceneMonitor::dumpToFile(const std::string &file_name)
         os << std::setprecision(10);
 
         LLTrace::PeriodicRecording& scene_load_recording = mSceneLoadRecording.getResults();
-        const U32 frame_count = scene_load_recording.getNumRecordedPeriods();
+        const auto frame_count = scene_load_recording.getNumRecordedPeriods();
 
         F64Seconds frame_time;
 
@@ -673,7 +672,7 @@ LLSceneMonitorView::LLSceneMonitorView(const LLRect& rect)
     :   LLFloater(LLSD())
 {
     setRect(rect);
-    setVisible(FALSE);
+    setVisible(false);
 
     setCanMinimize(false);
     setCanCollapse(false);
@@ -705,7 +704,7 @@ void LLSceneMonitorView::onTeleportFinished()
     }
 }
 
-void LLSceneMonitorView::onVisibilityChange(BOOL visible)
+void LLSceneMonitorView::onVisibilityChange(bool visible)
 {
     LLSceneMonitor::getInstance()->setDebugViewerVisible(visible);
 }

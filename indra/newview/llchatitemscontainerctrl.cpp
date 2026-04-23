@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2016, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,9 +38,8 @@
 #include "lllocalcliprect.h"
 #include "lltrans.h"
 #include "llfloaterimnearbychat.h"
-// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
-#include "lltextparser.h"
-// [/SL:KB]
+#include "llfloaterworldmap.h"
+#include "llviewermenu.h"
 
 #include "llviewercontrol.h"
 #include "llagentdata.h"
@@ -50,9 +50,9 @@
 #include "rlvhandler.h"
 // [/RLVa:KB]
 
-static const S32 msg_left_offset = 10;
-static const S32 msg_right_offset = 10;
-static const S32 msg_height_pad = 5;
+static constexpr S32 msg_left_offset = 10;
+static constexpr S32 msg_right_offset = 10;
+static constexpr S32 msg_height_pad = 5;
 
 //*******************************************************************************************************************
 // LLObjectHandler
@@ -69,7 +69,7 @@ public:
         if (params.size() < 2) return false;
 
         LLUUID object_id;
-        if (!object_id.set(params[0].asString(), FALSE))
+        if (!object_id.set(params[0], false))
         {
             return false;
         }
@@ -79,6 +79,23 @@ public:
         if (verb == "inspect")
         {
             LLFloaterReg::showInstance("inspect_object", LLSD().with("object_id", object_id));
+            return true;
+        }
+
+        if (verb == "zoomin")
+        {
+            if (!handle_zoom_to_object(object_id) && params.size() > 2)
+            {
+                // zoom faled, show location
+                // secondlife:///app/object/object_id/zoomin/{LOCATION}/{COORDS} SLapp
+                const std::string region_name = LLURI::unescape(params[0].asString());
+                S32 x = (params.size() > 1) ? params[1].asInteger() : 128;
+                S32 y = (params.size() > 2) ? params[2].asInteger() : 128;
+                S32 z = (params.size() > 3) ? params[3].asInteger() : 0;
+
+                LLFloaterWorldMap::getInstance()->trackURL(region_name, x, y, z);
+                LLFloaterReg::showInstance("world_map", "center");
+            }
             return true;
         }
 
@@ -100,7 +117,7 @@ LLFloaterIMNearbyChatToastPanel* LLFloaterIMNearbyChatToastPanel::createInstance
     return item;
 }
 
-void    LLFloaterIMNearbyChatToastPanel::reshape        (S32 width, S32 height, BOOL called_from_parent )
+void    LLFloaterIMNearbyChatToastPanel::reshape        (S32 width, S32 height, bool called_from_parent )
 {
     LLPanel::reshape(width, height,called_from_parent);
 
@@ -129,28 +146,116 @@ void    LLFloaterIMNearbyChatToastPanel::reshape        (S32 width, S32 height, 
     msg_text->setRect(msg_text_rect);
 }
 
-BOOL LLFloaterIMNearbyChatToastPanel::postBuild()
+bool LLFloaterIMNearbyChatToastPanel::postBuild()
 {
     return LLPanel::postBuild();
 }
 
-//void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
-// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
-void LLFloaterIMNearbyChatToastPanel::addMessage(const LLSD& notification, bool prepend_newline)
-// [/SL:KB]
+void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
 {
     std::string     messageText = notification["message"].asString();       // UTF-8 line of text
 
 
     std::string color_name = notification["text_color"].asString();
 
-    LLColor4 textColor = LLUIColorTable::instance().getColor(color_name);
-    textColor.mV[VALPHA] =notification["color_alpha"].asReal();
+    LLUIColor textColor = LLUIColorTable::instance().getColor(color_name);
+    F32 textAlpha = (F32)notification["color_alpha"].asReal();
 
     LLFontGL* messageFont = LLViewerChat::getChatFont();
 
-// [SL:KB] - Patch: Chat-Alerts | Checked: Catznip-5.3
-    // Copied from LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
+    //append text
+    {
+        LLStyle::Params style_params;
+        style_params.color(textColor);
+        style_params.alpha(textAlpha);
+        std::string font_name = LLFontGL::nameFromFont(messageFont);
+        std::string font_style_size = LLFontGL::sizeFromFont(messageFont);
+        style_params.font.name(font_name);
+        style_params.font.size(font_style_size);
+
+        int chat_type = notification["chat_type"].asInteger();
+
+        if(notification["chat_style"].asInteger()== CHAT_STYLE_IRC)
+        {
+            style_params.font.style = "ITALIC";
+        }
+        else if( chat_type == CHAT_TYPE_SHOUT)
+        {
+            style_params.font.style = "BOLD";
+        }
+        else if( chat_type == CHAT_TYPE_WHISPER)
+        {
+            style_params.font.style = "ITALIC";
+        }
+        mMsgText->appendText(messageText, true, style_params);
+    }
+
+    snapToMessageHeight();
+
+}
+
+void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
+{
+    std::string     messageText = notification["message"].asString();       // UTF-8 line of text
+    std::string     fromName = notification["from"].asString(); // agent or object name
+    mFromID = notification["from_id"].asUUID();     // agent id or object id
+    mFromName = fromName;
+
+// [RLVa:KB] - Checked: 2010-04-22 (RLVa-1.2.0f) | Added: RLVa-1.2.0f
+    mShowIconTooltip = notification.has("show_icon_tooltip") ? notification["show_icon_tooltip"].asBoolean() : true;
+// [/RLVa:KB]
+
+    int sType = notification["source"].asInteger();
+    mSourceType = (EChatSourceType)sType;
+
+    std::string color_name = notification["text_color"].asString();
+
+    LLUIColor textColor = LLUIColorTable::instance().getColor(color_name);
+    F32 textAlpha = (F32)notification["color_alpha"].asReal();
+
+    LLFontGL* messageFont = LLViewerChat::getChatFont();
+
+    mMsgText = getChild<LLChatMsgBox>("msg_text", false);
+    mMsgText->setContentTrusted(false);
+    mMsgText->setIsFriendCallback(LLAvatarActions::isFriend);
+
+    mMsgText->setText(std::string(""));
+
+    if ( notification["chat_style"].asInteger() != CHAT_STYLE_IRC )
+    {
+        std::string str_sender;
+
+        str_sender = fromName;
+
+        str_sender+=" ";
+
+        //append sender name
+        if (mSourceType == CHAT_SOURCE_AGENT || mSourceType == CHAT_SOURCE_OBJECT)
+        {
+            LLStyle::Params style_params_name;
+            style_params_name.color = LLUIColorTable::instance().getColor("HTMLLinkColor");
+            style_params_name.font.name = LLFontGL::nameFromFont(messageFont);
+            style_params_name.font.size = LLFontGL::sizeFromFont(messageFont);
+
+//          style_params_name.link_href = notification["sender_slurl"].asString();
+//          style_params_name.is_link = true;
+// [RLVa:KB] - Checked: 2011-12-13 (RLVa-1.4.6) | Added: RLVa-1.4.6
+            if (notification.has("sender_slurl"))
+            {
+                style_params_name.link_href = notification["sender_slurl"].asString();
+                style_params_name.is_link = true;
+            }
+// [/RLVa:KB]
+
+            mMsgText->appendText(str_sender, false, style_params_name);
+
+        }
+        else
+        {
+            mMsgText->appendText(str_sender, false);
+        }
+    }
+
     S32 chars_in_line = mMsgText->getRect().getWidth() / messageFont->getWidth("c");
     S32 max_lines = notification["available_height"].asInteger() / (mMsgText->getTextPixelHeight() + 4);
     int lines = 0;
@@ -177,12 +282,12 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(const LLSD& notification, bool 
         messageText.erase(it, messageText.end());
         messageText += " ...";
     }
-// [/SL:KB]
 
     //append text
     {
         LLStyle::Params style_params;
         style_params.color(textColor);
+        style_params.alpha(textAlpha);
         std::string font_name = LLFontGL::nameFromFont(messageFont);
         std::string font_style_size = LLFontGL::sizeFromFont(messageFont);
         style_params.font.name(font_name);
@@ -202,152 +307,11 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(const LLSD& notification, bool 
         {
             style_params.font.style = "ITALIC";
         }
-
-// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
-        static LLCachedControl<bool> sEnableChatAlerts(gSavedSettings, "ChatAlerts", false);
-        if ( (sEnableChatAlerts) && (gAgentID != mFromID) )
-        {
-            S32 nHighlightMask = mMsgText->getHighlightsMask();
-            mMsgText->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_NEARBYCHAT);
-            mMsgText->appendText(messageText, prepend_newline, style_params);
-            mMsgText->setHighlightsMask(nHighlightMask & ~LLHighlightEntry::CAT_NEARBYCHAT);
-        }
-        else
-        {
-            mMsgText->appendText(messageText, TRUE, style_params);
-        }
-// [/SL:KB]
-//      mMsgText->appendText(messageText, TRUE, style_params);
+        mMsgText->appendText(messageText, false, style_params);
     }
+
 
     snapToMessageHeight();
-
-}
-
-void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
-{
-//  std::string     messageText = notification["message"].asString();       // UTF-8 line of text
-    std::string     fromName = notification["from"].asString(); // agent or object name
-    mFromID = notification["from_id"].asUUID();     // agent id or object id
-    mFromName = fromName;
-
-// [RLVa:KB] - Checked: 2010-04-22 (RLVa-1.2.0f) | Added: RLVa-1.2.0f
-    mShowIconTooltip = notification.has("show_icon_tooltip") ? notification["show_icon_tooltip"].asBoolean() : true;
-// [/RLVa:KB]
-
-    int sType = notification["source"].asInteger();
-    mSourceType = (EChatSourceType)sType;
-
-//  std::string color_name = notification["text_color"].asString();
-//
-//  LLColor4 textColor = LLUIColorTable::instance().getColor(color_name);
-//  textColor.mV[VALPHA] =notification["color_alpha"].asReal();
-
-    mMsgText = getChild<LLChatMsgBox>("msg_text", false);
-    mMsgText->setContentTrusted(false);
-    mMsgText->setIsFriendCallback(LLAvatarActions::isFriend);
-
-    mMsgText->setText(std::string(""));
-
-    if ( notification["chat_style"].asInteger() != CHAT_STYLE_IRC )
-    {
-        std::string str_sender;
-
-        str_sender = fromName;
-
-        str_sender+=" ";
-
-        //append sender name
-        if (mSourceType == CHAT_SOURCE_AGENT || mSourceType == CHAT_SOURCE_OBJECT)
-        {
-            LLStyle::Params style_params_name;
-
-            LLColor4 user_name_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
-            style_params_name.color(user_name_color);
-
-            LLFontGL* messageFont = LLViewerChat::getChatFont();
-            std::string font_name = LLFontGL::nameFromFont(messageFont);
-            std::string font_style_size = LLFontGL::sizeFromFont(messageFont);
-            style_params_name.font.name(font_name);
-            style_params_name.font.size(font_style_size);
-
-//          style_params_name.link_href = notification["sender_slurl"].asString();
-//          style_params_name.is_link = true;
-// [RLVa:KB] - Checked: 2011-12-13 (RLVa-1.4.6) | Added: RLVa-1.4.6
-            if (notification.has("sender_slurl"))
-            {
-                style_params_name.link_href = notification["sender_slurl"].asString();
-                style_params_name.is_link = true;
-            }
-// [/RLVa:KB]
-
-            mMsgText->appendText(str_sender, FALSE, style_params_name);
-
-        }
-        else
-        {
-            mMsgText->appendText(str_sender, false);
-        }
-    }
-
-// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
-    addMessage(notification, false);
-// [/SL:KB]
-//  S32 chars_in_line = mMsgText->getRect().getWidth() / messageFont->getWidth("c");
-//  S32 max_lines = notification["available_height"].asInteger() / (mMsgText->getTextPixelHeight() + 4);
-//  int lines = 0;
-//  int chars = 0;
-//
-//  //Remove excessive chars if message does not fit in available height. MAINT-6891
-//  std::string::iterator it;
-//  for (it = messageText.begin(); it < messageText.end() && lines < max_lines; it++)
-//  {
-//      if (*it == '\n')
-//          ++lines;
-//      else
-//          ++chars;
-//
-//      if (chars >= chars_in_line)
-//      {
-//          chars = 0;
-//          ++lines;
-//      }
-//  }
-//
-//  if (it < messageText.end())
-//  {
-//      messageText.erase(it, messageText.end());
-//      messageText += " ...";
-//  }
-//
-//  //append text
-//  {
-//      LLStyle::Params style_params;
-//      style_params.color(textColor);
-//      std::string font_name = LLFontGL::nameFromFont(messageFont);
-//      std::string font_style_size = LLFontGL::sizeFromFont(messageFont);
-//      style_params.font.name(font_name);
-//      style_params.font.size(font_style_size);
-//
-//      int chat_type = notification["chat_type"].asInteger();
-//
-//      if(notification["chat_style"].asInteger()== CHAT_STYLE_IRC)
-//      {
-//          style_params.font.style = "ITALIC";
-//      }
-//      else if( chat_type == CHAT_TYPE_SHOUT)
-//      {
-//          style_params.font.style = "BOLD";
-//      }
-//      else if( chat_type == CHAT_TYPE_WHISPER)
-//      {
-//          style_params.font.style = "ITALIC";
-//      }
-//      mMsgText->appendText(messageText, FALSE, style_params);
-//  }
-//
-//
-//  snapToMessageHeight();
 
     mIsDirty = true;//will set Avatar Icon in draw
 }
@@ -379,12 +343,12 @@ void LLFloaterIMNearbyChatToastPanel::onMouseEnter              (S32 x, S32 y, M
         return;
 }
 
-BOOL    LLFloaterIMNearbyChatToastPanel::handleMouseDown    (S32 x, S32 y, MASK mask)
+bool    LLFloaterIMNearbyChatToastPanel::handleMouseDown    (S32 x, S32 y, MASK mask)
 {
     return LLPanel::handleMouseDown(x,y,mask);
 }
 
-BOOL    LLFloaterIMNearbyChatToastPanel::handleMouseUp  (S32 x, S32 y, MASK mask)
+bool    LLFloaterIMNearbyChatToastPanel::handleMouseUp  (S32 x, S32 y, MASK mask)
 {
     /*
     fix for request  EXT-4780
@@ -397,18 +361,17 @@ BOOL    LLFloaterIMNearbyChatToastPanel::handleMouseUp  (S32 x, S32 y, MASK mask
     S32 local_y = y - mMsgText->getRect().mBottom;
 
     //if text_box process mouse up (ussually this is click on url) - we didn't show nearby_chat.
-    if (mMsgText->pointInView(local_x, local_y) )
+    if (mMsgText->pointInView(local_x, local_y))
     {
-        if (mMsgText->handleMouseUp(local_x,local_y,mask) == TRUE)
-            return TRUE;
-        else
-        {
-            LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat")->showHistory();
-            return FALSE;
-        }
+        if (mMsgText->handleMouseUp(local_x, local_y, mask))
+            return true;
+
+        LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat")->showHistory();
+        return false;
     }
+
     LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat")->showHistory();
-    return LLPanel::handleMouseUp(x,y,mask);
+    return LLPanel::handleMouseUp(x, y, mask);
 }
 
 void    LLFloaterIMNearbyChatToastPanel::setHeaderVisibility(EShowItemHeader e)
@@ -427,7 +390,7 @@ bool    LLFloaterIMNearbyChatToastPanel::canAddText ()
     return msg_text->getLineCount()<10;
 }
 
-BOOL    LLFloaterIMNearbyChatToastPanel::handleRightMouseDown(S32 x, S32 y, MASK mask)
+bool    LLFloaterIMNearbyChatToastPanel::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
     LLUICtrl* avatar_icon = getChild<LLUICtrl>("avatar_icon", false);
 
@@ -436,7 +399,7 @@ BOOL    LLFloaterIMNearbyChatToastPanel::handleRightMouseDown(S32 x, S32 y, MASK
 
     //eat message for avatar icon if msg was from object
     if(avatar_icon->pointInView(local_x, local_y) && mSourceType != CHAT_SOURCE_AGENT)
-        return TRUE;
+        return true;
     return LLPanel::handleRightMouseDown(x,y,mask);
 }
 void LLFloaterIMNearbyChatToastPanel::draw()
@@ -455,7 +418,7 @@ void LLFloaterIMNearbyChatToastPanel::draw()
             if(mSourceType == CHAT_SOURCE_OBJECT)
                 icon->setValue(LLSD("OBJECT_Icon"));
             else if(mSourceType == CHAT_SOURCE_SYSTEM)
-                icon->setValue(LLSD("AL_Logo"));
+                icon->setValue(LLSD("SL_Logo"));
             else if(mSourceType == CHAT_SOURCE_AGENT)
                 icon->setValue(mFromID);
             else if(!mFromID.isNull())

@@ -38,11 +38,10 @@
 #include "llbadgeholder.h"
 #include <list>
 #include <queue>
-#include <boost/unordered/unordered_map.hpp>
 
 const S32 LLPANEL_BORDER_WIDTH = 1;
-const BOOL BORDER_YES = TRUE;
-const BOOL BORDER_NO = FALSE;
+const bool BORDER_YES = true;
+const bool BORDER_NO = false;
 
 class LLButton;
 class LLUIImage;
@@ -108,20 +107,20 @@ protected:
 public:
     typedef std::vector<class LLUICtrl *>               ctrl_list_t;
 
-    BOOL buildFromFile(const std::string &filename, const LLPanel::Params& default_params = getDefaultParams());
+    bool buildFromFile(const std::string &filename, const LLPanel::Params& default_params = getDefaultParams());
 
     static LLPanel* createFactoryPanel(const std::string& name);
 
     /*virtual*/ ~LLPanel();
 
     // LLView interface
-    /*virtual*/ BOOL    isPanel() const;
+    /*virtual*/ bool    isPanel() const;
     /*virtual*/ void    draw();
-    /*virtual*/ BOOL    handleKeyHere( KEY key, MASK mask );
-    /*virtual*/ void    onVisibilityChange ( BOOL new_visibility );
+    /*virtual*/ bool    handleKeyHere( KEY key, MASK mask );
+    /*virtual*/ void    onVisibilityChange ( bool new_visibility );
 
     // From LLFocusableElement
-    /*virtual*/ void    setFocus( BOOL b );
+    /*virtual*/ void    setFocus( bool b );
 
     // New virtuals
     virtual     void    refresh();  // called in setFocus()
@@ -132,32 +131,32 @@ public:
     void addBorder( LLViewBorder::Params p);
     void addBorder();
     void            removeBorder();
-    BOOL            hasBorder() const { return mBorder != NULL; }
-    void            setBorderVisible( BOOL b );
+    bool            hasBorder() const { return mBorder != NULL; }
+    void            setBorderVisible( bool b );
 
-    void            setBackgroundColor( const LLColor4& color ) { mBgOpaqueColor = color; }
+    void            setBackgroundColor( const LLUIColor& color ) { mBgOpaqueColor = color; }
     const LLColor4& getBackgroundColor() const { return mBgOpaqueColor; }
-    void            setTransparentColor(const LLColor4& color) { mBgAlphaColor = color; }
+    void            setTransparentColor(const LLUIColor& color) { mBgAlphaColor = color; }
     const LLColor4& getTransparentColor() const { return mBgAlphaColor; }
     void            setBackgroundImage(LLUIImage* image) { mBgOpaqueImage = image; }
     void            setTransparentImage(LLUIImage* image) { mBgAlphaImage = image; }
     LLPointer<LLUIImage> getBackgroundImage() const { return mBgOpaqueImage; }
     LLPointer<LLUIImage> getTransparentImage() const { return mBgAlphaImage; }
-    LLColor4        getBackgroundImageOverlay() { return mBgOpaqueImageOverlay; }
-    LLColor4        getTransparentImageOverlay() { return mBgAlphaImageOverlay; }
-    void            setBackgroundVisible( BOOL b )  { mBgVisible = b; }
-    BOOL            isBackgroundVisible() const { return mBgVisible; }
-    void            setBackgroundOpaque(BOOL b)     { mBgOpaque = b; }
-    BOOL            isBackgroundOpaque() const { return mBgOpaque; }
+    const LLColor4&        getBackgroundImageOverlay() { return mBgOpaqueImageOverlay; }
+    const LLColor4&        getTransparentImageOverlay() { return mBgAlphaImageOverlay; }
+    void            setBackgroundVisible( bool b )  { mBgVisible = b; }
+    bool            isBackgroundVisible() const { return mBgVisible; }
+    void            setBackgroundOpaque(bool b)     { mBgOpaque = b; }
+    bool            isBackgroundOpaque() const { return mBgOpaque; }
     void            setDefaultBtn(LLButton* btn = NULL);
     void            setDefaultBtn(std::string_view id);
     void            updateDefaultBtn();
     void            setLabel(const LLStringExplicit& label) { mLabel = label; }
     std::string     getLabel() const { return mLabel; }
-    void            setHelpTopic(std::string help_topic) { mHelpTopic = std::move(help_topic); }
+    void            setHelpTopic(const std::string& help_topic) { mHelpTopic = help_topic; }
     std::string     getHelpTopic() const { return mHelpTopic; }
 
-    void            setCtrlsEnabled(BOOL b);
+    void            setCtrlsEnabled(bool b);
     ctrl_list_t     getCtrlList() const;
 
     LLHandle<LLPanel>   getHandle() const { return getDerivedHandle<LLPanel>(); }
@@ -168,7 +167,7 @@ public:
     EnableCallbackRegistry::ScopedRegistrar& getEnableCallbackRegistrar() { return mEnableCallbackRegistrar; }
 
     void initFromParams(const Params& p);
-    BOOL initPanelXML(  LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node, const LLPanel::Params& default_params);
+    bool initPanelXML(  LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node, const LLPanel::Params& default_params);
 
     bool hasString(std::string_view name);
     std::string getString(std::string_view name, const LLStringUtil::format_map_t& args) const;
@@ -181,19 +180,19 @@ public:
     void childSetVisible(std::string_view name, bool visible);
 
     void childSetEnabled(std::string_view name, bool enabled);
-    void childEnable(std::string_view name) { childSetEnabled(name, true); }
+    void childEnable(std::string_view name)   { childSetEnabled(name, true); }
     void childDisable(std::string_view name) { childSetEnabled(name, false); };
 
     // LLUICtrl
-    void childSetFocus(std::string_view id, BOOL focus = TRUE);
-    BOOL childHasFocus(std::string_view id);
+    void childSetFocus(std::string_view id, bool focus = true);
+    bool childHasFocus(std::string_view id);
 
     // *TODO: Deprecate; for backwards compatability only:
     // Prefer getChild<LLUICtrl>("foo")->setCommitCallback(boost:bind(...)),
     // which takes a generic slot.  Or use mCommitCallbackRegistrar.add() with
     // a named callback and reference it in XML.
-    void childSetCommitCallback(std::string_view id, boost::function<void (LLUICtrl*,void*)> cb, void* data);
-    void childSetColor(std::string_view id, const LLColor4& color);
+    void childSetCommitCallback(std::string_view id, std::function<void (LLUICtrl*,void*)> cb, void* data);
+    void childSetColor(std::string_view id, const LLUIColor& color);
 
     LLCtrlSelectionInterface* childGetSelectionInterface(std::string_view id) const;
     LLCtrlListInterface* childGetListInterface(std::string_view id) const;
@@ -204,12 +203,12 @@ public:
     LLSD childGetValue(std::string_view id) const;
 
     // For setting text / label replacement params, e.g. "Hello [NAME]"
-    // Not implemented for all types, defaults to noop, returns FALSE if not applicaple
-    BOOL childSetTextArg(std::string_view id, const std::string& key, const LLStringExplicit& text);
-    BOOL childSetLabelArg(std::string_view id, const std::string& key, const LLStringExplicit& text);
+    // Not implemented for all types, defaults to noop, returns false if not applicaple
+    bool childSetTextArg(std::string_view id, const std::string& key, const LLStringExplicit& text);
+    bool childSetLabelArg(std::string_view id, const std::string& key, const LLStringExplicit& text);
 
     // LLButton
-    void childSetAction(std::string_view id, boost::function<void(void*)> function, void* value);
+    void childSetAction(std::string_view id, std::function<void(void*)> function, void* value);
     void childSetAction(std::string_view id, const commit_signal_t::slot_type& function);
 
     static LLView*  fromXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node = NULL);
@@ -217,7 +216,7 @@ public:
     //call onOpen to let panel know when it's about to be shown or activated
     virtual void    onOpen(const LLSD& key) {}
 
-    void setXMLFilename(std::string filename) { mXMLFilename = std::move(filename); };
+    void setXMLFilename(std::string filename) { mXMLFilename = filename; };
     std::string getXMLFilename() { return mXMLFilename; };
 
     boost::signals2::connection setVisibleCallback( const commit_signal_t::slot_type& cb );
@@ -239,8 +238,8 @@ protected:
     std::string     mXMLFilename;
 
 private:
-    BOOL            mBgVisible;             // any background at all?
-    BOOL            mBgOpaque;              // use opaque color or image
+    bool            mBgVisible;             // any background at all?
+    bool            mBgOpaque;              // use opaque color or image
     LLUIColor       mBgOpaqueColor;
     LLUIColor       mBgAlphaColor;
     LLUIColor       mBgOpaqueImageOverlay;
@@ -251,7 +250,7 @@ private:
     LLButton*       mDefaultBtn;
     LLUIString      mLabel;
 
-    typedef boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>> ui_string_map_t;
+    typedef boost::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> ui_string_map_t;
     ui_string_map_t mUIStrings;
 
 
@@ -260,25 +259,25 @@ private:
 // Build time optimization, generate once in .cpp file
 #ifndef LLPANEL_CPP
 extern template class LLPanel* LLView::getChild<class LLPanel>(
-    std::string_view name, BOOL recurse) const;
+    std::string_view name, bool recurse) const;
 #endif
 
-typedef boost::function<LLPanel* (void)> LLPanelClassCreatorFunc;
+typedef std::function<LLPanel* (void)> LLPanelClassCreatorFunc;
 
 // local static instance for registering a particular panel class
 
-class LLRegisterPanelClass final
+class LLRegisterPanelClass
 :   public LLSingleton< LLRegisterPanelClass >
 {
     LLSINGLETON_EMPTY_CTOR(LLRegisterPanelClass);
 public:
     // register with either the provided builder, or the generic templated builder
-    void addPanelClass(std::string tag, LLPanelClassCreatorFunc func)
+    void addPanelClass(const std::string& tag,LLPanelClassCreatorFunc func)
     {
-        mPanelClassesNames.insert_or_assign(std::move(tag), std::move(func));
+        mPanelClassesNames[tag] = func;
     }
 
-    LLPanel* createPanelClass(const std::string_view tag)
+    LLPanel* createPanelClass(std::string_view tag)
     {
         param_name_map_t::iterator iT =  mPanelClassesNames.find(tag);
         if(iT == mPanelClassesNames.end())
@@ -293,7 +292,7 @@ public:
     }
 
 private:
-    typedef std::map< std::string, LLPanelClassCreatorFunc, std::less<>> param_name_map_t;
+    typedef boost::unordered_map<std::string, LLPanelClassCreatorFunc, ll::string_hash, std::equal_to<>> param_name_map_t;
 
     param_name_map_t mPanelClassesNames;
 };

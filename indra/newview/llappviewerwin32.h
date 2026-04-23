@@ -31,7 +31,7 @@
 #include "llappviewer.h"
 #endif
 
-class LLAppViewerWin32 final : public LLAppViewer
+class LLAppViewerWin32 : public LLAppViewer
 {
 public:
     LLAppViewerWin32(const char* cmd_line);
@@ -43,9 +43,11 @@ public:
     bool init() override; // Override to do application initialization
     bool cleanup() override;
 
-    void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) override;
+    bool reportCrashToBugsplat(void* pExcepInfo) override;
+    bool reportCustomToBugsplat(const std::string& desription) override;
 
 protected:
+    bool initWindow() override; // Override to initialize the viewer's window.
     void initLoggingAndGetLastDuration() override; // Override to clean stack_trace info.
     void initConsole() override; // Initialize OS level debugging console.
     bool initHardwareTest() override; // Win32 uses DX9 to test hardware.
@@ -53,20 +55,16 @@ protected:
 
     bool beingDebugged() override;
     bool restoreErrorTrap() override;
-    void initCrashReporting(bool reportFreeze) override;
 
     bool sendURLToOtherInstance(const std::string& url) override;
 
     std::string generateSerialNumber();
-
-    static const std::string sWindowClass;
 
 private:
     void disableWinErrorReporting();
 
     std::string mCmdLine;
     bool mIsConsoleAllocated;
-    bool mSentryInitialized = false;
 };
 
 #endif // LL_LLAPPVIEWERWIN32_H

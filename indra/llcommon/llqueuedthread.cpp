@@ -37,9 +37,9 @@
 // MAIN THREAD
 LLQueuedThread::LLQueuedThread(const std::string& name, bool threaded, bool should_pause) :
     LLThread(name),
-    mIdleThread(TRUE),
+    mIdleThread(true),
     mNextHandle(0),
-    mStarted(FALSE),
+    mStarted(false),
     mThreaded(threaded),
     mRequestQueue(name, 1024 * 1024)
 {
@@ -80,7 +80,7 @@ void LLQueuedThread::shutdown()
             mRequestQueue.close();
         }
 
-        S32 timeout = 100;
+        S32 timeout = 50;
         for ( ; timeout>0; timeout--)
         {
             if (isStopped())
@@ -101,19 +101,34 @@ void LLQueuedThread::shutdown()
     }
 
     QueuedRequest* req;
-    S32 active_count = 0;
+    S32 queued_count = 0;
+    bool  has_active = false;
+    lockData();
     while ( (req = (QueuedRequest*)mRequestHash.pop_element()) )
     {
-        if (req->getStatus() == STATUS_QUEUED || req->getStatus() == STATUS_INPROGRESS)
+        if (req->getStatus() == STATUS_INPROGRESS)
         {
-            ++active_count;
+            has_active = true;
+            req->setFlags(FLAG_ABORT | FLAG_AUTO_COMPLETE);
+            continue;
+        }
+        if (req->getStatus() == STATUS_QUEUED)
+        {
+            ++queued_count;
             req->setStatus(STATUS_ABORTED); // avoid assert in deleteRequest
         }
         req->deleteRequest();
     }
-    if (active_count)
+    unlockData();
+    if (queued_count)
     {
-        LL_WARNS() << "~LLQueuedThread() called with active requests: " << active_count << LL_ENDL;
+        LL_WARNS() << "~LLQueuedThread() called with unpocessed requests: " << queued_count << LL_ENDL;
+    }
+    if (has_active)
+    {
+        LL_WARNS() << "~LLQueuedThread() called with active requests!" << LL_ENDL;
+        ms_sleep(100); // last chance for request to finish
+        printQueueStats();
     }
 
     mRequestQueue.close();
@@ -146,12 +161,12 @@ size_t LLQueuedThread::updateQueue(F32 max_time_ms)
         // schedule a call to threadedUpdate for every call to updateQueue
         if (!isQuitting())
         {
-            mRequestQueue.post([=]()
+            mRequestQueue.post([=, this]()
                 {
                     LL_PROFILE_ZONE_NAMED_CATEGORY_THREAD("qt - update");
-                    mIdleThread = FALSE;
+                    mIdleThread = false;
                     threadedUpdate();
-                    mIdleThread = TRUE;
+                    mIdleThread = true;
                 }
             );
         }
@@ -191,7 +206,7 @@ size_t LLQueuedThread::getPending()
 // MAIN thread
 void LLQueuedThread::waitOnPending()
 {
-    while (true)
+    while(1)
     {
         update(0);
 
@@ -204,12 +219,13 @@ void LLQueuedThread::waitOnPending()
             yield();
         }
     }
+    return;
 }
 
 // MAIN thread
 void LLQueuedThread::printQueueStats()
 {
-    U32 size = mRequestQueue.size();
+    auto size = mRequestQueue.size();
     if (size > 0)
     {
         LL_INFOS() << llformat("Pending Requests:%d ", mRequestQueue.size()) << LL_ENDL;
@@ -242,9 +258,9 @@ bool LLQueuedThread::addRequest(QueuedRequest* req)
 #if _DEBUG
 //  LL_INFOS() << llformat("LLQueuedThread::Added req [%08d]",handle) << LL_ENDL;
 #endif
-
     unlockData();
 
+    llassert(!mDataLock->isSelfLocked());
     mRequestQueue.post([this, req]() { processRequest(req); });
 
     return true;
@@ -297,7 +313,7 @@ LLQueuedThread::QueuedRequest* LLQueuedThread::getRequest(handle_t handle)
 {
     if (handle == nullHandle())
     {
-        return nullptr;
+        return 0;
     }
     lockData();
     QueuedRequest* res = (QueuedRequest*)mRequestHash.find(handle);
@@ -391,7 +407,7 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
 
-    mIdleThread = FALSE;
+    mIdleThread = false;
     //threadedUpdate();
 
     // Get next request from pool
@@ -451,6 +467,8 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
 
                 unlockData();
 
+                llassert(!mDataLock->isSelfLocked());
+
 #if 0
                 // try again on next frame
                 // NOTE: tried using "post" with a time in the future, but this
@@ -471,7 +489,7 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
 #else
                 using namespace std::chrono_literals;
                 auto retry_time = LL::WorkQueue::TimePoint::clock::now() + 16ms;
-                mRequestQueue.post([=]
+                mRequestQueue.post([=, this]
                     {
                         LL_PROFILE_ZONE_NAMED("processRequest - retry");
                         if (LL::WorkQueue::TimePoint::clock::now() < retry_time)
@@ -480,7 +498,7 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
 
                             if (sleep_time.count() > 0)
                             {
-                                ms_sleep(sleep_time.count());
+                                ms_sleep((U32)sleep_time.count());
                             }
                         }
                         processRequest(req);
@@ -491,7 +509,7 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
         }
     }
 
-    mIdleThread = TRUE;
+    mIdleThread = true;
 }
 
 // virtual
@@ -510,7 +528,7 @@ void LLQueuedThread::run()
     // call checPause() immediately so we don't try to do anything before the class is fully constructed
     checkPause();
     startThread();
-    mStarted = TRUE;
+    mStarted = true;
 
 
     /*while (1)
@@ -519,7 +537,7 @@ void LLQueuedThread::run()
         // this will block on the condition until runCondition() returns true, the thread is unpaused, or the thread leaves the RUNNING state.
         checkPause();
 
-        mIdleThread = FALSE;
+        mIdleThread = false;
 
         threadedUpdate();
 
@@ -528,7 +546,7 @@ void LLQueuedThread::run()
         if (pending_work == 0)
         {
             //LL_PROFILE_ZONE_NAMED("LLQueuedThread - sleep");
-            mIdleThread = TRUE;
+            mIdleThread = true;
             //ms_sleep(1);
         }
         //LLThread::yield(); // thread should yield after each request
@@ -567,7 +585,12 @@ LLQueuedThread::QueuedRequest::QueuedRequest(LLQueuedThread::handle_t handle, U3
 
 LLQueuedThread::QueuedRequest::~QueuedRequest()
 {
-    llassert_always(mStatus == STATUS_DELETE);
+    if (mStatus != STATUS_DELETE)
+    {
+        // The only method to delete a request is deleteRequest(),
+        // it should have set the status to STATUS_DELETE
+        LL_ERRS() << "LLQueuedThread::QueuedRequest deleted with status " << mStatus << LL_ENDL;
+    }
 }
 
 //virtual

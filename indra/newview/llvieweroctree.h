@@ -70,8 +70,7 @@ S32 AABBSphereIntersect(const LLVector3& min, const LLVector3& max, const LLVect
 S32 AABBSphereIntersectR2(const LLVector3& min, const LLVector3& max, const LLVector3 &origin, const F32 &radius_squared);
 
 //defines data needed for octree of an entry
-//LL_ALIGN_PREFIX(16)
-class LLViewerOctreeEntry : public LLRefCount
+class alignas(16) LLViewerOctreeEntry : public LLRefCount
 {
     LL_ALIGN_NEW
     friend class LLViewerOctreeEntryData;
@@ -115,16 +114,15 @@ private:
     LLViewerOctreeGroup*        mGroup;
 
     //aligned members
-    LL_ALIGN_16(LLVector4a      mExtents[2]);
-    LL_ALIGN_16(LLVector4a      mPositionGroup);
+    LLVector4a      mExtents[2];
+    LLVector4a      mPositionGroup;
     F32                         mBinRadius;
     mutable S32                 mBinIndex;
     mutable U32                 mVisible;
 
-} ;//LL_ALIGN_POSTFIX(16);
+};
 
 //defines an abstract class for entry data
-//LL_ALIGN_PREFIX(16)
 class LLViewerOctreeEntryData : public LLRefCount
 {
 protected:
@@ -173,11 +171,10 @@ protected:
     LLPointer<LLViewerOctreeEntry>        mEntry;
     LLViewerOctreeEntry::eEntryDataType_t mDataType;
     static  U32                           sCurVisible; // Counter for what value of mVisible means currently visible
-};//LL_ALIGN_POSTFIX(16);
+};
 
 
 //defines an octree group for an octree node, which contains multiple entries.
-//LL_ALIGN_PREFIX(16)
 class LLViewerOctreeGroup
 :   public OctreeListener
 {
@@ -213,11 +210,11 @@ public:
     virtual void unbound();
     virtual void rebound();
 
-    BOOL isDead()                           { return hasState(DEAD); }
+    bool isDead()                           { return hasState(DEAD); }
 
     void setVisible();
-    BOOL isVisible() const;
-    virtual BOOL isRecentlyVisible() const;
+    bool isVisible() const;
+    virtual bool isRecentlyVisible() const;
     S32  getVisible(LLViewerCamera::eCameraID id) const {return mVisible[id];}
     S32  getAnyVisible() const {return mAnyVisible;}
     bool isEmpty() const { return mOctreeNode->isEmpty(); }
@@ -253,24 +250,23 @@ public:
 protected:
     void checkStates();
 private:
-    virtual bool boundObjects(BOOL empty, LLVector4a& minOut, LLVector4a& maxOut);
+    virtual bool boundObjects(bool empty, LLVector4a& minOut, LLVector4a& maxOut);
 
 protected:
     U32         mState;
     OctreeNode* mOctreeNode;
 
-    LL_ALIGN_16(LLVector4a mBounds[2]);        // bounding box (center, size) of this node and all its children (tight fit to objects)
-    LL_ALIGN_16(LLVector4a mObjectBounds[2]);  // bounding box (center, size) of objects in this node
-    LL_ALIGN_16(LLVector4a mExtents[2]);       // extents (min, max) of this node and all its children
-    LL_ALIGN_16(LLVector4a mObjectExtents[2]); // extents (min, max) of objects in this node
+    LLVector4a mBounds[2];        // bounding box (center, size) of this node and all its children (tight fit to objects)
+    LLVector4a mObjectBounds[2];  // bounding box (center, size) of objects in this node
+    LLVector4a mExtents[2];       // extents (min, max) of this node and all its children
+    LLVector4a mObjectExtents[2]; // extents (min, max) of objects in this node
 
     S32         mAnyVisible; //latest visible to any camera
     S32         mVisible[LLViewerCamera::NUM_CAMERAS];
 
-};//LL_ALIGN_POSTFIX(16);
+};
 
 //octree group which has capability to support occlusion culling
-//LL_ALIGN_PREFIX(16)
 class LLOcclusionCullingGroup : public LLViewerOctreeGroup
 {
 public:
@@ -305,19 +301,18 @@ public:
     void clearOcclusionState(U32 state, S32 mode = STATE_MODE_SINGLE);
     void checkOcclusion(); //read back last occlusion query (if any)
     void doOcclusion(LLCamera* camera, const LLVector4a* shift = NULL); //issue occlusion query
-    BOOL isOcclusionState(U32 state) const  { return mOcclusionState[LLViewerCamera::sCurCameraID] & state ? TRUE : FALSE; }
-    U32  getOcclusionState() const  { return mOcclusionState[LLViewerCamera::sCurCameraID];}
+    bool isOcclusionState(U32 state) const { return mOcclusionState[LLViewerCamera::sCurCameraID] & state; }
+    U32  getOcclusionState() const { return mOcclusionState[LLViewerCamera::sCurCameraID];}
 
-    BOOL needsUpdate();
+    bool needsUpdate();
     U32  getLastOcclusionIssuedTime();
 
     //virtual
     void handleChildAddition(const OctreeNode* parent, OctreeNode* child);
 
     //virtual
-    BOOL isRecentlyVisible() const;
-    LLViewerOctreePartition* getSpatialPartition()const {return mSpatialPartition;}
-    BOOL isAnyRecentlyVisible() const;
+    bool isRecentlyVisible() const;
+    bool isAnyRecentlyVisible() const;
 
     static U32 getNewOcclusionQueryObjectName();
     static void releaseOcclusionQueryObjectName(U32 name);
@@ -326,7 +321,7 @@ protected:
     void releaseOcclusionQueryObjectNames();
 
 private:
-    BOOL earlyFail(LLCamera* camera, const LLVector4a* bounds);
+    bool earlyFail(LLCamera* camera, const LLVector4a* bounds);
 
 protected:
     U32         mOcclusionState[LLViewerCamera::NUM_CAMERAS];
@@ -340,7 +335,7 @@ protected:
 
 public:
     static std::set<U32> sPendingQueries;
-};//LL_ALIGN_POSTFIX(16);
+};
 
 class LLViewerOctreePartition
 {
@@ -350,7 +345,7 @@ public:
 
     // Cull on arbitrary frustum
     virtual S32 cull(LLCamera &camera, bool do_occlusion) = 0;
-    BOOL isOcclusionEnabled();
+    bool isOcclusionEnabled();
 
 protected:
     // MUST call from destructor of any derived classes (SL-17276)
@@ -361,7 +356,7 @@ public:
     U32              mDrawableType;
     OctreeNode*      mOctree;
     LLViewerRegion*  mRegionp; // the region this partition belongs to.
-    BOOL             mOcclusionEnabled; // if TRUE, occlusion culling is performed
+    bool             mOcclusionEnabled; // if true, occlusion culling is performed
     U32              mLODSeed;
     U32              mLODPeriod;    //number of frames between LOD updates for a given spatial group (staggered by mLODSeed)
 };
@@ -419,7 +414,7 @@ public:
     virtual void visit(const OctreeNode* branch);
 
 public:
-    static BOOL sInDebug;
+    static bool sInDebug;
 };
 
 #endif

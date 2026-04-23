@@ -4,7 +4,6 @@
 	<floater.string name="mini_map_caption">
 		ミニマップ
 	</floater.string>
-	<net_map name="Net Map"/>
 	<text label="北" name="floater_map_north">
 		北
 	</text>

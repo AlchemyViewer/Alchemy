@@ -51,9 +51,6 @@
 #include "rlvcommon.h"
 #include "rlvhandler.h"
 // [/RLVa:KB]
-#include "lltextbox.h"
-#include "llresmgr.h"
-#include "lltrans.h"
 
 // Context menu and Gear menu helper.
 static void edit_outfit()
@@ -120,6 +117,7 @@ protected:
                       boost::bind(&LLAppearanceMgr::removeItemsFromAvatar, LLAppearanceMgr::getInstance(), mUUIDs, no_op));
         registrar.add("Wearing.Detach",
                       boost::bind(&LLAppearanceMgr::removeItemsFromAvatar, LLAppearanceMgr::getInstance(), mUUIDs, no_op));
+        registrar.add("Wearing.Favorite", boost::bind(toggle_favorites, mUUIDs));
         LLContextMenu* menu = createFromFile("menu_wearing_tab.xml");
 
         updateMenuItemsVisibility(menu);
@@ -132,6 +130,8 @@ protected:
         bool bp_selected            = false;    // true if body parts selected
         bool clothes_selected       = false;
         bool attachments_selected   = false;
+        bool can_favorite = false;
+        bool can_unfavorite = false;
 // [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
         S32 rlv_locked_count = 0;
 // [/RLVa:KB]
@@ -147,6 +147,9 @@ protected:
                 continue;
             }
 
+            LLUUID linked_id = item->getLinkedUUID();
+            LLViewerInventoryItem* linked_item = gInventory.getItem(linked_id);
+
             LLAssetType::EType type = item->getType();
             if (type == LLAssetType::AT_CLOTHING)
             {
@@ -160,6 +163,8 @@ protected:
             {
                 attachments_selected = true;
             }
+            can_favorite |= !linked_item->getIsFavorite();
+            can_unfavorite |= linked_item->getIsFavorite();
 // [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
             if ( (rlv_handler_t::isEnabled()) && (!rlvPredCanRemoveItem(*it)) )
             {
@@ -169,11 +174,11 @@ protected:
         }
 
         // Enable/disable some menu items depending on the selection.
+        bool show_touch = !bp_selected && !clothes_selected && attachments_selected;
+        bool show_edit = bp_selected || clothes_selected || attachments_selected;
 // [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
         bool rlv_blocked = (mUUIDs.size() == rlv_locked_count);
 // [/RLVa:KB]
-        bool show_touch = !bp_selected && !clothes_selected && attachments_selected;
-        bool show_edit = bp_selected || clothes_selected || attachments_selected;
         bool allow_detach = !bp_selected && !clothes_selected && attachments_selected;
         bool allow_take_off = !bp_selected && clothes_selected && !attachments_selected;
 
@@ -183,12 +188,14 @@ protected:
         menu->setItemEnabled("edit_item",          1 == mUUIDs.size() && get_is_item_editable(mUUIDs.front()));
         menu->setItemVisible("take_off",    allow_take_off);
         menu->setItemVisible("detach",      allow_detach);
+        menu->setItemVisible("edit_outfit_separator", show_touch || show_edit || allow_take_off || allow_detach);
 // [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
         menu->setItemEnabled("take_off",    !rlv_blocked);
         menu->setItemEnabled("detach",      !rlv_blocked);
 // [/RLVa:KB]
-        menu->setItemVisible("edit_outfit_separator", show_touch | show_edit | allow_take_off || allow_detach);
         menu->setItemVisible("show_original", mUUIDs.size() == 1);
+        menu->setItemVisible("favorites_add", can_favorite);
+        menu->setItemVisible("favorites_remove", can_unfavorite);
     }
 };
 
@@ -216,15 +223,15 @@ protected:
 
     void updateMenuItemsVisibility(LLContextMenu* menu)
     {
-        menu->setItemVisible("touch_attach", TRUE);
+        menu->setItemVisible("touch_attach", true);
         menu->setItemEnabled("touch_attach", 1 == mUUIDs.size());
-        menu->setItemVisible("edit_item", TRUE);
+        menu->setItemVisible("edit_item", true);
         menu->setItemEnabled("edit_item", 1 == mUUIDs.size());
-        menu->setItemVisible("take_off", FALSE);
-        menu->setItemVisible("detach", TRUE);
-        menu->setItemVisible("edit_outfit_separator", FALSE);
-        menu->setItemVisible("show_original", FALSE);
-        menu->setItemVisible("edit_outfit", FALSE);
+        menu->setItemVisible("take_off", false);
+        menu->setItemVisible("detach", true);
+        menu->setItemVisible("edit_outfit_separator", false);
+        menu->setItemVisible("show_original", false);
+        menu->setItemVisible("edit_outfit", false);
     }
 
     LLPanelWearing*         mPanelWearing;
@@ -236,8 +243,7 @@ static LLPanelInjector<LLPanelWearing> t_panel_wearing("panel_wearing");
 
 LLPanelWearing::LLPanelWearing()
     :   LLPanelAppearanceTab()
-    ,   mCOFItemsList(nullptr)
-    ,   mAvatarComplexityLabel(nullptr)
+    ,   mCOFItemsList(NULL)
     ,   mIsInitialized(false)
     ,   mAttachmentsChangedConnection()
 {
@@ -256,9 +262,13 @@ LLPanelWearing::~LLPanelWearing()
     {
         mAttachmentsChangedConnection.disconnect();
     }
+    if (mGearMenuConnection.connected())
+    {
+        mGearMenuConnection.disconnect();
+    }
 }
 
-BOOL LLPanelWearing::postBuild()
+bool LLPanelWearing::postBuild()
 {
     mAccordionCtrl = getChild<LLAccordionCtrl>("wearables_accordion");
     mWearablesTab = getChild<LLAccordionCtrlTab>("tab_wearables");
@@ -273,13 +283,7 @@ BOOL LLPanelWearing::postBuild()
     mTempItemsList->setFgUnselectedColor(LLColor4::white);
     mTempItemsList->setRightMouseDownCallback(boost::bind(&LLPanelWearing::onTempAttachmentsListRightClick, this, _1, _2, _3));
 
-    mAvatarComplexityLabel = getChild<LLTextBox>("avatar_complexity_label");
-
-    LLMenuButton* menu_gear_btn = getChild<LLMenuButton>("options_gear_btn");
-
-    menu_gear_btn->setMenu(mGearMenu->getMenu());
-
-    return TRUE;
+    return true;
 }
 
 //virtual
@@ -457,15 +461,9 @@ bool LLPanelWearing::populateAttachmentsList(bool update)
             }
             else
             {
-                row["columns"][1]["value"] = LLTrans::getString("LoadingData");
+                row["columns"][1]["value"] = "Loading...";
                 populated = false;
             }
-            std::string complexity_string;
-            LLLocale locale("");
-            LLResMgr::getInstance()->getIntegerString(complexity_string, mTempItemComplexityMap[attachment->getID()]);
-            row["columns"][2]["column"] = "weight";
-            row["columns"][2]["value"] = complexity_string;
-            row["columns"][2]["halign"] = "right";
             mTempItemsList->addElement(row);
             mAttachmentsMap[attachment->getID()] = attachment;
         }
@@ -488,8 +486,8 @@ void LLPanelWearing::getAttachmentLimitsCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-    httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getAttachmentLimitsCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+    httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getAttachmentLimitsCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -510,11 +508,11 @@ void LLPanelWearing::getAttachmentLimitsCoro(std::string url)
 void LLPanelWearing::setAttachmentDetails(LLSD content)
 {
     mObjectNames.clear();
-    S32 number_attachments = content["attachments"].size();
-    for(int i = 0; i < number_attachments; i++)
+    auto number_attachments = content["attachments"].size();
+    for(size_t i = 0; i < number_attachments; i++)
     {
-        S32 number_objects = content["attachments"][i]["objects"].size();
-        for(int j = 0; j < number_objects; j++)
+        auto number_objects = content["attachments"][i]["objects"].size();
+        for(size_t j = 0; j < number_objects; j++)
         {
             LLUUID task_id = content["attachments"][i]["objects"][j]["id"].asUUID();
             std::string name = content["attachments"][i]["objects"][j]["name"].asString();
@@ -592,6 +590,16 @@ void LLPanelWearing::onRemoveAttachment()
     }
 }
 
+LLToggleableMenu* LLPanelWearing::getGearMenu()
+{
+    return mGearMenu->getMenu();
+}
+
+LLToggleableMenu* LLPanelWearing::getSortMenu()
+{
+    return NULL;
+}
+
 void LLPanelWearing::onRemoveItem()
 {
     if (mWearablesTab->isExpanded())
@@ -626,18 +634,6 @@ void LLPanelWearing::copyToClipboard()
         }
     }
 
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(text),0,text.size());
-}
-
-void LLPanelWearing::updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity)
-{
-    std::string complexity_string;
-    LLLocale locale("");
-    LLResMgr::getInstance()->getIntegerString(complexity_string, complexity);
-
-    mAvatarComplexityLabel->setTextArg("[WEIGHT]", complexity_string);
-
-    mTempItemComplexityMap = temp_item_complexity;
-    updateAttachmentsList();
+    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(text), 0, static_cast<S32>(text.size()));
 }
 // EOF

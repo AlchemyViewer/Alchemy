@@ -46,17 +46,17 @@ class LLTextureCtrl;
 class LLInventoryItem;
 class LLUUID;
 
-class LLPanelObject final : public LLPanel
+class LLPanelObject : public LLPanel
 {
 public:
     LLPanelObject();
     virtual ~LLPanelObject();
 
-    BOOL    postBuild() override;
-    void    draw() override;
-    void    clearCtrls() override;
+    virtual bool    postBuild();
+    virtual void    draw();
+    virtual void    clearCtrls();
 
-    void            refresh() override;
+    void            refresh();
 
     static bool     precommitValidate(const LLSD& data);
 
@@ -93,7 +93,7 @@ public:
     void            onCommitSculpt(const LLSD& data);
     void            onCancelSculpt(const LLSD& data);
     void            onSelectSculpt(const LLSD& data);
-    BOOL            onDropSculpt(LLInventoryItem* item);
+    bool            onDropSculpt(LLInventoryItem* item);
     static void     onCommitSculptType(    LLUICtrl *ctrl, void* userdata);
 
     void            menuDoToSelected(const LLSD& userdata);
@@ -102,9 +102,9 @@ public:
 protected:
     void            getState();
 
-    void            sendRotation(BOOL btn_down);
-    void            sendScale(BOOL btn_down);
-    void            sendPosition(BOOL btn_down);
+    void            sendRotation(bool btn_down);
+    void            sendScale(bool btn_down);
+    void            sendPosition(bool btn_down);
     void            sendIsPhysical();
     void            sendIsTemporary();
     void            sendIsPhantom();
@@ -116,6 +116,7 @@ protected:
 protected:
     // Per-object options
     LLComboBox*     mComboBaseType;
+    LLMenuButton*   mMenuClipboardParams;
 
     LLTextBox*      mLabelCut;
     LLSpinCtrl*     mSpinCutBegin;
@@ -164,7 +165,7 @@ protected:
     LLSpinCtrl*     mCtrlScaleX;
     LLSpinCtrl*     mCtrlScaleY;
     LLSpinCtrl*     mCtrlScaleZ;
-    BOOL            mSizeChanged;
+    bool            mSizeChanged;
 
     LLTextBox*      mLabelRotation;
     LLSpinCtrl*     mCtrlRotX;
@@ -196,20 +197,13 @@ protected:
     LLButton        *mBtnPipettePrimParams = nullptr;
 
     LLVector3       mCurEulerDegrees;       // to avoid sending rotation when not changed
-    BOOL            mIsPhysical;            // to avoid sending "physical" when not changed
-    BOOL            mIsTemporary;           // to avoid sending "temporary" when not changed
-    BOOL            mIsPhantom;             // to avoid sending "phantom" when not changed
+    bool            mIsPhysical;            // to avoid sending "physical" when not changed
+    bool            mIsTemporary;           // to avoid sending "temporary" when not changed
+    bool            mIsPhantom;             // to avoid sending "phantom" when not changed
     S32             mSelectedType;          // So we know what selected type we last were
 
     LLUUID          mSculptTextureRevert;   // so we can revert the sculpt texture on cancel
     U8              mSculptTypeRevert;      // so we can revert the sculpt type on cancel
-
-    F32             mRegionMaxHeight;
-    F32             mRegionMaxDepth;
-    F32             mMinScale;
-    F32             mMaxScale;
-    F32             mMaxHollowSize;
-    F32             mMinHoleSize;
 
     LLVector3       mClipboardPos;
     LLVector3       mClipboardSize;

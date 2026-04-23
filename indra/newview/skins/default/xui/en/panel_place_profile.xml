@@ -89,6 +89,10 @@
         Information about this location is unavailable due to access restrictions.  Please check your permissions with the parcel owner.
     </string>
     <string
+     name="acquired_date_ampm">
+        [wkday,datetime,local] [mth,datetime,local] [day,datetime,local] [hour12,datetime,local]:[min,datetime,local]:[second,datetime,local] [ampm,datetime,local] [year,datetime,local]
+    </string>
+    <string
      name="acquired_date">
         [wkday,datetime,local] [mth,datetime,local] [day,datetime,local] [hour,datetime,local]:[min,datetime,local]:[second,datetime,local] [year,datetime,local]
     </string>
@@ -188,7 +192,7 @@
      value="Place Profile"
      width="280" />
     <scroll_container
-     color="PanelDefaultBackgroundColor"
+     color="DkGray2"
      follows="all"
      height="575"
      layout="topleft"
@@ -198,7 +202,7 @@
      top_pad="9"
      width="324">
         <panel
-         bg_alpha_color="PanelDefaultBackgroundColor"
+         bg_alpha_color="DkGray2"
          follows="left|top|right|bottom"
          height="597"
          layout="topleft"
@@ -328,7 +332,7 @@
             <icon
              follows="top|left"
              height="16"
-             image_name="Parcel_M_Dark"
+             image_name="unknown"
              layout="topleft"
              left="10"
              name="maturity_icon"

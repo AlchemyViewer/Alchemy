@@ -35,7 +35,7 @@
 
 LLFlyoutButton::LLFlyoutButton(const Params& p)
 :   LLComboBox(p),
-    mToggleState(FALSE),
+    mToggleState(false),
     mActionButton(NULL)
 {
 // [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4
@@ -76,6 +76,11 @@ void LLFlyoutButton::draw()
     LLComboBox::draw();
 }
 
+bool LLFlyoutButton::handleScrollWheel(S32 x, S32 y, S32 clicks)
+{
+    return LLUICtrl::handleScrollWheel(x, y, clicks);
+}
+
 // [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4
 // override
 void LLFlyoutButton::setLabel(const LLStringExplicit& name)
@@ -91,7 +96,7 @@ void LLFlyoutButton::updateLabel()
 }
 // [/SL:KB]
 
-void LLFlyoutButton::setToggleState(BOOL state)
+void LLFlyoutButton::setToggleState(bool state)
 {
     mToggleState = state;
 }

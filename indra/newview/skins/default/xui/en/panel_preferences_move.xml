@@ -21,13 +21,13 @@
 		 tab_stop="false" 
 		 width="517">
 			<panel
-				label="General Move and View"
+				label="General"
 				name="general_move_panel"
 				filename="panel_preferences_move_general.xml"
 				layout="topleft"
 				follows="all" />
 			<panel
-				label="Mouselook"
+				label="Mouse Input"
 				name="mlook_panel"
 				filename="panel_preferences_move_mlook.xml"
 				layout="topleft"

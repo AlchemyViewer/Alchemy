@@ -32,21 +32,11 @@
 #include "llsingleton.h"
 #include "llstl.h"
 
-template <typename T>
-struct LLRegistryDefaultComparator
-{
-    bool operator()(const T& lhs, const T& rhs) const
-    {
-        using std::less;
-        return less<T>()(lhs, rhs);
-    }
-};
-
-template <typename KEY, typename VALUE, typename COMPARATOR = LLRegistryDefaultComparator<KEY> >
+template <typename KEY, typename VALUE>
 class LLRegistry
 {
 public:
-    typedef LLRegistry<KEY, VALUE, COMPARATOR>      registry_t;
+    typedef LLRegistry<KEY, VALUE>      registry_t;
     typedef const KEY&                              ref_const_key_t;
     typedef const VALUE&                            ref_const_value_t;
     typedef const VALUE*                            ptr_const_value_t;
@@ -54,13 +44,13 @@ public:
 
     class Registrar
     {
-        friend class LLRegistry<KEY, VALUE, COMPARATOR>;
+        friend class LLRegistry<KEY, VALUE>;
     public:
-        typedef std::map<KEY, VALUE, COMPARATOR> registry_map_t;
+        typedef std::map<KEY, VALUE> registry_map_t;
 
         bool add(ref_const_key_t key, ref_const_value_t value)
         {
-            if (mMap.insert(std::make_pair(key, value)).second == false)
+            if (!mMap.insert(std::make_pair(key, value)).second)
             {
                 LL_WARNS() << "Tried to register " << key << " but it was already registered!" << LL_ENDL;
                 return false;
@@ -123,8 +113,8 @@ public:
 
     protected:
         // use currentRegistrar() or defaultRegistrar()
-        Registrar() = default;
-        ~Registrar() = default;
+        Registrar() {}
+        ~Registrar() {}
 
     private:
         registry_map_t                                          mMap;
@@ -134,8 +124,10 @@ public:
     typedef typename std::list<Registrar*>::iterator scope_list_iterator_t;
     typedef typename std::list<Registrar*>::const_iterator scope_list_const_iterator_t;
 
-    LLRegistry() = default;
-    ~LLRegistry() = default;
+    LLRegistry()
+    {}
+
+    ~LLRegistry() {}
 
     ptr_value_t getValue(ref_const_key_t key)
     {
@@ -232,9 +224,9 @@ private:
     Registrar       mDefaultRegistrar;
 };
 
-template <typename KEY, typename VALUE, typename DERIVED_TYPE, typename COMPARATOR = LLRegistryDefaultComparator<KEY> >
+template <typename KEY, typename VALUE, typename DERIVED_TYPE>
 class LLRegistrySingleton
-    :   public LLRegistry<KEY, VALUE, COMPARATOR>,
+    :   public LLRegistry<KEY, VALUE>,
         public LLSingleton<DERIVED_TYPE>
 {
     // This LLRegistrySingleton doesn't use LLSINGLETON(LLRegistrySingleton)
@@ -242,7 +234,7 @@ class LLRegistrySingleton
     // LLRegistrySingleton. So each concrete subclass needs
     // LLSINGLETON(whatever) -- not this intermediate base class.
 public:
-    typedef LLRegistry<KEY, VALUE, COMPARATOR>      registry_t;
+    typedef LLRegistry<KEY, VALUE>      registry_t;
     typedef const KEY&                              ref_const_key_t;
     typedef const VALUE&                            ref_const_value_t;
     typedef VALUE*                                  ptr_value_t;
@@ -295,7 +287,7 @@ public:
     class StaticRegistrar : public registry_t::Registrar
     {
     public:
-        virtual ~StaticRegistrar() = default;
+        virtual ~StaticRegistrar() {}
         StaticRegistrar(ref_const_key_t key, ref_const_value_t value)
         {
             if (singleton_t::instance().exists(key))
@@ -307,7 +299,7 @@ public:
     };
 
     // convenience functions
-    typedef typename LLRegistry<KEY, VALUE, COMPARATOR>::Registrar& ref_registrar_t;
+    typedef typename LLRegistry<KEY, VALUE>::Registrar& ref_registrar_t;
     static ref_registrar_t currentRegistrar()
     {
         return singleton_t::instance().registry_t::currentRegistrar();

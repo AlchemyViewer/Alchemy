@@ -27,57 +27,35 @@
 #ifndef LL_LLAPPVIEWERLINUX_H
 #define LL_LLAPPVIEWERLINUX_H
 
-#if LL_DBUS_ENABLED
-#include <sdbus-c++/sdbus-c++.h>
-#endif
-
 #ifndef LL_LLAPPVIEWER_H
 #include "llappviewer.h"
 #endif
 
 class LLCommandLineParser;
-class ViewerAppAPI;
 
 class LLAppViewerLinux final : public LLAppViewer
 {
 public:
-    LLAppViewerLinux();
-    ~LLAppViewerLinux() override;
+    LLAppViewerLinux() = default;
+    ~LLAppViewerLinux() override = default;
 
     //
     // Main application logic
     //
-    bool init() override;           // Override to do application initialization
+    bool init() override;            // Override to do application initialization
     std::string generateSerialNumber() override;
-
-    void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) override;
+    bool setupSLURLHandler();
 
 protected:
     bool beingDebugged() override;
 
     bool restoreErrorTrap() override;
-    void initCrashReporting(bool reportFreeze) override;
+    void initCrashReporting(bool reportFreeze);
 
-    void initLoggingAndGetLastDuration() override;
     bool initParseCommandLine(LLCommandLineParser& clp) override;
 
     bool initSLURLHandler() override;
     bool sendURLToOtherInstance(const std::string& url) override;
-private:
-    bool mSentryInitialized = false;
-#if LL_DBUS_ENABLED
-public:
-        void shutdownDBUS();
-private:
-        std::unique_ptr<sdbus::IConnection> mViewerAPIConnection;
-        std::unique_ptr<ViewerAppAPI> mViewerAPIObject;
-#endif
 };
-
-#if LL_DBUS_ENABLED
-#define VIEWERAPI_SERVICE "com.secondlife.ViewerAppAPIService"
-#define VIEWERAPI_PATH "/com/secondlife/ViewerAppAPI"
-#define VIEWERAPI_INTERFACE "com.secondlife.ViewerAppAPI"
-#endif // LL_DBUS_ENABLED
 
 #endif // LL_LLAPPVIEWERLINUX_H

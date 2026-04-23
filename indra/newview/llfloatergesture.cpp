@@ -51,7 +51,7 @@
 #include "llviewercontrol.h"
 #include "llfloaterperms.h"
 
-BOOL item_name_precedes( LLInventoryItem* a, LLInventoryItem* b )
+bool item_name_precedes( LLInventoryItem* a, LLInventoryItem* b )
 {
     return LLStringUtil::precedesDict( a->getName(), b->getName() );
 }
@@ -85,7 +85,7 @@ public:
             perm.setMaskEveryone(LLFloaterPerms::getEveryonePerms("Gestures"));
             perm.setMaskGroup(LLFloaterPerms::getGroupPerms("Gestures"));
             item->setPermissions(perm);
-            item->updateServer(FALSE);
+            item->updateServer(false);
         }
     }
 };
@@ -188,7 +188,7 @@ LLFloaterGesture::~LLFloaterGesture()
 }
 
 // virtual
-BOOL LLFloaterGesture::postBuild()
+bool LLFloaterGesture::postBuild()
 {
     std::string label;
 
@@ -224,17 +224,17 @@ BOOL LLFloaterGesture::postBuild()
     {
         buildGestureList();
 
-        mGestureList->setFocus(TRUE);
+        mGestureList->setFocus(true);
 
-        const BOOL ascending = TRUE;
-        mGestureList->sortByColumn("name", ascending);
+        constexpr bool ascending = true;
+        mGestureList->sortByColumn(std::string("name"), ascending);
         mGestureList->selectFirstItem();
     }
 
     // Update button labels
     onCommitList();
 
-    return TRUE;
+    return true;
 }
 
 
@@ -320,15 +320,29 @@ void LLFloaterGesture::addGesture(const LLUUID& item_id , LLMultiGesture* gestur
 
     if (gesture)
     {
+        element["columns"][0]["column"] = "active";
+        element["columns"][0]["type"] = "icon";
         if (gesture->mPlaying)
         {
             font_style = "BOLD";
+            element["columns"][0]["value"] = "Activate_Checkmark";
         }
+
+        // Only add "playing" if we've got the name, less confusing. JC
         item_name = gesture->mName;
-        element["columns"][0]["column"] = "trigger";
-        element["columns"][0]["value"] = gesture->mTrigger;
-        element["columns"][0]["font"]["name"] = "SANSSERIF";
-        element["columns"][0]["font"]["style"] = font_style;
+        if (item && gesture->mPlaying)
+        {
+            item_name += " " + getString("playing");
+        }
+        element["columns"][1]["column"] = "name";
+        element["columns"][1]["value"] = item_name;
+        element["columns"][1]["font"]["name"] = "SANSSERIF";
+        element["columns"][1]["font"]["style"] = font_style;
+
+        element["columns"][2]["column"] = "trigger";
+        element["columns"][2]["value"] = gesture->mTrigger;
+        element["columns"][2]["font"]["name"] = "SANSSERIF";
+        element["columns"][2]["font"]["style"] = font_style;
 
         std::string key_string;
         std::string buffer;
@@ -345,45 +359,38 @@ void LLFloaterGesture::addGesture(const LLUUID& item_id , LLMultiGesture* gestur
                     gesture->mKey);
         }
 
-        element["columns"][1]["column"] = "shortcut";
-        element["columns"][1]["value"] = buffer;
-        element["columns"][1]["font"]["name"] = "SANSSERIF";
-        element["columns"][1]["font"]["style"] = font_style;
-
         // hidden column for sorting
-        element["columns"][2]["column"] = "key";
-        element["columns"][2]["value"] = key_string;
-        element["columns"][2]["font"]["name"] = "SANSSERIF";
-        element["columns"][2]["font"]["style"] = font_style;
-
-        // Only add "playing" if we've got the name, less confusing. JC
-        if (item && gesture->mPlaying)
-        {
-            item_name += " " + getString("playing");
-        }
-        element["columns"][3]["column"] = "name";
-        element["columns"][3]["value"] = item_name;
+        element["columns"][3]["column"] = "key";
+        element["columns"][3]["value"] = key_string;
         element["columns"][3]["font"]["name"] = "SANSSERIF";
         element["columns"][3]["font"]["style"] = font_style;
+
+        element["columns"][4]["column"] = "shortcut";
+        element["columns"][4]["value"] = buffer;
+        element["columns"][4]["font"]["name"] = "SANSSERIF";
+        element["columns"][4]["font"]["style"] = font_style;
     }
     else
     {
-        element["columns"][0]["column"] = "trigger";
+        element["columns"][0]["column"] = "active";
+        element["columns"][0]["type"] = "icon";
         element["columns"][0]["value"] = "";
-        element["columns"][0]["font"]["name"] = "SANSSERIF";
-        element["columns"][0]["font"]["style"] = font_style;
-        element["columns"][1]["column"] = "shortcut";
-        element["columns"][1]["value"] = "---";
+        element["columns"][1]["column"] = "name";
+        element["columns"][1]["value"] = item_name;
         element["columns"][1]["font"]["name"] = "SANSSERIF";
         element["columns"][1]["font"]["style"] = font_style;
-        element["columns"][2]["column"] = "key";
-        element["columns"][2]["value"] = "~~~";
+        element["columns"][2]["column"] = "trigger";
+        element["columns"][2]["value"] = "";
         element["columns"][2]["font"]["name"] = "SANSSERIF";
         element["columns"][2]["font"]["style"] = font_style;
-        element["columns"][3]["column"] = "name";
-        element["columns"][3]["value"] = item_name;
+        element["columns"][3]["column"] = "key";
+        element["columns"][3]["value"] = "~~~";
         element["columns"][3]["font"]["name"] = "SANSSERIF";
         element["columns"][3]["font"]["style"] = font_style;
+        element["columns"][4]["column"] = "shortcut";
+        element["columns"][4]["value"] = "---";
+        element["columns"][4]["font"]["name"] = "SANSSERIF";
+        element["columns"][4]["font"]["style"] = font_style;
     }
 
     LL_DEBUGS("Gesture") << "Added gesture [" << item_name << "]" << LL_ENDL;
@@ -391,9 +398,18 @@ void LLFloaterGesture::addGesture(const LLUUID& item_id , LLMultiGesture* gestur
     LLScrollListItem* sl_item = list->addElement(element, ADD_BOTTOM);
     if(sl_item)
     {
-        LLFontGL::StyleFlags style = LLGestureMgr::getInstance()->isGestureActive(item_id) ? LLFontGL::BOLD : LLFontGL::NORMAL;
-        // *TODO find out why ["font"]["style"] does not affect font style
-        ((LLScrollListText*)sl_item->getColumn(0))->setFontStyle(style);
+        if (LLGestureMgr::getInstance()->isGestureActive(item_id))
+        {
+            // If gesture was not yet loaded, will have to set active state here
+            ((LLScrollListIcon*)sl_item->getColumn(0))->setValue("Activate_Checkmark");
+            ((LLScrollListIcon*)sl_item->getColumn(0))->setIconSize(10);
+            ((LLScrollListText*)sl_item->getColumn(1))->setFontStyle(LLFontGL::BOLD);
+        }
+        else
+        {
+            ((LLScrollListIcon*)sl_item->getColumn(0))->setValue("");
+            ((LLScrollListText*)sl_item->getColumn(1))->setFontStyle(LLFontGL::NORMAL);
+        }
     }
 }
 
@@ -457,8 +473,8 @@ void LLFloaterGesture::onClickPlay()
     if(!LLGestureMgr::instance().isGestureActive(item_id))
     {
         // we need to inform server about gesture activating to be consistent with LLPreviewGesture and  LLGestureComboList.
-        BOOL inform_server = TRUE;
-        BOOL deactivate_similar = FALSE;
+        bool inform_server = true;
+        bool deactivate_similar = false;
         LLGestureMgr::instance().setGestureLoadedCallback(item_id, boost::bind(&LLFloaterGesture::playGesture, this, item_id));
         LLViewerInventoryItem *item = gInventory.getItem(item_id);
         llassert(item);
@@ -499,13 +515,13 @@ void LLFloaterGesture::onActivateBtnClick()
 
     LLGestureMgr* gm = LLGestureMgr::getInstance();
     uuid_vec_t::const_iterator it = ids.begin();
-    BOOL first_gesture_state = gm->isGestureActive(*it);
-    BOOL is_mixed = FALSE;
+    bool first_gesture_state = gm->isGestureActive(*it);
+    bool is_mixed = false;
     while( ++it != ids.end() )
     {
         if(first_gesture_state != gm->isGestureActive(*it))
         {
-            is_mixed = TRUE;
+            is_mixed = true;
             break;
         }
     }
@@ -678,7 +694,7 @@ void LLFloaterGesture::onDeleteSelected()
             new_item->setParent(trash_id);
             // no need to restamp it though it's a move into trash because
             // it's a brand new item already.
-            new_item->updateParentOnServer(FALSE);
+            new_item->updateParentOnServer(false);
             gInventory.updateItem(new_item);
         }
     }

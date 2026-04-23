@@ -24,6 +24,8 @@
 * $/LicenseInfo$
 */
 
+#include "linden_common.h"
+
 #include "llmath.h"
 #include "llrigginginfo.h"
 
@@ -120,7 +122,6 @@ void LLJointRiggingInfoTab::clear()
 
 void showDetails(const LLJointRiggingInfoTab& src, const std::string& str)
 {
-    LL_DEBUGS("RigSpammish") << "details: ";
     S32 count_rigged = 0;
     S32 count_box = 0;
     LLVector4a zero_vec;
@@ -137,7 +138,7 @@ void showDetails(const LLJointRiggingInfoTab& src, const std::string& str)
             }
        }
     }
-    LL_CONT << str << " has " << count_rigged << " rigged joints, of which " << count_box << " are non-empty" << LL_ENDL;
+    LL_DEBUGS("RigSpammish") << "details: " << str << " has " << count_rigged << " rigged joints, of which " << count_box << " are non-empty" << LL_ENDL;
 }
 
 void LLJointRiggingInfoTab::merge(const LLJointRiggingInfoTab& src)

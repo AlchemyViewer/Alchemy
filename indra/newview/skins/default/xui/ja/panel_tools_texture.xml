@@ -12,14 +12,12 @@
 	<panel.string name="paste_options">
 		ペースト時のオプション
 	</panel.string>
-	<button name="copy_color_btn" tool_tip="色のパラメータをコピーします。"/>
-	<button name="paste_color_btn" tool_tip="色のパラメータをペーストします。"/>
-	<button name="pipette_color_btn" tool_tip="ピペットツールで色のパラメータをペーストします。"/>
+	<menu_button name="clipboard_color_params_btn" tool_tip="ペースト時のオプションを選択します。"/>
 	<text name="color label">
 		色
 	</text>
 	<!-- label is blank because control places it below the box -->
-	<color_swatch label="" name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます。"/>
+	<color_swatch name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます。"/>
 	<text name="color trans">
 		透過度
 	</text>
@@ -27,30 +25,28 @@
 		グロー
 	</text>
 	<check_box label="明るさ全開" name="checkbox fullbright"/>
-	<view_border name="object_horizontal"/>
+	<check_box label="水面を隠す" name="checkbox_hide_water"/>
 	<text name="label_matmedia">
 		マテリアル
 	</text>
 	<combo_box name="combobox matmedia" width="100">
-		<combo_box.item label="レガシーマテリアル" name="Materials" value="Materials"/>
-		<combo_box.item label="ＰＢＲメタリック／粗さ" name="PBR" value="PBR"/>
-		<combo_box.item label="メディア" name="Media" value="Media"/>
+		<combo_box.item label="レガシーマテリアル" name="Materials"/>
+		<combo_box.item label="ＰＢＲメタリック／粗さ" name="PBR"/>
+		<combo_box.item label="メディア" name="Media"/>
 	</combo_box>
 	<radio_group name="radio_material_type">
-		<radio_item label="テクスチャ（ディフューズ）" name="Texture (diffuse)" value="0"/>
-		<radio_item label="法線（ノーマル）" name="Bumpiness (normal)" value="1"/>
-		<radio_item label="鏡面反射（スペキュラ）" name="Shininess (specular)" value="2"/>
+		<radio_item label="テクスチャ（ディフューズ）" name="Texture (diffuse)"/>
+		<radio_item label="法線（ノーマル）" name="Bumpiness (normal)"/>
+		<radio_item label="鏡面反射（スペキュラ）" name="Shininess (specular)"/>
 	</radio_group>
 	<radio_group name="radio_pbr_type">
-		<radio_item label="完全なマテリアル" name="Complete material" value="0"/>
-		<radio_item label="ベースカラー（アルベド）" name="Base color" value="1"/>
-		<radio_item label="法線（ノーマル）" name="Normal" value="2"/>
-		<radio_item label="メタリック／粗さ" name="Metallic/roughness" value="3"/>
-		<radio_item label="放射（エミッシブ）" name="Emissive" value="4"/>
+		<radio_item label="完全なマテリアル" name="Complete material"/>
+		<radio_item label="ベースカラー（アルベド）" name="Base color"/>
+		<radio_item label="法線（ノーマル）" name="Normal"/>
+		<radio_item label="メタリック／粗さ" name="Metallic/roughness"/>
+		<radio_item label="放射（エミッシブ）" name="Emissive"/>
 	</radio_group>
-	<button name="copy_texture_btn" tool_tip="テクスチャパラメータをコピーします。"/>
-	<button name="paste_texture_btn" tool_tip="テクスチャパラメータをペーストします。"/>
-	<button name="pipette_texture_btn" tool_tip="ピペットツールでテクスチャパラメータをペーストします。"/>
+	<menu_button name="clipboard_texture_params_btn" tool_tip="ペースト時のオプションを選択します。"/>
 	<texture_picker label="ＰＢＲマテリアル" name="pbr_control" tool_tip="クリックでＰＢＲマテリアルを選択します。"/>
 	<button name="pbr_from_inventory" label="インベントリから選択"/>
 	<text name="material_permissions_loading_label">
@@ -95,7 +91,7 @@
 		<combo_box.item label="吸盤" name="suction"/>
 		<combo_box.item label="織物" name="weave"/>
 		<!-- NORSPEC-182, ensure item doesn't show up in menu until it should
-		<combo_box.item label="テクスチャを使用" name="Use texture" value="Use texture"/>
+		<combo_box.item label="テクスチャを使用" name="Use texture"/>
 		-->
 	</combo_box>
 	<texture_picker label="鏡面反射" name="shinytexture control" tool_tip="クリックで鏡面反射（スペキュラ）マップのテクスチャを選択します。"/>
@@ -108,27 +104,26 @@
 		<combo_box.item label="中" name="Medium"/>
 		<combo_box.item label="高" name="High"/>
 		<!-- NORSPEC-182, ensure item doesn't show up in menu until it should
-		<combo_box.item label="テクスチャを使用" name="Use texture" value="Use texture"/>
+		<combo_box.item label="テクスチャを使用" name="Use texture"/>
 		-->
 	</combo_box>
 	<text name="label glossiness">
 		光沢度
 	</text>
 	<combo_box name="combobox shininess">
-		<combo_box.item label="なし" name="None" value="None"/>
-		<combo_box.item label="低" name="Low" value="Low"/>
-		<combo_box.item label="中" name="Medium" value="Medium"/>
-		<combo_box.item label="高" name="High" value="High"/>
+		<combo_box.item label="なし" name="None"/>
+		<combo_box.item label="低" name="Low"/>
+		<combo_box.item label="中" name="Medium"/>
+		<combo_box.item label="高" name="High"/>
 	</combo_box>
 	<text name="label environment">
 		自然環境
 	</text>
-	<spinner name="environment"/>
 	<text name="label shinycolor">
 		光沢色
 	</text>
 	<!-- label is blank because control places it below the box -->
-	<color_swatch label="" name="shinycolorswatch" tool_tip="クリックしてカラーピッカーを開きます。"/>
+	<color_swatch name="shinycolorswatch" tool_tip="クリックしてカラーピッカーを開きます。"/>
 	<text name="media_info">
 		ここに選択したメディアのＵＲＬを入力します。
 	</text>
@@ -144,7 +139,7 @@
 	</combo_box>
 	<spinner label="水平スケール" name="TexScaleU"/>
 	<spinner label="垂直スケール" name="TexScaleV"/>
-	<spinner label="メーターごとに繰り返す" name="rptctrl"/>
+	<spinner label="メートル毎に繰り返す" name="rptctrl"/>
 	<spinner label="回転度" name="TexRot"/>
 	<spinner label="水平オフセット" name="TexOffsetU"/>
 	<spinner label="垂直オフセット" name="TexOffsetV"/>
@@ -158,20 +153,16 @@
 	<spinner label="回転度" name="shinyRot"/>
 	<spinner label="水平オフセット" name="shinyOffsetU"/>
 	<spinner label="垂直オフセット" name="shinyOffsetV"/>
-	<web_browser name="title_media"/>
+	<check_box label="平面を揃える" name="checkbox planar align" tool_tip="テクスチャを最後に選択された面を基準に揃えます。平面テクスチャのマッピングが必要です。"/>
+	<button label="揃える" label_selected="現在のテクスチャレイヤーを揃える" name="button align textures" tool_tip="現在のテクスチャレイヤーを揃えます。"/>
 	<!-- BEGIN PBR Material texture transform parameters -->
 	<spinner label="水平スケール" name="gltfTextureScaleU"/>
 	<spinner label="垂直スケール" name="gltfTextureScaleV"/>
 	<spinner label="回転度" name="gltfTextureRotation"/>
 	<spinner label="水平オフセット" name="gltfTextureOffsetU"/>
 	<spinner label="垂直オフセット" name="gltfTextureOffsetV"/>
+	<spinner label="メートル毎に繰り返す" name="gltfRptctrl"/>
 	<!-- END PBR Material texture transform parameters -->
-	<check_box label="平面を揃える" name="checkbox planar align" tool_tip="テクスチャを最後に選択された面を基準に揃えます。平面テクスチャのマッピングが必要です。"/>
 	<check_box label="マテリアルを同期" name="checkbox_sync_settings" tool_tip="全てのマップの繰り返しを同期させます。"/>
-	<button label="揃える" name="button align textures" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
-	<web_browser name="title_media"/>
-	<button label="全て検索" name="btn_select_same_diff" tool_tip="この面と同じディフューズ（拡散反射）マップを貼り付けた、すべての面を選択します。"/>
-	<button label="全て検索" name="btn_select_same_norm" tool_tip="この面と同じ法線（ノーマル）マップを貼り付けた、すべての面を選択します。"/>
-	<button label="全て検索" name="btn_select_same_spec" tool_tip="この面と同じ鏡面反射（スペキュラ）マップを貼り付けた、すべての面を選択します。"/>
-	<button label="全て検索" name="btn_select_same_pbr" tool_tip="この面と同じＰＢＲマテリアルを貼り付けた、すべての面を選択します。"/>
+	<button label="揃える" name="button align textures" label_selected="現在のテクスチャレイヤーを揃える" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
 </panel>

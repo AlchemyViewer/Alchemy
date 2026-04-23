@@ -61,7 +61,6 @@
 #include "rlvactions.h"
 #include "rlvhelper.h"
 #include "rlvhandler.h"
-#include "rlvinventory.h"
 #include "rlvui.h"
 // [/RLVa:KB]
 
@@ -69,10 +68,8 @@
 #include <boost/algorithm/string/replace.hpp>
 #include "boost/lexical_cast.hpp"
 
-
-
 // Resurrect the Autorespond from the archive
-// -- FLN
+// -- Fallen
 std::string replace_wildcards(std::string input, const LLUUID& id, const std::string& name)
 {
     boost::algorithm::replace_all(input, "#n", name);
@@ -85,7 +82,6 @@ std::string replace_wildcards(std::string input, const LLUUID& id, const std::st
     boost::algorithm::replace_all(input, "#d", LLAvatarNameCache::get(id, &av_name) ? av_name.getDisplayName() : name);
     return input;
 }
-
 
 extern void on_new_message(const LLSD& msg);
 
@@ -142,7 +138,7 @@ static std::string clean_name_from_im(const std::string& name, EInstantMessage t
 }
 
 static std::string clean_name_from_task_im(const std::string& msg,
-    BOOL from_group)
+    bool from_group)
 {
     boost::smatch match;
     static const boost::regex returned_exp(
@@ -213,44 +209,40 @@ void inventory_offer_handler(LLOfferInfo* info)
         return;
     }
 
+    bool bAutoAccept(false);
+    // Avoid the Accept/Discard dialog if the user so desires. JC
+    if (gSavedSettings.getBOOL("AutoAcceptNewInventory")
+        && (info->mType == LLAssetType::AT_NOTECARD
+        || info->mType == LLAssetType::AT_LANDMARK
+        || info->mType == LLAssetType::AT_TEXTURE))
+    {
+        // For certain types, just accept the items into the inventory,
+        // and possibly open them on receipt depending upon "ShowNewInventory".
+        bAutoAccept = true;
+    }
+
     // Strip any SLURL from the message display. (DEV-2754)
     std::string msg = info->mDesc;
-    size_t indx = msg.find(" ( http://slurl.com/secondlife/");
+    auto indx = msg.find(" ( http://slurl.com/secondlife/");
     if (indx == std::string::npos)
     {
-        // try to find new slurl host
+        // https
+        indx = msg.find(" ( https://slurl.com/secondlife/");
+    }
+    if (indx == std::string::npos)
+    {
+        // try to find new slurl http host
         indx = msg.find(" ( http://maps.secondlife.com/secondlife/");
     }
-    if (indx != std::string::npos && indx >= 0)
+    if (indx == std::string::npos)
+    {
+        // try to find new slurl https host
+        indx = msg.find(" ( https://maps.secondlife.com/secondlife/");
+    }
+    if (indx >= 0)
     {
         LLStringUtil::truncate(msg, indx);
     }
-
-    // Avoid the Accept/Discard dialog if the user so desires. JC
-    bool bAutoAccept(false);
-    if ((gSavedSettings.getBOOL("AutoAcceptNewInventory"))
-        && ((!rlv_handler_t::isEnabled()) || (!RlvInventory::instance().isGiveToRLVOffer(*info))))
-    {
-        bAutoAccept = true;
-        if (info->mType != LLAssetType::AT_NOTECARD
-            || info->mType != LLAssetType::AT_LANDMARK
-            || info->mType != LLAssetType::AT_TEXTURE)
-        {
-            LLSD args;
-            args["NAME"] = LLSLURL(info->mFromGroup ? "group" : "agent", info->mFromID, "about").getSLURLString();
-            if (info->mFromObject)
-                args["ITEM"] = msg;
-            else
-            {
-                const std::string& verb = "select?name=" + LLURI::escape(msg);
-                args["ITEM"] = LLSLURL("inventory", info->mObjectID, verb.c_str()).getSLURLString();
-            }
-            LLNotificationsUtil::add("AutoAcceptedInventory", args);
-        }
-    }
-
-    // Strip any SLURL from the message display. (DEV-2754)
-        // try to find new slurl host
 
     LLSD args;
     args["[OBJECTNAME]"] = msg;
@@ -287,7 +279,7 @@ void inventory_offer_handler(LLOfferInfo* info)
     // faked for toast one.
     payload["object_id"] = object_id;
     // Flag indicating that this notification is faked for toast.
-    payload["give_inventory_notification"] = FALSE;
+    payload["give_inventory_notification"] = false;
     args["OBJECTFROMNAME"] = info->mFromName;
     args["NAME"] = info->mFromName;
     if (info->mFromGroup)
@@ -313,7 +305,7 @@ void inventory_offer_handler(LLOfferInfo* info)
         // Only filter if the object owner is a nearby agent
         if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, info->mFromID)) && (RlvUtil::isNearbyAgent(info->mFromID)) )
         {
-            payload["rlv_shownames"] = TRUE;
+            payload["rlv_shownames"] = true;
             args["NAME_SLURL"] = LLSLURL("agent", info->mFromID, "rlvanonym").getSLURLString();
         }
 // [/RLVa:KB]
@@ -328,7 +320,7 @@ void inventory_offer_handler(LLOfferInfo* info)
         p.name = info->mFromID == gAgentID ? "OwnObjectGiveItem" : "ObjectGiveItem";
 
         // Pop up inv offer chiclet and let the user accept (keep), or reject (and silently delete) the inventory.
-        LLPostponedNotification::add<LLPostponedOfferNotification>(p, info->mFromID, info->mFromGroup == TRUE);
+        LLPostponedNotification::add<LLPostponedOfferNotification>(p, info->mFromID, info->mFromGroup);
     }
     else // Agent -> Agent Inventory Offer
     {
@@ -338,16 +330,8 @@ void inventory_offer_handler(LLOfferInfo* info)
             (RlvActions::canShowName(RlvActions::SNC_DEFAULT, info->mFromID)) || (!RlvUtil::isNearbyAgent(info->mFromID)) || (RlvUIEnabler::hasOpenIM(info->mFromID)) || (RlvUIEnabler::hasOpenProfile(info->mFromID));
         if (!fRlvCanShowName)
         {
-            payload["rlv_shownames"] = TRUE;
-            LLAvatarName av_name;
-            if (LLAvatarNameCache::get(info->mFromID, &av_name))
-            {
-                args["NAME"] = RlvStrings::getAnonym(av_name);
-            }
-            else
-            {
-                args["NAME"] = RlvStrings::getAnonym(info->mFromName);
-            }
+            payload["rlv_shownames"] = true;
+            args["NAME"] = RlvStrings::getAnonym(info->mFromName);
             args["NAME_SLURL"] = LLSLURL("agent", info->mFromID, "rlvanonym").getSLURLString();
         }
 // [/RLVa:KB]
@@ -385,31 +369,9 @@ void inventory_offer_handler(LLOfferInfo* info)
         if (!bAutoAccept) // if we auto accept, do not pester the user
         {
             // Inform user that there is a script floater via toast system
-            payload["give_inventory_notification"] = TRUE;
+            payload["give_inventory_notification"] = true;
             p.payload = payload;
             LLPostponedNotification::add<LLPostponedOfferNotification>(p, info->mFromID, false);
-        }
-
-        if (bAutoAccept && gSavedSettings.getBOOL("ShowNewInventory"))
-        {
-            LLViewerInventoryCategory* catp = NULL;
-            catp = (LLViewerInventoryCategory*)gInventory.getCategory(info->mObjectID);
-            LLViewerInventoryItem* itemp = NULL;
-            if(!catp)
-            {
-                itemp = (LLViewerInventoryItem*)gInventory.getItem(info->mObjectID);
-            }
-
-            LLOpenAgentOffer* open_agent_offer = new LLOpenAgentOffer(info->mObjectID, info->mFromName, false);
-            open_agent_offer->startFetch();
-            if(catp || (itemp && itemp->isFinished()))
-            {
-                open_agent_offer->done();
-            }
-            else
-            {
-                gInventory.addObserver(open_agent_offer);
-            }
         }
     }
 
@@ -459,7 +421,7 @@ static bool parse_lure_bucket(const std::string& bucket,
         ly = boost::lexical_cast<S32>((*(++iter)).c_str());
         lz = boost::lexical_cast<S32>((*(++iter)).c_str());
     }
-    catch (const boost::bad_lexical_cast&)
+    catch (boost::bad_lexical_cast&)
     {
         LL_WARNS("parse_lure_bucket")
             << "Couldn't parse lure bucket."
@@ -504,13 +466,13 @@ static void notification_display_name_callback(const LLUUID& id,
 }
 
 void LLIMProcessing::processNewMessage(LLUUID from_id,
-    BOOL from_group,
+    bool from_group,
     LLUUID to_id,
     U8 offline,
     EInstantMessage dialog, // U8
     LLUUID session_id,
     U32 timestamp,
-    std::string name,
+    std::string agentName,
     std::string message,
     U32 parent_estate_id,
     LLUUID region_id,
@@ -518,10 +480,12 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     U8 *binary_bucket,
     S32 binary_bucket_size,
     LLHost &sender,
+    LLSD metadata,
     LLUUID aux_id)
 {
     LLChat chat;
     std::string buffer;
+    std::string name = agentName;
 
     // make sure that we don't have an empty or all-whitespace name
     LLStringUtil::trim(name);
@@ -537,26 +501,50 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     // IDEVO convert new-style "Resident" names for display
     name = clean_name_from_im(name, dialog);
 
-    BOOL is_do_not_disturb = gAgent.isDoNotDisturb();
-    BOOL is_rejecting_tp_offers = gAgent.isRejectTeleportOffers();
-    static LLCachedControl<bool> ALDontRejectTeleportOffersFromFriends(gSavedPerAccountSettings, "ALDontRejectTeleportOffersFromFriends");
+    bool is_do_not_disturb = gAgent.isDoNotDisturb();
 
-    BOOL is_muted = LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat)
-        // object IMs contain sender object id in session_id (STORM-1209)
-        || (dialog == IM_FROM_TASK && LLMuteList::getInstance()->isMuted(session_id));
+    // NOTE: Not set on this
+    // *TODO*: Revisit this
+    // -- Fallen
+    static LLCachedControl<bool> AlchemyRejectTeleportOffers(gSavedPerAccountSettings, "ALRejectTeleportOffersMode");
+    static LLCachedControl<bool> AlchemyDontRejectTeleportOffersFromFriends(gSavedPerAccountSettings, "ALDontRejectTeleportOffersFromFriends");
+    static LLCachedControl<bool> AlchemyRejectFriendshipRequests(gSavedPerAccountSettings, "ALRejectFriendshipRequestsMode");
 
-    BOOL is_rejecting_friendship_requests = gAgent.getRejectFriendshipRequests();
-
-    BOOL is_owned_by_me = FALSE;
-    BOOL is_friend = (LLAvatarTracker::instance().getBuddyInfo(from_id) == NULL) ? false : true;
-    BOOL accept_im_from_only_friend = gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly");
-    BOOL is_linden = chat.mSourceType != CHAT_SOURCE_OBJECT &&
-        LLMuteList::isLinden(name);
-
-    // Resurrect AutoResponse from Alchemy Archive 
-    // -- FLN
+    // Resurrect AutoResponse from Alchemy Archive (Thanks Cinders!)
+    // -- Fallen
     static LLCachedControl<bool> sAutorespond(gSavedPerAccountSettings, "AlchemyAutoresponseEnable");
     static LLCachedControl<bool> sAutorespondNonFriend(gSavedPerAccountSettings, "AlchemyAutoresponseNotFriendEnable");
+
+    bool is_muted = LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat)
+        // object IMs contain sender object id in session_id (STORM-1209)
+        || (dialog == IM_FROM_TASK && LLMuteList::getInstance()->isMuted(session_id));
+    bool is_owned_by_me = false;
+    bool is_friend = LLAvatarTracker::instance().getBuddyInfo(from_id) != NULL;
+    bool accept_im_from_only_friend = gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly");
+    bool is_linden = chat.mSourceType != CHAT_SOURCE_OBJECT &&
+        LLMuteList::isLinden(name);
+
+    /***
+    * The simulator may have flagged this sender as a bot, if the viewer would like to display
+    * the chat text in a different color or font, the below code is how the viewer can
+    * tell if the sender is a bot.
+    *-----------------------------------------------------
+    bool is_bot = false;
+    if (metadata.has("sender"))
+    {   // The server has identified this sender as a bot.
+        is_bot = metadata["sender"]["bot"].asBoolean();
+    }
+    *-----------------------------------------------------
+    */
+
+    std::string notice_name;
+    LLSD notice_args;
+    if (metadata.has("notice"))
+    {   // The server has injected a notice into the IM conversation.
+        // These will be things like bot notifications, etc.
+        notice_name = metadata["notice"]["id"].asString();
+        notice_args = metadata["notice"]["data"];
+    }
 
     chat.mMuted = is_muted;
     chat.mFromID = from_id;
@@ -595,7 +583,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
         case IM_NOTHING_SPECIAL:    // p2p IM
             // Don't show dialog, just do IM
             if (!gAgent.isGodlike()
-                && gAgent.getRegion()->isPrelude()
+                && gAgent.inPrelude()
                 && to_id.isNull())
             {
                 // do nothing -- don't distract newbies in
@@ -681,7 +669,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     pack_instant_message(
                         gMessageSystem,
                         gAgent.getID(),
-                        FALSE,
+                        false,
                         gAgent.getSessionID(),
                         from_id,
                         my_name,
@@ -693,7 +681,6 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     gIMMgr->addMessage(session_id, gAgent.getID(), my_name, LLTrans::getString("AutoresponsePrefix").append(response));
                 }
             }
-
             else if (from_id.isNull())
             {
                 LLSD args;
@@ -708,7 +695,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             }
             else
             {
-                // standard message, not from system
+                // standard message, server may have injected a notice into the conversation.
                 std::string saved;
                 if (offline == IM_OFFLINE)
                 {
@@ -735,7 +722,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
 // [RLVa:KB] - Checked: 2010-11-30 (RLVa-1.3.0)
                 // Don't block offline IMs, or IMs from Lindens
-                if ( (rlv_handler_t::isEnabled()) && (offline != IM_OFFLINE) && (!RlvActions::canReceiveIM(from_id)) && (!LLMuteList::isLinden(original_name) ))
+                if ( (rlv_handler_t::isEnabled()) && (offline != IM_OFFLINE) && (!RlvActions::canReceiveIM(from_id)) && (!LLMuteList::getInstance()->isLinden(original_name) ))
                 {
                     if (!mute_im)
                         RlvUtil::sendBusyMessage(from_id, RlvStrings::getString(RlvStringKeys::Blocked::RecvImRemote), session_id);
@@ -754,8 +741,17 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                             region_message = true;
                         }
                     }
-                    gIMMgr->addMessage(
-                        session_id,
+
+                    std::string real_name;
+
+                    if (!notice_name.empty())
+                    {   // The simulator has injected some sort of notice into the conversation.
+                        // findString will only replace the contents of buffer if the notice_id is found.
+                        LLTrans::findString(buffer, notice_name, notice_args);
+                        real_name = SYSTEM_FROM;
+                    }
+
+                    gIMMgr->addMessage(session_id,
                         from_id,
                         name,
                         buffer,
@@ -766,7 +762,9 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                         region_id,
                         position,
                         region_message,
-                        timestamp);
+                        timestamp,
+                        LLUUID::null,
+                        real_name);
                 }
                 else
                 {
@@ -802,32 +800,6 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     false,
                     0
                 );
-
-                // Resurrect Autorespond from Alchemy archive
-                // -- FLN
-                if (sAutorespond || (sAutorespondNonFriend && !is_friend))
-                {
-                    std::string my_name;
-                    LLAgentUI::buildFullname(my_name);
-                    std::string response = gSavedPerAccountSettings.getString(sAutorespondNonFriend && !is_friend
-                        ? "AlchemyAutoresponseNotFriend"
-                        : "AlchemyAutoresponse");
-                    response = replace_wildcards(response, from_id, name);
-                    pack_instant_message(gMessageSystem,
-                        gAgent.getID(),
-                        FALSE,
-                        gAgent.getSessionID(),
-                        from_id,
-                        my_name,
-                        response,
-                        IM_ONLINE,
-                        IM_DO_NOT_DISTURB_AUTO_RESPONSE,
-                        session_id);
-                    gAgent.sendReliableMessage();
-
-                    gIMMgr->addMessage(session_id, gAgent.getID(), my_name, LLTrans::getString("AutoresponsePrefix").append(response));
-                }
-
             }
 
             gIMMgr->processIMTypingStart(from_id, dialog);
@@ -862,8 +834,8 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             {
                 // aux_id contains group id, binary bucket contains name and asset type
                 group_id = aux_id;
-                has_inventory = binary_bucket_size > 1 ? TRUE : FALSE;
-                from_group = TRUE; // inaccurate value correction
+                has_inventory = binary_bucket_size > 1;
+                from_group = true; // inaccurate value correction
                 if (has_inventory)
                 {
                     std::string str_bucket = ll_safe_string((char*)binary_bucket, binary_bucket_size);
@@ -876,14 +848,6 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     asset_type = (LLAssetType::EType)(atoi((*(iter++)).c_str()));
                     iter++; // wearable type if applicable, otherwise asset type
                     item_name = std::string((*(iter++)).c_str());
-                    // Note There is more elements in 'tokens' ...
-
-
-                    for (int i = 0; i < 6; i++)
-                    {
-                        LL_WARNS() << *(iter++) << LL_ENDL;
-                        iter++;
-                    }
                 }
             }
             else
@@ -923,7 +887,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             }
             else
             {
-                std::string::size_type index = original_name.find(" Resident");
+                auto index = original_name.find(" Resident");
                 if (index != std::string::npos)
                 {
                     original_name = original_name.substr(0, index);
@@ -1087,7 +1051,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 bucketp = (struct offer_agent_bucket_t*) &binary_bucket[0];
                 info->mType = (LLAssetType::EType) bucketp->asset_type;
                 info->mObjectID = bucketp->object_id;
-                info->mFromObject = FALSE;
+                info->mFromObject = false;
             }
             else // IM_TASK_INVENTORY_OFFERED
             {
@@ -1116,7 +1080,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     LL_WARNS("Messaging") << "Malformed inventory offer from object, type might be " << info->mType << LL_ENDL;
                 }
                 info->mObjectID = LLUUID::null;
-                info->mFromObject = TRUE;
+                info->mFromObject = true;
             }
 
             info->mIM = dialog;
@@ -1259,7 +1223,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 // NOTE: the chat message itself will be filtered in LLNearbyChatHandler::processChat()
                 if ( (!RlvActions::canShowName(RlvActions::SNC_DEFAULT)) && (!from_group) && (RlvUtil::isNearbyAgent(from_id)) )
                 {
-                    query_string["rlv_shownames"] = TRUE;
+                    query_string["rlv_shownames"] = true;
 
                     RlvUtil::filterNames(name);
                     chat.mFromName = name;
@@ -1283,7 +1247,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 // [SL:KB] - Checked: 2010-11-02 (RLVa-1.2.2a) | Added: RLVa-1.2.2a
             chat.mURL = LLSLURL("objectim", session_id, LLURI::mapToQueryString(query_string)).getSLURLString();
 // [/SL:KB]
-           chat.mText = message;
+            chat.mText = message;
 
             // Note: lie to Nearby Chat, pretending that this is NOT an IM, because
             // IMs from obejcts don't open IM sessions.
@@ -1340,10 +1304,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
             // Only show messages if we have a session open (which
             // should happen after you get an "invitation"
-//           if (!gIMMgr->hasSession(session_id))
-// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
-            if (!gIMMgr->hasSession(session_id) && (!gAgent.isInGroup(session_id) || (!gIMMgr->checkSnoozeExpiration(session_id) || !gIMMgr->restoreSnoozedSession(session_id))) )
-// [/SL:KB]
+            if (!gIMMgr->hasSession(session_id))
             {
                 return;
             }
@@ -1444,7 +1405,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                   ((IM_TELEPORT_REQUEST == dialog) && (RlvActions::autoAcceptTeleportRequest(from_id))) );
 // [/RLVa:KB]
 
-           if (is_muted)
+            if (is_muted)
             {
                 return;
             }
@@ -1452,7 +1413,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             {
                 return;
             }
-            else if ((is_rejecting_tp_offers && (!ALDontRejectTeleportOffersFromFriends || (ALDontRejectTeleportOffersFromFriends && !is_friend))) && (!fRlvAutoAccept))
+            else if ((AlchemyRejectTeleportOffers && (!AlchemyDontRejectTeleportOffersFromFriends || (AlchemyDontRejectTeleportOffersFromFriends && !is_friend))) && (!fRlvAutoAccept))
             {
                 send_rejecting_tp_offers_message(gMessageSystem, from_id);
             }
@@ -1554,7 +1515,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 LLSD payload;
                 payload["from_id"] = from_id;
                 payload["lure_id"] = session_id;
-                payload["godlike"] = FALSE;
+                payload["godlike"] = false;
                 payload["region_maturity"] = region_access;
 
                 if (!canUserAccessDstRegion)
@@ -1674,7 +1635,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             LLSD payload;
             payload["from_id"] = from_id;
             payload["lure_id"] = session_id;
-            payload["godlike"] = TRUE;
+            payload["godlike"] = true;
             payload["region_maturity"] = region_access;
 
             if (!canUserAccessDstRegion)
@@ -1728,17 +1689,17 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
         case IM_FRIENDSHIP_OFFERED:
         {
-            if (is_rejecting_friendship_requests)
+            LLSD payload;
+            payload["from_id"] = from_id;
+            payload["session_id"] = session_id;;
+            payload["online"] = (offline == IM_ONLINE);
+            payload["sender"] = sender.getIPandPort();
+
+            if (AlchemyRejectFriendshipRequests)
             {
                 send_rejecting_friendship_requests_message(gMessageSystem, from_id);
                 return;
             }
-
-            LLSD payload;
-            payload["from_id"] = from_id;
-            payload["session_id"] = session_id;
-            payload["online"] = (offline == IM_ONLINE);
-            payload["sender"] = sender.getIPandPort();
 
             bool add_notification = true;
             for (auto& panel : LLToastNotifyPanel::instance_snapshot())
@@ -1820,14 +1781,14 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
 void LLIMProcessing::requestOfflineMessages()
 {
-    static BOOL requested = FALSE;
+    static bool requested = false;
     if (!requested
         && gMessageSystem
         && !gDisconnected
-        && LLMuteList::getInstance()->isLoaded()
         && isAgentAvatarValid()
         && gAgent.getRegion()
-        && gAgent.getRegion()->capabilitiesReceived())
+        && gAgent.getRegion()->capabilitiesReceived()
+        && (LLMuteList::getInstance()->isLoaded() || LLMuteList::getInstance()->getLoadFailed()))
     {
         std::string cap_url = gAgent.getRegionCapability("ReadOfflineMsgs");
 
@@ -1847,7 +1808,7 @@ void LLIMProcessing::requestOfflineMessages()
             LLCoros::instance().launch("LLIMProcessing::requestOfflineMessagesCoro",
                 boost::bind(&LLIMProcessing::requestOfflineMessagesCoro, cap_url));
         }
-        requested = TRUE;
+        requested = true;
     }
 }
 
@@ -1855,8 +1816,8 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestOfflineMessagesCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestOfflineMessagesCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -1933,7 +1894,7 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
         }
         else
         {
-            position.set(message_data["local_x"].asReal(), message_data["local_y"].asReal(), message_data["local_z"].asReal());
+            position.set((F32)message_data["local_x"].asReal(), (F32)message_data["local_y"].asReal(), (F32)message_data["local_z"].asReal());
         }
 
         std::vector<U8> bin_bucket;
@@ -1947,7 +1908,7 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
         }
 
         // Todo: once drtsim-451 releases, remove the string option
-        BOOL from_group;
+        bool from_group;
         if (message_data["from_group"].isInteger())
         {
             from_group = message_data["from_group"].asInteger();
@@ -1955,6 +1916,12 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
         else
         {
             from_group = message_data["from_group"].asString() == "Y";
+        }
+
+        LLSD metadata;
+        if (message_data.has("metadata"))
+        {
+            metadata = message_data["metadata"];
         }
 
         EInstantMessage dialog = static_cast<EInstantMessage>(message_data["dialog"].asInteger());
@@ -1984,6 +1951,7 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
                     local_bin_bucket.data(),
                     S32(local_bin_bucket.size()),
                     local_sender,
+                    metadata,
                     message_data["asset_id"].asUUID());
             });
 

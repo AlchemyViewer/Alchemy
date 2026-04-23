@@ -29,7 +29,7 @@
 
 #include "lldrawpool.h"
 
-class LLDrawPoolTree final : public LLFacePool
+class LLDrawPoolTree : public LLFacePool
 {
     LLPointer<LLViewerTexture> mTexturep;
 public:
@@ -55,7 +55,7 @@ public:
     /*virtual*/ void endShadowPass(S32 pass);
     /*virtual*/ void renderShadow(S32 pass);
 
-    /*virtual*/ BOOL verify() const;
+    /*virtual*/ bool verify() const;
     /*virtual*/ LLViewerTexture *getTexture();
     /*virtual*/ LLViewerTexture *getDebugTexture();
     /*virtual*/ LLColor3 getDebugColor() const; // For AGP debug display

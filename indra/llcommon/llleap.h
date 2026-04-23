@@ -86,10 +86,10 @@ public:
         Error(const std::string& what): LLException(what) {}
     };
 
-    virtual ~LLLeap() = default;
+    virtual ~LLLeap();
 
 protected:
-    LLLeap() = default;
+    LLLeap();
 };
 
 #endif /* ! defined(LL_LLLEAP_H) */

@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2011, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -180,7 +181,7 @@ void RlvAttachmentLocks::addAttachmentLock(const LLUUID& idAttachObj, const LLUU
 /*
     // Sanity check - make sure it's an object we know about
     if ( (m_Objects.find(idRlvObj) == m_Objects.end()) || (!idxAttachPt) )
-        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == FALSE)
+        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == false)
 */
 
 #ifndef RLV_RELEASE
@@ -199,7 +200,7 @@ void RlvAttachmentLocks::addAttachmentPointLock(S32 idxAttachPt, const LLUUID& i
 /*
     // Sanity check - make sure it's an object we know about
     if ( (m_Objects.find(idRlvObj) == m_Objects.end()) || (!idxAttachPt) )
-        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == FALSE)
+        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == false)
 */
 
     // NOTE: m_AttachPtXXX can contain duplicate <idxAttachPt, idRlvObj> pairs (ie @detach:spine=n,detach=n from an attachment on spine)
@@ -242,9 +243,10 @@ bool RlvAttachmentLocks::canDetach(const LLViewerJointAttachment* pAttachPt, boo
     //       fDetachAll == true  : return true  => all attachments are unlocked
     if (pAttachPt)
     {
-        for (LLViewerObject* pAttachObj : pAttachPt->mAttachedObjects)
+        for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
+                itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
         {
-            if ((fDetachAll) ^ (!isLockedAttachment(pAttachObj)))
+            if ( (fDetachAll) ^ (!isLockedAttachment(*itAttachObj)) )
                 return !fDetachAll;
         }
     }
@@ -256,9 +258,10 @@ bool RlvAttachmentLocks::hasLockedAttachment(const LLViewerJointAttachment* pAtt
 {
     if (pAttachPt)
     {
-        for (LLViewerObject* pAttachObj : pAttachPt->mAttachedObjects)
+        for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
+                itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
         {
-            if (isLockedAttachment(pAttachObj))
+            if (isLockedAttachment(*itAttachObj))
                 return true;
         }
     }
@@ -318,7 +321,7 @@ void RlvAttachmentLocks::removeAttachmentLock(const LLUUID& idAttachObj, const L
 /*
     // Sanity check - make sure it's an object we know about
     if ( (m_Objects.find(idRlvObj) == m_Objects.end()) || (!idxAttachPt) )
-        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == FALSE)
+        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == false)
 */
 
 #ifndef RLV_RELEASE
@@ -348,7 +351,7 @@ void RlvAttachmentLocks::removeAttachmentPointLock(S32 idxAttachPt, const LLUUID
 /*
     // Sanity check - make sure it's an object we know about
     if ( (m_Objects.find(idRlvObj) == m_Objects.end()) || (!idxAttachPt) )
-        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == FALSE)
+        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == false)
 */
 
     if (eLock & RLV_LOCK_REMOVE)
@@ -432,6 +435,9 @@ bool RlvAttachmentLocks::verifyAttachmentLocks()
 // RlvAttachmentLockWatchdog member functions
 //
 
+RlvAttachmentLockWatchdog::RlvAttachmentLockWatchdog()
+{
+}
 
 // Checked: 2010-09-23 (RLVa-1.2.1d) | Added: RLVa-1.2.1d
 bool RlvAttachmentLockWatchdog::RlvWearInfo::isAddLockedAttachPt(S32 idxAttachPt) const
@@ -513,8 +519,10 @@ void RlvAttachmentLockWatchdog::detach(S32 idxAttachPt, const uuid_vec_t& idsAtt
         return;
 
     std::vector<const LLViewerObject*> attachObjs;
-    for (const LLViewerObject* pAttachObj : pAttachPt->mAttachedObjects)
+    for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
+            itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
     {
+        const LLViewerObject* pAttachObj = *itAttachObj;
         if (idsAttachObjExcept.end() == std::find(idsAttachObjExcept.begin(), idsAttachObjExcept.end(), pAttachObj->getID()))
             attachObjs.push_back(pAttachObj);
     }
@@ -591,12 +599,15 @@ void RlvAttachmentLockWatchdog::onAttach(const LLViewerObject* pAttachObj, const
                 else
                 {
                     // Iterate over all the current attachments and force detach any that shouldn't be there
-                    for (const LLViewerObject* pAttachObjL : pAttachPt->mAttachedObjects)
+                    for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
+                            itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
                     {
+                        const LLViewerObject* pAttachObj = *itAttachObj;
+
                         uuid_vec_t::iterator itAttach =
-                            std::find(itAttachPrev->second.begin(), itAttachPrev->second.end(), pAttachObjL->getAttachmentItemID());
+                            std::find(itAttachPrev->second.begin(), itAttachPrev->second.end(), pAttachObj->getAttachmentItemID());
                         if (itAttach == itAttachPrev->second.end())
-                            detach(pAttachObjL);
+                            detach(pAttachObj);
                         else
                             itAttachPrev->second.erase(itAttach);
                     }
@@ -702,7 +713,7 @@ void RlvAttachmentLockWatchdog::onSavedAssetIntoInventory(const LLUUID& idItem)
 }
 
 // Checked: 2010-03-05 (RLVa-1.2.0a) | Modified: RLVa-1.0.5b
-BOOL RlvAttachmentLockWatchdog::onTimer()
+bool RlvAttachmentLockWatchdog::onTimer()
 {
     // RELEASE-RLVa: [SL-2.0.0] This will need rewriting for "ENABLE_MULTIATTACHMENTS"
     F64 tsCurrent = LLFrameTimer::getElapsedSeconds();
@@ -769,20 +780,23 @@ void RlvAttachmentLockWatchdog::onWearAttachment(const LLUUID& idItem, ERlvWearM
     //       o eWearAction == RLV_WEAR_REPLACE : examine whether the new attachment can indeed replace/detach the old one
     RlvWearInfo infoWear(idItem, eWearAction);
     RLV_ASSERT( (RLV_WEAR_ADD == eWearAction) || (RLV_WEAR_REPLACE == eWearAction) ); // One of the two, but never both
-    for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
+    for (LLVOAvatar::attachment_map_t::const_iterator itAttachPt = gAgentAvatarp->mAttachmentPoints.begin();
+            itAttachPt != gAgentAvatarp->mAttachmentPoints.end(); ++itAttachPt)
     {
-        const LLViewerJointAttachment* pAttachPt = attach_pair.second;
+        const LLViewerJointAttachment* pAttachPt = itAttachPt->second;
         // We only need to know which attachments were present for RLV_LOCK_ADD locked attachment points (and not RLV_LOCK_REM locked ones)
         if (gRlvAttachmentLocks.isLockedAttachmentPoint(pAttachPt, RLV_LOCK_ADD))
         {
             uuid_vec_t attachObjs;
-            for (const LLViewerObject* pAttachObj : pAttachPt->mAttachedObjects)
+            for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
+                    itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
             {
+                const LLViewerObject* pAttachObj = *itAttachObj;
                 if (std::find(m_PendingDetach.begin(), m_PendingDetach.end(), pAttachObj->getAttachmentItemID()) != m_PendingDetach.end())
                     continue;   // Exclude attachments that are pending a force-detach
                 attachObjs.push_back(pAttachObj->getAttachmentItemID());
             }
-            infoWear.attachPts.insert(std::pair<S32, uuid_vec_t>(attach_pair.first, attachObjs));
+            infoWear.attachPts.insert(std::pair<S32, uuid_vec_t>(itAttachPt->first, attachObjs));
         }
     }
 
@@ -805,7 +819,7 @@ void RlvWearableLocks::addWearableTypeLock(LLWearableType::EType eType, const LL
 /*
     // Sanity check - make sure it's an object we know about
     if ( (m_Objects.find(idRlvObj) == m_Objects.end()) || (!idxAttachPt) )
-        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == FALSE)
+        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == false)
 */
 
     // NOTE: m_WearableTypeXXX can contain duplicate <eType, idRlvObj> pairs (ie @remoutfit:shirt=n,remoutfit=n from the same object)
@@ -818,7 +832,7 @@ void RlvWearableLocks::addWearableTypeLock(LLWearableType::EType eType, const LL
 // Checked: 2010-03-19 (RLVa-1.2.0c) | Added: RLVa-1.2.0a
 bool RlvWearableLocks::canRemove(LLWearableType::EType eType) const
 {
-    // NOTE: we return TRUE if the wearable type has at least one wearable that can be removed by the user
+    // NOTE: we return true if the wearable type has at least one wearable that can be removed by the user
     for (U32 idxWearable = 0, cntWearable = gAgentWearables.getWearableCount(eType); idxWearable < cntWearable; idxWearable++)
         if (!isLockedWearable(gAgentWearables.getViewerWearable(eType, idxWearable)))
             return true;
@@ -828,7 +842,7 @@ bool RlvWearableLocks::canRemove(LLWearableType::EType eType) const
 // Checked: 2010-03-19 (RLVa-1.2.0c) | Added: RLVa-1.2.0a
 bool RlvWearableLocks::hasLockedWearable(LLWearableType::EType eType) const
 {
-    // NOTE: we return TRUE if there is at least 1 non-removable wearable currently worn on this wearable type
+    // NOTE: we return true if there is at least 1 non-removable wearable currently worn on this wearable type
     for (U32 idxWearable = 0, cntWearable = gAgentWearables.getWearableCount(eType); idxWearable < cntWearable; idxWearable++)
         if (isLockedWearable(gAgentWearables.getViewerWearable(eType, idxWearable)))
             return true;
@@ -879,7 +893,7 @@ void RlvWearableLocks::removeWearableTypeLock(LLWearableType::EType eType, const
 /*
     // Sanity check - make sure it's an object we know about
     if ( (m_Objects.find(idRlvObj) == m_Objects.end()) || (!idxAttachPt) )
-        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == FALSE)
+        return; // If (idxAttachPt) == 0 then: (pObj == NULL) || (pObj->isAttachment() == false)
 */
 
     if (eLock & RLV_LOCK_REMOVE)
@@ -964,7 +978,7 @@ void RlvFolderLocks::addFolderLock(const folderlock_source_t& lockSource, ELockP
 // Checked: 2011-03-28 (RLVa-1.3.0g) | Modified: RLVa-1.3.0g
 bool RlvFolderLocks::getLockedFolders(const folderlock_source_t& lockSource, LLInventoryModel::cat_array_t& lockFolders) const
 {
-    S32 cntFolders = lockFolders.size();
+    size_t cntFolders = lockFolders.size();
     switch (lockSource.first)
     {
         case ST_ATTACHMENT:
@@ -1032,17 +1046,17 @@ bool RlvFolderLocks::getLockedFolders(const folderlock_source_t& lockSource, LLI
 // Checked: 2011-11-26 (RLVa-1.5.4a) | Modified: RLVa-1.5.4a
 bool RlvFolderLocks::getLockedItems(const LLUUID& idFolder, LLInventoryModel::item_array_t& lockItems) const
 {
-    S32 cntItems = lockItems.size();
+    size_t cntItems = lockItems.size();
 
     LLInventoryModel::cat_array_t folders; LLInventoryModel::item_array_t items;
     LLFindWearablesEx f(true, true);    // Collect all worn items
-    gInventory.collectDescendentsIf(idFolder, folders, items, FALSE, f);
+    gInventory.collectDescendentsIf(idFolder, folders, items, false, f);
 
     // Generally several of the worn items will belong to the same folder so we'll cache the results of each lookup
     std::map<LLUUID, bool> folderLookups; std::map<LLUUID, bool>::const_iterator itLookup;
 
     bool fItemLocked = false;
-    for (S32 idxItem = 0, cntItem = items.size(); idxItem < cntItem; idxItem++)
+    for (size_t idxItem = 0, cntItem = items.size(); idxItem < cntItem; idxItem++)
     {
         LLViewerInventoryItem* pItem = items.at(idxItem);
         if (LLAssetType::AT_LINK == pItem->getActualType())
@@ -1108,7 +1122,7 @@ bool RlvFolderLocks::hasLockedFolderDescendent(const LLUUID& idFolder, int eSour
 
     LLInventoryModel::cat_array_t folders; LLInventoryModel::item_array_t items;
     RlvLockedDescendentsCollector f(eSourceTypeMask, ePermMask, eLockTypeMask);
-    gInventory.collectDescendentsIf(idFolder, folders, items, FALSE, f, false);
+    gInventory.collectDescendentsIf(idFolder, folders, items, false, f, false);
     return !folders.empty();
 }
 
@@ -1218,7 +1232,7 @@ void RlvFolderLocks::refreshLockedLookups() const
         LLInventoryModel::cat_array_t lockedFolders; const LLUUID& idFolderRoot = gInventory.getRootFolderID();
         if (getLockedFolders(pLockDescr->lockSource, lockedFolders))
         {
-            for (S32 idxFolder = 0, cntFolder = lockedFolders.size(); idxFolder < cntFolder; idxFolder++)
+            for (size_t idxFolder = 0, cntFolder = lockedFolders.size(); idxFolder < cntFolder; idxFolder++)
             {
                 const LLViewerInventoryCategory* pFolder = lockedFolders.at(idxFolder);
                 if (idFolderRoot != pFolder->getUUID())
@@ -1239,7 +1253,7 @@ void RlvFolderLocks::refreshLockedLookups() const
     LLInventoryModel::item_array_t lockedItems;
     if (getLockedItems(LLAppearanceMgr::instance().getCOF(), lockedItems))
     {
-        for (S32 idxItem = 0, cntItem = lockedItems.size(); idxItem < cntItem; idxItem++)
+        for (size_t idxItem = 0, cntItem = lockedItems.size(); idxItem < cntItem; idxItem++)
         {
             const LLViewerInventoryItem* pItem = lockedItems.at(idxItem);
             switch (pItem->getType())

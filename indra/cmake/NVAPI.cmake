@@ -1,14 +1,12 @@
 # -*- cmake -*-
-include(Prebuilt)
+include_guard()
 
-set(USE_NVAPI ON CACHE BOOL "Use NVAPI library.")
+add_library(ll::nvapi INTERFACE IMPORTED)
 
 if (USE_NVAPI)
   if (WINDOWS)
-    add_library( ll::nvapi INTERFACE IMPORTED )
-    target_link_libraries( ll::nvapi INTERFACE nvapi)
-    use_prebuilt_binary(nvapi)
-    target_compile_definitions( ll::nvapi INTERFACE LL_NVAPI=1)
+    find_library(NVAPI_LIBRARY nvapi64 REQUIRED)
+    target_link_libraries(ll::nvapi INTERFACE ${NVAPI_LIBRARY})
   endif (WINDOWS)
 endif (USE_NVAPI)
 

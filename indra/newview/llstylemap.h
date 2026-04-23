@@ -35,9 +35,9 @@
 // Lightweight class for holding and managing mappings between UUIDs and links.
 // Used (for example) to create clickable name links off of IM chat.
 
-typedef boost::unordered_map<LLUUID, LLStyle::Params> style_map_t;
+typedef std::map<LLUUID, LLStyle::Params> style_map_t;
 
-class LLStyleMap final : public LLSingleton<LLStyleMap>
+class LLStyleMap : public LLSingleton<LLStyleMap>
 {
     LLSINGLETON_EMPTY_CTOR(LLStyleMap);
 public:

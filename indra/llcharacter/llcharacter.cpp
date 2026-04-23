@@ -38,8 +38,8 @@
 
 LLStringTable LLCharacter::sVisualParamNames(1024);
 
-std::vector< LLCharacter* > LLCharacter::sInstances;
-BOOL LLCharacter::sAllowInstancesChange = TRUE ;
+std::list< LLCharacter* > LLCharacter::sInstances;
+bool LLCharacter::sAllowInstancesChange = true ;
 
 //-----------------------------------------------------------------------------
 // LLCharacter()
@@ -53,7 +53,6 @@ LLCharacter::LLCharacter()
     mSkeletonSerialNum( 0 )
 {
     llassert_always(sAllowInstancesChange) ;
-    sInstances.push_back(this);
 
     mMotionController.setCharacter( this );
     mPauseRequest = new LLPauseRequestHandle();
@@ -66,40 +65,23 @@ LLCharacter::LLCharacter()
 //-----------------------------------------------------------------------------
 LLCharacter::~LLCharacter()
 {
-    for (LLVisualParam *param = getFirstVisualParam();
-        param;
-        param = getNextVisualParam())
+    for (const auto& it : mVisualParamIndexMap)
     {
-        delete param;
+        delete it.second;
     }
-
-    U32 i ;
-    U32 size = sInstances.size() ;
-    for(i = 0 ; i < size ; i++)
-    {
-        if(sInstances[i] == this)
-        {
-            break ;
-        }
-    }
-
-    llassert_always(i < size) ;
 
     llassert_always(sAllowInstancesChange) ;
-    sInstances[i] = sInstances[size - 1] ;
-    sInstances.pop_back() ;
 }
 
 
 //-----------------------------------------------------------------------------
 // getJoint()
 //-----------------------------------------------------------------------------
-LLJoint *LLCharacter::getJoint( const std::string &name )
+LLJoint* LLCharacter::getJoint(std::string_view name)
 {
-    LLJoint* joint = NULL;
+    LLJoint* joint = nullptr;
 
-    LLJoint *root = getRootJoint();
-    if (root)
+    if (LLJoint* root = getRootJoint())
     {
         joint = root->findJoint(name);
     }
@@ -114,7 +96,7 @@ LLJoint *LLCharacter::getJoint( const std::string &name )
 //-----------------------------------------------------------------------------
 // registerMotion()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::registerMotion( const LLUUID& id, LLMotionConstructor create )
+bool LLCharacter::registerMotion( const LLUUID& id, LLMotionConstructor create )
 {
     return mMotionController.registerMotion(id, create);
 }
@@ -147,7 +129,7 @@ LLMotion* LLCharacter::createMotion( const LLUUID &id )
 //-----------------------------------------------------------------------------
 // startMotion()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::startMotion(const LLUUID &id, F32 start_offset)
+bool LLCharacter::startMotion(const LLUUID &id, F32 start_offset)
 {
     return mMotionController.startMotion(id, start_offset);
 }
@@ -156,7 +138,7 @@ BOOL LLCharacter::startMotion(const LLUUID &id, F32 start_offset)
 //-----------------------------------------------------------------------------
 // stopMotion()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::stopMotion(const LLUUID& id, BOOL stop_immediate)
+bool LLCharacter::stopMotion(const LLUUID& id, bool stop_immediate)
 {
     return mMotionController.stopMotionLocally(id, stop_immediate);
 }
@@ -164,7 +146,7 @@ BOOL LLCharacter::stopMotion(const LLUUID& id, BOOL stop_immediate)
 //-----------------------------------------------------------------------------
 // isMotionActive()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::isMotionActive(const LLUUID& id)
+bool LLCharacter::isMotionActive(const LLUUID& id)
 {
     LLMotion *motionp = mMotionController.findMotion(id);
     if (motionp)
@@ -172,7 +154,7 @@ BOOL LLCharacter::isMotionActive(const LLUUID& id)
         return mMotionController.isMotionActive(motionp);
     }
 
-    return FALSE;
+    return false;
 }
 
 
@@ -255,9 +237,9 @@ void LLCharacter::dumpCharacter( LLJoint* joint )
 //-----------------------------------------------------------------------------
 // setAnimationData()
 //-----------------------------------------------------------------------------
-void LLCharacter::setAnimationData(std::string name, void *data)
+void LLCharacter::setAnimationData(std::string_view name, void *data)
 {
-    mAnimationData.insert_or_assign(std::move(name), data);
+    mAnimationData.insert_or_assign(name, data);
 }
 
 //-----------------------------------------------------------------------------
@@ -265,15 +247,12 @@ void LLCharacter::setAnimationData(std::string name, void *data)
 //-----------------------------------------------------------------------------
 void* LLCharacter::getAnimationData(std::string_view name)
 {
-    auto iter = mAnimationData.find(name);
-    if (iter == mAnimationData.end())
+    auto it = mAnimationData.find(name);
+    if (it != mAnimationData.end())
     {
-        return nullptr;
+        return it->second;
     }
-    else
-    {
-        return iter->second;
-    }
+    return nullptr;
 }
 
 //-----------------------------------------------------------------------------
@@ -287,22 +266,22 @@ void LLCharacter::removeAnimationData(std::string_view name)
 //-----------------------------------------------------------------------------
 // setVisualParamWeight()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::setVisualParamWeight(const LLVisualParam* which_param, F32 weight)
+bool LLCharacter::setVisualParamWeight(const LLVisualParam* which_param, F32 weight)
 {
     S32 index = which_param->getID();
-    auto index_iter = mVisualParamIndexMap.find(index);
+    visual_param_index_map_t::iterator index_iter = mVisualParamIndexMap.find(index);
     if (index_iter != mVisualParamIndexMap.end())
     {
         index_iter->second->setWeight(weight);
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 //-----------------------------------------------------------------------------
 // setVisualParamWeight()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::setVisualParamWeight(const char* param_name, F32 weight)
+bool LLCharacter::setVisualParamWeight(const char* param_name, F32 weight)
 {
     std::string tname(param_name);
     LLStringUtil::toLower(tname);
@@ -311,25 +290,25 @@ BOOL LLCharacter::setVisualParamWeight(const char* param_name, F32 weight)
     if (name_iter != mVisualParamNameMap.end())
     {
         name_iter->second->setWeight(weight);
-        return TRUE;
+        return true;
     }
     LL_WARNS() << "LLCharacter::setVisualParamWeight() Invalid visual parameter: " << param_name << LL_ENDL;
-    return FALSE;
+    return false;
 }
 
 //-----------------------------------------------------------------------------
 // setVisualParamWeight()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::setVisualParamWeight(S32 index, F32 weight)
+bool LLCharacter::setVisualParamWeight(S32 index, F32 weight)
 {
-    auto index_iter = mVisualParamIndexMap.find(index);
+    visual_param_index_map_t::iterator index_iter = mVisualParamIndexMap.find(index);
     if (index_iter != mVisualParamIndexMap.end())
     {
         index_iter->second->setWeight(weight);
-        return TRUE;
+        return true;
     }
     LL_WARNS() << "LLCharacter::setVisualParamWeight() Invalid visual parameter index: " << index << LL_ENDL;
-    return FALSE;
+    return false;
 }
 
 //-----------------------------------------------------------------------------
@@ -338,7 +317,7 @@ BOOL LLCharacter::setVisualParamWeight(S32 index, F32 weight)
 F32 LLCharacter::getVisualParamWeight(LLVisualParam *which_param)
 {
     S32 index = which_param->getID();
-    auto index_iter = mVisualParamIndexMap.find(index);
+    visual_param_index_map_t::iterator index_iter = mVisualParamIndexMap.find(index);
     if (index_iter != mVisualParamIndexMap.end())
     {
         return index_iter->second->getWeight();
@@ -372,7 +351,7 @@ F32 LLCharacter::getVisualParamWeight(const char* param_name)
 //-----------------------------------------------------------------------------
 F32 LLCharacter::getVisualParamWeight(S32 index)
 {
-    auto index_iter = mVisualParamIndexMap.find(index);
+    visual_param_index_map_t::iterator index_iter = mVisualParamIndexMap.find(index);
     if (index_iter != mVisualParamIndexMap.end())
     {
         return index_iter->second->getWeight();
@@ -389,9 +368,10 @@ F32 LLCharacter::getVisualParamWeight(S32 index)
 //-----------------------------------------------------------------------------
 void LLCharacter::clearVisualParamWeights()
 {
-    for (const auto& param_pair : mVisualParamSortedVector)
+    for (LLVisualParam *param = getFirstVisualParam();
+        param;
+        param = getNextVisualParam())
     {
-        LLVisualParam* param = param_pair.second;
         if (param->isTweakable())
         {
             param->setWeight( param->getDefaultWeight());
@@ -422,8 +402,8 @@ LLVisualParam*  LLCharacter::getVisualParam(const char *param_name)
 void LLCharacter::addSharedVisualParam(LLVisualParam *param)
 {
     S32 index = param->getID();
-    auto index_iter = mVisualParamIndexMap.find(index);
-    LLVisualParam* current_param = nullptr;
+    visual_param_index_map_t::iterator index_iter = mVisualParamIndexMap.find(index);
+    LLVisualParam* current_param = 0;
     if (index_iter != mVisualParamIndexMap.end())
         current_param = index_iter->second;
     if( current_param )
@@ -449,22 +429,13 @@ void LLCharacter::addVisualParam(LLVisualParam *param)
 {
     S32 index = param->getID();
     // Add Index map
-    auto idxres = mVisualParamIndexMap.emplace(index, param);
+    std::pair<visual_param_index_map_t::iterator, bool> idxres;
+    idxres = mVisualParamIndexMap.insert(visual_param_index_map_t::value_type(index, param));
     if (!idxres.second)
     {
         LL_WARNS() << "Visual parameter " << param->getName() << " already exists with same ID as " <<
             param->getName() << LL_ENDL;
         visual_param_index_map_t::iterator index_iter = idxres.first;
-        index_iter->second = param;
-    }
-
-    // Add Index map
-    auto idxreshash = mVisualParamSortedVector.insert(index, param);
-    if (!idxreshash.second)
-    {
-        LL_WARNS() << "Visual parameter " << param->getName() << " already exists with same ID as " <<
-            param->getName() << LL_ENDL;
-        auto index_iter = idxreshash.first;
         index_iter->second = param;
     }
 
@@ -475,7 +446,7 @@ void LLCharacter::addVisualParam(LLVisualParam *param)
         LLStringUtil::toLower(tname);
         char *tableptr = sVisualParamNames.addString(tname);
         std::pair<visual_param_name_map_t::iterator, bool> nameres;
-        nameres = mVisualParamNameMap.emplace(tableptr, param);
+        nameres = mVisualParamNameMap.insert(visual_param_name_map_t::value_type(tableptr, param));
         if (!nameres.second)
         {
             // Already exists, copy param
@@ -491,9 +462,10 @@ void LLCharacter::addVisualParam(LLVisualParam *param)
 //-----------------------------------------------------------------------------
 void LLCharacter::updateVisualParams()
 {
-    for (const auto& param_pair : mVisualParamSortedVector)
+    for (LLVisualParam *param = getFirstVisualParam();
+        param;
+        param = getNextVisualParam())
     {
-        LLVisualParam* param = param_pair.second;
         if (param->isAnimating())
         {
             continue;

@@ -125,7 +125,7 @@ public:
     LLPanelOutfitEdit();
     /*virtual*/ ~LLPanelOutfitEdit();
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     /*virtual*/ void onOpen(const LLSD& key);
 
     void moveWearable(bool closer_to_body);
@@ -182,14 +182,12 @@ public:
 
     void resetAccordionState();
 
-    virtual BOOL    handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
+    virtual bool    handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                       EDragAndDropType cargo_type,
                                       void* cargo_data,
                                       EAcceptance* accept,
                                       std::string& tooltip_msg);
 
-
-    void updateAvatarComplexity(U32 complexity);
 private:
     void onAddMoreButtonClicked();
     void showFilteredWearablesListView(LLWearableType::EType type);
@@ -221,9 +219,14 @@ private:
     LLButton*           mFolderViewBtn;
     LLButton*           mListViewBtn;
     LLButton*           mPlusBtn;
+    LLButton*           mShowAddWearablesBtn = nullptr;
+    LLButton*           mFilterBtn = nullptr;
     LLPanel*            mAddWearablesPanel;
-    LLTextBox*          mAvatarComplexityLabel;
-    LLTextBox*          mAvatarComplexityAddingLabel;
+    LLPanel*            mOutfitNameStatusPanel = nullptr;
+    LLLoadingIndicator* mLoadingIndicator = nullptr;
+    LLView*             mFilterPanel = nullptr;
+    LLUICtrl*           mNoAddWearablesButtonBar = nullptr;
+    LLUICtrl*           mAddWearablesButtonBar = nullptr;
 
     LLComboBox*         mFolderViewFilterCmbBox;
     LLComboBox*         mListViewFilterCmbBox;
@@ -244,8 +247,6 @@ private:
     bool                mInitialized;
     LLMenuButton*       mWearablesGearMenuBtn;
     LLMenuButton*       mGearMenuBtn;
-    LLLoadingIndicator* mLoadingIndicator = nullptr;
-    LLPanel*            mOutfitNameStatusPanel = nullptr;
 
 };
 

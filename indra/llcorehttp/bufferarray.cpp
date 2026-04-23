@@ -57,11 +57,11 @@ public:
     void operator delete(void *);
     void operator delete(void *, size_t len);
 
+    Block(const Block&) = delete;
+    Block& operator=(const Block&) = delete;
+
 protected:
     Block(size_t len);
-
-    Block(const Block &);                       // Not defined
-    void operator=(const Block &);              // Not defined
 
     // Allocate the block with the additional space for the
     // buffered data at the end of the object.
@@ -147,9 +147,9 @@ size_t BufferArray::append(const void * src, size_t len)
         {
             block = Block::alloc(BLOCK_ALLOC_SIZE);
         }
-        catch (const std::bad_alloc&)
+        catch (std::bad_alloc&)
         {
-            LLMemory::logMemoryInfo(TRUE);
+            LLMemory::logMemoryInfo(true);
 
             //output possible call stacks to log file.
             LLError::LLCallStacks::print();

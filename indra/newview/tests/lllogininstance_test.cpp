@@ -66,6 +66,7 @@ static LLEventStream gTestPump("test_pump");
 #include "../llstartup.h"
 LLSLURL LLStartUp::sStartSLURL;
 LLSLURL& LLStartUp::getStartSLURL() { return sStartSLURL; }
+std::string LLStartUp::getUserId() { return ""; };
 
 #include "lllogin.h"
 
@@ -74,7 +75,7 @@ static LLSD gLoginCreds;
 static bool gDisconnectCalled = false;
 
 #include "../llviewerwindow.h"
-void LLViewerWindow::setShowProgress(BOOL show) {}
+void LLViewerWindow::setShowProgress(bool show) {}
 LLProgressView * LLViewerWindow::getProgressView(void) const { return 0; }
 
 LLViewerWindow* gViewerWindow;
@@ -122,7 +123,7 @@ void LLCredential::authenticatorType(std::string &idType)
 LLNotificationPtr LLNotificationsUtil::add(const std::string& name,
                                            const LLSD& substitutions,
                                            const LLSD& payload,
-                                           boost::function<void (const LLSD&, const LLSD&)> functor)
+                                           std::function<void (const LLSD&, const LLSD&)> functor)
 {
     return LLNotificationPtr((LLNotification*)NULL);
 }
@@ -144,11 +145,11 @@ bool LLGridManager::addGrid(LLSD& grid_data)
 }
 LLGridManager::LLGridManager()
 :
-    mPlatform(NOPLATFORM)
+    mIsInProductionGrid(false)
 {
 }
 
-void LLGridManager::getLoginURIs(std::vector<std::string>& uris) const
+void LLGridManager::getLoginURIs(std::vector<std::string>& uris)
 {
     uris.push_back(VIEWERLOGIN_URI);
 }
@@ -158,46 +159,35 @@ void LLGridManager::addSystemGrid(const std::string& label,
                                   const std::string& login,
                                   const std::string& helper,
                                   const std::string& login_page,
-                                  const std::string& password_url,
-                                  const std::string& register_url,
                                   const std::string& update_url_base,
                                   const std::string& web_profile_url,
-                                  const std::string& grid_status_url,
-                                  const std::string& grid_status_rss_url,
-                                  const std::string& administrator,
-                                  const std::string& platform,
                                   const std::string& login_id)
 {
 }
-std::map<std::string, std::string> LLGridManager::getKnownGrids() const
+std::map<std::string, std::string> LLGridManager::getKnownGrids()
 {
     std::map<std::string, std::string> result;
     return result;
 }
 
-void LLGridManager::setGridChoice(const std::string&, const bool, const bool)
+void LLGridManager::setGridChoice(const std::string& grid_name)
 {
 }
 
-bool LLGridManager::isInSecondlife() const
-{
-    return false;
-}
-
-bool LLGridManager::isInOpenSim() const
+bool LLGridManager::isInProductionGrid()
 {
     return false;
 }
 
-std::string LLGridManager::getSLURLBase(const std::string& grid_name) const
+std::string LLGridManager::getSLURLBase(const std::string& grid_name)
 {
     return "myslurl";
 }
-std::string LLGridManager::getAppSLURLBase(const std::string& grid_name) const
+std::string LLGridManager::getAppSLURLBase(const std::string& grid_name)
 {
     return "myappslurl";
 }
-std::string LLGridManager::getGridId(const std::string& grid) const
+std::string LLGridManager::getGridId(const std::string& grid)
 {
     return std::string();
 }
@@ -209,13 +199,13 @@ LLControlGroup gSavedSettings("Global");
 LLControlGroup::LLControlGroup(const std::string& name) :
     LLInstanceTracker<LLControlGroup, std::string>(name){}
 LLControlGroup::~LLControlGroup() {}
-void LLControlGroup::setBOOL(const std::string_view name, BOOL val) {}
-BOOL LLControlGroup::getBOOL(const std::string_view name) { return FALSE; }
-F32 LLControlGroup::getF32(const std::string_view name) { return 0.0f; }
-U32 LLControlGroup::saveToFile(const std::string& filename, BOOL nondefault_only) { return 1; }
-void LLControlGroup::setString(const std::string_view name, const std::string& val) {}
-std::string LLControlGroup::getString(const std::string_view name) { return "test_string"; }
-LLControlVariable* LLControlGroup::declareBOOL(const std::string& name, BOOL initial_val, const std::string& comment, LLControlVariable::ePersist persist) { return NULL; }
+void LLControlGroup::setBOOL(std::string_view name, bool val) {}
+bool LLControlGroup::getBOOL(std::string_view name) { return false; }
+F32 LLControlGroup::getF32(std::string_view name) { return 0.0f; }
+U32 LLControlGroup::saveToFile(const std::string& filename, bool nondefault_only) { return 1; }
+void LLControlGroup::setString(std::string_view name, const std::string& val) {}
+std::string LLControlGroup::getString(std::string_view name) { return "test_string"; }
+LLControlVariable* LLControlGroup::declareBOOL(const std::string& name, bool initial_val, const std::string& comment, LLControlVariable::ePersist persist) { return NULL; }
 LLControlVariable* LLControlGroup::declareString(const std::string& name, const std::string &initial_val, const std::string& comment, LLControlVariable::ePersist persist) { return NULL; }
 
 #include "lluicolortable.h"
@@ -233,8 +223,6 @@ bool llHashedUniqueID(unsigned char* id)
 //-----------------------------------------------------------------------------
 #include "../llappviewer.h"
 void LLAppViewer::forceQuit(void) {}
-bool LLAppViewer::isUpdaterMissing() { return true; }
-bool LLAppViewer::waitForUpdater() { return false; }
 LLAppViewer * LLAppViewer::sInstance = 0;
 
 //-----------------------------------------------------------------------------
@@ -246,7 +234,7 @@ static LLEventPump * gTOSReplyPump = NULL;
 LLPointer<LLSecAPIHandler> gSecAPIHandler;
 
 //static
-LLFloater* LLFloaterReg::showInstance(std::string_view name, const LLSD& key, BOOL focus)
+LLFloater* LLFloaterReg::showInstance(std::string_view name, const LLSD& key, bool focus)
 {
     gTOSType = name;
     gTOSReplyPump = &LLEventPumps::instance().obtain(key["reply_pump"]);
@@ -263,7 +251,7 @@ void LLProgressView::setMessage(std::string const &){}
 // LLNotifications
 class MockNotifications : public LLNotificationsInterface
 {
-    boost::function<void (const LLSD&, const LLSD&)> mResponder;
+    std::function<void (const LLSD&, const LLSD&)> mResponder;
     int mAddedCount;
 
 public:
@@ -356,13 +344,13 @@ namespace tut
             gTOSReplyPump = 0; // clear the callback.
 
 
-            gSavedSettings.declareBOOL("NoInventoryLibrary", FALSE, "", LLControlVariable::PERSIST_NO);
-            gSavedSettings.declareBOOL("ConnectAsGod", FALSE, "", LLControlVariable::PERSIST_NO);
-            gSavedSettings.declareBOOL("UseDebugMenus", FALSE, "", LLControlVariable::PERSIST_NO);
+            gSavedSettings.declareBOOL("NoInventoryLibrary", false, "", LLControlVariable::PERSIST_NO);
+            gSavedSettings.declareBOOL("ConnectAsGod", false, "", LLControlVariable::PERSIST_NO);
+            gSavedSettings.declareBOOL("UseDebugMenus", false, "", LLControlVariable::PERSIST_NO);
             gSavedSettings.declareString("ClientSettingsFile", "test_settings.xml", "", LLControlVariable::PERSIST_NO);
             gSavedSettings.declareString("NextLoginLocation", "", "", LLControlVariable::PERSIST_NO);
-            gSavedSettings.declareBOOL("LoginLastLocation", FALSE, "", LLControlVariable::PERSIST_NO);
-            gSavedSettings.declareBOOL("CmdLineSkipUpdater", TRUE, "", LLControlVariable::PERSIST_NO);
+            gSavedSettings.declareBOOL("LoginLastLocation", false, "", LLControlVariable::PERSIST_NO);
+            gSavedSettings.declareBOOL("CmdLineSkipUpdater", true, "", LLControlVariable::PERSIST_NO);
 
             LLSD authenticator = LLSD::emptyMap();
             LLSD identifier = LLSD::emptyMap();

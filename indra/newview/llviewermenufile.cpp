@@ -70,6 +70,7 @@
 #include "llviewerassetupload.h"
 
 // linden libraries
+#include "llfilesystem.h"
 #include "llnotificationsutil.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
@@ -84,7 +85,7 @@
 
 class LLFileEnableUpload : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         return true;
     }
@@ -92,10 +93,10 @@ class LLFileEnableUpload : public view_listener_t
 
 class LLFileEnableUploadModel : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         LLFloaterModelPreview* fmp = (LLFloaterModelPreview*) LLFloaterReg::findInstance("upload_model");
-        if (fmp && fmp->isModelLoading())
+        if (fmp && !fmp->isDead() && fmp->isModelLoading())
         {
             return false;
         }
@@ -119,16 +120,15 @@ class LLFileEnableUploadMaterial : public view_listener_t
 
 class LLMeshEnabled : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
-        static const LLCachedControl<bool> mesh_enabled(gSavedSettings, "MeshEnabled", true);
-        return mesh_enabled;
+        return gSavedSettings.getBOOL("MeshEnabled");
     }
 };
 
 class LLMeshUploadVisible : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         return gMeshRepo.meshUploadEnabled();
     }
@@ -139,11 +139,11 @@ std::queue<LLFilePickerThread*> LLFilePickerThread::sDeadQ;
 
 void LLFilePickerThread::getFile()
 {
-#if (LL_WINDOWS && !LL_NFD) || (LL_LINUX && LL_NFD)
+#if LL_DARWIN || LL_SDL_WINDOW
+    runModeless();
+#elif LL_WINDOWS
     // Todo: get rid of LLFilePickerThread and make this modeless
     start();
-#elif LL_DARWIN
-    runModeless();
 #else
     run();
 #endif
@@ -152,7 +152,7 @@ void LLFilePickerThread::getFile()
 //virtual
 void LLFilePickerThread::run()
 {
-#if (LL_WINDOWS && !LL_NFD) || (LL_LINUX && LL_NFD)
+#if LL_WINDOWS
     bool blocking = false;
 #else
     bool blocking = true; // modal
@@ -190,7 +190,7 @@ void LLFilePickerThread::run()
 
 void LLFilePickerThread::runModeless()
 {
-    BOOL result = FALSE;
+    bool result = false;
     LLFilePicker picker;
 
     if (mIsSaveDialog)
@@ -442,7 +442,7 @@ const bool check_file_extension(const std::string& filename, LLFilePicker::ELoad
         //now grab the set of valid file extensions
         std::string valid_extensions = build_extensions_string(type);
 
-        BOOL ext_valid = FALSE;
+        bool ext_valid = false;
 
         typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
         boost::char_separator<char> sep(" ");
@@ -453,7 +453,7 @@ const bool check_file_extension(const std::string& filename, LLFilePicker::ELoad
         //and compare them to the extension of the file
         //to be uploaded
         for (token_iter = tokens.begin();
-            token_iter != tokens.end() && ext_valid != TRUE;
+            token_iter != tokens.end() && !ext_valid;
             ++token_iter)
         {
             const std::string& cur_token = *token_iter;
@@ -462,11 +462,11 @@ const bool check_file_extension(const std::string& filename, LLFilePicker::ELoad
             {
                 //valid extension
                 //or the acceptable extension is any
-                ext_valid = TRUE;
+                ext_valid = true;
             }
         }//end for (loop over all tokens)
 
-        if (ext_valid == FALSE)
+        if (!ext_valid)
         {
             //should only get here if the extension exists
             //but is invalid
@@ -480,13 +480,19 @@ const bool check_file_extension(const std::string& filename, LLFilePicker::ELoad
     return true;
 }
 
-const void upload_single_file(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter type)
+void upload_single_file(
+    const std::vector<std::string>& filenames,
+    LLFilePicker::ELoadFilter type,
+    const LLUUID& dest)
 {
     std::string filename = filenames[0];
     if (!check_file_extension(filename, type)) return;
 
     if (!filename.empty())
     {
+        LLSD args;
+        args["filename"] = filename;
+        args["dest"] = dest;
         if (type == LLFilePicker::FFLOAD_WAV)
         {
             // pre-qualify wavs to make sure the format is acceptable
@@ -518,10 +524,6 @@ const void upload_single_file(const std::vector<std::string>& filenames, LLFileP
         case LLFilePicker::FFLOAD_WAV:
             floater_name = "upload_sound";
             break;
-        case LLFilePicker::FFLOAD_MODEL:
-            if (LLFloaterModelPreview* pFloaterModelPreview = LLFloaterReg::getTypedInstance<LLFloaterModelPreview>("upload_model"))
-                pFloaterModelPreview->loadModel(LLModel::LOD_HIGH, filename);
-            return;
         case LLFilePicker::FFLOAD_GLTF:
             LLMaterialEditor::loadMaterialFromFile(filename, -1);
             return;
@@ -531,13 +533,12 @@ const void upload_single_file(const std::vector<std::string>& filenames, LLFileP
 
         if (!floater_name.empty())
         {
-            LLFloaterReg::showInstance(floater_name, LLSD(filename));
+            LLFloaterReg::showInstance(floater_name, args);
         }
     }
-    return;
 }
 
-void do_bulk_upload(std::vector<std::string> filenames)
+void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLUUID& dest)
 {
     for (std::vector<std::string>::const_iterator in_iter = filenames.begin(); in_iter != filenames.end(); ++in_iter)
     {
@@ -560,12 +561,7 @@ void do_bulk_upload(std::vector<std::string> filenames)
             bool resource_upload = false;
             if (asset_type == LLAssetType::AT_TEXTURE)
             {
-                LLPointer<LLImageFormatted> image_frmted = LLImageFormatted::createFromType(codec);
-                if (gDirUtilp->fileExists(filename) && image_frmted->load(filename))
-                {
-                    expected_upload_cost = LLAgentBenefitsMgr::current().getTextureUploadCost(image_frmted);
-                    resource_upload = true;
-                }
+                resource_upload = true;
             }
             else if (LLAgentBenefitsMgr::current().findUploadCost(asset_type, expected_upload_cost))
             {
@@ -574,17 +570,116 @@ void do_bulk_upload(std::vector<std::string> filenames)
 
             if (resource_upload)
             {
-                LLResourceUploadInfo::ptr_t uploadInfo(new LLNewFileResourceUploadInfo(
-                    filename,
-                    asset_name,
-                    asset_name, 0,
-                    LLFolderType::FT_NONE, LLInventoryType::IT_NONE,
-                    LLFloaterPerms::getNextOwnerPerms("Uploads"),
-                    LLFloaterPerms::getGroupPerms("Uploads"),
-                    LLFloaterPerms::getEveryonePerms("Uploads"),
-                    expected_upload_cost));
+                if (asset_type == LLAssetType::AT_TEXTURE)
+                {
+                    std::string exten = gDirUtilp->getExtension(filename);
+                    U32         codec = LLImageBase::getCodecFromExtension(exten);
 
-                upload_new_resource(uploadInfo);
+                    // Load the image
+                    LLPointer<LLImageFormatted> image = LLImageFormatted::createFromType(codec);
+                    if (image.isNull())
+                    {
+                        LL_WARNS() << "Failed to create image container for " << filename << LL_ENDL;
+                        continue;
+                    }
+                    if (!image->load(filename))
+                    {
+                        LL_WARNS() << "Failed to load image: " << filename << LL_ENDL;
+                        continue;
+                    }
+                    // Decompress or expand it in a raw image structure
+                    LLPointer<LLImageRaw> raw_image = new LLImageRaw;
+                    if (!image->decode(raw_image, 0.0f))
+                    {
+                        LL_WARNS() << "Failed to decode image: " << filename << LL_ENDL;
+                        continue;
+                    }
+                    // Check the image constraints
+                    if ((image->getComponents() != 3) && (image->getComponents() != 4))
+                    {
+                        LL_WARNS() << "Attempted to upload a texture that has " << image->getComponents()
+                                   << " components, but only 3 (RGB) or 4 (RGBA) are allowed." << LL_ENDL;
+                        continue;
+                    }
+                    // Downscale images to fit the max_texture_dimensions_*, or 1024 if allow_2k is false
+                    S32 max_width  = allow_2k ? gSavedSettings.getS32("max_texture_dimension_X") : 1024;
+                    S32 max_height = allow_2k ? gSavedSettings.getS32("max_texture_dimension_Y") : 1024;
+
+                    S32 orig_width  = raw_image->getWidth();
+                    S32 orig_height = raw_image->getHeight();
+
+                    if (orig_width > max_width || orig_height > max_height)
+                    {
+                        // Calculate scale factors
+                        F32 width_scale  = (F32)max_width / (F32)orig_width;
+                        F32 height_scale = (F32)max_height / (F32)orig_height;
+                        F32 scale        = llmin(width_scale, height_scale);
+
+                        // Calculate new dimensions, preserving aspect ratio
+                        S32 new_width  = LLImageRaw::contractDimToPowerOfTwo(llclamp((S32)llroundf(orig_width * scale), 4, max_width));
+                        S32 new_height = LLImageRaw::contractDimToPowerOfTwo(llclamp((S32)llroundf(orig_height * scale), 4, max_height));
+
+                        if (!raw_image->scale(new_width, new_height))
+                        {
+                            LL_WARNS() << "Failed to scale image from " << orig_width << "x" << orig_height << " to " << new_width << "x"
+                                       << new_height << LL_ENDL;
+                            continue;
+                        }
+
+                        // Inform the resident about the resized image
+                        LLSD subs;
+                        subs["[ORIGINAL_WIDTH]"]  = orig_width;
+                        subs["[ORIGINAL_HEIGHT]"] = orig_height;
+                        subs["[NEW_WIDTH]"]       = new_width;
+                        subs["[NEW_HEIGHT]"]      = new_height;
+                        subs["[MAX_WIDTH]"]       = max_width;
+                        subs["[MAX_HEIGHT]"]      = max_height;
+                        LLNotificationsUtil::add("ImageUploadResized", subs);
+                    }
+
+                    raw_image->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
+
+                    LLTransactionID tid;
+                    tid.generate();
+                    LLAssetID new_asset_id = tid.makeAssetID(gAgent.getSecureSessionID());
+
+                    LLPointer<LLImageJ2C> formatted = new LLImageJ2C;
+
+                    if (formatted->encode(raw_image, 0.0f))
+                    {
+                        LLFileSystem fmt_file(new_asset_id, LLAssetType::AT_TEXTURE, LLFileSystem::WRITE);
+                        fmt_file.write(formatted->getData(), formatted->getDataSize());
+
+                        LLResourceUploadInfo::ptr_t assetUploadInfo = std::make_shared<LLResourceUploadInfo>(
+                            tid, LLAssetType::AT_TEXTURE,
+                            asset_name,
+                            asset_name, 0,
+                            LLFolderType::FT_NONE, LLInventoryType::IT_NONE,
+                            LLFloaterPerms::getNextOwnerPerms("Uploads"),
+                            LLFloaterPerms::getGroupPerms("Uploads"),
+                            LLFloaterPerms::getEveryonePerms("Uploads"),
+                            LLAgentBenefitsMgr::current().getTextureUploadCost(raw_image->getWidth(), raw_image->getHeight()),
+                            dest
+                        );
+
+                        upload_new_resource(assetUploadInfo);
+                    }
+                }
+                else
+                {
+                    LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLNewFileResourceUploadInfo>(
+                        filename,
+                        asset_name,
+                        asset_name, 0,
+                        LLFolderType::FT_NONE, LLInventoryType::IT_NONE,
+                        LLFloaterPerms::getNextOwnerPerms("Uploads"),
+                        LLFloaterPerms::getGroupPerms("Uploads"),
+                        LLFloaterPerms::getEveryonePerms("Uploads"),
+                        expected_upload_cost,
+                        dest);
+
+                    upload_new_resource(uploadInfo);
+                }
             }
         }
 
@@ -594,21 +689,21 @@ void do_bulk_upload(std::vector<std::string> filenames)
             tinygltf::Model model;
             if (LLTinyGLTFHelper::loadModel(filename, model))
             {
-                S32 materials_in_file = model.materials.size();
+                S32 materials_in_file = static_cast<S32>(model.materials.size());
 
                 for (S32 i = 0; i < materials_in_file; i++)
                 {
                     // Todo:
                     // 1. Decouple bulk upload from material editor
                     // 2. Take into account possiblity of identical textures
-                    LLMaterialEditor::uploadMaterialFromModel(filename, model, i);
+                    LLMaterialEditor::uploadMaterialFromModel(filename, model, i, dest);
                 }
             }
         }
     }
 }
 
-void do_bulk_upload(std::vector<std::string> filenames, const LLSD& notification, const LLSD& response)
+void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLSD& notification, const LLSD& response, const LLUUID& dest)
 {
     S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
     if (option != 0)
@@ -617,13 +712,19 @@ void do_bulk_upload(std::vector<std::string> filenames, const LLSD& notification
         return;
     }
 
-    do_bulk_upload(filenames);
+    do_bulk_upload(filenames, allow_2k, dest);
 }
 
-bool get_bulk_upload_expected_cost(const std::vector<std::string>& filenames, S32& total_cost, S32& file_count)
+bool get_bulk_upload_expected_cost(
+    const std::vector<std::string>& filenames,
+    bool allow_2k,
+    S32& total_cost,
+    S32& file_count,
+    S32& textures_2k_count)
 {
     total_cost = 0;
     file_count = 0;
+    textures_2k_count = 0;
     for (std::vector<std::string>::const_iterator in_iter = filenames.begin(); in_iter != filenames.end(); ++in_iter)
     {
         std::string filename = (*in_iter);
@@ -635,12 +736,42 @@ bool get_bulk_upload_expected_cost(const std::vector<std::string>& filenames, S3
 
         if (LLResourceUploadInfo::findAssetTypeAndCodecOfExtension(ext, asset_type, codec))
         {
-            if (asset_type == LLAssetType::AT_TEXTURE)
+            if (asset_type == LLAssetType::AT_TEXTURE && allow_2k)
             {
                 LLPointer<LLImageFormatted> image_frmted = LLImageFormatted::createFromType(codec);
-                if (gDirUtilp->fileExists(filename) && image_frmted->load(filename))
+                if (gDirUtilp->fileExists(filename) && image_frmted && image_frmted->load(filename))
                 {
-                    total_cost += LLAgentBenefitsMgr::current().getTextureUploadCost(image_frmted);
+                    S32 biased_width, biased_height;
+
+                    S32 max_width  = allow_2k ? gSavedSettings.getS32("max_texture_dimension_X") : 1024;
+                    S32 max_height = allow_2k ? gSavedSettings.getS32("max_texture_dimension_Y") : 1024;
+
+                    S32 orig_width  = image_frmted->getWidth();
+                    S32 orig_height = image_frmted->getHeight();
+
+                    if (orig_width > max_width || orig_height > max_height)
+                    {
+                        // Calculate scale factors
+                        F32 width_scale  = (F32)max_width / (F32)orig_width;
+                        F32 height_scale = (F32)max_height / (F32)orig_height;
+                        F32 scale        = llmin(width_scale, height_scale);
+
+                        // Calculate new dimensions, preserving aspect ratio
+                        biased_width = LLImageRaw::contractDimToPowerOfTwo(llclamp((S32)llroundf(orig_width * scale), 4, max_width));
+                        biased_height = LLImageRaw::contractDimToPowerOfTwo(llclamp((S32)llroundf(orig_height * scale), 4, max_height));
+                    }
+                    else
+                    {
+                        biased_width = LLImageRaw::biasedDimToPowerOfTwo(orig_width, LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
+                        biased_height = LLImageRaw::biasedDimToPowerOfTwo(orig_height, LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
+                    }
+
+                    total_cost += LLAgentBenefitsMgr::current().getTextureUploadCost(biased_width, biased_height);
+                    S32 area = biased_width * biased_height;
+                    if (area >= LLAgentBenefits::MIN_2K_TEXTURE_AREA)
+                    {
+                        textures_2k_count++;
+                    }
                     file_count++;
                 }
             }
@@ -657,7 +788,7 @@ bool get_bulk_upload_expected_cost(const std::vector<std::string>& filenames, S3
 
             if (LLTinyGLTFHelper::loadModel(filename, model))
             {
-                S32 materials_in_file = model.materials.size();
+                S32 materials_in_file = static_cast<S32>(model.materials.size());
 
                 for (S32 i = 0; i < materials_in_file; i++)
                 {
@@ -695,7 +826,48 @@ bool get_bulk_upload_expected_cost(const std::vector<std::string>& filenames, S3
     return file_count > 0;
 }
 
-const void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter type)
+void upload_bulk(const std::vector<std::string>& filtered_filenames, bool allow_2k, const LLUUID& dest)
+{
+    S32 expected_upload_cost;
+    S32 expected_upload_count;
+    S32 textures_2k_count;
+    if (get_bulk_upload_expected_cost(filtered_filenames, allow_2k, expected_upload_cost, expected_upload_count, textures_2k_count))
+    {
+        static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
+        if (sPowerfulWizard && expected_upload_cost == 0)
+        {
+            do_bulk_upload(filtered_filenames, allow_2k, dest);
+        }
+        else
+        {
+            LLSD key;
+            key["upload_cost"] = expected_upload_cost;
+            key["upload_count"] = expected_upload_count;
+            key["has_2k_textures"] = (textures_2k_count > 0);
+            key["dest"] = dest;
+
+            LLSD array;
+            for (const std::string& str : filtered_filenames)
+            {
+                array.append(str);
+            }
+            key["files"] = array;
+
+            LLFloaterReg::showInstance("bulk_upload", key);
+        }
+        if (filtered_filenames.size() > expected_upload_count)
+        {
+            LLNotificationsUtil::add("BulkUploadIncompatibleFiles");
+        }
+    }
+    else
+    {
+        LLNotificationsUtil::add("BulkUploadNoCompatibleFiles");
+    }
+
+}
+
+void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter type, bool allow_2k, const LLUUID& dest)
 {
     // TODO:
     // Check user balance for entire cost
@@ -717,61 +889,44 @@ const void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::
             filtered_filenames.push_back(filename);
         }
     }
-
-    S32 expected_upload_cost;
-    S32 expected_upload_count;
-    if (get_bulk_upload_expected_cost(filtered_filenames, expected_upload_cost, expected_upload_count))
-    {
-        static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
-        if (sPowerfulWizard && expected_upload_cost == 0)
-        {
-            do_bulk_upload(filtered_filenames);
-        }
-        else
-        {
-            LLSD args;
-            args["COST"] = expected_upload_cost;
-            args["COUNT"] = expected_upload_count;
-
-            std::string strUploadList;
-            for (const std::string& filename : filtered_filenames)
-                strUploadList += gDirUtilp->getBaseFileName(filename) + "\n";
-            args["FILES"] = strUploadList;
-
-            LLNotificationsUtil::add("BulkUploadCostConfirmation", args, LLSD(), boost::bind(do_bulk_upload, filtered_filenames, _1, _2));
-        }
-
-        if (filtered_filenames.size() > expected_upload_count)
-        {
-            LLNotificationsUtil::add("BulkUploadIncompatibleFiles");
-        }
-    }
-    else
-    {
-        LLNotificationsUtil::add("BulkUploadNoCompatibleFiles");
-    }
-
+    upload_bulk(filtered_filenames, allow_2k, dest);
 }
 
 class LLFileUploadImage : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         if (gAgentCamera.cameraMouselook())
         {
             gAgentCamera.changeCameraToDefault();
         }
-        LLFilePickerReplyThread::startPicker(boost::bind(&upload_single_file, _1, _2), LLFilePicker::FFLOAD_IMAGE, false);
+        LLFilePickerReplyThread::startPicker(boost::bind(&upload_single_file, _1, _2, LLUUID::null), LLFilePicker::FFLOAD_IMAGE, false);
         return true;
     }
 };
 
 class LLFileUploadModel : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
-        LLFloaterModelPreview::showModelPreview();
-        return TRUE;
+        if (LLConvexDecomposition::isFunctional())
+        {
+            LLFloaterModelPreview::showModelPreview();
+        }
+        else
+        {
+            if (gGLManager.mIsApple)
+            {
+                LLNotificationsUtil::add("ModelUploaderMissingPhysicsApple");
+            }
+            else
+            {
+                // TPV?
+                LLNotificationsUtil::add("ModelUploaderMissingPhysics");
+                LLFloaterModelPreview::showModelPreview();
+            }
+        }
+        return true;
     }
 };
 
@@ -780,45 +935,45 @@ class LLFileUploadMaterial : public view_listener_t
     bool handleEvent(const LLSD& userdata)
     {
         LLMaterialEditor::importMaterial();
-        return TRUE;
+        return true;
     }
 };
 
 class LLFileUploadSound : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         if (gAgentCamera.cameraMouselook())
         {
             gAgentCamera.changeCameraToDefault();
         }
-        LLFilePickerReplyThread::startPicker(boost::bind(&upload_single_file, _1, _2), LLFilePicker::FFLOAD_WAV, false);
+        LLFilePickerReplyThread::startPicker(boost::bind(&upload_single_file, _1, _2, LLUUID::null), LLFilePicker::FFLOAD_WAV, false);
         return true;
     }
 };
 
 class LLFileUploadAnim : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         if (gAgentCamera.cameraMouselook())
         {
             gAgentCamera.changeCameraToDefault();
         }
-        LLFilePickerReplyThread::startPicker(boost::bind(&upload_single_file, _1, _2), LLFilePicker::FFLOAD_ANIM, false);
+        LLFilePickerReplyThread::startPicker(boost::bind(&upload_single_file, _1, _2, LLUUID::null), LLFilePicker::FFLOAD_ANIM, false);
         return true;
     }
 };
 
 class LLFileUploadBulk : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         if (gAgentCamera.cameraMouselook())
         {
             gAgentCamera.changeCameraToDefault();
         }
-        LLFilePickerReplyThread::startPicker(boost::bind(&upload_bulk, _1, _2), LLFilePicker::FFLOAD_ALL, true);
+        LLFilePickerReplyThread::startPicker(boost::bind(&upload_bulk, _1, _2, true, LLUUID::null), LLFilePicker::FFLOAD_ALL, true);
         return true;
     }
 };
@@ -836,7 +991,7 @@ void upload_error(const std::string& error_message, const std::string& label, co
 
 class LLFileEnableCloseWindow : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         bool frontmost_fl_exists = (NULL != gFloaterView->getFrontmostClosableFloater());
         bool frontmost_snapshot_fl_exists = (NULL != gSnapshotFloaterView->getFrontmostClosableFloater());
@@ -847,7 +1002,7 @@ class LLFileEnableCloseWindow : public view_listener_t
 
 class LLFileCloseWindow : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         bool frontmost_fl_exists = (NULL != gFloaterView->getFrontmostClosableFloater());
         LLFloater* snapshot_floater = gSnapshotFloaterView->getFrontmostClosableFloater();
@@ -871,7 +1026,7 @@ class LLFileCloseWindow : public view_listener_t
 
 class LLFileEnableCloseAllWindows : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         LLFloaterSnapshot* floater_snapshot = LLFloaterSnapshot::findInstance();
         bool is_floaters_snapshot_opened = (floater_snapshot && floater_snapshot->isInVisibleChain());
@@ -882,7 +1037,7 @@ class LLFileEnableCloseAllWindows : public view_listener_t
 
 class LLFileCloseAllWindows : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         bool app_quitting = false;
         gFloaterView->closeAllChildren(app_quitting);
@@ -896,18 +1051,19 @@ class LLFileCloseAllWindows : public view_listener_t
 
 class LLFileTakeSnapshotToDisk : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         LLPointer<LLImageRaw> raw = new LLImageRaw;
 
         S32 width = gViewerWindow->getWindowWidthRaw();
         S32 height = gViewerWindow->getWindowHeightRaw();
 
-        BOOL render_ui = gSavedSettings.getBOOL("RenderUIInSnapshot");
-        BOOL render_hud = gSavedSettings.getBOOL("RenderHUDInSnapshot");
-        BOOL render_no_post = gSavedSettings.getBOOL("RenderSnapshotNoPost");
+        bool render_ui = gSavedSettings.getBOOL("RenderUIInSnapshot");
+        bool render_hud = gSavedSettings.getBOOL("RenderHUDInSnapshot");
+        bool render_no_post = gSavedSettings.getBOOL("RenderSnapshotNoPost");
+        bool render_balance = gSavedSettings.getBOOL("RenderBalanceInSnapshot");
 
-        BOOL high_res = gSavedSettings.getBOOL("HighResSnapshot");
+        bool high_res = gSavedSettings.getBOOL("HighResSnapshot");
         if (high_res)
         {
             width *= 2;
@@ -920,12 +1076,13 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
         if (gViewerWindow->rawSnapshot(raw,
                                        width,
                                        height,
-                                       TRUE,
-                                       FALSE,
+                                       true,
+                                       false,
                                        render_ui,
                                        render_hud,
-                                       FALSE,
+                                       false,
                                        render_no_post,
+                                       render_balance,
                                        LLSnapshotModel::SNAPSHOT_TYPE_COLOR,
                                        high_res ? S32_MAX : MAX_SNAPSHOT_IMAGE_SIZE)) //per side
         {
@@ -959,7 +1116,7 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
 
 class LLFileQuit : public view_listener_t
 {
-    bool handleEvent(const LLSD& userdata) override
+    bool handleEvent(const LLSD& userdata)
     {
         LLAppViewer::instance()->userQuit();
         return true;
@@ -967,7 +1124,7 @@ class LLFileQuit : public view_listener_t
 };
 
 
-void handle_compress_image(void*)
+void handle_compress_image()
 {
     LLFilePicker& picker = LLFilePicker::instance();
     if (picker.getMultipleOpenFiles(LLFilePicker::FFLOAD_IMAGE))
@@ -980,7 +1137,7 @@ void handle_compress_image(void*)
             LL_INFOS() << "Input:  " << infile << LL_ENDL;
             LL_INFOS() << "Output: " << outfile << LL_ENDL;
 
-            BOOL success;
+            bool success;
 
             success = LLViewerTextureList::createUploadFile(infile, outfile, IMG_CODEC_TGA);
 
@@ -1003,7 +1160,7 @@ void handle_compress_image(void*)
 // so doing dirty, but OS independent fopen and fseek
 size_t get_file_size(std::string &filename)
 {
-    LLFILE* file = LLFile::fopen(filename, "rb");       /*Flawfinder: ignore*/
+    LLFILE* file = LLFile::fopen(filename, LLFILE_MODE("rb"));       /*Flawfinder: ignore*/
     if (!file)
     {
         LL_WARNS() << "Error opening " << filename << LL_ENDL;
@@ -1017,7 +1174,7 @@ size_t get_file_size(std::string &filename)
     return file_length;
 }
 
-void handle_compress_file_test(void*)
+void handle_compress_file_test()
 {
     LLFilePicker& picker = LLFilePicker::instance();
     if (picker.getOpenFile())
@@ -1030,7 +1187,7 @@ void handle_compress_file_test(void*)
 
             S64Bytes initial_size = S64Bytes(get_file_size(infile));
 
-            BOOL success;
+            bool success;
 
             F64 total_seconds = LLTimer::getTotalSeconds();
             success = gzip_file(infile, packfile);
@@ -1065,14 +1222,14 @@ void handle_compress_file_test(void*)
                 }
                 else
                 {
-                    LL_INFOS() << "Failed to decompress file: " << packfile << LL_ENDL;
+                    LL_INFOS() << "Failed to uncompress file: " << packfile << LL_ENDL;
                     LLFile::remove(packfile);
                 }
 
             }
             else
             {
-                LL_INFOS() << "Failed to compress file: " << infile << LL_ENDL;
+                LL_INFOS() << "Failed to compres file: " << infile << LL_ENDL;
             }
         }
         else
@@ -1109,7 +1266,7 @@ LLUUID upload_new_resource(
         name, desc, compression_info,
         destination_folder_type, inv_type,
         next_owner_perms, group_perms, everyone_perms,
-        expected_upload_cost, show_inventory));
+        expected_upload_cost, LLUUID::null, show_inventory));
     upload_new_resource(uploadInfo, callback, userdata);
 
     return LLUUID::null;
@@ -1124,7 +1281,7 @@ void upload_done_callback(
     LLResourceData* data = (LLResourceData*)user_data;
     S32 expected_upload_cost = data ? data->mExpectedUploadCost : 0;
     //LLAssetType::EType pref_loc = data->mPreferredLocation;
-    BOOL is_balance_sufficient = TRUE;
+    bool is_balance_sufficient = true;
 
     if(data)
     {
@@ -1142,7 +1299,7 @@ void upload_done_callback(
                 if(!(can_afford_transaction(expected_upload_cost)))
                 {
                     LLBuyCurrencyHTML::openCurrencyFloater( "", expected_upload_cost );
-                    is_balance_sufficient = FALSE;
+                    is_balance_sufficient = false;
                 }
                 else if(region)
                 {
@@ -1303,7 +1460,7 @@ void upload_new_resource(
             data->mAssetInfo.mType,
             asset_callback,
             (void*)data,
-            FALSE);
+            false);
     }
 }
 

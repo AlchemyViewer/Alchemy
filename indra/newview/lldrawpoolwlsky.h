@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -38,12 +41,15 @@ public:
                             LLVertexBuffer::MAP_TEXCOORD0;
     static const U32 STAR_VERTEX_DATA_MASK =    LLVertexBuffer::MAP_VERTEX |
         LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_TEXCOORD0;
+    static const U32 METEOR_VERTEX_DATA_MASK =  LLVertexBuffer::MAP_VERTEX |
+        LLVertexBuffer::MAP_NORMAL | LLVertexBuffer::MAP_COLOR |
+        LLVertexBuffer::MAP_TEXCOORD0;
     static const U32 ADV_ATMO_SKY_VERTEX_DATA_MASK = LLVertexBuffer::MAP_VERTEX
                                                    | LLVertexBuffer::MAP_TEXCOORD0;
     LLDrawPoolWLSky(void);
     /*virtual*/ ~LLDrawPoolWLSky();
 
-    /*virtual*/ BOOL isDead() { return FALSE; }
+    /*virtual*/ bool isDead() { return false; }
 
     /*virtual*/ S32 getNumDeferredPasses() { return 1; }
     /*virtual*/ void beginDeferredPass(S32 pass);
@@ -52,13 +58,13 @@ public:
 
     /*virtual*/ LLViewerTexture *getDebugTexture();
     /*virtual*/ U32 getVertexDataMask() { return SKY_VERTEX_DATA_MASK; }
-    /*virtual*/ BOOL verify() const { return TRUE; }        // Verify that all data in the draw pool is correct!
+    /*virtual*/ bool verify() const { return true; }        // Verify that all data in the draw pool is correct!
     /*virtual*/ S32 getShaderLevel() const { return mShaderLevel; }
 
     //static LLDrawPool* createPool(const U32 type, LLViewerTexture *tex0 = NULL);
 
     /*virtual*/ LLViewerTexture* getTexture();
-    /*virtual*/ BOOL isFacePool() { return FALSE; }
+    /*virtual*/ bool isFacePool() { return false; }
     /*virtual*/ void resetDrawOrders();
 
     static void cleanupGL();
@@ -70,6 +76,8 @@ private:
     void renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const;
 
     void renderStarsDeferred(const LLVector3& camPosLocal) const;
+    void renderMeteorsDeferred(const LLVector3& camPosLocal) const;
+    void renderAuroraDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const;
     void renderHeavenlyBodies();
 };
 

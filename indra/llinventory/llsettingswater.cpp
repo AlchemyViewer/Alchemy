@@ -24,6 +24,7 @@
 * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
 * $/LicenseInfo$
 */
+#include "linden_common.h"
 
 #include "llsettingswater.h"
 #include <algorithm>
@@ -68,14 +69,18 @@ static const LLUUID DEFAULT_OPAQUE_WATER_TEXTURE("43c32285-d658-1793-c123-bf8631
 //=========================================================================
 LLSettingsWater::LLSettingsWater(const LLSD &data) :
     LLSettingsBase(data),
-    mNextNormalMapID()
+    mNextNormalMapID(),
+    mNextTransparentTextureID()
 {
+    loadValuesFromLLSD();
 }
 
 LLSettingsWater::LLSettingsWater() :
     LLSettingsBase(),
-    mNextNormalMapID()
+    mNextNormalMapID(),
+    mNextTransparentTextureID()
 {
+    replaceSettings(defaults());
 }
 
 //=========================================================================
@@ -107,6 +112,53 @@ LLSD LLSettingsWater::defaults(const LLSettingsBase::TrackPosition& position)
     }
 
     return dfltsetting;
+}
+
+void LLSettingsWater::loadValuesFromLLSD()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
+
+    LLSettingsBase::loadValuesFromLLSD();
+
+    LLSD& settings = getSettings();
+
+    mBlurMultiplier = (F32)settings[SETTING_BLUR_MULTIPLIER].asReal();
+    mWaterFogColor = LLColor3(settings[SETTING_FOG_COLOR]);
+    mWaterFogDensity = (F32)settings[SETTING_FOG_DENSITY].asReal();
+    mFogMod = (F32)settings[SETTING_FOG_MOD].asReal();
+    mFresnelOffset = (F32)settings[SETTING_FRESNEL_OFFSET].asReal();
+    mFresnelScale = (F32)settings[SETTING_FRESNEL_SCALE].asReal();
+    mNormalScale = LLVector3(settings[SETTING_NORMAL_SCALE]);
+    mScaleAbove = (F32)settings[SETTING_SCALE_ABOVE].asReal();
+    mScaleBelow = (F32)settings[SETTING_SCALE_BELOW].asReal();
+    mWave1Dir = LLVector2(settings[SETTING_WAVE1_DIR]);
+    mWave2Dir = LLVector2(settings[SETTING_WAVE2_DIR]);
+
+    mNormalMapID = settings[SETTING_NORMAL_MAP].asUUID();
+    mTransparentTextureID = settings[SETTING_TRANSPARENT_TEXTURE].asUUID();
+}
+
+void LLSettingsWater::saveValuesToLLSD()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
+
+    LLSettingsBase::saveValuesToLLSD();
+
+    LLSD & settings = getSettings();
+    settings[SETTING_BLUR_MULTIPLIER] = LLSD::Real(mBlurMultiplier);
+    settings[SETTING_FOG_COLOR] = mWaterFogColor.getValue();
+    settings[SETTING_FOG_DENSITY] = LLSD::Real(mWaterFogDensity);
+    settings[SETTING_FOG_MOD] = LLSD::Real(mFogMod);
+    settings[SETTING_FRESNEL_OFFSET] = LLSD::Real(mFresnelOffset);
+    settings[SETTING_FRESNEL_SCALE] = LLSD::Real(mFresnelScale);
+    settings[SETTING_NORMAL_SCALE] = mNormalScale.getValue();
+    settings[SETTING_SCALE_ABOVE] = LLSD::Real(mScaleAbove);
+    settings[SETTING_SCALE_BELOW] = LLSD::Real(mScaleBelow);
+    settings[SETTING_WAVE1_DIR] = mWave1Dir.getValue();
+    settings[SETTING_WAVE2_DIR] = mWave2Dir.getValue();
+
+    settings[SETTING_NORMAL_MAP] = mNormalMapID;
+    settings[SETTING_TRANSPARENT_TEXTURE] = mTransparentTextureID;
 }
 
 LLSD LLSettingsWater::translateLegacySettings(LLSD legacy)
@@ -180,13 +232,30 @@ LLSD LLSettingsWater::translateLegacySettings(LLSD legacy)
     return newsettings;
 }
 
-void LLSettingsWater::blend(const LLSettingsBase::ptr_t &end, F64 blendf)
+void LLSettingsWater::blend(LLSettingsBase::ptr_t &end, F64 blendf)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     LLSettingsWater::ptr_t other = PTR_NAMESPACE::static_pointer_cast<LLSettingsWater>(end);
     if (other)
     {
-        LLSD blenddata = interpolateSDMap(mSettings, other->mSettings, other->getParameterMap(), blendf);
-        replaceSettings(blenddata);
+        mSettingFlags |= other->mSettingFlags;
+
+        mBlurMultiplier = lerp(mBlurMultiplier, other->mBlurMultiplier, (F32)blendf);
+        lerpColor(mWaterFogColor, other->mWaterFogColor, (F32)blendf);
+        mWaterFogDensity = lerp(mWaterFogDensity, other->mWaterFogDensity, (F32)blendf);
+        mFogMod = lerp(mFogMod, other->mFogMod, (F32)blendf);
+        mFresnelOffset = lerp(mFresnelOffset, other->mFresnelOffset, (F32)blendf);
+        mFresnelScale = lerp(mFresnelScale, other->mFresnelScale, (F32)blendf);
+        lerpVector3(mNormalScale, other->mNormalScale, (F32)blendf);
+        mScaleAbove = lerp(mScaleAbove, other->mScaleAbove, (F32)blendf);
+        mScaleBelow = lerp(mScaleBelow, other->mScaleBelow, (F32)blendf);
+        lerpVector2(mWave1Dir, other->mWave1Dir, (F32)blendf);
+        lerpVector2(mWave2Dir, other->mWave2Dir, (F32)blendf);
+
+        setDirtyFlag(true);
+        setReplaced();
+        setLLSDDirty();
+
         mNextNormalMapID = other->getNormalMapID();
         mNextTransparentTextureID = other->getTransparentTextureID();
     }
@@ -204,7 +273,34 @@ void LLSettingsWater::replaceSettings(LLSD settings)
     mNextTransparentTextureID.setNull();
 }
 
-void LLSettingsWater::replaceWithWater(LLSettingsWater::ptr_t other)
+void LLSettingsWater::replaceSettings(const LLSettingsBase::ptr_t& other_water)
+{
+    LLSettingsBase::replaceSettings(other_water);
+
+    llassert(getSettingsType() == other_water->getSettingsType());
+
+    LLSettingsWater::ptr_t other = PTR_NAMESPACE::dynamic_pointer_cast<LLSettingsWater>(other_water);
+
+    mBlurMultiplier = other->mBlurMultiplier;
+    mWaterFogColor = other->mWaterFogColor;
+    mWaterFogDensity = other->mWaterFogDensity;
+    mFogMod = other->mFogMod;
+    mFresnelOffset = other->mFresnelOffset;
+    mFresnelScale = other->mFresnelScale;
+    mNormalScale = other->mNormalScale;
+    mScaleAbove = other->mScaleAbove;
+    mScaleBelow = other->mScaleBelow;
+    mWave1Dir = other->mWave1Dir;
+    mWave2Dir = other->mWave2Dir;
+
+    mNormalMapID = other->mNormalMapID;
+    mTransparentTextureID = other->mTransparentTextureID;
+
+    mNextNormalMapID.setNull();
+    mNextTransparentTextureID.setNull();
+}
+
+void LLSettingsWater::replaceWithWater(const LLSettingsWater::ptr_t& other)
 {
     replaceWith(other);
 
@@ -212,46 +308,46 @@ void LLSettingsWater::replaceWithWater(LLSettingsWater::ptr_t other)
     mNextTransparentTextureID = other->mNextTransparentTextureID;
 }
 
-const LLSettingsWater::validation_list_t& LLSettingsWater::getValidationList() const
+LLSettingsWater::validation_list_t LLSettingsWater::getValidationList() const
 {
     return LLSettingsWater::validationList();
 }
 
-const LLSettingsWater::validation_list_t& LLSettingsWater::validationList()
+LLSettingsWater::validation_list_t LLSettingsWater::validationList()
 {
     static validation_list_t validation;
 
     if (validation.empty())
     {
         validation.push_back(Validator(SETTING_BLUR_MULTIPLIER, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(-0.5f, 0.5f))));
+            boost::bind(&Validator::verifyFloatRange, _1, _2, llsd::array(-0.5f, 0.5f))));
         validation.push_back(Validator(SETTING_FOG_COLOR, true, LLSD::TypeArray,
-            boost::bind(&Validator::verifyVectorMinMax, boost::placeholders::_1, boost::placeholders::_2,
+            boost::bind(&Validator::verifyVectorMinMax, _1, _2,
                 llsd::array(0.0f, 0.0f, 0.0f, 1.0f),
                 llsd::array(1.0f, 1.0f, 1.0f, 1.0f))));
         validation.push_back(Validator(SETTING_FOG_DENSITY, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.001f, 100.0f))));
+            boost::bind(&Validator::verifyFloatRange, _1, _2, llsd::array(0.001f, 100.0f))));
         validation.push_back(Validator(SETTING_FOG_MOD, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.0f, 20.0f))));
+            boost::bind(&Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 20.0f))));
         validation.push_back(Validator(SETTING_FRESNEL_OFFSET, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.0f, 1.0f))));
+            boost::bind(&Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 1.0f))));
         validation.push_back(Validator(SETTING_FRESNEL_SCALE, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.0f, 1.0f))));
+            boost::bind(&Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 1.0f))));
         validation.push_back(Validator(SETTING_NORMAL_MAP, true, LLSD::TypeUUID));
         validation.push_back(Validator(SETTING_NORMAL_SCALE, true, LLSD::TypeArray,
-            boost::bind(&Validator::verifyVectorMinMax, boost::placeholders::_1, boost::placeholders::_2,
+            boost::bind(&Validator::verifyVectorMinMax, _1, _2,
                 llsd::array(0.0f, 0.0f, 0.0f),
                 llsd::array(10.0f, 10.0f, 10.0f))));
         validation.push_back(Validator(SETTING_SCALE_ABOVE, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.0f, 3.0f))));
+            boost::bind(&Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 3.0f))));
         validation.push_back(Validator(SETTING_SCALE_BELOW, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.0f, 3.0f))));
+            boost::bind(&Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 3.0f))));
         validation.push_back(Validator(SETTING_WAVE1_DIR, true, LLSD::TypeArray,
-            boost::bind(&Validator::verifyVectorMinMax, boost::placeholders::_1, boost::placeholders::_2,
+            boost::bind(&Validator::verifyVectorMinMax, _1, _2,
                 llsd::array(-20.0f, -20.0f),
                 llsd::array(20.0f, 20.0f))));
         validation.push_back(Validator(SETTING_WAVE2_DIR, true, LLSD::TypeArray,
-            boost::bind(&Validator::verifyVectorMinMax, boost::placeholders::_1, boost::placeholders::_2,
+            boost::bind(&Validator::verifyVectorMinMax, _1, _2,
                 llsd::array(-20.0f, -20.0f),
                 llsd::array(20.0f, 20.0f))));
     }
@@ -283,11 +379,6 @@ F32 LLSettingsWater::getModifiedWaterFogDensity(bool underwater) const
 {
     F32 fog_density = getWaterFogDensity();
     F32 underwater_fog_mod = getFogMod();
-    return getModifiedWaterFogDensityFast(fog_density, underwater_fog_mod, underwater);
-}
-
-F32 LLSettingsWater::getModifiedWaterFogDensityFast(F32 fog_density, F32 underwater_fog_mod, bool underwater) const
-{
     if (underwater && underwater_fog_mod > 0.0f)
     {
         underwater_fog_mod = llclamp(underwater_fog_mod, 0.0f, 10.0f);
@@ -300,7 +391,7 @@ F32 LLSettingsWater::getModifiedWaterFogDensityFast(F32 fog_density, F32 underwa
         // 2) Force density to be an arbitrary non-negative (i.e. 1) when underwater and modifier is not an integer (1 was aribtrarily chosen as it gives at least some notion of fog in the transition)
         // This is more restrictive, effectively forcing a density under certain conditions, but allowing the range of #1 and avoiding blackness in other cases
         // at the cost of overriding the fog density.
-        if(fog_density < 0.0f && underwater_fog_mod != (F32)ll_round(underwater_fog_mod) )
+        if (fog_density < 0.0f && underwater_fog_mod != (F32)ll_round(underwater_fog_mod))
         {
             fog_density = 1.0f;
         }

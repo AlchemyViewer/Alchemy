@@ -28,13 +28,11 @@
 #ifndef LL_LLLANDMARK_H
 #define LL_LLLANDMARK_H
 
+#include <functional>
 #include <map>
-#include <boost/function.hpp>
 #include "llframetimer.h"
 #include "lluuid.h"
 #include "v3dmath.h"
-
-#include "boost/unordered_map.hpp"
 
 class LLMessageSystem;
 class LLHost;
@@ -43,9 +41,9 @@ class LLLandmark
 {
 public:
     // for calling back interested parties when a region handle comes back.
-    typedef boost::function<void(const LLUUID& region_id, const U64& region_handle)> region_handle_callback_t;
+    typedef std::function<void(const LLUUID& region_id, const U64& region_handle)> region_handle_callback_t;
 
-    ~LLLandmark() = default;
+    ~LLLandmark() {}
 
     // returns true if the position is known.
     bool getGlobalPos(LLVector3d& pos);
@@ -101,7 +99,7 @@ private:
     };
 
     static std::pair<LLUUID, U64> mLocalRegion;
-    typedef boost::unordered_map<LLUUID, CacheInfo> region_map_t;
+    typedef std::map<LLUUID, CacheInfo> region_map_t;
     static region_map_t mRegions;
     typedef std::multimap<LLUUID, region_handle_callback_t> region_callback_map_t;
     static region_callback_map_t sRegionCallbackMap;

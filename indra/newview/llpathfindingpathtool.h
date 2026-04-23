@@ -27,14 +27,14 @@
 #ifndef LL_LLPATHFINDINGPATHTOOL_H
 #define LL_LLPATHFINDINGPATHTOOL_H
 
-#include <boost/function.hpp>
+#include <functional>
 #include <boost/signals2.hpp>
 
 #include "llpathinglib.h"
 #include "llsingleton.h"
 #include "lltool.h"
 
-class LLPathfindingPathTool final : public LLTool, public LLSingleton<LLPathfindingPathTool>
+class LLPathfindingPathTool : public LLTool, public LLSingleton<LLPathfindingPathTool>
 {
     LLSINGLETON(LLPathfindingPathTool);
     virtual ~LLPathfindingPathTool();
@@ -62,21 +62,21 @@ public:
         kCharacterTypeD
     } ECharacterType;
 
-    typedef boost::function<void (void)>         path_event_callback_t;
+    typedef std::function<void(void)>            path_event_callback_t;
     typedef boost::signals2::signal<void (void)> path_event_signal_t;
     typedef boost::signals2::connection          path_event_slot_t;
 
-    virtual BOOL      handleMouseDown(S32 pX, S32 pY, MASK pMask) override;
-    virtual BOOL      handleMouseUp(S32 pX, S32 pY, MASK pMask) override;
-    virtual BOOL      handleMiddleMouseDown(S32 pX, S32 pY, MASK pMask) override;
-    virtual BOOL      handleMiddleMouseUp(S32 pX, S32 pY, MASK pMask) override;
-    virtual BOOL      handleRightMouseDown(S32 pX, S32 pY, MASK pMask) override;
-    virtual BOOL      handleRightMouseUp(S32 pX, S32 pY, MASK pMask) override;
-    virtual BOOL      handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    virtual bool      handleMouseDown(S32 pX, S32 pY, MASK pMask) override;
+    virtual bool      handleMouseUp(S32 pX, S32 pY, MASK pMask) override;
+    virtual bool      handleMiddleMouseDown(S32 pX, S32 pY, MASK pMask) override;
+    virtual bool      handleMiddleMouseUp(S32 pX, S32 pY, MASK pMask) override;
+    virtual bool      handleRightMouseDown(S32 pX, S32 pY, MASK pMask) override;
+    virtual bool      handleRightMouseUp(S32 pX, S32 pY, MASK pMask) override;
+    virtual bool      handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
-    virtual BOOL      handleHover(S32 pX, S32 pY, MASK pMask) override;
+    virtual bool      handleHover(S32 pX, S32 pY, MASK pMask) override;
 
-    virtual BOOL      handleKey(KEY pKey, MASK pMask) override;
+    virtual bool      handleKey(KEY pKey, MASK pMask) override;
 
     EPathStatus       getPathStatus() const;
 
@@ -105,16 +105,16 @@ private:
 
     void              setFinalA(const LLVector3 &pStartPoint, const LLVector3 &pEndPoint);
     bool              hasFinalA() const;
-    const LLVector3   getFinalAStart() const;
-    const LLVector3   getFinalAEnd() const;
+    const LLVector3   &getFinalAStart() const;
+    const LLVector3   &getFinalAEnd() const;
 
     void              setTempA(const LLVector3 &pStartPoint, const LLVector3 &pEndPoint);
     bool              hasTempA() const;
 
     void              setFinalB(const LLVector3 &pStartPoint, const LLVector3 &pEndPoint);
     bool              hasFinalB() const;
-    const LLVector3   getFinalBStart() const;
-    const LLVector3   getFinalBEnd() const;
+    const LLVector3   &getFinalBStart() const;
+    const LLVector3   &getFinalBEnd() const;
 
     void              setTempB(const LLVector3 &pStartPoint, const LLVector3 &pEndPoint);
     bool              hasTempB() const;

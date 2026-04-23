@@ -34,7 +34,7 @@ class LLIMProcessing
 public:
     // Pre-process message for IM manager
     static void processNewMessage(LLUUID from_id,
-        BOOL from_group,
+        bool from_group,
         LLUUID to_id,
         U8 offline,
         EInstantMessage dialog, // U8
@@ -48,6 +48,7 @@ public:
         U8 *binary_bucket,
         S32 binary_bucket_size,
         LLHost &sender,
+        LLSD metadata,
         LLUUID aux_id = LLUUID::null);
 
     // Either receives list of offline messages from 'ReadOfflineMsgs' capability
@@ -60,10 +61,8 @@ private:
 };
 
 // Resurrect the Autorespond from the archive
-// -- FLN
+// -- Fallen
 // Replace wild cards in message strings
 std::string replace_wildcards(std::string input, const LLUUID& id, const std::string& name);
-
-
 
 #endif  // LL_LLLLIMPROCESSING_H

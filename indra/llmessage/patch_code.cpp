@@ -27,7 +27,6 @@
 #include "linden_common.h"
 
 #include "llmath.h"
-//#include "vmath.h"
 #include "v3math.h"
 #include "patch_dct.h"
 #include "patch_code.h"
@@ -130,7 +129,7 @@ void code_patch(LLBitPack &bitpack, S32 *patch, S32 postquant)
 {
     S32     i, j, patch_size = gPatchSize, wbits = gWordBits;
     S32     temp;
-    BOOL    b_eob;
+    bool    b_eob;
 
     if (  (postquant > patch_size*patch_size)
         ||(postquant < 0))
@@ -143,16 +142,16 @@ void code_patch(LLBitPack &bitpack, S32 *patch, S32 postquant)
 
     for (i = 0; i < patch_size*patch_size; i++)
     {
-        b_eob = FALSE;
+        b_eob = false;
         temp = patch[i];
         if (!temp)
         {
-            b_eob = TRUE;
+            b_eob = true;
             for (j = i; j < patch_size*patch_size - postquant; j++)
             {
                 if (patch[j])
                 {
-                    b_eob = FALSE;
+                    b_eob = false;
                     break;
                 }
             }
@@ -229,7 +228,7 @@ void    decode_patch_group_header(LLBitPack &bitpack, LLGroupHeader *gopp)
     gPatchSize = gopp->patch_size;
 }
 
-void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph, bool b_large_patch)
+void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph)
 {
     U8 retvalu8;
 
@@ -256,7 +255,7 @@ void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph, bool b_large_
 #else
     bitpack.bitUnpack((U8 *)&retvalu32, 32);
 #endif
-    memcpy(&ph->dc_offset, &retvalu32, sizeof(ph->dc_offset));
+    ph->dc_offset = *(F32 *)&retvalu32;
 
     U16 retvalu16 = 0;
 #ifdef LL_BIG_ENDIAN
@@ -268,25 +267,15 @@ void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph, bool b_large_
 #endif
     ph->range = retvalu16;
 
-    retvalu32 = 0;
+    retvalu16 = 0;
 #ifdef LL_BIG_ENDIAN
-    ret = (U8*)&retvalu32;
-    if (b_large_patch)
-    {
-        bitpack.bitUnpack(&(ret[3]), 8);
-        bitpack.bitUnpack(&(ret[2]), 8);
-        bitpack.bitUnpack(&(ret[1]), 8);
-        bitpack.bitUnpack(&(ret[0]), 8);
-    }
-    else
-    {
-        bitpack.bitUnpack(&(ret[1]), 8);
-        bitpack.bitUnpack(&(ret[0]), 2);
-    }
+    ret = (U8 *)&retvalu16;
+    bitpack.bitUnpack(&(ret[1]), 8);
+    bitpack.bitUnpack(&(ret[0]), 2);
 #else
-    bitpack.bitUnpack((U8*)&retvalu32, b_large_patch ? 32 : 10);
+    bitpack.bitUnpack((U8 *)&retvalu16, 10);
 #endif
-    ph->patchids = retvalu32;
+    ph->patchids = retvalu16;
 
     gWordBits = (ph->quant_wbits & 0xf) + 2;
 }

@@ -31,8 +31,7 @@
 #include "llerror.h"
 #include "llpointer.h"
 #include "llrefcount.h"
-#include "boost/function.hpp"
-#include "boost/shared_ptr.hpp"
+#include <functional>
 #include <string>
 
 class LLSD;
@@ -49,8 +48,8 @@ class LLSD;
 class LLLineBuffer
 {
 public:
-    LLLineBuffer() = default;
-    virtual ~LLLineBuffer() = default;
+    LLLineBuffer() {};
+    virtual ~LLLineBuffer() {};
 
     virtual void clear() = 0; // Clear the buffer, and reset it.
 
@@ -71,7 +70,6 @@ namespace LLError
         Setting a level means log messages at that level or above.
     */
 
-    LL_COMMON_API void setPrintLocation(bool);
     LL_COMMON_API void setDefaultLevel(LLError::ELevel);
     LL_COMMON_API ELevel getDefaultLevel();
     LL_COMMON_API void setAlwaysFlush(bool flush);
@@ -93,7 +91,7 @@ namespace LLError
         Control functions.
     */
 
-    typedef boost::function<void(const std::string&)> FatalFunction;
+    typedef std::function<void(const std::string&)> FatalFunction;
 
     LL_COMMON_API void setFatalFunction(const FatalFunction&);
         // The fatal function will be called after an message of LEVEL_ERROR
@@ -144,7 +142,7 @@ namespace LLError
         // An object that handles the actual output or error messages.
     public:
         Recorder();
-        virtual ~Recorder() = default;
+        virtual ~Recorder();
 
         virtual void recordMessage(LLError::ELevel, const std::string& message) = 0;
             // use the level for better display, not for filtering
@@ -190,7 +188,7 @@ namespace LLError
         {}
         void recordMessage(LLError::ELevel level, const std::string& message) override
         {
-            LL_PROFILE_ZONE_SCOPED
+            LL_PROFILE_ZONE_SCOPED;
             mCallable(level, message);
         }
     private:
@@ -237,7 +235,7 @@ namespace LLError
     LL_COMMON_API SettingsStoragePtr saveAndResetSettings();
     LL_COMMON_API void restoreSettings(SettingsStoragePtr pSettingsStorage);
 
-    LL_COMMON_API std::string abbreviateFile(std::string filePath);
+    LL_COMMON_API std::string abbreviateFile(const std::string& filePath);
     LL_COMMON_API int shouldLogCallCount();
 };
 

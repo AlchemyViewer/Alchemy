@@ -43,15 +43,8 @@
 #include "../llsdserialize.h"
 #include "../u64.h"
 #include "../llhash.h"
-#include "../llrand.h"
 
 #include "../test/lltut.h"
-
-
-#if LL_WINDOWS
-// disable overflow warnings
-#pragma warning(disable: 4307)
-#endif
 
 namespace tut
 {
@@ -68,7 +61,7 @@ namespace tut
         std::ostringstream resp;
         resp << "{'connect':true,  'position':[r128,r128,r128], 'look_at':[r0,r1,r0], 'agent_access':'M', 'region_x':i8192, 'region_y':i8192}";
         std::string str = resp.str();
-        LLMemoryStream mstr((U8*)str.c_str(), str.size());
+        LLMemoryStream mstr((U8*)str.c_str(), static_cast<S32>(str.size()));
         LLSD response;
         S32 count = LLSDSerialize::fromNotation(response, mstr, str.size());
         ensure("stream parsed", response.isDefined());
@@ -119,7 +112,7 @@ namespace tut
             typedef std::vector<U8> buf_t;
             buf_t source;
             srand(i);       /* Flawfinder: ignore */
-            S32 size = ll_rand() % 1000 + 10;
+            S32 size = rand() % 1000 + 10;
             std::generate_n(
                 std::back_insert_iterator<buf_t>(source),
                 size,
@@ -170,7 +163,7 @@ namespace tut
             typedef std::vector<U8> buf_t;
             buf_t source;
             srand(666 + i);     /* Flawfinder: ignore */
-            S32 size = ll_rand() % 1000 + 10;
+            S32 size = rand() % 1000 + 10;
             std::generate_n(
                 std::back_insert_iterator<buf_t>(source),
                 size,
@@ -253,7 +246,7 @@ namespace tut
         resp << "{'label':'short binary test', 'singlebinary':b(1)\"A\", 'singlerawstring':s(1)\"A\", 'endoftest':'end' }";
         std::string str = resp.str();
         LLSD sd;
-        LLMemoryStream mstr((U8*)str.c_str(), str.size());
+        LLMemoryStream mstr((U8*)str.c_str(), static_cast<S32>(str.size()));
         S32 count = LLSDSerialize::fromNotation(sd, mstr, str.size());
         ensure_equals("parse count", count, 5);
         ensure("sd created", sd.isDefined());
@@ -326,7 +319,7 @@ namespace tut
             // gen up a starting point
             std::string expected;
             srand(1337 + i);        /* Flawfinder: ignore */
-            S32 size = ll_rand() % 30 + 5;
+            S32 size = rand() % 30 + 5;
             std::generate_n(
                 std::back_insert_iterator<std::string>(expected),
                 size,
@@ -457,7 +450,7 @@ namespace tut
     void mem_object::test<1>()
     {
         const char HELLO_WORLD[] = "hello world";
-        LLMemoryStream mem((U8*)&HELLO_WORLD[0], strlen(HELLO_WORLD));      /* Flawfinder: ignore */
+        LLMemoryStream mem((U8*)&HELLO_WORLD[0], static_cast<S32>(strlen(HELLO_WORLD)));      /* Flawfinder: ignore */
         std::string hello;
         std::string world;
         mem >> hello >> world;
@@ -510,7 +503,7 @@ namespace tut
         result_str = (const char*) result;
         ensure_equals("U64_to_str converted 1.4", val_str, result_str);
 
-        val = U64L(-1); // 0xFFFFFFFFFFFFFFFF == 18446744073709551615
+        val = U64(-1); // 0xFFFFFFFFFFFFFFFF == 18446744073709551615
         val_str = "18446744073709551615";
         U64_to_str(val, result, sizeof(result));
         result_str = (const char*) result;
@@ -626,7 +619,7 @@ namespace tut
         val = U64_to_F64(U64L(2));
         ensure_equals("U64_to_F64 converted 3.6", val, result);
 
-        result = U64L(0x7FFFFFFFFFFFFFFF) * 1.0L; // 0x7FFFFFFFFFFFFFFF
+        result = F64(0x7FFFFFFFFFFFFFFF) * 1.0; // 0x7FFFFFFFFFFFFFFF
         val = U64_to_F64(U64L(0x7FFFFFFFFFFFFFFF));
         ensure_equals("U64_to_F64 converted 3.7", val, result);
     }

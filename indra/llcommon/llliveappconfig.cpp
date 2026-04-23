@@ -41,6 +41,9 @@ LLLiveAppConfig::LLLiveAppConfig(
 { }
 
 
+LLLiveAppConfig::~LLLiveAppConfig()
+{ }
+
 // virtual
 bool LLLiveAppConfig::loadFile()
 {

@@ -36,14 +36,13 @@
 // The plane normal = [A, B, C]
 // The closest approach = D / sqrt(A*A + B*B + C*C)
 
-
-LL_ALIGN_PREFIX(16)
-class LLPlane
+class alignas(16) LLPlane
 {
+    LL_ALIGN_NEW
 public:
 
     // Constructors
-    LLPlane() = default; // no default constructor
+    LLPlane() = default;
     LLPlane(const LLVector3 &p0, F32 d) { setVec(p0, d); }
     LLPlane(const LLVector3 &p0, const LLVector3 &n) { setVec(p0, n); }
     inline void setVec(const LLVector3 &p0, F32 d) { mV.set(p0[0], p0[1], p0[2], d); }
@@ -65,9 +64,9 @@ public:
         setVec(w, d);
     }
 
-    inline LLPlane& operator=(const LLVector4& v2) {mV.loadua(v2.mV); return *this; }
+    inline LLPlane& operator=(const LLVector4& v2) {  mV.set(v2[0],v2[1],v2[2],v2[3]); return *this;}
 
-    inline LLPlane& operator=(const LLVector4a& v2) {  mV = v2; return *this;}
+    inline LLPlane& operator=(const LLVector4a& v2) {  mV.set(v2[0],v2[1],v2[2],v2[3]); return *this;}
 
     inline void set(const LLPlane& p2) { mV = p2.mV; }
 
@@ -89,7 +88,7 @@ public:
     inline void getVector3(LLVector3& vec) const { vec.set(mV[0], mV[1], mV[2]); }
 
     // Retrieve the mask indicating which of the x, y, or z axis are greater or equal to zero.
-    inline U8 calcPlaneMask() const
+    inline U8 calcPlaneMask()
     {
         return mV.greaterEqual(LLVector4a::getZero()).getGatheredBits() & LLVector4Logical::MASK_XYZ;
     }
@@ -102,11 +101,9 @@ public:
 
 private:
     LLVector4a mV;
-} LL_ALIGN_POSTFIX(16);
+};
 
-#ifndef SHOW_ASSERT
 static_assert(std::is_trivial<LLPlane>::value, "LLPlane must be a trivial type");
-static_assert(std::is_standard_layout<LLPlane>::value, "LLPlane must be a standard layout type");
-#endif
+
 
 #endif // LL_LLPLANE_H

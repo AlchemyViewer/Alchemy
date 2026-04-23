@@ -45,6 +45,7 @@ public:
         Optional<S32>           text_width;
         Optional<bool>          show_text;
         Optional<bool>          can_edit_text;
+        Optional<bool>          is_volume_slider;
         Optional<S32>           decimal_digits;
 
         Optional<LLUIColor>     text_color,
@@ -63,6 +64,7 @@ public:
             label_width("label_width"),
             show_text("show_text"),
             can_edit_text("can_edit_text"),
+            is_volume_slider("volume"),
             decimal_digits("decimal_digits", 3),
             text_color("text_color"),
             text_disabled_color("text_disabled_color"),
@@ -82,17 +84,17 @@ public:
     virtual ~LLSliderCtrl();
 
     /*virtual*/ F32 getValueF32() const { return mSlider->getValueF32(); }
-    void            setValue(F32 v, BOOL from_event = FALSE);
+    void            setValue(F32 v, bool from_event = false);
 
-    /*virtual*/ void    setValue(const LLSD& value) { setValue((F32)value.asReal(), TRUE); }
+    /*virtual*/ void    setValue(const LLSD& value) { setValue((F32)value.asReal(), true); }
     /*virtual*/ LLSD    getValue() const            { return LLSD(getValueF32()); }
-    /*virtual*/ BOOL    setLabelArg( const std::string& key, const LLStringExplicit& text );
+    /*virtual*/ bool    setLabelArg( const std::string& key, const LLStringExplicit& text );
 
-    BOOL            isMouseHeldDown() const { return mSlider->hasMouseCapture(); }
+    bool            isMouseHeldDown() const { return mSlider->hasMouseCapture(); }
 
     virtual void    setPrecision(S32 precision);
 
-    /*virtual*/ void    setEnabled( BOOL b );
+    /*virtual*/ void    setEnabled( bool b );
     /*virtual*/ void    clear();
 
     /*virtual*/ void    setMinValue(const LLSD& min_value)  { setMinValue((F32)min_value.asReal()); }
@@ -105,8 +107,8 @@ public:
     F32             getMaxValue() const { return mSlider->getMaxValue(); }
 
     void            setLabel(const LLStringExplicit& label)     { if (mLabelBox) mLabelBox->setText(label); }
-    void            setLabelColor(const LLColor4& c)            { mTextEnabledColor = c; }
-    void            setDisabledLabelColor(const LLColor4& c)    { mTextDisabledColor = c; }
+    void            setLabelColor(const LLUIColor& c)            { mTextEnabledColor = c; }
+    void            setDisabledLabelColor(const LLUIColor& c)    { mTextDisabledColor = c; }
 
     boost::signals2::connection setSliderMouseDownCallback( const commit_signal_t::slot_type& cb );
     boost::signals2::connection setSliderMouseUpCallback( const commit_signal_t::slot_type& cb );
@@ -114,23 +116,22 @@ public:
 
     /*virtual*/ void    onTabInto();
 
-    /*virtual*/ void    setTentative(BOOL b);           // marks value as tentative
+    /*virtual*/ void    setTentative(bool b);           // marks value as tentative
     /*virtual*/ void    onCommit();                     // mark not tentative, then commit
 
-    /*virtual*/ void    setControlName(std::string_view control_name, LLView* context)
+    /*virtual*/ void    setControlName(const std::string& control_name, LLView* context)
     {
         LLUICtrl::setControlName(control_name, context);
         mSlider->setControlName(control_name, context);
     }
 
     /*virtual*/ void    setRect(const LLRect& rect);
-    /*virtual*/ void    reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+    /*virtual*/ void    reshape(S32 width, S32 height, bool called_from_parent = true);
 
     static void     onSliderCommit(LLUICtrl* caller, const LLSD& userdata);
 
     static void     onEditorCommit(LLUICtrl* ctrl, const LLSD& userdata);
     static void     onEditorGainFocus(LLFocusableElement* caller, void *userdata);
-    static void     onEditorChangeFocus(LLUICtrl* caller, S32 direction, void *userdata);
 
 protected:
     virtual std::string _getSearchText() const
@@ -152,8 +153,8 @@ private:
 
     const LLFontGL* mFont;
     const LLFontGL* mLabelFont;
-    BOOL            mShowText;
-    BOOL            mCanEditText;
+    bool            mShowText;
+    bool            mCanEditText;
 
     S32             mPrecision;
     LLTextBox*      mLabelBox;

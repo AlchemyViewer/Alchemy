@@ -46,7 +46,7 @@ public:
     LLTeleportHistoryPanel();
     virtual ~LLTeleportHistoryPanel();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
     void draw() override;
 
     void onSearchEdit(const std::string& string) override;
@@ -62,7 +62,7 @@ public:
     LLToggleableMenu* getSortingMenu() override;
     LLToggleableMenu* getCreateMenu() override;
 
-    bool handleDragAndDropToTrash(BOOL drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept) override { return false; }
+    bool handleDragAndDropToTrash(bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept) override { return false; }
 
 private:
 
@@ -83,6 +83,7 @@ private:
     void showTeleportHistory();
     void handleItemSelect(LLFlatListView* );
     LLFlatListView* getFlatListViewFromTab(LLAccordionCtrlTab *);
+    static void gotSLURLCallback(const std::string& slurl);
     void onGearMenuAction(const LLSD& userdata);
     bool isActionEnabled(const LLSD& userdata) const;
 
@@ -104,7 +105,7 @@ private:
     typedef std::vector<LLAccordionCtrlTab*> item_containers_t;
     item_containers_t mItemContainers;
 
-    LLHandle<LLContextMenu> mAccordionTabMenuHandle;
+    LLContextMenu*          mAccordionTabMenu;
 
     LLToggleableMenu*           mGearItemMenu;
     LLToggleableMenu*           mSortingMenu;

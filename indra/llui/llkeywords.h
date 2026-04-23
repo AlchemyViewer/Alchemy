@@ -36,10 +36,11 @@
 #include <map>
 #include <list>
 #include <deque>
+#include <vector>
+#include <cstddef>
+#include <boost/unordered_map.hpp>
 #include "llpointer.h"
 
-class LLStyle;
-typedef LLPointer<LLStyle> LLStyleSP;
 class LLTextSegment;
 typedef LLPointer<LLTextSegment> LLTextSegmentPtr;
 
@@ -55,6 +56,7 @@ public:
      * - TT_ONE_SIDED_DELIMITER are for open-ended delimiters which are terminated by EOL.
      * - TT_TWO_SIDED_DELIMITER are for delimiters that end with a different delimiter than they open with.
      * - TT_DOUBLE_QUOTATION_MARKS are for delimiting areas using the same delimiter to open and close.
+     * - TT_LONG_BRACKET are for Lua tokens that use brackets with counted equals signs.
      */
     typedef enum e_token_type
     {
@@ -64,6 +66,7 @@ public:
         TT_TWO_SIDED_DELIMITER,
         TT_ONE_SIDED_DELIMITER,
         TT_DOUBLE_QUOTATION_MARKS,
+        TT_LONG_BRACKET,                    // Lua long brackets: --[=*[ or [=*[
         // Following constants are more specific versions of the preceding ones
         TT_CONSTANT,                        // WORD
         TT_CONTROL,                         // WORD
@@ -71,11 +74,10 @@ public:
         TT_FUNCTION,                        // WORD
         TT_LABEL,                           // LINE
         TT_SECTION,                         // WORD
-        TT_TYPE,                            // WORD
-        TT_PREPROC                          // WORD
+        TT_TYPE                             // WORD
     } ETokenType;
 
-    LLKeywordToken( ETokenType type, const LLColor4& color, const LLWString& token, const LLWString& tool_tip, const LLWString& delimiter  )
+    LLKeywordToken( ETokenType type, const LLUIColor& color, const LLWString& token, const LLWString& tool_tip, const LLWString& delimiter  )
         :
         mType( type ),
         mToken( token ),
@@ -85,12 +87,16 @@ public:
     {
     }
 
-    S32                 getLengthHead() const   { return mToken.size(); }
-    S32                 getLengthTail() const   { return mDelimiter.size(); }
+    ~LLKeywordToken()
+    {
+    }
+
+    S32                 getLengthHead() const   { return static_cast<S32>(mToken.size()); }
+    S32                 getLengthTail() const   { return static_cast<S32>(mDelimiter.size()); }
     bool                isHead(const llwchar* s) const;
     bool                isTail(const llwchar* s) const;
     const LLWString&    getToken() const        { return mToken; }
-    const LLColor4&     getColor() const        { return mColor; }
+    const LLUIColor&     getColor() const        { return mColor; }
     ETokenType          getType()  const        { return mType; }
     const LLWString&    getToolTip() const      { return mToolTip; }
     const LLWString&    getDelimiter() const    { return mDelimiter; }
@@ -102,7 +108,7 @@ public:
 private:
     ETokenType  mType;
     LLWString   mToken;
-    LLColor4    mColor;
+    LLUIColor    mColor;
     LLWString   mToolTip;
     LLWString   mDelimiter;
 };
@@ -114,20 +120,46 @@ public:
     ~LLKeywords();
 
     void        clearLoaded() { mLoaded = false; }
-    LLColor4    getColorGroup(std::string_view key_in);
-    bool        isLoaded() const    { return mLoaded; }
+    LLUIColor    getColorGroup(std::string_view key_in) const;
+    bool        isLoaded() const { return mLoaded; }
 
     void        findSegments(std::vector<LLTextSegmentPtr> *seg_list,
                              const LLWString& text,
                              class LLTextEditor& editor,
                              LLStyleConstSP style);
-    void        initialize(LLSD SyntaxXML);
+    struct SegmentOp
+    {
+        enum EOpType
+        {
+            OP_LINE_BREAK,
+            OP_TOKEN
+        };
+        EOpType         type;
+        S32             start;
+        S32             end;
+        LLKeywordToken* token;
+    };
+    typedef std::vector<SegmentOp> segment_ops_t;
+    void        collectSegmentOps(segment_ops_t& ops, const LLWString& text, bool disable_syntax_highlighting) const;
+    void        applySegmentOps(std::vector<LLTextSegmentPtr> *seg_list,
+                                const LLWString& text,
+                                const segment_ops_t& ops,
+                                class LLTextEditor& editor,
+                                LLStyleConstSP style);
+    bool        applySegmentOpsRange(std::vector<LLTextSegmentPtr> *seg_list,
+                                     const LLWString& text,
+                                     const segment_ops_t& ops,
+                                     size_t& op_index,
+                                     size_t max_ops,
+                                     class LLTextEditor& editor,
+                                     LLStyleConstSP style);
+    void        initialize(LLSD SyntaxXML, bool luau_language = false);
     void        processTokens();
 
     // Add the token as described
     void addToken(LLKeywordToken::ETokenType type,
                     const std::string& key,
-                    const LLColor4& color,
+                    const LLUIColor& color,
                     const std::string& tool_tip = LLStringUtil::null,
                     const std::string& delimiter = LLStringUtil::null);
 
@@ -156,7 +188,7 @@ public:
         bool mOwner;
 
 
-        LLColor4            mColor;
+        LLUIColor            mColor;
     };
 
     typedef std::map<WStringMapIndex, LLKeywordToken*> word_token_map_t;
@@ -164,7 +196,7 @@ public:
     keyword_iterator_t begin() const { return mWordTokenMap.begin(); }
     keyword_iterator_t end() const { return mWordTokenMap.end(); }
 
-    typedef std::map<WStringMapIndex, LLColor4> group_color_map_t;
+    typedef std::map<WStringMapIndex, LLUIColor> group_color_map_t;
     typedef group_color_map_t::const_iterator color_iterator_t;
     group_color_map_t   mColorGroupMap;
 
@@ -177,7 +209,7 @@ protected:
     void        insertSegment(std::vector<LLTextSegmentPtr>& seg_list,
                               LLTextSegmentPtr new_segment,
                               S32 text_len,
-                              const LLColor4 &defaultColor,
+                              const LLUIColor &defaultColor,
                               class LLTextEditor& editor);
     void        insertSegments(const LLWString& wtext,
                                std::vector<LLTextSegmentPtr>& seg_list,
@@ -192,19 +224,21 @@ protected:
 
     bool        mLoaded;
     LLSD        mSyntax;
+    bool        mLuauLanguage;
     word_token_map_t mWordTokenMap;
     typedef std::deque<LLKeywordToken*> token_list_t;
     token_list_t mLineTokenList;
     token_list_t mDelimiterTokenList;
+    typedef std::map<llwchar, token_list_t> token_by_first_char_map_t;
+    token_by_first_char_map_t mLineTokenByFirstChar;
+    token_by_first_char_map_t mDelimiterTokenByFirstChar;
 
-    typedef  std::map<std::string, std::string, std::less<>> element_attributes_t;
+    typedef boost::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> element_attributes_t;
     typedef element_attributes_t::const_iterator attribute_iterator_t;
     element_attributes_t mAttributes;
-    std::string                                              getAttribute(std::string_view key);
+    std::string getAttribute(std::string_view key);
 
     std::string getArguments(LLSD& arguments);
-
-    LLStyleSP getDefaultStyle(const LLTextEditor& editor);
 };
 
 #endif  // LL_LLKEYWORDS_H

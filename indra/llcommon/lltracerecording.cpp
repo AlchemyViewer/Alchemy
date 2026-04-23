@@ -32,11 +32,6 @@
 #include "lltracethreadrecorder.h"
 #include "llthread.h"
 
-inline F64 al_lerp(F64 a, F64 b, F64 u)
-{
-    return a + ((b - a) * u);
-}
-
 namespace LLTrace
 {
 
@@ -229,7 +224,7 @@ F32 Recording::getPerSec(const StatType<TimeBlockAccumulator::CallCountFacet>& s
     update();
     const TimeBlockAccumulator& accumulator = mBuffers->mStackTimers[stat.getIndex()];
     const TimeBlockAccumulator* active_accumulator = mActiveBuffers ? &mActiveBuffers->mStackTimers[stat.getIndex()] : NULL;
-    return (F32)(accumulator.mCalls + (active_accumulator ? active_accumulator->mCalls : 0)) / mElapsedSeconds.value();
+    return (F32)(accumulator.mCalls + (active_accumulator ? active_accumulator->mCalls : 0)) / (F32)mElapsedSeconds.value();
 }
 
 bool Recording::hasValue(const StatType<CountAccumulator>& stat)
@@ -296,13 +291,13 @@ F64 Recording::getMean( const StatType<SampleAccumulator>& stat )
     const SampleAccumulator* active_accumulator = mActiveBuffers ? &mActiveBuffers->mSamples[stat.getIndex()] : NULL;
     if (active_accumulator && active_accumulator->hasValue())
     {
-        F32 t = 0.0f;
+        F64 t = 0.0;
         S32 div = accumulator.getSampleCount() + active_accumulator->getSampleCount();
         if (div > 0)
         {
-            t = active_accumulator->getSampleCount() / div;
+            t = (F64)active_accumulator->getSampleCount() / (F64)div;
         }
-        return al_lerp(accumulator.getMean(), active_accumulator->getMean(), t);
+        return std::lerp(accumulator.getMean(), active_accumulator->getMean(), t);
     }
     else
     {
@@ -319,7 +314,7 @@ F64 Recording::getStandardDeviation( const StatType<SampleAccumulator>& stat )
     if (active_accumulator && active_accumulator->hasValue())
     {
         F64 sum_of_squares = SampleAccumulator::mergeSumsOfSquares(accumulator, *active_accumulator);
-        return sqrtf(sum_of_squares / (accumulator.getSamplingTime() + active_accumulator->getSamplingTime()));
+        return sqrt(sum_of_squares / (F64)(accumulator.getSamplingTime() + active_accumulator->getSamplingTime()));
     }
     else
     {
@@ -382,13 +377,13 @@ F64 Recording::getMean( const StatType<EventAccumulator>& stat )
     const EventAccumulator* active_accumulator = mActiveBuffers ? &mActiveBuffers->mEvents[stat.getIndex()] : NULL;
     if (active_accumulator && active_accumulator->hasValue())
     {
-        F32 t = 0.0f;
+        F64 t = 0.0;
         S32 div = accumulator.getSampleCount() + active_accumulator->getSampleCount();
         if (div > 0)
         {
-            t = active_accumulator->getSampleCount() / div;
+            t = (F64)active_accumulator->getSampleCount() / (F64)div;
         }
-        return al_lerp(accumulator.getMean(), active_accumulator->getMean(), t);
+        return std::lerp(accumulator.getMean(), active_accumulator->getMean(), t);
     }
     else
     {
@@ -405,7 +400,7 @@ F64 Recording::getStandardDeviation( const StatType<EventAccumulator>& stat )
     if (active_accumulator && active_accumulator->hasValue())
     {
         F64 sum_of_squares = EventAccumulator::mergeSumsOfSquares(accumulator, *active_accumulator);
-        return sqrtf(sum_of_squares / (accumulator.getSampleCount() + active_accumulator->getSampleCount()));
+        return sqrt(sum_of_squares / (F64)(accumulator.getSampleCount() + active_accumulator->getSampleCount()));
     }
     else
     {

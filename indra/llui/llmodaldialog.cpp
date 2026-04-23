@@ -28,6 +28,7 @@
 
 #include "llmodaldialog.h"
 
+#include "llemojihelper.h"
 #include "llfocusmgr.h"
 #include "v4color.h"
 #include "v2math.h"
@@ -35,22 +36,23 @@
 #include "llwindow.h"
 #include "llkeyboard.h"
 #include "llmenugl.h"
+
 // static
 std::list<LLModalDialog*> LLModalDialog::sModalStack;
 
-LLModalDialog::LLModalDialog( const LLSD& key, BOOL modal )
+LLModalDialog::LLModalDialog( const LLSD& key, bool modal )
     : LLFloater(key),
       mModal( modal )
 {
     if (modal)
     {
-        setCanMinimize(FALSE);
-        setCanClose(FALSE);
-        setCanCollapse(FALSE);
+        setCanMinimize(false);
+        setCanCollapse(false);
+        setCanClose(false);
     }
-    setVisible( FALSE );
-    setBackgroundVisible(TRUE);
-    setBackgroundOpaque(TRUE);
+    setVisible( false );
+    setBackgroundVisible(true);
+    setBackgroundOpaque(true);
     centerOnScreen(); // default position
     mCloseSignal.connect(boost::bind(&LLModalDialog::stopModal, this));
 }
@@ -73,18 +75,8 @@ LLModalDialog::~LLModalDialog()
 }
 
 // virtual
-BOOL LLModalDialog::postBuild()
+bool LLModalDialog::postBuild()
 {
-    if (mModal)
-    {
-        setCanMinimize(FALSE);
-        setCanClose(FALSE);
-        setCanCollapse(FALSE);
-    }
-    setVisible(FALSE);
-    setBackgroundVisible(TRUE);
-    setBackgroundOpaque(TRUE);
-    centerOnScreen(); // default position
     return LLFloater::postBuild();
 }
 
@@ -98,7 +90,7 @@ void LLModalDialog::openFloater(const LLSD& key)
     LLFloater::setFloaterHost(thost);
 }
 
-void LLModalDialog::reshape(S32 width, S32 height, BOOL called_from_parent)
+void LLModalDialog::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLFloater::reshape(width, height, called_from_parent);
     centerOnScreen();
@@ -109,20 +101,20 @@ void LLModalDialog::onOpen(const LLSD& key)
 {
     if (mModal)
     {
-        // If Modal, Hide the active modal dialog
+        // If Modal, hide the active modal dialog
         if (!sModalStack.empty())
         {
             LLModalDialog* front = sModalStack.front();
             if (front != this)
             {
-                front->setVisible(FALSE);
+                front->setVisible(false);
             }
         }
 
         // This is a modal dialog.  It sucks up all mouse and keyboard operations.
         gFocusMgr.setMouseCapture( this );
         LLUI::getInstance()->addPopup(this);
-        setFocus(TRUE);
+        setFocus(true);
 
         std::list<LLModalDialog*>::iterator iter = std::find(sModalStack.begin(), sModalStack.end(), this);
         if (iter != sModalStack.end())
@@ -155,23 +147,29 @@ void LLModalDialog::stopModal()
     if (!sModalStack.empty())
     {
         LLModalDialog* front = sModalStack.front();
-        front->setVisible(TRUE);
+        front->setVisible(true);
     }
 }
 
 
-void LLModalDialog::setVisible( BOOL visible )
+void LLModalDialog::setVisible( bool visible )
 {
     if (mModal)
     {
         if( visible )
         {
+            // Hide all menus currently shown
+            LLMenuGL::sMenuContainer->hideMenus();
+
+            // Hide EmojiPicker if it is shown
+            LLEmojiHelper::instance().hideHelper(nullptr, true);
+
             // This is a modal dialog.  It sucks up all mouse and keyboard operations.
             gFocusMgr.setMouseCapture( this );
 
             // The dialog view is a root view
             LLUI::getInstance()->addPopup(this);
-            setFocus( TRUE );
+            setFocus( true );
         }
         else
         {
@@ -182,13 +180,13 @@ void LLModalDialog::setVisible( BOOL visible )
     LLFloater::setVisible( visible );
 }
 
-BOOL LLModalDialog::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLModalDialog::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     LLView* popup_menu = LLMenuGL::sMenuContainer->getVisibleMenu();
     if (popup_menu != NULL)
     {
         S32 mx, my;
-        LLUI::getMousePositionScreen(&mx, &my);
+        LLUI::getInstance()->getMousePositionScreen(&mx, &my);
         LLRect menu_screen_rc = popup_menu->calcScreenRect();
         if(!menu_screen_rc.pointInRect(mx, my))
         {
@@ -210,24 +208,22 @@ BOOL LLModalDialog::handleMouseDown(S32 x, S32 y, MASK mask)
     }
 
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLModalDialog::handleHover(S32 x, S32 y, MASK mask)
+bool LLModalDialog::handleHover(S32 x, S32 y, MASK mask)
 {
     if( childrenHandleHover(x, y, mask) == NULL )
     {
         getWindow()->setCursor(UI_CURSOR_ARROW);
-#ifdef SHOW_DEBUG
         LL_DEBUGS("UserInput") << "hover handled by " << getName() << LL_ENDL;
-#endif
     }
 
     LLView* popup_menu = LLMenuGL::sMenuContainer->getVisibleMenu();
     if (popup_menu != NULL)
     {
         S32 mx, my;
-        LLUI::getMousePositionScreen(&mx, &my);
+        LLUI::getInstance()->getMousePositionScreen(&mx, &my);
         LLRect menu_screen_rc = popup_menu->calcScreenRect();
         if(menu_screen_rc.pointInRect(mx, my))
         {
@@ -238,60 +234,60 @@ BOOL LLModalDialog::handleHover(S32 x, S32 y, MASK mask)
         }
     }
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLModalDialog::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLModalDialog::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     childrenHandleMouseUp(x, y, mask);
-    return TRUE;
+    return true;
 }
 
-BOOL LLModalDialog::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLModalDialog::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
     childrenHandleScrollWheel(x, y, clicks);
-    return TRUE;
+    return true;
 }
 
-BOOL LLModalDialog::handleDoubleClick(S32 x, S32 y, MASK mask)
+bool LLModalDialog::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
     if (!LLFloater::handleDoubleClick(x, y, mask))
     {
         // Click outside the panel
         make_ui_sound("UISndInvalidOp");
     }
-    return TRUE;
+    return true;
 }
 
-BOOL LLModalDialog::handleRightMouseDown(S32 x, S32 y, MASK mask)
+bool LLModalDialog::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
     LLMenuGL::sMenuContainer->hideMenus();
     childrenHandleRightMouseDown(x, y, mask);
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLModalDialog::handleKeyHere(KEY key, MASK mask )
+bool LLModalDialog::handleKeyHere(KEY key, MASK mask )
 {
     LLFloater::handleKeyHere(key, mask );
 
     if (mModal)
     {
         // Suck up all keystokes except CTRL-Q.
-        BOOL is_quit = ('Q' == key) && (MASK_CONTROL == mask);
+        bool is_quit = ('Q' == key) && (MASK_CONTROL == mask);
         return !is_quit;
     }
     else
     {
         // don't process escape key until message box has been on screen a minimal amount of time
         // to avoid accidentally destroying the message box when user is hitting escape at the time it appears
-        BOOL enough_time_elapsed = mVisibleTime.getElapsedTimeF32() > 1.0f;
+        bool enough_time_elapsed = mVisibleTime.getElapsedTimeF32() > 1.0f;
         if (enough_time_elapsed && key == KEY_ESCAPE)
         {
             closeFloater();
-            return TRUE;
+            return true;
         }
-        return FALSE;
+        return false;
     }
 }
 
@@ -310,10 +306,9 @@ void LLModalDialog::draw()
 
 void LLModalDialog::centerOnScreen()
 {
-    LLVector2 window_size = LLUI::getWindowSize();
+    LLVector2 window_size = LLUI::getInstance()->getWindowSize();
     centerWithin(LLRect(0, 0, ll_round(window_size.mV[VX]), ll_round(window_size.mV[VY])));
 }
-
 
 // static
 void LLModalDialog::onAppFocusLost()
@@ -326,7 +321,7 @@ void LLModalDialog::onAppFocusLost()
             gFocusMgr.setMouseCapture( NULL );
         }
 
-        instance->setFocus(FALSE);
+        instance->setFocus(false);
     }
 }
 
@@ -339,13 +334,14 @@ void LLModalDialog::onAppFocusGained()
 
         // This is a modal dialog.  It sucks up all mouse and keyboard operations.
         gFocusMgr.setMouseCapture( instance );
-        instance->setFocus(TRUE);
+        instance->setFocus(true);
         LLUI::getInstance()->addPopup(instance);
 
         instance->centerOnScreen();
     }
 }
 
+// static
 void LLModalDialog::shutdownModals()
 {
     // This method is only for use during app shutdown. ~LLModalDialog()

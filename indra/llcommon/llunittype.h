@@ -31,6 +31,11 @@
 #include "llpreprocessor.h"
 #include "llerror.h"
 
+#ifdef LL_WINDOWS
+#pragma warning(push)
+#pragma warning(disable : 4244) // possible loss of data on conversions
+#endif
+
 //lightweight replacement of type traits for simple type equality check
 template<typename S, typename T>
 struct LLIsSameType
@@ -83,7 +88,7 @@ struct LLUnit
     typedef void is_unit_t;
 
     // value initialization
-    LL_FORCE_INLINE explicit constexpr LLUnit(storage_t value = storage_t())
+    LL_FORCE_INLINE explicit LLUnit(storage_t value = storage_t())
     :   mValue(value)
     {}
 
@@ -255,7 +260,7 @@ struct LLUnitImplicit : public LLUnit<STORAGE_TYPE, UNITS>
     typedef typename LLUnit<STORAGE_TYPE, UNITS>::storage_t storage_t;
     typedef LLUnit<STORAGE_TYPE, UNITS> base_t;
 
-    LL_FORCE_INLINE constexpr LLUnitImplicit(storage_t value = storage_t())
+    LL_FORCE_INLINE LLUnitImplicit(storage_t value = storage_t())
     :   base_t(value)
     {}
 
@@ -845,5 +850,9 @@ LL_FORCE_INLINE S2 ll_convert_units(LLUnit<S1, base_unit_name> in, LLUnit<S2, un
     typedef LLUnitImplicit<U32, ns::unit_name> U32##unit_name##Implicit;\
     typedef LLUnit<U64, ns::unit_name> U64##unit_name;                  \
     typedef LLUnitImplicit<U64, ns::unit_name> U64##unit_name##Implicit
+
+#ifdef LL_WINDOWS
+#pragma warning(pop)
+#endif
 
 #endif //LL_UNITTYPE_H

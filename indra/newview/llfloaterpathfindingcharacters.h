@@ -39,15 +39,15 @@ class LLQuaternion;
 class LLSD;
 class LLVector3;
 
-class LLFloaterPathfindingCharacters final : public LLFloaterPathfindingObjects
+class LLFloaterPathfindingCharacters : public LLFloaterPathfindingObjects
 {
 public:
     virtual void                                    onClose(bool pIsAppQuitting);
 
-    BOOL                                            isShowPhysicsCapsule() const;
-    void                                            setShowPhysicsCapsule(BOOL pIsShowPhysicsCapsule);
+    bool                                            isShowPhysicsCapsule() const;
+    void                                            setShowPhysicsCapsule(bool pIsShowPhysicsCapsule);
 
-    BOOL                                            isPhysicsCapsuleEnabled(LLUUID& id, LLVector3& pos, LLQuaternion& rot) const;
+    bool                                            isPhysicsCapsuleEnabled(LLUUID& id, LLVector3& pos, LLQuaternion& rot) const;
 
     static void                                     openCharactersWithSelectedObjects();
     static LLHandle<LLFloaterPathfindingCharacters> getInstanceHandle();
@@ -58,7 +58,7 @@ protected:
     LLFloaterPathfindingCharacters(const LLSD& pSeed);
     virtual ~LLFloaterPathfindingCharacters();
 
-    virtual BOOL                       postBuild();
+    virtual bool                       postBuild();
 
     virtual void                       requestGetObjects();
 

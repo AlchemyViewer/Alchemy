@@ -43,7 +43,7 @@ class LLWearableData
     //--------------------------------------------------------------------
 public:
     LLWearableData();
-    virtual ~LLWearableData() = default;
+    virtual ~LLWearableData();
 
     void setAvatarAppearance(LLAvatarAppearance* appearance) { mAvatarAppearance = appearance; }
 
@@ -60,13 +60,14 @@ public:
     const LLWearable*   getBottomWearable(const LLWearableType::EType type) const;
     U32             getWearableCount(const LLWearableType::EType type) const;
     U32             getWearableCount(const U32 tex_index) const;
-    BOOL            getWearableIndex(const LLWearable *wearable, U32& index) const;
+    bool            getWearableIndex(const LLWearable *wearable, U32& index) const;
     U32             getClothingLayerCount() const;
-    BOOL            canAddWearable(const LLWearableType::EType type) const;
+    bool            canAddWearable(const LLWearableType::EType type) const;
 
-    BOOL            isOnTop(LLWearable* wearable) const;
+    bool            isOnTop(LLWearable* wearable) const;
 
-    static const U32 MAX_CLOTHING_LAYERS = 60;
+    static constexpr U32 MAX_CLOTHING_LAYERS = 60;
+    static constexpr U32 MAX_BODY_PARTS = 4;
 
     //--------------------------------------------------------------------
     // Setters
@@ -76,7 +77,7 @@ protected:
     void            setWearable(const LLWearableType::EType type, U32 index, LLWearable *wearable);
     void            pushWearable(const LLWearableType::EType type, LLWearable *wearable,
                                  bool trigger_updated = true);
-    virtual void    wearableUpdated(LLWearable *wearable, BOOL removed);
+    virtual void    wearableUpdated(LLWearable *wearable, bool removed);
     void            eraseWearable(LLWearable *wearable);
     void            eraseWearable(const LLWearableType::EType type, U32 index);
 //  void            clearWearableType(const LLWearableType::EType type);

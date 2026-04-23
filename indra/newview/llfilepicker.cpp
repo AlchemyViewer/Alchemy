@@ -36,16 +36,12 @@
 #include "llviewercontrol.h"
 #include "llwindow.h"   // beforeDialog()
 
-#if LL_SDL
-#include "llwindowsdl.h"
+#if LL_SDL_WINDOW
+#include "llwindowsdl.h" // for some X/GTK utils to help with filepickers
 #endif // LL_SDL
 
 #if LL_LINUX
 #include "llhttpconstants.h"    // file picker uses some of thes constants on Linux
-#endif
-
-#if LL_NFD
-#include "nfd.hpp"
 #endif
 
 //
@@ -54,7 +50,7 @@
 
 LLFilePicker LLFilePicker::sInstance;
 
-#if LL_WINDOWS && !LL_NFD
+#if LL_WINDOWS && !LL_SDL_WINDOW
 #define SOUND_FILTER L"Sounds (*.wav)\0*.wav\0"
 #define IMAGE_FILTER L"Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)\0*.tga;*.bmp;*.jpg;*.jpeg;*.png;*.webp\0"
 #define ANIM_FILTER L"Animations (*.bvh; *.anim)\0*.bvh;*.anim\0"
@@ -63,14 +59,13 @@ LLFilePicker LLFilePicker::sInstance;
 #define XML_FILTER L"XML files (*.xml)\0*.xml\0"
 #define SLOBJECT_FILTER L"Objects (*.slobject)\0*.slobject\0"
 #define RAW_FILTER L"RAW files (*.raw)\0*.raw\0"
-#define MODEL_FILTER L"Model files (*.dae)\0*.dae\0"
+#define MODEL_FILTER L"Model files (*.dae, *.gltf, *.glb)\0*.dae;*.gltf;*.glb\0"
 #define MATERIAL_FILTER L"GLTF Files (*.gltf; *.glb)\0*.gltf;*.glb\0"
 #define HDRI_FILTER L"HDRI Files (*.exr)\0*.exr\0"
 #define MATERIAL_TEXTURES_FILTER L"GLTF Import (*.gltf; *.glb; *.tga; *.bmp; *.jpg; *.jpeg; *.png)\0*.gltf;*.glb;*.tga;*.bmp;*.jpg;*.jpeg;*.png\0"
-#define SCRIPT_FILTER L"Script files (*.lsl)\0*.lsl\0"
+#define SCRIPT_FILTER L"Script files (*.lsl; *.lua; *.luau)\0*.lsl;*.lua;*.luau\0"
 #define DICTIONARY_FILTER L"Dictionary files (*.dic; *.xcu)\0*.dic;*.xcu\0"
 #define ZIP_FILTER L"ZIP files (*.zip)\0*.zip\0"
-#define EXECUTABLE_FILTER L"Executables (*.exe)\0*.exe\0"
 #endif
 
 #ifdef LL_DARWIN
@@ -88,7 +83,7 @@ LLFilePicker::LLFilePicker()
 {
     reset();
 
-#if LL_WINDOWS && !LL_NFD
+#if LL_WINDOWS && !LL_SDL_WINDOW
     mOFN.lStructSize = sizeof(OPENFILENAMEW);
     mOFN.hwndOwner = NULL;  // Set later
     mOFN.hInstance = NULL;
@@ -108,7 +103,7 @@ LLFilePicker::LLFilePicker()
     mOFN.lpfnHook = NULL;
     mOFN.lpTemplateName = NULL;
     mFilesW[0] = '\0';
-#elif LL_DARWIN
+#elif LL_DARWIN && !LL_SDL_WINDOW
     mPickOptions = 0;
 #endif
 
@@ -173,429 +168,485 @@ void LLFilePicker::reset()
     mCurrentFile = 0;
 }
 
-#if LL_NFD
-std::vector<nfdfilteritem_t> LLFilePicker::setupFilter(ELoadFilter filter)
+#if LL_SDL_WINDOW
+
+namespace
 {
-    std::vector<nfdfilteritem_t> filter_vec;
+    std::vector<SDL_DialogFileFilter> setupLoadFilter(LLFilePicker::ELoadFilter filter)
+    {
+        std::vector<SDL_DialogFileFilter> filter_vec;
+
+        switch (filter)
+        {
+        case LLFilePicker::FFLOAD_ALL:
+        case LLFilePicker::FFLOAD_EXE:
+            filter_vec.push_back({ "All Files (*.*)", "*" });
+            filter_vec.push_back({ "Sounds (*.wav)", "wav" });
+            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png)", "tga;bmp;jpg;jpeg;png" });
+            filter_vec.push_back({ "Animations (*.bvh; *.anim)", "bvh;anim" });
+            filter_vec.push_back({ "GLTF Files (*.gltf; *.glb)", "gltf;glb" });
+            break;
+        case LLFilePicker::FFLOAD_WAV:
+            filter_vec.push_back({ "Sounds (*.wav)", "wav" });
+            break;
+        case LLFilePicker::FFLOAD_IMAGE:
+            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)", "tga;bmp;jpg;jpeg;png;webp" });
+            break;
+        case LLFilePicker::FFLOAD_ANIM:
+            filter_vec.push_back({ "Animations (*.bvh; *.anim)", "bvh;anim" });
+            break;
+        case LLFilePicker::FFLOAD_GLTF:
+            filter_vec.push_back({ "glTF (*.gltf; *.glb)", "gltf;glb" });
+            break;
+        case LLFilePicker::FFLOAD_COLLADA:
+            filter_vec.push_back({ "Scene (*.dae)", "dae" });
+            break;
+        case LLFilePicker::FFLOAD_XML:
+            filter_vec.push_back({ "XML files (*.xml)", "xml" });
+            break;
+        case LLFilePicker::FFLOAD_SLOBJECT:
+            filter_vec.push_back({ "Objects (*.slobject)", "slobject" });
+            break;
+        case LLFilePicker::FFLOAD_RAW:
+            filter_vec.push_back({ "RAW files (*.raw)", "raw" });
+            break;
+        case LLFilePicker::FFLOAD_MODEL:
+            filter_vec.push_back({ "Model files (*.dae; *.gltf; *.glb)", "dae;gltf;glb" });
+            filter_vec.push_back({ "Collada files (*.dae)", "dae" });
+            filter_vec.push_back({ "GLTF Files (*.gltf; *.glb)", "gltf;glb" });
+            break;
+        case LLFilePicker::FFLOAD_MATERIAL:
+            filter_vec.push_back({ "GLTF Files (*.gltf; *.glb)", "gltf;glb" });
+            break;
+        case LLFilePicker::FFLOAD_MATERIAL_TEXTURE:
+            filter_vec.push_back({ "GLTF Import (*.gltf; *.glb; *.tga; *.bmp; *.jpg; *.jpeg; *.png)", "gltf;glb;tga;bmp;jpg;jpeg;png" });
+            filter_vec.push_back({ "GLTF Files (*.gltf; *.glb)", "gltf;glb" });
+            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)", "tga;bmp;jpg;jpeg;png;webp" });
+            break;
+        case LLFilePicker::FFLOAD_HDRI:
+            filter_vec.push_back({ "HDRI Files (*.exr)", "exr" });
+            break;
+        case LLFilePicker::FFLOAD_SCRIPT:
+            filter_vec.push_back({ "Script files (*.lsl; *.lua; *.luau)", "lsl;lua;luau" });
+            break;
+        case LLFilePicker::FFLOAD_DICTIONARY:
+            filter_vec.push_back({ "Dictionary files (*.dic; *.xcu)", "dic;xcu" });
+            break;
+        case LLFilePicker::FFLOAD_ZIP:
+            filter_vec.push_back({ "ZIP files (*.zip)", "zip" });
+            break;
+        default:
+            break;
+        }
+        return filter_vec;
+    }
+}
+
+bool LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
+{
+    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    return false;
+}
+
+bool LLFilePicker::getOpenFileModeless(ELoadFilter filter,
+    void (*callback)(bool, std::vector<std::string>&, void*),
+    void* userdata)
+{
+    if (mLocked)
+    {
+        return false;
+    }
+
+    // if local file browsing is turned off, return without opening dialog
+    if (!check_local_file_access_enabled())
+    {
+        return false;
+    }
+
+    auto file_filters = setupLoadFilter(filter);
+
+    reset();
+
+    {
+        struct LLSDLFileUserdata
+        {
+            LLSDLFileUserdata(void (*callback_func)(bool, std::vector<std::string>&, void*), void* callback_userdata)
+                : mCallback(callback_func), mUserdata(callback_userdata)
+            {
+            }
+            void (*mCallback)(bool, std::vector<std::string>&, void*);
+            void* mUserdata;
+        };
+
+        auto sdl_callback = [](void* userdata, const char* const* filelist, int filter)
+            {
+                LLSDLFileUserdata* callback_struct = (LLSDLFileUserdata*)userdata;
+
+                auto* callback_func = callback_struct->mCallback;
+                auto* callback_data = callback_struct->mUserdata;
+                delete callback_struct; // delete callback container
+
+                std::vector<std::string> rtn;
+
+                if (!filelist)
+                {
+                    LL_WARNS() << "Error during SDL file picking: " << SDL_GetError() << LL_ENDL;
+                    callback_func(false, rtn, callback_data);
+                    return;
+                }
+                else if (!*filelist)
+                {
+                    LL_INFOS() << "User did not select any file. Dialog likely cancelled." << LL_ENDL;
+                    callback_func(false, rtn, callback_data);
+                    return;
+                }
+
+                while (*filelist)
+                {
+                    rtn.push_back(std::string(*filelist));
+                    filelist++;
+                }
+
+                callback_func(true, rtn, callback_data);
+
+            };
+
+        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata);
+
+        SDL_PropertiesID props = SDL_CreateProperties();
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, file_filters.data());
+        SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, file_filters.size());
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, SDL_GL_GetCurrentWindow());
+        SDL_SetBooleanProperty(props, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, false);
+
+        SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFILE, sdl_callback, llfilecallback, props);
+
+        SDL_DestroyProperties(props);
+    }
+    return true;
+}
+
+bool LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
+{
+    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    return false;
+}
+
+bool LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
+    void (*callback)(bool, std::vector<std::string>&, void*),
+    void* userdata)
+{
+    if (mLocked)
+    {
+        return false;
+    }
+
+    // if local file browsing is turned off, return without opening dialog
+    if (!check_local_file_access_enabled())
+    {
+        return false;
+    }
+
+    auto file_filters = setupLoadFilter(filter);
+
+    reset();
+
+    {
+        struct LLSDLFileUserdata
+        {
+            LLSDLFileUserdata(void (*callback_func)(bool, std::vector<std::string>&, void*), void* callback_userdata)
+                : mCallback(callback_func), mUserdata(callback_userdata)
+            {
+            }
+            void (*mCallback)(bool, std::vector<std::string>&, void*);
+            void* mUserdata;
+        };
+
+        auto sdl_callback = [](void* userdata, const char* const* filelist, int filter)
+            {
+                LLSDLFileUserdata* callback_struct = (LLSDLFileUserdata*)userdata;
+
+                auto* callback_func = callback_struct->mCallback;
+                auto* callback_data = callback_struct->mUserdata;
+                delete callback_struct; // delete callback container
+
+                std::vector<std::string> rtn;
+
+                if (!filelist)
+                {
+                    LL_WARNS() << "Error during SDL file picking: " << SDL_GetError() << LL_ENDL;
+                    callback_func(false, rtn, callback_data);
+                    return;
+                }
+                else if (!*filelist)
+                {
+                    LL_INFOS() << "User did not select any file. Dialog likely cancelled." << LL_ENDL;
+                    callback_func(false, rtn, callback_data);
+                    return;
+                }
+
+                while (*filelist)
+                {
+                    rtn.push_back(std::string(*filelist));
+                    filelist++;
+                }
+
+                callback_func(true, rtn, callback_data);
+
+            };
+
+        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata);
+
+        SDL_PropertiesID props = SDL_CreateProperties();
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, file_filters.data());
+        SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, file_filters.size());
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, SDL_GL_GetCurrentWindow());
+        SDL_SetBooleanProperty(props, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, true);
+
+        SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFILE, sdl_callback, llfilecallback, props);
+
+        SDL_DestroyProperties(props);
+    }
+
+    return true;
+}
+
+bool LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, bool blocking)
+{
+    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    return false;
+}
+
+bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
+    const std::string& filename,
+    void (*callback)(bool, std::string&, void*),
+    void* userdata)
+{
+    if (mLocked)
+    {
+        return false;
+    }
+
+    // if local file browsing is turned off, return without opening dialog
+    if (!check_local_file_access_enabled())
+    {
+        return false;
+    }
+
+    std::string default_filename;
+    if (!filename.empty())
+    {
+        default_filename = filename;
+    }
+
+    std::vector<SDL_DialogFileFilter> file_filters;
+
     switch (filter)
     {
-    case FFLOAD_ALL:
-        break;
-    case FFLOAD_EXE:
-#if LL_WINDOWS
-        filter_vec.emplace_back(nfdfilteritem_t{"Executables", "exe"});
-#endif
-        break;
-    case FFLOAD_WAV:
-        filter_vec.emplace_back(nfdfilteritem_t{"Sounds", "wav"});
-        break;
-    case FFLOAD_IMAGE:
-        filter_vec.emplace_back(nfdfilteritem_t{"Images", "tga,bmp,jpg,jpeg,png,webp"});
-        break;
-    case FFLOAD_ANIM:
-        filter_vec.emplace_back(nfdfilteritem_t{"Animations", "bvh,anim"});
-        break;
-    case FFLOAD_GLTF:
-        filter_vec.emplace_back(nfdfilteritem_t{"GLTF Files", "gltf,glb"});
-        break;
-    case FFLOAD_COLLADA:
-        filter_vec.emplace_back(nfdfilteritem_t{"Scene", "dae"});
-        break;
-    case FFLOAD_XML:
-        filter_vec.emplace_back(nfdfilteritem_t{"XML files", "xml"});
-        break;
-    case FFLOAD_SLOBJECT:
-        filter_vec.emplace_back(nfdfilteritem_t{"Objects", "slobject"});
-        break;
-    case FFLOAD_RAW:
-        filter_vec.emplace_back(nfdfilteritem_t{"RAW files", "raw"});
-        break;
-    case FFLOAD_MODEL:
-        filter_vec.emplace_back(nfdfilteritem_t{"Model files", "dae"});
-        break;
-    case FFLOAD_MATERIAL:
-        filter_vec.emplace_back(nfdfilteritem_t{"GLTF Files", "gltf,glb"});
-        break;
-    case FFLOAD_MATERIAL_TEXTURE:
-        filter_vec.emplace_back(nfdfilteritem_t{"GLTF Import", "gltf,glb,tga,bmp,jpg,jpeg,png"});
-        filter_vec.emplace_back(nfdfilteritem_t{"GLTF Files", "gltf,glb"});
-        filter_vec.emplace_back(nfdfilteritem_t{"Images", "tga,bmp,jpg,jpeg,png,webp"});
-        break;
-    case FFLOAD_SCRIPT:
-        filter_vec.emplace_back(nfdfilteritem_t{"Script files", "lsl"});
-        break;
-    case FFLOAD_DICTIONARY:
-        filter_vec.emplace_back(nfdfilteritem_t{"Dictionary files", "dic,xcu"});
-        break;
-    case FFLOAD_ZIP:
-        filter_vec.emplace_back(nfdfilteritem_t{"ZIP files", "zip"});
-    default:
-        break;
-    }
-    return filter_vec;
-}
-
-BOOL LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
-{
-    if( mLocked )
-    {
-        return FALSE;
-    }
-    BOOL success = FALSE;
-
-    // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
-    {
-        return FALSE;
-    }
-
-    // initialize NFD
-    NFD::Guard nfdGuard;
-
-    // auto-freeing memory
-    NFD::UniquePath outPath;
-
-    // prepare filters for the dialog
-    auto filterItem = setupFilter(filter);
-    //
-    if (blocking)
-    {
-        // Modal, so pause agent
-        send_agent_pause();
-    }
-
-    reset();
-
-    // show the dialog
-    nfdresult_t result = NFD::OpenDialog(outPath, filterItem.data(), filterItem.size());
-    if (result == NFD_OKAY)
-    {
-        mFiles.push_back(outPath.get());
-        success = TRUE;
-    }
-
-    if (blocking)
-    {
-        send_agent_resume();
-        // Account for the fact that the app has been stalled.
-        LLFrameTimer::updateFrameTime();
-    }
-
-    return success;
-}
-
-BOOL LLFilePicker::getOpenFileModeless(ELoadFilter filter,
-                                       void (*callback)(bool, std::vector<std::string> &, void*),
-                                       void *userdata)
-{
-    if( mLocked )
-        return FALSE;
-
-    // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
-    {
-        return FALSE;
-    }
-
-    reset();
-    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
-    return FALSE;
-}
-
-BOOL LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
-{
-    if( mLocked )
-    {
-        return FALSE;
-    }
-    BOOL success = FALSE;
-
-    // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
-    {
-        return FALSE;
-    }
-
-    // initialize NFD
-    NFD::Guard nfdGuard;
-
-    auto filterItem = setupFilter(filter);
-
-    reset();
-
-    if (blocking)
-    {
-        // Modal, so pause agent
-        send_agent_pause();
-    }
-
-    // auto-freeing memory
-    NFD::UniquePathSet outPaths;
-
-    // show the dialog
-    nfdresult_t result = NFD::OpenDialogMultiple(outPaths, filterItem.data(), filterItem.size());
-    if (result == NFD_OKAY)
-    {
-        LL_INFOS() << "Success!" << LL_ENDL;
-
-        nfdpathsetsize_t numPaths;
-        NFD::PathSet::Count(outPaths, numPaths);
-
-        nfdpathsetsize_t i;
-        for (i = 0; i < numPaths; ++i)
-        {
-            NFD::UniquePathSetPath path;
-            NFD::PathSet::GetPath(outPaths, i, path);
-            mFiles.push_back(path.get());
-            LL_INFOS() << "Path " << i << ": " << path.get() << LL_ENDL;
-        }
-        success = TRUE;
-    }
-    else if (result == NFD_CANCEL)
-    {
-        LL_INFOS() << "User pressed cancel." << LL_ENDL;
-    }
-    else
-    {
-        LL_INFOS() << "Error: " << NFD::GetError() << LL_ENDL;
-    }
-
-    if (blocking)
-    {
-        send_agent_resume();
-
-        // Account for the fact that the app has been stalled.
-        LLFrameTimer::updateFrameTime();
-    }
-
-    return success;
-}
-
-BOOL LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
-                                                void (*callback)(bool, std::vector<std::string> &, void*),
-                                                void *userdata )
-{
-    if( mLocked )
-        return FALSE;
-
-    // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
-    {
-        return FALSE;
-    }
-
-    reset();
-
-    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
-    return FALSE;
-}
-
-BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, bool blocking)
-{
-    if( mLocked )
-    {
-        return FALSE;
-    }
-    BOOL success = FALSE;
-
-    // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
-    {
-        return FALSE;
-    }
-
-    // initialize NFD
-    NFD::Guard nfdGuard;
-
-    std::vector<nfdfilteritem_t> filter_vec;
-    std::string saved_filename = filename;
-    switch( filter )
-    {
     case FFSAVE_ALL:
-        filter_vec.emplace_back(nfdfilteritem_t{"WAV Sounds", "wav"});
-        filter_vec.emplace_back(nfdfilteritem_t{"Targa, Bitmap Images", "tga,bmp"});
+        file_filters.push_back({ "All Files (*.*)", "*" });
+        file_filters.push_back({ "WAV Sounds (*.wav)", "wav" });
+        file_filters.push_back({ "Targa, Bitmap Images (*.tga; *.bmp)", "tga;bmp" });
         break;
     case FFSAVE_WAV:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.wav";
+            default_filename = "untitled.wav";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"WAV Sounds", "wav"});
+        file_filters.push_back({ "WAV Sounds (*.wav)", "wav" });
         break;
     case FFSAVE_TGA:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.tga";
+            default_filename = "untitled.tga";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"Targa Images", "tga"});
+        file_filters.push_back({ "Targa Images (*.tga)", "tga" });
         break;
     case FFSAVE_BMP:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.bmp";
+            default_filename = "untitled.bmp";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"Bitmap Images", "bmp"});
+        file_filters.push_back({ "Bitmap Images (*.bmp)", "bmp" });
         break;
     case FFSAVE_PNG:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.png";
+            default_filename = "untitled.png";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"PNG Images", "png"});
+        file_filters.push_back({ "PNG Images (*.png)", "png" });
         break;
     case FFSAVE_WEBP:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.webp";
+            default_filename = "untitled.webp";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"WebP Images", "webp"});
+        file_filters.push_back({ "WebP Images (*.webp)", "webp" });
         break;
-    case FFSAVE_TGAPNGWEBP:
-        if (filename.empty())
+    case FFSAVE_TGAPNG:
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.png";
+            //PNG by default
+            default_filename = "untitled.png";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"PNG Images", "png"});
-        filter_vec.emplace_back(nfdfilteritem_t{"Targa Images", "tga"});
-        filter_vec.emplace_back(nfdfilteritem_t{"Jpeg Images", "jpg,jpeg"});
-        filter_vec.emplace_back(nfdfilteritem_t{"Jpeg2000 Images", "j2c"});
-        filter_vec.emplace_back(nfdfilteritem_t{"Bitmap Images", "bmp"});
-        filter_vec.emplace_back(nfdfilteritem_t{"WebP Images", "webp"});
+        file_filters.push_back({ "PNG Images (*.png)", "png" });
+        file_filters.push_back({ "Targa Images (*.tga)", "tga" });
+        file_filters.push_back({ "WebP Images (*.webp)", "webp" });
         break;
+
     case FFSAVE_JPEG:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.jpeg";
+            default_filename = "untitled.jpeg";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"Jpeg Images", "jpg,jpeg"});
+        file_filters.push_back({ "JPEG Images (*.jpg *.jpeg)", "jpg;jpeg" });
         break;
     case FFSAVE_AVI:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.avi";
+            default_filename = "untitled.avi";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"AVI Movie File", "avi"});
+        file_filters.push_back({ "AVI Movie File (*.avi)", "avi" });
         break;
     case FFSAVE_ANIM:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.xaf";
+            default_filename = "untitled.xaf";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"XAF Anim File", "xaf"});
+        file_filters.push_back({ "XAF Anim File (*.xaf)", "xaf" });
+        break;
+    case FFSAVE_GLTF:
+        if (default_filename.empty())
+        {
+            default_filename = "untitled.gltf";
+        }
+        file_filters.push_back({ "glTF Asset File (*.gltf)", "gltf" });
         break;
     case FFSAVE_CSV:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.csv";
+            default_filename = "untitled.csv";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"Comma seperated values", "csv"});
+        file_filters.push_back({ "Comma seperated values (*.csv)", "csv" });
         break;
     case FFSAVE_XML:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.xml";
+            default_filename = "untitled.xml";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"XML File", "xml"});
+        file_filters.push_back({ "XML File (*.xml)", "xml" });
         break;
     case FFSAVE_COLLADA:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.collada";
+            default_filename = "untitled.collada";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"COLLADA File", "collada"});
+        file_filters.push_back({ "COLLADA File (*.collada)", "collada" });
         break;
     case FFSAVE_RAW:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.raw";
+            default_filename = "untitled.raw";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"RAW files", "raw"});
+        file_filters.push_back({ "RAW files (*.raw)", "raw" });
         break;
     case FFSAVE_J2C:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.j2c";
+            default_filename = "untitled.j2c";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"Compressed Images", "j2c"});
+        file_filters.push_back({ "Compressed Images (*.j2c)", "j2c" });
         break;
     case FFSAVE_SCRIPT:
-        if (filename.empty())
+        if (default_filename.empty())
         {
-            saved_filename = "untitled.lsl";
+            default_filename = "untitled.lsl";
         }
-        filter_vec.emplace_back(nfdfilteritem_t{"LSL Files", "lsl"});
+        file_filters.push_back({ "Script files (*.lsl; *.lua; *.luau)", "lsl;lua;luau" });
         break;
     default:
-        return FALSE;
+        return false;
     }
 
     reset();
 
-    if (blocking)
     {
-        // Modal, so pause agent
-        send_agent_pause();
+        struct LLSDLFileUserdata
+        {
+            LLSDLFileUserdata(void (*callback_func)(bool, std::string&, void*), void* callback_userdata)
+                : mCallback(callback_func), mUserdata(callback_userdata)
+            {
+            }
+            void (*mCallback)(bool, std::string&, void*);
+            void* mUserdata;
+        };
+
+        auto sdl_callback = [](void* userdata, const char* const* filelist, int filter)
+            {
+                LLSDLFileUserdata* callback_struct = (LLSDLFileUserdata*)userdata;
+
+                auto* callback_func = callback_struct->mCallback;
+                auto* callback_data = callback_struct->mUserdata;
+                delete callback_struct; // delete callback container
+
+                std::string rtn;
+                if (!filelist)
+                {
+                    LL_WARNS() << "Error during SDL file picking: " << SDL_GetError() << LL_ENDL;
+                    callback_func(false, rtn, callback_data);
+                    return;
+                }
+                else if (!*filelist)
+                {
+                    LL_INFOS() << "User did not select any file. Dialog likely cancelled." << LL_ENDL;
+                    callback_func(false, rtn, callback_data);
+                    return;
+                }
+
+                while (*filelist) {
+                    rtn = std::string(*filelist);
+                    break;
+                }
+                callback_func(true, rtn, callback_data);
+
+            };
+
+        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata);
+
+        SDL_PropertiesID props = SDL_CreateProperties();
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, file_filters.data());
+        SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, file_filters.size());
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, SDL_GL_GetCurrentWindow());
+
+        // Disabled default file name functionality currently due to inconsistency between various SDL3 backends
+        // if(!default_filename.empty())
+        // {
+        //     SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, default_filename.c_str());
+        // }
+        SDL_SetBooleanProperty(props, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, false);
+
+        SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_SAVEFILE, sdl_callback, llfilecallback, props);
+
+        SDL_DestroyProperties(props);
     }
 
-    {
-        NFD::UniquePath savePath;
-
-        // show the dialog
-        nfdresult_t result = NFD::SaveDialog(savePath, filter_vec.data(), filter_vec.size(), NULL, saved_filename.c_str());
-        if (result == NFD_OKAY) {
-            mFiles.push_back(savePath.get());
-            success = TRUE;
-        }
-        gKeyboard->resetKeys();
-    }
-
-    if (blocking)
-    {
-        send_agent_resume();
-
-        // Account for the fact that the app has been stalled.
-        LLFrameTimer::updateFrameTime();
-    }
-
-    return success;
-}
-
-BOOL LLFilePicker::getSaveFileModeless(ESaveFilter filter,
-                                       const std::string& filename,
-                                       void (*callback)(bool, std::string&, void*),
-                                       void *userdata)
-{
-    if( mLocked )
-        return FALSE;
-
-    // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
-    {
-        return FALSE;
-    }
-
-    reset();
-    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
-    return FALSE;
+    return true;
 }
 #elif LL_WINDOWS
 
-BOOL LLFilePicker::setupFilter(ELoadFilter filter)
+bool LLFilePicker::setupFilter(ELoadFilter filter)
 {
-    BOOL res = TRUE;
+    bool res = true;
     switch (filter)
     {
     case FFLOAD_ALL:
+    case FFLOAD_EXE:
         mOFN.lpstrFilter = L"All Files (*.*)\0*.*\0" \
         SOUND_FILTER \
         IMAGE_FILTER \
         ANIM_FILTER \
         MATERIAL_FILTER \
         L"\0";
-        break;
-    case FFLOAD_EXE:
-        mOFN.lpstrFilter = EXECUTABLE_FILTER \
-            L"\0";
         break;
     case FFLOAD_WAV:
         mOFN.lpstrFilter = SOUND_FILTER \
@@ -631,6 +682,8 @@ BOOL LLFilePicker::setupFilter(ELoadFilter filter)
         break;
     case FFLOAD_MODEL:
         mOFN.lpstrFilter = MODEL_FILTER \
+            COLLADA_FILTER \
+            MATERIAL_FILTER \
             L"\0";
         break;
     case FFLOAD_MATERIAL:
@@ -660,24 +713,24 @@ BOOL LLFilePicker::setupFilter(ELoadFilter filter)
             L"\0";
         break;
     default:
-        res = FALSE;
+        res = false;
         break;
     }
     return res;
 }
 
-BOOL LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
+bool LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
 {
-    if( mLocked )
+    if (mLocked)
     {
-        return FALSE;
+        return false;
     }
-    BOOL success = FALSE;
+    bool success = false;
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
     // don't provide default file selection
@@ -703,7 +756,7 @@ BOOL LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
     success = GetOpenFileName(&mOFN);
     if (success)
     {
-        std::string filename = ll_convert_wide_to_string(mFilesW);
+        std::string filename = ll_convert<std::string>(std::wstring(mFilesW));
         mFiles.push_back(filename);
     }
 
@@ -717,27 +770,27 @@ BOOL LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
     return success;
 }
 
-BOOL LLFilePicker::getOpenFileModeless(ELoadFilter filter,
+bool LLFilePicker::getOpenFileModeless(ELoadFilter filter,
                                        void (*callback)(bool, std::vector<std::string> &, void*),
                                        void *userdata)
 {
     // not supposed to be used yet, use LLFilePickerThread
     LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
-    return FALSE;
+    return false;
 }
 
-BOOL LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
+bool LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
 {
     if( mLocked )
     {
-        return FALSE;
+        return false;
     }
-    BOOL success = FALSE;
+    bool success = false;
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
     // don't provide default file selection
@@ -769,7 +822,7 @@ BOOL LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
         // lengths.
         if( wcslen(mOFN.lpstrFile) > mOFN.nFileOffset ) /*Flawfinder: ignore*/
         {
-            std::string filename = ll_convert_wide_to_string(mFilesW);
+            std::string filename = ll_convert<std::string>(std::wstring(mFilesW));
             mFiles.push_back(filename);
         }
         else
@@ -783,7 +836,7 @@ BOOL LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
                     break;
                 if (*tptrw == 0)
                     tptrw++; // shouldn't happen?
-                std::string filename = ll_convert_wide_to_string(tptrw);
+                std::string filename = ll_convert<std::string>(std::wstring(tptrw));
                 if (dirname.empty())
                     dirname = filename + "\\";
                 else
@@ -803,33 +856,33 @@ BOOL LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
     return success;
 }
 
-BOOL LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
+bool LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
                                                 void (*callback)(bool, std::vector<std::string> &, void*),
                                                 void *userdata )
 {
     // not supposed to be used yet, use LLFilePickerThread
     LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
-    return FALSE;
+    return false;
 }
 
-BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, bool blocking)
+bool LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, bool blocking)
 {
     if( mLocked )
     {
-        return FALSE;
+        return false;
     }
-    BOOL success = FALSE;
+    bool success = false;
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
     mOFN.lpstrFile = mFilesW;
     if (!filename.empty())
     {
-        std::wstring tstring = ll_convert_string_to_wide(filename);
+        std::wstring tstring = ll_convert<std::wstring>(filename);
         wcsncpy(mFilesW, tstring.c_str(), FILENAME_BUFFER_SIZE);    }   /*Flawfinder: ignore*/
     else
     {
@@ -897,7 +950,7 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
             L"WebP Images (*.webp)\0*.webp\0" \
             L"\0";
         break;
-    case FFSAVE_TGAPNGWEBP:
+    case FFSAVE_TGAPNG:
         if (filename.empty())
         {
             wcsncpy( mFilesW,L"untitled.png", FILENAME_BUFFER_SIZE);    /*Flawfinder: ignore*/
@@ -907,9 +960,6 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
         mOFN.lpstrFilter =
             L"PNG Images (*.png)\0*.png\0" \
             L"Targa Images (*.tga)\0*.tga\0" \
-            L"Jpeg Images (*.jpg)\0*.jpg\0" \
-            L"Jpeg2000 Images (*.j2c)\0*.j2c\0" \
-            L"Bitmap Images (*.bmp)\0*.bmp\0" \
             L"WebP Images (*.webp)\0*.webp\0" \
             L"\0";
         break;
@@ -947,11 +997,11 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
     case FFSAVE_GLTF:
         if (filename.empty())
         {
-            wcsncpy( mFilesW,L"untitled.glb", FILENAME_BUFFER_SIZE);    /*Flawfinder: ignore*/
+            wcsncpy( mFilesW,L"untitled.gltf", FILENAME_BUFFER_SIZE);   /*Flawfinder: ignore*/
         }
-        mOFN.lpstrDefExt = L"glb";
+        mOFN.lpstrDefExt = L"gltf";
         mOFN.lpstrFilter =
-            L"glTF Asset File (*.gltf *.glb)\0*.gltf;*.glb\0" \
+            L"glTF Asset File (*.gltf)\0*.gltf\0" \
             L"\0";
         break;
     case FFSAVE_CSV:
@@ -1014,7 +1064,7 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
         mOFN.lpstrFilter = L"LSL Files (*.lsl)\0*.lsl\0" L"\0";
         break;
     default:
-        return FALSE;
+        return false;
     }
 
 
@@ -1036,7 +1086,7 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
             success = GetSaveFileName(&mOFN);
             if (success)
             {
-                std::string filename = ll_convert_wide_to_string(mFilesW);
+                std::string filename = ll_convert<std::string>(std::wstring(mFilesW));
                 mFiles.push_back(filename);
             }
         }
@@ -1057,14 +1107,14 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
     return success;
 }
 
-BOOL LLFilePicker::getSaveFileModeless(ESaveFilter filter,
+bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
                                        const std::string& filename,
                                        void (*callback)(bool, std::string&, void*),
                                        void *userdata)
 {
     // not supposed to be used yet, use LLFilePickerThread
     LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
-    return FALSE;
+    return false;
 }
 
 #elif LL_DARWIN
@@ -1076,36 +1126,36 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
     {
         case FFLOAD_ALL:
         case FFLOAD_EXE:
-            allowedv->emplace_back("app");
-            allowedv->emplace_back("exe");
-            allowedv->emplace_back("wav");
-            allowedv->emplace_back("bvh");
-            allowedv->emplace_back("anim");
-            allowedv->emplace_back("dae");
-            allowedv->emplace_back("raw");
-            allowedv->emplace_back("lsl");
-            allowedv->emplace_back("dic");
-            allowedv->emplace_back("xcu");
-            allowedv->emplace_back("gif");
-            allowedv->emplace_back("gltf");
-            allowedv->emplace_back("glb");
+            allowedv->push_back("app");
+            allowedv->push_back("exe");
+            allowedv->push_back("wav");
+            allowedv->push_back("bvh");
+            allowedv->push_back("anim");
+            allowedv->push_back("dae");
+            allowedv->push_back("raw");
+            allowedv->push_back("lsl");
+            allowedv->push_back("dic");
+            allowedv->push_back("xcu");
+            allowedv->push_back("gif");
+            allowedv->push_back("gltf");
+            allowedv->push_back("glb");
         case FFLOAD_IMAGE:
-            allowedv->emplace_back("jpg");
-            allowedv->emplace_back("jpeg");
-            allowedv->emplace_back("bmp");
-            allowedv->emplace_back("tga");
-            allowedv->emplace_back("bmpf");
-            allowedv->emplace_back("tpic");
-            allowedv->emplace_back("png");
-            allowedv->emplace_back("webp");
+            allowedv->push_back("jpg");
+            allowedv->push_back("jpeg");
+            allowedv->push_back("bmp");
+            allowedv->push_back("tga");
+            allowedv->push_back("bmpf");
+            allowedv->push_back("tpic");
+            allowedv->push_back("png");
+            allowedv->push_back("webp");
             break;
             break;
         case FFLOAD_WAV:
-            allowedv->emplace_back("wav");
+            allowedv->push_back("wav");
             break;
         case FFLOAD_ANIM:
-            allowedv->emplace_back("bvh");
-            allowedv->emplace_back("anim");
+            allowedv->push_back("bvh");
+            allowedv->push_back("anim");
             break;
         case FFLOAD_GLTF:
         case FFLOAD_MATERIAL:
@@ -1114,24 +1164,29 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
             break;
         case FFLOAD_HDRI:
             allowedv->push_back("exr");
+        case FFLOAD_MODEL:
+            allowedv->push_back("gltf");
+            allowedv->push_back("glb");
         case FFLOAD_COLLADA:
-            allowedv->emplace_back("dae");
+            allowedv->push_back("dae");
             break;
         case FFLOAD_XML:
-            allowedv->emplace_back("xml");
+            allowedv->push_back("xml");
             break;
         case FFLOAD_RAW:
-            allowedv->emplace_back("raw");
+            allowedv->push_back("raw");
             break;
         case FFLOAD_SCRIPT:
-            allowedv->emplace_back("lsl");
+            allowedv->push_back("lsl");
+            allowedv->push_back("lua");
+            allowedv->push_back("luau");
             break;
         case FFLOAD_DICTIONARY:
-            allowedv->emplace_back("dic");
-            allowedv->emplace_back("xcu");
+            allowedv->push_back("dic");
+            allowedv->push_back("xcu");
             break;
         case FFLOAD_ZIP:
-            allowedv->emplace_back("zip");
+            allowedv->push_back("zip");
             break;
         case FFLOAD_DIRECTORY:
             break;
@@ -1142,10 +1197,10 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
     return allowedv;
 }
 
-bool    LLFilePicker::doNavChooseDialog(ELoadFilter filter)
+bool LLFilePicker::doNavChooseDialog(ELoadFilter filter)
 {
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
         return false;
     }
@@ -1159,6 +1214,7 @@ bool    LLFilePicker::doNavChooseDialog(ELoadFilter filter)
 
     gViewerWindow->getWindow()->afterDialog();
 
+
     if (filev && filev->size() > 0)
     {
         mFiles.insert(mFiles.end(), filev->begin(), filev->end());
@@ -1168,12 +1224,12 @@ bool    LLFilePicker::doNavChooseDialog(ELoadFilter filter)
     return false;
 }
 
-bool    LLFilePicker::doNavChooseDialogModeless(ELoadFilter filter,
+bool LLFilePicker::doNavChooseDialogModeless(ELoadFilter filter,
                                                 void (*callback)(bool, std::vector<std::string> &,void*),
                                                 void *userdata)
 {
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
         return false;
     }
@@ -1193,63 +1249,95 @@ void set_nav_save_data(LLFilePicker::ESaveFilter filter, std::string &extension,
     switch (filter)
     {
         case LLFilePicker::FFSAVE_WAV:
+            type = "WAVE";
+            creator = "TVOD";
             extension = "wav";
             break;
         case LLFilePicker::FFSAVE_TGA:
+            type = "TPIC";
+            creator = "prvw";
             extension = "tga";
             break;
-        case LLFilePicker::FFSAVE_TGAPNGWEBP:
-            extension = "png,tga,jpg,jpeg,j2c,bmp,bmpf,webp";
+        case LLFilePicker::FFSAVE_TGAPNG:
+            type = "PNG";
+            creator = "prvw";
+            extension = "png,tga,webp";
             break;
         case LLFilePicker::FFSAVE_BMP:
-            extension = "bmp,bmpf";
+            type = "BMPf";
+            creator = "prvw";
+            extension = "bmp";
             break;
         case LLFilePicker::FFSAVE_JPEG:
+            type = "JPEG";
+            creator = "prvw";
             extension = "jpeg";
             break;
         case LLFilePicker::FFSAVE_PNG:
+            type = "PNG ";
+            creator = "prvw";
             extension = "png";
             break;
         case LLFilePicker::FFSAVE_WEBP:
             extension = "webp";
+            type = "WEBP";
+            creator = "prvw";
             break;
         case LLFilePicker::FFSAVE_AVI:
+            type = "\?\?\?\?";
+            creator = "\?\?\?\?";
             extension = "mov";
             break;
 
         case LLFilePicker::FFSAVE_ANIM:
+            type = "\?\?\?\?";
+            creator = "\?\?\?\?";
             extension = "xaf";
             break;
         case LLFilePicker::FFSAVE_GLTF:
-            extension = "glb";
+            type = "\?\?\?\?";
+            creator = "\?\?\?\?";
+            extension = "gltf";
             break;
 
         case LLFilePicker::FFSAVE_XML:
+            type = "\?\?\?\?";
+            creator = "\?\?\?\?";
             extension = "xml";
             break;
         case LLFilePicker::FFSAVE_CSV:
+            type = "\?\?\?\?";
+            creator = "\?\?\?\?";
             extension = "csv";
             break;
         case LLFilePicker::FFSAVE_RAW:
+            type = "\?\?\?\?";
+            creator = "\?\?\?\?";
             extension = "raw";
             break;
 
         case LLFilePicker::FFSAVE_J2C:
+            type = "\?\?\?\?";
+            creator = "prvw";
             extension = "j2c";
             break;
 
         case LLFilePicker::FFSAVE_SCRIPT:
-            extension = "lsl";
+            type = "LSL ";
+            creator = "\?\?\?\?";
+            extension = "lsl;lua;luau";
             break;
 
         case LLFilePicker::FFSAVE_ALL:
         default:
+            type = "\?\?\?\?";
+            creator = "\?\?\?\?";
             extension = "";
             break;
     }
 }
 
-bool    LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filename)
+bool LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filename)
 {
     // Setup the type, creator, and extension
     std::string     extension, type, creator;
@@ -1263,6 +1351,8 @@ bool    LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& fil
 
     // Run the dialog
     std::unique_ptr<std::string> filev = doSaveDialog(&namestring,
+                 &type,
+                 &creator,
                  &extension,
                  mPickOptions);
 
@@ -1277,7 +1367,7 @@ bool    LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& fil
     return false;
 }
 
-bool    LLFilePicker::doNavSaveDialogModeless(ESaveFilter filter,
+bool LLFilePicker::doNavSaveDialogModeless(ESaveFilter filter,
                                               const std::string& filename,
                                               void (*callback)(bool, std::string&, void*),
                                               void *userdata)
@@ -1301,17 +1391,17 @@ bool    LLFilePicker::doNavSaveDialogModeless(ESaveFilter filter,
     return true;
 }
 
-BOOL LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
+bool LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
 {
     if( mLocked )
-        return FALSE;
+        return false;
 
-    BOOL success = FALSE;
+    bool success = false;
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
     reset();
@@ -1321,7 +1411,6 @@ BOOL LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
 
     if (filter == FFLOAD_DIRECTORY) //This should only be called from lldirpicker.
     {
-
         mPickOptions |= ( F_NAV_SUPPORT | F_DIRECTORY );
         mPickOptions &= ~F_FILE;
     }
@@ -1357,17 +1446,17 @@ BOOL LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
 }
 
 
-BOOL LLFilePicker::getOpenFileModeless(ELoadFilter filter,
+bool LLFilePicker::getOpenFileModeless(ELoadFilter filter,
                                        void (*callback)(bool, std::vector<std::string> &, void*),
                                        void *userdata)
 {
-    if( mLocked )
-        return FALSE;
+    if (mLocked)
+        return false;
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
     reset();
@@ -1390,18 +1479,18 @@ BOOL LLFilePicker::getOpenFileModeless(ELoadFilter filter,
     return doNavChooseDialogModeless(filter, callback, userdata);
 }
 
-BOOL LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
+bool LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
 {
-    if( mLocked )
-        return FALSE;
+    if (mLocked)
+        return false;
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
-    BOOL success = FALSE;
+    bool success = false;
 
     reset();
 
@@ -1436,17 +1525,17 @@ BOOL LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
 }
 
 
-BOOL LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
+bool LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
                                                 void (*callback)(bool, std::vector<std::string> &, void*),
                                                 void *userdata )
 {
-    if( mLocked )
-        return FALSE;
+    if (mLocked)
+        return false;
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
     reset();
@@ -1458,15 +1547,16 @@ BOOL LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
     return doNavChooseDialogModeless(filter, callback, userdata);
 }
 
-BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, bool blocking)
+bool LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, bool blocking)
 {
 
-    if( mLocked )
+    if (mLocked)
         return false;
-    BOOL success = false;
+
+    bool success = false;
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
         return false;
     }
@@ -1499,16 +1589,16 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
     return success;
 }
 
-BOOL LLFilePicker::getSaveFileModeless(ESaveFilter filter,
+bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
                                        const std::string& filename,
                                        void (*callback)(bool, std::string&, void*),
                                        void *userdata)
 {
-    if( mLocked )
+    if (mLocked)
         return false;
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
         return false;
     }
@@ -1526,13 +1616,13 @@ BOOL LLFilePicker::getSaveFileModeless(ESaveFilter filter,
 // Hacky stubs designed to facilitate fake getSaveFile and getOpenFile with
 // static results, when we don't have a real filepicker.
 
-BOOL LLFilePicker::getSaveFile( ESaveFilter filter, const std::string& filename, bool blocking )
+bool LLFilePicker::getSaveFile( ESaveFilter filter, const std::string& filename, bool blocking )
 {
     // if local file browsing is turned off, return without opening dialog
     // (Even though this is a stub, I think we still should not return anything at all)
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
     reset();
@@ -1542,39 +1632,27 @@ BOOL LLFilePicker::getSaveFile( ESaveFilter filter, const std::string& filename,
     if (!filename.empty())
     {
         mFiles.push_back(gDirUtilp->getLindenUserDir() + gDirUtilp->getDirDelimiter() + filename);
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
-BOOL LLFilePicker::getSaveFileModeless(ESaveFilter filter,
+bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
                                        const std::string& filename,
                                        void (*callback)(bool, std::string&, void*),
                                        void *userdata)
 {
-    if( mLocked )
-        return FALSE;
-
-    // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
-    {
-        return FALSE;
-    }
-
-    reset();
-    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
-    return FALSE;
+    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    return false;
 }
 
-BOOL LLFilePicker::getOpenFile( ELoadFilter filter, bool blocking )
+bool LLFilePicker::getOpenFile( ELoadFilter filter, bool blocking )
 {
-    if( mLocked )
-        return FALSE;
-
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    // (Even though this is a stub, I think we still should not return anything at all)
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
     reset();
@@ -1590,79 +1668,56 @@ BOOL LLFilePicker::getOpenFile( ELoadFilter filter, bool blocking )
     }
     mFiles.push_back(filename);
     LL_INFOS() << "getOpenFile: Will try to open file: " << filename << LL_ENDL;
-    return TRUE;
+    return true;
 }
 
-BOOL LLFilePicker::getOpenFileModeless(ELoadFilter filter,
+bool LLFilePicker::getOpenFileModeless(ELoadFilter filter,
                                        void (*callback)(bool, std::vector<std::string> &, void*),
                                        void *userdata)
 {
-    if( mLocked )
-        return FALSE;
-
-    // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
-    {
-        return FALSE;
-    }
-
-    reset();
-    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
-    return FALSE;
+    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    return false;
 }
 
-BOOL LLFilePicker::getMultipleOpenFiles( ELoadFilter filter, bool blocking)
+bool LLFilePicker::getMultipleOpenFiles( ELoadFilter filter, bool blocking)
 {
-    if( mLocked )
-        return FALSE;
-
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    // (Even though this is a stub, I think we still should not return anything at all)
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
     reset();
-    return FALSE;
+    return false;
 }
 
-BOOL LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
+bool LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
                                                 void (*callback)(bool, std::vector<std::string> &, void*),
                                                 void *userdata )
 {
-    if( mLocked )
-        return FALSE;
-
-    // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
-    {
-        return FALSE;
-    }
-
-    reset();
-
-    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
-    return FALSE;
+    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    return false;
 }
 
 #else // not implemented
 
-BOOL LLFilePicker::getSaveFile( ESaveFilter filter, const std::string& filename )
+bool LLFilePicker::getSaveFile( ESaveFilter filter, const std::string& filename )
 {
     reset();
-    return FALSE;
+    return false;
 }
 
-BOOL LLFilePicker::getOpenFile( ELoadFilter filter )
+bool LLFilePicker::getOpenFile( ELoadFilter filter )
 {
     reset();
-    return FALSE;
+    return false;
 }
 
-BOOL LLFilePicker::getMultipleOpenFiles( ELoadFilter filter, bool blocking)
+bool LLFilePicker::getMultipleOpenFiles( ELoadFilter filter, bool blocking)
 {
     reset();
-    return FALSE;
+    return false;
 }
 
 #endif // LL_LINUX

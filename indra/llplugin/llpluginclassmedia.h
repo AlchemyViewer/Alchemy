@@ -29,14 +29,13 @@
 #ifndef LL_LLPLUGINCLASSMEDIA_H
 #define LL_LLPLUGINCLASSMEDIA_H
 
-#include "llgltypes.h"
 #include "llpluginprocessparent.h"
 #include "llrect.h"
 #include "llpluginclassmediaowner.h"
 #include <queue>
 #include "v4color.h"
 
-class LLPluginClassMedia final : public LLPluginProcessParentOwner
+class LLPluginClassMedia : public LLPluginProcessParentOwner
 {
     LOG_CLASS(LLPluginClassMedia);
 public:
@@ -135,6 +134,10 @@ public:
     // Text may be unicode (utf8 encoded)
     bool textInput(const std::string &text, MASK modifiers, LLSD native_key_data);
 
+#if LL_LINUX
+    void enablePipeWireVolumeCatcher( bool enable );
+#endif
+
     static std::string sOIDcookieUrl;
     static std::string sOIDcookieName;
     static std::string sOIDcookieValue;
@@ -164,7 +167,7 @@ public:
     // "Exited" means any regular or error state after "Running" (plugin may have crashed or exited normally)
     bool isPluginExited(void) { return mPlugin?mPlugin->isDone():false; };
 
-    std::string getPluginVersion() { return mPlugin?mPlugin->getPluginVersion():std::string(); };
+    std::string getPluginVersion() { return mPlugin?mPlugin->getPluginVersion():std::string(""); };
 
     bool getDisableTimeout() { return mPlugin?mPlugin->getDisableTimeout():false; };
     void setDisableTimeout(bool disable) { if(mPlugin) mPlugin->setDisableTimeout(disable); };
@@ -225,8 +228,7 @@ public:
     void    showPageSource();
 
     // These can be called before init(), and they will be queued and sent before the media init message.
-    void    setCEFProgramDirs(const std::string& helper_path, const std::string& resources_path = std::string(), const std::string& locales_path = std::string());
-    void    setUserDataPath(const std::string &user_data_path_cache, const std::string &username, const std::string &user_data_path_cef_log, bool verbose_log);
+    void    setUserDataPath(const std::string &user_data_path_cache, const std::string &username, const std::string &user_data_path_cef_log);
     void    setLanguageCode(const std::string &language_code);
     void    setPluginsEnabled(const bool enabled);
     void    setJavascriptEnabled(const bool enabled);
@@ -366,9 +368,9 @@ protected:
 
     bool        mTextureParamsReceived;     // the mRequestedTexture* fields are only valid when this is true
     S32         mRequestedTextureDepth;
-    LLGLenum    mRequestedTextureInternalFormat;
-    LLGLenum    mRequestedTextureFormat;
-    LLGLenum    mRequestedTextureType;
+    U32         mRequestedTextureInternalFormat;
+    U32         mRequestedTextureFormat;
+    U32         mRequestedTextureType;
     bool        mRequestedTextureSwapBytes;
     bool        mRequestedTextureCoordsOpenGL;
 

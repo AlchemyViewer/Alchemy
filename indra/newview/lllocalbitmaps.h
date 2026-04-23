@@ -32,6 +32,7 @@
 #include "lleventtimer.h"
 #include "llpointer.h"
 #include "llwearabletype.h"
+#include <filesystem>
 
 class LLScrollListCtrl;
 class LLImageRaw;
@@ -89,6 +90,7 @@ class LLLocalBitmap
             ET_IMG_BMP,
             ET_IMG_TGA,
             ET_IMG_JPG,
+            ET_IMG_J2C,
             ET_IMG_PNG,
             ET_IMG_WEBP
         };
@@ -99,7 +101,7 @@ class LLLocalBitmap
         LLUUID      mTrackingID;
         LLUUID      mWorldID;
         bool        mValid;
-        LLSD        mLastModified;
+        std::filesystem::file_time_type        mLastModified;
         EExtension  mExtension;
         ELinkStatus mLinkStatus;
         S32         mUpdateRetries;
@@ -107,7 +109,7 @@ class LLLocalBitmap
 
         // Store a list of accosiated materials
         // Might be a better idea to hold this in LLGLTFMaterialList
-        typedef std::vector<LLPointer<LLGLTFMaterial> > mat_list_t;
+        typedef std::list<LLPointer<LLGLTFMaterial> > mat_list_t;
         mat_list_t mGLTFMaterialWithLocalTextures;
 
 };
@@ -122,11 +124,11 @@ class LLLocalBitmapTimer : public LLEventTimer
         void startTimer();
         void stopTimer();
         bool isRunning();
-        BOOL tick();
+        bool tick();
 
 };
 
-class LLLocalBitmapMgr final : public LLSingleton<LLLocalBitmapMgr>
+class LLLocalBitmapMgr : public LLSingleton<LLLocalBitmapMgr>
 {
     LLSINGLETON(LLLocalBitmapMgr);
     ~LLLocalBitmapMgr();
@@ -137,10 +139,10 @@ protected:
 public:
     LLUUID       addUnit(const std::string& filename);
     LLUUID       getUnitID(const std::string& filename);
-// [/SL:KB]
     void         delUnit(LLUUID tracking_id);
     bool        checkTextureDimensions(std::string filename);
 
+    LLUUID       getTrackingID(const LLUUID& world_id) const;
     LLUUID       getWorldID(const LLUUID &tracking_id) const;
     bool         isLocal(const LLUUID& world_id) const;
     std::string  getFilename(const LLUUID &tracking_id) const;

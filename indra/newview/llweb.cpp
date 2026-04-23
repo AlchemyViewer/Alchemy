@@ -34,6 +34,7 @@
 
 #include "llagent.h"
 #include "llappviewer.h"
+#include "llfloatermarketplace.h"
 #include "llfloaterwebcontent.h"
 #include "llfloaterreg.h"
 #include "lllogininstance.h"
@@ -50,7 +51,6 @@
 #include "llviewerwindow.h"
 #include "llnotificationsutil.h"
 #include "lluriparser.h"
-#include "uriparser/Uri.h"
 
 bool on_load_url_external_response(const LLSD& notification, const LLSD& response, bool async );
 
@@ -75,12 +75,20 @@ void LLWeb::loadURL(const std::string& url, const std::string& target, const std
 }
 
 // static
-// Explicitly open a Web URL using the Web content floater
+// Explicitly open a Web URL using the Web content floater or Marketplace floater
 void LLWeb::loadURLInternal(const std::string &url, const std::string& target, const std::string& uuid, bool dev_mode)
 {
     LLFloaterWebContent::Params p;
     p.url(url).target(target).id(uuid).dev_mode(dev_mode);
-    LLFloaterReg::showInstance("web_content", p);
+
+    if (LLFloaterMarketplace::isMarketplaceURL(url))
+    {
+        LLFloaterReg::showInstance("marketplace", p);
+    }
+    else
+    {
+        LLFloaterReg::showInstance("web_content", p);
+    }
 }
 
 // static
@@ -131,8 +139,8 @@ std::string LLWeb::escapeURL(const std::string& url)
     // The CURL curl_escape() function escapes colons, slashes,
     // and all characters but A-Z and 0-9.  Do a cheesy mini-escape.
     std::string escaped_url;
-    S32 len = url.length();
-    for (S32 i = 0; i < len; i++)
+    auto len = url.length();
+    for (size_t i = 0; i < len; i++)
     {
         char c = url[i];
         if (c == ' ')

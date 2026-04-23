@@ -43,14 +43,6 @@
 			<text name="nearbycount">
 				[REGION]には[TOTAL]人中[COUNT]人のアバターがいます。
 			</text>
-			<layout_stack>
-				<layout_panel name="Net Map Panel">
-					<net_map name="Net Map"/>
-				</layout_panel>
-				<layout_panel>
-					<avatar_list name="avatar_list"/>
-				</layout_panel>
-			</layout_stack>
 		</panel>
 		<!-- ================================= FRIENDS tab ========================== -->
 		<panel label="フレンド" name="friends_panel">

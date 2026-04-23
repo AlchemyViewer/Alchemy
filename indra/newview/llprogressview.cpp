@@ -77,9 +77,13 @@ LLProgressView::LLProgressView()
     mFadeFromLoginTimer.stop();
 }
 
-BOOL LLProgressView::postBuild()
+bool LLProgressView::postBuild()
 {
     mProgressBar = getChild<LLProgressBar>("login_progress_bar");
+
+    mProgressText = getChild<LLTextBox>("progress_text");
+    mMessageText = getChild<LLTextBox>("message_text");
+    mMessageTextRectInitial = mMessageText->getRect(); // auto resizes, save initial size
 
     // media control that is used to play intro video
     mMediaCtrl = getChild<LLMediaCtrl>("login_media_panel");
@@ -91,17 +95,23 @@ BOOL LLProgressView::postBuild()
     mCancelBtn = getChild<LLButton>("cancel_btn");
     mCancelBtn->setClickedCallback(  LLProgressView::onCancelButtonClicked, NULL );
 
+    mLayoutPanel4 = getChild<LLView>("panel4");
+    mLayoutPanel4RectInitial = mLayoutPanel4->getRect();
+
+    mLayoutMOTD = getChild<LLView>("panel_motd");
+    mLayoutMOTDRectInitial = mLayoutMOTD->getRect();
+
     getChild<LLTextBox>("title_text")->setText(LLStringExplicit(LLAppViewer::instance()->getSecondLifeTitle()));
 
     getChild<LLTextBox>("message_text")->setClickedCallback(onClickMessage, this);
 
     // hidden initially, until we need it
-    setVisible(FALSE);
+    setVisible(false);
 
     LLNotifications::instance().getChannel("AlertModal")->connectChanged(boost::bind(&LLProgressView::onAlertModal, this, _1));
 
     sInstance = this;
-    return TRUE;
+    return true;
 }
 
 
@@ -115,24 +125,24 @@ LLProgressView::~LLProgressView()
     sInstance = NULL;
 }
 
-BOOL LLProgressView::handleHover(S32 x, S32 y, MASK mask)
+bool LLProgressView::handleHover(S32 x, S32 y, MASK mask)
 {
     if( childrenHandleHover( x, y, mask ) == NULL )
     {
         gViewerWindow->setCursor(UI_CURSOR_WAIT);
     }
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLProgressView::handleKeyHere(KEY key, MASK mask)
+bool LLProgressView::handleKeyHere(KEY key, MASK mask)
 {
     // Suck up all keystokes except CTRL-Q.
     if( ('Q' == key) && (MASK_CONTROL == mask) )
     {
         LLAppViewer::instance()->userQuit();
     }
-    return TRUE;
+    return true;
 }
 
 void LLProgressView::revealIntroPanel()
@@ -141,20 +151,20 @@ void LLProgressView::revealIntroPanel()
     std::string intro_url = gSavedSettings.getString("PostFirstLoginIntroURL");
     if ( intro_url.length() > 0 &&
             gSavedSettings.getBOOL("BrowserJavascriptEnabled") &&
-            gSavedSettings.getBOOL("PostFirstLoginIntroViewed" ) == FALSE )
+            !gSavedSettings.getBOOL("PostFirstLoginIntroViewed"))
     {
         // hide the progress bar
         getChild<LLView>("stack1")->setVisible(false);
 
         // navigate to intro URL and reveal widget
         mMediaCtrl->navigateTo( intro_url );
-        mMediaCtrl->setVisible( TRUE );
+        mMediaCtrl->setVisible( true );
 
 
         // flag as having seen the new user post login intro
-        gSavedSettings.setBOOL("PostFirstLoginIntroViewed", TRUE );
+        gSavedSettings.setBOOL("PostFirstLoginIntroViewed", true );
 
-        mMediaCtrl->setFocus(TRUE);
+        mMediaCtrl->setFocus(true);
     }
 
     mFadeFromLoginTimer.start();
@@ -173,7 +183,7 @@ void LLProgressView::setStartupComplete()
     }
 }
 
-void LLProgressView::setVisible(BOOL visible)
+void LLProgressView::setVisible(bool visible)
 {
     if (!visible && mFadeFromLoginTimer.getStarted())
     {
@@ -182,14 +192,14 @@ void LLProgressView::setVisible(BOOL visible)
     // hiding progress view
     if (getVisible() && !visible)
     {
-        LLPanel::setVisible(FALSE);
+        LLPanel::setVisible(false);
     }
     // showing progress view
     else if (visible && (!getVisible() || mFadeToWorldTimer.getStarted()))
     {
-        setFocus(TRUE);
+        setFocus(true);
         mFadeToWorldTimer.stop();
-        LLPanel::setVisible(TRUE);
+        LLPanel::setVisible(true);
     }
 }
 
@@ -229,34 +239,6 @@ void LLProgressView::drawStartTexture(F32 alpha)
     gGL.popMatrix();
 }
 
-void LLProgressView::drawLogos(F32 alpha)
-{
-    if (mLogosList.empty())
-    {
-        return;
-    }
-
-    // logos are tied to label,
-    // due to potential resizes we have to figure offsets out on draw or resize
-    LLTextBox *logos_label = getChild<LLTextBox>("logos_lbl");
-    S32 offset_x, offset_y;
-    logos_label->localPointToScreen(0, 0, &offset_x, &offset_y);
-    std::vector<TextureData>::const_iterator iter = mLogosList.begin();
-    std::vector<TextureData>::const_iterator end = mLogosList.end();
-    for (; iter != end; iter++)
-    {
-        gl_draw_scaled_image_with_border(iter->mDrawRect.mLeft + offset_x,
-                             iter->mDrawRect.mBottom + offset_y,
-                             iter->mDrawRect.getWidth(),
-                             iter->mDrawRect.getHeight(),
-                             iter->mTexturep.get(),
-                             UI_VERTEX_COLOR % alpha,
-                             FALSE,
-                             iter->mClipRect,
-                             iter->mOffsetRect);
-    }
-}
-
 void LLProgressView::draw()
 {
     static LLTimer timer;
@@ -272,7 +254,6 @@ void LLProgressView::draw()
         }
 
         LLPanel::draw();
-        drawLogos(alpha);
         return;
     }
 
@@ -285,7 +266,6 @@ void LLProgressView::draw()
 
         drawStartTexture(alpha);
         LLPanel::draw();
-        drawLogos(alpha);
 
         // faded out completely - remove panel and reveal world
         if (mFadeToWorldTimer.getElapsedTimeF32() > FADE_TO_WORLD_TIME )
@@ -298,7 +278,7 @@ void LLProgressView::draw()
             gFocusMgr.releaseFocusIfNeeded( this );
 
             // turn off panel that hosts intro so we see the world
-            setVisible(FALSE);
+            setVisible(false);
 
             // stop observing events since we no longer care
             mMediaCtrl->remObserver( this );
@@ -320,12 +300,11 @@ void LLProgressView::draw()
     drawStartTexture(1.0f);
     // draw children
     LLPanel::draw();
-    drawLogos(1.0f);
 }
 
 void LLProgressView::setText(const std::string& text)
 {
-    getChild<LLUICtrl>("progress_text")->setValue(text);
+    mProgressText->setValue(text);
 }
 
 void LLProgressView::setPercent(const F32 percent)
@@ -336,109 +315,19 @@ void LLProgressView::setPercent(const F32 percent)
 void LLProgressView::setMessage(const std::string& msg)
 {
     mMessage = msg;
-    getChild<LLUICtrl>("message_text")->setValue(mMessage);
-}
-
-void LLProgressView::loadLogo(const std::string &path,
-                              const U8 image_codec,
-                              const LLRect &pos_rect,
-                              const LLRectf &clip_rect,
-                              const LLRectf &offset_rect)
-{
-    // We need these images very early, so we have to force-load them, otherwise they might not load in time.
-    if (!gDirUtilp->fileExists(path))
+    mMessageText->setValue(mMessage);
+    S32 height = mMessageText->getTextPixelHeight();
+    S32 delta  = height - mMessageTextRectInitial.getHeight();
+    if (delta > 0)
     {
-        return;
+        mLayoutPanel4->reshape(mLayoutPanel4RectInitial.getWidth(), mLayoutPanel4RectInitial.getHeight() + delta);
+        mLayoutMOTD->reshape(mLayoutMOTDRectInitial.getWidth(), mLayoutMOTDRectInitial.getHeight() + delta);
     }
-
-    LLPointer<LLImageFormatted> start_image_frmted = LLImageFormatted::createFromType(image_codec);
-    if (!start_image_frmted->load(path))
+    else
     {
-        LL_WARNS("AppInit") << "Image load failed: " << path << LL_ENDL;
-        return;
+        mLayoutPanel4->reshape(mLayoutPanel4RectInitial.getWidth(), mLayoutPanel4RectInitial.getHeight());
+        mLayoutMOTD->reshape(mLayoutMOTDRectInitial.getWidth(), mLayoutMOTDRectInitial.getHeight());
     }
-
-    LLPointer<LLImageRaw> raw = new LLImageRaw;
-    if (!start_image_frmted->decode(raw, 0.0f))
-    {
-        LL_WARNS("AppInit") << "Image decode failed " << path << LL_ENDL;
-        return;
-    }
-    // HACK: getLocalTexture allows only power of two dimentions
-    raw->expandToPowerOfTwo();
-
-    TextureData data;
-    data.mTexturep = LLViewerTextureManager::getLocalTexture(raw.get(), FALSE);
-    data.mDrawRect = pos_rect;
-    data.mClipRect = clip_rect;
-    data.mOffsetRect = offset_rect;
-    mLogosList.push_back(data);
-}
-
-void LLProgressView::initLogos()
-{
-    mLogosList.clear();
-
-    const U8 image_codec = IMG_CODEC_PNG;
-    const LLRectf default_clip(0.f, 1.f, 1.f, 0.f);
-    const S32 default_height = 28;
-    const S32 default_pad = 15;
-
-    S32 icon_width;
-
-    // We don't know final screen rect yet, so we can't precalculate position fully
-    LLTextBox *logos_label = getChild<LLTextBox>("logos_lbl");
-    S32 texture_start_x = logos_label->getFont()->getWidthF32(logos_label->getWText().c_str()) + default_pad;
-    S32 texture_start_y = -7;
-
-    // Normally we would just preload these textures from textures.xml,
-    // and display them via icon control, but they are only needed on
-    // startup and preloaded/UI ones stay forever
-    // (and this code was done already so simply reused it)
-    std::string temp_str = gDirUtilp->getExpandedFilename(LL_PATH_DEFAULT_SKIN, "textures", "3p_icons");
-
-    temp_str += gDirUtilp->getDirDelimiter();
-
-    S32 icon_height;
-
-#ifdef LL_FMODSTUDIO
-    // original image size is 264x96, it is on longer side but
-    // with no internal paddings so it gets additional padding
-    icon_width = 77;
-    icon_height = 20;
-    S32 pad_fmod_y = 4;
-    texture_start_x++;
-    loadLogo(temp_str + "fmod_logo.png",
-        image_codec,
-        LLRect(texture_start_x, texture_start_y + pad_fmod_y + icon_height, texture_start_x + icon_width, texture_start_y + pad_fmod_y),
-        default_clip,
-        default_clip);
-
-    texture_start_x += icon_width + default_pad + 1;
-#endif //LL_FMODSTUDIO
-#ifdef LL_HAVOK
-    // original image size is 342x113, central element is on a larger side
-    // plus internal padding, so it gets slightly more height than desired 32
-    icon_width = 88;
-    icon_height = 29;
-    S32 pad_havok_y = -1;
-    loadLogo(temp_str + "havok_logo.png",
-        image_codec,
-        LLRect(texture_start_x, texture_start_y + pad_havok_y + icon_height, texture_start_x + icon_width, texture_start_y + pad_havok_y),
-        default_clip,
-        default_clip);
-
-    texture_start_x += icon_width + default_pad;
-#endif //LL_HAVOK
-
-    // 108x41
-    icon_width = 74;
-    icon_height = default_height;
-    loadLogo(temp_str + "vivox_logo.png",
-        image_codec,
-        LLRect(texture_start_x, texture_start_y + icon_height, texture_start_x + icon_width, texture_start_y),
-        default_clip,
-        default_clip);
 }
 
 void LLProgressView::initStartTexture(S32 location_id, bool is_in_production)
@@ -504,7 +393,7 @@ void LLProgressView::initStartTexture(S32 location_id, bool is_in_production)
         {
             // HACK: getLocalTexture allows only power of two dimentions
             raw->expandToPowerOfTwo();
-            gStartTexture = LLViewerTextureManager::getLocalTexture(raw.get(), FALSE);
+            gStartTexture = LLViewerTextureManager::getLocalTexture(raw.get(), false);
         }
     }
 
@@ -519,25 +408,17 @@ void LLProgressView::initStartTexture(S32 location_id, bool is_in_production)
 void LLProgressView::initTextures(S32 location_id, bool is_in_production)
 {
     initStartTexture(location_id, is_in_production);
-    initLogos();
-
-    childSetVisible("panel_icons", mLogosList.empty() ? FALSE : TRUE);
-    childSetVisible("panel_top_spacer", mLogosList.empty() ? TRUE : FALSE);
 }
 
 void LLProgressView::releaseTextures()
 {
     gStartTexture = NULL;
-    mLogosList.clear();
-
-    childSetVisible("panel_top_spacer", TRUE);
-    childSetVisible("panel_icons", FALSE);
 }
 
-void LLProgressView::setCancelButtonVisible(BOOL b, const std::string& label)
+void LLProgressView::setCancelButtonVisible(bool b, const std::string& label)
 {
-    mCancelBtn->setVisible( b );
-    mCancelBtn->setEnabled( b );
+    mCancelBtn->setVisible(b);
+    mCancelBtn->setEnabled(b);
     mCancelBtn->setLabelSelected(label);
     mCancelBtn->setLabelUnselected(label);
 }
@@ -556,8 +437,8 @@ void LLProgressView::onCancelButtonClicked(void*)
     else
     {
         gAgent.teleportCancel();
-        sInstance->mCancelBtn->setEnabled(FALSE);
-        sInstance->setVisible(FALSE);
+        sInstance->mCancelBtn->setEnabled(false);
+        sInstance->setVisible(false);
     }
 }
 
@@ -607,7 +488,7 @@ bool LLProgressView::handleUpdate(const LLSD& event_data)
 
     if(percent.isDefined())
     {
-        setPercent(percent.asReal());
+        setPercent((F32)percent.asReal());
     }
     return false;
 }

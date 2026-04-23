@@ -159,7 +159,6 @@
       </menu_item_call>
 
       <menu_item_separator/>
-
       <menu_item_call
          label="Preferences..."
          name="Preferences"
@@ -175,14 +174,6 @@
              function="Floater.Toggle"
              parameter="toybox" />
         </menu_item_call>
-      <menu_item_call
-          label="Cinematic Mode"
-          name="CinematicMode"
-          shortcut="alt|shift|c">
-        <menu_item_call.on_click
-            function="View.ToggleCinematicMode" >
-        </menu_item_call.on_click>
-      </menu_item_call>
          <menu_item_call
          label="Hide all controls"
          name="Hide UI"
@@ -234,6 +225,7 @@
        </menu_item_call>
        <menu_item_call label="Hover height..."
          layout="topleft"
+         shortcut="alt|control|H"
          name="Hover Height">
             <menu_item_call.on_click
              function="HoverHeight" />
@@ -452,11 +444,11 @@
       </menu_item_call>
       <menu_item_separator/>
       <menu_item_call
-        label="Complete avatars..."
-        name="Avatar Picker">
+        label="Avatar Welcome Pack..."
+        name="Avatar Welcome Pack">
         <menu_item_call.on_click
          function="Floater.ToggleOrBringToFront"
-         parameter="avatar" />
+         parameter="avatar_welcome_pack" />
       </menu_item_call>
       <menu_item_separator/>
 
@@ -524,7 +516,7 @@
        layout="topleft"
        name="Reset Skeleton">
         <menu_item_call.on_click
-         function="Avatar.ResetSkeleton" />
+         function="Avatar.ResetSelfSkeleton" />
       </menu_item_call>
       <menu_item_call 
        label="Reset skeleton and animations"
@@ -589,40 +581,6 @@
              function="Communicate.NearbyChat"/>
         </menu_item_check>
         <menu_item_check
-         name="Conversation Log..."
-         label="Conversation Log...">
-            <menu_item_check.on_check
-             function="Floater.Visible"
-             parameter="conversation" />
-            <menu_item_check.on_enable
-             function="Conversation.IsConversationLoggingAllowed" />
-            <menu_item_check.on_click
-             function="Floater.Toggle"
-             parameter="conversation" />
-        </menu_item_check>
-        <menu_item_check
-         label="Chat Alerts..."
-         name="Chat Alerts">
-            <menu_item_check.on_check
-             function="Floater.Visible"
-             parameter="chat_alerts" />
-            <menu_item_check.on_click
-             function="Floater.Toggle"
-             parameter="chat_alerts" />
-        </menu_item_check>
-        <menu_item_check
-         label="Gestures..."
-         name="Gestures"
-         shortcut="control|G">
-            <menu_item_check.on_check
-             function="Floater.Visible"
-             parameter="gestures" />
-            <menu_item_check.on_click
-             function="Floater.Toggle"
-             parameter="gestures" />
-        </menu_item_check>
-        <menu_item_separator/>
-        <menu_item_check
          label="Speak"
          name="Speak">
             <menu_item_check.on_check
@@ -634,6 +592,30 @@
             <menu_item_check.on_click
              function="Agent.ToggleMicrophone"
              parameter="speak" />
+        </menu_item_check>
+        <menu_item_check
+         name="Conversation Log..."
+         label="Conversation Log...">
+            <menu_item_check.on_check
+             function="Floater.Visible"
+             parameter="conversation" />
+            <menu_item_check.on_enable
+             function="Conversation.IsConversationLoggingAllowed" />
+            <menu_item_check.on_click
+             function="Floater.Toggle"
+             parameter="conversation" />
+        </menu_item_check>
+        <menu_item_separator/>
+        <menu_item_check
+         label="Gestures..."
+         name="Gestures"
+         shortcut="control|G">
+            <menu_item_check.on_check
+             function="Floater.Visible"
+             parameter="gestures" />
+            <menu_item_check.on_click
+             function="Floater.Toggle"
+             parameter="gestures" />
         </menu_item_check>
         <menu_item_separator/>
         <menu_item_check
@@ -692,62 +674,42 @@
          label="Reject teleport offers and requests"
          name="Automatically reject teleport offers">
          <menu_item_check.on_check
-            function="World.GetRejectTeleportOffers"/>
-            <menu_item_check.on_click
-               function="World.SetRejectTeleportOffers"/>
-            </menu_item_check>
+            function="Communicate.GetRejectTeleportOffers"/>
+         <menu_item_check.on_click
+            function="Communicate.SetRejectTeleportOffers"/>
+      </menu_item_check>
       <menu_item_check
          label="Reject all friendship requests"
          name="Reject all friendship requests">
          <menu_item_check.on_check
-             function="World.GetRejectFriendshipRequests"/>
+             function="Communicate.GetRejectFriendshipRequests"/>
           <menu_item_check.on_click
-              function="World.SetRejectFriendshipRequests"/>
+              function="Communicate.SetRejectFriendshipRequests"/>
       </menu_item_check>
       <menu_item_separator/>
       <menu_item_check
          label="Autorespond"
          name="Set AutoRespond">
-            <menu_item_check.on_check
+         <menu_item_check.on_check
             function="Communicate.GetAutoRespond"/>
-            <menu_item_check.on_click
+         <menu_item_check.on_click
             function="Communicate.SetAutoRespond"/>
-      </menu_item_check>
-      <menu_item_check
-         label="AutoRespond to non-friends"
-         name="Set AutoRespond to non-friends">
+         </menu_item_check>
+         <menu_item_check
+            label="AutoRespond to non-friends"
+            name="Set AutoRespond to non-friends">
             <menu_item_check.on_check
-            function="Communicate.GetAutoRespondNonFriends"/>
+               function="Communicate.GetAutoRespondNonFriends"/>
             <menu_item_check.on_click
-            function="Communicate.SetAutoRespondNonFriends"/>
-      </menu_item_check>
+               function="Communicate.SetAutoRespondNonFriends"/>
+         </menu_item_check>
+
     </menu>
     <menu
      create_jump_keys="true"
      label="World"
      name="World"
      tear_off="true">
-		<menu_item_check
-         label="Poser"
-         name="Poser"
-         use_mac_ctrl="true">
-			<menu_item_check.on_check
-             function="Floater.Visible"
-             parameter="poser" />
-			<menu_item_check.on_click
-             function="Floater.Toggle"
-             parameter="poser" />
-		</menu_item_check>
-		<menu_item_check
-			 label="Pose Creator"
-			 name="Pose Creator">
-			<menu_item_check.on_check
-             function="Floater.Visible"
-             parameter="poser_creator" />
-			<menu_item_check.on_click
-             function="Floater.Toggle"
-             parameter="poser_creator" />
-		</menu_item_check>
         <menu_item_call
          label="Resync Animations"
          name="Resync Animations"
@@ -755,17 +717,17 @@
           <menu_item_call.on_click
            function="World.SyncAnimations" />
         </menu_item_call>
-		<menu_item_check
+        <menu_item_check
          label="Sound Explorer"
          name="Sound Explorer"
          use_mac_ctrl="true">
-			<menu_item_check.on_check
+            <menu_item_check.on_check
              function="Floater.Visible"
              parameter="sound_explorer" />
-			<menu_item_check.on_click
+            <menu_item_check.on_click
              function="Floater.Toggle"
              parameter="sound_explorer" />
-		</menu_item_check>
+        </menu_item_check>
         <menu_item_separator/>
         <menu_item_call
          label="Landmark This Place"
@@ -832,7 +794,7 @@
              parameter="search" />
             <menu_item_check.on_click
              function="Avatar.ToggleSearch"/>
-            </menu_item_check>
+        </menu_item_check>
         <menu_item_separator/>
         <menu_item_call
          label="Teleport home"
@@ -863,8 +825,7 @@
         
 <menu_item_call
          label="360 snapshot"
-         name="Capture 360"
-         shortcut="control|alt|shift|s">
+         name="Capture 360">
             <menu_item_call.on_click
              function="Floater.Show"
              parameter="360capture" />
@@ -919,8 +880,7 @@
         <menu_item_call
          label="Region / Estate"
          name="RegionEstate"
-         shortcut="alt|R"
-         use_mac_ctrl="true">
+         shortcut="alt|R">
             <menu_item_call.on_click
              function="Floater.Show"
              parameter="region_info" />
@@ -1038,21 +998,8 @@
           </menu_item_check>
           <menu_item_separator />
           <menu_item_check
-	          label="Depth of Field Focus lock"
-	          layout="topleft"
-	          shortcut="alt|shift|X"
-	          name="lock_focus_point">
-	          <menu_item_check.on_check
-		          function="CheckControl"
-		          parameter="RenderFocusPointLocked" />
-	          <menu_item_check.on_click
-		          function="ToggleControl"
-		          parameter="RenderFocusPointLocked" />
-          </menu_item_check>
-          <menu_item_check
              label="Advanced Menu"
-             name="Show Advanced Menu"
-             shortcut="control|alt|D">
+             name="Show Advanced Menu">
             <on_check
                function="CheckControl"
                parameter="UseDebugMenus" />
@@ -1129,7 +1076,8 @@
           </menu_item_check>
           <menu_item_check
              label="Midday (Legacy)"
-             name="legacy noon">
+             name="legacy noon"
+             shortcut="control|shift|T">
             <menu_item_check.on_click
              function="World.EnvSettings"
              parameter="legacy noon" />
@@ -1138,7 +1086,7 @@
              parameter="legacy noon" />
             <menu_item_check.on_enable
              function="RLV.EnableIfNot"
-             parameter="setenv" />
+             parameter="setenv" />	     
           </menu_item_check>
             <menu_item_check
              label="Sunset"
@@ -1171,7 +1119,7 @@
             <menu_item_check
              label="Use Shared Environment"
              name="Use Shared Environment"
-			 shortcut="control|shift|X">
+             shortcut="control|shift|X">
                 <menu_item_check.on_click
                  function="World.EnvSettings"
                  parameter="region" />
@@ -1232,6 +1180,9 @@
 <menu_item_call.on_click
 	     	 	 function="World.EnvSettings"
                  parameter="editor"/>
+          <menu_item_call.on_enable
+           function="RLV.EnableIfNot"
+           parameter="setenv" />
 	     	</menu_item_call>
 	     		     	<menu_item_separator/>
 <menu
@@ -1243,6 +1194,9 @@ label="New preset..."
 <menu_item_call.on_click
 function="World.EnvPreset"
 	     	 	 	parameter="new_water"/>
+            <menu_item_call.on_enable
+            function="RLV.EnableIfNot"
+            parameter="setenv" />
 </menu_item_call>
 <menu_item_call
 label="Edit preset..."
@@ -1250,6 +1204,10 @@ label="Edit preset..."
 <menu_item_call.on_click
 function="World.EnvPreset"
 	     	 	 	parameter="edit_water"/>
+            <menu_item_call.on_enable
+            function="RLV.EnableIfNot"
+            parameter="setenv" />
+</menu_item_call>
 </menu>
 	     	 	 <menu
 name="Sky Presets"
@@ -1260,6 +1218,9 @@ label="New preset..."
 <menu_item_call.on_click
 function="World.EnvPreset"
 	     	 	 	parameter="new_sky"/>
+            <menu_item_call.on_enable
+            function="RLV.EnableIfNot"
+            parameter="setenv" />
 </menu_item_call>
 <menu_item_call
 label="Edit preset..."
@@ -1267,6 +1228,9 @@ label="Edit preset..."
 <menu_item_call.on_click
 function="World.EnvPreset"
 	     	 	 	parameter="edit_sky"/>
+            <menu_item_call.on_enable
+            function="RLV.EnableIfNot"
+            parameter="setenv" />
 </menu_item_call>
 </menu>
 <menu
@@ -1278,6 +1242,9 @@ label="New preset..."
 <menu_item_call.on_click
 function="World.EnvPreset"
 	     	 	 	parameter="new_day_cycle"/>
+            <menu_item_call.on_enable
+            function="RLV.EnableIfNot"
+            parameter="setenv" />
 </menu_item_call>
 <menu_item_call
 label="Edit preset..."
@@ -1285,6 +1252,9 @@ label="Edit preset..."
 <menu_item_call.on_click
 function="World.EnvPreset"
 	     	 	 	parameter="edit_day_cycle"/>
+            <menu_item_call.on_enable
+            function="RLV.EnableIfNot"
+            parameter="setenv" />
 </menu_item_call>
 </menu>
 </menu>
@@ -1661,6 +1631,7 @@ function="World.EnvPreset"
 			</menu_item_check>
 
             <menu_item_separator/>
+
             <menu_item_check
                  label="Select Only My Objects"
                  name="Select Only My Objects">
@@ -1670,7 +1641,7 @@ function="World.EnvPreset"
                      function="Tools.SelectOnlyMyObjects"
                      parameter="agents" />
                 </menu_item_check>
-            <menu_item_check
+                <menu_item_check
                  label="Select Only Copyable Objects"
                  name="Select Only Copyable Objects">
                     <menu_item_check.on_check
@@ -1733,11 +1704,9 @@ function="World.EnvPreset"
                  label="Show Hidden Selection"
                  name="Show Hidden Selection">
                     <menu_item_check.on_check
-                     function="CheckControl"
-                     parameter="RenderHiddenSelections" />
+                     control="RenderHiddenSelections" />
                     <menu_item_check.on_click
-                     function="ToggleControl"
-                     parameter="RenderHiddenSelections" />
+                     function="Tools.ShowHiddenSelection" />
                 </menu_item_check>
                 <menu_item_check
                  label="Show Light Radius for Selection"
@@ -1765,7 +1734,7 @@ function="World.EnvPreset"
                      function="ToggleControl"
                      parameter="ShowSelectionBeam" />
                 </menu_item_check>
-	        <menu_item_check
+                <menu_item_check
 	         label="Show Parcel Boundary Outline"
 	         name="RenderParcelSelection">
 			  <menu_item_check.on_check
@@ -1798,27 +1767,28 @@ function="World.EnvPreset"
                   <menu_item_check.on_click
                    function="View.HighlightTransparent" />
                 </menu_item_check>
-			<menu_item_check
-				   label="Highlight Transparent Probes"
-				   name="Highlight Transparent Probes" >
-				<menu_item_check.on_check
-				 function="CheckControl"
-				 parameter="RenderReflectionProbeShowTransparent" />
-				<menu_item_check.on_click
-				 function="View.HighlightTransparentProbe" />
-				<menu_item_check.on_enable
-				 function="View.CheckHighlightTransparent"/>
-			</menu_item_check>
-		    	<menu_item_separator/>
                 <menu_item_check
-                       label="Grab objects with Ctrl-Drag"
-                       name="EnableCtrlDragMovement">
-                    <menu_item_check.on_check
-                     function="CheckControl"
-                     parameter="EnableGrab" />
-                    <menu_item_check.on_click
-                     function="ToggleControl"
-                     parameter="EnableGrab" />
+                   label="Highlight Transparent Probes"
+                   name="Highlight Transparent Probes"
+                   shortcut="alt|shift|T">
+                  <menu_item_check.on_check
+                   function="CheckControl"
+                   parameter="RenderReflectionProbeShowTransparent" />
+                  <menu_item_check.on_click
+                   function="View.HighlightTransparentProbe" />
+                  <menu_item_check.on_enable
+                   function="View.CheckHighlightTransparent"/>
+                </menu_item_check>
+                <menu_item_separator/>
+                <menu_item_check
+                   label="Grab objects with Ctrl-Drag"
+                   name="EnableCtrlDragMovement">
+                  <menu_item_check.on_check
+                   function="CheckControl"
+                   parameter="EnableGrab" />
+                  <menu_item_check.on_click
+                   function="ToggleControl"
+                   parameter="EnableGrab" />
                 </menu_item_check>
         <menu_item_separator/>
           
@@ -1832,6 +1802,64 @@ function="World.EnvPreset"
              parameter="RenderDisablePostProcessing" />
           </menu_item_check>
           
+
+          <menu
+           create_jump_keys="true"
+           label="Selection level of detail"
+           name="Selection level of detail"
+           tear_off="true">
+
+              <menu_item_check
+                label="Default"
+                name="Default lod setting">
+                  <menu_item_check.on_check
+                   function="Tools.ToolsCheckSelectionLODMode"
+                   parameter="default" />
+                  <menu_item_check.on_click
+                   function="Tools.SelectionLODMode"
+                   parameter="default" />
+              </menu_item_check>
+              <menu_item_check
+                label="High"
+                name="High lod setting">
+                  <menu_item_check.on_check
+                   function="Tools.ToolsCheckSelectionLODMode"
+                   parameter="high" />
+                  <menu_item_check.on_click
+                   function="Tools.SelectionLODMode"
+                   parameter="high" />
+              </menu_item_check>
+              <menu_item_check
+                label="Medium"
+                name="Medium lod setting">
+                  <menu_item_check.on_check
+                   function="Tools.ToolsCheckSelectionLODMode"
+                   parameter="medium" />
+                  <menu_item_check.on_click
+                   function="Tools.SelectionLODMode"
+                   parameter="medium" />
+              </menu_item_check>
+              <menu_item_check
+                label="Low"
+                name="Low lod setting">
+                  <menu_item_check.on_check
+                   function="Tools.ToolsCheckSelectionLODMode"
+                   parameter="low" />
+                  <menu_item_check.on_click
+                   function="Tools.SelectionLODMode"
+                   parameter="low" />
+              </menu_item_check>
+              <menu_item_check
+                label="Lowest"
+                name="Lowest lod setting">
+                  <menu_item_check.on_check
+                   function="Tools.ToolsCheckSelectionLODMode"
+                   parameter="lowest" />
+                  <menu_item_check.on_click
+                   function="Tools.SelectionLODMode"
+                   parameter="lowest" />
+              </menu_item_check>
+          </menu>
         <menu_item_separator/>
 
                 <menu_item_check
@@ -2012,58 +2040,29 @@ function="World.EnvPreset"
              parameter="hud" />
         </menu_item_call>-->
 		<menu_item_separator/>
-		<menu_item_call
-             label="Alchemy Website"
-             name="Alchemy Website">
-			<menu_item_call.on_click
-				function="Advanced.ShowURL"
-				parameter="https://www.alchemyviewer.org"/>
-		</menu_item_call>
-		<menu_item_call
-             label="Alchemy Downloads"
-             name="Alchemy Downloads">
-			<menu_item_call.on_click
-				function="Advanced.ShowURL"
-				parameter="https://www.alchemyviewer.org/downloads"/>
-		</menu_item_call>
-		<menu_item_call
-             label="Report Alchemy Bug"
-             name="Report Alchemy Bug">
-			<menu_item_call.on_click
-				function="Advanced.ShowURL"
-				parameter="https://github.com/AlchemyViewer/Alchemy/issues/new?assignees=&amp;labels=bug%2Ctriage&amp;projects=&amp;template=10-bug.yaml"/>
-		</menu_item_call>
-		<menu_item_call
-             label="Request Alchemy Improvement"
-             name="Request Alchemy Improvement">
-			<menu_item_call.on_click
-				function="Advanced.ShowURL"
-				parameter="https://github.com/AlchemyViewer/Alchemy/issues/new?assignees=&amp;labels=enhancement%2C+triage&amp;projects=&amp;template=20-enhancement.md&amp;title=New+Feature"/>
-		</menu_item_call>
-		<menu_item_separator/>
         <menu_item_call
-             label="Second Life Knowledge Base"
+             label="Knowledge Base"
              name="Knowledge Base">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
             parameter="http://community.secondlife.com/t5/English-Knowledge-Base/Second-Life-User-s-Guide/ta-p/1244857"/>
         </menu_item_call>
         <menu_item_call
-             label="Second Life Wiki"
+             label="Wiki"
              name="Wiki">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
                  parameter="http://wiki.secondlife.com"/>
         </menu_item_call>
         <menu_item_call
-             label="Second Life Community Forums"
+             label="Community Forums"
              name="Community Forums">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
                  parameter="http://community.secondlife.com/t5/Forums/ct-p/Forums"/>
         </menu_item_call>         
         <menu_item_call
-             label="Second Life Support portal"
+             label="Support portal"
              name="Support portal">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
@@ -2071,18 +2070,11 @@ function="World.EnvPreset"
         </menu_item_call>
         <menu_item_separator/>
         <menu_item_call
-             label="Second Life News"
-             name="Second Life News">
-             <menu_item_call.on_click
-                 function="Advanced.ShowURL"
-                 parameter="http://community.secondlife.com/t5/Featured-News/bg-p/blog_feature_news"/>  
-        </menu_item_call>
-        <menu_item_call
-             label="Second Life Blogs"
+             label="[SECOND_LIFE] Blogs"
              name="Second Life Blogs">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
-                 parameter="http://community.secondlife.com/t5/Blogs/ct-p/Blogs"/>
+                 parameter="https://community.secondlife.com/news/"/>
         </menu_item_call>
         <menu_item_separator/>
 
@@ -2093,7 +2085,7 @@ function="World.EnvPreset"
                  function="ReportAbuse" />
             </menu_item_call>
         <menu_item_call
-             label="Report Second Life Bug"
+             label="Report Bug"
              name="Report Bug">
                 <menu_item_call.on_click
                  function="Advanced.ReportBug"/>
@@ -2123,7 +2115,7 @@ function="World.EnvPreset"
      tear_off="true"
      visible="true">
       <menu
-       label="Debug"
+       label="Develop"
        name="Debug"
        tear_off="true">
         <menu_item_check
@@ -2380,16 +2372,16 @@ function="World.EnvPreset"
              function="ToggleControl"
              parameter="LimitSelectDistance" />
         </menu_item_check>
-		<menu_item_check
+        <menu_item_check
          label="Limit Drag Distance"
          name="Limit Drag Distance">
-			<menu_item_check.on_check
+            <menu_item_check.on_check
              function="CheckControl"
              parameter="LimitDragDistance" />
-			<menu_item_check.on_click
+            <menu_item_check.on_click
              function="ToggleControl"
              parameter="LimitDragDistance" />
-		</menu_item_check>
+        </menu_item_check>
         <menu_item_check
          label="Disable Camera Constraints"
          name="Disable Camera Distance">
@@ -2400,26 +2392,7 @@ function="World.EnvPreset"
              function="ToggleControl"
              parameter="DisableCameraConstraints" />
         </menu_item_check>
-        <menu_item_check
-         label="Disable Minimum Zoom Distance"
-         name="Disable Minimum Zoom Distance">
-            <menu_item_check.on_check
-             function="CheckControl"
-             parameter="AlchemyCameraNoZoomLimit" />
-            <menu_item_check.on_click
-             function="ToggleControl"
-             parameter="AlchemyCameraNoZoomLimit" />
-        </menu_item_check>
-        <menu_item_check
-         label="Disable Sim Camera Collision Plane"
-         name="Disable Sim Camera Collision Plane">
-            <menu_item_check.on_check
-             function="CheckControl"
-             parameter="AlchemyIgnoreSimCameraConstraint" />
-            <menu_item_check.on_click
-             function="ToggleControl"
-             parameter="AlchemyIgnoreSimCameraConstraint" />
-        </menu_item_check>
+
         <menu_item_separator/>
 		<menu_item_check
          label="Avatar Nimble"
@@ -2432,7 +2405,7 @@ function="World.EnvPreset"
              parameter="AlchemyNimble" />
 		</menu_item_check>
 		<menu_item_separator/>
-		<menu_item_check
+        <menu_item_check
          label="High-res Snapshot"
          name="HighResSnapshot">
             <menu_item_check.on_check
@@ -2545,7 +2518,7 @@ function="World.EnvPreset"
             </menu_item_check>
         </menu>
 
-		<menu
+        <menu
          create_jump_keys="true"
          label="Hover Tips"
          name="Hover Tips"
@@ -2585,7 +2558,7 @@ function="World.EnvPreset"
                  function="View.CheckShowHoverTips" />
             </menu_item_check>
         </menu>
-		
+
         <menu
          create_jump_keys="true"
          label="Rendering Types"
@@ -2782,6 +2755,16 @@ function="World.EnvPreset"
                 <menu_item_check.on_click
                  function="Advanced.ToggleRenderType"
                  parameter="bump" />
+            </menu_item_check>
+            <menu_item_check
+             label="PBR"
+             name="Rendering Type PBR">
+                <menu_item_check.on_check
+                 function="Advanced.CheckRenderType"
+                 parameter="pbr" />
+                <menu_item_check.on_click
+                 function="Advanced.ToggleRenderType"
+                 parameter="pbr" />
             </menu_item_check>
         </menu>
         <menu
@@ -3022,10 +3005,9 @@ function="World.EnvPreset"
              parameter="all" />
         </menu_item_call>
      <menu_item_check
-         label="Show Developer Menu"
+         label="Show Develop Menu"
          name="Debug Mode"
-         shortcut="control|alt|Q"
-         use_mac_ctrl="true">
+         shortcut="control|alt|Q">
             <menu_item_check.on_check
              function="CheckControl"
              parameter="QAMode" />
@@ -3036,7 +3018,7 @@ function="World.EnvPreset"
     </menu>
     <menu
      create_jump_keys="true"
-     label="Developer"
+     label="Develop"
      name="Develop"
      tear_off="true"
      visible="false">
@@ -3088,18 +3070,6 @@ function="World.EnvPreset"
                 <menu_item_check.on_click
                  function="Advanced.ToggleConsole"
                  parameter="fast timers" />
-            </menu_item_check>
-            <menu_item_check
-             label="Memory"
-             name="Memory"
-             shortcut="control|shift|0"
-             use_mac_ctrl="true">
-                <menu_item_check.on_check
-                 function="Advanced.CheckConsole"
-                 parameter="memory view" />
-                <menu_item_check.on_click
-                 function="Advanced.ToggleConsole"
-                 parameter="memory view" />
             </menu_item_check>
             <menu_item_check
                label="Scene Statistics"
@@ -3371,7 +3341,7 @@ function="World.EnvPreset"
                  function="Advanced.ForceErrorOSException" />
                 <menu_item_call.on_visible
                  function="Advanced.EnableErrorOSException" />
-            </menu_item_call>            
+            </menu_item_call>
             <menu_item_call
              label="Force a Crash in a Coroutine"
              name="Force a Crash in a Coroutine">
@@ -3379,10 +3349,28 @@ function="World.EnvPreset"
                  function="Advanced.ForceErrorCoroutineCrash" />
             </menu_item_call>
             <menu_item_call
-             label="Force a Crash in a Thread"
-             name="Force a Crash in a Thread">
+             label="Force a Crash in a Coroprocedure"
+             name="Force a Crash in a Coroprocedure">
+                <menu_item_call.on_click
+                 function="Advanced.ForceErrorCoroprocedureCrash" />
+            </menu_item_call>
+            <menu_item_call
+             label="Force a Crash in a Work Queue"
+             name="Force a Crash in a Work Queue">
+                <menu_item_call.on_click
+                 function="Advanced.ForceErrorWorkQueueCrash" />
+            </menu_item_call>
+            <menu_item_call
+             label="Force an LLError Crash in a Thread"
+             name="Force an LLError Crash in a Thread">
                 <menu_item_call.on_click
                  function="Advanced.ForceErrorThreadCrash" />
+            </menu_item_call>
+            <menu_item_call
+             label="Force an Exception Crash in a Thread"
+             name="Force an Exception Crash in a Thread">
+                <menu_item_call.on_click
+                 function="Advanced.ForceExceptionThreadCrash" />
             </menu_item_call>
             <menu_item_call
              label="Force Disconnect Viewer"
@@ -3398,6 +3386,78 @@ function="World.EnvPreset"
                 parameter="mem_leaking" />
                </menu_item_call>
         </menu>
+      <menu
+         create_jump_keys="true"
+         label="GLTF"
+         name="GLTF"
+         tear_off="true">
+        <menu_item_call
+         label="Open..."
+         name="Open...">
+            <!--<menu_item_call.on_enable
+             function="EnableGLTF"/>-->
+          <menu_item_call.on_click
+           function="Advanced.ClickGLTFOpen" />
+        </menu_item_call>
+        <menu_item_call
+         label="Save As..."
+         name="Save As...">
+          <menu_item_call.on_enable
+             function="EnableGLTFSaveAs"/>
+          <menu_item_call.on_click
+           function="Advanced.ClickGLTFSaveAs" />
+        </menu_item_call>
+        <menu_item_call
+         label="Upload..."
+         name="Upload...">
+          <menu_item_call.on_enable
+             function="EnableGLTFUpload"/>
+          <menu_item_call.on_click
+           function="Advanced.ClickGLTFUpload" />
+        </menu_item_call>
+        <menu_item_call
+         label="Edit..."
+         name="Edit...">
+          <menu_item_call.on_enable
+             function="EnableGLTFUpload"/>
+          <menu_item_call.on_click
+           function="Advanced.ClickGLTFEdit" />
+        </menu_item_call>
+      </menu>
+      <menu
+         create_jump_keys="true"
+         label="Video"
+         name="Video"
+         tear_off="true">
+        <menu_item_call
+         label="1080x1920"
+         name="1080x1920">
+          <menu_item_call.on_click
+           function="Advanced.ClickResizeWindow"
+            parameter="1080x1920"/>
+        </menu_item_call>
+        <menu_item_call
+         label="1920x1080"
+         name="1920x1080">
+          <menu_item_call.on_click
+           function="Advanced.ClickResizeWindow"
+            parameter="1920x1080"/>
+        </menu_item_call>
+        <menu_item_call
+         label="1280x720"
+         name="1280x720">
+          <menu_item_call.on_click
+           function="Advanced.ClickResizeWindow"
+            parameter="1280x720"/>
+          </menu_item_call>
+        <menu_item_call
+          label="720x1280"
+         name="720x1280">
+          <menu_item_call.on_click
+           function="Advanced.ClickResizeWindow"
+            parameter="720x1280"/>
+          </menu_item_call>
+      </menu>
         <menu
          create_jump_keys="true"
          label="Render Tests"
@@ -3449,12 +3509,6 @@ function="World.EnvPreset"
            name="HDRI Preview">
             <menu_item_call.on_click
              function="Advanced.ClickHDRIPreview" />
-          </menu_item_call>
-          <menu_item_call
-           label="GLTF Scene Preview"
-           name="GLTF Scene Preview">
-            <menu_item_call.on_click
-             function="Advanced.ClickGLTFScenePreview" />
           </menu_item_call>
         </menu>
       <menu
@@ -3800,9 +3854,7 @@ function="World.EnvPreset"
             </menu_item_check>
             <menu_item_check
              label="Object-Object Occlusion"
-             name="Object-Object Occlusion"
-             shortcut="control|alt|shift|O"
-             use_mac_ctrl="true">
+             name="Object-Object Occlusion">
                 <menu_item_check.on_check
                  function="CheckControl"
                  parameter="UseOcclusion" />
@@ -3879,16 +3931,6 @@ function="World.EnvPreset"
                  parameter="RenderAutoMaskAlphaNonDeferred" />
             </menu_item_check>
             <menu_item_check
-             label="Automatic Alpha Masks (RMSE)"
-             name="Automatic Alpha Masks (RMSE)">
-                <menu_item_check.on_check
-                 function="CheckControl"
-                 parameter="RenderAutoMaskAlphaUseRMSE" />
-                <menu_item_check.on_click
-                 function="ToggleControl"
-                 parameter="RenderAutoMaskAlphaUseRMSE" />
-            </menu_item_check>
-            <menu_item_check
              label="Animation Textures"
              name="Animation Textures">
                 <menu_item_check.on_check
@@ -3938,6 +3980,26 @@ function="World.EnvPreset"
                  function="Advanced.HandleAttachedLightParticles"
                  parameter="RenderAttachedParticles" />
             </menu_item_check>
+            <menu_item_check
+              label="Render Avatar Cloth"
+             name="Render Avatar Cloth">
+                <menu_item_check.on_check
+                 function="CheckControl"
+                 parameter="RenderAvatarCloth" />
+                <menu_item_check.on_click
+                 function="ToggleControl"
+                 parameter="RenderAvatarCloth" />
+            </menu_item_check>
+            <menu_item_check
+             label="Collect Font Vertex Buffers"
+             name="Collect Font Vertex Buffers">
+                <menu_item_check.on_check
+                 function="CheckControl"
+                 parameter="CollectFontVertexBuffers" />
+                <menu_item_check.on_click
+                 function="ToggleControl"
+                 parameter="CollectFontVertexBuffers" />
+            </menu_item_check>
           <menu_item_separator />
           <menu_item_check
              label="Enable Shader Cache"
@@ -3956,13 +4018,6 @@ function="World.EnvPreset"
             <menu_item_call.on_click
              function="Advanced.ClearShaderCache" />
           </menu_item_call>
-          <menu_item_call
-            enabled="true"
-            label="Rebuild Terrain"
-            name="Rebuild Terrain">
-            <menu_item_call.on_click
-             function="Advanced.RebuildTerrain" />
-          </menu_item_call>
           <menu_item_separator />
           <menu_item_call
             enabled="true"
@@ -3971,6 +4026,7 @@ function="World.EnvPreset"
             <menu_item_call.on_click
              function="Develop.ClearCache" />
           </menu_item_call>
+          
         </menu>
 
         <menu
@@ -4206,6 +4262,38 @@ function="World.EnvPreset"
                  function="Advanced.ResetInterestLists" />
 			</menu_item_call>
 		</menu>
+        <!-- terrain -->
+        <menu
+         create_jump_keys="true"
+         label="Terrain"
+         name="DevelopTerrain"
+         tear_off="true">
+            <menu_item_call
+              enabled="true"
+              label="Rebuild Terrain"
+              name="Rebuild Terrain">
+              <menu_item_call.on_click
+               function="Advanced.RebuildTerrain" />
+            </menu_item_call>
+
+            <menu_item_separator/>
+
+            <menu_item_call
+              label="Create Local Paintmap"
+              name="Create Local Paintmap">
+              <menu_item_call.on_enable
+               function="EnableTerrainLocalPaintMap"/>
+              <menu_item_call.on_click
+               function="Advanced.TerrainCreateLocalPaintMap" />
+            </menu_item_call>
+            <menu_item_call
+              enabled="true"
+              label="Delete Local Paintmap"
+              name="Delete Local Paintmap">
+              <menu_item_call.on_click
+               function="Advanced.TerrainDeleteLocalPaintMap" />
+            </menu_item_call>
+		</menu>
         <menu
          create_jump_keys="true"
          label="UI"
@@ -4381,11 +4469,11 @@ function="World.EnvPreset"
               parameter="ui_preview" />
             </menu_item_call>
             <menu_item_call
-             label="Color Settings"
+             label="Show Color settings"
              name="Color Settings">
-             <menu_item_call.on_click
-              function="Floater.Toggle"
-              parameter="settings_color" />
+                <menu_item_call.on_click
+                 function="Floater.Toggle"
+                 parameter="settings_color" />
             </menu_item_call>
             <menu_item_call
                label="Reload Color Settings"
@@ -4399,6 +4487,13 @@ function="World.EnvPreset"
                 <menu_item_call.on_click
                  function="Floater.Show"
                  parameter="font_test" />
+            </menu_item_call>
+            <menu_item_call
+             label="Show SLapps Test"
+             name="Show SLapps Test">
+                <menu_item_call.on_click
+                 function="Floater.Show"
+                 parameter="slapp_test" />
             </menu_item_call>
             <menu_item_check
              label="Show XUI Names"
@@ -4524,6 +4619,26 @@ function="World.EnvPreset"
                      function="ToggleControl"
                      parameter="AllowSelectAvatar" />
                 </menu_item_check>
+                <menu_item_check
+                 label="Disable Look At Animation"
+                 name="Disable Look At Animation">
+                    <menu_item_check.on_check
+                     function="CheckControl"
+                     parameter="DisableLookAtAnimation" />
+                    <menu_item_check.on_click
+                     function="ToggleControl"
+                     parameter="DisableLookAtAnimation" />
+                </menu_item_check>
+                <menu_item_check
+                 label="Render Only Friends"
+                 name="Render Only Friends">
+                    <menu_item_check.on_check
+                     function="CheckControl"
+                     parameter="RenderAvatarFriendsOnly" />
+                    <menu_item_check.on_click
+                     function="ToggleControl"
+                     parameter="RenderAvatarFriendsOnly" />
+                </menu_item_check>
             </menu>
             <menu
              create_jump_keys="true"
@@ -4621,6 +4736,16 @@ function="World.EnvPreset"
                  function="Advanced.ToggleDebugCharacterVis" />
             </menu_item_check>
             <menu_item_check
+             label="Debug Character Rez State"
+             name="Debug Character Rez State">
+                <menu_item_check.on_check
+                 function="CheckControl"
+                 parameter="NameTagDebugAVRezState" />
+                <menu_item_check.on_click
+                 function="ToggleControl"
+                 parameter="NameTagDebugAVRezState" />
+            </menu_item_check>
+            <menu_item_check
              label="Show Collision Skeleton"
              name="Show Collision Skeleton">
                 <menu_item_check.on_check
@@ -4694,6 +4819,7 @@ function="World.EnvPreset"
         </menu>
 
         <menu_item_separator/>
+
         <menu_item_call
          label="Compress Images"
          name="Compress Images">
@@ -4706,13 +4832,6 @@ function="World.EnvPreset"
         <menu_item_call.on_click
          function="Advanced.CompressFileTest" />
       </menu_item_call>
-
-      <menu_item_call
-         label="Enable Visual Leak Detector"
-         name="Enable Visual Leak Detector">
-        <menu_item_call.on_click
-           function="Advanced.ToggleVisualLeakDetector" />
-        </menu_item_call>
       
         <menu_item_check
          label="Output Debug Minidump"

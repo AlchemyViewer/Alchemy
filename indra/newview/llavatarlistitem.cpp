@@ -36,6 +36,7 @@
 #include "llfloaterreg.h"
 #include "lltextutil.h"
 
+#include "alavatargroups.h"
 #include "llagent.h"
 #include "llavatarnamecache.h"
 #include "llavatariconctrl.h"
@@ -47,14 +48,15 @@
 #include "rlvactions.h"
 #include "rlvcommon.h"
 // [/RLVa:KB]
-#include "alavatargroups.h"
+
+#include <fmt/format.h>
 
 bool LLAvatarListItem::sStaticInitialized = false;
 S32 LLAvatarListItem::sLeftPadding = 0;
 S32 LLAvatarListItem::sNameRightPadding = 0;
 S32 LLAvatarListItem::sChildrenWidths[LLAvatarListItem::ALIC_COUNT];
 
-static LLWidgetNameRegistry::StaticRegistrar sRegisterAvatarListItemParams(&typeid(LLAvatarListItem::Params), "avatar_list_item");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterAvatarListItemParams(typeid(LLAvatarListItem::Params), "avatar_list_item");
 
 LLAvatarListItem::Params::Params()
 :   default_style("default_style"),
@@ -70,6 +72,15 @@ LLAvatarListItem::Params::Params()
 LLAvatarListItem::LLAvatarListItem(bool not_from_ui_factory/* = true*/)
     : LLPanel(),
     LLFriendObserver(),
+    mAvatarIcon(NULL),
+    mAvatarName(NULL),
+    mIconPermissionOnline(NULL),
+    mIconPermissionMap(NULL),
+    mIconPermissionEditMine(NULL),
+    mIconPermissionEditTheirs(NULL),
+    mSpeakingIndicator(NULL),
+    mInfoBtn(NULL),
+    mProfileBtn(NULL),
     mOnlineStatus(E_UNKNOWN),
     mShowInfoBtn(true),
     mShowProfileBtn(true),
@@ -79,6 +90,7 @@ LLAvatarListItem::LLAvatarListItem(bool not_from_ui_factory/* = true*/)
     mShowPermissions(SP_NEVER),
 //  mShowPermissions(false),
     mShowCompleteName(false),
+    mForceCompleteName(false),
     mHovered(false),
     mAvatarNameCacheConnection(),
     mGreyOutUsername(""),
@@ -105,7 +117,7 @@ LLAvatarListItem::~LLAvatarListItem()
     }
 }
 
-BOOL  LLAvatarListItem::postBuild()
+bool LLAvatarListItem::postBuild()
 {
     mAvatarIcon = getChild<LLAvatarIconCtrl>("avatar_icon");
     mAvatarName = getChild<LLTextBox>("avatar_name");
@@ -164,10 +176,10 @@ BOOL  LLAvatarListItem::postBuild()
     mIconPermissionOnlineTheirs->setEnabled(SP_NEVER != mShowPermissions);
     mIconPermissionMapTheirs->setEnabled(SP_NEVER != mShowPermissions);
 
-    return TRUE;
+    return true;
 }
 
-void LLAvatarListItem::handleVisibilityChange ( BOOL new_visibility )
+void LLAvatarListItem::handleVisibilityChange ( bool new_visibility )
 {
     //Adjust positions of icons (info button etc) when
     //speaking indicator visibility was changed/toggled while panel was closed (not visible)
@@ -367,7 +379,7 @@ void LLAvatarListItem::setTextFieldDistance(F32 distance)
     if (distance == 0)
         mTextField->setValue(LLStringUtil::null);
     else
-        mTextField->setValue(fmt::format(FMT_STRING("{:0.1f}m"), distance));
+        mTextField->setValue(fmt::format("{:0.0f}m", distance));
 }
 
 void LLAvatarListItem::setTextFieldSeconds(U32 secs_since)
@@ -387,19 +399,18 @@ void LLAvatarListItem::setShowProfileBtn(bool show)
 
 void LLAvatarListItem::showSpeakingIndicator(bool visible)
 {
-    // Already done? Then do nothing.
-    if (mSpeakingIndicator->getVisible() == (BOOL)visible)
-        return;
-// Disabled to not contradict with SpeakingIndicatorManager functionality. EXT-3976
-// probably this method should be totally removed.
-//  mSpeakingIndicator->setVisible(visible);
-//  updateChildren();
+    // used only to hide indicator to not contradict with SpeakingIndicatorManager functionality
+    if (mSpeakingIndicator && !visible)
+    {
+        mSpeakingIndicator->setIsActiveChannel(visible);
+        mSpeakingIndicator->setShowParticipantsSpeaking(visible);
+    }
 }
 
 void LLAvatarListItem::setAvatarIconVisible(bool visible)
 {
     // Already done? Then do nothing.
-    if (mAvatarIcon->getVisible() == (BOOL)visible)
+    if (mAvatarIcon->getVisible() == (bool)visible)
     {
         return;
     }
@@ -492,7 +503,7 @@ void LLAvatarListItem::onModifyRightsConfirmationCallback(const LLSD& notificati
     }
 }
 
-BOOL LLAvatarListItem::handleDoubleClick(S32 x, S32 y, MASK mask)
+bool LLAvatarListItem::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
 //  if(mInfoBtn->getRect().pointInRect(x, y))
 // [RVLa:KB] - Checked: RLVa-1.2.2
@@ -500,7 +511,7 @@ BOOL LLAvatarListItem::handleDoubleClick(S32 x, S32 y, MASK mask)
 // [/SL:KB]
     {
         onInfoBtnClick();
-        return TRUE;
+        return true;
     }
 //  if(mProfileBtn->getRect().pointInRect(x, y))
 // [RLVa:KB] - Checked: RLVa-1.2.2
@@ -508,7 +519,7 @@ BOOL LLAvatarListItem::handleDoubleClick(S32 x, S32 y, MASK mask)
 // [/SL:KB]
     {
         onProfileBtnClick();
-        return TRUE;
+        return true;
     }
     return LLPanel::handleDoubleClick(x, y, mask);
 }
@@ -558,9 +569,9 @@ void LLAvatarListItem::onAvatarNameCache(const LLAvatarName& av_name)
 {
     mAvatarNameCacheConnection.disconnect();
 
-    mGreyOutUsername.clear();
-    std::string name_string = mShowCompleteName? av_name.getCompleteName(false) : av_name.getDisplayName();
-    if(av_name.getCompleteName() != av_name.getUserName())
+    mGreyOutUsername = "";
+    std::string name_string = mShowCompleteName? av_name.getCompleteName(false, mForceCompleteName) : av_name.getDisplayName();
+    if(av_name.getCompleteName(false, mForceCompleteName) != av_name.getUserName())
     {
         mGreyOutUsername = "[ " + av_name.getUserName(true) + " ]";
         LLStringUtil::toLower(mGreyOutUsername);
@@ -624,7 +635,7 @@ std::string LLAvatarListItem::formatSeconds(U32 secs)
     }
 
     LLStringUtil::format_map_t args;
-    args["[COUNT]"] = llformat("%u", count);
+    args["[COUNT]"] = fmt::to_string(count);
     return getString(fmt, args);
 }
 
@@ -690,7 +701,6 @@ void LLAvatarListItem::initChildrenWidths(LLAvatarListItem* avatar_item)
 
     S32 permission_map_theirs_width = avatar_item->mIconPermissionEditTheirs->getRect().mLeft - avatar_item->mIconPermissionMapTheirs->getRect().mLeft;
     S32 permission_online_theirs_width = avatar_item->mIconPermissionMapTheirs->getRect().mLeft - avatar_item->mIconPermissionOnlineTheirs->getRect().mLeft;
-
 
     // avatar icon width + padding
     S32 icon_width = avatar_item->mAvatarName->getRect().mLeft - avatar_item->mAvatarIcon->getRect().mLeft;

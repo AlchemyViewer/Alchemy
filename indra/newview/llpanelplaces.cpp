@@ -74,6 +74,10 @@
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+#include "rlvhandler.h"
+// [/RLVa:KB]
 
 // Constants
 static const F32 PLACE_INFO_UPDATE_INTERVAL = 3.0;
@@ -108,7 +112,7 @@ public:
         }
 
         LLUUID parcel_id;
-        if (!parcel_id.set(params[0].asStringRef(), FALSE))
+        if (!parcel_id.set(params[0], false))
         {
             return false;
         }
@@ -221,7 +225,7 @@ public:
     }
     /*virtual*/ void setErrorStatus(S32 status, const std::string& reason)
     {
-        LL_ERRS() << "Can't complete remote parcel request. Http Status: "
+        LL_WARNS() << "Can't complete remote parcel request. Http Status: "
                << status << ". Reason : " << reason << LL_ENDL;
     }
 
@@ -275,7 +279,7 @@ LLPanelPlaces::~LLPanelPlaces()
     }
 }
 
-BOOL LLPanelPlaces::postBuild()
+bool LLPanelPlaces::postBuild()
 {
     mTeleportBtn = getChild<LLButton>("teleport_btn");
     mTeleportBtn->setClickedCallback(boost::bind(&LLPanelPlaces::onTeleportButtonClicked, this));
@@ -309,7 +313,7 @@ BOOL LLPanelPlaces::postBuild()
 
     LLDragAndDropButton* trash_btn = (LLDragAndDropButton*)mRemoveSelectedBtn;
     trash_btn->setDragAndDropHandler(boost::bind(&LLPanelPlaces::handleDragAndDropToTrash, this
-        , _4 // BOOL drop
+        , _4 // bool drop
         , _5 // EDragAndDropType cargo_type
         , _6 // void* cargo_data
         , _7 // EAcceptance* accept
@@ -323,7 +327,7 @@ BOOL LLPanelPlaces::postBuild()
     mPlaceMenu = LLUICtrlFactory::getInstance()->createFromFile<LLToggleableMenu>("menu_place.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
     if (mPlaceMenu)
     {
-        mPlaceMenu->setAlwaysShowMenu(TRUE);
+        mPlaceMenu->setAlwaysShowMenu(true);
     }
     else
     {
@@ -343,7 +347,7 @@ BOOL LLPanelPlaces::postBuild()
     }
 
     mButtonsContainer = getChild<LLPanel>("button_layout_panel");
-    mButtonsContainer->setVisible(FALSE);
+    mButtonsContainer->setVisible(false);
     mFilterContainer = getChild<LLLayoutStack>("top_menu_panel");
 
     mFilterEditor = getChild<LLFilterEditor>("Filter");
@@ -360,7 +364,7 @@ BOOL LLPanelPlaces::postBuild()
     mPlaceProfile = findChild<LLPanelPlaceProfile>("panel_place_profile");
     mLandmarkInfo = findChild<LLPanelLandmarkInfo>("panel_landmark_info");
     if (!mPlaceProfile || !mLandmarkInfo)
-        return FALSE;
+        return false;
 
     mPlaceProfileBackBtn = mPlaceProfile->getChild<LLButton>("back_btn");
     mPlaceProfileBackBtn->setClickedCallback(boost::bind(&LLPanelPlaces::onBackButtonClicked, this));
@@ -379,16 +383,10 @@ BOOL LLPanelPlaces::postBuild()
     LLButton* edit_btn = mLandmarkInfo->getChild<LLButton>("edit_btn");
     edit_btn->setCommitCallback(boost::bind(&LLPanelPlaces::onEditButtonClicked, this));
 
-    mOptionLP = getChild<LLLayoutPanel>("lp_options");
-    mLayoutPanel2 = getChild<LLLayoutPanel>("lp2");
-
-    mAddBtnPanel = getChild<LLUICtrl>("add_btn_panel");
-    mTrashBtnPanel = getChild<LLUICtrl>("trash_btn_panel");
-
     createTabs();
     updateVerbs();
 
-    return TRUE;
+    return true;
 }
 
 void LLPanelPlaces::onOpen(const LLSD& key)
@@ -409,9 +407,9 @@ void LLPanelPlaces::onOpen(const LLSD& key)
             // The second toggle forces the list to be set to Landmark.
             // This avoids extracting and duplicating all the state logic from togglePlaceInfoPanel()
             // here or some specific private method
-            togglePlaceInfoPanel(FALSE);
+            togglePlaceInfoPanel(false);
             mPlaceInfoType = key_type;
-            togglePlaceInfoPanel(FALSE);
+            togglePlaceInfoPanel(false);
             // Update the active tab
             onTabSelected();
             // Update the buttons at the bottom of the panel
@@ -441,7 +439,7 @@ void LLPanelPlaces::onOpen(const LLSD& key)
             mPosGlobal.setZero();
             mItem = NULL;
             mRegionId.setNull();
-            togglePlaceInfoPanel(TRUE);
+            togglePlaceInfoPanel(true);
 
             if (mPlaceInfoType == AGENT_INFO_TYPE)
             {
@@ -456,7 +454,6 @@ void LLPanelPlaces::onOpen(const LLSD& key)
                 LLUUID dest_folder = key["dest_folder"];
                 mLandmarkInfo->setInfoAndCreateLandmark(dest_folder);
 
-                LLVector3 local_pos;
                 if (key.has("x") && key.has("y") && key.has("z"))
                 {
                     mPosGlobal = LLVector3d(key["x"].asReal(),
@@ -466,12 +463,11 @@ void LLPanelPlaces::onOpen(const LLSD& key)
                 else
                 {
                     mPosGlobal = gAgent.getPositionGlobal();
-                    local_pos = gAgent.getPositionAgent();
                 }
 
-                mLandmarkInfo->displayParcelInfo(LLUUID(), local_pos, mPosGlobal);
+                mLandmarkInfo->displayParcelInfo(LLUUID(), mPosGlobal);
 
-                mSaveBtn->setEnabled(FALSE);
+                mSaveBtn->setEnabled(false);
             }
             else if (mPlaceInfoType == LANDMARK_INFO_TYPE)
             {
@@ -482,7 +478,7 @@ void LLPanelPlaces::onOpen(const LLSD& key)
                 if (!item)
                     return;
 
-                BOOL is_editable = gInventory.isObjectDescendentOf(id, gInventory.getRootFolderID())
+                bool is_editable = gInventory.isObjectDescendentOf(id, gInventory.getRootFolderID())
                                    && item->getPermissions().allowModifyBy(gAgent.getID());
                 mLandmarkInfo->setCanEdit(is_editable);
 
@@ -504,7 +500,7 @@ void LLPanelPlaces::onOpen(const LLSD& key)
                     mPosGlobal = LLVector3d(key["x"].asReal(),
                                             key["y"].asReal(),
                                             key["z"].asReal());
-                    mPlaceProfile->displayParcelInfo(LLUUID(), LLVector3(), mPosGlobal);
+                    mPlaceProfile->displayParcelInfo(LLUUID(), mPosGlobal);
                 }
 
                 mPlaceProfile->setInfoType(LLPanelPlaceInfo::PLACE);
@@ -519,7 +515,7 @@ void LLPanelPlaces::onOpen(const LLSD& key)
                 mPosGlobal = hist_items[index].mGlobalPos;
 
                 mPlaceProfile->setInfoType(LLPanelPlaceInfo::TELEPORT_HISTORY);
-                mPlaceProfile->displayParcelInfo(LLUUID(), hist_items[index].mLocalPos, mPosGlobal);
+                mPlaceProfile->displayParcelInfo(LLUUID(), mPosGlobal);
             }
 
             updateVerbs();
@@ -582,7 +578,7 @@ void LLPanelPlaces::setItem(LLInventoryItem* item)
     }
 
     // Check if item is in agent's inventory and he has the permission to modify it.
-    BOOL is_landmark_editable = gInventory.isObjectDescendentOf(mItem->getUUID(), gInventory.getRootFolderID()) &&
+    bool is_landmark_editable = gInventory.isObjectDescendentOf(mItem->getUUID(), gInventory.getRootFolderID()) &&
                                 mItem->getPermissions().allowModifyBy(gAgent.getID());
 
     mSaveBtn->setEnabled(is_landmark_editable);
@@ -635,7 +631,7 @@ void LLPanelPlaces::onLandmarkLoaded(LLLandmark* landmark)
     LLUUID region_id;
     landmark->getRegionID(region_id);
     landmark->getGlobalPos(mPosGlobal);
-    mLandmarkInfo->displayParcelInfo(region_id, landmark->getRegionPos(), mPosGlobal);
+    mLandmarkInfo->displayParcelInfo(region_id, mPosGlobal);
 
     updateVerbs();
 }
@@ -659,7 +655,7 @@ void LLPanelPlaces::onFilterEdit(const std::string& search_string, bool force_fi
 void LLPanelPlaces::onTabSelected()
 {
     mActivePanel = dynamic_cast<LLPanelPlacesTab*>(mTabContainer->getCurrentPanel());
-    if (!mActivePanel)
+    if (!mActivePanel || !mTabsCreated)
         return;
 
     onFilterEdit(mActivePanel->getFilterSubString(), true);
@@ -668,10 +664,10 @@ void LLPanelPlaces::onTabSelected()
     // History panel does not support deletion nor creation
     // Hide menus
     bool supports_create = mActivePanel->getCreateMenu() != NULL;
-    mAddBtnPanel->setVisible(supports_create);
+    childSetVisible("add_btn_panel", supports_create);
 
     // favorites and inventory can remove items, history can clear history
-    mTrashBtnPanel->setVisible(TRUE);
+    childSetVisible("trash_btn_panel", true);
 
     if (supports_create)
     {
@@ -792,7 +788,7 @@ void LLPanelPlaces::onEditButtonClicked()
 
     isLandmarkEditModeOn = true;
 
-    mLandmarkInfo->toggleLandmarkEditMode(TRUE);
+    mLandmarkInfo->toggleLandmarkEditMode(true);
 
     updateVerbs();
 }
@@ -839,7 +835,7 @@ void LLPanelPlaces::onSaveButtonClicked()
         gInventory.accountForUpdate(update);
 
         new_item->setParent(folder_id);
-        new_item->updateParentOnServer(FALSE);
+        new_item->updateParentOnServer(false);
     }
 
     gInventory.updateItem(new_item);
@@ -859,7 +855,7 @@ void LLPanelPlaces::onCancelButtonClicked()
     }
     else
     {
-        mLandmarkInfo->toggleLandmarkEditMode(FALSE);
+        mLandmarkInfo->toggleLandmarkEditMode(false);
         isLandmarkEditModeOn = false;
 
         updateVerbs();
@@ -906,7 +902,7 @@ void LLPanelPlaces::onOverflowButtonClicked()
     {
         menu = mLandmarkMenu;
 
-        BOOL is_landmark_removable = FALSE;
+        bool is_landmark_removable = false;
         if (mItem.notNull())
         {
             const LLUUID& item_id = mItem->getUUID();
@@ -986,7 +982,7 @@ void LLPanelPlaces::onOverflowMenuItemClicked(const LLSD& param)
 
 void LLPanelPlaces::onBackButtonClicked()
 {
-    togglePlaceInfoPanel(FALSE);
+    togglePlaceInfoPanel(false);
 
     // Resetting mPlaceInfoType when Place Info panel is closed.
     mPlaceInfoType = LLStringUtil::null;
@@ -1031,7 +1027,7 @@ void LLPanelPlaces::onRemoveButtonClicked()
     }
 }
 
-bool LLPanelPlaces::handleDragAndDropToTrash(BOOL drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept)
+bool LLPanelPlaces::handleDragAndDropToTrash(bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept)
 {
     if (mActivePanel)
     {
@@ -1040,7 +1036,7 @@ bool LLPanelPlaces::handleDragAndDropToTrash(BOOL drop, EDragAndDropType cargo_t
     return false;
 }
 
-void LLPanelPlaces::togglePlaceInfoPanel(BOOL visible)
+void LLPanelPlaces::togglePlaceInfoPanel(bool visible)
 {
     if (!mPlaceProfile || !mLandmarkInfo)
         return;
@@ -1063,7 +1059,7 @@ void LLPanelPlaces::togglePlaceInfoPanel(BOOL visible)
             // to avoid text blinking.
             mResetInfoTimer.setTimerExpirySec(PLACE_INFO_UPDATE_INTERVAL);
 
-            mLandmarkInfo->setVisible(FALSE);
+            mLandmarkInfo->setVisible(false);
         }
         else if (mPlaceInfoType == AGENT_INFO_TYPE)
         {
@@ -1079,7 +1075,7 @@ void LLPanelPlaces::togglePlaceInfoPanel(BOOL visible)
              mPlaceInfoType == LANDMARK_TAB_INFO_TYPE)
     {
         mLandmarkInfo->setVisible(visible);
-        mPlaceProfile->setVisible(FALSE);
+        mPlaceProfile->setVisible(false);
         if (visible)
         {
             mLandmarkInfo->resetLocation();
@@ -1103,7 +1099,7 @@ void LLPanelPlaces::togglePlaceInfoPanel(BOOL visible)
                 mTabContainer->selectTabPanel(landmarks_panel);
                 if (mItem.notNull())
                 {
-                    landmarks_panel->setItemSelected(mItem->getUUID(), TRUE);
+                    landmarks_panel->setItemSelected(mItem->getUUID(), true);
                 }
                 else
                 {
@@ -1115,7 +1111,7 @@ void LLPanelPlaces::togglePlaceInfoPanel(BOOL visible)
 }
 
 // virtual
-void LLPanelPlaces::onVisibilityChange(BOOL new_visibility)
+void LLPanelPlaces::onVisibilityChange(bool new_visibility)
 {
     LLPanel::onVisibilityChange(new_visibility);
 
@@ -1218,10 +1214,10 @@ void LLPanelPlaces::createTabs()
         // History panel does not support deletion nor creation
         // Hide menus
         bool supports_create = mActivePanel->getCreateMenu() != NULL;
-        mAddBtnPanel->setVisible(supports_create);
+        childSetVisible("add_btn_panel", supports_create);
 
         // favorites and inventory can remove items, history can clear history
-        mTrashBtnPanel->setVisible(TRUE);
+        childSetVisible("trash_btn_panel", true);
 
         if (supports_create)
         {
@@ -1299,9 +1295,8 @@ void LLPanelPlaces::updateVerbs()
 
     bool show_options_btn = is_place_info_visible && !is_create_landmark_visible && !isLandmarkEditModeOn;
     mOverflowBtn->setVisible(show_options_btn);
-
-    mOptionLP->setVisible(show_options_btn);
-    mLayoutPanel2->setVisible(!show_options_btn);
+    getChild<LLLayoutPanel>("lp_options")->setVisible(show_options_btn);
+    getChild<LLLayoutPanel>("lp2")->setVisible(!show_options_btn);
 
     if (is_place_info_visible)
     {
@@ -1314,10 +1309,20 @@ void LLPanelPlaces::updateVerbs()
             mTeleportBtn->setEnabled(have_3d_pos &&
                                      !LLViewerParcelMgr::getInstance()->inAgentParcel(mPosGlobal));
         }
-        else if (mPlaceInfoType == LANDMARK_INFO_TYPE || mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+// [RLVa:KB]
+        else if (mPlaceInfoType == LANDMARK_INFO_TYPE)
         {
-            mTeleportBtn->setEnabled(have_3d_pos);
+            mTeleportBtn->setEnabled(have_3d_pos && !gRlvHandler.hasBehaviour(RLV_BHVR_TPLM));
         }
+        else if (mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+        {
+            mTeleportBtn->setEnabled(have_3d_pos && RlvActions::canTeleportToLocation());
+        }
+// [/RLVa:KB]
+//      else if (mPlaceInfoType == LANDMARK_INFO_TYPE || mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+//      {
+//          mTeleportBtn->setEnabled(have_3d_pos);
+//      }
     }
     else
     {
@@ -1344,6 +1349,13 @@ LLPanelPlaceInfo* LLPanelPlaces::getCurrentInfoPanel()
     return NULL;
 }
 
+void LLPanelPlaces::hideBackBtn()
+{
+    mPlaceProfileBackBtn->setVisible(false);
+    setBackgroundVisible(false);
+    mPlaceProfile->setBackgroundVisible(false);
+}
+
 static bool is_agent_in_selected_parcel(LLParcel* parcel)
 {
     LLViewerParcelMgr* parcel_mgr = LLViewerParcelMgr::getInstance();
@@ -1358,6 +1370,12 @@ static bool is_agent_in_selected_parcel(LLParcel* parcel)
 
 static void onSLURLBuilt(std::string& slurl)
 {
+    if (slurl.empty())
+    {
+        LLNotificationsUtil::add("LandmarkLocationUnknown");
+        return;
+    }
+
     LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(slurl));
 
     LLSD args;

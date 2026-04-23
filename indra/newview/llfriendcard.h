@@ -33,7 +33,7 @@
 
 class LLViewerInventoryItem;
 
-class LLFriendCardsManager final
+class LLFriendCardsManager
     : public LLSingleton<LLFriendCardsManager>
     , public LLFriendObserver
 {
@@ -44,6 +44,8 @@ class LLFriendCardsManager final
     friend class CreateFriendCardCallback;
 
 public:
+    typedef std::map<LLUUID, uuid_vec_t > folderid_buddies_map_t;
+
     enum EManagerState
     {
         INIT = 1,
@@ -94,7 +96,7 @@ public:
     void syncFriendCardsFolders();
 
 private:
-    typedef boost::function<void()> callback_t;
+    typedef std::function<void()> callback_t;
 
 
 

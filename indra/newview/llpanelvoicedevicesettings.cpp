@@ -51,7 +51,7 @@ LLPanelVoiceDeviceSettings::LLPanelVoiceDeviceSettings()
     mCtrlOutputDevices = NULL;
     mInputDevice = gSavedSettings.getString("VoiceInputAudioDevice");
     mOutputDevice = gSavedSettings.getString("VoiceOutputAudioDevice");
-    mDevicesUpdated = FALSE;  //obsolete
+    mDevicesUpdated = false;  //obsolete
     mUseTuningMode = true;
 
     // grab "live" mic volume level
@@ -63,7 +63,7 @@ LLPanelVoiceDeviceSettings::~LLPanelVoiceDeviceSettings()
 {
 }
 
-BOOL LLPanelVoiceDeviceSettings::postBuild()
+bool LLPanelVoiceDeviceSettings::postBuild()
 {
     LLSlider* volume_slider = getChild<LLSlider>("mic_volume_slider");
     // set mic volume tuning slider based on last mic volume setting
@@ -88,11 +88,11 @@ BOOL LLPanelVoiceDeviceSettings::postBuild()
     mCtrlInputDevices->setMouseDownCallback(boost::bind(&LLPanelVoiceDeviceSettings::onInputDevicesClicked, this));
 
 
-    return TRUE;
+    return true;
 }
 
 // virtual
-void LLPanelVoiceDeviceSettings::onVisibilityChange ( BOOL new_visibility )
+void LLPanelVoiceDeviceSettings::onVisibilityChange ( bool new_visibility )
 {
     if (new_visibility)
     {
@@ -103,7 +103,7 @@ void LLPanelVoiceDeviceSettings::onVisibilityChange ( BOOL new_visibility )
         cleanup();
         // when closing this window, turn of visiblity control so that
         // next time preferences is opened we don't suspend voice
-        gSavedSettings.setBOOL("ShowDeviceSettings", FALSE);
+        gSavedSettings.setBOOL("ShowDeviceSettings", false);
     }
 }
 void LLPanelVoiceDeviceSettings::draw()
@@ -116,12 +116,12 @@ void LLPanelVoiceDeviceSettings::draw()
     if (voice_enabled)
     {
         getChildView("wait_text")->setVisible( !is_in_tuning_mode && mUseTuningMode);
-        getChildView("disabled_text")->setVisible(FALSE);
-        mUnmuteBtn->setVisible(FALSE);
+        getChildView("disabled_text")->setVisible(false);
+        mUnmuteBtn->setVisible(false);
     }
     else
     {
-        getChildView("wait_text")->setVisible(FALSE);
+        getChildView("wait_text")->setVisible(false);
 
         static LLCachedControl<bool> chat_enabled(gSavedSettings, "EnableVoiceChat");
         // If voice isn't enabled, it is either disabled or muted
@@ -144,7 +144,7 @@ void LLPanelVoiceDeviceSettings::draw()
             LLView* bar_view = getChild<LLView>(view_name);
             if (bar_view)
             {
-                gl_rect_2d(bar_view->getRect(), LLColor4::grey, TRUE);
+                gl_rect_2d(bar_view->getRect(), LLColor4::grey, true);
 
                 LLColor4 color;
                 if (power_bar_idx < discrete_power)
@@ -158,7 +158,7 @@ void LLPanelVoiceDeviceSettings::draw()
 
                 LLRect color_rect = bar_view->getRect();
                 color_rect.stretch(-1);
-                gl_rect_2d(color_rect, color, TRUE);
+                gl_rect_2d(color_rect, color, true);
             }
         }
     }
@@ -240,13 +240,38 @@ void LLPanelVoiceDeviceSettings::refresh()
         if(mCtrlInputDevices)
         {
             mCtrlInputDevices->removeall();
-            mCtrlInputDevices->add(getLocalizedDeviceName(mInputDevice), mInputDevice, ADD_BOTTOM);
+            auto it = mLocalizedDeviceNames.find(mInputDevice);
+            if (it != mLocalizedDeviceNames.end())
+            {
+                mCtrlInputDevices->add(getLocalizedDeviceName(mInputDevice), mInputDevice, ADD_BOTTOM);
+            }
+            else
+            {
+                // Display name generaly doesn't match value.
+                // Value is an id so it's not nessesary readable,
+                // might not even be valid (disconnected usb).
+                // Until we get the data, don't change the device,
+                // otherwise box might override the control.
+                // But show a readable placeholder.
+                // Combo is disabled so it's safe to show
+                // a placeholder.
+                mCtrlInputDevices->add(getString("device_not_loaded"), mInputDevice, ADD_BOTTOM);
+            }
             mCtrlInputDevices->setValue(mInputDevice);
         }
         if(mCtrlOutputDevices)
         {
             mCtrlOutputDevices->removeall();
-            mCtrlOutputDevices->add(getLocalizedDeviceName(mOutputDevice), mOutputDevice, ADD_BOTTOM);
+            auto it = mLocalizedDeviceNames.find(mOutputDevice);
+            if (it != mLocalizedDeviceNames.end())
+            {
+                mCtrlOutputDevices->add(getLocalizedDeviceName(mOutputDevice), mOutputDevice, ADD_BOTTOM);
+            }
+            else
+            {
+                // Don't change the device, only the label
+                mCtrlOutputDevices->add(getString("device_not_loaded"), mOutputDevice, ADD_BOTTOM);
+            }
             mCtrlOutputDevices->setValue(mOutputDevice);
         }
     }
@@ -267,7 +292,7 @@ void LLPanelVoiceDeviceSettings::refresh()
                 }
 
                 // Fix invalid input audio device preference.
-                if (!mCtrlInputDevices->setSelectedByValue(mInputDevice, TRUE))
+                if (!mCtrlInputDevices->setSelectedByValue(mInputDevice, true))
                 {
                     mCtrlInputDevices->setValue(DEFAULT_DEVICE);
                     gSavedSettings.setString("VoiceInputAudioDevice", DEFAULT_DEVICE);
@@ -290,7 +315,7 @@ void LLPanelVoiceDeviceSettings::refresh()
                 }
 
                 // Fix invalid output audio device preference.
-                if (!mCtrlOutputDevices->setSelectedByValue(mOutputDevice, TRUE))
+                if (!mCtrlOutputDevices->setSelectedByValue(mOutputDevice, true))
                 {
                     mCtrlOutputDevices->setValue(DEFAULT_DEVICE);
                     gSavedSettings.setString("VoiceOutputAudioDevice", DEFAULT_DEVICE);
@@ -336,7 +361,7 @@ std::string LLPanelVoiceDeviceSettings::getLocalizedDeviceName(const std::string
 
 void LLPanelVoiceDeviceSettings::onCommitInputDevice()
 {
-    if(LLVoiceClient::instanceExists())
+    if(LLVoiceClient::getInstance())
     {
         mInputDevice = mCtrlInputDevices->getValue().asString();
         LLVoiceClient::getInstance()->setCaptureDevice(mInputDevice);
@@ -348,7 +373,7 @@ void LLPanelVoiceDeviceSettings::onCommitInputDevice()
 
 void LLPanelVoiceDeviceSettings::onCommitOutputDevice()
 {
-    if(LLVoiceClient::instanceExists())
+    if(LLVoiceClient::getInstance())
     {
 
         mOutputDevice = mCtrlOutputDevices->getValue().asString();
@@ -371,5 +396,5 @@ void LLPanelVoiceDeviceSettings::onInputDevicesClicked()
 
 void LLPanelVoiceDeviceSettings::onCommitUnmute()
 {
-    gSavedSettings.setBOOL("EnableVoiceChat", TRUE);
+    gSavedSettings.setBOOL("EnableVoiceChat", true);
 }

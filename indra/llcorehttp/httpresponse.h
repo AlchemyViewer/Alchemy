@@ -57,7 +57,7 @@ class HttpHeaders;
 /// Allocation:  Refcounted, heap only.  Caller of the constructor
 /// is given a refcount.
 ///
-class HttpResponse final : public LLCoreInt::RefCounted
+class HttpResponse : public LLCoreInt::RefCounted
 {
 public:
     HttpResponse();
@@ -65,8 +65,8 @@ public:
 protected:
     virtual ~HttpResponse();                            // Use release()
 
-    HttpResponse(const HttpResponse &) = delete;                    // Not defined
-    void operator=(const HttpResponse &) = delete;              // Not defined
+    HttpResponse(const HttpResponse&) = delete;
+    void operator=(const HttpResponse&) = delete;
 
 public:
     /// Statistics for the HTTP
@@ -227,11 +227,11 @@ protected:
     std::string         mContentType;
     unsigned int        mRetries;
     unsigned int        m503Retries;
-    std::string     mRequestUrl;
-    std::string     mRequestMethod;
+    std::string         mRequestUrl;
+    std::string         mRequestMethod;
 
     TransferStats::ptr_t    mStats;
-    U64         mRequestId;
+    U64                     mRequestId;
 };
 
 

@@ -36,6 +36,9 @@ const S32 RefCounted::NOT_REF_COUNTED;
 
 #endif  // ! LL_WINDOWS
 
+RefCounted::~RefCounted()
+{}
+
 
 } // end namespace LLCoreInt
 

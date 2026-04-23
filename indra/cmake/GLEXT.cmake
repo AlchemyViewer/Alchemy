@@ -1,12 +1,7 @@
 # -*- cmake -*-
-include(Prebuilt)
-include(GLH)
-include(GLM)
-include(SDL2)
+include_guard()
 
-add_library( ll::glext INTERFACE IMPORTED )
-if(NOT SDL_FOUND)
-  use_system_binary(glext)
-  use_prebuilt_binary(glext)
-endif()
+add_library(ll::glext INTERFACE IMPORTED)
 
+find_path(OPENGL_REGISTRY_INCLUDE_DIRS "GL/glcorearb.h" REQUIRED)
+target_include_directories(ll::glext SYSTEM INTERFACE ${OPENGL_REGISTRY_INCLUDE_DIRS})

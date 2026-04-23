@@ -136,7 +136,6 @@ LLTrace::CountStatHandle<>  FPS("FPS", "Frames rendered"),
                             UPLOAD_TEXTURE("uploadtexture", "Textures uploaded"),
                             EDIT_TEXTURE("edittexture", "Changes to textures on objects"),
                             KILLED("killed", "Number of times killed"),
-                            FRAMETIME_DOUBLED("frametimedoubled", "Ratio of frames 2x longer than previous"),
                             TEX_BAKES("texbakes", "Number of times avatar textures have been baked"),
                             TEX_REBAKES("texrebakes", "Number of times avatar textures have been forced to rebake"),
                             NUM_NEW_OBJECTS("numnewobjectsstat", "Number of objects in scene that were not previously in cache");
@@ -155,11 +154,6 @@ LLTrace::CountStatHandle<F64Kilobytes >
                             TEXTURE_NETWORK_DATA_RECEIVED("texturedatareceived", "Network data received for textures"),
                             MESSAGE_SYSTEM_DATA_IN("messagedatain", "Incoming message system network data"),
                             MESSAGE_SYSTEM_DATA_OUT("messagedataout", "Outgoing message system network data");
-
-LLTrace::CountStatHandle<F64Seconds >
-                            SIM_20_FPS_TIME("sim20fpstime", "Seconds with sim FPS below 20"),
-                            SIM_PHYSICS_20_FPS_TIME("simphysics20fpstime", "Seconds with physics FPS below 20"),
-                            LOSS_5_PERCENT_TIME("loss5percenttime", "Seconds with packet loss > 5%");
 
 SimMeasurement<>            SIM_TIME_DILATION("simtimedilation", "Simulator time scale", LL_SIM_STAT_TIME_DILATION),
                             SIM_FPS("simfps", "Simulator framerate", LL_SIM_STAT_FPS),
@@ -204,9 +198,6 @@ static LLTrace::SampleStatHandle<bool>
                             CHAT_BUBBLES("chatbubbles", "Chat Bubbles Enabled");
 
 LLTrace::SampleStatHandle<F64Megabytes > FORMATTED_MEM("formattedmemstat");
-LLTrace::SampleStatHandle<F64Kilobytes >    DELTA_BANDWIDTH("deltabandwidth", "Increase/Decrease in bandwidth based on packet loss"),
-                                                            MAX_BANDWIDTH("maxbandwidth", "Max bandwidth setting");
-
 
 SimMeasurement<F64Milliseconds >    SIM_FRAME_TIME("simframemsec", "", LL_SIM_STAT_FRAMEMS),
                                                     SIM_NET_TIME("simnetmsec", "", LL_SIM_STAT_NETMS),
@@ -227,9 +218,23 @@ SimMeasurement<F64Kilobytes >   SIM_UNACKED_BYTES("simtotalunackedbytes", "", LL
 SimMeasurement<F64Megabytes >   SIM_PHYSICS_MEM("physicsmemoryallocated", "", LL_SIM_STAT_SIMPHYSICSMEMORY);
 
 LLTrace::SampleStatHandle<F64Milliseconds > FRAMETIME_JITTER("frametimejitter", "Average delta between successive frame times"),
-                                            FRAMETIME_SLEW("frametimeslew", "Average delta between frame time and mean"),
                                             FRAMETIME("frametime", "Measured frame time"),
-                                            SIM_PING("simpingstat");
+                                            SIM_PING("simpingstat"),
+                                            FRAMETIME_JITTER_99TH("frametimejitter99", "99th percentile of frametime jitter over the last 5 seconds."),
+                                            FRAMETIME_JITTER_95TH("frametimejitter95", "99th percentile of frametime jitter over the last 5 seconds."),
+                                            FRAMETIME_99TH("frametime99", "99th percentile of frametime over the last 5 seconds."),
+                                            FRAMETIME_95TH("frametime95", "99th percentile of frametime over the last 5 seconds."),
+                                            FRAMETIME_JITTER_CUMULATIVE("frametimejitcumulative", "Cumulative frametime jitter over the session."),
+                                            FRAMETIME_JITTER_STDDEV("frametimejitterstddev", "Standard deviation of frametime jitter in a 5 second period."),
+                                            FRAMETIME_STDDEV("frametimestddev", "Standard deviation of frametime in a 5 second period.");
+
+LLTrace::SampleStatHandle<U32> FRAMETIME_JITTER_EVENTS("frametimeevents", "Number of frametime events in the session.  Applies when jitter exceeds 10% of the previous frame."),
+                                FRAMETIME_JITTER_EVENTS_PER_MINUTE("frametimeeventspm", "Average number of frametime events per minute."),
+                                FRAMETIME_JITTER_EVENTS_LAST_MINUTE("frametimeeventslastmin", "Number of frametime events in the last minute.");
+
+LLTrace::SampleStatHandle<F64> NOTRMALIZED_FRAMETIME_JITTER_SESSION("normalizedframetimejitter", "Normalized frametime jitter over the session.");
+LLTrace::SampleStatHandle<F64> NFTV("nftv", "Normalized frametime variation.");
+LLTrace::SampleStatHandle<F64> NORMALIZED_FRAMTIME_JITTER_PERIOD("normalizedframetimejitterperiod", "Normalized frametime jitter over the last 5 seconds.");
 
 LLTrace::EventStatHandle<LLUnit<F64, LLUnits::Meters> > AGENT_POSITION_SNAP("agentpositionsnap", "agent position corrections");
 
@@ -245,10 +250,7 @@ LLTrace::EventStatHandle<F64Milliseconds >  REGION_CROSSING_TIME("regioncrossing
 
 LLTrace::EventStatHandle<F64Seconds >   AVATAR_EDIT_TIME("avataredittime", "Seconds in Edit Appearance"),
                                                             TOOLBOX_TIME("toolboxtime", "Seconds using Toolbox"),
-                                                            MOUSELOOK_TIME("mouselooktime", "Seconds in Mouselook"),
-                                                            FPS_10_TIME("fps10time", "Seconds below 10 FPS"),
-                                                            FPS_8_TIME("fps8time", "Seconds below 8 FPS"),
-                                                            FPS_2_TIME("fps2time", "Seconds below 2 FPS");
+                                                            MOUSELOOK_TIME("mouselooktime", "Seconds in Mouselook");
 
 LLTrace::EventStatHandle<LLUnit<F32, LLUnits::Percent> > OBJECT_CACHE_HIT_RATE("object_cache_hits");
 
@@ -260,6 +262,20 @@ LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  HUDS_FRAME_PCT("huds_
 LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  UI_FRAME_PCT("ui_frame_pct");
 LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  SWAP_FRAME_PCT("swap_frame_pct");
 LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  IDLE_FRAME_PCT("idle_frame_pct");
+
+
+
+LLTrace::SampleStatHandle<U32> WEBRTC_PACKETS_IN_LOST("webrtc_packets_in_lost", "Lost incoming packets"),
+    WEBRTC_PACKETS_IN_RECEIVED("webrtc_packets_in_recv", "Incoming packets received"),
+    WEBRTC_PACKETS_OUT_SENT("webrtc_packets_out_sent", "Outgoing packets sent"),
+    WEBRTC_PACKETS_OUT_LOST("webrtc_packets_out_lost", "Lost outgoing packets");
+
+LLTrace::SampleStatHandle<F32> WEBRTC_JITTER_OUT("webrtc_jitter_out", "Timing variation of outgoing audio"),
+    WEBRTC_JITTER_IN("webrtc_jitter_in", "Timing variation of incoming audio"),
+    WEBRTC_LATENCY("webrtc_latency", "Round-trip audio delay"),
+    WEBRTC_UPLOAD_BANDWIDTH("webrtc_upload_bandwidth", "Estimated upload bandwidth"),
+    WEBRTC_JITTER_BUFFER("webrtc_jitter_buffer", "Average delay added to smooth incoming audio");
+
 }
 
 LLViewerStats::LLViewerStats()
@@ -276,59 +292,128 @@ void LLViewerStats::resetStats()
     getRecording().reset();
 }
 
+// Helper for calculating Nth percentile with linear interpolation
+template<typename T>
+T calcPercentile(const std::vector<T>& sorted, double percent)
+{
+    if (sorted.empty())
+        return T(0);
+    double idx       = percent * (sorted.size() - 1);
+    size_t idx_below = static_cast<size_t>(std::floor(idx));
+    size_t idx_above = static_cast<size_t>(std::ceil(idx));
+    if (idx_below == idx_above)
+        return sorted[idx_below];
+    double weight_above = idx - idx_below;
+    return sorted[idx_below] * (1.0 - weight_above) + sorted[idx_above] * weight_above;
+}
+
+template<typename T>
+T calcStddev(const std::vector<T>& values)
+{
+    if (values.size() < 2)
+        return T(0);
+    double sum = 0, sq_sum = 0;
+    for (const auto& v : values)
+    {
+        double d = v.value();
+        sum += d;
+        sq_sum += d * d;
+    }
+    double mean     = sum / values.size();
+    double variance = (sq_sum / values.size()) - (mean * mean);
+    return T(std::sqrt(variance));
+}
+
 void LLViewerStats::updateFrameStats(const F64Seconds time_diff)
 {
-    if (getRecording().getLastValue(LLStatViewer::PACKETS_LOST_PERCENT) > F32Percent(5.0))
-    {
-        add(LLStatViewer::LOSS_5_PERCENT_TIME, time_diff);
-    }
-
-    F32 sim_fps = getRecording().getLastValue(LLStatViewer::SIM_FPS);
-    if (0.f < sim_fps && sim_fps < 20.f)
-    {
-        add(LLStatViewer::SIM_20_FPS_TIME, time_diff);
-    }
-
-    F32 sim_physics_fps = getRecording().getLastValue(LLStatViewer::SIM_PHYSICS_FPS);
-
-    if (0.f < sim_physics_fps && sim_physics_fps < 20.f)
-    {
-        add(LLStatViewer::SIM_PHYSICS_20_FPS_TIME, time_diff);
-    }
-
-    if (time_diff >= (F64Seconds)0.5)
-    {
-        record(LLStatViewer::FPS_2_TIME, time_diff);
-    }
-    if (time_diff >= (F64Seconds)0.125)
-    {
-        record(LLStatViewer::FPS_8_TIME, time_diff);
-    }
-    if (time_diff >= (F64Seconds)0.1)
-    {
-        record(LLStatViewer::FPS_10_TIME, time_diff);
-    }
-
     if (gFrameCount && mLastTimeDiff > (F64Seconds)0.0)
     {
-        // new "stutter" meter
-        add(LLStatViewer::FRAMETIME_DOUBLED, time_diff >= 2.0 * mLastTimeDiff ? 1 : 0);
-
+        mTotalTime += time_diff;
         sample(LLStatViewer::FRAMETIME, time_diff);
-
         // old stats that were never really used
-        F64Seconds jit = (F64Seconds) std::fabs((mLastTimeDiff - time_diff));
+        F64Seconds jit = (F64Seconds)std::fabs((mLastTimeDiff - time_diff));
         sample(LLStatViewer::FRAMETIME_JITTER, jit);
+        mTotalFrametimeJitter += jit;
+        sample(LLStatViewer::FRAMETIME_JITTER_CUMULATIVE, mTotalFrametimeJitter);
+        sample(LLStatViewer::NOTRMALIZED_FRAMETIME_JITTER_SESSION, mTotalFrametimeJitter / mTotalTime);
 
-        F32Seconds average_frametime = gRenderStartTime.getElapsedTimeF32() / (F32)gFrameCount;
-        sample(LLStatViewer::FRAMETIME_SLEW, F64Milliseconds (average_frametime - time_diff));
+        mLastNoramlizedSessionJitter = mTotalFrametimeJitter / mTotalTime;
 
-        F32 max_bandwidth = gViewerThrottle.getMaxBandwidth();
-        F32 delta_bandwidth = gViewerThrottle.getCurrentBandwidth() - max_bandwidth;
-        sample(LLStatViewer::DELTA_BANDWIDTH, F64Bits(delta_bandwidth));
-        sample(LLStatViewer::MAX_BANDWIDTH, F64Bits(max_bandwidth));
+        static LLCachedControl<F32> frameTimeEventThreshold(gSavedSettings, "StatsFrametimeEventThreshold", 0.1f);
+
+        if (time_diff - mLastTimeDiff > mLastTimeDiff * frameTimeEventThreshold())
+        {
+            sample(LLStatViewer::FRAMETIME_JITTER_EVENTS, mFrameJitterEvents++);
+            mFrameJitterEventsLastMinute++;
+        }
+
+        mFrameTimes.push_back(time_diff);
+        mFrameTimesJitter.push_back(jit);
+
+        mLastFrameTimeSample += time_diff;
+        mTimeSinceLastEventSample += time_diff;
+
+        static LLCachedControl<S32> frameTimeSampleSeconds(gSavedSettings, "StatsFrametimeSampleSeconds", 5);
+
+        if (mLastFrameTimeSample >= frameTimeSampleSeconds())
+        {
+            std::sort(mFrameTimes.begin(), mFrameTimes.end());
+            std::sort(mFrameTimesJitter.begin(), mFrameTimesJitter.end());
+
+            // Use new helpers for calculations
+            F64Seconds frame_time_stddev = calcStddev(mFrameTimes);
+            sample(LLStatViewer::FRAMETIME_STDDEV, frame_time_stddev);
+
+            F64Seconds ninety_ninth_percentile = calcPercentile(mFrameTimes, 0.99);
+            F64Seconds ninety_fifth_percentile = calcPercentile(mFrameTimes, 0.95);
+            sample(LLStatViewer::FRAMETIME_99TH, ninety_ninth_percentile);
+            sample(LLStatViewer::FRAMETIME_95TH, ninety_fifth_percentile);
+
+            frame_time_stddev = calcStddev(mFrameTimesJitter);
+            sample(LLStatViewer::FRAMETIME_JITTER_STDDEV, frame_time_stddev);
+
+            ninety_ninth_percentile = calcPercentile(mFrameTimesJitter, 0.99);
+            ninety_fifth_percentile = calcPercentile(mFrameTimesJitter, 0.95);
+            sample(LLStatViewer::FRAMETIME_JITTER_99TH, ninety_ninth_percentile);
+            sample(LLStatViewer::FRAMETIME_JITTER_95TH, ninety_fifth_percentile);
+
+            F64 averageFrameTime = 0;
+            for (const auto& frame_time : mFrameTimes)
+            {
+                averageFrameTime += frame_time.value();
+            }
+            averageFrameTime /= mFrameTimes.size();
+
+            sample(LLStatViewer::NFTV, frame_time_stddev / averageFrameTime);
+            mLastNormalizedFrametimeVariance = frame_time_stddev / averageFrameTime;
+
+            // Add up all of the jitter values.
+            F64 totalJitter = 0;
+            for (const auto& frame_jitter : mFrameTimesJitter)
+            {
+                totalJitter += frame_jitter.value();
+            }
+
+            mLastNormalizedPeriodJitter = totalJitter / mLastFrameTimeSample;
+
+            sample(LLStatViewer::NORMALIZED_FRAMTIME_JITTER_PERIOD, mLastNormalizedPeriodJitter);
+
+            mFrameTimes.clear();
+            mFrameTimesJitter.clear();
+            mLastFrameTimeSample = F64Seconds(0);
+        }
+
+        if (mTimeSinceLastEventSample >= 60)
+        {
+            mEventMinutes++;
+            // Calculate average events per minute
+            U64 frame_time_events_per_minute = (U64)mFrameJitterEvents / mEventMinutes;
+            sample(LLStatViewer::FRAMETIME_JITTER_EVENTS_PER_MINUTE, frame_time_events_per_minute);
+            sample(LLStatViewer::FRAMETIME_JITTER_EVENTS_LAST_MINUTE, mFrameJitterEventsLastMinute);
+            mFrameJitterEventsLastMinute   = 0;
+            mTimeSinceLastEventSample    = F64Seconds(0);
+        }
     }
-
     mLastTimeDiff = time_diff;
 }
 
@@ -336,7 +421,7 @@ void LLViewerStats::addToMessage(LLSD &body)
 {
     LLSD &misc = body["misc"];
 
-    misc["Version"] = TRUE;
+    misc["Version"] = true;
     //TODO RN: get last value, not mean
     misc["Vertex Buffers Enabled"] = getRecording().getMean(LLStatViewer::ENABLE_VBO);
 
@@ -359,14 +444,14 @@ F32     gAveLandCompression = 0.f,
         gWorstLandCompression = 0.f,
         gWorstWaterCompression = 0.f;
 
-U64Bytes                gTotalWorldData,
+U32Bytes                gTotalWorldData,
                                 gTotalObjectData,
                                 gTotalTextureData;
 U32                             gSimPingCount = 0;
 U32Bits             gObjectData;
 F32Milliseconds     gAvgSimPing(0.f);
 // rely on default initialization
-U64Bytes            gTotalTextureBytesPerBoostLevel[LLViewerTexture::MAX_GL_IMAGE_CATEGORY];
+U32Bytes            gTotalTextureBytesPerBoostLevel[LLViewerTexture::MAX_GL_IMAGE_CATEGORY];
 
 extern U32  gVisCompared;
 extern U32  gVisTested;
@@ -399,11 +484,9 @@ void update_statistics()
 
     record(LLStatViewer::TRIANGLES_DRAWN_PER_FRAME, last_frame_recording.getSum(LLStatViewer::TRIANGLES_DRAWN));
 
-    sample(LLStatViewer::ENABLE_VBO,      (F64)TRUE);
-    sample(LLStatViewer::DRAW_DISTANCE,   (F64)LLPipeline::RenderFarClip);
-
-    static const LLCachedControl<bool> use_chat_bubbles(gSavedSettings, "UseChatBubbles");
-    sample(LLStatViewer::CHAT_BUBBLES, use_chat_bubbles);
+    sample(LLStatViewer::ENABLE_VBO,      (F64)gSavedSettings.getBOOL("RenderVBOEnable"));
+    sample(LLStatViewer::DRAW_DISTANCE,   (F64)gSavedSettings.getF32("RenderFarClip"));
+    sample(LLStatViewer::CHAT_BUBBLES,    gSavedSettings.getBOOL("UseChatBubbles"));
 
     typedef LLTrace::StatType<LLTrace::TimeBlockAccumulator>::instance_tracker_t stat_type_t;
 
@@ -430,7 +513,7 @@ void update_statistics()
     }
     add(LLStatViewer::FPS, 1);
 
-    F64Bits layer_bits = gVLManager.getLandBits() + gVLManager.getWindBits() + gVLManager.getCloudBits() + gVLManager.getWaterBits();
+    F64Bits layer_bits = gVLManager.getLandBits() + gVLManager.getWindBits() + gVLManager.getCloudBits();
     add(LLStatViewer::LAYERS_NETWORK_DATA_RECEIVED, layer_bits);
     add(LLStatViewer::OBJECT_NETWORK_DATA_RECEIVED, gObjectData);
     add(LLStatViewer::ASSET_UDP_DATA_RECEIVED, F64Bits(gTransferManager.getTransferBitsIn(LLTCT_ASSET)));
@@ -570,7 +653,7 @@ void send_viewer_stats(bool include_preferences)
     std::string url = gAgent.getRegion()->getCapability("ViewerStats");
 
     if (url.empty()) {
-        //LL_WARNS() << "Could not get ViewerStats capability" << LL_ENDL;
+        LL_WARNS() << "Could not get ViewerStats capability" << LL_ENDL;
         return;
     }
 
@@ -598,8 +681,16 @@ void send_viewer_stats(bool include_preferences)
         agent["run_time"] = run_time;
     }
 
+    // report time the viewer has spent in the foreground
+    agent["foreground_time"] = gForegroundTime.getElapsedTimeF32();
+
     // send fps only for time app spends in foreground
     agent["fps"] = (F32)gForegroundFrameCount / gForegroundTime.getElapsedTimeF32();
+
+    agent["normalized_session_jitter"] = LLViewerStats::instance().getLastNormalizedSessionJitter();
+    agent["normalized_frametime_variance"] = LLViewerStats::instance().getLastNormalizedFrametimeVariance();
+    agent["normalized_period_jitter"]      = LLViewerStats::instance().getLastNormalizedPeriodJitter();
+
     agent["version"] = LLVersionInfo::instance().getChannelAndVersion();
     std::string language = LLUI::getLanguage();
     agent["language"] = language;
@@ -705,7 +796,11 @@ void send_viewer_stats(bool include_preferences)
     fail["failed_resends"] = (S32) gMessageSystem->mFailedResendPackets;
     fail["off_circuit"] = (S32) gMessageSystem->mOffCircuitPackets;
     fail["invalid"] = (S32) gMessageSystem->mInvalidOnCircuitPackets;
-    fail["missing_updater"] = (S32) LLAppViewer::instance()->isUpdaterMissing();
+#if LL_VELOPACK
+    fail["missing_updater"] = false;
+#else
+    fail["missing_updater"] = true;
+#endif
 
     LLSD &inventory = body["inventory"];
     inventory["usable"] = gInventory.isInventoryUsable();
@@ -738,7 +833,7 @@ void send_viewer_stats(bool include_preferences)
         // The 32-bit and 64-bit versions normally exist in:
         //     C:\Windows\System32
         //     C:\Windows\SysWOW64
-        HMODULE vulkan_loader = LoadLibrary(TEXT("vulkan-1.dll"));
+        HMODULE vulkan_loader = LoadLibraryA("vulkan-1.dll");
         if (NULL != vulkan_loader)
         {
             vulkan_detected = true;

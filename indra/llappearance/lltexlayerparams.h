@@ -30,6 +30,7 @@
 #include "llpointer.h"
 #include "v4color.h"
 #include "llviewervisualparam.h"
+#include <atomic>
 
 class LLAvatarAppearance;
 class LLImageRaw;
@@ -48,11 +49,11 @@ class LLTexLayerParam : public LLViewerVisualParam
 public:
     LLTexLayerParam(LLTexLayerInterface *layer);
     LLTexLayerParam(LLAvatarAppearance *appearance);
-    /*virtual*/ BOOL setInfo(LLViewerVisualParamInfo *info, BOOL add_to_appearance);
+    /*virtual*/ bool setInfo(LLViewerVisualParamInfo *info, bool add_to_appearance);
     /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const = 0;
 
 protected:
-    LLTexLayerParam(const LLTexLayerParam& pOther) = default;
+    LLTexLayerParam(const LLTexLayerParam& pOther);
 
     LLTexLayerInterface*    mTexLayer;
     LLAvatarAppearance*     mAvatarAppearance;
@@ -62,8 +63,7 @@ protected:
 // LLTexLayerParamAlpha
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-LL_ALIGN_PREFIX(16)
-class alignas(16) LLTexLayerParamAlpha final : public LLTexLayerParam
+class alignas(16) LLTexLayerParamAlpha : public LLTexLayerParam
 {
     LL_ALIGN_NEW
 public:
@@ -71,28 +71,28 @@ public:
     LLTexLayerParamAlpha( LLAvatarAppearance* appearance );
     /*virtual*/ ~LLTexLayerParamAlpha();
 
-    /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable = nullptr) const override;
+    /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable = NULL) const;
 
     // LLVisualParam Virtual functions
-    ///*virtual*/ BOOL      parseData(LLXmlTreeNode* node);
-    /*virtual*/ void        apply( ESex avatar_sex ) override {}
-    /*virtual*/ void        setWeight(F32 weight) override;
-    /*virtual*/ void        setAnimationTarget(F32 target_value) override;
-    /*virtual*/ void        animate(F32 delta) override;
+    ///*virtual*/ bool      parseData(LLXmlTreeNode* node);
+    /*virtual*/ void        apply( ESex avatar_sex ) {}
+    /*virtual*/ void        setWeight(F32 weight);
+    /*virtual*/ void        setAnimationTarget(F32 target_value);
+    /*virtual*/ void        animate(F32 delta);
 
     // LLViewerVisualParam Virtual functions
-    /*virtual*/ F32                 getTotalDistortion()                                  override { return 1.f; }
-    /*virtual*/ const LLVector4a&   getAvgDistortion()                                    override { return mAvgDistortionVec; }
-    /*virtual*/ F32                 getMaxDistortion()                                    override { return 3.f; }
-    /*virtual*/ LLVector4a          getVertexDistortion(S32 index, LLPolyMesh *poly_mesh) override { return LLVector4a(1.f, 1.f, 1.f);}
-    /*virtual*/ const LLVector4a*   getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh)override { if( index ){ *index = 0;} if( poly_mesh ){ *poly_mesh = NULL; } return &mAvgDistortionVec; };
-    /*virtual*/ const LLVector4a*   getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override { if( index ){ *index = 0;} if( poly_mesh ){ *poly_mesh = NULL; } return NULL; };
+    /*virtual*/ F32                 getTotalDistortion()                                    { return 1.f; }
+    /*virtual*/ const LLVector4a&   getAvgDistortion()                                      { return mAvgDistortionVec; }
+    /*virtual*/ F32                 getMaxDistortion()                                      { return 3.f; }
+    /*virtual*/ LLVector4a          getVertexDistortion(S32 index, LLPolyMesh *poly_mesh)   { return LLVector4a(1.f, 1.f, 1.f);}
+    /*virtual*/ const LLVector4a*   getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh)  { index = 0; poly_mesh = NULL; return &mAvgDistortionVec;};
+    /*virtual*/ const LLVector4a*   getNextDistortion(U32 *index, LLPolyMesh **poly_mesh)   { index = 0; poly_mesh = NULL; return NULL;};
 
     // New functions
-    BOOL                    render( S32 x, S32 y, S32 width, S32 height );
-    BOOL                    getSkip() const;
+    bool                    render( S32 x, S32 y, S32 width, S32 height );
+    bool                    getSkip() const;
     void                    deleteCaches();
-    BOOL                    getMultiplyBlend() const;
+    bool                    getMultiplyBlend() const;
 
 private:
     LLTexLayerParamAlpha(const LLTexLayerParamAlpha& pOther);
@@ -100,9 +100,9 @@ private:
     LLPointer<LLGLTexture>  mCachedProcessedTexture;
     LLPointer<LLImageTGA>   mStaticImageTGA;
     LLPointer<LLImageRaw>   mStaticImageRaw;
-    std::atomic<BOOL>       mNeedsCreateTexture;
-    BOOL                    mStaticImageInvalid;
-    LL_ALIGN_16(LLVector4a              mAvgDistortionVec);
+    std::atomic<bool>       mNeedsCreateTexture;
+    bool                    mStaticImageInvalid;
+    LLVector4a              mAvgDistortionVec;
     F32                     mCachedEffectiveWeight;
 
 public:
@@ -112,20 +112,20 @@ public:
 
     typedef std::list< LLTexLayerParamAlpha* > param_alpha_ptr_list_t;
     static param_alpha_ptr_list_t sInstances;
-} LL_ALIGN_POSTFIX(16);
-class LLTexLayerParamAlphaInfo final : public LLViewerVisualParamInfo
+};
+class LLTexLayerParamAlphaInfo : public LLViewerVisualParamInfo
 {
     friend class LLTexLayerParamAlpha;
 public:
     LLTexLayerParamAlphaInfo();
-    /*virtual*/ ~LLTexLayerParamAlphaInfo() = default;
+    /*virtual*/ ~LLTexLayerParamAlphaInfo() {};
 
-    /*virtual*/ BOOL parseXml(LLXmlTreeNode* node) override;
+    /*virtual*/ bool parseXml(LLXmlTreeNode* node);
 
 private:
     std::string             mStaticImageFileName;
-    BOOL                    mMultiplyBlend;
-    BOOL                    mSkipIfZeroWeight;
+    bool                    mMultiplyBlend;
+    bool                    mSkipIfZeroWeight;
     F32                     mDomain;
 };
 //
@@ -152,44 +152,44 @@ public:
     LLTexLayerParamColor( LLTexLayerInterface* layer );
     LLTexLayerParamColor( LLAvatarAppearance* appearance );
 
-    /* virtual */ ~LLTexLayerParamColor() = default;
+    /* virtual */ ~LLTexLayerParamColor();
 
-    /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable = NULL) const override;
+    /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable = NULL) const;
 
     // LLVisualParam Virtual functions
-    ///*virtual*/ BOOL          parseData(LLXmlTreeNode* node);
-    /*virtual*/ void            apply( ESex avatar_sex ) override {}
-    /*virtual*/ void            setWeight(F32 weight) override;
-    /*virtual*/ void            setAnimationTarget(F32 target_value) override;
-    /*virtual*/ void            animate(F32 delta) override;
+    ///*virtual*/ bool          parseData(LLXmlTreeNode* node);
+    /*virtual*/ void            apply( ESex avatar_sex ) {}
+    /*virtual*/ void            setWeight(F32 weight);
+    /*virtual*/ void            setAnimationTarget(F32 target_value);
+    /*virtual*/ void            animate(F32 delta);
 
 
     // LLViewerVisualParam Virtual functions
-    /*virtual*/ F32                 getTotalDistortion()                                    override { return 1.f; }
-    /*virtual*/ const LLVector4a&   getAvgDistortion()                                      override { return mAvgDistortionVec; }
-    /*virtual*/ F32                 getMaxDistortion()                                      override { return 3.f; }
-    /*virtual*/ LLVector4a          getVertexDistortion(S32 index, LLPolyMesh *poly_mesh)   override { return LLVector4a(1.f, 1.f, 1.f); }
-    /*virtual*/ const LLVector4a*   getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh)  override { index = 0; poly_mesh = NULL; return &mAvgDistortionVec;};
-    /*virtual*/ const LLVector4a*   getNextDistortion(U32 *index, LLPolyMesh **poly_mesh)   override { index = 0; poly_mesh = NULL; return NULL;};
+    /*virtual*/ F32                 getTotalDistortion()                                    { return 1.f; }
+    /*virtual*/ const LLVector4a&   getAvgDistortion()                                      { return mAvgDistortionVec; }
+    /*virtual*/ F32                 getMaxDistortion()                                      { return 3.f; }
+    /*virtual*/ LLVector4a          getVertexDistortion(S32 index, LLPolyMesh *poly_mesh)   { return LLVector4a(1.f, 1.f, 1.f); }
+    /*virtual*/ const LLVector4a*   getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh)  { index = 0; poly_mesh = NULL; return &mAvgDistortionVec;};
+    /*virtual*/ const LLVector4a*   getNextDistortion(U32 *index, LLPolyMesh **poly_mesh)   { index = 0; poly_mesh = NULL; return NULL;};
 
     // New functions
     LLColor4                getNetColor() const;
 protected:
-    LLTexLayerParamColor(const LLTexLayerParamColor& pOther) = default;
+    LLTexLayerParamColor(const LLTexLayerParamColor& pOther);
 
     virtual void onGlobalColorChanged() {}
 private:
     LLVector4a              mAvgDistortionVec;
 };
 
-class LLTexLayerParamColorInfo final : public LLViewerVisualParamInfo
+class LLTexLayerParamColorInfo : public LLViewerVisualParamInfo
 {
     friend class LLTexLayerParamColor;
 
 public:
     LLTexLayerParamColorInfo();
-    virtual ~LLTexLayerParamColorInfo() = default;
-    BOOL parseXml( LLXmlTreeNode* node ) override;
+    virtual ~LLTexLayerParamColorInfo() {};
+    bool parseXml( LLXmlTreeNode* node );
     LLTexLayerParamColor::EColorOperation getOperation() const { return mOperation; }
 private:
     enum { MAX_COLOR_VALUES = 20 };

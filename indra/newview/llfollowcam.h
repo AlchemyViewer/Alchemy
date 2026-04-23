@@ -188,12 +188,12 @@ protected:
     //------------------------------------------
 protected:
         void    calculatePitchSineAndCosine();
-        BOOL    updateBehindnessConstraint(LLVector3 focus, LLVector3& cam_position);
+        bool    updateBehindnessConstraint(LLVector3 focus, LLVector3& cam_position);
 
 };// end of FollowCam class
 
 
-class LLFollowCamMgr final : public LLSingleton<LLFollowCamMgr>
+class LLFollowCamMgr : public LLSingleton<LLFollowCamMgr>
 {
     LLSINGLETON(LLFollowCamMgr);
     ~LLFollowCamMgr();

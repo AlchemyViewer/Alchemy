@@ -35,21 +35,19 @@
 #include "llsd.h"
 #include "llcorehttputil.h"
 #include <boost/signals2.hpp>
-#include <boost/function.hpp>
-
-#include "boost/unordered_map.hpp"
+#include <functional>
 
 class LLSD;
 class LLUUID;
 
 
-class LLExperienceCache final : public LLParamSingleton < LLExperienceCache >
+class LLExperienceCache: public LLSingleton < LLExperienceCache >
 {
-    LLSINGLETON(LLExperienceCache, std::string);
+    LLSINGLETON(LLExperienceCache);
 
 public:
-    typedef boost::function<std::string(const std::string &)> CapabilityQuery_t;
-    typedef boost::function<void(const LLSD &)> ExperienceGetFn_t;
+    typedef std::function<std::string(const std::string &)> CapabilityQuery_t;
+    typedef std::function<void(const LLSD &)> ExperienceGetFn_t;
 
     void setCapabilityQuery(CapabilityQuery_t queryfn);
     void cleanup();
@@ -106,11 +104,11 @@ public:
     static const int PROPERTY_SUSPENDED;    // 1 << 7
 
 private:
-    virtual ~LLExperienceCache() = default;
+    virtual ~LLExperienceCache();
 
     virtual void initSingleton() override;
 
-    typedef boost::function<LLSD(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &, LLCore::HttpRequest::ptr_t, std::string)> permissionInvoker_fn;
+    typedef std::function<LLSD(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &, LLCore::HttpRequest::ptr_t, std::string)> permissionInvoker_fn;
 
     // Callback types for get()
     typedef boost::signals2::signal < void(const LLSD &) > callback_signal_t;
@@ -118,11 +116,11 @@ private:
     // May have multiple callbacks for a single ID, which are
     // represented as multiple slots bound to the signal.
     // Avoid copying signals via pointers.
-    typedef boost::unordered_map<LLUUID, signal_ptr> signal_map_t;
-    typedef boost::unordered_map<LLUUID, LLSD> cache_t;
+    typedef std::map<LLUUID, signal_ptr> signal_map_t;
+    typedef std::map<LLUUID, LLSD> cache_t;
 
     typedef std::set<LLUUID> RequestQueue_t;
-    typedef boost::unordered_map<LLUUID, F64> PendingQueue_t;
+    typedef std::map<LLUUID, F64> PendingQueue_t;
 
     //--------------------------------------------
     static const std::string PRIVATE_KEY;   // "private_id"
@@ -146,9 +144,9 @@ private:
     std::string     mCacheFileName;
     static bool     sShutdown; // control for coroutines, they exist out of LLExperienceCache's scope, so they need a static control
 
-    void idleCoro();
+    static void idleCoro();
     void eraseExpired();
-    void requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &, std::string, RequestQueue_t);
+    static void requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &, std::string, RequestQueue_t);
     void requestExperiences();
 
     void fetchAssociatedExperienceCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &, LLUUID, LLUUID, std::string, ExperienceGetFn_t);

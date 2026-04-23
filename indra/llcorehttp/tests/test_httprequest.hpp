@@ -454,7 +454,9 @@ void HttpRequestTestObjectType::test<4>()
 template <> template <>
 void HttpRequestTestObjectType::test<5>()
 {
-    skip("Skip due to issues with testing thread cancellation");
+#ifndef LL_WINDOWS
+    skip("Skip due to issues with testing pthread cancellation");
+#endif
 
     ScopedCurlInit ready;
 
@@ -519,8 +521,9 @@ void HttpRequestTestObjectType::test<5>()
 template <> template <>
 void HttpRequestTestObjectType::test<6>()
 {
-    skip("Skip due to issues with testing thread cancellation");
-
+#ifndef LL_WINDOWS
+    skip("Skip due to issues with testing pthread cancellation");
+#endif
     ScopedCurlInit ready;
 
     set_test_name("HttpRequest Spin + NoOp + hard termination");
@@ -1565,6 +1568,10 @@ void HttpRequestTestObjectType::test<16>()
                 boost::regex("\\*/\\*", boost::regex::icase)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
+                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
+                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
+        handler.mHeadersRequired.push_back(
+            regex_container_t::value_type(
                 boost::regex("X-Reflect-keep-alive", boost::regex::icase),
                 boost::regex("\\d+", boost::regex::icase)));
         handler.mHeadersRequired.push_back(
@@ -1632,6 +1639,10 @@ void HttpRequestTestObjectType::test<16>()
             regex_container_t::value_type(
                 boost::regex("X-Reflect-accept", boost::regex::icase),
                 boost::regex("image/x-j2c", boost::regex::icase)));
+        handler.mHeadersRequired.push_back(
+            regex_container_t::value_type(
+                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
+                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
                 boost::regex("X-Reflect-keep-alive", boost::regex::icase),
@@ -1798,6 +1809,10 @@ void HttpRequestTestObjectType::test<17>()
             regex_container_t::value_type(
                 boost::regex("X-Reflect-accept", boost::regex::icase),
                 boost::regex("\\*/\\*", boost::regex::icase)));
+        handler.mHeadersRequired.push_back(
+            regex_container_t::value_type(
+                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
+                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
                 boost::regex("X-Reflect-keep-alive", boost::regex::icase),
@@ -1980,6 +1995,10 @@ void HttpRequestTestObjectType::test<18>()
                 boost::regex("\\*/\\*", boost::regex::icase)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
+                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
+                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
+        handler.mHeadersRequired.push_back(
+            regex_container_t::value_type(
                 boost::regex("X-Reflect-keep-alive", boost::regex::icase),
                 boost::regex("\\d+", boost::regex::icase)));
         handler.mHeadersRequired.push_back(
@@ -2157,7 +2176,7 @@ void HttpRequestTestObjectType::test<19>()
         // headers
         headers = HttpHeaders::ptr_t(new HttpHeaders);
         headers->append("Keep-Alive", "120");
-        headers->append("Accept-Encoding", "deflate");
+        headers->append("Accept-encoding", "deflate");
         headers->append("Accept", "text/plain");
 
         // Issue a GET with modified headers
@@ -2170,6 +2189,10 @@ void HttpRequestTestObjectType::test<19>()
             regex_container_t::value_type(
                 boost::regex("X-Reflect-accept", boost::regex::icase),
                 boost::regex("text/plain", boost::regex::icase)));
+        handler.mHeadersRequired.push_back(
+            regex_container_t::value_type(
+                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
+                boost::regex("deflate", boost::regex::icase))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
                 boost::regex("X-Reflect-keep-alive", boost::regex::icase),
@@ -2344,10 +2367,10 @@ void HttpRequestTestObjectType::test<20>()
 
         // headers
         headers = HttpHeaders::ptr_t(new HttpHeaders());
-        headers->append("Keep-Alive", "120");
+        headers->append("keep-Alive", "120");
         headers->append("Accept", "text/html");
-        headers->append("Content-Type", "application/llsd+xml");
-        headers->append("Cache-Control", "no-store");
+        headers->append("content-type", "application/llsd+xml");
+        headers->append("cache-control", "no-store");
 
         // And a buffer array
         const char * msg("<xml><llsd><string>It was the best of times, it was the worst of times.</string></llsd></xml>");
@@ -2364,6 +2387,10 @@ void HttpRequestTestObjectType::test<20>()
             regex_container_t::value_type(
                 boost::regex("X-Reflect-accept", boost::regex::icase),
                 boost::regex("text/html", boost::regex::icase)));
+        handler.mHeadersRequired.push_back(
+            regex_container_t::value_type(
+                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
+                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
                 boost::regex("X-Reflect-keep-alive", boost::regex::icase),
@@ -2554,9 +2581,9 @@ void HttpRequestTestObjectType::test<21>()
 
         // headers
         headers = HttpHeaders::ptr_t(new HttpHeaders);
-        headers->append("Content-Type", "text/plain");
-        headers->append("Content-Type", "text/html");
-        headers->append("Content-Type", "application/llsd+xml");
+        headers->append("content-type", "text/plain");
+        headers->append("content-type", "text/html");
+        headers->append("content-type", "application/llsd+xml");
 
         // And a buffer array
         const char * msg("<xml><llsd><string>It was the best of times, it was the worst of times.</string></llsd></xml>");
@@ -2573,6 +2600,10 @@ void HttpRequestTestObjectType::test<21>()
             regex_container_t::value_type(
                 boost::regex("X-Reflect-accept", boost::regex::icase),
                 boost::regex("\\*/\\*", boost::regex::icase)));
+        handler.mHeadersRequired.push_back(
+            regex_container_t::value_type(
+                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
+                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
                 boost::regex("X-Reflect-keep-alive", boost::regex::icase),
@@ -2713,13 +2744,6 @@ void HttpRequestTestObjectType::test<22>()
 
     set_test_name("BUG-2295");
 
-#if LL_WINDOWS && ADDRESS_SIZE == 64
-    // teamcity win64 builds freeze on this test, if you figure out the cause, please fix it
-    if (getenv("TEAMCITY_PROJECT_NAME"))
-    {
-        skip("BUG-2295 - partial load on W64 causes freeze");
-    }
-#endif
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
     // Create before memory record as the string copy will bump numbers.
@@ -2892,14 +2916,6 @@ void HttpRequestTestObjectType::test<23>()
     ScopedCurlInit ready;
 
     set_test_name("HttpRequest GET 503s with 'Retry-After'");
-
-#if LL_WINDOWS && ADDRESS_SIZE == 64
-    // teamcity win64 builds freeze on this test, if you figure out the cause, please fix it
-    if (getenv("TEAMCITY_PROJECT_NAME"))
-    {
-        skip("llcorehttp 503-with-retry test hangs on Windows 64");
-    }
-#endif
 
     // This tests mainly that the code doesn't fall over if
     // various well- and mis-formed Retry-After headers are

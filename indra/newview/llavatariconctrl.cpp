@@ -121,7 +121,7 @@ void LLAvatarIconIDCache::save  ()
         return;
     }
 
-    for(auto it = mCache.begin();it!=mCache.end();++it)
+    for(std::map<LLUUID,LLAvatarIconIDCacheItem>::iterator it = mCache.begin();it!=mCache.end();++it)
     {
         if(!it->second.expired())
         {
@@ -134,7 +134,7 @@ void LLAvatarIconIDCache::save  ()
 
 LLUUID* LLAvatarIconIDCache::get        (const LLUUID& avatar_id)
 {
-    auto it = mCache.find(avatar_id);
+    std::map<LLUUID,LLAvatarIconIDCacheItem>::iterator it = mCache.find(avatar_id);
     if(it==mCache.end())
         return 0;
     if(it->second.expired())
@@ -283,8 +283,7 @@ bool LLAvatarIconCtrl::updateFromCache()
     const LLUUID& icon_id = *icon_id_ptr;
 
     // Update the avatar
-    static LLCachedControl<bool> UseDefaultImage(gSavedSettings, "AlchemyUseDefaultAvatarIcon", false);
-    if (icon_id.notNull() && !UseDefaultImage)
+    if (icon_id.notNull())
     {
         LLIconCtrl::setValue(icon_id);
     }
@@ -330,10 +329,6 @@ void LLAvatarIconCtrl::processProperties(void* data, EAvatarProcessorType type)
                 return;
             }
 
-// [SL:KB] - Patch: Control-AvatarIconCtrl | Checked: 2014-02-20 (Catznip-3.7)
-            LLAvatarPropertiesProcessor::getInstance()->removeObserver(mAvatarId, this);
-// [/SL:KB]
-
             LLAvatarIconIDCache::getInstance()->add(mAvatarId, avatar_data->image_id);
             updateFromCache();
         }
@@ -362,11 +357,11 @@ void LLAvatarIconCtrl::onAvatarNameCache(const LLUUID& agent_id, const LLAvatarN
 }
 
 // [SL:KB] - Checked: 2010-11-01 (RLVa-1.2.2a) | Added: RLVa-1.2.2a
-BOOL LLAvatarIconCtrl::handleToolTip(S32 x, S32 y, MASK mask)
+bool LLAvatarIconCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 {
     // Don't show our tooltip if we were asked not to
     if (!mDrawTooltip)
-        return FALSE;
+        return false;
     return LLIconCtrl::handleToolTip(x, y, mask);
 }
 // [/SL:KB]

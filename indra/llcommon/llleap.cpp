@@ -32,6 +32,13 @@
 #include "llleaplistener.h"
 #include "llexception.h"
 
+#if LL_MSVC
+#pragma warning (disable : 4355) // 'this' used in initializer list: yes, intentionally
+#endif
+
+LLLeap::LLLeap() {}
+LLLeap::~LLLeap() {}
+
 class LLLeapImpl: public LLLeap
 {
     LOG_CLASS(LLLeap);
@@ -54,7 +61,7 @@ public:
         // Pass it a callback to our connect() method, so it can send events
         // from a particular LLEventPump to the plugin without having to know
         // this class or method name.
-        mListener(new LLLeapListener(
+        mListener(std::make_unique<LLLeapListener>(
                       [this](LLEventPump& pump, const std::string& listener)
                       { return connect(pump, listener); }))
     {
@@ -181,6 +188,17 @@ public:
                                << childout.peek(0, peeklen) << "..." << LL_ENDL;
         }
 
+        // Handle any remaining stderr data (partial lines) the same way as we do
+        // for stdout: log it.
+        LLProcess::ReadPipe& childerr(mChild->getReadPipe(LLProcess::STDERR));
+        if (childerr.size())
+        {
+            LLProcess::ReadPipe::size_type
+                peeklen((std::min)(LLProcess::ReadPipe::size_type(50), childerr.size()));
+            LL_WARNS("LLLeap") << "Final stderr " << childerr.size() << " bytes: "
+                               << childerr.peek(0, peeklen) << "..." << LL_ENDL;
+        }
+
         // Kill this instance. MUST BE LAST before return!
         delete this;
         return false;
@@ -226,7 +244,7 @@ public:
 
         LL_DEBUGS("EventHost") << "Sending: "
                                << static_cast<U64>(buffer.tellp()) << ':';
-        std::string::size_type truncate(80);
+        llssize truncate(80);
         if (buffer.tellp() <= truncate)
         {
             LL_CONT << buffer.str();

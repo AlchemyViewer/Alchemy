@@ -29,6 +29,8 @@
 
 // library headers
 #include "llnotificationsutil.h"
+#include <vector>
+#include <tuple>
 // project headers
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -47,6 +49,7 @@
 #include "llinventorybridge.h"
 #include "llinventorydefines.h"
 #include "llinventoryfunctions.h"
+#include "llinventorymodelbackgroundfetch.h"
 #include "llpreviewnotecard.h"
 #include "llrootview.h"
 #include "llselectmgr.h"
@@ -106,7 +109,7 @@ public:
 class LLDroppableItem : public LLInventoryCollectFunctor
 {
 public:
-    LLDroppableItem(BOOL is_transfer) :
+    LLDroppableItem(bool is_transfer) :
         mCountLosing(0), mIsTransfer(is_transfer) {}
     virtual ~LLDroppableItem() {}
     virtual bool operator()(LLInventoryCategory* cat,
@@ -115,7 +118,7 @@ public:
 
 protected:
     S32 mCountLosing;
-    BOOL mIsTransfer;
+    bool mIsTransfer;
 };
 
 bool LLDroppableItem::operator()(LLInventoryCategory* cat,
@@ -291,7 +294,7 @@ LLToolDragAndDrop::LLToolDragAndDrop()
     mSource(SOURCE_AGENT),
     mCursor(UI_CURSOR_NO),
     mLastAccept(ACCEPT_NO),
-    mDrop(FALSE),
+    mDrop(false),
     mCurItemIndex(0)
 {
 
@@ -303,7 +306,7 @@ void LLToolDragAndDrop::setDragStart(S32 x, S32 y)
     mDragStartY = y;
 }
 
-BOOL LLToolDragAndDrop::isOverThreshold(S32 x,S32 y)
+bool LLToolDragAndDrop::isOverThreshold(S32 x,S32 y)
 {
     S32 mouse_delta_x = x - mDragStartX;
     S32 mouse_delta_y = y - mDragStartY;
@@ -322,6 +325,16 @@ void LLToolDragAndDrop::beginDrag(EDragAndDropType type,
         LL_WARNS() << "Attempted to start drag without a cargo type" << LL_ENDL;
         return;
     }
+
+    if (type != DAD_CATEGORY)
+    {
+        LLViewerInventoryItem* item = gInventory.getItem(cargo_id);
+        if (item && !item->isFinished())
+        {
+            LLInventoryModelBackgroundFetch::instance().start(item->getUUID(), false);
+        }
+    }
+
     mCargoTypes.clear();
     mCargoTypes.push_back(type);
     mCargoIDs.clear();
@@ -330,7 +343,7 @@ void LLToolDragAndDrop::beginDrag(EDragAndDropType type,
     mSourceID = source_id;
     mObjectID = object_id;
 
-    setMouseCapture( TRUE );
+    setMouseCapture( true );
     LLToolMgr::getInstance()->setTransientTool( this );
     mCursor = UI_CURSOR_NO;
     if ((mCargoTypes[0] == DAD_CATEGORY)
@@ -356,16 +369,13 @@ void LLToolDragAndDrop::beginDrag(EDragAndDropType type,
                 items,
                 LLInventoryModel::EXCLUDE_TRASH,
                 is_not_preferred);
-            S32 count = cats.size();
-            S32 i;
-            for(i = 0; i < count; ++i)
+            for (auto& cat : cats)
             {
-                folder_ids.push_back(cats.at(i)->getUUID());
+                folder_ids.emplace_back(cat->getUUID());
             }
-            count = items.size();
-            for(i = 0; i < count; ++i)
+            for (auto& item : items)
             {
-                item_ids.push_back(items.at(i)->getUUID());
+                item_ids.emplace_back(item->getUUID());
             }
             if (!folder_ids.empty() || !item_ids.empty())
             {
@@ -400,16 +410,16 @@ void LLToolDragAndDrop::beginMultiDrag(
     mSource = source;
     mSourceID = source_id;
 
-    setMouseCapture( TRUE );
+    setMouseCapture( true );
     LLToolMgr::getInstance()->setTransientTool( this );
     mCursor = UI_CURSOR_NO;
     if ((mSource == SOURCE_AGENT) || (mSource == SOURCE_LIBRARY))
     {
         // find categories (i.e. inventory folders) in the cargo.
         LLInventoryCategory* cat = NULL;
-        S32 count = llmin(cargo_ids.size(), types.size());
-        std::set<LLUUID> cat_ids;
-        for(S32 i = 0; i < count; ++i)
+        auto count = llmin(cargo_ids.size(), types.size());
+        uuid_set_t cat_ids;
+        for (size_t i = 0; i < count; ++i)
         {
             cat = gInventory.getCategory(cargo_ids[i]);
             if (cat)
@@ -427,10 +437,9 @@ void LLToolDragAndDrop::beginMultiDrag(
                     items,
                     LLInventoryModel::EXCLUDE_TRASH,
                     is_not_preferred);
-                S32 cat_count = cats.size();
-                for(S32 i = 0; i < cat_count; ++i)
+                for (auto& cat : cats)
                 {
-                    cat_ids.insert(cat->getUUID());
+                    cat_ids.emplace(cat->getUUID());
                 }
             }
         }
@@ -449,7 +458,7 @@ void LLToolDragAndDrop::endDrag()
 {
     mEndDragSignal();
     LLSelectMgr::getInstance()->unhighlightAll();
-    setMouseCapture(FALSE);
+    setMouseCapture(false);
 }
 
 void LLToolDragAndDrop::onMouseCaptureLost()
@@ -464,15 +473,15 @@ void LLToolDragAndDrop::onMouseCaptureLost()
     mCustomMsg.clear();
 }
 
-BOOL LLToolDragAndDrop::handleMouseUp( S32 x, S32 y, MASK mask )
+bool LLToolDragAndDrop::handleMouseUp( S32 x, S32 y, MASK mask )
 {
     if (hasMouseCapture())
     {
         EAcceptance acceptance = ACCEPT_NO;
-        dragOrDrop( x, y, mask, TRUE, &acceptance );
+        dragOrDrop( x, y, mask, true, &acceptance );
         endDrag();
     }
-    return TRUE;
+    return true;
 }
 
 ECursorType LLToolDragAndDrop::acceptanceToCursor( EAcceptance acceptance )
@@ -539,50 +548,48 @@ ECursorType LLToolDragAndDrop::acceptanceToCursor( EAcceptance acceptance )
     case ACCEPT_POSTPONED:
         break;
     default:
-        llassert( FALSE );
+        llassert( false );
     }
 
     return mCursor;
 }
 
-BOOL LLToolDragAndDrop::handleHover( S32 x, S32 y, MASK mask )
+bool LLToolDragAndDrop::handleHover( S32 x, S32 y, MASK mask )
 {
     EAcceptance acceptance = ACCEPT_NO;
-    dragOrDrop( x, y, mask, FALSE, &acceptance );
+    dragOrDrop( x, y, mask, false, &acceptance );
 
     ECursorType cursor = acceptanceToCursor(acceptance);
     gViewerWindow->getWindow()->setCursor( cursor );
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("UserInput") << "hover handled by LLToolDragAndDrop" << LL_ENDL;
-#endif
-    return TRUE;
+    return true;
 }
 
-BOOL LLToolDragAndDrop::handleKey(KEY key, MASK mask)
+bool LLToolDragAndDrop::handleKey(KEY key, MASK mask)
 {
     if (key == KEY_ESCAPE)
     {
         // cancel drag and drop operation
         endDrag();
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
-BOOL LLToolDragAndDrop::handleToolTip(S32 x, S32 y, MASK mask)
+bool LLToolDragAndDrop::handleToolTip(S32 x, S32 y, MASK mask)
 {
-    const F32 DRAG_N_DROP_TOOLTIP_DELAY = 0.10000000149f;
+    const F32 DRAG_N_DROP_TOOLTIP_DELAY = 0.1f;
     if (!mToolTipMsg.empty())
     {
         LLToolTipMgr::instance().unblockToolTips();
         LLToolTipMgr::instance().show(LLToolTip::Params()
             .message(mToolTipMsg)
             .delay_time(DRAG_N_DROP_TOOLTIP_DELAY));
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 void LLToolDragAndDrop::handleDeselect()
@@ -594,12 +601,12 @@ void LLToolDragAndDrop::handleDeselect()
 }
 
 // protected
-void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
+void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, bool drop,
                                    EAcceptance* acceptance)
 {
     *acceptance = ACCEPT_YES_MULTI;
 
-    BOOL handled = FALSE;
+    bool handled = false;
 
     LLView* top_view = gFocusMgr.getTopCtrl();
     LLViewerInventoryItem* item;
@@ -619,7 +626,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
 
     if (top_view)
     {
-        handled = TRUE;
+        handled = true;
 
         for (mCurItemIndex = 0; mCurItemIndex < (S32)mCargoIDs.size(); mCurItemIndex++)
         {
@@ -630,7 +637,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
             LLInventoryObject* cargo = locateInventory(item, cat);
             if (cargo)
             {
-                handled = handled && top_view->handleDragAndDrop(local_x, local_y, mask, FALSE,
+                handled = handled && top_view->handleDragAndDrop(local_x, local_y, mask, false,
                                                     mCargoTypes[mCurItemIndex],
                                                     (void*)cargo,
                                                     &item_acceptance,
@@ -638,7 +645,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
             }
             else if (is_uuid_dragged)
             {
-                handled = handled && top_view->handleDragAndDrop(local_x, local_y, mask, FALSE,
+                handled = handled && top_view->handleDragAndDrop(local_x, local_y, mask, false,
                                                     mCargoTypes[mCurItemIndex],
                                                     (void*)&mCargoIDs[mCurItemIndex],
                                                     &item_acceptance,
@@ -671,7 +678,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
                 LLInventoryObject* cargo = locateInventory(item, cat);
                 if (cargo)
                 {
-                    handled = handled && top_view->handleDragAndDrop(local_x, local_y, mask, TRUE,
+                    handled = handled && top_view->handleDragAndDrop(local_x, local_y, mask, true,
                                                         mCargoTypes[mCurItemIndex],
                                                         (void*)cargo,
                                                         &item_acceptance,
@@ -679,7 +686,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
                 }
                 else if (is_uuid_dragged)
                 {
-                    handled = handled && top_view->handleDragAndDrop(local_x, local_y, mask, FALSE,
+                    handled = handled && top_view->handleDragAndDrop(local_x, local_y, mask, false,
                                                         mCargoTypes[mCurItemIndex],
                                                         (void*)&mCargoIDs[mCurItemIndex],
                                                         &item_acceptance,
@@ -695,7 +702,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
 
     if (!handled)
     {
-        handled = TRUE;
+        handled = true;
 
         LLRootView* root_view = gViewerWindow->getRootView();
 
@@ -708,7 +715,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
             // fix for EXT-3191
             if (cargo)
             {
-                handled = handled && root_view->handleDragAndDrop(x, y, mask, FALSE,
+                handled = handled && root_view->handleDragAndDrop(x, y, mask, false,
                                                     mCargoTypes[mCurItemIndex],
                                                     (void*)cargo,
                                                     &item_acceptance,
@@ -716,7 +723,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
             }
             else if (is_uuid_dragged)
             {
-                handled = handled && root_view->handleDragAndDrop(x, y, mask, FALSE,
+                handled = handled && root_view->handleDragAndDrop(x, y, mask, false,
                                                     mCargoTypes[mCurItemIndex],
                                                     (void*)&mCargoIDs[mCurItemIndex],
                                                     &item_acceptance,
@@ -746,7 +753,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
                 LLInventoryObject* cargo = locateInventory(item, cat);
                 if (cargo)
                 {
-                    handled = handled && root_view->handleDragAndDrop(x, y, mask, TRUE,
+                    handled = handled && root_view->handleDragAndDrop(x, y, mask, true,
                                               mCargoTypes[mCurItemIndex],
                                               (void*)cargo,
                                               &item_acceptance,
@@ -754,7 +761,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
                 }
                 else if (is_uuid_dragged)
                 {
-                    handled = handled && root_view->handleDragAndDrop(x, y, mask, TRUE,
+                    handled = handled && root_view->handleDragAndDrop(x, y, mask, true,
                                               mCargoTypes[mCurItemIndex],
                                               (void*)&mCargoIDs[mCurItemIndex],
                                               &item_acceptance,
@@ -772,7 +779,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
     if (!handled)
     {
         // Disallow drag and drop to 3D from the marketplace
-        const LLUUID marketplacelistings_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+        const LLUUID marketplacelistings_id = gInventory.getMarketplaceListingsUUID();
         if (marketplacelistings_id.notNull())
         {
             for (S32 item_index = 0; item_index < (S32)mCargoIDs.size(); item_index++)
@@ -790,18 +797,18 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, BOOL drop,
     }
 }
 
-void LLToolDragAndDrop::dragOrDrop3D( S32 x, S32 y, MASK mask, BOOL drop, EAcceptance* acceptance )
+void LLToolDragAndDrop::dragOrDrop3D( S32 x, S32 y, MASK mask, bool drop, EAcceptance* acceptance )
 {
     mDrop = drop;
     if (mDrop)
     {
         // don't allow drag and drop onto rigged or transparent objects
-        pick(gViewerWindow->pickImmediate(x, y, FALSE, FALSE));
+        pick(gViewerWindow->pickImmediate(x, y, false, false));
     }
     else
     {
         // don't allow drag and drop onto transparent objects
-        gViewerWindow->pickAsync(x, y, mask, pickCallback, FALSE, FALSE);
+        gViewerWindow->pickAsync(x, y, mask, pickCallback, false, false);
     }
 
     *acceptance = mLastAccept;
@@ -884,7 +891,7 @@ void LLToolDragAndDrop::pick(const LLPickInfo& pick_info)
             (U32)mLastAccept,
             (U32)callMemberFunction(*this,
                                     LLDragAndDropDictionary::instance().get(dad_type, target))
-                (hit_obj, hit_face, pick_info.mKeyMask, FALSE));
+                (hit_obj, hit_face, pick_info.mKeyMask, false));
     }
 
     if (mDrop && ((U32)mLastAccept >= ACCEPT_YES_COPY_SINGLE))
@@ -899,7 +906,7 @@ void LLToolDragAndDrop::pick(const LLPickInfo& pick_info)
                 const EDragAndDropType dad_type = mCargoTypes[item_index];
                 // Call the right implementation function
                 callMemberFunction(*this, LLDragAndDropDictionary::instance().get(dad_type, target))
-                    (hit_obj, hit_face, pick_info.mKeyMask, TRUE);
+                    (hit_obj, hit_face, pick_info.mKeyMask, true);
             }
         }
         else
@@ -930,12 +937,12 @@ void LLToolDragAndDrop::pick(const LLPickInfo& pick_info)
 }
 
 // static
-BOOL LLToolDragAndDrop::handleDropMaterialProtections(LLViewerObject* hit_obj,
+bool LLToolDragAndDrop::handleDropMaterialProtections(LLViewerObject* hit_obj,
                                                      LLInventoryItem* item,
                                                      LLToolDragAndDrop::ESource source,
                                                      const LLUUID& src_id)
 {
-    if (!item) return FALSE;
+    if (!item) return false;
 
     // Always succeed if....
     // material is from the library
@@ -943,7 +950,7 @@ BOOL LLToolDragAndDrop::handleDropMaterialProtections(LLViewerObject* hit_obj,
     if (SOURCE_LIBRARY == source)
     {
         // dropping a material from the library always just works.
-        return TRUE;
+        return true;
     }
 
     // In case the inventory has not been loaded (e.g. due to some recent operation
@@ -964,7 +971,7 @@ BOOL LLToolDragAndDrop::handleDropMaterialProtections(LLViewerObject* hit_obj,
             args["ERROR_MESSAGE"] = "Unable to add texture.\nPlease wait a few seconds and try again.";
         }
         LLNotificationsUtil::add("ErrorMessage", args);
-        return FALSE;
+        return false;
     }
     // Make sure to verify both id and type since 'null'
     // is a shared default for some asset types.
@@ -974,7 +981,7 @@ BOOL LLToolDragAndDrop::handleDropMaterialProtections(LLViewerObject* hit_obj,
         // then it can always be added to a side.
         // This saves some work if the task's inventory is already loaded
         // and ensures that the asset item is only added once.
-        return TRUE;
+        return true;
     }
 
     LLPointer<LLViewerInventoryItem> new_item = new LLViewerInventoryItem(item);
@@ -983,7 +990,7 @@ BOOL LLToolDragAndDrop::handleDropMaterialProtections(LLViewerObject* hit_obj,
         // Check that we can add the material as inventory to the object
         if (willObjectAcceptInventory(hit_obj,item) < ACCEPT_YES_COPY_SINGLE )
         {
-            return FALSE;
+            return false;
         }
         // make sure the object has the material in it's inventory.
         if (SOURCE_AGENT == source)
@@ -1006,7 +1013,7 @@ BOOL LLToolDragAndDrop::handleDropMaterialProtections(LLViewerObject* hit_obj,
             else
             {
                 LL_WARNS() << "Unable to find source object." << LL_ENDL;
-                return FALSE;
+                return false;
             }
         }
         // Add the asset item to the target object's inventory.
@@ -1032,7 +1039,7 @@ BOOL LLToolDragAndDrop::handleDropMaterialProtections(LLViewerObject* hit_obj,
         // Check that we can add the asset as inventory to the object
         if (willObjectAcceptInventory(hit_obj,item) < ACCEPT_YES_COPY_SINGLE )
         {
-            return FALSE;
+            return false;
         }
         // *FIX: may want to make sure agent can paint hit_obj.
 
@@ -1059,7 +1066,7 @@ BOOL LLToolDragAndDrop::handleDropMaterialProtections(LLViewerObject* hit_obj,
         // Check that we can add the material as inventory to the object
         if (willObjectAcceptInventory(hit_obj,item) < ACCEPT_YES_COPY_SINGLE )
         {
-            return FALSE;
+            return false;
         }
         // *FIX: may want to make sure agent can paint hit_obj.
 
@@ -1073,7 +1080,7 @@ BOOL LLToolDragAndDrop::handleDropMaterialProtections(LLViewerObject* hit_obj,
         // we should return false here. This will requre a separate listener
         // since without listener, we have no way to receive update
     }
-    return TRUE;
+    return true;
 }
 
 void set_texture_to_material(LLViewerObject* hit_obj,
@@ -1124,28 +1131,33 @@ void set_texture_to_material(LLViewerObject* hit_obj,
         case LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR:
         default:
             {
-                material->setBaseColorId(asset_id);
+                material->setBaseColorId(asset_id, true);
             }
             break;
 
         case LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS:
             {
-                material->setOcclusionRoughnessMetallicId(asset_id);
+                material->setOcclusionRoughnessMetallicId(asset_id, true);
             }
             break;
 
         case LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE:
             {
-                material->setEmissiveId(asset_id);
+                material->setEmissiveId(asset_id, true);
             }
             break;
 
         case LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL:
             {
-                material->setNormalId(asset_id);
+                material->setNormalId(asset_id, true);
             }
             break;
     }
+    // Update viewer side, needed for updating mSavedGLTFOverrideMaterials.
+    // Also for parity, we are immediately setting textures and materials,
+    // so we should immediate set overrides to.
+    hit_obj->setTEGLTFMaterialOverride(hit_face, material);
+    // update server
     LLGLTFMaterialList::queueModify(hit_obj, hit_face, material);
 }
 
@@ -1173,7 +1185,7 @@ void LLToolDragAndDrop::dropTextureAllFaces(LLViewerObject* hit_obj,
 
     if (has_non_pbr_faces || remove_pbr)
     {
-        BOOL res = handleDropMaterialProtections(hit_obj, item, source, src_id);
+        bool res = handleDropMaterialProtections(hit_obj, item, source, src_id);
         if (!res)
         {
             return;
@@ -1253,6 +1265,7 @@ void LLToolDragAndDrop::dropMaterial(LLViewerObject* hit_obj,
         // If user dropped a material onto face it implies
         // applying texture now without cancel, save to selection
         if (nodep
+            && gFloaterTools
             && gFloaterTools->getVisible()
             && nodep->mSavedGLTFMaterialIds.size() > hit_face)
         {
@@ -1278,7 +1291,7 @@ void LLToolDragAndDrop::dropMaterialOneFace(LLViewerObject* hit_obj,
     // SL-20013 must save asset_id before handleDropMaterialProtections since our item instance
     // may be deleted if it is moved into task inventory
     LLUUID asset_id = item->getAssetUUID();
-    BOOL success = handleDropMaterialProtections(hit_obj, item, source, src_id);
+    bool success = handleDropMaterialProtections(hit_obj, item, source, src_id);
     if (!success)
     {
         return;
@@ -1290,7 +1303,89 @@ void LLToolDragAndDrop::dropMaterialOneFace(LLViewerObject* hit_obj,
         asset_id = BLANK_MATERIAL_ASSET_ID;
     }
 
-    hit_obj->setRenderMaterialID(hit_face, asset_id);
+        // Preserve existing texture transforms when switching to PBR material
+    LLTextureEntry* tep = hit_obj->getTE(hit_face);
+    F32 existing_scale_s = LLGLTFMaterial::TextureTransform().mScale.mV[0];
+    F32 existing_scale_t = LLGLTFMaterial::TextureTransform().mScale.mV[1];
+    F32 existing_offset_s = LLGLTFMaterial::TextureTransform().mOffset.mV[0];
+    F32 existing_offset_t = LLGLTFMaterial::TextureTransform().mOffset.mV[1];
+    F32 existing_rotation = LLGLTFMaterial::TextureTransform().mRotation;
+    bool should_preserve_transforms = false;
+    LLGLTFMaterial* preserved_override = nullptr;
+
+    if (tep && asset_id.notNull())
+    {
+        // Only preserve transforms from existing GLTF material override
+        // Do not fall back to texture entry transforms when switching between PBR materials
+        LLGLTFMaterial* existing_override = tep->getGLTFMaterialOverride();
+        if (existing_override)
+        {
+            // Check if existing override has non-default transforms
+            const LLGLTFMaterial::TextureTransform& existing_transform = existing_override->mTextureTransform[0];
+            const LLGLTFMaterial::TextureTransform& default_transform = LLGLTFMaterial::TextureTransform();
+
+            if (existing_transform.mScale != default_transform.mScale ||
+                existing_transform.mOffset != default_transform.mOffset ||
+                existing_transform.mRotation != default_transform.mRotation)
+            {
+                // Preserve non-default transforms from current PBR material
+                preserved_override = new LLGLTFMaterial();
+                for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                {
+                    preserved_override->mTextureTransform[i].mScale = existing_transform.mScale;
+                    preserved_override->mTextureTransform[i].mOffset = existing_transform.mOffset;
+                    preserved_override->mTextureTransform[i].mRotation = existing_transform.mRotation;
+                }
+                should_preserve_transforms = true;
+            }
+            // If existing override has default transforms, don't preserve anything
+        }
+        else
+        {
+            // No existing PBR material override - check texture entry transforms
+            // This handles the case of switching from Blinn-Phong to PBR material
+            F32 existing_scale_s, existing_scale_t, existing_offset_s, existing_offset_t, existing_rotation;
+            tep->getScale(&existing_scale_s, &existing_scale_t);
+            tep->getOffset(&existing_offset_s, &existing_offset_t);
+            existing_rotation = tep->getRotation();
+
+            const LLGLTFMaterial::TextureTransform& default_transform = LLGLTFMaterial::TextureTransform();
+            if (existing_scale_s != default_transform.mScale.mV[0] || existing_scale_t != default_transform.mScale.mV[1] ||
+                existing_offset_s != default_transform.mOffset.mV[0] || existing_offset_t != default_transform.mOffset.mV[1] ||
+                existing_rotation != default_transform.mRotation)
+            {
+                // Preserve non-default transforms from texture entry
+                preserved_override = new LLGLTFMaterial();
+                for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                {
+                    LLVector2 pbr_scale, pbr_offset;
+                    F32 pbr_rotation;
+                    LLGLTFMaterial::convertTextureTransformToPBR(
+                        existing_scale_s, existing_scale_t,
+                        existing_offset_s, existing_offset_t,
+                        existing_rotation,
+                        pbr_scale, pbr_offset, pbr_rotation);
+                    preserved_override->mTextureTransform[i].mScale = pbr_scale;
+                    preserved_override->mTextureTransform[i].mOffset = pbr_offset;
+                    preserved_override->mTextureTransform[i].mRotation = pbr_rotation;
+                }
+                should_preserve_transforms = true;
+            }
+        }
+    }
+
+    if (should_preserve_transforms && preserved_override)
+    {
+        // Apply material with preserved transforms
+        LLGLTFMaterialList::queueApply(hit_obj, hit_face, asset_id, preserved_override);
+        // Update local state
+        hit_obj->setRenderMaterialID(hit_face, asset_id, false, true);
+        tep->setGLTFMaterialOverride(preserved_override);
+    }
+    else
+    {
+        hit_obj->setRenderMaterialID(hit_face, asset_id);
+    }
 
     dialog_refresh_all();
 
@@ -1313,7 +1408,7 @@ void LLToolDragAndDrop::dropMaterialAllFaces(LLViewerObject* hit_obj,
     // SL-20013 must save asset_id before handleDropMaterialProtections since our item instance
     // may be deleted if it is moved into task inventory
     LLUUID asset_id = item->getAssetUUID();
-    BOOL success = handleDropMaterialProtections(hit_obj, item, source, src_id);
+    bool success = handleDropMaterialProtections(hit_obj, item, source, src_id);
 
     if (!success)
     {
@@ -1326,7 +1421,134 @@ void LLToolDragAndDrop::dropMaterialAllFaces(LLViewerObject* hit_obj,
         asset_id = BLANK_MATERIAL_ASSET_ID;
     }
 
-    hit_obj->setRenderMaterialIDs(asset_id);
+        // Preserve existing texture transforms when switching to PBR material for all faces
+    std::vector<std::pair<bool, LLGLTFMaterial*>> preserved_transforms(hit_obj->getNumTEs());
+
+    if (asset_id.notNull())
+    {
+        for (S32 te = 0; te < hit_obj->getNumTEs(); ++te)
+        {
+            LLTextureEntry* tep = hit_obj->getTE(te);
+            if (!tep) continue;
+
+            bool should_preserve = false;
+            LLGLTFMaterial* preserved_override = nullptr;
+
+            // Only preserve transforms from existing GLTF material override
+            // Do not fall back to texture entry transforms when switching between PBR materials
+            LLGLTFMaterial* existing_override = tep->getGLTFMaterialOverride();
+            if (existing_override)
+            {
+                // Check if existing override has non-default transforms
+                const LLGLTFMaterial::TextureTransform& existing_transform = existing_override->mTextureTransform[0];
+                const LLGLTFMaterial::TextureTransform& default_transform = LLGLTFMaterial::TextureTransform();
+
+                if (existing_transform.mScale != default_transform.mScale ||
+                    existing_transform.mOffset != default_transform.mOffset ||
+                    existing_transform.mRotation != default_transform.mRotation)
+                {
+                    // Preserve non-default transforms from current PBR material
+                    preserved_override = new LLGLTFMaterial();
+                    for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                    {
+                        preserved_override->mTextureTransform[i].mScale = existing_transform.mScale;
+                        preserved_override->mTextureTransform[i].mOffset = existing_transform.mOffset;
+                        preserved_override->mTextureTransform[i].mRotation = existing_transform.mRotation;
+                    }
+                    should_preserve = true;
+                }
+                else
+                {
+                    // Existing override has default transforms, fall back to texture entry
+                    F32 existing_scale_s, existing_scale_t, existing_offset_s, existing_offset_t, existing_rotation;
+                    tep->getScale(&existing_scale_s, &existing_scale_t);
+                    tep->getOffset(&existing_offset_s, &existing_offset_t);
+                    existing_rotation = tep->getRotation();
+
+                    if (existing_scale_s != default_transform.mScale.mV[0] || existing_scale_t != default_transform.mScale.mV[1] ||
+                        existing_offset_s != default_transform.mOffset.mV[0] || existing_offset_t != default_transform.mOffset.mV[1] ||
+                        existing_rotation != default_transform.mRotation)
+                    {
+                        // Preserve non-default transforms from texture entry
+                        preserved_override = new LLGLTFMaterial();
+                        for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                        {
+                            LLVector2 pbr_scale, pbr_offset;
+                            F32 pbr_rotation;
+                            LLGLTFMaterial::convertTextureTransformToPBR(
+                                existing_scale_s, existing_scale_t,
+                                existing_offset_s, existing_offset_t,
+                                existing_rotation,
+                                pbr_scale, pbr_offset, pbr_rotation);
+                            preserved_override->mTextureTransform[i].mScale = pbr_scale;
+                            preserved_override->mTextureTransform[i].mOffset = pbr_offset;
+                            preserved_override->mTextureTransform[i].mRotation = pbr_rotation;
+                        }
+                        should_preserve = true;
+                    }
+                }
+            }
+            else
+            {
+                // No existing PBR material override - check texture entry transforms
+                // This handles the case of switching from Blinn-Phong to PBR material
+                F32 existing_scale_s, existing_scale_t, existing_offset_s, existing_offset_t, existing_rotation;
+                tep->getScale(&existing_scale_s, &existing_scale_t);
+                tep->getOffset(&existing_offset_s, &existing_offset_t);
+                existing_rotation = tep->getRotation();
+
+                const LLGLTFMaterial::TextureTransform& default_transform = LLGLTFMaterial::TextureTransform();
+                if (existing_scale_s != default_transform.mScale.mV[0] || existing_scale_t != default_transform.mScale.mV[1] ||
+                    existing_offset_s != default_transform.mOffset.mV[0] || existing_offset_t != default_transform.mOffset.mV[1] ||
+                    existing_rotation != default_transform.mRotation)
+                {
+                    // Preserve non-default transforms from texture entry
+                    preserved_override = new LLGLTFMaterial();
+                    for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                    {
+                        LLVector2 pbr_scale, pbr_offset;
+                        F32 pbr_rotation;
+                        LLGLTFMaterial::convertTextureTransformToPBR(
+                            existing_scale_s, existing_scale_t,
+                            existing_offset_s, existing_offset_t,
+                            existing_rotation,
+                            pbr_scale, pbr_offset, pbr_rotation);
+                        preserved_override->mTextureTransform[i].mScale = pbr_scale;
+                        preserved_override->mTextureTransform[i].mOffset = pbr_offset;
+                        preserved_override->mTextureTransform[i].mRotation = pbr_rotation;
+                    }
+                    should_preserve = true;
+                }
+            }
+
+            preserved_transforms[te] = std::make_pair(should_preserve, preserved_override);
+        }
+    }
+
+    // Apply materials with preserved transforms
+    if (asset_id.notNull())
+    {
+        for (S32 te = 0; te < hit_obj->getNumTEs(); ++te)
+        {
+            LLGLTFMaterial* preserved_override = preserved_transforms[te].second;
+            if (preserved_override)
+            {
+                // Apply material with preserved transforms
+                LLGLTFMaterialList::queueApply(hit_obj, te, asset_id, preserved_override);
+                // Update local state
+                hit_obj->setRenderMaterialID(te, asset_id, false, true);
+                hit_obj->getTE(te)->setGLTFMaterialOverride(preserved_override);
+            }
+            else
+            {
+                hit_obj->setRenderMaterialID(te, asset_id);
+            }
+        }
+    }
+    else
+    {
+        hit_obj->setRenderMaterialIDs(asset_id);
+    }
     dialog_refresh_all();
     // send the update to the simulator
     hit_obj->sendTEUpdate();
@@ -1344,7 +1566,7 @@ void LLToolDragAndDrop::dropMesh(LLViewerObject* hit_obj,
         return;
     }
     LLUUID asset_id = item->getAssetUUID();
-    BOOL success = handleDropMaterialProtections(hit_obj, item, source, src_id);
+    bool success = handleDropMaterialProtections(hit_obj, item, source, src_id);
     if(!success)
     {
         return;
@@ -1352,7 +1574,7 @@ void LLToolDragAndDrop::dropMesh(LLViewerObject* hit_obj,
 
     LLSculptParams sculpt_params;
     sculpt_params.setSculptTexture(asset_id, LL_SCULPT_TYPE_MESH);
-    hit_obj->setParameterEntry(LLNetworkData::PARAMS_SCULPT, sculpt_params, TRUE);
+    hit_obj->setParameterEntry(LLNetworkData::PARAMS_SCULPT, sculpt_params, true);
 
     dialog_refresh_all();
 }
@@ -1410,6 +1632,7 @@ void LLToolDragAndDrop::dropTexture(LLViewerObject* hit_obj,
                 LLTextureEntry* te = hit_obj->getTE(hit_face);
                 if (te && !remove_pbr)
                 {
+                    // saveGLTFMaterials will make a copy
                     override_materials.push_back(te->getGLTFMaterialOverride());
                 }
                 else
@@ -1428,10 +1651,10 @@ void LLToolDragAndDrop::dropTexture(LLViewerObject* hit_obj,
 
         // If user dropped a texture onto face it implies
         // applying texture now without cancel, save to selection
-        LLPanelFace* panel_face = gFloaterTools->getPanelFace();
+        LLPanelFace* panel_face = gFloaterTools ? gFloaterTools->getPanelFace() : nullptr;
         if (nodep
-            && gFloaterTools->getVisible()
             && panel_face
+            && gFloaterTools->getVisible()
             && panel_face->getTextureDropChannel() == 0 /*texture*/
             && nodep->mSavedTextures.size() > hit_face)
         {
@@ -1446,9 +1669,11 @@ void LLToolDragAndDrop::dropTexture(LLViewerObject* hit_obj,
             }
 
             LLTextureEntry* te = hit_obj->getTE(hit_face);
-            if (te && !remove_pbr)
+            LLGLTFMaterial * override_mat = nullptr;
+            if (te && !remove_pbr && (override_mat = te->getGLTFMaterialOverride()))
             {
-                nodep->mSavedGLTFOverrideMaterials[hit_face] = te->getGLTFMaterialOverride();
+                LLGLTFMaterial* copy = new LLGLTFMaterial(*override_mat);
+                nodep->mSavedGLTFOverrideMaterials[hit_face] = copy;
             }
             else
             {
@@ -1485,8 +1710,8 @@ void LLToolDragAndDrop::dropTextureOneFace(LLViewerObject* hit_obj,
         if (allow_adding_to_override)
         {
             LLGLTFMaterial::TextureInfo drop_channel = LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR;
-            LLPanelFace* panel_face = gFloaterTools->getPanelFace();
-            if (gFloaterTools->getVisible() && panel_face)
+            LLPanelFace* panel_face = gFloaterTools ? gFloaterTools->getPanelFace() : nullptr;
+            if (panel_face && gFloaterTools->getVisible())
             {
                 drop_channel = panel_face->getPBRDropChannel();
             }
@@ -1495,7 +1720,7 @@ void LLToolDragAndDrop::dropTextureOneFace(LLViewerObject* hit_obj,
         }
         return;
     }
-    BOOL success = handleDropMaterialProtections(hit_obj, item, source, src_id);
+    bool success = handleDropMaterialProtections(hit_obj, item, source, src_id);
     if (!success)
     {
         return;
@@ -1511,9 +1736,9 @@ void LLToolDragAndDrop::dropTextureOneFace(LLViewerObject* hit_obj,
 
     LLTextureEntry* tep = hit_obj->getTE(hit_face);
 
-    LLPanelFace* panel_face = gFloaterTools->getPanelFace();
+    LLPanelFace* panel_face = gFloaterTools ? gFloaterTools->getPanelFace() : nullptr;
 
-    if (gFloaterTools->getVisible() && panel_face)
+    if (panel_face && gFloaterTools->getVisible())
     {
         tex_channel = (tex_channel > -1) ? tex_channel : panel_face->getTextureDropChannel();
         switch (tex_channel)
@@ -1565,7 +1790,7 @@ void LLToolDragAndDrop::dropTextureOneFace(LLViewerObject* hit_obj,
 
 void LLToolDragAndDrop::dropScript(LLViewerObject* hit_obj,
                                    LLInventoryItem* item,
-                                   BOOL active,
+                                   bool active,
                                    ESource source,
                                    const LLUUID& src_id)
 {
@@ -1607,25 +1832,25 @@ void LLToolDragAndDrop::dropScript(LLViewerObject* hit_obj,
                 }
             }
         }
-        hit_obj->saveScript(new_script, active, true);
-        gFloaterTools->dirty();
+        hit_obj->saveScript(new_script, active, true, LLUUID::null);
+        if (gFloaterTools)
+        {
+            gFloaterTools->dirty();
+        }
 
         // VEFFECT: SetScript
-        if (!gSavedSettings.getBOOL("AlchemyPointAtPrivate"))
-        {
-            LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, TRUE);
-            effectp->setSourceObject(gAgentAvatarp);
-            effectp->setTargetObject(hit_obj);
-            effectp->setDuration(LL_HUD_DUR_SHORT);
-            effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-        }
+        LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+        effectp->setSourceObject(gAgentAvatarp);
+        effectp->setTargetObject(hit_obj);
+        effectp->setDuration(LL_HUD_DUR_SHORT);
+        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
     }
 }
 
 void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
-                   BOOL bypass_sim_raycast,
-                   BOOL from_task_inventory,
-                   BOOL remove_from_inventory)
+                   bool bypass_sim_raycast,
+                   bool from_task_inventory,
+                   bool remove_from_inventory)
 {
     LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromPosGlobal(mLastHitPos);
     if (!regionp)
@@ -1662,7 +1887,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
     if (!remove_from_inventory
         && !item->getPermissions().allowCopyBy(gAgent.getID()))
     {
-        remove_from_inventory = TRUE;
+        remove_from_inventory = true;
     }
 
     // Limit raycast to a single object.
@@ -1690,7 +1915,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
     LLUUID source_id = from_task_inventory ? mSourceID : LLUUID::null;
 
     // Select the object only if we're editing.
-    BOOL rez_selected = LLToolMgr::getInstance()->inEdit();
+    bool rez_selected = LLToolMgr::getInstance()->inEdit();
 
 
     LLVector3 ray_start = regionp->getPosRegionFromGlobal(mLastCameraPos);
@@ -1698,7 +1923,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
     // currently the ray's end point is an approximation,
     // and is sometimes too short (causing failure.)  so we
     // double the ray's length:
-    if (bypass_sim_raycast == FALSE)
+    if (!bypass_sim_raycast)
     {
         LLVector3 ray_direction = ray_start - ray_end;
         ray_end = ray_end - ray_direction;
@@ -1731,7 +1956,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
     msg->addVector3Fast(_PREHASH_RayStart, ray_start);
     msg->addVector3Fast(_PREHASH_RayEnd, ray_end);
     msg->addUUIDFast(_PREHASH_RayTargetID, ray_target_id );
-    msg->addBOOLFast(_PREHASH_RayEndIsIntersection, FALSE);
+    msg->addBOOLFast(_PREHASH_RayEndIsIntersection, false);
     msg->addBOOLFast(_PREHASH_RezSelected, rez_selected);
     msg->addBOOLFast(_PREHASH_RemoveItem, remove_from_inventory);
 
@@ -1783,14 +2008,11 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
     }
 
     // VEFFECT: DropObject
-    if (!gSavedSettings.getBOOL("AlchemyPointAtPrivate"))
-    {
-        LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, TRUE);
-        effectp->setSourceObject(gAgentAvatarp);
-        effectp->setPositionGlobal(mLastHitPos);
-        effectp->setDuration(LL_HUD_DUR_SHORT);
-        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-    }
+    LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+    effectp->setSourceObject(gAgentAvatarp);
+    effectp->setPositionGlobal(mLastHitPos);
+    effectp->setDuration(LL_HUD_DUR_SHORT);
+    effectp->setColor(LLColor4U(gAgent.getEffectColor()));
 
     add(LLStatViewer::OBJECT_REZ, 1);
 }
@@ -1849,15 +2071,15 @@ void LLToolDragAndDrop::dropInventory(LLViewerObject* hit_obj,
     }
 
     // VEFFECT: AddToInventory
-    if (!gSavedSettings.getBOOL("AlchemyPointAtPrivate"))
+    LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+    effectp->setSourceObject(gAgentAvatarp);
+    effectp->setTargetObject(hit_obj);
+    effectp->setDuration(LL_HUD_DUR_SHORT);
+    effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+    if (gFloaterTools)
     {
-        LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, TRUE);
-        effectp->setSourceObject(gAgentAvatarp);
-        effectp->setTargetObject(hit_obj);
-        effectp->setDuration(LL_HUD_DUR_SHORT);
-        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+        gFloaterTools->dirty();
     }
-    gFloaterTools->dirty();
 }
 
 // accessor that looks at permissions, copyability, and names of
@@ -1865,11 +2087,12 @@ void LLToolDragAndDrop::dropInventory(LLViewerObject* hit_obj,
 EAcceptance LLToolDragAndDrop::willObjectAcceptInventory(LLViewerObject* obj, LLInventoryItem* item, EDragAndDropType type)
 {
     // check the basics
-    if (!item || !obj) return ACCEPT_NO;
+    if (!item || !obj)
+        return ACCEPT_NO;
+
     // HACK: downcast
     LLViewerInventoryItem* vitem = (LLViewerInventoryItem*)item;
-    if (!vitem->isFinished() && (type != DAD_CATEGORY)
-    && !(gInventory.isObjectDescendentOf(vitem->getUUID(), gLocalInventory)))
+    if (!vitem->isFinished() && (type != DAD_CATEGORY))
     {
         // Note: for DAD_CATEGORY we assume that folder version check passed and folder
         // is complete, meaning that items inside are up to date.
@@ -1877,36 +2100,37 @@ EAcceptance LLToolDragAndDrop::willObjectAcceptInventory(LLViewerObject* obj, LL
         // Library or agent inventory only.
         return ACCEPT_NO;
     }
-    if (vitem->getIsLinkType()) return ACCEPT_NO; // No giving away links
+    if (vitem->getIsLinkType())
+        return ACCEPT_NO; // No giving away links
 
     // deny attempts to drop from an object onto itself. This is to
     // help make sure that drops that are from an object to an object
     // don't have to worry about order of evaluation. Think of this
     // like check for self in assignment.
-    if(obj->getID() == item->getParentUUID())
+    if (obj->getID() == item->getParentUUID())
     {
         return ACCEPT_NO;
     }
 
-    //BOOL copy = (perm.allowCopyBy(gAgent.getID(),
+    //bool copy = (perm.allowCopyBy(gAgent.getID(),
     //                            gAgent.getGroupID())
     //           && (obj->mPermModify || obj->mFlagAllowInventoryAdd));
-    BOOL worn = FALSE;
+    bool worn = false;
     LLVOAvatarSelf* my_avatar = NULL;
-    switch(item->getType())
+    switch (item->getType())
     {
     case LLAssetType::AT_OBJECT:
         my_avatar = gAgentAvatarp;
         if(my_avatar && my_avatar->isWearingAttachment(item->getUUID()))
         {
-                worn = TRUE;
+                worn = true;
         }
         break;
     case LLAssetType::AT_BODYPART:
     case LLAssetType::AT_CLOTHING:
-        if(gAgentWearables.isWearingItem(item->getUUID()))
+        if (gAgentWearables.isWearingItem(item->getUUID()))
         {
-            worn = TRUE;
+            worn = true;
         }
         break;
     case LLAssetType::AT_CALLINGCARD:
@@ -1914,19 +2138,19 @@ EAcceptance LLToolDragAndDrop::willObjectAcceptInventory(LLViewerObject* obj, LL
         // because of incomplete LSL support. See STORM-1117.
         return ACCEPT_NO;
     default:
-            break;
+        break;
     }
     const LLPermissions& perm = item->getPermissions();
-    BOOL modify = (obj->permModify() || obj->flagAllowInventoryAdd());
-    BOOL transfer = FALSE;
-    if((obj->permYouOwner() && (perm.getOwner() == gAgent.getID()))
+    bool modify = (obj->permModify() || obj->flagAllowInventoryAdd());
+    bool transfer = false;
+    if ((obj->permYouOwner() && (perm.getOwner() == gAgent.getID()))
        || perm.allowOperationBy(PERM_TRANSFER, gAgent.getID()))
     {
-        transfer = TRUE;
+        transfer = true;
     }
-    BOOL volume = (LL_PCODE_VOLUME == obj->getPCode());
-    BOOL attached = obj->isAttachment();
-    BOOL unrestricted = ((perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED) ? TRUE : FALSE;
+    bool volume = (LL_PCODE_VOLUME == obj->getPCode());
+    bool attached = obj->isAttachment();
+    bool unrestricted = (perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED;
 
 // [RLVa:KB] - Checked: 2010-03-31 (RLVa-1.2.0c) | Modified: RLVa-1.0.0c
     if (rlv_handler_t::isEnabled())
@@ -1944,20 +2168,23 @@ EAcceptance LLToolDragAndDrop::willObjectAcceptInventory(LLViewerObject* obj, LL
     }
 // [/RLVa:KB]
 
-    if(attached && !unrestricted)
+    if (attached && !unrestricted)
     {
         // Attachments are in world and in inventory simultaneously,
         // at the moment server doesn't support such a situation.
         return ACCEPT_NO_LOCKED;
     }
-    else if(modify && transfer && volume && !worn)
+
+    if (modify && transfer && volume && !worn)
     {
         return ACCEPT_YES_MULTI;
     }
-    else if(!modify)
+
+    if (!modify)
     {
         return ACCEPT_NO_LOCKED;
     }
+
     return ACCEPT_NO;
 }
 
@@ -1978,7 +2205,7 @@ static void give_inventory_cb(const LLSD& notification, const LLSD& response)
     LLViewerInventoryCategory * inv_cat =  gInventory.getCategory(payload["item_id"]);
     if (NULL == inv_item && NULL == inv_cat)
     {
-        llassert( FALSE );
+        llassert( false );
         return;
     }
     bool successfully_shared;
@@ -2037,7 +2264,7 @@ static void get_name_cb(const LLUUID& id,
 
 // function used as drag-and-drop handler for simple agent give inventory requests
 //static
-bool LLToolDragAndDrop::handleGiveDragAndDrop(LLUUID dest_agent, LLUUID session_id, BOOL drop,
+bool LLToolDragAndDrop::handleGiveDragAndDrop(LLUUID dest_agent, LLUUID session_id, bool drop,
                                               EDragAndDropType cargo_type,
                                               void* cargo_data,
                                               EAcceptance* accept,
@@ -2123,7 +2350,7 @@ bool LLToolDragAndDrop::handleGiveDragAndDrop(LLUUID dest_agent, LLUUID session_
         break;
     }
 
-    return TRUE;
+    return true;
 }
 
 
@@ -2133,14 +2360,14 @@ bool LLToolDragAndDrop::handleGiveDragAndDrop(LLUUID dest_agent, LLUUID session_
 ///
 
 EAcceptance LLToolDragAndDrop::dad3dNULL(
-    LLViewerObject*, S32, MASK, BOOL)
+    LLViewerObject*, S32, MASK, bool)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dNULL()" << LL_ENDL;
     return ACCEPT_NO;
 }
 
 EAcceptance LLToolDragAndDrop::dad3dRezAttachmentFromInv(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dRezAttachmentFromInv()" << LL_ENDL;
     // must be in the user's inventory
@@ -2187,7 +2414,7 @@ EAcceptance LLToolDragAndDrop::dad3dRezAttachmentFromInv(
     {
         if(mSource == SOURCE_LIBRARY)
         {
-//          LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, (LLViewerJointAttachment*)0));
+//          LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, (LLViewerJointAttachment*)0, false));
 // [SL:KB] - Patch: Appearance-DnDWear | Checked: 2010-09-28 (Catznip-2.2)
             // Make this behave consistent with dad3dWearItem
             LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, (LLViewerJointAttachment*)0, fReplace));
@@ -2206,7 +2433,7 @@ EAcceptance LLToolDragAndDrop::dad3dRezAttachmentFromInv(
             // Make this behave consistent with dad3dWearItem
             rez_attachment(item, 0, !(mask & MASK_CONTROL));
 // [/SL:KB]
-//          rez_attachment(item, 0);
+//          rez_attachment(item, 0, false);
         }
     }
     return ACCEPT_YES_SINGLE;
@@ -2214,7 +2441,7 @@ EAcceptance LLToolDragAndDrop::dad3dRezAttachmentFromInv(
 
 
 EAcceptance LLToolDragAndDrop::dad3dRezObjectOnLand(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
 // [RLVa:KB] - Checked: 2010-03-23 (RLVa-1.2.0e) | Modified: RLVa-1.1.0l
     // RELEASE-RLVa: [SL-2.2.0] Make sure the code below is the only code path to LLToolDragAndDrop::dad3dRezFromObjectOnLand()
@@ -2242,21 +2469,21 @@ EAcceptance LLToolDragAndDrop::dad3dRezObjectOnLand(
     }
 
     EAcceptance accept;
-    BOOL remove_inventory;
+    bool remove_inventory;
 
     // Get initial settings based on shift key
     if (mask & MASK_SHIFT)
     {
         // For now, always make copy
         //accept = ACCEPT_YES_SINGLE;
-        //remove_inventory = TRUE;
+        //remove_inventory = true;
         accept = ACCEPT_YES_COPY_SINGLE;
-        remove_inventory = FALSE;
+        remove_inventory = false;
     }
     else
     {
         accept = ACCEPT_YES_COPY_SINGLE;
-        remove_inventory = FALSE;
+        remove_inventory = false;
     }
 
     // check if the item can be copied. If not, send that to the sim
@@ -2264,7 +2491,7 @@ EAcceptance LLToolDragAndDrop::dad3dRezObjectOnLand(
     if(!item->getPermissions().allowCopyBy(gAgent.getID()))
     {
         accept = ACCEPT_YES_SINGLE;
-        remove_inventory = TRUE;
+        remove_inventory = true;
     }
 
     // Check if it's in the trash.
@@ -2276,14 +2503,14 @@ EAcceptance LLToolDragAndDrop::dad3dRezObjectOnLand(
 
     if(drop)
     {
-        dropObject(obj, TRUE, FALSE, remove_inventory);
+        dropObject(obj, true, false, remove_inventory);
     }
 
     return accept;
 }
 
 EAcceptance LLToolDragAndDrop::dad3dRezObjectOnObject(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
 // [RLVa:KB] - Checked: 2010-03-23 (RLVa-1.2.0e) | Modified: RLVa-1.1.0l
     // NOTE: if (mask & MASK_CONTROL) then it's a drop rather than a rez, so we let that pass through when @rez=n restricted
@@ -2332,20 +2559,20 @@ EAcceptance LLToolDragAndDrop::dad3dRezObjectOnObject(
     }
 
     EAcceptance accept;
-    BOOL remove_inventory;
+    bool remove_inventory;
 
     if (mask & MASK_SHIFT)
     {
         // For now, always make copy
         //accept = ACCEPT_YES_SINGLE;
-        //remove_inventory = TRUE;
+        //remove_inventory = true;
         accept = ACCEPT_YES_COPY_SINGLE;
-        remove_inventory = FALSE;
+        remove_inventory = false;
     }
     else
     {
         accept = ACCEPT_YES_COPY_SINGLE;
-        remove_inventory = FALSE;
+        remove_inventory = false;
     }
 
     // check if the item can be copied. If not, send that to the sim
@@ -2353,7 +2580,7 @@ EAcceptance LLToolDragAndDrop::dad3dRezObjectOnObject(
     if(!item->getPermissions().allowCopyBy(gAgent.getID()))
     {
         accept = ACCEPT_YES_SINGLE;
-        remove_inventory = TRUE;
+        remove_inventory = true;
     }
 
     // Check if it's in the trash.
@@ -2361,19 +2588,19 @@ EAcceptance LLToolDragAndDrop::dad3dRezObjectOnObject(
     if(gInventory.isObjectDescendentOf(item->getUUID(), trash_id))
     {
         accept = ACCEPT_YES_SINGLE;
-        remove_inventory = TRUE;
+        remove_inventory = true;
     }
 
     if(drop)
     {
-        dropObject(obj, FALSE, FALSE, remove_inventory);
+        dropObject(obj, false, false, remove_inventory);
     }
 
     return accept;
 }
 
 EAcceptance LLToolDragAndDrop::dad3dRezScript(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dRezScript()" << LL_ENDL;
 
@@ -2387,13 +2614,13 @@ EAcceptance LLToolDragAndDrop::dad3dRezScript(
     LLViewerInventoryItem* item;
     LLViewerInventoryCategory* cat;
     locateInventory(item, cat);
-    if (!item || (!item->isFinished() && !(gInventory.isObjectDescendentOf(item->getUUID(), gLocalInventory)))) return ACCEPT_NO;
+    if (!item || !item->isFinished()) return ACCEPT_NO;
     EAcceptance rv = willObjectAcceptInventory(obj, item);
     if(drop && (ACCEPT_YES_SINGLE <= rv))
     {
         // rez in the script active by default, rez in inactive if the
         // control key is being held down.
-        BOOL active = ((mask & MASK_CONTROL) == 0);
+        bool active = ((mask & MASK_CONTROL) == 0);
 
         LLViewerObject* root_object = obj;
         if (obj && obj->getParent())
@@ -2410,8 +2637,49 @@ EAcceptance LLToolDragAndDrop::dad3dRezScript(
     return rv;
 }
 
+
+bool is_water_exclusion_face(LLViewerObject* obj, S32 face)
+{
+    LLViewerTexture* image = obj->getTEImage(face);
+    if (!image)
+        return false;
+
+    // magic texture and alpha blending
+    bool exclude_water = (image->getID() == IMG_ALPHA_GRAD) && obj->isImageAlphaBlended(face);
+
+    // transparency
+    exclude_water &= (obj->getTE(face)->getColor().mV[VALPHA] == 1);
+
+    //absence of normal and specular textures
+    image = obj->getTENormalMap(face);
+    if (image && image != LLViewerFetchedTexture::sDefaultImagep)
+        exclude_water &= image->getID().isNull();
+    image = obj->getTESpecularMap(face);
+    if (image && image != LLViewerFetchedTexture::sDefaultImagep)
+        exclude_water &= image->getID().isNull();
+
+    return exclude_water;
+}
+
+bool is_water_exclusion_surface(LLViewerObject* obj, S32 face, bool all_faces)
+{
+    if (all_faces)
+    {
+        bool exclude_water = false;
+        for (S32 it_face = 0; it_face < obj->getNumTEs(); it_face++)
+        {
+            exclude_water |= is_water_exclusion_face(obj, it_face);
+        }
+        return exclude_water;
+    }
+    else
+    {
+        return is_water_exclusion_face(obj, face);
+    }
+}
+
 EAcceptance LLToolDragAndDrop::dad3dApplyToObject(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop, EDragAndDropType cargo_type)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop, EDragAndDropType cargo_type)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dApplyToObject()" << LL_ENDL;
 
@@ -2425,7 +2693,7 @@ EAcceptance LLToolDragAndDrop::dad3dApplyToObject(
     LLViewerInventoryItem* item;
     LLViewerInventoryCategory* cat;
     locateInventory(item, cat);
-    if( !item || (!item->isFinished() && !(gInventory.isObjectDescendentOf(item->getUUID(), gLocalInventory))) ) return ACCEPT_NO;
+    if (!item || !item->isFinished()) return ACCEPT_NO;
     LLPermissions item_permissions = item->getPermissions();
     EAcceptance rv = willObjectAcceptInventory(obj, item);
     if((mask & MASK_CONTROL))
@@ -2500,7 +2768,13 @@ EAcceptance LLToolDragAndDrop::dad3dApplyToObject(
         else if (cargo_type == DAD_MATERIAL)
         {
             bool all_faces = mask & MASK_SHIFT;
-            if (item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID()))
+
+            if (is_water_exclusion_surface(obj, face, all_faces))
+            {
+                LLNotificationsUtil::add("WaterExclusionNoMaterial");
+                return ACCEPT_NO;
+            }
+            else if (item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID()))
             {
                 dropMaterial(obj, face, item, mSource, mSourceID, all_faces);
             }
@@ -2530,14 +2804,11 @@ EAcceptance LLToolDragAndDrop::dad3dApplyToObject(
         }
 
         // VEFFECT: SetTexture
-        if (!gSavedSettings.getBOOL("AlchemyPointAtPrivate"))
-        {
-            LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, TRUE);
-            effectp->setSourceObject(gAgentAvatarp);
-            effectp->setTargetObject(obj);
-            effectp->setDuration(LL_HUD_DUR_SHORT);
-            effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-        }
+        LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+        effectp->setSourceObject(gAgentAvatarp);
+        effectp->setTargetObject(obj);
+        effectp->setDuration(LL_HUD_DUR_SHORT);
+        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
     }
 
     // enable multi-drop, although last texture will win
@@ -2546,25 +2817,42 @@ EAcceptance LLToolDragAndDrop::dad3dApplyToObject(
 
 
 EAcceptance LLToolDragAndDrop::dad3dTextureObject(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     return dad3dApplyToObject(obj, face, mask, drop, DAD_TEXTURE);
 }
 
 EAcceptance LLToolDragAndDrop::dad3dMaterialObject(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     return dad3dApplyToObject(obj, face, mask, drop, DAD_MATERIAL);
 }
 
 EAcceptance LLToolDragAndDrop::dad3dMeshObject(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     return dad3dApplyToObject(obj, face, mask, drop, DAD_MESH);
 }
 
+
+/*
+EAcceptance LLToolDragAndDrop::dad3dTextureSelf(
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
+{
+    LL_DEBUGS() << "LLToolDragAndDrop::dad3dTextureAvatar()" << LL_ENDL;
+    if(drop)
+    {
+        if( !(mask & MASK_SHIFT) )
+        {
+            dropTextureOneFaceAvatar( (LLVOAvatar*)obj, face, (LLInventoryItem*)mCargoData);
+        }
+    }
+    return (mask & MASK_SHIFT) ? ACCEPT_NO : ACCEPT_YES_SINGLE;
+}
+*/
+
 EAcceptance LLToolDragAndDrop::dad3dWearItem(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dWearItem()" << LL_ENDL;
     LLViewerInventoryItem* item;
@@ -2608,7 +2896,7 @@ EAcceptance LLToolDragAndDrop::dad3dWearItem(
 }
 
 EAcceptance LLToolDragAndDrop::dad3dActivateGesture(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dActivateGesture()" << LL_ENDL;
     LLViewerInventoryItem* item;
@@ -2627,6 +2915,7 @@ EAcceptance LLToolDragAndDrop::dad3dActivateGesture(
 
         if( drop )
         {
+            LLUUID item_id;
             if(mSource == SOURCE_LIBRARY)
             {
                 // create item based on that one, and put it on if that
@@ -2656,7 +2945,7 @@ EAcceptance LLToolDragAndDrop::dad3dActivateGesture(
 }
 
 EAcceptance LLToolDragAndDrop::dad3dWearCategory(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dWearCategory()" << LL_ENDL;
     LLViewerInventoryItem* item;
@@ -2686,46 +2975,46 @@ EAcceptance LLToolDragAndDrop::dad3dWearCategory(
         return ACCEPT_NO_CUSTOM;
     }
 
-    if(mSource == SOURCE_AGENT)
+    if (mSource == SOURCE_AGENT)
     {
         const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
-        if( gInventory.isObjectDescendentOf( category->getUUID(), trash_id ) )
+        if (gInventory.isObjectDescendentOf(category->getUUID(), trash_id))
         {
             return ACCEPT_NO;
         }
 
         const LLUUID &outbox_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_OUTBOX);
-        if(outbox_id.notNull() && gInventory.isObjectDescendentOf(category->getUUID(), outbox_id))
+        if (outbox_id.notNull() && gInventory.isObjectDescendentOf(category->getUUID(), outbox_id))
         {
             // Legacy
             return ACCEPT_NO;
         }
 
-        if(drop)
+        if (drop)
         {
-            BOOL append = ( (mask & MASK_SHIFT) ? TRUE : FALSE );
-            LLAppearanceMgr::instance().wearInventoryCategory(category, false, append);
+            LLAppearanceMgr::instance().wearInventoryCategory(category, false, mask & MASK_SHIFT);
         }
+
         return ACCEPT_YES_MULTI;
     }
-    else if(mSource == SOURCE_LIBRARY)
+
+    if (mSource == SOURCE_LIBRARY)
     {
-        if(drop)
+        if (drop)
         {
             LLAppearanceMgr::instance().wearInventoryCategory(category, true, false);
         }
+
         return ACCEPT_YES_MULTI;
     }
-    else
-    {
-        // TODO: copy/move category to avatar's inventory and then wear it.
-        return ACCEPT_NO;
-    }
+
+    // TODO: copy/move category to avatar's inventory and then wear it.
+    return ACCEPT_NO;
 }
 
 
 EAcceptance LLToolDragAndDrop::dad3dUpdateInventory(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dadUpdateInventory()" << LL_ENDL;
 
@@ -2739,7 +3028,9 @@ EAcceptance LLToolDragAndDrop::dad3dUpdateInventory(
     LLViewerInventoryItem* item;
     LLViewerInventoryCategory* cat;
     locateInventory(item, cat);
-    if (!item || !item->isFinished()) return ACCEPT_NO;
+    if (!item || !item->isFinished())
+        return ACCEPT_NO;
+
     LLViewerObject* root_object = obj;
     if (obj && obj->getParent())
     {
@@ -2751,21 +3042,22 @@ EAcceptance LLToolDragAndDrop::dad3dUpdateInventory(
     }
 
     EAcceptance rv = willObjectAcceptInventory(root_object, item);
-    if(root_object && drop && (ACCEPT_YES_COPY_SINGLE <= rv))
+    if (root_object && drop && (ACCEPT_YES_COPY_SINGLE <= rv))
     {
         dropInventory(root_object, item, mSource, mSourceID);
     }
+
     return rv;
 }
 
-BOOL LLToolDragAndDrop::dadUpdateInventory(LLViewerObject* obj, BOOL drop)
+bool LLToolDragAndDrop::dadUpdateInventory(LLViewerObject* obj, bool drop)
 {
     EAcceptance rv = dad3dUpdateInventory(obj, -1, MASK_NONE, drop);
-    return (rv >= ACCEPT_YES_COPY_SINGLE);
+    return rv >= ACCEPT_YES_COPY_SINGLE;
 }
 
 EAcceptance LLToolDragAndDrop::dad3dUpdateInventoryCategory(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dUpdateInventoryCategory()" << LL_ENDL;
     if (obj == NULL)
@@ -2881,7 +3173,7 @@ EAcceptance LLToolDragAndDrop::dad3dUpdateInventoryCategory(
 
 
 EAcceptance LLToolDragAndDrop::dad3dRezCategoryOnObject(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     if ((mask & MASK_CONTROL))
     {
@@ -2894,15 +3186,15 @@ EAcceptance LLToolDragAndDrop::dad3dRezCategoryOnObject(
 }
 
 
-BOOL LLToolDragAndDrop::dadUpdateInventoryCategory(LLViewerObject* obj,
-                                                   BOOL drop)
+bool LLToolDragAndDrop::dadUpdateInventoryCategory(LLViewerObject* obj,
+                                                   bool drop)
 {
     EAcceptance rv = dad3dUpdateInventoryCategory(obj, -1, MASK_NONE, drop);
     return (rv >= ACCEPT_YES_COPY_SINGLE);
 }
 
 EAcceptance LLToolDragAndDrop::dad3dGiveInventoryObject(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dGiveInventoryObject()" << LL_ENDL;
 
@@ -2946,7 +3238,7 @@ EAcceptance LLToolDragAndDrop::dad3dGiveInventoryObject(
 
 
 EAcceptance LLToolDragAndDrop::dad3dGiveInventory(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dGiveInventory()" << LL_ENDL;
     // item has to be in agent inventory.
@@ -2975,7 +3267,7 @@ EAcceptance LLToolDragAndDrop::dad3dGiveInventory(
 }
 
 EAcceptance LLToolDragAndDrop::dad3dGiveInventoryCategory(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dGiveInventoryCategory()" << LL_ENDL;
 // [RLVa:KB] - @share
@@ -2999,7 +3291,7 @@ EAcceptance LLToolDragAndDrop::dad3dGiveInventoryCategory(
 
 
 EAcceptance LLToolDragAndDrop::dad3dRezFromObjectOnLand(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dRezFromObjectOnLand()" << LL_ENDL;
     LLViewerInventoryItem* item = NULL;
@@ -3014,13 +3306,13 @@ EAcceptance LLToolDragAndDrop::dad3dRezFromObjectOnLand(
     }
     if(drop)
     {
-        dropObject(obj, TRUE, TRUE, FALSE);
+        dropObject(obj, true, true, false);
     }
     return ACCEPT_YES_SINGLE;
 }
 
 EAcceptance LLToolDragAndDrop::dad3dRezFromObjectOnObject(
-    LLViewerObject* obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject* obj, S32 face, MASK mask, bool drop)
 {
     LL_DEBUGS() << "LLToolDragAndDrop::dad3dRezFromObjectOnObject()" << LL_ENDL;
     LLViewerInventoryItem* item;
@@ -3049,13 +3341,13 @@ EAcceptance LLToolDragAndDrop::dad3dRezFromObjectOnObject(
     }
     if(drop)
     {
-        dropObject(obj, FALSE, TRUE, FALSE);
+        dropObject(obj, false, true, false);
     }
     return ACCEPT_YES_SINGLE;
 }
 
 EAcceptance LLToolDragAndDrop::dad3dCategoryOnLand(
-    LLViewerObject *obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject *obj, S32 face, MASK mask, bool drop)
 {
     return ACCEPT_NO;
     /*
@@ -3093,7 +3385,7 @@ EAcceptance LLToolDragAndDrop::dad3dCategoryOnLand(
 // This shortcuts alot of steps to make a basic object
 // w/ an inventory and a special permissions set
 EAcceptance LLToolDragAndDrop::dad3dAssetOnLand(
-    LLViewerObject *obj, S32 face, MASK mask, BOOL drop)
+    LLViewerObject *obj, S32 face, MASK mask, bool drop)
 {
     return ACCEPT_NO;
     /*

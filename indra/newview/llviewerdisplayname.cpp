@@ -30,6 +30,7 @@
 
 // viewer includes
 #include "llagent.h"
+#include "llfloaterprofile.h"
 #include "llfloaterreg.h"
 #include "llviewerregion.h"
 #include "llvoavatar.h"
@@ -99,13 +100,13 @@ void LLViewerDisplayName::set(const std::string& display_name, const set_name_sl
             boost::bind(&LLViewerDisplayName::setDisplayNameCoro, cap_url, body));
 }
 
-void LLViewerDisplayName::setDisplayNameCoro(const std::string cap_url, const LLSD body)
+void LLViewerDisplayName::setDisplayNameCoro(std::string cap_url, LLSD body)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("SetDisplayNameCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
-    LLCore::HttpHeaders::ptr_t httpHeaders(std::make_shared<LLCore::HttpHeaders>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("SetDisplayNameCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
 
     // People API can return localized error messages.  Indicate our
     // language preference via header.
@@ -206,6 +207,12 @@ class LLDisplayNameUpdate : public LLHTTPNode
         if (agent_id == gAgent.getID())
         {
             LLViewerDisplayName::sNameChangedSignal();
+        }
+
+        LLFloaterProfile* profile_floater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::findInstance("profile", LLSD().with("id", agent_id)));
+        if (profile_floater)
+        {
+            profile_floater->refreshName();
         }
     }
 };

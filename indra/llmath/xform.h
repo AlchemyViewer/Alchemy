@@ -28,20 +28,13 @@
 
 #include "v3math.h"
 #include "m4math.h"
-#include "llmatrix4a.h"
 #include "llquaternion.h"
 
-constexpr F32 SL_MAX_OBJECT_Z       = 4096.f;
-constexpr F32 SL_MIN_OBJECT_Z       = -256.f;
-constexpr F32 SL_DEFAULT_MAX_PRIM_SCALE = 64.f;
-constexpr F32 SL_DEFAULT_MAX_PRIM_SCALE_NO_MESH = 10.f;
-constexpr F32 SL_MIN_PRIM_SCALE = 0.01f;
-
-constexpr F32 OS_MAX_OBJECT_Z       = 10000.f;
-constexpr F32 OS_MIN_OBJECT_Z       = -10000.f;
-constexpr F32 OS_DEFAULT_MAX_PRIM_SCALE = 256.f;
-constexpr F32 OS_MIN_PRIM_SCALE = 0.001f;
-
+constexpr F32 MAX_OBJECT_Z      = 4096.f; // should match REGION_HEIGHT_METERS, Pre-havok4: 768.f
+constexpr F32 MIN_OBJECT_Z      = -256.f;
+constexpr F32 DEFAULT_MAX_PRIM_SCALE = 64.f;
+constexpr F32 DEFAULT_MAX_PRIM_SCALE_NO_MESH = 10.f;
+constexpr F32 MIN_PRIM_SCALE = 0.01f;
 constexpr F32 MAX_PRIM_SCALE = 65536.f; // something very high but not near FLT_MAX
 
 class LLXform
@@ -59,7 +52,7 @@ protected:
     LLXform*      mParent;
     U32           mChanged;
 
-    BOOL          mScaleChildOffset;
+    bool          mScaleChildOffset;
 
 public:
     typedef enum e_changed_flags
@@ -85,15 +78,15 @@ public:
         mScale.   setVec(1,1,1);
         mWorldPosition.clearVec();
         mWorldRotation.loadIdentity();
-        mScaleChildOffset = FALSE;
+        mScaleChildOffset = false;
     }
 
      LLXform();
-    virtual ~LLXform() = default;
+    virtual ~LLXform();
 
     void getLocalMat4(LLMatrix4 &mat) const { mat.initAll(mScale, mRotation, mPosition); }
 
-    inline BOOL setParent(LLXform *parent);
+    inline bool setParent(LLXform *parent);
 
     inline void setPosition(const LLVector3& pos);
     inline void setPosition(const F32 x, const F32 y, const F32 z);
@@ -116,18 +109,18 @@ public:
     void warn(const char* const msg);
 
     void        setChanged(const U32 bits)                  { mChanged |= bits; }
-    BOOL        isChanged() const                           { return mChanged; }
-    BOOL        isChanged(const U32 bits) const             { return mChanged & bits; }
+    bool        isChanged() const                           { return mChanged; }
+    bool        isChanged(const U32 bits) const             { return mChanged & bits; }
     void        clearChanged()                              { mChanged = 0; }
     void        clearChanged(U32 bits)                      { mChanged &= ~bits; }
 
-    void        setScaleChildOffset(BOOL scale)             { mScaleChildOffset = scale; }
-    BOOL        getScaleChildOffset()                       { return mScaleChildOffset; }
+    void        setScaleChildOffset(bool scale)             { mScaleChildOffset = scale; }
+    bool        getScaleChildOffset() const                 { return mScaleChildOffset; }
 
     LLXform* getParent() const { return mParent; }
     LLXform* getRoot() const;
-    virtual BOOL isRoot() const;
-    virtual BOOL isRootEdit() const;
+    virtual bool isRoot() const;
+    virtual bool isRootEdit() const;
 
     const LLVector3&    getPosition()  const        { return mPosition; }
     const LLVector3&    getScale() const            { return mScale; }
@@ -137,42 +130,41 @@ public:
     const LLVector3&    getWorldPosition() const    { return mWorldPosition; }
 };
 
-LL_ALIGN_PREFIX(16)
 class LLXformMatrix : public LLXform
 {
 public:
     LLXformMatrix() : LLXform() {};
-    virtual ~LLXformMatrix() = default;
+    virtual ~LLXformMatrix();
 
-    const LLMatrix4a&    getWorldMatrix() const      { return mWorldMatrix; }
-    void setWorldMatrix (const LLMatrix4a& mat)   { mWorldMatrix = mat; }
+    const LLMatrix4&    getWorldMatrix() const      { return mWorldMatrix; }
+    void setWorldMatrix (const LLMatrix4& mat)   { mWorldMatrix = mat; }
 
     void init()
     {
         mWorldMatrix.setIdentity();
-        mMin.clear();
-        mMax.clear();
+        mMin.clearVec();
+        mMax.clearVec();
 
         LLXform::init();
     }
 
     void update();
-    void updateMatrix(BOOL update_bounds = TRUE);
+    void updateMatrix(bool update_bounds = true);
     void getMinMax(LLVector3& min,LLVector3& max) const;
 
 protected:
-    LL_ALIGN_16(LLMatrix4a  mWorldMatrix);
-    LL_ALIGN_16(LLVector4a  mMin);
-    LL_ALIGN_16(LLVector4a  mMax);
+    LLMatrix4   mWorldMatrix;
+    LLVector3   mMin;
+    LLVector3   mMax;
 
-} LL_ALIGN_POSTFIX(16);
+};
 
-BOOL LLXform::setParent(LLXform* parent)
+bool LLXform::setParent(LLXform* parent)
 {
     // Validate and make sure we're not creating a loop
     if (parent == mParent)
     {
-        return TRUE;
+        return true;
     }
     if (parent)
     {
@@ -182,13 +174,13 @@ BOOL LLXform::setParent(LLXform* parent)
             if (cur_par == this)
             {
                 //warn("LLXform::setParent Creating loop when setting parent!");
-                return FALSE;
+                return false;
             }
             cur_par = cur_par->mParent;
         }
     }
     mParent = parent;
-    return TRUE;
+    return true;
 }
 
 void LLXform::setPosition(const LLVector3& pos)

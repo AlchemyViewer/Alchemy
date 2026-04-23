@@ -88,7 +88,7 @@ void HttpLibcurl::shutdown()
 
     if (mMultiHandles)
     {
-        for (int policy_class(0); policy_class < mPolicyCount; ++policy_class)
+        for (unsigned int policy_class(0); policy_class < mPolicyCount; ++policy_class)
         {
             if (mMultiHandles[policy_class])
             {
@@ -122,7 +122,7 @@ void HttpLibcurl::start(int policy_count)
     mActiveHandles = new int [mPolicyCount];
     mDirtyPolicy = new bool [mPolicyCount];
 
-    for (int policy_class(0); policy_class < mPolicyCount; ++policy_class)
+    for (unsigned int policy_class(0); policy_class < mPolicyCount; ++policy_class)
     {
         if (NULL == (mMultiHandles[policy_class] = curl_multi_init()))
         {
@@ -148,7 +148,7 @@ HttpService::ELoopSpeed HttpLibcurl::processTransport()
     HttpService::ELoopSpeed ret(HttpService::REQUEST_SLEEP);
 
     // Give libcurl some cycles to do I/O & callbacks
-    for (int policy_class(0); policy_class < mPolicyCount; ++policy_class)
+    for (unsigned int policy_class(0); policy_class < mPolicyCount; ++policy_class)
     {
         if (! mMultiHandles[policy_class])
         {
@@ -418,7 +418,7 @@ bool HttpLibcurl::completeRequest(CURLM * multi_handle, CURL * handle, CURLcode 
     else
     {
         LL_WARNS(LOG_CORE) << "Curl multi_handle or handle is NULL on remove! multi:"
-            << std::hex << multi_handle << " h:" << handle << std::dec << LL_ENDL;
+            << std::hex << multi_handle << " h:" << std::hex << handle << std::dec << LL_ENDL;
     }
 
     op->mCurlHandle = NULL;
@@ -442,18 +442,18 @@ bool HttpLibcurl::completeRequest(CURLM * multi_handle, CURL * handle, CURLcode 
 
 int HttpLibcurl::getActiveCount() const
 {
-    return mActiveOps.size();
+    return static_cast<int>(mActiveOps.size());
 }
 
 
-int HttpLibcurl::getActiveCountInClass(int policy_class) const
+int HttpLibcurl::getActiveCountInClass(unsigned int policy_class) const
 {
     llassert_always(policy_class < mPolicyCount);
 
     return mActiveHandles ? mActiveHandles[policy_class] : 0;
 }
 
-void HttpLibcurl::policyUpdated(int policy_class)
+void HttpLibcurl::policyUpdated(unsigned int policy_class)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     if (policy_class < 0 || policy_class >= mPolicyCount || ! mMultiHandles)
@@ -492,7 +492,7 @@ void HttpLibcurl::policyUpdated(int policy_class)
             // We'll try to do pipelining on this multihandle
             check_curl_multi_setopt(multi_handle,
                                      CURLMOPT_PIPELINING,
-                                     CURLPIPE_HTTP1);
+                                     1L);
             check_curl_multi_setopt(multi_handle,
                                      CURLMOPT_MAX_PIPELINE_LENGTH,
                                      long(options.mPipelining));
@@ -507,7 +507,7 @@ void HttpLibcurl::policyUpdated(int policy_class)
         {
             check_curl_multi_setopt(multi_handle,
                                      CURLMOPT_PIPELINING,
-                                     CURLPIPE_NOTHING);
+                                     0L);
             check_curl_multi_setopt(multi_handle,
                                      CURLMOPT_MAX_HOST_CONNECTIONS,
                                      0L);

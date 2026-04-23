@@ -36,6 +36,7 @@ out vec4 frag_color;
 uniform mat3 env_mat;
 uniform vec3 sun_dir;
 uniform vec3 moon_dir;
+uniform int classic_mode;
 
 #ifdef USE_DIFFUSE_TEX
 uniform sampler2D diffuseMap;
@@ -50,9 +51,7 @@ in vec3 vary_norm;
 in vec4 vertex_color; //vertex color should be treated as sRGB
 #endif
 
-#ifdef HAS_ALPHA_MASK
 uniform float minimum_alpha;
-#endif
 
 uniform mat4 proj_mat;
 uniform mat4 inv_proj;
@@ -149,7 +148,7 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 diffuse, vec3 v, vec3 n, vec
         float amb_da = 0.0;//ambiance;
         if (da > 0)
         {
-            lit = max(da * dist_atten,0.0);
+            lit = clamp(da * dist_atten, 0.0, 1.0);
             col = lit * light_col * diffuse;
             amb_da += (da*0.5+0.5) * ambiance;
         }
@@ -162,7 +161,10 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 diffuse, vec3 v, vec3 n, vec
 
         // no spec for alpha shader...
     }
-    col = max(col, vec3(0));
+    float final_scale = 1.0;
+    if (classic_mode > 0)
+        final_scale = 0.9;
+    col = max(col * final_scale, vec3(0));
     return col;
 }
 
@@ -221,6 +223,13 @@ void main()
 
     float final_alpha = diffuse_linear.a;
 
+#ifdef IS_AVATAR_SKIN
+    if(final_alpha < minimum_alpha)
+    {
+        discard;
+    }
+#endif
+
 #ifdef USE_VERTEX_COLOR
     final_alpha *= vertex_color.a;
 
@@ -240,27 +249,41 @@ void main()
     vec3 atten;
 
     calcAtmosphericVarsLinear(pos.xyz, norm, light_dir, sunlit, amblit, additive, atten);
-
-    vec3 sunlit_linear = srgb_to_linear(sunlit);
+    if (classic_mode > 0)
+        sunlit *= 1.35;
+    vec3 sunlit_linear = sunlit;
     vec3 amblit_linear = amblit;
 
-    vec3 irradiance;
-    vec3 glossenv;
-    vec3 legacyenv;
+    vec3 irradiance = amblit;
+    vec3 glossenv = vec3(0.0);
+    vec3 legacyenv = vec3(0.0);
     sampleReflectionProbesLegacy(irradiance, glossenv, legacyenv, frag, pos.xyz, norm.xyz, 0.0, 0.0, true, amblit_linear);
 
 
-    float final_da = clamp(dot(norm.xyz, light_dir.xyz), 0.0, 1.0);
+    float da = dot(norm.xyz, light_dir.xyz);
+          da = clamp(da, -1.0, 1.0);
+
+    float final_da = da;
+          final_da = clamp(final_da, 0.0f, 1.0f);
 
     vec4 color = vec4(0.0);
 
     color.a   = final_alpha;
 
-    vec3 sun_contrib = min(final_da, shadow) * sunlit_linear;
-
     color.rgb = irradiance;
+    if (classic_mode > 0)
+    {
+        final_da = pow(final_da,1.2);
+        vec3 sun_contrib = vec3(min(final_da, shadow));
 
-    color.rgb += sun_contrib;
+        color.rgb = srgb_to_linear(color.rgb * 0.9 + linear_to_srgb(sun_contrib) * sunlit_linear * 0.7);
+        sunlit_linear = srgb_to_linear(sunlit_linear);
+    }
+    else
+    {
+        vec3 sun_contrib = min(final_da, shadow) * sunlit_linear;
+        color.rgb += sun_contrib;
+    }
 
     color.rgb *= diffuse_linear.rgb;
 
@@ -282,11 +305,15 @@ void main()
     color.rgb = applySkyAndWaterFog(pos.xyz, additive, atten, color).rgb;
 
 #endif // #else // FOR_IMPOSTOR
-
+    float final_scale = 1;
+    if (classic_mode > 0)
+        final_scale = 1.1;
 #ifdef IS_HUD
     color.rgb = linear_to_srgb(color.rgb);
+    final_scale = 1;
 #endif
 
+    color.rgb *= final_scale;
     frag_color = max(color, vec4(0));
 }
 

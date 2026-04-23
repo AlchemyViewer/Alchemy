@@ -60,9 +60,11 @@ public:
     HttpLibcurl(HttpService * service);
     virtual ~HttpLibcurl();
 
-    HttpLibcurl(const HttpLibcurl&) = delete;               // Not defined
-    void operator=(const HttpLibcurl&) = delete;  // Not defined
+private:
+    HttpLibcurl(const HttpLibcurl&) = delete;
+    void operator=(const HttpLibcurl&) = delete;
 
+public:
     typedef std::shared_ptr<HttpOpRequest> opReqPtr_t;
 
     /// Give cycles to libcurl to run active requests.  Completed
@@ -105,7 +107,7 @@ public:
     ///
     /// Threading:  called by worker thread.
     int getActiveCount() const;
-    int getActiveCountInClass(int policy_class) const;
+    int getActiveCountInClass(unsigned int policy_class) const;
 
     /// Attempt to cancel a request identified by handle.
     ///
@@ -122,7 +124,7 @@ public:
     /// initialization and dynamic option setting.
     ///
     /// Threading:  called by worker thread.
-    void policyUpdated(int policy_class);
+    void policyUpdated(unsigned int policy_class);
 
     /// Allocate a curl handle for caller.  May be freed using
     /// either the freeHandle() method or calling curl_easy_cleanup()
@@ -177,8 +179,8 @@ protected:
         ~HandleCache();
 
     private:
-        HandleCache(const HandleCache &);               // Not defined
-        void operator=(const HandleCache &);            // Not defined
+        HandleCache(const HandleCache&)    = delete;
+        void operator=(const HandleCache&) = delete;
 
     public:
         /// Allocate a curl handle for caller.  May be freed using
@@ -209,7 +211,7 @@ protected:
     HttpService *       mService;           // Simple reference, not owner
     HandleCache         mHandleCache;       // Handle allocator, owner
     active_set_t        mActiveOps;
-    int                 mPolicyCount;
+    unsigned int        mPolicyCount;
     CURLM **            mMultiHandles;      // One handle per policy class
     int *               mActiveHandles;     // Active count per policy class
     bool *              mDirtyPolicy;       // Dirty policy update waiting for stall (per pc)

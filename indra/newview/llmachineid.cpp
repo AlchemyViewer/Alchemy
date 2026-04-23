@@ -27,11 +27,11 @@
 #include "llviewerprecompiledheaders.h"
 #include "lluuid.h"
 #include "llmachineid.h"
-#include <system_error>
 #if LL_WINDOWS
-#  define _WIN32_DCOM
-#  include <comdef.h>
-#  include <Wbemidl.h>
+#define _WIN32_DCOM
+#include <iostream>
+#include <comdef.h>
+#include <Wbemidl.h>
 #elif LL_DARWIN
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
@@ -293,7 +293,7 @@ bool LLWMIMethods::getGenericSerialNumber(const BSTR &select, const LPCWSTR &var
         if (validate_as_uuid)
         {
             std::wstring ws(serialNumber, serial_size);
-            std::string str(ws.begin(), ws.end());
+            std::string str = ll_convert<std::string>(ws);
 
             if (!LLUUID::validate(str))
             {
@@ -315,7 +315,7 @@ bool LLWMIMethods::getGenericSerialNumber(const BSTR &select, const LPCWSTR &var
                 continue;
             }
         }
-        LL_DEBUGS("AppInit") << " Serial Number : " << ll_convert_wide_to_string(vtProp.bstrVal) << LL_ENDL;
+        LL_INFOS("AppInit") << " Serial Number : " << ll_convert_wide_to_string(std::wstring(vtProp.bstrVal, SysStringLen(vtProp.bstrVal))) << LL_ENDL;
 
         unsigned int j = 0;
 
@@ -350,15 +350,8 @@ bool LLWMIMethods::getGenericSerialNumber(const BSTR &select, const LPCWSTR &var
 bool getSerialNumber(unsigned char *unique_id, size_t len)
 {
     CFStringRef serial_cf_str = NULL;
-    io_service_t platformExpert = NULL;
-    if (__builtin_available(macOS 12.0, *)) {
-        platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,
-                                                                  IOServiceMatching("IOPlatformExpertDevice"));
-    } else {
-        platformExpert = IOServiceGetMatchingService(kIOMasterPortDefault,
-                                                                  IOServiceMatching("IOPlatformExpertDevice"));
-    }
-
+    io_service_t platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,
+                                                                 IOServiceMatching("IOPlatformExpertDevice"));
     if (platformExpert)
     {
         serial_cf_str = (CFStringRef) IORegistryEntryCreateCFProperty(platformExpert,
@@ -405,6 +398,8 @@ bool getSerialNumber(unsigned char *unique_id, size_t len)
 
 S32 LLMachineID::init()
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     size_t len = sizeof(static_unique_id);
     memset(static_unique_id, 0, len);
     S32 ret_code = 0;
@@ -479,7 +474,7 @@ S32 LLMachineID::init()
     has_static_legacy_id = false;
 #endif
 
-        LL_DEBUGS("AppInit") << "UniqueID: 0x";
+        LL_INFOS("AppInit") << "UniqueID: 0x";
         // Code between here and LL_ENDL is not executed unless the LL_DEBUGS
         // actually produces output
         for (size_t i = 0; i < len; ++i)

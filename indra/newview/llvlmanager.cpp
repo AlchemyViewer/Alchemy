@@ -37,14 +37,8 @@
 #include "llbitpack.h"
 
 const   char    LAND_LAYER_CODE                 = 'L';
-const   char    WATER_LAYER_CODE                = 'W';
 const   char    WIND_LAYER_CODE                 = '7';
 const   char    CLOUD_LAYER_CODE                = '8';
-
-const   char    AURORA_LAND_LAYER_CODE          = 'M';
-const   char    AURORA_WATER_LAYER_CODE         = 'X';
-const   char    AURORA_WIND_LAYER_CODE          = '9';
-const   char    AURORA_CLOUD_LAYER_CODE         = ':';
 
 LLVLManager gVLManager;
 
@@ -60,25 +54,25 @@ LLVLManager::~LLVLManager()
 
 void LLVLManager::addLayerData(LLVLData *vl_datap, const S32Bytes mesg_size)
 {
-    if (LAND_LAYER_CODE == vl_datap->mType || AURORA_LAND_LAYER_CODE == vl_datap->mType)
+    if (LAND_LAYER_CODE == vl_datap->mType)
     {
         mLandBits += mesg_size;
     }
-    else if (WATER_LAYER_CODE == vl_datap->mType || AURORA_WATER_LAYER_CODE == vl_datap->mType)
-    {
-        mWaterBits += mesg_size;
-    }
-    else if (WIND_LAYER_CODE == vl_datap->mType || AURORA_WIND_LAYER_CODE == vl_datap->mType)
+    else if (WIND_LAYER_CODE == vl_datap->mType)
     {
         mWindBits += mesg_size;
     }
-    else if (CLOUD_LAYER_CODE == vl_datap->mType || AURORA_CLOUD_LAYER_CODE == vl_datap->mType)
+    else if (CLOUD_LAYER_CODE == vl_datap->mType)
     {
         mCloudBits += mesg_size;
     }
     else
     {
-        LL_ERRS() << "Unknown layer type!" << (S32)vl_datap->mType << LL_ENDL;
+        // Corrupted message? New feature?
+        LL_WARNS() << "Unknown layer type!" << (S32)vl_datap->mType
+            << " for region " << vl_datap->mRegionp->getName() << LL_ENDL;
+        delete vl_datap; // addLayerData took ownership
+        return;
     }
 
     mPacketData.push_back(vl_datap);
@@ -99,23 +93,14 @@ void LLVLManager::unpackData(const S32 num_packets)
         decode_patch_group_header(bit_pack, &goph);
         if (LAND_LAYER_CODE == datap->mType)
         {
-            datap->mRegionp->getLand().decompressDCTPatch(bit_pack, &goph, FALSE);
+            datap->mRegionp->getLand().decompressDCTPatch(bit_pack, &goph, false);
         }
-        else if (AURORA_LAND_LAYER_CODE == datap->mType)
-        {
-            datap->mRegionp->getLand().decompressDCTPatch(bit_pack, &goph, TRUE);
-        }
-        else if (WIND_LAYER_CODE == datap->mType || AURORA_WIND_LAYER_CODE == datap->mType)
-
+        else if (WIND_LAYER_CODE == datap->mType)
         {
             datap->mRegionp->mWind.decompress(bit_pack, &goph);
 
         }
-        else if (CLOUD_LAYER_CODE == datap->mType || AURORA_CLOUD_LAYER_CODE == datap->mType)
-        {
-
-        }
-        else if (WATER_LAYER_CODE == datap->mType || AURORA_WATER_LAYER_CODE == datap->mType)
+        else if (CLOUD_LAYER_CODE == datap->mType)
         {
 
         }
@@ -131,7 +116,7 @@ void LLVLManager::unpackData(const S32 num_packets)
 
 void LLVLManager::resetBitCounts()
 {
-    mLandBits = mWindBits = mCloudBits = mWaterBits = (S32Bits)0;
+    mLandBits = mWindBits = mCloudBits = (S32Bits)0;
 }
 
 U32Bits LLVLManager::getLandBits() const
@@ -149,14 +134,9 @@ U32Bits LLVLManager::getCloudBits() const
     return mCloudBits;
 }
 
-U32Bits LLVLManager::getWaterBits() const
-{
-    return mWaterBits;
-}
-
 S32Bytes LLVLManager::getTotalBytes() const
 {
-    return mLandBits + mWindBits + mCloudBits + mWaterBits;
+    return mLandBits + mWindBits + mCloudBits;
 }
 
 void LLVLManager::cleanupData(LLViewerRegion *regionp)

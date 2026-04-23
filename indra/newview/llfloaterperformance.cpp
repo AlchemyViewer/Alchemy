@@ -91,7 +91,7 @@ LLFloaterPerformance::~LLFloaterPerformance()
     delete mUpdateTimer;
 }
 
-BOOL LLFloaterPerformance::postBuild()
+bool LLFloaterPerformance::postBuild()
 {
     mMainPanel = getChild<LLPanel>("panel_performance_main");
     mNearbyPanel = getChild<LLPanel>("panel_performance_nearby");
@@ -115,16 +115,17 @@ BOOL LLFloaterPerformance::postBuild()
     mHUDList = mHUDsPanel->getChild<LLNameListCtrl>("hud_list");
     mHUDList->setNameListType(LLNameListCtrl::SPECIAL);
     mHUDList->setHoverIconName("StopReload_Off");
-    mHUDList->setIconClickedCallback(boost::bind(&LLFloaterPerformance::detachItem, this, _1));
+    mHUDList->setIconClickedCallback(boost::bind(&LLFloaterPerformance::detachObject, this, _1));
 
     mObjectList = mComplexityPanel->getChild<LLNameListCtrl>("obj_list");
     mObjectList->setNameListType(LLNameListCtrl::SPECIAL);
     mObjectList->setHoverIconName("StopReload_Off");
-    mObjectList->setIconClickedCallback(boost::bind(&LLFloaterPerformance::detachItem, this, _1));
+    mObjectList->setIconClickedCallback(boost::bind(&LLFloaterPerformance::detachObject, this, _1));
 
     mSettingsPanel->getChild<LLButton>("advanced_btn")->setCommitCallback(boost::bind(&LLFloaterPerformance::onClickAdvanced, this));
     mSettingsPanel->getChild<LLButton>("defaults_btn")->setCommitCallback(boost::bind(&LLFloaterPerformance::onClickDefaults, this));
     mSettingsPanel->getChild<LLRadioGroup>("graphics_quality")->setCommitCallback(boost::bind(&LLFloaterPerformance::onChangeQuality, this, _2));
+    mSettingsPanel->getChild<LLCheckBoxCtrl>("advanced_lighting_model")->setMouseDownCallback(boost::bind(&LLFloaterPerformance::onClickAdvancedLighting, this));
     mSettingsPanel->getChild<LLComboBox>("ShadowDetail")->setMouseDownCallback(boost::bind(&LLFloaterPerformance::onClickShadows, this));
 
     mNearbyPanel->getChild<LLButton>("exceptions_btn")->setCommitCallback(boost::bind(&LLFloaterPerformance::onClickExceptions, this));
@@ -151,16 +152,23 @@ BOOL LLFloaterPerformance::postBuild()
     mStartAutotuneBtn->setCommitCallback(boost::bind(&LLFloaterPerformance::startAutotune, this));
     mStopAutotuneBtn->setCommitCallback(boost::bind(&LLFloaterPerformance::stopAutotune, this));
 
-    gSavedPerAccountSettings.declareBOOL("HadEnabledAutoFPS", FALSE, "User had enabled AutoFPS at least once", LLControlVariable::PERSIST_ALWAYS);
+    mCheckTuneContinous = mAutoadjustmentsPanel->getChild<LLCheckBoxCtrl>("AutoTuneContinuous");
+    mTextWIPDesc = mAutoadjustmentsPanel->getChild<LLTextBox>("wip_desc");
+    mTextDisplayDesc = mAutoadjustmentsPanel->getChild<LLTextBox>("display_desc");
 
-    return TRUE;
+    mTextFPSLabel = getChild<LLTextBox>("fps_lbl");
+    mTextFPSValue = getChild<LLTextBox>("fps_value");
+
+    gSavedPerAccountSettings.declareBOOL("HadEnabledAutoFPS", false, "User had enabled AutoFPS at least once", LLControlVariable::PERSIST_ALWAYS);
+
+    return true;
 }
 
 void LLFloaterPerformance::showSelectedPanel(LLPanel* selected_panel)
 {
     hidePanels();
-    mMainPanel->setVisible(FALSE);
-    selected_panel->setVisible(TRUE);
+    mMainPanel->setVisible(false);
+    selected_panel->setVisible(true);
 
     if (mHUDsPanel == selected_panel)
     {
@@ -213,16 +221,16 @@ void LLFloaterPerformance::draw()
 void LLFloaterPerformance::showMainPanel()
 {
     hidePanels();
-    mMainPanel->setVisible(TRUE);
+    mMainPanel->setVisible(true);
 }
 
 void LLFloaterPerformance::hidePanels()
 {
-    mNearbyPanel->setVisible(FALSE);
-    mComplexityPanel->setVisible(FALSE);
-    mHUDsPanel->setVisible(FALSE);
-    mSettingsPanel->setVisible(FALSE);
-    mAutoadjustmentsPanel->setVisible(FALSE);
+    mNearbyPanel->setVisible(false);
+    mComplexityPanel->setVisible(false);
+    mHUDsPanel->setVisible(false);
+    mSettingsPanel->setVisible(false);
+    mAutoadjustmentsPanel->setVisible(false);
 }
 
 void LLFloaterPerformance::initBackBtn(LLPanel* panel)
@@ -320,7 +328,7 @@ void LLFloaterPerformance::populateHUDList()
             }
         }
     }
-    mHUDList->sortByColumnIndex(1, FALSE);
+    mHUDList->sortByColumnIndex(1, false);
     mHUDList->setScrollPos(prev_pos);
     mHUDList->selectItemBySpecialId(prev_selected_id);
 }
@@ -412,7 +420,7 @@ void LLFloaterPerformance::populateObjectList()
             }
         }
     }
-    mObjectList->sortByColumnIndex(1, FALSE);
+    mObjectList->sortByColumnIndex(1, false);
     mObjectList->setScrollPos(prev_pos);
     mObjectList->selectItemBySpecialId(prev_selected_id);
 }
@@ -427,15 +435,12 @@ void LLFloaterPerformance::populateNearbyList()
     mNearbyList->updateColumns(true);
 
     static LLCachedControl<U32> max_render_cost(gSavedSettings, "RenderAvatarMaxComplexity", 0);
-    std::vector<LLCharacter*> valid_nearby_avs;
+    std::vector<LLVOAvatar*> valid_nearby_avs;
     mNearbyMaxGPUTime = LLWorld::getInstance()->getNearbyAvatarsAndMaxGPUTime(valid_nearby_avs);
 
-    std::vector<LLCharacter*>::iterator char_iter = valid_nearby_avs.begin();
-
-    while (char_iter != valid_nearby_avs.end())
+    for (LLVOAvatar* avatar : valid_nearby_avs)
     {
-        LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(*char_iter);
-        if (avatar && (LLVOAvatar::AOA_INVISIBLE != avatar->getOverallAppearance()))
+        if (LLVOAvatar::AOA_INVISIBLE != avatar->getOverallAppearance())
         {
             F32 render_av_gpu_ms = avatar->getGPURenderTime();
 
@@ -500,9 +505,8 @@ void LLFloaterPerformance::populateNearbyList()
                 }
             }
         }
-        char_iter++;
     }
-    mNearbyList->sortByColumnIndex(1, FALSE);
+    mNearbyList->sortByColumnIndex(1, false);
     mNearbyList->setScrollPos(prev_pos);
     mNearbyList->selectByID(prev_selected_id);
 }
@@ -511,21 +515,25 @@ void LLFloaterPerformance::setFPSText()
 {
     const S32 NUM_PERIODS = 50;
     S32 current_fps = (S32)ll_round(LLTrace::get_frame_recording().getPeriodMedianPerSec(LLStatViewer::FPS, NUM_PERIODS));
-    getChild<LLTextBox>("fps_value")->setValue(current_fps);
+    mTextFPSValue->setValue(current_fps);
 
     std::string fps_text = getString("fps_text");
-    static LLCachedControl<bool> vsync_enabled(gSavedSettings, "RenderVSyncEnable", false);
+    static LLCachedControl<bool> vsync_enabled(gSavedSettings, "RenderVSyncEnable", true);
     S32 refresh_rate = gViewerWindow->getWindow()->getRefreshRate();
     if (vsync_enabled && (refresh_rate > 0) && (current_fps >= refresh_rate))
     {
         fps_text += getString("max_text");
     }
-    getChild<LLTextBox>("fps_lbl")->setValue(fps_text);
+    mTextFPSLabel->setValue(fps_text);
 }
 
-void LLFloaterPerformance::detachItem(const LLUUID& item_id)
+void LLFloaterPerformance::detachObject(const LLUUID& obj_id)
 {
-    LLAppearanceMgr::instance().removeItemFromAvatar(item_id);
+    LLViewerObject* obj = gObjectList.findObject(obj_id);
+    if (obj)
+    {
+        LLAppearanceMgr::instance().removeItemFromAvatar(obj->getAttachmentItemID());
+    }
 }
 
 void LLFloaterPerformance::onClickAdvanced()
@@ -682,9 +690,19 @@ void LLFloaterPerformance::changeQualityLevel(const std::string& notif)
 bool is_ALM_available()
 {
     bool bumpshiny = LLCubeMap::sUseCubeMaps && LLFeatureManager::getInstance()->isFeatureAvailable("RenderObjectBump") && gSavedSettings.getBOOL("RenderObjectBump");
+    bool shaders = gSavedSettings.getBOOL("WindLightUseAtmosShaders");
 
     return LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred") &&
-        bumpshiny;
+        bumpshiny &&
+        shaders;
+}
+
+void LLFloaterPerformance::onClickAdvancedLighting()
+{
+    if (!is_ALM_available())
+    {
+        changeQualityLevel("AdvancedLightingConfirm");
+    }
 }
 
 void LLFloaterPerformance::onClickShadows()
@@ -711,17 +729,17 @@ void LLFloaterPerformance::updateAutotuneCtrls(bool autotune_enabled)
     static LLCachedControl<bool> auto_tune_locked(gSavedSettings, "AutoTuneLock");
     mStartAutotuneBtn->setEnabled(!autotune_enabled && !auto_tune_locked);
     mStopAutotuneBtn->setEnabled(autotune_enabled && !auto_tune_locked);
-    getChild<LLCheckBoxCtrl>("AutoTuneContinuous")->setEnabled(!autotune_enabled || (autotune_enabled && auto_tune_locked));
+    mCheckTuneContinous->setEnabled(!autotune_enabled || (autotune_enabled && auto_tune_locked));
 
-    getChild<LLTextBox>("wip_desc")->setVisible(autotune_enabled && !auto_tune_locked);
-    getChild<LLTextBox>("display_desc")->setVisible(LLPerfStats::tunables.vsyncEnabled);
+    mTextWIPDesc->setVisible(autotune_enabled && !auto_tune_locked);
+    mTextDisplayDesc->setVisible(LLPerfStats::tunables.vsyncEnabled);
 }
 
 void LLFloaterPerformance::enableAutotuneWarning()
 {
     if (!gSavedPerAccountSettings.getBOOL("HadEnabledAutoFPS") && LLPerfStats::tunables.userAutoTuneEnabled)
     {
-        gSavedPerAccountSettings.setBOOL("HadEnabledAutoFPS", TRUE);
+        gSavedPerAccountSettings.setBOOL("HadEnabledAutoFPS", true);
 
         LLNotificationsUtil::add("EnableAutoFPSWarning", LLSD(), LLSD(),
             [](const LLSD& notif, const LLSD& resp)

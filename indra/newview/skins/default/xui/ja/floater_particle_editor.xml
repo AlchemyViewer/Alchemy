@@ -3,7 +3,7 @@
 	<layout_stack name="master_stack">
 		<layout_panel name="layout_master">
 			<accordion name="accordion_master">
-				<accordion_tab name="burst_tab" title="バースト／寿命" fit_panel="true">
+				<accordion_tab name="burst_tab" title="バースト／寿命">
 					<panel name="burst_panel">
 						<slider name="burst_rate" label="頻度："/>
 						<slider name="burst_count" label="回数："/>
@@ -54,26 +54,24 @@
 						<color_swatch label="開始色" name="start_color_selector"/>
 						<color_swatch label="終了色" name="end_color_selector"/>
 						<combo_box name="blend_func_src_combo">
-							<combo_box.commit_callback function="Particle.Edit"/>
-							<combo_box.item label="ブレンド１" name="blend_one" value="blend_one"/>
-							<combo_box.item label="ブレンド０" name="blend_zero" value="blend_zero"/>
-							<combo_box.item label="終了色にブレンド" name="blend_dest_color" value="blend_dest_color"/>
-							<combo_box.item label="開始色にブレンド" name="blend_src_color" value="blend_src_color"/>
-							<combo_box.item label="ブレンド１‐終了色" name="blend_one_minus_dest_color" value="blend_one_minus_dest_color"/>
-							<combo_box.item label="ブレンド１‐開始色" name="blend_one_minus_src_color" value="blend_one_minus_src_color"/>
-							<combo_box.item label="開始色アルファ" name="blend_src_alpha" value="blend_src_alpha"/>
-							<combo_box.item label="ブレンド１‐開始色アルファ" name="blend_one_minus_src_alpha" value="blend_one_minus_src_alpha"/>
+							<combo_box.item label="ブレンド１" name="blend_one"/>
+							<combo_box.item label="ブレンド０" name="blend_zero"/>
+							<combo_box.item label="終了色にブレンド" name="blend_dest_color"/>
+							<combo_box.item label="開始色にブレンド" name="blend_src_color"/>
+							<combo_box.item label="ブレンド１－終了色" name="blend_one_minus_dest_color"/>
+							<combo_box.item label="ブレンド１－開始色" name="blend_one_minus_src_color"/>
+							<combo_box.item label="開始色アルファ" name="blend_src_alpha"/>
+							<combo_box.item label="ブレンド１－開始色アルファ" name="blend_one_minus_src_alpha"/>
 						</combo_box>
 						<combo_box name="blend_func_dest_combo">
-							<combo_box.commit_callback function="Particle.Edit"/>
-							<combo_box.item label="ブレンド１" name="blend_one" value="blend_one"/>
-							<combo_box.item label="ブレンド０" name="blend_zero" value="blend_zero"/>
-							<combo_box.item label="終了色にブレンド" name="blend_dest_color" value="blend_dest_color"/>
-							<combo_box.item label="開始色にブレンド" name="blend_src_color" value="blend_src_color"/>
-							<combo_box.item label="ブレンド１‐終了色" name="blend_one_minus_dest_color" value="blend_one_minus_dest_color"/>
-							<combo_box.item label="ブレンド１‐開始色" name="blend_one_minus_src_color" value="blend_one_minus_src_color"/>
-							<combo_box.item label="開始色アルファ" name="blend_src_alpha" value="blend_src_alpha"/>
-							<combo_box.item label="ブレンド１‐開始色アルファ" name="blend_one_minus_src_alpha" value="blend_one_minus_src_alpha"/>
+							<combo_box.item label="ブレンド１" name="blend_one"/>
+							<combo_box.item label="ブレンド０" name="blend_zero"/>
+							<combo_box.item label="終了色にブレンド" name="blend_dest_color"/>
+							<combo_box.item label="開始色にブレンド" name="blend_src_color"/>
+							<combo_box.item label="ブレンド１－終了色" name="blend_one_minus_dest_color"/>
+							<combo_box.item label="ブレンド１－開始色" name="blend_one_minus_src_color"/>
+							<combo_box.item label="開始色アルファ" name="blend_src_alpha"/>
+							<combo_box.item label="ブレンド１－開始色アルファ" name="blend_one_minus_src_alpha"/>
 						</combo_box>
 					</panel>
 				</accordion_tab>
@@ -84,15 +82,14 @@
 				パターン：
 			</text>
 			<combo_box name="pattern_type_combo">
-				<combo_box.commit_callback function="Particle.Edit"/>
-				<combo_box.item label="爆散" name="explode" value="explode"/>
-				<combo_box.item label="角度" name="angle" value="angle"/>
-				<combo_box.item label="角錐" name="angle_cone" value="angle_cone"/>
-				<combo_box.item label="空の角錐" name="angle_cone_empty" value="angle_cone_empty"/>
-				<combo_box.item label="ドロップ" name="drop" value="drop"/>
+				<combo_box.item label="爆散" name="explode"/>
+				<combo_box.item label="角度" name="angle"/>
+				<combo_box.item label="角錐" name="angle_cone"/>
+				<combo_box.item label="空の角錐" name="angle_cone_empty"/>
+				<combo_box.item label="ドロップ" name="drop"/>
 			</combo_box>
 			<check_box name="bounce_checkbox" label="跳ねる"/>
-			<check_box name="emissive_checkbox" label="放射性" top_pad="4"/>
+			<check_box name="emissive_checkbox" label="放射性"/>
 			<check_box name="wind_checkbox" label="風"/>
 			<check_box name="ribbon_checkbox" label="リボン"/>
 			<check_box name="follow_source_checkbox" label="ソースに従う"/>
@@ -101,7 +98,6 @@
 			<check_box name="interpolate_scale_checkbox" label="スケールを補間"/>
 			<check_box name="target_position_checkbox" label="目標位置"/>
 			<check_box name="target_linear_checkbox" label="線形の目標"/>
-			<line_editor name="target_key_input"/>
 			<button name="clear_target_button" tool_tip="目標のオブジェクトまたはアバターをクリアします。"/>
 			<button name="pick_target_button" tool_tip="ここをクリックして、パーティクルの目標オブジェクトまたはアバターを選択します。"/>
 			<button name="copy_button" label="コピー" tool_tip="パーティクルシステムのパラメータをＬＳＬスクリプトとしてクリップボードにコピーします。"/>

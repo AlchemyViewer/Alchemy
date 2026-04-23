@@ -28,15 +28,15 @@
 #define LL_LLWINDOWLISTENER_H
 
 #include "lleventapi.h"
-#include <boost/function.hpp>
+#include <functional>
 
 class LLKeyboard;
 class LLViewerWindow;
 
-class LLWindowListener final : public LLEventAPI
+class LLWindowListener : public LLEventAPI
 {
 public:
-    typedef boost::function<LLKeyboard*()> KeyboardGetter;
+    typedef std::function<LLKeyboard*()> KeyboardGetter;
     LLWindowListener(LLViewerWindow * window, const KeyboardGetter& kbgetter);
 
     void getInfo(LLSD const & evt);

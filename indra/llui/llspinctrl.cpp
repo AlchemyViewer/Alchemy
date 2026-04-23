@@ -63,7 +63,7 @@ LLSpinCtrl::Params::Params()
 LLSpinCtrl::LLSpinCtrl(const LLSpinCtrl::Params& p)
 :   LLF32UICtrl(p),
     mLabelBox(NULL),
-    mbHasBeenSet( FALSE ),
+    mbHasBeenSet( false ),
     mPrecision(p.decimal_digits),
     mTextEnabledColor(p.text_enabled_color()),
     mTextDisabledColor(p.text_disabled_color())
@@ -86,6 +86,7 @@ LLSpinCtrl::LLSpinCtrl(const LLSpinCtrl::Params& p)
         params.name("SpinCtrl Label");
         params.rect(label_rect);
         params.initial_value(p.label());
+        params.font_valign = LLFontGL::VCENTER;
         if (p.font.isProvided())
         {
             params.font(p.font);
@@ -143,12 +144,12 @@ LLSpinCtrl::LLSpinCtrl(const LLSpinCtrl::Params& p)
     //RN: this seems to be a BAD IDEA, as it makes the editor behavior different when it has focus
     // than when it doesn't.  Instead, if you always have to double click to select all the text,
     // it's easier to understand
-    //mEditor->setSelectAllonFocusReceived(TRUE);
-    mEditor->setSelectAllonCommit(FALSE);
+    //mEditor->setSelectAllonFocusReceived(true);
+    mEditor->setSelectAllonCommit(false);
     addChild(mEditor);
 
     updateEditor();
-    setUseBoundingRect( TRUE );
+    setUseBoundingRect( true );
 }
 
 F32 clamp_precision(F32 value, S32 decimal_precision)
@@ -295,7 +296,7 @@ void LLSpinCtrl::setValue(const LLSD& value )
     F32 v = (F32)value.asReal();
     if (getValueF32() != v || !mbHasBeenSet)
     {
-        mbHasBeenSet = TRUE;
+        mbHasBeenSet = true;
         LLF32UICtrl::setValue(value);
 
         if (!mEditor->hasFocus())
@@ -311,7 +312,7 @@ void LLSpinCtrl::forceSetValue(const LLSD& value )
     F32 v = (F32)value.asReal();
     if (getValueF32() != v || !mbHasBeenSet)
     {
-        mbHasBeenSet = TRUE;
+        mbHasBeenSet = true;
         LLF32UICtrl::setValue(value);
 
         updateEditor();
@@ -323,14 +324,14 @@ void LLSpinCtrl::clear()
 {
     setValue(mMinValue);
     mEditor->clear();
-    mbHasBeenSet = FALSE;
+    mbHasBeenSet = false;
 }
 
 void LLSpinCtrl::updateLabelColor()
 {
     if( mLabelBox )
     {
-        mLabelBox->setColor( getEnabled() ? mTextEnabledColor.get() : mTextDisabledColor.get() );
+        mLabelBox->setColor( getEnabled() ? mTextEnabledColor : mTextDisabledColor );
     }
 }
 
@@ -353,7 +354,7 @@ void LLSpinCtrl::updateEditor()
 
 void LLSpinCtrl::onEditorCommit( const LLSD& data )
 {
-    BOOL success = FALSE;
+    bool success = false;
 
     if( mEditor->evaluateFloat() )
     {
@@ -369,7 +370,7 @@ void LLSpinCtrl::onEditorCommit( const LLSD& data )
         setValue(val);
         if( !mValidateSignal || (*mValidateSignal)( this, val ) )
         {
-            success = TRUE;
+            success = true;
             onCommit();
         }
         else
@@ -398,13 +399,13 @@ void LLSpinCtrl::forceEditorCommit()
 }
 
 
-void LLSpinCtrl::setFocus(BOOL b)
+void LLSpinCtrl::setFocus(bool b)
 {
     LLUICtrl::setFocus( b );
     mEditor->setFocus( b );
 }
 
-void LLSpinCtrl::setEnabled(BOOL b)
+void LLSpinCtrl::setEnabled(bool b)
 {
     LLView::setEnabled( b );
     mEditor->setEnabled( b );
@@ -412,14 +413,14 @@ void LLSpinCtrl::setEnabled(BOOL b)
 }
 
 
-void LLSpinCtrl::setTentative(BOOL b)
+void LLSpinCtrl::setTentative(bool b)
 {
     mEditor->setTentative(b);
     LLUICtrl::setTentative(b);
 }
 
 
-BOOL LLSpinCtrl::isMouseHeldDown() const
+bool LLSpinCtrl::isMouseHeldDown() const
 {
     return
         mDownBtn->hasMouseCapture()
@@ -428,7 +429,7 @@ BOOL LLSpinCtrl::isMouseHeldDown() const
 
 void LLSpinCtrl::onCommit()
 {
-    setTentative(FALSE);
+    setTentative(false);
     setControlValue(getValueF32());
     LLF32UICtrl::onCommit();
 }
@@ -459,7 +460,7 @@ void LLSpinCtrl::setLabel(const LLStringExplicit& label)
     updateLabelColor();
 }
 
-void LLSpinCtrl::setAllowEdit(BOOL allow_edit)
+void LLSpinCtrl::setAllowEdit(bool allow_edit)
 {
     mEditor->setEnabled(allow_edit);
     mAllowEdit = allow_edit;
@@ -477,7 +478,7 @@ void LLSpinCtrl::reportInvalidData()
     make_ui_sound("UISndBadKeystroke");
 }
 
-BOOL LLSpinCtrl::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLSpinCtrl::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
     if( clicks > 0 )
     {
@@ -492,10 +493,10 @@ BOOL LLSpinCtrl::handleScrollWheel(S32 x, S32 y, S32 clicks)
         onUpBtn(getValue());
     }
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLSpinCtrl::handleKeyHere(KEY key, MASK mask)
+bool LLSpinCtrl::handleKeyHere(KEY key, MASK mask)
 {
     if (mEditor->hasFocus())
     {
@@ -505,20 +506,20 @@ BOOL LLSpinCtrl::handleKeyHere(KEY key, MASK mask)
             // but not allowing revert on a spinner seems dangerous
             updateEditor();
             mEditor->resetScrollPosition();
-            mEditor->setFocus(FALSE);
-            return TRUE;
+            mEditor->setFocus(false);
+            return true;
         }
         if(key == KEY_UP)
         {
             onUpBtn(getValue());
-            return TRUE;
+            return true;
         }
         if(key == KEY_DOWN)
         {
             onDownBtn(getValue());
-            return TRUE;
+            return true;
         }
     }
-    return FALSE;
+    return false;
 }
 

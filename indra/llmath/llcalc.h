@@ -34,7 +34,7 @@ class LLCalc
 {
 public:
     LLCalc();
-    ~LLCalc() = default;
+    ~LLCalc();
 
     // Variable name constants
     static const char* X_POS;
@@ -73,10 +73,9 @@ public:
     void    setVar(const std::string& name, const F32& value);
     void    clearVar(const std::string& name);
     void    clearAllVariables();
-//  void    updateVariables(LLSD& vars);
 
     bool    evalString(const std::string& expression, F32& result);
-    std::string::size_type  getLastErrorPos()   { return mLastErrorPos; }
+    std::string::size_type getLastErrorPos() const { return mLastErrorPos; }
 
     static LLCalc* getInstance();
     static void cleanUp();
@@ -86,6 +85,7 @@ public:
 private:
     std::string::size_type  mLastErrorPos;
 
+    calc_map_t  mConstants;
     calc_map_t  mVariables;
 
     // "There shall be only one"

@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -33,9 +36,11 @@
 class LLShaderMgr
 {
 public:
-    LLShaderMgr() = default;
-    virtual ~LLShaderMgr() = default;
+    LLShaderMgr();
+    virtual ~LLShaderMgr();
 
+    // Note: although you can use statically hashed strings to just bind a random uniform, it's generally preferably that you use this.
+    // Always document what the actual shader uniform is next to the shader uniform in this struct.
     // clang-format off
     typedef enum
     {                                       // Shader uniform name, set in LLShaderMgr::initAttribsAndUniforms()
@@ -56,7 +61,17 @@ public:
         TEXTURE_BASE_COLOR_TRANSFORM,         //  "texture_base_color_transform" (GLTF)
         TEXTURE_NORMAL_TRANSFORM,             //  "texture_normal_transform" (GLTF)
         TEXTURE_METALLIC_ROUGHNESS_TRANSFORM, //  "texture_metallic_roughness_transform" (GLTF)
+        TEXTURE_OCCLUSION_TRANSFORM,          //  "texture_occlusion_transform" (GLTF)
         TEXTURE_EMISSIVE_TRANSFORM,           //  "texture_emissive_transform" (GLTF)
+        BASE_COLOR_TEXCOORD,                  //  "base_color_texcoord" (GLTF)
+        EMISSIVE_TEXCOORD,                    //  "emissive_texcoord" (GLTF)
+        NORMAL_TEXCOORD,                      //  "normal_texcoord" (GLTF)
+        METALLIC_ROUGHNESS_TEXCOORD,          //  "metallic_roughness_texcoord" (GLTF)
+        OCCLUSION_TEXCOORD,                   //  "occlusion_texcoord" (GLTF)
+        GLTF_NODE_ID,                         //  "gltf_node_id" (GLTF)
+        GLTF_MATERIAL_ID,                     //  "gltf_material_id" (GLTF)
+
+        TERRAIN_TEXTURE_TRANSFORMS,           //  "terrain_texture_transforms" (GLTF)
 
         VIEWPORT,                           //  "viewport"
         LIGHT_POSITION,                     //  "light_position"
@@ -91,6 +106,9 @@ public:
         DIFFUSE_MAP,                        //  "diffuseMap"
         ALTERNATE_DIFFUSE_MAP,              //  "altDiffuseMap"
         SPECULAR_MAP,                       //  "specularMap"
+        METALLIC_ROUGHNESS_MAP,             //  "metallicRoughnessMap"
+        NORMAL_MAP,                         //  "normalMap"
+        OCCLUSION_MAP,                      //  "occlusionMap"
         EMISSIVE_MAP,                       //  "emissiveMap"
         BUMP_MAP,                           //  "bumpMap"
         BUMP_MAP2,                          //  "bumpMap2"
@@ -102,13 +120,13 @@ public:
         HERO_PROBE,                         //  "heroProbes"
         CLOUD_NOISE_MAP,                    //  "cloud_noise_texture"
         CLOUD_NOISE_MAP_NEXT,               //  "cloud_noise_texture_next"
-        FULLBRIGHT,                         //  "fullbright"
         LIGHTNORM,                          //  "lightnorm"
         SUNLIGHT_COLOR,                     //  "sunlight_color"
         AMBIENT,                            //  "ambient_color"
         SKY_HDR_SCALE,                      //  "sky_hdr_scale"
         SKY_SUNLIGHT_SCALE,                 //  "sky_sunlight_scale"
         SKY_AMBIENT_SCALE,                  //  "sky_ambient_scale"
+        CLASSIC_MODE,                       //  "classic_mode"
         BLUE_HORIZON,                       //  "blue_horizon"
         BLUE_DENSITY,                       //  "blue_density"
         HAZE_HORIZON,                       //  "haze_horizon"
@@ -138,6 +156,18 @@ public:
         GLOW_STRENGTH,                      //  "glowStrength"
         GLOW_DELTA,                         //  "glowDelta"
         GLOW_NOISE_MAP,                     //  "glowNoiseMap"
+
+        BLOOM_THRESHOLD,                    //  "bloom_threshold"
+        BLOOM_KNEE,                         //  "bloom_knee"
+        BLOOM_TEXEL_SIZE,                   //  "bloom_texel_size"
+        BLOOM_SCATTER,                      //  "bloom_scatter"
+        BLOOM_STRENGTH,                     //  "bloom_strength"
+        BLOOM_ALPHA_GLOW_BOOST,             //  "alpha_glow_boost"
+        BLOOM_SAMPLER,                      //  "bloomMap"
+        HALATION_SAMPLER,                   //  "halationMap"
+        HALATION_STRENGTH,                  //  "halation_strength"
+        HALATION_TINT,                      //  "halation_tint"
+        HALATION_LUM_WEIGHTS,               //  "halation_lum_weights"
 
         MINIMUM_ALPHA,                      //  "minimum_alpha"
         EMISSIVE_BRIGHTNESS,                //  "emissive_brightness"
@@ -200,7 +230,6 @@ public:
         DEFERRED_SHADOW3,                   //  "shadowMap3"
         DEFERRED_SHADOW4,                   //  "shadowMap4"
         DEFERRED_SHADOW5,                   //  "shadowMap5"
-        DEFERRED_NORMAL,                    //  "normalMap"
         DEFERRED_POSITION,                  //  "positionMap"
         DEFERRED_DIFFUSE,                   //  "diffuseRect"
         DEFERRED_SPECULAR,                  //  "specularRect"
@@ -210,10 +239,8 @@ public:
         DEFERRED_NOISE,                     //  "noiseMap"
         DEFERRED_LIGHTFUNC,                 //  "lightFunc"
         DEFERRED_LIGHT,                     //  "lightMap"
-        DEFERRED_BLOOM,                     //  "bloomMap"
         DEFERRED_PROJECTION,                //  "projectionMap"
         DEFERRED_NORM_MATRIX,               //  "norm_mat"
-        TEXTURE_GAMMA,                      //  "texture_gamma"
         SPECULAR_COLOR,                     //  "specular_color"
         ENVIRONMENT_INTENSITY,              //  "env_intensity"
 
@@ -223,6 +250,7 @@ public:
         WATER_SCREENTEX,                    //  "screenTex"
         WATER_SCREENDEPTH,                  //  "screenDepth"
         WATER_REFTEX,                       //  "refTex"
+        WATER_EXCLUSIONTEX,                 //  "exclusionTex"
         WATER_EYEVEC,                       //  "eyeVec"
         WATER_TIME,                         //  "time"
         WATER_WAVE_DIR1,                    //  "waveDir1"
@@ -265,6 +293,7 @@ public:
         TERRAIN_DETAIL3,                    //  "detail_3"
 
         TERRAIN_ALPHARAMP,                  //  "alpha_ramp"
+        TERRAIN_PAINTMAP,                   //  "paint_map"
 
         TERRAIN_DETAIL0_BASE_COLOR,                //  "detail_0_base_color" (GLTF)
         TERRAIN_DETAIL1_BASE_COLOR,                //  "detail_1_base_color" (GLTF)
@@ -288,6 +317,8 @@ public:
         TERRAIN_ROUGHNESS_FACTORS,                 //  "roughnessFactors" (GLTF)
         TERRAIN_EMISSIVE_COLORS,                   //  "emissiveColors" (GLTF)
         TERRAIN_MINIMUM_ALPHAS,                    //  "minimum_alphas" (GLTF)
+
+        REGION_SCALE,                              //  "region_scale" (GLTF)
 
         SHINY_ORIGIN,                       //  "origin"
         DISPLAY_GAMMA,                      //  "display_gamma"
@@ -326,8 +357,125 @@ public:
         MOONLIGHT_COLOR,                    //  "moonlight_color"
 
         DEBUG_NORMAL_DRAW_LENGTH,           //  "debug_normal_draw_length"
-        COLORGRADE_LUT,                     //  "colorgrade_lut"
-        COLORGRADE_LUT_SIZE,                //  "colorgrade_lut_size"
+
+        SMAA_EDGE_TEX,                      //  "edgesTex"
+        SMAA_AREA_TEX,                      //  "areaTex"
+        SMAA_SEARCH_TEX,                    //  "searchTex"
+        SMAA_BLEND_TEX,                     //  "blendTex"
+        SMAA_PREDICATION_TEX,               //  "predicationTex"
+
+        EXPOSURE,
+        TONEMAP_TYPE,
+        TONEMAP_MIX,
+        TONEMAP_PARAMS,
+
+        // Alchemy Effects Stack
+        FRAME_ID,                           //  "uFrameId"
+        SCREEN_RESOLUTION,                  //  "uResolution"
+
+        // Chromatic Aberration
+        CA_AMOUNT,                          //  "uCAAmount"        (pre-squared × 0.02 on CPU)
+        CA_FALLOFF,                         //  "uCAFalloff"       (reciprocal on CPU)
+        CA_ANGLE_SIN_COS,                   //  "uCAAngleSinCos"   vec2(sin, cos) on CPU
+        CA_OFFSET_R,                        //  "uCAOffsetR"
+        CA_OFFSET_B,                        //  "uCAOffsetB"
+        CA_ANISOTROPY,                      //  "uCAAnisotropy"
+
+        // Lens Flare
+        LENS_FLARE_STRENGTH,                //  "uLensFlareStrength"
+        LENS_FLARE_SUN_POS,                 //  "uLensFlareSunPos"
+        LENS_FLARE_SUN_VISIBILITY,          //  "uLensFlareSunVisibility"
+        LENS_FLARE_STREAK_LENGTH,           //  "uLensFlareStreakLength"
+        LENS_FLARE_STREAK_FALLOFF,          //  "uLensFlareStreakFalloff"
+        LENS_FLARE_STREAK_WIDTH,            //  "uLensFlareStreakWidth"
+        LENS_FLARE_STREAK_INTENSITY,         //  "uLensFlareStreakIntensity"
+        LENS_FLARE_STREAK_TINT,             //  "uLensFlareStreakTint"
+        LENS_FLARE_CHROMATIC_SPREAD,        //  "uLensFlareChromaticSpread"
+        LENS_FLARE_GLOW_RADIUS,             //  "uLensFlareGlowRadius"
+        LENS_FLARE_GLOW_FALLOFF,            //  "uLensFlareGlowFalloff"
+        LENS_FLARE_GLOW,                    //  "uLensFlareGlow"
+        LENS_FLARE_GHOST_COUNT,             //  "uLensFlareGhostCount"
+        LENS_FLARE_GHOST_SPACING,           //  "uLensFlareGhostSpacing"
+        LENS_FLARE_GHOST,                   //  "uLensFlareGhost"
+        LENS_FLARE_HALO_RADIUS,             //  "uLensFlareHaloRadius"
+        LENS_FLARE_HALO_WIDTH,              //  "uLensFlareHaloWidth"
+        LENS_FLARE_HALO,                    //  "uLensFlareHalo"
+        LENS_FLARE_OCCLUSION_RADIUS,        //  "uLensFlareOcclusionRadius"
+        LENS_FLARE_STARBURST,               //  "uLensFlareStarburst"
+        LENS_FLARE_STARBURST_SPIKES,        //  "uLensFlareStarburstSpikes"
+        LENS_FLARE_STARBURST_SHARPNESS,     //  "uLensFlareStarburstSharpness"
+        LENS_FLARE_STARBURST_FALLOFF,       //  "uLensFlareStarburstFalloff"
+        LENS_FLARE_OCCLUSION_TAPS,          //  "uLensFlareOcclusionTaps"
+        LENS_FLARE_LIGHT_COLOR,             //  "uLensFlareLightColor"
+
+        // Color Correction LUT
+        COLOR_GRADE_LUT,                    //  "uColorGradeLut"
+        COLOR_GRADE_LUT_SIZE,               //  "uColorGradeLutSize"
+        COLOR_GRADE_LUT_STRENGTH,           //  "uColorGradeLutStrength"
+
+        // Linear-space grading (pre-tonemap) — CPU-precomputed
+        COLOR_GRADE_WHITE_BALANCE_GAIN,     //  "uWhiteBalanceGain"
+        COLOR_GRADE_LIFT,                   //  "uLift"
+        COLOR_GRADE_INV_GAMMA_CC,           //  "uInvGammaCC"       (1 / gamma)
+        COLOR_GRADE_GAIN,                   //  "uGain"
+
+        // Split toning (tints are pre-divided by dot(tint, LUMA) on the CPU)
+        SPLIT_TONE_SHADOW_RATIO,            //  "uShadowRatio"
+        SPLIT_TONE_HIGHLIGHT_RATIO,         //  "uHighlightRatio"
+        SPLIT_TONE_MIDTONE_RATIO,           //  "uMidtoneRatio"
+        SPLIT_TONE_MIDTONE_AMOUNT,          //  "uMidtoneAmount"
+        SPLIT_TONE_MID,                     //  "uSplitToneMid"     (0.5 + balance * 0.4)
+        SPLIT_TONE_AMOUNT,                  //  "uToneAmount"
+
+        // Display-space grading — all CPU-precomputed to scale/bias pairs
+        COLOR_GRADE_BWP_SCALE,              //  "uBWPScale"         (1 / (white - black))
+        COLOR_GRADE_BWP_BIAS,               //  "uBWPBias"          (-black * scale)
+        COLOR_GRADE_BC_SCALE,               //  "uBCScale"          (contrast)
+        COLOR_GRADE_BC_BIAS,                //  "uBCBias"           ((bright - 0.5) * c + 0.5)
+        COLOR_GRADE_HIGHLIGHTS_SCALED,      //  "uHighlightsScaled" (highlights * 0.3)
+        COLOR_GRADE_SHADOWS_SCALED,         //  "uShadowsScaled"    (shadows * 0.3)
+        COLOR_GRADE_SATURATION,             //  "uSaturation"
+        COLOR_GRADE_VIBRANCE,               //  "uVibrance"
+        COLOR_GRADE_HUE_SHIFT_NORM,         //  "uHueShiftNorm"     (degrees / 360)
+
+        // Per-channel filmic curves
+        COLOR_GRADE_CURVE_TOE,              //  "uCurveToe"
+        COLOR_GRADE_CURVE_INV_RANGE,        //  "uCurveInvRange"    (1 / (shoulder - toe))
+        COLOR_GRADE_CURVE_STRENGTH,         //  "uCurveStrength"
+
+        // Vignette
+        VIGNETTE_AMOUNT,                    //  "uVignetteAmount"
+        VIGNETTE_RADIUS,                    //  "uVignetteRadius"
+        VIGNETTE_SOFT,                      //  "uVignetteSoft"
+        VIGNETTE_SHAPE,                     //  "uVignetteShape"
+        VIGNETTE_COLOR,                     //  "uVignetteColor"
+        VIGNETTE_MID_COLOR,                 //  "uVignetteMidColor"
+        VIGNETTE_MID_POINT,                 //  "uVignetteMidPoint"
+        VIGNETTE_CENTER,                    //  "uVignetteCenter"
+        VIGNETTE_ASPECT,                    //  "uVignetteAspect"
+        VIGNETTE_FEATHER,                   //  "uVignetteFeather"
+
+        // CVD Compensation
+        CVD_MODE,                           //  "uCompensateMode"
+        CVD_AMOUNT,                         //  "uCompensateAmount"
+
+        // Film Grain
+        GRAIN_AMOUNT,                      //  "uGrainAmount"
+        GRAIN_STYLE,                       //  "uGrainStyle"
+        GRAIN_SIZE,                        //  "uGrainSize"
+        GRAIN_RANGE,                       //  "uGrainRange"
+        GRAIN_TINT,                        //  "uGrainTint"
+        GRAIN_ANIMATE,                     //  "uGrainAnimate"
+
+        // Dithering
+        DITHER_AMOUNT,                      //  "uDitherAmount"
+        DITHER_BITS,                        //  "uDitherBits"
+        DITHER_ANIMATE,                     //  "uDitherAnimate"
+
+        // Previews
+        PREVIEW_MODE,                      //  "uPreviewMode"
+
+        // End Alchemy Effects Stack
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
@@ -338,11 +486,11 @@ public:
 
     virtual void initAttribsAndUniforms(void);
 
-    BOOL attachShaderFeatures(LLGLSLShader * shader);
-    void dumpObjectLog(GLuint ret, BOOL warns = TRUE, const std::string& filename = "");
+    bool attachShaderFeatures(LLGLSLShader * shader);
+    void dumpObjectLog(GLuint ret, bool warns = true, const std::string& filename = "");
     void dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text);
-    BOOL    linkProgramObject(GLuint obj, BOOL suppress_errors = FALSE);
-    BOOL    validateProgramObject(GLuint obj);
+    bool    linkProgramObject(GLuint obj, bool suppress_errors = false);
+    bool    validateProgramObject(GLuint obj);
     GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1);
 
     // Implemented in the application to actually point to the shader directory.
@@ -351,7 +499,7 @@ public:
     // Implemented in the application to actually update out of date uniforms for a particular shader
     virtual void updateShaderUniforms(LLGLSLShader * shader) = 0; // Pure Virtual
 
-    void initShaderCache(bool enabled, const LLUUID& old_cache_version, const LLUUID& current_cache_version);
+    void initShaderCache(bool enabled, const LLUUID& old_cache_version, const LLUUID& current_cache_version, bool second_instance);
     void clearShaderCache();
     void persistShaderCacheMetadata();
 
@@ -359,8 +507,9 @@ public:
     bool saveCachedProgramBinary(LLGLSLShader* shader);
 
 public:
-    boost::unordered_map<std::string, GLuint, al::string_hash, std::equal_to<>> mVertexShaderObjects;
-    boost::unordered_map<std::string, GLuint, al::string_hash, std::equal_to<>> mFragmentShaderObjects;
+    // Map of shader names to compiled
+    std::map<std::string, GLuint> mVertexShaderObjects;
+    std::map<std::string, GLuint> mFragmentShaderObjects;
 
     //global (reserved slot) shader parameters
     std::vector<std::string> mReservedAttribs;
@@ -374,10 +523,9 @@ public:
         F32 mLastUsedTime = 0.0;
     };
     std::map<LLUUID, ProgramBinaryData> mShaderBinaryCache;
-    bool mShaderCacheInitialized = false;
+    LLUUID mShaderCacheVersion;
     bool mShaderCacheEnabled = false;
     std::string mShaderCacheDir;
-    static bool sMirrorsEnabled;
 
 protected:
 

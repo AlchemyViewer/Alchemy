@@ -32,8 +32,12 @@
 #include "llsdserialize.h"
 #include "u64.h"
 
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
+/**
+ * Constructor.
+ */
+LLPluginMessage::LLPluginMessage()
+{
+}
 
 /**
  * Constructor.
@@ -54,6 +58,14 @@ LLPluginMessage::LLPluginMessage(const LLPluginMessage &p)
 LLPluginMessage::LLPluginMessage(const std::string &message_class, const std::string &message_name)
 {
     setMessage(message_class, message_name);
+}
+
+
+/**
+ * Destructor.
+ */
+LLPluginMessage::~LLPluginMessage()
+{
 }
 
 /**
@@ -345,13 +357,9 @@ std::string LLPluginMessage::generate(void) const
 {
     std::ostringstream result;
 
-#if LL_DEBUG
     // Pretty XML may be slightly easier to deal with while debugging...
 //  LLSDSerialize::toXML(mMessage, result);
     LLSDSerialize::toPrettyXML(mMessage, result);
-#else
-    LLSDSerialize::toXML(mMessage, result);
-#endif
 
     return result.str();
 }
@@ -366,8 +374,11 @@ int LLPluginMessage::parse(const std::string &message)
     // clear any previous state
     clear();
 
-    boost::iostreams::stream<boost::iostreams::array_source> input(message.data(), message.size());
-    return LLSDSerialize::fromXML(mMessage, input);
+    std::istringstream input(message);
+
+    S32 parse_result = LLSDSerialize::fromXML(mMessage, input);
+
+    return (int)parse_result;
 }
 
 
@@ -377,6 +388,15 @@ int LLPluginMessage::parse(const std::string &message)
 LLPluginMessageListener::~LLPluginMessageListener()
 {
     // TODO: should listeners have a way to ensure they're removed from dispatcher lists when deleted?
+}
+
+
+/**
+ * Destructor
+ */
+LLPluginMessageDispatcher::~LLPluginMessageDispatcher()
+{
+
 }
 
 /**

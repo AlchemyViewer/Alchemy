@@ -34,9 +34,9 @@
 
 #include "llfloater.h"
 #include "llmapimagetype.h"
-#include "lltracker.h"
 #include "llremoteparcelrequest.h"
 #include "llslurl.h"
+#include "lltracker.h"
 
 class LLCtrlListInterface;
 class LLFriendObserver;
@@ -50,8 +50,26 @@ class LLButton;
 class LLCheckBoxCtrl;
 class LLSliderCtrl;
 class LLSpinCtrl;
+class LLSearchEditor;
+class LLComboBox;
+class LLScrollListCtrl;
 
-class LLFloaterWorldMap final : public LLRemoteParcelInfoObserver, public LLFloater
+class LLWorldMapParcelInfoObserver : public LLRemoteParcelInfoObserver
+{
+public:
+    LLWorldMapParcelInfoObserver(const LLVector3d& pos_global);
+    ~LLWorldMapParcelInfoObserver();
+
+    void processParcelInfo(const LLParcelData& parcel_data);
+    void setParcelID(const LLUUID& parcel_id);
+    void setErrorStatus(S32 status, const std::string& reason);
+
+protected:
+    LLVector3d  mPosGlobal;
+    LLUUID      mParcelID;
+};
+
+class LLFloaterWorldMap : public LLFloater
 {
 public:
     LLFloaterWorldMap(const LLSD& key);
@@ -61,19 +79,19 @@ public:
     static LLFloaterWorldMap* getInstance();
 
     static void *createWorldMapView(void* data);
-    BOOL postBuild() override;
+    bool postBuild();
 
-    /*virtual*/ void onOpen(const LLSD& key) override;
-    /*virtual*/ void onClose(bool app_quitting) override;
+    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ void onClose(bool app_quitting);
 
     static void reloadIcons(void*);
 
-    /*virtual*/ void reshape( S32 width, S32 height, BOOL called_from_parent = TRUE ) override;
-    /*virtual*/ BOOL handleHover(S32 x, S32 y, MASK mask) override;
-    /*virtual*/ BOOL handleScrollWheel(S32 x, S32 y, S32 clicks) override;
-    /*virtual*/ void draw() override;
+    /*virtual*/ void reshape( S32 width, S32 height, bool called_from_parent = true );
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleScrollWheel(S32 x, S32 y, S32 clicks);
+    /*virtual*/ void draw();
 
-    /*virtual*/ void onFocusLost() override;
+    /*virtual*/ void onFocusLost();
 
     // methods for dealing with inventory. The observe() method is
     // called during program startup. inventoryUpdated() will be
@@ -99,9 +117,9 @@ public:
     // A z_attenuation of 0.0f collapses the distance into the X-Y plane
     F32             getDistanceToDestination(const LLVector3d& pos_global, F32 z_attenuation = 0.5f) const;
 
-    void            clearLocationSelection(BOOL clear_ui = FALSE, BOOL dest_reached = FALSE);
-    void            clearAvatarSelection(BOOL clear_ui = FALSE);
-    void            clearLandmarkSelection(BOOL clear_ui = FALSE);
+    void            clearLocationSelection(bool clear_ui = false, bool dest_reached = false);
+    void            clearAvatarSelection(bool clear_ui = false);
+    void            clearLandmarkSelection(bool clear_ui = false);
 
     // Adjust the maximally zoomed out limit of the zoom slider so you can
     // see the whole world, plus a little.
@@ -118,6 +136,8 @@ public:
 
     //Slapp instigated avatar tracking
     void            avatarTrackFromSlapp( const LLUUID& id );
+
+    void            processParcelInfo(const LLParcelData& parcel_data, const LLVector3d& pos_global) const;
 
 protected:
     void            onGoHome();
@@ -137,9 +157,9 @@ protected:
     void            onCopySLURL();
     void            onTrackRegion();
 
-    //void            onExpandCollapseBtn();
+    void            onExpandCollapseBtn();
 
-    void            centerOnTarget(BOOL animate);
+    void            centerOnTarget(bool animate);
     void            updateLocation();
 
     // fly to the tracked item, if there is one
@@ -148,7 +168,6 @@ protected:
     void            buildLandmarkIDLists();
     void            flyToLandmark();
     void            teleportToLandmark();
-    void            setLandmarkVisited();
 
     void            buildAvatarIDList();
     void            flyToAvatar();
@@ -158,20 +177,9 @@ protected:
     void            onLocationFocusChanged( LLFocusableElement* ctrl );
     void            onLocationCommit();
     void            onCoordinatesCommit();
-    void            onCommitSearchResult();
+    void            onCommitSearchResult(bool from_search);
 
     void            onTeleportFinished();
-
-    // LLRemoteParcelInfoObserver
-    void    requestParcelInfo(const LLVector3d& pos_global, const LLVector3d& region_origin);
-
-    void    processParcelInfo(const LLParcelData& parcel_data) override;
-    void    setParcelID(const LLUUID& parcel_id) override;
-    void    setErrorStatus(S32 status, const std::string& reason) override;
-
-    bool        mShowParcelInfo;
-    LLVector3d  mParcelPosGlobal;
-    LLUUID      mParcelID;
 
 private:
     LLWorldMapView* mMapView; // Panel displaying the map
@@ -182,8 +190,13 @@ private:
     // enable/disable teleport destination coordinates
     void enableTeleportCoordsDisplay( bool enabled );
 
-    std::vector<LLUUID> mLandmarkAssetIDList;
-    std::vector<LLUUID> mLandmarkItemIDList;
+    void            requestParcelInfo(const LLVector3d& pos_global, const LLVector3d& region_origin);
+    LLVector3d      mRequestedGlobalPos;
+    bool            mShowParcelInfo;
+    LLWorldMapParcelInfoObserver* mParcelInfoObserver;
+
+    uuid_vec_t      mLandmarkAssetIDList;
+    uuid_vec_t      mLandmarkItemIDList;
 
     static const LLUUID sHomeID;
 
@@ -197,10 +210,11 @@ private:
     LLVector3               mCompletingRegionPos;
 
     std::string             mLastRegionName;
-    BOOL                    mWaitingForTracker;
+    bool                    mWaitingForTracker;
 
-    BOOL                    mIsClosing;
-    BOOL                    mSetToUserPosition;
+    bool                    mIsClosing;
+    bool                    mSetToUserPosition;
+    bool                    mProcessingSearchUpdate; // Don't update search string from what user set it to
 
     LLVector3d              mTrackedLocation;
     LLTracker::ETrackingStatus mTrackedStatus;
@@ -208,19 +222,15 @@ private:
     LLUUID                  mTrackedAvatarID;
     LLSLURL                 mSLURL;
 
-    LLCtrlListInterface *   mListFriendCombo;
-    LLCtrlListInterface *   mListLandmarkCombo;
-    LLCtrlListInterface *   mListSearchResults;
-
     LLButton*               mTeleportButton = nullptr;
     LLButton*               mShowDestinationButton = nullptr;
     LLButton*               mCopySlurlButton = nullptr;
     LLButton*               mTrackRegionButton = nullptr;
     LLButton*               mGoHomeButton = nullptr;
+    LLButton*               mSearchButton = nullptr;
 
     LLCheckBoxCtrl*         mPeopleCheck = nullptr;
     LLCheckBoxCtrl*         mInfohubCheck = nullptr;
-    LLCheckBoxCtrl*         mTelehubCheck = nullptr;
     LLCheckBoxCtrl*         mLandSaleCheck = nullptr;
     LLCheckBoxCtrl*         mEventsCheck = nullptr;
     LLCheckBoxCtrl*         mEventsMatureCheck = nullptr;
@@ -230,12 +240,19 @@ private:
     LLUICtrl*               mLandmarkIcon = nullptr;
     LLUICtrl*               mLocationIcon = nullptr;
 
-    LLUICtrl*               mLocationsLabel = nullptr;
+    LLSearchEditor*         mLocationEditor = nullptr;
     LLUICtrl*               mTeleportCoordSpinX = nullptr;
     LLUICtrl*               mTeleportCoordSpinY = nullptr;
     LLUICtrl*               mTeleportCoordSpinZ = nullptr;
 
     LLSliderCtrl*           mZoomSlider = nullptr;
+
+    LLComboBox*             mLandmarkCombo = nullptr;
+    LLComboBox*             mFriendCombo = nullptr;
+
+    LLScrollListCtrl*       mSearchResults = nullptr;
+
+    LLPanel*                mTrackCtrlsPanel = nullptr;
 
     boost::signals2::connection mTeleportFinishConnection;
 };
@@ -249,8 +266,8 @@ public:
     static LLPanelHideBeacon* getInstance();
 
     LLPanelHideBeacon();
-    /*virtual*/ BOOL postBuild();
-    /*virtual*/ void setVisible(BOOL visible);
+    /*virtual*/ bool postBuild();
+    /*virtual*/ void setVisible(bool visible);
     /*virtual*/ void draw();
 
 private:

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel name="autoresponse_settings">
+<panel name="autoresponse_rejection_settings">
 	<text name="autorespond_reject_friends_response_label">
 		「フレンドシップのリクエストをすべて拒否する」モード時の他のアバターに対する自動返答：
 	</text>
@@ -12,5 +12,14 @@
 	<text_editor name="autorespond_rto_response">
 		ログイン後に変更できます。
 	</text_editor>
-	<check_box label="フレンドリストに載っている人からのテレポートのオファー（と応答を送信）を拒否しない" name="ALDontRejectTeleportOffersFromFriends"/>
+	<check_box label="フレンドリストに載っている人からのテレポートのオファー（と応答を送信）を拒否しない" name="AlchemyDontRejectTeleportOffersFromFriends"/>
+	<text name="adhoc_ignore_label">
+		アドホック（会話）の拒否：
+	</text>
+	<combo_box name="adhoc_preference_combo">
+		<item label="切り" name="adhoc_preference_allow_none"/>
+		<item label="フレンドのみ" name="adhoc_preference_allow_friends"/>
+		<item label="全て" name="adhoc_preference_allow_all"/>
+	</combo_box>
+	<check_box name="AlchemyReportIgnoredAdHocSession" label="無視された会話チャットを報告する"/>
 </panel>

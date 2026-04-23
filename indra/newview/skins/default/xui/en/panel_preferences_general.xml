@@ -91,6 +91,37 @@
          name="Traditional Chinese"
          value="zh" />
     </combo_box>
+   <text
+     type="string"
+     length="1"
+     follows="left|top"
+     height="15"
+     layout="topleft"
+     left="255"
+     name="time_format_textbox"
+     top="10"
+     width="200">
+        Time Format:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left="255"
+     max_chars="135"
+     name="time_format_combobox"
+     width="70">
+        <combo_box.item
+         enabled="true"
+         label="1:00 PM"
+         name="12H"
+         value="0" />
+        <combo_box.item
+         enabled="true"
+         label="13:00"
+         name="24H"
+         value="1" />
+    </combo_box>
     <text
  font="SansSerifSmall"
      type="string"
@@ -113,7 +144,7 @@
      left="30"
      top_pad="8"
      name="maturity_desired_prompt"
-     width="225">
+     width="200">
         I want to access content rated:
     </text>
 	<text
@@ -122,7 +153,7 @@
      follows="left|top"
      height="15"
      layout="topleft"
-     left_pad="2"
+     left_pad="5"
      name="maturity_desired_textbox"
      width="200">
     </text>
@@ -200,7 +231,7 @@
     type="string"
     length="1"
     follows="left|top"
-    height="16"
+    height="15"
     layout="topleft"
     left="30"
     name="name_tags_textbox"
@@ -210,7 +241,7 @@
    </text>
    <radio_group
      control_name="AvatarNameTagMode"
-     height="15"
+     height="20"
      layout="topleft"
      left="35"
      top_pad="0" 
@@ -251,7 +282,7 @@
      layout="topleft"
      left="35"
      name="show_my_name_checkbox1"
-	 top_pad="5"
+	 top_pad="2"
      width="100" />
    <check_box
      control_name="NameTagShowUsernames"
@@ -264,24 +295,16 @@
      tool_tip="Show username, like bobsmith123"
      top_delta="0" />
     <check_box
-     control_name="NameTagShowGroupTitles"
-	 enabled_control="AvatarNameTagMode"
+     control_name="UseDisplayNames"
+     follows="top|left"
      height="16"
-     label="Group titles"
+     label="Display names"
      layout="topleft"
      left="35"
-     width="100" 
-     name="show_all_title_checkbox1"
-	 tool_tip="Show group titles, like Officer or Member"
-     top_pad="3" />
-     <check_box
-     control_name="RenderHideGroupTitle"
-     height="16"
-     label="Hide own group title"
-     layout="topleft"
-     left_pad="50"
-     name="RenderHideGroupTitle"
-     tool_tip="Shows or hides your own group title for yourself and everyone else."/>
+     name="display_names_check"
+     width="100"
+     tool_tip="Check to use display names in chat, IM, name tags, etc."
+     top_pad="3"/>
     <check_box
      control_name="NameTagShowFriends"
 	 enabled_control="AvatarNameTagMode"
@@ -290,35 +313,38 @@
      layout="topleft"
      left_pad="50"
      name="show_friends"
-     tool_tip="Highlight the name tags of your friends"/>     
-    <check_box
-	 control_name="UseDisplayNames"
-	 follows="top|left"
-	 height="16"
-	 label="View Display Names"
-	 layout="topleft"
-	 left="35"
-	 name="display_names_check"
-	 width="120"
-	 tool_tip="Check to use display names in chat, IM, name tags, etc."
-	 top_pad="3"/>
-   <check_box
-   control_name="NameTagShowDistance"
-   height="16"
-   label="Show Distance"
-   layout="topleft"
-   left_pad="30"
-   name="show_distance"
-   tool_tip="Show the distance of other residents from yourself in the name tags"/>     
+     tool_tip="Highlight the name tags of your friends"/>
+    <combo_box
+     height="23"
+     layout="topleft"
+     control_name="GroupTitlesTagMode"
+     enabled_control="AvatarNameTagMode"
+     left="39"
+     top_pad="3"
+     name="group_title"
+     width="130">
+        <combo_box.item
+         label="No group tags"
+         name="no_tags"
+         value="0" />
+        <combo_box.item
+         label="Only my group tag"
+         name="my_tag"
+         value="1" />
+        <combo_box.item
+         label="All group tags"
+         name="all_tags"
+         value="2" />
+    </combo_box>
 	<text
 	 type="string"
 	 length="1"
 	 follows="left|top"
-	 height="18"
+	 height="15"
 	 layout="topleft"
 	 left="30"
 	 name="inworld_typing_rg_label"
-	 top_pad="1"
+	 top_pad="4"
 	 width="400">
        Pressing letter keys:
    </text>
@@ -327,7 +353,7 @@
      height="34"
      layout="topleft"
      left="35"
-     top_pad="2" 
+     top_pad="0" 
      name="inworld_typing_preference">
         <radio_item
          label="Starts local chat"

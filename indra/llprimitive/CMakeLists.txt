@@ -1,19 +1,10 @@
 # -*- cmake -*-
 
-project(llprimitive)
+add_library (llprimitive STATIC)
 
-include(00-Common)
-include(LLCommon)
-include(LLCoreHttp)
-include(LLPhysicsExtensions)
-include(LLPrimitive)
-include(GLH)
-include(GLM)
-include(TinyGLTF)
-
-set(llprimitive_SOURCE_FILES
+target_sources(llprimitive
+    PRIVATE
     lldaeloader.cpp
-    llgltfloader.cpp
     llgltfmaterial.cpp
     llmaterialid.cpp
     llmaterial.cpp
@@ -28,12 +19,11 @@ set(llprimitive_SOURCE_FILES
     lltreeparams.cpp
     llvolumemessage.cpp
     material_codes.cpp
-    )
 
-set(llprimitive_HEADER_FILES
-    CMakeLists.txt
+    PUBLIC
+    FILE_SET HEADERS
+    FILES
     lldaeloader.h
-    llgltfloader.h
     llgltfmaterial.h
     llgltfmaterial_templates.h
     legacy_object_types.h
@@ -55,27 +45,36 @@ set(llprimitive_HEADER_FILES
     object_flags.h
     )
 
-list(APPEND llprimitive_SOURCE_FILES ${llprimitive_HEADER_FILES})
-
-add_library (llprimitive ${llprimitive_SOURCE_FILES})
 target_include_directories( llprimitive  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(llprimitive
         PUBLIC
-        llcommon
-        llmath
+        llcharacter
+        llrender
         llmessage
         llcorehttp
         llxml
-        llcharacter
-        llrender
-        llphysicsextensions_impl
+        llcommon
+        llmath
         ll::colladadom
-        ll::glh_linear
+        ll::glm
+        ll::tinygltf
         )
 
-#add unit tests
-if (LL_TESTS)
+if (HAVOK OR HAVOK_TPV)
+    target_link_libraries(llprimitive PUBLIC
+        llphysicsextensions_impl
+        )
+else()
+    target_link_libraries(llprimitive PUBLIC
+        llphysicsextensionsos
+        )
+endif ()
+
+target_precompile_headers(llprimitive REUSE_FROM llprecompiled)
+
+# add unit tests
+if (BUILD_TESTING)
     INCLUDE(LLAddBuildTest)
     SET(llprimitive_TEST_SOURCE_FILES
       llmediaentry.cpp
@@ -85,4 +84,4 @@ if (LL_TESTS)
 
     set_property(SOURCE llprimitive.cpp PROPERTY LL_TEST_ADDITIONAL_LIBRARIES llmessage)
     LL_ADD_PROJECT_UNIT_TESTS(llprimitive "${llprimitive_TEST_SOURCE_FILES}")
-endif (LL_TESTS)
+endif ()

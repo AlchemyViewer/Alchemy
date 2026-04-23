@@ -42,7 +42,7 @@ typedef enum e_pointat_type
     POINTAT_NUM_TARGETS
 } EPointAtType;
 
-class LLHUDEffectPointAt final : public LLHUDEffect
+class LLHUDEffectPointAt : public LLHUDEffect
 {
 public:
     friend class LLHUDObject;
@@ -50,7 +50,7 @@ public:
     /*virtual*/ void markDead();
     /*virtual*/ void setSourceObject(LLViewerObject* objectp);
 
-    BOOL setPointAt(EPointAtType target_type, LLViewerObject *object, LLVector3 position);
+    bool setPointAt(EPointAtType target_type, LLViewerObject *object, LLVector3 position);
     void clearPointAtTarget();
 
     EPointAtType getPointAtType() { return mTargetType; }
@@ -70,7 +70,7 @@ protected:
     bool calcTargetPosition();
     void update();
 public:
-    static BOOL sDebugPointAt;
+    static bool sDebugPointAt;
 private:
     EPointAtType                mTargetType;
     LLVector3d                  mTargetOffsetGlobal;

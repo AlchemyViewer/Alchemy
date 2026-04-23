@@ -31,26 +31,24 @@
 #include "llappviewer.h"
 #endif
 
-class LLAppViewerMacOSX final : public LLAppViewer
+class LLAppViewerMacOSX : public LLAppViewer
 {
 public:
     LLAppViewerMacOSX();
-    ~LLAppViewerMacOSX() override;
+    virtual ~LLAppViewerMacOSX();
 
     //
     // Main application logic
     //
-    bool init() override;           // Override to do application initialization
+    virtual bool init();            // Override to do application initialization
 
-    void forceErrorOSSpecificException() override;
+    virtual void forceErrorOSSpecificException();
 
-    void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) override;
 protected:
-    bool restoreErrorTrap() override;
-    void initCrashReporting(bool reportFreeze) override;
+    virtual bool restoreErrorTrap();
 
-    std::string generateSerialNumber() override;
-    bool initParseCommandLine(LLCommandLineParser& clp) override;
+    std::string generateSerialNumber();
+    virtual bool initParseCommandLine(LLCommandLineParser& clp);
 };
 
 #endif // LL_LLAPPVIEWERMACOSX_H

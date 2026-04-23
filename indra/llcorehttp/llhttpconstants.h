@@ -100,6 +100,8 @@ extern const std::string HTTP_VERB_POST;
 extern const std::string HTTP_VERB_DELETE;
 extern const std::string HTTP_VERB_MOVE;
 extern const std::string HTTP_VERB_OPTIONS;
+extern const std::string HTTP_VERB_PATCH;
+extern const std::string HTTP_VERB_COPY;
 
 enum EHTTPMethod
 {
@@ -196,6 +198,7 @@ extern const std::string HTTP_IN_HEADER_LOCATION;
 extern const std::string HTTP_IN_HEADER_RETRY_AFTER;
 extern const std::string HTTP_IN_HEADER_SET_COOKIE;
 extern const std::string HTTP_IN_HEADER_USER_AGENT;
+extern const std::string HTTP_IN_HEADER_X_CONTENT_TYPE_OPTIONS;
 extern const std::string HTTP_IN_HEADER_X_FORWARDED_FOR;
 
 //// HTTP Content Types ////
@@ -223,5 +226,6 @@ extern const std::string HTTP_CONTENT_IMAGE_BMP;
 //// HTTP Cache Settings ////
 extern const std::string HTTP_NO_CACHE;
 extern const std::string HTTP_NO_CACHE_CONTROL;
+extern const std::string HTTP_NOSNIFF;
 
 #endif

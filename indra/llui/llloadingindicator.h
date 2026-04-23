@@ -71,7 +71,7 @@ public:
         {}
     };
 
-    virtual ~LLLoadingIndicator() = default;
+    virtual ~LLLoadingIndicator() {}
 
     // llview overrides
     virtual void draw();

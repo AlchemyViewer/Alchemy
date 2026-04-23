@@ -66,9 +66,8 @@ void LLEnvironmentRequest::onRegionCapsReceived(const LLUUID& region_id, LLEnvir
         LL_INFOS("WindlightCaps") << "Got caps for a non-current region" << LL_ENDL;
         return;
     }
-#ifdef SHOW_DEBUG
+
     LL_DEBUGS("WindlightCaps") << "Received region capabilities" << LL_ENDL;
-#endif
     doRequest(cb);
 }
 
@@ -102,8 +101,8 @@ void LLEnvironmentRequest::environmentRequestCoro(std::string url, LLEnvironment
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     S32 requestId = ++LLEnvironmentRequest::sLastRequest;
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-            httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EnvironmentRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+            httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EnvironmentRequest", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -182,9 +181,7 @@ bool LLEnvironmentApply::initiateRequest(const LLSD& content, LLEnvironment::env
     }
 
     LL_INFOS("WindlightCaps") << "Sending windlight settings to " << url << LL_ENDL;
-#ifdef SHOW_DEBUG
     LL_DEBUGS("WindlightCaps") << "content: " << content << LL_ENDL;
-#endif
 
     std::string coroname =
         LLCoros::instance().launch("LLEnvironmentApply::environmentApplyCoro",
@@ -196,8 +193,8 @@ void LLEnvironmentApply::environmentApplyCoro(std::string url, LLSD content, LLE
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EnvironmentApply", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EnvironmentApply", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->postAndSuspend(httpRequest, url, content);
 
@@ -254,9 +251,8 @@ void LLEnvironmentApply::environmentApplyCoro(std::string url, LLSD content, LLE
             notify["FAIL_REASON"] = result["fail_reason"].asString();
             break;
         }
-#ifdef SHOW_DEBUG
+
         LL_DEBUGS("WindlightCaps") << "Success in applying windlight settings to region " << result["regionID"].asUUID() << LL_ENDL;
-#endif
 
     } while (false);
 

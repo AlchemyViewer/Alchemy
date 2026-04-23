@@ -36,31 +36,30 @@
 #include "v3math.h"
 #include "v4math.h"
 #include "m4math.h"
-#include "llmatrix4a.h"
 #include "llquaternion.h"
 #include "xform.h"
 #include "llmatrix4a.h"
 
-const S32 LL_CHARACTER_MAX_JOINTS_PER_MESH = 15;
+constexpr S32 LL_CHARACTER_MAX_JOINTS_PER_MESH = 15;
 // Need to set this to count of animate-able joints,
 // currently = #bones + #collision_volumes + #attachments + 2,
 // rounded to next multiple of 4.
-const U32 LL_CHARACTER_MAX_ANIMATED_JOINTS = 216; // must be divisible by 4!
-const U32 LL_MAX_JOINTS_PER_MESH_OBJECT = 110;
+constexpr U32 LL_CHARACTER_MAX_ANIMATED_JOINTS = 216; // must be divisible by 4!
+constexpr U32 LL_MAX_JOINTS_PER_MESH_OBJECT = 110;
 
 // These should be higher than the joint_num of any
 // other joint, to avoid conflicts in updateMotionsByType()
-const U32 LL_HAND_JOINT_NUM = (LL_CHARACTER_MAX_ANIMATED_JOINTS-1);
-const U32 LL_FACE_JOINT_NUM = (LL_CHARACTER_MAX_ANIMATED_JOINTS-2);
-const S32 LL_CHARACTER_MAX_PRIORITY = 7;
-const F32 LL_MAX_PELVIS_OFFSET = 5.f;
+constexpr U32 LL_HAND_JOINT_NUM = (LL_CHARACTER_MAX_ANIMATED_JOINTS-1);
+constexpr U32 LL_FACE_JOINT_NUM = (LL_CHARACTER_MAX_ANIMATED_JOINTS-2);
+constexpr S32 LL_CHARACTER_MAX_PRIORITY = 7;
+constexpr F32 LL_MAX_PELVIS_OFFSET = 5.f;
 
-const F32 LL_JOINT_TRESHOLD_POS_OFFSET = 0.0001f; //0.1 mm
+constexpr F32 LL_JOINT_TRESHOLD_POS_OFFSET = 0.0001f; //0.1 mm
 
 class LLVector3OverrideMap
 {
 public:
-    LLVector3OverrideMap() = default;
+    LLVector3OverrideMap() {}
     bool findActiveOverride(LLUUID& mesh_id, LLVector3& pos) const;
     void showJointVector3Overrides(std::ostringstream& os) const;
     U32 count() const;
@@ -87,8 +86,7 @@ inline bool operator!=(const LLVector3OverrideMap& a, const LLVector3OverrideMap
 //-----------------------------------------------------------------------------
 // class LLJoint
 //-----------------------------------------------------------------------------
-LL_ALIGN_PREFIX(16)
-class LLJoint
+class alignas(16) LLJoint
 {
     LL_ALIGN_NEW
 public:
@@ -119,7 +117,7 @@ public:
     };
 protected:
     // explicit transformation members
-    LL_ALIGN_16(LLMatrix4a          mWorldMatrix);
+    LLMatrix4a          mWorldMatrix;
     LLXformMatrix       mXform;
 
     std::string mName;
@@ -134,7 +132,7 @@ protected:
 
 public:
     U32             mDirtyFlags;
-    BOOL            mUpdateXform;
+    bool            mUpdateXform;
 
     // describes the skin binding pose
     LLVector3       mSkinOffset;
@@ -144,15 +142,6 @@ public:
     LLVector3       mEnd;
 
     S32             mJointNum;
-
-    //BD - Poser
-    LLQuaternion    mNextRotation;
-    LLQuaternion    mTargetRotation;
-    LLQuaternion    mLastRotation;
-    LLVector3       mNextPosition;
-    LLVector3       mTargetPosition;
-    LLVector3       mLastPosition;
-    bool            mHasPosition;
 
     // child joints
     typedef std::vector<LLJoint*> joints_t;
@@ -232,7 +221,7 @@ public:
     LLJoint *getRoot();
 
     // search for child joints by name
-    LLJoint *findJoint( const std::string &name );
+    LLJoint* findJoint(std::string_view name);
 
     // add/remove children
     void addChild( LLJoint *joint );
@@ -256,28 +245,6 @@ public:
     LLVector3 getLastWorldPosition();
     void setWorldPosition( const LLVector3& pos );
 
-    //BD - Poser
-    void setTargetPosition(const LLVector3& pos) { mTargetPosition = pos; }
-    LLVector3 getTargetPosition() const { return mTargetPosition; }
-
-    void setTargetRotation(const LLQuaternion& rot) { mTargetRotation = rot; }
-    LLQuaternion getTargetRotation() const { return mTargetRotation; }
-
-    void setLastPosition(const LLVector3& pos) { mLastPosition = pos; }
-    LLVector3 getLastPosition() const { return mLastPosition; }
-
-    void setLastRotation(const LLQuaternion& rot) { mLastRotation = rot; }
-    LLQuaternion getLastRotation() const { return mLastRotation; }
-
-    void setCanReposition(const bool can_reposition) { mHasPosition = can_reposition; }
-    bool canReposition() const { return mHasPosition; }
-
-    void setNextPosition(const LLVector3& pos) { mNextPosition = pos; }
-    LLVector3 getNextPosition() const { return mNextPosition; }
-
-    void setNextRotation(const LLQuaternion& rot) { mNextRotation = rot; }
-    LLQuaternion getNextRotation() const { return mNextRotation; }
-
     // get/set local rotation
     const LLQuaternion& getRotation();
     void setRotation( const LLQuaternion& rot );
@@ -292,7 +259,7 @@ public:
     void setScale( const LLVector3& scale, bool apply_attachment_overrides = false );
 
     // get/set world matrix
-    const LLMatrix4a& getWorldMatrix();
+    const LLMatrix4 &getWorldMatrix();
     void setWorldMatrix( const LLMatrix4& mat );
 
     const LLMatrix4a& getWorldMatrix4a();
@@ -312,7 +279,7 @@ public:
 
     void clampRotation(LLQuaternion old_rot, LLQuaternion new_rot);
 
-    virtual BOOL isAnimatable() const { return TRUE; }
+    virtual bool isAnimatable() const { return true; }
 
     void addAttachmentPosOverride( const LLVector3& pos, const LLUUID& mesh_id, const std::string& av_info, bool& active_override_changed );
     void removeAttachmentPosOverride( const LLUUID& mesh_id, const std::string& av_info, bool& active_override_changed );
@@ -334,6 +301,6 @@ public:
     // These are used in checks of whether a pos/scale override is considered significant.
     bool aboveJointPosThreshold(const LLVector3& pos) const;
     bool aboveJointScaleThreshold(const LLVector3& scale) const;
-} LL_ALIGN_POSTFIX(16);
+};
 #endif // LL_LLJOINT_H
 

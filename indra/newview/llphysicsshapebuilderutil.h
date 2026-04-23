@@ -73,10 +73,13 @@ public:
         {
             return LLVolumeParams::operator<(params);
         }
-        return (params.mForceConvex == false) && (mForceConvex == true);
+
+        return !params.mForceConvex && mForceConvex;
     }
 
     bool shouldForceConvex() const { return mForceConvex; }
+
+    bool hasDecomposition() const;
 
 private:
     bool mForceConvex;
@@ -134,10 +137,8 @@ public:
         // Offset of shape from origin of primitive's reference frame
         LLVector3   mCenter;
     };
-    // <FS:Beq> FIRE-23053 - analysed mesh physics is not correctly displayed for thin meshes
-    //  static void determinePhysicsShape( const LLPhysicsVolumeParams& volume_params, const LLVector3& scale, PhysicsShapeSpecification& specOut );
-    static void determinePhysicsShape(const LLPhysicsVolumeParams& volume_params, const LLVector3& scale, bool hasDecomp, PhysicsShapeSpecification& specOut);
-    //</FS:Beq>
+
+    static void determinePhysicsShape( const LLPhysicsVolumeParams& volume_params, const LLVector3& scale, PhysicsShapeSpecification& specOut );
 };
 
 #endif //LL_PHYSICS_SHAPE_BUILDER_H

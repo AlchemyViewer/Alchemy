@@ -46,6 +46,7 @@
 
 #include "llhttpconstants.h"
 #include "llproxy.h"
+
 #include "httpstats.h"
 
 // *DEBUG:  "[curl:bugs] #1420" problem and testing.
@@ -154,7 +155,7 @@ HttpOpRequest::HttpOpRequest()
       mPolicyRetryLimit(HTTP_RETRY_COUNT_DEFAULT),
       mPolicyMinRetryBackoff(HttpTime(HTTP_RETRY_BACKOFF_MIN_DEFAULT)),
       mPolicyMaxRetryBackoff(HttpTime(HTTP_RETRY_BACKOFF_MAX_DEFAULT)),
-      mCallbackSSLVerify(NULL),
+      mCallbackSSLVerify(nullptr),
       mRequestId(0)
 {
     // *NOTE:  As members are added, retry initialization/cleanup
@@ -270,7 +271,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
         if (mReplyOffset || mReplyLength)
         {
             // Got an explicit offset/length in response
-            response->setRange(mReplyOffset, mReplyLength, mReplyFullLength);
+            response->setRange(mReplyOffset, static_cast<unsigned int>(mReplyLength), static_cast<unsigned int>(mReplyFullLength));
         }
         response->setContentType(mReplyConType);
         response->setRetries(mPolicyRetries, mPolicy503Retries);
@@ -331,7 +332,7 @@ HttpStatus HttpOpRequest::setupGetByteRange(HttpRequest::policy_t policy_id,
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     setupCommon(policy_id, url, NULL, options, headers);
     mReqMethod = HOR_GET;
-    mReqOffset = offset;
+    mReqOffset = static_cast<off_t>(offset);
     mReqLength = len;
     if (offset || len)
     {
@@ -431,6 +432,7 @@ void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
                                 const HttpHeaders::ptr_t & headers)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    mRequestId = sRequestId++;
     mProcFlags = 0U;
     mReqPolicy = policy_id;
     mReqURL = url;
@@ -517,6 +519,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
     check_curl_easy_setopt(mCurlHandle, CURLOPT_NOPROGRESS, 1);
     check_curl_easy_setopt(mCurlHandle, CURLOPT_URL, mReqURL.c_str());
     check_curl_easy_setopt(mCurlHandle, CURLOPT_PRIVATE, getHandle());
+    check_curl_easy_setopt(mCurlHandle, CURLOPT_ENCODING, "");
 
     check_curl_easy_setopt(mCurlHandle, CURLOPT_AUTOREFERER, 1);
     check_curl_easy_setopt(mCurlHandle, CURLOPT_MAXREDIRS, HTTP_REDIRECTS_DEFAULT);
@@ -529,11 +532,6 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 
     check_curl_easy_setopt(mCurlHandle, CURLOPT_COOKIEFILE, "");
 
-    if(!gpolicy.mUserAgent.empty())
-    {
-        check_curl_easy_setopt(mCurlHandle, CURLOPT_USERAGENT, gpolicy.mUserAgent.c_str());
-    }
-
     if (gpolicy.mSslCtxCallback)
     {
         check_curl_easy_setopt(mCurlHandle, CURLOPT_SSL_CTX_FUNCTION, curlSslCtxCallback);
@@ -544,8 +542,9 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
     long follow_redirect(1L);
     long sslPeerV(0L);
     long sslHostV(0L);
-    long dnsCacheTimeout(600); // Refetch dns after 600 seconds
+    long dnsCacheTimeout(-1L);
     long nobody(0L);
+    curl_off_t lastModified(0L);
 
     if (mReqOptions)
     {
@@ -554,6 +553,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
         sslHostV = mReqOptions->getSSLVerifyHost() ? 2L : 0L;
         dnsCacheTimeout = mReqOptions->getDNSCacheTimeout();
         nobody = mReqOptions->getHeadersOnly() ? 1L : 0L;
+        lastModified = (curl_off_t)mReqOptions->getLastModified();
     }
     check_curl_easy_setopt(mCurlHandle, CURLOPT_FOLLOWLOCATION, follow_redirect);
 
@@ -561,6 +561,17 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
     check_curl_easy_setopt(mCurlHandle, CURLOPT_SSL_VERIFYHOST, sslHostV);
 
     check_curl_easy_setopt(mCurlHandle, CURLOPT_NOBODY, nobody);
+
+    if (lastModified)
+    {
+        check_curl_easy_setopt(mCurlHandle, CURLOPT_TIMECONDITION, CURL_TIMECOND_IFMODSINCE);
+#if (LIBCURL_VERSION_NUM >= 0x073B00)
+        // requires curl 7.59.0
+        check_curl_easy_setopt(mCurlHandle, CURLOPT_TIMEVALUE_LARGE, lastModified);
+#else
+        check_curl_easy_setopt(mCurlHandle, CURLOPT_TIMEVALUE, (long)lastModified);
+#endif
+    }
 
     // The Linksys WRT54G V5 router has an issue with frequent
     // DNS lookups from LAN machines.  If they happen too often,
@@ -585,18 +596,18 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
         LLProxy::applyProxySettings(mCurlHandle);
 
     }
-    else if (!gpolicy.mHttpProxy.empty())
+    else if (gpolicy.mHttpProxy.size())
     {
         // *TODO:  This is fine for now but get fuller socks5/
         // authentication thing going later....
         check_curl_easy_setopt(mCurlHandle, CURLOPT_PROXY, gpolicy.mHttpProxy.c_str());
         check_curl_easy_setopt(mCurlHandle, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
     }
-    if (!gpolicy.mCAPath.empty())
+    if (gpolicy.mCAPath.size())
     {
         check_curl_easy_setopt(mCurlHandle, CURLOPT_CAPATH, gpolicy.mCAPath.c_str());
     }
-    if (!gpolicy.mCAFile.empty())
+    if (gpolicy.mCAFile.size())
     {
         check_curl_easy_setopt(mCurlHandle, CURLOPT_CAINFO, gpolicy.mCAFile.c_str());
     }
@@ -611,11 +622,11 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
     case HOR_POST:
         {
             check_curl_easy_setopt(mCurlHandle, CURLOPT_POST, 1);
-
+            check_curl_easy_setopt(mCurlHandle, CURLOPT_ENCODING, "");
             long data_size(0);
             if (mReqBody)
             {
-                data_size = mReqBody->size();
+                data_size = static_cast<long>(mReqBody->size());
             }
             check_curl_easy_setopt(mCurlHandle, CURLOPT_POSTFIELDS, static_cast<void *>(NULL));
             check_curl_easy_setopt(mCurlHandle, CURLOPT_POSTFIELDSIZE, data_size);
@@ -633,7 +644,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
             long data_size(0);
             if (mReqBody)
             {
-                data_size = mReqBody->size();
+                data_size = static_cast<long>(mReqBody->size());
             }
             check_curl_easy_setopt(mCurlHandle, CURLOPT_INFILESIZE, data_size);
             mCurlHeaders = curl_slist_append(mCurlHeaders, "Expect:");
@@ -661,12 +672,12 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 
     if (!mReqHeaders || !mReqHeaders->find(HTTP_OUT_HEADER_CONNECTION))
     {
+        // *TODO: Should this be 'Keep-Alive' ?
         mCurlHeaders = curl_slist_append(mCurlHeaders, "Connection: keep-alive");
     }
-
     if (!mReqHeaders || !mReqHeaders->find(HTTP_OUT_HEADER_KEEP_ALIVE))
     {
-        mCurlHeaders = curl_slist_append(mCurlHeaders, "Keep-Alive: 300");
+        mCurlHeaders = curl_slist_append(mCurlHeaders, "Keep-alive: 300");
     }
 
     // Tracing
@@ -751,6 +762,13 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
         //
         // xfer_timeout *= cpolicy.mPipelining;
         xfer_timeout *= 2L;
+
+        // Also try requesting HTTP/2.
+/******************************/
+        // but for test purposes, only if overriding VIEWERASSET
+        if (getenv("VIEWERASSET"))
+/******************************/
+        check_curl_easy_setopt(mCurlHandle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
     }
     // *DEBUG:  Enable following override for timeout handling and "[curl:bugs] #1420" tests
     //if (cpolicy.mPipelining)

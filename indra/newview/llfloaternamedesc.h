@@ -39,9 +39,9 @@ class LLRadioGroup;
 class LLFloaterNameDesc : public LLFloater
 {
 public:
-    LLFloaterNameDesc(const LLSD& filename);
+    LLFloaterNameDesc(const LLSD& args);
     virtual ~LLFloaterNameDesc();
-    virtual BOOL postBuild();
+    bool postBuild() override;
 
     void        onBtnOK();
     void        onBtnCancel();
@@ -50,35 +50,36 @@ public:
     virtual S32 getExpectedUploadCost() const;
 
 protected:
-    virtual void        onCommit();
+    virtual void        onCommit() override;
 
 protected:
-    BOOL        mIsAudio;
+    bool        mIsAudio;
     bool        mIsText;
 
     std::string     mFilenameAndPath;
     std::string     mFilename;
+    LLUUID          mDestinationFolderId;
 };
 
-class LLFloaterSoundPreview final : public LLFloaterNameDesc
+class LLFloaterSoundPreview : public LLFloaterNameDesc
 {
 public:
     LLFloaterSoundPreview(const LLSD& filename );
-    virtual BOOL postBuild();
+    bool postBuild() override;
 };
 
-class LLFloaterAnimPreview final : public LLFloaterNameDesc
+class LLFloaterAnimPreview : public LLFloaterNameDesc
 {
 public:
     LLFloaterAnimPreview(const LLSD& filename );
-    virtual BOOL postBuild();
+    bool postBuild() override;
 };
 
-class LLFloaterScriptPreview final : public LLFloaterNameDesc
+class LLFloaterScriptPreview : public LLFloaterNameDesc
 {
 public:
     LLFloaterScriptPreview(const LLSD& filename );
-    virtual BOOL postBuild();
+    bool postBuild() override;
 };
 
 #endif  // LL_LLFLOATERNAMEDESC_H

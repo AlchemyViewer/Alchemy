@@ -29,9 +29,9 @@
 
 #include "llsingleton.h" // for LLSingleton
 
+#include <functional>
 #include <vector>
 #include <string>
-#include <boost/function.hpp>
 #include <boost/signals2.hpp>
 #include "llteleporthistorystorage.h"
 
@@ -44,10 +44,11 @@
 class LLTeleportHistoryItem
 {
 public:
-    LLTeleportHistoryItem() = default;
+    LLTeleportHistoryItem()
+    {}
 
-    LLTeleportHistoryItem(std::string grid, std::string region, std::string title, LLVector3d global_pos, LLVector3 local_pos)
-        : mGrid(std::move(grid)), mRegion(std::move(region)), mTitle(std::move(title)), mGlobalPos(global_pos), mLocalPos(local_pos)
+    LLTeleportHistoryItem(std::string title, LLVector3d global_pos)
+        : mTitle(title), mGlobalPos(global_pos)
     {}
 
     /**
@@ -56,11 +57,8 @@ public:
      */
     const std::string& getTitle() const;
 
-    std::string mGrid;      // grid slurl uri
-    std::string mRegion;    // region name
     std::string mTitle;     // human-readable location title
     std::string mFullTitle; // human-readable location title including coordinates
-    LLVector3   mLocalPos;
     LLVector3d  mGlobalPos; // global position
     LLUUID      mRegionID;  // region ID for getting the region info
 };
@@ -73,7 +71,7 @@ public:
  *
  * @see LLNavigationBar
  */
-class LLTeleportHistory final : public LLSingleton<LLTeleportHistory>
+class LLTeleportHistory: public LLSingleton<LLTeleportHistory>
 {
     LLSINGLETON(LLTeleportHistory);
     ~LLTeleportHistory();
@@ -82,7 +80,7 @@ class LLTeleportHistory final : public LLSingleton<LLTeleportHistory>
 public:
 
     typedef std::vector<LLTeleportHistoryItem>  slurl_list_t;
-    typedef boost::function<void()>             history_callback_t;
+    typedef std::function<void()>               history_callback_t;
     typedef boost::signals2::signal<void()>     history_signal_t;
 
     /**
@@ -101,11 +99,6 @@ public:
      * The item is specified by its index (starting from 0).
      */
     void                    goToItem(int idx);
-
-    void onRegionNameResponse(
-        std::string region_name,
-        LLVector3 local_coords,
-        U64 region_handle, const std::string& url, const LLUUID& snapshot_id, bool teleport);
 
     /**
      * @return history items.

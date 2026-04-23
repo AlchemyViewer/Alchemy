@@ -31,19 +31,30 @@
 #include "llassettype.h"
 #include "llinventorytype.h"
 
+struct IconEntry : public LLDictionaryEntry
+{
+    IconEntry(const std::string& item_name) : LLDictionaryEntry(item_name) {}
+};
+
+class LLIconDictionary : public LLSimpleton<LLIconDictionary>, public LLDictionary<LLInventoryType::EIconName, IconEntry>
+{
+public:
+    LLIconDictionary();
+};
+
 class LLInventoryIcon
 {
 public:
     static const std::string& getIconName(LLAssetType::EType asset_type,
                                           LLInventoryType::EType inventory_type = LLInventoryType::IT_NONE,
                                           U32 misc_flag = 0, // different meanings depending on item type
-                                          BOOL item_is_multi = FALSE);
+                                          bool item_is_multi = false);
     static const std::string& getIconName(LLInventoryType::EIconName idx);
 
     static LLPointer<class LLUIImage> getIcon(LLAssetType::EType asset_type,
                                 LLInventoryType::EType inventory_type = LLInventoryType::IT_NONE,
                                 U32 misc_flag = 0, // different meanings depending on item type
-                                BOOL item_is_multi = FALSE);
+                                bool item_is_multi = false);
     static LLPointer<class LLUIImage> getIcon(LLInventoryType::EIconName idx);
 
 protected:

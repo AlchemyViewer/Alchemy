@@ -35,7 +35,7 @@
 
 class LLGroupIconCtrl;
 
-class LLToastIMPanel final : public LLToastPanel
+class LLToastIMPanel: public LLToastPanel
 {
 public:
     struct Params
@@ -52,8 +52,8 @@ public:
 
     LLToastIMPanel(LLToastIMPanel::Params &p);
     virtual ~LLToastIMPanel();
-    /*virtual*/ BOOL    handleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL    handleToolTip(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask);
 private:
     void showInspector();
 

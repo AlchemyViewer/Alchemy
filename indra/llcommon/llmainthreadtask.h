@@ -43,10 +43,11 @@
  */
 class LLMainThreadTask
 {
-public:
+private:
     // Don't instantiate this class -- use dispatch() instead.
-    LLMainThreadTask() = delete;
+    LLMainThreadTask() {}
 
+public:
     /// dispatch() is the only way to invoke this functionality.
     template <typename CALLABLE>
     static auto dispatch(CALLABLE&& callable) -> decltype(callable())
@@ -78,17 +79,17 @@ private:
             LLEventTimer(0),
             mTask(std::forward<CALLABLE>(callable))
         {}
-        BOOL tick() override
+        bool tick() override
         {
             // run the task on the main thread, will populate the future
             // obtained by get_future()
             mTask();
             // tell LLEventTimer we're done (one shot)
-            return TRUE;
+            return true;
         }
         // Given arbitrary CALLABLE, which might be a lambda, how are we
         // supposed to obtain its signature for std::packaged_task? It seems
-        // redundant to have to add an argument list to engage result_of, then
+        // redundant to have to add an argument list to engage invoke_result_t, then
         // add the argument list again to complete the signature. At least we
         // only support a nullary CALLABLE.
         std::packaged_task<std::invoke_result_t<CALLABLE>()> mTask;

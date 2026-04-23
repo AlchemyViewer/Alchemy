@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -85,7 +86,7 @@ bool RlvActions::getCameraAvatarDistanceLimits(float& nDistMin, float& nDistMax)
         static RlvCachedBehaviourModifier<float> sCamDistMax(RLV_MODIFIER_SETCAM_AVDISTMAX);
 
         nDistMax = (fDistMax) ? sCamDistMax : F32_MAX;
-        nDistMin = (fDistMin) ? sCamDistMin : 0.0;
+        nDistMin = (fDistMin) ? sCamDistMin : 0.f;
         return true;
     }
     return false;
@@ -100,7 +101,7 @@ bool RlvActions::getCameraOriginDistanceLimits(float& nDistMin, float& nDistMax)
         static RlvCachedBehaviourModifier<float> sCamDistMax(RLV_MODIFIER_SETCAM_ORIGINDISTMAX);
 
         nDistMax = (fDistMax) ? sCamDistMax : F32_MAX;
-        nDistMin = (fDistMin) ? sCamDistMin : 0.0;
+        nDistMin = (fDistMin) ? sCamDistMin : 0.f;
         return true;
     }
     return false;
@@ -163,7 +164,7 @@ static bool rlvCheckAvatarIMDistance(const LLUUID& idAvatar, ERlvBehaviourModifi
     {
         LLVector3d posAgent; bool fHasMax = pBhvrModDistMax->hasValue();
         float nMinDist = pBhvrModDistMin->getValue<float>(), nMaxDist = (fHasMax) ? pBhvrModDistMax->getValue<float>() : std::numeric_limits<float>::max();
-        float nDist = (LLWorld::getInstance()->getAvatar(idAvatar, posAgent)) ? llabs(dist_vec_squared(gAgent.getPositionGlobal(), posAgent)) : std::numeric_limits<float>::max();
+        float nDist = (LLWorld::getInstance()->getAvatar(idAvatar, posAgent)) ? F32(llabs(dist_vec_squared(gAgent.getPositionGlobal(), posAgent))) : std::numeric_limits<float>::max();
         return (nMinDist < nMaxDist) && (nMinDist <= nDist) && (nDist <= nMaxDist);
     }
     return false;
@@ -236,13 +237,11 @@ bool RlvActions::canShowName(EShowNamesContext eContext, const LLUUID& idAgent)
         switch (eContext)
         {
             // Show/hide avatar name
-            case SNC_DEFAULT:
             case SNC_COUNT:
+            case SNC_DEFAULT:
             case SNC_TELEPORTOFFER:
             case SNC_TELEPORTREQUEST:
                 return gRlvHandler.isException(RLV_BHVR_SHOWNAMES, idAgent) || (gAgentID == idAgent);
-            default:
-                return false;
         }
     }
     return false;
@@ -364,13 +363,13 @@ bool RlvActions::canTeleportToLocal(const LLVector3d& posGlobal)
     bool fCanTeleport = RlvActions::canStand(idRlvObjExcept);
     if ( (fCanTeleport) && (gRlvHandler.hasBehaviourExcept(RLV_BHVR_SITTP, idRlvObjExcept)) )
     {
-        const F32 nDistSq = (posGlobal - gAgent.getPositionGlobal()).lengthSquared();
+        const F32 nDistSq = F32((posGlobal - gAgent.getPositionGlobal()).lengthSquared());
         const F32 nSitTpDist = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SITTPDIST)->getValue<F32>();
         fCanTeleport = nDistSq < nSitTpDist * nSitTpDist;
     }
     if ( (fCanTeleport) && (gRlvHandler.hasBehaviourExcept(RLV_BHVR_TPLOCAL, idRlvObjExcept)) )
     {
-        const F32 nDistSq = (LLVector2(posGlobal.mdV[0], posGlobal.mdV[1]) - LLVector2(gAgent.getPositionGlobal().mdV[0], gAgent.getPositionGlobal().mdV[1])).lengthSquared();
+        const F32 nDistSq = (LLVector2(F32(posGlobal.mdV[0]), F32(posGlobal.mdV[1])) - LLVector2(F32(gAgent.getPositionGlobal().mdV[0]), F32(gAgent.getPositionGlobal().mdV[1]))).lengthSquared();
         const F32 nTpLocalDist = llmin(RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_TPLOCALDIST)->getValue<float>(), RLV_MODIFIER_TPLOCAL_DEFAULT);
         fCanTeleport = nDistSq < nTpLocalDist * nTpLocalDist;
     }
@@ -386,7 +385,7 @@ bool RlvActions::canTeleportToLocation()
 
 bool RlvActions::isLocalTp(const LLVector3d& posGlobal)
 {
-    const F32 nDistSq = (LLVector2(posGlobal.mdV[0], posGlobal.mdV[1]) - LLVector2(gAgent.getPositionGlobal().mdV[0], gAgent.getPositionGlobal().mdV[1])).lengthSquared();
+    const F32 nDistSq = (LLVector2(F32(posGlobal.mdV[0]), F32(posGlobal.mdV[1])) - LLVector2(F32(gAgent.getPositionGlobal().mdV[0]), F32(gAgent.getPositionGlobal().mdV[1]))).lengthSquared();
     return nDistSq < RLV_MODIFIER_TPLOCAL_DEFAULT * RLV_MODIFIER_TPLOCAL_DEFAULT;
 }
 
@@ -652,7 +651,7 @@ bool RlvActions::canTouch(const LLViewerObject* pObj, const LLVector3& posOffset
 
 bool RlvActions::canStand()
 {
-    // NOTE: return FALSE only if we're @unsit=n restricted and the avie is currently sitting on something and TRUE for everything else
+    // NOTE: return false only if we're @unsit=n restricted and the avie is currently sitting on something and true for everything else
     return (!gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || ((isAgentAvatarValid()) && (!gAgentAvatarp->isSitting()));
 }
 

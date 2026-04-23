@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -26,7 +27,10 @@
 #include "llregionhandle.h"
 #include "llscriptruntimeperms.h"
 #include "llsdserialize.h"
+#include "lluri.h"
 #include "lltrans.h"
+#include "llurlentry.h"
+#include "llurlregistry.h"
 #include "llversioninfo.h"
 #include "llviewerparcelmgr.h"
 #include "llviewermenu.h"
@@ -41,12 +45,9 @@
 #include "rlvhandler.h"
 #include "rlvlocks.h"
 
-#include "llscriptruntimeperms.h"
-#include <boost/algorithm/string/predicate.hpp> // icontains
-#include <boost/algorithm/string/regex.hpp> // regex_replace_all
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/regex.hpp>
 #include <boost/regex.hpp>
-
 
 // ============================================================================
 // Forward declarations
@@ -72,7 +73,7 @@ void RlvNotifications::warnGiveToRLV()
 /*
 void RlvNotifications::onGiveToRLVConfirmation(const LLSD& notification, const LLSD& response)
 {
-    gSavedSettings.setWarning(RLV_SETTING_FIRSTUSE_GIVETORLV, FALSE);
+    gSavedSettings.setWarning(RLV_SETTING_FIRSTUSE_GIVETORLV, false);
 
     S32 idxOption = LLNotification::getSelectedOption(notification, response);
     if ( (0 == idxOption) || (1 == idxOption) )
@@ -146,7 +147,7 @@ void RlvSettings::updateLoginLastLocation()
         if (gSavedPerAccountSettings.get<bool>(RlvSettingNames::LoginLastLocation) != fValue)
         {
             gSavedPerAccountSettings.set<bool>(RlvSettingNames::LoginLastLocation, fValue);
-            gSavedPerAccountSettings.saveToFile(gSavedSettings.getString("PerAccountSettingsFile"), TRUE);
+            gSavedPerAccountSettings.saveToFile(gSavedSettings.getString("PerAccountSettingsFile"), true);
         }
     }
 }
@@ -375,7 +376,7 @@ const std::string& RlvStrings::getAnonym(const std::string& strName)
     const char* pszName = strName.c_str(); U32 nHash = 0;
 
     // Test with 11,264 SL names showed a 3.33% - 3.82% occurance for each so we *should* get a very even spread
-    for (int idx = 0, cnt = strName.length(); idx < cnt; idx++)
+    for (size_t idx = 0, cnt = strName.length(); idx < cnt; idx++)
         nHash += pszName[idx];
 
     return m_Anonyms[nHash % m_Anonyms.size()];
@@ -452,7 +453,7 @@ std::string RlvStrings::getVersion(const LLUUID& idRlvObject, bool fLegacy)
 
 std::string RlvStrings::getVersionAbout()
 {
-    return fmt::format(FMT_STRING("RLV v{:d}.{:d}.{:d} / RLVa v{:d}.{:d}.{:d}.{:d}"),
+    return llformat("RLV v%d.%d.%d / RLVa v%d.%d.%d.%d",
                     RLV_VERSION_MAJOR, RLV_VERSION_MINOR, RLV_VERSION_PATCH, RLVa_VERSION_MAJOR, RLVa_VERSION_MINOR, RLVa_VERSION_PATCH, LLVersionInfo::instance().getBuild());
 }
 
@@ -505,11 +506,10 @@ std::string escape_for_regex(const std::string& str)
 void RlvUtil::filterLocation(std::string& strUTF8Text)
 {
     // Filter any mention of the surrounding region names
+    LLWorld::region_list_t regions = LLWorld::getInstance()->getRegionList();
     const std::string& strHiddenRegion = RlvStrings::getString(RlvStringKeys::Hidden::Region);
-    for (LLViewerRegion* pRegion : LLWorld::getInstance()->getRegionList())
-    {
-        boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex(pRegion->getName()) + "\\b", boost::regex::icase), strHiddenRegion);
-    }
+    for (LLWorld::region_list_t::const_iterator itRegion = regions.begin(); itRegion != regions.end(); ++itRegion)
+        boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex((*itRegion)->getName()) + "\\b", boost::regex::icase), strHiddenRegion);
 
     // Filter any mention of the parcel name
     LLViewerParcelMgr* pParcelMgr = LLViewerParcelMgr::getInstance();
@@ -522,7 +522,7 @@ void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fCl
 {
     uuid_vec_t idAgents;
     LLWorld::getInstance()->getAvatars(&idAgents, NULL);
-    for (int idxAgent = 0, cntAgent = idAgents.size(); idxAgent < cntAgent; idxAgent++)
+    for (size_t idxAgent = 0, cntAgent = idAgents.size(); idxAgent < cntAgent; idxAgent++)
     {
         LLAvatarName avName;
         // NOTE: if we're agressively culling nearby names then ignore exceptions
@@ -551,24 +551,93 @@ void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fCl
             }
         }
     }
+
+    filterMentions(strUTF8Text);
+}
+
+// Checked: 2026-02-09 (RLVa-2.6.2) | Added: RLVa-2.6.2
+void RlvUtil::filterMentions(std::string& strUTF8Text)
+{
+    if (!RlvActions::isRlvEnabled())
+        return;
+    if (RlvActions::canShowName(RlvActions::SNC_DEFAULT))
+        return;
+
+    static const boost::regex mention_regex(APP_HEADER_REGEX
+                                            "/agent/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+                                            "/mention(?=/|\\?|$)",
+                                            boost::regex::perl);
+    boost::sregex_iterator it(strUTF8Text.begin(), strUTF8Text.end(), mention_regex);
+    boost::sregex_iterator end;
+
+    if (it == end)
+        return;
+
+    std::string result;
+    result.reserve(strUTF8Text.size());
+    size_t last_pos = 0;
+
+    for (; it != end; ++it)
+    {
+        const boost::smatch& match = *it;
+        const size_t start = match.position();
+        const size_t length = match.length();
+
+        result.append(strUTF8Text, last_pos, start - last_pos);
+
+        const std::string match_url = match.str();
+        std::string agent_id_str;
+        {
+            LLURI uri(match_url);
+            LLSD path_array = uri.pathArray();
+            if (path_array.size() == 4)
+            {
+                agent_id_str = path_array.get(2).asString();
+            }
+        }
+        const LLUUID agent_id(agent_id_str);
+        const bool can_show =
+            agent_id.notNull() &&
+            (RlvActions::canShowName(RlvActions::SNC_DEFAULT, agent_id));
+
+        if (can_show)
+        {
+            // Preserve the original mention URI for exceptions so URL-aware floaters keep it clickable.
+            result.append(strUTF8Text, start, length);
+        }
+        else
+        {
+            // Remove the URI and replace with anonymized name if names are hidden
+            LLAvatarName av_name;
+            const std::string anonym = (agent_id.notNull() && LLAvatarNameCache::get(agent_id, &av_name))
+                                           ? RlvStrings::getAnonym(av_name)
+                                           : RlvStrings::getAnonym(agent_id_str.empty() ? LLUUID::null.asString() : agent_id_str);
+            result += "@" + anonym;
+        }
+
+        last_pos = start + length;
+    }
+
+    result.append(strUTF8Text, last_pos, std::string::npos);
+    strUTF8Text.swap(result);
 }
 
 // Checked: 2012-08-19 (RLVa-1.4.7)
 void RlvUtil::filterScriptQuestions(S32& nQuestions, LLSD& sdPayload)
 {
     // Check SCRIPT_PERMISSION_ATTACH
-    if ((!gRlvAttachmentLocks.canAttach()) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_ATTACH].permbit & nQuestions))
+    if ( (!gRlvAttachmentLocks.canAttach()) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_ATTACH].permbit & nQuestions) )
     {
         // Notify the user that we blocked it since they're not allowed to wear any new attachments
-        sdPayload["rlv_blocked"] = std::string(RlvStringKeys::Blocked::PermissionAttach);
+        sdPayload["rlv_blocked"] = RlvStringKeys::Blocked::PermissionAttach;
         nQuestions &= ~SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_ATTACH].permbit;
     }
 
     // Check SCRIPT_PERMISSION_TELEPORT
-    if ((gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TELEPORT].permbit & nQuestions))
+    if ( (gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TELEPORT].permbit & nQuestions) )
     {
         // Notify the user that we blocked it since they're not allowed to teleport
-        sdPayload["rlv_blocked"] = std::string(RlvStringKeys::Blocked::PermissionTeleport);
+        sdPayload["rlv_blocked"] = RlvStringKeys::Blocked::PermissionTeleport;
         nQuestions &= ~SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TELEPORT].permbit;
     }
 
@@ -593,7 +662,7 @@ bool RlvUtil::isNearbyAgent(const LLUUID& idAgent)
         std::vector<LLUUID> idAgents;
         LLWorld::getInstance()->getAvatars(&idAgents, NULL);
 
-        for (int idxAgent = 0, cntAgent = idAgents.size(); idxAgent < cntAgent; idxAgent++)
+        for (size_t idxAgent = 0, cntAgent = idAgents.size(); idxAgent < cntAgent; idxAgent++)
             if (idAgents[idxAgent] == idAgent)
                 return true;
     }
@@ -650,7 +719,7 @@ void RlvUtil::sendBusyMessage(const LLUUID& idTo, const std::string& strMsg, con
     std::string strFullName;
     LLAgentUI::buildFullname(strFullName);
 
-    pack_instant_message(gMessageSystem, gAgent.getID(), FALSE, gAgent.getSessionID(), idTo, strFullName,
+    pack_instant_message(gMessageSystem, gAgent.getID(), false, gAgent.getSessionID(), idTo, strFullName,
         strMsg, IM_ONLINE, IM_DO_NOT_DISTURB_AUTO_RESPONSE, idSession);
     gAgent.sendReliableMessage();
 }
@@ -669,7 +738,7 @@ bool RlvUtil::sendChatReply(S32 nChannel, const std::string& strUTF8Text)
     gMessageSystem->nextBlockFast(_PREHASH_ChatData);
     gMessageSystem->addStringFast(_PREHASH_Message, utf8str_truncate(strUTF8Text, MAX_MSG_STR_LEN));
     gMessageSystem->addU8Fast(_PREHASH_Type, CHAT_TYPE_SHOUT);
-    gMessageSystem->addS32("Channel", nChannel);
+    gMessageSystem->addS32Fast(_PREHASH_Channel, nChannel);
     gAgent.sendReliableMessage();
     add(LLStatViewer::CHAT_COUNT, 1);
 
@@ -741,9 +810,9 @@ void rlvMenuToggleVisible()
     bool fTopLevel = rlvGetSetting(RlvSettingNames::TopLevelMenu, true);
     bool fRlvEnabled = rlv_handler_t::isEnabled();
 
-    LLMenuGL* pRLVaMenuMain = gMenuBarView->findChildMenuByName("RLVa Main", FALSE);
-    LLMenuGL* pAdvancedMenu = gMenuBarView->findChildMenuByName("Advanced", FALSE);
-    LLMenuGL* pRLVaMenuEmbed = pAdvancedMenu->findChildMenuByName("RLVa Embedded", FALSE);
+    LLMenuGL* pRLVaMenuMain = gMenuBarView->findChildMenuByName("RLVa Main", false);
+    LLMenuGL* pAdvancedMenu = gMenuBarView->findChildMenuByName("Advanced", false);
+    LLMenuGL* pRLVaMenuEmbed = pAdvancedMenu->findChildMenuByName("RLVa Embedded", false);
 
     gMenuBarView->setItemVisible("RLVa Main", (fRlvEnabled) && (fTopLevel));
     pAdvancedMenu->setItemVisible("RLVa Embedded", (fRlvEnabled) && (!fTopLevel));
@@ -792,16 +861,19 @@ bool rlvMenuEnableIfNot(const LLSD& sdParam)
 // Checked: 2011-05-28 (RLVa-1.4.6) | Modified: RLVa-1.4.0
 bool rlvCanDeleteOrReturn(const LLViewerObject* pObj)
 {
-    // Block if: @rez=n restricted and owned by us or a group *or* @unsit=n restricted and being sat on by us
+    // Block right here if this specific object is edit blocked
+    if (!RlvActions::canEdit(pObj)) return false;
+
+    // Block if: @rez=n or @edit=n restricted and owned/editable by us or a group *or* @unsit=n restricted and being sat on by us
     return
-        ( (!gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || ((!pObj->permYouOwner()) && (!pObj->permGroupOwner())) ) &&
+        ( (!gRlvHandler.hasBehaviour(RLV_BHVR_EDIT) && !gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || ((!pObj->permYouOwner()) && (!pObj->permModify()) && (!pObj->permGroupOwner())) ) &&
         ( (!gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (!isAgentAvatarValid()) || (!pObj->getRootEdit()->isChild(gAgentAvatarp)) );
 }
 
 // Checked: 2011-05-28 (RLVa-1.4.6) | Modified: RLVa-1.4.0
 bool rlvCanDeleteOrReturn()
 {
-    if ( (gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || (gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) )
+    if ( (gRlvHandler.hasBehaviour(RLV_BHVR_EDIT)) || (gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || (gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (gRlvHandler.hasException(RLV_BHVR_EDITOBJ)) )
     {
         struct RlvCanDeleteOrReturn : public LLSelectedObjectFunctor
         {
@@ -936,7 +1008,7 @@ bool RlvPredIsEqualOrLinkedItem::operator()(const LLViewerInventoryItem* pItem) 
 
 // Checked: 2009-11-15 (RLVa-1.1.0c) | Added: RLVa-1.1.0c
 /*
-BOOL rlvEnableSharedWearEnabler(void* pParam)
+bool rlvEnableSharedWearEnabler(void* pParam)
 {
     return false;
     // Visually disable the "Enable Shared Wear" option when at least one attachment is non-detachable

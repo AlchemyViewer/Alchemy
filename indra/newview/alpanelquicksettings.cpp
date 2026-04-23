@@ -57,7 +57,7 @@ ALPanelQuickSettings::~ALPanelQuickSettings()
 }
 
 // virtual
-BOOL ALPanelQuickSettings::postBuild()
+bool ALPanelQuickSettings::postBuild()
 {
     refresh();
 
@@ -99,7 +99,7 @@ void ALPanelQuickSettings::refresh()
 void ALPanelQuickSettings::syncFromPreferenceSetting()
 {
     F32 value = gSavedPerAccountSettings.getF32("AvatarHoverOffsetZ");
-    mHoverSlider->setValue(value, FALSE);
+    mHoverSlider->setValue(value, false);
     mHoverSpinner->setValue(value);
 
     if (isAgentAvatarValid())

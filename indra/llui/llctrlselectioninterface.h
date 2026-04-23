@@ -38,7 +38,7 @@ class LLScrollListItem;
 class LLCtrlSelectionInterface
 {
 public:
-    virtual ~LLCtrlSelectionInterface()  = default;
+    virtual ~LLCtrlSelectionInterface();
 
     enum EOperation
     {
@@ -47,39 +47,39 @@ public:
         OP_DESELECT,
     };
 
-    virtual BOOL    getCanSelect() const = 0;
+    virtual bool    getCanSelect() const = 0;
 
     virtual S32     getItemCount() const = 0;
 
-    virtual BOOL    selectFirstItem() = 0;
-    virtual BOOL    selectNthItem( S32 index ) = 0;
-    virtual BOOL    selectItemRange( S32 first, S32 last ) = 0;
+    virtual bool    selectFirstItem() = 0;
+    virtual bool    selectNthItem( S32 index ) = 0;
+    virtual bool    selectItemRange( S32 first, S32 last ) = 0;
 
     virtual S32     getFirstSelectedIndex() const = 0;
 
     // TomY TODO: Simply cast the UUIDs to LLSDs, using the selectByValue function
-    virtual BOOL    setCurrentByID( const LLUUID& id ) = 0;
+    virtual bool    setCurrentByID( const LLUUID& id ) = 0;
     virtual LLUUID  getCurrentID() const = 0;
 
-            BOOL    selectByValue(const LLSD value);
-            BOOL    deselectByValue(const LLSD value);
-    virtual BOOL    setSelectedByValue(const LLSD& value, BOOL selected) = 0;
+            bool    selectByValue(const LLSD value);
+            bool    deselectByValue(const LLSD value);
+    virtual bool    setSelectedByValue(const LLSD& value, bool selected) = 0;
     virtual LLSD    getSelectedValue() = 0;
 
-    virtual BOOL    isSelected(const LLSD& value) const = 0;
+    virtual bool    isSelected(const LLSD& value) const = 0;
 
-    virtual BOOL    operateOnSelection(EOperation op) = 0;
-    virtual BOOL    operateOnAll(EOperation op) = 0;
+    virtual bool    operateOnSelection(EOperation op) = 0;
+    virtual bool    operateOnAll(EOperation op) = 0;
 };
 
 class LLCtrlListInterface : public LLCtrlSelectionInterface
 {
 public:
-    virtual ~LLCtrlListInterface()  = default;
+    virtual ~LLCtrlListInterface();
 
     virtual void addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM) = 0;
     virtual void clearColumns() = 0;
-    virtual void setColumnLabel(std::string_view column, const std::string& label) = 0;
+    virtual void setColumnLabel(const std::string& column, const std::string& label) = 0;
     // TomY TODO: Document this
     virtual LLScrollListItem* addElement(const LLSD& value, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL) = 0;
 
@@ -88,13 +88,13 @@ public:
     virtual LLScrollListItem* addSimpleElement(const std::string& value, EAddPosition pos, const LLSD& id) = 0;
 
     virtual void clearRows() = 0;
-    virtual void sortByColumn(std::string_view name, BOOL ascending) = 0;
+    virtual void sortByColumn(const std::string& name, bool ascending) = 0;
 };
 
 class LLCtrlScrollInterface
 {
 public:
-    virtual ~LLCtrlScrollInterface() = default;
+    virtual ~LLCtrlScrollInterface();
 
     virtual S32 getScrollPos() const = 0;
     virtual void setScrollPos( S32 pos ) = 0;

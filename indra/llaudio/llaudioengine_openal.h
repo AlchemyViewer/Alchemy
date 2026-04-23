@@ -8,6 +8,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -34,11 +37,13 @@
 #include "lllistener_openal.h"
 #include "llwindgen.h"
 
-class LLAudioEngine_OpenAL final : public LLAudioEngine
+#include <vector>
+
+class LLAudioEngine_OpenAL : public LLAudioEngine
 {
     public:
         LLAudioEngine_OpenAL();
-        virtual ~LLAudioEngine_OpenAL() = default;
+        virtual ~LLAudioEngine_OpenAL();
 
         virtual bool init(void *user_data, const std::string &app_title);
         virtual std::string getDriverName(bool verbose);
@@ -65,6 +70,12 @@ class LLAudioEngine_OpenAL final : public LLAudioEngine
         U32 mWindBufBytes;
         ALuint mWindSource;
         int mNumEmptyWindALBuffers;
+
+        ALCdevice*  mALCDevice  = nullptr;
+        ALCcontext* mALCContext = nullptr;
+
+        std::vector<ALuint> mWindRecycleBuffers;
+        std::vector<ALuint> mWindQueueBuffers;
 
         static const int MAX_NUM_WIND_BUFFERS = 80;
         static const float WIND_BUFFER_SIZE_SEC; // 1/20th sec
@@ -102,7 +113,8 @@ class LLAudioBufferOpenAL : public LLAudioBuffer{
         void cleanup();
         ALuint getBuffer() {return mALBuffer;}
 
-        ALuint mALBuffer;
+        ALuint mALBuffer       = AL_NONE;
+        U16    mBytesPerFrame  = 0; // channels * bits_per_sample / 8
 };
 
 #endif

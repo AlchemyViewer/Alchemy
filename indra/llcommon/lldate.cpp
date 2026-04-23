@@ -44,15 +44,10 @@
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
 
-static const F64 DATE_EPOCH = 0.0;
-
 static const F64 LL_APR_USEC_PER_SEC = 1000000.0;
     // should be APR_USEC_PER_SEC, but that relies on INT64_C which
     // isn't defined in glib under our build set up for some reason
 
-
-LLDate::LLDate() : mSecondsSinceEpoch(DATE_EPOCH)
-{}
 
 LLDate::LLDate(F64SecondsImplicit seconds_since_epoch) :
     mSecondsSinceEpoch(seconds_since_epoch.value())
@@ -72,7 +67,7 @@ std::string LLDate::asString() const
 {
     std::ostringstream stream;
     toStream(stream);
-    return stream.str();
+    return std::move(stream).str();
 }
 
 //@ brief Converts time in seconds since EPOCH
@@ -85,7 +80,16 @@ std::string LLDate::asRFC1123() const
     return toHTTPDateString (std::string ("%A, %d %b %Y %H:%M:%S GMT"));
 }
 
-std::string LLDate::toHTTPDateString (const std::string& fmt) const
+std::string LLDate::toLocalDateString (std::string fmt) const
+{
+    LL_PROFILE_ZONE_SCOPED;
+
+    time_t locSeconds = (time_t) mSecondsSinceEpoch;
+    struct tm * lt = localtime (&locSeconds);
+    return toHTTPDateString(lt, fmt);
+}
+
+std::string LLDate::toHTTPDateString (std::string fmt) const
 {
     LL_PROFILE_ZONE_SCOPED;
 
@@ -94,7 +98,7 @@ std::string LLDate::toHTTPDateString (const std::string& fmt) const
     return toHTTPDateString(gmt, fmt);
 }
 
-std::string LLDate::toHTTPDateString (tm * gmt, const std::string& fmt)
+std::string LLDate::toHTTPDateString (tm * gmt, std::string fmt)
 {
     LL_PROFILE_ZONE_SCOPED;
 
@@ -104,7 +108,7 @@ std::string LLDate::toHTTPDateString (tm * gmt, const std::string& fmt)
     if (this_locale != prev_locale)
     {
         setlocale(LC_TIME, this_locale.c_str());
-        prev_locale = std::move(this_locale);
+        prev_locale = this_locale;
     }
 
     // use strftime() as it appears to be faster than std::time_put
@@ -130,11 +134,7 @@ void LLDate::toStream(std::ostream& s) const
     }
 
     s << std::dec << std::setfill('0');
-#if( LL_WINDOWS || __GNUC__ > 2)
     s << std::right;
-#else
-    s.setf(ios::right);
-#endif
     s        << std::setw(4) << (exp_time.tm_year + 1900)
       << '-' << std::setw(2) << (exp_time.tm_mon + 1)
       << '-' << std::setw(2) << (exp_time.tm_mday)
@@ -183,8 +183,6 @@ bool LLDate::split(S32 *year, S32 *month, S32 *day, S32 *hour, S32 *min, S32 *se
 
 bool LLDate::fromString(const std::string& iso8601_date)
 {
-    if(iso8601_date.empty()) return false;
-
     boost::iostreams::stream<boost::iostreams::array_source> stream(iso8601_date.data(), iso8601_date.size());
     return fromStream(stream);
 }

@@ -32,7 +32,6 @@
 #include "llspellcheck.h"
 #include <hunspell/hunspell.hxx>
 
-
 static const std::string DICT_DIR = "dictionaries";
 static const std::string DICT_FILE_CUSTOM = "user_custom.dic";
 static const std::string DICT_FILE_IGNORE = "user_ignore.dic";
@@ -43,19 +42,13 @@ static const std::string DICT_FILE_USER = "user_dictionaries.xml";
 LLSpellChecker::settings_change_signal_t LLSpellChecker::sSettingsChangeSignal;
 
 LLSpellChecker::LLSpellChecker()
-    : mHunspell(NULL)
 {
+    // Load initial dictionary information
+    refreshDictionaryMap();
 }
 
 LLSpellChecker::~LLSpellChecker()
 {
-    delete mHunspell;
-}
-
-void LLSpellChecker::initSingleton()
-{
-    // Load initial dictionary information
-    refreshDictionaryMap();
 }
 
 bool LLSpellChecker::checkSpelling(const std::string& word) const
@@ -83,7 +76,7 @@ S32 LLSpellChecker::getSuggestions(const std::string& word, std::vector<std::str
 
     suggestions = mHunspell->suggest(word);
 
-    return suggestions.size();
+    return static_cast<S32>(suggestions.size());
 }
 
 const LLSD LLSpellChecker::getDictionaryData(const std::string& dict_language)
@@ -301,8 +294,7 @@ void LLSpellChecker::initHunspell(const std::string& dict_language)
 {
     if (mHunspell)
     {
-        delete mHunspell;
-        mHunspell = NULL;
+        mHunspell.reset();
         mDictLanguage.clear();
         mDictFile.clear();
         mIgnoreList.clear();
@@ -323,11 +315,11 @@ void LLSpellChecker::initHunspell(const std::string& dict_language)
         const std::string filename_dic = dict_entry["name"].asString() + ".dic";
         if ( (gDirUtilp->fileExists(user_path + filename_aff)) && (gDirUtilp->fileExists(user_path + filename_dic)) )
         {
-            mHunspell = new Hunspell((user_path + filename_aff).c_str(), (user_path + filename_dic).c_str());
+            mHunspell = std::make_unique<Hunspell>((user_path + filename_aff).c_str(), (user_path + filename_dic).c_str());
         }
         else if ( (gDirUtilp->fileExists(app_path + filename_aff)) && (gDirUtilp->fileExists(app_path + filename_dic)) )
         {
-            mHunspell = new Hunspell((app_path + filename_aff).c_str(), (app_path + filename_dic).c_str());
+            mHunspell = std::make_unique<Hunspell>((app_path + filename_aff).c_str(), (app_path + filename_dic).c_str());
         }
         if (!mHunspell)
         {
@@ -402,7 +394,7 @@ const std::string LLSpellChecker::getDictionaryUserPath()
 // static
 bool LLSpellChecker::getUseSpellCheck()
 {
-    return LLSpellChecker::instance().mHunspell;
+    return (LLSpellChecker::instanceExists()) && (LLSpellChecker::instance().mHunspell);
 }
 
 bool LLSpellChecker::canRemoveDictionary(const std::string& dict_language)
@@ -437,7 +429,7 @@ void LLSpellChecker::removeDictionary(const std::string& dict_language)
             {
                 LLFile::remove(dict_aff);
             }
-            dict_map.erase(it - dict_map.beginArray());
+            dict_map.erase((LLSD::Integer)(it - dict_map.beginArray()));
             break;
         }
     }

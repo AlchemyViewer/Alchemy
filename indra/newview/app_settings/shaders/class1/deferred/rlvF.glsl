@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2018&license=viewerlgpl$
  * Copyright (c) 2018-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -20,8 +21,6 @@ out vec4 frag_color;
 in vec2 vary_fragcoord;
 
 uniform sampler2D diffuseRect;
-uniform sampler2D depthMap;
-uniform mat4 inv_proj;
 uniform vec2 screen_res;
 
 uniform int  rlvEffectMode;     // ESphereMode

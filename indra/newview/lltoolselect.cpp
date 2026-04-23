@@ -53,27 +53,24 @@
 #include "llfloaterreg.h"
 // [/RLVa:KB]
 
-// Globals
-//extern BOOL gAllowSelectAvatar;
-
-const F32 SELECTION_ROTATION_TRESHOLD = 0.1f;
-const F32 SELECTION_SITTING_ROTATION_TRESHOLD = 3.2f; //radian
+constexpr F32 SELECTION_ROTATION_TRESHOLD = 0.1f;
+constexpr F32 SELECTION_SITTING_ROTATION_TRESHOLD = 3.2f; //radian
 
 LLToolSelect::LLToolSelect( LLToolComposite* composite )
 :   LLTool( std::string("Select"), composite ),
-    mIgnoreGroup( FALSE )
+    mIgnoreGroup( false )
 {
- }
+}
 
 // True if you selected an object.
-BOOL LLToolSelect::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLToolSelect::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     // do immediate pick query
-    BOOL pick_rigged = false; //gSavedSettings.getBOOL("AnimatedObjectsAllowLeftClick");
-    BOOL pick_transparent = gSavedSettings.getBOOL("SelectInvisibleObjects");
-    BOOL pick_reflection_probe = gSavedSettings.getBOOL("SelectReflectionProbes");
+    bool pick_rigged = gSavedSettings.getBOOL("AnimatedObjectsAllowLeftClick");
+    static LLCachedControl<bool> select_invisible_objects(gSavedSettings, "SelectInvisibleObjects");
+    static LLCachedControl<bool> select_reflection_probes(gSavedSettings, "SelectReflectionProbes");
 
-    mPick = gViewerWindow->pickImmediate(x, y, pick_transparent, pick_rigged, FALSE, TRUE, pick_reflection_probe);
+    mPick = gViewerWindow->pickImmediate(x, y, select_invisible_objects, pick_rigged, false, true, select_reflection_probes);
 
     // Pass mousedown to agent
     LLTool::handleMouseDown(x, y, mask);
@@ -81,9 +78,8 @@ BOOL LLToolSelect::handleMouseDown(S32 x, S32 y, MASK mask)
     return mPick.getObject().notNull();
 }
 
-
 // static
-LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pick, BOOL ignore_group, BOOL temp_select, BOOL select_root)
+LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pick, bool ignore_group, bool temp_select, bool select_root)
 {
     LLViewerObject* object = pick.getObject();
     if (select_root)
@@ -129,19 +125,19 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 // [/RLVa:KB]
 
     bool select_copy = gSavedSettings.getBOOL("SelectCopyOnly");
-    BOOL select_owned = gSavedSettings.getBOOL("SelectOwnedOnly");
-    BOOL select_movable = gSavedSettings.getBOOL("SelectMovableOnly");
+    bool select_owned = gSavedSettings.getBOOL("SelectOwnedOnly");
+    bool select_movable = gSavedSettings.getBOOL("SelectMovableOnly");
 
     // *NOTE: These settings must be cleaned up at bottom of function.
     if (temp_select || LLSelectMgr::getInstance()->mAllowSelectAvatar)
     {
-        gSavedSettings.setBOOL("SelectCopyOnly", FALSE);
-        gSavedSettings.setBOOL("SelectOwnedOnly", FALSE);
-        gSavedSettings.setBOOL("SelectMovableOnly", FALSE);
-        LLSelectMgr::getInstance()->setForceSelection(TRUE);
+        gSavedSettings.setBOOL("SelectCopyOnly", false);
+        gSavedSettings.setBOOL("SelectOwnedOnly", false);
+        gSavedSettings.setBOOL("SelectMovableOnly", false);
+        LLSelectMgr::getInstance()->setForceSelection(true);
     }
 
-    BOOL extend_select = (pick.mKeyMask == MASK_SHIFT) || (pick.mKeyMask == MASK_CONTROL);
+    bool extend_select = (pick.mKeyMask == MASK_SHIFT) || (pick.mKeyMask == MASK_CONTROL);
 
     // If no object, check for icon, then just deselect
     if (!object)
@@ -159,7 +155,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
     }
     else
     {
-        BOOL already_selected = object->isSelected();
+        bool already_selected = object->isSelected();
 
         if (already_selected &&
             object->getNumTEs() > 0 &&
@@ -186,7 +182,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
                 }
                 else
                 {
-                    LLSelectMgr::getInstance()->deselectObjectAndFamily(object, TRUE, TRUE);
+                    LLSelectMgr::getInstance()->deselectObjectAndFamily(object, true, true);
                 }
             }
             else
@@ -229,8 +225,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
             LLSelectMgr::getInstance()->setAgentHUDZoom(target_zoom, current_zoom);
         }
 
-        static LLCachedControl<bool> disablePointAt(gSavedSettings, "AlchemyPointAtPrivate", false);
-        if (!disablePointAt && !gAgentCamera.getFocusOnAvatar() &&                                      // if camera not glued to avatar
+        if (!gAgentCamera.getFocusOnAvatar() &&                                     // if camera not glued to avatar
             LLVOAvatar::findAvatarFromAttachment(object) != gAgentAvatarp &&    // and it's not one of your attachments
             object != gAgentAvatarp)                                    // and it's not you
         {
@@ -266,7 +261,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
                 LLSelectNode* select_node = selection->findNode(root_object);
                 if (select_node)
                 {
-                    select_node->setTransient(TRUE);
+                    select_node->setTransient(true);
                 }
 
                 LLViewerObject::const_child_list_t& child_list = root_object->getChildren();
@@ -277,7 +272,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
                     select_node = selection->findNode(child);
                     if (select_node)
                     {
-                        select_node->setTransient(TRUE);
+                        select_node->setTransient(true);
                     }
                 }
 
@@ -291,17 +286,17 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
         gSavedSettings.setBOOL("SelectCopyOnly", select_copy);
         gSavedSettings.setBOOL("SelectOwnedOnly", select_owned);
         gSavedSettings.setBOOL("SelectMovableOnly", select_movable);
-        LLSelectMgr::getInstance()->setForceSelection(FALSE);
+        LLSelectMgr::getInstance()->setForceSelection(false);
     }
 
     return LLSelectMgr::getInstance()->getSelection();
 }
 
-BOOL LLToolSelect::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLToolSelect::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-    mIgnoreGroup = ALControlCache::EditLinkedParts;
+    mIgnoreGroup = gSavedSettings.getBOOL("EditLinkedParts");
 
-    handleObjectSelection(mPick, mIgnoreGroup, FALSE);
+    handleObjectSelection(mPick, mIgnoreGroup, false);
 
     return LLTool::handleMouseUp(x, y, mask);
 }
@@ -310,7 +305,7 @@ void LLToolSelect::handleDeselect()
 {
     if( hasMouseCapture() )
     {
-        setMouseCapture( FALSE );  // Calls onMouseCaptureLost() indirectly
+        setMouseCapture( false );  // Calls onMouseCaptureLost() indirectly
     }
 }
 
@@ -319,7 +314,7 @@ void LLToolSelect::stopEditing()
 {
     if( hasMouseCapture() )
     {
-        setMouseCapture( FALSE );  // Calls onMouseCaptureLost() indirectly
+        setMouseCapture( false );  // Calls onMouseCaptureLost() indirectly
     }
 }
 
@@ -327,10 +322,10 @@ void LLToolSelect::onMouseCaptureLost()
 {
     // Finish drag
 
-    LLSelectMgr::getInstance()->enableSilhouette(TRUE);
+    LLSelectMgr::getInstance()->enableSilhouette(true);
 
     // Clean up drag-specific variables
-    mIgnoreGroup = FALSE;
+    mIgnoreGroup = false;
 }
 
 

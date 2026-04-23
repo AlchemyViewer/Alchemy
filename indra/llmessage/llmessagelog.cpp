@@ -35,7 +35,7 @@ LLMessageLogEntry::LLMessageLogEntry(LLHost from_host, LLHost to_host, U8* data,
 :   mType(TEMPLATE)
 ,   mFromHost(std::move(from_host))
 ,   mToHost(std::move(to_host))
-,   mDataSize(data_size)
+,   mDataSize(narrow(data_size))
 ,   mData(nullptr)
 ,   mHeaders(nullptr)
 ,   mMethod(HTTP_INVALID)
@@ -53,7 +53,7 @@ LLMessageLogEntry::LLMessageLogEntry(EEntryType etype, U8* data, size_t data_siz
                                      std::string content_type, LLCore::HttpHeaders::ptr_t headers,
     EHTTPMethod method, U8 status_code, U64 request_id)
 :   mType(etype)
-,   mDataSize(data_size)
+,   mDataSize(narrow(data_size))
 ,   mData(nullptr)
 ,   mURL(std::move(url))
 ,   mContentType(std::move(content_type))
@@ -167,7 +167,7 @@ void LLMessageLog::log(const LLCore::HttpRequestQueue::opPtr_t& op)
 
     LogPayload payload = std::make_shared<LLMessageLogEntry>(LLMessageLogEntry::HTTP_REQUEST, data, data_size,
         req->mReqURL, req->mReplyConType, req->mReqHeaders, convertEMethodToEHTTPMethod(req->mReqMethod),
-        req->mStatus.getType(), req->mRequestId);
+        (U8)req->mStatus.getType(), req->mRequestId);
     if (sCallback) sCallback(payload);
     sRingBuffer.push_back(std::move(payload));
 }
@@ -189,7 +189,7 @@ void LLMessageLog::log(LLCore::HttpResponse* response)
 
     LogPayload payload = std::make_shared<LLMessageLogEntry>(LLMessageLogEntry::HTTP_RESPONSE, data, data_size,
         response->getRequestURL(), response->getContentType(), response->getHeaders(), HTTP_INVALID,
-        response->getStatus().getType(), response->getRequestId());
+        (U8)response->getStatus().getType(), response->getRequestId());
     if (sCallback) sCallback(payload);
     sRingBuffer.push_back(std::move(payload));
 }

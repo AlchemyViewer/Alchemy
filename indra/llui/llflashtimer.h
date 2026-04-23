@@ -28,13 +28,13 @@
 #define LL_FLASHTIMER_H
 
 #include "lleventtimer.h"
-#include "boost/function.hpp"
+#include <functional>
 
 class LLFlashTimer : public LLEventTimer
 {
 public:
 
-    typedef boost::function<void (bool)> callback_t;
+    typedef std::function<void (bool)> callback_t;
 
     /**
      * Constructor.
@@ -43,16 +43,16 @@ public:
      * @param period - how frequently callback should be called
      * @param cb - callback to be called each tick
      */
-    LLFlashTimer(callback_t cb = NULL, S32 count = 0, F32 period = 0.0);
-    ~LLFlashTimer() = default;
+    LLFlashTimer(callback_t cb = nullptr, S32 count = 0, F32 period = 0.0);
+    ~LLFlashTimer() {};
 
-    /*virtual*/ BOOL tick();
+    /*virtual*/ bool tick();
 
     void startFlashing();
     void stopFlashing();
 
-    bool isFlashingInProgress();
-    bool isCurrentlyHighlighted();
+    bool isFlashingInProgress() const;
+    bool isCurrentlyHighlighted() const;
     /*
      * Use this instead of deleting this object.
      * The next call to tick() will return true and that will destroy this object.

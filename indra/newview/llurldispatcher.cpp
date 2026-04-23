@@ -43,7 +43,6 @@
 #include "llworldmapmessage.h"
 #include "llurldispatcherlistener.h"
 #include "llviewernetwork.h"
-#include "llviewerregion.h"
 
 // library includes
 #include "llnotificationsutil.h"
@@ -161,7 +160,7 @@ bool LLURLDispatcherImpl::dispatchApp(const LLSLURL& slurl,
                                       bool trusted_browser)
 {
     LL_INFOS() << "cmd: " << slurl.getAppCmd() << " path: " << slurl.getAppPath() << " query: " << slurl.getAppQuery() << LL_ENDL;
-    const LLSD& query_map = slurl.getAppQueryMap();
+    const LLSD& query_map = LLURI::queryMap(slurl.getAppQuery());
     bool handled = LLCommandDispatcher::dispatch(
             slurl.getAppCmd(), slurl.getAppPath(), query_map, slurl.getGrid(), web, nav_type, trusted_browser);
 
@@ -192,28 +191,6 @@ bool LLURLDispatcherImpl::dispatchRegion(const LLSLURL& slurl, const std::string
         return true;
     }
 
-    std::string current_grid;
-    auto regionp = gAgent.getRegion();
-    if (regionp)
-    {
-        current_grid = LLGridManager::getInstance()->getGridByProbing(regionp->getHGGrid());
-    }
-    else
-    {
-        current_grid = LLGridManager::getInstance()->getGrid();
-    }
-
-    std::string region_name;
-    const std::string& grid = slurl.getGrid();
-    if (LLGridManager::getInstance()->getGridByProbing(grid) != current_grid)
-    {
-        region_name = llformat("%s:%s", grid.c_str(), slurl.getRegion().c_str());
-    }
-    else
-    {
-        region_name = slurl.getRegion();
-    }
-
     if (!handleGrid(slurl))
     {
         return true;
@@ -239,9 +216,8 @@ void LLURLDispatcherImpl::regionNameCallback(U64 region_handle, const LLSLURL& s
 
 bool LLURLDispatcherImpl::handleGrid(const LLSLURL& slurl)
 {
-    if(LLGridManager::instance().isInSecondlife() &&
-        (LLGridManager::getInstance()->getGrid(slurl.getGrid())
-       != LLGridManager::getInstance()->getGrid()))
+    if (LLGridManager::getInstance()->getGrid(slurl.getGrid())
+        != LLGridManager::getInstance()->getGrid())
     {
         LLSD args;
         args["SLURL"] = slurl.getLocationString();
@@ -330,13 +306,13 @@ public:
         LLVector3 coords(128, 128, 0);
         if (tokens.size() <= 4)
         {
-            coords = LLVector3(tokens[1].asReal(),
-                               tokens[2].asReal(),
-                               tokens[3].asReal());
+            coords = LLVector3((F32)tokens[1].asReal(),
+                               (F32)tokens[2].asReal(),
+                               (F32)tokens[3].asReal());
         }
 
         // Region names may be %20 escaped.
-        std::string region_name = LLURI::unescape(tokens[0].asString());
+        std::string region_name = LLURI::unescape(tokens[0]);
 
         LLSD args;
         args["LOCATION"] = region_name;
@@ -356,9 +332,9 @@ public:
         {
             // region specified, coordinates (if any) are region-local
             LLVector3 local_pos(
-                params.has("x")? params["x"].asReal() : 128,
-                params.has("y")? params["y"].asReal() : 128,
-                params.has("z")? params["z"].asReal() : 0);
+                params.has("x")? (F32)params["x"].asReal() : 128.f,
+                params.has("y")? (F32)params["y"].asReal() : 128.f,
+                params.has("z")? (F32)params["z"].asReal() : 0.f);
             std::string regionname(params["regionname"]);
             std::string destination(LLSLURL(regionname, local_pos).getSLURLString());
             // have to resolve region's global coordinates first

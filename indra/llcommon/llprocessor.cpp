@@ -32,10 +32,9 @@
 
 #include <iomanip>
 //#include <memory>
-#include <tuple>
 
 #if LL_WINDOWS
-#   include "llwin32headerslean.h"
+#   include "llwin32headers.h"
 #   define _interlockedbittestandset _renamed_interlockedbittestandset
 #   define _interlockedbittestandreset _renamed_interlockedbittestandreset
 #   include <intrin.h>
@@ -185,7 +184,7 @@ namespace
         case 0xF: return "Intel Pentium 4";
         case 0x10: return "Intel Itanium 2 (IA-64)";
         }
-        return STRINGIZE("Intel <unknown 0x" << std::hex << composed_family << std::dec << ">");
+        return STRINGIZE("Intel <unknown 0x" << std::hex << composed_family << ">");
     }
 
     std::string amd_CPUFamilyName(int composed_family)
@@ -207,7 +206,7 @@ namespace
         case 0x18: return "AMD Hygon Dhyana";
         case 0x19: return "AMD Zen 3";
         }
-        return STRINGIZE("AMD <unknown 0x" << std::hex << composed_family << std::dec << ">");
+        return STRINGIZE("AMD <unknown 0x" << std::hex << composed_family << ">");
     }
 
     std::string compute_CPUFamilyName(const char* cpu_vendor, int family, int ext_family)
@@ -242,7 +241,7 @@ public:
         mProcessorInfo["config"] = LLSD::emptyMap();
         mProcessorInfo["extension"] = LLSD::emptyMap();
     }
-    virtual ~LLProcessorInfoImpl() = default;
+    virtual ~LLProcessorInfoImpl() {}
 
     F64 getCPUFrequency() const
     {
@@ -307,7 +306,6 @@ public:
         out << "Extended family:  " << getInfo(eExtendedFamily, 0) << std::endl;
         out << "Model:            " << getInfo(eModel, 0) << std::endl;
         out << "Extended model:   " << getInfo(eExtendedModel, 0) << std::endl;
-        out << "Stepping:         " << getInfo(eStepping, 0) << std::endl;
         out << "Type:             " << getInfo(eType, 0) << std::endl;
         out << "Brand ID:         " << getInfo(eBrandID, 0) << std::endl;
         out << std::endl;
@@ -325,9 +323,9 @@ public:
         out << "// CPU Extensions" << std::endl;
         out << "//////////////////////////" << std::endl;
 
-        for(const auto& llsd_pair : mProcessorInfo["extension"].asMap())
+        for(LLSD::map_const_iterator itr = mProcessorInfo["extension"].beginMap(); itr != mProcessorInfo["extension"].endMap(); ++itr)
         {
-            out << "  " << llsd_pair.first << std::endl;
+            out << "  " << itr->first << std::endl;
         }
         return out.str();
     }
@@ -488,60 +486,25 @@ public:
     }
 
 private:
-    typedef std::tuple<int, int, int, int> familyModelTuple;
-    familyModelTuple computeFamilyAndModel(
-        const std::string& vendor,
-        int signature) {
-        int family = (signature >> 8) & 0xf;
-        int model = (signature >> 4) & 0xf;
-        int ext_family = 0;
-        int ext_model = 0;
-        // The "Intel 64 and IA-32 Architectures Developer's Manual: Vol. 2A"
-        // specifies the Extended Model is defined only when the Base Family is
-        // 06h or 0Fh.
-        // The "AMD CPUID Specification" specifies that the Extended Model is
-        // defined only when Base Family is 0Fh.
-        // Both manuals define the display model as
-        // {ExtendedModel[3:0],BaseModel[3:0]} in that case.
-        if (family == 0xf || (family == 0x6 && vendor == "GenuineIntel")) {
-            ext_model = (signature >> 16) & 0xf;
-            model += ext_model << 4;
-        }
-        // Both the "Intel 64 and IA-32 Architectures Developer's Manual: Vol. 2A"
-        // and the "AMD CPUID Specification" specify that the Extended Family is
-        // defined only when the Base Family is 0Fh.
-        // Both manuals define the display family as {0000b,BaseFamily[3:0]} +
-        // ExtendedFamily[7:0] in that case.
-        if (family == 0xf) {
-            ext_family = (signature >> 20) & 0xff;
-            family += ext_family;
-        }
-        return familyModelTuple(family, model, ext_family, ext_model);
-    }
-
     void getCPUIDInfo()
     {
-        //// http://msdn.microsoft.com/en-us/library/hskdteyh(VS.80).aspx
+        // http://msdn.microsoft.com/en-us/library/hskdteyh(VS.80).aspx
 
-        //// __cpuid with an InfoType argument of 0 returns the number of
-        //// valid Ids in cpu_info[0] and the CPU identification string in
-        //// the other three array elements. The CPU identification string is
-        //// not in linear order. The code below arranges the information
-        //// in a human readable form.
-
-        int cpu_info[4] = { -1 };
+        // __cpuid with an InfoType argument of 0 returns the number of
+        // valid Ids in cpu_info[0] and the CPU identification string in
+        // the other three array elements. The CPU identification string is
+        // not in linear order. The code below arranges the information
+        // in a human readable form.
+        int cpu_info[4] = {-1};
         __cpuid(cpu_info, 0);
+        unsigned int ids = (unsigned int)cpu_info[0];
+        setConfig(eMaxID, (S32)ids);
 
-        const int ids = cpu_info[0];
-        setConfig(eMaxID, LLSD::Integer(ids));
-
-        std::swap(cpu_info[2], cpu_info[3]);
-        char cpu_string[sizeof(cpu_info) * 3 + 1];
-        static const size_t kVendorNameSize = 3 * sizeof(cpu_info[1]);
-        static_assert(kVendorNameSize < sizeof(cpu_string), "cpu_string too small");
-        memcpy(cpu_string, &cpu_info[1], kVendorNameSize);
-        cpu_string[kVendorNameSize] = '\0';
-        std::string cpu_vendor(cpu_string);
+        char cpu_vendor[0x20];
+        memset(cpu_vendor, 0, sizeof(cpu_vendor));
+        *((int*)cpu_vendor) = cpu_info[1];
+        *((int*)(cpu_vendor+4)) = cpu_info[3];
+        *((int*)(cpu_vendor+8)) = cpu_info[2];
         setInfo(eVendor, cpu_vendor);
         std::string cmp_vendor(cpu_vendor);
         bool is_amd = false;
@@ -550,110 +513,123 @@ private:
             is_amd = true;
         }
 
-        if (ids > 0)
+        // Get the information associated with each valid Id
+        for(unsigned int i=0; i<=ids; ++i)
         {
-            __cpuid(cpu_info, 1);
-            const int signature = cpu_info[0];
+            __cpuid(cpu_info, i);
 
-            setInfo(eStepping, cpu_info[0] & 0xf);
-            setInfo(eType, (cpu_info[0] >> 12) & 0x3);
-            setInfo(eBrandID, cpu_info[1] & 0xff);
-
-            int family, model, ext_family, ext_model;
-            std::tie(family, model, ext_family, ext_model) = computeFamilyAndModel(cpu_vendor, signature);
-            setInfo(eFamily, family);
-            setInfo(eModel, model);
-            setInfo(eExtendedFamily, ext_family);
-            setInfo(eExtendedModel, ext_model);
-
-            setInfo(eFamilyName, compute_CPUFamilyName(cpu_string, family, ext_family));
-
-            setConfig(eCLFLUSHCacheLineSize, ((cpu_info[1] >> 8) & 0xff) * 8);
-            setConfig(eAPICPhysicalID, (cpu_info[1] >> 24) & 0xff);
-
-            if (cpu_info[2] & 0x1)
+            // Interpret CPU feature information.
+            if  (i == 1)
             {
-                setExtension(cpu_feature_names[eSSE3_Features]);
-            }
+                setInfo(eStepping, cpu_info[0] & 0xf);
+                setInfo(eModel, (cpu_info[0] >> 4) & 0xf);
+                int family = (cpu_info[0] >> 8) & 0xf;
+                setInfo(eFamily, family);
+                setInfo(eType, (cpu_info[0] >> 12) & 0x3);
+                setInfo(eExtendedModel, (cpu_info[0] >> 16) & 0xf);
+                int ext_family = (cpu_info[0] >> 20) & 0xff;
+                setInfo(eExtendedFamily, ext_family);
+                setInfo(eBrandID, cpu_info[1] & 0xff);
 
-            if (cpu_info[2] & 0x8)
-            {
-                    // intel specific SSE3 suplements
-                setExtension(cpu_feature_names[eMONTIOR_MWAIT]);
-            }
+                setInfo(eFamilyName, compute_CPUFamilyName(cpu_vendor, family, ext_family));
 
-            if (cpu_info[2] & 0x10)
-            {
-                setExtension(cpu_feature_names[eCPLDebugStore]);
-            }
+                setConfig(eCLFLUSHCacheLineSize, ((cpu_info[1] >> 8) & 0xff) * 8);
+                setConfig(eAPICPhysicalID, (cpu_info[1] >> 24) & 0xff);
 
-            if (cpu_info[2] & 0x100)
-            {
-                setExtension(cpu_feature_names[eThermalMonitor2]);
-            }
-
-            if (cpu_info[2] & 0x200)
-            {
-                setExtension(cpu_feature_names[eSSE3S_Features]);
-            }
-
-            if (is_amd)
-            {
-                setExtension(cpu_feature_names[eSSE4a_Features]);
-            }
-
-            if (cpu_info[2] & 0x80000)
-            {
-                setExtension(cpu_feature_names[eSSE4_1_Features]);
-            }
-
-            if (cpu_info[2] & 0x100000)
-            {
-                setExtension(cpu_feature_names[eSSE4_2_Features]);
-            }
-
-            int feature_info = cpu_info[3];
-            for (int index = 0, bit = 1; index < eSSE3_Features; ++index, bit <<= 1)
-            {
-                if (feature_info & bit)
+                if(cpu_info[2] & 0x1)
                 {
-                    setExtension(cpu_feature_names[index]);
+                    setExtension(cpu_feature_names[eSSE3_Features]);
+                }
+
+                if(cpu_info[2] & 0x8)
+                {
+                    // intel specific SSE3 suplements
+                    setExtension(cpu_feature_names[eMONTIOR_MWAIT]);
+                }
+
+                if(cpu_info[2] & 0x10)
+                {
+                    setExtension(cpu_feature_names[eCPLDebugStore]);
+                }
+
+                if(cpu_info[2] & 0x100)
+                {
+                    setExtension(cpu_feature_names[eThermalMonitor2]);
+                }
+
+                if (cpu_info[2] & 0x200)
+                {
+                    setExtension(cpu_feature_names[eSSE3S_Features]);
+                }
+
+                if (cpu_info[2] & 0x80000)
+                {
+                    setExtension(cpu_feature_names[eSSE4_1_Features]);
+                }
+
+                if (cpu_info[2] & 0x100000)
+                {
+                    setExtension(cpu_feature_names[eSSE4_2_Features]);
+                }
+
+                unsigned int feature_info = (unsigned int) cpu_info[3];
+                for(unsigned int index = 0, bit = 1; index < eSSE3_Features; ++index, bit <<= 1)
+                {
+                    if(feature_info & bit)
+                    {
+                        setExtension(cpu_feature_names[index]);
+                    }
                 }
             }
         }
 
-        // Get the brand string of the cpu.
+        // Calling __cpuid with 0x80000000 as the InfoType argument
+        // gets the number of valid extended IDs.
         __cpuid(cpu_info, 0x80000000);
-        const int max_parameter = cpu_info[0];
+        unsigned int ext_ids = cpu_info[0];
+        setConfig(eMaxExtID, 0);
 
-        static const int paramStart = 0x80000002;
-        static const int paramEnd = 0x80000004;
-        static const int kParameterSize = paramEnd - paramStart + 1;
-        static_assert(kParameterSize * sizeof(cpu_info) + 1 == sizeof(cpu_string), "cpu_string has wrong size");
-        if (max_parameter >= paramEnd) {
-            size_t i = 0;
-            for (int parameter = paramStart; parameter <= paramEnd;
-                ++parameter) {
-                __cpuid(cpu_info, parameter);
-                memcpy(&cpu_string[i], cpu_info, sizeof(cpu_info));
-                i += sizeof(cpu_info);
-            }
-            cpu_string[i] = '\0';
-            setInfo(eBrandName, std::string(cpu_string));
-        }
+        char cpu_brand_string[0x40];
+        memset(cpu_brand_string, 0, sizeof(cpu_brand_string));
 
-        if (max_parameter >= 0x80000006)
+        // Get the information associated with each extended ID.
+        for(unsigned int i=0x80000000; i<=ext_ids; ++i)
         {
-            __cpuid(cpu_info, 0x80000006);
-            setConfig(eCacheLineSize, cpu_info[2] & 0xff);
-            setConfig(eL2Associativity, (cpu_info[2] >> 12) & 0xf);
-            setConfig(eCacheSizeK, (cpu_info[2] >> 16) & 0xffff);
+            __cpuid(cpu_info, i);
+
+            // Interpret CPU brand string and cache information.
+            if (i == 0x80000001)
+            {
+                if (is_amd)
+                {
+                    setExtension(cpu_feature_names[eSSE4a_Features]);
+                }
+            }
+            else if (i == 0x80000002)
+            {
+                memcpy(cpu_brand_string, cpu_info, sizeof(cpu_info));
+            }
+            else if  (i == 0x80000003)
+                memcpy(cpu_brand_string + 16, cpu_info, sizeof(cpu_info));
+            else if  (i == 0x80000004)
+            {
+                memcpy(cpu_brand_string + 32, cpu_info, sizeof(cpu_info));
+                setInfo(eBrandName, cpu_brand_string);
+            }
+            else if  (i == 0x80000006)
+            {
+                setConfig(eCacheLineSize, cpu_info[2] & 0xff);
+                setConfig(eL2Associativity, (cpu_info[2] >> 12) & 0xf);
+                setConfig(eCacheSizeK, (cpu_info[2] >> 16) & 0xffff);
+            }
         }
     }
 };
 
 #elif LL_DARWIN
 
+#include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/IOKitLib.h>
 #include <mach/machine.h>
 #include <sys/sysctl.h>
 
@@ -664,6 +640,10 @@ public:
     {
         getCPUIDInfo();
         uint64_t frequency = getSysctlInt64("hw.cpufrequency");
+        if (frequency == 0) // fallback to clockrate and tbfrequency
+        {
+            frequency = getSysctlClockrate() * getSysctlInt64("hw.tbfrequency");
+        }
         setInfo(eFrequency, (F64)frequency  / (F64)1000000);
     }
 
@@ -674,7 +654,7 @@ private:
     {
         int result = 0;
         size_t len = sizeof(int);
-        int error = sysctlbyname(name, (void*)&result, &len, NULL, 0);
+        int error = sysctlbyname(name, (void*)&result, &len, nullptr, 0);
         return error == -1 ? 0 : result;
     }
 
@@ -682,7 +662,7 @@ private:
     {
         uint64_t value = 0;
         size_t size = sizeof(value);
-        int result = sysctlbyname(name, (void*)&value, &size, NULL, 0);
+        int result = sysctlbyname(name, (void*)&value, &size, nullptr, 0);
         if ( result == 0 )
         {
             if ( size == sizeof( uint64_t ) )
@@ -702,6 +682,14 @@ private:
         return result == -1 ? 0 : value;
     }
 
+    uint64_t getSysctlClockrate()
+    {
+        struct clockinfo clockrate{};
+        size_t size = sizeof(clockrate);
+        int error = sysctlbyname("kern.clockrate", &clockrate, &size, nullptr, 0);
+        return error == -1 ? 0 : clockrate.hz;
+    }
+
     void getCPUIDInfo()
     {
         size_t len = 0;
@@ -718,7 +706,8 @@ private:
         memset(cpu_vendor, 0, len);
         sysctlbyname("machdep.cpu.vendor", (void*)cpu_vendor, &len, NULL, 0);
         cpu_vendor[0x1f] = 0;
-        setInfo(eVendor, cpu_vendor);
+        // M series CPUs don't provide this field so if empty, just fall back to Apple.
+        setInfo(eVendor, (cpu_vendor[0] != '\0') ? cpu_vendor : "Apple");
 
         setInfo(eStepping, getSysctlInt("machdep.cpu.stepping"));
         setInfo(eModel, getSysctlInt("machdep.cpu.model"));
@@ -750,32 +739,7 @@ private:
             }
         }
 
-        // *NOTE:Mani - I didn't find any docs that assure me that machdep.cpu.feature_bits will always be
-        // The feature bits I think it is. Here's a test:
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-    #if defined(__i386__) && defined(__PIC__)
-            /* %ebx may be the PIC register.  */
-        #define __cpuid(level, a, b, c, d)          \
-        __asm__ ("xchgl\t%%ebx, %1\n\t"         \
-                "cpuid\n\t"                 \
-                "xchgl\t%%ebx, %1\n\t"          \
-                : "=a" (a), "=r" (b), "=c" (c), "=d" (d)    \
-                : "0" (level))
-    #else
-        #define __cpuid(level, a, b, c, d)          \
-        __asm__ ("cpuid\n\t"                    \
-                 : "=a" (a), "=b" (b), "=c" (c), "=d" (d)   \
-                 : "0" (level))
-    #endif
-
-        unsigned int eax, ebx, ecx, edx;
-        __cpuid(0x1, eax, ebx, ecx, edx);
-        if(feature_infos[0] != (S32)edx)
-        {
-            LL_WARNS() << "machdep.cpu.feature_bits doesn't match expected cpuid result!" << LL_ENDL;
-        }
-#endif // LL_RELEASE_FOR_DOWNLOAD
-
+        // @TODO: Audit our usage of machdep.cpu.feature_bits.
 
         uint64_t ext_feature_info = getSysctlInt64("machdep.cpu.extfeature_bits");
         S32 *ext_feature_infos = (S32*)(&ext_feature_info);
@@ -819,6 +783,20 @@ private:
 };
 
 #elif LL_LINUX
+
+// *NOTE:Mani - eww, macros! srry.
+#define LLPI_SET_INFO_STRING(llpi_id, cpuinfo_id) \
+        if (!cpuinfo[cpuinfo_id].empty()) \
+        { setInfo(llpi_id, cpuinfo[cpuinfo_id]);}
+
+#define LLPI_SET_INFO_INT(llpi_id, cpuinfo_id) \
+        {\
+            S32 result; \
+            if (!cpuinfo[cpuinfo_id].empty() \
+                && LLStringUtil::convertToS32(cpuinfo[cpuinfo_id], result)) \
+            { setInfo(llpi_id, result);} \
+        }
+
 const char CPUINFO_FILE[] = "/proc/cpuinfo";
 
 class LLProcessorInfoLinuxImpl : public LLProcessorInfoImpl
@@ -829,13 +807,37 @@ public:
         get_proc_cpuinfo();
     }
 
-    virtual ~LLProcessorInfoLinuxImpl() = default;
+    virtual ~LLProcessorInfoLinuxImpl() {}
+
 private:
+
+    F64 getCPUMaxMHZ()
+    {
+        // Nicky: We just look into cpu0. In theory we could iterate over all cores
+        // "/sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_max_freq"
+        // But those should not fluctuate that much?
+        llifstream fIn{ "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq" };
+
+        if( !fIn.is_open() )
+            return 0.0;
+
+        std::string strLine;
+        fIn >> strLine;
+        if( strLine.empty() )
+            return 0.0l;
+
+        F64 mhz {};
+        if( !LLStringUtil::convertToF64(strLine, mhz ) )
+            return 0.0;
+
+        mhz = mhz / 1000.0;
+        return mhz;
+    }
 
     void get_proc_cpuinfo()
     {
         std::map< std::string, std::string > cpuinfo;
-        LLFILE* cpuinfo_fp = LLFile::fopen(CPUINFO_FILE, "rb");
+        LLFILE* cpuinfo_fp = LLFile::fopen(CPUINFO_FILE, LLFILE_MODE("rb"));
         if(cpuinfo_fp)
         {
             char line[MAX_STRING];
@@ -866,24 +868,17 @@ private:
         }
 # if LL_X86
 
-// *NOTE:Mani - eww, macros! srry.
-#define LLPI_SET_INFO_STRING(llpi_id, cpuinfo_id) \
-        if (!cpuinfo[cpuinfo_id].empty()) \
-        { setInfo(llpi_id, cpuinfo[cpuinfo_id]);}
-
-#define LLPI_SET_INFO_INT(llpi_id, cpuinfo_id) \
-        {\
-            S32 result; \
-            if (!cpuinfo[cpuinfo_id].empty() \
-                && LLStringUtil::convertToS32(cpuinfo[cpuinfo_id], result)) \
-            { setInfo(llpi_id, result);} \
-        }
-
-        F64 mhz;
-        if (LLStringUtil::convertToF64(cpuinfo["cpu mhz"], mhz)
-            && 200.0 < mhz && mhz < 10000.0)
+        F64 mhzFromSys = getCPUMaxMHZ();
+        F64 mhzFromProc {};
+        if( !LLStringUtil::convertToF64(cpuinfo["cpu mhz"], mhzFromProc ) )
+            mhzFromProc = 0.0;
+        if (mhzFromSys > 1.0 && mhzFromSys > mhzFromProc )
         {
-            setInfo(eFrequency,(F64)(mhz));
+            setInfo( eFrequency, mhzFromSys );
+        }
+        else if (  200.0 < mhzFromProc && mhzFromProc < 10000.0)
+        {
+            setInfo(eFrequency,(F64)(mhzFromProc));
         }
 
         LLPI_SET_INFO_STRING(eBrandName, "model name");
@@ -893,7 +888,7 @@ private:
         LLPI_SET_INFO_INT(eModel, "model");
 
 
-        S32 family = 0;
+        S32 family{};
         if (!cpuinfo["cpu family"].empty()
             && LLStringUtil::convertToS32(cpuinfo["cpu family"], family))
         {
@@ -959,7 +954,7 @@ private:
         std::ostringstream s;
 
         // *NOTE:Mani - This is for linux only.
-        LLFILE* cpuinfo = LLFile::fopen(CPUINFO_FILE, "rb");
+        LLFILE* cpuinfo = LLFile::fopen(CPUINFO_FILE, LLFILE_MODE("rb"));
         if(cpuinfo)
         {
             char line[MAX_STRING];
@@ -1006,6 +1001,7 @@ LLProcessorInfo::LLProcessorInfo() : mImpl(NULL)
 }
 
 
+LLProcessorInfo::~LLProcessorInfo() {}
 F64MegahertzImplicit LLProcessorInfo::getCPUFrequency() const { return mImpl->getCPUFrequency(); }
 bool LLProcessorInfo::hasSSE() const { return mImpl->hasSSE(); }
 bool LLProcessorInfo::hasSSE2() const { return mImpl->hasSSE2(); }

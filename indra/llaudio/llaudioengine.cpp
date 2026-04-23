@@ -46,6 +46,7 @@ extern void request_sound(const LLUUID &sound_guid);
 
 LLAudioEngine* gAudiop = NULL;
 
+
 //
 // LLAudioEngine implementation
 //
@@ -56,6 +57,11 @@ LLAudioEngine::LLAudioEngine()
     setDefaults();
 }
 
+
+LLAudioEngine::~LLAudioEngine()
+{
+}
+
 LLStreamingAudioInterface* LLAudioEngine::getStreamingAudioImpl()
 {
     return mStreamingAudioImpl;
@@ -63,7 +69,6 @@ LLStreamingAudioInterface* LLAudioEngine::getStreamingAudioImpl()
 
 void LLAudioEngine::setStreamingAudioImpl(LLStreamingAudioInterface *impl)
 {
-    delete mStreamingAudioImpl;
     mStreamingAudioImpl = impl;
 }
 
@@ -116,10 +121,6 @@ void LLAudioEngine::shutdown()
 {
     // Clean up wind source
     cleanupWind();
-
-    // Clean up streaming audio
-    delete mStreamingAudioImpl;
-    mStreamingAudioImpl = nullptr;
 
     // Clean up audio sources
     for (source_map::value_type& src_pair : mAllSources)
@@ -224,6 +225,7 @@ void LLAudioEngine::updateChannels()
 
 void LLAudioEngine::idle()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     // "Update" all of our audio sources, clean up dead ones.
     // Primarily does position updating, cleanup of unused audio sources.
     // Also does regeneration of the current priority of each audio source.
@@ -717,7 +719,7 @@ void LLAudioEngine::setMaxWindGain(F32 gain)
 }
 
 
-F64 LLAudioEngine::mapWindVecToGain(const LLVector3& wind_vec)
+F64 LLAudioEngine::mapWindVecToGain(LLVector3 wind_vec)
 {
     F64 gain = static_cast<F64>(wind_vec.magVec());
 
@@ -734,7 +736,7 @@ F64 LLAudioEngine::mapWindVecToGain(const LLVector3& wind_vec)
 }
 
 
-F64 LLAudioEngine::mapWindVecToPitch(const LLVector3& wind_vec)
+F64 LLAudioEngine::mapWindVecToPitch(LLVector3 wind_vec)
 {
     LLVector3 listen_right;
     F64 theta;
@@ -758,7 +760,7 @@ F64 LLAudioEngine::mapWindVecToPitch(const LLVector3& wind_vec)
 }
 
 
-F64 LLAudioEngine::mapWindVecToPan(const LLVector3& wind_vec)
+F64 LLAudioEngine::mapWindVecToPan(LLVector3 wind_vec)
 {
     LLVector3 listen_right;
     F64 theta;
@@ -817,12 +819,9 @@ void LLAudioEngine::triggerSound(const SoundData& soundData)
     triggerSound(soundData.audio_uuid, soundData.owner_id, soundData.gain, soundData.type, soundData.pos_global);
 }
 
-void LLAudioEngine::setListenerPos(const LLVector3& aVec)
+void LLAudioEngine::setListenerPos(LLVector3 aVec)
 {
-    if (mListenerp)
-    {
-        mListenerp->setPosition(aVec);
-    }
+    mListenerp->setPosition(aVec);
 }
 
 
@@ -830,48 +829,36 @@ LLVector3 LLAudioEngine::getListenerPos()
 {
     if (mListenerp)
     {
-        return mListenerp->getPosition();
+        return(mListenerp->getPosition());
     }
     else
     {
-        return LLVector3::zero;
+        return(LLVector3::zero);
     }
 }
 
 
-void LLAudioEngine::setListenerVelocity(const LLVector3& aVec)
+void LLAudioEngine::setListenerVelocity(LLVector3 aVec)
 {
-    if (mListenerp)
-    {
-        mListenerp->setVelocity(aVec);
-    }
+    mListenerp->setVelocity(aVec);
 }
 
 
-void LLAudioEngine::translateListener(const LLVector3& aVec)
+void LLAudioEngine::translateListener(LLVector3 aVec)
 {
-    if (mListenerp)
-    {
-        mListenerp->translate(aVec);
-    }
+    mListenerp->translate(aVec);
 }
 
 
-void LLAudioEngine::orientListener(const LLVector3& up, const LLVector3& at)
+void LLAudioEngine::orientListener(LLVector3 up, LLVector3 at)
 {
-    if (mListenerp)
-    {
-        mListenerp->orient(up, at);
-    }
+    mListenerp->orient(up, at);
 }
 
 
-void LLAudioEngine::setListener(const LLVector3& pos, const LLVector3& vel, const LLVector3& up, const LLVector3& at)
+void LLAudioEngine::setListener(LLVector3 pos, LLVector3 vel, LLVector3 up, LLVector3 at)
 {
-    if (mListenerp)
-    {
-        mListenerp->set(pos, vel, up, at);
-    }
+    mListenerp->set(pos,vel,up,at);
 }
 
 
@@ -946,7 +933,7 @@ LLAudioData * LLAudioEngine::getAudioData(const LLUUID &audio_uuid)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     if( isCorruptSound( audio_uuid ) )
-        return 0;
+        return nullptr;
 
     auto iter = mAllData.find(audio_uuid);
     if (iter == mAllData.end())
@@ -1247,7 +1234,7 @@ void LLAudioEngine::assetCallback(const LLUUID &uuid, LLAssetType::EType type, v
             LLAudioDecodeMgr::getInstance()->addDecodeRequest(uuid);
         }
     }
-    gAudiop->mCurrentTransfer.setNull();
+    gAudiop->mCurrentTransfer = LLUUID::null;
     gAudiop->startNextTransfer();
 }
 
@@ -1300,7 +1287,7 @@ void LLAudioEngine::pruneSoundLog()
         {
             auto iter = mSoundHistory.begin();
             auto end = mSoundHistory.end();
-            U64 lowest_time = (*iter).second->mTimeStopped;
+            F64 lowest_time = (*iter).second->mTimeStopped;
             LLUUID lowest_id = (*iter).first;
             for (; iter != end; ++iter)
             {
@@ -1320,7 +1307,7 @@ void LLAudioEngine::pruneSoundLog()
 //
 
 
-LLAudioSource::LLAudioSource(const LLUUID& id, const LLUUID& owner_id, const F32 gain, const S32 type, const LLUUID& source_id, const bool isTrigger)
+LLAudioSource::LLAudioSource(const LLUUID& id, const LLUUID& owner_id, const F32 gain, const S32 type, const LLUUID& source_id, const bool is_trigger)
 :   mID(id),
     mOwnerID(owner_id),
     mPriority(0.f),
@@ -1338,10 +1325,11 @@ LLAudioSource::LLAudioSource(const LLUUID& id, const LLUUID& owner_id, const F32
     mCurrentDatap(NULL),
     mQueuedDatap(NULL),
     mSourceID(source_id),
-    mIsTrigger(isTrigger)
+    mIsTrigger(is_trigger)
 {
     mLogID.generate();
 }
+
 
 LLAudioSource::~LLAudioSource()
 {
@@ -1920,7 +1908,7 @@ bool LLAudioData::load()
     {
         // Hrm.  Right now, let's unset the buffer, since it's empty.
         gAudiop->cleanupBuffer(mBufferp);
-        mBufferp = NULL;
+        mBufferp = nullptr;
 
         if (!gDirUtilp->fileExists(wav_path))
         {
@@ -1938,7 +1926,7 @@ bool LLAudioData::load()
     return true;
 }
 
-const U32 MAX_SOUND_RETRIES = 25;
+const U32 MAX_SOUND_RETRIES = 5;
 
 void LLAudioEngine::markSoundCorrupt(const LLUUID& sound_id)
 {

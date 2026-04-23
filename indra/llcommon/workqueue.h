@@ -14,6 +14,7 @@
 
 #include "llcoros.h"
 #include "llexception.h"
+#include "llhandle.h"
 #include "llinstancetracker.h"
 #include "llinstancetrackersubclass.h"
 #include "threadsafeschedule.h"
@@ -21,6 +22,9 @@
 #include <exception>                // std::current_exception
 #include <functional>               // std::function
 #include <string>
+
+class LLEventPumps;
+
 
 namespace LL
 {
@@ -51,7 +55,9 @@ namespace LL
          * You may omit the WorkQueueBase name, in which case a unique name is
          * synthesized; for practical purposes that makes it anonymous.
          */
-        WorkQueueBase(const std::string& name);
+        WorkQueueBase(const std::string& name, bool auto_shutdown);
+
+        virtual ~WorkQueueBase();
 
         /**
          * Since the point of WorkQueue is to pass work to some other worker
@@ -197,6 +203,11 @@ namespace LL
     private:
         virtual Work pop_() = 0;
         virtual bool tryPop_(Work&) = 0;
+
+        // Name used for the LLApp event listener (empty if not registered)
+        std::string mListenerName;
+        // Due to shutdown order issues, store by handle
+        LLHandle<LLEventPumps> mPumpHandle;
     };
 
 /*****************************************************************************
@@ -212,7 +223,7 @@ namespace LL
          * You may omit the WorkQueue name, in which case a unique name is
          * synthesized; for practical purposes that makes it anonymous.
          */
-        WorkQueue(const std::string& name = std::string(), size_t capacity=1024);
+        WorkQueue(const std::string& name = std::string(), size_t capacity=1024, bool auto_shutdown = true);
 
         /**
          * Since the point of WorkQueue is to pass work to some other worker
@@ -282,7 +293,7 @@ namespace LL
          * You may omit the WorkSchedule name, in which case a unique name is
          * synthesized; for practical purposes that makes it anonymous.
          */
-        WorkSchedule(const std::string& name = std::string(), size_t capacity=1024);
+        WorkSchedule(const std::string& name = std::string(), size_t capacity=1024, bool auto_shutdown = true);
 
         /**
          * Since the point of WorkSchedule is to pass work to some other worker
@@ -525,7 +536,11 @@ namespace LL
                         reply,
                         // Bind the current exception to transport back to the
                         // originating WorkQueue. Once there, rethrow it.
-                        [exc = std::current_exception()](){ std::rethrow_exception(exc); });
+                        [exc = std::current_exception()]()
+                    {
+                        LL_INFOS("LLCoros") << "Rethrowing exception from WorkQueueBase::postTo" << LL_ENDL;
+                        std::rethrow_exception(exc);
+                    });
                 }
             },
             // if caller passed a TimePoint, pass it along to post()

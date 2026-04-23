@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="モデルのアップロード">
-	<string name="status_idle"/>
 	<string name="status_parse_error">
-		エラー：DAEファイルに問題が見つかりました。‐詳細につきましてはログをご確認ください。
+		エラー：DAEファイルに問題が見つかりました。－詳細につきましてはログをご確認ください。
 	</string>
 	<string name="status_bind_shape_orientation">
 		警告：バインドシェイプマトリックスは、標準のＸ軸正方向にはありません。
@@ -76,6 +75,11 @@
 	<string name="tbd">
 		未計算
 	</string>
+	<string name="ModelTextureScaling">
+		このモデル内の１つ以上のテクスチャが、許容画像サイズ内に収まるようにスケーリングされました。
+	</string>
+
+	<!-- Warnings and info from model loader-->
 	<string name="TooManyJoint">
 		ジョイントが多すぎるためスキニングが無効化されました：[MAX]個中[JOINTS]個
 	</string>
@@ -88,6 +92,10 @@
 	<string name="ModelLoaded">
 		[MODEL_NAME]モデルが読み込まれました。
 	</string>
+	<string name="InvBindCountMismatch">
+		バインド行列の数とジョイント数の不一致が検出されました。
+	</string>
+
 	<string name="IncompleteTC">
 		テクスチャの座標データが不完全です。
 	</string>
@@ -113,7 +121,7 @@
 		シーンを解析できませんでした。
 	</string>
 	<string name="ParsingErrorCorrupt">
-		DAEファイルでエラーが見つかりました。‐ファイルが破損しているようです。
+		DAEファイルでエラーが見つかりました。－ファイルが破損しているようです。
 	</string>
 	<string name="ParsingErrorNoController">
 		コントローラーを確認できませんでした。
@@ -130,112 +138,134 @@
 	<string name="ParsingErrorPositionInvalidModel">
 		位置データがないのでメッシュを処理できません。無効なモデルです。
 	</string>
+	<string name="UnknownException">
+		[FILENAME] の処理中にインポーターがクラッシュしました。この問題が発生した場合、ファイルが有効な場合は、Second Lifeサポートに問題を報告してください。例外：[EXCEPTION]
+	</string>
+	<!-- GLTF specific messages -->
+	<string name="NoScenesFound">
+		ＧＬＴＦファイルにシーンが定義されていません。
+	</string>
+	<string name="InvalidMeshReference">
+		ノード「[NODE_NAME]」は無効なメッシュ[MESH_INDEX]を参照しています。（メッシュの合計数：[TOTAL_MESHES]）
+	</string>
+	<string name="InvalidGeometryNonTriangulated">
+		メッシュ「[MESH_NAME]」プリミティブ[PRIMITIVE_INDEX]：[INDEX_COUNT]個のインデックスを持つ無効なジオメトリが検出されました。（三角形にする必要があります）
+	</string>
+	<string name="EmptyVertexArray">
+		メッシュ「[MESH_NAME]」プリミティブ[PRIMITIVE_INDEX]：空の頂点配列
+	</string>
+	<string name="ErrorIndexLimit">
+		頂点数が65,534個に制限されているため、メッシュ「[MESH_NAME]」を処理できません。頂点数：[VERTEX_COUNT]
+	</string>
+	<string name="TextureFound">
+		マテリアル「[MATERIAL_NAME]」のテクスチャが見つかりました：[TEXTURE_NAME]
+	</string>
+	<string name="IgnoredExtension">
+		モデルは、サポートされていない拡張子[EXT]を使用しているため、関連するマテリアルのプロパティは無視されます。
+	</string>
+	<string name="UnsupportedExtension">
+		モデルが読み込めません。サポートされていない拡張子：[EXT]
+	</string>
+	<string name="FailedToCreateTempFile">
+		埋め込まれた[TEXTURE_TYPE]テクスチャ[TEXTURE_INDEX]の一時ファイルの作成に失敗しました：[TEMP_FILE]
+	</string>
+	<string name="SkinJointsOverLimit">
+		スキン[SKIN_INDEX]は、[MAX]箇所中[JOINT_COUNT]箇所の互換ジョイントを定義しています。未使用のジョイントはモデルごとに削除されます。
+	</string>
+	<string name="SkinUsupportedJoints">
+		スキン[SKIN_INDEX]は、[JOINT_COUNT]箇所のジョイントを定義していますが、認識されるのは互換性がある[LEGAL_COUNT]箇所だけです。
+	</string>
+	<string name="SkinUnusedJoints">
+		スキン[SKIN_INDEX]は、[JOINT_COUNT]箇所の互換性のあるジョイントを定義していますが、そのうち[USED_COUNT]箇所のみが使用されています。
+	</string>
+	<string name="ModelTooManyJoints">
+		モデル「[MODEL_NAME]」は、[MAX]箇所中[JOINT_COUNT]箇所のジョイントを使用しています。アップロードに失敗する可能性があります。
+	</string>
+	<string name="ModelSplitPrimitive">
+		プリミティブ「[MODEL_NAME]」は、頂点が多すぎるため[FACE_COUNT]個の面に分割されました。
+	</string>
+	<string name="ModelTooManySubmodels">
+		モデル「[MODEL_NAME]」には、[SUBMODEL_COUNT]箇所の生成されたメッシュパーツが含まれており、パーツは[SUBMODEL_LIMIT]個までトリミングされています。
+	</string>
+	<string name="ParsingErrorMissingBuffer">
+		バッファが見つからないか、空の[BUFFER_NAME]です。
+	</string>
+	<string name="ParsingErrorMissingBufferBin">
+		バッファが見つからないか空です。[BUFFER_URI]ファイルが存在するかどうかを確認してください。
+	</string>
+	<string name="ParsingErrorException">
+		パーサーは、[FILENAME]を処理できませんでした。ファイルが破損しているか、不完全であるか、読み取り保護されている可能性があります。例外：[EXCEPTION]
+	</string>
 	<panel name="left_panel">
 		<panel name="model_name_representation_panel">
 			<text name="name_label">
 				モデル名：
 			</text>
-			<line_editor name="description_form"/>
 		</panel>
 		<tab_container name="import_tab">
-			<last_tab tab_top_image_flash="TabTop_Right_Flashing"/>
 			<!-- for log tab -->
 			<!-- LOD PANEL -->
 			<panel label="ＬｏＤ" name="lod_panel" title="詳細度">
-				<view_border name="lod_tab_border"/>
 				<text name="source" value="ソース"/>
 				<text name="triangles" value="三角形数"/>
 				<text name="vertices" value="頂点数"/>
 				<text name="high_label" value="高"/>
 				<combo_box name="lod_source_high">
-					<item name="Load from file" label="ファイルから読み込む" value="Load from file"/>
-					<item name="MeshOpt Auto" label="自動生成" value="MeshOpt Auto"/>
-					<item name="MeshOptCombine" label="正確な生成" value="MeshOptCombine"/>
-					<item name="MeshOptSloppy" label="簡易生成" value="MeshOptSloppy"/>
+					<item name="Load from file" label="ファイルから読み込む"/>
+					<item name="MeshOpt Auto" label="自動生成"/>
+					<item name="MeshOptCombine" label="正確な生成"/>
+					<item name="MeshOptSloppy" label="簡易生成"/>
 				</combo_box>
-				<line_editor name="lod_file_high" value=""/>
 				<button label="参照…" name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
-					<item label="三角形の限度数" name="Triangle Limit" value="Triangle Limit"/>
-					<item label="エラーのしきい値" name="Error Threshold" value="Error Threshold"/>
+					<item label="三角形の限度数" name="Triangle Limit"/>
+					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
-				<spinner name="lod_triangle_limit_high"/>
-				<spinner name="lod_error_threshold_high"/>
-				<text name="high_triangles"/>
-				<text name="high_vertices"/>
-				<text name="high_status" value=""/>
-				<icon name="status_icon_high"/>
 				<text name="medium_label" value="中"/>
 				<combo_box name="lod_source_medium">
-					<item name="Load from file" label="ファイルから読み込む" value="Load from file"/>
-					<item name="MeshOpt Auto" label="自動生成" value="MeshOpt Auto"/>
-					<item name="MeshOptCombine" label="正確な生成" value="MeshOptCombine"/>
-					<item name="MeshOptSloppy" label="簡易生成" value="MeshOptSloppy"/>
-					<item name="Use LoD above" label="上記のＬｏＤ設定を使用" value="Use LoD above"/>
+					<item name="Load from file" label="ファイルから読み込む"/>
+					<item name="MeshOpt Auto" label="自動生成"/>
+					<item name="MeshOptCombine" label="正確な生成"/>
+					<item name="MeshOptSloppy" label="簡易生成"/>
+					<item name="Use LoD above" label="上記のＬｏＤ設定を使用"/>
 				</combo_box>
-				<line_editor name="lod_file_medium" value=""/>
 				<button label="参照…" name="lod_browse_medium"/>
 				<combo_box name="lod_mode_medium">
-					<item label="三角形の限度数" name="Triangle Limit" value="Triangle Limit"/>
-					<item label="エラーのしきい値" name="Error Threshold" value="Error Threshold"/>
+					<item label="三角形の限度数" name="Triangle Limit"/>
+					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
-				<spinner name="lod_triangle_limit_medium"/>
-				<spinner name="lod_error_threshold_medium"/>
-				<text name="medium_triangles"/>
-				<text name="medium_vertices"/>
-				<text name="medium_status" value=""/>
-				<icon name="status_icon_medium"/>
 				<text name="low_label" value="低"/>
 				<combo_box name="lod_source_low">
-					<item name="Load from file" label="ファイルから読み込む" value="Load from file"/>
-					<item name="MeshOpt Auto" label="自動生成" value="MeshOpt Auto"/>
-					<item name="MeshOptCombine" label="正確な生成" value="MeshOptCombine"/>
-					<item name="MeshOptSloppy" label="簡易生成" value="MeshOptSloppy"/>
-					<item name="Use LoD above" label="上記のＬｏＤ設定を使用" value="Use LoD above"/>
+					<item name="Load from file" label="ファイルから読み込む"/>
+					<item name="MeshOpt Auto" label="自動生成"/>
+					<item name="MeshOptCombine" label="正確な生成"/>
+					<item name="MeshOptSloppy" label="簡易生成"/>
+					<item name="Use LoD above" label="上記のＬｏＤ設定を使用"/>
 				</combo_box>
-				<line_editor name="lod_file_low" value=""/>
 				<button label="参照…" name="lod_browse_low"/>
 				<combo_box name="lod_mode_low">
-					<item label="三角形の限度数" name="Triangle Limit" value="Triangle Limit"/>
-					<item label="エラーのしきい値" name="Error Threshold" value="Error Threshold"/>
+					<item label="三角形の限度数" name="Triangle Limit"/>
+					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
-				<spinner name="lod_triangle_limit_low"/>
-				<spinner name="lod_error_threshold_low"/>
-				<text name="low_triangles"/>
-				<text name="low_vertices"/>
-				<text name="low_status" value=""/>
-				<icon name="status_icon_low"/>
 				<text name="lowest_label" value="最低"/>
 				<combo_box name="lod_source_lowest">
-					<item name="Load from file" label="ファイルから読み込む" value="Load from file"/>
-					<item name="MeshOpt Auto" label="自動生成" value="MeshOpt Auto"/>
-					<item name="MeshOptCombine" label="正確な生成" value="MeshOptCombine"/>
-					<item name="MeshOptSloppy" label="簡易生成" value="MeshOptSloppy"/>
-					<item name="Use LoD above" label="上記のＬｏＤ設定を使用" value="Use LoD above"/>
+					<item name="Load from file" label="ファイルから読み込む"/>
+					<item name="MeshOpt Auto" label="自動生成"/>
+					<item name="MeshOptCombine" label="正確な生成"/>
+					<item name="MeshOptSloppy" label="簡易生成"/>
+					<item name="Use LoD above" label="上記のＬｏＤ設定を使用"/>
 				</combo_box>
-				<line_editor name="lod_file_lowest"/>
 				<button label="参照…" name="lod_browse_lowest"/>
 				<combo_box name="lod_mode_lowest">
-					<item name="Triangle Limit" label="三角形の限度数" value="Triangle Limit"/>
-					<item name="Error Threshold" label="エラーのしきい値" value="Error Threshold"/>
+					<item label="三角形の限度数" name="Triangle Limit"/>
+					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
-				<spinner name="lod_triangle_limit_lowest"/>
-				<spinner name="lod_error_threshold_lowest"/>
-				<text name="lowest_triangles"/>
-				<text name="lowest_vertices"/>
-				<text name="lowest_status"/>
-				<icon name="status_icon_lowest"/>
-				<icon name="lod_status_message_icon"/>
-				<text name="lod_status_message_text"/>
-				<view_border name="lod_tab_border"/>
 				<check_box name="gen_normals" label="法線を生成"/>
 				<text name="crease_label" value="折り目の角度："/>
-				<spinner name="crease_angle"/>
 			</panel>
 			<!-- PHYSYCS PANEL -->
 			<panel label="物理効果" name="physics_panel">
 				<!-- ==== STEP 1: Level of Detail ==== -->
-				<view_border name="physics_tab_border"/>
 				<panel name="physics geometry">
 					<text name="first_step_name">
 						ステップ１：描画詳細度
@@ -263,7 +293,6 @@
 							ファイルから
 						</combo_item>
 					</combo_box>
-					<line_editor name="physics_file"/>
 					<button name="physics_browse" label="参照…"/>
 					<!--
 					<check_box name="physics_optimize" label="最適化"/>
@@ -271,7 +300,6 @@
 					-->
 				</panel>
 				<!-- ==== STEP 2: Analyze ==== -->
-				<view_border name="physics_tab_border1"/>
 				<panel name="physics analysis">
 					<text name="method_label">
 						ステップ２：分析
@@ -290,7 +318,6 @@
 					<button label="キャンセル" name="decompose_cancel"/>
 				</panel>
 				<!-- ==== STEP 3: Simplify ==== -->
-				<view_border name="physics_tab_border2"/>
 				<panel name="physics simplification">
 					<text name="second_step_label">
 						手順３：簡素化
@@ -307,12 +334,10 @@
 					<text name="Retain%_label">
 						維持率：
 					</text>
-					<combo_box name="Combine Quality" value="1"/>
 					<button label="簡素化" name="Simplify"/>
 					<button label="キャンセル" name="simplify_cancel"/>
 				</panel>
 				<!-- ==== Results ==== -->
-				<view_border name="physics_tab_border3"/>
 				<panel name="physics info">
 					<text name="results_text">
 						結果：
@@ -327,38 +352,30 @@
 						凸包数：[HULLS]
 					</text>
 				</panel>
-				<panel name="physics message">
-					<icon name="physics_status_message_icon"/>
-					<text name="physics_status_message_text"/>
-				</panel>
 			</panel>
 			<!-- MODIFIERS PANEL -->
 			<panel label="アップロードオプション" name="modifiers_panel">
 				<text name="scale_label" width="160">
 					スケール（1＝拡大縮小なし）：
 				</text>
-				<spinner name="import_scale" value="1.0"/>
 				<text name="dimensions_label">
 					サイズ：
 				</text>
 				<text name="import_dimensions">
-					[X]×[Y]×[Z]
+					[X]✕[Y]✕[Z]
 				</text>
 				<check_box label="テクスチャを含む" name="upload_textures"/>
 				<text name="pelvis_offset_label">
 					Ｚオフセット（アバターの上下調整）：
 				</text>
-				<spinner name="pelvis_offset" value="0.0"/>
 			</panel>
 			<panel label="オーバーライド" name="rigging_panel" title="リグ">
-				<view_border name="avatar_tab_border"/>
 				<check_box label="スキンのウエイトを含める" name="upload_skin"/>
 				<check_box label="ジョイント位置を含める" name="upload_joints"/>
 				<check_box label="スケールをロック" name="lock_scale_if_joint_position"/>
 				<text name="pelvis_offset_label">
 					Ｚオフセット（アバターの上下調整）：
 				</text>
-				<spinner name="pelvis_offset" value="0.0"/>
 				<text name="skin_too_many_joints">
 					スキンされたジョイントが多すぎます。
 				</text>
@@ -368,7 +385,6 @@
 				<text name="joints_descr">
 					ジョイント数：
 				</text>
-				<scroll_list name="joints_list"/>
 				<text name="conflicts_description" width="230">
 					[JOINTS_COUNT]個のジョイントに[CONFLICTS]箇所の競合があります。
 				</text>
@@ -384,8 +400,6 @@
 			</panel>
 			<!-- Log -->
 			<panel label="ログ" name="logs_panel" title="ログ">
-				<view_border name="log_tab_border"/>
-				<text_editor name="log_text"/>
 				<check_box label="詳細ログを有効にする（非常に遅くなる可能性があります）" name="verbose_logging"/>
 			</panel>
 		</tab_container>
@@ -415,7 +429,6 @@
 				<text>
 					費用の内訳
 				</text>
-				<view_border name="price_breakdown_border"/>
 				<text name="price_breakdown_labels" width="100">
 					ダウンロード：
 物理効果数：
@@ -428,7 +441,7 @@
 [TEXTURES]枚
 [MODEL]個</text>
 			</panel>
-			<!-- 
+			<!--
 			Streaming breakdown numbers are available but not fully understood
 			uncommenting the following sections will display the numbers for debugging purposes
 			<text name="streaming_breakdown_labels">
@@ -447,7 +460,6 @@
 				<text>
 					物理効果コスト
 				</text>
-				<view_border name="price_breakdown_border"/>
 				<text name="physics_breakdown_labels">
 					基準の殻：
 メッシュ：
@@ -498,6 +510,5 @@
 		<text name="physics_explode_label">
 			展開プレビュー：
 		</text>
-		<slider name="physics_explode"/>
 	</panel>
 </floater>

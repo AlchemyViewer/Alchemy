@@ -28,6 +28,7 @@
 #define LL_PROFILEIMAGEPICKER_H
 
 #include "llviewermenufile.h"
+#include "llpanel.h"
 
 enum EProfileImageType
 {
@@ -38,16 +39,13 @@ enum EProfileImageType
 class LLProfileImagePicker final : public LLFilePickerThread
 {
 public:
-    typedef std::function<void(LLUUID const&)> ugly_picker_cb_t;
-
-    LLProfileImagePicker(EProfileImageType type, LLHandle<LLPanel>* handle, ugly_picker_cb_t const& cb);
-    ~LLProfileImagePicker() override;
+    LLProfileImagePicker(EProfileImageType type, LLHandle<LLPanel> handle);
+    ~LLProfileImagePicker() override = default;
     void notify(const std::vector<std::string>& filenames) override;
 
 private:
-    LLHandle<LLPanel>* mHandle;
+    LLHandle<LLPanel> mHandle;
     EProfileImageType mType;
-    ugly_picker_cb_t mCallback;
 };
 
 #endif //  LL_PROFILEIMAGEPICKER_H

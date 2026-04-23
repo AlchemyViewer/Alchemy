@@ -43,14 +43,11 @@
 #include "lltrans.h"
 
 #include "llagent.h"
-#include "llavataractions.h"
 #include "llexpandabletextbox.h"
 #include "llslurl.h"
 #include "lltexturectrl.h"
 #include "llviewerregion.h"
 #include "llhttpconstants.h"
-#include "llworld.h"
-#include "llworldmap.h"
 
 LLPanelPlaceInfo::LLPanelPlaceInfo()
 :   LLPanel(),
@@ -75,7 +72,7 @@ LLPanelPlaceInfo::~LLPanelPlaceInfo()
 }
 
 //virtual
-BOOL LLPanelPlaceInfo::postBuild()
+bool LLPanelPlaceInfo::postBuild()
 {
     mTitle = getChild<LLTextBox>("title");
     mCurrentTitle = mTitle->getText();
@@ -95,7 +92,7 @@ BOOL LLPanelPlaceInfo::postBuild()
     mScrollingPanelMinHeight = mScrollContainer->getScrolledViewRect().getHeight();
     mScrollingPanelWidth = mScrollingPanel->getRect().getWidth();
 
-    return TRUE;
+    return true;
 }
 
 //virtual
@@ -145,35 +142,15 @@ void LLPanelPlaceInfo::sendParcelInfoRequest()
 }
 
 void LLPanelPlaceInfo::displayParcelInfo(const LLUUID& region_id,
-                                         const LLVector3& local_pos,
                                          const LLVector3d& pos_global)
 {
     LLViewerRegion* region = gAgent.getRegion();
     if (!region)
         return;
 
-    if (!local_pos.isNull())
-    {
-        mPosRegion = local_pos;
-    }
-    else
-    {
-        const LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
-        if (siminfo)
-        {
-            mPosRegion = siminfo->getLocalPos(pos_global);
-        }
-        else if (LLViewerRegion* regionp = LLWorld::instance().getRegionFromID(region_id))
-        {
-            mPosRegion = LLVector3(pos_global - regionp->getOriginGlobal());
-        }
-        else
-        {
-            mPosRegion.setVec((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
-                (F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
-                (F32)pos_global.mdV[VZ]);
-        }
-    }
+    mPosRegion.setVec((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
+                      (F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
+                      (F32)pos_global.mdV[VZ]);
 
     LLSD body;
     std::string url = region->getCapability("RemoteParcelRequest");
@@ -217,7 +194,7 @@ void LLPanelPlaceInfo::setErrorStatus(S32 status, const std::string& reason)
     mRegionTitle.clear();
 
     // Enable "Back" button that was disabled when parcel request was sent.
-    getChild<LLButton>("back_btn")->setEnabled(TRUE);
+    getChild<LLButton>("back_btn")->setEnabled(true);
 }
 
 // virtual
@@ -281,11 +258,11 @@ void LLPanelPlaceInfo::processParcelInfo(const LLParcelData& parcel_data)
 }
 
 // virtual
-void LLPanelPlaceInfo::reshape(S32 width, S32 height, BOOL called_from_parent)
+void LLPanelPlaceInfo::reshape(S32 width, S32 height, bool called_from_parent)
 {
 
     // This if was added to force collapsing description textbox on Windows at the beginning of reshape
-    // (the only case when reshape is skipped here is when it's caused by this textbox, so called_from_parent is FALSE)
+    // (the only case when reshape is skipped here is when it's caused by this textbox, so called_from_parent is false)
     // This way it is consistent with Linux where topLost collapses textbox at the beginning of reshape.
     // On windows it collapsed only after reshape which caused EXT-8342.
     if(called_from_parent)
@@ -321,7 +298,11 @@ void LLPanelPlaceInfo::createPick(const LLVector3d& pos_global)
     data.snapshot_id = mSnapshotCtrl->getImageAssetID();
     data.parcel_id = mParcelID;
 
-    LLAvatarActions::createPick(data);
+    LLFloaterProfile* profile_floater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgentID)));
+    if (profile_floater)
+    {
+        profile_floater->createPick(data);
+    }
 }
 
 // static

@@ -45,7 +45,7 @@ class LLColorSwatchCtrl;
 class LLTextureCtrl;
 class LLVOVolume;
 
-class LLPanelVolume final : public LLPanel
+class LLPanelVolume : public LLPanel
 {
 public:
     LLPanelVolume();
@@ -54,7 +54,7 @@ public:
     virtual void    draw();
     virtual void    clearCtrls();
 
-    virtual BOOL    postBuild();
+    virtual bool    postBuild();
 
     void            refresh();
 
@@ -115,7 +115,6 @@ protected:
 
     void            handleResponseChangeToFlexible(const LLSD &pNotification, const LLSD &pResponse);
 
-
     //Animesh
     LLCheckBoxCtrl* mCheckAnimesh = nullptr;
 
@@ -145,9 +144,8 @@ protected:
     LLSpinCtrl*     mSpinForceY   = nullptr;
     LLSpinCtrl*     mSpinForceZ   = nullptr;
 
-    S32         mComboMaterialItemCount;
+    S32             mComboMaterialItemCount;
     LLComboBox*     mComboMaterial = nullptr;
-
 
     LLColor4        mLightSavedColor;
     LLPointer<LLViewerObject> mObject;

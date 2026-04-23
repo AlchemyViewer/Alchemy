@@ -34,7 +34,7 @@
 
 class LLAvatarName;
 
-class LLAvatarIconIDCache final : public LLSingleton<LLAvatarIconIDCache>
+class LLAvatarIconIDCache: public LLSingleton<LLAvatarIconIDCache>
 {
     LLSINGLETON(LLAvatarIconIDCache);
 
@@ -58,7 +58,7 @@ protected:
 
 
     std::string mFilename;
-    boost::unordered_flat_map<LLUUID,LLAvatarIconIDCacheItem> mCache;//we cache only LLUID and time
+    std::map<LLUUID,LLAvatarIconIDCacheItem> mCache;//we cache only LLUID and time
 };
 
 inline
@@ -112,7 +112,7 @@ public:
     virtual ~LLAvatarIconCtrl();
 
 // [SL:KB] - Checked: 2010-11-01 (RLVa-1.2.2a) | Added: RLVa-1.2.2a
-    /*virtual*/ BOOL handleToolTip(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask);
 // [/SL:KB]
 
     virtual void setValue(const LLSD& value);

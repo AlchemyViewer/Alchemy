@@ -52,10 +52,10 @@ boost::signals2::connection LLToggleableMenu::setVisibilityChangeCallback(const 
 }
 
 // virtual
-void LLToggleableMenu::onVisibilityChange (BOOL curVisibilityIn)
+void LLToggleableMenu::onVisibilityChange (bool curVisibilityIn)
 {
     S32 x,y;
-    LLUI::getMousePositionLocal(LLUI::getRootView(), &x, &y);
+    LLUI::getInstance()->getMousePositionLocal(LLUI::getInstance()->getRootView(), &x, &y);
 
     // STORM-1879: also check MouseCapture to see if the button was really
         // clicked (otherwise the VisibilityChange was triggered via keyboard shortcut)
@@ -94,7 +94,7 @@ bool LLToggleableMenu::toggleVisibility()
 
     if (getVisible())
     {
-        setVisible(FALSE);
+        setVisible(false);
         mClosedByButtonClick = false;
         return false;
     }

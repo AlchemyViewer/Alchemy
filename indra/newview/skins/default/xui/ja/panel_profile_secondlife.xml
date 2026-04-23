@@ -22,10 +22,6 @@
 	<string name="BadgePremium" value="プレミアム会員"/>
 	<string name="BadgePremiumPlus" value="プレミアム・プラス会員"/>
 	<layout_stack name="image_stack">
-		<layout_panel name="image_panel">
-			<icon name="2nd_life_pic"/>
-			<loading_indicator name="image_upload_indicator"/>
-		</layout_panel>
 		<layout_panel name="basics_panel">
 			<line_editor name="user_name" value="（読み込んでいます…）"/>
 			<line_editor name="sl_birth_date" value="（読み込んでいます…）"/>
@@ -34,9 +30,7 @@
 		<layout_panel name="partner_layout">
 			<text name="partner_link" value="パートナー：（読み込んでいます…）"/>
 		</layout_panel>
-		<layout_panel name="partner_spacer_layout"/>
 		<layout_panel name="badge_layout">
-			<icon name="badge_icon"/>
 			<text name="badge_text" value="バッチのテスト"/>
 		</layout_panel>
 		<layout_panel name="friend_layout">
@@ -53,18 +47,15 @@
 		<layout_panel name="account_layout">
 			<text name="account_info" value="アカウント：（読み込んでいます…）"/>
 		</layout_panel>
-		<layout_panel name="indicator_stack">
-			<loading_indicator name="progress_indicator"/>
-		</layout_panel>
 		<layout_panel name="settings_panel">
 			<!-- only for self -->
 			<combo_box name="show_in_search" tool_tip="検索結果から、あなたを見つけてもらいましょう。">
-				<combo_box.item name="Hide" label="表示しない" value="0"/>
-				<combo_box.item name="Show" label="表示する" value="1"/>
+				<combo_box.item name="Hide" label="表示しない"/>
+				<combo_box.item name="Show" label="表示する"/>
 			</combo_box>
 			<combo_box name="hide_age" tool_tip="他の人から、あなたのＳＬ年齢をどのように表示するかを決めましょう。">
-				<combo_box.item name="Show" label="ＳＬ誕生日と年齢を表示" value="0"/>
-				<combo_box.item name="Hide" label="月日のみ" value="1"/>
+				<combo_box.item name="Show" label="ＳＬ誕生日と年齢を表示"/>
+				<combo_box.item name="Hide" label="月日のみ"/>
 			</combo_box>
 		</layout_panel>
 		<layout_panel name="menu_panel">
@@ -84,17 +75,12 @@
 			<line_editor name="user_key" value="00000000-0000-0000-0000-000000000000"/>
 			<menu_button name="clipboard_avatar_params" tool_tip="ペースト時のオプション"/>
 		</layout_panel>
-		<layout_panel name="about_panel">
-			<text_editor name="sl_description_edit"/>
-		</layout_panel>
 		<layout_panel name="about_buttons_panel">
 			<button name="save_description_changes" label="保存"/>
 			<button name="discard_description_changes" label="破棄"/>
-			<view_border name="cost_text_border"/>
 		</layout_panel>
 		<layout_panel name="groups_panel">
 			<text name="group_label" value="グループのメンバーシップ"/>
-			<group_list name="group_list"/>
 		</layout_panel>
 	</layout_stack>
 </panel>

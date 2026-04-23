@@ -76,7 +76,9 @@ bool LLEmojiHelper::isCursorInEmojiCode(const LLWString& wtext, S32 cursorPos, S
         shortCodePos--;
     }
 
-    bool isShortCode = (L':' == wtext[shortCodePos - 1]) && (cursorPos - shortCodePos >= 2);
+    bool isShortCode = (cursorPos - shortCodePos >= 2) && (L':' == wtext[shortCodePos - 1]);
+    if(isShortCode && (shortCodePos >= 2) && isdigit(wtext[shortCodePos - 2])) // <TS:3T> Add qualifier to avoid emoji pop-up when typing times.
+        isShortCode = false;
     if (pShortCodePos)
         *pShortCodePos = (isShortCode) ? shortCodePos - 1 : -1;
     return isShortCode;
@@ -97,6 +99,7 @@ void LLEmojiHelper::showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, c
         LLFloater* pHelperFloater = LLFloaterReg::getInstance(DEFAULT_EMOJI_HELPER_FLOATER);
         mHelperHandle = pHelperFloater->getHandle();
         mHelperCommitConn = pHelperFloater->setCommitCallback(std::bind([&](const LLSD& sdValue) { onCommitEmoji(utf8str_to_wstring(sdValue.asStringRef())[0]); }, std::placeholders::_2));
+        mHelperCloseConn = pHelperFloater->setCloseCallback([this](LLUICtrl* ctrl, const LLSD& param) { onCloseHelper(ctrl, param); });
     }
     setHostCtrl(hostctrl_p);
     mEmojiCommitCb = cb;
@@ -114,7 +117,17 @@ void LLEmojiHelper::showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, c
     S32 top = floater_y - HELPER_FLOATER_OFFSET_Y + rect.getHeight();
     rect.setLeftTopAndSize(left, top, rect.getWidth(), rect.getHeight());
     pHelperFloater->setRect(rect);
+
+    // Hack: Trying to open floater, search for a match,
+    // and hide floater immediately if no match found,
+    // instead of checking prior to opening
+    //
+    // Supress sounds in case floater won't be shown.
+    // Todo: add some kind of shouldShow(short_code)
+    U8 sound_flags = pHelperFloater->getSoundFlags();
+    pHelperFloater->setSoundFlags(LLView::SILENT);
     pHelperFloater->openFloater(LLSD().with("hint", short_code));
+    pHelperFloater->setSoundFlags(sound_flags);
 }
 
 void LLEmojiHelper::hideHelper(const LLUICtrl* ctrl_p, bool strict)
@@ -144,6 +157,16 @@ void LLEmojiHelper::onCommitEmoji(llwchar emoji)
     {
         mEmojiCommitCb(emoji);
     }
+}
+
+void LLEmojiHelper::onCloseHelper(LLUICtrl* ctrl, const LLSD& param)
+{
+    mCloseSignal(ctrl, param);
+}
+
+boost::signals2::connection LLEmojiHelper::setCloseCallback(const commit_signal_t::slot_type& cb)
+{
+    return mCloseSignal.connect(cb);
 }
 
 void LLEmojiHelper::setHostCtrl(LLUICtrl* hostctrl_p)

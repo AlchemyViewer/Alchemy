@@ -48,9 +48,10 @@ void LLSculptIDSize::inc(const LLDrawable *pdrawable, int sz)
 
     if (!pdrawable) return;
     LLVOVolume* vvol = pdrawable->getVOVolume();
-    if (!vvol || !vvol->isAttachment()) return;
-    LLVOAvatar* vavatar = vvol->getAvatar();
-    if (!vavatar || vavatar->isSelf()) return;
+    if (!vvol) return;
+    if (!vvol->isAttachment()) return;
+    if (!vvol->getAvatar()) return;
+    if (vvol->getAvatar()->isSelf()) return;
     LLVolume *vol = vvol->getVolume();
     if (!vol) return;
 

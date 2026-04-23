@@ -24,11 +24,11 @@
  * $/LicenseInfo$
  */
 
-#ifndef LL_LLINVENTORY_H
-#define LL_LLINVENTORY_H
+#pragma once
 
 #include "llfoldertype.h"
 #include "llinventorytype.h"
+#include "llinventorydefines.h"
 #include "llpermissions.h"
 #include "llrefcount.h"
 #include "llsaleinfo.h"
@@ -61,7 +61,7 @@ public:
                       const std::string& name);
     void copyObject(const LLInventoryObject* other); // LLRefCount requires custom copy
 protected:
-    virtual ~LLInventoryObject() = default;
+    virtual ~LLInventoryObject();
 
     //--------------------------------------------------------------------
     // Accessors
@@ -71,10 +71,12 @@ public:
     virtual const LLUUID& getLinkedUUID() const; // inventoryID that this item points to, else this item's inventoryID
     const LLUUID& getParentUUID() const;
     virtual const LLUUID& getThumbnailUUID() const;
+    virtual bool getIsFavorite() const;
+    virtual const std::string& getRuntime() const;
     virtual const std::string& getName() const;
     virtual LLAssetType::EType getType() const;
     LLAssetType::EType getActualType() const; // bypasses indirection for linked items
-    BOOL getIsLinkType() const;
+    bool getIsLinkType() const;
     virtual time_t getCreationDate() const;
 
     //--------------------------------------------------------------------
@@ -86,6 +88,8 @@ public:
     virtual void rename(const std::string& new_name);
     void setParent(const LLUUID& new_parent);
     virtual void setThumbnailUUID(const LLUUID& thumbnail_uuid);
+    virtual void setFavorite(bool favorite);
+    virtual void setRuntime(std::string_view runtime);
     void setType(LLAssetType::EType type);
     virtual void setCreationDate(time_t creation_date_utc); // only stored for items
 
@@ -98,11 +102,11 @@ public:
     //   between simulator and viewer.
     //--------------------------------------------------------------------
 
-    virtual BOOL importLegacyStream(std::istream& input_stream);
-    virtual BOOL exportLegacyStream(std::ostream& output_stream, BOOL include_asset_key = TRUE) const;
+    virtual bool importLegacyStream(std::istream& input_stream);
+    virtual bool exportLegacyStream(std::ostream& output_stream, bool include_asset_key = true) const;
 
-    virtual void updateParentOnServer(BOOL) const;
-    virtual void updateServer(BOOL) const;
+    virtual void updateParentOnServer(bool) const;
+    virtual void updateServer(bool) const;
 
     //--------------------------------------------------------------------
     // Member Variables
@@ -111,6 +115,8 @@ protected:
     LLUUID mUUID;
     LLUUID mParentUUID; // Parent category.  Root categories have LLUUID::NULL.
     LLUUID mThumbnailUUID;
+    bool mFavorite;
+    std::string mRuntime;
     LLAssetType::EType mType;
     std::string mName;
     time_t mCreationDate; // seconds from 1/1/1970, UTC
@@ -149,7 +155,7 @@ public:
     virtual void copyItem(const LLInventoryItem* other); // LLRefCount requires custom copy
     void generateUUID() { mUUID.generate(); }
 protected:
-    ~LLInventoryItem() = default; // ref counted
+    ~LLInventoryItem(); // ref counted
 
     //--------------------------------------------------------------------
     // Accessors
@@ -163,6 +169,7 @@ public:
     virtual const std::string& getActualDescription() const; // Does not follow links
     virtual const LLSaleInfo& getSaleInfo() const;
     virtual LLInventoryType::EType getInventoryType() const;
+    virtual U8 getInventorySubType() const { return getFlags() & LLInventoryItemFlags::II_FLAGS_SUBTYPE_MASK; }
     virtual U32 getFlags() const;
     virtual time_t getCreationDate() const;
     virtual U32 getCRC32() const; // really more of a checksum.
@@ -179,6 +186,7 @@ public:
     void setSaleInfo(const LLSaleInfo& sale_info);
     void setPermissions(const LLPermissions& perm);
     void setInventoryType(LLInventoryType::EType inv_type);
+    void setInventorySubType(U8 sub_type)  { setFlags((getFlags() & ~LLInventoryItemFlags::II_FLAGS_SUBTYPE_MASK) | (sub_type & LLInventoryItemFlags::II_FLAGS_SUBTYPE_MASK)); }
     void setFlags(U32 flags);
     void setCreator(const LLUUID& creator); // only used for calling cards
 
@@ -190,17 +198,17 @@ public:
     // Assumes you have already called nextBlock().
     virtual void packMessage(LLMessageSystem* msg) const;
 
-    // Returns TRUE if the inventory item came through the network correctly.
+    // Returns true if the inventory item came through the network correctly.
     // Uses a simple crc check which is defeatable, but we want to detect
     // network mangling somehow.
-    virtual BOOL unpackMessage(LLMessageSystem* msg, const char* block, S32 block_num = 0);
+    virtual bool unpackMessage(LLMessageSystem* msg, const char* block, S32 block_num = 0);
 
     //--------------------------------------------------------------------
     // File Support
     //--------------------------------------------------------------------
 public:
-    virtual BOOL importLegacyStream(std::istream& input_stream);
-    virtual BOOL exportLegacyStream(std::ostream& output_stream, BOOL include_asset_key = TRUE) const;
+    virtual bool importLegacyStream(std::istream& input_stream);
+    virtual bool exportLegacyStream(std::ostream& output_stream, bool include_asset_key = true) const;
 
     //--------------------------------------------------------------------
     // Helper Functions
@@ -244,7 +252,7 @@ public:
     LLInventoryCategory(const LLInventoryCategory* other);
     void copyCategory(const LLInventoryCategory* other); // LLRefCount requires custom copy
 protected:
-    virtual ~LLInventoryCategory() = default;
+    virtual ~LLInventoryCategory();
 
     //--------------------------------------------------------------------
     // Accessors And Mutators
@@ -255,7 +263,6 @@ public:
     LLSD asLLSD() const;
     LLSD asAISCreateCatLLSD() const;
     bool fromLLSD(const LLSD& sd);
-    bool isPreferredTypeRoot() const;
 
     //--------------------------------------------------------------------
     // Messaging
@@ -268,11 +275,12 @@ public:
     // File Support
     //--------------------------------------------------------------------
 public:
-    virtual BOOL importLegacyStream(std::istream& input_stream);
-    virtual BOOL exportLegacyStream(std::ostream& output_stream, BOOL include_asset_key = TRUE) const;
+    virtual bool importLegacyStream(std::istream& input_stream);
+    virtual bool exportLegacyStream(std::ostream& output_stream, bool include_asset_key = true) const;
 
-    LLSD exportLLSD() const;
-    bool importLLSD(const LLSD& cat_data);
+    virtual void exportLLSD(LLSD& sd) const;
+    bool importLLSDMap(const LLSD& cat_data);
+    virtual bool importLLSD(const std::string& label, const LLSD& value);
     //--------------------------------------------------------------------
     // Member Variables
     //--------------------------------------------------------------------
@@ -286,9 +294,8 @@ protected:
 //
 //   These functions convert between structured data and an inventory
 //   item, appropriate for serialization.
+//   Not up to date (no favorites, nor thumbnails), for testing purposes
 //-----------------------------------------------------------------------------
 LLSD ll_create_sd_from_inventory_item(LLPointer<LLInventoryItem> item);
 LLSD ll_create_sd_from_inventory_category(LLPointer<LLInventoryCategory> cat);
 LLPointer<LLInventoryCategory> ll_create_category_from_sd(const LLSD& sd_cat);
-
-#endif // LL_LLINVENTORY_H

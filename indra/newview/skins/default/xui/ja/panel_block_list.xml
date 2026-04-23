@@ -11,7 +11,6 @@
 	<panel name="bottom_panel">
 		<button label="住民をブロック" name="block_resident_btn" tool_tip="ブロックしたい住民をピックします。"/>
 		<button label="オブジェクトをブロック" name="block_object_btn" tool_tip="ブロックしたいオブジェクトを名前で選びます。" width="160"/>
-		<icon name="derenderx_spacer_icon"/>
 		<button label="解除" name="block_trash_btn" tool_tip="選択した項目をブロックリストから削除します。"/>
 	</panel>
 </panel>

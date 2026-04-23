@@ -26,7 +26,7 @@ class LLFloaterMessageRewriter final : public LLFloater
 public:
     LLFloaterMessageRewriter(const LLSD& key);
     ~LLFloaterMessageRewriter() = default;
-    BOOL postBuild() override;
+    bool postBuild() override;
 
 private:
     void onClickSaveRules();

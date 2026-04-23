@@ -1,14 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="floaterland" title="土地情報">
-	<floater.string name="maturity_icon_general">
-		"Parcel_PG_Dark"
-	</floater.string>
-	<floater.string name="maturity_icon_moderate">
-		"Parcel_M_Dark"
-	</floater.string>
-	<floater.string name="maturity_icon_adult">
-		"Parcel_R_Dark"
-	</floater.string>
 	<floater.string name="Hours">
 		[HOURS]時間
 	</floater.string>
@@ -77,7 +68,6 @@
 			<text name="Name:">
 				名前：
 			</text>
-			<line_editor name="Name"/>
 			<text name="Description:">
 				説明：
 			</text>
@@ -272,7 +262,6 @@
 			<text name="Autoreturn">
 				他者のオブジェクトの自動返却（分単位、0で自動返却なし）：
 			</text>
-			<line_editor name="clean other time"/>
 			<text name="Object Owners:" width="130">
 				オブジェクトの所有者：
 			</text>
@@ -320,13 +309,6 @@
 			</panel.string>
 			<text name="allow_label">
 				他の住人への許可設定：
-			</text>
-			<text name="allow_label1">
-				地形の編集：
-			</text>
-			<check_box label="全員" name="edit land check" tool_tip="ここにチェックを入れると、誰でもあなたの土地をテラフォーミングすることができるようになります。自分の土地はいつでも編集できるため、ここはオフのままにしておくことを推奨します。"/>
-			<text name="caution_text">
-				（使用には注意してください！）
 			</text>
 			<text name="allow_label0">
 				飛行：
@@ -382,7 +364,7 @@
 			<text name="Teleport Routing: ">
 				テレポート経路：
 			</text>
-			<combo_box name="landing type" tool_tip="テレポート経路‐あなたの土地へのテレポート経路を選択してください。">
+			<combo_box name="landing type" tool_tip="テレポート経路－あなたの土地へのテレポート経路を選択してください。">
 				<combo_box.item label="不可" name="Blocked"/>
 				<combo_box.item label="ランディング地点のみ" name="LandingPoint"/>
 				<combo_box.item label="どこでも可能" name="Anywhere"/>
@@ -409,11 +391,11 @@
 				このテクスチャを使用するオブジェクトの「再生」をクリックすると、動画やWebページを表示します。テクスチャを変更するにはサムネイルを選択してください。
 			</text>
 			<check_box label="スケールを自動設定" name="media_auto_scale" tool_tip="このオプションをチェックすると、この区画のコンテンツのスケールが自動的に設定されます。動作速度と画質が少し低下することがありますが、他のテクスチャのスケーリングや整列が必要になることはありません。"/>
-			<text name="media_size" tool_tip="レンダリングするWebメディアのサイズです。デフォルトの０のままにします。">
+			<text name="media_size" tool_tip="描画するWebメディアのサイズです。デフォルトの０のままにします。">
 				サイズ：
 			</text>
-			<spinner name="media_size_width" tool_tip="レンダリングするWebメディアのサイズです。デフォルトの０のままにします。"/>
-			<spinner name="media_size_height" tool_tip="レンダリングするWebメディアのサイズです。デフォルトの０のままにします。"/>
+			<spinner name="media_size_width" tool_tip="描画するWebメディアのサイズです。デフォルトの０のままにします。"/>
+			<spinner name="media_size_height" tool_tip="描画するWebメディアのサイズです。デフォルトの０のままにします。"/>
 			<text name="pixels">
 				ピクセル
 			</text>

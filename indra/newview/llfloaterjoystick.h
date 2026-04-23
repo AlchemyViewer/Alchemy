@@ -33,19 +33,18 @@
 class LLCheckBoxCtrl;
 class LLComboBox;
 
-class LLFloaterJoystick final : public LLFloater
+class LLFloaterJoystick : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
 
-    virtual BOOL postBuild();
+    virtual bool postBuild();
     virtual void refresh();
     virtual void apply();   // Apply the changed values.
     virtual void cancel();  // Cancel the changed values.
     virtual void draw();
     static  void setSNDefaults();
-    static  void setXboxDefaults();
 
     static bool addDeviceCallback(std::string &name, LLSD& value, void* userdata);
     void addDevice(std::string &name, LLSD& value);
@@ -65,7 +64,6 @@ private:
 
     static void onCommitJoystickEnabled(LLUICtrl*, void*);
     static void onClickRestoreSNDefaults(void*);
-    static void onClickRestoreXboxDefaults(void*);
     static void onClickCancel(void*);
     static void onClickOK(void*);
 
@@ -97,11 +95,11 @@ private:
     LLComboBox      *mJoysticksCombo;
 
     bool mHasDeviceList;
+    bool mJoystickInitialized;
+    LLUUID mCurrentDeviceId;
 
     // stats view
     LLStatBar* mAxisStatsBar[6];
-
-    LLButton* mAxisButton[16];
 };
 
 #endif

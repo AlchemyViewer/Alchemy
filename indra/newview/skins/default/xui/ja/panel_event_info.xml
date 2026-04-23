@@ -21,40 +21,34 @@
 	<panel.string name="no_reminder">
 		リマインドしない
 	</panel.string>
-	<button name="back_btn"/>
 	<tex name="title" value="イベント情報"/>
 	<scroll_container name="profile_scroll">
 		<panel name="scroll_content_panel">
-			<panel name="snapshot_panel">
-				<texture_picker name="snapshot"/>
-			</panel>
-			<text_editor name="name" value="[name]"/>
+			<text_editor name="name" value="［名前］"/>
 			<text name="event_location_label" value="場所："/>
-			<text_editor name="location" value="[loading...]"/>
+			<text_editor name="location" value="［場所］"/>
 			<text name="content_type_label" value="コンテンツ種別："/>
-			<icon name="content_type_moderate"/>
-			<icon name="content_type_general"/>
-			<text_editor name="content_type" value="[content type]"/>
+			<text_editor name="content_type" value="［コンテンツタイプ］"/>
 			<text name="time_label" value="時間："/>
-			<text_editor name="time" value="[time]"/>
+			<text_editor name="time" value="［時間］"/>
 			<text name="duration_label" value="期間："/>
-			<text_editor name="duration" value="[duration] hours"/>
+			<text_editor name="duration" value="［期間］時間"/>
 			<layout_stack name="descr_stack">
 				<layout_panel name="host_layout_panel">
-					<text name="host_label" value="Host:"/>
+					<text name="host_label" value="ホスト："/>
 					<text_editor name="host" value="secondlife:///app/agent/00000000-0000-0000-0000-000000000000/inspect"/>
 				</layout_panel>
 				<layout_panel name="category_panel">
 					<text name="category_label" value="カテゴリ："/>
-					<text name="category" value="[category]"/>
+					<text name="category" value="［カテゴリ］"/>
 				</layout_panel>
 				<layout_panel name="cover_panel">
 					<text name="cover_label" value="カバー："/>
-					<text name="cover" value="L$[cover]"/>
+					<text name="cover" value="L$［カバー］"/>
 				</layout_panel>
 				<layout_panel name="descr_layout_panel">
 					<text name="desc_label" value="説明："/>
-					<text_editor name="desc" value="[description]"/>
+					<text_editor name="desc" value="［説明］"/>
 				</layout_panel>
 			</layout_stack>
 		</panel>

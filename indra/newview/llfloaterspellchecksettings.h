@@ -29,15 +29,15 @@
 
 #include "llfloater.h"
 
-class LLFloaterSpellCheckerSettings final : public LLFloater
+class LLFloaterSpellCheckerSettings : public LLFloater
 {
 public:
     LLFloaterSpellCheckerSettings(const LLSD& key);
 
-    /*virtual*/ void draw();
-    /*virtual*/ BOOL postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void onClose(bool app_quitting);
+    void draw() override;
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void onClose(bool app_quitting) override;
 
 protected:
     void onBtnImport();
@@ -46,16 +46,15 @@ protected:
     void onSpellCheckSettingsChange();
     void refreshDictionaries(bool from_settings);
 
-private:
-    boost::signals2::connection mSpellcheckCtrlConnection;
+    bool mMainSelectionChanged{ false };
 };
 
-class LLFloaterSpellCheckerImport final : public LLFloater
+class LLFloaterSpellCheckerImport : public LLFloater
 {
 public:
     LLFloaterSpellCheckerImport(const LLSD& key);
 
-    /*virtual*/ BOOL postBuild();
+    bool postBuild() override;
 
 protected:
     void onBtnBrowse();

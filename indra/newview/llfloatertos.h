@@ -30,7 +30,6 @@
 #include "llmodaldialog.h"
 #include "llassetstorage.h"
 #include "llmediactrl.h"
-#include <boost/function.hpp>
 #include "lleventcoro.h"
 #include "llcoros.h"
 
@@ -47,9 +46,9 @@ public:
     LLFloaterTOS(const LLSD& data);
     virtual ~LLFloaterTOS();
 
-    BOOL postBuild();
+    bool postBuild() override;
 
-    virtual void draw();
+    void draw() override;
 
     static void     updateAgree( LLUICtrl *, void* userdata );
     static void     onContinue( void* userdata );
@@ -60,7 +59,7 @@ public:
     void            updateAgreeEnabled(bool enabled);
 
     // inherited from LLViewerMediaObserver
-    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event);
+    void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
 
 private:
     static void testSiteIsAliveCoro(LLHandle<LLFloater> handle, std::string url);
@@ -70,8 +69,6 @@ private:
     bool            mSiteAlive;
     bool            mRealNavigateBegun;
     std::string     mReplyPumpName;
-
-
 };
 
 #endif // LL_LLFLOATERTOS_H

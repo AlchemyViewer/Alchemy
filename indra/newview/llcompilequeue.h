@@ -36,25 +36,6 @@
 #include "llevents.h"
 
 class LLScrollListCtrl;
-class FSLSLPreprocessor;
-
-struct LLScriptQueueData
-{
-    LLUUID mQueueID;
-    LLUUID mTaskId;
-    LLPointer<LLInventoryItem> mItem;
-    LLUUID mExperienceId;
-    std::string mExperiencename;
-
-    LLScriptQueueData(const LLUUID& q_id, const LLUUID& task_id, const LLUUID& experience_id, LLInventoryItem* item) :
-        mQueueID(q_id),
-        mTaskId(task_id),
-        mExperienceId(experience_id),
-        mItem(new LLInventoryItem(item))
-    { }
-
-};
-// </FS:KC>
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLFloaterScriptQueue
@@ -73,15 +54,15 @@ public:
     LLFloaterScriptQueue(const LLSD& key);
     virtual ~LLFloaterScriptQueue();
 
-    /*virtual*/ BOOL postBuild() override;
+    /*virtual*/ bool postBuild() override;
 
-    void setMono(bool mono) { mMono = mono; }
+    void setCompileTarget(std::string target) { mCompileTarget = target; }
 
     // addObject() accepts an object id.
     void addObject(const LLUUID& id, std::string name);
 
-    // start() returns TRUE if the queue has started, otherwise FALSE.
-    BOOL start();
+    // start() returns true if the queue has started, otherwise false.
+    bool start();
 
     void addProcessingMessage(const std::string &message, const LLSD &args);
     void addStringMessage(const std::string &message);
@@ -92,7 +73,7 @@ protected:
     static void onCloseBtn(void* user_data);
 
     // returns true if this is done
-    BOOL isDone() const;
+    bool isDone() const;
 
     virtual bool startQueue() = 0;
 
@@ -100,8 +81,8 @@ protected:
 
 protected:
     // UI
-    LLScrollListCtrl* mMessages;
-    LLButton* mCloseBtn;
+    LLScrollListCtrl* mMessages { nullptr };
+    LLButton* mCloseBtn { nullptr };
 
     // Object Queue
     struct ObjectData
@@ -113,14 +94,13 @@ protected:
 
     object_data_list_t mObjectList;
     LLUUID mCurrentObjectID;
-    bool mDone;
+    bool mDone { false };
 
     std::string mStartString;
-    bool mMono;
+    std::string mCompileTarget { "lsl2" };
 
-    typedef boost::function<bool(const LLPointer<LLViewerObject> &, LLInventoryObject*, LLEventPump &)>   fnQueueAction_t;
+    typedef std::function<bool(const LLPointer<LLViewerObject> &, LLInventoryObject*, LLEventPump &)>   fnQueueAction_t;
     static void objectScriptProcessingQueueCoro(std::string action, LLHandle<LLFloaterScriptQueue> hfloater, object_data_list_t objectList, fnQueueAction_t func);
-
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -143,11 +123,8 @@ class LLFloaterCompileQueue final : public LLFloaterScriptQueue
 public:
 
     void experienceIdsReceived( const LLSD& content );
-    BOOL hasExperience(const LLUUID& id)const;
+    bool hasExperience(const LLUUID& id)const;
 
-    static void finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response, std::string scriptName, LLUUID queueId);
-    static void scriptPreprocComplete(const LLUUID& asset_id, LLScriptQueueData* data, LLAssetType::EType type, const std::string& script_text);
-    static void scriptLogMessage(LLScriptQueueData* data, std::string message);
 protected:
     LLFloaterCompileQueue(const LLSD& key);
     virtual ~LLFloaterCompileQueue();
@@ -164,8 +141,6 @@ private:
     static void processExperienceIdResults(LLSD result, LLUUID parent);
     //uuid_list_t mAssetIds;  // list of asset IDs processed.
     uuid_list_t mExperienceIds;
-
-    std::unique_ptr<FSLSLPreprocessor> mLSLProc;
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -233,7 +208,7 @@ class LLFloaterDeleteQueue final : public LLFloaterScriptQueue
     friend class LLFloaterReg;
 protected:
     LLFloaterDeleteQueue(const LLSD& key);
-    virtual ~LLFloaterDeleteQueue();
+    ~LLFloaterDeleteQueue() override = default;
 
     static bool deleteObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
 

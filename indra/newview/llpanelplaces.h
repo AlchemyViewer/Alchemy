@@ -48,7 +48,6 @@ class LLTabContainer;
 class LLToggleableMenu;
 class LLMenuButton;
 class LLLayoutStack;
-class LLLayoutPanel;
 
 typedef std::pair<LLUUID, std::string>  folder_pair_t;
 
@@ -58,7 +57,7 @@ public:
     LLPanelPlaces();
     virtual ~LLPanelPlaces();
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     /*virtual*/ void onOpen(const LLSD& key);
 
     // Called on parcel selection change to update place information.
@@ -82,6 +81,8 @@ public:
 
     /*virtual*/ S32 notifyParent(const LLSD& info);
 
+    void hideBackBtn();
+
 private:
     void onLandmarkLoaded(LLLandmark* landmark);
     void onFilterEdit(const std::string& search_string, bool force_filter);
@@ -100,11 +101,11 @@ private:
     void onSortingMenuClick();
     void onAddMenuClick();
     void onRemoveButtonClicked();
-    bool handleDragAndDropToTrash(BOOL drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept);
+    bool handleDragAndDropToTrash(bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept);
 
-    void togglePlaceInfoPanel(BOOL visible);
+    void togglePlaceInfoPanel(bool visible);
 
-    /*virtual*/ void onVisibilityChange(BOOL new_visibility);
+    /*virtual*/ void onVisibilityChange(bool new_visibility);
 
     void updateVerbs();
 
@@ -117,10 +118,6 @@ private:
     LLLayoutStack*              mFilterContainer;
     LLPanelPlaceProfile*        mPlaceProfile;
     LLPanelLandmarkInfo*        mLandmarkInfo;
-    LLLayoutPanel*              mOptionLP = nullptr;
-    LLLayoutPanel*              mLayoutPanel2 = nullptr;
-    LLUICtrl*                   mAddBtnPanel = nullptr;
-    LLUICtrl*                   mTrashBtnPanel = nullptr;
 
     LLToggleableMenu*           mPlaceMenu;
     LLToggleableMenu*           mLandmarkMenu;

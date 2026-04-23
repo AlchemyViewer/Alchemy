@@ -27,7 +27,7 @@
 			layout="topleft"
 			name="colortone_settings"
 			can_resize="false">
-			<!--LUT Control-->
+			<!--Color Grading-->
             <check_box
                 follows="left|top"
                 height="15"
@@ -155,7 +155,8 @@
 					name="lut_AST5"
 					value="AESTHETICS_5.png" />
 			</combo_box>
-			<view_border
+            <!--Sharpen Controls--><!--
+            <view_border
 				bevel_style="none"
 				height="0"
 				layout="topleft"
@@ -163,7 +164,6 @@
 				name="cost_text_border"
 				top_pad="6"
 				width="500" />
-			<!--Sharpen Controls-->
 			<text
 				follows="left|top"
 				height="15"
@@ -280,7 +280,7 @@
 				name="cost_text_border"
 				top_pad="7"
 				width="500" />
-			<!--Tonemapper Control-->
+			--><!--Tonemapper Control-->
 			<text
 				follows="left|top"
 				height="15"
@@ -289,11 +289,11 @@
 				width="90"
 				layout="topleft"
 				tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
-				value="Tonemapper:" />
+				value="Tone mapping:" />
 			<combo_box
 				allow_text_entry="false"
 				tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
-				control_name="RenderToneMapType"
+				control_name="AlchemyRenderTonemapType"
 				follows="left|top"
 				height="16"
 				layout="topleft"
@@ -302,22 +302,34 @@
 				name="tonemap_type_combo"
 				top_delta="0"
 				width="90">
-				<combo_box.item
-					label="ACES"
-					name="toneACES"
-					value="1" />
-				<combo_box.item
-					label="Uchimura"
-					name="toneUchimura"
-					value="2" />
-				<combo_box.item
-					label="AMD LPM"
-					name="toneAMD"
-					value="3" />
-				<combo_box.item
-					label="Uncharted"
-					name="toneUncharted"
-					value="4" />
+                <combo_box.item
+                 label="Khronos Neutral"
+                 name="0"
+                 value="0"/>
+                <combo_box.item
+                 label="ACES"
+                 name="1"
+                 value="1"/>
+                <combo_box.item
+                 label="ACES Boosted"
+                 name="2"
+                 value="2"/>
+                <combo_box.item
+                 label="Reinhard"
+                 name="3"
+                 value="3"/>
+                <combo_box.item
+                 label="Filmic"
+                 name="4"
+                 value="4"/>
+                <combo_box.item
+                 label="GT"
+                 name="5"
+                 value="5"/>
+                <combo_box.item
+                 label="AgX"
+                 name="6"
+                 value="6"/>
 			</combo_box>
 			<button
 				name="exposure_default_btn"
@@ -373,7 +385,7 @@
 				name="exposure_spinner"
 				tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
 				control_name="RenderExposure" />
-			<text
+            <!--<text
 				visible="false"
 				name="tonemapper_dynamic_text1"
 				follows="left|top"
@@ -631,7 +643,7 @@
 				min_val="0.0"
 				width="55"
 				increment=".1"
-				name="tonemapper_dynamic_spinner7" />
+				name="tonemapper_dynamic_spinner7" />-->
 		</panel>
 		<!--Rendering Panel-->
 		<panel

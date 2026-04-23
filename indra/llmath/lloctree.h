@@ -31,8 +31,6 @@
 #include "v3math.h"
 #include "llvector4a.h"
 #include <vector>
-#include "fix_macros.h"
-#include <boost/pool/pool.hpp>
 
 #define OCT_ERRS LL_WARNS("OctreeErrors")
 
@@ -74,7 +72,6 @@ template <class T, typename T_PTR>
 class LLOctreeTraveler
 {
 public:
-    virtual ~LLOctreeTraveler() = default;
     virtual void traverse(const LLOctreeNode<T, T_PTR>* node);
     virtual void visit(const LLOctreeNode<T, T_PTR>* branch) = 0;
 };
@@ -398,6 +395,28 @@ public:
                 child->insert(data);
             }
         }
+        else if (parent)
+        {
+            //it's not in here, give it to the root
+            OCT_ERRS << "Octree insertion failed, starting over from root!" << LL_ENDL;
+
+            oct_node* node = this;
+
+            while (parent)
+            {
+                node = parent;
+                parent = node->getOctParent();
+            }
+
+            node->insert(data);
+        }
+        else
+        {
+            // It's not in here, and we are root.
+            // LLOctreeRoot::insert() should have expanded
+            // root by now, something is wrong
+            OCT_ERRS << "Octree insertion failed! Root expansion failed." << LL_ENDL;
+        }
 
         return false;
     }
@@ -434,7 +453,7 @@ public:
 
         S32 i = data->getBinIndex();
 
-        if (i >= 0 && i < getElementCount())
+        if (i >= 0 && i < (S32)getElementCount())
         {
             if (mData[i] == data)
             { //found it
@@ -529,7 +548,7 @@ public:
         }
     }
 
-    void addChild(oct_node* child, BOOL silent = FALSE)
+    void addChild(oct_node* child, bool silent = false)
     {
 #if LL_OCTREE_PARANOIA_CHECK
 
@@ -572,7 +591,7 @@ public:
         }
     }
 
-    void removeChild(S32 index, BOOL destroy = FALSE)
+    void removeChild(S32 index, bool destroy = false)
     {
         for (U32 i = 0; i < this->getListenerCount(); i++)
         {
@@ -619,7 +638,7 @@ public:
         {
             if (getChild(i) == node)
             {
-                removeChild(i, TRUE);
+                removeChild(i, true);
                 return;
             }
         }
@@ -688,7 +707,7 @@ public:
             //(don't notify listeners of addition)
             for (U32 i = 0; i < child->getChildCount(); i++)
             {
-                this->addChild(child->getChild(i), TRUE);
+                this->addChild(child->getChild(i), true);
             }
 
             //destroy child
@@ -704,7 +723,7 @@ public:
     // LLOctreeRoot::insert
     bool insert(T* data) override
     {
-        if (data == NULL)
+        if (data == nullptr)
         {
             OCT_ERRS << "!!! INVALID ELEMENT ADDED TO OCTREE ROOT !!!" << LL_ENDL;
             return false;

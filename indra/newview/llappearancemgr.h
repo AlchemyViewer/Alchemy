@@ -41,7 +41,7 @@ class LLWearableHoldingPattern;
 class LLInventoryCallback;
 class LLOutfitUnLockTimer;
 
-class LLAppearanceMgr final : public LLSingleton<LLAppearanceMgr>
+class LLAppearanceMgr: public LLSingleton<LLAppearanceMgr>
 {
     LLSINGLETON(LLAppearanceMgr);
     ~LLAppearanceMgr();
@@ -57,16 +57,15 @@ public:
                                  nullary_func_t post_update_func = no_op);
     void updateCOF(const LLUUID& category, bool append = false);
 // [RLVa:KB] - Checked: 2010-03-05 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
-    void updateCOF(LLInventoryModel::item_array_t& body_items_new,
-                                LLInventoryModel::item_array_t& wear_items_new,
-                                LLInventoryModel::item_array_t& obj_items_new,
-                                LLInventoryModel::item_array_t& gest_items_new,
-                                bool append=false, const LLUUID& idOutfit=LLUUID::null, LLPointer<LLInventoryCallback> link_waiter = NULL);
+    void updateCOF(LLInventoryModel::item_array_t& body_items_new, LLInventoryModel::item_array_t& wear_items_new,
+                   LLInventoryModel::item_array_t& obj_items_new, LLInventoryModel::item_array_t& gest_items_new,
+                   bool append = false, const LLUUID& idOutfit = LLUUID::null, LLPointer<LLInventoryCallback> link_waiter = NULL);
 // [/RLVa:KB]
     void wearInventoryCategory(LLInventoryCategory* category, bool copy, bool append);
     void wearInventoryCategoryOnAvatar(LLInventoryCategory* category, bool append);
     void wearCategoryFinal(const LLUUID& cat_id, bool copy_items, bool append);
     void wearOutfitByName(const std::string& name);
+    bool wearOutfit(const LLSD& query_map, bool append = false);
     void changeOutfit(bool proceed, const LLUUID& category, bool append);
     void replaceCurrentOutfit(const LLUUID& new_outfit);
     void renameOutfit(const LLUUID& outfit_id);
@@ -94,7 +93,7 @@ public:
                              LLPointer<LLInventoryCallback> cb);
 
     // Return whether this folder contains minimal contents suitable for making a full outfit.
-    BOOL getCanMakeFolderIntoOutfit(const LLUUID& folder_id);
+    bool getCanMakeFolderIntoOutfit(const LLUUID& folder_id);
 
     // Determine whether a given outfit can be removed.
     bool getCanRemoveOutfit(const LLUUID& outfit_cat_id);
@@ -109,7 +108,7 @@ public:
     bool getCanReplaceCOF(const LLUUID& outfit_cat_id);
 
     // Can we add all referenced items to the avatar?
-    bool canAddWearables(const uuid_vec_t& item_ids) const;
+    bool canAddWearables(const uuid_vec_t& item_ids, bool warn_on_type_mismatch = true) const;
 
     // Copy all items in a category.
     void shallowCopyCategoryContents(const LLUUID& src_id, const LLUUID& dst_id,
@@ -157,6 +156,7 @@ public:
     // Attachment link management
     void unregisterAttachment(const LLUUID& item_id);
     void registerAttachment(const LLUUID& item_id);
+    bool getAttachmentInvLinkEnable() const { return mAttachmentInvLinkEnabled; }
     void setAttachmentInvLinkEnable(bool val);
 
     // Add COF link to individual item.
@@ -254,7 +254,7 @@ public:
     void setAppearanceServiceURL(const std::string& url) { mAppearanceServiceURL = url; }
     std::string getAppearanceServiceURL() const;
 
-    typedef boost::function<void ()> attachments_changed_callback_t;
+    typedef std::function<void()>            attachments_changed_callback_t;
     typedef boost::signals2::signal<void ()> attachments_changed_signal_t;
     boost::signals2::connection setAttachmentsChangedCallback(attachments_changed_callback_t cb);
 
@@ -262,17 +262,13 @@ public:
 private:
     void serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter);
 
-// [SL:KB] - Patch: Appearance-Misc
-    void syncCofVersionAndRefreshCoro();
-// [/SL:KB]
-
     static void debugAppearanceUpdateCOF(const LLSD& content);
 
     std::string     mAppearanceServiceURL;
 
 private:
 
-    void filterWearableItems(LLInventoryModel::item_array_t& items, S32 max_per_type, S32 max_total);
+    void filterWearableItems(LLInventoryModel::item_array_t& items, S32 max_per_type, S32 max_total, bool skip_bodyparts = false);
 
     void getDescendentsOfAssetType(const LLUUID& category,
                                           LLInventoryModel::item_array_t& items,
@@ -284,6 +280,7 @@ private:
                                    LLInventoryModel::item_array_t& gest_items);
 
     static void onOutfitRename(const LLSD& notification, const LLSD& response);
+
 
     bool mAttachmentInvLinkEnabled;
     bool mOutfitIsDirty;
@@ -316,7 +313,7 @@ private:
     // Item-specific convenience functions
 public:
     // Is this in the COF?
-    BOOL getIsInCOF(const LLUUID& obj_id) const;
+    bool getIsInCOF(const LLUUID& obj_id) const;
     bool getIsInCOF(const LLInventoryObject* obj) const;
     // Is this in the COF and can the user delete it from the COF?
     bool getIsProtectedCOFItem(const LLUUID& obj_id) const;

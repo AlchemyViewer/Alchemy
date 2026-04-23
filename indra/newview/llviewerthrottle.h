@@ -58,17 +58,20 @@ class LLViewerThrottle
 public:
     LLViewerThrottle();
 
-    void setMaxBandwidth(F32 kbits_per_second, BOOL from_event = FALSE);
+    void setMaxBandwidth(F32 kbits_per_second, bool from_event = false);
 
     void load();
     void save() const;
     void sendToSim() const;
 
+    static F32 getMaxBandwidthKbps();
     F32 getMaxBandwidth()const          { return mMaxBandwidth; }
     F32 getCurrentBandwidth() const     { return mCurrentBandwidth; }
 
     void updateDynamicThrottle();
     void resetDynamicThrottle();
+
+    void setBufferLoadRate(F32 rate) { mBufferLoadRate = llmax(mBufferLoadRate, rate); }
 
     LLViewerThrottleGroup getThrottleGroup(const F32 bandwidth_kbps);
 
@@ -76,6 +79,7 @@ public:
 protected:
     F32 mMaxBandwidth;
     F32 mCurrentBandwidth;
+    F32 mBufferLoadRate = 0;
 
     LLViewerThrottleGroup mCurrent;
 

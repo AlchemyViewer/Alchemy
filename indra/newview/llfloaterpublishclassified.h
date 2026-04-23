@@ -36,7 +36,7 @@ public:
     LLFloaterPublishClassified(const LLSD& key);
     ~LLFloaterPublishClassified() override = default;
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void setPrice(S32 price);
     S32 getPrice();

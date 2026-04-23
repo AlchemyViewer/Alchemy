@@ -3,8 +3,9 @@
 <floater
   positioning="cascading"
   default_tab_group="1"
+  legacy_header_height="18"
   can_resize="true"
-  height="570"
+  height="588"
   layout="topleft"
   name="floater_places"
   help_topic="floater_places"
@@ -15,6 +16,7 @@
   min_width="333"
   width="333">
     <panel
+      top="18"
       tab_group="1"
       class="panel_places"
       name="main_panel"

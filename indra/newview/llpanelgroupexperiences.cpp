@@ -50,7 +50,7 @@ LLPanelGroupExperiences::~LLPanelGroupExperiences()
 {
 }
 
-BOOL LLPanelGroupExperiences::postBuild()
+bool LLPanelGroupExperiences::postBuild()
 {
     mExperiencesList = getChild<LLFlatListView>("experiences_list");
     if (hasString("loading_experiences"))
@@ -67,7 +67,7 @@ BOOL LLPanelGroupExperiences::postBuild()
 
 void LLPanelGroupExperiences::activate()
 {
-    if ((getGroupID().isNull()) || gDisconnected)
+    if ((getGroupID() == LLUUID::null) || gDisconnected)
     {
         return;
     }
@@ -80,7 +80,7 @@ void LLPanelGroupExperiences::setGroupID(const LLUUID& id)
 {
     LLPanelGroupTab::setGroupID(id);
 
-    if(id.isNull())
+    if(id == LLUUID::null)
     {
         return;
     }

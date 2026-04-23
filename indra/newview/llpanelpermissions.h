@@ -48,7 +48,7 @@ public:
     LLPanelPermissions();
     virtual ~LLPanelPermissions();
 
-    /*virtual*/ BOOL    postBuild();
+    /*virtual*/ bool    postBuild();
     void updateOwnerName(const LLUUID& owner_id, const LLAvatarName& owner_name, const LLStyle::Params& style_params);
     void updateCreatorName(const LLUUID& creator_id, const LLAvatarName& creator_name, const LLStyle::Params& style_params);
     void refresh();                         // refresh all labels as needed
@@ -77,11 +77,11 @@ protected:
 
     static void onCommitSaleInfo(LLUICtrl* ctrl, void* data);
     static void onCommitSaleType(LLUICtrl* ctrl, void* data);
+    static void onCommitSalePrice(LLUICtrl *ctrl, void *data);
     void setAllSaleInfo();
 
     static void onCommitClickAction(LLUICtrl* ctrl, void*);
     static void onCommitIncludeInSearch(LLUICtrl* ctrl, void*);
-    static void onCommitExport(LLUICtrl* ctrl, void*);
 
     static LLViewerInventoryItem* findItem(LLUUID &object_id);
 

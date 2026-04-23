@@ -40,7 +40,9 @@ public:
         mNextEntry(0)
     {
     }
-    virtual ~LLSimpleHashEntry() = default;
+    virtual ~LLSimpleHashEntry()
+    {
+    }
     HASH_KEY_TYPE getHashKey() const
     {
         return mHashKey;
@@ -65,7 +67,9 @@ public:
         llassert((TABLE_SIZE ^ (TABLE_SIZE-1)) == (TABLE_SIZE | (TABLE_SIZE-1))); // power of 2
         memset(mEntryTable, 0, sizeof(mEntryTable));
     }
-    virtual ~LLSimpleHash() = default;
+    virtual ~LLSimpleHash()
+    {
+    }
 
     virtual int getIndex(HASH_KEY_TYPE key)
     {

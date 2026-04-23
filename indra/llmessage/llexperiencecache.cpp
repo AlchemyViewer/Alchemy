@@ -23,6 +23,8 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
+#include "linden_common.h"
+
 #include "llexperiencecache.h"
 
 #include "llavatarname.h"
@@ -35,7 +37,6 @@
 #include <set>
 #include <map>
 #include <boost/tokenizer.hpp>
-#include <boost/concept_check.hpp>
 
 //=========================================================================
 namespace LLExperienceCacheImpl
@@ -88,25 +89,20 @@ const int LLExperienceCache::SEARCH_PAGE_SIZE     = 30;
 bool LLExperienceCache::sShutdown = false;
 
 //=========================================================================
-LLExperienceCache::LLExperienceCache(std::string grid)
+LLExperienceCache::LLExperienceCache()
 {
-    std::string file;
-    if (grid.empty())
-    {
-        file = "experience_cache.xml";
-    }
-    else
-    {
-        LLStringUtil::toLower(grid);
-        LLStringUtil::replaceChar(grid, ' ', '_');
-        file = fmt::format("experience_cache.{:s}.xml", grid);
-    }
+}
 
-    mCacheFileName = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, file);
+LLExperienceCache::~LLExperienceCache()
+{
+    // can exit without cleanup()
+    sShutdown = true;
 }
 
 void LLExperienceCache::initSingleton()
 {
+    mCacheFileName = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "experience_cache.xml");
+
     LL_INFOS("ExperienceCache") << "Loading " << mCacheFileName << LL_ENDL;
     llifstream cache_stream(mCacheFileName.c_str());
 
@@ -115,11 +111,10 @@ void LLExperienceCache::initSingleton()
         cache_stream >> (*this);
     }
 
-    LLCoprocedureManager::instance().initializePool("ExpCache");
+    constexpr size_t CORO_QUEUE_SIZE = 2048;
+    LLCoprocedureManager::instance().initializePool("ExpCache", CORO_QUEUE_SIZE);
 
-    LLCoros::instance().launch("LLExperienceCache::idleCoro",
-        boost::bind(&LLExperienceCache::idleCoro, this));
-
+    LLCoros::instance().launch("LLExperienceCache::idleCoro", LLExperienceCache::idleCoro);
 }
 
 void LLExperienceCache::cleanup()
@@ -251,6 +246,7 @@ const LLExperienceCache::cache_t& LLExperienceCache::getCached()
     return mCache;
 }
 
+// static because used by coroutine and can outlive the instance
 void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter, std::string url, RequestQueue_t requests)
 {
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
@@ -258,6 +254,13 @@ void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdap
     //LL_INFOS("requestExperiencesCoro") << "url: " << url << LL_ENDL;
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
+
+    if (sShutdown)
+    {
+        return;
+    }
+
+    LLExperienceCache* self = LLExperienceCache::getInstance();
 
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
@@ -268,22 +271,22 @@ void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdap
 
         LLSD headers = httpResults[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_HEADERS];
         // build dummy entries for the failed requests
-        for (const LLUUID& exp_id : requests)
+        for (RequestQueue_t::const_iterator it = requests.begin(); it != requests.end(); ++it)
         {
-            LLSD exp = get(exp_id);
+            LLSD exp = self->get(*it);
             //leave the properties alone if we already have a cache entry for this xp
             if (exp.isUndefined())
             {
                 exp[PROPERTIES] = PROPERTY_INVALID;
             }
             exp[EXPIRES] = now + LLExperienceCacheImpl::getErrorRetryDeltaTime(status, headers);
-            exp[EXPERIENCE_ID] = exp_id;
+            exp[EXPERIENCE_ID] = *it;
             exp["key_type"] = EXPERIENCE_ID;
-            exp["uuid"] = exp_id;
+            exp["uuid"] = *it;
             exp["error"] = (LLSD::Integer)status.getType();
             exp[QUOTA] = DEFAULT_QUOTA;
 
-            processExperience(exp_id, exp);
+            self->processExperience(*it, exp);
         }
         return;
     }
@@ -296,12 +299,10 @@ void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdap
         const LLSD& row = *it;
         LLUUID public_key = row[EXPERIENCE_ID].asUUID();
 
-#ifdef SHOW_DEBUG
         LL_DEBUGS("ExperienceCache") << "Received result for " << public_key
             << " display '" << row[LLExperienceCache::NAME].asString() << "'" << LL_ENDL;
-#endif
 
-        processExperience(public_key, row);
+        self->processExperience(public_key, row);
     }
 
     LLSD error_ids = result["error_ids"];
@@ -317,7 +318,7 @@ void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdap
         exp[MISSING] = true;
         exp[QUOTA] = DEFAULT_QUOTA;
 
-        processExperience(id, exp);
+        self->processExperience(id, exp);
         LL_WARNS("ExperienceCache") << "LLExperienceResponder::result() error result for " << id << LL_ENDL;
     }
 
@@ -326,7 +327,7 @@ void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdap
 
 void LLExperienceCache::requestExperiences()
 {
-    if (mCapability.empty())
+    if (mCapability == nullptr)
     {
         LL_WARNS("ExperienceCache") << "Capability query method not set." << LL_ENDL;
         return;
@@ -335,7 +336,7 @@ void LLExperienceCache::requestExperiences()
     std::string urlBase = mCapability("GetExperienceInfo");
     if (urlBase.empty())
     {
-        //LL_WARNS("ExperienceCache") << "No Experience capability." << LL_ENDL;
+        LL_WARNS("ExperienceCache") << "No Experience capability." << LL_ENDL;
         return;
     }
 
@@ -368,7 +369,7 @@ void LLExperienceCache::requestExperiences()
         if (mRequestQueue.empty() || (ostr.tellp() > EXP_URL_SEND_THRESHOLD))
         {   // request is placed in the coprocedure pool for the ExpCache cache.  Throttling is done by the pool itself.
             LLCoprocedureManager::instance().enqueueCoprocedure("ExpCache", "RequestExperiences",
-                boost::bind(&LLExperienceCache::requestExperiencesCoro, this, _1, ostr.str(), requests) );
+                boost::bind(&LLExperienceCache::requestExperiencesCoro, _1, ostr.str(), requests) );
 
             ostr.str(std::string());
             ostr << urlBase << "?page_size=" << PAGE_SIZE1;
@@ -400,7 +401,7 @@ void LLExperienceCache::setCapabilityQuery(LLExperienceCache::CapabilityQuery_t 
     mCapability = queryfn;
 }
 
-
+// static, because coro can outlive the instance
 void LLExperienceCache::idleCoro()
 {
     const F32 SECS_BETWEEN_REQUESTS = 0.5f;
@@ -409,14 +410,15 @@ void LLExperienceCache::idleCoro()
     LL_INFOS("ExperienceCache") << "Launching Experience cache idle coro." << LL_ENDL;
     do
     {
-        if (mEraseExpiredTimer.checkExpirationAndReset(ERASE_EXPIRED_TIMEOUT))
+        LLExperienceCache* self = LLExperienceCache::getInstance();
+        if (self->mEraseExpiredTimer.checkExpirationAndReset(ERASE_EXPIRED_TIMEOUT))
         {
-            eraseExpired();
+            self->eraseExpired();
         }
 
-        if (!mRequestQueue.empty())
+        if (!self->mRequestQueue.empty())
         {
-            requestExperiences();
+            self->requestExperiences();
         }
 
         llcoro::suspendUntilTimeout(SECS_BETWEEN_REQUESTS);
@@ -478,9 +480,7 @@ bool LLExperienceCache::fetch(const LLUUID& key, bool refresh/* = true*/)
 {
     if(!key.isNull() && !isRequestPending(key) && (refresh || mCache.find(key)==mCache.end()))
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("ExperienceCache") << " queue request for " << EXPERIENCE_ID << " " << key << LL_ENDL;
-#endif
 
         mRequestQueue.insert(key);
         return true;
@@ -546,7 +546,7 @@ void LLExperienceCache::get(const LLUUID& key, LLExperienceCache::ExperienceGetF
 //=========================================================================
 void LLExperienceCache::fetchAssociatedExperience(const LLUUID& objectId, const LLUUID& itemId, ExperienceGetFn_t fn)
 {
-    if (mCapability.empty())
+    if (mCapability == nullptr)
     {
         LL_WARNS("ExperienceCache") << "Capability query method not set." << LL_ENDL;
         return;
@@ -558,7 +558,7 @@ void LLExperienceCache::fetchAssociatedExperience(const LLUUID& objectId, const 
 
 void LLExperienceCache::fetchAssociatedExperience(const LLUUID& objectId, const LLUUID& itemId, std::string url, ExperienceGetFn_t fn)
 {
-    if (mCapability.empty())
+    if (mCapability == nullptr)
     {
         LL_WARNS("ExperienceCache") << "Capability query method not set." << LL_ENDL;
         return;
@@ -608,8 +608,10 @@ void LLExperienceCache::fetchAssociatedExperienceCoro(LLCoreHttpUtil::HttpCorout
             failure["error"] = -1;
             failure["message"] = "no experience";
         }
-        if (fn && !fn.empty())
+        if (fn != nullptr)
+        {
             fn(failure);
+        }
         return;
     }
 
@@ -620,7 +622,7 @@ void LLExperienceCache::fetchAssociatedExperienceCoro(LLCoreHttpUtil::HttpCorout
 //-------------------------------------------------------------------------
 void LLExperienceCache::findExperienceByName(const std::string text, int page, ExperienceGetFn_t fn)
 {
-    if (mCapability.empty())
+    if (mCapability == nullptr)
     {
         LL_WARNS("ExperienceCache") << "Capability query method not set." << LL_ENDL;
         return;
@@ -663,7 +665,7 @@ void LLExperienceCache::findExperienceByNameCoro(LLCoreHttpUtil::HttpCoroutineAd
 //-------------------------------------------------------------------------
 void LLExperienceCache::getGroupExperiences(const LLUUID &groupId, ExperienceGetFn_t fn)
 {
-    if (mCapability.empty())
+    if (mCapability == nullptr)
     {
         LL_WARNS("ExperienceCache") << "Capability query method not set." << LL_ENDL;
         return;
@@ -751,7 +753,7 @@ void LLExperienceCache::regionExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdapt
 //-------------------------------------------------------------------------
 void LLExperienceCache::getExperiencePermission(const LLUUID &experienceId, ExperienceGetFn_t fn)
 {
-    if (mCapability.empty())
+    if (mCapability == nullptr)
     {
         LL_WARNS("ExperienceCache") << "Capability query method not set." << LL_ENDL;
         return;
@@ -775,7 +777,7 @@ void LLExperienceCache::getExperiencePermission(const LLUUID &experienceId, Expe
 
 void LLExperienceCache::setExperiencePermission(const LLUUID &experienceId, const std::string &permission, ExperienceGetFn_t fn)
 {
-    if (mCapability.empty())
+    if (mCapability == nullptr)
     {
         LL_WARNS("ExperienceCache") << "Capability query method not set." << LL_ENDL;
         return;
@@ -805,13 +807,14 @@ void LLExperienceCache::setExperiencePermission(const LLUUID &experienceId, cons
 
 void LLExperienceCache::forgetExperiencePermission(const LLUUID &experienceId, ExperienceGetFn_t fn)
 {
-    if (mCapability.empty())
+    if (mCapability == nullptr)
     {
         LL_WARNS("ExperienceCache") << "Capability query method not set." << LL_ENDL;
         return;
     }
 
-    std::string url = fmt::format("{}?{}", mCapability("ExperiencePreferences"), experienceId.asString());
+    std::string url = mCapability("ExperiencePreferences") + "?" + experienceId.asString();
+
 
     permissionInvoker_fn invoker(boost::bind(
         // Humans ignore next line.  It is just a cast to specify which LLCoreHttpUtil::HttpCoroutineAdapter routine overload.
@@ -848,7 +851,7 @@ void LLExperienceCache::experiencePermissionCoro(LLCoreHttpUtil::HttpCoroutineAd
 //-------------------------------------------------------------------------
 void LLExperienceCache::getExperienceAdmin(const LLUUID &experienceId, ExperienceGetFn_t fn)
 {
-    if (mCapability.empty())
+    if (mCapability == nullptr)
     {
         LL_WARNS("ExperienceCache") << "Capability query method not set." << LL_ENDL;
         return;
@@ -880,7 +883,7 @@ void LLExperienceCache::getExperienceAdminCoro(LLCoreHttpUtil::HttpCoroutineAdap
 //-------------------------------------------------------------------------
 void LLExperienceCache::updateExperience(LLSD updateData, ExperienceGetFn_t fn)
 {
-    if (mCapability.empty())
+    if (mCapability == nullptr)
     {
         LL_WARNS("ExperienceCache") << "Capability query method not set." << LL_ENDL;
         return;

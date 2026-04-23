@@ -31,6 +31,12 @@
 
 #include "llpluginclassmedia.h"
 #include "llpluginmessageclasses.h"
+#include "llcontrol.h"
+
+extern LLControlGroup gSavedSettings;
+#if LL_DARWIN || LL_LINUX
+extern bool gHiDPISupport;
+#endif
 
 static int LOW_PRIORITY_TEXTURE_SIZE_DEFAULT = 256;
 
@@ -162,6 +168,7 @@ void LLPluginClassMedia::reset()
 
 void LLPluginClassMedia::idle(void)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     if(mPlugin)
     {
         mPlugin->idle();
@@ -260,10 +267,10 @@ void LLPluginClassMedia::idle(void)
             message.setValueS32("height", mRequestedMediaHeight);
             message.setValueS32("texture_width", mRequestedTextureWidth);
             message.setValueS32("texture_height", mRequestedTextureHeight);
-            message.setValueReal("background_r", mBackgroundColor.mV[VX]);
-            message.setValueReal("background_g", mBackgroundColor.mV[VY]);
-            message.setValueReal("background_b", mBackgroundColor.mV[VZ]);
-            message.setValueReal("background_a", mBackgroundColor.mV[VW]);
+            message.setValueReal("background_r", mBackgroundColor.mV[VRED]);
+            message.setValueReal("background_g", mBackgroundColor.mV[VGREEN]);
+            message.setValueReal("background_b", mBackgroundColor.mV[VBLUE]);
+            message.setValueReal("background_a", mBackgroundColor.mV[VALPHA]);
             mPlugin->sendMessage(message);  // DO NOT just use sendMessage() here -- we want this to jump ahead of the queue.
 
             LL_DEBUGS("Plugin") << "Sending size_change" << LL_ENDL;
@@ -364,14 +371,6 @@ void LLPluginClassMedia::setSizeInternal(void)
     {
         mRequestedMediaWidth = nextPowerOf2(mRequestedMediaWidth);
         mRequestedMediaHeight = nextPowerOf2(mRequestedMediaHeight);
-    }
-
-    {
-        if (mRequestedMediaWidth > 8192)
-            mRequestedMediaWidth = 8192;
-
-        if (mRequestedMediaHeight > 8192)
-            mRequestedMediaHeight = 8192;
     }
 }
 
@@ -950,29 +949,17 @@ void LLPluginClassMedia::showPageSource()
     sendMessage(message);
 }
 
-void LLPluginClassMedia::setCEFProgramDirs(const std::string& helper_path,
-                                           const std::string& resources_path,
-                                           const std::string& locales_path)
-{
-    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "set_cef_data_path");
-    message.setValue("helper_path", helper_path);
-    message.setValue("resources_path", resources_path);
-    message.setValue("locales_path", locales_path);
-
-    sendMessage(message);
-}
-
 void LLPluginClassMedia::setUserDataPath(const std::string &user_data_path_cache,
                                          const std::string &username,
-                                         const std::string &user_data_path_cef_log,
-                                         bool verbose_log)
+                                         const std::string &user_data_path_cef_log)
 {
     LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "set_user_data_path");
     message.setValue("cache_path", user_data_path_cache);
     message.setValue("username", username); // cef shares cache between users but creates user-based contexts
     message.setValue("cef_log_file", user_data_path_cef_log);
 
-    message.setValueBoolean("cef_verbose_log", verbose_log);
+    bool cef_verbose_log = gSavedSettings.getBOOL("CefVerboseLog");
+    message.setValueBoolean("cef_verbose_log", cef_verbose_log);
     sendMessage(message);
 }
 
@@ -1017,6 +1004,15 @@ void LLPluginClassMedia::enableMediaPluginDebugging( bool enable )
     message.setValueBoolean( "enable", enable );
     sendMessage( message );
 }
+
+#if LL_LINUX
+void LLPluginClassMedia::enablePipeWireVolumeCatcher( bool enable )
+{
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "enable_pipewire_volume_catcher");
+    message.setValueBoolean( "enable", enable );
+    sendMessage( message );
+}
+#endif
 
 void LLPluginClassMedia::setTarget(const std::string &target)
 {
@@ -1079,7 +1075,6 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
                     mDirtyRect.unionWith(newDirtyRect);
                 }
 
-#ifdef SHOW_DEBUG
                 LL_DEBUGS("Plugin") << "adjusted incoming rect is: ("
                     << newDirtyRect.mLeft << ", "
                     << newDirtyRect.mTop << ", "
@@ -1090,7 +1085,6 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
                     << mDirtyRect.mRight << ", "
                     << mDirtyRect.mBottom << ")"
                     << LL_ENDL;
-#endif
 
                 mediaEvent(LLPluginClassMediaOwner::MEDIA_EVENT_CONTENT_UPDATED);
             }
@@ -1182,6 +1176,7 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
         {
             S32 width = message.getValueS32("width");
             S32 height = message.getValueS32("height");
+            std::string name = message.getValue("name");
 
             // TODO: check that name matches?
             mNaturalMediaWidth = width;
@@ -1191,6 +1186,10 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
         }
         else if(message_name == "size_change_response")
         {
+            std::string name = message.getValue("name");
+
+            // TODO: check that name matches?
+
             mTextureWidth = message.getValueS32("texture_width");
             mTextureHeight = message.getValueS32("texture_height");
             mMediaWidth = message.getValueS32("width");

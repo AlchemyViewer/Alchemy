@@ -88,17 +88,17 @@ public:
     };
 
     // LLView interface
-    /*virtual*/ void        setEnabled(BOOL enabled);
-    /*virtual*/ BOOL        handleToolTip(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL        handleKeyHere(KEY key, MASK mask);
+    /*virtual*/ void        setEnabled(bool enabled);
+    /*virtual*/ bool        handleToolTip(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool        handleKeyHere(KEY key, MASK mask);
     /*virtual*/ void        onFocusReceived();
     /*virtual*/ void        onFocusLost();
     /*virtual*/ void        draw();
-    /*virtual*/ void        reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+    /*virtual*/ void        reshape(S32 width, S32 height, bool called_from_parent = true);
     //========================================================================
 
     // LLUICtrl interface
-    /*virtual*/ void        setFocus(BOOL b);
+    /*virtual*/ void        setFocus(bool b);
     //========================================================================
 
     // LLComboBox interface
@@ -198,7 +198,7 @@ private:
     boost::signals2::connection mLocationHistoryConnection;
     boost::signals2::connection mRegionCrossingSlot;
     LLPathfindingNavMesh::navmesh_slot_t mNavMeshSlot;
-    bool mIsNavMeshDirty;
+    bool mIsNavMeshDirty = false;
     LLUIImage* mLandmarkImageOn;
     LLUIImage* mLandmarkImageOff;
     LLPointer<LLUIImage> mIconMaturityGeneral;
@@ -210,8 +210,10 @@ private:
     std::string mEditLandmarkTooltip;
     // this field holds a human-readable form of the location string, it is needed to be able to compare copy-pated value and real location
     std::string mHumanReadableLocation;
-    bool isHumanReadableLocationVisible;
+    bool isHumanReadableLocationVisible = false;
     std::string mMaturityHelpTopic;
+
+    U8 mLastSimAccess = 0;
 };
 
 #endif

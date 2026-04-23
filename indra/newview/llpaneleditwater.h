@@ -65,8 +65,8 @@ class LLPanelSettingsWaterMainTab : public LLPanelSettingsWater
 public:
                             LLPanelSettingsWaterMainTab();
 
-    virtual BOOL            postBuild() override;
-    virtual void            setEnabled(BOOL enabled) override;
+    virtual bool            postBuild() override;
+    virtual void            setEnabled(bool enabled) override;
 
 protected:
     virtual void            refresh() override;
@@ -78,20 +78,20 @@ private:
 //     LLSlider *              mSldUnderWaterMod;
     LLTextureCtrl *         mTxtNormalMap;
 
-    void                    onFogColorChanged(LLColor3 col);
-    void                    onFogDensityChanged(F32 val);
-    void                    onFogUnderWaterChanged(F32 val);
-    void                    onNormalMapChanged(LLUUID val);
+    void                    onFogColorChanged();
+    void                    onFogDensityChanged();
+    void                    onFogUnderWaterChanged();
+    void                    onNormalMapChanged();
 
-    void                    onLargeWaveChanged(LLVector2 val);
-    void                    onSmallWaveChanged(LLVector2 val);
+    void                    onLargeWaveChanged();
+    void                    onSmallWaveChanged();
 
     void                    onNormalScaleChanged();
-    void                    onFresnelScaleChanged(F32 val);
-    void                    onFresnelOffsetChanged(F32 val);
-    void                    onScaleAboveChanged(F32 val);
-    void                    onScaleBelowChanged(F32 val);
-    void                    onBlurMultipChanged(F32 val);
+    void                    onFresnelScaleChanged();
+    void                    onFresnelOffsetChanged();
+    void                    onScaleAboveChanged();
+    void                    onScaleBelowChanged();
+    void                    onBlurMultipChanged();
 };
 
 

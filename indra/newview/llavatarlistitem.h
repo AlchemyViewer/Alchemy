@@ -48,7 +48,7 @@ typedef enum
     SP_COUNT
 } EShowPermissionType;
 
-class LLAvatarListItem final : public LLPanel, public LLFriendObserver
+class LLAvatarListItem : public LLPanel, public LLFriendObserver
 {
 public:
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
@@ -86,17 +86,17 @@ public:
     LLAvatarListItem(bool not_from_ui_factory = true);
     virtual ~LLAvatarListItem();
 
-    BOOL postBuild() override;
+    virtual bool postBuild() override;
 
     /**
      * Processes notification from speaker indicator to update children when indicator's visibility is changed.
      */
-    virtual void handleVisibilityChange ( BOOL new_visibility );
-    S32 notifyParent(const LLSD& info) final override;
-    void onMouseLeave(S32 x, S32 y, MASK mask) final override;
-    void onMouseEnter(S32 x, S32 y, MASK mask) final override;
-    void setValue(const LLSD& value) final override;
-    void changed(U32 mask) final override; // from LLFriendObserver
+    virtual void handleVisibilityChange ( bool new_visibility );
+    virtual S32 notifyParent(const LLSD& info) override;
+    virtual void onMouseLeave(S32 x, S32 y, MASK mask) override;
+    virtual void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    virtual void setValue(const LLSD& value) override;
+    virtual void changed(U32 mask) override; // from LLFriendObserver
 
     void setOnline(bool online);
     void updateAvatarName(); // re-query the name cache
@@ -116,7 +116,7 @@ public:
 
     void showTextField(bool show);
     void setAvatarIconVisible(bool visible);
-    void setShowCompleteName(bool show) { mShowCompleteName = show;};
+    void setShowCompleteName(bool show, bool force = false) { mShowCompleteName = show; mForceCompleteName = force;};
 // [RLVa:KB] - Checked: RLVa-1.2.0
     void setRlvCheckShowNames(bool fRlvCheckShowNames) { mRlvCheckShowNames = fRlvCheckShowNames; }
 // [/RLVa:KB]
@@ -131,7 +131,7 @@ public:
     void onPermissionBtnToggle(S32 toggleRight);
     void onModifyRightsConfirmationCallback(const LLSD& notification, const LLSD& response, bool fGrant);
 
-    /*virtual*/ BOOL handleDoubleClick(S32 x, S32 y, MASK mask) final override;
+    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
 protected:
     /**
@@ -248,6 +248,7 @@ private:
     bool mHovered;
 
     bool mShowCompleteName;
+    bool mForceCompleteName;
     std::string mGreyOutUsername;
 
     void fetchAvatarName();

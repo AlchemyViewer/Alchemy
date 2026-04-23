@@ -71,12 +71,12 @@ public:
 
     // If available, copies name ("bobsmith123" or "James Linden") into string
     // If not available, copies the string "waiting".
-    // Returns TRUE iff available.
-    BOOL getFullName(const LLUUID& id, std::string& full_name);
+    // Returns true if available.
+    bool getFullName(const LLUUID& id, std::string& full_name);
 
     // Reverse lookup of UUID from name
-    BOOL getUUID(const std::string& first, const std::string& last, LLUUID& id);
-    BOOL getUUID(const std::string& fullname, LLUUID& id);
+    bool getUUID(const std::string& first, const std::string& last, LLUUID& id);
+    bool getUUID(const std::string& fullname, LLUUID& id);
 
     // IDEVO Temporary code
     // Clean up new-style "bobsmith123 Resident" names to "bobsmith123" for display
@@ -100,8 +100,8 @@ public:
     // If available, this method copies the group name into the string
     // provided. The caller must allocate at least
     // DB_GROUP_NAME_BUF_SIZE characters. If not available, this
-    // method copies the string "waiting". Returns TRUE iff available.
-    BOOL getGroupName(const LLUUID& id, std::string& group);
+    // method copies the string "waiting". Returns true if available.
+    bool getGroupName(const LLUUID& id, std::string& group);
 
     // Call the callback with the group or avatar name.
     // If the data is currently available, may call the callback immediatly
@@ -137,7 +137,8 @@ public:
     void localizeCacheName(std::string key, std::string value);
 
 private:
-    boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>> sCacheName;
+    using cache_map_t = boost::unordered_map<std::string, std::string>;
+    cache_map_t mCacheName;
 
     class Impl;
     Impl& impl;

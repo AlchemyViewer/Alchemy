@@ -3,13 +3,10 @@
 	<floater.string name="Title">
 		スクリプト：[NAME]
 	</floater.string>
-	<panel name="script panel"/>
-	<icon name="lock"/>
 	<text name="path_txt">
 		ファイルパス
 	</text>
 	<text name="desc txt">
 		説明：
 	</text>
-	<line_editor name="desc"/>
 </floater>

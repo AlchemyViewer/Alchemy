@@ -28,6 +28,8 @@
 #ifndef LL_LLINSTANCETRACKER_H
 #define LL_LLINSTANCETRACKER_H
 
+#include "llpreprocessor.h"
+
 #include <map>
 #include <set>
 #include <vector>
@@ -35,7 +37,7 @@
 #include <memory>
 #include <type_traits>
 
-#include <shared_mutex>
+#include <mutex>
 
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/indirect_iterator.hpp>
@@ -52,7 +54,7 @@ namespace LLInstanceTrackerPrivate
     struct StaticBase
     {
         // We need to be able to lock static data while manipulating it.
-        std::mutex mMutex;
+        LL_PROFILE_MUTEX_NAMED(std::mutex, mMutex, "InstanceTracker Data");
     };
 
     void logerrs(const char* cls, const std::string&, const std::string&, const std::string&);
@@ -101,7 +103,8 @@ public:
 
     static size_t instanceCount()
     {
-        return LockStatic()->mMap.size();
+        LockStatic lock; LL_PROFILE_MUTEX_LOCK(lock->mMutex);
+        return lock->mMap.size();
     }
 
     // snapshot of std::pair<const KEY, std::shared_ptr<SUBCLASS>> pairs, for
@@ -220,13 +223,14 @@ public:
 
     static ptr_t getInstance(const KEY& k)
     {
-        LockStatic lock;
+        LockStatic lock; LL_PROFILE_MUTEX_LOCK(lock->mMutex);
         const InstanceMap& map(lock->mMap);
         typename InstanceMap::const_iterator found = map.find(k);
         return (found == map.end()) ? NULL : found->second;
     }
 
 protected:
+    LL_UBSAN_SUPRESS_VPTR
     LLInstanceTracker(const KEY& key)
     {
         // We do not intend to manage the lifespan of this object with
@@ -236,19 +240,23 @@ protected:
         ptr_t ptr(static_cast<T*>(this), [](T*){});
         // save corresponding weak_ptr for future reference
         mSelf = ptr;
-        LockStatic lock;
+        LockStatic lock; LL_PROFILE_MUTEX_LOCK(lock->mMutex);
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+        std::string_view typeidname(typeid(T).name());
+        LockableName(lock->mMutex, typeidname.data(), typeidname.size());
+#endif
         add_(lock, key, ptr);
     }
 public:
     virtual ~LLInstanceTracker()
     {
-        LockStatic lock;
+        LockStatic lock; LL_PROFILE_MUTEX_LOCK(lock->mMutex);
         remove_(lock);
     }
 protected:
     virtual void setKey(KEY key)
     {
-        LockStatic lock;
+        LockStatic lock; LL_PROFILE_MUTEX_LOCK(lock->mMutex);
         // Even though the shared_ptr we store in our map has a no-op deleter
         // for T itself, letting the use count decrement to 0 will still
         // delete the use-count object. Capture the shared_ptr we just removed
@@ -360,7 +368,8 @@ public:
 
     static size_t instanceCount()
     {
-        return LockStatic()->mSet.size();
+        LockStatic lock; LL_PROFILE_MUTEX_LOCK(lock->mMutex);
+        return lock->mSet.size();
     }
 
     // snapshot of std::shared_ptr<SUBCLASS> pointers
@@ -448,6 +457,7 @@ public:
     using key_snapshot_of = instance_snapshot_of<SUBCLASS>;
 
 protected:
+    LL_UBSAN_SUPRESS_VPTR
     LLInstanceTracker()
     {
         // Since we do not intend for this shared_ptr to manage lifespan, give
@@ -456,14 +466,20 @@ protected:
         // save corresponding weak_ptr for future reference
         mSelf = ptr;
         // Also store it in our class-static set to track this instance.
-        LockStatic()->mSet.emplace(ptr);
+        LockStatic lock; LL_PROFILE_MUTEX_LOCK(lock->mMutex);
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+        std::string_view typeidname(typeid(T).name());
+        LockableName(lock->mMutex, typeidname.data(), typeidname.size());
+#endif
+        lock->mSet.emplace(ptr);
     }
 public:
     virtual ~LLInstanceTracker()
     {
         // convert weak_ptr to shared_ptr because that's what we store in our
         // InstanceSet
-        LockStatic()->mSet.erase(mSelf.lock());
+        LockStatic lock; LL_PROFILE_MUTEX_LOCK(lock->mMutex);
+        lock->mSet.erase(mSelf.lock());
     }
 protected:
     LLInstanceTracker(const LLInstanceTracker& other):

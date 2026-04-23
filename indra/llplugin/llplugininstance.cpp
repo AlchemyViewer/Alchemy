@@ -36,11 +36,15 @@
 #include "direct.h" // needed for _chdir()
 #endif
 
+/** Virtual destructor. */
+LLPluginInstanceMessageListener::~LLPluginInstanceMessageListener()
+{
+}
 
 /**
  * TODO:DOC describe how it's used
  */
-const char *LLPluginInstance::PLUGIN_INIT_FUNCTION_NAME = "ALPluginInitEntryPoint";
+const char *LLPluginInstance::PLUGIN_INIT_FUNCTION_NAME = "LLPluginInitEntryPoint";
 
 /**
  * Constructor.
@@ -137,9 +141,7 @@ void LLPluginInstance::sendMessage(const std::string &message)
 {
     if(mPluginSendMessageFunction)
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("Plugin") << "sending message to plugin: \"" << message << "\"" << LL_ENDL;
-#endif
         mPluginSendMessageFunction(message.c_str(), &mPluginUserData);
     }
     else
@@ -174,9 +176,7 @@ void LLPluginInstance::receiveMessage(const char *message_string)
 {
     if(mOwner)
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("Plugin") << "processing incoming message: \"" << message_string << "\"" << LL_ENDL;
-#endif
         mOwner->receivePluginMessage(message_string);
     }
     else

@@ -32,7 +32,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "llwin32headerslean.h"
+#include "llwin32headers.h"
 #include <dbghelp.h>
 
 typedef USHORT NTAPI RtlCaptureStackBackTrace_Function(
@@ -43,15 +43,15 @@ typedef USHORT NTAPI RtlCaptureStackBackTrace_Function(
 
 static RtlCaptureStackBackTrace_Function* const RtlCaptureStackBackTrace_fn =
    (RtlCaptureStackBackTrace_Function*)
-   GetProcAddress(GetModuleHandle(TEXT("ntdll.dll")), "RtlCaptureStackBackTrace");
+   GetProcAddress(GetModuleHandleA("ntdll.dll"), "RtlCaptureStackBackTrace");
 
 bool ll_get_stack_trace(std::vector<std::string>& lines)
 {
     const S32 MAX_STACK_DEPTH = 32;
     const S32 STRING_NAME_LENGTH = 200;
     const S32 FRAME_SKIP = 2;
-    static BOOL symbolsLoaded = false;
-    static BOOL firstCall = true;
+    static bool symbolsLoaded = false;
+    static bool firstCall = true;
 
     HANDLE hProc = GetCurrentProcess();
 
@@ -89,7 +89,7 @@ bool ll_get_stack_trace(std::vector<std::string>& lines)
         for(S32 i=0; i < depth; i++)
         {
             std::stringstream stack_line;
-            BOOL ret;
+            bool ret;
 
             DWORD64 addr = (DWORD64)frames[i];
             ret = SymGetSymFromAddr64(hProc, addr, 0, pSym);
@@ -103,11 +103,11 @@ bool ll_get_stack_trace(std::vector<std::string>& lines)
             if(ret)
             {
                 std::string file_name = line.FileName;
-                std::string::size_type index = file_name.rfind('\\');
+                std::string::size_type index = file_name.rfind("\\");
                 stack_line << file_name.substr(index + 1, file_name.size()) << ":" << line.LineNumber;
             }
 
-            lines.emplace_back(stack_line.str());
+            lines.push_back(stack_line.str());
         }
 
         free(pSym);
@@ -131,7 +131,7 @@ void ll_get_stack_trace_internal(std::vector<std::string>& lines)
     const S32 STRING_NAME_LENGTH = 256;
 
     HANDLE process = GetCurrentProcess();
-    SymInitialize( process, NULL, TRUE );
+    SymInitialize( process, NULL, true );
 
     void *stack[MAX_STACK_DEPTH];
 

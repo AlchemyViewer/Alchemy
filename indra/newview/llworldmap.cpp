@@ -32,14 +32,13 @@
 #include "message.h"
 #include "lltracker.h"
 #include "lluistring.h"
+#include "llviewercontrol.h"
 #include "llviewertexturelist.h"
 #include "lltrans.h"
 #include "llgltexture.h"
-#include "llappviewer.h"
-#include "lltexturecache.h"
 
 // Timers to temporise database requests
-const F32 AGENTS_UPDATE_TIMER = 30.f;           // Seconds between 2 agent requests for a region
+const F32 AGENTS_UPDATE_TIMER = 60.0;           // Seconds between 2 agent requests for a region
 const F32 REQUEST_ITEMS_TIMER = 10.f * 60.f;    // Seconds before we consider re-requesting item data for the grid
 const F64 BLOCK_UPDATE_TIMER = 60.0;            // Periodically update sim info
 
@@ -66,8 +65,6 @@ LLItemInfo::LLItemInfo(F32 global_x, F32 global_y,
 
 LLSimInfo::LLSimInfo(U64 handle)
 :   mHandle(handle),
-    mSizeX(REGION_WIDTH_UNITS),
-    mSizeY(REGION_WIDTH_UNITS),
     mName(),
     mAgentsUpdateTime(0),
     mAccess(0x0),
@@ -79,21 +76,12 @@ LLSimInfo::LLSimInfo(U64 handle)
 
 void LLSimInfo::setLandForSaleImage (LLUUID image_id)
 {
-    if (mMapImageID.isNull() && image_id.notNull())
-    {
-        mOverlayImage = LLViewerTextureManager::findFetchedTexture(image_id, TEX_LIST_STANDARD);
-        if(mOverlayImage.notNull())
-        {
-            LLAppViewer::getTextureCache()->removeFromCache(image_id);
-        }
-    }
     mMapImageID = image_id;
 
     // Fetch the image
     if (mMapImageID.notNull())
     {
         mOverlayImage = LLViewerTextureManager::getFetchedTexture(mMapImageID, FTT_DEFAULT, MIPMAP_TRUE, LLGLTexture::BOOST_MAP, LLViewerTexture::LOD_TEXTURE);
-        mOverlayImage->forceImmediateUpdate();
         mOverlayImage->setAddressMode(LLTexUnit::TAM_CLAMP);
     }
     else
@@ -131,6 +119,7 @@ LLVector3d LLSimInfo::getGlobalOrigin() const
 {
     return from_region_handle(mHandle);
 }
+
 LLVector3 LLSimInfo::getLocalPos(LLVector3d global_pos) const
 {
     LLVector3d sim_origin = from_region_handle(mHandle);
@@ -244,6 +233,7 @@ LLWorldMap::LLWorldMap() :
     mFirstRequest(true)
 {
     //LL_INFOS("WorldMap") << "Creating the World Map -> LLWorldMap::LLWorldMap()" << LL_ENDL;
+    mMapBlockLoaded = new bool[MAP_BLOCK_RES*MAP_BLOCK_RES];
     clearSimFlags();
 }
 
@@ -252,6 +242,7 @@ LLWorldMap::~LLWorldMap()
 {
     //LL_INFOS("WorldMap") << "Destroying the World Map -> LLWorldMap::~LLWorldMap()" << LL_ENDL;
     reset();
+    delete[] mMapBlockLoaded;
 }
 
 
@@ -262,6 +253,7 @@ void LLWorldMap::reset()
     clearSimFlags();        // Clear the block info flags array
 
     // Finally, clear the region map itself
+    for_each(mSimInfoMap.begin(), mSimInfoMap.end(), DeletePairedPointer());
     mSimInfoMap.clear();
 }
 
@@ -276,7 +268,7 @@ bool LLWorldMap::clearItems(bool force)
         LLSimInfo* sim_info = NULL;
         for (sim_info_map_t::iterator it = mSimInfoMap.begin(); it != mSimInfoMap.end(); ++it)
         {
-            sim_info = it->second.get();
+            sim_info = it->second;
             if (sim_info)
             {
                 sim_info->clearItems();
@@ -298,7 +290,7 @@ void LLWorldMap::clearImageRefs()
     LLSimInfo* sim_info = NULL;
     for (sim_info_map_t::iterator it = mSimInfoMap.begin(); it != mSimInfoMap.end(); ++it)
     {
-        sim_info = it->second.get();
+        sim_info = it->second;
         if (sim_info)
         {
             sim_info->clearImage();
@@ -309,14 +301,18 @@ void LLWorldMap::clearImageRefs()
 // Doesn't clear the already-loaded sim infos, just re-requests them
 void LLWorldMap::clearSimFlags()
 {
-    mMapBlockLoaded.fill(false);
+    for (S32 idx=0; idx<MAP_BLOCK_RES*MAP_BLOCK_RES; ++idx)
+    {
+        mMapBlockLoaded[idx] = false;
+    }
     mMapBlockLastUpdateOffsets.clear();
 }
 
 LLSimInfo* LLWorldMap::createSimInfoFromHandle(const U64 handle)
 {
-    auto ret = mSimInfoMap.insert_or_assign(handle, std::make_unique<LLSimInfo>(handle));
-    return ret.first->second.get();
+    LLSimInfo* sim_info = new LLSimInfo(handle);
+    mSimInfoMap[handle] = sim_info;
+    return sim_info;
 }
 
 void LLWorldMap::equalizeBoostLevels()
@@ -336,43 +332,31 @@ LLSimInfo* LLWorldMap::simInfoFromHandle(const U64 handle)
     sim_info_map_t::iterator it = mSimInfoMap.find(handle);
     if (it != mSimInfoMap.end())
     {
-        return it->second.get();
+        return it->second;
     }
-    U32 x = 0, y = 0;
-    from_region_handle(handle, &x, &y);
-
-    for (const auto& sim_info_pair : mSimInfoMap)
-    {
-        U32 checkRegionX, checkRegionY;
-        from_region_handle(sim_info_pair.first, &checkRegionX, &checkRegionY);
-
-        LLSimInfo* info = sim_info_pair.second.get();
-        if (x >= checkRegionX && x < (checkRegionX + info->getSizeX()) &&
-            y >= checkRegionY && y < (checkRegionY + info->getSizeY()))
-        {
-            return info;
-        }
-    }
-    return nullptr;
+    return NULL;
 }
 
 
 LLSimInfo* LLWorldMap::simInfoFromName(const std::string& sim_name)
 {
-    LLSimInfo* sim_info = nullptr;
+    LLSimInfo* sim_info = NULL;
     if (!sim_name.empty())
     {
         // Iterate through the entire sim info map and compare the name
-        for (const auto& sim_info_pair : mSimInfoMap)
+        sim_info_map_t::iterator it;
+        for (it = mSimInfoMap.begin(); it != mSimInfoMap.end(); ++it)
         {
-            auto temp_sim_info = sim_info_pair.second.get();
-            if (temp_sim_info && temp_sim_info->isName(sim_name) )
+            sim_info = it->second;
+            if (sim_info && sim_info->isName(sim_name) )
             {
-                sim_info = temp_sim_info;
                 // break out of loop if success
                 break;
             }
         }
+        // If we got to the end, we haven't found the sim. Reset the ouput value to NULL.
+        if (it == mSimInfoMap.end())
+            sim_info = NULL;
     }
     return sim_info;
 }
@@ -398,13 +382,12 @@ void LLWorldMap::reloadItems(bool force)
     //LL_INFOS("WorldMap") << "LLWorldMap::reloadItems()" << LL_ENDL;
     if (clearItems(force))
     {
-        auto& world_map_message = LLWorldMapMessage::instance();
-        world_map_message.sendItemRequest(MAP_ITEM_TELEHUB);
-        world_map_message.sendItemRequest(MAP_ITEM_PG_EVENT);
-        world_map_message.sendItemRequest(MAP_ITEM_MATURE_EVENT);
-        world_map_message.sendItemRequest(MAP_ITEM_ADULT_EVENT);
-        world_map_message.sendItemRequest(MAP_ITEM_LAND_FOR_SALE);
-        world_map_message.sendItemRequest(MAP_ITEM_LAND_FOR_SALE_ADULT);
+        LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_TELEHUB);
+        LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_PG_EVENT);
+        LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_MATURE_EVENT);
+        LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_ADULT_EVENT);
+        LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_LAND_FOR_SALE);
+        LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_LAND_FOR_SALE_ADULT);
     }
 }
 
@@ -412,15 +395,15 @@ void LLWorldMap::reloadItems(bool force)
 // static public
 // Insert a region in the region map
 // returns true if region inserted, false otherwise
-bool LLWorldMap::insertRegion(U32 x_world, U32 y_world, U16 x_size, U16 y_size, std::string& name, LLUUID& image_id, U32 accesscode, U32 region_flags)
+bool LLWorldMap::insertRegion(U32 x_world, U32 y_world, std::string& name, LLUUID& image_id, U32 accesscode, U32 region_flags)
 {
     // This region doesn't exist
     if (accesscode == 255)
     {
         // Checks if the track point is in it and invalidates it if it is
-        if (isTrackingInRectangle( x_world, y_world, x_world + REGION_WIDTH_UNITS, y_world + REGION_WIDTH_UNITS))
+        if (LLWorldMap::getInstance()->isTrackingInRectangle( x_world, y_world, x_world + REGION_WIDTH_UNITS, y_world + REGION_WIDTH_UNITS))
         {
-            setTrackingInvalid();
+            LLWorldMap::getInstance()->setTrackingInvalid();
         }
         // return failure to insert
         return false;
@@ -431,30 +414,29 @@ bool LLWorldMap::insertRegion(U32 x_world, U32 y_world, U16 x_size, U16 y_size, 
         //LL_INFOS("WorldMap") << "Map sim : " << name << ", ID : " << image_id.getString() << LL_ENDL;
         // Insert the region in the region map of the world map
         // Loading the LLSimInfo object with what we got and insert it in the map
-        LLSimInfo* siminfo = simInfoFromHandle(handle);
+        LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromHandle(handle);
         if (siminfo == NULL)
         {
-            siminfo = createSimInfoFromHandle(handle);
+            siminfo = LLWorldMap::getInstance()->createSimInfoFromHandle(handle);
         }
         siminfo->setName(name);
         siminfo->setAccess(accesscode);
         siminfo->setRegionFlags(region_flags);
     //  siminfo->setWaterHeight((F32) water_height);
         siminfo->setLandForSaleImage(image_id);
-        siminfo->setSize(x_size, y_size);
 
         // Handle the location tracking (for teleport, UI feedback and info display)
-        if (isTrackingInRectangle( x_world, y_world, x_world + REGION_WIDTH_UNITS, y_world + REGION_WIDTH_UNITS))
+        if (LLWorldMap::getInstance()->isTrackingInRectangle( x_world, y_world, x_world + REGION_WIDTH_UNITS, y_world + REGION_WIDTH_UNITS))
         {
             if (siminfo->isDown())
             {
                 // We were tracking this location, but it's no available
-                setTrackingInvalid();
+                LLWorldMap::getInstance()->setTrackingInvalid();
             }
             else
             {
                 // We were tracking this location, and it does exist and is available
-                setTrackingValid();
+                LLWorldMap::getInstance()->setTrackingValid();
             }
         }
         // return insert region success
@@ -475,10 +457,10 @@ bool LLWorldMap::insertItem(U32 x_world, U32 y_world, std::string& name, LLUUID&
     U64 handle = to_region_handle(pos);
 
     // Get the region record for that handle or NULL if we haven't browsed it yet
-    LLSimInfo* siminfo = simInfoFromHandle(handle);
+    LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromHandle(handle);
     if (siminfo == NULL)
     {
-        siminfo = createSimInfoFromHandle(handle);
+        siminfo = LLWorldMap::getInstance()->createSimInfoFromHandle(handle);
     }
 
     //LL_INFOS("WorldMap") << "Process item : type = " << type << LL_ENDL;
@@ -514,9 +496,20 @@ bool LLWorldMap::insertItem(U32 x_world, U32 y_world, std::string& name, LLUUID&
         case MAP_ITEM_MATURE_EVENT:
         case MAP_ITEM_ADULT_EVENT:
         {
-            std::string timeStr = "["+ LLTrans::getString ("TimeHour")+"]:["
-                                       +LLTrans::getString ("TimeMin")+"] ["
-                                       +LLTrans::getString ("TimeAMPM")+"]";
+            std::string timeStr;
+
+            static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+            if (use_24h)
+            {
+                timeStr = "[" + LLTrans::getString("TimeHour") + "]:["
+                    + LLTrans::getString("TimeMin") + "]";
+            }
+            else
+            {
+                timeStr = "[" + LLTrans::getString("TimeHour12") + "]:["
+                    + LLTrans::getString("TimeMin") + "] ["
+                    + LLTrans::getString("TimeAMPM") + "]";
+            }
             LLSD substitution;
             substitution["datetime"] = (S32) extra;
             LLStringUtil::format (timeStr, substitution);
@@ -604,7 +597,7 @@ void LLWorldMap::dropImagePriorities()
     // Same for the "land for sale" tiles per region
     for (sim_info_map_t::iterator it = mSimInfoMap.begin(); it != mSimInfoMap.end(); ++it)
     {
-        LLSimInfo* info = it->second.get();
+        LLSimInfo* info = it->second;
         info->dropImagePriority();
     }
 }
@@ -623,11 +616,15 @@ void LLWorldMap::updateRegions(S32 x0, S32 y0, S32 x1, S32 y1)
 
     // Remove blocks that have been request more than BLOCK_UPDATE_TIMER ago
     // so we re-request them for an update
-    for (const auto& it : mMapBlockLastUpdateOffsets)
+    for (auto it = mMapBlockLastUpdateOffsets.begin(); it != mMapBlockLastUpdateOffsets.end();)
     {
-        if ((time_now - it.second) <= BLOCK_UPDATE_TIMER)
+        if ((time_now - it->second) > BLOCK_UPDATE_TIMER)
         {
-            new_offsets[it.first] = it.second;
+            it = mMapBlockLastUpdateOffsets.erase(it);
+        }
+        else
+        {
+            ++it;
         }
     }
     mMapBlockLastUpdateOffsets.swap(new_offsets);
@@ -655,7 +652,7 @@ void LLWorldMap::dump()
     LL_INFOS("WorldMap") << "LLWorldMap::dump()" << LL_ENDL;
     for (sim_info_map_t::iterator it = mSimInfoMap.begin(); it != mSimInfoMap.end(); ++it)
     {
-        LLSimInfo* info = it->second.get();
+        LLSimInfo* info = it->second;
         if (info)
         {
             info->dump();

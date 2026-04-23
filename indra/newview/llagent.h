@@ -39,11 +39,11 @@
 #include "httprequest.h"
 #include "llcorehttputil.h"
 
-#include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/signals2.hpp>
 
-extern const BOOL   ANIMATE;
+#include <functional>
+
+extern const bool   ANIMATE;
 extern const U8     AGENT_STATE_TYPING;  // Typing indication
 extern const U8     AGENT_STATE_EDITING; // Set when agent has objects selected
 
@@ -78,8 +78,8 @@ struct LLGroupData
     LLUUID mID;
     LLUUID mInsigniaID;
     U64 mPowers;
-    BOOL mAcceptNotices;
-    BOOL mListInProfile;
+    bool mAcceptNotices;
+    bool mListInProfile;
     S32 mContribution;
     std::string mName;
 };
@@ -89,7 +89,7 @@ class LLAgentListener;
 //------------------------------------------------------------------------
 // LLAgent
 //------------------------------------------------------------------------
-class LLAgent final : public LLOldEvents::LLObservable
+class LLAgent : public LLOldEvents::LLObservable
 {
     LOG_CLASS(LLAgent);
 
@@ -118,7 +118,7 @@ private:
 public:
     void            onAppFocusGained();
     void            setFirstLogin(bool b);
-    // Return TRUE if the database reported this login as the first for this particular user.
+    // Return true if the database reported this login as the first for this particular user.
     bool            isFirstLogin() const    { return mFirstLogin; }
     bool            isInitialized() const   { return mInitialized; }
 
@@ -169,10 +169,10 @@ public:
     // On the very first login, outfit needs to be chosen by some
     // mechanism, usually by loading the requested initial outfit.  We
     // don't render the avatar until the choice is made.
-    BOOL            isOutfitChosen() const  { return mOutfitChosen; }
-    void            setOutfitChosen(BOOL b) { mOutfitChosen = b; }
+    bool            isOutfitChosen() const  { return mOutfitChosen; }
+    void            setOutfitChosen(bool b) { mOutfitChosen = b; }
 private:
-    BOOL            mOutfitChosen;
+    bool            mOutfitChosen;
 
 /**                    Identity
  **                                                                            **
@@ -238,13 +238,13 @@ private:
 public:
     void            setStartPosition(U32 location_id); // Marks current location as start, sends information to servers
     void            setHomePosRegion(const U64& region_handle, const LLVector3& pos_region);
-    BOOL            getHomePosGlobal(LLVector3d* pos_global);
+    bool            getHomePosGlobal(LLVector3d* pos_global);
     bool            isInHomeRegion();
 
 private:
     void            setStartPositionSuccess(const LLSD &result);
 
-    BOOL            mHaveHomePosition;
+    bool            mHaveHomePosition;
     U64             mHomeRegionHandle;
     LLVector3       mHomePosRegion;
 
@@ -255,7 +255,7 @@ public:
     void changeParcels(); // called by LLViewerParcelMgr when we cross a parcel boundary
 
     // Register a boost callback to be called when the agent changes parcels
-    typedef boost::function<void()> parcel_changed_callback_t;
+    typedef std::function<void()> parcel_changed_callback_t;
     boost::signals2::connection     addParcelChangedCallback(parcel_changed_callback_t);
 
 private:
@@ -271,10 +271,10 @@ public:
     void            setRegion(LLViewerRegion *regionp);
     LLViewerRegion  *getRegion() const;
     LLHost          getRegionHost() const;
-    BOOL            inPrelude();
+    bool            inPrelude();
 
     // Capability
-    const std::string&     getRegionCapability(std::string_view name) const; // short hand for if (getRegion()) { getRegion()->getCapability(name) }
+    std::string     getRegionCapability(std::string_view name); // short hand for if (getRegion()) { getRegion()->getCapability(name) }
 
     /**
      * Register a boost callback to be called when the agent changes regions
@@ -361,11 +361,11 @@ private:
     // Fly
     //--------------------------------------------------------------------
 public:
-    BOOL            getFlying() const;
-    void            setFlying(BOOL fly, BOOL fail_sound = FALSE);
+    bool            getFlying() const;
+    void            setFlying(bool fly, bool fail_sound = false);
     static void     toggleFlying();
     static bool     enableFlying();
-    BOOL            canFly();           // Does this parcel allow you to fly?
+    bool            canFly();           // Does this parcel allow you to fly?
     static bool     isSitting();
 
     //--------------------------------------------------------------------
@@ -413,22 +413,12 @@ private:
     LLFrameTimer    mTypingTimer;
 
     //--------------------------------------------------------------------
-    //BD - Custom Posing
-    //--------------------------------------------------------------------
-public:
-    void            setPosing()             { mIsPosing = true; }
-    void            clearPosing()           { mIsPosing = false; }
-    bool            getPosing() const       { return mIsPosing; }
-
-    bool            mIsPosing;
-
-    //--------------------------------------------------------------------
     // AFK
     //--------------------------------------------------------------------
 public:
     void            setAFK();
     void            clearAFK();
-    BOOL            getAFK() const;
+    bool            getAFK() const;
     static const F32 MIN_AFK_TIME;
 
     //--------------------------------------------------------------------
@@ -485,44 +475,19 @@ public:
 public:
     void            setDoNotDisturb(bool pIsDoNotDisturb);
     bool            isDoNotDisturb() const;
-
-public:
-    void            setRejectTeleportOffers(bool pIsRejectTeleportOffers);
-    bool            isRejectTeleportOffers() const;
 private:
     bool            mIsDoNotDisturb;
-    bool            mIsRejectTeleportOffers;
-
-public:
-    void            setRejectFriendshipRequests();
-    void            clearRejectFriendshipRequests();
-    void            selectRejectFriendshipRequests(BOOL);
-    BOOL            getRejectFriendshipRequests() const;
-private:
-    BOOL            mIsRejectFriendshipRequests;
-
-public:
-    void            setAutoRespond(bool pIsAutoRespond);
-    bool            getAutoRespond() const;
-private:
-    BOOL            mIsAutoRespond;
-
-public:
-    void            setAutoRespondNonFriends(bool pIsAutoRespondNonFriends);
-    bool            getAutoRespondNonFriends() const;
-private:
-    BOOL            mIsAutoRespondNonFriends;
 
     //--------------------------------------------------------------------
     // Grab
     //--------------------------------------------------------------------
 public:
-    BOOL            leftButtonGrabbed() const;
-    BOOL            rotateGrabbed() const;
-    BOOL            forwardGrabbed() const;
-    BOOL            backwardGrabbed() const;
-    BOOL            upGrabbed() const;
-    BOOL            downGrabbed() const;
+    bool            leftButtonGrabbed() const;
+    bool            rotateGrabbed() const;
+    bool            forwardGrabbed() const;
+    bool            backwardGrabbed() const;
+    bool            upGrabbed() const;
+    bool            downGrabbed() const;
 
     //--------------------------------------------------------------------
     // Controls
@@ -531,24 +496,21 @@ public:
     U32             getControlFlags();
     void            setControlFlags(U32 mask);      // Performs bitwise mControlFlags |= mask
     void            clearControlFlags(U32 mask);    // Performs bitwise mControlFlags &= ~mask
-    BOOL            controlFlagsDirty() const;
-    void            enableControlFlagReset();
+    bool            controlFlagsDirty() const;
     void            resetControlFlags();
-    BOOL            anyControlGrabbed() const;      // True iff a script has taken over a control
-    BOOL            isControlGrabbed(S32 control_index) const;
+    bool            anyControlGrabbed() const;      // True iff a script has taken over a control
+    bool            isControlGrabbed(S32 control_index) const;
     // Send message to simulator to force grabbed controls to be
     // released, in case of a poorly written script.
     void            forceReleaseControls();
-    void            setFlagsDirty() { mbFlagsDirty = TRUE; }
 
 private:
     S32             mControlsTakenCount[TOTAL_CONTROLS];
     S32             mControlsTakenPassedOnCount[TOTAL_CONTROLS];
     U32             mControlFlags;                  // Replacement for the mFooKey's
-    BOOL            mbFlagsDirty;
-    BOOL            mbFlagsNeedReset;               // ! HACK ! For preventing incorrect flags sent when crossing region boundaries
+    F64             mLastJumpInputTime;             // Time of last jump input (key-down) in seconds from LLTimer::getTotalSeconds()
 
-    BOOL            mIgnorePrejump;
+    bool            mIgnorePrejump;
     //--------------------------------------------------------------------
     // Animations
     //--------------------------------------------------------------------
@@ -563,8 +525,8 @@ public:
 
     void            endAnimationUpdateUI();
     void            unpauseAnimation() { mPauseRequest = NULL; }
-    BOOL            getCustomAnim() const { return mCustomAnim; }
-    void            setCustomAnim(BOOL anim) { mCustomAnim = anim; }
+    bool            getCustomAnim() const { return mCustomAnim; }
+    void            setCustomAnim(bool anim) { mCustomAnim = anim; }
 
     typedef boost::signals2::signal<void ()> camera_signal_t;
     boost::signals2::connection setMouselookModeInCallback( const camera_signal_t::slot_type& cb );
@@ -573,9 +535,9 @@ public:
 private:
     camera_signal_t* mMouselookModeInSignal;
     camera_signal_t* mMouselookModeOutSignal;
-    BOOL            mCustomAnim;        // Current animation is ANIM_AGENT_CUSTOMIZE ?
+    bool            mCustomAnim;        // Current animation is ANIM_AGENT_CUSTOMIZE ?
     LLPointer<LLPauseRequestHandle> mPauseRequest;
-    BOOL            mViewsPushed;       // Keep track of whether or not we have pushed views
+    bool            mViewsPushed;       // Keep track of whether or not we have pushed views
 
 /**                    Animation
  **                                                                            **
@@ -601,8 +563,8 @@ public:
     void            moveYaw(F32 mag, bool reset_view = true);
     void            movePitch(F32 mag);
 
-    BOOL            isMovementLocked() const                { return mMovementKeysLocked; }
-    void            setMovementLocked(BOOL set_locked)  { mMovementKeysLocked = set_locked; }
+    bool            isMovementLocked() const                { return mMovementKeysLocked; }
+    void            setMovementLocked(bool set_locked)  { mMovementKeysLocked = set_locked; }
 
     //--------------------------------------------------------------------
     // Move the avatar's frame
@@ -621,12 +583,12 @@ public:
     // Autopilot
     //--------------------------------------------------------------------
 public:
-    BOOL            getAutoPilot() const                { return mAutoPilot; }
+    bool            getAutoPilot() const                { return mAutoPilot; }
     LLVector3d      getAutoPilotTargetGlobal() const    { return mAutoPilotTargetGlobal; }
     LLUUID          getAutoPilotLeaderID() const        { return mLeaderID; }
     F32             getAutoPilotStopDistance() const    { return mAutoPilotStopDistance; }
     F32             getAutoPilotTargetDist() const      { return mAutoPilotTargetDist; }
-    BOOL            getAutoPilotUseRotation() const     { return mAutoPilotUseRotation; }
+    bool            getAutoPilotUseRotation() const     { return mAutoPilotUseRotation; }
     LLVector3       getAutoPilotTargetFacing() const    { return mAutoPilotTargetFacing; }
     F32             getAutoPilotRotationThreshold() const   { return mAutoPilotRotationThreshold; }
     std::string     getAutoPilotBehaviorName() const    { return mAutoPilotBehaviorName; }
@@ -634,30 +596,30 @@ public:
     void            startAutoPilotGlobal(const LLVector3d &pos_global,
                                          const std::string& behavior_name = std::string(),
                                          const LLQuaternion *target_rotation = NULL,
-                                         void (*finish_callback)(BOOL, void *) = NULL, void *callback_data = NULL,
+                                         void (*finish_callback)(bool, void *) = NULL, void *callback_data = NULL,
                                          F32 stop_distance = 0.f, F32 rotation_threshold = 0.03f,
-                                         BOOL allow_flying = TRUE);
-    void            startFollowPilot(const LLUUID &leader_id, BOOL allow_flying = TRUE, F32 stop_distance = 0.5f);
-    void            stopAutoPilot(BOOL user_cancel = FALSE);
+                                         bool allow_flying = true);
+    void            startFollowPilot(const LLUUID &leader_id, bool allow_flying = true, F32 stop_distance = 0.5f);
+    void            stopAutoPilot(bool user_cancel = false);
     void            setAutoPilotTargetGlobal(const LLVector3d &target_global);
     void            autoPilot(F32 *delta_yaw);          // Autopilot walking action, angles in radians
     void            renderAutoPilotTarget();
 private:
-    BOOL            mAutoPilot;
-    BOOL            mAutoPilotFlyOnStop;
-    BOOL            mAutoPilotAllowFlying;
+    bool            mAutoPilot;
+    bool            mAutoPilotFlyOnStop;
+    bool            mAutoPilotAllowFlying;
     LLVector3d      mAutoPilotTargetGlobal;
     F32             mAutoPilotStopDistance;
-    BOOL            mAutoPilotUseRotation;
+    bool            mAutoPilotUseRotation;
     LLVector3       mAutoPilotTargetFacing;
     F32             mAutoPilotTargetDist;
     S32             mAutoPilotNoProgressFrameCount;
     F32             mAutoPilotRotationThreshold;
     std::string     mAutoPilotBehaviorName;
-    void            (*mAutoPilotFinishedCallback)(BOOL, void *);
+    void            (*mAutoPilotFinishedCallback)(bool, void *);
     void*           mAutoPilotCallbackData;
     LLUUID          mLeaderID;
-    BOOL            mMovementKeysLocked;
+    bool            mMovementKeysLocked;
     bool            mMovementResetCamera;
 
 /**                    Movement
@@ -702,7 +664,7 @@ private:
 public:
     void            teleportViaLandmark(const LLUUID& landmark_id);         // Teleport to a landmark
     void            teleportHome()  { teleportViaLandmark(LLUUID::null); }  // Go home
-    void            teleportViaLure(const LLUUID& lure_id, BOOL godlike);   // To an invited location
+    void            teleportViaLure(const LLUUID& lure_id, bool godlike);   // To an invited location
     void            teleportViaLocation(const LLVector3d& pos_global);      // To a global location - this will probably need to be deprecated
 // [RLVa:KB] - Checked: RLVa-2.0.0
     void            teleportViaLocationLookAt(const LLVector3d& pos_global, const LLVector3& look_at = LLVector3::zero);// To a global location, preserving camera rotation
@@ -748,13 +710,13 @@ private:
     void            startTeleportRequest();
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
-    void            teleportRequest(const LLVector3d& pos_global, const LLVector3& look_at = LLVector3(0, 1, 0));
+    void            teleportRequest(const U64& region_handle, const LLVector3& pos_local, const LLVector3& look_at = LLVector3(0, 1, 0));
 // [/RLVa:KB]
 //  void            teleportRequest(const U64& region_handle,
 //                                  const LLVector3& pos_local,             // Go to a named location home
 //                                  bool look_at_from_camera = false);
     void            doTeleportViaLandmark(const LLUUID& landmark_id);           // Teleport to a landmark
-    void            doTeleportViaLure(const LLUUID& lure_id, BOOL godlike); // To an invited location
+    void            doTeleportViaLure(const LLUUID& lure_id, bool godlike); // To an invited location
     void            doTeleportViaLocation(const LLVector3d& pos_global);        // To a global location - this will probably need to be deprecated
 // [RLVa:KB] - Checked: RLVa-2.0.0
     void            doTeleportViaLocationLookAt(const LLVector3d& pos_global, const LLVector3& look_at);// To a global location, preserving camera rotation
@@ -805,14 +767,14 @@ private:
 
 public:
     // Checks if agent can modify an object based on the permissions and the agent's proxy status.
-    BOOL            isGrantedProxy(const LLPermissions& perm);
-    BOOL            allowOperation(PermissionBit op,
+    bool            isGrantedProxy(const LLPermissions& perm);
+    bool            allowOperation(PermissionBit op,
                                    const LLPermissions& perm,
                                    U64 group_proxy_power = 0,
                                    U8 god_minimum = GOD_MAINTENANCE);
     const LLAgentAccess& getAgentAccess();
-    BOOL            canManageEstate() const;
-    BOOL            getAdminOverride() const;
+    bool            canManageEstate() const;
+    bool            getAdminOverride() const;
 private:
     LLAgentAccess * mAgentAccess;
 
@@ -823,12 +785,12 @@ public:
     bool            isGodlike() const;
     bool            isGodlikeWithoutAdminMenuFakery() const;
     U8              getGodLevel() const;
-    void            setAdminOverride(BOOL b);
+    void            setAdminOverride(bool b);
     void            setGodLevel(U8 god_level);
     void            requestEnterGodMode();
     void            requestLeaveGodMode();
 
-    typedef boost::function<void (U8)>         god_level_change_callback_t;
+    typedef std::function<void(U8)>            god_level_change_callback_t;
     typedef boost::signals2::signal<void (U8)> god_level_change_signal_t;
     typedef boost::signals2::connection        god_level_change_slot_t;
 
@@ -894,13 +856,13 @@ private:
 
 public:
     LLQuaternion    getHeadRotation();
-    BOOL            needsRenderAvatar(); // TRUE when camera mode is such that your own avatar should draw
-    BOOL            needsRenderHead();
-    void            setShowAvatar(BOOL show) { mShowAvatar = show; }
-    BOOL            getShowAvatar() const { return mShowAvatar; }
+    bool            needsRenderAvatar(); // true when camera mode is such that your own avatar should draw
+    bool            needsRenderHead();
+    void            setShowAvatar(bool show) { mShowAvatar = show; }
+    bool            getShowAvatar() const { return mShowAvatar; }
 
 private:
-    BOOL            mShowAvatar;        // Should we render the avatar?
+    bool            mShowAvatar;        // Should we render the avatar?
 
     //--------------------------------------------------------------------
     // Rendering state bitmap helpers
@@ -916,7 +878,7 @@ private:
     // HUD
     //--------------------------------------------------------------------
 public:
-    const LLColor4  getEffectColor();
+    LLColor4        getEffectColor();
     void            setEffectColor(const LLColor4 &color);
 private:
     LLUIColor * mEffectColor;
@@ -932,15 +894,15 @@ private:
 
 public:
     const LLUUID    &getGroupID() const         { return mGroupID; }
-    // Get group information by group_id, or FALSE if not in group.
-    BOOL            getGroupData(const LLUUID& group_id, LLGroupData& data) const;
+    // Get group information by group_id, or false if not in group.
+    bool            getGroupData(const LLUUID& group_id, LLGroupData& data) const;
     // Get just the agent's contribution to the given group.
     S32             getGroupContribution(const LLUUID& group_id) const;
     // Update internal datastructures and update the server.
-    BOOL            setGroupContribution(const LLUUID& group_id, S32 contribution);
-    BOOL            setUserGroupFlags(const LLUUID& group_id, BOOL accept_notices, BOOL list_in_profile);
+    bool            setGroupContribution(const LLUUID& group_id, S32 contribution);
+    bool            setUserGroupFlags(const LLUUID& group_id, bool accept_notices, bool list_in_profile);
     const std::string &getGroupName() const     { return mGroupName; }
-    BOOL            canJoinGroups() const;
+    bool            canJoinGroups() const;
 private:
     std::string     mGroupName;
     LLUUID          mGroupID;
@@ -950,10 +912,10 @@ private:
     //--------------------------------------------------------------------
 public:
     // Checks against all groups in the entire agent group list.
-    BOOL            isInGroup(const LLUUID& group_id, BOOL ingnore_God_mod = FALSE) const;
+    bool            isInGroup(const LLUUID& group_id, bool ingnore_God_mod = false) const;
 protected:
     // Only used for building titles.
-    BOOL            isGroupMember() const       { return !mGroupID.isNull(); }
+    bool            isGroupMember() const       { return !mGroupID.isNull(); }
 public:
     std::vector<LLGroupData> mGroups;
 
@@ -961,19 +923,19 @@ public:
     // Group Title
     //--------------------------------------------------------------------
 public:
-    void            setHideGroupTitle(BOOL hide)    { mHideGroupTitle = hide; }
-    BOOL            isGroupTitleHidden() const      { return mHideGroupTitle; }
+    void            setHideGroupTitle(bool hide)    { mHideGroupTitle = hide; }
+    bool            isGroupTitleHidden() const      { return mHideGroupTitle; }
     LLUUID          getGroupForRezzing();
 private:
     std::string     mGroupTitle;                    // Honorific, like "Sir"
-    BOOL            mHideGroupTitle;
+    bool            mHideGroupTitle;
 
     //--------------------------------------------------------------------
     // Group Powers
     //--------------------------------------------------------------------
 public:
-    BOOL            hasPowerInGroup(const LLUUID& group_id, U64 power) const;
-    BOOL            hasPowerInActiveGroup(const U64 power) const;
+    bool            hasPowerInGroup(const LLUUID& group_id, U64 power) const;
+    bool            hasPowerInActiveGroup(const U64 power) const;
     U64             getPowerInGroup(const LLUUID& group_id) const;
     U64             mGroupPowers;
 
@@ -1006,14 +968,14 @@ public:
     void            sendAgentUserInfoRequest();
 
 // IM to Email and Online visibility
-    void            sendAgentUpdateUserInfo(bool im_to_email, const std::string& directory_visibility);
+    void            sendAgentUpdateUserInfo(const std::string& directory_visibility);
 
 private:
     void            requestAgentUserInfoCoro(std::string capurl);
-    void            updateAgentUserInfoCoro(std::string capurl, bool im_via_email, std::string directory_visibility);
+    void            updateAgentUserInfoCoro(std::string capurl, std::string directory_visibility);
     // DEPRECATED: may be removed when User Info cap propagates
     void            sendAgentUserInfoRequestMessage();
-    void            sendAgentUpdateUserInfoMessage(bool im_via_email, const std::string& directory_visibility);
+    void            sendAgentUpdateUserInfoMessage(const std::string& directory_visibility);
 
     //--------------------------------------------------------------------
     // Receive
@@ -1037,8 +999,8 @@ public:
 
     /// Utilities for allowing the the agent sub managers to post and get via
     /// HTTP using the agent's policy settings and headers.
-    bool requestPostCapability(const std::string &capName, LLSD &postData, httpCallback_t cbSuccess = NULL, httpCallback_t cbFailure = NULL);
-    bool requestGetCapability(const std::string &capName, httpCallback_t cbSuccess = NULL, httpCallback_t cbFailure = NULL);
+    bool requestPostCapability(const std::string &capName, LLSD &postData, httpCallback_t cbSuccess = nullptr, httpCallback_t cbFailure = nullptr);
+    bool requestGetCapability(const std::string& capName, httpCallback_t cbSuccess = nullptr, httpCallback_t cbFailure = nullptr);
 
     LLCore::HttpRequest::policy_t getAgentPolicy() const { return mHttpPolicy; }
 

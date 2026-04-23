@@ -34,31 +34,21 @@
 
 #include "lldispatcher.h"
 #include "llfloaterreg.h"
-#include "llnotifications.h"
-#include "llnotificationsutil.h"
 #include "llparcel.h"
 
 #include "llagent.h"
 #include "llclassifiedflags.h"
-#include "llclassifiedinfo.h"
 #include "lliconctrl.h"
-#include "lllineeditor.h"
-#include "llcombobox.h"
 #include "lltexturectrl.h"
-#include "lltexteditor.h"
-#include "llviewerparcelmgr.h"
 #include "llfloaterworldmap.h"
 #include "llviewergenericmessage.h" // send_generic_message
 #include "llviewerregion.h"
-#include "llviewertexture.h"
-#include "lltrans.h"
 #include "llscrollcontainer.h"
-#include "llstatusbar.h"
 #include "llcorehttputil.h"
 
 //static
 LLPanelClassifiedInfo::panel_list_t LLPanelClassifiedInfo::sAllPanels;
-static LLPanelInjector<LLPanelClassifiedInfo> t_panel_classified_info("panel_classified_info");
+static LLPanelInjector<LLPanelClassifiedInfo> t_panel_panel_classified_info("panel_classified_info");
 
 // "classifiedclickthrough"
 // strings[0] = classified_id
@@ -92,12 +82,9 @@ static LLDispatchClassifiedClickThrough sClassifiedClickThrough;
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-static LLPanelInjector<LLPanelClassifiedInfo> t_classified_info("panel_classified_info");
-
 LLPanelClassifiedInfo::LLPanelClassifiedInfo()
  : LLPanel()
  , mInfoLoaded(false)
- , mFromSearch(false)
  , mScrollingPanel(NULL)
  , mScrollContainer(NULL)
  , mScrollingPanelMinHeight(0)
@@ -118,20 +105,14 @@ LLPanelClassifiedInfo::~LLPanelClassifiedInfo()
 {
     sAllPanels.remove(this);
 
-    LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+    if (getAvatarId().notNull())
+    {
+        LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+    }
 }
 
-// static
-LLPanelClassifiedInfo* LLPanelClassifiedInfo::create()
+bool LLPanelClassifiedInfo::postBuild()
 {
-    LLPanelClassifiedInfo* panel = new LLPanelClassifiedInfo();
-    panel->buildFromFile("panel_classified_info.xml");
-    return panel;
-}
-
-BOOL LLPanelClassifiedInfo::postBuild()
-{
-    childSetAction("back_btn", boost::bind(&LLPanelClassifiedInfo::onExit, this));
     childSetAction("show_on_map_btn", boost::bind(&LLPanelClassifiedInfo::onMapClick, this));
     childSetAction("teleport_btn", boost::bind(&LLPanelClassifiedInfo::onTeleportClick, this));
 
@@ -144,20 +125,10 @@ BOOL LLPanelClassifiedInfo::postBuild()
     mSnapshotCtrl = getChild<LLTextureCtrl>("classified_snapshot");
     mSnapshotRect = getDefaultSnapshotRect();
 
-    return TRUE;
+    return true;
 }
 
-void LLPanelClassifiedInfo::setExitCallback(const commit_callback_t& cb)
-{
-    getChild<LLButton>("back_btn")->setClickedCallback(cb);
-}
-
-void LLPanelClassifiedInfo::setEditClassifiedCallback(const commit_callback_t& cb)
-{
-    getChild<LLButton>("edit_btn")->setClickedCallback(cb);
-}
-
-void LLPanelClassifiedInfo::reshape(S32 width, S32 height, BOOL called_from_parent /* = TRUE */)
+void LLPanelClassifiedInfo::reshape(S32 width, S32 height, bool called_from_parent /* = true */)
 {
     LLPanel::reshape(width, height, called_from_parent);
 
@@ -182,7 +153,20 @@ void LLPanelClassifiedInfo::reshape(S32 width, S32 height, BOOL called_from_pare
 
 void LLPanelClassifiedInfo::onOpen(const LLSD& key)
 {
-    setAvatarId(key["classified_creator_id"].asUUID());
+    bool from_search = key.has("from_search") ? key["from_search"].asBoolean() : false;
+
+    LLUUID avatar_id = key["classified_creator_id"];
+    if(avatar_id.isNull() && !from_search)
+    {
+        return;
+    }
+
+    if(getAvatarId().notNull())
+    {
+        LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+    }
+
+    setAvatarId(avatar_id);
 
     resetData();
     resetControls();
@@ -198,7 +182,6 @@ void LLPanelClassifiedInfo::onOpen(const LLSD& key)
 
     LLAvatarPropertiesProcessor::getInstance()->addObserver(getAvatarId(), this);
     LLAvatarPropertiesProcessor::getInstance()->sendClassifiedInfoRequest(getClassifiedId());
-
     gGenericDispatcher.addHandler("classifiedclickthrough", &sClassifiedClickThrough);
 
     if (gAgent.getRegion())
@@ -278,13 +261,20 @@ void LLPanelClassifiedInfo::processProperties(void* data, EAvatarProcessorType t
             LLStringUtil::format(date_str, LLSD().with("datetime", (S32) c_info->creation_date));
             getChild<LLUICtrl>("creation_date")->setValue(date_str);
 
-            date_str = date_fmt;
-            LLStringUtil::format(date_str, LLSD().with("datetime", (S32) c_info->expiration_date));
-            getChild<LLUICtrl>("expiration_date")->setValue(date_str);
-
             setInfoLoaded(true);
+
+            LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
         }
     }
+}
+
+void LLPanelClassifiedInfo::setAvatarId(const LLUUID& avatar_id)
+{
+    if (mAvatarId.notNull())
+    {
+        LLAvatarPropertiesProcessor::getInstance()->removeObserver(mAvatarId, this);
+    }
+    mAvatarId = avatar_id;
 }
 
 void LLPanelClassifiedInfo::resetData()
@@ -314,8 +304,8 @@ void LLPanelClassifiedInfo::resetData()
     getChild<LLUICtrl>("auto_renew")->setValue(LLStringUtil::null);
     getChild<LLUICtrl>("creation_date")->setValue(LLStringUtil::null);
     getChild<LLUICtrl>("click_through_text")->setValue(LLStringUtil::null);
-    getChild<LLIconCtrl>("content_type_moderate")->setVisible(FALSE);
-    getChild<LLIconCtrl>("content_type_general")->setVisible(FALSE);
+    getChild<LLIconCtrl>("content_type_moderate")->setVisible(false);
+    getChild<LLIconCtrl>("content_type_general")->setVisible(false);
 }
 
 void LLPanelClassifiedInfo::resetControls()
@@ -393,8 +383,9 @@ void LLPanelClassifiedInfo::setClickThrough(
             << teleport << ", " << map << ", " << profile << "] ("
             << (from_new_table ? "new" : "old") << ")" << LL_ENDL;
 
-    for (auto self : sAllPanels)
+    for (panel_list_t::iterator iter = sAllPanels.begin(); iter != sAllPanels.end(); ++iter)
     {
+        LLPanelClassifiedInfo* self = *iter;
         if (self->getClassifiedId() != classified_id)
         {
             continue;
@@ -499,8 +490,8 @@ void LLPanelClassifiedInfo::stretchSnapshot()
     // Lets increase texture height to force texture look as expected.
     rc.mBottom -= BTN_HEIGHT_SMALL;
 
-    F32 t_width = texture->getFullWidth();
-    F32 t_height = texture->getFullHeight();
+    F32 t_width = (F32)texture->getFullWidth();
+    F32 t_height = (F32)texture->getFullHeight();
 
     F32 ratio = llmin<F32>( (rc.getWidth() / t_width), (rc.getHeight() / t_height) );
 
@@ -586,8 +577,4 @@ void LLPanelClassifiedInfo::onTeleportClick()
     }
 }
 
-void LLPanelClassifiedInfo::onExit()
-{
-    LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
-    gGenericDispatcher.addHandler("classifiedclickthrough", nullptr); // deregister our handler
-}
+//EOF

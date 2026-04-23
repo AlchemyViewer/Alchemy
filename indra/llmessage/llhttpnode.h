@@ -102,7 +102,7 @@ public:
     class Response : public LLRefCount
     {
     protected:
-        virtual ~Response() = default;
+        virtual ~Response();
 
     public:
         /**
@@ -298,7 +298,7 @@ private:
 
 
 
-class LLSimpleResponse final : public LLHTTPNode::Response
+class LLSimpleResponse : public LLHTTPNode::Response
 {
 public:
     static LLPointer<LLSimpleResponse> create();
@@ -314,7 +314,7 @@ public:
     std::string mMessage;
 
 protected:
-    ~LLSimpleResponse() = default;
+    ~LLSimpleResponse();
 
 private:
         LLSimpleResponse() : mCode(0) {} // Must be accessed through LLPointer.
@@ -350,7 +350,7 @@ public:
     class NodeFactory
     {
     public:
-        virtual ~NodeFactory() = default;
+        virtual ~NodeFactory();
         virtual LLHTTPNode* build() const = 0;
     };
 

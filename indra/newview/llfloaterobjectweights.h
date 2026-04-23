@@ -41,7 +41,7 @@ class LLTextBox;
  * A functor that checks whether a bounding box for all
  * selected objects crosses a region or parcel bounds.
  */
-struct LLCrossParcelFunctor final : public LLSelectedObjectFunctor
+struct LLCrossParcelFunctor : public LLSelectedObjectFunctor
 {
     /*virtual*/ bool apply(LLViewerObject* obj);
 
@@ -50,7 +50,7 @@ private:
 };
 
 
-class LLFloaterObjectWeights final : public LLFloater, LLAccountingCostObserver
+class LLFloaterObjectWeights : public LLFloater, LLAccountingCostObserver
 {
 public:
     LOG_CLASS(LLFloaterObjectWeights);
@@ -58,21 +58,24 @@ public:
     LLFloaterObjectWeights(const LLSD& key);
     ~LLFloaterObjectWeights();
 
-    /*virtual*/ BOOL postBuild();
+    bool postBuild() override;
 
-    /*virtual*/ void onOpen(const LLSD& key);
+    void onOpen(const LLSD& key) override;
 
-    /*virtual*/ void onWeightsUpdate(const SelectionCost& selection_cost);
-    /*virtual*/ void setErrorStatus(S32 status, const std::string& reason);
+    void onWeightsUpdate(const SelectionCost& selection_cost) override;
+    void setErrorStatus(S32 status, const std::string& reason) override;
+
+    void draw() override;
 
     void updateLandImpacts(const LLParcel* parcel);
-    void refresh();
+    void refresh() override;
 
 private:
-    /*virtual*/ void generateTransactionID();
+    void generateTransactionID() override;
 
     void toggleWeightsLoadingIndicators(bool visible);
     void toggleLandImpactsLoadingIndicators(bool visible);
+    void toggleRenderLoadingIndicators(bool visible);
 
     void updateIfNothingSelected();
 
@@ -88,6 +91,10 @@ private:
     LLTextBox       *mRezzedOnLand;
     LLTextBox       *mRemainingCapacity;
     LLTextBox       *mTotalCapacity;
+
+    LLTextBox       *mLodLevel;
+    LLTextBox       *mTrianglesShown;
+    LLTextBox       *mPixelArea;
 };
 
 #endif //LL_LLFLOATEROBJECTWEIGHTS_H

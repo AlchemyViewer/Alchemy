@@ -42,7 +42,7 @@
     ...
 
     //allocate a 256x256 RGBA render target with depth buffer
-    target.allocate(256,256,GL_RGBA,TRUE);
+    target.allocate(256,256,GL_RGBA,true);
 
     //render to contents of offscreen buffer
     target.bindTarget();
@@ -61,13 +61,20 @@
 class LLRenderTarget
 {
 public:
-    //whether or not to use FBO implementation
+    // Whether or not to use FBO implementation
     static bool sUseFBO;
     static U32 sBytesAllocated;
     static U32 sCurFBO;
     static U32 sCurResX;
     static U32 sCurResY;
 
+    // Format options for the depth buffer.
+    // Combined depth+stencil is selected automatically when stencil is requested.
+    enum eDepthFormat : U32
+    {
+        DEPTH_FMT_24 = 0,   // GL_DEPTH_COMPONENT24 / GL_DEPTH24_STENCIL8
+        DEPTH_FMT_32F,      // GL_DEPTH_COMPONENT32F / GL_DEPTH32F_STENCIL8
+    };
 
     LLRenderTarget();
     ~LLRenderTarget();
@@ -79,8 +86,10 @@ public:
     // resY - height
     // color_fmt - GL color format (e.g. GL_RGB)
     // depth - if true, allocate a depth buffer
+    // stencil - if true, allocate a combined depth+stencil buffer (requires depth)
     // usage - deprecated, should always be TT_TEXTURE
-    bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, LLTexUnit::eTextureType usage = LLTexUnit::TT_TEXTURE, LLTexUnit::eTextureMipGeneration generateMipMaps = LLTexUnit::TMG_NONE);
+    // depth_fmt - bit depth for the depth component (ignored unless depth is true)
+    bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, bool stencil = false, LLTexUnit::eTextureType usage = LLTexUnit::TT_TEXTURE, LLTexUnit::eTextureMipGeneration generateMipMaps = LLTexUnit::TMG_NONE, eDepthFormat depth_fmt = DEPTH_FMT_24);
 
     //resize existing attachments to use new resolution and color format
     // CAUTION: if the GL runs out of memory attempting to resize, this render target will be undefined
@@ -148,6 +157,8 @@ public:
     U32 getNumTextures() const;
 
     U32 getDepth(void) const { return mDepth; }
+    bool hasStencil() const { return mStencil; }
+    eDepthFormat getDepthFormat() const { return mDepthFormat; }
 
     void bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilterOptions filter_options = LLTexUnit::TFO_BILINEAR);
 
@@ -172,6 +183,8 @@ public:
     // *HACK
     void swapFBORefs(LLRenderTarget& other);
 
+    static LLRenderTarget* sBoundTarget;
+
 protected:
     U32 mResX;
     U32 mResY;
@@ -182,12 +195,12 @@ protected:
 
     U32 mDepth;
     bool mUseDepth;
+    bool mStencil;
+    eDepthFormat mDepthFormat;
     LLTexUnit::eTextureMipGeneration mGenerateMipMaps;
     U32 mMipLevels;
 
     LLTexUnit::eTextureType mUsage;
-
-    static LLRenderTarget* sBoundTarget;
 };
 
 #endif

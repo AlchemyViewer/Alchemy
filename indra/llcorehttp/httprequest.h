@@ -27,7 +27,6 @@
 #ifndef _LLCORE_HTTP_REQUEST_H_
 #define _LLCORE_HTTP_REQUEST_H_
 
-#include <boost/function.hpp>
 
 #include "httpcommon.h"
 #include "httphandler.h"
@@ -90,9 +89,11 @@ public:
     HttpRequest();
     virtual ~HttpRequest();
 
-    HttpRequest(const HttpRequest &) = delete;          // Disallowed
-    void operator=(const HttpRequest &) = delete;       // Disallowed
+private:
+    HttpRequest(const HttpRequest &);           // Disallowed
+    void operator=(const HttpRequest &);        // Disallowed
 
+public:
     typedef unsigned int policy_t;
 
     typedef std::shared_ptr<HttpRequest> ptr_t;
@@ -103,9 +104,9 @@ public:
 
     /// Represents a default, catch-all policy class that guarantees
     /// eventual service for any HTTP request.
-    inline static constexpr policy_t DEFAULT_POLICY_ID = 0;
-    inline static constexpr policy_t INVALID_POLICY_ID = 0xFFFFFFFFU;
-    inline static constexpr policy_t GLOBAL_POLICY_ID = 0xFFFFFFFEU;
+    static constexpr policy_t DEFAULT_POLICY_ID = 0;
+    static constexpr policy_t INVALID_POLICY_ID = 0xFFFFFFFFU;
+    static constexpr policy_t GLOBAL_POLICY_ID = 0xFFFFFFFEU;
 
     /// Create a new policy class into which requests can be made.
     ///
@@ -231,17 +232,12 @@ public:
         /// Global only
         PO_SSL_VERIFY_CALLBACK,
 
-        /// String giving a user agent for app
-        ///
-        /// Global only
-        PO_USER_AGENT,
-
         PO_LAST  // Always at end
     };
 
     /// Prototype for policy based callbacks.  The callback methods will be executed
     /// on the worker thread so no modifications should be made to the HttpHandler object.
-    typedef boost::function<HttpStatus(const std::string &, const HttpHandler::ptr_t &, void *)> policyCallback_t;
+    typedef std::function<HttpStatus(const std::string &, const HttpHandler::ptr_t &, void *)> policyCallback_t;
 
     /// Set a policy option for a global or class parameter at
     /// startup time (prior to thread start).

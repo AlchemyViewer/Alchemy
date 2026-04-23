@@ -32,7 +32,6 @@
 #include "llviewerprecompiledheaders.h"
 #include "llviewercontrol.h"
 #include "llglheaders.h"
-#include "llsphere.h"
 #include "llvoicevisualizer.h"
 #include "llviewercamera.h"
 #include "llviewerobject.h"
@@ -41,7 +40,6 @@
 #include "llvoiceclient.h"
 #include "llrender.h"
 #include "llagent.h"
-#include "alcinematicmode.h"
 
 //brent's wave image
 //29de489d-0491-fb00-7dab-f9e686d31e83
@@ -126,7 +124,7 @@ LLVoiceVisualizer::LLVoiceVisualizer( const U8 type )
     for (int i=0; i<NUM_VOICE_SYMBOL_WAVES; i++)
     {
         mSoundSymbol.mWaveFadeOutStartTime  [i] = mCurrentTime;
-        mSoundSymbol.mTexture               [i] = LLViewerTextureManager::getFetchedTextureFromFile(sound_level_img[i], FTT_LOCAL_FILE, FALSE, LLGLTexture::BOOST_UI);
+        mSoundSymbol.mTexture               [i] = LLViewerTextureManager::getFetchedTextureFromFile(sound_level_img[i], FTT_LOCAL_FILE, false, LLGLTexture::BOOST_UI);
         mSoundSymbol.mWaveActive            [i] = false;
         mSoundSymbol.mWaveOpacity           [i] = 1.0f;
         mSoundSymbol.mWaveExpansion         [i] = 1.0f;
@@ -339,7 +337,7 @@ void LLVoiceVisualizer::lipSyncOohAah( F32& ooh, F32& aah )
 void LLVoiceVisualizer::render()
 {
     static LLCachedControl<bool> show_visualizer(gSavedSettings, "VoiceVisualizerEnabled", true);
-    if ( ! mVoiceEnabled  || !show_visualizer || ALCinematicMode::isEnabled())
+    if (!mVoiceEnabled || !show_visualizer)
     {
         return;
     }

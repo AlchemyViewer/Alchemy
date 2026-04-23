@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2020&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2020, Rye Mutt <rye@alchemyviewer.org>
+ * Copyright (C) Rye Mutt <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -58,9 +58,9 @@ public:
 
     // Copy various data types about avatar(name, slurl, uuid) to clipboard
     static void copyData(const LLUUID& id, ECopyDataType type);
-    static void copyData(const uuid_vec_t& ids, ECopyDataType type);
-    static void copyData(const LLUUID& id, const LLSD& userdata);
-    static void copyData(const uuid_vec_t& id, const LLSD& userdata);
+    static void copyDataMultiple(const uuid_vec_t& ids, ECopyDataType type);
+    static void copyDataUI(const LLUUID& id, const LLSD& userdata);
+    static void copyDataMultipleUI(const uuid_vec_t& id, const LLSD& userdata);
 
     // Local actions
     static bool canZoomIn(const LLUUID& idAgent);
@@ -73,21 +73,21 @@ public:
 
     // Parcel actions
     static bool canFreezeEject(const LLUUID& avatar_id);
-    static bool canFreezeEject(const uuid_vec_t& ids);
+    static bool canFreezeEjectMultiple(const uuid_vec_t& ids);
     static void parcelFreeze(const LLUUID& avatar_id);
-    static void parcelFreeze(const uuid_vec_t& ids);
+    static void parcelFreezeMultiple(const uuid_vec_t& ids);
     static void parcelEject(const LLUUID& avatar_id);
-    static void parcelEject(const uuid_vec_t& ids);
+    static void parcelEjectMultiple(const uuid_vec_t& ids);
 
     // Estate actions
     static bool canManageAvatarsEstate(const LLUUID& avatar_id);
-    static bool canManageAvatarsEstate(const uuid_vec_t& ids);
+    static bool canManageAvatarsEstateMultiple(const uuid_vec_t& ids);
     static void estateTeleportHome(const LLUUID& avatar_id);
-    static void estateTeleportHome(const uuid_vec_t& ids);
+    static void estateTeleportHomeMultiple(const uuid_vec_t& ids);
     static void estateKick(const LLUUID& avatar_id);
-    static void estateKick(const uuid_vec_t& ids);
+    static void estateKickMultiple(const uuid_vec_t& ids);
     static void estateBan(const LLUUID& avatar_id);
-    static void estateBan(const uuid_vec_t& ids);
+    static void estateBanMultiple(const uuid_vec_t& ids);
 
     // God actions
     static void godKick(const LLUUID& id);
@@ -96,6 +96,11 @@ public:
 
     // Webprofile
     static void showWebProfile(const LLUUID& id);
+
+    /**
+     * Checks whether agent is mappable
+     */
+    static bool isAgentMappable(const LLUUID& agent_id);
 
 private:
     static bool handleParcelFreeze(const LLSD& notification, const LLSD& response);

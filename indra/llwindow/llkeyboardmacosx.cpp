@@ -133,7 +133,8 @@ LLKeyboardMacOSX::LLKeyboardMacOSX()
     mTranslateKeyMap[0x7e] = KEY_UP;
 
     // Build inverse map
-    for (auto iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
+    std::map<U16, KEY>::iterator iter;
+    for (iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
     {
         mInvTranslateKeyMap[iter->second] = iter->first;
     }
@@ -153,7 +154,7 @@ LLKeyboardMacOSX::LLKeyboardMacOSX()
     mTranslateNumpadMap[0x4c] = KEY_PAD_RETURN; // keypad enter
 
     // Build inverse numpad map
-    for (auto iter = mTranslateNumpadMap.begin(); iter != mTranslateNumpadMap.end(); iter++)
+    for (iter = mTranslateNumpadMap.begin(); iter != mTranslateNumpadMap.end(); iter++)
     {
         mInvTranslateNumpadMap[iter->second] = iter->first;
     }
@@ -161,7 +162,7 @@ LLKeyboardMacOSX::LLKeyboardMacOSX()
 
 void LLKeyboardMacOSX::resetMaskKeys()
 {
-    U32 mask = getModifiers();
+    MASK mask = getModifiers();
 
     // MBW -- XXX -- This mirrors the operation of the Windows version of resetMaskKeys().
     //    It looks a bit suspicious, as it won't correct for keys that have been released.
@@ -171,25 +172,25 @@ void LLKeyboardMacOSX::resetMaskKeys()
 
     if(mask & MAC_SHIFT_KEY)
     {
-        mKeyLevel[KEY_SHIFT] = TRUE;
+        mKeyLevel[KEY_SHIFT] = true;
     }
 
     if(mask & MAC_CTRL_KEY)
     {
-        mKeyLevel[KEY_CONTROL] = TRUE;
+        mKeyLevel[KEY_CONTROL] = true;
     }
 
     if(mask & MAC_ALT_KEY)
     {
-        mKeyLevel[KEY_ALT] = TRUE;
+        mKeyLevel[KEY_ALT] = true;
     }
 }
 
 /*
-static BOOL translateKeyMac(const U32 key, const U32 mask, KEY &outKey, U32 &outMask)
+static bool translateKeyMac(const U16 key, const MASK mask, KEY &outKey, U32 &outMask)
 {
     // Translate the virtual keycode into the keycodes the keyboard system expects.
-    U32 virtualKey = (mask >> 24) & 0x0000007F;
+    U16 virtualKey = (mask >> 24) & 0x0000007F;
     outKey = macKeyTransArray[virtualKey];
 
 
@@ -202,7 +203,7 @@ void LLKeyboardMacOSX::handleModifier(MASK mask)
     updateModifiers(mask);
 }
 
-MASK LLKeyboardMacOSX::updateModifiers(const U32 mask)
+MASK LLKeyboardMacOSX::updateModifiers(const MASK mask)
 {
     // translate the mask
     MASK out_mask = 0;
@@ -225,11 +226,11 @@ MASK LLKeyboardMacOSX::updateModifiers(const U32 mask)
     return out_mask;
 }
 
-BOOL LLKeyboardMacOSX::handleKeyDown(const U32 key, U32 mask)
+bool LLKeyboardMacOSX::handleKeyDown(const U16 key, MASK mask)
 {
     KEY     translated_key = 0;
     U32     translated_mask = 0;
-    BOOL    handled = FALSE;
+    bool    handled = false;
 
     translated_mask = updateModifiers(mask);
 
@@ -242,11 +243,11 @@ BOOL LLKeyboardMacOSX::handleKeyDown(const U32 key, U32 mask)
 }
 
 
-BOOL LLKeyboardMacOSX::handleKeyUp(const U32 key, U32 mask)
+bool LLKeyboardMacOSX::handleKeyUp(const U16 key, MASK mask)
 {
     KEY     translated_key = 0;
     U32     translated_mask = 0;
-    BOOL    handled = FALSE;
+    bool    handled = false;
 
     translated_mask = updateModifiers(mask);
 
@@ -258,10 +259,10 @@ BOOL LLKeyboardMacOSX::handleKeyUp(const U32 key, U32 mask)
     return handled;
 }
 
-MASK LLKeyboardMacOSX::currentMask(BOOL for_mouse_event)
+MASK LLKeyboardMacOSX::currentMask(bool for_mouse_event)
 {
     MASK result = MASK_NONE;
-    U32 mask = getModifiers();
+    MASK mask = getModifiers();
 
     if (mask & MAC_SHIFT_KEY)           result |= MASK_SHIFT;
     if (mask & MAC_CTRL_KEY)            result |= MASK_CONTROL;
@@ -278,7 +279,7 @@ MASK LLKeyboardMacOSX::currentMask(BOOL for_mouse_event)
 
 void LLKeyboardMacOSX::scanKeyboard()
 {
-    U32 key;
+    S32 key;
     for (key = 0; key < KEY_COUNT; key++)
     {
         // Generate callback if any event has occurred on this key this frame.
@@ -290,12 +291,13 @@ void LLKeyboardMacOSX::scanKeyboard()
             mCallbacks->handleScanKey(key, mKeyDown[key], mKeyUp[key], mKeyLevel[key]);
         }
     }
+    mCurScanKey = KEY_NONE;
 
     // Reset edges for next frame
     for (key = 0; key < KEY_COUNT; key++)
     {
-        mKeyUp[key] = FALSE;
-        mKeyDown[key] = FALSE;
+        mKeyUp[key] = false;
+        mKeyDown[key] = false;
         if (mKeyLevel[key])
         {
             mKeyLevelFrameCount[key]++;
@@ -303,12 +305,12 @@ void LLKeyboardMacOSX::scanKeyboard()
     }
 }
 
-BOOL LLKeyboardMacOSX::translateNumpadKey( const U32 os_key, KEY *translated_key )
+bool LLKeyboardMacOSX::translateNumpadKey( const U16 os_key, KEY *translated_key )
 {
     return translateKey(os_key, translated_key);
 }
 
-U32 LLKeyboardMacOSX::inverseTranslateNumpadKey(const KEY translated_key)
+U16 LLKeyboardMacOSX::inverseTranslateNumpadKey(const KEY translated_key)
 {
     return inverseTranslateKey(translated_key);
 }

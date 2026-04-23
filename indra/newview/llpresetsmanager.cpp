@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -25,8 +28,6 @@
  */
 
 #include "llviewerprecompiledheaders.h"
-
-#include <boost/assign/list_of.hpp>
 
 #include "llpresetsmanager.h"
 
@@ -292,38 +293,32 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 {
     const std::vector<std::string> camera_controls = {
         // From panel_preferences_graphics.xml
-        "AlwaysRenderFriends",
         "RenderAnisotropicLevel",
         "RenderAvatarLODFactor",
         "RenderAvatarMaxComplexity",
         "RenderAvatarMaxNonImpostors",
         "RenderAvatarPhysicsLODFactor",
-        "RenderColorGradeLUT",
         "RenderDeferredSSAO",
         "RenderDepthOfField",
         "RenderFSAASamples",
+        "RenderFSAAType",
         "RenderFarClip",
         "RenderFlexTimeFactor",
         "RenderGlowResolutionPow",
-        "RenderLocalLights",
         "RenderLocalLightCount",
         "RenderMaxPartCount",
         "RenderQualityPerformance",
         "RenderShadowDetail",
         "RenderTerrainLODFactor",
         "RenderExposure",
-        "RenderToneMapType",
+        "AlchemyRenderTonemapType",
         "RenderTransparentWater",
         "RenderTreeLODFactor",
         "RenderVolumeLODFactor",
-        "WLSkyDetail",
         "RenderScreenSpaceReflections",
         "RenderReflectionProbeDetail",
         "RenderReflectionProbeLevel"
-        "RenderSharpenMethod",
-        "RenderSharpenDLSSharpness",
-        "RenderSharpenDLSDenoise",
-        "RenderSharpenCASSharpness",
+        "RenderCASSharpness",
     };
     names = camera_controls;
 }
@@ -483,7 +478,7 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
         llofstream presetsXML(pathName.c_str());
         if (presetsXML.is_open())
         {
-            LLPointer<LLSDFormatter> formatter = new LLSDXMLFormatter(false, true);
+            LLPointer<LLSDFormatter> formatter = new LLSDXMLFormatter();
             formatter->format(paramsData, presetsXML, LLSDFormatter::OPTIONS_PRETTY);
             presetsXML.close();
             saved = true;
@@ -522,7 +517,7 @@ bool LLPresetsManager::setPresetNamesInComboBox(const std::string& subdirectory,
     bool sts = true;
 
     combo->clearRows();
-    combo->setEnabled(TRUE);
+    combo->setEnabled(true);
 
     std::list<std::string> preset_names;
     loadPresetNamesFromDir(subdirectory, preset_names, default_option);

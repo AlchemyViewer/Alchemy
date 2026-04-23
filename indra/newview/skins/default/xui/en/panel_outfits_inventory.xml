@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
  <panel name="Outfits"
+ bg_alpha_color="DkGray"
+ bg_opaque_color="DkGray"
+ background_opaque="true"
+ background_visible="true"
   follows="all"
  height="575"
  label="Things"
@@ -15,10 +19,6 @@
    <panel.string
      name="wear_items_tooltip">
      Wear selected items
-   </panel.string>
-   <panel.string
-     name="cof_tab_label">
-     WEARING ([COUNT]/[MAX] Att.)
    </panel.string>
    <tab_container
      follows="all"

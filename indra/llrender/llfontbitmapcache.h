@@ -44,7 +44,7 @@ class LLFontBitmapCache
 {
 public:
     LLFontBitmapCache();
-    ~LLFontBitmapCache() = default;
+    ~LLFontBitmapCache();
 
     // Need to call this once, before caching any glyphs.
     void init(S32 max_char_width,
@@ -52,7 +52,7 @@ public:
 
     void reset();
 
-    BOOL nextOpenPos(S32 width, S32& posX, S32& posY, EFontGlyphType bitmapType, U32& bitmapNum);
+    bool nextOpenPos(S32 width, S32& posX, S32& posY, EFontGlyphType bitmapType, U32& bitmapNum);
 
     void destroyGL();
 
@@ -60,9 +60,10 @@ public:
     LLImageGL* getImageGL(EFontGlyphType bitmapType, U32 bitmapNum) const;
 
     S32 getMaxCharWidth() const { return mMaxCharWidth; }
-    U32 getNumBitmaps(EFontGlyphType bitmapType) const { return (bitmapType < EFontGlyphType::Count) ? mImageRawVec[static_cast<U32>(bitmapType)].size() : 0; }
+    U32 getNumBitmaps(EFontGlyphType bitmapType) const { return (bitmapType < EFontGlyphType::Count) ? static_cast<U32>(mImageRawVec[static_cast<U32>(bitmapType)].size()) : 0U; }
     S32 getBitmapWidth() const { return mBitmapWidth; }
     S32 getBitmapHeight() const { return mBitmapHeight; }
+    S32 getCacheGeneration() const { return mGeneration; }
 
 protected:
     static U32 getNumComponents(EFontGlyphType bitmap_type);
@@ -74,6 +75,7 @@ private:
     S32 mCurrentOffsetY[static_cast<U32>(EFontGlyphType::Count)] = { 1 };
     S32 mMaxCharWidth = 0;
     S32 mMaxCharHeight = 0;
+    S32 mGeneration = 0;
     std::vector<LLPointer<LLImageRaw>> mImageRawVec[static_cast<U32>(EFontGlyphType::Count)];
     std::vector<LLPointer<LLImageGL>> mImageGLVec[static_cast<U32>(EFontGlyphType::Count)];
 };

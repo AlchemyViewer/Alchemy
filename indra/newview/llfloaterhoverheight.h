@@ -29,11 +29,11 @@
 
 #include "llfloater.h"
 
-class LLFloaterHoverHeight final : public LLFloater
+class LLFloaterHoverHeight: public LLFloater
 {
 public:
     LLFloaterHoverHeight(const LLSD& key);
-    BOOL postBuild();
+    bool postBuild();
 
     static void onSliderMoved(LLUICtrl* ctrl, void* userData);
 

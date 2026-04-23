@@ -60,9 +60,9 @@ public:
         }
     };
 
-    /*virtual*/ BOOL handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
 
-    /*virtual*/ BOOL handleMouseUp(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask);
 
     /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask);
 
@@ -82,7 +82,7 @@ protected:
 /**
  * Web browser-like navigation bar.
  */
-class LLNavigationBar final
+class LLNavigationBar
     :   public LLPanel, public LLSingleton<LLNavigationBar>, private LLDestroyClass<LLNavigationBar>
 {
     LLSINGLETON(LLNavigationBar);
@@ -93,9 +93,9 @@ class LLNavigationBar final
 public:
 
     /*virtual*/ void    draw() override;
-    /*virtual*/ BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
-    /*virtual*/ BOOL    postBuild() override;
-    /*virtual*/ void    setVisible(BOOL visible) override;
+    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    postBuild() override;
+    /*virtual*/ void    setVisible(bool visible) override;
 
     void handleLoginComplete();
     void clearHistoryCache();
@@ -109,6 +109,9 @@ public:
     void refreshLocationCtrl();
 // [/RLVa:KB]
 private:
+    // the distance between navigation panel and favorites panel in pixels
+    const static S32 FAVBAR_TOP_PADDING = 10;
+
     void rebuildTeleportHistoryMenu();
     void showTeleportHistoryMenu(LLUICtrl* btn_ctrl);
     void invokeSearch(std::string search_text);
@@ -138,7 +141,7 @@ private:
     {
         if (LLNavigationBar::instanceExists())
         {
-            LLNavigationBar::getInstance()->setEnabled(FALSE);
+            LLNavigationBar::getInstance()->setEnabled(false);
         }
     }
 

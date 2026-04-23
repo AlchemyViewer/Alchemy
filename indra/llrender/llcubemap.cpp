@@ -59,6 +59,10 @@ LLCubeMap::LLCubeMap(bool init_as_srgb)
     mTargets[5] = GL_TEXTURE_CUBE_MAP_POSITIVE_Z;
 }
 
+LLCubeMap::~LLCubeMap()
+{
+}
+
 void LLCubeMap::initGL()
 {
     llassert(gGLManager.mInited);
@@ -74,10 +78,18 @@ void LLCubeMap::initGL()
 
             for (int i = 0; i < 6; i++)
             {
-                mImages[i] = new LLImageGL(RESOLUTION, RESOLUTION, 4, FALSE);
+                mImages[i] = new LLImageGL(RESOLUTION, RESOLUTION, 4, false);
+            #if USE_SRGB_DECODE
+                if (mIssRGB) {
+                    mImages[i]->setExplicitFormat(GL_SRGB8_ALPHA8, GL_RGBA);
+                }
+            #endif
                 mImages[i]->setTarget(mTargets[i], LLTexUnit::TT_CUBE_MAP);
                 mRawImages[i] = new LLImageRaw(RESOLUTION, RESOLUTION, 4);
-                mImages[i]->createGLTexture(0, mRawImages[i], texname);
+                if (!mImages[i]->createGLTexture(0, mRawImages[i], texname))
+                {
+                    LL_WARNS() << "Failed to create GL texture for environment cubemap face " << i << LL_ENDL;
+                }
 
                 gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
                 mImages[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
@@ -102,6 +114,9 @@ void LLCubeMap::initRawData(const std::vector<LLPointer<LLImageRaw> >& rawimages
     // Yes, I know that this is inefficient! - djs 08/08/02
     for (int i = 0; i < 6; i++)
     {
+        LLImageDataSharedLock lockIn(rawimages[i]);
+        LLImageDataLock lockOut(mRawImages[i]);
+
         const U8 *sd = rawimages[i]->getData();
         U8 *td = mRawImages[i]->getData();
 
@@ -164,7 +179,7 @@ void LLCubeMap::initReflectionMap(U32 resolution, U32 components)
 
     LLImageGL::generateTextures(1, &texname);
 
-    mImages[0] = new LLImageGL(resolution, resolution, components, TRUE);
+    mImages[0] = new LLImageGL(resolution, resolution, components, true);
     mImages[0]->setTexName(texname);
     mImages[0]->setTarget(mTargets[0], LLTexUnit::TT_CUBE_MAP);
     gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
@@ -188,10 +203,13 @@ void LLCubeMap::initEnvironmentMap(const std::vector<LLPointer<LLImageRaw> >& ra
         llassert(rawimages[i]->getHeight() == resolution);
         llassert(rawimages[i]->getComponents() == components);
 
-        mImages[i] = new LLImageGL(resolution, resolution, components, TRUE);
+        mImages[i] = new LLImageGL(resolution, resolution, components, true);
         mImages[i]->setTarget(mTargets[i], LLTexUnit::TT_CUBE_MAP);
         mRawImages[i] = rawimages[i];
-        mImages[i]->createGLTexture(0, mRawImages[i], texname);
+        if (!mImages[i]->createGLTexture(0, mRawImages[i], texname))
+        {
+            LL_WARNS() << "Failed to create GL texture for environment cubemap face " << i << LL_ENDL;
+        }
 
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
         mImages[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
@@ -212,8 +230,8 @@ void LLCubeMap::generateMipMaps()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
-    mImages[0]->setUseMipMaps(TRUE);
-    mImages[0]->setHasMipMaps(TRUE);
+    mImages[0]->setUseMipMaps(true);
+    mImages[0]->setHasMipMaps(true);
     enableTexture(0);
     bind();
     mImages[0]->setFilteringOption(LLTexUnit::TFO_BILINEAR);
@@ -277,13 +295,18 @@ void LLCubeMap::setMatrix(S32 stage)
         gGL.getTexUnit(stage)->activate();
     }
 
-    LLMatrix4a trans = get_current_modelview();
-    trans.setRow<3>(LLVector4a::getZero());
+    LLVector3 x(gGLModelView+0);
+    LLVector3 y(gGLModelView+4);
+    LLVector3 z(gGLModelView+8);
+
+    LLMatrix3 mat3;
+    mat3.setRows(x,y,z);
+    LLMatrix4 trans(mat3);
     trans.transpose();
 
     gGL.matrixMode(LLRender::MM_TEXTURE);
     gGL.pushMatrix();
-    gGL.loadMatrix(trans);
+    gGL.loadMatrix((F32 *)trans.mMatrix);
     gGL.matrixMode(LLRender::MM_MODELVIEW);
 
     /*if (stage > 0)

@@ -39,14 +39,14 @@
    inventory items pointing to the same asset (i.e. more than one ItemID
    per assetID).  EXT-6252
 */
-class LLWearableList final : public LLSingleton<LLWearableList>
+class LLWearableList : public LLSingleton<LLWearableList>
 {
     LLSINGLETON_EMPTY_CTOR(LLWearableList);
     ~LLWearableList();
 public:
     void cleanup() ;
 
-    S32                 getLength() const { return mList.size(); }
+    S32                 getLength() const { return static_cast<S32>(mList.size()); }
 
     void                getAsset(const LLAssetID& assetID,
                                  const std::string& wearable_name,

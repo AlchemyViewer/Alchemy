@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2011, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -250,7 +251,7 @@ std::string RlvFloaterBehaviours::getFormattedBehaviourString(ERlvBehaviourFilte
             }
 
             std::string strOption; LLUUID idOption;
-            if ( (rlvCmd.hasOption()) && (idOption.set(rlvCmd.getOption(), FALSE)) && (idOption.notNull()) )
+            if ( (rlvCmd.hasOption()) && (idOption.set(rlvCmd.getOption(), false)) && (idOption.notNull()) )
             {
                 LLAvatarName avName;
                 if (gObjectList.findObject(idOption))
@@ -275,7 +276,7 @@ std::string RlvFloaterBehaviours::getFormattedBehaviourString(ERlvBehaviourFilte
 void RlvFloaterBehaviours::onBtnCopyToClipboard()
 {
     LLWString wstrRestrictions = utf8str_to_wstring(getFormattedBehaviourString(ERlvBehaviourFilter::ALL));
-    LLClipboard::instance().copyToClipboard(wstrRestrictions, 0, wstrRestrictions.length());
+    LLClipboard::instance().copyToClipboard(wstrRestrictions, 0, narrow(wstrRestrictions.length()));
 }
 
 // Checked: 2011-05-23 (RLVa-1.3.1c) | Modified: RLVa-1.3.1c
@@ -286,10 +287,10 @@ void RlvFloaterBehaviours::onCommand(const RlvCommand& rlvCmd, ERlvCmdRet eRet)
 }
 
 // Checked: 2011-05-23 (RLVa-1.3.1c) | Added: RLVa-1.3.1c
-BOOL RlvFloaterBehaviours::postBuild()
+bool RlvFloaterBehaviours::postBuild()
 {
     getChild<LLUICtrl>("copy_btn")->setCommitCallback(boost::bind(&RlvFloaterBehaviours::onBtnCopyToClipboard, this));
-    return TRUE;
+    return true;
 }
 
 void RlvFloaterBehaviours::refreshAll()
@@ -333,7 +334,7 @@ void RlvFloaterBehaviours::refreshAll()
         for (const RlvCommand& rlvCmd : rlvObjectEntry.second.getCommandList())
         {
             std::string strOption; LLUUID idOption;
-            if ( (rlvCmd.hasOption()) && (idOption.set(rlvCmd.getOption(), FALSE)) && (idOption.notNull()) )
+            if ( (rlvCmd.hasOption()) && (idOption.set(rlvCmd.getOption(), false)) && (idOption.notNull()) )
             {
                 LLAvatarName avName;
                 if (gObjectList.findObject(idOption))
@@ -427,11 +428,11 @@ void RlvFloaterLocks::onClose(bool fQuitting)
 }
 
 // Checked: 2012-07-14 (RLVa-1.4.7)
-BOOL RlvFloaterLocks::postBuild()
+bool RlvFloaterLocks::postBuild()
 {
     getChild<LLUICtrl>("refresh_btn")->setCommitCallback(boost::bind(&RlvFloaterLocks::refreshAll, this));
 
-    return TRUE;
+    return true;
 }
 
 // Checked: 2010-03-11 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
@@ -556,7 +557,7 @@ void RlvFloaterLocks::refreshAll()
 
     LLInventoryModel::cat_array_t folders; LLInventoryModel::item_array_t items;
     LLFindWearablesEx f(true, true);
-    gInventory.collectDescendentsIf(LLAppearanceMgr::instance().getCOF(), folders, items, FALSE, f);
+    gInventory.collectDescendentsIf(LLAppearanceMgr::instance().getCOF(), folders, items, false, f);
 
     for (LLInventoryModel::item_array_t::const_iterator itItem = items.begin(); itItem != items.end(); ++itItem)
     {
@@ -632,7 +633,7 @@ RlvFloaterStrings::RlvFloaterStrings(const LLSD& sdKey)
 }
 
 // Checked: 2011-11-08 (RLVa-1.5.0)
-BOOL RlvFloaterStrings::postBuild()
+bool RlvFloaterStrings::postBuild()
 {
     // Set up the UI controls
     m_pStringList = findChild<LLComboBox>("string_list");
@@ -660,7 +661,7 @@ BOOL RlvFloaterStrings::postBuild()
 
     refresh();
 
-    return TRUE;
+    return true;
 }
 
 // Checked: 2011-11-08 (RLVa-1.5.0)
@@ -742,13 +743,14 @@ RlvFloaterConsole::~RlvFloaterConsole()
 {
 }
 
-BOOL RlvFloaterConsole::postBuild()
+bool RlvFloaterConsole::postBuild()
 {
     m_pInputEdit = getChild<LLChatEntry>("console_input");
     m_pInputEdit->setCommitCallback(boost::bind(&RlvFloaterConsole::onInput, this, _1, _2));
     m_pInputEdit->setTextExpandedCallback(boost::bind(&RlvFloaterConsole::reshapeLayoutPanel, this));
     m_pInputEdit->setFocus(true);
     m_pInputEdit->setCommitOnFocusLost(false);
+    m_pInputEdit->setShowChatMentionPicker(false);
 
     m_pInputPanel = getChild<LLLayoutPanel>("input_panel");
     m_nInputEditPad = m_pInputPanel->getRect().getHeight() - m_pInputEdit->getRect().getHeight();
@@ -756,7 +758,7 @@ BOOL RlvFloaterConsole::postBuild()
     m_pOutputText = getChild<LLTextEditor>("console_output");
     m_pOutputText->appendText(s_strRlvConsolePrompt, false);
 
-    return TRUE;
+    return true;
 }
 
 void RlvFloaterConsole::onClose(bool fQuitting)
@@ -837,7 +839,7 @@ void RlvFloaterConsole::onInput(LLUICtrl* pCtrl, const LLSD& sdParam)
 
 void RlvFloaterConsole::reshapeLayoutPanel()
 {
-    m_pInputPanel->reshape(m_pInputPanel->getRect().getWidth(), m_pInputEdit->getRect().getHeight() + m_nInputEditPad, FALSE);
+    m_pInputPanel->reshape(m_pInputPanel->getRect().getWidth(), m_pInputEdit->getRect().getHeight() + m_nInputEditPad, false);
 }
 
 // ============================================================================

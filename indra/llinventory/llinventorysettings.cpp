@@ -35,7 +35,7 @@
 
 
 //=========================================================================
-struct SettingsEntry final : public LLDictionaryEntry
+struct SettingsEntry : public LLDictionaryEntry
 {
     SettingsEntry(const std::string &name,
         const std::string& default_new_name,
@@ -57,13 +57,17 @@ struct SettingsEntry final : public LLDictionaryEntry
     LLInventoryType::EIconName mIconName;
 };
 
-class LLSettingsDictionary final : public LLSingleton<LLSettingsDictionary>,
+class LLSettingsDictionary : public LLSingleton<LLSettingsDictionary>,
     public LLDictionary<LLSettingsType::type_e, SettingsEntry>
 {
-    LLSINGLETON_EMPTY_CTOR(LLSettingsDictionary);
+    LLSINGLETON(LLSettingsDictionary);
 
     void initSingleton() override;
 };
+
+LLSettingsDictionary::LLSettingsDictionary()
+{
+}
 
 void LLSettingsDictionary::initSingleton()
 {

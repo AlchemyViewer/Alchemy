@@ -14,7 +14,6 @@
 	<menu_item_call label="マップ" name="map"/>
 	<menu_item_call label="共有" name="share"/>
 	<menu_item_call label="支払う" name="pay"/>
-	<menu_item_separator name="separator_utils"/>
 	<context_menu label="管理" name="manage_menu">
 		<menu_item_check label="ブロック／解除" name="block_unblock"/>
 		<menu_item_call label="嫌がらせの報告" name="report_abuse"/>

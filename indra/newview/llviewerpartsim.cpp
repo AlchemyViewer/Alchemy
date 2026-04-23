@@ -76,12 +76,12 @@ LLViewerPart::LLViewerPart() :
     mPartID(0),
     mLastUpdateTime(0.f),
     mSkipOffset(0.f),
-    mVPCallback(NULL),
-    mImagep(NULL)
+    mVPCallback(nullptr),
+    mImagep(nullptr)
 {
-    mPartSourcep = NULL;
-    mParent = NULL;
-    mChild = NULL;
+    mPartSourcep = nullptr;
+    mParent      = nullptr;
+    mChild       = nullptr;
     ++LLViewerPartSim::sParticleCount2 ;
 }
 
@@ -137,7 +137,7 @@ LLViewerPartGroup::LLViewerPartGroup(const LLVector3 &center_agent, const F32 bo
  : mHud(hud)
 {
     mVOPartGroupp = NULL;
-    mUniformParticles = TRUE;
+    mUniformParticles = true;
 
     mRegionp = LLWorld::getInstance()->getRegionFromPosAgent(center_agent);
     llassert_always(center_agent.isFinite());
@@ -220,48 +220,48 @@ void LLViewerPartGroup::cleanup()
     }
 }
 
-BOOL LLViewerPartGroup::posInGroup(const LLVector3 &pos, const F32 desired_size)
+bool LLViewerPartGroup::posInGroup(const LLVector3 &pos, const F32 desired_size)
 {
     if ((pos.mV[VX] < mMinObjPos.mV[VX])
         || (pos.mV[VY] < mMinObjPos.mV[VY])
         || (pos.mV[VZ] < mMinObjPos.mV[VZ]))
     {
-        return FALSE;
+        return false;
     }
 
     if ((pos.mV[VX] > mMaxObjPos.mV[VX])
         || (pos.mV[VY] > mMaxObjPos.mV[VY])
         || (pos.mV[VZ] > mMaxObjPos.mV[VZ]))
     {
-        return FALSE;
+        return false;
     }
 
     if (desired_size > 0 &&
         (desired_size < mBoxRadius*0.5f ||
         desired_size > mBoxRadius*2.f))
     {
-        return FALSE;
+        return false;
     }
 
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLViewerPartGroup::addPart(LLViewerPart* part, F32 desired_size)
+bool LLViewerPartGroup::addPart(LLViewerPart* part, F32 desired_size)
 {
     if (part->mFlags & LLPartData::LL_PART_HUD && !mHud)
     {
-        return FALSE;
+        return false;
     }
 
-    BOOL uniform_part = part->mScale.mV[0] == part->mScale.mV[1] &&
+    bool uniform_part = part->mScale.mV[0] == part->mScale.mV[1] &&
                     !(part->mFlags & LLPartData::LL_PART_FOLLOW_VELOCITY_MASK);
 
     if (!posInGroup(part->mPosAgent, desired_size) ||
         (mUniformParticles && !uniform_part) ||
         (!mUniformParticles && uniform_part))
     {
-        return FALSE;
+        return false;
     }
 
     gPipeline.markRebuild(mVOPartGroupp->mDrawable, LLDrawable::REBUILD_ALL);
@@ -269,7 +269,7 @@ BOOL LLViewerPartGroup::addPart(LLViewerPart* part, F32 desired_size)
     mParticles.push_back(part);
     part->mSkipOffset=mSkippedTime;
     LLViewerPartSim::incPartCount(1);
-    return TRUE;
+    return true;
 }
 
 
@@ -279,7 +279,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
 
     LLVector3 gravity(0.f, 0.f, GRAVITY);
 
-    LLViewerPartSim::checkParticleCount(mParticles.size());
+    LLViewerPartSim::checkParticleCount(static_cast<U32>(mParticles.size()));
 
     LLViewerCamera* camera = LLViewerCamera::getInstance();
     LLViewerRegion *regionp = getRegion();
@@ -390,7 +390,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
         }
 
         // Do glow interpolation
-        part->mGlow.mV[3] = (U8) ll_round(ll_lerp(part->mStartGlow, part->mEndGlow, frac)*255.f);
+        part->mGlow.mV[3] = (U8) ll_round(lerp(part->mStartGlow, part->mEndGlow, frac)*255.f);
 
         // Set the last update time to now.
         part->mLastUpdateTime = cur_time;
@@ -399,7 +399,8 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
         // Kill dead particles (either flagged dead, or too old)
         if ((part->mLastUpdateTime > part->mMaxAge) || (LLViewerPart::LL_PART_DEAD_MASK == part->mFlags))
         {
-            vector_replace_with_last(mParticles, mParticles.begin() + i);
+            mParticles[i] = mParticles.back() ;
+            mParticles.pop_back() ;
             delete part ;
         }
         else
@@ -409,7 +410,8 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
             {
                 // Transfer particles between groups
                 LLViewerPartSim::getInstance()->put(part) ;
-                vector_replace_with_last(mParticles, mParticles.begin() + i);
+                mParticles[i] = mParticles.back() ;
+                mParticles.pop_back() ;
             }
             else
             {
@@ -523,11 +525,11 @@ void LLViewerPartSim::destroyClass()
 }
 
 //static
-BOOL LLViewerPartSim::shouldAddPart()
+bool LLViewerPartSim::shouldAddPart()
 {
     if (sParticleCount >= MAX_PART_COUNT)
     {
-        return FALSE;
+        return false;
     }
 
     if (sParticleCount > PART_THROTTLE_THRESHOLD*sMaxParticleCount)
@@ -538,7 +540,7 @@ BOOL LLViewerPartSim::shouldAddPart()
         if (ll_frand() < frac)
         {
             // Skip...
-            return FALSE;
+            return false;
         }
     }
 
@@ -546,10 +548,10 @@ BOOL LLViewerPartSim::shouldAddPart()
     const F32 MIN_FRAME_RATE_FOR_NEW_PARTICLES = 4.f;
     if (gFPSClamped < MIN_FRAME_RATE_FOR_NEW_PARTICLES)
     {
-        return FALSE;
+        return false;
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLViewerPartSim::addPart(LLViewerPart* part)
@@ -654,9 +656,10 @@ void LLViewerPartSim::shift(const LLVector3 &offset)
     }
 }
 
+static LLTrace::BlockTimerStatHandle FTM_SIMULATE_PARTICLES("Simulate Particles");
+
 void LLViewerPartSim::updateSimulation()
 {
-    LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("Simulate Particles");
     static LLFrameTimer update_timer;
 
     const F32 dt = llmin(update_timer.getElapsedTimeAndResetF32(), 0.1f);
@@ -665,6 +668,8 @@ void LLViewerPartSim::updateSimulation()
     {
         return;
     }
+
+    LL_RECORD_BLOCK_TIME(FTM_SIMULATE_PARTICLES);
 
     // Start at a random particle system so the same
     // particle system doesn't always get first pick at the
@@ -675,9 +680,11 @@ void LLViewerPartSim::updateSimulation()
     S32 count = (S32) mViewerPartSources.size();
     S32 start = (S32)ll_frand((F32)count);
     S32 dir = 1;
+    S32 deldir = 0;
     if (ll_frand() > 0.5f)
     {
         dir = -1;
+        deldir = -1;
     }
 
     S32 num_updates = 0;
@@ -694,35 +701,39 @@ void LLViewerPartSim::updateSimulation()
 
         if (!mViewerPartSources[i]->isDead())
         {
-            BOOL upd = TRUE;
+            bool upd = true;
             LLViewerObject* vobj = mViewerPartSources[i]->mSourceObjectp;
-            if (vobj)
+
+            if (vobj && vobj->isAvatar() && ((LLVOAvatar*)vobj)->isInMuteList())
             {
-                if (vobj->isAvatar() && ((LLVOAvatar*) vobj)->isInMuteList())
-                {
-                    upd = FALSE;
-                }
+                upd = false;
+            }
 
-                if (vobj->isOwnerInMuteList(mViewerPartSources[i]->getOwnerUUID()))
-                {
-                    upd = FALSE;
-                }
+            if(vobj && vobj->isOwnerInMuteList(mViewerPartSources[i]->getOwnerUUID()))
+            {
+                upd = false;
+            }
 
-                if (upd && (vobj->getPCode() == LL_PCODE_VOLUME))
+            if (upd && vobj && (vobj->getPCode() == LL_PCODE_VOLUME))
+            {
+                LLVOVolume* vvo = (LLVOVolume*)vobj;
+                if (vvo->isAttachment())
                 {
-                    LLVOAvatar* avatarp = vobj->getAvatar();
-                    if (avatarp && (avatarp->isTooComplex() || avatarp->isTooSlow()))
+                    if (!LLPipeline::sRenderAttachedParticles)
                     {
-                        upd = FALSE;
+                        upd = false;
                     }
-
-                    LLVOVolume* vvo = (LLVOVolume *) vobj;
-                    if (!LLPipeline::sRenderAttachedParticles && vvo && vvo->isAttachment())
+                    else
                     {
-                        upd = FALSE;
+                        LLVOAvatar* avatarp = vobj->getAvatar();
+                        if (avatarp && avatarp->isTooComplex() && avatarp->isTooSlow())
+                        {
+                            upd = false;
+                        }
                     }
                 }
             }
+
             if (upd)
             {
                 mViewerPartSources[i]->update(dt);
@@ -731,8 +742,9 @@ void LLViewerPartSim::updateSimulation()
 
         if (mViewerPartSources[i]->isDead())
         {
-            vector_replace_with_last(mViewerPartSources, mViewerPartSources.begin() + i);
+            mViewerPartSources.erase(mViewerPartSources.begin() + i);
             count--;
+            i+=deldir;
         }
         else
         {
@@ -758,7 +770,7 @@ void LLViewerPartSim::updateSimulation()
 
         if ((LLDrawable::getCurrentFrame()+mViewerPartGroups[i]->mID)%visirate == 0)
         {
-            if (vobj && !vobj->isDead() && vobj->mDrawable)
+            if (vobj && !vobj->isDead())
             {
                 gPipeline.markRebuild(vobj->mDrawable, LLDrawable::REBUILD_ALL);
             }
@@ -767,7 +779,7 @@ void LLViewerPartSim::updateSimulation()
             if (!mViewerPartGroups[i]->getCount())
             {
                 delete mViewerPartGroups[i];
-                vector_replace_with_last(mViewerPartGroups, mViewerPartGroups.begin() + i);
+                mViewerPartGroups.erase(mViewerPartGroups.begin() + i);
                 i--;
                 count--;
             }
@@ -849,15 +861,15 @@ void LLViewerPartSim::removeLastCreatedSource()
 
 void LLViewerPartSim::cleanupRegion(LLViewerRegion *regionp)
 {
-    group_list_t& vec = mViewerPartGroups;
-    for (group_list_t::iterator it = vec.begin();it!=vec.end();)
+    for (group_list_t::iterator i = mViewerPartGroups.begin(); i != mViewerPartGroups.end(); )
     {
-        if ((*it)->getRegion() == regionp)
+        group_list_t::iterator iter = i++;
+
+        if ((*iter)->getRegion() == regionp)
         {
-            delete *it;
-            it = vector_replace_with_last(vec,it);
+            delete *iter;
+            i = mViewerPartGroups.erase(iter);
         }
-        else ++it;
     }
 }
 

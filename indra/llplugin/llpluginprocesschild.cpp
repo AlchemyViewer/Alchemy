@@ -320,9 +320,7 @@ void LLPluginProcessChild::sendMessageToPlugin(const LLPluginMessage &message)
     {
         std::string buffer = message.generate();
 
-#ifdef SHOW_DEBUG
         LL_DEBUGS("Plugin") << "Sending to plugin: " << buffer << LL_ENDL;
-#endif
         LLTimer elapsed;
 
         mInstance->sendMessage(buffer);
@@ -339,9 +337,7 @@ void LLPluginProcessChild::sendMessageToParent(const LLPluginMessage &message)
 {
     std::string buffer = message.generate();
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("Plugin") << "Sending to parent: " << buffer << LL_ENDL;
-#endif
 
     writeMessageRaw(buffer);
 }
@@ -349,9 +345,8 @@ void LLPluginProcessChild::sendMessageToParent(const LLPluginMessage &message)
 void LLPluginProcessChild::receiveMessageRaw(const std::string &message)
 {
     // Incoming message from the TCP Socket
-#ifdef SHOW_DEBUG
+
     LL_DEBUGS("Plugin") << "Received from parent: " << message << LL_ENDL;
-#endif
 
     // Decode this message
     LLPluginMessage parsed;
@@ -385,7 +380,7 @@ void LLPluginProcessChild::receiveMessageRaw(const std::string &message)
             passMessage = false;
 
             std::string message_name = parsed.getName();
-            if (message_name == "load_plugin_alchemy")
+            if (message_name == "load_plugin")
             {
                 mPluginFile = parsed.getValue("file");
                 mPluginDir = parsed.getValue("dir");
@@ -490,9 +485,7 @@ void LLPluginProcessChild::receiveMessageRaw(const std::string &message)
 /* virtual */
 void LLPluginProcessChild::receivePluginMessage(const std::string &message)
 {
-#ifdef SHOW_DEBUG
     LL_DEBUGS("Plugin") << "Received from plugin: " << message << LL_ENDL;
-#endif
 
     if (mBlockingRequest)
     {
@@ -575,9 +568,7 @@ void LLPluginProcessChild::receivePluginMessage(const std::string &message)
 
     if (passMessage)
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("Plugin") << "Passing through to parent: " << message << LL_ENDL;
-#endif
         writeMessageRaw(message);
     }
 
@@ -598,9 +589,7 @@ void LLPluginProcessChild::receivePluginMessage(const std::string &message)
 
 void LLPluginProcessChild::setState(EState state)
 {
-#ifdef SHOW_DEBUG
     LL_DEBUGS("Plugin") << "setting state to " << state << LL_ENDL;
-#endif
     mState = state;
 };
 

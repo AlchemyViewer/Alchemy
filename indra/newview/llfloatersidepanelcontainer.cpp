@@ -28,6 +28,7 @@
 
 #include "llfloaterreg.h"
 #include "llfloatersidepanelcontainer.h"
+#include "llnotificationsutil.h"
 #include "llpaneleditwearable.h"
 
 // newview includes
@@ -35,6 +36,9 @@
 #include "lltransientfloatermgr.h"
 #include "llpaneloutfitedit.h"
 #include "llsidepanelappearance.h"
+
+//static
+const std::string LLFloaterSidePanelContainer::sMainPanelName("main_panel");
 
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
 LLFloaterSidePanelContainer::validate_signal_t LLFloaterSidePanelContainer::mValidateSignal;
@@ -53,10 +57,10 @@ LLFloaterSidePanelContainer::~LLFloaterSidePanelContainer()
     LLTransientFloaterMgr::getInstance()->removeControlView(LLTransientFloaterMgr::GLOBAL, this);
 }
 
-BOOL LLFloaterSidePanelContainer::postBuild()
+bool LLFloaterSidePanelContainer::postBuild()
 {
     mMainPanel = getChild<LLPanel>(sMainPanelName);
-    return TRUE;
+    return true;
 }
 
 void LLFloaterSidePanelContainer::onOpen(const LLSD& key)
@@ -68,22 +72,21 @@ void LLFloaterSidePanelContainer::closeFloater(bool app_quitting)
 {
     if(getInstanceName() == "appearance")
     {
-        LLPanelOutfitEdit* panel_outfit_edit =
-            LLFloaterSidePanelContainer::findPanel<LLPanelOutfitEdit>("appearance", "panel_outfit_edit");
+        LLPanelOutfitEdit* panel_outfit_edit = findChild<LLPanelOutfitEdit>("panel_outfit_edit");
         if (panel_outfit_edit)
         {
             LLFloater *parent = gFloaterView->getParentFloater(panel_outfit_edit);
-            if (parent == this )
+            if (parent == this)
             {
                 LLSidepanelAppearance* panel_appearance = dynamic_cast<LLSidepanelAppearance*>(mMainPanel);
-            if ( panel_appearance )
+                if (panel_appearance)
                 {
                     LLPanelEditWearable *edit_wearable_ptr = panel_appearance->getWearable();
                     if (edit_wearable_ptr)
                     {
                         edit_wearable_ptr->onClose();
                     }
-                if(!app_quitting)
+                    if(!app_quitting)
                     {
                         panel_appearance->showOutfitsInventoryPanel();
                     }
@@ -97,6 +100,45 @@ void LLFloaterSidePanelContainer::closeFloater(bool app_quitting)
     if (getInstanceName() == "inventory" && !getKey().isUndefined())
     {
         destroy();
+    }
+}
+
+void LLFloaterSidePanelContainer::onClickCloseBtn(bool app_quitting)
+{
+    if (!app_quitting && getInstanceName() == "appearance")
+    {
+        LLPanelOutfitEdit* panel_outfit_edit = findChild<LLPanelOutfitEdit>("panel_outfit_edit");
+        if (panel_outfit_edit)
+        {
+            LLFloater* parent = gFloaterView->getParentFloater(panel_outfit_edit);
+            if (parent == this)
+            {
+                LLSidepanelAppearance* panel_appearance = dynamic_cast<LLSidepanelAppearance*>(getPanel("appearance"));
+                if (panel_appearance)
+                {
+                    LLPanelEditWearable* edit_wearable_ptr = panel_appearance->getWearable();
+                    if (edit_wearable_ptr && edit_wearable_ptr->getVisible() && edit_wearable_ptr->isDirty())
+                    {
+                        LLNotificationsUtil::add("UsavedWearableChanges", LLSD(), LLSD(), [this](const LLSD& notification, const LLSD& response)
+                        {
+                            onCloseMsgCallback(notification, response);
+                        });
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    closeFloater();
+}
+
+void LLFloaterSidePanelContainer::onCloseMsgCallback(const LLSD& notification, const LLSD& response)
+{
+    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    if (0 == option)
+    {
+        closeFloater();
     }
 }
 
@@ -135,7 +177,7 @@ LLPanel* LLFloaterSidePanelContainer::openChildPanel(std::string_view panel_name
     }
     else if (!hasFocus())
     {
-        setFocus(TRUE);
+        setFocus(true);
     }
 
     LLPanel* panel = NULL;
@@ -143,7 +185,7 @@ LLPanel* LLFloaterSidePanelContainer::openChildPanel(std::string_view panel_name
     LLSideTrayPanelContainer* container = dynamic_cast<LLSideTrayPanelContainer*>(view->getParent());
     if (container)
     {
-        container->openPanel(std::string(panel_name), params);
+        container->openPanel(panel_name, params);
         panel = container->getCurrentPanel();
     }
     else if ((panel = dynamic_cast<LLPanel*>(view)) != NULL)
@@ -155,12 +197,12 @@ LLPanel* LLFloaterSidePanelContainer::openChildPanel(std::string_view panel_name
 }
 
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
-bool LLFloaterSidePanelContainer::canShowPanel(std::string_view floater_name, const LLSD& key)
+bool LLFloaterSidePanelContainer::canShowPanel(const std::string& floater_name, const LLSD& key)
 {
     return mValidateSignal(floater_name, sMainPanelName, key);
 }
 
-bool LLFloaterSidePanelContainer::canShowPanel(std::string_view floater_name, std::string_view panel_name, const LLSD& key)
+bool LLFloaterSidePanelContainer::canShowPanel(const std::string& floater_name, const std::string& panel_name, const LLSD& key)
 {
     return mValidateSignal(floater_name, panel_name, key);
 }
@@ -171,7 +213,7 @@ void LLFloaterSidePanelContainer::showPanel(std::string_view floater_name, const
     LLFloaterSidePanelContainer* floaterp = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>(floater_name);
 //  if (floaterp)
 // [RLVa:KB] - Checked: 2013-04-16 (RLVa-1.4.8)
-    if ( (floaterp) && ((floaterp->getVisible()) || (LLFloaterReg::canShowInstance(floater_name, key))) && (canShowPanel(floater_name, key)) )
+    if ( (floaterp) && ((floaterp->getVisible()) || (LLFloaterReg::canShowInstance(std::string(floater_name), key))) && (canShowPanel(std::string(floater_name), key)) )
 // [/RLVa:KB]
     {
         floaterp->openChildPanel(sMainPanelName, key);
@@ -195,7 +237,7 @@ void LLFloaterSidePanelContainer::showPanel(std::string_view floater_name, std::
     LLFloaterSidePanelContainer* floaterp = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>(floater_name);
 //  if (floaterp)
 // [RLVa:KB] - Checked: 2013-04-16 (RLVa-1.4.8)
-    if ( (floaterp) && ((floaterp->getVisible()) || (LLFloaterReg::canShowInstance(floater_name, key))) && (canShowPanel(floater_name, panel_name, key)) )
+    if ( (floaterp) && ((floaterp->getVisible()) || (LLFloaterReg::canShowInstance(std::string(floater_name), key))) && (canShowPanel(std::string(floater_name), std::string(panel_name), key)) )
 // [/RLVa:KB]
     {
         floaterp->openChildPanel(panel_name, key);
@@ -205,7 +247,6 @@ void LLFloaterSidePanelContainer::showPanel(std::string_view floater_name, std::
 LLPanel* LLFloaterSidePanelContainer::getPanel(std::string_view floater_name, std::string_view panel_name)
 {
     LLFloaterSidePanelContainer* floaterp = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>(floater_name);
-
     if (floaterp)
     {
         if (panel_name == sMainPanelName)
@@ -224,7 +265,6 @@ LLPanel* LLFloaterSidePanelContainer::getPanel(std::string_view floater_name, st
 LLPanel* LLFloaterSidePanelContainer::findPanel(std::string_view floater_name, std::string_view panel_name)
 {
     LLFloaterSidePanelContainer* floaterp = LLFloaterReg::findTypedInstance<LLFloaterSidePanelContainer>(floater_name);
-
     if (floaterp)
     {
         if (panel_name == sMainPanelName)

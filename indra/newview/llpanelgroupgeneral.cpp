@@ -42,9 +42,6 @@
 #include "lldbstrings.h"
 #include "llavataractions.h"
 #include "llgroupactions.h"
-// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-#include "llgroupoptions.h"
-// [/SL:KB]
 #include "lllineeditor.h"
 #include "llnamelistctrl.h"
 #include "llnotificationsutil.h"
@@ -56,6 +53,7 @@
 #include "lltexturectrl.h"
 #include "lltrans.h"
 #include "llviewerwindow.h"
+#include "llmutelist.h"
 
 static LLPanelInjector<LLPanelGroupGeneral> t_panel_group_general("panel_group_general");
 
@@ -67,8 +65,8 @@ const S32 DECLINE_TO_STATE = 0;
 
 LLPanelGroupGeneral::LLPanelGroupGeneral()
 :   LLPanelGroupTab(),
-    mChanged(FALSE),
-    mFirstUse(TRUE),
+    mChanged(false),
+    mFirstUse(true),
     mGroupNameEditor(NULL),
     mFounderName(NULL),
     mInsignia(NULL),
@@ -90,9 +88,9 @@ LLPanelGroupGeneral::~LLPanelGroupGeneral()
 {
 }
 
-BOOL LLPanelGroupGeneral::postBuild()
+bool LLPanelGroupGeneral::postBuild()
 {
-    bool recurse = true;
+    constexpr bool recurse = true;
 
     mEditCharter = getChild<LLTextEditor>("charter", recurse);
     if(mEditCharter)
@@ -118,7 +116,7 @@ BOOL LLPanelGroupGeneral::postBuild()
         if (gAgent.isTeen())
         {
             // Teens don't get to set mature flag. JC
-            mComboMature->setVisible(FALSE);
+            mComboMature->setVisible(false);
             mComboMature->setCurrentByIndex(NON_MATURE_CONTENT);
         }
     }
@@ -142,8 +140,8 @@ BOOL LLPanelGroupGeneral::postBuild()
         mSpinEnrollmentFee->resetDirty();
     }
 
-    BOOL accept_notices = FALSE;
-    BOOL list_in_profile = FALSE;
+    bool accept_notices = false;
+    bool list_in_profile = false;
     LLGroupData data;
     if(gAgent.getGroupData(mGroupID,data))
     {
@@ -158,6 +156,17 @@ BOOL LLPanelGroupGeneral::postBuild()
         mCtrlReceiveNotices->setEnabled(data.mID.notNull());
     }
 
+    mCtrlReceiveGroupChat = getChild<LLCheckBoxCtrl>("receive_chat", recurse);
+    if(mCtrlReceiveGroupChat)
+    {
+        mCtrlReceiveGroupChat->setCommitCallback(LLPanelGroupGeneral::onCommitUserOnly, this);
+        mCtrlReceiveGroupChat->setEnabled(data.mID.notNull());
+        if(data.mID.notNull())
+        {
+            mCtrlReceiveGroupChat->set(!LLMuteList::instance().isGroupMuted(data.mID));
+        }
+    }
+
     mCtrlListGroup = getChild<LLCheckBoxCtrl>("list_groups_in_profile", recurse);
     if (mCtrlListGroup)
     {
@@ -166,34 +175,6 @@ BOOL LLPanelGroupGeneral::postBuild()
         mCtrlListGroup->setEnabled(data.mID.notNull());
         mCtrlListGroup->resetDirty();
     }
-
-// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-    LLGroupOptions* pOptions = (mGroupID.notNull()) ? LLGroupOptionsMgr::instance().getOptions(mGroupID) : NULL;
-
-    mCtrlReceiveChat = getChild<LLCheckBoxCtrl>("receive_chat", recurse);
-    if (mCtrlReceiveChat)
-    {
-        mCtrlReceiveChat->setCommitCallback(onCommitUserOnly, this);
-        mCtrlReceiveChat->set( (pOptions) && (pOptions->mReceiveGroupChat) );
-        mCtrlReceiveChat->setEnabled(nullptr != pOptions);
-    }
-
-    mCtrlSnoozeOnClose = getChild<LLCheckBoxCtrl>("snooze_chat", recurse);
-    if (mCtrlSnoozeOnClose)
-    {
-        mCtrlSnoozeOnClose->setCommitCallback(boost::bind(&LLPanelGroupGeneral::onCommitSnoozeChat, this));
-        mCtrlSnoozeOnClose->set( (pOptions) && (pOptions->mSnoozeOnClose) );
-        mCtrlSnoozeOnClose->setEnabled(nullptr != pOptions);
-    }
-
-    mCtrlSnoozeDuration = getChild<LLComboBox>("snooze_chat_duration", recurse);
-    if (mCtrlSnoozeDuration)
-    {
-        mCtrlSnoozeDuration->setCommitCallback(onCommitUserOnly, this);
-        mCtrlSnoozeDuration->setValue( (pOptions) ? LLSD(pOptions->mSnoozeDuration) : LLSD() );
-        mCtrlSnoozeDuration->setEnabled( (nullptr != pOptions) && (pOptions->mSnoozeOnClose) );
-    }
-// [/SL:KB]
 
     mActiveTitleLabel = getChild<LLTextBox>("active_title_label", recurse);
 
@@ -208,13 +189,13 @@ BOOL LLPanelGroupGeneral::postBuild()
     // If the group_id is null, then we are creating a new group
     if (mGroupID.isNull())
     {
-        mEditCharter->setEnabled(TRUE);
+        mEditCharter->setEnabled(true);
 
-        mCtrlShowInGroupList->setEnabled(TRUE);
-        mComboMature->setEnabled(TRUE);
-        mCtrlOpenEnrollment->setEnabled(TRUE);
-        mCtrlEnrollmentFee->setEnabled(TRUE);
-        mSpinEnrollmentFee->setEnabled(TRUE);
+        mCtrlShowInGroupList->setEnabled(true);
+        mComboMature->setEnabled(true);
+        mCtrlOpenEnrollment->setEnabled(true);
+        mCtrlEnrollmentFee->setEnabled(true);
+        mSpinEnrollmentFee->setEnabled(true);
 
     }
 
@@ -227,7 +208,8 @@ void LLPanelGroupGeneral::setupCtrls(LLPanel* panel_group)
     if (mInsignia)
     {
         mInsignia->setCommitCallback(onCommitAny, this);
-        mInsignia->setAllowLocalTexture(FALSE);
+        mInsignia->setAllowLocalTexture(false);
+        mInsignia->setBakeTextureEnabled(false);
     }
     mFounderName = getChild<LLTextBox>("founder_name");
 
@@ -258,7 +240,7 @@ void LLPanelGroupGeneral::onCommitAny(LLUICtrl* ctrl, void* data)
 void LLPanelGroupGeneral::onCommitUserOnly(LLUICtrl* ctrl, void* data)
 {
     LLPanelGroupGeneral* self = (LLPanelGroupGeneral*)data;
-    self->mChanged = TRUE;
+    self->mChanged = true;
     self->notifyObservers();
 }
 
@@ -284,11 +266,11 @@ void LLPanelGroupGeneral::onCommitEnrollment(LLUICtrl* ctrl, void* data)
 
     if (self->mCtrlEnrollmentFee->get())
     {
-        self->mSpinEnrollmentFee->setEnabled(TRUE);
+        self->mSpinEnrollmentFee->setEnabled(true);
     }
     else
     {
-        self->mSpinEnrollmentFee->setEnabled(FALSE);
+        self->mSpinEnrollmentFee->setEnabled(false);
         self->mSpinEnrollmentFee->set(0);
     }
 }
@@ -322,9 +304,9 @@ void LLPanelGroupGeneral::activate()
         LLGroupMgr::getInstance()->sendGroupTitlesRequest(mGroupID);
         LLGroupMgr::getInstance()->sendGroupPropertiesRequest(mGroupID);
 
-        mFirstUse = FALSE;
+        mFirstUse = false;
     }
-    mChanged = FALSE;
+    mChanged = false;
 
     update(GC_ALL);
 }
@@ -348,7 +330,7 @@ bool LLPanelGroupGeneral::apply(std::string& mesg)
         mComboActiveTitle->resetDirty();
     }
 
-    BOOL has_power_in_group = gAgent.hasPowerInGroup(mGroupID,GP_GROUP_CHANGE_IDENTITY);
+    bool has_power_in_group = gAgent.hasPowerInGroup(mGroupID,GP_GROUP_CHANGE_IDENTITY);
 
     if (has_power_in_group)
     {
@@ -388,7 +370,7 @@ bool LLPanelGroupGeneral::apply(std::string& mesg)
                 }
                 else
                 {
-                    gdatap->mMaturePublish = FALSE;
+                    gdatap->mMaturePublish = false;
                 }
             }
             if (mCtrlShowInGroupList) gdatap->mShowInList = mCtrlShowInGroupList->get();
@@ -412,8 +394,8 @@ bool LLPanelGroupGeneral::apply(std::string& mesg)
         }
     }
 
-    BOOL receive_notices = false;
-    BOOL list_in_profile = false;
+    bool receive_notices = false;
+    bool list_in_profile = false;
     if (mCtrlReceiveNotices)
         receive_notices = mCtrlReceiveNotices->get();
     if (mCtrlListGroup)
@@ -421,32 +403,28 @@ bool LLPanelGroupGeneral::apply(std::string& mesg)
 
     gAgent.setUserGroupFlags(mGroupID, receive_notices, list_in_profile);
 
-// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-    if (mCtrlReceiveChat)
+    if(mCtrlReceiveGroupChat)
     {
-        LLGroupOptionsMgr::instance().setOptionReceiveChat(mGroupID, mCtrlReceiveChat->get());
-    }
-
-    if (mCtrlSnoozeOnClose)
-    {
-        LLGroupOptionsMgr::instance().setOptionSnoozeOnClose(mGroupID, mCtrlSnoozeOnClose->get());
-        if ( (mCtrlSnoozeOnClose->get()) && (mCtrlSnoozeDuration) )
+        if(mCtrlReceiveGroupChat->get())
         {
-            LLGroupOptionsMgr::instance().setOptionSnoozeDuration(mGroupID, mCtrlSnoozeDuration->getValue().asInteger());
+            LLMuteList::instance().removeGroup(mGroupID);
+        }
+        else
+        {
+            LLMuteList::instance().addGroup(mGroupID);
         }
     }
-// [/SL:KB]
 
     resetDirty();
 
-    mChanged = FALSE;
+    mChanged = false;
 
     return true;
 }
 
 void LLPanelGroupGeneral::cancel()
 {
-    mChanged = FALSE;
+    mChanged = false;
 
     //cancel out all of the click changes to, although since we are
     //shifting tabs or closing the floater, this need not be done...yet
@@ -507,6 +485,8 @@ void LLPanelGroupGeneral::update(LLGroupChange gc)
 
         if (is_member)
         {
+            LLUUID current_title_role;
+
             mComboActiveTitle->clear();
             mComboActiveTitle->removeall();
             bool has_selected_title = false;
@@ -514,11 +494,11 @@ void LLPanelGroupGeneral::update(LLGroupChange gc)
             if (1 == gdatap->mTitles.size())
             {
                 // Only the everyone title.  Don't bother letting them try changing this.
-                mComboActiveTitle->setEnabled(FALSE);
+                mComboActiveTitle->setEnabled(false);
             }
             else
             {
-                mComboActiveTitle->setEnabled(TRUE);
+                mComboActiveTitle->setEnabled(true);
             }
 
             std::vector<LLGroupTitle>::const_iterator citer = gdatap->mTitles.begin();
@@ -601,39 +581,19 @@ void LLPanelGroupGeneral::update(LLGroupChange gc)
         }
     }
 
-// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-    if (mCtrlReceiveChat)
+    if (mCtrlReceiveGroupChat)
     {
-        mCtrlReceiveChat->setVisible(is_member);
+        mCtrlReceiveGroupChat->setVisible(is_member);
         if (is_member)
         {
-            mCtrlReceiveChat->setEnabled(mAllowEdit);
+            mCtrlReceiveGroupChat->setEnabled(mAllowEdit);
         }
     }
-
-    if (mCtrlSnoozeOnClose)
-    {
-        mCtrlSnoozeOnClose->setVisible(is_member);
-        if (is_member)
-        {
-            mCtrlSnoozeOnClose->setEnabled(mAllowEdit);
-        }
-    }
-
-    if (mCtrlSnoozeDuration)
-    {
-        mCtrlSnoozeDuration->setVisible(is_member);
-        if (is_member)
-        {
-            mCtrlSnoozeDuration->setEnabled(mAllowEdit && mCtrlSnoozeOnClose->get());
-        }
-    }
-// [/SL:KB]
 
     if (mInsignia) mInsignia->setEnabled(mAllowEdit && can_change_ident);
     if (mEditCharter) mEditCharter->setEnabled(mAllowEdit && can_change_ident);
 
-    if (mGroupNameEditor) mGroupNameEditor->setVisible(FALSE);
+    if (mGroupNameEditor) mGroupNameEditor->setVisible(false);
     if (mFounderName) mFounderName->setText(LLSLURL("agent", gdatap->mFounderID, "inspect").getSLURLString());
     if (mInsignia)
     {
@@ -672,22 +632,18 @@ void LLPanelGroupGeneral::updateChanged()
         mSpinEnrollmentFee,
         mCtrlReceiveNotices,
         mCtrlListGroup,
-// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-        mCtrlReceiveChat,
-        mCtrlSnoozeOnClose,
-        mCtrlSnoozeDuration,
-// [/SL:KB]
         mActiveTitleLabel,
-        mComboActiveTitle
+        mComboActiveTitle,
+        mCtrlReceiveGroupChat
     };
 
-    mChanged = FALSE;
+    mChanged = false;
 
     for( size_t i=0; i<LL_ARRAY_SIZE(check_list); i++ )
     {
         if( check_list[i] && check_list[i]->isDirty() )
         {
-            mChanged = TRUE;
+            mChanged = true;
             break;
         }
     }
@@ -708,31 +664,17 @@ void LLPanelGroupGeneral::reset()
 
     mCtrlListGroup->setEnabled(false);
 
-// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-    mCtrlReceiveChat->set(true);
-    mCtrlReceiveChat->setEnabled(false);
-    mCtrlReceiveChat->setVisible(true);
-
-    mCtrlSnoozeOnClose->set(false);
-    mCtrlSnoozeOnClose->setEnabled(false);
-    mCtrlSnoozeOnClose->setVisible(true);
-
-    mCtrlSnoozeDuration->setValue(LLSD());
-    mCtrlSnoozeDuration->setEnabled(false);
-    mCtrlSnoozeDuration->setVisible(true);
-// [/SL:KB]
-
-    mGroupNameEditor->setEnabled(TRUE);
-    mEditCharter->setEnabled(TRUE);
+    mGroupNameEditor->setEnabled(true);
+    mEditCharter->setEnabled(true);
 
     mCtrlShowInGroupList->setEnabled(false);
-    mComboMature->setEnabled(TRUE);
+    mComboMature->setEnabled(true);
 
-    mCtrlOpenEnrollment->setEnabled(TRUE);
+    mCtrlOpenEnrollment->setEnabled(true);
 
-    mCtrlEnrollmentFee->setEnabled(TRUE);
+    mCtrlEnrollmentFee->setEnabled(true);
 
-    mSpinEnrollmentFee->setEnabled(TRUE);
+    mSpinEnrollmentFee->setEnabled(true);
     mSpinEnrollmentFee->set((F32)0);
 
     mGroupNameEditor->setVisible(true);
@@ -745,10 +687,14 @@ void LLPanelGroupGeneral::reset()
 
     mInsignia->setImageAssetName(mInsignia->getDefaultImageName());
 
+    mCtrlReceiveGroupChat->set(false);
+    mCtrlReceiveGroupChat->setEnabled(false);
+    mCtrlReceiveGroupChat->setVisible(true);
+
+
     {
-        std::string empty_str = "";
-        mEditCharter->setText(empty_str);
-        mGroupNameEditor->setText(empty_str);
+        mEditCharter->setText(LLStringUtil::null);
+        mGroupNameEditor->setText(LLStringUtil::null);
     }
 
     {
@@ -777,13 +723,9 @@ void    LLPanelGroupGeneral::resetDirty()
         mSpinEnrollmentFee,
         mCtrlReceiveNotices,
         mCtrlListGroup,
-// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-        mCtrlReceiveChat,
-        mCtrlSnoozeOnClose,
-        mCtrlSnoozeDuration,
-// [/SL:KB]
         mActiveTitleLabel,
-        mComboActiveTitle
+        mComboActiveTitle,
+        mCtrlReceiveGroupChat
     };
 
     for( size_t i=0; i<LL_ARRAY_SIZE(check_list); i++ )
@@ -799,14 +741,14 @@ void LLPanelGroupGeneral::setGroupID(const LLUUID& id)
 {
     LLPanelGroupTab::setGroupID(id);
 
-    if(id.isNull())
+    if(id == LLUUID::null)
     {
         reset();
         return;
     }
 
-    BOOL accept_notices = FALSE;
-    BOOL list_in_profile = FALSE;
+    bool accept_notices = false;
+    bool list_in_profile = false;
     LLGroupData data;
     if(gAgent.getGroupData(mGroupID,data))
     {
@@ -827,30 +769,15 @@ void LLPanelGroupGeneral::setGroupID(const LLUUID& id)
         mCtrlListGroup->setEnabled(data.mID.notNull());
     }
 
-// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-    LLGroupOptions* pOptions = LLGroupOptionsMgr::instance().getOptions(mGroupID);
-
-    mCtrlReceiveChat = getChild<LLCheckBoxCtrl>("receive_chat");
-    if (mCtrlReceiveChat)
+    mCtrlReceiveGroupChat = getChild<LLCheckBoxCtrl>("receive_chat");
+    if (mCtrlReceiveGroupChat)
     {
-        mCtrlReceiveChat->set( (pOptions) && (pOptions->mReceiveGroupChat) );
-        mCtrlReceiveChat->setEnabled(nullptr != pOptions);
+        if(data.mID.notNull())
+        {
+            mCtrlReceiveGroupChat->set(!LLMuteList::instance().isGroupMuted(data.mID));
+        }
+        mCtrlReceiveGroupChat->setEnabled(data.mID.notNull());
     }
-
-    mCtrlSnoozeOnClose = getChild<LLCheckBoxCtrl>("snooze_chat");
-    if (mCtrlSnoozeOnClose)
-    {
-        mCtrlSnoozeOnClose->set( (pOptions) && (pOptions->mSnoozeOnClose) );
-        mCtrlSnoozeOnClose->setEnabled(nullptr != pOptions);
-    }
-
-    mCtrlSnoozeDuration = getChild<LLComboBox>("snooze_chat_duration");
-    if (mCtrlSnoozeDuration)
-    {
-        mCtrlSnoozeDuration->setValue( (pOptions) ? LLSD(pOptions->mSnoozeDuration) : LLSD() );
-        mCtrlSnoozeDuration->setEnabled( (nullptr != pOptions) && (pOptions->mSnoozeOnClose) );
-    }
-// [/SL:KB]
 
     mCtrlShowInGroupList->setEnabled(data.mID.notNull());
 
@@ -866,11 +793,3 @@ void LLPanelGroupGeneral::setGroupID(const LLUUID& id)
 
     activate();
 }
-
-// [SL:KB] - Patch: Chat-GroupOptions | Checked: Catznip-5.2
-void LLPanelGroupGeneral::onCommitSnoozeChat()
-{
-    mCtrlSnoozeDuration->setEnabled(mCtrlSnoozeOnClose->get());
-    onCommitUserOnly(mCtrlSnoozeOnClose, this);
-}
-// [/SL:KB]

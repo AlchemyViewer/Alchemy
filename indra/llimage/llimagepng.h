@@ -29,10 +29,10 @@
 #include "stdtypes.h"
 #include "llimage.h"
 
-class LLImagePNG final : public LLImageFormatted
+class LLImagePNG : public LLImageFormatted
 {
 protected:
-    ~LLImagePNG() = default;
+    ~LLImagePNG();
 
 public:
     LLImagePNG();

@@ -30,12 +30,14 @@
 #include "llinstancetracker.h"
 #include "lltrace.h"
 #include "lltreeiterators.h"
-#include "llprofiler.h"
+#include "llprocessor.h"
 
+#if LL_X86 || LL_X86_64
 #if LL_WINDOWS
 #include <intrin.h>
 #else
 #include <x86intrin.h>
+#endif
 #endif
 
 #define LL_FAST_TIMER_ON 1
@@ -43,13 +45,7 @@
 
 // NOTE: Also see llprofiler.h
 #if !defined(LL_PROFILER_CONFIGURATION)
-#if AL_ENABLE_ALL_TIMERS
 #define LL_RECORD_BLOCK_TIME(timer_stat) const LLTrace::BlockTimer& LL_GLUE_TOKENS(block_time_recorder, __LINE__)(LLTrace::timeThisBlock(timer_stat)); (void)LL_GLUE_TOKENS(block_time_recorder, __LINE__);
-#else
-#define LL_RECORD_BLOCK_TIME(timer_stat)
-#endif
-
-#define LL_ALWAYS_RECORD_BLOCK_TIME(timer_stat) const LLTrace::BlockTimer& LL_GLUE_TOKENS(block_time_recorder, __LINE__)(LLTrace::timeThisBlock(timer_stat)); (void)LL_GLUE_TOKENS(block_time_recorder, __LINE__);
 #endif // LL_PROFILER_CONFIGURATION
 
 namespace LLTrace
@@ -83,14 +79,15 @@ public:
     // on 1Ghz machine, a 32-bit word will hold ~1000 seconds of timing
     static U32 getCPUClockCount32()
     {
-        U64 time_stamp = __rdtsc() >> 8U;
-        return static_cast<U32>(time_stamp);
+        unsigned __int64 val = __rdtsc();
+        val = val >> 8;
+        return static_cast<U32>(val);
     }
 
     // return full timer value, *not* shifted by 8 bits
     static U64 getCPUClockCount64()
     {
-        return static_cast<U64>(__rdtsc());
+        return static_cast<U64>( __rdtsc() );
     }
 
 #else
@@ -98,7 +95,7 @@ public:
     // These use QueryPerformanceCounter, which is arguably fine and also works on AMD architectures.
     static U32 getCPUClockCount32()
     {
-        return (U32)(get_clock_count() >> 8);
+        return (U32)(get_clock_count()>>8);
     }
 
     static U64 getCPUClockCount64()
@@ -142,9 +139,26 @@ public:
 #endif // (LL_LINUX) && !(defined(__i386__) || defined(__amd64__))
 
 
-#if (LL_LINUX || LL_DARWIN) && (defined(__i386__) || defined(__amd64__))
+#if LL_DARWIN && LL_ARM64
+    //
+    // Mac implementation of CPU clock - non-x86.
+    //
+    static U64 getCPUClockCount64()
+    {
+        return clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+    }
+
+    static U32 getCPUClockCount32()
+    {
+        return (U32)(getCPUClockCount64() >> 8);
+    }
+#endif // LL_DARWIN && LL_ARM64
+
+#if (LL_LINUX || LL_DARWIN) && (LL_X86 || LL_X86_64)
     //
     // Mac+Linux FAST x86 implementation of CPU clock
+    //
+#if LL_FASTTIMER_USE_RDTSC
     static U32 getCPUClockCount32()
     {
         U64 time_stamp = __rdtsc() >> 8U;
@@ -155,7 +169,7 @@ public:
     {
         return static_cast<U64>(__rdtsc());
     }
-
+#endif
 #endif
 
     static BlockTimerStatHandle& getRootTimeBlock();
@@ -195,7 +209,7 @@ private:
 
 private:
     U64                     mStartTime;
-    BlockTimerStackRecord   mParentTimerData;
+    BlockTimerStackRecord   mParentTimerData{};
 
 public:
     // statics

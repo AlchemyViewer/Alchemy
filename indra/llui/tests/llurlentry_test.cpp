@@ -36,12 +36,6 @@
 
 #include <boost/regex.hpp>
 
-#if LL_WINDOWS
-// because something pulls in window and lldxdiag dependencies which in turn need wbemuuid.lib
-    #pragma comment(lib, "wbemuuid.lib")
-#endif
-
-
 // namespace LLExperienceCache
 // {
 //     const LLSD& get( const LLUUID& key)
@@ -58,7 +52,7 @@
 typedef std::map<std::string, LLControlGroup*> settings_map_t;
 settings_map_t LLUI::sSettingGroups;
 
-BOOL LLControlGroup::getBOOL(const std::string& name)
+bool LLControlGroup::getBOOL(const std::string& name)
 {
     return false;
 }
@@ -91,10 +85,10 @@ S32 LLUIImage::getHeight() const
 }
 |*==========================================================================*/
 
-const std::string dogFace("DogFace");
+const std::string anonName("Anon");
 const std::string& rlvGetAnonym(const LLAvatarName& avName)
 {
-    return dogFace;
+    return anonName;
 }
 
 namespace tut

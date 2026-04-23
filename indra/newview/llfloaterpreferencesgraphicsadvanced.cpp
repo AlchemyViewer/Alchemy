@@ -55,28 +55,61 @@ LLFloaterPreferenceGraphicsAdvanced::LLFloaterPreferenceGraphicsAdvanced(const L
     mCommitCallbackRegistrar.add("Pref.Cancel", boost::bind(&LLFloaterPreferenceGraphicsAdvanced::onBtnCancel, this, _2));
     mCommitCallbackRegistrar.add("Pref.OK",     boost::bind(&LLFloaterPreferenceGraphicsAdvanced::onBtnOK, this, _2));
 
-    gSavedSettings.getControl("RenderAvatarMaxNonImpostors")->getSignal()->connect(boost::bind(&LLFloaterPreferenceGraphicsAdvanced::updateIndirectMaxNonImpostors, this, _2));
+    mImpostorsChangedSignal = gSavedSettings.getControl("RenderAvatarMaxNonImpostors")->getSignal()->connect(boost::bind(&LLFloaterPreferenceGraphicsAdvanced::updateIndirectMaxNonImpostors, this, _2));
 }
 
 LLFloaterPreferenceGraphicsAdvanced::~LLFloaterPreferenceGraphicsAdvanced()
 {
     mComplexityChangedSignal.disconnect();
+    mComplexityModeChangedSignal.disconnect();
     mLODFactorChangedSignal.disconnect();
 }
 
-BOOL LLFloaterPreferenceGraphicsAdvanced::postBuild()
+bool LLFloaterPreferenceGraphicsAdvanced::postBuild()
 {
-    // Don't do this on Mac as their braindead GL versioning
-    // sets this when 8x and 16x are indeed available
+    // Disable FSAA combo when shaders are not loaded
     //
-#if !LL_DARWIN
+    {
+        LLComboBox* combo = getChild<LLComboBox>("fsaa");
+        if (!gFXAAProgram[0].isComplete())
+            combo->remove("FXAA");
+
+        if (!gSMAAEdgeDetectProgram[0].isComplete())
+            combo->remove("SMAA");
+
+        if (!gFXAAProgram[0].isComplete() && !gSMAAEdgeDetectProgram[0].isComplete())
+        {
+            combo->setEnabled(false);
+            getChild<LLComboBox>("fsaa quality")->setEnabled(false);
+        }
+    }
+
+#if !LL_DARWIN && !LL_SDL_WINDOW
     LLCheckBoxCtrl *use_HiDPI = getChild<LLCheckBoxCtrl>("use HiDPI");
-    use_HiDPI->setVisible(FALSE);
+    use_HiDPI->setVisible(false);
 #endif
 
-    mComplexityChangedSignal = gSavedSettings.getControl("RenderAvatarMaxComplexity")->getCommitSignal()->connect(boost::bind(&LLFloaterPreferenceGraphicsAdvanced::updateComplexityText, this));
-    mLODFactorChangedSignal = gSavedSettings.getControl("RenderVolumeLODFactor")->getCommitSignal()->connect(boost::bind(&LLFloaterPreferenceGraphicsAdvanced::updateObjectMeshDetailText, this));
-    return TRUE;
+    mComplexityChangedSignal = gSavedSettings.getControl("RenderAvatarMaxComplexity")->getCommitSignal()->connect(
+        [this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+        {
+            updateComplexityText();
+        });
+    mComplexityModeChangedSignal = gSavedSettings.getControl("RenderAvatarComplexityMode")->getSignal()->connect(
+        [this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+        {
+            updateComplexityMode(new_val);
+        });
+    mLODFactorChangedSignal = gSavedSettings.getControl("RenderVolumeLODFactor")->getCommitSignal()->connect(
+        [this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+        {
+            updateObjectMeshDetailText();
+        });
+    mNumImpostorsChangedSignal = gSavedSettings.getControl("RenderAvatarMaxNonImpostors")->getSignal()->connect(
+        [this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+        {
+            updateIndirectMaxNonImpostors(new_val);
+        });
+    return true;
 }
 
 void LLFloaterPreferenceGraphicsAdvanced::onOpen(const LLSD& key)
@@ -89,7 +122,7 @@ void LLFloaterPreferenceGraphicsAdvanced::onClickCloseBtn(bool app_quitting)
     LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
     if (instance)
     {
-        instance->cancel();
+        instance->cancel({"RenderQualityPerformance"});
     }
     updateMaxComplexity();
 }
@@ -118,8 +151,6 @@ void LLFloaterPreferenceGraphicsAdvanced::onAdvancedAtmosphericsEnable()
 
 void LLFloaterPreferenceGraphicsAdvanced::refresh()
 {
-    getChild<LLUICtrl>("fsaa")->setValue((LLSD::Integer)  gSavedSettings.getU32("RenderFSAASamples"));
-
     // sliders and their text boxes
     //  mPostProcess = gSavedSettings.getS32("RenderGlowResolutionPow");
     // slider text boxes
@@ -130,7 +161,7 @@ void LLFloaterPreferenceGraphicsAdvanced::refresh()
     updateSliderText(getChild<LLSliderCtrl>("AvatarPhysicsDetail",  true), getChild<LLTextBox>("AvatarPhysicsDetailText",       true));
     updateSliderText(getChild<LLSliderCtrl>("TerrainMeshDetail",    true), getChild<LLTextBox>("TerrainMeshDetailText",     true));
     updateSliderText(getChild<LLSliderCtrl>("RenderPostProcess",    true), getChild<LLTextBox>("PostProcessText",           true));
-    updateSliderText(getChild<LLSliderCtrl>("SkyMeshDetail",        true), getChild<LLTextBox>("SkyMeshDetailText",         true));
+    updateSliderText(getChild<LLSliderCtrl>("GlowResolution",        true), getChild<LLTextBox>("GlowResolutionText",         true));
     LLAvatarComplexityControls::setIndirectControls();
     setMaxNonImpostorsText(
         gSavedSettings.getU32("RenderAvatarMaxNonImpostors"),
@@ -139,6 +170,10 @@ void LLFloaterPreferenceGraphicsAdvanced::refresh()
         gSavedSettings.getU32("RenderAvatarMaxComplexity"),
         getChild<LLTextBox>("IndirectMaxComplexityText", true));
     refreshEnabledState();
+
+    bool enable_complexity = gSavedSettings.getS32("RenderAvatarComplexityMode") != LLVOAvatar::AV_RENDER_ONLY_SHOW_FRIENDS;
+    getChild<LLSliderCtrl>("IndirectMaxComplexity")->setEnabled(enable_complexity);
+    getChild<LLSliderCtrl>("IndirectMaxNonImpostors")->setEnabled(enable_complexity);
 }
 
 void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledGraphics()
@@ -152,6 +187,13 @@ void LLFloaterPreferenceGraphicsAdvanced::updateMaxComplexity()
     LLAvatarComplexityControls::updateMax(
         getChild<LLSliderCtrl>("IndirectMaxComplexity"),
         getChild<LLTextBox>("IndirectMaxComplexityText"));
+}
+
+void LLFloaterPreferenceGraphicsAdvanced::updateComplexityMode(const LLSD& newvalue)
+{
+    bool enable_complexity = newvalue.asInteger() != LLVOAvatar::AV_RENDER_ONLY_SHOW_FRIENDS;
+    getChild<LLSliderCtrl>("IndirectMaxComplexity")->setEnabled(enable_complexity);
+    getChild<LLSliderCtrl>("IndirectMaxNonImpostors")->setEnabled(enable_complexity);
 }
 
 void LLFloaterPreferenceGraphicsAdvanced::updateComplexityText()
@@ -216,8 +258,8 @@ void LLFloaterPreferenceGraphicsAdvanced::updateIndirectMaxNonImpostors(const LL
     if ((value != 0) && (value != gSavedSettings.getU32("IndirectMaxNonImpostors")))
     {
         gSavedSettings.setU32("IndirectMaxNonImpostors", value);
-        setMaxNonImpostorsText(value, getChild<LLTextBox>("IndirectMaxNonImpostorsText"));
     }
+    setMaxNonImpostorsText(value, getChild<LLTextBox>("IndirectMaxNonImpostorsText"));
 }
 
 void LLFloaterPreferenceGraphicsAdvanced::setMaxNonImpostorsText(U32 value, LLTextBox* text_box)
@@ -237,40 +279,76 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
     LLComboBox* ctrl_shadows = getChild<LLComboBox>("ShadowDetail");
     LLTextBox* shadows_text = getChild<LLTextBox>("RenderShadowDetailText");
     LLCheckBoxCtrl* ctrl_ssao = getChild<LLCheckBoxCtrl>("UseSSAO");
-    LLComboBox* ctrl_anisotropic = getChild<LLComboBox>("anisotropic_filter");
+    LLCheckBoxCtrl* ctrl_dof = getChild<LLCheckBoxCtrl>("UseDoF");
+    LLSliderCtrl* cas_slider = getChild<LLSliderCtrl>("RenderSharpness");
+
+    // disabled windlight
+    if (!LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))
+    {
+        //deferred needs windlight, disable deferred
+        ctrl_shadows->setEnabled(false);
+        ctrl_shadows->setValue(0);
+        shadows_text->setEnabled(false);
+
+        ctrl_ssao->setEnabled(false);
+        ctrl_ssao->setValue(false);
+
+        ctrl_dof->setEnabled(false);
+        ctrl_dof->setValue(false);
+    }
+
+    // disabled deferred
+    if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred"))
+    {
+        ctrl_shadows->setEnabled(false);
+        ctrl_shadows->setValue(0);
+        shadows_text->setEnabled(false);
+
+        ctrl_ssao->setEnabled(false);
+        ctrl_ssao->setValue(false);
+
+        ctrl_dof->setEnabled(false);
+        ctrl_dof->setValue(false);
+    }
 
     // disabled deferred SSAO
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferredSSAO"))
     {
-        ctrl_ssao->setEnabled(FALSE);
-        ctrl_ssao->setValue(FALSE);
+        ctrl_ssao->setEnabled(false);
+        ctrl_ssao->setValue(false);
     }
 
     // disabled deferred shadows
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderShadowDetail"))
     {
-        ctrl_shadows->setEnabled(FALSE);
+        ctrl_shadows->setEnabled(false);
         ctrl_shadows->setValue(0);
-        shadows_text->setEnabled(FALSE);
+        shadows_text->setEnabled(false);
     }
 
+    // Vintage mode
+    static LLCachedControl<bool> is_not_vintage(gSavedSettings, "RenderDisableVintageMode");
+    LLSliderCtrl*         tonemapMix    = getChild<LLSliderCtrl>("TonemapMix");
+    LLComboBox*           tonemapSelect = getChild<LLComboBox>("TonemapType");
+    LLTextBox*            tonemapLabel  = getChild<LLTextBox>("TonemapTypeText");
+    LLSliderCtrl*         exposureSlider = getChild<LLSliderCtrl>("RenderExposure");
+
+    tonemapSelect->setEnabled(is_not_vintage);
+    tonemapLabel->setEnabled(is_not_vintage);
+    tonemapMix->setEnabled(is_not_vintage);
+    exposureSlider->setEnabled(is_not_vintage);
+    cas_slider->setEnabled(is_not_vintage);
+
+    LLComboBox* ctrl_anisotropic = getChild<LLComboBox>("anisotropic_filter");
     if (!LLFeatureManager::instance().isFeatureAvailable("RenderAnisotropicLevel"))
     {
-        ctrl_anisotropic->setEnabled(FALSE);
+        ctrl_anisotropic->setEnabled(false);
     }
 }
 
 void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
 {
-    // WindLight
-    //LLCheckBoxCtrl* ctrl_wind_light = getChild<LLCheckBoxCtrl>("WindLightUseAtmosShaders");
-    //ctrl_wind_light->setEnabled(TRUE);
-    LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
-    LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
-    sky->setEnabled(TRUE);
-    sky_text->setEnabled(TRUE);
-
-    BOOL enabled = TRUE;
+    bool enabled = true;
 
     LLCheckBoxCtrl* ctrl_ssao = getChild<LLCheckBoxCtrl>("UseSSAO");
     LLCheckBoxCtrl* ctrl_dof = getChild<LLCheckBoxCtrl>("UseDoF");
@@ -278,7 +356,7 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
     LLTextBox* shadow_text = getChild<LLTextBox>("RenderShadowDetailText");
 
     // note, okay here to get from ctrl_deferred as it's twin, ctrl_deferred2 will alway match it
-    enabled = enabled && LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferredSSAO");// && (ctrl_deferred->get() ? TRUE : FALSE);
+    enabled = enabled && LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferredSSAO");// && ctrl_deferred->get();
 
     //ctrl_deferred->set(gSavedSettings.getBOOL("RenderDeferred"));
 
@@ -294,15 +372,16 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
 
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderVBOEnable"))
     {
-        getChildView("vbo")->setEnabled(FALSE);
+        getChildView("vbo")->setEnabled(false);
     }
 
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderCompressTextures"))
     {
-        getChildView("texture compression")->setEnabled(FALSE);
+        getChildView("texture compression")->setEnabled(false);
     }
 
-    // AF Filtering
+    getChildView("antialiasing restart")->setVisible(!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred"));
+
     LLComboBox* af_combo = getChild<LLComboBox>("anisotropic_filter");
     if (2.f > gGLManager.mMaxAnisotropy) {
         af_combo->remove("2x");
@@ -316,8 +395,6 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
     if (16.f > gGLManager.mMaxAnisotropy) {
         af_combo->remove("16x");
     }
-
-    getChildView("antialiasing restart")->setVisible(!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred"));
 
     // now turn off any features that are unavailable
     disableUnavailableSettings();

@@ -49,7 +49,7 @@ LLTransferSource::stype_scfunc_map LLTransferSource::sSourceCreateMap;
 //
 
 LLTransferManager::LLTransferManager() :
-    mValid(FALSE)
+    mValid(false)
 {
     S32 i;
     for (i = 0; i < LLTTT_NUM_TYPES; i++)
@@ -78,19 +78,19 @@ void LLTransferManager::init()
     {
         LL_ERRS() << "Double initializing LLTransferManager!" << LL_ENDL;
     }
-    mValid = TRUE;
+    mValid = true;
 
     // Register message system handlers
-    gMessageSystem->setHandlerFuncFast(_PREHASH_TransferRequest, processTransferRequest, NULL);
-    gMessageSystem->setHandlerFuncFast(_PREHASH_TransferInfo, processTransferInfo, NULL);
-    gMessageSystem->setHandlerFuncFast(_PREHASH_TransferPacket, processTransferPacket, NULL);
-    gMessageSystem->setHandlerFuncFast(_PREHASH_TransferAbort, processTransferAbort, NULL);
+    gMessageSystem->setHandlerFunc("TransferRequest", processTransferRequest, NULL);
+    gMessageSystem->setHandlerFunc("TransferInfo", processTransferInfo, NULL);
+    gMessageSystem->setHandlerFunc("TransferPacket", processTransferPacket, NULL);
+    gMessageSystem->setHandlerFunc("TransferAbort", processTransferAbort, NULL);
 }
 
 
 void LLTransferManager::cleanup()
 {
-    mValid = FALSE;
+    mValid = false;
 
     host_tc_map::iterator iter;
     for (iter = mTransferConnections.begin(); iter != mTransferConnections.end(); iter++)
@@ -169,6 +169,11 @@ LLTransferTargetChannel *LLTransferManager::getTargetChannel(const LLHost &host,
     return tcp->getTargetChannel(type);
 }
 
+// virtual
+LLTransferSourceParams::~LLTransferSourceParams()
+{ }
+
+
 LLTransferSource *LLTransferManager::findTransferSource(const LLUUID &transfer_id)
 {
     // This linear traversal could screw us later if we do lots of
@@ -208,15 +213,8 @@ void LLTransferManager::processTransferRequest(LLMessageSystem *msgp, void **)
     F32 priority;
 
     msgp->getUUIDFast(_PREHASH_TransferInfo, _PREHASH_TransferID, transfer_id);
-
-    S32 temp_source_type;
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_SourceType, temp_source_type);
-    source_type = (LLTransferSourceType)temp_source_type;
-
-    S32 temp_channel_type;
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, temp_channel_type);
-    channel_type = (LLTransferChannelType)temp_channel_type;
-
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_SourceType, (S32 &)source_type);
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, (S32 &)channel_type);
     msgp->getF32Fast(_PREHASH_TransferInfo, _PREHASH_Priority, priority);
 
     LLTransferSourceChannel *tscp = gTransferManager.getSourceChannel(msgp->getSender(), channel_type);
@@ -256,7 +254,7 @@ void LLTransferManager::processTransferRequest(LLMessageSystem *msgp, void **)
     msgp->getBinaryDataFast(_PREHASH_TransferInfo, _PREHASH_Params, tmp, size);
 
     LLDataPackerBinaryBuffer dpb(tmp, MAX_PARAMS_SIZE);
-    BOOL unpack_ok = tsp->unpackParams(dpb);
+    bool unpack_ok = tsp->unpackParams(dpb);
     if (!unpack_ok)
     {
         // This should only happen if the data is corrupt or
@@ -279,20 +277,15 @@ void LLTransferManager::processTransferInfo(LLMessageSystem *msgp, void **)
     //LL_INFOS() << "LLTransferManager::processTransferInfo" << LL_ENDL;
 
     LLUUID transfer_id;
+    LLTransferTargetType target_type;
     LLTransferChannelType channel_type;
     LLTSCode status;
     S32 size;
 
     msgp->getUUIDFast(_PREHASH_TransferInfo, _PREHASH_TransferID, transfer_id);
-
-    S32 temp_channel_type;
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, temp_channel_type);
-    channel_type = (LLTransferChannelType)temp_channel_type;
-
-    S32 temp_status;
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_Status, temp_status);
-    status = (LLTSCode)temp_status;
-
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_TargetType, (S32 &)target_type);
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, (S32 &)channel_type);
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_Status, (S32 &)status);
     msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_Size, size);
 
     //LL_INFOS() << transfer_id << ":" << target_type<< ":" << channel_type << LL_ENDL;
@@ -349,7 +342,7 @@ void LLTransferManager::processTransferInfo(LLMessageSystem *msgp, void **)
 
     //LL_INFOS() << "Receiving " << transfer_id << ", size " << size << " bytes" << LL_ENDL;
     ttp->setSize(size);
-    ttp->setGotInfo(TRUE);
+    ttp->setGotInfo(true);
 
     // OK, at this point we to handle any delayed transfer packets (which could happen
     // if this packet was lost)
@@ -427,16 +420,9 @@ void LLTransferManager::processTransferPacket(LLMessageSystem *msgp, void **)
     LLTSCode status;
     S32 size;
     msgp->getUUIDFast(_PREHASH_TransferData, _PREHASH_TransferID, transfer_id);
-
-    S32 temp_channel_type;
-    msgp->getS32Fast(_PREHASH_TransferData, _PREHASH_ChannelType, temp_channel_type);
-    channel_type = (LLTransferChannelType)temp_channel_type;
-
+    msgp->getS32Fast(_PREHASH_TransferData, _PREHASH_ChannelType, (S32 &)channel_type);
     msgp->getS32Fast(_PREHASH_TransferData, _PREHASH_Packet, packet_id);
-
-    S32 temp_status;
-    msgp->getS32Fast(_PREHASH_TransferData, _PREHASH_Status, temp_status);
-    status = (LLTSCode)temp_status;
+    msgp->getS32Fast(_PREHASH_TransferData, _PREHASH_Status, (S32 &)status);
 
     // Find the transfer associated with this packet.
     //LL_INFOS() << transfer_id << ":" << channel_type << LL_ENDL;
@@ -519,7 +505,7 @@ void LLTransferManager::processTransferPacket(LLMessageSystem *msgp, void **)
     // NOTE: THERE IS A CUT AND PASTE OF THIS CODE IN THE TRANSFERINFO HANDLER
     // SO WE CAN PLAY BACK DELAYED PACKETS THERE!!!!!!!!!!!!!!!!!!!!!!!!!
     //
-    BOOL done = FALSE;
+    bool done = false;
     while (!done)
     {
         LLTSCode ret_code = ttp->dataCallback(packet_id, tmp_data, size);
@@ -571,7 +557,7 @@ void LLTransferManager::processTransferPacket(LLMessageSystem *msgp, void **)
         else
         {
             // No matching delayed packet, abort it.
-            done = TRUE;
+            done = true;
         }
     }
 }
@@ -585,10 +571,7 @@ void LLTransferManager::processTransferAbort(LLMessageSystem *msgp, void **)
     LLUUID transfer_id;
     LLTransferChannelType channel_type;
     msgp->getUUIDFast(_PREHASH_TransferInfo, _PREHASH_TransferID, transfer_id);
-
-    S32 temp_channel_type;
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, temp_channel_type);
-    channel_type = (LLTransferChannelType)temp_channel_type;
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, (S32 &)channel_type);
 
     // See if it's a target that we're trying to abort
     // Find the transfer associated with this packet.
@@ -797,7 +780,7 @@ void LLTransferSourceChannel::updateTransfers()
 
     LLPriQueueMap<LLTransferSource *>::pqm_iter iter, next;
 
-    BOOL done = FALSE;
+    bool done = false;
     for (iter = mTransferSources.mMap.begin(); (iter != mTransferSources.mMap.end()) && !done;)
     {
         //LL_INFOS() << "LLTransferSourceChannel::updateTransfers()" << LL_ENDL;
@@ -808,7 +791,7 @@ void LLTransferSourceChannel::updateTransfers()
         LLTransferSource *tsp = iter->second;
         U8 *datap = NULL;
         S32 data_size = 0;
-        BOOL delete_data = FALSE;
+        bool delete_data = false;
         S32 packet_id = 0;
         S32 sent_bytes = 0;
         LLTSCode status = LLTS_OK;
@@ -835,11 +818,11 @@ void LLTransferSourceChannel::updateTransfers()
         gMessageSystem->nextBlockFast(_PREHASH_TransferData);
         gMessageSystem->addUUIDFast(_PREHASH_TransferID, tsp->getID());
         gMessageSystem->addS32Fast(_PREHASH_ChannelType, getChannelType());
-        gMessageSystem->addS32Fast(_PREHASH_Packet, packet_id); // HACK!  Need to put in a REAL packet id
+        gMessageSystem->addS32Fast(_PREHASH_Packet, packet_id);    // HACK!  Need to put in a REAL packet id
         gMessageSystem->addS32Fast(_PREHASH_Status, status);
         gMessageSystem->addBinaryDataFast(_PREHASH_Data, datap, data_size);
         sent_bytes = gMessageSystem->getCurrentSendTotal();
-        gMessageSystem->sendReliable(getHost(), LL_DEFAULT_RELIABLE_RETRIES, TRUE, F32Seconds(0.f),
+        gMessageSystem->sendReliable(getHost(), LL_DEFAULT_RELIABLE_RETRIES, true, F32Seconds(0.f),
                                      LLTransferManager::reliablePacketCallback, (void**)cb_uuid);
 
         // Do bookkeeping for the throttle
@@ -1224,7 +1207,7 @@ LLTransferTarget::LLTransferTarget(
     mSourceType(source_type),
     mID(transfer_id),
     mChannelp(NULL),
-    mGotInfo(FALSE),
+    mGotInfo(false),
     mSize(0),
     mLastPacketID(-1)
 {
@@ -1352,7 +1335,7 @@ void LLTransferSourceParamsInvItem::packParams(LLDataPacker &dp) const
 }
 
 
-BOOL LLTransferSourceParamsInvItem::unpackParams(LLDataPacker &dp)
+bool LLTransferSourceParamsInvItem::unpackParams(LLDataPacker &dp)
 {
     S32 tmp_at;
 
@@ -1366,7 +1349,7 @@ BOOL LLTransferSourceParamsInvItem::unpackParams(LLDataPacker &dp)
 
     mAssetType = (LLAssetType::EType)tmp_at;
 
-    return TRUE;
+    return true;
 }
 
 LLTransferSourceParamsEstate::LLTransferSourceParamsEstate() :
@@ -1404,7 +1387,7 @@ void LLTransferSourceParamsEstate::packParams(LLDataPacker &dp) const
 }
 
 
-BOOL LLTransferSourceParamsEstate::unpackParams(LLDataPacker &dp)
+bool LLTransferSourceParamsEstate::unpackParams(LLDataPacker &dp)
 {
     S32 tmp_et;
 
@@ -1414,5 +1397,5 @@ BOOL LLTransferSourceParamsEstate::unpackParams(LLDataPacker &dp)
 
     mEstateAssetType = (EstateAssetType)tmp_et;
 
-    return TRUE;
+    return true;
 }

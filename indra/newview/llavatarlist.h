@@ -43,7 +43,7 @@ class LLListContextMenu;
  * @see setDirty()
  * @see setNameFilter()
  */
-class LLAvatarList final : public LLFlatListViewEx
+class LLAvatarList : public LLFlatListViewEx
 {
     LOG_CLASS(LLAvatarList);
 public:
@@ -56,7 +56,7 @@ public:
     {
         Optional<bool>  ignore_online_status, // show all items as online
                         show_last_interaction_time, // show most recent interaction time. *HACK: move this to a derived class
-                        show_distance,  // *HACK: my sinuses hurt and i want pizza.
+                        show_distance,
                         show_info_btn,
                         show_profile_btn,
                         show_speaking_indicator,
@@ -68,11 +68,11 @@ public:
     LLAvatarList(const Params&);
     virtual ~LLAvatarList();
 
-    void draw() override; // from LLView
+    virtual void draw(); // from LLView
 
-    void clear() override;
+    virtual void clear();
 
-    void setVisible(BOOL visible) override;
+    virtual void setVisible(bool visible);
 
     void setNameFilter(const std::string& filter);
     void setDirty(bool val = true, bool force_refresh = false);
@@ -81,7 +81,7 @@ public:
 
     void setContextMenu(LLListContextMenu* menu) { mContextMenu = menu; }
     void setSessionID(const LLUUID& session_id) { mSessionID = session_id; }
-    const LLUUID& getSessionID() const { return mSessionID; }
+    const LLUUID& getSessionID() { return mSessionID; }
 
     void toggleIcons();
     void setSpeakingIndicatorsVisible(bool visible);
@@ -89,12 +89,12 @@ public:
     void sortByName();
     void setShowIcons(std::string param_name);
     bool getIconsVisible() const { return mShowIcons; }
-    const std::string& getIconParamName() const {return mIconParamName;}
-    std::string getAvatarName(const LLAvatarName& av_name);
-    BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
-    BOOL handleMouseDown( S32 x, S32 y, MASK mask ) override;
-    BOOL handleMouseUp(S32 x, S32 y, MASK mask) override;
-    BOOL handleHover(S32 x, S32 y, MASK mask) override;
+    const std::string getIconParamName() const{return mIconParamName;}
+    std::string getAvatarName(LLAvatarName av_name);
+    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
 
     // Return true if filter has at least one match.
     bool filterHasMatches();
@@ -109,16 +109,18 @@ public:
 
     boost::signals2::connection setItemDoubleClickCallback(const mouse_signal_t::slot_type& cb);
 
-    S32 notifyParent(const LLSD& info) override;
+    boost::signals2::connection setItemClickedCallback(const mouse_signal_t::slot_type& cb);
+
+    virtual S32 notifyParent(const LLSD& info);
 
     void handleDisplayNamesOptionChanged();
 
-    void setShowCompleteName(bool show) { mShowCompleteName = show;};
+    void setShowCompleteName(bool show, bool force = false) { mShowCompleteName = show; mForceCompleteName = force; };
 
 protected:
     void refresh();
 
-    void addNewItem(const LLUUID& id, const std::string& name, BOOL is_online, EAddPosition pos = ADD_BOTTOM);
+    void addNewItem(const LLUUID& id, const std::string& name, bool is_online, EAddPosition pos = ADD_BOTTOM);
     void computeDifference(
         const uuid_vec_t& vnew,
         uuid_vec_t& vadded,
@@ -127,9 +129,11 @@ protected:
     void updateDistances();
     void rebuildNames();
     void onItemDoubleClicked(LLUICtrl* ctrl, S32 x, S32 y, MASK mask);
+    void onItemClicked(LLUICtrl* ctrl, S32 x, S32 y, MASK mask);
 //  void updateAvatarNames();
 
 private:
+
     bool mIgnoreOnlineStatus;
     bool mShowLastInteractionTime;
     bool mShowDistance;
@@ -141,6 +145,7 @@ private:
     bool mShowSpeakingIndicator;
     EShowPermissionType mShowPermissions;
     bool mShowCompleteName;
+    bool mForceCompleteName;
 // [RLVa:KB] - RLVa-1.2.0
     bool mRlvCheckShowNames;
 // [/RLVa:KB]
@@ -156,6 +161,7 @@ private:
 
     commit_signal_t mRefreshCompleteSignal;
     mouse_signal_t mItemDoubleClickSignal;
+    mouse_signal_t mItemClickedSignal;
 };
 
 /** Abstract comparator for avatar items */
@@ -164,10 +170,10 @@ class LLAvatarItemComparator : public LLFlatListView::ItemComparator
     LOG_CLASS(LLAvatarItemComparator);
 
 public:
-    LLAvatarItemComparator() = default;
-    virtual ~LLAvatarItemComparator() = default;
+    LLAvatarItemComparator() {};
+    virtual ~LLAvatarItemComparator() {};
 
-    bool compare(const LLPanel* item1, const LLPanel* item2) const override;
+    virtual bool compare(const LLPanel* item1, const LLPanel* item2) const;
 
 protected:
 

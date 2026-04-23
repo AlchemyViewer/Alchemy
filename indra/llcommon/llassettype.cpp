@@ -27,44 +27,8 @@
 #include "linden_common.h"
 
 #include "llassettype.h"
-#include "lldictionary.h"
 #include "llmemory.h"
-#include "llsingleton.h"
-
-///----------------------------------------------------------------------------
-/// Class LLAssetType
-///----------------------------------------------------------------------------
-struct AssetEntry : public LLDictionaryEntry
-{
-    AssetEntry(const char *desc_name,
-               const char *type_name,   // 8 character limit!
-               const char *human_name,  // for decoding to human readable form; put any and as many printable characters you want in each one
-               bool can_link,           // can you create a link to this type?
-               bool can_fetch,          // can you fetch this asset by ID?
-               bool can_know)           // can you see this asset's ID?
-        :
-        LLDictionaryEntry(desc_name),
-        mTypeName(type_name),
-        mHumanName(human_name),
-        mCanLink(can_link),
-        mCanFetch(can_fetch),
-        mCanKnow(can_know)
-    {
-        llassert(strlen(mTypeName) <= 8);
-    }
-
-    const char *mTypeName;
-    const char *mHumanName;
-    bool mCanLink;
-    bool mCanFetch;
-    bool mCanKnow;
-};
-
-class LLAssetDictionary final : public LLSingleton<LLAssetDictionary>,
-                          public LLDictionary<LLAssetType::EType, AssetEntry>
-{
-    LLSINGLETON(LLAssetDictionary);
-};
+#include "llsd.h"
 
 LLAssetDictionary::LLAssetDictionary()
 {
@@ -97,18 +61,21 @@ LLAssetDictionary::LLAssetDictionary()
     addEntry(LLAssetType::AT_PERSON,            new AssetEntry("PERSON",            "person",   "person",           false,      false,      false));
     addEntry(LLAssetType::AT_SETTINGS,          new AssetEntry("SETTINGS",          "settings", "settings blob",    true,       true,       true));
     addEntry(LLAssetType::AT_MATERIAL,          new AssetEntry("MATERIAL",          "material", "render material",  true,       true,       true));
+    addEntry(LLAssetType::AT_GLTF,              new AssetEntry("GLTF",              "gltf",     "GLTF",             true,       true,       true));
+    addEntry(LLAssetType::AT_GLTF_BIN,          new AssetEntry("GLTF_BIN",          "glbin",    "GLTF binary",      true,       true,        true));
     addEntry(LLAssetType::AT_UNKNOWN,           new AssetEntry("UNKNOWN",           "invalid",  NULL,               false,      false,      false));
-    addEntry(LLAssetType::AT_NONE,              new AssetEntry("NONE",              "-1",       NULL,               FALSE,      FALSE,      FALSE));
+    addEntry(LLAssetType::AT_NONE,              new AssetEntry("NONE",              "-1",       NULL,               false,      false,      false));
 
 };
 
 const std::string LLAssetType::BADLOOKUP("llassettype_bad_lookup");
 
 // static
-LLAssetType::EType LLAssetType::getType(std::string desc_name)
+LLAssetType::EType LLAssetType::getType(const std::string& desc_name)
 {
-    LLStringUtil::toUpper(desc_name);
-    return LLAssetDictionary::getInstance()->lookup(desc_name);
+    std::string s = desc_name;
+    LLStringUtil::toUpper(s);
+    return LLAssetDictionary::getInstance()->lookup(s);
 }
 
 // static
@@ -143,14 +110,12 @@ const char *LLAssetType::lookup(LLAssetType::EType asset_type)
 // static
 LLAssetType::EType LLAssetType::lookup(const char* name)
 {
-    return lookup(al::safe_string_view(name));
+    return lookup(ll_safe_string(name));
 }
 
 // static
-LLAssetType::EType LLAssetType::lookup(const std::string_view type_name)
+LLAssetType::EType LLAssetType::lookup(const std::string& type_name)
 {
-    if(type_name.empty()) return AT_UNKNOWN;
-
     const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
     for (const LLAssetDictionary::value_type& pair : *dict)
     {
@@ -181,11 +146,11 @@ const char *LLAssetType::lookupHumanReadable(LLAssetType::EType asset_type)
 // static
 LLAssetType::EType LLAssetType::lookupHumanReadable(const char* name)
 {
-    return lookupHumanReadable(al::safe_string_view(name));
+    return lookupHumanReadable(ll_safe_string(name));
 }
 
 // static
-LLAssetType::EType LLAssetType::lookupHumanReadable(const std::string_view readable_name)
+LLAssetType::EType LLAssetType::lookupHumanReadable(const std::string& readable_name)
 {
     const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
     for (const LLAssetDictionary::value_type& pair : *dict)
@@ -246,14 +211,18 @@ bool LLAssetType::lookupIsAssetIDKnowable(EType asset_type)
     return false;
 }
 
-std::vector<std::string> LLAssetType::getAssetTypeNames()
+LLSD LLAssetType::getTypeNames()
 {
-    std::vector<std::string> names;
-    const LLAssetDictionary& dict = LLAssetDictionary::instance();
-    for (const auto& dict_pair : dict)
+    LLSD type_names;
+    const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
+    for (S32 type = AT_TEXTURE; type < AT_COUNT; ++type)
     {
-        const AssetEntry* entry = dict_pair.second;
-        names.push_back(entry->mTypeName);
+        const AssetEntry *entry = dict->lookup((LLAssetType::EType) type);
+        // skip llassettype_bad_lookup
+        if (entry)
+        {
+            type_names.append(entry->mTypeName);
+        }
     }
-    return names;
+    return type_names;
 }

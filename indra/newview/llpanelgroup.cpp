@@ -36,6 +36,7 @@
 #include "lluictrlfactory.h"
 
 // Viewer includes
+#include "alfloatergroupprofile.h"
 #include "llviewermessage.h"
 #include "llviewerwindow.h"
 #include "llappviewer.h"
@@ -43,7 +44,6 @@
 #include "llfloaterreg.h"
 #include "llfloater.h"
 #include "llgroupactions.h"
-#include "llfloatergroupprofile.h"
 #include "llslurl.h"
 
 #include "llagent.h"
@@ -65,8 +65,8 @@ static LLPanelInjector<LLPanelGroup> t_panel_group("panel_group_info_sidetray");
 
 LLPanelGroupTab::LLPanelGroupTab()
     : LLPanel(),
-      mAllowEdit(TRUE),
-      mHasModal(FALSE)
+      mAllowEdit(true),
+      mHasModal(false)
 {
     mGroupID = LLUUID::null;
 }
@@ -75,21 +75,21 @@ LLPanelGroupTab::~LLPanelGroupTab()
 {
 }
 
-BOOL LLPanelGroupTab::isVisibleByAgent(LLAgent* agentp)
+bool LLPanelGroupTab::isVisibleByAgent(LLAgent* agentp)
 {
     //default to being visible
-    return TRUE;
+    return true;
 }
 
-BOOL LLPanelGroupTab::postBuild()
+bool LLPanelGroupTab::postBuild()
 {
-    return TRUE;
+    return true;
 }
 
 LLPanelGroup::LLPanelGroup()
 :   LLPanel(),
     LLGroupMgrObserver( LLUUID() ),
-    mSkipRefresh(FALSE),
+    mSkipRefresh(false),
     mButtonJoin(NULL)
 {
     // Set up the factory callbacks.
@@ -122,7 +122,7 @@ void LLPanelGroup::onOpen(const LLSD& key)
 
     if(str_action == "refresh")
     {
-        if(mID == group_id || group_id.isNull())
+        if(mID == group_id || group_id == LLUUID::null)
             refreshData();
     }
     else if(str_action == "close")
@@ -154,31 +154,28 @@ void LLPanelGroup::onOpen(const LLSD& key)
 // [/SL:KB]
 }
 
-BOOL LLPanelGroup::postBuild()
+bool LLPanelGroup::postBuild()
 {
     mGroupsAccordion = getChild<LLAccordionCtrl>("groups_accordion");
 
     mDefaultNeedsApplyMesg = getString("default_needs_apply_text");
     mWantApplyMesg = getString("want_apply_text");
 
-    mButtonApply = findChild<LLButton>("btn_apply");
-    if (mButtonApply)
-    {
-        mButtonApply->setClickedCallback(onBtnApply, this);
-        mButtonApply->setVisible(true);
-        mButtonApply->setEnabled(false);
-    }
+    mButtonApply = getChild<LLButton>("btn_apply");
+    mButtonApply->setClickedCallback(onBtnApply, this);
+    mButtonApply->setVisible(true);
+    mButtonApply->setEnabled(false);
 
-    mButtonCall = findChild<LLButton>("btn_call");
-    if(mButtonCall) mButtonCall->setClickedCallback(onBtnGroupCallClicked, this);
+    mButtonCall = getChild<LLButton>("btn_call");
+    mButtonCall->setClickedCallback(onBtnGroupCallClicked, this);
 
-    mButtonChat = findChild<LLButton>("btn_chat");
-    if(mButtonChat) mButtonChat->setClickedCallback(onBtnGroupChatClicked, this);
+    mButtonChat = getChild<LLButton>("btn_chat");
+    mButtonChat->setClickedCallback(onBtnGroupChatClicked, this);
 
-    mButtonRefresh = findChild<LLButton>("btn_refresh");
-    if(mButtonRefresh) mButtonRefresh->setClickedCallback(onBtnRefresh, this);
+    mButtonRefresh = getChild<LLButton>("btn_refresh");
+    mButtonRefresh->setClickedCallback(onBtnRefresh, this);
 
-    mButtonCancel = findChild<LLButton>("btn_cancel");
+    mGroupNameCtrl = getChild<LLUICtrl>("group_name");
 
     childSetCommitCallback("back",boost::bind(&LLPanelGroup::onBackBtnClick,this),NULL);
 
@@ -204,11 +201,18 @@ BOOL LLPanelGroup::postBuild()
         mButtonJoin->setCommitCallback(boost::bind(&LLPanelGroup::onBtnJoin,this));
 
         mJoinText = panel_general->getChild<LLUICtrl>("join_cost_text");
+
+        mButtonActivate = panel_general->getChild<LLButton>("btn_activate");
+        mButtonActivate->setVisible(false);
+        mButtonActivate->setEnabled(gAgent.getGroupID() != mID);
+        mButtonActivate->setCommitCallback(boost::bind(&LLPanelGroup::onBtnActivate, this));
+
+        gAgent.addListener(this, "new group");
     }
 
     LLVoiceClient::addObserver(this);
 
-    return TRUE;
+    return true;
 }
 
 void LLPanelGroup::reposButton(LLButton* button)
@@ -222,23 +226,13 @@ void LLPanelGroup::reposButton(LLButton* button)
 
 void LLPanelGroup::reposButtons()
 {
-    if(mButtonRefresh && mButtonCancel && mButtonRefresh->getVisible() && mButtonCancel->getVisible())
-    {
-        LLRect btn_refresh_rect = mButtonRefresh->getRect();
-        LLRect btn_cancel_rect = mButtonCancel->getRect();
-        btn_refresh_rect.setLeftTopAndSize( btn_cancel_rect.mLeft + btn_cancel_rect.getWidth() + 2,
-            btn_refresh_rect.getHeight() + 2, btn_refresh_rect.getWidth(), btn_refresh_rect.getHeight());
-        mButtonRefresh->setRect(btn_refresh_rect);
-    }
-
     reposButton(mButtonApply);
     reposButton(mButtonRefresh);
-    reposButton(mButtonCancel);
     reposButton(mButtonChat);
     reposButton(mButtonCall);
 }
 
-void LLPanelGroup::reshape(S32 width, S32 height, BOOL called_from_parent )
+void LLPanelGroup::reshape(S32 width, S32 height, bool called_from_parent )
 {
     LLPanel::reshape(width, height, called_from_parent );
 
@@ -247,7 +241,7 @@ void LLPanelGroup::reshape(S32 width, S32 height, BOOL called_from_parent )
 
 void LLPanelGroup::onBackBtnClick()
 {
-    LLFloaterGroupProfile* parent = dynamic_cast<LLFloaterGroupProfile*>(getParent());
+    ALFloaterGroupProfile* parent = dynamic_cast<ALFloaterGroupProfile*>(getParent());
     if (parent)
     {
         parent->closeHostedFloater();
@@ -260,6 +254,12 @@ void LLPanelGroup::onBackBtnClick()
             parent->openPreviousPanel();
         }
     }
+}
+
+void LLPanelGroup::hideBackBtn()
+{
+    childSetVisible("back", false);
+    setBackgroundVisible(false);
 }
 
 void LLPanelGroup::onBtnRefresh(void* user_data)
@@ -292,12 +292,19 @@ void LLPanelGroup::onBtnJoin()
     if (LLGroupActions::isInGroup(mID))
     {
         LLGroupActions::leave(mID);
+        mButtonActivate->setVisible(false);
     }
     else
     {
-    LL_DEBUGS() << "joining group: " << mID << LL_ENDL;
-    LLGroupActions::join(mID);
+        LL_DEBUGS() << "joining group: " << mID << LL_ENDL;
+        LLGroupActions::join(mID);
+    }
 }
+
+void LLPanelGroup::onBtnActivate()
+{
+    LLGroupActions::activate(mID);
+    mButtonActivate->setEnabled(false);
 }
 
 void LLPanelGroup::changed(LLGroupChange gc)
@@ -328,9 +335,8 @@ void LLPanelGroup::update(LLGroupChange gc)
     LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mID);
     if(gdatap)
     {
-
         {
-            LLFloaterGroupProfile* parent = dynamic_cast<LLFloaterGroupProfile*>(getParent());
+            ALFloaterGroupProfile* parent = dynamic_cast<ALFloaterGroupProfile*>(getParent());
             if (parent)
             {
                 parent->setGroupName(gdatap->mName);
@@ -339,9 +345,8 @@ void LLPanelGroup::update(LLGroupChange gc)
 
         {
             std::string group_name =  gdatap->mName.empty() ? LLTrans::getString("LoadingData") : gdatap->mName;
-            LLUICtrl* group_name_ctrl = getChild<LLUICtrl>("group_name");
-            group_name_ctrl->setValue(group_name);
-            group_name_ctrl->setToolTip(group_name);
+            mGroupNameCtrl->setValue(group_name);
+            mGroupNameCtrl->setToolTip(group_name);
         }
 
 
@@ -350,6 +355,8 @@ void LLPanelGroup::update(LLGroupChange gc)
         bool join_btn_visible = is_member || gdatap->mOpenEnrollment;
 
         mButtonJoin->setVisible(join_btn_visible);
+        mButtonActivate->setEnabled(gAgent.getGroupID() != mID);
+        mButtonActivate->setVisible(is_member);
         mJoinText->setVisible(join_btn_visible);
 
         if (is_member)
@@ -395,21 +402,17 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
     if(gdatap)
     {
         std::string group_name =  gdatap->mName.empty() ? LLTrans::getString("LoadingData") : gdatap->mName;
-        LLUICtrl* group_name_ctrl = getChild<LLUICtrl>("group_name");
-        group_name_ctrl->setValue(group_name);
-        group_name_ctrl->setToolTip(group_name);
+        mGroupNameCtrl->setValue(group_name);
+        mGroupNameCtrl->setToolTip(group_name);
     }
 
     getChild<LLUICtrl>("group_key")->setValue(str_group_id);
 
-    bool is_null_group_id = group_id.isNull();
+    bool is_null_group_id = group_id == LLUUID::null;
     if(mButtonApply)
         mButtonApply->setVisible(!is_null_group_id);
     if(mButtonRefresh)
         mButtonRefresh->setVisible(!is_null_group_id);
-
-    if(mButtonCancel)
-        mButtonCancel->setVisible(!is_null_group_id);
 
     if(mButtonCall)
             mButtonCall->setVisible(!is_null_group_id);
@@ -428,6 +431,8 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
 
     if(mButtonJoin)
         mButtonJoin->setVisible(false);
+    if (mButtonActivate)
+        mButtonActivate->setVisible(false);
 
 
     if(is_null_group_id)//creating new group
@@ -449,7 +454,7 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
         tab_land->setVisible(false);
         tab_experiences->setVisible(false);
 
-        getChild<LLUICtrl>("group_name")->setVisible(false);
+        mGroupNameCtrl->setVisible(false);
         getChild<LLUICtrl>("Key:")->setVisible(false);
         getChild<LLUICtrl>("group_key")->setVisible(false);
         getChild<LLUICtrl>("clipboard_group")->setVisible(false);
@@ -484,7 +489,7 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
         tab_land->setVisible(is_member);
         tab_experiences->setVisible(is_member);
 
-        getChild<LLUICtrl>("group_name")->setVisible(true);
+        mGroupNameCtrl->setVisible(true);
         getChild<LLUICtrl>("Key:")->setVisible(true);
         getChild<LLUICtrl>("group_key")->setVisible(true);
         getChild<LLUICtrl>("clipboard_group")->setVisible(true);
@@ -534,7 +539,7 @@ bool LLPanelGroup::apply(LLPanelGroupTab* tab)
             }
         }
 
-        mSkipRefresh = TRUE;
+        mSkipRefresh = true;
         return true;
     }
 
@@ -566,8 +571,8 @@ void LLPanelGroup::draw()
     if (mRefreshTimer.hasExpired())
     {
         mRefreshTimer.stop();
-        if(mButtonRefresh) mButtonRefresh->setEnabled(TRUE);
-        mGroupsAccordion->setEnabled(TRUE);
+        if(mButtonRefresh) mButtonRefresh->setEnabled(true);
+        mGroupsAccordion->setEnabled(true);
     }
 
     if(mButtonApply && mButtonApply->getVisible())
@@ -585,7 +590,7 @@ void LLPanelGroup::refreshData()
 {
     if(mSkipRefresh)
     {
-        mSkipRefresh = FALSE;
+        mSkipRefresh = false;
         return;
     }
     LLGroupMgr::getInstance()->clearGroupData(getID());
@@ -593,8 +598,8 @@ void LLPanelGroup::refreshData()
     setGroupID(getID());
 
     // 5 second timeout
-    if(mButtonRefresh) mButtonRefresh->setEnabled(FALSE);
-    mGroupsAccordion->setEnabled(FALSE);
+    if(mButtonRefresh) mButtonRefresh->setEnabled(false);
+    mGroupsAccordion->setEnabled(false);
 
     mRefreshTimer.start();
     mRefreshTimer.setTimerExpirySec(5);
@@ -639,7 +644,7 @@ void LLPanelGroup::showNotice(const std::string& subject,
                        LLOfferInfo* inventory_offer)
 {
     LLPanelGroup* panel(NULL);
-    if (auto* floater = LLFloaterReg::findTypedInstance<LLFloaterGroupProfile>("group_profile", LLSD(group_id)))
+    if (auto* floater = LLFloaterReg::findTypedInstance<ALFloaterGroupProfile>("group_profile", LLSD(group_id)))
     {
         panel = floater->getGroupPanel();
     }
@@ -657,18 +662,35 @@ void LLPanelGroup::showNotice(const std::string& subject,
 
 }
 
+bool LLPanelGroup::handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& userdata)
+{
+    if (event->desc() == "new group")
+    {
+        mButtonActivate->setEnabled(gAgent.getGroupID() != mID);
+        return true;
+    }
+
+    if (event->desc() == "value_changed")
+    {
+        mButtonActivate->setEnabled(gAgent.getGroupID() != mID);
+        return true;
+    }
+
+    return false;
+}
+
 void LLPanelGroup::onCommitMenu(const LLSD& userdata)
 {
     const std::string item_name = userdata.asString();
     if (item_name == "copy_group_slurl")
     {
         LLWString wstr = utf8str_to_wstring(LLSLURL("group", mID, "about").getSLURLString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
+        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
     }
     else if (item_name == "copy_group_id")
     {
         LLWString wstr = utf8str_to_wstring(mID.asString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
+        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
     }
     else if (item_name == "copy_group_name")
     {
@@ -676,7 +698,8 @@ void LLPanelGroup::onCommitMenu(const LLSD& userdata)
         if (gCacheName->getGroupName(mID, name))
         {
             LLWString wstr = utf8str_to_wstring(name);
-            LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
+            LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
         }
     }
 }
+

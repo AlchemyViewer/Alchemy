@@ -32,33 +32,29 @@
 #include "lltrace.h"
 #include "lltracethreadrecorder.h"
 #include "llcleanup.h"
+#include "llapr.h"
 
-thread_local bool gProfilerEnabled = false;
-
-#if (TRACY_ENABLE) && LL_PROFILER_ENABLE_TRACY_MEMORY
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
 // Override new/delete for tracy memory profiling
 
 void* ll_tracy_new(size_t size)
 {
-    void* ptr;
-    if (gProfilerEnabled)
-    {
-        //LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
-        ptr = (malloc)(size);
-    }
-    else
-    {
-        ptr = (malloc)(size);
-    }
+    void* ptr = (malloc)(size);
     if (!ptr)
     {
         throw std::bad_alloc();
     }
-    TracyAlloc(ptr, size);
+    LL_PROFILE_ALLOC(ptr, size);
     return ptr;
 }
 
-void* operator new(size_t size)
+void ll_tracy_delete(void* ptr)
+{
+    LL_PROFILE_FREE(ptr);
+    (free)(ptr);
+}
+
+void* operator new(std::size_t size)
 {
     return ll_tracy_new(size);
 }
@@ -66,20 +62,6 @@ void* operator new(size_t size)
 void* operator new[](std::size_t count)
 {
     return ll_tracy_new(count);
-}
-
-void ll_tracy_delete(void* ptr)
-{
-    TracyFree(ptr);
-    if (gProfilerEnabled)
-    {
-        //LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
-        (free)(ptr);
-    }
-    else
-    {
-        (free)(ptr);
-    }
 }
 
 void operator delete(void *ptr) noexcept
@@ -92,30 +74,49 @@ void operator delete[](void* ptr) noexcept
     ll_tracy_delete(ptr);
 }
 
-// C-style malloc/free can't be so easily overridden, so we define tracy versions and use
-// a pre-processor #define in linden_common.h to redirect to them. The parens around the native
-// functions below prevents recursive substitution by the preprocessor.
-//
-// Unaligned mallocs are rare in LL code but hooking them causes problems in 3p lib code (looking at
-// you, Havok), so we'll only capture the aligned version.
+#if !defined(LL_LINUX)
 
-void *tracy_aligned_malloc(size_t size, size_t alignment)
+void* ll_tracy_aligned_new(size_t size, size_t alignment)
 {
-    auto ptr = ll_aligned_malloc_fallback(size, alignment);
-    if (ptr) TracyAlloc(ptr, size);
+    void* ptr = ll_aligned_malloc_fallback(size, alignment);
+    if (!ptr)
+    {
+        throw std::bad_alloc();
+    }
     return ptr;
 }
 
-void tracy_aligned_free(void *memblock)
+void ll_tracy_aligned_delete(void* ptr)
 {
-    TracyFree(memblock);
-    ll_aligned_free_fallback(memblock);
+    ll_aligned_free_fallback(ptr);
+}
+
+void* operator new(size_t size, std::align_val_t align)
+{
+    return ll_tracy_aligned_new(size, (size_t)align);
+}
+
+void* operator new[](std::size_t count, std::align_val_t align)
+{
+    return ll_tracy_aligned_new(count, (size_t)align);
+}
+
+void operator delete(void *ptr, std::align_val_t align) noexcept
+{
+    ll_tracy_aligned_delete(ptr);
+}
+
+void operator delete[](void* ptr, std::align_val_t align) noexcept
+{
+    ll_tracy_aligned_delete(ptr);
 }
 
 #endif
 
+#endif // TRACY_ENABLE && !LL_PROFILER_ENABLE_TRACY_OPENGL
+
 //static
-BOOL LLCommon::sAprInitialized = FALSE;
+bool LLCommon::sAprInitialized = false;
 
 static LLTrace::ThreadRecorder* sMasterThreadRecorder = NULL;
 
@@ -125,7 +126,7 @@ void LLCommon::initClass()
     if (!sAprInitialized)
     {
         ll_init_apr();
-        sAprInitialized = TRUE;
+        sAprInitialized = true;
     }
     LLTimer::initClass();
     assert_main_thread();       // Make sure we record the main thread
@@ -146,6 +147,6 @@ void LLCommon::cleanupClass()
     if (sAprInitialized)
     {
         ll_cleanup_apr();
-        sAprInitialized = FALSE;
+        sAprInitialized = false;
     }
 }

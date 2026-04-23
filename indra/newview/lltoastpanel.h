@@ -42,7 +42,7 @@
 class LLToastPanel : public LLPanel {
 public:
     LLToastPanel(const LLNotificationPtr&);
-    virtual ~LLToastPanel() = default;
+    virtual ~LLToastPanel() = 0;
 
     virtual std::string getTitle();
     virtual const std::string& getNotificationName();

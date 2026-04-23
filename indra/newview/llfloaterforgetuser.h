@@ -31,13 +31,13 @@
 
 class LLScrollListCtrl;
 
-class LLFloaterForgetUser final : public LLFloater
+class LLFloaterForgetUser : public LLFloater
 {
 public:
     LLFloaterForgetUser(const LLSD &key);
     ~LLFloaterForgetUser();
 
-    BOOL postBuild();
+    bool postBuild() override;
     void onForgetClicked();
 
 private:

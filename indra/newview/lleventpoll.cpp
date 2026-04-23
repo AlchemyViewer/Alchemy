@@ -29,7 +29,6 @@
 #include "lleventpoll.h"
 #include "llappviewer.h"
 #include "llagent.h"
-#include "llviewernetwork.h"
 
 #include "llsdserialize.h"
 #include "lleventtimer.h"
@@ -55,20 +54,13 @@ namespace Details
         void stop();
 
     private:
-        // We will wait RETRY_SECONDS + (errorCount * RETRY_SECONDS_INC) before retrying after an error.
-        // This means we attempt to recover relatively quickly but back off giving more time to recover
-        // until we finally give up after MAX_EVENT_POLL_HTTP_ERRORS attempts.
-        static const F32                EVENT_POLL_ERROR_RETRY_SECONDS;
-        static const F32                EVENT_POLL_ERROR_RETRY_SECONDS_INC;
-        static const S32                MAX_EVENT_POLL_HTTP_ERRORS;
-
         void                            eventPollCoro(std::string url);
 
+        void                            handleMessage(const std::string& msg_name, const LLSD& body);
         void                            handleMessage(const LLSD &content);
 
         bool                            mDone;
         LLCore::HttpRequest::ptr_t      mHttpRequest;
-        LLCore::HttpOptions::ptr_t      mHttpOptions;
         LLCore::HttpRequest::policy_t   mHttpPolicy;
         std::string                     mSenderIp;
         int                             mCounter;
@@ -78,9 +70,13 @@ namespace Details
     };
 
 
-    const F32 LLEventPollImpl::EVENT_POLL_ERROR_RETRY_SECONDS = 15.f; // ~ half of a normal timeout.
-    const F32 LLEventPollImpl::EVENT_POLL_ERROR_RETRY_SECONDS_INC = 5.f; // ~ half of a normal timeout.
-    const S32 LLEventPollImpl::MAX_EVENT_POLL_HTTP_ERRORS = 10; // ~5 minutes, by the above rules.
+    // We will wait RETRY_SECONDS + (errorCount * RETRY_SECONDS_INC) before retrying after an error.
+    // This means we attempt to recover relatively quickly but back off giving more time to recover
+    // until we finally give up after MAX_EVENT_POLL_HTTP_ERRORS attempts.
+    constexpr F32 EVENT_POLL_ERROR_RETRY_SECONDS = 1.f;
+    constexpr F32 EVENT_POLL_ERROR_RETRY_SECONDS_INC = 3.f;
+    constexpr S32 MAX_EVENT_POLL_ERRORS = 15; // ~5 minutes, by the above rules.
+    constexpr F64 MIN_SECONDS_PASSED = 10.0; // Minimum time we expect the server to hold the request.
 
     int LLEventPollImpl::sNextCounter = 1;
 
@@ -88,7 +84,6 @@ namespace Details
     LLEventPollImpl::LLEventPollImpl(const LLHost &sender) :
         mDone(false),
         mHttpRequest(),
-        mHttpOptions(),
         mHttpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID),
         mSenderIp(),
         mCounter(sNextCounter++)
@@ -97,24 +92,28 @@ namespace Details
         LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
 
         mHttpRequest = std::make_shared<LLCore::HttpRequest>();
-        mHttpPolicy  = app_core_http.getPolicy(LLAppCoreHttp::AP_LONG_POLL);
-        mHttpOptions = std::make_shared<LLCore::HttpOptions>();
-        if (!LLGridManager::instance().isInSecondlife())
-        {
-            mHttpOptions->setRetries(0);
-            mHttpOptions->setTransferTimeout(60);
-        }
-
+        mHttpPolicy = app_core_http.getPolicy(LLAppCoreHttp::AP_LONG_POLL);
         mSenderIp = sender.getIPandPort();
+    }
+
+    void LLEventPollImpl::handleMessage(const std::string &msg_name, const LLSD &body)
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_APP;
+        LLSD message;
+        message["sender"] = mSenderIp;
+        message["body"] = body;
+
+        LLMessageSystem::dispatch(msg_name, message);
     }
 
     void LLEventPollImpl::handleMessage(const LLSD& content)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_APP;
-        std::string msg_name = content["message"];
+        std::string msg_name = content["message"].asString();
         LLSD message;
         message["sender"] = mSenderIp;
         message["body"] = content["body"];
+
         LLMessageSystem::dispatch(msg_name, message);
     }
 
@@ -148,14 +147,20 @@ namespace Details
 
     void LLEventPollImpl::eventPollCoro(std::string url)
     {
-        LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EventPoller", mHttpPolicy));
+        LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EventPoller", mHttpPolicy);
         LLSD acknowledge;
         int errorCount = 0;
         int counter = mCounter; // saved on the stack for logging.
+        LLTimer message_time;
 
         LL_DEBUGS("LLEventPollImpl") << " <" << counter << "> entering coroutine." << LL_ENDL;
 
         mAdapter = httpAdapter;
+
+        // This is a loop with its own waitToRetry implementation,
+        // so disable retries.
+        LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
+        httpOpts->setRetries(0);
 
         LL::WorkQueue::ptr_t main_queue = nullptr;
 
@@ -173,11 +178,13 @@ namespace Details
             request["ack"] = acknowledge;
             request["done"] = mDone;
 
+            message_time.reset();
+
 //          LL_DEBUGS("LLEventPollImpl::eventPollCoro") << "<" << counter << "> request = "
 //              << LLSDXMLStreamer(request) << LL_ENDL;
 
             LL_DEBUGS("LLEventPollImpl") << " <" << counter << "> posting and yielding." << LL_ENDL;
-            LLSD result = httpAdapter->postAndSuspend(mHttpRequest, url, request, mHttpOptions);
+            LLSD result = httpAdapter->postAndSuspend(mHttpRequest, url, request, httpOpts);
 
 //          LL_DEBUGS("LLEventPollImpl::eventPollCoro") << "<" << counter << "> result = "
 //              << LLSDXMLStreamer(result) << LL_ENDL;
@@ -190,16 +197,35 @@ namespace Details
                 break;
             }
 
-            LLSD httpResults = result["http_result"];
+            LLSD &httpResults = result["http_result"];
             LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
             if (!status)
             {
-                if (status == LLCore::HttpStatus(LLCore::HttpStatus::EXT_CURL_EASY, CURLE_OPERATION_TIMEDOUT) || status == LLCore::HttpStatus(HTTP_BAD_GATEWAY))
-                {   // A standard timeout response we get this when there are no events.
-                    LL_DEBUGS("LLEventPollImpl") << "All is very quiet on target server. It may have gone idle?" << LL_ENDL;
-                    errorCount = 0;
-                    continue;
+                if (status == LLCore::HttpStatus(LLCore::HttpStatus::EXT_CURL_EASY, CURLE_OPERATION_TIMEDOUT) // A standard timeout, no events.
+                    || status == LLCore::HttpStatus(HTTP_BAD_GATEWAY) // An expected 'No events' case.
+                    || status == LLCore::HttpStatus(HTTP_INTERNAL_ERROR)
+                    || status == LLCore::HttpStatus(HTTP_SERVICE_UNAVAILABLE)
+                    || status == LLCore::HttpStatus(HTTP_GATEWAY_TIME_OUT))
+                {
+                    if (message_time.getElapsedSeconds() < MIN_SECONDS_PASSED)
+                    {
+                        // Server is supposed to hold request for 20 to 30 seconds.
+                        // If it didn't hold the request at least for 10s, treat as an error.
+                        LL_WARNS("LLEventPollImpl") << "Response arrived too early, status: " << status.toTerseString()
+                            << ", time passed: " << message_time.getElapsedSeconds() << LL_ENDL;
+                    }
+                    else
+                    {
+                        // Timeout, expected and means 'no events'. Request is to be re-issued immediately.
+                        // Current definition of a timeout is any of :
+                        // - libcurl easy 28 status code
+                        // - Linden 499 special http status code
+                        // - RFC - standard 502 - 504 http status codes
+                        LL_DEBUGS("LLEventPollImpl") << "No events, from: " << mSenderIp <<" status: " << (S32)status.getStatus() << LL_ENDL;
+                        errorCount = 0;
+                        continue;
+                    }
                 }
                 else if ((status == LLCore::HttpStatus(LLCore::HttpStatus::LLCORE, LLCore::HE_OP_CANCELED)) ||
                         (status == LLCore::HttpStatus(HTTP_NOT_FOUND)))
@@ -207,27 +233,30 @@ namespace Details
                     // some cases the server gets ahead of the viewer and will
                     // return a 404 error (Not Found) before the cancel event
                     // comes back in the queue
-                    LL_WARNS("LLEventPollImpl") << "Canceling coroutine" << LL_ENDL;
+                    LL_WARNS("LLEventPollImpl") << "<" << counter << "> Canceling coroutine, status: " << status.toTerseString() << LL_ENDL;
                     break;
                 }
                 else if (!status.isHttpStatus())
                 {
-                    /// Some LLCore or LIBCurl error was returned.  This is unlikely to be recoverable
-                    LL_WARNS("LLEventPollImpl") << "Critical error from poll request returned from libraries.  Canceling coroutine." << LL_ENDL;
-                    break;
+                    // Some LLCore or LIBCurl error was returned.
+                    LL_WARNS("LLEventPollImpl") << "<" << counter << "> Error from poll request returned from libraries. " << status.toTerseString() << LL_ENDL;
                 }
-                LL_WARNS("LLEventPollImpl") << "<" << counter << "> Error result from LLCoreHttpUtil::HttpCoroHandler. Code "
-                    << status.toTerseString() << ": '" << httpResults["message"] << "'" << LL_ENDL;
+                else
+                {
+                    LL_WARNS("LLEventPollImpl") << "<" << counter << "> Error result from LLCoreHttpUtil::HttpCoroHandler. Code "
+                        << status.toTerseString() << ": '" << httpResults["message"] << "'" << LL_ENDL;
+                }
 
-                if (errorCount < MAX_EVENT_POLL_HTTP_ERRORS)
+                if (errorCount < MAX_EVENT_POLL_ERRORS)
                 {   // An unanticipated error has been received from our poll
                     // request. Calculate a timeout and wait for it to expire(sleep)
-                    // before trying again.  The sleep time is increased by 5 seconds
+                    // before trying again.  The sleep time is increased by 3 seconds
                     // for each consecutive error.
-                    ++errorCount;
 
                     F32 waitToRetry = EVENT_POLL_ERROR_RETRY_SECONDS
                         + errorCount * EVENT_POLL_ERROR_RETRY_SECONDS_INC;
+
+                    ++errorCount;
 
                     LL_WARNS("LLEventPollImpl") << "<" << counter << "> Retrying in " << waitToRetry <<
                         " seconds, error count is now " << errorCount << LL_ENDL;
@@ -256,6 +285,10 @@ namespace Details
                         LL_WARNS("LLEventPollImpl") << "< " << counter << "> Forcing disconnect due to stalled main region event poll." << LL_ENDL;
                         LLAppViewer::instance()->forceDisconnect(LLTrans::getString("AgentLostConnection"));
                     }
+                    else
+                    {
+                        LL_WARNS("LLEventPollImpl") << "< " << counter << "> Stopping event poll for " << mSenderIp << " due to failures." << LL_ENDL;
+                    }
                     break;
                 }
             }
@@ -272,7 +305,7 @@ namespace Details
             }
 
             acknowledge = result["id"];
-            LLSD events = result["events"];
+            LLSD &events = result["events"];
 
             if (acknowledge.isUndefined())
             {
@@ -283,20 +316,37 @@ namespace Details
             LL_DEBUGS("LLEventPollImpl") << " <" << counter << "> " << events.size() << "events (id " << acknowledge << ")" << LL_ENDL;
 
 
-            LLSD::array_const_iterator i = events.beginArray();
-            LLSD::array_const_iterator end = events.endArray();
+            LLSD::array_iterator i = events.beginArray();
+            LLSD::array_iterator end = events.endArray();
             for (; i != end; ++i)
             {
                 if (i->has("message"))
                 {
                     if (main_queue)
-                    { // shuttle to a sensible spot in the main thread instead
+                    {
+                        // Shuttle copy to a sensible spot in the main thread instead
                         // of wherever this coroutine happens to be executing
-                        const LLSD& msg = *i;
-                        main_queue->post([this, msg]()
+
+                        LL::WorkQueue::Work work;
+                        {
+                            // LLSD is too smart for it's own good and may act like a smart
+                            // pointer for the content of (*i), so instead of passing (*i)
+                            // pass a prepared name and move ownership of "body",
+                            // as we are not going to need "body" anywhere else.
+                            std::string msg_name = (*i)["message"].asString();
+
+                            // WARNING: This is a shallow copy!
+                            // If something still retains the data (like in httpAdapter?) this might still
+                            // result in a crash, if it does appear to be the case, make a deep copy or
+                            // convert data to string and pass that string.
+                            const LLSD body = (*i)["body"];
+                            (*i)["body"].clear();
+                            work = [this, msg_name, body]()
                             {
-                                handleMessage(msg);
-                            });
+                                handleMessage(msg_name, body);
+                            };
+                        }
+                        main_queue->post(work);
                     }
                     else
                     {

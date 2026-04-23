@@ -33,7 +33,7 @@
 #include "llagent.h"
 #include "llfloaterworldmap.h"
 
-const U32 LAYER_FLAG = 2;
+constexpr U32 LAYER_FLAG = 2;
 
 //---------------------------------------------------------------------------
 // World Map Message Handling
@@ -43,7 +43,7 @@ LLWorldMapMessage::LLWorldMapMessage() :
     mSLURLRegionName(),
     mSLURLRegionHandle(0),
     mSLURL(),
-    mSLURLCallback(0),
+    mSLURLCallback(nullptr),
     mSLURLTeleport(false)
 {
 }
@@ -63,7 +63,7 @@ void LLWorldMapMessage::sendItemRequest(U32 type, U64 handle)
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->addU32Fast(_PREHASH_Flags, LAYER_FLAG);
     msg->addU32Fast(_PREHASH_EstateID, 0); // Filled in on sim
-    msg->addBOOLFast(_PREHASH_Godlike, FALSE); // Filled in on sim
+    msg->addBOOLFast(_PREHASH_Godlike, false); // Filled in on sim
 
     msg->nextBlockFast(_PREHASH_RequestData);
     msg->addU32Fast(_PREHASH_ItemType, type);
@@ -84,7 +84,7 @@ void LLWorldMapMessage::sendNamedRegionRequest(std::string region_name)
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->addU32Fast(_PREHASH_Flags, LAYER_FLAG);
     msg->addU32Fast(_PREHASH_EstateID, 0); // Filled in on sim
-    msg->addBOOLFast(_PREHASH_Godlike, FALSE); // Filled in on sim
+    msg->addBOOLFast(_PREHASH_Godlike, false); // Filled in on sim
     msg->nextBlockFast(_PREHASH_NameData);
     msg->addStringFast(_PREHASH_Name, region_name);
     gAgent.sendReliableMessage();
@@ -135,10 +135,14 @@ void LLWorldMapMessage::sendMapBlockRequest(U16 min_x, U16 min_y, U16 max_x, U16
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     U32 flags = LAYER_FLAG;
-    flags |= (return_nonexistent ? 0x10000 : 0);
+    if (return_nonexistent)
+    {
+        // overwrite LAYER_FLAG, otherwise server won't respond to missing regions
+        flags = MAP_SIM_RETURN_NULL_SIMS;
+    }
     msg->addU32Fast(_PREHASH_Flags, flags);
     msg->addU32Fast(_PREHASH_EstateID, 0); // Filled in on sim
-    msg->addBOOLFast(_PREHASH_Godlike, FALSE); // Filled in on sim
+    msg->addBOOLFast(_PREHASH_Godlike, false); // Filled in on sim
     msg->nextBlockFast(_PREHASH_PositionData);
     msg->addU16Fast(_PREHASH_MinX, min_x);
     msg->addU16Fast(_PREHASH_MinY, min_y);
@@ -157,27 +161,24 @@ void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
     U32 agent_flags;
     msg->getU32Fast(_PREHASH_AgentData, _PREHASH_Flags, agent_flags);
 
-    // There's only one flag that we ever use here
-    if (agent_flags != LAYER_FLAG)
+    S32 num_blocks = msg->getNumberOfBlocksFast(_PREHASH_Data);
+
+    // There's only one flag that we ever use here, unless we also want an existence check.
+    if (agent_flags != LAYER_FLAG
+        && num_blocks != 1) // we check existence for a single region
     {
         LL_WARNS() << "Invalid map image type returned! layer = " << agent_flags << LL_ENDL;
         return;
     }
 
-    S32 num_blocks = msg->getNumberOfBlocksFast(_PREHASH_Data);
-    //LL_INFOS("WorldMap") << "num_blocks = " << num_blocks << LL_ENDL;
+    LL_DEBUGS("WorldMap") << "num_blocks = " << num_blocks << LL_ENDL;
 
     bool found_null_sim = false;
-
-    auto& world_map = LLWorldMap::instance();
-    auto& world_map_message = LLWorldMapMessage::instance();
 
     for (S32 block=0; block<num_blocks; ++block)
     {
         U16 x_regions;
         U16 y_regions;
-        U16 x_size = 256;
-        U16 y_size = 256;
         std::string name;
         U8 accesscode;
         U32 region_flags;
@@ -192,60 +193,51 @@ void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
 //      msg->getU8Fast(_PREHASH_Data, _PREHASH_WaterHeight, water_height, block);
 //      msg->getU8Fast(_PREHASH_Data, _PREHASH_Agents, agents, block);
         msg->getUUIDFast(_PREHASH_Data, _PREHASH_MapImageID, image_id, block);
-        if(msg->getNumberOfBlocksFast(_PREHASH_Size) > 0)
-        {
-            msg->getU16Fast(_PREHASH_Size, _PREHASH_SizeX, x_size, block);
-            msg->getU16Fast(_PREHASH_Size, _PREHASH_SizeY, y_size, block);
-        }
-        if(x_size == 0 || (x_size % 16) != 0|| (y_size % 16) != 0)
-        {
-            x_size = 256;
-            y_size = 256;
-        }
 
         U32 x_world = (U32)(x_regions) * REGION_WIDTH_UNITS;
         U32 y_world = (U32)(y_regions) * REGION_WIDTH_UNITS;
 
-        // name shouldn't be empty, see EXT-4568
-        if (name.empty() && accesscode != 255)
+        // Name shouldn't be empty unless region doesn't exist
+        if (!name.empty())
         {
-            LL_WARNS("WorldMap") << "MapBlockReply returned an empty region name; not inserting in the world map" << LL_ENDL;
-            continue;
-        }
+            // Insert that region in the world map, if failure, flag it as a "null_sim"
+            if (!(LLWorldMap::getInstance()->insertRegion(x_world, y_world, name, image_id, (U32)accesscode, region_flags)))
+            {
+                found_null_sim = true;
+            }
 
-        // Insert that region in the world map, if failure, flag it as a "null_sim"
-        if (!(world_map.insertRegion(x_world, y_world, x_size, y_size, name, image_id, (U32)accesscode, region_flags)))
+            // If we hit a valid tracking location, do what needs to be done app level wise
+            if (LLWorldMap::getInstance()->isTrackingValidLocation())
+            {
+                LLVector3d pos_global = LLWorldMap::getInstance()->getTrackedPositionGlobal();
+                if (LLWorldMap::getInstance()->isTrackingDoubleClick())
+                {
+                    // Teleport if the user double clicked
+                    gAgent.teleportViaLocation(pos_global);
+                }
+                // Update the "real" tracker information
+                gFloaterWorldMap->trackLocation(pos_global);
+            }
+        }
+        else
         {
             found_null_sim = true;
         }
 
-        // If we hit a valid tracking location, do what needs to be done app level wise
-        if (world_map.isTrackingValidLocation())
-        {
-            LLVector3d pos_global = world_map.getTrackedPositionGlobal();
-            if (world_map.isTrackingDoubleClick())
-            {
-                // Teleport if the user double clicked
-                gAgent.teleportViaLocation(pos_global);
-            }
-            // Update the "real" tracker information
-            gFloaterWorldMap->trackLocation(pos_global);
-        }
-
         // Handle the SLURL callback if any
-        url_callback_t callback = world_map_message.mSLURLCallback;
-        if(callback != NULL)
+        url_callback_t callback = LLWorldMapMessage::getInstance()->mSLURLCallback;
+        if (callback != nullptr)
         {
             U64 handle = to_region_handle(x_world, y_world);
             // Check if we reached the requested region
-            if ((LLStringUtil::compareInsensitive(world_map_message.mSLURLRegionName, name)==0)
-                || (world_map_message.mSLURLRegionHandle == handle))
+            if ((LLStringUtil::compareInsensitive(LLWorldMapMessage::getInstance()->mSLURLRegionName, name)==0)
+                || (LLWorldMapMessage::getInstance()->mSLURLRegionHandle == handle))
             {
-                world_map_message.mSLURLCallback = NULL;
-                world_map_message.mSLURLRegionName.clear();
-                world_map_message.mSLURLRegionHandle = 0;
+                LLWorldMapMessage::getInstance()->mSLURLCallback = nullptr;
+                LLWorldMapMessage::getInstance()->mSLURLRegionName.clear();
+                LLWorldMapMessage::getInstance()->mSLURLRegionHandle = 0;
 
-                callback(handle, world_map_message.mSLURL, image_id, world_map_message.mSLURLTeleport);
+                callback(handle, LLWorldMapMessage::getInstance()->mSLURL, image_id, LLWorldMapMessage::getInstance()->mSLURLTeleport);
             }
         }
     }
@@ -262,8 +254,6 @@ void LLWorldMapMessage::processMapItemReply(LLMessageSystem* msg, void**)
 
     S32 num_blocks = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
-    auto& world_map = LLWorldMap::instance();
-
     for (S32 block=0; block<num_blocks; ++block)
     {
         U32 X, Y;
@@ -277,7 +267,7 @@ void LLWorldMapMessage::processMapItemReply(LLMessageSystem* msg, void**)
         msg->getS32Fast(_PREHASH_Data, _PREHASH_Extra, extra, block);
         msg->getS32Fast(_PREHASH_Data, _PREHASH_Extra2, extra2, block);
 
-        world_map.insertItem(X, Y, name, uuid, type, extra, extra2);
+        LLWorldMap::getInstance()->insertItem(X, Y, name, uuid, type, extra, extra2);
     }
 }
 

@@ -46,6 +46,11 @@ LLHeartbeat::LLHeartbeat(F32 secs_between_heartbeat,
     mPanicTimer.setTimerExpirySec(mAggressiveHeartbeatPanicSecs);
 }
 
+LLHeartbeat::~LLHeartbeat()
+{
+    // do nothing.
+}
+
 void
 LLHeartbeat::setSuppressed(bool is_suppressed)
 {

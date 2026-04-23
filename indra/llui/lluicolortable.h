@@ -27,26 +27,25 @@
 #ifndef LL_LLUICOLORTABLE_H_
 #define LL_LLUICOLORTABLE_H_
 
-#include <map>
+#include <boost/unordered_map.hpp>
 
 #include "llinitparam.h"
 #include "llsingleton.h"
 
 #include "v4color.h"
 
-#include <boost/unordered/unordered_node_map.hpp>
-
 class LLUIColor;
 
-class LLUIColorTable final : public LLSingleton<LLUIColorTable>
+class LLUIColorTable : public LLSimpleton<LLUIColorTable>
 {
-    LLSINGLETON_EMPTY_CTOR(LLUIColorTable);
     LOG_CLASS(LLUIColorTable);
 
     // consider using sorted vector, can be much faster
-    typedef boost::unordered_node_map<std::string, LLUIColor, al::string_hash, std::equal_to<>>  string_color_map_t;
+    typedef boost::unordered_map<std::string, LLUIColor, ll::string_hash, std::equal_to<>>  string_color_map_t;
 
 public:
+    LLUIColorTable() = default;
+
     struct ColorParams : LLInitParam::ChoiceBlock<ColorParams>
     {
         Alternative<LLColor4>    value;
@@ -77,7 +76,7 @@ public:
     void clear();
 
     // color lookup
-    LLUIColor getColor(std::string_view, const LLColor4& default_color = LLColor4::magenta) const;
+    LLUIColor getColor(std::string_view name, const LLColor4& default_color = LLColor4::magenta) const;
 
     // if the color is in the table, it's value is changed, otherwise it is added
     void setColor(std::string_view name, const LLColor4& color);

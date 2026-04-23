@@ -27,7 +27,7 @@
 
 #include "llagentaccess.h"
 #include "indra_constants.h"
-#include "llviewercontrol.h"
+#include "llcontrol.h"
 
 LLAgentAccess::LLAgentAccess(LLControlGroup& savedSettings) :
     mSavedSettings(savedSettings),
@@ -101,31 +101,19 @@ bool LLAgentAccess::canAccessAdult() const
 
 bool LLAgentAccess::prefersPG() const
 {
-#ifdef LL_TEST
     U32 access = mSavedSettings.getU32("PreferredMaturity");
-#else
-    U32 access = ALControlCache::PreferredMaturity;
-#endif
     return access < SIM_ACCESS_MATURE;
 }
 
 bool LLAgentAccess::prefersMature() const
 {
-#ifdef LL_TEST
     U32 access = mSavedSettings.getU32("PreferredMaturity");
-#else
-    U32 access = ALControlCache::PreferredMaturity;
-#endif
     return access >= SIM_ACCESS_MATURE;
 }
 
 bool LLAgentAccess::prefersAdult() const
 {
-#ifdef LL_TEST
     U32 access = mSavedSettings.getU32("PreferredMaturity");
-#else
-    U32 access = ALControlCache::PreferredMaturity;
-#endif
     return access >= SIM_ACCESS_ADULT;
 }
 

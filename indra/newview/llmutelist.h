@@ -35,6 +35,11 @@ class LLViewerObject;
 class LLMessageSystem;
 class LLMuteListObserver;
 
+#if LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfree-nonheap-object" // False positive in LLMuteList::compare_by_name
+#endif
+
 // An entry in the mute list.
 class LLMute
 {
@@ -69,12 +74,20 @@ public:
     U32         mFlags; // flags pertaining to this mute entry
 };
 
-class LLMuteList final : public LLSingleton<LLMuteList>
+class LLMuteList : public LLSimpleton<LLMuteList>
 {
-    LLSINGLETON(LLMuteList);
-    ~LLMuteList();
-    /*virtual*/ void cleanupSingleton() override;
 public:
+    LLMuteList();
+    ~LLMuteList();
+
+    enum EMuteListState
+    {
+        ML_INITIAL,
+        ML_REQUESTED,
+        ML_LOADED,
+        ML_FAILED,
+    };
+
     // reasons for auto-unmuting a resident
     enum EAutoReason
     {
@@ -89,26 +102,27 @@ public:
     void removeObserver(LLMuteListObserver* observer);
 
     // Add either a normal or a BY_NAME mute, for any or all properties.
-    BOOL add(const LLMute& mute, U32 flags = 0);
+    bool add(const LLMute& mute, U32 flags = 0);
 
     // Remove both normal and legacy mutes, for any or all properties.
-    BOOL remove(const LLMute& mute, U32 flags = 0);
-    BOOL autoRemove(const LLUUID& agent_id, const EAutoReason reason);
+    bool remove(const LLMute& mute, U32 flags = 0);
+    bool autoRemove(const LLUUID& agent_id, const EAutoReason reason);
 
     // Name is required to test against legacy text-only mutes.
-    BOOL isMuted(const LLUUID& id, const std::string& name = LLStringUtil::null, U32 flags = 0) const;
+    bool isMuted(const LLUUID& id, const std::string& name = LLStringUtil::null, U32 flags = 0) const;
 
     // Workaround for username-based mute search, a lot of string conversions so use cautiously
     // Expects lower case username
-    BOOL isMuted(const std::string& username, U32 flags = 0) const;
+    bool isMuted(const std::string& username, U32 flags = 0) const;
 
     // Alternate (convenience) form for places we don't need to pass the name, but do need flags
-    BOOL isMuted(const LLUUID& id, U32 flags) const { return isMuted(id, LLStringUtil::null, flags); };
+    bool isMuted(const LLUUID& id, U32 flags) const { return isMuted(id, LLStringUtil::null, flags); };
 
     static bool isLinden(const LLUUID& id);
     static bool isLinden(const std::string& name);
 
-    BOOL isLoaded() const { return mIsLoaded; }
+    bool isLoaded() const { return mLoadState == ML_LOADED; }
+    bool getLoadFailed() const;
 
     std::vector<LLMute> getMutes() const;
 
@@ -119,13 +133,13 @@ public:
     void cache(const LLUUID& agent_id);
 
     // group functions
-    BOOL addGroup(const LLUUID& group_id);
-    BOOL removeGroup(const LLUUID& group_id);
-    BOOL isGroupMuted(const LLUUID& group_id);
+    bool addGroup(const LLUUID& group_id);
+    bool removeGroup(const LLUUID& group_id);
+    bool isGroupMuted(const LLUUID& group_id);
 
 private:
-    BOOL loadFromFile(const std::string& filename);
-    BOOL saveToFile(const std::string& filename);
+    bool loadFromFile(const std::string& filename);
+    bool saveToFile(const std::string& filename);
 
     void setLoaded();
     void notifyObservers();
@@ -173,7 +187,8 @@ private:
     typedef std::set<LLMuteListObserver*> observer_set_t;
     observer_set_t mObservers;
 
-    BOOL mIsLoaded;
+    EMuteListState mLoadState;
+    F64 mRequestStartTime;
 
     friend class LLDispatchEmptyMuteList;
 };
@@ -186,7 +201,7 @@ public:
     virtual void onChangeDetailed(const LLMute& ) { }
 };
 
-class LLRenderMuteList final : public LLSingleton<LLRenderMuteList>
+class LLRenderMuteList : public LLSingleton<LLRenderMuteList>
 {
     LLSINGLETON(LLRenderMuteList);
 public:
@@ -209,5 +224,8 @@ private:
     observer_set_t mObservers;
 };
 
+#if LL_GNUC
+#pragma GCC diagnostic pop
+#endif
 
 #endif //LL_MUTELIST_H

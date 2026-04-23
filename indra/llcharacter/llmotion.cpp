@@ -43,21 +43,27 @@
 // Class Constructor
 //-----------------------------------------------------------------------------
 LLMotion::LLMotion( const LLUUID &id ) :
-    mStopped(TRUE),
-    mActive(FALSE),
+    mStopped(true),
+    mActive(false),
     mID(id),
     mActivationTimestamp(0.f),
     mStopTimestamp(0.f),
     mSendStopTimestamp(F32_MAX),
     mResidualWeight(0.f),
     mFadeWeight(1.f),
-    mDeactivateCallback(NULL),
-    mDeactivateCallbackUserData(NULL),
-    //BD - Eternal
-    mEternal(false)
+    mDeactivateCallback(nullptr),
+    mDeactivateCallbackUserData(nullptr)
 {
     for (S32 i=0; i<3; ++i)
         memset(&mJointSignature[i][0], 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
+}
+
+//-----------------------------------------------------------------------------
+// ~LLMotion()
+// Class Destructor
+//-----------------------------------------------------------------------------
+LLMotion::~LLMotion()
+{
 }
 
 //-----------------------------------------------------------------------------
@@ -67,7 +73,7 @@ void LLMotion::fadeOut()
 {
     if (mFadeWeight > 0.01f)
     {
-        mFadeWeight = ll_lerp(mFadeWeight, 0.f, LLSmoothInterpolation::getInterpolant(0.15f));
+        mFadeWeight = lerp(mFadeWeight, 0.f, LLSmoothInterpolation::getInterpolant(0.15f));
     }
     else
     {
@@ -82,7 +88,7 @@ void LLMotion::fadeIn()
 {
     if (mFadeWeight < 0.99f)
     {
-        mFadeWeight = ll_lerp(mFadeWeight, 1.f, LLSmoothInterpolation::getInterpolant(0.15f));
+        mFadeWeight = lerp(mFadeWeight, 1.f, LLSmoothInterpolation::getInterpolant(0.15f));
     }
     else
     {
@@ -116,31 +122,6 @@ void LLMotion::addJointState(const LLPointer<LLJointState>& jointState)
     mJointSignature[2][joint_num] = (usage & LLJointState::SCALE) ? (0xff >> (7 - priority)) : 0;
 }
 
-//BD
-//-----------------------------------------------------------------------------
-// removeJointState()
-//-----------------------------------------------------------------------------
-void LLMotion::removeJointState(const LLPointer<LLJointState>& jointState)
-{
-    mPose.removeJointState(jointState);
-}
-
-//BD
-//-----------------------------------------------------------------------------
-// findJointState()
-//-----------------------------------------------------------------------------
-const LLPointer<LLJointState> LLMotion::findJointState(const std::string jointName)
-{
-    const LLPointer<LLJointState> joint_state = mPose.findJointState(jointName);
-    return joint_state;
-}
-
-const LLPointer<LLJointState> LLMotion::findJointState(LLJoint *joint)
-{
-    const LLPointer<LLJointState> joint_state = mPose.findJointState(joint);
-    return joint_state;
-}
-
 void LLMotion::setDeactivateCallback( void (*cb)(void *), void* userdata )
 {
     mDeactivateCallback = cb;
@@ -151,10 +132,10 @@ void LLMotion::setDeactivateCallback( void (*cb)(void *), void* userdata )
 void LLMotion::setStopTime(F32 time)
 {
     mStopTimestamp = time;
-    mStopped = TRUE;
+    mStopped = true;
 }
 
-BOOL LLMotion::isBlending()
+bool LLMotion::isBlending()
 {
     return mPose.getWeight() < 1.f;
 }
@@ -165,8 +146,8 @@ BOOL LLMotion::isBlending()
 void LLMotion::activate(F32 time)
 {
     mActivationTimestamp = time;
-    mStopped = FALSE;
-    mActive = TRUE;
+    mStopped = false;
+    mActive = true;
     onActivate();
 }
 
@@ -175,7 +156,7 @@ void LLMotion::activate(F32 time)
 //-----------------------------------------------------------------------------
 void LLMotion::deactivate()
 {
-    mActive = FALSE;
+    mActive = false;
     mPose.setWeight(0.f);
 
     if (mDeactivateCallback)
@@ -188,9 +169,9 @@ void LLMotion::deactivate()
     onDeactivate();
 }
 
-BOOL LLMotion::canDeprecate()
+bool LLMotion::canDeprecate()
 {
-    return TRUE;
+    return true;
 }
 
 // End

@@ -46,12 +46,12 @@ namespace LLCore
 /// *NOTE:  This will very likely be removed in the near future
 /// when priority is removed from the library.
 
-class HttpOpSetPriority final : public HttpOperation
+class HttpOpSetPriority : public HttpOperation
 {
 public:
     HttpOpSetPriority(HttpHandle handle);
 
-    virtual ~HttpOpSetPriority() = default;
+    virtual ~HttpOpSetPriority();
 
 private:
     HttpOpSetPriority(const HttpOpSetPriority &);           // Not defined

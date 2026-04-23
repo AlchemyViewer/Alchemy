@@ -30,7 +30,6 @@
 
 #include "lldrawpooltree.h"
 
-#include "alglmath.h"
 #include "llviewercontrol.h"
 #include "lldir.h"
 #include "llprimitive.h"
@@ -137,10 +136,7 @@ void LLVOTree::initClass()
             S32 S32_val;
             std::string name;
 
-            BOOL success = TRUE;
-
-
-
+            bool success{ true };
             S32 species;
             static LLStdStringHandle species_id_string = LLXmlTree::addAttributeString("species_id");
             if (!tree_def->getFastAttributeS32(species_id_string, species))
@@ -252,7 +248,7 @@ void LLVOTree::initClass()
             }
         }
 
-        BOOL have_all_trees = TRUE;
+        bool have_all_trees {true};
         std::string err;
 
         for (S32 i=0;i<sMaxTreeSpecies;++i)
@@ -260,7 +256,7 @@ void LLVOTree::initClass()
             if (!sSpeciesTable.count(i))
             {
                 err.append(llformat(" %d",i));
-                have_all_trees = FALSE;
+                have_all_trees = false;
             }
         }
 
@@ -323,7 +319,7 @@ U32 LLVOTree::processUpdateMessage(LLMessageSystem *mesgsys,
     const auto& species_data = sSpeciesTable[mSpecies];
 
     static const S32 MAX_TREE_TEXTURE_VIRTURE_SIZE_RESET_INTERVAL = 32 ; //frames.
-    mTreeImagep = LLViewerTextureManager::getFetchedTexture(species_data->mTextureID, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+    mTreeImagep = LLViewerTextureManager::getFetchedTexture(species_data->mTextureID, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
     mTreeImagep->setMaxVirtualSizeResetInterval(MAX_TREE_TEXTURE_VIRTURE_SIZE_RESET_INTERVAL); //allow to wait for at most 16 frames to reset virtual size.
 
     mBranchLength = species_data->mBranchLength;
@@ -412,15 +408,18 @@ void LLVOTree::idleUpdate(LLAgent &agent, const F64 &time)
     mTrunkLOD = trunk_LOD;
 }
 
+void LLVOTree::render(LLAgent &agent)
+{
+}
+
+
 void LLVOTree::setPixelAreaAndAngle(LLAgent &agent)
 {
-    auto& viewerCamera = LLViewerCamera::instance();
-
     LLVector3 center = getPositionAgent();//center of tree.
     LLVector3 viewer_pos_agent = gAgentCamera.getCameraPositionAgent();
     LLVector3 lookAt = center - viewer_pos_agent;
     F32 dist = lookAt.normVec() ;
-    F32 cos_angle_to_view_dir = lookAt * viewerCamera.getXAxis() ;
+    F32 cos_angle_to_view_dir = lookAt * LLViewerCamera::getInstance()->getXAxis() ;
     F32 radius = getScale().length()*0.5f;
     F32 range = dist - radius;
 
@@ -436,12 +435,12 @@ void LLVOTree::setPixelAreaAndAngle(LLAgent &agent)
     F32 max_scale = mBillboardScale * getMaxScale();
     F32 area = max_scale * (max_scale*mBillboardRatio);
     // Compute pixels per meter at the given range
-    F32 pixels_per_meter = viewerCamera.getViewHeightInPixels() / (tan(viewerCamera.getView()) * dist);
+    F32 pixels_per_meter = LLViewerCamera::getInstance()->getViewHeightInPixels() / (tan(LLViewerCamera::getInstance()->getView()) * dist);
     mPixelArea = pixels_per_meter * pixels_per_meter * area ;
 
     F32 importance = LLFace::calcImportanceToCamera(cos_angle_to_view_dir, dist) ;
     mPixelArea = LLFace::adjustPixelArea(importance, mPixelArea) ;
-    if (mPixelArea > viewerCamera.getScreenPixelArea())
+    if (mPixelArea > LLViewerCamera::getInstance()->getScreenPixelArea())
     {
         mAppAngle = 180.f;
     }
@@ -462,16 +461,14 @@ void LLVOTree::updateTextures()
         {
             setDebugText(llformat("%4.0f", (F32) sqrt(mPixelArea)));
         }
-        mTreeImagep->addTextureStats(mPixelArea);
     }
-
 }
 
 
 LLDrawable* LLVOTree::createDrawable(LLPipeline *pipeline)
 {
     pipeline->allocDrawable(this);
-    mDrawable->setLit(FALSE);
+    mDrawable->setLit(false);
 
     mDrawable->setRenderType(LLPipeline::RENDER_TYPE_TREE);
 
@@ -480,7 +477,7 @@ LLDrawable* LLVOTree::createDrawable(LLPipeline *pipeline)
     // Just a placeholder for an actual object...
     LLFace *facep = mDrawable->addFace(poolp, mTreeImagep);
     facep->setSize(1, 3);
-
+    facep->setTexture(LLRender::DIFFUSE_MAP, mTreeImagep);
     updateRadius();
 
     return mDrawable;
@@ -491,13 +488,7 @@ LLDrawable* LLVOTree::createDrawable(LLPipeline *pipeline)
 const S32 LEAF_INDICES = 24;
 const S32 LEAF_VERTICES = 16;
 
-
-void LLVOTree::resetVertexBuffers()
-{
-    mReferenceBuffer = NULL;
-}
-
-BOOL LLVOTree::updateGeometry(LLDrawable *drawable)
+bool LLVOTree::updateGeometry(LLDrawable *drawable)
 {
     LL_PROFILE_ZONE_SCOPED;
 
@@ -509,7 +500,7 @@ BOOL LLVOTree::updateGeometry(LLDrawable *drawable)
         {
             facep->setVertexBuffer(NULL);
         }
-        return TRUE ;
+        return true ;
     }
 
     if (mDrawable->getFace(0) &&
@@ -526,7 +517,7 @@ BOOL LLVOTree::updateGeometry(LLDrawable *drawable)
         S32 lod;
 
         LLFace *face = drawable->getFace(0);
-        if (!face) return TRUE;
+        if (!face) return true;
 
         face->mCenterAgent = getPositionAgent();
         face->mCenterLocal = face->mCenterAgent;
@@ -549,7 +540,7 @@ BOOL LLVOTree::updateGeometry(LLDrawable *drawable)
                 << max_vertices << " vertices and "
                 << max_indices << " indices" << LL_ENDL;
             mReferenceBuffer = NULL; //unref
-            return TRUE;
+            return true;
         }
 
         LLStrider<LLVector3> vertices;
@@ -739,7 +730,7 @@ BOOL LLVOTree::updateGeometry(LLDrawable *drawable)
             slices = sLODSlices[lod];
             F32 base_radius = 0.65f;
             F32 top_radius = base_radius * species_data->mTaper;
-            //LL_INFOS() << "Species " << ((U32) mSpecies) << ", taper = " << species_data.mTaper << LL_ENDL;
+            //LL_INFOS() << "Species " << ((U32) mSpecies) << ", taper = " << sSpeciesTable[mSpecies].mTaper << LL_ENDL;
             //LL_INFOS() << "Droop " << mDroop << ", branchlength: " << mBranchLength << LL_ENDL;
             F32 angle = 0;
             F32 angle_inc = 360.f/(slices-1);
@@ -880,17 +871,19 @@ BOOL LLVOTree::updateGeometry(LLDrawable *drawable)
     //generate tree mesh
     updateMesh();
 
-    return TRUE;
+    return true;
 }
 
 void LLVOTree::updateMesh()
 {
+    LLMatrix4 matrix;
+
     // Translate to tree base  HACK - adjustment in Z plants tree underground
     const LLVector3 &pos_region = getPositionRegion();
     //gGL.translatef(pos_agent.mV[VX], pos_agent.mV[VY], pos_agent.mV[VZ] - 0.1f);
-    LLMatrix4a trans_mat;
-    trans_mat.setIdentity();
-    trans_mat.setTranslate_affine(pos_region - LLVector3(0.f,0.f,0.1f));
+    LLMatrix4 trans_mat;
+    trans_mat.setTranslation(pos_region.mV[VX], pos_region.mV[VY], pos_region.mV[VZ] - 0.1f);
+    trans_mat *= matrix;
 
     // Rotate to tree position and bend for current trunk/wind
     // Note that trunk stiffness controls the amount of bend at the trunk as
@@ -903,12 +896,16 @@ void LLVOTree::updateMesh()
         LLQuaternion(90.f*DEG_TO_RAD, LLVector4(0,0,1)) *
         getRotation();
 
-
-    LLMatrix4a rot_mat = trans_mat;
-    rot_mat.mul(LLMatrix4a(LLQuaternion2(rot)));
+    LLMatrix4 rot_mat(rot);
+    rot_mat *= trans_mat;
 
     F32 radius = getScale().magVec()*0.05f;
-    rot_mat.applyScale_affine(radius);
+    LLMatrix4 scale_mat;
+    scale_mat.mMatrix[0][0] =
+        scale_mat.mMatrix[1][1] =
+        scale_mat.mMatrix[2][2] = radius;
+
+    scale_mat *= rot_mat;
 
 //  const F32 THRESH_ANGLE_FOR_BILLBOARD = 15.f;
 //  const F32 BLEND_RANGE_FOR_BILLBOARD = 3.f;
@@ -943,8 +940,8 @@ void LLVOTree::updateMesh()
 
     facep->setVertexBuffer(buff);
 
-    LLStrider<LLVector4a> vertices;
-    LLStrider<LLVector4a> normals;
+    LLStrider<LLVector3> vertices;
+    LLStrider<LLVector3> normals;
     LLStrider<LLVector2> tex_coords;
     LLStrider<LLColor4U> colors;
     LLStrider<U16> indices;
@@ -956,27 +953,27 @@ void LLVOTree::updateMesh()
     buff->getColorStrider(colors);
     buff->getIndexStrider(indices);
 
-    genBranchPipeline(vertices, normals, tex_coords, colors, indices, idx_offset, rot_mat, mTrunkLOD, stop_depth, mDepth, mTrunkDepth, 1.0, mTwist, droop, mBranches, alpha);
+    genBranchPipeline(vertices, normals, tex_coords, colors, indices, idx_offset, scale_mat, mTrunkLOD, stop_depth, mDepth, mTrunkDepth, 1.0, mTwist, droop, mBranches, alpha);
 
     mReferenceBuffer->unmapBuffer();
     buff->unmapBuffer();
 }
 
-void LLVOTree::appendMesh(LLStrider<LLVector4a>& vertices,
-                         LLStrider<LLVector4a>& normals,
+void LLVOTree::appendMesh(LLStrider<LLVector3>& vertices,
+                         LLStrider<LLVector3>& normals,
                          LLStrider<LLVector2>& tex_coords,
                          LLStrider<LLColor4U>& colors,
                          LLStrider<U16>& indices,
                          U16& cur_idx,
-                         LLMatrix4a& matrix,
-                         LLMatrix4a& norm_mat,
+                         LLMatrix4& matrix,
+                         LLMatrix4& norm_mat,
                          S32 vert_start,
                          S32 vert_count,
                          S32 index_count,
                          S32 index_offset)
 {
-    LLStrider<LLVector4a> v;
-    LLStrider<LLVector4a> n;
+    LLStrider<LLVector3> v;
+    LLStrider<LLVector3> n;
     LLStrider<LLVector2> t;
     LLStrider<LLColor4U> c;
     LLStrider<U16> idx;
@@ -991,10 +988,10 @@ void LLVOTree::appendMesh(LLStrider<LLVector4a>& vertices,
     for (S32 i = 0; i < vert_count; i++)
     {
         U16 index = vert_start + i;
-        matrix.affineTransform(v[index],*vertices++);
-        LLVector4a& norm = *normals++;
-        norm_mat.perspectiveTransform(n[index],norm);
-        norm.normalize3fast();
+        *vertices++ = v[index] * matrix;
+        LLVector3 norm = n[index] * norm_mat;
+        norm.normalize();
+        *normals++ = norm;
         *tex_coords++ = t[index];
         *colors++ = c[index];
     }
@@ -1011,13 +1008,13 @@ void LLVOTree::appendMesh(LLStrider<LLVector4a>& vertices,
 }
 
 
-void LLVOTree::genBranchPipeline(LLStrider<LLVector4a>& vertices,
-                                 LLStrider<LLVector4a>& normals,
+void LLVOTree::genBranchPipeline(LLStrider<LLVector3>& vertices,
+                                 LLStrider<LLVector3>& normals,
                                  LLStrider<LLVector2>& tex_coords,
                                  LLStrider<LLColor4U>& colors,
                                  LLStrider<U16>& indices,
                                  U16& index_offset,
-                                 LLMatrix4a& matrix,
+                                 LLMatrix4& matrix,
                                  S32 trunk_LOD,
                                  S32 stop_level,
                                  U16 depth,
@@ -1046,44 +1043,45 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector4a>& vertices,
             {
                 llassert(sLODIndexCount[trunk_LOD] > 0);
                 width = scale * length * aspect;
+                LLMatrix4 scale_mat;
+                scale_mat.mMatrix[0][0] = width;
+                scale_mat.mMatrix[1][1] = width;
+                scale_mat.mMatrix[2][2] = scale*length;
+                scale_mat *= matrix;
 
-                LLMatrix4a scale_mat = matrix;
-                scale_mat.applyScale_affine(width,width,scale*length);
-
-                LLMatrix4a norm_mat = scale_mat;
-                norm_mat.invert();
-                norm_mat.transpose();
+                glm::mat4 norm(glm::make_mat4((F32*) scale_mat.mMatrix));
+                LLMatrix4 norm_mat = LLMatrix4(glm::value_ptr(glm::transpose(glm::inverse(norm))));
 
                 appendMesh(vertices, normals, tex_coords, colors, indices, index_offset, scale_mat, norm_mat,
                             sLODVertexOffset[trunk_LOD], sLODVertexCount[trunk_LOD], sLODIndexCount[trunk_LOD], sLODIndexOffset[trunk_LOD]);
             }
 
-            LLMatrix4a trans_matrix = matrix;
-            trans_matrix.applyTranslation_affine(0.f,0.f,scale*length);
-            const LLMatrix4a& trans_mat = trans_matrix;
-
             // Recurse to create more branches
             for (S32 i=0; i < (S32)branches; i++)
             {
+                LLMatrix4 trans_mat;
+                trans_mat.setTranslation(0,0,scale*length);
+                trans_mat *= matrix;
 
                 LLQuaternion rot =
                     LLQuaternion(20.f*DEG_TO_RAD, LLVector4(0.f, 0.f, 1.f)) *
                     LLQuaternion(droop*DEG_TO_RAD, LLVector4(0.f, 1.f, 0.f)) *
                     LLQuaternion(((constant_twist + ((i%2==0)?twist:-twist))*i)*DEG_TO_RAD, LLVector4(0.f, 0.f, 1.f));
 
-                LLMatrix4a rot_mat = trans_mat;
-                rot_mat.mul(LLMatrix4a(LLQuaternion2(rot)));
+                LLMatrix4 rot_mat(rot);
+                rot_mat *= trans_mat;
 
                 genBranchPipeline(vertices, normals, tex_coords, colors, indices, index_offset, rot_mat, trunk_LOD, stop_level, depth - 1, 0, scale*mScaleStep, twist, droop, branches, alpha);
             }
             //  Recurse to continue trunk
             if (trunk_depth)
             {
+                LLMatrix4 trans_mat;
+                trans_mat.setTranslation(0,0,scale*length);
+                trans_mat *= matrix;
 
-                static const LLMatrix4a srot_mat = ALGLMath::genRot(70.5f,0.f,0.f,1.f);
-                LLMatrix4a rot_mat;
-                rot_mat.setMul(trans_mat, srot_mat);    // rotate a bit around Z when ascending
-
+                LLMatrix4 rot_mat(70.5f*DEG_TO_RAD, LLVector4(0,0,1));
+                rot_mat *= trans_mat; // rotate a bit around Z when ascending
                 genBranchPipeline(vertices, normals, tex_coords, colors, indices, index_offset, rot_mat, trunk_LOD, stop_level, depth, trunk_depth-1, scale*mScaleStep, twist, droop, branches, alpha);
             }
         }
@@ -1093,12 +1091,15 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector4a>& vertices,
             //  Append leaves as two 90 deg crossed quads with leaf textures
             //
             {
-                LLMatrix4a scale_mat = matrix;
-                scale_mat.applyScale_affine(scale*mLeafScale);
+                LLMatrix4 scale_mat;
+                scale_mat.mMatrix[0][0] =
+                    scale_mat.mMatrix[1][1] =
+                    scale_mat.mMatrix[2][2] = scale*mLeafScale;
 
-                LLMatrix4a norm_mat = scale_mat;
-                norm_mat.invert();
-                norm_mat.transpose();
+                scale_mat *= matrix;
+
+                glm::mat4 norm(glm::make_mat4((F32*)scale_mat.mMatrix));
+                LLMatrix4 norm_mat = LLMatrix4(glm::value_ptr(glm::transpose(glm::inverse(norm))));
 
                 appendMesh(vertices, normals, tex_coords, colors, indices, index_offset, scale_mat, norm_mat, 0, LEAF_VERTICES, LEAF_INDICES, 0);
             }
@@ -1167,16 +1168,26 @@ void LLVOTree::updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
     LLVector4a pos;
     pos.load3(center.mV);
     mDrawable->setPositionGroup(pos);
+
+    if (mDrawable->getNumFaces() > 0)
+    {
+        LLFace* facep = mDrawable->getFace(0);
+        if (facep)
+        {
+            facep->mExtents[0] = newMin;
+            facep->mExtents[1] = newMax;
+        }
+    }
 }
 
-BOOL LLVOTree::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, BOOL pick_unselectable, S32 *face_hitp,
+bool LLVOTree::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, bool pick_transparent, bool pick_rigged, bool pick_unselectable, S32 *face_hitp,
                                       LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
 
 {
 
     if (!lineSegmentBoundingBox(start, end))
     {
-        return FALSE;
+        return false;
     }
 
     const LLVector4a* exta = mDrawable->getSpatialExtents();
@@ -1213,10 +1224,10 @@ BOOL LLVOTree::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& e
         {
             normal->load3(norm.mV);
         }
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 U32 LLVOTree::getPartitionType() const
@@ -1225,7 +1236,7 @@ U32 LLVOTree::getPartitionType() const
 }
 
 LLTreePartition::LLTreePartition(LLViewerRegion* regionp)
-: LLSpatialPartition(0, FALSE, regionp)
+: LLSpatialPartition(0, false, regionp)
 {
     mDrawableType = LLPipeline::RENDER_TYPE_TREE;
     mPartitionType = LLViewerRegion::PARTITION_TREE;

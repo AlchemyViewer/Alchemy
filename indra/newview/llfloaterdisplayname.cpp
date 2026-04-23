@@ -40,12 +40,12 @@
 #include "llagent.h"
 
 
-class LLFloaterDisplayName final : public LLFloater
+class LLFloaterDisplayName : public LLFloater
 {
 public:
     LLFloaterDisplayName(const LLSD& key);
     virtual ~LLFloaterDisplayName() { }
-    /*virtual*/ BOOL    postBuild();
+    /*virtual*/ bool    postBuild();
     void onSave();
     void onReset();
     void onCancel();
@@ -56,6 +56,7 @@ private:
     void onCacheSetName(bool success,
                                           const std::string& reason,
                                           const LLSD& content);
+    bool mIsLockedOut = false;
 };
 
 LLFloaterDisplayName::LLFloaterDisplayName(const LLSD& key) :
@@ -72,8 +73,8 @@ void LLFloaterDisplayName::onOpen(const LLSD& key)
     LLAvatarNameCache::get(gAgent.getID(), &av_name);
 
     F64 now_secs = LLDate::now().secondsSinceEpoch();
-
-    if (now_secs < av_name.mNextUpdate)
+    mIsLockedOut = now_secs < av_name.mNextUpdate;
+    if (mIsLockedOut)
     {
         // ...can't update until some time in the future
         F64 next_update_local_secs =
@@ -87,7 +88,7 @@ void LLFloaterDisplayName::onOpen(const LLSD& key)
         getChild<LLUICtrl>("save_btn")->setEnabled(false);
         getChild<LLUICtrl>("display_name_editor")->setEnabled(false);
         getChild<LLUICtrl>("display_name_confirm")->setEnabled(false);
-        getChild<LLUICtrl>("cancel_btn")->setFocus(TRUE);
+        getChild<LLUICtrl>("cancel_btn")->setFocus(true);
 
     }
     else
@@ -100,7 +101,7 @@ void LLFloaterDisplayName::onOpen(const LLSD& key)
     }
 }
 
-BOOL LLFloaterDisplayName::postBuild()
+bool LLFloaterDisplayName::postBuild()
 {
     getChild<LLUICtrl>("reset_btn")->setCommitCallback(boost::bind(&LLFloaterDisplayName::onReset, this));
     getChild<LLUICtrl>("cancel_btn")->setCommitCallback(boost::bind(&LLFloaterDisplayName::onCancel, this));
@@ -108,7 +109,7 @@ BOOL LLFloaterDisplayName::postBuild()
 
     center();
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterDisplayName::onCacheSetName(bool success,
@@ -167,18 +168,19 @@ void LLFloaterDisplayName::onReset()
     }
     getChild<LLUICtrl>("display_name_editor")->setValue(av_name.getUserName());
 
-    if (getChild<LLUICtrl>("display_name_editor")->getEnabled())
+    if (mIsLockedOut)
     {
-        // UI is enabled, fill the first field
-        getChild<LLUICtrl>("display_name_confirm")->clear();
-        getChild<LLUICtrl>("display_name_confirm")->setFocus(TRUE);
+        // UI is disabled.
+        // We should allow resetting even if user already
+        // set a display name, enable save button
+        getChild<LLUICtrl>("display_name_confirm")->setValue(av_name.getUserName());
+        getChild<LLUICtrl>("save_btn")->setEnabled(true);
     }
     else
     {
-        // UI is disabled, looks like we should allow resetting
-        // even if user already set a display name, enable save button
-        getChild<LLUICtrl>("display_name_confirm")->setValue(av_name.getUserName());
-        getChild<LLUICtrl>("save_btn")->setEnabled(true);
+        // UI is enabled, focus on the confirm field
+        getChild<LLUICtrl>("display_name_confirm")->clear();
+        getChild<LLUICtrl>("display_name_confirm")->setFocus(true);
     }
 }
 

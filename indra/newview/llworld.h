@@ -77,6 +77,7 @@ class LLWorld final : public LLSimpleton<LLWorld>
 {
 public:
     LLWorld();
+    ~LLWorld() = default;
 
     // Clear any objects, regions
     // Prepares class to be reused or destroyed
@@ -94,7 +95,7 @@ public:
     LLViewerRegion*         getRegionFromPosAgent(const LLVector3 &pos);
     LLViewerRegion*         getRegionFromHandle(const U64 &handle);
     LLViewerRegion*         getRegionFromID(const LLUUID& region_id);
-    BOOL                    positionRegionValidGlobal(const LLVector3d& pos);           // true if position is in valid region
+    bool                    positionRegionValidGlobal(const LLVector3d& pos);           // true if position is in valid region
     LLVector3d              clipToVisibleRegions(const LLVector3d &start_pos, const LLVector3d &end_pos);
 
     void                    updateAgentOffset(const LLVector3d &offset);
@@ -125,20 +126,13 @@ public:
     LLSurfacePatch *        resolveLandPatchGlobal(const LLVector3d &position);
     LLVector3               resolveLandNormalGlobal(const LLVector3d &position);        // absolute frame
 
-    void                    setRegionSize(const U32& width = 0, const U32& length = 0);
     U32                     getRegionWidthInPoints() const  { return mWidth; }
     F32                     getRegionScale() const          { return mScale; }
 
     // region X and Y size in meters
     F32                     getRegionWidthInMeters() const  { return mWidthInMeters; }
     F32                     getRegionMinHeight() const      { return -mWidthInMeters; }
-    F32                     getRegionMaxHeight() const      { return mRegionMaxHeight; }
-    F32                     getRegionMinPrimScale() const   { return mRegionMinPrimScale; }
-    F32                     getRegionMaxPrimScale() const   { return mRegionMaxPrimScale; }
-    F32                     getRegionMaxPrimScaleNoMesh() const { return mRegionMaxPrimScaleNoMesh; }
-    F32                     getRegionMaxHollowSize() const  { return mRegionMaxHollowSize; }
-    F32                     getRegionMinHoleSize() const    { return mRegionMinHoleSize; }
-    S32                     getRegionMaxLinkObjects() const { return mRegionMaxLinkObjects; }
+    F32                     getRegionMaxHeight() const      { return MAX_OBJECT_Z; }
 
     void                    updateRegions(F32 max_update_time);
     void                    updateVisibilities();
@@ -170,10 +164,9 @@ public:
     U32  getNumOfActiveCachedObjects() const {return mNumOfActiveCachedObjects;}
 
     void clearAllVisibleObjects();
-    void refreshLimits();
 
-    virtual CapUrlMatches getCapURLMatches(const std::string& cap_url);
-    virtual bool isCapURLMapped(const std::string& cap_url);
+    CapUrlMatches getCapURLMatches(const std::string& cap_url);
+    bool isCapURLMapped(const std::string& cap_url);
 
 public:
     typedef std::list<LLViewerRegion*> region_list_t;
@@ -213,7 +206,7 @@ public:
 
     // profile nearby avatars using gPipeline.profileAvatar and update their render times
     // return max GPU time
-    F32 getNearbyAvatarsAndMaxGPUTime(std::vector<LLCharacter*> &valid_nearby_avs);
+    F32 getNearbyAvatarsAndMaxGPUTime(std::vector<LLVOAvatar*> &valid_nearby_avs);
 
 private:
     void clearHoleWaterObjects();
@@ -227,21 +220,12 @@ private:
     region_remove_signal_t mRegionRemovedSignal;
 
     // Number of points on edge
-    U32 mWidth = 256;
-    U32 mLength = 256;
+    static const U32 mWidth;
 
     // meters/point, therefore mWidth * mScale = meters per edge
-    F32 mScale = 1.f;
+    static const F32 mScale;
 
-    F32 mWidthInMeters;
-    F32 mRegionMaxHeight;
-    F32 mRegionMinPrimScale;
-    F32 mRegionMaxPrimScale;
-    F32 mRegionMaxPrimScaleNoMesh;
-    F32 mRegionMaxHollowSize;
-    F32 mRegionMinHoleSize;
-    S32 mRegionMaxLinkObjects;
-    bool mRefreshLimits;
+    static const F32 mWidthInMeters;
 
     F32 mLandFarClip;                   // Far clip distance for land.
     LLPatchVertexArray      mLandPatch;
@@ -257,7 +241,7 @@ private:
     //
 
     std::list<LLPointer<LLVOWater> > mHoleWaterObjects;
-    static constexpr S32 EDGE_WATER_OBJECTS_COUNT = 8;
+    static const S32 EDGE_WATER_OBJECTS_COUNT = 8;
     LLPointer<LLVOWater> mEdgeWaterObjects[EDGE_WATER_OBJECTS_COUNT];
 
     LLPointer<LLViewerTexture> mDefaultWaterTexturep;

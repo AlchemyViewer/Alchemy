@@ -102,7 +102,6 @@
 #include "lltextbox.h"
 #include "llui.h"
 #include "llversioninfo.h"
-#include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
 #include "llvovolume.h"
 #include "llwindow.h"
@@ -170,8 +169,7 @@ struct LabelTable : public LLInitParam::Block<LabelTable>
     {}
 };
 
-const std::string DEFAULT_SKIN = "alchemy";
-
+const std::string DEFAULT_SKIN = "default";
 
 typedef enum e_skin_type
 {
@@ -197,6 +195,8 @@ typedef struct skin_t
 // if creating/destroying these is too slow, we'll need to create
 // a static member and update all our static callbacks
 
+void handleNameTagOptionChanged(const LLSD& newvalue);
+void handleDisplayNamesOptionChanged(const LLSD& newvalue);
 bool callback_clear_browser_cache(const LLSD& notification, const LLSD& response);
 bool callback_clear_cache(const LLSD& notification, const LLSD& response);
 
@@ -211,7 +211,7 @@ bool callback_clear_cache(const LLSD& notification, const LLSD& response)
     if ( option == 0 ) // YES
     {
         // flag client texture cache for clearing next time the client runs
-        gSavedSettings.setBOOL("PurgeCacheOnNextStartup", TRUE);
+        gSavedSettings.setBOOL("PurgeCacheOnNextStartup", true);
         LLNotificationsUtil::add("CacheWillClear");
     }
 
@@ -231,8 +231,8 @@ bool callback_clear_browser_cache(const LLSD& notification, const LLSD& response
         LLNavigationBar::getInstance()->clearHistoryCache();
 
         // flag client texture cache for clearing next time the client runs
-        gSavedSettings.setBOOL("PurgeWebCacheOnNextStartup", TRUE);
-        LLNotificationsUtil::add("WebCacheWillClear");
+        gSavedSettings.setBOOL("PurgeCacheOnNextStartup", true);
+        LLNotificationsUtil::add("CacheWillClear");
 
         LLSearchHistory::getInstance()->clearHistory();
         LLSearchHistory::getInstance()->save();
@@ -246,7 +246,26 @@ bool callback_clear_browser_cache(const LLSD& notification, const LLSD& response
     return false;
 }
 
+void handleNameTagOptionChanged(const LLSD& newvalue)
+{
+    LLAvatarNameCache::getInstance()->setUseUsernames(gSavedSettings.getBOOL("NameTagShowUsernames"));
+    LLVOAvatar::invalidateNameTags();
+}
 
+void handleDisplayNamesOptionChanged(const LLSD& newvalue)
+{
+    LLAvatarNameCache::getInstance()->setUseDisplayNames(newvalue.asBoolean());
+    LLVOAvatar::invalidateNameTags();
+}
+
+void handleAppearanceCameraMovementChanged(const LLSD& newvalue)
+{
+    if(!newvalue.asBoolean() && gAgentCamera.getCameraMode() == CAMERA_MODE_CUSTOMIZE_AVATAR)
+    {
+        gAgentCamera.changeCameraToDefault();
+        gAgentCamera.resetView();
+    }
+}
 
 void fractionFromDecimal(F32 decimal_val, S32& numerator, S32& denominator)
 {
@@ -279,7 +298,9 @@ public:
     {
         if (params.size() < 1) return false;
 
-        LLFloaterPreference* prefsfloater = LLFloaterReg::showTypedInstance<LLFloaterPreference>("preferences");
+        LLFloaterPreference* prefsfloater = dynamic_cast<LLFloaterPreference*>
+            (LLFloaterReg::showInstance("preferences"));
+
         if (prefsfloater)
         {
             // find 'controls' panel and bring it the front
@@ -306,7 +327,6 @@ std::string LLFloaterPreference::sSkin = "";
 LLFloaterPreference::LLFloaterPreference(const LLSD& key)
     : LLFloater(key),
     mGotPersonalInfo(false),
-    mOriginalIMViaEmail(false),
     mLanguageChanged(false),
     mAvatarDataInitialized(false),
     mSearchDataDirty(true)
@@ -337,6 +357,7 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
     mCommitCallbackRegistrar.add("Pref.AutoAdjustments",         boost::bind(&LLFloaterPreference::onClickAutoAdjustments, this));
     mCommitCallbackRegistrar.add("Pref.HardwareDefaults",       boost::bind(&LLFloaterPreference::setHardwareDefaults, this));
     mCommitCallbackRegistrar.add("Pref.AvatarImpostorsEnable",  boost::bind(&LLFloaterPreference::onAvatarImpostorsEnable, this));
+    mCommitCallbackRegistrar.add("Pref.UpdateIndirectMaxNonImpostors", boost::bind(&LLFloaterPreference::updateMaxNonImpostors, this));
     mCommitCallbackRegistrar.add("Pref.UpdateIndirectMaxComplexity",    boost::bind(&LLFloaterPreference::updateMaxComplexity, this));
     mCommitCallbackRegistrar.add("Pref.RenderOptionUpdate",     boost::bind(&LLFloaterPreference::onRenderOptionEnable, this));
     mCommitCallbackRegistrar.add("Pref.WindowedMod",            boost::bind(&LLFloaterPreference::onCommitWindowedMode, this));
@@ -353,26 +374,31 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
     mCommitCallbackRegistrar.add("Pref.RememberedUsernames",    boost::bind(&LLFloaterPreference::onClickRememberedUsernames, this));
     mCommitCallbackRegistrar.add("Pref.SpellChecker",           boost::bind(&LLFloaterPreference::onClickSpellChecker, this));
     mCommitCallbackRegistrar.add("Pref.Advanced",               boost::bind(&LLFloaterPreference::onClickAdvanced, this));
+    mCommitCallbackRegistrar.add("Pref.Scripting",              boost::bind(&LLFloaterPreference::onClickScriptingPerfs, this));
 
     sSkin = gSavedSettings.getString("SkinCurrent");
 
     mCommitCallbackRegistrar.add("Pref.ClickActionChange",      boost::bind(&LLFloaterPreference::onClickActionChange, this));
 
-    LLAvatarPropertiesProcessor::getInstance()->addObserver(LLUUID::null, this);
+    gSavedSettings.getControl("NameTagShowUsernames")->getCommitSignal()->connect(boost::bind(&handleNameTagOptionChanged,  _2));
+    gSavedSettings.getControl("NameTagShowFriends")->getCommitSignal()->connect(boost::bind(&handleNameTagOptionChanged,  _2));
+    gSavedSettings.getControl("UseDisplayNames")->getCommitSignal()->connect(boost::bind(&handleDisplayNamesOptionChanged,  _2));
+
+    gSavedSettings.getControl("AppearanceCameraMovement")->getCommitSignal()->connect(boost::bind(&handleAppearanceCameraMovementChanged,  _2));
+    gSavedSettings.getControl("WindLightUseAtmosShaders")->getCommitSignal()->connect(boost::bind(&LLFloaterPreference::onAtmosShaderChange, this));
+
+    LLAvatarPropertiesProcessor::getInstance()->addObserver( gAgent.getID(), this );
 
     mComplexityChangedSignal = gSavedSettings.getControl("RenderAvatarMaxComplexity")->getCommitSignal()->connect(boost::bind(&LLFloaterPreference::updateComplexityText, this));
+    mImpostorsChangedSignal = gSavedSettings.getControl("RenderAvatarMaxNonImpostors")->getSignal()->connect(boost::bind(&LLFloaterPreference::updateIndirectMaxNonImpostors, this, _2));
 
     mCommitCallbackRegistrar.add("Pref.ClearLog",               boost::bind(&LLConversationLog::onClearLog, &LLConversationLog::instance()));
     mCommitCallbackRegistrar.add("Pref.DeleteTranscripts",      boost::bind(&LLFloaterPreference::onDeleteTranscripts, this));
-    mCommitCallbackRegistrar.add("UpdateFilter", boost::bind(&LLFloaterPreference::onUpdateFilterTerm, this, false));
-
-#if !LL_HAVOK
-    mCommitCallbackRegistrar.add("Pref.AddGrid", boost::bind(&LLFloaterPreference::onClickAddGrid, this));
-    mCommitCallbackRegistrar.add("Pref.ActivateGrid", boost::bind(&LLFloaterPreference::onClickActivateGrid, this));
-    mCommitCallbackRegistrar.add("Pref.RemoveGrid", boost::bind(&LLFloaterPreference::onClickRemoveGrid, this));
-    mCommitCallbackRegistrar.add("Pref.RefreshGrid", boost::bind(&LLFloaterPreference::onClickRefreshGrid, this));
-    mCommitCallbackRegistrar.add("Pref.DebugGrid", boost::bind(&LLFloaterPreference::onClickDebugGrid, this));
-    mCommitCallbackRegistrar.add("Pref.SelectGrid", boost::bind(&LLFloaterPreference::onSelectGrid, this, _2));
+    mCommitCallbackRegistrar.add("UpdateFilter", boost::bind(&LLFloaterPreference::onUpdateFilterTerm, this, false)); // <FS:ND/> Hook up for filtering
+#ifdef LL_DISCORD
+    gSavedSettings.getControl("EnableDiscord")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
+    gSavedSettings.getControl("ShowDiscordActivityDetails")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
+    gSavedSettings.getControl("ShowDiscordActivityState")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
 #endif
     mCommitCallbackRegistrar.add("Pref.AddSkin", boost::bind(&LLFloaterPreference::onAddSkin, this));
     mCommitCallbackRegistrar.add("Pref.RemoveSkin", boost::bind(&LLFloaterPreference::onRemoveSkin, this));
@@ -395,7 +421,7 @@ void LLFloaterPreference::processProperties( void* pData, EAvatarProcessorType t
     if ( APT_PROPERTIES_LEGACY == type )
     {
         const LLAvatarLegacyData* pAvatarData = static_cast<const LLAvatarLegacyData*>( pData );
-        if (pAvatarData && (gAgent.getID() == pAvatarData->avatar_id) && (pAvatarData->avatar_id.notNull()))
+        if (pAvatarData && (gAgent.getID() == pAvatarData->avatar_id) && (pAvatarData->avatar_id != LLUUID::null))
         {
             mAllowPublish = (bool)(pAvatarData->flags & AVATAR_ALLOW_PUBLISH);
             mAvatarDataInitialized = true;
@@ -427,11 +453,11 @@ void LLFloaterPreference::saveAvatarPropertiesCoro(const std::string cap_url, bo
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("put_avatar_properties_coro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("put_avatar_properties_coro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpHeaders::ptr_t httpHeaders;
 
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     httpOpts->setFollowRedirects(true);
 
     std::string finalUrl = cap_url + "/" + gAgentID.asString();
@@ -452,11 +478,28 @@ void LLFloaterPreference::saveAvatarPropertiesCoro(const std::string cap_url, bo
     LL_DEBUGS("Preferences") << "Agent id: " << gAgentID << " Data: " << data << " Result: " << httpResults << LL_ENDL;
 }
 
-BOOL LLFloaterPreference::postBuild()
+bool LLFloaterPreference::postBuild()
 {
+    mDeleteTranscriptsBtn = getChild<LLButton>("delete_transcripts");
+
+    mEnabledPopups = getChild<LLScrollListCtrl>("enabled_popups");
+    mDisabledPopups = getChild<LLScrollListCtrl>("disabled_popups");
+    mEnablePopupBtn = getChild<LLButton>("enable_this_popup");
+    mDisablePopupBtn = getChild<LLButton>("disable_this_popup");
+
+    gSavedSettings.getControl("ChatFontSize")->getSignal()->connect(boost::bind(&LLFloaterIMSessionTab::processChatHistoryStyleUpdate, false));
+
+    gSavedSettings.getControl("ChatFontSize")->getSignal()->connect(boost::bind(&LLViewerChat::signalChatFontChanged));
+
     gSavedSettings.getControl("ChatBubbleOpacity")->getSignal()->connect(boost::bind(&LLFloaterPreference::onNameTagOpacityChange, this, _2));
 
     gSavedSettings.getControl("PreferredMaturity")->getSignal()->connect(boost::bind(&LLFloaterPreference::onChangeMaturity, this));
+
+    gSavedSettings.getControl("RenderAvatarComplexityMode")->getSignal()->connect(
+        [this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+        {
+            onChangeComplexityMode(new_val);
+        });
 
     gSavedPerAccountSettings.getControl("ModelUploadFolder")->getSignal()->connect(boost::bind(&LLFloaterPreference::onChangeModelFolder, this));
     gSavedPerAccountSettings.getControl("PBRUploadFolder")->getSignal()->connect(boost::bind(&LLFloaterPreference::onChangePBRFolder, this));
@@ -468,13 +511,16 @@ BOOL LLFloaterPreference::postBuild()
     if (!tabcontainer->selectTab(gSavedSettings.getS32("LastPrefTab")))
         tabcontainer->selectFirstTab();
 
-    getChild<LLUICtrl>("cache_location")->setEnabled(FALSE); // make it read-only but selectable (STORM-227)
+    getChild<LLUICtrl>("cache_location")->setEnabled(false); // make it read-only but selectable (STORM-227)
     std::string cache_location = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "");
     setCacheLocation(cache_location);
 
-    getChild<LLUICtrl>("log_path_string")->setEnabled(FALSE); // make it read-only but selectable
+    getChild<LLUICtrl>("log_path_string")->setEnabled(false); // make it read-only but selectable
 
-    getChild<LLComboBox>("language_combobox")->setCommitCallback(boost::bind(&LLFloaterPreference::onLanguageChange, this));
+    mLanguageCombobox = getChild<LLComboBox>("language_combobox");
+    mLanguageCombobox->setCommitCallback(boost::bind(&LLFloaterPreference::onLanguageChange, this));
+    mTimeFormatCombobox = getChild<LLComboBox>("time_format_combobox");
+    mTimeFormatCombobox->setCommitCallback(boost::bind(&LLFloaterPreference::onTimeFormatChange, this));
 
     getChild<LLComboBox>("FriendIMOptions")->setCommitCallback(boost::bind(&LLFloaterPreference::onNotificationsChange, this,"FriendIMOptions"));
     getChild<LLComboBox>("NonFriendIMOptions")->setCommitCallback(boost::bind(&LLFloaterPreference::onNotificationsChange, this,"NonFriendIMOptions"));
@@ -489,9 +535,6 @@ BOOL LLFloaterPreference::postBuild()
         gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
         gSavedPerAccountSettings.setString("ALRejectTeleportOffersResponse", LLTrans::getString("RejectTeleportOffersResponseDefault"));
         gSavedPerAccountSettings.setString("ALRejectFriendshipRequestsResponse", LLTrans::getString("RejectFriendshipRequestsResponseDefault"));
-
-        gSavedPerAccountSettings.setString("AlchemyAutoresponse", LLTrans::getString("AutoResponseModeDefault"));
-        gSavedPerAccountSettings.setString("AlchemyAutoresponseNotFriend", LLTrans::getString("AutoResponseModeNonFriendsDefault"));
     }
 
     // set 'enable' property for 'Clear log...' button
@@ -499,23 +542,14 @@ BOOL LLFloaterPreference::postBuild()
 
     LLLogChat::getInstance()->setSaveHistorySignal(boost::bind(&LLFloaterPreference::onLogChatHistorySaved, this));
 
-#if !LL_HAVOK
-    refreshGridList();
-    mGridListChangedConnection = LLGridManager::getInstance()->addGridListChangedCallback(boost::bind(&LLFloaterPreference::refreshGridList, this));
-#else
-    if(tabcontainer)
-    {
-        auto tab = tabcontainer->getPanelByName("grids");
-        if(tab) tabcontainer->removeTabPanel(tab);
-    }
-#endif
-
     loadUserSkins();
-
 
     LLSliderCtrl* fov_slider = getChild<LLSliderCtrl>("camera_fov");
     fov_slider->setMinValue(LLViewerCamera::getInstance()->getMinView());
     fov_slider->setMaxValue(LLViewerCamera::getInstance()->getMaxView());
+
+    bool enable_complexity = gSavedSettings.getS32("RenderAvatarComplexityMode") != LLVOAvatar::AV_RENDER_ONLY_SHOW_FRIENDS;
+    getChild<LLSliderCtrl>("IndirectMaxComplexity")->setEnabled(enable_complexity);
 
     // Hook up and init for filtering
     mFilterEdit = getChild<LLSearchEditor>("search_prefs_edit");
@@ -530,58 +564,72 @@ BOOL LLFloaterPreference::postBuild()
         std::map<std::string, std::string>::iterator iter = labels.find(system_lang);
         if (iter != labels.end())
         {
-            getChild<LLComboBox>("language_combobox")->add(iter->second, LLSD("default"), ADD_TOP, true);
+            mLanguageCombobox->add(iter->second, LLSD("default"), ADD_TOP, true);
         }
         else
         {
             LL_WARNS() << "Language \"" << system_lang << "\" is not in default_languages.xml" << LL_ENDL;
-            getChild<LLComboBox>("language_combobox")->add("System default", LLSD("default"), ADD_TOP, true);
+            mLanguageCombobox->add("System default", LLSD("default"), ADD_TOP, true);
         }
     }
     else
     {
         LL_WARNS() << "Failed to load labels from " << user_filename << ". Using default." << LL_ENDL;
-        getChild<LLComboBox>("language_combobox")->add("System default", LLSD("default"), ADD_TOP, true);
+        mLanguageCombobox->add("System default", LLSD("default"), ADD_TOP, true);
     }
 
-    return TRUE;
+#ifndef LL_DISCORD
+    LLPanel* panel = getChild<LLPanel>("privacy_preferences_discord");
+    getChild<LLTabContainer>("privacy_tab_container")->removeTabPanel(panel);
+#endif
+
+    return true;
 }
 
 void LLFloaterPreference::updateDeleteTranscriptsButton()
 {
-    getChild<LLButton>("delete_transcripts")->setEnabled(LLLogChat::transcriptFilesExist());
+    mDeleteTranscriptsBtn->setEnabled(LLLogChat::transcriptFilesExist());
 }
 
 void LLFloaterPreference::onDoNotDisturbResponseChanged()
 {
-    // set "DoNotDisturbResponseChanged" TRUE if user edited message differs from default, FALSE otherwise
+    // set "DoNotDisturbResponseChanged" true if user edited message differs from default, false otherwise
     bool response_changed_flag =
             LLTrans::getString("DoNotDisturbModeResponseDefault")
                     != getChild<LLUICtrl>("do_not_disturb_response")->getValue().asString();
 
     gSavedPerAccountSettings.setBOOL("DoNotDisturbResponseChanged", response_changed_flag );
-
-    bool reject_friendship_requests_response_changed_flag =
-            LLTrans::getString("RejectFriendshipRequestsResponseDefault")
-                != getChild<LLUICtrl>("autorespond_reject_friends_response")->getValue().asString();
-
-    gSavedPerAccountSettings.setBOOL("ALRejectFriendshipRequestsChanged", reject_friendship_requests_response_changed_flag);
 }
 
 void LLFloaterPreference::onRejectTeleportOffersResponseChanged()
 {
     bool reject_teleport_offers_response_changed_flag =
-            LLTrans::getString("RejectTeleportOffersResponseDefault")
-                    != getChild<LLUICtrl>("autorespond_rto_response")->getValue().asString();
+        LLTrans::getString("RejectTeleportOffersResponseDefault")
+            != getChild<LLUICtrl>("autorespond_rto_response")->getValue().asString();
 
     gSavedPerAccountSettings.setBOOL("ALRejectTeleportOffersResponseChanged", reject_teleport_offers_response_changed_flag);
+}
+
+void LLFloaterPreference::onRejectFriendshipRequestResponseChanged()
+{
+    bool reject_friendship_request_response_changed_flag =
+        LLTrans::getString("RejectFriendshipRequestsResponseDefault")
+            != getChild<LLUICtrl>("autorespond_reject_friends_response")->getValue().asString();
+
+    gSavedPerAccountSettings.setBOOL("ALRejectFriendshipRequestsChanged", reject_friendship_request_response_changed_flag);
+}
+
+void LLFloaterPreference::onAdHocSelectionChanged(const LLSD& newvalue)
+{
+    S32 value = gSavedPerAccountSettings.getS32("AlchemyIgnoreAdHocSessions");
+    getChild<LLCheckBoxCtrl>("AlchemyReportIgnoredAdHocSession")->setEnabled(value != 0);
 }
 
 void LLFloaterPreference::onAutoRespondResponseChanged()
 {
     bool auto_response_changed_flag =
             LLTrans::getString("AutoResponseModeDefault")
-                    != getChild<LLUICtrl>("AlchemyAutoresponse")->getValue().asString();
+                    != getChild<LLUICtrl>("autorespond_response")->getValue().asString();
 
     gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseChanged", auto_response_changed_flag);
 }
@@ -590,116 +638,10 @@ void LLFloaterPreference::onAutoRespondNonFriendsResponseChanged()
 {
     bool auto_response_non_friends_changed_flag =
             LLTrans::getString("AutoResponseModeNonFriendsDefault")
-                    != getChild<LLUICtrl>("AlchemyAutoresponseNotFriend")->getValue().asString();
+                    != getChild<LLUICtrl>("autorespond_nf_response")->getValue().asString();
 
     gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendChanged", auto_response_non_friends_changed_flag);
 }
-
-#if !LL_HAVOK
-////////////////////////////////////////////////////
-// Grid panel
-
-void LLFloaterPreference::refreshGridList()
-{
-    LLScrollListCtrl* grid_list = getChild<LLScrollListCtrl>("grid_list");
-    grid_list->clearRows();
-    std::map<std::string, std::string> known_grids = LLGridManager::getInstance()->getKnownGrids();
-    for (auto& known_grid : known_grids)
-    {
-        if (!known_grid.first.empty() && !known_grid.second.empty())
-        {
-            bool connected_grid = LLGridManager::getInstance()->getGrid() == known_grid.first;
-            std::vector<std::string> uris;
-            LLGridManager::getInstance()->getLoginURIs(known_grid.first, uris);
-            LLURI login_uri = LLURI(uris.at(0));
-
-            LLSD row;
-            row["id"] = known_grid.first;
-            row["columns"][0]["column"] = "grid_label";
-            row["columns"][0]["value"] = known_grid.second;
-            row["columns"][0]["font"]["style"] = connected_grid ? "BOLD" : "NORMAL";
-            row["columns"][1]["column"] = "login_uri";
-            row["columns"][1]["value"] = login_uri.authority();
-            row["columns"][1]["font"]["style"] = connected_grid ? "BOLD" : "NORMAL";
-
-            grid_list->addElement(row);
-        }
-    }
-}
-
-void LLFloaterPreference::onClickAddGrid()
-{
-    std::string login_uri = getChild<LLLineEditor>("add_grid")->getValue().asString();
-    LLGridManager::getInstance()->addRemoteGrid(login_uri, LLGridManager::ADD_MANUAL);
-}
-
-void LLFloaterPreference::onClickActivateGrid()
-{
-    std::string grid = getChild<LLScrollListCtrl>("grid_list")->getSelectedValue().asString();
-    LLGridManager::getInstance()->setGridChoice(grid);
-}
-
-void LLFloaterPreference::onClickRemoveGrid()
-{
-    std::string grid = getChild<LLScrollListCtrl>("grid_list")->getSelectedValue().asString();
-    if (LLGridManager::getInstance()->getGrid() == grid)
-    {
-        LLNotificationsUtil::add("CannotRemoveConnectedGrid",
-                                 LLSD().with("GRID", LLGridManager::getInstance()->getGridLabel()));
-    }
-    else
-    {
-        LLNotificationsUtil::add("ConfirmRemoveGrid",
-                                 LLSD().with("GRID", LLGridManager::getInstance()->getGridLabel(grid)),
-                                 LLSD(grid), boost::bind(&LLFloaterPreference::handleRemoveGridCB, this, _1, _2));
-    }
-}
-
-void LLFloaterPreference::onClickRefreshGrid()
-{
-    std::string grid = getChild<LLScrollListCtrl>("grid_list")->getSelectedValue().asString();
-    // So I'm a little paranoid, no big deal...
-    if (!LLGridManager::getInstance()->isSystemGrid(grid))
-    {
-        LLGridManager::getInstance()->addRemoteGrid(grid, LLGridManager::ADD_MANUAL);
-    }
-}
-
-void LLFloaterPreference::onClickDebugGrid()
-{
-    LLSD args;
-    std::stringstream data_str;
-    const std::string& grid = getChild<LLScrollListCtrl>("grid_list")->getSelectedValue().asString().c_str();
-    LLSD gridInfo = LLGridManager::getInstance()->getGridInfo(grid);
-    LLSDSerialize::toPrettyXML(gridInfo, data_str);
-    args["title"] = llformat("%s - %s", LLTrans::getString("GridInfoTitle").c_str(), grid.c_str());
-    args["data"] = data_str.str();
-    LLFloaterReg::showInstance("generic_text", args);
-}
-
-void LLFloaterPreference::onSelectGrid(const LLSD& data)
-{
-    getChild<LLUICtrl>("activate_grid")->setEnabled(LLStartUp::getStartupState() < STATE_LOGIN_CLEANUP
-                                                    && LLGridManager::getInstance()->getGrid() != data.asString());
-    getChild<LLUICtrl>("remove_grid")->setEnabled(LLGridManager::getInstance()->getGrid() != data.asString()
-                                                  && !LLGridManager::getInstance()->isSystemGrid(data.asString()));
-    getChild<LLUICtrl>("refresh_grid")->setEnabled(!LLGridManager::getInstance()->isSystemGrid(data.asString()));
-    getChild<LLUICtrl>("debug_grid")->setEnabled(!data.asString().empty());
-}
-
-bool LLFloaterPreference::handleRemoveGridCB(const LLSD& notification, const LLSD& response)
-{
-    const S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
-    if (0 == option)
-    {
-        const std::string& grid = notification["payload"].asString();
-        if (!LLGridManager::getInstance()->removeGrid(grid))
-            LLNotificationsUtil::add("RemoveGridFailure",
-                                     LLSD().with("GRID", notification["substitutions"]["GRID"].asString()));
-    }
-    return false;
-}
-#endif
 
 ////////////////////////////////////////////////////
 // Skins panel
@@ -797,7 +739,7 @@ void LLFloaterPreference::reloadSkinList()
         row["columns"][0]["font"]["style"] = current_skin == skin.first ? "BOLD" : "NORMAL";
         skin_list->addElement(row);
     }
-    skin_list->setSelectedByValue(current_skin, TRUE);
+    skin_list->setSelectedByValue(current_skin, true);
     onSelectSkin(skin_list->getSelectedValue());
 }
 
@@ -909,10 +851,10 @@ void LLFloaterPreference::callbackApplySkin(const LLSD& notification, const LLSD
     switch (option)
     {
         case 0: // Yes
-            gSavedSettings.setBOOL("ResetUserColorsOnLogout", TRUE);
+            gSavedSettings.setBOOL("ResetUserColorsOnLogout", true);
             break;
         case 1: // No
-            gSavedSettings.setBOOL("ResetUserColorsOnLogout", FALSE);
+            gSavedSettings.setBOOL("ResetUserColorsOnLogout", false);
             break;
         case 2: // Cancel
             gSavedSettings.setString("SkinCurrent", sSkin);
@@ -963,26 +905,26 @@ void LLFloaterPreference::refreshSkinInfo(const skin_t& skin)
 
 LLFloaterPreference::~LLFloaterPreference()
 {
-#if !LL_HAVOK
-    if (mGridListChangedConnection.connected())
-        mGridListChangedConnection.disconnect();
-#endif
-    LLAvatarPropertiesProcessor::getInstance()->removeObserver(LLUUID::null, this);
     LLConversationLog::instance().removeObserver(this);
+    if (LLAvatarPropertiesProcessor::instanceExists())
+    {
+        LLAvatarPropertiesProcessor::getInstance()->removeObserver(gAgent.getID(), this);
+    }
     mComplexityChangedSignal.disconnect();
-    mDnDModeConnection.disconnect();
+    mImpostorsChangedSignal.disconnect();
     mRejectTeleportConnection.disconnect();
+    mRejectFriendshipRequestsConnection.disconnect();
     mAutoResponseConnection.disconnect();
     mAutoResponseNonFriendsConnection.disconnect();
 }
 
 void LLFloaterPreference::draw()
 {
-    BOOL has_first_selected = (getChildRef<LLScrollListCtrl>("disabled_popups").getFirstSelected()!=NULL);
-    gSavedSettings.setBOOL("FirstSelectedDisabledPopups", has_first_selected);
+    bool has_first_selected = (mDisabledPopups->getFirstSelected()!=NULL);
+    mEnablePopupBtn->setEnabled(has_first_selected);
 
-    has_first_selected = (getChildRef<LLScrollListCtrl>("enabled_popups").getFirstSelected()!=NULL);
-    gSavedSettings.setBOOL("FirstSelectedEnabledPopups", has_first_selected);
+    has_first_selected = (mEnabledPopups->getFirstSelected()!=NULL);
+    mDisablePopupBtn->setEnabled(has_first_selected);
 
     LLFloater::draw();
 }
@@ -1004,6 +946,8 @@ void LLFloaterPreference::saveSettings()
 
 void LLFloaterPreference::apply()
 {
+    LLAvatarPropertiesProcessor::getInstance()->addObserver( gAgent.getID(), this );
+
     LLTabContainer* tabcontainer = getChild<LLTabContainer>("pref core");
     if (sSkin != gSavedSettings.getString("SkinCurrent"))
     {
@@ -1028,7 +972,7 @@ void LLFloaterPreference::apply()
     std::string cache_location = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "");
     setCacheLocation(cache_location);
 
-    if (hasChild("web_proxy_enabled", TRUE) &&hasChild("web_proxy_editor", TRUE) && hasChild("web_proxy_port", TRUE))
+    if (hasChild("web_proxy_enabled", true) &&hasChild("web_proxy_editor", true) && hasChild("web_proxy_port", true))
     {
         bool proxy_enable = getChild<LLUICtrl>("web_proxy_enabled")->getValue();
         std::string proxy_address = getChild<LLUICtrl>("web_proxy_editor")->getValue();
@@ -1038,11 +982,9 @@ void LLFloaterPreference::apply()
 
     if (mGotPersonalInfo)
     {
-        bool new_im_via_email = getChild<LLUICtrl>("send_im_to_email")->getValue().asBoolean();
         bool new_hide_online = getChild<LLUICtrl>("online_visibility")->getValue().asBoolean();
 
-        if ((!LLGridManager::instance().isInSecondlife() && (new_im_via_email != mOriginalIMViaEmail))
-            ||(new_hide_online != mOriginalHideOnlineStatus))
+        if (new_hide_online != mOriginalHideOnlineStatus)
         {
             // This hack is because we are representing several different
             // possible strings with a single checkbox. Since most users
@@ -1056,23 +998,23 @@ void LLFloaterPreference::apply()
              //Update showonline value, otherwise multiple applys won't work
                 mOriginalHideOnlineStatus = new_hide_online;
             }
-            gAgent.sendAgentUpdateUserInfo(new_im_via_email,mDirectoryVisibility);
+            gAgent.sendAgentUpdateUserInfo(mDirectoryVisibility);
         }
     }
 
     // Setting this up so we sync the settings with menu.
     // i.e Checking the checkox form the Preferences will also check it in the menu.
-    // --FLN 
+    // --Fallen
     bool autoresponse_enabled = getChild<LLCheckBoxCtrl>("AlchemyAutoresponseEnable")->get();
     bool autoresponse_notfriends_enabled = getChild<LLCheckBoxCtrl>("AlchemyAutoresponseNotFriendEnable")->get();
-  
-    gAgent.setAutoRespond(autoresponse_enabled);
-    gAgent.setAutoRespondNonFriends(autoresponse_notfriends_enabled);
+
+    gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseEnable", autoresponse_enabled);
+    gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendEnable", autoresponse_notfriends_enabled);
 
     saveAvatarProperties();
 }
 
-void LLFloaterPreference::cancel()
+void LLFloaterPreference::cancel(const std::vector<std::string> settings_to_skip)
 {
     LLTabContainer* tabcontainer = getChild<LLTabContainer>("pref core");
     // Call cancel() on all panels that derive from LLPanelPreference
@@ -1082,7 +1024,7 @@ void LLFloaterPreference::cancel()
         LLView* view = *iter;
         LLPanelPreference* panel = dynamic_cast<LLPanelPreference*>(view);
         if (panel)
-            panel->cancel();
+            panel->cancel(settings_to_skip);
     }
     // hide joystick pref floater
     LLFloaterReg::hideInstance("pref_joystick");
@@ -1129,27 +1071,24 @@ void LLFloaterPreference::cancel()
 void LLFloaterPreference::onOpen(const LLSD& key)
 {
     // this variable and if that follows it are used to properly handle do not disturb mode response message
+    static bool initialized = false;
     // if user is logged in and we haven't initialized do not disturb mode response yet, do it
-    if (!mDnDInit && LLStartUp::getStartupState() == STATE_STARTED)
+    if (!initialized && LLStartUp::getStartupState() == STATE_STARTED)
     {
         // Special approach is used for do not disturb response localization, because "DoNotDisturbModeResponse" is
         // in non-localizable xml, and also because it may be changed by user and in this case it shouldn't be localized.
         // To keep track of whether do not disturb response is default or changed by user additional setting DoNotDisturbResponseChanged
         // was added into per account settings.
 
-        // initialization should happen once,so setting variable to TRUE
-        mDnDInit = true;
+        // initialization should happen once,so setting variable to true
+        initialized = true;
         // this connection is needed to properly set "DoNotDisturbResponseChanged" setting when user makes changes in
         // do not disturb response message.
-        mDnDModeConnection = gSavedPerAccountSettings.getControl("DoNotDisturbModeResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onDoNotDisturbResponseChanged, this));
-
-        mRejectTeleportConnection =  gSavedPerAccountSettings.getControl("ALRejectTeleportOffersResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onRejectTeleportOffersResponseChanged, this));
-
+        gSavedPerAccountSettings.getControl("DoNotDisturbModeResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onDoNotDisturbResponseChanged, this));
+        mRejectTeleportConnection = gSavedPerAccountSettings.getControl("ALRejectTeleportOffersResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onRejectTeleportOffersResponseChanged, this));
+        mRejectFriendshipRequestsConnection = gSavedPerAccountSettings.getControl("ALRejectFriendshipRequestsResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onRejectFriendshipRequestResponseChanged, this));
         mAutoResponseConnection = gSavedPerAccountSettings.getControl("AlchemyAutoresponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onAutoRespondResponseChanged, this));
-        
-        mAutoResponseNonFriendsConnection = gSavedPerAccountSettings.getControl("AlchemyAutoresponseNotFriend")->getSignal()->connect(boost::bind(&LLFloaterPreference::onAutoRespondNonFriendsResponseChanged, this));
-
-    }
+        mAutoResponseNonFriendsConnection = gSavedPerAccountSettings.getControl("AlchemyAutoresponseNotFriend")->getSignal()->connect(boost::bind(&LLFloaterPreference::onAutoRespondNonFriendsResponseChanged, this));    }
     gAgent.sendAgentUserInfoRequest();
 
     /////////////////////////// From LLPanelGeneral //////////////////////////
@@ -1184,6 +1123,7 @@ void LLFloaterPreference::onOpen(const LLSD& key)
 
     // Forget previous language changes.
     mLanguageChanged = false;
+    mLastQualityLevel = gSavedSettings.getU32("RenderQualityPerformance");
 
     // Display selected maturity icons.
     onChangeMaturity();
@@ -1196,6 +1136,17 @@ void LLFloaterPreference::onOpen(const LLSD& key)
 
     // Load (double-)click to walk/teleport settings.
     updateClickActionViews();
+
+#if LL_LINUX
+    // Lixux doesn't support automatic mode
+    LLComboBox* combo = getChild<LLComboBox>("double_click_action_combo");
+    S32 mode = gSavedSettings.getS32("MouseWarpMode");
+    if (mode == 0)
+    {
+        combo->setValue("1");
+    }
+    combo->setEnabledByValue("0", false);
+#endif
 
     // Enabled/disabled popups, might have been changed by user actions
     // while preferences floater was closed.
@@ -1224,10 +1175,17 @@ void LLFloaterPreference::onOpen(const LLSD& key)
 
     bool started = (LLStartUp::getStartupState() == STATE_STARTED);
 
+    LLButton* load_btn = findChild<LLButton>("PrefLoadButton");
+    LLButton* save_btn = findChild<LLButton>("PrefSaveButton");
+    LLButton* delete_btn = findChild<LLButton>("PrefDeleteButton");
     LLButton* exceptions_btn = findChild<LLButton>("RenderExceptionsButton");
     LLButton* auto_adjustments_btn = findChild<LLButton>("AutoAdjustmentsButton");
-    if (exceptions_btn && auto_adjustments_btn)
+
+    if (load_btn && save_btn && delete_btn && exceptions_btn && auto_adjustments_btn)
     {
+        load_btn->setEnabled(started);
+        save_btn->setEnabled(started);
+        delete_btn->setEnabled(started);
         exceptions_btn->setEnabled(started);
         auto_adjustments_btn->setEnabled(started);
     }
@@ -1251,32 +1209,53 @@ void LLFloaterPreference::onAvatarImpostorsEnable()
 }
 
 //static
-void LLFloaterPreference::initDoNotDisturbResponse()
+// NOTE: This was moved to the section below as we may add more autoresponses.
+// - [x] Do Not Disturb
+// - [x] Reject Teleport
+// - [ ] Autoresponses.
+// - [ ] ....
+//
+// -- Fallen
+// void LLFloaterPreference::initDoNotDisturbResponse()
+//     {
+//         if (!gSavedPerAccountSettings.getBOOL("DoNotDisturbResponseChanged"))
+//         {
+//             //LLTrans::getString("DoNotDisturbModeResponseDefault") is used here for localization (EXT-5885)
+//             gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
+//         }
+//     }
+
+// static
+void LLFloaterPreference::initAutoResponses()
+{
+    // NOTE: Combined the initDoNotDisturbReponse
+    // -- Fallen
+    if (!gSavedPerAccountSettings.getBOOL("DoNotDisturbResponseChanged"))
     {
-        if (!gSavedPerAccountSettings.getBOOL("DoNotDisturbResponseChanged"))
-        {
-            //LLTrans::getString("DoNotDisturbModeResponseDefault") is used here for localization (EXT-5885)
-            gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
-        }
-
-        if (!gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsChanged"))
-        {
-            gSavedPerAccountSettings.setString("ALRejectFriendshipRequestsResponse", LLTrans::getString("RejectFriendshipRequestsResponseDefault"));
-        }
-
-        // This is called on viewer init so we setup defaults
-        // not sure this is necessary anymore ???
-        // -- FLN
-        if (!gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseChanged"))
-        {
-            gSavedPerAccountSettings.setString("AlchemyAutoresponse", LLTrans::getString("AlchemyAutoresponseDefault"));
-        }
-        
-        if (!gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseNotFriendChanged"))
-        {
-            gSavedPerAccountSettings.setString("AlchemyAutoresponseNotFriend", LLTrans::getString("AlchemyAutoresponseNotFriendDefault"));
-        }
+        //LLTrans::getString("DoNotDisturbModeResponseDefault") is used here for localization (EXT-5885)
+        gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
     }
+
+    if (!gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersResponseChanged"))
+    {
+        gSavedPerAccountSettings.setString("ALRejectTeleportOffersResponse", LLTrans::getString("RejectTeleportOffersResponseDefault"));
+    }
+
+    if (!gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsChanged"))
+    {
+        gSavedPerAccountSettings.setString("ALRejectFriendshipRequestsResponse", LLTrans::getString("RejectFriendshipRequestsResponseDefault"));
+    }
+
+    if (!gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseEnable"))
+    {
+        gSavedPerAccountSettings.setString("AlchemyAutoresponse", LLTrans::getString("AutoResponseModeDefault"));
+    }
+
+    if (!gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseNotFriendEnable"))
+    {
+        gSavedPerAccountSettings.setString("AlchemyAutoresponseNotFriend", LLTrans::getString("AutoResponseModeNonFriendsDefault"));
+    }
+}
 
 //static
 void LLFloaterPreference::updateShowFavoritesCheckbox(bool val)
@@ -1310,6 +1289,8 @@ void LLFloaterPreference::setRecommendedSettings()
     LLAvatarComplexityControls::setIndirectControls();
 
     refreshEnabledGraphics();
+    gSavedSettings.setString("PresetGraphicActive", "");
+    LLPresetsManager::getInstance()->triggerChangeSignal();
 
     LLTabContainer* tabcontainer = getChild<LLTabContainer>("pref core");
     child_list_t::const_iterator iter = tabcontainer->getChildList()->begin();
@@ -1327,7 +1308,7 @@ void LLFloaterPreference::setRecommendedSettings()
 
 void LLFloaterPreference::resetAutotuneSettings()
 {
-    gSavedSettings.setBOOL("AutoTuneFPS", FALSE);
+    gSavedSettings.setBOOL("AutoTuneFPS", false);
 
     const std::string autotune_settings[] = {
         "AutoTuneLock",
@@ -1441,12 +1422,12 @@ void LLFloaterPreference::onBtnOK(const LLSD& userdata)
         }
 
         LLUIColorTable::instance().saveUserSettings();
-        gSavedSettings.saveToFile(gSavedSettings.getString("ClientSettingsFile"), TRUE);
+        gSavedSettings.saveToFile(gSavedSettings.getString("ClientSettingsFile"), true);
 
         //Only save once logged in and loaded per account settings
         if(mGotPersonalInfo)
         {
-            gSavedPerAccountSettings.saveToFile(gSavedSettings.getString("PerAccountSettingsFile"), TRUE);
+            gSavedPerAccountSettings.saveToFile(gSavedSettings.getString("PerAccountSettingsFile"), true);
     }
     }
     else
@@ -1477,25 +1458,26 @@ void LLFloaterPreference::onBtnCancel(const LLSD& userdata)
         }
         refresh();
     }
-    cancel();
 
     if (userdata.asString() == "closeadvanced")
     {
+        cancel({"RenderQualityPerformance"});
         LLFloaterReg::hideInstance("prefs_graphics_advanced");
     }
     else
     {
+        cancel();
         closeFloater();
     }
 }
 
 // static
-void LLFloaterPreference::updateUserInfo(const std::string& visibility, bool im_via_email, bool is_verified_email, const std::string& email)
+void LLFloaterPreference::updateUserInfo(const std::string& visibility)
 {
     LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
     if (instance)
     {
-        instance->setPersonalInfo(visibility, im_via_email, is_verified_email, email);
+        instance->setPersonalInfo(visibility);
     }
 }
 
@@ -1516,7 +1498,7 @@ void LLFloaterPreference::refreshEnabledGraphics()
 
 void LLFloaterPreference::onClickClearCache()
 {
-    LLFloaterReg::showInstance("clear_cache");
+    LLNotificationsUtil::add("ConfirmClearCache", LLSD(), LLSD(), callback_clear_cache);
 }
 
 void LLFloaterPreference::onClickBrowserClearCache()
@@ -1534,6 +1516,13 @@ void LLFloaterPreference::onLanguageChange()
         LLNotificationsUtil::add("ChangeLanguage");
         mLanguageChanged = true;
     }
+}
+
+void LLFloaterPreference::onTimeFormatChange()
+{
+    std::string val = mTimeFormatCombobox->getValue();
+    gSavedSettings.setBOOL("Use24HourClock", val == "1");
+    onLanguageChange();
 }
 
 void LLFloaterPreference::onNotificationsChange(const std::string& OptionName)
@@ -1559,7 +1548,7 @@ void LLFloaterPreference::onNameTagOpacityChange(const LLSD& newvalue)
     if (color_swatch)
     {
         LLColor4 new_color = color_swatch->get();
-        color_swatch->set( new_color.setAlpha(newvalue.asReal()) );
+        color_swatch->set(new_color.setAlpha((F32)newvalue.asReal()));
     }
 }
 
@@ -1610,13 +1599,8 @@ void LLFloaterPreference::onClickResetCache()
 
 void LLFloaterPreference::buildPopupLists()
 {
-    LLScrollListCtrl& disabled_popups =
-        getChildRef<LLScrollListCtrl>("disabled_popups");
-    LLScrollListCtrl& enabled_popups =
-        getChildRef<LLScrollListCtrl>("enabled_popups");
-
-    disabled_popups.deleteAllItems();
-    enabled_popups.deleteAllItems();
+    mDisabledPopups->deleteAllItems();
+    mEnabledPopups->deleteAllItems();
 
     for (LLNotifications::TemplateMap::const_iterator iter = LLNotifications::instance().templatesBegin();
          iter != LLNotifications::instance().templatesEnd();
@@ -1658,11 +1642,11 @@ void LLFloaterPreference::buildPopupLists()
                     }
                 }
             }
-            item = disabled_popups.addElement(row);
+            item = mDisabledPopups->addElement(row);
         }
         else
         {
-            item = enabled_popups.addElement(row);
+            item = mEnabledPopups->addElement(row);
         }
 
         if (item)
@@ -1682,7 +1666,7 @@ void LLFloaterPreference::refreshEnabledState()
 // [/RLVa:KB]
 
     // Cannot have floater active until caps have been received
-    getChild<LLButton>("default_creation_permissions")->setEnabled(LLStartUp::getStartupState() < STATE_STARTED ? false : true);
+    getChild<LLButton>("default_creation_permissions")->setEnabled(LLStartUp::getStartupState() >= STATE_STARTED);
 
     getChildView("block_list")->setEnabled(LLLoginInstance::getInstance()->authSuccess());
 }
@@ -1731,6 +1715,9 @@ void LLAvatarComplexityControls::setIndirectMaxArc()
 void LLFloaterPreference::refresh()
 {
     LLPanel::refresh();
+    setMaxNonImpostorsText(
+        gSavedSettings.getU32("RenderAvatarMaxNonImpostors"),
+        getChild<LLTextBox>("IndirectMaxNonImpostorsText", true));
     LLAvatarComplexityControls::setText(
         gSavedSettings.getU32("RenderAvatarMaxComplexity"),
         getChild<LLTextBox>("IndirectMaxComplexityText", true));
@@ -1741,6 +1728,14 @@ void LLFloaterPreference::refresh()
         advanced->refresh();
     }
     updateClickActionViews();
+
+    mTimeFormatCombobox->selectByValue(gSavedSettings.getBOOL("Use24HourClock") ? "1" : "0");
+
+    std::string current_language = gSavedSettings.getString("Language");
+    if (current_language != "default" && !current_language.empty())
+    {
+        mLanguageCombobox->selectByValue(LLSD(current_language));
+    }
 }
 
 void LLFloaterPreference::onCommitWindowedMode()
@@ -1751,7 +1746,35 @@ void LLFloaterPreference::onCommitWindowedMode()
 void LLFloaterPreference::onChangeQuality(const LLSD& data)
 {
     U32 level = (U32)(data.asReal());
+    constexpr U32 LVL_HIGH = 4;
+    if (level >= LVL_HIGH && mLastQualityLevel < level)
+    {
+        constexpr U32 LOW_MEM_THRESHOLD = 4097;
+        U32 total_mem = U32Megabytes(LLMemory::getMaxMemKB());
+        if (total_mem < LOW_MEM_THRESHOLD)
+        {
+            LLSD args;
+            args["TOTAL_MEM"] = LLSD::Integer(total_mem);
+            LLNotificationsUtil::add("PreferenceQualityWithLowMemory", args, LLSD(), [this](const LLSD& notification, const LLSD& response)
+            {
+                S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+                // If cancel pressed
+                if (option == 1)
+                {
+                    constexpr U32 LVL_MED_PLUS = 3;
+                    gSavedSettings.setU32("RenderQualityPerformance", LVL_MED_PLUS);
+                    mLastQualityLevel = LVL_MED_PLUS;
+                    LLFeatureManager::getInstance()->setGraphicsLevel(LVL_MED_PLUS, true);
+                    refreshEnabledGraphics();
+                    refresh();
+                }
+            }
+            );
+        }
+    }
+    mLastQualityLevel = level;
     LLFeatureManager::getInstance()->setGraphicsLevel(level, true);
+    gSavedSettings.setU32("DebugQualityPerformance", level);
     refreshEnabledGraphics();
     refresh();
 }
@@ -1765,16 +1788,14 @@ void LLFloaterPreference::onClickSetSounds()
 
 void LLFloaterPreference::onClickEnablePopup()
 {
-    LLScrollListCtrl& disabled_popups = getChildRef<LLScrollListCtrl>("disabled_popups");
-
-    std::vector<LLScrollListItem*> items = disabled_popups.getAllSelected();
+    std::vector<LLScrollListItem*> items = mDisabledPopups->getAllSelected();
     std::vector<LLScrollListItem*>::iterator itor;
     for (itor = items.begin(); itor != items.end(); ++itor)
     {
         LLNotificationTemplatePtr templatep = LLNotifications::instance().getTemplate(*(std::string*)((*itor)->getUserdata()));
-        //gSavedSettings.setWarning(templatep->mName, TRUE);
+        //gSavedSettings.setWarning(templatep->mName, true);
         std::string notification_name = templatep->mName;
-        LLUI::getInstance()->mSettingGroups["ignores"]->setBOOL(notification_name, TRUE);
+        LLUI::getInstance()->mSettingGroups["ignores"]->setBOOL(notification_name, true);
     }
 
     buildPopupLists();
@@ -1786,9 +1807,7 @@ void LLFloaterPreference::onClickEnablePopup()
 
 void LLFloaterPreference::onClickDisablePopup()
 {
-    LLScrollListCtrl& enabled_popups = getChildRef<LLScrollListCtrl>("enabled_popups");
-
-    std::vector<LLScrollListItem*> items = enabled_popups.getAllSelected();
+    std::vector<LLScrollListItem*> items = mEnabledPopups->getAllSelected();
     std::vector<LLScrollListItem*>::iterator itor;
     for (itor = items.begin(); itor != items.end(); ++itor)
     {
@@ -1877,7 +1896,7 @@ bool LLFloaterPreference::moveTranscriptsAndLog()
         //Couldn't move the log and created a new directory so remove the new directory
         if(madeDirectory)
         {
-            LLFile::rmdir(chatLogPath);
+            LLFile::remove(chatLogPath);
         }
         return false;
     }
@@ -1903,7 +1922,7 @@ bool LLFloaterPreference::moveTranscriptsAndLog()
 
         if(madeDirectory)
         {
-            LLFile::rmdir(chatLogPath);
+            LLFile::remove(chatLogPath);
         }
 
         return false;
@@ -1915,72 +1934,37 @@ bool LLFloaterPreference::moveTranscriptsAndLog()
     return true;
 }
 
-void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im_via_email, bool is_verified_email, const std::string& email)
+void LLFloaterPreference::setPersonalInfo(const std::string& visibility)
 {
     mGotPersonalInfo = true;
-    mOriginalIMViaEmail = im_via_email;
     mDirectoryVisibility = visibility;
 
     if (visibility == VISIBILITY_DEFAULT)
     {
         mOriginalHideOnlineStatus = false;
-        getChildView("online_visibility")->setEnabled(TRUE);
+        getChildView("online_visibility")->setEnabled(true);
     }
     else if (visibility == VISIBILITY_HIDDEN)
     {
         mOriginalHideOnlineStatus = true;
-        getChildView("online_visibility")->setEnabled(TRUE);
+        getChildView("online_visibility")->setEnabled(true);
     }
     else
     {
         mOriginalHideOnlineStatus = true;
     }
 
-    getChild<LLUICtrl>("online_searchresults")->setEnabled(TRUE);
-    getChildView("friends_online_notify_checkbox")->setEnabled(TRUE);
+    getChild<LLUICtrl>("online_searchresults")->setEnabled(true);
+    getChildView("friends_online_notify_checkbox")->setEnabled(true);
     getChild<LLUICtrl>("online_visibility")->setValue(mOriginalHideOnlineStatus);
     getChild<LLUICtrl>("online_visibility")->setLabelArg("[DIR_VIS]", mDirectoryVisibility);
-    getChildView("favorites_on_login_check")->setEnabled(TRUE);
-    getChildView("log_path_button")->setEnabled(TRUE);
-    getChildView("conversation_log_combo")->setEnabled(TRUE);
-    LLCheckBoxCtrl* send_im_to_email = getChild<LLCheckBoxCtrl>("send_im_to_email");
-    if (LLGridManager::instance().isInSecondlife())
-    {
-        childSetEnabled("email_settings", true);
-        childSetVisible("email_settings", true);
-        send_im_to_email->setVisible(FALSE);
-    }
-    else
-    {
-        childSetEnabled("email_settings", false);
-        childSetVisible("email_settings", false);
 
-        std::string display_email(email);
-        if (display_email.size() > 30)
-        {
-            display_email.resize(30);
-            display_email += "...";
-        }
-        send_im_to_email->setVisible(TRUE);
-        send_im_to_email->setEnabled(is_verified_email);
-        send_im_to_email->setValue(im_via_email);
-        send_im_to_email->setLabelArg("[EMAIL]", display_email);
-
-        std::string tooltip;
-        if (!is_verified_email)
-        {
-            tooltip = getString("email_unverified_tooltip");
-        }
-
-        send_im_to_email->setToolTip(tooltip);
-    }
-
-    getChild<LLUICtrl>("voice_call_friends_only_check")->setEnabled(TRUE);
+    getChildView("favorites_on_login_check")->setEnabled(true);
+    getChildView("log_path_button")->setEnabled(true);
+    getChildView("chat_font_size")->setEnabled(true);
+    getChildView("conversation_log_combo")->setEnabled(true);
+    getChild<LLUICtrl>("voice_call_friends_only_check")->setEnabled(true);
     getChild<LLUICtrl>("voice_call_friends_only_check")->setValue(gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly"));
-
-    getChildView("Enable_Discord_Integration")->setEnabled(TRUE);
-    getChildView("Discord_Integration_Show_Name")->setEnabled(TRUE);
-    getChildView("Discord_Integration_Show_Region")->setEnabled(TRUE);
 }
 
 
@@ -2041,6 +2025,44 @@ void LLAvatarComplexityControls::setRenderTimeText(F32 value, LLTextBox* text_bo
     else
     {
         text_box->setText(llformat("%.0f", value));
+    }
+}
+
+void LLFloaterPreference::updateMaxNonImpostors()
+{
+    // Called when the IndirectMaxNonImpostors control changes
+    // Responsible for fixing the slider label (IndirectMaxNonImpostorsText) and setting RenderAvatarMaxNonImpostors
+    LLSliderCtrl* ctrl = getChild<LLSliderCtrl>("IndirectMaxNonImpostors", true);
+    U32 value = ctrl->getValue().asInteger();
+
+    if (0 == value || LLVOAvatar::NON_IMPOSTORS_MAX_SLIDER <= value)
+    {
+        value = 0;
+    }
+    gSavedSettings.setU32("RenderAvatarMaxNonImpostors", value);
+    LLVOAvatar::updateImpostorRendering(value); // make it effective immediately
+    setMaxNonImpostorsText(value, getChild<LLTextBox>("IndirectMaxNonImpostorsText"));
+}
+
+void LLFloaterPreference::updateIndirectMaxNonImpostors(const LLSD& newvalue)
+{
+    U32 value = newvalue.asInteger();
+    if ((value != 0) && (value != gSavedSettings.getU32("IndirectMaxNonImpostors")))
+    {
+        gSavedSettings.setU32("IndirectMaxNonImpostors", value);
+    }
+    setMaxNonImpostorsText(value, getChild<LLTextBox>("IndirectMaxNonImpostorsText"));
+}
+
+void LLFloaterPreference::setMaxNonImpostorsText(U32 value, LLTextBox* text_box)
+{
+    if (0 == value)
+    {
+        text_box->setText(LLTrans::getString("no_limit"));
+    }
+    else
+    {
+        text_box->setText(llformat("%d", value));
     }
 }
 
@@ -2109,6 +2131,28 @@ void LLFloaterPreference::onChangeMaturity()
                                                             || sim_access == SIM_ACCESS_ADULT);
 
     getChild<LLIconCtrl>("rating_icon_adult")->setVisible(sim_access == SIM_ACCESS_ADULT);
+
+    // Update Legacy Search maturity settings
+    bool can_access_mature = gAgent.canAccessMature();
+    bool can_access_adult  = gAgent.canAccessAdult();
+    if (!can_access_mature)
+    {
+        gSavedSettings.setBOOL("ShowMatureSims", false);
+        gSavedSettings.setBOOL("ShowMatureLand", false);
+        gSavedSettings.setBOOL("ShowMatureClassifieds", false);
+    }
+    if (!can_access_adult)
+    {
+        gSavedSettings.setBOOL("ShowAdultSims", false);
+        gSavedSettings.setBOOL("ShowAdultLand", false);
+        gSavedSettings.setBOOL("ShowAdultClassifieds", false);
+    }
+}
+
+void LLFloaterPreference::onChangeComplexityMode(const LLSD& newvalue)
+{
+    bool enable_complexity = newvalue.asInteger() != LLVOAvatar::AV_RENDER_ONLY_SHOW_FRIENDS;
+    getChild<LLSliderCtrl>("IndirectMaxComplexity")->setEnabled(enable_complexity);
 }
 
 std::string get_category_path(LLFolderType::EType cat_type)
@@ -2219,9 +2263,30 @@ void LLFloaterPreference::onClickAdvanced()
     }
 }
 
+void LLFloaterPreference::onClickScriptingPerfs()
+{
+    LLFloaterReg::showInstance("scripting_settings");
+}
+
 void LLFloaterPreference::onClickActionChange()
 {
     updateClickActionControls();
+}
+
+void LLFloaterPreference::onAtmosShaderChange()
+{
+    LLCheckBoxCtrl* ctrl_alm = getChild<LLCheckBoxCtrl>("UseLightShaders");
+    if(ctrl_alm)
+    {
+        //Deferred/SSAO/Shadows
+        bool bumpshiny = LLCubeMap::sUseCubeMaps && LLFeatureManager::getInstance()->isFeatureAvailable("RenderObjectBump") && gSavedSettings.getBOOL("RenderObjectBump");
+        bool shaders = gSavedSettings.getBOOL("WindLightUseAtmosShaders");
+        bool enabled = LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred") &&
+                        bumpshiny &&
+                        shaders;
+
+        ctrl_alm->setEnabled(enabled);
+    }
 }
 
 void LLFloaterPreference::onClickPermsDefault()
@@ -2253,11 +2318,9 @@ void LLFloaterPreference::onDeleteTranscriptsResponse(const LLSD& notification, 
 
 void LLFloaterPreference::onLogChatHistorySaved()
 {
-    LLButton * delete_transcripts_buttonp = getChild<LLButton>("delete_transcripts");
-
-    if (!delete_transcripts_buttonp->getEnabled())
+    if (!mDeleteTranscriptsBtn->getEnabled())
     {
-        delete_transcripts_buttonp->setEnabled(true);
+        mDeleteTranscriptsBtn->setEnabled(true);
     }
 }
 
@@ -2367,7 +2430,7 @@ void LLFloaterPreference::setCacheLocation(const LLStringExplicit& location)
 void LLFloaterPreference::selectPanel(const LLSD& name)
 {
     LLTabContainer * tab_containerp = getChild<LLTabContainer>("pref core");
-    LLPanel * panel = tab_containerp->getPanelByName(name.asString());
+    LLPanel * panel = tab_containerp->getPanelByName(name.asStringRef());
     if (NULL != panel)
     {
         tab_containerp->selectTabPanel(panel);
@@ -2386,7 +2449,23 @@ void LLFloaterPreference::selectChatPanel()
 
 void LLFloaterPreference::changed()
 {
-    getChild<LLButton>("clear_log")->setEnabled(LLConversationLog::instance().getConversations().size() > 0);
+    if (LLConversationLog::instance().getIsLoggingEnabled())
+    {
+        getChild<LLButton>("clear_log")->setEnabled(LLConversationLog::instance().getConversations().size() > 0);
+    }
+    else
+    {
+        // onClearLog clears list, then notifies changed() and only then clears file,
+        // so check presence of conversations before checking file, file will cleared later.
+        bool has_logs = false;
+        if (LLConversationLog::instance().getConversations().size() > 0)
+        {
+            std::filesystem::path file_path = fsyspath(LLConversationLog::instance().getFileName());
+            has_logs = LLFile::isfile(file_path)
+                        && LLFile::size(file_path) > 0;
+        }
+        getChild<LLButton>("clear_log")->setEnabled(has_logs);
+    }
 
     // set 'enable' property for 'Delete transcripts...' button
     updateDeleteTranscriptsButton();
@@ -2411,7 +2490,7 @@ class LLPanelPreference::Updater : public LLEventTimer
 
 public:
 
-    typedef boost::function<bool(const LLSD&)> callback_t;
+    typedef std::function<bool(const LLSD&)> callback_t;
 
     Updater(callback_t cb, F32 period)
     :LLEventTimer(period),
@@ -2430,12 +2509,12 @@ public:
 
 protected:
 
-    BOOL tick()
+    bool tick()
     {
         mCallback(mNewValue);
         mEventTimer.stop();
 
-        return FALSE;
+        return false;
     }
 
 private:
@@ -2457,55 +2536,55 @@ LLPanelPreference::LLPanelPreference()
 }
 
 //virtual
-BOOL LLPanelPreference::postBuild()
+bool LLPanelPreference::postBuild()
 {
     ////////////////////// PanelGeneral ///////////////////
-    if (hasChild("display_names_check", TRUE))
+    if (hasChild("display_names_check", true))
     {
-        BOOL use_people_api = gSavedSettings.getBOOL("UsePeopleAPI");
+        bool use_people_api = gSavedSettings.getBOOL("UsePeopleAPI");
         LLCheckBoxCtrl* ctrl_display_name = getChild<LLCheckBoxCtrl>("display_names_check");
         ctrl_display_name->setEnabled(use_people_api);
         if (!use_people_api)
         {
-            ctrl_display_name->setValue(FALSE);
+            ctrl_display_name->setValue(false);
         }
     }
 
     ////////////////////// PanelVoice ///////////////////
-    if (hasChild("voice_unavailable", TRUE))
+    if (hasChild("voice_unavailable", true))
     {
-        BOOL voice_disabled = gSavedSettings.getBOOL("CmdLineDisableVoice");
+        bool voice_disabled = gSavedSettings.getBOOL("CmdLineDisableVoice");
         getChildView("voice_unavailable")->setVisible( voice_disabled);
         getChildView("enable_voice_check")->setVisible( !voice_disabled);
     }
 
     //////////////////////PanelPrivacy ///////////////////
-    if (hasChild("media_enabled", TRUE))
+    if (hasChild("media_enabled", true))
     {
         bool media_enabled = gSavedSettings.getBOOL("AudioStreamingMedia");
 
         getChild<LLCheckBoxCtrl>("media_enabled")->set(media_enabled);
         getChild<LLCheckBoxCtrl>("autoplay_enabled")->setEnabled(media_enabled);
     }
-    if (hasChild("music_enabled", TRUE))
+    if (hasChild("music_enabled", true))
     {
         getChild<LLCheckBoxCtrl>("music_enabled")->set(gSavedSettings.getBOOL("AudioStreamingMusic"));
     }
-    if (hasChild("voice_call_friends_only_check", TRUE))
+    if (hasChild("voice_call_friends_only_check", true))
     {
         getChild<LLCheckBoxCtrl>("voice_call_friends_only_check")->setCommitCallback(boost::bind(&showFriendsOnlyWarning, _1, _2));
     }
-    if (hasChild("allow_multiple_viewer_check", TRUE))
+    if (hasChild("allow_multiple_viewer_check", true))
     {
         getChild<LLCheckBoxCtrl>("allow_multiple_viewer_check")->setCommitCallback(boost::bind(&showMultipleViewersWarning, _1, _2));
     }
-    if (hasChild("favorites_on_login_check", TRUE))
+    if (hasChild("favorites_on_login_check", true))
     {
         getChild<LLCheckBoxCtrl>("favorites_on_login_check")->setCommitCallback(boost::bind(&handleFavoritesOnLoginChanged, _1, _2));
         bool show_favorites_at_login = LLPanelLogin::getShowFavorites();
         getChild<LLCheckBoxCtrl>("favorites_on_login_check")->setValue(show_favorites_at_login);
     }
-    if (hasChild("mute_chb_label", TRUE))
+    if (hasChild("mute_chb_label", true))
     {
         getChild<LLTextBox>("mute_chb_label")->setShowCursorHand(false);
         getChild<LLTextBox>("mute_chb_label")->setSoundFlags(LLView::MOUSE_UP);
@@ -2513,19 +2592,11 @@ BOOL LLPanelPreference::postBuild()
     }
 
     //////////////////////PanelSetup ///////////////////
-    if (hasChild("max_bandwidth", TRUE))
+    if (hasChild("max_bandwidth", true))
     {
         mBandWidthUpdater = new LLPanelPreference::Updater(boost::bind(&handleBandwidthChanged, _1), BANDWIDTH_UPDATER_TIMEOUT);
-        mBandwithConnection = gSavedSettings.getControl("ThrottleBandwidthKBPS")->getSignal()->connect(boost::bind(&LLPanelPreference::Updater::update, mBandWidthUpdater, _2));
+        gSavedSettings.getControl("ThrottleBandwidthKBPS")->getSignal()->connect(boost::bind(&LLPanelPreference::Updater::update, mBandWidthUpdater, _2));
     }
-
-#ifndef LL_LINUX
-    if (hasChild("enable_game_mode_check", TRUE))
-    {
-        getChild<LLCheckBoxCtrl>("enable_game_mode_check")->setEnabled(FALSE);
-        getChild<LLCheckBoxCtrl>("enable_game_mode_check")->setToolTip(LLTrans::getString("NotAvailableOnPlatform"));
-    }
-#endif
 
 #ifdef EXTERNAL_TOS
     LLRadioGroup* ext_browser_settings = getChild<LLRadioGroup>("preferred_browser_behavior");
@@ -2543,7 +2614,6 @@ BOOL LLPanelPreference::postBuild()
 
 LLPanelPreference::~LLPanelPreference()
 {
-    mBandwithConnection.disconnect();
     if (mBandWidthUpdater)
     {
         delete mBandWidthUpdater;
@@ -2651,7 +2721,7 @@ void LLPanelPreference::toggleMuteWhenMinimized()
     }
 }
 
-void LLPanelPreference::cancel()
+void LLPanelPreference::cancel(const std::vector<std::string> settings_to_skip)
 {
     for (control_values_map_t::iterator iter =  mSavedValues.begin();
          iter !=  mSavedValues.end(); ++iter)
@@ -2660,6 +2730,12 @@ void LLPanelPreference::cancel()
         LLSD ctrl_value = iter->second;
 
         if((control->getName() == "InstantMessageLogPath") && (ctrl_value.asString() == ""))
+        {
+            continue;
+        }
+
+        auto found = std::find(settings_to_skip.begin(), settings_to_skip.end(), control->getName());
+        if (found != settings_to_skip.end())
         {
             continue;
         }
@@ -2685,7 +2761,7 @@ void LLPanelPreference::setControlFalse(const LLSD& user_data)
     LLControlVariable* control = findControl(control_name);
 
     if (control)
-        control->set(LLSD(FALSE));
+        control->set(LLSD(false));
 }
 
 void LLPanelPreference::updateMediaAutoPlayCheckbox(LLUICtrl* ctrl)
@@ -2762,7 +2838,7 @@ private:
 static LLPanelInjector<LLPanelPreferenceGraphics> t_pref_graph("panel_preference_graphics");
 static LLPanelInjector<LLPanelPreferencePrivacy> t_pref_privacy("panel_preference_privacy");
 
-BOOL LLPanelPreferenceGraphics::postBuild()
+bool LLPanelPreferenceGraphics::postBuild()
 {
     LLFloaterReg::showInstance("prefs_graphics_advanced");
     LLFloaterReg::hideInstance("prefs_graphics_advanced");
@@ -2779,7 +2855,6 @@ BOOL LLPanelPreferenceGraphics::postBuild()
 
 void LLPanelPreferenceGraphics::draw()
 {
-    setPresetText();
     LLPanelPreference::draw();
 }
 
@@ -2812,7 +2887,11 @@ void LLPanelPreferenceGraphics::setPresetText()
 
     if (hasDirtyChilds() && !preset_graphic_active.empty())
     {
+        gSavedSettings.setString("PresetGraphicActive", "");
         preset_graphic_active.clear();
+        // This doesn't seem to cause an infinite recursion.  This trigger is needed to cause the pulldown
+        // panel to update.
+        LLPresetsManager::getInstance()->triggerChangeSignal();
     }
 
     if (!preset_graphic_active.empty())
@@ -2902,9 +2981,9 @@ void LLPanelPreferenceGraphics::resetDirtyChilds()
     }
 }
 
-void LLPanelPreferenceGraphics::cancel()
+void LLPanelPreferenceGraphics::cancel(const std::vector<std::string> settings_to_skip)
 {
-    LLPanelPreference::cancel();
+    LLPanelPreference::cancel(settings_to_skip);
 }
 void LLPanelPreferenceGraphics::saveSettings()
 {
@@ -2945,7 +3024,7 @@ LLPanelPreferenceControls::~LLPanelPreferenceControls()
 {
 }
 
-BOOL LLPanelPreferenceControls::postBuild()
+bool LLPanelPreferenceControls::postBuild()
 {
     // populate list of controls
     pControlsTable = getChild<LLScrollListCtrl>("controls_list");
@@ -2955,7 +3034,7 @@ BOOL LLPanelPreferenceControls::postBuild()
     pKeyModeBox->setCommitCallback(boost::bind(&LLPanelPreferenceControls::onModeCommit, this));
     getChild<LLButton>("restore_defaults")->setCommitCallback(boost::bind(&LLPanelPreferenceControls::onRestoreDefaultsBtn, this));
 
-    return TRUE;
+    return true;
 }
 
 void LLPanelPreferenceControls::regenerateControls()
@@ -3192,7 +3271,7 @@ void LLPanelPreferenceControls::apply()
     }
 }
 
-void LLPanelPreferenceControls::cancel()
+void LLPanelPreferenceControls::cancel(const std::vector<std::string> settings_to_skip)
 {
     for (U32 i = 0; i < LLKeyConflictHandler::MODE_COUNT - 1; ++i)
     {
@@ -3281,7 +3360,7 @@ void LLPanelPreferenceControls::onListCommit()
             if (root_floater)
                 root_floater->addDependentFloater(dialog);
             dialog->openFloater();
-            dialog->setFocus(TRUE);
+            dialog->setFocus(true);
         }
     }
     else
@@ -3547,12 +3626,12 @@ LLFloaterPreferenceProxy::~LLFloaterPreferenceProxy()
 {
 }
 
-BOOL LLFloaterPreferenceProxy::postBuild()
+bool LLFloaterPreferenceProxy::postBuild()
 {
     LLRadioGroup* socksAuth = getChild<LLRadioGroup>("socks5_auth_type");
     if (!socksAuth)
     {
-        return FALSE;
+        return false;
     }
     if (socksAuth->getSelectedValue().asString() == "None")
     {
@@ -3567,7 +3646,7 @@ BOOL LLFloaterPreferenceProxy::postBuild()
         getChild<LLLineEditor>("socks5_password")->setValue(socks_cred->getAuthenticator()["creds"].asString());
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterPreferenceProxy::onOpen(const LLSD& key)
@@ -3719,9 +3798,9 @@ void LLFloaterPreferenceProxy::onChangeSocksSettings()
     // Check for invalid states for the other HTTP proxy radio
     LLRadioGroup* otherHttpProxy = getChild<LLRadioGroup>("other_http_proxy_type");
     if ((otherHttpProxy->getSelectedValue().asString() == "Socks" &&
-            getChild<LLCheckBoxCtrl>("socks_proxy_enabled")->get() == FALSE )||(
+            !getChild<LLCheckBoxCtrl>("socks_proxy_enabled")->get())||(
                     otherHttpProxy->getSelectedValue().asString() == "Web" &&
-                    getChild<LLCheckBoxCtrl>("web_proxy_enabled")->get() == FALSE ) )
+                    !getChild<LLCheckBoxCtrl>("web_proxy_enabled")->get()))
     {
         otherHttpProxy->selectFirstItem();
     }
@@ -3730,10 +3809,10 @@ void LLFloaterPreferenceProxy::onChangeSocksSettings()
 
 void LLFloaterPreference::onUpdateFilterTerm(bool force)
 {
-    LLWString seachValue = utf8str_to_wstring( mFilterEdit->getValue().asString() );
-    LLWStringUtil::toLower( seachValue );
+    LLWString seachValue = utf8str_to_wstring(mFilterEdit->getValue());
+    LLWStringUtil::toLower(seachValue);
 
-    if( !mSearchData || (mSearchData->mLastFilter == seachValue && !force))
+    if (!mSearchData || (mSearchData->mLastFilter == seachValue && !force))
         return;
 
     if (mSearchDataDirty)
@@ -3744,21 +3823,20 @@ void LLFloaterPreference::onUpdateFilterTerm(bool force)
 
     mSearchData->mLastFilter = seachValue;
 
-    if( !mSearchData->mRootTab )
+    if (!mSearchData->mRootTab)
         return;
 
     mSearchData->mRootTab->hightlightAndHide( seachValue );
     filterIgnorableNotifications();
 
-    LLTabContainer *pRoot = getChild< LLTabContainer >( "pref core" );
-    if( pRoot )
+    if (LLTabContainer* pRoot = getChild<LLTabContainer>("pref core"))
         pRoot->selectFirstTab();
 }
 
 void LLFloaterPreference::filterIgnorableNotifications()
 {
-    bool visible = getChildRef<LLScrollListCtrl>("enabled_popups").highlightMatchingItems(mFilterEdit->getValue());
-    visible |= getChildRef<LLScrollListCtrl>("disabled_popups").highlightMatchingItems(mFilterEdit->getValue());
+    bool visible = mEnabledPopups->highlightMatchingItems(mFilterEdit->getValue());
+    visible |= mDisabledPopups->highlightMatchingItems(mFilterEdit->getValue());
 
     if (visible)
     {
@@ -3768,72 +3846,69 @@ void LLFloaterPreference::filterIgnorableNotifications()
 
 void collectChildren( LLView const *aView, ll::prefs::PanelDataPtr aParentPanel, ll::prefs::TabContainerDataPtr aParentTabContainer )
 {
-    if( !aView )
+    if (!aView)
         return;
 
-    llassert_always( aParentPanel || aParentTabContainer );
+    llassert_always(aParentPanel || aParentTabContainer);
 
-    LLView::child_list_const_iter_t itr = aView->beginChild();
-    LLView::child_list_const_iter_t itrEnd = aView->endChild();
-
-    while( itr != itrEnd )
+    for (LLView* pView : *aView->getChildList())
     {
-        LLView *pView = *itr;
+        if (!pView)
+            continue;
+
         ll::prefs::PanelDataPtr pCurPanelData = aParentPanel;
         ll::prefs::TabContainerDataPtr pCurTabContainer = aParentTabContainer;
-        if( !pView )
-            continue;
-        LLPanel const *pPanel = dynamic_cast< LLPanel const *>( pView );
-        LLTabContainer const *pTabContainer = dynamic_cast< LLTabContainer const *>( pView );
-        ll::ui::SearchableControl const *pSCtrl = dynamic_cast< ll::ui::SearchableControl const *>( pView );
 
-        if( pTabContainer )
+        LLPanel const *pPanel = dynamic_cast<LLPanel const*>(pView);
+        LLTabContainer const *pTabContainer = dynamic_cast<LLTabContainer const*>(pView);
+        ll::ui::SearchableControl const *pSCtrl = dynamic_cast<ll::ui::SearchableControl const*>( pView );
+
+        if (pTabContainer)
         {
             pCurPanelData.reset();
 
-            pCurTabContainer                = std::make_shared<ll::prefs::TabContainerData>();
-            pCurTabContainer->mTabContainer = const_cast< LLTabContainer *>( pTabContainer );
-            pCurTabContainer->mLabel        = pTabContainer->getLabel();
-            pCurTabContainer->mPanel        = 0;
+            pCurTabContainer = ll::prefs::TabContainerDataPtr(new ll::prefs::TabContainerData);
+            pCurTabContainer->mTabContainer = const_cast< LLTabContainer *>(pTabContainer);
+            pCurTabContainer->mLabel = pTabContainer->getLabel();
+            pCurTabContainer->mPanel = 0;
 
-            if( aParentPanel )
-                aParentPanel->mChildPanel.push_back( pCurTabContainer );
-            if( aParentTabContainer )
-                aParentTabContainer->mChildPanel.push_back( pCurTabContainer );
+            if (aParentPanel)
+                aParentPanel->mChildPanel.push_back(pCurTabContainer);
+            if (aParentTabContainer)
+                aParentTabContainer->mChildPanel.push_back(pCurTabContainer);
         }
-        else if( pPanel )
+        else if (pPanel)
         {
             pCurTabContainer.reset();
 
-            pCurPanelData         = std::make_shared<ll::prefs::PanelData>();
+            pCurPanelData = ll::prefs::PanelDataPtr(new ll::prefs::PanelData);
             pCurPanelData->mPanel = pPanel;
             pCurPanelData->mLabel = pPanel->getLabel();
 
             llassert_always( aParentPanel || aParentTabContainer );
 
-            if( aParentTabContainer )
-                aParentTabContainer->mChildPanel.push_back( pCurPanelData );
-            else if( aParentPanel )
-                aParentPanel->mChildPanel.push_back( pCurPanelData );
+            if (aParentTabContainer)
+                aParentTabContainer->mChildPanel.push_back(pCurPanelData);
+            else if (aParentPanel)
+                aParentPanel->mChildPanel.push_back(pCurPanelData);
         }
-        else if( pSCtrl && pSCtrl->getSearchText().size() )
+        else if (pSCtrl && pSCtrl->getSearchText().size())
         {
-            ll::prefs::SearchableItemPtr item = std::make_shared<ll::prefs::SearchableItem>();
-            item->mView                       = pView;
-            item->mCtrl                       = pSCtrl;
+            ll::prefs::SearchableItemPtr item = ll::prefs::SearchableItemPtr(new ll::prefs::SearchableItem());
+            item->mView = pView;
+            item->mCtrl = pSCtrl;
 
-            item->mLabel = utf8str_to_wstring( pSCtrl->getSearchText() );
-            LLWStringUtil::toLower( item->mLabel );
+            item->mLabel = utf8str_to_wstring(pSCtrl->getSearchText());
+            LLWStringUtil::toLower(item->mLabel);
 
-            llassert_always( aParentPanel || aParentTabContainer );
+            llassert_always(aParentPanel || aParentTabContainer);
 
-            if( aParentPanel )
-                aParentPanel->mChildren.push_back( item );
-            if( aParentTabContainer )
-                aParentTabContainer->mChildren.push_back( item );
+            if (aParentPanel)
+                aParentPanel->mChildren.push_back(item);
+            if (aParentTabContainer)
+                aParentTabContainer->mChildren.push_back(item);
         }
-        collectChildren( pView, pCurPanelData, pCurTabContainer );
-        ++itr;
+        collectChildren(pView, pCurPanelData, pCurTabContainer);
     }
 }
 
@@ -3843,12 +3918,12 @@ void LLFloaterPreference::collectSearchableItems()
     LLTabContainer *pRoot = getChild< LLTabContainer >( "pref core" );
     if( mFilterEdit && pRoot )
     {
-        mSearchData.reset(new ll::prefs::SearchData() );
+        mSearchData = std::make_unique<ll::prefs::SearchData>();
 
-        ll::prefs::TabContainerDataPtr pRootTabcontainer = std::make_shared<ll::prefs::TabContainerData>();
-        pRootTabcontainer->mTabContainer                 = pRoot;
-        pRootTabcontainer->mLabel                        = pRoot->getLabel();
-        mSearchData->mRootTab                            = pRootTabcontainer;
+        ll::prefs::TabContainerDataPtr pRootTabcontainer = ll::prefs::TabContainerDataPtr( new ll::prefs::TabContainerData );
+        pRootTabcontainer->mTabContainer = pRoot;
+        pRootTabcontainer->mLabel = pRoot->getLabel();
+        mSearchData->mRootTab = pRootTabcontainer;
 
         collectChildren( this, ll::prefs::PanelDataPtr(), pRootTabcontainer );
     }

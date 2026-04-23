@@ -24,10 +24,8 @@
  */
 
 #include "linden_common.h"
-#include "llapr.h"
 
-#include "apr_portable.h"
-
+#include "llapp.h"
 #include "llthread.h"
 #include "llmutex.h"
 
@@ -35,9 +33,14 @@
 #include "lltrace.h"
 #include "lltracethreadrecorder.h"
 #include "llexception.h"
+#include "workqueue.h"
 
 #if LL_LINUX
 #include <sched.h>
+#endif
+
+#if LL_DARWIN || LL_LINUX
+#include <pthread.h>
 #endif
 
 
@@ -54,25 +57,32 @@ typedef struct tagTHREADNAME_INFO
     DWORD dwFlags; // Reserved for future use, must be zero.
 } THREADNAME_INFO;
 #pragma pack(pop)
+#endif
 
 void set_thread_name(const char* threadName)
 {
+#if LL_WINDOWS
     THREADNAME_INFO info;
-    info.dwType = 0x1000;
-    info.szName = threadName;
-    info.dwThreadID = (DWORD)-1;
-    info.dwFlags = 0;
+    info.dwType     = 0x1000;
+    info.szName     = threadName;
+    info.dwThreadID = GetCurrentThreadId();
+    info.dwFlags    = 0;
 
     __try
     {
-        ::RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(DWORD), (ULONG_PTR*)&info );
+        ::RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(DWORD), (ULONG_PTR*)&info);
     }
-    __except(EXCEPTION_CONTINUE_EXECUTION)
+    __except (EXCEPTION_CONTINUE_EXECUTION)
     {
     }
-}
+#elif LL_DARWIN
+    std::string truncated_name(std::string_view(threadName).substr(0, 15));
+    pthread_setname_np(truncated_name.c_str());
+#elif LL_LINUX
+    std::string truncated_name(std::string_view(threadName).substr(0, 15));
+    pthread_setname_np(pthread_self(), truncated_name.c_str());
 #endif
-
+}
 
 //----------------------------------------------------------------------------
 // Usage:
@@ -106,6 +116,27 @@ namespace
         return s_thread_id;
     }
 
+#if LL_WINDOWS
+
+    static const U32 STATUS_MSC_EXCEPTION = 0xE06D7363; // compiler specific
+
+    U32 exception_filter(U32 code, struct _EXCEPTION_POINTERS* exception_infop)
+    {
+        if (LLApp::instance()->reportCrashToBugsplat((void*)exception_infop))
+        {
+            // Handled
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+        else if (code == STATUS_MSC_EXCEPTION)
+        {
+            // C++ exception, go on
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+
+        // handle it, convert to std::exception
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+#endif // LL_WINDOWS
 } // anonymous namespace
 
 LL_COMMON_API bool on_main_thread()
@@ -126,60 +157,36 @@ LL_COMMON_API bool assert_main_thread()
 }
 
 //
-// Handed to the thread creation function
+// Handed to the APR thread creation function
 //
 void LLThread::threadRun()
 {
-    // Set thread state to running
-    mStatus = RUNNING;
-
-#ifdef LL_WINDOWS
     set_thread_name(mName.c_str());
-
-#if 0 // probably a bad idea, see usage of SetThreadIdealProcessor in LLWindowWin32)
-    HANDLE hThread = GetCurrentThread();
-    if (hThread)
-    {
-        SetThreadAffinityMask(hThread, (DWORD_PTR) 0xFFFFFFFFFFFFFFFE);
-    }
-#endif
-
-#endif
     LL_PROFILER_SET_THREAD_NAME( mName.c_str() );
 
-#ifdef SHOW_ASSERT
+    // this is the first point at which we're actually running in the new thread
+    mID = currentID();
+
     // for now, hard code all LLThreads to report to single master thread recorder, which is known to be running on main thread
-    mRecorder = std::make_unique<LLTrace::ThreadRecorder>(*LLTrace::get_master_thread_recorder());
-#endif
+    mRecorder = new LLTrace::ThreadRecorder(*LLTrace::get_master_thread_recorder());
 
     // Run the user supplied function
     do
     {
-        try
-        {
-            LL_PROFILER_THREAD_BEGIN(mName.c_str());
-            run();
-            LL_PROFILER_THREAD_END(mName.c_str());
-        }
-        catch (const LLContinueError &e)
-        {
-            LL_WARNS("THREAD") << "ContinueException on thread '" << mName <<
-                "' reentering run(). Error what is: '" << e.what() << "'" << LL_ENDL;
-            //output possible call stacks to log file.
-            LLError::LLCallStacks::print();
-
-            LOG_UNHANDLED_EXCEPTION("LLThread");
-            continue;
-        }
+#ifdef LL_WINDOWS
+        sehHandle(); // Structured Exception Handling
+#else
+        tryRun();
+#endif
         break;
 
     } while (true);
 
     //LL_INFOS() << "LLThread::staticRun() Exiting: " << threadp->mName << LL_ENDL;
 
-#ifdef SHOW_ASSERT
-    mRecorder.reset();
-#endif
+
+    delete mRecorder;
+    mRecorder = NULL;
 
     // We're done with the run function, this thread is done executing now.
     //NB: we are using this flag to sync across threads...we really need memory barriers here
@@ -188,14 +195,82 @@ void LLThread::threadRun()
     mStatus = STOPPED;
 }
 
-LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
-    mPaused(FALSE),
-    mName(name),
-    mStatus(STOPPED)
+void LLThread::tryRun()
 {
-    mRunCondition = std::make_unique<LLCondition>();
-    mDataLock = std::make_unique<LLMutex>();
-    mLocalAPRFilePoolp = NULL ;
+    try
+    {
+        run();
+    }
+    catch (const LLContinueError& e)
+    {
+        LL_WARNS("THREAD") << "ContinueException on thread '" << mName <<
+            "'. Error what is: '" << e.what() << "'" << LL_ENDL;
+        LLError::LLCallStacks::print();
+
+        LOG_UNHANDLED_EXCEPTION("LLThread");
+    }
+    catch (std::bad_alloc&)
+    {
+        // Todo: improve this, this is going to have a different callstack
+        // instead of showing where it crashed
+        LL_WARNS("THREAD") << "Out of memory in a thread: " << mName << LL_ENDL;
+
+        LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
+        main_queue->post(
+            // Bind the current exception, rethrow it in main loop.
+            []() {
+            LLError::LLUserWarningMsg::showOutOfMemory();
+            LL_ERRS("THREAD") << "Out of memory in a thread" << LL_ENDL;
+        });
+    }
+#ifndef LL_WINDOWS
+    catch (...)
+    {
+        // Stash any other kind of uncaught exception to be rethrown by main thread.
+        LL_WARNS("THREAD") << "Capturing and rethrowing uncaught exception in LLThread "
+            << mName << LL_ENDL;
+
+        LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
+        main_queue->post(
+            // Bind the current exception, rethrow it in main loop.
+            [exc = std::current_exception(), name = mName]()
+        {
+            LL_INFOS("THREAD") << "Rethrowing exception from thread " << name << LL_ENDL;
+            std::rethrow_exception(exc);
+        });
+    }
+#endif // else LL_WINDOWS
+}
+
+#ifdef LL_WINDOWS
+void LLThread::sehHandle()
+{
+    __try
+    {
+        // handle stop and continue exceptions first
+        tryRun();
+    }
+    __except (exception_filter(GetExceptionCode(), GetExceptionInformation()))
+    {
+        // convert to C++ styled exception
+        // Note: it might be better to use _se_set_translator
+        // if you want exception to inherit full callstack
+        char integer_string[512];
+        sprintf(integer_string, "SEH, code: %lu\n", GetExceptionCode());
+        throw std::exception(integer_string);
+    }
+}
+#endif
+
+LLThread::LLThread(const std::string& name) :
+    mPaused(false),
+    mName(name),
+    mThreadp(NULL),
+    mStatus(STOPPED),
+    mRecorder(NULL)
+{
+    mRunCondition = new LLCondition();
+    mDataLock = new LLMutex();
 }
 
 
@@ -206,12 +281,6 @@ LLThread::~LLThread()
     if (isCrashed())
     {
         LL_WARNS("THREAD") << "Destroying crashed thread named '" << mName << "'" << LL_ENDL;
-    }
-
-    if(mLocalAPRFilePoolp)
-    {
-        delete mLocalAPRFilePoolp ;
-        mLocalAPRFilePoolp = NULL ;
     }
 }
 
@@ -254,59 +323,58 @@ void LLThread::shutdown()
         if (!isStopped())
         {
             // This thread just wouldn't stop, even though we gave it time
-            LL_WARNS() << "LLThread::~LLThread() exiting thread: " << mName << " before clean exit!" << LL_ENDL;
+            //LL_WARNS() << "LLThread::~LLThread() exiting thread before clean exit!" << LL_ENDL;
             // Put a stake in its heart. (A very hostile method to force a thread to quit)
 #if     LL_WINDOWS
             TerminateThread(mNativeHandle, 0);
 #else
             pthread_cancel(mNativeHandle);
 #endif
-#ifdef SHOW_ASSERT
-            mRecorder.reset();
-#endif
+
+            delete mRecorder;
+            mRecorder = NULL;
             mStatus = STOPPED;
             return;
         }
+        delete mThreadp;
+        mThreadp = NULL;
     }
 
-    mThreadp.reset();
-    mRunCondition.reset();
-    mDataLock.reset();
-#ifdef SHOW_ASSERT
+    delete mRunCondition;
+    mRunCondition = NULL;
+
+    delete mDataLock;
+    mDataLock = NULL;
+
     if (mRecorder)
     {
         // missed chance to properly shut down recorder (needs to be done in thread context)
         // probably due to abnormal thread termination
         // so just leak it and remove it from parent
-        LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder.release());
+        LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder);
     }
-#endif
 }
+
 
 void LLThread::start()
 {
     llassert(isStopped());
+
+    // Set thread state to running
+    mStatus = RUNNING;
+
     try
     {
-        mThreadp = std::make_unique<std::thread>(std::bind(&LLThread::threadRun, this));
+        mThreadp = new std::thread(std::bind(&LLThread::threadRun, this));
         mNativeHandle = mThreadp->native_handle();
         mThreadp->detach();
     }
-    catch (const std::system_error& err)
+    catch (std::system_error& ex)
     {
         mStatus = STOPPED;
-        LL_WARNS() << "Failed to start thread: \"" << mName << "\" due to error: " << err.what() << LL_ENDL;
+        LL_WARNS() << "failed to start thread " << mName << " " << ex.what() << LL_ENDL;
     }
-    catch (const std::bad_alloc& err)
-    {
-        mStatus = CRASHED;
-        LL_WARNS() << "Failed to allocate thread: \"" << mName << "\" due to error: " << err.what() << LL_ENDL;
-    }
-}
 
-LLThread::id_t LLThread::getID() const
-{
-    return mThreadp ? mThreadp->get_id() : std::thread::id();
 }
 
 //============================================================================
@@ -345,7 +413,7 @@ bool LLThread::runCondition(void)
 // Stop thread execution if requested until unpaused.
 void LLThread::checkPause()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     mDataLock->lock();
 
     // This is in a while loop because the pthread API allows for spurious wakeups.
@@ -377,20 +445,20 @@ void LLThread::setQuitting()
 // static
 LLThread::id_t LLThread::currentID()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     return std::this_thread::get_id();
 }
 
 // static
 void LLThread::yield()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     std::this_thread::yield();
 }
 
 void LLThread::wake()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     mDataLock->lock();
     if(!shouldSleep())
     {
@@ -401,7 +469,7 @@ void LLThread::wake()
 
 void LLThread::wakeLocked()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     if(!shouldSleep())
     {
         mRunCondition->signal();
@@ -410,19 +478,17 @@ void LLThread::wakeLocked()
 
 void LLThread::lockData()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     mDataLock->lock();
 }
 
 void LLThread::unlockData()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     mDataLock->unlock();
 }
 
 //============================================================================
-
-//----------------------------------------------------------------------------
 
 LLThreadSafeRefCount::LLThreadSafeRefCount() :
     mRef(0)
@@ -440,6 +506,12 @@ LLThreadSafeRefCount::~LLThreadSafeRefCount()
     {
         LL_ERRS() << "deleting referenced object mRef = " << mRef << LL_ENDL;
     }
+}
+
+//============================================================================
+
+LLResponder::~LLResponder()
+{
 }
 
 //============================================================================

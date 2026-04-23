@@ -58,12 +58,12 @@ public:
 
     LLViewerPartSource(const U32 type);
 
-    virtual void update(const F32 dt); // Return FALSE if this source is dead...
+    virtual void update(const F32 dt); // Return false if this source is dead...
 
     virtual void setDead();
-    BOOL isDead() const             { return mIsDead; }
-    void setSuspended( BOOL state ) { mIsSuspended = state; }
-    BOOL isSuspended() const        { return mIsSuspended; }
+    bool isDead() const             { return mIsDead; }
+    void setSuspended( bool state ) { mIsSuspended = state; }
+    bool isSuspended() const        { return mIsSuspended; }
     U32 getType() const             { return mType; }
     static void updatePart(LLViewerPart &part, const F32 dt);
     void setOwnerUUID(const LLUUID& owner_id) { mOwnerUUID = owner_id; }
@@ -81,8 +81,8 @@ public:
 
 protected:
     U32         mType;
-    BOOL        mIsDead;
-    BOOL        mIsSuspended;
+    bool        mIsDead;
+    bool        mIsSuspended;
     F32         mLastUpdateTime;
     F32         mLastPartTime;
     LLUUID      mOwnerUUID;
@@ -104,7 +104,7 @@ protected:
 //
 
 
-class LLViewerPartSourceScript final : public LLViewerPartSource
+class LLViewerPartSourceScript : public LLViewerPartSource
 {
 public:
     LLViewerPartSourceScript(LLViewerObject *source_objp);
@@ -112,7 +112,7 @@ public:
 
     /*virtual*/ void setDead();
 
-    BOOL updateFromMesg();
+    bool updateFromMesg();
 
     // Returns a new particle source to attach to an object...
     static LLPointer<LLViewerPartSourceScript> unpackPSS(LLViewerObject *source_objp, LLPointer<LLViewerPartSourceScript> pssp, const S32 block_num);
@@ -136,7 +136,7 @@ protected:
 // Particle source for spiral effect (customize avatar, mostly)
 //
 
-class LLViewerPartSourceSpiral final : public LLViewerPartSource
+class LLViewerPartSourceSpiral : public LLViewerPartSource
 {
 public:
     LLViewerPartSourceSpiral(const LLVector3 &pos);
@@ -160,7 +160,7 @@ protected:
 // Particle source for tractor(editing) beam
 //
 
-class LLViewerPartSourceBeam final : public LLViewerPartSource
+class LLViewerPartSourceBeam : public LLViewerPartSource
 {
 public:
     LLViewerPartSourceBeam();
@@ -190,7 +190,7 @@ protected:
 // Particle source for chat effect
 //
 
-class LLViewerPartSourceChat final : public LLViewerPartSource
+class LLViewerPartSourceChat : public LLViewerPartSource
 {
 public:
     LLViewerPartSourceChat(const LLVector3 &pos);

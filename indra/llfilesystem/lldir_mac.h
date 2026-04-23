@@ -1,6 +1,6 @@
 /**
  * @file lldir_mac.h
- * @brief Definition of directory utilities class for Mac OS X
+ * @brief Definition of directory utilities class for macOS
  *
  * $LicenseInfo:firstyear=2000&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -35,17 +35,16 @@
 
 #include <dirent.h>
 
-class LLDir_Mac final : public LLDir
+class LLDir_Mac : public LLDir
 {
 public:
     LLDir_Mac();
-    virtual ~LLDir_Mac() = default;
+    virtual ~LLDir_Mac();
 
     /*virtual*/ void initAppDirs(const std::string &app_name,
         const std::string& app_read_only_data_dir);
 
     virtual std::string getCurPath();
-    virtual bool fileExists(const std::string &filename) const;
 
     /*virtual*/ std::string getLLPluginLauncher();
     /*virtual*/ std::string getLLPluginFilename(std::string base_name);

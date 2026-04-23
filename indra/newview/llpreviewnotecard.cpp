@@ -46,6 +46,7 @@
 #include "llnotecard.h"
 // [/SL:KB]
 #include "llnotificationsutil.h"
+#include "llmd5.h"
 #include "llresmgr.h"
 #include "roles_constants.h"
 #include "llscrollbar.h"
@@ -64,7 +65,6 @@
 #include "lllineeditor.h"
 #include "lluictrlfactory.h"
 #include "llviewerassetupload.h"
-#include "llmd5.h"
 
 ///----------------------------------------------------------------------------
 /// Class LLPreviewNotecard
@@ -72,70 +72,63 @@
 
 // Default constructor
 LLPreviewNotecard::LLPreviewNotecard(const LLSD& key) //const LLUUID& item_id,
-    : LLPreview( key ),
-    mLiveFile(NULL)
+    : LLPreview( key )
 {
     const LLInventoryItem *item = getItem();
+    std::string note_name = "New Note";
     if (item)
     {
         mAssetID = item->getAssetUUID();
+        if (!item->getName().empty())
+        {
+            note_name = item->getName();
+        }
     }
+    mNoteName = note_name;
 }
 
 LLPreviewNotecard::~LLPreviewNotecard()
 {
     delete mLiveFile;
-    mFontNameConnection.disconnect();
-    mFontSizeConnection.disconnect();
+    mEditor = nullptr;
 }
 
-BOOL LLPreviewNotecard::postBuild()
+bool LLPreviewNotecard::postBuild()
 {
     mEditor = getChild<LLViewerTextEditor>("Notecard Editor");
-    if (auto fontp = LLFontGL::getFont(LLFontDescriptor(gSavedSettings.getString("NotecardFontName"), gSavedSettings.getString("NotecardFontSize"), 0).normalize()))
-    {
-        mEditor->setFont(fontp);
-    }
-    mFontNameConnection = gSavedSettings.getControl("NotecardFontName")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&)
-        {
-            std::string text = mEditor->getText();
-            if (auto fontp = LLFontGL::getFont(LLFontDescriptor(newval.asString(), gSavedSettings.getString("NotecardFontSize"), 0).normalize()))
-            {
-                mEditor->setFont(fontp);
-            }
-            mEditor->setText(text);
-        });
-    mFontSizeConnection = gSavedSettings.getControl("NotecardFontSize")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&)
-        {
-            std::string text = mEditor->getText();
-            if (auto fontp = LLFontGL::getFont(LLFontDescriptor(gSavedSettings.getString("NotecardFontName"), newval.asString(), 0).normalize()))
-            {
-                mEditor->setFont(fontp);
-            }
-            mEditor->setText(text);
-        });
-
     mEditor->setNotecardInfo(mItemUUID, mObjectID, getKey());
     mEditor->makePristine();
 
-    childSetAction("Save", onClickSave, this);
-    getChildView("lock")->setVisible( FALSE);
+    mSaveBtn = getChild<LLButton>("Save");
+    mSaveBtn->setCommitCallback(boost::bind(&LLPreviewNotecard::saveIfNeeded, this, nullptr, true));
 
-    childSetAction("Delete", onClickDelete, this);
-    getChildView("Delete")->setEnabled(false);
+    mLockBtn = getChild<LLUICtrl>("lock");
+    mLockBtn->setVisible(false);
 
-    childSetAction("Edit", onClickEdit, this);
+    mDeleteBtn = getChild<LLButton>("Delete");
+    mDeleteBtn->setCommitCallback(boost::bind(&LLPreviewNotecard::deleteNotecard, this));
+    mDeleteBtn->setEnabled(false);
+
+    mEditBtn = getChild<LLButton>("Edit");
+    mEditBtn->setCommitCallback(boost::bind(&LLPreviewNotecard::openInExternalEditor, this));
 
     const LLInventoryItem* item = getItem();
+    std::string note_name = mNoteName;
 
-    childSetCommitCallback("desc", LLPreview::onText, this);
+    mDescEditor = getChild<LLLineEditor>("desc");
+    mDescEditor->setCommitCallback(boost::bind(&LLPreview::onText, mDescEditor, this));
     if (item)
     {
-        getChild<LLUICtrl>("desc")->setValue(item->getDescription());
-        BOOL source_library = mObjectUUID.isNull() && gInventory.isObjectDescendentOf(item->getUUID(), gInventory.getLibraryRootFolderID());
-        getChildView("Delete")->setEnabled(!source_library);
+        if (!item->getName().empty())
+        {
+            note_name = item->getName();
+        }
+        mDescEditor->setValue(item->getDescription());
+        bool source_library = mObjectUUID.isNull() && gInventory.isObjectDescendentOf(item->getUUID(), gInventory.getLibraryRootFolderID());
+        mDeleteBtn->setEnabled(!source_library);
     }
-    getChild<LLLineEditor>("desc")->setPrevalidate(&LLTextValidate::validateASCIIPrintableNoPipe);
+    mNoteName = note_name;
+    mDescEditor->setPrevalidate(&LLTextValidate::validateASCIIPrintableNoPipe);
 
     return LLPreview::postBuild();
 }
@@ -146,66 +139,71 @@ bool LLPreviewNotecard::saveItem()
     return saveIfNeeded(item);
 }
 
-void LLPreviewNotecard::setEnabled( BOOL enabled )
+void LLPreviewNotecard::setEnabled(bool enabled)
 {
-
-    LLViewerTextEditor* editor = getChild<LLViewerTextEditor>("Notecard Editor");
-
-    getChildView("Notecard Editor")->setEnabled(enabled);
-    getChildView("lock")->setVisible( !enabled);
-    getChildView("desc")->setEnabled(enabled);
-    getChildView("Save")->setEnabled(enabled && editor && (!editor->isPristine()));
+    if (mEditor)
+    {
+        mEditor->setEnabled(enabled);
+    }
+    if (mLockBtn)
+    {
+        mLockBtn->setVisible(!enabled);
+    }
+    if (mDescEditor)
+    {
+        mDescEditor->setEnabled(enabled);
+    }
+    if (mSaveBtn)
+    {
+        mSaveBtn->setEnabled(enabled && mEditor && (!mEditor->isPristine()));
+    }
 }
 
 
 void LLPreviewNotecard::draw()
 {
-    LLViewerTextEditor* editor = getChild<LLViewerTextEditor>("Notecard Editor");
-    BOOL changed = !editor->isPristine();
+    bool changed = !mEditor->isPristine();
 
-    getChildView("Save")->setEnabled(changed && getEnabled());
+    mSaveBtn->setEnabled(changed && getEnabled());
 
     LLPreview::draw();
 }
 
 // virtual
-BOOL LLPreviewNotecard::handleKeyHere(KEY key, MASK mask)
+bool LLPreviewNotecard::handleKeyHere(KEY key, MASK mask)
 {
     if(('S' == key) && (MASK_CONTROL == (mask & MASK_CONTROL)))
     {
         saveIfNeeded();
-        return TRUE;
+        return true;
     }
 
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
     if(('F' == key) && (MASK_CONTROL == (mask & MASK_CONTROL)))
     {
         LLFloaterSearchReplace::show(getEditor());
-        return TRUE;
+        return true;
     }
 // [/SL:KB]
-
     return LLPreview::handleKeyHere(key, mask);
 }
 
 // virtual
-BOOL LLPreviewNotecard::canClose()
+bool LLPreviewNotecard::canClose()
 {
-    LLViewerTextEditor* editor = getChild<LLViewerTextEditor>("Notecard Editor");
-
-    if(mForceClose || editor->isPristine())
+    if(mForceClose || !mEditor || mEditor->isPristine())
     {
-        return TRUE;
+        return true;
     }
     else
     {
         if(!mSaveDialogShown)
         {
-            mSaveDialogShown = TRUE;
+            mSaveDialogShown = true;
             // Bring up view-modal dialog: Save changes? Yes, No, Cancel
             LLNotificationsUtil::add("SaveChanges", LLSD(), LLSD(), boost::bind(&LLPreviewNotecard::handleSaveChangesDialog,this, _1, _2));
         }
-        return FALSE;
+        return false;
     }
 }
 
@@ -214,20 +212,13 @@ void LLPreviewNotecard::setObjectID(const LLUUID& object_id)
 {
     LLPreview::setObjectID(object_id);
 
-    LLViewerTextEditor* editor = getChild<LLViewerTextEditor>("Notecard Editor");
-    editor->setNotecardObjectID(mObjectUUID);
-    editor->makePristine();
+    mEditor->setNotecardObjectID(mObjectUUID);
+    mEditor->makePristine();
 }
 
 const LLInventoryItem* LLPreviewNotecard::getDragItem()
 {
-    LLViewerTextEditor* editor = getChild<LLViewerTextEditor>("Notecard Editor");
-
-    if(editor)
-    {
-        return editor->getDragItem();
-    }
-    return NULL;
+    return mEditor->getDragItem();
 }
 
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
@@ -239,10 +230,7 @@ LLTextEditor* LLPreviewNotecard::getEditor()
 
 bool LLPreviewNotecard::hasEmbeddedInventory()
 {
-    LLViewerTextEditor* editor = NULL;
-    editor = getChild<LLViewerTextEditor>("Notecard Editor");
-    if (!editor) return false;
-    return editor->hasEmbeddedInventory();
+    return mEditor->hasEmbeddedInventory();
 }
 
 void LLPreviewNotecard::refreshFromInventory(const LLUUID& new_item_id)
@@ -260,10 +248,9 @@ void LLPreviewNotecard::updateTitleButtons()
 {
     LLPreview::updateTitleButtons();
 
-    LLUICtrl* lock_btn = getChild<LLUICtrl>("lock");
-    if(lock_btn->getVisible() && !isMinimized()) // lock button stays visible if floater is minimized.
+    if(mLockBtn && mLockBtn->getVisible() && !isMinimized()) // lock button stays visible if floater is minimized.
     {
-        LLRect lock_rc = lock_btn->getRect();
+        LLRect lock_rc = mLockBtn->getRect();
         LLRect buttons_rect = getDragHandle()->getButtonsRect();
         buttons_rect.mLeft = lock_rc.mLeft;
         getDragHandle()->setButtonsRect(buttons_rect);
@@ -274,29 +261,29 @@ void LLPreviewNotecard::loadAsset()
 {
     // request the asset.
     const LLInventoryItem* item = getItem();
-    LLViewerTextEditor* editor = getChild<LLViewerTextEditor>("Notecard Editor");
-
-    if (!editor)
-        return;
-
     bool fail = false;
+    std::string note_name = mNoteName;
 
     if(item)
     {
         LLPermissions perm(item->getPermissions());
-        BOOL is_owner = gAgent.allowOperation(PERM_OWNER, perm, GP_OBJECT_MANIPULATE);
-        BOOL allow_copy = gAgent.allowOperation(PERM_COPY, perm, GP_OBJECT_MANIPULATE);
-        BOOL allow_modify = canModify(mObjectUUID, item);
-        BOOL source_library = mObjectUUID.isNull() && gInventory.isObjectDescendentOf(mItemUUID, gInventory.getLibraryRootFolderID());
+        bool is_owner = gAgent.allowOperation(PERM_OWNER, perm, GP_OBJECT_MANIPULATE);
+        bool allow_copy = gAgent.allowOperation(PERM_COPY, perm, GP_OBJECT_MANIPULATE);
+        bool allow_modify = canModify(mObjectUUID, item);
+        bool source_library = mObjectUUID.isNull() && gInventory.isObjectDescendentOf(mItemUUID, gInventory.getLibraryRootFolderID());
+        if(!item->getName().empty())
+        {
+            note_name = item->getName();
+        }
 
         if (allow_copy || gAgent.isGodlike())
         {
             mAssetID = item->getAssetUUID();
             if(mAssetID.isNull())
             {
-                editor->setText(LLStringUtil::null);
-                editor->makePristine();
-                editor->setEnabled(TRUE);
+                mEditor->setText(LLStringUtil::null);
+                mEditor->makePristine();
+                mEditor->setEnabled(true);
                 mAssetStatus = PREVIEW_ASSET_LOADED;
 
 // [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
@@ -323,9 +310,9 @@ void LLPreviewNotecard::loadAsset()
                         // The object that we're trying to look at disappeared, bail.
                         LL_WARNS() << "Can't find object " << mObjectUUID << " associated with notecard." << LL_ENDL;
                         mAssetID.setNull();
-                        editor->setText(getString("no_object"));
-                        editor->makePristine();
-                        editor->setEnabled(FALSE);
+                        mEditor->setText(getString("no_object"));
+                        mEditor->makePristine();
+                        mEditor->setEnabled(false);
                         mAssetStatus = PREVIEW_ASSET_LOADED;
                         return;
                     }
@@ -347,29 +334,29 @@ void LLPreviewNotecard::loadAsset()
                                                 item->getType(),
                                                 &onLoadComplete,
                                                 (void*)user_data,
-                                                TRUE);
+                                                true);
                 mAssetStatus = PREVIEW_ASSET_LOADING;
             }
         }
         else
         {
             mAssetID.setNull();
-            editor->setText(getString("not_allowed"));
-            editor->makePristine();
-            editor->setEnabled(FALSE);
+            mEditor->setText(getString("not_allowed"));
+            mEditor->makePristine();
+            mEditor->setEnabled(false);
             mAssetStatus = PREVIEW_ASSET_LOADED;
         }
 
         if(!allow_modify)
         {
-            editor->setEnabled(FALSE);
-            getChildView("lock")->setVisible( TRUE);
-            getChildView("Edit")->setEnabled(FALSE);
+            mEditor->setEnabled(false);
+            mLockBtn->setVisible( true);
+            mEditBtn->setEnabled(false);
         }
 
         if((allow_modify || is_owner) && !source_library)
         {
-            getChildView("Delete")->setEnabled(TRUE);
+            mDeleteBtn->setEnabled(true);
         }
     }
     else if (mObjectUUID.notNull() && mItemUUID.notNull())
@@ -396,11 +383,13 @@ void LLPreviewNotecard::loadAsset()
         fail = true;
     }
 
+    mNoteName = note_name;
+
     if (fail)
     {
-        editor->setText(LLStringUtil::null);
-        editor->makePristine();
-        editor->setEnabled(TRUE);
+        mEditor->setText(LLStringUtil::null);
+        mEditor->makePristine();
+        mEditor->setEnabled(true);
         // Don't set asset status here; we may not have set the item id yet
         // (e.g. when this gets called initially)
         //mAssetStatus = PREVIEW_ASSET_LOADED;
@@ -430,7 +419,7 @@ void LLPreviewNotecard::onLoadComplete(const LLUUID& asset_uuid,
             buffer[file_length] = 0;
 
 
-            LLViewerTextEditor* previewEditor = preview->getChild<LLViewerTextEditor>("Notecard Editor");
+            LLViewerTextEditor* previewEditor = preview->mEditor;
 
             if( (file_length > 19) && !strncmp( &buffer[0], "Linden text version", 19 ) )
             {
@@ -446,7 +435,7 @@ void LLPreviewNotecard::onLoadComplete(const LLUUID& asset_uuid,
             }
 
             previewEditor->makePristine();
-            BOOL modifiable = preview->canModify(preview->mObjectID, preview->getItem());
+            bool modifiable = preview->canModify(preview->mObjectID, preview->getItem());
             preview->setEnabled(modifiable);
             preview->syncExternal();
             preview->mAssetStatus = PREVIEW_ASSET_LOADED;
@@ -480,38 +469,6 @@ void LLPreviewNotecard::onLoadComplete(const LLUUID& asset_uuid,
 // [/SL:KB]
     }
     delete floater_key;
-}
-
-// static
-void LLPreviewNotecard::onClickSave(void* user_data)
-{
-    //LL_INFOS() << "LLPreviewNotecard::onBtnSave()" << LL_ENDL;
-    LLPreviewNotecard* preview = (LLPreviewNotecard*)user_data;
-    if(preview)
-    {
-        preview->saveIfNeeded();
-    }
-}
-
-
-// static
-void LLPreviewNotecard::onClickDelete(void* user_data)
-{
-    LLPreviewNotecard* preview = (LLPreviewNotecard*)user_data;
-    if(preview)
-    {
-        preview->deleteNotecard();
-    }
-}
-
-// static
-void LLPreviewNotecard::onClickEdit(void* user_data)
-{
-    LLPreviewNotecard* preview = (LLPreviewNotecard*)user_data;
-    if (preview)
-    {
-        preview->openInExternalEditor();
-    }
 }
 
 struct LLSaveNotecardInfo
@@ -576,23 +533,15 @@ void LLPreviewNotecard::finishTaskUpload(LLUUID itemId, LLUUID newAssetId, LLUUI
 
 bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
 {
-    LLViewerTextEditor* editor = getChild<LLViewerTextEditor>("Notecard Editor");
-
-    if(!editor)
-    {
-        LL_WARNS() << "Cannot get handle to the notecard editor." << LL_ENDL;
-        return false;
-    }
-
-    if(!editor->isPristine())
+    if(!mEditor->isPristine())
     {
         std::string buffer;
-        if (!editor->exportBuffer(buffer))
+        if (!mEditor->exportBuffer(buffer))
         {
             return false;
         }
 
-        editor->makePristine();
+        mEditor->makePristine();
         const LLInventoryItem* item = getItem();
         // save it out to database
         if (item)
@@ -654,13 +603,13 @@ bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
                 LLSaveNotecardInfo* info = new LLSaveNotecardInfo(this, mItemUUID, mObjectUUID,
                                                                 tid, copyitem);
 
-                S32 size = buffer.length() + 1;
+                S32 size = static_cast<S32>(buffer.length()) + 1;
                 file.write((U8*)buffer.c_str(), size);
 
                 gAssetStorage->storeAssetData(tid, LLAssetType::AT_NOTECARD,
                                                 &onSaveComplete,
                                                 (void*)info,
-                                                FALSE);
+                                                false);
                 return true;
             }
             else // !gAssetStorage
@@ -680,13 +629,23 @@ bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
 void LLPreviewNotecard::syncExternal()
 {
     // Sync with external editor.
-    std::string tmp_file = getTmpFileName();
+    std::string note_name = getCleanNameForTmpFile();
+    std::string tmp_file = getTmpFileName(note_name);
     llstat s;
-    if (LLFile::stat(tmp_file, &s) == 0) // file exists
+    if (LLFile::stat(tmp_file, &s) != 0)
     {
-        if (mLiveFile) mLiveFile->ignoreNextUpdate();
-        writeToFile(tmp_file);
+        // file doesn't exist, try with empty name
+        note_name.clear();
+        tmp_file = getTmpFileName(note_name);
+        if (LLFile::stat(tmp_file, &s) != 0)
+        {
+            // file doesn't exist, with either name, give up
+            return;
+        }
     }
+
+    if (mLiveFile) mLiveFile->ignoreNextUpdate();
+    writeToFile(tmp_file);
 }
 
 /*virtual*/
@@ -758,7 +717,7 @@ void LLPreviewNotecard::onSaveComplete(const LLUUID& asset_uuid, void* user_data
                 LLPointer<LLViewerInventoryItem> new_item = new LLViewerInventoryItem(item);
                 new_item->setAssetUUID(asset_uuid);
                 new_item->setTransactionID(info->mTransactionID);
-                new_item->updateServer(FALSE);
+                new_item->updateServer(false);
                 gInventory.updateItem(new_item);
                 gInventory.notifyObservers();
             }
@@ -791,11 +750,7 @@ void LLPreviewNotecard::onSaveComplete(const LLUUID& asset_uuid, void* user_data
         // Perform item copy to inventory
         if (info->mCopyItem.notNull())
         {
-            LLViewerTextEditor* editor = info->mSelf->getChild<LLViewerTextEditor>("Notecard Editor");
-            if (editor)
-            {
-                editor->copyInventory(info->mCopyItem);
-            }
+            info->mSelf->mEditor->copyInventory(info->mCopyItem);
         }
 
         // Find our window and close it if requested.
@@ -824,17 +779,17 @@ void LLPreviewNotecard::onSaveComplete(const LLUUID& asset_uuid, void* user_data
 
 bool LLPreviewNotecard::handleSaveChangesDialog(const LLSD& notification, const LLSD& response)
 {
-    mSaveDialogShown = FALSE;
+    mSaveDialogShown = false;
     S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
     switch(option)
     {
     case 0:  // "Yes"
-        mCloseAfterSave = TRUE;
-        LLPreviewNotecard::onClickSave((void*)this);
+        mCloseAfterSave = true;
+        saveIfNeeded();
         break;
 
     case 1:  // "No"
-        mForceClose = TRUE;
+        mForceClose = true;
         closeFloater();
         break;
 
@@ -863,7 +818,7 @@ bool LLPreviewNotecard::handleConfirmDeleteDialog(const LLSD& notification, cons
         if (item != NULL)
         {
             const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
-            gInventory.changeItemParent(item, trash_id, FALSE);
+            gInventory.changeItemParent(item, trash_id, false);
         }
     }
     else
@@ -881,7 +836,7 @@ bool LLPreviewNotecard::handleConfirmDeleteDialog(const LLSD& notification, cons
     }
 
     // close floater, ignore unsaved changes
-    mForceClose = TRUE;
+    mForceClose = true;
     closeFloater();
     return false;
 }
@@ -891,8 +846,16 @@ void LLPreviewNotecard::openInExternalEditor()
     delete mLiveFile; // deletes file
 
     // Save the notecard to a temporary file.
-    std::string filename = getTmpFileName();
-    writeToFile(filename);
+    std::string note_name = getCleanNameForTmpFile();
+    std::string filename = getTmpFileName(note_name);
+    if(!writeToFile(filename)) {
+        // In case some characters from notecard name are forbidden
+        // and not accounted for, name is too long or some other issue,
+        // try file that doesn't include notecard name
+        note_name.clear();
+        filename = getTmpFileName(note_name);
+        writeToFile(filename);
+    }
 
     // Start watching file changes.
     mLiveFile = new LLLiveLSLFile(filename, boost::bind(&LLPreviewNotecard::onExternalChange, this, _1));
@@ -950,7 +913,7 @@ bool LLPreviewNotecard::loadNotecardText(const std::string& filename)
         return false;
     }
 
-    LLFILE* file = LLFile::fopen(filename, "rb");       /*Flawfinder: ignore*/
+    LLFILE* file = LLFile::fopen(filename, LLFILE_MODE("rb"));       /*Flawfinder: ignore*/
     if (!file)
     {
         LL_WARNS() << "Error opening " << filename << LL_ENDL;
@@ -981,7 +944,7 @@ bool LLPreviewNotecard::loadNotecardText(const std::string& filename)
 
 bool LLPreviewNotecard::writeToFile(const std::string& filename)
 {
-    LLFILE* fp = LLFile::fopen(filename, "wb");
+    LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("wb"));
     if (!fp)
     {
         LL_WARNS() << "Unable to write to " << filename << LL_ENDL;
@@ -1000,8 +963,21 @@ bool LLPreviewNotecard::writeToFile(const std::string& filename)
     return true;
 }
 
+std::string LLPreviewNotecard::getCleanNameForTmpFile() const
+{
+    std::string note_name = mNoteName;
+    if(note_name.empty()) {
+        note_name = "New note";
+    }
+    static const std::set<char> forbidden_chars{ '<', '>', ':', '"', '\\', '/', '|', '?', '*' };
+    note_name.erase(
+        std::remove_if(note_name.begin(), note_name.end(), [](char c) {
+            return forbidden_chars.contains(c);
+        }), note_name.end());
+    return note_name;
+}
 
-std::string LLPreviewNotecard::getTmpFileName()
+std::string LLPreviewNotecard::getTmpFileName(const std::string& note_name) const
 {
     std::string notecard_id = mObjectID.asString() + "_" + mItemUUID.asString();
 
@@ -1010,7 +986,11 @@ std::string LLPreviewNotecard::getTmpFileName()
     LLMD5 notecard_id_hash((const U8 *)notecard_id.c_str());
     notecard_id_hash.hex_digest(notecard_id_hash_str);
 
-    return std::string(LLFile::tmpdir()) + "sl_notecard_" + notecard_id_hash_str + ".txt";
+    if(note_name.empty()) {
+        return std::string(LLFile::tmpdir()) + "sl_notecard_" + notecard_id_hash_str + ".txt";
+    } else {
+        return std::string(LLFile::tmpdir()) + "sl_notecard_" + note_name + "_" + notecard_id_hash_str + ".txt";
+    }
 }
 
 

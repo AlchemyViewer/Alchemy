@@ -30,8 +30,6 @@
 
 #include "llfloater.h"
 
-class LLPanel;
-
 /**
  * Class LLFloaterSidePanelContainer
  *
@@ -42,20 +40,22 @@ class LLPanel;
  * drag an inventory item from My Inventory window to a docked IM window,
  * i.e. share the item (see VWR-22891).
  */
-class LLFloaterSidePanelContainer final : public LLFloater
+class LLFloaterSidePanelContainer : public LLFloater
 {
 private:
-    static inline constexpr std::string_view sMainPanelName = "main_panel";
-    LLPanel* mMainPanel = nullptr;
+    static const std::string sMainPanelName;
+
 public:
     LLFloaterSidePanelContainer(const LLSD& key, const Params& params = getDefaultParams());
     ~LLFloaterSidePanelContainer();
 
-    /*virtual*/ BOOL postBuild();
+    bool postBuild() override;
 
-    /*virtual*/ void onOpen(const LLSD& key);
+    void onOpen(const LLSD& key) override;
 
-    /*virtual*/ void closeFloater(bool app_quitting = false);
+    void closeFloater(bool app_quitting = false) override;
+
+    void onClickCloseBtn(bool app_qutting) override;
 
     void cleanup() { destroy(); }
 
@@ -64,8 +64,8 @@ public:
     static LLFloater* getTopmostInventoryFloater();
 
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
-    static bool canShowPanel(std::string_view floater_name, const LLSD& key);
-    static bool canShowPanel(std::string_view floater_name, std::string_view panel_name, const LLSD& key);
+    static bool canShowPanel(const std::string& floater_name, const LLSD& key);
+    static bool canShowPanel(const std::string& floater_name, const std::string& panel_name, const LLSD& key);
 // [/RLVa:KB]
 
     static void showPanel(std::string_view floater_name, const LLSD& key);
@@ -102,11 +102,16 @@ public:
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
     // Used to determine whether a sidepanel can be shown
 public:
-    typedef boost::signals2::signal<bool(std::string_view, std::string_view, const LLSD&), boost_boolean_combiner> validate_signal_t;
+    typedef boost::signals2::signal<bool(const std::string&, const std::string&, const LLSD&), boost_boolean_combiner> validate_signal_t;
     static boost::signals2::connection setValidateCallback(const validate_signal_t::slot_type& cb) { return mValidateSignal.connect(cb); }
 private:
     static validate_signal_t mValidateSignal;
 // [/RLVa:KB]
+
+protected:
+    void onCloseMsgCallback(const LLSD& notification, const LLSD& response);
+
+    LLPanel* mMainPanel = nullptr;
 };
 
 #endif // LL_LLFLOATERSIDEPANELCONTAINER_H

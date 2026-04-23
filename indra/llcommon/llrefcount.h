@@ -26,7 +26,6 @@
 #ifndef LLREFCOUNT_H
 #define LLREFCOUNT_H
 
-#include <boost/noncopyable.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include "llatomic.h"
 
@@ -46,16 +45,6 @@ class LL_COMMON_API LLRefCount
 protected:
     LLRefCount(const LLRefCount& other);
     LLRefCount& operator=(const LLRefCount&);
-    LLRefCount(LLRefCount&& other) noexcept
-    {
-        *this = std::move(other);
-    }
-    LLRefCount& operator=(LLRefCount&& other) noexcept
-    {
-        mRef = other.mRef;
-        return *this;
-    }
-
     virtual ~LLRefCount(); // use unref()
 
 public:

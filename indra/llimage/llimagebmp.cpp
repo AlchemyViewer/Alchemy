@@ -96,6 +96,8 @@ bool LLImageBMP::updateData()
 {
     resetLastError();
 
+    LLImageDataLock lock(this);
+
     // Check to make sure that this instance has been initialized with data
     U8* mdata = getData();
     if (!mdata || (0 == getDataSize()))
@@ -322,7 +324,7 @@ bool LLImageBMP::updateData()
         if (!mColorPalette)
         {
             LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS() << "Out of memory in LLImageBMP::updateData(), size: " << color_palette_size << LL_ENDL;
+            LL_ERRS() << "Out of memory in LLImageBMP::updateData()" << LL_ENDL;
             return false;
         }
         memcpy( mColorPalette, mdata + FILE_HEADER_SIZE + BITMAP_HEADER_SIZE + extension_size, color_palette_size );    /* Flawfinder: ignore */
@@ -337,8 +339,11 @@ bool LLImageBMP::decode(LLImageRaw* raw_image, F32 decode_time)
 
     resetLastError();
 
+    LLImageDataLock lockIn(this);
+    LLImageDataLock lockOut(raw_image);
+
     // Check to make sure that this instance has been initialized with data
-    U8* mdata = getData();
+    const U8* mdata = getData();
     if (!mdata || (0 == getDataSize()))
     {
         setLastError("llimagebmp trying to decode an image with no data!");
@@ -351,7 +356,7 @@ bool LLImageBMP::decode(LLImageRaw* raw_image, F32 decode_time)
         return false;
     }
 
-    U8* src = mdata + mBitmapOffset;
+    const U8* src = mdata + mBitmapOffset;
     U8* dst = raw_image->getData();
 
     bool success = false;
@@ -398,7 +403,7 @@ U32 LLImageBMP::countTrailingZeros( U32 m )
 }
 
 
-bool LLImageBMP::decodeColorMask16( U8* dst, U8* src )
+bool LLImageBMP::decodeColorMask16( U8* dst, const U8* src )
 {
     llassert( 16 == mBitsPerPixel );
 
@@ -434,7 +439,7 @@ bool LLImageBMP::decodeColorMask16( U8* dst, U8* src )
     return true;
 }
 
-bool LLImageBMP::decodeColorMask32( U8* dst, U8* src )
+bool LLImageBMP::decodeColorMask32( U8* dst, const U8* src )
 {
     // Note: alpha is not supported
 
@@ -478,7 +483,7 @@ bool LLImageBMP::decodeColorMask32( U8* dst, U8* src )
 }
 
 
-bool LLImageBMP::decodeColorTable8( U8* dst, U8* src )
+bool LLImageBMP::decodeColorTable8( U8* dst, const U8* src )
 {
     llassert( (8 == mBitsPerPixel) && (mColorPaletteColors >= 256) );
 
@@ -508,7 +513,7 @@ bool LLImageBMP::decodeColorTable8( U8* dst, U8* src )
 }
 
 
-bool LLImageBMP::decodeTruecolor24( U8* dst, U8* src )
+bool LLImageBMP::decodeTruecolor24( U8* dst, const U8* src )
 {
     llassert( 24 == mBitsPerPixel );
     llassert( 3 == getComponents() );
@@ -542,12 +547,21 @@ bool LLImageBMP::encode(const LLImageRaw* raw_image, F32 encode_time)
 
     resetLastError();
 
+    LLImageDataSharedLock lockIn(raw_image);
+    LLImageDataLock lockOut(this);
+
     S32 src_components = raw_image->getComponents();
     S32 dst_components =  ( src_components < 3 ) ? 1 : 3;
 
     if( (2 == src_components) || (4 == src_components) )
     {
         LL_INFOS() << "Dropping alpha information during BMP encoding" << LL_ENDL;
+    }
+
+    if (raw_image->isBufferInvalid())
+    {
+        setLastError("Invalid input, no buffer");
+        return false;
     }
 
     setSize(raw_image->getWidth(), raw_image->getHeight(), dst_components);

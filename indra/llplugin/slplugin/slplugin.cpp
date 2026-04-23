@@ -88,22 +88,6 @@ LONG WINAPI myWin32ExceptionHandler( struct _EXCEPTION_POINTERS* exception_infop
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
-// Taken from : http://blog.kalmbach-software.de/2013/05/23/improvedpreventsetunhandledexceptionfilter/
-// The MSVC 2005 and above CRT forces the call of the default-debugger (normally Dr.Watson)
-// even with the other exception handling code. This (terrifying) piece of code
-// patches things so that doesn't happen.
-LPTOP_LEVEL_EXCEPTION_FILTER WINAPI MyDummySetUnhandledExceptionFilter(
-    LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter )
-{
-    return NULL;
-}
-
-BOOL PreventSetUnhandledExceptionFilter()
-{
-    // remove the scary stuff that also isn't supported on 64 bit Windows
-    return TRUE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 //  Hook our exception handler and replace the system one
 void initExceptionHandler()
@@ -112,7 +96,6 @@ void initExceptionHandler()
 
     // save old exception handler in case we need to restore it at the end
     prev_filter = SetUnhandledExceptionFilter( myWin32ExceptionHandler );
-    PreventSetUnhandledExceptionFilter();
 }
 
 bool checkExceptionHandler()
@@ -121,18 +104,16 @@ bool checkExceptionHandler()
     LPTOP_LEVEL_EXCEPTION_FILTER prev_filter;
     prev_filter = SetUnhandledExceptionFilter(myWin32ExceptionHandler);
 
-    PreventSetUnhandledExceptionFilter();
-
     if (prev_filter != myWin32ExceptionHandler)
     {
         LL_WARNS("AppInit") << "Our exception handler (" << (void *)myWin32ExceptionHandler << ") replaced with " << prev_filter << "!" << LL_ENDL;
         ok = false;
     }
 
-    if (prev_filter == NULL)
+    if (prev_filter == nullptr)
     {
-        ok = FALSE;
-        if (NULL == myWin32ExceptionHandler)
+        ok = false;
+        if (nullptr == myWin32ExceptionHandler)
         {
             LL_WARNS("AppInit") << "Exception handler uninitialized." << LL_ENDL;
         }
@@ -169,7 +150,7 @@ int main(int argc, char **argv)
 #if LL_WINDOWS
     if( strlen( lpCmdLine ) == 0 )
     {
-        LL_ERRS("slplugin") << "usage: " << "ALPlugin" << " launcher_port" << LL_ENDL;
+        LL_ERRS("slplugin") << "usage: " << "SLPlugin" << " launcher_port" << LL_ENDL;
     };
 
     U32 port = 0;
@@ -206,11 +187,16 @@ int main(int argc, char **argv)
 
     LLCocoaPlugin cocoa_interface;
     cocoa_interface.setupCocoa();
+    cocoa_interface.createAutoReleasePool();
 #endif //LL_DARWIN
 
     LLPluginProcessChild *plugin = new LLPluginProcessChild();
 
     plugin->init(port);
+
+#if LL_DARWIN
+    cocoa_interface.deleteAutoReleasePool();
+#endif
 
     LLTimer timer;
     timer.start();
@@ -227,6 +213,9 @@ int main(int argc, char **argv)
 #endif
     while(!plugin->isDone())
     {
+#if LL_DARWIN
+        cocoa_interface.createAutoReleasePool();
+#endif
         timer.reset();
         plugin->idle();
 #if LL_DARWIN
@@ -264,6 +253,10 @@ int main(int argc, char **argv)
     // that do crash with a single call to the intercept
     // exception handler such as QuickTime.
     //checkExceptionHandler();
+#endif
+
+#if LL_DARWIN
+        cocoa_interface.deleteAutoReleasePool();
 #endif
     }
     delete plugin;

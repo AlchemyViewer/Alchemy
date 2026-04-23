@@ -277,10 +277,6 @@ namespace tut
     template<> template<>
     void llquat_test_object_t::test<9>()
     {
-#if LL_LINUX || LL_DARWIN
-        skip("This test fails depending on architecture. Need to fix comparison operation, is_approx_equal, to work on more than one platform.");
-#endif
-
         //test case for LLQuaternion operator*(const LLQuaternion &a, const LLQuaternion &b) fn
         LLQuaternion quat1(1.0f, 2.5f, 3.5f, 5.5f);
         LLQuaternion quat2(4.0f, 3.0f, 5.0f, 1.0f);
@@ -335,9 +331,6 @@ namespace tut
     template<> template<>
     void llquat_test_object_t::test<10>()
     {
-#if LL_LINUX || LL_DARWIN
-        skip("This test fails depending on architecture. Need to fix comparison operation, is_approx_equal, to work on more than one platform.");
-#endif
         LLVector4 vect(12.0f, 5.0f, 60.0f, 75.1f);
         LLQuaternion quat(2323.034f, 23.5f, 673.23f, 57667.5f);
         LLVector4 result = vect * quat;
@@ -356,18 +349,15 @@ namespace tut
         ensure(
             "2. LLVector4 operator*(const LLVector4 &a, const LLQuaternion &rot) failed",
             is_approx_equal(-58153.5390f, result.mV[0]) &&
-            (183787.8125f == result.mV[1]) &&
-            (116864.164063f == result.mV[2]) &&
-            (78.099998f == result.mV[3]));
+            is_approx_equal(183787.8125f, result.mV[1]) &&
+            is_approx_equal(116864.164063f, result.mV[2]) &&
+            is_approx_equal(78.099998f, result.mV[3]));
     }
 
     //test case for LLVector3 operator*(const LLVector3 &a, const LLQuaternion &rot) fn.
     template<> template<>
     void llquat_test_object_t::test<11>()
     {
-#if LL_LINUX || LL_DARWIN
-        skip("This test fails depending on architecture. Need to fix comparison operation, is_approx_equal, to work on more than one platform.");
-#endif
         LLVector3 vect(12.0f, 5.0f, 60.0f);
         LLQuaternion quat(23.5f, 6.5f, 3.23f, 56.5f);
         LLVector3 result = vect * quat;

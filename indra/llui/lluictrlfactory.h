@@ -55,17 +55,17 @@ public:
     };
 
 protected:
-    LLChildRegistry() = default;
+    LLChildRegistry() {}
 };
 
-class LLDefaultChildRegistry final : public LLChildRegistry<LLDefaultChildRegistry>
+class LLDefaultChildRegistry : public LLChildRegistry<LLDefaultChildRegistry>
 {
     LLSINGLETON_EMPTY_CTOR(LLDefaultChildRegistry);
 };
 
 // lookup widget name by type
-class LLWidgetNameRegistry final
-:   public LLRegistrySingleton<const std::type_info*, std::string, LLWidgetNameRegistry>
+class LLWidgetNameRegistry
+:   public LLRegistrySingleton<std::type_index, std::string, LLWidgetNameRegistry>
 {
     LLSINGLETON_EMPTY_CTOR(LLWidgetNameRegistry);
 };
@@ -74,21 +74,23 @@ class LLWidgetNameRegistry final
 // this is used for schema generation
 //typedef const LLInitParam::BaseBlock& (*empty_param_block_func_t)();
 //class LLDefaultParamBlockRegistry
-//: public LLRegistrySingleton<const std::type_info*, empty_param_block_func_t, LLDefaultParamBlockRegistry>
+//: public LLRegistrySingleton<std::type_index, empty_param_block_func_t, LLDefaultParamBlockRegistry>
 //{
 //  LLSINGLETON(LLDefaultParamBlockRegistry);
 //};
 
 // Build time optimization, generate this once in .cpp file
 #ifndef LLUICTRLFACTORY_CPP
-extern template class LLUICtrlFactory* LLSingleton<class LLUICtrlFactory>::getInstance();
+extern template class LLUICtrlFactory* LLSimpleton<class LLUICtrlFactory>::getInstance();
 #endif
 
-class LLUICtrlFactory final : public LLSingleton<LLUICtrlFactory>
+class LLUICtrlFactory : public LLSimpleton<LLUICtrlFactory>
 {
-    LLSINGLETON(LLUICtrlFactory);
+public:
+    LLUICtrlFactory();
     ~LLUICtrlFactory();
 
+private:
     // only partial specialization allowed in inner classes, so use extra dummy parameter
     template <typename PARAM_BLOCK, int DUMMY>
     class ParamDefaults
@@ -182,10 +184,10 @@ fail:
     }
 
     template<class T>
-    static T* getDefaultWidget(const std::string& name)
+    static T* getDefaultWidget(std::string_view name)
     {
-        typename T::Params widget_params;
-        widget_params.name = name;
+        typename T::Params widget_params{};
+        widget_params.name = std::string(name);
         return create<T>(widget_params);
     }
 
@@ -202,7 +204,7 @@ private:
     static void copyName(LLXMLNodePtr src, LLXMLNodePtr dest);
 
     // helper function for adding widget type info to various registries
-    static void registerWidget(const std::type_info* widget_type, const std::type_info* param_block_type, const std::string& tag);
+    static void registerWidget(std::type_index widget_type, std::type_index param_block_type, const std::string& tag);
 
     static void loadWidgetTemplate(const std::string& widget_tag, LLInitParam::BaseBlock& block);
 
@@ -290,7 +292,7 @@ template <typename PARAM_BLOCK, int DUMMY>
 LLUICtrlFactory::ParamDefaults<PARAM_BLOCK, DUMMY>::ParamDefaults()
 {
     // look up template file for this param block...
-    const std::string* param_block_tag = LLWidgetNameRegistry::instance().getValue(&typeid(PARAM_BLOCK));
+    const std::string* param_block_tag = LLWidgetNameRegistry::instance().getValue(typeid(PARAM_BLOCK));
     if (param_block_tag)
     {   // ...and if it exists, back fill values using the most specific template first
         PARAM_BLOCK params;
@@ -305,21 +307,21 @@ LLUICtrlFactory::ParamDefaults<PARAM_BLOCK, DUMMY>::ParamDefaults()
 }
 
 template <int DUMMY>
-LLUICtrlFactory::ParamDefaults<LLInitParam::BaseBlock, DUMMY>::ParamDefaults() = default;
+LLUICtrlFactory::ParamDefaults<LLInitParam::BaseBlock, DUMMY>::ParamDefaults() {}
 
 // this is here to make gcc happy with reference to LLUICtrlFactory
 template<typename DERIVED>
 template<typename T>
 LLChildRegistry<DERIVED>::Register<T>::Register(const char* tag, LLWidgetCreatorFunc func)
-:   LLChildRegistry<DERIVED>::StaticRegistrar(tag, func.empty() ? (LLWidgetCreatorFunc)&LLUICtrlFactory::defaultBuilder<T> : func)
+:   LLChildRegistry<DERIVED>::StaticRegistrar(tag, func == nullptr ? (LLWidgetCreatorFunc)&LLUICtrlFactory::defaultBuilder<T> : func)
 {
     // add this widget to various registries
-    LLUICtrlFactory::instance().registerWidget(&typeid(T), &typeid(typename T::Params), tag);
+    LLUICtrlFactory::registerWidget(typeid(T), typeid(typename T::Params), tag);
 
     // since registry_t depends on T, do this in line here
     // TODO: uncomment this for schema generation
     //typedef typename T::child_registry_t registry_t;
-    //LLChildRegistryRegistry::instance().defaultRegistrar().add(&typeid(T), registry_t::instance());
+    //LLChildRegistryRegistry::instance().defaultRegistrar().add(typeid(T), registry_t::instance());
 }
 
 #endif //LLUICTRLFACTORY_H

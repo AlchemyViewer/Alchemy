@@ -44,7 +44,7 @@
 	</panel.string>
 	<text name="title" value="オブジェクトのプロフィール"/>
 	<text name="where" value="（インワールド）"/>
-	<panel label="" name="properties_panel">
+	<panel  name="properties_panel">
 		<text name="Name:">
 			名前：
 		</text>
@@ -59,11 +59,14 @@
 		<text name="Owner:">
 			所有者：
 		</text>
+		<text name="Owner Name">
+			テスト文字列　無視してください
+		</text>
 		<text name="Group_label">
 			グループ：
 		</text>
-		<text name="Group Name"/>
 		<button name="button set group" tool_tip="このオブジェクトの権限を共有するグループを選択してください。"/>
+		<name_box  initial_value="読み込んでいます…" name="Group Name Proxy"/>
 		<button label="寄贈" label_selected="寄贈" name="button deed" tool_tip="このアイテムを寄贈すると「次の所有者」の権限が適用されます。グループ共有オブジェクトは、グループのオフィサーが寄贈できます。"/>
 		<text name="label click action">
 			クリックで：
@@ -87,7 +90,6 @@
 			</text>
 			<check_box label="移動" name="checkbox allow everyone move" tool_tip="オブジェクトは誰でも動かすことができます。"/>
 			<check_box label="コピー" name="checkbox allow everyone copy" tool_tip="オブジェクトのコピーは誰でも受け取ることができます。オブジェクトとそのオブジェクトの中身はすべて、コピーまたは譲渡できるように設定する必要があります。"/>
-			<check_box label="エクスポート" name="checkbox allow export" tool_tip="次の所有者は、このオブジェクトを他のグリッドにエクスポートできます。"/>
 			<text name="GroupLabel">
 				グループ：
 			</text>

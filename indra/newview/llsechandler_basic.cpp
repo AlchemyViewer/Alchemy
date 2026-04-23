@@ -57,6 +57,7 @@
 static const std::string DEFAULT_CREDENTIAL_STORAGE = "credential";
 
 // compat
+#define LEGACY_PASSWORD_STORAGE 1
 #define COMPAT_STORE_SALT_SIZE 16
 
 // 256 bits of salt data...
@@ -69,7 +70,6 @@ LLSD _basic_constraints_ext(X509* cert);
 LLSD _key_usage_ext(X509* cert);
 LLSD _ext_key_usage_ext(X509* cert);
 std::string _subject_key_identifier(X509 *cert);
-std::string _cert_sha256_digest(X509* cert);
 LLSD _authority_key_identifier(X509* cert);
 void _validateCert(int validation_policy,
                    LLPointer<LLCertificate> cert,
@@ -81,7 +81,7 @@ LLBasicCertificate::LLBasicCertificate(const std::string& pem_cert,
 {
     // BIO_new_mem_buf returns a read only bio, but takes a void* which isn't const
     // so we need to cast it.
-    BIO * pem_bio = BIO_new_mem_buf((void*)pem_cert.c_str(), pem_cert.length());
+    BIO * pem_bio = BIO_new_mem_buf((void*)pem_cert.c_str(), static_cast<int>(pem_cert.length()));
     if(pem_bio == NULL)
     {
         LL_WARNS("SECAPI") << "Could not allocate an openssl memory BIO." << LL_ENDL;
@@ -194,7 +194,6 @@ LLSD& LLBasicCertificate::_initLLSD()
     mLLSDInfo[CERT_EXTENDED_KEY_USAGE] = _ext_key_usage_ext(mCert);
     mLLSDInfo[CERT_SUBJECT_KEY_IDENTFIER] = _subject_key_identifier(mCert);
     mLLSDInfo[CERT_AUTHORITY_KEY_IDENTIFIER] = _authority_key_identifier(mCert);
-    mLLSDInfo[CERT_SHA256_DIGEST] = _cert_sha256_digest(mCert);
     return mLLSDInfo;
 }
 
@@ -707,7 +706,7 @@ LLBasicCertificateChain::LLBasicCertificateChain(X509_STORE_CTX* store)
 
     // we're passed in a context, which contains a cert, and a blob of untrusted
     // certificates which compose the chain.
-    if((store == NULL) || (X509_STORE_CTX_get0_cert(store) == NULL))
+    if((store == NULL) || X509_STORE_CTX_get0_cert(store) == NULL)
     {
         LL_WARNS("SECAPI") << "An invalid store context was passed in when trying to create a certificate chain" << LL_ENDL;
         return;
@@ -768,7 +767,7 @@ bool _cert_subdomain_wildcard_match(const std::string& subdomain,
 {
     // split wildcard into the portion before the *, and the portion after
 
-    std::string::size_type wildcard_pos = wildcard.find_first_of('*');
+    auto wildcard_pos = wildcard.find_first_of('*');
     // check the case where there is no wildcard.
     if(wildcard_pos == wildcard.npos)
     {
@@ -780,7 +779,7 @@ bool _cert_subdomain_wildcard_match(const std::string& subdomain,
     if(subdomain.substr(0, wildcard_pos) != wildcard.substr(0, wildcard_pos))
     {
         // the first portions of the strings didn't match
-        return FALSE;
+        return false;
     }
 
     // as the portion of the wildcard string before the * matched, we need to check the
@@ -789,7 +788,7 @@ bool _cert_subdomain_wildcard_match(const std::string& subdomain,
     if(new_wildcard_string.empty())
     {
         // we had nothing after the *, so it's an automatic match
-        return TRUE;
+        return true;
     }
 
     // grab the portion of the remaining wildcard string before the next '*'.  We need to find this
@@ -800,20 +799,20 @@ bool _cert_subdomain_wildcard_match(const std::string& subdomain,
     std::string new_subdomain = subdomain.substr(wildcard_pos, subdomain.npos);
 
     // iterate through the current subdomain, finding instances of the match string.
-    std::string::size_type sub_pos = new_subdomain.find_first_of(new_wildcard_match_string);
+    auto sub_pos = new_subdomain.find_first_of(new_wildcard_match_string);
     while(sub_pos != std::string::npos)
     {
         new_subdomain = new_subdomain.substr(sub_pos, std::string::npos);
         if(_cert_subdomain_wildcard_match(new_subdomain, new_wildcard_string))
         {
-            return TRUE;
+            return true;
         }
         sub_pos = new_subdomain.find_first_of(new_wildcard_match_string, 1);
 
 
     }
     // didn't find any instances of the match string that worked in the subdomain, so fail.
-    return FALSE;
+    return false;
 }
 
 
@@ -832,8 +831,8 @@ bool _cert_hostname_wildcard_match(const std::string& hostname, const std::strin
     std::string new_cn = common_name;
 
     // find the last '.' in the hostname and the match name.
-    std::string::size_type subdomain_pos = new_hostname.find_last_of('.');
-    std::string::size_type subcn_pos = new_cn.find_last_of('.');
+    auto subdomain_pos = new_hostname.find_last_of('.');
+    auto subcn_pos = new_cn.find_last_of('.');
 
     // if the last char is a '.', strip it
     if(subdomain_pos == (new_hostname.length()-1))
@@ -858,7 +857,7 @@ bool _cert_hostname_wildcard_match(const std::string& hostname, const std::strin
         if(!_cert_subdomain_wildcard_match(new_hostname.substr(subdomain_pos+1, std::string::npos),
                                            cn_part))
         {
-            return FALSE;
+            return false;
         }
         new_hostname = new_hostname.substr(0, subdomain_pos);
         new_cn = new_cn.substr(0, subcn_pos);
@@ -870,7 +869,7 @@ bool _cert_hostname_wildcard_match(const std::string& hostname, const std::strin
     if(new_cn == "*")
     {
         // if it's just a '*' we support all child domains as well, so '*.
-        return TRUE;
+        return true;
     }
 
     return _cert_subdomain_wildcard_match(new_hostname, new_cn);
@@ -886,10 +885,10 @@ bool _LLSDArrayIncludesValue(const LLSD& llsd_set, LLSD llsd_value)
     {
         if(valueCompareLLSD((*set_value), llsd_value))
         {
-            return TRUE;
+            return true;
         }
     }
-    return FALSE;
+    return false;
 }
 
 void _validateCert(int validation_policy,
@@ -922,7 +921,7 @@ void _validateCert(int validation_policy,
 
     if (validation_policy & VALIDATION_POLICY_TIME)
     {
-        LLDate validation_date(time(NULL));
+        LLDate validation_date((double)time(NULL));
         if(validation_params.has(CERT_VALIDATION_DATE))
         {
             validation_date = validation_params[CERT_VALIDATION_DATE];
@@ -996,7 +995,7 @@ void _validateCert(int validation_policy,
 bool _verify_signature(LLPointer<LLCertificate> parent,
                        LLPointer<LLCertificate> child)
 {
-    bool verify_result = FALSE;
+    bool verify_result = false;
     LLSD cert1, cert2;
     parent->getLLSD(cert1);
     child->getLLSD(cert2);
@@ -1034,23 +1033,6 @@ bool _verify_signature(LLPointer<LLCertificate> parent,
     return verify_result;
 }
 
-std::string _cert_sha256_digest(X509* cert)
-{
-    unsigned char digest_data[SHA256_DIGEST_LENGTH];
-    unsigned int len = sizeof(digest_data);
-    std::stringstream result;
-    X509_digest(cert, EVP_sha256(), digest_data, &len);
-    result << std::hex << std::setprecision(2);
-    for (unsigned int i = 0; i < len; i++)
-    {
-        if (i != 0)
-        {
-            result << ":";
-        }
-        result << std::setfill('0') << std::setw(2) << (int)digest_data[i];
-    }
-    return result.str();
-}
 
 // validate the certificate chain against a store.
 // There are many aspects of cert validatioin policy involved in
@@ -1122,7 +1104,6 @@ void LLBasicCertificateStore::validate(int validation_policy,
 
     std::string subject_name(cert_string_name_from_X509_NAME(X509_get_subject_name(cert_x509)));
     std::string skeyid(_subject_key_identifier(cert_x509));
-    std::string sha256_digest(_cert_sha256_digest(cert_x509));
 
     LL_DEBUGS("SECAPI") << "attempting to validate cert "
                         << " for '" << (validation_params.has(CERT_HOSTNAME) ? validation_params[CERT_HOSTNAME].asString() : "(unknown hostname)") << "'"
@@ -1137,11 +1118,7 @@ void LLBasicCertificateStore::validate(int validation_policy,
         LLTHROW(LLCertException(current_cert_info, "No Subject Key Id"));
     }
 
-    if (sha256_digest.empty())
-    {
-        LLTHROW(LLCertException(current_cert_info, "No SHA256 digest"));
-    }
-    t_cert_cache::iterator cache_entry = mTrustedCertCache.find(sha256_digest);
+    t_cert_cache::iterator cache_entry = mTrustedCertCache.find(skeyid);
     if(cache_entry != mTrustedCertCache.end())
     {
         // this cert is in the cache, so validate the time.
@@ -1154,7 +1131,7 @@ void LLBasicCertificateStore::validate(int validation_policy,
             }
             else
             {
-                validation_date = LLDate(time(NULL)); // current time
+                validation_date = LLDate((double)time(NULL)); // current time
             }
 
             if((validation_date < cache_entry->second.first) ||
@@ -1208,11 +1185,11 @@ void LLBasicCertificateStore::validate(int validation_policy,
         // look for a CA in the CA store that may belong to this chain.
         LLSD cert_search_params = LLSD::emptyMap();
         // is the cert itself in the store?
-        cert_search_params[CERT_SHA256_DIGEST] = current_cert_info[CERT_SHA256_DIGEST];
+        cert_search_params[CERT_SUBJECT_KEY_IDENTFIER] = current_cert_info[CERT_SUBJECT_KEY_IDENTFIER];
         LLCertificateStore::iterator found_store_cert = find(cert_search_params);
         if(found_store_cert != end())
         {
-            mTrustedCertCache[sha256_digest] = std::pair<LLDate, LLDate>(from_time, to_time);
+            mTrustedCertCache[skeyid] = std::pair<LLDate, LLDate>(from_time, to_time);
             LL_DEBUGS("SECAPI") << "Valid cert "
                                 << " for '" << (validation_params.has(CERT_HOSTNAME) ? validation_params[CERT_HOSTNAME].asString() : "(unknown hostname)") << "'";
             X509* cert_x509 = (*found_store_cert)->getOpenSSLX509();
@@ -1220,7 +1197,6 @@ void LLBasicCertificateStore::validate(int validation_policy,
             X509_free(cert_x509);
             LL_CONT << " as '" << found_cert_subject_name << "'"
                     << " skeyid '" << current_cert_info[CERT_SUBJECT_KEY_IDENTFIER].asString() << "'"
-                    << " sha256 digest '" << current_cert_info[CERT_SHA256_DIGEST].asString() << "'"
                     << " found in cert store"
                     << LL_ENDL;
             return;
@@ -1259,11 +1235,10 @@ void LLBasicCertificateStore::validate(int validation_policy,
                 LLTHROW(LLCertValidationInvalidSignatureException(current_cert_info));
             }
             // successfully validated.
-            mTrustedCertCache[sha256_digest] = std::pair<LLDate, LLDate>(from_time, to_time);
+            mTrustedCertCache[skeyid] = std::pair<LLDate, LLDate>(from_time, to_time);
             LL_DEBUGS("SECAPI") << "Verified and cached cert for '" << validation_params[CERT_HOSTNAME].asString() << "'"
                                 << " as '" << subject_name << "'"
                                 << " id '" << skeyid << "'"
-                                << " hash '" << sha256_digest << "'"
                                 << " using CA '" << cert_search_params[CERT_SUBJECT_NAME_STRING] << "'"
                                 << " with id '" <<  cert_search_params[CERT_SUBJECT_KEY_IDENTFIER].asString() << "' found in cert store"
                                 << LL_ENDL;
@@ -1287,10 +1262,9 @@ void LLBasicCertificateStore::validate(int validation_policy,
     else
     {
         LL_DEBUGS("SECAPI") << "! Caching untrusted cert for '" << subject_name << "'"
-                            << " skeyid '" << skeyid << "'"
-                            << " sha256_digest '" << sha256_digest << "' in cert store because ! VALIDATION_POLICY_TRUSTED"
+                            << " skeyid '" << skeyid << "' in cert store because ! VALIDATION_POLICY_TRUSTED"
                             << LL_ENDL;
-        mTrustedCertCache[sha256_digest] = std::pair<LLDate, LLDate>(from_time, to_time);
+        mTrustedCertCache[skeyid] = std::pair<LLDate, LLDate>(from_time, to_time);
     }
 }
 
@@ -1384,7 +1358,7 @@ void compat_rc4(llifstream &protected_data_stream, std::string &decrypted_data)
         protected_data_stream.read((char *)buffer, BUFFER_READ_SIZE);
 
         EVP_DecryptUpdate(ctx, decrypted_buffer, &decrypted_length,
-            buffer, protected_data_stream.gcount());
+            buffer, (int)protected_data_stream.gcount());
         decrypted_data.append((const char *)decrypted_buffer, decrypted_length);
     }
 
@@ -1435,12 +1409,13 @@ void LLSecAPIBasicHandler::_readProtectedData(unsigned char *unique_id, U32 id_l
         EVP_DecryptInit_ex(ctx, EVP_chacha20(), nullptr, salt, nullptr); // 0 is decrypt
 
         std::string decrypted_data;
+
         while(protected_data_stream.good()) {
             // read data as a block:
             protected_data_stream.read((char *)buffer, BUFFER_READ_SIZE);
 
             EVP_DecryptUpdate(ctx, decrypted_buffer, &decrypted_length,
-                              buffer, protected_data_stream.gcount());
+                              buffer, (int)protected_data_stream.gcount());
             decrypted_data.append((const char *)decrypted_buffer, decrypted_length);
         }
 
@@ -1506,17 +1481,18 @@ void LLSecAPIBasicHandler::_writeProtectedData()
     U8 buffer[BUFFER_READ_SIZE];
     U8 encrypted_buffer[BUFFER_READ_SIZE];
 
+
     if(mProtectedDataMap.isUndefined())
     {
         LLFile::remove(mProtectedDataFilename);
         return;
     }
-
     // create a string with the formatted data.
     LLSDSerialize::toXML(mProtectedDataMap, formatted_data_ostream);
     std::istringstream formatted_data_istream(formatted_data_ostream.str());
     // generate the seed
     RAND_bytes(salt, STORE_SALT_SIZE);
+
 
     // write to a temp file so we don't clobber the initial file if there is
     // an error.
@@ -1527,7 +1503,6 @@ void LLSecAPIBasicHandler::_writeProtectedData()
     EVP_CIPHER_CTX* ctx = nullptr;
     try
     {
-
         ctx = EVP_CIPHER_CTX_new();
         EVP_EncryptInit_ex(ctx, EVP_chacha20(), NULL, salt, NULL); // 1 is encrypt
         unsigned char unique_id[MAC_ADDRESS_BYTES];
@@ -1545,7 +1520,7 @@ void LLSecAPIBasicHandler::_writeProtectedData()
                 break;
             }
             EVP_EncryptUpdate(ctx, encrypted_buffer, &encrypted_length,
-                          buffer, formatted_data_istream.gcount());
+                          buffer, (int)formatted_data_istream.gcount());
             protected_data_stream.write((const char *)encrypted_buffer, encrypted_length);
         }
 
@@ -1960,7 +1935,7 @@ std::string LLSecAPIBasicHandler::_legacyLoadPassword()
     unsigned char unique_id[MAC_ADDRESS_BYTES];
     LLMachineID::getUniqueID(unique_id, sizeof(unique_id));
     LLXORCipher cipher(unique_id, sizeof(unique_id));
-    cipher.decrypt(&buffer[0], buffer.size());
+    cipher.decrypt(&buffer[0], static_cast<U32>(buffer.size()));
 
     return std::string((const char*)&buffer[0], buffer.size());
 }
@@ -2013,7 +1988,7 @@ bool valueCompareLLSD(const LLSD& lhs, const LLSD& rhs)
 {
     if (lhs.type() != rhs.type())
     {
-        return FALSE;
+        return false;
     }
     if (lhs.isMap())
     {
@@ -2025,7 +2000,7 @@ bool valueCompareLLSD(const LLSD& lhs, const LLSD& rhs)
         {
             if (!rhs.has(litt->first))
             {
-                return FALSE;
+                return false;
             }
         }
 
@@ -2037,14 +2012,14 @@ bool valueCompareLLSD(const LLSD& lhs, const LLSD& rhs)
         {
             if (!lhs.has(ritt->first))
             {
-                return FALSE;
+                return false;
             }
             if (!valueCompareLLSD(lhs[ritt->first], ritt->second))
             {
-                return FALSE;
+                return false;
             }
         }
-        return TRUE;
+        return true;
     }
     else if (lhs.isArray())
     {
@@ -2056,7 +2031,7 @@ bool valueCompareLLSD(const LLSD& lhs, const LLSD& rhs)
         {
             if (!valueCompareLLSD(*ritt, *litt))
             {
-                return FALSE;
+                return false;
             }
             ritt++;
         }

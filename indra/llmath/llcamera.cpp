@@ -70,6 +70,11 @@ LLCamera::LLCamera(F32 vertical_fov_rads, F32 aspect_ratio, S32 view_height_in_p
     setView(vertical_fov_rads);
 }
 
+LLCamera::~LLCamera()
+{
+
+}
+
 // ---------------- LLCamera::getFoo() member functions ----------------
 
 F32 LLCamera::getMinView() const
@@ -95,7 +100,7 @@ LLPlane LLCamera::getUserClipPlane()
 
 // ---------------- LLCamera::setFoo() member functions ----------------
 
-void LLCamera::setUserClipPlane(const LLPlane& plane)
+void LLCamera::setUserClipPlane(LLPlane& plane)
 {
     mPlaneCount = AGENT_PLANE_USER_CLIP_NUM;
     mAgentPlanes[AGENT_PLANE_USER_CLIP] = plane;
@@ -399,7 +404,7 @@ void LLCamera::calculateFrustumPlanes()
     calculateFrustumPlanes(left, right, top, bottom);
 }
 
-LLPlane planeFromPoints(const LLVector3& p1, const LLVector3& p2, const LLVector3& p3)
+LLPlane planeFromPoints(LLVector3 p1, LLVector3 p2, LLVector3 p3)
 {
     LLVector3 n = ((p2-p1)%(p3-p1));
     n.normVec();

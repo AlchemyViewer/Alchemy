@@ -31,7 +31,8 @@
 //#include "llboost.h"
 #include "llrect.h"
 #include "llsd.h"
-#include <boost/function.hpp>
+#include <functional>
+#include <boost/bind.hpp>
 #include <boost/signals2.hpp>
 
 #include "llinitparam.h"
@@ -39,20 +40,20 @@
 #include "llviewmodel.h"        // *TODO move dependency to .cpp file
 #include "llsearchablecontrol.h"
 
-const BOOL TAKE_FOCUS_YES = TRUE;
-const BOOL TAKE_FOCUS_NO  = FALSE;
-const S32 DROP_SHADOW_FLOATER = 5;
+constexpr bool TAKE_FOCUS_YES = true;
+constexpr bool TAKE_FOCUS_NO  = false;
+constexpr S32 DROP_SHADOW_FLOATER = 5;
 
 class LLUICtrl
     : public LLView, public boost::signals2::trackable
 {
 public:
-    typedef boost::function<void (LLUICtrl* ctrl, const LLSD& param)> commit_callback_t;
+    typedef std::function<void (LLUICtrl* ctrl, const LLSD& param)> commit_callback_t;
     typedef boost::signals2::signal<void (LLUICtrl* ctrl, const LLSD& param)> commit_signal_t;
     // *TODO: add xml support for this type of signal in the future
     typedef boost::signals2::signal<void (LLUICtrl* ctrl, S32 x, S32 y, MASK mask)> mouse_signal_t;
 
-    typedef boost::function<bool (LLUICtrl* ctrl, const LLSD& param)> enable_callback_t;
+    typedef std::function<bool (LLUICtrl* ctrl, const LLSD& param)> enable_callback_t;
     typedef boost::signals2::signal<bool (LLUICtrl* ctrl, const LLSD& param), boost_boolean_combiner> enable_signal_t;
 
     struct CallbackParam : public LLInitParam::Block<CallbackParam>
@@ -147,26 +148,27 @@ protected:
     // We shouldn't ever need to set this directly
     //virtual void    setViewModel(const LLViewModelPtr&);
 
-    virtual BOOL    postBuild();
+    /*virtual*/ bool    postBuild() override;
 
 public:
     // LLView interface
-    /*virtual*/ BOOL    setLabelArg( const std::string& key, const LLStringExplicit& text );
-    /*virtual*/ BOOL    isCtrl() const;
-    /*virtual*/ void    onMouseEnter(S32 x, S32 y, MASK mask);
-    /*virtual*/ void    onMouseLeave(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL    canFocusChildren() const;
-    /*virtual*/ BOOL    handleMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL    handleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL    handleRightMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL    handleRightMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL    handleDoubleClick(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool    setLabelArg( const std::string& key, const LLStringExplicit& text ) override;
+    /*virtual*/ bool    isCtrl() const override;
+    /*virtual*/ void    onMouseEnter(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ void    onMouseLeave(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    canFocusChildren() const override;
+    /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleRightMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
     // From LLFocusableElement
-    /*virtual*/ void    setFocus( BOOL b );
-    /*virtual*/ BOOL    hasFocus() const;
+    /*virtual*/ void    setFocus( bool b ) override;
+    /*virtual*/ bool    hasFocus() const override;
 
     // New virtuals
+
 
     // Return NULL by default (overrride if the class has the appropriate interface)
     virtual class LLCtrlSelectionInterface* getSelectionInterface();
@@ -175,7 +177,7 @@ public:
 
     bool setControlValue(const LLSD& value);
     void setControlVariable(LLControlVariable* control);
-    virtual void setControlName(std::string_view control, LLView* context = NULL);
+    virtual void setControlName(const std::string& control, LLView *context = NULL);
     void removeControlVariable();
 
     LLControlVariable* getControlVariable() { return mControlVariable; }
@@ -185,24 +187,24 @@ public:
     void setMakeVisibleControlVariable(LLControlVariable* control);
     void setMakeInvisibleControlVariable(LLControlVariable* control);
 
-    void setFunctionName(std::string function_name);
+    void setFunctionName(const std::string& function_name);
 
-    virtual void    setTentative(BOOL b);
-    virtual BOOL    getTentative() const;
+    virtual void    setTentative(bool b);
+    virtual bool    getTentative() const;
     virtual void    setValue(const LLSD& value);
     virtual LLSD    getValue() const;
     /// When two widgets are displaying the same data (e.g. during a skin
     /// change), share their ViewModel.
     virtual void    shareViewModelFrom(const LLUICtrl& other);
 
-    virtual BOOL    setTextArg(  const std::string& key, const LLStringExplicit& text );
-    virtual void    setIsChrome(BOOL is_chrome);
+    virtual bool    setTextArg(  const std::string& key, const LLStringExplicit& text );
+    virtual void    setIsChrome(bool is_chrome);
 
-    virtual BOOL    acceptsTextInput() const; // Defaults to false
+    virtual bool    acceptsTextInput() const; // Defaults to false
 
     // A control is dirty if the user has modified its value.
     // Editable controls should override this.
-    virtual BOOL    isDirty() const; // Defauls to false
+    virtual bool    isDirty() const; // Defauls to false
     virtual void    resetDirty(); //Defaults to no-op
 
     // Call appropriate callback
@@ -215,7 +217,7 @@ public:
     // selected radio button, etc.).  Defaults to no-op.
     virtual void    clear();
 
-    virtual void    setColor(const LLColor4& color);
+    virtual void    setColor(const LLUIColor& color);
 
     // Ansariel: Changed to virtual. We might want to change the transparency ourself!
     virtual F32 getCurrentTransparency();
@@ -223,16 +225,16 @@ public:
     void                setTransparencyType(ETypeTransparency type);
     ETypeTransparency   getTransparencyType() const {return mTransparencyType;}
 
-    BOOL    focusNextItem(BOOL text_entry_only);
-    BOOL    focusPrevItem(BOOL text_entry_only);
-    BOOL    focusFirstItem(BOOL prefer_text_fields = FALSE, BOOL focus_flash = TRUE );
+    bool    focusNextItem(bool text_entry_only);
+    bool    focusPrevItem(bool text_entry_only);
+    bool    focusFirstItem(bool prefer_text_fields = false, bool focus_flash = true );
 
     // Non Virtuals
     LLHandle<LLUICtrl> getHandle() const { return getDerivedHandle<LLUICtrl>(); }
-    BOOL            getIsChrome() const;
+    bool            getIsChrome() const;
 
-    void            setTabStop( BOOL b );
-    BOOL            hasTabStop() const;
+    void            setTabStop( bool b );
+    bool            hasTabStop() const;
 
     LLUICtrl*       getParentUICtrl() const;
 
@@ -257,29 +259,29 @@ public:
     boost::signals2::connection setDoubleClickCallback( const mouse_signal_t::slot_type& cb );
 
     // *TODO: Deprecate; for backwards compatability only:
-    boost::signals2::connection setCommitCallback( boost::function<void (LLUICtrl*,void*)> cb, void* data);
-    boost::signals2::connection setValidateBeforeCommit( boost::function<bool (const LLSD& data)> cb );
+    boost::signals2::connection setCommitCallback( std::function<void (LLUICtrl*,void*)> cb, void* data);
+    boost::signals2::connection setValidateBeforeCommit( std::function<bool (const LLSD& data)> cb );
 
     LLUICtrl* findRootMostFocusRoot();
 
-    class LLTextInputFilter final : public LLQueryFilter, public LLSingleton<LLTextInputFilter>
+    class LLTextInputFilter : public LLQueryFilter, public LLSingleton<LLTextInputFilter>
     {
         LLSINGLETON_EMPTY_CTOR(LLTextInputFilter);
         /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override
         {
-            return filterResult_t(view->isCtrl() && static_cast<const LLUICtrl *>(view)->acceptsTextInput(), TRUE);
+            return filterResult_t(view->isCtrl() && static_cast<const LLUICtrl *>(view)->acceptsTextInput(), true);
         }
     };
 
     template <typename F, typename DERIVED> class CallbackRegistry : public LLRegistrySingleton<std::string, F, DERIVED >
     {};
 
-    class CommitCallbackRegistry final : public CallbackRegistry<commit_callback_t, CommitCallbackRegistry>
+    class CommitCallbackRegistry : public CallbackRegistry<commit_callback_t, CommitCallbackRegistry>
     {
         LLSINGLETON_EMPTY_CTOR(CommitCallbackRegistry);
     };
     // the enable callback registry is also used for visiblity callbacks
-    class EnableCallbackRegistry final : public CallbackRegistry<enable_callback_t, EnableCallbackRegistry>
+    class EnableCallbackRegistry : public CallbackRegistry<enable_callback_t, EnableCallbackRegistry>
     {
         LLSINGLETON_EMPTY_CTOR(EnableCallbackRegistry);
     };
@@ -319,14 +321,14 @@ protected:
     static F32 sActiveControlTransparency;
     static F32 sInactiveControlTransparency;
 
-    virtual void addInfo(LLSD & info);
+    /*virtual*/ void addInfo(LLSD & info) override;
 
 private:
 
-    BOOL            mIsChrome;
-    BOOL            mRequestsFront;
-    BOOL            mTabStop;
-    BOOL            mTentative;
+    bool            mIsChrome;
+    bool            mRequestsFront;
+    bool            mTabStop;
+    bool            mTentative;
 
     ETypeTransparency mTransparencyType;
 };
@@ -334,7 +336,7 @@ private:
 // Build time optimization, generate once in .cpp file
 #ifndef LLUICTRL_CPP
 extern template class LLUICtrl* LLView::getChild<class LLUICtrl>(
-    std::string_view name, BOOL recurse) const;
+    std::string_view name, bool recurse) const;
 #endif
 
 #endif  // LL_LLUICTRL_H

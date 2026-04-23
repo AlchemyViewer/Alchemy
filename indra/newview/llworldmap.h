@@ -28,8 +28,6 @@
 #define LL_LLWORLDMAP_H
 
 #include "llworldmipmap.h"
-#include <boost/function.hpp>
-#include <boost/unordered/unordered_flat_map.hpp>
 
 #include "v3dmath.h"
 #include "lluuid.h"
@@ -38,20 +36,6 @@
 #include "llviewerregion.h"
 #include "llviewertexture.h"
 #include "llgltexture.h"
-
-#include <array>
-
-// map item types
-const U32 MAP_ITEM_TELEHUB = 0x01;
-const U32 MAP_ITEM_PG_EVENT = 0x02;
-const U32 MAP_ITEM_MATURE_EVENT = 0x03;
-//const U32 MAP_ITEM_POPULAR = 0x04;        // No longer supported, 2009-03-02 KLW
-//const U32 MAP_ITEM_AGENT_COUNT = 0x05;
-const U32 MAP_ITEM_AGENT_LOCATIONS = 0x06;
-const U32 MAP_ITEM_LAND_FOR_SALE = 0x07;
-const U32 MAP_ITEM_CLASSIFIED = 0x08;
-const U32 MAP_ITEM_ADULT_EVENT = 0x09;
-const U32 MAP_ITEM_LAND_FOR_SALE_ADULT = 0x0a;
 
 // Description of objects like hubs, events, land for sale, people and more (TBD).
 // Note: we don't store a "type" in there so we need to store instances of this class in
@@ -117,30 +101,25 @@ public:
 
     // Setters
     void setName(std::string& name) { mName = name; }
-    void setSize(U16 sizeX, U16 sizeY) { mSizeX = sizeX; mSizeY = sizeY; }
     void setAccess (U32 accesscode) { mAccess = accesscode; }
     void setRegionFlags (U32 region_flags) { mRegionFlags = region_flags; }
     void setLandForSaleImage (LLUUID image_id);
 //  void setWaterHeight (F32 water_height) { mWaterHeight = water_height; }
 
     // Accessors
-    std::string getName() const { return mName; }
+    const std::string& getName() const { return mName; }
     const std::string getFlagsString() const { return LLViewerRegion::regionFlagsToString(mRegionFlags); }
-    const std::string getAccessString() const { return LLViewerRegion::accessToString((U8)mAccess); }
-    const std::string getShortAccessString() const { return LLViewerRegion::accessToShortString(static_cast<U8>(mAccess)); }
-    const std::string getAccessIcon() const { return LLViewerRegion::getAccessIcon(static_cast<U8>(mAccess)); }
+    const std::string& getAccessString() const { return LLViewerRegion::accessToString((U8)mAccess); }
+    const std::string& getShortAccessString() const { return LLViewerRegion::accessToShortString(static_cast<U8>(mAccess)); }
+    const std::string& getAccessIcon() const { return LLViewerRegion::getAccessIcon(static_cast<U8>(mAccess)); }
 
     const S32 getAgentCount() const;                // Compute the total agents count
     LLPointer<LLViewerFetchedTexture> getLandForSaleImage();    // Get the overlay image, fetch it if necessary
 
-    const U64& getHandle() const { return mHandle; }
-    const U16 getSizeX() const { return mSizeX; }
-    const U16 getSizeY() const { return mSizeY; }
-
     bool isName(const std::string& name) const;
-    bool isDown() { return (mAccess == SIM_ACCESS_DOWN); }
-    bool isPG() { return (mAccess <= SIM_ACCESS_PG); }
-    bool isAdult() { return (mAccess == SIM_ACCESS_ADULT); }
+    bool isDown() const { return (mAccess == SIM_ACCESS_DOWN); }
+    bool isPG() const { return (mAccess <= SIM_ACCESS_PG); }
+    bool isAdult() const { return (mAccess == SIM_ACCESS_ADULT); }
 
     // Debug only
     void dump() const;  // Print the region info to the standard output
@@ -167,10 +146,10 @@ public:
     const LLSimInfo::item_info_list_t& getLandForSaleAdult() const { return mLandForSaleAdult; }
     const LLSimInfo::item_info_list_t& getAgentLocation() const { return mAgentLocations; }
 
+    const U64& getHandle() const { return mHandle; }
+
 private:
     U64 mHandle;                // This is a hash of the X and Y world coordinates of the SW corner of the sim
-    U16 mSizeX;
-    U16 mSizeY;
     std::string mName;          // Region name
 
     F64 mAgentsUpdateTime;      // Time stamp giving the last time the agents information was requested for that region
@@ -199,16 +178,16 @@ private:
 
 // We request region data on the world by "blocks" of (MAP_BLOCK_SIZE x MAP_BLOCK_SIZE) regions
 // This is to reduce the number of requests to the asset DB and get things in big "blocks"
-const S32 MAP_MAX_SIZE = 16384;
-const S32 MAP_BLOCK_SIZE = 16;
+const S32 MAP_MAX_SIZE = 2048;
+const S32 MAP_BLOCK_SIZE = 4;
 const S32 MAP_BLOCK_RES = (MAP_MAX_SIZE / MAP_BLOCK_SIZE);
 
-class LLWorldMap final : public LLSingleton<LLWorldMap>
+class LLWorldMap : public LLSimpleton<LLWorldMap>
 {
-    LLSINGLETON(LLWorldMap);
+public:
+    LLWorldMap();
     ~LLWorldMap();
 
-public:
     // Clear all: list of region info, tiles, blocks and items
     void reset();
 
@@ -217,14 +196,14 @@ public:
     void reloadItems(bool force = false);   // Reload the items (people, hub, etc...)
 
     // Region Map access
-    typedef boost::unordered_map<U64, std::unique_ptr<LLSimInfo>> sim_info_map_t;
+    typedef std::map<U64, LLSimInfo*> sim_info_map_t;
     const LLWorldMap::sim_info_map_t& getRegionMap() const { return mSimInfoMap; }
     void updateRegions(S32 x0, S32 y0, S32 x1, S32 y1);     // Requests region info for a rectangle of regions (in grid coordinates)
 
     // Insert a region and items in the map global instance
     // Note: x_world and y_world in world coordinates (meters)
-    bool insertRegion(U32 x_world, U32 y_world, U16 x_size, U16 y_size, std::string& name, LLUUID& uuid, U32 accesscode, U32 region_flags);
-    bool insertItem(U32 x_world, U32 y_world, std::string& name, LLUUID& uuid, U32 type, S32 extra, S32 extra2);
+    static bool insertRegion(U32 x_world, U32 y_world, std::string& name, LLUUID& uuid, U32 accesscode, U32 region_flags);
+    static bool insertItem(U32 x_world, U32 y_world, std::string& name, LLUUID& uuid, U32 type, S32 extra, S32 extra2);
 
     // Get info on sims (region) : note that those methods only search the range of loaded sims (the one that are being browsed)
     // *not* the entire world. So a NULL return does not mean a down or unexisting region, just an out of range region.
@@ -277,9 +256,9 @@ private:
     // This boolean table avoids "blocks" to be requested multiple times.
     // Issue: Not sure this scheme is foolproof though as I've seen
     // cases where a block is never retrieved and, because of this boolean being set, never re-requested
-    std::array<bool, MAP_BLOCK_RES*MAP_BLOCK_RES>   mMapBlockLoaded;        // Telling us if the block of regions has been requested or not
+    bool *          mMapBlockLoaded;        // Telling us if the block of regions has been requested or not
 
-    typedef boost::unordered_flat_map<S32, F64> block_last_update_map_t;
+    typedef boost::unordered_map<S32, F64> block_last_update_map_t;
     block_last_update_map_t mMapBlockLastUpdateOffsets;
 
     // Track location data : used while there's nothing tracked yet by LLTracker

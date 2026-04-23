@@ -27,8 +27,9 @@
 #ifndef LL_LLCALLBACKLIST_H
 #define LL_LLCALLBACKLIST_H
 
-#include "llstl.h"
-#include <boost/function.hpp>
+#include "stdtypes.h"
+
+#include <functional>
 #include <list>
 
 class LLCallbackList
@@ -41,8 +42,8 @@ public:
     //
     typedef std::list< callback_pair_t >    callback_list_t;
 
-    LLCallbackList() = default;
-    ~LLCallbackList() = default;
+    LLCallbackList();
+    ~LLCallbackList();
 
     void addFunction( callback_t func, void *data = NULL );         // register a callback, which will be called as func(data)
     bool containsFunction( callback_t func, void *data = NULL );    // true if list already contains the function/data pair
@@ -59,8 +60,8 @@ protected:
     callback_list_t mCallbackList;
 };
 
-typedef boost::function<void ()> nullary_func_t;
-typedef boost::function<bool ()> bool_func_t;
+typedef std::function<void ()> nullary_func_t;
+typedef std::function<bool ()> bool_func_t;
 
 // Call a given callable once in idle loop.
 void doOnIdleOneTime(nullary_func_t callable);

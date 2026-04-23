@@ -1,5 +1,5 @@
 /**
- * @file alpanelonlinestatus.h
+ * @file alpanelradaralert.h
  * @brief Radar alert tip toasts
  *
  * $LicenseInfo:firstyear=2010&license=viewerlgpl$

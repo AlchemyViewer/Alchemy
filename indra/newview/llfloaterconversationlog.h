@@ -29,17 +29,18 @@
 #include "llfloater.h"
 
 class LLConversationLogList;
+class LLMenuButton;
 
-class LLFloaterConversationLog final : public LLFloater
+class LLFloaterConversationLog : public LLFloater
 {
 public:
 
     LLFloaterConversationLog(const LLSD& key);
     virtual ~LLFloaterConversationLog(){};
 
-    virtual BOOL postBuild();
+    bool postBuild() override;
 
-    virtual void draw();
+    void draw() override;
 
     void onFilterEdit(const std::string& search_string);
 
@@ -50,6 +51,7 @@ private:
     bool isActionChecked(const LLSD& userdata);
 
     LLConversationLogList* mConversationLogList;
+    LLMenuButton*          mConversationsGearBtn = nullptr;
 };
 
 

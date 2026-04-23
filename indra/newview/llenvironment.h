@@ -27,8 +27,6 @@
 #ifndef LL_ENVIRONMENT_H
 #define LL_ENVIRONMENT_H
 
-#include <array>
-
 #include "llsingleton.h"
 #include "llmemory.h"
 #include "llsd.h"
@@ -49,7 +47,7 @@ class LLViewerCamera;
 class LLParcel;
 
 //-------------------------------------------------------------------------
-class LLEnvironment final : public LLSimpleton<LLEnvironment>
+class LLEnvironment : public LLSimpleton<LLEnvironment>
 {
     LOG_CLASS(LLEnvironment);
 public:
@@ -128,8 +126,8 @@ public:
     bool                        canAgentUpdateRegionEnvironment() const;
 
     LLSettingsDay::ptr_t        getCurrentDay() const { return mCurrentEnvironment->getDayCycle(); }
-    const LLSettingsSky::ptr_t&     getCurrentSky() const;
-    const LLSettingsWater::ptr_t&   getCurrentWater() const;
+    LLSettingsSky::ptr_t        getCurrentSky() const;
+    LLSettingsWater::ptr_t      getCurrentWater() const;
 
     void                        update(const LLViewerCamera * cam);
 
@@ -235,6 +233,8 @@ public:
     void                        updateParcel(S32 parcel_id, const LLSettingsWater::ptr_t &pwater, S32 day_length, S32 day_offset, altitudes_vect_t altitudes = altitudes_vect_t(), environment_apply_fn cb = environment_apply_fn());
     void                        resetParcel(S32 parcel_id, environment_apply_fn cb = environment_apply_fn());
 
+    void                        selectAgentEnvironment();
+
     S32                         calculateSkyTrackForAltitude(F64 altitude);
 
     const altitude_list_t &     getRegionAltitudes() const { return mTrackAltitudes; }
@@ -255,7 +255,7 @@ public:
         static const U32                NO_ANIMATE_WATER;
 
                                         DayInstance(EnvSelection_t env);
-        virtual                         ~DayInstance() = default;
+        virtual                         ~DayInstance() { };
 
         virtual ptr_t                   clone() const;
 
@@ -275,9 +275,9 @@ public:
 
         void                            setSkyTrack(S32 trackno);
 
-        const LLSettingsDay::ptr_t&     getDayCycle() const     { return mDayCycle; }
-        const LLSettingsSky::ptr_t&     getSky() const          { return mSky; }
-        const LLSettingsWater::ptr_t&   getWater() const        { return mWater; }
+        LLSettingsDay::ptr_t            getDayCycle() const     { return mDayCycle; }
+        LLSettingsSky::ptr_t            getSky() const          { return mSky; }
+        LLSettingsWater::ptr_t          getWater() const        { return mWater; }
         LLSettingsDay::Seconds          getDayLength() const    { return mDayLength; }
         LLSettingsDay::Seconds          getDayOffset() const    { return mDayOffset; }
         S32                             getSkyTrack() const     { return mSkyTrack; }
@@ -326,7 +326,7 @@ public:
     {
     public:
                                     DayTransition(const LLSettingsSky::ptr_t &skystart, const LLSettingsWater::ptr_t &waterstart, DayInstance::ptr_t &end, LLSettingsDay::Seconds time);
-        virtual                     ~DayTransition() = default;
+        virtual                     ~DayTransition() { };
 
         virtual bool                applyTimeDelta(const LLSettingsBase::Seconds& delta) override;
         virtual void                animate() override;

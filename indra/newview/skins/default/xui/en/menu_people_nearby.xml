@@ -89,6 +89,90 @@
       	 function="Avatar.EnableItem"
          parameter="can_invite"/>
     </menu_item_call>
+    <context_menu
+   label="Manage"
+   name="manage_menu">
+        <menu_item_check
+         label="Block/Unblock"
+         layout="topleft"
+         name="block_unblock">
+            <menu_item_check.on_click
+             function="Avatar.BlockUnblock" />
+            <menu_item_check.on_check
+             function="Avatar.CheckItem"
+             parameter="is_blocked" />
+            <menu_item_check.on_enable
+             function="Avatar.EnableItem"
+             parameter="can_block" />
+        </menu_item_check>
+        <menu_item_call
+             label="Report"
+             name="report_abuse">
+            <menu_item_call.on_click
+             function="Avatar.ReportAbuse" />
+            <menu_item_call.on_enable
+             function="Avatar.EnableItem"
+             parameter="can_report" />
+        </menu_item_call>
+        <menu_item_separator name="freeze_separator">
+            <menu_item_separator.on_visible
+            function="Avatar.EnableItem"
+            parameter="can_freeze_eject" />
+        </menu_item_separator>
+        <menu_item_call
+             label="Freeze"
+             name="freeze">
+            <menu_item_call.on_click
+             function="Avatar.Freeze" />
+            <menu_item_call.on_visible
+             function="Avatar.EnableItem"
+             parameter="can_freeze_eject" />
+        </menu_item_call>
+        <menu_item_call
+             label="Eject"
+             name="eject">
+            <menu_item_call.on_click
+             function="Avatar.Eject" />
+            <menu_item_call.on_visible
+             function="Avatar.EnableItem"
+             parameter="can_freeze_eject" />
+        </menu_item_call>
+        <menu_item_separator name="freeze_separator">
+            <menu_item_separator.on_visible
+            function="Avatar.EnableItem"
+            parameter="can_manage_estate" />
+        </menu_item_separator>
+        <menu_item_call
+         label="Teleport Home"
+         name="teleporthome">
+            <menu_item_call.on_click
+             function="Avatar.ManageEstate"
+             parameter="0" />
+            <menu_item_call.on_visible
+             function="Avatar.EnableItem"
+             parameter="can_manage_estate" />
+        </menu_item_call>
+        <menu_item_call
+         label="Estate Kick"
+         name="estatekick">
+            <menu_item_call.on_click
+             function="Avatar.ManageEstate"
+             parameter="1" />
+            <menu_item_call.on_visible
+             function="Avatar.EnableItem"
+             parameter="can_manage_estate" />
+        </menu_item_call>
+        <menu_item_call
+         label="Estate Ban"
+         name="estateban">
+            <menu_item_call.on_click
+             function="Avatar.ManageEstate"
+             parameter="2" />
+            <menu_item_call.on_visible
+             function="Avatar.EnableItem"
+             parameter="can_manage_estate" />
+        </menu_item_call>
+    </context_menu>
     <menu_item_separator name="separator_invite_to_group"/>
     <menu_item_call
      label="Zoom In"
@@ -96,7 +180,7 @@
      name="zoom_in">
       <menu_item_call.on_click
        function="Avatar.ZoomIn" />
-      <menu_item_call.on_enable
+      <menu_item_call.on_visible
        function="Avatar.EnableItem"
        parameter="can_zoom_in"/>
     </menu_item_call>
@@ -106,7 +190,7 @@
      name="teleport_to">
       <menu_item_call.on_click
        function="Avatar.TeleportTo" />
-      <menu_item_call.on_enable
+      <menu_item_call.on_visible
        function="Avatar.EnableItem"
        parameter="can_teleport_to"/>
     </menu_item_call>
@@ -116,7 +200,7 @@
      name="map">
         <menu_item_call.on_click
          function="Avatar.ShowOnMap" />
-        <menu_item_call.on_enable
+        <menu_item_call.on_visible
          function="Avatar.EnableItem"
          parameter="can_show_on_map" />
     </menu_item_call>
@@ -141,79 +225,8 @@
          parameter="can_pay"/> 
     </menu_item_call>
   <menu_item_separator name="separator_utils" />
-    <context_menu
-   label="Manage"
-   name="manage_menu">
-    <menu_item_check
-     label="Block/Unblock"
-     layout="topleft"
-     name="block_unblock">
-        <menu_item_check.on_click
-         function="Avatar.BlockUnblock" />
-        <menu_item_check.on_check
-         function="Avatar.CheckItem"
-         parameter="is_blocked" />
-        <menu_item_check.on_enable
-         function="Avatar.EnableItem"
-         parameter="can_block" />
-    </menu_item_check>
-    <menu_item_call
-         label="Report"
-         name="report_abuse">
-        <menu_item_call.on_click
-         function="Avatar.ReportAbuse" />
-    </menu_item_call>
-    <menu_item_call
-         label="Freeze"
-         name="freeze">
-        <menu_item_call.on_click
-         function="Avatar.Freeze" />
-        <menu_item_call.on_visible
-         function="Avatar.EnableItem"
-         parameter="can_freeze_eject" />
-    </menu_item_call>
-    <menu_item_call
-         label="Eject"
-         name="eject">
-        <menu_item_call.on_click
-         function="Avatar.Eject" />
-        <menu_item_call.on_visible
-         function="Avatar.EnableItem"
-         parameter="can_freeze_eject" />
-    </menu_item_call>
-    <menu_item_call
-     label="Teleport Home"
-     name="teleporthome">
-      <menu_item_call.on_click
-       function="Avatar.ManageEstate" 
-       parameter="0" />
-      <menu_item_call.on_visible
-       function="Avatar.EnableItem"
-       parameter="can_manage_estate" />
-    </menu_item_call>
-    <menu_item_call
-     label="Estate Kick"
-     name="estatekick">
-      <menu_item_call.on_click
-       function="Avatar.ManageEstate"
-       parameter="1" />
-      <menu_item_call.on_visible
-       function="Avatar.EnableItem"
-       parameter="can_manage_estate" />
-    </menu_item_call>
-    <menu_item_call
-     label="Estate Ban"
-     name="estateban">
-      <menu_item_call.on_click
-       function="Avatar.ManageEstate"
-       parameter="2" />
-      <menu_item_call.on_visible
-       function="Avatar.EnableItem"
-       parameter="can_manage_estate" />
-    </menu_item_call>
-  </context_menu>
   <context_menu
-   label="Actions"
+   label="Copy"
    name="utils_menu">
     <menu_item_call
      label="Copy Full Name"

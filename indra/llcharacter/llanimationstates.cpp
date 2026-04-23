@@ -340,6 +340,13 @@ LLAnimationLibrary::LLAnimationLibrary() :
 }
 
 //-----------------------------------------------------------------------------
+// ~LLAnimationLibrary()
+//-----------------------------------------------------------------------------
+LLAnimationLibrary::~LLAnimationLibrary()
+{
+}
+
+//-----------------------------------------------------------------------------
 // Return the text name of an animation state
 //-----------------------------------------------------------------------------
 const char *LLAnimationLibrary::animStateToString( const LLUUID& state )
@@ -348,10 +355,9 @@ const char *LLAnimationLibrary::animStateToString( const LLUUID& state )
     {
         return NULL;
     }
-    auto it = mAnimMap.find(state);
-    if (it != mAnimMap.end())
+    if (mAnimMap.count(state))
     {
-        return it->second;
+        return mAnimMap[state];
     }
 
     return NULL;
@@ -361,7 +367,7 @@ const char *LLAnimationLibrary::animStateToString( const LLUUID& state )
 //-----------------------------------------------------------------------------
 // Return the animation state for a given name
 //-----------------------------------------------------------------------------
-LLUUID LLAnimationLibrary::stringToAnimState( const std::string& name, BOOL allow_ids )
+LLUUID LLAnimationLibrary::stringToAnimState( const std::string& name, bool allow_ids )
 {
     std::string lower_case_name(name);
     LLStringUtil::toLower(lower_case_name);
@@ -385,7 +391,7 @@ LLUUID LLAnimationLibrary::stringToAnimState( const std::string& name, BOOL allo
     else if (allow_ids)
     {
         // try to convert string to LLUUID
-        id.set(name, FALSE);
+        id.set(name, false);
     }
 
     return id;

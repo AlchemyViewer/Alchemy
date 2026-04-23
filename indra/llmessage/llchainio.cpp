@@ -57,6 +57,15 @@ bool LLDeferredChain::addToPump(
 /**
  * LLChainIOFactory
  */
+LLChainIOFactory::LLChainIOFactory()
+{
+}
+
+// virtual
+LLChainIOFactory::~LLChainIOFactory()
+{
+}
+
 #if 0
 bool LLChainIOFactory::build(LLIOPipe* in, LLIOPipe* out) const
 {

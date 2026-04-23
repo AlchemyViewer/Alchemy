@@ -38,6 +38,11 @@ public:
     {
     }
 
+    virtual bool canHandleUntrusted(const LLSD &params, const LLSD &query_map, LLMediaCtrl *web, const std::string &nav_type)
+    {
+        return (nav_type == NAV_TYPE_CLICKED || nav_type == NAV_TYPE_EXTERNAL);
+    }
+
     bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web)
     {
         //Make sure we have some parameters
@@ -48,7 +53,7 @@ public:
 
         //Get the ID
         LLUUID id;
-        if (!id.set(params[0].asString(), FALSE ))
+        if (!id.set( params[0], false ))
         {
             return false;
         }

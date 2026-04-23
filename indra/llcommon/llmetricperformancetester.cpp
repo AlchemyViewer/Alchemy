@@ -50,22 +50,22 @@ void LLMetricPerformanceTesterBasic::cleanupClass()
 }
 
 /*static*/
-BOOL LLMetricPerformanceTesterBasic::addTester(LLMetricPerformanceTesterBasic* tester)
+bool LLMetricPerformanceTesterBasic::addTester(LLMetricPerformanceTesterBasic* tester)
 {
     llassert_always(tester != NULL);
     std::string name = tester->getTesterName() ;
     if (getTester(name))
     {
         LL_ERRS() << "Tester name is already used by some other tester : " << name << LL_ENDL ;
-        return FALSE;
+        return false;
     }
 
-    sTesterMap.emplace(std::make_pair(std::move(name), tester));
-    return TRUE;
+    sTesterMap.insert(std::make_pair(name, tester));
+    return true;
 }
 
 /*static*/
-void LLMetricPerformanceTesterBasic::deleteTester(std::string_view name)
+void LLMetricPerformanceTesterBasic::deleteTester(std::string name)
 {
     name_tester_map_t::iterator tester = sTesterMap.find(name);
     if (tester != sTesterMap.end())
@@ -76,7 +76,7 @@ void LLMetricPerformanceTesterBasic::deleteTester(std::string_view name)
 }
 
 /*static*/
-LLMetricPerformanceTesterBasic* LLMetricPerformanceTesterBasic::getTester(std::string_view name)
+LLMetricPerformanceTesterBasic* LLMetricPerformanceTesterBasic::getTester(std::string name)
 {
     // Check for the requested metric name
     name_tester_map_t::iterator found_it = sTesterMap.find(name) ;
@@ -88,8 +88,8 @@ LLMetricPerformanceTesterBasic* LLMetricPerformanceTesterBasic::getTester(std::s
 }
 
 /*static*/
-// Return TRUE if this metric is requested or if the general default "catch all" metric is requested
-BOOL LLMetricPerformanceTesterBasic::isMetricLogRequested(std::string_view name)
+// Return true if this metric is requested or if the general default "catch all" metric is requested
+bool LLMetricPerformanceTesterBasic::isMetricLogRequested(std::string name)
 {
     return (LLTrace::BlockTimer::sMetricLog && ((LLTrace::BlockTimer::sLogName == name) || (LLTrace::BlockTimer::sLogName == DEFAULT_METRIC_NAME)));
 }
@@ -104,10 +104,11 @@ LLSD LLMetricPerformanceTesterBasic::analyzeMetricPerformanceLog(std::istream& i
     {
         for (LLSD::map_iterator iter = cur.beginMap(); iter != cur.endMap(); ++iter)
         {
+            std::string label = iter->first;
+
             LLMetricPerformanceTesterBasic* tester = LLMetricPerformanceTesterBasic::getTester(iter->second["Name"].asString()) ;
             if(tester)
             {
-                const std::string& label = iter->first;
                 ret[label]["Name"] = iter->second["Name"] ;
 
                 auto num_of_metrics = tester->getNumberOfMetrics() ;
@@ -123,7 +124,7 @@ LLSD LLMetricPerformanceTesterBasic::analyzeMetricPerformanceLog(std::istream& i
 }
 
 /*static*/
-void LLMetricPerformanceTesterBasic::doAnalysisMetrics(const std::string& baseline, const std::string& target, const std::string& output)
+void LLMetricPerformanceTesterBasic::doAnalysisMetrics(std::string baseline, std::string target, std::string output)
 {
     if(!LLMetricPerformanceTesterBasic::hasMetricPerformanceTesters())
     {
@@ -180,6 +181,10 @@ LLMetricPerformanceTesterBasic::LLMetricPerformanceTesterBasic(std::string name)
     mValidInstance = LLMetricPerformanceTesterBasic::addTester(this) ;
 }
 
+LLMetricPerformanceTesterBasic::~LLMetricPerformanceTesterBasic()
+{
+}
+
 void LLMetricPerformanceTesterBasic::preOutputTestResults(LLSD* sd)
 {
     incrementCurrentCount() ;
@@ -201,7 +206,7 @@ void LLMetricPerformanceTesterBasic::outputTestResults()
 
 void LLMetricPerformanceTesterBasic::addMetric(std::string str)
 {
-    mMetricStrings.emplace_back(std::move(str));
+    mMetricStrings.push_back(str) ;
 }
 
 /*virtual*/
@@ -210,14 +215,15 @@ void LLMetricPerformanceTesterBasic::analyzePerformance(llofstream* os, LLSD* ba
     resetCurrentCount() ;
 
     std::string current_label = getCurrentLabelName();
-    BOOL in_base = (*base).has(current_label) ;
-    BOOL in_current = (*current).has(current_label) ;
+    bool in_base = (*base).has(current_label) ;
+    bool in_current = (*current).has(current_label) ;
 
     while(in_base || in_current)
     {
+        LLSD::String label = current_label ;
+
         if(in_base && in_current)
         {
-            LLSD::String label = current_label;
             *os << llformat("%s\n", label.c_str()) ;
 
             for(U32 index = 0 ; index < mMetricStrings.size() ; index++)
@@ -246,16 +252,16 @@ void LLMetricPerformanceTesterBasic::analyzePerformance(llofstream* os, LLSD* ba
 }
 
 /*virtual*/
-void LLMetricPerformanceTesterBasic::compareTestResults(llofstream* os, std::string_view metric_string, S32 v_base, S32 v_current)
+void LLMetricPerformanceTesterBasic::compareTestResults(llofstream* os, std::string metric_string, S32 v_base, S32 v_current)
 {
-    *os << llformat(" ,%s, %d, %d, %d, %.4f\n", std::string(metric_string).c_str(), v_base, v_current,
+    *os << llformat(" ,%s, %d, %d, %d, %.4f\n", metric_string.c_str(), v_base, v_current,
                         v_current - v_base, (v_base != 0) ? 100.f * v_current / v_base : 0) ;
 }
 
 /*virtual*/
-void LLMetricPerformanceTesterBasic::compareTestResults(llofstream* os, std::string_view metric_string, F32 v_base, F32 v_current)
+void LLMetricPerformanceTesterBasic::compareTestResults(llofstream* os, std::string metric_string, F32 v_base, F32 v_current)
 {
-    *os << llformat(" ,%s, %.4f, %.4f, %.4f, %.4f\n", std::string(metric_string).c_str(), v_base, v_current,
+    *os << llformat(" ,%s, %.4f, %.4f, %.4f, %.4f\n", metric_string.c_str(), v_base, v_current,
                         v_current - v_base, (fabs(v_base) > 0.0001f) ? 100.f * v_current / v_base : 0.f ) ;
 }
 
@@ -314,5 +320,14 @@ void LLMetricPerformanceTesterWithSession::analyzePerformance(llofstream* os, LL
         delete mCurrentSessionp ;
         mCurrentSessionp = NULL ;
     }
+}
+
+
+//----------------------------------------------------------------------------------------------
+// LLTestSession
+//----------------------------------------------------------------------------------------------
+
+LLMetricPerformanceTesterWithSession::LLTestSession::~LLTestSession()
+{
 }
 

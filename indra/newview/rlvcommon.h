@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -81,7 +82,7 @@ public:
 
     static bool getDebugHideUnsetDup()          { return rlvGetSetting<bool>(RlvSettingNames::DebugHideUnsetDup, false); }
     #ifdef RLV_EXPERIMENTAL_COMPOSITEFOLDERS
-    static BOOL getEnableComposites()           { return s_fCompositeFolders; }
+    static bool getEnableComposites()           { return s_fCompositeFolders; }
     #endif // RLV_EXPERIMENTAL_COMPOSITEFOLDERS
     static bool getEnableIMQuery()              { return rlvGetSetting<bool>(RlvSettingNames::EnableIMQuery, true); }
     static bool getEnableLegacyNaming()         { return s_fLegacyNaming; }
@@ -108,7 +109,7 @@ protected:
     static bool onChangedSettingBOOL(const LLSD& sdValue, bool* pfSetting);
 
     #ifdef RLV_EXPERIMENTAL_COMPOSITEFOLDERS
-    static BOOL s_fCompositeFolders;
+    static bool s_fCompositeFolders;
     #endif // RLV_EXPERIMENTAL_COMPOSITEFOLDERS
 
     /*
@@ -169,6 +170,7 @@ public:
 
     static void filterLocation(std::string& strUTF8Text);                           // @showloc
     static void filterNames(std::string& strUTF8Text, bool fFilterLegacy = true, bool fClearMatches = false);   // @shownames
+    static void filterMentions(std::string& strUTF8Text);                           // @shownames (mention URIs)
     static void filterScriptQuestions(S32& nQuestions, LLSD& sdPayload);
 
     static bool isForceTp() { return m_fForceTp; }

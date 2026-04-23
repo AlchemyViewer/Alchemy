@@ -55,7 +55,7 @@
 			<button name="pause_btn" tool_tip="メディアを一時停止"/>
 		</layout_panel>
 		<layout_panel name="media_address">
-			<line_editor name="media_address_url" tool_tip="メディア URL"/>
+			<line_editor name="media_address_url" tool_tip="メディアＵＲＬ"/>
 			<layout_stack name="media_address_url_icons">
 				<layout_panel name="media_address_url_icons_wl">
 					<icon name="media_whitelist_flag" tool_tip="ホワイトリスト有効"/>
@@ -85,5 +85,5 @@
 			<button name="new_window_btn" tool_tip="ＵＲＬをブラウザで開く"/>
 		</layout_panel>
 	</layout_stack>
-	<icon name="media_secure_lock_flag" tool_tip="安全なブラウジング"/>
+	<icon name="media_secure_lock_flag" tool_tip="セキュアブラウジング"/>
 </panel>

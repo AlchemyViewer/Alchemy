@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-@file   test_llcorehttp_peer.py
+@file   test_llsdmessage_peer.py
 @author Nat Goodspeed
 @date   2008-10-09
 @brief  This script asynchronously runs the executable (with args) specified on
@@ -50,12 +50,12 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
     """This subclass of BaseHTTPRequestHandler is to receive and echo
     LLSD-flavored messages sent by the C++ LLHTTPClient.
 
-    Target URLs are fairly free-form and are assembled by 
+    Target URLs are fairly free-form and are assembled by
     concatinating fragments.  Currently defined fragments
     are:
     - '/reflect/'       Request headers are bounced back to caller
                         after prefixing with 'X-Reflect-'
-    - '/fail/'          Body of request can contain LLSD with 
+    - '/fail/'          Body of request can contain LLSD with
                         'reason' string and 'status' integer
                         which will become response header.
     - '/bug2295/'       206 response, no data in body:
@@ -69,7 +69,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
     -- '/bug2295/inv_cont_range/0/'  Generates HE_INVALID_CONTENT_RANGE error in llcorehttp.
     - '/503/'           Generate 503 responses with various kinds
                         of 'retry-after' headers
-    -- '/503/0/'            "Retry-After: 2"   
+    -- '/503/0/'            "Retry-After: 2"
     -- '/503/1/'            "Retry-After: Thu, 31 Dec 2043 23:59:59 GMT"
     -- '/503/2/'            "Retry-After: Fri, 31 Dec 1999 23:59:59 GMT"
     -- '/503/3/'            "Retry-After: "
@@ -94,13 +94,13 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         except (KeyError, ValueError):
             return ""
         max_chunk_size = 10*1024*1024
-        L = []
+        L = bytes()
         while size_remaining:
             chunk_size = min(size_remaining, max_chunk_size)
             chunk = self.rfile.read(chunk_size)
-            L.append(chunk.decode('utf-8'))
+            L += chunk
             size_remaining -= len(chunk)
-        return (''.join(L)).encode('utf-8')
+        return L.decode("utf-8")
         # end of swiped read() logic
 
     def read_xml(self):
@@ -132,7 +132,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         # self.answer(self.read())
         try:
             self.answer(dict(reply="success", status=200,
-                             reason=self.read().decode('utf-8')))
+                             reason=self.read()))
         except self.ignore_exceptions as e:
             print("Exception during POST (ignoring): %s" % str(e), file=sys.stderr)
 
@@ -141,7 +141,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         # self.answer(self.read())
         try:
             self.answer(dict(reply="success", status=200,
-                             reason=self.read().decode('utf-8')))
+                             reason=self.read()))
         except self.ignore_exceptions as e:
             print("Exception during PUT (ignoring): %s" % str(e), file=sys.stderr)
 
@@ -183,7 +183,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/plain")
             self.end_headers()
             if body:
-                self.wfile.write(body.encode('utf-8'))
+                self.wfile.write(body)
         elif "/bug2295/" in self.path:
             # Test for https://jira.secondlife.com/browse/BUG-2295
             #
@@ -218,7 +218,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/plain")
             self.end_headers()
             if body:
-                self.wfile.write(body.encode('utf-8'))
+                self.wfile.write(body.encode("utf-8"))
         elif "fail" not in self.path:
             data = data.copy()          # we're going to modify
             # Ensure there's a "reply" key in data, even if there wasn't before
@@ -230,7 +230,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.reflect_headers()
             self.send_header("Content-type", "application/llsd+xml")
             self.send_header("Content-Length", str(len(response)))
-            self.send_header("X-LL-Special", "Mememememe")
+            self.send_header("X-LL-Special", "Mememememe");
             self.end_headers()
             if withdata:
                 self.wfile.write(response)
@@ -252,9 +252,9 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def reflect_headers(self):
-        for name in list(self.headers.keys()):
-            # print("Header:  %s: %s" % (name, self.headers[name]))
-            self.send_header("X-Reflect-" + name, str(self.headers[name]))
+        for (name, val) in self.headers.items():
+            # print("Header: %s %s" % (name, val), file=sys.stderr)
+            self.send_header("X-Reflect-" + name, val)
 
     if not VERBOSE:
         # When VERBOSE is set, skip both these overrides because they exist to
@@ -281,9 +281,9 @@ class Server(HTTPServer):
     # a failure status.
     def handle_error(self, request, client_address):
         print('-'*40)
-        print('Ignoring exception during processing of request from', end=' ')
-        print(client_address)
+        print('Ignoring exception during processing of request from %' % (client_address))
         print('-'*40)
+
 
 if __name__ == "__main__":
     do_valgrind = False

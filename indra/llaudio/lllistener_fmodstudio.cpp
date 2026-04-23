@@ -1,11 +1,11 @@
 /**
  * @file listener_fmodstudio.cpp
  * @brief Implementation of LISTENER class abstracting the audio
- * support as a FMOD Studio implementation
+ * support as a FMODSTUDIO implementation
  *
- * $LicenseInfo:firstyear=2002&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2020&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2020, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,47 +28,62 @@
 #include "linden_common.h"
 #include "llaudioengine.h"
 #include "lllistener_fmodstudio.h"
-#include "fmod.hpp"
+#include <fmod.hpp>
 
 //-----------------------------------------------------------------------
 // constructor
 //-----------------------------------------------------------------------
 LLListener_FMODSTUDIO::LLListener_FMODSTUDIO(FMOD::System *system)
-    : LLListener(),
-    mDopplerFactor(1.0f),
-    mRolloffFactor(1.0f)
 {
     mSystem = system;
+    init();
 }
 
 //-----------------------------------------------------------------------
-void LLListener_FMODSTUDIO::translate(const LLVector3& offset)
+LLListener_FMODSTUDIO::~LLListener_FMODSTUDIO()
+{
+}
+
+//-----------------------------------------------------------------------
+void LLListener_FMODSTUDIO::init(void)
+{
+    // do inherited
+    LLListener::init();
+    mDopplerFactor = 1.0f;
+    mRolloffFactor = 1.0f;
+}
+
+//-----------------------------------------------------------------------
+void LLListener_FMODSTUDIO::translate(LLVector3 offset)
 {
     LLListener::translate(offset);
 
-    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, nullptr, nullptr);
+    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
 }
 
 //-----------------------------------------------------------------------
-void LLListener_FMODSTUDIO::setPosition(const LLVector3& pos)
+void LLListener_FMODSTUDIO::setPosition(LLVector3 pos)
 {
     LLListener::setPosition(pos);
 
-    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, nullptr, nullptr);
+    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
 }
 
 //-----------------------------------------------------------------------
-void LLListener_FMODSTUDIO::setVelocity(const LLVector3& vel)
+void LLListener_FMODSTUDIO::setVelocity(LLVector3 vel)
 {
     LLListener::setVelocity(vel);
 
-    mSystem->set3DListenerAttributes(0, nullptr, (FMOD_VECTOR*)mVelocity.mV, nullptr, nullptr);
+    mSystem->set3DListenerAttributes(0, nullptr, (FMOD_VECTOR*)mVelocity.mV, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
 }
 
 //-----------------------------------------------------------------------
-void LLListener_FMODSTUDIO::orient(const LLVector3& up, const LLVector3& at)
+void LLListener_FMODSTUDIO::orient(LLVector3 up, LLVector3 at)
 {
     LLListener::orient(up, at);
+
+    // at = -at; by default Fmod studio is 'left-handed' but we are providing
+    // flag FMOD_INIT_3D_RIGHTHANDED so no correction are needed
 
     mSystem->set3DListenerAttributes(0, nullptr, nullptr, (FMOD_VECTOR*)at.mV, (FMOD_VECTOR*)up.mV);
 }
@@ -76,7 +91,7 @@ void LLListener_FMODSTUDIO::orient(const LLVector3& up, const LLVector3& at)
 //-----------------------------------------------------------------------
 void LLListener_FMODSTUDIO::commitDeferredChanges()
 {
-    if(!mSystem)
+    if (!mSystem)
     {
         return;
     }
@@ -87,14 +102,15 @@ void LLListener_FMODSTUDIO::commitDeferredChanges()
 
 void LLListener_FMODSTUDIO::setRolloffFactor(F32 factor)
 {
-    //An internal FMOD Studio optimization skips 3D updates if there have not been changes to the 3D sound environment.
+    //An internal FMOD optimization skips 3D updates if there have not been changes to the 3D sound environment.
+    // (this was true for FMODex, looks to be still true for FMOD STUDIO, but needs a recheck)
     //Sadly, a change in rolloff is not accounted for, thus we must touch the listener properties as well.
-    //In short: Changing the position ticks a dirtyflag inside fmod studio, which makes it not skip 3D processing next update call.
-    if(mRolloffFactor != factor)
+    //In short: Changing the position ticks a dirtyflag inside fmod, which makes it not skip 3D processing next update call.
+    if (mRolloffFactor != factor)
     {
-        LLVector3 tmp_pos = mPosition - LLVector3(0.f,0.f,.1f);
-        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*) tmp_pos.mV, nullptr, nullptr, nullptr);
-        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*) mPosition.mV, nullptr, nullptr, nullptr);
+        LLVector3 pos = mPosition - LLVector3(0.f, 0.f, .1f);
+        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)pos.mV, nullptr, nullptr, nullptr);
+        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, nullptr, nullptr);
     }
     mRolloffFactor = factor;
     mSystem->set3DSettings(mDopplerFactor, 1.f, mRolloffFactor);
@@ -118,5 +134,3 @@ F32 LLListener_FMODSTUDIO::getDopplerFactor()
 {
     return mDopplerFactor;
 }
-
-

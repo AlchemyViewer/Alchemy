@@ -48,8 +48,8 @@ class LLDispatchHandler
 public:
     typedef std::vector<std::string> sparam_t;
     //typedef std::vector<S32> iparam_t;
-    LLDispatchHandler() = default;
-    virtual ~LLDispatchHandler() = default;
+    LLDispatchHandler() {}
+    virtual ~LLDispatchHandler() {}
     virtual bool operator()(
         const LLDispatcher* dispatcher,
         const std::string& key,
@@ -73,8 +73,8 @@ public:
     //typedef std::vector<S32> iparam_t;
 
     // construct a dispatcher.
-    LLDispatcher() = default;
-    virtual ~LLDispatcher() = default;
+    LLDispatcher();
+    virtual ~LLDispatcher();
 
     // Returns if they keyed handler exists in this dispatcher.
     bool isHandlerPresent(const key_t& name) const;

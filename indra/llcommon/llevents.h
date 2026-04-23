@@ -41,11 +41,7 @@
 
 #include <boost/signals2.hpp>
 #include <boost/bind.hpp>
-#include <boost/utility.hpp>        // noncopyable
 #include <boost/optional/optional.hpp>
-#include <boost/visit_each.hpp>
-#include <boost/ref.hpp>            // reference_wrapper
-#include <boost/type_traits/is_pointer.hpp>
 #include <boost/static_assert.hpp>
 #include "llsd.h"
 #include "llsingleton.h"
@@ -184,7 +180,7 @@ public:
     LLListenerOrPumpName(const T& listener): mListener(listener) {}
 
     /// for omitted method parameter: uninitialized mListener
-    LLListenerOrPumpName() = default;
+    LLListenerOrPumpName() {}
 
     /// test for validity
     operator bool() const { return bool(mListener); }
@@ -225,7 +221,7 @@ class LLEventPump;
 // capable of this.) In that case, instead of calling LLEventPumps::instance()
 // again -- resurrecting the deleted LLSingleton -- store an
 // LLHandle<LLEventPumps> and test it before use.
-class LL_COMMON_API LLEventPumps final : public LLSingleton<LLEventPumps>,
+class LL_COMMON_API LLEventPumps: public LLSingleton<LLEventPumps>,
                                   public LLHandleProvider<LLEventPumps>
 {
     LLSINGLETON(LLEventPumps);
@@ -632,7 +628,7 @@ class LL_COMMON_API LLEventStream: public LLEventPump
 {
 public:
     LLEventStream(const std::string& name, bool tweak=false): LLEventPump(name, tweak) {}
-    virtual ~LLEventStream() = default;
+    virtual ~LLEventStream() {}
 
     /// Post an event to all listeners
     virtual bool post(const LLSD& event);
@@ -663,7 +659,7 @@ class LL_COMMON_API LLEventMailDrop : public LLEventStream
 {
 public:
     LLEventMailDrop(const std::string& name, bool tweak = false) : LLEventStream(name, tweak) {}
-    virtual ~LLEventMailDrop() = default;
+    virtual ~LLEventMailDrop() {}
 
     /// Post an event to all listeners
     virtual bool post(const LLSD& event) override;
@@ -736,7 +732,7 @@ public:
         mReqid(request["reqid"])
     {}
     /// If you don't yet have the request, use setFrom() later.
-    LLReqID() = default;
+    LLReqID() {}
 
     /// Extract and store the ["reqid"] value from an incoming request.
     void setFrom(const LLSD& request)

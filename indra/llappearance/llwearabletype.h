@@ -33,12 +33,12 @@
 #include "llsingleton.h"
 #include "llinvtranslationbrdg.h"
 
-class LLWearableType final : public LLParamSingleton<LLWearableType>
+class LLWearableType : public LLSimpleton<LLWearableType>
 {
-    LLSINGLETON(LLWearableType, LLTranslationBridge::ptr_t &trans);
-    ~LLWearableType() = default;
-    void initSingleton() override;
 public:
+    LLWearableType(LLTranslationBridge::ptr_t &trans);
+    ~LLWearableType();
+
     enum EType
     {
         WT_SHAPE      = 0,
@@ -72,8 +72,8 @@ public:
     LLAssetType::EType                  getAssetType(EType type);
     EType                               typeNameToType(const std::string& type_name);
     LLInventoryType::EIconName          getIconName(EType type);
-    BOOL                                getDisableCameraSwitch(EType type);
-    BOOL                                getAllowMultiwear(EType type);
+    bool                                getDisableCameraSwitch(EType type);
+    bool                                getAllowMultiwear(EType type);
 
     static EType                        inventoryFlagsToWearableType(U32 flags);
 
@@ -85,8 +85,8 @@ private:
             const std::string& default_new_name,
             LLAssetType::EType assetType,
             LLInventoryType::EIconName iconName,
-            BOOL disable_camera_switch = FALSE,
-            BOOL allow_multiwear = TRUE) :
+            bool disable_camera_switch = false,
+            bool allow_multiwear = true) :
             LLDictionaryEntry(name),
             mAssetType(assetType),
             mDefaultNewName(default_new_name),
@@ -101,15 +101,15 @@ private:
         const std::string mLabel;
         const std::string mDefaultNewName;
         LLInventoryType::EIconName mIconName;
-        BOOL mDisableCameraSwitch;
-        BOOL mAllowMultiwear;
+        bool mDisableCameraSwitch;
+        bool mAllowMultiwear;
     };
 
     class LLWearableDictionary : public LLDictionary<LLWearableType::EType, WearableEntry>
     {
     public:
         LLWearableDictionary(LLTranslationBridge::ptr_t& trans);
-        ~LLWearableDictionary() = default;
+        ~LLWearableDictionary() {}
 
 // [RLVa:KB] - Checked: 2010-03-03 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
     protected:

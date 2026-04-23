@@ -44,13 +44,13 @@ LLToastLifeTimer::LLToastLifeTimer(LLToast* toast, F32 period)
 }
 
 /*virtual*/
-BOOL LLToastLifeTimer::tick()
+bool LLToastLifeTimer::tick()
 {
     if (mEventTimer.hasExpired())
     {
         mToast->expire();
     }
-    return FALSE;
+    return false;
 }
 
 void LLToastLifeTimer::stop()
@@ -68,7 +68,7 @@ void LLToastLifeTimer::restart()
     mEventTimer.reset();
 }
 
-BOOL LLToastLifeTimer::getStarted()
+bool LLToastLifeTimer::getStarted()
 {
     return mEventTimer.getStarted();
 }
@@ -94,8 +94,8 @@ LLToast::Params::Params()
     enable_hide_btn("enable_hide_btn", true),
     force_show("force_show", false),
     force_store("force_store", false),
-    fading_time_secs("fading_time_secs", gSavedSettings.getS32("ToastFadingTime")),
-    lifetime_secs("lifetime_secs", gSavedSettings.getS32("NotificationToastLifeTime"))
+    fading_time_secs("fading_time_secs", (F32)gSavedSettings.getS32("ToastFadingTime")),
+    lifetime_secs("lifetime_secs", (F32)gSavedSettings.getS32("NotificationToastLifeTime"))
 {};
 
 LLToast::LLToast(const LLToast::Params& p)
@@ -117,15 +117,15 @@ LLToast::LLToast(const LLToast::Params& p)
     mIsFading(false),
     mIsHovered(false)
 {
-    mTimer.reset(new LLToastLifeTimer(this, p.lifetime_secs));
+    mTimer = std::make_unique<LLToastLifeTimer>(this, p.lifetime_secs);
 
     buildFromFile("panel_toast.xml");
 
-    setCanDrag(FALSE);
+    setCanDrag(false);
 
     mWrapperPanel = getChild<LLPanel>("wrapper_panel");
 
-    setBackgroundOpaque(TRUE); // *TODO: obsolete
+    setBackgroundOpaque(true); // *TODO: obsolete
     updateTransparency();
 
     if(p.panel())
@@ -140,7 +140,7 @@ LLToast::LLToast(const LLToast::Params& p)
     }
 
     // init callbacks if present
-    if(!p.on_delete_toast().empty())
+    if (p.on_delete_toast() != nullptr)
     {
         mOnDeleteToastSignal.connect(p.on_delete_toast());
     }
@@ -151,7 +151,7 @@ LLToast::LLToast(const LLToast::Params& p)
     }
 }
 
-void LLToast::reshape(S32 width, S32 height, BOOL called_from_parent)
+void LLToast::reshape(S32 width, S32 height, bool called_from_parent)
 {
     // We shouldn't  use reshape from LLModalDialog since it changes toasts position.
     // Toasts position should be controlled only by toast screen channel, see LLScreenChannelBase.
@@ -160,14 +160,14 @@ void LLToast::reshape(S32 width, S32 height, BOOL called_from_parent)
 }
 
 //--------------------------------------------------------------------------
-BOOL LLToast::postBuild()
+bool LLToast::postBuild()
 {
     if(!mCanFade)
     {
         mTimer->stop();
     }
 
-    return TRUE;
+    return true;
 }
 
 //--------------------------------------------------------------------------
@@ -209,7 +209,7 @@ void LLToast::hide()
 {
     if (!mIsHidden)
     {
-        setVisible(FALSE);
+        setVisible(false);
         setFading(false);
         mTimer->stop();
         mIsHidden = true;
@@ -218,7 +218,7 @@ void LLToast::hide()
 }
 
 /*virtual*/
-void LLToast::setFocus(BOOL b)
+void LLToast::setFocus(bool b)
 {
     if (b
         && !hasFocus()
@@ -226,9 +226,9 @@ void LLToast::setFocus(BOOL b)
         && mWrapperPanel
         && !mWrapperPanel->getChildList()->empty())
     {
-        LLModalDialog::setFocus(TRUE);
+        LLModalDialog::setFocus(true);
         // mostly for buttons
-        mPanel->setFocus(TRUE);
+        mPanel->setFocus(true);
     }
     else
     {
@@ -256,12 +256,12 @@ void LLToast::onFocusReceived()
 
 void LLToast::setLifetime(S32 seconds)
 {
-    mToastLifetime = seconds;
+    mToastLifetime = (F32)seconds;
 }
 
 void LLToast::setFadingTime(S32 seconds)
 {
-    mToastFadingTime = seconds;
+    mToastFadingTime = (F32)seconds;
 }
 
 void LLToast::closeToast()
@@ -391,7 +391,7 @@ void LLToast::draw()
 }
 
 //--------------------------------------------------------------------------
-void LLToast::setVisible(BOOL show)
+void LLToast::setVisible(bool show)
 {
     if(mIsHidden)
     {
@@ -421,7 +421,7 @@ void LLToast::setVisible(BOOL show)
         if(mHideBtn)
             mHideBtn->setVisible(show);
     }
-    LLFloater::setVisible(show);
+    LLModalDialog::setVisible(show);
     if (mPanel
         && !mPanel->isDead()
         && mWrapperPanel
@@ -436,8 +436,16 @@ void LLToast::setVisible(BOOL show)
 
 void LLToast::updateHoveredState()
 {
+    if (!mWrapperPanel)
+    {
+        // Shouldn't be happening.
+        // mWrapperPanel should have been inited in the constructor
+        // This needs to be figured out and fixed
+        llassert(false);
+        return;
+    }
     S32 x, y;
-    LLUI::getMousePositionScreen(&x, &y);
+    LLUI::getInstance()->getMousePositionScreen(&x, &y);
 
     LLRect panel_rc = mWrapperPanel->calcScreenRect();
     LLRect button_rc;
@@ -495,7 +503,7 @@ void LLToast::updateHoveredState()
             sendChildToFront(mHideBtn);
             if(mHideBtn && mHideBtn->getEnabled())
             {
-                mHideBtn->setVisible(TRUE);
+                mHideBtn->setVisible(true);
             }
 
             mToastMouseEnterSignal(this, getValue());
@@ -518,7 +526,7 @@ void LLToast::updateHoveredState()
                     mHideBtnPressed = false;
                     return;
                 }
-                mHideBtn->setVisible(FALSE);
+                mHideBtn->setVisible(false);
             }
 
             mToastMouseLeaveSignal(this, getValue());
@@ -526,7 +534,7 @@ void LLToast::updateHoveredState()
     }
 }
 
-void LLToast::setBackgroundOpaque(BOOL b)
+void LLToast::setBackgroundOpaque(bool b)
 {
     if(mWrapperPanel && !isBackgroundVisible())
     {
@@ -583,7 +591,7 @@ void LLNotificationsUI::LLToast::startTimer()
 
 //--------------------------------------------------------------------------
 
-BOOL LLToast::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLToast::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     if(mHideBtn && mHideBtn->getEnabled())
     {
@@ -607,7 +615,7 @@ bool LLToast::isNotificationValid()
 
 S32 LLToast::notifyParent(const LLSD& info)
 {
-    if (info.has("action") && "hide_toast" == info["action"].asString())
+    if (info.has("action") && "hide_toast" == info["action"].asStringRef())
     {
         hide();
         return 1;

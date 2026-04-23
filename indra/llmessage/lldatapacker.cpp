@@ -45,7 +45,7 @@ const S32 DP_BUFSIZE = 512;
 
 static char DUMMY_BUFFER[128]; /*Flawfinder: ignore*/
 
-LLDataPacker::LLDataPacker() : mPassFlags(0), mWriteEnabled(FALSE)
+LLDataPacker::LLDataPacker() : mPassFlags(0), mWriteEnabled(false)
 {
 }
 
@@ -61,10 +61,10 @@ void LLDataPacker::dumpBufferToLog()
     LL_ERRS() << "dumpBufferToLog not implemented for this type!" << LL_ENDL;
 }
 
-BOOL LLDataPacker::packFixed(const F32 value, const char *name,
-                             const BOOL is_signed, const U32 int_bits, const U32 frac_bits)
+bool LLDataPacker::packFixed(const F32 value, const char *name,
+                             const bool is_signed, const U32 int_bits, const U32 frac_bits)
 {
-    BOOL success = TRUE;
+    bool success = true;
     S32 unsigned_bits = int_bits + frac_bits;
     S32 total_bits = unsigned_bits;
 
@@ -113,10 +113,10 @@ BOOL LLDataPacker::packFixed(const F32 value, const char *name,
     return success;
 }
 
-BOOL LLDataPacker::unpackFixed(F32 &value, const char *name,
-                               const BOOL is_signed, const U32 int_bits, const U32 frac_bits)
+bool LLDataPacker::unpackFixed(F32 &value, const char *name,
+                               const bool is_signed, const U32 int_bits, const U32 frac_bits)
 {
-    BOOL success = TRUE;
+    bool success = true;
     //LL_INFOS() << "unpackFixed:" << name << " int:" << int_bits << " frac:" << frac_bits << LL_ENDL;
     S32 unsigned_bits = int_bits + frac_bits;
     S32 total_bits = unsigned_bits;
@@ -166,82 +166,82 @@ BOOL LLDataPacker::unpackFixed(F32 &value, const char *name,
     return success;
 }
 
-BOOL LLDataPacker::unpackU16s(U16 *values, S32 count, const char *name)
+bool LLDataPacker::unpackU16s(U16 *values, S32 count, const char *name)
 {
     for (S32 idx = 0; idx < count; ++idx)
     {
         if (!unpackU16(values[idx], name))
         {
             LL_WARNS("DATAPACKER") << "Buffer overflow reading Unsigned 16s \"" << name << "\" at index " << idx << "!" << LL_ENDL;
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
-BOOL LLDataPacker::unpackS16s(S16 *values, S32 count, const char *name)
+bool LLDataPacker::unpackS16s(S16 *values, S32 count, const char *name)
 {
     for (S32 idx = 0; idx < count; ++idx)
     {
         if (!unpackS16(values[idx], name))
         {
             LL_WARNS("DATAPACKER") << "Buffer overflow reading Signed 16s \"" << name << "\" at index " << idx << "!" << LL_ENDL;
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
-BOOL LLDataPacker::unpackF32s(F32 *values, S32 count, const char *name)
+bool LLDataPacker::unpackF32s(F32 *values, S32 count, const char *name)
 {
     for (S32 idx = 0; idx < count; ++idx)
     {
         if (!unpackF32(values[idx], name))
         {
             LL_WARNS("DATAPACKER") << "Buffer overflow reading Float 32s \"" << name << "\" at index " << idx << "!" << LL_ENDL;
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
-BOOL LLDataPacker::unpackColor4Us(LLColor4U *values, S32 count, const char *name)
+bool LLDataPacker::unpackColor4Us(LLColor4U *values, S32 count, const char *name)
 {
     for (S32 idx = 0; idx < count; ++idx)
     {
         if (!unpackColor4U(values[idx], name))
         {
             LL_WARNS("DATAPACKER") << "Buffer overflow reading Float 32s \"" << name << "\" at index " << idx << "!" << LL_ENDL;
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
-BOOL LLDataPacker::unpackUUIDs(LLUUID *values, S32 count, const char *name)
+bool LLDataPacker::unpackUUIDs(LLUUID *values, S32 count, const char *name)
 {
     for (S32 idx = 0; idx < count; ++idx)
     {
         if (!unpackUUID(values[idx], name))
         {
             LL_WARNS("DATAPACKER") << "Buffer overflow reading UUIDs \"" << name << "\" at index " << idx << "!" << LL_ENDL;
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 //---------------------------------------------------------------------------
 // LLDataPackerBinaryBuffer implementation
 //---------------------------------------------------------------------------
 
-BOOL LLDataPackerBinaryBuffer::packString(const std::string& value, const char *name)
+bool LLDataPackerBinaryBuffer::packString(const std::string& value, const char *name)
 {
-    S32 length = value.length()+1;
+    S32 length = static_cast<S32>(value.length()) + 1;
 
     if (!verifyLength(length, name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -249,30 +249,30 @@ BOOL LLDataPackerBinaryBuffer::packString(const std::string& value, const char *
         htolememcpy(mCurBufferp, value.c_str(), MVT_VARIABLE, length);
     }
     mCurBufferp += length;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackString(std::string& value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackString(std::string& value, const char *name)
 {
     S32 length = (S32)strlen((char *)mCurBufferp) + 1; /*Flawfinder: ignore*/
 
     if (!verifyLength(length, name))
     {
-        return FALSE;
+        return false;
     }
 
     value = std::string((char*)mCurBufferp); // We already assume NULL termination calling strlen()
 
     mCurBufferp += length;
-    return TRUE;
+    return true;
 }
 
-BOOL LLDataPackerBinaryBuffer::packBinaryData(const U8 *value, S32 size, const char *name)
+bool LLDataPackerBinaryBuffer::packBinaryData(const U8 *value, S32 size, const char *name)
 {
     if (!verifyLength(size + 4, name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -285,46 +285,60 @@ BOOL LLDataPackerBinaryBuffer::packBinaryData(const U8 *value, S32 size, const c
         htolememcpy(mCurBufferp, value, MVT_VARIABLE, size);
     }
     mCurBufferp += size;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackBinaryData(U8 *value, S32 &size, const char *name)
+bool LLDataPackerBinaryBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &out_size, const char *name)
 {
     if (!verifyLength(4, name))
     {
         LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData would unpack invalid data, aborting!" << LL_ENDL;
-        return FALSE;
+        out_size = 0;
+        return false;
     }
 
-    htolememcpy(&size, mCurBufferp, MVT_S32, 4);
+    if (value_size < 0)
+    {
+        LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData passed negative buffer size, aborting!" << LL_ENDL;
+        out_size = 0;
+        return false;
+    }
 
-    if (size < 0)
+    htolememcpy(&out_size, mCurBufferp, MVT_S32, 4);
+
+    if (out_size < 0)
     {
         LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData unpacked invalid size, aborting!" << LL_ENDL;
-        return FALSE;
+        out_size = 0;
+        return false;
     }
 
     mCurBufferp += 4;
 
-    if (!verifyLength(size, name))
+    if (!verifyLength(out_size, name))
     {
         LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData would unpack invalid data, aborting!" << LL_ENDL;
-        return FALSE;
+        return false;
+    }
+    S32 copy_size = llmin(out_size, value_size);
+    htolememcpy(value, mCurBufferp, MVT_VARIABLE, copy_size);
+    mCurBufferp += out_size;
+
+    if (value_size < out_size)
+    {
+        LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData buffer too small for data, truncating!" << LL_ENDL;
     }
 
-    htolememcpy(value, mCurBufferp, MVT_VARIABLE, size);
-    mCurBufferp += size;
-
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::packBinaryDataFixed(const U8 *value, S32 size, const char *name)
+bool LLDataPackerBinaryBuffer::packBinaryDataFixed(const U8 *value, S32 size, const char *name)
 {
     if (!verifyLength(size, name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -332,27 +346,27 @@ BOOL LLDataPackerBinaryBuffer::packBinaryDataFixed(const U8 *value, S32 size, co
         htolememcpy(mCurBufferp, value, MVT_VARIABLE, size);
     }
     mCurBufferp += size;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackBinaryDataFixed(U8 *value, S32 size, const char *name)
+bool LLDataPackerBinaryBuffer::unpackBinaryDataFixed(U8 *value, S32 size, const char *name)
 {
     if (!verifyLength(size, name))
     {
-        return FALSE;
+        return false;
     }
     htolememcpy(value, mCurBufferp, MVT_VARIABLE, size);
     mCurBufferp += size;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::packU8(const U8 value, const char *name)
+bool LLDataPackerBinaryBuffer::packU8(const U8 value, const char *name)
 {
     if (!verifyLength(sizeof(U8), name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -360,28 +374,28 @@ BOOL LLDataPackerBinaryBuffer::packU8(const U8 value, const char *name)
         *mCurBufferp = value;
     }
     mCurBufferp++;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackU8(U8 &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackU8(U8 &value, const char *name)
 {
     if (!verifyLength(sizeof(U8), name))
     {
-        return FALSE;
+        return false;
     }
 
     value = *mCurBufferp;
     mCurBufferp++;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::packU16(const U16 value, const char *name)
+bool LLDataPackerBinaryBuffer::packU16(const U16 value, const char *name)
 {
     if (!verifyLength(sizeof(U16), name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -389,25 +403,25 @@ BOOL LLDataPackerBinaryBuffer::packU16(const U16 value, const char *name)
         htolememcpy(mCurBufferp, &value, MVT_U16, 2);
     }
     mCurBufferp += 2;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackU16(U16 &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackU16(U16 &value, const char *name)
 {
     if (!verifyLength(sizeof(U16), name))
     {
-        return FALSE;
+        return false;
     }
 
     htolememcpy(&value, mCurBufferp, MVT_U16, 2);
     mCurBufferp += 2;
-    return TRUE;
+    return true;
 }
 
-BOOL LLDataPackerBinaryBuffer::packS16(const S16 value, const char *name)
+bool LLDataPackerBinaryBuffer::packS16(const S16 value, const char *name)
 {
-    BOOL success = verifyLength(sizeof(S16), name);
+    bool success = verifyLength(sizeof(S16), name);
 
     if (mWriteEnabled && success)
     {
@@ -417,9 +431,9 @@ BOOL LLDataPackerBinaryBuffer::packS16(const S16 value, const char *name)
     return success;
 }
 
-BOOL LLDataPackerBinaryBuffer::unpackS16(S16 &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackS16(S16 &value, const char *name)
 {
-    BOOL success = verifyLength(sizeof(S16), name);
+    bool success = verifyLength(sizeof(S16), name);
 
     if (success)
     {
@@ -429,11 +443,11 @@ BOOL LLDataPackerBinaryBuffer::unpackS16(S16 &value, const char *name)
     return success;
 }
 
-BOOL LLDataPackerBinaryBuffer::packU32(const U32 value, const char *name)
+bool LLDataPackerBinaryBuffer::packU32(const U32 value, const char *name)
 {
     if (!verifyLength(sizeof(U32), name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -441,28 +455,28 @@ BOOL LLDataPackerBinaryBuffer::packU32(const U32 value, const char *name)
         htolememcpy(mCurBufferp, &value, MVT_U32, 4);
     }
     mCurBufferp += 4;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackU32(U32 &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackU32(U32 &value, const char *name)
 {
     if (!verifyLength(sizeof(U32), name))
     {
-        return FALSE;
+        return false;
     }
 
     htolememcpy(&value, mCurBufferp, MVT_U32, 4);
     mCurBufferp += 4;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::packS32(const S32 value, const char *name)
+bool LLDataPackerBinaryBuffer::packS32(const S32 value, const char *name)
 {
     if (!verifyLength(sizeof(S32), name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -470,28 +484,28 @@ BOOL LLDataPackerBinaryBuffer::packS32(const S32 value, const char *name)
         htolememcpy(mCurBufferp, &value, MVT_S32, 4);
     }
     mCurBufferp += 4;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackS32(S32 &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackS32(S32 &value, const char *name)
 {
     if(!verifyLength(sizeof(S32), name))
     {
-        return FALSE;
+        return false;
     }
 
     htolememcpy(&value, mCurBufferp, MVT_S32, 4);
     mCurBufferp += 4;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::packF32(const F32 value, const char *name)
+bool LLDataPackerBinaryBuffer::packF32(const F32 value, const char *name)
 {
     if (!verifyLength(sizeof(F32), name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -499,28 +513,28 @@ BOOL LLDataPackerBinaryBuffer::packF32(const F32 value, const char *name)
         htolememcpy(mCurBufferp, &value, MVT_F32, 4);
     }
     mCurBufferp += 4;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackF32(F32 &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackF32(F32 &value, const char *name)
 {
     if (!verifyLength(sizeof(F32), name))
     {
-        return FALSE;
+        return false;
     }
 
     htolememcpy(&value, mCurBufferp, MVT_F32, 4);
     mCurBufferp += 4;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::packColor4(const LLColor4 &value, const char *name)
+bool LLDataPackerBinaryBuffer::packColor4(const LLColor4 &value, const char *name)
 {
     if (!verifyLength(16, name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -528,28 +542,28 @@ BOOL LLDataPackerBinaryBuffer::packColor4(const LLColor4 &value, const char *nam
         htolememcpy(mCurBufferp, value.mV, MVT_LLVector4, 16);
     }
     mCurBufferp += 16;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackColor4(LLColor4 &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackColor4(LLColor4 &value, const char *name)
 {
     if (!verifyLength(16, name))
     {
-        return FALSE;
+        return false;
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_LLVector4, 16);
     mCurBufferp += 16;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::packColor4U(const LLColor4U &value, const char *name)
+bool LLDataPackerBinaryBuffer::packColor4U(const LLColor4U &value, const char *name)
 {
     if (!verifyLength(4, name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -557,29 +571,29 @@ BOOL LLDataPackerBinaryBuffer::packColor4U(const LLColor4U &value, const char *n
         htolememcpy(mCurBufferp, value.mV, MVT_VARIABLE, 4);
     }
     mCurBufferp += 4;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackColor4U(LLColor4U &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackColor4U(LLColor4U &value, const char *name)
 {
     if (!verifyLength(4, name))
     {
-        return FALSE;
+        return false;
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_VARIABLE, 4);
     mCurBufferp += 4;
-    return TRUE;
+    return true;
 }
 
 
 
-BOOL LLDataPackerBinaryBuffer::packVector2(const LLVector2 &value, const char *name)
+bool LLDataPackerBinaryBuffer::packVector2(const LLVector2 &value, const char *name)
 {
     if (!verifyLength(8, name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -588,29 +602,29 @@ BOOL LLDataPackerBinaryBuffer::packVector2(const LLVector2 &value, const char *n
         htolememcpy(mCurBufferp+4, &value.mV[1], MVT_F32, 4);
     }
     mCurBufferp += 8;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackVector2(LLVector2 &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackVector2(LLVector2 &value, const char *name)
 {
     if (!verifyLength(8, name))
     {
-        return FALSE;
+        return false;
     }
 
     htolememcpy(&value.mV[0], mCurBufferp, MVT_F32, 4);
     htolememcpy(&value.mV[1], mCurBufferp+4, MVT_F32, 4);
     mCurBufferp += 8;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::packVector3(const LLVector3 &value, const char *name)
+bool LLDataPackerBinaryBuffer::packVector3(const LLVector3 &value, const char *name)
 {
     if (!verifyLength(12, name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -618,27 +632,27 @@ BOOL LLDataPackerBinaryBuffer::packVector3(const LLVector3 &value, const char *n
         htolememcpy(mCurBufferp, value.mV, MVT_LLVector3, 12);
     }
     mCurBufferp += 12;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackVector3(LLVector3 &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackVector3(LLVector3 &value, const char *name)
 {
     if (!verifyLength(12, name))
     {
-        return FALSE;
+        return false;
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_LLVector3, 12);
     mCurBufferp += 12;
-    return TRUE;
+    return true;
 }
 
-BOOL LLDataPackerBinaryBuffer::packVector4(const LLVector4 &value, const char *name)
+bool LLDataPackerBinaryBuffer::packVector4(const LLVector4 &value, const char *name)
 {
     if (!verifyLength(16, name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -646,27 +660,27 @@ BOOL LLDataPackerBinaryBuffer::packVector4(const LLVector4 &value, const char *n
         htolememcpy(mCurBufferp, value.mV, MVT_LLVector4, 16);
     }
     mCurBufferp += 16;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackVector4(LLVector4 &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackVector4(LLVector4 &value, const char *name)
 {
     if (!verifyLength(16, name))
     {
-        return FALSE;
+        return false;
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_LLVector4, 16);
     mCurBufferp += 16;
-    return TRUE;
+    return true;
 }
 
-BOOL LLDataPackerBinaryBuffer::packUUID(const LLUUID &value, const char *name)
+bool LLDataPackerBinaryBuffer::packUUID(const LLUUID &value, const char *name)
 {
     if (!verifyLength(16, name))
     {
-        return FALSE;
+        return false;
     }
 
     if (mWriteEnabled)
@@ -674,20 +688,20 @@ BOOL LLDataPackerBinaryBuffer::packUUID(const LLUUID &value, const char *name)
         htolememcpy(mCurBufferp, value.mData, MVT_LLUUID, 16);
     }
     mCurBufferp += 16;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerBinaryBuffer::unpackUUID(LLUUID &value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackUUID(LLUUID &value, const char *name)
 {
     if (!verifyLength(16, name))
     {
-        return FALSE;
+        return false;
     }
 
     htolememcpy(value.mData, mCurBufferp, MVT_LLUUID, 16);
     mCurBufferp += 16;
-    return TRUE;
+    return true;
 }
 
 const LLDataPackerBinaryBuffer& LLDataPackerBinaryBuffer::operator=(const LLDataPackerBinaryBuffer &a)
@@ -729,9 +743,9 @@ void LLDataPackerBinaryBuffer::dumpBufferToLog()
 //---------------------------------------------------------------------------
 // LLDataPackerAsciiBuffer implementation
 //---------------------------------------------------------------------------
-BOOL LLDataPackerAsciiBuffer::packString(const std::string& value, const char *name)
+bool LLDataPackerAsciiBuffer::packString(const std::string& value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -740,7 +754,7 @@ BOOL LLDataPackerAsciiBuffer::packString(const std::string& value, const char *n
     }
     else
     {
-        numCopied = value.length() + 1; /*Flawfinder: ignore*/
+        numCopied = static_cast<S32>(value.length()) + 1; /*Flawfinder: ignore*/
     }
 
     // snprintf returns number of bytes that would have been written
@@ -759,21 +773,21 @@ BOOL LLDataPackerAsciiBuffer::packString(const std::string& value, const char *n
     return success;
 }
 
-BOOL LLDataPackerAsciiBuffer::unpackString(std::string& value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackString(std::string& value, const char *name)
 {
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore*/
     if (!getValueStr(name, valuestr, DP_BUFSIZE))  // NULL terminated
     {
-        return FALSE;
+        return false;
     }
     value = valuestr;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLDataPackerAsciiBuffer::packBinaryData(const U8 *value, S32 size, const char *name)
+bool LLDataPackerAsciiBuffer::packBinaryData(const U8 *value, S32 size, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
 
     int numCopied = 0;
@@ -796,7 +810,7 @@ BOOL LLDataPackerAsciiBuffer::packBinaryData(const U8 *value, S32 size, const ch
 
 
         S32 i;
-        BOOL bBufferFull = FALSE;
+        bool bBufferFull = false;
         for (i = 0; i < size && !bBufferFull; i++)
         {
             numCopied = snprintf(mCurBufferp, getBufferSize()-getCurrentSize(), "%02x ", value[i]); /* Flawfinder: ignore */
@@ -804,7 +818,7 @@ BOOL LLDataPackerAsciiBuffer::packBinaryData(const U8 *value, S32 size, const ch
             {
                 numCopied = getBufferSize()-getCurrentSize();
                 LL_WARNS() << "LLDataPackerAsciiBuffer::packBinaryData: data truncated: " << LL_ENDL;
-                bBufferFull = TRUE;
+                bBufferFull = true;
             }
             mCurBufferp += numCopied;
         }
@@ -836,21 +850,34 @@ BOOL LLDataPackerAsciiBuffer::packBinaryData(const U8 *value, S32 size, const ch
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackBinaryData(U8 *value, S32 &size, const char *name)
+bool LLDataPackerAsciiBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &out_size, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        out_size = 0;
+        return false;
+    }
+
+    if (value_size < 0)
+    {
+        LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData passed negative buffer size, aborting!" << LL_ENDL;
+        out_size = 0;
+        return false;
     }
 
     char *cur_pos = &valuestr[0];
-    sscanf(valuestr,"%010d", &size);
+    sscanf(valuestr,"%010d", &out_size);
     cur_pos += 11;
 
+    S32 max_bytes = llmin(out_size, value_size);
+    if (max_bytes != out_size)
+    {
+        LL_WARNS() << "LLDataPackerAsciiBuffer::unpackBinaryData: buffer too small for data, truncating!" << LL_ENDL;
+    }
     S32 i;
-    for (i = 0; i < size; i++)
+    for (i = 0; i < max_bytes; i++)
     {
         S32 val;
         sscanf(cur_pos,"%02x", &val);
@@ -861,16 +888,16 @@ BOOL LLDataPackerAsciiBuffer::unpackBinaryData(U8 *value, S32 &size, const char 
 }
 
 
-BOOL LLDataPackerAsciiBuffer::packBinaryDataFixed(const U8 *value, S32 size, const char *name)
+bool LLDataPackerAsciiBuffer::packBinaryDataFixed(const U8 *value, S32 size, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
 
     if (mWriteEnabled)
     {
         S32 i;
         int numCopied = 0;
-        BOOL bBufferFull = FALSE;
+        bool bBufferFull = false;
         for (i = 0; i < size && !bBufferFull; i++)
         {
             numCopied = snprintf(mCurBufferp, getBufferSize()-getCurrentSize(), "%02x ", value[i]); /* Flawfinder: ignore */
@@ -878,7 +905,7 @@ BOOL LLDataPackerAsciiBuffer::packBinaryDataFixed(const U8 *value, S32 size, con
             {
                 numCopied = getBufferSize()-getCurrentSize();
                 LL_WARNS() << "LLDataPackerAsciiBuffer::packBinaryDataFixed: data truncated: " << LL_ENDL;
-                bBufferFull = TRUE;
+                bBufferFull = true;
             }
             mCurBufferp += numCopied;
 
@@ -908,13 +935,13 @@ BOOL LLDataPackerAsciiBuffer::packBinaryDataFixed(const U8 *value, S32 size, con
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackBinaryDataFixed(U8 *value, S32 size, const char *name)
+bool LLDataPackerAsciiBuffer::unpackBinaryDataFixed(U8 *value, S32 size, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     char *cur_pos = &valuestr[0];
@@ -932,9 +959,9 @@ BOOL LLDataPackerAsciiBuffer::unpackBinaryDataFixed(U8 *value, S32 size, const c
 
 
 
-BOOL LLDataPackerAsciiBuffer::packU8(const U8 value, const char *name)
+bool LLDataPackerAsciiBuffer::packU8(const U8 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -965,13 +992,13 @@ BOOL LLDataPackerAsciiBuffer::packU8(const U8 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackU8(U8 &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackU8(U8 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     S32 in_val;
@@ -980,9 +1007,9 @@ BOOL LLDataPackerAsciiBuffer::unpackU8(U8 &value, const char *name)
     return success;
 }
 
-BOOL LLDataPackerAsciiBuffer::packU16(const U16 value, const char *name)
+bool LLDataPackerAsciiBuffer::packU16(const U16 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -1012,13 +1039,13 @@ BOOL LLDataPackerAsciiBuffer::packU16(const U16 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackU16(U16 &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackU16(U16 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     S32 in_val;
@@ -1027,9 +1054,9 @@ BOOL LLDataPackerAsciiBuffer::unpackU16(U16 &value, const char *name)
     return success;
 }
 
-BOOL LLDataPackerAsciiBuffer::packS16(const S16 value, const char *name)
+bool LLDataPackerAsciiBuffer::packS16(const S16 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -1059,13 +1086,13 @@ BOOL LLDataPackerAsciiBuffer::packS16(const S16 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackS16(S16 &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackS16(S16 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     S32 in_val;
@@ -1074,9 +1101,9 @@ BOOL LLDataPackerAsciiBuffer::unpackS16(S16 &value, const char *name)
     return success;
 }
 
-BOOL LLDataPackerAsciiBuffer::packU32(const U32 value, const char *name)
+bool LLDataPackerAsciiBuffer::packU32(const U32 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -1104,13 +1131,13 @@ BOOL LLDataPackerAsciiBuffer::packU32(const U32 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackU32(U32 &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackU32(U32 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%u", &value);
@@ -1118,9 +1145,9 @@ BOOL LLDataPackerAsciiBuffer::unpackU32(U32 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::packS32(const S32 value, const char *name)
+bool LLDataPackerAsciiBuffer::packS32(const S32 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -1148,13 +1175,13 @@ BOOL LLDataPackerAsciiBuffer::packS32(const S32 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackS32(S32 &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackS32(S32 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%d", &value);
@@ -1162,9 +1189,9 @@ BOOL LLDataPackerAsciiBuffer::unpackS32(S32 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::packF32(const F32 value, const char *name)
+bool LLDataPackerAsciiBuffer::packF32(const F32 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -1192,13 +1219,13 @@ BOOL LLDataPackerAsciiBuffer::packF32(const F32 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackF32(F32 &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackF32(F32 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%f", &value);
@@ -1206,9 +1233,9 @@ BOOL LLDataPackerAsciiBuffer::unpackF32(F32 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::packColor4(const LLColor4 &value, const char *name)
+bool LLDataPackerAsciiBuffer::packColor4(const LLColor4 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -1236,22 +1263,22 @@ BOOL LLDataPackerAsciiBuffer::packColor4(const LLColor4 &value, const char *name
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackColor4(LLColor4 &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackColor4(LLColor4 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];  /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%f %f %f %f", &value.mV[0], &value.mV[1], &value.mV[2], &value.mV[3]);
     return success;
 }
 
-BOOL LLDataPackerAsciiBuffer::packColor4U(const LLColor4U &value, const char *name)
+bool LLDataPackerAsciiBuffer::packColor4U(const LLColor4U &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -1279,13 +1306,13 @@ BOOL LLDataPackerAsciiBuffer::packColor4U(const LLColor4U &value, const char *na
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackColor4U(LLColor4U &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackColor4U(LLColor4U &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];   /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     S32 r, g, b, a;
@@ -1299,9 +1326,9 @@ BOOL LLDataPackerAsciiBuffer::unpackColor4U(LLColor4U &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::packVector2(const LLVector2 &value, const char *name)
+bool LLDataPackerAsciiBuffer::packVector2(const LLVector2 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -1329,13 +1356,13 @@ BOOL LLDataPackerAsciiBuffer::packVector2(const LLVector2 &value, const char *na
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackVector2(LLVector2 &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackVector2(LLVector2 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];   /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%f %f", &value.mV[0], &value.mV[1]);
@@ -1343,9 +1370,9 @@ BOOL LLDataPackerAsciiBuffer::unpackVector2(LLVector2 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::packVector3(const LLVector3 &value, const char *name)
+bool LLDataPackerAsciiBuffer::packVector3(const LLVector3 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -1373,22 +1400,22 @@ BOOL LLDataPackerAsciiBuffer::packVector3(const LLVector3 &value, const char *na
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackVector3(LLVector3 &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackVector3(LLVector3 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];  /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%f %f %f", &value.mV[0], &value.mV[1], &value.mV[2]);
     return success;
 }
 
-BOOL LLDataPackerAsciiBuffer::packVector4(const LLVector4 &value, const char *name)
+bool LLDataPackerAsciiBuffer::packVector4(const LLVector4 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     int numCopied = 0;
     if (mWriteEnabled)
@@ -1416,13 +1443,13 @@ BOOL LLDataPackerAsciiBuffer::packVector4(const LLVector4 &value, const char *na
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackVector4(LLVector4 &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackVector4(LLVector4 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];  /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%f %f %f %f", &value.mV[0], &value.mV[1], &value.mV[2], &value.mV[3]);
@@ -1430,9 +1457,9 @@ BOOL LLDataPackerAsciiBuffer::unpackVector4(LLVector4 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiBuffer::packUUID(const LLUUID &value, const char *name)
+bool LLDataPackerAsciiBuffer::packUUID(const LLUUID &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
 
     int numCopied = 0;
@@ -1456,20 +1483,20 @@ BOOL LLDataPackerAsciiBuffer::packUUID(const LLUUID &value, const char *name)
     {
         numCopied = getBufferSize()-getCurrentSize();
         LL_WARNS() << "LLDataPackerAsciiBuffer::packUUID: truncated: " << LL_ENDL;
-        success = FALSE;
+        success = false;
     }
     mCurBufferp += numCopied;
     return success;
 }
 
 
-BOOL LLDataPackerAsciiBuffer::unpackUUID(LLUUID &value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackUUID(LLUUID &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];  /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     char tmp_str[64];   /* Flawfinder: ignore */
@@ -1514,9 +1541,9 @@ void LLDataPackerAsciiBuffer::writeIndentedName(const char *name)
     }
 }
 
-BOOL LLDataPackerAsciiBuffer::getValueStr(const char *name, char *out_value, S32 value_len)
+bool LLDataPackerAsciiBuffer::getValueStr(const char *name, char *out_value, S32 value_len)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char buffer[DP_BUFSIZE];    /* Flawfinder: ignore */
     char keyword[DP_BUFSIZE];   /* Flawfinder: ignore */
     char value[DP_BUFSIZE]; /* Flawfinder: ignore */
@@ -1537,7 +1564,7 @@ BOOL LLDataPackerAsciiBuffer::getValueStr(const char *name, char *out_value, S32
         if (strcmp(keyword, name))
         {
             LL_WARNS() << "Data packer expecting keyword of type " << name << ", got " << keyword << " instead!" << LL_ENDL;
-            return FALSE;
+            return false;
         }
     }
     else
@@ -1572,9 +1599,9 @@ std::string convertF32ToString(F32 val)
 //---------------------------------------------------------------------------
 // LLDataPackerAsciiFile implementation
 //---------------------------------------------------------------------------
-BOOL LLDataPackerAsciiFile::packString(const std::string& value, const char *name)
+bool LLDataPackerAsciiFile::packString(const std::string& value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -1587,22 +1614,22 @@ BOOL LLDataPackerAsciiFile::packString(const std::string& value, const char *nam
     return success;
 }
 
-BOOL LLDataPackerAsciiFile::unpackString(std::string& value, const char *name)
+bool LLDataPackerAsciiFile::unpackString(std::string& value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE];  /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
     value = valuestr;
     return success;
 }
 
 
-BOOL LLDataPackerAsciiFile::packBinaryData(const U8 *value, S32 size, const char *name)
+bool LLDataPackerAsciiFile::packBinaryData(const U8 *value, S32 size, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
 
     if (mFP)
@@ -1634,34 +1661,46 @@ BOOL LLDataPackerAsciiFile::packBinaryData(const U8 *value, S32 size, const char
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackBinaryData(U8 *value, S32 &size, const char *name)
+bool LLDataPackerAsciiFile::unpackBinaryData(U8 *value, S32 value_size, S32 &out_size, const char *name)
 {
-    BOOL success = TRUE;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore*/
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        out_size = 0;
+        return false;
+    }
+
+    if (value_size < 0)
+    {
+        LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData passed negative buffer size, aborting!" << LL_ENDL;
+        out_size = 0;
+        return false;
     }
 
     char *cur_pos = &valuestr[0];
-    sscanf(valuestr,"%010d", &size);
+    sscanf(valuestr,"%010d", &out_size);
     cur_pos += 11;
 
+    S32 max_bytes = llmin(out_size, value_size);
+    if (max_bytes != out_size)
+    {
+        LL_WARNS() << "LLDataPackerAsciiBuffer::unpackBinaryData: buffer too small for data, truncating!" << LL_ENDL;
+    }
     S32 i;
-    for (i = 0; i < size; i++)
+    for (i = 0; i < max_bytes; i++)
     {
         S32 val;
         sscanf(cur_pos,"%02x", &val);
         value[i] = val;
         cur_pos += 3;
     }
-    return success;
+    return true;
 }
 
 
-BOOL LLDataPackerAsciiFile::packBinaryDataFixed(const U8 *value, S32 size, const char *name)
+bool LLDataPackerAsciiFile::packBinaryDataFixed(const U8 *value, S32 size, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
 
     if (mFP)
@@ -1688,13 +1727,13 @@ BOOL LLDataPackerAsciiFile::packBinaryDataFixed(const U8 *value, S32 size, const
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackBinaryDataFixed(U8 *value, S32 size, const char *name)
+bool LLDataPackerAsciiFile::unpackBinaryDataFixed(U8 *value, S32 size, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore*/
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     char *cur_pos = &valuestr[0];
@@ -1712,9 +1751,9 @@ BOOL LLDataPackerAsciiFile::unpackBinaryDataFixed(U8 *value, S32 size, const cha
 
 
 
-BOOL LLDataPackerAsciiFile::packU8(const U8 value, const char *name)
+bool LLDataPackerAsciiFile::packU8(const U8 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -1730,13 +1769,13 @@ BOOL LLDataPackerAsciiFile::packU8(const U8 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackU8(U8 &value, const char *name)
+bool LLDataPackerAsciiFile::unpackU8(U8 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     S32 in_val;
@@ -1745,9 +1784,9 @@ BOOL LLDataPackerAsciiFile::unpackU8(U8 &value, const char *name)
     return success;
 }
 
-BOOL LLDataPackerAsciiFile::packU16(const U16 value, const char *name)
+bool LLDataPackerAsciiFile::packU16(const U16 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -1761,13 +1800,13 @@ BOOL LLDataPackerAsciiFile::packU16(const U16 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackU16(U16 &value, const char *name)
+bool LLDataPackerAsciiFile::unpackU16(U16 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     S32 in_val;
@@ -1776,9 +1815,9 @@ BOOL LLDataPackerAsciiFile::unpackU16(U16 &value, const char *name)
     return success;
 }
 
-BOOL LLDataPackerAsciiFile::packS16(const S16 value, const char *name)
+bool LLDataPackerAsciiFile::packS16(const S16 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -1792,13 +1831,13 @@ BOOL LLDataPackerAsciiFile::packS16(const S16 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackS16(S16 &value, const char *name)
+bool LLDataPackerAsciiFile::unpackS16(S16 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     S32 in_val;
@@ -1807,9 +1846,9 @@ BOOL LLDataPackerAsciiFile::unpackS16(S16 &value, const char *name)
     return success;
 }
 
-BOOL LLDataPackerAsciiFile::packU32(const U32 value, const char *name)
+bool LLDataPackerAsciiFile::packU32(const U32 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -1823,13 +1862,13 @@ BOOL LLDataPackerAsciiFile::packU32(const U32 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackU32(U32 &value, const char *name)
+bool LLDataPackerAsciiFile::unpackU32(U32 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%u", &value);
@@ -1837,9 +1876,9 @@ BOOL LLDataPackerAsciiFile::unpackU32(U32 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::packS32(const S32 value, const char *name)
+bool LLDataPackerAsciiFile::packS32(const S32 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -1853,13 +1892,13 @@ BOOL LLDataPackerAsciiFile::packS32(const S32 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackS32(S32 &value, const char *name)
+bool LLDataPackerAsciiFile::unpackS32(S32 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%d", &value);
@@ -1867,9 +1906,9 @@ BOOL LLDataPackerAsciiFile::unpackS32(S32 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::packF32(const F32 value, const char *name)
+bool LLDataPackerAsciiFile::packF32(const F32 value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -1883,13 +1922,13 @@ BOOL LLDataPackerAsciiFile::packF32(const F32 value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackF32(F32 &value, const char *name)
+bool LLDataPackerAsciiFile::unpackF32(F32 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%f", &value);
@@ -1897,9 +1936,9 @@ BOOL LLDataPackerAsciiFile::unpackF32(F32 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::packColor4(const LLColor4 &value, const char *name)
+bool LLDataPackerAsciiFile::packColor4(const LLColor4 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -1913,22 +1952,22 @@ BOOL LLDataPackerAsciiFile::packColor4(const LLColor4 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackColor4(LLColor4 &value, const char *name)
+bool LLDataPackerAsciiFile::unpackColor4(LLColor4 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%f %f %f %f", &value.mV[0], &value.mV[1], &value.mV[2], &value.mV[3]);
     return success;
 }
 
-BOOL LLDataPackerAsciiFile::packColor4U(const LLColor4U &value, const char *name)
+bool LLDataPackerAsciiFile::packColor4U(const LLColor4U &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -1942,13 +1981,13 @@ BOOL LLDataPackerAsciiFile::packColor4U(const LLColor4U &value, const char *name
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackColor4U(LLColor4U &value, const char *name)
+bool LLDataPackerAsciiFile::unpackColor4U(LLColor4U &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     S32 r, g, b, a;
@@ -1962,9 +2001,9 @@ BOOL LLDataPackerAsciiFile::unpackColor4U(LLColor4U &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::packVector2(const LLVector2 &value, const char *name)
+bool LLDataPackerAsciiFile::packVector2(const LLVector2 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -1978,13 +2017,13 @@ BOOL LLDataPackerAsciiFile::packVector2(const LLVector2 &value, const char *name
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackVector2(LLVector2 &value, const char *name)
+bool LLDataPackerAsciiFile::unpackVector2(LLVector2 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%f %f", &value.mV[0], &value.mV[1]);
@@ -1992,9 +2031,9 @@ BOOL LLDataPackerAsciiFile::unpackVector2(LLVector2 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::packVector3(const LLVector3 &value, const char *name)
+bool LLDataPackerAsciiFile::packVector3(const LLVector3 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -2008,22 +2047,22 @@ BOOL LLDataPackerAsciiFile::packVector3(const LLVector3 &value, const char *name
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackVector3(LLVector3 &value, const char *name)
+bool LLDataPackerAsciiFile::unpackVector3(LLVector3 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%f %f %f", &value.mV[0], &value.mV[1], &value.mV[2]);
     return success;
 }
 
-BOOL LLDataPackerAsciiFile::packVector4(const LLVector4 &value, const char *name)
+bool LLDataPackerAsciiFile::packVector4(const LLVector4 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     if (mFP)
     {
@@ -2037,13 +2076,13 @@ BOOL LLDataPackerAsciiFile::packVector4(const LLVector4 &value, const char *name
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackVector4(LLVector4 &value, const char *name)
+bool LLDataPackerAsciiFile::unpackVector4(LLVector4 &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     sscanf(valuestr,"%f %f %f %f", &value.mV[0], &value.mV[1], &value.mV[2], &value.mV[3]);
@@ -2051,9 +2090,9 @@ BOOL LLDataPackerAsciiFile::unpackVector4(LLVector4 &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::packUUID(const LLUUID &value, const char *name)
+bool LLDataPackerAsciiFile::packUUID(const LLUUID &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     writeIndentedName(name);
     std::string tmp_str;
     value.toString(tmp_str);
@@ -2069,13 +2108,13 @@ BOOL LLDataPackerAsciiFile::packUUID(const LLUUID &value, const char *name)
 }
 
 
-BOOL LLDataPackerAsciiFile::unpackUUID(LLUUID &value, const char *name)
+bool LLDataPackerAsciiFile::unpackUUID(LLUUID &value, const char *name)
 {
-    BOOL success = TRUE;
+    bool success = true;
     char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
-        return FALSE;
+        return false;
     }
 
     char tmp_str[64]; /*Flawfinder: ignore */
@@ -2089,14 +2128,13 @@ BOOL LLDataPackerAsciiFile::unpackUUID(LLUUID &value, const char *name)
 void LLDataPackerAsciiFile::writeIndentedName(const char *name)
 {
     std::string indent_buf;
-    indent_buf.reserve(mIndent+1);
+    indent_buf.resize(mIndent);
 
     S32 i;
     for(i = 0; i < mIndent; i++)
     {
         indent_buf[i] = '\t';
     }
-    indent_buf[i] = 0;
     if (mFP)
     {
         fprintf(mFP,"%s%s\t",indent_buf.c_str(), name);
@@ -2107,9 +2145,9 @@ void LLDataPackerAsciiFile::writeIndentedName(const char *name)
     }
 }
 
-BOOL LLDataPackerAsciiFile::getValueStr(const char *name, char *out_value, S32 value_len)
+bool LLDataPackerAsciiFile::getValueStr(const char *name, char *out_value, S32 value_len)
 {
-    BOOL success = FALSE;
+    bool success = false;
     char buffer[DP_BUFSIZE]; /*Flawfinder: ignore*/
     char keyword[DP_BUFSIZE]; /*Flawfinder: ignore*/
     char value[DP_BUFSIZE]; /*Flawfinder: ignore*/
@@ -2124,7 +2162,7 @@ BOOL LLDataPackerAsciiFile::getValueStr(const char *name, char *out_value, S32 v
         if (0 != fgetpos(mFP, &last_pos)) // 0==success for fgetpos
         {
             LL_WARNS() << "Data packer failed to fgetpos" << LL_ENDL;
-            return FALSE;
+            return false;
         }
 
         if (fgets(buffer, DP_BUFSIZE, mFP) == NULL)
@@ -2138,20 +2176,20 @@ BOOL LLDataPackerAsciiFile::getValueStr(const char *name, char *out_value, S32 v
         {
             LL_WARNS() << "Data packer could not get the keyword!" << LL_ENDL;
             fsetpos(mFP, &last_pos);
-            return FALSE;
+            return false;
         }
         if (strcmp(keyword, name))
         {
             LL_WARNS() << "Data packer expecting keyword of type " << name << ", got " << keyword << " instead!" << LL_ENDL;
             fsetpos(mFP, &last_pos);
-            return FALSE;
+            return false;
         }
 
         S32 in_value_len = (S32)strlen(value)+1; /*Flawfinder: ignore*/
         S32 min_len = llmin(in_value_len, value_len);
         memcpy(out_value, value, min_len); /*Flawfinder: ignore*/
         out_value[min_len-1] = 0;
-        success = TRUE;
+        success = true;
     }
     else if (mInputStream)
     {
@@ -2161,19 +2199,19 @@ BOOL LLDataPackerAsciiFile::getValueStr(const char *name, char *out_value, S32 v
         if (!keyword[0])
         {
             LL_WARNS() << "Data packer could not get the keyword!" << LL_ENDL;
-            return FALSE;
+            return false;
         }
         if (strcmp(keyword, name))
         {
             LL_WARNS() << "Data packer expecting keyword of type " << name << ", got " << keyword << " instead!" << LL_ENDL;
-            return FALSE;
+            return false;
         }
 
         S32 in_value_len = (S32)strlen(value)+1; /*Flawfinder: ignore*/
         S32 min_len = llmin(in_value_len, value_len);
         memcpy(out_value, value, min_len); /*Flawfinder: ignore*/
         out_value[min_len-1] = 0;
-        success = TRUE;
+        success = true;
     }
 
     return success;

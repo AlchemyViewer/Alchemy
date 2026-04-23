@@ -6,18 +6,14 @@
 	<menu_item_call label="ＩＭ" name="Send IM..."/>
 	<menu_item_call label="コール" name="Call"/>
 	<menu_item_call label="グループに招待" name="Invite..."/>
-	<menu_item_separator/>
 	<context_menu label="容姿" name="Appearance">
 		<menu_item_call label="スケルトンをリセット" name="Reset Skeleton"/>
 		<menu_item_call label="テクスチャをリフレシュ" name="Refresh Textures"/>
 		<menu_item_call label="スケルトンとアニメーションをリセット" name="Reset Skeleton And Animations"/>
-		<menu_item_separator/>
 		<menu_item_check name="RenderNormally" label="通常の描画設定"/>
 		<menu_item_check name="AlwaysRenderFully" label="常に完全描画する"/>
 		<menu_item_check name="DoNotRender" label="描画しない"/>
-		<menu_item_separator/>
-		<menu_item_call label="描画の例外…" name="RenderExceptions">
-		</menu_item_call>
+		<menu_item_call label="描画の例外…" name="RenderExceptions"/>
 	</context_menu>
 	<context_menu label="操作" name="Utilities">
 		<menu_item_call label="テクスチャのデバッグ" name="Debug..."/>
@@ -38,9 +34,7 @@
 		<menu_item_call label="不動産からキック" name="Estate Kick..."/>
 		<menu_item_call label="不動産からバン" name="Estate Ban..."/>
 	</context_menu>
-	<menu_item_separator/>
 	<menu_item_call label="ズームイン" name="Zoom In"/>
-	<menu_item_call label="ここにテレポート" name="Teleport To">
-	</menu_item_call>
+	<menu_item_call label="ここにテレポート" name="Teleport To"/>
 	<menu_item_call label="支払う" name="Pay..."/>
 </context_menu>

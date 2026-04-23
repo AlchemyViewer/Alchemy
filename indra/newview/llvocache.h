@@ -31,10 +31,9 @@
 #include "lldatapacker.h"
 #include "lldir.h"
 #include "llvieweroctree.h"
-#include "llapr.h"
 #include "llgltfmaterial.h"
 
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 //---------------------------------------------------------------------------
 // Cache entries
@@ -50,12 +49,12 @@ public:
 
     LLUUID mObjectId;
     U32    mLocalId = 0;
-    std::unordered_map<S32, LLSD> mSides; //override LLSD per side
-    std::unordered_map<S32, LLPointer<LLGLTFMaterial> > mGLTFMaterial; //GLTF material per side
+    boost::unordered_map<S32, LLSD> mSides; //override LLSD per side
+    boost::unordered_map<S32, LLPointer<LLGLTFMaterial> > mGLTFMaterial; //GLTF material per side
     U64 mRegionHandle = 0;
 };
 
-class LLVOCacheEntry final
+class LLVOCacheEntry
 :   public LLViewerOctreeEntryData
 {
     LL_ALIGN_NEW
@@ -102,7 +101,7 @@ protected:
     ~LLVOCacheEntry();
 public:
     LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &dp);
-    LLVOCacheEntry(LLAPRFile* apr_file);
+    LLVOCacheEntry(LLFile* apr_file);
     LLVOCacheEntry();
 
     void updateEntry(U32 crc, LLDataPackerBinaryBuffer &dp);
@@ -140,14 +139,14 @@ public:
     void removeChild(LLVOCacheEntry* entry);
     void removeAllChildren();
     LLVOCacheEntry* getChild(); //remove the first child, and return it.
-    S32  getNumOfChildren() const  {return mChildrenList.size();}
+    S32  getNumOfChildren() const { return static_cast<S32>(mChildrenList.size()); }
 
     void setBoundingInfo(const LLVector3& pos, const LLVector3& scale); //called from processing object update message
     void updateParentBoundingInfo();
     void saveBoundingSphere();
 
-    void setValid(BOOL valid = TRUE) {mValid = valid;}
-    BOOL isValid() const {return mValid;}
+    void setValid(bool valid = true) {mValid = valid;}
+    bool isValid() const {return mValid;}
 
     void setUpdateFlags(U32 flags) {mUpdateFlags = flags;}
     U32  getUpdateFlags() const    {return mUpdateFlags;}
@@ -163,7 +162,7 @@ public:
     typedef std::set<LLVOCacheEntry*>                      vocache_entry_set_t;
     typedef std::set<LLVOCacheEntry*, CompareVOCacheEntry> vocache_entry_priority_list_t;
 
-    typedef std::unordered_map<U32, LLGLTFOverrideCacheEntry>  vocache_gltf_overrides_map_t;
+    typedef boost::unordered_map<U32, LLGLTFOverrideCacheEntry>  vocache_gltf_overrides_map_t;
 
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
     vocache_entry_set_t::const_iterator getChildrenBegin() const { return mChildrenList.begin(); }
@@ -186,7 +185,7 @@ protected:
     U32                         mState; //high 16 bits reserved for special use.
     vocache_entry_set_t         mChildrenList; //children entries in a linked set.
 
-    BOOL                        mValid; //if set, this entry is valid, otherwise it is invalid and will be removed.
+    bool                        mValid; //if set, this entry is valid, otherwise it is invalid and will be removed.
 
     LLVector4a                  mBSphereCenter; //bounding sphere center
     F32                         mBSphereRadius; //bounding sphere radius
@@ -199,7 +198,7 @@ public:
     static F32                  sRearPixelThreshold;
 };
 
-class LLVOCacheGroup final : public LLOcclusionCullingGroup
+class LLVOCacheGroup : public LLOcclusionCullingGroup
 {
 public:
     LLVOCacheGroup(OctreeNode* node, LLViewerOctreePartition* part) : LLOcclusionCullingGroup(node, part){}
@@ -211,7 +210,7 @@ protected:
     virtual ~LLVOCacheGroup();
 };
 
-class LLVOCachePartition final : public LLViewerOctreePartition
+class LLVOCachePartition : public LLViewerOctreePartition
 {
 public:
     LLVOCachePartition(LLViewerRegion* regionp);
@@ -225,7 +224,7 @@ public:
     void processOccluders(LLCamera* camera);
     void removeOccluder(LLVOCacheGroup* group);
 
-    void setCullHistory(BOOL has_new_object);
+    void setCullHistory(bool has_new_object);
 
     bool isFrontCull() const {return mFrontCull;}
 
@@ -233,10 +232,10 @@ private:
     void selectBackObjects(LLCamera &camera, F32 projection_area_cutoff, bool use_occlusion); //select objects behind camera.
 
 public:
-    static BOOL sNeedsOcclusionCheck;
+    static bool sNeedsOcclusionCheck;
 
 private:
-    BOOL  mFrontCull; //the view frustum cull if set, otherwise is back sphere cull.
+    bool  mFrontCull; //the view frustum cull if set, otherwise is back sphere cull.
     U32   mCullHistory;
     U32   mCulledTime[LLViewerCamera::NUM_CAMERAS];
     std::set<LLVOCacheGroup*> mOccludedGroups;
@@ -248,9 +247,10 @@ private:
 //
 //Note: LLVOCache is not thread-safe
 //
-class LLVOCache final : public LLParamSingleton<LLVOCache>
+class LLVOCache : public LLSimpleton<LLVOCache>
 {
-    LLSINGLETON(LLVOCache, bool read_only);
+public:
+    LLVOCache(bool read_only);
     ~LLVOCache() ;
 
 private:
@@ -293,8 +293,8 @@ public:
     bool readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_entry_map_t& cache_entry_map) ;
     void readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map);
 
-    void writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, BOOL dirty_cache, bool removal_enabled);
-    void writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, BOOL dirty_cache, bool removal_enabled);
+    void writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled);
+    void writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, bool dirty_cache, bool removal_enabled);
     void removeEntry(U64 handle) ;
     void removeGenericExtrasForHandle(U64 handle);
 
@@ -304,8 +304,8 @@ public:
 private:
     void setDirNames(ELLPath location);
     // determine the cache filename for the region from the region handle
-    void getObjectCacheFilename(U64 handle, std::string& filename);
-    std::string getObjectCacheExtrasFilename(U64 handle);
+    std::filesystem::path getObjectCacheFilename(U64 handle);
+    std::filesystem::path getObjectCacheExtrasFilename(U64 handle);
     void removeFromCache(HeaderEntryInfo* entry);
     void readCacheHeader();
     void writeCacheHeader();
@@ -313,7 +313,7 @@ private:
     void removeCache() ;
     void removeEntry(HeaderEntryInfo* entry) ;
     void purgeEntries(U32 size);
-    BOOL updateEntry(const HeaderEntryInfo* entry);
+    bool updateEntry(const HeaderEntryInfo* entry);
 
 private:
     bool                 mEnabled;
@@ -322,9 +322,8 @@ private:
     HeaderMetaInfo       mMetaInfo;
     U32                  mCacheSize;
     U32                  mNumEntries;
-    std::string          mHeaderFileName ;
-    std::string          mObjectCacheDirName;
-    LLVolatileAPRPool*   mLocalAPRFilePoolp ;
+    std::filesystem::path          mHeaderFilePath;
+    std::filesystem::path          mObjectCacheDirPath;
     header_entry_queue_t mHeaderEntryQueue;
     handle_entry_map_t   mHandleEntryMap;
 };

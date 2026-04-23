@@ -130,29 +130,7 @@
 			movie
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
-		</impl>
-	</scheme>
-	<scheme name="example">
-		<label name="example_label">
-			Example Plugin scheme trigger
-		</label>
-		<widgettype>
-			movie
-		</widgettype>
-		<impl>
-			media_plugin_example
-		</impl>
-	</scheme>
-	<scheme name="libvlc">
-		<label name="libvlc_label">
-			LibVLC supported media
-		</label>
-		<widgettype>
-			movie
-		</widgettype>
-		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</scheme>
 	<mimetype name="blank">
@@ -185,7 +163,7 @@
 			audio
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype name="video/*">
@@ -196,7 +174,7 @@
 			movie
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype name="image/*">
@@ -218,7 +196,7 @@
 			movie
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype name="application/javascript">
@@ -240,7 +218,7 @@
 			audio
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype name="application/pdf">
@@ -256,7 +234,7 @@
 	</mimetype>
 	<mimetype name="application/postscript">
 		<label name="application/postscript_label">
-			Postscript Document 
+			Postscript Document
 		</label>
 		<widgettype>
 			image
@@ -309,17 +287,6 @@
 			media_plugin_cef
 		</impl>
 	</mimetype>
-    <mimetype name="application/octet-stream">
-        <label name="application/octet-stream_label">
-            Stream
-        </label>
-        <widgettype>
-            movie
-        </widgettype>
-        <impl>
-            media_plugin_libvlc
-        </impl>
-    </mimetype>
 	<mimetype name="audio/mid">
 		<label name="audio/mid_label">
 			Audio (MIDI)
@@ -328,7 +295,7 @@
 			audio
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype name="audio/mpeg">
@@ -339,7 +306,7 @@
 			audio
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype name="audio/x-aiff">
@@ -350,7 +317,7 @@
 			audio
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype name="audio/x-wav">
@@ -361,7 +328,7 @@
 			audio
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype menu="1" name="image/bmp">
@@ -471,7 +438,7 @@
 			movie
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype name="video/mp4">
@@ -482,32 +449,10 @@
 			movie
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
-    <mimetype name="video/x-flv">
-        <label name="video/x-flv_label">
-            Movie (flv)
-        </label>
-        <widgettype>
-            movie
-        </widgettype>
-        <impl>
-            media_plugin_libvlc
-        </impl>
-    </mimetype>
-  <mimetype name="application/octet-stream">
-    <label name="video/octet-stream">
-      Movie
-    </label>
-    <widgettype>
-      movie
-    </widgettype>
-    <impl>
-      media_plugin_libvlc
-    </impl>
-  </mimetype>
-  <mimetype menu="1" name="video/quicktime">
+	<mimetype menu="1" name="video/quicktime">
 		<label name="video/quicktime_label">
 			Movie (QuickTime)
 		</label>
@@ -515,7 +460,7 @@
 			movie
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype name="video/x-ms-asf">
@@ -526,7 +471,7 @@
 			movie
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype name="video/x-ms-wmv">
@@ -537,7 +482,7 @@
 			movie
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 	<mimetype menu="1" name="video/x-msvideo">
@@ -548,7 +493,7 @@
 			movie
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_gstreamer10
 		</impl>
 	</mimetype>
 </mimetypes>

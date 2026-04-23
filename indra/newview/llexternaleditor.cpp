@@ -44,18 +44,22 @@ LLExternalEditor::EErrorCode LLExternalEditor::setCommand(const std::string& env
     std::string cmd = findCommand(env_var, override);
     if (cmd.empty())
     {
-        LL_WARNS() << "Editor command is empty or not set, falling back to OS-specific open handler" << LL_ENDL;
+        LL_INFOS() << "Editor command is empty or not set, falling back to OS open handler" << LL_ENDL;
 #if LL_WINDOWS
-        static const std::string os_cmd = "C:\\Windows\\explorer.exe \"%s\"";
+        std::string os_cmd = LLStringUtil::getenv("SystemRoot", "");
+        if (!os_cmd.empty())
+        {
+            os_cmd.append("\\explorer.exe \"%s\"");
+        }
 #elif LL_DARWIN
-        static const std::string os_cmd = "/usr/bin/open \"%s\"";
+        static const std::string os_cmd = "/usr/bin/open -t \"%s\"";
 #elif LL_LINUX
         static const std::string os_cmd = "/usr/bin/xdg-open \"%s\"";
 #endif
         cmd = findCommand("", os_cmd);
         if (cmd.empty())
         {
-            LL_WARNS() << "Failed to find the OS-specific open handler \"" << cmd << "\"" << LL_ENDL;
+            LL_WARNS() << "Failed to find OS open handler \"" << cmd << "\"" << LL_ENDL;
             return EC_NOT_SPECIFIED;
         }
     }
@@ -148,8 +152,8 @@ size_t LLExternalEditor::tokenize(string_vec_t& tokens, const std::string& str)
 
     tokenizer tokens_list(str, sep);
     tokenizer::iterator token_iter;
-    BOOL inside_quotes = FALSE;
-    BOOL last_was_space = FALSE;
+    bool inside_quotes = false;
+    bool last_was_space = false;
     for (token_iter = tokens_list.begin(); token_iter != tokens_list.end(); ++token_iter)
     {
         if (!strncmp("\"",(*token_iter).c_str(),2))
@@ -161,7 +165,7 @@ size_t LLExternalEditor::tokenize(string_vec_t& tokens, const std::string& str)
             if(inside_quotes)
             {
                 tokens.back().append(std::string(" "));
-                last_was_space = TRUE;
+                last_was_space = true;
             }
         }
         else
@@ -170,7 +174,7 @@ size_t LLExternalEditor::tokenize(string_vec_t& tokens, const std::string& str)
             if (last_was_space)
             {
                 tokens.back().append(to_push);
-                last_was_space = FALSE;
+                last_was_space = false;
             }
             else
             {

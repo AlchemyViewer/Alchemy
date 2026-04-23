@@ -24,21 +24,24 @@
  * $/LicenseInfo$
  */
 
+#include "linden_common.h"
+
 #include "lldiriterator.h"
 
-#include "fix_macros.h"
+#include "fsyspath.h"
 #include "llregex.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 static std::string glob_to_regex(const std::string& glob);
 
 class LLDirIterator::Impl
 {
 public:
-    Impl(const std::string &dirname, const std::string &mask);
-    ~Impl() = default;
+    Impl(const std::filesystem::path& dirname, const std::string& mask);
+
+    ~Impl();
 
     bool next(std::string &fname);
 
@@ -48,22 +51,19 @@ private:
     bool                    mIsValid;
 };
 
-LLDirIterator::Impl::Impl(const std::string &dirname, const std::string &mask)
+LLDirIterator::Impl::Impl(const std::filesystem::path& dir_path, const std::string& mask)
     : mIsValid(false)
 {
-#ifdef LL_WINDOWS // or BOOST_WINDOWS_API
-    fs::path dir_path(ll_convert_string_to_wide(dirname));
-#else
-    fs::path dir_path(dirname);
-#endif
-    boost::system::error_code ec;
     bool is_dir = false;
 
     // Check if path is a directory.
-    is_dir = fs::is_directory(dir_path, ec);
-    if(ec.failed())
+    try
     {
-        LL_WARNS() << ec.what() << LL_ENDL;
+        is_dir = fs::is_directory(dir_path);
+    }
+    catch (const fs::filesystem_error& e)
+    {
+        LL_WARNS() << e.what() << LL_ENDL;
         return;
     }
 
@@ -74,10 +74,13 @@ LLDirIterator::Impl::Impl(const std::string &dirname, const std::string &mask)
     }
 
     // Initialize the directory iterator for the given path.
-    mIter = fs::directory_iterator(dir_path, ec);
-    if (ec.failed())
+    try
     {
-        LL_WARNS() << ec.what() << LL_ENDL;
+        mIter = fs::directory_iterator(dir_path);
+    }
+    catch (const fs::filesystem_error& e)
+    {
+        LL_WARNS() << e.what() << LL_ENDL;
         return;
     }
 
@@ -91,7 +94,7 @@ LLDirIterator::Impl::Impl(const std::string &dirname, const std::string &mask)
     {
         mFilterExp.assign(exp);
     }
-    catch (const boost::regex_error& e)
+    catch (boost::regex_error& e)
     {
         LL_WARNS() << "\"" << exp << "\" is not a valid regular expression: "
                 << e.what() << LL_ENDL;
@@ -99,6 +102,10 @@ LLDirIterator::Impl::Impl(const std::string &dirname, const std::string &mask)
     }
 
     mIsValid = true;
+}
+
+LLDirIterator::Impl::~Impl()
+{
 }
 
 bool LLDirIterator::Impl::next(std::string &fname)
@@ -120,7 +127,7 @@ bool LLDirIterator::Impl::next(std::string &fname)
         while (mIter != end_itr && !found)
         {
             boost::smatch match;
-            std::string name = mIter->path().filename().string();
+            std::string name = ll_convert<std::string>(mIter->path().filename().u8string());
             found = ll_regex_match(name, match, mFilterExp);
             if (found)
             {
@@ -200,7 +207,6 @@ std::string glob_to_regex(const std::string& glob)
             case '|':
             case '$':
                 regex += '\\';
-                [[fallthrough]];
             default:
                 regex += c;
                 break;
@@ -218,9 +224,19 @@ std::string glob_to_regex(const std::string& glob)
     return regex;
 }
 
+LLDirIterator::LLDirIterator(const char* dirname, const std::string& mask)
+{
+    mImpl = new Impl(fsyspath(dirname), mask);
+}
+
 LLDirIterator::LLDirIterator(const std::string &dirname, const std::string &mask)
 {
-    mImpl = new Impl(dirname, mask);
+    mImpl = new Impl(fsyspath(dirname), mask);
+}
+
+LLDirIterator::LLDirIterator(const std::filesystem::path& dir_path, const std::string& mask)
+{
+    mImpl = new Impl(dir_path, mask);
 }
 
 LLDirIterator::~LLDirIterator()

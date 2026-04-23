@@ -35,6 +35,7 @@
 #include "v2math.h"
 #include "llrect.h"
 #include "llfontgl.h"
+#include "llfontvertexbuffer.h"
 #include <set>
 #include <vector>
 
@@ -47,28 +48,29 @@ struct lltextobject_further_away
     bool operator()(const LLPointer<LLHUDText>& lhs, const LLPointer<LLHUDText>& rhs) const;
 };
 
-class LLHUDText final : public LLHUDObject
+class LLHUDText : public LLHUDObject
 {
 protected:
     class LLHUDTextSegment
     {
     public:
-        LLHUDTextSegment(LLWString text, const LLFontGL::StyleFlags style, const LLColor4& color, const LLFontGL* font)
+        LLHUDTextSegment(const LLWString& text, const LLFontGL::StyleFlags style, const LLColor4& color, const LLFontGL* font)
         :   mColor(color),
             mStyle(style),
-            mFont(font),
-            mText(std::move(text))
+            mText(text),
+            mFont(font)
         {}
         F32 getWidth(const LLFontGL* font);
         const LLWString& getText() const { return mText; }
-        void clearFontWidthMap() { mFontWidthMap[0].first = nullptr; mFontWidthMap[1].first = nullptr; }
+        void clearFontWidthMap() { mFontWidthMap.clear(); }
 
         LLColor4                mColor;
         LLFontGL::StyleFlags    mStyle;
         const LLFontGL*         mFont;
+        LLFontVertexBuffer      mFontBuffer;
     private:
         LLWString               mText;
-        std::pair<const LLFontGL*, F32> mFontWidthMap[2];
+        std::map<const LLFontGL*, F32> mFontWidthMap;
     };
 
 public:
@@ -91,38 +93,38 @@ public:
     void clearString();
 
     // Add text a line at a time, allowing custom formatting
-    void addLine(const std::string &text_utf8, const LLColor4& color, const LLFontGL::StyleFlags style = LLFontGL::NORMAL, const LLFontGL* font = nullptr);
+    void addLine(const std::string &text_utf8, const LLColor4& color, const LLFontGL::StyleFlags style = LLFontGL::NORMAL, const LLFontGL* font = NULL);
 
     // Sets the default font for lines with no font specified
     void setFont(const LLFontGL* font);
     void setColor(const LLColor4 &color);
     void setAlpha(F32 alpha);
-    void setZCompare(const BOOL zcompare);
-    void setDoFade(const BOOL do_fade);
-//  void setVisibleOffScreen(BOOL visible) { mVisibleOffScreen = visible; }
+    void setZCompare(const bool zcompare);
+    void setDoFade(const bool do_fade);
+//  void setVisibleOffScreen(bool visible) { mVisibleOffScreen = visible; }
 
     // mMaxLines of -1 means unlimited lines.
     void setMaxLines(S32 max_lines) { mMaxLines = max_lines; }
     void setFadeDistance(F32 fade_distance, F32 fade_range) { mFadeDistance = fade_distance; mFadeRange = fade_range; }
     void updateVisibility();
-    LLVector2 updateScreenPos(const LLVector2 &offset_target);
+    LLVector2 updateScreenPos(LLVector2 &offset_target);
     void updateSize();
     void setMass(F32 mass) { mMass = llmax(0.1f, mass); }
     void setTextAlignment(ETextAlignment alignment) { mTextAlignment = alignment; }
     void setVertAlignment(EVertAlignment alignment) { mVertAlignment = alignment; }
-    /*virtual*/ void markDead() override;
+    /*virtual*/ void markDead();
     friend class LLHUDObject;
-    /*virtual*/ F32 getDistance() const override { return mLastDistance; }
-    BOOL getVisible() { return mVisible; }
-    BOOL getHidden() const { return mHidden; }
-    void setHidden( BOOL hide ) { mHidden = hide; }
-    void setOnHUDAttachment(BOOL on_hud) { mOnHUDAttachment = on_hud; }
+    /*virtual*/ F32 getDistance() const { return mLastDistance; }
+    bool getVisible() { return mVisible; }
+    bool getHidden() const { return mHidden; }
+    void setHidden( bool hide ) { mHidden = hide; }
+    void setOnHUDAttachment(bool on_hud) { mOnHUDAttachment = on_hud; }
     void shift(const LLVector3& offset);
 
     static void shiftAll(const LLVector3& offset);
     static void renderAllHUD();
     static void reshape();
-    static void setDisplayText(BOOL flag) { sDisplayText = flag ; }
+    static void setDisplayText(bool flag) { sDisplayText = flag ; }
 
 // [RLVa:KB] - Checked: RLVa-2.0.3
     const std::string& getObjectText() const                        { return mObjText; }
@@ -135,21 +137,21 @@ public:
 protected:
     LLHUDText(const U8 type);
 
-    /*virtual*/ void render() override;
+    /*virtual*/ void render();
     void renderText();
     static void updateAll();
     S32 getMaxLines();
 
 private:
     ~LLHUDText();
-    BOOL            mOnHUDAttachment;
-    BOOL            mDoFade;
+    bool            mOnHUDAttachment;
+    bool            mDoFade;
     F32             mFadeRange;
     F32             mFadeDistance;
     F32             mLastDistance;
-    BOOL            mZCompare;
-//  BOOL            mVisibleOffScreen;
-    BOOL            mOffscreen;
+    bool            mZCompare;
+//  bool            mVisibleOffScreen;
+    bool            mOffscreen;
     LLColor4        mColor;
     LLVector3       mScale;
     F32             mWidth;
@@ -168,12 +170,12 @@ private:
     std::vector<LLHUDTextSegment> mTextSegments;
     ETextAlignment  mTextAlignment;
     EVertAlignment  mVertAlignment;
-    BOOL            mHidden;
+    bool            mHidden;
 // [RLVa:KB] - Checked: RLVa-1.0.0
     std::string     mObjText;
 // [/RLVa:KB]
 
-    static BOOL    sDisplayText ;
+    static bool    sDisplayText ;
     static std::set<LLPointer<LLHUDText> > sTextObjects;
     static std::vector<LLPointer<LLHUDText> > sVisibleTextObjects;
     static std::vector<LLPointer<LLHUDText> > sVisibleHUDTextObjects;

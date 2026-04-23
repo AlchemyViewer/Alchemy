@@ -33,16 +33,19 @@
 #include "llui.h"
 
 LLStyle::Params::Params()
-:   visible("visible", true),
+    : visible("visible", true),
     drop_shadow("drop_shadow", LLFontGL::NO_SHADOW),
     color("color", LLColor4::black),
     readonly_color("readonly_color", LLColor4::black),
     selected_color("selected_color", LLColor4::black),
-    font("font", LLFontGL::getFontMonospace()),
+    highlight_bg_color("highlight_bg_color", LLColor4::green),
+    alpha("alpha", 1.f),
+    font("font", LLStyle::getDefaultFont()),
     image("image"),
     link_href("href"),
     is_link("is_link"),
-    use_default_link_style("use_default_link_style", true)
+    use_default_link_style("use_default_link_style", true),
+    draw_highlight_bg("draw_highlight_bg", false)
 {}
 
 
@@ -51,11 +54,14 @@ LLStyle::LLStyle(const LLStyle::Params& p)
     mColor(p.color),
     mReadOnlyColor(p.readonly_color),
     mSelectedColor(p.selected_color),
+    mHighlightBgColor(p.highlight_bg_color),
     mFont(p.font()),
     mLink(p.link_href),
     mIsLink(p.is_link.isProvided() ? p.is_link : !p.link_href().empty()),
     mDropShadow(p.drop_shadow),
-    mImagep(p.image())
+    mImagep(p.image()),
+    mAlpha(p.alpha),
+    mDrawHighlightBg(p.draw_highlight_bg)
 {}
 
 void LLStyle::setFont(const LLFontGL* font)
@@ -69,22 +75,27 @@ const LLFontGL* LLStyle::getFont() const
     return mFont;
 }
 
+const LLFontGL* LLStyle::getDefaultFont()
+{
+    return LLFontGL::getFontMonospace();
+}
+
 void LLStyle::setLinkHREF(const std::string& href)
 {
     mLink = href;
 }
 
-BOOL LLStyle::isLink() const
+bool LLStyle::isLink() const
 {
     return mIsLink;
 }
 
-BOOL LLStyle::isVisible() const
+bool LLStyle::isVisible() const
 {
     return mVisible;
 }
 
-void LLStyle::setVisible(BOOL is_visible)
+void LLStyle::setVisible(bool is_visible)
 {
     mVisible = is_visible;
 }

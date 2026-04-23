@@ -23,7 +23,7 @@
 			<scroll_list.columns label="区画" name="name"/>
 			<scroll_list.columns label="リージョン" name="location"/>
 			<scroll_list.columns label="種別" name="type"/>
-			<scroll_list.columns label="エリア" name="area"/>
+			<scroll_list.columns label="面積" name="area"/>
 			<scroll_list.columns label="非表示" name="hidden"/>
 		</scroll_list>
 		<text name="total_contributed_land_label">
@@ -48,7 +48,6 @@
 		<text name="your_contribution_label">
 			あなたの貢献面積：
 		</text>
-		<line_editor name="your_contribution_line_editor"/>
 		<text name="your_contribution_units">
 			㎡
 		</text>

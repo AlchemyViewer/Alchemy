@@ -45,7 +45,7 @@ public:
     /**
      * @brief Fetches landmark LLViewerInventoryItems for the given landmark name.
      */
-    static LLInventoryModel::item_array_t fetchLandmarksByName(std::string& name, BOOL if_use_substring);
+    static LLInventoryModel::item_array_t fetchLandmarksByName(std::string& name, bool if_use_substring);
     /**
      * @brief Checks whether landmark exists for current agent position.
      */
@@ -107,7 +107,7 @@ public:
      *
      * @return pointer to loaded landmark from gLandmarkList or NULL if landmark does not exist or wasn't loaded.
      */
-    static LLLandmark* getLandmark(const LLUUID& landmarkInventoryItemID, LLLandmarkList::loaded_callback_t cb = NULL);
+    static LLLandmark* getLandmark(const LLUUID& landmarkInventoryItemID, LLLandmarkList::loaded_callback_t cb = nullptr);
 
     /**
      * @brief  Performs standard action of copying of SLURL from landmark to user's clipboard.

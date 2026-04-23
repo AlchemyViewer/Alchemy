@@ -61,17 +61,17 @@
 
 namespace
 {
-    constexpr S32 NUM_TILES_X = 8;
-    constexpr S32 NUM_TILES_Y = 4;
-    constexpr S32 NUM_TILES = NUM_TILES_X * NUM_TILES_Y;
-    constexpr S32 NUM_CUBEMAP_FACES = 6; // See SKYTEX_RESOLUTION for face dimensions
-    constexpr S32 TOTAL_TILES = NUM_CUBEMAP_FACES * NUM_TILES;
-    constexpr S32 MAX_TILES = TOTAL_TILES + 1;
+    const S32 NUM_TILES_X = 8;
+    const S32 NUM_TILES_Y = 4;
+    const S32 NUM_TILES = NUM_TILES_X * NUM_TILES_Y;
+    const S32 NUM_CUBEMAP_FACES = 6; // See SKYTEX_RESOLUTION for face dimensions
+    const S32 TOTAL_TILES = NUM_CUBEMAP_FACES * NUM_TILES;
+    const S32 MAX_TILES = TOTAL_TILES + 1;
 
 // Heavenly body constants
-    constexpr F32 SUN_DISK_RADIUS   = 0.5f;
-    constexpr F32 MOON_DISK_RADIUS  = SUN_DISK_RADIUS * 0.9f;
-    constexpr F32 SUN_INTENSITY = 1e5;
+    const F32 SUN_DISK_RADIUS   = 0.5f;
+    const F32 MOON_DISK_RADIUS  = SUN_DISK_RADIUS * 0.9f;
+    const F32 SUN_INTENSITY = 1e5;
 
 // Texture coordinates:
     const LLVector2 TEX00 = LLVector2(0.f, 0.f);
@@ -79,9 +79,9 @@ namespace
     const LLVector2 TEX10 = LLVector2(1.f, 0.f);
     const LLVector2 TEX11 = LLVector2(1.f, 1.f);
 
-    constexpr F32Seconds UPDATE_EXPRY(0.25f);
+    F32Seconds UPDATE_EXPRY(0.25f);
 
-    constexpr F32 UPDATE_MIN_DELTA_THRESHOLD = 0.0005f;
+    const F32 UPDATE_MIN_DELTA_THRESHOLD = 0.0005f;
 }
 /***************************************
         SkyTex
@@ -100,14 +100,22 @@ LLSkyTex::LLSkyTex() :
 void LLSkyTex::init(bool isShiny)
 {
     mIsShiny = isShiny;
-    mSkyData = new LLColor4[(U32)(SKYTEX_RESOLUTION * SKYTEX_RESOLUTION)];
-    mSkyDirs = new LLVector3[(U32)(SKYTEX_RESOLUTION * SKYTEX_RESOLUTION)];
+    try
+    {
+        mSkyData = new LLColor4[(U32)(SKYTEX_RESOLUTION * SKYTEX_RESOLUTION)];
+        mSkyDirs = new LLVector3[(U32)(SKYTEX_RESOLUTION * SKYTEX_RESOLUTION)];
+    }
+    catch (std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS() << "Failed to allocate memory for sky texture data" << LL_ENDL;
+    }
 
     for (S32 i = 0; i < 2; ++i)
     {
-        mTexture[i] = LLViewerTextureManager::getLocalTexture(FALSE);
+        mTexture[i] = LLViewerTextureManager::getLocalTexture(false);
         mTexture[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
-        mImageRaw[i] = new LLImageRaw(SKYTEX_RESOLUTION, SKYTEX_RESOLUTION, SKYTEX_COMPONENTS);
+        mImageRaw[i] = new LLImageRaw((U16)SKYTEX_RESOLUTION, (U16)SKYTEX_RESOLUTION, (S8)SKYTEX_COMPONENTS);
 
         initEmpty(i);
     }
@@ -123,7 +131,7 @@ void LLSkyTex::restoreGL()
 {
     for (S32 i = 0; i < 2; i++)
     {
-        mTexture[i] = LLViewerTextureManager::getLocalTexture(FALSE);
+        mTexture[i] = LLViewerTextureManager::getLocalTexture(false);
         mTexture[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
     }
 }
@@ -139,7 +147,7 @@ LLSkyTex::~LLSkyTex()
 
 S32 LLSkyTex::getResolution()
 {
-    return SKYTEX_RESOLUTION;
+    return (S32)SKYTEX_RESOLUTION;
 }
 
 S32 LLSkyTex::getCurrent()
@@ -158,7 +166,7 @@ S32 LLSkyTex::getNext()
     return ((sCurrent+1) & 1);
 }
 
-S32 LLSkyTex::getWhich(const BOOL curr)
+S32 LLSkyTex::getWhich(const bool curr)
 {
     int tex = curr ? sCurrent : getNext();
     return tex;
@@ -166,13 +174,14 @@ S32 LLSkyTex::getWhich(const BOOL curr)
 
 void LLSkyTex::initEmpty(const S32 tex)
 {
+    LLImageDataLock lock(mImageRaw[tex]);
     U8* data = mImageRaw[tex]->getData();
     for (S32 i = 0; i < SKYTEX_RESOLUTION; ++i)
     {
         for (S32 j = 0; j < SKYTEX_RESOLUTION; ++j)
         {
-            const S32 basic_offset = (i * SKYTEX_RESOLUTION + j);
-            S32 offset = basic_offset * SKYTEX_COMPONENTS;
+            const S32 basic_offset = (i * (S32)SKYTEX_RESOLUTION + j);
+            S32 offset = basic_offset * (S32)SKYTEX_COMPONENTS;
             data[offset] = 0;
             data[offset+1] = 0;
             data[offset+2] = 0;
@@ -187,13 +196,14 @@ void LLSkyTex::initEmpty(const S32 tex)
 
 void LLSkyTex::create()
 {
-    U8* data = mImageRaw[sCurrent]->getData();
+    LLImageDataSharedLock lock(mImageRaw[sCurrent]);
+    const U8* data = mImageRaw[sCurrent]->getData();
     for (S32 i = 0; i < SKYTEX_RESOLUTION; ++i)
     {
         for (S32 j = 0; j < SKYTEX_RESOLUTION; ++j)
         {
-            const S32 basic_offset = (i * SKYTEX_RESOLUTION + j);
-            S32 offset = basic_offset * SKYTEX_COMPONENTS;
+            const S32 basic_offset = (i * (S32)SKYTEX_RESOLUTION + j);
+            S32 offset = basic_offset * (S32)SKYTEX_COMPONENTS;
             U32* pix = (U32*)(data + offset);
             LLColor4U temp = LLColor4U(mSkyData[basic_offset]);
             *pix = temp.asRGBA();
@@ -205,17 +215,17 @@ void LLSkyTex::create()
 void LLSkyTex::createGLImage(S32 which)
 {
     mTexture[which]->setExplicitFormat(GL_RGBA8, GL_RGBA);
-    mTexture[which]->createGLTexture(0, mImageRaw[which], 0, TRUE, LLGLTexture::LOCAL);
+    mTexture[which]->createGLTexture(0, mImageRaw[which], 0, true, LLGLTexture::LOCAL);
     mTexture[which]->setAddressMode(LLTexUnit::TAM_CLAMP);
 }
 
-void LLSkyTex::bindTexture(BOOL curr)
+void LLSkyTex::bindTexture(bool curr)
 {
     int tex = getWhich(curr);
     gGL.getTexUnit(0)->bind(mTexture[tex], true);
 }
 
-LLImageRaw* LLSkyTex::getImageRaw(BOOL curr)
+LLImageRaw* LLSkyTex::getImageRaw(bool curr)
 {
     int tex = getWhich(curr);
     return mImageRaw[tex];
@@ -232,10 +242,10 @@ LLHeavenBody::LLHeavenBody(const F32 rad)
   mDirection(LLVector3(0,0,0)),
   mIntensity(0.f),
   mDiskRadius(rad),
-  mDraw(FALSE),
+  mDraw(false),
   mHorizonVisibility(1.f),
   mVisibility(1.f),
-  mVisible(FALSE)
+  mVisible(false)
 {
     mColor.setToBlack();
     mColorCached.setToBlack();
@@ -390,28 +400,28 @@ const LLVector3* LLHeavenBody::corners() const
         Sky
 ***************************************/
 
-const S32 SKYTEX_TILE_RES_X = SKYTEX_RESOLUTION / NUM_TILES_X;
-const S32 SKYTEX_TILE_RES_Y = SKYTEX_RESOLUTION / NUM_TILES_Y;
+const S32 SKYTEX_TILE_RES_X = (S32)SKYTEX_RESOLUTION / NUM_TILES_X;
+const S32 SKYTEX_TILE_RES_Y = (S32)SKYTEX_RESOLUTION / NUM_TILES_Y;
 
 LLVOSky::LLVOSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
-:   LLStaticViewerObject(id, pcode, regionp, TRUE),
+:   LLStaticViewerObject(id, pcode, regionp, true),
     mSun(SUN_DISK_RADIUS), mMoon(MOON_DISK_RADIUS),
     mBrightnessScale(1.f),
     mBrightnessScaleNew(0.f),
     mBrightnessScaleGuess(1.f),
-    mWeatherChange(FALSE),
+    mWeatherChange(false),
     mCloudDensity(0.2f),
     mWind(0.f),
-    mForceUpdate(FALSE),
-    mNeedUpdate(TRUE),
+    mForceUpdate(false),
+    mNeedUpdate(true),
     mCubeMapUpdateStage(-1),
     mWorldScale(1.f),
     mBumpSunDir(0.f, 0.f, 1.f)
 {
     /// WL PARAMS
 
-    mInitialized = FALSE;
-    mbCanSelect = FALSE;
+    mInitialized = false;
+    mbCanSelect = false;
     mUpdateTimer.reset();
 
     mForceUpdateThrottle.setTimerExpirySec(UPDATE_EXPRY);
@@ -434,7 +444,7 @@ LLVOSky::LLVOSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
     mSun.setIntensity(SUN_INTENSITY);
     mMoon.setIntensity(0.1f * SUN_INTENSITY);
 
-    mHeavenlyBodyUpdated = FALSE ;
+    mHeavenlyBodyUpdated = false ;
 
     mDrawRefl = 0;
     mInterpVal = 0.f;
@@ -454,7 +464,7 @@ void LLVOSky::init()
     llassert(!mInitialized);
 
     // Update sky at least once to get correct initial sun/moon directions and lighting calcs performed
-    const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
     psky->update();
 
     updateDirections(psky);
@@ -477,10 +487,10 @@ void LLVOSky::init()
 
     mInitialized = true;
 
-    mHeavenlyBodyUpdated = FALSE ;
+    mHeavenlyBodyUpdated = false ;
 
-    mRainbowMap = LLViewerTextureManager::getFetchedTexture(psky->getRainbowTextureId(), FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
-    mHaloMap    = LLViewerTextureManager::getFetchedTexture(psky->getHaloTextureId(),  FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
+    mRainbowMap = LLViewerTextureManager::getFetchedTexture(psky->getRainbowTextureId(), FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
+    mHaloMap    = LLViewerTextureManager::getFetchedTexture(psky->getHaloTextureId(),  FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
 }
 
 
@@ -566,7 +576,7 @@ void LLVOSky::restoreGL()
         mSkyTex[i].restoreGL();
     }
 
-    const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
     if (psky)
     {
@@ -643,7 +653,7 @@ void LLVOSky::createSkyTexture(const LLSettingsSky::ptr_t &psky, AtmosphericsVar
     }
 }
 
-void LLVOSky::updateDirections(const LLSettingsSky::ptr_t& psky)
+void LLVOSky::updateDirections(LLSettingsSky::ptr_t psky)
 {
     mSun.setDirection(psky->getSunDirection());
     mMoon.setDirection(psky->getMoonDirection());
@@ -659,25 +669,29 @@ void LLVOSky::idleUpdate(LLAgent &agent, const F64 &time)
 
 void LLVOSky::forceSkyUpdate()
 {
-    mForceUpdate = TRUE;
+    mForceUpdate = true;
     m_lastAtmosphericsVars = {};
     mCubeMapUpdateStage = -1;
 }
 
 bool LLVOSky::updateSky()
 {
-    if (mDead || gGLManager.mIsDisabled || !(gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY)))
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+
+    if (mDead || !(gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY)))
     {
-        // It's dead or disabled.  Don't update it.
-        return TRUE;
+        // It's dead.  Don't update it.
+        return true;
+    }
+
+    if (gGLManager.mIsDisabled)
+    {
+        return true;
     }
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
 
     static S32 next_frame = 0;
-
-    LLEnvironment& environment = LLEnvironment::instance();
-    const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
 
     mNeedUpdate = mForceUpdate;
 
@@ -691,8 +705,8 @@ bool LLVOSky::updateSky()
     if (!mCubeMap || LLPipeline::sReflectionProbesEnabled)
     {
         mCubeMapUpdateStage = NUM_CUBEMAP_FACES;
-        mForceUpdate = FALSE;
-        return TRUE;
+        mForceUpdate = false;
+        return true;
     }
 
     if (mCubeMapUpdateStage < 0)
@@ -706,9 +720,9 @@ bool LLVOSky::updateSky()
         if (mNeedUpdate && (mForceUpdateThrottle.hasExpired() || mForceUpdate))
         {
             // start updating cube map sides
-            updateFog(&environment, psky, LLViewerCamera::getInstance()->getFar());
+            updateFog(LLViewerCamera::getInstance()->getFar());
             mCubeMapUpdateStage = 0;
-            mForceUpdate = FALSE;
+            mForceUpdate = false;
         }
     }
     else if (mCubeMapUpdateStage == NUM_CUBEMAP_FACES && !LLPipeline::sReflectionProbesEnabled)
@@ -718,7 +732,7 @@ bool LLVOSky::updateSky()
 
         bool is_alm_wl_sky = gPipeline.canUseWindLightShaders();
 
-        int tex = mSkyTex[0].getWhich(TRUE);
+        int tex = mSkyTex[0].getWhich(true);
 
         for (int side = 0; side < NUM_CUBEMAP_FACES; side++)
         {
@@ -727,14 +741,14 @@ bool LLVOSky::updateSky()
 
             if (!is_alm_wl_sky)
             {
-                raw1 = mSkyTex[side].getImageRaw(TRUE);
-                raw2 = mSkyTex[side].getImageRaw(FALSE);
+                raw1 = mSkyTex[side].getImageRaw(true);
+                raw2 = mSkyTex[side].getImageRaw(false);
                 raw2->copy(raw1);
                 mSkyTex[side].createGLImage(tex);
             }
 
-            raw1 = mShinyTex[side].getImageRaw(TRUE);
-            raw2 = mShinyTex[side].getImageRaw(FALSE);
+            raw1 = mShinyTex[side].getImageRaw(true);
+            raw2 = mShinyTex[side].getImageRaw(false);
             raw2->copy(raw1);
             mShinyTex[side].createGLImage(tex);
         }
@@ -759,8 +773,8 @@ bool LLVOSky::updateSky()
 
         m_lastAtmosphericsVars = m_atmosphericsVars;
 
-        mNeedUpdate = FALSE;
-        mForceUpdate = FALSE;
+        mNeedUpdate = false;
+        mForceUpdate = false;
 
         mForceUpdateThrottle.setTimerExpirySec(UPDATE_EXPRY);
 
@@ -787,7 +801,7 @@ bool LLVOSky::updateSky()
         mCubeMapUpdateStage++;
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLVOSky::updateTextures()
@@ -826,7 +840,7 @@ void LLVOSky::updateTextures()
 LLDrawable *LLVOSky::createDrawable(LLPipeline *pipeline)
 {
     pipeline->allocDrawable(this);
-    mDrawable->setLit(FALSE);
+    mDrawable->setLit(false);
 
     LLDrawPoolSky *poolp = (LLDrawPoolSky*) gPipeline.getPool(LLDrawPool::POOL_SKY);
     poolp->setSkyTex(mSkyTex);
@@ -861,8 +875,8 @@ void LLVOSky::setMoonScale(F32 moon_scale)
 void LLVOSky::setSunTextures(const LLUUID& sun_texture, const LLUUID& sun_texture_next)
 {
     // We test the UUIDs here because we explicitly do not want the default image returned by getFetchedTexture in that case...
-    mSunTexturep[0] = sun_texture.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(sun_texture, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
-    mSunTexturep[1] = sun_texture_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(sun_texture_next, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
+    mSunTexturep[0] = sun_texture.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(sun_texture, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
+    mSunTexturep[1] = sun_texture_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(sun_texture_next, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
 
     bool can_use_wl = gPipeline.canUseWindLightShaders();
 
@@ -901,11 +915,12 @@ void LLVOSky::setSunTextures(const LLUUID& sun_texture, const LLUUID& sun_textur
 
 void LLVOSky::setMoonTextures(const LLUUID& moon_texture, const LLUUID& moon_texture_next)
 {
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
     bool can_use_wl = gPipeline.canUseWindLightShaders();
 
-    mMoonTexturep[0] = moon_texture.isNull()      ? nullptr : LLViewerTextureManager::getFetchedTexture(moon_texture, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
-    mMoonTexturep[1] = moon_texture_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(moon_texture_next, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
+    mMoonTexturep[0] = moon_texture.isNull()      ? nullptr : LLViewerTextureManager::getFetchedTexture(moon_texture, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
+    mMoonTexturep[1] = moon_texture_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(moon_texture_next, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
 
     if (mFace[FACE_MOON])
     {
@@ -925,8 +940,10 @@ void LLVOSky::setMoonTextures(const LLUUID& moon_texture, const LLUUID& moon_tex
 
 void LLVOSky::setCloudNoiseTextures(const LLUUID& cloud_noise_texture, const LLUUID& cloud_noise_texture_next)
 {
-    mCloudNoiseTexturep[0] = cloud_noise_texture.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(cloud_noise_texture, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
-    mCloudNoiseTexturep[1] = cloud_noise_texture_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(cloud_noise_texture_next, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+
+    mCloudNoiseTexturep[0] = cloud_noise_texture.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(cloud_noise_texture, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
+    mCloudNoiseTexturep[1] = cloud_noise_texture_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(cloud_noise_texture_next, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
 
     if (mCloudNoiseTexturep[0])
     {
@@ -941,13 +958,13 @@ void LLVOSky::setCloudNoiseTextures(const LLUUID& cloud_noise_texture, const LLU
 
 void LLVOSky::setBloomTextures(const LLUUID& bloom_texture, const LLUUID& bloom_texture_next)
 {
-    const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
     LLUUID bloom_tex = bloom_texture.isNull() ? psky->GetDefaultBloomTextureId() : bloom_texture;
     LLUUID bloom_tex_next = bloom_texture_next.isNull() ? (bloom_texture.isNull() ? psky->GetDefaultBloomTextureId() : bloom_texture) : bloom_texture_next;
 
-    mBloomTexturep[0] = bloom_tex.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(bloom_tex, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
-    mBloomTexturep[1] = bloom_tex_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(bloom_tex_next, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
+    mBloomTexturep[0] = bloom_tex.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(bloom_tex, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
+    mBloomTexturep[1] = bloom_tex_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(bloom_tex_next, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
 
     if (mBloomTexturep[0])
     {
@@ -960,7 +977,7 @@ void LLVOSky::setBloomTextures(const LLUUID& bloom_texture, const LLUUID& bloom_
     }
 }
 
-BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
+bool LLVOSky::updateGeometry(LLDrawable *drawable)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
     if (mFace[FACE_REFLECTION] == NULL)
@@ -1051,9 +1068,8 @@ BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
     bool draw_sun  = updateHeavenlyBodyGeometry(drawable, mSunScale, FACE_SUN, mSun, up, right);
     bool draw_moon = updateHeavenlyBodyGeometry(drawable, mMoonScale, FACE_MOON, mMoon, up, right);
 
-    LLEnvironment& environment = LLEnvironment::instance();
-    draw_sun  &= environment.getIsSunUp();
-    draw_moon &= environment.getIsMoonUp();
+    draw_sun  &= LLEnvironment::getInstance()->getIsSunUp();
+    draw_moon &= LLEnvironment::getInstance()->getIsMoonUp();
 
     mSun.setDraw(draw_sun);
     mMoon.setDraw(draw_moon);
@@ -1063,7 +1079,7 @@ BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
     const F32 camera_height = mCameraPosAgent.mV[2];
     const F32 height_above_water = camera_height - water_height;
 
-    bool sun_flag = FALSE;
+    bool sun_flag = false;
     if (mSun.isVisible())
     {
         sun_flag = !mMoon.isVisible() || ((look_at * mSun.getDirection()) > 0);
@@ -1077,12 +1093,13 @@ BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
                 updateReflectionGeometry(drawable, height_above_water, mSun);
             }
 
-    return TRUE;
+    LLPipeline::sCompiles++;
+    return true;
 }
 
 bool LLVOSky::updateHeavenlyBodyGeometry(LLDrawable *drawable, F32 scale, const S32 f, LLHeavenBody& hb, const LLVector3 &up, const LLVector3 &right)
 {
-    mHeavenlyBodyUpdated = TRUE ;
+    mHeavenlyBodyUpdated = true ;
 
     LLStrider<LLVector3> verticesp;
     LLStrider<LLVector3> normalsp;
@@ -1124,7 +1141,7 @@ bool LLVOSky::updateHeavenlyBodyGeometry(LLDrawable *drawable, F32 scale, const 
     v_clipped[2] = draw_pos + scaled_right + scaled_up;
     v_clipped[3] = draw_pos + scaled_right - scaled_up;
 
-    hb.setVisible(TRUE);
+    hb.setVisible(true);
 
     facep = mFace[f];
 
@@ -1149,7 +1166,7 @@ bool LLVOSky::updateHeavenlyBodyGeometry(LLDrawable *drawable, F32 scale, const 
 
     if (-1 == index_offset)
     {
-        return TRUE;
+        return true;
     }
 
     for (S32 vtx = 0; vtx < 4; ++vtx)
@@ -1173,7 +1190,7 @@ bool LLVOSky::updateHeavenlyBodyGeometry(LLDrawable *drawable, F32 scale, const 
 
     facep->getVertexBuffer()->unmapBuffer();
 
-    return TRUE;
+    return true;
 }
 
 F32 dtReflection(const LLVector3& p, F32 cos_dir_from_top, F32 sin_dir_from_top, F32 diff_angl_dir)
@@ -1519,14 +1536,15 @@ void LLVOSky::updateReflectionGeometry(LLDrawable *drawable, F32 H,
 }
 }
 
-void LLVOSky::updateFog(LLEnvironment* environment, const LLSettingsSky::ptr_t& psky, const F32 distance)
+void LLVOSky::updateFog(const F32 distance)
 {
-    if (psky)
+    LLEnvironment& environment = LLEnvironment::instance();
+    if (environment.getCurrentSky() != nullptr)
     {
-        LLVector3 light_dir = LLVector3(environment->getClampedLightNorm());
+        LLVector3 light_dir = LLVector3(environment.getClampedLightNorm());
         m_legacyAtmospherics.updateFog(distance, light_dir);
+        }
     }
-}
 
 void LLVOSky::setSunAndMoonDirectionsCFR(const LLVector3 &sun_dir_cfr, const LLVector3 &moon_dir_cfr)
 {

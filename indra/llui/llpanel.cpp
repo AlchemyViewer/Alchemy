@@ -55,7 +55,7 @@ LLPanel::factory_stack_t    LLPanel::sFactoryStack;
 
 // Compiler optimization, generate extern template
 template class LLPanel* LLView::getChild<class LLPanel>(
-    std::string_view name, BOOL recurse) const;
+    std::string_view name, bool recurse) const;
 
 LLPanel::LocalizedString::LocalizedString()
 :   name("name"),
@@ -127,9 +127,9 @@ LLPanel::~LLPanel()
 }
 
 // virtual
-BOOL LLPanel::isPanel() const
+bool LLPanel::isPanel() const
 {
-    return TRUE;
+    return true;
 }
 
 void LLPanel::addBorder(LLViewBorder::Params p)
@@ -167,13 +167,13 @@ void LLPanel::clearCtrls()
     for (LLPanel::ctrl_list_t::iterator ctrl_it = ctrls.begin(); ctrl_it != ctrls.end(); ++ctrl_it)
     {
         LLUICtrl* ctrl = *ctrl_it;
-        ctrl->setFocus( FALSE );
-        ctrl->setEnabled( FALSE );
+        ctrl->setFocus( false );
+        ctrl->setEnabled( false );
         ctrl->clear();
     }
 }
 
-void LLPanel::setCtrlsEnabled( BOOL b )
+void LLPanel::setCtrlsEnabled( bool b )
 {
     LLPanel::ctrl_list_t ctrls = getCtrlList();
     for (LLPanel::ctrl_list_t::iterator ctrl_it = ctrls.begin(); ctrl_it != ctrls.end(); ++ctrl_it)
@@ -240,39 +240,17 @@ void LLPanel::draw()
 
 void LLPanel::updateDefaultBtn()
 {
-    if( mDefaultBtn)
-    {
-        if (gFocusMgr.childHasKeyboardFocus( this ) && mDefaultBtn->getEnabled())
-        {
-            LLButton* buttonp = dynamic_cast<LLButton*>(gFocusMgr.getKeyboardFocus());
-            BOOL focus_is_child_button = buttonp && buttonp->getCommitOnReturn();
-            // only enable default button when current focus is not a return-capturing button
-            mDefaultBtn->setBorderEnabled(!focus_is_child_button);
-        }
-        else
-        {
-            mDefaultBtn->setBorderEnabled(FALSE);
-        }
-    }
 }
 
 void LLPanel::refresh()
 {
     // do nothing by default
-    // but is automatically called in setFocus(TRUE)
+    // but is automatically called in setFocus(true)
 }
 
 void LLPanel::setDefaultBtn(LLButton* btn)
 {
-    if (mDefaultBtn && mDefaultBtn->getEnabled())
-    {
-        mDefaultBtn->setBorderEnabled(FALSE);
-    }
     mDefaultBtn = btn;
-    if (mDefaultBtn)
-    {
-        mDefaultBtn->setBorderEnabled(TRUE);
-    }
 }
 
 void LLPanel::setDefaultBtn(std::string_view id)
@@ -288,17 +266,17 @@ void LLPanel::setDefaultBtn(std::string_view id)
     }
 }
 
-BOOL LLPanel::handleKeyHere( KEY key, MASK mask )
+bool LLPanel::handleKeyHere( KEY key, MASK mask )
 {
-    BOOL handled = FALSE;
+    bool handled = false;
 
     LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
 
     // handle user hitting ESC to defocus
     if (key == KEY_ESCAPE)
     {
-        setFocus(FALSE);
-        return TRUE;
+        setFocus(false);
+        return true;
     }
     else if( (mask == MASK_SHIFT) && (KEY_TAB == key))
     {
@@ -308,7 +286,7 @@ BOOL LLPanel::handleKeyHere( KEY key, MASK mask )
             LLUICtrl* focus_root = cur_focus->findRootMostFocusRoot();
             if (focus_root)
             {
-                handled = focus_root->focusPrevItem(FALSE);
+                handled = focus_root->focusPrevItem(false);
             }
         }
     }
@@ -320,7 +298,7 @@ BOOL LLPanel::handleKeyHere( KEY key, MASK mask )
             LLUICtrl* focus_root = cur_focus->findRootMostFocusRoot();
             if (focus_root)
             {
-                handled = focus_root->focusNextItem(FALSE);
+                handled = focus_root->focusNextItem(false);
             }
         }
     }
@@ -333,38 +311,38 @@ BOOL LLPanel::handleKeyHere( KEY key, MASK mask )
         {
             // current focus is a return-capturing button,
             // let *that* button handle the return key
-            handled = FALSE;
+            handled = false;
         }
         else if (mDefaultBtn && mDefaultBtn->getVisible() && mDefaultBtn->getEnabled())
         {
             // If we have a default button, click it when return is pressed
             mDefaultBtn->onCommit();
-            handled = TRUE;
+            handled = true;
         }
         else if (cur_focus->acceptsTextInput())
         {
             // call onCommit for text input handling control
             cur_focus->onCommit();
-            handled = TRUE;
+            handled = true;
         }
     }
 
     return handled;
 }
 
-void LLPanel::onVisibilityChange ( BOOL new_visibility )
+void LLPanel::onVisibilityChange ( bool new_visibility )
 {
     LLUICtrl::onVisibilityChange ( new_visibility );
     if (mVisibleSignal)
-        (*mVisibleSignal)(this, LLSD(new_visibility) ); // Pass BOOL as LLSD
+        (*mVisibleSignal)(this, LLSD(new_visibility) ); // Pass bool as LLSD
 }
 
-void LLPanel::setFocus(BOOL b)
+void LLPanel::setFocus(bool b)
 {
     if( b && !hasFocus())
     {
         // give ourselves focus preemptively, to avoid infinite loop
-        LLUICtrl::setFocus(TRUE);
+        LLUICtrl::setFocus(true);
         // then try to pass to first valid child
         focusFirstItem();
     }
@@ -374,7 +352,7 @@ void LLPanel::setFocus(BOOL b)
     }
 }
 
-void LLPanel::setBorderVisible(BOOL b)
+void LLPanel::setBorderVisible(bool b)
 {
     if (mBorder)
     {
@@ -488,8 +466,8 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
 
     setBackgroundVisible(p.background_visible);
     setBackgroundOpaque(p.background_opaque);
-    setBackgroundColor(p.bg_opaque_color().get());
-    setTransparentColor(p.bg_alpha_color().get());
+    setBackgroundColor(p.bg_opaque_color);
+    setTransparentColor(p.bg_alpha_color);
     mBgOpaqueImage = p.bg_opaque_image();
     mBgAlphaImage = p.bg_alpha_image();
     mBgOpaqueImageOverlay = p.bg_opaque_image_overlay;
@@ -502,7 +480,7 @@ static LLTrace::BlockTimerStatHandle FTM_PANEL_SETUP("Panel Setup");
 static LLTrace::BlockTimerStatHandle FTM_EXTERNAL_PANEL_LOAD("Load Extern Panel Reference");
 static LLTrace::BlockTimerStatHandle FTM_PANEL_POSTBUILD("Panel PostBuild");
 
-BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node, const LLPanel::Params& default_params)
+bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node, const LLPanel::Params& default_params)
 {
     Params params(default_params);
     {
@@ -518,8 +496,6 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
             setXMLFilename(xml_filename);
         }
 
-        auto& uictrl_factory = LLUICtrlFactory::instance();
-
         LLXUIParser parser;
 
         if (!xml_filename.empty())
@@ -528,35 +504,35 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
             {
                 //if we are exporting, we want to export the current xml
                 //not the referenced xml
-                parser.readXUI(node, params, uictrl_factory.getCurFileName());
+                parser.readXUI(node, params, LLUICtrlFactory::getInstance()->getCurFileName());
                 Params output_params(params);
                 setupParamsForExport(output_params, parent);
                 output_node->setName(node->getName()->mString);
                 parser.writeXUI(output_node, output_params, LLInitParam::default_parse_rules(), &default_params);
-                return TRUE;
+                return true;
             }
 
-            uictrl_factory.pushFileName(xml_filename);
+            LLUICtrlFactory::instance().pushFileName(xml_filename);
 
             LL_RECORD_BLOCK_TIME(FTM_EXTERNAL_PANEL_LOAD);
             if (!LLUICtrlFactory::getLayeredXMLNode(xml_filename, referenced_xml))
             {
                 LL_WARNS() << "Couldn't parse panel from: " << xml_filename << LL_ENDL;
 
-                return FALSE;
+                return false;
             }
 
-            parser.readXUI(referenced_xml, params, uictrl_factory.getCurFileName());
+            parser.readXUI(referenced_xml, params, LLUICtrlFactory::getInstance()->getCurFileName());
 
             // add children using dimensions from referenced xml for consistent layout
             setShape(params.rect);
             LLUICtrlFactory::createChildren(this, referenced_xml, child_registry_t::instance());
 
-            uictrl_factory.popFileName();
+            LLUICtrlFactory::instance().popFileName();
         }
 
         // ask LLUICtrlFactory for filename, since xml_filename might be empty
-        parser.readXUI(node, params, uictrl_factory.getCurFileName());
+        parser.readXUI(node, params, LLUICtrlFactory::getInstance()->getCurFileName());
 
         if (output_node)
         {
@@ -590,7 +566,7 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
             postBuild();
         }
     }
-    return TRUE;
+    return true;
 }
 
 bool LLPanel::hasString(std::string_view name)
@@ -608,7 +584,7 @@ std::string LLPanel::getString(std::string_view name, const LLStringUtil::format
         formatted_string.setArgList(args);
         return formatted_string.getString();
     }
-    std::string err_str = fmt::format("Failed to find string {} in panel {} loaded from file {}", name, getName(), mXMLFilename); //*TODO: Translate
+    std::string err_str("Failed to find string " + std::string(name) + " in panel " + getName()); //*TODO: Translate
     if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
     {
         LL_ERRS() << err_str << LL_ENDL;
@@ -627,7 +603,7 @@ std::string LLPanel::getString(std::string_view name) const
     {
         return found_it->second;
     }
-    std::string err_str = fmt::format("Failed to find string {} in panel {} loaded from file {}", name, getName(), mXMLFilename); //*TODO: Translate
+    std::string err_str("Failed to find string " + std::string(name) +" in panel " + getName()); //*TODO: Translate
     if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
     {
         LL_ERRS() << err_str << LL_ENDL;
@@ -636,7 +612,7 @@ std::string LLPanel::getString(std::string_view name) const
     {
         LL_WARNS() << err_str << LL_ENDL;
     }
-    return {};
+    return LLStringUtil::null;
 }
 
 
@@ -658,7 +634,7 @@ void LLPanel::childSetEnabled(std::string_view id, bool enabled)
     }
 }
 
-void LLPanel::childSetFocus(std::string_view id, BOOL focus)
+void LLPanel::childSetFocus(std::string_view id, bool focus)
 {
     LLUICtrl* child = findChild<LLUICtrl>(id);
     if (child)
@@ -667,7 +643,7 @@ void LLPanel::childSetFocus(std::string_view id, BOOL focus)
     }
 }
 
-BOOL LLPanel::childHasFocus(std::string_view id)
+bool LLPanel::childHasFocus(std::string_view id)
 {
     LLUICtrl* child = findChild<LLUICtrl>(id);
     if (child)
@@ -676,7 +652,7 @@ BOOL LLPanel::childHasFocus(std::string_view id)
     }
     else
     {
-        return FALSE;
+        return false;
     }
 }
 
@@ -684,7 +660,7 @@ BOOL LLPanel::childHasFocus(std::string_view id)
 // Prefer getChild<LLUICtrl>("foo")->setCommitCallback(boost:bind(...)),
 // which takes a generic slot.  Or use mCommitCallbackRegistrar.add() with
 // a named callback and reference it in XML.
-void LLPanel::childSetCommitCallback(std::string_view id, boost::function<void (LLUICtrl*,void*)> cb, void* data)
+void LLPanel::childSetCommitCallback(std::string_view id, std::function<void (LLUICtrl*,void*)> cb, void* data)
 {
     LLUICtrl* child = findChild<LLUICtrl>(id);
     if (child)
@@ -693,7 +669,7 @@ void LLPanel::childSetCommitCallback(std::string_view id, boost::function<void (
     }
 }
 
-void LLPanel::childSetColor(std::string_view id, const LLColor4& color)
+void LLPanel::childSetColor(std::string_view id, const LLUIColor& color)
 {
     LLUICtrl* child = findChild<LLUICtrl>(id);
     if (child)
@@ -752,24 +728,24 @@ LLSD LLPanel::childGetValue(std::string_view id) const
     return LLSD();
 }
 
-BOOL LLPanel::childSetTextArg(std::string_view id, const std::string& key, const LLStringExplicit& text)
+bool LLPanel::childSetTextArg(std::string_view id, const std::string& key, const LLStringExplicit& text)
 {
     LLUICtrl* child = findChild<LLUICtrl>(id);
     if (child)
     {
         return child->setTextArg(key, text);
     }
-    return FALSE;
+    return false;
 }
 
-BOOL LLPanel::childSetLabelArg(std::string_view id, const std::string& key, const LLStringExplicit& text)
+bool LLPanel::childSetLabelArg(std::string_view id, const std::string& key, const LLStringExplicit& text)
 {
     LLView* child = findChild<LLView>(id);
     if (child)
     {
         return child->setLabelArg(key, text);
     }
-    return FALSE;
+    return false;
 }
 
 void LLPanel::childSetAction(std::string_view id, const commit_signal_t::slot_type& function)
@@ -781,7 +757,7 @@ void LLPanel::childSetAction(std::string_view id, const commit_signal_t::slot_ty
     }
 }
 
-void LLPanel::childSetAction(std::string_view id, boost::function<void(void*)> function, void* value)
+void LLPanel::childSetAction(std::string_view id, std::function<void(void*)> function, void* value)
 {
     LLButton* button = findChild<LLButton>(id);
     if (button)
@@ -803,10 +779,10 @@ boost::signals2::connection LLPanel::setVisibleCallback( const commit_signal_t::
 //-----------------------------------------------------------------------------
 // buildPanel()
 //-----------------------------------------------------------------------------
-BOOL LLPanel::buildFromFile(const std::string& filename, const LLPanel::Params& default_params)
+bool LLPanel::buildFromFile(const std::string& filename, const LLPanel::Params& default_params)
 {
     LL_PROFILE_ZONE_SCOPED;
-    BOOL didPost = FALSE;
+    bool didPost = false;
     LLXMLNodePtr root;
 
     if (!LLUICtrlFactory::getLayeredXMLNode(filename, root))

@@ -13,9 +13,6 @@
  title="[MATERIAL_NAME]">
   <string name="no_upload_fee_string">no upload fee</string>
   <string name="upload_fee_string">L$[FEE] upload fee</string>
-  <string name="material_selection_title">Material selection</string>
-  <string name="material_selection_text">Select material:</string>
-  <string name="material_batch_import_text">--- Bulk Upload All ---</string>
   <string name="material_override_title">Editing Material</string>
 
   <scroll_container
@@ -26,6 +23,7 @@
    width="250"
    follows="all"
    layout="topleft"
+   color="DkGray2"
    opaque="true"
    tab_stop="true"
    reserve_scroll_corner="false">
@@ -54,7 +52,7 @@
                type="string"
                name="unsaved_changes"
                font.style="BOLD"
-               text_color="EmphasisColor"
+               text_color="DrYellow"
                length="1"
                follows="left|top"
                height="10"

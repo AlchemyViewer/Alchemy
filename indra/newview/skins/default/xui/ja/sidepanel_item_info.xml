@@ -29,11 +29,9 @@
 	</panel.string>
 	<layout_stack name="main_stack">
 		<layout_panel name="layout_item_name">
-			<icon name="item_type_icon"/>
 			<line_editor name="LabelItemName" tool_tip="使用できる名前の文字数は最大６３文字までです。長いプリム名は短縮されます。名前に使用できる文字は ASCII-7（非拡張）に含まれる印字可能な文字のみです（縦線「|」は例外）。"/>
 		</layout_panel>
 		<layout_panel name="layout_item_details">
-			<thumbnail name="item_thumbnail"/>
 			<text name="LabelOwnerTitle">
 				所有者：
 			</text>
@@ -62,10 +60,8 @@
 			<text name="LabelItemExperienceTitle">
 				体験：
 			</text>
-			<text name="LabelItemExperience"/>
 		</layout_panel>
 		<layout_panel name="layout_item_permissions_sale">
-			<view_border name="cost_text_border"/>
 			<text name="perm_modify">
 				権限
 			</text>
@@ -89,7 +85,6 @@
 			<check_box label="編集" name="CheckNextOwnerModify" tool_tip="次の所有者は、アイテム名などのプロパティを編集したり、サイズ変更ができるようになります。"/>
 			<check_box label="コピー" name="CheckNextOwnerCopy" tool_tip="次の所有者は、このオブジェクトを無制限にコピーできるようになります。コピーには制作者の情報が含まれ、コピー元のアイテムと違って許可などに関して制約があります。"/>
 			<check_box label="再販・譲渡" name="CheckNextOwnerTransfer" tool_tip="次の所有者は、このオブジェクトを他の人に譲渡したり、再販することができるようになります。"/>
-			<view_border name="cost_text_border"/>
 			<check_box label="販売対象とする" name="CheckPurchase" tool_tip="このオブジェクトやオブジェクトの中身を購入できるようにするか、指定価格でインワールドにコピーできるようになります。"/>
 			<combo_box name="ComboBoxSaleType" tool_tip="購入者がコピー、コピーの中身、またはアイテム自体を受け取るのか選択してください。">
 				<combo_box.item label="コピー" name="Copy"/>

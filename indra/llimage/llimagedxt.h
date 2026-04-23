@@ -31,7 +31,7 @@
 
 // This class decodes and encodes LL DXT files (which may unclude uncompressed RGB or RGBA mipped data)
 
-class LLImageDXT final : public LLImageFormatted
+class LLImageDXT : public LLImageFormatted
 {
 public:
     enum EFileFormat
@@ -90,7 +90,7 @@ public:
     };
 
 protected:
-    /*virtual*/ ~LLImageDXT() = default;
+    /*virtual*/ ~LLImageDXT();
 
 private:
     bool encodeDXT(const LLImageRaw* raw_image, F32 decode_time, bool explicit_mips);

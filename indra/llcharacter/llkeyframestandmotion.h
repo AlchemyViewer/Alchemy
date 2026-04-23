@@ -37,8 +37,7 @@
 //-----------------------------------------------------------------------------
 // class LLKeyframeStandMotion
 //-----------------------------------------------------------------------------
-LL_ALIGN_PREFIX(16)
-class LLKeyframeStandMotion final :
+class alignas(16) LLKeyframeStandMotion :
     public LLKeyframeMotion
 {
     LL_ALIGN_NEW
@@ -47,7 +46,7 @@ public:
     LLKeyframeStandMotion(const LLUUID &id);
 
     // Destructor
-    virtual ~LLKeyframeStandMotion() = default;
+    virtual ~LLKeyframeStandMotion();
 
 public:
     //-------------------------------------------------------------------------
@@ -63,9 +62,9 @@ public:
     // animation callbacks to be implemented by subclasses
     //-------------------------------------------------------------------------
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
-    virtual BOOL onActivate();
+    virtual bool onActivate();
     void    onDeactivate();
-    virtual BOOL onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F32 time, U8* joint_mask);
 
 public:
     //-------------------------------------------------------------------------
@@ -85,7 +84,7 @@ public:
 
     LLCharacter *mCharacter;
 
-    BOOL                mFlipFeet;
+    bool                mFlipFeet;
 
     LLPointer<LLJointState> mPelvisState;
 
@@ -109,10 +108,10 @@ public:
 
     LLQuaternion        mLastGoodPelvisRotation;
     LLVector3           mLastGoodPosition;
-    BOOL                mTrackAnkles;
+    bool                mTrackAnkles;
 
     S32                 mFrameNum;
-} LL_ALIGN_POSTFIX(16);
+};
 
 #endif // LL_LLKEYFRAMESTANDMOTION_H
 

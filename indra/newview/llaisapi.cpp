@@ -786,7 +786,7 @@ void AISAPI::FetchOrphans(completion_t callback)
 void AISAPI::EnqueueAISCommand(const std::string &procName, LLCoprocedureManager::CoProcedure_t proc)
 {
     LLCoprocedureManager &inst = LLCoprocedureManager::instance();
-    S32 pending_in_pool = inst.countPending("AIS");
+    auto pending_in_pool = inst.countPending("AIS");
     std::string procFullName = "AIS(" + procName + ")";
     if (pending_in_pool < MAX_SIMULTANEOUS_COROUTINES)
     {
@@ -815,7 +815,7 @@ void AISAPI::onIdle(void *userdata)
     if (!sPostponedQuery.empty())
     {
         LLCoprocedureManager &inst = LLCoprocedureManager::instance();
-        S32 pending_in_pool = inst.countPending("AIS");
+        auto pending_in_pool = inst.countPending("AIS");
         while (pending_in_pool < MAX_SIMULTANEOUS_COROUTINES && !sPostponedQuery.empty())
         {
             ais_query_item_t &item = sPostponedQuery.front();
@@ -839,7 +839,7 @@ void AISAPI::onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD&
     if ( (type == UPDATECATEGORY || type == UPDATEITEM)
         && gSavedSettings.getBOOL("DebugAvatarAppearanceMessage"))
     {
-        dump_sequential_xml(gAgentAvatarp->getFullname() + "_ais_update", update);
+        dump_sequential_xml(gAgentAvatarp->getDebugName() + "_ais_update", update);
     }
 
     AISUpdate ais_update(update, type, request_body);
@@ -861,8 +861,8 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
         return;
     }
 
-    LLCore::HttpOptions::ptr_t httpOptions(std::make_shared<LLCore::HttpOptions>());
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+    LLCore::HttpOptions::ptr_t httpOptions = std::make_shared<LLCore::HttpOptions>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpHeaders::ptr_t httpHeaders;
 
     httpOptions->setTimeout(HTTP_TIMEOUT);
@@ -950,7 +950,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
     LL_DEBUGS("Inventory", "AIS3") << "Result: " << result << LL_ENDL;
     onUpdateReceived(result, type, body);
 
-    if (callback && !callback.empty())
+    if (callback != nullptr)
     {
         bool needs_callback = true;
         LLUUID id(LLUUID::null);
@@ -979,7 +979,9 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 id = result["linked_id"];
             }
             break;
+// RLVa
         case COPYINVENTORY:
+// RLVa
         case CREATEINVENTORY:
             // CREATEINVENTORY can have multiple callbacks
             if (result.has("_created_categories"))
@@ -1005,6 +1007,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 }
             }
             break;
+// RLVa
         case UPDATECATEGORY:
             if (result.has("_updated_categories"))
             {
@@ -1022,6 +1025,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 id = result["category_id"];
             }
             break;
+// RLVa
         default:
             break;
         }
@@ -1037,6 +1041,9 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
 }
 
 //-------------------------------------------------------------------------
+U32 AISUpdate::sBatchFrameCount = 0;
+LLTimer AISUpdate::sBatchTimer;
+
 AISUpdate::AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& request_body)
 : mType(type)
 {
@@ -1054,8 +1061,16 @@ AISUpdate::AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& 
         mFetchDepth = request_body["depth"].asInteger();
     }
 
-    mTimer.setTimerExpirySec(AIS_EXPIRY_SECONDS);
-    mTimer.start();
+    mTaskTimer.setTimerExpirySec(AIS_TASK_EXPIRY_SECONDS);
+    mTaskTimer.start();
+
+    U32 current_frame = LLFrameTimer::getFrameCount();
+    if (sBatchFrameCount != current_frame)
+    {
+        sBatchTimer.setTimerExpirySec(AIS_BATCH_EXPIRY_SECONDS);
+        sBatchTimer.start();
+        sBatchFrameCount = current_frame;
+    }
     parseUpdate(update);
 }
 
@@ -1076,11 +1091,25 @@ void AISUpdate::clearParseResults()
 
 void AISUpdate::checkTimeout()
 {
-    if (mTimer.hasExpired())
+    if (mTaskTimer.hasExpired() || sBatchTimer.hasExpired())
     {
-        llcoro::suspend();
+        // If we are taking too long, don't starve other tasks,
+        // yield to mainloop.
+        // If we use normal suspend(), there will be a chance of
+        // waking up from other suspends, before main coro had
+        // a chance, so wait for a frame tick instead.
+        llcoro::suspendUntilNextFrame();
         LLCoros::checkStop();
-        mTimer.setTimerExpirySec(AIS_EXPIRY_SECONDS);
+        mTaskTimer.setTimerExpirySec(AIS_TASK_EXPIRY_SECONDS);
+
+        U32 current_frame = LLFrameTimer::getFrameCount();
+        if (sBatchFrameCount != current_frame)
+        {
+            // To give other tasks a chance batch timer
+            // has a longer delay.
+            sBatchTimer.setTimerExpirySec(AIS_BATCH_EXPIRY_SECONDS);
+            sBatchFrameCount = current_frame;
+        }
     }
 }
 
@@ -1216,7 +1245,7 @@ void AISUpdate::parseItem(const LLSD& item_map)
         // Default to current values where not provided.
         new_item->copyViewerItem(curr_item);
     }
-    BOOL rv = new_item->unpackMessage(item_map);
+    bool rv = new_item->unpackMessage(item_map);
     if (rv)
     {
         if (mFetch)
@@ -1261,7 +1290,7 @@ void AISUpdate::parseLink(const LLSD& link_map, S32 depth)
         // Default to current values where not provided.
         new_link->copyViewerItem(curr_link);
     }
-    BOOL rv = new_link->unpackMessage(link_map);
+    bool rv = new_link->unpackMessage(link_map);
     if (rv)
     {
         const LLUUID& parent_id = new_link->getParentUUID();
@@ -1337,15 +1366,6 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
     {
         LL_WARNS() << "Got stale folder, known: " << curr_cat->getVersion()
             << ", received: " << version << LL_ENDL;
-        // <FS:Beq> FIRE-33337 workaround for rename issue until proper fix is in place and tested
-        // Also servers a general handler for version de-sync bugs in the future.
-        if( version < curr_cat->getVersion() )
-        {
-            // AIS version is considered canonical, so we need to refetch
-            curr_cat->setVersion(LLViewerInventoryCategory::VERSION_UNKNOWN);
-            curr_cat->fetch();
-        }
-        // </FS:Beq>
         return;
     }
 
@@ -1367,7 +1387,7 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
             new_cat = new LLViewerInventoryCategory(LLUUID::null);
         }
     }
-    BOOL rv = new_cat->unpackMessage(category_map);
+    bool rv = new_cat->unpackMessage(category_map);
     // *NOTE: unpackMessage does not unpack version or descendent count.
     if (rv)
     {
@@ -1383,7 +1403,7 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
             uuid_int_map_t::const_iterator lookup_it = mCatDescendentsKnown.find(category_id);
             if (mCatDescendentsKnown.end() != lookup_it)
             {
-                S32 descendent_count = lookup_it->second;
+                S32 descendent_count = static_cast<S32>(lookup_it->second);
                 LL_DEBUGS("Inventory") << "Setting descendents count to " << descendent_count
                     << " for category " << category_id << LL_ENDL;
                 new_cat->setDescendentCount(descendent_count);
@@ -1412,8 +1432,6 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
                      && curr_cat->getVersion() > LLViewerInventoryCategory::VERSION_UNKNOWN
                      && version > curr_cat->getVersion())
             {
-                // Potentially should new_cat->setVersion(unknown) here,
-                // but might be waiting for a callback that would increment
                 LL_DEBUGS("Inventory") << "Category " << category_id
                     << " is stale. Known version: " << curr_cat->getVersion()
                     << " server version: " << version << LL_ENDL;
@@ -1436,7 +1454,7 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
             uuid_int_map_t::const_iterator lookup_it = mCatDescendentsKnown.find(category_id);
             if (mCatDescendentsKnown.end() != lookup_it)
             {
-                S32 descendent_count = lookup_it->second;
+                S32 descendent_count = static_cast<S32>(lookup_it->second);
                 LL_DEBUGS("Inventory") << "Setting descendents count to " << descendent_count
                     << " for new category " << category_id << LL_ENDL;
                 new_cat->setDescendentCount(descendent_count);
@@ -1511,13 +1529,15 @@ void AISUpdate::parseEmbedded(const LLSD& embedded, S32 depth)
     }
 }
 
-void AISUpdate::parseUUIDArray(const LLSD& content, const std::string_view name, uuid_list_t& ids)
+void AISUpdate::parseUUIDArray(const LLSD& content, const std::string& name, uuid_list_t& ids)
 {
     if (content.has(name))
     {
-        for(const auto& sd : content[name].asArray())
+        for(LLSD::array_const_iterator it = content[name].beginArray(),
+                end = content[name].endArray();
+                it != end; ++it)
         {
-            ids.insert(sd.asUUID());
+            ids.insert((*it).asUUID());
         }
     }
 }
@@ -1610,12 +1630,10 @@ void AISUpdate::doUpdate()
     checkTimeout();
 
     // Do version/descendant accounting.
-    for (auto catit = mCatDescendentDeltas.begin();
+    for (std::map<LLUUID,size_t>::const_iterator catit = mCatDescendentDeltas.begin();
          catit != mCatDescendentDeltas.end(); ++catit)
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("Inventory") << "descendant accounting for " << catit->first << LL_ENDL;
-#endif
 
         const LLUUID cat_id(catit->first);
         // Don't account for update if we just created this category.
@@ -1636,7 +1654,7 @@ void AISUpdate::doUpdate()
         LLViewerInventoryCategory* cat = gInventory.getCategory(cat_id);
         if (cat)
         {
-            S32 descendent_delta = catit->second;
+            S32 descendent_delta = static_cast<S32>(catit->second);
             S32 old_count = cat->getDescendentCount();
             LL_DEBUGS("Inventory") << "Updating descendant count for "
                                    << cat->getName() << " " << cat_id
@@ -1705,7 +1723,7 @@ void AISUpdate::doUpdate()
                 LLPointer<LLViewerInventoryItem> new_item = lost_it->second;
 
                 new_item->setParent(lost_uuid);
-                new_item->updateParentOnServer(FALSE);
+                new_item->updateParentOnServer(false);
             }
         }
     }
@@ -1760,7 +1778,7 @@ void AISUpdate::doUpdate()
          ucv_it != mCatVersionsUpdated.end(); ++ucv_it)
     {
         const LLUUID id = ucv_it->first;
-        S32 version = ucv_it->second;
+        S32 version = static_cast<S32>(ucv_it->second);
         LLViewerInventoryCategory *cat = gInventory.getCategory(id);
         LL_DEBUGS("Inventory") << "cat version update " << cat->getName() << " to version " << cat->getVersion() << LL_ENDL;
         if (cat->getVersion() != version)

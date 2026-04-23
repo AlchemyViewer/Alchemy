@@ -29,25 +29,27 @@
 
 // This file contains various stuff for handling gl extensions and other gl related stuff.
 
+#include <functional>
 #include <string>
-#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered_map.hpp>
 #include <list>
+
+#include "llglheaders.h"
 
 #include "llerror.h"
 #include "v4color.h"
 #include "llstring.h"
 #include "stdtypes.h"
 #include "v4math.h"
-#include "llmatrix4a.h"
 #include "llplane.h"
 #include "llgltypes.h"
 #include "llinstancetracker.h"
 
-#include "llglheaders.h"
+#include "glm/mat4x4.hpp"
 
-extern BOOL gDebugGL;
-extern BOOL gDebugSession;
-extern BOOL gDebugGLSession;
+extern bool gDebugGL;
+extern bool gDebugSession;
+extern bool gDebugGLSession;
 extern llofstream gFailLog;
 
 #define LL_GL_ERRS LL_ERRS("RenderState")
@@ -69,14 +71,14 @@ public:
     bool initGL();
     void shutdownGL();
 
-#if LL_WINDOWS
-    void initWGL(); // Initializes stupid WGL extensions
-#endif
+    void initWGL(); // Initializes WGL extensions
+    void initGLX(); // Initializes GLX extensions
+    void initEGL(); // Initializes EGL extensions
 
     std::string getRawGLString(); // For sending to simulator
 
-    BOOL mInited;
-    BOOL mIsDisabled;
+    bool mInited;
+    bool mIsDisabled;
 
     // OpenGL limits
     S32 mMaxSamples;
@@ -89,32 +91,37 @@ public:
     S32 mGLMaxIndexRange;
     S32 mGLMaxTextureSize;
     F32 mMaxAnisotropy = 0.f;
+    S32 mMaxUniformBlockSize = 0;
+    S32 mMaxVaryingVectors = 0;
+    LLVector2 mAliasedLineRange = LLVector2(1.f, 1.f);
 
     // GL 4.x capabilities
     bool mHasCubeMapArray = false;
     bool mHasDebugOutput = false;
     bool mHasTransformFeedback = false;
-    bool mHasTextureSwizzle = false;
-    bool mHasGPUShader4  = false;
-    bool mHasAdaptiveVSync = false;
+    bool mHasAnisotropic = false;
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;
-    bool mHasNVXMemInfo = false;
+    bool mHasNVXGpuMemoryInfo = false;
     bool mHasATIMemInfo = false;
-    bool mHasTextureFilterAnisotropic = false;
+    bool mHasGLXMESAQueryRenderer = false;
 
-    BOOL mIsAMD;
-    BOOL mIsNVIDIA;
-    BOOL mIsIntel;
+    bool mIsAMD;
+    bool mIsNVIDIA;
+    bool mIsIntel;
+    bool mIsApple = false;
+
+    // hints to the render pipe
+    U32 mDownScaleMethod = 0; // see settings.xml RenderDownScaleMethod
 
 #if LL_DARWIN
     // Needed to distinguish problem cards on older Macs that break with Materials
-    BOOL mIsMobileGF;
+    bool mIsMobileGF;
 #endif
 
     // Whether this version of GL is good enough for SL to use
-    BOOL mHasRequirements;
+    bool mHasRequirements;
 
     S32 mDriverVersionMajor;
     S32 mDriverVersionMinor;
@@ -125,9 +132,7 @@ public:
     std::string mDriverVersionVendorString;
     std::string mGLVersionString;
 
-    S32 mVRAM; // VRAM in MB
-
-    void getPixelFormat(); // Get the best pixel format
+    U32 mVRAM; // VRAM in MB
 
     std::string getGLInfoString();
     void printGLInfoString();
@@ -142,10 +147,18 @@ public:
     // In ALL CAPS
     std::string mGLRenderer;
 
+    // GL Extension String
+    std::set<std::string> mGLExtensions;
+
+#if LL_LINUX
+    bool mIsX11 = false;
+    bool mIsWayland = false;
+#endif
+
 private:
+    void reloadExtensionsString();
     void initExtensions();
     void initGLStates();
-    void initGLImages();
 };
 
 extern LLGLManager gGLManager;
@@ -162,12 +175,17 @@ void assert_glerror();
 
 void clear_glerror();
 
-#ifdef SHOW_DEBUG
+
 # define stop_glerror() assert_glerror()
 # define llglassertok() assert_glerror()
+
+// stop_glerror is still needed on OS X but has performance implications
+// use macro below to conditionally add stop_glerror to non-release builds
+// on OS X
+#if LL_DARWIN && !LL_RELEASE_FOR_DOWNLOAD
+#define STOP_GLERROR stop_glerror()
 #else
-# define stop_glerror()
-# define llglassertok()
+#define STOP_GLERROR
 #endif
 
 #define llglassertok_always() assert_glerror()
@@ -228,8 +246,6 @@ void clear_glerror();
 
 */
 
-#include "boost/function.hpp"
-
 class LLGLState
 {
 public:
@@ -245,39 +261,26 @@ public:
     static void checkStates(GLboolean writeAlpha = GL_TRUE);
 
 protected:
-    static boost::unordered_flat_map<LLGLenum, LLGLboolean> sStateMap;
+    static boost::unordered_map<LLGLenum, LLGLboolean> sStateMap;
 
 public:
-    enum { CURRENT_STATE = -2 };
+    enum { CURRENT_STATE = -2, DISABLED_STATE = 0, ENABLED_STATE = 1 };
     LLGLState(LLGLenum state, S32 enabled = CURRENT_STATE);
     ~LLGLState();
     void setEnabled(S32 enabled);
-    void enable() { setEnabled(TRUE); }
-    void disable() { setEnabled(FALSE); }
+    void enable() { setEnabled(ENABLED_STATE); }
+    void disable() { setEnabled(DISABLED_STATE); }
 protected:
     LLGLenum mState;
-    BOOL mWasEnabled;
-    BOOL mIsEnabled;
-};
-
-// New LLGLState class wrappers that don't depend on actual GL flags.
-class LLGLEnableBlending : public LLGLState
-{
-public:
-    LLGLEnableBlending(bool enable);
-};
-
-class LLGLEnableAlphaReject : public LLGLState
-{
-public:
-    LLGLEnableAlphaReject(bool enable);
+    bool mWasEnabled;
+    bool mIsEnabled;
 };
 
 // Enable with functor
 class LLGLEnableFunc : LLGLState
 {
 public:
-    LLGLEnableFunc(LLGLenum state, bool enable, boost::function<void()> func)
+    LLGLEnableFunc(LLGLenum state, bool enable, std::function<void()> func)
         : LLGLState(state, enable)
     {
         if (enable)
@@ -291,14 +294,14 @@ public:
 class LLGLEnable : public LLGLState
 {
 public:
-    LLGLEnable(LLGLenum state) : LLGLState(state, TRUE) {}
+    LLGLEnable(LLGLenum state) : LLGLState(state, ENABLED_STATE) {}
 };
 
 /// TODO: Being deprecated.
 class LLGLDisable : public LLGLState
 {
 public:
-    LLGLDisable(LLGLenum state) : LLGLState(state, FALSE) {}
+    LLGLDisable(LLGLenum state) : LLGLState(state, DISABLED_STATE) {}
 };
 
 /*
@@ -311,25 +314,24 @@ public:
   GL_MODELVIEW_MATRIX is active whenever program execution
   leaves this class.
   Does not stack.
+  Caches inverse of projection matrix used in gGLObliqueProjectionInverse
 */
-LL_ALIGN_PREFIX(16)
 class LLGLUserClipPlane
 {
 public:
 
-    LLGLUserClipPlane(const LLPlane& plane, const LLMatrix4a& modelview, const LLMatrix4a& projection, bool apply = true);
+    LLGLUserClipPlane(const LLPlane& plane, const glm::mat4& modelview, const glm::mat4& projection, bool apply = true);
     ~LLGLUserClipPlane();
 
     void setPlane(F32 a, F32 b, F32 c, F32 d);
     void disable();
 
 private:
-
-    LL_ALIGN_16(LLMatrix4a mProjection);
-    LL_ALIGN_16(LLMatrix4a mModelview);
-
     bool mApply;
-} LL_ALIGN_POSTFIX(16);
+
+    glm::mat4 mProjection;
+    glm::mat4 mModelview;
+};
 
 /*
   Modify and load projection matrix to push depth values to far clip plane.
@@ -342,9 +344,9 @@ class LLGLSquashToFarClip
 {
 public:
     LLGLSquashToFarClip();
-    LLGLSquashToFarClip(const LLMatrix4a& projection, U32 layer = 0);
+    LLGLSquashToFarClip(const glm::mat4& projection, U32 layer = 0);
 
-    void setProjectionMatrix(const LLMatrix4a& P_in, U32 layer);
+    void setProjectionMatrix(glm::mat4 projection, U32 layer);
 
     ~LLGLSquashToFarClip();
 };
@@ -359,9 +361,9 @@ public:
 
     static std::list<LLGLUpdate*> sGLQ;
 
-    BOOL mInQ;
+    bool mInQ;
     LLGLUpdate()
-        : mInQ(FALSE)
+        : mInQ(false)
     {
     }
     virtual ~LLGLUpdate()
@@ -383,7 +385,9 @@ const U32 FENCE_WAIT_TIME_NANOSECONDS = 1000;  //1 ms
 class LLGLFence
 {
 public:
-    virtual ~LLGLFence() = default;
+    virtual ~LLGLFence()
+    {
+    }
 
     virtual void placeFence() = 0;
     virtual bool isCompleted() = 0;
@@ -403,14 +407,17 @@ public:
     void wait();
 };
 
+extern LLMatrix4 gGLObliqueProjectionInverse;
+
 #include "llglstates.h"
 
 void init_glstates();
 
 void parse_gl_version( S32* major, S32* minor, S32* release, std::string* vendor_specific, std::string* version_string );
 
-extern BOOL gHeadlessClient;
-extern BOOL gNonInteractive;
-extern BOOL gGLActive;
+extern bool gClothRipple;
+extern bool gHeadlessClient;
+extern bool gNonInteractive;
+extern bool gGLActive;
 
 #endif // LL_LLGL_H

@@ -35,7 +35,7 @@
 struct LL_COMMON_API LLDictionaryEntry
 {
     LLDictionaryEntry(const std::string &name);
-    virtual ~LLDictionaryEntry() = default;
+    virtual ~LLDictionaryEntry() {}
     const std::string mName;
     std::string mNameCapitalized;
 };
@@ -48,7 +48,7 @@ public:
     typedef typename map_t::iterator iterator_t;
     typedef typename map_t::const_iterator const_iterator_t;
 
-    LLDictionary() = default;
+    LLDictionary() {}
     virtual ~LLDictionary()
     {
         for (iterator_t iter = map_t::begin(); iter != map_t::end(); ++iter)
@@ -61,11 +61,11 @@ public:
         if (dictionary_iter == map_t::end()) return NULL;
         return dictionary_iter->second;
     }
-    const Index lookup(const std::string_view name) const
+    const Index lookup(const std::string &name) const
     {
-        for (const_iterator_t dictionary_iter = map_t::begin(), end_iter = map_t::end();
-             dictionary_iter != end_iter;
-             ++dictionary_iter)
+        for (const_iterator_t dictionary_iter = map_t::begin();
+             dictionary_iter != map_t::end();
+             dictionary_iter++)
         {
             const Entry *entry = dictionary_iter->second;
             if (entry->mName == name)

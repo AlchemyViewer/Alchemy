@@ -31,7 +31,7 @@
 #include "llpanel.h"
 class LLScrollListCtrl;
 
-class LLPanelExperienceLog final
+class LLPanelExperienceLog
     : public LLPanel
 {
 public:
@@ -40,9 +40,9 @@ public:
 
     static LLPanelExperienceLog* create();
 
-    /*virtual*/ BOOL postBuild(void) override;
+    /*virtual*/ bool postBuild();
 
-    void refresh() override;
+    void refresh();
 protected:
     void logSizeChanged();
     void notifyChanged();

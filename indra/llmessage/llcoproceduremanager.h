@@ -35,16 +35,16 @@
 
 class LLCoprocedurePool;
 
-class LLCoprocedureManager final : public LLSingleton < LLCoprocedureManager >
+class LLCoprocedureManager : public LLSingleton < LLCoprocedureManager >
 {
-    LLSINGLETON_EMPTY_CTOR(LLCoprocedureManager);
+    LLSINGLETON(LLCoprocedureManager);
     virtual ~LLCoprocedureManager();
 
 public:
-    typedef boost::function<U32(const std::string &)> SettingQuery_t;
-    typedef boost::function<void(const std::string &, U32, const std::string &)> SettingUpdate_t;
+    typedef std::function<U32(const std::string &)> SettingQuery_t;
+    typedef std::function<void(const std::string &, U32, const std::string &)> SettingUpdate_t;
 
-    typedef boost::function<void(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &, const LLUUID &id)> CoProcedure_t;
+    typedef std::function<void(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &, const LLUUID &id)> CoProcedure_t;
 
     /// Places the coprocedure on the queue for processing.
     ///
@@ -79,7 +79,7 @@ public:
     void close();
     void close(const std::string &pool);
 
-    void initializePool(const std::string &poolName);
+    void initializePool(const std::string &poolName, size_t queue_size = DEFAULT_QUEUE_SIZE);
 
 private:
 

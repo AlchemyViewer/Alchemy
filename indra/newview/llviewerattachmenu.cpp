@@ -40,6 +40,8 @@
 #include "llmenugl.h"
 #include "lltrans.h"
 
+#include <fmt/format.h>
+
 // static
 void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, const std::string& attach_to_hud_menu_name)
 {
@@ -58,24 +60,26 @@ void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, c
     }
 
     // Populate "Attach to..." / "Attach to HUD..." submenus.
-    for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
+    for (LLVOAvatar::attachment_map_t::iterator iter = gAgentAvatarp->mAttachmentPoints.begin();
+         iter != gAgentAvatarp->mAttachmentPoints.end(); )
     {
-        LLViewerJointAttachment* attachment = attach_pair.second;
+        LLVOAvatar::attachment_map_t::iterator curiter = iter++;
+        LLViewerJointAttachment* attachment = curiter->second;
         LLMenuItemCallGL::Params p;
         std::string submenu_name = attachment->getName();
         std::string translated_submenu_name;
 
         if (LLTrans::findString(translated_submenu_name, submenu_name))
         {
-            p.name = attachment->getIsHUDAttachment() ? translated_submenu_name : fmt::format(FMT_STRING("{} ({})"), translated_submenu_name, attach_pair.first);
+            p.name = attachment->getIsHUDAttachment() ? translated_submenu_name : fmt::format(FMT_STRING("{} ({})"), translated_submenu_name, curiter->first);
         }
         else
         {
-            p.name = attachment->getIsHUDAttachment() ? submenu_name : fmt::format(FMT_STRING("{} ({})"), submenu_name, attach_pair.first);
+            p.name = attachment->getIsHUDAttachment() ? submenu_name : fmt::format(FMT_STRING("{} ({})"), submenu_name, curiter->first);
         }
 
         LLSD cbparams;
-        cbparams["index"] = attach_pair.first;
+        cbparams["index"] = curiter->first;
         cbparams["label"] = p.name;
         p.on_click.function_name = "Object.Attach";
         p.on_click.parameter = LLSD(attachment->getName());
@@ -92,9 +96,11 @@ void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, c
 void LLViewerAttachMenu::attachObjects(const uuid_vec_t& items, const std::string& joint_name)
 {
     LLViewerJointAttachment* attachmentp = NULL;
-    for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
+    for (LLVOAvatar::attachment_map_t::iterator iter = gAgentAvatarp->mAttachmentPoints.begin();
+         iter != gAgentAvatarp->mAttachmentPoints.end(); )
     {
-        LLViewerJointAttachment* attachment = attach_pair.second;
+        LLVOAvatar::attachment_map_t::iterator curiter = iter++;
+        LLViewerJointAttachment* attachment = curiter->second;
         if (attachment->getName() == joint_name)
         {
             attachmentp = attachment;
@@ -106,17 +112,18 @@ void LLViewerAttachMenu::attachObjects(const uuid_vec_t& items, const std::strin
         return;
     }
 
-    for (const LLUUID& id : items)
+    for (uuid_vec_t::const_iterator it = items.begin(); it != items.end(); ++it)
     {
+        const LLUUID &id = *it;
         LLViewerInventoryItem* item = (LLViewerInventoryItem*)gInventory.getLinkedItem(id);
         if(item && gInventory.isObjectDescendentOf(id, gInventory.getRootFolderID()))
         {
-            rez_attachment(item, attachmentp); // don't replace if called from an "Attach To..." menu
+            rez_attachment(item, attachmentp, false); // don't replace if called from an "Attach To..." menu
         }
         else if(item && item->isFinished())
         {
             // must be in library. copy it to our inventory and put it on.
-//          LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, attachmentp));
+//          LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, attachmentp, false));
 // [SL:KB] - Patch: Appearance-DnDWear | Checked: 2013-02-04 (Catznip-3.4)
             LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, attachmentp, false));
 // [/SL;KB]

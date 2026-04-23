@@ -6,38 +6,17 @@
 <strings>
 
 	<!-- Default Args - these arguments will be replaced in all strings -->
-	<string name="SECOND_LIFE">[CURRENT_GRID]</string>
+	<string name="SECOND_LIFE">Second Life</string>
+	<string name="ALCHEMY">Alchemy</string>
 	<string name="APP_NAME">Alchemy</string>
 	<string name="CAPITALIZED_APP_NAME">ALCHEMY</string>
-	<string name="SECOND_LIFE_GRID">[CURRENT_GRID] Grid</string>
-	<string name="SUPPORT_SITE">Support Portal</string>
-
-	<!-- Default Args set in LLViewerNetwork -->
-	<string name="CURRENT_GRID"/>
-	<string name="GRID_ADMIN"/>
-
+	<string name="SECOND_LIFE_GRID">Second Life Grid</string>
+	<string name="SUPPORT_SITE">Second Life Support Portal</string>
 
 	<!-- starting up -->
-	<string name="StartupDetectingHardware">Detecting hardware...</string>
 	<string name="StartupLoading">Loading [APP_NAME]...</string>
-	<string name="StartupChangingCacheLocation">Migrating cache...</string>
-	<string name="StartupClearingCache">Obliterating cache...</string>
-	<string name="StartupClearingTextureCache">Obliterating texture cache...</string>
-	<string name="StartupClearingDiskCache">Obliterating asset cache...</string>
-	<string name="StartupClearingObjectCache">Obliterating object cache...</string>
-	<string name="StartupClearingShaderCache">Obliterating shader cache...</string>
-	<string name="StartupInitializingDiskCache">Initializing disk cache...</string>
+	<string name="StartupClearingCache">Clearing cache...</string>
 	<string name="StartupInitializingTextureCache">Initializing texture cache...</string>
-	<string name="StartupInitializingTextureCache0">Fluffing texture cache...</string>
-	<string name="StartupInitializingTextureCache1">Reticulating splines...</string>
-	<string name="StartupInitializingTextureCache2">Preheating texture baking oven...</string>
-	<string name="StartupInitializingTextureCache3">Booping the snoot, texturally...</string>
-	<string name="StartupInitializingTextureCache4">Loading the enchanted hippo...</string>
-	<string name="StartupInitializingTextureCache5">Sacrificing virgin goats to Nvidia...</string>
-	<string name="StartupInitializingTextureCache6">Preparing for Project Sansar. (lol)...</string>
-	<string name="StartupInitializingTextureCache7">Discovering new ways to make you wait...</string>
-	<string name="StartupInitializingTextureCache8">Trying to sort in O(n)...</string>
-	<string name="StartupInitializingTextureCache9">Generating witty startup message...</string>
 	<string name="StartupRequireDriverUpdate">Graphics initialization failed. Please update your graphics driver!</string>
 
 	<!-- about dialog/support string-->
@@ -46,9 +25,7 @@
 [[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]
 	</string>
 	<string name="AboutCompiler">Compiler Version: [COMPILER] [COMPILER_VERSION]</string>
-  <string name="AboutVCSRev">Git Revision: [GIT_REV]</string>
     <string name="BuildConfig">Build Configuration [BUILD_CONFIG]</string>
-  <string name="BuildDate">Build Date: [BUILD_DATE] [BUILD_TIME]</string>
 
 	<string name="AboutPosition">
 You are at [POSITION_LOCAL_0,number,1], [POSITION_LOCAL_1,number,1], [POSITION_LOCAL_2,number,1] in [REGION] located at &lt;nolink&gt;[HOSTNAME]&lt;/nolink&gt;
@@ -78,17 +55,12 @@ Graphics Card: [GRAPHICS_CARD]
 	<string name="AboutSettings">
 Window size: [WINDOW_WIDTH]x[WINDOW_HEIGHT]
 Font Size Adjustment: [FONT_SIZE_ADJUSTMENT]pt
-UI Font: [FONT_MAIN_OVERRIDE]
-Monospace Font: [FONT_MONO_OVERRIDE]
-Chat Font: [FONT_CHAT_OVERRIDE]
-Script Font: [FONT_SCRIPT_OVERRIDE]
 UI Scaling: [UI_SCALE]
 Draw distance: [DRAW_DISTANCE]m
 Bandwidth: [NET_BANDWITH]kbit/s
 LOD factor: [LOD_FACTOR]
 Render quality: [RENDER_QUALITY]
 Texture memory: [TEXTURE_MEMORY]MB
-Texture cache: [TEXTURE_CACHE_INFO]
 Disk cache: [DISK_CACHE_INFO]
 	</string>
   <string name="AboutOSXHiDPI">
@@ -96,10 +68,9 @@ HiDPI display mode: [HIDPI]
 	</string>
 	<string name="AboutLibs">
 RestrainedLove API: [RLV_VERSION]
-libcurl Version: [LIBCURL_VERSION]
 J2C Decoder Version: [J2C_VERSION]
 Audio Driver Version: [AUDIO_DRIVER_VERSION]
-[CEF_VERSION]
+[LIBCEF_VERSION]
 LibVLC Version: [LIBVLC_VERSION]
 Voice Server Version: [VOICE_VERSION]
 	</string>
@@ -125,11 +96,11 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="LoginPrecaching">Loading world...</string>
 	<string name="LoginInitializingBrowser">Initializing embedded web browser...</string>
 	<string name="LoginInitializingMultimedia">Initializing multimedia...</string>
-	<string name="LoginInitializingFonts">Loading all the pretty fonts...</string>
-	<string name="LoginVerifyingCache">Verifying cache files (can take 69-99 seconds)...</string>
+	<string name="LoginInitializingFonts">Loading fonts...</string>
+	<string name="LoginVerifyingCache">Verifying cache files (can take 60-90 seconds)...</string>
 	<string name="LoginProcessingResponse">Processing response...</string>
 	<string name="LoginInitializingWorld">Initializing world...</string>
-	<string name="LoginDecodingImages">Handcrafting images...</string>
+	<string name="LoginDecodingImages">Decoding images...</string>
 	<string name="LoginInitializingQuicktime">Initializing QuickTime...</string>
 	<string name="LoginQuicktimeNotFound">QuickTime not found - unable to initialize.</string>
 	<string name="LoginQuicktimeOK">QuickTime initialized successfully.</string>
@@ -150,18 +121,21 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="LoginFailedNoNetwork">Network error: Could not establish connection, please check your network connection.</string>
 	<string name="LoginFailedHeader">Login failed.</string>
 	<string name="Quit">Quit</string>
+	<string name="create_account_url">http://join.secondlife.com/?sourceid=[sourceid]</string>
 	
 	<string name="AgniGridLabel">Second Life Main Grid (Agni)</string>
 	<string name="AditiGridLabel">Second Life Beta Test Grid (Aditi)</string>
 	
 	<string name="ViewerDownloadURL">https://www.alchemyviewer.org/downloads</string>
 	<string name="LoginFailedViewerNotPermitted">
-    The viewer you are using can no longer access [CURRENT_GRID]. Please visit the following page to download a new viewer: https://www.alchemyviewer.org/downloads</string>
+The viewer you are using can no longer access Second Life. Please visit the following page to download a new viewer:
+https://www.alchemyviewer.org/downloads</string>
 	<string name="LoginFailed">"Login process did not complete due to system issues. Try again in a few minutes.
-If you feel this is an error, please contact support.</string>
+If you feel this is an error, please contact Support.</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">Optional viewer update available: [VERSION]</string>
 	<string name="LoginFailedRequiredUpdate">Required viewer update: [VERSION]</string>
-	<string name="LoginFailedAlreadyLoggedIn">This agent is already logged in.</string>
+	<string name="LoginFailedAlreadyLoggedIn">This agent is already logged in.
+</string>
 	<string name="LoginFailedAuthenticationFailed">Sorry! We couldn't log you in.
 Please check to make sure you entered the right
     * Username (like bobsmith12 or steller.sunshine)
@@ -169,46 +143,50 @@ Please check to make sure you entered the right
     * Second Factor Token (if enabled)
 Also, please make sure your Caps Lock key is off.</string>
 	<string name="LoginFailedPasswordChanged">As a security precaution your password has been changed.
-Please go to your account page and answer the security question to reset your password.
+Please go to your account page at http://secondlife.com/password
+and answer the security question to reset your password.
 We are very sorry for the inconvenience.</string>
 	<string name="LoginFailedPasswordReset">We made some changes to our system and you will need to reset your password.
-Please go to your account page and answer the security question to reset your password.
+Please go to your account page at http://secondlife.com/password
+and answer the security question to reset your password.
 We are very sorry for the inconvenience.</string>
-	<string name="LoginFailedEmployeesOnly">[CURRENT_GRID] is temporarily closed for maintenance.
-Logins are currently restricted to [GRID_ADMIN] employees only.</string>
-	<string name="LoginFailedPremiumOnly">[CURRENT_GRID] logins are temporarily restricted in order to make sure that those in-world have the best possible experience.
+	<string name="LoginFailedEmployeesOnly">Second Life is temporarily closed for maintenance.
+Logins are currently restricted to employees only.
+Check www.secondlife.com/status for updates.</string>
+	<string name="LoginFailedPremiumOnly">Second Life logins are temporarily restricted in order to make sure that those in-world have the best possible experience.
 
-People with free accounts will not be able to access [CURRENT_GRID] during this time, to make room for those who have paid for [CURRENT_GRID].</string>
-	<string name="LoginFailedComputerProhibited">[CURRENT_GRID] cannot be accessed from this computer.
-If you feel this is an error, please contact support.</string>
+People with free accounts will not be able to access Second Life during this time, to make room for those who have paid for Second Life.</string>
+	<string name="LoginFailedComputerProhibited">Second Life cannot be accessed from this computer.
+If you feel this is an error, please contact
+support@secondlife.com.</string>
   <!--'Pacific time' placeholder for [TIME] in case time from server can't be decoded-->
   <string name="PacificTime">Pacific Time</string>
 	<string name="LoginFailedAcountSuspended">Your account is not accessible until
 [TIME].
-If you feel this is an error, please contact support.</string>
+If you feel this is an error, please contact support@secondlife.com.</string>
 	<string name="LoginFailedAccountDisabled">We are unable to complete your request at this time.
-Please contact [CURRENT_GRID] support for assistance.</string>
+Please contact Second Life support for assistance at http://support.secondlife.com.</string>
 	<string name="LoginFailedTransformError">Data inconsistency found during login.
-Please contact [CURRENT_GRID] support.</string>
+Please contact support@secondlife.com.</string>
 	<string name="LoginFailedAccountMaintenance">Your account is undergoing minor maintenance.
 Your account is not accessible until
 [TIME].
-If you feel this is an error, please contact [CURRENT_GRID] support.</string>
+If you feel this is an error, please contact support@secondlife.com.</string>
 	<string name="LoginFailedPendingLogoutFault">Request for logout responded with a fault from simulator.</string>
 	<string name="LoginFailedPendingLogout">The system is logging you out right now.
 Please wait a minute before you try logging in again.</string>
 	<string name="LoginFailedUnableToCreateSession">Unable to create valid session.</string>
 	<string name="LoginFailedUnableToConnectToSimulator">Unable to connect to a simulator.</string>
-	<string name="LoginFailedRestrictedHours">Your account can only access [CURRENT_GRID]
+	<string name="LoginFailedRestrictedHours">Your account can only access Second Life
 between [START] and [END] Pacific Time.
 Please come back during those hours.
-If you feel this is an error, please contact [CURRENT_GRID] support.</string>
+If you feel this is an error, please contact support@secondlife.com.</string>
 	<string name="LoginFailedIncorrectParameters">Incorrect parameters.
-If you feel this is an error, please contact [CURRENT_GRID] support.</string>
+If you feel this is an error, please contact support@secondlife.com.</string>
 	<string name="LoginFailedFirstNameNotAlphanumeric">First name parameter must be alphanumeric.
-If you feel this is an error, please contact [CURRENT_GRID] support.</string>
+If you feel this is an error, please contact support@secondlife.com.</string>
 	<string name="LoginFailedLastNameNotAlphanumeric">Last name parameter must be alphanumeric.
-If you feel this is an error, please contact [CURRENT_GRID] support.</string>
+If you feel this is an error, please contact support@secondlife.com.</string>
 	<string name="LogoutFailedRegionGoingOffline">Region is going offline.
 Please try logging in again in a minute.</string>
 	<string name="LogoutFailedAgentNotInRegion">Agent not in region.
@@ -229,7 +207,7 @@ Please try logging in again in a minute.</string>
 If you feel this is an error, please contact support@secondlife.com</string>
 
 	<!-- Disconnection -->
-	<string name="AgentLostConnection">Well this is embarassing.  This region may be experiencing trouble.  Please check your connection to the Internet.</string>
+	<string name="AgentLostConnection">This region may be experiencing trouble.  Please check your connection to the Internet.</string>
 	<string name="SavingSettings">Saving your settings...</string>
 	<string name="LoggingOut">Logging out...</string>
 	<string name="ShuttingDown">Shutting down...</string>
@@ -286,6 +264,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="TooltipOutboxMixedStock">All items in a stock folder must have the same type and permission</string>
 	<string name="TooltipOutfitNotInInventory">You can only put items or outfits from your personal inventory into "My outfits"</string>
 	<string name="TooltipCantCreateOutfit">One or more items can't be used inside "My outfits"</string>
+    <string name="TooltipCantMoveOutfitIntoOutfit">Can not move an outfit into another outfit</string>
 	
 	<string name="TooltipDragOntoOwnChild">You can't move a folder into its child</string>
 	<string name="TooltipDragOntoSelf">You can't move a folder into itself</string>
@@ -355,6 +334,7 @@ are allowed.
 	<!-- searching - generic -->
 	<string name="Searching">Searching...</string>
 	<string name="NoneFound">None found.</string>
+    <string name="ServerUnavailable">Service not available.</string>
 
 	<!-- Indicates that an avatar name or other similar datum is being retrieved. General usage. -->
 	<string name="RetrievingData">Retrieving...</string>
@@ -546,6 +526,8 @@ http://secondlife.com/support for help fixing this problem.
 	<string name="reconnect_nearby">You will now be reconnected to Nearby Voice Chat</string>
 	<string name="ScriptQuestionCautionChatGranted">'[OBJECTNAME]', an object owned by '[OWNERNAME]', located in [REGIONNAME] at [REGIONPOS], has been granted permission to: [PERMISSIONS].</string>
 	<string name="ScriptQuestionCautionChatDenied">'[OBJECTNAME]', an object owned by '[OWNERNAME]', located in [REGIONNAME] at [REGIONPOS], has been denied permission to: [PERMISSIONS].</string>
+	<string name="ScriptTakeMoneyCaution">The object &apos;&lt;nolink&gt;[OBJECTNAME]&lt;/nolink&gt;&apos; wants total access to your Linden Dollars account. If you allow access, it can remove funds from your account at any time, or empty your account completely, on an ongoing basis with no additional warnings.</string>
+	<string name="PrivilegedLandAccessCaution">The object &apos;&lt;nolink&gt;[OBJECTNAME]&lt;/nolink&gt;&apos; wants privileged access to your land. If you allow access it may sell your land with no additional warnings.</string>
 	<string name="AdditionalPermissionsRequestHeader">If you allow access to your account, you will also be allowing the object to:</string>
 	<string name="ScriptTakeMoney">Take Linden dollars (L$) from you</string>
 	<string name="ActOnControlInputs">Act on your control inputs</string>
@@ -563,6 +545,7 @@ http://secondlife.com/support for help fixing this problem.
 	<string name="ChangeYourDefaultAnimations">Change your default animations</string>
 	<string name="ForceSitAvatar">Force your avatar to sit</string>
 	<string name="ChangeEnvSettings">Change your environment settings</string>
+	<string name="PrivilegedLandAccess">Sell land on your behalf.</string>
 	
 	<string name="NotConnected">Not Connected</string>
 	<string name="AgentNameSubst">(You)</string> <!-- Substitution for agent name -->
@@ -598,8 +581,8 @@ http://secondlife.com/support for help fixing this problem.
 	<string name="targa_image_files">Targa Images</string>
 	<string name="bitmap_image_files">Bitmap Images</string>
 	<string name="png_image_files">PNG Images</string>
-	<string name="webp_image_files">WebP Images</string>
-	<string name="save_texture_image_files">Targa, PNG, or WebP Images</string>
+    <string name="webp_image_files">WebP Images</string>
+	<string name="save_texture_image_files">Targa, PNG, WebP Images</string>
 	<string name="avi_movie_file">AVI Movie File</string>
 	<string name="xaf_animation_file">XAF Anim File</string>
 	<string name="xml_file">XML File</string>
@@ -610,9 +593,7 @@ http://secondlife.com/support for help fixing this problem.
 	<string name="choose_the_directory">Choose Directory</string>
 	<string name="script_files">Scripts</string>
 	<string name="dictionary_files">Dictionaries</string>
-	<string name="gltf_files">GLTF Files</string>
 	<string name="zip_files">Zip files</string>
-	<string name="recompile_script_verb">Recompile</string>
 
     <!-- Text validator error messages -->
     <string name="Validator_InvalidNumericString">Invalid numeric string: "[STR]"</string>
@@ -628,7 +609,7 @@ http://secondlife.com/support for help fixing this problem.
     <string name="Validator_ShouldBeASCII">Invalid character [NR]: '[CH]' (should only be an ASCII character)</string>
     <string name="Validator_ShouldBeNewLineOrASCII">Invalid character [NR]: '[CH]' (should only be an ASCII character or a new line)</string>
 
-  <!-- LSL Usage Hover Tips -->
+    <!-- LSL Usage Hover Tips -->
   <!-- NOTE: For now these are set as translate="false", until DEV-40761 is implemented (to internationalize the rest of tooltips in the same window).
              This has no effect on viewer code, but prevents Linden Lab internal localization tool from scraping these strings.  -->
 	<string name="LSLTipSleepTime" translate="false">
@@ -957,7 +938,7 @@ Returns the rotation velocity in radians per second
 	</string>
 	<string name="LSLTipText_llGetTimeOfDay" translate="false">
 float llGetTimeOfDay()
-Returns the time in seconds since [CURRENT_GRID] server midnight or since region up-time, whichever is smaller
+Returns the time in seconds since [SECOND_LIFE] server midnight or since region up-time, whichever is smaller
 	</string>
 	<string name="LSLTipText_llGetWallclock" translate="false">
 float llGetWallclock()
@@ -2355,6 +2336,7 @@ For AI Character: Get the closest navigable point to the point provided.
 	<!-- inventory -->
 	<string name="InventoryNoMatchingItems">Didn't find what you're looking for? Try [secondlife:///app/search/all/[SEARCH_TERM] Search].</string>
 	<string name="InventoryNoMatchingRecentItems">Didn't find what you're looking for? Try [secondlife:///app/inventory/filters Show filters].</string>	
+  <string name="InventoryNoMatchingFavorites">You haven't marked any items as favorites.</string>
 	<string name="PlacesNoMatchingItems">To add a place to your landmarks, click the star to the right of the location name.</string>
 	<string name="FavoritesNoMatchingItems">To add a place to your favorites, click the star to the right of the location name, then save the landmark to "Favorites bar".</string>
 	<string name="MarketplaceNoListing">You have no listings yet.</string>
@@ -2519,13 +2501,13 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="InvFolder Uncompressed Sounds">Uncompressed Sounds</string>
 	<string name="InvFolder Animations">Animations</string>
 	<string name="InvFolder Gestures">Gestures</string>
-	<string name="InvFolder Favorite">My Favorites</string>
+	<string name="InvFolder Favorite">Favorites Bar</string>
   <!-- historically default name of the Favorites folder can start from either "f" or "F" letter.
       Also, it can be written as "Favorite" or "Favorites".
   We should localize all variants of them with the same value -->
-	<string name="InvFolder favorite">My Favorites</string>
-	<string name="InvFolder Favorites">My Favorites</string>
-	<string name="InvFolder favorites">My Favorites</string>
+	<string name="InvFolder favorite">Favorites Bar</string>
+	<string name="InvFolder Favorites">Favorites Bar</string>
+	<string name="InvFolder favorites">Favorites Bar</string>
 	<string name="InvFolder Current Outfit">Current Outfit</string>
 	<string name="InvFolder Initial Outfits">Initial Outfits</string>
 	<string name="InvFolder My Outfits">My Outfits</string>
@@ -2537,11 +2519,8 @@ If you continue to receive this message, please contact Second Life support for 
   <string name="InvFolder Material">Materials</string>
   <string name="InvFolder Materials">Materials</string>
 	<string name="InvFolder Animation Overrides">Animation Overrides</string>
-    <string name="InvFolder Settings">Settings</string>
-	<string name="InvFolder Local Inventory">Local Inventory</string>
 	<string name="InvFolder #RLV">#RLV</string>
-	<string name="InvFolder #Firestorm">#Firestorm</string>
-  
+
   <!-- are used for Friends and Friends/All folders in Inventory "Calling cards" folder. See EXT-694-->
 	<string name="InvFolder Friends">Friends</string>	
 	<string name="InvFolder All">All</string>
@@ -2698,12 +2677,6 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="CompileNoExperiencePerm">Skipping script [SCRIPT] with Experience [EXPERIENCE].</string>
 	<string name="CompileQueueTitle">Recompilation Progress</string>
 	<string name="CompileQueueStart">recompile</string>
-	<string name="CompileQueuePreprocessing">Preprocessing: [SCRIPT]</string>
-	<string name="CompileQueuePreprocessingComplete">Preprocessing of script [SCRIPT] completed</string>
-	<string name="CompileQueueCompiling">Compiling "[SCRIPT]"...</string>
-	<string name="CompileSuccess">Compilation of "[SCRIPT]" succeeded</string>
-	<string name="CompileFailure">Compilation of "[SCRIPT]" failed:</string>
-	<string name="CompilePermissions">Skipping: [ITEM_NAME] (Permissions)</string>
 	<string name="ResetQueueTitle">Reset Progress</string>
 	<string name="ResetQueueStart">reset</string>
 	<string name="RunQueueTitle">Set Running Progress</string>
@@ -2857,12 +2830,6 @@ If you continue to receive this message, please contact Second Life support for 
 
   <!-- panel preferences general -->
   <string name="DoNotDisturbModeResponseDefault">This resident has turned on &apos;Do Not Disturb&apos; and will see your message later.</string>
-  <string name="RejectFriendshipRequestsResponseDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;reject all friendship requests mode&apos; which means they have requested not to be disturbed with friendship requests. You may still send an IM manually.</string>
-
-  <!-- panel preferences chat-->
-  <string name="RejectTeleportOffersResponseDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;reject all teleport offers and requests mode&apos; which means they have requested not to be disturbed with teleport offers and requests. You may still send an IM message manually.</string>
-  <string name="AlchemyAutoresponseDefault">The Resident you messaged has activated &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
-  <string name="AlchemyAutoresponseNotFriendDefault">The Resident you messaged has activated &apos;autorespond non-friends mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
 
 	<!-- Mute -->
 	<string name="MuteByName">(By name)</string>
@@ -3026,9 +2993,9 @@ Expected .wav, .tga, .bmp, .jpg, .jpeg, or .anim
 	<string name="Play Media">Play/Pause Media</string>
 
 	<!-- Drivers support/update pages -->
-	<string name="IntelDriverPage">https://www.intel.com/content/www/us/en/support/detect.html</string>
-	<string name="NvidiaDriverPage">https://www.nvidia.com/Download/index.aspx?lang=en-us</string>
-	<string name="AMDDriverPage">https://www.amd.com/en/support</string>
+	<string name="IntelDriverPage">http://www.intel.com/p/en_US/support/detect/graphics</string>
+	<string name="NvidiaDriverPage">http://www.nvidia.com/Download/index.aspx?lang=en-us</string>
+	<string name="AMDDriverPage">http://support.amd.com/us/Pages/AMDSupportHub.aspx</string>
 
 
 	<!-- OSMessageBox messages -->
@@ -3056,6 +3023,9 @@ If this message persists, restart your computer.
 		[APP_NAME] appears to have frozen or crashed on the previous run.
 Would you like to send a crash report?
 	</string>
+    <string name="MBFreezeDetected">
+        [APP_NAME] appears to have frozen. If this issue occurs regularly, please contact support at https://support.secondlife.com.
+    </string>
 	<string name="MBAlert">Notification</string>
 	<string name="MBNoDirectX">
 		[APP_NAME] is unable to detect DirectX 9.0b or greater.
@@ -3091,7 +3061,7 @@ If you continue to receive this message, contact the [SUPPORT_SITE].
     <string name="MBOutOfMemoryErr">
         [APP_NAME]'s request for memory failed. Application can't proceed and will be closed.
 
-If your computer's RAM is low, quit any heavy applications before runing Second Life, allocate a page file or reduce graphical settings like draw distance.
+If your computer's RAM is low, quit any heavy applications before running Alchemy, allocate a page file or reduce graphical settings like draw distance.
     </string>
     <string name="MBMissingFile">
         [APP_NAME] couldn't access or find some of the files it needs and will be closed.
@@ -3739,7 +3709,6 @@ Please reinstall viewer from https://alchemyviewer.org/downloads and contact the
   <string name="OfflineStatus">Offline</string>
 	<string name="not_online_msg">User not online - message will be stored and delivered later.</string>
 	<string name="not_online_inventory">User not online - inventory has been saved.</string>
-	<string name="AutoresponsePrefix">(Autoresponse)</string>
 
 	<!-- voice calls -->
 	<string name="answered_call">Your call has been answered</string>
@@ -3774,6 +3743,10 @@ Please reinstall viewer from https://alchemyviewer.org/downloads and contact the
   </string>
   <string name="inventory_item_offered_rlv">
     Inventory item offered to [NAME]
+  </string>
+  <string name="bot_warning">
+  You are chatting with a bot, [NAME]. Do not share any personal information.
+Learn more at https://second.life/scripted-agents.
   </string>
   <string name="share_alert">
     Drag items from inventory here
@@ -3952,9 +3925,6 @@ Abuse Report</string>
   <string name="Other Gestures">Other Gestures</string>
   <string name="Speech Gestures">Speech Gestures</string>
   <string name="Common Gestures">Common Gestures</string>
-  <!-- Additional inventory entries -->
-  <string name="RlvRoot">#RLV</string>
-  <string name="Local Inventory">Local Inventory</string>
   <!-- gestures -->
   <string name="Male - Excuse me">Male - Excuse me</string>
   <string name="Male - Get lost">Male - Get lost</string>
@@ -4026,6 +3996,7 @@ Abuse Report</string>
   <string name="AvatarBirthDateFormatShort">[mthnum,datetime,slt]/[day,datetime,slt]</string>
 
   <string name="DefaultMimeType">none/none</string>
+  <string name="texture_load_area_error">Can't load images larger than [PIXELS] pixels</string>
   <string name="texture_load_dimensions_error">Can't load images larger than [WIDTH]*[HEIGHT]</string>
   <string name="texture_load_format_error">Incorrect image format.</string>
   <string name="texture_load_empty_file">File is empty.</string>
@@ -4244,7 +4215,7 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_AboutLand_Label">About land</string>
   <string name="Command_AnimationOverride_Label">AO</string>
   <string name="Command_Appearance_Label">Outfits</string>
-  <string name="Command_Avatar_Label">Complete Avatars</string>
+  <string name="Command_Avatar_Label">Avatar Welcome Pack</string>
   <string name="Command_Build_Label">Build</string>
   <string name="Command_Chat_Label">Nearby Chat</string>
   <string name="Command_Conversations_Label">Conversations</string>
@@ -4268,7 +4239,6 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_PersonalLighting_Label">Personal Lighting</string>
   <string name="Command_Picks_Label">Picks</string>
   <string name="Command_Places_Label">Places</string>
-  <string name="Command_Poser_Label">Poser</string>
   <string name="Command_Preferences_Label">Preferences</string>
   <string name="Command_Profile_Label">Profile</string>
   <string name="Command_Quick_Settings_Label">Quick Settings</string>
@@ -4312,7 +4282,6 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_PersonalLighting_Tooltip">Modify your personal environment lighting</string>
   <string name="Command_Picks_Tooltip">Places to show as favorites in your profile</string>
   <string name="Command_Places_Tooltip">Places you've saved</string>
-  <string name="Command_Poser_Tooltip">Pose your avatar and animated objects</string>
   <string name="Command_Preferences_Tooltip">Preferences</string>
   <string name="Command_Profile_Tooltip">Edit or view your profile</string>
   <string name="Command_Quick_Settings_Tooltip">Quick preferences</string>
@@ -4404,6 +4373,9 @@ name="Command_360_Capture_Label">360 snapshot</string>
 
   <!-- PBR Materials -->
   <string name="Material Texture Name Header">Textures present this material: </string>
+  <string name="material_selection_title">Material selection</string>
+  <string name="material_selection_text">Select material:</string>
+  <string name="material_batch_import_text">--- Bulk Upload All ---</string>
   
   <!-- Conversation log messages -->
   <string name="logging_calls_disabled_log_empty">
@@ -4467,56 +4439,23 @@ and report the problem.
 [https://community.secondlife.com/knowledgebase/english/error-messages-r520/#Section__3 Knowledge Base]
   </string>
 
-  <string name="outfit_photo_load_codec_error">Invalid image format. Please use another image</string>
+<!-- Alchemy Below This Line-->
+  <!-- panel preferences chat rejection -->
+  <string name="RejectTeleportOffersResponseDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;reject all teleport offers and requests mode&apos; which means they have requested not to be disturbed with teleport offers and requests. You may still send an IM manually.</string>
+  <string name="RejectFriendshipRequestsResponseDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;reject all friendship requests mode&apos; which means they have requested not to be disturbed with friendship requests. You may still send an IM manually</string>
+  <string name="IgnoredAdHocSession">You've been invited to a conference (ad-hoc) chat by [AVATAR_NAME], but the viewer automatically ignored it because of your settings.</string>
 
-  <!-- Alchemy Strings -->
+<!-- panel preferences chat -->
+  <string name="AutoResponseModeDefault">The Resident you messaged has activated [APP_NAME]&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
+  <string name="AutoResponseModeNonFriendsDefault">The Resident you messaged has activated [APP_NAME]&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
+
   <string name="NotifyIncomingMessage">Incoming message from [NAME]...</string>
   <string name="NearbyChatTitleChannel">Nearby chat (on channel [CHANNEL])</string>
   <string name="AvatarTyping">Typing</string>
   <string name="UnknownAvatar">Unknown Avatar</string>
-  <string name="NotAvailableOnPlatform">Not availalbe on this platform</string>
   <string name="NowPlaying">Now Playing</string>
-  <string name="GridInfoTitle">GRID INFO</string>
 
-  <!-- <LSL Preprocessor -->
-  <string name="preproc_toggle_warning">Toggling the preprocessor will not take full effect until you close and reopen this editor.</string>
-  <string name="fs_preprocessor_starting">[APP_NAME] preprocessor starting...</string>
-  <string name="fs_preprocessor_not_supported">Warning: Preprocessor not supported in this build. ([WHERE])</string>
-  <string name="fs_preprocessor_disabled_by_script_marker">[APP_NAME] preprocessor disabled by directive at line [LINENUMBER].</string>
-  <string name="fs_preprocessor_settings_list_prefix">Settings:</string>
-  <string name="fs_preprocessor_cpp_exception">[ERR_NAME] ([LINENUMBER]): [ERR_DESC]</string>
-  <string name="fs_preprocessor_lexing_exception">[SEVERITY]: [ERR_NAME] ([LINENUMBER]): [ERR_DESC]</string>
-  <string name="fs_preprocessor_exception">[ERR_NAME] ([LINENUMBER]): exception caught: [ERR_DESC]</string>
-  <string name="fs_preprocessor_error">[ERR_NAME] ([LINENUMBER]): unexpected exception caught.</string>
-  <string name="fs_preprocessor_lsl2_directive_override">Detected compile-as-LSL2 directive overriding preference setting.</string>
-  <string name="fs_preprocessor_mono_directive_override">Detected compile-as-Mono directive overriding preference setting.</string>
-  <!-- LSL Optimizer -->
-  <string name="fs_preprocessor_optimizer_start">Optimizing out unreferenced user-defined functions and global variables.</string>
-  <string name="fs_preprocessor_optimizer_regex_err">Not a valid regular expression: '[WHAT]'; LSL optimization skipped.</string>
-  <string name="fs_preprocessor_optimizer_exception">Exception caught: '[WHAT]'; LSL optimization skipped.</string>
-  <string name="fs_preprocessor_optimizer_unexpected_exception">Unexpected exception in LSL optimizer; not applied.</string>
-  <!-- LSL Compressor -->
-  <string name="fs_preprocessor_compress_start">Compressing script text by removing unnecessary space.</string>
-  <string name="fs_preprocessor_compress_regex_err">Not a valid regular expression: '[WHAT]'; LSL compression skipped.</string>
-  <string name="fs_preprocessor_compress_exception">Exception caught: '[WHAT]'; LSL compression skipped.</string>
-  <string name="fs_preprocessor_compress_unexpected_exception">Unexpected exception in LSL compressor; not applied.</string>
-  <!-- LSL Lazy lists -->
-  <string name="fs_preprocessor_lazylist_start">Applying lazy list conversion.</string>
-  <string name="fs_preprocessor_lazylist_regex_err">Not a valid regular expression: '[WHAT]'; Lazy list converter skipped.</string>
-  <string name="fs_preprocessor_lazylist_exception">Exception caught: '[WHAT]'; Lazy list converter skipped.</string>
-  <string name="fs_preprocessor_lazylist_unexpected_exception">Unexpected exception in lazy list converter; not applied.</string>
-  <!-- LSL switch statement -->
-  <string name="fs_preprocessor_switchstatement_start">Applying switch statement conversion.</string>
-  <string name="fs_preprocessor_switchstatement_regex_err">Not a valid regular expression: '[WHAT]'; Switch statement converter skipped.</string>
-  <string name="fs_preprocessor_switchstatement_exception">Exception caught: '[WHAT]'; Switch statement converter skipped.</string>
-  <string name="fs_preprocessor_switchstatement_unexpected_exception">Unexpected exception in switch statement converter; not applied.</string>
-  <!-- LSL Cache -->
-  <string name="fs_preprocessor_cache_miss">Caching included file: '[FILENAME]'</string>
-  <string name="fs_preprocessor_cache_invalidated">Included file '[FILENAME]' has changed, recaching.</string>
-  <string name="fs_preprocessor_cache_completed">Caching completed for '[FILENAME]'</string>
-  <string name="fs_preprocessor_cache_unsafe">Error: script named '[FILENAME]' isn't safe to copy to the filesystem. This include will fail.</string>
-  <string name="fs_preprocessor_caching_err">Error caching included file '[FILENAME]'</string>
-  <string name="fs_preprocessor_truncated">Warning: Preprocessor output truncated due to excessive script text size. This script will most likely not work.</string>
+  <string name="SimulatorFeaturesTitle">SIMULATOR FEATURES</string>
 
 	<string
      name="MinimapToolTipMsg">
@@ -4574,6 +4513,4 @@ and report the problem.
     <string name="TooltipDistance">
         Distance: [OBJECT_DISTANCE]
     </string>
-	<string name="AutoResponseModeDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
-	<string name="AutoResponseModeNonFriendsDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
 </strings>

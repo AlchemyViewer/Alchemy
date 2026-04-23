@@ -28,21 +28,26 @@
 #include "llkeyboardheadless.h"
 #include "llwindowcallbacks.h"
 
+LLKeyboardHeadless::LLKeyboardHeadless()
+{ }
+
+bool LLKeyboardHeadless::handleKeyUp(const LLKeyboard::NATIVE_KEY_TYPE key, MASK mask)
+{
+    return false;
+}
+
+bool LLKeyboardHeadless::handleKeyDown(const LLKeyboard::NATIVE_KEY_TYPE key, MASK mask)
+{
+    return false;
+}
+
 void LLKeyboardHeadless::resetMaskKeys()
 { }
 
-
-BOOL LLKeyboardHeadless::handleKeyDown(const U32 key, MASK mask)
-{ return FALSE; }
-
-
-BOOL LLKeyboardHeadless::handleKeyUp(const U32 key, MASK mask)
-{ return FALSE; }
-
-MASK LLKeyboardHeadless::currentMask(BOOL for_mouse_event)
+MASK LLKeyboardHeadless::currentMask(bool for_mouse_event)
 { return MASK_NONE; }
 
-#ifdef LL_DARWIN
+#if LL_DARWIN && !LL_SDL_WINDOW
 void LLKeyboardHeadless::handleModifier(MASK mask)
 {
 
@@ -62,12 +67,13 @@ void LLKeyboardHeadless::scanKeyboard()
             mCallbacks->handleScanKey(key, mKeyDown[key], mKeyUp[key], mKeyLevel[key]);
         }
     }
+    mCurScanKey = KEY_NONE;
 
     // Reset edges for next frame
     for (S32 key = 0; key < KEY_COUNT; key++)
     {
-        mKeyUp[key] = FALSE;
-        mKeyDown[key] = FALSE;
+        mKeyUp[key] = false;
+        mKeyDown[key] = false;
         if (mKeyLevel[key])
         {
             mKeyLevelFrameCount[key]++;

@@ -41,12 +41,12 @@ LLFloaterAddPaymentMethod::~LLFloaterAddPaymentMethod()
 {
 }
 
-BOOL LLFloaterAddPaymentMethod::postBuild()
+bool LLFloaterAddPaymentMethod::postBuild()
 {
-    setCanDrag(FALSE);
+    setCanDrag(false);
     getChild<LLButton>("continue_btn")->setCommitCallback(boost::bind(&LLFloaterAddPaymentMethod::onContinueBtn, this));
     getChild<LLButton>("close_btn")->setCommitCallback(boost::bind(&LLFloaterAddPaymentMethod::onCloseBtn, this));
-    return TRUE;
+    return true;
 }
 
 void LLFloaterAddPaymentMethod::onOpen(const LLSD& key)
@@ -75,7 +75,7 @@ void LLFloaterAddPaymentMethod::onCloseBtn()
 
 void LLFloaterAddPaymentMethod::centerOnScreen()
 {
-    LLVector2 window_size = LLUI::getWindowSize();
+    LLVector2 window_size = LLUI::getInstance()->getWindowSize();
     centerWithin(LLRect(0, 0, ll_round(window_size.mV[VX]), ll_round(window_size.mV[VY])));
 }
 

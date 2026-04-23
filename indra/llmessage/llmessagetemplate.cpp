@@ -117,7 +117,7 @@ std::ostream& operator<<(std::ostream& s, LLMessageBlock &msg)
     }
 
 
-    for (auto& variable : msg.mMemberVariables)
+    for (LLMessageVariable* variable : msg.mMemberVariables)
     {
         s << *variable;
     }
@@ -159,7 +159,7 @@ std::ostream& operator<<(std::ostream& s, LLMessageTemplate &msg)
         s << ")\n";
     }
 
-    for (auto ci : msg.mMemberBlocks)
+    for (LLMessageBlock* ci : msg.mMemberBlocks)
     {
         s << *ci;
     }

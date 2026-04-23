@@ -54,17 +54,6 @@
 		parameter="MenuSearch" />
 	</menu_item_check>
 	<menu_item_check
-         label="Show L$ Balance"
-         layout="topleft"
-         name="ShowStatusBarBalance">
-		<on_click
-		  function="ToggleControl"
-		  parameter="ShowStatusBarBalance" />
-		<on_check
-		function="CheckControl"
-		parameter="ShowStatusBarBalance" />
-	</menu_item_check>
-	<menu_item_check
          label="Show Clock"
          layout="topleft"
          name="ShowStatusBarTime">

@@ -55,18 +55,6 @@ public:
     typedef boost::signals2::signal<void(const LLSD& value, LLScrollListCell* cell)> commit_signal_t;
 // [/SL:KB]
 
-    //BD - Cells ~ Thanks to Liru
-    struct Contents : public LLInitParam::Block<Contents>
-    {
-        Multiple<LLScrollListCell::Params>  columns;
-        Contents()
-        :   columns("columns")
-        {
-            addSynonym(columns, "columns");
-            addSynonym(columns, "cell");
-        }
-    };
-
     struct Params : public LLInitParam::Block<Params>
     {
         Optional<bool>      enabled;
@@ -82,9 +70,6 @@ public:
         Ignored             length;
 
         Multiple<LLScrollListCell::Params> columns;
-        Optional<std::string> tool_tip;
-        //BD - Cells ~ Thanks to Liru
-        Optional<Contents> contents;
 
         Params()
         :   enabled("enabled", true),
@@ -93,11 +78,7 @@ public:
             name("name"),
             type("type"),
             length("length"),
-            columns("columns"),
-            //BD
-            tool_tip("tool_tip"),
-            //BD - Cells ~ Thanks to Liru
-            contents("contents")
+            columns("columns")
         {
             addSynonym(columns, "column");
             addSynonym(value, "id");
@@ -106,27 +87,20 @@ public:
 
     virtual ~LLScrollListItem();
 
-    void    setSelected( BOOL b );
-    BOOL    getSelected() const             { return mSelected; }
+    void    setSelected( bool b );
+    bool    getSelected() const             { return mSelected; }
 
-    void    setEnabled( BOOL b )            { mEnabled = b; }
-    BOOL    getEnabled() const              { return mEnabled; }
+    void    setEnabled( bool b )            { mEnabled = b; }
+    bool    getEnabled() const              { return mEnabled; }
 
-    void    setHighlighted( BOOL b );
-    BOOL    getHighlighted() const          { return mHighlighted; }
+    void    setHighlighted( bool b );
+    bool    getHighlighted() const          { return mHighlighted; }
 
     void    setSelectedCell( S32 cell );
     S32     getSelectedCell() const         { return mSelectedIndex; }
 
     void    setHoverCell( S32 cell );
     S32     getHoverCell() const            { return mHoverIndex; }
-
-    void        setToolTip(std::string str) { mToolTip = str; }
-    std::string getToolTip() const          { return mToolTip; }
-
-    //BD
-    void    setFlagged(bool b)              { mFlaggedDead = b; }
-    bool    getFlagged() const              { return mFlaggedDead; }
 
     void    setUserdata( void* userdata )   { mUserdata = userdata; }
     void*   getUserdata() const             { return mUserdata; }
@@ -161,17 +135,14 @@ protected:
     LLScrollListItem( const Params& );
 
 private:
-    BOOL    mSelected;
-    BOOL    mHighlighted;
+    bool    mSelected;
+    bool    mHighlighted;
     S32     mHoverIndex;
     S32     mSelectedIndex;
-    BOOL    mEnabled;
-
-    bool    mFlaggedDead = false;
+    bool    mEnabled;
     void*   mUserdata;
     LLSD    mItemValue;
     LLSD    mItemAltValue;
-    std::string mToolTip;
     std::vector<LLScrollListCell *> mColumns;
     LLRect  mRectangle;
 };

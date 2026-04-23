@@ -36,7 +36,7 @@ class LLTransientFloater;
 /**
  * Provides functionality to hide transient floaters.
  */
-class LLTransientFloaterMgr final : public LLSingleton<LLTransientFloaterMgr>
+class LLTransientFloaterMgr: public LLSingleton<LLTransientFloaterMgr>
 {
     LLSINGLETON(LLTransientFloaterMgr);
 
@@ -78,11 +78,9 @@ protected:
      */
     void init(LLFloater* thiz);
 public:
-    virtual ~LLTransientFloater() = default;
-
     virtual LLTransientFloaterMgr::ETransientGroup getGroup() = 0;
     bool isTransientDocked() { return mFloater->isDocked(); };
-    void setTransientVisible(BOOL visible) {mFloater->setVisible(visible); }
+    void setTransientVisible(bool visible) {mFloater->setVisible(visible); }
 
 private:
     LLFloater* mFloater;

@@ -34,35 +34,142 @@
 #include "llurldispatcher.h"        // SLURL from other app instance
 #include "llviewernetwork.h"
 #include "llviewercontrol.h"
-#include "llwindowsdl.h"
 #include "llmd5.h"
 #include "llfindlocale.h"
+#include "llversioninfo.h"
 
 #include <exception>
 
-#include "algamemode.h"
+#define SDL_MAIN_USE_CALLBACKS
+#include <SDL3/SDL_main.h>
 
-// Sentry (https://sentry.io) crash reporting tool
-#if defined(AL_SENTRY)
-#include <sentry.h>
+#include "SDL3/SDL.h"
+
+#include "llsdl.h"
+#include "llwindowsdl.h"
+
+#ifdef LL_GLIB
+#include <gio/gio.h>
 #endif
 
-#if LL_DBUS_ENABLED
-#include <sdbus-c++/sdbus-c++.h>
-#include "llappviewerlinux_api-client-glue.h"
-#include "llappviewerlinux_api-server-glue.h"
+#define VIEWERAPI_SERVICE "com.secondlife.ViewerAppAPIService"
+#define VIEWERAPI_PATH "/com/secondlife/ViewerAppAPI"
+#define VIEWERAPI_INTERFACE "com.secondlife.ViewerAppAPI"
 
-#include "threadpool.h"
-#include "workqueue.h"
-#endif
+static const char * DBUS_SERVER = "<node name=\"/com/secondlife/ViewerAppAPI\">\n"
+                                  "  <interface name=\"com.secondlife.ViewerAppAPI\">\n"
+                                  "    <annotation name=\"org.freedesktop.DBus.GLib.CSymbol\" value=\"viewer_app_api\"/>\n"
+                                  "    <method name=\"GoSLURL\">\n"
+                                  "      <annotation name=\"org.freedesktop.DBus.GLib.CSymbol\" value=\"dispatchSLURL\"/>\n"
+                                  "      <arg type=\"s\" name=\"slurl\" direction=\"in\" />\n"
+                                  "    </method>\n"
+                                  "  </interface>\n"
+                                  "</node>";
+
+typedef struct
+{
+    GObject parent;
+} ViewerAppAPI;
 
 namespace
 {
     int gArgC = 0;
     char **gArgV = NULL;
+    LLAppViewerLinux* gViewerAppPtr = NULL;
     void (*gOldTerminateHandler)() = NULL;
 }
 
+void check_vm_bloat()
+{
+#if LL_LINUX
+    // watch our own VM and RSS sizes, warn if we bloated rapidly
+    static const std::string STATS_FILE = "/proc/self/stat";
+    FILE *fp = fopen(STATS_FILE.c_str(), "r");
+    if (fp)
+    {
+        static long long last_vm_size = 0;
+        static long long last_rss_size = 0;
+        const long long significant_vm_difference = 250 * 1024*1024;
+        const long long significant_rss_difference = 50 * 1024*1024;
+        long long this_vm_size = 0;
+        long long this_rss_size = 0;
+
+        ssize_t res;
+        size_t dummy;
+        char *ptr = nullptr;
+        for (int i=0; i<22; ++i) // parse past the values we don't want
+        {
+            res = getdelim(&ptr, &dummy, ' ', fp);
+            if (-1 == res)
+            {
+                LL_WARNS() << "Unable to parse " << STATS_FILE << LL_ENDL;
+                goto finally;
+            }
+            free(ptr);
+            ptr = nullptr;
+        }
+        // 23rd space-delimited entry is vsize
+        res = getdelim(&ptr, &dummy, ' ', fp);
+        llassert(ptr);
+        if (-1 == res)
+        {
+            LL_WARNS() << "Unable to parse " << STATS_FILE << LL_ENDL;
+            goto finally;
+        }
+        this_vm_size = atoll(ptr);
+        free(ptr);
+        ptr = nullptr;
+        // 24th space-delimited entry is RSS
+        res = getdelim(&ptr, &dummy, ' ', fp);
+        llassert(ptr);
+        if (-1 == res)
+        {
+            LL_WARNS() << "Unable to parse " << STATS_FILE << LL_ENDL;
+            goto finally;
+        }
+        this_rss_size = getpagesize() * atoll(ptr);
+        free(ptr);
+        ptr = nullptr;
+
+        LL_INFOS() << "VM SIZE IS NOW " << (this_vm_size/(1024*1024)) << " MB, RSS SIZE IS NOW " << (this_rss_size/(1024*1024)) << " MB" << LL_ENDL;
+
+        if (llabs(last_vm_size - this_vm_size) > significant_vm_difference)
+        {
+            if (this_vm_size > last_vm_size)
+            {
+                LL_WARNS() << "VM size grew by " << (this_vm_size - last_vm_size)/(1024*1024) << " MB in last frame" << LL_ENDL;
+            }
+            else
+            {
+                LL_INFOS() << "VM size shrank by " << (last_vm_size - this_vm_size)/(1024*1024) << " MB in last frame" << LL_ENDL;
+            }
+        }
+
+        if (llabs(last_rss_size - this_rss_size) > significant_rss_difference)
+        {
+            if (this_rss_size > last_rss_size)
+            {
+                LL_WARNS() << "RSS size grew by " << (this_rss_size - last_rss_size)/(1024*1024) << " MB in last frame" << LL_ENDL;
+            }
+            else
+            {
+                LL_INFOS() << "RSS size shrank by " << (last_rss_size - this_rss_size)/(1024*1024) << " MB in last frame" << LL_ENDL;
+            }
+        }
+
+        last_rss_size = this_rss_size;
+        last_vm_size = this_vm_size;
+
+finally:
+        if (ptr)
+        {
+            free(ptr);
+            ptr = nullptr;
+        }
+        fclose(fp);
+    }
+#endif // LL_LINUX
+}
 
 static void exceptionTerminateHandler()
 {
@@ -76,31 +183,85 @@ static void exceptionTerminateHandler()
     gOldTerminateHandler(); // call old terminate() handler
 }
 
-int main( int argc, char **argv )
+SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
+    // Call Tracy first thing to have it allocate memory
+    // https://github.com/wolfpld/tracy/issues/196
+    LL_PROFILER_FRAME_END;
+    LL_PROFILER_SET_THREAD_NAME("App");
+
+    gSDLMainHandled = true;
+
     gArgC = argc;
     gArgV = argv;
 
-    LLAppViewer* viewer_app_ptr = new LLAppViewerLinux();
+    gViewerAppPtr = new LLAppViewerLinux();
 
     // install unexpected exception handler
     gOldTerminateHandler = std::set_terminate(exceptionTerminateHandler);
 
-    bool ok = viewer_app_ptr->init();
+    unsetenv( "LD_PRELOAD" ); // <FS:ND/> Get rid of any preloading, we do not want this to happen during startup of plugins.
+
+    // This needs to be set as early as possible
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, LLVersionInfo::getInstance()->getChannel().c_str());
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, LLVersionInfo::getInstance()->getVersion().c_str());
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "org.alchemyviewer.viewer");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Linden Research Inc");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "Copyright (c) Linden Research, Inc. 2025");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://www.secondlife.com");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
+
+    bool ok = gViewerAppPtr->init();
     if(!ok)
     {
         LL_WARNS() << "Application init failed." << LL_ENDL;
-        return -1;
+        return SDL_APP_FAILURE;
     }
 
-        // Run the application main loop
-    while (! viewer_app_ptr->frame())
-    {}
+    return SDL_APP_CONTINUE;
+}
 
-#if LL_DBUS_ENABLED
-    ((LLAppViewerLinux*)viewer_app_ptr)->shutdownDBUS();
+SDL_AppResult SDL_AppIterate(void *appstate)
+{
+    // Run the application main loop
+    if (!gViewerAppPtr->frame())
+    {
+#if LL_GLIB
+        // Pump until we've nothing left to do or passed 1/15th of a
+        // second pumping for this frame.
+        static LLTimer pump_timer;
+        pump_timer.reset();
+        pump_timer.setTimerExpirySec(1.0f / 15.0f);
+        do
+        {
+            g_main_context_iteration(g_main_context_default(), false);
+        } while( g_main_context_pending(g_main_context_default()) && !pump_timer.hasExpired());
 #endif
 
+        // hack - doesn't belong here - but this is just for debugging
+        if (getenv("LL_DEBUG_BLOAT"))
+        {
+            check_vm_bloat();
+        }
+
+        return SDL_APP_CONTINUE;
+    }
+
+    if(LLApp::isError())
+    {
+        return SDL_APP_FAILURE;
+    }
+
+    return SDL_APP_SUCCESS;
+}
+
+SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
+{
+    return LLWindowSDL::handleEvents(*event);
+}
+
+void SDL_AppQuit(void *appstate, SDL_AppResult result)
+{
     if (!LLApp::isError())
     {
         //
@@ -108,36 +269,24 @@ int main( int argc, char **argv )
         // the assumption is that the error handler is responsible for doing
         // app cleanup if there was a problem.
         //
-        viewer_app_ptr->cleanup();
+        gViewerAppPtr->cleanup();
     }
-    delete viewer_app_ptr;
-    viewer_app_ptr = NULL;
 
-#if defined(AL_SENTRY)
-    sentry_close();
-#endif
-
-    //ALGameMode::shutdown();
-
-    return 0;
-}
-
-LLAppViewerLinux::LLAppViewerLinux()
-{
-}
-
-LLAppViewerLinux::~LLAppViewerLinux()
-{
+    delete gViewerAppPtr;
+    gViewerAppPtr = nullptr;
 }
 
 bool LLAppViewerLinux::init()
 {
-    LLAppViewer* pApp = LLAppViewer::instance();
-    pApp->initCrashReporting();
-
     bool success = LLAppViewer::init();
 
-    ALGameMode::instance().init();
+#if LL_SEND_CRASH_REPORTS
+    if (success)
+    {
+        LLAppViewer* pApp = LLAppViewer::instance();
+        pApp->initCrashReporting();
+    }
+#endif
 
     return success;
 }
@@ -150,132 +299,146 @@ bool LLAppViewerLinux::restoreErrorTrap()
 }
 
 /////////////////////////////////////////
-#if LL_DBUS_ENABLED
+#if LL_GLIB
 
-class ViewerAppAPI : public sdbus::AdaptorInterfaces<com::secondlife::ViewerAppAPI_adaptor /*, more adaptor classes if there are more interfaces*/>
+typedef struct
 {
-public:
-    ViewerAppAPI(sdbus::IConnection& connection, std::string objectPath)
-        : AdaptorInterfaces(connection, std::move(objectPath))
-    {
-        registerAdaptor();
-    }
+        GObjectClass parent_class;
+} ViewerAppAPIClass;
 
-    ~ViewerAppAPI()
-    {
-        unregisterAdaptor();
-    }
+static void viewerappapi_init(ViewerAppAPI *server);
+static void viewerappapi_class_init(ViewerAppAPIClass *klass);
 
-protected:
-    bool GoSLURL(const std::string& slurl) override
-    {
-        LL_INFOS() << "Was asked to go to slurl: " << slurl << LL_ENDL;
+G_DEFINE_TYPE(ViewerAppAPI, viewerappapi, G_TYPE_OBJECT);
 
-        LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
-        LL::WorkQueue::ptr_t general_queue = LL::WorkQueue::getInstance("General");
-        llassert_always(main_queue);
-        llassert_always(general_queue);
-
-        bool posted = main_queue->postTo(
-            general_queue,
-            [slurl]() // Work done on general queue
-            {
-                return slurl;
-            },
-            [](std::string url) // Callback to main thread
-            mutable {
-                const bool trusted_browser = false;
-                if (LLURLDispatcher::dispatch(url, "", nullptr, trusted_browser))
-                {
-                    LL_INFOS() << "Dispatched url from ViewerAppAPI: " << url << LL_ENDL;
-                }
-            });
-
-        return posted; // the invokation succeeded, even if the actual dispatch didn't.
-    }
-};
-
-class ViewerAppAPIProxy : public sdbus::ProxyInterfaces<com::secondlife::ViewerAppAPI_proxy /*, more proxy classes if there are more interfaces*/>
+void viewerappapi_class_init(ViewerAppAPIClass *klass)
 {
-public:
-    ViewerAppAPIProxy(std::string destination, std::string objectPath)
-        : ProxyInterfaces(std::move(destination), std::move(objectPath))
-    {
-        registerProxy();
-    }
+}
 
-    ~ViewerAppAPIProxy()
-    {
-        unregisterProxy();
-    }
-};
+static void dispatchSLURL(gchar const *slurl)
+{
+    LL_INFOS() << "Was asked to go to slurl: " << slurl << LL_ENDL;
+
+    std::string url = slurl;
+    LLMediaCtrl* web = NULL;
+    const bool trusted_browser = false;
+    LLURLDispatcher::dispatch(url, "", web, trusted_browser);
+}
+
+static void DoMethodeCall (GDBusConnection       *connection,
+                                const gchar           *sender,
+                                const gchar           *object_path,
+                                const gchar           *interface_name,
+                                const gchar           *method_name,
+                                GVariant              *parameters,
+                                GDBusMethodInvocation *invocation,
+                                gpointer               user_data)
+{
+    LL_INFOS() << "DBUS message " << method_name << "  from: " << sender << " interface: " << interface_name << LL_ENDL;
+    const gchar *slurl;
+
+    g_variant_get (parameters, "(&s)", &slurl);
+    dispatchSLURL(slurl);
+}
+
+GDBusNodeInfo *gBusNodeInfo = nullptr;
+static const GDBusInterfaceVTable interface_vtable =
+        {
+                DoMethodeCall
+        };
+static void busAcquired(GDBusConnection *connection, const gchar *name, gpointer user_data)
+{
+    auto id = g_dbus_connection_register_object(connection,
+                                                VIEWERAPI_PATH,
+                                                gBusNodeInfo->interfaces[0],
+                                                &interface_vtable,
+                                                NULL,  /* user_data */
+                                                             NULL,  /* user_data_free_func */
+                                                             NULL); /* GError** */
+    g_assert (id > 0);
+}
+
+static void nameAcquired(GDBusConnection *connection, const gchar *name, gpointer user_data)
+{
+}
+
+static void nameLost(GDBusConnection *connection, const gchar *name, gpointer user_data)
+{
+
+}
+void viewerappapi_init(ViewerAppAPI *server)
+{
+    gBusNodeInfo = g_dbus_node_info_new_for_xml (DBUS_SERVER, NULL);
+    g_assert (gBusNodeInfo != NULL);
+
+    g_bus_own_name(G_BUS_TYPE_SESSION,
+                   VIEWERAPI_SERVICE,
+                   G_BUS_NAME_OWNER_FLAGS_NONE,
+                   busAcquired,
+                   nameAcquired,
+                   nameLost,
+                   NULL,
+                   NULL);
+
+}
+
+///
 
 //virtual
 bool LLAppViewerLinux::initSLURLHandler()
 {
-    // Create D-Bus connection to the system bus and requests name on it.
-    try
-    {
-        mViewerAPIConnection = sdbus::createSessionBusConnection(VIEWERAPI_SERVICE);
-    }
-    catch(const sdbus::Error& err)
-    {
-        LL_WARNS() << "Failed to create DBUS session connection: " << err.what() << LL_ENDL;
-        return false;
-    }
+    //ViewerAppAPI *api_server = (ViewerAppAPI*)
+    g_object_new(viewerappapi_get_type(), NULL);
 
-    // Create concatenator D-Bus object.
-    try
-    {
-        mViewerAPIObject = std::make_unique<ViewerAppAPI>(*mViewerAPIConnection, VIEWERAPI_PATH);
-    }
-    catch(const sdbus::Error& err)
-    {
-        LL_WARNS() << "Failed to create DBUS ViewerAppAPI object: " << err.what() << LL_ENDL;
-        mViewerAPIConnection.reset();
-        return false;
-    }
-
-    // Run the loop on the connection.
-    try
-    {
-        mViewerAPIConnection->enterEventLoopAsync();
-    }
-    catch(const sdbus::Error& err)
-    {
-        LL_WARNS() << "Failed to create DBUS event loop: " << err.what() << LL_ENDL;
-        mViewerAPIObject.reset();
-        mViewerAPIConnection.reset();
-        return false;
-    }
     return true;
-}
-
-void LLAppViewerLinux::shutdownDBUS()
-{
-    mViewerAPIObject.reset();
-    mViewerAPIConnection.reset();
 }
 
 //virtual
 bool LLAppViewerLinux::sendURLToOtherInstance(const std::string& url)
 {
-    // Create proxy object for the concatenator object on the server side
-    ViewerAppAPIProxy viewerAppAPIProxy(VIEWERAPI_SERVICE, VIEWERAPI_PATH);
+    auto *pBus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, nullptr);
 
-    try
+    if( !pBus )
     {
-        viewerAppAPIProxy.GoSLURL(url);
-    }
-    catch(const sdbus::Error& e)
-    {
-        LL_WARNS() << "Got ViewerAppAPI error " << e.getName() << " with message " << e.getMessage() << LL_ENDL;
+        LL_WARNS() << "Getting dbus failed." << LL_ENDL;
+        return false;
     }
 
+    auto pProxy = g_dbus_proxy_new_sync(pBus, G_DBUS_PROXY_FLAGS_NONE, nullptr,
+                                        VIEWERAPI_SERVICE, VIEWERAPI_PATH,
+                                        VIEWERAPI_INTERFACE, nullptr, nullptr);
+
+    if( !pProxy )
+    {
+        LL_WARNS() << "Cannot create new dbus proxy." << LL_ENDL;
+        g_object_unref( pBus );
+        return false;
+    }
+
+    auto *pArgs = g_variant_new( "(s)", url.c_str() );
+    if( !pArgs )
+    {
+        LL_WARNS() << "Cannot create new variant." << LL_ENDL;
+        g_object_unref( pBus );
+        return false;
+    }
+
+    auto pRes  = g_dbus_proxy_call_sync(pProxy,
+                                        "GoSLURL",
+                                        pArgs,
+                                        G_DBUS_CALL_FLAGS_NONE,
+                                        -1, nullptr, nullptr);
+
+
+
+    if( pRes )
+        g_variant_unref( pRes );
+    g_object_unref( pProxy );
+    g_object_unref( pBus );
     return true;
 }
 
-#else // LL_DBUS_ENABLED
+#else // LL_GLIB
 bool LLAppViewerLinux::initSLURLHandler()
 {
     return false; // not implemented without dbus
@@ -284,48 +447,10 @@ bool LLAppViewerLinux::sendURLToOtherInstance(const std::string& url)
 {
     return false; // not implemented without dbus
 }
-#endif // LL_DBUS_ENABLED
-
-void LLAppViewerLinux::setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name)
-{
-#if defined(AL_SENTRY)
-    if (mSentryInitialized)
-    {
-        sentry_value_t user = sentry_value_new_object();
-        sentry_value_set_by_key(user, "id", sentry_value_new_string(user_id.asString().c_str()));
-        sentry_value_set_by_key(user, "username", sentry_value_new_string(avatar_name.c_str()));
-        sentry_set_user(user);
-    }
-#endif
-}
+#endif // LL_GLIB
 
 void LLAppViewerLinux::initCrashReporting(bool reportFreeze)
 {
-#if defined(AL_SENTRY)
-    sentry_options_t* options = sentry_options_new();
-    sentry_options_set_dsn(options, SENTRY_DSN);
-    sentry_options_set_release(options, LL_VIEWER_CHANNEL_AND_VERSION);
-
-#if 0
-    std::string crashpad_path = gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "crashpad_handler");
-    sentry_options_set_handler_path(options, crashpad_path.c_str());
-#endif
-    std::string database_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");
-    sentry_options_set_database_path(options, database_path.c_str());
-
-    std::string logfile_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "Alchemy.log");
-    sentry_options_add_attachment(options, logfile_path.c_str());
-
-    mSentryInitialized = (sentry_init(options) == 0);
-    if (mSentryInitialized)
-    {
-        LL_INFOS() << "Successfully initialized Sentry" << LL_ENDL;
-    }
-    else
-    {
-        LL_WARNS() << "Failed to initialize Sentry" << LL_ENDL;
-    }
-#endif
 }
 
 bool LLAppViewerLinux::beingDebugged()
@@ -356,7 +481,7 @@ bool LLAppViewerLinux::beingDebugged()
                     base += 1;
                 }
 
-                if (strcmp(base, "gdb") == 0)
+                if (strcmp(base, "gdb") == 0 || strcmp(base, "lldb") == 0)
                 {
                     debugged = yes;
                 }
@@ -366,11 +491,6 @@ bool LLAppViewerLinux::beingDebugged()
     }
 
     return debugged == yes;
-}
-
-void LLAppViewerLinux::initLoggingAndGetLastDuration()
-{
-    LLAppViewer::initLoggingAndGetLastDuration();
 }
 
 bool LLAppViewerLinux::initParseCommandLine(LLCommandLineParser& clp)

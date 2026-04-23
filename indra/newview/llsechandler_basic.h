@@ -28,6 +28,11 @@
 #ifndef LLSECHANDLER_BASIC
 #define LLSECHANDLER_BASIC
 
+#ifdef LL_WINDOWS
+#pragma warning (push)
+#pragma warning(disable:4250)
+#endif // LL_WINDOWS
+
 #include "llsecapi.h"
 #include <vector>
 #include <openssl/x509.h>
@@ -138,7 +143,7 @@ public:
     virtual iterator find(const LLSD& params);
 
     // return the number of certs in the store
-    virtual int size() const { return mCerts.size(); }
+    virtual int size() const { return static_cast<int>(mCerts.size()); }
 
     // insert the cert to the store.  if a copy of the cert already exists in the store, it is removed first
     virtual void  add(LLPointer<LLCertificate> cert) { insert(end(), cert); }
@@ -184,7 +189,7 @@ public:
 protected:
     std::vector<LLPointer<LLCertificate> >            mCerts;
 
-    // cache of cert sha256 hashes to from/to date pairs, to improve
+    // cache of cert sha1 hashes to from/to date pairs, to improve
     // performance of cert trust.  Note, these are not the CA certs,
     // but the certs that have been validated against this store.
     typedef std::map<std::string, std::pair<LLDate, LLDate> > t_cert_cache;
@@ -345,6 +350,10 @@ protected:
 };
 
 bool valueCompareLLSD(const LLSD& lhs, const LLSD& rhs);
+
+#ifdef LL_WINDOWS
+#pragma warning (pop)
+#endif // LL_WINDOWS
 
 #endif // LLSECHANDLER_BASIC
 

@@ -45,7 +45,7 @@
      left_pad="0"
      max_length_bytes="127"
      name="desc"
-     width="190" />
+     width="265" />
     <text
      type="string"
      length="1"
@@ -131,7 +131,7 @@
        width="108">
         <combo_box
          allow_text_entry="true"
-         top_delta="0"
+         top="-1"
          follows="bottom|left|right"
          height="23"
          left="0"

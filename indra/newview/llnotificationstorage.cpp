@@ -41,9 +41,9 @@
 #include "llregistry.h"
 #include "llviewermessage.h"
 
-typedef boost::function<LLNotificationResponderInterface * (const LLSD& pParams)> responder_constructor_t;
+typedef std::function<LLNotificationResponderInterface*(const LLSD& pParams)> responder_constructor_t;
 
-class LLResponderRegistry final : public LLRegistrySingleton<std::string, responder_constructor_t, LLResponderRegistry>
+class LLResponderRegistry : public LLRegistrySingleton<std::string, responder_constructor_t, LLResponderRegistry>
 {
     LLSINGLETON_EMPTY_CTOR(LLResponderRegistry);
 public:

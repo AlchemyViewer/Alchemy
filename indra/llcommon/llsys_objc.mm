@@ -29,16 +29,10 @@
 
 bool LLGetDarwinOSInfo(int64_t &major, int64_t &minor, int64_t &patch)
 {
-    NSOperatingSystemVersion osVersion = [[NSProcessInfo processInfo] operatingSystemVersion];
-    major = osVersion.majorVersion;
-    minor = osVersion.minorVersion;
-    patch = osVersion.patchVersion;
-    return true;
-}
+        NSOperatingSystemVersion osVersion = [[NSProcessInfo processInfo] operatingSystemVersion];
+        major = osVersion.majorVersion;
+        minor = osVersion.minorVersion;
+        patch = osVersion.patchVersion;
 
-const char* LLGetDarwinPreferredLanguage()
-{
-	NSString* lang = [[NSLocale preferredLanguages] objectAtIndex:0];
-	const char* ret = [lang cStringUsingEncoding:NSASCIIStringEncoding];
-	return ret;
+    return true;
 }

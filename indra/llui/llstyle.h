@@ -43,15 +43,26 @@ public:
         Optional<LLFontGL::ShadowType>  drop_shadow;
         Optional<LLUIColor>             color,
                                         readonly_color,
-                                        selected_color;
+                                        selected_color,
+                                        highlight_bg_color;
+        Optional<F32>                   alpha;
         Optional<const LLFontGL*>       font;
         Optional<LLUIImage*>            image;
         Optional<std::string>           link_href;
         Optional<bool>                  is_link;
         Optional<bool>                  use_default_link_style;
+        Optional<bool>                  draw_highlight_bg;
         Params();
     };
     LLStyle(const Params& p = Params());
+
+    enum EUnderlineLink
+    {
+        UNDERLINE_ALWAYS = 0,
+        UNDERLINE_ON_HOVER,
+        UNDERLINE_NEVER
+    };
+
 public:
     const LLUIColor& getColor() const { return mColor; }
     void setColor(const LLUIColor &color) { mColor = color; }
@@ -62,23 +73,30 @@ public:
     const LLUIColor& getSelectedColor() const { return mSelectedColor; }
     void setSelectedColor(const LLUIColor& color) { mSelectedColor = color; }
 
-    BOOL isVisible() const;
-    void setVisible(BOOL is_visible);
+    F32 getAlpha() const { return mAlpha; }
+    void setAlpha(F32 alpha) { mAlpha = alpha; }
+
+    bool isVisible() const;
+    void setVisible(bool is_visible);
 
     LLFontGL::ShadowType getShadowType() const { return mDropShadow; }
 
     void setFont(const LLFontGL* font);
     const LLFontGL* getFont() const;
+    static const LLFontGL* getDefaultFont();
 
     const std::string& getLinkHREF() const { return mLink; }
     void setLinkHREF(const std::string& href);
-    BOOL isLink() const;
+    bool isLink() const;
 
     LLPointer<LLUIImage> getImage() const;
     void setImage(const LLUUID& src);
     void setImage(const std::string& name);
 
-    BOOL isImage() const { return mImagep.notNull(); }
+    bool isImage() const { return mImagep.notNull(); }
+
+    bool getDrawHighlightBg() const { return mDrawHighlightBg; }
+    const LLUIColor& getHighlightBgColor() const { return mHighlightBgColor; }
 
     bool operator==(const LLStyle &rhs) const
     {
@@ -87,10 +105,13 @@ public:
             && mColor == rhs.mColor
             && mReadOnlyColor == rhs.mReadOnlyColor
             && mSelectedColor == rhs.mSelectedColor
+            && mHighlightBgColor == rhs.mHighlightBgColor
             && mFont == rhs.mFont
             && mLink == rhs.mLink
             && mImagep == rhs.mImagep
-            && mDropShadow == rhs.mDropShadow;
+            && mDropShadow == rhs.mDropShadow
+            && mAlpha == rhs.mAlpha
+            && mDrawHighlightBg == rhs.mDrawHighlightBg;
     }
 
     bool operator!=(const LLStyle& rhs) const { return !(*this == rhs); }
@@ -102,15 +123,17 @@ protected:
     ~LLStyle() = default;
 
 private:
-    BOOL                mVisible;
+    std::string         mLink;
     LLUIColor           mColor;
     LLUIColor           mReadOnlyColor;
     LLUIColor           mSelectedColor;
-    std::string         mFontName;
+    LLUIColor           mHighlightBgColor;
     const LLFontGL*     mFont;
-    std::string         mLink;
-    bool                mIsLink;
     LLPointer<LLUIImage> mImagep;
+    F32                 mAlpha;
+    bool                mVisible;
+    bool                mIsLink;
+    bool                mDrawHighlightBg;
 };
 
 typedef LLPointer<LLStyle> LLStyleSP;

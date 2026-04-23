@@ -33,7 +33,7 @@
 #include "stdtypes.h"
 #include "v3math.h"
 
-const F32 DEFAULT_INTERSECTION_ERROR = 0.000001f;
+constexpr F32 DEFAULT_INTERSECTION_ERROR = 0.000001f;
 
 class LLLine
 {
@@ -75,8 +75,9 @@ protected:
     LLVector3 mPoint;
     LLVector3 mDirection;
 };
-#ifndef SHOW_ASSERT
+
+static_assert(std::is_trivially_copyable<LLLine>::value, "LLLine must be trivial copy");
+static_assert(std::is_trivially_move_assignable<LLLine>::value, "LLLine must be trivial move");
 static_assert(std::is_standard_layout<LLLine>::value, "LLLine must be a standard layout type");
-#endif
 
 #endif

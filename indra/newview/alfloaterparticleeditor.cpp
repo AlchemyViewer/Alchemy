@@ -98,7 +98,7 @@ ALFloaterParticleEditor::ALFloaterParticleEditor(const LLSD& key)
     , mInjectScriptButton(nullptr), mStartColorSelector(nullptr), mEndColorSelector(nullptr)
 {
     mCommitCallbackRegistrar.add("Particle.Edit", [this](LLUICtrl* ctrl, const LLSD& param) { onParameterChange(); });
-    mDefaultParticleTexture = LLViewerFetchedTexture::sPixieSmallImagep;
+    mDefaultParticleTexture = LLViewerFetchedTexture::sDefaultParticleImagep;
 }
 
 ALFloaterParticleEditor::~ALFloaterParticleEditor()
@@ -106,7 +106,7 @@ ALFloaterParticleEditor::~ALFloaterParticleEditor()
     clearParticles();
 }
 
-BOOL ALFloaterParticleEditor::postBuild()
+bool ALFloaterParticleEditor::postBuild()
 {
     LLPanel* panel = getChild<LLPanel>("burst_panel");
     mBurstRateCtrl = panel->getChild<LLUICtrl>("burst_rate");
@@ -178,17 +178,17 @@ BOOL ALFloaterParticleEditor::postBuild()
     return LLFloater::postBuild();
 }
 
-BOOL ALFloaterParticleEditor::canClose()
+bool ALFloaterParticleEditor::canClose()
 {
     if (!hasChanged())
     {
-        return TRUE;
+        return true;
     }
     else
     {
         // Bring up view-modal dialog: Save changes? Yes, No, Cancel
         LLNotificationsUtil::add("ParticleSaveChanges", LLSD(), LLSD(), boost::bind(&ALFloaterParticleEditor::handleSaveDialog, this, _1, _2));
-        return FALSE;
+        return false;
     }
 }
 
@@ -266,24 +266,24 @@ void ALFloaterParticleEditor::onParameterChange()
     }
 
     // limit burst rate to 0.01 to avoid internal freeze, script still gets the real value
-    mParticles.mBurstRate = llmax<float>(0.01f, mBurstRateCtrl->getValue().asReal());
+    mParticles.mBurstRate = llmax<float>(0.01f, (F32)mBurstRateCtrl->getValue().asReal());
     mParticles.mBurstPartCount = mBurstCountCtrl->getValue().asInteger();
-    mParticles.mBurstRadius = mBurstRadiusCtrl->getValue().asReal();
-    mParticles.mInnerAngle = mAngleBeginCtrl->getValue().asReal();
-    mParticles.mOuterAngle = mAngleEndCtrl->getValue().asReal();
-    mParticles.mBurstSpeedMin = mBurstSpeedMinCtrl->getValue().asReal();
-    mParticles.mBurstSpeedMax = mBurstSpeedMaxCtrl->getValue().asReal();
-    mParticles.mPartData.setStartAlpha(mStartAlphaCtrl->getValue().asReal());
-    mParticles.mPartData.setEndAlpha(mEndAlphaCtrl->getValue().asReal());
-    mParticles.mPartData.setStartScale(mScaleStartXCtrl->getValue().asReal(),
-                       mScaleStartYCtrl->getValue().asReal());
-    mParticles.mPartData.setEndScale(mScaleEndXCtrl->getValue().asReal(),
-                     mScaleEndYCtrl->getValue().asReal());
-    mParticles.mMaxAge = mSourceMaxAgeCtrl->getValue().asReal();
-    mParticles.mPartData.setMaxAge(mParticlesMaxAgeCtrl->getValue().asReal());
+    mParticles.mBurstRadius = (F32)mBurstRadiusCtrl->getValue().asReal();
+    mParticles.mInnerAngle = (F32)mAngleBeginCtrl->getValue().asReal();
+    mParticles.mOuterAngle = (F32)mAngleEndCtrl->getValue().asReal();
+    mParticles.mBurstSpeedMin = (F32)mBurstSpeedMinCtrl->getValue().asReal();
+    mParticles.mBurstSpeedMax = (F32)mBurstSpeedMaxCtrl->getValue().asReal();
+    mParticles.mPartData.setStartAlpha((F32)mStartAlphaCtrl->getValue().asReal());
+    mParticles.mPartData.setEndAlpha((F32)mEndAlphaCtrl->getValue().asReal());
+    mParticles.mPartData.setStartScale((F32)mScaleStartXCtrl->getValue().asReal(),
+        (F32)mScaleStartYCtrl->getValue().asReal());
+    mParticles.mPartData.setEndScale((F32)mScaleEndXCtrl->getValue().asReal(),
+        (F32)mScaleEndYCtrl->getValue().asReal());
+    mParticles.mMaxAge = (F32)mSourceMaxAgeCtrl->getValue().asReal();
+    mParticles.mPartData.setMaxAge((F32)mParticlesMaxAgeCtrl->getValue().asReal());
 
-    mParticles.mPartData.mStartGlow = mStartGlowCtrl->getValue().asReal();
-    mParticles.mPartData.mEndGlow = mEndGlowCtrl->getValue().asReal();
+    mParticles.mPartData.mStartGlow = (F32)mStartGlowCtrl->getValue().asReal();
+    mParticles.mPartData.mEndGlow = (F32)mEndGlowCtrl->getValue().asReal();
 
     mParticles.mPartData.mBlendFuncSource = sParticleBlends.at(mBlendFuncSrcCombo->getSelectedValue()).flag;
     mParticles.mPartData.mBlendFuncDest = sParticleBlends.at(mBlendFuncDestCombo->getSelectedValue()).flag;
@@ -304,12 +304,12 @@ void ALFloaterParticleEditor::onParameterChange()
 
     mParticles.mTargetUUID = mTargetKeyInput->getValue().asUUID();
 
-    mParticles.mPartAccel = LLVector3(mAcellerationXCtrl->getValue().asReal(),
-                      mAcellerationYCtrl->getValue().asReal(),
-                      mAcellerationZCtrl->getValue().asReal());
-    mParticles.mAngularVelocity = LLVector3(mOmegaXCtrl->getValue().asReal(),
-                        mOmegaYCtrl->getValue().asReal(),
-                        mOmegaZCtrl->getValue().asReal());
+    mParticles.mPartAccel = LLVector3((F32)mAcellerationXCtrl->getValue().asReal(),
+        (F32)mAcellerationYCtrl->getValue().asReal(),
+        (F32)mAcellerationZCtrl->getValue().asReal());
+    mParticles.mAngularVelocity = LLVector3((F32)mOmegaXCtrl->getValue().asReal(),
+        (F32)mOmegaYCtrl->getValue().asReal(),
+        (F32)mOmegaZCtrl->getValue().asReal());
 
     LLColor4 color = mStartColorSelector->get();
     mParticles.mPartData.setStartColor(LLVector3(color.mV[VRED], color.mV[VGREEN], color.mV[VBLUE]));
@@ -323,14 +323,14 @@ void ALFloaterParticleEditor::onParameterChange()
 void ALFloaterParticleEditor::updateUI()
 {
     U8 pattern = sParticlePatterns.at(mPatternTypeCombo->getValue()).flag;
-    BOOL drop_pattern = (pattern == LLPartSysData::LL_PART_SRC_PATTERN_DROP);
-    BOOL explode_pattern = (pattern == LLPartSysData::LL_PART_SRC_PATTERN_EXPLODE);
-    BOOL target_linear = mTargetLinearCheckBox->getValue();
-    BOOL interpolate_color = mInterpolateColorCheckBox->getValue();
-    BOOL interpolate_scale = mInterpolateScaleCheckBox->getValue();
-    BOOL target_enabled = target_linear | (mTargetPositionCheckBox->getValue().asBoolean() ? TRUE : FALSE);
+    bool drop_pattern = (pattern == LLPartSysData::LL_PART_SRC_PATTERN_DROP);
+    bool explode_pattern = (pattern == LLPartSysData::LL_PART_SRC_PATTERN_EXPLODE);
+    bool target_linear = mTargetLinearCheckBox->getValue();
+    bool interpolate_color = mInterpolateColorCheckBox->getValue();
+    bool interpolate_scale = mInterpolateScaleCheckBox->getValue();
+    bool target_enabled = target_linear | (mTargetPositionCheckBox->getValue().asBoolean() ? true : false);
 
-    mBurstRadiusCtrl->setEnabled(!(target_linear | (mFollowSourceCheckBox->getValue().asBoolean() ? TRUE : FALSE) | drop_pattern));
+    mBurstRadiusCtrl->setEnabled(!(target_linear | (mFollowSourceCheckBox->getValue().asBoolean() ? true : false) | drop_pattern));
     mBurstSpeedMinCtrl->setEnabled(!(target_linear | drop_pattern));
     mBurstSpeedMaxCtrl->setEnabled(!(target_linear | drop_pattern));
 
@@ -370,8 +370,8 @@ void ALFloaterParticleEditor::onClickClearTarget()
 
 void ALFloaterParticleEditor::onClickTargetPicker()
 {
-    mPickTargetButton->setToggleState(TRUE);
-    mPickTargetButton->setEnabled(FALSE);
+    mPickTargetButton->setToggleState(true);
+    mPickTargetButton->setEnabled(false);
     LLToolObjPicker::getInstance()->setExitCallback(onTargetPicked, this);
     LLToolMgr::getInstance()->setTransientTool(LLToolObjPicker::getInstance());
 }
@@ -385,8 +385,8 @@ void ALFloaterParticleEditor::onTargetPicked(void* userdata)
 
     LLToolMgr::getInstance()->clearTransientTool();
 
-    self->mPickTargetButton->setEnabled(TRUE);
-    self->mPickTargetButton->setToggleState(FALSE);
+    self->mPickTargetButton->setEnabled(true);
+    self->mPickTargetButton->setToggleState(false);
 
     if (picked.notNull())
     {
@@ -473,23 +473,23 @@ default\n\
     LLStringUtil::replaceString(script, "[END_ALPHA]", mEndAlphaCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[START_GLOW]", mStartGlowCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[END_GLOW]", mEndGlowCtrl->getValue().asString());
-    LLStringUtil::replaceString(script, "[START_SCALE]", lslVector(mScaleStartXCtrl->getValue().asReal(),
-                                       mScaleStartYCtrl->getValue().asReal(),
-                                       0.0f));
-    LLStringUtil::replaceString(script, "[END_SCALE]", lslVector(mScaleEndXCtrl->getValue().asReal(),
-                                     mScaleEndYCtrl->getValue().asReal(),
-                                     0.0f));
+    LLStringUtil::replaceString(script, "[START_SCALE]", lslVector((F32)mScaleStartXCtrl->getValue().asReal(),
+        (F32)mScaleStartYCtrl->getValue().asReal(),
+        0.0f));
+    LLStringUtil::replaceString(script, "[END_SCALE]", lslVector((F32)mScaleEndXCtrl->getValue().asReal(),
+        (F32)mScaleEndYCtrl->getValue().asReal(),
+        0.0f));
     LLStringUtil::replaceString(script, "[TEXTURE]", texture_string);
     LLStringUtil::replaceString(script, "[SOURCE_MAX_AGE]", mSourceMaxAgeCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[PART_MAX_AGE]", mParticlesMaxAgeCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[BURST_RATE]", mBurstRateCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[BURST_COUNT]", mBurstCountCtrl->getValue());
-    LLStringUtil::replaceString(script, "[ACCELERATION]", lslVector(mAcellerationXCtrl->getValue().asReal(),
-                                    mAcellerationYCtrl->getValue().asReal(),
-                                    mAcellerationZCtrl->getValue().asReal()));
-    LLStringUtil::replaceString(script, "[OMEGA]", lslVector(mOmegaXCtrl->getValue().asReal(),
-                                 mOmegaYCtrl->getValue().asReal(),
-                                 mOmegaZCtrl->getValue().asReal()));
+    LLStringUtil::replaceString(script, "[ACCELERATION]", lslVector((F32)mAcellerationXCtrl->getValue().asReal(),
+        (F32)mAcellerationYCtrl->getValue().asReal(),
+        (F32)mAcellerationZCtrl->getValue().asReal()));
+    LLStringUtil::replaceString(script, "[OMEGA]", lslVector((F32)mOmegaXCtrl->getValue().asReal(),
+        (F32)mOmegaYCtrl->getValue().asReal(),
+        (F32)mOmegaZCtrl->getValue().asReal()));
     LLStringUtil::replaceString(script, "[BURST_SPEED_MIN]", mBurstSpeedMinCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[BURST_SPEED_MAX]", mBurstSpeedMaxCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[BLEND_FUNC_SOURCE]", sParticleBlends.at(mBlendFuncSrcCombo->getValue().asString()).script_const);
@@ -568,12 +568,12 @@ void ALFloaterParticleEditor::injectScript()
         perm.getMaskNextOwner(),
         callback);
 
-    setCanClose(FALSE);
+    setCanClose(false);
 }
 
 void ALFloaterParticleEditor::callbackReturned(const LLUUID& inventoryItemID)
 {
-    setCanClose(TRUE);
+    setCanClose(true);
 
     if (inventoryItemID.isNull())
     {
@@ -604,8 +604,7 @@ void ALFloaterParticleEditor::callbackReturned(const LLUUID& inventoryItemID)
 
     LLBufferedAssetUploadInfo::taskUploadFinish_f proc =
         boost::bind(&ALFloaterParticleEditor::finishUpload, _1, _2, _3, _4, true, mObject->getID());
-    LLResourceUploadInfo::ptr_t uploadInfo(new LLScriptAssetUpload(mObject->getID(), inventoryItemID,
-        LLScriptAssetUpload::MONO, true, LLUUID::null, script, proc, nullptr));
+    LLResourceUploadInfo::ptr_t uploadInfo(new LLScriptAssetUpload(mObject->getID(), inventoryItemID, "mono", true, LLUUID::null, script, proc, nullptr));
     LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
 
     if (mCloseAfterSave) closeFloater();
@@ -639,7 +638,7 @@ void ALFloaterParticleEditor::finishUpload(LLUUID itemId, LLUUID taskId, LLUUID 
         return;
     }
     auto* script = gInventory.getItem(itemId);
-    object->saveScript(script, TRUE, FALSE);
+    object->saveScript(script, true, false, LLUUID::null);
 
     LLNotificationsUtil::add("ParticleScriptInjected");
 }

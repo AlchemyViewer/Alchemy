@@ -6,9 +6,9 @@ version 2.0
 // numbers. Each message must be numbered relative to the
 // other messages of that type. The current highest number
 // for each type is listed below:
-// Low: 430
+// Low: 431
 // Medium: 18
-// High: 32
+// High: 30
 // PLEASE UPDATE THIS WHEN YOU ADD A NEW MESSAGE!
 
 
@@ -1553,7 +1553,7 @@ version 2.0
         AgentData Single
         {   AgentID     LLUUID  }
         {   SessionID   LLUUID  }
-        {   SerialNum   U32     }   // U32, used by both pause and resume. Non-increasing numbers are ignored.
+        {   SerialNum   U32     }   // used by both pause and resume. Non-increasing numbers are ignored.
     }
 }
 
@@ -1564,7 +1564,7 @@ version 2.0
         AgentData Single
         {   AgentID     LLUUID  }
         {   SessionID   LLUUID  }
-        {   SerialNum   U32     }   // U32, used by both pause and resume. Non-increasing numbers are ignored.
+        {   SerialNum   U32     }   // used by both pause and resume. Non-increasing numbers are ignored.
     }
 }
 
@@ -1677,7 +1677,7 @@ version 2.0
         AgentData Single
         {   AgentID     LLUUID      }
         {   SessionID   LLUUID      }
-        {   SerialNum   U32         }   // U32, Increases every time the appearance changes. A value of 0 resets.
+        {   SerialNum   U32         }   // Increases every time the appearance changes. A value of 0 resets.
         {   Size        LLVector3   }
     }
     {
@@ -2106,6 +2106,24 @@ version 2.0
     }
 }
 
+//  ObjectBypassModUpdate
+//  Viewer -> Simulator
+//  Allows the owner of an object to bypass mod protections for
+//  Predefined fields.
+{
+    ObjectBypassModUpdate Low 431 NotTrusted Zerocoded
+    {
+        AgentData Single
+        {   AgentID     LLUUID  }
+        {   SessionID   LLUUID  }
+    }
+    {
+        ObjectData Variable
+        {   ObjectLocalID   U32         }
+        {   PropertyID      U8          }
+        {   Value           Variable 2  }
+    }
+}
 
 {
     ObjectMaterial Low 97 NotTrusted Zerocoded
@@ -2120,7 +2138,6 @@ version 2.0
         {   Material        U8  }
     }
 }
-
 
 {
     ObjectShape Low 98 NotTrusted Zerocoded
@@ -2835,6 +2852,8 @@ version 2.0
 
 // AlertMessage
 // Specifies the text to be posted in an alert dialog
+// Also sent from dataserver to simulator with AgentInfo block
+// Simulator doesn't include AgentInfo block to viewer
 {
     AlertMessage Low 134 Trusted Unencoded
     {
@@ -3019,6 +3038,7 @@ version 2.0
         {   DamageThrottle      F32 }
         {   RegenerationRate    F32 }
         {   InvulnerabilyTime   F32 }
+        {   DamageLimit         F32 }
     }
 
 }
@@ -3277,7 +3297,7 @@ version 2.0
         {   ObjectData          Variable 1  }
 
         {   ParentID            U32         }
-        {   UpdateFlags         U32         }   // U32, see object_flags.h
+        {   UpdateFlags         U32         }   // see object_flags.h
 
         {   PathCurve           U8          }
         {   ProfileCurve        U8          }
@@ -4380,6 +4400,9 @@ version 2.0
 }
 
 // ScriptTeleportRequest
+// Interestingly, this message does not actually "Request a Teleport"
+// on the viewer. Instead it opens the world map and places a beacon
+// at the indicated location.
 // reliable
 {
     ScriptTeleportRequest Low 195 Trusted Unencoded
@@ -4389,6 +4412,10 @@ version 2.0
         {   SimName     Variable 1  }
         {   SimPosition LLVector3   }
         {   LookAt      LLVector3   }
+    }
+    {
+        Options Variable
+        {   Flags           U32 }
     }
 }
 
@@ -5689,6 +5716,10 @@ version 2.0
         EstateBlock Single
         {   EstateID    U32 }
     }
+    {
+        MetaData Variable
+        {   Data    Variable    2   }
+    }
 }
 
 // RetrieveInstantMessages - used to get instant messages that
@@ -6787,6 +6818,10 @@ version 2.0
         {   CreationDate    S32         }
         {   CRC             U32         }
     }
+    {
+        NewScriptInfo Variable
+        {   TemplateID      LLUUID      }
+    }
 }
 
 // Create inventory
@@ -7577,7 +7612,7 @@ version 2.0
 }
 
 // JoinGroupRequest
-// viewer -> simulator
+// viewer -> simulator -> dataserver
 // reliable
 {
     JoinGroupRequest Low 343 NotTrusted Zerocoded
@@ -7750,7 +7785,7 @@ version 2.0
         {   Charter                 Variable 2  }   // string
         {   ShowInList              BOOL        }
         {   MemberTitle             Variable 1  }   // string
-        {   PowersMask              U64         }   // U32 mask
+        {   PowersMask              U64         }
         {   InsigniaID              LLUUID      }
         {   FounderID               LLUUID      }
         {   MembershipFee           S32         }
@@ -8022,8 +8057,8 @@ version 2.0
         ProposalData Single
         {   GroupID         LLUUID      }
         {   Quorum          S32         }
-        {   Majority        F32         }   // F32
-        {   Duration        S32         }   // S32, seconds
+        {   Majority        F32         }
+        {   Duration        S32         }   // seconds
         {   ProposalText    Variable 1  }   // string
     }
 }
@@ -8342,7 +8377,7 @@ version 2.0
         AgentData Single
         {   AgentID     LLUUID  }
         {   SessionID   LLUUID  }
-        {   SerialNum   U32     }   // U32, Increases every time the wearables change for a given agent.  Used to avoid processing out of order packets.
+        {   SerialNum   U32     }   // Increases every time the wearables change for a given agent.  Used to avoid processing out of order packets.
     }
     {
         WearableData Variable
@@ -8835,11 +8870,6 @@ version 2.0
         {   Agents      U8          }
         {   MapImageID  LLUUID      }
     }
-    {
-        Size Variable
-        {   SizeX  U16   }
-        {   SizeY  U16   }
-    }
 }
 
 // viewer -> sim
@@ -9219,7 +9249,7 @@ version 2.0
         {   Charter         Variable 2  }   // string
         {   ShowInList      BOOL        }
         {   InsigniaID      LLUUID      }
-        {   MembershipFee   S32         }   // S32
+        {   MembershipFee   S32         }
         {   OpenEnrollment  BOOL        }
         {   AllowPublish    BOOL        }   // whether profile is externally visible or not
         {   MaturePublish   BOOL        }   // profile is "mature"
@@ -9230,13 +9260,16 @@ version 2.0
 // GameControlInput - input from game controller
 // The main payload of this message is split into two Variable chunks:
 //
-//   AxisData = list of {Index:Value} pirs.  Value is an S16 that mapt to a range [-1, 1]
+//   AxisData = list of {Index:Value} pairs.  Value is an S16 that maps to range [-1, 1]
 //   ButtonData = list of indices of pressed buttons
 //
 // Any Axis ommitted from the message is assumed by the receiving Simulator to be unchanged
 // from its previously received value.
 //
 // Any Button omitted from the message is assumed by the receiving Simulator to be unpressed.
+//
+// GameControlInput messages are sent unreliably, but when input changes stop the last
+// message will be resent at a ever increasing period to make sure the server receives it.
 //
 {
     GameControlInput High 32 NotTrusted Zerocoded
@@ -9255,3 +9288,4 @@ version 2.0
         { Data  Variable 1  }
     }
 }
+

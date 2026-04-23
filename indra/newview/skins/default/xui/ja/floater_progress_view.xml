@@ -6,8 +6,6 @@
 	<floater.string name="teleporting">
 		テレポートしています…
 	</floater.string>
-	<text value="[APP_NAME]"/>
-	<text name="progress_text"/>
 	<button label="キャンセル" name="cancel_btn"/>
 	<progress_bar name="progress_bar" tool_tip="プログレスバー"/>
 </floater>

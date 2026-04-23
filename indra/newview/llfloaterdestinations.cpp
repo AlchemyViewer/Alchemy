@@ -25,21 +25,14 @@
  * $/LicenseInfo$
  */
 
-/**
- * Floater that appears when buying an object, giving a preview
- * of its contents and their permissions.
- */
-
 #include "llviewerprecompiledheaders.h"
 
 #include "llfloaterdestinations.h"
-#include "llagent.h"
 #include "llmediactrl.h"
+#include "lluictrlfactory.h"
 #include "llviewercontrol.h"
-#include "llviewermedia.h"
-#include "llviewernetwork.h"
-#include "llviewerregion.h"
 #include "llweb.h"
+
 
 LLFloaterDestinations::LLFloaterDestinations(const LLSD& key)
     :   LLFloater(key)
@@ -48,32 +41,21 @@ LLFloaterDestinations::LLFloaterDestinations(const LLSD& key)
 
 LLFloaterDestinations::~LLFloaterDestinations()
 {
-    LLMediaCtrl* destinations = findChild<LLMediaCtrl>("destination_guide_contents");
-    if (destinations)
-    {
-        LL_INFOS() << "Unloading destinations media" << LL_ENDL;
-        destinations->navigateStop();
-        destinations->clearCache();          //images are reloading each time already
-        destinations->unloadMediaSource();
-    }
 }
 
-BOOL LLFloaterDestinations::postBuild()
+bool LLFloaterDestinations::postBuild()
 {
     enableResizeCtrls(true, true, false);
-    LLMediaCtrl* destinations = findChild<LLMediaCtrl>("destination_guide_contents");
-    if (destinations)
-    {
-        destinations->setErrorPageURL(gSavedSettings.getString("GenericErrorPageURL"));
+    LLMediaCtrl* destinations = getChild<LLMediaCtrl>("destination_guide_contents");
+    destinations->setErrorPageURL(gSavedSettings.getString("GenericErrorPageURL"));
+    std::string url = gSavedSettings.getString("DestinationGuideURL");
+    url = LLWeb::expandURLSubstitutions(url, LLSD());
+    destinations->navigateTo(url, HTTP_CONTENT_TEXT_HTML);
 
-        LLViewerRegion* regionp = gAgent.getRegion();
-        std::string dest_url = regionp != nullptr ? regionp->getDestinationGuideURL()
-            : LLGridManager::getInstance()->isInOpenSim() ? "" : gSavedSettings.getString("DestinationGuideURL");
-
-        dest_url = LLWeb::expandURLSubstitutions(dest_url, LLSD());
-        destinations->navigateTo(dest_url, HTTP_CONTENT_TEXT_HTML);
-    }
-    return TRUE;
+    // If cookie is there, will set it now. Otherwise will have to wait for login completion
+    // which will also update destinations instance if it already exists.
+    LLViewerMedia::getInstance()->getOpenIDCookie(destinations);
+    return true;
 }
 
 

@@ -29,14 +29,14 @@
 
 #include "llavataractions.h"
 
-#include <boost/lambda/lambda.hpp>  // for lambda::constant
-
 #include "llavatarnamecache.h"  // IDEVO
 #include "llsd.h"
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
 #include "roles_constants.h"    // for GP_MEMBER_INVITE
 
+#include "alfloaterprofilelegacy.h"
+#include "alpanelprofilelegacy.h"
 #include "llaccordionctrl.h"
 #include "llagent.h"
 #include "llappviewer.h"        // for gLastVersionChannel
@@ -50,7 +50,6 @@
 #include "llfloaterreg.h"
 #include "llfloaterpay.h"
 #include "llfloaterprofile.h"
-#include "llfloaterprofilelegacy.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llfloaterwebcontent.h"
 #include "llfloaterworldmap.h"
@@ -65,7 +64,6 @@
 #include "llnotificationsutil.h"    // for LLNotificationsUtil
 #include "llpaneloutfitedit.h"
 #include "llpanelprofile.h"
-#include "llpanelprofilelegacy.h"
 #include "llparcel.h"
 #include "llrecentpeople.h"
 #include "lltrans.h"
@@ -75,6 +73,8 @@
 #include "llviewernetwork.h" //LLGridManager
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
+#include "lltrans.h"
+#include "llcallingcard.h"
 #include "llslurl.h"            // IDEVO
 #include "llsidepanelinventory.h"
 #include "llavatarname.h"
@@ -146,9 +146,7 @@ void LLAvatarActions::requestFriendshipDialog(const LLUUID& id)
 void LLAvatarActions::removeFriendDialog(const LLUUID& id)
 {
     if (id.isNull())
-    {
         return;
-    }
 
     uuid_vec_t ids;
     ids.push_back(id);
@@ -158,10 +156,8 @@ void LLAvatarActions::removeFriendDialog(const LLUUID& id)
 // static
 void LLAvatarActions::removeFriendsDialog(const uuid_vec_t& ids)
 {
-    if (ids.empty())
-    {
+    if(ids.size() == 0)
         return;
-    }
 
     LLSD args;
     std::string msgType;
@@ -197,9 +193,8 @@ void LLAvatarActions::removeFriendsDialog(const uuid_vec_t& ids)
 void LLAvatarActions::offerTeleport(const LLUUID& invitee)
 {
     if (invitee.isNull())
-    {
         return;
-    }
+
     std::vector<LLUUID> ids;
     ids.push_back(invitee);
     offerTeleport(ids);
@@ -208,10 +203,9 @@ void LLAvatarActions::offerTeleport(const LLUUID& invitee)
 // static
 void LLAvatarActions::offerTeleport(const uuid_vec_t& ids)
 {
-    if (ids.empty())
-    {
+    if (ids.size() == 0)
         return;
-    }
+
     handle_lure(ids);
 }
 
@@ -231,10 +225,9 @@ static void on_avatar_name_cache_start_im(const LLUUID& agent_id,
 void LLAvatarActions::startIM(const LLUUID& id)
 {
     if (id.isNull() || gAgent.getID() == id)
-    {
         return;
-    }
-    // [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
+
+// [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
     if (!RlvActions::canStartIM(id))
     {
         make_ui_sound("UISndInvalidOp");
@@ -250,9 +243,8 @@ void LLAvatarActions::startIM(const LLUUID& id)
 void LLAvatarActions::endIM(const LLUUID& id)
 {
     if (id.isNull())
-    {
         return;
-    }
+
     LLUUID session_id = gIMMgr->computeSessionID(IM_NOTHING_SPECIAL, id);
     if (session_id != LLUUID::null)
     {
@@ -292,7 +284,7 @@ void LLAvatarActions::startCall(const LLUUID& id)
 // static
 void LLAvatarActions::startAdhocCall(const uuid_vec_t& ids, const LLUUID& floater_id)
 {
-    if (ids.empty())
+    if (ids.size() == 0)
     {
         return;
     }
@@ -303,14 +295,16 @@ void LLAvatarActions::startAdhocCall(const uuid_vec_t& ids, const LLUUID& floate
     for (uuid_vec_t::const_iterator it = ids.begin(); it != ids.end(); ++it)
     {
 // [RLVa:KB] - Checked: 2011-04-11 (RLVa-1.3.0)
-        if (!RlvActions::canStartIM(*it))
+        const LLUUID& idAgent = *it;
+        if (!RlvActions::canStartIM(idAgent))
         {
             make_ui_sound("UISndInvalidOp");
             RlvUtil::notifyBlocked(RlvStringKeys::Blocked::StartConference);
             return;
         }
+        id_array.push_back(idAgent);
 // [/RLVa:KB]
-        id_array.push_back(*it);
+//      id_array.push_back(*it);
     }
 
     // create the new ad hoc voice session
@@ -386,9 +380,9 @@ void LLAvatarActions::showProfile(const LLUUID& avatar_id)
 {
     if (avatar_id.notNull())
     {
-        if (gSkinSettings.getBool("LegacyProfile"))
+        if (gSkinSettings.getBOOL("LegacyProfile"))
         {
-            LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
         }
         else
@@ -403,9 +397,9 @@ void LLAvatarActions::showPicks(const LLUUID& avatar_id)
 {
     if (avatar_id.notNull())
     {
-        if (gSkinSettings.getBool("LegacyProfile"))
+        if (gSkinSettings.getBOOL("LegacyProfile"))
         {
-            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
             LLPanel* tab = profile->expandTab("avatar_picks_tab");
             tab->getChild<LLAccordionCtrl>("accordion")->expandTab("tab_picks");
@@ -427,12 +421,16 @@ void LLAvatarActions::showPick(const LLUUID& avatar_id, const LLUUID& pick_id)
 {
     if (avatar_id.notNull())
     {
-        if (gSkinSettings.getBool("LegacyProfile"))
+        if (gSkinSettings.getBOOL("LegacyProfile"))
         {
-            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
-            /*auto* tab = */dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
-            // *TODO: Finish
+            auto* tab = dynamic_cast<ALPanelProfileLegacy::ALPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+            if(tab)
+            {
+                // *TODO: Finish
+                (void)tab;
+            }
         }
         else
         {
@@ -448,7 +446,6 @@ void LLAvatarActions::showPick(const LLUUID& avatar_id, const LLUUID& pick_id)
 // static
 void LLAvatarActions::createPick()
 {
-
     LLViewerRegion* region = gAgent.getRegion();
     if (region)
     {
@@ -480,10 +477,10 @@ bool LLAvatarActions::isPickTabSelected(const LLUUID& avatar_id)
         static LLCachedControl<bool> legacy_profile(gSkinSettings, "LegacyProfile");
         if (legacy_profile)
         {
-            const LLFloaterProfileLegacy* profile = LLFloaterReg::findTypedInstance<LLFloaterProfileLegacy>(
+            const ALFloaterProfileLegacy* profile = LLFloaterReg::findTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id));
             if (profile == nullptr) { return false; }
-            return dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->getExpandedTab()) != nullptr;
+            return dynamic_cast<ALPanelProfileLegacy::ALPanelProfilePicks*>(profile->getExpandedTab()) != nullptr;
         }
         else
         {
@@ -502,9 +499,9 @@ void LLAvatarActions::showClassifieds(const LLUUID& avatar_id)
 {
     if (avatar_id.notNull())
     {
-        if (gSkinSettings.getBool("LegacyProfile"))
+        if (gSkinSettings.getBOOL("LegacyProfile"))
         {
-            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
             LLPanel* tab = profile->expandTab("avatar_picks_tab");
             tab->getChild<LLAccordionCtrl>("accordion")->expandTab("tab_classifieds");
@@ -526,9 +523,9 @@ void LLAvatarActions::showClassified(const LLUUID& avatar_id, const LLUUID& clas
 {
     if (avatar_id.notNull())
     {
-        if (gSkinSettings.getBool("LegacyProfile"))
+        if (gSkinSettings.getBOOL("LegacyProfile"))
         {
-            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
             LLPanel* tab = profile->expandTab("avatar_picks_tab");
             tab->getChild<LLAccordionCtrl>("accordion")->expandTab("tab_classifieds");
@@ -549,11 +546,11 @@ void LLAvatarActions::showClassified(const LLUUID& avatar_id, const LLUUID& clas
 // static
 void LLAvatarActions::createClassified()
 {
-    if (gSkinSettings.getBool("LegacyProfile"))
+    if (gSkinSettings.getBOOL("LegacyProfile"))
     {
-        const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+        const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
             "legacy_profile", LLSD().with("avatar_id", gAgent.getID()));
-        auto* tab = dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+        auto* tab = dynamic_cast<ALPanelProfileLegacy::ALPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
         tab->createNewClassified();
 
     }
@@ -575,13 +572,13 @@ bool LLAvatarActions::profileVisible(const LLUUID& avatar_id)
     return floater && floater->isShown();
 }
 
-//static
+// static
 LLFloater* LLAvatarActions::findProfileFloater(const LLUUID& avatar_id)
 {
     LLFloater* profile = nullptr;
     static LLCachedControl<bool> legacy_profile(gSkinSettings, "LegacyProfile");
     if (legacy_profile) {
-        profile = LLFloaterReg::findTypedInstance<LLFloaterProfileLegacy>("legacy_profile", LLSD().with("avatar_id", avatar_id));
+        profile = LLFloaterReg::findTypedInstance<ALFloaterProfileLegacy>("legacy_profile", LLSD().with("avatar_id", avatar_id));
     } else {
         profile = LLFloaterReg::findTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
     }
@@ -590,11 +587,11 @@ LLFloater* LLAvatarActions::findProfileFloater(const LLUUID& avatar_id)
 
 void LLAvatarActions::createPick(const LLPickData& data)
 {
-    if (gSkinSettings.getBool("LegacyProfile"))
+    if (gSkinSettings.getBOOL("LegacyProfile"))
     {
-        const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+        const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
             "legacy_profile", LLSD().with("avatar_id", gAgent.getID()));
-        auto* tab = dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+        auto* tab = dynamic_cast<ALPanelProfileLegacy::ALPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
         tab->createNewPick();
     }
     else
@@ -682,7 +679,7 @@ void LLAvatarActions::teleport_request_callback(const LLSD& notification, const 
         msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
         msg->nextBlockFast(_PREHASH_MessageBlock);
-        msg->addBOOLFast(_PREHASH_FromGroup, FALSE);
+        msg->addBOOLFast(_PREHASH_FromGroup, false);
         msg->addUUIDFast(_PREHASH_ToAgentID, notification["substitutions"]["uuid"] );
         msg->addU8Fast(_PREHASH_Offline, IM_ONLINE);
         msg->addU8Fast(_PREHASH_Dialog, IM_TELEPORT_REQUEST);
@@ -815,8 +812,8 @@ void LLAvatarActions::csr(const LLUUID& id, std::string name)
     std::string url = "http://csr.lindenlab.com/agent/";
 
     // slow and stupid, but it's late
-    S32 len = name.length();
-    for (S32 i = 0; i < len; i++)
+    auto len = name.length();
+    for (size_t i = 0; i < len; i++)
     {
         if (name[i] == ' ')
         {
@@ -887,7 +884,7 @@ namespace action_give_inventory
      */
     static LLInventoryPanel* get_active_inventory_panel()
     {
-        LLInventoryPanel* active_panel = LLInventoryPanel::getActiveInventoryPanel(FALSE);
+        LLInventoryPanel* active_panel = LLInventoryPanel::getActiveInventoryPanel(false);
         LLFloater* floater_appearance = LLFloaterReg::findInstance("appearance");
         if (!active_panel || (floater_appearance && floater_appearance->hasFocus()))
         {
@@ -977,7 +974,7 @@ namespace action_give_inventory
         }
     }
 
-    struct LLShareInfo final : public LLSingleton<LLShareInfo>
+    struct LLShareInfo : public LLSingleton<LLShareInfo>
     {
         LLSINGLETON_EMPTY_CTOR(LLShareInfo);
     public:
@@ -999,11 +996,11 @@ namespace action_give_inventory
             return;
         }
 
-        S32 count = LLShareInfo::instance().mAvatarNames.size();
+        auto count = LLShareInfo::instance().mAvatarNames.size();
         bool shared = count && !inventory_selected_uuids.empty();
 
         // iterate through avatars
-        for(S32 i = 0; i < count; ++i)
+        for(size_t i = 0; i < count; ++i)
         {
             const LLUUID& avatar_uuid = LLShareInfo::instance().mAvatarUuids[i];
 
@@ -1077,7 +1074,7 @@ namespace action_give_inventory
      * @param avatar_uuids - avatar names request to be sent.
      */
 
-//    static void give_inventory_ids(const uuid_vec_t& avatar_uuids, const std::vector<LLAvatarName> avatar_names, const uuid_set_t inventory_selected_uuids)
+//  static void give_inventory_ids(const uuid_vec_t& avatar_uuids, const std::vector<LLAvatarName> avatar_names, const uuid_set_t inventory_selected_uuids)
 // [RLVa:KB] - @share
     static void give_inventory_ids(uuid_vec_t avatar_uuids, std::vector<LLAvatarName> avatar_names, const uuid_set_t inventory_selected_uuids)
 // [/RLVa:KB]
@@ -1087,7 +1084,7 @@ namespace action_give_inventory
 // [RLVa:KB] - @share
         if ( (RlvActions::isRlvEnabled()) && (RlvActions::hasBehaviour(RLV_BHVR_SHARE)) )
         {
-            for (int idxAvatar = avatar_uuids.size() - 1; idxAvatar >= 0; idxAvatar--)
+            for (ptrdiff_t idxAvatar = avatar_uuids.size() - 1; idxAvatar >= 0; idxAvatar--)
             {
                 if (!RlvActions::canGiveInventory(avatar_uuids[idxAvatar]))
                 {
@@ -1258,7 +1255,7 @@ void LLAvatarActions::shareWithAvatars(LLView * panel)
     LLFloater* root_floater = gFloaterView->getParentFloater(panel);
     LLInventoryPanel* inv_panel = dynamic_cast<LLInventoryPanel*>(panel);
     LLFloaterAvatarPicker* picker =
-        LLFloaterAvatarPicker::show(boost::bind(give_inventory, _1, _2, inv_panel), TRUE, FALSE, FALSE, root_floater->getName());
+        LLFloaterAvatarPicker::show(boost::bind(give_inventory, _1, _2, inv_panel), true, false, false, root_floater->getName());
     if (!picker)
     {
         return;
@@ -1280,7 +1277,7 @@ void LLAvatarActions::shareWithAvatars(const uuid_set_t inventory_selected_uuids
     using namespace action_give_inventory;
 
     LLFloaterAvatarPicker* picker =
-        LLFloaterAvatarPicker::show(boost::bind(give_inventory_ids, _1, _2, inventory_selected_uuids), TRUE, FALSE, FALSE, root_floater->getName());
+        LLFloaterAvatarPicker::show(boost::bind(give_inventory_ids, _1, _2, inventory_selected_uuids), true, false, false, root_floater->getName());
     if (!picker)
     {
         return;
@@ -1491,7 +1488,7 @@ bool LLAvatarActions::handleRemove(const LLSD& notification, const LLSD& respons
             case 0: // YES
                 if( ip->isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS))
                 {
-                    LLAvatarTracker::instance().empower(id, FALSE);
+                    LLAvatarTracker::instance().empower(id, false);
                     LLAvatarTracker::instance().notifyObservers();
                 }
                 LLAvatarTracker::instance().terminateBuddy(id);
@@ -1544,7 +1541,7 @@ bool LLAvatarActions::callbackAddFriendWithMessage(const LLSD& notification, con
     return false;
 }
 
-#if 0
+#if 0 // ALAvatarActions
 // static
 bool LLAvatarActions::handleKick(const LLSD& notification, const LLSD& response)
 {
@@ -1560,7 +1557,7 @@ bool LLAvatarActions::handleKick(const LLSD& notification, const LLSD& response)
         msg->addUUIDFast(_PREHASH_GodID,        gAgent.getID() );
         msg->addUUIDFast(_PREHASH_GodSessionID, gAgent.getSessionID());
         msg->addUUIDFast(_PREHASH_AgentID,   avatar_id );
-        msg->addU32("KickFlags", KICK_FLAGS_DEFAULT );
+        msg->addU32Fast(_PREHASH_KickFlags, KICK_FLAGS_DEFAULT );
         msg->addStringFast(_PREHASH_Reason,    response["message"].asString() );
         gAgent.sendReliableMessage();
     }
@@ -1582,13 +1579,13 @@ bool LLAvatarActions::handleFreezeAvatar(const LLSD& notification, const LLSD& r
         LLUUID avatar_id = notification["payload"]["avatar_id"].asUUID();
         LLMessageSystem* msg = gMessageSystem;
 
-        msg->newMessage("FreezeUser");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgent.getID());
-        msg->addUUID("SessionID", gAgent.getSessionID());
-        msg->nextBlock("Data");
-        msg->addUUID("TargetID", avatar_id );
-        msg->addU32("Flags", flags );
+        msg->newMessageFast(_PREHASH_FreezeUser);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addUUIDFast(_PREHASH_TargetID, avatar_id );
+        msg->addU32Fast(_PREHASH_Flags, flags );
         gAgent.sendReliableMessage();
     }
     return false;
@@ -1608,13 +1605,13 @@ bool LLAvatarActions::handleEjectAvatar(const LLSD& notification, const LLSD& re
     {
         LLMessageSystem* msg = gMessageSystem;
         U32 flags = 0x0;
-        msg->newMessage("EjectUser");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgent.getID() );
-        msg->addUUID("SessionID", gAgent.getSessionID() );
-        msg->nextBlock("Data");
-        msg->addUUID("TargetID", avatar_id );
-        msg->addU32("Flags", flags );
+        msg->newMessageFast(_PREHASH_EjectUser);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addUUIDFast(_PREHASH_TargetID, avatar_id );
+        msg->addU32Fast(_PREHASH_Flags, flags );
         gAgent.sendReliableMessage();
     }
     else if (ban_enabled)
@@ -1622,13 +1619,13 @@ bool LLAvatarActions::handleEjectAvatar(const LLSD& notification, const LLSD& re
         LLMessageSystem* msg = gMessageSystem;
 
         U32 flags = 0x1;
-        msg->newMessage("EjectUser");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgent.getID() );
-        msg->addUUID("SessionID", gAgent.getSessionID() );
-        msg->nextBlock("Data");
-        msg->addUUID("TargetID", avatar_id );
-        msg->addU32("Flags", flags );
+        msg->newMessageFast(_PREHASH_EjectUser);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addUUIDFast(_PREHASH_TargetID, avatar_id );
+        msg->addU32Fast(_PREHASH_Flags, flags );
         gAgent.sendReliableMessage();
     }
     return false;
@@ -1647,7 +1644,7 @@ bool LLAvatarActions::handleFreeze(const LLSD& notification, const LLSD& respons
         msg->addUUIDFast(_PREHASH_GodID,        gAgent.getID() );
         msg->addUUIDFast(_PREHASH_GodSessionID, gAgent.getSessionID());
         msg->addUUIDFast(_PREHASH_AgentID,   avatar_id );
-        msg->addU32("KickFlags", KICK_FLAGS_FREEZE );
+        msg->addU32Fast(_PREHASH_KickFlags, KICK_FLAGS_FREEZE );
         msg->addStringFast(_PREHASH_Reason, response["message"].asString() );
         gAgent.sendReliableMessage();
     }
@@ -1668,7 +1665,7 @@ bool LLAvatarActions::handleUnfreeze(const LLSD& notification, const LLSD& respo
         msg->addUUIDFast(_PREHASH_GodID,        gAgent.getID() );
         msg->addUUIDFast(_PREHASH_GodSessionID, gAgent.getSessionID());
         msg->addUUIDFast(_PREHASH_AgentID,   avatar_id );
-        msg->addU32("KickFlags", KICK_FLAGS_UNFREEZE );
+        msg->addU32Fast(_PREHASH_KickFlags, KICK_FLAGS_UNFREEZE );
         msg->addStringFast(_PREHASH_Reason,    text );
         gAgent.sendReliableMessage();
     }
@@ -1680,6 +1677,7 @@ bool LLAvatarActions::handleUnfreeze(const LLSD& notification, const LLSD& respo
 void LLAvatarActions::requestFriendship(const LLUUID& target_id, const std::string& target_name, const std::string& message)
 {
     const LLUUID calling_card_folder_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_CALLINGCARD);
+
     send_improved_im(target_id,
                      target_name,
                      message,
@@ -1722,22 +1720,7 @@ bool LLAvatarActions::canBlock(const LLUUID& id)
     LLAvatarNameCache::get(id, &av_name);
 
     std::string full_name = av_name.getUserName();
-    bool is_linden = LLMuteList::isLinden(full_name);
+    bool is_linden = (full_name.find("Linden") != std::string::npos);
     bool is_self = id == gAgentID;
     return !is_self && !is_linden;
-}
-
-//static
-bool LLAvatarActions::isAgentMappable(const LLUUID& agent_id)
-{
-    const LLRelationship* buddy_info = nullptr;
-    bool is_friend = LLAvatarActions::isFriend(agent_id);
-
-    if (is_friend)
-        buddy_info = LLAvatarTracker::instance().getBuddyInfo(agent_id);
-
-    return (buddy_info &&
-            buddy_info->isOnline() &&
-            buddy_info->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION)
-            );
 }

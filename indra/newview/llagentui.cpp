@@ -34,7 +34,6 @@
 // Viewer includes
 #include "llagent.h"
 #include "llviewercontrol.h"
-#include "llviewernetwork.h"
 #include "llviewerregion.h"
 #include "llviewerparcelmgr.h"
 #include "llvoavatarself.h"
@@ -53,34 +52,38 @@ void LLAgentUI::buildFullname(std::string& name)
 //static
 void LLAgentUI::buildSLURL(LLSLURL& slurl, const bool escaped /*= true*/)
 {
-    LLSLURL return_slurl;
-    LLViewerRegion *regionp = gAgent.getRegion();
-    if (regionp)
-    {
-        return_slurl = LLSLURL(regionp->getHGGrid(), regionp->getName(), gAgent.getPositionAgent());
-    }
+      LLSLURL return_slurl;
+      LLViewerRegion *regionp = gAgent.getRegion();
+      if (regionp)
+      {
+          // Make sure coordinates are within current region
+          LLVector3d global_pos = gAgent.getPositionGlobal();
+          LLVector3d region_origin = regionp->getOriginGlobal();
+          // -1 otherwise slurl will fmod 256 to 0.
+          // And valid slurl range is supposed to be 0..255
+          F64 max_val = REGION_WIDTH_METERS - 1;
+          global_pos.mdV[VX] = llclamp(global_pos[VX], region_origin[VX], region_origin[VX] + max_val);
+          global_pos.mdV[VY] = llclamp(global_pos[VY], region_origin[VY], region_origin[VY] + max_val);
+
+          return_slurl = LLSLURL(regionp->getName(), global_pos);
+      }
     slurl = return_slurl;
 }
 
 //static
-BOOL LLAgentUI::checkAgentDistance(const LLVector3& pole, F32 radius)
+bool LLAgentUI::checkAgentDistance(const LLVector3& pole, F32 radius)
 {
     F32 delta_x = gAgent.getPositionAgent().mV[VX] - pole.mV[VX];
     F32 delta_y = gAgent.getPositionAgent().mV[VY] - pole.mV[VY];
 
     return  sqrt( delta_x* delta_x + delta_y* delta_y ) < radius;
 }
-BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const LLVector3& agent_pos_region)
+bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const LLVector3& agent_pos_region)
 {
     LLViewerRegion* region = gAgent.getRegion();
-    LLViewerParcelMgr& parcelMGr = LLViewerParcelMgr::instance();
-    LLParcel* parcel = parcelMGr.getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 
-    if (!region || !parcel) return FALSE;
-
-    std::string remote_grid = LLGridManager::instance().getGridByProbing(region->getHGGrid());
-    std::string cur_grid = LLGridManager::instance().getGrid();
-    bool is_hypergrid = remote_grid != cur_grid;
+    if (!region || !parcel) return false;
 
     S32 pos_x = S32(agent_pos_region.mV[VX] + 0.5f);
     S32 pos_y = S32(agent_pos_region.mV[VY] + 0.5f);
@@ -106,21 +109,21 @@ BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const 
     }
 
     // create a default name and description for the landmark
-    bool rlva_has_showloc = gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC);
-    const std::string& parcel_name = rlva_has_showloc  ? RlvStrings::getString(RlvStringKeys::Hidden::Parcel) : parcelMGr.getAgentParcelName();
-    const std::string& region_name = rlva_has_showloc ? RlvStrings::getString(RlvStringKeys::Hidden::Region) : region->getName();
-    const std::string& grid_name = rlva_has_showloc ? RlvStrings::getString(RlvStringKeys::Hidden::Grid) : region->getHGGridName();
+    std::string parcel_name = LLViewerParcelMgr::getInstance()->getAgentParcelName();
+    std::string region_name = region->getName();
 // [RLVa:KB] - Checked: 2010-04-04 (RLVa-1.2.0d) | Modified: RLVa-1.2.0d
     // RELEASE-RLVa: [SL-2.0.0] Check ELocationFormat to make sure our switch still makes sense
-    if (rlva_has_showloc)
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
     {
+        parcel_name = RlvStrings::getString(RlvStringKeys::Hidden::Parcel);
+        region_name = RlvStrings::getString(RlvStringKeys::Hidden::Region);
         if (LOCATION_FORMAT_NO_MATURITY == fmt)
             fmt = LOCATION_FORMAT_LANDMARK;
         else if (LOCATION_FORMAT_FULL == fmt)
             fmt = LOCATION_FORMAT_NO_COORDS;
     }
 // [/RLVa:KB]
-    const std::string& sim_access_string = region->getSimAccessString();
+    std::string sim_access_string = region->getSimAccessString();
     std::string buffer;
     if( parcel_name.empty() )
     {
@@ -131,29 +134,30 @@ BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const 
             buffer = llformat("%.100s", region_name.c_str());
             break;
         case LOCATION_FORMAT_NORMAL:
-            buffer = is_hypergrid
-                ? llformat("%s, %s", region_name.c_str(), grid_name.c_str())
-                : llformat("%s", region_name.c_str());
+            buffer = llformat("%s", region_name.c_str());
             break;
         case LOCATION_FORMAT_NORMAL_COORDS:
-            buffer = is_hypergrid
-                ? llformat("%s (%d, %d, %d), %s", region_name.c_str(), pos_x, pos_y, pos_z, grid_name.c_str())
-                : llformat("%s (%d, %d, %d)", region_name.c_str(), pos_x, pos_y, pos_z);
+            buffer = llformat("%s (%d, %d, %d)",
+                region_name.c_str(),
+                pos_x, pos_y, pos_z);
             break;
         case LOCATION_FORMAT_NO_COORDS:
-            buffer = is_hypergrid
-                ? llformat("%s, %s%s%s", region_name.c_str(), grid_name.c_str(), sim_access_string.empty() ? "" : " - ", sim_access_string.c_str())
-                : llformat("%s%s%s", region_name.c_str(), sim_access_string.empty() ? "" : " - ", sim_access_string.c_str());
+            buffer = llformat("%s%s%s",
+                region_name.c_str(),
+                sim_access_string.empty() ? "" : " - ",
+                sim_access_string.c_str());
             break;
         case LOCATION_FORMAT_NO_MATURITY:
-            buffer = is_hypergrid
-                ? llformat("%s (%d, %d, %d), %s", region_name.c_str(), pos_x, pos_y, pos_z, grid_name.c_str())
-                : llformat("%s (%d, %d, %d)", region_name.c_str(), pos_x, pos_y, pos_z);
+            buffer = llformat("%s (%d, %d, %d)",
+                region_name.c_str(),
+                pos_x, pos_y, pos_z);
             break;
         case LOCATION_FORMAT_FULL:
-            buffer = is_hypergrid
-                ? llformat("%s (%d, %d, %d), %s%s%s", region_name.c_str(), pos_x, pos_y, pos_z, grid_name.c_str(), sim_access_string.empty() ? "" : " - ", sim_access_string.c_str())
-                : llformat("%s (%d, %d, %d)%s%s", region_name.c_str(), pos_x, pos_y, pos_z, sim_access_string.empty() ? "" : " - ", sim_access_string.c_str());
+            buffer = llformat("%s (%d, %d, %d)%s%s",
+                region_name.c_str(),
+                pos_x, pos_y, pos_z,
+                sim_access_string.empty() ? "" : " - ",
+                sim_access_string.c_str());
             break;
         }
     }
@@ -166,34 +170,40 @@ BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const 
             buffer = llformat("%.100s", parcel_name.c_str());
             break;
         case LOCATION_FORMAT_NORMAL:
-            buffer = is_hypergrid
-                ? llformat("%s, %s, %s", parcel_name.c_str(), region_name.c_str(), grid_name.c_str())
-                : llformat("%s, %s", parcel_name.c_str(), region_name.c_str());
+            buffer = llformat("%s, %s", parcel_name.c_str(), region_name.c_str());
             break;
         case LOCATION_FORMAT_NORMAL_COORDS:
-            buffer = llformat("%s (%d, %d, %d)", parcel_name.c_str(), pos_x, pos_y, pos_z);
+            buffer = llformat("%s (%d, %d, %d)",
+                parcel_name.c_str(),
+                pos_x, pos_y, pos_z);
             break;
         case LOCATION_FORMAT_NO_MATURITY:
-            buffer = is_hypergrid
-                ? llformat("%s, %s (%d, %d, %d), %s", parcel_name.c_str(), region_name.c_str(), pos_x, pos_y, pos_z, grid_name.c_str())
-                : llformat("%s, %s (%d, %d, %d)", parcel_name.c_str(), region_name.c_str(), pos_x, pos_y, pos_z);
+            buffer = llformat("%s, %s (%d, %d, %d)",
+                parcel_name.c_str(),
+                region_name.c_str(),
+                pos_x, pos_y, pos_z);
             break;
         case LOCATION_FORMAT_NO_COORDS:
-            buffer = is_hypergrid
-                ? llformat("%s, %s, %s%s%s", parcel_name.c_str(), region_name.c_str(), grid_name.c_str(), sim_access_string.empty() ? "" : " - ", sim_access_string.c_str())
-                : llformat("%s, %s%s%s", parcel_name.c_str(), region_name.c_str(), sim_access_string.empty() ? "" : " - ", sim_access_string.c_str());
+            buffer = llformat("%s, %s%s%s",
+                              parcel_name.c_str(),
+                              region_name.c_str(),
+                              sim_access_string.empty() ? "" : " - ",
+                              sim_access_string.c_str());
                 break;
         case LOCATION_FORMAT_FULL:
-            buffer = is_hypergrid
-                ? llformat("%s, %s (%d, %d, %d), %s%s%s", parcel_name.c_str(), region_name.c_str(), pos_x, pos_y, pos_z, grid_name.c_str(), sim_access_string.empty() ? "" : " - ", sim_access_string.c_str())
-                : llformat("%s, %s (%d, %d, %d)%s%s", parcel_name.c_str(), region_name.c_str(), pos_x, pos_y, pos_z, sim_access_string.empty() ? "" : " - ", sim_access_string.c_str());
+            buffer = llformat("%s, %s (%d, %d, %d)%s%s",
+                parcel_name.c_str(),
+                region_name.c_str(),
+                pos_x, pos_y, pos_z,
+                sim_access_string.empty() ? "" : " - ",
+                sim_access_string.c_str());
             break;
         }
     }
-    str = std::move(buffer);
-    return TRUE;
+    str = buffer;
+    return true;
 }
-BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt)
+bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt)
 {
     return buildLocationString(str,fmt, gAgent.getPositionAgent());
 }

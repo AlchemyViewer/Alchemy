@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -30,14 +33,12 @@
 #include "llshadermgr.h"
 #include "llmaterial.h"
 
-#include "alrenderutils.h"
-
 #define LL_DEFERRED_MULTI_LIGHT_COUNT 16
 
 class LLViewerShaderMgr: public LLShaderMgr
 {
 public:
-    static BOOL sInitialized;
+    static bool sInitialized;
     static bool sSkipReload;
 
     LLViewerShaderMgr();
@@ -60,12 +61,12 @@ public:
     // name of a file error happened at, otherwise
     // returns an empty string
     std::string loadBasicShaders();
-    BOOL loadShadersEffects();
-    BOOL loadShadersDeferred();
-    BOOL loadShadersObject();
-    BOOL loadShadersAvatar();
-    BOOL loadShadersWater();
-    BOOL loadShadersInterface();
+    bool loadShadersEffects();
+    bool loadShadersDeferred();
+    bool loadShadersObject();
+    bool loadShadersAvatar();
+    bool loadShadersWater();
+    bool loadShadersInterface();
 
     std::vector<S32> mShaderLevel;
     S32 mMaxAvatarShaderLevel;
@@ -151,6 +152,7 @@ inline bool operator != (LLViewerShaderMgr::shader_iter const & a, LLViewerShade
 }
 
 extern LLVector4            gShinyOrigin;
+
 //utility shaders
 extern LLGLSLShader         gOcclusionProgram;
 extern LLGLSLShader         gOcclusionCubeProgram;
@@ -175,6 +177,8 @@ extern LLGLSLShader         gBenchmarkProgram;
 extern LLGLSLShader         gReflectionProbeDisplayProgram;
 extern LLGLSLShader         gCopyProgram;
 extern LLGLSLShader         gCopyDepthProgram;
+extern LLGLSLShader         gPBRTerrainBakeProgram;
+extern LLGLSLShader         gDrawColorProgram;
 
 //output tex0[tc0] - tex1[tc1]
 extern LLGLSLShader         gTwoTextureCompareProgram;
@@ -191,10 +195,14 @@ extern LLGLSLShader     gObjectAlphaMaskNoColorProgram;
 
 //environment shaders
 extern LLGLSLShader         gWaterProgram;
-extern LLGLSLShader         gWaterEdgeProgram;
 extern LLGLSLShader         gUnderWaterProgram;
 extern LLGLSLShader         gGlowProgram;
 extern LLGLSLShader         gGlowExtractProgram;
+extern LLGLSLShader         gBloomExtractProgram;
+extern LLGLSLShader         gBloomDownsampleProgram;
+extern LLGLSLShader         gBloomDownsampleFirstProgram;
+extern LLGLSLShader         gBloomUpsampleProgram;
+extern LLGLSLShader         gBloomCompositeProgram;
 
 //interface shaders
 extern LLGLSLShader         gHighlightProgram;
@@ -214,10 +222,6 @@ extern LLGLSLShader         gImpostorProgram;
 // Post Process Shaders
 extern LLGLSLShader         gPostScreenSpaceReflectionProgram;
 
-extern LLGLSLShader         gPostSMAAEdgeDetect[4];
-extern LLGLSLShader         gPostSMAABlendWeights[4];
-extern LLGLSLShader         gPostSMAANeighborhoodBlend[4];
-
 // Deferred rendering shaders
 extern LLGLSLShader         gDeferredImpostorProgram;
 extern LLGLSLShader         gDeferredDiffuseProgram;
@@ -234,6 +238,7 @@ extern LLGLSLShader         gDeferredMultiLightProgram[LL_DEFERRED_MULTI_LIGHT_C
 extern LLGLSLShader         gDeferredSpotLightProgram;
 extern LLGLSLShader         gDeferredMultiSpotLightProgram;
 extern LLGLSLShader         gDeferredSunProgram;
+extern LLGLSLShader         gDeferredSunProbeProgram;
 extern LLGLSLShader         gHazeProgram;
 extern LLGLSLShader         gHazeWaterProgram;
 extern LLGLSLShader         gDeferredBlurLightProgram;
@@ -250,10 +255,11 @@ extern LLGLSLShader         gDeferredPostProgramNoNear;
 extern LLGLSLShader         gDeferredCoFProgram;
 extern LLGLSLShader         gDeferredDoFCombineProgram;
 extern LLGLSLShader         gFXAAProgram[4];
+extern LLGLSLShader         gSMAAEdgeDetectProgram[4];
+extern LLGLSLShader         gSMAABlendWeightsProgram[4];
+extern LLGLSLShader         gSMAANeighborhoodBlendProgram[4];
+extern LLGLSLShader         gCASProgram;
 extern LLGLSLShader         gDeferredPostNoDoFProgram;
-extern LLGLSLShader         gDeferredPostGammaCorrectProgram;
-extern LLGLSLShader         gNoPostGammaCorrectProgram;
-extern LLGLSLShader         gLegacyPostGammaCorrectProgram;
 extern LLGLSLShader         gExposureProgram;
 extern LLGLSLShader         gExposureProgramNoFade;
 extern LLGLSLShader         gLuminanceProgram;
@@ -278,20 +284,20 @@ extern LLGLSLShader         gDeferredWLCloudProgram;
 extern LLGLSLShader         gDeferredWLSunProgram;
 extern LLGLSLShader         gDeferredWLMoonProgram;
 extern LLGLSLShader         gDeferredStarProgram;
+extern LLGLSLShader         gDeferredMeteorProgram;
+extern LLGLSLShader         gDeferredAuroraProgram;
 extern LLGLSLShader         gDeferredFullbrightShinyProgram;
 extern LLGLSLShader         gHUDFullbrightShinyProgram;
 extern LLGLSLShader         gNormalMapGenProgram;
 extern LLGLSLShader         gDeferredGenBrdfLutProgram;
 extern LLGLSLShader         gDeferredBufferVisualProgram;
-extern LLGLSLShader         gDeferredPostCASProgram;
-extern LLGLSLShader         gDeferredPostDLSProgram;
-extern LLGLSLShader         gDeferredPostTonemapProgram;
-extern LLGLSLShader         gDeferredPostTonemapACESProgram;
-extern LLGLSLShader         gDeferredPostTonemapUchiProgram;
-extern LLGLSLShader         gDeferredPostTonemapLPMProgram;
-extern LLGLSLShader         gDeferredPostTonemapHableProgram;
-extern LLGLSLShader         gDeferredPostColorCorrectProgram[3];
-extern LLGLSLShader         gDeferredPostColorCorrectLUTProgram[3];
+extern LLGLSLShader         gBlitWithEffectsProgram;
+extern LLGLSLShader         gCGGammaProgram;
+extern LLGLSLShader         gCGLegacyGammaProgram;
+extern LLGLSLShader         gCGTonemapProgram;
+extern LLGLSLShader         gCGTonemapLegacyGammaProgram;
+extern LLGLSLShader         gCGTonemapColorgradeProgram;
+extern LLGLSLShader         gCGTonemapColorgradeLegacyGammaProgram;
 // [RLVa:KB] - @setsphere
 extern LLGLSLShader         gRlvSphereProgram;
 // [/RLVa:KB]
@@ -304,6 +310,9 @@ extern LLGLSLShader         gPBRGlowProgram;
 extern LLGLSLShader         gDeferredPBROpaqueProgram;
 extern LLGLSLShader         gDeferredPBRAlphaProgram;
 extern LLGLSLShader         gHUDPBRAlphaProgram;
+
+// GLTF shaders
+extern LLGLSLShader         gGLTFPBRMetallicRoughnessProgram;
 
 // Encodes detail level for dropping textures, in accordance with the GLTF spec where possible
 // 0 is highest detail, -1 drops emissive, etc
@@ -319,5 +328,13 @@ enum TerrainPBRDetail : S32
     TERRAIN_PBR_DETAIL_BASE_COLOR         = -4,
     TERRAIN_PBR_DETAIL_MIN                = -4,
 };
-extern LLGLSLShader         gDeferredPBRTerrainProgram;
+enum TerrainPaintType : U32
+{
+    // Use LLVLComposition::mDatap (heightmap) generated by generateHeights, plus noise from TERRAIN_ALPHARAMP
+    TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE = 0,
+    // Use paint map if PBR terrain, otherwise fall back to TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
+    TERRAIN_PAINT_TYPE_PBR_PAINTMAP         = 1,
+    TERRAIN_PAINT_TYPE_COUNT                = 2,
+};
+extern LLGLSLShader         gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
 #endif

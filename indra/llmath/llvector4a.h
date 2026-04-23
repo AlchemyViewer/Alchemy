@@ -30,10 +30,12 @@
 
 class LLRotation;
 
-#include <cassert>
+#include <assert.h>
 #include "llpreprocessor.h"
-#include "llmath.h"
 #include "llmemory.h"
+#include "glm/vec3.hpp"
+#include "glm/vec4.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 ///////////////////////////////////
 // FIRST TIME USERS PLEASE READ
@@ -47,11 +49,9 @@ class LLRotation;
 // of this writing, July 08, 2010) about getting it implemented before you resort to
 // LLVector3/LLVector4.
 /////////////////////////////////
-class LLIVector4a;
 
 class alignas(16) LLVector4a
 {
-    friend class LLIVector4a;
     LL_ALIGN_NEW
 public:
 
@@ -62,25 +62,22 @@ public:
     // Call initClass() at startup to avoid 15,000+ cycle penalties from denormalized numbers
     static void initClass()
     {
-#if LL_WINDOWS
-        unsigned int current_word = 0;
-        _controlfp_s(&current_word, _DN_FLUSH, _MCW_DN);
-#endif
-        _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
         _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
         _MM_SET_ROUNDING_MODE(_MM_ROUND_NEAREST);
     }
 
     // Return a vector of all zeros
-    static inline LLVector4a getZero()
+    static inline const LLVector4a& getZero()
     {
-        return _mm_setzero_ps();
+        extern const LLVector4a LL_V4A_ZERO;
+        return LL_V4A_ZERO;
     }
 
     // Return a vector of all epsilon, where epsilon is a small float suitable for approximate equality checks
-    static inline LLVector4a getEpsilon()
+    static inline const LLVector4a& getEpsilon()
     {
-        return _mm_set1_ps(F_APPROXIMATELY_ZERO);
+        extern const LLVector4a LL_V4A_EPSILON;
+        return LL_V4A_EPSILON;
     }
 
     // Copy 16 bytes from src to dst. Source and destination must be 16-byte aligned
@@ -97,15 +94,8 @@ public:
     // CONSTRUCTORS
     ////////////////////////////////////
 
-#ifdef SHOW_ASSERT
     //LLVector4a is plain data which should never have a default constructor or destructor(malloc&free won't trigger it)
-    LLVector4a()
-    { //DO NOT INITIALIZE -- The overhead is completely unnecessary
-        ll_assert_aligned(this,16);
-    }
-#else
     LLVector4a() = default;
-#endif
 
     LLVector4a(F32 x, F32 y, F32 z, F32 w = 0.f)
     {
@@ -127,6 +117,49 @@ public:
         mQ = q;
     }
 
+    bool operator==(const LLVector4a& rhs) const
+    {
+        return equals4(rhs);
+    }
+
+    bool operator!=(const LLVector4a& rhs) const
+    {
+        return !(*this == rhs);
+    }
+
+    const LLVector4a& operator+=(const LLVector4a& rhs)
+    {
+        add(rhs);
+        return *this;
+    }
+
+    const LLVector4a& operator-=(const LLVector4a& rhs)
+    {
+        sub(rhs);
+        return *this;
+    }
+
+    LLVector4a operator+(const LLVector4a& rhs) const
+    {
+        LLVector4a result = *this;
+        result.add(rhs);
+        return result;
+    }
+
+    LLVector4a operator-(const LLVector4a& rhs) const
+    {
+        LLVector4a result = *this;
+        result.sub(rhs);
+        return result;
+    }
+
+    LLVector4a cross3(const LLVector4a& b) const
+    {
+        LLVector4a result;
+        result.setCross3(*this, b);
+        return result;
+    }
+
     ////////////////////////////////////
     // LOAD/STORE
     ////////////////////////////////////
@@ -138,7 +171,7 @@ public:
     inline void loadua(const F32* src);
 
     // Load only three floats beginning at address 'src'. Slowest method.
-    inline void load3(const F32* src, const F32 w = 0.f);
+    inline void load3(const F32* src);
 
     // Store to a 16-byte aligned memory address
     inline void store4a(F32* dst) const;
@@ -163,12 +196,6 @@ public:
     // Prefer this method for read-only access to a single element. Prefer the templated version if the elem is known at compile time.
     template <int N> LL_FORCE_INLINE LLSimdScalar getScalarAt() const;
 
-    // Prefer this method for read-only access to a single element. Prefer the templated version if the elem is known at compile time.
-    inline LLVector4a getVectorAt(const S32 idx) const;
-
-    // Prefer this method for read-only access to a single element. Prefer the templated version if the elem is known at compile time.
-    template <int N> LL_FORCE_INLINE LLVector4a getVectorAt() const;
-
     // Set to an x, y, z and optional w provided
     inline void set(F32 x, F32 y, F32 z, F32 w = 0.f);
 
@@ -187,9 +214,6 @@ public:
     // Set all 4 elements to element i of v, with i NOT known at compile time
     inline void splat(const LLVector4a& v, U32 i);
 
-    // Sets element N to that of src's element N. Much cleaner than.. {LLVector4Logical mask; mask.clear(); mask.setElement<N>(); target.setSelectWithMask(mask,src,target);}
-    template <int N> inline void copyComponent(const LLVector4a& src);
-
     // Select bits from sourceIfTrue and sourceIfFalse according to bits in mask
     inline void setSelectWithMask( const LLVector4Logical& mask, const LLVector4a& sourceIfTrue, const LLVector4a& sourceIfFalse );
 
@@ -200,17 +224,8 @@ public:
     // Set this to the element-wise (a + b)
     inline void setAdd(const LLVector4a& a, const LLVector4a& b);
 
-    // Set this to the element-wise (a + b)
-    inline void setAdd(const LLVector4a& a, const LLIVector4a& b);
-
-    // Set this to the element-wise (a0 + b0, a1, a2, a3)
-    inline void setAddFirst(const LLVector4a& a, const LLVector4a& b);
-
     // Set this to element-wise (a - b)
     inline void setSub(const LLVector4a& a, const LLVector4a& b);
-
-    // Set this to element-wise (a - b)
-    inline void setSub(const LLVector4a& a, const LLIVector4a& b);
 
     // Set this to element-wise multiply (a * b)
     inline void setMul(const LLVector4a& a, const LLVector4a& b);
@@ -223,9 +238,6 @@ public:
 
     // Add to each component in this vector the corresponding component in rhs
     inline void add(const LLVector4a& rhs);
-
-    // Add the first component of rhs to the first componant in this vector
-    inline void addFirst(const LLVector4a& rhs);
 
     // Subtract from each component in this vector the corresponding component in rhs
     inline void sub(const LLVector4a& rhs);
@@ -271,7 +283,7 @@ public:
     // Normalize this vector with respect to the x, y, and z components only. Accurate only to 10-12 bits of precision. W component is destroyed
     // Same as above except substitutes default vector contents if the vector is non-finite or degenerate due to zero length.
     //
-    inline void normalize3fast_checked(LLVector4a* d = nullptr);
+    inline void normalize3fast_checked(LLVector4a* d = 0);
 
     // Return true if this vector is normalized with respect to x,y,z up to tolerance
     inline LLBool32 isNormalized3( F32 tolerance = 1e-3 ) const;
@@ -313,14 +325,6 @@ public:
     void quantize8( const LLVector4a& low, const LLVector4a& high );
     void quantize16( const LLVector4a& low, const LLVector4a& high );
 
-    void negate();
-
-    // Set this vector to  rhs(2, 3, 2, 3)
-    inline void setMoveHighLow(const LLVector4a& rhs);
-
-    // Move high order bits to low order bits (2, 3, 2, 3)
-    inline void moveHighLow();
-
     ////////////////////////////////////
     // LOGICAL
     ////////////////////////////////////
@@ -358,14 +362,21 @@ public:
 
     inline operator LLQuad() const;
 
+    explicit inline operator glm::vec3() const
+    {
+        return glm::make_vec3(getF32ptr());
+    };
+
+    explicit inline operator glm::vec4() const
+    {
+        return glm::make_vec4(getF32ptr());
+    };
+
 private:
     LLQuad mQ;
 };
 
-#ifndef SHOW_ASSERT
 static_assert(std::is_trivial<LLVector4a>::value, "LLVector4a must be a trivial type");
-static_assert(std::is_standard_layout<LLVector4a>::value, "LLVector4a must be a standard layout type");
-#endif
 
 inline void update_min_max(LLVector4a& min, LLVector4a& max, const LLVector4a& p)
 {
@@ -378,130 +389,4 @@ inline std::ostream& operator<<(std::ostream& s, const LLVector4a& v)
     s << "(" << v[0] << ", " << v[1] << ", " << v[2] << ", " << v[3] << ")";
     return s;
 }
-
-class alignas(16) LLIVector4a
-{
-public:
-    friend class LLVector4a;
-    LL_ALIGN_NEW
-
-    // Constants
-    // Return a vector of all zeros
-    static inline LLIVector4a getZero()
-    {
-        return _mm_setzero_si128();
-    }
-
-    ////////////////////////////////////
-    // CONSTRUCTORS
-    ////////////////////////////////////
-
-    LLIVector4a() = default;
-    /*{ //DO NOT INITIALIZE -- The overhead is completely unnecessary
-        ll_assert_aligned(this, 16);
-    }*/
-
-    //LLIVector4a(S32 x, S32 y, S32 z, S32 w = 0)
-    //{
-    //  set(x, y, z, w);
-    //}
-
-    explicit LLIVector4a(S16 x)
-    {
-        splat16(x);
-    }
-
-    explicit LLIVector4a(S32 x)
-    {
-        splat32(x);
-    }
-
-    explicit LLIVector4a(S64 x)
-    {
-        splat64(x);
-    }
-
-    LLIVector4a(LLIQuad q)
-    {
-        mQ = q;
-    }
-
-    LLIVector4a(const LLVector4a& rhs)
-    {
-        setFloatTrunc(rhs);
-    }
-
-    ////////////////////////////////////
-    // LOAD/STORE
-    ////////////////////////////////////
-
-    // Load from 16-byte aligned src array (preferred method of loading)
-    inline void load128a(const S32* src)
-    {
-        mQ = _mm_load_si128((LLIQuad*)src);
-    }
-
-    // Load from unaligned src array (NB: Significantly slower than load4a)
-    inline void load128ua(const S32* src)
-    {
-        mQ = _mm_loadu_si128((LLIQuad*)src);
-    }
-
-    // Store to a 16-byte aligned memory address
-    inline void store128a(S32* dst) const
-    {
-        _mm_store_si128((LLIQuad*)dst, mQ);
-    }
-
-    inline void splat16(const S16 x)
-    {
-        mQ = _mm_set1_epi16(x);
-    }
-
-    inline void splat32(const S32 x)
-    {
-        mQ = _mm_set1_epi32(x);
-    }
-
-    inline void splat64(const S64 x)
-    {
-        mQ = _mm_set1_epi64x(x);
-    }
-
-    inline void setFloatTrunc(const LLVector4a& rhs)
-    {
-        mQ = _mm_cvttps_epi32(rhs.mQ);
-    }
-
-    inline void setMin16(const LLIVector4a& lhs, const LLIVector4a& rhs)
-    {
-        mQ = _mm_min_epi16(lhs.mQ, rhs.mQ);
-    }
-
-    inline void min16(const LLIVector4a& rhs)
-    {
-        mQ = _mm_min_epi16(mQ, rhs.mQ);
-    }
-
-    inline void setMax16(const LLIVector4a& lhs, const LLIVector4a& rhs)
-    {
-        mQ = _mm_max_epi16(lhs.mQ, rhs.mQ);
-    }
-
-    inline void max16(const LLIVector4a& rhs)
-    {
-        mQ = _mm_max_epi16(mQ, rhs.mQ);
-    }
-
-    inline operator LLIQuad() const
-    {
-        return mQ;
-    }
-
-    LLIQuad mQ;
-} LL_ALIGN_POSTFIX(16);
-
-static_assert(std::is_trivial<LLIVector4a>{}, "LLIVector4a must be a trivial type");
-static_assert(std::is_standard_layout<LLIVector4a>{}, "LLIVector4a must be a standard layout type");
-
 #endif

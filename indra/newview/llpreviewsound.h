@@ -29,7 +29,7 @@
 
 #include "llpreview.h"
 
-class LLPreviewSound final : public LLPreview
+class LLPreviewSound : public LLPreview
 {
 public:
     LLPreviewSound(const LLSD& key);
@@ -38,7 +38,7 @@ public:
     static void auditionSound( void* userdata );
 
 protected:
-    /* virtual */ BOOL  postBuild();
+    bool postBuild() override;
 };
 
 #endif  // LL_LLPREVIEWSOUND_H

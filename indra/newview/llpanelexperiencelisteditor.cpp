@@ -54,7 +54,7 @@ LLPanelExperienceListEditor::LLPanelExperienceListEditor()
 {
 }
 
-BOOL LLPanelExperienceListEditor::postBuild()
+bool LLPanelExperienceListEditor::postBuild()
 {
     mItems = getChild<LLNameListCtrl>("experience_list");
     mAdd = getChild<LLButton>("btn_add");
@@ -68,7 +68,7 @@ BOOL LLPanelExperienceListEditor::postBuild()
     mItems->setCommitCallback(boost::bind(&LLPanelExperienceListEditor::checkButtonsEnabled, this));
 
     checkButtonsEnabled();
-    return TRUE;
+    return true;
 }
 
 const uuid_list_t& LLPanelExperienceListEditor::getExperienceIds() const
@@ -95,7 +95,7 @@ void LLPanelExperienceListEditor::addExperienceIds( const uuid_vec_t& experience
 void LLPanelExperienceListEditor::setExperienceIds( const LLSD& experience_ids )
 {
     mExperienceIds.clear();
-    for (const LLSD& uuid : llsd::inArray(experience_ids))
+    for (LLSD uuid : llsd::inArray(experience_ids))
     {
         // Using insert(range) doesn't work here because the conversion from
         // LLSD to LLUUID is ambiguous: have to specify asUUID() for each entry.
@@ -118,7 +118,7 @@ void LLPanelExperienceListEditor::onAdd()
 
     mKey.generateNewID();
 
-    LLFloaterExperiencePicker* picker=LLFloaterExperiencePicker::show(boost::bind(&LLPanelExperienceListEditor::addExperienceIds, this, _1), mKey, FALSE, TRUE, mFilters, mAdd);
+    LLFloaterExperiencePicker* picker=LLFloaterExperiencePicker::show(boost::bind(&LLPanelExperienceListEditor::addExperienceIds, this, _1), mKey, false, true, mFilters, mAdd);
     mPicker = picker->getDerivedHandle<LLFloaterExperiencePicker>();
 }
 

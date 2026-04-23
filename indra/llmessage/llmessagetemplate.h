@@ -300,10 +300,10 @@ public:
                 << "has already been used as a block name!" << LL_ENDL;
         }
         *member_blockp = blockp;
-        if ((mTotalSize != -1)
-            && (blockp->mTotalSize != -1)
-            && ((blockp->mType == MBT_SINGLE)
-                || (blockp->mType == MBT_MULTIPLE)))
+        if (  (mTotalSize != -1)
+            &&(blockp->mTotalSize != -1)
+            &&(  (blockp->mType == MBT_SINGLE)
+               ||(blockp->mType == MBT_MULTIPLE)))
         {
             mTotalSize += blockp->mNumber*blockp->mTotalSize;
         }
@@ -349,7 +349,7 @@ public:
         return mDeprecation;
     }
 
-    void setHandlerFunc(void(*handler_func)(LLMessageSystem *msgsystem, void **user_data), void **user_data)
+    void setHandlerFunc(void (*handler_func)(LLMessageSystem *msgsystem, void **user_data), void **user_data)
     {
         mMessageCallbacks.clear();
         if (handler_func)
@@ -361,11 +361,11 @@ public:
         mMessageCallbacks.emplace_back(callback);
     }
 
-    BOOL callHandlerFunc(LLMessageSystem *msgsystem) const
+    bool callHandlerFunc(LLMessageSystem *msgsystem) const
     {
         for (auto& cb : mMessageCallbacks)
             cb(msgsystem);
-        return (BOOL)!mMessageCallbacks.empty();
+        return !mMessageCallbacks.empty();
     }
 
     bool isUdpBanned() const
@@ -385,7 +385,7 @@ public:
     const LLMessageBlock* getBlock(char* name) const
     {
         message_block_map_t::const_iterator iter = mMemberBlocks.find(name);
-        return iter != mMemberBlocks.end() ? *iter : NULL;
+        return iter != mMemberBlocks.end()? *iter : NULL;
     }
 
 public:

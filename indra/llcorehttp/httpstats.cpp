@@ -35,6 +35,10 @@ HTTPStats::HTTPStats()
 }
 
 
+HTTPStats::~HTTPStats()
+{
+}
+
 void HTTPStats::resetStats()
 {
     mResutCodes.clear();
@@ -66,9 +70,9 @@ namespace
         F32 value = bytes;
         int suffix = 0;
 
-        while ((value > 1024.f) && (suffix < 3))
+        while ((value > 1024.0) && (suffix < 3))
         {
-            value /= 1024.f;
+            value /= 1024.0;
             ++suffix;
         }
 

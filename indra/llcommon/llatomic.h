@@ -34,9 +34,9 @@
 template <typename Type, typename AtomicType = std::atomic< Type > > class LLAtomicBase
 {
 public:
-    LLAtomicBase() = default;
+    LLAtomicBase() {};
     LLAtomicBase(Type x) { mData.store(x); }
-    ~LLAtomicBase() = default;
+    ~LLAtomicBase() {};
 
     operator const Type() { return mData; }
 

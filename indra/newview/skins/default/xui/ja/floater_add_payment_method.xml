@@ -9,9 +9,6 @@
 		</text>
 		<button label="始めましょう" name="continue_btn"/>
 		<button label="また後で" name="close_btn"/>
-		<icon name="image_left"/>
-		<icon name="image_center"/>
-		<icon name="image_right"/>
 		<text name="image_left_desc">
 			お気に入りのアバターを作成しましょう。ストアやSecond Lifeマーケットプレイスにある何百万ものアイテムからお選びください。あなただけのスタイルがここにあります。
 		</text>

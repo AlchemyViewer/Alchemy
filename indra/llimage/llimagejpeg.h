@@ -31,18 +31,12 @@
 
 #include "llimage.h"
 
-#include "llwin32headerslean.h"
 extern "C" {
-#ifdef LL_USESYSTEMLIBS
 # include <jpeglib.h>
 # include <jerror.h>
-#else
-# include "jpeglib/jpeglib.h"
-# include "jpeglib/jerror.h"
-#endif
 }
 
-class LLImageJPEG final : public LLImageFormatted
+class LLImageJPEG : public LLImageFormatted
 {
 protected:
     virtual ~LLImageJPEG();
@@ -73,15 +67,15 @@ public:
     static void     errorEmitMessage(j_common_ptr cinfo, int msg_level);
     static void     errorOutputMessage(j_common_ptr cinfo);
 
-    static bool     decompress(LLImageJPEG* imagep);
-
 protected:
     U8*             mOutputBuffer;      // temp buffer used during encoding
     S32             mOutputBufferSize;  // bytes in mOuputBuffer
 
     S32             mEncodeQuality;     // on a scale from 1 to 100
 private:
+#if !LL_ARM64
     static jmp_buf  sSetjmpBuffer;      // To allow the library to abort.
+#endif
 };
 
 #endif  // LL_LLIMAGEJPEG_H

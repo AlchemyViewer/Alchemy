@@ -5,7 +5,6 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * Copyright (C) 2010-2017, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -36,6 +35,8 @@
 //
 // class LLFolderViewModelInventory
 //
+static LLTrace::BlockTimerStatHandle FTM_INVENTORY_SORT("Inventory Sort");
+
 bool LLFolderViewModelInventory::startDrag(std::vector<LLFolderViewModelItem*>& items)
 {
     std::vector<EDragAndDropType> types;
@@ -63,13 +64,14 @@ bool LLFolderViewModelInventory::startDrag(std::vector<LLFolderViewModelItem*>& 
 
 void LLFolderViewModelInventory::sort( LLFolderViewFolder* folder )
 {
-    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Inventory Sort");
+    LL_RECORD_BLOCK_TIME(FTM_INVENTORY_SORT);
 
     if (!folder->areChildrenInited() || !needsSort(folder->getViewModelItem())) return;
 
-    LLFolderViewModelItemInventory* modelp =   static_cast<LLFolderViewModelItemInventory*>(folder->getViewModelItem());
-    if (modelp->getUUID().isNull()) return;
+    LLFolderViewModelItemInventory* sort_modelp =   static_cast<LLFolderViewModelItemInventory*>(folder->getViewModelItem());
+    if (!sort_modelp->canSortContent()) return;
 
+    bool has_favorites = false;
     for (std::list<LLFolderViewFolder*>::iterator it =   folder->getFoldersBegin(), end_it = folder->getFoldersEnd();
         it != end_it;
         ++it)
@@ -78,11 +80,14 @@ void LLFolderViewModelInventory::sort( LLFolderViewFolder* folder )
         LLFolderViewFolder* child_folderp = *it;
         sort(child_folderp);
 
+        LLFolderViewModelItemInventory* modelp = static_cast<LLFolderViewModelItemInventory*>(child_folderp->getViewModelItem());
+        has_favorites |= child_folderp->isFavorite() || child_folderp->hasFavorites();
+
         if (child_folderp->getFoldersCount() > 0)
         {
-            time_t most_recent_folder_time =
-                static_cast<LLFolderViewModelItemInventory*>((*child_folderp->getFoldersBegin())->getViewModelItem())->getCreationDate();
-            LLFolderViewModelItemInventory* modelp =   static_cast<LLFolderViewModelItemInventory*>(child_folderp->getViewModelItem());
+            LLFolderViewModelItemInventory* folderp = static_cast<LLFolderViewModelItemInventory*>((*child_folderp->getFoldersBegin())->getViewModelItem());
+            time_t most_recent_folder_time = folderp->getCreationDate();
+
             if (most_recent_folder_time > modelp->getCreationDate())
             {
                 modelp->setCreationDate(most_recent_folder_time);
@@ -90,15 +95,25 @@ void LLFolderViewModelInventory::sort( LLFolderViewFolder* folder )
         }
         if (child_folderp->getItemsCount() > 0)
         {
-            time_t most_recent_item_time =
-                static_cast<LLFolderViewModelItemInventory*>((*child_folderp->getItemsBegin())->getViewModelItem())->getCreationDate();
+            LLFolderViewModelItemInventory* itemp = static_cast<LLFolderViewModelItemInventory*>((*child_folderp->getItemsBegin())->getViewModelItem());
+            time_t most_recent_item_time = itemp->getCreationDate();
 
-            LLFolderViewModelItemInventory* modelp =   static_cast<LLFolderViewModelItemInventory*>(child_folderp->getViewModelItem());
             if (most_recent_item_time > modelp->getCreationDate())
             {
                 modelp->setCreationDate(most_recent_item_time);
             }
         }
+    }
+    for (std::list<LLFolderViewItem*>::const_iterator it = folder->getItemsBegin(), end_it = folder->getItemsEnd();
+        it != end_it && !has_favorites;
+        ++it)
+    {
+        LLFolderViewItem* child_itemp = *it;
+        has_favorites |= child_itemp->isFavorite();
+    }
+    if (has_favorites)
+    {
+        folder->updateHasFavorites(true);
     }
     base_t::sort(folder);
 }
@@ -233,7 +248,7 @@ bool LLFolderViewModelItemInventory::filterChildItem( LLFolderViewModelItem* ite
     return continue_filtering;
 }
 
-bool LLFolderViewModelItemInventory::filter( LLFolderViewFilter& filter)
+bool LLFolderViewModelItemInventory::filter(LLFolderViewFilter& filter)
 {
     const S32 filter_generation = filter.getCurrentGeneration();
     const S32 must_pass_generation = filter.getFirstRequiredGeneration();
@@ -264,10 +279,7 @@ bool LLFolderViewModelItemInventory::filter( LLFolderViewFilter& filter)
     }
      */
 
-//  bool is_folder = (getInventoryType() == LLInventoryType::IT_CATEGORY);
-// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-19 (Catznip-3.6)
-    bool is_folder = (getInventoryType() == LLInventoryType::IT_CATEGORY) && (!isLink());
-// [/SL:KB]
+    bool is_folder = (getInventoryType() == LLInventoryType::IT_CATEGORY);
     const bool passed_filter_folder = is_folder ? filter.checkFolder(this) : true;
     setPassedFolderFilter(passed_filter_folder, filter_generation);
 

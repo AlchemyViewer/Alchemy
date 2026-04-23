@@ -143,6 +143,14 @@
              name="checkbox fullbright"
              top_pad="4"
              width="81" />
+            <check_box
+             height="19"
+             label="Hide water"
+             layout="topleft"
+             left="172"
+             top_delta="0"
+             name="checkbox_hide_water"
+             width="81" />
             <view_border
              bevel_style="none"
              follows="top|left"
@@ -173,7 +181,7 @@
              top_pad="5"
              width="90">
                 <combo_box.item
-                 label="Legacy Materials"
+                 label="Textures"
                  name="Materials"
                  value="Materials" />
                 <combo_box.item
@@ -299,20 +307,20 @@
              allow_no_texture="true"
              follows="left|top"
              height="80"
-             label="PBR Material"
+             label="Material"
              layout="topleft"
              left="10"
              name="pbr_control"
              tool_tip="Click to choose a pbr material"
-             top_pad="25"
+             top_pad="5"
              width="64" />
             <button
-            visible="false"
+            visible="true"
              follows="left|top"
              height="23"
              layout="topleft"
              left_pad="10"
-             top_delta="0"
+             top_delta="10"
              name="pbr_from_inventory"
              label="Choose from inventory"
              width="140"/>
@@ -331,7 +339,7 @@
                 Loading contents...
             </text>
             <button
-            visible="false"
+            visible="true"
              follows="left|top"
              height="23"
              layout="topleft"
@@ -341,7 +349,7 @@
              label="Edit Selected"
              width="140"/>
             <button
-            visible="false"
+            visible="true"
              follows="left|top"
              height="23"
              layout="topleft"
@@ -356,12 +364,12 @@
              fallback_image="materials_ui_x_24.png"
              follows="left|top"
              height="80"
-             label="Diffuse"
+             label="Texture       "
              layout="topleft"
              left="10"
              name="texture control"
              tool_tip="Click to choose a picture"
-             top_delta="-54"
+             top_delta="-64"
              width="64" />
             <text
             visible="false"
@@ -438,7 +446,7 @@
              fallback_image="materials_ui_x_24.png"
              follows="left|top"
              height="80"
-             label="Normal"
+             label="Texture       "
              layout="topleft"
              left="10"
              name="bumpytexture control"
@@ -555,7 +563,7 @@
              fallback_image="materials_ui_x_24.png"
              follows="left|top"
              height="80"
-             label="Specular"
+             label="Texture       "
              layout="topleft"
              left="10"
              name="shinytexture control"
@@ -698,7 +706,7 @@
 			 URL of chosen media, if any, goes here
 			 </text>
 			<button
-          visible="false"
+			 visible="false"
 			 follows="top|left"
 			 height="18"
 			 layout="topleft"
@@ -709,7 +717,7 @@
 			 label="Choose..."
 			 width="85"/>
 			<button
-          visible="false"
+			 visible="false"
 			 follows="top|left"
 			 height="18"
 			 layout="topleft"
@@ -720,7 +728,7 @@
 			 label="Remove"
 			 width="85"/>
             <button
-          visible="false"
+			 visible="false"
 			 follows="left|top"
 			 height="18"
 			 label="Align"
@@ -769,8 +777,8 @@
              label_width="200"
              layout="topleft"
              left="10"
-             min_val="-100"
-             max_val="100"
+             min_val="-10000"
+             max_val="10000"
              name="TexScaleU"
              top_pad="1"
              width="271" />
@@ -782,8 +790,8 @@
              label_width="200"
              layout="topleft"
              left="10"
-             min_val="-100"
-             max_val="100"
+             min_val="-10000"
+             max_val="10000"
              name="TexScaleV"
              width="271" />
             <spinner
@@ -791,9 +799,9 @@
              follows="left|top"
              height="19"
              initial_value=""
-			 label="Repeats per meter"
+             label="Repeats per meter"
              layout="topleft"
-			 label_width="200"
+             label_width="200"
              left="10"
              max_val="100"
              min_val="-100"
@@ -805,9 +813,9 @@
              height="19"
              increment="1"
              initial_value="0"
-			 label="Rotation degrees"
+             label="Rotation degrees"
              layout="topleft"
-			 label_width="200"
+             label_width="200"
              left="10"
              max_val="360"
              min_val="-360"
@@ -845,8 +853,8 @@
              label_width="200"
              layout="topleft"
              left="10"
-             min_val="-100"
-             max_val="100"
+             min_val="-10000"
+             max_val="10000"
              name="bumpyScaleU"
              top_delta="-115"
              width="271" />
@@ -858,8 +866,8 @@
              label_width="200"
              layout="topleft"
              left="10"
-             min_val="-100"
-             max_val="100"
+             min_val="-10000"
+             max_val="10000"
              name="bumpyScaleV"
              width="271" />
            <spinner
@@ -871,7 +879,7 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="200"
+             label_width="200"
              left="10"
              max_val="360"
              min_val="-360"
@@ -909,8 +917,8 @@
              label_width="200"
              layout="topleft"
              left="10"
-             min_val="-100"
-             max_val="100"
+             min_val="-10000"
+             max_val="10000"
              name="shinyScaleU"
              top_delta="-115"
              width="271" />
@@ -922,8 +930,8 @@
              label_width="200"
              layout="topleft"
              left="10"
-             min_val="-100"
-             max_val="100"
+             min_val="-10000"
+             max_val="10000"
              name="shinyScaleV"
              width="271" />
            <spinner
@@ -935,7 +943,7 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="200"
+             label_width="200"
              left="10"
              max_val="360"
              min_val="-360"
@@ -974,8 +982,8 @@
              label_width="200"
              layout="topleft"
              left="10"
-             min_val="-100"
-             max_val="100"
+             min_val="-10000"
+             max_val="10000"
              name="gltfTextureScaleU"
              top_delta="-115"
              width="271" />
@@ -987,9 +995,22 @@
              label_width="200"
              layout="topleft"
              left="10"
-             min_val="-100"
-             max_val="100"
+             min_val="-10000"
+             max_val="10000"
              name="gltfTextureScaleV"
+             width="271" />
+            <spinner
+             decimal_digits="1"
+             follows="left|top"
+             height="19"
+             initial_value=""
+             label="Repeats per meter"
+             layout="topleft"
+             label_width="200"
+             left="10"
+             max_val="100"
+             min_val="-100"
+             name="gltfRptctrl"
              width="271" />
             <spinner
              follows="left|top"
@@ -1058,6 +1079,7 @@
              left_pad="5"
              top_delta="-18"
              label="Align"
+             label_selected="Align current texture layers"
              name="button align textures"
              tool_tip="Align current texture layers"
              width="69" />

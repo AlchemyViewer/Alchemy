@@ -37,13 +37,13 @@
 class LLBBox
 {
 public:
-    LLBBox() {mEmpty = TRUE;}
+    LLBBox() {mEmpty = true;}
     LLBBox( const LLVector3& pos_agent,
         const LLQuaternion& rot,
         const LLVector3& min_local,
         const LLVector3& max_local )
         :
-        mMinLocal( min_local ), mMaxLocal( max_local ), mPosAgent(pos_agent), mRotation( rot), mEmpty( TRUE )
+        mMinLocal( min_local ), mMaxLocal( max_local ), mPosAgent(pos_agent), mRotation( rot), mEmpty( true )
         {}
 
     // Default copy constructor is OK.
@@ -64,8 +64,8 @@ public:
 
     LLVector3           getExtentLocal() const              { return mMaxLocal - mMinLocal; }
 
-    BOOL                containsPointLocal(const LLVector3& p) const;
-    BOOL                containsPointAgent(const LLVector3& p) const;
+    bool                containsPointLocal(const LLVector3& p) const;
+    bool                containsPointAgent(const LLVector3& p) const;
 
     void                addPointAgent(LLVector3 p);
     void                addBBoxAgent(const LLBBox& b);
@@ -92,8 +92,12 @@ private:
     LLVector3           mMaxLocal;
     LLVector3           mPosAgent;  // Position relative to Agent's Region
     LLQuaternion        mRotation;
-    BOOL                mEmpty;     // Nothing has been added to this bbox yet
+    bool                mEmpty;     // Nothing has been added to this bbox yet
 };
+
+static_assert(std::is_trivially_copyable<LLBBox>::value, "LLBBox must be trivial copy");
+static_assert(std::is_trivially_move_assignable<LLBBox>::value, "LLBBox must be trivial move");
+static_assert(std::is_standard_layout<LLBBox>::value, "LLBBox must be a standard layout type");
 
 //LLBBox operator*(const LLBBox &a, const LLMatrix4 &b);
 

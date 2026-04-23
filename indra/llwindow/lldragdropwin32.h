@@ -31,7 +31,7 @@
 
 #if LL_OS_DRAGDROP_ENABLED
 
-#include "llwin32headerslean.h"
+#include "llwin32headers.h"
 // [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
 #include <shellapi.h>
 // [/SL:KB]

@@ -71,7 +71,7 @@ void LLToolTipView::draw()
     LLView::draw();
 }
 
-BOOL LLToolTipView::handleHover(S32 x, S32 y, MASK mask)
+bool LLToolTipView::handleHover(S32 x, S32 y, MASK mask)
 {
     static S32 last_x = x;
     static S32 last_y = y;
@@ -89,7 +89,7 @@ BOOL LLToolTipView::handleHover(S32 x, S32 y, MASK mask)
     return LLView::handleHover(x, y, mask);
 }
 
-BOOL LLToolTipView::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLToolTipView::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     LLToolTipMgr::instance().blockToolTips();
 
@@ -98,29 +98,29 @@ BOOL LLToolTipView::handleMouseDown(S32 x, S32 y, MASK mask)
         // If we are handling the mouse event menu holder
         // won't get a chance to close menus so do this here
         LLMenuGL::sMenuContainer->hideMenus();
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
-BOOL LLToolTipView::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
+bool LLToolTipView::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
 {
     LLToolTipMgr::instance().blockToolTips();
     return LLView::handleMiddleMouseDown(x, y, mask);
 }
 
-BOOL LLToolTipView::handleRightMouseDown(S32 x, S32 y, MASK mask)
+bool LLToolTipView::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
     LLToolTipMgr::instance().blockToolTips();
     return LLView::handleRightMouseDown(x, y, mask);
 }
 
 
-BOOL LLToolTipView::handleScrollWheel( S32 x, S32 y, S32 clicks )
+bool LLToolTipView::handleScrollWheel( S32 x, S32 y, S32 clicks )
 {
     LLToolTipMgr::instance().blockToolTips();
-    return FALSE;
+    return false;
 }
 
 void LLToolTipView::drawStickyRect()
@@ -129,7 +129,7 @@ void LLToolTipView::drawStickyRect()
 }
 
 // defaults for floater param block pulled from widgets/floater.xml
-static LLWidgetNameRegistry::StaticRegistrar sRegisterInspectorParams(&typeid(LLInspector::Params), "inspector");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterInspectorParams(typeid(LLInspector::Params), "inspector");
 
 //
 // LLToolTip
@@ -145,6 +145,10 @@ LLToolTip::Params::Params()
     wrap("wrap", true),
     pos("pos"),
     message("message"),
+    delay_time("delay_time", LLUI::getInstance()->mSettingGroups["config"]->getF32( "ToolTipDelay" )),
+    visible_time_over("visible_time_over", LLUI::getInstance()->mSettingGroups["config"]->getF32( "ToolTipVisibleTimeOver" )),
+    visible_time_near("visible_time_near", LLUI::getInstance()->mSettingGroups["config"]->getF32( "ToolTipVisibleTimeNear" )),
+    visible_time_far("visible_time_far", LLUI::getInstance()->mSettingGroups["config"]->getF32( "ToolTipVisibleTimeFar" )),
     sticky_rect("sticky_rect"),
     image("image"),
     text_color("text_color"),
@@ -153,15 +157,6 @@ LLToolTip::Params::Params()
     media_playing("media_playing", false),
     allow_paste_tooltip("allow_paste_tooltip", false)
 {
-    static LLUICachedControl<F32> tool_tip_delay("ToolTipDelay", 0.69999f);
-    static LLUICachedControl<F32> visible_time_over_setting("ToolTipVisibleTimeOver", 1000.f);
-    static LLUICachedControl<F32> visible_time_near_setting("ToolTipVisibleTimeNear", 10.f);
-    static LLUICachedControl<F32> visible_time_far_setting("ToolTipVisibleTimeFar", 1.0f);
-    changeDefault(delay_time, tool_tip_delay);
-    changeDefault(visible_time_over, visible_time_over_setting);
-    changeDefault(visible_time_near, visible_time_near_setting);
-    changeDefault(visible_time_far, visible_time_far_setting);
-
     changeDefault(chrome, true);
 }
 
@@ -330,14 +325,14 @@ void LLToolTip::snapToChildren()
     setShape(tooltip_rect);
 }
 
-void LLToolTip::setVisible(BOOL visible)
+void LLToolTip::setVisible(bool visible)
 {
     // fade out tooltip over time
     if (visible)
     {
         mVisibleTimer.start();
         mFadeTimer.stop();
-        LLPanel::setVisible(TRUE);
+        LLPanel::setVisible(true);
     }
     else
     {
@@ -350,7 +345,7 @@ void LLToolTip::setVisible(BOOL visible)
     }
 }
 
-BOOL LLToolTip::handleHover(S32 x, S32 y, MASK mask)
+bool LLToolTip::handleHover(S32 x, S32 y, MASK mask)
 {
     //mInfoButton->setFlashing(true);
     if(mInfoButton)
@@ -361,7 +356,7 @@ BOOL LLToolTip::handleHover(S32 x, S32 y, MASK mask)
     {
         getWindow()->setCursor(UI_CURSOR_HAND);
     }
-    return TRUE;
+    return true;
 }
 
 void LLToolTip::onMouseLeave(S32 x, S32 y, MASK mask)
@@ -378,7 +373,7 @@ void LLToolTip::draw()
 
     if (mFadeTimer.getStarted())
     {
-        static LLUICachedControl<F32> tool_tip_fade_time("ToolTipFadeTime", 1.f);
+        static LLCachedControl<F32> tool_tip_fade_time(*LLUI::getInstance()->mSettingGroups["config"], "ToolTipFadeTime", 0.2f);
         alpha = clamp_rescale(mFadeTimer.getElapsedTimeF32(), 0.f, tool_tip_fade_time(), 1.f, 0.f);
         if (alpha == 0.f)
         {
@@ -395,22 +390,22 @@ void LLToolTip::draw()
     }
 }
 
-bool LLToolTip::isFading()
+bool LLToolTip::isFading() const
 {
     return mFadeTimer.getStarted();
 }
 
-F32 LLToolTip::getVisibleTime()
+F32 LLToolTip::getVisibleTime() const
 {
     return mVisibleTimer.getStarted() ? mVisibleTimer.getElapsedTimeF32() : 0.f;
 }
 
-bool LLToolTip::hasClickCallback()
+bool LLToolTip::hasClickCallback() const
 {
     return mHasClickCallback;
 }
 
-void LLToolTip::getToolTipMessage(std::string & message)
+void LLToolTip::getToolTipMessage(std::string& message) const
 {
     if (mTextBox)
     {
@@ -465,12 +460,12 @@ void LLToolTipMgr::createToolTip(const LLToolTip::Params& params)
     {
         LLCoordGL pos = params.pos;
         // try to spawn at requested position
-        LLUI::positionViewNearMouse(mToolTip, pos.mX, pos.mY);
+        LLUI::getInstance()->positionViewNearMouse(mToolTip, pos.mX, pos.mY);
     }
     else
     {
         // just spawn at mouse location
-        LLUI::positionViewNearMouse(mToolTip);
+        LLUI::getInstance()->positionViewNearMouse(mToolTip);
     }
 
     //...update "sticky" rect and tooltip position
@@ -482,7 +477,7 @@ void LLToolTipMgr::createToolTip(const LLToolTip::Params& params)
     {
         S32 mouse_x;
         S32 mouse_y;
-        LLUI::getMousePositionLocal(gToolTipView->getParent(), &mouse_x, &mouse_y);
+        LLUI::getInstance()->getMousePositionLocal(gToolTipView->getParent(), &mouse_x, &mouse_y);
 
         // allow mouse a little bit of slop before changing tooltips
         mMouseNearRect.setCenterAndSize(mouse_x, mouse_y, 3, 3);
@@ -511,7 +506,7 @@ void LLToolTipMgr::show(const LLToolTip::Params& params)
 
     // fill in default tooltip params from tool_tip.xml
     LLToolTip::Params params_with_defaults(params);
-    params_with_defaults.fillFrom(LLUICtrlFactory::getDefaultParams<LLToolTip>());
+    params_with_defaults.fillFrom(LLUICtrlFactory::instance().getDefaultParams<LLToolTip>());
     if (!params_with_defaults.validateBlock())
     {
         LL_WARNS() << "Could not display tooltip!" << LL_ENDL;
@@ -520,7 +515,7 @@ void LLToolTipMgr::show(const LLToolTip::Params& params)
 
     // are we ready to show the tooltip?
     if (!mToolTipsBlocked                                   // we haven't hit a key, moved the mouse, etc.
-        && LLUI::getMouseIdleTime() > params_with_defaults.delay_time)  // the mouse has been still long enough
+        && LLUI::getInstance()->getMouseIdleTime() > params_with_defaults.delay_time)   // the mouse has been still long enough
     {
         bool tooltip_changed = mLastToolTipParams.message() != params_with_defaults.message()
                                 || mLastToolTipParams.pos() != params_with_defaults.pos()
@@ -554,7 +549,7 @@ void LLToolTipMgr::hideToolTips()
 {
     if (mToolTip)
     {
-        mToolTip->setVisible(FALSE);
+        mToolTip->setVisible(false);
     }
 }
 
@@ -592,7 +587,7 @@ void LLToolTipMgr::updateToolTipVisibility()
     }
 
     // hide tooltips when mouse cursor is hidden
-    if (LLUI::getWindow()->isCursorHidden())
+    if (LLUI::getInstance()->getWindow()->isCursorHidden())
     {
         blockToolTips();
         return;
@@ -603,7 +598,7 @@ void LLToolTipMgr::updateToolTipVisibility()
     if (toolTipVisible())
     {
         S32 mouse_x, mouse_y;
-        LLUI::getMousePositionLocal(gToolTipView, &mouse_x, &mouse_y);
+        LLUI::getInstance()->getMousePositionLocal(gToolTipView, &mouse_x, &mouse_y);
 
         // mouse far away from tooltip
         tooltip_timeout = mLastToolTipParams.visible_time_far;

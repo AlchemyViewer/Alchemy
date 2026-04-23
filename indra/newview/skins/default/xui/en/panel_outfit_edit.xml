@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <!-- Side tray Outfit Edit panel -->
 <panel
+        background_visible="true"
         border="false"
         height="600"
         follows="all"
@@ -78,7 +79,7 @@
             layout="topleft"
             left_pad="10"
             name="title"
-            text_color="White"
+            text_color="LtGray"
             top="0"
             value="Edit outfit parts"
             use_ellipses="true"
@@ -87,7 +88,7 @@
     <!-- "HEADER WITH ICON, STATUS TEXT AND OUTFIT NAME" -->
     <panel
             background_visible="true"
-            bg_alpha_color="PanelDefaultBackgroundColor"
+            bg_alpha_color="DkGray2"
             bevel_style="none"
             follows="top|left|right"
             height="40"
@@ -134,7 +135,7 @@
                     layout="topleft"
                     name="curr_outfit_name"
                     parse_urls="false"
-                    text_color="White"
+                    text_color="LtGray"
                     top_pad="2"
                     value="[Current Outfit]"
                     use_ellipses="true"
@@ -265,7 +266,7 @@ It is calculated as border_size + 2*UIResizeBarOverlap
                 <layout_panel
                         auto_resize="false"
                         background_visible="true"
-                        bg_alpha_color="PanelDefaultBackgroundColor"
+                        bg_alpha_color="DkGray2"
                         height="30"
                         name="filter_panel"
                         width="311"
@@ -282,6 +283,7 @@ It is calculated as border_size + 2*UIResizeBarOverlap
                             height="25"
                             name="look_item_filter"
                             search_button_visible="true"
+                            text_color="black"
                             visible="true"/>
 
                 </layout_panel>
@@ -290,7 +292,7 @@ It is calculated as border_size + 2*UIResizeBarOverlap
 
 
         <layout_panel background_visible="false"
-                bg_alpha_color="PanelDefaultBackgroundColor"
+                bg_alpha_color="DkGray2"
                 auto_resize="true"
                 height="450"
                 min_height="80"
@@ -387,21 +389,6 @@ It is calculated as border_size + 2*UIResizeBarOverlap
                 left_pad="1"
                 name="dummy_right_icon"
                 width="250" />
-        <text
-                top_delta="0"
-                type="string"
-                length="1"
-                height="25"
-                layout="topleft"
-                right="-36"
-                name="avatar_complexity_label"
-                font="SansSerifMedium"
-                follows="bottom|right"
-                halign="right"
-                v_pad="6"
-                width="150">
-                    Complexity: [WEIGHT]
-        </text>
         <button
                 follows="bottom|right"
                 height="25"
@@ -410,7 +397,7 @@ It is calculated as border_size + 2*UIResizeBarOverlap
                 image_selected="Toolbar_Right_Selected"
                 image_unselected="Toolbar_Right_Off"
                 layout="topleft"
-                left_pad="6"
+                left_pad="1"
                 name="shop_btn_1"
                 top="1"
                 tool_tip="Visit the SL Marketplace. You can also select something you are wearing, then click here to see more things like it"
@@ -477,21 +464,6 @@ It is calculated as border_size + 2*UIResizeBarOverlap
                 name="dummy_right_icon"
                 width="186" >
         </icon>
-        <text
-                top_delta="0"
-                type="string"
-                length="1"
-                height="25"
-                layout="topleft"
-                right="-36"
-                name="avatar_complexity_adding_label"
-                font="SansSerifMedium"
-                follows="bottom|right"
-                halign="right"
-                v_pad="6"
-                width="150">
-                    Complexity: [WEIGHT]
-        </text>
         <button
                 follows="bottom|right"
                 height="25"

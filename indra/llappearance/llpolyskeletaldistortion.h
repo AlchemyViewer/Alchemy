@@ -51,15 +51,15 @@ class LLAvatarAppearance;
 //-----------------------------------------------------------------------------
 struct LLPolySkeletalBoneInfo
 {
-    LLPolySkeletalBoneInfo(std::string name, LLVector3 scale, LLVector3 pos, BOOL haspos)
-        : mBoneName(std::move(name)),
-          mScaleDeformation(std::move(scale)),
-          mPositionDeformation(std::move(pos)),
+    LLPolySkeletalBoneInfo(std::string &name, LLVector3 &scale, LLVector3 &pos, bool haspos)
+        : mBoneName(name),
+          mScaleDeformation(scale),
+          mPositionDeformation(pos),
           mHasPositionDeformation(haspos) {}
     std::string mBoneName;
     LLVector3 mScaleDeformation;
     LLVector3 mPositionDeformation;
-    BOOL mHasPositionDeformation;
+    bool mHasPositionDeformation;
 };
 
 class alignas(16) LLPolySkeletalDistortionInfo : public LLViewerVisualParamInfo
@@ -68,10 +68,11 @@ class alignas(16) LLPolySkeletalDistortionInfo : public LLViewerVisualParamInfo
     friend class LLPolySkeletalDistortion;
 public:
 
-    LLPolySkeletalDistortionInfo() = default;
-    /*virtual*/ ~LLPolySkeletalDistortionInfo() = default;
+    LLPolySkeletalDistortionInfo();
+    /*virtual*/ ~LLPolySkeletalDistortionInfo() {};
 
-    /*virtual*/ BOOL parseXml(LLXmlTreeNode* node) override;
+    /*virtual*/ bool parseXml(LLXmlTreeNode* node);
+
 protected:
     typedef std::vector<LLPolySkeletalBoneInfo> bone_info_list_t;
     bone_info_list_t mBoneInfoList;
@@ -86,37 +87,37 @@ class alignas(16) LLPolySkeletalDistortion : public LLViewerVisualParam
     LL_ALIGN_NEW
 public:
     LLPolySkeletalDistortion(LLAvatarAppearance *avatarp);
-    ~LLPolySkeletalDistortion() = default;
+    ~LLPolySkeletalDistortion();
 
     // Special: These functions are overridden by child classes
     LLPolySkeletalDistortionInfo*   getInfo() const { return (LLPolySkeletalDistortionInfo*)mInfo; }
     //   This sets mInfo and calls initialization functions
-    BOOL                            setInfo(LLPolySkeletalDistortionInfo *info);
+    bool                            setInfo(LLPolySkeletalDistortionInfo *info);
 
-    /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const override;
+    /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const;
 
     // LLVisualParam Virtual functions
-    ///*virtual*/ BOOL              parseData(LLXmlTreeNode* node);
-    /*virtual*/ void                apply( ESex sex ) override;
+    ///*virtual*/ bool              parseData(LLXmlTreeNode* node);
+    /*virtual*/ void                apply( ESex sex );
 
     // LLViewerVisualParam Virtual functions
-    /*virtual*/ F32                 getTotalDistortion() override { return 0.1f; }
-    /*virtual*/ const LLVector4a&   getAvgDistortion() override { return mDefaultVec; }
-    /*virtual*/ F32                 getMaxDistortion() override { return 0.1f; }
-    /*virtual*/ LLVector4a          getVertexDistortion(S32 index, LLPolyMesh *poly_mesh) override {return LLVector4a(0.001f, 0.001f, 0.001f);}
-    /*virtual*/ const LLVector4a*   getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh) override { if( index ){ *index = 0;} if( poly_mesh ){ *poly_mesh = NULL; } return &mDefaultVec; };
-    /*virtual*/ const LLVector4a*   getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override { if( index ){ *index = 0;} if( poly_mesh ){ *poly_mesh = NULL; } return NULL; };
+    /*virtual*/ F32                 getTotalDistortion() { return 0.1f; }
+    /*virtual*/ const LLVector4a&   getAvgDistortion()  { return mDefaultVec; }
+    /*virtual*/ F32                 getMaxDistortion() { return 0.1f; }
+    /*virtual*/ LLVector4a          getVertexDistortion(S32 index, LLPolyMesh *poly_mesh){return LLVector4a(0.001f, 0.001f, 0.001f);}
+    /*virtual*/ const LLVector4a*   getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh){index = 0; poly_mesh = NULL; return &mDefaultVec;};
+    /*virtual*/ const LLVector4a*   getNextDistortion(U32 *index, LLPolyMesh **poly_mesh){index = 0; poly_mesh = NULL; return NULL;};
 
 protected:
-    LLPolySkeletalDistortion(const LLPolySkeletalDistortion& pOther) = default;
+    LLPolySkeletalDistortion(const LLPolySkeletalDistortion& pOther);
 
-    LL_ALIGN_16(LLVector4a mDefaultVec);
+    LLVector4a mDefaultVec;
     typedef std::map<LLJoint*, LLVector3> joint_vec_map_t;
     joint_vec_map_t mJointScales;
     joint_vec_map_t mJointOffsets;
     // Backlink only; don't make this an LLPointer.
     LLAvatarAppearance *mAvatar;
-} LL_ALIGN_POSTFIX(16);
+};
 
 #endif // LL_LLPOLYSKELETALDISTORTION_H
 

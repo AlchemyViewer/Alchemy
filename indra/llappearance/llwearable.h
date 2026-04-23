@@ -31,7 +31,6 @@
 #include "llpermissions.h"
 #include "llsaleinfo.h"
 #include "llwearabletype.h"
-#include "llsortedvector.h"
 
 class LLVisualParam;
 class LLTexGlobalColorInfo;
@@ -56,7 +55,7 @@ public:
     LLWearableType::EType       getType() const { return mType; }
     void                        setType(LLWearableType::EType type, LLAvatarAppearance *avatarp);
     const std::string&          getName() const { return mName; }
-    void                        setName(std::string name) { mName = std::move(name); }
+    void                        setName(const std::string& name) { mName = name; }
     const std::string&          getDescription() const { return mDescription; }
     void                        setDescription(const std::string& desc) { mDescription = desc; }
     const LLPermissions&        getPermissions() const { return mPermissions; }
@@ -81,9 +80,9 @@ public:
         SUCCESS,
         BAD_HEADER
     };
-    BOOL                exportFile(const std::string& filename) const;
+    bool                exportFile(const std::string& filename) const;
     EImportResult       importFile(const std::string& filename, LLAvatarAppearance* avatarp );
-    virtual BOOL                exportStream( std::ostream& output_stream ) const;
+    virtual bool                exportStream( std::ostream& output_stream ) const;
     virtual EImportResult       importStream( std::istream& input_stream, LLAvatarAppearance* avatarp );
 
     static void         setCurrentDefinitionVersion( S32 version ) { LLWearable::sCurrentDefinitionVersion = version; }
@@ -110,7 +109,7 @@ public:
     // Something happened that requires the wearable to be updated (e.g. worn/unworn).
     virtual void        setUpdated() const = 0;
 
-    typedef LLSortedVector<S32, LLVisualParam *>    visual_param_index_map_t;
+    typedef std::map<S32, LLVisualParam *>    visual_param_index_map_t;
     visual_param_index_map_t mVisualParamIndexMap;
 
 protected:
@@ -119,7 +118,7 @@ protected:
     void                destroyTextures();
     void                createVisualParams(LLAvatarAppearance *avatarp);
     void                createLayers(S32 te, LLAvatarAppearance *avatarp);
-    BOOL                getNextPopulatedLine(std::istream& input_stream, char* buffer, U32 buffer_size);
+    bool                getNextPopulatedLine(std::istream& input_stream, char* buffer, U32 buffer_size);
 
     static S32          sCurrentDefinitionVersion;  // Depends on the current state of the avatar_lad.xml.
     S32                 mDefinitionVersion;         // Depends on the state of the avatar_lad.xml when this asset was created.

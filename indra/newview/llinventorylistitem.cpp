@@ -41,9 +41,21 @@
 #include "llinventorymodel.h"
 #include "llviewerinventory.h"
 
-static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelInventoryListItemBaseParams(&typeid(LLPanelInventoryListItemBase::Params), "inventory_list_item");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelInventoryListItemBaseParams(typeid(LLPanelInventoryListItemBase::Params), "inventory_list_item");
 
-static const S32 WIDGET_SPACING = 3;
+constexpr S32 WIDGET_SPACING = 3;
+constexpr S32 FAVORITE_IMAGE_SIZE = 14;
+constexpr S32 FAVORITE_IMAGE_PAD = 3;
+
+bool get_is_item_favorite(const LLViewerInventoryItem* inv)
+{
+    if (inv->getIsLinkType())
+    {
+        LLInventoryObject* obj = gInventory.getObject(inv->getLinkedUUID());
+        return obj && obj->getIsFavorite();
+    }
+    return inv->getIsFavorite();
+}
 
 LLPanelInventoryListItemBase::Params::Params()
 :   default_style("default_style"),
@@ -57,6 +69,7 @@ LLPanelInventoryListItemBase::Params::Params()
 
 LLPanelInventoryListItemBase* LLPanelInventoryListItemBase::create(LLViewerInventoryItem* item)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     LLPanelInventoryListItemBase* list_item = NULL;
     if (item)
     {
@@ -75,19 +88,30 @@ void LLPanelInventoryListItemBase::draw()
         LLViewerInventoryItem* inv_item = getItem();
         if (inv_item)
         {
-            updateItem(inv_item->getName());
+            updateItem(inv_item->getName(), get_is_item_favorite(inv_item));
         }
         setNeedsRefresh(false);
     }
 
+    static LLUICachedControl<bool> draw_star("InventoryFavoritesUseStar", true);
+
+    LLRect local_rect = getLocalRect();
     if (mHovered && mHoverImage)
     {
-        mHoverImage->draw(getLocalRect());
+        mHoverImage->draw(local_rect);
+    }
+    else if (mIsFavorite && draw_star())
+    {
+
+        static LLPointer<LLUIImage> fav_img = LLRender2D::getInstance()->getUIImage("Inv_Favorite_Star_Full");
+        gl_draw_scaled_image(
+            local_rect.getWidth() - FAVORITE_IMAGE_SIZE - FAVORITE_IMAGE_PAD, FAVORITE_IMAGE_PAD,
+            FAVORITE_IMAGE_SIZE, FAVORITE_IMAGE_SIZE, fav_img->getImage());
     }
 
     if (mSelected && mSelectedImage)
     {
-        mSelectedImage->draw(getLocalRect());
+        mSelectedImage->draw(local_rect);
     }
 
     if (mSeparatorVisible && mSeparatorImage)
@@ -95,7 +119,7 @@ void LLPanelInventoryListItemBase::draw()
         // place under bottom of listitem, using image height
         // item_pad in list using the item should be >= image height
         // to avoid cropping of top of the next item.
-        LLRect separator_rect = getLocalRect();
+        LLRect separator_rect = local_rect;
         separator_rect.mTop = separator_rect.mBottom;
         separator_rect.mBottom -= mSeparatorImage->getHeight();
         F32 alpha = getCurrentTransparency();
@@ -107,9 +131,15 @@ void LLPanelInventoryListItemBase::draw()
 
 // virtual
 void LLPanelInventoryListItemBase::updateItem(const std::string& name,
+                                              bool favorite,
                                               EItemState item_state)
 {
     setIconImage(mIconImage);
+    if (mIsFavorite != favorite)
+    {
+        mIsFavorite = favorite;
+        reshapeMiddleWidgets();
+    }
     setTitle(name, mHighlightedText, item_state);
 }
 
@@ -158,13 +188,14 @@ void LLPanelInventoryListItemBase::setShowWidget(LLUICtrl* ctrl, bool show)
     ctrl->setEnabled(show);
 }
 
-BOOL LLPanelInventoryListItemBase::postBuild()
+bool LLPanelInventoryListItemBase::postBuild()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     LLViewerInventoryItem* inv_item = getItem();
     if (inv_item)
     {
-        mIconImage = LLInventoryIcon::getIcon(inv_item->getType(), inv_item->getInventoryType(), inv_item->getFlags(), FALSE);
-        updateItem(inv_item->getName());
+        mIconImage = LLInventoryIcon::getIcon(inv_item->getType(), inv_item->getInventoryType(), inv_item->getFlags(), false);
+        updateItem(inv_item->getName(), get_is_item_favorite(inv_item));
     }
 
     setNeedsRefresh(true);
@@ -172,7 +203,7 @@ BOOL LLPanelInventoryListItemBase::postBuild()
     setWidgetsVisible(false);
     reshapeWidgets();
 
-    return TRUE;
+    return true;
 }
 
 void LLPanelInventoryListItemBase::setValue(const LLSD& value)
@@ -182,7 +213,7 @@ void LLPanelInventoryListItemBase::setValue(const LLSD& value)
     mSelected = value["selected"];
 }
 
-BOOL LLPanelInventoryListItemBase::handleHover(S32 x, S32 y, MASK mask)
+bool LLPanelInventoryListItemBase::handleHover(S32 x, S32 y, MASK mask)
 {
     mHovered = true;
     return LLPanel::handleHover(x, y, mask);
@@ -290,6 +321,7 @@ LLPanelInventoryListItemBase::LLPanelInventoryListItemBase(LLViewerInventoryItem
     mHovered(false),
     mSelected(false),
     mSeparatorVisible(false),
+    mIsFavorite(false),
     mHoverImage(params.hover_image),
     mSelectedImage(params.selected_image),
     mSeparatorImage(params.separator_image)
@@ -392,6 +424,16 @@ void LLPanelInventoryListItemBase::setTitle(const std::string& title,
     default:;
     }
 
+    if (mIsFavorite)
+    {
+        static LLUICachedControl<bool> use_color("InventoryFavoritesColorText", true);
+        if (use_color)
+        {
+            static const LLUIColor favorite_color = LLUIColorTable::instance().getColor("InventoryFavoriteColor", LLColor4::white);
+            style_params.color = favorite_color;
+        }
+    }
+
     LLTextUtil::textboxSetHighlightedVal(
         mTitleCtrl,
         style_params,
@@ -399,13 +441,13 @@ void LLPanelInventoryListItemBase::setTitle(const std::string& title,
         highlit_text);
 }
 
-BOOL LLPanelInventoryListItemBase::handleToolTip( S32 x, S32 y, MASK mask)
+bool LLPanelInventoryListItemBase::handleToolTip( S32 x, S32 y, MASK mask)
 {
     LLRect text_box_rect = mTitleCtrl->getRect();
     if (text_box_rect.pointInRect(x, y) &&
         mTitleCtrl->getTextPixelWidth() <= text_box_rect.getWidth())
     {
-        return FALSE;
+        return false;
     }
     return LLPanel::handleToolTip(x, y, mask);
 }
@@ -466,6 +508,10 @@ void LLPanelInventoryListItemBase::reshapeMiddleWidgets()
 
     S32 name_left = icon_rect.mRight + getWidgetSpacing();
     S32 name_right = getLocalRect().getWidth() - mRightWidgetsWidth - getWidgetSpacing();
+    if (mIsFavorite)
+    {
+        name_right -= FAVORITE_IMAGE_SIZE + FAVORITE_IMAGE_PAD;
+    }
     LLRect name_rect(mTitleCtrl->getRect());
     name_rect.set(name_left, name_rect.mTop, name_right, name_rect.mBottom);
     mTitleCtrl->setShape(name_rect);

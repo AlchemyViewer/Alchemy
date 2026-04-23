@@ -29,8 +29,6 @@
 #include "llrand.h"
 #include "lluuid.h"
 
-#include <random>
-
 /**
  * Through analysis, we have decided that we want to take values which
  * are close enough to 1.0 to map back to 0.0.  We came to this
@@ -60,77 +58,114 @@
  * to restore uniform distribution.
  */
 
-static thread_local std::unique_ptr<std::ranlux48> __generator;
-inline std::ranlux48* _generator()
-{
-    if (!__generator.get())
+// pRandomGenerator is a stateful static object, which is therefore not
+// inherently thread-safe.
+//We use a pointer to not construct a huge object in the TLS space, sadly this is necessary
+// due to libcef.so on Linux being compiled with TLS model initial-exec (resulting in
+// FLAG STATIC_TLS, see readelf libcef.so). CEFs own TLS objects + LLRandLagFib2281 then will exhaust the
+// available TLS space, causing media failure.
+
+static thread_local std::unique_ptr< LLRandLagFib2281 > pRandomGenerator = nullptr;
+
+namespace {
+    F64 ll_internal_get_rand()
     {
-        std::random_device seeder;
-        __generator = std::make_unique<std::ranlux48>(seeder());
+        if( !pRandomGenerator )
+        {
+            std::random_device rd;
+            pRandomGenerator.reset(new LLRandLagFib2281(rd()));
+        }
+
+        return(*pRandomGenerator)();
     }
-    return __generator.get();
 }
 
-S32 ll_rand()
-{
-    return ll_rand(S32_MAX);
-}
+// no default implementation, only specific F64 and F32 specializations
+template <typename REAL>
+inline REAL ll_internal_random();
 
-S32 ll_rand(S32 val)
+template <>
+inline F64 ll_internal_random<F64>()
 {
-    if (val == 0) return 0;
-
-    // The clamping rules are described above.
-    S32 rv;
-    if (val > 0)
-    {
-        rv = std::uniform_int_distribution<S32>(0, val)(*_generator());
-    }
-    else
-    {
-        rv = std::uniform_int_distribution<S32>(val, 0)(*_generator());
-    }
-    if (rv == val) return 0;
+    // *HACK: Through experimentation, we have found that dual core
+    // CPUs (or at least multi-threaded processes) seem to
+    // occasionally give an obviously incorrect random number -- like
+    // 5^15 or something. Sooooo, clamp it as described above.
+    F64 rv{ ll_internal_get_rand() };
+    if(!((rv >= 0.0) && (rv < 1.0))) return fmod(rv, 1.0);
     return rv;
 }
 
-F32 ll_frand()
+template <>
+inline F32 ll_internal_random<F32>()
 {
-    // see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63176
-    // and https://llvm.org/bugs/show_bug.cgi?id=18767
-    // and https://github.com/microsoft/STL/issues/1074
-    return (F32)std::generate_canonical<F64, 10>((*_generator()));
+    // *HACK: clamp the result as described above.
+    // Per Monty, it's important to clamp using the correct fmodf() rather
+    // than expanding to F64 for fmod() and then truncating back to F32. Prior
+    // to this change, we were getting sporadic ll_frand() == 1.0 results.
+    F32 rv{ narrow<F64>(ll_internal_get_rand()) };
+    if(!((rv >= 0.0f) && (rv < 1.0f))) return fmodf(rv, 1.0f);
+    return rv;
 }
 
-F32 ll_frand(F32 val)
+/*------------------------------ F64 aliases -------------------------------*/
+inline F64 ll_internal_random_double()
 {
-    F32 rv = ll_frand() * val;
-    if (val > 0.0f)
-    {
-        if (rv >= val) return 0.0f;
-    }
-    else
-    {
-        if (rv <= val) return 0.0f;
-    }
-    return rv;
+    return ll_internal_random<F64>();
 }
 
 F64 ll_drand()
 {
-    return std::generate_canonical<F64, 10>((*_generator()));
+    return ll_internal_random_double();
+}
+
+/*------------------------------ F32 aliases -------------------------------*/
+inline F32 ll_internal_random_float()
+{
+    return ll_internal_random<F32>();
+}
+
+F32 ll_frand()
+{
+    return ll_internal_random_float();
+}
+
+/*-------------------------- clamped random range --------------------------*/
+S32 ll_rand()
+{
+    return ll_rand(RAND_MAX);
+}
+
+S32 ll_rand(S32 val)
+{
+    // The clamping rules are described above.
+    S32 rv = (S32)(ll_internal_random_double() * val);
+    if(rv == val) return 0;
+    return rv;
+}
+
+template <typename REAL>
+REAL ll_grand(REAL val)
+{
+    // The clamping rules are described above.
+    REAL rv = ll_internal_random<REAL>() * val;
+    if(val > 0)
+    {
+        if(rv >= val) return REAL();
+    }
+    else
+    {
+        if(rv <= val) return REAL();
+    }
+    return rv;
+}
+
+F32 ll_frand(F32 val)
+{
+    return ll_grand<F32>(val);
 }
 
 F64 ll_drand(F64 val)
 {
-    F64 rv = ll_drand() * val;
-    if (val > 0.0)
-    {
-        if (rv >= val) return 0.0;
-    }
-    else
-    {
-        if(rv <= val) return 0.0;
-    }
-    return rv;
+    return ll_grand<F64>(val);
 }

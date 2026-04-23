@@ -297,7 +297,7 @@ bool font_desc_init_from_xml(LLXMLNodePtr node, LLFontDescriptor& desc)
 
             if (child->hasAttribute("load_collection"))
             {
-                BOOL col = FALSE;
+                bool col = false;
                 child->getAttributeBOOL("load_collection", col);
                 if (col)
                 {
@@ -373,15 +373,7 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
             if (child->getAttributeString("name",size_name) &&
                 child->getAttributeF32("size",size_value))
             {
-// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
-                std::string font_name;
-                // The default font size will be stored under an empty string; named fonts can specify their own custom sizes
-                if ( (!child->hasAttribute("font")) || (child->getAttributeString("font", font_name)) )
-                {
-                    registry->mFontSizes[std::pair<std::string, std::string>(font_name, size_name)] = size_value;
-                }
-// [/SL:KB]
-//              registry->mFontSizes[size_name] = size_value;
+                registry->mFontSizes[size_name] = size_value;
             }
 
         }
@@ -389,26 +381,14 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
     return true;
 }
 
-//bool LLFontRegistry::nameToSize(const std::string& size_name, F32& size)
-// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
-bool LLFontRegistry::nameToSize(const std::string& font_name, const std::string& size_name, F32& size)
-// [/SL:KB]
+bool LLFontRegistry::nameToSize(const std::string& size_name, F32& size)
 {
-//  font_size_map_t::iterator it = mFontSizes.find(size_name);
-// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
-    font_size_map_t::iterator it = mFontSizes.find(std::pair<std::string, std::string>(font_name, size_name));
-// [/SL:KB]
+    font_size_map_t::iterator it = mFontSizes.find(size_name);
     if (it != mFontSizes.end())
     {
         size = it->second;
         return true;
     }
-// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
-    if (!font_name.empty())
-    {
-        return nameToSize(LLStringUtil::null, size_name, size);
-    }
-// [/SL:KB]
     return false;
 }
 
@@ -423,10 +403,7 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     // First decipher the requested size.
     LLFontDescriptor norm_desc = desc.normalize();
     F32 point_size;
-//  bool found_size = nameToSize(norm_desc.getSize(),point_size);
-// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
-    bool found_size = nameToSize(norm_desc.getName(), norm_desc.getSize(), point_size);
-// [/SL:KB]
+    bool found_size = nameToSize(norm_desc.getSize(),point_size);
     if (!found_size)
     {
         LL_WARNS() << "createFont unrecognized size " << norm_desc.getSize() << LL_ENDL;
@@ -498,7 +475,7 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
 
     // The first font will get pulled will be the "head" font, set to non-fallback.
     // Rest will consitute the fallback list.
-    BOOL is_first_found = TRUE;
+    bool is_first_found = true;
 
     string_vec_t font_search_paths;
     font_search_paths.push_back(LLFontGL::getFontPathLocal());
@@ -522,8 +499,8 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
 
         // *HACK: Fallback fonts don't render, so we can use that to suppress
         // creation of OpenGL textures for test apps. JC
-        BOOL is_fallback = !is_first_found || !mCreateGLTextures;
-        F32 extra_scale = (is_fallback)?fallback_scale:1.0;
+        bool is_fallback = !is_first_found || !mCreateGLTextures;
+        F32 extra_scale = (is_fallback) ? fallback_scale : 1.0f;
         F32 point_size_scale = extra_scale * point_size;
         bool is_font_loaded = false;
         for(string_vec_t::iterator font_search_path_it = font_search_paths.begin();
@@ -747,10 +724,7 @@ void LLFontRegistry::dump()
          size_it != mFontSizes.end();
          ++size_it)
     {
-// [SL:KB] - Patch: UI-Font | Checked: 2012-10-08 (Catznip-3.3)
-        LL_INFOS() << "Size: <" << size_it->first.first << "," << size_it->first.second << "> => " << size_it->second << LL_ENDL;
-// [/SL:KB]
-//      LL_INFOS() << "Size: " << size_it->first << " => " << size_it->second << LL_ENDL;
+        LL_INFOS() << "Size: " << size_it->first << " => " << size_it->second << LL_ENDL;
     }
     for (font_reg_map_t::iterator font_it = mFontMap.begin();
          font_it != mFontMap.end();

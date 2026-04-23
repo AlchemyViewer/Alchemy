@@ -33,9 +33,6 @@
 #include <vector>
 #include <boost/signals2.hpp>
 
-#include "boost/unordered/unordered_flat_map.hpp"
-#include "boost/unordered/unordered_flat_set.hpp"
-
 #include "llsd.h"
 #include "llsdutil.h"
 #include "v2math.h"
@@ -52,8 +49,7 @@
 #define SETTINGS_OVERRIDE override
 
 class LLSettingsBase :
-    public PTR_NAMESPACE::enable_shared_from_this<LLSettingsBase>,
-    private boost::noncopyable
+    public PTR_NAMESPACE::enable_shared_from_this<LLSettingsBase>
 {
     friend class LLEnvironment;
     friend class LLSettingsDay;
@@ -95,11 +91,15 @@ public:
     };
     // Contains settings' names (map key), related shader id-key and default
     // value for revert in case we need to reset shader (no need to search each time)
-    typedef boost::unordered_flat_map<std::string, DefaultParam, al::string_hash, std::equal_to<>>  parammapping_t;
+    typedef std::map<std::string, DefaultParam>  parammapping_t;
 
     typedef PTR_NAMESPACE::shared_ptr<LLSettingsBase> ptr_t;
 
     virtual ~LLSettingsBase() = default;
+
+    // Non-copyable
+    LLSettingsBase(const LLSettingsBase&) = delete;
+    LLSettingsBase& operator=(const LLSettingsBase&) = delete;
 
     //---------------------------------------------------------------------
     virtual std::string getSettingsType() const = 0;
@@ -112,72 +112,59 @@ public:
     virtual bool isDirty() const { return mDirty; }
     virtual bool isVeryDirty() const { return mReplaced; }
     inline void setDirtyFlag(bool dirty) { mDirty = dirty; clearAssetId(); }
+    inline void setReplaced() { mReplaced = true; }
 
-    size_t getHash() const; // Hash will not include Name, ID or a previously stored Hash
+    size_t getHash(); // Hash will not include Name, ID or a previously stored Hash
 
     inline LLUUID getId() const
     {
-        return getValue(SETTING_ID).asUUID();
+        return mSettingId;
     }
 
     inline std::string getName() const
     {
-        return getValue(SETTING_NAME).asString();
+        return mSettingName;
     }
 
     inline void setName(std::string val)
     {
-        setValue(SETTING_NAME, val);
+        mSettingName = val;
+        setDirtyFlag(true);
+        setLLSDDirty();
     }
 
     inline LLUUID getAssetId() const
     {
-        if (mSettings.has(SETTING_ASSETID))
-            return mSettings[SETTING_ASSETID].asUUID();
-        return LLUUID();
+        return mAssetId;
     }
 
     inline U32 getFlags() const
     {
-        if (mSettings.has(SETTING_FLAGS))
-            return static_cast<U32>(mSettings[SETTING_FLAGS].asInteger());
-        return 0;
+        return mSettingFlags;
     }
 
     inline void setFlags(U32 value)
     {
-        setLLSD(SETTING_FLAGS, LLSD::Integer(value));
+        mSettingFlags = value;
+        setDirtyFlag(true);
+        setLLSDDirty();
     }
 
     inline bool getFlag(U32 flag) const
     {
-        if (mSettings.has(SETTING_FLAGS))
-            return ((U32)mSettings[SETTING_FLAGS].asInteger() & flag) == flag;
-        return false;
+        return (mSettingFlags & flag) == flag;
     }
 
     inline void setFlag(U32 flag)
     {
-        U32 flags((mSettings.has(SETTING_FLAGS)) ? (U32)mSettings[SETTING_FLAGS].asInteger() : 0);
-
-        flags |= flag;
-
-        if (flags)
-            mSettings[SETTING_FLAGS] = LLSD::Integer(flags);
-        else
-            mSettings.erase(SETTING_FLAGS);
+        mSettingFlags |= flag;
+        setLLSDDirty();
     }
 
     inline void clearFlag(U32 flag)
     {
-        U32 flags((mSettings.has(SETTING_FLAGS)) ? (U32)mSettings[SETTING_FLAGS].asInteger() : 0);
-
-        flags &= ~flag;
-
-        if (flags)
-            mSettings[SETTING_FLAGS] = LLSD::Integer(flags);
-        else
-            mSettings.erase(SETTING_FLAGS);
+        mSettingFlags &= ~flag;
+        setLLSDDirty();
     }
 
     virtual void replaceSettings(LLSD settings)
@@ -186,14 +173,41 @@ public:
         setDirtyFlag(true);
         mReplaced = true;
         mSettings = settings;
+        loadValuesFromLLSD();
     }
 
-    virtual LLSD getSettings() const;
+    virtual void replaceSettings(const ptr_t& other)
+    {
+        mBlendedFactor = 0.0;
+        setDirtyFlag(true);
+        mReplaced = true;
+        mSettingFlags = other->getFlags();
+        mSettingName = other->getName();
+        mSettingId = other->getId();
+        mAssetId = other->getAssetId();
+        setLLSDDirty();
+    }
+
+    void setSettings(LLSD settings)
+    {
+        setDirtyFlag(true);
+        mSettings = settings;
+        loadValuesFromLLSD();
+    }
+
+    // if you are using getSettings to edit them, call setSettings(settings),
+    // replaceSettings(settings) or loadValuesFromLLSD() afterwards
+    virtual LLSD& getSettings();
+    virtual void setLLSDDirty()
+    {
+        mLLSDDirty = true;
+    }
 
     //---------------------------------------------------------------------
     //
     inline void setLLSD(const std::string &name, const LLSD &value)
     {
+        saveValuesIfNeeded();
         mSettings[name] = value;
         mDirty = true;
         if (name != SETTING_ASSETID)
@@ -205,8 +219,9 @@ public:
         setLLSD(name, value);
     }
 
-    inline LLSD getValue(const std::string &name, const LLSD &deflt = LLSD()) const
+    inline LLSD getValue(const std::string &name, const LLSD &deflt = LLSD())
     {
+        saveValuesIfNeeded();
         if (!mSettings.has(name))
             return deflt;
         return mSettings[name];
@@ -262,18 +277,18 @@ public:
         (const_cast<LLSettingsBase *>(this))->updateSettings();
     }
 
-    virtual void    blend(const ptr_t &end, BlendFactor blendf) = 0;
+    virtual void    blend(ptr_t &end, BlendFactor blendf) = 0;
 
     virtual bool    validate();
 
-    virtual ptr_t   buildDerivedClone() const = 0;
+    virtual ptr_t   buildDerivedClone() = 0;
 
     class Validator
     {
     public:
         static const U32 VALIDATION_PARTIAL;
 
-        typedef boost::function<bool(LLSD &, U32)> verify_pr;
+        typedef std::function<bool(LLSD &, U32)> verify_pr;
 
         Validator(std::string name, bool required, LLSD::Type type, verify_pr verify = verify_pr(), LLSD defval = LLSD())  :
             mName(name),
@@ -287,7 +302,7 @@ public:
         bool        isRequired() const { return mRequired; }
         LLSD::Type  getType() const { return mType; }
 
-        bool        verify(LLSD &data, U32 flags) const;
+        bool        verify(LLSD &data, U32 flags);
 
         // Some basic verifications
         static bool verifyColor(LLSD &value, U32 flags);
@@ -309,30 +324,34 @@ public:
     };
     typedef std::vector<Validator> validation_list_t;
 
-    static LLSD settingValidation(LLSD &settings, const validation_list_t &validations, bool partial = false);
+    static LLSD settingValidation(LLSD &settings, validation_list_t &validations, bool partial = false);
 
     inline void setAssetId(LLUUID value)
     {   // note that this skips setLLSD
-        mSettings[SETTING_ASSETID] = value;
+        mAssetId = value;
+        mLLSDDirty = true;
     }
 
     inline void clearAssetId()
     {
-        if (mSettings.has(SETTING_ASSETID))
-            mSettings.erase(SETTING_ASSETID);
+        mAssetId.setNull();
+        mLLSDDirty = true;
     }
 
     // Calculate any custom settings that may need to be cached.
     virtual void updateSettings() { mDirty = false; mReplaced = false; }
+    LLSD         cloneSettings();
+
+    static void lerpVector2(LLVector2& a, const LLVector2& b, F32 mix);
+    static void lerpVector3(LLVector3& a, const LLVector3& b, F32 mix);
+    static void lerpColor(LLColor3& a, const LLColor3& b, F32 mix);
+
 protected:
 
     LLSettingsBase();
     LLSettingsBase(const LLSD setting);
 
-    typedef boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>>   stringset_t;
-
-    // combining settings objects. Customize for specific setting types
-    virtual void lerpSettings(const LLSettingsBase &other, BlendFactor mix);
+    typedef std::set<std::string>   stringset_t;
 
     // combining settings maps where it can based on mix rate
     // @settings initial value (mix==0)
@@ -340,8 +359,8 @@ protected:
     // @defaults list of default values for legacy fields and (re)setting shaders
     // @mix from 0 to 1, ratio or rate of transition from initial 'settings' to 'other'
     // return interpolated and combined LLSD map
-    LLSD    interpolateSDMap(const LLSD &settings, const LLSD &other, const parammapping_t& defaults, BlendFactor mix) const;
-    LLSD    interpolateSDValue(const std::string& name, const LLSD &value, const LLSD &other, const parammapping_t& defaults, BlendFactor mix, const stringset_t& slerps) const;
+    static LLSD interpolateSDMap(const LLSD &settings, const LLSD &other, const parammapping_t& defaults, BlendFactor mix, const stringset_t& skip, const stringset_t& slerps);
+    static LLSD interpolateSDValue(const std::string& name, const LLSD &value, const LLSD &other, const parammapping_t& defaults, BlendFactor mix, const stringset_t& skip, const stringset_t& slerps);
 
     /// when lerping between settings, some may require special handling.
     /// Get a list of these key to be skipped by the default settings lerp.
@@ -352,34 +371,42 @@ protected:
     // rather than lerped.
     virtual const stringset_t& getSlerpKeys() const;
 
-    virtual const validation_list_t& getValidationList() const = 0;
+    virtual validation_list_t getValidationList() const = 0;
 
-    // Apply any settings that need special handling.
-    virtual void applySpecial(void *, bool force = false) { };
+    // Apply settings.
+    virtual void applyToUniforms(void *) { };
+    virtual void applySpecial(void*, bool force = false) { };
 
     virtual const parammapping_t& getParameterMap() const;
-
-    LLSD        mSettings;
-
-    LLSD        cloneSettings() const;
 
     inline void setBlendFactor(BlendFactor blendfactor)
     {
         mBlendedFactor = blendfactor;
     }
 
-    void replaceWith(LLSettingsBase::ptr_t other)
+    virtual void replaceWith(const LLSettingsBase::ptr_t other)
     {
-        replaceSettings(other->cloneSettings());
+        replaceSettings(other);
         setBlendFactor(other->getBlendFactor());
     }
 
+    virtual void loadValuesFromLLSD();
+    virtual void saveValuesToLLSD();
+    void saveValuesIfNeeded();
+
+    LLUUID mAssetId;
+    LLUUID mSettingId;
+    std::string mSettingName;
+    U32 mSettingFlags;
+
 private:
-    bool        mDirty;
+    bool        mLLSDDirty;
+    bool        mDirty; // gates updateSettings
     bool        mReplaced; // super dirty!
 
-    LLSD        combineSDMaps(const LLSD &first, const LLSD &other) const;
+    static LLSD combineSDMaps(const LLSD &first, const LLSD &other);
 
+    LLSD        mSettings;
     BlendFactor mBlendedFactor;
 };
 
@@ -476,7 +503,7 @@ public:
     LLSettingsBlenderTimeDelta(const LLSettingsBase::ptr_t &target,
         const LLSettingsBase::ptr_t &initsetting, const LLSettingsBase::ptr_t &endsetting, const LLSettingsBase::Seconds& blend_span) :
         LLSettingsBlender(target, initsetting, endsetting),
-        mBlendSpan(blend_span),
+        mBlendSpan((F32)blend_span.value()),
         mLastUpdate(0.0f),
         mTimeSpent(0.0f),
         mBlendFMinDelta(MIN_BLEND_DELTA),
@@ -486,7 +513,9 @@ public:
         mLastUpdate = mTimeStart;
     }
 
-    virtual ~LLSettingsBlenderTimeDelta() = default;
+    virtual ~LLSettingsBlenderTimeDelta()
+    {
+    }
 
     virtual void reset(LLSettingsBase::ptr_t &initsetting, const LLSettingsBase::ptr_t &endsetting, const LLSettingsBase::TrackPosition& blend_span) SETTINGS_OVERRIDE
     {

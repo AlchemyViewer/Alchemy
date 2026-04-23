@@ -283,7 +283,7 @@ void LLKeyConflictHandler::loadFromSettings(const LLViewerInput::KeyMode& keymod
         {
             LLKeyboard::keyFromString(it->key, &key);
         }
-        LLKeyboard::maskFromString(it->mask.getValue(), &mask);
+        LLKeyboard::maskFromString(it->mask, &mask);
         // Note: it->command is also the name of UI element, howhever xml we are loading from
         // might not know all the commands, so UI will have to know what to fill by its own
         // Assumes U32_MAX conflict mask, and is assignable by default,
@@ -476,8 +476,8 @@ void LLKeyConflictHandler::saveToSettings(bool temporary)
                 // so make sure to cleanup.
                 // Also this helps in keeping file small.
                 iter->second.mKeyBind.trimEmpty();
-                U32 size = iter->second.mKeyBind.getDataCount();
-                for (U32 i = 0; i < size; ++i)
+                auto size = iter->second.mKeyBind.getDataCount();
+                for (size_t i = 0; i < size; ++i)
                 {
                     if (iter->first.empty())
                     {
@@ -491,7 +491,7 @@ void LLKeyConflictHandler::saveToSettings(bool temporary)
                         continue;
                     }
 
-                    LLKeyData data = key.mKeyBind.getKeyData(i);
+                    LLKeyData data = key.mKeyBind.getKeyData(static_cast<U32>(i));
                     // Still write empty LLKeyData to make sure we will maintain UI position
                     if (data.mKey == KEY_NONE)
                     {
@@ -575,7 +575,7 @@ void LLKeyConflictHandler::saveToSettings(bool temporary)
             // Write the resulting XML to file
             if (!output_node->isNull())
             {
-                LLFILE *fp = LLFile::fopen(filename, "w");
+                LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("w"));
                 if (fp != NULL)
                 {
                     LLXMLNode::writeHeaderToFile(fp);

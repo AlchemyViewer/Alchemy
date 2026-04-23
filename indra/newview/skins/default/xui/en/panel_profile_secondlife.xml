@@ -80,11 +80,9 @@ Account: [ACCTTYPE]
       <profile_image
        name="2nd_life_pic"
        image_name="Generic_Person_Large"
-       show_loading="false"
        layout="topleft"
        follows="all"
        interactable="true"
-	   for_profile="true"
        top="0"
        left="2"
        bottom="-1"
@@ -198,7 +196,7 @@ Account: [ACCTTYPE]
      visible="false">
       <icon
        name="badge_icon"
-       image_name="Beta_Tester"
+       image_name="Profile_Badge_Beta"
        layout="topleft"
        follows="left|top"
        top="10"
@@ -584,7 +582,7 @@ Account: [ACCTTYPE]
        max_length="65000"
        parse_urls="true"
        word_wrap="true"
-	   show_emoji_helper="true"
+       show_emoji_helper="true"
         />
     </layout_panel>
     <layout_panel

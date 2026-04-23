@@ -47,7 +47,6 @@
 #include "llviewercamera.h"
 #include "llviewerjoint.h"
 #include "llviewerobject.h"
-#include "llviewerregion.h" // getRegion()
 #include "llviewerwindow.h"
 #include "llvoavatar.h"
 #include "llworld.h"        // for LLWorld::getInstance()
@@ -100,7 +99,7 @@ void LLManip::rebuild(LLViewerObject* vobj)
 LLManip::LLManip( const std::string& name, LLToolComposite* composite )
     :
     LLTool( name, composite ),
-    mInSnapRegime(FALSE),
+    mInSnapRegime(false),
     mHighlightedPart(LL_NO_PART),
     mManipPart(LL_NO_PART)
 {
@@ -148,7 +147,7 @@ void LLManip::getManipNormal(LLViewerObject* object, EManipPart manip, LLVector3
 }
 
 
-BOOL LLManip::getManipAxis(LLViewerObject* object, EManipPart manip, LLVector3 &axis)
+bool LLManip::getManipAxis(LLViewerObject* object, EManipPart manip, LLVector3 &axis)
 {
     LLVector3 grid_origin;
     LLVector3 grid_scale;
@@ -170,11 +169,11 @@ BOOL LLManip::getManipAxis(LLViewerObject* object, EManipPart manip, LLVector3 &
     }
     else
     {
-        return FALSE;
+        return false;
     }
 
     axis.rotVec( grid_rotation );
-    return TRUE;
+    return true;
 }
 
 F32 LLManip::getSubdivisionLevel(const LLVector3 &reference_point, const LLVector3 &translate_axis, F32 grid_scale, S32 min_pixel_spacing, F32 min_subdivisions, F32 max_subdivisions)
@@ -216,7 +215,7 @@ LLObjectSelectionHandle LLManip::getSelection()
     return mObjectSelection;
 }
 
-BOOL LLManip::handleHover(S32 x, S32 y, MASK mask)
+bool LLManip::handleHover(S32 x, S32 y, MASK mask)
 {
     // We only handle the event if mousedown started with us
     if( hasMouseCapture() )
@@ -225,31 +224,27 @@ BOOL LLManip::handleHover(S32 x, S32 y, MASK mask)
         {
             // Somehow the object got deselected while we were dragging it.
             // Release the mouse
-            setMouseCapture( FALSE );
+            setMouseCapture( false );
         }
 
-#ifdef SHOW_DEBUG
         LL_DEBUGS("UserInput") << "hover handled by LLManip (active)" << LL_ENDL;
-#endif
     }
     else
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("UserInput") << "hover handled by LLManip (inactive)" << LL_ENDL;
-#endif
     }
     gViewerWindow->setCursor(UI_CURSOR_ARROW);
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLManip::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLManip::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-    BOOL    handled = FALSE;
+    bool    handled = false;
     if( hasMouseCapture() )
     {
-        handled = TRUE;
-        setMouseCapture( FALSE );
+        handled = true;
+        setMouseCapture( false );
     }
     return handled;
 }
@@ -259,20 +254,20 @@ void LLManip::updateGridSettings()
     sGridMaxSubdivisionLevel = gSavedSettings.getBOOL("GridSubUnit") ? (F32)gSavedSettings.getS32("GridSubdivision") : 1.f;
 }
 
-BOOL LLManip::getMousePointOnPlaneAgent(LLVector3& point, S32 x, S32 y, LLVector3 origin, LLVector3 normal)
+bool LLManip::getMousePointOnPlaneAgent(LLVector3& point, S32 x, S32 y, LLVector3 origin, LLVector3 normal)
 {
     LLVector3d origin_double = gAgent.getPosGlobalFromAgent(origin);
     LLVector3d global_point;
-    BOOL result = getMousePointOnPlaneGlobal(global_point, x, y, origin_double, normal);
+    bool result = getMousePointOnPlaneGlobal(global_point, x, y, origin_double, normal);
     point = gAgent.getPosAgentFromGlobal(global_point);
     return result;
 }
 
-BOOL LLManip::getMousePointOnPlaneGlobal(LLVector3d& point, S32 x, S32 y, LLVector3d origin, LLVector3 normal) const
+bool LLManip::getMousePointOnPlaneGlobal(LLVector3d& point, S32 x, S32 y, LLVector3d origin, LLVector3 normal) const
 {
     if (mObjectSelection->getSelectType() == SELECT_TYPE_HUD)
     {
-        BOOL result = FALSE;
+        bool result = false;
         F32 mouse_x = ((F32)x / gViewerWindow->getWorldViewWidthScaled() - 0.5f) * LLViewerCamera::getInstance()->getAspect() / gAgentCamera.mHUDCurZoom;
         F32 mouse_y = ((F32)y / gViewerWindow->getWorldViewHeightScaled() - 0.5f) / gAgentCamera.mHUDCurZoom;
 
@@ -287,7 +282,7 @@ BOOL LLManip::getMousePointOnPlaneGlobal(LLVector3d& point, S32 x, S32 y, LLVect
         {
             mouse_pos.mV[VX] = (normal * (origin_agent - mouse_pos))
                                 / (normal.mV[VX]);
-            result = TRUE;
+            result = true;
         }
 
         point = gAgent.getPosGlobalFromAgent(mouse_pos);
@@ -299,13 +294,13 @@ BOOL LLManip::getMousePointOnPlaneGlobal(LLVector3d& point, S32 x, S32 y, LLVect
                                         point, x, y, origin, normal );
     }
 
-    //return FALSE;
+    //return false;
 }
 
 // Given the line defined by mouse cursor (a1 + a_param*(a2-a1)) and the line defined by b1 + b_param*(b2-b1),
 // returns a_param and b_param for the points where lines are closest to each other.
 // Returns false if the two lines are parallel.
-BOOL LLManip::nearestPointOnLineFromMouse( S32 x, S32 y, const LLVector3& b1, const LLVector3& b2, F32 &a_param, F32 &b_param )
+bool LLManip::nearestPointOnLineFromMouse( S32 x, S32 y, const LLVector3& b1, const LLVector3& b2, F32 &a_param, F32 &b_param )
 {
     LLVector3 a1;
     LLVector3 a2;
@@ -323,7 +318,7 @@ BOOL LLManip::nearestPointOnLineFromMouse( S32 x, S32 y, const LLVector3& b1, co
         a2 = gAgentCamera.getCameraPositionAgent() + LLVector3(gViewerWindow->mouseDirectionGlobal(x, y));
     }
 
-    BOOL parallel = TRUE;
+    bool parallel = true;
     LLVector3 a = a2 - a1;
     LLVector3 b = b2 - b1;
 
@@ -337,7 +332,7 @@ BOOL LLManip::nearestPointOnLineFromMouse( S32 x, S32 y, const LLVector3& b1, co
     if( (denom < -F_APPROXIMATELY_ZERO) || (F_APPROXIMATELY_ZERO < denom) )
     {
         a_param = (dist - normal * a1) / denom;
-        parallel = FALSE;
+        parallel = false;
     }
 
     normal = (a % b) % a;   // normal to plane (P) through a and (shortest line between a and b)
@@ -347,7 +342,7 @@ BOOL LLManip::nearestPointOnLineFromMouse( S32 x, S32 y, const LLVector3& b1, co
     if( (denom < -F_APPROXIMATELY_ZERO) || (F_APPROXIMATELY_ZERO < denom) )
     {
         b_param = (dist - normal * b1) / denom;
-        parallel = FALSE;
+        parallel = false;
     }
 
     return parallel;
@@ -361,7 +356,7 @@ LLVector3 LLManip::getSavedPivotPoint() const
 LLVector3 LLManip::getPivotPoint()
 {
     static LLCachedControl<bool> editRootAxis(gSavedSettings, "AlchemyEditRootAxis", false);
-    LLViewerObject* object = mObjectSelection->getFirstRootObject(TRUE);
+    LLViewerObject* object = mObjectSelection->getFirstRootObject(true);
     if (object && (mObjectSelection->getObjectCount() == 1 || editRootAxis) && mObjectSelection->getSelectType() != SELECT_TYPE_HUD)
     {
         LLSelectNode* select_node = mObjectSelection->getFirstNode();
@@ -369,20 +364,20 @@ LLVector3 LLManip::getPivotPoint()
         {
             return object->getGLTFNodePositionAgent(select_node->mSelectedGLTFNode);
         }
-        return object->getPivotPositionAgent();
+        return mObjectSelection->getFirstObject()->getPivotPositionAgent();
     }
     return LLSelectMgr::getInstance()->getBBoxOfSelection().getCenterAgent();
 }
 
 
-void LLManip::renderGuidelines(BOOL draw_x, BOOL draw_y, BOOL draw_z)
+void LLManip::renderGuidelines(bool draw_x, bool draw_y, bool draw_z)
 {
     LLVector3 grid_origin;
     LLQuaternion grid_rot;
     LLVector3 grid_scale;
     LLSelectMgr::getInstance()->getGrid(grid_origin, grid_rot, grid_scale);
 
-    const BOOL children_ok = TRUE;
+    const bool children_ok = true;
     LLViewerObject* object = mObjectSelection->getFirstRootObject(children_ok);
     if (!object)
     {
@@ -401,7 +396,7 @@ void LLManip::renderGuidelines(BOOL draw_x, BOOL draw_y, BOOL draw_z)
         grid_rot.getAngleAxis(&angle_radians, &x, &y, &z);
         gGL.rotatef(angle_radians * RAD_TO_DEG, x, y, z);
 
-        F32 region_size = object->getRegion()->getWidth();
+        F32 region_size = LLWorld::getInstance()->getRegionWidthInMeters();
 
         const F32 LINE_ALPHA = 0.33f;
 
@@ -456,10 +451,10 @@ void LLManip::renderXYZ(const LLVector3 &vec)
         gGL.color4f(0.f, 0.f, 0.f, 0.7f);
 
         imagep->draw(
-            (window_center_x - 115) * display_scale.mV[VX],
-            (window_center_y + vertical_offset - PAD) * display_scale.mV[VY],
-            235 * display_scale.mV[VX],
-            (PAD * 2 + 10) * display_scale.mV[VY],
+            (S32)((window_center_x - 115) * display_scale.mV[VX]),
+            (S32)((window_center_y + vertical_offset - PAD) * display_scale.mV[VY]),
+            (S32)(235 * display_scale.mV[VX]),
+            (S32)((PAD * 2 + 10) * display_scale.mV[VY]),
             LLColor4(0.f, 0.f, 0.f, 0.7f) );
 
         LLFontGL* font = LLFontGL::getFontSansSerif();
@@ -469,33 +464,33 @@ void LLManip::renderXYZ(const LLVector3 &vec)
         // render drop shadowed text (manually because of bigger 'distance')
         F32 right_x;
         feedback_string = llformat("X: %.3f", vec.mV[VX]);
-        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x - 102.f + 1.f, window_center_y + vertical_offset - 2.f, LLColor4::black,
+        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x - 102.f + 1.f, (F32)(window_center_y + vertical_offset) - 2.f, LLColor4::black,
             LLFontGL::LEFT, LLFontGL::BASELINE,
             LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, 1000, &right_x);
 
         feedback_string = llformat("Y: %.3f", vec.mV[VY]);
-        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x - 27.f + 1.f, window_center_y + vertical_offset - 2.f, LLColor4::black,
+        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x - 27.f + 1.f, (F32)(window_center_y + vertical_offset) - 2.f, LLColor4::black,
             LLFontGL::LEFT, LLFontGL::BASELINE,
             LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, 1000, &right_x);
 
         feedback_string = llformat("Z: %.3f", vec.mV[VZ]);
-        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x + 48.f + 1.f, window_center_y + vertical_offset - 2.f, LLColor4::black,
+        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x + 48.f + 1.f, (F32)(window_center_y + vertical_offset) - 2.f, LLColor4::black,
             LLFontGL::LEFT, LLFontGL::BASELINE,
             LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, 1000, &right_x);
 
         // render text on top
         feedback_string = llformat("X: %.3f", vec.mV[VX]);
-        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x - 102.f, window_center_y + vertical_offset, LLColor4(1.f, 0.5f, 0.5f, 1.f),
+        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x - 102.f, (F32)(window_center_y + vertical_offset), LLColor4(1.f, 0.5f, 0.5f, 1.f),
             LLFontGL::LEFT, LLFontGL::BASELINE,
             LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, 1000, &right_x);
 
         feedback_string = llformat("Y: %.3f", vec.mV[VY]);
-        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x - 27.f, window_center_y + vertical_offset, LLColor4(0.5f, 1.f, 0.5f, 1.f),
+        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x - 27.f, (F32)(window_center_y + vertical_offset), LLColor4(0.5f, 1.f, 0.5f, 1.f),
             LLFontGL::LEFT, LLFontGL::BASELINE,
             LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, 1000, &right_x);
 
         feedback_string = llformat("Z: %.3f", vec.mV[VZ]);
-        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x + 48.f, window_center_y + vertical_offset, LLColor4(0.5f, 0.5f, 1.f, 1.f),
+        font->render(utf8str_to_wstring(feedback_string), 0, window_center_x + 48.f, (F32)(window_center_y + vertical_offset), LLColor4(0.5f, 0.5f, 1.f, 1.f),
             LLFontGL::LEFT, LLFontGL::BASELINE,
             LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, 1000, &right_x);
     }
@@ -504,11 +499,11 @@ void LLManip::renderXYZ(const LLVector3 &vec)
     gViewerWindow->setup3DRender();
 }
 
-void LLManip::renderTickText(const LLVector3& pos, const LLWString& text, const LLColor4 &color)
+void LLManip::renderTickText(const LLVector3& pos, const std::string& text, const LLColor4 &color)
 {
     const LLFontGL* big_fontp = LLFontGL::getFontSansSerif();
 
-    BOOL hud_selection = mObjectSelection->getSelectType() == SELECT_TYPE_HUD;
+    bool hud_selection = mObjectSelection->getSelectType() == SELECT_TYPE_HUD;
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();
     LLVector3 render_pos = pos;
@@ -525,9 +520,9 @@ void LLManip::renderTickText(const LLVector3& pos, const LLWString& text, const 
     LLColor4 shadow_color = LLColor4::black;
     shadow_color.mV[VALPHA] = color.mV[VALPHA] * 0.5f;
     gViewerWindow->setup3DViewport(1, -1);
-    hud_render_text(text, render_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,  -0.5f * big_fontp->getWidthF32(text.c_str()), 3.f, shadow_color, mObjectSelection->getSelectType() == SELECT_TYPE_HUD);
+    hud_render_utf8text(text, render_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,  -0.5f * big_fontp->getWidthF32(text), 3.f, shadow_color, mObjectSelection->getSelectType() == SELECT_TYPE_HUD);
     gViewerWindow->setup3DViewport();
-    hud_render_text(text, render_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(text.c_str()), 3.f, color, mObjectSelection->getSelectType() == SELECT_TYPE_HUD);
+    hud_render_utf8text(text, render_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(text), 3.f, color, mObjectSelection->getSelectType() == SELECT_TYPE_HUD);
 
     gGL.popMatrix();
 }
@@ -566,7 +561,7 @@ void LLManip::renderTickValue(const LLVector3& pos, F32 value, const std::string
         }
     }
 
-    BOOL hud_selection = mObjectSelection->getSelectType() == SELECT_TYPE_HUD;
+    bool hud_selection = mObjectSelection->getSelectType() == SELECT_TYPE_HUD;
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();
     {
@@ -582,7 +577,7 @@ void LLManip::renderTickValue(const LLVector3& pos, F32 value, const std::string
 
         if (fractional_portion != 0)
         {
-            fraction_string = llformat("%c%02d%s", LLResMgr::getDecimalPoint(), fractional_portion, suffix.c_str());
+            fraction_string = llformat("%c%02d%s", LLResMgr::getInstance()->getDecimalPoint(), fractional_portion, suffix.c_str());
 
             hud_render_utf8text(val_string, render_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::DROP_SHADOW, -1.f * big_fontp->getWidthF32(val_string), 3.f, color, hud_selection);
             hud_render_utf8text(fraction_string, render_pos, *small_fontp, LLFontGL::NORMAL, LLFontGL::DROP_SHADOW, 1.f, 3.f, color, hud_selection);
@@ -602,7 +597,7 @@ LLColor4 LLManip::setupSnapGuideRenderPass(S32 pass)
     static LLUIColor grid_color_shadow = LLUIColorTable::instance().getColor("GridlineShadowColor");
 
     LLColor4 line_color;
-    F32 line_alpha = ALControlCache::GridOpacity;
+    F32 line_alpha = gSavedSettings.getF32("GridOpacity");
 
     switch(pass)
     {

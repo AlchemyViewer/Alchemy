@@ -33,7 +33,8 @@
 #include "stdtypes.h"
 #include "lltimer.h"
 #include "llsdutil.h"
-#include <boost/function.hpp>
+
+#include <functional>
 
 class LLEventTimer;
 class LLDate;
@@ -92,8 +93,8 @@ public:
     /// construct and connect
     LLEventTimeoutBase(LLEventPump& source);
 
-    /// Callable, can be constructed with boost::bind()
-    typedef boost::function<void()> Action;
+    /// Callable, can be constructed with std::bind()
+    typedef std::function<void()> Action;
 
     /**
      * Start countdown timer for the specified number of @a seconds. Forward
@@ -211,7 +212,7 @@ private:
 class LL_COMMON_API LLEventTimeout: public LLEventTimeoutBase
 {
 public:
-    LLEventTimeout() = default;
+    LLEventTimeout();
     LLEventTimeout(LLEventPump& source);
 
     /// using LLEventTimeout as namespace for free functions
@@ -429,7 +430,7 @@ public:
     // path, then stores it to mTarget.
     virtual bool post(const LLSD& event)
     {
-        LL_PROFILE_ZONE_SCOPED
+        LL_PROFILE_ZONE_SCOPED;
 
         // Extract the element specified by 'mPath' from 'event'. To perform a
         // generic type-appropriate store through mTarget, construct an

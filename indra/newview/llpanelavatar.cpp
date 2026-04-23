@@ -30,7 +30,6 @@
 #include "llagent.h"
 #include "llloadingindicator.h"
 #include "lltooldraganddrop.h"
-#include "llviewermenu.h" // is_agent_mappable
 
 //////////////////////////////////////////////////////////////////////////
 // LLProfileDropTarget
@@ -40,12 +39,7 @@ LLProfileDropTarget::LLProfileDropTarget(const LLProfileDropTarget::Params& p)
     mAgentID(p.agent_id)
 {}
 
-void LLProfileDropTarget::doDrop(EDragAndDropType cargo_type, void* cargo_data)
-{
-    LL_INFOS() << "LLProfileDropTarget::doDrop()" << LL_ENDL;
-}
-
-BOOL LLProfileDropTarget::handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
+bool LLProfileDropTarget::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                      EDragAndDropType cargo_type,
                                      void* cargo_data,
                                      EAcceptance* accept,
@@ -56,10 +50,10 @@ BOOL LLProfileDropTarget::handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
         LLToolDragAndDrop::handleGiveDragAndDrop(mAgentID, LLUUID::null, drop,
                                                  cargo_type, cargo_data, accept);
 
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 static LLDefaultChildRegistry::Register<LLProfileDropTarget> r("profile_drop_target");
@@ -132,11 +126,11 @@ static void put_avatar_properties_coro(std::string cap_url, LLUUID agent_id, LLS
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("put_avatar_properties_coro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("put_avatar_properties_coro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpHeaders::ptr_t httpHeaders;
 
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     httpOpts->setFollowRedirects(true);
 
     std::string finalUrl = cap_url + "/" + agent_id.asString();

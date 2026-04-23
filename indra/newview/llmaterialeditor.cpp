@@ -61,21 +61,11 @@
 #include "llviewertexturelist.h"
 #include "llfloaterperms.h"
 
+#include <tiny_gltf.h>
+#include "lltinygltfhelper.h"
+
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
-
-#include <boost/json.hpp>
-
-#ifndef TINYGLTF_USE_BOOSTJSON
-#define TINYGLTF_USE_BOOSTJSON 1
-#endif
-
-#ifndef TINYGLTF_NO_INCLUDE_BOOSTJSON
-#define TINYGLTF_NO_INCLUDE_BOOSTJSON 1
-#endif
-#undef STRICT
-#include "tinygltf/tiny_gltf.h"
-#include "lltinygltfhelper.h"
 
 const std::string MATERIAL_BASE_COLOR_DEFAULT_NAME = "Base Color";
 const std::string MATERIAL_NORMAL_DEFAULT_NAME = "Normal";
@@ -115,17 +105,17 @@ LLFloaterComboOptions::~LLFloaterComboOptions()
 
 }
 
-BOOL LLFloaterComboOptions::postBuild()
+bool LLFloaterComboOptions::postBuild()
 {
-    mConfirmButton = getChild<LLButton>("combo_ok", TRUE);
-    mCancelButton = getChild<LLButton>("combo_cancel", TRUE);
-    mComboOptions = getChild<LLComboBox>("combo_options", TRUE);
-    mComboText = getChild<LLTextBox>("combo_text", TRUE);
+    mConfirmButton = getChild<LLButton>("combo_ok", true);
+    mCancelButton = getChild<LLButton>("combo_cancel", true);
+    mComboOptions = getChild<LLComboBox>("combo_options", true);
+    mComboText = getChild<LLTextBox>("combo_text", true);
 
     mConfirmButton->setCommitCallback([this](LLUICtrl* ctrl, const LLSD& param) {onConfirm(); });
     mCancelButton->setCommitCallback([this](LLUICtrl* ctrl, const LLSD& param) {onCancel(); });
 
-    return TRUE;
+    return true;
 }
 
 LLFloaterComboOptions* LLFloaterComboOptions::showUI(
@@ -148,10 +138,11 @@ LLFloaterComboOptions* LLFloaterComboOptions::showUI(
         {
             combo_picker->mComboOptions->addSimpleElement(*iter);
         }
-        combo_picker->mComboOptions->selectFirstItem();
+        // select 'Bulk Upload All' option
+        combo_picker->mComboOptions->selectNthItem((S32)options.size() - 1);
 
         combo_picker->openFloater(LLSD(title));
-        combo_picker->setFocus(TRUE);
+        combo_picker->setFocus(true);
         combo_picker->center();
     }
     return combo_picker;
@@ -432,7 +423,7 @@ void LLMaterialEditor::setAuxItem(const LLInventoryItem* item)
     }
 }
 
-BOOL LLMaterialEditor::postBuild()
+bool LLMaterialEditor::postBuild()
 {
     // if this is a 'live editor' instance, it is also
     // single instance and uses live overrides
@@ -493,17 +484,17 @@ BOOL LLMaterialEditor::postBuild()
 
     if (mIsOverride)
     {
-        childSetVisible("base_color_upload_fee", FALSE);
-        childSetVisible("metallic_upload_fee", FALSE);
-        childSetVisible("emissive_upload_fee", FALSE);
-        childSetVisible("normal_upload_fee", FALSE);
+        childSetVisible("base_color_upload_fee", false);
+        childSetVisible("metallic_upload_fee", false);
+        childSetVisible("emissive_upload_fee", false);
+        childSetVisible("normal_upload_fee", false);
     }
     else
     {
         refreshUploadCost();
     }
 
-    boost::function<void(LLUICtrl*, void*)> changes_callback = [this](LLUICtrl * ctrl, void* userData)
+    std::function<void(LLUICtrl*, void*)> changes_callback = [this](LLUICtrl * ctrl, void* userData)
     {
         const U32 *flag = (const U32*)userData;
         markChangesUnsaved(*flag);
@@ -626,7 +617,7 @@ void LLMaterialEditor::setBaseColorId(const LLUUID& id)
 {
     mBaseColorTextureCtrl->setValue(id);
     mBaseColorTextureCtrl->setDefaultImageAssetID(id);
-    mBaseColorTextureCtrl->setTentative(FALSE);
+    mBaseColorTextureCtrl->setTentative(false);
 }
 
 void LLMaterialEditor::setBaseColorUploadId(const LLUUID& id)
@@ -659,7 +650,7 @@ void LLMaterialEditor::setBaseColor(const LLColor4& color)
 
 F32 LLMaterialEditor::getTransparency()
 {
-    return childGetValue("transparency").asReal();
+    return (F32)childGetValue("transparency").asReal();
 }
 
 void LLMaterialEditor::setTransparency(F32 transparency)
@@ -679,7 +670,7 @@ void LLMaterialEditor::setAlphaMode(const std::string& alpha_mode)
 
 F32 LLMaterialEditor::getAlphaCutoff()
 {
-    return childGetValue("alpha cutoff").asReal();
+    return (F32)childGetValue("alpha cutoff").asReal();
 }
 
 void LLMaterialEditor::setAlphaCutoff(F32 alpha_cutoff)
@@ -702,7 +693,7 @@ void LLMaterialEditor::setMetallicRoughnessId(const LLUUID& id)
 {
     mMetallicTextureCtrl->setValue(id);
     mMetallicTextureCtrl->setDefaultImageAssetID(id);
-    mMetallicTextureCtrl->setTentative(FALSE);
+    mMetallicTextureCtrl->setTentative(false);
 }
 
 void LLMaterialEditor::setMetallicRoughnessUploadId(const LLUUID& id)
@@ -719,7 +710,7 @@ void LLMaterialEditor::setMetallicRoughnessUploadId(const LLUUID& id)
 
 F32 LLMaterialEditor::getMetalnessFactor()
 {
-    return childGetValue("metalness factor").asReal();
+    return (F32)childGetValue("metalness factor").asReal();
 }
 
 void LLMaterialEditor::setMetalnessFactor(F32 factor)
@@ -729,7 +720,7 @@ void LLMaterialEditor::setMetalnessFactor(F32 factor)
 
 F32 LLMaterialEditor::getRoughnessFactor()
 {
-    return childGetValue("roughness factor").asReal();
+    return (F32)childGetValue("roughness factor").asReal();
 }
 
 void LLMaterialEditor::setRoughnessFactor(F32 factor)
@@ -746,7 +737,7 @@ void LLMaterialEditor::setEmissiveId(const LLUUID& id)
 {
     mEmissiveTextureCtrl->setValue(id);
     mEmissiveTextureCtrl->setDefaultImageAssetID(id);
-    mEmissiveTextureCtrl->setTentative(FALSE);
+    mEmissiveTextureCtrl->setTentative(false);
 }
 
 void LLMaterialEditor::setEmissiveUploadId(const LLUUID& id)
@@ -780,7 +771,7 @@ void LLMaterialEditor::setNormalId(const LLUUID& id)
 {
     mNormalTextureCtrl->setValue(id);
     mNormalTextureCtrl->setDefaultImageAssetID(id);
-    mNormalTextureCtrl->setTentative(FALSE);
+    mNormalTextureCtrl->setTentative(false);
 }
 
 void LLMaterialEditor::setNormalUploadId(const LLUUID& id)
@@ -1274,7 +1265,7 @@ bool LLMaterialEditor::decodeAsset(const std::vector<char>& buffer)
 
                     tinygltf::Model model_in;
 
-                    if (loader.LoadASCIIFromString(&model_in, &error_msg, &warn_msg, data.c_str(), data.length(), ""))
+                    if (loader.LoadASCIIFromString(&model_in, &error_msg, &warn_msg, data.c_str(), static_cast<unsigned int>(data.length()), ""))
                     {
                         // assets are only supposed to have one item
                         // *NOTE: This duplicates some functionality from
@@ -1343,21 +1334,21 @@ const std::string LLMaterialEditor::buildMaterialDescription()
         desc << mNormalName;
     }
 
-    // trim last char if it's a ',' in case there is no normal texture
-    // present and the code above inserts one
-    // (no need to check for string length - always has initial string)
-    std::string::iterator iter = desc.str().end() - 1;
-    if (*iter == ',')
-    {
-        desc.str().erase(iter);
-    }
-
     // sanitize the material description so that it's compatible with the inventory
     // note: split this up because clang doesn't like operating directly on the
     // str() - error: lvalue reference to type 'basic_string<...>' cannot bind to a
     // temporary of type 'basic_string<...>'
     std::string inv_desc = desc.str();
     LLInventoryObject::correctInventoryName(inv_desc);
+
+    // trim last char if it's a ',' in case there is no normal texture
+    // present and the code above inserts one
+    // (no need to check for string length - always has initial string)
+    std::string::iterator iter = inv_desc.end() - 1;
+    if (*iter == ',')
+    {
+        inv_desc.erase(iter);
+    }
 
     return inv_desc;
 }
@@ -1425,7 +1416,7 @@ bool LLMaterialEditor::saveIfNeeded()
         }
 
         std::string res_desc = buildMaterialDescription();
-        createInventoryItem(buffer, mMaterialName, res_desc, local_permissions);
+        createInventoryItem(buffer, mMaterialName, res_desc, local_permissions, mUploadFolder);
 
         // We do not update floater with uploaded asset yet, so just close it.
         closeFloater();
@@ -1595,12 +1586,12 @@ private:
     std::string mNewName;
 };
 
-void LLMaterialEditor::createInventoryItem(const std::string &buffer, const std::string &name, const std::string &desc, const LLPermissions& permissions)
+void LLMaterialEditor::createInventoryItem(const std::string &buffer, const std::string &name, const std::string &desc, const LLPermissions& permissions, const LLUUID& upload_folder)
 {
     // gen a new uuid for this asset
     LLTransactionID tid;
     tid.generate();     // timestamp-based randomization + uniquification
-    LLUUID parent = gInventory.findUserDefinedCategoryUUIDForType(LLFolderType::FT_MATERIAL);
+    LLUUID parent = upload_folder.isNull() ? gInventory.findUserDefinedCategoryUUIDForType(LLFolderType::FT_MATERIAL) : upload_folder;
     const U8 subtype = NO_INV_SUBTYPE;  // TODO maybe use AT_SETTINGS and LLSettingsType::ST_MATERIAL ?
 
     LLPointer<LLObjectsMaterialItemCallback> cb = new LLObjectsMaterialItemCallback(permissions, buffer, name);
@@ -1897,7 +1888,7 @@ static void pack_textures(
     if (normal_img)
     {
         // create a losslessly compressed version of the normal map
-        normal_j2c = LLViewerTextureList::convertToUploadFile(normal_img, LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT, false, true);
+        normal_j2c = LLViewerTextureList::convertToUploadFile(normal_img, 2048, false, true);
         LL_DEBUGS("MaterialEditor") << "Normal: " << normal_j2c->getDataSize() << LL_ENDL;
     }
 
@@ -1914,7 +1905,11 @@ static void pack_textures(
     }
 }
 
-void LLMaterialEditor::uploadMaterialFromModel(const std::string& filename, tinygltf::Model& model_in, S32 index)
+void LLMaterialEditor::uploadMaterialFromModel(
+    const std::string& filename,
+    tinygltf::Model& model_in,
+    S32 index,
+    const LLUUID& dest)
 {
     if (index < 0 || !LLMaterialEditor::capabilitiesAvailable())
     {
@@ -1937,12 +1932,13 @@ void LLMaterialEditor::uploadMaterialFromModel(const std::string& filename, tiny
     // This uses 'filename' to make sure multiple bulk uploads work
     // instead of fighting for a single instance.
     LLMaterialEditor* me = (LLMaterialEditor*)LLFloaterReg::getInstance("material_editor", LLSD().with("filename", filename).with("index", LLSD::Integer(index)));
+    me->mUploadFolder = dest;
     me->loadMaterial(model_in, filename, index, false);
     me->saveIfNeeded();
 }
 
 
-void LLMaterialEditor::loadMaterialFromFile(const std::string& filename, S32 index)
+void LLMaterialEditor::loadMaterialFromFile(const std::string& filename, S32 index, const LLUUID& dest_folder)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
@@ -1969,10 +1965,6 @@ void LLMaterialEditor::loadMaterialFromFile(const std::string& filename, S32 ind
 
     if (!loaded)
     {
-        if (!warn_msg.empty())
-            LL_WARNS("MaterialEditor") << "gltf load warning: " << warn_msg.c_str() << LL_ENDL;
-        if (!error_msg.empty())
-            LL_WARNS("MaterialEditor") << "gltf load error: " << error_msg.c_str() << LL_ENDL;
         LLNotificationsUtil::add("CannotUploadMaterial");
         return;
     }
@@ -1991,21 +1983,23 @@ void LLMaterialEditor::loadMaterialFromFile(const std::string& filename, S32 ind
         return;
     }
 
-    LLMaterialEditor* me = (LLMaterialEditor*)LLFloaterReg::getInstance("material_editor");
-
     if (index >= 0)
     {
         // Prespecified material
+        LLMaterialEditor* me = (LLMaterialEditor*)LLFloaterReg::getInstance("material_editor");
+        me->mUploadFolder = dest_folder;
         me->loadMaterial(model_in, filename, index);
     }
     else if (model_in.materials.size() == 1)
     {
-        // Only one, just load it
+        // Only one material, just load it
+        LLMaterialEditor* me = (LLMaterialEditor*)LLFloaterReg::getInstance("material_editor");
+        me->mUploadFolder = dest_folder;
         me->loadMaterial(model_in, filename, 0);
     }
     else
     {
-        // Promt user to select material
+        // Multiple materials, Promt user to select material
         std::list<std::string> material_list;
         std::vector<tinygltf::Material>::const_iterator mat_iter = model_in.materials.begin();
         std::vector<tinygltf::Material>::const_iterator mat_end = model_in.materials.end();
@@ -2023,15 +2017,20 @@ void LLMaterialEditor::loadMaterialFromFile(const std::string& filename, S32 ind
             }
         }
 
-        material_list.push_back(me->getString("material_batch_import_text"));
+        material_list.push_back(LLTrans::getString("material_batch_import_text"));
 
         LLFloaterComboOptions::showUI(
-            [me, model_in, filename](const std::string& option, S32 index)
+            [model_in, filename, dest_folder](const std::string& option, S32 index)
         {
-            me->loadMaterial(model_in, filename, index);
+            if (index >= 0) // -1 on cancel
+            {
+                LLMaterialEditor* me = (LLMaterialEditor*)LLFloaterReg::getInstance("material_editor");
+                me->mUploadFolder = dest_folder;
+                me->loadMaterial(model_in, filename, index);
+            }
         },
-            me->getString("material_selection_title"),
-            me->getString("material_selection_text"),
+            LLTrans::getString("material_selection_title"),
+            LLTrans::getString("material_selection_text"),
             material_list
             );
     }
@@ -2070,7 +2069,7 @@ void LLMaterialEditor::loadLive()
         }
 
         me->openFloater();
-        me->setFocus(TRUE);
+        me->setFocus(true);
     }
 }
 
@@ -2442,17 +2441,17 @@ void LLMaterialEditor::onSaveObjectsMaterialAsMsgCallback(const LLSD& notificati
         return;
     }
 
-    createInventoryItem(str.str(), new_name, std::string(), permissions);
+    createInventoryItem(str.str(), new_name, std::string(), permissions, LLUUID::null);
 }
 
-const void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter type);
+void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter type, bool allow_2k, const LLUUID& dest);
 
 void LLMaterialEditor::loadMaterial(const tinygltf::Model &model_in, const std::string &filename, S32 index, bool open_floater)
 {
     if (index == model_in.materials.size())
     {
         // bulk upload all the things
-        upload_bulk({ filename }, LLFilePicker::FFLOAD_MATERIAL);
+        upload_bulk({ filename }, LLFilePicker::FFLOAD_MATERIAL, true, mUploadFolder);
         return;
     }
 
@@ -2488,6 +2487,42 @@ void LLMaterialEditor::loadMaterial(const tinygltf::Model &model_in, const std::
         mBaseColorFetched, mNormalFetched, mMetallicRoughnessFetched, mEmissiveFetched);
     pack_textures(base_color_img, normal_img, mr_img, emissive_img, occlusion_img,
         mBaseColorJ2C, mNormalJ2C, mMetallicRoughnessJ2C, mEmissiveJ2C);
+
+    if (open_floater)
+    {
+        bool textures_scaled = false;
+        if (mBaseColorFetched && mBaseColorJ2C
+            && (mBaseColorFetched->getWidth() != mBaseColorJ2C->getWidth()
+                || mBaseColorFetched->getHeight() != mBaseColorJ2C->getHeight()))
+        {
+            textures_scaled = true;
+        }
+        else if (mNormalFetched && mNormalJ2C
+            && (mNormalFetched->getWidth() != mNormalJ2C->getWidth()
+                || mNormalFetched->getHeight() != mNormalJ2C->getHeight()))
+        {
+            textures_scaled = true;
+        }
+        else if (mMetallicRoughnessFetched && mMetallicRoughnessJ2C
+            && (mMetallicRoughnessFetched->getWidth() != mMetallicRoughnessJ2C->getWidth()
+                || mMetallicRoughnessFetched->getHeight() != mMetallicRoughnessJ2C->getHeight()))
+        {
+            textures_scaled = true;
+        }
+        else if (mEmissiveFetched && mEmissiveJ2C
+            && (mEmissiveFetched->getWidth() != mEmissiveJ2C->getWidth()
+                || mEmissiveFetched->getHeight() != mEmissiveJ2C->getHeight()))
+        {
+            textures_scaled = true;
+        }
+
+        if (textures_scaled)
+        {
+            LLSD args;
+            args["MAX_SIZE"] = LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT;
+            LLNotificationsUtil::add("MaterialImagesWereScaled", args);
+        }
+    }
 
     LLUUID base_color_id;
     if (mBaseColorFetched.notNull())
@@ -2564,7 +2599,7 @@ void LLMaterialEditor::loadMaterial(const tinygltf::Model &model_in, const std::
     if (open_floater)
     {
         openFloater(getKey());
-        setFocus(TRUE);
+        setFocus(true);
         setCanSave(true);
         setCanSaveAs(true);
 
@@ -2633,13 +2668,13 @@ bool LLMaterialEditor::setFromGltfModel(const tinygltf::Model& model, S32 index,
         }
 
         setAlphaMode(material_in.alphaMode);
-        setAlphaCutoff(material_in.alphaCutoff);
+        setAlphaCutoff((F32)material_in.alphaCutoff);
 
         setBaseColor(LLTinyGLTFHelper::getColor(material_in.pbrMetallicRoughness.baseColorFactor));
         setEmissiveColor(LLTinyGLTFHelper::getColor(material_in.emissiveFactor));
 
-        setMetalnessFactor(material_in.pbrMetallicRoughness.metallicFactor);
-        setRoughnessFactor(material_in.pbrMetallicRoughness.roughnessFactor);
+        setMetalnessFactor((F32)material_in.pbrMetallicRoughness.metallicFactor);
+        setRoughnessFactor((F32)material_in.pbrMetallicRoughness.roughnessFactor);
 
         setDoubleSided(material_in.doubleSided);
     }
@@ -2689,16 +2724,14 @@ const std::string LLMaterialEditor::getImageNameFromUri(std::string image_uri, c
     }
 
     // uri doesn't include the type at all
-    if (name_includes_type == false)
+    if (!name_includes_type)
     {
         // uri doesn't include the type and the uri is not empty
         // so we can include everything
         if (stripped_uri.length() > 0)
         {
-            // example "DamagedHelmet: base layer"
+            // example "base layer"
             return STRINGIZE(
-                mMaterialNameShort <<
-                ": " <<
                 stripped_uri <<
                 " (" <<
                 texture_type <<
@@ -2707,28 +2740,17 @@ const std::string LLMaterialEditor::getImageNameFromUri(std::string image_uri, c
         }
         else
         // uri doesn't include the type (because the uri is empty)
-        // so we must reorganize the string a bit to include the name
-        // and an explicit name type
+        // include an explicit name type
         {
-            // example "DamagedHelmet: (Emissive)"
-            return STRINGIZE(
-                mMaterialNameShort <<
-                " (" <<
-                texture_type <<
-                ")"
-            );
+            // example "Emissive"
+            return texture_type;
         }
     }
     else
-    // uri includes the type so just use it directly with the
-    // name of the material
+    // uri includes the type so just use it directly
     {
-        return STRINGIZE(
-            // example: AlienBust: normal_layer
-            mMaterialNameShort <<
-            ": " <<
-            stripped_uri
-        );
+        // example: "normal_layer"
+        return stripped_uri;
     }
 }
 
@@ -2859,18 +2881,25 @@ void LLMaterialEditor::setFromGltfMetaData(const std::string& filename, const ti
     }
 }
 
-void LLMaterialEditor::importMaterial()
+void LLMaterialEditor::importMaterial(const LLUUID dest_folder)
 {
     LLFilePickerReplyThread::startPicker(
-        [](const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter load_filter, LLFilePicker::ESaveFilter save_filter)
+        [dest_folder](const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter load_filter, LLFilePicker::ESaveFilter save_filter)
             {
                 if (LLAppViewer::instance()->quitRequested())
                 {
                     return;
                 }
-                if (filenames.size() > 0)
+                try
                 {
-                    LLMaterialEditor::loadMaterialFromFile(filenames[0], -1);
+                    if (filenames.size() > 0)
+                    {
+                        LLMaterialEditor::loadMaterialFromFile(filenames[0], -1, dest_folder);
+                    }
+                }
+                catch (std::bad_alloc&)
+                {
+                    LLNotificationsUtil::add("CannotOpenFileTooBig");
                 }
             },
         LLFilePicker::FFLOAD_MATERIAL,
@@ -3402,7 +3431,7 @@ void LLMaterialEditor::loadAsset()
                     LLAssetType::AT_MATERIAL,
                     &onLoadComplete,
                     (void*)user_data,
-                    TRUE);
+                    true);
             }
         }
     }
@@ -3434,7 +3463,7 @@ void LLMaterialEditor::loadAsset()
     {
         /*editor->setText(LLStringUtil::null);
         editor->makePristine();
-        editor->setEnabled(TRUE);*/
+        editor->setEnabled(true);*/
         // Don't set asset status here; we may not have set the item id yet
         // (e.g. when this gets called initially)
         //mAssetStatus = PREVIEW_ASSET_LOADED;
@@ -3466,8 +3495,8 @@ void LLMaterialEditor::onLoadComplete(const LLUUID& asset_uuid,
 
             editor->decodeAsset(buffer);
 
-            BOOL allow_modify = editor->canModify(editor->mObjectUUID, editor->getItem());
-            BOOL source_library = editor->mObjectUUID.isNull() && gInventory.isObjectDescendentOf(editor->mItemUUID, gInventory.getLibraryRootFolderID());
+            bool allow_modify = editor->canModify(editor->mObjectUUID, editor->getItem());
+            bool source_library = editor->mObjectUUID.isNull() && gInventory.isObjectDescendentOf(editor->mItemUUID, gInventory.getLibraryRootFolderID());
             editor->setEnableEditing(allow_modify && !source_library);
             editor->resetUnsavedChanges();
             editor->mAssetStatus = PREVIEW_ASSET_LOADED;
@@ -3515,6 +3544,8 @@ void LLMaterialEditor::inventoryChanged(LLViewerObject* object,
 
 void LLMaterialEditor::saveTexture(LLImageJ2C* img, const std::string& name, const LLUUID& asset_id, upload_callback_f cb)
 {
+    LLImageDataSharedLock lock(img);
+
     if (asset_id.isNull()
         || img == nullptr
         || img->getDataSize() == 0)
@@ -3551,6 +3582,7 @@ void LLMaterialEditor::saveTexture(LLImageJ2C* img, const std::string& name, con
         LLFloaterPerms::getGroupPerms("Uploads"),
         LLFloaterPerms::getEveryonePerms("Uploads"),
         expected_upload_cost,
+        mUploadFolder,
         false,
         cb,
         failed_upload));

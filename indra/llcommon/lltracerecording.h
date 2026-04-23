@@ -35,10 +35,15 @@
 #include "llpointer.h"
 #include <limits>
 
+#ifdef LL_WINDOWS
+#pragma warning(push)
+#pragma warning(disable : 4244) // possible loss of data on conversions
+#endif
+
 class LLStopWatchControlsMixinCommon
 {
 public:
-    virtual ~LLStopWatchControlsMixinCommon() = default;
+    virtual ~LLStopWatchControlsMixinCommon() {}
 
     enum EPlayState
     {
@@ -713,5 +718,9 @@ namespace LLTrace
         PeriodicRecording mPotentialRecording;
     };
 }
+
+#ifdef LL_WINDOWS
+#pragma warning(pop)
+#endif
 
 #endif // LL_LLTRACERECORDING_H

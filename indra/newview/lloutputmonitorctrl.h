@@ -28,9 +28,10 @@
 #define LL_LLOUTPUTMONITORCTRL_H
 
 #include "v4color.h"
-#include "llview.h"
+#include "../llui/llview.h"
 #include "llmutelist.h"
 #include "llspeakingindicatormanager.h"
+//#include "../llui/lluiimage.h"
 
 class LLTextBox;
 class LLUICtrlFactory;
@@ -67,7 +68,7 @@ public:
 
     // llview overrides
     virtual void    draw();
-    virtual BOOL    handleMouseUp(S32 x, S32 y, MASK mask);
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
 
     void            setPower(F32 val);
     F32             getPower(F32 val) const { return mPower; }

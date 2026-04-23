@@ -60,12 +60,12 @@ enum VoiceGesticulationLevel
     NUM_VOICE_GESTICULATION_LEVELS
 };
 
-constexpr int NUM_VOICE_SYMBOL_WAVES = 7;
+const static int NUM_VOICE_SYMBOL_WAVES = 7;
 
 //----------------------------------------------------
 // LLVoiceVisualizer class
 //----------------------------------------------------
-class LLVoiceVisualizer final : public LLHUDEffect
+class LLVoiceVisualizer : public LLHUDEffect
 {
     //---------------------------------------------------
     // public methods
@@ -137,7 +137,7 @@ class LLVoiceVisualizer final : public LLHUDEffect
     // private static members
     //---------------------------------------------------
 
-        static bool   sLipSyncEnabled;       // 0 disabled, 1 babble loop
+        static bool   sLipSyncEnabled;       // false: disabled, true: babble loop
         static bool   sPrefsInitialized;     // the first instance will initialize the static members
         static F32*   sOoh;                  // the babble loop of amplitudes for the ooh morph
         static F32*   sAah;                  // the babble loop of amplitudes for the ooh morph

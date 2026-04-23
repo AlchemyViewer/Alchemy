@@ -34,7 +34,6 @@
 #include <sys/param.h>
 #endif
 
-#include "llwin32headerslean.h"
 #include "apr_pools.h"
 #include "llbuffer.h"
 #include "llframetimer.h"

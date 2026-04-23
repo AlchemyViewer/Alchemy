@@ -36,20 +36,6 @@
 #include "llwearabletype.h"
 #include "llinventorysettings.h"
 
-struct IconEntry final : public LLDictionaryEntry
-{
-    IconEntry(const std::string &item_name)
-        :
-        LLDictionaryEntry(item_name)
-    {}
-};
-
-class LLIconDictionary final : public LLSingleton<LLIconDictionary>,
-                         public LLDictionary<LLInventoryType::EIconName, IconEntry>
-{
-    LLSINGLETON(LLIconDictionary);
-};
-
 typedef LLPointer<LLUIImage> LLUIImagePtr;
 
 LLIconDictionary::LLIconDictionary()
@@ -110,7 +96,7 @@ LLIconDictionary::LLIconDictionary()
 LLUIImagePtr LLInventoryIcon::getIcon(LLAssetType::EType asset_type,
                                       LLInventoryType::EType inventory_type,
                                       U32 misc_flag,
-                                      BOOL item_is_multi)
+                                      bool item_is_multi)
 {
     const std::string& icon_name = getIconName(asset_type, inventory_type, misc_flag, item_is_multi);
     return LLUI::getUIImage(icon_name);
@@ -124,7 +110,7 @@ LLUIImagePtr LLInventoryIcon::getIcon(LLInventoryType::EIconName idx)
 const std::string& LLInventoryIcon::getIconName(LLAssetType::EType asset_type,
                                                 LLInventoryType::EType inventory_type,
                                                 U32 misc_flag,
-                                                BOOL item_is_multi)
+                                                bool item_is_multi)
 {
     LLInventoryType::EIconName idx = LLInventoryType::ICONNAME_OBJECT;
     if (item_is_multi)
@@ -176,7 +162,6 @@ const std::string& LLInventoryIcon::getIconName(LLAssetType::EType asset_type,
             break;
         case LLAssetType::AT_MESH:
             idx = LLInventoryType::ICONNAME_MESH;
-            break;
         case LLAssetType::AT_SETTINGS:
             idx = assignSettingsIcon(misc_flag);
             break;

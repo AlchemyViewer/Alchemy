@@ -27,7 +27,6 @@
 #include "_httpservice.h"
 
 #include <boost/bind.hpp>
-#include <boost/function.hpp>
 
 #include "_httpoperation.h"
 #include "_httprequestqueue.h"
@@ -63,8 +62,7 @@ const HttpService::OptionDescriptor HttpService::sOptionDesc[] =
     {   true,       true,       true,       false,      false   },      // PO_TRACE
     {   true,       true,       false,      true,       false   },      // PO_ENABLE_PIPELINING
     {   true,       true,       false,      true,       false   },      // PO_THROTTLE_RATE
-    {   false,      false,      true,       false,      true    },      // PO_SSL_VERIFY_CALLBACK
-    {   false,      false,      true,       false,      false   }       // PO_USER_AGENT
+    {   false,      false,      true,       false,      true    }       // PO_SSL_VERIFY_CALLBACK
 };
 HttpService * HttpService::sInstance(NULL);
 volatile HttpService::EState HttpService::sState(NOT_INITIALIZED);
@@ -90,18 +88,32 @@ HttpService::~HttpService()
         {
             if (mRequestQueue->stopQueue())
             {
-                // Give mRequestQueue a chance to finish
-                ms_sleep(10);
+                // Now wait a bit for the thread to exit
+                S32       counter  = 0;
+                const S32 MAX_WAIT = 600;
+                while (counter < MAX_WAIT)
+                {
+                    if (STOPPED == sState)
+                    {
+                        break;
+                    }
+                    // Sleep for a tenth of a second
+                    ms_sleep(100);
+                    std::this_thread::yield();
+                    counter++;
+                }
             }
         }
-    }
 
-    if (mThread && mThread->joinable())
-    {
-        mThread->join();
-        LL_INFOS() << "Joined HTTP Service Thread." << LL_ENDL;
+        if (mThread && RUNNING == sState)
+        {
+            // Failed to shutdown, expect problems ahead so do a hard termination.
+            LL_WARNS(LOG_CORE) << "Destroying HttpService with running thread.  Expect problems." << LL_NEWLINE << "State: " << S32(sState)
+                               << " Last policy: " << U32(mLastPolicy) << LL_ENDL;
+
+            mThread->cancel();
+        }
     }
-    mThread.reset();
 
     if (mRequestQueue)
     {
@@ -114,6 +126,8 @@ HttpService::~HttpService()
 
     delete mPolicy;
     mPolicy = NULL;
+
+    mThread.reset();
 }
 
 
@@ -200,6 +214,7 @@ void HttpService::startThread()
     mTransport->start(mLastPolicy + 1);
 
     mThread = std::make_unique<LLCoreInt::HttpThread>(boost::bind(&HttpService::threadRun, this, _1));
+    mThread->detach(); // Detach thread to let it clean its self up
     sState = RUNNING;
 }
 
@@ -270,6 +285,7 @@ void HttpService::shutdown()
 // requested to stop.
 void HttpService::threadRun(LLCoreInt::HttpThread * thread)
 {
+    set_thread_name("HttpService");
     LL_PROFILER_SET_THREAD_NAME("HttpService");
 
     ELoopSpeed loop(REQUEST_SLEEP);
@@ -300,7 +316,7 @@ void HttpService::threadRun(LLCoreInt::HttpThread * thread)
         }
         catch (const std::bad_alloc&)
         {
-            LLMemory::logMemoryInfo(TRUE);
+            LLMemory::logMemoryInfo(true);
 
             //output possible call stacks to log file.
             LLError::LLUserWarningMsg::showOutOfMemory();

@@ -52,7 +52,7 @@ typedef enum e_debug_var_type
     VAR_TYPE_COUNT
 } EDebugVarType;
 
-class LLDebugVarMessageBox final : public LLFloater
+class LLDebugVarMessageBox : public LLFloater
 {
 protected:
     LLDebugVarMessageBox(const std::string& title, EDebugVarType var_type, void *var);
@@ -80,7 +80,7 @@ protected:
     LLButton*       mAnimateButton;
     LLTextBox*      mText;
     std::string     mTitle;
-    BOOL            mAnimate;
+    bool            mAnimate;
 
     static std::map<std::string, LLDebugVarMessageBox*> sInstances;
 };

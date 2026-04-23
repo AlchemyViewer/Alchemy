@@ -55,7 +55,7 @@ LLDrawPoolTree::LLDrawPoolTree(LLViewerTexture *texturep) :
 //============================================
 void LLDrawPoolTree::beginDeferredPass(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LL_RECORD_BLOCK_TIME(FTM_RENDER_TREES);
 
     shader = &gDeferredTreeProgram;
     shader->bind();
@@ -64,13 +64,12 @@ void LLDrawPoolTree::beginDeferredPass(S32 pass)
 
 void LLDrawPoolTree::renderDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LL_PROFILE_ZONE_SCOPED;
 
     if (mDrawFace.empty())
     {
         return;
     }
-
 
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
     LLViewerTexture* pTexture = (LLPipeline::sRenderTextures) ? mTexturep.get() : LLViewerFetchedTexture::sDefaultDiffuseImagep.get();
@@ -79,20 +78,16 @@ void LLDrawPoolTree::renderDeferred(S32 pass)
 //  gGL.getTexUnit(sDiffTex)->bindFast(mTexturep);
     mTexturep->addTextureStats(1024.f * 1024.f); // <=== keep Linden tree textures at full res
 
-    for (LLFace* face : mDrawFace)
+    for (std::vector<LLFace*>::iterator iter = mDrawFace.begin();
+        iter != mDrawFace.end(); iter++)
     {
-        if (!face || !face->getDrawable() || !face->getDrawable()->getRegion())
-            continue;
-
+        LLFace* face = *iter;
         LLVertexBuffer* buff = face->getVertexBuffer();
 
         if (buff)
         {
-            LLMatrix4a* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
-            if(model_matrix && model_matrix->isIdentity())
-            {
-                model_matrix = NULL;
-            }
+            LLMatrix4* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
+
             llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
             LLRenderPass::applyModelMatrix(model_matrix);
 
@@ -104,7 +99,7 @@ void LLDrawPoolTree::renderDeferred(S32 pass)
 
 void LLDrawPoolTree::endDeferredPass(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LL_RECORD_BLOCK_TIME(FTM_RENDER_TREES);
 
     shader->unbind();
 }
@@ -114,10 +109,11 @@ void LLDrawPoolTree::endDeferredPass(S32 pass)
 //============================================
 void LLDrawPoolTree::beginShadowPass(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LL_PROFILE_ZONE_SCOPED;
 
-    glPolygonOffset(gSavedSettings.getF32("RenderDeferredTreeShadowOffset"),
-                    gSavedSettings.getF32("RenderDeferredTreeShadowBias"));
+    static LLCachedControl<F32> shadow_offset(gSavedSettings, "RenderDeferredTreeShadowOffset");
+    static LLCachedControl<F32> shadow_bias(gSavedSettings, "RenderDeferredTreeShadowBias");
+    glPolygonOffset(shadow_offset(), shadow_bias());
 
     LLEnvironment& environment = LLEnvironment::instance();
 
@@ -140,9 +136,9 @@ void LLDrawPoolTree::endShadowPass(S32 pass)
     gDeferredTreeShadowProgram.unbind();
 }
 
-BOOL LLDrawPoolTree::verify() const
+bool LLDrawPoolTree::verify() const
 {
-    return TRUE;
+    return true;
 }
 
 LLViewerTexture *LLDrawPoolTree::getTexture()

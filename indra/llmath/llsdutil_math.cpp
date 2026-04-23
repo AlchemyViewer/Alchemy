@@ -38,7 +38,7 @@
 #include "v4color.h"
 
 #if LL_WINDOWS
-#include "llwin32headerslean.h"
+#   include "llwin32headers.h"    // for htonl
 #elif LL_LINUX
 #   include <netinet/in.h>
 #elif LL_DARWIN

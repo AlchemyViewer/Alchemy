@@ -26,10 +26,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#ifdef INCLUDE_VLD
-#include "vld.h"
-#endif
-#include "llwin32headerslean.h"
+#include "llwin32headers.h"
 
 #include "llwindowwin32.h" // *FIX: for setting gIconResource.
 
@@ -47,10 +44,8 @@
 #include "llviewercontrol.h"
 #include "lldxhardware.h"
 
-#ifdef LL_NVAPI
 #include "nvapi/nvapi.h"
 #include "nvapi/NvApiDriverSettings.h"
-#endif
 
 #include <stdlib.h>
 
@@ -74,10 +69,154 @@
 #include <fstream>
 #include <exception>
 
+#include "llversioninfovars.h"
+
+// Velopack installer and update framework
+#if LL_VELOPACK
+#include "llvelopack.h"
+#endif
+
 // Sentry (https://sentry.io) crash reporting tool
-#if defined(AL_SENTRY)
+#if AL_SENTRY
 #include <sentry.h>
 #endif
+
+// Bugsplat (http://bugsplat.com) crash reporting tool
+#ifdef LL_BUGSPLAT
+#include "bugsplat/BugSplat.h"
+#include "boost/json.hpp"                 // Boost.Json
+#include "llagent.h"                // for agent location
+#include "llstartup.h"
+#include "llviewerregion.h"
+#include "llvoavatarself.h"         // for agent name
+
+namespace
+{
+    // MiniDmpSender's constructor is defined to accept __wchar_t* instead of
+    // plain wchar_t*. That said, wunder() returns std::basic_string<__wchar_t>,
+    // NOT plain __wchar_t*, despite the apparent convenience. Calling
+    // wunder(something).c_str() as an argument expression is fine: that
+    // std::basic_string instance will survive until the function returns.
+    // Calling c_str() on a std::basic_string local to wunder() would be
+    // Undefined Behavior: we'd be left with a pointer into a destroyed
+    // std::basic_string instance. But we can do that with a macro...
+    #define WCSTR(string) wunder(string).c_str()
+
+    // It would be nice if, when wchar_t is the same as __wchar_t, this whole
+    // function would optimize away. However, we use it only for the arguments
+    // to the BugSplat API -- a handful of calls.
+    inline std::basic_string<__wchar_t> wunder(const std::wstring& str)
+    {
+        return { str.begin(), str.end() };
+    }
+
+    // when what we have in hand is a std::string, convert from UTF-8 using
+    // specific wstringize() overload
+    inline std::basic_string<__wchar_t> wunder(const std::string& str)
+    {
+        return wunder(wstringize(str));
+    }
+
+    // Irritatingly, MiniDmpSender::setCallback() is defined to accept a
+    // classic-C function pointer instead of an arbitrary C++ callable. If it
+    // did accept a modern callable, we could pass a lambda that binds our
+    // MiniDmpSender pointer. As things stand, though, we must define an
+    // actual function and store the pointer statically.
+    static MiniDmpSender *sBugSplatSender = nullptr;
+    static std::string sBugsplatDesriptionField;
+
+    bool bugsplatSendLog(UINT nCode, LPVOID lpVal1, LPVOID lpVal2)
+    {
+        if (nCode == MDSCB_EXCEPTIONCODE)
+        {
+            // send the main viewer log file, one per instance
+            // widen to wstring, convert to __wchar_t, then pass c_str()
+            sBugSplatSender->sendAdditionalFile(
+                WCSTR(LLError::logFileName()));
+
+            // second instance does not have some log files
+            // TODO: This needs fixing, if each instance now has individual logs,
+            // same should be made true for static debug files
+            if (!LLAppViewer::instance()->isSecondInstance())
+            {
+                sBugSplatSender->sendAdditionalFile(
+                    WCSTR(*LLAppViewer::instance()->getStaticDebugFile()));
+            }
+
+            sBugSplatSender->sendAdditionalFile(
+                WCSTR(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "settings.xml")));
+
+            // We don't have an email address for any user. Hijack this
+            // metadata field for the platform identifier.
+            sBugSplatSender->setDefaultUserEmail(
+                WCSTR(LLOSInfo::instance().getOSStringSimple()));
+
+            if (gAgentAvatarp)
+            {
+                // user name, when we have it
+                sBugSplatSender->setDefaultUserName(WCSTR(gAgentAvatarp->getFullname()));
+
+                sBugSplatSender->sendAdditionalFile(
+                    WCSTR(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "settings_per_account.xml")));
+            }
+
+            if (!sBugsplatDesriptionField.empty())
+            {
+                // Can be set by watchdog or other code that detects a problem
+                // and wants to add some context to the crash report.
+                // Will be visible in the BugSplat web UI.
+                sBugSplatSender->setDefaultUserDescription(WCSTR(LLError::getFatalMessage()));
+                // This type of crash is not nessesarily a crash, or final.
+                // Prepare for the next one.
+                sBugsplatDesriptionField.clear();
+            }
+            else
+            {
+                // LL_ERRS message, when there is one
+                sBugSplatSender->setDefaultUserDescription(WCSTR(LLError::getFatalMessage()));
+            }
+
+            sBugSplatSender->setAttribute(WCSTR(L"OS"), WCSTR(LLOSInfo::instance().getOSStringSimple())); // In case we ever stop using email for this
+            sBugSplatSender->setAttribute(WCSTR(L"AppState"), WCSTR(LLStartUp::getStartupStateString()));
+            sBugSplatSender->setAttribute(WCSTR(L"GLVendor"), WCSTR(gGLManager.mGLVendor));
+            sBugSplatSender->setAttribute(WCSTR(L"GLVersion"), WCSTR(gGLManager.mGLVersionString));
+            sBugSplatSender->setAttribute(WCSTR(L"GPUVersion"), WCSTR(gGLManager.mDriverVersionVendorString));
+            sBugSplatSender->setAttribute(WCSTR(L"GLRenderer"), WCSTR(gGLManager.mGLRenderer));
+            sBugSplatSender->setAttribute(WCSTR(L"VRAM"), WCSTR(STRINGIZE(gGLManager.mVRAM)));
+            sBugSplatSender->setAttribute(WCSTR(L"RAM"), WCSTR(STRINGIZE(gSysMemory.getPhysicalMemoryKB().value())));
+
+            if (gAgent.getRegion())
+            {
+                // region location, when we have it
+                LLVector3 loc = gAgent.getPositionAgent();
+                sBugSplatSender->resetAppIdentifier(
+                    WCSTR(STRINGIZE(gAgent.getRegion()->getName()
+                                    << '/' << loc.mV[0]
+                                    << '/' << loc.mV[1]
+                                    << '/' << loc.mV[2])));
+            }
+
+            LLAppViewer* app = LLAppViewer::instance();
+            if (!app->isSecondInstance() && !app->errorMarkerExists())
+            {
+                // If marker doesn't exist, create a marker with 'other' or 'logout' code for next launch
+                // otherwise don't override existing file
+                // Any unmarked crashes will be considered as freezes
+                if (app->logoutRequestSent())
+                {
+                    app->createErrorMarker(LAST_EXEC_LOGOUT_CRASH);
+                }
+                else
+                {
+                    app->createErrorMarker(LAST_EXEC_OTHER_CRASH);
+                }
+            }
+        } // MDSCB_EXCEPTIONCODE
+
+        return false;
+    }
+}
+#endif // LL_BUGSPLAT
 
 namespace
 {
@@ -104,20 +243,6 @@ LONG WINAPI catchallCrashHandler(EXCEPTION_POINTERS * /*ExceptionInfo*/)
     return 0;
 }
 
-// *FIX:Mani - This hack is to fix a linker issue with libndofdev.lib
-// The lib was compiled under VS2005 - in VS2003 we need to remap assert
-#ifdef LL_DEBUG
-#ifdef LL_MSVC7
-extern "C" {
-    void _wassert(const wchar_t * _Message, const wchar_t *_File, unsigned _Line)
-    {
-        LL_ERRS() << _Message << LL_ENDL;
-    }
-}
-#endif
-#endif
-
-const std::string LLAppViewerWin32::sWindowClass = "Alchemy";
 
 // Create app mutex creates a unique global windows object.
 // If the object can be created it returns true, otherwise
@@ -133,18 +258,12 @@ bool create_app_mutex()
     LPCWSTR unique_mutex_name = L"AlchemyAppMutex";
     HANDLE hMutex;
     hMutex = CreateMutex(NULL, TRUE, unique_mutex_name);
-    if(GetLastError() == ERROR_ALREADY_EXISTS)
+    if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
         result = false;
     }
     return result;
 }
-
-#ifdef LL_NVAPI
-
-#define ALWSTR_SIZE(inwstr) ((inwstr.size() + 1) * sizeof(wchar_t))
-
-static std::wstring NVAPI_APPNAME = TEXT("Alchemy Viewer");
 
 /*
     This function is used to print to the command line a text message
@@ -152,7 +271,7 @@ static std::wstring NVAPI_APPNAME = TEXT("Alchemy Viewer");
 */
 void nvapi_error(NvAPI_Status status)
 {
-    NvAPI_ShortString szDesc = { 0 };
+    NvAPI_ShortString szDesc = {0};
     NvAPI_GetErrorMessage(status, szDesc);
     LL_WARNS() << "nvapi error: " << szDesc << LL_ENDL;
 
@@ -170,11 +289,11 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
         return;
     }
 
-    NvAPI_UnicodeString profile_name = {};
-    memcpy_s(profile_name, sizeof(profile_name), NVAPI_APPNAME.c_str(), ALWSTR_SIZE(NVAPI_APPNAME));
-
+    NvAPI_UnicodeString profile_name;
+    std::wstring w_app_name = TEXT("Alchemy Viewer");
+    wsprintf(reinterpret_cast<wchar_t*>(profile_name), L"%s", w_app_name.c_str());
     NvDRSProfileHandle hProfile = 0;
-    // Check if we already have a Alchmey Viewer profile
+    // (3) Check if we already have an application profile for the viewer
     status = NvAPI_DRS_FindProfileByName(hSession, profile_name, &hProfile);
     if (status != NVAPI_OK && status != NVAPI_PROFILE_NOT_FOUND)
     {
@@ -183,13 +302,13 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
     }
     else if (status == NVAPI_PROFILE_NOT_FOUND)
     {
-        // Don't have a Alchemy Viewer profile yet - create one
+        // Don't have an application profile yet - create one
         LL_INFOS() << "Creating Alchemy Viewer profile for NVIDIA driver" << LL_ENDL;
 
         NVDRS_PROFILE profileInfo;
         profileInfo.version = NVDRS_PROFILE_VER;
         profileInfo.isPredefined = 0;
-        memcpy_s(profileInfo.profileName, sizeof(profileInfo.profileName), NVAPI_APPNAME.c_str(), ALWSTR_SIZE(NVAPI_APPNAME));
+        wsprintf(reinterpret_cast<wchar_t*>(profileInfo.profileName), L"%s", w_app_name.c_str());
 
         status = NvAPI_DRS_CreateProfile(hSession, &profileInfo, &hProfile);
         if (status != NVAPI_OK)
@@ -239,15 +358,14 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
         }
     }
 
-    // Check if current exe is part of the profile
+    // (4) Check if current exe is part of the profile
     std::string exe_name = gDirUtilp->getExecutableFilename();
     NVDRS_APPLICATION profile_application = {};
     profile_application.version = NVDRS_APPLICATION_VER;
 
-    std::wstring w_exe_name = ll_convert_string_to_wide(exe_name);
-    size_t w_exe_bytes = ALWSTR_SIZE(w_exe_name);
-    NvAPI_UnicodeString profile_app_name = {};
-    memcpy_s(profile_app_name, sizeof(profile_app_name), w_exe_name.c_str(), w_exe_bytes);
+    std::wstring w_exe_name = ll_convert<std::wstring>(exe_name);
+    NvAPI_UnicodeString profile_app_name;
+    wsprintf(reinterpret_cast<wchar_t*>(profile_app_name), L"%s", w_exe_name.c_str());
 
     status = NvAPI_DRS_GetApplicationInfo(hSession, hProfile, profile_app_name, &profile_application);
     if (status != NVAPI_OK && status != NVAPI_EXECUTABLE_NOT_FOUND)
@@ -257,16 +375,16 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
     }
     else if (status == NVAPI_EXECUTABLE_NOT_FOUND)
     {
-        LL_INFOS() << "Creating application for " << exe_name << " for NVIDIA driver" << LL_ENDL;
+        LL_INFOS() << "Creating application for " << exe_name << " for NVIDIA application profile" << LL_ENDL;
 
         // Add this exe to the profile
         NVDRS_APPLICATION application = {};
         application.version = NVDRS_APPLICATION_VER;
         application.isPredefined = 0;
-        memcpy_s(application.appName, sizeof(application.appName), w_exe_name.c_str(), w_exe_bytes);
-        memcpy_s(application.launcher, sizeof(application.launcher), w_exe_name.c_str(), w_exe_bytes);
-
-        memcpy_s(application.userFriendlyName, sizeof(application.userFriendlyName), TEXT(LL_VIEWER_CHANNEL), sizeof(TEXT(LL_VIEWER_CHANNEL)));
+        wsprintf(reinterpret_cast<wchar_t*>(application.appName), L"%s", w_exe_name.c_str());
+        wsprintf(reinterpret_cast<wchar_t*>(application.launcher), L"%s", w_exe_name.c_str());
+        wsprintf(reinterpret_cast<wchar_t*>(application.userFriendlyName), L"%s", w_app_name.c_str());
+        wsprintf(reinterpret_cast<wchar_t*>(application.fileInFolder), L"%s", "");
 
         status = NvAPI_DRS_CreateApplication(hSession, hProfile, &application);
         if (status != NVAPI_OK)
@@ -275,7 +393,7 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
             return;
         }
 
-        // apply our changes to the system
+        // Save application in case we added one
         status = NvAPI_DRS_SaveSettings(hSession);
         if (status != NVAPI_OK)
         {
@@ -300,7 +418,6 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
         return;
     }
 }
-#endif
 
 //#define DEBUGGING_SEH_FILTER 1
 #if DEBUGGING_SEH_FILTER
@@ -314,6 +431,17 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
                      PWSTR     pCmdLine,
                      int       nCmdShow)
 {
+#if LL_VELOPACK
+    // Velopack MUST be initialized first - it may handle install/uninstall
+    // commands and exit the process before we do anything else.
+    if (!velopack_initialize())
+    {
+        // Obsolete? Always return true
+        // Velopack handled the invocation (install/uninstall hook)
+        return 0;
+    }
+#endif
+
     // Call Tracy first thing to have it allocate memory
     // https://github.com/wolfpld/tracy/issues/196
     LL_PROFILER_FRAME_END;
@@ -323,7 +451,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     DWORD heap_enable_lfh_error[MAX_HEAPS];
     S32 num_heaps = 0;
 
-#if WINDOWS_CRT_MEM_CHECKS && !INCLUDE_VLD
+#if WINDOWS_CRT_MEM_CHECKS
     _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // dump memory leaks on exit
 #elif 0
     // Experimental - enable the low fragmentation heap
@@ -350,6 +478,9 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 #endif
 #endif
 
+    // *FIX: global
+    gIconResource = MAKEINTRESOURCE(IDI_LL_ICON);
+
     LLAppViewerWin32* viewer_app_ptr = new LLAppViewerWin32(ll_convert_wide_to_string(pCmdLine).c_str());
 
     gOldTerminateHandler = std::set_terminate(exceptionTerminateHandler);
@@ -359,32 +490,36 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     gDebugInfo["FoundOtherInstanceAtStartup"] = LLSD::Boolean(found_other_instance);
 
     bool ok = viewer_app_ptr->init();
-    if(!ok)
+    if (!ok)
     {
         LL_WARNS() << "Application init failed." << LL_ENDL;
         return -1;
     }
 
-#ifdef LL_NVAPI
-    // Initialize NVAPI
-    NvAPI_Status nvStatus = NvAPI_Initialize();
-    NvDRSSessionHandle nvhSession = 0;
-
-    if (nvStatus == NVAPI_OK)
+    NvDRSSessionHandle hSession = 0;
+    static LLCachedControl<bool> use_nv_api(gSavedSettings, "NvAPICreateApplicationProfile", true);
+    if (use_nv_api)
     {
-        // Create the session handle to access driver settings
-        nvStatus = NvAPI_DRS_CreateSession(&nvhSession);
-        if (nvStatus != NVAPI_OK)
+        NvAPI_Status status;
+
+        // Initialize NVAPI
+        status = NvAPI_Initialize();
+
+        if (status == NVAPI_OK)
         {
-            nvapi_error(nvStatus);
-        }
-        else
-        {
-            //override driver setting as needed
-            ll_nvapi_init(nvhSession);
+            // Create the session handle to access driver settings
+            status = NvAPI_DRS_CreateSession(&hSession);
+            if (status != NVAPI_OK)
+            {
+                nvapi_error(status);
+            }
+            else
+            {
+                //override driver setting as needed
+                ll_nvapi_init(hSession);
+            }
         }
     }
-#endif
 
     // Have to wait until after logging is initialized to display LFH info
     if (num_heaps > 0)
@@ -422,7 +557,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
         }
 #endif
 
-        gGLActive = TRUE;
+        gGLActive = true;
 
         viewer_app_ptr->cleanup();
 
@@ -442,28 +577,12 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     delete viewer_app_ptr;
     viewer_app_ptr = NULL;
 
-#ifdef LL_NVAPI
     // (NVAPI) (6) We clean up. This is analogous to doing a free()
-    if (nvhSession)
+    if (hSession)
     {
-        NvAPI_DRS_DestroySession(nvhSession);
-        nvhSession = 0;
+        NvAPI_DRS_DestroySession(hSession);
+        hSession = 0;
     }
-
-    if (nvStatus == NVAPI_OK)
-    {
-        nvStatus = NvAPI_Unload();
-        if (nvStatus != NVAPI_OK)
-        {
-            nvapi_error(nvStatus);
-        }
-    }
-
-#endif
-
-#if defined(AL_SENTRY)
-    sentry_close();
-#endif
 
     return 0;
 }
@@ -493,13 +612,13 @@ void LLAppViewerWin32::disableWinErrorReporting()
 {
     std::string executable_name = gDirUtilp->getExecutableFilename();
 
-    if( S_OK == WerRemoveExcludedApplication( ll_convert_string_to_wide(executable_name).c_str(), FALSE ) )
+    if( S_OK == WerAddExcludedApplication(ll_convert<std::wstring>(executable_name).c_str(), FALSE ) )
     {
-        LL_INFOS() << "WerRemoveExcludedApplication() succeeded for " << executable_name << LL_ENDL;
+        LL_INFOS() << "WerAddExcludedApplication() succeeded for " << executable_name << LL_ENDL;
     }
     else
     {
-        LL_INFOS() << "WerRemoveExcludedApplication() failed for " << executable_name << LL_ENDL;
+        LL_INFOS() << "WerAddExcludedApplication() failed for " << executable_name << LL_ENDL;
     }
 }
 
@@ -600,8 +719,97 @@ bool LLAppViewerWin32::init()
     LLWinDebug::instance();
 #endif
 
-    LLAppViewer* pApp = LLAppViewer::instance();
-    pApp->initCrashReporting();
+#if LL_SEND_CRASH_REPORTS
+#if defined(LL_BUGSPLAT)
+    if (!isSecondInstance())
+    {
+        // Cleanup previous session
+        std::string log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "bugsplat.log");
+        LLFile::remove(log_file, ENOENT);
+    }
+
+    // Win7 is no longer supported
+    bool is_win_7_or_below = LLOSInfo::getInstance()->mMajorVer <= 6 && LLOSInfo::getInstance()->mMajorVer <= 1;
+
+    if (!is_win_7_or_below)
+    {
+        std::string build_data_fname(
+            gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "build_data.json"));
+        // Use llifstream instead of std::ifstream because LL_PATH_EXECUTABLE
+        // could contain non-ASCII characters, which std::ifstream doesn't handle.
+        llifstream inf(build_data_fname.c_str());
+        if (!inf.is_open())
+        {
+            LL_WARNS("BUGSPLAT") << "Can't initialize BugSplat, can't read '" << build_data_fname
+                << "'" << LL_ENDL;
+        }
+        else
+        {
+            boost::system::error_code ec;
+            boost::json::value build_data = boost::json::parse(inf, ec);
+            if(ec.failed())
+            {
+                // gah, the typo is baked into Json::Reader API
+                LL_WARNS("BUGSPLAT") << "Can't initialize BugSplat, can't parse '" << build_data_fname
+                    << "': " << ec.what() << LL_ENDL;
+            }
+            else
+            {
+                if (!build_data.is_object() || !build_data.as_object().contains("BugSplat DB"))
+                {
+                    LL_WARNS("BUGSPLAT") << "Can't initialize BugSplat, no 'BugSplat DB' entry in '"
+                        << build_data_fname << "'" << LL_ENDL;
+                }
+                else
+                {
+                    boost::json::value BugSplat_DB = build_data.at("BugSplat DB");
+
+                    // Got BugSplat_DB, onward!
+                    std::wstring version_string(WSTRINGIZE(LL_VIEWER_VERSION_MAJOR << '.' <<
+                        LL_VIEWER_VERSION_MINOR << '.' <<
+                        LL_VIEWER_VERSION_PATCH << '.' <<
+                        LL_VIEWER_VERSION_BUILD));
+
+                    DWORD dwFlags = MDSF_NONINTERACTIVE | // automatically submit report without prompting
+                        MDSF_PREVENTHIJACKING; // disallow swiping Exception filter
+
+                    bool needs_log_file = !isSecondInstance();
+                    LL_DEBUGS("BUGSPLAT");
+                    if (needs_log_file)
+                    {
+                        // Startup only!
+                        LL_INFOS("BUGSPLAT") << "Engaged BugSplat logging to bugsplat.log" << LL_ENDL;
+                        dwFlags |= MDSF_LOGFILE | MDSF_LOG_VERBOSE;
+                    }
+                    LL_ENDL;
+
+                    // have to convert normal wide strings to strings of __wchar_t
+                    sBugSplatSender = new MiniDmpSender(
+                        WCSTR(boost::json::value_to<std::string>(BugSplat_DB)),
+                        WCSTR(LL_TO_WSTRING(LL_VIEWER_CHANNEL)),
+                        WCSTR(version_string),
+                        nullptr,              // szAppIdentifier -- set later
+                        dwFlags);
+                    sBugSplatSender->setCallback(bugsplatSendLog);
+
+                    LL_DEBUGS("BUGSPLAT");
+                    if (needs_log_file)
+                    {
+                        // Log file will be created in %TEMP%, but it will be moved into logs folder in case of crash
+                        std::string log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "bugsplat.log");
+                        sBugSplatSender->setLogFilePath(WCSTR(log_file));
+                    }
+                    LL_ENDL;
+
+                    // engage stringize() overload that converts from wstring
+                    LL_INFOS("BUGSPLAT") << "Engaged BugSplat(" << LL_TO_STRING(LL_VIEWER_CHANNEL)
+                        << ' ' << stringize(version_string) << ')' << LL_ENDL;
+                } // got BugSplat_DB
+            } // parsed build_data.json
+        } // opened build_data.json
+    } // !is_win_7_or_below
+#endif // LL_BUGSPLAT
+#endif // LL_SEND_CRASH_REPORTS
 
     bool success = LLAppViewer::init();
 
@@ -623,17 +831,71 @@ bool LLAppViewerWin32::cleanup()
     return result;
 }
 
-void LLAppViewerWin32::setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name)
+bool LLAppViewerWin32::reportCrashToBugsplat(void* pExcepInfo)
 {
-#if defined(AL_SENTRY)
-    if (mSentryInitialized)
+#if defined(LL_BUGSPLAT)
+    if (sBugSplatSender)
     {
-        sentry_value_t user = sentry_value_new_object();
-        sentry_value_set_by_key(user, "id", sentry_value_new_string(user_id.asString().c_str()));
-        sentry_value_set_by_key(user, "username", sentry_value_new_string(avatar_name.c_str()));
-        sentry_set_user(user);
+        sBugSplatSender->createReport((EXCEPTION_POINTERS*)pExcepInfo);
+        return true;
     }
+#endif // LL_BUGSPLAT
+    return false;
+}
+
+#if defined(LL_BUGSPLAT)
+static int reportCustomToBugsplatFilter(EXCEPTION_POINTERS* pExcepInfo)
+{
+    if (sBugSplatSender)
+    {
+        sBugSplatSender->createReport(pExcepInfo);
+    }
+    return EXCEPTION_EXECUTE_HANDLER;
+}
 #endif
+
+bool LLAppViewerWin32::reportCustomToBugsplat(const std::string &description)
+{
+#if defined(LL_BUGSPLAT)
+    if (sBugSplatSender)
+    {
+        sBugsplatDesriptionField = description;
+
+        __try
+        {
+            // Generate a custom exception code
+            RaiseException(0xE0000001, 0, 0, NULL);
+        }
+        __except (reportCustomToBugsplatFilter(GetExceptionInformation()))
+        {
+        }
+        return true;
+    }
+#endif // LL_BUGSPLAT
+    return false;
+}
+
+bool LLAppViewerWin32::initWindow()
+{
+    // This is a workaround/hotfix for a change in Windows 11 24H2 (and possibly later)
+    // Where the window width and height need to correctly reflect an available FullScreen size
+    if (gSavedSettings.getBOOL("FullScreen"))
+    {
+        DEVMODE dev_mode;
+        ::ZeroMemory(&dev_mode, sizeof(DEVMODE));
+        dev_mode.dmSize = sizeof(DEVMODE);
+        if (EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &dev_mode))
+        {
+            gSavedSettings.setU32("WindowWidth", dev_mode.dmPelsWidth);
+            gSavedSettings.setU32("WindowHeight", dev_mode.dmPelsHeight);
+        }
+        else
+        {
+            LL_WARNS("AppInit") << "Unable to set WindowWidth and WindowHeight for FullScreen mode" << LL_ENDL;
+        }
+    }
+
+    return LLAppViewer::initWindow();
 }
 
 void LLAppViewerWin32::initLoggingAndGetLastDuration()
@@ -662,39 +924,10 @@ void write_debug_dx(const std::string& str)
 
 bool LLAppViewerWin32::initHardwareTest()
 {
-    //
-    // Do driver verification and initialization based on DirectX
-    // hardware polling and driver versions
-    //
-    if (FALSE == gSavedSettings.getBOOL("NoHardwareProbe"))
-    {
-        LLSplashScreen::update(LLTrans::getString("StartupDetectingHardware"));
-
-        LL_DEBUGS("AppInit") << "Attempting to poll DirectX for hardware info" << LL_ENDL;
-        gDXHardware.setWriteDebugFunc(write_debug_dx);
-        gDXHardware.updateVRAM();
-        LL_DEBUGS("AppInit") << "Done polling DXGI for vram info" << LL_ENDL;
-
-        // Disable so debugger can work
-        std::string splash_msg;
-        LLStringUtil::format_map_t args;
-        args["[APP_NAME]"] = LLAppViewer::instance()->getSecondLifeTitle();
-        splash_msg = LLTrans::getString("StartupLoading", args);
-
-        LLSplashScreen::update(splash_msg);
-    }
-
     if (!restoreErrorTrap())
     {
-        LL_WARNS("AppInit") << " Someone took over my exception handler (post hardware probe)!" << LL_ENDL;
+        LL_WARNS("AppInit") << " Someone took over my exception handler!" << LL_ENDL;
     }
-
-    if (gGLManager.mVRAM == 0)
-    {
-        gGLManager.mVRAM = gDXHardware.getVRAM();
-    }
-
-    LL_INFOS("AppInit") << "Detected VRAM: " << gGLManager.mVRAM << LL_ENDL;
 
     return true;
 }
@@ -738,39 +971,11 @@ bool LLAppViewerWin32::restoreErrorTrap()
     return true; // we don't check for handler collisions on windows, so just say they're ok
 }
 
-void LLAppViewerWin32::initCrashReporting(bool reportFreeze)
-{
-#if defined(AL_SENTRY)
-    sentry_options_t* options = sentry_options_new();
-    sentry_options_set_dsn(options, SENTRY_DSN);
-    sentry_options_set_release(options, LL_VIEWER_CHANNEL_AND_VERSION);
-
-    std::string crashpad_path = gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "crashpad_handler.exe");
-    sentry_options_set_handler_pathw(options, ll_convert_string_to_wide(crashpad_path).c_str());
-
-    std::string database_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");
-    sentry_options_set_database_pathw(options, ll_convert_string_to_wide(database_path).c_str());
-
-    std::string logfile_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "Alchemy.log");
-    sentry_options_add_attachmentw(options, ll_convert_string_to_wide(logfile_path).c_str());
-
-    mSentryInitialized = (sentry_init(options) == 0);
-    if (mSentryInitialized)
-    {
-        LL_INFOS() << "Successfully initialized Sentry" << LL_ENDL;
-    }
-    else
-    {
-        LL_WARNS() << "Failed to initialize Sentry" << LL_ENDL;
-    }
-#endif
-}
-
 //virtual
 bool LLAppViewerWin32::sendURLToOtherInstance(const std::string& url)
 {
     wchar_t window_class[256]; /* Flawfinder: ignore */   // Assume max length < 255 chars.
-    mbstowcs(window_class, sWindowClass.c_str(), 255);
+    mbstowcs(window_class, sWindowClass, 255);
     window_class[255] = 0;
     // Use the class instead of the window name.
     HWND other_window = FindWindow(window_class, NULL);
@@ -781,7 +986,7 @@ bool LLAppViewerWin32::sendURLToOtherInstance(const std::string& url)
         COPYDATASTRUCT cds;
         const S32 SLURL_MESSAGE_TYPE = 0;
         cds.dwData = SLURL_MESSAGE_TYPE;
-        cds.cbData = url.length() + 1;
+        cds.cbData = static_cast<DWORD>(url.length()) + 1;
         cds.lpData = (void*)url.c_str();
 
         LRESULT msg_result = SendMessage(other_window, WM_COPYDATA, NULL, (LPARAM)&cds);

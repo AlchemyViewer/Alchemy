@@ -60,19 +60,22 @@ protected:
     LLFlyoutButton(const Params&);
     friend class LLUICtrlFactory;
 public:
-    virtual void    draw() override;
+    void draw() override;
+
+    bool handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+
 // [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4
-            void    setLabel(const LLStringExplicit& name) override;
-            void    updateLabel() override;
+    void    setLabel(const LLStringExplicit& name) override;
+    void    updateLabel() override;
 // [/SL:KB]
 
-    void setToggleState(BOOL state);
+    void setToggleState(bool state);
 
     void onActionButtonClick(const LLSD& data);
 
 protected:
     LLButton*               mActionButton;
-    BOOL                    mToggleState;
+    bool                    mToggleState;
 };
 
 #endif // LL_LLFLYOUTBUTTON_H

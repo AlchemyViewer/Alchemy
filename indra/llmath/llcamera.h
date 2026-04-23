@@ -33,23 +33,23 @@
 #include "llplane.h"
 #include "llvector4a.h"
 
-const F32 DEFAULT_FIELD_OF_VIEW     = 60.f * DEG_TO_RAD;
-const F32 DEFAULT_ASPECT_RATIO      = 640.f / 480.f;
-const F32 DEFAULT_NEAR_PLANE        = 0.25f;
-const F32 DEFAULT_FAR_PLANE         = 64.f; // far reaches across two horizontal, not diagonal, regions
+constexpr F32 DEFAULT_FIELD_OF_VIEW = 60.f * DEG_TO_RAD;
+constexpr F32 DEFAULT_ASPECT_RATIO  = 640.f / 480.f;
+constexpr F32 DEFAULT_NEAR_PLANE    = 0.25f;
+constexpr F32 DEFAULT_FAR_PLANE     = 64.f; // far reaches across two horizontal, not diagonal, regions
 
-const F32 MAX_ASPECT_RATIO  = 50.0f;
-const F32 MAX_NEAR_PLANE    = 1023.9f; // Clamp the near plane just before the skybox ends
-const F32 MAX_FAR_PLANE     = 100000.0f; //1000000.0f; // Max allowed. Not good Z precision though.
-const F32 MAX_FAR_CLIP      = 512.0f;
+constexpr F32 MAX_ASPECT_RATIO  = 50.0f;
+constexpr F32 MAX_NEAR_PLANE    = 1023.9f;   // Clamp the near plane just before the skybox ends
+constexpr F32 MAX_FAR_PLANE     = 100000.0f; //1000000.0f; // Max allowed. Not good Z precision though.
+constexpr F32 MAX_FAR_CLIP      = 512.0f;
 
-const F32 MIN_ASPECT_RATIO  = 0.02f;
-const F32 MIN_NEAR_PLANE    = 0.1f;
-const F32 MIN_FAR_PLANE     = 0.2f;
+constexpr F32 MIN_ASPECT_RATIO  = 0.02f;
+constexpr F32 MIN_NEAR_PLANE    = 0.1f;
+constexpr F32 MIN_FAR_PLANE     = 0.2f;
 
 // Min/Max FOV values for square views. Call getMin/MaxView to get extremes based on current aspect ratio.
-static const F32 MIN_FIELD_OF_VIEW = 5.0f * DEG_TO_RAD;
-static const F32 MAX_FIELD_OF_VIEW = 190.f * DEG_TO_RAD;
+constexpr F32 MIN_FIELD_OF_VIEW = 5.0f * DEG_TO_RAD;
+constexpr F32 MAX_FIELD_OF_VIEW = 175.f * DEG_TO_RAD;
 
 // An LLCamera is an LLCoorFrame with a view frustum.
 // This means that it has several methods for moving it around
@@ -60,10 +60,10 @@ static const F32 MAX_FIELD_OF_VIEW = 190.f * DEG_TO_RAD;
 // roll(), pitch(), yaw()
 // etc...
 
-LL_ALIGN_PREFIX(16)
-class LLCamera
+class alignas(16) LLCamera
 :   public LLCoordFrame
 {
+    LL_ALIGN_NEW
 public:
     LLCamera(const LLCamera& rhs)
     {
@@ -120,9 +120,9 @@ public:
     };
 
 private:
-    LL_ALIGN_16(LLPlane mAgentPlanes[AGENT_PLANE_USER_CLIP_NUM]);  //frustum planes in agent space a la gluUnproject (I'm a bastard, I know) - DaveP
-    LL_ALIGN_16(LLPlane mRegionPlanes[AGENT_PLANE_USER_CLIP_NUM]);  //frustum planes in a local region space, derived from mAgentPlanes
-    LL_ALIGN_16(LLPlane mLastAgentPlanes[AGENT_PLANE_USER_CLIP_NUM]);
+    LLPlane mAgentPlanes[AGENT_PLANE_USER_CLIP_NUM];  //frustum planes in agent space a la gluUnproject (I'm a bastard, I know) - DaveP
+    LLPlane mRegionPlanes[AGENT_PLANE_USER_CLIP_NUM];  //frustum planes in a local region space, derived from mAgentPlanes
+    LLPlane mLastAgentPlanes[AGENT_PLANE_USER_CLIP_NUM];
     U8 mPlaneMask[PLANE_MASK_NUM];         // 8 for alignment
 
     F32 mView;                  // angle between top and bottom frustum planes in radians.
@@ -145,12 +145,12 @@ public:
 public:
     LLCamera();
     LLCamera(F32 vertical_fov_rads, F32 aspect_ratio, S32 view_height_in_pixels, F32 near_plane, F32 far_plane);
-    virtual ~LLCamera() = default;
+    virtual ~LLCamera();
 
     bool isChanged(); //check if mAgentPlanes changed since last frame.
 
     LLPlane getUserClipPlane();
-    void setUserClipPlane(const LLPlane& plane);
+    void setUserClipPlane(LLPlane& plane);
     void disableUserClipPlane();
     virtual void setView(F32 vertical_fov_rads);
     void setViewHeightInPixels(S32 height);
@@ -218,7 +218,7 @@ protected:
     void calculateFrustumPlanes();
     void calculateFrustumPlanes(F32 left, F32 right, F32 top, F32 bottom);
     void calculateFrustumPlanesFromWindow(F32 x1, F32 y1, F32 x2, F32 y2);
-} LL_ALIGN_POSTFIX(16);
+};
 
 
 #endif

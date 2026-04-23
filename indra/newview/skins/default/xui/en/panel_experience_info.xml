@@ -23,7 +23,7 @@
     left="3"
     right="-3"/>
   <scroll_container
-    color="PanelDefaultBackgroundColor"
+    color="DkGray2"
     follows="all"
     height="532"
     layout="topleft"
@@ -33,7 +33,7 @@
     top_pad="10"
     width="330">
     <panel
-      bg_alpha_color="PanelDefaultBackgroundColor"
+      bg_alpha_color="DkGray2"
       follows="top|left"
       height="480"
       layout="topleft"
@@ -303,7 +303,7 @@
           <icon
             follows="top|left"
             height="16"
-            image_name="Parcel_M_Dark"
+            image_name="unknown"
             layout="topleft"
             left_pad="10"
             name="maturity_icon"

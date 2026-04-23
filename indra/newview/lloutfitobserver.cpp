@@ -32,13 +32,7 @@
 #include "llviewerinventory.h"
 
 LLOutfitObserver::LLOutfitObserver() :
-    mCOFLastVersion(LLViewerInventoryCategory::VERSION_UNKNOWN),
-    mLastOutfitDirtiness(false),
-    mBOFReplaced(),
-    mBOFChanged(),
-    mCOFChanged(),
-    mCOFSaved(),
-    mOutfitLockChanged()
+    mCOFLastVersion(LLViewerInventoryCategory::VERSION_UNKNOWN)
 {
     gInventory.addObserver(this);
 }

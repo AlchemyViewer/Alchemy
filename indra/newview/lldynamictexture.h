@@ -33,7 +33,7 @@
 #include "llviewertexture.h"
 #include "llcamera.h"
 
-class LLViewerDynamicTexture : public LLViewerTexture
+class alignas(16) LLViewerDynamicTexture : public LLViewerTexture
 {
     LL_ALIGN_NEW
 public:
@@ -60,7 +60,7 @@ public:
                      S32 height,
                      S32 components,        // = 4,
                      EOrder order,          // = ORDER_MIDDLE,
-                     BOOL clamp);
+                     bool clamp);
 
     /*virtual*/ S8 getType() const ;
 
@@ -69,15 +69,15 @@ public:
 
     S32         getSize()       { return mFullWidth * mFullHeight * mComponents; }
 
-    virtual BOOL needsRender() { return TRUE; }
-    virtual void preRender(BOOL clear_depth = TRUE);
-    virtual BOOL render();
-    virtual void postRender(BOOL success);
+    virtual bool needsRender() { return true; }
+    virtual void preRender(bool clear_depth = true);
+    virtual bool render();
+    virtual void postRender(bool success);
 
     virtual void restoreGLTexture() {}
     virtual void destroyGLTexture() {}
 
-    static BOOL updateAllInstances();
+    static bool updateAllInstances();
     static void destroyGL() ;
     static void restoreGL() ;
 
@@ -85,12 +85,12 @@ public:
 
 protected:
     void generateGLTexture();
-    void generateGLTexture(LLGLint internal_format, LLGLenum primary_format, LLGLenum type_format, BOOL swap_bytes = FALSE);
+    void generateGLTexture(LLGLint internal_format, LLGLenum primary_format, LLGLenum type_format, bool swap_bytes = false);
 
 protected:
-    BOOL mClamp;
+    bool mClamp;
     LLCoordGL mOrigin;
-    LL_ALIGN_16(LLCamera mCamera);
+    LLCamera mCamera;
 
     LLRenderTarget* mBoundTarget;
 

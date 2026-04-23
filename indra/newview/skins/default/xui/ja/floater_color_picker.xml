@@ -5,49 +5,38 @@
 			<text name="r_val_text">
 				赤：
 			</text>
-			<spinner name="rspin"/>
 			<text name="g_val_text">
 				緑：
 			</text>
-			<spinner name="gspin"/>
 			<text name="b_val_text">
 				青：
 			</text>
-			<spinner name="bspin"/>
 		</panel>
 		<panel name="LSL" label="LSL">
 			<text name="r_val_text_float">
 				赤：
 			</text>
-			<spinner name="rspin_float"/>
 			<text name="g_val_text_float">
 				緑：
 			</text>
-			<spinner name="gspin_float"/>
 			<text name="b_val_text_float">
 				青：
 			</text>
-			<spinner name="bspin_float"/>
 		</panel>
 	</tab_container>
 	<text name="h_val_text">
 		色相：
 	</text>
-	<spinner name="hspin"/>
 	<text name="s_val_text">
 		彩度：
 	</text>
-	<spinner name="sspin"/>
 	<text name="l_val_text">
 		輝度：
 	</text>
-	<spinner name="lspin"/>
 	<text name="hex_text">
 		Hex #
 	</text>
-	<line_editor name="hex_value"/>
 	<check_box label="すぐ適用" name="apply_immediate"/>
-	<button name="color_pipette"/>
 	<button label="ＯＫ" label_selected="ＯＫ" name="select_btn"/>
 	<button label="キャンセル" label_selected="キャンセル" name="cancel_btn"/>
 	<text tool_tip="パレットの下にドラッグして保存" name="Current color:">

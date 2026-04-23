@@ -27,11 +27,12 @@
 // Use me only if you need to stub out some helper functions, not if you e.g. need sane numbers from countFilesInDir
 
 LLDir::LLDir() {}
-BOOL LLDir::deleteFilesInDir(const std::string &dirname, const std::string &mask) { return true; }
+LLDir::~LLDir() {}
+S32 LLDir::deleteFilesInDir(const std::string &dirname, const std::string &mask) { return 1; }
 void LLDir::setChatLogsDir(const std::string &path) {}
-void LLDir::setPerAccountChatLogsDir(const std::string &, const std::string &gridname) {}
+void LLDir::setPerAccountChatLogsDir(const std::string &) {}
 void LLDir::updatePerAccountChatLogsDir() {}
-void LLDir::setLindenUserDir(const std::string &, const std::string &gridname) {}
+void LLDir::setLindenUserDir(const std::string &) {}
 void LLDir::setSkinFolder(const std::string &skin_folder, const std::string& language) {}
 bool LLDir::setCacheDir(const std::string &path) { return true; }
 void LLDir::dumpCurrentDirectories(LLError::ELevel) {}

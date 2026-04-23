@@ -35,15 +35,13 @@
 #include <boost/bind.hpp>
 #include "llautoreplace.h"
 
-class LLFloaterAutoReplaceSettings final : public LLFloater
+class LLFloaterAutoReplaceSettings : public LLFloater
 {
 public:
     LLFloaterAutoReplaceSettings(const LLSD& key);
 
-    /*virtual*/ BOOL postBuild();
-    /*virtual*/ void onClose(bool app_quitting);
-
-    void setData(void * data);
+    bool postBuild() override;
+    void onClose(bool app_quitting) override;
 
 private:
 
@@ -107,6 +105,8 @@ private:
     bool callbackNewListName(const LLSD& notification, const LLSD& response);
     /// called from the RenameAutoReplaceList notification dialog
     bool callbackListNameConflict(const LLSD& notification, const LLSD& response);
+    /// called from the RemoveAutoReplaceList notification dialog
+    bool callbackRemoveList(const LLSD& notification, const LLSD& response);
 
     bool selectedListIsFirst();
     bool selectedListIsLast();

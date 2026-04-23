@@ -33,7 +33,7 @@
 // For return values of set*
 #include "lllslconstants.h"
 
-class LLMediaEntry final
+class LLMediaEntry
 {
 public:
     enum MediaControls {
@@ -46,7 +46,7 @@ public:
     LLMediaEntry(const LLMediaEntry &rhs);
 
     LLMediaEntry &operator=(const LLMediaEntry &rhs);
-    ~LLMediaEntry();
+    virtual ~LLMediaEntry();
 
     bool operator==(const LLMediaEntry &rhs) const;
     bool operator!=(const LLMediaEntry &rhs) const;

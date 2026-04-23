@@ -27,9 +27,9 @@
 #ifndef LL_LLCHATBAR_H
 #define LL_LLCHATBAR_H
 
+#include "llpanel.h"
 #include "llframetimer.h"
 #include "llchat.h"
-#include "llfloater.h"
 
 class LLLineEditor;
 class LLMessageSystem;
@@ -40,42 +40,46 @@ class LLChatBarGestureObserver;
 class LLComboBox;
 
 
-class LLChatBar final
-:   public LLFloater
+class LLChatBar
+:   public LLPanel
 {
 public:
     // constructor for inline chat-bars (e.g. hosted in chat history window)
-    LLChatBar(const LLSD& key);
+    LLChatBar();
+    ~LLChatBar();
+    virtual bool postBuild();
 
-    BOOL        postBuild() override;
-    void        onOpen(const LLSD& key) override;
-    BOOL        handleKeyHere(KEY key, MASK mask) override;
-    void        onFocusLost() override;
+    virtual bool handleKeyHere(KEY key, MASK mask);
 
-// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
-    /*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
-
-    typedef boost::signals2::signal<void (LLUICtrl* ctrl, S32 width, S32 height)> reshape_signal_t;
-    boost::signals2::connection setReshapeCallback(const reshape_signal_t::slot_type& cb);
-// [/SL:KB]
-
-    void        refresh() override;
+    void        refresh();
     void        refreshGestures();
 
     // Move cursor into chat input field.
-    void        setKeyboardFocus(BOOL b);
+    void        setKeyboardFocus(bool b);
 
     // Ignore arrow keys for chat bar
-    void        setIgnoreArrowKeys(BOOL b);
+    void        setIgnoreArrowKeys(bool b);
 
-    BOOL        inputEditorHasFocus() const;
-    std::string getCurrentChat() const;
+    bool        inputEditorHasFocus();
+    std::string getCurrentChat();
 
     // since chat bar logic is reused for chat history
     // gesture combo box might not be a direct child
     void        setGestureCombo(LLComboBox* combo);
 
+    // Send a chat (after stripping /20foo channel chats).
+    // "Animate" means the nodding animation for regular text.
+    void        sendChatFromViewer(const LLWString &wtext, EChatType type, bool animate);
+    void        sendChatFromViewer(const std::string &utf8text, EChatType type, bool animate);
+
+    // If input of the form "/20foo" or "/20 foo", returns "foo" and channel 20.
+    // Otherwise returns input and channel 0.
+    LLWString stripChannelNumber(const LLWString &mesg, S32* channel);
+
     // callbacks
+    void onClickSay(LLUICtrl* ctrl);
+
+    static void onTabClick( void* userdata );
     static void onInputEditorKeystroke(LLLineEditor* caller, void* userdata);
     static void onInputEditorFocusLost();
     static void onInputEditorGainFocus();
@@ -85,27 +89,24 @@ public:
     static void startChat(const char* line);
     static void stopChat();
 
-    static void updateChatFont();
+protected:
+    void sendChat(EChatType type);
+    void updateChat();
 
 protected:
-    ~LLChatBar();
-
-    void sendChat(EChatType type);
-
     LLLineEditor*   mInputEditor;
 
     LLFrameTimer    mGestureLabelTimer;
 
-    BOOL            mIsBuilt;
+    // Which non-zero channel did we last chat on?
+    S32             mLastSpecialChatChannel;
+
+    bool            mIsBuilt;
     LLComboBox*     mGestureCombo;
 
     LLChatBarGestureObserver* mObserver;
-
-// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
-    reshape_signal_t*       mReshapeSignal = nullptr;
-// [/SL:KB]
-
-    boost::signals2::connection mChatFontSizeConnection;
 };
+
+extern LLChatBar *gChatBar;
 
 #endif

@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater
- positioning="centered"
- save_rect="true"
  legacy_header_height="18"
  height="475"
  min_height="475"
@@ -107,7 +105,7 @@
      height="20"
      layout="topleft"
      left_delta="104"
-     max_length_bytes="63"
+     max_length_bytes="31"
      name="replace_editor"
      tool_tip="Replace the trigger word(s) with these words. For example, trigger &apos;hello&apos; replace with &apos;howdy&apos; will turn the chat &apos;I wanted to say hello&apos; into &apos;I wanted to say howdy&apos; as well as playing the gesture"
      top_delta="-4"
@@ -147,12 +145,12 @@
      length="1"
      follows="top|left"
      font="SansSerifSmall"
-     height="18"
+     height="10"
      layout="topleft"
      left="10"
      font.style="BOLD"
      name="library_label"
-     top_pad="5"
+     top_delta="25"
      width="100">
         Library:
     </text>
@@ -162,7 +160,7 @@
      layout="topleft"
      left="10"
      name="library_list"
-     top_pad="2"
+     top_delta="15"
      width="180">
         <scroll_list.rows
          name="action_animation"
@@ -191,7 +189,7 @@
      length="1"
      follows="top|left"
      font="SansSerifSmall"
-     height="18"
+     height="10"
      layout="topleft"
      left="10"
      font.style="BOLD"
@@ -206,7 +204,7 @@
      layout="topleft"
      left="10"
      name="step_list"
-     top_pad="2"
+     top_pad="5"
      width="180" />
     <button
      follows="top|left"

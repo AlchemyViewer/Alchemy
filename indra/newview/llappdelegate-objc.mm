@@ -25,12 +25,19 @@
  */
 
 #import "llappdelegate-objc.h"
-#if defined(AL_SENTRY)
-#import "Sentry.h"
+#if defined(LL_BUGSPLAT)
+#include <filesystem>
+#include <vector>
+@import BugSplatMac;
+// derived from BugsplatMac's BugsplatTester/AppDelegate.m
+@interface LLAppDelegate () <BugSplatDelegate>
+@end
 #endif
 #include "llwindowmacosx-objc.h"
 #include "llappviewermacosx-for-objc.h"
 #include <Carbon/Carbon.h> // Used for Text Input Services ("Safe" API - it's supported)
+
+#include "llversioninfovars.h"
 
 @implementation LLAppDelegate
 
@@ -39,6 +46,12 @@
 @synthesize inputView;
 @synthesize currentInputLanguage;
 
+- (void)dealloc
+{
+    [currentInputLanguage release];
+    [super dealloc];
+}
+
 - (void) applicationWillFinishLaunching:(NSNotification *)notification
 {
     [[NSAppleEventManager sharedAppleEventManager] setEventHandler:self andSelector:@selector(handleGetURLEvent:withReplyEvent:) forEventClass:kInternetEventClass andEventID:kAEGetURL];
@@ -46,40 +59,51 @@
 
 - (void) applicationDidFinishLaunching:(NSNotification *)notification
 {
-	// Call constructViewer() first so our logging subsystem is in place. This
-	// risks missing crashes in the LLAppViewerMacOSX constructor, but for
-	// present purposes it's more important to get the startup sequence
-	// properly logged.
-	// Someday I would like to modify the logging system so that calls before
-	// it's initialized are cached in a std::ostringstream and then, once it's
-	// initialized, "played back" into whatever handlers have been set up.
-	constructViewer();
+    // Call constructViewer() first so our logging subsystem is in place. This
+    // risks missing crashes in the LLAppViewerMacOSX constructor, but for
+    // present purposes it's more important to get the startup sequence
+    // properly logged.
+    // Someday I would like to modify the logging system so that calls before
+    // it's initialized are cached in a std::ostringstream and then, once it's
+    // initialized, "played back" into whatever handlers have been set up.
+    constructViewer();
 
-#if defined(AL_SENTRY)
-    [SentrySDK startWithConfigureOptions:^(SentryOptions *options) {
-        options.dsn = @SENTRY_DSN;
-        options.debug = NO;
-        options.releaseName = @LL_VIEWER_CHANNEL_AND_VERSION;
-        options.enableAppHangTracking = NO;
-    }];
+#if defined(LL_BUGSPLAT)
+    infos("bugsplat setup");
+    // Engage BugSplat *before* calling initViewer() to handle
+    // any crashes during initialization.
+    // https://www.bugsplat.com/docs/platforms/os-x#initialization
+
+    // Initialize BugSplat
+    [[BugSplat shared] setDelegate:self];
+    [[BugSplat shared] setAutoSubmitCrashReport:YES];
+    [[BugSplat shared] setPersistUserDetails:NO];
+    [[BugSplat shared] setAskUserDetails:NO];
+    [BugSplat shared].expirationTimeInterval = 0;
+    [[BugSplat shared] start];
+
+    // Optionally, add some attributes to your crash reports.
+    // Attributes are artibrary key/value pairs that are searchable in the BugSplat dashboard.
+    // [[BugSplat shared] setValue:@"Value of Plain Attribute" forAttribute:@"PlainAttribute"];
+
 #endif
-    
-	frameTimer = nil;
+    infos("post-bugsplat setup");
 
-	[self languageUpdated];
+    frameTimer = nil;
 
-	if (initViewer())
-	{
-		// Set up recurring calls to oneFrame (repeating timer with timeout 0)
-		// until applicationShouldTerminate.
-		frameTimer = [NSTimer timerWithTimeInterval:0.0001 target:self
-							  selector:@selector(oneFrame) userInfo:nil repeats:YES];
-        [[NSRunLoop currentRunLoop] addTimer:frameTimer forMode:NSRunLoopCommonModes];
-	} else {
-		exit(0);
-	}
+    [self languageUpdated];
 
-	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(languageUpdated) name:@"NSTextInputContextKeyboardSelectionDidChangeNotification" object:nil];
+    if (initViewer())
+    {
+        // Set up recurring calls to oneFrame (repeating timer with timeout 0)
+        // until applicationShouldTerminate.
+        frameTimer = [NSTimer scheduledTimerWithTimeInterval:0.0 target:self
+                              selector:@selector(oneFrame) userInfo:nil repeats:YES];
+    } else {
+        exit(0);
+    }
+
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(languageUpdated) name:@"NSTextInputContextKeyboardSelectionDidChangeNotification" object:nil];
 
  //   [[NSAppleEventManager sharedAppleEventManager] setEventHandler:self andSelector:@selector(handleGetURLEvent:withReplyEvent:) forEventClass:kInternetEventClass andEventID:kAEGetURL];
 }
@@ -97,74 +121,74 @@
 
 - (void) applicationDidBecomeActive:(NSNotification *)notification
 {
-	callWindowFocus();
+    callWindowFocus();
 }
 
 - (void) applicationDidResignActive:(NSNotification *)notification
 {
-	callWindowUnfocus();
+    callWindowUnfocus();
 }
 
 - (void) applicationDidHide:(NSNotification *)notification
 {
-	callWindowHide();
+    callWindowHide();
 }
 
 - (void) applicationDidUnhide:(NSNotification *)notification
 {
-	callWindowUnhide();
+    callWindowUnhide();
 }
 
 - (NSApplicationTerminateReply) applicationShouldTerminate:(NSApplication *)sender
 {
-	// run one frame to assess state
-	if (!pumpMainLoop())
-	{
-		// pumpMainLoop() returns true when done, false if it wants to be
-		// called again. Since it returned false, do not yet cancel
-		// frameTimer.
-		handleQuit();
-		[[NSApplication sharedApplication] stopModal];
-		return NSTerminateCancel;
-	} else {
-		// pumpMainLoop() returned true: it's done. Okay, done with frameTimer.
-		frameTimer = nil;
-		cleanupViewer();
-		return NSTerminateNow;
-	}
+    // run one frame to assess state
+    if (!pumpMainLoop())
+    {
+        // pumpMainLoop() returns true when done, false if it wants to be
+        // called again. Since it returned false, do not yet cancel
+        // frameTimer.
+        handleQuit();
+        [[NSApplication sharedApplication] stopModal];
+        return NSTerminateCancel;
+    } else {
+        // pumpMainLoop() returned true: it's done. Okay, done with frameTimer.
+        [frameTimer release];
+        cleanupViewer();
+        return NSTerminateNow;
+    }
 }
 
 - (void) oneFrame
 {
-	bool appExiting = pumpMainLoop();
-	if (appExiting)
-	{
-		// Once pumpMainLoop() reports that we're done, cancel frameTimer:
-		// stop the repetitive calls.
-        frameTimer = nil;
-		[[LLApplication sharedApplication] terminate:self];
-	}
+    bool appExiting = pumpMainLoop();
+    if (appExiting)
+    {
+        // Once pumpMainLoop() reports that we're done, cancel frameTimer:
+        // stop the repetitive calls.
+        [frameTimer release];
+        [[NSApplication sharedApplication] terminate:self];
+    }
 }
 
 - (void) showInputWindow:(bool)show withEvent:(NSEvent*)textEvent
 {
-	if (![self romanScript])
-	{
-		if (show)
-		{
-			NSLog(@"Showing input window.");
-			[inputWindow makeKeyAndOrderFront:inputWindow];
+    if (![self romanScript])
+    {
+        if (show)
+        {
+            NSLog(@"Showing input window.");
+            [inputWindow makeKeyAndOrderFront:inputWindow];
             if (textEvent != nil)
             {
                 [[inputView inputContext] discardMarkedText];
                 [[inputView inputContext] handleEvent:textEvent];
             }
-		} else {
-			NSLog(@"Hiding input window.");
-			[inputWindow orderOut:inputWindow];
-			[window makeKeyAndOrderFront:window];
-		}
-	}
+        } else {
+            NSLog(@"Hiding input window.");
+            [inputWindow orderOut:inputWindow];
+            [window makeKeyAndOrderFront:window];
+        }
+    }
 }
 
 // This will get called multiple times by NSNotificationCenter.
@@ -174,15 +198,15 @@
 
 - (void) languageUpdated
 {
-	TISInputSourceRef currentInput = TISCopyCurrentKeyboardInputSource();
-	CFArrayRef languages = (CFArrayRef)TISGetInputSourceProperty(currentInput, kTISPropertyInputSourceLanguages);
-	
+    TISInputSourceRef currentInput = TISCopyCurrentKeyboardInputSource();
+    CFArrayRef languages = (CFArrayRef)TISGetInputSourceProperty(currentInput, kTISPropertyInputSourceLanguages);
+
 #if 0 // In the event of ever needing to add new language sources, change this to 1 and watch the terminal for "languages:"
-	NSLog(@"languages: %@", TISGetInputSourceProperty(currentInput, kTISPropertyInputSourceLanguages));
+    NSLog(@"languages: %@", TISGetInputSourceProperty(currentInput, kTISPropertyInputSourceLanguages));
 #endif
-	
-	// Typically the language we want is going to be the very first result in the array.
-	currentInputLanguage = (NSString*)CFArrayGetValueAtIndex(languages, 0);
+
+    // Typically the language we want is going to be the very first result in the array.
+    currentInputLanguage = (NSString*)CFArrayGetValueAtIndex(languages, 0);
 }
 
 - (bool) romanScript
@@ -196,13 +220,58 @@
             return false;
         }
     }
-    
+
     return true;
+}
+
+- (void) setBugsplatValue:(nullable NSString *)value forAttribute:(NSString *)attribute
+{
+#if defined(LL_BUGSPLAT)
+    //[[BugSplat shared] setValue:@"Value of not so plain <value> Attribute" forAttribute:@"NotSoPlainAttribute"];
+    [[BugSplat shared] setValue:value forAttribute:attribute];
+#endif // LL_BUGSPLAT
 }
 
 #if defined(LL_BUGSPLAT)
 
-- (NSString *)applicationLogForBugsplatStartupManager:(BugsplatStartupManager *)bugsplatStartupManager
+- (void)bugSplatWillSendCrashReport:(BugSplat *)bugSplat
+{
+    infos("bugSplatWillSendCrashReport");
+}
+
+- (void)bugSplatWillSendCrashReportsAlways:(BugSplat *)bugSplat
+{
+    infos("bugSplatWillSendCrashReportsAlways");
+}
+
+- (void)bugSplatDidFinishSendingCrashReport:(BugSplat *)bugSplat
+{
+    infos("bugSplatDidFinishSendingCrashReport");
+
+    if(!secondLogPath.empty())
+    {
+        std::filesystem::remove(secondLogPath);
+    }
+    clearDumpLogsDir();
+}
+
+- (void)bugSplatWillCancelSendingCrashReport:(BugSplat *)bugSplat
+{
+    infos("bugSplatWillCancelSendingCrashReport");
+}
+
+- (void)bugSplatWillShowSubmitCrashReportAlert:(BugSplat *)bugSplat
+{
+    infos("bugSplatWillShowSubmitCrashReportAlert");
+}
+
+- (void)bugSplat:(BugSplat *)bugSplat didFailWithError:(NSError *)error
+{
+    std::string error_str([[error localizedDescription] UTF8String]);
+    infos("bugSplat:didFailWithError: " + error_str);
+}
+
+- (NSString *)applicationLogForBugSplat:(BugSplat *)bugSplat;
 {
     CrashMetadata& meta(CrashMetadata_instance());
     // As of BugsplatMac 1.0.6, userName and userEmail properties are now
@@ -213,16 +282,21 @@
     // report we are about to send.
     infos("applicationLogForBugsplatStartupManager setting userName = '" +
           meta.agentFullname + '"');
-    bugsplatStartupManager.userName =
+    bugSplat.userName =
         [NSString stringWithCString:meta.agentFullname.c_str()
                            encoding:NSUTF8StringEncoding];
     // Use the email field for OS version, just as we do on Windows, until
     // BugSplat provides more metadata fields.
     infos("applicationLogForBugsplatStartupManager setting userEmail = '" +
           meta.OSInfo + '"');
-    bugsplatStartupManager.userEmail =
+    bugSplat.userEmail =
         [NSString stringWithCString:meta.OSInfo.c_str()
                            encoding:NSUTF8StringEncoding];
+
+    //bugSplat.userID =
+    //    [NSString stringWithCString:meta.regionName.c_str()
+    //                       encoding:NSUTF8StringEncoding];
+
     // This strangely-named override method's return value contributes the
     // User Description metadata field.
     infos("applicationLogForBugsplatStartupManager -> '" + meta.fatalMessage + "'");
@@ -230,7 +304,8 @@
                               encoding:NSUTF8StringEncoding];
 }
 
-- (NSString *)applicationKeyForBugsplatStartupManager:(BugsplatStartupManager *)bugsplatStartupManager signal:(NSString *)signal exceptionName:(NSString *)exceptionName exceptionReason:(NSString *)exceptionReason {
+- (NSString *)applicationKeyForBugSplat:(BugSplat *)bugSplat signal:(NSString *)signal exceptionName:(NSString *)exceptionName exceptionReason:(NSString *)exceptionReason
+{
     // TODO: exceptionName, exceptionReason
 
     // Windows sends location within region as well, but that's because
@@ -245,39 +320,18 @@
                               encoding:NSUTF8StringEncoding];
 }
 
-- (NSString *)defaultUserNameForBugsplatStartupManager:(BugsplatStartupManager *)bugsplatStartupManager {
-    std::string agentFullname(CrashMetadata_instance().agentFullname);
-    infos("defaultUserNameForBugsplatStartupManager -> '" + agentFullname + "'");
-    return [NSString stringWithCString:agentFullname.c_str()
-                              encoding:NSUTF8StringEncoding];
-}
-
-- (NSString *)defaultUserEmailForBugsplatStartupManager:(BugsplatStartupManager *)bugsplatStartupManager {
-    // Use the email field for OS version, just as we do on Windows, until
-    // BugSplat provides more metadata fields.
-    std::string OSInfo(CrashMetadata_instance().OSInfo);
-    infos("defaultUserEmailForBugsplatStartupManager -> '" + OSInfo + "'");
-    return [NSString stringWithCString:OSInfo.c_str()
-                              encoding:NSUTF8StringEncoding];
-}
-
-- (void)bugsplatStartupManagerWillSendCrashReport:(BugsplatStartupManager *)bugsplatStartupManager
-{
-    infos("bugsplatStartupManagerWillSendCrashReport");
-}
-
 struct AttachmentInfo
 {
     AttachmentInfo(const std::string& path, const std::string& type):
         pathname(path),
-        basename(boost::filesystem::path(path).filename().string()),
+        basename(std::filesystem::path(path).filename().string()),
         mimetype(type)
     {}
 
     std::string pathname, basename, mimetype;
 };
 
-- (NSArray<BugsplatAttachment *> *)attachmentsForBugsplatStartupManager:(BugsplatStartupManager *)bugsplatStartupManager
+- (NSArray<BugSplatAttachment *> *)attachmentsForBugSplat:(BugSplat *)bugSplat
 {
     const CrashMetadata& metadata(CrashMetadata_instance());
 
@@ -288,7 +342,8 @@ struct AttachmentInfo
         AttachmentInfo(metadata.logFilePathname,      "text/plain"),
         AttachmentInfo(metadata.userSettingsPathname, "text/xml"),
         AttachmentInfo(metadata.accountSettingsPathname, "text/xml"),
-        AttachmentInfo(metadata.staticDebugPathname,  "text/xml")
+        AttachmentInfo(metadata.staticDebugPathname,  "text/xml"),
+        AttachmentInfo(metadata.attributesPathname,  "text/xml")
     };
 
     secondLogPath = metadata.secondLogFilePathname;
@@ -297,14 +352,14 @@ struct AttachmentInfo
         info.push_back(AttachmentInfo(secondLogPath,  "text/xml"));
     }
 
-    // We "happen to know" that info[0].basename is "SecondLife.old" -- due to
+    // We "happen to know" that info[0].basename is "SecondLife.crash" -- due to
     // the fact that BugsplatMac only notices a crash during the viewer run
-    // following the crash. 
+    // following the crash.
     // The Bugsplat service doesn't respect the MIME type above when returning
     // the log data to a browser, so take this opportunity to rename the file
-    // from <base>.old to <base>_log.txt
-    info[0].basename = 
-        boost::filesystem::path(info[0].pathname).stem().string() + "_log.txt";
+    // from <base>.crash to <base>_log.txt
+    info[0].basename =
+        std::filesystem::path(info[0].pathname).stem().string() + "_log.txt";
     infos("attachmentsForBugsplatStartupManager attaching log " + info[0].basename);
 
     NSMutableArray *attachments = [[NSMutableArray alloc] init];
@@ -320,8 +375,8 @@ struct AttachmentInfo
                                                   encoding:NSUTF8StringEncoding];
         NSData *nsdata = [NSData dataWithContentsOfFile:nspathname];
 
-        BugsplatAttachment *attachment =
-            [[BugsplatAttachment alloc] initWithFilename:nsbasename
+        BugSplatAttachment *attachment =
+            [[BugSplatAttachment alloc] initWithFilename:nsbasename
                                           attachmentData:nsdata
                                              contentType:nsmimetype];
 
@@ -332,23 +387,6 @@ struct AttachmentInfo
     return attachments;
 }
 
-- (void)bugsplatStartupManagerDidFinishSendingCrashReport:(BugsplatStartupManager *)bugsplatStartupManager
-{
-    infos("Sent crash report to BugSplat");
-
-    if(!secondLogPath.empty())
-    {
-        boost::filesystem::remove(secondLogPath);
-    }
-    clearDumpLogsDir();
-}
-
-- (void)bugsplatStartupManager:(BugsplatStartupManager *)bugsplatStartupManager didFailWithError:(NSError *)error
-{
-    // TODO: message string from NSError
-    infos("Could not send crash report to BugSplat");
-}
-
 #endif // LL_BUGSPLAT
 
 @end
@@ -357,14 +395,13 @@ struct AttachmentInfo
 
 - (void)sendEvent:(NSEvent *)event
 {
+    startWatchdog("sendEvent"); // events are outside pumpMainLoop
+    [super sendEvent:event];
     if ([event type] == NSEventTypeKeyUp && ([event modifierFlags] & NSEventModifierFlagCommand))
-    {   
+    {
         [[self keyWindow] sendEvent:event];
     }
-    else
-    {
-        [super sendEvent:event];
-    }
+    stopWatchdog(); // leaving scope
 }
 
 @end

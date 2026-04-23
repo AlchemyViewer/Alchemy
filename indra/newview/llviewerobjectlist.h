@@ -30,6 +30,8 @@
 #include <map>
 #include <set>
 
+#include <boost/unordered_map.hpp>
+
 // common includes
 #include "llstring.h"
 #include "lltrace.h"
@@ -38,10 +40,6 @@
 #include "llviewerobject.h"
 #include "lleventcoro.h"
 #include "llcoros.h"
-
-// system includes
-#include <boost/unordered/unordered_flat_map.hpp>
-#include <boost/unordered/unordered_map.hpp>
 
 class LLCamera;
 class LLNetMap;
@@ -78,11 +76,11 @@ public:
 
     LLViewerObject *replaceObject(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp); // TomY: hack to switch VO instances on the fly
 
-    BOOL killObject(LLViewerObject *objectp);
+    bool killObject(LLViewerObject *objectp);
     void killObjects(LLViewerRegion *regionp); // Kill all objects owned by a particular region.
     void killAllObjects();
 
-    void cleanDeadObjects(const BOOL use_timer = TRUE); // Clean up the dead object list.
+    void cleanDeadObjects(const bool use_timer = true); // Clean up the dead object list.
 
     // Simulator and viewer side object updates...
     void processUpdateCore(LLViewerObject* objectp, void** data, U32 block, const EObjectUpdateType update_type,
@@ -177,7 +175,7 @@ public:
 
     // if we paused in the last frame
     // used to discount stats from this frame
-    BOOL mWasPaused;
+    bool mWasPaused;
 
     void getUUIDFromLocal(LLUUID &id,
                                 const U32 local_id,
@@ -186,9 +184,10 @@ public:
     void setUUIDAndLocal(const LLUUID &id,
                                 const U32 local_id,
                                 const U32 ip,
-                                const U32 port); // Requires knowledge of message system info!
+                                const U32 port,
+                                LLViewerObject* objectp); // Requires knowledge of message system info!
 
-    BOOL removeFromLocalIDTable(const LLViewerObject* objectp);
+    bool removeFromLocalIDTable(LLViewerObject* objectp);
     // Used ONLY by the orphaned object code.
     U64 getIndex(const U32 local_id, const U32 ip, const U32 port);
 
@@ -208,34 +207,32 @@ protected:
 
     vobj_list_t mMapObjects;
 
+    uuid_set_t   mDeadObjects;
 
-    using uuid_hash_set_t = boost::unordered_multiset<LLUUID>;
-    uuid_hash_set_t   mDeadObjects;
-
-    boost::unordered_flat_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
+    boost::unordered_map<LLUUID, LLPointer<LLViewerObject>> mUUIDObjectMap;
 
     //set of objects that need to update their cost
-    uuid_hash_set_t   mStaleObjectCost;
-    uuid_hash_set_t   mPendingObjectCost;
+    uuid_set_t   mStaleObjectCost;
+    uuid_set_t   mPendingObjectCost;
 
     //set of objects that need to update their physics flags
-    uuid_hash_set_t   mStalePhysicsFlags;
-    uuid_hash_set_t   mPendingPhysicsFlags;
+    uuid_set_t   mStalePhysicsFlags;
+    uuid_set_t   mPendingPhysicsFlags;
 
     std::vector<LLDebugBeacon> mDebugBeacons;
 
     S32 mCurLazyUpdateIndex;
 
     static U32 sSimulatorMachineIndex;
-    boost::unordered_flat_map<U64, U32> mIPAndPortToIndex;
+    std::map<U64, U32> mIPAndPortToIndex;
 
-    boost::unordered_flat_map<U64, LLUUID> mIndexAndLocalIDToUUID;
+    boost::unordered_map<U64, LLUUID> mIndexAndLocalIDToUUID;
 
     friend class LLViewerObject;
 
 private:
     static void reportObjectCostFailure(LLSD &objectList);
-    void fetchObjectCostsCoro(std::string url, uuid_hash_set_t staleObjects);
+    void fetchObjectCostsCoro(std::string url);
 
     static void reportPhysicsFlagFailure(LLSD &obejectList);
     void fetchPhisicsFlagsCoro(std::string url);
@@ -268,15 +265,16 @@ extern LLViewerObjectList gObjectList;
  */
 inline LLViewerObject *LLViewerObjectList::findObject(const LLUUID &id)
 {
+    if (id.isNull())
+        return NULL;
+
     auto iter = mUUIDObjectMap.find(id);
-    if(iter != mUUIDObjectMap.end())
+    if (iter != mUUIDObjectMap.end())
     {
         return iter->second;
     }
-    else
-    {
-        return NULL;
-    }
+
+    return NULL;
 }
 
 inline LLViewerObject *LLViewerObjectList::getObject(const S32 index)

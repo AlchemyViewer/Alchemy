@@ -37,7 +37,7 @@
 #define LL_LLINITDESTROYCLASS_H
 
 #include "llsingleton.h"
-#include <boost/function.hpp>
+#include <functional>
 #include <typeinfo>
 #include <vector>
 #include <utility>                  // std::pair
@@ -50,7 +50,7 @@
 class LLCallbackRegistry
 {
 public:
-    typedef boost::function<void()> func_t;
+    typedef std::function<void()> func_t;
 
     void registerCallback(const std::string& name, const func_t& func)
     {
@@ -74,7 +74,7 @@ private:
  * (before main()), requiring LLInitClassList to be fully constructed on
  * demand regardless of module initialization order.
  */
-class LLInitClassList final :
+class LLInitClassList :
     public LLCallbackRegistry,
     public LLSingleton<LLInitClassList>
 {
@@ -88,7 +88,7 @@ class LLInitClassList final :
  * time (before main()), requiring LLDestroyClassList to be fully constructed
  * on demand regardless of module initialization order.
  */
-class LLDestroyClassList final :
+class LLDestroyClassList :
     public LLCallbackRegistry,
     public LLSingleton<LLDestroyClassList>
 {

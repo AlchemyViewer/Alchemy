@@ -5,7 +5,6 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * Copyright (C) 2010-2017, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,7 +27,7 @@
 #ifndef LL_LLIMVIEW_H
 #define LL_LLIMVIEW_H
 
-#include "lldockablefloater.h"
+#include "../llui/lldockablefloater.h"
 #include "lleventtimer.h"
 #include "llinstantmessage.h"
 
@@ -52,7 +51,7 @@ class LLSessionTimeoutTimer : public LLEventTimer
 public:
     LLSessionTimeoutTimer(const LLUUID& session_id, F32 period) : LLEventTimer(period), mSessionId(session_id) {}
     virtual ~LLSessionTimeoutTimer() {};
-    /* virtual */ BOOL tick();
+    /* virtual */ bool tick();
 
 private:
     LLUUID mSessionId;
@@ -62,7 +61,7 @@ private:
 /**
  * Model (MVC) for IM Sessions
  */
-class LLIMModel final :  public LLSingleton<LLIMModel>
+class LLIMModel :  public LLSingleton<LLIMModel>
 {
     LLSINGLETON(LLIMModel);
 
@@ -79,15 +78,6 @@ public:
             ADHOC_SESSION,
             NONE_SESSION,
         } SType;
-
-// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.6
-        enum class SCloseAction
-        {
-            CLOSE_DEFAULT,
-            CLOSE_LEAVE,
-            CLOSE_SNOOZE
-        };
-// [/SL:KB]
 
         LLIMSession(const LLUUID& session_id, const std::string& name,
             const EInstantMessage& type, const LLUUID& other_participant_id, const LLSD& voiceChannelInfo, const uuid_vec_t& ids, bool has_offline_msg);
@@ -132,10 +122,6 @@ public:
         std::string mName;
         EInstantMessage mType;
         SType mSessionType;
-// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.6
-        SCloseAction mCloseAction = SCloseAction::CLOSE_DEFAULT;
-        int mSnoozeDuration = -1;
-// [/SL:KB]
         LLUUID mOtherParticipantID;
         uuid_vec_t mInitialTargetIDs;
         std::string mHistoryFileName;
@@ -185,7 +171,7 @@ public:
 
 
     /** Session id to session object */
-    boost::unordered_flat_map<LLUUID, LLIMSession*> mId2SessionMap;
+    std::map<LLUUID, LLIMSession*> mId2SessionMap;
 
     typedef boost::signals2::signal<void(const LLSD&)> session_signal_t;
     session_signal_t mNewMsgSignal;
@@ -314,7 +300,7 @@ public:
     static void sendLeaveSession(const LLUUID& session_id, const LLUUID& other_participant_id);
     static bool sendStartSession(const LLUUID& temp_session_id, const LLUUID& other_participant_id,
                           const uuid_vec_t& ids, EInstantMessage dialog, bool p2p_as_adhoc_call);
-    static void sendTypingState(LLUUID session_id, LLUUID other_participant_id, BOOL typing);
+    static void sendTypingState(LLUUID session_id, LLUUID other_participant_id, bool typing);
     static void sendMessage(const std::string& utf8_text, const LLUUID& im_session_id,
                                 const LLUUID& other_participant_id, EInstantMessage dialog);
 
@@ -347,7 +333,7 @@ class LLIMSessionObserver
 {
 public:
     virtual ~LLIMSessionObserver() {}
-    virtual void sessionAdded(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id, BOOL has_offline_msg) = 0;
+    virtual void sessionAdded(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id, bool has_offline_msg) = 0;
     virtual void sessionActivated(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id) = 0;
     virtual void sessionVoiceOrIMStarted(const LLUUID& session_id) = 0;
     virtual void sessionRemoved(const LLUUID& session_id) = 0;
@@ -355,7 +341,7 @@ public:
 };
 
 
-class LLIMMgr final : public LLSingleton<LLIMMgr>
+class LLIMMgr : public LLSingleton<LLIMMgr>
 {
     LLSINGLETON(LLIMMgr);
     friend class LLIMModel;
@@ -382,7 +368,9 @@ public:
                     const LLUUID& region_id = LLUUID::null,
                     const LLVector3& position = LLVector3::zero,
                     bool is_region_msg = false,
-                    U32 timestamp = 0);
+                    U32 timestamp = 0,
+                    LLUUID display_id = LLUUID::null,
+                    std::string_view display_name = "");
 
     void addSystemMessage(const LLUUID& session_id, const std::string& message_name, const LLSD& args);
 
@@ -455,13 +443,7 @@ public:
     // good connection.
     void disconnectAllSessions();
 
-    BOOL hasSession(const LLUUID& session_id);
-
-// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
-    bool checkSnoozeExpiration(const LLUUID& session_id) const;
-    bool isSnoozedSession(const LLUUID& session_id) const;
-    bool restoreSnoozedSession(const LLUUID& session_id);
-// [/SL:KB]
+    bool hasSession(const LLUUID& session_id);
 
     static LLUUID computeSessionID(EInstantMessage dialog, const LLUUID& other_participant_id);
 
@@ -521,7 +503,7 @@ private:
     void noteOfflineUsers(const LLUUID& session_id, const std::vector<LLUUID>& ids);
     void noteMutedUsers(const LLUUID& session_id, const std::vector<LLUUID>& ids);
 
-    void processIMTypingCore(const LLUUID& from_id, const EInstantMessage im_type, BOOL typing);
+    void processIMTypingCore(const LLUUID& from_id, const EInstantMessage im_type, bool typing);
 
     static void onInviteNameLookup(LLSD payload, const LLUUID& id, const LLAvatarName& name);
 
@@ -547,14 +529,9 @@ private:
 
     LLSD mPendingInvitations;
     LLSD mPendingAgentListUpdates;
-
-// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
-    typedef boost::unordered_flat_map<LLUUID, F64> snoozed_sessions_t;
-    snoozed_sessions_t mSnoozedSessions;
-// [/SL:KB]
 };
 
-class LLCallDialogManager final : public LLSingleton<LLCallDialogManager>
+class LLCallDialogManager : public LLSingleton<LLCallDialogManager>
 {
     LLSINGLETON(LLCallDialogManager);
     ~LLCallDialogManager();
@@ -573,6 +550,8 @@ protected:
     std::string mCurrentSessionlName;
     LLIMModel::LLIMSession* mSession;
     LLVoiceChannel::EState mOldState;
+
+    boost::signals2::connection mVoiceChannelChanged;
 };
 
 class LLCallDialog : public LLDockableFloater
@@ -581,7 +560,7 @@ public:
     LLCallDialog(const LLSD& payload);
     virtual ~LLCallDialog();
 
-    virtual BOOL postBuild();
+    virtual bool postBuild();
 
     void dockToToolbarButton(const std::string& toolbarButtonName);
 
@@ -626,7 +605,7 @@ public:
         }
     }
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     /*virtual*/ void onOpen(const LLSD& key);
 
     static void onAccept(void* user_data);
@@ -652,7 +631,7 @@ class LLOutgoingCallDialog : public LLCallDialog
 public:
     LLOutgoingCallDialog(const LLSD& payload);
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     void show(const LLSD& key);
 
     static void onCancel(void* user_data);

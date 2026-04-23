@@ -35,54 +35,54 @@
 class LLView;
 
 typedef std::list<LLView *>         viewList_t;
-typedef std::pair<BOOL, BOOL>       filterResult_t;
+typedef std::pair<bool, bool>       filterResult_t;
 
 // Abstract base class for all query filters.
 class LLQueryFilter
 {
 public:
-    virtual ~LLQueryFilter() = default;
+    virtual ~LLQueryFilter() {};
     virtual filterResult_t operator() (const LLView* const view, const viewList_t & children) const = 0;
 };
 
 class LLQuerySorter
 {
 public:
-    virtual ~LLQuerySorter() = default;
+    virtual ~LLQuerySorter() {};
     virtual void sort(LLView * parent, viewList_t &children) const;
 };
 
-class LLLeavesFilter final : public LLQueryFilter, public LLSingleton<LLLeavesFilter>
+class LLLeavesFilter : public LLQueryFilter, public LLSingleton<LLLeavesFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLLeavesFilter);
     /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
-class LLRootsFilter final : public LLQueryFilter, public LLSingleton<LLRootsFilter>
+class LLRootsFilter : public LLQueryFilter, public LLSingleton<LLRootsFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLRootsFilter);
     /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
-class LLVisibleFilter final : public LLQueryFilter, public LLSingleton<LLVisibleFilter>
+class LLVisibleFilter : public LLQueryFilter, public LLSingleton<LLVisibleFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLVisibleFilter);
     /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
-class LLEnabledFilter final : public LLQueryFilter, public LLSingleton<LLEnabledFilter>
+class LLEnabledFilter : public LLQueryFilter, public LLSingleton<LLEnabledFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLEnabledFilter);
     /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
-class LLTabStopFilter final : public LLQueryFilter, public LLSingleton<LLTabStopFilter>
+class LLTabStopFilter : public LLQueryFilter, public LLSingleton<LLTabStopFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLTabStopFilter);
     /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
-class LLCtrlFilter final : public LLQueryFilter, public LLSingleton<LLCtrlFilter>
+class LLCtrlFilter : public LLQueryFilter, public LLSingleton<LLCtrlFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLCtrlFilter);
     /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
@@ -93,7 +93,7 @@ class LLWidgetTypeFilter : public LLQueryFilter
 {
     /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const
     {
-        return filterResult_t(dynamic_cast<const T*>(view) != NULL, TRUE);
+        return filterResult_t(dynamic_cast<const T*>(view) != NULL, true);
     }
 
 };
@@ -107,7 +107,7 @@ public:
     typedef filterList_t::const_iterator        filterList_const_iter_t;
 
     LLViewQuery() : mPreFilters(), mPostFilters(), mSorterp() {}
-    virtual ~LLViewQuery() = default;
+    virtual ~LLViewQuery() {}
 
     void addPreFilter(const LLQueryFilter* prefilter) { mPreFilters.push_back(prefilter); }
     void addPostFilter(const LLQueryFilter* postfilter) { mPostFilters.push_back(postfilter); }

@@ -47,69 +47,33 @@ void LLResMgr::setLocale( LLLOCALE_ID locale_id )
     mLocale = locale_id;
 }
 
-char LLResMgr::getDecimalPoint()
+char LLResMgr::getDecimalPoint() const
 {
     char decimal = localeconv()->decimal_point[0];
 
-#if LL_DARWIN
-    // On the Mac, locale support is broken before 10.4, which causes things to go all pear-shaped.
-    if(decimal == 0)
-    {
-        decimal = '.';
-    }
-#endif
-
     return decimal;
 }
 
-char LLResMgr::getThousandsSeparator()
+std::string LLResMgr::getThousandsSeparator() const
 {
-    char separator = localeconv()->thousands_sep[0];
-
-#if LL_DARWIN
-    // On the Mac, locale support is broken before 10.4, which causes things to go all pear-shaped.
-    if(separator == 0)
-    {
-        separator = ',';
-    }
-#endif
-
-    return separator;
+    return localeconv()->thousands_sep;
 }
 
-char LLResMgr::getMonetaryDecimalPoint()
+char LLResMgr::getMonetaryDecimalPoint() const
 {
     char decimal = localeconv()->mon_decimal_point[0];
 
-#if LL_DARWIN
-    // On the Mac, locale support is broken before 10.4, which causes things to go all pear-shaped.
-    if(decimal == 0)
-    {
-        decimal = '.';
-    }
-#endif
-
     return decimal;
 }
 
-char LLResMgr::getMonetaryThousandsSeparator()
+std::string LLResMgr::getMonetaryThousandsSeparator() const
 {
-    char separator = localeconv()->mon_thousands_sep[0];
-
-#if LL_DARWIN
-    // On the Mac, locale support is broken before 10.4, which causes things to go all pear-shaped.
-    if(separator == 0)
-    {
-        separator = ',';
-    }
-#endif
-
-    return separator;
+    return localeconv()->mon_thousands_sep;
 }
 
 
 // Sets output to a string of integers with monetary separators inserted according to the locale.
-std::string LLResMgr::getMonetaryString( S32 input )
+std::string LLResMgr::getMonetaryString( S32 input ) const
 {
     std::string output;
 
@@ -117,7 +81,7 @@ std::string LLResMgr::getMonetaryString( S32 input )
     struct lconv *conv = localeconv();
 
     char* negative_sign = conv->negative_sign;
-    char separator = getMonetaryThousandsSeparator();
+    std::string separator = getMonetaryThousandsSeparator();
     char* grouping = conv->mon_grouping;
 
     // Note on mon_grouping:
@@ -131,9 +95,9 @@ std::string LLResMgr::getMonetaryString( S32 input )
 
 
     // Note: we assume here that the currency symbol goes on the left. (Hey, it's Lindens! We can just decide.)
-    BOOL negative = (input < 0 );
-    BOOL negative_before = negative && (conv->n_sign_posn != 2);
-    BOOL negative_after = negative && (conv->n_sign_posn == 2);
+    bool negative = (input < 0 );
+    bool negative_before = negative && (conv->n_sign_posn != 2);
+    bool negative_after = negative && (conv->n_sign_posn == 2);
 
     std::string digits = llformat("%u", abs(input));
     if( !grouping || !grouping[0] )
@@ -167,12 +131,9 @@ std::string LLResMgr::getMonetaryString( S32 input )
     }
     S32 group_count = cur_group;
 
-    char reversed_output[20] = "";  /* Flawfinder: ignore */
-    char forward_output[20] = "";   /* Flawfinder: ignore */
-    S32 output_pos = 0;
-
+    std::string formatted;
     cur_group = 0;
-    S32 pos = digits.size()-1;
+    S32 pos = static_cast<S32>(digits.size()) - 1;
     S32 count_within_group = 0;
     while( (pos >= 0) && (groupings[cur_group] >= 0) )
     {
@@ -180,7 +141,7 @@ std::string LLResMgr::getMonetaryString( S32 input )
         if( count_within_group > groupings[cur_group] )
         {
             count_within_group = 1;
-            reversed_output[ output_pos++ ] = separator;
+            formatted = separator + formatted;
 
             if( (cur_group + 1) >= group_count )
             {
@@ -192,28 +153,19 @@ std::string LLResMgr::getMonetaryString( S32 input )
                 cur_group++;
             }
         }
-        reversed_output[ output_pos++ ] = digits[pos--];
+        formatted = std::string(1, digits[pos--]) + formatted;
     }
 
     while( pos >= 0 )
     {
-        reversed_output[ output_pos++ ] = digits[pos--];
-    }
-
-
-    reversed_output[ output_pos ] = '\0';
-    forward_output[ output_pos ] = '\0';
-
-    for( S32 i = 0; i < output_pos; i++ )
-    {
-        forward_output[ output_pos - 1 - i ] = reversed_output[ i ];
+        formatted = std::string(1, digits[pos--]) + formatted;
     }
 
     if( negative_before )
     {
         output.append( negative_sign );
     }
-    output.append( forward_output );
+    output.append( formatted );
     if( negative_after )
     {
         output.append( negative_sign );
@@ -221,7 +173,7 @@ std::string LLResMgr::getMonetaryString( S32 input )
     return output;
 }
 
-void LLResMgr::getIntegerString( std::string& output, S32 input )
+void LLResMgr::getIntegerString( std::string& output, S32 input ) const
 {
     // handle special case of input value being zero
     if (input == 0)
@@ -243,11 +195,11 @@ void LLResMgr::getIntegerString( std::string& output, S32 input )
         {
             if (fraction == remaining_count)
             {
-                fraction_string = llformat_to_utf8("%d%c", fraction, getThousandsSeparator());
+                fraction_string = llformat_to_utf8("%d", fraction) + getThousandsSeparator();
             }
             else
             {
-                fraction_string = llformat_to_utf8("%3.3d%c", fraction, getThousandsSeparator());
+                fraction_string = llformat_to_utf8("%3.3d", fraction) + getThousandsSeparator();
             }
             output = fraction_string + output;
         }

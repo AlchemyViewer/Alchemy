@@ -59,7 +59,7 @@ class alignas(16) LLFace
     LL_ALIGN_NEW
 public:
     LLFace(const LLFace& rhs) = delete;
-    LLFace& operator=(const LLFace& rhs) = delete;
+    const LLFace& operator=(const LLFace& rhs) = delete;
 
     enum EMasks
     {
@@ -81,8 +81,8 @@ public:
     }
     ~LLFace()  { destroy(); }
 
-    const LLMatrix4a& getWorldMatrix()  const   { return mVObjp->getWorldMatrix(mXform); }
-    const LLMatrix4a& getRenderMatrix() const;
+    const LLMatrix4& getWorldMatrix()   const   { return mVObjp->getWorldMatrix(mXform); }
+    const LLMatrix4& getRenderMatrix() const;
     U32             getIndicesCount()   const   { return mIndicesCount; };
     S32             getIndicesStart()   const   { return mIndicesIndex; };
     U16             getGeomCount()      const   { return mGeomCount; }      // vertex count for this face
@@ -99,27 +99,29 @@ public:
     void            switchTexture(U32 ch, LLViewerTexture* new_texture);
     void            dirtyTexture();
     LLXformMatrix*  getXform()          const   { return mXform; }
-    BOOL            hasGeometry()       const   { return mGeomCount > 0; }
+    bool            hasGeometry()       const   { return mGeomCount > 0; }
     LLVector3       getPositionAgent()  const;
     LLVector2       surfaceToTexture(LLVector2 surface_coord, const LLVector4a& position, const LLVector4a& normal);
     void            getPlanarProjectedParams(LLQuaternion* face_rot, LLVector3* face_pos, F32* scale) const;
+    bool            calcAlignedPlanarGLTF(const LLFace* align_to, LLVector2* res_st_offset,
+                                        LLVector2* res_st_scale, F32* res_st_rot, S32 gltf_info_index = 0) const;
     bool            calcAlignedPlanarTE(const LLFace* align_to, LLVector2* st_offset,
                                         LLVector2* st_scale, F32* st_rot, LLRender::eTexIndex map = LLRender::DIFFUSE_MAP) const;
 
     U32             getState()          const   { return mState; }
     void            setState(U32 state)         { mState |= state; }
     void            clearState(U32 state)       { mState &= ~state; }
-    BOOL            isState(U32 state)  const   { return ((mState & state) != 0) ? TRUE : FALSE; }
+    bool            isState(U32 state)  const   { return (mState & state) != 0; }
     void            setVirtualSize(F32 size) { mVSize = size; }
     void            setPixelArea(F32 area)  { mPixelArea = area; }
     F32             getVirtualSize() const { return mVSize; }
     F32             getPixelArea() const { return mPixelArea; }
 
-    S32             getIndexInTex(U32 ch) const {llassert(ch < LLRender::NUM_TEXTURE_CHANNELS); return mIndexInTex[ch];}
-    void            setIndexInTex(U32 ch, S32 index) { llassert(ch < LLRender::NUM_TEXTURE_CHANNELS);  mIndexInTex[ch] = index ;}
+    S32             getIndexInTex(U32 ch) const      { llassert(ch < LLRender::NUM_TEXTURE_CHANNELS); return mIndexInTex[ch]; }
+    void            setIndexInTex(U32 ch, S32 index) { llassert(ch < LLRender::NUM_TEXTURE_CHANNELS); mIndexInTex[ch] = index; }
 
     void            setWorldMatrix(const LLMatrix4& mat);
-    const LLTextureEntry* getTextureEntry() const { return mVObjp->getTE(mTEOffset); }
+    const LLTextureEntry* getTextureEntry() const { return mVObjp ? mVObjp->getTE(mTEOffset) : nullptr; }
 
     LLFacePool*     getPool()           const   { return mDrawPoolp; }
     U32             getPoolType()       const   { return mPoolType; }
@@ -147,13 +149,14 @@ public:
     //for volumes
     void updateRebuildFlags();
     bool canRenderAsMask(); // logic helper
-    BOOL getGeometryVolume(const LLVolume& volume,
+    bool getGeometryVolume(const LLVolume& volume,
                             S32 face_index,
-                            const LLMatrix4a& mat_vert,
-                            const LLMatrix4a& mat_normal,
+                            const LLMatrix4& mat_vert,
+                            const LLMatrix3& mat_normal,
                             U16 index_offset,
                             bool force_rebuild = false,
-                            bool no_debug_assert = false);
+                            bool no_debug_assert = false,
+                            bool rebuild_for_gltf = false);
 
     // For avatar
     U16          getGeometryAvatar(
@@ -161,7 +164,7 @@ public:
                                     LLStrider<LLVector3> &normals,
                                     LLStrider<LLVector2> &texCoords,
                                     LLStrider<F32>       &vertex_weights,
-                                    LLStrider<LLVector4a> &clothing_weights);
+                                    LLStrider<LLVector4> &clothing_weights);
 
     // For volumes, etc.
     U16             getGeometry(LLStrider<LLVector3> &vertices,
@@ -174,8 +177,8 @@ public:
 
     void        setSize(S32 numVertices, S32 num_indices = 0, bool align = false);
 
-    BOOL        genVolumeBBoxes(const LLVolume &volume, S32 f,
-                                    const LLMatrix4a& mat_vert, BOOL global_volume = FALSE);
+    bool        genVolumeBBoxes(const LLVolume &volume, S32 f,
+                                    const LLMatrix4& mat_vert_in, bool global_volume = false);
 
     void        init(LLDrawable* drawablep, LLViewerObject* objp);
     void        destroy();
@@ -192,7 +195,7 @@ public:
     S32         getReferenceIndex()         const   { return mReferenceIndex; }
     void        setReferenceIndex(const S32 index)  { mReferenceIndex = index; }
 
-    BOOL        verify(const U32* indices_array = NULL) const;
+    bool        verify(const U32* indices_array = NULL) const;
     void        printDebugInfo() const;
 
     void        setGeomIndex(U16 idx);
@@ -200,16 +203,15 @@ public:
     void        setDrawInfo(LLDrawInfo* draw_info);
 
     F32         getTextureVirtualSize() ;
-    F32         getImportanceToCamera()const {return mImportanceToCamera ;}
     void        resetVirtualSize();
 
     void        setHasMedia(bool has_media)  { mHasMedia = has_media ;}
-    BOOL        hasMedia() const ;
+    bool        hasMedia() const ;
 
     void        setMediaAllowed(bool is_media_allowed)  { mIsMediaAllowed = is_media_allowed; }
-    BOOL        isMediaAllowed() const { return mIsMediaAllowed; }
+    bool        isMediaAllowed() const { return mIsMediaAllowed; }
 
-    BOOL        switchTexture() ;
+    bool        switchTexture() ;
 
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
     bool        isDefaultTexture(U32 nChannel) const;
@@ -231,12 +233,18 @@ public:
     // return true if this face is in an alpha draw pool
     bool isInAlphaPool() const;
 public: //aligned members
+
+    // bounding box of face in drawable space
     LLVector4a      mExtents[2];
+
+    // cached bounding box of rigged face in world space
+    // calculated on-demand by LLFace::calcPixelArea and may not be up-to-date
+    LLVector4a  mRiggedExtents[2] = { LLVector4a(0,0,0), LLVector4a(0,0,0) };
 
 private:
     friend class LLViewerTextureList;
     F32         adjustPartialOverlapPixelArea(F32 cos_angle_to_view_dir, F32 radius );
-    BOOL        calcPixelArea(F32& cos_angle_to_view_dir, F32& radius) ;
+    bool        calcPixelArea(F32& cos_angle_to_view_dir, F32& radius) ;
 public:
     static F32 calcImportanceToCamera(F32 to_view_dir, F32 dist);
     static F32 adjustPixelArea(F32 importance, F32 pixel_area) ;
@@ -251,16 +259,24 @@ public:
     F32         mLastUpdateTime;
     F32         mLastSkinTime;
     F32         mLastMoveTime;
-    LLMatrix4a* mTextureMatrix;
-    LLDrawInfo* mDrawInfo = nullptr;
+    LLMatrix4*  mTextureMatrix;
+    LLMatrix4*  mSpecMapMatrix;
+    LLMatrix4*  mNormalMapMatrix;
+    LLDrawInfo* mDrawInfo;
     LLVOAvatar* mAvatar = nullptr;
     LLMeshSkinInfo* mSkinInfo = nullptr;
 
     // return mSkinInfo->mHash or 0 if mSkinInfo is null
     U64 getSkinHash();
 
+    // true if face was recently in the main camera frustum according to LLViewerTextureList updates
+    bool mInFrustum = false;
+    // value of gFrameCount the last time the face was touched by LLViewerTextureList::updateImageDecodePriority
+    U32 mLastTextureUpdate = 0;
+
 private:
     LLPointer<LLVertexBuffer> mVertexBuffer;
+    LLPointer<LLVertexBuffer> mVertexBufferGLTF;
 
     U32         mState;
     LLFacePool* mDrawPoolp;
@@ -290,7 +306,14 @@ private:
     S32         mReferenceIndex;
     std::vector<S32> mRiggedIndex;
 
+    // gFrameTimeSeconds when mPixelArea was last updated
+    F32         mLastPixelAreaUpdate = 0.f;
+
+    // virtual size of face in texture area  (mPixelArea adjusted by texture repeats)
+    // used to determine desired resolution of texture
     F32         mVSize;
+
+    // pixel area face covers on screen
     F32         mPixelArea;
 
     //importance factor, in the range [0, 1.0].
@@ -309,7 +332,7 @@ private:
 // [/SL:KB]
 
 protected:
-    static BOOL sSafeRenderSelect;
+    static bool sSafeRenderSelect;
 
 public:
     struct CompareDistanceGreater

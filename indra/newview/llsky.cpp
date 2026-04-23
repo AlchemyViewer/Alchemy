@@ -73,7 +73,7 @@ LLSky::LLSky()
     mFogColor.mV[VALPHA] = 0.0f;
 
     mLightingGeneration = 0;
-    mUpdatedThisFrame = TRUE;
+    mUpdatedThisFrame = true;
 }
 
 
@@ -207,7 +207,7 @@ void LLSky::init()
 
     gSky.setFogRatio(gSavedSettings.getF32("RenderFogRatio"));
 
-    mUpdatedThisFrame = TRUE;
+    mUpdatedThisFrame = true;
 }
 
 
@@ -264,8 +264,7 @@ void LLSky::updateFog(const F32 distance)
 {
     if (mVOSkyp)
     {
-        LLEnvironment* environment = LLEnvironment::getInstance();
-        mVOSkyp->updateFog(environment, environment->getCurrentSky(), distance);
+        mVOSkyp->updateFog(distance);
     }
 }
 

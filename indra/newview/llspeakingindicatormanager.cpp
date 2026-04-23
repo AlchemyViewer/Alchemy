@@ -46,7 +46,7 @@
  *
  * Several indicators can be registered for the same avatar.
  */
-class SpeakingIndicatorManager final : public LLSingleton<SpeakingIndicatorManager>, LLVoiceClientParticipantObserver
+class SpeakingIndicatorManager : public LLSingleton<SpeakingIndicatorManager>, LLVoiceClientParticipantObserver
 {
     LLSINGLETON(SpeakingIndicatorManager);
     ~SpeakingIndicatorManager();
@@ -109,9 +109,9 @@ private:
      * Changes state of indicators specified by LLUUIDs
      *
      * @param speakers_uuids - avatars' LLUUIDs whose speaking indicators should be switched
-     * @param switch_on - if TRUE specified indicator will be switched on, off otherwise.
+     * @param switch_on - if true specified indicator will be switched on, off otherwise.
      */
-    void switchSpeakerIndicators(const speaker_ids_t& speakers_uuids, BOOL switch_on);
+    void switchSpeakerIndicators(const speaker_ids_t& speakers_uuids, bool switch_on);
 
     /**
      * Ensures that passed instance of Speaking Indicator does not exist among registered ones.
@@ -133,6 +133,8 @@ private:
      * @see onChange()
      */
     speaker_ids_t mSwitchedIndicatorsOn;
+
+    boost::signals2::connection mVoiceChannelChanged;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -154,7 +156,7 @@ void SpeakingIndicatorManager::registerSpeakingIndicator(const LLUUID& speaker_i
     mSpeakingIndicators.insert(value_type);
 
     speaker_ids_t speakers_uuids;
-    BOOL is_in_same_voice = LLVoiceClient::getInstance()->isParticipant(speaker_id);
+    bool is_in_same_voice = LLVoiceClient::getInstance()->isParticipant(speaker_id);
 
     speakers_uuids.insert(speaker_id);
     switchSpeakerIndicators(speakers_uuids, is_in_same_voice);
@@ -181,7 +183,7 @@ void SpeakingIndicatorManager::unregisterSpeakingIndicator(const LLUUID& speaker
 //////////////////////////////////////////////////////////////////////////
 SpeakingIndicatorManager::SpeakingIndicatorManager()
 {
-    LLVoiceChannel::setCurrentVoiceChannelChangedCallback(boost::bind(&SpeakingIndicatorManager::sOnCurrentChannelChanged, this, _1));
+    mVoiceChannelChanged = LLVoiceChannel::setCurrentVoiceChannelChangedCallback(boost::bind(&SpeakingIndicatorManager::sOnCurrentChannelChanged, this, _1));
     LLVoiceClient::addObserver(this);
 }
 
@@ -198,8 +200,17 @@ void SpeakingIndicatorManager::cleanupSingleton()
 
 void SpeakingIndicatorManager::sOnCurrentChannelChanged(const LLUUID& /*session_id*/)
 {
-    switchSpeakerIndicators(mSwitchedIndicatorsOn, FALSE);
-    mSwitchedIndicatorsOn.clear();
+    if (LLVoiceChannel::isSuspended())
+    {
+        switchSpeakerIndicators(mSwitchedIndicatorsOn, false);
+        mSwitchedIndicatorsOn.clear();
+    }
+    else
+    {
+        // Multiple onParticipantsChanged can arrive at the same time
+        // from different sources, might want to filter by some factor.
+        onParticipantsChanged();
+    }
 }
 
 void SpeakingIndicatorManager::onParticipantsChanged()
@@ -211,15 +222,15 @@ void SpeakingIndicatorManager::onParticipantsChanged()
 
     LL_DEBUGS("SpeakingIndicator") << "Switching all OFF, count: " << mSwitchedIndicatorsOn.size() << LL_ENDL;
     // switch all indicators off
-    switchSpeakerIndicators(mSwitchedIndicatorsOn, FALSE);
+    switchSpeakerIndicators(mSwitchedIndicatorsOn, false);
     mSwitchedIndicatorsOn.clear();
 
     LL_DEBUGS("SpeakingIndicator") << "Switching all ON, count: " << speakers_uuids.size() << LL_ENDL;
     // then switch current voice participants indicators on
-    switchSpeakerIndicators(speakers_uuids, TRUE);
+    switchSpeakerIndicators(speakers_uuids, true);
 }
 
-void SpeakingIndicatorManager::switchSpeakerIndicators(const speaker_ids_t& speakers_uuids, BOOL switch_on)
+void SpeakingIndicatorManager::switchSpeakerIndicators(const speaker_ids_t& speakers_uuids, bool switch_on)
 {
     LLVoiceChannel* voice_channel = LLVoiceChannel::getCurrentVoiceChannel();
     LLUUID session_id;

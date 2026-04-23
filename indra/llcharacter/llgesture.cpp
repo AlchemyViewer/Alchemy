@@ -67,17 +67,41 @@ LLGesture::LLGesture(U8 **buffer, S32 max_size)
     *buffer = deserialize(*buffer, max_size);
 }
 
-BOOL LLGesture::trigger(KEY key, MASK mask)
+LLGesture::LLGesture(const LLGesture &rhs)
 {
-    LL_WARNS() << "Parent class trigger called: you probably didn't mean this." << LL_ENDL;
-    return FALSE;
+    mKey            = rhs.mKey;
+    mMask           = rhs.mMask;
+    mTrigger        = rhs.mTrigger;
+    mTriggerLower   = rhs.mTriggerLower;
+    mSoundItemID    = rhs.mSoundItemID;
+    mAnimation      = rhs.mAnimation;
+    mOutputString   = rhs.mOutputString;
+}
+
+const LLGesture &LLGesture::operator =(const LLGesture &rhs)
+{
+    mKey            = rhs.mKey;
+    mMask           = rhs.mMask;
+    mTrigger        = rhs.mTrigger;
+    mTriggerLower   = rhs.mTriggerLower;
+    mSoundItemID    = rhs.mSoundItemID;
+    mAnimation      = rhs.mAnimation;
+    mOutputString   = rhs.mOutputString;
+    return (*this);
 }
 
 
-BOOL LLGesture::trigger(const std::string& trigger_string)
+bool LLGesture::trigger(KEY key, MASK mask)
 {
     LL_WARNS() << "Parent class trigger called: you probably didn't mean this." << LL_ENDL;
-    return FALSE;
+    return false;
+}
+
+
+bool LLGesture::trigger(const std::string& trigger_string)
+{
+    LL_WARNS() << "Parent class trigger called: you probably didn't mean this." << LL_ENDL;
+    return false;
 }
 
 // NOT endian-neutral
@@ -165,12 +189,12 @@ void LLGestureList::deleteAll()
 // Iterates through space delimited tokens in string, triggering any gestures found.
 // Generates a revised string that has the found tokens replaced by their replacement strings
 // and (as a minor side effect) has multiple spaces in a row replaced by single spaces.
-BOOL LLGestureList::triggerAndReviseString(const std::string &string, std::string* revised_string)
+bool LLGestureList::triggerAndReviseString(const std::string &string, std::string* revised_string)
 {
     std::string tokenized = string;
 
-    BOOL found_gestures = FALSE;
-    BOOL first_token = TRUE;
+    bool found_gestures = false;
+    bool first_token = true;
 
     typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
     boost::char_separator<char> sep(" ");
@@ -211,7 +235,7 @@ BOOL LLGestureList::triggerAndReviseString(const std::string &string, std::strin
                         }
 
                     }
-                    found_gestures = TRUE;
+                    found_gestures = true;
                     break;
                 }
                 gesture = NULL;
@@ -227,14 +251,14 @@ BOOL LLGestureList::triggerAndReviseString(const std::string &string, std::strin
             revised_string->append( cur_token );
         }
 
-        first_token = FALSE;
+        first_token = false;
     }
     return found_gestures;
 }
 
 
 
-BOOL LLGestureList::trigger(KEY key, MASK mask)
+bool LLGestureList::trigger(KEY key, MASK mask)
 {
     for (U32 i = 0; i < mList.size(); i++)
     {
@@ -243,7 +267,7 @@ BOOL LLGestureList::trigger(KEY key, MASK mask)
         {
             if (gesture->trigger(key, mask))
             {
-                return TRUE;
+                return true;
             }
         }
         else
@@ -251,14 +275,14 @@ BOOL LLGestureList::trigger(KEY key, MASK mask)
             LL_WARNS() << "NULL gesture in gesture list (" << i << ")" << LL_ENDL;
         }
     }
-    return FALSE;
+    return false;
 }
 
 // NOT endian-neutral
 U8 *LLGestureList::serialize(U8 *buffer) const
 {
     // a single S32 serves as the header that tells us how many to read
-    U32 count = mList.size();
+    auto count = mList.size();
     htolememcpy(buffer, &count, MVT_S32, 4);
     buffer += sizeof(count);
 

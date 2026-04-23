@@ -9,7 +9,7 @@
      name="add_friends">
         <on_click
          function="Avatar.AddFriends" />
-        <on_visible
+        <on_enable
          function="Avatar.EnableItem"
          parameter="can_add" />
     </menu_item_call>
@@ -19,7 +19,7 @@
      name="remove_friends">
         <menu_item_call.on_click
          function="Avatar.RemoveFriend" />
-        <menu_item_call.on_visible
+        <menu_item_call.on_enable
          function="Avatar.EnableItem"
          parameter="can_delete" />
     </menu_item_call>
@@ -48,6 +48,9 @@
      name="share">
         <on_click
          function="Avatar.Share" />
+        <on_enable
+         function="Avatar.EnableItem"
+         parameter="can_share" />
     </menu_item_call>
     <menu_item_call
      enabled="false"
@@ -56,6 +59,9 @@
      name="pay">
         <on_click
          function="Avatar.Pay" />
+        <on_enable
+         function="Avatar.EnableItem"
+         parameter="can_pay" />
     </menu_item_call>
     <menu_item_call
     label="Offer Teleport"

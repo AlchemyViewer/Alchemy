@@ -276,6 +276,8 @@
       name="Object Profile">
     <menu_item_call.on_click
      function="Object.Inspect" />
+         <menu_item_call.on_enable
+          function="Object.EnableInspect" />
   </menu_item_call>
   <menu_item_call
     label="Inspect"

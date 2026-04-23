@@ -32,22 +32,21 @@
 //-----------------------------------------------------------------------------
 #include <string>
 
+#include <boost/unordered_map.hpp>
+
 #include "lljoint.h"
 #include "llmotioncontroller.h"
 #include "llvisualparam.h"
 #include "llstringtable.h"
 #include "llpointer.h"
 #include "llrefcount.h"
-#include "llsortedvector.h"
-
-#include "boost/unordered/unordered_flat_map.hpp"
 
 class LLPolyMesh;
 
 class LLPauseRequestHandle : public LLThreadSafeRefCount
 {
 public:
-    LLPauseRequestHandle() = default;
+    LLPauseRequestHandle() {};
 };
 
 typedef LLPointer<LLPauseRequestHandle> LLAnimPauseRequest;
@@ -79,7 +78,7 @@ public:
     // get the specified joint
     // default implementation does recursive search,
     // subclasses may optimize/cache results.
-    virtual LLJoint *getJoint( const std::string &name );
+    virtual LLJoint* getJoint(std::string_view name);
 
     // get the position of the character
     virtual LLVector3 getCharacterPosition() = 0;
@@ -122,13 +121,15 @@ public:
 
     virtual void addDebugText( const std::string& text ) = 0;
 
+    virtual std::string getDebugName() const { return getID().asString(); }
+
     virtual const LLUUID&   getID() const = 0;
     //-------------------------------------------------------------------------
     // End Interface
     //-------------------------------------------------------------------------
     // registers a motion with the character
     // returns true if successfull
-    BOOL registerMotion( const LLUUID& id, LLMotionConstructor create );
+    bool registerMotion( const LLUUID& id, LLMotionConstructor create );
 
     void removeMotion( const LLUUID& id );
 
@@ -140,13 +141,13 @@ public:
 
     // start a motion
     // returns true if successful, false if an error occurred
-    virtual BOOL startMotion( const LLUUID& id, F32 start_offset = 0.f);
+    virtual bool startMotion( const LLUUID& id, F32 start_offset = 0.f);
 
     // stop a motion
-    virtual BOOL stopMotion( const LLUUID& id, BOOL stop_immediate = FALSE );
+    virtual bool stopMotion( const LLUUID& id, bool stop_immediate = false );
 
     // is this motion active?
-    BOOL isMotionActive( const LLUUID& id );
+    bool isMotionActive( const LLUUID& id );
 
     // Event handler for motion deactivation.
     // Called when a motion has completely stopped and has been deactivated.
@@ -159,7 +160,7 @@ public:
     void updateMotions(e_update_t update_type);
 
     LLAnimPauseRequest requestPause();
-    BOOL areAnimationsPaused() const { return mMotionController.isPaused(); }
+    bool areAnimationsPaused() const { return mMotionController.isPaused(); }
     void setAnimTimeFactor(F32 factor) { mMotionController.setTimeFactor(factor); }
     void setTimeStep(F32 time_step) { mMotionController.setTimeStep(time_step); }
 
@@ -182,9 +183,9 @@ public:
 
     virtual LLJoint* findCollisionVolume(S32 volume_id) { return NULL; }
 
-    virtual S32 getCollisionVolumeID(std::string_view name) { return -1; }
+    virtual S32 getCollisionVolumeID(std::string &name) { return -1; }
 
-    void setAnimationData(std::string name, void *data);
+    void setAnimationData(std::string_view name, void *data);
 
     void *getAnimationData(std::string_view name);
 
@@ -193,9 +194,9 @@ public:
     void addVisualParam(LLVisualParam *param);
     void addSharedVisualParam(LLVisualParam *param);
 
-    virtual BOOL setVisualParamWeight(const LLVisualParam *which_param, F32 weight);
-    virtual BOOL setVisualParamWeight(const char* param_name, F32 weight);
-    virtual BOOL setVisualParamWeight(S32 index, F32 weight);
+    virtual bool setVisualParamWeight(const LLVisualParam *which_param, F32 weight);
+    virtual bool setVisualParamWeight(const char* param_name, F32 weight);
+    virtual bool setVisualParamWeight(S32 index, F32 weight);
 
     // get visual param weight by param or name
     F32 getVisualParamWeight(LLVisualParam *distortion);
@@ -208,20 +209,20 @@ public:
     // visual parameter accessors
     LLVisualParam*  getFirstVisualParam()
     {
-        mCurIterator = mVisualParamSortedVector.begin();
+        mCurIterator = mVisualParamIndexMap.begin();
         return getNextVisualParam();
     }
     LLVisualParam*  getNextVisualParam()
     {
-        if (mCurIterator == mVisualParamSortedVector.end())
-            return nullptr;
+        if (mCurIterator == mVisualParamIndexMap.end())
+            return 0;
         return (mCurIterator++)->second;
     }
 
     S32 getVisualParamCountInGroup(const EVisualParamGroup group) const
     {
         S32 rtn = 0;
-        for (const auto& index_pair : mVisualParamSortedVector)
+        for (const visual_param_index_map_t::value_type& index_pair : mVisualParamIndexMap)
         {
             if (index_pair.second->getGroup() == group)
             {
@@ -236,10 +237,36 @@ public:
         visual_param_index_map_t::const_iterator iter = mVisualParamIndexMap.find(id);
         return (iter == mVisualParamIndexMap.end()) ? 0 : iter->second;
     }
-
+    S32 getVisualParamID(LLVisualParam *id)
+    {
+        for (visual_param_index_map_t::value_type& index_pair : mVisualParamIndexMap)
+        {
+            if (index_pair.second == id)
+                return index_pair.first;
+        }
+        return 0;
+    }
     S32             getVisualParamCount() const { return (S32)mVisualParamIndexMap.size(); }
     LLVisualParam*  getVisualParam(const char *name);
 
+    void animateTweakableVisualParams(F32 delta)
+    {
+        for (auto& it : mVisualParamIndexMap)
+        {
+            if (it.second->isTweakable())
+            {
+                it.second->animate(delta);
+            }
+        }
+    }
+
+    void applyAllVisualParams(ESex avatar_sex)
+    {
+        for (auto& it : mVisualParamIndexMap)
+        {
+            it.second->apply(avatar_sex);
+        }
+    }
 
     ESex getSex() const         { return mSex; }
     void setSex( ESex sex )     { mSex = sex; }
@@ -250,8 +277,8 @@ public:
     U32             getSkeletonSerialNum() const        { return mSkeletonSerialNum; }
     void            setSkeletonSerialNum( U32 num ) { mSkeletonSerialNum = num; }
 
-    static std::vector< LLCharacter* > sInstances;
-    static BOOL sAllowInstancesChange ; //debug use
+    static std::list< LLCharacter* > sInstances;
+    static bool sAllowInstancesChange ; //debug use
 
     virtual void    setHoverOffset(const LLVector3& hover_offset, bool send_update=true) { mHoverOffset = hover_offset; }
     const LLVector3& getHoverOffset() const { return mHoverOffset; }
@@ -259,7 +286,7 @@ public:
 protected:
     LLMotionController  mMotionController;
 
-    typedef boost::unordered_flat_map<std::string, void *, al::string_hash, std::equal_to<>> animation_data_map_t;
+    typedef boost::unordered_map<std::string, void*, ll::string_hash, std::equal_to<>> animation_data_map_t;
     animation_data_map_t mAnimationData;
 
     F32                 mPreferredPelvisHeight;
@@ -270,14 +297,13 @@ protected:
 
 private:
     // visual parameter stuff
-    typedef boost::unordered_flat_map<S32, LLVisualParam *>         visual_param_index_map_t;   //Hash map for fast lookup.
-    typedef LLSortedVector<S32,LLVisualParam *>             visual_param_sorted_vec_t;  //Contiguous sorted array.
-    typedef boost::unordered_flat_map<char *, LLVisualParam *>  visual_param_name_map_t;
+    typedef std::map<S32, LLVisualParam *>      visual_param_index_map_t;
+    typedef std::map<char *, LLVisualParam *>   visual_param_name_map_t;
 
-    visual_param_sorted_vec_t::iterator             mCurIterator;
-    visual_param_sorted_vec_t                       mVisualParamSortedVector;
-    visual_param_index_map_t                        mVisualParamIndexMap;
-    visual_param_name_map_t                         mVisualParamNameMap;
+    visual_param_index_map_t::iterator          mCurIterator;
+    visual_param_index_map_t                    mVisualParamIndexMap;
+    visual_param_name_map_t                     mVisualParamNameMap;
+
     static LLStringTable sVisualParamNames;
 
     LLVector3 mHoverOffset;

@@ -46,6 +46,20 @@ LLUIImage::LLUIImage(const std::string& name, LLPointer<LLTexture> image)
     getTextureHeight();
 }
 
+LLUIImage::LLUIImage(std::string&& name, LLPointer<LLTexture> image) :
+    mName(std::move(name)),
+    mImage(image),
+    mScaleRegion(0.f, 1.f, 1.f, 0.f),
+    mClipRegion(0.f, 1.f, 1.f, 0.f),
+    mImageLoaded(NULL),
+    mScaleStyle(SCALE_INNER),
+    mCachedW(-1),
+    mCachedH(-1)
+{
+    getTextureWidth();
+    getTextureHeight();
+}
+
 LLUIImage::~LLUIImage()
 {
     delete mImageLoaded;
@@ -83,7 +97,7 @@ void LLUIImage::draw3D(const LLVector3& origin_agent, const LLVector3& x_axis, c
 
     LLRender2D::pushMatrix();
     {
-        LLVector3 rect_origin = origin_agent + (rect.mLeft * x_axis) + (rect.mBottom * y_axis);
+        LLVector3 rect_origin = origin_agent + ((F32)rect.mLeft * x_axis) + ((F32)rect.mBottom * y_axis);
         LLRender2D::translate(rect_origin.mV[VX],
                                             rect_origin.mV[VY],
                                             rect_origin.mV[VZ]);
@@ -100,8 +114,8 @@ void LLUIImage::draw3D(const LLVector3& origin_agent, const LLVector3& x_axis, c
                                         (rect.getHeight() - (border_height * border_scale * 0.5f)) / (F32)rect.getHeight(),
                                         (rect.getWidth() - (border_width * border_scale * 0.5f)) / (F32)rect.getWidth(),
                                         (border_height * border_scale * 0.5f) / (F32)rect.getHeight()),
-                                rect.getWidth() * x_axis,
-                                rect.getHeight() * y_axis);
+                                (F32)rect.getWidth() * x_axis,
+                                (F32)rect.getHeight() * y_axis);
 
     } LLRender2D::popMatrix();
 }

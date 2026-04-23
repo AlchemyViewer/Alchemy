@@ -79,14 +79,14 @@ public:
     }
 
     // Note: follows GL_QUAD conventions: the top and right edges are not considered part of the rect
-    BOOL        pointInRect(const Type x, const Type y) const
+    bool        pointInRect(const Type x, const Type y) const
     {
         return  mLeft <= x && x < mRight &&
                 mBottom <= y && y < mTop;
     }
 
     //// Note: follows GL_QUAD conventions: the top and right edges are not considered part of the rect
-    BOOL        localPointInRect(const Type x, const Type y) const
+    bool        localPointInRect(const Type x, const Type y) const
     {
         return  0 <= x && x < getWidth() &&
                 0 <= y && y < getHeight();
@@ -133,8 +133,8 @@ public:
     }
 
     // Note: Does NOT follow GL_QUAD conventions: the top and right edges ARE considered part of the rect
-    // returns TRUE if any part of rect is is inside this LLRect
-    BOOL        overlaps(const LLRectBase& rect) const
+    // returns true if any part of rect is is inside this LLRect
+    bool        overlaps(const LLRectBase& rect) const
     {
         return !(mLeft > rect.mRight
             || mRight < rect.mLeft
@@ -142,7 +142,7 @@ public:
             || mTop < rect.mBottom);
     }
 
-    BOOL        contains(const LLRectBase& rect) const
+    bool        contains(const LLRectBase& rect) const
     {
         return mLeft <= rect.mLeft
             && mRight >= rect.mRight
@@ -291,8 +291,8 @@ template <class Type> LLRectBase<Type> LLRectBase<Type>::null(0,0,0,0);
 typedef LLRectBase<S32> LLRect;
 typedef LLRectBase<F32> LLRectf;
 
-static_assert(std::is_trivially_copyable<LLRect>::value, "LLRect must be trivially copyable");
-static_assert(std::is_trivially_destructible<LLRect>::value, "LLRect must be trivially destructible");
+static_assert(std::is_trivially_copyable<LLRect>::value, "LLRect must be trivial copy");
+static_assert(std::is_trivially_move_assignable<LLRect>::value, "LLRect must be trivial move");
 static_assert(std::is_standard_layout<LLRect>::value, "LLRect must be a standard layout type");
 
 #endif

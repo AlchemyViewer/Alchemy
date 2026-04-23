@@ -118,9 +118,7 @@ private:
         // centralize such calls, using "mainloop" to ensure it happens once
         // per frame, and refcounting running LLProcess objects to remain
         // registered only while needed.
-#ifdef SHOW_DEBUG
         LL_DEBUGS("LLProcess") << "calling apr_proc_other_child_refresh_all()" << LL_ENDL;
-#endif
         apr_proc_other_child_refresh_all(APR_OC_REASON_RUNNING);
         return false;
     }
@@ -135,6 +133,7 @@ static LLProcessListener sProcessListener;
 /*****************************************************************************
 *   WritePipe and ReadPipe
 *****************************************************************************/
+LLProcess::BasePipe::~BasePipe() {}
 const LLProcess::BasePipe::size_type
       // use funky syntax to call max() to avoid blighted max() macros
       LLProcess::BasePipe::npos((std::numeric_limits<LLProcess::BasePipe::size_type>::max)());
@@ -177,14 +176,14 @@ public:
             // In general, our streambuf might contain a number of different
             // physical buffers; iterate over those.
             bool keepwriting = true;
-            for (const_buffer_sequence::const_iterator bufi(bufs.begin()), bufend(bufs.end());
+            for (auto bufi(boost::asio::buffer_sequence_begin(bufs)), bufend(boost::asio::buffer_sequence_end(bufs));
                  bufi != bufend && keepwriting; ++bufi)
             {
                 // http://www.boost.org/doc/libs/1_49_0_beta1/doc/html/boost_asio/reference/buffer.html#boost_asio.reference.buffer.accessing_buffer_contents
                 // Although apr_file_write() accepts const void*, we
                 // manipulate const char* so we can increment the pointer.
-                const char* remainptr = boost::asio::buffer_cast<const char*>(*bufi);
-                std::size_t remainlen = boost::asio::buffer_size(*bufi);
+                const char* remainptr = static_cast<const char*>(bufi->data());
+                std::size_t remainlen = bufi->size();
                 while (remainlen)
                 {
                     // Tackle the current buffer in discrete chunks. On
@@ -218,12 +217,12 @@ public:
                     remainlen -= written;
 
                     LL_DEBUGS("LLProcess") << "wrote " << written << " of " << towrite
-                        << " bytes to " << mDesc
-                        << " (original " << total << "),"
-                        << " code " << err << ": ";
-                        char msgbuf[512];
-                        LL_CONT << apr_strerror(err, msgbuf, sizeof(msgbuf))
-                        << LL_ENDL;
+                                           << " bytes to " << mDesc
+                                           << " (original " << total << "),"
+                                           << " code " << err << ": ";
+                                           char msgbuf[512];
+                                           LL_CONT << apr_strerror(err, msgbuf, sizeof(msgbuf))
+                                           << LL_ENDL;
 
                     // The parent end of this pipe is nonblocking. If we weren't able
                     // to write everything we wanted, don't keep banging on it -- that
@@ -378,14 +377,14 @@ public:
             // In general, the mutable_buffer_sequence returned by prepare() might
             // contain a number of different physical buffers; iterate over those.
             std::size_t tocommit(0);
-            for (mutable_buffer_sequence::const_iterator bufi(bufs.begin()), bufend(bufs.end());
+            for (auto bufi(boost::asio::buffer_sequence_begin(bufs)), bufend(boost::asio::buffer_sequence_end(bufs));
                  bufi != bufend; ++bufi)
             {
                 // http://www.boost.org/doc/libs/1_49_0_beta1/doc/html/boost_asio/reference/buffer.html#boost_asio.reference.buffer.accessing_buffer_contents
-                std::size_t toread(boost::asio::buffer_size(*bufi));
+                std::size_t toread(bufi->size());
                 apr_size_t gotten(toread);
                 apr_status_t err = apr_file_read(mPipe,
-                                                 boost::asio::buffer_cast<void*>(*bufi),
+                                                 bufi->data(),
                                                  &gotten);
                 // EAGAIN is exactly what we want from a nonblocking pipe.
                 // Rather than waiting for data, it should return immediately.
@@ -394,9 +393,7 @@ public:
                     // Handle EOF specially: it's part of normal-case processing.
                     if (err == APR_EOF)
                     {
-#ifdef SHOW_DEBUG
                         LL_DEBUGS("LLProcess") << "EOF on " << mDesc << LL_ENDL;
-#endif
                     }
                     else
                     {
@@ -416,10 +413,8 @@ public:
                 // received. Make sure we commit those later. (Don't commit them
                 // now, that would invalidate the buffer iterator sequence!)
                 tocommit += gotten;
-#ifdef SHOW_DEBUG
                 LL_DEBUGS("LLProcess") << "filled " << gotten << " of " << toread
                                        << " bytes from " << mDesc << LL_ENDL;
-#endif
 
                 // The parent end of this pipe is nonblocking. If we weren't even
                 // able to fill this buffer, don't loop to try to fill the next --
@@ -462,7 +457,8 @@ public:
                        ("slot", LLSD::Integer(mIndex))
                        ("name", whichfile(mIndex))
                        ("desc", mDesc)
-                       ("eof", state == CLOSED));
+                       ("eof", state == CLOSED)
+                       ("exhst", state == EXHAUSTED));
         }
 
         return false;
@@ -533,18 +529,9 @@ LLProcess::LLProcess(const LLSDOrParams& params):
     // preserve existing semantics, we promise that mAttached defaults to the
     // same setting as mAutokill.
     mAttached(params.attached.isProvided()? params.attached : params.autokill),
-    mPool(NULL),
-    mPipes(NSLOTS)
+    mPool(NULL)
 {
-    // Hmm, when you construct a ptr_vector with a size, it merely reserves
-    // space, it doesn't actually make it that big. Explicitly make it bigger.
-    // Because of ptr_vector's odd semantics, have to push_back(0) the right
-    // number of times! resize() wants to default-construct new BasePipe
-    // instances, which fails because it's pure virtual. But because of the
-    // constructor call, these push_back() calls should require no new
-    // allocation.
-    for (size_t i = 0; i < mPipes.capacity(); ++i)
-        mPipes.push_back(0);
+    mPipes.resize(NSLOTS);
 
     if (! params.validateBlock(true))
     {
@@ -566,9 +553,9 @@ LLProcess::LLProcess(const LLSDOrParams& params):
     // IQA-490, CHOP-900: On Windows, ask APR to jump through hoops to
     // constrain the set of handles passed to the child process. Before we
     // changed to APR, the Windows implementation of LLProcessLauncher called
-    // CreateProcess(bInheritHandles=FALSE), meaning to pass NO open handles
+    // CreateProcess(bInheritHandles=false), meaning to pass NO open handles
     // to the child process. Now that we support pipes, though, we must allow
-    // apr_proc_create() to pass bInheritHandles=TRUE. But without taking
+    // apr_proc_create() to pass bInheritHandles=true. But without taking
     // special pains, that causes trouble in a number of ways, due to the fact
     // that the viewer is constantly opening and closing files -- most of
     // which CreateProcess() passes to every child process!
@@ -670,10 +657,7 @@ LLProcess::LLProcess(const LLSDOrParams& params):
     // case), e.g. by calling operator(), returns a reference to *the same
     // instance* of the wrapped type that's stored in our Block subclass.
     // That's important! We know 'params' persists throughout this method
-    // call; but without that guarantee, we'd have to assume that converting
-    // one of its members to std::string might return a different (temp)
-    // instance. Capturing the c_str() from a temporary std::string is Bad Bad
-    // Bad. But armed with this knowledge, when you see params.cwd().c_str(),
+    // call; but without that guarantee, when you see params.cwd().c_str(),
     // grit your teeth and smile and carry on.
 
     if (params.cwd.isProvided())
@@ -688,7 +672,7 @@ LLProcess::LLProcess(const LLSDOrParams& params):
     argv.push_back(params.executable().c_str());
 
     // Add arguments. See above remarks about c_str().
-    for(const std::string& arg: params.args)
+    for (const std::string& arg : params.args)
     {
         argv.push_back(arg.c_str());
     }
@@ -756,11 +740,11 @@ LLProcess::LLProcess(const LLSDOrParams& params):
         apr_file_t* pipe(mProcess.*(members[i]));
         if (i == STDIN)
         {
-            mPipes.replace(i, new WritePipeImpl(desc, pipe));
+            mPipes[i] = std::make_unique<WritePipeImpl>(desc, pipe);
         }
         else
         {
-            mPipes.replace(i, new ReadPipeImpl(desc, pipe, FILESLOT(i)));
+            mPipes[i] = std::make_unique<ReadPipeImpl>(desc, pipe, FILESLOT(i));
         }
         // Removed temporaily for Xcode 7 build tests: error was:
         // "error: expression with side effects will be evaluated despite
@@ -924,7 +908,7 @@ std::string LLProcess::getStatusString(const std::string& desc, const Status& st
 
     if (status.mState == KILLED)
 #if LL_WINDOWS
-        return STRINGIZE(desc << " killed with exception " << std::hex << status.mData << std::dec);
+        return STRINGIZE(desc << " killed with exception " << std::hex << status.mData);
 #else
         return STRINGIZE(desc << " killed by signal " << status.mData
                          << " (" << apr_signal_description_get(status.mData) << ")");
@@ -941,7 +925,6 @@ void LLProcess::status_callback(int reason, void* data, int status)
     static_cast<LLProcess*>(data)->handle_status(reason, status);
 }
 
-#ifdef SHOW_DEBUG
 #define tabent(symbol) { symbol, #symbol }
 static struct ReasonCode
 {
@@ -957,18 +940,16 @@ static struct ReasonCode
     tabent(APR_OC_REASON_RUNNING)
 };
 #undef tabent
-#endif
 
 // Object-oriented callback
 void LLProcess::handle_status(int reason, int status)
 {
-#ifdef SHOW_DEBUG
     {
         // This odd appearance of LL_DEBUGS is just to bracket a lookup that will
         // only be performed if in fact we're going to produce the log message.
         LL_DEBUGS("LLProcess") << empty;
         std::string reason_str;
-        for(const ReasonCode& rcp : reasons)
+        for (const ReasonCode& rcp : reasons)
         {
             if (reason == rcp.code)
             {
@@ -982,7 +963,6 @@ void LLProcess::handle_status(int reason, int status)
         }
         LL_CONT << mDesc << ": handle_status(" << reason_str << ", " << status << ")" << LL_ENDL;
     }
-#endif
 
     if (! (reason == APR_OC_REASON_DEATH || reason == APR_OC_REASON_LOST))
     {
@@ -1072,14 +1052,14 @@ PIPETYPE* LLProcess::getPipePtr(std::string& error, FILESLOT slot)
         error = STRINGIZE(mDesc << " has no slot " << slot);
         return NULL;
     }
-    if (mPipes.is_null(slot))
+    if (!mPipes[slot])
     {
         error = STRINGIZE(mDesc << ' ' << whichfile(slot) << " not a monitored pipe");
         return NULL;
     }
     // Make sure we dynamic_cast in pointer domain so we can test, rather than
     // accepting runtime's exception.
-    PIPETYPE* ppipe = dynamic_cast<PIPETYPE*>(&mPipes[slot]);
+    PIPETYPE* ppipe = dynamic_cast<PIPETYPE*>(mPipes[slot].get());
     if (! ppipe)
     {
         error = STRINGIZE(mDesc << ' ' << whichfile(slot) << " not a " << typeid(PIPETYPE).name());
@@ -1159,7 +1139,7 @@ std::ostream& operator<<(std::ostream& out, const LLProcess::Params& params)
         out << "cd " << LLStringUtil::quote(params.cwd) << ": ";
     }
     out << LLStringUtil::quote(params.executable);
-    for(const std::string& arg : params.args)
+    for (const std::string& arg : params.args)
     {
         out << ' ' << LLStringUtil::quote(arg);
     }

@@ -49,10 +49,10 @@ S32 copy_file(const std::string& from, const std::string& to);
 LLXfer_File::LLXfer_File (S32 chunk_size)
 : LLXfer(chunk_size)
 {
-    init(LLStringUtil::null, FALSE, chunk_size);
+    init(LLStringUtil::null, false, chunk_size);
 }
 
-LLXfer_File::LLXfer_File (const std::string& local_filename, BOOL delete_local_on_completion, S32 chunk_size)
+LLXfer_File::LLXfer_File (const std::string& local_filename, bool delete_local_on_completion, S32 chunk_size)
 : LLXfer(chunk_size)
 {
     init(local_filename, delete_local_on_completion, chunk_size);
@@ -67,7 +67,7 @@ LLXfer_File::~LLXfer_File ()
 
 ///////////////////////////////////////////////////////////
 
-void LLXfer_File::init (const std::string& local_filename, BOOL delete_local_on_completion, S32 chunk_size)
+void LLXfer_File::init (const std::string& local_filename, bool delete_local_on_completion, S32 chunk_size)
 {
 
     mFp = NULL;
@@ -75,8 +75,8 @@ void LLXfer_File::init (const std::string& local_filename, BOOL delete_local_on_
     mRemoteFilename.clear();
     mRemotePath = LL_PATH_NONE;
     mTempFilename.clear();
-    mDeleteLocalOnCompletion = FALSE;
-    mDeleteRemoteOnCompletion = FALSE;
+    mDeleteLocalOnCompletion = false;
+    mDeleteRemoteOnCompletion = false;
 
     if (!local_filename.empty())
     {
@@ -120,7 +120,7 @@ S32 LLXfer_File::initializeRequest(U64 xfer_id,
                    const std::string& remote_filename,
                    ELLPath remote_path,
                    const LLHost& remote_host,
-                   BOOL delete_remote_on_completion,
+                   bool delete_remote_on_completion,
                    void (*callback)(void**,S32,LLExtStat),
                    void** user_data)
 {
@@ -161,7 +161,7 @@ S32 LLXfer_File::initializeRequest(U64 xfer_id,
 S32 LLXfer_File::startDownload()
 {
     S32 retval = 0;  // presume success
-    mFp = LLFile::fopen(mTempFilename,"w+b");       /* Flawfinder : ignore */
+    mFp = LLFile::fopen(mTempFilename,LLFILE_MODE("w+b"));       /* Flawfinder : ignore */
     if (mFp)
     {
         fclose(mFp);
@@ -174,7 +174,7 @@ S32 LLXfer_File::startDownload()
         gMessageSystem->addStringFast(_PREHASH_Filename, mRemoteFilename);
         gMessageSystem->addU8Fast(_PREHASH_FilePath, (U8) mRemotePath);
         gMessageSystem->addBOOLFast(_PREHASH_DeleteOnCompletion, mDeleteRemoteOnCompletion);
-        gMessageSystem->addBOOLFast(_PREHASH_UseBigPackets, BOOL(mChunkSize == LL_XFER_LARGE_PAYLOAD));
+        gMessageSystem->addBOOLFast(_PREHASH_UseBigPackets, mChunkSize == LL_XFER_LARGE_PAYLOAD);
         gMessageSystem->addUUIDFast(_PREHASH_VFileID, LLUUID::null);
         gMessageSystem->addS16Fast(_PREHASH_VFileType, -1);
 
@@ -209,7 +209,7 @@ S32 LLXfer_File::startSend (U64 xfer_id, const LLHost &remote_host)
     mBufferStartOffset = 0;
 
     // We leave the file open, assuming we'll start reading and sending soon
-    mFp = LLFile::fopen(mLocalFilename,"rb");       /* Flawfinder : ignore */
+    mFp = LLFile::fopen(mLocalFilename, LLFILE_MODE("rb"));       /* Flawfinder : ignore */
     if (mFp)
     {
         fseek(mFp,0,SEEK_END);
@@ -252,7 +252,7 @@ S32 LLXfer_File::reopenFileHandle()
 
     if (mFp == NULL)
     {
-        mFp = LLFile::fopen(mLocalFilename,"rb");       /* Flawfinder : ignore */
+        mFp = LLFile::fopen(mLocalFilename, LLFILE_MODE("rb"));       /* Flawfinder : ignore */
         if (mFp == NULL)
         {
             LL_INFOS("Xfer") << "Warning: " << mLocalFilename << " not found when re-opening file" << LL_ENDL;
@@ -287,11 +287,11 @@ S32 LLXfer_File::suck(S32 start_position)
 
         if (feof(mFp))
         {
-            mBufferContainsEOF = TRUE;
+            mBufferContainsEOF = true;
         }
         else
         {
-            mBufferContainsEOF = FALSE;
+            mBufferContainsEOF = false;
         }
     }
     else
@@ -313,11 +313,11 @@ S32 LLXfer_File::flush()
         {
             LL_ERRS("Xfer") << "Overwriting open file pointer!" << LL_ENDL;
         }
-        mFp = LLFile::fopen(mTempFilename,"a+b");       /* Flawfinder : ignore */
+        mFp = LLFile::fopen(mTempFilename, LLFILE_MODE("a+b"));       /* Flawfinder : ignore */
 
         if (mFp)
         {
-            U32 write_size = fwrite(mBuffer,1,mBufferLength,mFp);
+            S32 write_size = static_cast<S32>(fwrite(mBuffer,1,mBufferLength,mFp));
             if (write_size != mBufferLength)
             {
                 LL_WARNS("Xfer") << "Non-matching write size, requested " << mBufferLength
@@ -362,8 +362,40 @@ S32 LLXfer_File::processEOF()
     {
         if (LLFile::rename(mTempFilename,mLocalFilename))
         {
+#if !LL_WINDOWS
+            S32 error_number = errno;
+            LL_INFOS("Xfer") << "Rename failure (" << error_number << ") - "
+                    << mTempFilename << " to " << mLocalFilename << LL_ENDL;
+            if(EXDEV == error_number)
+            {
+                if(copy_file(mTempFilename, mLocalFilename) == 0)
+                {
+                    LL_INFOS("Xfer") << "Rename across mounts; copying+unlinking the file instead." << LL_ENDL;
+                    unlink(mTempFilename.c_str());
+                }
+                else
+                {
+                    LL_WARNS("Xfer") << "Copy failure - " << mTempFilename << " to "
+                            << mLocalFilename << LL_ENDL;
+                }
+            }
+            else
+            {
+                //LLFILE* fp = LLFile::fopen(mTempFilename, LLFILE_MODE("r"));
+                //LL_WARNS() << "File " << mTempFilename << " does "
+                //      << (!fp ? "not" : "" ) << " exit." << LL_ENDL;
+                //if(fp) fclose(fp);
+                //fp = LLFile::fopen(mLocalFilename, LLFILE_MODE("r"));
+                //LL_WARNS() << "File " << mLocalFilename << " does "
+                //      << (!fp ? "not" : "" ) << " exit." << LL_ENDL;
+                //if(fp) fclose(fp);
+                LL_WARNS("Xfer") << "Rename fatally failed, can only handle EXDEV ("
+                        << EXDEV << ")" << LL_ENDL;
+            }
+#else
             LL_WARNS("Xfer") << "Rename failure - " << mTempFilename << " to "
                     << mLocalFilename << LL_ENDL;
+#endif
         }
     }
 
@@ -380,14 +412,14 @@ S32 LLXfer_File::processEOF()
 
 ///////////////////////////////////////////////////////////
 
-BOOL LLXfer_File::matchesLocalFilename(const std::string& filename)
+bool LLXfer_File::matchesLocalFilename(const std::string& filename)
 {
     return (filename == mLocalFilename);
 }
 
 ///////////////////////////////////////////////////////////
 
-BOOL LLXfer_File::matchesRemoteFilename(const std::string& filename, ELLPath remote_path)
+bool LLXfer_File::matchesRemoteFilename(const std::string& filename, ELLPath remote_path)
 {
     return ((filename == mRemoteFilename) && (remote_path == mRemotePath));
 }
@@ -420,8 +452,8 @@ U32 LLXfer_File::getXferTypeTag()
 S32 copy_file(const std::string& from, const std::string& to)
 {
     S32 rv = 0;
-    LLFILE* in = LLFile::fopen(from, "rb"); /*Flawfinder: ignore*/
-    LLFILE* out = LLFile::fopen(to, "wb");  /*Flawfinder: ignore*/
+    LLFILE* in = LLFile::fopen(from, LLFILE_MODE("rb")); /*Flawfinder: ignore*/
+    LLFILE* out = LLFile::fopen(to, LLFILE_MODE("wb"));  /*Flawfinder: ignore*/
     if(in && out)
     {
         S32 read = 0;

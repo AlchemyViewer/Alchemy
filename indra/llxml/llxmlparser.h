@@ -27,11 +27,7 @@
 #ifndef LL_LLXMLPARSER_H
 #define LL_LLXMLPARSER_H
 
-#if defined(LL_USESYSTEMLIBS)
-# include <expat.h>
-#else
-# include "expat/expat.h"
-#endif
+#include <expat.h>
 
 class LLXmlParser
 {
@@ -40,7 +36,7 @@ public:
     virtual ~LLXmlParser();
 
     // Parses entire file
-    BOOL parseFile(const std::string &path);
+    bool parseFile(const std::string &path);
 
     //  Parses some input. Returns 0 if a fatal error is detected.
     //  The last call must have isFinal true;

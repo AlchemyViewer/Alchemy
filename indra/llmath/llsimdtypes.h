@@ -32,7 +32,6 @@
 #endif
 
 typedef __m128  LLQuad;
-typedef __m128i LLIQuad;
 
 class LLBool32
 {
@@ -49,8 +48,8 @@ public:
 private:
     int m_bool;
 };
-static_assert(std::is_trivial<LLBool32>::value, "LLBool32 must be a trivial type");
-static_assert(std::is_standard_layout<LLBool32>::value, "LLBool32 must be a standard layout type");
+
+static_assert(std::is_trivial<LLBool32>::value, "LLBool32 must be a standard layout type");
 
 class LLSimdScalar
 {
@@ -64,6 +63,12 @@ public:
     inline LLSimdScalar(F32 f)
     {
         mQ = _mm_set_ss(f);
+    }
+
+    static inline const LLSimdScalar& getZero()
+    {
+        extern const LLQuad F_ZERO_4A;
+        return reinterpret_cast<const LLSimdScalar&>(F_ZERO_4A);
     }
 
     inline F32 getF32() const;
@@ -99,7 +104,7 @@ public:
 private:
     LLQuad mQ;
 };
-static_assert(std::is_trivial<LLSimdScalar>::value, "LLSimdScalar must be a trivial type");
-static_assert(std::is_standard_layout<LLSimdScalar>::value, "LLSimdScalar must be a standard layout type");
+
+static_assert(std::is_trivial<LLSimdScalar>::value, "LLSimdScalar must be a standard layout type");
 
 #endif //LL_SIMD_TYPES_H

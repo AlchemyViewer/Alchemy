@@ -51,7 +51,6 @@
 #include "rlvcommon.h"
 // [/RLVa:KB]
 #include <boost/tokenizer.hpp>
-#include "alcinematicmode.h"
 
 const F32 HORIZONTAL_PADDING = 15.f;
 const F32 VERTICAL_PADDING = 12.f;
@@ -63,7 +62,7 @@ const F32 MAX_DRAW_DISTANCE = 300.f;
 std::set<LLPointer<LLHUDText> > LLHUDText::sTextObjects;
 std::vector<LLPointer<LLHUDText> > LLHUDText::sVisibleTextObjects;
 std::vector<LLPointer<LLHUDText> > LLHUDText::sVisibleHUDTextObjects;
-BOOL LLHUDText::sDisplayText = TRUE ;
+bool LLHUDText::sDisplayText = true ;
 
 bool lltextobject_further_away::operator()(const LLPointer<LLHUDText>& lhs, const LLPointer<LLHUDText>& rhs) const
 {
@@ -73,8 +72,8 @@ bool lltextobject_further_away::operator()(const LLPointer<LLHUDText>& lhs, cons
 
 LLHUDText::LLHUDText(const U8 type) :
             LLHUDObject(type),
-            mOnHUDAttachment(FALSE),
-//          mVisibleOffScreen(FALSE),
+            mOnHUDAttachment(false),
+//          mVisibleOffScreen(false),
             mWidth(0.f),
             mHeight(0.f),
             mFontp(LLFontGL::getFontSansSerifSmall()),
@@ -85,14 +84,14 @@ LLHUDText::LLHUDText(const U8 type) :
             mTextAlignment(ALIGN_TEXT_CENTER),
             mVertAlignment(ALIGN_VERT_CENTER),
 //          mLOD(0),
-            mHidden(FALSE)
+            mHidden(false)
 {
     mColor = LLColor4(1.f, 1.f, 1.f, 1.f);
-    mDoFade = TRUE;
+    mDoFade = true;
     mFadeDistance = gSavedSettings.getF32("AlchemyHudTextFadeDistance");
     mFadeRange = gSavedSettings.getF32("AlchemyHudTextFadeRange");
-    mZCompare = TRUE;
-    mOffscreen = FALSE;
+    mZCompare = true;
+    mOffscreen = false;
     mRadius = 0.1f;
     LLPointer<LLHUDText> ptr(this);
     sTextObjects.insert(ptr);
@@ -104,8 +103,7 @@ LLHUDText::~LLHUDText()
 
 void LLHUDText::render()
 {
-    static LLCachedControl<bool> cinematic_hide_hover(gSavedSettings, "AlchemyCinematicModeHideHoverText");
-    if (!mOnHUDAttachment && sDisplayText && mVisible && !mHidden && !(ALCinematicMode::isEnabled() && cinematic_hide_hover))
+    if (!mOnHUDAttachment && sDisplayText)
     {
         LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
         //LLGLDisable gls_stencil(GL_STENCIL_TEST);
@@ -122,7 +120,7 @@ void LLHUDText::renderText()
 
     gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
 
-    LLGLState gls_blend(GL_BLEND, TRUE);
+    LLGLState gls_blend(GL_BLEND, true);
 
     LLColor4 shadow_color(0.f, 0.f, 0.f, 1.f);
     F32 alpha_factor = 1.f;
@@ -210,10 +208,6 @@ void LLHUDText::renderText()
             }
 
             text_color = segment_iter->mColor;
-            if (mOnHUDAttachment)
-            {
-                text_color = linearColor4(text_color);
-            }
             text_color.mV[VALPHA] *= alpha_factor;
 
             hud_render_text(segment_iter->getText(), render_position, *fontp, style, shadow, x_offset, y_offset, text_color, mOnHUDAttachment);
@@ -229,7 +223,6 @@ void LLHUDText::setString(const std::string &text_utf8)
 //  addLine(text_utf8, mColor);
 // [RLVa:KB] - Checked: RLVa-2.0.3
     // NOTE: setString() is called for debug and map beacons as well
-
     if (RlvActions::isRlvEnabled())
     {
         std::string text(text_utf8);
@@ -287,7 +280,7 @@ void LLHUDText::addLine(const std::string &text_utf8,
             do
             {
                 F32 max_pixels = HUD_TEXT_MAX_WIDTH_NO_BUBBLE;
-                S32 segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, wline.length(), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                S32 segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, static_cast<S32>(wline.length()), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                 LLHUDTextSegment segment(iter->substr(line_length, segment_length), style, color, font);
                 mTextSegments.push_back(segment);
                 line_length += segment_length;
@@ -298,7 +291,7 @@ void LLHUDText::addLine(const std::string &text_utf8,
     }
 }
 
-void LLHUDText::setZCompare(const BOOL zcompare)
+void LLHUDText::setZCompare(const bool zcompare)
 {
     mZCompare = zcompare;
 }
@@ -330,7 +323,7 @@ void LLHUDText::setAlpha(F32 alpha)
 }
 
 
-void LLHUDText::setDoFade(const BOOL do_fade)
+void LLHUDText::setDoFade(const bool do_fade)
 {
     mDoFade = do_fade;
 }
@@ -344,11 +337,10 @@ void LLHUDText::updateVisibility()
 
     mPositionAgent = gAgent.getPosAgentFromGlobal(mPositionGlobal);
 
-#if 0
     if (!mSourceObject)
     {
         // Beacons
-        mVisible = TRUE;
+        mVisible = true;
         if (mOnHUDAttachment)
         {
             sVisibleHUDTextObjects.push_back(LLPointer<LLHUDText> (this));
@@ -359,57 +351,55 @@ void LLHUDText::updateVisibility()
         }
         return;
     }
-#endif
 
     // Not visible if parent object is dead
-    if (!mSourceObject || mSourceObject->isDead())
+    if (mSourceObject->isDead())
     {
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
     // for now, all text on hud objects is visible
     if (mOnHUDAttachment)
     {
-        mVisible = TRUE;
+        mVisible = true;
         sVisibleHUDTextObjects.push_back(LLPointer<LLHUDText> (this));
         mLastDistance = mPositionAgent.mV[VX];
         return;
     }
 
     // push text towards camera by radius of object, but not past camera
-    auto& viewerCamera = LLViewerCamera::instance();
-    LLVector3 vec_from_camera = mPositionAgent - viewerCamera.getOrigin();
+    LLVector3 vec_from_camera = mPositionAgent - LLViewerCamera::getInstance()->getOrigin();
     LLVector3 dir_from_camera = vec_from_camera;
     dir_from_camera.normVec();
 
-    if (dir_from_camera * viewerCamera.getAtAxis() <= 0.f)
+    if (dir_from_camera * LLViewerCamera::getInstance()->getAtAxis() <= 0.f)
     { //text is behind camera, don't render
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
-    if (vec_from_camera * viewerCamera.getAtAxis() <= viewerCamera.getNear() + 0.1f + mSourceObject->getVObjRadius())
+    if (vec_from_camera * LLViewerCamera::getInstance()->getAtAxis() <= LLViewerCamera::getInstance()->getNear() + 0.1f + mSourceObject->getVObjRadius())
     {
-        mPositionAgent = viewerCamera.getOrigin() + vec_from_camera * ((viewerCamera.getNear() + 0.1f) / (vec_from_camera * viewerCamera.getAtAxis()));
+        mPositionAgent = LLViewerCamera::getInstance()->getOrigin() + vec_from_camera * ((LLViewerCamera::getInstance()->getNear() + 0.1f) / (vec_from_camera * LLViewerCamera::getInstance()->getAtAxis()));
     }
     else
     {
         mPositionAgent -= dir_from_camera * mSourceObject->getVObjRadius();
     }
 
-    mLastDistance = (mPositionAgent - viewerCamera.getOrigin()).magVec();
+    mLastDistance = (mPositionAgent - LLViewerCamera::getInstance()->getOrigin()).magVec();
 
     if (!mTextSegments.size() || (mDoFade && (mLastDistance > mFadeDistance + mFadeRange)))
     {
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
     LLVector3 pos_agent_center = gAgent.getPosAgentFromGlobal(mPositionGlobal) - dir_from_camera;
-    F32 last_distance_center = (pos_agent_center - viewerCamera.getOrigin()).magVec();
-    static const LLCachedControl<F32> prim_text_max_draw(gSavedSettings, "PrimTextMaxDrawDistance");
-    F32 max_draw_distance = prim_text_max_draw;
+    F32 last_distance_center = (pos_agent_center - LLViewerCamera::getInstance()->getOrigin()).magVec();
+    static LLCachedControl<F32> prim_text_max_dist(gSavedSettings, "PrimTextMaxDrawDistance");
+    F32 max_draw_distance = prim_text_max_dist;
 
     if(max_draw_distance < 0)
     {
@@ -424,7 +414,7 @@ void LLHUDText::updateVisibility()
 
     if(last_distance_center > max_draw_distance)
     {
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
@@ -432,39 +422,39 @@ void LLHUDText::updateVisibility()
     LLVector3 x_pixel_vec;
     LLVector3 y_pixel_vec;
 
-    viewerCamera.getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+    LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 
     LLVector3 render_position = mPositionAgent +
             (x_pixel_vec * mPositionOffset.mV[VX]) +
             (y_pixel_vec * mPositionOffset.mV[VY]);
 
-    mOffscreen = FALSE;
-    if (!viewerCamera.sphereInFrustum(render_position, mRadius))
+    mOffscreen = false;
+    if (!LLViewerCamera::getInstance()->sphereInFrustum(render_position, mRadius))
     {
 //      if (!mVisibleOffScreen)
 //      {
-            mVisible = FALSE;
+            mVisible = false;
             return;
 //      }
 //      else
 //      {
-//          mOffscreen = TRUE;
+//          mOffscreen = true;
 //      }
     }
 
-    mVisible = TRUE;
-    sVisibleTextObjects.emplace_back(this);
+    mVisible = true;
+    sVisibleTextObjects.push_back(LLPointer<LLHUDText> (this));
 }
 
-LLVector2 LLHUDText::updateScreenPos(const LLVector2 &offset)
+LLVector2 LLHUDText::updateScreenPos(LLVector2 &offset)
 {
     LLCoordGL screen_pos;
     LLVector2 screen_pos_vec;
-//  LLVector3 x_pixel_vec;
-//  LLVector3 y_pixel_vec;
-//  LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+    LLVector3 x_pixel_vec;
+    LLVector3 y_pixel_vec;
+    LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 //  LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * x_pixel_vec) + (offset.mV[VY] * y_pixel_vec);
-//  if (!LLViewerCamera::getInstance()->projectPosAgentToScreen(world_pos, screen_pos, FALSE) && mVisibleOffScreen)
+//  if (!LLViewerCamera::getInstance()->projectPosAgentToScreen(world_pos, screen_pos, false) && mVisibleOffScreen)
 //  {
 //      // bubble off-screen, so find a spot for it along screen edge
 //      LLViewerCamera::getInstance()->projectPosAgentToScreenEdge(world_pos, screen_pos);
@@ -527,8 +517,8 @@ void LLHUDText::updateSize()
 
     // *TODO: Could do some sort of timer-based resize logic here
     F32 u = 1.f;
-    mWidth = llmax(width, ll_lerp(mWidth, (F32)width, u));
-    mHeight = llmax(height, ll_lerp(mHeight, (F32)height, u));
+    mWidth = llmax(width, lerp(mWidth, (F32)width, u));
+    mHeight = llmax(height, lerp(mHeight, (F32)height, u));
 }
 
 void LLHUDText::updateAll()
@@ -642,18 +632,17 @@ void LLHUDText::reshape()
 
 F32 LLHUDText::LLHUDTextSegment::getWidth(const LLFontGL* font)
 {
-    // Singu note: Reworked hotspot. Less indirection
-    if (mFontWidthMap[0].first == font)
+    std::map<const LLFontGL*, F32>::iterator iter = mFontWidthMap.find(font);
+    if (iter != mFontWidthMap.end())
     {
-        return mFontWidthMap[0].second;
+        return iter->second;
     }
-    else if (mFontWidthMap[1].first == font)
+    else
     {
-        return mFontWidthMap[1].second;
+        F32 width = font->getWidthF32(mText.c_str());
+        mFontWidthMap[font] = width;
+        return width;
     }
-    F32 width = font->getWidthF32(mText.c_str());
-    mFontWidthMap[mFontWidthMap[0].first != nullptr] = std::make_pair(font, width);
-    return width;
 }
 
 // [RLVa:KB] - Checked: RLVa-2.0.3

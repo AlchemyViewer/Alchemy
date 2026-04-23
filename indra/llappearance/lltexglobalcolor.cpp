@@ -42,7 +42,13 @@ LLTexGlobalColor::LLTexGlobalColor(LLAvatarAppearance* appearance)
 {
 }
 
-BOOL LLTexGlobalColor::setInfo(LLTexGlobalColorInfo *info)
+LLTexGlobalColor::~LLTexGlobalColor()
+{
+    // mParamColorList are LLViewerVisualParam's and get deleted with ~LLCharacter()
+    //std::for_each(mParamColorList.begin(), mParamColorList.end(), DeletePointer());
+}
+
+bool LLTexGlobalColor::setInfo(LLTexGlobalColorInfo *info)
 {
     llassert(mInfo == NULL);
     mInfo = info;
@@ -52,15 +58,15 @@ BOOL LLTexGlobalColor::setInfo(LLTexGlobalColorInfo *info)
     for (LLTexLayerParamColorInfo* color_info : mInfo->mParamColorInfoList)
     {
         LLTexParamGlobalColor* param_color = new LLTexParamGlobalColor(this);
-        if (!param_color->setInfo(color_info, TRUE))
+        if (!param_color->setInfo(color_info, true))
         {
             mInfo = NULL;
-            return FALSE;
+            return false;
         }
         mParamGlobalColorList.push_back(param_color);
     }
 
-    return TRUE;
+    return true;
 }
 
 LLColor4 LLTexGlobalColor::getColor() const
@@ -91,6 +97,19 @@ LLTexParamGlobalColor::LLTexParamGlobalColor(LLTexGlobalColor* tex_global_color)
 //-----------------------------------------------------------------------------
 // LLTexParamGlobalColor
 //-----------------------------------------------------------------------------
+LLTexParamGlobalColor::LLTexParamGlobalColor(const LLTexParamGlobalColor& pOther)
+    : LLTexLayerParamColor(pOther),
+    mTexGlobalColor(pOther.mTexGlobalColor)
+{
+}
+
+//-----------------------------------------------------------------------------
+// ~LLTexParamGlobalColor
+//-----------------------------------------------------------------------------
+LLTexParamGlobalColor::~LLTexParamGlobalColor()
+{
+}
+
 /*virtual*/ LLViewerVisualParam* LLTexParamGlobalColor::cloneParam(LLWearable* wearable) const
 {
     return new LLTexParamGlobalColor(*this);
@@ -105,20 +124,25 @@ void LLTexParamGlobalColor::onGlobalColorChanged()
 // LLTexGlobalColorInfo
 //-----------------------------------------------------------------------------
 
+LLTexGlobalColorInfo::LLTexGlobalColorInfo()
+{
+}
+
+
 LLTexGlobalColorInfo::~LLTexGlobalColorInfo()
 {
     for_each(mParamColorInfoList.begin(), mParamColorInfoList.end(), DeletePointer());
     mParamColorInfoList.clear();
 }
 
-BOOL LLTexGlobalColorInfo::parseXml(LLXmlTreeNode* node)
+bool LLTexGlobalColorInfo::parseXml(LLXmlTreeNode* node)
 {
     // name attribute
     static LLStdStringHandle name_string = LLXmlTree::addAttributeString("name");
     if (!node->getFastAttributeString(name_string, mName))
     {
         LL_WARNS() << "<global_color> element is missing name attribute." << LL_ENDL;
-        return FALSE;
+        return false;
     }
     // <param> sub-element
     for (LLXmlTreeNode* child = node->getChildByName("param");
@@ -132,10 +156,10 @@ BOOL LLTexGlobalColorInfo::parseXml(LLXmlTreeNode* node)
             if (!info->parseXml(child))
             {
                 delete info;
-                return FALSE;
+                return false;
             }
             mParamColorInfoList.push_back(info);
         }
     }
-    return TRUE;
+    return true;
 }

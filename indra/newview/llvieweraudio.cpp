@@ -76,7 +76,7 @@ LLViewerAudio::~LLViewerAudio()
 
 void LLViewerAudio::registerIdleListener()
 {
-    if(mIdleListnerActive==false)
+    if (!mIdleListnerActive)
     {
         mIdleListnerActive = true;
         doOnIdleRepeating(boost::bind(boost::bind(&LLViewerAudio::onIdleUpdate, this)));
@@ -118,7 +118,7 @@ void LLViewerAudio::startInternetStreamWithAutoFade(const std::string &streamURI
 
             LLStreamingAudioInterface *stream = gAudiop->getStreamingAudioImpl();
             if (stream && stream->supportsAdjustableBufferSizes())
-                stream->setBufferSizes(gSavedSettings.getU32("FMODStreamBufferSize"),gSavedSettings.getU32("FMODDecodeBufferSize"));
+                stream->setBufferSizes(FMODEX_STREAM_BUFFER_SIZE, FMODEX_DECODE_BUFFER_SIZE);
 
             gAudiop->startInternetStream(mNextStreamURI);
         }
@@ -185,7 +185,7 @@ bool LLViewerAudio::onIdleUpdate()
                     LL_DEBUGS("AudioEngine") << "Audio fade in: " << mNextStreamURI << LL_ENDL;
                     LLStreamingAudioInterface *stream = gAudiop->getStreamingAudioImpl();
                     if(stream && stream->supportsAdjustableBufferSizes())
-                        stream->setBufferSizes(gSavedSettings.getU32("FMODStreamBufferSize"),gSavedSettings.getU32("FMODDecodeBufferSize"));
+                        stream->setBufferSizes(FMODEX_STREAM_BUFFER_SIZE, FMODEX_DECODE_BUFFER_SIZE);
 
                     gAudiop->startInternetStream(mNextStreamURI);
                 }
@@ -243,7 +243,7 @@ void LLViewerAudio::startFading()
     {
         // The fade state here should only be one of FADE_IN or FADE_OUT, but, in case it is not,
         // rather than check for both states assume a fade in and check for the fade out case.
-        mFadeTime = getFadeState() == LLViewerAudio::FADE_OUT ?
+        mFadeTime = LLViewerAudio::getInstance()->getFadeState() == LLViewerAudio::FADE_OUT ?
             AUDIO_MUSIC_FADE_OUT_TIME : AUDIO_MUSIC_FADE_IN_TIME;
 
         // Prevent invalid fade time
@@ -264,7 +264,7 @@ F32 LLViewerAudio::getFadeVolume()
         mDone = true;
         // If we have been fading out set volume to 0 until the next fade state occurs to prevent
         // an audio transient.
-        if (getFadeState() == LLViewerAudio::FADE_OUT)
+        if (LLViewerAudio::getInstance()->getFadeState() == LLViewerAudio::FADE_OUT)
         {
             fade_volume = 0.0f;
         }
@@ -275,7 +275,7 @@ F32 LLViewerAudio::getFadeVolume()
         // Calculate how far we are into the fade time
         fade_volume = stream_fade_timer.getElapsedTimeF32() / mFadeTime;
 
-        if (getFadeState() == LLViewerAudio::FADE_OUT)
+        if (LLViewerAudio::getInstance()->getFadeState() == LLViewerAudio::FADE_OUT)
         {
             // If we are not fading in then we are fading out, so invert the fade
             // direction; start loud and move towards zero volume.
@@ -288,15 +288,15 @@ F32 LLViewerAudio::getFadeVolume()
 
 void LLViewerAudio::onTeleportStarted()
 {
-    if (gAudiop && !getForcedTeleportFade())
+    if (gAudiop && !LLViewerAudio::getInstance()->getForcedTeleportFade())
     {
         // Even though the music was turned off it was starting up (with autoplay disabled) occasionally
         // after a failed teleport or after an intra-parcel teleport.  Also, the music sometimes was not
         // restarting after a successful intra-parcel teleport. Setting mWasPlaying fixes these issues.
-        setWasPlaying(!gAudiop->getInternetStreamURL().empty());
-        setForcedTeleportFade(true);
-        startInternetStreamWithAutoFade(LLStringUtil::null);
-        setNextStreamURI(LLStringUtil::null);
+        LLViewerAudio::getInstance()->setWasPlaying(!gAudiop->getInternetStreamURL().empty());
+        LLViewerAudio::getInstance()->setForcedTeleportFade(true);
+        LLViewerAudio::getInstance()->startInternetStreamWithAutoFade(LLStringUtil::null);
+        LLViewerAudio::getInstance()->setNextStreamURI(LLStringUtil::null);
     }
 }
 
@@ -355,9 +355,9 @@ void init_audio()
 
 // load up our initial set of sounds we'll want so they're in memory and ready to be played
 
-    BOOL mute_audio = gSavedSettings.getBOOL("MuteAudio");
+    bool mute_audio = gSavedSettings.getBOOL("MuteAudio");
 
-    if (!mute_audio && FALSE == gSavedSettings.getBOOL("NoPreload"))
+    if (!mute_audio && false == gSavedSettings.getBOOL("NoPreload"))
     {
         gAudiop->preloadSound(LLUUID(gSavedSettings.getString("UISndAlert")));
         gAudiop->preloadSound(LLUUID(gSavedSettings.getString("UISndBadKeystroke")));
@@ -390,6 +390,7 @@ void init_audio()
         gAudiop->preloadSound(LLUUID(gSavedSettings.getString("UISndWindowClose")));
         gAudiop->preloadSound(LLUUID(gSavedSettings.getString("UISndWindowOpen")));
         gAudiop->preloadSound(LLUUID(gSavedSettings.getString("UISndRestart")));
+        gAudiop->preloadSound(LLUUID(gSavedSettings.getString("UISndChatMention")));
     }
 
     audio_update_volume(true);
@@ -397,20 +398,12 @@ void init_audio()
 
 void audio_update_volume(bool force_update)
 {
-    static const LLCachedControl<F32> master_volume(gSavedSettings, "AudioLevelMaster");
-    static const LLCachedControl<bool> mute_audio_cc(gSavedSettings, "MuteAudio");
-    bool mute_audio = mute_audio_cc;
+    static LLCachedControl<F32> master_volume(gSavedSettings, "AudioLevelMaster");
+    static LLCachedControl<bool> mute_audio_setting(gSavedSettings, "MuteAudio");
+    static LLCachedControl<bool> mute_when_minimized(gSavedSettings, "MuteWhenMinimized");
+    bool mute_audio = mute_audio_setting();
 
-    LLProgressView* progress = gViewerWindow->getProgressView();
-    BOOL progress_view_visible = FALSE;
-
-    if (progress)
-    {
-        progress_view_visible = progress->getVisible();
-    }
-
-    static const LLCachedControl<bool> mute_when_minimized(gSavedSettings, "MuteWhenMinimized");
-    if (!gViewerWindow->getActive() && mute_when_minimized)
+    if (!gViewerWindow->getActive() && mute_when_minimized())
     {
         mute_audio = true;
     }
@@ -420,7 +413,7 @@ void audio_update_volume(bool force_update)
     {
         // Sound Effects
 
-        gAudiop->setMasterGain ( master_volume );
+        gAudiop->setMasterGain (master_volume());
 
         const F32 AUDIO_LEVEL_DOPPLER = 1.f;
         gAudiop->setDopplerFactor(AUDIO_LEVEL_DOPPLER);
@@ -436,6 +429,7 @@ void audio_update_volume(bool force_update)
             gAudiop->setRolloffFactor(AUDIO_LEVEL_UNDERWATER_ROLLOFF);
         }
 
+        bool progress_view_visible = gViewerWindow->getShowProgress();
         gAudiop->setMuted(mute_audio || progress_view_visible);
 
         //Play any deferred sounds when unmuted
@@ -449,16 +443,21 @@ void audio_update_volume(bool force_update)
             audio_update_wind(true);
         }
 
+        static LLCachedControl<bool> mute_sounds(gSavedSettings, "MuteSounds");
+        static LLCachedControl<bool> mute_ui(gSavedSettings, "MuteUI");
+        static LLCachedControl<bool> mute_ambient(gSavedSettings, "MuteAmbient");
+        static LLCachedControl<bool> mute_music(gSavedSettings, "MuteMusic");
+        static LLCachedControl<F32> al_sfx(gSavedSettings, "AudioLevelSFX");
+        static LLCachedControl<F32> al_ui(gSavedSettings, "AudioLevelUI");
+        static LLCachedControl<F32> al_ambient(gSavedSettings, "AudioLevelAmbient");
+        static LLCachedControl<F32> al_music(gSavedSettings, "AudioLevelMusic");
         // handle secondary gains
-        static const LLCachedControl<bool> sounds_mute(gSavedSettings, "MuteSounds");
-        static const LLCachedControl<bool> ui_mute(gSavedSettings, "MuteUI");
-        static const LLCachedControl<bool> ambient_mute(gSavedSettings, "MuteAmbient");
-        static const LLCachedControl<F32> sounds_volume(gSavedSettings, "AudioLevelSFX");
-        static const LLCachedControl<F32> ui_volume(gSavedSettings, "AudioLevelUI");
-        static const LLCachedControl<F32> ambient_volume(gSavedSettings, "AudioLevelAmbient");
-        gAudiop->setSecondaryGain(LLAudioEngine::AUDIO_TYPE_SFX, sounds_mute ? 0.f : sounds_volume);
-        gAudiop->setSecondaryGain(LLAudioEngine::AUDIO_TYPE_UI,  ui_mute ? 0.f : ui_volume);
-        gAudiop->setSecondaryGain(LLAudioEngine::AUDIO_TYPE_AMBIENT, ambient_mute ? 0.f : ambient_volume);
+        gAudiop->setSecondaryGain(LLAudioEngine::AUDIO_TYPE_SFX,
+                                  mute_sounds() ? 0.f : al_sfx());
+        gAudiop->setSecondaryGain(LLAudioEngine::AUDIO_TYPE_UI,
+                                  mute_ui() ? 0.f : al_ui());
+        gAudiop->setSecondaryGain(LLAudioEngine::AUDIO_TYPE_AMBIENT,
+                                  mute_ambient() ? 0.f : al_ambient());
 
         // Streaming Music
 
@@ -468,32 +467,29 @@ void audio_update_volume(bool force_update)
             LLViewerAudio::getInstance()->setForcedTeleportFade(false);
         }
 
-        static const LLCachedControl<F32> music_volume_setting(gSavedSettings, "AudioLevelMusic");
-        static const LLCachedControl<bool> music_muted(gSavedSettings, "MuteMusic");
-        const F32 fade_volume = LLViewerAudio::getInstance()->getFadeVolume();
+        F32 fade_volume = LLViewerAudio::getInstance()->getFadeVolume();
 
-        const F32 music_volume = mute_volume * master_volume * music_volume_setting * fade_volume;
-        gAudiop->setInternetStreamGain (music_muted ? 0.f : music_volume);
+        F32 music_volume = mute_volume * master_volume * al_music() * fade_volume;
+        gAudiop->setInternetStreamGain (mute_music() ? 0.f : music_volume);
     }
 
     // Streaming Media
-    static const LLCachedControl<F32> media_volume_setting(gSavedSettings, "AudioLevelMedia");
-    static const LLCachedControl<bool> media_muted(gSavedSettings, "MuteMedia");
-    const F32 media_volume = mute_volume * master_volume * media_volume_setting;
-    LLViewerMedia::getInstance()->setVolume( media_muted ? 0.0f : media_volume );
+    static LLCachedControl<bool> media_muted(gSavedSettings, "MuteMedia");
+    static LLCachedControl<F32> media_volume(gSavedSettings, "AudioLevelMedia");
+    LLViewerMedia::getInstance()->setVolume( media_muted() ? 0.0f : (mute_volume * master_volume() * media_volume()));
 
     // Voice, this is parametric singleton, it gets initialized when ready
     if (LLVoiceClient::instanceExists())
     {
-        static const LLCachedControl<F32> voice_volume_setting(gSavedSettings, "AudioLevelVoice");
-        static const LLCachedControl<bool> voice_mute(gSavedSettings, "MuteVoice");
-        static const LLCachedControl<F32> mic_volume(gSavedSettings, "AudioLevelMic");
-        const F32 voice_volume = mute_volume * master_volume * voice_volume_setting;
+        static LLCachedControl<bool> voice_mute(gSavedSettings, "MuteVoice");
+        static LLCachedControl<F32> voice_volume_setting(gSavedSettings, "AudioLevelVoice");
+        static LLCachedControl<F32> voice_mic_setting(gSavedSettings, "AudioLevelMic");
+        F32 voice_volume = mute_volume * master_volume() * voice_volume_setting();
         LLVoiceClient *voice_inst = LLVoiceClient::getInstance();
-        voice_inst->setVoiceVolume(voice_mute ? 0.f : voice_volume);
-        voice_inst->setMicGain(voice_mute ? 0.f : mic_volume);
+        voice_inst->setVoiceVolume(voice_mute() ? 0.f : voice_volume);
+        voice_inst->setMicGain(voice_mute() ? 0.f : voice_mic_setting());
 
-        if (!gViewerWindow->getActive() && mute_when_minimized)
+        if (!gViewerWindow->getActive() && mute_when_minimized())
         {
             voice_inst->setMuteMic(true);
         }
@@ -547,8 +543,8 @@ void audio_update_wind(bool force_update)
         // whereas steady-state avatar walk velocity is only 3.2 m/s.
         // Without this the world feels desolate on first login when you are
         // standing still.
-        const F32 WIND_LEVEL = 0.5f;
-        LLVector3 scaled_wind_vec = gWindVec * WIND_LEVEL;
+        static LLUICachedControl<F32> wind_level("AudioLevelWind", 0.5f);
+        LLVector3 scaled_wind_vec = gWindVec * wind_level;
 
         // Mix in the avatar's motion, subtract because when you walk north,
         // the apparent wind moves south.
@@ -560,12 +556,13 @@ void audio_update_wind(bool force_update)
         // don't use the setter setMaxWindGain() because we don't
         // want to screw up the fade-in on startup by setting actual source gain
         // outside the fade-in.
-        static const LLCachedControl<bool> mute_audio(gSavedSettings, "MuteAudio");
-        static const LLCachedControl<bool> mute_ambient(gSavedSettings, "MuteAmbient");
-        static const LLCachedControl<F32> audio_level_master(gSavedSettings, "AudioLevelMaster");
-        static const LLCachedControl<F32> audio_level_ambient(gSavedSettings, "AudioLevelAmbient");
-        F32 master_volume = mute_audio ? 0.f : audio_level_master;
-        F32 ambient_volume = mute_ambient ? 0.f : audio_level_ambient;
+        static LLCachedControl<bool> mute_audio(gSavedSettings, "MuteAudio");
+        static LLCachedControl<bool> mute_ambient(gSavedSettings, "MuteAmbient");
+        static LLCachedControl<F32> level_master(gSavedSettings, "AudioLevelMaster");
+        static LLCachedControl<F32> level_ambient(gSavedSettings, "AudioLevelAmbient");
+
+        F32 master_volume  = mute_audio() ? 0.f : level_master();
+        F32 ambient_volume = mute_ambient() ? 0.f : level_ambient();
         F32 max_wind_volume = master_volume * ambient_volume;
 
         const F32 WIND_SOUND_TRANSITION_TIME = 2.f;

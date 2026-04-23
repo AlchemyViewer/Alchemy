@@ -35,8 +35,6 @@
 #include "lljoint.h"
 #include "llpointer.h"
 
-#include "boost/unordered/unordered_flat_map.hpp"
-
 #include <map>
 #include <string>
 
@@ -65,13 +63,13 @@ public:
     // Constructor
     LLPose() : mWeight(0.f) {}
     // Destructor
-    ~LLPose() = default;
+    ~LLPose();
     // add a joint state in this pose
-    BOOL addJointState(const LLPointer<LLJointState>& jointState);
+    bool addJointState(const LLPointer<LLJointState>& jointState);
     // remove a joint state from this pose
-    BOOL removeJointState(const LLPointer<LLJointState>& jointState);
+    bool removeJointState(const LLPointer<LLJointState>& jointState);
     // removes all joint states from this pose
-    BOOL removeAllJointStates();
+    bool removeAllJointStates();
     // set weight for all joint states in this pose
     void setWeight(F32 weight);
     // get weight for this pose
@@ -82,34 +80,33 @@ public:
 
 const S32 JSB_NUM_JOINT_STATES = 6;
 
-LL_ALIGN_PREFIX(16)
-class LLJointStateBlender
+class alignas(16) LLJointStateBlender
 {
     LL_ALIGN_NEW
 protected:
     LLPointer<LLJointState> mJointStates[JSB_NUM_JOINT_STATES];
     S32             mPriorities[JSB_NUM_JOINT_STATES];
-    BOOL            mAdditiveBlends[JSB_NUM_JOINT_STATES];
+    bool            mAdditiveBlends[JSB_NUM_JOINT_STATES];
 public:
     LLJointStateBlender();
-    ~LLJointStateBlender() = default;
-    void blendJointStates(BOOL apply_now = TRUE);
-    BOOL addJointState(const LLPointer<LLJointState>& joint_state, S32 priority, BOOL additive_blend);
+    ~LLJointStateBlender();
+    void blendJointStates(bool apply_now = true);
+    bool addJointState(const LLPointer<LLJointState>& joint_state, S32 priority, bool additive_blend);
     void interpolate(F32 u);
     void clear();
     void resetCachedJoint();
 
 public:
-    LL_ALIGN_16(LLJoint mJointCache);
-} LL_ALIGN_POSTFIX(16);
+    LLJoint mJointCache;
+};
 
 class LLMotion;
 
 class LLPoseBlender
 {
 protected:
-    typedef std::list<LLJointStateBlender*> blender_list_t;
-    typedef boost::unordered_flat_map<LLJoint*,LLJointStateBlender*> blender_map_t;
+    typedef std::vector<LLJointStateBlender*> blender_list_t;
+    typedef std::map<LLJoint*,LLJointStateBlender*> blender_map_t;
     blender_map_t mJointStateBlenderPool;
     blender_list_t mActiveBlenders;
 
@@ -122,7 +119,7 @@ public:
     ~LLPoseBlender();
 
     // request motion joint states to be added to pose blender joint state records
-    BOOL addMotion(LLMotion* motion);
+    bool addMotion(LLMotion* motion);
 
     // blend all joint states and apply to skeleton
     void blendAndApply();
@@ -131,7 +128,7 @@ public:
     void clearBlenders();
 
     // blend all joint states and cache results
-    void blendAndCache(BOOL reset_cached_joints);
+    void blendAndCache(bool reset_cached_joints);
 
     // interpolate all joints towards cached values
     void interpolate(F32 u);

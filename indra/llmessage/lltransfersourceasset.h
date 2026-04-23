@@ -30,13 +30,15 @@
 #include "lltransfermanager.h"
 #include "llassetstorage.h"
 
+class LLFileSystem;
+
 class LLTransferSourceParamsAsset : public LLTransferSourceParams
 {
 public:
     LLTransferSourceParamsAsset();
-    virtual ~LLTransferSourceParamsAsset() = default;
+    virtual ~LLTransferSourceParamsAsset() {}
     /*virtual*/ void packParams(LLDataPacker &dp) const;
-    /*virtual*/ BOOL unpackParams(LLDataPacker &dp);
+    /*virtual*/ bool unpackParams(LLDataPacker &dp);
 
     void setAsset(const LLUUID &asset_id, const LLAssetType::EType asset_type);
 
@@ -52,7 +54,7 @@ class LLTransferSourceAsset : public LLTransferSource
 {
 public:
     LLTransferSourceAsset(const LLUUID &request_id, const F32 priority);
-    virtual ~LLTransferSourceAsset() = default;
+    virtual ~LLTransferSourceAsset();
 
     static void responderCallback(const LLUUID& uuid, LLAssetType::EType type,
                                   void *user_data, S32 result, LLExtStat ext_status );
@@ -63,15 +65,15 @@ protected:
                                       const S32 max_bytes,
                                       U8 **datap,
                                       S32 &returned_bytes,
-                                      BOOL &delete_returned);
+                                      bool &delete_returned);
     /*virtual*/ void completionCallback(const LLTSCode status);
 
     virtual void packParams(LLDataPacker& dp) const;
-    /*virtual*/ BOOL unpackParams(LLDataPacker &dp);
+    /*virtual*/ bool unpackParams(LLDataPacker &dp);
 
 protected:
     LLTransferSourceParamsAsset mParams;
-    BOOL mGotResponse;
+    bool mGotResponse;
 
     S32 mCurPos;
 };

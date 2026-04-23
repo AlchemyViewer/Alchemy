@@ -25,6 +25,8 @@
 * $/LicenseInfo$
 */
 
+#include "linden_common.h"
+
 #include "llsettingsdaycycle.h"
 #include "llerror.h"
 #include <algorithm>
@@ -110,10 +112,10 @@ const LLSettingsDay::Seconds LLSettingsDay::MINIMUM_DAYOFFSET(0);
 const LLSettingsDay::Seconds LLSettingsDay::DEFAULT_DAYOFFSET(57600);  // +16 hours == -8 hours (SLT time offset)
 const LLSettingsDay::Seconds LLSettingsDay::MAXIMUM_DAYOFFSET(86400);  // 24 hours
 
-const S32 LLSettingsDay::TRACK_WATER(0);   // water track is 0
-const S32 LLSettingsDay::TRACK_GROUND_LEVEL(1);
-const S32 LLSettingsDay::TRACK_MAX(5);     // 5 tracks, 4 skys, 1 water
-const S32 LLSettingsDay::FRAME_MAX(56);
+const U32 LLSettingsDay::TRACK_WATER(0);   // water track is 0
+const U32 LLSettingsDay::TRACK_GROUND_LEVEL(1);
+const U32 LLSettingsDay::TRACK_MAX(5);     // 5 tracks, 4 skys, 1 water
+const U32 LLSettingsDay::FRAME_MAX(56);
 
 const F32 LLSettingsDay::DEFAULT_FRAME_SLOP_FACTOR(0.02501f);
 
@@ -124,33 +126,38 @@ static const F32 DEFAULT_MULTISLIDER_INCREMENT(0.005f);
 //=========================================================================
 LLSettingsDay::LLSettingsDay(const LLSD &data) :
     LLSettingsBase(data),
-    mInitialized(false)
+    mInitialized(false),
+    mDaySettings(LLSD::emptyMap())
 {
     mDayTracks.resize(TRACK_MAX);
+    loadValuesFromLLSD();
 }
 
 LLSettingsDay::LLSettingsDay() :
     LLSettingsBase(),
-    mInitialized(false)
+    mInitialized(false),
+    mDaySettings(LLSD::emptyMap())
 {
     mDayTracks.resize(TRACK_MAX);
+    replaceSettings(defaults());
 }
 
 //=========================================================================
-LLSD LLSettingsDay::getSettings() const
+LLSD& LLSettingsDay::getSettings()
 {
-    LLSD settings(LLSD::emptyMap());
+    mDaySettings = LLSD::emptyMap();
+    LLSD& settings = LLSettingsBase::getSettings();
 
-    if (mSettings.has(SETTING_NAME))
-        settings[SETTING_NAME] = mSettings[SETTING_NAME];
+    if (settings.has(SETTING_NAME))
+        mDaySettings[SETTING_NAME] = settings[SETTING_NAME];
 
-    if (mSettings.has(SETTING_ID))
-        settings[SETTING_ID] = mSettings[SETTING_ID];
+    if (settings.has(SETTING_ID))
+        mDaySettings[SETTING_ID] = settings[SETTING_ID];
 
-    if (mSettings.has(SETTING_ASSETID))
-        settings[SETTING_ASSETID] = mSettings[SETTING_ASSETID];
+    if (settings.has(SETTING_ASSETID))
+        mDaySettings[SETTING_ASSETID] = settings[SETTING_ASSETID];
 
-    settings[SETTING_TYPE] = getSettingsType();
+    mDaySettings[SETTING_TYPE] = getSettingsType();
 
     std::map<std::string, LLSettingsBase::ptr_t> in_use;
 
@@ -174,7 +181,7 @@ LLSD LLSettingsDay::getSettings() const
         }
         tracks.append(trackout);
     }
-    settings[SETTING_TRACKS] = tracks;
+    mDaySettings[SETTING_TRACKS] = tracks;
 
     LLSD frames(LLSD::emptyMap());
     for (std::map<std::string, LLSettingsBase::ptr_t>::iterator itFrame = in_use.begin(); itFrame != in_use.end(); ++itFrame)
@@ -184,9 +191,15 @@ LLSD LLSettingsDay::getSettings() const
 
         frames[(*itFrame).first] = framesettings;
     }
-    settings[SETTING_FRAMES] = frames;
+    mDaySettings[SETTING_FRAMES] = frames;
 
-    return settings;
+    return mDaySettings;
+}
+
+void LLSettingsDay::setLLSDDirty()
+{
+    mDaySettings = LLSD::emptyMap();
+    LLSettingsBase::setLLSDDirty();
 }
 
 bool LLSettingsDay::initialize(bool validate_frames)
@@ -203,10 +216,10 @@ bool LLSettingsDay::initialize(bool validate_frames)
 
     std::map<std::string, LLSettingsBase::ptr_t> used;
 
-    for (const auto& llsd_pair : frames.asMap())
+    for (LLSD::map_const_iterator itFrame = frames.beginMap(); itFrame != frames.endMap(); ++itFrame)
     {
-        const std::string& name = llsd_pair.first;
-        const LLSD& data = llsd_pair.second;
+        std::string name = (*itFrame).first;
+        LLSD data = (*itFrame).second;
         LLSettingsBase::ptr_t keyframe;
 
         if (data[SETTING_TYPE].asString() == "sky")
@@ -237,16 +250,16 @@ bool LLSettingsDay::initialize(bool validate_frames)
     {
         mDayTracks[i].clear();
         LLSD curtrack = tracks[i];
-        for (const auto& llsd_val : curtrack.asArray())
+        for (LLSD::array_const_iterator it = curtrack.beginArray(); it != curtrack.endArray(); ++it)
         {
-            LLSettingsBase::TrackPosition keyframe = LLSettingsBase::TrackPosition(llsd_val[SETTING_KEYKFRAME].asReal());
+            LLSettingsBase::TrackPosition keyframe = LLSettingsBase::TrackPosition((*it)[SETTING_KEYKFRAME].asReal());
             keyframe = llclamp(keyframe, 0.0f, 1.0f);
             LLSettingsBase::ptr_t setting;
 
 
-            if (llsd_val.has(SETTING_KEYNAME))
+            if ((*it).has(SETTING_KEYNAME))
             {
-                std::string key_name = llsd_val[SETTING_KEYNAME];
+                std::string key_name = (*it)[SETTING_KEYNAME];
                 if (i == TRACK_WATER)
                 {
                     setting = used[key_name];
@@ -392,6 +405,8 @@ bool LLSettingsDay::initialize(bool validate_frames)
         mSettings[SETTING_ASSETID] = assetid;
     }
 
+    loadValuesFromLLSD();
+
     mInitialized = true;
     return true;
 }
@@ -449,7 +464,7 @@ LLSD LLSettingsDay::defaults()
     return dfltsetting;
 }
 
-void LLSettingsDay::blend(const LLSettingsBase::ptr_t &other, F64 mix)
+void LLSettingsDay::blend(LLSettingsBase::ptr_t &other, F64 mix)
 {
     LL_ERRS("DAYCYCLE") << "Day cycles are not blendable!" << LL_ENDL;
 }
@@ -461,45 +476,45 @@ namespace
         // Trim extra tracks.
         while (value.size() > LLSettingsDay::TRACK_MAX)
         {
-            value.erase(value.size() - 1);
+            value.erase(static_cast<LLSD::Integer>(value.size()) - 1);
         }
 
         S32 framecount(0);
 
-        for (auto& llsd_val : value.asArray())
+        for (LLSD::array_iterator track = value.beginArray(); track != value.endArray(); ++track)
         {
             S32 index = 0;
-            while (index < llsd_val.size())
+            while (index < (*track).size())
             {
-                LLSD& elem = llsd_val[index];
+                LLSD& elem = (*track)[index];
 
                 ++framecount;
                 if (index >= LLSettingsDay::FRAME_MAX)
                 {
-                    llsd_val.erase(index);
+                    (*track).erase(index);
                     continue;
                 }
 
                 if (!elem.has(LLSettingsDay::SETTING_KEYKFRAME))
                 {
-                    llsd_val.erase(index);
+                    (*track).erase(index);
                     continue;
                 }
 
                 if (!elem[LLSettingsDay::SETTING_KEYKFRAME].isReal())
                 {
-                    llsd_val.erase(index);
+                    (*track).erase(index);
                     continue;
                 }
 
                 if (!elem.has(LLSettingsDay::SETTING_KEYNAME) &&
                     !elem.has(LLSettingsDay::SETTING_KEYID))
                 {
-                    llsd_val.erase(index);
+                    (*track).erase(index);
                     continue;
                 }
 
-                LLSettingsBase::TrackPosition frame = elem[LLSettingsDay::SETTING_KEYKFRAME].asReal();
+                LLSettingsBase::TrackPosition frame = (F32)elem[LLSettingsDay::SETTING_KEYKFRAME].asReal();
                 if ((frame < 0.0) || (frame > 1.0))
                 {
                     frame = llclamp(frame, 0.0f, 1.0f);
@@ -510,7 +525,7 @@ namespace
 
         }
 
-        int waterTracks = value[0].size();
+        int waterTracks = static_cast<int>(value[0].size());
         int skyTracks   = framecount - waterTracks;
 
         if (waterTracks < 1)
@@ -532,19 +547,19 @@ namespace
         bool hasSky(false);
         bool hasWater(false);
 
-        for (const auto& llsd_pair : value.asMap())
+        for (LLSD::map_iterator itf = value.beginMap(); itf != value.endMap(); ++itf)
         {
-            LLSD frame = llsd_pair.second;
+            LLSD frame = (*itf).second;
 
             std::string ftype = frame[LLSettingsBase::SETTING_TYPE];
             if (ftype == "sky")
             {
-                const LLSettingsSky::validation_list_t& valid_sky = LLSettingsSky::validationList();
+                LLSettingsSky::validation_list_t valid_sky = LLSettingsSky::validationList();
                 LLSD res_sky = LLSettingsBase::settingValidation(frame, valid_sky, flags);
 
                 if (res_sky["success"].asInteger() == 0)
                 {
-                    LL_WARNS("SETTINGS") << "Sky setting named '" << llsd_pair.first << "' validation failed!: " << res_sky << LL_ENDL;
+                    LL_WARNS("SETTINGS") << "Sky setting named '" << (*itf).first << "' validation failed!: " << res_sky << LL_ENDL;
                     LL_WARNS("SETTINGS") << "Sky: " << frame << LL_ENDL;
                     continue;
                 }
@@ -552,11 +567,11 @@ namespace
             }
             else if (ftype == "water")
             {
-                const LLSettingsWater::validation_list_t& valid_h2o = LLSettingsWater::validationList();
+                LLSettingsWater::validation_list_t valid_h2o = LLSettingsWater::validationList();
                 LLSD res_h2o = LLSettingsBase::settingValidation(frame, valid_h2o, flags);
                 if (res_h2o["success"].asInteger() == 0)
                 {
-                    LL_WARNS("SETTINGS") << "Water setting named '" << llsd_pair.first << "' validation failed!: " << res_h2o << LL_ENDL;
+                    LL_WARNS("SETTINGS") << "Water setting named '" << (*itf).first << "' validation failed!: " << res_h2o << LL_ENDL;
                     LL_WARNS("SETTINGS") << "Water: " << frame << LL_ENDL;
                     continue;
                 }
@@ -564,7 +579,7 @@ namespace
             }
             else
             {
-                LL_WARNS("SETTINGS") << "Unknown settings block of type '" << ftype << "' named '" << llsd_pair.first << "'" << LL_ENDL;
+                LL_WARNS("SETTINGS") << "Unknown settings block of type '" << ftype << "' named '" << (*itf).first << "'" << LL_ENDL;
                 return false;
             }
         }
@@ -587,12 +602,12 @@ namespace
     }
 }
 
-const LLSettingsDay::validation_list_t& LLSettingsDay::getValidationList() const
+LLSettingsDay::validation_list_t LLSettingsDay::getValidationList() const
 {
     return LLSettingsDay::validationList();
 }
 
-const LLSettingsDay::validation_list_t& LLSettingsDay::validationList()
+LLSettingsDay::validation_list_t LLSettingsDay::validationList()
 {
     static validation_list_t validation;
 

@@ -59,8 +59,10 @@ static const char* FieldName[] =
 
 namespace
 {
-#ifdef __clang__
+#if defined(LL_CLANG)
 #   pragma clang diagnostic ignored "-Wunused-function"
+#elif defined(LL_GNUC)
+#   pragma GCC diagnostic ignored "-Wunused-function"
 #endif
     void test_that_error_h_includes_enough_things_to_compile_a_message()
     {
@@ -283,7 +285,7 @@ namespace tut
     void ErrorTestObject::test<2>()
         // messages are filtered based on default level
     {
-#ifndef ENABLE_DEBUG_MACRO
+#ifdef LL_DISABLE_DEBUG_LOGGING
         skip("Debug messages disabled");
 #endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
@@ -329,7 +331,7 @@ namespace tut
     void ErrorTestObject::test<3>()
         // error type string in output
     {
-#ifndef ENABLE_DEBUG_MACRO
+#ifdef LL_DISABLE_DEBUG_LOGGING
         skip("Debug messages disabled");
 #endif
         writeSome();
@@ -545,7 +547,7 @@ namespace tut
     void ErrorTestObject::test<5>()
         // backslash, return, and newline are not escaped with backslashes
     {
-#ifndef ENABLE_DEBUG_MACRO
+#ifdef LL_DISABLE_DEBUG_LOGGING
         skip("Debug messages disabled");
 #endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
@@ -889,7 +891,7 @@ namespace tut
     void ErrorTestObject::test<17>()
         // backslash, return, and newline are escaped with backslashes
     {
-#ifndef ENABLE_DEBUG_MACRO
+#ifdef LL_DISABLE_DEBUG_LOGGING
         skip("Debug messages disabled");
 #endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
@@ -919,7 +921,7 @@ namespace tut
     void ErrorTestObject::test<18>()
         // space character is not allowed in a tag
     {
-#ifndef ENABLE_DEBUG_MACRO
+#ifdef LL_DISABLE_DEBUG_LOGGING
         skip("Debug messages disabled");
 #endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);

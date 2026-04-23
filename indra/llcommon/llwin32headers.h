@@ -28,20 +28,9 @@
 #define LL_LLWINDOWS_H
 
 #ifdef LL_WINDOWS
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef PSAPI_VERSION
-#define PSAPI_VERSION   2
-#endif
-#undef WIN32_LEAN_AND_MEAN
-#include <WinSock2.h>
-#include <Windows.h>
-#include <Ws2ipdef.h>
-#include <Psapi.h>
-// reset to default, which is lean
-#define WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
+#include <windows.h> // Does not include winsock.h because WIN32_LEAN_AND_MEAN is defined
+#include <winsock2.h> // Requires windows.h
+#include <ws2ipdef.h>
 #endif
 
 #endif

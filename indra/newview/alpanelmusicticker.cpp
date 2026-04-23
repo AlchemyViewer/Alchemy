@@ -4,7 +4,7 @@
 *
 * $LicenseInfo:firstyear=2015&license=viewerlgpl$
 * Copyright (C) Shyotl Kuhr
-* Copyright (C) 2015 Drake Arconis
+* Copyright (C) Rye Mutt <rye@alchemyviewer.org>
 *
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public
@@ -54,7 +54,7 @@ ALPanelMusicTicker::~ALPanelMusicTicker()
     }
 }
 
-BOOL ALPanelMusicTicker::postBuild()
+bool ALPanelMusicTicker::postBuild()
 {
     mStationText = getChild<LLTextBox>("station_text");
     mArtistText =   getChild<LLTextBox>("artist_text");
@@ -85,7 +85,7 @@ void ALPanelMusicTicker::draw()
     LLPanel::draw();
 }
 
-void ALPanelMusicTicker::reshape(S32 width, S32 height, BOOL called_from_parent/*=TRUE*/)
+void ALPanelMusicTicker::reshape(S32 width, S32 height, bool called_from_parent/*=true*/)
 {
     bool width_changed = (getRect().getWidth() != width);
     LLPanel::reshape(width, height, called_from_parent);
@@ -144,9 +144,9 @@ void ALPanelMusicTicker::drawOscilloscope() //called via draw.
 
     const LLRect& root_rect = mVisualizer->getRect();
 
-    F32 height = root_rect.getHeight();
+    F32 height = (F32)root_rect.getHeight();
     F32 height_scale = height / 2.f;    //WaveData ranges from 1 to -1, so height_scale = height / 2
-    F32 width = root_rect.getWidth();
+    F32 width = (F32)root_rect.getWidth();
     F32 width_scale = width / (F32)NUM_WAVE_DATA_VALUES;
 
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);

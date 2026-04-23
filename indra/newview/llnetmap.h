@@ -70,18 +70,18 @@ public:
     static const F32 MAP_SCALE_VERY_CLOSE;
     static const F32 MAP_SCALE_MAX;
 
-    /*virtual*/ void    draw() override;
-    /*virtual*/ BOOL    handleScrollWheel(S32 x, S32 y, S32 clicks) override;
-    /*virtual*/ BOOL    handleMouseDown(S32 x, S32 y, MASK mask) override;
-    /*virtual*/ BOOL    handleMouseUp(S32 x, S32 y, MASK mask) override;
-    /*virtual*/ BOOL    handleHover( S32 x, S32 y, MASK mask ) override;
-    /*virtual*/ BOOL    handleToolTip( S32 x, S32 y, MASK mask) override;
-    /*virtual*/ void    reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
+    /*virtual*/ void    draw();
+    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, S32 clicks);
+    /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool    handleHover( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool    handleToolTip( S32 x, S32 y, MASK mask);
+    /*virtual*/ void    reshape(S32 width, S32 height, bool called_from_parent = true);
 
-    /*virtual*/ BOOL    postBuild() override;
-    /*virtual*/ BOOL    handleRightMouseDown( S32 x, S32 y, MASK mask ) override;
-    /*virtual*/ BOOL    handleClick(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL    handleDoubleClick( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool    postBuild();
+    /*virtual*/ bool    handleRightMouseDown( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool    handleClick(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool    handleDoubleClick( S32 x, S32 y, MASK mask );
 
     void            refreshParcelOverlay() { mUpdateParcelImage = true; }
 
@@ -99,7 +99,7 @@ public:
     void            renderScaledPointGlobal( const LLVector3d& pos, const LLColor4U &color, F32 radius );
 
 private:
-    const LLVector3d& getObjectImageCenterGlobal() const { return mObjectImageCenterGlobal; }
+    const LLVector3d& getObjectImageCenterGlobal()  { return mObjectImageCenterGlobal; }
     void            renderPoint(const LLVector3 &pos, const LLColor4U &color,
                                 S32 diameter, S32 relative_height = 0);
 
@@ -108,16 +108,16 @@ private:
 
     void            drawTracking( const LLVector3d& pos_global,
                                   const LLColor4& color,
-                                  BOOL draw_arrow = TRUE);
+                                  bool draw_arrow = true);
     bool            isMouseOnPopupMenu();
     void            updateAboutLandPopupButton();
-    BOOL            handleToolTipAgent(const LLUUID& avatar_id);
+    bool            handleToolTipAgent(const LLUUID& avatar_id);
     static void     showAvatarInspector(const LLUUID& avatar_id);
 
     bool            createImage(LLPointer<LLImageRaw>& rawimagep) const;
     void            createObjectImage();
     void            createParcelImage();
-    void            renderPropertyLinesForRegion(const LLViewerRegion* pRegion, const LLColor4U& clrOverlay);
+    void            renderPropertyLinesForRegion(LLViewerRegion* pRegion, const LLColor4U& clrOverlay);
 
     F32             getScaleForName(std::string scale_name);
     static bool     outsideSlop(S32 x, S32 y, S32 start_x, S32 start_y, S32 slop);

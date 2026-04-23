@@ -30,6 +30,7 @@
 #include "llgl.h"
 #include "llrender.h"
 #include "llstaticstringtable.h"
+#include <boost/json.hpp>
 #include <boost/unordered_map.hpp>
 
 class LLShaderFeatures
@@ -44,19 +45,23 @@ public:
     bool hasTransport = false; // implies no lighting (it's possible to have neither though)
     bool hasSkinning = false;
     bool hasObjectSkinning = false;
+    bool mGLTF = false;
     bool hasAtmospherics = false;
     bool hasGamma = false;
     bool hasShadows = false;
     bool hasAmbientOcclusion = false;
     bool hasSrgb = false;
     bool isDeferred = false;
+    bool hasFullGBuffer = false;
     bool hasScreenSpaceReflections = false;
-    bool disableTextureIndex = false;
     bool hasAlphaMask = false;
     bool hasReflectionProbes = false;
     bool attachNothing = false;
     bool hasHeroProbes = false;
     bool isPBRTerrain = false;
+    bool hasTonemap = false;
+    bool hasColorGrade = false;
+    bool hasPostEffects = false;
 };
 
 // ============= Structure for caching shader uniforms ===============
@@ -69,8 +74,8 @@ public:
     template<typename T>
     struct UniformSetting
     {
-        S32 mUniform;
-        T mValue;
+        S32 mUniform{ 0 };
+        T mValue{};
     };
 
     typedef UniformSetting<S32> IntSetting;
@@ -145,8 +150,19 @@ public:
         SG_COUNT
     } eGroup;
 
+    enum UniformBlock : GLuint
+    {
+        UB_REFLECTION_PROBES,   // "ReflectionProbes"
+        UB_GLTF_JOINTS,         // "GLTFJoints"
+        UB_GLTF_NODES,          // "GLTFNodes"
+        UB_GLTF_MATERIALS,      // "GLTFMaterials"
+        NUM_UNIFORM_BLOCKS
+    };
+
+
     static std::set<LLGLSLShader*> sInstances;
     static bool sProfileEnabled;
+    static bool sCanProfile;
 
     LLGLSLShader();
     ~LLGLSLShader();
@@ -155,15 +171,18 @@ public:
     static LLGLSLShader* sCurBoundShaderPtr;
     static S32 sIndexedTextureChannels;
 
+    static U32 sMaxGLTFMaterials;
+    static U32 sMaxGLTFNodes;
+
     static void initProfile();
-    static void finishProfile(bool emit_report = true);
+    static void finishProfile(boost::json::value& stats=sDefaultStats);
 
     static void startProfile();
     static void stopProfile();
 
     void unload();
     void clearStats();
-    void dumpStats();
+    void dumpStats(boost::json::object& stats);
 
     // place query objects for profiling if profiling is enabled
     // if for_runtime is true, will place timer query only whether or not profiling is enabled
@@ -175,30 +194,28 @@ public:
     // If force_read is true, will force an immediate readback (severe performance penalty)
     bool readProfileQuery(bool for_runtime = false, bool force_read = false);
 
-    BOOL createShader(std::vector<LLStaticHashedString>* attributes,
-        std::vector<LLStaticHashedString>* uniforms,
-        U32 varying_count = 0,
-        const char** varyings = NULL);
-    BOOL attachFragmentObject(std::string_view object);
-    BOOL attachVertexObject(std::string_view object);
+    bool createShader();
+    bool attachFragmentObject(std::string object);
+    bool attachVertexObject(std::string object);
     void attachObject(GLuint object);
     void attachObjects(GLuint* objects = NULL, S32 count = 0);
-    BOOL mapAttributes(const std::vector<LLStaticHashedString>* attributes);
-    BOOL mapUniforms(const std::vector<LLStaticHashedString>*);
-    void mapUniform(GLint index, const std::vector<LLStaticHashedString>*);
+    bool mapAttributes();
+    bool mapUniforms();
+    void mapUniform(GLint index);
     void uniform1i(U32 index, GLint i);
     void uniform1f(U32 index, GLfloat v);
     void fastUniform1f(U32 index, GLfloat v);
+    void uniform1ui(U32 index, GLuint i);
     void uniform2f(U32 index, GLfloat x, GLfloat y);
     void uniform3f(U32 index, GLfloat x, GLfloat y, GLfloat z);
     void uniform4f(U32 index, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
     void uniform1iv(U32 index, U32 count, const GLint* i);
     void uniform4iv(U32 index, U32 count, const GLint* i);
-    void uniform4uiv(U32 index, U32 count, const GLuint* i);
     void uniform1fv(U32 index, U32 count, const GLfloat* v);
     void uniform2fv(U32 index, U32 count, const GLfloat* v);
     void uniform3fv(U32 index, U32 count, const GLfloat* v);
     void uniform4fv(U32 index, U32 count, const GLfloat* v);
+    void uniform4uiv(U32 index, U32 count, const GLuint* v);
     void uniform2i(const LLStaticHashedString& uniform, GLint i, GLint j);
     void uniformMatrix2fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
     void uniformMatrix3fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
@@ -207,14 +224,15 @@ public:
     void uniform1i(const LLStaticHashedString& uniform, GLint i);
     void uniform1iv(const LLStaticHashedString& uniform, U32 count, const GLint* v);
     void uniform4iv(const LLStaticHashedString& uniform, U32 count, const GLint* v);
-    void uniform4uiv(const LLStaticHashedString& uniform, U32 count, const GLuint* v);
     void uniform1f(const LLStaticHashedString& uniform, GLfloat v);
     void uniform2f(const LLStaticHashedString& uniform, GLfloat x, GLfloat y);
     void uniform3f(const LLStaticHashedString& uniform, GLfloat x, GLfloat y, GLfloat z);
+    void uniform4f(const LLStaticHashedString& uniform, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
     void uniform1fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
     void uniform2fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
     void uniform3fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
     void uniform4fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
+    void uniform4uiv(const LLStaticHashedString& uniform, U32 count, const GLuint* v);
     void uniformMatrix4fv(const LLStaticHashedString& uniform, U32 count, GLboolean transpose, const GLfloat* v);
 
     void setMinimumAlpha(F32 minimum);
@@ -230,17 +248,10 @@ public:
     GLint mapUniformTextureChannel(GLint location, GLenum type, GLint size);
 
     void clearPermutations();
-    void addPermutations(std::map<std::string, std::string>& map)
-    {
-        mDefines.insert(map.begin(), map.end());
-    }
     void addPermutation(std::string name, std::string value);
-    void removePermutations(std::map<std::string, std::string>& map)
+    void addPermutations(const std::map<std::string, std::string>& defines)
     {
-        for (const auto& entry : map)
-        {
-            mDefines.erase(entry.first);
-        }
+        mDefines.insert(defines.begin(), defines.end());
     }
     void removePermutation(std::string name);
 
@@ -265,7 +276,7 @@ public:
     S32 unbindTexture(const std::string& uniform, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
     S32 unbindTexture(S32 uniform, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
 
-    BOOL link(BOOL suppress_errors = FALSE);
+    bool link(bool suppress_errors = false);
     void bind();
     //helper to conditionally bind mRiggedVariant instead of this
     void bind(bool rigged);
@@ -281,7 +292,7 @@ public:
     U32 mLightHash;
 
     GLuint mProgramObject;
-#if LL_RELEASE_WITH_DEBUG_INFO
+#if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO
     struct attr_name
     {
         GLint loc;
@@ -296,14 +307,14 @@ public:
     U32 mAttributeMask;  //mask of which reserved attributes are set (lines up with LLVertexBuffer::getTypeMask())
     std::vector<GLint> mUniform;   //lookup table of uniform enum to uniform location
     LLStaticStringTable<GLint> mUniformMap; //lookup map of uniform name to uniform location
-    typedef boost::unordered_flat_map<GLint, LLVector4> uniform_value_map_t;
+    typedef boost::unordered_map<GLint, LLVector4>  uniform_value_map_t;
     uniform_value_map_t mValue; //lookup map of uniform location to last known value
     std::vector<GLint> mTexture;
     S32 mTotalUniformSize;
     S32 mActiveTextureChannels;
     S32 mShaderLevel;
     S32 mShaderGroup; // see LLGLSLShader::eGroup
-    BOOL mUniformsDirty;
+    bool mUniformsDirty;
     LLShaderFeatures mFeatures;
     std::vector< std::pair< std::string, GLenum > > mShaderFiles;
     std::string mName;
@@ -331,15 +342,40 @@ public:
     // this pointer should be set to whichever shader represents this shader's rigged variant
     LLGLSLShader* mRiggedVariant = nullptr;
 
+    // variants for use by GLTF renderer
+    // bit 0 = alpha mode blend (1) or opaque (0)
+    // bit 1 = rigged (1) or static (0)
+    // bit 2 = unlit (1) or lit (0)
+    // bit 3 = single (0) or multi (1) uv coordinates
+    struct GLTFVariant
+    {
+        constexpr static U8 ALPHA_BLEND = 1;
+        constexpr static U8 RIGGED = 2;
+        constexpr static U8 UNLIT = 4;
+        constexpr static U8 MULTI_UV = 8;
+    };
+
+    constexpr static U8 NUM_GLTF_VARIANTS = 16;
+
+    std::vector<LLGLSLShader> mGLTFVariants;
+
+    //helper to bind GLTF variant
+    void bind(U8 variant);
+
     // hacky flag used for optimization in LLDrawPoolAlpha
     bool mCanBindFast = false;
 
-#ifdef LL_PROFILER_ENABLE_RENDER_DOC
+#if LL_PROFILER_ENABLE_RENDER_DOC
     void setLabel(const char* label);
 #endif
 
 private:
     void unloadInternal();
+    // This must be static because finishProfile() is called at least once
+    // within a __try block. If we default its stats parameter to a temporary
+    // json::value, that temporary must be destroyed when the stack is
+    // unwound, which __try forbids.
+    static boost::json::value sDefaultStats;
 };
 
 //UI shader (declared here so llui_libtest will link properly)
@@ -349,7 +385,7 @@ extern LLGLSLShader         gSolidColorProgram;
 //Alpha mask shader (declared here so llappearance can access properly)
 extern LLGLSLShader         gAlphaMaskProgram;
 
-#ifdef LL_PROFILER_ENABLE_RENDER_DOC
+#if LL_PROFILER_ENABLE_RENDER_DOC
 #define LL_SET_SHADER_LABEL(shader) shader.setLabel(#shader)
 #else
 #define LL_SET_SHADER_LABEL(shader, label)

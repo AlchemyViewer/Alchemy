@@ -30,43 +30,43 @@
 #include "lliconctrl.h"
 #include "llviewertexture.h"
 
-class LLProfileImageCtrl : public LLIconCtrl
+class LLProfileImageCtrl: public LLIconCtrl
 {
-  public:
-    struct Params : public LLInitParam::Block<Params, LLIconCtrl::Params>
+public:
+    struct Params: public LLInitParam::Block<Params, LLIconCtrl::Params>
     {
     };
 
     LLProfileImageCtrl(const Params& p);
     virtual ~LLProfileImageCtrl();
 
-    virtual void                      setValue(const LLSD& value) override;
-    LLUUID                            getImageAssetId() { return mImageID; }
-    LLPointer<LLViewerFetchedTexture> getImage() { return mImage; }
-    void                              draw() override;
+    virtual void setValue(const LLSD& value) override;
+    LLUUID getImageAssetId() { return mImageID; }
+    LLPointer<LLViewerFetchedTexture> getImage() {return mImage;}
+    void draw() override;
 
     typedef boost::signals2::signal<void(bool success, LLViewerFetchedTexture* imagep)> image_loaded_signal_t;
     boost::signals2::connection setImageLoadedCallback(const image_loaded_signal_t::slot_type& cb);
 
-  private:
-    void        onImageLoaded(bool success, LLViewerFetchedTexture* src_vi);
-    static void onImageLoaded(BOOL                    success,
+private:
+    void onImageLoaded(bool success, LLViewerFetchedTexture* src_vi);
+    static void onImageLoaded(bool success,
                               LLViewerFetchedTexture* src_vi,
-                              LLImageRaw*             src,
-                              LLImageRaw*             aux_src,
-                              S32                     discard_level,
-                              BOOL                    final,
-                              void*                   userdata);
-    void        releaseTexture();
+                              LLImageRaw* src,
+                              LLImageRaw* aux_src,
+                              S32 discard_level,
+                              bool final,
+                              void* userdata);
+    void releaseTexture();
 
     void setImageAssetId(const LLUUID& asset_id);
 
-  private:
-    LLPointer<LLViewerFetchedTexture>             mImage;
-    LLUUID                                        mImageID;
-    S32                                           mImageOldBoostLevel;
-    bool                                          mWasNoDelete;
-    image_loaded_signal_t*                        mImageLoadedSignal;
+private:
+    LLPointer<LLViewerFetchedTexture> mImage;
+    LLUUID mImageID;
+    S32 mImageOldBoostLevel;
+    bool mWasNoDelete;
+    image_loaded_signal_t* mImageLoadedSignal;
     LLLoadedCallbackEntry::source_callback_list_t mCallbackTextureList;
 };
 

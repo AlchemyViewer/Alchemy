@@ -2,19 +2,15 @@
 <floater name="settings_debug" title="デバッグ設定">
 	<filter_editor name="filter_input" label="検索語句を入力"/>
 	<scroll_list name="setting_list">
-		<scroll_list.columns name="changed_setting"/>
 		<scroll_list.columns label="設定" name="setting"/>
 	</scroll_list>
 	<text name="setting_name_txt">
 		デバッグ設定名
 	</text>
-	<text_editor name="comment_text"/>
 	<radio_group name="boolean_combo">
-		<radio_item label="有効" name="TRUE" value="true"/>
-		<radio_item label="無効" name="FALSE" value=""/>
-		<commit_callback function="CommitSettings"/>
+		<radio_item label="有効" name="TRUE"/>
+		<radio_item label="無効" name="FALSE"/>
 	</radio_group>
-	<line_editor name="val_text"/>
 	<color_swatch label="色" name="val_color_swatch"/>
 	<spinner label="Ｘ" name="val_spinner_1"/>
 	<spinner label="Ｘ" name="val_spinner_2"/>

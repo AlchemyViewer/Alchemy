@@ -75,7 +75,7 @@ LLPanelLandAudio::~LLPanelLandAudio()
 }
 
 
-BOOL LLPanelLandAudio::postBuild()
+bool LLPanelLandAudio::postBuild()
 {
     mCheckSoundLocal = getChild<LLCheckBoxCtrl>("check sound local");
     childSetCommitCallback("check sound local", onCommitAny, this);
@@ -101,7 +101,7 @@ BOOL LLPanelLandAudio::postBuild()
     mCheckObscureMOAP = getChild<LLCheckBoxCtrl>("obscure_moap");
     childSetCommitCallback("obscure_moap", onCommitAny, this);
 
-    return TRUE;
+    return true;
 }
 
 
@@ -119,7 +119,7 @@ void LLPanelLandAudio::refresh()
         // something selected, hooray!
 
         // Display options
-        BOOL can_change_media = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_CHANGE_MEDIA);
+        bool can_change_media = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_CHANGE_MEDIA);
 
         mCheckSoundLocal->set( parcel->getSoundLocal() );
         mCheckSoundLocal->setEnabled( can_change_media );
@@ -166,9 +166,9 @@ void LLPanelLandAudio::refresh()
         }
         mMusicURLEdit->add(LLSD(current_url), ADD_TOP);
         mMusicURLEdit->selectByValue(current_url);
-        mMusicURLEdit->setEnabled(TRUE);
+        mMusicURLEdit->setEnabled(true);
 
-        BOOL can_change_av_sounds = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_OPTIONS) && parcel->getHaveNewParcelLimitData();
+        bool can_change_av_sounds = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_OPTIONS) && parcel->getHaveNewParcelLimitData();
         mCheckAVSoundAny->set(parcel->getAllowAnyAVSounds());
         mCheckAVSoundAny->setEnabled(can_change_av_sounds);
 
@@ -191,14 +191,14 @@ void LLPanelLandAudio::onCommitAny(LLUICtrl*, void *userdata)
     }
 
     // Extract data from UI
-    BOOL sound_local        = self->mCheckSoundLocal->get();
+    bool sound_local        = self->mCheckSoundLocal->get();
     std::string music_url   = self->mMusicURLEdit->getSimple();
 
-    BOOL voice_enabled = self->mCheckParcelEnableVoice->get();
-    BOOL voice_estate_chan = !self->mCheckParcelVoiceLocal->get();
+    bool voice_enabled = self->mCheckParcelEnableVoice->get();
+    bool voice_estate_chan = !self->mCheckParcelVoiceLocal->get();
 
-    BOOL any_av_sound       = self->mCheckAVSoundAny->get();
-    BOOL group_av_sound     = TRUE;     // If set to "Everyone" then group is checked as well
+    bool any_av_sound       = self->mCheckAVSoundAny->get();
+    bool group_av_sound     = true;     // If set to "Everyone" then group is checked as well
     if (!any_av_sound)
     {   // If "Everyone" is off, use the value from the checkbox
         group_av_sound = self->mCheckAVSoundGroup->get();
@@ -231,7 +231,7 @@ void LLPanelLandAudio::onCommitMusicUrl()
     if (!parcel)
         return;
 
-    BOOL can_change_media = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_CHANGE_MEDIA);
+    bool can_change_media = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_CHANGE_MEDIA);
     if (!can_change_media)
         return;
 
