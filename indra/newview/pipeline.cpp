@@ -7608,6 +7608,30 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         S32 depth_channel = shader->bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
         S32 exposure_channel = shader->bindTexture(LLShaderMgr::EXPOSURE_MAP, &mExposureMap);
 
+        // HDR bloom pyramid is folded into the tonemap variants of this shader
+        // (permutation BLOOM_COMPOSITE). Bind the pyramid top + strength here so
+        // the composite no longer needs its own pass. When HDR is off the shader
+        // variant lacks the sampler and bindTexture is a no-op via getTextureChannel.
+        S32 bloom_channel = -1;
+        if (apply_tonemap && mRT->bloomMipCount > 0)
+        {
+            bloom_channel = shader->bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mRT->bloomMip[0], false, LLTexUnit::TFO_BILINEAR);
+            if (bloom_channel > -1)
+            {
+                static LLCachedControl<F32>      bloom_strength(gSavedSettings, "RenderBloomStrength", 0.325f);
+                static LLCachedControl<F32>      halation_strength(gSavedSettings, "RenderBloomHalationStrength", 0.0f);
+                static LLCachedControl<LLColor3> halation_tint(gSavedSettings, "RenderBloomHalationTint", LLColor3(1.0f, 0.35f, 0.15f));
+                // Pyramid needs at least 3 mips for the downsample/upsample chain
+                // to be meaningful; otherwise gate the signal to zero so a partial
+                // allocation doesn't leak an unfiltered mip into the scene.
+                const F32 strength_gate = (mRT->bloomMipCount >= 3) ? 1.0f : 0.0f;
+                shader->uniform1f(LLShaderMgr::BLOOM_STRENGTH,    llmax(bloom_strength(), 0.0f)    * strength_gate);
+                shader->uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f) * strength_gate);
+                const LLColor3& tint = halation_tint();
+                shader->uniform3f(LLShaderMgr::HALATION_TINT, tint.mV[0], tint.mV[1], tint.mV[2]);
+            }
+        }
+
         shader->uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (GLfloat)src->getWidth(), (GLfloat)src->getHeight());
 
         // Chromatic aberration parameters
@@ -7998,6 +8022,10 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         {
             gGL.getTexUnit(exposure_channel)->unbind(LLTexUnit::TT_TEXTURE);
         }
+        if (bloom_channel > -1)
+        {
+            gGL.getTexUnit(bloom_channel)->unbind(LLTexUnit::TT_TEXTURE);
+        }
         if (depth_channel > -1)
         {
             gGL.getTexUnit(depth_channel)->unbind(LLTexUnit::TT_TEXTURE);
@@ -8257,6 +8285,8 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 
 // Composite the bloom pyramid (mBloomMip[0]) additively into the pre-tonemap
 // scene buffer. Halation rides in the alpha channel and is tinted at composite.
+// The main render path folds this into colorCorrectF (BLOOM_COMPOSITE); this
+// function is retained for standalone use (e.g. offline capture paths).
 void LLPipeline::compositeBloomHDR(LLRenderTarget* scene)
 {
     LL_PROFILE_GPU_ZONE("bloom hdr composite");
@@ -8901,11 +8931,13 @@ void LLPipeline::renderFinalize()
 
         generateExposure(&mLuminanceMap, &mExposureMap);
 
-        // HDR bloom runs pre-tonemap against the linear scene buffer, so it is
-        // composited before colorCorrect. The legacy alpha-tagged prim-glow signal
-        // is carried into the extract pass, so prim glow survives the migration.
+        // HDR bloom runs pre-tonemap against the linear scene buffer. The pyramid
+        // is generated here; the additive composite is folded into colorCorrect's
+        // tonemap variants (BLOOM_COMPOSITE permutation) so we avoid a separate
+        // fullscreen pass over the scene buffer. The legacy alpha-tagged prim-glow
+        // signal is carried into the extract pass, so prim glow survives the
+        // migration. compositeBloomHDR is preserved for standalone use cases.
         generateBloomHDR(&mRT->screen);
-        compositeBloomHDR(&mRT->screen);
     }
 
     // Handles tonemap, colorgrading, and gamma correction in one pass. In the HDR

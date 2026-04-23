@@ -38,6 +38,18 @@ uniform sampler2D depthMap;
 uniform float gamma;
 #endif
 
+#ifdef BLOOM_COMPOSITE
+// Pre-tonemap bloom pyramid (top mip). Read once here so the blend no longer
+// needs a standalone pass over the scene buffer. With BLOOM_HALATION the
+// halation signal rides in the alpha channel; otherwise the pyramid is RGB-only.
+uniform sampler2D bloomMap;
+uniform float bloom_strength;
+#ifdef BLOOM_HALATION
+uniform float halation_strength;
+uniform vec3  halation_tint;
+#endif
+#endif
+
 // =============================================================================
 // Forward Declarations
 // =============================================================================
@@ -98,6 +110,20 @@ void main()
     diff.rgb += computeLensFlare(diffuseRect, depthMap, vary_fragcoord);
 #else
     vec4 diff = texture(diffuseRect, vary_fragcoord);
+#endif
+
+#ifdef BLOOM_COMPOSITE
+    // Additively composite the HDR bloom pyramid before exposure/tonemap so the
+    // glow is rolled through the same exposure curve as the underlying scene.
+    {
+        vec4 bloom_sample = texture(bloomMap, vary_fragcoord);
+    #ifdef BLOOM_HALATION
+        diff.rgb += bloom_sample.rgb * bloom_strength
+                  + bloom_sample.a   * halation_strength * halation_tint;
+    #else
+        diff.rgb += bloom_sample.rgb * bloom_strength;
+    #endif
+    }
 #endif
 
 #ifdef TONEMAP

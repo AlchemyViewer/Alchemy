@@ -529,8 +529,9 @@ bool LLGLTFPreviewTexture::render()
         gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);
         gPipeline.generateExposure(&gPipeline.mLuminanceMap, &gPipeline.mExposureMap, /*use_history = */ false);
 
+        // Bloom composite is folded into colorCorrect's tonemap variants, so we
+        // only generate the pyramid here.
         gPipeline.generateBloomHDR(&screen);
-        gPipeline.compositeBloomHDR(&screen);
     }
 
     gPipeline.colorCorrect(&screen, &gPipeline.mRT->postPingMap, true, false);

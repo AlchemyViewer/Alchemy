@@ -3048,6 +3048,14 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         llassert(success);
     }
 
+    // HDR-only: the bloom pyramid is allocated in the HDR path, so the tonemap
+    // shader variants fold the bloom composite inline. Halation rides in the
+    // bloom alpha channel when RenderBloomHalation is on — both settings trigger
+    // shader rebuilds, so reading them at compile time stays in sync with the
+    // bloom pyramid format.
+    const bool hdr_enabled         = gSavedSettings.getBOOL("RenderHDREnabled");
+    const bool bloom_halation_perm = gSavedSettings.getBOOL("RenderBloomHalation");
+
     if (success)
     {
         gCGTonemapProgram.mName = "CG Tonemap Shader";
@@ -3060,9 +3068,17 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapProgram.clearPermutations();
         gCGTonemapProgram.addPermutation("TONEMAP", "1");
         gCGTonemapProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
+        if (!hdr_enabled)
         {
             gCGTonemapProgram.addPermutation("DITHER", "1");
+        }
+        else
+        {
+            gCGTonemapProgram.addPermutation("BLOOM_COMPOSITE", "1");
+            if (bloom_halation_perm)
+            {
+                gCGTonemapProgram.addPermutation("BLOOM_HALATION", "1");
+            }
         }
         gCGTonemapProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapProgram.createShader();
@@ -3082,9 +3098,17 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGTonemapLegacyGammaProgram.addPermutation("TONEMAP", "1");
         gCGTonemapLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
+        if (!hdr_enabled)
         {
             gCGTonemapLegacyGammaProgram.addPermutation("DITHER", "1");
+        }
+        else
+        {
+            gCGTonemapLegacyGammaProgram.addPermutation("BLOOM_COMPOSITE", "1");
+            if (bloom_halation_perm)
+            {
+                gCGTonemapLegacyGammaProgram.addPermutation("BLOOM_HALATION", "1");
+            }
         }
         gCGTonemapLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapLegacyGammaProgram.createShader();
@@ -3105,9 +3129,17 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapColorgradeProgram.addPermutation("COLOR_GRADE", "1");
         gCGTonemapColorgradeProgram.addPermutation("TONEMAP", "1");
         gCGTonemapColorgradeProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
+        if (!hdr_enabled)
         {
             gCGTonemapColorgradeProgram.addPermutation("DITHER", "1");
+        }
+        else
+        {
+            gCGTonemapColorgradeProgram.addPermutation("BLOOM_COMPOSITE", "1");
+            if (bloom_halation_perm)
+            {
+                gCGTonemapColorgradeProgram.addPermutation("BLOOM_HALATION", "1");
+            }
         }
         gCGTonemapColorgradeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapColorgradeProgram.createShader();
@@ -3129,9 +3161,17 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("TONEMAP", "1");
         gCGTonemapColorgradeLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
+        if (!hdr_enabled)
         {
             gCGTonemapColorgradeLegacyGammaProgram.addPermutation("DITHER", "1");
+        }
+        else
+        {
+            gCGTonemapColorgradeLegacyGammaProgram.addPermutation("BLOOM_COMPOSITE", "1");
+            if (bloom_halation_perm)
+            {
+                gCGTonemapColorgradeLegacyGammaProgram.addPermutation("BLOOM_HALATION", "1");
+            }
         }
         gCGTonemapColorgradeLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGTonemapColorgradeLegacyGammaProgram.createShader();
