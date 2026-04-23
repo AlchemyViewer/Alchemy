@@ -51,12 +51,12 @@ public:
 
     static LLFloaterIMNearbyChat* buildFloater(const LLSD& key);
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void onClose(bool app_quitting);
-    /*virtual*/ void setVisible(bool visible);
-    /*virtual*/ void setVisibleAndFrontmost(bool take_focus=true, const LLSD& key = LLSD());
-    /*virtual*/ void closeHostedFloater();
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void onClose(bool app_quitting) override;
+    void setVisible(bool visible) override;
+    void setVisibleAndFrontmost(bool take_focus=true, const LLSD& key = LLSD()) override;
+    void closeHostedFloater() override;
 
     void loadHistory();
     void reloadMessages(bool clean_messages = false);
@@ -74,7 +74,7 @@ public:
     std::string getCurrentChat();
     S32 getMessageArchiveLength() { return static_cast<S32>(mMessageArchive.size()); }
 
-    virtual bool handleKeyHere( KEY key, MASK mask );
+    bool handleKeyHere( KEY key, MASK mask ) override;
 
     static void startChat(const char* line);
     static void stopChat();
@@ -104,8 +104,8 @@ protected:
     void onChatBoxCommit();
     void onChatFontChange(LLFontGL* fontp);
 
-    /*virtual*/ void onTearOffClicked();
-    /*virtual*/ void onClickCloseBtn(bool app_qutting = false);
+    void onTearOffClicked() override;
+    void onClickCloseBtn(bool app_qutting = false) override;
 
     static LLWString stripChannelNumber(const LLWString &mesg, S32* channel);
     EChatType processChatTypeTriggers(EChatType type, std::string &str);
@@ -133,7 +133,7 @@ protected:
 // [/RLVa:KB]
 
 private:
-    /*virtual*/ void refresh();
+    void refresh() override;
 
     std::vector<LLChat> mMessageArchive;
 
