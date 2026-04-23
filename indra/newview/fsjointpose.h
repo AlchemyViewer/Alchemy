@@ -1,0 +1,499 @@
+/**
+ * @file fsjointpose.h
+ * @brief Container for the pose of a joint.
+ *
+ * $LicenseInfo:firstyear=2024&license=viewerlgpl$
+ * Phoenix Firestorm Viewer Source Code
+ * Copyright (c) 2024 Angeldark Raymaker @ Second Life
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
+ * $/LicenseInfo$
+ */
+
+#ifndef FS_JOINTPPOSE_H
+#define FS_JOINTPPOSE_H
+
+//-----------------------------------------------------------------------------
+// Header files
+//-----------------------------------------------------------------------------
+#include "llmotion.h"
+
+/// <summary>
+/// Describes the kind of pose-change.
+/// Useful for undoing complex changes.
+/// </summary>
+typedef enum E_PoserChangeType
+{
+    POSER_CHANGE_DEFAULT = 0, // a simple change to pos/rot/scale
+    POSER_CHANGE_CHILDMOVE = 1, // position change of a child by rotating its 2 antecedent joints
+    POSER_CHANGE_ROTATION = 2, // a rotation change
+} E_PoserChangeType;
+
+//-----------------------------------------------------------------------------
+// class FSJointPose
+//-----------------------------------------------------------------------------
+class FSJointPose
+{
+   public:
+     /// <summary>
+     /// A class encapsulating the positions/rotations for a joint.
+     /// </summary>
+     /// <param name="joint">The joint this joint pose represents.</param>
+     /// <param name="usage">The default usage the joint should have in a pose.</param>
+     /// <param name="isCollisionVolume">Whether the supplied joint is a collision volume.</param>
+     FSJointPose(LLJoint* joint, U32 usage, bool isCollisionVolume = false);
+
+    /// <summary>
+    /// Gets the name of the joint.
+    /// </summary>
+    std::string jointName() const { return mJointName; }
+
+    /// <summary>
+    /// Gets whether this represents a collision volume.
+    /// </summary>
+    /// <returns>true if the joint is a collision volume, otherwise false.</returns>
+    bool isCollisionVolume() const { return mIsCollisionVolume; }
+
+    /// <summary>
+    /// Gets the 'public' position of the joint.
+    /// </summary>
+    LLVector3 getPublicPosition() const { return mCurrentState.mPosition; }
+
+    /// <summary>
+    /// Sets the 'public' position of the joint.
+    /// </summary>
+    void setPublicPosition(const LLVector3& pos);
+
+    /// <summary>
+    /// Undoes the last position set, if any.
+    /// </summary>
+    /// <returns>A value indicating what kind of change was undone (important for undo).</returns>
+    E_PoserChangeType undoLastChange();
+
+    /// <summary>
+    /// Undoes the last position set, if any.
+    /// </summary>
+    /// <returns>A value indicating what kind of change was redone.</returns>
+    E_PoserChangeType redoLastChange();
+
+    /// <summary>
+    /// Resets the joint to its conditions when posing started.
+    /// </summary>
+    void resetJoint();
+
+    /// <summary>
+    /// Gets the 'public' rotation of the joint.
+    /// </summary>
+    LLQuaternion getPublicRotation() const { return mCurrentState.mRotation; }
+
+    /// <summary>
+    /// Sets the 'public' rotation of the joint.
+    /// </summary>
+    /// <param name="zeroBase">Whether to zero the base rotation on setting the supplied rotation.</param>
+    /// <param name="zeroBaseAsUser">Whether to indicate base was zeroed by action of the user; used for BVH export.</param>
+    /// <param name="changeType">The type change, hinting at the kind of undo action expected.</param>
+    /// <param name="rot">The change in rotation to apply.</param>
+    /// <remarks>
+    /// 'Public rotation' is the amount of rotation the user has added to the initial state.
+    /// Public rotation is what a user may save to an external format (such as BVH).
+    /// This distinguishes 'private' rotation, which is the state inherited from something like a pose in-world.
+    /// If zeroBase is true, we treat rotations as if in BVH mode: user work.
+    /// If zeroBase is false, we treat as NOT BVH: some existing pose and user work.
+    /// </remarks>
+    void setPublicRotation(bool zeroBase, bool zeroBaseAsUser, E_PoserChangeType changeType, const LLQuaternion& rot);
+
+    /// <summary>
+    /// Reflects the base and delta rotation of the represented joint left-right.
+    /// </summary>
+    void reflectRotation();
+
+    /// <summary>
+    /// Reflects the base rotation of the represented joint left-right.
+    /// </summary>
+    void reflectBaseRotation();
+
+    /// <summary>
+    /// Sets the private rotation of the represented joint to zero.
+    /// </summary>
+    /// <param name="lockInBvh">Whether the joint should be locked if exported to BVH.</param>
+    void zeroBaseRotation(bool lockInBvh);
+
+    /// <summary>
+    /// Queries whether the represented joint is zero.
+    /// </summary>
+    /// <returns>True if the represented joint is zero, otherwise false.</returns>
+    bool isBaseRotationZero() const;
+
+    /// <summary>
+    /// Gets whether an undo of this joint may be performed.
+    /// </summary>
+    /// <returns>true if the joint may have a undo applied, otherwise false.</returns>
+    bool canPerformUndo() const;
+
+    /// <summary>
+    /// Gets whether a redo of this joint may be performed.
+    /// </summary>
+    /// <returns>true if the joint may have a redo applied, otherwise false.</returns>
+    bool canPerformRedo() const { return mUndoneJointStatesIndex > 0; }
+
+    /// <summary>
+    /// Gets the 'public' scale of the joint.
+    /// </summary>
+    LLVector3 getPublicScale() const { return mCurrentState.mScale; }
+
+    /// <summary>
+    /// Sets the 'public' scale of the joint.
+    /// </summary>
+    void setPublicScale(const LLVector3& scale);
+
+    /// <summary>
+    /// Exchanges the rotations between two joints.
+    /// </summary>
+    void swapRotationWith(FSJointPose* oppositeJoint);
+
+    /// <summary>
+    /// Exchanges the base rotations between two joints.
+    /// </summary>
+    void swapBaseRotationWith(FSJointPose* oppositeJoint);
+
+    /// <summary>
+    /// Clones the rotation to this from the supplied joint.
+    /// </summary>
+    void cloneRotationFrom(FSJointPose* fromJoint);
+
+    /// <summary>
+    /// Mirrors the rotation to this from the supplied joint.
+    /// </summary>
+    void mirrorRotationFrom(FSJointPose* fromJoint);
+
+    /// <summary>
+    /// Resets the beginning properties of the joint this represents.
+    /// </summary>
+    void recaptureJoint();
+
+    /// <summary>
+    /// Recalculates the delta reltive to the base for a new rotation.
+    /// </summary>
+    /// <param name="zeroBase">Whether to zero the base rotation on setting the supplied rotation.</param>
+    /// <param name="rotation">The rotation of the supplied joint.</param>
+    /// <param name="position">The position of the supplied joint.</param>
+    /// <param name="scale">The scale of the supplied joint.</param>
+    /// <returns>The rotation of the public difference between before and after recapture.</returns>
+    LLQuaternion updateJointAsDelta(bool zeroBase, const LLQuaternion& rotation, const LLVector3& position, const LLVector3& scale);
+
+    /// <summary>
+    /// Sets the base rotation to the supplied rotation if the supplied priority is appropriate.
+    /// </summary>
+    /// <param name="rotation">The base rotation to set; zero is ignored.</param>
+    /// <param name="priority">The priority of the base rotation; only priority equal or higher than any prior sets have any effect.</param>
+    void setBaseRotation(const LLQuaternion& rotation, LLJoint::JointPriority priority);
+
+    /// <summary>
+    /// Sets the base position to the supplied position if the supplied priority is appropriate.
+    /// </summary>
+    /// <param name="position">The base position to set; zero is ignored.</param>
+    /// <param name="priority">The priority of the base rotation; only priority equal or higher than any prior sets have any effect.</param>
+    void setBasePosition(const LLVector3& position, LLJoint::JointPriority priority);
+
+    /// <summary>
+    /// Sets the base scale to the supplied scale if the supplied priority is appropriate.
+    /// </summary>
+    /// <param name="scale">The base scale to set; zero is ignored.</param>
+    /// <param name="priority">The priority of the base rotation; only priority equal or higher than any prior sets have any effect.</param>
+    void setBaseScale(const LLVector3& scale, LLJoint::JointPriority priority);
+
+    /// <summary>
+    /// Sets the priority of the bone to the supplied value.
+    /// </summary>
+    /// <param name="priority">The new priority of the base rotation.</param>
+    void setJointPriority(LLJoint::JointPriority priority);
+
+    /// <summary>
+    /// Clears the undo/redo deque.
+    /// </summary>
+    void purgeUndoQueue();
+
+    /// <summary>
+    /// Gets whether the user has specified the base rotation of a joint to be zero.
+    /// </summary>
+    /// <returns>True if the user performed some action to specify zero rotation as the base, otherwise false.</returns>
+    bool userHasSetBaseRotationToZero() const;
+
+    /// <summary>
+    /// Gets whether the rotation of a joint has been 'locked' so that its world rotation can remain constant while parent joints change.
+    /// </summary>
+    /// <returns>True if the joint is rotationally locked to the world, otherwise false.</returns>
+    bool getWorldRotationLockState() const;
+
+    /// <summary>
+    /// Sets whether the world-rotation of a joint has been 'locked' so that as its parent joints change rotation or position, this joint keeps a constant world rotation.
+    /// </summary>
+    /// <param name="newState">The new state for the world-rotation lock.</param>
+    void setWorldRotationLockState(bool newState);
+
+    /// <summary>
+    /// Gets whether the rotation of a joint has been mirrored.
+    /// </summary>
+    /// <returns>True if the joint has been mirrored, otherwise false.</returns>
+    bool getRotationMirrorState() const;
+
+    /// <summary>
+    /// Sets whether the rotation of a joint has been mirrored.
+    /// </summary>
+    /// <param name="newState">The new state for the mirror.</param>
+    void setRotationMirrorState(bool newState);
+
+    /// <summary>
+    /// Reverts the position/rotation/scale to their values when the animation begun.
+    /// This treatment is required for certain joints, particularly Collision Volumes and those bones not commonly animated by an AO.
+    /// </summary>
+    void revertJoint();
+
+    LLQuaternion getTargetRotation() const { return mCurrentState.getTargetRotation(); }
+    LLVector3    getTargetPosition() const { return mCurrentState.getTargetPosition(); }
+    LLVector3    getTargetScale() const { return mCurrentState.getTargetScale(); }
+
+    /// <summary>
+    /// Gets the pointer to the jointstate for the joint this represents.
+    /// </summary>
+    LLPointer<LLJointState> getJointState() const { return mJointState; }
+
+    /// <summary>
+    /// Gets whether this joint has been modified this session.
+    /// </summary>
+    /// <returns>True if the joint has been changed at all, otherwise false.</returns>
+    bool getJointModified() const { return mModifiedThisSession; }
+
+    /// <summary>
+    /// Gets the number of the joint represented by this.
+    /// </summary>
+    /// <returns>The joint number, derived from LLjoint.</returns>
+    S32 getJointNumber() const { return mJointNumber; }
+
+    class FSJointState
+    {
+      public:
+        FSJointState(LLJoint* joint)
+        {
+            mStartingRotation.set(joint->getRotation());
+            mBaseRotation.set(joint->getRotation());
+            mBasePosition.set(joint->getPosition());
+            mBaseScale.set(joint->getScale());
+        }
+
+        FSJointState() = default;
+        LLQuaternion getTargetRotation() const { return mRotation * mBaseRotation; }
+        LLVector3    getTargetPosition() const { return mPosition + mBasePosition; }
+        LLVector3    getTargetScale() const { return mScale + mBaseScale; }
+
+        void reflectRotation()
+        {
+            reflectBaseRotation();
+            mRotation.mQ[VX] *= -1;
+            mRotation.mQ[VZ] *= -1;
+            mJointRotationIsMirrored = !mJointRotationIsMirrored;
+        }
+
+        void reflectBaseRotation()
+        {
+            mBaseRotation.mQ[VX] *= -1;
+            mBaseRotation.mQ[VZ] *= -1;
+        }
+
+        void cloneRotationFrom(FSJointState otherState)
+        {
+            cloneBaseRotationFrom(otherState);
+            mRotation.set(otherState.mRotation);
+            mUserSpecifiedBaseZero = otherState.mUserSpecifiedBaseZero;
+        }
+
+        void cloneBaseRotationFrom(FSJointState otherState)
+        {
+            mBaseRotation.set(otherState.mBaseRotation);
+        }
+
+        bool baseRotationIsZero() const { return mBaseRotation == LLQuaternion::DEFAULT; }
+
+        void resetJoint()
+        {
+            mUserSpecifiedBaseZero   = false;
+            mRotationIsWorldLocked   = false;
+            mJointRotationIsMirrored = false;
+            mPoserChangeType         = POSER_CHANGE_DEFAULT;
+            mBaseRotation.set(mStartingRotation);
+            mRotation.set(LLQuaternion::DEFAULT);
+            mPosition.setZero();
+            mScale.setZero();
+        }
+
+        void zeroBaseRotation()
+        {
+            mBasePriority = LLJoint::LOW_PRIORITY;
+            mBaseRotation = LLQuaternion::DEFAULT;
+            mJointRotationIsMirrored = false;
+        }
+
+        void revertJointToBase(LLJoint* joint) const
+        {
+            if (!joint)
+                return;
+
+            joint->setRotation(mBaseRotation);
+            joint->setPosition(mBasePosition);
+            joint->setScale(mBaseScale);
+        }
+
+        LLQuaternion updateFromJointProperties(bool zeroBase, const LLQuaternion rotation, const LLVector3 position, const LLVector3 scale)
+        {
+            LLQuaternion initalPublicRot = mRotation;
+            LLQuaternion invRot = mBaseRotation;
+            invRot.conjugate();
+            LLQuaternion newPublicRot = rotation * invRot;
+
+            if (zeroBase)
+            {
+                mUserSpecifiedBaseZero = zeroBase;
+                zeroBaseRotation();
+            }
+
+            mRotation.set(newPublicRot);
+            mPosition.set(position - mBasePosition);
+            mScale.set(scale - mBaseScale);
+
+            return newPublicRot *= ~initalPublicRot;
+        }
+
+        void resetBaseRotation(LLQuaternion rotation, LLJoint::JointPriority priority)
+        {
+            if (mUserSpecifiedBaseZero)
+                return;
+
+            if (priority < mBasePriority)
+                return;
+
+            if (rotation == LLQuaternion::DEFAULT)
+                return;
+
+            mBasePriority = priority;
+            mBaseRotation.set(rotation);
+        }
+
+        void resetBasePosition(LLVector3 position, LLJoint::JointPriority priority)
+        {
+            if (priority < mBasePriority)
+                return;
+
+            mBasePriority = priority;
+            mBasePosition.set(position);
+        }
+
+        void resetBaseScale(LLVector3 scale, LLJoint::JointPriority priority)
+        {
+            if (priority < mBasePriority)
+                return;
+
+            if (scale.isExactlyZero())
+                return;
+
+            mBasePriority = priority;
+            mBaseScale.set(scale);
+        }
+
+        void setPriority(LLJoint::JointPriority priority) { mBasePriority = priority; }
+
+      private:
+        FSJointState(FSJointState* state)
+        {
+            mStartingRotation.set(state->mStartingRotation);
+            mBaseRotation.set(state->mBaseRotation);
+            mBasePosition.set(state->mBasePosition);
+            mBaseScale.set(state->mBaseScale);
+
+            mRotation.set(state->mRotation);
+            mPosition.set(state->mPosition);
+            mScale.set(state->mScale);
+
+            mUserSpecifiedBaseZero   = state->mUserSpecifiedBaseZero;
+            mRotationIsWorldLocked   = state->mRotationIsWorldLocked;
+            mBasePriority            = state->mBasePriority;
+            mJointRotationIsMirrored = state->mJointRotationIsMirrored;
+            mPoserChangeType = state->mPoserChangeType;
+        }
+
+      public:
+        LLQuaternion      mRotation;
+        LLVector3         mPosition;
+        LLVector3         mScale;
+        bool              mRotationIsWorldLocked = false;
+        E_PoserChangeType mPoserChangeType       = POSER_CHANGE_DEFAULT;
+
+        /// <summary>
+        /// Whether the joint has been mirrored.
+        /// </summary>
+        /// <remarks>
+        /// Used when loading a diff; indicating that the base-rotations, once restored, need to be swapped.
+        /// </remarks>
+        bool mJointRotationIsMirrored = false;
+
+        /// <summary>
+        /// A value indicating whether the user has explicitly set the base rotation to zero.
+        /// </summary>
+        /// <remarks>
+        /// The base-rotation, representing any 'current animation' state when posing starts, may become zero for several reasons.
+        /// Loading a Pose, editing a rotation intended to save to BVH, or setting to 'T-Pose' being examples.
+        /// If a user intends on creating a BVH, zero-rotation has a special meaning upon upload: the joint is free (is not animated by that BVH).
+        /// This value represents the explicit intent to have that joint be 'free' in BVH (which is sometimes undesireable).
+        /// </remarks>
+        bool mUserSpecifiedBaseZero = false;
+
+      private:
+        LLQuaternion mStartingRotation;
+        LLQuaternion mBaseRotation;
+        LLVector3    mBasePosition;
+        LLVector3    mBaseScale;
+        LLJoint::JointPriority mBasePriority = LLJoint::LOW_PRIORITY;
+    };
+
+  private:
+    std::string             mJointName = ""; // expected to be a match to LLJoint.getName() for a joint implementation.
+    LLPointer<LLJointState> mJointState{ nullptr };
+
+    /// <summary>
+    /// Collision Volumes require special treatment when we stop animating an avatar, as they do not revert to their original state
+    /// natively.
+    /// </summary>
+    bool mIsCollisionVolume{ false };
+
+    S32 mJointNumber = -1;
+
+    /// <summary>
+    /// Whether this joint has ever been changed by poser.
+    /// </summary>
+    bool mModifiedThisSession{ false };
+
+    std::deque<FSJointState>              mLastSetJointStates;
+    size_t                                mUndoneJointStatesIndex      = 0;
+    std::chrono::system_clock::time_point mTimeLastUpdatedCurrentState = std::chrono::system_clock::now();
+
+    FSJointState mCurrentState;
+
+    void addStateToUndo(const FSJointState& stateToAddToUndo);
+    FSJointState undoLastStateChange(const FSJointState& currentState);
+    FSJointState redoLastStateChange(const FSJointState& currentState);
+};
+
+#endif // FS_JOINTPPOSE_H

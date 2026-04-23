@@ -911,3 +911,310 @@ void LLToolCompGun::draw()
     }
     LLToolComposite::draw();
 }
+
+
+
+
+#include "llviewerwindow.h"      // for gViewerWindow->pickAsync()
+#include "llselectmgr.h"         // for LLSelectMgr
+#include "llfloaterreg.h"        // for LLFloaterReg::showInstance()
+#include "llviewermenu.h"        // for LLEditMenuHandler::gEditMenuHandler
+#include "fsfloaterposer.h"
+
+// If you want a standard static instance approach:
+FSToolCompPose* FSToolCompPose::getInstance()
+{
+    // Meyers singleton pattern
+    static FSToolCompPose instance;
+    return &instance;
+}
+
+//-----------------------------------
+// Constructor
+FSToolCompPose::FSToolCompPose()
+:   LLToolComposite(std::string("Pose"))
+{
+    // Create a joint manipulator
+    mManip = new FSManipRotateJoint(this);
+
+    // Possibly create a selection rectangle tool if you want 
+    // to be able to box-select joints or objects 
+    // (same usage as LLToolCompRotate does)
+    // mSelectRect = new LLToolSelectRect(this);
+
+    // Set the default and current subtool
+    mCur = mManip;
+    mDefault = mManip;
+}
+
+//-----------------------------------
+// Destructor
+FSToolCompPose::~FSToolCompPose()
+{
+    delete mManip;
+    mManip = nullptr;
+
+    delete mSelectRect;
+    mSelectRect = nullptr;
+}
+
+//-----------------------------------
+// Handle Hover
+bool FSToolCompPose::handleHover(S32 x, S32 y, MASK mask)
+{
+    // If the current subtool hasn't captured the mouse,
+    // switch to your manip subtool (like LLToolCompRotate).
+    if (!mCur->hasMouseCapture())
+    {
+        setCurrentTool(mManip);
+    }
+    return mCur->handleHover(x, y, mask);
+}
+
+//-----------------------------------
+// Handle MouseDown
+bool FSToolCompPose::handleMouseDown(S32 x, S32 y, MASK mask)
+{
+    mMouseDown = true;
+
+    // Kick off an async pick, which calls pickCallback when complete
+    // so we can see if user clicked on a manip ring or not
+    gViewerWindow->pickAsync(x, y, mask, pickCallback);
+    return true;
+}
+
+//-----------------------------------
+// The pickCallback
+void FSToolCompPose::pickCallback(const LLPickInfo& pick_info)
+{
+    FSToolCompPose* self = FSToolCompPose::getInstance();
+    FSManipRotateJoint* manip = self->mManip;
+
+    if (!manip) return; // No manipulator available, exit
+
+    // Highlight the manipulator based on the mouse position
+    manip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
+
+    if (!self->mMouseDown)
+    {
+        // No action needed if mouse is up; interaction is handled by highlight logic
+        return;
+    }
+
+    // Check if a manipulator ring is highlighted
+    if (manip->getHighlightedPart() != LLManip::LL_NO_PART)
+    {
+        // Switch to the manipulator tool for dragging
+        self->setCurrentTool(manip);
+        manip->handleMouseDownOnPart(pick_info.mMousePt.mX, pick_info.mMousePt.mY, pick_info.mKeyMask);
+    }
+    else
+    {
+        // If no ring is highlighted, reset interaction or do nothing
+        LL_DEBUGS("FSToolCompPose") << "No manipulator ring selected" << LL_ENDL;
+    }
+}
+
+
+//-----------------------------------
+// Handle MouseUp
+bool FSToolCompPose::handleMouseUp(S32 x, S32 y, MASK mask)
+{
+    mMouseDown = false;
+    // The base LLToolComposite sets mCur->handleMouseUp(...) 
+    // and does other management
+    return LLToolComposite::handleMouseUp(x, y, mask);
+}
+
+//-----------------------------------
+// getOverrideTool
+// If you want SHIFT+CTRL combos to do something else
+LLTool* FSToolCompPose::getOverrideTool(MASK mask)
+{
+    if (mask == MASK_CONTROL)
+    {
+        return FSToolCompPoseTranslate::getInstance();
+    }
+
+    // Otherwise fallback
+    return LLToolComposite::getOverrideTool(mask);
+}
+
+//-----------------------------------
+// Handle DoubleClick
+bool FSToolCompPose::handleDoubleClick(S32 x, S32 y, MASK mask)
+{
+    if (!mManip->getSelection()->isEmpty() &&
+        mManip->getHighlightedPart() == LLManip::LL_NO_PART)
+    {
+        // Possibly show some pose properties or open the pose floater
+        mPoser = dynamic_cast<FSFloaterPoser*>(LLFloaterReg::showInstance("fs_poser"));
+        return true;
+    }
+    else
+    {
+        // If nothing selected, try a mouse down again
+        return handleMouseDown(x, y, mask);
+    }
+}
+
+//-----------------------------------
+// render
+void FSToolCompPose::render()
+{
+    // Render the current subtool
+    mCur->render();
+
+    // If the current subtool is not the manip, we can still
+    // optionally draw manip guidelines in the background
+    if (mCur != mManip)
+    {
+        mManip->renderGuidelines(); // or something similar if your manip has it
+        LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
+    }
+}
+
+FSToolCompPoseTranslate* FSToolCompPoseTranslate::getInstance()
+{
+    // Meyers singleton pattern
+    static FSToolCompPoseTranslate instance;
+    return &instance;
+}
+
+//-----------------------------------
+// Constructor
+FSToolCompPoseTranslate::FSToolCompPoseTranslate() : LLToolComposite(std::string("PoseTranslate"))
+{
+    // Create a joint manipulator
+    mManip = new FSManipTranslateJoint(this);
+
+    // Set the default and current subtool
+    mCur = mManip;
+    mDefault = mManip;
+}
+
+//-----------------------------------
+// Destructor
+FSToolCompPoseTranslate::~FSToolCompPoseTranslate()
+{
+    delete mManip;
+    mManip = nullptr;
+
+    delete mSelectRect;
+    mSelectRect = nullptr;
+}
+
+//-----------------------------------
+// Handle Hover
+bool FSToolCompPoseTranslate::handleHover(S32 x, S32 y, MASK mask)
+{
+    // If the current subtool hasn't captured the mouse,
+    // switch to your manip subtool (like LLToolCompRotate).
+    if (!mCur->hasMouseCapture())
+    {
+        setCurrentTool(mManip);
+    }
+    return mCur->handleHover(x, y, mask);
+}
+
+//-----------------------------------
+// Handle MouseDown
+bool FSToolCompPoseTranslate::handleMouseDown(S32 x, S32 y, MASK mask)
+{
+    mMouseDown = true;
+
+    // Kick off an async pick, which calls pickCallback when complete
+    // so we can see if user clicked on a manip ring or not
+    gViewerWindow->pickAsync(x, y, mask, pickCallback);
+    return true;
+}
+
+//-----------------------------------
+// The pickCallback
+void FSToolCompPoseTranslate::pickCallback(const LLPickInfo& pick_info)
+{
+    FSToolCompPoseTranslate* self  = FSToolCompPoseTranslate::getInstance();
+    FSManipTranslateJoint* manip = self->mManip;
+
+    if (!manip) return; // No manipulator available, exit
+
+    // Highlight the manipulator based on the mouse position
+    manip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
+
+    if (!self->mMouseDown)
+    {
+        // No action needed if mouse is up; interaction is handled by highlight logic
+        return;
+    }
+
+    // Check if a manipulator ring is highlighted
+    if (manip->getHighlightedPart() != LLManip::LL_NO_PART)
+    {
+        // Switch to the manipulator tool for dragging
+        self->setCurrentTool(manip);
+        manip->handleMouseDownOnPart(pick_info.mMousePt.mX, pick_info.mMousePt.mY, pick_info.mKeyMask);
+    }
+    else
+    {
+        // If no ring is highlighted, reset interaction or do nothing
+        LL_DEBUGS("FSToolCompPose") << "No manipulator ring selected" << LL_ENDL;
+    }
+}
+
+
+//-----------------------------------
+// Handle MouseUp
+bool FSToolCompPoseTranslate::handleMouseUp(S32 x, S32 y, MASK mask)
+{
+    mMouseDown = false;
+    // The base LLToolComposite sets mCur->handleMouseUp(...) 
+    // and does other management
+    return LLToolComposite::handleMouseUp(x, y, mask);
+}
+
+//-----------------------------------
+// getOverrideTool
+// If you want SHIFT+CTRL combos to do something else
+LLTool* FSToolCompPoseTranslate::getOverrideTool(MASK mask)
+{
+    if (mask == (MASK_CONTROL | MASK_SHIFT))
+    {
+        return LLToolCompScale::getInstance();
+    }
+    // Otherwise fallback
+    return LLToolComposite::getOverrideTool(mask);
+}
+
+//-----------------------------------
+// Handle DoubleClick
+bool FSToolCompPoseTranslate::handleDoubleClick(S32 x, S32 y, MASK mask)
+{
+    if (!mManip->getSelection()->isEmpty() &&
+        mManip->getHighlightedPart() == LLManip::LL_NO_PART)
+    {
+        // Possibly show some pose properties or open the pose floater
+        mPoser = dynamic_cast<FSFloaterPoser*>(LLFloaterReg::showInstance("fs_poser"));
+        return true;
+    }
+    else
+    {
+        // If nothing selected, try a mouse down again
+        return handleMouseDown(x, y, mask);
+    }
+}
+
+//-----------------------------------
+// render
+void FSToolCompPoseTranslate::render()
+{
+    // Render the current subtool
+    mCur->render();
+
+    // If the current subtool is not the manip, we can still
+    // optionally draw manip guidelines in the background
+    if (mCur != mManip)
+    {
+        mManip->renderGuidelines(); // or something similar if your manip has it
+        LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
+    }
+}

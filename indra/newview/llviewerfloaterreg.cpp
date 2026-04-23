@@ -49,6 +49,9 @@
 #include "alfloatertransactionlog.h"
 #include "alfloaterwebprofile.h"
 #include "allegacynotificationwellwindow.h"
+
+#include "fsfloaterposer.h" // <FS:AR> [FIRE-30873]: Poser
+
 #include "llcommandhandler.h"
 #include "llcompilequeue.h"
 #include "llfasttimerview.h"
@@ -605,6 +608,8 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("sound_explorer", "floater_explore_sounds.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterExploreSounds>);
     LLFloaterReg::add("transaction_log", "floater_al_transaction_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterTransactionLog>);
     LLFloaterReg::add("webprofile", "floater_al_web_profile.xml", (LLFloaterBuildFunc)&ALFloaterWebProfile::create);
+
+    LLFloaterReg::add("fs_poser", "floater_fs_poser.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSFloaterPoser>); // <FS:AR> [FIRE-30873]: Poser
 
     // *NOTE: Please keep these alphabetized for easier merges
 

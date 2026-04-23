@@ -164,6 +164,7 @@ with the same filename but different name
   <texture name="Command_PersonalLighting_Icon"  file_name="toolbar_icons/personal_lighting.png"  preload="true" />
   <texture name="Command_Picks_Icon"        file_name="toolbar_icons/picks.png"        preload="true" />
   <texture name="Command_Places_Icon"       file_name="toolbar_icons/places.png"       preload="true" />
+  <texture name="Command_Poser_Icon"        file_name="toolbar_icons/poser.png"        preload="true" />
   <texture name="Command_Preferences_Icon"  file_name="toolbar_icons/preferences.png"  preload="true" />
   <texture name="Command_Profile_Icon"      file_name="toolbar_icons/profile.png"      preload="true" />
   <texture name="Command_RegionTracker_Icon" file_name="toolbar_icons/regiontracker.png"       preload="true" />
@@ -986,4 +987,12 @@ with the same filename but different name
   <texture name="Cam_Save" file_name="icons/Cam_Save.png"/>
 
   <texture name="Icon_Pointer" file_name="icons/Icon_Pointer.png" preload="false"/>
+
+  <texture name="Script_Undo" file_name="script_editor/script_undo.png" preload="false" />
+  <texture name="Script_Redo" file_name="script_editor/script_redo.png" preload="false" />
+	<texture name="Poser_Visual_On"			file_name="icons/visual_pose_enabled.png" />
+	<texture name="Edit_Flip_X"			file_name="icons/visual_pose_enabled.png" />
+  <texture name="Script_Running" file_name="script_editor/green_square.png" preload="false" />
+  <texture name="Script_NotRunning" file_name="script_editor/yellow_square.png" preload="false" />
+  <texture name="Script_Error" file_name="script_editor/red_square.png" preload="false" />
 </textures>

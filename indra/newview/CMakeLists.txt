@@ -198,6 +198,14 @@ set(viewer_SOURCE_FILES
     altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
+    fsfloaterposer.cpp
+    fsjointpose.cpp
+    fsmaniprotatejoint.cpp
+    fsmaniptranslatejoint.cpp
+    fsposeranimator.cpp
+    fsposestate.cpp
+    fsposingmotion.cpp
+    fsvirtualtrackpad.cpp
     gltfscenemanager.cpp
     gltf/asset.cpp
     gltf/accessor.cpp
@@ -951,6 +959,14 @@ set(viewer_HEADER_FILES
     altoolalign.h
     alunzip.h
     alviewermenu.h
+    fsfloaterposer.h
+    fsjointpose.h
+    fsmaniprotatejoint.h
+    fsmaniptranslatejoint.h
+    fsposeranimator.h
+	  fsposestate.h
+    fsposingmotion.h
+    fsvirtualtrackpad.h
     gltfscenemanager.h
     groupchatlistener.h
     gltf/asset.h

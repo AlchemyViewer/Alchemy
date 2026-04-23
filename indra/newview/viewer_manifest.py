@@ -92,6 +92,9 @@ class ViewerManifest(LLManifest):
                 # ... and the entire color grading LUT directory
                 self.path("colorlut")
 
+                # <FS:AR> Poser Presets
+                self.path("poses")
+
                 # ... and the included spell checking dictionaries
                 dicts_dir = os.path.join(self.args['vcpkg_dir'], 'share', 'alchemy-dictionaries')
                 with self.prefix(src=dicts_dir):
