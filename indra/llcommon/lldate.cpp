@@ -29,8 +29,6 @@
 #include "linden_common.h"
 #include "lldate.h"
 
-#include "apr_time.h"
-
 #include <time.h>
 #include <locale.h>
 #include <string>
@@ -44,9 +42,26 @@
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
 
-static const F64 LL_APR_USEC_PER_SEC = 1000000.0;
-    // should be APR_USEC_PER_SEC, but that relies on INT64_C which
-    // isn't defined in glib under our build set up for some reason
+namespace
+{
+    bool gmtime_utc(time_t secs, struct tm& out)
+    {
+#if LL_WINDOWS
+        return gmtime_s(&out, &secs) == 0;
+#else
+        return gmtime_r(&secs, &out) != nullptr;
+#endif
+    }
+
+    time_t timegm_utc(struct tm& in)
+    {
+#if LL_WINDOWS
+        return _mkgmtime(&in);
+#else
+        return timegm(&in);
+#endif
+    }
+}
 
 
 LLDate::LLDate(F64SecondsImplicit seconds_since_epoch) :
@@ -124,10 +139,12 @@ std::string LLDate::toHTTPDateString (tm * gmt, std::string fmt)
 
 void LLDate::toStream(std::ostream& s) const
 {
-    apr_time_t time = (apr_time_t)(mSecondsSinceEpoch * LL_APR_USEC_PER_SEC);
+    S64 total_usec = (S64)(mSecondsSinceEpoch * (F64)USEC_PER_SEC);
+    time_t secs = (time_t)(total_usec / 1000000);
+    int usec = (int)(total_usec % 1000000);
 
-    apr_time_exp_t exp_time;
-    if (apr_time_exp_gmt(&exp_time, time) != APR_SUCCESS)
+    struct tm exp_time;
+    if (!gmtime_utc(secs, exp_time))
     {
         s << "1970-01-01T00:00:00Z";
         return;
@@ -141,10 +158,9 @@ void LLDate::toStream(std::ostream& s) const
       << 'T' << std::setw(2) << (exp_time.tm_hour)
       << ':' << std::setw(2) << (exp_time.tm_min)
       << ':' << std::setw(2) << (exp_time.tm_sec);
-    if (exp_time.tm_usec > 0)
+    if (usec > 0)
     {
-        s << '.' << std::setw(2)
-          << (int)(exp_time.tm_usec / (LL_APR_USEC_PER_SEC / 100));
+        s << '.' << std::setw(2) << (usec / 10000);
     }
     s << 'Z'
       << std::setfill(' ');
@@ -152,10 +168,10 @@ void LLDate::toStream(std::ostream& s) const
 
 bool LLDate::split(S32 *year, S32 *month, S32 *day, S32 *hour, S32 *min, S32 *sec) const
 {
-    apr_time_t time = (apr_time_t)(mSecondsSinceEpoch * LL_APR_USEC_PER_SEC);
+    time_t secs = (time_t)mSecondsSinceEpoch;
 
-    apr_time_exp_t exp_time;
-    if (apr_time_exp_gmt(&exp_time, time) != APR_SUCCESS)
+    struct tm exp_time;
+    if (!gmtime_utc(secs, exp_time))
     {
         return false;
     }
@@ -189,8 +205,8 @@ bool LLDate::fromString(const std::string& iso8601_date)
 
 bool LLDate::fromStream(std::istream& s)
 {
-    struct apr_time_exp_t exp_time;
-    apr_int32_t tm_part;
+    struct tm exp_time = {};
+    S32 tm_part;
     int c;
 
     s >> tm_part;
@@ -218,21 +234,14 @@ bool LLDate::fromStream(std::istream& s)
     s >> tm_part;
     exp_time.tm_sec = tm_part;
 
-    // zero out the unused fields
-    exp_time.tm_usec = 0;
-    exp_time.tm_wday = 0;
-    exp_time.tm_yday = 0;
-    exp_time.tm_isdst = 0;
-    exp_time.tm_gmtoff = 0;
-
     // generate a time_t from that
-    apr_time_t time;
-    if (apr_time_exp_gmt_get(&time, &exp_time) != APR_SUCCESS)
+    time_t time = timegm_utc(exp_time);
+    if (time == (time_t)-1)
     {
         return false;
     }
 
-    F64 seconds_since_epoch = time / LL_APR_USEC_PER_SEC;
+    F64 seconds_since_epoch = (F64)time;
 
     // check for fractional
     c = s.peek();
@@ -270,7 +279,7 @@ bool LLDate::fromStream(std::istream& s)
 
 bool LLDate::fromYMDHMS(S32 year, S32 month, S32 day, S32 hour, S32 min, S32 sec)
 {
-    struct apr_time_exp_t exp_time;
+    struct tm exp_time = {};
 
     exp_time.tm_year = year - 1900;
     exp_time.tm_mon = month - 1;
@@ -279,21 +288,14 @@ bool LLDate::fromYMDHMS(S32 year, S32 month, S32 day, S32 hour, S32 min, S32 sec
     exp_time.tm_min = min;
     exp_time.tm_sec = sec;
 
-    // zero out the unused fields
-    exp_time.tm_usec = 0;
-    exp_time.tm_wday = 0;
-    exp_time.tm_yday = 0;
-    exp_time.tm_isdst = 0;
-    exp_time.tm_gmtoff = 0;
-
     // generate a time_t from that
-    apr_time_t time;
-    if (apr_time_exp_gmt_get(&time, &exp_time) != APR_SUCCESS)
+    time_t time = timegm_utc(exp_time);
+    if (time == (time_t)-1)
     {
         return false;
     }
 
-    mSecondsSinceEpoch = time / LL_APR_USEC_PER_SEC;
+    mSecondsSinceEpoch = (F64)time;
 
     return true;
 }
