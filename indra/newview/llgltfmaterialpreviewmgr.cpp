@@ -533,13 +533,13 @@ bool LLGLTFPreviewTexture::render()
         gPipeline.compositeBloomHDR(&screen);
     }
 
-    gPipeline.colorCorrect(&screen, &gPipeline.mPostPingMap, true, false);
+    gPipeline.colorCorrect(&screen, &gPipeline.mRT->postPingMap, true, false);
     LLVertexBuffer::unbind();
 
     if (!hdr)
     {
-        gPipeline.generateGlow(&gPipeline.mPostPingMap);
-        gPipeline.combineGlow(&gPipeline.mPostPingMap, &screen);
+        gPipeline.generateGlow(&gPipeline.mRT->postPingMap);
+        gPipeline.combineGlow(&gPipeline.mRT->postPingMap, &screen);
     }
 
     // *HACK: Restore mExposureMap (it will be consumed by generateExposure next frame)

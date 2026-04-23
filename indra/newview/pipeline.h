@@ -96,6 +96,8 @@ extern LLTrace::BlockTimerStatHandle FTM_RENDER_UI_2D;
 class LLPipeline
 {
 public:
+    static constexpr U32 BLOOM_MAX_MIPS = 7;
+
     LLPipeline();
     ~LLPipeline();
 
@@ -709,8 +711,17 @@ public:
         LLRenderTarget          deferredScreen;
         LLRenderTarget          deferredLight;
 
+        // tonemapped and gamma corrected render ready for post
+        LLRenderTarget          postPingMap;
+        LLRenderTarget          postPongMap;
+
         //sun shadow map
         LLRenderTarget          shadow[4];
+
+        // HDR bloom pyramid (RGB = bloom, A = halation intensity).
+        // mBloomMip[0] is full-res extract; subsequent levels are halved.
+        LLRenderTarget              bloomMip[BLOOM_MAX_MIPS];
+        U32                         bloomMipCount = 0;
     };
 
     // main full resoltuion render target
@@ -739,10 +750,6 @@ public:
     LLRenderTarget          mLuminanceMap;
     LLRenderTarget          mExposureMap;
     LLRenderTarget          mLastExposure;
-
-    // tonemapped and gamma corrected render ready for post
-    LLRenderTarget          mPostPingMap;
-    LLRenderTarget          mPostPongMap;
 
     // FXAA helper target
     LLRenderTarget          mFXAAMap;
@@ -800,12 +807,6 @@ public:
 
     //texture for making the glow
     LLRenderTarget              mGlow[3];
-
-    // HDR bloom pyramid (RGB = bloom, A = halation intensity).
-    // mBloomMip[0] is full-res extract; subsequent levels are halved.
-    static const U32            BLOOM_MAX_MIPS = 7;
-    LLRenderTarget              mBloomMip[BLOOM_MAX_MIPS];
-    U32                         mBloomMipCount = 0;
 
     //noise map
     U32                 mNoiseMap;

@@ -934,12 +934,55 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         mRT->deferredLight.release();
     }
 
+    U32 post_color_fmt = hdr ? GL_RGB10_A2 : GL_RGBA;
+    if(mRT != &mHeroProbeRT)
+    {
+        if (hdr)
+        {
+            // HDR bloom pyramid. Level 0 starts at scene * (num/den); each subsequent
+            // level halves. Lowering the base resolution trades a bit of extract
+            // precision for linear savings on the whole pyramid plus wider bloom reach
+            // per mip, since the composite bilinearly upsamples mip 0 back to screen.
+            // When halation is enabled the alpha channel carries the warmth signal, so
+            // we need RGBA16F. With halation off we drop to R11F_G11F_B10F for half the
+            // bandwidth on the pyramid hot path.
+            const S32 bloom_mip_setting = llclamp(gSavedSettings.getS32("RenderBloomMipCount"), 3, (S32)BLOOM_MAX_MIPS);
+            const S32 bloom_scale_idx   = llclamp(gSavedSettings.getS32("RenderBloomResolutionScale"), 0, 4);
+            // (numerator, denominator) for each preset: full, 3/4, half, quarter, eighth.
+            static const U32 bloom_scale_num[5] = { 1, 3, 1, 1, 1 };
+            static const U32 bloom_scale_den[5] = { 1, 4, 2, 4, 8 };
+            const U32 base_num = bloom_scale_num[bloom_scale_idx];
+            const U32 base_den = bloom_scale_den[bloom_scale_idx];
+            const U32 base_w = llmax(1u, (resX * base_num) / base_den);
+            const U32 base_h = llmax(1u, (resY * base_num) / base_den);
+            const bool bloom_halation = gSavedSettings.getBOOL("RenderBloomHalation");
+            const U32 bloom_format = bloom_halation ? GL_RGBA16F : GL_R11F_G11F_B10F;
+            mRT->bloomMipCount = 0;
+            for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
+            {
+                mRT->bloomMip[i].release();
+            }
+            for (S32 i = 0; i < bloom_mip_setting; i++)
+            {
+                U32 mw = llmax(1u, base_w >> (U32)i);
+                U32 mh = llmax(1u, base_h >> (U32)i);
+                if (!mRT->bloomMip[i].allocate(mw, mh, bloom_format))
+                {
+                    break;
+                }
+                ++mRT->bloomMipCount;
+                if (mw == 1 && mh == 1) break;
+            }
+        }
+
+        mRT->postPingMap.allocate(resX, resY, post_color_fmt);
+        mRT->postPongMap.allocate(resX, resY, post_color_fmt);
+    }
+
     allocateShadowBuffer(resX, resY);
 
     if (!gCubeSnapshot) // hack to not re-allocate various targets for cube snapshots
     {
-        U32 post_color_fmt = hdr ? GL_RGB10_A2 : GL_RGBA;
-
         if (RenderUIBuffer)
         {
             if (!mUIScreen.allocate(resX, resY, GL_RGBA))
@@ -979,44 +1022,6 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         else
         {
             mSceneMap.release();
-        }
-
-        mPostPingMap.allocate(resX, resY, post_color_fmt);
-        mPostPongMap.allocate(resX, resY, post_color_fmt);
-
-        // HDR bloom pyramid. Level 0 starts at scene * (num/den); each subsequent
-        // level halves. Lowering the base resolution trades a bit of extract
-        // precision for linear savings on the whole pyramid plus wider bloom reach
-        // per mip, since the composite bilinearly upsamples mip 0 back to screen.
-        // When halation is enabled the alpha channel carries the warmth signal, so
-        // we need RGBA16F. With halation off we drop to R11F_G11F_B10F for half the
-        // bandwidth on the pyramid hot path.
-        const S32 bloom_mip_setting = llclamp(gSavedSettings.getS32("RenderBloomMipCount"), 3, (S32)BLOOM_MAX_MIPS);
-        const S32 bloom_scale_idx   = llclamp(gSavedSettings.getS32("RenderBloomResolutionScale"), 0, 4);
-        // (numerator, denominator) for each preset: full, 3/4, half, quarter, eighth.
-        static const U32 bloom_scale_num[5] = { 1, 3, 1, 1, 1 };
-        static const U32 bloom_scale_den[5] = { 1, 4, 2, 4, 8 };
-        const U32 base_num = bloom_scale_num[bloom_scale_idx];
-        const U32 base_den = bloom_scale_den[bloom_scale_idx];
-        const U32 base_w = llmax(1u, (resX * base_num) / base_den);
-        const U32 base_h = llmax(1u, (resY * base_num) / base_den);
-        const bool bloom_halation = gSavedSettings.getBOOL("RenderBloomHalation");
-        const U32 bloom_format = bloom_halation ? GL_RGBA16F : GL_R11F_G11F_B10F;
-        mBloomMipCount = 0;
-        for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
-        {
-            mBloomMip[i].release();
-        }
-        for (S32 i = 0; i < bloom_mip_setting; i++)
-        {
-            U32 mw = llmax(1u, base_w >> (U32)i);
-            U32 mh = llmax(1u, base_h >> (U32)i);
-            if (!mBloomMip[i].allocate(mw, mh, bloom_format))
-            {
-                break;
-            }
-            ++mBloomMipCount;
-            if (mw == 1 && mh == 1) break;
         }
 
         // The water exclusion mask needs its own depth buffer so we can take care of the problem of multiple water planes.
@@ -1292,9 +1297,6 @@ void LLPipeline::releaseGLBuffers()
 
     mWaterExclusionMask.release();
 
-    mPostPingMap.release();
-    mPostPongMap.release();
-
     mFXAAMap.release();
     mSMAABlendBuffer.release();
 
@@ -1308,12 +1310,6 @@ void LLPipeline::releaseGLBuffers()
     {
         mGlow[i].release();
     }
-
-    for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
-    {
-        mBloomMip[i].release();
-    }
-    mBloomMipCount = 0;
 
     mHeroProbeManager.cleanup(); // release hero probes
 
@@ -1347,17 +1343,38 @@ void LLPipeline::releaseShadowBuffers()
 
 void LLPipeline::releaseScreenBuffers()
 {
-    mRT->screen.release();
-    mRT->deferredScreen.release();
-    mRT->deferredLight.release();
+    mMainRT.screen.release();
+    mMainRT.deferredScreen.release();
+    mMainRT.deferredLight.release();
+    mMainRT.postPingMap.release();
+    mMainRT.postPongMap.release();
+    for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
+    {
+        mHeroProbeRT.bloomMip[i].release();
+    }
+    mHeroProbeRT.bloomMipCount = 0;
 
     mAuxillaryRT.screen.release();
     mAuxillaryRT.deferredScreen.release();
     mAuxillaryRT.deferredLight.release();
+    mAuxillaryRT.postPingMap.release();
+    mAuxillaryRT.postPongMap.release();
+    for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
+    {
+        mHeroProbeRT.bloomMip[i].release();
+    }
+    mHeroProbeRT.bloomMipCount = 0;
 
     mHeroProbeRT.screen.release();
     mHeroProbeRT.deferredScreen.release();
     mHeroProbeRT.deferredLight.release();
+    mHeroProbeRT.postPingMap.release();
+    mHeroProbeRT.postPongMap.release();
+    for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
+    {
+        mHeroProbeRT.bloomMip[i].release();
+    }
+    mHeroProbeRT.bloomMipCount = 0;
 }
 
 void LLPipeline::releaseSunShadowTarget(U32 index)
@@ -1396,13 +1413,17 @@ void LLPipeline::createGLBuffers()
     GLuint resX = gViewerWindow->getWorldViewWidthRaw();
     GLuint resY = gViewerWindow->getWorldViewHeightRaw();
 
-    // allocate screen space glow buffers
-    const U32 glow_res = llmax(1, llmin(512, 1 << gSavedSettings.getS32("RenderGlowResolutionPow")));
-    const bool glow_hdr = gSavedSettings.getBOOL("RenderGlowHDR");
-    const U32 glow_color_fmt = glow_hdr ? GL_RGBA16F : GL_RGBA;
-    for (U32 i = 0; i < 3; i++)
+    bool hdr = gGLManager.mGLVersion > 4.05f && gSavedSettings.getBOOL("RenderHDREnabled");
+    if (!hdr)
     {
-        mGlow[i].allocate(512, glow_res, glow_color_fmt);
+        // allocate screen space glow buffers
+        const U32 glow_res = llmax(1, llmin(512, 1 << gSavedSettings.getS32("RenderGlowResolutionPow")));
+        const bool glow_hdr = gSavedSettings.getBOOL("RenderGlowHDR");
+        const U32 glow_color_fmt = glow_hdr ? GL_RGBA16F : GL_RGBA;
+        for (U32 i = 0; i < 3; i++)
+        {
+            mGlow[i].allocate(512, glow_res, glow_color_fmt);
+        }
     }
 
     allocateScreenBuffer(resX, resY);
@@ -7326,7 +7347,7 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
         channel = gLuminanceProgram.enableTexture(LLShaderMgr::DEFERRED_EMISSIVE);
         if (channel > -1)
         {
-            mGlow[1].bindTexture(0, channel);
+            mRT->bloomMip[0].bindTexture(0, channel);
         }
 
         channel = gLuminanceProgram.enableTexture(LLShaderMgr::NORMAL_MAP);
@@ -8131,7 +8152,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 {
     LL_PROFILE_GPU_ZONE("bloom hdr generate");
 
-    if (mBloomMipCount < 3 ||
+    if (mRT->bloomMipCount < 3 ||
         !gBloomExtractProgram.isComplete() ||
         !gBloomDownsampleProgram.isComplete() ||
         !gBloomDownsampleFirstProgram.isComplete() ||
@@ -8151,8 +8172,8 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
     // Extract pass: write thresholded bloom + halation into mip 0.
     {
         LLGLDisable blend(GL_BLEND);
-        mBloomMip[0].bindTarget();
-        mBloomMip[0].clear();
+        mRT->bloomMip[0].bindTarget();
+        mRT->bloomMip[0].clear();
 
         gBloomExtractProgram.bind();
         gBloomExtractProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, src);
@@ -8168,7 +8189,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-        mBloomMip[0].flush();
+        mRT->bloomMip[0].flush();
         gBloomExtractProgram.unbind();
     }
 
@@ -8179,14 +8200,14 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
     // averaged data where firefly energy has been amortized out.
     {
         LLGLDisable blend(GL_BLEND);
-        for (U32 i = 1; i < mBloomMipCount; ++i)
+        for (U32 i = 1; i < mRT->bloomMipCount; ++i)
         {
             LLGLSLShader* shader = (i == 1) ? &gBloomDownsampleFirstProgram
                                             : &gBloomDownsampleProgram;
-            LLRenderTarget* srcMip = &mBloomMip[i - 1];
+            LLRenderTarget* srcMip = &mRT->bloomMip[i - 1];
 
-            mBloomMip[i].bindTarget();
-            mBloomMip[i].clear();
+            mRT->bloomMip[i].bindTarget();
+            mRT->bloomMip[i].clear();
 
             shader->bind();
             shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, srcMip, false, LLTexUnit::TFO_BILINEAR);
@@ -8197,7 +8218,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
             mScreenTriangleVB->setBuffer();
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-            mBloomMip[i].flush();
+            mRT->bloomMip[i].flush();
             shader->unbind();
         }
     }
@@ -8211,10 +8232,10 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         gBloomUpsampleProgram.bind();
         gBloomUpsampleProgram.uniform1f(LLShaderMgr::BLOOM_SCATTER, llmax(bloom_scatter(), 0.0f));
 
-        for (S32 i = (S32)mBloomMipCount - 1; i > 0; --i)
+        for (S32 i = (S32)mRT->bloomMipCount - 1; i > 0; --i)
         {
-            LLRenderTarget* srcMip = &mBloomMip[i];
-            LLRenderTarget* dstMip = &mBloomMip[i - 1];
+            LLRenderTarget* srcMip = &mRT->bloomMip[i];
+            LLRenderTarget* dstMip = &mRT->bloomMip[i - 1];
 
             dstMip->bindTarget();
 
@@ -8240,7 +8261,7 @@ void LLPipeline::compositeBloomHDR(LLRenderTarget* scene)
 {
     LL_PROFILE_GPU_ZONE("bloom hdr composite");
 
-    if (mBloomMipCount < 3 || !gBloomCompositeProgram.isComplete())
+    if (mRT->bloomMipCount < 3 || !gBloomCompositeProgram.isComplete())
     {
         return;
     }
@@ -8257,7 +8278,7 @@ void LLPipeline::compositeBloomHDR(LLRenderTarget* scene)
     scene->bindTarget();
 
     gBloomCompositeProgram.bind();
-    gBloomCompositeProgram.bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mBloomMip[0], false, LLTexUnit::TFO_BILINEAR);
+    gBloomCompositeProgram.bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mRT->bloomMip[0], false, LLTexUnit::TFO_BILINEAR);
     gBloomCompositeProgram.uniform1f(LLShaderMgr::BLOOM_STRENGTH, llmax(bloom_strength(), 0.0f));
     gBloomCompositeProgram.uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f));
     const LLColor3& tint = halation_tint();
@@ -8890,7 +8911,7 @@ void LLPipeline::renderFinalize()
     // Handles tonemap, colorgrading, and gamma correction in one pass. In the HDR
     // path, this also applies eye adaptation and bloom. In the non-HDR path, this
     // is just a linear copy with color correction.
-    colorCorrect(&mRT->screen, &mPostPingMap, hdr, true);
+    colorCorrect(&mRT->screen, &mRT->postPingMap, hdr, true);
 
     LLVertexBuffer::unbind();
 
@@ -8898,11 +8919,11 @@ void LLPipeline::renderFinalize()
     // bloom process and composited back in after tonemapping.
     if (!hdr)
     {
-        generateGlow(&mPostPingMap);
+        generateGlow(&mRT->postPingMap);
     }
 
-    LLRenderTarget* sourceBuffer = &mPostPingMap;
-    LLRenderTarget* targetBuffer = &mPostPongMap;
+    LLRenderTarget* sourceBuffer = &mRT->postPingMap;
+    LLRenderTarget* targetBuffer = &mRT->postPongMap;
 
     if (RenderFSAAType == 1)
     {
