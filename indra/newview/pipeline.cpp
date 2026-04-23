@@ -8888,7 +8888,7 @@ void LLPipeline::renderFinalize()
     }
 
     // Handles tonemap, colorgrading, and gamma correction in one pass. In the HDR
-    // path, this also applies eye adaptation and bloom. In the non-HDR path, this \
+    // path, this also applies eye adaptation and bloom. In the non-HDR path, this
     // is just a linear copy with color correction.
     colorCorrect(&mRT->screen, &mPostPingMap, hdr, true);
 
