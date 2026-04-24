@@ -164,9 +164,11 @@ protected:
     std::string appendTime();
     void assignResizeLimits();
 
+public:
     static void applyMUPose(std::string& text);
     static void applyOOCClose(std::string& text);
 
+protected:
     void updateUsedEmojis(LLWStringView text);
 
     S32  mFloaterExtraWidth;

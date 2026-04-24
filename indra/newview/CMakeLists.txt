@@ -152,6 +152,7 @@ set(viewer_SOURCE_FILES
     alassetblocklist.cpp
     alavataractions.cpp
     alavatargroups.cpp
+    alchatbar.cpp
     alchatcommand.cpp
     alcheatcodes.cpp
     alclassifieditem.cpp
@@ -241,7 +242,7 @@ set(viewer_SOURCE_FILES
     llbuycurrencyhtml.cpp
     llcallingcard.cpp
     llchannelmanager.cpp
-    llchatbar.cpp
+    #llchatbar.cpp
     llchathistory.cpp
     llchatitemscontainerctrl.cpp
     llchatmsgbox.cpp
@@ -905,6 +906,7 @@ set(viewer_HEADER_FILES
     alassetblocklist.h
     alavataractions.h
     alavatargroups.h
+    alchatbar.h
     alchatcommand.h
     alclassifieditem.h
     alderenderlist.h
@@ -995,7 +997,7 @@ set(viewer_HEADER_FILES
     llcallingcard.h
     llcapabilityprovider.h
     llchannelmanager.h
-    llchatbar.h
+    #llchatbar.h
     llchathistory.h
     llchatitemscontainerctrl.h
     llchatmsgbox.h

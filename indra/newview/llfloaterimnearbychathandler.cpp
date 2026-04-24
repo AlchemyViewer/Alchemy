@@ -30,6 +30,7 @@
 #include "llagentdata.h" // for gAgentID
 #include "llfloaterimnearbychathandler.h"
 
+#include "alchatbar.h"
 // [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
 #include "llchatentry.h"
 // [/SL:KB]
@@ -103,6 +104,11 @@ public:
         }
 // [/SL:KB]
 
+        ctrl = gSavedSettings.getControl("AlchemyNearbyChatInput").get();
+        if (ctrl)
+        {
+            ctrl->getSignal()->connect(boost::bind(&LLFloaterIMNearbyChatScreenChannel::nearbyInputSettingChanged, this));
+        }
     }
 
 // [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
@@ -125,6 +131,11 @@ public:
     S32  getToastWidth();
     void updateToastWidth();
 // [/SL:KB]
+
+    void nearbyInputSettingChanged()
+    {
+        mChatBarReshapeConnection.disconnect();
+    }
 
     void redrawToasts()
     {
@@ -415,6 +426,10 @@ static bool sort_toasts_predicate(LLHandle<LLToast> first, LLHandle<LLToast> sec
 
 void LLFloaterIMNearbyChatScreenChannel::arrangeToasts()
 {
+// [SL:KB] - Patch: Chat-NearbyToastHeightRatio | Checked: Catznip-5.3
+    const float nToastHeightRatio = llclamp(gSavedSettings.getS32("NearbyToastHeightRatio"), 30, 100) / 100.f;
+// [/SL:KB]
+
     if(mStopProcessing || isHovering())
         return;
 
@@ -437,10 +452,16 @@ void LLFloaterIMNearbyChatScreenChannel::arrangeToasts()
     mFloaterSnapRegion->localRectToOtherView(mFloaterSnapRegion->getLocalRect(), &channel_rect, gFloaterView);
     channel_rect.mLeft += 10;
     channel_rect.mRight = channel_rect.mLeft + 300;
+// [SL:KB] - Patch: Chat-NearbyToastHeightRatio | Checked: Catznip-5.3
+    channel_rect.mTop = (S32)((F32)channel_rect.mBottom + (F32)channel_rect.getHeight() * nToastHeightRatio);
+// [/SL:KB]
 
     S32 channel_bottom = channel_rect.mBottom;
 
-    S32     bottom = channel_bottom + 80;
+//  S32     bottom = channel_bottom + 80;
+// [SL:KB] - Patch: Chat-NearbyChatBar | Checked: 2012-01-17 (Catznip-3.2)
+    S32     bottom = channel_bottom + gSavedSettings.getS32("NearbyToastOffset");
+// [/SL:KB]
     S32     margin = gSavedSettings.getS32("ToastGap");
 
     //sort active toasts
@@ -459,7 +480,14 @@ void LLFloaterIMNearbyChatScreenChannel::arrangeToasts()
 
         S32 toast_top = bottom + toast->getRect().getHeight() + margin;
 
-        if(toast_top > channel_rect.getHeight())
+//      if(toast_top > channel_rect.getHeight())
+// [SL:KB] - Patch: Chat-NearbyToastHeightRatio | Checked: Catznip-5.3
+        // Make some allowances:
+        //  * if a large toast appears (that currently won't fit the reserved height) then don't kill it and all other toasts
+        //  * if only 2 toasts are visible only kill them if we're covering at least half the screen or if they're really too tall
+        if ( (toast_top > channel_rect.mTop) && (it != m_active_toasts.begin()) &&
+             ((m_active_toasts.size() > 3) || (nToastHeightRatio >= 0.5) || (toast_top > channel_rect.mBottom + channel_rect.getHeight() * 1.5)) )
+// [/SL:KB]
         {
             while(it!=m_active_toasts.end())
             {
@@ -497,8 +525,8 @@ S32 LLFloaterIMNearbyChatScreenChannel::getToastWidth()
     if (0 == s_nToastWidth)                 // Follow the width of the nearby chat bar
     {
         static S32 s_nLastToastWidth = 400;
-        //static LLCachedControl<bool> sUseChatbar(gSavedSettings, "AlchemyNearbyChatInput", true);
-        //if (!sUseChatbar)
+        static LLCachedControl<bool> sUseChatbar(gSavedSettings, "AlchemyNearbyChatInput", true);
+        if (!sUseChatbar)
         {
             LLFloaterIMNearbyChat* pNearbyChat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
             if (pNearbyChat)
@@ -515,23 +543,23 @@ S32 LLFloaterIMNearbyChatScreenChannel::getToastWidth()
                 }
             }
         }
-        //else
-        //{
-        //    LLChatBar* pNearbyChat = LLFloaterReg::getTypedInstance<LLChatBar>("chatbar");
-        //    if (pNearbyChat)
-        //    {
-        //        if (!mChatBarReshapeConnection.connected())
-        //        {
-        //            mChatBarReshapeConnection = pNearbyChat->setReshapeCallback(boost::bind(&LLFloaterIMNearbyChatScreenChannel::updateToastWidth, this));
-        //        }
+        else
+        {
+            ALChatBar* pNearbyChat = LLFloaterReg::getTypedInstance<ALChatBar>("chatbar");
+            if (pNearbyChat)
+            {
+                if (!mChatBarReshapeConnection.connected())
+                {
+                    mChatBarReshapeConnection = pNearbyChat->setReshapeCallback(boost::bind(&LLFloaterIMNearbyChatScreenChannel::updateToastWidth, this));
+                }
 
-        //        // We're using the width of the chatbar floater
-        //        //if ((!pNearbyChat->isMinimized()) && ((pNearbyChat->isTornOff()) || (!pNearbyChat->getHost()) || (!pNearbyChat->getHost()->isMinimized())))
-        //        {
-        //            s_nLastToastWidth = llmax(pNearbyChat->getRect().getWidth(), 400);
-        //        }
-        //    }
-        //}
+                // We're using the width of the chatbar floater
+                //if ((!pNearbyChat->isMinimized()) && ((pNearbyChat->isTornOff()) || (!pNearbyChat->getHost()) || (!pNearbyChat->getHost()->isMinimized())))
+                {
+                    s_nLastToastWidth = llmax(pNearbyChat->getRect().getWidth(), 400);
+                }
+            }
+        }
         return s_nLastToastWidth;
     }
 

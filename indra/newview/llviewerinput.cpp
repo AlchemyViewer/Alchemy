@@ -28,6 +28,7 @@
 
 #include "llviewerinput.h"
 
+#include "alchatbar.h"
 #include "llappviewer.h"
 #include "llfloaterreg.h"
 #include "llmath.h"
@@ -690,7 +691,15 @@ bool start_chat( EKeystate s )
     if (KEYSTATE_DOWN != s) return true;
 
     // start chat
-    LLFloaterIMNearbyChat::startChat(NULL);
+    static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+    if (!sChatInWindow)
+    {
+        LLFloaterIMNearbyChat::startChat(nullptr);
+    }
+    else
+    {
+        ALChatBar::startChat(nullptr);
+    }
     return true;
 }
 
@@ -700,15 +709,30 @@ bool start_gesture( EKeystate s )
     if (KEYSTATE_UP == s &&
         ! (focus_ctrlp && focus_ctrlp->acceptsTextInput()))
     {
-        if ((LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))->getCurrentChat().empty())
+        static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+        if (!sChatInWindow)
         {
-            // No existing chat in chat editor, insert '/'
-            LLFloaterIMNearbyChat::startChat("/");
+            if ((LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))->getCurrentChat().empty())
+            {
+                // No existing chat in chat editor, insert '/'
+                LLFloaterIMNearbyChat::startChat("/");
+            }
+            else
+            {
+                // Don't overwrite existing text in chat editor
+                LLFloaterIMNearbyChat::startChat(nullptr);
+            }
         }
         else
         {
-            // Don't overwrite existing text in chat editor
-            LLFloaterIMNearbyChat::startChat(NULL);
+            if ((LLFloaterReg::getTypedInstance<ALChatBar>("chatbar"))->getCurrentChat().empty())
+            {
+                ALChatBar::startChat("/");
+            }
+            else
+            {
+                ALChatBar::startChat(nullptr);
+            }
         }
     }
     return true;

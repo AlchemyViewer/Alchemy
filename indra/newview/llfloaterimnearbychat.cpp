@@ -641,6 +641,7 @@ void LLFloaterIMNearbyChat::onChatBoxFocusReceived()
     mInputEditor->setEnabled(!gDisconnected);
 }
 
+// static
 EChatType LLFloaterIMNearbyChat::processChatTypeTriggers(EChatType type, std::string &str)
 {
     auto length = str.length();

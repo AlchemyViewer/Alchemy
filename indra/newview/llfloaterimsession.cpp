@@ -493,6 +493,7 @@ bool LLFloaterIMSession::postBuild()
     mInputEditor->setFocusLostCallback( boost::bind(onInputEditorFocusLost, _1, this) );
     mInputEditor->setKeystrokeCallback( boost::bind(onInputEditorKeystroke, _1, this) );
     mInputEditor->setCommitCallback(boost::bind(onSendMsg, _1, this));
+    mInputEditor->setFont(LLViewerChat::getChatFont());
 
     setDocked(true);
 

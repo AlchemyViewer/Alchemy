@@ -107,9 +107,11 @@ protected:
     void onTearOffClicked() override;
     void onClickCloseBtn(bool app_qutting = false) override;
 
+public:
     static LLWString stripChannelNumber(const LLWString &mesg, S32* channel);
-    EChatType processChatTypeTriggers(EChatType type, std::string &str);
+    static EChatType processChatTypeTriggers(EChatType type, std::string &str);
 
+protected:
     void displaySpeakingIndicator();
 
 // [RLVa:KB]
