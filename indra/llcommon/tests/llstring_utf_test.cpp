@@ -923,6 +923,9 @@ namespace tut
     }
 
     // Keycap: digit/#/* + U+FE0F + U+20E3 is a shaped 3-codepoint sequence.
+    // shapeRun itemises this into per-face sub-runs (the ASCII digit on
+    // the text font, the combining mark on the emoji font), so the
+    // cluster is still detected here for cursor-snapping purposes.
     template<> template<>
     void llstring_utf_object_t::test<95>()
     {
@@ -981,6 +984,22 @@ namespace tut
         ensure_equals("bare zwj",  wstring_find_shaping_runs(zwj).size(),  size_t(0));
         LLWString vs16 = { (llwchar)'a', (llwchar)0xFE0F, (llwchar)'b' };
         ensure_equals("bare vs16", wstring_find_shaping_runs(vs16).size(), size_t(0));
+    }
+
+    // BMP pictograph + VS16 + ZWJ + astral emoji (❤️‍🔥 = U+2764 U+FE0F
+    // U+200D U+1F525). The base ❤ is outside LLStringOps::isEmoji's astral
+    // range, but the shaping detector must still pick up the whole sequence
+    // so HarfBuzz gets to compose the "heart on fire" glyph instead of
+    // leaving ❤ and 🔥 as disjoint codepoints.
+    template<> template<>
+    void llstring_utf_object_t::test<99>()
+    {
+        LLWString ws = { (llwchar)0x2764, (llwchar)0xFE0F,
+                         (llwchar)0x200D, (llwchar)0x1F525 };
+        auto runs = wstring_find_shaping_runs(ws);
+        ensure_equals("bmp zwj runs", runs.size(),    size_t(1));
+        ensure_equals("bmp zwj begin", runs[0].first,  size_t(0));
+        ensure_equals("bmp zwj end",   runs[0].second, size_t(4));
     }
 
     // ---------------------------------------------------------------

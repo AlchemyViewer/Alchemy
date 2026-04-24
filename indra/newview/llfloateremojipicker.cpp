@@ -60,8 +60,11 @@ static const S32 EMPTY_LIST_IMAGE_INDEX = 0x1F6D1;
 static const std::string FREQUENTLY_USED_CATEGORY = "frequently used";
 
 // Floater state related variables
-static std::list<llwchar> sRecentlyUsed;
-static std::list<std::pair<llwchar, U32>> sFrequentlyUsed;
+// Per-user most-recently-used and most-frequently-used lists. Stored as
+// LLWString so multi-codepoint emoji (ZWJ families, flag pairs, keycap, tag
+// subdivision flags) count as a single logical emoji.
+static std::list<LLWString> sRecentlyUsed;
+static std::list<std::pair<LLWString, U32>> sFrequentlyUsed;
 
 // State file related values
 static std::string sStateFileName;
@@ -128,7 +131,7 @@ public:
         , const LLEmojiSearchResult& emoji)
         : LLScrollingPanel(panel_params)
         , mData(emoji)
-        , mChar(LLWString(1, emoji.Character))
+        , mChar(emoji.Character)
     {
     }
 
@@ -148,7 +151,7 @@ public:
             LLFontGL::VCENTER,          // valign
             LLFontGL::NORMAL,           // style
             LLFontGL::DROP_SHADOW_SOFT, // shadow
-            1);                         // max_chars
+            static_cast<S32>(mChar.size())); // max_chars — full cluster
     }
 
     virtual void updatePanel(bool allow_modify) override {}
@@ -177,14 +180,13 @@ public:
         }
         else
         {
-            setData(0, LLStringUtil::null, 0, 0);
+            setData(LLWString(), LLStringUtil::null, 0, 0);
         }
     }
 
-    void setData(llwchar emoji, std::string title, size_t begin, size_t end)
+    void setData(const LLWString& emoji, std::string title, size_t begin, size_t end)
     {
-        mWStr = LLWString(1, emoji);
-        mEmoji = emoji;
+        mWStr = emoji;
         mTitle = utf8str_to_wstring(title);
         mBegin = begin;
         mEnd = end;
@@ -220,8 +222,8 @@ protected:
             LLFontGL::VCENTER,          // valign
             LLFontGL::NORMAL,           // style
             LLFontGL::DROP_SHADOW_SOFT, // shadow
-            1,                          // max_chars
-            max_pixels);                // max_pixels
+            static_cast<S32>(mWStr.size()), // max_chars — full cluster
+            max_pixels);                    // max_pixels
     }
 
     void drawName(F32 x, F32 y, S32 max_pixels, const LLColor4& color)
@@ -286,7 +288,6 @@ protected:
     }
 
 private:
-    llwchar mEmoji;
     LLWString mWStr;
     LLWString mTitle;
     size_t mBegin;
@@ -403,7 +404,7 @@ void LLFloaterEmojiPicker::initialize()
             args["[FILTER]"] = mFilterPattern.substr(1);
             std::string title(getString("text_no_emoji_for_filter", args));
             LLEmojiDictionary::searchInShortCode(begin, end, title, mFilterPattern);
-            mPreview->setData(EMPTY_LIST_IMAGE_INDEX, title, begin, end);
+            mPreview->setData(LLWString(1, (llwchar)EMPTY_LIST_IMAGE_INDEX), title, begin, end);
             showPreview(true);
         }
         return;
@@ -740,7 +741,7 @@ void LLFloaterEmojiPicker::fillEmojisCategory(const std::vector<LLEmojiSearchRes
     if (mFilterPattern.empty())
     {
         const LLEmojiDictionary::emoji2descr_map_t& emoji2descr = LLEmojiDictionary::instance().getEmoji2Descr();
-        LLEmojiSearchResult emoji { 0, "", 0, 0 };
+        LLEmojiSearchResult emoji { LLWString(), "", 0, 0 };
         if (category == FREQUENTLY_USED_CATEGORY)
         {
             for (const auto& code : sFrequentlyUsed)
@@ -1137,15 +1138,18 @@ void LLFloaterEmojiPicker::hideFloater() const
 }
 
 // static
-std::list<llwchar>& LLFloaterEmojiPicker::getRecentlyUsed()
+std::list<LLWString>& LLFloaterEmojiPicker::getRecentlyUsed()
 {
     loadState();
     return sRecentlyUsed;
 }
 
 // static
-void LLFloaterEmojiPicker::onEmojiUsed(llwchar emoji)
+void LLFloaterEmojiPicker::onEmojiUsed(const LLWString& emoji)
 {
+    if (emoji.empty())
+        return;
+
     // Update sRecentlyUsed
     auto itr = std::find(sRecentlyUsed.begin(), sRecentlyUsed.end(), emoji);
     if (itr == sRecentlyUsed.end())
@@ -1218,16 +1222,27 @@ void LLFloaterEmojiPicker::loadState()
         return;
     }
 
+    // Entries are stored as raw UTF-8 separated by commas (and colon for the
+    // count in the frequently-used list). Comma (0x2C) and colon (0x3A)
+    // never appear inside emoji bytes — UTF-8 continuation bytes are >= 0x80
+    // and emoji codepoints are all non-ASCII — so this is unambiguous. Old
+    // files written as decimal codepoints have all-ASCII tokens; we detect
+    // those by checking for non-ASCII content and silently drop legacy
+    // entries. Users rebuild their history in a session or two.
+
     // Load and parse sRecentlyUsed
     std::string recentlyUsed = state[sKeyRecentlyUsed];
     std::vector<std::string> rtokens = LLStringUtil::getTokens(recentlyUsed, ",");
     int maxCountR = 20;
     for (const std::string& token : rtokens)
     {
-        llwchar emoji = (llwchar)atoi(token.c_str());
+        LLWString emoji = utf8str_to_wstring(token);
+        // Drop legacy ASCII-decimal tokens and obvious garbage.
+        if (emoji.empty() || emoji[0] < 0x80)
+            continue;
         if (std::find(sRecentlyUsed.begin(), sRecentlyUsed.end(), emoji) == sRecentlyUsed.end())
         {
-            sRecentlyUsed.push_back(emoji);
+            sRecentlyUsed.push_back(std::move(emoji));
             if (!--maxCountR)
                 break;
         }
@@ -1239,26 +1254,32 @@ void LLFloaterEmojiPicker::loadState()
     int maxCountF = 20;
     for (const std::string& token : ftokens)
     {
-        std::vector<std::string> pair = LLStringUtil::getTokens(token, ":");
-        if (pair.size() == 2)
+        // Split on the FIRST colon only — UTF-8 bytes of emoji never contain
+        // 0x3A so there's no ambiguity, but getTokens would split on every
+        // colon.
+        const size_t colon = token.find(':');
+        if (colon == std::string::npos || colon == 0 || colon + 1 >= token.size())
+            continue;
+
+        LLWString emoji = utf8str_to_wstring(token.substr(0, colon));
+        if (emoji.empty() || emoji[0] < 0x80)
+            continue;
+
+        const U32 count = (U32)atoi(token.c_str() + colon + 1);
+        if (!count)
+            continue;
+
+        auto it = std::find_if(sFrequentlyUsed.begin(), sFrequentlyUsed.end(),
+            [&emoji](std::pair<LLWString, U32>& it) { return it.first == emoji; });
+        if (it != sFrequentlyUsed.end())
         {
-            llwchar emoji = (llwchar)atoi(pair[0].c_str());
-            if (emoji)
-            {
-                U32 count = atoi(pair[1].c_str());
-                auto it = std::find_if(sFrequentlyUsed.begin(), sFrequentlyUsed.end(),
-                    [emoji](std::pair<llwchar, U32>& it) { return it.first == emoji; });
-                if (it != sFrequentlyUsed.end())
-                {
-                    it->second += count;
-                }
-                else
-                {
-                    sFrequentlyUsed.push_back(std::make_pair(emoji, count));
-                    if (!--maxCountF)
-                        break;
-                }
-            }
+            it->second += count;
+        }
+        else
+        {
+            sFrequentlyUsed.push_back(std::make_pair(std::move(emoji), count));
+            if (!--maxCountF)
+                break;
         }
     }
 
@@ -1284,17 +1305,17 @@ void LLFloaterEmojiPicker::saveState()
 
     LLSD state = LLSD::emptyMap();
 
+    // Entries are serialised as raw UTF-8 separated by commas. See loadState
+    // for the invariant that keeps comma/colon separators unambiguous.
     if (!sRecentlyUsed.empty())
     {
         U32 maxCount = 20;
         std::string recentlyUsed;
-        for (llwchar emoji : sRecentlyUsed)
+        for (const LLWString& emoji : sRecentlyUsed)
         {
             if (!recentlyUsed.empty())
                 recentlyUsed += ",";
-            char buffer[32];
-            snprintf(buffer, sizeof(buffer), "%u", (U32)emoji);
-            recentlyUsed += buffer;
+            recentlyUsed += wstring_to_utf8str(emoji);
             if (!--maxCount)
                 break;
         }
@@ -1305,12 +1326,13 @@ void LLFloaterEmojiPicker::saveState()
     {
         U32 maxCount = 20;
         std::string frequentlyUsed;
-        for (auto& it : sFrequentlyUsed)
+        for (const auto& it : sFrequentlyUsed)
         {
             if (!frequentlyUsed.empty())
                 frequentlyUsed += ",";
             char buffer[32];
-            snprintf(buffer, sizeof(buffer), "%u:%u", (U32)it.first, (U32)it.second);
+            snprintf(buffer, sizeof(buffer), ":%u", (U32)it.second);
+            frequentlyUsed += wstring_to_utf8str(it.first);
             frequentlyUsed += buffer;
             if (!--maxCount)
                 break;

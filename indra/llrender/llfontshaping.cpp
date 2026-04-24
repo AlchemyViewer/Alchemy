@@ -48,11 +48,14 @@ namespace
     struct ShapeCacheKey
     {
         std::u32string        codepoints;
-        const LLFontFreetype* face;
+        // The root face alone determines itemization (fallback chain) and
+        // therefore the shaped output for a given slice; per-codepoint face
+        // selection is deterministic downstream.
+        const LLFontFreetype* root_face;
 
         bool operator==(const ShapeCacheKey& o) const noexcept
         {
-            return face == o.face && codepoints == o.codepoints;
+            return root_face == o.root_face && codepoints == o.codepoints;
         }
     };
 
@@ -61,7 +64,7 @@ namespace
         size_t operator()(const ShapeCacheKey& k) const noexcept
         {
             size_t h = std::hash<std::u32string>{}(k.codepoints);
-            boost::hash_combine(h, k.face);
+            boost::hash_combine(h, k.root_face);
             return h;
         }
     };
@@ -79,22 +82,30 @@ namespace
     ShapeLru   sShapeLru;
     ShapeIndex sShapeIndex;
 
-    // Shape a new run into `out_glyphs`. Clusters are written in
-    // slice-local coordinates (0..len) so the result can be cached and
-    // later rebased for any caller.
-    void shape_fresh(const LLFontFreetype*            face,
-                     hb_font_t*                       hb_font,
-                     const LLWString&                 wstr,
-                     size_t                           begin,
-                     size_t                           end,
-                     std::vector<LLShapedGlyph>&      out_glyphs)
+    // Shape a single sub-run through its owning face and append the
+    // resulting glyphs to `out_glyphs`. Clusters are written in wstr
+    // coordinates relative to `sub_begin_in_slice` — i.e. local to the
+    // cached slice, not the original caller's wstr — so the cache can
+    // rebase them at copy-out time. Reserves/destroys its own hb_buffer.
+    void shape_sub_run(const LLFontFreetype*        face,
+                       const LLWString&             slice,
+                       size_t                       sub_begin_in_slice,
+                       size_t                       sub_end_in_slice,
+                       std::vector<LLShapedGlyph>&  out_glyphs)
     {
+        if (!face || sub_begin_in_slice >= sub_end_in_slice)
+            return;
+        hb_font_t* hb_font = face->getHbFont();
+        if (!hb_font)
+            return;
         hb_buffer_t* buf = hb_buffer_create();
         if (!buf)
             return;
 
-        const uint32_t* codepoints = reinterpret_cast<const uint32_t*>(wstr.data() + begin);
-        const int       len        = static_cast<int>(end - begin);
+        const uint32_t* codepoints = reinterpret_cast<const uint32_t*>(slice.data() + sub_begin_in_slice);
+        const int       len        = static_cast<int>(sub_end_in_slice - sub_begin_in_slice);
+        // offset=0 so HB cluster values come back local to this sub-run;
+        // we rebase below to the slice's coordinate system.
         hb_buffer_add_utf32(buf, codepoints, len, 0, len);
 
         hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
@@ -107,14 +118,15 @@ namespace
         const hb_glyph_info_t*     infos     = hb_buffer_get_glyph_infos(buf, &glyph_count);
         const hb_glyph_position_t* positions = hb_buffer_get_glyph_positions(buf, &glyph_count);
 
-        out_glyphs.reserve(glyph_count);
+        out_glyphs.reserve(out_glyphs.size() + glyph_count);
         constexpr F32 INV_64 = 1.f / 64.f;
+        const S32 cluster_base = static_cast<S32>(sub_begin_in_slice);
         for (unsigned int i = 0; i < glyph_count; ++i)
         {
             LLShapedGlyph sg;
             sg.face      = face;
             sg.glyph_id  = infos[i].codepoint;
-            sg.cluster   = static_cast<S32>(infos[i].cluster);  // slice-local
+            sg.cluster   = cluster_base + static_cast<S32>(infos[i].cluster);
             sg.x_advance = positions[i].x_advance * INV_64;
             sg.y_advance = positions[i].y_advance * INV_64;
             sg.x_offset  = positions[i].x_offset  * INV_64;
@@ -123,6 +135,39 @@ namespace
         }
 
         hb_buffer_destroy(buf);
+    }
+
+    // Itemize [begin, end) into contiguous sub-runs whose codepoints share
+    // the same owning face (as chosen by selectShapingFace). This is what
+    // lets a keycap like 8️⃣ succeed: '8' lives in the root face while
+    // U+FE0F and U+20E3 live in the emoji face, and each needs its own
+    // hb_shape pass on the face that actually carries its glyphs.
+    void shape_all_sub_runs(const LLFontFreetype* root_face,
+                            const LLWString&      slice,
+                            std::vector<LLShapedGlyph>& out_glyphs)
+    {
+        const size_t n = slice.size();
+        if (!root_face || n == 0)
+            return;
+
+        const LLFontFreetype* cur_face = nullptr;
+        size_t                cur_begin = 0;
+        for (size_t i = 0; i < n; ++i)
+        {
+            U32 unused = 0;
+            const LLFontFreetype* face = root_face->selectShapingFace(slice[i], unused);
+            if (!face)
+                face = root_face; // selectShapingFace never returns null, but defensive
+            if (face != cur_face)
+            {
+                if (cur_face != nullptr)
+                    shape_sub_run(cur_face, slice, cur_begin, i, out_glyphs);
+                cur_face = face;
+                cur_begin = i;
+            }
+        }
+        if (cur_face != nullptr)
+            shape_sub_run(cur_face, slice, cur_begin, n, out_glyphs);
     }
 }
 
@@ -137,21 +182,15 @@ void LLFontShaping::shapeRun(const LLFontFreetype* root_face,
     if (!root_face || begin >= end || end > wstr.size())
         return;
 
-    U32 base_glyph = 0; // Unused here; selectShapingFace returns it as a side effect.
-    const LLFontFreetype* face = root_face->selectShapingFace(wstr[begin], base_glyph);
-    if (!face)
-        return;
-
-    // Build the cache key. Copying the slice into a u32string is cheap for
-    // the sizes we see (shaping runs are typically 2-7 codepoints).
+    // Build the cache key from the slice + root face. Itemization is
+    // deterministic given (slice, root_face), so no need to encode the
+    // per-codepoint face chain explicitly.
     ShapeCacheKey key;
     key.codepoints.assign(wstr.data() + begin, wstr.data() + end);
-    key.face = face;
+    key.root_face = root_face;
 
     if (auto it = sShapeIndex.find(key); it != sShapeIndex.end())
     {
-        // Hit: splice to front for LRU, copy out with clusters rebased to
-        // the caller's wstr coordinates.
         sShapeLru.splice(sShapeLru.begin(), sShapeLru, it->second);
         const auto& cached = it->second->second;
         out_glyphs.reserve(cached.size());
@@ -165,13 +204,11 @@ void LLFontShaping::shapeRun(const LLFontFreetype* root_face,
         return;
     }
 
-    // Miss: shape, insert, then copy out. shape_fresh may leave out_glyphs
-    // empty (hb_buffer_create failure or hb_font null) — we still cache
-    // empty results so we don't re-try the failure every frame.
-    hb_font_t* hb_font = face->getHbFont();
+    // Miss: itemize the slice into per-face sub-runs, shape each on its
+    // owning face, and concatenate the glyph streams. Empty results are
+    // cached so repeat misses don't re-shape on every frame.
     std::vector<LLShapedGlyph> shaped;
-    if (hb_font)
-        shape_fresh(face, hb_font, wstr, begin, end, shaped);
+    shape_all_sub_runs(root_face, key.codepoints, shaped);
 
     sShapeLru.emplace_front(std::move(key), std::move(shaped));
     sShapeIndex.emplace(sShapeLru.front().first, sShapeLru.begin());

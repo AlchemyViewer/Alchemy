@@ -118,10 +118,10 @@ void LLPanelEmojiComplete::draw()
 
     for (size_t curIdx = firstVisibleIdx; curIdx < lastVisibleIdx; curIdx++)
     {
-        LLWString text(1, mEmojis[curIdx].Character);
+        const LLWString& text = mEmojis[curIdx].Character;
         mIconFont->render(text, 0, iconCenterX, iconCenterY,
             LLColor4::white, LLFontGL::HCENTER, LLFontGL::VCENTER, LLFontGL::NORMAL,
-            LLFontGL::DROP_SHADOW_SOFT, 1);
+            LLFontGL::DROP_SHADOW_SOFT, static_cast<S32>(text.size()));
         if (mVertical)
         {
             const std::string& shortCode = mEmojis[curIdx].String;
@@ -283,7 +283,7 @@ void LLPanelEmojiComplete::onCommit()
 {
     if (mCurSelected < mTotalEmojis)
     {
-        LLSD value(wstring_to_utf8str(LLWString(1, mEmojis[mCurSelected].Character)));
+        LLSD value(wstring_to_utf8str(mEmojis[mCurSelected].Character));
         setValue(value);
         LLUICtrl::onCommit();
     }
@@ -302,12 +302,12 @@ void LLPanelEmojiComplete::reshape(S32 width, S32 height, bool called_from_paren
     }
 }
 
-void LLPanelEmojiComplete::setEmojis(const LLWString& emojis)
+void LLPanelEmojiComplete::setEmojis(const std::vector<LLWString>& emojis)
 {
     mEmojis.clear();
 
     auto& emoji2descr = LLEmojiDictionary::instance().getEmoji2Descr();
-    for (const llwchar& emoji : emojis)
+    for (const LLWString& emoji : emojis)
     {
         std::string shortCode;
         if (mVertical)
@@ -329,7 +329,7 @@ void LLPanelEmojiComplete::setEmojis(const LLWString& emojis)
 
 void LLPanelEmojiComplete::setEmojiHint(const std::string& hint)
 {
-    llwchar curEmoji = mCurSelected < mTotalEmojis ? mEmojis[mCurSelected].Character : 0;
+    const LLWString curEmoji = mCurSelected < mTotalEmojis ? mEmojis[mCurSelected].Character : LLWString();
 
     LLEmojiDictionary::instance().findByShortCode(mEmojis, hint);
     mTotalEmojis = mEmojis.size();

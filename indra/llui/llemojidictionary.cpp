@@ -138,9 +138,14 @@ void LLEmojiDictionary::initClass()
 
 LLWString LLEmojiDictionary::findMatchingEmojis(const std::string& needle) const
 {
+    // Each descriptor's Character is itself an LLWString (possibly several
+    // codepoints for ZWJ sequences). Concatenate them all into a single
+    // LLWString so the caller can render the match as a run of emoji.
     LLWString result;
-    boost::transform(mEmojis | boost::adaptors::filtered(emoji_filter_shortcode_or_category_contains(needle)),
-                     std::back_inserter(result), [](const auto& descr) { return descr.Character; });
+    for (const LLEmojiDescriptor& d : mEmojis | boost::adaptors::filtered(emoji_filter_shortcode_or_category_contains(needle)))
+    {
+        result += d.Character;
+    }
     return result;
 }
 
@@ -227,7 +232,7 @@ void LLEmojiDictionary::findByShortCode(
     }
 }
 
-const LLEmojiDescriptor* LLEmojiDictionary::getDescriptorFromEmoji(llwchar emoji) const
+const LLEmojiDescriptor* LLEmojiDictionary::getDescriptorFromEmoji(const LLWString& emoji) const
 {
     const auto it = mEmoji2Descr.find(emoji);
     return (mEmoji2Descr.end() != it) ? it->second : nullptr;
@@ -239,9 +244,9 @@ const LLEmojiDescriptor* LLEmojiDictionary::getDescriptorFromShortCode(const std
     return (mShortCode2Descr.end() != it) ? it->second : nullptr;
 }
 
-std::string LLEmojiDictionary::getNameFromEmoji(llwchar ch) const
+std::string LLEmojiDictionary::getNameFromEmoji(const LLWString& emoji) const
 {
-    const auto it = mEmoji2Descr.find(ch);
+    const auto it = mEmoji2Descr.find(emoji);
     return (mEmoji2Descr.end() != it) ? it->second->ShortCodes.front() : LLStringUtil::null;
 }
 
@@ -250,7 +255,9 @@ bool LLEmojiDictionary::isEmoji(llwchar ch) const
     // Currently used codes: A9,AE,203C,2049,2122,...,2B55,3030,303D,3297,3299,1F004,...,1FAF6
     if (ch == 0xA9 || ch == 0xAE || (ch >= 0x2000 && ch < 0x3300) || (ch >= 0x1F000 && ch < 0x20000))
     {
-        return mEmoji2Descr.find(ch) != mEmoji2Descr.end();
+        // The dictionary is keyed by full LLWString sequences, so ask
+        // whether the single-codepoint emoji exists as its own entry.
+        return mEmoji2Descr.find(LLWString(1, ch)) != mEmoji2Descr.end();
     }
 
     return false;
@@ -337,7 +344,10 @@ void LLEmojiDictionary::loadGroups()
             // Add new group
             mGroups.emplace_back();
             LLEmojiGroup& group = mGroups.back();
-            group.Character = loadIcon(sd);
+            // Groups use a single-codepoint icon as a visual label; take the
+            // first codepoint if the source happens to be multi-codepoint.
+            const LLWString icon = loadIcon(sd);
+            group.Character = icon.empty() ? 0 : icon[0];
             group.Categories = loadCategories(sd);
             translateCategories(group.Categories);
 
@@ -384,8 +394,8 @@ void LLEmojiDictionary::loadEmojis()
     {
         const LLSD& sd = *it;
 
-        llwchar icon = loadIcon(sd);
-        if (!icon)
+        LLWString icon = loadIcon(sd);
+        if (icon.empty())
         {
             LL_WARNS() << "Skipping invalid emoji descriptor (no icon)" << LL_ENDL;
             continue;
@@ -429,7 +439,7 @@ void LLEmojiDictionary::loadEmojis()
         emoji.Category = category;
         emoji.ShortCodes = std::move(shortCodes);
 
-        mEmoji2Descr.insert(std::make_pair(icon, &emoji));
+        mEmoji2Descr.insert(std::make_pair(std::move(icon), &emoji));
         mCategory2Descrs[category].push_back(&emoji);
         for (const std::string& shortCode : emoji.ShortCodes)
         {
@@ -438,11 +448,13 @@ void LLEmojiDictionary::loadEmojis()
     }
 }
 
-llwchar LLEmojiDictionary::loadIcon(const LLSD& sd)
+LLWString LLEmojiDictionary::loadIcon(const LLSD& sd)
 {
-    // We don't currently support character composition
-    const LLWString icon = utf8str_to_wstring(sd["Character"].asString());
-    return (1 == icon.size()) ? icon[0] : L'\0';
+    // The Character field may be a single codepoint or a multi-codepoint
+    // sequence (ZWJ family, flag pair, keycap, tag subdivision). Return the
+    // whole LLWString; the caller decides whether only a single codepoint
+    // is acceptable (LLEmojiGroup icons collapse to the first).
+    return utf8str_to_wstring(sd["Character"].asString());
 }
 
 std::list<std::string> LLEmojiDictionary::loadCategories(const LLSD& sd)

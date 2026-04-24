@@ -705,8 +705,11 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
                             (F32)(sfgi->mWidth + sfgi->mXBearing) - sg.x_advance);
                     }
                     cur_x += sg.x_advance;
+                    // Round per shaped glyph to match render()'s pen motion,
+                    // so cursor positions and ellipsis cutoffs line up with
+                    // what's actually drawn.
+                    cur_x = (F32)ll_round(cur_x);
                 }
-                cur_x = (F32)ll_round(cur_x);
                 width_padding = run_padding;
                 i = (S32)run_range.second - 1;
                 continue;
@@ -1022,9 +1025,17 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
 
             if (!run_glyphs.empty())
             {
-                F32 run_advance = 0.f;
+                // Accumulate the rounded pen motion render() would produce
+                // (per-glyph ll_round), so cur_x stays pixel-consistent
+                // with the drawn output and clicks near cluster boundaries
+                // land on the same side they visually appear.
+                F32 run_end = cur_x;
                 for (const LLShapedGlyph& sg : run_glyphs)
-                    run_advance += sg.x_advance;
+                {
+                    run_end += sg.x_advance;
+                    run_end = (F32)ll_round(run_end);
+                }
+                const F32 run_advance = run_end - cur_x;
 
                 if (round)
                 {
@@ -1039,8 +1050,7 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
                 if (scaled_max_pixels < cur_x + run_advance)
                     break;
 
-                cur_x += run_advance;
-                cur_x = (F32)ll_round(cur_x);
+                cur_x = run_end;
                 pos = (S32)run_range.second - 1;  // loop's ++ lands past the run
                 next_glyph = NULL;
                 continue;

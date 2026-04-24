@@ -215,43 +215,27 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
 
     llassert(!mIsFallback);
 
-    // Root face first — cheapest path and by far the most common.
-    out_glyph_index = FT_Get_Char_Index(mFTFace, base);
-    if (out_glyph_index != 0)
-        return this;
-
     const size_t count = mFallbackFonts.size();
 
-    // Genuine emoji: try functor-guarded emoji fonts before anything else so
-    // the color font wins over a monochrome fallback that happens to have a
-    // glyph in the same range.
-    if (LLStringOps::isEmoji(base))
-    {
-        for (size_t i = 0; i < count; ++i)
-        {
-            const fallback_font_t& pair = mFallbackFonts[i];
-            if (!pair.second || !pair.second(base))
-                continue;
-            FT_UInt gi = FT_Get_Char_Index(pair.first->mFTFace, base);
-            if (gi)
-            {
-                out_glyph_index = gi;
-                return pair.first.get();
-            }
-        }
-    }
-
-    // Monochrome fallbacks next. Emoji-functor fonts get revisited afterwards
-    // without the functor guard.
-    std::vector<size_t> emoji_fonts_idx;
+    // Shaping runs are emoji presentation (the detector only flags
+    // sequences with ZWJ/VS16/skin-tone/keycap/tag/flag-pair), so try the
+    // emoji-functor fallbacks first, ignoring the functor gate. This is
+    // what gives:
+    //
+    //   * BMP pictographs like ❤ (U+2764) access to the emoji font's
+    //     composed ZWJ form (❤️‍🔥), which the root face's mono glyph
+    //     would otherwise steal.
+    //
+    //   * Keycap sequences (digit/#/* + FE0F + 20E3) the emoji font's
+    //     GSUB-composed keycap glyph. Routing keycaps through the root
+    //     face works for '8' but leaves U+20E3 as a notdef box because
+    //     text fonts generally don't carry it, and HarfBuzz can't shop
+    //     individual glyphs out to different faces mid-sequence.
     for (size_t i = 0; i < count; ++i)
     {
         const fallback_font_t& pair = mFallbackFonts[i];
-        if (pair.second)
-        {
-            emoji_fonts_idx.push_back(i);
+        if (!pair.second)
             continue;
-        }
         FT_UInt gi = FT_Get_Char_Index(pair.first->mFTFace, base);
         if (gi)
         {
@@ -260,9 +244,17 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
         }
     }
 
-    for (size_t idx : emoji_fonts_idx)
+    // No emoji fallback has the base — fall back to the root face.
+    out_glyph_index = FT_Get_Char_Index(mFTFace, base);
+    if (out_glyph_index != 0)
+        return this;
+
+    // Monochrome fallbacks.
+    for (size_t i = 0; i < count; ++i)
     {
-        const fallback_font_t& pair = mFallbackFonts[idx];
+        const fallback_font_t& pair = mFallbackFonts[i];
+        if (pair.second)
+            continue;
         FT_UInt gi = FT_Get_Char_Index(pair.first->mFTFace, base);
         if (gi)
         {

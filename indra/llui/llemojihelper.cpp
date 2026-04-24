@@ -44,9 +44,9 @@ constexpr S32 HELPER_FLOATER_OFFSET_Y = 0;
 // LLEmojiHelper
 //
 
-std::string LLEmojiHelper::getToolTip(llwchar ch) const
+std::string LLEmojiHelper::getToolTip(const LLWString& emoji) const
 {
-    return LLEmojiDictionary::instance().getNameFromEmoji(ch);
+    return LLEmojiDictionary::instance().getNameFromEmoji(emoji);
 }
 
 bool LLEmojiHelper::isActive(const LLUICtrl* ctrl_p) const
@@ -84,7 +84,7 @@ bool LLEmojiHelper::isCursorInEmojiCode(const LLWString& wtext, S32 cursorPos, S
     return isShortCode;
 }
 
-void LLEmojiHelper::showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, const std::string& short_code, std::function<void(llwchar)> cb)
+void LLEmojiHelper::showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, const std::string& short_code, std::function<void(const LLWString&)> cb)
 {
     // Commit immediately if the user already typed a full shortcode
     if (const auto* emojiDescrp = LLEmojiDictionary::instance().getDescriptorFromShortCode(short_code))
@@ -98,7 +98,10 @@ void LLEmojiHelper::showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, c
     {
         LLFloater* pHelperFloater = LLFloaterReg::getInstance(DEFAULT_EMOJI_HELPER_FLOATER);
         mHelperHandle = pHelperFloater->getHandle();
-        mHelperCommitConn = pHelperFloater->setCommitCallback(std::bind([&](const LLSD& sdValue) { onCommitEmoji(utf8str_to_wstring(sdValue.asStringRef())[0]); }, std::placeholders::_2));
+        // The picker serialises the chosen emoji as a UTF-8 string; decode
+        // the whole sequence rather than just the first codepoint so ZWJ
+        // families survive the callback.
+        mHelperCommitConn = pHelperFloater->setCommitCallback(std::bind([&](const LLSD& sdValue) { onCommitEmoji(utf8str_to_wstring(sdValue.asStringRef())); }, std::placeholders::_2));
         mHelperCloseConn = pHelperFloater->setCloseCallback([this](LLUICtrl* ctrl, const LLSD& param) { onCloseHelper(ctrl, param); });
     }
     setHostCtrl(hostctrl_p);
@@ -151,7 +154,7 @@ bool LLEmojiHelper::handleKey(const LLUICtrl* ctrl_p, KEY key, MASK mask)
     return mHelperHandle.get()->handleKey(key, mask, true);
 }
 
-void LLEmojiHelper::onCommitEmoji(llwchar emoji)
+void LLEmojiHelper::onCommitEmoji(const LLWString& emoji)
 {
     if (!mHostHandle.isDead() && mEmojiCommitCb)
     {

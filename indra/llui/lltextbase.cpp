@@ -4177,7 +4177,10 @@ bool LLEmojiTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
         LLWString emoji = getWText().substr(getStart(), getEnd() - getStart());
         if (!emoji.empty())
         {
-            mTooltip = LLEmojiHelper::instance().getToolTip(emoji[0]);
+            // Pass the whole emoji sequence so ZWJ families / flag pairs
+            // resolve to their composed shortcode name rather than the name
+            // of their first codepoint.
+            mTooltip = LLEmojiHelper::instance().getToolTip(emoji);
         }
     }
 

@@ -77,17 +77,20 @@ def process_folder(data_file, cldr_file, emojibase_file, messages_file, output_f
         if not short_code:
             short_code = cldr.get(hexcode)
 
-        if '-' in hexcode:
-            # Log unsupported multi-character emojis to the console
-            #print(f"Unsupported multi-character emoji '{hexcode}' with shortcode ':{short_code}:' in folder {folder_name}")
-            continue
-
         if not short_code:
-            print(f"Error: Shortcode not found for hexcode '{hexcode}' in folder {folder_name}")
+            # Multi-codepoint sequences (ZWJ families, tag subdivision flags,
+            # etc.) are common to not have a shortcode in the default
+            # emojibase/cldr data we consume — skip quietly. Single-codepoint
+            # entries without a shortcode remain a signal-bearing error
+            # because they indicate missing data we ought to fix.
+            if '-' not in hexcode:
+                print(f"Error: Shortcode not found for hexcode '{hexcode}' in folder {folder_name}")
             continue
 
-        # Convert hexcode to Unicode character
-        character = chr(int(hexcode, 16))
+        # Convert hexcode to the Unicode character(s). Single codepoints come
+        # through as "1F680"; multi-codepoint emoji (ZWJ sequences, flag
+        # pairs, keycap, tag subdivisions) as "1F468-200D-1F469-200D-1F467".
+        character = ''.join(chr(int(part, 16)) for part in hexcode.split('-'))
 
         # Get categories from groups and subgroups if they exist
         group = next((g['message'] for g in groups if item.get('group') is not None and g['order'] == item['group']), '')

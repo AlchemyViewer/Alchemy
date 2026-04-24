@@ -768,17 +768,27 @@ void LLTextEditor::setSelectAllOnFocusReceived(bool b)
     mSelectAllOnFocusReceived = b;
 }
 
-void LLTextEditor::insertEmoji(llwchar emoji)
+void LLTextEditor::insertEmoji(const LLWString& emoji)
 {
-    LL_INFOS() << "LLTextEditor::insertEmoji(" << wchar_utf8_preview(emoji) << ")" << LL_ENDL;
+    if (emoji.empty())
+        return;
+    LL_INFOS() << "LLTextEditor::insertEmoji(" << wchar_utf8_preview(emoji[0])
+               << (emoji.size() > 1 ? " +" : "")
+               << (emoji.size() > 1 ? std::to_string(emoji.size() - 1) : std::string())
+               << ")" << LL_ENDL;
     auto styleParams = LLStyle::Params();
     styleParams.font = LLFontGL::getFontEmojiLarge();
-    auto segment = new LLEmojiTextSegment(new LLStyle(styleParams), mCursorPos, mCursorPos + 1, *this);
-    insert(mCursorPos, LLWString(1, emoji), false, segment);
-    setCursorPos(mCursorPos + 1);
+    // Emoji segment spans the full cluster so LLFontGL::render sees the
+    // whole ZWJ/flag/keycap/tag sequence in one call and shapes it through
+    // HarfBuzz. Without a full-cluster segment the render path falls back
+    // to 1:1 codepoint lookup and breaks the composed glyph.
+    const S32 span = static_cast<S32>(emoji.size());
+    auto segment = new LLEmojiTextSegment(new LLStyle(styleParams), mCursorPos, mCursorPos + span, *this);
+    insert(mCursorPos, emoji, false, segment);
+    setCursorPos(mCursorPos + span);
 }
 
-void LLTextEditor::handleEmojiCommit(llwchar emoji)
+void LLTextEditor::handleEmojiCommit(const LLWString& emoji)
 {
     S32 shortCodePos;
     if (LLEmojiHelper::isCursorInEmojiCode(getWText(), mCursorPos, &shortCodePos))
@@ -1339,7 +1349,7 @@ void LLTextEditor::showEmojiHelper()
         return;
 
     const LLRect cursorRect(getLocalRectFromDocIndex(mCursorPos));
-    auto cb = [this](llwchar emoji) { insertEmoji(emoji); };
+    auto cb = [this](const LLWString& emoji) { insertEmoji(emoji); };
     LLEmojiHelper::instance().showHelper(this, cursorRect.mLeft, cursorRect.mTop, LLStringUtil::null, cb);
 }
 
@@ -1363,7 +1373,7 @@ void LLTextEditor::tryToShowEmojiHelper()
         const LLRect cursorRect(getLocalRectFromDocIndex(shortCodePos));
         const LLWString wpart(wtext.substr(shortCodePos, mCursorPos - shortCodePos));
         const std::string part(wstring_to_utf8str(wpart));
-        auto cb = [this](llwchar emoji) { handleEmojiCommit(emoji); };
+        auto cb = [this](const LLWString& emoji) { handleEmojiCommit(emoji); };
         LLEmojiHelper::instance().showHelper(this, cursorRect.mLeft, cursorRect.mTop, part, cb);
     }
     else

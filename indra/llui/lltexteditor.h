@@ -92,8 +92,8 @@ public:
 
     static S32      spacesPerTab();
 
-    void    insertEmoji(llwchar emoji);
-    void    handleEmojiCommit(llwchar emoji);
+    void    insertEmoji(const LLWString& emoji);
+    void    handleEmojiCommit(const LLWString& emoji);
 
     void handleMentionCommit(std::string name_url);
 

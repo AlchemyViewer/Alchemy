@@ -561,7 +561,7 @@ void LLFloaterIMSessionTab::onEmojiPickerClosed()
 
 void LLFloaterIMSessionTab::initEmojiRecentPanel()
 {
-    std::list<llwchar>& recentlyUsed = LLFloaterEmojiPicker::getRecentlyUsed();
+    std::list<LLWString>& recentlyUsed = LLFloaterEmojiPicker::getRecentlyUsed();
     if (recentlyUsed.empty())
     {
         mEmojiRecentEmptyText->setVisible(true);
@@ -569,11 +569,10 @@ void LLFloaterIMSessionTab::initEmojiRecentPanel()
     }
     else
     {
-        LLWString emojis;
-        for (llwchar emoji : recentlyUsed)
-        {
-            emojis += emoji;
-        }
+        // Pass as a list-of-clusters so setEmojis can keep ZWJ sequences
+        // intact. A single concatenated LLWString would collapse the groups
+        // back into ambiguous codepoints.
+        std::vector<LLWString> emojis(recentlyUsed.begin(), recentlyUsed.end());
         mEmojiRecentIconsCtrl->setEmojis(emojis);
         mEmojiRecentEmptyText->setVisible(false);
         mEmojiRecentContainer->setVisible(true);
@@ -600,8 +599,8 @@ void LLFloaterIMSessionTab::onRecentEmojiPicked(const LLSD& value)
         LLWString wstr = utf8string_to_wstring(str);
         if (wstr.size())
         {
-            llwchar emoji = wstr[0];
-            mInputEditor->insertEmoji(emoji);
+            // Whole wstr so ZWJ / flag / keycap / tag clusters stay together.
+            mInputEditor->insertEmoji(wstr);
         }
     }
 }
@@ -676,13 +675,31 @@ void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
     llassert_always(dictionary);
 
     bool emojiSent = false;
-    for (const llwchar& c : text)
+
+    // Walk shaping runs first: each run is a multi-codepoint cluster
+    // (ZWJ family, flag pair, keycap, tag subdivision) that must be
+    // recorded as a single emoji. Codepoints outside any shaping run are
+    // handled with the single-codepoint path below.
+    const auto runs = wstring_find_shaping_runs(text);
+    auto next_run = runs.begin();
+    for (size_t i = 0; i < text.size(); )
     {
-        if (dictionary->isEmoji(c))
+        if (next_run != runs.end() && next_run->first == i)
         {
-            LLFloaterEmojiPicker::onEmojiUsed(c);
+            LLFloaterEmojiPicker::onEmojiUsed(LLWString(text.data() + next_run->first,
+                                                        next_run->second - next_run->first));
+            emojiSent = true;
+            i = next_run->second;
+            ++next_run;
+            continue;
+        }
+
+        if (dictionary->isEmoji(text[i]))
+        {
+            LLFloaterEmojiPicker::onEmojiUsed(LLWString(1, text[i]));
             emojiSent = true;
         }
+        ++i;
     }
 
     if (!emojiSent)

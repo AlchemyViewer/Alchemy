@@ -51,8 +51,8 @@ public:
 
     void hideFloater() const;
 
-    static std::list<llwchar>& getRecentlyUsed();
-    static void onEmojiUsed(llwchar emoji);
+    static std::list<LLWString>& getRecentlyUsed();
+    static void onEmojiUsed(const LLWString& emoji);
 
     static void loadState();
     static void saveState();
