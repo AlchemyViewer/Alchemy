@@ -4488,11 +4488,11 @@ bool LLWindowWin32::handleImeRequests(WPARAM request, LPARAM param, LRESULT *res
                         LLWinImm::releaseContext(mWindowHandle, himc);
                         if (adjusted)
                         {
-                            const llutf16string & text_utf16 = wstring_to_utf16str(context);
+                            const std::wstring text_utf16 = ll_convert<std::wstring>(context);
                             const S32 new_preedit_start = reconvert_string->dwCompStrOffset / sizeof(WCHAR);
                             const S32 new_preedit_end = new_preedit_start + reconvert_string->dwCompStrLen;
-                            select = utf16str_wstring_length(text_utf16, new_preedit_start);
-                            select_length = utf16str_wstring_length(text_utf16, new_preedit_end) - select;
+                            select = wide_wstring_length(text_utf16, new_preedit_start);
+                            select_length = wide_wstring_length(text_utf16, new_preedit_end) - select;
                             select += context_offset;
                         }
                     }

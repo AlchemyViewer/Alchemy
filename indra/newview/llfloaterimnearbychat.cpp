@@ -972,7 +972,7 @@ LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* 
         // Move the pointer forward to the first non-whitespace char
         // Check isspace before looping, so we can handle "/33foo"
         // as well as "/33 foo"
-        while(c && iswspace(c))
+        while(c && LLStringOps::isSpace(c))
         {
             c = mesg[pos+1];
             pos++;

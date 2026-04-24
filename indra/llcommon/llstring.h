@@ -168,31 +168,31 @@ public:
     static std::string sPM;
 
     static char toUpper(char elem) { return toupper((unsigned char)elem); }
-    static llwchar toUpper(llwchar elem) { return towupper(elem); }
+    static llwchar toUpper(llwchar elem) { return towupper(static_cast<wint_t>(elem)); }
 
     static char toLower(char elem) { return tolower((unsigned char)elem); }
-    static llwchar toLower(llwchar elem) { return towlower(elem); }
+    static llwchar toLower(llwchar elem) { return towlower(static_cast<wint_t>(elem)); }
 
     static bool isSpace(char elem) { return isspace((unsigned char)elem) != 0; }
-    static bool isSpace(llwchar elem) { return iswspace(elem) != 0; }
+    static bool isSpace(llwchar elem) { return iswspace(static_cast<wint_t>(elem)) != 0; }
 
     static bool isUpper(char elem) { return isupper((unsigned char)elem) != 0; }
-    static bool isUpper(llwchar elem) { return iswupper(elem) != 0; }
+    static bool isUpper(llwchar elem) { return iswupper(static_cast<wint_t>(elem)) != 0; }
 
     static bool isLower(char elem) { return islower((unsigned char)elem) != 0; }
-    static bool isLower(llwchar elem) { return iswlower(elem) != 0; }
+    static bool isLower(llwchar elem) { return iswlower(static_cast<wint_t>(elem)) != 0; }
 
     static bool isDigit(char a) { return isdigit((unsigned char)a) != 0; }
-    static bool isDigit(llwchar a) { return iswdigit(a) != 0; }
+    static bool isDigit(llwchar a) { return iswdigit(static_cast<wint_t>(a)) != 0; }
 
     static bool isPunct(char a) { return ispunct((unsigned char)a) != 0; }
-    static bool isPunct(llwchar a) { return iswpunct(a) != 0; }
+    static bool isPunct(llwchar a) { return iswpunct(static_cast<wint_t>(a)) != 0; }
 
     static bool isAlpha(char a) { return isalpha((unsigned char)a) != 0; }
-    static bool isAlpha(llwchar a) { return iswalpha(a) != 0; }
+    static bool isAlpha(llwchar a) { return iswalpha(static_cast<wint_t>(a)) != 0; }
 
     static bool isAlnum(char a) { return isalnum((unsigned char)a) != 0; }
-    static bool isAlnum(llwchar a) { return iswalnum(a) != 0; }
+    static bool isAlnum(llwchar a) { return iswalnum(static_cast<wint_t>(a)) != 0; }
 
     // Returns true when 'a' corresponds to a "genuine" emoji. HB
     static bool isEmoji(llwchar a);
@@ -459,8 +459,8 @@ template<class T> std::string LLStringUtilBase<T>::sLocale;
 
 typedef LLStringUtilBase<char> LLStringUtil;
 typedef LLStringUtilBase<llwchar> LLWStringUtil;
-typedef std::basic_string<llwchar> LLWString;
-typedef std::basic_string_view<llwchar> LLWStringView;
+typedef std::u32string LLWString;
+typedef std::u32string_view LLWStringView;
 
 //@ Use this where we want to disallow input in the form of "foo"
 //  This is used to catch places where english text is embedded in the code
@@ -625,59 +625,11 @@ LL_COMMON_API std::string rawstr_to_utf8(const std::string& raw);
 // the Windows APIs we want to call are all defined in terms of wchar_t*
 // (or worse, LPCTSTR).
 // https://docs.microsoft.com/en-us/windows/desktop/winprog/windows-data-types
+typedef std::u16string llutf16string;
 
-// While there is no point coding for an ASCII-only world (! defined(UNICODE)),
-// use of U16 and llutf16string for Windows APIs locks in /Zc:wchar_t-. Going
-// forward, we should code in terms of wchar_t and std::wstring so as to
-// support either setting of /Zc:wchar_t.
-
-// The first link above states that char can be used to hold ASCII or any
-// multi-byte character set, and distinguishes wchar_t (UTF-16LE), char16_t
-// (UTF-16) and char32_t (UTF-32). Nonetheless, within this code base:
-// * char and std::string always hold UTF-8 (of which ASCII is a subset). It
-//   is a BUG if they are used to pass strings in any other multi-byte
-//   encoding.
-// * wchar_t and std::wstring should be our interface to Windows wide-string
-//   APIs, and therefore hold UTF-16LE.
-// * U16 and llutf16string are the previous but DEPRECATED UTF-16LE type. Do
-//   not introduce new uses of U16 or llutf16string for string data.
-// * llwchar and LLWString hold UTF-32 strings.
-// * Do not introduce char16_t or std::u16string.
-// * Do not introduce char32_t or std::u32string.
-//
-// This typedef may or may not be identical to std::wstring, depending on
-// LL_WCHAR_T_NATIVE.
-typedef std::basic_string<U16> llutf16string;
-
-// Considering wchar_t, llwchar and U16, there are three relevant cases:
-#if LLWCHAR_IS_WCHAR_T         // every which way but Windows
-// llwchar is identical to wchar_t, LLWString is identical to std::wstring.
-// U16 is distinct, llutf16string is distinct (though pretty useless).
-// Given conversions to/from LLWString and to/from llutf16string, conversions
-// involving std::wstring would collide.
-#define ll_convert_wstr_alias(TO, FROM, EXPR) // nothing
-// but we can define conversions involving llutf16string without collisions
-#define  ll_convert_u16_alias(TO, FROM, EXPR) ll_convert_alias(TO, FROM, EXPR)
-
-#elif defined(LL_WCHAR_T_NATIVE)    // Windows, either clang or MS /Zc:wchar_t
-// llwchar (32-bit), wchar_t (16-bit) and U16 are all different types.
-// Conversions to/from LLWString, to/from std::wstring and to/from llutf16string
-// can all be defined.
-#define ll_convert_wstr_alias(TO, FROM, EXPR) ll_convert_alias(TO, FROM, EXPR)
-#define  ll_convert_u16_alias(TO, FROM, EXPR) ll_convert_alias(TO, FROM, EXPR)
-
-#else  // ! LL_WCHAR_T_NATIVE: Windows with MS /Zc:wchar_t-
-// wchar_t is identical to U16, std::wstring is identical to llutf16string.
-// Given conversions to/from LLWString and to/from std::wstring, conversions
-// involving llutf16string would collide.
-#define  ll_convert_u16_alias(TO, FROM, EXPR) // nothing
-// but we can define conversions involving std::wstring without collisions
-#define ll_convert_wstr_alias(TO, FROM, EXPR) ll_convert_alias(TO, FROM, EXPR)
-#endif
-
-ll_convert_forms(ll_convert_u16_alias, LLWString,     llutf16string, utf16str_to_wstring);
-ll_convert_forms(ll_convert_u16_alias, llutf16string, LLWString,     wstring_to_utf16str);
-ll_convert_forms(ll_convert_u16_alias, llutf16string, std::string,   utf8str_to_utf16str);
+ll_convert_forms(ll_convert_alias, LLWString, llutf16string, utf16str_to_wstring);
+ll_convert_forms(ll_convert_alias, llutf16string, LLWString, wstring_to_utf16str);
+ll_convert_forms(ll_convert_alias, llutf16string, std::string, utf8str_to_utf16str);
 ll_convert_forms(ll_convert_alias,     LLWString,     std::string,   utf8str_to_wstring);
 
 // Same function, better name. JC
@@ -686,7 +638,7 @@ inline LLWString utf8string_to_wstring(const std::string& utf8_string) { return 
 LL_COMMON_API std::ptrdiff_t wchar_to_utf8chars(llwchar inchar, char* outchars);
 
 ll_convert_forms(ll_convert_alias,     std::string, LLWString,     wstring_to_utf8str);
-ll_convert_forms(ll_convert_u16_alias, std::string, llutf16string, utf16str_to_utf8str);
+ll_convert_forms(ll_convert_alias, std::string, llutf16string, utf16str_to_utf8str);
 
 // an older alias for utf16str_to_utf8str(llutf16string)
 inline std::string wstring_to_utf8str(const llutf16string &utf16str) { return utf16str_to_utf8str(utf16str);}
@@ -704,9 +656,6 @@ LL_COMMON_API S32 wchar_utf8_length(const llwchar wc);
 LL_COMMON_API std::string wchar_utf8_preview(const llwchar wc);
 
 LL_COMMON_API std::string utf8str_tolower(const std::string& utf8str);
-
-// Length in llwchar (UTF-32) of the first len units (16 bits) of the given UTF-16 string.
-LL_COMMON_API S32 utf16str_wstring_length(const llutf16string &utf16str, S32 len);
 
 // Length in utf16string (UTF-16) of wlen wchars beginning at woffset.
 LL_COMMON_API S32 wstring_utf16_length(const LLWString & wstr, S32 woffset, S32 wlen);
@@ -821,10 +770,10 @@ inline auto longname(const INSTR& in)                               \
 aliasmacro(OUTSTR, INSTR, longname(in));                            \
 aliasmacro(OUTSTR, const INSTR::value_type*, longname(in))
 
-ll_convert_cp_forms(ll_convert_wstr_alias, std::string,  std::wstring, ll_convert_wide_to_string);
-ll_convert_cp_forms(ll_convert_wstr_alias, std::wstring, std::string,  ll_convert_string_to_wide);
-   ll_convert_forms(ll_convert_wstr_alias, LLWString,    std::wstring, ll_convert_wide_to_wstring);
-   ll_convert_forms(ll_convert_wstr_alias, std::wstring, LLWString,    ll_convert_wstring_to_wide);
+ll_convert_cp_forms(ll_convert_alias, std::string, std::wstring, ll_convert_wide_to_string);
+ll_convert_cp_forms(ll_convert_alias, std::wstring, std::string, ll_convert_string_to_wide);
+ll_convert_forms(ll_convert_alias, LLWString, std::wstring, ll_convert_wide_to_wstring);
+ll_convert_forms(ll_convert_alias, std::wstring, LLWString, ll_convert_wstring_to_wide);
 
 /**
  * Converts incoming string into utf8 string
@@ -861,6 +810,8 @@ STRING windows_message() { return windows_message<STRING>(windows_get_last_error
 //@}
 
 LL_COMMON_API std::optional<std::wstring> llstring_getoptenv(const std::string& key);
+
+LL_COMMON_API S32 wide_wstring_length(const std::wstring& utf16str, const S32 utf16_len);
 
 #else // ! LL_WINDOWS
 
@@ -2112,8 +2063,6 @@ void LLStringUtilBase<T>::truncate(string_type& string, size_type count)
 // we're done with them: we don't need them to bleed into the consuming source
 // file.
 #undef ll_convert_alias
-#undef ll_convert_u16_alias
-#undef ll_convert_wstr_alias
 #undef LL_CONVERT_COPY_CHARS
 #undef ll_convert_forms
 #undef ll_convert_cp_forms

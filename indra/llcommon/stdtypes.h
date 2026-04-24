@@ -48,24 +48,8 @@ typedef long long unsigned int  U64;
 // (ssize_t is provided by SOME compilers, don't collide)
 typedef typename std::make_signed<std::size_t>::type llssize;
 
-#if LL_WINDOWS
-// https://docs.microsoft.com/en-us/cpp/build/reference/zc-wchar-t-wchar-t-is-native-type
-// https://docs.microsoft.com/en-us/cpp/cpp/fundamental-types-cpp
-// Windows wchar_t is 16-bit, whichever way /Zc:wchar_t is set. In effect,
-// Windows wchar_t is always a typedef, either for unsigned short or __wchar_t.
-// (__wchar_t, available either way, is Microsoft's native 2-byte wchar_t type.)
-// The version of clang available with VS 2019 also defines wchar_t as __wchar_t
-// which is also 16 bits.
-// In any case, llwchar should be a UTF-32 type.
-typedef U32                 llwchar;
-#else
-typedef wchar_t             llwchar;
-// What we'd actually want is a simple module-scope 'if constexpr' to test
-// std::is_same<wchar_t, llwchar>::value and use that to define, or not
-// define, string conversion specializations. Since we don't have that, we'll
-// have to rely on #if instead. Sorry, Dr. Stroustrup.
-#define LLWCHAR_IS_WCHAR_T 1
-#endif
+// llwchar should be a UTF-32 type.
+typedef char32_t            llwchar;
 
 typedef float               F32;
 typedef double              F64;

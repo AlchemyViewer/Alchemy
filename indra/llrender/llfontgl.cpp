@@ -624,7 +624,7 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
 
         if (in_word)
         {
-            if (iswspace(wch))
+            if (LLStringOps::isSpace(wch))
             {
                 if(wch !=(0x00A0))
                 {
@@ -633,7 +633,7 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
             }
             if (iswindividual(wch))
             {
-                if (iswpunct(wchars[i+1]))
+                if (LLStringOps::isPunct(wchars[i+1]))
                 {
                     in_word=true;
                 }
@@ -647,7 +647,7 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
         else
         {
             start_of_last_word = i;
-            if (!iswspace(wch)||!iswindividual(wch))
+            if (!LLStringOps::isSpace(wch) || !iswindividual(wch))
             {
                 in_word = true;
             }

@@ -1362,7 +1362,7 @@ bool LLFolderView::handleUnicodeCharHere(llwchar uni_char)
         mSearchTimer.reset();
         if (mSearchString.size() < 128)
         {
-            mSearchString += uni_char;
+            mSearchString += (char)uni_char;
         }
         search(getCurSelectedItem(), mSearchString, false);
 

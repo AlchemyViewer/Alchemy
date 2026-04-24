@@ -528,7 +528,7 @@ void LLKeywords::collectSegmentOps(segment_ops_t& ops, const LLWString& wtext, b
             }
 
             // Skip white space
-            while( *cur && iswspace(*cur) && (*cur != '\n')  )
+            while( *cur && LLStringOps::isSpace(*cur) && (*cur != '\n')  )
             {
                 cur++;
             }
@@ -572,7 +572,7 @@ void LLKeywords::collectSegmentOps(segment_ops_t& ops, const LLWString& wtext, b
         }
 
         // Skip white space
-        while( *cur && iswspace(*cur) && (*cur != '\n')  )
+        while (*cur && LLStringOps::isSpace(*cur) && (*cur != '\n'))
         {
             cur++;
         }
@@ -755,14 +755,14 @@ void LLKeywords::collectSegmentOps(segment_ops_t& ops, const LLWString& wtext, b
 
             // check against words
             llwchar prev = cur > base ? *(cur-1) : 0;
-            if (!iswalnum(prev) && prev != '_' && prev != '.')
+            if (!LLStringOps::isAlnum(prev) && prev != '_' && prev != '.')
             {
                 const llwchar* word_start = cur;
                 S32 namespace_dots = 0;
                 const llwchar* last_dot = nullptr;
 
                 // Find the full extent of the word, potentially including namespace dots
-                while (iswalnum(*cur) || *cur == '_' || (mLuauLanguage && *cur == '.' && iswalnum(*(cur+1))))
+                while (LLStringOps::isAlnum(*cur) || *cur == '_' || (mLuauLanguage && *cur == '.' && LLStringOps::isAlnum(*(cur+1))))
                 {
                     if (mLuauLanguage && *cur == '.')
                     {

@@ -1055,7 +1055,7 @@ bool LLTextEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
 
             mSelectionEnd = mCursorPos;
         }
-        else if ((mCursorPos < (S32)text.length()) && !iswspace( text[mCursorPos]) )
+        else if ((mCursorPos < (S32)text.length()) && !LLStringOps::isSpace( text[mCursorPos]) )
         {
             // Select the character the cursor is over
             startSelection();

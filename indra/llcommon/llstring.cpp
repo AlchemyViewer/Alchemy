@@ -191,10 +191,10 @@ std::ptrdiff_t wchar_to_utf8chars(llwchar in_char, char* outchars)
     return outchars - base;
 }
 
-auto utf16chars_to_wchar(const U16* inchars, llwchar* outchar)
+auto utf16chars_to_wchar(const char16_t* inchars, llwchar* outchar)
 {
-    const U16* base = inchars;
-    U16 cur_char = *inchars++;
+    const char16_t* base = inchars;
+    char16_t cur_char = *inchars++;
     llwchar char32 = cur_char;
     if ((cur_char >= 0xD800) && (cur_char <= 0xDFFF))
     {
@@ -239,13 +239,13 @@ llutf16string utf8str_to_utf16str( const char* utf8str, size_t len )
     return wstring_to_utf16str ( wstr );
 }
 
-LLWString utf16str_to_wstring(const U16* utf16str, size_t len)
+LLWString utf16str_to_wstring(const char16_t* utf16str, size_t len)
 {
     LLWString wout;
     if (len == 0) return wout;
 
     S32 i = 0;
-    const U16* chars16 = utf16str;
+    const char16_t* chars16 = utf16str;
     while (i < len)
     {
         llwchar cur_char;
@@ -253,33 +253,6 @@ LLWString utf16str_to_wstring(const U16* utf16str, size_t len)
         wout += cur_char;
     }
     return wout;
-}
-
-// Length in llwchar (UTF-32) of the first len units (16 bits) of the given UTF-16 string.
-S32 utf16str_wstring_length(const llutf16string &utf16str, const S32 utf16_len)
-{
-    S32 surrogate_pairs = 0;
-    // ... craziness to make gcc happy (llutf16string.c_str() is tweaked on linux):
-    const U16 *const utf16_chars = &(*(utf16str.begin()));
-    S32 i = 0;
-    while (i < utf16_len)
-    {
-        const U16 c = utf16_chars[i++];
-        if (c >= 0xD800 && c <= 0xDBFF)     // See http://en.wikipedia.org/wiki/UTF-16
-        {   // Have first byte of a surrogate pair
-            if (i >= utf16_len)
-            {
-                break;
-            }
-            const U16 d = utf16_chars[i];
-            if (d >= 0xDC00 && d <= 0xDFFF)
-            {   // Have valid second byte of a surrogate pair
-                surrogate_pairs++;
-                i++;
-            }
-        }
-    }
-    return utf16_len - surrogate_pairs;
 }
 
 // Length in utf16string (UTF-16) of wlen wchars beginning at woffset.
@@ -500,7 +473,7 @@ std::string wstring_to_utf8str(const llwchar* utf32str, size_t len)
     return out;
 }
 
-std::string utf16str_to_utf8str(const U16* utf16str, size_t len)
+std::string utf16str_to_utf8str(const char16_t* utf16str, size_t len)
 {
     return wstring_to_utf8str(utf16str_to_wstring(utf16str, len));
 }
@@ -954,9 +927,9 @@ LLWString ll_convert_wide_to_wstring(const wchar_t* in, size_t len)
 {
     // Whether or not std::wstring and llutf16string are distinct types, they
     // both hold UTF-16LE characters. (See header file comments.) Pretend this
-    // wchar_t* sequence is really a U16* sequence and use the conversion we
-    // define above.
-    return utf16str_to_wstring(reinterpret_cast<const U16*>(in), len);
+    // wchar_t* sequence is really a char16_t* sequence and use the conversion
+    // we define above.
+    return utf16str_to_wstring(reinterpret_cast<const char16_t*>(in), len);
 }
 
 std::wstring ll_convert_wstring_to_wide(const llwchar* in, size_t len)
@@ -1064,6 +1037,33 @@ std::optional<std::wstring> llstring_getoptenv(const std::string& key)
     }
     // return empty std::optional
     return {};
+}
+
+// Length in llwchar (UTF-32) of the first len units (16 bits) of the given UTF-16 string.
+S32 wide_wstring_length(const std::wstring& utf16str, const S32 utf16_len)
+{
+    S32 surrogate_pairs = 0;
+    // ... craziness to make gcc happy (llutf16string.c_str() is tweaked on linux):
+    const wchar_t* const utf16_chars = &(*(utf16str.begin()));
+    S32                   i           = 0;
+    while (i < utf16_len)
+    {
+        const wchar_t c = utf16_chars[i++];
+        if (c >= 0xD800 && c <= 0xDBFF) // See http://en.wikipedia.org/wiki/UTF-16
+        {                               // Have first byte of a surrogate pair
+            if (i >= utf16_len)
+            {
+                break;
+            }
+            const U16 d = utf16_chars[i];
+            if (d >= 0xDC00 && d <= 0xDFFF)
+            { // Have valid second byte of a surrogate pair
+                surrogate_pairs++;
+                i++;
+            }
+        }
+    }
+    return utf16_len - surrogate_pairs;
 }
 
 #else  // ! LL_WINDOWS
