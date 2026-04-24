@@ -509,4 +509,337 @@ namespace tut
         ensure("compare_insensitive gt",
                utf8str_compare_insensitive("abd", "abc") > 0);
     }
+
+    // ---------------------------------------------------------------
+    //              ICU-backed LLStringOps classifiers
+    // ---------------------------------------------------------------
+
+    // u_isspace is POSIX-compatible: it includes U+0020, U+00A0 NO-BREAK SPACE
+    // and U+3000 IDEOGRAPHIC SPACE. Non-space code points (letters, ideographs)
+    // must return false.
+    template<> template<>
+    void llstring_utf_object_t::test<53>()
+    {
+        ensure("isSpace ' '",      LLStringOps::isSpace((llwchar)0x0020));
+        ensure("isSpace NBSP",     LLStringOps::isSpace((llwchar)0x00A0));
+        ensure("isSpace idspace",  LLStringOps::isSpace((llwchar)0x3000));
+        ensure("isSpace not 'A'", !LLStringOps::isSpace((llwchar)'A'));
+        ensure("isSpace not 日",   !LLStringOps::isSpace((llwchar)0x65E5));
+    }
+
+    // isUpper / isLower: ASCII plus the Deseret astral cased block. Before the
+    // ICU port these returned false for astrals (wint_t narrowed U+10400 to
+    // 0x0400 which is neither upper nor lower in the C locale).
+    template<> template<>
+    void llstring_utf_object_t::test<54>()
+    {
+        ensure("isUpper 'A'",         LLStringOps::isUpper((llwchar)'A'));
+        ensure("not isLower 'A'",    !LLStringOps::isLower((llwchar)'A'));
+        ensure("isLower 'a'",         LLStringOps::isLower((llwchar)'a'));
+        ensure("not isUpper 'a'",    !LLStringOps::isUpper((llwchar)'a'));
+        ensure("isUpper Deseret cap", LLStringOps::isUpper((llwchar)0x10400));
+        ensure("isLower Deseret sm",  LLStringOps::isLower((llwchar)0x10428));
+        ensure("not isUpper '5'",    !LLStringOps::isUpper((llwchar)'5'));
+        ensure("not isLower '5'",    !LLStringOps::isLower((llwchar)'5'));
+    }
+
+    // isDigit: Unicode General Category Nd. Includes ASCII and Arabic-Indic
+    // digit blocks. Letters and symbols are rejected.
+    template<> template<>
+    void llstring_utf_object_t::test<55>()
+    {
+        ensure("isDigit '5'",        LLStringOps::isDigit((llwchar)'5'));
+        ensure("isDigit ARAB-IND 0", LLStringOps::isDigit((llwchar)0x0660));
+        ensure("not isDigit 'a'",   !LLStringOps::isDigit((llwchar)'a'));
+        ensure("not isDigit 🚀",    !LLStringOps::isDigit((llwchar)0x1F680));
+    }
+
+    // isPunct: includes Unicode General Category P*. U+3002 IDEOGRAPHIC FULL
+    // STOP (Po) was missed by the old MSVC iswpunct path.
+    template<> template<>
+    void llstring_utf_object_t::test<56>()
+    {
+        ensure("isPunct '.'",         LLStringOps::isPunct((llwchar)'.'));
+        ensure("isPunct CJK stop",    LLStringOps::isPunct((llwchar)0x3002));
+        ensure("not isPunct 'A'",    !LLStringOps::isPunct((llwchar)'A'));
+        ensure("not isPunct '5'",    !LLStringOps::isPunct((llwchar)'5'));
+    }
+
+    // isAlpha / isAlnum: CJK ideographs and Deseret astrals are alphabetic,
+    // digits are alnum-but-not-alpha, punctuation is neither.
+    template<> template<>
+    void llstring_utf_object_t::test<57>()
+    {
+        ensure("isAlpha 'A'",         LLStringOps::isAlpha((llwchar)'A'));
+        ensure("isAlpha 日",          LLStringOps::isAlpha((llwchar)0x65E5));
+        ensure("isAlpha Deseret",     LLStringOps::isAlpha((llwchar)0x10400));
+        ensure("not isAlpha '5'",    !LLStringOps::isAlpha((llwchar)'5'));
+        ensure("not isAlpha '.'",    !LLStringOps::isAlpha((llwchar)'.'));
+
+        ensure("isAlnum 'A'",         LLStringOps::isAlnum((llwchar)'A'));
+        ensure("isAlnum '5'",         LLStringOps::isAlnum((llwchar)'5'));
+        ensure("isAlnum Deseret",     LLStringOps::isAlnum((llwchar)0x10400));
+        ensure("not isAlnum '.'",    !LLStringOps::isAlnum((llwchar)'.'));
+    }
+
+    // ---------------------------------------------------------------
+    //                         emoji helpers
+    // ---------------------------------------------------------------
+
+    // LLStringOps::isEmoji only accepts code points in the "genuine" emoji
+    // range U+1F000..U+1FFFF. Non-emoji symbols (©, ®) and BMP pictographs
+    // must not be classified as emoji.
+    template<> template<>
+    void llstring_utf_object_t::test<60>()
+    {
+        ensure("isEmoji rocket",       LLStringOps::isEmoji((llwchar)0x1F680));
+        ensure("isEmoji mahjong",      LLStringOps::isEmoji((llwchar)0x1F000));
+        ensure("not isEmoji 'A'",     !LLStringOps::isEmoji((llwchar)'A'));
+        ensure("not isEmoji ©",       !LLStringOps::isEmoji((llwchar)0x00A9));
+        ensure("not isEmoji CJK-Ext", !LLStringOps::isEmoji((llwchar)0x20000));
+    }
+
+    template<> template<>
+    void llstring_utf_object_t::test<61>()
+    {
+        const LLWString with_emoji = { (llwchar)'H', (llwchar)'i', (llwchar)0x1F680 };
+        const LLWString no_emoji   = { (llwchar)'H', (llwchar)'i', (llwchar)0x65E5 };
+        ensure("wstring_has_emoji yes", wstring_has_emoji(with_emoji));
+        ensure("wstring_has_emoji no", !wstring_has_emoji(no_emoji));
+        ensure("wstring_has_emoji empty", !wstring_has_emoji(LLWString()));
+    }
+
+    // wstring_remove_emojis must strip consecutive emojis without skipping
+    // the following code point (the implementation uses i-- after erase to
+    // re-check the new index).
+    template<> template<>
+    void llstring_utf_object_t::test<62>()
+    {
+        LLWString ws = { (llwchar)'H', (llwchar)0x1F680, (llwchar)0x1F681, (llwchar)'i' };
+        const LLWString expected = { (llwchar)'H', (llwchar)'i' };
+        ensure("remove_emojis returned true", wstring_remove_emojis(ws));
+        ensure_wstring_equals("consecutive emojis stripped", ws, expected);
+
+        LLWString none = { (llwchar)'H', (llwchar)'i' };
+        ensure("remove_emojis returned false", !wstring_remove_emojis(none));
+        ensure_wstring_equals("unchanged when no emojis", none, expected);
+    }
+
+    template<> template<>
+    void llstring_utf_object_t::test<63>()
+    {
+        std::string s = "Hi\xF0\x9F\x9A\x80" "!";
+        ensure("utf8str_remove_emojis found", utf8str_remove_emojis(s));
+        ensure_equals("utf8 stripped", s, std::string("Hi!"));
+
+        std::string clean = "Hello";
+        ensure("utf8str_remove_emojis clean", !utf8str_remove_emojis(clean));
+        ensure_equals("clean unchanged", clean, std::string("Hello"));
+    }
+
+    // ZWJ family (U+1F468 U+200D U+1F469 U+200D U+1F467) must strip as a
+    // single unit — the old implementation left the two ZWJ code points
+    // behind, producing visible tofu.
+    template<> template<>
+    void llstring_utf_object_t::test<64>()
+    {
+        LLWString ws = { (llwchar)'H',
+                         (llwchar)0x1F468, (llwchar)0x200D,
+                         (llwchar)0x1F469, (llwchar)0x200D,
+                         (llwchar)0x1F467,
+                         (llwchar)'i' };
+        const LLWString expected = { (llwchar)'H', (llwchar)'i' };
+        ensure("ZWJ family found", wstring_remove_emojis(ws));
+        ensure_wstring_equals("ZWJ family stripped", ws, expected);
+    }
+
+    // Skin-tone modifier (U+1F3FB..FF) must strip together with its base emoji.
+    template<> template<>
+    void llstring_utf_object_t::test<65>()
+    {
+        LLWString ws = { (llwchar)'M',
+                         (llwchar)0x1F468, (llwchar)0x1F3FB,
+                         (llwchar)'X' };
+        const LLWString expected = { (llwchar)'M', (llwchar)'X' };
+        ensure("skin tone found", wstring_remove_emojis(ws));
+        ensure_wstring_equals("skin tone stripped", ws, expected);
+    }
+
+    // Regional indicator flag (🇺🇸 = U+1F1FA U+1F1F8). Both code points are in
+    // the astral emoji range so both strip — the output must not leave a
+    // dangling half-flag indicator.
+    template<> template<>
+    void llstring_utf_object_t::test<66>()
+    {
+        LLWString ws = { (llwchar)0x1F1FA, (llwchar)0x1F1F8, (llwchar)'!' };
+        const LLWString expected = { (llwchar)'!' };
+        ensure("flag found", wstring_remove_emojis(ws));
+        ensure_wstring_equals("flag stripped", ws, expected);
+    }
+
+    // Trailing VS16 (U+FE0F) after an astral emoji must be consumed together
+    // with the base glyph.
+    template<> template<>
+    void llstring_utf_object_t::test<67>()
+    {
+        LLWString ws = { (llwchar)0x1F680, (llwchar)0xFE0F, (llwchar)'!' };
+        const LLWString expected = { (llwchar)'!' };
+        ensure("VS16 found", wstring_remove_emojis(ws));
+        ensure_wstring_equals("VS16 stripped with base", ws, expected);
+    }
+
+    // Bare ZWJ or VS16 (no adjacent emoji) are not emoji themselves and must
+    // be left intact — critical because ZWJ is used in Arabic/Indic shaping
+    // outside any emoji context.
+    template<> template<>
+    void llstring_utf_object_t::test<68>()
+    {
+        LLWString ws = { (llwchar)'a', (llwchar)0x200D, (llwchar)'b' };
+        const LLWString expected = ws;
+        ensure("bare ZWJ not found", !wstring_remove_emojis(ws));
+        ensure_wstring_equals("bare ZWJ preserved", ws, expected);
+    }
+
+    // Documented limits of the current strip: BMP emoji like ❤ (U+2764) fall
+    // outside LLStringOps::isEmoji's "genuine emoji" range (0x1F000..0x20000),
+    // so the heart + VS16 pair survives unchanged. Widening isEmoji would
+    // affect UI callers (font fallback, !mAllowEmoji filter) and is out of
+    // scope for the ZWJ-sequence fix.
+    template<> template<>
+    void llstring_utf_object_t::test<69>()
+    {
+        LLWString ws = { (llwchar)0x2764, (llwchar)0xFE0F };
+        const LLWString expected = ws;
+        ensure("BMP heart not considered emoji", !wstring_remove_emojis(ws));
+        ensure_wstring_equals("BMP heart preserved", ws, expected);
+    }
+
+    // ---------------------------------------------------------------
+    //                     utf8str helper smoke pins
+    // ---------------------------------------------------------------
+
+    // utf8str_substChar replaces every occurrence of a code point (incl.
+    // astrals) with another code point, routing through LLWString so the
+    // byte-length change is handled for us.
+    template<> template<>
+    void llstring_utf_object_t::test<70>()
+    {
+        const std::string in  = "A\xF0\x9F\x9A\x80" "B\xF0\x9F\x9A\x80" "C";
+        const std::string out = utf8str_substChar(in, (llwchar)0x1F680, (llwchar)'X');
+        ensure_equals("substChar astral -> ASCII", out, std::string("AXBXC"));
+
+        const std::string in2  = "A\xE6\x97\xA5" "B";
+        const std::string out2 = utf8str_substChar(in2, (llwchar)0x65E5, (llwchar)'.');
+        ensure_equals("substChar BMP -> ASCII", out2, std::string("A.B"));
+    }
+
+    // utf8str_makeASCII replaces every non-ASCII llwchar (>0x7F) with '?'
+    // before serializing back to utf-8.
+    template<> template<>
+    void llstring_utf_object_t::test<71>()
+    {
+        const std::string mixed = "A\xE6\x97\xA5" "B\xF0\x9F\x9A\x80" "C";
+        const std::string expected = "A?B?C";
+        ensure_equals("utf8str_makeASCII", utf8str_makeASCII(mixed), expected);
+        ensure_equals("utf8str_makeASCII ascii passthrough",
+                      utf8str_makeASCII("Hello"), std::string("Hello"));
+    }
+
+    // mbcsstring_makeASCII is byte-level: every byte >0x7F becomes '?'. So a
+    // 3-byte UTF-8 character yields three '?' rather than one.
+    template<> template<>
+    void llstring_utf_object_t::test<72>()
+    {
+        const std::string mixed = "A\xE6\x97\xA5" "B";
+        const std::string expected = "A???B";
+        ensure_equals("mbcsstring_makeASCII", mbcsstring_makeASCII(mixed), expected);
+    }
+
+    // utf8str_removeCRLF strips CR (0x0D) only — LF is preserved.
+    template<> template<>
+    void llstring_utf_object_t::test<73>()
+    {
+        ensure_equals("removeCRLF crlf", utf8str_removeCRLF("a\r\nb"), std::string("a\nb"));
+        ensure_equals("removeCRLF cr",   utf8str_removeCRLF("a\rb"),   std::string("ab"));
+        ensure_equals("removeCRLF lf",   utf8str_removeCRLF("a\nb"),   std::string("a\nb"));
+        ensure_equals("removeCRLF empty", utf8str_removeCRLF(""),      std::string());
+    }
+
+    // utf8str_split splits at the last split-token at or before maxlen bytes,
+    // falling back to a hard byte cut when no token is in range. The trailing
+    // chunk contains whatever remains once the budget exceeds the rest.
+    template<> template<>
+    void llstring_utf_object_t::test<74>()
+    {
+        {
+            std::list<std::string> out;
+            utf8str_split(out, "Hello there world", 10, ' ');
+            ensure_equals("split 3 parts", out.size(), size_t(3));
+            auto it = out.begin();
+            ensure_equals("split[0]", *it++, std::string("Hello"));
+            ensure_equals("split[1]", *it++, std::string("there"));
+            ensure_equals("split[2]", *it,   std::string("world"));
+        }
+        {
+            std::list<std::string> out;
+            utf8str_split(out, "short", 10, ' ');
+            ensure_equals("split single", out.size(), size_t(1));
+            ensure_equals("split single val", out.front(), std::string("short"));
+        }
+    }
+
+    // wchar_utf8_preview formats hex of the code point, plus (when multi-byte)
+    // the decoded UTF-8 byte sequence in decimal.
+    template<> template<>
+    void llstring_utf_object_t::test<75>()
+    {
+        ensure_equals("preview ASCII", wchar_utf8_preview((llwchar)'A'), std::string("41"));
+        // é = U+00E9 → 0xC3 0xA9 → 195, 169
+        ensure_equals("preview 2-byte", wchar_utf8_preview((llwchar)0x00E9),
+                      std::string("E9 [195, 169]"));
+        // 🚀 = U+1F680 → 0xF0 0x9F 0x9A 0x80 → 240, 159, 154, 128
+        ensure_equals("preview astral", wchar_utf8_preview((llwchar)0x1F680),
+                      std::string("1F680 [240, 159, 154, 128]"));
+    }
+
+    // ---------------------------------------------------------------
+    //                     byte-level helpers
+    // ---------------------------------------------------------------
+
+    // iswindividual recognises the CJK Unified / Hangul / CJK Compat ranges
+    // used for per-character word breaks.
+    template<> template<>
+    void llstring_utf_object_t::test<80>()
+    {
+        ensure("iswindividual CJK 日",       iswindividual((llwchar)0x65E5));
+        ensure("iswindividual Hangul",       iswindividual((llwchar)0xAC00));
+        ensure("iswindividual CJK Compat",   iswindividual((llwchar)0xF900));
+        ensure("not iswindividual 'A'",     !iswindividual((llwchar)'A'));
+        ensure("not iswindividual emoji",   !iswindividual((llwchar)0x1F680));
+    }
+
+    template<> template<>
+    void llstring_utf_object_t::test<81>()
+    {
+        for (char c : std::string("0123456789abcdefABCDEF"))
+        {
+            ensure("is_char_hex yes", is_char_hex(c));
+        }
+        ensure("is_char_hex 'g'", !is_char_hex('g'));
+        ensure("is_char_hex 'Z'", !is_char_hex('Z'));
+        ensure("is_char_hex ' '", !is_char_hex(' '));
+    }
+
+    template<> template<>
+    void llstring_utf_object_t::test<82>()
+    {
+        ensure_equals("nybble '0'", (U32)hex_as_nybble('0'), U32(0));
+        ensure_equals("nybble '9'", (U32)hex_as_nybble('9'), U32(9));
+        ensure_equals("nybble 'a'", (U32)hex_as_nybble('a'), U32(10));
+        ensure_equals("nybble 'f'", (U32)hex_as_nybble('f'), U32(15));
+        ensure_equals("nybble 'A'", (U32)hex_as_nybble('A'), U32(10));
+        ensure_equals("nybble 'F'", (U32)hex_as_nybble('F'), U32(15));
+        // Non-hex inputs fall through to 0 (undefined-but-documented behavior).
+        ensure_equals("nybble 'g' -> 0", (U32)hex_as_nybble('g'), U32(0));
+    }
 }

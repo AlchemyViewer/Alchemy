@@ -684,18 +684,60 @@ bool wstring_has_emoji(LLWStringView wstr)
     return false;
 }
 
-// Cut emoji symbols if exist
+// Joiners and modifiers that extend an emoji into a multi-code-point sequence.
+// Stripping an emoji without also stripping these leaves orphan ZWJ/VS16
+// bytes — visible as empty boxes in most renderers. See Unicode TR51.
+static bool is_emoji_sequence_extender(llwchar wch)
+{
+    return wch == 0x200D                           // ZERO WIDTH JOINER
+        || wch == 0xFE0F                           // VARIATION SELECTOR-16
+        || wch == 0x20E3                           // COMBINING ENCLOSING KEYCAP
+        || (wch >= 0x1F3FB && wch <= 0x1F3FF);     // emoji skin-tone modifiers
+}
+
+// Cut emoji symbols if exist. Strips the emoji plus any immediately trailing
+// sequence extenders (ZWJ/VS16/skin-tone/keycap combiner) and follow-up
+// ZWJ-joined emoji, so families like 👨‍👩‍👧 and skin-toned emoji are removed
+// cleanly without leaving orphan joiners.
 bool wstring_remove_emojis(LLWString& wstr)
 {
     bool found = false;
-    for (size_t i = 0; i < wstr.size(); ++i)
+    size_t read = 0, write = 0;
+    while (read < wstr.size())
     {
-        if (LLStringOps::isEmoji(wstr[i]))
+        if (LLStringOps::isEmoji(wstr[read]))
         {
-            wstr.erase(i--, 1);
             found = true;
+            ++read;
+            while (read < wstr.size())
+            {
+                if (wstr[read] == 0x200D)
+                {
+                    // ZWJ: consume it and the following emoji (if any) to
+                    // continue the sequence.
+                    ++read;
+                    if (read < wstr.size() && LLStringOps::isEmoji(wstr[read]))
+                    {
+                        ++read;
+                        continue;
+                    }
+                    break;
+                }
+                if (is_emoji_sequence_extender(wstr[read]))
+                {
+                    ++read;
+                    continue;
+                }
+                break;
+            }
+        }
+        else
+        {
+            wstr[write++] = wstr[read++];
         }
     }
+    if (found)
+        wstr.resize(write);
     return found;
 }
 
