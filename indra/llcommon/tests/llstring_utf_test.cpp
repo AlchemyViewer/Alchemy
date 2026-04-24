@@ -469,16 +469,34 @@ namespace tut
         // These compose utf8str_to_wstring + wstring_to_utf8str. Covered here
         // so composition regressions surface before we diagnose them through
         // callers.
-        //
-        // NOTE: utf8str_tolower routes through LLStringOps::toLower -> towlower(wint_t).
-        // wint_t is 16-bit on Windows, so astral codepoints (U+10000..) are
-        // silently truncated — a PRE-EXISTING bug unrelated to the simdutf swap.
-        // Keep this pin BMP-only so it doesn't mask that bug.
         const std::string mixed = "H\xC3\xA9LLO \xE6\x97\xA5";
         ensure_equals("utf8str_trim passthrough",
                       utf8str_trim(mixed), mixed);
         ensure_equals("utf8str_tolower preserves BMP non-ASCII",
                       utf8str_tolower(mixed), std::string("h\xC3\xA9llo \xE6\x97\xA5"));
+    }
+
+    template<> template<>
+    void llstring_utf_object_t::test<52>()
+    {
+        // LLStringOps::toLower/toUpper route through ICU u_tolower/u_toupper,
+        // which operate on full UChar32 code points. Deseret U+10400..U+10427
+        // (capital) <-> U+10428..U+1044F (small) is a cased astral block, so
+        // it round-trips only when the cast path preserves the full 21-bit
+        // code point.
+        const llwchar capital = 0x10400; // DESERET CAPITAL LETTER LONG I
+        const llwchar small   = 0x10428; // DESERET SMALL LETTER LONG I
+        ensure_equals("u_tolower astral",
+                      (U32)LLStringOps::toLower(capital), (U32)small);
+        ensure_equals("u_toupper astral",
+                      (U32)LLStringOps::toUpper(small), (U32)capital);
+
+        LLWString ws;
+        ws.push_back(capital);
+        LLWStringUtil::toLower(ws);
+        LLWString expected;
+        expected.push_back(small);
+        ensure_wstring_equals("LLWStringUtil::toLower astral", ws, expected);
     }
 
     template<> template<>

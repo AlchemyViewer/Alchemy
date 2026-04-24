@@ -52,6 +52,8 @@
 
 #include <string.h>
 
+#include <unicode/uchar.h>
+
 const char LL_UNKNOWN_CHAR = '?';
 class LLSD;
 
@@ -168,31 +170,31 @@ public:
     static std::string sPM;
 
     static char toUpper(char elem) { return toupper((unsigned char)elem); }
-    static llwchar toUpper(llwchar elem) { return towupper(static_cast<wint_t>(elem)); }
+    static llwchar toUpper(llwchar elem) { return static_cast<llwchar>(u_toupper(static_cast<UChar32>(elem))); }
 
     static char toLower(char elem) { return tolower((unsigned char)elem); }
-    static llwchar toLower(llwchar elem) { return towlower(static_cast<wint_t>(elem)); }
+    static llwchar toLower(llwchar elem) { return static_cast<llwchar>(u_tolower(static_cast<UChar32>(elem))); }
 
     static bool isSpace(char elem) { return isspace((unsigned char)elem) != 0; }
-    static bool isSpace(llwchar elem) { return iswspace(static_cast<wint_t>(elem)) != 0; }
+    static bool isSpace(llwchar elem) { return u_isspace(static_cast<UChar32>(elem)) != 0; }
 
     static bool isUpper(char elem) { return isupper((unsigned char)elem) != 0; }
-    static bool isUpper(llwchar elem) { return iswupper(static_cast<wint_t>(elem)) != 0; }
+    static bool isUpper(llwchar elem) { return u_isupper(static_cast<UChar32>(elem)) != 0; }
 
     static bool isLower(char elem) { return islower((unsigned char)elem) != 0; }
-    static bool isLower(llwchar elem) { return iswlower(static_cast<wint_t>(elem)) != 0; }
+    static bool isLower(llwchar elem) { return u_islower(static_cast<UChar32>(elem)) != 0; }
 
     static bool isDigit(char a) { return isdigit((unsigned char)a) != 0; }
-    static bool isDigit(llwchar a) { return iswdigit(static_cast<wint_t>(a)) != 0; }
+    static bool isDigit(llwchar a) { return u_isdigit(static_cast<UChar32>(a)) != 0; }
 
     static bool isPunct(char a) { return ispunct((unsigned char)a) != 0; }
-    static bool isPunct(llwchar a) { return iswpunct(static_cast<wint_t>(a)) != 0; }
+    static bool isPunct(llwchar a) { return u_ispunct(static_cast<UChar32>(a)) != 0; }
 
     static bool isAlpha(char a) { return isalpha((unsigned char)a) != 0; }
-    static bool isAlpha(llwchar a) { return iswalpha(static_cast<wint_t>(a)) != 0; }
+    static bool isAlpha(llwchar a) { return u_isalpha(static_cast<UChar32>(a)) != 0; }
 
     static bool isAlnum(char a) { return isalnum((unsigned char)a) != 0; }
-    static bool isAlnum(llwchar a) { return iswalnum(static_cast<wint_t>(a)) != 0; }
+    static bool isAlnum(llwchar a) { return u_isalnum(static_cast<UChar32>(a)) != 0; }
 
     // Returns true when 'a' corresponds to a "genuine" emoji. HB
     static bool isEmoji(llwchar a);
