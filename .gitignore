@@ -22,7 +22,6 @@
 CMakeCache.txt
 cmake_install.cmake
 LICENSES
-build*
 debian/files
 debian/secondlife-appearance-utility*
 debian/secondlife-viewer*

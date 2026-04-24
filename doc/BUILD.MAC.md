@@ -1,94 +1,79 @@
 # Building on macOS
 
-## Step 1: Install Dependencies and Tools
+For presets, options, configuration types, and tests, see [BUILD.md](BUILD.md). This page only covers macOS-specific setup.
 
-### Install Xcode and Homebrew
+## 1. Install tools
 
-* [Xcode](https://developer.apple.com/xcode/)
-* [Homebrew](https://brew.sh/)
+- [Xcode](https://developer.apple.com/xcode/) — install from the App Store, then run `xcode-select --install`
+- [Homebrew](https://brew.sh/)
 
-### Install Homebrew dependencies
-
-Now we're going to install required build tools from Homebrew.
+Then install build dependencies via Homebrew:
 
 ```
-brew install git cmake zip unzip curl pkgconf automake autoconf autoconf-archive gettext libtool rustup dotnet
+brew install git cmake zip unzip curl pkgconf automake autoconf autoconf-archive \
+    gettext libtool rustup dotnet
 ```
 
-### Initialize Rust SDK
-Initialize the rust SDK using default options
+Initialise the Rust toolchain (only needed if you will package):
 
 ```
-rustup-init
+rustup-init -y
 ```
 
-## Step 2: Checkout Viewer Code
-Open a Terminal and checkout the viewer source code:
+## 2. Clone and bootstrap
 
-```git clone https://github.com/alchemyviewer/alchemy.git```
-
-## Step 3: Setup Build Tooling
-
-Please follow the below steps to set up the required tools to build and package the viewer
-
-### Setup Virtual Environment and Python dependencies
 ```
+git clone https://github.com/alchemyviewer/alchemy.git
 cd alchemy
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+dotnet tool restore        # only if you plan to produce installer packages
 ```
 
-### Install VPK package tool
-```
-dotnet tool restore
-```
+## 3. Configure
 
-## Step 4: Configure and install vcpkg dependencies
-Switch to the alchemy repository you just checked out and run cmake to configure:
+Pick a preset based on your CPU and preferred generator. Apple Silicon (M-series) uses arm64; Intel Macs use x86_64.
 
-```
-cmake -S indra --preset xcode-os
-```
+| Generator | Apple Silicon            | Intel                   |
+|:----------|:-------------------------|:------------------------|
+| Xcode     | `xcode-os-arm64`         | `xcode-os-x64`          |
+| Ninja     | `ninja-os-arm64`         | `ninja-os-x64`          |
 
-The --preset argument determines which build configuration to create, generally either an individual build configuration or a multi-config IDE such as Visual Studio or Xcode.
-
-To list availiable presets:
-
-```cmake -S indra --list-presets```
-
-
-For the Linden viewer build, this usage:
-
-```cmake -S indra --preset xcode-os [other options]...```
-
-passes [other options] to CMake. This can be used to override different CMake variables, e.g.:
-
-```cmake -S indra --preset xcode-os -DSOME_VARIABLE:BOOL=TRUE```
-
-The set of applicable CMake variables is still evolving. Please consult the CMake source files in indra/cmake, as well as the individual CMakeLists.txt files in the indra directory tree, to learn their effects.
-
-## Step 5: Build
-When that completes, you can either build within Xcode or from the Terminal:
-
-### Xcode:
-The command below will open the generated xcodeproj in Xcode
+`xcode-os` (no arch suffix) also works and picks your host architecture.
 
 ```
-open ./build-Darwin-xcode-os/SecondLife.xcodeproj
+cmake -S indra --preset xcode-os-arm64
 ```
 
-### Terminal:
-Build by running the following command:
+## 4. Build
+
+### From Xcode
 
 ```
-cmake --build build-Darwin-xcode-os --config Release
+open ./build-Darwin-xcode-os-arm64/Alchemy.xcodeproj
 ```
 
-the resulting viewer executable will be at:
+### From Terminal
 
 ```
-build-Darwin-xcode-os/newview/<CONFIGURATION>/SecondLife.app
+cmake --build build-Darwin-xcode-os-arm64 --config Release
 ```
 
+Ninja users:
 
+```
+cmake --build --preset ninja-os-arm64-release
+```
+
+The viewer app lands at:
+
+```
+build-Darwin-<preset>/newview/<Config>/<ChannelName>.app
+```
+
+where `<ChannelName>` follows `VIEWER_CHANNEL` (default `Alchemy Test` → `AlchemyTest.app`).
+
+---
+
+Common problems are covered in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

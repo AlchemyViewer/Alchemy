@@ -1,17 +1,17 @@
 # Building on Windows
 
-## Step 1: Install Build Tools
+For presets, options, configuration types, and tests, see [BUILD.md](BUILD.md). This page only covers Windows-specific setup.
 
-* [CMake](https://cmake.org/download/)
-* [Git for Windows](https://git-scm.com/install/windows)
-* [Visual Studio 2026](https://visualstudio.microsoft.com/vs/community/) - Select "Desktop development with C++" workload
-* [Python 3.13+](https://www.python.org/downloads/) - Be sure to "Add Python to PATH"
-* [Rust](https://rust-lang.org/tools/install/) - `Download and install RUSTUP-INIT.exe`
-* [dotnet SDK](https://dotnet.microsoft.com/en-us/download)
+## 1. Install tools
 
-### Intermediate Check
+- [Visual Studio 2026](https://visualstudio.microsoft.com/vs/community/) or Visual Studio 2022 — select the **Desktop development with C++** workload
+- [CMake](https://cmake.org/download/) 3.27+
+- [Git for Windows](https://git-scm.com/install/windows)
+- [Python 3.13+](https://www.python.org/downloads/) — tick **Add Python to PATH** during install
+- [Rust](https://rust-lang.org/tools/install/) — run `rustup-init.exe`, accept defaults (only needed if you'll package; see [BUILD.md](BUILD.md#prerequisites))
+- [.NET SDK](https://dotnet.microsoft.com/en-us/download) (same caveat)
 
-Confirm things are installed properly so far by typing the following in a Terminal:
+Sanity check in a fresh terminal:
 
 ```
 cmake --version
@@ -19,75 +19,51 @@ python --version
 git --version
 ```
 
-If everything reported sensible values and not "Command not found" errors, then you are in good shape!
+## 2. Clone and bootstrap
 
-## Step 2: Checkout Viewer Code
-Open a `Powershell` from the `Start Menu` and checkout the viewer source code:
+Open PowerShell:
 
-```git clone https://github.com/alchemyviewer/alchemy.git```
-
-## Step 3: Setup Build Tooling
-
-Please follow the below steps to set up the required tools to build and package the viewer
-
-### Setup Virtual Environment and Python dependencies
 ```
+git clone https://github.com/alchemyviewer/alchemy.git
 cd alchemy
-python3 -m venv .venv
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+dotnet tool restore        # only if you plan to produce installer packages
 ```
 
-### Install VPK package tool
-```
-dotnet tool restore
-```
-
-## Step 4: Configure and install vcpkg dependencies
-Switch to the viewer repository you just checked out and run cmake to configure and install dependencies:
+## 3. Configure
 
 ```
 cmake -S indra --preset vs2026-os
 ```
 
-The --preset argument determines which build configuration to create, generally either an individual build configuration or a multi-config IDE such as Visual Studio.
+For VS 2022 use `vs2022-os` instead. The first configure run downloads and builds every vcpkg dependency from source; expect it to take 30–60+ minutes and several GB of disk on the first run. Subsequent configures are fast.
 
-To list availiable presets:
+## 4. Build
 
-```cmake -S indra --list-presets```
-
-
-For the Linden viewer build, this usage:
-
-```cmake -S indra --preset vs2026-os [other options]...```
-
-passes [other options] to CMake. This can be used to override different CMake variables, e.g.:
-
-```cmake -S indra --preset vs2026-os -DSOME_VARIABLE:BOOL=TRUE```
-
-The set of applicable CMake variables is still evolving. Please consult the CMake source files in indra/cmake, as well as the individual CMakeLists.txt files in the indra directory tree, to learn their effects.
-
-## Step 5: Build
-When that completes, you can either build within Visual Studio or from the command line:
-
-### Visual Studio:
-The command below will open the generated solution in Visual Studio
+### From Visual Studio
 
 ```
-explorer.exe .\build-Windows-vs2026-os\SecondLife.slnx
+start .\build-Windows-vs2026-os\Alchemy.slnx
 ```
 
-### Command Line:
-Build by running:
+Then build from the IDE as usual. Note: `.slnx` is the newer solution format — if your Visual Studio is older and doesn't recognise it, upgrade VS or use a current edition.
+
+### From the command line
 
 ```
 cmake --build build-Windows-vs2026-os --config Release
 ```
 
-the resulting viewer executable will be at:
+The viewer lands at:
 
 ```
-build-Windows-vs2026-os/newview/<CONFIGURATION>/SecondLifeViewer.exe
+build-Windows-vs2026-os\newview\<Config>\<ChannelName>.exe
 ```
 
+where `<ChannelName>` follows `VIEWER_CHANNEL` (default `Alchemy Test` → `AlchemyTest.exe`).
 
+---
+
+Common problems are covered in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

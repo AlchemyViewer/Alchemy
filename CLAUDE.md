@@ -66,4 +66,4 @@ All source code lives under `indra/`. The codebase is organized as a set of libr
 
 
 ### Architecture breakdown
-- @docs/ARCHITECTURE.md
+- @doc/ARCHITECTURE.md
