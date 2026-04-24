@@ -55,14 +55,28 @@ namespace LLFontShaping
     // and tag subdivision flags. General BiDi and script-aware shaping are
     // deliberately out of scope here.
     //
+    // Results are cached behind a bounded LRU keyed by (codepoints, face),
+    // so repeated render/width/hit-test calls on the same text do not pay
+    // HarfBuzz's cost every frame. The cache is global (shared across all
+    // LLFontGL instances backed by the same face) and invalidated via
+    // clearCache() whenever a face is reloaded.
+    //
     // On entry out_glyphs is cleared. On any failure (null face, bad range,
     // HarfBuzz init failure) it remains empty — the caller should fall back
-    // to the 1:1 codepoint path for that run.
+    // to the 1:1 codepoint path for that run. Empty results are cached too
+    // so the failure isn't re-attempted on every frame.
     void shapeRun(const LLFontFreetype* root_face,
                   const LLWString&      wstr,
                   size_t                begin,
                   size_t                end,
                   std::vector<LLShapedGlyph>& out_glyphs);
+
+    // Drop every cached shaping result. Must be called when any LLFontFreetype
+    // reloads its FT_Face, since cached LLShapedGlyph entries carry glyph
+    // indices that are only valid for the face's current state. Safe to call
+    // when the cache is empty. Single-threaded; the shape path is main-thread
+    // only.
+    void clearCache();
 }
 
 #endif // LL_LLFONTSHAPING_H

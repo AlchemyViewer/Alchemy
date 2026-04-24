@@ -39,6 +39,8 @@
 #include <hb.h>
 #include <hb-ft.h>
 
+#include "llfontshaping.h"
+
 #include "lldir.h"
 #include "llerror.h"
 #include "llimage.h"
@@ -185,6 +187,11 @@ void LLFontFreetype::destroyHbFont()
         hb_font_destroy(mHbFont);
         mHbFont = nullptr;
     }
+    // Cached LLShapedGlyph entries carry glyph indices valid only for this
+    // face's current FT state. Dropping the hb_font means we're about to
+    // replace (or tear down) the face — purge the shape cache so stale
+    // entries don't survive.
+    LLFontShaping::clearCache();
 }
 
 hb_font_t* LLFontFreetype::getHbFont() const
