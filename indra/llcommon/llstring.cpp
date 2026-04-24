@@ -751,6 +751,107 @@ bool utf8str_remove_emojis(std::string& utf8str)
     return true;
 }
 
+// True if position i begins an emoji sequence that the 1:1 codepoint->glyph
+// path cannot render correctly — i.e., the next codepoint transforms the base
+// (ZWJ, VS15/16, skin-tone, keycap combiner, tag character, or regional
+// indicator pair), or we're sitting on a keycap starter (digit/#/* + FE0F +
+// 20E3). Isolated emoji are excluded: they render fine through FreeType alone.
+static bool is_shaping_starter(const llwchar* p, size_t n, size_t i)
+{
+    const llwchar c = p[i];
+    // Keycap sequence: digit/#/* + VS16 + COMBINING ENCLOSING KEYCAP.
+    if ((c == '#' || c == '*' || (c >= '0' && c <= '9'))
+        && i + 2 < n && p[i + 1] == 0xFE0F && p[i + 2] == 0x20E3)
+    {
+        return true;
+    }
+    if (!LLStringOps::isEmoji(c) || i + 1 >= n)
+        return false;
+    const llwchar next = p[i + 1];
+    if (next == 0x200D                               // ZWJ
+        || next == 0xFE0F || next == 0xFE0E          // VS15/VS16
+        || (next >= 0x1F3FB && next <= 0x1F3FF)      // skin tone
+        || next == 0x20E3                            // keycap combiner
+        || (next >= 0xE0020 && next <= 0xE007F))     // tag characters
+    {
+        return true;
+    }
+    // Regional indicator pair (flag).
+    return c >= 0x1F1E6 && c <= 0x1F1FF
+        && next >= 0x1F1E6 && next <= 0x1F1FF;
+}
+
+// Greedy forward walk from a confirmed shaping-starter position, returning the
+// one-past-end index of the sequence.
+static size_t advance_shaping_run(const llwchar* p, size_t n, size_t start)
+{
+    const llwchar base = p[start];
+    size_t r = start + 1;
+
+    // Keycap: always exactly 3 codepoints.
+    if ((base == '#' || base == '*' || (base >= '0' && base <= '9'))
+        && r + 1 < n && p[r] == 0xFE0F && p[r + 1] == 0x20E3)
+    {
+        return r + 2;
+    }
+
+    // Regional indicator pair: exactly one trailing RI.
+    if (base >= 0x1F1E6 && base <= 0x1F1FF
+        && r < n && p[r] >= 0x1F1E6 && p[r] <= 0x1F1FF)
+    {
+        return r + 1;
+    }
+
+    // General case: consume ZWJ-joined emoji, variation selectors, skin-tone
+    // modifiers, keycap combiners, and tag characters (including the U+E007F
+    // CANCEL TAG terminator).
+    while (r < n)
+    {
+        const llwchar c = p[r];
+        if (c == 0x200D)
+        {
+            if (r + 1 < n && LLStringOps::isEmoji(p[r + 1]))
+            {
+                r += 2;
+                continue;
+            }
+            break; // orphan ZWJ
+        }
+        if (c == 0xFE0F || c == 0xFE0E
+            || c == 0x20E3
+            || (c >= 0x1F3FB && c <= 0x1F3FF)
+            || (c >= 0xE0020 && c <= 0xE007F))
+        {
+            ++r;
+            continue;
+        }
+        break;
+    }
+    return r;
+}
+
+std::vector<std::pair<size_t, size_t>> wstring_find_shaping_runs(LLWStringView wstr)
+{
+    std::vector<std::pair<size_t, size_t>> runs;
+    const llwchar* p = wstr.data();
+    const size_t n = wstr.size();
+    size_t i = 0;
+    while (i < n)
+    {
+        if (is_shaping_starter(p, n, i))
+        {
+            const size_t end = advance_shaping_run(p, n, i);
+            runs.emplace_back(i, end);
+            i = end;
+        }
+        else
+        {
+            ++i;
+        }
+    }
+    return runs;
+}
+
 #if LL_WINDOWS
 unsigned int ll_wstring_default_code_page()
 {

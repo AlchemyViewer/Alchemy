@@ -33,6 +33,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <cstdio>
 #include <cwchar>                   // std::wcslen()
 //#include <locale>
@@ -724,6 +725,15 @@ LL_COMMON_API bool wstring_has_emoji(LLWStringView wstr);
 LL_COMMON_API bool wstring_remove_emojis(LLWString& wstr);
 
 LL_COMMON_API bool utf8str_remove_emojis(std::string& utf8str);
+
+// Locate contiguous ranges [begin, end) of wstr that form a multi-code-point
+// emoji sequence and therefore need HarfBuzz shaping to render correctly.
+// Covers: ZWJ families, VS15/VS16 presentation selectors, skin-tone modifiers,
+// regional indicator flag pairs, keycap sequences (digit/#/* + FE0F + 20E3),
+// and tag sequences (e.g., subdivision flags). Isolated emoji that render
+// correctly through the 1:1 FT_Get_Char_Index path are intentionally skipped.
+LL_COMMON_API std::vector<std::pair<size_t, size_t>>
+wstring_find_shaping_runs(LLWStringView wstr);
 
 #if LL_WINDOWS
 /* @name Windows string helpers

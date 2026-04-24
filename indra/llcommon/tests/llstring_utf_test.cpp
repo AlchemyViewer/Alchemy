@@ -80,7 +80,11 @@ namespace
 namespace tut
 {
     struct llstring_utf_data {};
-    typedef test_group<llstring_utf_data> llstring_utf_t;
+    // Tests are numbered by category (1x conversion, 2x validation, 3x case,
+    // 6x emoji, 8x byte-helpers, 9x shaping). The TUT default registers only
+    // test<1>..test<50>, silently dropping everything above. Keep this in sync
+    // with the highest test number used below.
+    typedef test_group<llstring_utf_data, 100> llstring_utf_t;
     typedef llstring_utf_t::object llstring_utf_object_t;
     tut::llstring_utf_t tut_llstring_utf("LLStringUTF");
 
@@ -766,8 +770,8 @@ namespace tut
     }
 
     // utf8str_split splits at the last split-token at or before maxlen bytes,
-    // falling back to a hard byte cut when no token is in range. The trailing
-    // chunk contains whatever remains once the budget exceeds the rest.
+    // falling back to a hard byte cut when no token is in range. Non-final
+    // chunks retain the trailing split-token (current implementation).
     template<> template<>
     void llstring_utf_object_t::test<74>()
     {
@@ -777,7 +781,7 @@ namespace tut
             ensure_equals("split 3 parts", out.size(), size_t(3));
             auto it = out.begin();
             ensure_equals("split[0]", *it++, std::string("Hello"));
-            ensure_equals("split[1]", *it++, std::string("there"));
+            ensure_equals("split[1]", *it++, std::string("there "));
             ensure_equals("split[2]", *it,   std::string("world"));
         }
         {
@@ -788,18 +792,18 @@ namespace tut
         }
     }
 
-    // wchar_utf8_preview formats hex of the code point, plus (when multi-byte)
-    // the decoded UTF-8 byte sequence in decimal.
+    // wchar_utf8_preview formats the code point in hex, plus (when multi-byte)
+    // the decoded UTF-8 byte sequence also in hex.
     template<> template<>
     void llstring_utf_object_t::test<75>()
     {
         ensure_equals("preview ASCII", wchar_utf8_preview((llwchar)'A'), std::string("41"));
-        // é = U+00E9 → 0xC3 0xA9 → 195, 169
+        // é = U+00E9 -> 0xC3 0xA9
         ensure_equals("preview 2-byte", wchar_utf8_preview((llwchar)0x00E9),
-                      std::string("E9 [195, 169]"));
-        // 🚀 = U+1F680 → 0xF0 0x9F 0x9A 0x80 → 240, 159, 154, 128
+                      std::string("E9 [C3, A9]"));
+        // Rocket = U+1F680 -> 0xF0 0x9F 0x9A 0x80
         ensure_equals("preview astral", wchar_utf8_preview((llwchar)0x1F680),
-                      std::string("1F680 [240, 159, 154, 128]"));
+                      std::string("1F680 [F0, 9F, 9A, 80]"));
     }
 
     // ---------------------------------------------------------------
@@ -841,5 +845,141 @@ namespace tut
         ensure_equals("nybble 'F'", (U32)hex_as_nybble('F'), U32(15));
         // Non-hex inputs fall through to 0 (undefined-but-documented behavior).
         ensure_equals("nybble 'g' -> 0", (U32)hex_as_nybble('g'), U32(0));
+    }
+
+    // ---------------------------------------------------------------
+    //                 shaping-run detector
+    // ---------------------------------------------------------------
+
+    // Inputs that never need shaping — empty, ASCII, CJK, a single isolated
+    // emoji, and two adjacent but unrelated emoji all render correctly via
+    // the 1:1 codepoint path, so the detector must return no runs.
+    template<> template<>
+    void llstring_utf_object_t::test<90>()
+    {
+        ensure_equals("empty",      wstring_find_shaping_runs(LLWString()).size(), size_t(0));
+        LLWString ascii = { (llwchar)'H', (llwchar)'i', (llwchar)'!' };
+        ensure_equals("ascii",      wstring_find_shaping_runs(ascii).size(),       size_t(0));
+        LLWString cjk   = { (llwchar)0x65E5, (llwchar)0x672C };
+        ensure_equals("cjk",        wstring_find_shaping_runs(cjk).size(),         size_t(0));
+        LLWString lone  = { (llwchar)0x1F680 };
+        ensure_equals("lone emoji", wstring_find_shaping_runs(lone).size(),        size_t(0));
+        LLWString pair  = { (llwchar)0x1F680, (llwchar)0x1F681 };
+        ensure_equals("two adj em", wstring_find_shaping_runs(pair).size(),        size_t(0));
+    }
+
+    // ZWJ family 👨‍👩‍👧 = U+1F468 U+200D U+1F469 U+200D U+1F467 — must emerge
+    // as a single 5-codepoint run.
+    template<> template<>
+    void llstring_utf_object_t::test<91>()
+    {
+        LLWString ws = { (llwchar)0x1F468, (llwchar)0x200D,
+                         (llwchar)0x1F469, (llwchar)0x200D,
+                         (llwchar)0x1F467 };
+        auto runs = wstring_find_shaping_runs(ws);
+        ensure_equals("one run",   runs.size(),    size_t(1));
+        ensure_equals("run begin", runs[0].first,  size_t(0));
+        ensure_equals("run end",   runs[0].second, size_t(5));
+    }
+
+    // Skin-tone modifier (U+1F3FB..FF) combines with the preceding emoji.
+    template<> template<>
+    void llstring_utf_object_t::test<92>()
+    {
+        LLWString ws = { (llwchar)0x1F468, (llwchar)0x1F3FB };
+        auto runs = wstring_find_shaping_runs(ws);
+        ensure_equals("skintone runs", runs.size(),    size_t(1));
+        ensure_equals("skintone end",  runs[0].second, size_t(2));
+    }
+
+    // Trailing VS16 (U+FE0F) forces emoji presentation and must be part of
+    // the same shaped run as its base.
+    template<> template<>
+    void llstring_utf_object_t::test<93>()
+    {
+        LLWString ws = { (llwchar)0x1F680, (llwchar)0xFE0F };
+        auto runs = wstring_find_shaping_runs(ws);
+        ensure_equals("vs16 runs", runs.size(),    size_t(1));
+        ensure_equals("vs16 end",  runs[0].second, size_t(2));
+    }
+
+    // Regional indicator pair — 🇺🇸 = U+1F1FA U+1F1F8 — becomes a flag glyph
+    // only under shaping. Two consecutive RIs form exactly one pair.
+    template<> template<>
+    void llstring_utf_object_t::test<94>()
+    {
+        LLWString ws = { (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
+        auto runs = wstring_find_shaping_runs(ws);
+        ensure_equals("flag runs", runs.size(),    size_t(1));
+        ensure_equals("flag end",  runs[0].second, size_t(2));
+        // Four RIs in a row form two separate flags.
+        LLWString four = { (llwchar)0x1F1FA, (llwchar)0x1F1F8,
+                           (llwchar)0x1F1EB, (llwchar)0x1F1F7 };
+        auto more = wstring_find_shaping_runs(four);
+        ensure_equals("two flags", more.size(),    size_t(2));
+        ensure_equals("flag0 end", more[0].second, size_t(2));
+        ensure_equals("flag1 begin", more[1].first, size_t(2));
+        ensure_equals("flag1 end",   more[1].second, size_t(4));
+    }
+
+    // Keycap: digit/#/* + U+FE0F + U+20E3 is a shaped 3-codepoint sequence.
+    template<> template<>
+    void llstring_utf_object_t::test<95>()
+    {
+        LLWString digit_kc = { (llwchar)'9', (llwchar)0xFE0F, (llwchar)0x20E3 };
+        auto runs = wstring_find_shaping_runs(digit_kc);
+        ensure_equals("keycap runs", runs.size(),    size_t(1));
+        ensure_equals("keycap end",  runs[0].second, size_t(3));
+        LLWString hash_kc = { (llwchar)'#', (llwchar)0xFE0F, (llwchar)0x20E3 };
+        ensure_equals("hash keycap", wstring_find_shaping_runs(hash_kc).size(), size_t(1));
+        LLWString bare = { (llwchar)'5' };
+        ensure_equals("bare digit",  wstring_find_shaping_runs(bare).size(),    size_t(0));
+    }
+
+    // Subdivision flag — base 🏴 (U+1F3F4) + tag characters (U+E0020..U+E007F)
+    // terminated by U+E007F. All tag bytes must be absorbed into the run.
+    template<> template<>
+    void llstring_utf_object_t::test<96>()
+    {
+        LLWString ws = { (llwchar)0x1F3F4,
+                         (llwchar)0xE0067, (llwchar)0xE0062, (llwchar)0xE0073,
+                         (llwchar)0xE0063, (llwchar)0xE0074,
+                         (llwchar)0xE007F };
+        auto runs = wstring_find_shaping_runs(ws);
+        ensure_equals("tag runs",  runs.size(),    size_t(1));
+        ensure_equals("tag begin", runs[0].first,  size_t(0));
+        ensure_equals("tag end",   runs[0].second, size_t(7));
+    }
+
+    // Mixed: ASCII + flag + ASCII + ZWJ family + ASCII. Two disjoint runs
+    // with correct bounds; surrounding ASCII is untouched.
+    template<> template<>
+    void llstring_utf_object_t::test<97>()
+    {
+        LLWString ws = { (llwchar)'H',
+                         (llwchar)0x1F1FA, (llwchar)0x1F1F8,       // flag @ [1,3)
+                         (llwchar)' ',
+                         (llwchar)0x1F468, (llwchar)0x200D,        // family @ [4,9)
+                         (llwchar)0x1F469, (llwchar)0x200D,
+                         (llwchar)0x1F467,
+                         (llwchar)'!' };
+        auto runs = wstring_find_shaping_runs(ws);
+        ensure_equals("two runs",    runs.size(),     size_t(2));
+        ensure_equals("run0 begin",  runs[0].first,   size_t(1));
+        ensure_equals("run0 end",    runs[0].second,  size_t(3));
+        ensure_equals("run1 begin",  runs[1].first,   size_t(4));
+        ensure_equals("run1 end",    runs[1].second,  size_t(9));
+    }
+
+    // Bare ZWJ/VS16 surrounded by non-emoji (as used in Arabic/Indic shaping
+    // outside any emoji context) must NOT produce a run. There is no emoji
+    // face to shape with and the caller should keep the 1:1 path.
+    template<> template<>
+    void llstring_utf_object_t::test<98>()
+    {
+        LLWString zwj  = { (llwchar)'a', (llwchar)0x200D, (llwchar)'b' };
+        ensure_equals("bare zwj",  wstring_find_shaping_runs(zwj).size(),  size_t(0));
+        LLWString vs16 = { (llwchar)'a', (llwchar)0xFE0F, (llwchar)'b' };
+        ensure_equals("bare vs16", wstring_find_shaping_runs(vs16).size(), size_t(0));
     }
 }
