@@ -33,6 +33,7 @@
 #include "llfontfreetype.h"
 #include "llfontbitmapcache.h"
 #include "llfontregistry.h"
+#include "llfontshaping.h"
 #include "llgl.h"
 #include "llimagegl.h"
 #include "llrender.h"
@@ -298,8 +299,125 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     std::pair<EFontGlyphType, S32> bitmap_entry = std::make_pair(EFontGlyphType::Grayscale, -1);
     S32 glyph_count = 0;
     llwchar last_char = wstr[begin_offset];
+
+    // Multi-codepoint emoji sequences (ZWJ families, VS16, skin-tone, flag
+    // pairs, keycap, tag subdivision flags) need HarfBuzz to pick the right
+    // composite glyph. Detect them up front and shape each range through the
+    // owning font face. Ranges are stored in original-wstr coordinates so
+    // they can be matched against `i` directly below. Empty when there are
+    // no such sequences in the slice — which is the overwhelmingly common
+    // case, so this adds nothing to the ASCII hot path.
+    std::vector<std::pair<size_t, size_t>> shape_ranges =
+        wstring_find_shaping_runs(LLWStringView(wstr.data() + begin_offset, length));
+    std::vector<std::vector<LLShapedGlyph>> shape_glyphs(shape_ranges.size());
+    for (size_t s = 0; s < shape_ranges.size(); ++s)
+    {
+        shape_ranges[s].first  += begin_offset;
+        shape_ranges[s].second += begin_offset;
+        LLFontShaping::shapeRun(mFontFreetype, wstr,
+                                shape_ranges[s].first,
+                                shape_ranges[s].second,
+                                shape_glyphs[s]);
+    }
+    size_t next_shape_run = 0;
+
     for (i = begin_offset; i < begin_offset + length; i++)
     {
+        // Entered a shaped run? Emit its HarfBuzz-positioned glyphs in one
+        // go and jump past the range. When shaping produced no glyphs (rare —
+        // face/HB failure) we fall through to the codepoint path so the
+        // range still draws something, even if ZWJ presentation is wrong.
+        if (next_shape_run < shape_ranges.size()
+            && (S32)shape_ranges[next_shape_run].first == i)
+        {
+            const auto  run_range  = shape_ranges[next_shape_run];
+            const auto& run_glyphs = shape_glyphs[next_shape_run];
+            ++next_shape_run;
+
+            if (!run_glyphs.empty())
+            {
+                next_glyph = NULL;  // drop any kerning prefetch from before the run
+                bool overflow = false;
+                for (const LLShapedGlyph& sg : run_glyphs)
+                {
+                    // Cache lives on the root face and its bitmap atlas; the
+                    // fallback face is only the *source* for the glyph. This
+                    // mirrors the non-shaped fallback path in addGlyphFromFont
+                    // where `this` is the root and `fontp` is the fallback.
+                    const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
+                        sg.face, sg.glyph_id,
+                        (!use_color) ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
+                    if (!sfgi)
+                        continue;
+
+                    std::pair<EFontGlyphType, S32> next_bitmap_entry = sfgi->mBitmapEntry;
+                    if (next_bitmap_entry != bitmap_entry)
+                    {
+                        if (glyph_count > 0)
+                        {
+                            gGL.begin(LLRender::TRIANGLES);
+                            gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
+                            gGL.end();
+                            glyph_count = 0;
+                        }
+                        bitmap_entry = next_bitmap_entry;
+                        LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
+                        gGL.getTexUnit(0)->bind(font_image);
+                    }
+
+                    const F32 glyph_x = cur_render_x + sg.x_offset + (F32)sfgi->mXBearing;
+                    const F32 glyph_y = cur_render_y + sg.y_offset + (F32)sfgi->mYBearing;
+
+                    if ((start_x + scaled_max_pixels) < (glyph_x + (F32)sfgi->mWidth))
+                    {
+                        overflow = true;
+                        break;
+                    }
+
+                    LLRectf uv_rect(sfgi->mXBitmapOffset * inv_width,
+                                    (sfgi->mYBitmapOffset + sfgi->mHeight + PAD_UVY) * inv_height,
+                                    (sfgi->mXBitmapOffset + sfgi->mWidth) * inv_width,
+                                    (sfgi->mYBitmapOffset - PAD_UVY) * inv_height);
+                    LLRectf screen_rect((F32)ll_round(glyph_x),
+                                        (F32)ll_round(glyph_y),
+                                        (F32)ll_round(glyph_x) + (F32)sfgi->mWidth,
+                                        (F32)ll_round(glyph_y) - (F32)sfgi->mHeight);
+
+                    if (glyph_count >= GLYPH_BATCH_SIZE)
+                    {
+                        gGL.begin(LLRender::TRIANGLES);
+                        gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
+                        gGL.end();
+                        glyph_count = 0;
+                    }
+
+                    const LLColor4U& col = bitmap_entry.first == EFontGlyphType::Grayscale
+                                               ? text_color : emoji_color;
+                    drawGlyph(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                              col, style_to_add, shadow, drop_shadow_strength);
+
+                    cur_x += sg.x_advance;
+                    cur_y += sg.y_advance;
+                    cur_x = (F32)ll_round(cur_x);
+                    cur_render_x = cur_x;
+                    cur_render_y = cur_y;
+                }
+
+                chars_drawn += (S32)(run_range.second - run_range.first);
+                if (overflow)
+                    break;
+
+                i = (S32)run_range.second - 1;  // loop's ++ lands past the run
+                // Force a rebind on the next non-shape glyph — the duplicate
+                // last_char guard relies on matching wch to avoid stale atlas
+                // binds and shaped runs bypassed that path.
+                last_char = 0;
+                continue;
+            }
+            // Empty run_glyphs — shaping failed. Fall through to the
+            // codepoint path for this iteration.
+        }
+
         llwchar wch = wstr[i];
 
         const LLFontGlyphInfo* fgi = next_glyph;
@@ -528,11 +646,74 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
     F32 cur_x = 0;
     const S32 max_index = begin_offset + max_chars;
 
+    // Determine the tight slice we'll actually measure (bounded by max_chars
+    // and the first NUL) so shaping only runs over real content.
+    S32 measure_end = begin_offset;
+    while (measure_end < max_index && wchars[measure_end] != 0)
+        ++measure_end;
+    const S32 measure_len = measure_end - begin_offset;
+
+    // Same shape-first preprocessing as render(); kept consistent so caret
+    // positions and ellipsis cutoffs agree with what's drawn.
+    std::vector<std::pair<size_t, size_t>> shape_ranges =
+        (measure_len > 0)
+            ? wstring_find_shaping_runs(LLWStringView(wchars + begin_offset, (size_t)measure_len))
+            : std::vector<std::pair<size_t, size_t>>();
+    std::vector<std::vector<LLShapedGlyph>> shape_glyphs(shape_ranges.size());
+    // LLFontShaping needs an LLWString, not a raw pointer; build one only if
+    // we actually have shape ranges to feed it.
+    if (!shape_ranges.empty())
+    {
+        LLWString slice(wchars + begin_offset, wchars + measure_end);
+        for (size_t s = 0; s < shape_ranges.size(); ++s)
+        {
+            const size_t rb = shape_ranges[s].first;
+            const size_t re = shape_ranges[s].second;
+            shape_ranges[s].first  = rb + begin_offset;
+            shape_ranges[s].second = re + begin_offset;
+            LLFontShaping::shapeRun(mFontFreetype, slice, rb, re, shape_glyphs[s]);
+        }
+    }
+    size_t next_shape_run = 0;
+
     const LLFontGlyphInfo* next_glyph = NULL;
 
     F32 width_padding = 0.f;
     for (S32 i = begin_offset; i < max_index && wchars[i] != 0; i++)
     {
+        if (next_shape_run < shape_ranges.size()
+            && (S32)shape_ranges[next_shape_run].first == i)
+        {
+            const auto  run_range  = shape_ranges[next_shape_run];
+            const auto& run_glyphs = shape_glyphs[next_shape_run];
+            ++next_shape_run;
+
+            if (!run_glyphs.empty())
+            {
+                next_glyph = NULL;
+                F32 run_padding = 0.f;
+                for (const LLShapedGlyph& sg : run_glyphs)
+                {
+                    const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
+                        sg.face, sg.glyph_id, EFontGlyphType::Unspecified);
+                    if (!sfgi)
+                        continue;
+                    if (!no_padding)
+                    {
+                        run_padding = llmax(0.f,
+                            run_padding - sg.x_advance,
+                            (F32)(sfgi->mWidth + sfgi->mXBearing) - sg.x_advance);
+                    }
+                    cur_x += sg.x_advance;
+                }
+                cur_x = (F32)ll_round(cur_x);
+                width_padding = run_padding;
+                i = (S32)run_range.second - 1;
+                continue;
+            }
+            // Fall through to codepoint path when shaping failed.
+        }
+
         llwchar wch = wchars[i];
 
         const LLFontGlyphInfo* fgi = next_glyph;
