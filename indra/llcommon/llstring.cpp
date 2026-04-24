@@ -32,9 +32,53 @@
 #include "llsd.h"
 #include <vector>
 
+#include <simdutf.h>
+
 #if LL_WINDOWS
 #include "llwin32headers.h"
 #endif
+
+namespace
+{
+
+// Tolerantly convert src (SrcCh* of length len) using simdutf's fast path on
+// valid runs, substituting `replacement` for each rejected code unit. Mirrors
+// the "best-effort with LL_UNKNOWN_CHAR" semantics of the previous hand-rolled
+// decoders while letting valid segments ride the SIMD path.
+template<typename SrcCh, typename DstCh>
+std::basic_string<DstCh> utf_convert_with_replacement(
+    const SrcCh* src, size_t len,
+    simdutf::result (*validate)(const SrcCh*, size_t),
+    size_t (*out_len_from)(const SrcCh*, size_t),
+    size_t (*convert_valid)(const SrcCh*, size_t, DstCh*),
+    DstCh replacement)
+{
+    std::basic_string<DstCh> out;
+    if (len == 0 || !src) return out;
+
+    while (len > 0)
+    {
+        const auto r = validate(src, len);
+        const size_t valid = (r.error == simdutf::error_code::SUCCESS) ? len : r.count;
+        if (valid > 0)
+        {
+            const size_t pos = out.size();
+            out.resize(pos + out_len_from(src, valid));
+            convert_valid(src, valid, out.data() + pos);
+            src += valid;
+            len -= valid;
+        }
+        if (r.error != simdutf::error_code::SUCCESS)
+        {
+            out.push_back(replacement);
+            ++src;
+            --len;
+        }
+    }
+    return out;
+}
+
+} // anonymous namespace
 
 std::string ll_safe_string(const char* in)
 {
@@ -191,90 +235,32 @@ std::ptrdiff_t wchar_to_utf8chars(llwchar in_char, char* outchars)
     return outchars - base;
 }
 
-auto utf16chars_to_wchar(const char16_t* inchars, llwchar* outchar)
-{
-    const char16_t* base = inchars;
-    char16_t cur_char = *inchars++;
-    llwchar char32 = cur_char;
-    if ((cur_char >= 0xD800) && (cur_char <= 0xDFFF))
-    {
-        // Surrogates
-        char32 = ((llwchar)(cur_char - 0xD800)) << 10;
-        cur_char = *inchars++;
-        char32 += (llwchar)(cur_char - 0xDC00) + 0x0010000UL;
-    }
-    else
-    {
-        char32 = (llwchar)cur_char;
-    }
-    *outchar = char32;
-    return inchars - base;
-}
-
 llutf16string wstring_to_utf16str(const llwchar* utf32str, size_t len)
 {
-    llutf16string out;
-
-    S32 i = 0;
-    while (i < len)
-    {
-        U32 cur_char = utf32str[i];
-        if (cur_char > 0xFFFF)
-        {
-            out += (0xD7C0 + (cur_char >> 10));
-            out += (0xDC00 | (cur_char & 0x3FF));
-        }
-        else
-        {
-            out += cur_char;
-        }
-        i++;
-    }
-    return out;
-}
-
-llutf16string utf8str_to_utf16str( const char* utf8str, size_t len )
-{
-    LLWString wstr = utf8str_to_wstring ( utf8str, len );
-    return wstring_to_utf16str ( wstr );
+    return utf_convert_with_replacement<char32_t, char16_t>(
+        utf32str, len,
+        &simdutf::validate_utf32_with_errors,
+        &simdutf::utf16_length_from_utf32,
+        &simdutf::convert_valid_utf32_to_utf16le,
+        static_cast<char16_t>(LL_UNKNOWN_CHAR));
 }
 
 LLWString utf16str_to_wstring(const char16_t* utf16str, size_t len)
 {
-    LLWString wout;
-    if (len == 0) return wout;
-
-    S32 i = 0;
-    const char16_t* chars16 = utf16str;
-    while (i < len)
-    {
-        llwchar cur_char;
-        i += (S32)utf16chars_to_wchar(chars16+i, &cur_char);
-        wout += cur_char;
-    }
-    return wout;
+    return utf_convert_with_replacement<char16_t, char32_t>(
+        utf16str, len,
+        &simdutf::validate_utf16le_with_errors,
+        &simdutf::utf32_length_from_utf16le,
+        &simdutf::convert_valid_utf16le_to_utf32,
+        static_cast<char32_t>(LL_UNKNOWN_CHAR));
 }
 
 // Length in utf16string (UTF-16) of wlen wchars beginning at woffset.
 S32 wstring_utf16_length(const LLWString &wstr, const S32 woffset, const S32 wlen)
 {
     const S32 end = llmin((S32)wstr.length(), woffset + wlen);
-    if (end < woffset)
-    {
-        return 0;
-    }
-    else
-    {
-        S32 length = end - woffset;
-        for (S32 i = woffset; i < end; i++)
-        {
-            if (wstr[i] >= 0x10000)
-            {
-                length++;
-            }
-        }
-        return length;
-    }
+    if (end <= woffset) return 0;
+    return (S32)simdutf::utf16_length_from_utf32(wstr.data() + woffset, end - woffset);
 }
 
 // Given a wstring and an offset in it, returns the length as wstring (i.e.,
@@ -361,121 +347,37 @@ std::string wchar_utf8_preview(const llwchar wc)
 
 S32 wstring_utf8_length(const LLWString& wstr)
 {
-    S32 len = 0;
-    for (S32 i = 0; i < (S32)wstr.length(); i++)
-    {
-        len += wchar_utf8_length(wstr[i]);
-    }
-    return len;
+    return (S32)simdutf::utf8_length_from_utf32(wstr.data(), wstr.size());
 }
 
 LLWString utf8str_to_wstring(const char* utf8str, size_t len)
 {
-    LLWString wout;
-
-    S32 i = 0;
-    while (i < len)
-    {
-        llwchar unichar;
-        U8 cur_char = utf8str[i];
-
-        if (cur_char < 0x80)
-        {
-            // Ascii character, just add it
-            unichar = cur_char;
-        }
-        else
-        {
-            S32 cont_bytes = 0;
-            if ((cur_char >> 5) == 0x6)         // Two byte UTF8 -> 1 UTF32
-            {
-                unichar = (0x1F&cur_char);
-                cont_bytes = 1;
-            }
-            else if ((cur_char >> 4) == 0xe)    // Three byte UTF8 -> 1 UTF32
-            {
-                unichar = (0x0F&cur_char);
-                cont_bytes = 2;
-            }
-            else if ((cur_char >> 3) == 0x1e)   // Four byte UTF8 -> 1 UTF32
-            {
-                unichar = (0x07&cur_char);
-                cont_bytes = 3;
-            }
-            else if ((cur_char >> 2) == 0x3e)   // Five byte UTF8 -> 1 UTF32
-            {
-                unichar = (0x03&cur_char);
-                cont_bytes = 4;
-            }
-            else if ((cur_char >> 1) == 0x7e)   // Six byte UTF8 -> 1 UTF32
-            {
-                unichar = (0x01&cur_char);
-                cont_bytes = 5;
-            }
-            else
-            {
-                wout += LL_UNKNOWN_CHAR;
-                ++i;
-                continue;
-            }
-
-            // Check that this character doesn't go past the end of the string
-            auto end = (len < (i + cont_bytes)) ? len : (i + cont_bytes);
-            do
-            {
-                ++i;
-
-                cur_char = utf8str[i];
-                if ( (cur_char >> 6) == 0x2 )
-                {
-                    unichar <<= 6;
-                    unichar += (0x3F&cur_char);
-                }
-                else
-                {
-                    // Malformed sequence - roll back to look at this as a new char
-                    unichar = LL_UNKNOWN_CHAR;
-                    --i;
-                    break;
-                }
-            } while(i < end);
-
-            // Handle overlong characters and NULL characters
-            if ( ((cont_bytes == 1) && (unichar < 0x80))
-                || ((cont_bytes == 2) && (unichar < 0x800))
-                || ((cont_bytes == 3) && (unichar < 0x10000))
-                || ((cont_bytes == 4) && (unichar < 0x200000))
-                || ((cont_bytes == 5) && (unichar < 0x4000000)) )
-            {
-                unichar = LL_UNKNOWN_CHAR;
-            }
-        }
-
-        wout += unichar;
-        ++i;
-    }
-    return wout;
+    return utf_convert_with_replacement<char, char32_t>(
+        utf8str, len,
+        &simdutf::validate_utf8_with_errors,
+        &simdutf::utf32_length_from_utf8,
+        &simdutf::convert_valid_utf8_to_utf32,
+        static_cast<char32_t>(LL_UNKNOWN_CHAR));
 }
 
 std::string wstring_to_utf8str(const llwchar* utf32str, size_t len)
 {
-    std::string out;
-
-    S32 i = 0;
-    while (i < len)
-    {
-        char tchars[8];     /* Flawfinder: ignore */
-        auto n = wchar_to_utf8chars(utf32str[i], tchars);
-        tchars[n] = 0;
-        out += tchars;
-        i++;
-    }
-    return out;
+    return utf_convert_with_replacement<char32_t, char>(
+        utf32str, len,
+        &simdutf::validate_utf32_with_errors,
+        &simdutf::utf8_length_from_utf32,
+        &simdutf::convert_valid_utf32_to_utf8,
+        static_cast<char>(LL_UNKNOWN_CHAR));
 }
 
 std::string utf16str_to_utf8str(const char16_t* utf16str, size_t len)
 {
-    return wstring_to_utf8str(utf16str_to_wstring(utf16str, len));
+    return utf_convert_with_replacement<char16_t, char>(
+        utf16str, len,
+        &simdutf::validate_utf16le_with_errors,
+        &simdutf::utf8_length_from_utf16le,
+        &simdutf::convert_valid_utf16le_to_utf8,
+        static_cast<char>(LL_UNKNOWN_CHAR));
 }
 
 std::u8string str_to_u8str(const char* str, size_t len)
@@ -521,73 +423,22 @@ S32 utf8str_compare_insensitive(const std::string& lhs, const std::string& rhs)
 
 std::string utf8str_truncate(const std::string& utf8str, const S32 max_len)
 {
-    if (0 == max_len)
-    {
-        return std::string();
-    }
-    if ((S32)utf8str.length() <= max_len)
-    {
-        return utf8str;
-    }
-    else
-    {
-        S32 cur_char = max_len;
-
-        // If we're ASCII, we don't need to do anything
-        if ((U8)utf8str[cur_char] > 0x7f)
-        {
-            // If first two bits are (10), it's the tail end of a multibyte char.  We need to shift back
-            // to the first character
-            while (0x80 == (0xc0 & utf8str[cur_char]))
-            {
-                cur_char--;
-                // Keep moving forward until we hit the first char;
-                if (cur_char == 0)
-                {
-                    // Make sure we don't trash memory if we've got a bogus string.
-                    break;
-                }
-            }
-        }
-        // The byte index we're on is one we want to get rid of, so we only want to copy up to (cur_char-1) chars
-        return utf8str.substr(0, cur_char);
-    }
+    if (0 == max_len) return std::string();
+    if ((S32)utf8str.length() <= max_len) return utf8str;
+    return utf8str.substr(0,
+        simdutf::trim_partial_utf8(utf8str.data(), (size_t)max_len));
 }
 
 // [RLVa:KB] - Checked: RLVa-2.1.0
 std::string utf8str_substr(const std::string& utf8str, const S32 index, const S32 max_len)
 {
-    if (0 == max_len)
-    {
-        return std::string();
-    }
-    if (utf8str.length() - index  <= max_len)
+    if (0 == max_len) return std::string();
+    if (utf8str.length() - index <= (size_t)max_len)
     {
         return utf8str.substr(index, max_len);
     }
-    else
-    {
-        S32 cur_char = max_len;
-
-        // If we're ASCII, we don't need to do anything
-        if ((U8)utf8str[index + cur_char] > 0x7f)
-        {
-            // If first two bits are (10), it's the tail end of a multibyte char.  We need to shift back
-            // to the first character
-            while (0x80 == (0xc0 & utf8str[index + cur_char]))
-            {
-                cur_char--;
-                // Keep moving forward until we hit the first char;
-                if (cur_char == 0)
-                {
-                    // Make sure we don't trash memory if we've got a bogus string.
-                    break;
-                }
-            }
-        }
-        // The byte index we're on is one we want to get rid of, so we only want to copy up to (cur_char-1) chars
-        return utf8str.substr(index, cur_char);
-    }
+    return utf8str.substr(index,
+        simdutf::trim_partial_utf8(utf8str.data() + index, (size_t)max_len));
 }
 
 void utf8str_split(std::list<std::string>& split_list, const std::string& utf8str, size_t maxlen, char split_token)
@@ -636,21 +487,21 @@ std::string utf8str_symbol_truncate(const std::string& utf8str, const S32 symbol
     {
         return utf8str;
     }
-    else
-    {
-        int len = 0, byteIndex = 0;
-        const char* aStr = utf8str.c_str();
-        size_t origSize = utf8str.size();
 
-        for (byteIndex = 0; len < symbol_len && byteIndex < origSize; byteIndex++)
+    int symbols = 0;
+    size_t byteIndex = 0;
+    const size_t origSize = utf8str.size();
+    while (byteIndex < origSize)
+    {
+        if ((utf8str[byteIndex] & 0xc0) != 0x80)
         {
-            if ((aStr[byteIndex] & 0xc0) != 0x80)
-            {
-                len += 1;
-            }
+            if (symbols == symbol_len)
+                break;
+            ++symbols;
         }
-        return utf8str.substr(0, byteIndex);
+        ++byteIndex;
     }
+    return utf8str.substr(0, byteIndex);
 }
 
 std::string utf8str_substChar(
@@ -706,7 +557,9 @@ std::string utf8str_removeCRLF(const std::string& utf8str)
     return out;
 }
 
-llwchar utf8str_to_wchar(const std::string& utf8str, size_t offset, size_t length)
+// Only used by utf8str_showBytesUTF8 below. Kept file-local after the simdutf
+// migration (no external callers).
+static llwchar utf8str_to_wchar(const std::string& utf8str, size_t offset, size_t length)
 {
     switch (length)
     {
@@ -925,21 +778,24 @@ std::wstring ll_convert_string_to_wide(const char* in, size_t len, unsigned int 
 
 LLWString ll_convert_wide_to_wstring(const wchar_t* in, size_t len)
 {
-    // Whether or not std::wstring and llutf16string are distinct types, they
-    // both hold UTF-16LE characters. (See header file comments.) Pretend this
-    // wchar_t* sequence is really a char16_t* sequence and use the conversion
-    // we define above.
-    return utf16str_to_wstring(reinterpret_cast<const char16_t*>(in), len);
+    // Windows wchar_t is 16-bit UTF-16LE — same layout as char16_t.
+    return utf_convert_with_replacement<char16_t, char32_t>(
+        reinterpret_cast<const char16_t*>(in), len,
+        &simdutf::validate_utf16le_with_errors,
+        &simdutf::utf32_length_from_utf16le,
+        &simdutf::convert_valid_utf16le_to_utf32,
+        static_cast<char32_t>(LL_UNKNOWN_CHAR));
 }
 
 std::wstring ll_convert_wstring_to_wide(const llwchar* in, size_t len)
 {
-    // first, convert to llutf16string, for which we have a real implementation
-    auto utf16str{ wstring_to_utf16str(in, len) };
-    // then, because each U16 char must be UTF-16LE encoded, pretend the U16*
-    // string pointer is a wchar_t* and instantiate a std::wstring of the same
-    // length.
-    return { reinterpret_cast<const wchar_t*>(utf16str.c_str()), utf16str.length() };
+    const auto utf16 = utf_convert_with_replacement<char32_t, char16_t>(
+        in, len,
+        &simdutf::validate_utf32_with_errors,
+        &simdutf::utf16_length_from_utf32,
+        &simdutf::convert_valid_utf32_to_utf16le,
+        static_cast<char16_t>(LL_UNKNOWN_CHAR));
+    return { reinterpret_cast<const wchar_t*>(utf16.data()), utf16.size() };
 }
 
 std::string ll_convert_string_to_utf8_string(const std::string& in)
@@ -1042,28 +898,10 @@ std::optional<std::wstring> llstring_getoptenv(const std::string& key)
 // Length in llwchar (UTF-32) of the first len units (16 bits) of the given UTF-16 string.
 S32 wide_wstring_length(const std::wstring& utf16str, const S32 utf16_len)
 {
-    S32 surrogate_pairs = 0;
-    // ... craziness to make gcc happy (llutf16string.c_str() is tweaked on linux):
-    const wchar_t* const utf16_chars = &(*(utf16str.begin()));
-    S32                   i           = 0;
-    while (i < utf16_len)
-    {
-        const wchar_t c = utf16_chars[i++];
-        if (c >= 0xD800 && c <= 0xDBFF) // See http://en.wikipedia.org/wiki/UTF-16
-        {                               // Have first byte of a surrogate pair
-            if (i >= utf16_len)
-            {
-                break;
-            }
-            const U16 d = utf16_chars[i];
-            if (d >= 0xDC00 && d <= 0xDFFF)
-            { // Have valid second byte of a surrogate pair
-                surrogate_pairs++;
-                i++;
-            }
-        }
-    }
-    return utf16_len - surrogate_pairs;
+    if (utf16_len <= 0) return 0;
+    return (S32)simdutf::utf32_length_from_utf16le(
+        reinterpret_cast<const char16_t*>(utf16str.data()),
+        (size_t)utf16_len);
 }
 
 #else  // ! LL_WINDOWS

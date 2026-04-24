@@ -629,7 +629,6 @@ typedef std::u16string llutf16string;
 
 ll_convert_forms(ll_convert_alias, LLWString, llutf16string, utf16str_to_wstring);
 ll_convert_forms(ll_convert_alias, llutf16string, LLWString, wstring_to_utf16str);
-ll_convert_forms(ll_convert_alias, llutf16string, std::string, utf8str_to_utf16str);
 ll_convert_forms(ll_convert_alias,     LLWString,     std::string,   utf8str_to_wstring);
 
 // Same function, better name. JC
@@ -715,8 +714,6 @@ LL_COMMON_API std::string utf8str_makeASCII(const std::string& utf8str);
 LL_COMMON_API std::string mbcsstring_makeASCII(const std::string& str);
 
 LL_COMMON_API std::string utf8str_removeCRLF(const std::string& utf8str);
-
-LL_COMMON_API llwchar utf8str_to_wchar(const std::string& utf8str, size_t offset, size_t length);
 
 LL_COMMON_API std::string utf8str_showBytesUTF8(const std::string& utf8str);
 
