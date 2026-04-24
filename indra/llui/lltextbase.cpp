@@ -1089,6 +1089,14 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
     {
         LLStyleSP emoji_style;
         LLEmojiDictionary* ed = LLEmojiDictionary::instanceExists() ? LLEmojiDictionary::getInstance() : NULL;
+        // Multi-codepoint emoji clusters (ZWJ families, flag pairs, keycap,
+        // tag subdivision flags) must live in a single LLEmojiTextSegment so
+        // LLFontGL::render sees the whole sequence in one call and can shape
+        // it through HarfBuzz. Otherwise the cluster gets chopped into one
+        // segment per emoji base with ZWJ/VS filler falling between, and
+        // each render() only sees an isolated emoji — presentation breaks.
+        const auto shape_runs = wstring_find_shaping_runs(wstr);
+        auto next_run = shape_runs.begin();
         LLTextSegment* segmentp = nullptr;
         segment_vec_t::iterator seg_iter;
         if (segments && segments->size() > 0)
@@ -1120,18 +1128,33 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
                 }
             }
 
-            llwchar code = wstr[text_kitty];
-            bool isEmoji = ed ? ed->isEmoji(code) : LLStringOps::isEmoji(code);
-            if (isEmoji)
-            {
-                if (!emoji_style)
-                {
-                    emoji_style = new LLStyle(getStyleParams());
-                    emoji_style->setFont(LLFontGL::getFontEmojiLarge());
-                }
+            // Drop runs that are entirely behind us (defensive; runs are
+            // sorted so this is usually a no-op).
+            while (next_run != shape_runs.end() && next_run->second <= (size_t)text_kitty)
+                ++next_run;
 
-                S32 new_seg_start = pos + text_kitty;
-                insertSegment(new LLEmojiTextSegment(emoji_style, new_seg_start, new_seg_start + 1, *this));
+            const bool is_cluster_start =
+                next_run != shape_runs.end() && next_run->first == (size_t)text_kitty;
+            const llwchar code    = wstr[text_kitty];
+            const bool    isEmoji = ed ? ed->isEmoji(code) : LLStringOps::isEmoji(code);
+            if (!is_cluster_start && !isEmoji)
+                continue;
+
+            if (!emoji_style)
+            {
+                emoji_style = new LLStyle(getStyleParams());
+                emoji_style->setFont(LLFontGL::getFontEmojiLarge());
+            }
+
+            const S32 span           = is_cluster_start ? (S32)(next_run->second - next_run->first) : 1;
+            const S32 new_seg_start  = pos + text_kitty;
+            insertSegment(new LLEmojiTextSegment(emoji_style, new_seg_start, new_seg_start + span, *this));
+
+            if (is_cluster_start)
+            {
+                // For-loop's ++ will land us past the cluster's last codepoint.
+                text_kitty += span - 1;
+                ++next_run;
             }
         }
     }

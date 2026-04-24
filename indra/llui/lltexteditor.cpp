@@ -517,7 +517,10 @@ S32 LLTextEditor::prevWordPos(S32 cursorPos) const
     {
         cursorPos--;
     }
-    return cursorPos;
+    // ZWJ, VS and tag codepoints are neither word chars nor spaces, so the
+    // walk can stop in the middle of an emoji cluster. Snap to the cluster
+    // start so ctrl+left never parks the caret inside a ZWJ sequence.
+    return (S32)wstring_grapheme_align_backward(wtext, (size_t)cursorPos);
 }
 
 S32 LLTextEditor::nextWordPos(S32 cursorPos) const
@@ -531,7 +534,7 @@ S32 LLTextEditor::nextWordPos(S32 cursorPos) const
     {
         cursorPos++;
     }
-    return cursorPos;
+    return (S32)wstring_grapheme_align_forward(wtext, (size_t)cursorPos);
 }
 
 const LLTextSegmentPtr  LLTextEditor::getPreviousSegment() const
@@ -1203,8 +1206,20 @@ void LLTextEditor::removeCharOrTab()
 
         for (S32 i = 0; i < chars_to_remove; i++)
         {
-            setCursorPos(mCursorPos - 1);
-            remove(mCursorPos, 1, false);
+            // The pseudo-tab branch (chars_to_remove > 1) is only entered
+            // when the preceding characters are all spaces, which never form
+            // a grapheme cluster, so stepping by 1 each iter is correct.
+            // The single-codepoint branch (chars_to_remove == 1) uses the
+            // cluster-aware step so backspace on an emoji removes the whole
+            // ZWJ/flag/keycap/tag sequence in one press.
+            S32 span = 1;
+            if (chars_to_remove == 1)
+            {
+                const size_t new_pos = wstring_step_grapheme_backward(getWText(), (size_t)mCursorPos);
+                span = mCursorPos - (S32)new_pos;
+            }
+            setCursorPos(mCursorPos - span);
+            remove(mCursorPos, span, false);
         }
 
         tryToShowEmojiHelper();
@@ -1231,8 +1246,10 @@ void LLTextEditor::removeChar()
 
     if (mCursorPos > 0)
     {
-        setCursorPos(mCursorPos - 1);
-        removeChar(mCursorPos);
+        const size_t new_pos = wstring_step_grapheme_backward(getWText(), (size_t)mCursorPos);
+        const S32 span = mCursorPos - (S32)new_pos;
+        setCursorPos((S32)new_pos);
+        remove(mCursorPos, span, false);
         tryToShowEmojiHelper();
         tryToShowMentionHelper();
     }
@@ -1418,7 +1435,7 @@ bool LLTextEditor::handleSelectionKey(const KEY key, const MASK mask)
             if( 0 < mCursorPos )
             {
                 startSelection();
-                setCursorPos(mCursorPos - 1);
+                setCursorPos((S32)wstring_step_grapheme_backward(getWText(), (size_t)mCursorPos));
                 if( mask & MASK_CONTROL )
                 {
                     setCursorPos(prevWordPos(mCursorPos));
@@ -1431,7 +1448,7 @@ bool LLTextEditor::handleSelectionKey(const KEY key, const MASK mask)
             if( mCursorPos < getLength() )
             {
                 startSelection();
-                setCursorPos(mCursorPos + 1);
+                setCursorPos((S32)wstring_step_grapheme_forward(getWText(), (size_t)mCursorPos));
                 if( mask & MASK_CONTROL )
                 {
                     setCursorPos(nextWordPos(mCursorPos));
@@ -1549,7 +1566,7 @@ bool LLTextEditor::handleNavigationKey(const KEY key, const MASK mask)
             {
                 if( 0 < mCursorPos )
                 {
-                    setCursorPos(mCursorPos - 1);
+                    setCursorPos((S32)wstring_step_grapheme_backward(getWText(), (size_t)mCursorPos));
                 }
                 else
                 {
@@ -1567,7 +1584,7 @@ bool LLTextEditor::handleNavigationKey(const KEY key, const MASK mask)
             {
                 if( mCursorPos < getLength() )
                 {
-                    setCursorPos(mCursorPos + 1);
+                    setCursorPos((S32)wstring_step_grapheme_forward(getWText(), (size_t)mCursorPos));
                 }
                 else
                 {
@@ -2174,7 +2191,20 @@ void LLTextEditor::doDelete()
 
         for( i = 0; i < chars_to_remove; i++ )
         {
-            setCursorPos(mCursorPos + 1);
+            // See removeCharOrTab: the pseudo-tab branch only runs on plain
+            // spaces, so stepping by 1 stays correct there. The single-char
+            // branch uses the cluster-aware forward step so Delete on an
+            // emoji peels off the whole ZWJ/flag/keycap sequence at once —
+            // removeChar() is itself cluster-aware for the backward direction,
+            // so after moving the cursor past the cluster it deletes the
+            // whole span.
+            S32 span = 1;
+            if (chars_to_remove == 1)
+            {
+                const size_t forward = wstring_step_grapheme_forward(getWText(), (size_t)mCursorPos);
+                span = (S32)forward - mCursorPos;
+            }
+            setCursorPos(mCursorPos + span);
             removeChar();
         }
 

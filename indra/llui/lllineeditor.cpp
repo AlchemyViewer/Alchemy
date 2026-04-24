@@ -972,12 +972,16 @@ void LLLineEditor::removeChar()
 {
     if( getCursor() > 0 )
     {
-        if (!prevalidateInput(mText.getWString().substr(getCursor()-1, 1)))
+        const LLWString& wstr = mText.getWString();
+        const S32 cursor = getCursor();
+        const S32 new_cursor = (S32)wstring_step_grapheme_backward(wstr, (size_t)cursor);
+        const S32 span = cursor - new_cursor;
+        if (!prevalidateInput(wstr.substr(new_cursor, span)))
             return;
 
-        mText.erase(getCursor() - 1, 1);
+        mText.erase(new_cursor, span);
 
-        setCursor(getCursor() - 1);
+        setCursor(new_cursor);
 
         mFontBufferPreSelection.reset();
         mFontBufferSelection.reset();
@@ -1153,7 +1157,11 @@ S32 LLLineEditor::prevWordPos(S32 cursorPos) const
     {
         cursorPos--;
     }
-    return cursorPos;
+    // Emoji (ZWJ, VS, skin tone, tag characters) pass neither isPartOfWord
+    // nor the space test, so the walk stops wherever inside an emoji
+    // cluster those characters start. Snap back to the cluster's own start
+    // so ctrl+left doesn't leave the caret between 🐕 and the ZWJ.
+    return (S32)wstring_grapheme_align_backward(wtext, (size_t)cursorPos);
 }
 
 S32 LLLineEditor::nextWordPos(S32 cursorPos) const
@@ -1167,7 +1175,7 @@ S32 LLLineEditor::nextWordPos(S32 cursorPos) const
     {
         cursorPos++;
     }
-    return cursorPos;
+    return (S32)wstring_grapheme_align_forward(wtext, (size_t)cursorPos);
 }
 
 
@@ -1184,7 +1192,7 @@ bool LLLineEditor::handleSelectionKey(KEY key, MASK mask)
         case KEY_LEFT:
             if( 0 < getCursor() )
             {
-                S32 cursorPos = getCursor() - 1;
+                S32 cursorPos = (S32)wstring_step_grapheme_backward(mText.getWString(), (size_t)getCursor());
                 if( mask & MASK_CONTROL )
                 {
                     cursorPos = prevWordPos(cursorPos);
@@ -1200,7 +1208,7 @@ bool LLLineEditor::handleSelectionKey(KEY key, MASK mask)
         case KEY_RIGHT:
             if( getCursor() < mText.length())
             {
-                S32 cursorPos = getCursor() + 1;
+                S32 cursorPos = (S32)wstring_step_grapheme_forward(mText.getWString(), (size_t)getCursor());
                 if( mask & MASK_CONTROL )
                 {
                     cursorPos = nextWordPos(cursorPos);
@@ -1547,7 +1555,7 @@ bool LLLineEditor::handleSpecialKey(KEY key, MASK mask)
             else
             if( 0 < getCursor() )
             {
-                S32 cursorPos = getCursor() - 1;
+                S32 cursorPos = (S32)wstring_step_grapheme_backward(mText.getWString(), (size_t)getCursor());
                 if( mask & MASK_CONTROL )
                 {
                     cursorPos = prevWordPos(cursorPos);
@@ -1574,7 +1582,7 @@ bool LLLineEditor::handleSpecialKey(KEY key, MASK mask)
             else
             if (getCursor() < mText.length())
             {
-                S32 cursorPos = getCursor() + 1;
+                S32 cursorPos = (S32)wstring_step_grapheme_forward(mText.getWString(), (size_t)getCursor());
                 if( mask & MASK_CONTROL )
                 {
                     cursorPos = nextWordPos(cursorPos);
@@ -1803,14 +1811,20 @@ void LLLineEditor::doDelete()
         }
         else if ( getCursor() < mText.length())
         {
-            const LLWString& text_to_delete = mText.getWString().substr(getCursor(), 1);
+            const LLWString& wtext = mText.getWString();
+            const S32 cursor = getCursor();
+            const S32 forward_pos = (S32)wstring_step_grapheme_forward(wtext, (size_t)cursor);
+            const S32 span = forward_pos - cursor;
+            const LLWString& text_to_delete = wtext.substr(cursor, span);
 
             if (!prevalidateInput(text_to_delete))
             {
                 onKeystroke();
                 return;
             }
-            setCursor(getCursor() + 1);
+            // Advance past the cluster, then backspace — removeChar is
+            // cluster-aware and will remove the whole span in one shot.
+            setCursor(forward_pos);
             removeChar();
         }
 

@@ -852,6 +852,66 @@ std::vector<std::pair<size_t, size_t>> wstring_find_shaping_runs(LLWStringView w
     return runs;
 }
 
+size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos)
+{
+    const size_t n = wstr.size();
+    if (pos >= n)
+        return n;
+    const size_t next = pos + 1;
+    // Runs are sorted by start, so stop scanning once we pass `next`.
+    for (const auto& run : wstring_find_shaping_runs(wstr))
+    {
+        if (next <= run.first)
+            break;
+        if (run.first < next && next < run.second)
+            return run.second;
+    }
+    return next;
+}
+
+size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos)
+{
+    if (pos == 0)
+        return 0;
+    const size_t prev = pos - 1;
+    for (const auto& run : wstring_find_shaping_runs(wstr))
+    {
+        if (prev < run.first)
+            break;
+        if (run.first < prev && prev < run.second)
+            return run.first;
+    }
+    return prev;
+}
+
+size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos)
+{
+    if (pos == 0 || pos >= wstr.size())
+        return pos;
+    for (const auto& run : wstring_find_shaping_runs(wstr))
+    {
+        if (pos <= run.first)
+            break;
+        if (run.first < pos && pos < run.second)
+            return run.first;
+    }
+    return pos;
+}
+
+size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
+{
+    if (pos >= wstr.size())
+        return wstr.size();
+    for (const auto& run : wstring_find_shaping_runs(wstr))
+    {
+        if (pos <= run.first)
+            break;
+        if (run.first < pos && pos < run.second)
+            return run.second;
+    }
+    return pos;
+}
+
 #if LL_WINDOWS
 unsigned int ll_wstring_default_code_page()
 {

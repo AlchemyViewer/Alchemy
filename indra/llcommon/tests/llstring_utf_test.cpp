@@ -81,10 +81,10 @@ namespace tut
 {
     struct llstring_utf_data {};
     // Tests are numbered by category (1x conversion, 2x validation, 3x case,
-    // 6x emoji, 8x byte-helpers, 9x shaping). The TUT default registers only
-    // test<1>..test<50>, silently dropping everything above. Keep this in sync
-    // with the highest test number used below.
-    typedef test_group<llstring_utf_data, 100> llstring_utf_t;
+    // 6x emoji, 8x byte-helpers, 9x shaping, 10x grapheme). The TUT default
+    // registers only test<1>..test<50>, silently dropping everything above.
+    // Keep this in sync with the highest test number used below.
+    typedef test_group<llstring_utf_data, 128> llstring_utf_t;
     typedef llstring_utf_t::object llstring_utf_object_t;
     tut::llstring_utf_t tut_llstring_utf("LLStringUTF");
 
@@ -981,5 +981,70 @@ namespace tut
         ensure_equals("bare zwj",  wstring_find_shaping_runs(zwj).size(),  size_t(0));
         LLWString vs16 = { (llwchar)'a', (llwchar)0xFE0F, (llwchar)'b' };
         ensure_equals("bare vs16", wstring_find_shaping_runs(vs16).size(), size_t(0));
+    }
+
+    // ---------------------------------------------------------------
+    //                 grapheme-step cursor walker
+    // ---------------------------------------------------------------
+
+    // Forward step must move exactly one codepoint through ASCII and skip
+    // past entire emoji clusters in one move so the caret never lands mid-
+    // ZWJ-family.
+    template<> template<>
+    void llstring_utf_object_t::test<100>()
+    {
+        // Pure ASCII — one codepoint per step, clamped at size.
+        LLWString ascii = { (llwchar)'a', (llwchar)'b', (llwchar)'c' };
+        ensure_equals("ascii 0->1", wstring_step_grapheme_forward(ascii, 0), size_t(1));
+        ensure_equals("ascii 2->3", wstring_step_grapheme_forward(ascii, 2), size_t(3));
+        ensure_equals("ascii at end stays", wstring_step_grapheme_forward(ascii, 3), size_t(3));
+
+        // ZWJ family in the middle: H, 👨, ZWJ, 👩, ZWJ, 👧, i
+        //                           0  1    2    3    4    5    6
+        LLWString fam = { (llwchar)'H',
+                          (llwchar)0x1F468, (llwchar)0x200D,
+                          (llwchar)0x1F469, (llwchar)0x200D,
+                          (llwchar)0x1F467,
+                          (llwchar)'i' };
+        ensure_equals("H->fam start", wstring_step_grapheme_forward(fam, 0), size_t(1));
+        ensure_equals("fam start jumps past cluster",
+                      wstring_step_grapheme_forward(fam, 1), size_t(6));
+        ensure_equals("from mid-cluster snaps past",
+                      wstring_step_grapheme_forward(fam, 3), size_t(6));
+        ensure_equals("fam end -> 'i'", wstring_step_grapheme_forward(fam, 6), size_t(7));
+
+        // Regional indicator flag: US = U+1F1FA U+1F1F8. One step covers both.
+        LLWString flag = { (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
+        ensure_equals("flag 0->past both",
+                      wstring_step_grapheme_forward(flag, 0), size_t(2));
+    }
+
+    // Backward step is the mirror: one codepoint through ASCII, snap to the
+    // start of any emoji cluster we'd otherwise land inside.
+    template<> template<>
+    void llstring_utf_object_t::test<101>()
+    {
+        LLWString ascii = { (llwchar)'a', (llwchar)'b', (llwchar)'c' };
+        ensure_equals("ascii 3->2", wstring_step_grapheme_backward(ascii, 3), size_t(2));
+        ensure_equals("ascii 1->0", wstring_step_grapheme_backward(ascii, 1), size_t(0));
+        ensure_equals("ascii at 0 stays", wstring_step_grapheme_backward(ascii, 0), size_t(0));
+
+        LLWString fam = { (llwchar)'H',
+                          (llwchar)0x1F468, (llwchar)0x200D,
+                          (llwchar)0x1F469, (llwchar)0x200D,
+                          (llwchar)0x1F467,
+                          (llwchar)'i' };
+        ensure_equals("end of string -> 'i' start",
+                      wstring_step_grapheme_backward(fam, 7), size_t(6));
+        ensure_equals("'i' start snaps back to cluster start",
+                      wstring_step_grapheme_backward(fam, 6), size_t(1));
+        ensure_equals("mid-cluster snaps to cluster start",
+                      wstring_step_grapheme_backward(fam, 4), size_t(1));
+        ensure_equals("cluster start -> 'H'",
+                      wstring_step_grapheme_backward(fam, 1), size_t(0));
+
+        LLWString flag = { (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
+        ensure_equals("flag end -> 0 (whole flag is one cluster)",
+                      wstring_step_grapheme_backward(flag, 2), size_t(0));
     }
 }

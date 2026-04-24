@@ -970,6 +970,35 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
 
     F32 scaled_max_pixels = max_pixels * sScaleX;
 
+    // Locate the tight slice we'll consider (bounded by max_chars and the
+    // first NUL) so we can shape the same window render() does. Without
+    // this, per-codepoint advances disagree with the rendered composite
+    // glyph: clicks land in the middle of an emoji cluster instead of on
+    // its edges.
+    S32 slice_end = begin_offset;
+    while (slice_end < max_index && wchars[slice_end] != 0)
+        ++slice_end;
+    const S32 slice_len = slice_end - begin_offset;
+
+    std::vector<std::pair<size_t, size_t>> shape_ranges =
+        (slice_len > 0)
+            ? wstring_find_shaping_runs(LLWStringView(wchars + begin_offset, (size_t)slice_len))
+            : std::vector<std::pair<size_t, size_t>>();
+    std::vector<std::vector<LLShapedGlyph>> shape_glyphs(shape_ranges.size());
+    if (!shape_ranges.empty())
+    {
+        LLWString slice(wchars + begin_offset, wchars + slice_end);
+        for (size_t s = 0; s < shape_ranges.size(); ++s)
+        {
+            const size_t rb = shape_ranges[s].first;
+            const size_t re = shape_ranges[s].second;
+            shape_ranges[s].first  = rb + begin_offset;
+            shape_ranges[s].second = re + begin_offset;
+            LLFontShaping::shapeRun(mFontFreetype, slice, rb, re, shape_glyphs[s]);
+        }
+    }
+    size_t next_shape_run = 0;
+
     const LLFontGlyphInfo* next_glyph = NULL;
 
     S32 pos;
@@ -979,6 +1008,43 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
         if (!wch)
         {
             break; // done
+        }
+
+        // A shaped cluster occupies one visual glyph; its entire width must
+        // be treated as one advance chunk. Left half → pos stays at cluster
+        // start, right half → consume the whole run and continue past it.
+        if (next_shape_run < shape_ranges.size()
+            && (S32)shape_ranges[next_shape_run].first == pos)
+        {
+            const auto  run_range  = shape_ranges[next_shape_run];
+            const auto& run_glyphs = shape_glyphs[next_shape_run];
+            ++next_shape_run;
+
+            if (!run_glyphs.empty())
+            {
+                F32 run_advance = 0.f;
+                for (const LLShapedGlyph& sg : run_glyphs)
+                    run_advance += sg.x_advance;
+
+                if (round)
+                {
+                    if (target_x < cur_x + run_advance * 0.5f)
+                        break;  // left half — pos is cluster start
+                }
+                else if (target_x < cur_x + run_advance)
+                {
+                    break;
+                }
+
+                if (scaled_max_pixels < cur_x + run_advance)
+                    break;
+
+                cur_x += run_advance;
+                cur_x = (F32)ll_round(cur_x);
+                pos = (S32)run_range.second - 1;  // loop's ++ lands past the run
+                next_glyph = NULL;
+                continue;
+            }
         }
 
         const LLFontGlyphInfo* glyph = next_glyph;
