@@ -37,6 +37,7 @@
 
 // Harfbuzz
 #include <hb.h>
+#include <hb-ft.h>
 
 #include "lldir.h"
 #include "llerror.h"
@@ -149,6 +150,7 @@ LLFontFreetype::LLFontFreetype()
     mLineHeight(0.f),
     mIsFallback(false),
     mFTFace(nullptr),
+    mHbFont(nullptr),
     mRenderGlyphCount(0),
     mStyle(0),
     mPointSize(0)
@@ -158,6 +160,9 @@ LLFontFreetype::LLFontFreetype()
 
 LLFontFreetype::~LLFontFreetype()
 {
+    // HarfBuzz handle first — it retains the FT_Face.
+    destroyHbFont();
+
     // Clean up freetype libs.
     if (mFTFace)
         FT_Done_Face(mFTFace);
@@ -166,9 +171,101 @@ LLFontFreetype::~LLFontFreetype()
     // Delete glyph info
     std::for_each(mCharGlyphInfoMap.begin(), mCharGlyphInfoMap.end(), DeletePairedPointer());
     mCharGlyphInfoMap.clear();
+    std::for_each(mShapedGlyphInfoMap.begin(), mShapedGlyphInfoMap.end(), DeletePairedPointer());
+    mShapedGlyphInfoMap.clear();
 
     delete mFontBitmapCachep;
     // mFallbackFonts cleaned up by LLPointer destructor
+}
+
+void LLFontFreetype::destroyHbFont()
+{
+    if (mHbFont)
+    {
+        hb_font_destroy(mHbFont);
+        mHbFont = nullptr;
+    }
+}
+
+hb_font_t* LLFontFreetype::getHbFont() const
+{
+    if (!mHbFont && mFTFace)
+    {
+        // hb_ft_font_create_referenced retains mFTFace for the lifetime of
+        // the hb_font, so we must destroy the hb_font before calling
+        // FT_Done_Face on the underlying face (see ~LLFontFreetype and
+        // loadFace).
+        mHbFont = hb_ft_font_create_referenced(mFTFace);
+    }
+    return mHbFont;
+}
+
+const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_glyph_index) const
+{
+    out_glyph_index = 0;
+    if (!mFTFace)
+        return this;
+
+    llassert(!mIsFallback);
+
+    // Root face first — cheapest path and by far the most common.
+    out_glyph_index = FT_Get_Char_Index(mFTFace, base);
+    if (out_glyph_index != 0)
+        return this;
+
+    const size_t count = mFallbackFonts.size();
+
+    // Genuine emoji: try functor-guarded emoji fonts before anything else so
+    // the color font wins over a monochrome fallback that happens to have a
+    // glyph in the same range.
+    if (LLStringOps::isEmoji(base))
+    {
+        for (size_t i = 0; i < count; ++i)
+        {
+            const fallback_font_t& pair = mFallbackFonts[i];
+            if (!pair.second || !pair.second(base))
+                continue;
+            FT_UInt gi = FT_Get_Char_Index(pair.first->mFTFace, base);
+            if (gi)
+            {
+                out_glyph_index = gi;
+                return pair.first.get();
+            }
+        }
+    }
+
+    // Monochrome fallbacks next. Emoji-functor fonts get revisited afterwards
+    // without the functor guard.
+    std::vector<size_t> emoji_fonts_idx;
+    for (size_t i = 0; i < count; ++i)
+    {
+        const fallback_font_t& pair = mFallbackFonts[i];
+        if (pair.second)
+        {
+            emoji_fonts_idx.push_back(i);
+            continue;
+        }
+        FT_UInt gi = FT_Get_Char_Index(pair.first->mFTFace, base);
+        if (gi)
+        {
+            out_glyph_index = gi;
+            return pair.first.get();
+        }
+    }
+
+    for (size_t idx : emoji_fonts_idx)
+    {
+        const fallback_font_t& pair = mFallbackFonts[idx];
+        FT_UInt gi = FT_Get_Char_Index(pair.first->mFTFace, base);
+        if (gi)
+        {
+            out_glyph_index = gi;
+            return pair.first.get();
+        }
+    }
+
+    // No face has a glyph; caller will end up rendering a tofu via `this`.
+    return this;
 }
 
 bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n)
@@ -177,6 +274,8 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     // changed font file names.
     if (mFTFace)
     {
+        // The hb_font retains mFTFace, so release it before the face goes.
+        destroyHbFont();
         FT_Done_Face(mFTFace);
         mFTFace = nullptr;
     }
@@ -263,6 +362,7 @@ S32 LLFontFreetype::getNumFaces(const std::string& filename)
 {
     if (mFTFace)
     {
+        destroyHbFont();
         FT_Done_Face(mFTFace);
         mFTFace = nullptr;
     }
@@ -284,6 +384,7 @@ S32 LLFontFreetype::getNumFaces(const std::string& filename)
 
     FT_Done_Face(mFTFace);
     mFTFace = nullptr;
+    // No hb_font was created for the probe face — getHbFont() is lazy.
 
     return num_faces;
 }
@@ -486,14 +587,16 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type
     return nullptr;
 }
 
-LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, llwchar wch, U32 glyph_index, EFontGlyphType requested_glyph_type) const
+LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type, EFontGlyphType& out_bitmap_glyph_type) const
 {
     LL_PROFILE_ZONE_SCOPED;
     if (mFTFace == nullptr)
         return nullptr;
 
     llassert(!mIsFallback);
-    fontp->renderGlyph(requested_glyph_type, glyph_index, wch);
+    // wch is only meaningful for the SVG glyph hook's debug output; shaped
+    // lookups don't have a single source codepoint to pass here.
+    fontp->renderGlyph(requested_glyph_type, glyph_index, 0);
 
     EFontGlyphType bitmap_glyph_type = EFontGlyphType::Unspecified;
     switch (fontp->mFTFace->glyph->bitmap.pixel_mode)
@@ -509,6 +612,8 @@ LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, l
             llassert_always(true);
             break;
     }
+    out_bitmap_glyph_type = bitmap_glyph_type;
+
     S32 width = fontp->mFTFace->glyph->bitmap.width;
     S32 height = fontp->mFTFace->glyph->bitmap.rows;
 
@@ -532,15 +637,6 @@ LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, l
     // Convert these from 26.6 units to float pixels.
     gi->mXAdvance = fontp->mFTFace->glyph->advance.x / 64.f;
     gi->mYAdvance = fontp->mFTFace->glyph->advance.y / 64.f;
-
-    insertGlyphInfo(wch, gi);
-
-    if (requested_glyph_type != bitmap_glyph_type)
-    {
-        LLFontGlyphInfo* gi_temp = new LLFontGlyphInfo(*gi);
-        gi_temp->mGlyphType = bitmap_glyph_type;
-        insertGlyphInfo(wch, gi_temp);
-    }
 
     if (fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_MONO
         || fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_GRAY)
@@ -613,6 +709,44 @@ LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, l
     return gi;
 }
 
+LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, llwchar wch, U32 glyph_index, EFontGlyphType requested_glyph_type) const
+{
+    EFontGlyphType bitmap_glyph_type;
+    LLFontGlyphInfo* gi = renderAndCreateGlyph(fontp, glyph_index, requested_glyph_type, bitmap_glyph_type);
+    if (!gi)
+        return nullptr;
+
+    insertGlyphInfo(wch, gi);
+
+    if (requested_glyph_type != bitmap_glyph_type)
+    {
+        LLFontGlyphInfo* gi_temp = new LLFontGlyphInfo(*gi);
+        gi_temp->mGlyphType = bitmap_glyph_type;
+        insertGlyphInfo(wch, gi_temp);
+    }
+
+    return gi;
+}
+
+LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type) const
+{
+    EFontGlyphType bitmap_glyph_type;
+    LLFontGlyphInfo* gi = renderAndCreateGlyph(fontp, glyph_index, requested_glyph_type, bitmap_glyph_type);
+    if (!gi)
+        return nullptr;
+
+    insertShapedGlyphInfo(fontp, glyph_index, gi);
+
+    if (requested_glyph_type != bitmap_glyph_type)
+    {
+        LLFontGlyphInfo* gi_temp = new LLFontGlyphInfo(*gi);
+        gi_temp->mGlyphType = bitmap_glyph_type;
+        insertShapedGlyphInfo(fontp, glyph_index, gi_temp);
+    }
+
+    return gi;
+}
+
 LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_type) const
 {
     std::pair<char_glyph_info_map_t::iterator, char_glyph_info_map_t::iterator> range_it = mCharGlyphInfoMap.equal_range(wch);
@@ -631,6 +765,24 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_
     }
 }
 
+LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType glyph_type) const
+{
+    const ShapedGlyphKey key{fontp, glyph_index};
+    auto range = mShapedGlyphInfoMap.equal_range(key);
+
+    auto iter = (EFontGlyphType::Unspecified != glyph_type)
+        ? std::find_if(range.first, range.second,
+            [glyph_type](const shaped_glyph_info_map_t::value_type& entry)
+            { return entry.second->mGlyphType == glyph_type; })
+        : range.first;
+    if (iter != range.second)
+    {
+        return iter->second;
+    }
+    return addShapedGlyphFromFont(fontp, glyph_index,
+        (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale);
+}
+
 void LLFontFreetype::insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const
 {
     llassert(gi->mGlyphType < EFontGlyphType::Count);
@@ -646,6 +798,26 @@ void LLFontFreetype::insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const
     else
     {
         mCharGlyphInfoMap.insert(std::make_pair(wch, gi));
+    }
+}
+
+void LLFontFreetype::insertShapedGlyphInfo(const LLFontFreetype* fontp, U32 glyph_index, LLFontGlyphInfo* gi) const
+{
+    llassert(gi->mGlyphType < EFontGlyphType::Count);
+    const ShapedGlyphKey key{fontp, glyph_index};
+    auto range = mShapedGlyphInfoMap.equal_range(key);
+
+    auto iter = std::find_if(range.first, range.second,
+        [gi](const shaped_glyph_info_map_t::value_type& entry)
+        { return entry.second->mGlyphType == gi->mGlyphType; });
+    if (iter != range.second)
+    {
+        delete iter->second;
+        iter->second = gi;
+    }
+    else
+    {
+        mShapedGlyphInfoMap.insert(std::make_pair(key, gi));
     }
 }
 
@@ -727,6 +899,13 @@ void LLFontFreetype::resetBitmapCache()
         delete it->second;
     }
     mCharGlyphInfoMap.clear();
+    // Shaped glyphs live in the same bitmap atlas and would dangle after the
+    // reset below.
+    for (auto& entry : mShapedGlyphInfoMap)
+    {
+        delete entry.second;
+    }
+    mShapedGlyphInfoMap.clear();
     mFontBitmapCachep->reset();
 
     // Adding default glyph is skipped for fallback fonts here as well as in loadFace().

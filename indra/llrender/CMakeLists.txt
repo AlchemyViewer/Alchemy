@@ -7,6 +7,7 @@ set(llrender_SOURCE_FILES
     llfontfreetype.cpp
     llfontfreetypesvg.cpp
     llfontgl.cpp
+    llfontshaping.cpp
     llfontvertexbuffer.cpp
     llfontregistry.cpp
     llgl.cpp
@@ -35,6 +36,7 @@ set(llrender_HEADER_FILES
     llfontfreetypesvg.h
     llfontbitmapcache.h
     llfontregistry.h
+    llfontshaping.h
     llgl.h
     llglheaders.h
     llglslshader.h
