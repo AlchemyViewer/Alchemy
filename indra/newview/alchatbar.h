@@ -33,14 +33,14 @@
 #include "llchat.h"
 #include "llfloater.h"
 
-class LLLineEditor;
+class LLChatEntry;
 class LLMessageSystem;
 class LLUICtrl;
 class LLUUID;
 class LLFrameTimer;
 class ALChatBarGestureObserver;
 class LLComboBox;
-
+class LLTextEditor;
 
 class ALChatBar final
 :   public LLFloater
@@ -67,9 +67,6 @@ public:
     // Move cursor into chat input field.
     void        setKeyboardFocus(bool b);
 
-    // Ignore arrow keys for chat bar
-    void        setIgnoreArrowKeys(bool b);
-
     bool        inputEditorHasFocus() const;
     std::string getCurrentChat() const;
 
@@ -78,7 +75,7 @@ public:
     void        setGestureCombo(LLComboBox* combo);
 
     // callbacks
-    static void onInputEditorKeystroke(LLLineEditor* caller, void* userdata);
+    void onInputEditorKeystroke(LLTextEditor* caller);
     static void onInputEditorFocusLost();
     static void onInputEditorGainFocus();
 
@@ -94,7 +91,9 @@ protected:
 
     void sendChat(EChatType type);
 
-    LLLineEditor*   mInputEditor;
+    void changeChannelLabel(S32 channel);
+
+    LLChatEntry* mInputEditor;
 
     LLFrameTimer    mGestureLabelTimer;
 
@@ -107,5 +106,6 @@ protected:
     reshape_signal_t*       mReshapeSignal = nullptr;
 // [/SL:KB]
 
+    boost::signals2::connection mChatChannelConnection;
     boost::signals2::connection mChatFontSizeConnection;
 };

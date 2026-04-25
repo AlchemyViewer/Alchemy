@@ -5,7 +5,7 @@
  bottom="-1"
  follows="left|bottom"
  legacy_header_height="20"
- height="20"
+ height="27"
  can_minimize="false"
  can_collapse="false"
  can_resize="true"
@@ -13,41 +13,34 @@
  can_close="false"
  layout="topleft"
  min_width="12"
- min_height="20"
+ min_height="27"
  name="chatbar"
  chrome="true"
  title=""
  width="450"
  single_instance="true"
  save_rect="true">
-   <line_editor
-    border_style="line"
-    border_thickness="1"
-    select_on_focus="false"
+   <chat_editor
     follows="left|bottom|right"
     font="SansSerifLarge"
-    height="19"
+    height="25"
     layout="topleft"
     top="0"
     left="1"
-    right="-27"
+    right="-35"
     name="Chat Editor"
-    spellcheck="true"
-    max_length_chars="5000"/>
+    spellcheck="true" />
    <menu_button
     follows="right"
-    height="19"
-    image_hover_unselected="Toolbar_Middle_Over"
+    height="25"
     image_overlay="OptionsMenu_Off"
-    image_selected="Toolbar_Middle_Selected"
-    image_unselected="Toolbar_Middle_Off"
     layout="topleft"
     left_pad="2"
     name="chatbar_gear_menu"
     menu_filename="menu_al_chatbar_gear.xml"
     tool_tip="Chatbar options"
     top="0"
-    width="19" />
+    width="25" />
    <icon
     follows="right"
     layout="topleft"

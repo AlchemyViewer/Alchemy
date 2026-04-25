@@ -125,8 +125,6 @@ LLFloaterIMNearbyChat::LLFloaterIMNearbyChat(const LLSD& llsd)
     mEnableCallbackRegistrar.add("Avatar.CheckGearItem", boost::bind(&cb_do_nothing));
 
     mMinFloaterHeight = EXPANDED_MIN_HEIGHT;
-
-    mChatChannelConnection = gSavedSettings.getControl("AlchemyNearbyChatChannel")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&) { changeChannelLabel(newval.asInteger()); });
 }
 
 // [RLVa:KB]
@@ -187,6 +185,8 @@ bool LLFloaterIMNearbyChat::postBuild()
     {
         loadHistory();
     }
+
+    mChatChannelConnection = gSavedSettings.getControl("AlchemyNearbyChatChannel")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&) { changeChannelLabel(newval.asInteger()); });
 
     return result;
 }

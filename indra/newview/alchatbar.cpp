@@ -42,6 +42,7 @@
 #include "llfloater.h"
 #include "llfloaterreg.h"
 #include "lltrans.h"
+#include "llchatentry.h"
 
 #include "alchatcommand.h"
 #include "llagent.h"
@@ -115,9 +116,8 @@ ALChatBar::~ALChatBar()
     delete mReshapeSignal;
     mReshapeSignal = nullptr;
 
-    if (mChatFontSizeConnection.connected())
-        mChatFontSizeConnection.disconnect();
-    // LLView destructor cleans up children
+    mChatChannelConnection.disconnect();
+    mChatFontSizeConnection.disconnect();
 }
 
 //-----------------------------------------------------------------------
@@ -131,22 +131,22 @@ bool ALChatBar::postBuild()
     // attempt to bind to an existing combo box named gesture
     setGestureCombo(findChild<LLComboBox>("Gesture"));
 
-    mInputEditor = getChild<LLLineEditor>("Chat Editor");
+    mInputEditor = getChild<LLChatEntry>("Chat Editor");
     mInputEditor->setAutoreplaceCallback(boost::bind(&LLAutoReplace::autoreplaceCallback, LLAutoReplace::getInstance(), _1, _2, _3, _4, _5));
-    mInputEditor->setKeystrokeCallback(&onInputEditorKeystroke, this);
+    mInputEditor->setKeystrokeCallback(boost::bind(&ALChatBar::onInputEditorKeystroke, this, _1));
     mInputEditor->setFocusLostCallback(boost::bind(&ALChatBar::onInputEditorFocusLost));
     mInputEditor->setFocusReceivedCallback(boost::bind(&ALChatBar::onInputEditorGainFocus));
-    mInputEditor->setCommitOnFocusLost( FALSE );
-    mInputEditor->setRevertOnEsc( FALSE );
-    mInputEditor->setIgnoreTab(TRUE);
-    mInputEditor->setPassDelete(TRUE);
-    mInputEditor->setReplaceNewlinesWithSpaces(FALSE);
-
-    mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN);
-    mInputEditor->setEnableLineHistory(TRUE);
+    mInputEditor->setCommitOnFocusLost( false );
+    mInputEditor->setPassDelete(true);
+    mInputEditor->setShowChatMentionPicker(true);
+    mInputEditor->setShowEmojiHelper(true);
+    mInputEditor->enableSingleLineMode(true);
+    changeChannelLabel(gSavedSettings.getS32("AlchemyNearbyChatChannel"));
+    mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN * 5);
 
     mInputEditor->setFont(LLViewerChat::getChatFont());
 
+    mChatChannelConnection = gSavedSettings.getControl("AlchemyNearbyChatChannel")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&) { changeChannelLabel(newval.asInteger()); });
     mChatFontSizeConnection = gSavedSettings.getControl("ChatFontSize")->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { mInputEditor->setFont(LLViewerChat::getChatFont()); });
 
     return TRUE;
@@ -293,16 +293,6 @@ void ALChatBar::setKeyboardFocus(bool focus)
     }
 }
 
-
-// Ignore arrow keys in chat bar
-void ALChatBar::setIgnoreArrowKeys(bool b)
-{
-    if (mInputEditor)
-    {
-        mInputEditor->setIgnoreArrowKeys(b);
-    }
-}
-
 bool ALChatBar::inputEditorHasFocus() const
 {
     return mInputEditor && mInputEditor->hasFocus();
@@ -399,6 +389,18 @@ void ALChatBar::sendChat( EChatType type )
     }
 }
 
+void ALChatBar::changeChannelLabel(S32 channel)
+{
+    if (channel == 0)
+        mInputEditor->setLabel(LLTrans::getString("NearbyChatTitle"));
+    else
+    {
+        LLStringUtil::format_map_t args;
+        args["CHANNEL"] = llformat("%d", channel);
+        mInputEditor->setLabel(LLTrans::getString("NearbyChatTitleChannel", args));
+    }
+}
+
 //-----------------------------------------------------------------------
 // Static functions
 //-----------------------------------------------------------------------
@@ -417,7 +419,7 @@ void ALChatBar::startChat(const char* line)
         bar->mInputEditor->setText(line_string);
     }
     // always move cursor to end so users don't obliterate chat when accidentally hitting WASD
-    bar->mInputEditor->setCursorToEnd();
+    bar->mInputEditor->endOfDoc();
 }
 
 
@@ -441,13 +443,10 @@ void ALChatBar::updateChatFont()
     }
 }
 
-// static
-void ALChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
+void ALChatBar::onInputEditorKeystroke(LLTextEditor* caller)
 {
-    ALChatBar* self = (ALChatBar *)userdata;
-
     LLWString raw_text;
-    if (self->mInputEditor) raw_text = self->mInputEditor->getWText();
+    if (mInputEditor) raw_text = mInputEditor->getWText();
 
     // Can't trim the end, because that will cause autocompletion
     // to eat trailing spaces that might be part of a gesture.
@@ -470,6 +469,7 @@ void ALChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
     KEY key = gKeyboard->currentKey();
 
     // Ignore "special" keys, like backspace, arrows, etc.
+    // Ignore "special" keys, like backspace, arrows, etc.
     if (gSavedSettings.getBOOL("ChatAutocompleteGestures")
         && length > 1
         && raw_text[0] == '/'
@@ -482,17 +482,21 @@ void ALChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
 
         if (LLGestureMgr::instance().matchPrefix(utf8_trigger, &utf8_out_str))
         {
-            if (self->mInputEditor)
+            std::string rest_of_match = utf8_out_str.substr(utf8_trigger.size());
+            if (!rest_of_match.empty())
             {
-                std::string rest_of_match = utf8_out_str.substr(utf8_trigger.size());
-                self->mInputEditor->setText(utf8_trigger + rest_of_match); // keep original capitalization for user-entered part
-                S32 outlength = self->mInputEditor->getLength(); // in characters
-
+                mInputEditor->setText(utf8_trigger + rest_of_match); // keep original capitalization for user-entered part
                 // Select to end of line, starting from the character
                 // after the last one the user typed.
-                self->mInputEditor->setSelection(length, outlength);
+                mInputEditor->selectByCursorPosition(static_cast<S32>(utf8_out_str.size() - rest_of_match.size()), static_cast<S32>(utf8_out_str.size()));
             }
+
         }
+
+        //LL_INFOS() << "GESTUREDEBUG " << trigger
+        //  << " len " << length
+        //  << " outlen " << out_str.getLength()
+        //  << LL_ENDL;
     }
 }
 
