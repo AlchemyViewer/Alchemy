@@ -497,10 +497,14 @@ F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LL
     // Apply the FreeType auto-hinter's subpixel side-bearing correction between
     // adjacent glyphs. When the hinter has shifted the right side of the left
     // glyph or the left side of the right glyph, (rsb_delta - lsb_delta) is the
+    // sub-pixel nudge that keeps spacing visually even.
     F32 delta_correction = 0.0f;
     if (left_glyph_info && right_glyph_info)
     {
+        // According to FreeType docs, these delta values should only trigger
+        // discrete ±1 pixel adjustments when they cross certain thresholds.
         // Substructing delta_diff from delta.x doesn't work as well as treating
+        // it as a thresholds
         S32 delta_diff = left_glyph_info->mRsbDelta - right_glyph_info->mLsbDelta;
         if (delta_diff > 32)
             delta_correction = -1.0f;
