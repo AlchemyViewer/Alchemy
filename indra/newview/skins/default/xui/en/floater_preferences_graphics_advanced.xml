@@ -698,7 +698,7 @@
     increment="1"
     initial_value="6"
     label="Bloom Quality:"
-    label_width="145"
+    label_width="164"
     layout="topleft"
     left="420"
     min_val="5"
@@ -785,7 +785,7 @@
    control_name="RenderShadowDetail"
    height="18"
    layout="topleft"
-   left_delta="130"
+   left_delta="175"
    top_delta="0" 
    name="ShadowDetail"
    width="150">
@@ -835,7 +835,7 @@
    control_name="RenderReflectionProbeDetail"
    height="18"
    layout="topleft"
-   left_delta="130"
+   left_delta="175"
    top_delta="0"
    name="ReflectionDetail"
    width="150">
@@ -871,7 +871,7 @@
    control_name="RenderReflectionProbeLevel"
    height="18"
    layout="topleft"
-   left_delta="130"
+   left_delta="175"
    top_delta="0"
    name="ReflectionLevel"
    width="150">
@@ -903,7 +903,7 @@
       name="ReflectionProbeCount"
       text_readonly_color="LabelDisabledColor"
       top_delta="22"
-      width="128">
+      width="130">
         Max Reflection Probes:
     </text>
 
@@ -912,7 +912,7 @@
      height="18"
      layout="topleft"
      label="Max. Reflection Probes:"
-     left_delta="130"
+     left_delta="175"
      top_delta="0"
      name="ProbeCount"
      width="150">
@@ -946,7 +946,7 @@
     increment="0.1"
     initial_value="160"
     label="Exposure:"
-    label_width="145"
+    label_width="164"
     layout="topleft"
     left="420"
     min_val="0.5"
@@ -990,7 +990,7 @@
    control_name="RenderHeroProbeResolution"
    height="18"
    layout="topleft"
-   left_delta="130"
+   left_delta="175"
    top_delta="0"
    name="MirrorResolution"
    width="150">
@@ -1030,7 +1030,7 @@
    control_name="RenderHeroProbeUpdateRate"
    height="18"
    layout="topleft"
-   left_delta="130"
+   left_delta="175"
    top_delta="0"
    name="HeroProbeUpdateRate"
    width="150">
@@ -1061,7 +1061,7 @@
     increment="0.05"
     initial_value="160"
     label="Sharpening:"
-    label_width="145"
+    label_width="164"
     layout="topleft"
     left="420"
     min_val="0.0"
@@ -1090,7 +1090,7 @@
     control_name="AlchemyRenderTonemapType"
     height="18"
     layout="topleft"
-    left_delta="130"
+    left_delta="175"
     top_delta="0"
     name="TonemapType"
     width="150">
@@ -1132,7 +1132,7 @@
    initial_value="1"
    label="Tone mapping strength:"
    tool_tip="Mix between linear and tone mapped colors"
-   label_width="145"
+   label_width="164"
    layout="topleft"
    left="420"
    min_val="0.0"

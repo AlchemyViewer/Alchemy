@@ -34,6 +34,7 @@
 #include FT_SYSTEM_H
 #include "llfontfreetypesvg.h"
 #include FT_FREETYPE_H
+#include FT_MULTIPLE_MASTERS_H
 
 // Harfbuzz
 #include <hb.h>
@@ -151,6 +152,7 @@ LLFontFreetype::LLFontFreetype()
     mDescender(0.f),
     mLineHeight(0.f),
     mIsFallback(false),
+    mHinting(EFontHinting::FORCE_AUTOHINT),
     mFTFace(nullptr),
     mHbFont(nullptr),
     mRenderGlyphCount(0),
@@ -267,7 +269,7 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
     return this;
 }
 
-bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n)
+bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, S32 weight, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags)
 {
     // Don't leak face objects.  This is also needed to deal with
     // changed font file names.
@@ -293,6 +295,20 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
         return false;
 
     mIsFallback = is_fallback;
+    mHinting = hinting;
+    mFontFlags = flags;
+    mWeight = weight;
+
+    bool variable_font = false;
+    if (weight >= 0)
+    {
+        variable_font = setVariationAxis("wght", static_cast<F32>(weight));
+
+        // For Inter, also set optical size based on point size
+        // This makes text look better at different sizes
+        setVariationAxis("opsz", point_size);
+    }
+
     F32 pixels_per_em = (point_size / 72.f)*vert_dpi; // Size in inches * dpi
 
     error = FT_Set_Char_Size(mFTFace,    /* handle to face object           */
@@ -346,6 +362,18 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     mStyle = LLFontGL::NORMAL;
     if(mFTFace->style_flags & FT_STYLE_FLAG_BOLD)
     {
+        mStyle |= LLFontGL::BOLD;
+    }
+    else if (flags & LLFontGL::BOLD)
+    {
+        // FontGL applies programmatic bolding to fonts that are a part of 'bold' descriptor but don't have the bold style set.
+        // Ex: Inter SemiBold doesn't have FT_STYLE_FLAG_BOLD and without this style it would be bolded programmatically.
+        mStyle |= LLFontGL::BOLD;
+    }
+    else if (weight >= 600 && variable_font)
+    {
+        // If the font is heavy enough, consider it bold and avoid programmatic bolding
+        // even if it doesn't have the bold style set.
         mStyle |= LLFontGL::BOLD;
     }
 
@@ -464,22 +492,24 @@ F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LL
 
     FT_Vector  delta;
 
-    llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, ft_kerning_unfitted, &delta));
+    llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, FT_KERNING_UNFITTED, &delta));
 
     // Apply the FreeType auto-hinter's subpixel side-bearing correction between
     // adjacent glyphs. When the hinter has shifted the right side of the left
     // glyph or the left side of the right glyph, (rsb_delta - lsb_delta) is the
-    // sub-pixel nudge that keeps spacing visually even. It combines cleanly with
-    // the ll_round() that callers apply after kerning: sub-pixel values only
-    // affect the rounded pen when they cross a half-pixel threshold, matching
-    // the classic FT_Pos +-32 snap.
-    S32 delta_correction = 0;
-    if (left_glyph_info)
-        delta_correction += left_glyph_info->mRsbDelta;
-    if (right_glyph_info)
-        delta_correction -= right_glyph_info->mLsbDelta;
+    F32 delta_correction = 0.0f;
+    if (left_glyph_info && right_glyph_info)
+    {
+        // Substructing delta_diff from delta.x doesn't work as well as treating
+        S32 delta_diff = left_glyph_info->mRsbDelta - right_glyph_info->mLsbDelta;
+        if (delta_diff > 32)
+            delta_correction = -1.0f;
+        else if (delta_diff < -31)
+            delta_correction = 1.0f;
+    }
 
-    return (delta.x + delta_correction) * (1.f / 64.f);
+    // ft_kerning_unfitted mode always returns 26.6 fixed-point values
+    return (F32)(delta.x * (1.f / 64.f)) + delta_correction;
 }
 
 bool LLFontFreetype::hasGlyph(llwchar wch) const
@@ -825,7 +855,7 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
     if (mFTFace == nullptr)
         return;
 
-    FT_Int32 load_flags = FT_LOAD_DEFAULT;
+    FT_Int32 load_flags = (FT_Int32)mHinting;
     if (EFontGlyphType::Color == bitmap_type)
     {
         // We may not actually get a color render so our caller should always examine mFTFace->glyph->bitmap.pixel_mode
@@ -871,7 +901,7 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
 void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
 {
     resetBitmapCache();
-    loadFace(mName, mPointSize, vert_dpi ,horz_dpi, mIsFallback, 0);
+    loadFace(mName, mPointSize, vert_dpi ,horz_dpi, mWeight, mIsFallback, 0, mHinting, mFontFlags);
     if (!mIsFallback)
     {
         // This is the head of the list - need to rebuild ourself and all fallbacks.
@@ -1044,6 +1074,73 @@ void LLFontFreetype::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num, U32
             from_offset++;
         }
     }
+}
+
+bool LLFontFreetype::setVariationAxis(const std::string& axis_tag, F32 value)
+{
+    if (!mFTFace)
+        return false;
+
+    // Check if this is a variable font
+    FT_MM_Var* master = nullptr;
+    if (FT_Get_MM_Var(mFTFace, &master) != 0)
+    {
+        // Not a variable font - this is not an error, just silently skip
+        return false;
+    }
+
+    // Find the axis by tag (e.g., "wght" for weight)
+    FT_UInt axis_index = 0;
+    bool found = false;
+    for (FT_UInt i = 0; i < master->num_axis; i++)
+    {
+        // Compare the 4-byte tag
+        if (master->axis[i].tag == FT_MAKE_TAG(axis_tag[0], axis_tag[1], axis_tag[2], axis_tag[3]))
+        {
+            axis_index = i;
+            found = true;
+
+            // Clamp value to valid range for this axis
+            F32 min_val = master->axis[i].minimum / 65536.0f;
+            F32 max_val = master->axis[i].maximum / 65536.0f;
+            value = llclamp(value, min_val, max_val);
+
+            break;
+        }
+    }
+
+    if (!found)
+    {
+        FT_Done_MM_Var(gFTLibrary, master);
+        LL_WARNS_ONCE("Font") << "Axis '" << axis_tag << "' not found in font: " << mName << LL_ENDL;
+        return false;
+    }
+
+    FT_UInt num_coords = master->num_axis;
+    FT_Fixed* coords = new FT_Fixed[num_coords];
+
+    // Get current coordinates
+    FT_Get_Var_Design_Coordinates(mFTFace, num_coords, coords);
+
+    // Update the specific axis
+    coords[axis_index] = (FT_Fixed)(value * 65536.0f);
+
+    // Set all coordinates
+    int error = FT_Set_Var_Design_Coordinates(mFTFace, num_coords, coords);
+
+    delete[] coords;
+    FT_Done_MM_Var(gFTLibrary, master);
+
+    if (error != 0)
+    {
+        LL_WARNS() << "Failed to set variation coordinates for " << axis_tag
+            << " = " << value << " in font: " << mName << LL_ENDL;
+        return false;
+    }
+
+    LL_DEBUGS("Font") << "Set " << axis_tag << " = " << value
+        << " for font: " << mName << LL_ENDL;
+    return true;
 }
 
 

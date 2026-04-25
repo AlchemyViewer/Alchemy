@@ -240,7 +240,7 @@ namespace tut
                       std::string("https://secondlife.com/helpers/"));
         ensure_equals("Agni login page",
                       LLGridManager::getInstance()->getLoginPage("util.agni.lindenlab.com"),
-                      std::string("https://viewer-splash.secondlife.com/"));
+                      std::string("https://viewer-splash-v2.secondlife.com/"));
         ensure("Agni is a system grid",
                LLGridManager::getInstance()->isSystemGrid("util.agni.lindenlab.com"));
 
@@ -265,7 +265,7 @@ namespace tut
                       std::string("https://secondlife.aditi.lindenlab.com/helpers/"));
         ensure_equals("Aditi login page",
                       LLGridManager::getInstance()->getLoginPage("util.aditi.lindenlab.com"),
-                      std::string("https://viewer-splash.secondlife.com/"));
+                      std::string("https://viewer-splash-v2.secondlife.com/"));
         ensure("Aditi is a system grid",
                LLGridManager::getInstance()->isSystemGrid("util.aditi.lindenlab.com"));
     }
@@ -313,7 +313,7 @@ namespace tut
                       std::string("https://secondlife.com/helpers/"));
         ensure_equals("Agni login page",
                       LLGridManager::getInstance()->getLoginPage("util.agni.lindenlab.com"),
-                      std::string("https://viewer-splash.secondlife.com/"));
+                      std::string("https://viewer-splash-v2.secondlife.com/"));
         ensure("Agni is a system grid",
                LLGridManager::getInstance()->isSystemGrid("util.agni.lindenlab.com"));
 
@@ -337,7 +337,7 @@ namespace tut
                       std::string("https://secondlife.aditi.lindenlab.com/helpers/"));
         ensure_equals("Aditi login page",
                       LLGridManager::getInstance()->getLoginPage("util.aditi.lindenlab.com"),
-                      std::string("https://viewer-splash.secondlife.com/"));
+                      std::string("https://viewer-splash-v2.secondlife.com/"));
         ensure("Aditi is a system grid",
                LLGridManager::getInstance()->isSystemGrid("util.aditi.lindenlab.com"));
 
@@ -426,7 +426,7 @@ namespace tut
                       std::string("https://secondlife.com/helpers/"));
         ensure_equals("getLoginPage",
                       LLGridManager::getInstance()->getLoginPage(),
-                      std::string("https://viewer-splash.secondlife.com/"));
+                      std::string("https://viewer-splash-v2.secondlife.com/"));
         ensure_equals("update url base for Agni", // relies on agni being the default
                       std::string("https://update.secondlife.com/update"),
                       LLGridManager::getInstance()->getUpdateServiceURL());

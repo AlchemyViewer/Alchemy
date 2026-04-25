@@ -654,7 +654,7 @@ void init_menus()
     LLRect menuBarRect = gLoginMenuBarView->getRect();
     menuBarRect.setLeftTopAndSize(0, menu_bar_holder->getRect().getHeight(), menuBarRect.getWidth(), menuBarRect.getHeight());
     gLoginMenuBarView->setRect(menuBarRect);
-    gLoginMenuBarView->setBackgroundColor( color );
+    gLoginMenuBarView->setBackgroundColor(LLColor4::black);
     menu_bar_holder->addChild(gLoginMenuBarView);
 
     // tooltips are on top of EVERYTHING, including menus
