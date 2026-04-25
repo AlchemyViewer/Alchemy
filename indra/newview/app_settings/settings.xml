@@ -8336,6 +8336,17 @@
     <key>Value</key>
     <real>0.0</real>
   </map>
+  <key>RenderStarCount</key>
+  <map>
+    <key>Comment</key>
+    <string>Total number of background stars rendered on the night sky. Lower values reduce vertex count and memory cost. Takes effect immediately.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>S32</string>
+    <key>Value</key>
+    <integer>155000</integer>
+  </map>
   <key>RenderMeteorsEnabled</key>
   <map>
     <key>Comment</key>

@@ -32,13 +32,15 @@
 
 #include "llviewerobject.h"
 
+#include <boost/signals2/connection.hpp>
+
 class LLVOWLSky : public LLStaticViewerObject {
 private:
     inline static U32 getNumStacks(void);
     inline static U32 getNumSlices(void);
     inline static U32 getStripsNumVerts(void);
     inline static U32 getStripsNumIndices(void);
-    static U32 getStarsNumVerts(void);
+    U32 getStarsNumVerts(void) const;
 
 public:
     LLVOWLSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
@@ -106,6 +108,9 @@ private:
         F32       width_scale;         // per-meteor thickness multiplier (0..4, packed to color.a)
     };
     std::vector<MeteorState> mMeteors;
+
+    // Connection that re-runs star generation when RenderStarCount changes.
+    boost::signals2::scoped_connection mStarCountConnection;
 };
 
 #endif // LL_VOWLSKY_H

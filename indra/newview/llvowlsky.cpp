@@ -62,8 +62,13 @@ namespace
         {  120000,   3.00f,  0.05f,   0.22f,  0.55f },   // faint "star dust"
     };
 
-    constexpr U32 kTotalStars =
+    // Default total used as the reference for the RenderStarCount setting:
+    // setting value N scales each tier by N / kDefaultStarTotal.
+    constexpr U32 kDefaultStarTotal =
         kStarTiers[0].count + kStarTiers[1].count + kStarTiers[2].count;
+
+    // Hard cap on configurable star count to bound peak VB allocation.
+    constexpr U32 kMaxStarTotal = 700000;
 
     // Meteor tuning. kMeteorHardMax is a fixed upper bound used for dynamic VB
     // sizing — the user-facing RenderMeteorMaxCount setting is clamped to this
@@ -225,15 +230,29 @@ inline U32 LLVOWLSky::getStripsNumIndices(void)
     return 2 * ((getNumStacks() - 2) * (getNumSlices() + 1)) + 1 ;
 }
 
-U32 LLVOWLSky::getStarsNumVerts(void)
+U32 LLVOWLSky::getStarsNumVerts(void) const
 {
-    return kTotalStars;
+    // mStarPositions is the source of truth — its size reflects whatever
+    // RenderStarCount asked for at the last initStars() call (after
+    // proportional scaling and rounding).
+    return (U32)mStarPositions.size();
 }
 
 LLVOWLSky::LLVOWLSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
     : LLStaticViewerObject(id, pcode, regionp, true)
 {
     initStars();
+
+    // Re-generate star data and force the VB to be rebuilt when the user
+    // changes RenderStarCount. The setting is intended for perf tuning, so
+    // taking effect immediately (without a restart) is the expected behavior.
+    mStarCountConnection = gSavedSettings.getControl("RenderStarCount")
+        ->getSignal()
+        ->connect([this](LLControlVariable*, const LLSD&, const LLSD&)
+        {
+            initStars();
+            resetVertexBuffers();
+        });
 }
 
 void LLVOWLSky::idleUpdate(LLAgent &agent, const F64 &time)
@@ -502,16 +521,24 @@ void LLVOWLSky::initStars()
     const F32 DISTANCE_TO_STARS = LLEnvironment::instance().getCurrentSky()->getDomeRadius();
     const LLVector3 galactic_pole = getGalacticPole();
 
+    // Scale every tier by RenderStarCount / kDefaultStarTotal so the visual
+    // mix between bright primaries, mid stars, and faint dust stays the same
+    // when the user dials the total down for performance.
+    const S32 requested = gSavedSettings.getS32("RenderStarCount");
+    const U32 target_total = (U32)llclamp(requested, 0, (S32)kMaxStarTotal);
+    const F32 scale = (F32)target_total / (F32)kDefaultStarTotal;
+
     mStarPositions.clear();
     mStarColors.clear();
-    mStarPositions.reserve(kTotalStars);
-    mStarColors.reserve(kTotalStars);
+    mStarPositions.reserve(target_total);
+    mStarColors.reserve(target_total);
 
     for (const StarTier& tier : kStarTiers)
     {
         const F32 tier_radius = DISTANCE_TO_STARS * tier.distance_factor;
+        const U32 tier_count = (U32)((F32)tier.count * scale + 0.5f);
 
-        for (U32 i = 0; i < tier.count; ++i)
+        for (U32 i = 0; i < tier_count; ++i)
         {
             const bool in_milky_way = ll_frand() < tier.milky_way_fraction;
             LLVector3 dir = generateStarDirection(galactic_pole, in_milky_way);
@@ -642,6 +669,13 @@ bool LLVOWLSky::updateStarGeometry(LLDrawable *drawable)
 
     const U32 num_stars = getStarsNumVerts();
     const U32 num_verts = num_stars * 6;
+
+    // RenderStarCount = 0 disables stars entirely. Leave mStarsVerts null so
+    // drawStars short-circuits.
+    if (num_verts == 0)
+    {
+        return true;
+    }
 
     mStarsVerts = new LLVertexBuffer(LLDrawPoolWLSky::STAR_VERTEX_DATA_MASK);
     if (!mStarsVerts->allocateBuffer(num_verts, 0))
