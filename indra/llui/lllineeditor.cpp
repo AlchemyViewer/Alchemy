@@ -1423,9 +1423,8 @@ void LLLineEditor::pasteHelper(bool is_primary)
                 if (available_chars < clean_string.size())
                 {
                     clean_string = clean_string.substr(0, available_chars);
+                    LLUI::getInstance()->reportBadKeystroke();
                 }
-
-                LLUI::getInstance()->reportBadKeystroke();
             }
 
             mText.insert(getCursor(), clean_string);
