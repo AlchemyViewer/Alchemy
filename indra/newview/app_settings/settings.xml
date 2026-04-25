@@ -12037,7 +12037,7 @@
       <key>Type</key>
       <string>String</string>
       <key>Value</key>
-      <string>alchemy</string>
+      <string>default</string>
     </map>
     <key>SkinningSettingsFile</key>
     <map>
