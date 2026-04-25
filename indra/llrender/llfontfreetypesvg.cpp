@@ -155,7 +155,13 @@ FT_Error LLFontFreeTypeSvgRenderer::OnPresetGlypthSlot(FT_GlyphSlot glyph_slot, 
     // different factors and both fill the same bitmap, collapsing the
     // size difference the font author encoded. Using upem keeps every
     // glyph on the same em grid so relative sizes survive rasterisation.
-    const float svg_scale = (float)document->metrics.x_ppem / (float)document->units_per_EM;
+    //
+    // Use x_scale (16.16 fixed-point: font units → 26.6 pixels) instead of
+    // the integer-rounded x_ppem so SVG glyphs match the exact pixel size
+    // FreeType uses for non-SVG glyphs. At non-integer ppem (e.g. 14pt/96dpi
+    // → 18.67px/em rounded to 18) x_ppem is several percent off, which
+    // shows up as emoji rendering visibly smaller than surrounding text.
+    const float svg_scale = (float)document->metrics.x_scale / (65536.f * 64.f);
     datap->Scale = svg_scale;
 
     // Find the path's horizontal extent so we can size the bitmap tightly
@@ -180,8 +186,11 @@ FT_Error LLFontFreeTypeSvgRenderer::OnPresetGlypthSlot(FT_GlyphSlot glyph_slot, 
     glyph_slot->bitmap.width = bw;
     // Vertical handling stays on the full em box; nanosvg's rasteriser
     // clips content outside the bitmap and the existing ascender-based
-    // bitmap_top positions it correctly against the baseline.
-    glyph_slot->bitmap.rows = document->metrics.y_ppem;
+    // bitmap_top positions it correctly against the baseline. Size the
+    // bitmap to ceil(upem * svg_scale) rather than y_ppem — y_ppem is the
+    // integer-rounded ppem and would clip the bottom row when exact ppem
+    // is fractional (matches the x-axis tight fit done above).
+    glyph_slot->bitmap.rows = (unsigned int)llmax(1, (int)ceilf((float)document->units_per_EM * svg_scale));
     // bitmap_left positions the bitmap's left edge in the advance box;
     // bitmap_left + bw < advance yields the visible margin. For most
     // Twemoji glyphs this recovers a small pixel gap at the font's
@@ -199,8 +208,12 @@ FT_Error LLFontFreeTypeSvgRenderer::OnPresetGlypthSlot(FT_GlyphSlot glyph_slot, 
     /* Copied as-is from fcft (MIT license) */
 
     // Compute all the bearings and set them correctly. The outline is scaled already, we just need to use the bounding box.
+    // horiBearingY is the baseline-to-top distance and is positive for
+    // glyphs above the baseline (per FT_Glyph_Metrics docs). Our renderer
+    // reads bitmap_top, not this metric, but a wrong sign here would
+    // mislead any other consumer that queries face->glyph->metrics.
     float horiBearingX = 0.f;
-    float horiBearingY = -(float)glyph_slot->bitmap_top;
+    float horiBearingY = (float)glyph_slot->bitmap_top;
 
     // XXX parentheses correct?
     float vertBearingX = glyph_slot->metrics.horiBearingX / 64.0f - glyph_slot->metrics.horiAdvance / 64.0f / 2;
