@@ -54,7 +54,7 @@ file(INSTALL
 
 vcpkg_install_copyright(
     FILE_LIST
-        ${SOURCE_PATH}/inter/Inter-License.txt
+        ${SOURCE_PATH}/inter/Inter-LICENSE.txt
         ${SOURCE_PATH}/dejavu-sans/DejaVu-License.txt
         ${SOURCE_PATH}/source-han-sans/SourceHanSans.txt
         ${SOURCE_PATH}/twemoji/Twemoji-MIT-license.txt
