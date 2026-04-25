@@ -19,6 +19,7 @@
 .venv
 .cache
 .zed
+.claude
 CMakeCache.txt
 cmake_install.cmake
 LICENSES
