@@ -32,6 +32,7 @@
 
 #include "llgl.h"
 
+#include "llapr.h"
 #include "llplugininstance.h"
 #include "llpluginmessage.h"
 #include "llpluginmessageclasses.h"
