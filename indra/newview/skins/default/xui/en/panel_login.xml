@@ -63,6 +63,43 @@
          auto_resize="false"
          user_resize="false"
          layout="topleft"
+         name="web_container"
+         width="690"
+         height="768"
+         background_visible="true"
+         bg_opaque_color="DkGrayLogin"
+         background_opaque="true">
+          <web_browser
+            tab_stop="false"
+            trusted_content="true"
+            bg_opaque_color="DkGrayLogin"
+            border_visible="false"
+            follows="all"
+            left="0"
+            top="0"
+            right="-1"
+            bottom="-1"
+            name="login_html"
+            start_url="" />
+        </layout_panel>
+        <layout_panel
+         auto_resize="false"
+         user_resize="false"
+         layout="topleft"
+         name="middle_gutter"
+         min_width="18"
+         max_width="18"
+         expanded_min_dim="18"
+         width="18"
+         height="768"
+         background_visible="true"
+         bg_opaque_color="DkGrayLogin"
+         background_opaque="true">
+        </layout_panel>
+        <layout_panel
+         auto_resize="false"
+         user_resize="false"
+         layout="topleft"
          name="ui_container"
          width="300"
          height="768"
@@ -342,43 +379,6 @@
                pad_bottom="1" />
             </layout_panel>
           </layout_stack>
-        </layout_panel>
-        <layout_panel
-         auto_resize="false"
-         user_resize="false"
-         layout="topleft"
-         name="middle_gutter"
-         min_width="18"
-         max_width="18"
-         expanded_min_dim="18"
-         width="18"
-         height="768"
-         background_visible="true"
-         bg_opaque_color="DkGrayLogin"
-         background_opaque="true">
-        </layout_panel>
-        <layout_panel
-         auto_resize="false"
-         user_resize="false"
-         layout="topleft"
-         name="web_container"
-         width="690"
-         height="768"
-         background_visible="true"
-         bg_opaque_color="DkGrayLogin"
-         background_opaque="true">
-          <web_browser
-            tab_stop="false"
-            trusted_content="true"
-            bg_opaque_color="DkGrayLogin"
-            border_visible="false"
-            follows="all"
-            left="0"
-            top="0"
-            right="-1"
-            bottom="-1"
-            name="login_html"
-            start_url="" />
         </layout_panel>
       </layout_stack>
     </layout_panel>
