@@ -4,7 +4,7 @@
   <font
       name="default"
       comment="default font files (global fallbacks)">
-    <file load_collection="true" font_weight="400">InterVariableFont.ttf</file>
+    <file load_collection="true" font_weight="400">InterVariable.woff2</file>
     <file size_delta="-0.5">DejaVuSans.woff2</file>
     <file functor="is_emoji">TwemojiSVG.woff2</file>
     <file load_collection="true">SourceHanSans-Regular.woff2</file>
@@ -38,7 +38,7 @@
   <font
       name="SansSerifBold"
       comment="Name of bold sans-serif font">
-      <file load_collection="true" flags="bold" font_weight="600">InterVariableFont.ttf</file>
+      <file load_collection="true" flags="bold" font_weight="600">InterVariable.woff2</file>
       <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
       <file load_collection="true">SourceHanSans-Bold.woff2</file>
     <os name="Windows">
@@ -52,7 +52,7 @@
   <font
       name="SansSerif"
       comment="Name of san-serif font (Truetype file name)">
-    <file load_collection="true" font_weight="400">InterVariableFont.ttf</file>
+    <file load_collection="true" font_weight="400">InterVariable.woff2</file>
     <file size_delta="-0.5">DejaVuSans.woff2</file>
     <os name="Windows">
       <file>arial.ttf</file>
@@ -66,7 +66,7 @@
       name="SansSerif"
       comment="Name of bold sans-serif font"
       font_style="BOLD">
-    <file load_collection="true" flags="bold" font_weight="600">InterVariableFont.ttf</file>
+    <file load_collection="true" flags="bold" font_weight="600">InterVariable.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
     <file load_collection="true">SourceHanSans-Bold.woff2</file>
   </font>
@@ -75,7 +75,7 @@
       name="SansSerif"
       comment="Name of italic sans-serif font"
       font_style="ITALIC">
-    <file load_collection="true" font_weight="400">InterItalicVariableFont.ttf</file>
+    <file load_collection="true" font_weight="400">InterVariable-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Oblique.woff2</file>
   </font>
 
@@ -83,7 +83,7 @@
       name="SansSerif"
       comment="Name of bold italic sans-serif font"
       font_style="BOLD|ITALIC">
-    <file load_collection="true" font_weight="800">InterItalicVariableFont.ttf</file>
+    <file load_collection="true" font_weight="800">InterVariable-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-BoldOblique.woff2</file>
   </font>
 
@@ -124,7 +124,7 @@
   <font
       name="Helvetica"
       comment="Name of Helvetica font">
-    <file font_weight="400">InterVariableFont.ttf</file>
+    <file font_weight="400">InterVariable.woff2</file>
     <file size_delta="-0.5">DejaVuSans.woff2</file>
     <os name="Windows">
       <file>arial.ttf</file>
@@ -138,7 +138,7 @@
       name="Helvetica"
       comment="Name of Helvetica font (bold)"
       font_style="BOLD">
-    <file flags="bold" font_weight="800">InterVariableFont.ttf</file>
+    <file flags="bold" font_weight="800">InterVariable.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
     <os name="Windows">
       <file>arialbd.ttf</file>
@@ -152,7 +152,7 @@
       name="Helvetica"
       comment="Name of Helvetica font (italic)"
       font_style="ITALIC">
-    <file font_weight="400">InterItalicVariableFont.ttf</file>
+    <file font_weight="400">InterVariable-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Oblique.woff2</file>
     <os name="Windows">
       <file>ariali.ttf</file>
@@ -166,7 +166,7 @@
       name="Helvetica"
       comment="Name of Helvetica font (bold italic)"
       font_style="BOLD|ITALIC">
-    <file font_weight="800">InterItalicVariableFont.ttf</file>
+    <file font_weight="800">InterVariable-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-BoldOblique.woff2</file>
     <os name="Windows">
       <file>arialbi.ttf</file>
@@ -180,7 +180,7 @@
       name="OverrideTest"
       comment="Name of font to test overriding">
     <file>times.ttf</file>
-    <file font_weight="400">InterVariableFont.ttf</file>
+    <file font_weight="400">InterVariable.woff2</file>
   </font>
 
   <font_size name="Monospace"
