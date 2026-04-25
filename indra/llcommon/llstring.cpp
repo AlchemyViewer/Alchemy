@@ -1177,13 +1177,13 @@ bool LLStringOps::isEmoji(llwchar a)
 
 S32 LLStringOps::collate(const llwchar* a, const llwchar* b)
 {
-    #if LL_WINDOWS
-        // in Windows, wide string functions operator on 16-bit strings,
-        // not the proper 32 bit wide string
-        return strcmp(wstring_to_utf8str(LLWString(a)).c_str(), wstring_to_utf8str(LLWString(b)).c_str());
-    #else
-        return wcscoll(a, b);
-    #endif
+#if LL_WINDOWS
+    // in Windows, wide string functions operator on 16-bit strings,
+    // not the proper 32 bit wide string
+    return wcscmp(ll_convert<std::wstring>(a).c_str(), ll_convert<std::wstring>(b).c_str());
+#else
+    return wcscoll((const wchar_t*)a, (const wchar_t*)b);
+#endif
 }
 
 void LLStringOps::setupDatetimeInfo (bool daylight)
