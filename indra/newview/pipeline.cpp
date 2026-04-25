@@ -7613,7 +7613,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // the composite no longer needs its own pass. When HDR is off the shader
         // variant lacks the sampler and bindTexture is a no-op via getTextureChannel.
         S32 bloom_channel = -1;
-        if (apply_tonemap && mRT->bloomMipCount > 0)
+        if (mRT->bloomMipCount > 0)
         {
             bloom_channel = shader->bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mRT->bloomMip[0], false, LLTexUnit::TFO_BILINEAR);
             if (bloom_channel > -1)

@@ -3009,6 +3009,14 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         llassert(success);
     }
 
+    // HDR-only: the bloom pyramid is allocated in the HDR path, so the tonemap
+    // shader variants fold the bloom composite inline. Halation rides in the
+    // bloom alpha channel when RenderBloomHalation is on — both settings trigger
+    // shader rebuilds, so reading them at compile time stays in sync with the
+    // bloom pyramid format.
+    const bool hdr_enabled         = gSavedSettings.getBOOL("RenderHDREnabled");
+    const bool bloom_halation_perm = gSavedSettings.getBOOL("RenderBloomHalation");
+
     if (success)
     {
         gCGGammaProgram.mName = "CG Gamma Shader";
@@ -3019,9 +3027,17 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGGammaProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
         gCGGammaProgram.clearPermutations();
         gCGGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
+        if (!hdr_enabled)
         {
             gCGGammaProgram.addPermutation("DITHER", "1");
+        }
+        else
+        {
+            gCGGammaProgram.addPermutation("BLOOM_COMPOSITE", "1");
+            if (bloom_halation_perm)
+            {
+                gCGGammaProgram.addPermutation("BLOOM_HALATION", "1");
+            }
         }
         gCGGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGGammaProgram.createShader();
@@ -3039,22 +3055,22 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gCGLegacyGammaProgram.clearPermutations();
         gCGLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
         gCGLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
-        if (!gSavedSettings.getBOOL("RenderHDREnabled"))
+        if (!hdr_enabled)
         {
             gCGLegacyGammaProgram.addPermutation("DITHER", "1");
+        }
+        else
+        {
+            gCGLegacyGammaProgram.addPermutation("BLOOM_COMPOSITE", "1");
+            if (bloom_halation_perm)
+            {
+                gCGLegacyGammaProgram.addPermutation("BLOOM_HALATION", "1");
+            }
         }
         gCGLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGLegacyGammaProgram.createShader();
         llassert(success);
     }
-
-    // HDR-only: the bloom pyramid is allocated in the HDR path, so the tonemap
-    // shader variants fold the bloom composite inline. Halation rides in the
-    // bloom alpha channel when RenderBloomHalation is on — both settings trigger
-    // shader rebuilds, so reading them at compile time stays in sync with the
-    // bloom pyramid format.
-    const bool hdr_enabled         = gSavedSettings.getBOOL("RenderHDREnabled");
-    const bool bloom_halation_perm = gSavedSettings.getBOOL("RenderBloomHalation");
 
     if (success)
     {
