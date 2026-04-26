@@ -1928,9 +1928,16 @@ void LLLineEditor::draw()
 
     // draw text
 
-    // With viewer-2 art files, input region is 2 pixels up
-    S32 cursor_bottom = background.mBottom + 2;
-    S32 cursor_top = background.mTop - 1;
+    // Cursor and selection-highlight extent must match the text's vertical
+    // span — not the editor box. text_bottom is the descender baseline that
+    // the glyph render uses with valign=BOTTOM, and text occupies exactly
+    // [text_bottom, text_bottom + getLineHeight()] in screen space (ceil
+    // ascender + ceil descender). Tying the cursor to the box height made
+    // the caret extend past the glyphs for fonts with smaller line-height /
+    // box-height ratios (Source Sans 3, etc.).
+    F32 text_bottom = (F32)background.mBottom + (F32)lineeditor_v_pad;
+    S32 cursor_bottom = (S32)text_bottom;
+    S32 cursor_top = cursor_bottom + mGLFont->getLineHeight();
 
     LLColor4 text_color;
     if (!mReadOnly)
@@ -1991,7 +1998,6 @@ void LLLineEditor::draw()
 
     S32 rendered_text = 0;
     F32 rendered_pixels_right = (F32)mTextLeftEdge;
-    F32 text_bottom = (F32)background.mBottom + (F32)lineeditor_v_pad;
 
     if( (gFocusMgr.getKeyboardFocus() == this) && hasSelection() )
     {
