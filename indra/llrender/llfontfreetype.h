@@ -181,6 +181,15 @@ public:
     bool getAllowMonospaceLigatures() const { return mAllowMonospaceLigatures; }
     void setAllowMonospaceLigatures(bool allow) { mAllowMonospaceLigatures = allow; }
 
+    // True when the pen position should accumulate fractionally through a
+    // glyph run, with each glyph's destination rect snapped at draw time.
+    // False (HINTING_DEFAULT) keeps the legacy per-glyph round so native-
+    // hinted glyphs designed for the integer pixel grid stay crisp; true
+    // (FORCE_AUTOHINT, NO_HINTING) preserves subpixel kerning precision
+    // from HarfBuzz's GPOS x_advance values that would otherwise be
+    // crushed by per-glyph ll_round in the hot paths.
+    bool useSubpixelPen() const { return mUseSubpixelPen; }
+
     // Pick the face in this font's fallback chain that owns a glyph for
     // `base` and return it, writing the FT glyph index into out_glyph_index.
     // Walks the same priority as addGlyph: emoji-functor fallbacks first,
@@ -244,6 +253,7 @@ private:
     S32 mFontFlags;
     S32 mWeight = -1;
     bool mAllowMonospaceLigatures = false;
+    bool mUseSubpixelPen = false;
     typedef std::pair<LLPointer<LLFontFreetype>, char_functor_t> fallback_font_t;
     typedef std::vector<fallback_font_t> fallback_font_vector_t;
     fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)

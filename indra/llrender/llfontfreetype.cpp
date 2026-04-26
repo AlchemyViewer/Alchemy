@@ -204,6 +204,16 @@ hb_font_t* LLFontFreetype::getHbFont() const
         // the hb_font, so we must destroy the hb_font before calling
         // FT_Done_Face on the underlying face (see ~LLFontFreetype and
         // loadFace).
+        //
+        // We deliberately do NOT override HarfBuzz's glyph_h_advance_func
+        // to apply the autohinter rsb/lsb correction that getXKerning uses
+        // for the legacy codepoint path. GPOS positioning emitted by HB
+        // supersedes that correction's purpose (it was a 1990s band-aid
+        // for autohinter rounding artifacts in the absence of OpenType
+        // positioning), and threading the correction into HB's stateless
+        // per-glyph callback would require a per-shaper "previous slot"
+        // cache that doesn't fit the HB API model. Visual parity with the
+        // legacy path is acceptably broken for autohinted UI fonts.
         mHbFont = hb_ft_font_create_referenced(mFTFace);
     }
     return mHbFont;
@@ -303,6 +313,11 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     mHinting = hinting;
     mFontFlags = flags;
     mWeight = weight;
+    // Native-hinted glyphs (HINTING_DEFAULT) are designed by the foundry to
+    // sit on the integer pixel grid; subpixel pen position would wash out
+    // the hinting. Autohinted (FORCE_AUTOHINT) and unhinted (NO_HINTING)
+    // glyphs tolerate and benefit from subpixel placement.
+    mUseSubpixelPen = (hinting != EFontHinting::DEFAULT);
 
     bool variable_font = false;
     if (weight >= 0)
@@ -497,10 +512,12 @@ F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LL
 
     FT_Vector  delta;
 
-    // Grid-fitted: callers round cur_x to integer pixels per glyph, so subpixel
-    // kerning would be discarded anyway. Will flip to FT_KERNING_UNFITTED once
-    // subpixel pen position lands and these values can survive accumulation.
-    llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, FT_KERNING_DEFAULT, &delta));
+    // UNFITTED gives subpixel-precise kerning when callers maintain a
+    // fractional pen accumulator (mUseSubpixelPen — autohinted/unhinted
+    // faces). DEFAULT grid-fits to integer pixels, which is what callers
+    // want when they round per glyph (native-hinted faces).
+    const FT_UInt kern_mode = mUseSubpixelPen ? FT_KERNING_UNFITTED : FT_KERNING_DEFAULT;
+    llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, kern_mode, &delta));
 
     // Apply the FreeType auto-hinter's subpixel side-bearing correction between
     // adjacent glyphs. The lsb/rsb deltas are populated only when the autohinter

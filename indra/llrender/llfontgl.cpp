@@ -216,6 +216,15 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // Not guaranteed to be set correctly
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
+    // Subpixel pen position: cumulative advance stays fractional through the
+    // loop so HarfBuzz GPOS kerning isn't crushed by per-glyph ll_round. Each
+    // glyph still snaps to integer pixels at draw time via ll_round on
+    // glyph_x in the screen_rect construction below — atlas bitmaps are
+    // pixel-aligned, only the pen position is sub-pixel. False for
+    // HINTING_DEFAULT (foundry hints align to integer grid), true for
+    // FORCE_AUTOHINT and NO_HINTING.
+    const bool subpixel_pen = mFontFreetype->useSubpixelPen();
+
     cur_x = ((F32)x * sScaleX) + origin.mV[VX];
     cur_y = ((F32)y * sScaleY) + origin.mV[VY];
 
@@ -309,7 +318,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // skin-tone, flag pairs, keycap, tag subdivision flags) get shaped — the
     // legacy Latin path falls back to FT_Get_Kerning, which only reads the
     // (usually absent) `kern` table on modern OT fonts.
-    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", false);
+    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", true);
     std::vector<std::pair<size_t, size_t>> shape_ranges;
     if (sFontShapeAllText && length > 0)
     {
@@ -414,7 +423,8 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
                     cur_x += sg.x_advance;
                     cur_y += sg.y_advance;
-                    cur_x = (F32)ll_round(cur_x);
+                    if (!subpixel_pen)
+                        cur_x = (F32)ll_round(cur_x);
                     cur_render_x = cur_x;
                     cur_render_y = cur_y;
                 }
@@ -520,12 +530,13 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
         }
 
-        // Round after kerning.
-        // Must do this to cur_x, not just to cur_render_x, otherwise you
-        // will squish sub-pixel kerned characters too close together.
-        // For example, "CCCCC" looks bad.
-        cur_x = (F32)ll_round(cur_x);
-        //cur_y = (F32)ll_round(cur_y);
+        // Round after kerning. With subpixel_pen on the cumulative advance
+        // stays fractional through the loop and only the per-glyph draw rect
+        // (above) snaps to integer pixels. Without subpixel_pen we keep the
+        // legacy per-glyph round so native-hinted glyphs stay on the
+        // integer grid the foundry designed them for.
+        if (!subpixel_pen)
+            cur_x = (F32)ll_round(cur_x);
 
         cur_render_x = cur_x;
         cur_render_y = cur_y;
@@ -662,6 +673,10 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
     F32 cur_x = 0;
     const S32 max_index = begin_offset + max_chars;
 
+    // Mirror render()'s pen accumulation policy so width measurements agree
+    // with what's drawn — see the comment at render()'s subpixel_pen.
+    const bool subpixel_pen = mFontFreetype->useSubpixelPen();
+
     // Determine the tight slice we'll actually measure (bounded by max_chars
     // and the first NUL) so shaping only runs over real content.
     S32 measure_end = begin_offset;
@@ -673,7 +688,7 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
     // positions and ellipsis cutoffs agree with what's drawn. When
     // FontShapeAllText is on, the slice is shaped as a single range; otherwise
     // only emoji clusters are shaped and Latin falls through to per-codepoint.
-    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", false);
+    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", true);
     std::vector<std::pair<size_t, size_t>> shape_ranges;
     if (measure_len > 0)
     {
@@ -734,10 +749,10 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
                             (F32)(sfgi->mWidth + sfgi->mXBearing) - sg.x_advance);
                     }
                     cur_x += sg.x_advance;
-                    // Round per shaped glyph to match render()'s pen motion,
-                    // so cursor positions and ellipsis cutoffs line up with
-                    // what's actually drawn.
-                    cur_x = (F32)ll_round(cur_x);
+                    // Match render()'s pen motion so caret positions and
+                    // ellipsis cutoffs agree with what's drawn.
+                    if (!subpixel_pen)
+                        cur_x = (F32)ll_round(cur_x);
                 }
                 width_padding = run_padding;
                 i = (S32)run_range.second - 1;
@@ -778,8 +793,10 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
             next_glyph = mFontFreetype->getGlyphInfo(next_char, EFontGlyphType::Unspecified);
             cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
         }
-        // Round after kerning.
-        cur_x = (F32)ll_round(cur_x);
+        // Round after kerning. With subpixel_pen on, accumulator stays
+        // fractional so cumulative kerning precision survives.
+        if (!subpixel_pen)
+            cur_x = (F32)ll_round(cur_x);
     }
 
     if (!no_padding)
@@ -822,6 +839,8 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
     F32 scaled_max_pixels = max_pixels * sScaleX;
     F32 width_padding = 0.f;
 
+    const bool subpixel_pen = mFontFreetype->useSubpixelPen();
+
     LLFontGlyphInfo* next_glyph = NULL;
 
     // Pre-shape the entire slice when FontShapeAllText is on so advance accounts
@@ -829,7 +848,7 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
     // parallel walker (shape_idx) to map shaped advances onto codepoints — a
     // ligature glyph spans multiple cps but its full advance fires on the
     // cluster's start cp, so trailing cps of the cluster contribute zero.
-    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", false);
+    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", true);
     std::vector<LLShapedGlyph> shape_glyphs;
     size_t shape_idx = 0;
     if (sFontShapeAllText && max_chars > 0 && wchars[0])
@@ -915,7 +934,8 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
                 clip = true;
                 break;
             }
-            cur_x = (F32)ll_round(cur_x);
+            if (!subpixel_pen)
+                cur_x = (F32)ll_round(cur_x);
             continue;
         }
 
@@ -953,7 +973,8 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
         }
 
         // Round after kerning.
-        cur_x = (F32)ll_round(cur_x);
+        if (!subpixel_pen)
+            cur_x = (F32)ll_round(cur_x);
     }
 
     if( clip )
@@ -989,6 +1010,7 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
     S32 drawable_chars = 0;
 
     F32 scaled_max_pixels = max_pixels * sScaleX;
+    const bool subpixel_pen = mFontFreetype->useSubpixelPen();
 
     S32 start = llmin(start_pos, text_len - 1);
 
@@ -997,7 +1019,7 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
     // the legacy fgi->mXAdvance + getXKerning chain. Ligatures and ZWJ
     // clusters get their full advance attributed to the cluster's first cp;
     // trailing cps contribute zero, which is what we want for measurement.
-    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", false);
+    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", true);
     std::vector<F32> per_cp_advance;
     F32 per_cp_last_extent = 0.f;
     if (sFontShapeAllText && start >= 0 && wchars[0])
@@ -1041,7 +1063,8 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
             drawable_chars++;
             if (max_chars >= 0 && drawable_chars >= max_chars)
                 break;
-            total_width = (F32)ll_round(total_width);
+            if (!subpixel_pen)
+                total_width = (F32)ll_round(total_width);
             continue;
         }
 
@@ -1075,7 +1098,8 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
         }
 
         // Round after kerning.
-        total_width = (F32)ll_round(total_width);
+        if (!subpixel_pen)
+            total_width = (F32)ll_round(total_width);
     }
 
     if (drawable_chars == 0)
@@ -1099,6 +1123,7 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
     }
 
     F32 cur_x = 0;
+    const bool subpixel_pen = mFontFreetype->useSubpixelPen();
 
     target_x *= sScaleX;
 
@@ -1117,7 +1142,7 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
         ++slice_end;
     const S32 slice_len = slice_end - begin_offset;
 
-    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", false);
+    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", true);
     std::vector<std::pair<size_t, size_t>> shape_ranges;
     if (slice_len > 0)
     {
@@ -1186,7 +1211,8 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
                 {
                     const F32 glyph_start = run_x;
                     run_x += sg.x_advance;
-                    run_x = (F32)ll_round(run_x);
+                    if (!subpixel_pen)
+                        run_x = (F32)ll_round(run_x);
 
                     if (round)
                     {
@@ -1250,7 +1276,8 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
 
 
         // Round after kerning.
-        cur_x = (F32)ll_round(cur_x);
+        if (!subpixel_pen)
+            cur_x = (F32)ll_round(cur_x);
     }
 
     return llmin(max_chars, pos - begin_offset);
