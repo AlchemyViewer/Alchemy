@@ -2458,19 +2458,6 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>FontShapeAllText</key>
-        <map>
-            <key>Comment</key>
-            <string>
-                Route all text through HarfBuzz shaping (not just emoji clusters), enabling GPOS pair-kerning and ligatures from modern OpenType fonts. Disable to fall back to the legacy per-codepoint path with FT_Get_Kerning.
-            </string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
     </map>
 </llsd>
 
