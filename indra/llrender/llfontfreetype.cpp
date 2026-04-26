@@ -526,13 +526,30 @@ F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LL
     F32 delta_correction = 0.0f;
     if (mHinting == EFontHinting::FORCE_AUTOHINT && left_glyph_info && right_glyph_info)
     {
-        // FreeType docs (see ftautoh / glyph-to-bitmap example): apply discrete
-        // ±1 pixel correction at the documented thresholds.
+        // delta_diff is in 26.6 fixed point: the autohinter's net shift in
+        // inter-glyph spacing (positive = hinter pushed glyphs apart).
         S32 delta_diff = left_glyph_info->mRsbDelta - right_glyph_info->mLsbDelta;
-        if (delta_diff >= 32)
-            delta_correction = -1.0f;
-        else if (delta_diff < -32)
-            delta_correction = 1.0f;
+        if (mUseSubpixelPen)
+        {
+            // Fractional pen accumulator can absorb the exact sub-pixel
+            // shift. FreeType reference: "you can apply the values directly
+            // as a fractional adjustment" when sub-pixel positioning is in
+            // use. Sign matches the integer pattern below — delta_diff > 0
+            // moves the next glyph leftward to compensate for the hinter's
+            // outward shift.
+            delta_correction = -(F32)delta_diff / 64.0f;
+        }
+        else
+        {
+            // Integer pen: ±1 pixel jump at FreeType's documented thresholds
+            // (ftautoh / glyph-to-bitmap example). The discrete clamp is the
+            // best approximation of the fractional shift when the pen can't
+            // hold sub-pixel state.
+            if (delta_diff >= 32)
+                delta_correction = -1.0f;
+            else if (delta_diff < -32)
+                delta_correction = 1.0f;
+        }
     }
 
     // FT_Get_Kerning returns delta.x in 26.6 fixed-point regardless of mode;
