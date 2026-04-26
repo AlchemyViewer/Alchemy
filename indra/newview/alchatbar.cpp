@@ -376,6 +376,7 @@ void ALChatBar::sendChat( EChatType type )
             }
         }
 
+        mInputEditor->updateHistory();
         mInputEditor->setText(LLStringExplicit(""));
     }
 
