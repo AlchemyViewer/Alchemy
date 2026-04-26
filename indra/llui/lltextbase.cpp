@@ -2686,7 +2686,7 @@ void LLTextBase::appendLineBreakSegment(const LLStyle::Params& style_params)
     LLStyleConstSP sp(new LLStyle(style_params));
     segments.push_back(new LLLineBreakTextSegment(sp, getLength()));
 
-    insertStringNoUndo(getLength(), utf8str_to_wstring("\n"), &segments);
+    insertStringNoUndo(getLength(), U"\n", &segments);
 }
 
 void LLTextBase::appendImageSegment(const LLStyle::Params& style_params)
@@ -2699,7 +2699,7 @@ void LLTextBase::appendImageSegment(const LLStyle::Params& style_params)
     LLStyleConstSP sp(new LLStyle(style_params));
     segments.push_back(new LLImageTextSegment(sp, getLength(),*this));
 
-    insertStringNoUndo(getLength(), utf8str_to_wstring(" "), &segments);
+    insertStringNoUndo(getLength(), U" ", &segments);
 }
 
 void LLTextBase::appendWidget(const LLInlineViewSegment::Params& params, const std::string& text, bool allow_undo)

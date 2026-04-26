@@ -1033,8 +1033,7 @@ void shorten_name(std::string &name, const LLStyle::Params& style_params, S32 ma
     }
 
     // name does not fit, cut it, add ...
-    const LLWString dots_pad(utf8str_to_wstring(std::string("....")));
-    F32 elipses_width = font->getWidthF32(dots_pad.c_str());
+    F32 elipses_width = font->getWidthF32(U"....");
     segment_length = font->maxDrawableChars(wline.substr(first_line_length).c_str(), (F32)max_pixels - elipses_width, static_cast<S32>(wline.length()), LLFontGL::ANYWHERE);
 
     name = name.substr(0, segment_length + first_line_length) + std::string("...");

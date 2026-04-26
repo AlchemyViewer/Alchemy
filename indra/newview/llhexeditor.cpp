@@ -139,7 +139,7 @@ void LLHexEditor::getPosAndContext(S32 x, S32 y, bool force_context, U32& pos, b
     pos = 0;
 
     F32 line_height = mGLFont->getLineHeight();
-    F32 char_width = mGLFont->getWidthF32(".");
+    F32 char_width = mGLFont->getWidthF32(U".");
     F32 data_column_width = char_width * 3; // " 00";
     F32 text_x = mTextRect.mLeft;
     F32 text_x_data = text_x + (char_width * 10.1f); // "00000000  ", dunno why it's a fraction off
@@ -259,7 +259,7 @@ void LLHexEditor::setFocus(bool b)
 F32 LLHexEditor::getSuggestedWidth(U8 cols)
 {
     cols = cols>1?cols:mColumns;
-    F32 char_width = mGLFont->getWidthF32(".");
+    F32 char_width = mGLFont->getWidthF32(U".");
     F32 data_column_width = char_width * 3; // " 00";
     F32 text_x = mTextRect.mLeft;
     F32 text_x_data = text_x + (char_width * 10.1f); // "00000000  ", dunno why it's a fraction off
@@ -585,7 +585,7 @@ void LLHexEditor::draw()
     bool has_focus = hasFocus();
 
     F32 line_height = mGLFont->getLineHeight();
-    F32 char_width = mGLFont->getWidthF32(".");
+    F32 char_width = mGLFont->getWidthF32(U".");
     F32 data_column_width = char_width * 3; // " 00";
     F32 text_x = mTextRect.mLeft;
     F32 text_x_data = text_x + (char_width * 10.1f); // "00000000  ", dunno why it's a fraction off

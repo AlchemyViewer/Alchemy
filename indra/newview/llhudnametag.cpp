@@ -409,7 +409,7 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
             font = mFontp;
         }
         typedef boost::tokenizer<boost::char_separator<llwchar>, LLWString::const_iterator, LLWString > tokenizer;
-        LLWString seps(utf8str_to_wstring("\r\n"));
+        static const LLWString seps(U"\r\n");
         boost::char_separator<llwchar> sep(seps.c_str());
 
         tokenizer tokens(wline, sep);
@@ -431,12 +431,10 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                     {
                         // token does does not fit into signle line, need to draw "...".
                         // Use four dots for ellipsis width to generate padding
-                        const LLWString dots_pad(utf8str_to_wstring(std::string("....")));
-                        S32 elipses_width = (S32)font->getWidthF32(dots_pad.c_str());
+                        S32 elipses_width = (S32)font->getWidthF32(U"....");
                         // truncated string length
                         segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels - elipses_width, static_cast<S32>(wline.length()), LLFontGL::ANYWHERE);
-                        const LLWString dots(utf8str_to_wstring(std::string("...")));
-                        LLHUDTextSegment segment(iter->substr(line_length, segment_length) + dots, style, color, font);
+                        LLHUDTextSegment segment(iter->substr(line_length, segment_length) + U"...", style, color, font);
                         mTextSegments.push_back(segment);
                         break; // consider it to be complete
                     }
@@ -477,8 +475,8 @@ void LLHUDNameTag::addLabel(const std::string& label_utf8, F32 max_pixels)
     LLWString wstr = utf8string_to_wstring(label_utf8);
     if (!wstr.empty())
     {
-        LLWString seps(utf8str_to_wstring("\r\n"));
-        LLWString empty;
+        static const LLWString seps(U"\r\n");
+        static const LLWString empty;
 
         typedef boost::tokenizer<boost::char_separator<llwchar>, LLWString::const_iterator, LLWString > tokenizer;
         boost::char_separator<llwchar> sep(seps.c_str(), empty.c_str(), boost::keep_empty_tokens);

@@ -2196,8 +2196,7 @@ void LLLineEditor::draw()
                 S32 cursor_right = cursor_left + lineeditor_cursor_thickness;
                 if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode() && !hasSelection())
                 {
-                    const LLWString space(utf8str_to_wstring(std::string(" ")));
-                    S32 wswidth = mGLFont->getWidth(space.c_str());
+                    S32 wswidth = mGLFont->getWidth(U" ");
                     S32 width = mGLFont->getWidth(mText.getWString().c_str(), getCursor(), 1) + 1;
                     cursor_right = cursor_left + llmax(wswidth, width);
                 }

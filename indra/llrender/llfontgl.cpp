@@ -284,7 +284,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         if (string_width > scaled_max_pixels)
         {
             // use four dots for ellipsis width to generate padding
-            const LLWString dots(utf8str_to_wstring(std::string("....")));
+            const LLWString dots(U"....");
             scaled_max_pixels = llmax(0, scaled_max_pixels - ll_round(getWidthF32(dots.c_str())));
             draw_ellipses = true;
         }
@@ -571,7 +571,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     {
         // recursively render ellipses at end of string
         // we've already reserved enough room
-        static LLWString elipses_wstr(utf8string_to_wstring(std::string("...")));
+        static const LLWString elipses_wstr(U"...");
         render(elipses_wstr,
                 0,
                 (cur_x - origin.mV[VX]) / sScaleX, (F32)y,

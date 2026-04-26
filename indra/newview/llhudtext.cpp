@@ -268,7 +268,7 @@ void LLHUDText::addLine(const std::string &text_utf8,
             font = mFontp;
         }
         typedef boost::tokenizer<boost::char_separator<llwchar>, LLWString::const_iterator, LLWString > tokenizer;
-        LLWString seps(utf8str_to_wstring("\r\n"));
+        static const LLWString seps(U"\r\n");
         boost::char_separator<llwchar> sep(seps.c_str());
 
         tokenizer tokens(wline, sep);
