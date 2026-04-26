@@ -857,15 +857,15 @@ namespace tut
     template<> template<>
     void llstring_utf_object_t::test<90>()
     {
-        ensure_equals("empty",      wstring_find_shaping_runs(LLWString()).size(), size_t(0));
+        ensure_equals("empty",      wstring_find_emoji_clusters(LLWString()).size(), size_t(0));
         LLWString ascii = { (llwchar)'H', (llwchar)'i', (llwchar)'!' };
-        ensure_equals("ascii",      wstring_find_shaping_runs(ascii).size(),       size_t(0));
+        ensure_equals("ascii",      wstring_find_emoji_clusters(ascii).size(),       size_t(0));
         LLWString cjk   = { (llwchar)0x65E5, (llwchar)0x672C };
-        ensure_equals("cjk",        wstring_find_shaping_runs(cjk).size(),         size_t(0));
+        ensure_equals("cjk",        wstring_find_emoji_clusters(cjk).size(),         size_t(0));
         LLWString lone  = { (llwchar)0x1F680 };
-        ensure_equals("lone emoji", wstring_find_shaping_runs(lone).size(),        size_t(0));
+        ensure_equals("lone emoji", wstring_find_emoji_clusters(lone).size(),        size_t(0));
         LLWString pair  = { (llwchar)0x1F680, (llwchar)0x1F681 };
-        ensure_equals("two adj em", wstring_find_shaping_runs(pair).size(),        size_t(0));
+        ensure_equals("two adj em", wstring_find_emoji_clusters(pair).size(),        size_t(0));
     }
 
     // ZWJ family 👨‍👩‍👧 = U+1F468 U+200D U+1F469 U+200D U+1F467 — must emerge
@@ -876,7 +876,7 @@ namespace tut
         LLWString ws = { (llwchar)0x1F468, (llwchar)0x200D,
                          (llwchar)0x1F469, (llwchar)0x200D,
                          (llwchar)0x1F467 };
-        auto runs = wstring_find_shaping_runs(ws);
+        auto runs = wstring_find_emoji_clusters(ws);
         ensure_equals("one run",   runs.size(),    size_t(1));
         ensure_equals("run begin", runs[0].first,  size_t(0));
         ensure_equals("run end",   runs[0].second, size_t(5));
@@ -887,7 +887,7 @@ namespace tut
     void llstring_utf_object_t::test<92>()
     {
         LLWString ws = { (llwchar)0x1F468, (llwchar)0x1F3FB };
-        auto runs = wstring_find_shaping_runs(ws);
+        auto runs = wstring_find_emoji_clusters(ws);
         ensure_equals("skintone runs", runs.size(),    size_t(1));
         ensure_equals("skintone end",  runs[0].second, size_t(2));
     }
@@ -898,7 +898,7 @@ namespace tut
     void llstring_utf_object_t::test<93>()
     {
         LLWString ws = { (llwchar)0x1F680, (llwchar)0xFE0F };
-        auto runs = wstring_find_shaping_runs(ws);
+        auto runs = wstring_find_emoji_clusters(ws);
         ensure_equals("vs16 runs", runs.size(),    size_t(1));
         ensure_equals("vs16 end",  runs[0].second, size_t(2));
     }
@@ -909,13 +909,13 @@ namespace tut
     void llstring_utf_object_t::test<94>()
     {
         LLWString ws = { (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
-        auto runs = wstring_find_shaping_runs(ws);
+        auto runs = wstring_find_emoji_clusters(ws);
         ensure_equals("flag runs", runs.size(),    size_t(1));
         ensure_equals("flag end",  runs[0].second, size_t(2));
         // Four RIs in a row form two separate flags.
         LLWString four = { (llwchar)0x1F1FA, (llwchar)0x1F1F8,
                            (llwchar)0x1F1EB, (llwchar)0x1F1F7 };
-        auto more = wstring_find_shaping_runs(four);
+        auto more = wstring_find_emoji_clusters(four);
         ensure_equals("two flags", more.size(),    size_t(2));
         ensure_equals("flag0 end", more[0].second, size_t(2));
         ensure_equals("flag1 begin", more[1].first, size_t(2));
@@ -930,13 +930,13 @@ namespace tut
     void llstring_utf_object_t::test<95>()
     {
         LLWString digit_kc = { (llwchar)'9', (llwchar)0xFE0F, (llwchar)0x20E3 };
-        auto runs = wstring_find_shaping_runs(digit_kc);
+        auto runs = wstring_find_emoji_clusters(digit_kc);
         ensure_equals("keycap runs", runs.size(),    size_t(1));
         ensure_equals("keycap end",  runs[0].second, size_t(3));
         LLWString hash_kc = { (llwchar)'#', (llwchar)0xFE0F, (llwchar)0x20E3 };
-        ensure_equals("hash keycap", wstring_find_shaping_runs(hash_kc).size(), size_t(1));
+        ensure_equals("hash keycap", wstring_find_emoji_clusters(hash_kc).size(), size_t(1));
         LLWString bare = { (llwchar)'5' };
-        ensure_equals("bare digit",  wstring_find_shaping_runs(bare).size(),    size_t(0));
+        ensure_equals("bare digit",  wstring_find_emoji_clusters(bare).size(),    size_t(0));
     }
 
     // Subdivision flag — base 🏴 (U+1F3F4) + tag characters (U+E0020..U+E007F)
@@ -948,7 +948,7 @@ namespace tut
                          (llwchar)0xE0067, (llwchar)0xE0062, (llwchar)0xE0073,
                          (llwchar)0xE0063, (llwchar)0xE0074,
                          (llwchar)0xE007F };
-        auto runs = wstring_find_shaping_runs(ws);
+        auto runs = wstring_find_emoji_clusters(ws);
         ensure_equals("tag runs",  runs.size(),    size_t(1));
         ensure_equals("tag begin", runs[0].first,  size_t(0));
         ensure_equals("tag end",   runs[0].second, size_t(7));
@@ -966,7 +966,7 @@ namespace tut
                          (llwchar)0x1F469, (llwchar)0x200D,
                          (llwchar)0x1F467,
                          (llwchar)'!' };
-        auto runs = wstring_find_shaping_runs(ws);
+        auto runs = wstring_find_emoji_clusters(ws);
         ensure_equals("two runs",    runs.size(),     size_t(2));
         ensure_equals("run0 begin",  runs[0].first,   size_t(1));
         ensure_equals("run0 end",    runs[0].second,  size_t(3));
@@ -981,9 +981,9 @@ namespace tut
     void llstring_utf_object_t::test<98>()
     {
         LLWString zwj  = { (llwchar)'a', (llwchar)0x200D, (llwchar)'b' };
-        ensure_equals("bare zwj",  wstring_find_shaping_runs(zwj).size(),  size_t(0));
+        ensure_equals("bare zwj",  wstring_find_emoji_clusters(zwj).size(),  size_t(0));
         LLWString vs16 = { (llwchar)'a', (llwchar)0xFE0F, (llwchar)'b' };
-        ensure_equals("bare vs16", wstring_find_shaping_runs(vs16).size(), size_t(0));
+        ensure_equals("bare vs16", wstring_find_emoji_clusters(vs16).size(), size_t(0));
     }
 
     // BMP pictograph + VS16 + ZWJ + astral emoji (❤️‍🔥 = U+2764 U+FE0F
@@ -996,7 +996,7 @@ namespace tut
     {
         LLWString ws = { (llwchar)0x2764, (llwchar)0xFE0F,
                          (llwchar)0x200D, (llwchar)0x1F525 };
-        auto runs = wstring_find_shaping_runs(ws);
+        auto runs = wstring_find_emoji_clusters(ws);
         ensure_equals("bmp zwj runs", runs.size(),    size_t(1));
         ensure_equals("bmp zwj begin", runs[0].first,  size_t(0));
         ensure_equals("bmp zwj end",   runs[0].second, size_t(4));

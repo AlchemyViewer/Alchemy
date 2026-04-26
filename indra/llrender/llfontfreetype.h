@@ -166,6 +166,21 @@ public:
     // reused across shape() calls to avoid per-call setup cost.
     hb_font_t* getHbFont() const;
 
+    // True if the underlying FT face has FT_FACE_FLAG_FIXED_WIDTH set —
+    // i.e. the font is monospace. Shaping width-modifying features (kern,
+    // liga, calt, etc.) on a monospace face violates column alignment, so
+    // shape_sub_run disables those features for fixed-width faces.
+    bool isFixedWidth() const;
+
+    // Per-face opt-in: keep liga/clig/dlig/calt enabled on a fixed-width
+    // face. For programmer fonts (Fira Code, JetBrains Mono, etc.) where
+    // ligatures are width-preserving by design. kern stays disabled either
+    // way — monospace + GPOS pair-kerning is fundamentally incompatible.
+    // Set via <font ligatures="on"> in fonts.xml. No effect on non-fixed-
+    // width faces (their full feature set runs unconditionally).
+    bool getAllowMonospaceLigatures() const { return mAllowMonospaceLigatures; }
+    void setAllowMonospaceLigatures(bool allow) { mAllowMonospaceLigatures = allow; }
+
     // Pick the face in this font's fallback chain that owns a glyph for
     // `base` and return it, writing the FT glyph index into out_glyph_index.
     // Walks the same priority as addGlyph: emoji-functor fallbacks first,
@@ -228,6 +243,7 @@ private:
     EFontHinting mHinting;
     S32 mFontFlags;
     S32 mWeight = -1;
+    bool mAllowMonospaceLigatures = false;
     typedef std::pair<LLPointer<LLFontFreetype>, char_functor_t> fallback_font_t;
     typedef std::vector<fallback_font_t> fallback_font_vector_t;
     fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)

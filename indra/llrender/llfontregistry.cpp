@@ -181,16 +181,16 @@ LLFontDescriptor LLFontDescriptor::normalize() const
     return LLFontDescriptor(new_name,new_size,new_style, getFontFiles(), getFontCollectionFiles());
 }
 
-void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor)
+void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor, bool monospace_ligatures)
 {
     char_functor_map_t::const_iterator it = mCharFunctors.find(char_functor);
-    mFontFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, (mCharFunctors.end() != it) ? it->second : nullptr));
+    mFontFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, (mCharFunctors.end() != it) ? it->second : nullptr, monospace_ligatures));
 }
 
-void LLFontDescriptor::addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor)
+void LLFontDescriptor::addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor, bool monospace_ligatures)
 {
     char_functor_map_t::const_iterator it = mCharFunctors.find(char_functor);
-    mFontCollectionFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, (mCharFunctors.end() != it) ? it->second : nullptr));
+    mFontCollectionFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, (mCharFunctors.end() != it) ? it->second : nullptr, monospace_ligatures));
 }
 
 LLFontRegistry::LLFontRegistry(bool create_gl_textures)
@@ -263,6 +263,12 @@ std::string currentOsName()
 
 bool font_desc_init_from_xml(LLXMLNodePtr node, LLFontDescriptor& desc)
 {
+    // Font-level opt-in for monospace ligatures (Fira Code, JetBrains Mono,
+    // Cascadia Code, etc.). Read from the <font> tag once and propagate to
+    // all <file> children — ligatures are intrinsic to the font's design,
+    // so the same value applies to every file in the fallback chain.
+    bool font_monospace_ligatures = false;
+
     if (node->hasName("font"))
     {
         std::string attr_name;
@@ -275,6 +281,16 @@ bool font_desc_init_from_xml(LLXMLNodePtr node, LLFontDescriptor& desc)
         if (node->getAttributeString("font_style",attr_style))
         {
             desc.setStyle(LLFontGL::getStyleFromString(attr_style));
+        }
+
+        if (node->hasAttribute("ligatures"))
+        {
+            std::string attr_ligatures;
+            node->getAttributeString("ligatures", attr_ligatures);
+            LLStringUtil::toLower(attr_ligatures);
+            font_monospace_ligatures = (attr_ligatures == "on"
+                                     || attr_ligatures == "true"
+                                     || attr_ligatures == "1");
         }
 
         desc.setSize(s_template_string);
@@ -347,11 +363,11 @@ bool font_desc_init_from_xml(LLXMLNodePtr node, LLFontDescriptor& desc)
                 child->getAttributeBOOL("load_collection", col);
                 if (col)
                 {
-                    desc.addFontCollectionFile(font_file_name, hinting, flags, size_delta, weight, char_functor);
+                    desc.addFontCollectionFile(font_file_name, hinting, flags, size_delta, weight, char_functor, font_monospace_ligatures);
                 }
             }
 
-            desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, char_functor);
+            desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, char_functor, font_monospace_ligatures);
         }
         else if (child->hasName("os"))
         {
@@ -567,6 +583,7 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
                                  LLFontGL::sVertDPI, LLFontGL::sHorizDPI, font_file_it->mWeight, is_fallback, i, font_file_it->mHinting, font_file_it->mFlags))
                 {
                     is_font_loaded = true;
+                    fontp->mFontFreetype->setAllowMonospaceLigatures(font_file_it->mMonospaceLigatures);
                     if (is_first_found)
                     {
                         result = fontp;

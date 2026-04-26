@@ -1098,8 +1098,8 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
         // it through HarfBuzz. Otherwise the cluster gets chopped into one
         // segment per emoji base with ZWJ/VS filler falling between, and
         // each render() only sees an isolated emoji — presentation breaks.
-        const auto shape_runs = wstring_find_shaping_runs(wstr);
-        auto next_run = shape_runs.begin();
+        const auto emoji_clusters = wstring_find_emoji_clusters(wstr);
+        auto next_run = emoji_clusters.begin();
         LLTextSegment* segmentp = nullptr;
         segment_vec_t::iterator seg_iter;
         if (segments && segments->size() > 0)
@@ -1133,11 +1133,11 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
 
             // Drop runs that are entirely behind us (defensive; runs are
             // sorted so this is usually a no-op).
-            while (next_run != shape_runs.end() && next_run->second <= (size_t)text_kitty)
+            while (next_run != emoji_clusters.end() && next_run->second <= (size_t)text_kitty)
                 ++next_run;
 
             const bool is_cluster_start =
-                next_run != shape_runs.end() && next_run->first == (size_t)text_kitty;
+                next_run != emoji_clusters.end() && next_run->first == (size_t)text_kitty;
             const llwchar code    = wstr[text_kitty];
             const bool    isEmoji = ed ? ed->isEmoji(code) : LLStringOps::isEmoji(code);
             if (!is_cluster_start && !isEmoji)

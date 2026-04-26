@@ -71,6 +71,21 @@ namespace LLFontShaping
                   size_t                end,
                   std::vector<LLShapedGlyph>& out_glyphs);
 
+    // Like shapeRun, but returns a const reference into the LRU instead of
+    // copying out. Cluster values in the returned glyphs are SLICE-LOCAL —
+    // i.e. relative to `begin`, not original-wstr coords. Callers that need
+    // original-wstr clusters add `begin` once on consumption.
+    //
+    // The reference is invalidated by any subsequent shapeLine/shapeRun call
+    // or by clearCache(). Intended for renderer hot paths that shape once,
+    // iterate, and discard within a single function call. On failure or
+    // bad input returns a reference to a static empty vector.
+    const std::vector<LLShapedGlyph>& shapeLine(
+        const LLFontFreetype* root_face,
+        const LLWString&      wstr,
+        size_t                begin,
+        size_t                end);
+
     // Drop every cached shaping result. Must be called when any LLFontFreetype
     // reloads its FT_Face, since cached LLShapedGlyph entries carry glyph
     // indices that are only valid for the face's current state. Safe to call

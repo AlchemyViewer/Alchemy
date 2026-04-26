@@ -43,13 +43,14 @@ enum class EFontHinting : S32
 
 struct LLFontFileInfo
 {
-    LLFontFileInfo(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor = nullptr)
+    LLFontFileInfo(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false)
         : FileName(file_name)
         , CharFunctor(char_functor)
         , mHinting(hinting)
         , mFlags(flags)
-        , mSizeDelta(size_delta)
         , mWeight(weight)
+        , mSizeDelta(size_delta)
+        , mMonospaceLigatures(monospace_ligatures)
     {
     }
 
@@ -58,8 +59,9 @@ struct LLFontFileInfo
         , CharFunctor(ffi.CharFunctor)
         , mHinting(hinting)
         , mFlags(flags)
-        , mSizeDelta(size_delta)
         , mWeight(weight)
+        , mSizeDelta(size_delta)
+        , mMonospaceLigatures(ffi.mMonospaceLigatures)
     {
     }
 
@@ -73,6 +75,13 @@ struct LLFontFileInfo
     // so in some cases we want to adjust relative sizes to make characters
     // from different files match.
     F32 mSizeDelta;
+
+    // Opt-in: keep liga/clig/dlig/calt features enabled even when the face
+    // is fixed-width. For programmer fonts (Fira Code, JetBrains Mono,
+    // Cascadia Code, Iosevka) where ligatures are width-preserving by design
+    // and intrinsic to the font's purpose. Set via <font ligatures="on"> in
+    // fonts.xml. Has no effect on non-fixed-width faces.
+    bool mMonospaceLigatures;
 };
 typedef std::vector<LLFontFileInfo> font_file_info_vec_t;
 
@@ -94,10 +103,10 @@ public:
     const std::string& getSize() const { return mSize; }
     void setSize(const std::string& size) { mSize = size; }
 
-    void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor = LLStringUtil::null);
+    void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor = LLStringUtil::null, bool monospace_ligatures = false);
     const font_file_info_vec_t & getFontFiles() const { return mFontFiles; }
     void setFontFiles(const font_file_info_vec_t& font_files) { mFontFiles = font_files; }
-    void addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor = LLStringUtil::null);
+    void addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor = LLStringUtil::null, bool monospace_ligatures = false);
     const font_file_info_vec_t& getFontCollectionFiles() const { return mFontCollectionFiles; }
     void setFontCollectionFiles(const font_file_info_vec_t& font_collection_files) { mFontCollectionFiles = font_collection_files; }
 

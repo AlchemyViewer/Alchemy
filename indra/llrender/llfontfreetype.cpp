@@ -209,6 +209,11 @@ hb_font_t* LLFontFreetype::getHbFont() const
     return mHbFont;
 }
 
+bool LLFontFreetype::isFixedWidth() const
+{
+    return mFTFace && (mFTFace->face_flags & FT_FACE_FLAG_FIXED_WIDTH) != 0;
+}
+
 const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_glyph_index) const
 {
     out_glyph_index = 0;
@@ -492,27 +497,29 @@ F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LL
 
     FT_Vector  delta;
 
-    llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, FT_KERNING_UNFITTED, &delta));
+    // Grid-fitted: callers round cur_x to integer pixels per glyph, so subpixel
+    // kerning would be discarded anyway. Will flip to FT_KERNING_UNFITTED once
+    // subpixel pen position lands and these values can survive accumulation.
+    llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, FT_KERNING_DEFAULT, &delta));
 
     // Apply the FreeType auto-hinter's subpixel side-bearing correction between
-    // adjacent glyphs. When the hinter has shifted the right side of the left
-    // glyph or the left side of the right glyph, (rsb_delta - lsb_delta) is the
-    // sub-pixel nudge that keeps spacing visually even.
+    // adjacent glyphs. The lsb/rsb deltas are populated only when the autohinter
+    // ran; for native-hinted (DEFAULT) and unhinted (NO_HINTING) loads they're
+    // always zero and the correction is meaningless.
     F32 delta_correction = 0.0f;
-    if (left_glyph_info && right_glyph_info)
+    if (mHinting == EFontHinting::FORCE_AUTOHINT && left_glyph_info && right_glyph_info)
     {
-        // According to FreeType docs, these delta values should only trigger
-        // discrete ±1 pixel adjustments when they cross certain thresholds.
-        // Substructing delta_diff from delta.x doesn't work as well as treating
-        // it as a thresholds
+        // FreeType docs (see ftautoh / glyph-to-bitmap example): apply discrete
+        // ±1 pixel correction at the documented thresholds.
         S32 delta_diff = left_glyph_info->mRsbDelta - right_glyph_info->mLsbDelta;
-        if (delta_diff > 32)
+        if (delta_diff >= 32)
             delta_correction = -1.0f;
-        else if (delta_diff < -31)
+        else if (delta_diff < -32)
             delta_correction = 1.0f;
     }
 
-    // ft_kerning_unfitted mode always returns 26.6 fixed-point values
+    // FT_Get_Kerning returns delta.x in 26.6 fixed-point regardless of mode;
+    // the mode only controls whether values are grid-fitted to integer pixels.
     return (F32)(delta.x * (1.f / 64.f)) + delta_correction;
 }
 

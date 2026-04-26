@@ -676,15 +676,15 @@ void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
 
     bool emojiSent = false;
 
-    // Walk shaping runs first: each run is a multi-codepoint cluster
+    // Walk emoji clusters first: each cluster is a multi-codepoint sequence
     // (ZWJ family, flag pair, keycap, tag subdivision) that must be
-    // recorded as a single emoji. Codepoints outside any shaping run are
+    // recorded as a single emoji. Codepoints outside any cluster are
     // handled with the single-codepoint path below.
-    const auto runs = wstring_find_shaping_runs(text);
-    auto next_run = runs.begin();
+    const auto clusters = wstring_find_emoji_clusters(text);
+    auto next_run = clusters.begin();
     for (size_t i = 0; i < text.size(); )
     {
-        if (next_run != runs.end() && next_run->first == i)
+        if (next_run != clusters.end() && next_run->first == i)
         {
             LLFloaterEmojiPicker::onEmojiUsed(LLWString(text.data() + next_run->first,
                                                         next_run->second - next_run->first));

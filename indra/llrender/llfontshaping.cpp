@@ -91,6 +91,7 @@ namespace
                        const LLWString&             slice,
                        size_t                       sub_begin_in_slice,
                        size_t                       sub_end_in_slice,
+                       hb_script_t                  script,
                        std::vector<LLShapedGlyph>&  out_glyphs)
     {
         if (!face || sub_begin_in_slice >= sub_end_in_slice)
@@ -109,10 +110,44 @@ namespace
         hb_buffer_add_utf32(buf, codepoints, len, 0, len);
 
         hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
-        hb_buffer_set_script(buf, HB_SCRIPT_COMMON);
+        hb_buffer_set_script(buf, script);
         hb_buffer_set_language(buf, hb_language_get_default());
 
-        hb_shape(hb_font, buf, nullptr, 0);
+        // Monospace contract: HB's default features (kern, liga, clig, dlig,
+        // calt) modify glyph width or substitute multi-cp ligatures, which
+        // break column alignment in fixed-width fonts. Disable them on a
+        // monospace face by default. Programmer fonts (Fira Code, JetBrains
+        // Mono, etc.) ship width-preserving ligatures and can opt back in
+        // via <font ligatures="on"> in fonts.xml — kern still stays off
+        // there because monospace + GPOS pair-kerning is fundamentally
+        // incompatible. Other features (mark, mkmk, ccmp, locl, rlig, rvrn)
+        // preserve width and stay on unconditionally.
+        static const hb_feature_t kFixedWidthStrict[] = {
+            { HB_TAG('k','e','r','n'), 0, 0, (unsigned)-1 },
+            { HB_TAG('l','i','g','a'), 0, 0, (unsigned)-1 },
+            { HB_TAG('c','l','i','g'), 0, 0, (unsigned)-1 },
+            { HB_TAG('d','l','i','g'), 0, 0, (unsigned)-1 },
+            { HB_TAG('c','a','l','t'), 0, 0, (unsigned)-1 },
+        };
+        static const hb_feature_t kFixedWidthLigaturesOk[] = {
+            { HB_TAG('k','e','r','n'), 0, 0, (unsigned)-1 },
+        };
+        const hb_feature_t* features = nullptr;
+        unsigned int num_features = 0;
+        if (face->isFixedWidth())
+        {
+            if (face->getAllowMonospaceLigatures())
+            {
+                features = kFixedWidthLigaturesOk;
+                num_features = (unsigned int)(sizeof(kFixedWidthLigaturesOk) / sizeof(kFixedWidthLigaturesOk[0]));
+            }
+            else
+            {
+                features = kFixedWidthStrict;
+                num_features = (unsigned int)(sizeof(kFixedWidthStrict) / sizeof(kFixedWidthStrict[0]));
+            }
+        }
+        hb_shape(hb_font, buf, features, num_features);
 
         unsigned int glyph_count = 0;
         const hb_glyph_info_t*     infos     = hb_buffer_get_glyph_infos(buf, &glyph_count);
@@ -138,10 +173,15 @@ namespace
     }
 
     // Itemize [begin, end) into contiguous sub-runs whose codepoints share
-    // the same owning face (as chosen by selectShapingFace). This is what
-    // lets a keycap like 8️⃣ succeed: '8' lives in the root face while
-    // U+FE0F and U+20E3 live in the emoji face, and each needs its own
-    // hb_shape pass on the face that actually carries its glyphs.
+    // both an owning face (as chosen by selectShapingFace) and a Unicode
+    // script. Face boundaries let a keycap like 8️⃣ succeed: '8' lives in
+    // the root face while U+FE0F and U+20E3 live in the emoji face. Script
+    // boundaries give HarfBuzz the right script tag per buffer so GPOS
+    // lookups under script-specific feature lists ('latn', 'cyrl', etc.)
+    // fire correctly. COMMON/INHERITED codepoints (spaces, punctuation,
+    // VS selectors, ZWJ) inherit the surrounding script and never trigger
+    // a boundary by themselves; this keeps "Hello, world!" as one run with
+    // script LATIN rather than fragmenting at every comma.
     void shape_all_sub_runs(const LLFontFreetype* root_face,
                             const LLWString&      slice,
                             std::vector<LLShapedGlyph>& out_glyphs)
@@ -150,37 +190,73 @@ namespace
         if (!root_face || n == 0)
             return;
 
-        const LLFontFreetype* cur_face = nullptr;
-        size_t                cur_begin = 0;
+        hb_unicode_funcs_t* uf = hb_unicode_funcs_get_default();
+
+        const LLFontFreetype* cur_face   = nullptr;
+        hb_script_t           cur_script = HB_SCRIPT_INVALID;  // unknown until first non-neutral cp
+        size_t                cur_begin  = 0;
+
+        auto emit = [&](size_t end_excl) {
+            // INVALID surfaces only when a run consists entirely of neutral
+            // codepoints (e.g. a string of spaces); fall back to COMMON.
+            const hb_script_t script = (cur_script == HB_SCRIPT_INVALID) ? HB_SCRIPT_COMMON
+                                                                         : cur_script;
+            shape_sub_run(cur_face, slice, cur_begin, end_excl, script, out_glyphs);
+        };
+
         for (size_t i = 0; i < n; ++i)
         {
             U32 unused = 0;
             const LLFontFreetype* face = root_face->selectShapingFace(slice[i], unused);
             if (!face)
                 face = root_face; // selectShapingFace never returns null, but defensive
-            if (face != cur_face)
+
+            const hb_script_t cp_script = hb_unicode_script(uf, slice[i]);
+            const bool is_neutral = (cp_script == HB_SCRIPT_COMMON
+                                  || cp_script == HB_SCRIPT_INHERITED);
+
+            if (cur_face == nullptr)
             {
-                if (cur_face != nullptr)
-                    shape_sub_run(cur_face, slice, cur_begin, i, out_glyphs);
-                cur_face = face;
-                cur_begin = i;
+                cur_face   = face;
+                cur_begin  = i;
+                cur_script = is_neutral ? HB_SCRIPT_INVALID : cp_script;
+                continue;
+            }
+
+            const bool face_change   = (face != cur_face);
+            const bool script_change = !is_neutral
+                                       && cur_script != HB_SCRIPT_INVALID
+                                       && cp_script != cur_script;
+
+            if (face_change || script_change)
+            {
+                emit(i);
+                cur_face   = face;
+                cur_begin  = i;
+                cur_script = is_neutral ? HB_SCRIPT_INVALID : cp_script;
+            }
+            else if (cur_script == HB_SCRIPT_INVALID && !is_neutral)
+            {
+                // Adopt the first non-neutral script seen in this run so any
+                // leading neutrals (spaces, punctuation) get the right tag.
+                cur_script = cp_script;
             }
         }
         if (cur_face != nullptr)
-            shape_sub_run(cur_face, slice, cur_begin, n, out_glyphs);
+            emit(n);
     }
 }
 
-void LLFontShaping::shapeRun(const LLFontFreetype* root_face,
-                             const LLWString&      wstr,
-                             size_t                begin,
-                             size_t                end,
-                             std::vector<LLShapedGlyph>& out_glyphs)
+const std::vector<LLShapedGlyph>& LLFontShaping::shapeLine(
+    const LLFontFreetype* root_face,
+    const LLWString&      wstr,
+    size_t                begin,
+    size_t                end)
 {
-    out_glyphs.clear();
+    static const std::vector<LLShapedGlyph> sEmpty;
 
     if (!root_face || begin >= end || end > wstr.size())
-        return;
+        return sEmpty;
 
     // Build the cache key from the slice + root face. Itemization is
     // deterministic given (slice, root_face), so no need to encode the
@@ -192,16 +268,7 @@ void LLFontShaping::shapeRun(const LLFontFreetype* root_face,
     if (auto it = sShapeIndex.find(key); it != sShapeIndex.end())
     {
         sShapeLru.splice(sShapeLru.begin(), sShapeLru, it->second);
-        const auto& cached = it->second->second;
-        out_glyphs.reserve(cached.size());
-        const S32 base = static_cast<S32>(begin);
-        for (const LLShapedGlyph& sg : cached)
-        {
-            LLShapedGlyph out = sg;
-            out.cluster += base;
-            out_glyphs.push_back(out);
-        }
-        return;
+        return it->second->second;
     }
 
     // Miss: itemize the slice into per-face sub-runs, shape each on its
@@ -219,7 +286,21 @@ void LLFontShaping::shapeRun(const LLFontFreetype* root_face,
         sShapeLru.pop_back();
     }
 
-    const auto& cached = sShapeLru.front().second;
+    return sShapeLru.front().second;
+}
+
+void LLFontShaping::shapeRun(const LLFontFreetype* root_face,
+                             const LLWString&      wstr,
+                             size_t                begin,
+                             size_t                end,
+                             std::vector<LLShapedGlyph>& out_glyphs)
+{
+    out_glyphs.clear();
+
+    const auto& cached = shapeLine(root_face, wstr, begin, end);
+    if (cached.empty())
+        return;
+
     out_glyphs.reserve(cached.size());
     const S32 base = static_cast<S32>(begin);
     for (const LLShapedGlyph& sg : cached)

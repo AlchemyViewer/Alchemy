@@ -851,7 +851,7 @@ static size_t advance_shaping_run(const llwchar* p, size_t n, size_t start)
     return r;
 }
 
-std::vector<std::pair<size_t, size_t>> wstring_find_shaping_runs(LLWStringView wstr)
+std::vector<std::pair<size_t, size_t>> wstring_find_emoji_clusters(LLWStringView wstr)
 {
     std::vector<std::pair<size_t, size_t>> runs;
     const llwchar* p = wstr.data();
@@ -879,8 +879,8 @@ size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos)
     if (pos >= n)
         return n;
     const size_t next = pos + 1;
-    // Runs are sorted by start, so stop scanning once we pass `next`.
-    for (const auto& run : wstring_find_shaping_runs(wstr))
+    // Clusters are sorted by start, so stop scanning once we pass `next`.
+    for (const auto& run : wstring_find_emoji_clusters(wstr))
     {
         if (next <= run.first)
             break;
@@ -895,7 +895,7 @@ size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos)
     if (pos == 0)
         return 0;
     const size_t prev = pos - 1;
-    for (const auto& run : wstring_find_shaping_runs(wstr))
+    for (const auto& run : wstring_find_emoji_clusters(wstr))
     {
         if (prev < run.first)
             break;
@@ -909,7 +909,7 @@ size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos)
 {
     if (pos == 0 || pos >= wstr.size())
         return pos;
-    for (const auto& run : wstring_find_shaping_runs(wstr))
+    for (const auto& run : wstring_find_emoji_clusters(wstr))
     {
         if (pos <= run.first)
             break;
@@ -923,7 +923,7 @@ size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
 {
     if (pos >= wstr.size())
         return wstr.size();
-    for (const auto& run : wstring_find_shaping_runs(wstr))
+    for (const auto& run : wstring_find_emoji_clusters(wstr))
     {
         if (pos <= run.first)
             break;

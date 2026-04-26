@@ -727,29 +727,29 @@ LL_COMMON_API bool wstring_remove_emojis(LLWString& wstr);
 LL_COMMON_API bool utf8str_remove_emojis(std::string& utf8str);
 
 // Locate contiguous ranges [begin, end) of wstr that form a multi-code-point
-// emoji sequence and therefore need HarfBuzz shaping to render correctly.
-// Covers: ZWJ families, VS15/VS16 presentation selectors, skin-tone modifiers,
-// regional indicator flag pairs, keycap sequences (digit/#/* + FE0F + 20E3),
-// and tag sequences (e.g., subdivision flags). Isolated emoji that render
+// emoji cluster — ZWJ families, VS15/VS16 presentation selectors, skin-tone
+// modifiers, regional indicator flag pairs, keycap sequences (digit/#/* + FE0F
+// + 20E3), and tag sequences (e.g., subdivision flags). Used by emoji-aware
+// cursor stepping and selection logic, NOT by the renderer (which now shapes
+// the entire line via LLFontShaping::shapeLine). Isolated emoji that render
 // correctly through the 1:1 FT_Get_Char_Index path are intentionally skipped.
 LL_COMMON_API std::vector<std::pair<size_t, size_t>>
-wstring_find_shaping_runs(LLWStringView wstr);
+wstring_find_emoji_clusters(LLWStringView wstr);
 
 // Cluster-aware cursor stepping. Move one codepoint forward/backward from
 // `pos`, then — if that single-codepoint step landed strictly inside an emoji
-// shaping run — jump to the far edge of the run so the caret doesn't split a
+// cluster — jump to the far edge of the cluster so the caret doesn't split a
 // ZWJ family, flag pair, keycap, tag subdivision, etc. Clamped to [0, size].
-// This is a narrow grapheme walker: it handles the emoji subset currently
-// picked up by wstring_find_shaping_runs, not the full UAX #29 spec (Hangul
-// LVT, Indic aksara, combining marks outside emoji context still step per
-// codepoint).
+// This is a narrow grapheme walker: it handles the emoji subset picked up by
+// wstring_find_emoji_clusters, not the full UAX #29 spec (Hangul LVT, Indic
+// aksara, combining marks outside emoji context still step per codepoint).
 LL_COMMON_API size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos);
 LL_COMMON_API size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos);
 
-// Snap `pos` onto a cluster boundary when it currently sits strictly inside a
-// shaping run. The backward variant snaps to the run's start, the forward
-// variant to its end. Positions already on a boundary (or outside any run)
-// are returned unchanged. Intended for places that compute a position
+// Snap `pos` onto a cluster boundary when it currently sits strictly inside an
+// emoji cluster. The backward variant snaps to the cluster's start, the
+// forward variant to its end. Positions already on a boundary (or outside any
+// cluster) are returned unchanged. Intended for places that compute a position
 // through some other rule — word-boundary walks, pixel hit-testing — and
 // need to nudge onto the nearest safe cluster edge in a chosen direction
 // without the single-codepoint step that wstring_step_grapheme_* applies.

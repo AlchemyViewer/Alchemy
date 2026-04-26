@@ -29,6 +29,7 @@
 #include "llfontgl.h"
 
 // Linden library includes
+#include "llcontrol.h"
 #include "llfasttimer.h"
 #include "llfontfreetype.h"
 #include "llfontbitmapcache.h"
@@ -42,6 +43,8 @@
 #include "lltexture.h"
 #include "lldir.h"
 #include "llstring.h"
+
+extern LLControlGroup gSavedSettings;
 
 // Third party library includes
 #include <boost/tokenizer.hpp>
@@ -300,20 +303,33 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     S32 glyph_count = 0;
     llwchar last_char = wstr[begin_offset];
 
-    // Multi-codepoint emoji sequences (ZWJ families, VS16, skin-tone, flag
-    // pairs, keycap, tag subdivision flags) need HarfBuzz to pick the right
-    // composite glyph. Detect them up front and shape each range through the
-    // owning font face. Ranges are stored in original-wstr coordinates so
-    // they can be matched against `i` directly below. Empty when there are
-    // no such sequences in the slice — which is the overwhelmingly common
-    // case, so this adds nothing to the ASCII hot path.
-    std::vector<std::pair<size_t, size_t>> shape_ranges =
-        wstring_find_shaping_runs(LLWStringView(wstr.data() + begin_offset, length));
+    // FontShapeAllText: when on, route the entire slice through HarfBuzz so
+    // GPOS pair-kerning and ligatures from modern OT fonts apply to Latin too.
+    // When off, only multi-codepoint emoji clusters (ZWJ families, VS16,
+    // skin-tone, flag pairs, keycap, tag subdivision flags) get shaped — the
+    // legacy Latin path falls back to FT_Get_Kerning, which only reads the
+    // (usually absent) `kern` table on modern OT fonts.
+    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", false);
+    std::vector<std::pair<size_t, size_t>> shape_ranges;
+    if (sFontShapeAllText && length > 0)
+    {
+        // Single all-encompassing shape range; the loop's shaped path below
+        // will consume the entire string in one HarfBuzz-positioned pass.
+        shape_ranges.emplace_back(static_cast<size_t>(begin_offset),
+                                  static_cast<size_t>(begin_offset + length));
+    }
+    else
+    {
+        shape_ranges = wstring_find_emoji_clusters(LLWStringView(wstr.data() + begin_offset, length));
+        for (auto& r : shape_ranges)
+        {
+            r.first  += begin_offset;
+            r.second += begin_offset;
+        }
+    }
     std::vector<std::vector<LLShapedGlyph>> shape_glyphs(shape_ranges.size());
     for (size_t s = 0; s < shape_ranges.size(); ++s)
     {
-        shape_ranges[s].first  += begin_offset;
-        shape_ranges[s].second += begin_offset;
         LLFontShaping::shapeRun(mFontFreetype, wstr,
                                 shape_ranges[s].first,
                                 shape_ranges[s].second,
@@ -654,11 +670,24 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
     const S32 measure_len = measure_end - begin_offset;
 
     // Same shape-first preprocessing as render(); kept consistent so caret
-    // positions and ellipsis cutoffs agree with what's drawn.
-    std::vector<std::pair<size_t, size_t>> shape_ranges =
-        (measure_len > 0)
-            ? wstring_find_shaping_runs(LLWStringView(wchars + begin_offset, (size_t)measure_len))
-            : std::vector<std::pair<size_t, size_t>>();
+    // positions and ellipsis cutoffs agree with what's drawn. When
+    // FontShapeAllText is on, the slice is shaped as a single range; otherwise
+    // only emoji clusters are shaped and Latin falls through to per-codepoint.
+    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", false);
+    std::vector<std::pair<size_t, size_t>> shape_ranges;
+    if (measure_len > 0)
+    {
+        if (sFontShapeAllText)
+        {
+            shape_ranges.emplace_back(static_cast<size_t>(0),
+                                      static_cast<size_t>(measure_len));
+        }
+        else
+        {
+            shape_ranges = wstring_find_emoji_clusters(
+                LLWStringView(wchars + begin_offset, (size_t)measure_len));
+        }
+    }
     std::vector<std::vector<LLShapedGlyph>> shape_glyphs(shape_ranges.size());
     // LLFontShaping needs an LLWString, not a raw pointer; build one only if
     // we actually have shape ranges to feed it.
@@ -795,6 +824,27 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
 
     LLFontGlyphInfo* next_glyph = NULL;
 
+    // Pre-shape the entire slice when FontShapeAllText is on so advance accounts
+    // for GPOS pair-kerning and ligatures. The codepoint loop below uses a
+    // parallel walker (shape_idx) to map shaped advances onto codepoints — a
+    // ligature glyph spans multiple cps but its full advance fires on the
+    // cluster's start cp, so trailing cps of the cluster contribute zero.
+    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", false);
+    std::vector<LLShapedGlyph> shape_glyphs;
+    size_t shape_idx = 0;
+    if (sFontShapeAllText && max_chars > 0 && wchars[0])
+    {
+        S32 measure_end = 0;
+        while (measure_end < max_chars && wchars[measure_end] != 0)
+            ++measure_end;
+        if (measure_end > 0)
+        {
+            LLWString slice(wchars, wchars + measure_end);
+            LLFontShaping::shapeRun(mFontFreetype, slice, 0, (size_t)measure_end, shape_glyphs);
+        }
+    }
+    const bool use_shaped = !shape_glyphs.empty();
+
     S32 i;
     for (i=0; (i < max_chars); i++)
     {
@@ -835,6 +885,38 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
             {
                 in_word = true;
             }
+        }
+
+        if (use_shaped)
+        {
+            // Sum advances and the largest extent of any glyph whose cluster
+            // lands on this codepoint. Trailing codepoints of a multi-cp
+            // cluster (ligatures, ZWJ sequences) consume zero glyphs and
+            // pass through with cur_x unchanged.
+            F32 advance_this = 0.f;
+            F32 extent_this  = 0.f;
+            while (shape_idx < shape_glyphs.size()
+                   && shape_glyphs[shape_idx].cluster <= i)
+            {
+                const auto& sg = shape_glyphs[shape_idx];
+                advance_this += sg.x_advance;
+                const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
+                    sg.face, sg.glyph_id, EFontGlyphType::Unspecified);
+                if (sfgi)
+                    extent_this = llmax(extent_this, (F32)(sfgi->mWidth + sfgi->mXBearing));
+                ++shape_idx;
+            }
+            width_padding = llmax(0.f,
+                                  width_padding - advance_this,
+                                  extent_this - advance_this);
+            cur_x += advance_this;
+            if (scaled_max_pixels < cur_x + width_padding)
+            {
+                clip = true;
+                break;
+            }
+            cur_x = (F32)ll_round(cur_x);
+            continue;
         }
 
         LLFontGlyphInfo* fgi = next_glyph;
@@ -909,8 +991,60 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
     F32 scaled_max_pixels = max_pixels * sScaleX;
 
     S32 start = llmin(start_pos, text_len - 1);
+
+    // FontShapeAllText: pre-shape [0, start+1) and project advances onto a
+    // per-codepoint table. Walking backward through that table substitutes for
+    // the legacy fgi->mXAdvance + getXKerning chain. Ligatures and ZWJ
+    // clusters get their full advance attributed to the cluster's first cp;
+    // trailing cps contribute zero, which is what we want for measurement.
+    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", false);
+    std::vector<F32> per_cp_advance;
+    F32 per_cp_last_extent = 0.f;
+    if (sFontShapeAllText && start >= 0 && wchars[0])
+    {
+        LLWString slice(wchars, wchars + start + 1);
+        std::vector<LLShapedGlyph> shape_glyphs;
+        LLFontShaping::shapeRun(mFontFreetype, slice, 0, (size_t)(start + 1), shape_glyphs);
+        if (!shape_glyphs.empty())
+        {
+            per_cp_advance.assign(start + 1, 0.f);
+            for (const auto& sg : shape_glyphs)
+            {
+                if (sg.cluster >= 0 && sg.cluster <= start)
+                {
+                    per_cp_advance[sg.cluster] += sg.x_advance;
+                    if (sg.cluster == start)
+                    {
+                        const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
+                            sg.face, sg.glyph_id, EFontGlyphType::Unspecified);
+                        if (sfgi)
+                            per_cp_last_extent = llmax(per_cp_last_extent,
+                                                       (F32)(sfgi->mWidth + sfgi->mXBearing));
+                    }
+                }
+            }
+        }
+    }
+    const bool use_shaped = !per_cp_advance.empty();
+
     for (S32 i = start; i >= 0; i--)
     {
+        if (use_shaped)
+        {
+            // Last cp uses extent so the rightmost glyph stays fully visible.
+            F32 width = (i == start)
+                        ? llmax(per_cp_last_extent, per_cp_advance[i])
+                        : per_cp_advance[i];
+            if (scaled_max_pixels < (total_width + width))
+                break;
+            total_width += width;
+            drawable_chars++;
+            if (max_chars >= 0 && drawable_chars >= max_chars)
+                break;
+            total_width = (F32)ll_round(total_width);
+            continue;
+        }
+
         llwchar wch = wchars[i];
 
         const LLFontGlyphInfo* fgi= mFontFreetype->getGlyphInfo(wch, EFontGlyphType::Unspecified);
@@ -983,10 +1117,21 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
         ++slice_end;
     const S32 slice_len = slice_end - begin_offset;
 
-    std::vector<std::pair<size_t, size_t>> shape_ranges =
-        (slice_len > 0)
-            ? wstring_find_shaping_runs(LLWStringView(wchars + begin_offset, (size_t)slice_len))
-            : std::vector<std::pair<size_t, size_t>>();
+    static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", false);
+    std::vector<std::pair<size_t, size_t>> shape_ranges;
+    if (slice_len > 0)
+    {
+        if (sFontShapeAllText)
+        {
+            shape_ranges.emplace_back(static_cast<size_t>(0),
+                                      static_cast<size_t>(slice_len));
+        }
+        else
+        {
+            shape_ranges = wstring_find_emoji_clusters(
+                LLWStringView(wchars + begin_offset, (size_t)slice_len));
+        }
+    }
     std::vector<std::vector<LLShapedGlyph>> shape_glyphs(shape_ranges.size());
     if (!shape_ranges.empty())
     {
@@ -1013,9 +1158,14 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
             break; // done
         }
 
-        // A shaped cluster occupies one visual glyph; its entire width must
-        // be treated as one advance chunk. Left half → pos stays at cluster
-        // start, right half → consume the whole run and continue past it.
+        // Per-glyph hit-test inside a shape range. Each glyph's `cluster`
+        // points back to a codepoint in the original wstr; clicks land on
+        // that boundary. For ligatures (one glyph spans multiple cps) and
+        // mark stacks (multiple glyphs share one cluster), this correctly
+        // snaps to the nearest cluster boundary — you can't put the cursor
+        // mid-ligature. Mid-test matches the legacy codepoint path's
+        // unrounded `cur_x + W*0.5f` so behavior agrees character-for-
+        // character on Latin text.
         if (next_shape_run < shape_ranges.size()
             && (S32)shape_ranges[next_shape_run].first == pos)
         {
@@ -1025,32 +1175,35 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
 
             if (!run_glyphs.empty())
             {
-                // Accumulate the rounded pen motion render() would produce
-                // (per-glyph ll_round), so cur_x stays pixel-consistent
-                // with the drawn output and clicks near cluster boundaries
-                // land on the same side they visually appear.
-                F32 run_end = cur_x;
+                // sg.cluster is SLICE-LOCAL (0-based from the slice passed to
+                // shapeRun, which starts at `wchars + begin_offset`). The
+                // function returns positions relative to begin_offset, so
+                // sg.cluster IS the right answer — no further subtraction
+                // is needed and we must NOT use the outer-loop `pos`
+                // (which is wstr-local) for shaped hits.
+                F32 run_x = cur_x;
                 for (const LLShapedGlyph& sg : run_glyphs)
                 {
-                    run_end += sg.x_advance;
-                    run_end = (F32)ll_round(run_end);
-                }
-                const F32 run_advance = run_end - cur_x;
+                    const F32 glyph_start = run_x;
+                    run_x += sg.x_advance;
+                    run_x = (F32)ll_round(run_x);
 
-                if (round)
-                {
-                    if (target_x < cur_x + run_advance * 0.5f)
-                        break;  // left half — pos is cluster start
-                }
-                else if (target_x < cur_x + run_advance)
-                {
-                    break;
+                    if (round)
+                    {
+                        if (target_x < glyph_start + sg.x_advance * 0.5f)
+                            return llmin(max_chars, (S32)sg.cluster);
+                    }
+                    else if (target_x < glyph_start + sg.x_advance)
+                    {
+                        return llmin(max_chars, (S32)sg.cluster);
+                    }
+
+                    if (scaled_max_pixels < run_x)
+                        return llmin(max_chars, (S32)sg.cluster);
                 }
 
-                if (scaled_max_pixels < cur_x + run_advance)
-                    break;
-
-                cur_x = run_end;
+                // Click is past the entire shaped run; advance and continue.
+                cur_x = run_x;
                 pos = (S32)run_range.second - 1;  // loop's ++ lands past the run
                 next_glyph = NULL;
                 continue;
