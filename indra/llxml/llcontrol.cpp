@@ -1085,7 +1085,10 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
                     existing_control->setDefaultValue(control_map["Value"]);
                     existing_control->setPersist(persist);
                     existing_control->setHiddenFromSettingsEditor(hidefromsettingseditor);
-                    existing_control->setComment(control_map["Comment"].asString());
+
+                    std::string comment = control_map["Comment"].asString();
+                    LLStringUtil::trim(comment);
+                    existing_control->setComment(comment);
                 }
                 else
                 {
@@ -1140,6 +1143,7 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
             }
 
             std::string comment = control_map["Comment"].asString();
+            LLStringUtil::trim(comment);
             if (!error_when_no_comment
                 && !set_default_values
                 && comment.empty())
