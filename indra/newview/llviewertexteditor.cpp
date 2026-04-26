@@ -199,7 +199,7 @@ public:
         else
         {
             width = EMBEDDED_ITEM_LABEL_PADDING + mImage->getWidth() + mStyle->getFont()->getWidthF32(mLabel.c_str());
-            height = llmax(mImage->getHeight(), mStyle->getFont()->getLineHeight());
+            height = llmax(mImage->getHeight(), mStyle->getFont()->getLineSpacing());
         }
         return false;
     }

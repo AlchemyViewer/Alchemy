@@ -9,7 +9,6 @@
   border_visible="false"
   word_wrap="false" 
   ignore_tab="true"
-  line_spacing.pixels="1" 
   track_bottom="false" 
   cursor_color="TextCursorColor"
   default_color="TextDefaultColor"

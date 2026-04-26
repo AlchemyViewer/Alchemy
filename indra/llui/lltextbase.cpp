@@ -3070,9 +3070,11 @@ LLRect LLTextBase::getLocalRectFromDocIndex(S32 pos) const
 
     if (mLineInfoList.empty())
     {
-        // return default height rect in upper left
+        // return default height rect in upper left — match the line spacing
+        // a populated line would use so empty-doc cursor isn't shorter than
+        // populated-doc cursor for fonts with non-zero line gap.
         local_rect = content_window_rect;
-        local_rect.mBottom = local_rect.mTop - mFont->getLineHeight();
+        local_rect.mBottom = local_rect.mTop - mFont->getLineSpacing();
         return local_rect;
     }
 
@@ -3709,7 +3711,11 @@ LLNormalTextSegment::LLNormalTextSegment( LLStyleConstSP style, S32 start, S32 e
     mEditor(editor),
     mLastGeneration(-1)
 {
-    mFontHeight = mStyle->getFont()->getLineHeight();
+    // Foundry-recommended baseline-to-baseline distance (face->height,
+    // includes hhea.lineGap). Multi-line text editors get the spacing
+    // designers intended; for fonts with lineGap == 0 this equals
+    // getLineHeight().
+    mFontHeight = mStyle->getFont()->getLineSpacing();
     mCanEdit = !mStyle->getDrawHighlightBg();
     if (!mCanEdit)
     {
@@ -3732,7 +3738,7 @@ LLNormalTextSegment::LLNormalTextSegment( const LLUIColor& color, S32 start, S32
 {
     mStyle = new LLStyle(LLStyle::Params().visible(is_visible).color(color));
 
-    mFontHeight = mStyle->getFont()->getLineHeight();
+    mFontHeight = mStyle->getFont()->getLineSpacing();
 }
 
 LLNormalTextSegment::~LLNormalTextSegment()
@@ -4265,7 +4271,7 @@ bool LLInlineViewSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& w
         if (mForceNewLine)
         {
             // Chat, string can't be smaller then font height even if it is empty
-            height = LLStyle::getDefaultFont()->getLineHeight();
+            height = LLStyle::getDefaultFont()->getLineSpacing();
 
             return true; // new line
         }
@@ -4329,11 +4335,11 @@ void LLInlineViewSegment::linkToDocument(LLTextBase* editor)
 
 LLLineBreakTextSegment::LLLineBreakTextSegment(S32 pos):LLTextSegment(pos,pos+1)
 {
-    mFontHeight = LLStyle::getDefaultFont()->getLineHeight();
+    mFontHeight = LLStyle::getDefaultFont()->getLineSpacing();
 }
 LLLineBreakTextSegment::LLLineBreakTextSegment(LLStyleConstSP style,S32 pos):LLTextSegment(pos,pos+1)
 {
-    mFontHeight = style->getFont()->getLineHeight();
+    mFontHeight = style->getFont()->getLineSpacing();
 }
 LLLineBreakTextSegment::~LLLineBreakTextSegment()
 {
@@ -4386,7 +4392,7 @@ static const S32 IMAGE_HPAD = 3;
 bool LLImageTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
 {
     width = 0;
-    height = mStyle->getFont()->getLineHeight();
+    height = mStyle->getFont()->getLineSpacing();
 
     LLUIImagePtr image = mStyle->getImage();
     if( num_chars>0 && image.notNull())

@@ -632,7 +632,22 @@ F32 LLFontGL::getDescenderHeight() const
 
 S32 LLFontGL::getLineHeight() const
 {
-    return llceil(mFontFreetype->getAscenderHeight() / sScaleY) + llceil(mFontFreetype->getDescenderHeight() / sScaleY);
+    // Glyph bounding-box height (no foundry line gap). Single ceil avoids
+    // the double-ceil over-estimate that older `ceil(asc) + ceil(desc)`
+    // produced when both fractional parts were non-zero. For full
+    // baseline-to-baseline distance including the font's recommended line
+    // gap, use getLineSpacing().
+    return llceil((mFontFreetype->getAscenderHeight() + mFontFreetype->getDescenderHeight()) / sScaleY);
+}
+
+S32 LLFontGL::getLineSpacing() const
+{
+    // Foundry-recommended baseline-to-baseline distance — face->height,
+    // which is ascender + descender + lineGap. Used by multi-line text
+    // layout so consecutive lines sit at the spacing the font designer
+    // intended; for many screen fonts lineGap is 0 and this matches
+    // getLineHeight().
+    return llceil(mFontFreetype->getLineHeight() / sScaleY);
 }
 
 S32 LLFontGL::getWidth(const std::string& utf8text) const

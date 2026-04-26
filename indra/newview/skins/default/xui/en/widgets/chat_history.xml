@@ -15,7 +15,6 @@
   name="chat_history"
   type="string"
   word_wrap="true"
-  line_spacing.multiple="1.0" 
   font="SansSerif">
   <more_chat_text
     mouse_opaque="true" 

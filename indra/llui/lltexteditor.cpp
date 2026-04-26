@@ -2458,7 +2458,9 @@ void LLTextEditor::drawPreeditMarker()
         return;
     }
 
-    const S32 line_height = mFont->getLineHeight();
+    // Use full line spacing (face->height) so multi-line iteration matches
+    // what segment layout produced via LLNormalTextSegment::mFontHeight.
+    const S32 line_height = mFont->getLineSpacing();
 
     S32 line_start = getLineStart(cur_line);
     S32 line_y = mVisibleTextRect.mTop - line_height;
@@ -3181,7 +3183,8 @@ bool LLTextEditor::getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect
 
     const LLWString textString(getWText());
     const llwchar * const text = textString.c_str();
-    const S32 line_height = mFont->getLineHeight();
+    // Multi-line iteration: match segment layout's line spacing (see above).
+    const S32 line_height = mFont->getLineSpacing();
 
     if (coord)
     {

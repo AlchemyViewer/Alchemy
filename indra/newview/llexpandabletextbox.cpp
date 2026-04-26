@@ -63,7 +63,7 @@ public:
         else
         {
             width = (F32)(mEditor.getDocumentView()->getRect().getWidth() - mEditor.getHPad());
-            height = mStyle->getFont()->getLineHeight();
+            height = mStyle->getFont()->getLineSpacing();
         }
         return true;
     }

@@ -132,7 +132,8 @@ public:
     // font metrics - override for LLFontFreetype that returns units of virtual pixels
     F32 getAscenderHeight() const;
     F32 getDescenderHeight() const;
-    S32 getLineHeight() const;
+    S32 getLineHeight() const;     // ascender + descender (no line gap)
+    S32 getLineSpacing() const;    // face->height — full baseline-to-baseline distance (includes line gap)
 
     S32 getWidth(const std::string& utf8text) const;
     S32 getWidth(const llwchar* wchars) const;
