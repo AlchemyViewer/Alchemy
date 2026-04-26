@@ -935,6 +935,17 @@ void LLTextBase::drawText()
         text_rect.mRight = (F32)mDocumentView->getRect().getWidth(); // clamp right edge to document extents
         text_rect.translate((F32)mDocumentView->getRect().mLeft, (F32)mDocumentView->getRect().mBottom); // adjust by scroll position
 
+        // Track whether this line needs an "..." trailer — true when more
+        // wrapped lines exist past this last visible one. If a segment's
+        // own use_ellipses path fires (single-line overflow), it draws dots
+        // itself; for word-wrapped lines that fit within the rect, render()
+        // never sees overflow so we render the dots ourselves after the
+        // segment loop, in the slack between line content and right edge.
+        const bool needs_ellipsis = mUseEllipses
+                                 && next_line == last_line
+                                 && last_line < (S32)mLineInfoList.size();
+        const F32 saved_right = text_rect.mRight;
+
         // draw a single line of text
         S32 seg_start = line_start;
         while( seg_start < line_end )
@@ -953,16 +964,6 @@ void LLTextBase::drawText()
 
             S32 seg_end = llmin(line_end, cur_segment->getEnd());
             S32 clipped_end = seg_end - cur_segment->getStart();
-
-            if (mUseEllipses                                // using ellipses
-                && clipped_end == line_end                  // last segment on line
-                && next_line == last_line                   // this is the last visible line
-                && last_line < (S32)mLineInfoList.size())   // and there is more text to display
-            {
-                // more lines of text to go, but we can't fit them
-                // so shrink text rect to force ellipses
-                text_rect.mRight -= 2;
-            }
 
             // Draw squiggly lines under any visible misspelled words
             while ( (mMisspellRanges.end() != misspell_it) && (misspell_it->first < (U32)seg_end) && (misspell_it->second > (U32)seg_start) )
@@ -1007,6 +1008,36 @@ void LLTextBase::drawText()
             text_rect.mLeft = cur_segment->draw(seg_start - cur_segment->getStart(), clipped_end, selection_left, selection_right, text_rect);
 
             seg_start = clipped_end + cur_segment->getStart();
+        }
+
+        // After segment loop: text_rect.mLeft = right_x of last drawn glyph
+        // (or last drawn ellipsis dot if a segment's render fired its own
+        // use_ellipses path). For word-wrapped lines the slack between this
+        // and saved_right is wide; render only adds dots when that slack
+        // can fit them, which leaves nothing in front of the rect edge.
+        if (needs_ellipsis)
+        {
+            const F32 dots_width_f = mFont->getWidthF32(U"....");
+            // Only render manual dots if there's room AFTER the line content,
+            // i.e. the segment's own use_ellipses path didn't already eat
+            // into the right edge. A gap >= dots width means render() left
+            // slack and we need to fill it with the truncation indicator.
+            if (saved_right - text_rect.mLeft >= dots_width_f)
+            {
+                LLRectf dots_rect = text_rect;
+                dots_rect.mRight = saved_right;
+                static const LLWString dots = U"...";
+                mFont->render(dots, 0,
+                              dots_rect,
+                              mFgColor.get(),
+                              LLFontGL::LEFT, mTextVAlign,
+                              LLFontGL::NORMAL,
+                              LLFontGL::NO_SHADOW,
+                              S32_MAX,
+                              nullptr,
+                              false,
+                              false);
+            }
         }
 
         line_start = next_start;
