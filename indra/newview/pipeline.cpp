@@ -7586,13 +7586,13 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         {
             if (legacy_gamma)
             {
-                shader = no_post       ? &gCGLegacyGammaProgram
+                shader = no_post       ? color_grade ? &gCGColorgradeLegacyGammaProgram : &gCGLegacyGammaProgram
                          : color_grade ? &gCGTonemapColorgradeLegacyGammaProgram
                                        : &gCGTonemapLegacyGammaProgram;
             }
             else
             {
-                shader = no_post       ? &gCGGammaProgram
+                shader = no_post       ? color_grade ? &gCGColorgradeGammaProgram : &gCGGammaProgram
                          : color_grade ? &gCGTonemapColorgradeProgram
                                        : &gCGTonemapProgram;
             }
@@ -8194,6 +8194,12 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
     static LLCachedControl<F32> bloom_scatter(gSavedSettings, "RenderBloomScatter", 0.7f);
     static LLCachedControl<F32> alpha_glow_boost(gSavedSettings, "RenderBloomAlphaGlowBoost", 2.0f);
 
+    static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
+    static LLCachedControl<bool> buildNoPost(gSavedSettings, "RenderDisablePostProcessing", false);
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+    bool legacy_gamma = psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f;
+    bool no_post = gSnapshotNoPost || legacy_gamma || (buildNoPost && gFloaterTools && gFloaterTools->isAvailable());
+
     LLGLDepthTest depth(GL_FALSE);
     LLGLDisable cull(GL_CULL_FACE);
 
@@ -8205,7 +8211,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 
         gBloomExtractProgram.bind();
         gBloomExtractProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, src);
-        gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_THRESHOLD, bloom_threshold());
+        gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_THRESHOLD, no_post ? 99999.f :bloom_threshold());
         gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_KNEE, llmax(bloom_knee(), 0.0f));
         gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_ALPHA_GLOW_BOOST, llmax(alpha_glow_boost(), 0.0f));
 

@@ -234,6 +234,8 @@ LLGLSLShader            gCGGammaProgram;
 LLGLSLShader            gCGLegacyGammaProgram;
 LLGLSLShader            gCGTonemapProgram;
 LLGLSLShader            gCGTonemapLegacyGammaProgram;
+LLGLSLShader            gCGColorgradeGammaProgram;
+LLGLSLShader            gCGColorgradeLegacyGammaProgram;
 LLGLSLShader            gCGTonemapColorgradeProgram;
 LLGLSLShader            gCGTonemapColorgradeLegacyGammaProgram;
 // [RLVa:KB] - @setsphere
@@ -3069,6 +3071,65 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
         gCGLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gCGLegacyGammaProgram.createShader();
+        llassert(success);
+    }
+
+    if (success)
+    {
+        gCGColorgradeGammaProgram.mName = "CG Color Grade Gamma Shader";
+        gCGColorgradeGammaProgram.mFeatures.isDeferred = true;
+        gCGColorgradeGammaProgram.mFeatures.hasColorGrade = true;
+        gCGColorgradeGammaProgram.mFeatures.hasPostEffects = true;
+        gCGColorgradeGammaProgram.mShaderFiles.clear();
+        gCGColorgradeGammaProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gCGColorgradeGammaProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
+        gCGColorgradeGammaProgram.clearPermutations();
+        gCGColorgradeGammaProgram.addPermutation("COLOR_GRADE", "1");
+        gCGColorgradeGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
+        if (!hdr_enabled)
+        {
+            gCGColorgradeGammaProgram.addPermutation("DITHER", "1");
+        }
+        else
+        {
+            gCGColorgradeGammaProgram.addPermutation("BLOOM_COMPOSITE", "1");
+            if (bloom_halation_perm)
+            {
+                gCGColorgradeGammaProgram.addPermutation("BLOOM_HALATION", "1");
+            }
+        }
+        gCGColorgradeGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success                                = gCGColorgradeGammaProgram.createShader();
+        llassert(success);
+    }
+
+    if (success)
+    {
+        gCGColorgradeLegacyGammaProgram.mName = "CG Color Grade Legacy Gamma Shader";
+        gCGColorgradeLegacyGammaProgram.mFeatures.isDeferred = true;
+        gCGColorgradeLegacyGammaProgram.mFeatures.hasColorGrade = true;
+        gCGColorgradeLegacyGammaProgram.mFeatures.hasPostEffects = true;
+        gCGColorgradeLegacyGammaProgram.mShaderFiles.clear();
+        gCGColorgradeLegacyGammaProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gCGColorgradeLegacyGammaProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
+        gCGColorgradeLegacyGammaProgram.clearPermutations();
+        gCGColorgradeLegacyGammaProgram.addPermutation("COLOR_GRADE", "1");
+        gCGColorgradeLegacyGammaProgram.addPermutation("LEGACY_GAMMA", "1");
+        gCGColorgradeLegacyGammaProgram.addPermutation("HAS_POST_EFFECTS", "1");
+        if (!hdr_enabled)
+        {
+            gCGColorgradeLegacyGammaProgram.addPermutation("DITHER", "1");
+        }
+        else
+        {
+            gCGColorgradeLegacyGammaProgram.addPermutation("BLOOM_COMPOSITE", "1");
+            if (bloom_halation_perm)
+            {
+                gCGColorgradeLegacyGammaProgram.addPermutation("BLOOM_HALATION", "1");
+            }
+        }
+        gCGColorgradeLegacyGammaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = gCGColorgradeLegacyGammaProgram.createShader();
         llassert(success);
     }
 

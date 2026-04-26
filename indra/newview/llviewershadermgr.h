@@ -296,6 +296,8 @@ extern LLGLSLShader         gCGGammaProgram;
 extern LLGLSLShader         gCGLegacyGammaProgram;
 extern LLGLSLShader         gCGTonemapProgram;
 extern LLGLSLShader         gCGTonemapLegacyGammaProgram;
+extern LLGLSLShader         gCGColorgradeGammaProgram;
+extern LLGLSLShader         gCGColorgradeLegacyGammaProgram;
 extern LLGLSLShader         gCGTonemapColorgradeProgram;
 extern LLGLSLShader         gCGTonemapColorgradeLegacyGammaProgram;
 // [RLVa:KB] - @setsphere
