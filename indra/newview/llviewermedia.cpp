@@ -410,10 +410,6 @@ LLViewerMediaImpl* LLViewerMedia::getMediaImplFromTextureID(const LLUUID& textur
 //////////////////////////////////////////////////////////////////////////////////////////
 std::string LLViewerMedia::getCurrentUserAgent()
 {
-    // Don't use user-visible string to avoid
-    // punctuation and strange characters.
-    std::string skin_name = gSavedSettings.getString("SkinCurrent");
-
     // Just in case we need to check browser differences in A/B test
     // builds.
     std::string channel = LLVersionInfo::instance().getChannel();
@@ -427,7 +423,7 @@ std::string LLViewerMedia::getCurrentUserAgent()
     std::ostringstream codec;
     codec << "SecondLife/";
     codec << LLVersionInfo::instance().getVersion();
-    codec << " (" << channel << "; " << skin_name << " skin)";
+    codec << " (" << channel << "; default skin)";
     LL_INFOS() << codec.str() << LL_ENDL;
 
     return codec.str();
