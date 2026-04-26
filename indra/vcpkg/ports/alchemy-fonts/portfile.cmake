@@ -4,19 +4,8 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO AlchemyViewer/alchemy-fonts
     REF ${VERSION}
-    SHA512 db35caf90f5eaf55e32bf266b00dbd1e1d1c2b7f80e6175c19342da1df4561a73735a35ef7f6e363b19d0d92e03069966a97b0764ca5bed277cdbf6f9f822475
+    SHA512 85fd492b322ddd2734b31cd6b44eb03e1e413acb892113e26d0f398006d80551f2619650b5e6ea15e3068e76b67152fec0061bb036754e8424a3e8802f50092a
     HEAD_REF main
-)
-
-file(INSTALL
-    DIRECTORY "${SOURCE_PATH}/inter/"
-    DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
-    FILES_MATCHING
-    PATTERN "*.ttc"
-    PATTERN "*.ttf"
-    PATTERN "*.otf"
-    PATTERN "*.woff2"
-    PATTERN "*.txt"
 )
 
 file(INSTALL
@@ -31,6 +20,18 @@ file(INSTALL
 )
 
 file(INSTALL
+    DIRECTORY "${SOURCE_PATH}/source-code/"
+    DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
+    FILES_MATCHING
+    PATTERN "*.ttc"
+    PATTERN "*.ttf"
+    PATTERN "*.otf"
+    PATTERN "*.woff2"
+    PATTERN "*.txt"
+    PATTERN "*.md"
+)
+
+file(INSTALL
     DIRECTORY "${SOURCE_PATH}/source-han-sans/"
     DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
     FILES_MATCHING
@@ -39,6 +40,18 @@ file(INSTALL
     PATTERN "*.otf"
     PATTERN "*.woff2"
     PATTERN "*.txt"
+)
+
+file(INSTALL
+    DIRECTORY "${SOURCE_PATH}/source-sans/"
+    DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
+    FILES_MATCHING
+    PATTERN "*.ttc"
+    PATTERN "*.ttf"
+    PATTERN "*.otf"
+    PATTERN "*.woff2"
+    PATTERN "*.txt"
+    PATTERN "*.md"
 )
 
 file(INSTALL
@@ -54,9 +67,10 @@ file(INSTALL
 
 vcpkg_install_copyright(
     FILE_LIST
-        ${SOURCE_PATH}/inter/Inter-LICENSE.txt
         ${SOURCE_PATH}/dejavu-sans/DejaVu-License.txt
+        ${SOURCE_PATH}/source-code/SourceCode.LICENSE.md
         ${SOURCE_PATH}/source-han-sans/SourceHanSans.txt
+        ${SOURCE_PATH}/source-sans/SourceSans.LICENSE.md
         ${SOURCE_PATH}/twemoji/Twemoji-MIT-license.txt
         ${SOURCE_PATH}/twemoji/Twemoji-Artwork-CC-BY-license.txt
     COMMENT "Fonts contained within this package are licensed as follows"

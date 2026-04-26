@@ -4,10 +4,10 @@
   <font
       name="default"
       comment="default font files (global fallbacks)">
-    <file load_collection="true" font_weight="400">InterVariable.woff2</file>
+    <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
     <file size_delta="-0.5">DejaVuSans.woff2</file>
     <file functor="is_emoji">TwemojiSVG.woff2</file>
-    <file load_collection="true">SourceHanSans-Regular.woff2</file>
+    <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.woff2</file>
     <os name="Windows">
       <file>meiryo.TTC</file>
       <file>MSGOTHIC.TTC</file>
@@ -38,9 +38,9 @@
   <font
       name="SansSerifBold"
       comment="Name of bold sans-serif font">
-      <file load_collection="true" flags="bold" font_weight="600">InterVariable.woff2</file>
+      <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
       <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
-      <file load_collection="true">SourceHanSans-Bold.woff2</file>
+      <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.woff2</file>
     <os name="Windows">
       <file>arialbd.ttf</file>
       </os>
@@ -52,7 +52,7 @@
   <font
       name="SansSerif"
       comment="Name of san-serif font (Truetype file name)">
-    <file load_collection="true" font_weight="400">InterVariable.woff2</file>
+    <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
     <file size_delta="-0.5">DejaVuSans.woff2</file>
     <os name="Windows">
       <file>arial.ttf</file>
@@ -66,16 +66,16 @@
       name="SansSerif"
       comment="Name of bold sans-serif font"
       font_style="BOLD">
-    <file load_collection="true" flags="bold" font_weight="600">InterVariable.woff2</file>
+    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
-    <file load_collection="true">SourceHanSans-Bold.woff2</file>
+    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.woff2</file>
   </font>
 
   <font
       name="SansSerif"
       comment="Name of italic sans-serif font"
       font_style="ITALIC">
-    <file load_collection="true" font_weight="400">InterVariable-Italic.woff2</file>
+    <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Oblique.woff2</file>
   </font>
 
@@ -83,7 +83,7 @@
       name="SansSerif"
       comment="Name of bold italic sans-serif font"
       font_style="BOLD|ITALIC">
-    <file load_collection="true" font_weight="800">InterVariable-Italic.woff2</file>
+    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-BoldOblique.woff2</file>
   </font>
 
@@ -95,7 +95,28 @@
   <font
       name="Monospace"
       comment="Name of monospace font">
-    <file>DejaVuSansMono.woff2</file>
+    <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Upright.woff2</file>
+  </font>
+
+  <font
+      name="Monospace"
+      comment="Name of bold monospace font"
+      font_style="BOLD">
+    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Upright.woff2</file>
+  </font>
+
+  <font
+      name="Monospace"
+      comment="Name of italic monospace font"
+      font_style="ITALIC">
+    <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Italic.woff2</file>
+  </font>
+
+  <font
+      name="Monospace"
+      comment="Name of bold italic monospace font"
+      font_style="BOLD|ITALIC">
+    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Italic.woff2</file>
   </font>
 
   <font name="DejaVu"
@@ -125,7 +146,7 @@
   <font
       name="Helvetica"
       comment="Name of Helvetica font">
-    <file font_weight="400">InterVariable.woff2</file>
+    <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
     <file size_delta="-0.5">DejaVuSans.woff2</file>
     <os name="Windows">
       <file>arial.ttf</file>
@@ -139,7 +160,7 @@
       name="Helvetica"
       comment="Name of Helvetica font (bold)"
       font_style="BOLD">
-    <file flags="bold" font_weight="800">InterVariable.woff2</file>
+    <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
     <os name="Windows">
       <file>arialbd.ttf</file>
@@ -153,7 +174,7 @@
       name="Helvetica"
       comment="Name of Helvetica font (italic)"
       font_style="ITALIC">
-    <file font_weight="400">InterVariable-Italic.woff2</file>
+    <file font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Oblique.woff2</file>
     <os name="Windows">
       <file>ariali.ttf</file>
@@ -167,7 +188,7 @@
       name="Helvetica"
       comment="Name of Helvetica font (bold italic)"
       font_style="BOLD|ITALIC">
-    <file font_weight="800">InterVariable-Italic.woff2</file>
+    <file font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-BoldOblique.woff2</file>
     <os name="Windows">
       <file>arialbi.ttf</file>
@@ -181,12 +202,12 @@
       name="OverrideTest"
       comment="Name of font to test overriding">
     <file>times.ttf</file>
-    <file font_weight="400">InterVariable.woff2</file>
+    <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
   </font>
 
   <font_size name="Monospace"
          comment="Size for monospaced font (points, or 1/72 of an inch)"
-         size="8.0"
+         size="10.0"
          />
   <font_size name="Huge"
          comment="Size of huge font (points, or 1/72 of an inch)"
