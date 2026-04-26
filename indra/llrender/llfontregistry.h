@@ -39,6 +39,10 @@ enum class EFontHinting : S32
     DEFAULT = 0,
     NO_HINTING = 0x8000U,
     FORCE_AUTOHINT = 0x20,
+    // Light autohinter: vertical hinting only, no horizontal grid-fitting.
+    // Pairs with subpixel pen position (mUseSubpixelPen) to give smooth,
+    // weight-stable text at the cost of slightly softer stems vs DEFAULT.
+    LIGHT = 0x10020, // FT_LOAD_FORCE_AUTOHINT | FT_LOAD_TARGET_LIGHT
 };
 
 struct LLFontFileInfo

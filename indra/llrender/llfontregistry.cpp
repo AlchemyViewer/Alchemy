@@ -332,6 +332,10 @@ bool font_desc_init_from_xml(LLXMLNodePtr node, LLFontDescriptor& desc)
                 {
                     hinting = EFontHinting::NO_HINTING;
                 }
+                else if (attr_hinting == "light")
+                {
+                    hinting = EFontHinting::LIGHT;
+                }
             }
 
             if (child->hasAttribute("flags"))

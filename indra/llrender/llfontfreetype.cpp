@@ -325,8 +325,9 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     mWeight = weight;
     // Native-hinted glyphs (HINTING_DEFAULT) are designed by the foundry to
     // sit on the integer pixel grid; subpixel pen position would wash out
-    // the hinting. Autohinted (FORCE_AUTOHINT) and unhinted (NO_HINTING)
-    // glyphs tolerate and benefit from subpixel placement.
+    // the hinting. Autohinted (FORCE_AUTOHINT), light-autohinted (LIGHT),
+    // and unhinted (NO_HINTING) glyphs tolerate and benefit from subpixel
+    // placement.
     mUseSubpixelPen = (hinting != EFontHinting::DEFAULT);
 
     bool variable_font = false;
@@ -945,7 +946,13 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
         llassert_always_msg(FT_Err_Ok == error, message.c_str());
     }
 
-    if (FT_Render_Glyph(mFTFace->glyph, FT_RENDER_MODE_NORMAL) != 0)
+    // FT_Render_Glyph's mode arg overrides the load_flags' target. For
+    // LIGHT we want the lighter stem-weight filter to match the LIGHT
+    // autohinter's no-horizontal-fit output; everything else uses NORMAL.
+    const FT_Render_Mode render_mode = (mHinting == EFontHinting::LIGHT)
+        ? FT_RENDER_MODE_LIGHT
+        : FT_RENDER_MODE_NORMAL;
+    if (FT_Render_Glyph(mFTFace->glyph, render_mode) != 0)
     {
         LL_WARNS() << "Failed to render glyph for character " << llformat("U+%xu", U32(wch)) << " at glyph index " << glyph_index << LL_ENDL;
     }
