@@ -96,6 +96,40 @@ namespace
     {
         if (!face || sub_begin_in_slice >= sub_end_in_slice)
             return;
+
+        // Strict monospace: bypass HarfBuzz entirely and synthesize one
+        // glyph per codepoint using FT's canonical mXAdvance. HB's default
+        // feature set has many always-on lookups (rclt, rlig, ccmp, locl,
+        // mark, mkmk) that we can't disable via the features array, and
+        // some fonts have non-zero positioning under those features that
+        // breaks column alignment even after kern/liga/clig/dlig/calt are
+        // off. Going direct to FT guarantees every glyph in the run gets
+        // exactly the monospace cell width with no positioning drift.
+        // Programmer fonts opting in via <font ligatures="on"> need real
+        // shaping (for liga/calt) so they fall through to the HB path.
+        if (face->isFixedWidth() && !face->getAllowMonospaceLigatures())
+        {
+            out_glyphs.reserve(out_glyphs.size() + (sub_end_in_slice - sub_begin_in_slice));
+            for (size_t i = sub_begin_in_slice; i < sub_end_in_slice; ++i)
+            {
+                const llwchar wch = slice[i];
+                const LLFontGlyphInfo* fgi = face->getGlyphInfo(wch, EFontGlyphType::Unspecified);
+                if (!fgi)
+                    continue;
+
+                LLShapedGlyph sg;
+                sg.face      = face;
+                sg.glyph_id  = fgi->mGlyphIndex;
+                sg.cluster   = static_cast<S32>(i);
+                sg.x_advance = fgi->mXAdvance;
+                sg.y_advance = 0.f;
+                sg.x_offset  = 0.f;
+                sg.y_offset  = 0.f;
+                out_glyphs.push_back(sg);
+            }
+            return;
+        }
+
         hb_font_t* hb_font = face->getHbFont();
         if (!hb_font)
             return;
@@ -113,39 +147,19 @@ namespace
         hb_buffer_set_script(buf, script);
         hb_buffer_set_language(buf, hb_language_get_default());
 
-        // Monospace contract: HB's default features (kern, liga, clig, dlig,
-        // calt) modify glyph width or substitute multi-cp ligatures, which
-        // break column alignment in fixed-width fonts. Disable them on a
-        // monospace face by default. Programmer fonts (Fira Code, JetBrains
-        // Mono, etc.) ship width-preserving ligatures and can opt back in
-        // via <font ligatures="on"> in fonts.xml — kern still stays off
-        // there because monospace + GPOS pair-kerning is fundamentally
-        // incompatible. Other features (mark, mkmk, ccmp, locl, rlig, rvrn)
-        // preserve width and stay on unconditionally.
-        static const hb_feature_t kFixedWidthStrict[] = {
-            { HB_TAG('k','e','r','n'), 0, 0, (unsigned)-1 },
-            { HB_TAG('l','i','g','a'), 0, 0, (unsigned)-1 },
-            { HB_TAG('c','l','i','g'), 0, 0, (unsigned)-1 },
-            { HB_TAG('d','l','i','g'), 0, 0, (unsigned)-1 },
-            { HB_TAG('c','a','l','t'), 0, 0, (unsigned)-1 },
-        };
+        // Programmer fonts opted into ligatures via <font ligatures="on">
+        // still need kern disabled (monospace + GPOS pair-kerning is
+        // fundamentally incompatible). Other features stay on so liga/
+        // calt fire as the font intends for sequences like `=>` `!=`.
         static const hb_feature_t kFixedWidthLigaturesOk[] = {
             { HB_TAG('k','e','r','n'), 0, 0, (unsigned)-1 },
         };
         const hb_feature_t* features = nullptr;
         unsigned int num_features = 0;
-        if (face->isFixedWidth())
+        if (face->isFixedWidth() && face->getAllowMonospaceLigatures())
         {
-            if (face->getAllowMonospaceLigatures())
-            {
-                features = kFixedWidthLigaturesOk;
-                num_features = (unsigned int)(sizeof(kFixedWidthLigaturesOk) / sizeof(kFixedWidthLigaturesOk[0]));
-            }
-            else
-            {
-                features = kFixedWidthStrict;
-                num_features = (unsigned int)(sizeof(kFixedWidthStrict) / sizeof(kFixedWidthStrict[0]));
-            }
+            features = kFixedWidthLigaturesOk;
+            num_features = (unsigned int)(sizeof(kFixedWidthLigaturesOk) / sizeof(kFixedWidthLigaturesOk[0]));
         }
         hb_shape(hb_font, buf, features, num_features);
 

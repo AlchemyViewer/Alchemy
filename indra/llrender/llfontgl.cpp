@@ -319,8 +319,18 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // legacy Latin path falls back to FT_Get_Kerning, which only reads the
     // (usually absent) `kern` table on modern OT fonts.
     static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", true);
+    // Strict-monospace root face never participates in whole-slice shaping —
+    // even synthesized "1 glyph per cp" output goes through the renderer's
+    // shaped branch which uses a different glyph cache (mShapedGlyphInfoMap)
+    // and atlas position than the codepoint path's mCharGlyphInfoMap, and
+    // the divergent atlas slots produce visible rendering differences in
+    // monospace contexts. Fall back to legacy emoji-cluster shape ranges so
+    // ASCII goes through the codepoint path (guaranteed visual parity with
+    // toggle-off) while embedded emoji clusters still shape via HarfBuzz.
+    const bool root_strict_mono = mFontFreetype->isFixedWidth()
+                               && !mFontFreetype->getAllowMonospaceLigatures();
     std::vector<std::pair<size_t, size_t>> shape_ranges;
-    if (sFontShapeAllText && length > 0)
+    if (sFontShapeAllText && length > 0 && !root_strict_mono)
     {
         // Single all-encompassing shape range; the loop's shaped path below
         // will consume the entire string in one HarfBuzz-positioned pass.
@@ -685,14 +695,16 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
     const S32 measure_len = measure_end - begin_offset;
 
     // Same shape-first preprocessing as render(); kept consistent so caret
-    // positions and ellipsis cutoffs agree with what's drawn. When
-    // FontShapeAllText is on, the slice is shaped as a single range; otherwise
-    // only emoji clusters are shaped and Latin falls through to per-codepoint.
+    // positions and ellipsis cutoffs agree with what's drawn. Strict-monospace
+    // root face skips whole-slice shaping (visual parity with codepoint path);
+    // see render() for the rationale.
     static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", true);
+    const bool root_strict_mono = mFontFreetype->isFixedWidth()
+                               && !mFontFreetype->getAllowMonospaceLigatures();
     std::vector<std::pair<size_t, size_t>> shape_ranges;
     if (measure_len > 0)
     {
-        if (sFontShapeAllText)
+        if (sFontShapeAllText && !root_strict_mono)
         {
             shape_ranges.emplace_back(static_cast<size_t>(0),
                                       static_cast<size_t>(measure_len));
@@ -848,10 +860,13 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
     // parallel walker (shape_idx) to map shaped advances onto codepoints — a
     // ligature glyph spans multiple cps but its full advance fires on the
     // cluster's start cp, so trailing cps of the cluster contribute zero.
+    // Skip for strict-monospace root face — see render() for rationale.
     static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", true);
+    const bool root_strict_mono = mFontFreetype->isFixedWidth()
+                               && !mFontFreetype->getAllowMonospaceLigatures();
     std::vector<LLShapedGlyph> shape_glyphs;
     size_t shape_idx = 0;
-    if (sFontShapeAllText && max_chars > 0 && wchars[0])
+    if (sFontShapeAllText && !root_strict_mono && max_chars > 0 && wchars[0])
     {
         S32 measure_end = 0;
         while (measure_end < max_chars && wchars[measure_end] != 0)
@@ -1019,10 +1034,13 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
     // the legacy fgi->mXAdvance + getXKerning chain. Ligatures and ZWJ
     // clusters get their full advance attributed to the cluster's first cp;
     // trailing cps contribute zero, which is what we want for measurement.
+    // Skip for strict-monospace root face — see render() for rationale.
     static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", true);
+    const bool root_strict_mono = mFontFreetype->isFixedWidth()
+                               && !mFontFreetype->getAllowMonospaceLigatures();
     std::vector<F32> per_cp_advance;
     F32 per_cp_last_extent = 0.f;
-    if (sFontShapeAllText && start >= 0 && wchars[0])
+    if (sFontShapeAllText && !root_strict_mono && start >= 0 && wchars[0])
     {
         LLWString slice(wchars, wchars + start + 1);
         std::vector<LLShapedGlyph> shape_glyphs;
@@ -1143,10 +1161,12 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
     const S32 slice_len = slice_end - begin_offset;
 
     static LLCachedControl<bool> sFontShapeAllText(gSavedSettings, "FontShapeAllText", true);
+    const bool root_strict_mono = mFontFreetype->isFixedWidth()
+                               && !mFontFreetype->getAllowMonospaceLigatures();
     std::vector<std::pair<size_t, size_t>> shape_ranges;
     if (slice_len > 0)
     {
-        if (sFontShapeAllText)
+        if (sFontShapeAllText && !root_strict_mono)
         {
             shape_ranges.emplace_back(static_cast<size_t>(0),
                                       static_cast<size_t>(slice_len));

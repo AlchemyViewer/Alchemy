@@ -204,17 +204,27 @@ hb_font_t* LLFontFreetype::getHbFont() const
         // the hb_font, so we must destroy the hb_font before calling
         // FT_Done_Face on the underlying face (see ~LLFontFreetype and
         // loadFace).
-        //
+        mHbFont = hb_ft_font_create_referenced(mFTFace);
+        if (mHbFont)
+        {
+            // HB's hb_ft path queries glyph advances via FT_Get_Advance
+            // using its own load_flags (default: FT_LOAD_DEFAULT |
+            // FT_LOAD_NO_HINTING). Our atlas loads glyphs with mHinting
+            // (typically FORCE_AUTOHINT). When those load modes differ,
+            // HB's x_advance values drift sub-pixel from FT's mXAdvance —
+            // visible in monospace fonts as accumulating column drift
+            // (autohinter snaps each glyph's advance to the integer
+            // monospace width; unhinted advances vary fractionally).
+            // Force HB to use the same load mode as the atlas so advances
+            // agree and the monospace contract holds end-to-end.
+            hb_ft_font_set_load_flags(mHbFont, static_cast<int>(mHinting));
+        }
         // We deliberately do NOT override HarfBuzz's glyph_h_advance_func
         // to apply the autohinter rsb/lsb correction that getXKerning uses
         // for the legacy codepoint path. GPOS positioning emitted by HB
-        // supersedes that correction's purpose (it was a 1990s band-aid
-        // for autohinter rounding artifacts in the absence of OpenType
-        // positioning), and threading the correction into HB's stateless
-        // per-glyph callback would require a per-shaper "previous slot"
-        // cache that doesn't fit the HB API model. Visual parity with the
-        // legacy path is acceptably broken for autohinted UI fonts.
-        mHbFont = hb_ft_font_create_referenced(mFTFace);
+        // supersedes that correction's purpose, and threading it into HB's
+        // stateless per-glyph callback would require a per-shaper "previous
+        // slot" cache that doesn't fit the HB API model.
     }
     return mHbFont;
 }
