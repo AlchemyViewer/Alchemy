@@ -661,7 +661,13 @@ S32 LLFontGL::getWidth(const std::string& utf8text, S32 begin_offset, S32 max_ch
 S32 LLFontGL::getWidth(const llwchar* wchars, S32 begin_offset, S32 max_chars) const
 {
     F32 width = getWidthF32(wchars, begin_offset, max_chars);
-    return ll_round(width);
+    // llceil, not ll_round: getWidth's contract is "minimum integer pixel
+    // width that contains the rendered text". With subpixel pen position
+    // (mUseSubpixelPen), getWidthF32 returns fractional widths; ll_round
+    // would truncate fractions < 0.5 (e.g. 28.4 -> 28) and clip the last
+    // glyph in callers that size layout rects to the returned width
+    // (LLButton::resize, scroll list cells, tooltip backgrounds, etc.).
+    return llceil(width);
 }
 
 F32 LLFontGL::getWidthF32(const std::string& utf8text) const
