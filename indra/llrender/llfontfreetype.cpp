@@ -113,14 +113,13 @@ LLFontGlyphInfo::LLFontGlyphInfo(U32 index, EFontGlyphType glyph_type)
     mHeight(0),         // In pixels
     mXAdvance(0.f),     // In pixels
     mYAdvance(0.f),     // In pixels
-    mXBitmapOffset(0),  // Offset to the origin in the bitmap
-    mYBitmapOffset(0),  // Offset to the origin in the bitmap
     mXBearing(0),       // Distance from baseline to left in pixels
     mYBearing(0),       // Distance from baseline to top in pixels
     mLsbDelta(0),
     mRsbDelta(0),
-    mBitmapEntry(std::make_pair(EFontGlyphType::Unspecified, -1)) // Which bitmap in the bitmap cache contains this glyph
+    mPhaseCount(1)
 {
+    // mPhaseSlots default-construct (zeroed PhaseSlot per element).
 }
 
 LLFontGlyphInfo::LLFontGlyphInfo(const LLFontGlyphInfo& fgi)
@@ -130,14 +129,13 @@ LLFontGlyphInfo::LLFontGlyphInfo(const LLFontGlyphInfo& fgi)
     , mHeight(fgi.mHeight)
     , mXAdvance(fgi.mXAdvance)
     , mYAdvance(fgi.mYAdvance)
-    , mXBitmapOffset(fgi.mXBitmapOffset)
-    , mYBitmapOffset(fgi.mYBitmapOffset)
     , mXBearing(fgi.mXBearing)
     , mYBearing(fgi.mYBearing)
     , mLsbDelta(fgi.mLsbDelta)
     , mRsbDelta(fgi.mRsbDelta)
+    , mPhaseSlots(fgi.mPhaseSlots)
+    , mPhaseCount(fgi.mPhaseCount)
 {
-    mBitmapEntry = fgi.mBitmapEntry;
 }
 
 LLFontFreetype::LLFontFreetype()
@@ -673,118 +671,157 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
         return nullptr;
 
     llassert(!mIsFallback);
-    // wch is only meaningful for the SVG glyph hook's debug output; shaped
-    // lookups don't have a single source codepoint to pass here.
-    fontp->renderGlyph(requested_glyph_type, glyph_index, 0);
 
-    EFontGlyphType bitmap_glyph_type = EFontGlyphType::Unspecified;
-    switch (fontp->mFTFace->glyph->bitmap.pixel_mode)
-    {
-        case FT_PIXEL_MODE_MONO:
-        case FT_PIXEL_MODE_GRAY:
-            bitmap_glyph_type = EFontGlyphType::Grayscale;
-            break;
-        case FT_PIXEL_MODE_BGRA:
-            bitmap_glyph_type = EFontGlyphType::Color;
-            break;
-        default:
-            llassert_always(true);
-            break;
-    }
-    out_bitmap_glyph_type = bitmap_glyph_type;
-
-    S32 width = fontp->mFTFace->glyph->bitmap.width;
-    S32 height = fontp->mFTFace->glyph->bitmap.rows;
-
-    S32 pos_x, pos_y;
-    U32 bitmap_num;
-    mFontBitmapCachep->nextOpenPos(width, pos_x, pos_y, bitmap_glyph_type, bitmap_num);
+    // Render N subpixel-x phases for fonts that use the subpixel pen
+    // accumulator, otherwise just one. Each phase shifts the outline by
+    // (k / kNumPhases) px before rasterization via FT_Set_Transform; the
+    // resulting bitmaps go to separate atlas slots and the renderer picks
+    // one matching the fractional pen position at draw time.
+    const U8 num_phases = fontp->mUseSubpixelPen ? LLFontGlyphInfo::kNumPhases : 1;
 
     LLFontGlyphInfo* gi = new LLFontGlyphInfo(glyph_index, requested_glyph_type);
-    gi->mXBitmapOffset = pos_x;
-    gi->mYBitmapOffset = pos_y;
-    gi->mBitmapEntry = std::make_pair(bitmap_glyph_type, bitmap_num);
-    gi->mWidth = width;
-    gi->mHeight = height;
-    gi->mXBearing = fontp->mFTFace->glyph->bitmap_left;
-    gi->mYBearing = fontp->mFTFace->glyph->bitmap_top;
-    // FreeType fills these when the glyph has been auto-hinted; they describe how
-    // much the hinter nudged the left/right side bearings (in 26.6 pixels). Keep
-    // them so inter-glyph spacing can be corrected in getXKerning().
-    gi->mLsbDelta = (S32)fontp->mFTFace->glyph->lsb_delta;
-    gi->mRsbDelta = (S32)fontp->mFTFace->glyph->rsb_delta;
-    // Convert these from 26.6 units to float pixels.
-    gi->mXAdvance = fontp->mFTFace->glyph->advance.x / 64.f;
-    gi->mYAdvance = fontp->mFTFace->glyph->advance.y / 64.f;
+    gi->mPhaseCount = num_phases;
 
-    if (fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_MONO
-        || fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_GRAY)
+    EFontGlyphType bitmap_glyph_type = EFontGlyphType::Unspecified;
+
+    for (U8 phase = 0; phase < num_phases; ++phase)
     {
-        U8 *buffer_data = fontp->mFTFace->glyph->bitmap.buffer;
-        S32 buffer_row_stride = fontp->mFTFace->glyph->bitmap.pitch;
-        U8 *tmp_graydata = nullptr;
+        // FT_Set_Transform delta in 26.6 fixed-point. 64 == 1 px, so each
+        // phase shifts by (phase * 64 / kNumPhases) units.
+        FT_Vector delta = { (FT_Pos)((phase * 64) / LLFontGlyphInfo::kNumPhases), 0 };
+        FT_Set_Transform(fontp->mFTFace, nullptr, &delta);
 
-        if (fontp->mFTFace->glyph->bitmap.pixel_mode
-            == FT_PIXEL_MODE_MONO)
+        // wch is only meaningful for the SVG glyph hook's debug output; shaped
+        // lookups don't have a single source codepoint to pass here.
+        fontp->renderGlyph(requested_glyph_type, glyph_index, 0);
+
+        EFontGlyphType phase_type = EFontGlyphType::Unspecified;
+        switch (fontp->mFTFace->glyph->bitmap.pixel_mode)
         {
-            // need to expand 1-bit bitmap to 8-bit graymap.
-            tmp_graydata = new U8[width * height];
-            S32 xpos, ypos;
-            for (ypos = 0; ypos < height; ++ypos)
-            {
-                S32 bm_row_offset = buffer_row_stride * ypos;
-                for (xpos = 0; xpos < width; ++xpos)
-                {
-                    U32 bm_col_offsetbyte = xpos / 8;
-                    U32 bm_col_offsetbit = 7 - (xpos % 8);
-                    U32 bit =
-                    !!(buffer_data[bm_row_offset
-                               + bm_col_offsetbyte
-                       ] & (1 << bm_col_offsetbit) );
-                    tmp_graydata[width*ypos + xpos] =
-                        255 * bit;
-                }
-            }
-            // use newly-built graymap.
-            buffer_data = tmp_graydata;
-            buffer_row_stride = width;
+            case FT_PIXEL_MODE_MONO:
+            case FT_PIXEL_MODE_GRAY:
+                phase_type = EFontGlyphType::Grayscale;
+                break;
+            case FT_PIXEL_MODE_BGRA:
+                phase_type = EFontGlyphType::Color;
+                break;
+            default:
+                llassert_always(true);
+                break;
+        }
+        // All phases must produce the same pixel format — they're the same
+        // glyph rasterized at slightly different x-offsets.
+        if (phase == 0)
+        {
+            bitmap_glyph_type = phase_type;
+        }
+        else
+        {
+            llassert(phase_type == bitmap_glyph_type);
         }
 
-        setSubImageLuminanceAlpha(pos_x,
-                                    pos_y,
-                                    bitmap_num,
-                                    width,
-                                    height,
-                                    buffer_data,
-                                    buffer_row_stride);
+        S32 width = fontp->mFTFace->glyph->bitmap.width;
+        S32 height = fontp->mFTFace->glyph->bitmap.rows;
 
-        if (tmp_graydata)
-            delete[] tmp_graydata;
-    }
-    else if (fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA)
-    {
-        setSubImageBGRA(pos_x,
-                        pos_y,
-                        bitmap_num,
-                        fontp->mFTFace->glyph->bitmap.width,
-                        fontp->mFTFace->glyph->bitmap.rows,
-                        fontp->mFTFace->glyph->bitmap.buffer,
-                        llabs(fontp->mFTFace->glyph->bitmap.pitch));
-    } else {
-        llassert(false);
+        S32 pos_x, pos_y;
+        U32 bitmap_num;
+        mFontBitmapCachep->nextOpenPos(width, pos_x, pos_y, bitmap_glyph_type, bitmap_num);
+
+        LLFontGlyphInfo::PhaseSlot& slot = gi->mPhaseSlots[phase];
+        slot.mXBitmapOffset = pos_x;
+        slot.mYBitmapOffset = pos_y;
+        slot.mWidth = width;
+        slot.mHeight = height;
+        slot.mXBearing = fontp->mFTFace->glyph->bitmap_left;
+        slot.mYBearing = fontp->mFTFace->glyph->bitmap_top;
+        slot.mBitmapEntry = std::make_pair(bitmap_glyph_type, bitmap_num);
+
+        // Glyph-level metrics come from phase 0. They're invariant across
+        // phases (FT_Set_Transform shifts the outline before rasterization —
+        // advance, lsb/rsb deltas, and overall metrics are unchanged) modulo
+        // 1 px AA boundary effects. Measurement paths use these.
+        if (phase == 0)
+        {
+            gi->mWidth = width;
+            gi->mHeight = height;
+            gi->mXBearing = slot.mXBearing;
+            gi->mYBearing = slot.mYBearing;
+            // FreeType fills these when the glyph has been auto-hinted; they describe
+            // how much the hinter nudged the left/right side bearings (in 26.6 pixels).
+            // Keep them so inter-glyph spacing can be corrected in getXKerning().
+            gi->mLsbDelta = (S32)fontp->mFTFace->glyph->lsb_delta;
+            gi->mRsbDelta = (S32)fontp->mFTFace->glyph->rsb_delta;
+            // Convert these from 26.6 units to float pixels.
+            gi->mXAdvance = fontp->mFTFace->glyph->advance.x / 64.f;
+            gi->mYAdvance = fontp->mFTFace->glyph->advance.y / 64.f;
+        }
+
+        // Copy the rasterized bitmap into the per-phase atlas slot.
+        if (fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_MONO
+            || fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_GRAY)
+        {
+            U8 *buffer_data = fontp->mFTFace->glyph->bitmap.buffer;
+            S32 buffer_row_stride = fontp->mFTFace->glyph->bitmap.pitch;
+            U8 *tmp_graydata = nullptr;
+
+            if (fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_MONO)
+            {
+                // need to expand 1-bit bitmap to 8-bit graymap.
+                tmp_graydata = new U8[width * height];
+                S32 xpos, ypos;
+                for (ypos = 0; ypos < height; ++ypos)
+                {
+                    S32 bm_row_offset = buffer_row_stride * ypos;
+                    for (xpos = 0; xpos < width; ++xpos)
+                    {
+                        U32 bm_col_offsetbyte = xpos / 8;
+                        U32 bm_col_offsetbit = 7 - (xpos % 8);
+                        U32 bit =
+                            !!(buffer_data[bm_row_offset + bm_col_offsetbyte] & (1 << bm_col_offsetbit));
+                        tmp_graydata[width * ypos + xpos] = 255 * bit;
+                    }
+                }
+                // use newly-built graymap.
+                buffer_data = tmp_graydata;
+                buffer_row_stride = width;
+            }
+
+            setSubImageLuminanceAlpha(pos_x, pos_y, bitmap_num, width, height,
+                                      buffer_data, buffer_row_stride);
+
+            if (tmp_graydata)
+                delete[] tmp_graydata;
+        }
+        else if (fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA)
+        {
+            setSubImageBGRA(pos_x, pos_y, bitmap_num,
+                            fontp->mFTFace->glyph->bitmap.width,
+                            fontp->mFTFace->glyph->bitmap.rows,
+                            fontp->mFTFace->glyph->bitmap.buffer,
+                            llabs(fontp->mFTFace->glyph->bitmap.pitch));
+        }
+        else
+        {
+            llassert(false);
+        }
+
+        LLImageGL *image_gl = mFontBitmapCachep->getImageGL(bitmap_glyph_type, bitmap_num);
+        LLImageRaw *image_raw = mFontBitmapCachep->getImageRaw(bitmap_glyph_type, bitmap_num);
+        if (image_gl && image_raw)
+        {
+            image_gl->setSubImage(image_raw, 0, 0, image_gl->getWidth(), image_gl->getHeight());
+        }
+        else
+        {
+            llassert(false); //images were just inserted by nextOpenPos, they shouldn't be missing
+        }
     }
 
-    LLImageGL *image_gl = mFontBitmapCachep->getImageGL(bitmap_glyph_type, bitmap_num);
-    LLImageRaw *image_raw = mFontBitmapCachep->getImageRaw(bitmap_glyph_type, bitmap_num);
-    if (image_gl && image_raw)
-    {
-        image_gl->setSubImage(image_raw, 0, 0, image_gl->getWidth(), image_gl->getHeight());
-    }
-    else
-    {
-        llassert(false); //images were just inserted by nextOpenPos, they shouldn't be missing
-    }
+    // Reset the FT face transform so subsequent non-phased renders (e.g. for
+    // fallback paths or other faces sharing this FT_Library) aren't affected.
+    FT_Set_Transform(fontp->mFTFace, nullptr, nullptr);
 
+    out_bitmap_glyph_type = bitmap_glyph_type;
     return gi;
 }
 

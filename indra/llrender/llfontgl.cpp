@@ -376,7 +376,41 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     if (!sfgi)
                         continue;
 
-                    std::pair<EFontGlyphType, S32> next_bitmap_entry = sfgi->mBitmapEntry;
+                    // Quantize the pen x to 1/N px resolution and split into
+                    // integer pixel + subpixel phase. Doing them together (not
+                    // independently) keeps phase pick consistent with the
+                    // integer dest position when the fractional part is close
+                    // to 1 — round(frac * N) wrapping to N must also bump the
+                    // integer pen by 1, otherwise the bitmap lands one pixel
+                    // off the visual position the phase was rasterized for.
+                    const F32 pen_x = cur_render_x + sg.x_offset;
+                    const F32 pen_y = cur_render_y + sg.y_offset;
+                    U8 phase;
+                    S32 dest_int_x;
+                    if (sfgi->mPhaseCount > 1)
+                    {
+                        const F32 frac_x = pen_x - floorf(pen_x);
+                        const U32 raw =
+                            (U32)floorf(frac_x * (F32)LLFontGlyphInfo::kNumPhases + 0.5f);
+                        if (raw >= LLFontGlyphInfo::kNumPhases)
+                        {
+                            phase = 0;
+                            dest_int_x = (S32)floorf(pen_x) + 1;
+                        }
+                        else
+                        {
+                            phase = (U8)raw;
+                            dest_int_x = (S32)floorf(pen_x);
+                        }
+                    }
+                    else
+                    {
+                        phase = 0;
+                        dest_int_x = ll_round(pen_x);
+                    }
+                    const auto& slot = sfgi->mPhaseSlots[phase];
+
+                    std::pair<EFontGlyphType, S32> next_bitmap_entry = slot.mBitmapEntry;
                     if (next_bitmap_entry != bitmap_entry)
                     {
                         if (glyph_count > 0)
@@ -391,23 +425,23 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                         gGL.getTexUnit(0)->bind(font_image);
                     }
 
-                    const F32 glyph_x = cur_render_x + sg.x_offset + (F32)sfgi->mXBearing;
-                    const F32 glyph_y = cur_render_y + sg.y_offset + (F32)sfgi->mYBearing;
+                    const F32 glyph_x = (F32)(dest_int_x + slot.mXBearing);
+                    const F32 glyph_y = (F32)ll_round(pen_y) + (F32)slot.mYBearing;
 
-                    if ((start_x + scaled_max_pixels) < (glyph_x + (F32)sfgi->mWidth))
+                    if ((start_x + scaled_max_pixels) < (glyph_x + (F32)slot.mWidth))
                     {
                         overflow = true;
                         break;
                     }
 
-                    LLRectf uv_rect(sfgi->mXBitmapOffset * inv_width,
-                                    (sfgi->mYBitmapOffset + sfgi->mHeight + PAD_UVY) * inv_height,
-                                    (sfgi->mXBitmapOffset + sfgi->mWidth) * inv_width,
-                                    (sfgi->mYBitmapOffset - PAD_UVY) * inv_height);
-                    LLRectf screen_rect((F32)ll_round(glyph_x),
-                                        (F32)ll_round(glyph_y),
-                                        (F32)ll_round(glyph_x) + (F32)sfgi->mWidth,
-                                        (F32)ll_round(glyph_y) - (F32)sfgi->mHeight);
+                    LLRectf uv_rect(slot.mXBitmapOffset * inv_width,
+                                    (slot.mYBitmapOffset + slot.mHeight + PAD_UVY) * inv_height,
+                                    (slot.mXBitmapOffset + slot.mWidth) * inv_width,
+                                    (slot.mYBitmapOffset - PAD_UVY) * inv_height);
+                    LLRectf screen_rect(glyph_x,
+                                        glyph_y,
+                                        glyph_x + (F32)slot.mWidth,
+                                        glyph_y - (F32)slot.mHeight);
 
                     if (glyph_count >= GLYPH_BATCH_SIZE)
                     {
@@ -458,8 +492,35 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             LL_ERRS() << "Missing Glyph Info" << LL_ENDL;
             break;
         }
+        // Quantize pen x and split into integer dest + subpixel phase. See the
+        // matching block in the shaped path above for the wrap-around rationale.
+        U8 cp_phase;
+        S32 cp_dest_int_x;
+        if (fgi->mPhaseCount > 1)
+        {
+            const F32 frac_x = cur_render_x - floorf(cur_render_x);
+            const U32 raw =
+                (U32)floorf(frac_x * (F32)LLFontGlyphInfo::kNumPhases + 0.5f);
+            if (raw >= LLFontGlyphInfo::kNumPhases)
+            {
+                cp_phase = 0;
+                cp_dest_int_x = (S32)floorf(cur_render_x) + 1;
+            }
+            else
+            {
+                cp_phase = (U8)raw;
+                cp_dest_int_x = (S32)floorf(cur_render_x);
+            }
+        }
+        else
+        {
+            cp_phase = 0;
+            cp_dest_int_x = ll_round(cur_render_x);
+        }
+        const auto& cp_slot = fgi->mPhaseSlots[cp_phase];
+
         // Per-glyph bitmap texture.
-        std::pair<EFontGlyphType, S32> next_bitmap_entry = fgi->mBitmapEntry;
+        std::pair<EFontGlyphType, S32> next_bitmap_entry = cp_slot.mBitmapEntry;
         if (next_bitmap_entry != bitmap_entry || last_char != wch)
         {
             // Actually draw the queued glyphs before switching their texture;
@@ -484,7 +545,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             last_char = wch;
         }
 
-        if ((start_x + scaled_max_pixels) < (cur_x + fgi->mXBearing + fgi->mWidth))
+        if ((start_x + scaled_max_pixels) < (cur_x + cp_slot.mXBearing + cp_slot.mWidth))
         {
             // Not enough room for this character.
             break;
@@ -492,15 +553,17 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
         // Draw the text at the appropriate location
         //Specify vertices and texture coordinates
-        LLRectf uv_rect((fgi->mXBitmapOffset) * inv_width,
-                (fgi->mYBitmapOffset + fgi->mHeight + PAD_UVY) * inv_height,
-                (fgi->mXBitmapOffset + fgi->mWidth) * inv_width,
-                (fgi->mYBitmapOffset - PAD_UVY) * inv_height);
-        // snap glyph origin to whole screen pixel
-        LLRectf screen_rect((F32)ll_round(cur_render_x + (F32)fgi->mXBearing),
-                    (F32)ll_round(cur_render_y + (F32)fgi->mYBearing),
-                    (F32)ll_round(cur_render_x + (F32)fgi->mXBearing) + (F32)fgi->mWidth,
-                    (F32)ll_round(cur_render_y + (F32)fgi->mYBearing) - (F32)fgi->mHeight);
+        LLRectf uv_rect((cp_slot.mXBitmapOffset) * inv_width,
+                (cp_slot.mYBitmapOffset + cp_slot.mHeight + PAD_UVY) * inv_height,
+                (cp_slot.mXBitmapOffset + cp_slot.mWidth) * inv_width,
+                (cp_slot.mYBitmapOffset - PAD_UVY) * inv_height);
+        // Integer dest derived from quantized pen + per-phase bearing.
+        const F32 cp_glyph_x = (F32)(cp_dest_int_x + cp_slot.mXBearing);
+        const F32 cp_glyph_y = (F32)ll_round(cur_render_y) + (F32)cp_slot.mYBearing;
+        LLRectf screen_rect(cp_glyph_x,
+                    cp_glyph_y,
+                    cp_glyph_x + (F32)cp_slot.mWidth,
+                    cp_glyph_y - (F32)cp_slot.mHeight);
 
         if (glyph_count >= GLYPH_BATCH_SIZE)
         {

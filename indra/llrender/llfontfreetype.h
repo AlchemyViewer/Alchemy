@@ -33,6 +33,7 @@
 #include "llimagegl.h"
 #include "llfontbitmapcache.h"
 
+#include <array>
 #include <boost/functional/hash.hpp>
 #include <boost/unordered_map.hpp>
 
@@ -75,26 +76,56 @@ private:
 
 struct LLFontGlyphInfo
 {
+    // Number of horizontal subpixel phases cached per glyph for fonts that use
+    // subpixel pen position. Each phase stores a separately-rasterized bitmap
+    // at a (k / kNumPhases) px x-offset, so the renderer can pick the phase
+    // matching the fractional part of the pen position and avoid the visible
+    // spacing inconsistency that round-half-up snapping produces on runs of
+    // identical glyphs (password dots, table rules, ASCII art).
+    //
+    // 8 phases give 1/8 px resolution; residual quantization error is at most
+    // 1/16 px (~0.06 px) — below the visual threshold for stem perception.
+    static constexpr U8 kNumPhases = 8;
+
+    // Per-phase atlas slot. Each phase is a separate atlas allocation; only
+    // the offsets and per-bitmap dimensions vary across phases, glyph-level
+    // metrics (advance, lsb/rsb deltas) are shared.
+    struct PhaseSlot
+    {
+        S32 mXBitmapOffset = 0;  // x in atlas
+        S32 mYBitmapOffset = 0;  // y in atlas
+        S32 mWidth = 0;          // bitmap width for this phase
+        S32 mHeight = 0;         // bitmap height for this phase
+        S32 mXBearing = 0;       // bitmap_left (origin offset relative to pen)
+        S32 mYBearing = 0;       // bitmap_top
+        std::pair<EFontGlyphType, S32> mBitmapEntry =
+            std::make_pair(EFontGlyphType::Unspecified, -1);
+    };
+
     LLFontGlyphInfo(U32 index, EFontGlyphType glyph_type);
     LLFontGlyphInfo(const LLFontGlyphInfo& fgi);
 
     U32 mGlyphIndex;
     EFontGlyphType mGlyphType;
 
-    // Metrics
+    // Glyph-level metrics. These are taken from phase 0 and used by the
+    // measurement paths (getWidthF32, maxDrawableChars, etc.) that don't
+    // need phase-specific accuracy. The renderer uses per-phase dimensions
+    // from mPhaseSlots[phase] instead.
     S32 mWidth;         // In pixels
     S32 mHeight;        // In pixels
     F32 mXAdvance;      // In pixels
     F32 mYAdvance;      // In pixels
+    S32 mXBearing;      // Distance from baseline to left in pixels
+    S32 mYBearing;      // Distance from baseline to top in pixels
+    S32 mLsbDelta;      // FreeType subpixel left side bearing delta (26.6 units)
+    S32 mRsbDelta;      // FreeType subpixel right side bearing delta (26.6 units)
 
-    // Information for actually rendering
-    S32 mXBitmapOffset; // Offset to the origin in the bitmap
-    S32 mYBitmapOffset; // Offset to the origin in the bitmap
-    S32 mXBearing;  // Distance from baseline to left in pixels
-    S32 mYBearing;  // Distance from baseline to top in pixels
-    S32 mLsbDelta;  // FreeType subpixel left side bearing delta (26.6 units)
-    S32 mRsbDelta;  // FreeType subpixel right side bearing delta (26.6 units)
-    std::pair<EFontGlyphType, S32> mBitmapEntry; // Which bitmap in the bitmap cache contains this glyph
+    // Per-phase atlas slots. mPhaseCount == 1 for native-hinted (HINTING_DEFAULT)
+    // faces — single integer-pen phase, slots 1..7 are unused. Subpixel-pen
+    // faces (FORCE_AUTOHINT, LIGHT, NO_HINTING) populate all kNumPhases slots.
+    std::array<PhaseSlot, kNumPhases> mPhaseSlots;
+    U8 mPhaseCount = 1;
 };
 
 extern LLFontManager *gFontManagerp;
