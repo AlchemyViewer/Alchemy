@@ -387,7 +387,6 @@ void LLTextBase::onValueChange(S32 start, S32 end)
 std::vector<LLRect> LLTextBase::getSelectionRects(const highlight_list_t& highlights)
 {
     // Nor supposed to be called without selection
-    llassert(hasSelection());
     llassert(!mLineInfoList.empty());
 
     std::vector<LLRect> selection_rects;
