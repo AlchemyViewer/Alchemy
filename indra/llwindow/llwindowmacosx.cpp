@@ -677,7 +677,7 @@ void setMarkedText(unsigned short *unitext, unsigned int *selectedRange, unsigne
             preeditor->markAsPreedit(location, length);
         }
 
-        LLWString fix_str = utf16str_to_wstring(llutf16string(unitext, text_len));
+        LLWString fix_str = utf16str_to_wstring(std::u16string((char16_t*)unitext, text_len));
 
         S32 caret_position = fix_str.length();
 
@@ -1385,11 +1385,11 @@ bool LLWindowMacOSX::isClipboardTextAvailable()
 bool LLWindowMacOSX::pasteTextFromClipboard(LLWString &dst)
 {
     unsigned short* pboard_data = copyFromPBoard(); // must free returned data
-    llutf16string str(pboard_data);
+    std::u16string str((char16_t*)pboard_data);
     free(pboard_data);
 
     dst = utf16str_to_wstring(str);
-    if (dst != L"")
+    if (!dst.empty())
     {
         return true;
     } else {
@@ -1400,9 +1400,9 @@ bool LLWindowMacOSX::pasteTextFromClipboard(LLWString &dst)
 bool LLWindowMacOSX::copyTextToClipboard(const LLWString &s)
 {
     bool result = false;
-    llutf16string utf16str = wstring_to_utf16str(s);
+    std::u16string utf16str = wstring_to_utf16str(s);
 
-    result = copyToPBoard(utf16str.data(), utf16str.length());
+    result = copyToPBoard((unsigned short*)utf16str.data(), utf16str.length());
 
     return result;
 }
