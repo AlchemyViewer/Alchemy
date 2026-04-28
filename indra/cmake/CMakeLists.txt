@@ -35,7 +35,6 @@ set(cmake_SOURCE_FILES
         LLTestCommand.cmake
         Meshoptimizer.cmake
         Mikktspace.cmake
-        NanoSVG.cmake
         NDOF.cmake
         NVAPI.cmake
         OpenAL.cmake

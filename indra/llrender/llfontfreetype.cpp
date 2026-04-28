@@ -30,10 +30,10 @@
 #include "llfontgl.h"
 
 // Freetype stuff
+#include <plutosvg-ft.h>
 #include <ft2build.h>
-#include FT_SYSTEM_H
-#include "llfontfreetypesvg.h"
 #include FT_FREETYPE_H
+#include FT_MODULE_H
 #include FT_MULTIPLE_MASTERS_H
 
 // Harfbuzz
@@ -95,13 +95,7 @@ LLFontManager::LLFontManager()
     LL_INFOS() << "Freetype version: " << major << "." << minor << "." << patch << LL_ENDL;
 
 #ifdef ENABLE_OT_SVG_SUPPORT
-    SVG_RendererHooks hooks = {
-        LLFontFreeTypeSvgRenderer::OnInit,
-        LLFontFreeTypeSvgRenderer::OnFree,
-        LLFontFreeTypeSvgRenderer::OnRender,
-        LLFontFreeTypeSvgRenderer::OnPresetGlypthSlot,
-    };
-    FT_Property_Set(gFTLibrary, "ot-svg", "svg-hooks", &hooks);
+    FT_Property_Set(gFTLibrary, "ot-svg", "svg-hooks", &plutosvg_ft_hooks);
 #endif
 }
 

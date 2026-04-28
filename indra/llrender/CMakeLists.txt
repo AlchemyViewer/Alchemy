@@ -5,7 +5,6 @@ set(llrender_SOURCE_FILES
     llcubemaparray.cpp
     llfontbitmapcache.cpp
     llfontfreetype.cpp
-    llfontfreetypesvg.cpp
     llfontgl.cpp
     llfontshaping.cpp
     llfontvertexbuffer.cpp
@@ -33,7 +32,6 @@ set(llrender_HEADER_FILES
     llfontgl.h
     llfontvertexbuffer.h
     llfontfreetype.h
-    llfontfreetypesvg.h
     llfontbitmapcache.h
     llfontregistry.h
     llfontshaping.h
@@ -74,7 +72,7 @@ if (BUILD_HEADLESS)
           llwindowheadless
           ll::freetype
           ll::harfbuzz
-          ll::nanosvg
+          ll::plutosvg
           ll::glext
           OpenGL::GL
           )
@@ -96,6 +94,7 @@ target_link_libraries(llrender
         llwindow
         ll::freetype
         ll::harfbuzz
+        ll::plutosvg
         ll::glext
         )
 

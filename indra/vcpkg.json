@@ -68,7 +68,6 @@
     "lsl-definitions",
     "meshoptimizer",
     "minizip",
-    "nanosvg",
     {
       "name": "nvapi",
       "platform": "windows & x64"
@@ -101,6 +100,12 @@
     {
       "name": "pkgconf",
       "platform": "windows | osx"
+    },
+    {
+      "name": "plutosvg",
+      "features": [
+        "freetype"
+      ]
     },
     "secondlife-certificates",
     "secondlife-emoji-shortcodes",
@@ -172,12 +177,12 @@
       "description": "Build with support for Sentry crash reporting",
       "dependencies": [
         {
-          "name": "sentry-native",
-          "platform": "windows | linux"
-        },
-        {
           "name": "sentry-cocoa",
           "platform": "osx"
+        },
+        {
+          "name": "sentry-native",
+          "platform": "windows | linux"
         }
       ]
     },
