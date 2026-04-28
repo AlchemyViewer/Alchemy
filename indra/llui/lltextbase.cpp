@@ -3293,11 +3293,28 @@ void LLTextBase::refreshHighlights()
         {
             const LLWString& wstrText = getWText();
 
+            // boost::ifind_all needs std::ctype<char32_t>, which libc++ doesn't define; lowercase via ICU instead.
             std::list<boost::iterator_range<LLWString::const_iterator> > highlightRanges;
             if (mHighlightCaseInsensitive)
-                boost::ifind_all(highlightRanges, wstrText, mHighlightWord);
+            {
+                LLWString lowerText(wstrText);
+                LLWStringUtil::toLower(lowerText);
+                LLWString lowerNeedle(mHighlightWord);
+                LLWStringUtil::toLower(lowerNeedle);
+
+                std::list<boost::iterator_range<LLWString::const_iterator> > lowerRanges;
+                boost::find_all(lowerRanges, lowerText, lowerNeedle);
+                for (const auto& range : lowerRanges)
+                {
+                    auto offset = range.begin() - lowerText.begin();
+                    auto begin = wstrText.begin() + offset;
+                    highlightRanges.emplace_back(begin, begin + range.size());
+                }
+            }
             else
+            {
                 boost::find_all(highlightRanges, wstrText, mHighlightWord);
+            }
 
             for (std::list<boost::iterator_range<LLWString::const_iterator> >::const_iterator itRange = highlightRanges.begin(); itRange != highlightRanges.end(); ++itRange)
             {
