@@ -301,8 +301,11 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // string can have more than one glyph per char (ex: bold or shadow),
     // make sure that GLYPH_BATCH_SIZE won't end up with half a symbol.
     // See drawGlyph.
-    // Ex: with shadows it's 6 glyps per char. 30 fits exactly 5 chars.
-    static constexpr S32 GLYPH_BATCH_SIZE = 30;
+    // Ex: with shadows it's 6 glyps per char. 120 stays a multiple of 6
+    // (20 chars at worst-case shadow expansion, 120 chars in the common
+    // single-glyph path) and at 720 vertices per batch fills GL submit
+    // payloads that 30 was leaving on the table.
+    static constexpr S32 GLYPH_BATCH_SIZE = 120;
     static thread_local LLVector4a vertices[GLYPH_BATCH_SIZE * 6];
     static thread_local LLVector2 uvs[GLYPH_BATCH_SIZE * 6];
     static thread_local LLColor4U colors[GLYPH_BATCH_SIZE * 6];
