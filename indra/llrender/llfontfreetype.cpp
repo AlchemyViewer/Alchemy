@@ -1136,7 +1136,7 @@ void LLFontFreetype::collectGarbage() const
     // churn during normal interaction; short enough that an hour-long session
     // doesn't accumulate every transient code page ever shown.
     constexpr F64 GC_INTERVAL_SEC      = 5.0;
-    constexpr F64 IDLE_THRESHOLD_SEC   = 60.0;
+    constexpr F64 IDLE_THRESHOLD_SEC   = 60.0 * 15.0;
 
     const F64 now = LLFrameTimer::getTotalSeconds();
     if (now < mNextGcTime)
