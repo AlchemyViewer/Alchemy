@@ -35,6 +35,7 @@
 
 #include <array>
 #include <boost/functional/hash.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered_map.hpp>
 
 // Hack.  FT_Face is just a typedef for a pointer to a struct,
@@ -248,9 +249,24 @@ public:
     void setStyle(U8 style);
     U8 getStyle() const;
 
+    // Run a maintenance pass that releases bitmap atlas sheets which haven't
+    // been read or written within the idle threshold, recovering their CPU
+    // and GPU memory and dropping any LLFontGlyphInfo entries that pointed
+    // into them. Self-throttled — repeat calls inside the GC interval are
+    // cheap no-ops, so it's fine for every render() invocation to call this
+    // unconditionally. NOT safe to call mid-render while a glyph pointer is
+    // held: call only at frame boundaries / before any glyph lookups.
+    void collectGarbage() const;
+
 private:
     void resetBitmapCache();
     void destroyHbFont();
+    // Return the FT glyph index for `wch` on this face, caching the result so
+    // subsequent lookups skip the cmap binary search inside FT_Get_Char_Index.
+    // A cached value of 0 is meaningful — it means the face has no glyph for
+    // `wch` — and prevents re-querying on every miss. Cleared whenever mFTFace
+    // is replaced.
+    U32 getCharGlyphIndex(llwchar wch) const;
     void setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num, U32 width, U32 height, U8 *data, S32 stride = 0) const;
     bool setSubImageBGRA(U32 x, U32 y, U32 bitmap_num, U16 width, U16 height, const U8* data, U32 stride) const;
     bool setVariationAxis(const std::string& axis_tag, F32 value);
@@ -300,6 +316,13 @@ private:
     typedef boost::unordered_multimap<llwchar, LLFontGlyphInfo*> char_glyph_info_map_t;
     mutable char_glyph_info_map_t mCharGlyphInfoMap; // Information about glyph location in bitmap
 
+    // Codepoint -> FT glyph index. Skips the cmap binary search on repeated
+    // lookups in selectShapingFace/addGlyph/faceHasGlyph. Populated lazily by
+    // getCharGlyphIndex; cleared when mFTFace is replaced. Open-addressed
+    // (flat) map: small POD value, frequent reads — cache-friendly probing
+    // beats node-based unordered_map here.
+    mutable boost::unordered_flat_map<llwchar, U32> mCharIndexCache;
+
     // Shaped-glyph cache, used only for glyphs looked up via HarfBuzz glyph
     // indices. Kept separate from mCharGlyphInfoMap so the existing 1:1
     // codepoint->glyph hot path stays untouched. The key carries the source
@@ -334,6 +357,11 @@ private:
     mutable hb_font_t* mHbFont;
 
     mutable S32 mRenderGlyphCount;
+
+    // Earliest wall-clock time (seconds) at which collectGarbage() should
+    // do real work. Throttle gate so the per-render call from LLFontGL::render
+    // is essentially free between sweeps.
+    mutable F64 mNextGcTime = 0.0;
 };
 
 #endif // LL_FONTFREETYPE_H

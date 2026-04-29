@@ -28,6 +28,7 @@
 
 #include "llgl.h"
 #include "llfontbitmapcache.h"
+#include "llframetimer.h"
 
 LLFontBitmapCache::LLFontBitmapCache()
 
@@ -65,6 +66,7 @@ LLImageRaw *LLFontBitmapCache::getImageRaw(EFontGlyphType bitmap_type, U32 bitma
     if (bitmap_type >= EFontGlyphType::Count || bitmap_num >= mImageRawVec[bitmap_idx].size())
         return nullptr;
 
+    touchSheet(bitmap_type, bitmap_num);
     return mImageRawVec[bitmap_idx][bitmap_num];
 }
 
@@ -74,6 +76,7 @@ LLImageGL *LLFontBitmapCache::getImageGL(EFontGlyphType bitmap_type, U32 bitmap_
     if (bitmap_type >= EFontGlyphType::Count || bitmap_num >= mImageGLVec[bitmap_idx].size())
         return nullptr;
 
+    touchSheet(bitmap_type, bitmap_num);
     return mImageGLVec[bitmap_idx][bitmap_num];
 }
 
@@ -86,47 +89,19 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32& pos_x, S32& pos_y, EFontGlyp
     }
 
     const U32 bitmap_idx = static_cast<U32>(bitmap_type);
-    if (mImageRawVec[bitmap_idx].empty() || (mCurrentOffsetX[bitmap_idx] + width + 1) > mBitmapWidth)
+
+    // The last sheet is the active allocation target. If it was released by
+    // the eviction sweep, force a fresh sheet — its in-flight pen offsets are
+    // pointing into a freed image.
+    const bool last_sheet_released = !mImageRawVec[bitmap_idx].empty()
+                                  && mImageRawVec[bitmap_idx].back().isNull();
+    bool need_new_sheet = mImageRawVec[bitmap_idx].empty() || last_sheet_released;
+
+    if (!need_new_sheet && (mCurrentOffsetX[bitmap_idx] + width + 1) > mBitmapWidth)
     {
-        if ((mImageRawVec[bitmap_idx].empty()) || (mCurrentOffsetY[bitmap_idx] + 2*mMaxCharHeight + 2) > mBitmapHeight)
+        if ((mCurrentOffsetY[bitmap_idx] + 2*mMaxCharHeight + 2) > mBitmapHeight)
         {
-            // We're out of space in the current image, or no image
-            // has been allocated yet.  Make a new one.
-
-            S32 image_width = mMaxCharWidth * 20;
-            S32 pow_iw = 2;
-            while (pow_iw < image_width)
-            {
-                pow_iw *= 2;
-            }
-            image_width = pow_iw;
-            image_width = llmin(512, image_width); // Don't make bigger than 512x512, ever.
-            S32 image_height = image_width;
-
-            mBitmapWidth = image_width;
-            mBitmapHeight = image_height;
-
-            S32 num_components = getNumComponents(bitmap_type);
-            mImageRawVec[bitmap_idx].emplace_back(new LLImageRaw(mBitmapWidth, mBitmapHeight, num_components));
-            bitmap_num = static_cast<U32>(mImageRawVec[bitmap_idx].size()) - 1;
-
-            LLImageRaw* image_raw = getImageRaw(bitmap_type, bitmap_num);
-            if (EFontGlyphType::Grayscale == bitmap_type)
-            {
-                image_raw->clear(255, 0);
-            }
-
-            // Make corresponding GL image.
-            mImageGLVec[bitmap_idx].emplace_back(new LLImageGL(image_raw, false, false));
-            LLImageGL* image_gl = getImageGL(bitmap_type, bitmap_num);
-
-            // Start at beginning of the new image.
-            mCurrentOffsetX[bitmap_idx] = 1;
-            mCurrentOffsetY[bitmap_idx] = 1;
-
-            // Attach corresponding GL texture. (*TODO: is this needed?)
-            gGL.getTexUnit(0)->bind(image_gl);
-            image_gl->setFilteringOption(LLTexUnit::TFO_POINT); // was setMipFilterNearest(true, true);
+            need_new_sheet = true;
         }
         else
         {
@@ -136,14 +111,120 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32& pos_x, S32& pos_y, EFontGlyp
         }
     }
 
+    if (need_new_sheet)
+    {
+        // We're out of space in the current image, or no image
+        // has been allocated yet.  Make a new one.
+
+        S32 image_width = mMaxCharWidth * 20;
+        S32 pow_iw = 2;
+        while (pow_iw < image_width)
+        {
+            pow_iw *= 2;
+        }
+        image_width = pow_iw;
+        image_width = llmin(512, image_width); // Don't make bigger than 512x512, ever.
+        S32 image_height = image_width;
+
+        mBitmapWidth = image_width;
+        mBitmapHeight = image_height;
+
+        S32 num_components = getNumComponents(bitmap_type);
+        mImageRawVec[bitmap_idx].emplace_back(new LLImageRaw(mBitmapWidth, mBitmapHeight, num_components));
+        bitmap_num = static_cast<U32>(mImageRawVec[bitmap_idx].size()) - 1;
+
+        LLImageRaw* image_raw = mImageRawVec[bitmap_idx][bitmap_num];
+        if (EFontGlyphType::Grayscale == bitmap_type)
+        {
+            image_raw->clear(255, 0);
+        }
+
+        // Make corresponding GL image.
+        mImageGLVec[bitmap_idx].emplace_back(new LLImageGL(image_raw, false, false));
+        LLImageGL* image_gl = mImageGLVec[bitmap_idx][bitmap_num];
+
+        // Track per-sheet last-used time alongside the image vectors.
+        mLastUsedTime[bitmap_idx].push_back(0.0);
+
+        // Start at beginning of the new image.
+        mCurrentOffsetX[bitmap_idx] = 1;
+        mCurrentOffsetY[bitmap_idx] = 1;
+
+        // Attach corresponding GL texture. (*TODO: is this needed?)
+        gGL.getTexUnit(0)->bind(image_gl);
+        image_gl->setFilteringOption(LLTexUnit::TFO_POINT); // was setMipFilterNearest(true, true);
+    }
+
     pos_x = mCurrentOffsetX[bitmap_idx];
     pos_y = mCurrentOffsetY[bitmap_idx];
     bitmap_num = getNumBitmaps(bitmap_type) - 1;
 
     mCurrentOffsetX[bitmap_idx] += width + 1;
+    touchSheet(bitmap_type, bitmap_num);
     mGeneration++;
 
     return true;
+}
+
+void LLFontBitmapCache::touchSheet(EFontGlyphType bitmap_type, U32 bitmap_num) const
+{
+    if (bitmap_type >= EFontGlyphType::Count)
+        return;
+
+    const U32 bitmap_idx = static_cast<U32>(bitmap_type);
+    if (bitmap_num >= mLastUsedTime[bitmap_idx].size())
+        return;
+    mLastUsedTime[bitmap_idx][bitmap_num] = LLFrameTimer::getTotalSeconds();
+}
+
+F64 LLFontBitmapCache::getSheetLastUsedTime(EFontGlyphType bitmap_type, U32 bitmap_num) const
+{
+    if (bitmap_type >= EFontGlyphType::Count)
+        return 0.0;
+    const U32 bitmap_idx = static_cast<U32>(bitmap_type);
+    if (bitmap_num >= mLastUsedTime[bitmap_idx].size())
+        return 0.0;
+    return mLastUsedTime[bitmap_idx][bitmap_num];
+}
+
+bool LLFontBitmapCache::isSheetReleased(EFontGlyphType bitmap_type, U32 bitmap_num) const
+{
+    if (bitmap_type >= EFontGlyphType::Count)
+        return false;
+    const U32 bitmap_idx = static_cast<U32>(bitmap_type);
+    if (bitmap_num >= mImageRawVec[bitmap_idx].size())
+        return false;
+    return mImageRawVec[bitmap_idx][bitmap_num].isNull();
+}
+
+void LLFontBitmapCache::releaseSheet(EFontGlyphType bitmap_type, U32 bitmap_num)
+{
+    if (bitmap_type >= EFontGlyphType::Count)
+        return;
+    const U32 bitmap_idx = static_cast<U32>(bitmap_type);
+    if (bitmap_num >= mImageRawVec[bitmap_idx].size())
+        return;
+    if (mImageRawVec[bitmap_idx][bitmap_num].isNull()
+        && (bitmap_num >= mImageGLVec[bitmap_idx].size()
+            || mImageGLVec[bitmap_idx][bitmap_num].isNull()))
+    {
+        return; // Already released.
+    }
+
+    if (bitmap_num < mImageGLVec[bitmap_idx].size() && mImageGLVec[bitmap_idx][bitmap_num].notNull())
+    {
+        // Drop the GL texture explicitly so the GPU memory is freed promptly,
+        // not on the next driver-level GC. The LLPointer reset below releases
+        // the LLImageGL CPU object.
+        mImageGLVec[bitmap_idx][bitmap_num]->destroyGLTexture();
+        mImageGLVec[bitmap_idx][bitmap_num] = nullptr;
+    }
+    mImageRawVec[bitmap_idx][bitmap_num] = nullptr;
+
+    if (bitmap_num < mLastUsedTime[bitmap_idx].size())
+        mLastUsedTime[bitmap_idx][bitmap_num] = 0.0;
+
+    mGeneration++;
 }
 
 void LLFontBitmapCache::destroyGL()
@@ -152,7 +233,8 @@ void LLFontBitmapCache::destroyGL()
     {
         for (LLImageGL* image_gl : mImageGLVec[idx])
         {
-            image_gl->destroyGLTexture();
+            if (image_gl)
+                image_gl->destroyGLTexture();
         }
     }
 }
@@ -163,6 +245,7 @@ void LLFontBitmapCache::reset()
     {
         mImageRawVec[idx].clear();
         mImageGLVec[idx].clear();
+        mLastUsedTime[idx].clear();
         mCurrentOffsetX[idx] = 1;
         mCurrentOffsetY[idx] = 1;
     }

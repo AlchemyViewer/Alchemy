@@ -74,10 +74,10 @@ namespace
     using ShapeIndex    = boost::unordered_map<ShapeCacheKey, ShapeLru::iterator, ShapeCacheKeyHash>;
 
     // Rough order-of-magnitude for an active chat window: a few dozen visible
-    // lines each with 1-3 shaping runs, plus a few editor buffers. 2048
-    // bounds worst-case memory (~250 KB) while absorbing realistic working
+    // lines each with 1-3 shaping runs, plus a few editor buffers. 8192
+    // bounds worst-case memory (~1 MB) while absorbing realistic working
     // sets without eviction churn.
-    constexpr size_t SHAPE_CACHE_LIMIT = 2048;
+    constexpr size_t SHAPE_CACHE_LIMIT = 8192;
 
     ShapeLru   sShapeLru;
     ShapeIndex sShapeIndex;

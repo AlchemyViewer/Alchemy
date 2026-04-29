@@ -44,6 +44,7 @@
 
 #include "lldir.h"
 #include "llerror.h"
+#include "llframetimer.h"
 #include "llimage.h"
 #include "llimagepng.h"
 //#include "llimagej2c.h"
@@ -255,7 +256,7 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
         const fallback_font_t& pair = mFallbackFonts[i];
         if (!pair.second)
             continue;
-        FT_UInt gi = FT_Get_Char_Index(pair.first->mFTFace, base);
+        U32 gi = pair.first->getCharGlyphIndex(base);
         if (gi)
         {
             out_glyph_index = gi;
@@ -264,7 +265,7 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
     }
 
     // No emoji fallback has the base — fall back to the root face.
-    out_glyph_index = FT_Get_Char_Index(mFTFace, base);
+    out_glyph_index = getCharGlyphIndex(base);
     if (out_glyph_index != 0)
         return this;
 
@@ -274,7 +275,7 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
         const fallback_font_t& pair = mFallbackFonts[i];
         if (pair.second)
             continue;
-        FT_UInt gi = FT_Get_Char_Index(pair.first->mFTFace, base);
+        U32 gi = pair.first->getCharGlyphIndex(base);
         if (gi)
         {
             out_glyph_index = gi;
@@ -290,7 +291,20 @@ bool LLFontFreetype::faceHasGlyph(llwchar wch) const
 {
     if (!mFTFace)
         return false;
-    return FT_Get_Char_Index(mFTFace, wch) != 0;
+    return getCharGlyphIndex(wch) != 0;
+}
+
+U32 LLFontFreetype::getCharGlyphIndex(llwchar wch) const
+{
+    if (!mFTFace)
+        return 0;
+
+    auto [it, inserted] = mCharIndexCache.try_emplace(wch, 0);
+    if (inserted)
+    {
+        it->second = static_cast<U32>(FT_Get_Char_Index(mFTFace, wch));
+    }
+    return it->second;
 }
 
 bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, S32 weight, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags)
@@ -304,6 +318,9 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
         FT_Done_Face(mFTFace);
         mFTFace = nullptr;
     }
+    // Glyph indices in the cache are tied to the FT_Face's cmap; a reload
+    // (different file or different params) invalidates them.
+    mCharIndexCache.clear();
 
     FT_Open_Args openArgs;
     memset( &openArgs, 0, sizeof( openArgs ) );
@@ -425,6 +442,7 @@ S32 LLFontFreetype::getNumFaces(const std::string& filename)
         FT_Done_Face(mFTFace);
         mFTFace = nullptr;
     }
+    mCharIndexCache.clear();
 
     S32 num_faces = 1;
 
@@ -587,7 +605,7 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type
     //LL_DEBUGS() << "Adding new glyph for " << wch << " to font" << LL_ENDL;
 
     // Initialize char to glyph map
-    FT_UInt glyph_index = FT_Get_Char_Index(mFTFace, wch);
+    U32 glyph_index = getCharGlyphIndex(wch);
     if (glyph_index == 0)
     {
         // No corresponding glyph in this font: look for a glyph in fallback
@@ -610,7 +628,7 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type
                     // the future with several different emoji fonts. HB
                     continue;
                 }
-                glyph_index = FT_Get_Char_Index(pair.first->mFTFace, wch);
+                glyph_index = pair.first->getCharGlyphIndex(wch);
                 if (glyph_index)
                 {
                     return addGlyphFromFont(pair.first, wch, glyph_index,
@@ -635,7 +653,7 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type
                 emoji_fonts_idx.push_back(i);
                 continue;
             }
-            glyph_index = FT_Get_Char_Index(pair.first->mFTFace, wch);
+            glyph_index = pair.first->getCharGlyphIndex(wch);
             if (glyph_index)
             {
                 return addGlyphFromFont(pair.first, wch, glyph_index,
@@ -650,7 +668,7 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type
         for (size_t j = 0, count2 = emoji_fonts_idx.size(); j < count2; ++j)
         {
             const fallback_font_t& pair = mFallbackFonts[emoji_fonts_idx[j]];
-            glyph_index = FT_Get_Char_Index(pair.first->mFTFace, wch);
+            glyph_index = pair.first->getCharGlyphIndex(wch);
             if (glyph_index)
             {
                 return addGlyphFromFont(pair.first, wch, glyph_index,
@@ -1076,19 +1094,107 @@ void LLFontFreetype::dumpFontBitmaps() const
     // Dump all the regular bitmaps (if any)
     for (int idx = 0, cnt = mFontBitmapCachep->getNumBitmaps(EFontGlyphType::Grayscale); idx < cnt; idx++)
     {
-        dumpFontBitmap(mFontBitmapCachep->getImageRaw(EFontGlyphType::Grayscale, idx), llformat("%s_%d_%d_%d.png", mFTFace->family_name, (int)(mPointSize * 10), mStyle, idx));
+        const LLImageRaw* raw = mFontBitmapCachep->getImageRaw(EFontGlyphType::Grayscale, idx);
+        if (!raw) continue; // sheet was evicted
+        dumpFontBitmap(raw, llformat("%s_%d_%d_%d.png", mFTFace->family_name, (int)(mPointSize * 10), mStyle, idx));
     }
 
     // Dump all the color bitmaps (if any)
     for (int idx = 0, cnt = mFontBitmapCachep->getNumBitmaps(EFontGlyphType::Color); idx < cnt; idx++)
     {
-        dumpFontBitmap(mFontBitmapCachep->getImageRaw(EFontGlyphType::Color, idx), llformat("%s_%d_%d_%d_clr.png", mFTFace->family_name, (int)(mPointSize * 10), mStyle, idx));
+        const LLImageRaw* raw = mFontBitmapCachep->getImageRaw(EFontGlyphType::Color, idx);
+        if (!raw) continue; // sheet was evicted
+        dumpFontBitmap(raw, llformat("%s_%d_%d_%d_clr.png", mFTFace->family_name, (int)(mPointSize * 10), mStyle, idx));
     }
 }
 
 const LLFontBitmapCache* LLFontFreetype::getFontBitmapCache() const
 {
     return mFontBitmapCachep;
+}
+
+void LLFontFreetype::collectGarbage() const
+{
+    if (!mFTFace)
+        return;
+
+    // Sweep cadence: cheap enough to run at the top of every render call, with
+    // GC_INTERVAL_SEC bounding actual work. Idle threshold sized for "real
+    // user idle" — roughly the time after which a chat scrollback or panel of
+    // unique-codepoint text has stopped being displayed. Long enough not to
+    // churn during normal interaction; short enough that an hour-long session
+    // doesn't accumulate every transient code page ever shown.
+    constexpr F64 GC_INTERVAL_SEC      = 5.0;
+    constexpr F64 IDLE_THRESHOLD_SEC   = 60.0;
+
+    const F64 now = LLFrameTimer::getTotalSeconds();
+    if (now < mNextGcTime)
+        return;
+    mNextGcTime = now + GC_INTERVAL_SEC;
+
+    auto glyph_uses_sheet = [](const LLFontGlyphInfo* gi, EFontGlyphType type, U32 num) -> bool
+    {
+        for (U8 p = 0; p < gi->mPhaseCount; ++p)
+        {
+            const auto& entry = gi->mPhaseSlots[p].mBitmapEntry;
+            if (entry.first == type && entry.second >= 0 && static_cast<U32>(entry.second) == num)
+                return true;
+        }
+        return false;
+    };
+
+    // Shaped runs in LLFontShaping's cache hold only metric/glyph_id data — no
+    // atlas references — so they survive eviction; getGlyphInfoByIndex on the
+    // next frame re-rasterizes whichever glyphs were dropped here. Cache
+    // generation bumps inside releaseSheet so LLFontVertexBuffer rebuilds.
+    for (U32 t = 0; t < static_cast<U32>(EFontGlyphType::Count); ++t)
+    {
+        const EFontGlyphType type = static_cast<EFontGlyphType>(t);
+        const U32 sheet_count = mFontBitmapCachep->getNumBitmaps(type);
+        for (U32 num = 0; num < sheet_count; ++num)
+        {
+            if (mFontBitmapCachep->isSheetReleased(type, num))
+                continue;
+            const F64 last_used = mFontBitmapCachep->getSheetLastUsedTime(type, num);
+            // last_used == 0 means the sheet was allocated but not yet drawn
+            // from — skip it for one cycle so a brand-new sheet gets at least
+            // a frame to be touched before it's a candidate.
+            if (last_used <= 0.0)
+                continue;
+            if ((now - last_used) <= IDLE_THRESHOLD_SEC)
+                continue;
+
+            // Drop every glyph entry that points into this sheet — including
+            // any phase slot, since releasing the sheet invalidates all of
+            // them. Single-pass erase-while-iterating on the multimap.
+            for (auto it = mCharGlyphInfoMap.begin(); it != mCharGlyphInfoMap.end(); )
+            {
+                if (glyph_uses_sheet(it->second, type, num))
+                {
+                    delete it->second;
+                    it = mCharGlyphInfoMap.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+            for (auto it = mShapedGlyphInfoMap.begin(); it != mShapedGlyphInfoMap.end(); )
+            {
+                if (glyph_uses_sheet(it->second, type, num))
+                {
+                    delete it->second;
+                    it = mShapedGlyphInfoMap.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+
+            mFontBitmapCachep->releaseSheet(type, num);
+        }
+    }
 }
 
 void LLFontFreetype::setStyle(U8 style)

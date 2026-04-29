@@ -65,10 +65,33 @@ public:
     S32 getBitmapHeight() const { return mBitmapHeight; }
     S32 getCacheGeneration() const { return mGeneration; }
 
+    // Drop the underlying images for a sheet, freeing the GPU and CPU memory.
+    // The slot index remains valid (kept as a nullptr placeholder) so existing
+    // sheet-index references stay numerically stable; callers must purge any
+    // glyph cache entries that referenced this sheet *before* releasing it,
+    // otherwise the next render will try to draw from a null texture. Bumps
+    // the cache generation so vertex buffers invalidate.
+    void releaseSheet(EFontGlyphType bitmap_type, U32 bitmap_num);
+
+    // Wall-clock seconds (LLFrameTimer::getTotalSeconds) when this sheet was
+    // last read or written. Returns 0 for invalid (type, num) and for sheets
+    // that have been released — the caller can distinguish via isSheetReleased.
+    F64 getSheetLastUsedTime(EFontGlyphType bitmap_type, U32 bitmap_num) const;
+
+    // True when a sheet at this index has been released. The slot still exists
+    // for index stability but holds no images.
+    bool isSheetReleased(EFontGlyphType bitmap_type, U32 bitmap_num) const;
+
 protected:
     static U32 getNumComponents(EFontGlyphType bitmap_type);
 
 private:
+    // Bump mLastUsedTime[type][num] to the current frame time. Called on every
+    // getImageGL / getImageRaw / nextOpenPos so per-sheet usage tracking covers
+    // both the read (render) and write (rasterize) paths without an explicit
+    // touch from each caller.
+    void touchSheet(EFontGlyphType bitmap_type, U32 bitmap_num) const;
+
     S32 mBitmapWidth = 0;
     S32 mBitmapHeight = 0;
     S32 mCurrentOffsetX[static_cast<U32>(EFontGlyphType::Count)] = { 1 };
@@ -78,6 +101,9 @@ private:
     S32 mGeneration = 0;
     std::vector<LLPointer<LLImageRaw>> mImageRawVec[static_cast<U32>(EFontGlyphType::Count)];
     std::vector<LLPointer<LLImageGL>> mImageGLVec[static_cast<U32>(EFontGlyphType::Count)];
+    // Per-sheet last-used timestamp, parallel-indexed with mImageRawVec /
+    // mImageGLVec. mutable so const reads (getImageGL) can update it.
+    mutable std::vector<F64> mLastUsedTime[static_cast<U32>(EFontGlyphType::Count)];
 };
 
 #endif //LL_LLFONTBITMAPCACHE_H
