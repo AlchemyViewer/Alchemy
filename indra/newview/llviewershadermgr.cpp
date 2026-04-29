@@ -485,6 +485,8 @@ void LLViewerShaderMgr::finalizeShaderList()
 
     mShaderList.push_back(&gCGGammaProgram);
     mShaderList.push_back(&gCGLegacyGammaProgram);
+    mShaderList.push_back(&gCGColorgradeGammaProgram);
+    mShaderList.push_back(&gCGColorgradeLegacyGammaProgram);
     mShaderList.push_back(&gCGTonemapProgram);
     mShaderList.push_back(&gCGTonemapLegacyGammaProgram);
     mShaderList.push_back(&gCGTonemapColorgradeProgram);
