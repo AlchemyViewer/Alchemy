@@ -323,6 +323,15 @@ private:
     // beats node-based unordered_map here.
     mutable boost::unordered_flat_map<llwchar, U32> mCharIndexCache;
 
+    // On the root face only, cache the result of selectShapingFace's fallback
+    // iteration: codepoint -> (winning face, glyph index in that face). One
+    // hash hit replaces an O(fallbacks)-deep walk through the fallback chain
+    // for each codepoint of every shape miss. Cached zeros (face=this,
+    // glyph_index=0) are kept so notdef codepoints don't re-iterate either.
+    // Cleared when this face's mFTFace is replaced or when the fallback list
+    // changes via addFallbackFont.
+    mutable boost::unordered_flat_map<llwchar, std::pair<const LLFontFreetype*, U32>> mShapingFaceResolution;
+
     // Shaped-glyph cache, used only for glyphs looked up via HarfBuzz glyph
     // indices. Kept separate from mCharGlyphInfoMap so the existing 1:1
     // codepoint->glyph hot path stays untouched. The key carries the source

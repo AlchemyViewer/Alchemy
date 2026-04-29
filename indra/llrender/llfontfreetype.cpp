@@ -235,7 +235,11 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
 
     llassert(!mIsFallback);
 
-    const size_t count = mFallbackFonts.size();
+    if (auto it = mShapingFaceResolution.find(base); it != mShapingFaceResolution.end())
+    {
+        out_glyph_index = it->second.second;
+        return it->second.first;
+    }
 
     // Shaping runs are emoji presentation (the detector only flags
     // sequences with ZWJ/VS16/skin-tone/keycap/tag/flag-pair), so try the
@@ -251,40 +255,39 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
     //     face works for '8' but leaves U+20E3 as a notdef box because
     //     text fonts generally don't carry it, and HarfBuzz can't shop
     //     individual glyphs out to different faces mid-sequence.
-    for (size_t i = 0; i < count; ++i)
+    auto resolve = [&]() -> std::pair<const LLFontFreetype*, U32>
     {
-        const fallback_font_t& pair = mFallbackFonts[i];
-        if (!pair.second)
-            continue;
-        U32 gi = pair.first->getCharGlyphIndex(base);
-        if (gi)
+        const size_t count = mFallbackFonts.size();
+        for (size_t i = 0; i < count; ++i)
         {
-            out_glyph_index = gi;
-            return pair.first.get();
+            const fallback_font_t& pair = mFallbackFonts[i];
+            if (!pair.second)
+                continue;
+            U32 gi = pair.first->getCharGlyphIndex(base);
+            if (gi)
+                return { pair.first.get(), gi };
         }
-    }
-
-    // No emoji fallback has the base — fall back to the root face.
-    out_glyph_index = getCharGlyphIndex(base);
-    if (out_glyph_index != 0)
-        return this;
-
-    // Monochrome fallbacks.
-    for (size_t i = 0; i < count; ++i)
-    {
-        const fallback_font_t& pair = mFallbackFonts[i];
-        if (pair.second)
-            continue;
-        U32 gi = pair.first->getCharGlyphIndex(base);
-        if (gi)
+        // No emoji fallback has the base — fall back to the root face.
+        if (U32 gi = getCharGlyphIndex(base); gi != 0)
+            return { this, gi };
+        // Monochrome fallbacks.
+        for (size_t i = 0; i < count; ++i)
         {
-            out_glyph_index = gi;
-            return pair.first.get();
+            const fallback_font_t& pair = mFallbackFonts[i];
+            if (pair.second)
+                continue;
+            U32 gi = pair.first->getCharGlyphIndex(base);
+            if (gi)
+                return { pair.first.get(), gi };
         }
-    }
+        // No face has a glyph; caller will end up rendering a tofu via `this`.
+        return { this, 0u };
+    };
 
-    // No face has a glyph; caller will end up rendering a tofu via `this`.
-    return this;
+    const auto result = resolve();
+    mShapingFaceResolution.emplace(base, result);
+    out_glyph_index = result.second;
+    return result.first;
 }
 
 bool LLFontFreetype::faceHasGlyph(llwchar wch) const
@@ -321,6 +324,9 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     // Glyph indices in the cache are tied to the FT_Face's cmap; a reload
     // (different file or different params) invalidates them.
     mCharIndexCache.clear();
+    // Resolution cache holds glyph indices into both this face and the
+    // fallbacks, all of which are about to be re-resolved.
+    mShapingFaceResolution.clear();
 
     FT_Open_Args openArgs;
     memset( &openArgs, 0, sizeof( openArgs ) );
@@ -443,6 +449,7 @@ S32 LLFontFreetype::getNumFaces(const std::string& filename)
         mFTFace = nullptr;
     }
     mCharIndexCache.clear();
+    mShapingFaceResolution.clear();
 
     S32 num_faces = 1;
 
@@ -470,6 +477,10 @@ void LLFontFreetype::addFallbackFont(const LLPointer<LLFontFreetype>& fallback_f
                                      const char_functor_t& functor)
 {
     mFallbackFonts.emplace_back(fallback_font, functor);
+    // Resolution cache encodes the previous fallback list; new fallback may
+    // win for codepoints that previously resolved to a later face or to
+    // notdef on this face.
+    mShapingFaceResolution.clear();
 }
 
 F32 LLFontFreetype::getLineHeight() const
