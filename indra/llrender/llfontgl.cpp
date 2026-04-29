@@ -346,13 +346,19 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             r.second += begin_offset;
         }
     }
-    std::vector<std::vector<LLShapedGlyph>> shape_glyphs(shape_ranges.size());
+    // The render loop never reads sg.cluster — only glyph_id/face/advance/
+    // offset — so we can take direct const references into the shape LRU
+    // instead of going through shapeRun, which copies the entire result and
+    // rebases clusters on every render. A pointer-of-vectors lets us alias
+    // the cached storage without owning it. shapeLine references are valid
+    // until the next shape* call or clearCache, both of which can't happen
+    // inside this loop.
+    std::vector<const std::vector<LLShapedGlyph>*> shape_glyphs(shape_ranges.size(), nullptr);
     for (size_t s = 0; s < shape_ranges.size(); ++s)
     {
-        LLFontShaping::shapeRun(mFontFreetype, wstr,
-                                shape_ranges[s].first,
-                                shape_ranges[s].second,
-                                shape_glyphs[s]);
+        shape_glyphs[s] = &LLFontShaping::shapeLine(mFontFreetype, wstr,
+                                                    shape_ranges[s].first,
+                                                    shape_ranges[s].second);
     }
     size_t next_shape_run = 0;
 
@@ -366,7 +372,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             && (S32)shape_ranges[next_shape_run].first == i)
         {
             const auto  run_range  = shape_ranges[next_shape_run];
-            const auto& run_glyphs = shape_glyphs[next_shape_run];
+            const auto& run_glyphs = *shape_glyphs[next_shape_run];
             ++next_shape_run;
 
             if (!run_glyphs.empty())
