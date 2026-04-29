@@ -237,6 +237,48 @@ namespace
                 continue;
             }
 
+            // Combining marks must stay in the same HarfBuzz buffer as their
+            // preceding base for mark-to-base GPOS attachment to fire — that's
+            // what positions the mark above (or below) the base instead of
+            // landing it standalone at the pen, which produces visible
+            // collisions with the next base. If selectShapingFace would
+            // route the mark to a different face from cur_face, try to keep
+            // the base+mark cluster together rather than splitting them.
+            const auto cat = hb_unicode_general_category(uf, slice[i]);
+            const bool is_mark = (cat == HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK
+                               || cat == HB_UNICODE_GENERAL_CATEGORY_ENCLOSING_MARK
+                               || cat == HB_UNICODE_GENERAL_CATEGORY_SPACING_MARK);
+            if (is_mark && face != cur_face)
+            {
+                if (cur_face->faceHasGlyph(slice[i]))
+                {
+                    // cur_face covers the mark — shape it inline with the base.
+                    face = cur_face;
+                }
+                else
+                {
+                    // cur_face lacks the mark glyph. Migrate the in-progress
+                    // sub-run to the mark's face if it covers every base
+                    // already collected; the bases re-render with a slightly
+                    // different style but the mark gets correct positioning.
+                    bool mark_face_covers_sub_run = true;
+                    for (size_t j = cur_begin; j < i; ++j)
+                    {
+                        if (!face->faceHasGlyph(slice[j]))
+                        {
+                            mark_face_covers_sub_run = false;
+                            break;
+                        }
+                    }
+                    if (mark_face_covers_sub_run)
+                        cur_face = face;
+                    // else: neither face covers everything — fall through to
+                    // the face_change path. Mark will still render standalone,
+                    // but with no better option available the split is the
+                    // honest outcome.
+                }
+            }
+
             const bool face_change   = (face != cur_face);
             const bool script_change = !is_neutral
                                        && cur_script != HB_SCRIPT_INVALID

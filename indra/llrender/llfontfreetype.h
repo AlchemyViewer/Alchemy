@@ -229,6 +229,13 @@ public:
     // when no face has a glyph for `base`.
     const LLFontFreetype* selectShapingFace(llwchar base, U32& out_glyph_index) const;
 
+    // True if this face's FreeType charmap directly contains a glyph for
+    // `wch`. Unlike hasGlyph() (which checks the cache), this consults
+    // the underlying charmap and works on fallback faces. Used by shape
+    // itemization to decide whether a face can absorb a given codepoint
+    // without producing notdef.
+    bool faceHasGlyph(llwchar wch) const;
+
     void reset(F32 vert_dpi, F32 horz_dpi);
 
     void destroyGL();

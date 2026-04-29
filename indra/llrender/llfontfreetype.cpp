@@ -286,6 +286,13 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
     return this;
 }
 
+bool LLFontFreetype::faceHasGlyph(llwchar wch) const
+{
+    if (!mFTFace)
+        return false;
+    return FT_Get_Char_Index(mFTFace, wch) != 0;
+}
+
 bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, S32 weight, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags)
 {
     // Don't leak face objects.  This is also needed to deal with
