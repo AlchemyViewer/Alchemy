@@ -326,8 +326,10 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     // sit on the integer pixel grid; subpixel pen position would wash out
     // the hinting. Autohinted (FORCE_AUTOHINT), light-autohinted (LIGHT),
     // and unhinted (NO_HINTING) glyphs tolerate and benefit from subpixel
-    // placement.
-    mUseSubpixelPen = (hinting != EFontHinting::DEFAULT);
+    // placement. Additionally we skip subpixel positioning for color and SVG
+    // fonts since they are designed to be rendered at specific sizes and
+    // subpixel positioning can cause unwanted blurring.
+    mUseSubpixelPen = !FT_HAS_COLOR(mFTFace) && !FT_HAS_SVG(mFTFace) && (hinting != EFontHinting::DEFAULT);
 
     bool variable_font = false;
     if (weight >= 0)
