@@ -133,9 +133,24 @@ namespace
         hb_font_t* hb_font = face->getHbFont();
         if (!hb_font)
             return;
-        hb_buffer_t* buf = hb_buffer_create();
-        if (!buf)
-            return;
+
+        // Persistent shaping buffer reused across every sub-run. HarfBuzz
+        // buffers retain their internal allocations across clear_contents,
+        // so successive shape calls amortize the codepoint/glyph storage
+        // and skip the create/destroy heap traffic that ran for every face
+        // and script boundary. The shape path is main-thread only (see
+        // header), so a thread_local pointer is just defensive — there's
+        // never a second thread to contend. Leaks at process exit, which
+        // is fine for a process-lifetime cache.
+        static thread_local hb_buffer_t* sBuf = nullptr;
+        if (!sBuf)
+        {
+            sBuf = hb_buffer_create();
+            if (!sBuf)
+                return;
+        }
+        hb_buffer_t* buf = sBuf;
+        hb_buffer_clear_contents(buf);
 
         const uint32_t* codepoints = reinterpret_cast<const uint32_t*>(slice.data() + sub_begin_in_slice);
         const int       len        = static_cast<int>(sub_end_in_slice - sub_begin_in_slice);
@@ -182,8 +197,6 @@ namespace
             sg.y_offset  = positions[i].y_offset  * INV_64;
             out_glyphs.push_back(sg);
         }
-
-        hb_buffer_destroy(buf);
     }
 
     // Itemize [begin, end) into contiguous sub-runs whose codepoints share
