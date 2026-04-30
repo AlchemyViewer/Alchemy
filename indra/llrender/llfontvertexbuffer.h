@@ -102,13 +102,25 @@ private:
 
     void renderBuffers();
 
+    // Color-only cache regen path: when only the foreground color changed
+    // (geometry-affecting params unchanged), rewrite the captured color
+    // attribute streams in place via LLVertexBuffer::setColorData. Avoids the
+    // full HarfBuzz shape + per-glyph vertex build that genBuffers does. Used
+    // by the dominant hover/fade animation case in UI buttons.
+    void recolorBuffers(const LLFontGL* fontp, const LLColor4& color, LLFontGL::ShadowType shadow);
+
     // Each pass (shadow, foreground) is captured into its own list so that
     // every vertex within a list shares the same color (foreground color, or
     // derived shadow color). Splitting the captured stream by pass is the
-    // structural prerequisite for the color-only cache regen path that
-    // follows in a later commit.
+    // structural prerequisite for color-only cache regen.
     std::list<LLVertexBufferData> mShadowBufferList;
     std::list<LLVertexBufferData> mForegroundBufferList;
+    // Set during genBuffers: did any captured batch render glyphs from the
+    // color (RGBA emoji) atlas? Mixed text+emoji strings can't be recolored
+    // safely without per-entry glyph-type tracking, since emoji glyphs use a
+    // fixed (255,255,255) RGB regardless of foreground color. Mixed strings
+    // fall through to full genBuffers on color change.
+    bool mLastUsesColorAtlas = false;
     S32 mChars = 0;
     const LLFontGL *mLastFont = nullptr;
     S32 mLastOffset = 0;
@@ -136,6 +148,14 @@ private:
     S32 mLastFontCacheGen = 0;
 
     static bool sEnableBufferCollection;
+
+public:
+    // Toggle for the color-only regen fast path. When false, color changes
+    // always fall through to full genBuffers (legacy behavior). Useful for
+    // A/B comparison and bisecting any visual regression.
+    static void enableColorOnlyRegen(bool enable) { sEnableColorOnlyRegen = enable; }
+private:
+    static bool sEnableColorOnlyRegen;
 };
 
 // Extracting width from a font is expensive, and due to
