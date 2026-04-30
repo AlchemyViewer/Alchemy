@@ -380,25 +380,31 @@ void LLFontVertexBuffer::recolorBuffers(
     LLColor4U shadow_u = LLFontGL::sShadowColor;
     shadow_u.mV[VALPHA] = shadow_alpha;
 
-    thread_local std::vector<LLColor4U> color_scratch;
-
-    for (LLVertexBufferData& entry : mForegroundBufferList)
+    // Route through getColorStrider (mapVertexBuffer) instead of setColorData
+    // for the recolor write. mapVertexBuffer writes into the buffer's CPU-side
+    // shadow (mMappedData) and tracks a dirty region; the next setBuffer call
+    // (driven by buffer.draw() in renderBuffers) flushes that region to GL.
+    // setColorData would call glBufferSubData against the *currently bound*
+    // buffer, which on the non-Apple GL path is not necessarily the entry's
+    // buffer — that path corrupted unrelated UI elements' GL data when
+    // clicking between buttons.
+    auto recolor = [](std::list<LLVertexBufferData>& list, const LLColor4U& fill)
     {
-        if (entry.mVB.notNull() && entry.mCount > 0)
+        for (LLVertexBufferData& entry : list)
         {
-            color_scratch.assign(entry.mCount, fg_u);
-            entry.mVB->setColorData(color_scratch.data(), 0, entry.mCount);
+            if (entry.mVB.isNull() || entry.mCount == 0)
+                continue;
+            LLStrider<LLColor4U> colors;
+            if (!entry.mVB->getColorStrider(colors, 0, entry.mCount))
+                continue;
+            for (U32 i = 0; i < entry.mCount; ++i)
+            {
+                colors[i] = fill;
+            }
         }
-    }
-    for (LLVertexBufferData& entry : mShadowBufferList)
-    {
-        if (entry.mVB.notNull() && entry.mCount > 0)
-        {
-            color_scratch.assign(entry.mCount, shadow_u);
-            entry.mVB->setColorData(color_scratch.data(), 0, entry.mCount);
-        }
-    }
-    LLVertexBuffer::flushBuffers(); // ensure all buffers are unmapped and data is sent to GPU before rendering
+    };
+    recolor(mForegroundBufferList, fg_u);
+    recolor(mShadowBufferList, shadow_u);
 
     mLastColor = color;
 }
