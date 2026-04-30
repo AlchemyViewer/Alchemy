@@ -3471,6 +3471,21 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gUIProgram.mShaderFiles.push_back(make_pair("interface/uiF.glsl", GL_FRAGMENT_SHADER));
         gUIProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gUIProgram.createShader();
+        if (success)
+        {
+            // Initialize the shadow-path uniforms to passthrough so non-text UI
+            // and NO_SHADOW text take the early-return branch in uiF.glsl. GLSL
+            // already zero-initializes uniforms, but pushing explicit defaults
+            // documents the contract and protects against driver quirks.
+            static LLStaticHashedString sShadowMode("shadowMode");
+            static LLStaticHashedString sGrayscaleAtlas("grayscaleAtlas");
+            static LLStaticHashedString sAtlasTexelSize("atlasTexelSize");
+            gUIProgram.bind();
+            gUIProgram.uniform1i(sShadowMode, 0);
+            gUIProgram.uniform1i(sGrayscaleAtlas, 1);
+            gUIProgram.uniform2f(sAtlasTexelSize, 0.f, 0.f);
+            gUIProgram.unbind();
+        }
     }
 
     if (success)
