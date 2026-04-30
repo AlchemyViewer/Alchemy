@@ -537,8 +537,15 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                                                ? text_color : emoji_color;
                     if (needs_two_pass)
                     {
-                        drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
-                                        precomputed_shadow_color, shadow, slant_offset);
+                        // BOLD suppresses shadow per the legacy drawGlyph contract
+                        // (see FIXME at drawGlyphForeground): the bold doubled quad
+                        // and the shadow taps are mutually exclusive. drawGlyphShadow
+                        // doesn't see `style`, so gate the call here.
+                        if (!(style_to_add & BOLD))
+                        {
+                            drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                                            precomputed_shadow_color, shadow, slant_offset);
+                        }
                         deferred.push_back({screen_rect, uv_rect, bitmap_entry, col});
                     }
                     else
@@ -672,8 +679,15 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                                                             : emoji_color;
         if (needs_two_pass)
         {
-            drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
-                            precomputed_shadow_color, shadow, slant_offset);
+            // BOLD suppresses shadow per the legacy drawGlyph contract
+            // (see FIXME at drawGlyphForeground): the bold doubled quad
+            // and the shadow taps are mutually exclusive. drawGlyphShadow
+            // doesn't see `style`, so gate the call here.
+            if (!(style_to_add & BOLD))
+            {
+                drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                                precomputed_shadow_color, shadow, slant_offset);
+            }
             deferred.push_back({screen_rect, uv_rect, bitmap_entry, col});
         }
         else

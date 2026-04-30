@@ -406,6 +406,9 @@ void LLFontVertexBuffer::recolorBuffers(
     recolor(mForegroundBufferList, fg_u);
     recolor(mShadowBufferList, shadow_u);
 
+    // Ensure all buffers are unmapped and data is sent to GPU before rendering
+    LLVertexBuffer::flushBuffers();
+
     mLastColor = color;
 }
 

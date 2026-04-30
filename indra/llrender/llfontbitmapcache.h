@@ -94,13 +94,14 @@ private:
 
     S32 mBitmapWidth = 0;
     S32 mBitmapHeight = 0;
-    // 2px atlas border lets the shadow shader's ±2px tap pattern sample into
-    // zero-cleared atlas territory rather than adjacent glyph pixels. Atlases
-    // are zero-cleared on construction (line ~139 of .cpp clears grayscale to
-    // (255, 0)) so out-of-glyph samples contribute zero alpha — exactly what
-    // soft shadow's accumulator wants.
-    S32 mCurrentOffsetX[static_cast<U32>(EFontGlyphType::Count)] = { 2 };
-    S32 mCurrentOffsetY[static_cast<U32>(EFontGlyphType::Count)] = { 2 };
+    // 4px atlas border guarantees safe shadow-shader sampling: with a 2px
+    // screen-space dilation around each glyph and the asymmetric (0,2) tap
+    // sampling 2 atlas texels further, the worst-case sample reach is
+    // 4 atlas pixels from the glyph edge. Atlases are zero-cleared on
+    // construction so those out-of-glyph samples contribute zero alpha
+    // rather than picking up adjacent glyph data.
+    S32 mCurrentOffsetX[static_cast<U32>(EFontGlyphType::Count)] = { 4 };
+    S32 mCurrentOffsetY[static_cast<U32>(EFontGlyphType::Count)] = { 4 };
     S32 mMaxCharWidth = 0;
     S32 mMaxCharHeight = 0;
     S32 mGeneration = 0;
