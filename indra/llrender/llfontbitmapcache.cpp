@@ -97,17 +97,17 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32& pos_x, S32& pos_y, EFontGlyp
                                   && mImageRawVec[bitmap_idx].back().isNull();
     bool need_new_sheet = mImageRawVec[bitmap_idx].empty() || last_sheet_released;
 
-    if (!need_new_sheet && (mCurrentOffsetX[bitmap_idx] + width + 1) > mBitmapWidth)
+    if (!need_new_sheet && (mCurrentOffsetX[bitmap_idx] + width + 2) > mBitmapWidth)
     {
-        if ((mCurrentOffsetY[bitmap_idx] + 2*mMaxCharHeight + 2) > mBitmapHeight)
+        if ((mCurrentOffsetY[bitmap_idx] + 2*mMaxCharHeight + 4) > mBitmapHeight)
         {
             need_new_sheet = true;
         }
         else
         {
             // Move to next row in current image.
-            mCurrentOffsetX[bitmap_idx] = 1;
-            mCurrentOffsetY[bitmap_idx] += mMaxCharHeight + 1;
+            mCurrentOffsetX[bitmap_idx] = 2;
+            mCurrentOffsetY[bitmap_idx] += mMaxCharHeight + 2;
         }
     }
 
@@ -146,9 +146,10 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32& pos_x, S32& pos_y, EFontGlyp
         // Track per-sheet last-used time alongside the image vectors.
         mLastUsedTime[bitmap_idx].push_back(0.0);
 
-        // Start at beginning of the new image.
-        mCurrentOffsetX[bitmap_idx] = 1;
-        mCurrentOffsetY[bitmap_idx] = 1;
+        // Start at beginning of the new image. 2px border accommodates the
+        // shadow shader's ±2 sample taps (commit "shader-based shadow").
+        mCurrentOffsetX[bitmap_idx] = 2;
+        mCurrentOffsetY[bitmap_idx] = 2;
 
         // Attach corresponding GL texture. (*TODO: is this needed?)
         gGL.getTexUnit(0)->bind(image_gl);
@@ -159,7 +160,7 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32& pos_x, S32& pos_y, EFontGlyp
     pos_y = mCurrentOffsetY[bitmap_idx];
     bitmap_num = getNumBitmaps(bitmap_type) - 1;
 
-    mCurrentOffsetX[bitmap_idx] += width + 1;
+    mCurrentOffsetX[bitmap_idx] += width + 2;
     touchSheet(bitmap_type, bitmap_num);
     mGeneration++;
 
@@ -246,8 +247,8 @@ void LLFontBitmapCache::reset()
         mImageRawVec[idx].clear();
         mImageGLVec[idx].clear();
         mLastUsedTime[idx].clear();
-        mCurrentOffsetX[idx] = 1;
-        mCurrentOffsetY[idx] = 1;
+        mCurrentOffsetX[idx] = 2;
+        mCurrentOffsetY[idx] = 2;
     }
 
     mBitmapWidth = 0;

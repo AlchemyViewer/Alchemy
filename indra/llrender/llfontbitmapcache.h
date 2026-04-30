@@ -94,8 +94,13 @@ private:
 
     S32 mBitmapWidth = 0;
     S32 mBitmapHeight = 0;
-    S32 mCurrentOffsetX[static_cast<U32>(EFontGlyphType::Count)] = { 1 };
-    S32 mCurrentOffsetY[static_cast<U32>(EFontGlyphType::Count)] = { 1 };
+    // 2px atlas border lets the shadow shader's ±2px tap pattern sample into
+    // zero-cleared atlas territory rather than adjacent glyph pixels. Atlases
+    // are zero-cleared on construction (line ~139 of .cpp clears grayscale to
+    // (255, 0)) so out-of-glyph samples contribute zero alpha — exactly what
+    // soft shadow's accumulator wants.
+    S32 mCurrentOffsetX[static_cast<U32>(EFontGlyphType::Count)] = { 2 };
+    S32 mCurrentOffsetY[static_cast<U32>(EFontGlyphType::Count)] = { 2 };
     S32 mMaxCharWidth = 0;
     S32 mMaxCharHeight = 0;
     S32 mGeneration = 0;
