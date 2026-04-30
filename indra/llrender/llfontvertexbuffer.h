@@ -111,8 +111,8 @@ private:
 
     // Each pass (shadow, foreground) is captured into its own list so that
     // every vertex within a list shares the same color (foreground color, or
-    // derived shadow color). Splitting the captured stream by pass is the
-    // structural prerequisite for color-only cache regen.
+    // derived shadow color). Color-only cache regen mutates the captured
+    // color attribute streams without rebuilding geometry.
     std::list<LLVertexBufferData> mShadowBufferList;
     std::list<LLVertexBufferData> mForegroundBufferList;
     // Set during genBuffers: did any captured batch render glyphs from the
@@ -121,6 +121,16 @@ private:
     // fixed (255,255,255) RGB regardless of foreground color. Mixed strings
     // fall through to full genBuffers on color change.
     bool mLastUsesColorAtlas = false;
+
+    // Snapshot of LLFontGL::sEnableShaderShadow at genBuffers time. Required
+    // because LLVertexBufferData doesn't capture shader uniforms; renderBuffers
+    // must re-push shadowMode / atlasTexelSize before replaying mShadowBufferList
+    // and reset shadowMode = 0 before mForegroundBufferList. If the static flag
+    // flips between gen and replay, the captured stream still replays with the
+    // shader state it was built for.
+    bool mLastUsedShaderShadow = false;
+    F32  mLastAtlasTexelW = 0.f;
+    F32  mLastAtlasTexelH = 0.f;
     S32 mChars = 0;
     const LLFontGL *mLastFont = nullptr;
     S32 mLastOffset = 0;

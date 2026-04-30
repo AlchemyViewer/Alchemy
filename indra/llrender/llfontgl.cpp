@@ -36,6 +36,7 @@
 #include "llfontregistry.h"
 #include "llfontshaping.h"
 #include "llgl.h"
+#include "llglslshader.h"
 #include "llimagegl.h"
 #include "llrender.h"
 #include "llstl.h"
@@ -65,6 +66,7 @@ bool LLFontGL::sDisplayFont = true ;
 std::string LLFontGL::sAppDir;
 
 LLColor4 LLFontGL::sShadowColor(0.f, 0.f, 0.f, 1.f);
+bool     LLFontGL::sEnableShaderShadow = true;
 LLFontRegistry* LLFontGL::sFontRegistry = NULL;
 
 LLCoordGL LLFontGL::sCurOrigin;
@@ -292,6 +294,30 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // Todo: Perhaps value should update after symbols were added?
     F32 inv_width = 1.f / font_bitmap_cache->getBitmapWidth();
     F32 inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
+
+    // Shader-shadow uniforms are pushed once before pass A starts and reset
+    // to passthrough (shadowMode = 0) before pass B's foreground emission.
+    // Captured into mShadowBufferList only by virtue of the shadow geometry
+    // they're set for; LLFontVertexBuffer::renderBuffers re-pushes the same
+    // values on cache replay since LLVertexBufferData doesn't capture
+    // uniforms. Skipped when sEnableShaderShadow is off (legacy multi-quad
+    // emission still drives shadow geometry — shader stays at shadowMode=0).
+    const bool push_shader_shadow_uniforms =
+        sEnableShaderShadow && (shadow != NO_SHADOW) && LLGLSLShader::sCurBoundShaderPtr;
+    static const LLStaticHashedString sShadowMode("shadowMode");
+    static const LLStaticHashedString sAtlasTexelSize("atlasTexelSize");
+    static const LLStaticHashedString sGrayscaleAtlas("grayscaleAtlas");
+    if (push_shader_shadow_uniforms)
+    {
+        const int mode = (shadow == DROP_SHADOW) ? 1 : 2; // SOFT
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, mode);
+        LLGLSLShader::sCurBoundShaderPtr->uniform2f(sAtlasTexelSize, inv_width, inv_height);
+        // Per-batch atlas type would be needed for correct mixed-atlas shadow
+        // sampling; for now treat all shadowed strings as grayscale text.
+        // Mixed text+emoji shadows may sample the wrong channel — acceptable
+        // limitation while sEnableShaderShadow is opt-in.
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sGrayscaleAtlas, 1);
+    }
 
     const S32 LAST_CHARACTER = LLFontFreetype::LAST_CHAR_FULL;
 
@@ -698,6 +724,14 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         if (on_pass_boundary)
         {
             on_pass_boundary();
+        }
+
+        // Reset shadowMode for foreground emission. Pass B's flushes (and any
+        // subsequent UI rendering) take the shader's default-passthrough
+        // branch.
+        if (push_shader_shadow_uniforms)
+        {
+            LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, 0);
         }
 
         // Pass B: emit foreground geometry from deferred metadata. Reset the
@@ -1946,6 +1980,32 @@ void LLFontGL::drawGlyphShadow(S32& glyph_count, LLVector4a* vertex_out, LLVecto
 {
     if (shadow == NO_SHADOW)
     {
+        return;
+    }
+
+    if (sEnableShaderShadow)
+    {
+        // Shader-based shadow: emit a single dilated quad. uiF.glsl with
+        // shadowMode > 0 takes 2 (DROP) or 5 (SOFT) atlas taps and accumulates
+        // alpha as max() to reproduce the multi-quad coverage profile. The
+        // dilated screen rect grows by 2px on each side to host the ±2px tap
+        // pattern; the dilated UV rect grows by 2 atlas texels (callers fill
+        // the slot's surrounding 2px atlas border with zeros via the atlas
+        // padding bump in llfontbitmapcache, so out-of-glyph samples
+        // contribute zero alpha).
+        LLRectf dilated_screen(screen_rect.mLeft - 2.f, screen_rect.mTop + 2.f,
+                               screen_rect.mRight + 2.f, screen_rect.mBottom - 2.f);
+        // Atlas texel size mirrors the (mTop - mBottom) / height ratio used
+        // elsewhere; rather than thread inv_width/inv_height into this leaf
+        // function, derive the per-axis texel size from the rect itself.
+        const F32 uv_per_px_x = (uv_rect.mRight - uv_rect.mLeft) / (screen_rect.mRight - screen_rect.mLeft);
+        const F32 uv_per_px_y = (uv_rect.mTop - uv_rect.mBottom) / (screen_rect.mTop - screen_rect.mBottom);
+        LLRectf dilated_uv(uv_rect.mLeft - 2.f * uv_per_px_x,
+                           uv_rect.mTop + 2.f * uv_per_px_y,
+                           uv_rect.mRight + 2.f * uv_per_px_x,
+                           uv_rect.mBottom - 2.f * uv_per_px_y);
+        renderTriangle(&vertex_out[glyph_count * 6], &uv_out[glyph_count * 6], &colors_out[glyph_count * 6], dilated_screen, dilated_uv, shadow_color, slant_offset);
+        glyph_count++;
         return;
     }
 

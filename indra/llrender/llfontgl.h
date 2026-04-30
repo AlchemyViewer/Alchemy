@@ -232,6 +232,15 @@ public:
 
     static LLColor4 sShadowColor;
 
+    // Shader-based shadow expansion: emit 1 dilated shadow quad per glyph and
+    // let the fragment shader take 5 atlas taps instead of emitting 5 quads
+    // per glyph from the CPU. Reduces DROP_SHADOW_SOFT geometry from 6 quads
+    // per glyph to 2, cutting batch flush amplification by ~3x. Off by default
+    // until per-atlas-type shader uniform plumbing is stable on mixed
+    // text+emoji strings; flip via LLFontGL::enableShaderShadow().
+    static bool sEnableShaderShadow;
+    static void enableShaderShadow(bool enable) { sEnableShaderShadow = enable; }
+
     static F32 sVertDPI;
     static F32 sHorizDPI;
     static F32 sScaleX;

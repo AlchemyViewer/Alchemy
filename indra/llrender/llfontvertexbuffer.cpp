@@ -30,7 +30,9 @@
 
 #include "llfontbitmapcache.h"
 #include "llfontfreetype.h"
+#include "llglslshader.h"
 #include "llimagegl.h"
+#include "llrender.h"
 #include "llvertexbuffer.h"
 
 #include "llmath.h"  // clamp_rescale
@@ -250,6 +252,26 @@ void LLFontVertexBuffer::genBuffers(
     // so will need to rerender previous characters
     mLastFontCacheGen = fontp->getCacheGeneration();
 
+    // Snapshot shader-shadow state for the cache. The static flag could flip
+    // between gen and replay, so we cache it alongside the captured streams
+    // and use the snapshot in renderBuffers.
+    mLastUsedShaderShadow = LLFontGL::sEnableShaderShadow && (shadow != LLFontGL::NO_SHADOW);
+    mLastAtlasTexelW = 0.f;
+    mLastAtlasTexelH = 0.f;
+    if (mLastUsedShaderShadow)
+    {
+        if (const LLFontFreetype* face = fontp->getFontFreetype())
+        {
+            if (const LLFontBitmapCache* cache = face->getFontBitmapCache())
+            {
+                const F32 w = (F32)cache->getBitmapWidth();
+                const F32 h = (F32)cache->getBitmapHeight();
+                mLastAtlasTexelW = (w > 0.f) ? 1.f / w : 0.f;
+                mLastAtlasTexelH = (h > 0.f) ? 1.f / h : 0.f;
+            }
+        }
+    }
+
     // Two-pass capture: pass A (shadow geometry) lands in mShadowBufferList,
     // pass B (foreground geometry) lands in mForegroundBufferList. The
     // pass-boundary callback runs at the seam between the two passes inside
@@ -376,6 +398,7 @@ void LLFontVertexBuffer::recolorBuffers(
             entry.mVB->setColorData(color_scratch.data(), 0, entry.mCount);
         }
     }
+    LLVertexBuffer::flushBuffers(); // ensure all buffers are unmapped and data is sent to GPU before rendering
 
     mLastColor = color;
 }
@@ -399,9 +422,24 @@ void LLFontVertexBuffer::renderBuffers()
     // Shadow first (under), foreground second (over). Pass-boundary order matches
     // the original interleaved-per-glyph emission's net visual stacking — shadow
     // contributions sit beneath glyph foregrounds rather than between them.
+    static const LLStaticHashedString sShadowMode("shadowMode");
+    static const LLStaticHashedString sAtlasTexelSize("atlasTexelSize");
+    static const LLStaticHashedString sGrayscaleAtlas("grayscaleAtlas");
+
+    if (mLastUsedShaderShadow && LLGLSLShader::sCurBoundShaderPtr)
+    {
+        const int mode = (mLastShadow == LLFontGL::DROP_SHADOW) ? 1 : 2; // SOFT
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, mode);
+        LLGLSLShader::sCurBoundShaderPtr->uniform2f(sAtlasTexelSize, mLastAtlasTexelW, mLastAtlasTexelH);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sGrayscaleAtlas, 1);
+    }
     for (LLVertexBufferData& buffer : mShadowBufferList)
     {
         buffer.draw();
+    }
+    if (mLastUsedShaderShadow && LLGLSLShader::sCurBoundShaderPtr)
+    {
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, 0);
     }
     for (LLVertexBufferData& buffer : mForegroundBufferList)
     {
