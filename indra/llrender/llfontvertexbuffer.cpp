@@ -46,7 +46,8 @@ void LLFontVertexBuffer::reset()
 {
     // Todo: some form of debug only frequecy check&assert to see if this is happening too often.
     // Regenerating this list is expensive
-    mBufferList.clear();
+    mShadowBufferList.clear();
+    mForegroundBufferList.clear();
 }
 
 S32 LLFontVertexBuffer::render(
@@ -126,7 +127,7 @@ S32 LLFontVertexBuffer::render(
         // For debug purposes and performance testing
         return fontp->render(text, begin_offset, x, y, color, halign, valign, style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
     }
-    if (mBufferList.empty())
+    if (mShadowBufferList.empty() && mForegroundBufferList.empty())
     {
         genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
             style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
@@ -179,14 +180,34 @@ void LLFontVertexBuffer::genBuffers(
     bool use_color)
 {
     // todo: add a debug build assert if this triggers too often for to long?
-    mBufferList.clear();
+    mShadowBufferList.clear();
+    mForegroundBufferList.clear();
     // Save before rendreing, it can change mid-render,
     // so will need to rerender previous characters
     mLastFontCacheGen = fontp->getCacheGeneration();
 
-    gGL.beginList(&mBufferList);
+    // Two-pass capture: pass A (shadow geometry) lands in mShadowBufferList,
+    // pass B (foreground geometry) lands in mForegroundBufferList. The
+    // pass-boundary callback runs at the seam between the two passes inside
+    // LLFontGL::render. For NO_SHADOW renders, fontp->render emits only the
+    // foreground stream and never invokes the callback; mShadowBufferList
+    // stays empty.
+    LLFontGL::pass_boundary_cb_t pass_boundary;
+    if (shadow != LLFontGL::NO_SHADOW)
+    {
+        gGL.beginList(&mShadowBufferList);
+        pass_boundary = [this]()
+        {
+            gGL.endList();
+            gGL.beginList(&mForegroundBufferList);
+        };
+    }
+    else
+    {
+        gGL.beginList(&mForegroundBufferList);
+    }
     mChars = fontp->render(text, begin_offset, x, y, color, halign, valign,
-        style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
+        style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color, pass_boundary);
     gGL.endList();
 
     mLastFont = fontp;
@@ -230,7 +251,14 @@ void LLFontVertexBuffer::renderBuffers()
     // Note: ellipses should technically be covered by push/load/translate of their own
     // but it's more complexity, values do not change, skipping doesn't appear to break
     // anything, so we can skip that until it proves to cause issues.
-    for (LLVertexBufferData& buffer : mBufferList)
+    // Shadow first (under), foreground second (over). Pass-boundary order matches
+    // the original interleaved-per-glyph emission's net visual stacking — shadow
+    // contributions sit beneath glyph foregrounds rather than between them.
+    for (LLVertexBufferData& buffer : mShadowBufferList)
+    {
+        buffer.draw();
+    }
+    for (LLVertexBufferData& buffer : mForegroundBufferList)
     {
         buffer.draw();
     }

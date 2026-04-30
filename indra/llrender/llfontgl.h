@@ -91,6 +91,7 @@ public:
 
     S32 getNumFaces(const std::string& filename);
     S32 getCacheGeneration() const;
+    const LLFontFreetype* getFontFreetype() const { return mFontFreetype.get(); }
 
     S32 render(const LLWString &text, S32 begin_offset,
                 const LLRect& rect,
@@ -112,6 +113,13 @@ public:
                 bool use_ellipses = false,
                 bool use_color = true) const;
 
+    // on_pass_boundary, if non-null, is invoked once between the shadow pass and
+    // the foreground pass when shadow != NO_SHADOW. LLFontVertexBuffer uses it to
+    // close one captured display list and open another so each pass lands in its
+    // own list with a uniform color across all vertices — a prerequisite for
+    // color-only cache regeneration. For NO_SHADOW renders the callback is not
+    // invoked (single-pass).
+    typedef std::function<void()> pass_boundary_cb_t;
     S32 render(const LLWString &text, S32 begin_offset,
                 F32 x, F32 y,
                 const LLColor4 &color,
@@ -120,7 +128,8 @@ public:
                 S32 max_chars = S32_MAX, S32 max_pixels = S32_MAX,
                 F32* right_x=NULL,
                 bool use_ellipses = false,
-                bool use_color = true) const;
+                bool use_color = true,
+                pass_boundary_cb_t on_pass_boundary = nullptr) const;
 
     S32 render(const LLWString &text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color) const;
 
@@ -243,7 +252,13 @@ private:
     LLPointer<LLFontFreetype> mFontFreetype;
 
     void renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, F32 slant_amt) const;
-    void drawGlyph(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, U8 style, ShadowType shadow, F32 drop_shadow_fade) const;
+    void drawGlyph(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, const LLColor4U& shadow_color, U8 style, ShadowType shadow) const;
+    // Caller hoists shadow_color and italic slant_offset out of the glyph loop and
+    // selects which half to emit. drawGlyphShadow is a no-op for NO_SHADOW or BOLD
+    // (bold and shadow are mutually exclusive). drawGlyphForeground emits the BOLD
+    // double-quad when style has BOLD set, otherwise a single quad.
+    void drawGlyphShadow(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& shadow_color, ShadowType shadow, F32 slant_offset) const;
+    void drawGlyphForeground(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, U8 style, F32 slant_offset) const;
 
     // Registry holds all instantiated fonts.
     static LLFontRegistry* sFontRegistry;

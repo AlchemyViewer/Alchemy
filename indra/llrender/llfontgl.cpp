@@ -152,7 +152,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRectf& rec
 
 
 S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
-                     ShadowType shadow, S32 max_chars, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color) const
+                     ShadowType shadow, S32 max_chars, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color, pass_boundary_cb_t on_pass_boundary) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
@@ -180,7 +180,14 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // style bits that are drawn by the underlying Freetype font
     U8 style_to_add = (style | mFontDescriptor.getStyle()) & ~mFontFreetype->getStyle();
 
+    // Shadow alpha and shadow type both depend only on per-render-call inputs
+    // (foreground luminance, foreground alpha, requested shadow style). Compute
+    // them once here so drawGlyph stays in the per-glyph hot path with no
+    // luminance/alpha math. Shadow RGB is always sShadowColor (essentially black);
+    // only alpha varies.
     F32 drop_shadow_strength = 0.f;
+    LLColor4U precomputed_shadow_color = LLFontGL::sShadowColor;
+    precomputed_shadow_color.mV[VALPHA] = 0;
     if (shadow != NO_SHADOW)
     {
         F32 luminance;
@@ -189,6 +196,12 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         if (luminance < 0.35f)
         {
             shadow = NO_SHADOW;
+        }
+        else
+        {
+            const F32 soft_scale = (shadow == DROP_SHADOW_SOFT) ? DROP_SHADOW_SOFT_STRENGTH : 1.0f;
+            const LLColor4U fg_u(color);
+            precomputed_shadow_color.mV[VALPHA] = U8(fg_u.mV[VALPHA] * drop_shadow_strength * soft_scale);
         }
     }
 
@@ -309,6 +322,34 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     static thread_local LLVector4a vertices[GLYPH_BATCH_SIZE * 6];
     static thread_local LLVector2 uvs[GLYPH_BATCH_SIZE * 6];
     static thread_local LLColor4U colors[GLYPH_BATCH_SIZE * 6];
+
+    // Italic slant_offset depends only on style; hoist it out of the per-glyph
+    // path so drawGlyphShadow/drawGlyphForeground don't recompute it.
+    const F32 slant_offset = (style_to_add & ITALIC) ? (-mFontFreetype->getAscenderHeight() * 0.2f) : 0.f;
+
+    // Two-pass split when the caller asked for a shadow: pass A walks the
+    // string and emits shadow geometry (or nothing, when the luminance gate
+    // above force-disabled it) plus per-glyph metadata into `deferred`; pass B
+    // walks `deferred` and emits foreground geometry. The boundary callback
+    // (if any) fires between the passes so LLFontVertexBuffer can swap capture
+    // lists, giving each pass its own captured stream with a uniform color
+    // across all vertices — the structural prerequisite for color-only cache
+    // regen. We key on the *original* requested shadow type so the callback
+    // contract matches genBuffers' list setup; dark text just emits an empty
+    // shadow pass.
+    const bool needs_two_pass = (on_pass_boundary != nullptr) || (shadow != NO_SHADOW);
+    struct DeferredGlyph
+    {
+        LLRectf screen_rect;
+        LLRectf uv_rect;
+        std::pair<EFontGlyphType, S32> bitmap_entry;
+        LLColor4U color;
+    };
+    std::vector<DeferredGlyph> deferred;
+    if (needs_two_pass)
+    {
+        deferred.reserve(length);
+    }
 
     LLColor4U text_color(color);
     // Preserve the transparency to render fading emojis in fading text (e.g.
@@ -468,8 +509,17 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
                     const LLColor4U& col = bitmap_entry.first == EFontGlyphType::Grayscale
                                                ? text_color : emoji_color;
-                    drawGlyph(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
-                              col, style_to_add, shadow, drop_shadow_strength);
+                    if (needs_two_pass)
+                    {
+                        drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                                        precomputed_shadow_color, shadow, slant_offset);
+                        deferred.push_back({screen_rect, uv_rect, bitmap_entry, col});
+                    }
+                    else
+                    {
+                        drawGlyphForeground(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                                            col, style_to_add, slant_offset);
+                    }
 
                     cur_x += sg.x_advance;
                     cur_y += sg.y_advance;
@@ -594,8 +644,17 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         const LLColor4U& col =
             bitmap_entry.first == EFontGlyphType::Grayscale ? text_color
                                                             : emoji_color;
-        drawGlyph(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
-                  col, style_to_add, shadow, drop_shadow_strength);
+        if (needs_two_pass)
+        {
+            drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                            precomputed_shadow_color, shadow, slant_offset);
+            deferred.push_back({screen_rect, uv_rect, bitmap_entry, col});
+        }
+        else
+        {
+            drawGlyphForeground(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                                col, style_to_add, slant_offset);
+        }
 
         chars_drawn++;
         cur_x += fgi->mXAdvance;
@@ -621,12 +680,64 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         cur_render_y = cur_y;
     }
 
+    // End-of-pass flush. In single-pass mode this drains the foreground batch
+    // and we're done. In two-pass mode this drains the shadow batch; pass B
+    // below then walks the deferred metadata to emit foreground geometry.
     gGL.begin(LLRender::TRIANGLES);
     {
         gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
     }
     gGL.end();
+    glyph_count = 0;
 
+    if (needs_two_pass)
+    {
+        // Pass-boundary callback: LLFontVertexBuffer uses this to close the
+        // shadow capture list and open the foreground capture list. With no
+        // callback this is a no-op (direct callers don't need separate lists).
+        if (on_pass_boundary)
+        {
+            on_pass_boundary();
+        }
+
+        // Pass B: emit foreground geometry from deferred metadata. Reset the
+        // atlas-binding tracker; the first deferred glyph forces a (possibly
+        // redundant, GL-driver-cheap) rebind to begin the foreground stream.
+        bitmap_entry = std::make_pair(EFontGlyphType::Grayscale, -1);
+        for (const DeferredGlyph& dg : deferred)
+        {
+            if (dg.bitmap_entry != bitmap_entry)
+            {
+                if (glyph_count > 0)
+                {
+                    gGL.begin(LLRender::TRIANGLES);
+                    gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
+                    gGL.end();
+                    glyph_count = 0;
+                }
+                bitmap_entry = dg.bitmap_entry;
+                LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
+                gGL.getTexUnit(0)->bind(font_image);
+            }
+
+            if (glyph_count >= GLYPH_BATCH_SIZE)
+            {
+                gGL.begin(LLRender::TRIANGLES);
+                gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
+                gGL.end();
+                glyph_count = 0;
+            }
+
+            drawGlyphForeground(glyph_count, vertices, uvs, colors,
+                                dg.screen_rect, dg.uv_rect,
+                                dg.color, style_to_add, slant_offset);
+        }
+
+        gGL.begin(LLRender::TRIANGLES);
+        gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
+        gGL.end();
+        glyph_count = 0;
+    }
 
     if (right_x)
     {
@@ -1831,28 +1942,15 @@ void LLFontGL::renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor
     colors_out[index] = color;
 }
 
-void LLFontGL::drawGlyph(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, U8 style, ShadowType shadow, F32 drop_shadow_strength) const
+void LLFontGL::drawGlyphShadow(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& shadow_color, ShadowType shadow, F32 slant_offset) const
 {
-    F32 slant_offset;
-    slant_offset = ((style & ITALIC) ? ( -mFontFreetype->getAscenderHeight() * 0.2f) : 0.f);
-
-    //FIXME: bold and drop shadow are mutually exclusive only for convenience
-    //Allow both when we need them.
-    if (style & BOLD)
+    if (shadow == NO_SHADOW)
     {
-        for (S32 pass = 0; pass < 2; pass++)
-        {
-            LLRectf screen_rect_offset = screen_rect;
-
-            screen_rect_offset.translate((F32)(pass * BOLD_OFFSET), 0.f);
-            renderTriangle(&vertex_out[glyph_count * 6], &uv_out[glyph_count * 6], &colors_out[glyph_count * 6], screen_rect_offset, uv_rect, color, slant_offset);
-            glyph_count++;
-        }
+        return;
     }
-    else if (shadow == DROP_SHADOW_SOFT)
+
+    if (shadow == DROP_SHADOW_SOFT)
     {
-        LLColor4U shadow_color = LLFontGL::sShadowColor;
-        shadow_color.mV[VALPHA] = U8(color.mV[VALPHA] * drop_shadow_strength * DROP_SHADOW_SOFT_STRENGTH);
         for (S32 pass = 0; pass < 5; pass++)
         {
             LLRectf screen_rect_offset = screen_rect;
@@ -1879,23 +1977,46 @@ void LLFontGL::drawGlyph(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv
             renderTriangle(&vertex_out[glyph_count * 6], &uv_out[glyph_count * 6], &colors_out[glyph_count * 6], screen_rect_offset, uv_rect, shadow_color, slant_offset);
             glyph_count++;
         }
-        renderTriangle(&vertex_out[glyph_count * 6], &uv_out[glyph_count * 6], &colors_out[glyph_count * 6], screen_rect, uv_rect, color, slant_offset);
-        glyph_count++;
     }
-    else if (shadow == DROP_SHADOW)
+    else // shadow == DROP_SHADOW
     {
-        LLColor4U shadow_color = LLFontGL::sShadowColor;
-        shadow_color.mV[VALPHA] = U8(color.mV[VALPHA] * drop_shadow_strength);
         LLRectf screen_rect_shadow = screen_rect;
         screen_rect_shadow.translate(1.f, -1.f);
         renderTriangle(&vertex_out[glyph_count * 6], &uv_out[glyph_count * 6], &colors_out[glyph_count * 6], screen_rect_shadow, uv_rect, shadow_color, slant_offset);
         glyph_count++;
-        renderTriangle(&vertex_out[glyph_count * 6], &uv_out[glyph_count * 6], &colors_out[glyph_count * 6], screen_rect, uv_rect, color, slant_offset);
-        glyph_count++;
     }
-    else // normal rendering
+}
+
+void LLFontGL::drawGlyphForeground(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, U8 style, F32 slant_offset) const
+{
+    //FIXME: bold and drop shadow are mutually exclusive only for convenience
+    //Allow both when we need them.
+    if (style & BOLD)
+    {
+        for (S32 pass = 0; pass < 2; pass++)
+        {
+            LLRectf screen_rect_offset = screen_rect;
+
+            screen_rect_offset.translate((F32)(pass * BOLD_OFFSET), 0.f);
+            renderTriangle(&vertex_out[glyph_count * 6], &uv_out[glyph_count * 6], &colors_out[glyph_count * 6], screen_rect_offset, uv_rect, color, slant_offset);
+            glyph_count++;
+        }
+    }
+    else
     {
         renderTriangle(&vertex_out[glyph_count * 6], &uv_out[glyph_count * 6], &colors_out[glyph_count * 6], screen_rect, uv_rect, color, slant_offset);
         glyph_count++;
     }
+}
+
+void LLFontGL::drawGlyph(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, const LLColor4U& shadow_color, U8 style, ShadowType shadow) const
+{
+    const F32 slant_offset = ((style & ITALIC) ? (-mFontFreetype->getAscenderHeight() * 0.2f) : 0.f);
+
+    // Bold paths skip shadow per the FIXME above; shadow paths skip bold.
+    if (!(style & BOLD))
+    {
+        drawGlyphShadow(glyph_count, vertex_out, uv_out, colors_out, screen_rect, uv_rect, shadow_color, shadow, slant_offset);
+    }
+    drawGlyphForeground(glyph_count, vertex_out, uv_out, colors_out, screen_rect, uv_rect, color, style, slant_offset);
 }

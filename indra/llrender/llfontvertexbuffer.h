@@ -102,7 +102,13 @@ private:
 
     void renderBuffers();
 
-    std::list<LLVertexBufferData> mBufferList;
+    // Each pass (shadow, foreground) is captured into its own list so that
+    // every vertex within a list shares the same color (foreground color, or
+    // derived shadow color). Splitting the captured stream by pass is the
+    // structural prerequisite for the color-only cache regen path that
+    // follows in a later commit.
+    std::list<LLVertexBufferData> mShadowBufferList;
+    std::list<LLVertexBufferData> mForegroundBufferList;
     S32 mChars = 0;
     const LLFontGL *mLastFont = nullptr;
     S32 mLastOffset = 0;
