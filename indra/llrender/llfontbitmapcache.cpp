@@ -81,7 +81,7 @@ LLImageGL *LLFontBitmapCache::getImageGL(EFontGlyphType bitmap_type, U32 bitmap_
 }
 
 
-bool LLFontBitmapCache::nextOpenPos(S32 width, S32& pos_x, S32& pos_y, EFontGlyphType bitmap_type, U32& bitmap_num)
+bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_y, EFontGlyphType bitmap_type, U32& bitmap_num)
 {
     if (bitmap_type >= EFontGlyphType::Count)
     {
@@ -99,7 +99,14 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32& pos_x, S32& pos_y, EFontGlyp
 
     if (!need_new_sheet && (mCurrentOffsetX[bitmap_idx] + width + 4) > mBitmapWidth)
     {
-        if ((mCurrentOffsetY[bitmap_idx] + 2*mMaxCharHeight + 8) > mBitmapHeight)
+        // Y advance must clear the tallest glyph already placed in this row,
+        // not just mMaxCharHeight (which is derived from the font's outline
+        // bbox and underestimates color-emoji strike heights). Likewise the
+        // "fits another row?" check uses the new glyph's own height to be
+        // sure it won't run off the bottom.
+        const S32 row_step = llmax(mMaxCharHeight, mCurrentRowMaxHeight[bitmap_idx]);
+        const S32 next_row_height = llmax(mMaxCharHeight, height);
+        if ((mCurrentOffsetY[bitmap_idx] + row_step + next_row_height + 8) > mBitmapHeight)
         {
             need_new_sheet = true;
         }
@@ -107,7 +114,8 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32& pos_x, S32& pos_y, EFontGlyp
         {
             // Move to next row in current image.
             mCurrentOffsetX[bitmap_idx] = 4;
-            mCurrentOffsetY[bitmap_idx] += mMaxCharHeight + 4;
+            mCurrentOffsetY[bitmap_idx] += row_step + 4;
+            mCurrentRowMaxHeight[bitmap_idx] = 0;
         }
     }
 
@@ -152,6 +160,7 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32& pos_x, S32& pos_y, EFontGlyp
         // in zero-cleared territory rather than adjacent glyph data.
         mCurrentOffsetX[bitmap_idx] = 4;
         mCurrentOffsetY[bitmap_idx] = 4;
+        mCurrentRowMaxHeight[bitmap_idx] = 0;
 
         // Attach corresponding GL texture. (*TODO: is this needed?)
         gGL.getTexUnit(0)->bind(image_gl);
@@ -163,6 +172,10 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32& pos_x, S32& pos_y, EFontGlyp
     bitmap_num = getNumBitmaps(bitmap_type) - 1;
 
     mCurrentOffsetX[bitmap_idx] += width + 4;
+    // Track tallest glyph placed in the current row so the next Y advance
+    // clears it, even when the glyph is taller than mMaxCharHeight.
+    if (height > mCurrentRowMaxHeight[bitmap_idx])
+        mCurrentRowMaxHeight[bitmap_idx] = height;
     touchSheet(bitmap_type, bitmap_num);
     mGeneration++;
 
@@ -251,6 +264,7 @@ void LLFontBitmapCache::reset()
         mLastUsedTime[idx].clear();
         mCurrentOffsetX[idx] = 4;
         mCurrentOffsetY[idx] = 4;
+        mCurrentRowMaxHeight[idx] = 0;
     }
 
     mBitmapWidth = 0;

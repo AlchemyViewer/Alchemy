@@ -701,8 +701,10 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
         // Allocate the slot in the *source* face's atlas. Today's call site
         // wrote to the head's atlas; after the move every glyph rasterized
         // through fontp lives in fontp->mFace's shared atlas, so heads with
-        // a common fallback face share these slots.
-        fontp->getBitmapCache()->nextOpenPos(width, pos_x, pos_y, bitmap_glyph_type, bitmap_num);
+        // a common fallback face share these slots. Pass height so the
+        // allocator can advance Y past tall color-emoji bitmaps even when
+        // mMaxCharHeight (derived from the outline bbox) underestimates them.
+        fontp->getBitmapCache()->nextOpenPos(width, height, pos_x, pos_y, bitmap_glyph_type, bitmap_num);
 
         LLFontGlyphInfo::PhaseSlot& slot = gi->mPhaseSlots[phase];
         slot.mXBitmapOffset = pos_x;

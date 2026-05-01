@@ -56,7 +56,14 @@ public:
 
     void reset();
 
-    bool nextOpenPos(S32 width, S32& posX, S32& posY, EFontGlyphType bitmapType, U32& bitmapNum);
+    // Reserve an atlas slot of (width, height). The cache advances its X
+    // pen by `width`; height drives the Y pen step when the row fills.
+    // Passing the actual rasterized glyph height (rather than relying on
+    // the font's bbox-derived mMaxCharHeight) is necessary for SBIX/SVG
+    // color-emoji fonts whose strike bitmaps are much taller than the
+    // outline bbox suggests — using the bbox alone leaves later rows
+    // overwriting earlier rows in the atlas.
+    bool nextOpenPos(S32 width, S32 height, S32& posX, S32& posY, EFontGlyphType bitmapType, U32& bitmapNum);
 
     void destroyGL();
 
@@ -104,8 +111,16 @@ private:
     // 4 atlas pixels from the glyph edge. Atlases are zero-cleared on
     // construction so those out-of-glyph samples contribute zero alpha
     // rather than picking up adjacent glyph data.
-    S32 mCurrentOffsetX[static_cast<U32>(EFontGlyphType::Count)] = { 4 };
-    S32 mCurrentOffsetY[static_cast<U32>(EFontGlyphType::Count)] = { 4 };
+    // (Note: array initializer applies the brace value to every element —
+    // earlier `= { 4 }` form set only [0] to 4 and silently zero-init'd [1].
+    // That was a real bug for Color atlases — they started at offset 0.)
+    S32 mCurrentOffsetX[static_cast<U32>(EFontGlyphType::Count)] = { 4, 4 };
+    S32 mCurrentOffsetY[static_cast<U32>(EFontGlyphType::Count)] = { 4, 4 };
+    // Tallest glyph height placed in the current row, per atlas type.
+    // Drives the Y pen advance when the row fills, so rows with mixed
+    // glyph heights (text + tall color emoji bitmaps) don't have later
+    // rows overwriting earlier rows.
+    S32 mCurrentRowMaxHeight[static_cast<U32>(EFontGlyphType::Count)] = { 0, 0 };
     S32 mMaxCharWidth = 0;
     S32 mMaxCharHeight = 0;
     S32 mGeneration = 0;
