@@ -11,7 +11,9 @@
 
 #include "llfontface.h"
 
-#include "llfontfreetype.h"  // for LLFontManager (gFontManagerp), EFontHinting, ll::fonts::LoadedFont
+#include "llfontfreetype.h"   // for LLFontGlyphInfo, LLFontManager, ll::fonts::LoadedFont
+#include "llfontregistry.h"   // for EFontHinting full definition
+#include "llimage.h"          // LLImageRaw, LLImageDataLock
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -20,15 +22,26 @@
 #include <hb.h>
 #include <hb-ft.h>
 
+#include <algorithm>
+
 extern FT_Library gFTLibrary;
 
 LLFontFace::LLFontFace()
-:   mHinting(static_cast<EFontHinting>(0))
+:   mHinting(static_cast<EFontHinting>(0)),
+    mFontBitmapCachep(new LLFontBitmapCache)
 {
 }
 
 LLFontFace::~LLFontFace()
 {
+    // Free LLFontGlyphInfo entries — owned by this face's caches.
+    for (auto& entry : mCharGlyphInfoMap)
+        delete entry.second;
+    mCharGlyphInfoMap.clear();
+    for (auto& entry : mShapedGlyphInfoMap)
+        delete entry.second;
+    mShapedGlyphInfoMap.clear();
+
     if (mHbFont)
     {
         // hb_ft_font_create_referenced retained mFTFace; destroying the
@@ -41,6 +54,8 @@ LLFontFace::~LLFontFace()
         FT_Done_Face(mFTFace);
         mFTFace = nullptr;
     }
+    delete mFontBitmapCachep;
+    mFontBitmapCachep = nullptr;
 }
 
 bool LLFontFace::load(const std::string& filename, S32 face_index,
@@ -99,7 +114,163 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
         FT_Set_Charmap(mFTFace, mFTFace->charmaps[0]);
     }
 
+    // Size the bitmap atlas from the just-set face metrics. Same calculation
+    // as the legacy LLFontFreetype::loadFace did, just on the wrapper now.
+    F32 pixels_per_em   = (point_size / 72.f) * vert_dpi;
+    F32 ems_per_unit    = 1.f / mFTFace->units_per_EM;
+    F32 pixels_per_unit = pixels_per_em * ems_per_unit;
+
+    F32 y_max = mFTFace->bbox.yMax * pixels_per_unit;
+    F32 y_min = mFTFace->bbox.yMin * pixels_per_unit;
+    F32 x_max = mFTFace->bbox.xMax * pixels_per_unit;
+    F32 x_min = mFTFace->bbox.xMin * pixels_per_unit;
+    S32 max_char_width  = ll_round(0.5f + (x_max - x_min));
+    S32 max_char_height = ll_round(0.5f + (y_max - y_min));
+    mFontBitmapCachep->init(max_char_width, max_char_height);
+
     return true;
+}
+
+LLFontGlyphInfo* LLFontFace::findGlyphInfo(llwchar wch, EFontGlyphType type) const
+{
+    auto range = mCharGlyphInfoMap.equal_range(wch);
+    auto iter = (type != EFontGlyphType::Unspecified)
+        ? std::find_if(range.first, range.second,
+            [type](const char_glyph_info_map_t::value_type& e) { return e.second->mGlyphType == type; })
+        : range.first;
+    return (iter != range.second) ? iter->second : nullptr;
+}
+
+void LLFontFace::insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const
+{
+    llassert(gi->mGlyphType < EFontGlyphType::Count);
+    auto range = mCharGlyphInfoMap.equal_range(wch);
+    auto iter = std::find_if(range.first, range.second,
+        [gi](const char_glyph_info_map_t::value_type& e) { return e.second->mGlyphType == gi->mGlyphType; });
+    if (iter != range.second)
+    {
+        delete iter->second;
+        iter->second = gi;
+    }
+    else
+    {
+        mCharGlyphInfoMap.insert(std::make_pair(wch, gi));
+    }
+}
+
+LLFontGlyphInfo* LLFontFace::findShapedGlyphInfo(U32 glyph_index, EFontGlyphType type) const
+{
+    auto range = mShapedGlyphInfoMap.equal_range(glyph_index);
+    auto iter = (type != EFontGlyphType::Unspecified)
+        ? std::find_if(range.first, range.second,
+            [type](const shaped_glyph_info_map_t::value_type& e) { return e.second->mGlyphType == type; })
+        : range.first;
+    return (iter != range.second) ? iter->second : nullptr;
+}
+
+void LLFontFace::insertShapedGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const
+{
+    llassert(gi->mGlyphType < EFontGlyphType::Count);
+    auto range = mShapedGlyphInfoMap.equal_range(glyph_index);
+    auto iter = std::find_if(range.first, range.second,
+        [gi](const shaped_glyph_info_map_t::value_type& e) { return e.second->mGlyphType == gi->mGlyphType; });
+    if (iter != range.second)
+    {
+        delete iter->second;
+        iter->second = gi;
+    }
+    else
+    {
+        mShapedGlyphInfoMap.insert(std::make_pair(glyph_index, gi));
+    }
+}
+
+void LLFontFace::resetBitmapCache()
+{
+    for (auto& entry : mCharGlyphInfoMap)
+        delete entry.second;
+    mCharGlyphInfoMap.clear();
+    for (auto& entry : mShapedGlyphInfoMap)
+        delete entry.second;
+    mShapedGlyphInfoMap.clear();
+    if (mFontBitmapCachep)
+        mFontBitmapCachep->reset();
+}
+
+void LLFontFace::destroyGL()
+{
+    if (mFontBitmapCachep)
+        mFontBitmapCachep->destroyGL();
+}
+
+bool LLFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
+                                 U16 width, U16 height,
+                                 const U8* data, U32 stride) const
+{
+    LLImageRaw* image_raw = mFontBitmapCachep ? mFontBitmapCachep->getImageRaw(EFontGlyphType::Color, bitmap_num) : nullptr;
+    if (!image_raw)
+    {
+        llassert(false);
+        return false;
+    }
+    llassert(image_raw->getComponents() == 4);
+
+    // Inspired by LLImageRaw::setSubImage(); copy + ARGB swizzle.
+    U32* image_data = (U32*)image_raw->getData();
+    if (!image_data)
+        return false;
+
+    for (U32 idxRow = 0; idxRow < height; idxRow++)
+    {
+        const U32 nSrcRow = height - 1 - idxRow;
+        const U32 nSrcOffset = nSrcRow * width * image_raw->getComponents();
+        const U32 nDstOffset = (y + idxRow) * image_raw->getWidth() + x;
+
+        for (U32 idxCol = 0; idxCol < width; idxCol++)
+        {
+            U32 nTemp = nSrcOffset + idxCol * 4;
+            image_data[nDstOffset + idxCol] = data[nTemp + 3] << 24 | data[nTemp] << 16 | data[nTemp + 1] << 8 | data[nTemp + 2];
+        }
+    }
+
+    return true;
+}
+
+void LLFontFace::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
+                                           U32 width, U32 height,
+                                           U8* data, S32 stride) const
+{
+    LLImageRaw* image_raw = mFontBitmapCachep ? mFontBitmapCachep->getImageRaw(EFontGlyphType::Grayscale, bitmap_num) : nullptr;
+    if (!image_raw)
+    {
+        llassert(false);
+        return;
+    }
+
+    LLImageDataLock lock(image_raw);
+
+    llassert(image_raw->getComponents() == 2);
+
+    U8* target = image_raw->getData();
+    llassert(target);
+    if (!data || !target)
+        return;
+
+    if (0 == stride)
+        stride = width;
+
+    U32 target_width = image_raw->getWidth();
+    for (U32 i = 0; i < height; i++)
+    {
+        U32 to_offset = (y + i) * target_width + x;
+        U32 from_offset = (height - 1 - i) * stride;
+        for (U32 j = 0; j < width; j++)
+        {
+            *(target + to_offset * 2 + 1) = *(data + from_offset);
+            to_offset++;
+            from_offset++;
+        }
+    }
 }
 
 U32 LLFontFace::getCharGlyphIndex(llwchar wch) const

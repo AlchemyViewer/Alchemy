@@ -13,11 +13,12 @@
 
 #include "llpointer.h"
 #include "llrefcount.h"
-#include "llfontregistry.h"  // for EFontHinting
 #include "stdtypes.h"
+#include "llfontbitmapcache.h"  // for LLFontBitmapCache + EFontGlyphType
 
 #include <boost/functional/hash.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered_map.hpp>
 
 #include <string>
 
@@ -26,6 +27,12 @@
 struct FT_FaceRec_;
 typedef struct FT_FaceRec_* LLFT_Face;
 struct hb_font_t;
+struct LLFontGlyphInfo;
+class  LLFontFreetype;
+// Defined in llfontregistry.h; forward-declared here to keep this header
+// independent of the registry. Translation units that need the values
+// (e.g. llfontface.cpp) include llfontregistry.h directly.
+enum class EFontHinting : S32;
 
 // Identity key for an FT_Face. Two LLFontFreetype instances that resolve to
 // the same key share the underlying face (via LLFontManager's cache). The
@@ -109,6 +116,48 @@ public:
     // which case programmatic bolding should be suppressed).
     bool wghtAxisSet() const    { return mWghtAxisSet; }
 
+    // Per-face bitmap atlas for glyphs rasterized through this face. Shared
+    // across every LLFontFreetype that wraps this face — heads sharing a
+    // primary face share the atlas; the same Twemoji face used as a fallback
+    // by N heads writes its emoji glyphs into ONE atlas instead of N.
+    LLFontBitmapCache* getBitmapCache() const { return mFontBitmapCachep; }
+
+    // Per-face glyph cache. Keyed on codepoint (llwchar) for the codepoint
+    // path, and on FT glyph index for the shaped path. LLFontGlyphInfo
+    // entries are owned here and deleted in ~LLFontFace.
+    LLFontGlyphInfo* findGlyphInfo(llwchar wch, EFontGlyphType type) const;
+    void             insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const;
+
+    LLFontGlyphInfo* findShapedGlyphInfo(U32 glyph_index, EFontGlyphType type) const;
+    void             insertShapedGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const;
+
+    // Iterate and conditionally erase entries. Used by collectGarbage to
+    // purge entries that referenced an evicted atlas sheet.
+    template<typename Pred>
+    void erase_codepoint_entries(Pred should_erase) const;
+    template<typename Pred>
+    void erase_shaped_entries(Pred should_erase) const;
+
+    // Drop all rasterized glyphs and reset the atlas. Used by the registry
+    // when DPI changes and the wrapper survives but its atlas state needs
+    // to be rebuilt.
+    void resetBitmapCache();
+
+    // Free GL textures while keeping the wrapper alive (used at shutdown
+    // when teardown order requires GL state release before destruction).
+    void destroyGL();
+
+    // Copy a rasterized bitmap into this face's atlas at slot
+    // (type=Grayscale, bitmap_num) at offset (x, y). Returns false on
+    // missing atlas / image data; non-fatal so callers can recover.
+    void setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
+                                   U32 width, U32 height,
+                                   U8* data, S32 stride = 0) const;
+    // Same for the Color (BGRA) atlas.
+    bool setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
+                         U16 width, U16 height,
+                         const U8* data, U32 stride) const;
+
 private:
     LLFontFace(const LLFontFace&) = delete;
     LLFontFace& operator=(const LLFontFace&) = delete;
@@ -116,10 +165,17 @@ private:
     // Apply a single OpenType variation axis value, if the face has one.
     bool setVariationAxis(const std::string& axis_tag, F32 value);
 
+    typedef boost::unordered_multimap<llwchar, LLFontGlyphInfo*> char_glyph_info_map_t;
+    typedef boost::unordered_multimap<U32, LLFontGlyphInfo*> shaped_glyph_info_map_t;
+
     LLFT_Face          mFTFace = nullptr;
     EFontHinting       mHinting;
     mutable hb_font_t* mHbFont = nullptr;
     mutable boost::unordered_flat_map<llwchar, U32> mCharIndexCache;
+
+    LLFontBitmapCache* mFontBitmapCachep = nullptr;
+    mutable char_glyph_info_map_t   mCharGlyphInfoMap;
+    mutable shaped_glyph_info_map_t mShapedGlyphInfoMap;
 
     bool mUseSubpixelPen = false;
     bool mHasColor       = false;
@@ -127,5 +183,41 @@ private:
     bool mIsFixedWidth   = false;
     bool mWghtAxisSet    = false;
 };
+
+// Inline template definitions — kept in the header so callers in
+// llfontfreetype.cpp can instantiate with their own predicates.
+template<typename Pred>
+void LLFontFace::erase_codepoint_entries(Pred should_erase) const
+{
+    for (auto it = mCharGlyphInfoMap.begin(); it != mCharGlyphInfoMap.end(); )
+    {
+        if (should_erase(it->second))
+        {
+            delete it->second;
+            it = mCharGlyphInfoMap.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
+template<typename Pred>
+void LLFontFace::erase_shaped_entries(Pred should_erase) const
+{
+    for (auto it = mShapedGlyphInfoMap.begin(); it != mShapedGlyphInfoMap.end(); )
+    {
+        if (should_erase(it->second))
+        {
+            delete it->second;
+            it = mShapedGlyphInfoMap.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
 
 #endif // LL_LLFONTFACE_H

@@ -286,14 +286,16 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
     F32 start_x = (F32)ll_round(cur_x);
 
-    const LLFontBitmapCache* font_bitmap_cache = mFontFreetype->getFontBitmapCache();
-
-    // This looks wrong, value is dynamic.
-    // LLFontBitmapCache::nextOpenPos can alter these values when
-    // new characters get added to cache, which affects whole string.
-    // Todo: Perhaps value should update after symbols were added?
-    F32 inv_width = 1.f / font_bitmap_cache->getBitmapWidth();
-    F32 inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
+    // After the LLFontFace move, atlas ownership is per source face — heads
+    // bind the atlas of whichever face produced each glyph. Track the current
+    // (face, atlas) pair as we walk glyphs and flip on transitions. The
+    // initial (face, cache, inv_width, inv_height) captures are deferred to
+    // the first glyph; the head's primary cache is used as a fallback for
+    // shadow-uniform setup below.
+    const LLFontFace*        current_face = nullptr;
+    const LLFontBitmapCache* font_bitmap_cache = mFontFreetype->getBitmapCache();
+    F32 inv_width  = font_bitmap_cache ? 1.f / font_bitmap_cache->getBitmapWidth()  : 0.f;
+    F32 inv_height = font_bitmap_cache ? 1.f / font_bitmap_cache->getBitmapHeight() : 0.f;
 
     // Shader-shadow uniforms are pushed once before pass A starts and reset
     // to passthrough (shadowMode = 0) before pass B's foreground emission.
@@ -369,6 +371,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         LLRectf screen_rect;
         LLRectf uv_rect;
         std::pair<EFontGlyphType, S32> bitmap_entry;
+        const LLFontFace* face;
         LLColor4U color;
     };
     std::vector<DeferredGlyph> deferred;
@@ -492,8 +495,9 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     }
                     const auto& slot = sfgi->mPhaseSlots[phase];
 
+                    const LLFontFace* glyph_face = sfgi->mSourceFace;
                     std::pair<EFontGlyphType, S32> next_bitmap_entry = slot.mBitmapEntry;
-                    if (next_bitmap_entry != bitmap_entry)
+                    if (glyph_face != current_face || next_bitmap_entry != bitmap_entry)
                     {
                         if (glyph_count > 0)
                         {
@@ -503,8 +507,21 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                             glyph_count = 0;
                         }
                         bitmap_entry = next_bitmap_entry;
-                        LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
-                        gGL.getTexUnit(0)->bind(font_image);
+                        if (glyph_face != current_face)
+                        {
+                            current_face = glyph_face;
+                            font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
+                            if (font_bitmap_cache)
+                            {
+                                inv_width  = 1.f / font_bitmap_cache->getBitmapWidth();
+                                inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
+                            }
+                        }
+                        if (font_bitmap_cache)
+                        {
+                            LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
+                            gGL.getTexUnit(0)->bind(font_image);
+                        }
                     }
 
                     const F32 glyph_x = (F32)(dest_int_x + slot.mXBearing);
@@ -546,7 +563,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                             drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
                                             precomputed_shadow_color, shadow, slant_offset);
                         }
-                        deferred.push_back({screen_rect, uv_rect, bitmap_entry, col});
+                        deferred.push_back({screen_rect, uv_rect, bitmap_entry, current_face, col});
                     }
                     else
                     {
@@ -618,8 +635,9 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         const auto& cp_slot = fgi->mPhaseSlots[cp_phase];
 
         // Per-glyph bitmap texture.
+        const LLFontFace* cp_glyph_face = fgi->mSourceFace;
         std::pair<EFontGlyphType, S32> next_bitmap_entry = cp_slot.mBitmapEntry;
-        if (next_bitmap_entry != bitmap_entry || last_char != wch)
+        if (cp_glyph_face != current_face || next_bitmap_entry != bitmap_entry || last_char != wch)
         {
             // Actually draw the queued glyphs before switching their texture;
             // otherwise the queued glyphs will be taken from wrong textures.
@@ -634,8 +652,21 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             }
 
             bitmap_entry = next_bitmap_entry;
-            LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
-            gGL.getTexUnit(0)->bind(font_image);
+            if (cp_glyph_face != current_face)
+            {
+                current_face = cp_glyph_face;
+                font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
+                if (font_bitmap_cache)
+                {
+                    inv_width  = 1.f / font_bitmap_cache->getBitmapWidth();
+                    inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
+                }
+            }
+            if (font_bitmap_cache)
+            {
+                LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
+                gGL.getTexUnit(0)->bind(font_image);
+            }
 
             // For some reason it's not enough to compare by bitmap_entry.
             // Issue hits emojis, japenese and chinese glyphs, only on first run.
@@ -688,7 +719,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                 drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
                                 precomputed_shadow_color, shadow, slant_offset);
             }
-            deferred.push_back({screen_rect, uv_rect, bitmap_entry, col});
+            deferred.push_back({screen_rect, uv_rect, bitmap_entry, current_face, col});
         }
         else
         {
@@ -752,9 +783,10 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         // atlas-binding tracker; the first deferred glyph forces a (possibly
         // redundant, GL-driver-cheap) rebind to begin the foreground stream.
         bitmap_entry = std::make_pair(EFontGlyphType::Grayscale, -1);
+        current_face = nullptr;
         for (const DeferredGlyph& dg : deferred)
         {
-            if (dg.bitmap_entry != bitmap_entry)
+            if (dg.face != current_face || dg.bitmap_entry != bitmap_entry)
             {
                 if (glyph_count > 0)
                 {
@@ -764,8 +796,16 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     glyph_count = 0;
                 }
                 bitmap_entry = dg.bitmap_entry;
-                LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
-                gGL.getTexUnit(0)->bind(font_image);
+                if (dg.face != current_face)
+                {
+                    current_face = dg.face;
+                    font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
+                }
+                if (font_bitmap_cache)
+                {
+                    LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
+                    gGL.getTexUnit(0)->bind(font_image);
+                }
             }
 
             if (glyph_count >= GLYPH_BATCH_SIZE)

@@ -305,37 +305,43 @@ void LLFontVertexBuffer::genBuffers(
     mLastUsesColorAtlas = false;
     if (const LLFontFreetype* face = fontp->getFontFreetype())
     {
-        if (const LLFontBitmapCache* cache = face->getFontBitmapCache())
-        {
+        // After the LLFontFace move, color atlases live on individual face
+        // wrappers — head primary, each fallback's face. Walk all of them
+        // to gather the set of color atlas textures this batch might have
+        // sampled from.
+        std::vector<LLGLuint> color_texnames;
+        auto collect_from_cache = [&color_texnames](const LLFontBitmapCache* cache) {
+            if (!cache)
+                return;
             const U32 color_atlas_count = cache->getNumBitmaps(EFontGlyphType::Color);
-            if (color_atlas_count > 0)
+            for (U32 i = 0; i < color_atlas_count; ++i)
             {
-                std::vector<LLGLuint> color_texnames;
-                color_texnames.reserve(color_atlas_count);
-                for (U32 i = 0; i < color_atlas_count; ++i)
+                if (LLImageGL* img = cache->getImageGL(EFontGlyphType::Color, i))
+                    color_texnames.push_back(img->getTexName());
+            }
+        };
+        collect_from_cache(face->getBitmapCache());
+        for (const auto& fb : face->getFallbackFonts())
+        {
+            if (fb.first)
+                collect_from_cache(fb.first->getBitmapCache());
+        }
+        if (!color_texnames.empty())
+        {
+            auto entry_uses_color = [&color_texnames](const LLVertexBufferData& entry) {
+                for (LLGLuint name : color_texnames)
                 {
-                    if (LLImageGL* img = cache->getImageGL(EFontGlyphType::Color, i))
-                    {
-                        color_texnames.push_back(img->getTexName());
-                    }
+                    if (name && entry.mTexName == name)
+                        return true;
                 }
-                auto entry_uses_color = [&color_texnames](const LLVertexBufferData& entry) {
-                    for (LLGLuint name : color_texnames)
-                    {
-                        if (name && entry.mTexName == name)
-                        {
-                            return true;
-                        }
-                    }
-                    return false;
-                };
-                for (const LLVertexBufferData& entry : mForegroundBufferList)
+                return false;
+            };
+            for (const LLVertexBufferData& entry : mForegroundBufferList)
+            {
+                if (entry_uses_color(entry))
                 {
-                    if (entry_uses_color(entry))
-                    {
-                        mLastUsesColorAtlas = true;
-                        break;
-                    }
+                    mLastUsesColorAtlas = true;
+                    break;
                 }
             }
         }

@@ -108,6 +108,11 @@ struct LLFontGlyphInfo
     U32 mGlyphIndex;
     EFontGlyphType mGlyphType;
 
+    // Atlas owner. mPhaseSlots[*].mBitmapEntry locates the slot within
+    // mSourceFace->getBitmapCache(); the renderer follows this indirection
+    // so two heads sharing a face render glyphs from the same atlas pages.
+    const LLFontFace* mSourceFace = nullptr;
+
     // Glyph-level metrics. These are taken from phase 0 and used by the
     // measurement paths (getWidthF32, maxDrawableChars, etc.) that don't
     // need phase-specific accuracy. The renderer uses per-phase dimensions
@@ -144,6 +149,9 @@ public:
 
     typedef std::function<bool(llwchar)> char_functor_t;
     void addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font, const char_functor_t& functor = nullptr);
+    typedef std::pair<LLPointer<LLFontFreetype>, char_functor_t> fallback_font_t;
+    typedef std::vector<fallback_font_t> fallback_font_vector_t;
+    const fallback_font_vector_t& getFallbackFonts() const { return mFallbackFonts; }
 
     // Global font metrics - in units of pixels
     F32 getLineHeight() const;
@@ -247,6 +255,8 @@ public:
 
     void       dumpFontBitmaps() const;
     const LLFontBitmapCache* getFontBitmapCache() const;
+    // Convenience non-const accessor — atlas now lives on the face wrapper.
+    LLFontBitmapCache* getBitmapCache() const { return mFace ? mFace->getBitmapCache() : nullptr; }
 
     void setStyle(U8 style);
     U8 getStyle() const;
@@ -271,8 +281,6 @@ private:
     // Delegates to mFace's char-index cache, which is shared across every
     // LLFontFreetype that resolved to the same LLFontFace.
     U32 getCharGlyphIndex(llwchar wch) const;
-    void setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num, U32 width, U32 height, U8 *data, S32 stride = 0) const;
-    bool setSubImageBGRA(U32 x, U32 y, U32 bitmap_num, U16 width, U16 height, const U8* data, U32 stride) const;
     bool hasGlyph(llwchar wch) const;       // Has a glyph for this character
     LLFontGlyphInfo* addGlyph(llwchar wch, EFontGlyphType glyph_type) const;        // Add a new character to the font if necessary
     LLFontGlyphInfo* addGlyphFromFont(
@@ -319,29 +327,21 @@ private:
     typedef std::vector<fallback_font_t> fallback_font_vector_t;
     fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)
 
-    // *NOTE: the same glyph can be present with multiple representations (but the pointer is always unique)
+    // Per-head fast lookup: codepoint -> non-owning pointer to a glyph info
+    // owned by the source LLFontFace. Avoids re-walking the fallback chain
+    // on every getGlyphInfo call. The pointed-to entries live and die with
+    // their LLFontFace; this map only caches the resolution.
     typedef boost::unordered_multimap<llwchar, LLFontGlyphInfo*> char_glyph_info_map_t;
-    mutable char_glyph_info_map_t mCharGlyphInfoMap; // Information about glyph location in bitmap
+    mutable char_glyph_info_map_t mCharGlyphInfoMap;
 
-    // (mCharIndexCache moved to LLFontFace — it's shared across every
-    // LLFontFreetype that resolves to the same face wrapper, since the
-    // codepoint→glyph-index mapping is determined entirely by the FT_Face
-    // charmap.)
-
-    // On the root face only, cache the result of selectShapingFace's fallback
-    // iteration: codepoint -> (winning face, glyph index in that face). One
-    // hash hit replaces an O(fallbacks)-deep walk through the fallback chain
-    // for each codepoint of every shape miss. Cached zeros (face=this,
-    // glyph_index=0) are kept so notdef codepoints don't re-iterate either.
-    // Cleared when this face's mFTFace is replaced or when the fallback list
-    // changes via addFallbackFont.
+    // Per-head shaping-face resolution cache: codepoint -> (winning face,
+    // glyph index in that face). Replaces an O(fallbacks)-deep walk for
+    // each codepoint. Cleared when mFace is replaced or when the fallback
+    // list changes via addFallbackFont.
     mutable boost::unordered_flat_map<llwchar, std::pair<const LLFontFreetype*, U32>> mShapingFaceResolution;
 
-    // Shaped-glyph cache, used only for glyphs looked up via HarfBuzz glyph
-    // indices. Kept separate from mCharGlyphInfoMap so the existing 1:1
-    // codepoint->glyph hot path stays untouched. The key carries the source
-    // face pointer so glyph indices from different fallback fonts don't
-    // collide when they happen to numerically match.
+    // Per-head fast lookup for shaped-path glyphs: (source face, glyph
+    // index) -> non-owning pointer into the source face's shaped glyph map.
     struct ShapedGlyphKey
     {
         const LLFontFreetype* face;
@@ -363,10 +363,9 @@ private:
     typedef boost::unordered_multimap<ShapedGlyphKey, LLFontGlyphInfo*, ShapedGlyphKeyHash> shaped_glyph_info_map_t;
     mutable shaped_glyph_info_map_t mShapedGlyphInfoMap;
 
-    mutable LLFontBitmapCache* mFontBitmapCachep;
-
-    // (mHbFont moved to LLFontFace — the HarfBuzz handle wraps the FT_Face,
-    // and shared faces share the same hb_font.)
+    // (LLFontBitmapCache moved to LLFontFace — atlas storage is now shared
+    // across every LLFontFreetype that wraps the same face. mCharIndexCache
+    // and mHbFont also live on LLFontFace for the same reason.)
 
     mutable S32 mRenderGlyphCount;
 
