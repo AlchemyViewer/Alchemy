@@ -431,7 +431,7 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                     {
                         // token does does not fit into signle line, need to draw "...".
                         // Use four dots for ellipsis width to generate padding
-                        S32 elipses_width = (S32)font->getWidthF32(U"....");
+                        F32 elipses_width = font->getWidthF32(U"....");
                         // truncated string length
                         segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels - elipses_width, static_cast<S32>(wline.length()), LLFontGL::ANYWHERE);
                         LLHUDTextSegment segment(iter->substr(line_length, segment_length) + U"...", style, color, font);

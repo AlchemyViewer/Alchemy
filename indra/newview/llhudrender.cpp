@@ -99,7 +99,7 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
     LLVector3 axis;
     rot.getAngleAxis(&angle, axis);
 
-    LLVector3 render_pos = pos_agent + (floorf(x_offset) * right_axis) + (floorf(y_offset) * up_axis);
+    LLVector3 render_pos = pos_agent + (x_offset * right_axis) + (y_offset * up_axis);
 
     //get the render_pos in screen space
 
@@ -118,14 +118,29 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
     gl_state_for_2d(world_view_rect.getWidth(), world_view_rect.getHeight());
     gViewerWindow->setup3DViewport();
 
-    win_coord.x -= world_view_rect.mLeft;
-    win_coord.y -= world_view_rect.mBottom;
+    // Split the projected position into an integer UI-pixel matrix translate
+    // (LLRender2D::translate stores into LLCoordGL via (S32) cast and
+    // discards sub-pixel info) and a sub-pixel residual passed to
+    // font.render as the (x, y) origin. The font's per-glyph 8-phase
+    // rasterization positions horizontal stems to ~1/8 px, so the string
+    // slides smoothly through fractional screen pixels as the camera moves
+    // instead of jumping a whole pixel at every integer boundary the matrix
+    // snap would otherwise enforce. The previous floorf on x_offset/y_offset
+    // above tried to snap along perspective-distorted pixel basis vectors
+    // and is replaced by this single screen-space split.
+    const F32 ui_x  = (win_coord.x - (F32)world_view_rect.mLeft)   / LLFontGL::sScaleX;
+    const F32 ui_y  = (win_coord.y - (F32)world_view_rect.mBottom) / LLFontGL::sScaleY;
+    const F32 int_x = floorf(ui_x);
+    const F32 int_y = floorf(ui_y);
+    const F32 frac_x = ui_x - int_x;
+    const F32 frac_y = ui_y - int_y;
+
     LLUI::loadIdentity();
     gGL.loadIdentity();
-    LLUI::translate((F32) win_coord.x*1.0f/LLFontGL::sScaleX, (F32) win_coord.y*1.0f/(LLFontGL::sScaleY), -(((F32) win_coord.z*2.f)-1.f));
+    LLUI::translate(int_x, int_y, -((win_coord.z * 2.f) - 1.f));
     F32 right_x;
 
-    font.render(wstr, 0, 0, 1, color, LLFontGL::LEFT, LLFontGL::BASELINE, style, shadow, static_cast<S32>(wstr.length()), 1000, &right_x, /*use_ellipses*/false, /*use_color*/true);
+    font.render(wstr, 0, frac_x, 1.f + frac_y, color, LLFontGL::LEFT, LLFontGL::BASELINE, style, shadow, static_cast<S32>(wstr.length()), 1000, &right_x, /*use_ellipses*/false, /*use_color*/true);
 
     LLUI::popMatrix();
     gGL.popMatrix();
