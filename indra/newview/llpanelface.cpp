@@ -1948,6 +1948,10 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
         calcp->setVar(LLCalc::TEX_ROTATION, (F32)mTexRotate->getValue().asReal());
         calcp->setVar(LLCalc::TEX_TRANSPARENCY, (F32)mCtrlColorTransp->getValue().asReal());
         calcp->setVar(LLCalc::TEX_GLOW, (F32)mCtrlGlow->getValue().asReal());
+
+        getChild<LLUICtrl>("btn_select_same_diff")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && mTextureCtrl->getEnabled() && identical_diffuse);
+        getChild<LLUICtrl>("btn_select_same_norm")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && mBumpyTextureCtrl->getEnabled() && identical_norm);
+        getChild<LLUICtrl>("btn_select_same_spec")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && mShinyTextureCtrl->getEnabled() && identical_spec);
     }
     else
     {
@@ -2149,6 +2153,8 @@ void LLPanelFace::updateUIGLTF(LLViewerObject* objectp, bool& has_pbr_material, 
         mPBROffsetU->setEnabled(new_state);
         mPBROffsetV->setEnabled(new_state);
 
+        getChild<LLUICtrl>("btn_select_same_pbr")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && new_state && identical_pbr);
+
         // Control values will be set once per frame in
         // setMaterialOverridesFromSelection
         sMaterialOverrideSelection.setDirty();
@@ -2166,6 +2172,7 @@ void LLPanelFace::updateVisibilityGLTF(LLViewerObject* objectp /*= nullptr */)
     const bool show_pbr_render_material_id = show_pbr && (pbr_type == PBRTYPE_RENDER_MATERIAL_ID);
 
     mPBRTextureCtrl->setVisible(show_pbr_render_material_id);
+    getChildView("btn_select_same_pbr")->setVisible(show_pbr_render_material_id);
 
     mBtnPbrFromInv->setVisible(show_pbr_render_material_id);
     mBtnEditBbr->setVisible(show_pbr_render_material_id && !inventory_pending);
@@ -3048,6 +3055,7 @@ void LLPanelFace::updateVisibility(LLViewerObject* objectp /* = nullptr */)
     mComboAlphaMode->setVisible(show_texture && show_material);
     mLabelMaskCutoff->setVisible(false);
     mMaskCutoff->setVisible(false);
+    getChild<LLUICtrl>("btn_select_same_diff")->setVisible(show_texture && show_material);
     if (show_texture && show_material)
     {
         updateAlphaControls();
@@ -3078,6 +3086,7 @@ void LLPanelFace::updateVisibility(LLViewerObject* objectp /* = nullptr */)
     mShinyRotate->setVisible(show_shininess);
     mShinyOffsetU->setVisible(show_shininess);
     mShinyOffsetV->setVisible(show_shininess);
+    getChild<LLUICtrl>("btn_select_same_spec")->setVisible(show_shininess);
 
     // Normal map controls
     if (show_bumpiness)
@@ -3092,6 +3101,7 @@ void LLPanelFace::updateVisibility(LLViewerObject* objectp /* = nullptr */)
     mBumpyRotate->setVisible(show_bumpiness);
     mBumpyOffsetU->setVisible(show_bumpiness);
     mBumpyOffsetV->setVisible(show_bumpiness);
+    getChild<LLUICtrl>("btn_select_same_norm")->setVisible(show_bumpiness);
 
     mTexRepeat->setVisible(show_material || show_media);
 

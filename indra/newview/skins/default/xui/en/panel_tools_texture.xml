@@ -1101,7 +1101,7 @@
              follows="left|top"
              height="23"
              left="10"
-             top="232"
+             top="212"
              label="Find All"
              name="btn_select_same_diff"
              tool_tip="Select all faces with the same diffuse texture as this one"
