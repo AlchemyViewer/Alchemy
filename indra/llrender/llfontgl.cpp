@@ -520,7 +520,8 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                         if (font_bitmap_cache)
                         {
                             LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
-                            gGL.getTexUnit(0)->bind(font_image);
+                            if (font_image)
+                                gGL.getTexUnit(0)->bind(font_image);
                         }
                     }
 
@@ -665,7 +666,13 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             if (font_bitmap_cache)
             {
                 LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
-                gGL.getTexUnit(0)->bind(font_image);
+                // Defensive: getImageGL returns null when a sheet has been
+                // released (collectGarbage) or when the slot index is out
+                // of range. Skip the bind in that case; the glyph won't
+                // render this frame but we don't crash inside LLTexUnit::bind
+                // dereferencing a null texture pointer.
+                if (font_image)
+                    gGL.getTexUnit(0)->bind(font_image);
             }
 
             // For some reason it's not enough to compare by bitmap_entry.
@@ -804,7 +811,8 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                 if (font_bitmap_cache)
                 {
                     LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
-                    gGL.getTexUnit(0)->bind(font_image);
+                    if (font_image)
+                        gGL.getTexUnit(0)->bind(font_image);
                 }
             }
 

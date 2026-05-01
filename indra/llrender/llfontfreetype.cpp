@@ -1046,17 +1046,25 @@ void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
 
 void LLFontFreetype::resetBitmapCache()
 {
-    // Drop the head's non-owning resolution caches; face will purge owning
-    // entries in resetBitmapCache below.
+    // Drop the head's non-owning resolution caches. Do NOT call into
+    // mFace->resetBitmapCache(): that would delete glyph entries that
+    // sibling heads sharing this LLFontFace still reference in their
+    // own local resolution caches, leaving them with dangling pointers
+    // and reading freed memory on the next render. Atlas + face-owned
+    // entry lifetime is tied to LLFontFace's refcount — for DPI/scale
+    // changes that drive resetSelf, loadFace below picks up a new face
+    // wrapper (different LLFontFaceKey) and the old wrapper drops to
+    // refcount 0 (and naturally tears down its atlas) once all heads
+    // have reloaded. For same-key resets the face cache is reused and
+    // any previously-rasterized glyphs remain valid.
     mCharGlyphInfoMap.clear();
     mShapedGlyphInfoMap.clear();
-    if (mFace)
-        mFace->resetBitmapCache();
 
-    if (!mIsFallback)
+    if (!mIsFallback && mFace && !mFace->findGlyphInfo(0, EFontGlyphType::Grayscale))
     {
-        // Re-pre-warm notdef on the (now empty) face atlas. Skipped for
-        // fallback heads — same logic as loadFace.
+        // Pre-warm notdef only if the face cache doesn't already have it.
+        // Fresh face → insert; reused face → already-pre-warmed by an
+        // earlier head, skip.
         addGlyphFromFont(this, 0, 0, EFontGlyphType::Grayscale);
     }
 }
