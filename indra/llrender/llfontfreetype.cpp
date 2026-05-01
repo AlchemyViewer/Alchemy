@@ -598,9 +598,39 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type
                      {
                         return entry.second->mGlyphType == glyph_type;
                      });
-    if (iter == range_it.second)
+    if (iter != range_it.second)
+        return nullptr;
+
+    if (glyph_index != 0)
     {
+        // Real glyph in this face — render and cache by wch.
         return addGlyphFromFont(this, wch, glyph_index, glyph_type);
+    }
+
+    // No face in our chain has this codepoint. Reuse the face's pre-warmed
+    // notdef entry (cached at wch=0 during loadFace) instead of rasterizing
+    // a per-codepoint copy. Caching notdef under each missing wch in the
+    // face's map would pollute it with entries that aren't really "this
+    // face has wch", and sibling heads would then short-circuit their own
+    // chain walk and pick up our notdef when their primary face actually
+    // has the glyph.
+    if (mFace)
+    {
+        if (LLFontGlyphInfo* notdef = mFace->findGlyphInfo(0, glyph_type))
+        {
+            // Mirror into the head's local cache for fast-path repeat lookups.
+            insertGlyphInfo(wch, notdef);
+            return notdef;
+        }
+        // Pre-warm wasn't done (e.g. on a path that loaded without it).
+        // Render once at glyph_index 0 and cache under wch=0.
+        if (LLFontGlyphInfo* notdef = addGlyphFromFont(this, 0, 0, glyph_type))
+        {
+            // addGlyphFromFont already inserted under wch=0 on the head;
+            // also remember the same pointer under the requested wch.
+            insertGlyphInfo(wch, notdef);
+            return notdef;
+        }
     }
     return nullptr;
 }
@@ -774,6 +804,21 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
 
 LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, llwchar wch, U32 glyph_index, EFontGlyphType requested_glyph_type) const
 {
+    // Cross-head dedup: a sibling head sharing fontp's face may have already
+    // rasterized this glyph. Reuse the existing entry rather than allocating
+    // a new atlas slot. The face cache key (wch) is meaningful only when the
+    // glyph genuinely belongs to fontp — addGlyph routes the no-glyph case
+    // through the shared-notdef path before we get here, so any caller with
+    // glyph_index>0 (or wch==0 for the pre-warm sentinel) is safe to dedup.
+    if (fontp->mFace && (glyph_index != 0 || wch == 0))
+    {
+        if (LLFontGlyphInfo* existing = fontp->mFace->findGlyphInfo(wch, requested_glyph_type))
+        {
+            insertGlyphInfo(wch, existing);
+            return existing;
+        }
+    }
+
     EFontGlyphType bitmap_glyph_type;
     LLFontGlyphInfo* gi = renderAndCreateGlyph(fontp, glyph_index, requested_glyph_type, bitmap_glyph_type);
     if (!gi)
@@ -832,34 +877,15 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_
     if (iter != range_it.second)
         return iter->second;
 
-    // Head missed. The glyph might be cached on a fallback's face from a
-    // sibling head's earlier rasterization — check the face caches before
-    // re-rasterizing. Walk our chain in priority order, mirroring addGlyph.
-    const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale;
-    if (mFace)
-    {
-        if (LLFontGlyphInfo* gi = mFace->findGlyphInfo(wch, resolve_type))
-        {
-            insertGlyphInfo(wch, gi);
-            return gi;
-        }
-    }
-    for (const fallback_font_t& pair : mFallbackFonts)
-    {
-        if (pair.second && !pair.second(wch))
-            continue; // functor gates this fallback to specific codepoints
-        if (pair.first->mFace)
-        {
-            if (LLFontGlyphInfo* gi = pair.first->mFace->findGlyphInfo(wch, resolve_type))
-            {
-                insertGlyphInfo(wch, gi);
-                return gi;
-            }
-        }
-    }
-
-    // Nothing cached anywhere — rasterize fresh through addGlyph.
-    return addGlyph(wch, resolve_type);
+    // Head missed. Defer to addGlyph for the chain walk: the SOURCE face
+    // for `wch` is determined by faceHasGlyph priority order, not by which
+    // face happens to have a cached entry. Cross-head dedup is then handled
+    // inside addGlyphFromFont, which checks the source face's cache before
+    // rasterizing. Walking face caches here would be wrong — a sibling
+    // head's earlier render through a face that's a *fallback* in our
+    // chain could shadow our *primary* face's render of the same codepoint.
+    return addGlyph(wch,
+        (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale);
 }
 
 LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType glyph_type) const
