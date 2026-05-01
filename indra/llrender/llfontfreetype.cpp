@@ -1147,20 +1147,22 @@ void LLFontFreetype::collectGarbage() const
             if ((now - last_used) <= IDLE_THRESHOLD_SEC)
                 continue;
 
-            // Purge entries from the face's owning caches first (deletes the
-            // LLFontGlyphInfo objects), then from the head's non-owning map.
+            // Order matters: drop the head's non-owning pointers FIRST, while
+            // the face entries they reference are still alive and the
+            // predicate can read them safely. Then have the face delete the
+            // matching owned entries. Doing it the other way around would
+            // call the predicate on dangling pointers (UB) and could leave
+            // the head's map with pointers to freed memory.
             auto matches = [&](const LLFontGlyphInfo* gi) { return glyph_uses_sheet(gi, type, num); };
+            for (auto it = mCharGlyphInfoMap.begin(); it != mCharGlyphInfoMap.end(); )
+                it = matches(it->second) ? mCharGlyphInfoMap.erase(it) : std::next(it);
+            for (auto it = mShapedGlyphInfoMap.begin(); it != mShapedGlyphInfoMap.end(); )
+                it = matches(it->second) ? mShapedGlyphInfoMap.erase(it) : std::next(it);
             if (mFace)
             {
                 mFace->erase_codepoint_entries(matches);
                 mFace->erase_shaped_entries(matches);
             }
-            // Head's resolution caches now hold dangling pointers — clear the
-            // matching entries (no delete; face already freed them).
-            for (auto it = mCharGlyphInfoMap.begin(); it != mCharGlyphInfoMap.end(); )
-                it = matches(it->second) ? mCharGlyphInfoMap.erase(it) : std::next(it);
-            for (auto it = mShapedGlyphInfoMap.begin(); it != mShapedGlyphInfoMap.end(); )
-                it = matches(it->second) ? mShapedGlyphInfoMap.erase(it) : std::next(it);
 
             getBitmapCache()->releaseSheet(type, num);
         }
