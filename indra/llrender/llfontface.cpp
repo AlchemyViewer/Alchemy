@@ -14,6 +14,7 @@
 #include "llfontfreetype.h"   // for LLFontGlyphInfo, LLFontManager, ll::fonts::LoadedFont
 #include "llfontregistry.h"   // for EFontHinting full definition
 #include "llimage.h"          // LLImageRaw, LLImageDataLock
+#include "llmath.h"           // ll_round, llclamp
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -97,9 +98,13 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
         setVariationAxis("opsz", point_size);
     }
 
+    // Round-to-nearest into 26.6: a plain (S32) cast truncates toward zero,
+    // which loses up to ~1/64 pt of precision for non-integer point sizes
+    // (e.g. LSmall=8.1 -> 8.1 * 64 = 518.4 -> would truncate to 518 instead
+    // of rounding to 518).
     error = FT_Set_Char_Size(mFTFace,
-                             0,                            // char_width in 1/64 pt
-                             (S32)(point_size * 64),       // char_height in 1/64 pt
+                             0,                                  // char_width in 1/64 pt
+                             ll_round(point_size * 64.f),        // char_height in 1/64 pt
                              (U32)horz_dpi,
                              (U32)vert_dpi);
     if (error)
@@ -343,7 +348,10 @@ bool LLFontFace::setVariationAxis(const std::string& axis_tag, F32 value)
     FT_UInt num_coords = master->num_axis;
     FT_Fixed* coords = new FT_Fixed[num_coords];
     FT_Get_Var_Design_Coordinates(mFTFace, num_coords, coords);
-    coords[axis_index] = (FT_Fixed)(value * 65536.0f);
+    // Round-to-nearest into 16.16. Plain (FT_Fixed) cast truncates, which
+    // loses sub-unit precision for non-integer axis values (e.g. an opsz
+    // axis driven by a fractional point size).
+    coords[axis_index] = (FT_Fixed)ll_round(value * 65536.0f);
     int error = FT_Set_Var_Design_Coordinates(mFTFace, num_coords, coords);
 
     delete[] coords;

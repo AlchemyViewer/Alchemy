@@ -302,20 +302,19 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     mWeight     = weight;
     mUseSubpixelPen = mFace->useSubpixelPen();
 
-    // Per-instance derived metrics. The face wrapper has FT_Set_Char_Size
-    // baked in for these (size, dpi) values; the metrics fall out of the
-    // sized face's units_per_EM and bbox.
-    F32 pixels_per_em = (point_size / 72.f) * vert_dpi;
-    F32 ems_per_unit = 1.f / ft->units_per_EM;
-    F32 pixels_per_unit = pixels_per_em * ems_per_unit;
-
-    mAscender   =  ft->ascender  * pixels_per_unit;
-    mDescender  = -ft->descender * pixels_per_unit;
-    mLineHeight =  ft->height    * pixels_per_unit;
+    // FreeType's size->metrics is populated by FT_Set_Char_Size (run inside
+    // LLFontFace::load) with scaled, 26.6 fractional-pixel ascender /
+    // descender / height values. Reading them directly matches FT's own
+    // accounting exactly — re-deriving from design units would diverge by
+    // sub-pixel due to FreeType's internal 16.16 y_scale rounding.
+    constexpr F32 INV_64 = 1.f / 64.f;
+    const FT_Size_Metrics& metrics = ft->size->metrics;
+    mAscender   =  metrics.ascender  * INV_64;
+    mDescender  = -metrics.descender * INV_64;  // FT descender is negative; flip to positive depth.
+    mLineHeight =  metrics.height    * INV_64;
 
     // The atlas (LLFontBitmapCache) is owned by mFace and was initialized
-    // inside LLFontFace::load with the same metrics computation; nothing
-    // to do here for atlas setup.
+    // inside LLFontFace::load; nothing to do here for atlas setup.
 
     if (!mIsFallback)
     {
