@@ -1948,7 +1948,7 @@ std::string LLFontGL::getFontPathSystem()
     HRESULT okay = SHGetKnownFolderPath(FOLDERID_Fonts, 0, NULL, &pwstr);
     if (SUCCEEDED(okay) && pwstr)
     {
-        system_font_path = ll_convert_wide_to_string(pwstr);
+        system_font_path = ll_convert_wide_to_string(pwstr) + gDirUtilp->getDirDelimiter();
         // SHGetKnownFolderPath() contract requires us to free pwstr
         CoTaskMemFree(pwstr);
         LL_INFOS() << "from SHGetKnownFolderPath(): " << system_font_path << LL_ENDL;
