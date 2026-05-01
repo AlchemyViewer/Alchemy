@@ -125,9 +125,11 @@ public:
     void setSize(const std::string& size) { mSize = size; }
 
     void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor = LLStringUtil::null, bool monospace_ligatures = false);
+    void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures = false);
     const font_file_info_vec_t & getFontFiles() const { return mFontFiles; }
     void setFontFiles(const font_file_info_vec_t& font_files) { mFontFiles = font_files; }
     void addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor = LLStringUtil::null, bool monospace_ligatures = false);
+    void addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures = false);
     const font_file_info_vec_t& getFontCollectionFiles() const { return mFontCollectionFiles; }
     void setFontCollectionFiles(const font_file_info_vec_t& font_collection_files) { mFontCollectionFiles = font_collection_files; }
 
@@ -170,6 +172,10 @@ public:
     const LLFontDescriptor *getMatchingFontDesc(const LLFontDescriptor& desc);
     const LLFontDescriptor *getClosestFontTemplate(const LLFontDescriptor& desc);
 
+    // Look up the point size for a size name, optionally honoring per-family
+    // overrides (<size> children of <font> in fonts.xml). Pass an empty family
+    // to skip the per-family lookup and consult only the global table.
+    bool nameToSize(const std::string& family, const std::string& size_name, F32& size);
     bool nameToSize(const std::string& size_name, F32& size);
 
     void dump();
@@ -182,11 +188,21 @@ private:
     LLFontGL *createFont(const LLFontDescriptor& desc);
     typedef boost::unordered_map<LLFontDescriptor,LLFontGL*> font_reg_map_t;
     typedef boost::unordered_map<std::string,F32> font_size_map_t;
+    typedef boost::unordered_map<std::string, font_size_map_t> family_size_map_t;
+    // Key: (family name, style flags). Stores the inherit="true" intent for
+    // a style variant; expanded at parse-time in init_from_xml.
+    typedef std::map<std::pair<std::string, U8>, bool> inherit_map_t;
 
     // Given a descriptor, look up specific font instantiation.
     font_reg_map_t mFontMap;
     // Given a size name, look up the point size.
     font_size_map_t mFontSizes;
+    // Per-family size overrides: mFamilySizes[family][size_name] = pt size.
+    // Consulted before mFontSizes when a family declares its own <size>.
+    family_size_map_t mFamilySizes;
+    // Style variants that requested inherit="true" — append the parent
+    // NORMAL-style entry's resolved files after parsing.
+    inherit_map_t mInheritFlags;
 
     string_vec_t mUltimateFallbackList;
     bool mCreateGLTextures;

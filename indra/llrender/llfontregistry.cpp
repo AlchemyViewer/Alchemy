@@ -30,6 +30,7 @@
 #include "llfontfreetype.h"
 #include "llfontgl.h"
 #include "llfontregistry.h"
+#include <algorithm>
 #include <boost/tokenizer.hpp>
 #include "llcontrol.h"
 #include "lldir.h"
@@ -41,7 +42,121 @@ extern LLControlGroup gSavedSettings;
 using std::string;
 using std::map;
 
-bool font_desc_init_from_xml(LLXMLNodePtr node, LLFontDescriptor& desc);
+namespace
+{
+    // Defaults declared at <font> level that propagate to child <file> entries
+    // (and through <os> recursion) unless the child overrides them. Mirrors
+    // the existing handling of the family-level "ligatures" attribute.
+    struct FamilyDefaults
+    {
+        bool monospace_ligatures = false;
+        EFontHinting hinting = EFontHinting::FORCE_AUTOHINT;
+        bool hinting_set = false;
+        S32 weight = -1;
+        bool weight_set = false;
+        bool load_collection = false;
+        bool load_collection_set = false;
+    };
+
+    typedef boost::unordered_map<std::string, F32> family_size_overrides_t;
+
+    // Output of parsing a single top-level <font> element beyond the
+    // descriptor itself: per-family size overrides and the inherit-fallbacks
+    // flag. Recursive calls (for <os>) leave these untouched.
+    struct FontParseExtras
+    {
+        family_size_overrides_t family_sizes;
+        bool inherit = false;
+    };
+
+    std::string trimSpaces(const std::string& s)
+    {
+        size_t start = 0;
+        size_t end = s.size();
+        while (start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r'))
+            ++start;
+        while (end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r'))
+            --end;
+        return s.substr(start, end - start);
+    }
+
+    bool parseHexCodepoint(const std::string& token, llwchar& out)
+    {
+        std::string s = trimSpaces(token);
+        if (s.size() >= 2 && (s[0] == 'U' || s[0] == 'u') && s[1] == '+')
+            s = s.substr(2);
+        else if (s.size() >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
+            s = s.substr(2);
+        if (s.empty())
+            return false;
+        char* end = nullptr;
+        unsigned long v = std::strtoul(s.c_str(), &end, 16);
+        if (!end || *end != '\0')
+            return false;
+        out = static_cast<llwchar>(v);
+        return true;
+    }
+
+    // Build a CharFunctor that returns true when a codepoint falls inside any
+    // of the supplied "U+XXXX" or "U+XXXX-U+YYYY" ranges. Captures a sorted
+    // shared vector so the closure stays cheap to copy through the existing
+    // CharFunctor plumbing.
+    std::function<bool(llwchar)> parseUnicodeRanges(const std::string& spec)
+    {
+        std::vector<std::pair<llwchar, llwchar>> ranges;
+        size_t pos = 0;
+        while (pos <= spec.size())
+        {
+            size_t comma = spec.find(',', pos);
+            std::string item = spec.substr(pos, (comma == std::string::npos) ? std::string::npos : comma - pos);
+            pos = (comma == std::string::npos) ? spec.size() + 1 : comma + 1;
+            item = trimSpaces(item);
+            if (item.empty())
+                continue;
+            size_t dash = item.find('-');
+            llwchar lo = 0, hi = 0;
+            if (dash == std::string::npos)
+            {
+                if (!parseHexCodepoint(item, lo))
+                {
+                    LL_WARNS() << "fonts.xml: bad unicode_ranges token '" << item << "'" << LL_ENDL;
+                    continue;
+                }
+                hi = lo;
+            }
+            else
+            {
+                if (!parseHexCodepoint(item.substr(0, dash), lo) ||
+                    !parseHexCodepoint(item.substr(dash + 1), hi))
+                {
+                    LL_WARNS() << "fonts.xml: bad unicode_ranges range '" << item << "'" << LL_ENDL;
+                    continue;
+                }
+                if (hi < lo)
+                    std::swap(lo, hi);
+            }
+            ranges.emplace_back(lo, hi);
+        }
+        if (ranges.empty())
+            return nullptr;
+        std::sort(ranges.begin(), ranges.end());
+        auto shared = std::make_shared<std::vector<std::pair<llwchar, llwchar>>>(std::move(ranges));
+        return [shared](llwchar cp) -> bool {
+            auto it = std::upper_bound(shared->begin(), shared->end(), cp,
+                [](llwchar c, const std::pair<llwchar, llwchar>& r) { return c < r.first; });
+            if (it == shared->begin())
+                return false;
+            --it;
+            return cp >= it->first && cp <= it->second;
+        };
+    }
+
+    bool font_desc_init_from_xml(LLXMLNodePtr node,
+                                 LLFontDescriptor& desc,
+                                 FamilyDefaults defaults = FamilyDefaults(),
+                                 FontParseExtras* extras = nullptr);
+}
+
 bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node);
 
 const std::string MACOSX_FONT_PATH_LIBRARY = "/Library/Fonts/";
@@ -187,10 +302,20 @@ void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hi
     mFontFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, (mCharFunctors.end() != it) ? it->second : nullptr, monospace_ligatures));
 }
 
+void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures)
+{
+    mFontFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, char_functor, monospace_ligatures));
+}
+
 void LLFontDescriptor::addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor, bool monospace_ligatures)
 {
     char_functor_map_t::const_iterator it = mCharFunctors.find(char_functor);
     mFontCollectionFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, (mCharFunctors.end() != it) ? it->second : nullptr, monospace_ligatures));
+}
+
+void LLFontDescriptor::addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures)
+{
+    mFontCollectionFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, char_functor, monospace_ligatures));
 }
 
 LLFontRegistry::LLFontRegistry(bool create_gl_textures)
@@ -261,14 +386,32 @@ std::string currentOsName()
 #endif
 }
 
-bool font_desc_init_from_xml(LLXMLNodePtr node, LLFontDescriptor& desc)
+namespace
 {
-    // Font-level opt-in for monospace ligatures (Fira Code, JetBrains Mono,
-    // Cascadia Code, etc.). Read from the <font> tag once and propagate to
-    // all <file> children — ligatures are intrinsic to the font's design,
-    // so the same value applies to every file in the fallback chain.
-    bool font_monospace_ligatures = false;
+// Parse the "font_hinting" attribute on a <file> or <font> node into an
+// EFontHinting. Returns true if the attribute was present and recognized.
+bool parseHintingAttr(LLXMLNodePtr node, EFontHinting& out)
+{
+    if (!node->hasAttribute("font_hinting"))
+        return false;
+    std::string s;
+    node->getAttributeString("font_hinting", s);
+    LLStringUtil::toLower(s);
+    if (s == "default") { out = EFontHinting::DEFAULT; return true; }
+    if (s == "force_auto") { out = EFontHinting::FORCE_AUTOHINT; return true; }
+    if (s == "no_hinting") { out = EFontHinting::NO_HINTING; return true; }
+    if (s == "light") { out = EFontHinting::LIGHT; return true; }
+    return false;
+}
 
+bool font_desc_init_from_xml(LLXMLNodePtr node,
+                             LLFontDescriptor& desc,
+                             FamilyDefaults defaults,
+                             FontParseExtras* extras)
+{
+    // Read family-level state from the top <font> element only. Recursive
+    // calls (for <os>) inherit the caller's `defaults` unchanged so that
+    // platform-specific files pick up the same family-level fallbacks.
     if (node->hasName("font"))
     {
         std::string attr_name;
@@ -288,9 +431,39 @@ bool font_desc_init_from_xml(LLXMLNodePtr node, LLFontDescriptor& desc)
             std::string attr_ligatures;
             node->getAttributeString("ligatures", attr_ligatures);
             LLStringUtil::toLower(attr_ligatures);
-            font_monospace_ligatures = (attr_ligatures == "on"
-                                     || attr_ligatures == "true"
-                                     || attr_ligatures == "1");
+            defaults.monospace_ligatures = (attr_ligatures == "on"
+                                         || attr_ligatures == "true"
+                                         || attr_ligatures == "1");
+        }
+
+        EFontHinting fam_hinting = EFontHinting::FORCE_AUTOHINT;
+        if (parseHintingAttr(node, fam_hinting))
+        {
+            defaults.hinting = fam_hinting;
+            defaults.hinting_set = true;
+        }
+
+        if (node->hasAttribute("font_weight"))
+        {
+            S32 fam_weight = -1;
+            node->getAttributeS32("font_weight", fam_weight);
+            defaults.weight = fam_weight;
+            defaults.weight_set = true;
+        }
+
+        if (node->hasAttribute("load_collection"))
+        {
+            bool fam_col = false;
+            node->getAttributeBOOL("load_collection", fam_col);
+            defaults.load_collection = fam_col;
+            defaults.load_collection_set = true;
+        }
+
+        if (extras && node->hasAttribute("inherit"))
+        {
+            bool inh = false;
+            node->getAttributeBOOL("inherit", inh);
+            extras->inherit = inh;
         }
 
         desc.setSize(s_template_string);
@@ -305,37 +478,28 @@ bool font_desc_init_from_xml(LLXMLNodePtr node, LLFontDescriptor& desc)
         {
             std::string font_file_name = child->getTextContents();
             std::string char_functor;
-            EFontHinting hinting = EFontHinting::FORCE_AUTOHINT;
+            std::function<bool(llwchar)> inline_functor;
+            EFontHinting hinting = defaults.hinting_set ? defaults.hinting : EFontHinting::FORCE_AUTOHINT;
             S32 flags = 0;
-            S32 weight = -1;
+            S32 weight = defaults.weight_set ? defaults.weight : -1;
+            bool load_collection = defaults.load_collection_set ? defaults.load_collection : false;
 
             if (child->hasAttribute("functor"))
             {
                 child->getAttributeString("functor", char_functor);
             }
 
-            if (child->hasAttribute("font_hinting"))
+            if (child->hasAttribute("unicode_ranges"))
             {
-                std::string attr_hinting;
-                child->getAttributeString("font_hinting", attr_hinting);
-                LLStringUtil::toLower(attr_hinting);
+                std::string spec;
+                child->getAttributeString("unicode_ranges", spec);
+                inline_functor = parseUnicodeRanges(spec);
+            }
 
-                if (attr_hinting == "default")
-                {
-                    hinting = EFontHinting::DEFAULT;
-                }
-                else if (attr_hinting == "force_auto")
-                {
-                    hinting = EFontHinting::FORCE_AUTOHINT;
-                }
-                else if (attr_hinting == "no_hinting")
-                {
-                    hinting = EFontHinting::NO_HINTING;
-                }
-                else if (attr_hinting == "light")
-                {
-                    hinting = EFontHinting::LIGHT;
-                }
+            EFontHinting file_hinting;
+            if (parseHintingAttr(child, file_hinting))
+            {
+                hinting = file_hinting;
             }
 
             if (child->hasAttribute("flags"))
@@ -363,26 +527,55 @@ bool font_desc_init_from_xml(LLXMLNodePtr node, LLFontDescriptor& desc)
 
             if (child->hasAttribute("load_collection"))
             {
-                bool col = false;
-                child->getAttributeBOOL("load_collection", col);
-                if (col)
-                {
-                    desc.addFontCollectionFile(font_file_name, hinting, flags, size_delta, weight, char_functor, font_monospace_ligatures);
-                }
+                child->getAttributeBOOL("load_collection", load_collection);
             }
 
-            desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, char_functor, font_monospace_ligatures);
+            // unicode_ranges takes precedence when both are present; functor
+            // is the legacy named-predicate path.
+            if (load_collection)
+            {
+                if (inline_functor)
+                    desc.addFontCollectionFile(font_file_name, hinting, flags, size_delta, weight, inline_functor, defaults.monospace_ligatures);
+                else
+                    desc.addFontCollectionFile(font_file_name, hinting, flags, size_delta, weight, char_functor, defaults.monospace_ligatures);
+            }
+
+            if (inline_functor)
+                desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, inline_functor, defaults.monospace_ligatures);
+            else
+                desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, char_functor, defaults.monospace_ligatures);
+        }
+        else if (child->hasName("size"))
+        {
+            // Per-family size override. Ignored on <os> recursion (extras is
+            // null there) since OS blocks shouldn't redefine sizes.
+            if (extras)
+            {
+                std::string size_name;
+                F32 size_value;
+                if (child->getAttributeString("name", size_name) &&
+                    child->getAttributeF32("size", size_value))
+                {
+                    extras->family_sizes[size_name] = size_value;
+                }
+                else
+                {
+                    LL_WARNS() << "fonts.xml: <size> inside <font name='" << desc.getName()
+                               << "'> needs both name and size attributes" << LL_ENDL;
+                }
+            }
         }
         else if (child->hasName("os"))
         {
             if (child_name == currentOsName())
             {
-                font_desc_init_from_xml(child, desc);
+                font_desc_init_from_xml(child, desc, defaults, nullptr);
             }
         }
     }
     return true;
 }
+} // anonymous namespace
 
 bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
 {
@@ -395,7 +588,8 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
         if (child->hasName("font"))
         {
             LLFontDescriptor desc;
-            bool font_succ = font_desc_init_from_xml(child, desc);
+            FontParseExtras extras;
+            bool font_succ = font_desc_init_from_xml(child, desc, FamilyDefaults(), &extras);
             LLFontDescriptor norm_desc = desc.normalize();
             if (font_succ)
             {
@@ -430,6 +624,20 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
                     registry->mFontMap.erase(*match_desc);
                     registry->mFontMap[new_desc] = NULL;
                 }
+
+                // Stash per-family size overrides and the inherit flag for
+                // later runtime use. Keyed by normalized family name so that
+                // size lookups use the same name the descriptor will carry.
+                if (!extras.family_sizes.empty())
+                {
+                    auto& dst = registry->mFamilySizes[norm_desc.getName()];
+                    for (const auto& kv : extras.family_sizes)
+                        dst[kv.first] = kv.second;
+                }
+                if (extras.inherit)
+                {
+                    registry->mInheritFlags[std::make_pair(norm_desc.getName(), norm_desc.getStyle())] = true;
+                }
             }
         }
         else if (child->hasName("font_size"))
@@ -447,8 +655,21 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
     return true;
 }
 
-bool LLFontRegistry::nameToSize(const std::string& size_name, F32& size)
+bool LLFontRegistry::nameToSize(const std::string& family, const std::string& size_name, F32& size)
 {
+    if (!family.empty())
+    {
+        family_size_map_t::const_iterator fam_it = mFamilySizes.find(family);
+        if (fam_it != mFamilySizes.end())
+        {
+            font_size_map_t::const_iterator size_it = fam_it->second.find(size_name);
+            if (size_it != fam_it->second.end())
+            {
+                size = size_it->second;
+                return true;
+            }
+        }
+    }
     font_size_map_t::iterator it = mFontSizes.find(size_name);
     if (it != mFontSizes.end())
     {
@@ -456,6 +677,11 @@ bool LLFontRegistry::nameToSize(const std::string& size_name, F32& size)
         return true;
     }
     return false;
+}
+
+bool LLFontRegistry::nameToSize(const std::string& size_name, F32& size)
+{
+    return nameToSize(LLStringUtil::null, size_name, size);
 }
 
 
