@@ -652,6 +652,54 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
 
         }
     }
+
+    // Expand inherit="true" style variants by appending the matching
+    // NORMAL-style entry's files to the variant's fallback chain. Done after
+    // the main loop so all <font> entries (and any cross-skin merging) have
+    // settled. The variant's own files stay first so its primary face wins.
+    for (const auto& kv : registry->mInheritFlags)
+    {
+        if (!kv.second)
+            continue;
+        const std::string& family = kv.first.first;
+        U8 style = kv.first.second;
+        if (style == 0)
+            continue; // NORMAL has nothing to inherit from.
+
+        LLFontDescriptor variant_key(family, s_template_string, style);
+        auto variant_it = registry->mFontMap.find(variant_key);
+        if (variant_it == registry->mFontMap.end())
+        {
+            LL_WARNS() << "fonts.xml: inherit='true' on " << family << " style "
+                       << (S32)style << " but no matching <font> entry exists" << LL_ENDL;
+            continue;
+        }
+
+        LLFontDescriptor parent_key(family, s_template_string, 0);
+        auto parent_it = registry->mFontMap.find(parent_key);
+        if (parent_it == registry->mFontMap.end())
+        {
+            LL_WARNS() << "fonts.xml: inherit='true' on " << family << " style "
+                       << (S32)style << " but no NORMAL-style parent exists" << LL_ENDL;
+            continue;
+        }
+
+        font_file_info_vec_t merged_files = variant_it->first.getFontFiles();
+        const font_file_info_vec_t& parent_files = parent_it->first.getFontFiles();
+        merged_files.insert(merged_files.end(), parent_files.begin(), parent_files.end());
+
+        font_file_info_vec_t merged_collection = variant_it->first.getFontCollectionFiles();
+        const font_file_info_vec_t& parent_collection = parent_it->first.getFontCollectionFiles();
+        merged_collection.insert(merged_collection.end(), parent_collection.begin(), parent_collection.end());
+
+        LLFontDescriptor new_variant = variant_it->first;
+        new_variant.setFontFiles(merged_files);
+        new_variant.setFontCollectionFiles(merged_collection);
+        LLFontGL* fontp = variant_it->second;
+        registry->mFontMap.erase(variant_it);
+        registry->mFontMap[new_variant] = fontp;
+    }
+
     return true;
 }
 
@@ -695,7 +743,7 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     // First decipher the requested size.
     LLFontDescriptor norm_desc = desc.normalize();
     F32 point_size;
-    bool found_size = nameToSize(norm_desc.getSize(),point_size);
+    bool found_size = nameToSize(norm_desc.getName(), norm_desc.getSize(), point_size);
     if (!found_size)
     {
         LL_WARNS() << "createFont unrecognized size " << norm_desc.getSize() << LL_ENDL;
