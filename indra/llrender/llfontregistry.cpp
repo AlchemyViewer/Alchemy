@@ -406,6 +406,60 @@ void LLFontRegistry::resolveFontReferences()
         static_cast<U8>(LLFontGL::BOLD | LLFontGL::ITALIC)
     };
 
+    // Pre-step: synthesize style descriptors for <use>-only families based
+    // on which styles their referenced families actually declare. A family
+    // that declared no <style> blocks gets a host descriptor for each
+    // style at least one (non-self) reference supports — either at that
+    // exact style or fallback-to-NORMAL.
+    for (const auto& kv : mFamilyUses)
+    {
+        const std::string& family = kv.first;
+
+        bool has_any_style = false;
+        for (U8 style : kStyles)
+        {
+            if (mFontMap.find(LLFontDescriptor(family, s_template_string, style)) != mFontMap.end())
+            {
+                has_any_style = true;
+                break;
+            }
+        }
+        if (has_any_style)
+            continue;
+
+        for (U8 style : kStyles)
+        {
+            bool any_ref_has_style = false;
+            for (const std::string& used : kv.second)
+            {
+                if (used == family)
+                    continue; // self-reference is rejected during resolution
+                if (mFontMap.find(LLFontDescriptor(used, s_template_string, style)) != mFontMap.end())
+                {
+                    any_ref_has_style = true;
+                    break;
+                }
+                // Non-NORMAL style absent on the reference falls back to NORMAL,
+                // which means the aggregator should still expose this style as
+                // long as any reference has SOME face to merge in.
+                if (style != 0
+                    && mFontMap.find(LLFontDescriptor(used, s_template_string, 0)) != mFontMap.end())
+                {
+                    any_ref_has_style = true;
+                    break;
+                }
+            }
+            if (any_ref_has_style)
+            {
+                LLFontDescriptor desc;
+                desc.setName(family);
+                desc.setStyle(style);
+                desc.setSize(s_template_string);
+                mergeFontEntry(desc);
+            }
+        }
+    }
+
     // Snapshot pre-resolution file lists. <use> targets are looked up in
     // this snapshot rather than the live mFontMap, so resolution is order-
     // independent and cycles / self-references behave deterministically:
@@ -832,7 +886,9 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
     }
 
     // Second sweep: process each <style> block as its own descriptor.
-    bool any_style_processed = false;
+    // <use>-only families (no <style> blocks) get their style descriptors
+    // synthesized later in resolveFontReferences, where we can see which
+    // styles the referenced families actually declare.
     for (LLXMLNodePtr c = font_node->getFirstChild(); c.notNull(); c = c->getNextSibling())
     {
         if (!c->hasName("style"))
@@ -861,33 +917,6 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
         if (style_inherit)
         {
             mInheritFlags[std::make_pair(family_name, style_flags)] = true;
-        }
-        any_style_processed = true;
-    }
-
-    // <use>-only family: no <style> blocks, just cross-family references.
-    // Synthesize an empty descriptor for every style so resolveFontReferences
-    // has a host at each style to merge the referenced families' matching-
-    // style files into. Without this, <use> directives would be silently
-    // dropped at every style except NORMAL and callers asking for the
-    // aggregator at BOLD/ITALIC/etc. would fall through to NORMAL via
-    // getClosestFontTemplate — losing the bold/italic distinction even
-    // though the referenced families have those styles.
-    if (!any_style_processed && !uses.empty())
-    {
-        static const U8 kAllStyles[4] = {
-            0,
-            LLFontGL::BOLD,
-            LLFontGL::ITALIC,
-            static_cast<U8>(LLFontGL::BOLD | LLFontGL::ITALIC)
-        };
-        for (U8 style : kAllStyles)
-        {
-            LLFontDescriptor desc;
-            desc.setName(family_name);
-            desc.setStyle(style);
-            desc.setSize(s_template_string);
-            mergeFontEntry(desc);
         }
     }
 
