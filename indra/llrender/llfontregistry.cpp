@@ -398,16 +398,28 @@ void LLFontRegistry::resolveFontReferences()
     // Step 1: resolve cross-family <use> references. For each (family, style)
     // entry that names another family, append the referenced family's
     // matching-style files (or NORMAL if the style isn't defined). Single-
-    // level only — referenced families' own <use> chains are not followed,
-    // which sidesteps cycle detection. Style variants that haven't yet been
-    // expanded by inherit (step 2) get the <use> appended at this point;
-    // inherit then pulls in NORMAL's already-<use>-expanded chain.
+    // level only — referenced families' own <use> chains are not followed.
     static const U8 kStyles[4] = {
         0,
         LLFontGL::BOLD,
         LLFontGL::ITALIC,
         static_cast<U8>(LLFontGL::BOLD | LLFontGL::ITALIC)
     };
+
+    // Snapshot pre-resolution file lists. <use> targets are looked up in
+    // this snapshot rather than the live mFontMap, so resolution is order-
+    // independent and cycles / self-references behave deterministically:
+    //   A->B and B->A both end up as [own, other], not double-counted;
+    //   <use family="self"/> still warns and is skipped below regardless.
+    boost::unordered_map<LLFontDescriptor, std::pair<font_file_info_vec_t, font_file_info_vec_t>> pre_use;
+    pre_use.reserve(mFontMap.size());
+    for (const auto& entry : mFontMap)
+    {
+        pre_use.emplace(entry.first,
+                        std::make_pair(entry.first.getFontFiles(),
+                                       entry.first.getFontCollectionFiles()));
+    }
+
     for (const auto& kv : mFamilyUses)
     {
         const std::string& family = kv.first;
@@ -425,23 +437,30 @@ void LLFontRegistry::resolveFontReferences()
 
             for (const std::string& used : used_families)
             {
+                if (used == family)
+                {
+                    LL_WARNS() << "fonts.xml: <use family='" << used
+                               << "'/> in '" << family
+                               << "' is self-referential; skipping" << LL_ENDL;
+                    continue;
+                }
                 LLFontDescriptor used_key(used, s_template_string, style);
-                auto used_it = mFontMap.find(used_key);
-                if (used_it == mFontMap.end() && style != 0)
+                auto snap_it = pre_use.find(used_key);
+                if (snap_it == pre_use.end() && style != 0)
                 {
                     // Fall back to NORMAL of the referenced family.
                     used_key = LLFontDescriptor(used, s_template_string, 0);
-                    used_it = mFontMap.find(used_key);
+                    snap_it = pre_use.find(used_key);
                 }
-                if (used_it == mFontMap.end())
+                if (snap_it == pre_use.end())
                 {
                     LL_WARNS() << "fonts.xml: <use family='" << used
                                << "'/> in '" << family
                                << "' but no such family is defined" << LL_ENDL;
                     continue;
                 }
-                const auto& src_files = used_it->first.getFontFiles();
-                const auto& src_collection = used_it->first.getFontCollectionFiles();
+                const auto& src_files = snap_it->second.first;
+                const auto& src_collection = snap_it->second.second;
                 merged_files.insert(merged_files.end(), src_files.begin(), src_files.end());
                 merged_collection.insert(merged_collection.end(), src_collection.begin(), src_collection.end());
             }
@@ -813,6 +832,7 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
     }
 
     // Second sweep: process each <style> block as its own descriptor.
+    bool any_style_processed = false;
     for (LLXMLNodePtr c = font_node->getFirstChild(); c.notNull(); c = c->getNextSibling())
     {
         if (!c->hasName("style"))
@@ -842,6 +862,22 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
         {
             mInheritFlags[std::make_pair(family_name, style_flags)] = true;
         }
+        any_style_processed = true;
+    }
+
+    // <use>-only family: no <style> blocks, just cross-family references.
+    // Synthesize an empty NORMAL descriptor so resolveFontReferences has a
+    // host to merge the referenced families' files into. Without this the
+    // <use> directives would be silently dropped — the family wouldn't even
+    // appear in mFontMap. Only-style with no NORMAL is a different shape
+    // and not handled here.
+    if (!any_style_processed && !uses.empty())
+    {
+        LLFontDescriptor desc;
+        desc.setName(family_name);
+        desc.setStyle(0);
+        desc.setSize(s_template_string);
+        mergeFontEntry(desc);
     }
 
     // Stash family-level metadata. Merging across skin layers: later layers
@@ -870,13 +906,22 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
         child->getAttributeString("name",child_name);
         if (child->hasName("font"))
         {
-            // New format detection: any <style> child means new format.
-            bool has_style_children = false;
+            // New format detection: any <style> or <use> child marks the
+            // entry as new-format. <use>-only entries are valid — the
+            // family has no primary face, just declares cross-family
+            // references that pull others in. processNewFormatFont
+            // synthesizes an empty NORMAL descriptor in that case so the
+            // resolver has a host to merge into.
+            bool has_new_format_children = false;
             for (LLXMLNodePtr c = child->getFirstChild(); c.notNull(); c = c->getNextSibling())
             {
-                if (c->hasName("style")) { has_style_children = true; break; }
+                if (c->hasName("style") || c->hasName("use"))
+                {
+                    has_new_format_children = true;
+                    break;
+                }
             }
-            if (has_style_children)
+            if (has_new_format_children)
             {
                 registry->processNewFormatFont(child);
                 continue;
