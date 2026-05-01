@@ -830,7 +830,16 @@ LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, l
     fontp->mFace->insertGlyphInfo(wch, gi);
     insertGlyphInfo(wch, gi);
 
-    if (requested_glyph_type != bitmap_glyph_type)
+    // Optimization: when the rendered pixel format differs from what the
+    // caller requested (e.g. Color requested but the file is monochrome),
+    // also publish the entry under the bitmap_type so a future lookup that
+    // asks for that type hits dedup. We must NOT replace an existing entry
+    // here — sibling heads sharing this face hold non-owning pointers to
+    // the existing entry in their local resolution caches, and replacing
+    // would delete the entry under them. Skip the secondary publish if a
+    // bitmap_type entry already exists; the existing one is correct.
+    if (requested_glyph_type != bitmap_glyph_type
+        && !fontp->mFace->findGlyphInfo(wch, bitmap_glyph_type))
     {
         LLFontGlyphInfo* gi_temp = new LLFontGlyphInfo(*gi);
         gi_temp->mGlyphType = bitmap_glyph_type;
@@ -853,7 +862,11 @@ LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fo
     fontp->mFace->insertShapedGlyphInfo(glyph_index, gi);
     insertShapedGlyphInfo(fontp, glyph_index, gi);
 
-    if (requested_glyph_type != bitmap_glyph_type)
+    // Same dangling-pointer hazard as in addGlyphFromFont above: skip the
+    // bitmap_type secondary publish if an entry already exists, otherwise
+    // we'd delete an LLFontGlyphInfo that sibling heads still reference.
+    if (requested_glyph_type != bitmap_glyph_type
+        && !fontp->mFace->findShapedGlyphInfo(glyph_index, bitmap_glyph_type))
     {
         LLFontGlyphInfo* gi_temp = new LLFontGlyphInfo(*gi);
         gi_temp->mGlyphType = bitmap_glyph_type;
