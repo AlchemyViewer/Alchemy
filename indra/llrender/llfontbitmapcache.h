@@ -59,10 +59,12 @@ public:
     // Reserve an atlas slot of (width, height). The cache advances its X
     // pen by `width`; height drives the Y pen step when the row fills.
     // Passing the actual rasterized glyph height (rather than relying on
-    // the font's bbox-derived mMaxCharHeight) is necessary for SBIX/SVG
-    // color-emoji fonts whose strike bitmaps are much taller than the
-    // outline bbox suggests — using the bbox alone leaves later rows
-    // overwriting earlier rows in the atlas.
+    // the font's bbox-derived mMaxCharHeight) is necessary for color-emoji
+    // fonts where the FontBBox is unreliable in *both* directions: the
+    // outline bbox can underestimate SBIX/SVG strike bitmap heights (rows
+    // would overlap), and at small point sizes the SFNT-level bbox covering
+    // strike dimensions can vastly overestimate actual rendered heights
+    // (rows would be hundreds of px too tall).
     bool nextOpenPos(S32 width, S32 height, S32& posX, S32& posY, EFontGlyphType bitmapType, U32& bitmapNum);
 
     void destroyGL();

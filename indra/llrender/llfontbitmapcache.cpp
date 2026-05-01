@@ -99,14 +99,21 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
 
     if (!need_new_sheet && (mCurrentOffsetX[bitmap_idx] + width + 4) > mBitmapWidth)
     {
-        // Y advance must clear the tallest glyph already placed in this row,
-        // not just mMaxCharHeight (which is derived from the font's outline
-        // bbox and underestimates color-emoji strike heights). Likewise the
-        // "fits another row?" check uses the new glyph's own height to be
-        // sure it won't run off the bottom.
-        const S32 row_step = llmax(mMaxCharHeight, mCurrentRowMaxHeight[bitmap_idx]);
-        const S32 next_row_height = llmax(mMaxCharHeight, height);
-        if ((mCurrentOffsetY[bitmap_idx] + row_step + next_row_height + 8) > mBitmapHeight)
+        // Y advance must clear the tallest glyph already placed in this row.
+        // Don't floor by mMaxCharHeight — for color emoji fonts the SFNT
+        // FontBBox often covers the union of SBIX strike dimensions even when
+        // the requested point size renders much smaller bitmaps (Twemoji's
+        // bbox at 11 pt produces mMaxCharHeight ~350 while typical glyphs
+        // rasterize ~16 px). Using that as a floor wastes ~330 px of vertical
+        // atlas space per row. The actual placed-glyph maximum is the right
+        // figure here; the new glyph's own height is what gates the row-fits
+        // check below. Fallback to the new glyph's height when the row is
+        // somehow "full" with nothing placed (degenerate case where the very
+        // first glyph in a fresh row is wider than the atlas).
+        const S32 placed_row_height = (mCurrentRowMaxHeight[bitmap_idx] > 0)
+                                    ? mCurrentRowMaxHeight[bitmap_idx]
+                                    : height;
+        if ((mCurrentOffsetY[bitmap_idx] + placed_row_height + height + 8) > mBitmapHeight)
         {
             need_new_sheet = true;
         }
@@ -114,7 +121,7 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
         {
             // Move to next row in current image.
             mCurrentOffsetX[bitmap_idx] = 4;
-            mCurrentOffsetY[bitmap_idx] += row_step + 4;
+            mCurrentOffsetY[bitmap_idx] += placed_row_height + 4;
             mCurrentRowMaxHeight[bitmap_idx] = 0;
         }
     }
@@ -173,7 +180,7 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
 
     mCurrentOffsetX[bitmap_idx] += width + 4;
     // Track tallest glyph placed in the current row so the next Y advance
-    // clears it, even when the glyph is taller than mMaxCharHeight.
+    // clears it without overlapping previously placed glyphs.
     if (height > mCurrentRowMaxHeight[bitmap_idx])
         mCurrentRowMaxHeight[bitmap_idx] = height;
     touchSheet(bitmap_type, bitmap_num);
