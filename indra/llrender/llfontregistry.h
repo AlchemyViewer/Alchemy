@@ -186,16 +186,25 @@ public:
 private:
     LLFontRegistry(const LLFontRegistry& other); // no-copy
     LLFontGL *createFont(const LLFontDescriptor& desc);
-    // Walk mInheritFlags and append each parent NORMAL-style entry's files
-    // to the inheriting variant. Idempotent — clears mInheritFlags after
-    // expansion so re-running over a partially-expanded registry is safe.
-    void expandInheritedFonts();
+    // Resolve cross-family <use> references, then per-family inherit="true"
+    // style variants, in that order. Idempotent — consumes mFamilyUses and
+    // mInheritFlags so re-running over a partially-resolved registry is safe.
+    void resolveFontReferences();
+    // Insert a fresh descriptor, or merge it into an existing same-key entry
+    // by prepending its files (used for cross-skin layering).
+    void mergeFontEntry(const LLFontDescriptor& desc);
+    // Process a new-format <font> block (one with <style> children) into
+    // separate (family, style) descriptors plus family-level metadata.
+    void processNewFormatFont(LLPointer<class LLXMLNode> font_node);
     typedef boost::unordered_map<LLFontDescriptor,LLFontGL*> font_reg_map_t;
     typedef boost::unordered_map<std::string,F32> font_size_map_t;
     typedef boost::unordered_map<std::string, font_size_map_t> family_size_map_t;
     // Key: (family name, style flags). Stores the inherit="true" intent for
-    // a style variant; expanded at parse-time in init_from_xml.
+    // a style variant; expanded at the end of parseFontInfo.
     typedef std::map<std::pair<std::string, U8>, bool> inherit_map_t;
+    // Per-family <use family="X"/> references, resolved at parse-time after
+    // all skin layers have loaded.
+    typedef std::map<std::string, std::vector<std::string>> family_uses_map_t;
 
     // Given a descriptor, look up specific font instantiation.
     font_reg_map_t mFontMap;
@@ -207,6 +216,10 @@ private:
     // Style variants that requested inherit="true" — append the parent
     // NORMAL-style entry's resolved files after parsing.
     inherit_map_t mInheritFlags;
+    // mFamilyUses[family] = [other_family, ...] — append each referenced
+    // family's matching-style files (or NORMAL fallback) to every style of
+    // `family` during resolveFontReferences().
+    family_uses_map_t mFamilyUses;
 
     string_vec_t mUltimateFallbackList;
     bool mCreateGLTextures;

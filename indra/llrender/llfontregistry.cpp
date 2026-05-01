@@ -367,10 +367,11 @@ bool LLFontRegistry::parseFontInfo(const std::string& xml_filename)
         }
     }
 
-    // Resolve inherit="true" once across the merged registry, after all
-    // skinned fonts.xml files have been read. Doing this per-file would
-    // double-append parent files for entries inherited across layers.
-    expandInheritedFonts();
+    // Resolve cross-family <use> and per-family inherit="true" once across
+    // the merged registry, after all skinned fonts.xml files have been read.
+    // Doing this per-file would double-append references for entries that
+    // appear in multiple skin layers.
+    resolveFontReferences();
 
     //if (success)
     //  dump();
@@ -378,8 +379,79 @@ bool LLFontRegistry::parseFontInfo(const std::string& xml_filename)
     return success;
 }
 
-void LLFontRegistry::expandInheritedFonts()
+void LLFontRegistry::resolveFontReferences()
 {
+    // Helper: replace the file lists on a (family, style) entry while
+    // preserving any cached LLFontGL pointer.
+    auto replace_files = [this](font_reg_map_t::iterator it,
+                                const font_file_info_vec_t& new_files,
+                                const font_file_info_vec_t& new_collection)
+    {
+        LLFontDescriptor new_desc = it->first;
+        new_desc.setFontFiles(new_files);
+        new_desc.setFontCollectionFiles(new_collection);
+        LLFontGL* fontp = it->second;
+        mFontMap.erase(it);
+        mFontMap[new_desc] = fontp;
+    };
+
+    // Step 1: resolve cross-family <use> references. For each (family, style)
+    // entry that names another family, append the referenced family's
+    // matching-style files (or NORMAL if the style isn't defined). Single-
+    // level only — referenced families' own <use> chains are not followed,
+    // which sidesteps cycle detection. Style variants that haven't yet been
+    // expanded by inherit (step 2) get the <use> appended at this point;
+    // inherit then pulls in NORMAL's already-<use>-expanded chain.
+    static const U8 kStyles[4] = {
+        0,
+        LLFontGL::BOLD,
+        LLFontGL::ITALIC,
+        static_cast<U8>(LLFontGL::BOLD | LLFontGL::ITALIC)
+    };
+    for (const auto& kv : mFamilyUses)
+    {
+        const std::string& family = kv.first;
+        const std::vector<std::string>& used_families = kv.second;
+
+        for (U8 style : kStyles)
+        {
+            LLFontDescriptor key(family, s_template_string, style);
+            auto it = mFontMap.find(key);
+            if (it == mFontMap.end())
+                continue;
+
+            font_file_info_vec_t merged_files = it->first.getFontFiles();
+            font_file_info_vec_t merged_collection = it->first.getFontCollectionFiles();
+
+            for (const std::string& used : used_families)
+            {
+                LLFontDescriptor used_key(used, s_template_string, style);
+                auto used_it = mFontMap.find(used_key);
+                if (used_it == mFontMap.end() && style != 0)
+                {
+                    // Fall back to NORMAL of the referenced family.
+                    used_key = LLFontDescriptor(used, s_template_string, 0);
+                    used_it = mFontMap.find(used_key);
+                }
+                if (used_it == mFontMap.end())
+                {
+                    LL_WARNS() << "fonts.xml: <use family='" << used
+                               << "'/> in '" << family
+                               << "' but no such family is defined" << LL_ENDL;
+                    continue;
+                }
+                const auto& src_files = used_it->first.getFontFiles();
+                const auto& src_collection = used_it->first.getFontCollectionFiles();
+                merged_files.insert(merged_files.end(), src_files.begin(), src_files.end());
+                merged_collection.insert(merged_collection.end(), src_collection.begin(), src_collection.end());
+            }
+
+            replace_files(it, merged_files, merged_collection);
+        }
+    }
+
+    // Step 2: resolve inherit="true". Done after <use> so a BOLD style that
+    // inherits NORMAL picks up NORMAL's post-<use> file list.
     for (const auto& kv : mInheritFlags)
     {
         if (!kv.second)
@@ -394,7 +466,7 @@ void LLFontRegistry::expandInheritedFonts()
         if (variant_it == mFontMap.end())
         {
             LL_WARNS() << "fonts.xml: inherit='true' on " << family << " style "
-                       << (S32)style << " but no matching <font> entry exists" << LL_ENDL;
+                       << (S32)style << " but no matching <font>/<style> entry exists" << LL_ENDL;
             continue;
         }
 
@@ -415,15 +487,12 @@ void LLFontRegistry::expandInheritedFonts()
         const font_file_info_vec_t& parent_collection = parent_it->first.getFontCollectionFiles();
         merged_collection.insert(merged_collection.end(), parent_collection.begin(), parent_collection.end());
 
-        LLFontDescriptor new_variant = variant_it->first;
-        new_variant.setFontFiles(merged_files);
-        new_variant.setFontCollectionFiles(merged_collection);
-        LLFontGL* fontp = variant_it->second;
-        mFontMap.erase(variant_it);
-        mFontMap[new_variant] = fontp;
+        replace_files(variant_it, merged_files, merged_collection);
     }
-    // Clear so a subsequent call (e.g. on dynamic skin reload) doesn't
-    // double-append parent files to entries we've already expanded.
+
+    // Consume both maps so a subsequent call (e.g. on dynamic skin reload)
+    // doesn't double-append references to already-resolved entries.
+    mFamilyUses.clear();
     mInheritFlags.clear();
 }
 
@@ -528,6 +597,14 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
     {
         std::string child_name;
         child->getAttributeString("name",child_name);
+        // <style> and <use> are new-format-only and handled at the
+        // process_new_format_font level. Skip them here so they don't get
+        // accidentally interpreted as <file> when font_desc_init_from_xml is
+        // called on a <style> node directly.
+        if (child->hasName("style") || child->hasName("use"))
+        {
+            continue;
+        }
         if (child->hasName("file"))
         {
             std::string font_file_name = child->getTextContents();
@@ -629,7 +706,159 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
     }
     return true;
 }
+// Read family-level defaults (ligatures, font_hinting, font_weight,
+// load_collection) from a <font> node. Used by both legacy and new-format
+// paths; mirrors the family-level reads done inside font_desc_init_from_xml
+// for backward compatibility.
+FamilyDefaults read_family_defaults(LLXMLNodePtr font_node)
+{
+    FamilyDefaults d;
+    if (font_node->hasAttribute("ligatures"))
+    {
+        std::string s;
+        font_node->getAttributeString("ligatures", s);
+        LLStringUtil::toLower(s);
+        d.monospace_ligatures = (s == "on" || s == "true" || s == "1");
+    }
+    EFontHinting h;
+    if (parseHintingAttr(font_node, h))
+    {
+        d.hinting = h;
+        d.hinting_set = true;
+    }
+    if (font_node->hasAttribute("font_weight"))
+    {
+        S32 w = -1;
+        font_node->getAttributeS32("font_weight", w);
+        d.weight = w;
+        d.weight_set = true;
+    }
+    if (font_node->hasAttribute("load_collection"))
+    {
+        bool c = false;
+        font_node->getAttributeBOOL("load_collection", c);
+        d.load_collection = c;
+        d.load_collection_set = true;
+    }
+    return d;
+}
+
 } // anonymous namespace
+
+void LLFontRegistry::mergeFontEntry(const LLFontDescriptor& desc)
+{
+    const LLFontDescriptor* match = getMatchingFontDesc(desc);
+    if (!match)
+    {
+        mFontMap[desc] = nullptr;
+        return;
+    }
+    font_file_info_vec_t files = match->getFontFiles();
+    files.insert(files.begin(), desc.getFontFiles().begin(), desc.getFontFiles().end());
+    font_file_info_vec_t collection = match->getFontCollectionFiles();
+    collection.insert(collection.begin(), desc.getFontCollectionFiles().begin(), desc.getFontCollectionFiles().end());
+
+    LLFontDescriptor merged = *match;
+    merged.setFontFiles(files);
+    merged.setFontCollectionFiles(collection);
+    mFontMap.erase(*match);
+    mFontMap[merged] = nullptr;
+}
+
+void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
+{
+    std::string family_name;
+    if (!font_node->getAttributeString("name", family_name))
+    {
+        LL_WARNS() << "fonts.xml: <font> missing required name attribute" << LL_ENDL;
+        return;
+    }
+
+    FamilyDefaults defaults = read_family_defaults(font_node);
+
+    // First sweep: collect family-level <size>, <use>; defer <style> to
+    // a second sweep so we can warn cleanly on stray children.
+    family_size_overrides_t family_sizes;
+    std::vector<std::string> uses;
+    for (LLXMLNodePtr c = font_node->getFirstChild(); c.notNull(); c = c->getNextSibling())
+    {
+        if (c->hasName("size"))
+        {
+            std::string size_name;
+            F32 size_value;
+            if (c->getAttributeString("name", size_name) &&
+                c->getAttributeF32("size", size_value))
+            {
+                family_sizes[size_name] = size_value;
+            }
+            else
+            {
+                LL_WARNS() << "fonts.xml: <size> in '" << family_name
+                           << "' needs both name and size attributes" << LL_ENDL;
+            }
+        }
+        else if (c->hasName("use"))
+        {
+            std::string used;
+            if (c->getAttributeString("family", used))
+            {
+                uses.push_back(used);
+            }
+            else
+            {
+                LL_WARNS() << "fonts.xml: <use> in '" << family_name
+                           << "' missing family attribute" << LL_ENDL;
+            }
+        }
+    }
+
+    // Second sweep: process each <style> block as its own descriptor.
+    for (LLXMLNodePtr c = font_node->getFirstChild(); c.notNull(); c = c->getNextSibling())
+    {
+        if (!c->hasName("style"))
+            continue;
+
+        std::string style_name;
+        c->getAttributeString("name", style_name);
+        // getStyleFromString returns 0 (NORMAL) for "NORMAL" or unrecognized
+        // input — both produce the same NORMAL-style descriptor.
+        U8 style_flags = LLFontGL::getStyleFromString(style_name);
+
+        LLFontDescriptor desc;
+        desc.setName(family_name);
+        desc.setStyle(style_flags);
+        desc.setSize(s_template_string);
+
+        // Parse <file>/<os> inside the <style>. Pass nullptr for extras —
+        // <size>/<use>/inherit at <style> level are not supported.
+        font_desc_init_from_xml(c, desc, defaults, nullptr);
+
+        bool style_inherit = false;
+        if (c->hasAttribute("inherit"))
+            c->getAttributeBOOL("inherit", style_inherit);
+
+        mergeFontEntry(desc);
+        if (style_inherit)
+        {
+            mInheritFlags[std::make_pair(family_name, style_flags)] = true;
+        }
+    }
+
+    // Stash family-level metadata. Merging across skin layers: later layers
+    // add to the maps without erasing earlier entries.
+    if (!family_sizes.empty())
+    {
+        auto& dst = mFamilySizes[family_name];
+        for (const auto& kv : family_sizes)
+            dst[kv.first] = kv.second;
+    }
+    if (!uses.empty())
+    {
+        auto& dst = mFamilyUses[family_name];
+        for (const auto& u : uses)
+            dst.push_back(u);
+    }
+}
 
 bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
 {
@@ -641,6 +870,20 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
         child->getAttributeString("name",child_name);
         if (child->hasName("font"))
         {
+            // New format detection: any <style> child means new format.
+            bool has_style_children = false;
+            for (LLXMLNodePtr c = child->getFirstChild(); c.notNull(); c = c->getNextSibling())
+            {
+                if (c->hasName("style")) { has_style_children = true; break; }
+            }
+            if (has_style_children)
+            {
+                registry->processNewFormatFont(child);
+                continue;
+            }
+
+            // Legacy format: a <font> entry with <file>/<os> children directly,
+            // and one (name, font_style) per entry.
             LLFontDescriptor desc;
             FontParseExtras extras;
             bool font_succ = font_desc_init_from_xml(child, desc, FamilyDefaults(), &extras);

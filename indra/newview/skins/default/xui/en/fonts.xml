@@ -1,234 +1,148 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <fonts>
 
-  <font
-      name="default"
-      comment="default font files (global fallbacks)">
-    <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
-    <file size_delta="-0.5">DejaVuSans.woff2</file>
-    <file functor="is_emoji">TwemojiSVG.woff2</file>
-    <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
-    <os name="Windows">
-      <file>meiryo.TTC</file>
-      <file>MSGOTHIC.TTC</file>
-      <file>gulim.ttc</file>
-      <file>simhei.ttf</file>
-      <file>ArialUni.ttf</file>
-      <file>msyh.ttc</file>
-      <file load_collection="true">Cambria.ttc</file>
-      <file>malgun.ttf</file>
-      <file>micross.ttf</file>
-    </os>
-    <os name="Mac">
-      <file>ヒラギノ角ゴシック W3.ttc</file>
-      <file>ヒラギノ角ゴ Pro W3.otf</file>
-      <file>ヒラギノ角ゴ ProN W3.otf</file>
-      <file>ヒラギノ明朝 ProN W3.ttc</file>
-      <file>AppleGothic.dfont</file>
-      <file>AppleGothic.ttf</file>
-      <file>AppleSDGothicNeo-Regular.otf</file>
-      <file>AppleSDGothicNeo.ttc</file>
-      <file>华文细黑.ttf</file>
-      <file>PingFang.ttc</file>
-      <file>STIXGeneral.otf</file>
-      <file>Thonburi.ttc</file>
-    </os>
+  <!-- Cross-script fallback families. These are small, single-purpose
+       families pulled in by other families via <use family="..."/>. -->
+
+  <font name="DejaVu">
+    <size name="LSmall" size="7.6"/>
+    <style name="NORMAL"><file size_delta="-0.5">DejaVuSans.woff2</file></style>
+    <style name="BOLD"><file size_delta="-0.5">DejaVuSans-Bold.woff2</file></style>
+    <style name="ITALIC"><file size_delta="-0.5">DejaVuSans-Oblique.woff2</file></style>
+    <style name="BOLD|ITALIC"><file size_delta="-0.5">DejaVuSans-BoldOblique.woff2</file></style>
   </font>
 
-  <font
-      name="SansSerif"
-      comment="Name of san-serif font (Truetype file name)">
-    <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
-    <file size_delta="-0.5">DejaVuSans.woff2</file>
-    <os name="Windows">
-      <file>arial.ttf</file>
+  <font name="Emoji">
+    <style name="NORMAL"><file functor="is_emoji">TwemojiSVG.woff2</file></style>
+  </font>
+
+  <font name="CJK">
+    <style name="NORMAL">
+      <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
+    </style>
+    <style name="BOLD">
+      <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
+    </style>
+    <style name="ITALIC">
+      <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
+    </style>
+    <style name="BOLD|ITALIC">
+      <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
+    </style>
+  </font>
+
+  <!-- The "default" font is appended (style-agnostically) to every font's
+       chain inside createFont(). Keep it minimal: OS-specific CJK fonts
+       that the standalone CJK family can't fully substitute for. -->
+  <font name="default" comment="Implicit ultimate fallback, OS-specific CJK">
+    <style name="NORMAL">
+      <os name="Windows">
+        <file>meiryo.TTC</file>
+        <file>MSGOTHIC.TTC</file>
+        <file>gulim.ttc</file>
+        <file>simhei.ttf</file>
+        <file>ArialUni.ttf</file>
+        <file>msyh.ttc</file>
+        <file load_collection="true">Cambria.ttc</file>
+        <file>malgun.ttf</file>
+        <file>micross.ttf</file>
       </os>
-    <os name="Mac">
-      <file>Helvetica.dfont</file>
+      <os name="Mac">
+        <file>ヒラギノ角ゴシック W3.ttc</file>
+        <file>ヒラギノ角ゴ Pro W3.otf</file>
+        <file>ヒラギノ角ゴ ProN W3.otf</file>
+        <file>ヒラギノ明朝 ProN W3.ttc</file>
+        <file>AppleGothic.dfont</file>
+        <file>AppleGothic.ttf</file>
+        <file>AppleSDGothicNeo-Regular.otf</file>
+        <file>AppleSDGothicNeo.ttc</file>
+        <file>华文细黑.ttf</file>
+        <file>PingFang.ttc</file>
+        <file>STIXGeneral.otf</file>
+        <file>Thonburi.ttc</file>
       </os>
+    </style>
   </font>
 
-  <font
-      name="SansSerif"
-      comment="Name of bold sans-serif font"
-      font_style="BOLD"
-      inherit="true">
-    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
-    <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
-    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
-    <os name="Windows">
-      <file>arialbd.ttf</file>
-    </os>
+  <!-- Primary user-facing families. Each declares its own primary face per
+       style and pulls in DejaVu/Emoji/CJK as fallbacks via <use>. -->
+
+  <font name="SansSerif">
+    <style name="NORMAL">
+      <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
+      <os name="Windows"><file>arial.ttf</file></os>
+      <os name="Mac"><file>Helvetica.dfont</file></os>
+    </style>
+    <style name="BOLD" inherit="true">
+      <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
+      <os name="Windows"><file>arialbd.ttf</file></os>
+    </style>
+    <style name="ITALIC" inherit="true">
+      <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
+    </style>
+    <style name="BOLD|ITALIC" inherit="true">
+      <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
+    </style>
+    <use family="DejaVu"/>
+    <use family="Emoji"/>
+    <use family="CJK"/>
   </font>
 
-  <font
-      name="SansSerif"
-      comment="Name of italic sans-serif font"
-      font_style="ITALIC"
-      inherit="true">
-    <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
-    <file size_delta="-0.5">DejaVuSans-Oblique.woff2</file>
+  <font name="Helvetica">
+    <style name="NORMAL">
+      <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
+      <os name="Windows"><file>arial.ttf</file></os>
+      <os name="Mac"><file>arial.ttf</file></os>
+    </style>
+    <style name="BOLD" inherit="true">
+      <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
+      <os name="Windows"><file>arialbd.ttf</file></os>
+      <os name="Mac"><file>arialbd.ttf</file></os>
+    </style>
+    <style name="ITALIC" inherit="true">
+      <file font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
+      <os name="Windows"><file>ariali.ttf</file></os>
+      <os name="Mac"><file>ariali.ttf</file></os>
+    </style>
+    <style name="BOLD|ITALIC" inherit="true">
+      <file font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
+      <os name="Windows"><file>arialbi.ttf</file></os>
+      <os name="Mac"><file>arialbi.ttf</file></os>
+    </style>
+    <use family="DejaVu"/>
+    <use family="Emoji"/>
+    <use family="CJK"/>
   </font>
 
-  <font
-      name="SansSerif"
-      comment="Name of bold italic sans-serif font"
-      font_style="BOLD|ITALIC"
-      inherit="true">
-    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
-    <file size_delta="-0.5">DejaVuSans-BoldOblique.woff2</file>
-  </font>
-
-  <font name="Emoji"
-	comment="Name of emoji font">
-    <file>TwemojiSVG.woff2</file>
-  </font>
-
-  <font
-      name="Monospace"
-      comment="Name of monospace font">
-    <!-- Per-family size overrides. The Monospace family carries its own
-         baseline ("Monospace" key, used by getFontMonospace and most XUI
-         consumers) plus the LSL editor's small/huge size knobs. These size
-         names apply to every Monospace style variant via the family map. -->
+  <font name="Monospace">
     <size name="Monospace" size="10.0"/>
     <size name="SmallLSL"  size="7"/>
     <size name="HugeLSL"   size="12"/>
-    <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Upright.woff2</file>
+    <style name="NORMAL">
+      <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Upright.woff2</file>
+    </style>
+    <style name="BOLD" inherit="true">
+      <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Upright.woff2</file>
+    </style>
+    <style name="ITALIC" inherit="true">
+      <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Italic.woff2</file>
+    </style>
+    <style name="BOLD|ITALIC" inherit="true">
+      <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Italic.woff2</file>
+    </style>
+    <use family="Emoji"/>
+    <use family="CJK"/>
   </font>
 
-  <font
-      name="Monospace"
-      comment="Name of bold monospace font"
-      font_style="BOLD"
-      inherit="true">
-    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Upright.woff2</file>
+  <font name="OverrideTest">
+    <style name="NORMAL">
+      <file>times.ttf</file>
+      <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
+    </style>
   </font>
 
-  <font
-      name="Monospace"
-      comment="Name of italic monospace font"
-      font_style="ITALIC"
-      inherit="true">
-    <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Italic.woff2</file>
-  </font>
-
-  <font
-      name="Monospace"
-      comment="Name of bold italic monospace font"
-      font_style="BOLD|ITALIC"
-      inherit="true">
-    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Italic.woff2</file>
-  </font>
-
-  <font name="DejaVu"
-	comment="Name of DejaVu font">
-    <!-- Legacy small-DejaVu size used by the notification list. -->
-    <size name="LSmall" size="7.6"/>
-    <file>DejaVuSans.woff2</file>
-    <file>TwemojiSVG.woff2</file>
-  </font>
-
-  <font name="DejaVu"
-	comment="Name of DejaVu font (bold)"
-	font_style="BOLD"
-	inherit="true">
-    <file>DejaVuSans-Bold.woff2</file>
-  </font>
-
-  <font name="DejaVu"
-	comment="Name of DejaVu font (italic)"
-	font_style="ITALIC"
-	inherit="true">
-    <file>DejaVuSans-Oblique.woff2</file>
-  </font>
-
-  <font name="DejaVu"
-	comment="Name of DejaVu font (bold italic)"
-	font_style="BOLD|ITALIC"
-	inherit="true">
-    <file>DejaVuSans-BoldOblique.woff2</file>
-  </font>
-
-  <font
-      name="Helvetica"
-      comment="Name of Helvetica font">
-    <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
-    <file size_delta="-0.5">DejaVuSans.woff2</file>
-    <os name="Windows">
-      <file>arial.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>arial.ttf</file>
-      </os>
-  </font>
-
-  <font
-      name="Helvetica"
-      comment="Name of Helvetica font (bold)"
-      font_style="BOLD"
-      inherit="true">
-    <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
-    <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
-    <os name="Windows">
-      <file>arialbd.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>arialbd.ttf</file>
-      </os>
-  </font>
-
-  <font
-      name="Helvetica"
-      comment="Name of Helvetica font (italic)"
-      font_style="ITALIC"
-      inherit="true">
-    <file font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
-    <file size_delta="-0.5">DejaVuSans-Oblique.woff2</file>
-    <os name="Windows">
-      <file>ariali.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>ariali.ttf</file>
-      </os>
-  </font>
-
-  <font
-      name="Helvetica"
-      comment="Name of Helvetica font (bold italic)"
-      font_style="BOLD|ITALIC"
-      inherit="true">
-    <file font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
-    <file size_delta="-0.5">DejaVuSans-BoldOblique.woff2</file>
-    <os name="Windows">
-      <file>arialbi.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>arialbi.ttf</file>
-      </os>
-  </font>
-
-  <font
-      name="OverrideTest"
-      comment="Name of font to test overriding">
-    <file>times.ttf</file>
-    <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
-  </font>
-
-  <font_size name="Huge"
-         comment="Size of huge font (points, or 1/72 of an inch)"
-         size="16.0"
-         />
-  <font_size name="Large"
-         comment="Size of large font (points, or 1/72 of an inch)"
-         size="11.0"
-         />
-  <font_size name="Medium"
-         comment="Size of medium font (points, or 1/72 of an inch)"
-         size="10"
-         />
-  <font_size name="Small"
-         comment="Size of small font (points, or 1/72 of an inch)"
-         size="9"
-         />
+  <font_size name="Huge"   size="16.0"/>
+  <font_size name="Large"  size="11.0"/>
+  <font_size name="Medium" size="10"/>
+  <font_size name="Small"  size="9"/>
 </fonts>
