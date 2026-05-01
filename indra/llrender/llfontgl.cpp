@@ -1938,23 +1938,21 @@ std::string LLFontGL::getFontPathSystem()
     return "/System/Library/Fonts/";
 
 #elif LL_WINDOWS
-    auto system_root = LLStringUtil::getenv("SystemRoot");
-    if (! system_root.empty())
+    static std::string system_font_path;
+    if (!system_font_path.empty())
     {
-        std::string fontpath(gDirUtilp->add(system_root, "fonts") + gDirUtilp->getDirDelimiter());
-        LL_INFOS() << "from SystemRoot: " << fontpath << LL_ENDL;
-        return fontpath;
+        return system_font_path;
     }
 
     wchar_t *pwstr = NULL;
     HRESULT okay = SHGetKnownFolderPath(FOLDERID_Fonts, 0, NULL, &pwstr);
     if (SUCCEEDED(okay) && pwstr)
     {
-        std::string fontpath(ll_convert_wide_to_string(pwstr));
+        system_font_path = ll_convert_wide_to_string(pwstr);
         // SHGetKnownFolderPath() contract requires us to free pwstr
         CoTaskMemFree(pwstr);
-        LL_INFOS() << "from SHGetKnownFolderPath(): " << fontpath << LL_ENDL;
-        return fontpath;
+        LL_INFOS() << "from SHGetKnownFolderPath(): " << system_font_path << LL_ENDL;
+        return system_font_path;
     }
 #endif
 
