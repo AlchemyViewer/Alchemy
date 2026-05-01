@@ -866,18 +866,29 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
     }
 
     // <use>-only family: no <style> blocks, just cross-family references.
-    // Synthesize an empty NORMAL descriptor so resolveFontReferences has a
-    // host to merge the referenced families' files into. Without this the
-    // <use> directives would be silently dropped — the family wouldn't even
-    // appear in mFontMap. Only-style with no NORMAL is a different shape
-    // and not handled here.
+    // Synthesize an empty descriptor for every style so resolveFontReferences
+    // has a host at each style to merge the referenced families' matching-
+    // style files into. Without this, <use> directives would be silently
+    // dropped at every style except NORMAL and callers asking for the
+    // aggregator at BOLD/ITALIC/etc. would fall through to NORMAL via
+    // getClosestFontTemplate — losing the bold/italic distinction even
+    // though the referenced families have those styles.
     if (!any_style_processed && !uses.empty())
     {
-        LLFontDescriptor desc;
-        desc.setName(family_name);
-        desc.setStyle(0);
-        desc.setSize(s_template_string);
-        mergeFontEntry(desc);
+        static const U8 kAllStyles[4] = {
+            0,
+            LLFontGL::BOLD,
+            LLFontGL::ITALIC,
+            static_cast<U8>(LLFontGL::BOLD | LLFontGL::ITALIC)
+        };
+        for (U8 style : kAllStyles)
+        {
+            LLFontDescriptor desc;
+            desc.setName(family_name);
+            desc.setStyle(style);
+            desc.setSize(s_template_string);
+            mergeFontEntry(desc);
+        }
     }
 
     // Stash family-level metadata. Merging across skin layers: later layers
