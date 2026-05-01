@@ -32,24 +32,16 @@
 
 #include "llimagegl.h"
 #include "llfontbitmapcache.h"
+#include "llfontface.h"
 
 #include <array>
 #include <boost/functional/hash.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered_map.hpp>
 
-// Hack.  FT_Face is just a typedef for a pointer to a struct,
-// but there's no simple forward declarations file for FreeType,
-// and the main include file is 200K.
-// We'll forward declare the struct here.  JC
-struct FT_FaceRec_;
-typedef struct FT_FaceRec_* LLFT_Face;
+// LLFT_Face / hb_font_t / EFontHinting come in via llfontface.h.
 struct FT_StreamRec_;
 typedef struct FT_StreamRec_ LLFT_Stream;
-enum class EFontHinting : S32;
-// Forward-declare HarfBuzz's opaque font handle so consumers of this header
-// (including the viewer's PCH) don't have to drag in <hb.h>.
-struct hb_font_t;
 
 namespace ll
 {
@@ -67,12 +59,19 @@ public:
 
     U8 const *loadFont( std::string const &aFilename, long &a_Size );
 
+    // Resolve a key to a refcounted, shared LLFontFace. Loads the face on
+    // miss and caches it; returns null if FreeType refuses the file or the
+    // requested size. Cached entries persist until cleanupClass(), or until
+    // unloadAllFonts() runs at shutdown.
+    LLPointer<LLFontFace> getOrCreateFace(const LLFontFaceKey& key);
+
 private:
     LLFontManager();
     ~LLFontManager();
 
     void unloadAllFonts();
     std::map< std::string, std::shared_ptr<ll::fonts::LoadedFont> > m_LoadedFonts;
+    boost::unordered_map<LLFontFaceKey, LLPointer<LLFontFace>> mFaceCache;
 };
 
 struct LLFontGlyphInfo
@@ -259,17 +258,18 @@ public:
     void collectGarbage() const;
 
 private:
+    // Convenience: dereference the shared face wrapper. Null when this
+    // instance hasn't been loaded yet or was unloaded.
+    LLFT_Face getFTFace() const { return mFace ? mFace->face() : nullptr; }
+
     void resetBitmapCache();
-    void destroyHbFont();
     // Return the FT glyph index for `wch` on this face, caching the result so
     // subsequent lookups skip the cmap binary search inside FT_Get_Char_Index.
-    // A cached value of 0 is meaningful — it means the face has no glyph for
-    // `wch` — and prevents re-querying on every miss. Cleared whenever mFTFace
-    // is replaced.
+    // Delegates to mFace's char-index cache, which is shared across every
+    // LLFontFreetype that resolved to the same LLFontFace.
     U32 getCharGlyphIndex(llwchar wch) const;
     void setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num, U32 width, U32 height, U8 *data, S32 stride = 0) const;
     bool setSubImageBGRA(U32 x, U32 y, U32 bitmap_num, U16 width, U16 height, const U8* data, U32 stride) const;
-    bool setVariationAxis(const std::string& axis_tag, F32 value);
     bool hasGlyph(llwchar wch) const;       // Has a glyph for this character
     LLFontGlyphInfo* addGlyph(llwchar wch, EFontGlyphType glyph_type) const;        // Add a new character to the font if necessary
     LLFontGlyphInfo* addGlyphFromFont(
@@ -300,7 +300,11 @@ private:
     F32 mDescender;
     F32 mLineHeight;
 
-    LLFT_Face mFTFace;
+    // Shared underlying FT_Face wrapper. Multiple LLFontFreetype instances
+    // can hold pointers to the same LLFontFace when their (filename, size,
+    // weight, hinting, flags) all match — see LLFontManager::getOrCreateFace.
+    // Per-instance state (fallback chain, atlas, glyph caches) stays here.
+    LLPointer<LLFontFace> mFace;
 
     bool mIsFallback;
     EFontHinting mHinting;
@@ -316,12 +320,10 @@ private:
     typedef boost::unordered_multimap<llwchar, LLFontGlyphInfo*> char_glyph_info_map_t;
     mutable char_glyph_info_map_t mCharGlyphInfoMap; // Information about glyph location in bitmap
 
-    // Codepoint -> FT glyph index. Skips the cmap binary search on repeated
-    // lookups in selectShapingFace/addGlyph/faceHasGlyph. Populated lazily by
-    // getCharGlyphIndex; cleared when mFTFace is replaced. Open-addressed
-    // (flat) map: small POD value, frequent reads — cache-friendly probing
-    // beats node-based unordered_map here.
-    mutable boost::unordered_flat_map<llwchar, U32> mCharIndexCache;
+    // (mCharIndexCache moved to LLFontFace — it's shared across every
+    // LLFontFreetype that resolves to the same face wrapper, since the
+    // codepoint→glyph-index mapping is determined entirely by the FT_Face
+    // charmap.)
 
     // On the root face only, cache the result of selectShapingFace's fallback
     // iteration: codepoint -> (winning face, glyph index in that face). One
@@ -360,10 +362,8 @@ private:
 
     mutable LLFontBitmapCache* mFontBitmapCachep;
 
-    // HarfBuzz handle wrapping mFTFace. Lazily created on first getHbFont()
-    // call and destroyed whenever mFTFace is replaced or the font is torn
-    // down (see destroyHbFont()).
-    mutable hb_font_t* mHbFont;
+    // (mHbFont moved to LLFontFace — the HarfBuzz handle wraps the FT_Face,
+    // and shared faces share the same hb_font.)
 
     mutable S32 mRenderGlyphCount;
 
