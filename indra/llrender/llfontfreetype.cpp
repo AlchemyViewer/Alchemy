@@ -102,8 +102,13 @@ LLFontManager::LLFontManager()
 
 LLFontManager::~LLFontManager()
 {
-    FT_Done_FreeType(gFTLibrary);
+    // Order matters: cached LLFontFace instances hold FT_Face pointers
+    // owned by gFTLibrary. Tearing those down (FT_Done_Face) requires the
+    // library to still be alive, so drop the face cache (and bytes) first
+    // and only then destroy the library.
     unloadAllFonts();
+    FT_Done_FreeType(gFTLibrary);
+    gFTLibrary = nullptr;
 }
 
 
