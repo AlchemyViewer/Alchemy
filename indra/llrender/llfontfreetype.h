@@ -237,6 +237,9 @@ public:
     bool faceHasGlyph(llwchar wch) const;
 
     void reset(F32 vert_dpi, F32 horz_dpi);
+    // reset() body without the fallback-chain cascade. Used by
+    // LLFontRegistry to reset shared fallback instances exactly once.
+    void resetSelf(F32 vert_dpi, F32 horz_dpi);
 
     void destroyGL();
 

@@ -1092,6 +1092,7 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
         bool is_fallback = !is_first_found || !mCreateGLTextures;
         F32 extra_scale = (is_fallback) ? fallback_scale : 1.0f;
         F32 point_size_scale = extra_scale * point_size;
+        F32 actual_point_size = point_size_scale + font_file_it->mSizeDelta;
         bool is_font_loaded = false;
         for(string_vec_t::iterator font_search_path_it = font_search_paths.begin();
             font_search_path_it != font_search_paths.end();
@@ -1103,11 +1104,33 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
             S32 num_faces = is_ft_collection ? fontp->getNumFaces(font_path) : 1;
             for (S32 i = 0; i < num_faces; i++)
             {
+                // Fallback dedup: if the same (filename, face_index, sized
+                // params, monospace_ligatures) tuple has already been loaded
+                // by a previous head, reuse it. The cache survives whether
+                // the head that originally allocated it is still around —
+                // entries are LLPointer-refcounted.
+                if (!is_first_found)
+                {
+                    FallbackInstanceKey key{
+                        {font_file_it->FileName, i, actual_point_size,
+                         LLFontGL::sVertDPI, LLFontGL::sHorizDPI,
+                         font_file_it->mWeight, font_file_it->mHinting, font_file_it->mFlags},
+                        font_file_it->mMonospaceLigatures
+                    };
+                    auto cache_it = mFallbackInstanceCache.find(key);
+                    if (cache_it != mFallbackInstanceCache.end())
+                    {
+                        result->mFontFreetype->addFallbackFont(cache_it->second, font_file_it->CharFunctor);
+                        is_font_loaded = true;
+                        continue;
+                    }
+                }
+
                 if (fontp == NULL)
                 {
                     fontp = new LLFontGL;
                 }
-                if (fontp->loadFace(font_path, point_size_scale + font_file_it->mSizeDelta,
+                if (fontp->loadFace(font_path, actual_point_size,
                                  LLFontGL::sVertDPI, LLFontGL::sHorizDPI, font_file_it->mWeight, is_fallback, i, font_file_it->mHinting, font_file_it->mFlags))
                 {
                     is_font_loaded = true;
@@ -1119,6 +1142,16 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
                     }
                     else
                     {
+                        // Insert into cache so the next head asking for
+                        // matching params reuses this LLFontFreetype.
+                        FallbackInstanceKey key{
+                            {font_file_it->FileName, i, actual_point_size,
+                             LLFontGL::sVertDPI, LLFontGL::sHorizDPI,
+                             font_file_it->mWeight, font_file_it->mHinting, font_file_it->mFlags},
+                            font_file_it->mMonospaceLigatures
+                        };
+                        mFallbackInstanceCache.emplace(key, fontp->mFontFreetype);
+
                         result->mFontFreetype->addFallbackFont(fontp->mFontFreetype, font_file_it->CharFunctor);
 
                         delete fontp;
@@ -1156,13 +1189,24 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
 
 void LLFontRegistry::reset()
 {
+    // With shared fallback LLFontFreetype instances, the legacy cascade in
+    // LLFontFreetype::reset (head -> mFallbackFonts) would re-load the same
+    // shared fallback once per head that lists it. Drive the reset from
+    // here instead: heads use resetSelf (no cascade), then iterate the
+    // fallback cache to reset each shared instance exactly once.
     for (font_reg_map_t::iterator it = mFontMap.begin();
          it != mFontMap.end();
          ++it)
     {
-        // Reset the corresponding font but preserve the entry.
-        if (it->second)
-            it->second->reset();
+        if (it->second && it->second->mFontFreetype)
+        {
+            it->second->mFontFreetype->resetSelf(LLFontGL::sVertDPI, LLFontGL::sHorizDPI);
+        }
+    }
+    for (auto& kv : mFallbackInstanceCache)
+    {
+        if (kv.second)
+            kv.second->resetSelf(LLFontGL::sVertDPI, LLFontGL::sHorizDPI);
     }
 }
 
@@ -1176,6 +1220,11 @@ void LLFontRegistry::clear()
         delete fontp;
     }
     mFontMap.clear();
+    // After heads are gone, the cache holds the only refs to shared
+    // fallback instances. Clearing it triggers FT_Done_Face for those
+    // wrappers (via LLFontFace's destructor when the LLPointer refcount
+    // hits zero through LLFontFreetype's release).
+    mFallbackInstanceCache.clear();
 }
 
 void LLFontRegistry::destroyGL()

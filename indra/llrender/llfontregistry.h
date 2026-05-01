@@ -29,10 +29,12 @@
 #define LL_LLFONTREGISTRY_H
 
 #include "llpointer.h"
+#include "llfontface.h"  // for LLFontFaceKey
 
 #include <boost/unordered_map.hpp>
 
 class LLFontGL;
+class LLFontFreetype;
 
 typedef std::vector<std::string> string_vec_t;
 
@@ -183,6 +185,35 @@ public:
 
     const string_vec_t& getUltimateFallbackList() const;
 
+    // Identity key for a fallback LLFontFreetype instance — face params
+    // plus the LLFontFreetype-level flags that don't go on LLFontFace.
+    struct FallbackInstanceKey
+    {
+        LLFontFaceKey face_key;
+        bool          monospace_ligatures;
+
+        bool operator==(const FallbackInstanceKey& o) const noexcept
+        {
+            return face_key == o.face_key && monospace_ligatures == o.monospace_ligatures;
+        }
+        friend std::size_t hash_value(const FallbackInstanceKey& k) noexcept
+        {
+            std::size_t seed = hash_value(k.face_key);
+            boost::hash_combine(seed, k.monospace_ligatures);
+            return seed;
+        }
+    };
+
+    // Look up or create a fallback LLFontFreetype with the supplied params.
+    // Returns null on load failure. The returned instance is registered in
+    // mFallbackInstanceCache and shared across every head that asks for
+    // matching params.
+    LLPointer<class LLFontFreetype> getOrCreateFallbackFont(
+        const std::string& font_path,
+        const LLFontFileInfo& file_info,
+        F32 point_size, F32 vert_dpi, F32 horz_dpi, S32 face_index,
+        EFontHinting hinting, S32 flags);
+
 private:
     LLFontRegistry(const LLFontRegistry& other); // no-copy
     LLFontGL *createFont(const LLFontDescriptor& desc);
@@ -220,6 +251,11 @@ private:
     // family's matching-style files (or NORMAL fallback) to every style of
     // `family` during resolveFontReferences().
     family_uses_map_t mFamilyUses;
+    // Cache of fallback LLFontFreetype instances keyed by face params +
+    // monospace_ligatures. Heads always create fresh (their fallback chain
+    // and atlas are head-specific); fallback instances dedup. Shared across
+    // every head that lists the same fallback file at matching params.
+    boost::unordered_map<FallbackInstanceKey, LLPointer<class LLFontFreetype>> mFallbackInstanceCache;
 
     string_vec_t mUltimateFallbackList;
     bool mCreateGLTextures;

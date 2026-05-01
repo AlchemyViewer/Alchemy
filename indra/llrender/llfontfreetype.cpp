@@ -931,13 +931,24 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
     mRenderGlyphCount++;
 }
 
+void LLFontFreetype::resetSelf(F32 vert_dpi, F32 horz_dpi)
+{
+    // Reset just this instance — clear its glyph caches, drop the previous
+    // face wrapper, and re-loadFace at the new DPI. Doesn't recurse into
+    // mFallbackFonts because shared fallback instances should be reset once
+    // by whoever owns the shared cache (LLFontRegistry::reset).
+    resetBitmapCache();
+    loadFace(mName, mPointSize, vert_dpi, horz_dpi, mWeight, mIsFallback, 0, mHinting, mFontFlags);
+}
+
 void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
 {
-    resetBitmapCache();
-    loadFace(mName, mPointSize, vert_dpi ,horz_dpi, mWeight, mIsFallback, 0, mHinting, mFontFlags);
+    // Standalone API for callers outside the registry: do the full cascade
+    // (head plus its fallback chain). Inside the registry we use resetSelf
+    // and drive the fallback resets ourselves — see LLFontRegistry::reset.
+    resetSelf(vert_dpi, horz_dpi);
     if (!mIsFallback)
     {
-        // This is the head of the list - need to rebuild ourself and all fallbacks.
         if (mFallbackFonts.empty())
         {
             LL_WARNS() << "LLFontGL::reset(), no fallback fonts present" << LL_ENDL;
@@ -946,7 +957,7 @@ void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
         {
             for (fallback_font_vector_t::iterator it = mFallbackFonts.begin(); it != mFallbackFonts.end(); ++it)
             {
-                it->first->reset(vert_dpi, horz_dpi);
+                it->first->resetSelf(vert_dpi, horz_dpi);
             }
         }
     }
