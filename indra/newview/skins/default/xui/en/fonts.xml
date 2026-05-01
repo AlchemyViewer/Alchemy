@@ -7,7 +7,7 @@
     <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
     <file size_delta="-0.5">DejaVuSans.woff2</file>
     <file functor="is_emoji">TwemojiSVG.woff2</file>
-    <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.woff2</file>
+    <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
     <os name="Windows">
       <file>meiryo.TTC</file>
       <file>MSGOTHIC.TTC</file>
@@ -20,10 +20,10 @@
       <file>micross.ttf</file>
     </os>
     <os name="Mac">
-      <file>ヒラギノ角ゴシック W3.ttc</file>  
-      <file>ヒラギノ角ゴ Pro W3.otf</file>
-      <file>ヒラギノ角ゴ ProN W3.otf</file>
-      <file>ヒラギノ明朝 ProN W3.ttc</file>
+      <file>ヒラギノ角ゴシック W3.ttc</file>
+      <file>ヒラギノ角ゴ Pro W3.otf</file>
+      <file>ヒラギノ角ゴ ProN W3.otf</file>
+      <file>ヒラギノ明朝 ProN W3.ttc</file>
       <file>AppleGothic.dfont</file>
       <file>AppleGothic.ttf</file>
       <file>AppleSDGothicNeo-Regular.otf</file>
@@ -33,20 +33,6 @@
       <file>STIXGeneral.otf</file>
       <file>Thonburi.ttc</file>
     </os>
-  </font>
-
-  <font
-      name="SansSerifBold"
-      comment="Name of bold sans-serif font">
-      <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
-      <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
-      <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.woff2</file>
-    <os name="Windows">
-      <file>arialbd.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>Helvetica.dfont</file>
-      </os>
   </font>
 
   <font
@@ -65,16 +51,21 @@
   <font
       name="SansSerif"
       comment="Name of bold sans-serif font"
-      font_style="BOLD">
+      font_style="BOLD"
+      inherit="true">
     <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
-    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.woff2</file>
+    <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
+    <os name="Windows">
+      <file>arialbd.ttf</file>
+    </os>
   </font>
 
   <font
       name="SansSerif"
       comment="Name of italic sans-serif font"
-      font_style="ITALIC">
+      font_style="ITALIC"
+      inherit="true">
     <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Oblique.woff2</file>
   </font>
@@ -82,7 +73,8 @@
   <font
       name="SansSerif"
       comment="Name of bold italic sans-serif font"
-      font_style="BOLD|ITALIC">
+      font_style="BOLD|ITALIC"
+      inherit="true">
     <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-BoldOblique.woff2</file>
   </font>
@@ -91,55 +83,70 @@
 	comment="Name of emoji font">
     <file>TwemojiSVG.woff2</file>
   </font>
-  
+
   <font
       name="Monospace"
       comment="Name of monospace font">
+    <!-- Per-family size overrides. The Monospace family carries its own
+         baseline ("Monospace" key, used by getFontMonospace and most XUI
+         consumers) plus the LSL editor's small/huge size knobs. These size
+         names apply to every Monospace style variant via the family map. -->
+    <size name="Monospace" size="10.0"/>
+    <size name="SmallLSL"  size="7"/>
+    <size name="HugeLSL"   size="12"/>
     <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Upright.woff2</file>
   </font>
 
   <font
       name="Monospace"
       comment="Name of bold monospace font"
-      font_style="BOLD">
+      font_style="BOLD"
+      inherit="true">
     <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Upright.woff2</file>
   </font>
 
   <font
       name="Monospace"
       comment="Name of italic monospace font"
-      font_style="ITALIC">
+      font_style="ITALIC"
+      inherit="true">
     <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Italic.woff2</file>
   </font>
 
   <font
       name="Monospace"
       comment="Name of bold italic monospace font"
-      font_style="BOLD|ITALIC">
+      font_style="BOLD|ITALIC"
+      inherit="true">
     <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Italic.woff2</file>
   </font>
 
   <font name="DejaVu"
 	comment="Name of DejaVu font">
+    <!-- Legacy small-DejaVu size used by the notification list. -->
+    <size name="LSmall" size="7.6"/>
     <file>DejaVuSans.woff2</file>
     <file>TwemojiSVG.woff2</file>
   </font>
 
   <font name="DejaVu"
 	comment="Name of DejaVu font (bold)"
-	font_style="BOLD">
+	font_style="BOLD"
+	inherit="true">
     <file>DejaVuSans-Bold.woff2</file>
   </font>
 
   <font name="DejaVu"
 	comment="Name of DejaVu font (italic)"
-	font_style="ITALIC">
+	font_style="ITALIC"
+	inherit="true">
     <file>DejaVuSans-Oblique.woff2</file>
   </font>
 
   <font name="DejaVu"
 	comment="Name of DejaVu font (bold italic)"
-	font_style="BOLD|ITALIC">
+	font_style="BOLD|ITALIC"
+	inherit="true">
     <file>DejaVuSans-BoldOblique.woff2</file>
   </font>
 
@@ -159,7 +166,8 @@
   <font
       name="Helvetica"
       comment="Name of Helvetica font (bold)"
-      font_style="BOLD">
+      font_style="BOLD"
+      inherit="true">
     <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
     <os name="Windows">
@@ -173,7 +181,8 @@
   <font
       name="Helvetica"
       comment="Name of Helvetica font (italic)"
-      font_style="ITALIC">
+      font_style="ITALIC"
+      inherit="true">
     <file font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-Oblique.woff2</file>
     <os name="Windows">
@@ -187,7 +196,8 @@
   <font
       name="Helvetica"
       comment="Name of Helvetica font (bold italic)"
-      font_style="BOLD|ITALIC">
+      font_style="BOLD|ITALIC"
+      inherit="true">
     <file font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
     <file size_delta="-0.5">DejaVuSans-BoldOblique.woff2</file>
     <os name="Windows">
@@ -205,10 +215,6 @@
     <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
   </font>
 
-  <font_size name="Monospace"
-         comment="Size for monospaced font (points, or 1/72 of an inch)"
-         size="10.0"
-         />
   <font_size name="Huge"
          comment="Size of huge font (points, or 1/72 of an inch)"
          size="16.0"
@@ -224,17 +230,5 @@
   <font_size name="Small"
          comment="Size of small font (points, or 1/72 of an inch)"
          size="9"
-         />
-   <font_size name="LSmall"
-         comment="Legacy size of small font (points, or 1/72 of an inch)"
-         size="7.6"
-         />
-<font_size name="SmallLSL"
-         comment="Size of small font for LSL editor (points, or 1/72 of an inch)"
-         size="7"
-         />
-  <font_size name="HugeLSL"
-         comment="Size of huge font for LSL editor (points, or 1/72 of an inch)"
-         size="12"
          />
 </fonts>

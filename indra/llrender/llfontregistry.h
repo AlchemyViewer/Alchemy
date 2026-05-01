@@ -186,6 +186,10 @@ public:
 private:
     LLFontRegistry(const LLFontRegistry& other); // no-copy
     LLFontGL *createFont(const LLFontDescriptor& desc);
+    // Walk mInheritFlags and append each parent NORMAL-style entry's files
+    // to the inheriting variant. Idempotent — clears mInheritFlags after
+    // expansion so re-running over a partially-expanded registry is safe.
+    void expandInheritedFonts();
     typedef boost::unordered_map<LLFontDescriptor,LLFontGL*> font_reg_map_t;
     typedef boost::unordered_map<std::string,F32> font_size_map_t;
     typedef boost::unordered_map<std::string, font_size_map_t> family_size_map_t;
