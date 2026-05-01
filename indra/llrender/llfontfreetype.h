@@ -323,8 +323,6 @@ private:
     S32 mWeight = -1;
     bool mAllowMonospaceLigatures = false;
     bool mUseSubpixelPen = false;
-    typedef std::pair<LLPointer<LLFontFreetype>, char_functor_t> fallback_font_t;
-    typedef std::vector<fallback_font_t> fallback_font_vector_t;
     fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)
 
     // Per-head fast lookup: codepoint -> non-owning pointer to a glyph info
