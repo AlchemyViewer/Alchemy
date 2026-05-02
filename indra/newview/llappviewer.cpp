@@ -38,6 +38,7 @@
 #include "lleventtimer.h"
 #include "llfile.h"
 #include "llfontgl.h"
+#include "lllivefile.h"
 #include "llviewertexturelist.h"
 #include "llgroupmgr.h"
 #include "llagent.h"
@@ -775,6 +776,34 @@ public:
     }
 };
 
+namespace
+{
+    // Polls one skinned fonts.xml path; on a detected mtime change,
+    // schedules a font reload through the same idle-tick mechanism the
+    // AlchemyUIFontOverrides setting listener uses. We don't re-parse
+    // anything here ourselves — LLFontGL::reloadFonts() in idle re-walks
+    // every skinned fonts.xml from scratch via findSkinnedFilenames, so
+    // one change anywhere produces one consistent reload across all
+    // layered files.
+    class LLFontsXmlLiveFile : public LLLiveFile
+    {
+    public:
+        explicit LLFontsXmlLiveFile(const std::string& path)
+            : LLLiveFile(path, 1.0f) {}
+        bool loadFile() override
+        {
+            LLFontGL::schedulePendingReload();
+            return true;
+        }
+    };
+
+    // Owns an LLLiveFile per skinned fonts.xml layer for the lifetime of
+    // the viewer. Each instance registers itself with the global
+    // LLEventTimer registry via addToEventTimer() so polling rides the
+    // existing idle tick instead of needing its own timer plumbing.
+    std::vector<std::unique_ptr<LLFontsXmlLiveFile>> sFontsXmlLiveFiles;
+}
+
 
 bool LLAppViewer::init()
 {
@@ -1045,6 +1074,23 @@ bool LLAppViewer::init()
 
     // call all self-registered classes
     LLInitClassList::instance().fireCallbacks();
+
+    // Register an LLLiveFile for each skinned fonts.xml layer so editing
+    // any of them on disk triggers a runtime reload of the font system.
+    // Has to happen after initWindow → LLFontGL::initClass so the file
+    // search paths line up with what the registry actually loaded; safe
+    // to be before the user can interact since polling is driven by the
+    // idle loop that hasn't started yet.
+    {
+        const string_vec_t fonts_xml_paths =
+            gDirUtilp->findSkinnedFilenames(LLDir::XUI, "fonts.xml");
+        for (const std::string& path : fonts_xml_paths)
+        {
+            auto live = std::make_unique<LLFontsXmlLiveFile>(path);
+            live->addToEventTimer();
+            sFontsXmlLiveFiles.push_back(std::move(live));
+        }
+    }
 
     LLFolderViewItem::initClass(); // SJB: Needs to happen after initWindow(), not sure why but related to fonts
 
