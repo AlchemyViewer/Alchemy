@@ -2160,6 +2160,8 @@ bool LLAppViewer::cleanup()
     // Shut down OpenGL
     if (gViewerWindow)
     {
+        sFontsXmlLiveFiles.clear(); // make sure any live file watchers are stopped before we shut down GL
+
         gViewerWindow->shutdownGL();
 
         // Destroy window, and make sure we're not fullscreen
