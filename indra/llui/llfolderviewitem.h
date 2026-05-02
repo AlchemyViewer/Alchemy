@@ -97,6 +97,11 @@ protected:
     LLWString                   mLabel;
     S32                         mLabelWidth;
     bool                        mLabelWidthDirty;
+    // Last LLFontGL::sFontMetricsGeneration this item recomputed against.
+    // Compared in draw(); on mismatch, mark mLabelWidthDirty so the next
+    // getRect() recomputes the label pixel width using the new font's
+    // glyph advances after an AlchemyUIFontOverrides reload.
+    S32                         mLastFontMetricsGeneration = -1;
     bool                        mIsFavorite;
     bool                        mHasFavorites;
     S32                         mLabelPaddingRight;

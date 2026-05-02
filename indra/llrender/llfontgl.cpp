@@ -62,6 +62,7 @@ F32 LLFontGL::sHorizDPI = 96.f;
 F32 LLFontGL::sScaleX = 1.f;
 F32 LLFontGL::sScaleY = 1.f;
 S32 LLFontGL::sResolutionGeneration = 0;
+S32 LLFontGL::sFontMetricsGeneration = 0;
 bool LLFontGL::sDisplayFont = true ;
 std::string LLFontGL::sAppDir;
 
@@ -1685,7 +1686,17 @@ bool LLFontGL::reloadFonts()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     if (!sFontRegistry)
         return false;
-    return sFontRegistry->reload();
+    bool ok = sFontRegistry->reload();
+    if (ok)
+    {
+        // Bump unconditionally on success so every metric-sensitive widget
+        // re-flows on its next draw — even no-op overrides (selecting the
+        // same family twice) cycle through here, and skipping the bump
+        // would leave widgets stuck on a stale layout if e.g. the user
+        // picked a different family then reverted.
+        ++sFontMetricsGeneration;
+    }
+    return ok;
 }
 
 namespace

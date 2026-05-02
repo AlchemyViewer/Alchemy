@@ -30,8 +30,10 @@
 #include "llfontbitmapcache.h"
 #include "llframetimer.h"
 
-LLFontBitmapCache::LLFontBitmapCache()
+S32 LLFontBitmapCache::sNextGeneration = 0;
 
+LLFontBitmapCache::LLFontBitmapCache()
+    : mGeneration(++sNextGeneration)
 {
 }
 
@@ -193,7 +195,7 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
     if (height > mCurrentRowMaxHeight[bitmap_idx])
         mCurrentRowMaxHeight[bitmap_idx] = height;
     touchSheet(bitmap_type, bitmap_num);
-    mGeneration++;
+    mGeneration = ++sNextGeneration;
 
     return true;
 }
@@ -256,7 +258,7 @@ void LLFontBitmapCache::releaseSheet(EFontGlyphType bitmap_type, U32 bitmap_num)
     if (bitmap_num < mLastUsedTime[bitmap_idx].size())
         mLastUsedTime[bitmap_idx][bitmap_num] = 0.0;
 
-    mGeneration++;
+    mGeneration = ++sNextGeneration;
 }
 
 void LLFontBitmapCache::destroyGL()
@@ -285,7 +287,7 @@ void LLFontBitmapCache::reset()
 
     mBitmapWidth = 0;
     mBitmapHeight = 0;
-    mGeneration++;
+    mGeneration = ++sNextGeneration;
 }
 
 //static

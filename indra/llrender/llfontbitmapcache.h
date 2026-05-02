@@ -125,7 +125,16 @@ private:
     S32 mCurrentRowMaxHeight[static_cast<U32>(EFontGlyphType::Count)] = { 0, 0 };
     S32 mMaxCharWidth = 0;
     S32 mMaxCharHeight = 0;
-    S32 mGeneration = 0;
+    // Globally-unique generation. Each new LLFontBitmapCache instance and
+    // every atlas mutation (nextOpenPos / releaseSheet / reset) takes a
+    // fresh value from sNextGeneration. This guarantees vertex/width
+    // buffers comparing their stored mLastFontCacheGen against the
+    // current cache generation can't false-match across an in-place font
+    // reload — without uniqueness, both buffers' stored gen and the new
+    // cache's initial gen could both happen to be 0 and the buffer would
+    // keep rendering with stale atlas UVs from the previous font.
+    S32 mGeneration;
+    static S32 sNextGeneration;
     std::vector<LLPointer<LLImageRaw>> mImageRawVec[static_cast<U32>(EFontGlyphType::Count)];
     std::vector<LLPointer<LLImageGL>> mImageGLVec[static_cast<U32>(EFontGlyphType::Count)];
     // Per-sheet last-used timestamp, parallel-indexed with mImageRawVec /

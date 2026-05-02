@@ -1811,6 +1811,15 @@ void LLScrollListCtrl::draw()
 {
     LLLocalClipRect clip(getLocalRect());
 
+    // Catch a runtime font swap so column widths recompute against the
+    // new font's getWidth(). Without this, columns sized for narrower
+    // glyphs at startup truncate cell text after a reload.
+    if (mLastFontMetricsGeneration != LLFontGL::sFontMetricsGeneration)
+    {
+        mLastFontMetricsGeneration = LLFontGL::sFontMetricsGeneration;
+        mColumnWidthsDirty = true;
+    }
+
     // if user specifies sort, make sure it is maintained
     updateSort();
 

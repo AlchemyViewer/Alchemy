@@ -249,7 +249,8 @@ LLTextBase::LLTextBase(const LLTextBase::Params &p)
     mParseHighlights(p.parse_highlights),
     mBGVisible(p.bg_visible),
     mScroller(NULL),
-    mStyleDirty(true)
+    mStyleDirty(true),
+    mLastFontMetricsGeneration(LLFontGL::sFontMetricsGeneration)
 {
     if(p.allow_scroll)
     {
@@ -1594,6 +1595,20 @@ void LLTextBase::reshape(S32 width, S32 height, bool called_from_parent)
 void LLTextBase::draw()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    // Catch a runtime font swap (LLFontGL::reloadFonts via the
+    // AlchemyUIFontOverrides setting): the cached LLFontGL* on this
+    // widget is still valid but its mFontFreetype now reports different
+    // ascender / descender / glyph widths. Cached line layout, segment
+    // styles, and word-wrap positions all became stale on the swap, so
+    // mark a full reflow + style recompute.
+    if (mLastFontMetricsGeneration != LLFontGL::sFontMetricsGeneration)
+    {
+        mLastFontMetricsGeneration = LLFontGL::sFontMetricsGeneration;
+        mStyleDirty = true;
+        needsReflow();
+    }
+
     // reflow if needed, on demand
     reflow();
 
@@ -3758,11 +3773,6 @@ LLNormalTextSegment::LLNormalTextSegment( LLStyleConstSP style, S32 start, S32 e
     mEditor(editor),
     mLastGeneration(-1)
 {
-    // Foundry-recommended baseline-to-baseline distance (face->height,
-    // includes hhea.lineGap). Multi-line text editors get the spacing
-    // designers intended; for fonts with lineGap == 0 this equals
-    // getLineHeight().
-    mFontHeight = mStyle->getFont()->getLineSpacing();
     mCanEdit = !mStyle->getDrawHighlightBg();
     if (!mCanEdit)
     {
@@ -3784,8 +3794,6 @@ LLNormalTextSegment::LLNormalTextSegment( const LLUIColor& color, S32 start, S32
     mLastGeneration(-1)
 {
     mStyle = new LLStyle(LLStyle::Params().visible(is_visible).color(color));
-
-    mFontHeight = mStyle->getFont()->getLineSpacing();
 }
 
 LLNormalTextSegment::~LLNormalTextSegment()
@@ -4069,11 +4077,15 @@ bool LLNormalTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& w
     width = 0;
     if (num_chars > 0 && (mStart + first_char >= 0))
     {
-        height = mFontHeight;
+        const LLFontGL* font = mStyle->getFont();
+        // Re-read line spacing each call rather than relying on the
+        // mFontHeight cached at construction. The font pointer is stable
+        // across an AlchemyUIFontOverrides reload, but the underlying
+        // mFontFreetype's getLineSpacing() returns the new face's value.
+        height = font->getLineSpacing();
 
-            const LLWString& text = getWText();
-            const LLFontGL* font = mStyle->getFont();
-            width += mFontWidthBuffer.getWidth(font, text.c_str(), mStart + first_char, num_chars, true);
+        const LLWString& text = getWText();
+        width += mFontWidthBuffer.getWidth(font, text.c_str(), mStart + first_char, num_chars, true);
     }
     // if last character is a newline, then return true, forcing line break
     return false;
@@ -4387,11 +4399,11 @@ void LLInlineViewSegment::linkToDocument(LLTextBase* editor)
 
 LLLineBreakTextSegment::LLLineBreakTextSegment(S32 pos):LLTextSegment(pos,pos+1)
 {
-    mFontHeight = LLStyle::getDefaultFont()->getLineSpacing();
+    mFont = LLStyle::getDefaultFont();
 }
 LLLineBreakTextSegment::LLLineBreakTextSegment(LLStyleConstSP style,S32 pos):LLTextSegment(pos,pos+1)
 {
-    mFontHeight = style->getFont()->getLineSpacing();
+    mFont = style->getFont();
 }
 LLLineBreakTextSegment::~LLLineBreakTextSegment()
 {
@@ -4401,13 +4413,16 @@ LLLineBreakTextSegment::~LLLineBreakTextSegment()
 LLTextSegmentPtr LLLineBreakTextSegment::clone(LLTextBase& target) const
 {
     LLLineBreakTextSegment* copy = new LLLineBreakTextSegment(mStart);
-    copy->mFontHeight = mFontHeight;
+    copy->mFont = mFont;
     return copy;
 }
 bool LLLineBreakTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
 {
     width = 0;
-    height = mFontHeight;
+    // Re-read each call (see LLNormalTextSegment::getDimensionsF32). mFont
+    // is the LLFontGL* captured at construction; its underlying freetype
+    // can swap out from under us via LLFontGL::reloadFonts.
+    height = mFont ? mFont->getLineSpacing() : 0;
 
     return true;
 }

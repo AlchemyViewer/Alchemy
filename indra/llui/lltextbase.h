@@ -171,7 +171,6 @@ protected:
 protected:
     class LLTextBase&   mEditor;
     LLStyleConstSP      mStyle;
-    S32                 mFontHeight;
     LLKeywordToken*     mToken;
     std::string         mTooltip;
     boost::signals2::connection mImageLoadedConnection;
@@ -286,7 +285,10 @@ public:
     F32         draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
 
 private:
-    S32         mFontHeight;
+    // Stored stable LLFontGL*; getDimensionsF32 calls
+    // mFont->getLineSpacing() each access so an in-place font reload
+    // (LLFontGL::reloadFonts) is reflected in line-break heights.
+    const LLFontGL* mFont = nullptr;
 };
 
 class LLImageTextSegment : public LLTextSegment
@@ -827,6 +829,11 @@ protected:
     S32                         mReflowIndex;       // index at which to start reflow.  S32_MAX indicates no reflow needed.
     bool                        mScrollNeeded;      // need to change scroll region because of change to cursor position
     S32                         mScrollIndex;       // index of first character to keep visible in scroll region
+    // Last LLFontGL::sFontMetricsGeneration this instance reflowed at.
+    // Compared in draw() so a runtime font swap (AlchemyUIFontOverrides
+    // → LLFontGL::reloadFonts) forces a full re-flow + style recompute
+    // with the new face's ascender / descender / glyph widths.
+    S32                         mLastFontMetricsGeneration;
 
     // Fired when a URL link is clicked
     commit_signal_t*            mURLClickSignal;
