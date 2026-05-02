@@ -379,6 +379,8 @@ void LLFontVertexBuffer::recolorBuffers(
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
+    gGL.flush(); // deliberately empty pending verts
+
     // Foreground: rebroadcast the new color across every captured fg vertex.
     // Pure-text path only (caller has guarded mLastUsesColorAtlas == false).
     const LLColor4U fg_u(color);
@@ -414,6 +416,7 @@ void LLFontVertexBuffer::recolorBuffers(
 
     // Ensure all buffers are unmapped and data is sent to GPU before rendering
     LLVertexBuffer::flushBuffers();
+    LLVertexBuffer::unbind();
 
     mLastColor = color;
 }
