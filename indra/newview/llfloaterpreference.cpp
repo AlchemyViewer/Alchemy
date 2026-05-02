@@ -971,7 +971,7 @@ void LLFloaterPreference::populateUIFontDropdowns()
         combo->clearRows();
         // First entry: clear-the-override sentinel. Stored as an empty
         // string so commit-handler treats it as erase.
-        combo->add("(default)", LLSD(""), ADD_BOTTOM, true);
+        combo->add(LLTrans::getString("Default"), LLSD(""), ADD_BOTTOM, true);
         const auto families = LLFontGL::getAvailableFamilies(filter);
         for (const auto& fam : families)
         {

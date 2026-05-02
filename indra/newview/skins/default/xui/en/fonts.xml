@@ -11,16 +11,16 @@
         <size name="Small"  size="7.6"/>
 
         <style name="NORMAL">
-            <file>DejaVuSansMono.woff2</file>
+            <file font_hinting="light">DejaVuSansMono.woff2</file>
         </style>
-        <style name="BOLD">
-            <file>DejaVuSans-Bold.woff2</file>
+        <style name="BOLD" inherit="true">
+            <file font_hinting="light">DejaVuSans-Bold.woff2</file>
         </style>
-        <style name="ITALIC">
-            <file>DejaVuSans-Oblique.woff2</file>
+        <style name="ITALIC" inherit="true">
+            <file font_hinting="light">DejaVuSans-Oblique.woff2</file>
         </style>
-        <style name="BOLD|ITALIC">
-            <file>DejaVuSans-BoldOblique.woff2</file>
+        <style name="BOLD|ITALIC" inherit="true">
+            <file font_hinting="light">DejaVuSans-BoldOblique.woff2</file>
         </style>
     </font>
 
