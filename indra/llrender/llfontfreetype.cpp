@@ -207,20 +207,18 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
         return it->second.first;
     }
 
-    // Shaping runs are emoji presentation (the detector only flags
-    // sequences with ZWJ/VS16/skin-tone/keycap/tag/flag-pair), so try the
-    // emoji-functor fallbacks first, ignoring the functor gate. This is
-    // what gives:
+    // Try the emoji-functor fallbacks first — but RESPECT the functor.
+    // The shape range can cover the whole string (not just emoji clusters),
+    // so plain non-pictographic chars also pass through here. Color emoji
+    // fonts like Twemoji carry ASCII outlines for safety, and routing 'e'
+    // through Twemoji means rasterizing a color SVG glyph as Grayscale —
+    // FreeType produces a 0×0 bitmap and the glyph renders invisible while
+    // HarfBuzz's advance still moves the pen, leaving gaps in plain text.
     //
-    //   * BMP pictographs like ❤ (U+2764) access to the emoji font's
-    //     composed ZWJ form (❤️‍🔥), which the root face's mono glyph
-    //     would otherwise steal.
-    //
-    //   * Keycap sequences (digit/#/* + FE0F + 20E3) the emoji font's
-    //     GSUB-composed keycap glyph. Routing keycaps through the root
-    //     face works for '8' but leaves U+20E3 as a notdef box because
-    //     text fonts generally don't carry it, and HarfBuzz can't shop
-    //     individual glyphs out to different faces mid-sequence.
+    // For chars the functor accepts (genuine emoji range, plus whatever
+    // BMP pictographs / keycap markers the unicode_ranges entry covers),
+    // the bypass still kicks in so HarfBuzz can compose ZWJ sequences and
+    // keycaps via the emoji face's GSUB tables.
     auto resolve = [&]() -> std::pair<const LLFontFreetype*, U32>
     {
         const size_t count = mFallbackFonts.size();
@@ -228,6 +226,8 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
         {
             const fallback_font_t& pair = mFallbackFonts[i];
             if (!pair.second)
+                continue;
+            if (!pair.second(base))
                 continue;
             U32 gi = pair.first->getCharGlyphIndex(base);
             if (gi)
