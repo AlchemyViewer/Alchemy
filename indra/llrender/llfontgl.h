@@ -190,6 +190,30 @@ public:
     static void destroyDefaultFonts();
     static void destroyAllGL();
 
+    // Re-parse fonts.xml and apply current AlchemyUIFontOverrides without
+    // restarting. Existing LLFontGL* pointers (cached by widgets and the
+    // static getters above) stay valid; only the underlying FreeType state
+    // is swapped. Setting handlers should call schedulePendingReload()
+    // instead of this directly; the viewer's idle loop drains the request
+    // via consumePendingReload() so the swap never lands mid-frame.
+    static bool reloadFonts();
+
+    // Mark a font reload as pending. Called from the AlchemyUIFontOverrides
+    // setting listener. Coalesces multiple changes inside a single frame
+    // into one reload.
+    static void schedulePendingReload();
+
+    // Returns true exactly once if a reload was scheduled since the last
+    // call (clearing the flag). Called from LLAppViewer::idle().
+    static bool consumePendingReload();
+
+    // User-selectable families declared in fonts.xml — see
+    // LLFontRegistry::getAvailableFamilies for the filtering and ordering
+    // rules. `filter` constrains the result by the per-family monospace
+    // attribute. Returns an empty vector if the registry isn't ready.
+    static std::vector<LLFontRegistry::FamilyInfo> getAvailableFamilies(
+        LLFontRegistry::FamilyFilter filter = LLFontRegistry::FamilyFilter::ANY);
+
     // Takes a string with potentially several flags, i.e. "NORMAL|BOLD|ITALIC"
     static U8 getStyleFromString(const std::string &style);
     static std::string getStringFromStyle(U8 style);

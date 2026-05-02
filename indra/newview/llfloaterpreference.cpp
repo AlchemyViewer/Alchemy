@@ -404,6 +404,8 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
     mCommitCallbackRegistrar.add("Pref.RemoveSkin", boost::bind(&LLFloaterPreference::onRemoveSkin, this));
     mCommitCallbackRegistrar.add("Pref.ApplySkin", boost::bind(&LLFloaterPreference::onApplySkin, this));
     mCommitCallbackRegistrar.add("Pref.SelectSkin", boost::bind(&LLFloaterPreference::onSelectSkin, this, _2));
+    mCommitCallbackRegistrar.add("Pref.UIFontSelected", boost::bind(&LLFloaterPreference::onUIFontSelected, this, _1, _2));
+    mCommitCallbackRegistrar.add("Pref.UIFontFileEntered", boost::bind(&LLFloaterPreference::onUIFontFileEntered, this, _1, _2));
 
     mCommitCallbackRegistrar.add("Pref.ResetControlDefault", [](LLUICtrl* ctrl, const LLSD& userdata)
         {
@@ -543,6 +545,8 @@ bool LLFloaterPreference::postBuild()
     LLLogChat::getInstance()->setSaveHistorySignal(boost::bind(&LLFloaterPreference::onLogChatHistorySaved, this));
 
     loadUserSkins();
+
+    populateUIFontDropdowns();
 
     LLSliderCtrl* fov_slider = getChild<LLSliderCtrl>("camera_fov");
     fov_slider->setMinValue(LLViewerCamera::getInstance()->getMinView());
@@ -901,6 +905,146 @@ void LLFloaterPreference::refreshSkinInfo(const skin_t& skin)
     getChild<LLTextBase>("skin_date")->setText(skin.mDate.toHTTPDateString("%A, %d %b %Y"));
     getChild<LLTextBase>("skin_compatibility")->setText(skin.mCompatVer);
     getChild<LLTextBase>("skin_notes")->setText(skin.mNotes);
+}
+
+namespace
+{
+    // Returns the override string currently stored for `family`, or empty
+    // if there's no override. The setting is an LLSD map; missing keys
+    // return undefined which asString() coerces to empty.
+    std::string getCurrentFontOverride(const std::string& family)
+    {
+        const LLSD overrides = gSavedSettings.getLLSD("AlchemyUIFontOverrides");
+        if (!overrides.isMap())
+            return std::string();
+        return overrides.has(family) ? overrides[family].asString() : std::string();
+    }
+
+    // Read-modify-write the AlchemyUIFontOverrides map. Empty `value`
+    // erases the family's entry (returns to built-in default).
+    void setFontOverride(const std::string& family, const std::string& value)
+    {
+        LLSD overrides = gSavedSettings.getLLSD("AlchemyUIFontOverrides");
+        if (!overrides.isMap())
+            overrides = LLSD::emptyMap();
+        if (value.empty())
+        {
+            if (overrides.has(family))
+                overrides.erase(family);
+            else
+                return; // No-op; avoid spurious setValue and listener fire.
+        }
+        else
+        {
+            if (overrides.has(family) && overrides[family].asString() == value)
+                return; // No-op.
+            overrides[family] = value;
+        }
+        gSavedSettings.setLLSD("AlchemyUIFontOverrides", overrides);
+    }
+}
+
+void LLFloaterPreference::populateUIFontDropdowns()
+{
+    // Two curated dropdowns expose the common case (UI font + monospace);
+    // the underlying setting is a generic family→override map so power
+    // users can set overrides for any other family via Debug Settings
+    // without needing matching UI here. Each dropdown filters by the
+    // per-family monospace attribute so the UI Font picker only shows
+    // proportional faces and the Mono Font picker only shows monospace
+    // faces.
+    struct Row {
+        const char* combo_name;
+        const char* family;
+        LLFontRegistry::FamilyFilter filter;
+    };
+    static const Row rows[] = {
+        { "ui_font_sansserif", "SansSerif", LLFontRegistry::FamilyFilter::PROPORTIONAL },
+        { "ui_font_monospace", "Monospace", LLFontRegistry::FamilyFilter::MONOSPACE },
+    };
+
+    for (const auto& [combo_name, family, filter] : rows)
+    {
+        LLComboBox* combo = findChild<LLComboBox>(combo_name);
+        if (!combo) continue;
+
+        combo->clearRows();
+        // First entry: clear-the-override sentinel. Stored as an empty
+        // string so commit-handler treats it as erase.
+        combo->add("(default)", LLSD(""), ADD_BOTTOM, true);
+        const auto families = LLFontGL::getAvailableFamilies(filter);
+        for (const auto& fam : families)
+        {
+            // A family overriding itself is a no-op the registry would
+            // reject — hide it from the picker rather than offer it.
+            if (fam.name == family) continue;
+            // Display the friendly ui_label, store the canonical name as
+            // the value (that's the override-map key the registry expects).
+            combo->add(fam.label, LLSD(fam.name), ADD_BOTTOM, true);
+        }
+
+        const std::string current = getCurrentFontOverride(family);
+        // Selecting by value: matches if `current` is empty (sentinel) or
+        // is a known family name. If `current` is a filename (no matching
+        // family), the combo lands on (default) and the line editor below
+        // shows the actual filename.
+        bool matched = combo->setSelectedByValue(LLSD(current), true);
+        if (!matched)
+        {
+            combo->setSelectedByValue(LLSD(""), true);
+        }
+
+        const std::string editor_name = std::string(combo_name) + "_file";
+        if (LLLineEditor* editor = findChild<LLLineEditor>(editor_name))
+        {
+            // The editor mirrors the current setting only when the value
+            // isn't a recognized family name. Picking from the combo
+            // clears the editor; typing into the editor wins.
+            editor->setText(matched ? std::string() : current);
+        }
+    }
+}
+
+void LLFloaterPreference::onUIFontSelected(LLUICtrl* ctrl, const LLSD& userdata)
+{
+    const std::string family = userdata.asString();
+    if (family.empty()) return;
+    LLComboBox* combo = dynamic_cast<LLComboBox*>(ctrl);
+    if (!combo) return;
+    const std::string value = combo->getValue().asString();
+    setFontOverride(family, value);
+
+    // Combo win: clear the file editor display so it doesn't suggest a
+    // value the setting no longer holds. The actual setting was just
+    // written above, so listeners (and the idle reload) will pick it up.
+    const std::string editor_name = combo->getName() + "_file";
+    if (LLLineEditor* editor = findChild<LLLineEditor>(editor_name))
+    {
+        editor->setText(std::string());
+    }
+}
+
+void LLFloaterPreference::onUIFontFileEntered(LLUICtrl* ctrl, const LLSD& userdata)
+{
+    const std::string family = userdata.asString();
+    if (family.empty()) return;
+    LLLineEditor* editor = dynamic_cast<LLLineEditor*>(ctrl);
+    if (!editor) return;
+    const std::string raw = editor->getText();
+    setFontOverride(family, raw);
+
+    // File-editor win: re-sync the matching combo to (default) since the
+    // user-supplied filename probably isn't a known family.
+    std::string combo_name = editor->getName();
+    if (combo_name.size() > 5 && combo_name.compare(combo_name.size() - 5, 5, "_file") == 0)
+        combo_name.resize(combo_name.size() - 5);
+    if (LLComboBox* combo = findChild<LLComboBox>(combo_name))
+    {
+        // If user happened to type an exact family name, prefer the combo
+        // selection so the next open shows it pinned in the dropdown.
+        if (!combo->setSelectedByValue(LLSD(raw), true))
+            combo->setSelectedByValue(LLSD(""), true);
+    }
 }
 
 LLFloaterPreference::~LLFloaterPreference()

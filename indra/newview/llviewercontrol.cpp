@@ -41,6 +41,7 @@
 #include "llagentcamera.h"
 #include "llconsole.h"
 #include "lldrawpoolbump.h"
+#include "llfontgl.h"
 #include "lldrawpoolterrain.h"
 #include "llflexibleobject.h"
 #include "llfeaturemanager.h"
@@ -425,6 +426,15 @@ static bool handleChatFontSizeChanged(const LLSD& newvalue)
     {
         gConsole->setFontSize(newvalue.asInteger());
     }
+    return true;
+}
+
+static bool handleUIFontOverridesChanged(const LLSD& newvalue)
+{
+    // Defer the actual reload to the next idle tick — setValue() can fire
+    // mid-frame, and tearing down LLFontFreetype state during a render
+    // would dangle the cached glyph atlas pointers active draw calls hold.
+    LLFontGL::schedulePendingReload();
     return true;
 }
 
@@ -911,6 +921,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderPerformanceTest", handleRenderPerfTestChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarCloth", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "ChatFontSize", handleChatFontSizeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyUIFontOverrides", handleUIFontOverridesChanged);
     setting_setup_signal_listener(gSavedSettings, "ConsoleMaxLines", handleConsoleMaxLinesChanged);
     setting_setup_signal_listener(gSavedSettings, "UploadBakedTexOld", handleUploadBakedTexOldChanged);
     setting_setup_signal_listener(gSavedSettings, "UseOcclusion", handleUseOcclusionChanged);

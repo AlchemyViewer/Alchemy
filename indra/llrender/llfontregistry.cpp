@@ -30,10 +30,13 @@
 #include "llfontfreetype.h"
 #include "llfontgl.h"
 #include "llfontregistry.h"
+#include "llfontshaping.h"
 #include <algorithm>
+#include <set>
 #include <boost/tokenizer.hpp>
 #include "llcontrol.h"
 #include "lldir.h"
+#include "llsd.h"
 #include "llwindow.h"
 #include "llxmlnode.h"
 
@@ -563,10 +566,182 @@ void LLFontRegistry::resolveFontReferences()
         replace_files(variant_it, merged_files, merged_collection);
     }
 
+    // Step 3: apply user font overrides (AlchemyUIFontOverrides) on top of
+    // the fully-composed file lists. Done last so the override prepends
+    // ahead of resolved <use> chains and inherited variants.
+    applyFamilyOverrides(gSavedSettings.getLLSD("AlchemyUIFontOverrides"));
+
     // Consume both maps so a subsequent call (e.g. on dynamic skin reload)
     // doesn't double-append references to already-resolved entries.
     mFamilyUses.clear();
     mInheritFlags.clear();
+}
+
+void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
+{
+    // Always clear the override-source map so a removed override stops
+    // routing size lookups through the prior source. Even an empty
+    // overrides map needs this — early-returning before would leave
+    // stale entries from a previous parse.
+    mFamilyOverrideSources.clear();
+
+    if (!overrides.isMap() || overrides.size() == 0)
+        return;
+
+    static const U8 kStyles[4] = {
+        0,
+        LLFontGL::BOLD,
+        LLFontGL::ITALIC,
+        static_cast<U8>(LLFontGL::BOLD | LLFontGL::ITALIC)
+    };
+
+    // Snapshot current template file lists. Overrides look up source-family
+    // files in this snapshot so chains of overrides (A->B and B->C in the
+    // same map) don't see each other's mid-iteration mutations — each
+    // override resolves against the original post-resolution state.
+    boost::unordered_map<LLFontDescriptor, std::pair<font_file_info_vec_t, font_file_info_vec_t>> pre_override;
+    pre_override.reserve(mFontMap.size());
+    for (const auto& entry : mFontMap)
+    {
+        if (!entry.first.isTemplate())
+            continue;
+        pre_override.emplace(entry.first,
+                             std::make_pair(entry.first.getFontFiles(),
+                                            entry.first.getFontCollectionFiles()));
+    }
+
+    auto replace_files = [this](font_reg_map_t::iterator it,
+                                const font_file_info_vec_t& new_files,
+                                const font_file_info_vec_t& new_collection)
+    {
+        LLFontDescriptor new_desc = it->first;
+        new_desc.setFontFiles(new_files);
+        new_desc.setFontCollectionFiles(new_collection);
+        LLFontGL* fontp = it->second;
+        mFontMap.erase(it);
+        mFontMap[new_desc] = fontp;
+    };
+
+    for (LLSD::map_const_iterator ov_it = overrides.beginMap();
+         ov_it != overrides.endMap();
+         ++ov_it)
+    {
+        const std::string& family = ov_it->first;
+        std::string override_value = ov_it->second.asString();
+        if (override_value.empty())
+            continue;
+
+        if (override_value == family)
+        {
+            LL_WARNS() << "AlchemyUIFontOverrides: '" << family
+                       << "' overrides to itself; skipping" << LL_ENDL;
+            continue;
+        }
+
+        // Verify the target family is actually declared. If not, skip with
+        // a warning rather than silently creating phantom entries.
+        bool target_exists = false;
+        for (U8 style : kStyles)
+        {
+            if (mFontMap.find(LLFontDescriptor(family, s_template_string, style)) != mFontMap.end())
+            {
+                target_exists = true;
+                break;
+            }
+        }
+        if (!target_exists)
+        {
+            LL_WARNS() << "AlchemyUIFontOverrides: target family '" << family
+                       << "' is not declared in fonts.xml; skipping" << LL_ENDL;
+            continue;
+        }
+
+        // Try the override as a known family name first. If absent across
+        // all styles in the snapshot, fall back to treating it as a font
+        // file name. (File lookup happens later in createFont via the
+        // font_search_paths walk; we only build the LLFontFileInfo here.)
+        bool source_is_family = false;
+        for (U8 style : kStyles)
+        {
+            if (pre_override.find(LLFontDescriptor(override_value, s_template_string, style)) != pre_override.end())
+            {
+                source_is_family = true;
+                break;
+            }
+        }
+
+        // Record family→family override so nameToSize can route per-family
+        // <size> lookups through the source family. File-name overrides
+        // don't get an entry — there's no source family to inherit sizes
+        // from.
+        if (source_is_family)
+        {
+            mFamilyOverrideSources[family] = override_value;
+        }
+
+        for (U8 style : kStyles)
+        {
+            LLFontDescriptor target_key(family, s_template_string, style);
+            font_reg_map_t::iterator target_it = mFontMap.find(target_key);
+            if (target_it == mFontMap.end())
+                continue;
+
+            font_file_info_vec_t prepend_files;
+            font_file_info_vec_t prepend_collection;
+
+            if (source_is_family)
+            {
+                LLFontDescriptor source_key(override_value, s_template_string, style);
+                auto src_it = pre_override.find(source_key);
+                if (src_it == pre_override.end() && style != 0)
+                {
+                    // Fall back to NORMAL style of the source family.
+                    source_key = LLFontDescriptor(override_value, s_template_string, 0);
+                    src_it = pre_override.find(source_key);
+                }
+                if (src_it == pre_override.end())
+                    continue;
+                prepend_files = src_it->second.first;
+                prepend_collection = src_it->second.second;
+            }
+            else
+            {
+                // File-name override. Inherit hinting/weight/flags/ligatures
+                // defaults from the target family's first existing file so
+                // the swap behaves like a drop-in replacement (e.g. a
+                // monospace family's ligatures setting carries to the
+                // user-supplied file).
+                EFontHinting hinting = EFontHinting::FORCE_AUTOHINT;
+                S32 weight = -1;
+                S32 flags = 0;
+                bool monospace_lig = false;
+                const auto& orig_files = target_it->first.getFontFiles();
+                if (!orig_files.empty())
+                {
+                    hinting = orig_files[0].mHinting;
+                    weight = orig_files[0].mWeight;
+                    flags = orig_files[0].mFlags;
+                    monospace_lig = orig_files[0].mMonospaceLigatures;
+                }
+                if (style & LLFontGL::BOLD)
+                    flags |= LLFontGL::BOLD;
+                prepend_files.emplace_back(override_value, hinting, flags, 0.f, weight, std::function<bool(llwchar)>(nullptr), monospace_lig);
+            }
+
+            // Prepend source onto the target's existing chain so the
+            // override wins for the head face but DejaVu/Emoji/CJK
+            // fallbacks (already resolved in onto target via <use>) stay
+            // available behind it.
+            font_file_info_vec_t merged_files = prepend_files;
+            font_file_info_vec_t merged_collection = prepend_collection;
+            const auto& orig_files = target_it->first.getFontFiles();
+            const auto& orig_collection = target_it->first.getFontCollectionFiles();
+            merged_files.insert(merged_files.end(), orig_files.begin(), orig_files.end());
+            merged_collection.insert(merged_collection.end(), orig_collection.begin(), orig_collection.end());
+
+            replace_files(target_it, merged_files, merged_collection);
+        }
+    }
 }
 
 std::string currentOsName()
@@ -849,6 +1024,31 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
 
     FamilyDefaults defaults = read_family_defaults(font_node);
 
+    // Family-level metadata: ui_label and user_selectable. Cross-skin
+    // layering merges fields individually so a later layer can override
+    // just the label without disturbing user_selectable, and vice versa.
+    {
+        FamilyMeta& meta = mFamilyMeta[family_name];
+        if (font_node->hasAttribute("ui_label"))
+        {
+            std::string ui_label;
+            font_node->getAttributeString("ui_label", ui_label);
+            meta.ui_label = ui_label;
+        }
+        if (font_node->hasAttribute("user_selectable"))
+        {
+            bool sel = true;
+            font_node->getAttributeBOOL("user_selectable", sel);
+            meta.user_selectable = sel;
+        }
+        if (font_node->hasAttribute("monospace"))
+        {
+            bool mono = false;
+            font_node->getAttributeBOOL("monospace", mono);
+            meta.monospace = mono;
+        }
+    }
+
     // First sweep: collect family-level <size>, <use>; defer <style> to
     // a second sweep so we can warn cleanly on stray children.
     family_size_overrides_t family_sizes;
@@ -1040,18 +1240,30 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
 
 bool LLFontRegistry::nameToSize(const std::string& family, const std::string& size_name, F32& size)
 {
+    auto try_family = [&](const std::string& fam) -> bool
+    {
+        family_size_map_t::const_iterator fam_it = mFamilySizes.find(fam);
+        if (fam_it == mFamilySizes.end())
+            return false;
+        font_size_map_t::const_iterator size_it = fam_it->second.find(size_name);
+        if (size_it == fam_it->second.end())
+            return false;
+        size = size_it->second;
+        return true;
+    };
+
     if (!family.empty())
     {
-        family_size_map_t::const_iterator fam_it = mFamilySizes.find(family);
-        if (fam_it != mFamilySizes.end())
-        {
-            font_size_map_t::const_iterator size_it = fam_it->second.find(size_name);
-            if (size_it != fam_it->second.end())
-            {
-                size = size_it->second;
-                return true;
-            }
-        }
+        // If `family` was overridden by a known source family via
+        // AlchemyUIFontOverrides, consult the source's per-family <size>
+        // table first so an override picks up the source's size scale
+        // (e.g. Monospace -> SourceCode brings SourceCode's sizes).
+        // Single-level only — chains aren't followed.
+        auto ov_it = mFamilyOverrideSources.find(family);
+        if (ov_it != mFamilyOverrideSources.end() && try_family(ov_it->second))
+            return true;
+        if (try_family(family))
+            return true;
     }
     font_size_map_t::iterator it = mFontSizes.find(size_name);
     if (it != mFontSizes.end())
@@ -1224,6 +1436,13 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
                     {
                         result = fontp;
                         is_first_found = false;
+                        // Detach fontp from result so the next i iteration
+                        // (TTC head with num_faces > 1) allocates a fresh
+                        // LLFontGL for the next face instead of reusing —
+                        // and crucially, doesn't `delete fontp` (which
+                        // would destroy result and dangle every cached
+                        // pointer to it).
+                        fontp = NULL;
                     }
                     else
                     {
@@ -1310,6 +1529,157 @@ void LLFontRegistry::clear()
     // wrappers (via LLFontFace's destructor when the LLPointer refcount
     // hits zero through LLFontFreetype's release).
     mFallbackInstanceCache.clear();
+}
+
+bool LLFontRegistry::reload()
+{
+    // Pointer-stable rebuild: every existing LLFontGL* (cached by widgets
+    // and by the static getters in llfontgl.cpp) stays alive. We swap each
+    // head's underlying mFontFreetype for one built from a freshly-parsed
+    // fonts.xml + current AlchemyUIFontOverrides.
+
+    // Snapshot existing non-template heads so we can wipe mFontMap freely.
+    std::vector<std::pair<LLFontDescriptor, LLFontGL*>> heads;
+    heads.reserve(mFontMap.size());
+    for (const auto& kv : mFontMap)
+    {
+        if (!kv.first.isTemplate() && kv.second)
+            heads.emplace_back(kv.first, kv.second);
+    }
+
+    // Pin the old fallback cache for the duration of the rebuild. Without
+    // this, the move/clear below would drop the only refs to shared
+    // LLFontFreetype fallbacks while existing heads' mFontFreetype still
+    // hold pointers into them — every fallback render would touch a freed
+    // FT_Face. Releasing the local at the end of the function tears down
+    // any old fallback that nothing holds anymore.
+    auto pinned_old_fallbacks = std::move(mFallbackInstanceCache);
+    mFallbackInstanceCache.clear();
+
+    // Wipe parse-time state.
+    mFontSizes.clear();
+    mFamilySizes.clear();
+    mFamilyUses.clear();
+    mInheritFlags.clear();
+    mFamilyMeta.clear();
+
+    // Wipe ALL mFontMap entries: templates so re-parse rebuilds them
+    // cleanly, non-templates so createFont's same-template shortcut at
+    // lines ~1108-1119 doesn't accidentally share an old (stale) freetype
+    // with a newly-built head. Pointers stay alive via the `heads`
+    // snapshot.
+    mFontMap.clear();
+
+    if (!parseFontInfo("fonts.xml"))
+    {
+        LL_WARNS() << "Font reload: parseFontInfo failed; restoring previous fallback cache" << LL_ENDL;
+        mFallbackInstanceCache = std::move(pinned_old_fallbacks);
+        // Re-insert the snapshot heads so widgets continue rendering
+        // against their previous freetype state.
+        for (const auto& [desc, head] : heads)
+            mFontMap[desc] = head;
+        return false;
+    }
+
+    // Drop the global shape cache: every shaped-glyph entry keys on a raw
+    // LLFontFreetype* that's about to dangle. ~LLFontFreetype also calls
+    // clearCache when each old freetype drops to refcount 0, but doing it
+    // once up front avoids racing the destructor against new entries the
+    // loop below would otherwise produce.
+    LLFontShaping::clearCache();
+
+    for (auto& [desc, head] : heads)
+    {
+        // createFont allocates a fresh LLFontGL with newly-loaded
+        // mFontFreetype and inserts it into mFontMap[desc]. We then steal
+        // its mFontFreetype LLPointer onto the existing head and replace
+        // the map entry with the original pointer so widget caches stay
+        // valid.
+        LLFontGL* fresh = createFont(desc);
+        if (fresh)
+        {
+            head->mFontFreetype = fresh->mFontFreetype;
+            head->mFontDescriptor = desc;
+            mFontMap[desc] = head;
+            delete fresh;
+            head->generateASCIIglyphs();
+        }
+        else
+        {
+            LL_WARNS() << "Font reload: createFont failed for "
+                       << desc.getName() << " size " << desc.getSize()
+                       << " style " << (S32)desc.getStyle()
+                       << "; keeping previous freetype" << LL_ENDL;
+            // Re-insert old head so widgets still render its previous
+            // (now-orphaned) glyphs rather than nothing at all.
+            mFontMap[desc] = head;
+        }
+    }
+
+    // pinned_old_fallbacks goes out of scope here. Any shared fallback
+    // instance no longer referenced by a (rebuilt) head's mFontFreetype
+    // chain hits refcount 0; ~LLFontFace fires on its LLFontFace and
+    // releases the FT_Face + atlas LLImageGL.
+    return true;
+}
+
+std::vector<LLFontRegistry::FamilyInfo> LLFontRegistry::getAvailableFamilies(FamilyFilter filter) const
+{
+    // Templates are the canonical "<font name='X'>" entries from fonts.xml
+    // after skin layering and reference resolution. Filter out:
+    //   - "default" — OS-fallback plumbing, never user-selectable.
+    //   - any family with user_selectable="false" attribute in fonts.xml
+    //     (e.g. internal fallbacks like Emoji/CJK that exist only to be
+    //     <use>'d by user-facing families).
+    //   - if filter == MONOSPACE/PROPORTIONAL, families whose `monospace`
+    //     metadata flag doesn't match the requested side.
+    std::set<std::string> uniq;
+    for (const auto& kv : mFontMap)
+    {
+        if (!kv.first.isTemplate())
+            continue;
+        const std::string& name = kv.first.getName();
+        if (name == "default")
+            continue;
+        auto meta_it = mFamilyMeta.find(name);
+        const bool has_meta = (meta_it != mFamilyMeta.end());
+        if (has_meta && !meta_it->second.user_selectable)
+            continue;
+        if (filter == FamilyFilter::MONOSPACE)
+        {
+            if (!has_meta || !meta_it->second.monospace)
+                continue;
+        }
+        else if (filter == FamilyFilter::PROPORTIONAL)
+        {
+            if (has_meta && meta_it->second.monospace)
+                continue;
+        }
+        uniq.insert(name);
+    }
+
+    std::vector<FamilyInfo> result;
+    result.reserve(uniq.size());
+    for (const std::string& name : uniq)
+    {
+        FamilyInfo info;
+        info.name = name;
+        auto meta_it = mFamilyMeta.find(name);
+        info.label = (meta_it != mFamilyMeta.end() && !meta_it->second.ui_label.empty())
+            ? meta_it->second.ui_label
+            : name;
+        result.push_back(std::move(info));
+    }
+    // Sort by label for stable, human-friendly dropdown order. Ties (same
+    // label across renamed entries) fall back to canonical name to keep
+    // ordering deterministic.
+    std::sort(result.begin(), result.end(),
+              [](const FamilyInfo& a, const FamilyInfo& b)
+              {
+                  if (a.label != b.label) return a.label < b.label;
+                  return a.name < b.name;
+              });
+    return result;
 }
 
 void LLFontRegistry::destroyGL()

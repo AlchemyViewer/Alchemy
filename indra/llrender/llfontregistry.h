@@ -35,6 +35,7 @@
 
 class LLFontGL;
 class LLFontFreetype;
+class LLSD;
 
 typedef std::vector<std::string> string_vec_t;
 
@@ -164,6 +165,12 @@ public:
     // Clear cached glyphs for all fonts.
     void reset();
 
+    // Re-parse fonts.xml and re-apply user font overrides
+    // (AlchemyUIFontOverrides). Existing LLFontGL* pointers stay valid —
+    // each head's underlying mFontFreetype is swapped in place. Returns
+    // false on parse failure (registry left untouched).
+    bool reload();
+
     // Destroy all fonts.
     void clear();
 
@@ -173,6 +180,33 @@ public:
     LLFontGL *getFont(const LLFontDescriptor& desc);
     const LLFontDescriptor *getMatchingFontDesc(const LLFontDescriptor& desc);
     const LLFontDescriptor *getClosestFontTemplate(const LLFontDescriptor& desc);
+
+    // (name, ui_label) for one <font> entry. `name` is the canonical
+    // family key (matches `<font name="...">` and the override-map key);
+    // `label` is the friendly text shown in the Preferences dropdown,
+    // taken from the `ui_label` attribute or defaulting to `name`.
+    struct FamilyInfo
+    {
+        std::string name;
+        std::string label;
+    };
+
+    // Filter for getAvailableFamilies. Backed by the per-family
+    // `monospace="true|false"` attribute in fonts.xml (defaults to false).
+    enum class FamilyFilter
+    {
+        ANY,           // any user-selectable family
+        MONOSPACE,     // only families with monospace="true"
+        PROPORTIONAL,  // only families WITHOUT monospace="true"
+    };
+
+    // Families declared in fonts.xml (after skin layering and reference
+    // resolution) that are user-selectable: the implicit "default" entry
+    // and any family marked `user_selectable="false"` are filtered out;
+    // `filter` further constrains the result by the family's monospace
+    // attribute. Sorted by label. Used by the Preferences UI to populate
+    // font-override dropdowns.
+    std::vector<FamilyInfo> getAvailableFamilies(FamilyFilter filter = FamilyFilter::ANY) const;
 
     // Look up the point size for a size name, optionally honoring per-family
     // overrides (<size> children of <font> in fonts.xml). Pass an empty family
@@ -221,6 +255,14 @@ private:
     // style variants, in that order. Idempotent — consumes mFamilyUses and
     // mInheritFlags so re-running over a partially-resolved registry is safe.
     void resolveFontReferences();
+    // Apply per-family user overrides from AlchemyUIFontOverrides setting.
+    // Each override prepends source files (another family's resolved files,
+    // or a single user-supplied font file) ahead of the target family's
+    // existing chain; the original chain stays as fallback so DejaVu/Emoji/
+    // CJK coverage is preserved. Called from resolveFontReferences after the
+    // <use> and inherit="true" resolution so overrides see fully composed
+    // file lists.
+    void applyFamilyOverrides(const LLSD& overrides);
     // Insert a fresh descriptor, or merge it into an existing same-key entry
     // by prepending its files (used for cross-skin layering).
     void mergeFontEntry(const LLFontDescriptor& desc);
@@ -236,6 +278,20 @@ private:
     // Per-family <use family="X"/> references, resolved at parse-time after
     // all skin layers have loaded.
     typedef std::map<std::string, std::vector<std::string>> family_uses_map_t;
+    // Family-level metadata read from <font> attributes. All three fields
+    // are optional: ui_label defaults to the family name, user_selectable
+    // defaults to true (preserving pre-attribute behavior), monospace
+    // defaults to false. monospace classifies the family for the
+    // Preferences "UI Font" vs "Mono Font" pickers — the data path itself
+    // doesn't care about monospace at the family level (per-file
+    // `ligatures` / `font_weight` etc. handle the rendering side).
+    struct FamilyMeta
+    {
+        std::string ui_label;
+        bool        user_selectable = true;
+        bool        monospace = false;
+    };
+    typedef std::map<std::string, FamilyMeta> family_meta_map_t;
 
     // Given a descriptor, look up specific font instantiation.
     font_reg_map_t mFontMap;
@@ -251,6 +307,16 @@ private:
     // family's matching-style files (or NORMAL fallback) to every style of
     // `family` during resolveFontReferences().
     family_uses_map_t mFamilyUses;
+    // Per-family ui_label / user_selectable from fonts.xml. Absent entries
+    // mean defaults: label = family name, selectable = true.
+    family_meta_map_t mFamilyMeta;
+    // target_family -> source_family for family-name overrides applied via
+    // AlchemyUIFontOverrides. nameToSize consults the source family's
+    // per-family <size> table before the target's, so a Monospace ->
+    // SourceCode override picks up SourceCode's own size scale (if any).
+    // Only family-name overrides populate this; file-name overrides
+    // don't, since there's no source family to draw size metadata from.
+    std::map<std::string, std::string> mFamilyOverrideSources;
     // Cache of fallback LLFontFreetype instances keyed by face params +
     // monospace_ligatures. Heads always create fresh (their fallback chain
     // and atlas are head-specific); fallback instances dedup. Shared across

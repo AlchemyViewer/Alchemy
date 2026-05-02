@@ -200,4 +200,97 @@ Jan 1, 2001
    top_pad="2"
    word_wrap="true"
    width="291" />
+  <!-- Custom UI Fonts: live-applied via AlchemyUIFontOverrides setting.
+       Combobox values are family names from fonts.xml; the line editor
+       beside each lets the user type a font filename instead. Either
+       resolves to an override entry; (default) clears the override. -->
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   font="SansSerifBold"
+   left="30"
+   name="ui_fonts_header"
+   top="290"
+   width="400">
+   Custom UI Fonts
+  </text>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="16"
+   layout="topleft"
+   left="40"
+   name="ui_font_sansserif_label"
+   top_pad="8"
+   width="80">
+   UI Font:
+  </text>
+  <combo_box
+   follows="left|top"
+   height="23"
+   layout="topleft"
+   left_pad="0"
+   name="ui_font_sansserif"
+   tool_tip="Override the SansSerif family used for most UI text. Pick a font family from fonts.xml or type a file name in the box at right."
+   top_delta="-3"
+   width="160">
+    <combo_box.commit_callback
+     function="Pref.UIFontSelected"
+     parameter="SansSerif" />
+  </combo_box>
+  <line_editor
+   follows="left|top"
+   height="23"
+   layout="topleft"
+   left_pad="6"
+   name="ui_font_sansserif_file"
+   tool_tip="Or type a font filename here (TrueType/OpenType/WOFF2). Cleared when the dropdown picks a built-in family."
+   top_delta="0"
+   width="180">
+    <line_editor.commit_callback
+     function="Pref.UIFontFileEntered"
+     parameter="SansSerif" />
+  </line_editor>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="16"
+   layout="topleft"
+   left="40"
+   name="ui_font_monospace_label"
+   top_pad="6"
+   width="80">
+   Mono Font:
+  </text>
+  <combo_box
+   follows="left|top"
+   height="23"
+   layout="topleft"
+   left_pad="0"
+   name="ui_font_monospace"
+   tool_tip="Override the Monospace family used by code/script editors and inline mono text. Pick from fonts.xml families or supply a filename."
+   top_delta="-3"
+   width="160">
+    <combo_box.commit_callback
+     function="Pref.UIFontSelected"
+     parameter="Monospace" />
+  </combo_box>
+  <line_editor
+   follows="left|top"
+   height="23"
+   layout="topleft"
+   left_pad="6"
+   name="ui_font_monospace_file"
+   tool_tip="Or type a font filename here (TrueType/OpenType/WOFF2). Cleared when the dropdown picks a built-in family."
+   top_delta="0"
+   width="180">
+    <line_editor.commit_callback
+     function="Pref.UIFontFileEntered"
+     parameter="Monospace" />
+  </line_editor>
 </panel>

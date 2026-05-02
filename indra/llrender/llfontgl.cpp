@@ -1679,6 +1679,48 @@ void LLFontGL::destroyDefaultFonts()
     sFontRegistry = NULL;
 }
 
+// static
+bool LLFontGL::reloadFonts()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    if (!sFontRegistry)
+        return false;
+    return sFontRegistry->reload();
+}
+
+namespace
+{
+    // Set by setting listener (settings_setup_listeners in llviewercontrol.cpp);
+    // drained by LLAppViewer::idle. Defers the actual reload off the
+    // setValue() callstack so we never tear down an LLFontFreetype during
+    // glyph rasterization or text render.
+    bool s_pending_font_reload = false;
+}
+
+// static
+void LLFontGL::schedulePendingReload()
+{
+    s_pending_font_reload = true;
+}
+
+// static
+bool LLFontGL::consumePendingReload()
+{
+    if (!s_pending_font_reload)
+        return false;
+    s_pending_font_reload = false;
+    return true;
+}
+
+// static
+std::vector<LLFontRegistry::FamilyInfo> LLFontGL::getAvailableFamilies(
+    LLFontRegistry::FamilyFilter filter)
+{
+    if (!sFontRegistry)
+        return {};
+    return sFontRegistry->getAvailableFamilies(filter);
+}
+
 //static
 void LLFontGL::destroyAllGL()
 {

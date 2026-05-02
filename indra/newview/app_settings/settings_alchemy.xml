@@ -747,6 +747,22 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyUIFontOverrides</key>
+        <map>
+            <key>Comment</key>
+            <string>
+                Per-family UI font overrides. Map of font family name (e.g. SansSerif,
+                Monospace) to override value. Override value is tried first as another
+                family name from fonts.xml, then as a font filename. Empty/absent =
+                built-in default. Applied at startup and on change without restart.
+            </string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
         <key>CloseChatBarOnReturn</key>
         <map>
             <key>Comment</key>

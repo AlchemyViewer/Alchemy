@@ -234,6 +234,19 @@ private:
     void onSelectSkin(const LLSD& data);
     void refreshSkinInfo(const skin_t& skin);
 
+    // Themes panel: populate the UI Font / Mono Font dropdowns from the
+    // family list parsed from fonts.xml, and pre-select / pre-fill from
+    // the current AlchemyUIFontOverrides setting.
+    void populateUIFontDropdowns();
+    // Commit handler for the family dropdown. userdata = family being
+    // overridden ("SansSerif" or "Monospace"). Selecting "(default)"
+    // erases the override; selecting another value writes it.
+    void onUIFontSelected(LLUICtrl* ctrl, const LLSD& userdata);
+    // Commit handler for the "Or filename" line editor. userdata = family
+    // being overridden. Empty input erases the override; otherwise writes
+    // the raw filename.
+    void onUIFontFileEntered(LLUICtrl* ctrl, const LLSD& userdata);
+
     static std::string sSkin;
     notifications_map mNotificationOptions;
     bool mGotPersonalInfo;

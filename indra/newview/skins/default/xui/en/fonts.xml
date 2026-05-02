@@ -4,23 +4,37 @@
   <!-- Cross-script fallback families. These are small, single-purpose
        families pulled in by other families via <use family="..."/>. -->
 
-    <font name="DejaVu">
-        <size name="LSmall" size="7.6"/>
+    <font name="DejaVu" ui_label="DejaVu Sans">
+        <size name="Huge"   size="16.0"/>
+        <size name="Large"  size="10.6"/>
+        <size name="Medium" size="8.6"/>
+        <size name="Small"  size="7.6"/>
+
         <style name="NORMAL">
-            <file size_delta="-0.5">DejaVuSans.woff2</file>
+            <file>DejaVuSansMono.woff2</file>
         </style>
         <style name="BOLD">
-            <file size_delta="-0.5">DejaVuSans-Bold.woff2</file>
+            <file>DejaVuSans-Bold.woff2</file>
         </style>
         <style name="ITALIC">
-            <file size_delta="-0.5">DejaVuSans-Oblique.woff2</file>
+            <file>DejaVuSans-Oblique.woff2</file>
         </style>
         <style name="BOLD|ITALIC">
-            <file size_delta="-0.5">DejaVuSans-BoldOblique.woff2</file>
+            <file>DejaVuSans-BoldOblique.woff2</file>
         </style>
     </font>
 
-    <font name="SourceCode">
+    <font name="DejaVuMono" ui_label="DejaVu Sans Mono" monospace="true">
+        <size name="Monospace" size="8.0"/>
+        <size name="SmallLSL"  size="7"/>
+        <size name="HugeLSL"   size="12"/>
+
+        <style name="NORMAL">
+            <file>DejaVuSansMono.woff2</file>
+        </style>
+    </font>
+
+    <font name="SourceCode" ui_label="Source Code Pro" monospace="true">
         <style name="NORMAL">
             <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Upright.woff2</file>
         </style>
@@ -35,7 +49,7 @@
         </style>
     </font>
     
-    <font name="SourceSans">
+    <font name="SourceSans" ui_label="Source Sans 3">
         <style name="NORMAL">
             <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
         </style>
@@ -53,7 +67,7 @@
         </style>
     </font>
 
-    <font name="CJK">
+    <font name="CJK" user_selectable="false">
         <style name="NORMAL">
             <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
         </style>
@@ -68,7 +82,7 @@
         </style>
     </font>
 
-    <font name="Emoji">
+    <font name="Emoji" user_selectable="false">
         <style name="NORMAL">
             <file functor="is_emoji">TwemojiSVG.woff2</file>
         </style>
@@ -114,14 +128,14 @@
   <!-- Primary user-facing families. Each declares its own primary face per
        style and pulls in DejaVu/Emoji/CJK as fallbacks via <use>. -->
 
-  <font name="SansSerif">
+  <font name="SansSerif" ui_label="Sans Serif (Default)">
     <use family="SourceSans"/>
     <use family="DejaVu"/>
     <use family="Emoji"/>
     <use family="CJK"/>
   </font>
 
-  <font name="Helvetica">
+  <font name="Helvetica" ui_label="Helvetica / Arial" user_selectable="false">
     <style name="NORMAL">
       <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
       <os name="Windows"><file>arial.ttf</file></os>
@@ -144,16 +158,13 @@
     </style>
   </font>
 
-  <font name="Monospace">
-    <size name="Monospace" size="10.0"/>
-    <size name="SmallLSL"  size="7"/>
-    <size name="HugeLSL"   size="12"/>
+  <font name="Monospace" ui_label="Monospace (Default)" monospace="true">
     <use family="SourceCode"/>
     <use family="Emoji"/>
     <use family="CJK"/>
   </font>
 
-  <font name="OverrideTest">
+  <font name="OverrideTest" user_selectable="false">
     <style name="NORMAL">
       <file>times.ttf</file>
       <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
@@ -164,4 +175,7 @@
   <font_size name="Large"  size="11.0"/>
   <font_size name="Medium" size="10"/>
   <font_size name="Small"  size="9"/>
+  <font_size name="Monospace" size="10.0"/>
+  <font_size name="SmallLSL"  size="7"/>
+  <font_size name="HugeLSL"   size="12"/>
 </fonts>
