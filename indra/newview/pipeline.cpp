@@ -9096,7 +9096,7 @@ void LLPipeline::renderFinalize()
         {
             gBlitWithEffectsProgram.uniform2f(LLShaderMgr::VIGNETTE_ASPECT, 1.f, 1.f);
         }
-        gBlitWithEffectsProgram.uniform3fv(LLShaderMgr::VIGNETTE_CENTER, 1, vignette_center().mV);
+        gBlitWithEffectsProgram.uniform2fv(LLShaderMgr::VIGNETTE_CENTER, 1, vignette_center().mV);
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_FEATHER, llclamp(vignette_feather(), 0.2f, 4.0f));
 
         // CVD Compensation
