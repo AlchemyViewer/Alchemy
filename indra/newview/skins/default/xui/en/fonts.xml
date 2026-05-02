@@ -84,7 +84,7 @@
 
     <font name="Emoji" user_selectable="false">
         <style name="NORMAL">
-            <file functor="is_emoji">TwemojiSVG.woff2</file>
+            <file unicode_ranges="U+1F000-U+1FFFF">TwemojiSVG.woff2</file>
         </style>
         <use family="SourceSans"/>
         <use family="DejaVu"/>

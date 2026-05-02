@@ -126,8 +126,7 @@ public:
     const std::string& getSize() const { return mSize; }
     void setSize(const std::string& size) { mSize = size; }
 
-    void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor = LLStringUtil::null, bool monospace_ligatures = false);
-    void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures = false);
+    void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false);
     const font_file_info_vec_t & getFontFiles() const { return mFontFiles; }
     void setFontFiles(const font_file_info_vec_t& font_files) { mFontFiles = font_files; }
 
@@ -139,9 +138,6 @@ private:
     std::string mSize;
     font_file_info_vec_t mFontFiles;
     U8 mStyle;
-
-    typedef std::map<std::string, std::function<bool(llwchar)>> char_functor_map_t;
-    static char_functor_map_t mCharFunctors;
 };
 
 class LLFontRegistry

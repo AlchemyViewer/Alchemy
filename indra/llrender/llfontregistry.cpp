@@ -163,10 +163,6 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node);
 const std::string MACOSX_FONT_PATH_LIBRARY = "/Library/Fonts/";
 const std::string MACOSX_FONT_SUPPLEMENTAL = "Supplemental/";
 
-LLFontDescriptor::char_functor_map_t LLFontDescriptor::mCharFunctors({
-    { "is_emoji", LLStringOps::isEmoji }
-});
-
 LLFontDescriptor::LLFontDescriptor():
     mStyle(0)
 {
@@ -285,12 +281,6 @@ LLFontDescriptor LLFontDescriptor::normalize() const
         new_style |= LLFontGL::ITALIC;
 
     return LLFontDescriptor(new_name,new_size,new_style, getFontFiles());
-}
-
-void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor, bool monospace_ligatures)
-{
-    char_functor_map_t::const_iterator it = mCharFunctors.find(char_functor);
-    mFontFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, (mCharFunctors.end() != it) ? it->second : nullptr, monospace_ligatures));
 }
 
 void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures)
@@ -806,16 +796,10 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
         if (child->hasName("file"))
         {
             std::string font_file_name = child->getTextContents();
-            std::string char_functor;
             std::function<bool(llwchar)> inline_functor;
             EFontHinting hinting = defaults.hinting_set ? defaults.hinting : EFontHinting::FORCE_AUTOHINT;
             S32 flags = 0;
             S32 weight = defaults.weight_set ? defaults.weight : -1;
-
-            if (child->hasAttribute("functor"))
-            {
-                child->getAttributeString("functor", char_functor);
-            }
 
             if (child->hasAttribute("unicode_ranges"))
             {
@@ -853,12 +837,7 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
                 child->getAttributeS32("font_weight", weight);
             }
 
-            // unicode_ranges takes precedence when both are present; functor
-            // is the legacy named-predicate path.
-            if (inline_functor)
-                desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, inline_functor, defaults.monospace_ligatures);
-            else
-                desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, char_functor, defaults.monospace_ligatures);
+            desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, inline_functor, defaults.monospace_ligatures);
         }
         else if (child->hasName("size"))
         {
