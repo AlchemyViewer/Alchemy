@@ -515,7 +515,7 @@ void LLMenuItemGL::draw( void )
     if (mBriefItem)
     {
         mFont->render( mLabel, 0, BRIEF_PAD_PIXELS / 2, 0, color,
-                       LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL);
+                       LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
     }
     else
     {
@@ -526,19 +526,19 @@ void LLMenuItemGL::draw( void )
         if( !mDrawBoolLabel.empty() )
         {
             mFont->render( mDrawBoolLabel.getWString(), 0, (F32)LEFT_PAD_PIXELS, y, color,
-                           LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false );
+                           LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
         mFont->render( mLabel.getWString(), 0, (F32)LEFT_PLAIN_PIXELS, y, color,
-                       LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false );
+                       LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         if( !mDrawAccelLabel.empty() )
         {
             mFont->render( mDrawAccelLabel.getWString(), 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
-                           LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false );
+                           LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
         if( !mDrawBranchLabel.empty() )
         {
             mFont->render( mDrawBranchLabel.getWString(), 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
-                           LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false );
+                           LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
     }
 
@@ -1646,7 +1646,7 @@ void LLMenuItemBranchDownGL::draw( void )
     // but it won't work if somebody decides to use different font
     // todo: adjust logic to work of rect and font height
     getFont()->render( mLabel.getWString(), 0, (F32)getRect().getWidth() / 2.f, (F32)LABEL_BOTTOM_PAD_PIXELS, color,
-                   LLFontGL::HCENTER, LLFontGL::BOTTOM, LLFontGL::NORMAL);
+                   LLFontGL::HCENTER, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false);
 
 
     // underline navigation key only when keyboard navigation has been initiated
