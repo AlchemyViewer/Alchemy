@@ -100,7 +100,6 @@ public:
     LLFontDescriptor();
     LLFontDescriptor(const std::string& name, const std::string& size, const U8 style);
     LLFontDescriptor(const std::string& name, const std::string& size, const U8 style, const font_file_info_vec_t& font_list);
-    LLFontDescriptor(const std::string& name, const std::string& size, const U8 style, const font_file_info_vec_t& font_list, const font_file_info_vec_t& font_collection_list);
     LLFontDescriptor normalize() const;
 
     bool operator<(const LLFontDescriptor& b) const;
@@ -131,10 +130,6 @@ public:
     void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures = false);
     const font_file_info_vec_t & getFontFiles() const { return mFontFiles; }
     void setFontFiles(const font_file_info_vec_t& font_files) { mFontFiles = font_files; }
-    void addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor = LLStringUtil::null, bool monospace_ligatures = false);
-    void addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures = false);
-    const font_file_info_vec_t& getFontCollectionFiles() const { return mFontCollectionFiles; }
-    void setFontCollectionFiles(const font_file_info_vec_t& font_collection_files) { mFontCollectionFiles = font_collection_files; }
 
     const U8 getStyle() const { return mStyle; }
     void setStyle(U8 style) { mStyle = style; }
@@ -143,7 +138,6 @@ private:
     std::string mName;
     std::string mSize;
     font_file_info_vec_t mFontFiles;
-    font_file_info_vec_t mFontCollectionFiles;
     U8 mStyle;
 
     typedef std::map<std::string, std::function<bool(llwchar)>> char_functor_map_t;

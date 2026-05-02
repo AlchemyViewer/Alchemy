@@ -57,8 +57,6 @@ namespace
         bool hinting_set = false;
         S32 weight = -1;
         bool weight_set = false;
-        bool load_collection = false;
-        bool load_collection_set = false;
     };
 
     typedef boost::unordered_map<std::string, F32> family_size_overrides_t;
@@ -186,16 +184,6 @@ LLFontDescriptor::LLFontDescriptor(const std::string& name,
 }
 
 LLFontDescriptor::LLFontDescriptor(const std::string& name,
-    const std::string& size,
-    const U8 style,
-    const font_file_info_vec_t& font_list,
-    const font_file_info_vec_t& font_collection_files) :
-    LLFontDescriptor(name, size, style, font_list)
-{
-    mFontCollectionFiles = font_collection_files;
-}
-
-LLFontDescriptor::LLFontDescriptor(const std::string& name,
                                    const std::string& size,
                                    const U8 style):
     mName(name),
@@ -296,7 +284,7 @@ LLFontDescriptor LLFontDescriptor::normalize() const
     if (removeSubString(new_name,"Italic"))
         new_style |= LLFontGL::ITALIC;
 
-    return LLFontDescriptor(new_name,new_size,new_style, getFontFiles(), getFontCollectionFiles());
+    return LLFontDescriptor(new_name,new_size,new_style, getFontFiles());
 }
 
 void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor, bool monospace_ligatures)
@@ -308,17 +296,6 @@ void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hi
 void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures)
 {
     mFontFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, char_functor, monospace_ligatures));
-}
-
-void LLFontDescriptor::addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::string& char_functor, bool monospace_ligatures)
-{
-    char_functor_map_t::const_iterator it = mCharFunctors.find(char_functor);
-    mFontCollectionFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, (mCharFunctors.end() != it) ? it->second : nullptr, monospace_ligatures));
-}
-
-void LLFontDescriptor::addFontCollectionFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures)
-{
-    mFontCollectionFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, char_functor, monospace_ligatures));
 }
 
 LLFontRegistry::LLFontRegistry(bool create_gl_textures)
@@ -384,15 +361,13 @@ bool LLFontRegistry::parseFontInfo(const std::string& xml_filename)
 
 void LLFontRegistry::resolveFontReferences()
 {
-    // Helper: replace the file lists on a (family, style) entry while
+    // Helper: replace the file list on a (family, style) entry while
     // preserving any cached LLFontGL pointer.
     auto replace_files = [this](font_reg_map_t::iterator it,
-                                const font_file_info_vec_t& new_files,
-                                const font_file_info_vec_t& new_collection)
+                                const font_file_info_vec_t& new_files)
     {
         LLFontDescriptor new_desc = it->first;
         new_desc.setFontFiles(new_files);
-        new_desc.setFontCollectionFiles(new_collection);
         LLFontGL* fontp = it->second;
         mFontMap.erase(it);
         mFontMap[new_desc] = fontp;
@@ -468,13 +443,11 @@ void LLFontRegistry::resolveFontReferences()
     // independent and cycles / self-references behave deterministically:
     //   A->B and B->A both end up as [own, other], not double-counted;
     //   <use family="self"/> still warns and is skipped below regardless.
-    boost::unordered_map<LLFontDescriptor, std::pair<font_file_info_vec_t, font_file_info_vec_t>> pre_use;
+    boost::unordered_map<LLFontDescriptor, font_file_info_vec_t> pre_use;
     pre_use.reserve(mFontMap.size());
     for (const auto& entry : mFontMap)
     {
-        pre_use.emplace(entry.first,
-                        std::make_pair(entry.first.getFontFiles(),
-                                       entry.first.getFontCollectionFiles()));
+        pre_use.emplace(entry.first, entry.first.getFontFiles());
     }
 
     for (const auto& kv : mFamilyUses)
@@ -490,7 +463,6 @@ void LLFontRegistry::resolveFontReferences()
                 continue;
 
             font_file_info_vec_t merged_files = it->first.getFontFiles();
-            font_file_info_vec_t merged_collection = it->first.getFontCollectionFiles();
 
             for (const std::string& used : used_families)
             {
@@ -516,13 +488,11 @@ void LLFontRegistry::resolveFontReferences()
                                << "' but no such family is defined" << LL_ENDL;
                     continue;
                 }
-                const auto& src_files = snap_it->second.first;
-                const auto& src_collection = snap_it->second.second;
+                const auto& src_files = snap_it->second;
                 merged_files.insert(merged_files.end(), src_files.begin(), src_files.end());
-                merged_collection.insert(merged_collection.end(), src_collection.begin(), src_collection.end());
             }
 
-            replace_files(it, merged_files, merged_collection);
+            replace_files(it, merged_files);
         }
     }
 
@@ -559,11 +529,7 @@ void LLFontRegistry::resolveFontReferences()
         const font_file_info_vec_t& parent_files = parent_it->first.getFontFiles();
         merged_files.insert(merged_files.end(), parent_files.begin(), parent_files.end());
 
-        font_file_info_vec_t merged_collection = variant_it->first.getFontCollectionFiles();
-        const font_file_info_vec_t& parent_collection = parent_it->first.getFontCollectionFiles();
-        merged_collection.insert(merged_collection.end(), parent_collection.begin(), parent_collection.end());
-
-        replace_files(variant_it, merged_files, merged_collection);
+        replace_files(variant_it, merged_files);
     }
 
     // Step 3: apply user font overrides (AlchemyUIFontOverrides) on top of
@@ -599,24 +565,20 @@ void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
     // files in this snapshot so chains of overrides (A->B and B->C in the
     // same map) don't see each other's mid-iteration mutations — each
     // override resolves against the original post-resolution state.
-    boost::unordered_map<LLFontDescriptor, std::pair<font_file_info_vec_t, font_file_info_vec_t>> pre_override;
+    boost::unordered_map<LLFontDescriptor, font_file_info_vec_t> pre_override;
     pre_override.reserve(mFontMap.size());
     for (const auto& entry : mFontMap)
     {
         if (!entry.first.isTemplate())
             continue;
-        pre_override.emplace(entry.first,
-                             std::make_pair(entry.first.getFontFiles(),
-                                            entry.first.getFontCollectionFiles()));
+        pre_override.emplace(entry.first, entry.first.getFontFiles());
     }
 
     auto replace_files = [this](font_reg_map_t::iterator it,
-                                const font_file_info_vec_t& new_files,
-                                const font_file_info_vec_t& new_collection)
+                                const font_file_info_vec_t& new_files)
     {
         LLFontDescriptor new_desc = it->first;
         new_desc.setFontFiles(new_files);
-        new_desc.setFontCollectionFiles(new_collection);
         LLFontGL* fontp = it->second;
         mFontMap.erase(it);
         mFontMap[new_desc] = fontp;
@@ -687,7 +649,6 @@ void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
                 continue;
 
             font_file_info_vec_t prepend_files;
-            font_file_info_vec_t prepend_collection;
 
             if (source_is_family)
             {
@@ -701,8 +662,7 @@ void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
                 }
                 if (src_it == pre_override.end())
                     continue;
-                prepend_files = src_it->second.first;
-                prepend_collection = src_it->second.second;
+                prepend_files = src_it->second;
             }
             else
             {
@@ -733,13 +693,10 @@ void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
             // fallbacks (already resolved in onto target via <use>) stay
             // available behind it.
             font_file_info_vec_t merged_files = prepend_files;
-            font_file_info_vec_t merged_collection = prepend_collection;
             const auto& orig_files = target_it->first.getFontFiles();
-            const auto& orig_collection = target_it->first.getFontCollectionFiles();
             merged_files.insert(merged_files.end(), orig_files.begin(), orig_files.end());
-            merged_collection.insert(merged_collection.end(), orig_collection.begin(), orig_collection.end());
 
-            replace_files(target_it, merged_files, merged_collection);
+            replace_files(target_it, merged_files);
         }
     }
 }
@@ -822,13 +779,6 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
             defaults.weight_set = true;
         }
 
-        if (node->hasAttribute("load_collection"))
-        {
-            bool fam_col = false;
-            node->getAttributeBOOL("load_collection", fam_col);
-            defaults.load_collection = fam_col;
-            defaults.load_collection_set = true;
-        }
 
         if (extras && node->hasAttribute("inherit"))
         {
@@ -861,7 +811,6 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
             EFontHinting hinting = defaults.hinting_set ? defaults.hinting : EFontHinting::FORCE_AUTOHINT;
             S32 flags = 0;
             S32 weight = defaults.weight_set ? defaults.weight : -1;
-            bool load_collection = defaults.load_collection_set ? defaults.load_collection : false;
 
             if (child->hasAttribute("functor"))
             {
@@ -904,21 +853,8 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
                 child->getAttributeS32("font_weight", weight);
             }
 
-            if (child->hasAttribute("load_collection"))
-            {
-                child->getAttributeBOOL("load_collection", load_collection);
-            }
-
             // unicode_ranges takes precedence when both are present; functor
             // is the legacy named-predicate path.
-            if (load_collection)
-            {
-                if (inline_functor)
-                    desc.addFontCollectionFile(font_file_name, hinting, flags, size_delta, weight, inline_functor, defaults.monospace_ligatures);
-                else
-                    desc.addFontCollectionFile(font_file_name, hinting, flags, size_delta, weight, char_functor, defaults.monospace_ligatures);
-            }
-
             if (inline_functor)
                 desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, inline_functor, defaults.monospace_ligatures);
             else
@@ -954,10 +890,10 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
     }
     return true;
 }
-// Read family-level defaults (ligatures, font_hinting, font_weight,
-// load_collection) from a <font> node. Used by both legacy and new-format
-// paths; mirrors the family-level reads done inside font_desc_init_from_xml
-// for backward compatibility.
+// Read family-level defaults (ligatures, font_hinting, font_weight) from a
+// <font> node. Used by both legacy and new-format paths; mirrors the
+// family-level reads done inside font_desc_init_from_xml for backward
+// compatibility.
 FamilyDefaults read_family_defaults(LLXMLNodePtr font_node)
 {
     FamilyDefaults d;
@@ -981,13 +917,6 @@ FamilyDefaults read_family_defaults(LLXMLNodePtr font_node)
         d.weight = w;
         d.weight_set = true;
     }
-    if (font_node->hasAttribute("load_collection"))
-    {
-        bool c = false;
-        font_node->getAttributeBOOL("load_collection", c);
-        d.load_collection = c;
-        d.load_collection_set = true;
-    }
     return d;
 }
 
@@ -1003,12 +932,9 @@ void LLFontRegistry::mergeFontEntry(const LLFontDescriptor& desc)
     }
     font_file_info_vec_t files = match->getFontFiles();
     files.insert(files.begin(), desc.getFontFiles().begin(), desc.getFontFiles().end());
-    font_file_info_vec_t collection = match->getFontCollectionFiles();
-    collection.insert(collection.begin(), desc.getFontCollectionFiles().begin(), desc.getFontCollectionFiles().end());
 
     LLFontDescriptor merged = *match;
     merged.setFontFiles(files);
-    merged.setFontCollectionFiles(collection);
     mFontMap.erase(*match);
     mFontMap[merged] = nullptr;
 }
@@ -1195,14 +1121,8 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
                                       desc.getFontFiles().begin(),
                                       desc.getFontFiles().end());
 
-                    font_file_info_vec_t font_collection_files = match_desc->getFontCollectionFiles();
-                    font_collection_files.insert(font_collection_files.begin(),
-                        desc.getFontCollectionFiles().begin(),
-                        desc.getFontCollectionFiles().end());
-
                     LLFontDescriptor new_desc = *match_desc;
                     new_desc.setFontFiles(font_files);
-                    new_desc.setFontCollectionFiles(font_collection_files);
                     registry->mFontMap.erase(*match_desc);
                     registry->mFontMap[new_desc] = NULL;
                 }
@@ -1333,7 +1253,6 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     // Build list of font names to look for.
     // Files specified for this font come first, followed by those from the default descriptor.
     font_file_info_vec_t font_files = match_desc->getFontFiles();
-    font_file_info_vec_t font_collection_files = match_desc->getFontCollectionFiles();
     LLFontDescriptor default_desc("default",s_template_string,0);
     const LLFontDescriptor *match_default_desc = getMatchingFontDesc(default_desc);
     if (match_default_desc)
@@ -1341,9 +1260,6 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
         font_files.insert(font_files.end(),
                           match_default_desc->getFontFiles().begin(),
                           match_default_desc->getFontFiles().end());
-        font_collection_files.insert(font_collection_files.end(),
-            match_default_desc->getFontCollectionFiles().begin(),
-            match_default_desc->getFontCollectionFiles().end());
     }
 
     // Add ultimate fallback list - generated dynamically on linux,
@@ -1381,9 +1297,6 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     {
         LLFontGL *fontp = NULL;
 
-        bool is_ft_collection = (std::find_if(font_collection_files.begin(), font_collection_files.end(),
-                                              [&font_file_it](const LLFontFileInfo& ffi) { return font_file_it->FileName == ffi.FileName; }) != font_collection_files.end());
-
         // *HACK: Fallback fonts don't render, so we can use that to suppress
         // creation of OpenGL textures for test apps. JC
         bool is_fallback = !is_first_found || !mCreateGLTextures;
@@ -1398,7 +1311,11 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
             const std::string font_path = *font_search_path_it + font_file_it->FileName;
 
             fontp = new LLFontGL;
-            S32 num_faces = is_ft_collection ? fontp->getNumFaces(font_path) : 1;
+            // Always probe num_faces — FreeType returns 1 for single-face
+            // files (.ttf, .otf, .woff2) and the actual face count for
+            // collections (.ttc, .otc), so we don't need fonts.xml to flag
+            // collections explicitly.
+            S32 num_faces = fontp->getNumFaces(font_path);
             for (S32 i = 0; i < num_faces; i++)
             {
                 // Fallback dedup: if the same (filename, face_index, sized

@@ -36,49 +36,49 @@
 
     <font name="SourceCode" ui_label="Source Code Pro" monospace="true">
         <style name="NORMAL">
-            <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Upright.woff2</file>
+            <file font_hinting="light" font_weight="400">SourceCodeVF-Upright.woff2</file>
         </style>
         <style name="BOLD" inherit="true">
-            <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Upright.woff2</file>
+            <file flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Upright.woff2</file>
         </style>
         <style name="ITALIC" inherit="true">
-            <file load_collection="true" font_hinting="light" font_weight="400">SourceCodeVF-Italic.woff2</file>
+            <file font_hinting="light" font_weight="400">SourceCodeVF-Italic.woff2</file>
         </style>
         <style name="BOLD|ITALIC" inherit="true">
-            <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Italic.woff2</file>
+            <file flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Italic.woff2</file>
         </style>
     </font>
     
     <font name="SourceSans" ui_label="Source Sans 3">
         <style name="NORMAL">
-            <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
+            <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
         </style>
         <style name="BOLD" inherit="true">
-            <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
+            <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
             <os name="Windows">
                 <file>arialbd.ttf</file>
             </os>
         </style>
         <style name="ITALIC" inherit="true">
-            <file load_collection="true" font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
+            <file font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
         </style>
         <style name="BOLD|ITALIC" inherit="true">
-            <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
+            <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
         </style>
     </font>
 
     <font name="CJK" user_selectable="false">
         <style name="NORMAL">
-            <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
+            <file font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
         </style>
         <style name="BOLD">
-            <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
+            <file flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
         </style>
         <style name="ITALIC">
-            <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
+            <file font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
         </style>
         <style name="BOLD|ITALIC">
-            <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
+            <file flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
         </style>
     </font>
 
@@ -103,7 +103,7 @@
         <file>simhei.ttf</file>
         <file>ArialUni.ttf</file>
         <file>msyh.ttc</file>
-        <file load_collection="true">Cambria.ttc</file>
+        <file>Cambria.ttc</file>
         <file>malgun.ttf</file>
         <file>micross.ttf</file>
       </os>
