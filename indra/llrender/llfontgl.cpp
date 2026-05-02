@@ -117,8 +117,18 @@ S32 LLFontGL::getNumFaces(const std::string& filename)
 
 S32 LLFontGL::getCacheGeneration() const
 {
-    const LLFontBitmapCache* font_bitmap_cache = mFontFreetype->getFontBitmapCache();
-    return font_bitmap_cache->getCacheGeneration();
+    // Every render() call may sample from this font's head atlas AND from
+    // each fallback face's atlas (e.g. emoji glyphs in an otherwise
+    // grayscale string). Each LLFontBitmapCache has its own per-instance
+    // generation that only ticks on mutations to that cache; the head
+    // atlas's local counter is blind to a fallback rasterizing a new
+    // glyph mid-frame, so vertex/width buffers comparing against it
+    // would miss the invalidation and keep the stale UVs that point at
+    // uninitialized atlas slots. The global counter ticks on any atlas
+    // mutation across every face — slight over-invalidation, but the
+    // only correct answer when the cache key has to cover all sampled
+    // atlases without enumerating them.
+    return LLFontBitmapCache::getGlobalGeneration();
 }
 
 S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRect& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,

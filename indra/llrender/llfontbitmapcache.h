@@ -78,6 +78,17 @@ public:
     S32 getBitmapHeight() const { return mBitmapHeight; }
     S32 getCacheGeneration() const { return mGeneration; }
 
+    // Snapshot of the global atlas-mutation counter. Every nextOpenPos /
+    // releaseSheet / reset / injectPage / new LLFontBitmapCache anywhere
+    // bumps this. Vertex/width-buffer caches that sample from a font's
+    // head face AND its fallback faces (each owning its own atlas with a
+    // separate per-instance mGeneration) need a counter that ticks on
+    // mutations to ANY of them — comparing only the head's mGeneration
+    // misses fallback rasterization (e.g. emoji glyphs added during a
+    // genBuffers walk), leaving the captured UVs pointing at uninitialized
+    // atlas slots until something else triggers a rebuild.
+    static S32 getGlobalGeneration() { return sNextGeneration; }
+
     // Drop the underlying images for a sheet, freeing the GPU and CPU memory.
     // The slot index remains valid (kept as a nullptr placeholder) so existing
     // sheet-index references stay numerically stable; callers must purge any
