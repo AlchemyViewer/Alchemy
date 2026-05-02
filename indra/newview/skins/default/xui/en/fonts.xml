@@ -86,8 +86,6 @@
         <style name="NORMAL">
             <file unicode_ranges="U+1F000-U+1FFFF">TwemojiSVG.woff2</file>
         </style>
-        <use family="SourceSans"/>
-        <use family="DejaVu"/>
     </font>
     
   <!-- The "default" font is appended (style-agnostically) to every font's

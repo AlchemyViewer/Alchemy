@@ -101,7 +101,7 @@ public:
                 S32 max_chars = S32_MAX,
                 F32* right_x=NULL,
                 bool use_ellipses = false,
-                bool use_color = true) const;
+                bool use_color = false) const;
 
     S32 render(const LLWString &text, S32 begin_offset,
                 const LLRectf& rect,
@@ -111,7 +111,7 @@ public:
                 S32 max_chars = S32_MAX,
                 F32* right_x=NULL,
                 bool use_ellipses = false,
-                bool use_color = true) const;
+                bool use_color = false) const;
 
     // on_pass_boundary, if non-null, is invoked once between the shadow pass and
     // the foreground pass when shadow != NO_SHADOW. LLFontVertexBuffer uses it to

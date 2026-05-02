@@ -179,7 +179,7 @@ LLTextBase::Params::Params()
     always_show_icons("always_show_icons", false),
     use_ellipses("use_ellipses", false),
     use_emoji("use_emoji", true),
-    use_color("use_color", true),
+    use_color("use_color", false),
     parse_urls("parse_urls", false),
     force_urls_external("force_urls_external", false),
     parse_highlights("parse_highlights", false)
