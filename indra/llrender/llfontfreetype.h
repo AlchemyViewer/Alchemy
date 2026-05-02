@@ -158,6 +158,15 @@ public:
     F32 getAscenderHeight() const;
     F32 getDescenderHeight() const;
 
+    // Underline stroke metrics, in pixels at this face's render size.
+    // Position is the distance from the baseline to the top of the
+    // underline (negative = below baseline, the typical case). Thickness
+    // is the underline's height; floored at 1 px so small point sizes
+    // still render a visible stroke. Falls back to descender depth and
+    // 1 px thickness when the face has no underline metadata.
+    F32 getUnderlinePosition() const;
+    F32 getUnderlineThickness() const;
+
 
 // For a lowercase "g":
 //

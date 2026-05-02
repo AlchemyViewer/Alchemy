@@ -401,6 +401,24 @@ F32 LLFontFreetype::getDescenderHeight() const
     return mDescender;
 }
 
+F32 LLFontFreetype::getUnderlinePosition() const
+{
+    LLFT_Face ft = getFTFace();
+    if (!ft || ft->units_per_EM <= 0)
+        return -mDescender;
+    const F32 scale = (F32)ft->size->metrics.y_ppem / (F32)ft->units_per_EM;
+    return (F32)ft->underline_position * scale;
+}
+
+F32 LLFontFreetype::getUnderlineThickness() const
+{
+    LLFT_Face ft = getFTFace();
+    if (!ft || ft->units_per_EM <= 0)
+        return 1.f;
+    const F32 scale = (F32)ft->size->metrics.y_ppem / (F32)ft->units_per_EM;
+    return llmax(1.f, (F32)ft->underline_thickness * scale);
+}
+
 F32 LLFontFreetype::getXAdvance(llwchar wch) const
 {
     if (getFTFace() == nullptr)

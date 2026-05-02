@@ -841,15 +841,31 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         *right_x = (cur_x - origin.mV[VX]) / sScaleX;
     }
 
-    //FIXME: add underline as glyph?
     if (style_to_add & UNDERLINE)
     {
-        F32 descender = (F32)llfloor(mFontFreetype->getDescenderHeight());
+        // Draw the underline as a TRIANGLES quad sampling sWhiteTexture
+        // instead of an LLRender::LINES primitive. The captured-list path
+        // (LLFontVertexBuffer) stamps each batch with its mode and texName
+        // at flush time; the legacy LINES + unbind sequence captured a
+        // texName=0 batch that re-played as an unbind→sWhiteTexture dance
+        // and rendered inconsistently across drivers. Going through the
+        // same TRIANGLES + textured-quad pipeline as glyphs is uniform,
+        // and using the font face's own underline metrics gives a
+        // typographically correct stroke instead of a fixed 1px line
+        // stuck at the descender depth.
+        const F32 y_bot = cur_y + mFontFreetype->getUnderlinePosition();
+        const F32 y_top = y_bot + mFontFreetype->getUnderlineThickness();
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-        gGL.begin(LLRender::LINES);
-        gGL.vertex2f(start_x, cur_y - descender);
-        gGL.vertex2f(cur_x, cur_y - descender);
+        LLColor4U col(color);
+        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, LLTexUnit::sWhiteTexture);
+        gGL.color4ubv(col.mV);
+        gGL.begin(LLRender::TRIANGLES);
+        gGL.vertex2f(start_x, y_bot);
+        gGL.vertex2f(cur_x,   y_bot);
+        gGL.vertex2f(start_x, y_top);
+        gGL.vertex2f(cur_x,   y_bot);
+        gGL.vertex2f(cur_x,   y_top);
+        gGL.vertex2f(start_x, y_top);
         gGL.end();
     }
 
