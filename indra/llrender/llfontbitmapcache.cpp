@@ -162,7 +162,7 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
         LLImageRaw* image_raw = mImageRawVec[bitmap_idx][bitmap_num];
         if (EFontGlyphType::Grayscale == bitmap_type)
         {
-            image_raw->clear(255, 0);
+            image_raw->clear(255, 255, 255, 0);
         }
 
         // Make corresponding GL image.
@@ -293,14 +293,19 @@ void LLFontBitmapCache::reset()
 //static
 U32 LLFontBitmapCache::getNumComponents(EFontGlyphType bitmap_type)
 {
+    // Grayscale atlases store coverage in the .a channel and white in .rgb so
+    // they read back as vec4(1, 1, 1, coverage) without any GL_TEXTURE_SWIZZLE
+    // trickery. Pre-RGBA grayscale was 2-component LA8, but uploading that on
+    // a core-profile context required rewriting the format to GL_RG plus a
+    // (R,R,R,G) swizzle — silent state on the GL texture object that the
+    // sub-rect upload path didn't replay, leading to format/upload mismatches.
     switch (bitmap_type)
     {
         case EFontGlyphType::Grayscale:
-            return 2;
         case EFontGlyphType::Color:
             return 4;
         default:
             llassert(false);
-            return 2;
+            return 4;
     }
 }

@@ -783,8 +783,8 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
                 buffer_row_stride = width;
             }
 
-            fontp->mFace->setSubImageLuminanceAlpha(pos_x, pos_y, bitmap_num, width, height,
-                                                    buffer_data, buffer_row_stride);
+            fontp->mFace->setSubImageGrayscale(pos_x, pos_y, bitmap_num, width, height,
+                                               buffer_data, buffer_row_stride);
 
             if (tmp_graydata)
                 delete[] tmp_graydata;
@@ -806,7 +806,10 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
         LLImageRaw *image_raw = fontp->getBitmapCache()->getImageRaw(bitmap_glyph_type, bitmap_num);
         if (image_gl && image_raw)
         {
-            image_gl->setSubImage(image_raw, 0, 0, image_gl->getWidth(), image_gl->getHeight());
+            // Upload only the dirty glyph rect — passing full atlas dimensions
+            // routes through setImage() and re-uploads the entire 1024×1024 page
+            // (2 MB grayscale / 4 MB BGRA) for every new glyph.
+            image_gl->setSubImage(image_raw, pos_x, pos_y, width, height, /*force_fast_update=*/true);
         }
         else
         {
@@ -1220,7 +1223,7 @@ U8 LLFontFreetype::getStyle() const
     return mStyle;
 }
 
-// (setSubImageBGRA / setSubImageLuminanceAlpha moved to LLFontFace —
+// (setSubImageBGRA / setSubImageGrayscale moved to LLFontFace —
 // they operate purely on the atlas, which now lives on the face wrapper.)
 // (setVariationAxis moved to LLFontFace::setVariationAxis — face state.)
 

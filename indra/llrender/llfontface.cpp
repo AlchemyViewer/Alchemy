@@ -241,9 +241,9 @@ bool LLFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
     return true;
 }
 
-void LLFontFace::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
-                                           U32 width, U32 height,
-                                           U8* data, S32 stride) const
+void LLFontFace::setSubImageGrayscale(U32 x, U32 y, U32 bitmap_num,
+                                      U32 width, U32 height,
+                                      U8* data, S32 stride) const
 {
     LLImageRaw* image_raw = mFontBitmapCachep ? mFontBitmapCachep->getImageRaw(EFontGlyphType::Grayscale, bitmap_num) : nullptr;
     if (!image_raw)
@@ -254,7 +254,7 @@ void LLFontFace::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
 
     LLImageDataLock lock(image_raw);
 
-    llassert(image_raw->getComponents() == 2);
+    llassert(image_raw->getComponents() == 4);
 
     U8* target = image_raw->getData();
     llassert(target);
@@ -264,6 +264,11 @@ void LLFontFace::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
     if (0 == stride)
         stride = width;
 
+    // Write only the alpha byte per pixel; RGB stays at the page's 255 clear
+    // value (set by LLFontBitmapCache::nextOpenPos), which makes the shader's
+    // vertex_color * texture path render as vertex_color.rgb with coverage
+    // gating the alpha. Source data is bottom-up (FreeType convention), so
+    // walk source rows in reverse.
     U32 target_width = image_raw->getWidth();
     for (U32 i = 0; i < height; i++)
     {
@@ -271,7 +276,7 @@ void LLFontFace::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
         U32 from_offset = (height - 1 - i) * stride;
         for (U32 j = 0; j < width; j++)
         {
-            *(target + to_offset * 2 + 1) = *(data + from_offset);
+            *(target + to_offset * 4 + 3) = *(data + from_offset);
             to_offset++;
             from_offset++;
         }
