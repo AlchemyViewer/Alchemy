@@ -100,7 +100,7 @@ public:
             alt_value("alt_value", ""),
             label("label"),
             tool_tip("tool_tip", ""),
-            font("font", LLFontGL::getFontEmojiSmall()),
+            font("font", LLFontGL::getFontSansSerifSmall()),
             font_color("font_color", LLColor4::black),
             color("color", LLColor4::white),
             font_halign("halign", LLFontGL::LEFT)

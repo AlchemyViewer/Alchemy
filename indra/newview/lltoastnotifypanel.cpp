@@ -50,7 +50,7 @@ S32 BUTTON_WIDTH = 110;
 
 
 //static
-const std::string LLToastNotifyPanel::sFontDefault("Emoji");
+const std::string LLToastNotifyPanel::sFontDefault("SansSerif");
 const std::string LLToastNotifyPanel::sFontScript("SansSerif");
 
 LLToastNotifyPanel::button_click_signal_t LLToastNotifyPanel::sButtonClickSignal;

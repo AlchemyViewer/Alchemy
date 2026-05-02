@@ -79,7 +79,7 @@ LLUICtrl::Params::Params()
     mouseenter_callback("mouseenter_callback"),
     mouseleave_callback("mouseleave_callback"),
     control_name("control_name"),
-    font("font", LLFontGL::getFontEmojiSmall()),
+    font("font", LLFontGL::getFontSansSerifSmall()),
     font_halign("halign"),
     font_valign("valign"),
     length("length"),   // ignore LLXMLNode cruft
