@@ -81,6 +81,7 @@
      parse_urls="true"
      word_wrap="true"
      show_emoji_helper="true"
+     use_color="true"
     />
     <button
      name="fl_save_changes"

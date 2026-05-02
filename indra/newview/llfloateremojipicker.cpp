@@ -151,7 +151,11 @@ public:
             LLFontGL::VCENTER,          // valign
             LLFontGL::NORMAL,           // style
             LLFontGL::DROP_SHADOW_SOFT, // shadow
-            static_cast<S32>(mChar.size())); // max_chars — full cluster
+            static_cast<S32>(mChar.size()), // max_chars — full cluster
+            S32_MAX,
+            nullptr,
+            false,
+            true);
     }
 
     virtual void updatePanel(bool allow_modify) override {}
@@ -223,7 +227,10 @@ protected:
             LLFontGL::NORMAL,           // style
             LLFontGL::DROP_SHADOW_SOFT, // shadow
             static_cast<S32>(mWStr.size()), // max_chars — full cluster
-            max_pixels);                    // max_pixels
+            max_pixels,// max_pixels
+            nullptr,
+            false,
+            true);
     }
 
     void drawName(F32 x, F32 y, S32 max_pixels, const LLColor4& color)

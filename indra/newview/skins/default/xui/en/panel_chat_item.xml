@@ -20,6 +20,7 @@
       left="30"
       right="-10"
       height="120"
+      use_color="true"
       text_color="white"
       word_wrap="true"
       mouse_opaque="true"

@@ -121,7 +121,7 @@ void LLPanelEmojiComplete::draw()
         const LLWString& text = mEmojis[curIdx].Character;
         mIconFont->render(text, 0, iconCenterX, iconCenterY,
             LLColor4::white, LLFontGL::HCENTER, LLFontGL::VCENTER, LLFontGL::NORMAL,
-            LLFontGL::DROP_SHADOW_SOFT, static_cast<S32>(text.size()));
+            LLFontGL::DROP_SHADOW_SOFT, static_cast<S32>(text.size()), S32_MAX, nullptr, false, true);
         if (mVertical)
         {
             const std::string& shortCode = mEmojis[curIdx].String;
