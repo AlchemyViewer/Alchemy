@@ -1,30 +1,195 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  ==========================================================================
+  fonts.xml — UI font registry
+  ==========================================================================
+
+  Skins layer additively: every skin's fonts.xml is parsed, and a later
+  skin's <font name="X"> entry PREPENDS its files to whatever the earlier
+  skin already had. <use> and inherit="true" are resolved ONCE after every
+  layer has been read. This file is the default skin, so it sets the
+  baseline registry every other skin's overrides extend.
+
+  ==========================================================================
+  Top-level elements (children of <fonts>)
+  ==========================================================================
+  <font>           Defines a font family (e.g. "SansSerif", "Monospace").
+  <font_size>      Adds a name -> point-size mapping to the global table
+                   (e.g. <font_size name="Huge" size="16.0"/>). Per-family
+                   <size> children inside <font> take precedence.
+
+  ==========================================================================
+  <font> attributes
+  ==========================================================================
+  name              REQUIRED. Family name. Widget XUI references it via
+                    font="Name" or font.size="Name". Sizes are appended
+                    (SansSerifLarge -> family "SansSerif" + size "Large").
+  label          Human-friendly label shown in font-picker dropdowns.
+                    Defaults to `name` if absent.
+  user_selectable   true/false. When false, the family is hidden from the
+                    font picker (used for internal fallbacks like Emoji,
+                    CJK, Helvetica). Default true.
+  monospace         true/false. Marks the family as fixed-width. Picker
+                    routes it to the Monospace category and the renderer
+                    bypasses HarfBuzz GPOS so column alignment holds.
+                    Default false.
+  ligatures         on/true/1 keeps liga/clig/dlig/calt features enabled
+                    even on monospace faces. For programmer fonts (Fira
+                    Code, JetBrains Mono) where ligatures are width-
+                    preserving by design. Default off. Inherited by every
+                    <file> in this family unless the file overrides it.
+  font_hinting      Family-level default. One of:
+                      default       — FreeType's default hinter
+                      force_auto    — autohinter (DEFAULT)
+                      no_hinting    — outlines passed unhinted
+                      light         — light autohint (vertical only),
+                                      pairs with subpixel pen for smooth,
+                                      weight-stable text. Slightly softer
+                                      stems than force_auto.
+                    Each <file> can override.
+  font_weight       Family-level default variable-font weight axis. Each
+                    <file> can override. -1 means use the file's own
+                    default. Typical values: 400 (regular), 600 (bold).
+  comment           Free-form. Parser ignores. Use for documentation.
+
+  ==========================================================================
+  <font> children
+  ==========================================================================
+  <size name=".." size=".."/>
+                    Per-family size override. Consulted BEFORE the global
+                    <font_size> table for lookups in this family. Lets
+                    one family scale differently (e.g. DejaVu's "Large"
+                    is 10.6 vs the global 11.0).
+  <use family="OtherFamily"/>
+                    Append OtherFamily's matching-style files to this
+                    family's chain, then recursively walk OtherFamily's
+                    own <use> chain. Each level matches the requested
+                    style first and falls back to that family's NORMAL
+                    if absent. Cycles (A->B->A) and diamonds (A->B,
+                    A->C with both B and C using D) terminate cleanly
+                    with each family contributing files exactly once.
+                    Self-references and unknown direct families log a
+                    warning and are skipped. Lets you compose chains
+                    (e.g. a "ScriptFallbacks" family that <use>s
+                    DejaVu/Emoji/CJK; user-facing families just <use>
+                    "ScriptFallbacks").
+  <style name="..">
+                    Style variant block. `name` is one of NORMAL, BOLD,
+                    ITALIC, BOLD|ITALIC. Anything else maps to NORMAL.
+
+  ==========================================================================
+  <style> attributes
+  ==========================================================================
+  name              REQUIRED. NORMAL | BOLD | ITALIC | BOLD|ITALIC.
+  inherit           true/false. On a non-NORMAL style, append this
+                    family's NORMAL-style resolved files (post-<use>) to
+                    this style's chain. Default false. Useful so BOLD
+                    only needs to declare its bold face — fallbacks are
+                    inherited from NORMAL automatically.
+
+  ==========================================================================
+  <file> attributes (text content is the font filename)
+  ==========================================================================
+  font_hinting      Override family-level setting. Values as above.
+  font_weight       Override family-level weight. Variable fonts only;
+                    static fonts ignore this.
+  flags             Comma-separated style flags forced on this file's
+                    glyphs. Currently only "bold" is recognized — used
+                    when a single .woff2 carries both upright & italic
+                    OR weights, and you want the "BOLD" face to also
+                    set the BOLD style flag for callers checking it.
+  size_delta        F32 added to the requested point size for this file.
+                    Used to align the visual x-height across files in a
+                    chain that disagree on intrinsic size. Negative
+                    values shrink, positive grow. Default 0.
+  unicode_ranges    Comma-separated list of Unicode ranges this file is
+                    allowed to handle. Format:
+                      "U+1F600"                  single codepoint
+                      "U+1F000-U+1FFFF"          range
+                      "U+2600-U+27BF,U+1F000-U+1FFFF"   multiple
+                    Codepoints outside every listed range skip this
+                    file during fallback walks. Hex digits are case-
+                    insensitive; "0xXXXX" is also accepted. Default:
+                    handle all codepoints.
+
+  ==========================================================================
+  <file> path resolution
+  ==========================================================================
+  Filenames are searched in this order:
+    1. <viewer install dir>/fonts/         (bundled fonts)
+    2. OS system font directory            (C:\Windows\Fonts, ~/Library/Fonts, etc.)
+    3. macOS Library + Library/Supplemental
+  Collections (.ttc / .otc) are auto-detected — every face in the file
+  is loaded as its own fallback entry; no flag is needed.
+
+  ==========================================================================
+  <os name="Windows|Mac|Linux">
+  ==========================================================================
+  Wrap <file> entries that should only load on a specific OS. Recurses
+  during parse and only the matching block contributes files to the
+  chain.
+
+  ==========================================================================
+  Implicit "default" font
+  ==========================================================================
+  The family named "default" is automatically appended to EVERY other
+  family's chain inside createFont. It exists for ultimate OS fallbacks
+  (system Arial, CJK system fonts). Don't <use> it directly — every
+  family already inherits it.
+
+  ==========================================================================
+  Runtime overrides (debug settings)
+  ==========================================================================
+  AlchemyUIFontOverrides is an LLSD map that prepends a different
+  source onto a family's chain at runtime. The override value can be:
+    - Another family name (e.g. "SourceSans")  ->  pulls that family's
+      files in front of the target. Per-family <size> lookups also
+      route through the source so the visual scale follows.
+    - A bare font filename (e.g. "consola.ttf")  ->  prepended as a
+      single file with the target family's hinting/weight/flags
+      inherited from its first existing file.
+
+  ==========================================================================
+  Cross-script fallback families
+  ==========================================================================
+  The user-facing families (SansSerif, Monospace, Helvetica) keep their
+  primary face minimal and pull script fallbacks (DejaVu for extended
+  Latin, Emoji for pictographs, CJK for Han/Kana/Hangul) via <use>.
+  Edit a single <use> chain to swap out a script's coverage for every
+  user-facing family at once.
+-->
 <fonts>
 
-  <!-- Cross-script fallback families. These are small, single-purpose
-       families pulled in by other families via <use family="..."/>. -->
+  <!-- ========================================================== -->
+  <!-- Cross-script fallback families.                              -->
+  <!-- Small, single-purpose; pulled in by other families via <use>. -->
+  <!-- user_selectable="false" hides them from the font-picker.     -->
+  <!-- ========================================================== -->
 
-    <font name="DejaVu" ui_label="DejaVu Sans">
+    <font name="DejaVu" label="DejaVu Sans">
+        <!-- Per-family size overrides: DejaVu reads larger than the
+             other Sans fonts at the same nominal pt, so map each named
+             size to a smaller point value to keep visual parity. -->
         <size name="Huge"   size="16.0"/>
         <size name="Large"  size="10.6"/>
         <size name="Medium" size="8.6"/>
         <size name="Small"  size="7.6"/>
 
         <style name="NORMAL">
-            <file font_hinting="light">DejaVuSansMono.woff2</file>
+            <file font_hinting="force_auto">DejaVuSansMono.woff2</file>
         </style>
         <style name="BOLD" inherit="true">
-            <file font_hinting="light">DejaVuSans-Bold.woff2</file>
+            <file font_hinting="force_auto">DejaVuSans-Bold.woff2</file>
         </style>
         <style name="ITALIC" inherit="true">
-            <file font_hinting="light">DejaVuSans-Oblique.woff2</file>
+            <file font_hinting="force_auto">DejaVuSans-Oblique.woff2</file>
         </style>
         <style name="BOLD|ITALIC" inherit="true">
-            <file font_hinting="light">DejaVuSans-BoldOblique.woff2</file>
+            <file font_hinting="force_auto">DejaVuSans-BoldOblique.woff2</file>
         </style>
     </font>
 
-    <font name="DejaVuMono" ui_label="DejaVu Sans Mono" monospace="true">
+    <font name="DejaVuMono" label="DejaVu Sans Mono" monospace="true">
         <size name="Monospace" size="8.0"/>
         <size name="SmallLSL"  size="7"/>
         <size name="HugeLSL"   size="12"/>
@@ -34,7 +199,7 @@
         </style>
     </font>
 
-    <font name="SourceCode" ui_label="Source Code Pro" monospace="true">
+    <font name="SourceCode" label="Source Code Pro" monospace="true">
         <style name="NORMAL">
             <file font_hinting="light" font_weight="400">SourceCodeVF-Upright.woff2</file>
         </style>
@@ -48,16 +213,14 @@
             <file flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Italic.woff2</file>
         </style>
     </font>
-    
-    <font name="SourceSans" ui_label="Source Sans 3">
+
+    <font name="SourceSans" label="Source Sans 3">
         <style name="NORMAL">
             <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
         </style>
         <style name="BOLD" inherit="true">
+            <!-- Variable font: same file, weight axis 600 = semibold/bold. -->
             <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
-            <os name="Windows">
-                <file>arialbd.ttf</file>
-            </os>
         </style>
         <style name="ITALIC" inherit="true">
             <file font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
@@ -68,6 +231,9 @@
     </font>
 
     <font name="CJK" user_selectable="false">
+        <!-- TTC collection — every face in the file auto-loads as a
+             fallback entry, so a single <file> covers all weights/widths
+             SourceHanSans ships. -->
         <style name="NORMAL">
             <file font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
         </style>
@@ -84,13 +250,27 @@
 
     <font name="Emoji" user_selectable="false">
         <style name="NORMAL">
+            <!-- unicode_ranges restricts the Twemoji fallback to actual
+                 emoji codepoints. Without this, color emoji glyphs would
+                 be picked for plain Latin (Twemoji ships ASCII outlines
+                 for safety) and rasterizing a color SVG glyph as
+                 Grayscale produces a 0x0 bitmap (invisible).
+                 Broaden this range to pick up additional pictographic
+                 blocks if needed:
+                   "U+2600-U+27BF" — Misc Symbols & Dingbats (incl ❤)
+                   "U+20E0-U+20E9" — keycap combiners
+                   "U+FE0E-U+FE0F" — variation selectors
+                   "U+1F900-U+1F9FF" — Supplemental Symbols
+                 Combine with commas. -->
             <file unicode_ranges="U+1F000-U+1FFFF">TwemojiSVG.woff2</file>
         </style>
     </font>
-    
-  <!-- The "default" font is appended (style-agnostically) to every font's
-       chain inside createFont(). Keep it minimal: OS-specific CJK fonts
-       that the standalone CJK family can't fully substitute for. -->
+
+  <!-- The "default" font is appended (style-agnostically) to every
+       font's chain inside createFont(). Keep it minimal: OS-specific
+       CJK fonts that the standalone CJK family can't fully substitute
+       for. Don't <use> "default" elsewhere — every family already
+       picks it up automatically. -->
   <font name="default" comment="Implicit ultimate fallback, OS-specific CJK">
     <style name="NORMAL">
       <os name="Windows">
@@ -123,17 +303,36 @@
     </style>
   </font>
 
-  <!-- Primary user-facing families. Each declares its own primary face per
-       style and pulls in DejaVu/Emoji/CJK as fallbacks via <use>. -->
-
-  <font name="SansSerif" ui_label="Sans Serif (Default)">
-    <use family="SourceSans"/>
+  <!-- Aggregates the cross-script fallback chain (extended Latin via
+       DejaVu, color emoji via Twemoji, CJK ideographs/kana/hangul via
+       SourceHanSans) into a single <use> target. Edit this family's
+       chain to swap the script coverage for every user-facing family
+       at once. Sits above the implicit "default" family in every
+       chain that pulls it in. -->
+  <font name="ScriptFallbacks" user_selectable="false">
     <use family="DejaVu"/>
     <use family="Emoji"/>
     <use family="CJK"/>
   </font>
 
-  <font name="Helvetica" ui_label="Helvetica / Arial" user_selectable="false">
+  <font name="MonoScriptFallbacks" user_selectable="false">
+    <use family="DejaVuMono"/>
+    <use family="Emoji"/>
+    <use family="CJK"/>
+  </font>
+
+  <!-- ========================================================== -->
+  <!-- Primary user-facing families. Each declares its own primary  -->
+  <!-- face per style and pulls in the shared ScriptFallbacks chain -->
+  <!-- via <use>. The implicit "default" family is appended after.  -->
+  <!-- ========================================================== -->
+
+  <font name="SansSerif" label="Sans Serif (Default)">
+    <use family="SourceSans"/>
+    <use family="ScriptFallbacks"/>
+  </font>
+
+  <font name="Helvetica" label="Helvetica / Arial" user_selectable="false">
     <style name="NORMAL">
       <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
       <os name="Windows"><file>arial.ttf</file></os>
@@ -156,18 +355,26 @@
     </style>
   </font>
 
-  <font name="Monospace" ui_label="Monospace (Default)" monospace="true">
+  <font name="Monospace" label="Monospace (Default)" monospace="true">
     <use family="SourceCode"/>
-    <use family="Emoji"/>
-    <use family="CJK"/>
+    <use family="MonoScriptFallbacks"/>
   </font>
 
+  <!-- Test family for AlchemyUIFontOverrides: not user-selectable;
+       intentionally lists Times first so the override (typically a
+       valid file like SourceSans3VF) replaces it for verification. -->
   <font name="OverrideTest" user_selectable="false">
     <style name="NORMAL">
       <file>times.ttf</file>
       <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
     </style>
   </font>
+
+  <!-- ========================================================== -->
+  <!-- Global named sizes (point-size table).                       -->
+  <!-- Per-family <size> overrides above take precedence; this is   -->
+  <!-- the fallback every family inherits.                          -->
+  <!-- ========================================================== -->
 
   <font_size name="Huge"   size="16.0"/>
   <font_size name="Large"  size="11.0"/>

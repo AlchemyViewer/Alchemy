@@ -374,11 +374,36 @@ void LLFontRegistry::resolveFontReferences()
         static_cast<U8>(LLFontGL::BOLD | LLFontGL::ITALIC)
     };
 
+    // Helper: depth-first walk of mFamilyUses checking whether `fam` or any
+    // family transitively reachable through its <use> chain declares `style`
+    // (or NORMAL fallback). Used by the synthesis pre-step so a use-only
+    // family that pulls in chains exposes whatever styles those chains
+    // ultimately cover, not just what its direct references declare.
+    std::function<bool(const std::string&, U8, std::set<std::string>&)> chain_has_style;
+    chain_has_style = [&](const std::string& fam, U8 style, std::set<std::string>& visited) -> bool {
+        if (!visited.insert(fam).second)
+            return false;
+        if (mFontMap.find(LLFontDescriptor(fam, s_template_string, style)) != mFontMap.end())
+            return true;
+        if (style != 0
+            && mFontMap.find(LLFontDescriptor(fam, s_template_string, 0)) != mFontMap.end())
+            return true;
+        auto uses_it = mFamilyUses.find(fam);
+        if (uses_it == mFamilyUses.end())
+            return false;
+        for (const std::string& used : uses_it->second)
+        {
+            if (chain_has_style(used, style, visited))
+                return true;
+        }
+        return false;
+    };
+
     // Pre-step: synthesize style descriptors for <use>-only families based
-    // on which styles their referenced families actually declare. A family
-    // that declared no <style> blocks gets a host descriptor for each
-    // style at least one (non-self) reference supports — either at that
-    // exact style or fallback-to-NORMAL.
+    // on which styles their referenced families (transitively) declare. A
+    // family that declared no <style> blocks gets a host descriptor for
+    // each style any family reachable through its <use> chain supports —
+    // either at that exact style or fallback-to-NORMAL.
     for (const auto& kv : mFamilyUses)
     {
         const std::string& family = kv.first;
@@ -402,16 +427,9 @@ void LLFontRegistry::resolveFontReferences()
             {
                 if (used == family)
                     continue; // self-reference is rejected during resolution
-                if (mFontMap.find(LLFontDescriptor(used, s_template_string, style)) != mFontMap.end())
-                {
-                    any_ref_has_style = true;
-                    break;
-                }
-                // Non-NORMAL style absent on the reference falls back to NORMAL,
-                // which means the aggregator should still expose this style as
-                // long as any reference has SOME face to merge in.
-                if (style != 0
-                    && mFontMap.find(LLFontDescriptor(used, s_template_string, 0)) != mFontMap.end())
+                std::set<std::string> visited;
+                visited.insert(family);
+                if (chain_has_style(used, style, visited))
                 {
                     any_ref_has_style = true;
                     break;
@@ -440,6 +458,41 @@ void LLFontRegistry::resolveFontReferences()
         pre_use.emplace(entry.first, entry.first.getFontFiles());
     }
 
+    // Helper: depth-first walk of `fam`'s <use> chain, appending each
+    // reached family's pre-resolution files to `out`. The shared `visited`
+    // set prevents cycles (A->B->A terminates cleanly with each appearing
+    // once) and prevents diamond-shaped graphs from including the same
+    // family twice (A->B, A->C, both B and C use D — D's files appear
+    // once, contributed by whichever path the walk reached first).
+    // Style is honoured per family with NORMAL fallback at each level.
+    std::function<void(const std::string&, U8, std::set<std::string>&, font_file_info_vec_t&)> collect_chain;
+    collect_chain = [&](const std::string& fam, U8 style, std::set<std::string>& visited, font_file_info_vec_t& out) {
+        if (!visited.insert(fam).second)
+            return;
+        LLFontDescriptor key(fam, s_template_string, style);
+        auto snap_it = pre_use.find(key);
+        if (snap_it == pre_use.end() && style != 0)
+        {
+            // Fall back to NORMAL of the referenced family.
+            key = LLFontDescriptor(fam, s_template_string, 0);
+            snap_it = pre_use.find(key);
+        }
+        if (snap_it != pre_use.end())
+        {
+            const auto& src_files = snap_it->second;
+            out.insert(out.end(), src_files.begin(), src_files.end());
+        }
+        // Recurse into fam's own <use> chain even when its file list at this
+        // style is missing — the chain may carry the coverage on its own.
+        auto uses_it = mFamilyUses.find(fam);
+        if (uses_it == mFamilyUses.end())
+            return;
+        for (const std::string& used : uses_it->second)
+        {
+            collect_chain(used, style, visited, out);
+        }
+    };
+
     for (const auto& kv : mFamilyUses)
     {
         const std::string& family = kv.first;
@@ -453,6 +506,8 @@ void LLFontRegistry::resolveFontReferences()
                 continue;
 
             font_file_info_vec_t merged_files = it->first.getFontFiles();
+            std::set<std::string> visited;
+            visited.insert(family); // the chain walks below must not loop back to us
 
             for (const std::string& used : used_families)
             {
@@ -463,23 +518,22 @@ void LLFontRegistry::resolveFontReferences()
                                << "' is self-referential; skipping" << LL_ENDL;
                     continue;
                 }
-                LLFontDescriptor used_key(used, s_template_string, style);
-                auto snap_it = pre_use.find(used_key);
-                if (snap_it == pre_use.end() && style != 0)
-                {
-                    // Fall back to NORMAL of the referenced family.
-                    used_key = LLFontDescriptor(used, s_template_string, 0);
-                    snap_it = pre_use.find(used_key);
-                }
-                if (snap_it == pre_use.end())
+                // Existence check: warn once at the top level if a direct
+                // reference is undeclared. Transitive misses (a chain
+                // hitting a missing family) get caught by the same check
+                // when that intermediate family is processed in its own
+                // outer-loop iteration.
+                if (pre_use.find(LLFontDescriptor(used, s_template_string, 0)) == pre_use.end()
+                    && pre_use.find(LLFontDescriptor(used, s_template_string, LLFontGL::BOLD)) == pre_use.end()
+                    && pre_use.find(LLFontDescriptor(used, s_template_string, LLFontGL::ITALIC)) == pre_use.end()
+                    && pre_use.find(LLFontDescriptor(used, s_template_string, (U8)(LLFontGL::BOLD | LLFontGL::ITALIC))) == pre_use.end())
                 {
                     LL_WARNS() << "fonts.xml: <use family='" << used
                                << "'/> in '" << family
                                << "' but no such family is defined" << LL_ENDL;
                     continue;
                 }
-                const auto& src_files = snap_it->second;
-                merged_files.insert(merged_files.end(), src_files.begin(), src_files.end());
+                collect_chain(used, style, visited, merged_files);
             }
 
             replace_files(it, merged_files);
@@ -934,10 +988,10 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
     // just the label without disturbing user_selectable, and vice versa.
     {
         FamilyMeta& meta = mFamilyMeta[family_name];
-        if (font_node->hasAttribute("ui_label"))
+        if (font_node->hasAttribute("label"))
         {
             std::string ui_label;
-            font_node->getAttributeString("ui_label", ui_label);
+            font_node->getAttributeString("label", ui_label);
             meta.ui_label = ui_label;
         }
         if (font_node->hasAttribute("user_selectable"))
