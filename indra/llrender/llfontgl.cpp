@@ -1720,6 +1720,7 @@ bool LLFontGL::reloadFonts()
         // same family twice) cycle through here, and skipping the bump
         // would leave widgets stuck on a stale layout if e.g. the user
         // picked a different family then reverted.
+        ++sResolutionGeneration;
         ++sFontMetricsGeneration;
     }
     return ok;
