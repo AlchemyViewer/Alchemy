@@ -49,21 +49,14 @@ void LLFontBitmapCache::init(S32 max_char_width,
     mMaxCharWidth = max_char_width;
     mMaxCharHeight = max_char_height;
 
-    // Sheet size: ~40 typical-width glyphs across, rounded up to a power of two.
-    // The previous (* 20, cap 512) sizing produced 256-512 px sheets for most
-    // fonts, which is too small for color emoji fonts (whose actual SBIX/SVG
-    // strike bitmaps run 32-128 px tall — only ~7×7 = 49 emoji per 512² sheet,
-    // and even worse with row-packing waste from variable glyph heights). At
-    // 1024² we fit ~15×15 = 225 64-px emoji per sheet and still keep memory
-    // reasonable (1 MB grayscale, 4 MB color, per sheet).
-    S32 image_width = mMaxCharWidth * 40;
+    S32 image_width = mMaxCharWidth * 20;
     S32 pow_iw = 2;
     while (pow_iw < image_width)
     {
         pow_iw <<= 1;
     }
     image_width = pow_iw;
-    image_width = llmin(1024, image_width); // Don't make bigger than 1024x1024, ever.
+    image_width = llmin(512, image_width); // Don't make bigger than 512x512, ever.
 
     mBitmapWidth = image_width;
     mBitmapHeight = image_width;
@@ -138,18 +131,16 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
     if (need_new_sheet)
     {
         // We're out of space in the current image, or no image
-        // has been allocated yet.  Make a new one. Keep this sizing in sync
-        // with init(); the recompute is harmless because mMaxCharWidth never
-        // changes after init, but the constants must match or sheets within
-        // one cache will disagree on dimensions.
-        S32 image_width = mMaxCharWidth * 40;
+        // has been allocated yet.  Make a new one.
+
+        S32 image_width = mMaxCharWidth * 20;
         S32 pow_iw = 2;
         while (pow_iw < image_width)
         {
             pow_iw *= 2;
         }
         image_width = pow_iw;
-        image_width = llmin(1024, image_width); // Don't make bigger than 1024x1024, ever.
+        image_width = llmin(512, image_width); // Don't make bigger than 512x512, ever.
         S32 image_height = image_width;
 
         mBitmapWidth = image_width;

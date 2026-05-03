@@ -1004,15 +1004,6 @@ void LLFolderViewItem::drawLabel(const LLFontGL * font, const F32 x, const F32 y
 
 void LLFolderViewItem::draw()
 {
-    // Catch a runtime font swap so the cached mLabelWidth gets recomputed
-    // against the new face's getWidth(). Without this, the inventory
-    // would keep clipping/padding labels by the prior font's metrics.
-    if (mLastFontMetricsGeneration != LLFontGL::sFontMetricsGeneration)
-    {
-        mLastFontMetricsGeneration = LLFontGL::sFontMetricsGeneration;
-        mLabelWidthDirty = true;
-    }
-
     const bool show_context = (getRoot() ? getRoot()->getShowSelectionContext() : false);
     const bool filled = show_context || (getRoot() ? getRoot()->getParentPanel()->hasFocus() : false); // If we have keyboard focus, draw selection filled
 

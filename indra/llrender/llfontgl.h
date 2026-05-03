@@ -270,12 +270,6 @@ public:
     static F32 sScaleX;
     static F32 sScaleY;
     static S32 sResolutionGeneration;
-    // Bumped each time reloadFonts() swaps font metrics. Widgets that
-    // cache laid-out text geometry (LLTextBase line layout, LLTextBox
-    // sized-to-fit rects) compare against this and invalidate when stale
-    // so the next render uses the new ascender / descender / glyph-width
-    // values instead of stale ones from the previous font.
-    static S32 sFontMetricsGeneration;
     static bool sDisplayFont ;
     static std::string sAppDir;         // For loading fonts
 

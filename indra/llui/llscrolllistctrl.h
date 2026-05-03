@@ -523,11 +523,6 @@ private:
     bool            mDisplayColumnHeaders;
     bool            mColumnsDirty;
     bool            mColumnWidthsDirty;
-    // Last LLFontGL::sFontMetricsGeneration this list recomputed against.
-    // Compared in draw(); on mismatch, mark column widths dirty so the
-    // next calcMaxContentWidth picks up the new font's glyph advances
-    // after an AlchemyUIFontOverrides reload.
-    S32             mLastFontMetricsGeneration = -1;
 
     bool            mAlternateSort;
 

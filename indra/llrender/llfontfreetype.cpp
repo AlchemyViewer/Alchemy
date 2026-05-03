@@ -806,10 +806,7 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
         LLImageRaw *image_raw = fontp->getBitmapCache()->getImageRaw(bitmap_glyph_type, bitmap_num);
         if (image_gl && image_raw)
         {
-            // Upload only the dirty glyph rect — passing full atlas dimensions
-            // routes through setImage() and re-uploads the entire 1024×1024 page
-            // (2 MB grayscale / 4 MB BGRA) for every new glyph.
-            image_gl->setSubImage(image_raw, pos_x, pos_y, width, height, /*force_fast_update=*/true);
+            image_gl->setSubImage(image_raw, 0, 0, image_gl->getWidth(), image_gl->getHeight());
         }
         else
         {

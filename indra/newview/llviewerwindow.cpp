@@ -2761,7 +2761,7 @@ void LLViewerWindow::sendShapeToSim()
 
 // Must be called after window is created to set up agent
 // camera variables and UI variables.
-void LLViewerWindow::reshape(S32 width, S32 height)
+void LLViewerWindow::reshape(S32 width, S32 height, bool force_reshape)
 {
     // Destroying the window at quit time generates spurious
     // reshape messages.  We don't care about these, and we
@@ -2786,7 +2786,7 @@ void LLViewerWindow::reshape(S32 width, S32 height)
 
         calcDisplayScale();
 
-        bool display_scale_changed = mDisplayScale != LLUI::getScaleFactor();
+        bool display_scale_changed = force_reshape || mDisplayScale != LLUI::getScaleFactor();
         LLUI::setScaleFactor(mDisplayScale);
         LLFontGL::sResolutionGeneration++;
 
@@ -3652,6 +3652,20 @@ void LLViewerWindow::updateUI()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     static std::string last_handle_msg;
+
+    // Drain any pending font reload before doing anything else this frame.
+    // The setting listener for AlchemyUIFontOverrides defers the reload
+    // here so we never tear down LLFontFreetype state mid-render. The
+    // next frame redraws automatically — widgets read through their
+    // cached LLFontGL* (now pointing at fresh freetype), and LLFontVertex-
+    // Buffer self-invalidates on the new bitmap-cache generation.
+    if (LLFontGL::consumePendingReload())
+    {
+        LLFontGL::reloadFonts();
+
+        // Force a reshape to update the font scaling for the new display resolution.
+        reshape(getWindowWidthRaw(), getWindowHeightRaw(), true);
+    }
 
     if (gLoggedInTime.getStarted())
     {

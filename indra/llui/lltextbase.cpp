@@ -249,8 +249,7 @@ LLTextBase::LLTextBase(const LLTextBase::Params &p)
     mParseHighlights(p.parse_highlights),
     mBGVisible(p.bg_visible),
     mScroller(NULL),
-    mStyleDirty(true),
-    mLastFontMetricsGeneration(LLFontGL::sFontMetricsGeneration)
+    mStyleDirty(true)
 {
     if(p.allow_scroll)
     {
@@ -1595,20 +1594,6 @@ void LLTextBase::reshape(S32 width, S32 height, bool called_from_parent)
 void LLTextBase::draw()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-
-    // Catch a runtime font swap (LLFontGL::reloadFonts via the
-    // AlchemyUIFontOverrides setting): the cached LLFontGL* on this
-    // widget is still valid but its mFontFreetype now reports different
-    // ascender / descender / glyph widths. Cached line layout, segment
-    // styles, and word-wrap positions all became stale on the swap, so
-    // mark a full reflow + style recompute.
-    if (mLastFontMetricsGeneration != LLFontGL::sFontMetricsGeneration)
-    {
-        mLastFontMetricsGeneration = LLFontGL::sFontMetricsGeneration;
-        mStyleDirty = true;
-        needsReflow();
-    }
-
     // reflow if needed, on demand
     reflow();
 

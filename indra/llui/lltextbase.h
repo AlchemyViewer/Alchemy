@@ -829,11 +829,6 @@ protected:
     S32                         mReflowIndex;       // index at which to start reflow.  S32_MAX indicates no reflow needed.
     bool                        mScrollNeeded;      // need to change scroll region because of change to cursor position
     S32                         mScrollIndex;       // index of first character to keep visible in scroll region
-    // Last LLFontGL::sFontMetricsGeneration this instance reflowed at.
-    // Compared in draw() so a runtime font swap (AlchemyUIFontOverrides
-    // → LLFontGL::reloadFonts) forces a full re-flow + style recompute
-    // with the new face's ascender / descender / glyph widths.
-    S32                         mLastFontMetricsGeneration;
 
     // Fired when a URL link is clicked
     commit_signal_t*            mURLClickSignal;

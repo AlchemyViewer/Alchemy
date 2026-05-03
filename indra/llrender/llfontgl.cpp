@@ -62,7 +62,6 @@ F32 LLFontGL::sHorizDPI = 96.f;
 F32 LLFontGL::sScaleX = 1.f;
 F32 LLFontGL::sScaleY = 1.f;
 S32 LLFontGL::sResolutionGeneration = 0;
-S32 LLFontGL::sFontMetricsGeneration = 0;
 bool LLFontGL::sDisplayFont = true ;
 std::string LLFontGL::sAppDir;
 
@@ -1729,6 +1728,7 @@ bool LLFontGL::reloadFonts()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     if (!sFontRegistry)
         return false;
+
     bool ok = sFontRegistry->reload();
     if (ok)
     {
@@ -1738,7 +1738,6 @@ bool LLFontGL::reloadFonts()
         // would leave widgets stuck on a stale layout if e.g. the user
         // picked a different family then reverted.
         ++sResolutionGeneration;
-        ++sFontMetricsGeneration;
     }
     return ok;
 }

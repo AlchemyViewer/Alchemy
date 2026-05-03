@@ -5172,17 +5172,6 @@ void LLAppViewer::idle()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_APP;
     pingMainloopTimeout("Main:Idle");
 
-    // Drain any pending font reload before doing anything else this frame.
-    // The setting listener for AlchemyUIFontOverrides defers the reload
-    // here so we never tear down LLFontFreetype state mid-render. The
-    // next frame redraws automatically — widgets read through their
-    // cached LLFontGL* (now pointing at fresh freetype), and LLFontVertex-
-    // Buffer self-invalidates on the new bitmap-cache generation.
-    if (LLFontGL::consumePendingReload())
-    {
-        LLFontGL::reloadFonts();
-    }
-
     // Update frame timers
     static LLTimer idle_timer;
 
