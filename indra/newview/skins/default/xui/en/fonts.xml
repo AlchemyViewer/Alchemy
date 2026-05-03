@@ -176,7 +176,7 @@
         <size name="Small"  size="7.6"/>
 
         <style name="NORMAL">
-            <file font_hinting="force_auto">DejaVuSansMono.woff2</file>
+            <file font_hinting="force_auto">DejaVuSans.woff2</file>
         </style>
         <style name="BOLD" inherit="true">
             <file font_hinting="force_auto">DejaVuSans-Bold.woff2</file>
