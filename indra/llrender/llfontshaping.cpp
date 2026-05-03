@@ -28,6 +28,7 @@
 
 #include "llfontshaping.h"
 #include "llfontfreetype.h"
+#include "llstring.h"
 
 #include <boost/functional/hash.hpp>
 #include <boost/unordered_map.hpp>
@@ -227,6 +228,26 @@ namespace
 
         hb_unicode_funcs_t* uf = hb_unicode_funcs_get_default();
 
+        // Cluster-aware face routing pre-pass. wstring_find_emoji_clusters
+        // identifies emoji shaping sequences (ZWJ families, keycaps, flags,
+        // skin-toned bases, ❤️‍🔥-style BMP+astral compositions). For each
+        // cluster, ask root_face for an emoji-fallback face whose charmap
+        // covers every codepoint in the cluster — that's the face whose GSUB
+        // can compose the ligature. selectShapingFace's per-codepoint walk
+        // would otherwise route a BMP base like ❤ (U+2764) to root because
+        // the emoji functor's astral range rejects it, splitting the cluster
+        // across two faces and dropping the ligature. nullptr means no single
+        // emoji face covers the cluster — leave per-codepoint routing alone.
+        std::vector<const LLFontFreetype*> cluster_face(n, nullptr);
+        const auto clusters = wstring_find_emoji_clusters(LLWStringView(slice.data(), n));
+        for (const auto& [cb, ce] : clusters)
+        {
+            if (const LLFontFreetype* f = root_face->selectClusterFace(slice.data() + cb, ce - cb))
+            {
+                std::fill(cluster_face.begin() + cb, cluster_face.begin() + ce, f);
+            }
+        }
+
         const LLFontFreetype* cur_face   = nullptr;
         hb_script_t           cur_script = HB_SCRIPT_INVALID;  // unknown until first non-neutral cp
         size_t                cur_begin  = 0;
@@ -242,7 +263,9 @@ namespace
         for (size_t i = 0; i < n; ++i)
         {
             U32 unused = 0;
-            const LLFontFreetype* face = root_face->selectShapingFace(slice[i], unused);
+            const LLFontFreetype* face = cluster_face[i]
+                ? cluster_face[i]
+                : root_face->selectShapingFace(slice[i], unused);
             if (!face)
                 face = root_face; // selectShapingFace never returns null, but defensive
 
