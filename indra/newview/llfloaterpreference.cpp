@@ -959,8 +959,8 @@ void LLFloaterPreference::populateUIFontDropdowns()
         LLFontRegistry::FamilyFilter filter;
     };
     static const Row rows[] = {
-        { "ui_font_sansserif", "SansSerif", LLFontRegistry::FamilyFilter::PROPORTIONAL },
-        { "ui_font_monospace", "Monospace", LLFontRegistry::FamilyFilter::MONOSPACE },
+        { "ui_font_sansserif", "SansSerifBase", LLFontRegistry::FamilyFilter::PROPORTIONAL },
+        { "ui_font_monospace", "MonospaceBase", LLFontRegistry::FamilyFilter::MONOSPACE },
     };
 
     for (const auto& [combo_name, family, filter] : rows)

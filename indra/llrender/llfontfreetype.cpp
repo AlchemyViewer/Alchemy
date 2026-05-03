@@ -258,36 +258,6 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
     return result.first;
 }
 
-const LLFontFreetype* LLFontFreetype::selectClusterFace(const llwchar* cp, size_t n) const
-{
-    if (!getFTFace() || !cp || n == 0)
-        return nullptr;
-
-    // Walk emoji-functor fallbacks. The functor itself is bypassed (the cluster
-    // has already been identified as emoji territory by the caller) — only
-    // direct charmap coverage matters. First fallback that has every codepoint
-    // wins. Monochrome fallbacks are skipped: a cluster routed to a B&W face
-    // would defeat the point of running this pre-pass at all (ZWJ ligatures in
-    // emoji fonts are what we're trying to preserve).
-    for (const fallback_font_t& pair : mFallbackFonts)
-    {
-        if (!pair.second)
-            continue;
-        bool covers_all = true;
-        for (size_t k = 0; k < n; ++k)
-        {
-            if (!pair.first->faceHasGlyph(cp[k]))
-            {
-                covers_all = false;
-                break;
-            }
-        }
-        if (covers_all)
-            return pair.first.get();
-    }
-    return nullptr;
-}
-
 bool LLFontFreetype::faceHasGlyph(llwchar wch) const
 {
     if (!getFTFace())

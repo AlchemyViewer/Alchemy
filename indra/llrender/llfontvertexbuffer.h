@@ -56,7 +56,7 @@ public:
         S32 max_chars = S32_MAX, S32 max_pixels = S32_MAX,
         F32* right_x = NULL,
         bool use_ellipses = false,
-        bool use_color = false);
+        bool use_color = true);
 
     S32 render(const LLFontGL* fontp,
         const LLWString& text,
@@ -69,7 +69,7 @@ public:
         S32 max_chars = S32_MAX,
         F32* right_x = NULL,
         bool use_ellipses = false,
-        bool use_color = false);
+        bool use_color = true);
 
     S32 render(const LLFontGL* fontp,
         const LLWString& text,
@@ -82,7 +82,7 @@ public:
         S32 max_chars = S32_MAX, S32 max_pixels = S32_MAX,
         F32* right_x = NULL,
         bool use_ellipses = false,
-        bool use_color = false);
+        bool use_color = true);
 
     static void enableBufferCollection(bool enable) { sEnableBufferCollection = enable; }
 private:

@@ -252,18 +252,6 @@ public:
     // when no face has a glyph for `base`.
     const LLFontFreetype* selectShapingFace(llwchar base, U32& out_glyph_index) const;
 
-    // Cluster-aware variant: pick an emoji-functor fallback face whose
-    // charmap contains every codepoint in [cp, cp+n). Used by shape
-    // itemization to keep ZWJ sequences with BMP bases (e.g. ❤️‍🔥 =
-    // U+2764 + VS16 + ZWJ + U+1F525) on a single face so HarfBuzz's GSUB
-    // can compose the ligature. Bypasses the per-codepoint functor check
-    // because the cluster has already been confirmed as emoji territory
-    // upstream (wstring_find_emoji_clusters), so direct charmap coverage
-    // is the correct test. Returns nullptr when no emoji fallback covers
-    // every codepoint, leaving the caller to fall back to per-codepoint
-    // routing via selectShapingFace.
-    const LLFontFreetype* selectClusterFace(const llwchar* cp, size_t n) const;
-
     // True if this face's FreeType charmap directly contains a glyph for
     // `wch`. Unlike hasGlyph() (which checks the cache), this consults
     // the underlying charmap and works on fallback faces. Used by shape

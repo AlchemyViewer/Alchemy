@@ -4,6 +4,6 @@
       bg_visible="true"
       drop_shadow="true"
       tear_off="false"
-      font="SansSerifSmall" 
+      font="SansSerifLimitedEmojiSmall" 
       shortcut_pad="15">
 </menu>

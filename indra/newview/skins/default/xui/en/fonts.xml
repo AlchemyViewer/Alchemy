@@ -266,22 +266,19 @@
     <font name="Emoji" user_selectable="false">
         <style name="NORMAL">
             <!-- unicode_ranges restricts the Twemoji fallback to actual
-                 emoji codepoints. Without this, color emoji glyphs would
-                 be picked for plain Latin (Twemoji ships ASCII outlines
-                 for safety) and rasterizing a color SVG glyph as
-                 Grayscale produces a 0x0 bitmap (invisible).
-                 Broaden this range to pick up additional pictographic
-                 blocks if needed:
-                   "U+2600-U+27BF" — Misc Symbols & Dingbats (incl ❤)
-                   "U+20E0-U+20E9" — keycap combiners
-                   "U+FE0E-U+FE0F" — variation selectors
-                   "U+1F900-U+1F9FF" — Supplemental Symbols
-                 Combine with commas. -->
+                 emoji codepoints.-->
+            <file unicode_ranges="U+2600-U+27BF,U+20E0-U+20E9,U+FE0E-U+FE0F,U+1F000-U+1FFFF,U+1F900-U+1F9FF">TwemojiSVG.woff2</file>
+        </style>
+    </font>
+
+    <font name="LimitedEmoji" user_selectable="false">
+        <style name="NORMAL">
             <file unicode_ranges="U+1F000-U+1FFFF">TwemojiSVG.woff2</file>
         </style>
     </font>
 
-  <!-- The "default" font is appended (style-agnostically) to every
+
+    <!-- The "default" font is appended (style-agnostically) to every
        font's chain inside createFont(). Keep it minimal: OS-specific
        CJK fonts that the standalone CJK family can't fully substitute
        for. Don't <use> "default" elsewhere — every family already
@@ -318,33 +315,34 @@
     </style>
   </font>
 
-  <!-- Aggregates the cross-script fallback chain (extended Latin via
-       DejaVu, color emoji via Twemoji, CJK ideographs/kana/hangul via
-       SourceHanSans) into a single <use> target. Edit this family's
-       chain to swap the script coverage for every user-facing family
-       at once. Sits above the implicit "default" family in every
-       chain that pulls it in. -->
-  <font name="ScriptFallbacks" user_selectable="false">
-    <use family="DejaVu"/>
-    <use family="Emoji"/>
-    <use family="CJK"/>
-  </font>
-
-  <font name="MonoScriptFallbacks" user_selectable="false">
-    <use family="DejaVuMono"/>
-    <use family="Emoji"/>
-    <use family="CJK"/>
-  </font>
-
   <!-- ========================================================== -->
   <!-- Primary user-facing families. Each declares its own primary  -->
   <!-- face per style and pulls in the shared ScriptFallbacks chain -->
   <!-- via <use>. The implicit "default" family is appended after.  -->
   <!-- ========================================================== -->
-
-  <font name="SansSerif" label="Sans Serif (Default)">
+  <font name="SansSerifBase" label="Sans Serif (Default)">
     <use family="SourceSans"/>
-    <use family="ScriptFallbacks"/>
+  </font>
+    
+  <font name="SansSerif" user_selectable="false">
+    <use family="SansSerifBase"/>
+    <use family="DejaVu"/>
+    <use family="Emoji"/>
+    <use family="CJK"/>
+  </font>
+
+  <font name="SansSerifEmoji" user_selectable="false">
+    <use family="Emoji"/>
+    <use family="SansSerifBase"/>
+    <use family="DejaVu"/>
+    <use family="CJK"/>
+  </font>
+
+  <font name="SansSerifLimitedEmoji" user_selectable="false">
+    <use family="SansSerifBase"/>
+    <use family="DejaVu"/>
+    <use family="LimitedEmoji"/>
+    <use family="CJK"/>
   </font>
 
   <font name="Helvetica" label="Helvetica / Arial" user_selectable="false">
@@ -370,9 +368,15 @@
     </style>
   </font>
 
-  <font name="Monospace" label="Monospace (Default)" monospace="true">
+  <font name="MonospaceBase" label="Monospace (Default)" monospace="true">
     <use family="SourceCode"/>
-    <use family="MonoScriptFallbacks"/>
+  </font>
+    
+  <font name="Monospace" label="Monospace (Default)" monospace="true" user_selectable="false">
+    <use family="MonospaceBase"/>
+    <use family="DejaVuMono"/>
+    <use family="Emoji"/>
+    <use family="CJK"/>
   </font>
 
   <!-- Test family for AlchemyUIFontOverrides: not user-selectable;
