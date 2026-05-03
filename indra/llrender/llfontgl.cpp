@@ -297,6 +297,51 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
     F32 start_x = (F32)ll_round(cur_x);
 
+    if (style_to_add & UNDERLINE)
+    {
+        // Draw the underline BEFORE glyph emission so descenders ('g',
+        // 'y', 'p', 'q', 'j') sit on top of the rule rather than being
+        // crossed by it — typographically correct and what every text
+        // engine produces. Captured-list path (LLFontVertexBuffer) gets
+        // an underline batch as the first entry in mForegroundBufferList,
+        // so replay draws it first too. Non-capture mode just streams it
+        // ahead of the glyph batches.
+        //
+        // Width: getWidthF32 is the same per-pen-accumulation walk the
+        // render loop uses, clamped to scaled_max_pixels for the ellipses
+        // path. Mirrors halign-RIGHT/HCENTER's existing math (lines 286,
+        // 289). For the rare overflow-without-ellipses case the rule may
+        // extend slightly past the last visible glyph; the typography
+        // win on common usage outweighs that corner.
+        //
+        // Texture: sWhiteTexture sample = vec4(1,1,1,1), so vertex_color
+        // multiplied through the standard ui shader produces a solid
+        // colored stroke. Going through TRIANGLES + textured-quad keeps
+        // the pipeline uniform with glyphs (the legacy LINES + unbind
+        // sequence captured a texName=0 batch that re-played as an
+        // unbind→sWhiteTexture dance and rendered inconsistently across
+        // drivers). Using the face's own underline_position /
+        // underline_thickness gives a typographically correct stroke
+        // instead of a fixed 1px line stuck at the descender depth.
+        const S32 underline_width = llmin(scaled_max_pixels,
+            ll_round(getWidthF32(wstr.c_str(), begin_offset, length) * sScaleX));
+        const F32 end_x = start_x + (F32)underline_width;
+        const F32 y_bot = cur_y + mFontFreetype->getUnderlinePosition();
+        const F32 y_top = y_bot + mFontFreetype->getUnderlineThickness();
+
+        LLColor4U col(color);
+        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, LLTexUnit::sWhiteTexture);
+        gGL.color4ubv(col.mV);
+        gGL.begin(LLRender::TRIANGLES);
+        gGL.vertex2f(start_x, y_bot);
+        gGL.vertex2f(end_x,   y_bot);
+        gGL.vertex2f(start_x, y_top);
+        gGL.vertex2f(end_x,   y_bot);
+        gGL.vertex2f(end_x,   y_top);
+        gGL.vertex2f(start_x, y_top);
+        gGL.end();
+    }
+
     // After the LLFontFace move, atlas ownership is per source face — heads
     // bind the atlas of whichever face produced each glyph. Track the current
     // (face, atlas) pair as we walk glyphs and flip on transitions. The
@@ -849,34 +894,6 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     if (right_x)
     {
         *right_x = (cur_x - origin.mV[VX]) / sScaleX;
-    }
-
-    if (style_to_add & UNDERLINE)
-    {
-        // Draw the underline as a TRIANGLES quad sampling sWhiteTexture
-        // instead of an LLRender::LINES primitive. The captured-list path
-        // (LLFontVertexBuffer) stamps each batch with its mode and texName
-        // at flush time; the legacy LINES + unbind sequence captured a
-        // texName=0 batch that re-played as an unbind→sWhiteTexture dance
-        // and rendered inconsistently across drivers. Going through the
-        // same TRIANGLES + textured-quad pipeline as glyphs is uniform,
-        // and using the font face's own underline metrics gives a
-        // typographically correct stroke instead of a fixed 1px line
-        // stuck at the descender depth.
-        const F32 y_bot = cur_y + mFontFreetype->getUnderlinePosition();
-        const F32 y_top = y_bot + mFontFreetype->getUnderlineThickness();
-
-        LLColor4U col(color);
-        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, LLTexUnit::sWhiteTexture);
-        gGL.color4ubv(col.mV);
-        gGL.begin(LLRender::TRIANGLES);
-        gGL.vertex2f(start_x, y_bot);
-        gGL.vertex2f(cur_x,   y_bot);
-        gGL.vertex2f(start_x, y_top);
-        gGL.vertex2f(cur_x,   y_bot);
-        gGL.vertex2f(cur_x,   y_top);
-        gGL.vertex2f(start_x, y_top);
-        gGL.end();
     }
 
     if (draw_ellipses)
