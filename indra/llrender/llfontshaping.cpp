@@ -262,26 +262,45 @@ namespace
             // preceding base for mark-to-base GPOS attachment to fire — that's
             // what positions the mark above (or below) the base instead of
             // landing it standalone at the pen, which produces visible
-            // collisions with the next base. If selectShapingFace would
-            // route the mark to a different face from cur_face, try to keep
-            // the base+mark cluster together rather than splitting them.
-            const auto cat = hb_unicode_general_category(uf, slice[i]);
+            // collisions with the next base.
+            //
+            // Emoji-sequence extenders (ZWJ, VS15/16, skin-tone, keycap
+            // combiner, tag chars) need the same treatment for a different
+            // reason: HarfBuzz composes ZWJ ligatures (🧑 + ZWJ + 🚀 → 🧑‍🚀)
+            // only when every codepoint of the sequence lands in one buffer
+            // on a face whose GSUB knows the ligature. selectShapingFace
+            // routes ZWJ/VS to root because they sit outside the emoji
+            // functor's astral range, fragmenting the sequence and dropping
+            // back to base + joiner-tofu + base. Keep them on cur_face when
+            // it covers them so the emoji face's GSUB sees the whole cluster.
+            const llwchar wch = slice[i];
+            const auto cat = hb_unicode_general_category(uf, wch);
             const bool is_mark = (cat == HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK
                                || cat == HB_UNICODE_GENERAL_CATEGORY_ENCLOSING_MARK
                                || cat == HB_UNICODE_GENERAL_CATEGORY_SPACING_MARK);
-            if (is_mark && face != cur_face)
+            const bool is_emoji_extender =
+                   wch == 0x200D                          // ZWJ
+                || wch == 0xFE0E || wch == 0xFE0F         // VS15/VS16
+                || wch == 0x20E3                          // keycap combiner
+                || (wch >= 0x1F3FB && wch <= 0x1F3FF)     // skin-tone modifiers
+                || (wch >= 0xE0020 && wch <= 0xE007F);    // tag characters
+            if ((is_mark || is_emoji_extender) && face != cur_face)
             {
-                if (cur_face->faceHasGlyph(slice[i]))
+                if (cur_face->faceHasGlyph(wch))
                 {
-                    // cur_face covers the mark — shape it inline with the base.
+                    // cur_face covers the joiner — shape it inline with the base.
                     face = cur_face;
                 }
-                else
+                else if (is_mark)
                 {
                     // cur_face lacks the mark glyph. Migrate the in-progress
                     // sub-run to the mark's face if it covers every base
                     // already collected; the bases re-render with a slightly
                     // different style but the mark gets correct positioning.
+                    // Only worth doing for marks — for emoji extenders the
+                    // emoji base sitting on cur_face is the whole point of
+                    // routing it there, and the proposed `face` (root) by
+                    // definition lacks the astral base.
                     bool mark_face_covers_sub_run = true;
                     for (size_t j = cur_begin; j < i; ++j)
                     {
