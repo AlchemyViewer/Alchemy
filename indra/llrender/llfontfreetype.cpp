@@ -26,6 +26,8 @@
 
 #include "linden_common.h"
 
+#include <unordered_set>
+
 #include "llfontfreetype.h"
 #include "llfontgl.h"
 
@@ -1298,4 +1300,55 @@ void LLFontManager::unloadAllFonts()
     // the bytes are still alive, then drop the byte cache.
     mFaceCache.clear();
     m_LoadedFonts.clear();
+}
+
+void LLFontManager::collectGarbage()
+{
+    // Sweep mFaceCache: every live LLFontFreetype holds an
+    // LLPointer<LLFontFace> mFace, so the map's own LLPointer is the sole
+    // ref iff getNumRefs() == 1. Same-order rule as unloadAllFonts —
+    // ~LLFontFace runs FT_Done_Face, which dereferences the FT_OPEN_MEMORY
+    // bytes still in m_LoadedFonts.
+    std::size_t faces_trimmed = 0;
+    for (auto it = mFaceCache.begin(); it != mFaceCache.end(); )
+    {
+        if (it->second->getNumRefs() == 1)
+        {
+            it = mFaceCache.erase(it);
+            ++faces_trimmed;
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    // Sweep m_LoadedFonts: byte buffers are consumed only by surviving
+    // LLFontFace entries via FT_OPEN_MEMORY (see LLFontFace::load).
+    // Anything whose filename no longer keys any surviving face is dead.
+    std::unordered_set<std::string> live_filenames;
+    live_filenames.reserve(mFaceCache.size());
+    for (const auto& kv : mFaceCache)
+        live_filenames.insert(kv.first.filename);
+
+    std::size_t loaded_trimmed = 0;
+    for (auto it = m_LoadedFonts.begin(); it != m_LoadedFonts.end(); )
+    {
+        if (live_filenames.find(it->first) == live_filenames.end())
+        {
+            it = m_LoadedFonts.erase(it);
+            ++loaded_trimmed;
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    if (faces_trimmed || loaded_trimmed)
+    {
+        LL_INFOS() << "LLFontManager::collectGarbage: trimmed "
+                   << faces_trimmed << " faces, "
+                   << loaded_trimmed << " loaded fonts" << LL_ENDL;
+    }
 }

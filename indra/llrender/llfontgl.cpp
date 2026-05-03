@@ -1732,6 +1732,13 @@ bool LLFontGL::reloadFonts()
     bool ok = sFontRegistry->reload();
     if (ok)
     {
+        // sFontRegistry->reload() has returned, so its pinned_old_fallbacks
+        // local has destructed and dropped the last refs to any orphan
+        // fallback freetypes. Trim now while their faces sit at refcount 1
+        // in mFaceCache.
+        if (gFontManagerp)
+            gFontManagerp->collectGarbage();
+
         // Bump unconditionally on success so every metric-sensitive widget
         // re-flows on its next draw — even no-op overrides (selecting the
         // same family twice) cycle through here, and skipping the bump
