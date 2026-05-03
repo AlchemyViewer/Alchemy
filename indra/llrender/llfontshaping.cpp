@@ -88,6 +88,7 @@ namespace
     // cached slice, not the original caller's wstr — so the cache can
     // rebase them at copy-out time. Reserves/destroys its own hb_buffer.
     void shape_sub_run(const LLFontFreetype*        face,
+                       const LLFontFreetype*        root_face,
                        const LLWString&             slice,
                        size_t                       sub_begin_in_slice,
                        size_t                       sub_end_in_slice,
@@ -107,7 +108,14 @@ namespace
         // exactly the monospace cell width with no positioning drift.
         // Programmer fonts opting in via <font ligatures="on"> need real
         // shaping (for liga/calt) so they fall through to the HB path.
-        if (face->isFixedWidth() && !face->getAllowMonospaceLigatures())
+        //
+        // Only valid when face is the head: getGlyphInfo asserts on
+        // fallbacks (the chain walk is rooted at the head). When a fallback
+        // face is itself fixed-width — e.g. SansSerif's DejaVuSansMono leg
+        // resolving Letterlike Symbols like U+210C — fall through to HB.
+        // Column alignment is already lost at the fallback boundary, so
+        // taking the bypass here would offer no benefit even if it worked.
+        if (face == root_face && face->isFixedWidth() && !face->getAllowMonospaceLigatures())
         {
             out_glyphs.reserve(out_glyphs.size() + (sub_end_in_slice - sub_begin_in_slice));
             for (size_t i = sub_begin_in_slice; i < sub_end_in_slice; ++i)
@@ -228,7 +236,7 @@ namespace
             // codepoints (e.g. a string of spaces); fall back to COMMON.
             const hb_script_t script = (cur_script == HB_SCRIPT_INVALID) ? HB_SCRIPT_COMMON
                                                                          : cur_script;
-            shape_sub_run(cur_face, slice, cur_begin, end_excl, script, out_glyphs);
+            shape_sub_run(cur_face, root_face, slice, cur_begin, end_excl, script, out_glyphs);
         };
 
         for (size_t i = 0; i < n; ++i)
