@@ -199,6 +199,21 @@
         </style>
     </font>
 
+    <font name="Inter" label="Inter">
+        <style name="NORMAL">
+            <file font_hinting="light" font_weight="400">InterVariable.woff2</file>
+        </style>
+        <style name="BOLD" inherit="true">
+            <file flags="bold" font_hinting="light" font_weight="600">InterVariable.woff2</file>
+        </style>
+        <style name="ITALIC" inherit="true">
+            <file font_hinting="light" font_weight="400">InterVariable-Italic.woff2</file>
+        </style>
+        <style name="BOLD|ITALIC" inherit="true">
+            <file flags="bold" font_hinting="light" font_weight="600">InterVariable-Italic.woff2</file>
+        </style>
+    </font>
+
     <font name="SourceCode" label="Source Code Pro" monospace="true">
         <style name="NORMAL">
             <file font_hinting="light" font_weight="400">SourceCodeVF-Upright.woff2</file>
