@@ -1511,6 +1511,8 @@ void LLFontRegistry::reloadForDpiChange()
 
 bool LLFontRegistry::reload(const LLSD& font_overrides)
 {
+    LL_INFOS() << "Reloading font registry" << LL_ENDL;
+
     // Pointer-stable rebuild: every existing LLFontGL* (cached by widgets
     // and by the static getters in llfontgl.cpp) stays alive. We swap each
     // head's underlying mFontFreetype for one built from a freshly-parsed

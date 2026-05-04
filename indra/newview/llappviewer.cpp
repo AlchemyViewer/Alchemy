@@ -793,13 +793,20 @@ namespace
     {
     public:
         explicit LLFontsXmlLiveFile(const std::string& path)
-            : LLLiveFile(path, 1.0f) {}
+            : LLLiveFile(path, 5.0f) {}
         bool loadFile() override
         {
+            if (mFirstCall)
+            {
+                mFirstCall = false;
+                return true; // skip the initial load, which happens during initClass before we have the live file set up
+            }
             LLFontGL::markFontsXmlDirty();
             LLFontGL::schedulePendingReload();
             return true;
         }
+
+        bool mFirstCall = true; // skip the initial load, which happens during initClass before we have the live file set up
     };
 
     // Owns an LLLiveFile per skinned fonts.xml layer for the lifetime of
