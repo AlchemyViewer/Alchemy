@@ -479,7 +479,7 @@ bool LLAppAppearanceUtility::init()
     const bool SKIP_ANALYZE_ALPHA=true;
 
     LLTranslationBridge::ptr_t trans = std::make_shared<LLPassthroughTranslationBridge>();
-    LLWearableType::initParamSingleton(trans);
+    LLWearableType::createInstance(trans);
 
     // *TODO: Create a texture bridge?
     LLAvatarAppearance::initClass();
@@ -653,6 +653,8 @@ bool LLAppAppearanceUtility::cleanup()
     LLAvatarAppearance::cleanupClass();
     LLImageGL::cleanupClass();
     LLImage::cleanupClass();
+
+    LLWearableType::deleteSingleton();
 
     if (mProcess)
     {

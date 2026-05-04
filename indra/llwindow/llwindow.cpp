@@ -257,7 +257,9 @@ bool LLWindow::copyTextToPrimary(const LLWString &src)
 // static
 std::vector<std::string> LLWindow::getDynamicFallbackFontList()
 {
-#if LL_SDL_WINDOW && !LL_MESA_HEADLESS
+#if LL_MESA_HEADLESS
+    return std::vector<std::string>();
+#elif LL_SDL_WINDOW
     return LLWindowSDL::getDynamicFallbackFontList();
 #elif LL_WINDOWS
     return LLWindowWin32::getDynamicFallbackFontList();
@@ -271,7 +273,9 @@ std::vector<std::string> LLWindow::getDynamicFallbackFontList()
 // static
 std::vector<std::string> LLWindow::getDisplaysResolutionList()
 {
-#if LL_SDL_WINDOW && !LL_MESA_HEADLESS
+#if LL_MESA_HEADLESS
+    return std::vector<std::string>();
+#elif LL_SDL_WINDOW
     return LLWindowSDL::getDisplaysResolutionList();
 #elif LL_WINDOWS
     return LLWindowWin32::getDisplaysResolutionList();

@@ -92,7 +92,7 @@ public:
 
     virtual bool setCursorPosition(LLCoordWindow position) = 0;
     virtual bool getCursorPosition(LLCoordWindow *position) = 0;
-#if LL_WINDOWS && !LL_SDL_WINDOW
+#if LL_WINDOWS && !LL_SDL_WINDOW && !LL_MESA_HEADLESS
     virtual bool getCursorDelta(LLCoordCommon* delta) = 0;
 #endif
     virtual bool isWrapMouse() const = 0;

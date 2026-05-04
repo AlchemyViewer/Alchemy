@@ -52,7 +52,9 @@
 #include <glm/gtc/matrix_access.hpp>
 #include "glm/gtc/type_ptr.hpp"
 
-#if LL_SDL_WINDOW
+#if LL_MESA_HEADLESS
+#  define LL_GET_PROC_ADDRESS(func) OSMesaGetProcAddress(func)
+#elif LL_SDL_WINDOW
 #  include "llwindowsdl.h"
 #  include "SDL3/SDL.h"
 #  define LL_GET_PROC_ADDRESS(func) SDL_GL_GetProcAddress(func)
@@ -1238,7 +1240,7 @@ bool LLGLManager::initGL()
     U32 old_vram = mVRAM;
     mVRAM = 0;
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_MESA_HEADLESS
     if (mHasAMDAssociations)
     {
         GLuint gl_gpus_count = wglGetGPUIDsAMD(0, 0);
@@ -1512,7 +1514,7 @@ void LLGLManager::reloadExtensionsString()
     }
 #endif
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_MESA_HEADLESS
     {
         PFNWGLGETEXTENSIONSSTRINGARBPROC wglGetExtensionsStringARB = (PFNWGLGETEXTENSIONSSTRINGARBPROC)LL_GET_PROC_ADDRESS("wglGetExtensionsStringARB");
         if (wglGetExtensionsStringARB)

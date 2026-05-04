@@ -41,22 +41,32 @@
 #include "llwin32headers.h"
 
 // quotes so we get libraries/.../GL/ version
-#include "GL/glcorearb.h"
+#include <GL/glcorearb.h>
+
+#if LL_MESA_HEADLESS
+#ifndef __gl_h_
+#define __gl_h_ 1
+#endif
+#ifndef __GL_H_
+#define __GL_H_ 1
+#endif
+#include <GL/osmesa.h>
+#endif
 
 #if LL_WINDOWS && !LL_MESA_HEADLESS
-#include "GL/wglext.h"
+#include <GL/wglext.h>
 #endif
 
 #if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
 #define GLX_GLXEXT_LEGACY
 #define __gl_h_ 1
-#include "GL/glx.h"
-#include "GL/glxext.h"
+#include <GL/glx.h>
+#include <GL/glxext.h>
 #endif
 
 #if LL_LINUX && LL_WAYLAND && !LL_MESA_HEADLESS
 #define EGL_EGL_PROTOTYPES 0
-#include "EGL/egl.h"
+#include <EGL/egl.h>
 #endif
 
 #elif LL_DARWIN
@@ -68,7 +78,7 @@
 
 #define GL_EXT_separate_specular_color 1
 #define GL_GLEXT_PROTOTYPES 1
-#include "GL/glext.h"
+#include <GL/glext.h>
 
 #endif // LL_MESA_HEADLESS / LL_SDL_WINDOW // LL_LINUX / LL_WINDOWS / LL_DARWIN
 
