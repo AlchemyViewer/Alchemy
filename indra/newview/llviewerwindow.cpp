@@ -2217,20 +2217,7 @@ LLViewerWindow::LLViewerWindow(const Params& p)
         mWindowRectScaled.set(0, ll_round((F32)size.mY / mDisplayScale.mV[VY]), ll_round((F32)size.mX / mDisplayScale.mV[VX]), 0);
     }
 
-    LLFontManager::initClass();
-
-    // fonts use an GL_UNSIGNED_BYTE image format,
-    // so they need convertion, init buffers if needed
-    LLImageGL::allocateConversionBuffer();
-
-    // Init font system, load default fonts and generate basic glyphs
-    // currently it takes aprox. 0.5 sec and we would load these fonts anyway
-    // before login screen.
-    LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
-        mDisplayScale.mV[VX],
-        mDisplayScale.mV[VY],
-        gDirUtilp->getAppRODataDir(),
-        gSavedSettings.getLLSD("AlchemyUIFontOverrides"));
+    initFonts();
 
     //
     // We want to set this stuff up BEFORE we initialize the pipeline, so we can turn off
@@ -6328,10 +6315,15 @@ void LLViewerWindow::restoreGL(const std::string& progress_message)
 
 void LLViewerWindow::initFonts(F32 zoom_factor)
 {
-    LLFontGL::destroyAllGL();
-    // Initialize with possibly different zoom factor
-
+    // initClass internally decides between the heavy full-reload path
+    // (which needs destroyAllGL up front to clear stale face state) and
+    // the fast DPI-only reload, which keeps the existing GL atlases
+    // alive — so we no longer destroyAllGL unconditionally here.
     LLFontManager::initClass();
+
+    // fonts use an GL_UNSIGNED_BYTE image format,
+    // so they need convertion, init buffers if needed
+    LLImageGL::allocateConversionBuffer();
 
     LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
                                 mDisplayScale.mV[VX] * zoom_factor,

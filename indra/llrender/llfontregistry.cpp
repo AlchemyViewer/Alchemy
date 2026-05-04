@@ -36,6 +36,7 @@
 #include <boost/tokenizer.hpp>
 #include "lldir.h"
 #include "llsd.h"
+#include "llsdutil.h"   // llsd_equals
 #include "llwindow.h"
 #include "llxmlnode.h"
 
@@ -578,6 +579,11 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
     // fully-composed file lists. Done last so the override prepends ahead
     // of resolved <use> chains and inherited variants.
     applyFamilyOverrides(font_overrides);
+
+    // Cache the just-applied overrides so a subsequent reload at the same
+    // (fonts.xml, overrides) but new DPI can detect the no-content-change
+    // case via overridesEqual and take the fast path.
+    mLastFontOverrides = font_overrides;
 
     // Consume both maps so a subsequent call (e.g. on dynamic skin reload)
     // doesn't double-append references to already-resolved entries.
@@ -1454,6 +1460,38 @@ void LLFontRegistry::clear()
     // wrappers (via LLFontFace's destructor when the LLPointer refcount
     // hits zero through LLFontFreetype's release).
     mFallbackInstanceCache.clear();
+}
+
+bool LLFontRegistry::overridesEqual(const LLSD& candidate) const
+{
+    return llsd_equals(mLastFontOverrides, candidate);
+}
+
+void LLFontRegistry::reloadForDpiChange()
+{
+    LL_PROFILE_ZONE_SCOPED;
+    // Fast path used by LLFontGL::initClass when fonts.xml content and
+    // overrides have not changed. Each freetype's mFace gets re-resolved
+    // through LLFontManager::getOrCreateFace at the new (sVertDPI,
+    // sHorizDPI) — DPI rounded to the same integers reuses the cached
+    // face wrapper; otherwise a fresh wrapper is created and the old one
+    // drops to manager-only refcount. Heads use resetSelf so the head /
+    // fallback cascade isn't double-walked. Shared fallback freetypes
+    // are reset once via mFallbackInstanceCache.
+    for (font_reg_map_t::iterator it = mFontMap.begin();
+         it != mFontMap.end();
+         ++it)
+    {
+        if (it->second && it->second->mFontFreetype)
+        {
+            it->second->mFontFreetype->resetSelf(LLFontGL::sVertDPI, LLFontGL::sHorizDPI);
+        }
+    }
+    for (auto& kv : mFallbackInstanceCache)
+    {
+        if (kv.second)
+            kv.second->resetSelf(LLFontGL::sVertDPI, LLFontGL::sHorizDPI);
+    }
 }
 
 bool LLFontRegistry::reload(const LLSD& font_overrides)

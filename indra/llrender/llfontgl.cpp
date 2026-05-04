@@ -61,6 +61,7 @@ F32 LLFontGL::sHorizDPI = 96.f;
 F32 LLFontGL::sScaleX = 1.f;
 F32 LLFontGL::sScaleY = 1.f;
 S32 LLFontGL::sResolutionGeneration = 0;
+bool LLFontGL::sFontsXmlDirty = false;
 bool LLFontGL::sDisplayFont = true ;
 std::string LLFontGL::sAppDir;
 
@@ -1660,26 +1661,58 @@ void LLFontGL::initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::st
     }
     else
     {
-        // Pointer-stable rebuild: re-parse fonts.xml, re-apply the
-        // caller-supplied overrides, and swap each head's mFontFreetype
-        // for one freshly loaded at the now-current sVertDPI / sHorizDPI.
-        // Covers UI scale changes, AlchemyUIFontOverrides changes, and
-        // skinned fonts.xml file mtime changes through one path.
-        if (sFontRegistry->reload(font_overrides))
+        // Decide between the heavy full-reload (re-parse fonts.xml +
+        // pointer-stable swap freetypes + re-rasterize ASCII) and the
+        // light DPI-only reload (resetSelf each freetype). UI scale
+        // changes go through the same initClass path as setting changes
+        // and live-file changes, so the fast path is gated on:
+        //   - fonts.xml content unchanged since the last parse, AND
+        //   - the LLSD overrides byte-equal to the last applied snapshot.
+        const bool xml_dirty = sFontsXmlDirty;
+        sFontsXmlDirty = false;
+        const bool overrides_changed = !sFontRegistry->overridesEqual(font_overrides);
+
+        if (xml_dirty || overrides_changed)
         {
-            // reload() has returned, so its pinned_old_fallbacks local
-            // has destructed and dropped the last refs to any orphan
-            // fallback freetypes. Trim now while their faces sit at
-            // refcount 1 in mFaceCache.
+            // Tear down GL state up front so the destroyGL → my fix's
+            // resetBitmapCache path clears stale glyph entries on every
+            // face in mFaceCache before reload's new-freetype cycle
+            // resolves them back via getOrCreateFace. Skipping this
+            // would leave stale entries on faces whose key is unchanged
+            // (override that doesn't move the file) and the next render
+            // would draw blocks.
+            destroyAllGL();
+            if (sFontRegistry->reload(font_overrides))
+            {
+                // reload() has returned, so its pinned_old_fallbacks
+                // local has destructed and dropped the last refs to
+                // any orphan fallback freetypes. Trim now while their
+                // faces sit at refcount 1 in mFaceCache.
+                if (gFontManagerp)
+                    gFontManagerp->collectGarbage();
+
+                // Bump unconditionally on success so every metric-
+                // sensitive widget re-flows on its next draw — even
+                // no-op overrides (selecting the same family twice)
+                // cycle through here, and skipping the bump would
+                // leave widgets stuck on a stale layout if e.g. the
+                // user picked a different family then reverted.
+                ++sResolutionGeneration;
+            }
+        }
+        else
+        {
+            // Fast path: fonts.xml + overrides identical, only DPI
+            // changed (or nothing changed at all). Skip the parseFontInfo
+            // + createFont + generateASCIIglyphs cycle — the heaviest
+            // part of a font reload. Each freetype's mFace is re-resolved
+            // via getOrCreateFace at the new DPI; cache miss creates a
+            // fresh face wrapper, cache hit (DPI rounded to same ints)
+            // reuses an existing wrapper. ASCII glyphs lazily re-rasterize
+            // on first render through the new face.
+            sFontRegistry->reloadForDpiChange();
             if (gFontManagerp)
                 gFontManagerp->collectGarbage();
-
-            // Bump unconditionally on success so every metric-sensitive
-            // widget re-flows on its next draw — even no-op overrides
-            // (selecting the same family twice) cycle through here, and
-            // skipping the bump would leave widgets stuck on a stale
-            // layout if e.g. the user picked a different family then
-            // reverted.
             ++sResolutionGeneration;
         }
     }
@@ -1764,6 +1797,12 @@ bool LLFontGL::consumePendingReload()
         return false;
     s_pending_font_reload = false;
     return true;
+}
+
+// static
+void LLFontGL::markFontsXmlDirty()
+{
+    sFontsXmlDirty = true;
 }
 
 // static

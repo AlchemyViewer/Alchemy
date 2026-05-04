@@ -30,12 +30,12 @@
 
 #include "llpointer.h"
 #include "llfontface.h"  // for LLFontFaceKey
+#include "llsd.h"        // mLastFontOverrides stored by value
 
 #include <boost/unordered_map.hpp>
 
 class LLFontGL;
 class LLFontFreetype;
-class LLSD;
 
 typedef std::vector<std::string> string_vec_t;
 
@@ -159,6 +159,22 @@ public:
     // mFontFreetype is swapped in place. Returns false on parse failure
     // (registry left untouched).
     bool reload(const LLSD& font_overrides);
+
+    // Fast path for DPI/scale changes when fonts.xml content and
+    // overrides are unchanged. Walks heads + shared fallback freetypes
+    // and re-loads each at the current sVertDPI/sHorizDPI. Skips the
+    // expensive parseFontInfo + createFont + generateASCIIglyphs cycle
+    // — atlas glyphs lazily re-rasterize on first render through
+    // each new face wrapper. Caller must have verified that overrides
+    // match (compare via overridesEqual) and fonts.xml hasn't been
+    // marked dirty since the last full parse.
+    void reloadForDpiChange();
+
+    // True iff `candidate` is byte-equal to the LLSD overrides currently
+    // applied to the registry (cached on the last parseFontInfo /
+    // applyFamilyOverrides call). Used by LLFontGL::initClass to decide
+    // between full reload and fast DPI-only reload.
+    bool overridesEqual(const LLSD& candidate) const;
 
     // Destroy all fonts.
     void clear();
@@ -314,6 +330,12 @@ private:
 
     string_vec_t mUltimateFallbackList;
     bool mCreateGLTextures;
+
+    // Snapshot of the LLSD overrides last applied via parseFontInfo /
+    // applyFamilyOverrides. Compared (via llsd_equals) against the next
+    // call's overrides to decide whether the registry can take the fast
+    // DPI-only reload path or needs a full re-parse.
+    LLSD mLastFontOverrides;
 };
 
 #endif // LL_LLFONTREGISTRY_H

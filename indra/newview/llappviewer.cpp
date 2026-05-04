@@ -785,6 +785,10 @@ namespace
     // pending flag and re-invokes initFonts, which re-walks every skinned
     // fonts.xml from scratch via findSkinnedFilenames, so one change
     // anywhere produces one consistent reload across all layered files.
+    // Also marks the registry's fonts.xml as dirty so initClass takes
+    // the full-reload path even if AlchemyUIFontOverrides is unchanged
+    // (otherwise the next initClass would short-circuit to the fast
+    // DPI-only path and miss the file edit).
     class LLFontsXmlLiveFile : public LLLiveFile
     {
     public:
@@ -792,6 +796,7 @@ namespace
             : LLLiveFile(path, 1.0f) {}
         bool loadFile() override
         {
+            LLFontGL::markFontsXmlDirty();
             LLFontGL::schedulePendingReload();
             return true;
         }

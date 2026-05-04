@@ -214,6 +214,14 @@ public:
     // call (clearing the flag). Called from LLAppViewer::idle().
     static bool consumePendingReload();
 
+    // Mark fonts.xml content as having changed since the last parse.
+    // Called by the live-file listener in newview when any skinned
+    // fonts.xml mtime advances. The next initClass on an existing
+    // registry will see this flag, take the full-reload (re-parse) path,
+    // and clear the flag. UI scale changes that come in while this flag
+    // is set still get the full reload — correctness over speed.
+    static void markFontsXmlDirty();
+
     // User-selectable families declared in fonts.xml — see
     // LLFontRegistry::getAvailableFamilies for the filtering and ordering
     // rules. `filter` constrains the result by the per-family monospace
@@ -277,6 +285,9 @@ public:
     static F32 sScaleX;
     static F32 sScaleY;
     static S32 sResolutionGeneration;
+    // Set by markFontsXmlDirty(); consumed by initClass on the next call
+    // to force the full-reload (re-parse) path even when overrides match.
+    static bool sFontsXmlDirty;
     static bool sDisplayFont ;
     static std::string sAppDir;         // For loading fonts
 

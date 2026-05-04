@@ -1038,8 +1038,9 @@ void LLFontFreetype::resetSelf(F32 vert_dpi, F32 horz_dpi)
 {
     // Reset just this instance — clear its glyph caches, drop the previous
     // face wrapper, and re-loadFace at the new DPI. Doesn't recurse into
-    // mFallbackFonts because shared fallback instances should be reset once
-    // by whoever owns the shared cache (LLFontRegistry::reset).
+    // mFallbackFonts because shared fallback instances should be reset
+    // once by whoever owns the shared cache
+    // (LLFontRegistry::reloadForDpiChange).
     resetBitmapCache();
     loadFace(mName, mPointSize, vert_dpi, horz_dpi, mWeight, mIsFallback, 0, mHinting, mFontFlags);
 }
@@ -1048,7 +1049,8 @@ void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
 {
     // Standalone API for callers outside the registry: do the full cascade
     // (head plus its fallback chain). Inside the registry we use resetSelf
-    // and drive the fallback resets ourselves — see LLFontRegistry::reset.
+    // and drive the fallback resets ourselves — see
+    // LLFontRegistry::reloadForDpiChange.
     resetSelf(vert_dpi, horz_dpi);
     if (!mIsFallback)
     {
