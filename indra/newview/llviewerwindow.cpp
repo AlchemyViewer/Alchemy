@@ -6370,6 +6370,12 @@ void LLViewerWindow::checkSettings()
         reshape(getWindowWidthRaw(), getWindowHeightRaw());
         mResDirty = false;
     }
+
+    // Per-frame glyph atlas eviction. Self-throttled inside each
+    // freetype, so most frames this is a cheap walk that does no real
+    // work. Was previously called from inside LLFontGL::render which
+    // forced the throttle check onto every glyph render.
+    LLFontGL::sweepGlyphCaches();
 }
 
 F32 LLViewerWindow::getWorldViewAspectRatio() const

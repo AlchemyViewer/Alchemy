@@ -214,6 +214,16 @@ public:
     // call (clearing the flag). Called from LLAppViewer::idle().
     static bool consumePendingReload();
 
+    // Once-per-frame glyph cache sweep. Iterates all live LLFontFreetype
+    // instances (heads + shared fallbacks) and runs each one's atlas-
+    // sheet eviction sweep. Each freetype self-throttles to GC_INTERVAL_SEC,
+    // so most calls are cheap no-ops. The viewer's frame loop drives this
+    // via LLViewerWindow::checkSettings — DO NOT call from the render
+    // hot path; the previous render-time call site paid the throttle-check
+    // cost on every glyph render. Calling between frames also avoids
+    // racing eviction with active glyph pointers.
+    static void sweepGlyphCaches();
+
     // Mark fonts.xml content as having changed since the last parse.
     // Called by the live-file listener in newview when any skinned
     // fonts.xml mtime advances. The next initClass on an existing

@@ -1467,6 +1467,21 @@ bool LLFontRegistry::overridesEqual(const LLSD& candidate) const
     return llsd_equals(mLastFontOverrides, candidate);
 }
 
+void LLFontRegistry::sweepGlyphCaches()
+{
+    LL_PROFILE_ZONE_SCOPED;
+    for (auto& kv : mFontMap)
+    {
+        if (kv.second && kv.second->mFontFreetype)
+            kv.second->mFontFreetype->collectGarbage();
+    }
+    for (auto& kv : mFallbackInstanceCache)
+    {
+        if (kv.second)
+            kv.second->collectGarbage();
+    }
+}
+
 void LLFontRegistry::reloadForDpiChange()
 {
     LL_PROFILE_ZONE_SCOPED;

@@ -178,11 +178,11 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         return 0;
     }
 
-    // Run the bitmap-atlas eviction sweep at frame entry, before any glyph
-    // lookup hands us a pointer that eviction could free. Self-throttled, so
-    // calls from each render() invocation in a frame are cheap no-ops after
-    // the first does any work.
-    mFontFreetype->collectGarbage();
+    // Atlas-sheet eviction now runs once per frame from
+    // LLFontGL::sweepGlyphCaches (driven by LLViewerWindow::checkSettings),
+    // not here. Doing it inside render() forced every glyph render to
+    // pay the throttle-check overhead and risked racing eviction with
+    // glyph pointers active inside the same render call.
 
     gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
 
@@ -1803,6 +1803,13 @@ bool LLFontGL::consumePendingReload()
 void LLFontGL::markFontsXmlDirty()
 {
     sFontsXmlDirty = true;
+}
+
+// static
+void LLFontGL::sweepGlyphCaches()
+{
+    if (sFontRegistry)
+        sFontRegistry->sweepGlyphCaches();
 }
 
 // static

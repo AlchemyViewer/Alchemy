@@ -160,6 +160,13 @@ public:
     // (registry left untouched).
     bool reload(const LLSD& font_overrides);
 
+    // Once-per-frame glyph cache sweep. Walks every head and shared
+    // fallback freetype and calls its collectGarbage() — each freetype
+    // self-throttles via its own mNextGcTime, so most calls are no-ops.
+    // Centralized here so the render hot path doesn't pay the
+    // throttle-check cost on every render() call.
+    void sweepGlyphCaches();
+
     // Fast path for DPI/scale changes when fonts.xml content and
     // overrides are unchanged. Walks heads + shared fallback freetypes
     // and re-loads each at the current sVertDPI/sHorizDPI. Skips the
