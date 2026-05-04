@@ -2229,7 +2229,8 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
         mDisplayScale.mV[VX],
         mDisplayScale.mV[VY],
-        gDirUtilp->getAppRODataDir());
+        gDirUtilp->getAppRODataDir(),
+        gSavedSettings.getLLSD("AlchemyUIFontOverrides"));
 
     //
     // We want to set this stuff up BEFORE we initialize the pipeline, so we can turn off
@@ -3652,20 +3653,6 @@ void LLViewerWindow::updateUI()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     static std::string last_handle_msg;
-
-    // Drain any pending font reload before doing anything else this frame.
-    // The setting listener for AlchemyUIFontOverrides defers the reload
-    // here so we never tear down LLFontFreetype state mid-render. The
-    // next frame redraws automatically — widgets read through their
-    // cached LLFontGL* (now pointing at fresh freetype), and LLFontVertex-
-    // Buffer self-invalidates on the new bitmap-cache generation.
-    if (LLFontGL::consumePendingReload())
-    {
-        LLFontGL::reloadFonts();
-
-        // Force a reshape to update the font scaling for the new display resolution.
-        reshape(getWindowWidthRaw(), getWindowHeightRaw(), true);
-    }
 
     if (gLoggedInTime.getStarted())
     {
@@ -6349,7 +6336,8 @@ void LLViewerWindow::initFonts(F32 zoom_factor)
     LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
                                 mDisplayScale.mV[VX] * zoom_factor,
                                 mDisplayScale.mV[VY] * zoom_factor,
-                                gDirUtilp->getAppRODataDir());
+                                gDirUtilp->getAppRODataDir(),
+                                gSavedSettings.getLLSD("AlchemyUIFontOverrides"));
 }
 
 void LLViewerWindow::requestResolutionUpdate()
@@ -6367,6 +6355,21 @@ void LLViewerWindow::checkSettings()
         gGL.refreshState();
         LLViewerShaderMgr::instance()->setShaders();
         mStatesDirty = false;
+    }
+
+    // Drain any pending font reload before doing anything else this frame.
+    // The setting listener for AlchemyUIFontOverrides defers the reload
+    // here so we never tear down LLFontFreetype state mid-render. Routes
+    // through initFonts(), which forwards the current overrides into
+    // LLFontGL::initClass — the single entry point for font system
+    // re-init (UI scale, font override, fonts.xml mtime).
+    if (LLFontGL::consumePendingReload())
+    {
+        initFonts();
+
+        // Force a reshape to update the font scaling for the new display resolution.
+        reshape(getWindowWidthRaw(), getWindowHeightRaw(), true);
+        mResDirty = false; // reshape will have already updated the resolution, so clear the dirty flag to avoid doing it again.
     }
 
     // We want to update the resolution AFTER the states getting refreshed not before.

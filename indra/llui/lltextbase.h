@@ -287,7 +287,8 @@ public:
 private:
     // Stored stable LLFontGL*; getDimensionsF32 calls
     // mFont->getLineSpacing() each access so an in-place font reload
-    // (LLFontGL::reloadFonts) is reflected in line-break heights.
+    // (LLFontGL::initClass on existing registry) is reflected in line-
+    // break heights.
     const LLFontGL* mFont = nullptr;
 };
 

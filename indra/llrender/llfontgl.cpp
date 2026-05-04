@@ -29,7 +29,6 @@
 #include "llfontgl.h"
 
 // Linden library includes
-#include "llcontrol.h"
 #include "llfasttimer.h"
 #include "llfontfreetype.h"
 #include "llfontbitmapcache.h"
@@ -1645,23 +1644,44 @@ const LLFontDescriptor& LLFontGL::getFontDesc() const
 }
 
 // static
-void LLFontGL::initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::string& app_dir, bool create_gl_textures)
+void LLFontGL::initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::string& app_dir, const LLSD& font_overrides, bool create_gl_textures)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     sVertDPI = (F32)llfloor(screen_dpi * y_scale);
     sHorizDPI = (F32)llfloor(screen_dpi * x_scale);
     sScaleX = x_scale;
     sScaleY = y_scale;
     sAppDir = app_dir;
 
-    // Font registry init
     if (!sFontRegistry)
     {
         sFontRegistry = new LLFontRegistry(create_gl_textures);
-        sFontRegistry->parseFontInfo("fonts.xml");
+        sFontRegistry->parseFontInfo("fonts.xml", font_overrides);
     }
     else
     {
-        sFontRegistry->reset();
+        // Pointer-stable rebuild: re-parse fonts.xml, re-apply the
+        // caller-supplied overrides, and swap each head's mFontFreetype
+        // for one freshly loaded at the now-current sVertDPI / sHorizDPI.
+        // Covers UI scale changes, AlchemyUIFontOverrides changes, and
+        // skinned fonts.xml file mtime changes through one path.
+        if (sFontRegistry->reload(font_overrides))
+        {
+            // reload() has returned, so its pinned_old_fallbacks local
+            // has destructed and dropped the last refs to any orphan
+            // fallback freetypes. Trim now while their faces sit at
+            // refcount 1 in mFaceCache.
+            if (gFontManagerp)
+                gFontManagerp->collectGarbage();
+
+            // Bump unconditionally on success so every metric-sensitive
+            // widget re-flows on its next draw — even no-op overrides
+            // (selecting the same family twice) cycle through here, and
+            // skipping the bump would leave widgets stuck on a stale
+            // layout if e.g. the user picked a different family then
+            // reverted.
+            ++sResolutionGeneration;
+        }
     }
 
     LLFontGL::loadDefaultFonts();
@@ -1720,33 +1740,6 @@ void LLFontGL::destroyDefaultFonts()
     // Remove the actual fonts.
     delete sFontRegistry;
     sFontRegistry = NULL;
-}
-
-// static
-bool LLFontGL::reloadFonts()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    if (!sFontRegistry)
-        return false;
-
-    bool ok = sFontRegistry->reload();
-    if (ok)
-    {
-        // sFontRegistry->reload() has returned, so its pinned_old_fallbacks
-        // local has destructed and dropped the last refs to any orphan
-        // fallback freetypes. Trim now while their faces sit at refcount 1
-        // in mFaceCache.
-        if (gFontManagerp)
-            gFontManagerp->collectGarbage();
-
-        // Bump unconditionally on success so every metric-sensitive widget
-        // re-flows on its next draw — even no-op overrides (selecting the
-        // same family twice) cycle through here, and skipping the bump
-        // would leave widgets stuck on a stale layout if e.g. the user
-        // picked a different family then reverted.
-        ++sResolutionGeneration;
-    }
-    return ok;
 }
 
 namespace

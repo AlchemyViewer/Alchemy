@@ -204,8 +204,21 @@ void LLFontFace::resetBitmapCache()
 
 void LLFontFace::destroyGL()
 {
+    // Tear down GL textures up front for prompt GPU memory release, then
+    // fully reset the face so any later loadFace() that resolves back to
+    // this same LLFontFace via LLFontManager::mFaceCache (e.g. UI scale
+    // change whose new vert/horz DPI floor-round to the same integers as
+    // before) gets back an empty face equivalent to a freshly-constructed
+    // one. Without the reset, stale mCharGlyphInfoMap / mShapedGlyphInfoMap
+    // entries continue to point at atlas slots in zombie LLImageGLs (CPU
+    // object alive, GL name 0), every bind() falls through to
+    // sDefaultGLTexture, and text renders as solid colored rectangles.
+    // Heads must clear their non-owning resolution caches BEFORE this
+    // runs (LLFontFreetype::destroyGL handles that) — the deletes below
+    // would otherwise leave dangling pointers in those maps.
     if (mFontBitmapCachep)
         mFontBitmapCachep->destroyGL();
+    resetBitmapCache();
 }
 
 bool LLFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
@@ -264,12 +277,38 @@ void LLFontFace::setSubImageGrayscale(U32 x, U32 y, U32 bitmap_num,
     if (0 == stride)
         stride = width;
 
+    // Hard bounds check: nextOpenPos is supposed to guarantee that the
+    // chosen (x, y, width, height) box fits inside the just-allocated
+    // sheet, but a regression in pen/sheet accounting (e.g. mBitmapWidth
+    // / mBitmapHeight unset because mMaxCharWidth was 0 at allocation
+    // time, or a glyph taller than the sheet) silently produces an
+    // out-of-range write here that corrupts adjacent heap allocations
+    // and crashes a few frames later. Bail with a once-per-process WARN
+    // and the offending dimensions so the underlying bug is diagnosable
+    // from logs instead of presenting as a stack-walked OOB write.
+    const U32 target_width  = image_raw->getWidth();
+    const U32 target_height = image_raw->getHeight();
+    if (x + width > target_width || y + height > target_height)
+    {
+        LL_WARNS_ONCE("Font") << "setSubImageGrayscale OOB: "
+                              << "atlas=" << target_width << "x" << target_height
+                              << ", components=" << (S32)image_raw->getComponents()
+                              << ", glyph=" << width << "x" << height
+                              << " at (" << x << "," << y
+                              << "), bitmap_num=" << bitmap_num
+                              << ", mBitmapWidth=" << mFontBitmapCachep->getBitmapWidth()
+                              << ", mBitmapHeight=" << mFontBitmapCachep->getBitmapHeight()
+                              << ", mMaxCharWidth=" << mFontBitmapCachep->getMaxCharWidth()
+                              << LL_ENDL;
+        llassert(false);
+        return;
+    }
+
     // Write only the alpha byte per pixel; RGB stays at the page's 255 clear
     // value (set by LLFontBitmapCache::nextOpenPos), which makes the shader's
     // vertex_color * texture path render as vertex_color.rgb with coverage
     // gating the alpha. Source data is bottom-up (FreeType convention), so
     // walk source rows in reverse.
-    U32 target_width = image_raw->getWidth();
     for (U32 i = 0; i < height; i++)
     {
         U32 to_offset = (y + i) * target_width + x;

@@ -177,7 +177,20 @@ public:
     void generateASCIIglyphs();
 
 
-    static void initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::string& app_dir, bool create_gl_textures = true);
+    // Single entry point for both initial font system bring-up AND
+    // subsequent reloads (UI scale change, AlchemyUIFontOverrides change,
+    // skinned fonts.xml file change). On the first call, parses fonts.xml
+    // and seeds default fonts. On every subsequent call, re-parses
+    // fonts.xml + applies the current `font_overrides` and pointer-stable-
+    // swaps each head's mFontFreetype to the freshly-loaded one. The
+    // (screen_dpi, x_scale, y_scale) trio are written into the shared
+    // sVertDPI / sHorizDPI / sScaleX / sScaleY statics that downstream
+    // loadFace calls inside the rebuild read for new face keys.
+    //
+    // `font_overrides` is plumbed in from the caller (newview's
+    // AlchemyUIFontOverrides setting) — llrender no longer reads
+    // gSavedSettings on its own.
+    static void initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::string& app_dir, const LLSD& font_overrides, bool create_gl_textures = true);
 
            void dumpTextures();
     static void dumpFonts();
@@ -190,17 +203,11 @@ public:
     static void destroyDefaultFonts();
     static void destroyAllGL();
 
-    // Re-parse fonts.xml and apply current AlchemyUIFontOverrides without
-    // restarting. Existing LLFontGL* pointers (cached by widgets and the
-    // static getters above) stay valid; only the underlying FreeType state
-    // is swapped. Setting handlers should call schedulePendingReload()
-    // instead of this directly; the viewer's idle loop drains the request
-    // via consumePendingReload() so the swap never lands mid-frame.
-    static bool reloadFonts();
-
     // Mark a font reload as pending. Called from the AlchemyUIFontOverrides
     // setting listener. Coalesces multiple changes inside a single frame
-    // into one reload.
+    // into one reload. The caller (newview) drains the flag via
+    // consumePendingReload() in checkSettings and re-invokes initClass with
+    // the up-to-date overrides.
     static void schedulePendingReload();
 
     // Returns true exactly once if a reload was scheduled since the last

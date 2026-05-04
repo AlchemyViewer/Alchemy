@@ -34,13 +34,10 @@
 #include <algorithm>
 #include <set>
 #include <boost/tokenizer.hpp>
-#include "llcontrol.h"
 #include "lldir.h"
 #include "llsd.h"
 #include "llwindow.h"
 #include "llxmlnode.h"
-
-extern LLControlGroup gSavedSettings;
 
 using std::string;
 using std::map;
@@ -301,7 +298,7 @@ LLFontRegistry::~LLFontRegistry()
     clear();
 }
 
-bool LLFontRegistry::parseFontInfo(const std::string& xml_filename)
+bool LLFontRegistry::parseFontInfo(const std::string& xml_filename, const LLSD& font_overrides)
 {
     bool success = false;  // Succeed if we find and read at least one XUI file
     const string_vec_t xml_paths = gDirUtilp->findSkinnedFilenames(LLDir::XUI, xml_filename);
@@ -341,7 +338,7 @@ bool LLFontRegistry::parseFontInfo(const std::string& xml_filename)
     // the merged registry, after all skinned fonts.xml files have been read.
     // Doing this per-file would double-append references for entries that
     // appear in multiple skin layers.
-    resolveFontReferences();
+    resolveFontReferences(font_overrides);
 
     //if (success)
     //  dump();
@@ -349,7 +346,7 @@ bool LLFontRegistry::parseFontInfo(const std::string& xml_filename)
     return success;
 }
 
-void LLFontRegistry::resolveFontReferences()
+void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
 {
     // Helper: replace the file list on a (family, style) entry while
     // preserving any cached LLFontGL pointer.
@@ -576,10 +573,11 @@ void LLFontRegistry::resolveFontReferences()
         replace_files(variant_it, merged_files);
     }
 
-    // Step 3: apply user font overrides (AlchemyUIFontOverrides) on top of
-    // the fully-composed file lists. Done last so the override prepends
-    // ahead of resolved <use> chains and inherited variants.
-    applyFamilyOverrides(gSavedSettings.getLLSD("AlchemyUIFontOverrides"));
+    // Step 3: apply caller-supplied user font overrides
+    // (AlchemyUIFontOverrides, plumbed through from newview) on top of the
+    // fully-composed file lists. Done last so the override prepends ahead
+    // of resolved <use> chains and inherited variants.
+    applyFamilyOverrides(font_overrides);
 
     // Consume both maps so a subsequent call (e.g. on dynamic skin reload)
     // doesn't double-append references to already-resolved entries.
@@ -1441,29 +1439,6 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     return result;
 }
 
-void LLFontRegistry::reset()
-{
-    // With shared fallback LLFontFreetype instances, the legacy cascade in
-    // LLFontFreetype::reset (head -> mFallbackFonts) would re-load the same
-    // shared fallback once per head that lists it. Drive the reset from
-    // here instead: heads use resetSelf (no cascade), then iterate the
-    // fallback cache to reset each shared instance exactly once.
-    for (font_reg_map_t::iterator it = mFontMap.begin();
-         it != mFontMap.end();
-         ++it)
-    {
-        if (it->second && it->second->mFontFreetype)
-        {
-            it->second->mFontFreetype->resetSelf(LLFontGL::sVertDPI, LLFontGL::sHorizDPI);
-        }
-    }
-    for (auto& kv : mFallbackInstanceCache)
-    {
-        if (kv.second)
-            kv.second->resetSelf(LLFontGL::sVertDPI, LLFontGL::sHorizDPI);
-    }
-}
-
 void LLFontRegistry::clear()
 {
     for (font_reg_map_t::iterator it = mFontMap.begin();
@@ -1481,12 +1456,12 @@ void LLFontRegistry::clear()
     mFallbackInstanceCache.clear();
 }
 
-bool LLFontRegistry::reload()
+bool LLFontRegistry::reload(const LLSD& font_overrides)
 {
     // Pointer-stable rebuild: every existing LLFontGL* (cached by widgets
     // and by the static getters in llfontgl.cpp) stays alive. We swap each
     // head's underlying mFontFreetype for one built from a freshly-parsed
-    // fonts.xml + current AlchemyUIFontOverrides.
+    // fonts.xml + caller-supplied font overrides.
 
     // Snapshot existing non-template heads so we can wipe mFontMap freely.
     std::vector<std::pair<LLFontDescriptor, LLFontGL*>> heads;
@@ -1520,7 +1495,7 @@ bool LLFontRegistry::reload()
     // snapshot.
     mFontMap.clear();
 
-    if (!parseFontInfo("fonts.xml"))
+    if (!parseFontInfo("fonts.xml", font_overrides))
     {
         LL_WARNS() << "Font reload: parseFontInfo failed; restoring previous fallback cache" << LL_ENDL;
         mFallbackInstanceCache = std::move(pinned_old_fallbacks);

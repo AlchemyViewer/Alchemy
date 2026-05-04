@@ -1093,6 +1093,16 @@ void LLFontFreetype::resetBitmapCache()
 
 void LLFontFreetype::destroyGL()
 {
+    // Clear our own non-owning resolution caches before the face deletes
+    // the LLFontGlyphInfo entries they reference. mFace->destroyGL fully
+    // resets the face (clears its owning glyph maps + atlas vectors), so
+    // any pointers left here would dangle until the next resetSelf().
+    // No render runs between here and the resetSelf() that follows — every
+    // call site of destroyGL is immediately followed by either initClass
+    // (initFonts path) or process exit (stopGL path) — but clearing now
+    // keeps the invariant local rather than relying on caller ordering.
+    mCharGlyphInfoMap.clear();
+    mShapedGlyphInfoMap.clear();
     if (mFace)
         mFace->destroyGL();
 }

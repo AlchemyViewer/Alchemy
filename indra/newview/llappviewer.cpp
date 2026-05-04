@@ -781,10 +781,10 @@ namespace
     // Polls one skinned fonts.xml path; on a detected mtime change,
     // schedules a font reload through the same idle-tick mechanism the
     // AlchemyUIFontOverrides setting listener uses. We don't re-parse
-    // anything here ourselves — LLFontGL::reloadFonts() in idle re-walks
-    // every skinned fonts.xml from scratch via findSkinnedFilenames, so
-    // one change anywhere produces one consistent reload across all
-    // layered files.
+    // anything here ourselves — LLViewerWindow::checkSettings drains the
+    // pending flag and re-invokes initFonts, which re-walks every skinned
+    // fonts.xml from scratch via findSkinnedFilenames, so one change
+    // anywhere produces one consistent reload across all layered files.
     class LLFontsXmlLiveFile : public LLLiveFile
     {
     public:

@@ -4406,7 +4406,7 @@ bool LLLineBreakTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32
     width = 0;
     // Re-read each call (see LLNormalTextSegment::getDimensionsF32). mFont
     // is the LLFontGL* captured at construction; its underlying freetype
-    // can swap out from under us via LLFontGL::reloadFonts.
+    // can swap out from under us via LLFontGL::initClass on a font reload.
     height = mFont ? mFont->getLineSpacing() : 0;
 
     return true;

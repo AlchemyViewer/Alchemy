@@ -67,8 +67,8 @@ public:
 
     // Drop face-cache and loaded-font entries no longer referenced by any
     // live LLFontFreetype. Intended to run after LLFontRegistry::reload()
-    // has dropped its old fallback references (i.e. from
-    // LLFontGL::reloadFonts() once reload() has returned).
+    // has dropped its old fallback references (i.e. from the existing-
+    // registry branch of LLFontGL::initClass once reload() has returned).
     void collectGarbage();
 
 private:

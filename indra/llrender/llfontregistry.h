@@ -149,17 +149,16 @@ public:
     LLFontRegistry(bool create_gl_textures);
     ~LLFontRegistry();
 
-    // Load standard font info from XML file(s).
-    bool parseFontInfo(const std::string& xml_filename);
+    // Load standard font info from XML file(s). `font_overrides` is an LLSD
+    // map of family-name → file/family override (caller supplies; the
+    // registry no longer reads gSavedSettings directly).
+    bool parseFontInfo(const std::string& xml_filename, const LLSD& font_overrides);
 
-    // Clear cached glyphs for all fonts.
-    void reset();
-
-    // Re-parse fonts.xml and re-apply user font overrides
-    // (AlchemyUIFontOverrides). Existing LLFontGL* pointers stay valid —
-    // each head's underlying mFontFreetype is swapped in place. Returns
-    // false on parse failure (registry left untouched).
-    bool reload();
+    // Re-parse fonts.xml and re-apply caller-supplied font overrides.
+    // Existing LLFontGL* pointers stay valid — each head's underlying
+    // mFontFreetype is swapped in place. Returns false on parse failure
+    // (registry left untouched).
+    bool reload(const LLSD& font_overrides);
 
     // Destroy all fonts.
     void clear();
@@ -244,7 +243,7 @@ private:
     // Resolve cross-family <use> references, then per-family inherit="true"
     // style variants, in that order. Idempotent — consumes mFamilyUses and
     // mInheritFlags so re-running over a partially-resolved registry is safe.
-    void resolveFontReferences();
+    void resolveFontReferences(const LLSD& font_overrides);
     // Apply per-family user overrides from AlchemyUIFontOverrides setting.
     // Each override prepends source files (another family's resolved files,
     // or a single user-supplied font file) ahead of the target family's

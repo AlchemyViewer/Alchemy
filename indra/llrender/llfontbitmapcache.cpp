@@ -128,6 +128,17 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
         }
     }
 
+    // Even when X didn't overflow, the placement still needs to fit the
+    // sheet vertically — the row was opened earlier by a smaller glyph
+    // that passed the wrap-time fit check, but a later (taller) glyph in
+    // the same row can poke past mBitmapHeight if we don't re-check here.
+    // Force a new sheet in that case rather than writing past the atlas.
+    if (!need_new_sheet
+        && (mCurrentOffsetY[bitmap_idx] + height + 4) > mBitmapHeight)
+    {
+        need_new_sheet = true;
+    }
+
     if (need_new_sheet)
     {
         // We're out of space in the current image, or no image
