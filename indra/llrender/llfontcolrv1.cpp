@@ -15,7 +15,12 @@
 
 #include <hb.h>
 #include <hb-ot.h>
+#include <hb-ft.h>
 #include <plutovg/plutovg.h>
+
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_COLOR_H
 
 #include <algorithm>
 #include <cstring>
@@ -631,15 +636,60 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
     if (!hb_font)
         return false;
 
-    // Glyph extents from hb-ft are in 26.6 fixed-point (pixels * 64), matching
-    // the rest of HB's positioning output (see LLFontShaping's INV_64 usage).
-    // y_bearing is positive distance from baseline to glyph top; height is
-    // negative in coord systems that grow up. A glyph with no extents has all
-    // zero fields — bail and let the outline fallback handle it.
-    hb_glyph_extents_t ext = {};
-    if (!hb_font_get_glyph_extents(hb_font, glyph_index, &ext))
-        return false;
-    if (ext.width == 0 || ext.height == 0)
+    // Surface-sizing bbox in HB paint coordinates (pixels * 64, the same
+    // 26.6 convention HB uses everywhere). x_bearing is the leftmost coord;
+    // y_bearing is the topmost in HB's Y-up coord system. height is stored
+    // negative for Y-up glyphs.
+    S32 bbox_x_bearing = 0;
+    S32 bbox_y_bearing = 0;
+    S32 bbox_width     = 0;
+    S32 bbox_height    = 0;
+
+    // Prefer FT's COLRv1 clip box when present — that's the spec-authoritative
+    // visual extent of the painted glyph. hb_font_get_glyph_extents returns
+    // the underlying outline glyph's bbox, which for many COLRv1 glyphs (esp.
+    // flag and family emoji built from many nested PaintColrGlyph layers)
+    // is zero or wildly different from the painted output. Fall back to the
+    // outline bbox if the font has no clip box for this glyph.
+    FT_Face ft_face = hb_ft_font_get_ft_face(hb_font);
+    FT_ClipBox clip = {};
+    bool used_clip_box = false;
+    if (ft_face && FT_Get_Color_Glyph_ClipBox(ft_face, glyph_index, &clip))
+    {
+        // The clip box gives 4 corners in 26.6 (font-design coords scaled by
+        // ppem * 64 — same units HB paint uses). For axis-aligned boxes the
+        // corners line up; rotated boxes are rare but supported by computing
+        // the AABB. Use the AABB unconditionally; the worst case is a slightly
+        // looser bound.
+        const FT_Pos xs[4] = { clip.bottom_left.x, clip.top_left.x,
+                               clip.top_right.x,   clip.bottom_right.x };
+        const FT_Pos ys[4] = { clip.bottom_left.y, clip.top_left.y,
+                               clip.top_right.y,   clip.bottom_right.y };
+        FT_Pos xmin = xs[0], xmax = xs[0], ymin = ys[0], ymax = ys[0];
+        for (int i = 1; i < 4; ++i)
+        {
+            if (xs[i] < xmin) xmin = xs[i];
+            if (xs[i] > xmax) xmax = xs[i];
+            if (ys[i] < ymin) ymin = ys[i];
+            if (ys[i] > ymax) ymax = ys[i];
+        }
+        bbox_x_bearing = (S32)xmin;
+        bbox_y_bearing = (S32)ymax;          // HB y_bearing convention: top-most Y, Y-up
+        bbox_width     = (S32)(xmax - xmin);
+        bbox_height    = (S32)(ymin - ymax); // negative, matching HB convention
+        used_clip_box  = true;
+    }
+    else
+    {
+        hb_glyph_extents_t ext = {};
+        if (!hb_font_get_glyph_extents(hb_font, glyph_index, &ext))
+            return false;
+        bbox_x_bearing = ext.x_bearing;
+        bbox_y_bearing = ext.y_bearing;
+        bbox_width     = ext.width;
+        bbox_height    = ext.height;
+    }
+    if (bbox_width == 0 || bbox_height == 0)
         return false;
 
     // Convert 26.6 extents to integer pixels for the surface allocation.
@@ -654,13 +704,14 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
     };
     auto ceil_div_64  = [](S32 v) -> S32 { return (v + 63) >> 6; };
 
-    const S32 abs_h_26_6 = (ext.height < 0) ? -ext.height : ext.height;
-    const S32 left_px    = floor_div_64(ext.x_bearing);
-    const S32 top_px     = floor_div_64(ext.y_bearing);
-    const S32 width_px   = ceil_div_64(ext.width);
+    const S32 abs_h_26_6 = (bbox_height < 0) ? -bbox_height : bbox_height;
+    const S32 left_px    = floor_div_64(bbox_x_bearing);
+    const S32 top_px     = floor_div_64(bbox_y_bearing);
+    const S32 width_px   = ceil_div_64(bbox_width);
     const S32 height_px  = ceil_div_64(abs_h_26_6);
     const S32 surf_w     = width_px  + 2 * GLYPH_PAD;
     const S32 surf_h     = height_px + 2 * GLYPH_PAD;
+    (void)used_clip_box;
     if (surf_w <= 0 || surf_h <= 0 || surf_w > 1024 || surf_h > 1024)
     {
         // Cap matches the atlas sheet ceiling (LLFontBitmapCache caps at
@@ -687,8 +738,8 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
     }
     p.width  = surf_w;
     p.height = surf_h;
-    p.origin_x     = (F32)ext.x_bearing;
-    p.origin_y_top = (F32)ext.y_bearing;
+    p.origin_x     = (F32)bbox_x_bearing;
+    p.origin_y_top = (F32)bbox_y_bearing;
     // hb_color_t is little-endian uint32 layout: blue=byte3, green=byte2,
     // red=byte1, alpha=byte0 per the HB_COLOR macro convention. Build the
     // foreground value matching that bit layout from our LLColor4U (RGBA bytes).
