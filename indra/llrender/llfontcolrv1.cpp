@@ -682,15 +682,39 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
     else
     {
         hb_glyph_extents_t ext = {};
-        if (!hb_font_get_glyph_extents(hb_font, glyph_index, &ext))
-            return false;
-        bbox_x_bearing = ext.x_bearing;
-        bbox_y_bearing = ext.y_bearing;
-        bbox_width     = ext.width;
-        bbox_height    = ext.height;
+        if (hb_font_get_glyph_extents(hb_font, glyph_index, &ext))
+        {
+            bbox_x_bearing = ext.x_bearing;
+            bbox_y_bearing = ext.y_bearing;
+            bbox_width     = ext.width;
+            bbox_height    = ext.height;
+        }
     }
+
+    // Empty bbox happens for COLRv1 ligature glyphs (notably ZWJ emoji like
+    // family-of-three or flags) whose underlying outline glyph is a stub —
+    // the paint tree carries the visual content but the cmap/glyf entry has
+    // zero extents. Without a clip box (which Noto-COLRv1 doesn't always
+    // ship), neither FT nor HB can size the surface. Fall back to a generous
+    // 2-em-square box centered on the baseline so HB's paint walk has space
+    // to draw into; paint commands that go outside still get plutovg-clipped
+    // to the surface, which is acceptable for the rare-edge case.
     if (bbox_width == 0 || bbox_height == 0)
-        return false;
+    {
+        unsigned x_ppem = 0, y_ppem = 0;
+        hb_font_get_ppem(hb_font, &x_ppem, &y_ppem);
+        if (x_ppem == 0 || y_ppem == 0)
+            return false;
+        const S32 ppem_x_64 = static_cast<S32>(x_ppem) * 64;
+        const S32 ppem_y_64 = static_cast<S32>(y_ppem) * 64;
+        // Center horizontally on the origin (-em..+em); vertically span from
+        // 1.5em above baseline down to 0.5em below — covers descender-heavy
+        // emoji while keeping the ascender at typical-cap-height bias.
+        bbox_x_bearing = -ppem_x_64;
+        bbox_y_bearing =  ppem_y_64 + (ppem_y_64 / 2);  // 1.5 em above baseline
+        bbox_width     =  2 * ppem_x_64;
+        bbox_height    = -2 * ppem_y_64;
+    }
 
     // Convert 26.6 extents to integer pixels for the surface allocation.
     // Floor the bearings (rounded outward to the leftmost / topmost pixel
