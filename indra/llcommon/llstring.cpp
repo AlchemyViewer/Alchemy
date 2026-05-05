@@ -1175,6 +1175,22 @@ bool LLStringOps::isEmoji(llwchar a)
 // static
 bool LLStringOps::isPictographBase(llwchar a)
 {
+    // Emoji-sequence extenders sit inside the broad pictograph ranges below
+    // (notably ZWJ at U+200D in the General Punctuation block, and the
+    // skin-tone modifiers in U+1F3FB..U+1F3FF). Exclude them up front so
+    // callers that ask "is this codepoint a base of an emoji cluster" get
+    // a no for these — the cluster walker handles them as extenders.
+    if (a == 0x200C || a == 0x200D)            // ZWNJ, ZWJ
+        return false;
+    if (a == 0xFE0E || a == 0xFE0F)            // VS-15 / VS-16
+        return false;
+    if (a == 0x20E3)                           // combining enclosing keycap
+        return false;
+    if (a >= 0x1F3FB && a <= 0x1F3FF)          // skin-tone modifiers
+        return false;
+    if (a >= 0xE0020 && a <= 0xE007F)          // tag characters (SP-CANCEL)
+        return false;
+
     return a == 0xA9 || a == 0xAE
         || (a >= 0x2000 && a < 0x3300)
         || (a >= 0x1F000 && a < 0x20000);

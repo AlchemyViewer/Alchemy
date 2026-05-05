@@ -1066,4 +1066,48 @@ namespace tut
         ensure_equals("flag end -> 0 (whole flag is one cluster)",
                       wstring_step_grapheme_backward(flag, 2), size_t(0));
     }
+
+    // ---------------------------------------------------------------
+    // LLStringOps::isPictographBase: broader than isEmoji. Recognises BMP
+    // pictographs (U+2000..U+3300, plus copyright/registered) so heart-on-
+    // fire (U+2764 + ZWJ + U+1F525) registers as an emoji-cluster start.
+    // ---------------------------------------------------------------
+
+    template<> template<>
+    void llstring_utf_object_t::test<102>()
+    {
+        // Astral emoji: both predicates accept.
+        ensure("isPictographBase rocket",
+                LLStringOps::isPictographBase((llwchar)0x1F680));
+        ensure("isPictographBase fire",
+                LLStringOps::isPictographBase((llwchar)0x1F525));
+        // BMP pictographs that isEmoji rejects but isPictographBase accepts.
+        ensure("isPictographBase heart",
+                LLStringOps::isPictographBase((llwchar)0x2764));
+        ensure("isPictographBase copyright",
+                LLStringOps::isPictographBase((llwchar)0x00A9));
+        ensure("isPictographBase registered",
+                LLStringOps::isPictographBase((llwchar)0x00AE));
+        // Plain ASCII / digits never qualify.
+        ensure("not isPictographBase 'A'",
+               !LLStringOps::isPictographBase((llwchar)'A'));
+        ensure("not isPictographBase '0'",
+               !LLStringOps::isPictographBase((llwchar)'0'));
+        // ZWJ and VS-16 are extenders, not bases.
+        ensure("not isPictographBase ZWJ",
+               !LLStringOps::isPictographBase((llwchar)0x200D));
+        ensure("not isPictographBase VS-16",
+               !LLStringOps::isPictographBase((llwchar)0xFE0F));
+        // Above the astral range upper bound: not a pictograph base.
+        ensure("not isPictographBase U+20000",
+               !LLStringOps::isPictographBase((llwchar)0x20000));
+        // Below U+2000 BMP cutoff (e.g. CJK Symbols U+3000 IS in range,
+        // but U+1FFF is not).
+        ensure("not isPictographBase U+1FFF",
+               !LLStringOps::isPictographBase((llwchar)0x1FFF));
+        ensure("isPictographBase U+2000 boundary",
+                LLStringOps::isPictographBase((llwchar)0x2000));
+        ensure("not isPictographBase U+3300 boundary",
+               !LLStringOps::isPictographBase((llwchar)0x3300));
+    }
 }

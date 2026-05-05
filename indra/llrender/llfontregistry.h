@@ -37,6 +37,11 @@
 class LLFontGL;
 class LLFontFreetype;
 
+// Forward-declare the test fixture so LLFontRegistry's friend declaration
+// can reference it. Defined inside namespace tut by
+// indra/llrender/tests/llfontregistry_test.cpp.
+namespace tut { struct llfontregistry_data; }
+
 typedef std::vector<std::string> string_vec_t;
 
 enum class EFontHinting : S32
@@ -152,6 +157,12 @@ class LLFontRegistry
 {
 public:
     friend bool init_from_xml(LLFontRegistry*, LLPointer<class LLXMLNode>);
+    // Test fixture in indra/llrender/tests/llfontregistry_test.cpp drives
+    // resolveFontReferences / applyFamilyOverrides directly so the resolver
+    // unit tests don't have to set up gDirUtilp + a temp skin tree just to
+    // reach parseFontInfo. Lives in `namespace tut`, where TUT requires
+    // the fixture struct.
+    friend struct ::tut::llfontregistry_data;
     // create_gl_textures - set to false for test apps with no OpenGL window,
     // such as llui_libtest
     LLFontRegistry(bool create_gl_textures);

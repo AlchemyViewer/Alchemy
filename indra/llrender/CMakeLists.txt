@@ -109,3 +109,23 @@ if (NOT USE_SDL_WINDOW)
           OpenGL::GL
           )
 endif()
+
+if (BUILD_TESTING)
+  # llrender pulls in llcommon / llimage / llmath / llfilesystem / llxml /
+  # llwindow + ll::freetype / ll::harfbuzz / ll::plutosvg / ll::glext via
+  # its own target_link_libraries; transitive linking propagates them to
+  # consumers, so listing llrender alone is enough.
+  set(test_libs llrender)
+  set(test_project llrender)
+  LL_ADD_INTEGRATION_TEST(llfontcolrv1 "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfontregistry "" "${test_libs}" "${test_project}")
+  if (TARGET INTEGRATION_TEST_llfontcolrv1)
+    # Hand the source-tree font directory to the test as a string literal.
+    # Tests that need a real font file (Noto-COLRv1.ttf, InterVariable.woff2)
+    # locate it relative to this dir; absent files cause the affected tests
+    # to skip rather than fail, so a partial font set still runs the rest
+    # of the suite.
+    target_compile_definitions(INTEGRATION_TEST_llfontcolrv1 PRIVATE
+        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
+  endif()
+endif()
