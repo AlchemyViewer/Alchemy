@@ -147,13 +147,12 @@ public:
     // when teardown order requires GL state release before destruction).
     void destroyGL();
 
-    // Copy a rasterized 8-bit grayscale bitmap into this face's atlas at slot
-    // (type=Grayscale, bitmap_num) at offset (x, y). The atlas is RGBA8 with
-    // RGB pre-cleared to 255; this function only writes the .a (coverage)
-    // byte per pixel.
-    void setSubImageGrayscale(U32 x, U32 y, U32 bitmap_num,
-                              U32 width, U32 height,
-                              U8* data, S32 stride = 0) const;
+    // Copy a rasterized bitmap into this face's atlas at slot
+    // (type=Grayscale, bitmap_num) at offset (x, y). Returns false on
+    // missing atlas / image data; non-fatal so callers can recover.
+    void setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
+                                   U32 width, U32 height,
+                                   U8* data, S32 stride = 0) const;
     // Same for the Color (BGRA) atlas. `stride` is FT's signed bitmap.pitch:
     // negative when the source buffer is bottom-up (data points to the row
     // at the highest address; rows step backward through memory).

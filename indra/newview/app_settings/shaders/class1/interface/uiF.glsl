@@ -40,9 +40,14 @@ in vec4 vertex_color;
 
 float sampleAtlasAlpha(vec2 uv)
 {
-    // Both atlas types are GL_RGBA8: the grayscale font atlas stores white in
-    // .rgb and coverage in .a; the emoji atlas stores native BGRA color with
-    // alpha in .a. Either way .a is the alpha to sample.
+    // Both atlas types route alpha through .a in the shader: the grayscale
+    // font atlas is uploaded as GL_LUMINANCE_ALPHA, which LLImageGL converts
+    // to GL_RG with TEXTURE_SWIZZLE (R, R, R, G) (see llimagegl.cpp's
+    // setManualImage), so .a maps to the rasterized alpha byte. RGBA emoji
+    // atlases natively store alpha in .a. Reading .g for grayscale would
+    // pick up the post-swizzle R channel (255 in cleared regions), which
+    // produced solid 83%-black boxes wherever the shader sampled outside a
+    // glyph.
     return texture(diffuseMap, uv).a;
 }
 

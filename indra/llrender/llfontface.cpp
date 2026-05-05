@@ -268,9 +268,9 @@ bool LLFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
     return true;
 }
 
-void LLFontFace::setSubImageGrayscale(U32 x, U32 y, U32 bitmap_num,
-                                      U32 width, U32 height,
-                                      U8* data, S32 stride) const
+void LLFontFace::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
+                                           U32 width, U32 height,
+                                           U8* data, S32 stride) const
 {
     LLImageRaw* image_raw = mFontBitmapCachep ? mFontBitmapCachep->getImageRaw(EFontGlyphType::Grayscale, bitmap_num) : nullptr;
     if (!image_raw)
@@ -281,7 +281,7 @@ void LLFontFace::setSubImageGrayscale(U32 x, U32 y, U32 bitmap_num,
 
     LLImageDataLock lock(image_raw);
 
-    llassert(image_raw->getComponents() == 4);
+    llassert(image_raw->getComponents() == 2);
 
     U8* target = image_raw->getData();
     llassert(target);
@@ -318,22 +318,19 @@ void LLFontFace::setSubImageGrayscale(U32 x, U32 y, U32 bitmap_num,
         return;
     }
 
-    // Write only the alpha byte per pixel; RGB stays at the page's 255 clear
-    // value (set by LLFontBitmapCache::nextOpenPos), which makes the shader's
-    // vertex_color * texture path render as vertex_color.rgb with coverage
     // gating the alpha. FT's bitmap.buffer points to the first row in draw
     // order (top); stride is the signed byte offset to the next row down,
     // so a negative stride means buffer sits at a higher address than the
     // rest of the data. Use signed arithmetic for from_offset so both pitch
-    // signs land on the right source bytes. Atlas is GL bottom-up, so map
-    // atlas memory row i to draw-order source row (height-1-i).
+    // gating the alpha. Source data is bottom-up (FreeType convention), so
+    // walk source rows in reverse.
     for (U32 i = 0; i < height; i++)
     {
         U32 to_offset = (y + i) * target_width + x;
         ptrdiff_t from_offset = (ptrdiff_t)(height - 1 - i) * (ptrdiff_t)stride;
         for (U32 j = 0; j < width; j++)
         {
-            *(target + to_offset * 4 + 3) = *(data + from_offset);
+            *(target + to_offset * 2 + 1) = *(data + from_offset);
             to_offset++;
             from_offset++;
         }
