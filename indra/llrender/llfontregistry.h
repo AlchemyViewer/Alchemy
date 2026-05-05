@@ -52,7 +52,7 @@ enum class EFontHinting : S32
 
 struct LLFontFileInfo
 {
-    LLFontFileInfo(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false)
+    LLFontFileInfo(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false, bool load_collection = false)
         : FileName(file_name)
         , CharFunctor(char_functor)
         , mHinting(hinting)
@@ -60,6 +60,7 @@ struct LLFontFileInfo
         , mWeight(weight)
         , mSizeDelta(size_delta)
         , mMonospaceLigatures(monospace_ligatures)
+        , mLoadCollection(load_collection)
     {
     }
 
@@ -71,6 +72,7 @@ struct LLFontFileInfo
         , mWeight(weight)
         , mSizeDelta(size_delta)
         , mMonospaceLigatures(ffi.mMonospaceLigatures)
+        , mLoadCollection(ffi.mLoadCollection)
     {
     }
 
@@ -91,6 +93,12 @@ struct LLFontFileInfo
     // and intrinsic to the font's purpose. Set via <font ligatures="on"> in
     // fonts.xml. Has no effect on non-fixed-width faces.
     bool mMonospaceLigatures;
+
+    // Opt-in: this file is a TTC/OTC collection — createFont probes
+    // FT's num_faces and creates one LLFontGL per face. Off by default
+    // so we don't pay the open/probe cost for plain .ttf/.otf/.woff2.
+    // Set via <file load_collection="true"> in fonts.xml.
+    bool mLoadCollection;
 };
 typedef std::vector<LLFontFileInfo> font_file_info_vec_t;
 
@@ -126,7 +134,7 @@ public:
     const std::string& getSize() const { return mSize; }
     void setSize(const std::string& size) { mSize = size; }
 
-    void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false);
+    void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false, bool load_collection = false);
     const font_file_info_vec_t & getFontFiles() const { return mFontFiles; }
     void setFontFiles(const font_file_info_vec_t& font_files) { mFontFiles = font_files; }
 

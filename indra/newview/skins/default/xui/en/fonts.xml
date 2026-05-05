@@ -250,16 +250,16 @@
              fallback entry, so a single <file> covers all weights/widths
              SourceHanSans ships. -->
         <style name="NORMAL">
-            <file font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
+            <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
         </style>
         <style name="BOLD">
-            <file flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
+            <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
         </style>
         <style name="ITALIC">
-            <file font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
+            <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
         </style>
         <style name="BOLD|ITALIC">
-            <file flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
+            <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
         </style>
     </font>
 
@@ -277,7 +277,6 @@
         </style>
     </font>
 
-
     <!-- The "default" font is appended (style-agnostically) to every
        font's chain inside createFont(). Keep it minimal: OS-specific
        CJK fonts that the standalone CJK family can't fully substitute
@@ -293,7 +292,7 @@
         <file>simhei.ttf</file>
         <file>ArialUni.ttf</file>
         <file>msyh.ttc</file>
-        <file>Cambria.ttc</file>
+        <file load_collection="true">Cambria.ttc</file>
         <file>malgun.ttf</file>
         <file>micross.ttf</file>
       </os>

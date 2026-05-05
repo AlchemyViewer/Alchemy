@@ -55,6 +55,8 @@ namespace
         bool hinting_set = false;
         S32 weight = -1;
         bool weight_set = false;
+        bool load_collection = false;
+        bool load_collection_set = false;
     };
 
     typedef boost::unordered_map<std::string, F32> family_size_overrides_t;
@@ -281,9 +283,9 @@ LLFontDescriptor LLFontDescriptor::normalize() const
     return LLFontDescriptor(new_name,new_size,new_style, getFontFiles());
 }
 
-void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures)
+void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures, bool load_collection)
 {
-    mFontFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, char_functor, monospace_ligatures));
+    mFontFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, char_functor, monospace_ligatures, load_collection));
 }
 
 LLFontRegistry::LLFontRegistry(bool create_gl_textures)
@@ -827,6 +829,13 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
             defaults.weight_set = true;
         }
 
+        if (node->hasAttribute("load_collection"))
+        {
+            bool fam_col = false;
+            node->getAttributeBOOL("load_collection", fam_col);
+            defaults.load_collection = fam_col;
+            defaults.load_collection_set = true;
+        }
 
         if (extras && node->hasAttribute("inherit"))
         {
@@ -858,6 +867,7 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
             EFontHinting hinting = defaults.hinting_set ? defaults.hinting : EFontHinting::FORCE_AUTOHINT;
             S32 flags = 0;
             S32 weight = defaults.weight_set ? defaults.weight : -1;
+            bool load_collection = defaults.load_collection_set ? defaults.load_collection : false;
 
             if (child->hasAttribute("unicode_ranges"))
             {
@@ -895,7 +905,12 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
                 child->getAttributeS32("font_weight", weight);
             }
 
-            desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, inline_functor, defaults.monospace_ligatures);
+            if (child->hasAttribute("load_collection"))
+            {
+                child->getAttributeBOOL("load_collection", load_collection);
+            }
+
+            desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, inline_functor, defaults.monospace_ligatures, load_collection);
         }
         else if (child->hasName("size"))
         {
@@ -927,10 +942,10 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
     }
     return true;
 }
-// Read family-level defaults (ligatures, font_hinting, font_weight) from a
-// <font> node. Used by both legacy and new-format paths; mirrors the
-// family-level reads done inside font_desc_init_from_xml for backward
-// compatibility.
+// Read family-level defaults (ligatures, font_hinting, font_weight,
+// load_collection) from a <font> node. Used by both legacy and new-format
+// paths; mirrors the family-level reads done inside font_desc_init_from_xml
+// for backward compatibility.
 FamilyDefaults read_family_defaults(LLXMLNodePtr font_node)
 {
     FamilyDefaults d;
@@ -953,6 +968,13 @@ FamilyDefaults read_family_defaults(LLXMLNodePtr font_node)
         font_node->getAttributeS32("font_weight", w);
         d.weight = w;
         d.weight_set = true;
+    }
+    if (font_node->hasAttribute("load_collection"))
+    {
+        bool c = false;
+        font_node->getAttributeBOOL("load_collection", c);
+        d.load_collection = c;
+        d.load_collection_set = true;
     }
     return d;
 }
@@ -1348,11 +1370,7 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
             const std::string font_path = *font_search_path_it + font_file_it->FileName;
 
             fontp = new LLFontGL;
-            // Always probe num_faces — FreeType returns 1 for single-face
-            // files (.ttf, .otf, .woff2) and the actual face count for
-            // collections (.ttc, .otc), so we don't need fonts.xml to flag
-            // collections explicitly.
-            S32 num_faces = fontp->getNumFaces(font_path);
+            S32 num_faces = font_file_it->mLoadCollection ? fontp->getNumFaces(font_path) : 1;
             for (S32 i = 0; i < num_faces; i++)
             {
                 // Fallback dedup: if the same (filename, face_index, sized
