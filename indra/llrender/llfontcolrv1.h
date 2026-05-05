@@ -34,6 +34,13 @@ public:
         S32       mPitch  = 0;
         S32       mLeft   = 0;  // bitmap_left equivalent
         S32       mTop    = 0;  // bitmap_top equivalent
+        // True iff every fill in the paint tree was the foreground slot —
+        // i.e. no CPAL palette colors were ever referenced. Caller can use
+        // this to decide whether to tint the rasterized glyph with the
+        // active text color at draw time (which preserves the white-baked
+        // bitmap as a luminance mask) or with the emoji-fixed white (which
+        // preserves CPAL palette colors verbatim). Always false on abort.
+        bool      mForegroundOnly = false;
     };
 
     LLFontColrV1Painter();
@@ -45,6 +52,8 @@ public:
     // CPAL palette entry 0xFFFF as "use foreground"). `point_size` is the
     // requested type size in pixels — the painter uses it to size the
     // staging surface and to map font-design-unit coordinates to pixels.
+    // `palette_index` selects which CPAL palette HB resolves color refs
+    // against; 0 is the default palette.
     //
     // Returns true on success and populates `out`. Returns false when the
     // glyph has no paint tree, the paint tree uses a feature we don't yet
@@ -54,6 +63,7 @@ public:
                     U32           glyph_index,
                     F32           point_size,
                     const LLColor4U& foreground,
+                    U32           palette_index,
                     Result&       out);
 
 private:

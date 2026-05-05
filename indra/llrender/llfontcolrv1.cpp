@@ -54,11 +54,55 @@ namespace
         // (sweep gradient, image fill, etc.). Caller treats true as "abort
         // and fall back to outline rasterization".
         bool               aborted = false;
+        // Tracks whether any non-foreground (palette / explicit RGBA) color
+        // was emitted during the walk. Drives the foreground-only tint flag
+        // on the resulting Result so the draw path can pick text_color over
+        // emoji-white for glyphs whose paint tree references only foreground.
+        bool               saw_palette_color = false;
 
         // Reusable scratch buffer for color-line stop slurps.
         std::vector<hb_color_stop_t>      stop_buf;
         std::vector<plutovg_gradient_stop_t> pv_stops;
+
+        // PaintComposite group stack: each entry is the (surface, canvas) we
+        // were drawing into before push_group redirected output to a fresh
+        // sub-surface. pop_group blits the current sub-surface back onto the
+        // popped parent under the requested compositing mode and frees the
+        // sub-surface. Empty during ordinary (non-grouped) painting.
+        struct GroupFrame
+        {
+            plutovg_surface_t* surface;
+            plutovg_canvas_t*  canvas;
+        };
+        std::vector<GroupFrame> group_stack;
     };
+
+    // Map an hb composite mode to a plutovg Porter-Duff operator. Plutovg
+    // doesn't expose W3C blend modes (multiply/screen/overlay/etc.); those
+    // return SRC_OVER as a graceful fallback with `*exact` set false so the
+    // caller can warn / record the lossy mapping.
+    inline plutovg_operator_t to_pv_operator(hb_paint_composite_mode_t mode, bool& exact)
+    {
+        exact = true;
+        switch (mode)
+        {
+            case HB_PAINT_COMPOSITE_MODE_CLEAR:     return PLUTOVG_OPERATOR_CLEAR;
+            case HB_PAINT_COMPOSITE_MODE_SRC:       return PLUTOVG_OPERATOR_SRC;
+            case HB_PAINT_COMPOSITE_MODE_DEST:      return PLUTOVG_OPERATOR_DST;
+            case HB_PAINT_COMPOSITE_MODE_SRC_OVER:  return PLUTOVG_OPERATOR_SRC_OVER;
+            case HB_PAINT_COMPOSITE_MODE_DEST_OVER: return PLUTOVG_OPERATOR_DST_OVER;
+            case HB_PAINT_COMPOSITE_MODE_SRC_IN:    return PLUTOVG_OPERATOR_SRC_IN;
+            case HB_PAINT_COMPOSITE_MODE_DEST_IN:   return PLUTOVG_OPERATOR_DST_IN;
+            case HB_PAINT_COMPOSITE_MODE_SRC_OUT:   return PLUTOVG_OPERATOR_SRC_OUT;
+            case HB_PAINT_COMPOSITE_MODE_DEST_OUT:  return PLUTOVG_OPERATOR_DST_OUT;
+            case HB_PAINT_COMPOSITE_MODE_SRC_ATOP:  return PLUTOVG_OPERATOR_SRC_ATOP;
+            case HB_PAINT_COMPOSITE_MODE_DEST_ATOP: return PLUTOVG_OPERATOR_DST_ATOP;
+            case HB_PAINT_COMPOSITE_MODE_XOR:       return PLUTOVG_OPERATOR_XOR;
+            default:
+                exact = false;
+                return PLUTOVG_OPERATOR_SRC_OVER;
+        }
+    }
 
     // ---- Utility: hb_color_t → plutovg_color_t (unpremultiplied float) ----
     inline void hb_to_pv_color(hb_color_t in, hb_color_t foreground,
@@ -196,6 +240,8 @@ namespace
                   hb_bool_t is_foreground, hb_color_t color, void*)
     {
         Painter* p = static_cast<Painter*>(data);
+        if (!is_foreground)
+            p->saw_palette_color = true;
         plutovg_color_t pc;
         hb_to_pv_color(color, p->foreground, is_foreground, &pc);
         plutovg_canvas_set_color(p->canvas, &pc);
@@ -232,6 +278,8 @@ namespace
         {
             if (!(s.offset >= 0.f) && !(s.offset <= 1.f))
                 continue; // NaN guard; either of those is true for any real number
+            if (!s.is_foreground)
+                p.saw_palette_color = true;
             plutovg_gradient_stop_t out;
             out.offset = s.offset;
             hb_to_pv_color(s.color, p.foreground, s.is_foreground, &out.color);
@@ -286,16 +334,159 @@ namespace
         plutovg_canvas_paint(p->canvas);
     }
 
-    void sweep_gradient_cb(hb_paint_funcs_t*, void* data,
-                           hb_color_line_t* /*color_line*/,
-                           float /*x0*/, float /*y0*/,
-                           float /*start_angle*/, float /*end_angle*/, void*)
+    // Linearly interpolate the color at parameter `t` (already wrapped/clamped
+    // into [0, 1] by the spread mode) across the painter's current pv_stops.
+    // Stops are assumed in offset-ascending order (the order HB produces).
+    void interp_stops(const std::vector<plutovg_gradient_stop_t>& stops,
+                      F32 t, plutovg_color_t* out)
     {
-        // Plutovg has no sweep/conic gradient primitive. Mark the painter as
-        // aborted so the caller falls back to outline rasterization for this
-        // glyph rather than emitting a partially-painted result.
-        // TODO: synthesize via a small lookup-texture fill (Phase 4).
-        static_cast<Painter*>(data)->aborted = true;
+        if (stops.empty()) { out->r = out->g = out->b = out->a = 0.f; return; }
+        if (t <= stops.front().offset) { *out = stops.front().color; return; }
+        if (t >= stops.back().offset)  { *out = stops.back().color;  return; }
+        for (size_t i = 1; i < stops.size(); ++i)
+        {
+            const auto& a = stops[i - 1];
+            const auto& b = stops[i];
+            if (t <= b.offset)
+            {
+                const F32 span = b.offset - a.offset;
+                const F32 u = (span > 0.f) ? (t - a.offset) / span : 0.f;
+                out->r = a.color.r + (b.color.r - a.color.r) * u;
+                out->g = a.color.g + (b.color.g - a.color.g) * u;
+                out->b = a.color.b + (b.color.b - a.color.b) * u;
+                out->a = a.color.a + (b.color.a - a.color.a) * u;
+                return;
+            }
+        }
+        *out = stops.back().color;
+    }
+
+    // Map a parameter t through the gradient extend mode into [0, 1]. The
+    // semantics match COLRv1 / SVG: PAD clamps; REPEAT wraps; REFLECT
+    // mirrors at every odd integer.
+    inline F32 apply_extend(F32 t, hb_paint_extend_t extend)
+    {
+        switch (extend)
+        {
+            case HB_PAINT_EXTEND_REPEAT:
+            {
+                F32 frac = t - floorf(t);
+                if (frac < 0.f) frac += 1.f;
+                return frac;
+            }
+            case HB_PAINT_EXTEND_REFLECT:
+            {
+                F32 wrapped = t - 2.f * floorf(t * 0.5f);
+                return (wrapped > 1.f) ? (2.f - wrapped) : wrapped;
+            }
+            case HB_PAINT_EXTEND_PAD:
+            default:
+                return (t < 0.f) ? 0.f : (t > 1.f) ? 1.f : t;
+        }
+    }
+
+    void sweep_gradient_cb(hb_paint_funcs_t*, void* data,
+                           hb_color_line_t* color_line,
+                           float x0, float y0,
+                           float start_angle, float end_angle, void*)
+    {
+        Painter* p = static_cast<Painter*>(data);
+        slurp_color_stops(*p, color_line);
+        if (p->pv_stops.empty())
+            return;
+
+        // Allocate a per-call lookup surface sized to the painter's main
+        // surface in device pixels. The fill loop walks every device pixel,
+        // maps it back to HB user-space (where the gradient is defined),
+        // computes the angle from the gradient center, and writes the
+        // sampled color. Then plutovg_canvas_paint with the LUT as the
+        // active texture stamps it into the active clip.
+        plutovg_surface_t* lut = plutovg_surface_create(p->width, p->height);
+        if (!lut)
+        {
+            p->aborted = true;
+            return;
+        }
+
+        // Compute the inverse of the current CTM so we can map device pixels
+        // back into HB user-space — that's the space (x0, y0) and the start/
+        // end angles are defined in. The CTM already includes the surface
+        // origin translate and the 1/64 paint-coord scale.
+        plutovg_matrix_t ctm;
+        plutovg_canvas_get_matrix(p->canvas, &ctm);
+        plutovg_matrix_t inv;
+        if (!plutovg_matrix_invert(&ctm, &inv))
+        {
+            // Singular CTM (zero-determinant scale). Shouldn't happen with
+            // our setup, but fall back gracefully if it does.
+            plutovg_surface_destroy(lut);
+            p->aborted = true;
+            return;
+        }
+
+        const hb_paint_extend_t extend = hb_color_line_get_extend(color_line);
+        const F32 angle_span = end_angle - start_angle;
+        if (angle_span == 0.f)
+        {
+            // Zero-width sweep — degenerate; the COLRv1 spec says fall back
+            // to a solid fill with the first stop's color.
+            plutovg_canvas_set_color(p->canvas, &p->pv_stops.front().color);
+            plutovg_canvas_paint(p->canvas);
+            plutovg_surface_destroy(lut);
+            return;
+        }
+        const F32 inv_span = 1.f / angle_span;
+
+        unsigned char* lut_data = plutovg_surface_get_data(lut);
+        const int lut_stride = p->width * 4;  // BGRA tight-packed
+        for (S32 py = 0; py < p->height; ++py)
+        {
+            unsigned char* row = lut_data + py * lut_stride;
+            for (S32 px = 0; px < p->width; ++px)
+            {
+                // Pixel center maps better than corner; +0.5 places the
+                // sample at the geometric center of the texel.
+                float ux, uy;
+                plutovg_matrix_map(&inv, (F32)px + 0.5f, (F32)py + 0.5f, &ux, &uy);
+                const F32 dx = ux - x0;
+                const F32 dy = uy - y0;
+                F32 angle = atan2f(dy, dx);
+                // Walk angle into the sweep range [start_angle, end_angle].
+                F32 t = (angle - start_angle) * inv_span;
+                t = apply_extend(t, extend);
+
+                plutovg_color_t c;
+                interp_stops(p->pv_stops, t, &c);
+                // Write BGRA premultiplied (plutovg's native surface format).
+                const F32 a8 = c.a * 255.f;
+                const F32 r8 = c.r * a8;  // premultiply
+                const F32 g8 = c.g * a8;
+                const F32 b8 = c.b * a8;
+                row[px * 4 + 0] = (unsigned char)(b8 + 0.5f);
+                row[px * 4 + 1] = (unsigned char)(g8 + 0.5f);
+                row[px * 4 + 2] = (unsigned char)(r8 + 0.5f);
+                row[px * 4 + 3] = (unsigned char)(a8 + 0.5f);
+            }
+        }
+
+        // Stamp the LUT into the active clip. The plain-texture paint type
+        // samples once (no tiling) at user coords; reset the canvas matrix
+        // to identity for this paint so texture pixel (i, j) lands at
+        // device pixel (i, j). Save/restore preserves the outer CTM.
+        plutovg_canvas_save(p->canvas);
+        plutovg_matrix_t identity;
+        plutovg_matrix_init_identity(&identity);
+        plutovg_canvas_set_matrix(p->canvas, &identity);
+        plutovg_canvas_set_texture(p->canvas, lut, PLUTOVG_TEXTURE_TYPE_PLAIN,
+                                   1.0f, &identity);
+        plutovg_canvas_paint(p->canvas);
+        plutovg_canvas_restore(p->canvas);
+
+        plutovg_surface_destroy(lut);
+
+        // Sweep colors are gradient stops; track palette-color use the same
+        // way slurp_color_stops does for linear/radial. (slurp already ran
+        // above, so the flag is set if any stop was non-foreground.)
     }
 
     hb_bool_t image_cb(hb_paint_funcs_t*, void* data,
@@ -311,28 +502,91 @@ namespace
         return false;
     }
 
-    void push_group_cb(hb_paint_funcs_t*, void* /*data*/, void*)
+    void push_group_cb(hb_paint_funcs_t*, void* data, void*)
     {
-        // PUSH_GROUP starts a transparent sublayer for later pop_group composite.
-        // We don't keep an actual intermediate surface — paints during the
-        // group write straight to the main canvas. For the dominant case
-        // (composite mode = SRC_OVER all the way out) this is identity-
-        // equivalent to a real group. Other composite modes need the
-        // intermediate; pop_group_cb aborts when it sees one of those.
+        // Allocate a transparent sub-surface the same size as the main one
+        // and redirect drawing to it. The new canvas inherits the current
+        // CTM so paint commands during the group land at the same device
+        // pixels they would on the parent. The clip is intentionally NOT
+        // copied — the COLRv1 spec composites the group through the parent
+        // clip at pop_group time, not during the group itself.
+        Painter* p = static_cast<Painter*>(data);
+        plutovg_surface_t* sub_surface = plutovg_surface_create(p->width, p->height);
+        if (!sub_surface)
+        {
+            p->aborted = true;
+            return;
+        }
+        plutovg_color_t transparent = { 0.f, 0.f, 0.f, 0.f };
+        plutovg_surface_clear(sub_surface, &transparent);
+        plutovg_canvas_t* sub_canvas = plutovg_canvas_create(sub_surface);
+        if (!sub_canvas)
+        {
+            plutovg_surface_destroy(sub_surface);
+            p->aborted = true;
+            return;
+        }
+        // Copy the parent CTM so subsequent transforms / paths produce the
+        // same device coords on the sub-canvas as they would on the parent.
+        plutovg_matrix_t parent_ctm;
+        plutovg_canvas_get_matrix(p->canvas, &parent_ctm);
+        plutovg_canvas_set_matrix(sub_canvas, &parent_ctm);
+
+        p->group_stack.push_back({ p->surface, p->canvas });
+        p->surface = sub_surface;
+        p->canvas  = sub_canvas;
     }
 
     void pop_group_cb(hb_paint_funcs_t*, void* data,
                       hb_paint_composite_mode_t mode, void*)
     {
-        // Without a real intermediate buffer, only SRC_OVER produces correct
-        // output (the writes are already on the canvas; SRC_OVER is the
-        // identity for "drop this group on top"). Any other mode requires
-        // the group to have been buffered separately — abort and fall back
-        // to outline rasterization.
-        if (mode != HB_PAINT_COMPOSITE_MODE_SRC_OVER)
+        Painter* p = static_cast<Painter*>(data);
+        if (p->group_stack.empty())
         {
-            static_cast<Painter*>(data)->aborted = true;
+            // pop without matching push — malformed paint tree. HB shouldn't
+            // hand us this, but bail rather than crash if it does.
+            p->aborted = true;
+            return;
         }
+
+        // Restore the parent canvas/surface; the current sub gets blitted
+        // back as a texture under the requested composite mode.
+        plutovg_surface_t* sub_surface = p->surface;
+        plutovg_canvas_t*  sub_canvas  = p->canvas;
+        const Painter::GroupFrame parent = p->group_stack.back();
+        p->group_stack.pop_back();
+        p->surface = parent.surface;
+        p->canvas  = parent.canvas;
+
+        bool exact = false;
+        const plutovg_operator_t op = to_pv_operator(mode, exact);
+        if (!exact)
+        {
+            // W3C blend mode (multiply/screen/etc.) — plutovg can't compose
+            // these natively. Falling back to SRC_OVER is the standard graceful
+            // degradation and the dominant case in real fonts; a future change
+            // could add a software blend pass here for the missing modes.
+            LL_WARNS_ONCE("Font") << "COLRv1 PaintComposite mode "
+                << (S32)mode << " not supported by plutovg; using SRC_OVER" << LL_ENDL;
+        }
+
+        // Save parent state, draw the sub-surface back onto it. Identity CTM
+        // so texture pixel (i, j) lines up with parent device pixel (i, j) —
+        // the sub was rendered using the parent CTM, so its device pixels
+        // already match positions, no remapping needed. The parent's active
+        // clip naturally bounds the blit.
+        plutovg_canvas_save(p->canvas);
+        plutovg_matrix_t identity;
+        plutovg_matrix_init_identity(&identity);
+        plutovg_canvas_set_matrix(p->canvas, &identity);
+        plutovg_canvas_set_operator(p->canvas, op);
+        plutovg_canvas_set_texture(p->canvas, sub_surface,
+                                   PLUTOVG_TEXTURE_TYPE_PLAIN, 1.f, &identity);
+        plutovg_canvas_paint(p->canvas);
+        plutovg_canvas_restore(p->canvas);
+
+        plutovg_canvas_destroy(sub_canvas);
+        plutovg_surface_destroy(sub_surface);
     }
 
     hb_paint_funcs_t* get_paint_funcs()
@@ -371,6 +625,7 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
                                      U32           glyph_index,
                                      F32           /*point_size*/,
                                      const LLColor4U& foreground,
+                                     U32           palette_index,
                                      Result&       out)
 {
     if (!hb_font)
@@ -453,15 +708,32 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
                                        (F32)top_px    + (F32)GLYPH_PAD);
     plutovg_canvas_scale(p.canvas, INV_64, -INV_64);
 
-    // Walk the paint tree. palette index 0 (default); foreground pre-resolved.
+    // Walk the paint tree. Palette index comes from the caller (typically
+    // computed by LLFontFace::load from the EmojiUseDarkPalette setting and
+    // the face's CPAL flags); foreground pre-resolved.
     hb_font_paint_glyph(hb_font, glyph_index, get_paint_funcs(), &p,
-                        /*palette_index=*/0, p.foreground);
+                        palette_index, p.foreground);
+
+    // Defensive cleanup: a malformed paint tree (or HB bug) could leave the
+    // group stack non-empty. Each frame holds owning surface+canvas pointers.
+    // Free everything the painter is currently sitting on (the redirected
+    // sub-surface) plus all parent frames before returning to the caller.
+    auto teardown = [&](bool ok)
+    {
+        if (p.canvas)  plutovg_canvas_destroy(p.canvas);
+        if (p.surface) plutovg_surface_destroy(p.surface);
+        for (const auto& frame : p.group_stack)
+        {
+            if (frame.canvas)  plutovg_canvas_destroy(frame.canvas);
+            if (frame.surface) plutovg_surface_destroy(frame.surface);
+        }
+        p.group_stack.clear();
+        return ok;
+    };
 
     if (p.aborted)
     {
-        plutovg_canvas_destroy(p.canvas);
-        plutovg_surface_destroy(p.surface);
-        return false;
+        return teardown(false);
     }
 
     // Surface is BGRA premultiplied (plutovg native), top-row first, stride
@@ -482,8 +754,7 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
     mStagingWidth  = surf_w;
     mStagingHeight = surf_h;
 
-    plutovg_canvas_destroy(p.canvas);
-    plutovg_surface_destroy(p.surface);
+    teardown(true);
 
     out.mBitmap = mStaging.data();
     out.mWidth  = surf_w;
@@ -495,5 +766,6 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
     // topmost pixel sits one PAD above the bbox top (top_px).
     out.mLeft   = left_px - GLYPH_PAD;
     out.mTop    = top_px  + GLYPH_PAD;
+    out.mForegroundOnly = !p.saw_palette_color;
     return true;
 }

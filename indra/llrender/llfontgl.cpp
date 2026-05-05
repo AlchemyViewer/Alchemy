@@ -63,6 +63,7 @@ F32 LLFontGL::sScaleY = 1.f;
 S32 LLFontGL::sResolutionGeneration = 0;
 bool LLFontGL::sFontsXmlDirty = false;
 bool LLFontGL::sDisplayFont = true ;
+bool LLFontGL::sUseDarkEmojiPalette = false;
 std::string LLFontGL::sAppDir;
 
 LLColor4 LLFontGL::sShadowColor(0.f, 0.f, 0.f, 1.f);
@@ -651,8 +652,16 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                         glyph_count = 0;
                     }
 
-                    const LLColor4U& col = bitmap_entry.first == EFontGlyphType::Grayscale
-                                               ? text_color : emoji_color;
+                    // Color-format glyphs normally tint with emoji_color (white,
+                    // preserving CPAL palette colors baked into the bitmap). COLRv1
+                    // glyphs whose paint tree references only the foreground slot
+                    // were rasterized with white as foreground, so tinting them
+                    // with text_color recovers a normal monochrome-text behavior
+                    // (the white bitmap acts as a luminance mask). Grayscale glyphs
+                    // always use text_color.
+                    const bool tint_with_text = bitmap_entry.first == EFontGlyphType::Grayscale
+                                              || sfgi->mTintWithForeground;
+                    const LLColor4U& col = tint_with_text ? text_color : emoji_color;
                     if (needs_two_pass)
                     {
                         // BOLD suppresses shadow per the legacy drawGlyph contract
@@ -815,9 +824,12 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             glyph_count = 0;
         }
 
-        const LLColor4U& col =
-            bitmap_entry.first == EFontGlyphType::Grayscale ? text_color
-                                                            : emoji_color;
+        // Same logic as the shape path — Grayscale always tints with text_color,
+        // Color glyphs default to emoji_color but flip to text_color for COLRv1
+        // glyphs whose paint tree was foreground-only.
+        const bool cp_tint_with_text = bitmap_entry.first == EFontGlyphType::Grayscale
+                                     || fgi->mTintWithForeground;
+        const LLColor4U& col = cp_tint_with_text ? text_color : emoji_color;
         if (needs_two_pass)
         {
             // BOLD suppresses shadow per the legacy drawGlyph contract

@@ -115,6 +115,11 @@ public:
     // the others via FT_LOAD_COLOR. Used by renderGlyph to decide whether to
     // route a Color request through the COLRv1 painter.
     bool hasColrV1() const      { return mHasColrV1; }
+    // CPAL palette index passed to hb_font_paint_glyph for COLRv1 rasterization.
+    // Computed at load time: defaults to 0 unless LLFontGL::sUseDarkEmojiPalette
+    // is set AND the face's CPAL has a palette flagged for dark backgrounds —
+    // in which case we use the first matching palette.
+    U32  paletteIndex() const   { return mPaletteIndex; }
     bool isFixedWidth() const   { return mIsFixedWidth; }
     // True iff load() successfully applied a "wght" variation axis value.
     // Used by LLFontFreetype's BOLD-style synthesis to decide whether a
@@ -191,6 +196,7 @@ private:
     bool mHasColrV1      = false;
     bool mIsFixedWidth   = false;
     bool mWghtAxisSet    = false;
+    U32  mPaletteIndex   = 0;
 };
 
 // Inline template definitions — kept in the header so callers in

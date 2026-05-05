@@ -6325,6 +6325,12 @@ void LLViewerWindow::initFonts(F32 zoom_factor)
     // so they need convertion, init buffers if needed
     LLImageGL::allocateConversionBuffer();
 
+    // Seed dark-palette flag before initClass so the freshly-loaded faces
+    // pick the right CPAL palette. The setting listener keeps it in sync
+    // afterward; without seeding here the first font load runs with the
+    // default (false) regardless of the persisted preference.
+    LLFontGL::sUseDarkEmojiPalette = gSavedSettings.getBOOL("EmojiUseDarkPalette");
+
     LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
                                 mDisplayScale.mV[VX] * zoom_factor,
                                 mDisplayScale.mV[VY] * zoom_factor,

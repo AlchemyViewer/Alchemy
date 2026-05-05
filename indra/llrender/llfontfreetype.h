@@ -137,6 +137,14 @@ struct LLFontGlyphInfo
     // faces (FORCE_AUTOHINT, LIGHT, NO_HINTING) populate all kNumPhases slots.
     std::array<PhaseSlot, kNumPhases> mPhaseSlots;
     U8 mPhaseCount = 1;
+
+    // True for COLRv1 glyphs whose paint tree references only the foreground
+    // color slot (no CPAL palette colors). The atlas is rasterized with white
+    // as the foreground so GL modulation applies cleanly; flagging these so
+    // the draw path tints with the live text color instead of the emoji-fixed
+    // white. Stays false for normal palette-driven emoji (the dominant case
+    // in Noto-COLRv1) and for non-COLRv1 glyphs.
+    bool mTintWithForeground = false;
 };
 
 extern LLFontManager *gFontManagerp;
@@ -404,6 +412,14 @@ private:
     // and mHbFont also live on LLFontFace for the same reason.)
 
     mutable S32 mRenderGlyphCount;
+
+    // Set by the most recent renderColrV1Glyph call to true iff the painter
+    // reported a foreground-only paint tree (no CPAL palette colors). The
+    // caller (renderAndCreateGlyph) reads this on the same call stack to
+    // populate LLFontGlyphInfo::mTintWithForeground; reset to false on every
+    // entry to renderGlyph so a non-COLRv1 glyph following a COLRv1 one
+    // doesn't inherit the stale flag.
+    mutable bool mLastColrV1ForegroundOnly = false;
 
     // Earliest wall-clock time (seconds) at which collectGarbage() should
     // do real work. Throttle gate so the per-render call from LLFontGL::render

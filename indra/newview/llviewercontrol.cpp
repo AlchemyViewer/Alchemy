@@ -438,6 +438,17 @@ static bool handleUIFontOverridesChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleEmojiUseDarkPaletteChanged(const LLSD& newvalue)
+{
+    // Push the new value into LLFontGL's static so LLFontFace::load picks
+    // it up during the upcoming reload. A bare schedulePendingReload would
+    // just re-init the font system with the same statics — without updating
+    // sUseDarkEmojiPalette here the reload would stay on palette 0.
+    LLFontGL::sUseDarkEmojiPalette = newvalue.asBoolean();
+    LLFontGL::schedulePendingReload();
+    return true;
+}
+
 static bool handleConsoleMaxLinesChanged(const LLSD& newvalue)
 {
     if(gConsole)
@@ -922,6 +933,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarCloth", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "ChatFontSize", handleChatFontSizeChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyUIFontOverrides", handleUIFontOverridesChanged);
+    setting_setup_signal_listener(gSavedSettings, "EmojiUseDarkPalette", handleEmojiUseDarkPaletteChanged);
     setting_setup_signal_listener(gSavedSettings, "ConsoleMaxLines", handleConsoleMaxLinesChanged);
     setting_setup_signal_listener(gSavedSettings, "UploadBakedTexOld", handleUploadBakedTexOldChanged);
     setting_setup_signal_listener(gSavedSettings, "UseOcclusion", handleUseOcclusionChanged);

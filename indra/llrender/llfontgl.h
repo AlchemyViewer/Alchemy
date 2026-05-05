@@ -299,6 +299,12 @@ public:
     // to force the full-reload (re-parse) path even when overrides match.
     static bool sFontsXmlDirty;
     static bool sDisplayFont ;
+    // Threaded in from newview's EmojiUseDarkPalette setting. Read by
+    // LLFontFace::load when computing the CPAL palette index for COLRv1
+    // faces; non-COLRv1 faces ignore it. Toggling the setting triggers a
+    // font reload via the standard schedulePendingReload mechanism, so
+    // every face re-runs LLFontFace::load and picks up the new value.
+    static bool sUseDarkEmojiPalette;
     static std::string sAppDir;         // For loading fonts
 
 private:

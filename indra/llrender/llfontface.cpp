@@ -12,6 +12,7 @@
 #include "llfontface.h"
 
 #include "llfontfreetype.h"   // for LLFontGlyphInfo, LLFontManager, ll::fonts::LoadedFont
+#include "llfontgl.h"         // for sUseDarkEmojiPalette
 #include "llfontregistry.h"   // for EFontHinting full definition
 #include "llimage.h"          // LLImageRaw, LLImageDataLock
 #include "llmath.h"           // ll_round, llclamp
@@ -21,6 +22,7 @@
 #include FT_MULTIPLE_MASTERS_H
 #include FT_TRUETYPE_TABLES_H
 #include FT_TRUETYPE_TAGS_H
+#include FT_COLOR_H
 
 #include <hb.h>
 #include <hb-ft.h>
@@ -108,6 +110,29 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
         {
             const U16 version = (static_cast<U16>(buf[0]) << 8) | buf[1];
             mHasColrV1 = (version >= 1);
+        }
+    }
+
+    // CPAL palette pick. Default to palette 0 (the font's primary palette).
+    // When EmojiUseDarkPalette is on and the face actually carries a palette
+    // flagged for dark backgrounds, prefer the first such palette; otherwise
+    // fall back to 0 even when the setting is on (a font may not ship a
+    // dark variant). Computed once at load and cached so the per-glyph
+    // rasterize path doesn't re-walk palette flags.
+    if (mHasColor && LLFontGL::sUseDarkEmojiPalette)
+    {
+        FT_Palette_Data palette_data = {};
+        if (FT_Palette_Data_Get(mFTFace, &palette_data) == 0
+            && palette_data.palette_flags != nullptr)
+        {
+            for (FT_UShort i = 0; i < palette_data.num_palettes; ++i)
+            {
+                if (palette_data.palette_flags[i] & FT_PALETTE_FOR_DARK_BACKGROUND)
+                {
+                    mPaletteIndex = i;
+                    break;
+                }
+            }
         }
     }
 

@@ -142,6 +142,7 @@ LLFontGlyphInfo::LLFontGlyphInfo(const LLFontGlyphInfo& fgi)
     , mRsbDelta(fgi.mRsbDelta)
     , mPhaseSlots(fgi.mPhaseSlots)
     , mPhaseCount(fgi.mPhaseCount)
+    , mTintWithForeground(fgi.mTintWithForeground)
 {
     // mSourceFace MUST propagate: the secondary-publish path in
     // addGlyphFromFont / addShapedGlyphFromFont copies an existing entry
@@ -705,6 +706,12 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
         // wch is only meaningful for the SVG glyph hook's debug output; shaped
         // lookups don't have a single source codepoint to pass here.
         fontp->renderGlyph(requested_glyph_type, glyph_index, 0);
+        // Propagate the COLRv1 foreground-only flag from the just-finished
+        // renderGlyph call. The flag is per-glyph, not per-phase (color
+        // glyphs only ever run a single phase), so writing on every phase
+        // is harmless. Stays false for non-COLRv1 paths.
+        if (phase == 0)
+            gi->mTintWithForeground = fontp->mLastColrV1ForegroundOnly;
 
         EFontGlyphType phase_type = EFontGlyphType::Unspecified;
         switch (fontp->getFTFace()->glyph->bitmap.pixel_mode)
@@ -1031,6 +1038,11 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
     if (getFTFace() == nullptr)
         return;
 
+    // Reset the COLRv1 stash so a subsequent non-COLRv1 glyph in the same
+    // renderAndCreateGlyph call doesn't pick up a stale flag from the prior
+    // glyph. renderColrV1Glyph below sets it back to true on success.
+    mLastColrV1ForegroundOnly = false;
+
     // COLRv1 fast path. FreeType's FT_LOAD_COLOR + FT_Render_Glyph rasterize
     // COLRv0 / sbix / CBDT / OT-SVG natively but explicitly NOT COLRv1; for
     // those faces we walk the paint tree ourselves via HarfBuzz callbacks
@@ -1128,7 +1140,7 @@ bool LLFontFreetype::renderColrV1Glyph(U32 glyph_index, llwchar wch) const
     // foreground tint correctly under text color settings.
     const LLColor4U emoji_fg(255, 255, 255, 255);
     if (!s_painter.paintGlyph(mFace->getHbFont(), glyph_index, mPointSize,
-                              emoji_fg, result))
+                              emoji_fg, mFace->paletteIndex(), result))
     {
         return false;
     }
@@ -1149,6 +1161,7 @@ bool LLFontFreetype::renderColrV1Glyph(U32 glyph_index, llwchar wch) const
     bm.num_grays  = 256;
     ft->glyph->bitmap_left = result.mLeft;
     ft->glyph->bitmap_top  = result.mTop;
+    mLastColrV1ForegroundOnly = result.mForegroundOnly;
     (void)wch;  // unused at present; kept in signature for log-friendly callers.
     return true;
 }

@@ -774,6 +774,22 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>EmojiUseDarkPalette</key>
+        <map>
+            <key>Comment</key>
+            <string>
+                For COLRv1 emoji fonts that ship multiple CPAL palettes,
+                pick the first palette flagged for dark backgrounds rather
+                than the default (palette 0). Has no effect on COLRv0 / SVG /
+                CBDT emoji fonts. Triggers a font reload on change.
+            </string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>EnableAutoCloseOOC</key>
         <map>
             <key>Comment</key>
