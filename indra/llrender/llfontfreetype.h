@@ -273,7 +273,6 @@ public:
     // Convenience non-const accessor — atlas now lives on the face wrapper.
     LLFontBitmapCache* getBitmapCache() const { return mFace ? mFace->getBitmapCache() : nullptr; }
 
-    void setStyle(U8 style);
     U8 getStyle() const;
 
     // Run a maintenance pass that releases bitmap atlas sheets which haven't
@@ -285,17 +284,20 @@ public:
     // held: call only at frame boundaries / before any glyph lookups.
     void collectGarbage() const;
 
+    // Return the FT glyph index for `wch` on this face, caching the result so
+    // subsequent lookups skip the cmap binary search inside FT_Get_Char_Index.
+    // Delegates to mFace's char-index cache, which is shared across every
+    // LLFontFreetype that resolved to the same LLFontFace. Public so the
+    // shared fallback-chain walker (free helper at file scope of the cpp)
+    // can probe each fallback without needing friendship.
+    U32 getCharGlyphIndex(llwchar wch) const;
+
 private:
     // Convenience: dereference the shared face wrapper. Null when this
     // instance hasn't been loaded yet or was unloaded.
     LLFT_Face getFTFace() const { return mFace ? mFace->face() : nullptr; }
 
     void resetBitmapCache();
-    // Return the FT glyph index for `wch` on this face, caching the result so
-    // subsequent lookups skip the cmap binary search inside FT_Get_Char_Index.
-    // Delegates to mFace's char-index cache, which is shared across every
-    // LLFontFreetype that resolved to the same LLFontFace.
-    U32 getCharGlyphIndex(llwchar wch) const;
     bool hasGlyph(llwchar wch) const;       // Has a glyph for this character
     LLFontGlyphInfo* addGlyph(llwchar wch, EFontGlyphType glyph_type) const;        // Add a new character to the font if necessary
     LLFontGlyphInfo* addGlyphFromFont(
@@ -349,8 +351,21 @@ private:
 
     // Per-head shaping-face resolution cache: codepoint -> (winning face,
     // glyph index in that face). Replaces an O(fallbacks)-deep walk for
-    // each codepoint. Cleared when mFace is replaced or when the fallback
-    // list changes via addFallbackFont.
+    // each codepoint.
+    //
+    // Invalidation: cleared on loadFace() reload (which happens when the
+    // freetype is rebuilt for a DPI change or fonts.xml override change)
+    // and on addFallbackFont() (new fallback may win for codepoints that
+    // previously resolved to a later face). NOT cleared when a fallback
+    // freetype is rebuilt elsewhere — the registry's pointer-stable swap
+    // preserves LLFontFreetype identity across reloads, so the cached
+    // pointers stay valid. If that invariant ever changes (e.g. a code
+    // path that destroys + recreates a fallback freetype rather than
+    // resetting it in place), this map needs clearing too.
+    //
+    // Bounded by SHAPING_RESOLUTION_LIMIT entries; selectShapingFace
+    // clears the map when the threshold is hit so a long session of
+    // CJK-heavy chat doesn't grow this without limit.
     mutable boost::unordered_flat_map<llwchar, std::pair<const LLFontFreetype*, U32>> mShapingFaceResolution;
 
     // Per-head fast lookup for shaped-path glyphs: (source face, glyph

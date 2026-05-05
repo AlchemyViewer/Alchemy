@@ -58,8 +58,6 @@
 
 #define ENABLE_OT_SVG_SUPPORT
 
-FT_Render_Mode gFontRenderMode = FT_RENDER_MODE_NORMAL;
-
 LLFontManager *gFontManagerp = nullptr;
 
 FT_Library gFTLibrary = nullptr;
@@ -132,6 +130,7 @@ LLFontGlyphInfo::LLFontGlyphInfo(U32 index, EFontGlyphType glyph_type)
 LLFontGlyphInfo::LLFontGlyphInfo(const LLFontGlyphInfo& fgi)
     : mGlyphIndex(fgi.mGlyphIndex)
     , mGlyphType(fgi.mGlyphType)
+    , mSourceFace(fgi.mSourceFace)
     , mWidth(fgi.mWidth)
     , mHeight(fgi.mHeight)
     , mXAdvance(fgi.mXAdvance)
@@ -143,6 +142,11 @@ LLFontGlyphInfo::LLFontGlyphInfo(const LLFontGlyphInfo& fgi)
     , mPhaseSlots(fgi.mPhaseSlots)
     , mPhaseCount(fgi.mPhaseCount)
 {
+    // mSourceFace MUST propagate: the secondary-publish path in
+    // addGlyphFromFont / addShapedGlyphFromFont copies an existing entry
+    // and republishes it under the actual bitmap_glyph_type, and the
+    // renderer reads sfgi->mSourceFace to pick the atlas. A null here
+    // produces a silent no-op render for typed lookups that hit the dup.
 }
 
 LLFontFreetype::LLFontFreetype()
@@ -195,6 +199,33 @@ bool LLFontFreetype::isFixedWidth() const
     return mFace && mFace->isFixedWidth();
 }
 
+namespace
+{
+    // Walk a fallback list and return the (face, glyph_index) for the first
+    // entry where `keep(functor)` returns true AND the face's charmap has
+    // `wch`. Returns (nullptr, 0) when no entry hits.
+    //
+    // This is the iteration mechanic shared between the codepoint-path
+    // (addGlyph) and shape-path (selectShapingFace) chain walks. The two
+    // policies still differ — see each call site for which passes run and
+    // why — but the per-pass loop is identical and lives here.
+    template <typename Keep>
+    std::pair<const LLFontFreetype*, U32>
+    find_fallback_hit(const LLFontFreetype::fallback_font_vector_t& fallbacks,
+                      llwchar wch, Keep keep)
+    {
+        for (const auto& pair : fallbacks)
+        {
+            if (!keep(pair.second))
+                continue;
+            U32 gi = pair.first->getCharGlyphIndex(wch);
+            if (gi)
+                return { pair.first.get(), gi };
+        }
+        return { nullptr, 0u };
+    }
+}
+
 const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_glyph_index) const
 {
     out_glyph_index = 0;
@@ -209,50 +240,56 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
         return it->second.first;
     }
 
-    // Try the emoji-functor fallbacks first — but RESPECT the functor.
-    // The shape range can cover the whole string (not just emoji clusters),
-    // so plain non-pictographic chars also pass through here. Color emoji
-    // fonts like Twemoji carry ASCII outlines for safety, and routing 'e'
-    // through Twemoji means rasterizing a color SVG glyph as Grayscale —
-    // FreeType produces a 0×0 bitmap and the glyph renders invisible while
-    // HarfBuzz's advance still moves the pen, leaving gaps in plain text.
+    // Shape-path priority:
+    //   1. Emoji-functor fallbacks (functor must accept `base`).
+    //   2. Root face.
+    //   3. Monochrome fallbacks (no functor).
     //
-    // For chars the functor accepts (genuine emoji range, plus whatever
-    // BMP pictographs / keycap markers the unicode_ranges entry covers),
-    // the bypass still kicks in so HarfBuzz can compose ZWJ sequences and
+    // The functor gates entry into the emoji bypass: shape ranges can cover
+    // whole strings (not just emoji clusters), so plain non-pictographic
+    // chars also pass through here. Color emoji fonts like Twemoji carry
+    // ASCII outlines for safety, and routing 'e' through Twemoji means
+    // rasterizing a color SVG glyph as Grayscale — FreeType produces a 0×0
+    // bitmap and the glyph renders invisible while HarfBuzz's advance still
+    // moves the pen, leaving gaps in plain text.
+    //
+    // For chars the functor accepts (genuine emoji range, plus whatever BMP
+    // pictographs / keycap markers the unicode_ranges entry covers), the
+    // bypass still kicks in so HarfBuzz can compose ZWJ sequences and
     // keycaps via the emoji face's GSUB tables.
+    //
+    // No "ignoring-functor" retry like the codepoint path has — by the
+    // time the shape path is reached, the functor's answer is the policy
+    // we want to honor.
     auto resolve = [&]() -> std::pair<const LLFontFreetype*, U32>
     {
-        const size_t count = mFallbackFonts.size();
-        for (size_t i = 0; i < count; ++i)
+        if (auto hit = find_fallback_hit(mFallbackFonts, base,
+                [&](const char_functor_t& f) { return f && f(base); });
+            hit.first)
         {
-            const fallback_font_t& pair = mFallbackFonts[i];
-            if (!pair.second)
-                continue;
-            if (!pair.second(base))
-                continue;
-            U32 gi = pair.first->getCharGlyphIndex(base);
-            if (gi)
-                return { pair.first.get(), gi };
+            return hit;
         }
-        // No emoji fallback has the base — fall back to the root face.
         if (U32 gi = getCharGlyphIndex(base); gi != 0)
             return { this, gi };
-        // Monochrome fallbacks.
-        for (size_t i = 0; i < count; ++i)
+        if (auto hit = find_fallback_hit(mFallbackFonts, base,
+                [](const char_functor_t& f) { return !f; });
+            hit.first)
         {
-            const fallback_font_t& pair = mFallbackFonts[i];
-            if (pair.second)
-                continue;
-            U32 gi = pair.first->getCharGlyphIndex(base);
-            if (gi)
-                return { pair.first.get(), gi };
+            return hit;
         }
         // No face has a glyph; caller will end up rendering a tofu via `this`.
         return { this, 0u };
     };
 
     const auto result = resolve();
+    // Bound per-face memory: a long-running client with CJK-heavy chat
+    // can otherwise accumulate one entry per unique codepoint forever.
+    // Clear-and-rebuild rather than LRU-evict — entries are cheap to
+    // recompute and the map is only an optimization. Limit chosen well
+    // above realistic working sets (CJK common-use is ~7k chars).
+    constexpr size_t SHAPING_RESOLUTION_LIMIT = 16384;
+    if (mShapingFaceResolution.size() >= SHAPING_RESOLUTION_LIMIT)
+        mShapingFaceResolution.clear();
     mShapingFaceResolution.emplace(base, result);
     out_glyph_index = result.second;
     return result.first;
@@ -433,23 +470,14 @@ F32 LLFontFreetype::getXAdvance(llwchar wch) const
     if (getFTFace() == nullptr)
         return 0.0;
 
-    // Return existing info only if it is current
+    // getGlyphInfo always returns a non-null entry once the face is loaded
+    // (addGlyph routes misses through the shared notdef pre-warmed at
+    // load time), so the `gi != nullptr` guard plus a getMaxCharWidth
+    // fallback that used to live here are dead in practice. Defensive
+    // null check kept since a notdef render failure could theoretically
+    // surface here.
     LLFontGlyphInfo* gi = getGlyphInfo(wch, EFontGlyphType::Unspecified);
-    if (gi)
-    {
-        return gi->mXAdvance;
-    }
-    else
-    {
-        char_glyph_info_map_t::iterator found_it = mCharGlyphInfoMap.find((llwchar)0);
-        if (found_it != mCharGlyphInfoMap.end())
-        {
-            return found_it->second->mXAdvance;
-        }
-    }
-
-    // Last ditch fallback - no glyphs defined at all.
-    return (F32)getBitmapCache()->getMaxCharWidth();
+    return gi ? gi->mXAdvance : 0.f;
 }
 
 F32 LLFontFreetype::getXAdvance(const LLFontGlyphInfo* glyph) const
@@ -549,72 +577,46 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type
     U32 glyph_index = getCharGlyphIndex(wch);
     if (glyph_index == 0)
     {
-        // No corresponding glyph in this font: look for a glyph in fallback
-        // fonts.
-        size_t count = mFallbackFonts.size();
+        // No glyph on this face: walk fallbacks in the codepoint-path
+        // priority order, which differs from the shape-path priority in
+        // selectShapingFace:
+        //   1. Emoji-functor fallbacks, gated on isEmoji(wch). The
+        //      isEmoji gate is stricter than the functor's own range —
+        //      kept defensively in case different emoji fonts' functors
+        //      partition the emoji range differently in the future.
+        //   2. Monochrome fallbacks (no functor). Priority over emoji
+        //      for non-genuine-emoji chars so legacy UI elements
+        //      (LSL dialogs, menu checkmarks) still pick monochrome.
+        //   3. Emoji-functor fallbacks ignoring the functor — last-
+        //      resort coverage for codepoints that aren't isEmoji and
+        //      aren't in a monochrome fallback but DO exist in an emoji
+        //      font's charmap.
+        //
+        // The shape path skips passes 1's isEmoji gate and pass 3
+        // entirely; comments at selectShapingFace explain why.
+
         if (LLStringOps::isEmoji(wch))
         {
-            // This is a "genuine" emoji (in the range 0x1f000-0x20000): print
-            // it using the emoji font(s) if possible. HB
-            for (size_t i = 0; i < count; ++i)
+            if (auto hit = find_fallback_hit(mFallbackFonts, wch,
+                    [&](const char_functor_t& f) { return f && f(wch); });
+                hit.first)
             {
-                const fallback_font_t& pair = mFallbackFonts[i];
-                if (!pair.second || !pair.second(wch))
-                {
-                    // If this font does not have a functor, or the character
-                    // does not pass the functor, reject it. Note: we keep the
-                    // functor test (despite the fact we already tested for
-                    // LLStringOps::isEmoji(wch) above), in case we would use
-                    // different, more restrictive or partionned functors in
-                    // the future with several different emoji fonts. HB
-                    continue;
-                }
-                glyph_index = pair.first->getCharGlyphIndex(wch);
-                if (glyph_index)
-                {
-                    return addGlyphFromFont(pair.first, wch, glyph_index,
-                                            glyph_type);
-                }
+                return addGlyphFromFont(hit.first, wch, hit.second, glyph_type);
             }
         }
-        // Then try and find a monochrome fallback font that could print this
-        // glyph: such fonts do *not* have a functor. We give priority to
-        // monochrome fonts for non-genuine emojis so that UI elements which
-        // used to render with them before the emojis font introduction (e.g.
-        // check marks in menus, or LSL dialogs text and buttons) do render the
-        // same way as they always did. HB
-        std::vector<size_t> emoji_fonts_idx;
-        for (size_t i = 0; i < count; ++i)
+        if (auto hit = find_fallback_hit(mFallbackFonts, wch,
+                [](const char_functor_t& f) { return !f; });
+            hit.first)
         {
-            const fallback_font_t& pair = mFallbackFonts[i];
-            if (pair.second)
-            {
-                // If this font got a functor, remember the index for later and
-                // try the next fallback font. HB
-                emoji_fonts_idx.push_back(i);
-                continue;
-            }
-            glyph_index = pair.first->getCharGlyphIndex(wch);
-            if (glyph_index)
-            {
-                return addGlyphFromFont(pair.first, wch, glyph_index,
-                                        glyph_type);
-            }
+            return addGlyphFromFont(const_cast<LLFontFreetype*>(hit.first),
+                                    wch, hit.second, glyph_type);
         }
-        // Everything failed so far: this character is not a genuine emoji,
-        // neither a special character known from our monochrome fallback
-        // fonts: make a last try, using the emoji font(s), but ignoring the
-        // functor to render using whatever (colorful) glyph that might be
-        // available in such fonts for this character. HB
-        for (size_t j = 0, count2 = emoji_fonts_idx.size(); j < count2; ++j)
+        if (auto hit = find_fallback_hit(mFallbackFonts, wch,
+                [](const char_functor_t& f) { return (bool)f; });
+            hit.first)
         {
-            const fallback_font_t& pair = mFallbackFonts[emoji_fonts_idx[j]];
-            glyph_index = pair.first->getCharGlyphIndex(wch);
-            if (glyph_index)
-            {
-                return addGlyphFromFont(pair.first, wch, glyph_index,
-                                        glyph_type);
-            }
+            return addGlyphFromFont(const_cast<LLFontFreetype*>(hit.first),
+                                    wch, hit.second, glyph_type);
         }
     }
 
@@ -626,7 +628,15 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type
                         return entry.second->mGlyphType == glyph_type;
                      });
     if (iter != range_it.second)
-        return nullptr;
+    {
+        // Already cached. Reachable when getGlyphInfo was called with
+        // Unspecified (wildcard) and routed here on a miss for the
+        // strict glyph_type, but the head's map happens to have the
+        // entry under a different filter path. Return the existing
+        // entry rather than nullptr — returning null pushes callers
+        // onto dead fallback branches and silently mis-renders.
+        return iter->second;
+    }
 
     if (glyph_index != 0)
     {
@@ -706,7 +716,19 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
                 phase_type = EFontGlyphType::Color;
                 break;
             default:
-                llassert_always(false);
+                // Unusual modes (LCD / LCD_V / GRAY2 / GRAY4) shouldn't
+                // arrive here — our render configuration only requests
+                // NORMAL/LIGHT/COLOR — but a single misbehaving system
+                // font is enough to surface them. Warn and treat as
+                // Grayscale; the bitmap-copy block below only handles
+                // MONO/GRAY/BGRA so we'll skip the data copy too, which
+                // means the slot stays zero (notdef-shaped quad with no
+                // alpha). Better than aborting startup.
+                LL_WARNS_ONCE("Font") << "Unsupported FT pixel_mode "
+                    << (S32)fontp->getFTFace()->glyph->bitmap.pixel_mode
+                    << " for glyph " << glyph_index
+                    << "; treating as Grayscale" << LL_ENDL;
+                phase_type = EFontGlyphType::Grayscale;
                 break;
         }
         // All phases must produce the same pixel format — they're the same
@@ -811,7 +833,9 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
         }
         else
         {
-            llassert(false);
+            // Mirrors the soft fallback in the pixel_mode switch above:
+            // unusual modes (LCD / LCD_V / GRAY2 / GRAY4) leave the slot
+            // zero rather than crashing debug builds.
         }
 
         LLImageGL *image_gl = fontp->getBitmapCache()->getImageGL(bitmap_glyph_type, bitmap_num);
@@ -838,10 +862,18 @@ LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, l
 {
     // Cross-head dedup: a sibling head sharing fontp's face may have already
     // rasterized this glyph. Reuse the existing entry rather than allocating
-    // a new atlas slot. The face cache key (wch) is meaningful only when the
-    // glyph genuinely belongs to fontp — addGlyph routes the no-glyph case
-    // through the shared-notdef path before we get here, so any caller with
-    // glyph_index>0 (or wch==0 for the pre-warm sentinel) is safe to dedup.
+    // a new atlas slot.
+    //
+    // The dedup gate has two halves:
+    //   - `glyph_index != 0`: the codepoint genuinely lives in fontp; the
+    //     face cache key (wch) is meaningful and deduping is safe.
+    //   - `wch == 0`: the loadFace pre-warm sentinel for the notdef glyph,
+    //     also keyed at wch=0 so heads share a single notdef render.
+    // For the (glyph_index == 0, wch != 0) case — caller wanted a glyph
+    // that fontp doesn't have — addGlyph routes through the shared-notdef
+    // path before reaching us, so we never legitimately see this combo;
+    // the gate keeps us from caching a bogus entry under wch if anyone
+    // calls in directly.
     if (fontp->mFace && (glyph_index != 0 || wch == 0))
     {
         if (LLFontGlyphInfo* existing = fontp->mFace->findGlyphInfo(wch, requested_glyph_type))
@@ -1236,11 +1268,6 @@ void LLFontFreetype::collectGarbage() const
             getBitmapCache()->releaseSheet(type, num);
         }
     }
-}
-
-void LLFontFreetype::setStyle(U8 style)
-{
-    mStyle = style;
 }
 
 U8 LLFontFreetype::getStyle() const
