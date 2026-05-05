@@ -114,6 +114,19 @@ protected:
     void analyzeAlpha(const void* data_in, U32 w, U32 h);
     void calcAlphaChannelOffsetAndStride();
 
+    // Rewrite mFormatPrimary/mFormatInternal from deprecated forms
+    // (GL_LUMINANCE / GL_ALPHA / GL_LUMINANCE_ALPHA) to their core-profile-
+    // valid equivalents (GL_RED + R8 with a {R,R,R,1} swizzle, etc.). Records
+    // the swizzle mask so the next createGLTexture can apply it once. No-op
+    // off core profile or for non-deprecated formats.
+    //
+    // Must run AFTER calcAlphaChannelOffsetAndStride: the alpha layout
+    // calc keys on the deprecated names (GL_LUMINANCE_ALPHA stride=2 etc).
+    // After rewrite, mAlphaStride/mAlphaOffset are still correct for the
+    // physical data layout (1 byte per channel either way), and subsequent
+    // setSubImage / readBackRaw / scaleDown read the live format names.
+    void resolveDeprecatedFormat();
+
 public:
     virtual void dump();    // debugging info to LL_INFOS()
 
@@ -275,6 +288,15 @@ protected:
     LLGLenum mFormatPrimary;  // = GL format (pixel data format)
     LLGLenum mFormatType;
     bool     mFormatSwapBytes;// if true, use glPixelStorei(GL_UNPACK_SWAP_BYTES, 1)
+
+    // Swizzle mask to apply to mTexName at creation time. Only populated
+    // when resolveDeprecatedFormat() rewrote a deprecated source/internal
+    // format (GL_LUMINANCE / GL_ALPHA / GL_LUMINANCE_ALPHA → GL_RED / GL_RG)
+    // on core profile, where the deprecated forms aren't valid as
+    // glTexImage2D / glTexSubImage2D / glGetTexImage parameters. Default
+    // (set in init()) is the identity swizzle with mHasCustomSwizzle false.
+    LLGLint  mSwizzleMask[4];
+    bool     mHasCustomSwizzle;
 
     bool mExternalTexture;
 
