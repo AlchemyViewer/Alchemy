@@ -306,14 +306,13 @@ private:
     friend class LLTextBillboard;
     friend class LLHUDText;
 
-    LLFontGL(const LLFontGL &source);
-    LLFontGL &operator=(const LLFontGL &source);
+    LLFontGL(const LLFontGL &source) = delete;
+    LLFontGL &operator=(const LLFontGL &source) = delete;
 
     LLFontDescriptor mFontDescriptor;
     LLPointer<LLFontFreetype> mFontFreetype;
 
     void renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, F32 slant_amt) const;
-    void drawGlyph(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, const LLColor4U& shadow_color, U8 style, ShadowType shadow) const;
     // Caller hoists shadow_color and italic slant_offset out of the glyph loop and
     // selects which half to emit. drawGlyphShadow is a no-op for NO_SHADOW or BOLD
     // (bold and shadow are mutually exclusive). drawGlyphForeground emits the BOLD

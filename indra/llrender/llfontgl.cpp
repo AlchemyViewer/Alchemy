@@ -173,7 +173,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         return static_cast<S32>(wstr.length());
     }
 
-    if (wstr.empty())
+    if (wstr.empty() || begin_offset < 0 || begin_offset >= (S32)wstr.length())
     {
         return 0;
     }
@@ -277,15 +277,27 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         break;
     }
 
+    // halign-RIGHT/HCENTER, the underline rule, and the ellipsis overflow
+    // check all want the same unscaled string width. Compute once and
+    // reuse — each call walks the string and (for non-mono fonts) does a
+    // shape-cache lookup, so three calls on the worst-case path is real
+    // measurement work paid for nothing.
+    const bool needs_string_width = (halign == RIGHT) || (halign == HCENTER)
+                                  || (style_to_add & UNDERLINE) || use_ellipses;
+    const F32 string_width_unscaled = needs_string_width
+        ? getWidthF32(wstr.c_str(), begin_offset, length)
+        : 0.f;
+    const S32 scaled_string_width = ll_round(string_width_unscaled * sScaleX);
+
     switch (halign)
     {
     case LEFT:
         break;
     case RIGHT:
-        cur_x -= llmin(scaled_max_pixels, ll_round(getWidthF32(wstr.c_str(), begin_offset, length) * sScaleX));
+        cur_x -= llmin(scaled_max_pixels, scaled_string_width);
         break;
     case HCENTER:
-        cur_x -= llmin(scaled_max_pixels, ll_round(getWidthF32(wstr.c_str(), begin_offset, length) * sScaleX)) / 2;
+        cur_x -= llmin(scaled_max_pixels, scaled_string_width) / 2;
         break;
     default:
         break;
@@ -322,8 +334,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         // drivers). Using the face's own underline_position /
         // underline_thickness gives a typographically correct stroke
         // instead of a fixed 1px line stuck at the descender depth.
-        const S32 underline_width = llmin(scaled_max_pixels,
-            ll_round(getWidthF32(wstr.c_str(), begin_offset, length) * sScaleX));
+        const S32 underline_width = llmin(scaled_max_pixels, scaled_string_width);
         const F32 end_x = start_x + (F32)underline_width;
         const F32 y_bot = cur_y + mFontFreetype->getUnderlinePosition();
         const F32 y_top = y_bot + mFontFreetype->getUnderlineThickness();
@@ -376,17 +387,16 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         LLGLSLShader::sCurBoundShaderPtr->uniform1i(sGrayscaleAtlas, 1);
     }
 
-    const S32 LAST_CHARACTER = LLFontFreetype::LAST_CHAR_FULL;
-
     bool draw_ellipses = false;
     if (use_ellipses)
     {
-        // check for too long of a string
-        S32 string_width = ll_round(getWidthF32(wstr.c_str(), begin_offset, max_chars) * sScaleX);
-        if (string_width > scaled_max_pixels)
+        // Use the hoisted string_width — it was computed with `length`
+        // (clamped against max_chars), which is what we actually render,
+        // so it's the right comparison.
+        if (scaled_string_width > scaled_max_pixels)
         {
             // use four dots for ellipsis width to generate padding
-            const LLWString dots(U"....");
+            static const LLWString dots(U"....");
             scaled_max_pixels = llmax(0, scaled_max_pixels - ll_round(getWidthF32(dots.c_str())));
             draw_ellipses = true;
         }
@@ -442,7 +452,6 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
     std::pair<EFontGlyphType, S32> bitmap_entry = std::make_pair(EFontGlyphType::Grayscale, -1);
     S32 glyph_count = 0;
-    llwchar last_char = wstr[begin_offset];
 
     // Strict-monospace root face never participates in whole-slice shaping —
     // even synthesized "1 glyph per cp" output goes through the renderer's
@@ -504,6 +513,14 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             {
                 next_glyph = NULL;  // drop any kerning prefetch from before the run
                 bool overflow = false;
+                // Slice-local cp index of the glyph that overflowed. shapeLine
+                // returns clusters relative to its begin parameter (here,
+                // run_range.first), so this is in [0, run_len). Used so
+                // chars_drawn reflects only cps whose cluster was reached
+                // before clipping — counting the full run on overflow lies
+                // to callers that drive word-wrap / chunked draw off the
+                // return value.
+                S32 overflow_cluster_local = 0;
                 for (const LLShapedGlyph& sg : run_glyphs)
                 {
                     // Cache lives on the root face and its bitmap atlas; the
@@ -586,6 +603,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     if ((start_x + scaled_max_pixels) < (glyph_x + (F32)slot.mWidth))
                     {
                         overflow = true;
+                        overflow_cluster_local = sg.cluster;
                         break;
                     }
 
@@ -635,15 +653,17 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     cur_render_y = cur_y;
                 }
 
-                chars_drawn += (S32)(run_range.second - run_range.first);
                 if (overflow)
+                {
+                    // Count cps strictly before the overflowing cluster.
+                    // overflow_cluster_local is slice-local (0-based within
+                    // the run), so adding it directly gives the cp count.
+                    chars_drawn += llmax(0, overflow_cluster_local);
                     break;
+                }
+                chars_drawn += (S32)(run_range.second - run_range.first);
 
                 i = (S32)run_range.second - 1;  // loop's ++ lands past the run
-                // Force a rebind on the next non-shape glyph — the duplicate
-                // last_char guard relies on matching wch to avoid stale atlas
-                // binds and shaped runs bypassed that path.
-                last_char = 0;
                 continue;
             }
             // Empty run_glyphs — shaping failed. Fall through to the
@@ -690,10 +710,16 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         }
         const auto& cp_slot = fgi->mPhaseSlots[cp_phase];
 
-        // Per-glyph bitmap texture.
+        // Per-glyph bitmap texture. Flush + rebind only when the atlas
+        // slot actually changes; the legacy `last_char != wch` clause
+        // forced a per-codepoint flush as a band-aid for an undiagnosed
+        // CJK/emoji-on-first-render issue. Moving atlas eviction off the
+        // render path (sweepGlyphCaches between frames) eliminated the
+        // underlying race, and Latin text now batches up to GLYPH_BATCH_SIZE
+        // glyphs per draw the way it should.
         const LLFontFace* cp_glyph_face = fgi->mSourceFace;
         std::pair<EFontGlyphType, S32> next_bitmap_entry = cp_slot.mBitmapEntry;
-        if (cp_glyph_face != current_face || next_bitmap_entry != bitmap_entry || last_char != wch)
+        if (cp_glyph_face != current_face || next_bitmap_entry != bitmap_entry)
         {
             // Actually draw the queued glyphs before switching their texture;
             // otherwise the queued glyphs will be taken from wrong textures.
@@ -729,11 +755,6 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                 if (font_image)
                     gGL.getTexUnit(0)->bind(font_image);
             }
-
-            // For some reason it's not enough to compare by bitmap_entry.
-            // Issue hits emojis, japenese and chinese glyphs, only on first run.
-            // Todo: figure it out, there might be a bug with raw image data.
-            last_char = wch;
         }
 
         if ((start_x + scaled_max_pixels) < (cur_x + cp_slot.mXBearing + cp_slot.mWidth))
@@ -794,9 +815,11 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         cur_y += fgi->mYAdvance;
 
         llwchar next_char = wstr[i+1];
-        if (next_char && (next_char < LAST_CHARACTER))
+        if (next_char)
         {
-            // Kern this puppy.
+            // Kern this puppy. The old `next_char < LAST_CHAR_FULL`
+            // gate was a vestigial ASCII-bucket-cache limit; today
+            // getXKerning works for any pair.
             next_glyph = mFontFreetype->getGlyphInfo(next_char, (!use_color) ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
             cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
         }
@@ -1018,10 +1041,13 @@ F32 LLFontGL::getWidthF32(const std::string& utf8text, S32 begin_offset, S32 max
 F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars, bool no_padding) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    const S32 LAST_CHARACTER = LLFontFreetype::LAST_CHAR_FULL;
 
     F32 cur_x = 0;
-    const S32 max_index = begin_offset + max_chars;
+    // Clamp the upper bound the same way charFromPixelOffset does. The default
+    // max_chars value is S32_MAX, so a non-zero begin_offset would otherwise
+    // overflow the S32 sum (UB on signed overflow). Halign-right and underline
+    // measurement paths in render() routinely call this with begin_offset > 0.
+    const S32 max_index = begin_offset + llmin(S32_MAX - begin_offset, max_chars);
 
     // Mirror render()'s pen accumulation policy so width measurements agree
     // with what's drawn — see the comment at render()'s subpixel_pen.
@@ -1137,11 +1163,12 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
         cur_x += advance;
         llwchar next_char = wchars[i+1];
 
-        if (((i + 1) < begin_offset + max_chars)
-            && next_char
-            && (next_char < LAST_CHARACTER))
+        if (((i + 1) < max_index) && next_char)
         {
-            // Kern this puppy.
+            // Kern this puppy. LAST_CHARACTER (255) was a vestigial limit
+            // from the era of ASCII-bucketed glyph caches; getXKerning
+            // works for any pair today and the codepoint path is the
+            // shape-failure / strict-mono fallback where this matters.
             next_glyph = mFontFreetype->getGlyphInfo(next_char, EFontGlyphType::Unspecified);
             cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
         }
@@ -2140,19 +2167,16 @@ std::string LLFontGL::getFontPathLocal()
     return local_path;
 }
 
-LLFontGL::LLFontGL(const LLFontGL &source)
-{
-    LL_ERRS() << "Not implemented!" << LL_ENDL;
-}
-
-LLFontGL &LLFontGL::operator=(const LLFontGL &source)
-{
-    LL_ERRS() << "Not implemented" << LL_ENDL;
-    return *this;
-}
-
 void LLFontGL::renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, F32 slant_amt) const
 {
+    // slant_amt shifts the bottom edge horizontally relative to the top
+    // (synthetic italic shear). Bottom-shifts-left + top-stays is the same
+    // as top-shifts-right relative to baseline. Caller passes negative
+    // slant_amt for italic, 0 for upright. The shear was lost in the
+    // QUADS→TRIANGLES conversion (commit d9da5bbb33) and the parameter sat
+    // dead until now; restoring it makes ITALIC render correctly when
+    // style_to_add still has the bit (i.e. the underlying FT face wasn't
+    // loaded with FT_STYLE_FLAG_ITALIC and no italic variant is wired up).
     S32 index = 0;
 
     vertex_out[index].set(screen_rect.mRight, screen_rect.mTop, 0.f);
@@ -2165,7 +2189,7 @@ void LLFontGL::renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor
     colors_out[index] = color;
     index++;
 
-    vertex_out[index].set(screen_rect.mLeft, screen_rect.mBottom, 0.f);
+    vertex_out[index].set(screen_rect.mLeft + slant_amt, screen_rect.mBottom, 0.f);
     uv_out[index].set(uv_rect.mLeft, uv_rect.mBottom);
     colors_out[index] = color;
     index++;
@@ -2176,12 +2200,12 @@ void LLFontGL::renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor
     colors_out[index] = color;
     index++;
 
-    vertex_out[index].set(screen_rect.mLeft, screen_rect.mBottom, 0.f);
+    vertex_out[index].set(screen_rect.mLeft + slant_amt, screen_rect.mBottom, 0.f);
     uv_out[index].set(uv_rect.mLeft, uv_rect.mBottom);
     colors_out[index] = color;
     index++;
 
-    vertex_out[index].set(screen_rect.mRight, screen_rect.mBottom, 0.f);
+    vertex_out[index].set(screen_rect.mRight + slant_amt, screen_rect.mBottom, 0.f);
     uv_out[index].set(uv_rect.mRight, uv_rect.mBottom);
     colors_out[index] = color;
 }
@@ -2279,14 +2303,3 @@ void LLFontGL::drawGlyphForeground(S32& glyph_count, LLVector4a* vertex_out, LLV
     }
 }
 
-void LLFontGL::drawGlyph(S32& glyph_count, LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, const LLColor4U& shadow_color, U8 style, ShadowType shadow) const
-{
-    const F32 slant_offset = ((style & ITALIC) ? (-mFontFreetype->getAscenderHeight() * 0.2f) : 0.f);
-
-    // Bold paths skip shadow per the FIXME above; shadow paths skip bold.
-    if (!(style & BOLD))
-    {
-        drawGlyphShadow(glyph_count, vertex_out, uv_out, colors_out, screen_rect, uv_rect, shadow_color, shadow, slant_offset);
-    }
-    drawGlyphForeground(glyph_count, vertex_out, uv_out, colors_out, screen_rect, uv_rect, color, style, slant_offset);
-}
