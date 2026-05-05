@@ -580,12 +580,7 @@ void LLImageGL::init(bool usemipmaps, bool allow_compression)
     mFormatType = GL_UNSIGNED_BYTE;
     mFormatSwapBytes = false;
 
-    // Identity swizzle until resolveDeprecatedFormat decides otherwise.
-    mSwizzleMask[0] = GL_RED;
-    mSwizzleMask[1] = GL_GREEN;
-    mSwizzleMask[2] = GL_BLUE;
-    mSwizzleMask[3] = GL_ALPHA;
-    mHasCustomSwizzle = false;
+    mDeprecatedSourceFormat = 0;
 
 #ifdef DEBUG_MISS
     mMissed = false;
@@ -1320,36 +1315,38 @@ void LLImageGL::deleteTextures(S32 numTextures, const U32 *textures)
 void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void* pixels, bool allow_compression)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    // Gate on GL version, not core profile. GL_TEXTURE_SWIZZLE_RGBA is in
-    // both core and compat profiles since GL 3.3, and routing the deprecated
-    // formats through R8/RG8 + swizzle gives the same visual result on
-    // either profile while keeping mFormatPrimary / mFormatInternal aligned
-    // with what's actually in the GL texture (matters because subsequent
-    // setSubImage / readBackRaw / scaleDown read those members directly).
+    // Gate on GL version. GL_TEXTURE_SWIZZLE_RGBA is in both core and
+    // compat profiles since GL 3.3, and the deprecated formats are
+    // re-expressed as R8 / RG8 via the swizzle attribute on the texture.
     // Below the 3.29 floor the manual-buffer-convert fallback below runs;
     // it relies on sManualScratch (allocated in allocateConversionBuffer).
+    //
+    // setManualImage no longer writes GL_TEXTURE_SWIZZLE_RGBA itself —
+    // overwriting it is destructive when the bound texture already has a
+    // custom swizzle (e.g. an LLImageGL whose resolveDeprecatedFormat ran
+    // and applied a specific mask in createGLTexture, or any caller that
+    // set up its own swizzle before this call). The format rewrite below
+    // still happens so glTexImage2D allocates the right backing storage;
+    // applying the swizzle is the caller's responsibility. LLImageGL's
+    // createGLTexture path handles it via mSwizzleMask. Direct callers
+    // that pass GL_ALPHA / GL_LUMINANCE / GL_LUMINANCE_ALPHA must apply
+    // the matching swizzle themselves before binding-and-uploading.
     if (gGLManager.mGLVersion >= CONVERSION_SCRATCH_BUFFER_GL_VERSION)
     {
         if (pixformat == GL_ALPHA)
-        { //GL_ALPHA is deprecated, convert to R8 with {0,0,0,R} swizzle
-            const GLint mask[] = { GL_ZERO, GL_ZERO, GL_ZERO, GL_RED };
-            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, mask);
+        { //GL_ALPHA → R8; caller-set {0,0,0,R} swizzle is required for {0,0,0,A} sample semantics
             pixformat = GL_RED;
             intformat = GL_R8;
         }
 
         if (pixformat == GL_LUMINANCE)
-        { //GL_LUMINANCE is deprecated, convert to R8 with {R,R,R,1} swizzle
-            const GLint mask[] = { GL_RED, GL_RED, GL_RED, GL_ONE };
-            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, mask);
+        { //GL_LUMINANCE → R8; caller-set {R,R,R,1} swizzle is required for {L,L,L,1} sample semantics
             pixformat = GL_RED;
             intformat = GL_R8;
         }
 
         if (pixformat == GL_LUMINANCE_ALPHA)
-        { //GL_LUMINANCE_ALPHA is deprecated, convert to RG8 with {R,R,R,G} swizzle
-            const GLint mask[] = { GL_RED, GL_RED, GL_RED, GL_GREEN };
-            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, mask);
+        { //GL_LUMINANCE_ALPHA → RG8; caller-set {R,R,R,G} swizzle is required for {L,L,L,A} sample semantics
             pixformat = GL_RG;
             intformat = GL_RG8;
         }
@@ -1695,17 +1692,13 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
             gGL.getTexUnit(0)->bind(this, false, false, new_texname);
             glTexParameteri(LLTexUnit::getInternalType(mBindTarget), GL_TEXTURE_BASE_LEVEL, 0);
             glTexParameteri(LLTexUnit::getInternalType(mBindTarget), GL_TEXTURE_MAX_LEVEL, mMaxDiscardLevel - discard_level);
-            // Apply swizzle mask once if resolveDeprecatedFormat rewrote our
-            // format. The mask is per-texture state and persists across
-            // glTexImage2D / scaleDown reallocations, so we never need to
-            // re-set it. setManualImage's per-call swizzle path is now a
-            // no-op for these textures (mFormatPrimary is already GL_RED /
-            // GL_RG by the time it's called) but stays for non-LLImageGL
-            // callers passing the deprecated forms directly.
-            if (mHasCustomSwizzle)
+            // Apply the swizzle mask once if resolveDeprecatedFormat saved
+            // an original format. Per-texture state persists across
+            // glTexImage2D / scaleDown reallocations, so we never re-set it.
+            if (mDeprecatedSourceFormat != 0)
             {
-                glTexParameteriv(LLTexUnit::getInternalType(mBindTarget),
-                                 GL_TEXTURE_SWIZZLE_RGBA, mSwizzleMask);
+                applySwizzleForDeprecatedFormat(LLTexUnit::getInternalType(mBindTarget),
+                                                mDeprecatedSourceFormat);
             }
         }
     }
@@ -2235,65 +2228,78 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
     }
 }
 
-void LLImageGL::resolveDeprecatedFormat()
+// static
+void LLImageGL::applySwizzleForDeprecatedFormat(U32 target, U32 original_format)
 {
-    // setManualImage applies the same swizzle table per-call when it sees a
-    // deprecated source format, but its rewrites are local to that function
-    // — our member state (mFormatPrimary / mFormatInternal) stays at the
-    // deprecated names, and any subsequent setSubImage / readBackRaw /
-    // scaleDown that read those members hand the deprecated enums to GL.
-    // On core profile that's GL_INVALID_ENUM (silent failure); on compat
-    // profile it works but produces a divergence between the LLImageGL's
-    // cached format and the actual GL texture state. Pre-rewrite at
-    // format-resolution time so members stay consistent with the GL texture,
-    // and remember the mask so createGLTexture can apply it once when the
-    // texture name is created.
-    //
-    // Gate is GL version, not core profile. GL_TEXTURE_SWIZZLE_RGBA is in
-    // both profiles since 3.3, and routing through R8/RG8 + swizzle gives
-    // the same visual result either way. Below the 3.29 floor setManualImage
-    // takes its manual-buffer-convert path which keys on the deprecated
-    // names; we must NOT rewrite mFormatPrimary out from under it there.
+    // Swizzle table is owned here; callers (LLImageGL::createGLTexture for
+    // resolved instances, llvoavatar's morph-mask upload for raw GL textures)
+    // identify the format they originally asked for and let this routine
+    // pick the matching mask. Keeps GL_TEXTURE_SWIZZLE_RGBA and the
+    // mask-component constants out of the call sites.
     if (gGLManager.mGLVersion < CONVERSION_SCRATCH_BUFFER_GL_VERSION)
         return;
 
-    LLGLint mask[4] = { GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA };
-    bool rewrote = false;
-
-    switch (mFormatPrimary)
+    LLGLint mask[4];
+    switch (original_format)
     {
     case GL_ALPHA:
         // Original meaning: byte goes to alpha, (R,G,B) read as (0,0,0).
         mask[0] = GL_ZERO; mask[1] = GL_ZERO; mask[2] = GL_ZERO; mask[3] = GL_RED;
-        mFormatPrimary = GL_RED;
-        mFormatInternal = GL_R8;
-        rewrote = true;
         break;
     case GL_LUMINANCE:
         // Original meaning: byte replicated to RGB, alpha = 1.
-        mask[0] = GL_RED; mask[1] = GL_RED; mask[2] = GL_RED; mask[3] = GL_ONE;
-        mFormatPrimary = GL_RED;
-        mFormatInternal = GL_R8;
-        rewrote = true;
+        mask[0] = GL_RED;  mask[1] = GL_RED;  mask[2] = GL_RED;  mask[3] = GL_ONE;
         break;
     case GL_LUMINANCE_ALPHA:
         // Original meaning: first byte replicated to RGB, second byte → alpha.
-        mask[0] = GL_RED; mask[1] = GL_RED; mask[2] = GL_RED; mask[3] = GL_GREEN;
+        mask[0] = GL_RED;  mask[1] = GL_RED;  mask[2] = GL_RED;  mask[3] = GL_GREEN;
+        break;
+    default:
+        return;  // not a format we re-express via swizzle
+    }
+    glTexParameteriv(target, GL_TEXTURE_SWIZZLE_RGBA, mask);
+}
+
+void LLImageGL::resolveDeprecatedFormat()
+{
+    // setManualImage rewrites the deprecated source/internal formats locally
+    // (so glTexImage2D allocates the right backing storage), but its
+    // rewrites don't propagate to LLImageGL's mFormatPrimary / mFormatInternal
+    // members. Subsequent setSubImage / readBackRaw / scaleDown that read
+    // those members would hand the deprecated enums to GL — invalid in core
+    // profile, divergent from the actual GL texture state on compat. Rewrite
+    // here at format-resolution time so members stay consistent with what
+    // the texture will hold, and remember the original format so
+    // createGLTexture can apply the matching swizzle once via
+    // applySwizzleForDeprecatedFormat.
+    //
+    // Gate is GL version, not core profile. GL_TEXTURE_SWIZZLE_RGBA is in
+    // both profiles since GL 3.3, so the same path works for both. Below the
+    // 3.29 floor setManualImage takes its manual-buffer-convert path which
+    // keys on the deprecated names; we must NOT rewrite mFormatPrimary out
+    // from under it there.
+    if (gGLManager.mGLVersion < CONVERSION_SCRATCH_BUFFER_GL_VERSION)
+        return;
+
+    switch (mFormatPrimary)
+    {
+    case GL_ALPHA:
+        mDeprecatedSourceFormat = mFormatPrimary;
+        mFormatPrimary = GL_RED;
+        mFormatInternal = GL_R8;
+        break;
+    case GL_LUMINANCE:
+        mDeprecatedSourceFormat = mFormatPrimary;
+        mFormatPrimary = GL_RED;
+        mFormatInternal = GL_R8;
+        break;
+    case GL_LUMINANCE_ALPHA:
+        mDeprecatedSourceFormat = mFormatPrimary;
         mFormatPrimary = GL_RG;
         mFormatInternal = GL_RG8;
-        rewrote = true;
         break;
     default:
         break;
-    }
-
-    if (rewrote)
-    {
-        mSwizzleMask[0] = mask[0];
-        mSwizzleMask[1] = mask[1];
-        mSwizzleMask[2] = mask[2];
-        mSwizzleMask[3] = mask[3];
-        mHasCustomSwizzle = true;
     }
 }
 

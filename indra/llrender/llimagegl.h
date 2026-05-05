@@ -136,6 +136,22 @@ public:
 
     static void setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels, bool allow_compression = true);
 
+    // Apply the GL_TEXTURE_SWIZZLE_RGBA mask that re-expresses a deprecated
+    // source format on the currently-bound texture as samplable RGBA.
+    // `original_format` is one of GL_ALPHA, GL_LUMINANCE, GL_LUMINANCE_ALPHA;
+    // anything else is a no-op. Centralizes the swizzle table so callers
+    // outside llrender don't need to know the GL_RED/GL_GREEN/GL_ZERO/GL_ONE
+    // mask layout (or even that GL_TEXTURE_SWIZZLE_RGBA exists). Below the
+    // GL 3.29 floor (where GL_TEXTURE_SWIZZLE_RGBA isn't reliably available)
+    // this is a no-op — the caller is expected to take the manual-buffer-
+    // convert path setManualImage falls into.
+    //
+    // For LLImageGL instances, createGLTexture calls this internally based
+    // on the format resolved by setExplicitFormat / the auto-format switch;
+    // direct setManualImage callers (e.g. llvoavatar's morph-mask upload
+    // on a raw GL texture) call this themselves before/after binding.
+    static void applySwizzleForDeprecatedFormat(U32 target, U32 original_format);
+
     bool createGLTexture() ;
     bool createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S32 usename = 0, bool to_create = true,
         S32 category = sMaxCategories-1, bool defer_copy = false, LLGLuint* tex_name = nullptr);
@@ -289,14 +305,11 @@ protected:
     LLGLenum mFormatType;
     bool     mFormatSwapBytes;// if true, use glPixelStorei(GL_UNPACK_SWAP_BYTES, 1)
 
-    // Swizzle mask to apply to mTexName at creation time. Only populated
-    // when resolveDeprecatedFormat() rewrote a deprecated source/internal
-    // format (GL_LUMINANCE / GL_ALPHA / GL_LUMINANCE_ALPHA → GL_RED / GL_RG)
-    // on core profile, where the deprecated forms aren't valid as
-    // glTexImage2D / glTexSubImage2D / glGetTexImage parameters. Default
-    // (set in init()) is the identity swizzle with mHasCustomSwizzle false.
-    LLGLint  mSwizzleMask[4];
-    bool     mHasCustomSwizzle;
+    // The original (deprecated) source format the caller asked for, when
+    // resolveDeprecatedFormat() rewrote it. Used at texture-creation time
+    // to apply the corresponding GL_TEXTURE_SWIZZLE_RGBA mask via
+    // applySwizzleForDeprecatedFormat. 0 = no rewrite happened.
+    LLGLenum mDeprecatedSourceFormat;
 
     bool mExternalTexture;
 
