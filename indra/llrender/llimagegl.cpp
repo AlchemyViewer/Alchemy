@@ -44,6 +44,7 @@
 #include "llrender.h"
 #include "llwindow.h"
 #include "llframetimer.h"
+#include <bit>
 #include <boost/unordered_map.hpp>
 
 extern LL_COMMON_API bool on_main_thread();
@@ -237,12 +238,9 @@ void LLImageGL::checkTexSize(bool forced) const
 //**************************************************************************************
 
 //----------------------------------------------------------------------------
-bool is_little_endian()
+constexpr bool is_little_endian()
 {
-    S32 a = 0x12345678;
-    U8 *c = (U8*)(&a);
-
-    return (*c == 0x78) ;
+    return std::endian::native == std::endian::little;
 }
 
 //static
@@ -500,6 +498,14 @@ LLImageGL::LLImageGL(
     LLGLenum formatPrimary,
     LLGLenum formatType,
     LLTexUnit::eTextureAddressMode addressMode)
+:   mExternalTexture(true)  // ctor previously left this uninitialized,
+                            // making the dtor's `!mExternalTexture && ...`
+                            // gate read indeterminate memory — could go
+                            // either way on any given run, in the wrong
+                            // direction either calling glDeleteTextures on
+                            // a texture we don't own or skipping the
+                            // sImageList.erase / sCount-- the other ctors
+                            // would do (sCount drifts negative over time).
 {
     init(false, true);
     mTexName = texName;
@@ -611,7 +617,9 @@ bool LLImageGL::setSize(S32 width, S32 height, S32 ncomponents, S32 discard_leve
 {
     if (width != mWidth || height != mHeight || ncomponents != mComponents)
     {
-        // Check if dimensions are a power of two!
+        // checkSize only rejects negative dimensions today (NPOT support
+        // is universal in the GL versions we target); the comment used
+        // to claim a power-of-two check that doesn't actually run.
         if (!checkSize(width, height))
         {
             LL_WARNS() << llformat("Texture has negative dimension: %dx%d",width,height) << LL_ENDL;
@@ -1223,7 +1231,7 @@ bool LLImageGL::setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_
 {
     if (gGL.getTexUnit(0)->bind(this, false, true))
     {
-        glCopyTexSubImage2D(GL_TEXTURE_2D, 0, fb_x, fb_y, x_pos, y_pos, width, height);
+        glCopyTexSubImage2D(GL_TEXTURE_2D, 0, x_pos, y_pos, fb_x, fb_y, width, height);
         mGLTextureCreated = true;
         stop_glerror();
         return true;
@@ -1568,13 +1576,17 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
         switch (mComponents)
         {
         case 1:
-            // Use luminance alpha (for fonts)
+            // Single-channel — used by font glyph maps, but the path
+            // is generic for any 1-component upload. setManualImage
+            // swizzles LUMINANCE → R8 with a gray-replicate mask on
+            // core profile.
             mFormatInternal = GL_LUMINANCE8;
             mFormatPrimary = GL_LUMINANCE;
             mFormatType = GL_UNSIGNED_BYTE;
             break;
         case 2:
-            // Use luminance alpha (for fonts)
+            // Two-channel (luminance + alpha). Same swizzle remap
+            // happens in setManualImage on core profile.
             mFormatInternal = GL_LUMINANCE8_ALPHA8;
             mFormatPrimary = GL_LUMINANCE_ALPHA;
             mFormatType = GL_UNSIGNED_BYTE;
@@ -1809,7 +1821,14 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
 
     //explicitly unbind texture
     gGL.getTexUnit(0)->unbind(mBindTarget);
-    llverify(gGL.getTexUnit(0)->bindManual(mBindTarget, mTexName));
+    // llverify is debug-only; in release a failed bind would have left
+    // glGetTexImage reading from whatever the previous bind was, returning
+    // bytes for the wrong texture. Check the result and bail.
+    if (!gGL.getTexUnit(0)->bindManual(mBindTarget, mTexName))
+    {
+        LL_WARNS() << "readBackRaw: bindManual failed for tex " << mTexName << LL_ENDL;
+        return false;
+    }
 
     //debug code, leave it there commented.
     //checkTexSize() ;
@@ -1928,6 +1947,18 @@ void LLImageGL::destroyGLTexture()
 
     if (mTexName != 0)
     {
+        if (mExternalTexture)
+        {
+            // Caller owns this texture (constructed via the wrap-an-existing-
+            // GL-name ctor). We must not glDeleteTextures it. Just forget our
+            // reference so callers using destroyGLTexture as a "detach" still
+            // see mTexName == 0 afterwards.
+            mTexName = 0;
+            mCurrentDiscardLevel = -1;
+            mGLTextureCreated = false;
+            return;
+        }
+
         if(mTextureMemory != S64Bytes(0))
         {
             mTextureMemory = (S64Bytes)0;
@@ -2196,13 +2227,19 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
     // suffer the worst from aliasing when used as alpha masks.
     if (w >= 2 && h >= 2)
     {
-        llassert(w % 2 == 0);
-        llassert(h % 2 == 0);
+        // Walk only complete 2x2 quads. Odd dimensions previously hit
+        // asserts in debug and read OOB on the trailing row/column in
+        // release (`current[w * mAlphaStride]` indexes one row down,
+        // which doesn't exist for the last odd row). Trailing odd row
+        // and column are dropped from the histogram; the remaining
+        // sample is still representative for the mask classifier.
+        const U32 paired_w = w & ~1u;
+        const U32 paired_h = h & ~1u;
         const GLubyte* rowstart = ((const GLubyte*) data_in) + mAlphaOffset;
-        for (U32 y = 0; y < h; y += 2)
+        for (U32 y = 0; y < paired_h; y += 2)
         {
             const GLubyte* current = rowstart;
-            for (U32 x = 0; x < w; x += 2)
+            for (U32 x = 0; x < paired_w; x += 2)
             {
                 const U32 s1 = current[0];
                 alphatotal += s1;
@@ -2408,15 +2445,19 @@ bool LLImageGL::getMask(const LLVector2 &tc) const
         S32 x = llfloor(u * mPickMaskWidth);
         S32 y = llfloor(v * mPickMaskHeight);
 
-        if (LL_UNLIKELY(x > mPickMaskWidth))
+        // Defensive clamp to the last valid index. The previous version
+        // tested `> mPickMaskWidth` and clamped to `mPickMaskWidth` itself,
+        // which is one past the valid range and addresses the start of the
+        // next row's bits. Use `>=` and clamp to width-1 / height-1.
+        if (LL_UNLIKELY(x >= mPickMaskWidth))
         {
             LL_WARNS_ONCE("render") << "Ooh, width overrun on pick mask read, that coulda been bad." << LL_ENDL;
-            x = llmax((U16)0, mPickMaskWidth);
+            x = mPickMaskWidth > 0 ? mPickMaskWidth - 1 : 0;
         }
-        if (LL_UNLIKELY(y > mPickMaskHeight))
+        if (LL_UNLIKELY(y >= mPickMaskHeight))
         {
             LL_WARNS_ONCE("render") << "Ooh, height overrun on pick mask read, that woulda been bad." << LL_ENDL;
-            y = llmax((U16)0, mPickMaskHeight);
+            y = mPickMaskHeight > 0 ? mPickMaskHeight - 1 : 0;
         }
 
         S32 idx = y*mPickMaskWidth+x;
