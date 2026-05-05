@@ -3376,7 +3376,7 @@ void LLMessageSystem::dumpPacketToLog()
     for (i = 0; i < mTrueReceiveSize; i++)
     {
         S32 offset = cur_line_pos * 3;
-        snprintf(line_buffer + offset, sizeof(line_buffer) - offset,
+        snprintf(line_buffer + offset, 4,
                  "%02x ", mTrueReceiveBuffer[i]);   /* Flawfinder: ignore */
         cur_line_pos++;
         if (cur_line_pos >= 16)
