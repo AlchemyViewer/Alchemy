@@ -582,22 +582,22 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type
         // No glyph on this face: walk fallbacks in the codepoint-path
         // priority order, which differs from the shape-path priority in
         // selectShapingFace:
-        //   1. Emoji-functor fallbacks, gated on isEmoji(wch). The
-        //      isEmoji gate is stricter than the functor's own range —
-        //      kept defensively in case different emoji fonts' functors
-        //      partition the emoji range differently in the future.
+        //   1. Emoji-functor fallbacks, gated on isPictographBase(wch).
+        //      The same predicate the shape itemizer uses to recognise
+        //      an emoji-cluster start, so codepoint-path and shape-path
+        //      agree on which characters are "emoji-eligible" and BMP
+        //      pictographs (heart, etc.) route to the colour face here
+        //      just as they do during shaping.
         //   2. Monochrome fallbacks (no functor). Priority over emoji
-        //      for non-genuine-emoji chars so legacy UI elements
-        //      (LSL dialogs, menu checkmarks) still pick monochrome.
+        //      fallbacks for non-pictograph chars so legacy UI elements
+        //      (LSL dialogs, menu checkmarks at U+2611 etc.) still
+        //      pick monochrome.
         //   3. Emoji-functor fallbacks ignoring the functor — last-
-        //      resort coverage for codepoints that aren't isEmoji and
-        //      aren't in a monochrome fallback but DO exist in an emoji
-        //      font's charmap.
-        //
-        // The shape path skips passes 1's isEmoji gate and pass 3
-        // entirely; comments at selectShapingFace explain why.
+        //      resort coverage for codepoints that aren't pictographs
+        //      and aren't in a monochrome fallback but DO exist in an
+        //      emoji font's charmap.
 
-        if (LLStringOps::isEmoji(wch))
+        if (LLStringOps::isPictographBase(wch))
         {
             if (auto hit = find_fallback_hit(mFallbackFonts, wch,
                     [&](const char_functor_t& f) { return f && f(wch); });

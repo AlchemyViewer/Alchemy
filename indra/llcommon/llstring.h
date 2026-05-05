@@ -104,8 +104,21 @@ public:
     static bool isAlnum(char a) { return isalnum((unsigned char)a) != 0; }
     static bool isAlnum(llwchar a) { return u_isalnum(static_cast<UChar32>(a)) != 0; }
 
-    // Returns true when 'a' corresponds to a "genuine" emoji. HB
+    // Returns true when 'a' corresponds to a "genuine" emoji (the strict
+    // astral-plane definition: U+1F000–U+1FFFF). Use this when you need to
+    // distinguish "this is unambiguously a color emoji and should never
+    // render as text" from "this could be either."
     static bool isEmoji(llwchar a);
+
+    // Broad pictograph predicate: matches the same set of base codepoints
+    // wstring_find_emoji_clusters / shape-time emoji-keeper logic treat as
+    // emoji bases. Includes BMP pictographs (U+2000–U+3300, plus copyright /
+    // registered) so codepoints like U+2764 (heart) and U+203C (double
+    // exclamation) are recognized as emoji starters when paired with VS-16
+    // or ZWJ. Broader than isEmoji on purpose — call this when picking
+    // emoji-styled fallbacks; call isEmoji when the strict astral
+    // definition is what matters.
+    static bool isPictographBase(llwchar a);
 
     static S32  collate(const char* a, const char* b) { return strcoll(a, b); }
     static S32  collate(const llwchar* a, const llwchar* b);

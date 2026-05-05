@@ -758,12 +758,9 @@ bool utf8str_remove_emojis(std::string& utf8str)
 // U+2000..U+32FF are eligible sequence bases per UAX #51, and HarfBuzz
 // compositions like ❤️‍🔥 (U+2764 U+FE0F U+200D U+1F525) require they be
 // detected here even though they are not "genuine" emoji.
-static bool is_pictograph_base(llwchar c)
-{
-    return c == 0xA9 || c == 0xAE
-        || (c >= 0x2000 && c < 0x3300)
-        || (c >= 0x1F000 && c < 0x20000);
-}
+// (Defined as LLStringOps::isPictographBase so the same predicate is
+// available to llrender's shape-itemizer and font-fallback walkers without
+// duplicating the range list.)
 
 // True if position i begins an emoji sequence that the 1:1 codepoint->glyph
 // path cannot render correctly — i.e., the next codepoint transforms the base
@@ -783,7 +780,7 @@ static bool is_shaping_starter(const llwchar* p, size_t n, size_t i)
     {
         return true;
     }
-    if (!is_pictograph_base(c) || i + 1 >= n)
+    if (!LLStringOps::isPictographBase(c) || i + 1 >= n)
         return false;
     const llwchar next = p[i + 1];
     if (next == 0x200D                               // ZWJ
@@ -831,7 +828,7 @@ static size_t advance_shaping_run(const llwchar* p, size_t n, size_t start)
             // Accept any pictograph base after the joiner, including BMP
             // pictographs like 🔥's partner heart in ❤️‍🔥 where the base
             // sits outside the astral emoji range.
-            if (r + 1 < n && is_pictograph_base(p[r + 1]))
+            if (r + 1 < n && LLStringOps::isPictographBase(p[r + 1]))
             {
                 r += 2;
                 continue;
@@ -1174,6 +1171,14 @@ bool LLStringOps::isEmoji(llwchar a)
     return a >= 0x1f000 && a < 0x20000;
 #endif
     }
+
+// static
+bool LLStringOps::isPictographBase(llwchar a)
+{
+    return a == 0xA9 || a == 0xAE
+        || (a >= 0x2000 && a < 0x3300)
+        || (a >= 0x1F000 && a < 0x20000);
+}
 
 S32 LLStringOps::collate(const llwchar* a, const llwchar* b)
 {

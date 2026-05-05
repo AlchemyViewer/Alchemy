@@ -28,6 +28,7 @@
 
 #include "llfontshaping.h"
 #include "llfontfreetype.h"
+#include "llstring.h"  // LLStringOps::isPictographBase
 #include "llthread.h"
 
 #include <boost/functional/hash.hpp>
@@ -199,8 +200,11 @@ namespace
             return;
         }
 
-        hb_font_t* hb_font = face->getHbFont();
-        if (!hb_font)
+        // Early-bail when the chosen face has no hb_font (allocation failure /
+        // unloaded face). The retry loop below also rejects null hb_font per
+        // candidate, so an empty primary face still produces an empty output
+        // rather than dereffing a null pointer.
+        if (!face->getHbFont())
             return;
 
         // Persistent shaping buffer reused across every sub-run. HarfBuzz
@@ -234,13 +238,6 @@ namespace
 
         const uint32_t* codepoints = reinterpret_cast<const uint32_t*>(slice.data() + sub_begin_in_slice);
         const int       len        = static_cast<int>(sub_end_in_slice - sub_begin_in_slice);
-        // offset=0 so HB cluster values come back local to this sub-run;
-        // we rebase below to the slice's coordinate system.
-        hb_buffer_add_utf32(buf, codepoints, len, 0, len);
-
-        hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
-        hb_buffer_set_script(buf, script);
-        hb_buffer_set_language(buf, hb_language_get_default());
 
         // Programmer fonts opted into ligatures via <font ligatures="on">
         // still need kern disabled (monospace + GPOS pair-kerning is
@@ -256,9 +253,131 @@ namespace
             features = kFixedWidthLigaturesOk;
             num_features = (unsigned int)(sizeof(kFixedWidthLigaturesOk) / sizeof(kFixedWidthLigaturesOk[0]));
         }
-        hb_shape(hb_font, buf, features, num_features);
 
-        unsigned int glyph_count = 0;
+        // VS-16 stripping for faces whose cmap lacks U+FE0F (notably Noto-
+        // COLRv1, which uses 'ccmp' / pre-shape normalization in its design
+        // and doesn't ship a cmap entry for VS-16). When VS-16 maps to
+        // notdef in such a face, it sits in the buffer between the heart
+        // and ZWJ glyphs and prevents the heart-on-fire ZWJ ligature rule
+        // from matching (the rule's components are heart + ZWJ + fire,
+        // not heart + .notdef + ZWJ + fire). Pre-stripping VS-16 lets the
+        // ligature fire and produces a single glyph instead of two.
+        //
+        // Scratch buffers are thread_local so we don't allocate per
+        // shape_sub_run call (one allocation per thread, amortized away
+        // across all shape calls). Cleared and re-filled on each strip.
+        // shape_sub_run is main-thread only per the header notes, but
+        // thread_local is the same cost as static here and keeps the
+        // assumption explicit.
+        static thread_local std::vector<uint32_t> stripped_buf;
+        static thread_local std::vector<int>      cluster_back_map;
+        // True when stripping ran for the last do_shape call. Read by the
+        // output loop to rebase HB's cluster values back to original input
+        // positions via cluster_back_map.
+        bool stripped_for_last_shape = false;
+
+        // Helper: shape `codepoints` through `shape_face` and return the
+        // resulting glyph count. The buffer ends up populated with the most
+        // recent shape's output, so the caller reads infos/positions from
+        // it after picking the winning face.
+        auto do_shape = [&](const LLFontFreetype* shape_face) -> unsigned int
+        {
+            hb_font_t* hbf = shape_face ? shape_face->getHbFont() : nullptr;
+            if (!hbf)
+                return 0;
+
+            const uint32_t* in_cps = codepoints;
+            int             in_len = len;
+            stripped_for_last_shape = false;
+            if (!shape_face->faceHasGlyph((llwchar)0xFE0F))
+            {
+                stripped_buf.clear();
+                cluster_back_map.clear();
+                stripped_buf.reserve(len);
+                cluster_back_map.reserve(len);
+                for (int k = 0; k < len; ++k)
+                {
+                    if (codepoints[k] == 0xFE0F)
+                        continue;
+                    stripped_buf.push_back(codepoints[k]);
+                    cluster_back_map.push_back(k);
+                }
+                if ((int)stripped_buf.size() != len)
+                {
+                    in_cps = stripped_buf.data();
+                    in_len = (int)stripped_buf.size();
+                    stripped_for_last_shape = true;
+                }
+            }
+
+            hb_buffer_clear_contents(buf);
+            // offset=0 so HB cluster values come back local to this sub-run;
+            // we rebase below to the slice's coordinate system.
+            hb_buffer_add_utf32(buf, in_cps, in_len, 0, in_len);
+            hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
+            hb_buffer_set_script(buf, script);
+            hb_buffer_set_language(buf, hb_language_get_default());
+            hb_shape(hbf, buf, features, num_features);
+            unsigned int gc = 0;
+            hb_buffer_get_glyph_infos(buf, &gc);
+            return gc;
+        };
+
+        unsigned int glyph_count = do_shape(face);
+        const LLFontFreetype* shape_face = face;
+
+        // ZWJ-ligature retry: when the input contains U+200D and the chosen
+        // face's GSUB didn't collapse the sequence (output count > 1), try
+        // every other emoji-functor fallback whose charmap covers the base
+        // codepoint. The first to produce strictly fewer glyphs wins —
+        // typically the difference is "4 glyphs (heart, vs-16, zwj, fire)
+        // unligatured" vs "1 glyph (heart-on-fire)". Skips when there's no
+        // ZWJ (avoids wasted work on every shape) and when the run is
+        // already a single glyph (already as ligated as possible). The
+        // hb-buffer is reused by `do_shape`; whichever shape wins, the
+        // buffer ends populated with that shape's output before we read
+        // glyphs out below.
+        bool has_zwj = false;
+        for (int k = 0; k < len; ++k)
+        {
+            if (codepoints[k] == 0x200D) { has_zwj = true; break; }
+        }
+        if (has_zwj && glyph_count > 1)
+        {
+            unsigned int best_count = glyph_count;
+            const LLFontFreetype* best_face = face;
+            bool any_candidate_ran = false;
+            const auto& fallbacks = root_face->getFallbackFonts();
+            for (const auto& entry : fallbacks)
+            {
+                const LLFontFreetype* cand = entry.first.get();
+                const auto& functor        = entry.second;
+                if (!cand || cand == face)
+                    continue;
+                if (!functor || !functor((llwchar)codepoints[0]))
+                    continue;
+                if (!cand->faceHasGlyph((llwchar)codepoints[0]))
+                    continue;
+                const unsigned int cand_count = do_shape(cand);
+                any_candidate_ran = true;
+                if (cand_count > 0 && cand_count < best_count)
+                {
+                    best_count = cand_count;
+                    best_face  = cand;
+                }
+            }
+            // If candidates ran, the buffer holds the LAST candidate's output
+            // (which may not be best_face). Re-shape with best_face so the
+            // readout loop reads the winning face's glyphs. When no candidate
+            // ran, the buffer still holds face's original output — skip the
+            // extra HB call.
+            if (any_candidate_ran)
+            {
+                glyph_count = do_shape(best_face);
+                shape_face  = best_face;
+            }
+        }
+
         const hb_glyph_info_t*     infos     = hb_buffer_get_glyph_infos(buf, &glyph_count);
         const hb_glyph_position_t* positions = hb_buffer_get_glyph_positions(buf, &glyph_count);
 
@@ -268,9 +387,20 @@ namespace
         for (unsigned int i = 0; i < glyph_count; ++i)
         {
             LLShapedGlyph sg;
-            sg.face      = face;
+            sg.face      = shape_face;
             sg.glyph_id  = infos[i].codepoint;
-            sg.cluster   = cluster_base + static_cast<S32>(infos[i].cluster);
+            // Rebase HB's cluster index. When VS-16 stripping ran for this
+            // shape, HB sees a shorter input than the original; the output
+            // cluster points into the stripped array and needs mapping back
+            // to the original-index space cluster_back_map encodes.
+            S32 src_cluster = static_cast<S32>(infos[i].cluster);
+            if (stripped_for_last_shape
+                && src_cluster >= 0
+                && src_cluster < (S32)cluster_back_map.size())
+            {
+                src_cluster = cluster_back_map[src_cluster];
+            }
+            sg.cluster   = cluster_base + src_cluster;
             sg.x_advance = positions[i].x_advance * INV_64;
             sg.y_advance = positions[i].y_advance * INV_64;
             sg.x_offset  = positions[i].x_offset  * INV_64;
@@ -302,6 +432,14 @@ namespace
         const LLFontFreetype* cur_face   = nullptr;
         hb_script_t           cur_script = HB_SCRIPT_INVALID;  // unknown until first non-neutral cp
         size_t                cur_begin  = 0;
+        // True when the current run started on an emoji codepoint — i.e. the
+        // run is "an emoji cluster" and cur_face is the chosen emoji handler.
+        // Drives the keeper's decision to retain emoji extenders on cur_face
+        // even when cur_face's cmap doesn't carry the extender's glyph (e.g.
+        // Noto-COLRv1 lacks VS-16 by design). When false, the extender's own
+        // selectShapingFace decision wins, so digit-keycap sequences like
+        // "0️⃣" still fragment correctly off Inter and onto the emoji face.
+        bool cur_run_is_emoji = false;
 
         auto set_cur_script_from = [&](hb_script_t cp_script, bool is_neutral)
         {
@@ -331,6 +469,7 @@ namespace
             {
                 cur_face  = face;
                 cur_begin = i;
+                cur_run_is_emoji = LLStringOps::isPictographBase(slice[i]);
                 set_cur_script_from(cp_script, is_neutral);
                 continue;
             }
@@ -366,6 +505,26 @@ namespace
                 if (cur_face->faceHasGlyph(wch))
                 {
                     // cur_face covers the joiner — shape it inline with the base.
+                    face = cur_face;
+                }
+                else if (is_emoji_extender && cur_run_is_emoji)
+                {
+                    // cur_face is the emoji handler for this run (the run
+                    // started on a pictograph base) and lacks the extender
+                    // in its cmap. Notable case: Noto-COLRv1 doesn't ship a
+                    // cmap entry for U+FE0F (VS-16); its GSUB rules for ZWJ
+                    // ligatures are written against the VS-stripped form
+                    // (heart + ZWJ + fire, not heart + VS-16 + ZWJ + fire).
+                    // Fragmenting at VS-16 would split the ligature across
+                    // sub-runs and the rule could never match. Keep the
+                    // extender on cur_face — shape_sub_run strips VS-16
+                    // before passing the input to HB when the face's cmap
+                    // lacks it, so the buffer reaches GSUB in the form the
+                    // rules expect. Gating on cur_run_is_emoji (rather than
+                    // cur_face != root_face) is what makes this work both
+                    // when the head is a non-emoji font with an emoji
+                    // fallback AND when the head IS an emoji font (e.g. the
+                    // SansSerifEmoji family used by LLEmojiTextSegment).
                     face = cur_face;
                 }
                 else if (is_mark)
@@ -412,6 +571,7 @@ namespace
                 emit(i);
                 cur_face  = face;
                 cur_begin = i;
+                cur_run_is_emoji = LLStringOps::isPictographBase(slice[i]);
                 set_cur_script_from(cp_script, is_neutral);
             }
             else if (cur_script == HB_SCRIPT_INVALID && !is_neutral)
