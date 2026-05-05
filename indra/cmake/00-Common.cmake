@@ -461,6 +461,13 @@ if(LINUX OR DARWIN)
 
     # This warning is annoying.
     add_compile_options(-Wno-switch)
+
+    # GCC 15's -Wsfinae-incomplete fires on benign CRTP patterns in LLInitParam where
+    # the derived type is incomplete during base instantiation but never gains the tested
+    # typedef anyway. Keep as a warning, not a hard error.
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15)
+      add_compile_options(-Wno-error=sfinae-incomplete)
+    endif()
   endif()
 
   if (BUILD_TARGET_IS_X86_64)
