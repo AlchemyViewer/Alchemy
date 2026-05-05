@@ -173,6 +173,13 @@ public:
     // registry no longer reads gSavedSettings directly).
     bool parseFontInfo(const std::string& xml_filename, const LLSD& font_overrides);
 
+    // Parse a single fonts.xml at an explicit path, bypassing
+    // gDirUtilp->findSkinnedFilenames. For headless test bring-up where
+    // the skin tree isn't staged. Resolves <use> / inherit / overrides
+    // exactly like parseFontInfo does after its per-file pass — single
+    // file only, no cross-skin layering.
+    bool parseFontInfoFromFile(const std::string& xml_path, const LLSD& font_overrides);
+
     // Re-parse fonts.xml and re-apply caller-supplied font overrides.
     // Existing LLFontGL* pointers stay valid — each head's underlying
     // mFontFreetype is swapped in place. Returns false on parse failure

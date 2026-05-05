@@ -192,6 +192,16 @@ public:
     // gSavedSettings on its own.
     static void initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::string& app_dir, const LLSD& font_overrides, bool create_gl_textures = true);
 
+    // Variant of initClass that loads fonts.xml from `fonts_xml_path`
+    // directly, bypassing gDirUtilp->findSkinnedFilenames. Single-shot:
+    // only seeds a fresh registry — does not support reloads. Intended
+    // for headless test bring-up where the skin tree isn't staged.
+    static void initClass(F32 screen_dpi, F32 x_scale, F32 y_scale,
+                          const std::string& app_dir,
+                          const std::string& fonts_xml_path,
+                          const LLSD& font_overrides,
+                          bool create_gl_textures = true);
+
            void dumpTextures();
     static void dumpFonts();
     static void dumpFontTextures();

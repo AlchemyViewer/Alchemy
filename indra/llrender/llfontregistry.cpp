@@ -301,6 +301,26 @@ LLFontRegistry::~LLFontRegistry()
     clear();
 }
 
+// Parse one fonts.xml file into the registry's mFontMap. Returns true if
+// init_from_xml succeeded; false on parse failure or wrong root tag.
+// Cross-family resolution is deliberately deferred to the caller so a
+// multi-file load (skin layering) only resolves once after every layer
+// has been merged.
+static bool parse_single_fonts_file(LLFontRegistry* reg, const std::string& path)
+{
+    LLXMLNodePtr root;
+    if (!LLXMLNode::parseFile(path, root, NULL))
+        return false;
+
+    if (root.isNull() || !root->hasName("fonts"))
+    {
+        LL_WARNS() << "Bad font info file: " << path << LL_ENDL;
+        return false;
+    }
+
+    return init_from_xml(reg, root);
+}
+
 bool LLFontRegistry::parseFontInfo(const std::string& xml_filename, const LLSD& font_overrides)
 {
     bool success = false;  // Succeed if we find and read at least one XUI file
@@ -311,30 +331,9 @@ bool LLFontRegistry::parseFontInfo(const std::string& xml_filename, const LLSD& 
         return false;
     }
 
-    for (string_vec_t::const_iterator path_it = xml_paths.begin();
-         path_it != xml_paths.end();
-         ++path_it)
+    for (const auto& path : xml_paths)
     {
-        LLXMLNodePtr root;
-        bool parsed_file = LLXMLNode::parseFile(*path_it, root, NULL);
-
-        if (!parsed_file)
-            continue;
-
-        if ( root.isNull() || ! root->hasName( "fonts" ) )
-        {
-            LL_WARNS() << "Bad font info file: " << *path_it << LL_ENDL;
-            continue;
-        }
-
-        std::string root_name;
-        root->getAttributeString("name",root_name);
-        if (root->hasName("fonts"))
-        {
-            // Expect a collection of children consisting of "font" or "font_size" entries
-            bool init_succ = init_from_xml(this, root);
-            success = success || init_succ;
-        }
+        success = parse_single_fonts_file(this, path) || success;
     }
 
     // Resolve cross-family <use> and per-family inherit="true" once across
@@ -346,6 +345,13 @@ bool LLFontRegistry::parseFontInfo(const std::string& xml_filename, const LLSD& 
     //if (success)
     //  dump();
 
+    return success;
+}
+
+bool LLFontRegistry::parseFontInfoFromFile(const std::string& xml_path, const LLSD& font_overrides)
+{
+    const bool success = parse_single_fonts_file(this, xml_path);
+    resolveFontReferences(font_overrides);
     return success;
 }
 

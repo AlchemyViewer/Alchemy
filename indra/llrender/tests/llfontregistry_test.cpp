@@ -6,8 +6,14 @@
  * Exercises the pure-CPU surface of llfontregistry — descriptor
  * normalization, init_from_xml, resolveFontReferences, applyFamilyOverrides,
  * nameToSize/getMatchingFontDesc/getClosestFontTemplate, getAvailableFamilies.
- * No FreeType / GL setup; FreeType-backed integration is covered by
- * llfontcolrv1_test.cpp.
+ * FreeType-backed integration is covered by llfontcolrv1_test.cpp.
+ *
+ * When the binary is built against llrenderheadless (BUILD_HEADLESS=ON,
+ * which sets LL_MESA_HEADLESS=1), the trailing block at the bottom of
+ * this file adds GL-requiring tests: createFont allocating an atlas,
+ * getFont caching the LLFontGL pointer, destroyGL releasing textures.
+ * Without LL_MESA_HEADLESS those tests compile out and the binary stays
+ * pure-CPU.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -25,6 +31,14 @@
 #include "../test/lltut.h"
 
 #include <cstring>
+
+#if LL_MESA_HEADLESS
+#  include "../llfontfreetype.h"
+#  include "../llfontbitmapcache.h"
+#  include "../llimagegl.h"
+#  include "llheadlessgl_fixture.h"
+#  include <cstdio>
+#endif
 
 // init_from_xml is declared inside LLFontRegistry as a public friend; the
 // header doesn't otherwise expose its prototype. Forward-declare here so
@@ -1063,4 +1077,182 @@ namespace tut
         ensure_equals("label defaults to name",
                       fams[0].label, std::string("Plain"));
     }
+
+#if LL_MESA_HEADLESS
+    // ===================================================================
+    // Group 7: GL-requiring paths (LL_MESA_HEADLESS only)
+    //
+    // Companion fixture that owns a local LLFontRegistry with
+    // create_gl_textures=true and shares the OSMesa GL context across
+    // all tests via llheadlessgl_fixture.h. Pure-CPU tests above keep
+    // their own create_gl_textures=false fixture so they don't pay for
+    // GL setup when building under BUILD_HEADLESS.
+    // ===================================================================
+
+    namespace
+    {
+#ifndef LLFONT_TEST_APP_DIR
+#  define LLFONT_TEST_APP_DIR ""
+#endif
+#ifndef LLFONT_TEST_DATA_DIR
+#  define LLFONT_TEST_DATA_DIR ""
+#endif
+
+        constexpr const char* kAppDir   = LLFONT_TEST_APP_DIR;
+        constexpr const char* kFontsDir = LLFONT_TEST_DATA_DIR;
+
+        bool fileExists(const std::string& path)
+        {
+            if (FILE* f = std::fopen(path.c_str(), "rb"))
+            {
+                std::fclose(f);
+                return true;
+            }
+            return false;
+        }
+
+        // Smallest fonts.xml fragment that resolves an "Inter" descriptor
+        // at size "Small" to InterVariable.woff2 — enough to reach
+        // createFont's GL-allocating path. No <use> / inherit / overrides
+        // so the GL fixture's loadXml can skip resolveFontReferences (a
+        // private method that the existing pure-CPU friend covers but
+        // the GL fixture doesn't).
+        constexpr const char* kInterXml =
+            "<fonts>"
+            "  <font_size name='Small' size='12.0'/>"
+            "  <font name='Inter'>"
+            "    <style name='NORMAL'><file>InterVariable.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+    }
+
+    struct llfontregistry_gl_data
+    {
+        ll_test::HeadlessGl& gl = ll_test::getHeadlessGl();
+
+        LLFontRegistry reg{ /*create_gl_textures=*/true };
+
+        llfontregistry_gl_data()
+        {
+            // sVertDPI / sHorizDPI need plausible values for createFont
+            // to compute pixel sizes — the fixture isn't going through
+            // LLFontGL::initClass which would set them. 96 DPI matches
+            // the rest of the test suite.
+            LLFontGL::sVertDPI  = 96.f;
+            LLFontGL::sHorizDPI = 96.f;
+            LLFontGL::sScaleX   = 1.f;
+            LLFontGL::sScaleY   = 1.f;
+            LLFontGL::sAppDir   = kAppDir;
+        }
+
+        bool loadXml(const char* xml)
+        {
+            LLXMLNodePtr root;
+            if (!LLXMLNode::parseBuffer(xml, std::strlen(xml), root, nullptr))
+                return false;
+            if (root.isNull() || !root->hasName("fonts"))
+                return false;
+            return init_from_xml(&reg, root);
+        }
+
+        bool interFontPresent() const
+        {
+            return fileExists(std::string(kFontsDir) + "InterVariable.woff2");
+        }
+    };
+
+    typedef test_group<llfontregistry_gl_data> llfontregistry_gl_test;
+    typedef llfontregistry_gl_test::object     llfontregistry_gl_object;
+    tut::llfontregistry_gl_test llfontregistry_gl_testcase("LLFontRegistry-GL");
+
+    // createFont with mCreateGLTextures=true must produce a head whose
+    // bitmap cache, after rasterizing the ASCII range, has at least one
+    // grayscale page bound to a live GL texture.
+    template<> template<>
+    void llfontregistry_gl_object::test<1>()
+    {
+        if (!interFontPresent())
+        {
+            skip("InterVariable.woff2 not present in test data dir");
+            return;
+        }
+        ensure("parse ok", loadXml(kInterXml));
+
+        LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
+        ensure("getFont resolves Inter/Small", font != nullptr);
+
+        font->generateASCIIglyphs();
+
+        const LLFontFreetype* ft = font->getFontFreetype();
+        ensure("LLFontFreetype present", ft != nullptr);
+
+        const LLFontBitmapCache* cache = ft->getFontBitmapCache();
+        ensure("bitmap cache present", cache != nullptr);
+        ensure("at least one grayscale atlas page",
+               cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
+
+        LLImageGL* page = cache->getImageGL(EFontGlyphType::Grayscale, 0);
+        ensure("page 0 LLImageGL present", page != nullptr);
+        ensure("page 0 has a live GL texture name",
+               page->getTexName() != 0);
+    }
+
+    // getFont(desc) must return the same LLFontGL pointer on a repeat
+    // call — the registry caches by descriptor and a second hit must
+    // not re-create or re-rasterize the head.
+    template<> template<>
+    void llfontregistry_gl_object::test<2>()
+    {
+        if (!interFontPresent())
+        {
+            skip("InterVariable.woff2 not present in test data dir");
+            return;
+        }
+        ensure("parse ok", loadXml(kInterXml));
+
+        LLFontGL* first = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
+        ensure("first getFont resolves", first != nullptr);
+
+        LLFontGL* second = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
+        ensure("second getFont resolves", second != nullptr);
+        ensure("repeat getFont returns the same LLFontGL pointer",
+               first == second);
+    }
+
+    // destroyGL must drop GL textures and reset the face's bitmap cache
+    // without removing registry entries — the LLFontGL pointer stays
+    // valid (so widget caches don't dangle) and getFont still hits.
+    // Reset semantics: LLFontFace::destroyGL → resetBitmapCache clears
+    // the LLImageGL vector entirely, so post-destroyGL the page count
+    // is 0 (not "page count preserved with texname=0"). The next render
+    // through the face re-allocates fresh atlas pages.
+    template<> template<>
+    void llfontregistry_gl_object::test<3>()
+    {
+        if (!interFontPresent())
+        {
+            skip("InterVariable.woff2 not present in test data dir");
+            return;
+        }
+        ensure("parse ok", loadXml(kInterXml));
+
+        LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
+        ensure("getFont resolves", font != nullptr);
+
+        font->generateASCIIglyphs();
+
+        const LLFontBitmapCache* cache = font->getFontFreetype()->getFontBitmapCache();
+        ensure("at least one atlas page before destroyGL",
+               cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
+        ensure("texname live before destroyGL",
+               cache->getImageGL(EFontGlyphType::Grayscale, 0)->getTexName() != 0);
+
+        reg.destroyGL();
+
+        ensure_equals("page vector cleared after destroyGL",
+                      (S32)cache->getNumBitmaps(EFontGlyphType::Grayscale), 0);
+        ensure("registry entry survived destroyGL — same LLFontGL pointer",
+               reg.getFont(LLFontDescriptor("Inter", "Small", 0)) == font);
+    }
+#endif // LL_MESA_HEADLESS
 }

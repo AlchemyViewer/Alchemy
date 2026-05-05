@@ -115,10 +115,21 @@ if (BUILD_TESTING)
   # llwindow + ll::freetype / ll::harfbuzz / ll::plutosvg / ll::glext via
   # its own target_link_libraries; transitive linking propagates them to
   # consumers, so listing llrender alone is enough.
-  set(test_libs llrender)
+  #
+  # When BUILD_HEADLESS=ON, llfontregistry_test gets re-pointed at
+  # llrenderheadless (with LL_MESA_HEADLESS=1) so the trailing GL tests
+  # at the bottom of that file activate. llfontcolrv1 stays on regular
+  # llrender — it doesn't need GL.
   set(test_project llrender)
+  set(test_libs llrender)
+  if (BUILD_HEADLESS)
+    set(registry_test_libs llrenderheadless)
+  else()
+    set(registry_test_libs llrender)
+  endif()
+
   LL_ADD_INTEGRATION_TEST(llfontcolrv1 "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llfontregistry "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfontregistry "" "${registry_test_libs}" "${test_project}")
   if (TARGET INTEGRATION_TEST_llfontcolrv1)
     # Hand the source-tree font directory to the test as a string literal.
     # Tests that need a real font file (Noto-COLRv1.ttf, InterVariable.woff2)
@@ -127,5 +138,31 @@ if (BUILD_TESTING)
     # of the suite.
     target_compile_definitions(INTEGRATION_TEST_llfontcolrv1 PRIVATE
         "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
+  endif()
+
+  if (BUILD_HEADLESS)
+    # Headless GL tests: link against llrenderheadless (which transitively
+    # pulls llwindowheadless + ll::osmesa) so the tests can stand up an
+    # OSMesa GL context and exercise GL-backed code paths. LL_MESA_HEADLESS=1
+    # matches the lib's compile-time configuration; the LLFONT_TEST_*
+    # defs feed source-tree font paths to the tests.
+    set(headless_test_compile_defs
+        LL_MESA_HEADLESS=1
+        "LLFONT_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\""
+        "LLFONT_TEST_FONTS_XML=\"${INDRA_SOURCE_DIR}/newview/skins/default/xui/en/fonts.xml\"")
+
+    if (TARGET INTEGRATION_TEST_llfontregistry)
+      # llfontregistry's GL tests live in the same source file under
+      # #if LL_MESA_HEADLESS — same defs as the standalone llfontgl test.
+      target_compile_definitions(INTEGRATION_TEST_llfontregistry PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
+    LL_ADD_INTEGRATION_TEST(llfontgl "" "llrenderheadless" "${test_project}")
+    if (TARGET INTEGRATION_TEST_llfontgl)
+      target_compile_definitions(INTEGRATION_TEST_llfontgl PRIVATE
+          ${headless_test_compile_defs})
+    endif()
   endif()
 endif()

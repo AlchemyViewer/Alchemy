@@ -1739,6 +1739,35 @@ void LLFontGL::initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::st
     LLFontGL::loadDefaultFonts();
 }
 
+// static
+void LLFontGL::initClass(F32 screen_dpi, F32 x_scale, F32 y_scale,
+                         const std::string& app_dir,
+                         const std::string& fonts_xml_path,
+                         const LLSD& font_overrides,
+                         bool create_gl_textures)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    sVertDPI = (F32)llfloor(screen_dpi * y_scale);
+    sHorizDPI = (F32)llfloor(screen_dpi * x_scale);
+    sScaleX = x_scale;
+    sScaleY = y_scale;
+    sAppDir = app_dir;
+
+    // Single-shot: bail if the registry was already created via either
+    // overload. Reload-with-explicit-path isn't supported — the test
+    // caller initializes once.
+    if (sFontRegistry)
+    {
+        LL_WARNS() << "LLFontGL::initClass(explicit path) called with an existing registry; ignoring" << LL_ENDL;
+        return;
+    }
+
+    sFontRegistry = new LLFontRegistry(create_gl_textures);
+    sFontRegistry->parseFontInfoFromFile(fonts_xml_path, font_overrides);
+
+    LLFontGL::loadDefaultFonts();
+}
+
 void LLFontGL::dumpTextures()
 {
     if (mFontFreetype.notNull())
