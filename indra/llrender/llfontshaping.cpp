@@ -28,6 +28,7 @@
 
 #include "llfontshaping.h"
 #include "llfontfreetype.h"
+#include "llthread.h"
 
 #include <boost/functional/hash.hpp>
 #include <boost/unordered_map.hpp>
@@ -36,6 +37,7 @@
 
 #include <list>
 #include <string>
+#include <string_view>
 
 namespace
 {
@@ -45,6 +47,12 @@ namespace
     // glyphs are stored in *slice-local* coordinates (begin=0) and rebased
     // to original-wstr coords at copy-out time, so the same codepoint
     // sequence in different wstring positions can share an entry.
+    //
+    // The index map owns the canonical key; the LRU list holds a pointer
+    // back into the index so lookups don't store the key twice. Pointer
+    // stability across rehash is guaranteed by boost::unordered_map (node-
+    // based). Iterators may invalidate on rehash, so we store key pointers
+    // and re-find when erasing — the LRU never holds a map iterator.
     struct ShapeCacheKey
     {
         std::u32string        codepoints;
@@ -52,26 +60,79 @@ namespace
         // therefore the shaped output for a given slice; per-codepoint face
         // selection is deterministic downstream.
         const LLFontFreetype* root_face;
+    };
 
-        bool operator==(const ShapeCacheKey& o) const noexcept
-        {
-            return root_face == o.root_face && codepoints == o.codepoints;
-        }
+    // Borrowed counterpart used for cache lookup so hits don't allocate a
+    // u32string just to compute the hash.
+    struct ShapeCacheKeyView
+    {
+        std::u32string_view   codepoints;
+        const LLFontFreetype* root_face;
     };
 
     struct ShapeCacheKeyHash
     {
+        // is_transparent enables boost::unordered_map's heterogeneous find,
+        // so ShapeCacheKeyView can probe a map keyed on ShapeCacheKey.
+        using is_transparent = void;
+
         size_t operator()(const ShapeCacheKey& k) const noexcept
         {
-            size_t h = std::hash<std::u32string>{}(k.codepoints);
-            boost::hash_combine(h, k.root_face);
+            return hash_impl(std::u32string_view(k.codepoints), k.root_face);
+        }
+        size_t operator()(const ShapeCacheKeyView& k) const noexcept
+        {
+            return hash_impl(k.codepoints, k.root_face);
+        }
+    private:
+        // Always hash through the string_view path so both overloads agree
+        // bit-for-bit — std::hash<u32string> and std::hash<u32string_view>
+        // are required to produce the same value, but routing both through
+        // the view variant removes any platform doubt.
+        static size_t hash_impl(std::u32string_view sv, const LLFontFreetype* face) noexcept
+        {
+            size_t h = std::hash<std::u32string_view>{}(sv);
+            boost::hash_combine(h, face);
             return h;
         }
     };
 
-    using ShapeEntry    = std::pair<ShapeCacheKey, std::vector<LLShapedGlyph>>;
-    using ShapeLru      = std::list<ShapeEntry>;
-    using ShapeIndex    = boost::unordered_map<ShapeCacheKey, ShapeLru::iterator, ShapeCacheKeyHash>;
+    struct ShapeCacheKeyEqual
+    {
+        using is_transparent = void;
+
+        bool operator()(const ShapeCacheKey& a, const ShapeCacheKey& b) const noexcept
+        {
+            return a.root_face == b.root_face && a.codepoints == b.codepoints;
+        }
+        bool operator()(const ShapeCacheKey& a, const ShapeCacheKeyView& b) const noexcept
+        {
+            return a.root_face == b.root_face
+                   && std::u32string_view(a.codepoints) == b.codepoints;
+        }
+        bool operator()(const ShapeCacheKeyView& a, const ShapeCacheKey& b) const noexcept
+        {
+            return a.root_face == b.root_face
+                   && a.codepoints == std::u32string_view(b.codepoints);
+        }
+    };
+
+    // ShapeLru holds non-owning pointers to keys stored inside ShapeIndex
+    // entries. Forward-ordered for type dependencies: List depends on Key,
+    // Entry depends on List, Index depends on Entry.
+    using ShapeLru = std::list<const ShapeCacheKey*>;
+
+    struct ShapeEntry
+    {
+        std::vector<LLShapedGlyph> glyphs;
+        // Iterator into sShapeLru pointing at this entry's slot. List
+        // iterators are stable across other-node insert/erase, so this
+        // stays valid until the entry itself is erased.
+        ShapeLru::iterator         lru_pos;
+    };
+
+    using ShapeIndex = boost::unordered_map<ShapeCacheKey, ShapeEntry,
+                                            ShapeCacheKeyHash, ShapeCacheKeyEqual>;
 
     // Rough order-of-magnitude for an active chat window: a few dozen visible
     // lines each with 1-3 shaping runs, plus a few editor buffers. 8192
@@ -89,7 +150,7 @@ namespace
     // rebase them at copy-out time. Reserves/destroys its own hb_buffer.
     void shape_sub_run(const LLFontFreetype*        face,
                        const LLFontFreetype*        root_face,
-                       const LLWString&             slice,
+                       std::u32string_view          slice,
                        size_t                       sub_begin_in_slice,
                        size_t                       sub_end_in_slice,
                        hb_script_t                  script,
@@ -155,7 +216,18 @@ namespace
         {
             sBuf = hb_buffer_create();
             if (!sBuf)
+            {
+                // hb_buffer_create only fails on allocation failure; log
+                // once so the empty-run fallback isn't completely silent
+                // when the system is starved of memory.
+                static thread_local bool sWarned = false;
+                if (!sWarned)
+                {
+                    LL_WARNS("Font") << "hb_buffer_create returned null; shaping disabled" << LL_ENDL;
+                    sWarned = true;
+                }
                 return;
+            }
         }
         hb_buffer_t* buf = sBuf;
         hb_buffer_clear_contents(buf);
@@ -218,7 +290,7 @@ namespace
     // a boundary by themselves; this keeps "Hello, world!" as one run with
     // script LATIN rather than fragmenting at every comma.
     void shape_all_sub_runs(const LLFontFreetype* root_face,
-                            const LLWString&      slice,
+                            std::u32string_view   slice,
                             std::vector<LLShapedGlyph>& out_glyphs)
     {
         const size_t n = slice.size();
@@ -230,6 +302,11 @@ namespace
         const LLFontFreetype* cur_face   = nullptr;
         hb_script_t           cur_script = HB_SCRIPT_INVALID;  // unknown until first non-neutral cp
         size_t                cur_begin  = 0;
+
+        auto set_cur_script_from = [&](hb_script_t cp_script, bool is_neutral)
+        {
+            cur_script = is_neutral ? HB_SCRIPT_INVALID : cp_script;
+        };
 
         auto emit = [&](size_t end_excl) {
             // INVALID surfaces only when a run consists entirely of neutral
@@ -252,9 +329,9 @@ namespace
 
             if (cur_face == nullptr)
             {
-                cur_face   = face;
-                cur_begin  = i;
-                cur_script = is_neutral ? HB_SCRIPT_INVALID : cp_script;
+                cur_face  = face;
+                cur_begin = i;
+                set_cur_script_from(cp_script, is_neutral);
                 continue;
             }
 
@@ -301,6 +378,12 @@ namespace
                     // emoji base sitting on cur_face is the whole point of
                     // routing it there, and the proposed `face` (root) by
                     // definition lacks the astral base.
+                    //
+                    // O(k) walk over the pending sub-run; bails on the first
+                    // miss. Worst case O(n²) on combining-mark-heavy text
+                    // where every mark fails — accepted because (a) such
+                    // text is rare in practice and (b) a successful migration
+                    // is a render-quality fix worth the cost.
                     bool mark_face_covers_sub_run = true;
                     for (size_t j = cur_begin; j < i; ++j)
                     {
@@ -327,9 +410,9 @@ namespace
             if (face_change || script_change)
             {
                 emit(i);
-                cur_face   = face;
-                cur_begin  = i;
-                cur_script = is_neutral ? HB_SCRIPT_INVALID : cp_script;
+                cur_face  = face;
+                cur_begin = i;
+                set_cur_script_from(cp_script, is_neutral);
             }
             else if (cur_script == HB_SCRIPT_INVALID && !is_neutral)
             {
@@ -345,48 +428,59 @@ namespace
 
 const std::vector<LLShapedGlyph>& LLFontShaping::shapeLine(
     const LLFontFreetype* root_face,
-    const LLWString&      wstr,
+    LLWStringView         wstr,
     size_t                begin,
     size_t                end)
 {
+    // The shape path mutates global LRU/index state with no synchronization;
+    // a stray call from a worker thread would corrupt the cache silently.
+    llassert(on_main_thread());
+
     static const std::vector<LLShapedGlyph> sEmpty;
 
     if (!root_face || begin >= end || end > wstr.size())
         return sEmpty;
 
-    // Build the cache key from the slice + root face. Itemization is
+    // Build the lookup view from the slice + root face. Itemization is
     // deterministic given (slice, root_face), so no need to encode the
     // per-codepoint face chain explicitly.
-    ShapeCacheKey key;
-    key.codepoints.assign(wstr.data() + begin, wstr.data() + end);
-    key.root_face = root_face;
+    std::u32string_view slice(wstr.data() + begin, end - begin);
+    ShapeCacheKeyView lookup{slice, root_face};
 
-    if (auto it = sShapeIndex.find(key); it != sShapeIndex.end())
+    if (auto it = sShapeIndex.find(lookup); it != sShapeIndex.end())
     {
-        sShapeLru.splice(sShapeLru.begin(), sShapeLru, it->second);
-        return it->second->second;
+        sShapeLru.splice(sShapeLru.begin(), sShapeLru, it->second.lru_pos);
+        return it->second.glyphs;
     }
 
     // Miss: itemize the slice into per-face sub-runs, shape each on its
     // owning face, and concatenate the glyph streams. Empty results are
     // cached so repeat misses don't re-shape on every frame.
     std::vector<LLShapedGlyph> shaped;
-    shape_all_sub_runs(root_face, key.codepoints, shaped);
+    shape_all_sub_runs(root_face, slice, shaped);
 
-    sShapeLru.emplace_front(std::move(key), std::move(shaped));
-    sShapeIndex.emplace(sShapeLru.front().first, sShapeLru.begin());
+    ShapeCacheKey key;
+    key.codepoints.assign(slice.data(), slice.size());
+    key.root_face = root_face;
+
+    auto [ins, inserted] = sShapeIndex.try_emplace(std::move(key));
+    // Just-missed lookup means inserted is true; no duplicate to merge.
+    sShapeLru.push_front(&ins->first);
+    ins->second.glyphs  = std::move(shaped);
+    ins->second.lru_pos = sShapeLru.begin();
 
     while (sShapeLru.size() > SHAPE_CACHE_LIMIT)
     {
-        sShapeIndex.erase(sShapeLru.back().first);
+        const ShapeCacheKey* tail = sShapeLru.back();
         sShapeLru.pop_back();
+        sShapeIndex.erase(*tail);
     }
 
-    return sShapeLru.front().second;
+    return ins->second.glyphs;
 }
 
 void LLFontShaping::shapeRun(const LLFontFreetype* root_face,
-                             const LLWString&      wstr,
+                             LLWStringView         wstr,
                              size_t                begin,
                              size_t                end,
                              std::vector<LLShapedGlyph>& out_glyphs)
@@ -411,4 +505,26 @@ void LLFontShaping::clearCache()
 {
     sShapeIndex.clear();
     sShapeLru.clear();
+}
+
+void LLFontShaping::clearCacheForFace(const LLFontFreetype* face)
+{
+    if (!face)
+        return;
+
+    // Walk the index — its iterator gives us O(1) erase from the LRU via
+    // the back-reference stored in each entry. Walking the LRU instead
+    // would force a per-key index lookup on every match.
+    for (auto it = sShapeIndex.begin(); it != sShapeIndex.end(); )
+    {
+        if (it->first.root_face == face)
+        {
+            sShapeLru.erase(it->second.lru_pos);
+            it = sShapeIndex.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
 }

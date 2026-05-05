@@ -88,9 +88,8 @@ LLFontManager::LLFontManager()
     error = FT_Init_FreeType(&gFTLibrary);
     if (error)
     {
-        // Clean up freetype libs.
+        // LL_ERRS aborts; FT_Done_FreeType on a failed init is UB anyway.
         LL_ERRS() << "Freetype initialization failure!" << LL_ENDL;
-        FT_Done_FreeType(gFTLibrary);
     }
 
     FT_Int major, minor, patch;
@@ -162,8 +161,9 @@ LLFontFreetype::LLFontFreetype()
 LLFontFreetype::~LLFontFreetype()
 {
     // The shape cache holds LLShapedGlyph entries keyed on
-    // (LLFontFreetype*, glyph_index); ours are about to dangle.
-    LLFontShaping::clearCache();
+    // (LLFontFreetype*, glyph_index); ours are about to dangle. Other
+    // faces' entries stay valid, so only drop ours.
+    LLFontShaping::clearCacheForFace(this);
 
     // Per-head resolution caches hold non-owning pointers into face-owned
     // glyph info entries. Just clear; entries are deleted by ~LLFontFace.
@@ -276,7 +276,8 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     {
         // Reload: cached shape entries depend on the previous face state,
         // and our resolution cache holds entries from the old fallback chain.
-        LLFontShaping::clearCache();
+        // Only this face's entries become stale here — siblings keep theirs.
+        LLFontShaping::clearCacheForFace(this);
     }
     mShapingFaceResolution.clear();
     // Per-head resolution caches hold non-owning pointers into face-owned
@@ -362,15 +363,21 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
 S32 LLFontFreetype::getNumFaces(const std::string& filename)
 {
     // Probe-only: open a temporary face to read num_faces and immediately
-    // close it. Doesn't touch any per-instance state — different from a
-    // full loadFace, which goes through the manager's cache.
-    FT_Face probe = nullptr;
+    // close it. Read the file into a local buffer instead of going through
+    // gFontManagerp->loadFont — the manager caches by filename and would
+    // hold the bytes alive forever for any probe of a font we never end up
+    // loading as a real face.
+    auto contents = LLFile::getContents(filename);
+    if (contents.empty())
+        return 0;
+
     FT_Open_Args openArgs;
     memset(&openArgs, 0, sizeof(openArgs));
-    openArgs.memory_base = gFontManagerp->loadFont(filename, openArgs.memory_size);
-    if (!openArgs.memory_base)
-        return 0;
+    openArgs.memory_base = reinterpret_cast<const FT_Byte*>(contents.data());
+    openArgs.memory_size = static_cast<FT_Long>(contents.size());
     openArgs.flags = FT_OPEN_MEMORY;
+
+    FT_Face probe = nullptr;
     if (FT_Open_Face(gFTLibrary, &openArgs, 0, &probe) != 0)
         return 0;
     S32 num_faces = probe->num_faces;
@@ -699,7 +706,7 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
                 phase_type = EFontGlyphType::Color;
                 break;
             default:
-                llassert_always(true);
+                llassert_always(false);
                 break;
         }
         // All phases must produce the same pixel format — they're the same
@@ -793,11 +800,14 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
         }
         else if (fontp->getFTFace()->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA)
         {
+            // Pass the signed pitch through — setSubImageBGRA walks rows
+            // with signed arithmetic so a negative-pitch (bottom-up) source
+            // lands on the right bytes.
             fontp->mFace->setSubImageBGRA(pos_x, pos_y, bitmap_num,
                             fontp->getFTFace()->glyph->bitmap.width,
                             fontp->getFTFace()->glyph->bitmap.rows,
                             fontp->getFTFace()->glyph->bitmap.buffer,
-                            llabs(fontp->getFTFace()->glyph->bitmap.pitch));
+                            fontp->getFTFace()->glyph->bitmap.pitch);
         }
         else
         {
@@ -998,19 +1008,23 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
         if (error == FT_Err_Out_Of_Memory)
         {
             LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS() << "Out of memory loading glyph for character " << llformat("U+%xu", U32(wch)) << LL_ENDL;
+            LL_ERRS() << "Out of memory loading glyph for character " << llformat("U+%X", U32(wch)) << LL_ENDL;
         }
 
         std::string message = llformat(
             "Error %d (%s) loading wchar %u glyph %u/%u: bitmap_type=%u, load_flags=%d",
             error, FT_Error_String(error), wch, glyph_index, getFTFace()->num_glyphs, bitmap_type, load_flags);
         LL_WARNS_ONCE() << message << LL_ENDL;
-        error = FT_Load_Glyph(getFTFace(), glyph_index, load_flags ^ FT_LOAD_COLOR);
-        if (FT_Err_Invalid_Outline == error
-            || FT_Err_Invalid_Composite == error
-            || (FT_Err_Ok != error && LLStringOps::isEmoji(wch)))
+        // Retry without color rendering — most common cause of failure on
+        // marginal color/SVG glyphs. Use & ~FT_LOAD_COLOR to clear the bit;
+        // an XOR would *add* it on a Grayscale request.
+        error = FT_Load_Glyph(getFTFace(), glyph_index, load_flags & ~FT_LOAD_COLOR);
+        if (FT_Err_Ok != error)
         {
-            // value~0 always corresponds to the 'missing glyph'
+            // value~0 always corresponds to the 'missing glyph'. Unconditional
+            // last-resort fallback so any retry failure (not just Invalid_*
+            // outlines or emoji codepoints) renders the notdef box rather than
+            // hitting the assert below.
             error = FT_Load_Glyph(getFTFace(), 0, FT_LOAD_DEFAULT);
             if (FT_Err_Ok != error)
             {
@@ -1028,7 +1042,7 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
         : FT_RENDER_MODE_NORMAL;
     if (FT_Render_Glyph(getFTFace()->glyph, render_mode) != 0)
     {
-        LL_WARNS() << "Failed to render glyph for character " << llformat("U+%xu", U32(wch)) << " at glyph index " << glyph_index << LL_ENDL;
+        LL_WARNS() << "Failed to render glyph for character " << llformat("U+%X", U32(wch)) << " at glyph index " << glyph_index << LL_ENDL;
     }
 
     mRenderGlyphCount++;
@@ -1250,12 +1264,10 @@ namespace ll
             {
                 mName = aName;
                 mSize = aSize;
-                mRefs = 1;
             }
             std::string mName;
             std::string mAddress;
             std::size_t mSize;
-            U32  mRefs;
         };
     }
 }
@@ -1266,7 +1278,6 @@ U8 const* LLFontManager::loadFont( std::string const &aFilename, long &a_Size)
     std::map< std::string, std::shared_ptr<ll::fonts::LoadedFont> >::iterator itr = m_LoadedFonts.find( aFilename );
     if( itr != m_LoadedFonts.end() )
     {
-        ++itr->second->mRefs;
         // A possible overflow cannot happen here, as it is asserted that the size is less than std::numeric_limits<long>::max() a few lines below.
         a_Size = static_cast<long>(itr->second->mSize);
         return reinterpret_cast<U8 const*>(itr->second->mAddress.c_str());

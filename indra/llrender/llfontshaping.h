@@ -53,20 +53,22 @@ namespace LLFontShaping
     // common script — the minimum setup needed for ZWJ families, VS15/16,
     // skin-tone modifiers, regional-indicator flag pairs, keycap sequences
     // and tag subdivision flags. General BiDi and script-aware shaping are
-    // deliberately out of scope here.
+    // deliberately out of scope here, and HarfBuzz pre/post-context is not
+    // populated at face/script split boundaries — Arabic init/medi/fina
+    // forms across a split won't fire correctly.
     //
     // Results are cached behind a bounded LRU keyed by (codepoints, face),
     // so repeated render/width/hit-test calls on the same text do not pay
     // HarfBuzz's cost every frame. The cache is global (shared across all
     // LLFontGL instances backed by the same face) and invalidated via
-    // clearCache() whenever a face is reloaded.
+    // clearCacheForFace(face) whenever a face is reloaded or destroyed.
     //
     // On entry out_glyphs is cleared. On any failure (null face, bad range,
     // HarfBuzz init failure) it remains empty — the caller should fall back
     // to the 1:1 codepoint path for that run. Empty results are cached too
     // so the failure isn't re-attempted on every frame.
     void shapeRun(const LLFontFreetype* root_face,
-                  const LLWString&      wstr,
+                  LLWStringView         wstr,
                   size_t                begin,
                   size_t                end,
                   std::vector<LLShapedGlyph>& out_glyphs);
@@ -77,21 +79,26 @@ namespace LLFontShaping
     // original-wstr clusters add `begin` once on consumption.
     //
     // The reference is invalidated by any subsequent shapeLine/shapeRun call
-    // or by clearCache(). Intended for renderer hot paths that shape once,
-    // iterate, and discard within a single function call. On failure or
-    // bad input returns a reference to a static empty vector.
+    // or by clearCache/clearCacheForFace. Intended for renderer hot paths
+    // that shape once, iterate, and discard within a single function call.
+    // On failure or bad input returns a reference to a static empty vector.
     const std::vector<LLShapedGlyph>& shapeLine(
         const LLFontFreetype* root_face,
-        const LLWString&      wstr,
+        LLWStringView         wstr,
         size_t                begin,
         size_t                end);
 
-    // Drop every cached shaping result. Must be called when any LLFontFreetype
-    // reloads its FT_Face, since cached LLShapedGlyph entries carry glyph
-    // indices that are only valid for the face's current state. Safe to call
-    // when the cache is empty. Single-threaded; the shape path is main-thread
-    // only.
+    // Drop every cached shaping result. Use this on a registry-wide
+    // reload (e.g. UI scale or skin change) where every face is being
+    // rebuilt anyway. For single-face teardown prefer clearCacheForFace.
+    // Single-threaded; the shape path is main-thread only.
     void clearCache();
+
+    // Drop only the entries owned by `face`. Called from ~LLFontFreetype
+    // and from loadFace() reload, so a face teardown doesn't blow away
+    // unrelated entries cached for siblings. No-op when `face` is null
+    // or has no entries. Single-threaded.
+    void clearCacheForFace(const LLFontFreetype* face);
 }
 
 #endif // LL_LLFONTSHAPING_H

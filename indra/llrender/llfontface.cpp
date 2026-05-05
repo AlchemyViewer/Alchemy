@@ -76,7 +76,12 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
     openArgs.flags = FT_OPEN_MEMORY;
     int error = FT_Open_Face(gFTLibrary, &openArgs, face_index, &mFTFace);
     if (error)
+    {
+        // FT_Open_Face leaves *aface undefined on failure; clear so ~LLFontFace
+        // doesn't call FT_Done_Face on a garbage pointer.
+        mFTFace = nullptr;
         return false;
+    }
 
     // Native-hinted glyphs (HINTING_DEFAULT) are designed by the foundry to
     // sit on the integer pixel grid; subpixel pen position would wash out
@@ -223,7 +228,7 @@ void LLFontFace::destroyGL()
 
 bool LLFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
                                  U16 width, U16 height,
-                                 const U8* data, U32 stride) const
+                                 const U8* data, S32 stride) const
 {
     LLImageRaw* image_raw = mFontBitmapCachep ? mFontBitmapCachep->getImageRaw(EFontGlyphType::Color, bitmap_num) : nullptr;
     if (!image_raw)
@@ -238,15 +243,24 @@ bool LLFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
     if (!image_data)
         return false;
 
+    // FreeType convention: `data` points to the first row in DRAW order
+    // (top of the glyph). `stride` is the signed byte offset to the next
+    // row down; FT may hand us a negative pitch when the buffer is laid
+    // out bottom-up, in which case `data` sits at a higher address than
+    // the rest of the buffer. Use signed arithmetic so both pitch signs
+    // land on the right source bytes.
     for (U32 idxRow = 0; idxRow < height; idxRow++)
     {
-        const U32 nSrcRow = height - 1 - idxRow;
-        const U32 nSrcOffset = nSrcRow * width * image_raw->getComponents();
+        // Atlas is GL bottom-up (memory row 0 = texture bottom). Map atlas
+        // memory row `idxRow` to draw-order source row (height-1-idxRow)
+        // so source-top lands at atlas-top visually.
+        const ptrdiff_t src_row    = (ptrdiff_t)(height - 1 - idxRow);
+        const ptrdiff_t nSrcOffset = src_row * (ptrdiff_t)stride;
         const U32 nDstOffset = (y + idxRow) * image_raw->getWidth() + x;
 
         for (U32 idxCol = 0; idxCol < width; idxCol++)
         {
-            U32 nTemp = nSrcOffset + idxCol * 4;
+            const ptrdiff_t nTemp = nSrcOffset + (ptrdiff_t)idxCol * 4;
             image_data[nDstOffset + idxCol] = data[nTemp + 3] << 24 | data[nTemp] << 16 | data[nTemp + 1] << 8 | data[nTemp + 2];
         }
     }
@@ -307,12 +321,16 @@ void LLFontFace::setSubImageGrayscale(U32 x, U32 y, U32 bitmap_num,
     // Write only the alpha byte per pixel; RGB stays at the page's 255 clear
     // value (set by LLFontBitmapCache::nextOpenPos), which makes the shader's
     // vertex_color * texture path render as vertex_color.rgb with coverage
-    // gating the alpha. Source data is bottom-up (FreeType convention), so
-    // walk source rows in reverse.
+    // gating the alpha. FT's bitmap.buffer points to the first row in draw
+    // order (top); stride is the signed byte offset to the next row down,
+    // so a negative stride means buffer sits at a higher address than the
+    // rest of the data. Use signed arithmetic for from_offset so both pitch
+    // signs land on the right source bytes. Atlas is GL bottom-up, so map
+    // atlas memory row i to draw-order source row (height-1-i).
     for (U32 i = 0; i < height; i++)
     {
         U32 to_offset = (y + i) * target_width + x;
-        U32 from_offset = (height - 1 - i) * stride;
+        ptrdiff_t from_offset = (ptrdiff_t)(height - 1 - i) * (ptrdiff_t)stride;
         for (U32 j = 0; j < width; j++)
         {
             *(target + to_offset * 4 + 3) = *(data + from_offset);

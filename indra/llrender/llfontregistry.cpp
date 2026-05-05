@@ -1581,9 +1581,11 @@ bool LLFontRegistry::reload(const LLSD& font_overrides)
 
     // Drop the global shape cache: every shaped-glyph entry keys on a raw
     // LLFontFreetype* that's about to dangle. ~LLFontFreetype also calls
-    // clearCache when each old freetype drops to refcount 0, but doing it
-    // once up front avoids racing the destructor against new entries the
-    // loop below would otherwise produce.
+    // clearCacheForFace when each old freetype drops to refcount 0, but
+    // here we're rebuilding every head — clearing in one shot up front is
+    // cheaper than O(faces × entries) per-face sweeps and avoids racing
+    // the destructor against new entries the loop below would otherwise
+    // produce.
     LLFontShaping::clearCache();
 
     for (auto& [desc, head] : heads)

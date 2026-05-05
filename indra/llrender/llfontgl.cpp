@@ -1054,19 +1054,20 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
                 LLWStringView(wchars + begin_offset, (size_t)measure_len));
         }
     }
-    std::vector<std::vector<LLShapedGlyph>> shape_glyphs(shape_ranges.size());
-    // LLFontShaping needs an LLWString, not a raw pointer; build one only if
-    // we actually have shape ranges to feed it.
+    // The measurement loop never reads sg.cluster — only x_advance and
+    // glyph_id/face — so take direct const refs into the shape LRU like
+    // the render path does, instead of paying for shapeRun's per-call copy.
+    std::vector<const std::vector<LLShapedGlyph>*> shape_glyphs(shape_ranges.size(), nullptr);
     if (!shape_ranges.empty())
     {
-        LLWString slice(wchars + begin_offset, wchars + measure_end);
+        LLWStringView slice(wchars + begin_offset, (size_t)(measure_end - begin_offset));
         for (size_t s = 0; s < shape_ranges.size(); ++s)
         {
             const size_t rb = shape_ranges[s].first;
             const size_t re = shape_ranges[s].second;
             shape_ranges[s].first  = rb + begin_offset;
             shape_ranges[s].second = re + begin_offset;
-            LLFontShaping::shapeRun(mFontFreetype, slice, rb, re, shape_glyphs[s]);
+            shape_glyphs[s] = &LLFontShaping::shapeLine(mFontFreetype, slice, rb, re);
         }
     }
     size_t next_shape_run = 0;
@@ -1080,7 +1081,7 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
             && (S32)shape_ranges[next_shape_run].first == i)
         {
             const auto  run_range  = shape_ranges[next_shape_run];
-            const auto& run_glyphs = shape_glyphs[next_shape_run];
+            const auto& run_glyphs = *shape_glyphs[next_shape_run];
             ++next_shape_run;
 
             if (!run_glyphs.empty())
@@ -1202,7 +1203,12 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
     // Skip for strict-monospace root face — see render() for rationale.
     const bool root_strict_mono = mFontFreetype->isFixedWidth()
                                && !mFontFreetype->getAllowMonospaceLigatures();
-    std::vector<LLShapedGlyph> shape_glyphs;
+    // shapeLine returns a const ref into the shape LRU; clusters come back
+    // slice-local (relative to begin=0), which equals 0..measure_end here.
+    // Keep the ref bound for the lifetime of the loop — no other shape*
+    // calls fire below, so the LRU entry can't be evicted underneath us.
+    static const std::vector<LLShapedGlyph> sEmptyShape;
+    const std::vector<LLShapedGlyph>* shape_glyphs = &sEmptyShape;
     size_t shape_idx = 0;
     if (!root_strict_mono && max_chars > 0 && wchars[0])
     {
@@ -1211,11 +1217,11 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
             ++measure_end;
         if (measure_end > 0)
         {
-            LLWString slice(wchars, wchars + measure_end);
-            LLFontShaping::shapeRun(mFontFreetype, slice, 0, (size_t)measure_end, shape_glyphs);
+            LLWStringView slice(wchars, (size_t)measure_end);
+            shape_glyphs = &LLFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)measure_end);
         }
     }
-    const bool use_shaped = !shape_glyphs.empty();
+    const bool use_shaped = !shape_glyphs->empty();
 
     S32 i;
     for (i=0; (i < max_chars); i++)
@@ -1267,10 +1273,10 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
             // pass through with cur_x unchanged.
             F32 advance_this = 0.f;
             F32 extent_this  = 0.f;
-            while (shape_idx < shape_glyphs.size()
-                   && shape_glyphs[shape_idx].cluster <= i)
+            while (shape_idx < shape_glyphs->size()
+                   && (*shape_glyphs)[shape_idx].cluster <= i)
             {
-                const auto& sg = shape_glyphs[shape_idx];
+                const auto& sg = (*shape_glyphs)[shape_idx];
                 advance_this += sg.x_advance;
                 const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
                     sg.face, sg.glyph_id, EFontGlyphType::Unspecified);
@@ -1379,9 +1385,11 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
     F32 per_cp_last_extent = 0.f;
     if (!root_strict_mono && start >= 0 && wchars[0])
     {
-        LLWString slice(wchars, wchars + start + 1);
-        std::vector<LLShapedGlyph> shape_glyphs;
-        LLFontShaping::shapeRun(mFontFreetype, slice, 0, (size_t)(start + 1), shape_glyphs);
+        // shapeLine ref valid through the per_cp_advance fill below since
+        // no other shape* calls run in between. Clusters are slice-local
+        // (begin=0), which equals 0..start here.
+        LLWStringView slice(wchars, (size_t)(start + 1));
+        const auto& shape_glyphs = LLFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)(start + 1));
         if (!shape_glyphs.empty())
         {
             per_cp_advance.assign(start + 1, 0.f);
@@ -1516,7 +1524,7 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
     std::vector<std::vector<LLShapedGlyph>> shape_glyphs(shape_ranges.size());
     if (!shape_ranges.empty())
     {
-        LLWString slice(wchars + begin_offset, wchars + slice_end);
+        LLWStringView slice(wchars + begin_offset, (size_t)(slice_end - begin_offset));
         for (size_t s = 0; s < shape_ranges.size(); ++s)
         {
             const size_t rb = shape_ranges[s].first;
@@ -1952,28 +1960,28 @@ LLFontGL::VAlign LLFontGL::vAlignFromName(const std::string& name)
 LLFontGL* LLFontGL::getFontEmojiSmall()
 {
     static LLFontGL* fontp = getFont(LLFontDescriptor("SansSerifEmoji", "Small", 0));
-    return fontp;;
+    return fontp;
 }
 
 //static
 LLFontGL* LLFontGL::getFontEmojiMedium()
 {
     static LLFontGL* fontp = getFont(LLFontDescriptor("SansSerifEmoji", "Medium", 0));
-    return fontp;;
+    return fontp;
 }
 
 //static
 LLFontGL* LLFontGL::getFontEmojiLarge()
 {
     static LLFontGL* fontp = getFont(LLFontDescriptor("SansSerifEmoji", "Large", 0));
-    return fontp;;
+    return fontp;
 }
 
 //static
 LLFontGL* LLFontGL::getFontEmojiHuge()
 {
     static LLFontGL* fontp = getFont(LLFontDescriptor("SansSerifEmoji", "Huge", 0));
-    return fontp;;
+    return fontp;
 }
 
 //static

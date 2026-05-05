@@ -154,10 +154,12 @@ public:
     void setSubImageGrayscale(U32 x, U32 y, U32 bitmap_num,
                               U32 width, U32 height,
                               U8* data, S32 stride = 0) const;
-    // Same for the Color (BGRA) atlas.
+    // Same for the Color (BGRA) atlas. `stride` is FT's signed bitmap.pitch:
+    // negative when the source buffer is bottom-up (data points to the row
+    // at the highest address; rows step backward through memory).
     bool setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
                          U16 width, U16 height,
-                         const U8* data, U32 stride) const;
+                         const U8* data, S32 stride) const;
 
 private:
     LLFontFace(const LLFontFace&) = delete;
