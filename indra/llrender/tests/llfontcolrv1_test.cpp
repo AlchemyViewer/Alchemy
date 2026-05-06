@@ -776,6 +776,138 @@ namespace tut
         hb_font_destroy(hb_font);
     }
 
+    // GLYPH_PAD bump (§10.2): outermost row/column of a rendered glyph
+    // contains no non-zero alpha. Pins that the surface allocates enough
+    // slack around the bbox for AA spread, supersample edge taps, and
+    // post-transform paint commands. A regression that drops PAD back to
+    // 1 (or below) would surface here as a fringe of non-zero pixels at
+    // the buffer boundary that visually clips the glyph at the atlas.
+    template<> template<>
+    void llfontcolrv1_object::test<17>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        hb_font_t* hb_font = face->getHbFont();
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result r;
+        const LLColor4U fg(255, 255, 255, 255);
+        ensure("paintGlyph succeeded",
+               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r));
+        ensure("bitmap valid",
+               r.mBitmap && r.mWidth >= 4 && r.mHeight >= 4);
+
+        // First row, last row.
+        for (S32 x = 0; x < r.mWidth; ++x)
+        {
+            const U8* top    = r.mBitmap                              + x*4;
+            const U8* bottom = r.mBitmap + (ptrdiff_t)(r.mHeight-1)*r.mPitch + x*4;
+            ensure_equals("top row alpha is zero",    (S32)top[3],    0);
+            ensure_equals("bottom row alpha is zero", (S32)bottom[3], 0);
+        }
+        // First column, last column.
+        for (S32 y = 0; y < r.mHeight; ++y)
+        {
+            const U8* left  = r.mBitmap + (ptrdiff_t)y*r.mPitch                + 0*4;
+            const U8* right = r.mBitmap + (ptrdiff_t)y*r.mPitch + (r.mWidth-1)*4;
+            ensure_equals("left col alpha is zero",  (S32)left[3],  0);
+            ensure_equals("right col alpha is zero", (S32)right[3], 0);
+        }
+    }
+
+    // SS path is taken at low ppem (§10.4). Default test face loads at
+    // 14pt @ 96dpi → ppem ≈ 18, well below the 32 ppem threshold, so the
+    // painter should report SS = true. Also pins the lastUsedSupersampling
+    // accessor — a regression that left mLastUsedSupersampling unset would
+    // fail here even if the SS path itself worked.
+    template<> template<>
+    void llfontcolrv1_object::test<18>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        hb_font_t* hb_font = face->getHbFont();
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result r;
+        const LLColor4U fg(255, 255, 255, 255);
+        ensure("paintGlyph at 14pt succeeded",
+               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r));
+        ensure("SS path was taken at low ppem",
+               painter.lastUsedSupersampling());
+    }
+
+    // SS path is skipped above the threshold (§10.4). A face loaded at
+    // 36pt @ 96dpi → ppem ≈ 48 puts us past the 32-ppem cap, so the
+    // painter should report SS = false and rasterize directly at the
+    // atlas dimensions. Pins the threshold gate so a regression that
+    // forces SS unconditionally would surface as a doubled allocation
+    // and rasterization cost on every large glyph.
+    template<> template<>
+    void llfontcolrv1_object::test<19>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        // Custom face key at 50pt — large enough that ppem clears the
+        // SUPERSAMPLE_PPEM_THRESHOLD (32 px) regardless of how
+        // LLFontFace::loadFace converts (point_size, dpi) into the
+        // FreeType pixel size. Independent of the default 14pt face the
+        // other tests use; LLFontManager keys on point_size so the two
+        // faces don't collide.
+        LLFontFaceKey big_key{
+            path,
+            /*face_index=*/0,
+            /*point_size=*/50.f,
+            /*vert_dpi=*/96.f,
+            /*horz_dpi=*/96.f,
+            /*weight=*/-1,
+            EFontHinting::DEFAULT,
+            /*flags=*/0
+        };
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(big_key);
+        ensure("big face loaded", face.notNull() && face->isValid());
+        hb_font_t* hb_font = face->getHbFont();
+        ensure("big hb_font available", hb_font != nullptr);
+
+        unsigned x_ppem = 0, y_ppem = 0;
+        hb_font_get_ppem(hb_font, &x_ppem, &y_ppem);
+        // Locking the threshold; if hb_font reports 0 here (face wasn't
+        // sized through HB), the SS code path falls through to the
+        // fallback_point_size — which we pass at 50.f below — and the
+        // gate still trips correctly.
+        if (x_ppem > 0u)
+            ensure("big face ppem is past the SS threshold",
+                   x_ppem > 32u && y_ppem > 32u);
+
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result r;
+        const LLColor4U fg(255, 255, 255, 255);
+        ensure("paintGlyph at 50pt succeeded",
+               painter.paintGlyph(hb_font, fire, 50.f, fg, 0, r));
+        ensure("SS path was skipped above threshold",
+               !painter.lastUsedSupersampling());
+    }
+
 #if LL_MESA_HEADLESS
     // -------------------------------------------------------------
     // GL-backed group: COLRv1 painter integrated with the LLFontFreetype

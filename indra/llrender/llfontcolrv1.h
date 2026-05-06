@@ -101,6 +101,13 @@ public:
                           foreground, palette_index, OutputFormat::BGRA, out);
     }
 
+    // Test/debug accessor: true if the most recent paintGlyph used 2×
+    // supersampling (low-ppem path). Atlas output is unaffected — the
+    // staging buffer is always at the final per-glyph dimensions — but
+    // tests want to assert SS kicks in below the threshold and skips
+    // above without inferring it from output bytes.
+    bool lastUsedSupersampling() const { return mLastUsedSupersampling; }
+
 private:
     LLFontColrV1Painter(const LLFontColrV1Painter&) = delete;
     LLFontColrV1Painter& operator=(const LLFontColrV1Painter&) = delete;
@@ -111,6 +118,11 @@ private:
     std::vector<U8> mStaging;
     S32             mStagingWidth  = 0;
     S32             mStagingHeight = 0;
+
+    // Tracks whether the last paintGlyph call took the supersampling path.
+    // Exposed via lastUsedSupersampling() for tests; not used for rendering
+    // decisions.
+    bool            mLastUsedSupersampling = false;
 };
 
 #endif // LL_LLFONTCOLRV1_H

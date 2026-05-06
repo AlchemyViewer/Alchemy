@@ -33,10 +33,14 @@ namespace
     // applies here — our callbacks don't recurse on their own.
 
     // Padding around the glyph bbox in surface pixels. Anti-aliased edges of
-    // outline-clipped fills can extend ~1 px past the geometric bbox at the
-    // shader sample positions; the existing atlas allocator already adds a
-    // 4 px border for shadow-tap safety, so 1 px here is plenty.
-    constexpr S32 GLYPH_PAD = 1;
+    // outline-clipped fills, supersampled gradients, and rotated transforms
+    // can spread coverage 1–2 px past the geometric bbox; clipping that
+    // spread to a tight surface produces visible 1-px fringes (especially
+    // on flag emoji built from stacked clip rects). 2 px gives both AA and
+    // post-transform paint commands enough slack without meaningful atlas
+    // cost — the existing 4-px shadow border in LLFontBitmapCache already
+    // subsumes this spread, so atlas footprint is unchanged.
+    constexpr S32 GLYPH_PAD = 2;
 
     // Floor (×256, fixed-point) applied to the alpha channel when folding
     // BGRA premul → Gray. Keeps fully-saturated palette black visible as a
@@ -50,6 +54,14 @@ namespace
     // 256 KB, whichever is larger, so a single huge glyph doesn't strand
     // multiple MB of per-thread memory for the rest of the process.
     constexpr size_t STAGING_HIGH_WATER_BYTES = 256 * 1024;
+
+    // Supersample factor below this ppem. Small glyphs have no inherent AA
+    // budget — gradient transitions and clip edges are 1 px wide, so any
+    // sub-pixel positioning issue surfaces as visible jaggies. 2× SS gives
+    // them 4× the rasterization area to absorb spread without changing the
+    // output (atlas) size. Above the threshold, glyphs already AA naturally
+    // and SS is wasted work.
+    constexpr unsigned SUPERSAMPLE_PPEM_THRESHOLD = 32u;
 
     struct Painter
     {
@@ -311,25 +323,43 @@ namespace
     }
 
     void linear_gradient_cb(hb_paint_funcs_t*, void* data, hb_color_line_t* color_line,
-                            float x0, float y0, float x1, float y1, float /*x2*/, float /*y2*/,
+                            float x0, float y0, float x1, float y1, float x2, float y2,
                             void*)
     {
-        // Note: COLRv1's PaintLinearGradient supplies a third point p2 used
-        // to define a rotation around p0. plutovg's linear gradient doesn't
-        // accept a rotation parameter directly; for the common case where
-        // p2 is collinear with p0..p1 (which it is in nearly all real fonts
-        // because emoji rarely use the rotation slot), the gradient axis
-        // p0->p1 is correct as-is. We accept this approximation; visually
-        // wrong glyphs in a font that uses p2 non-trivially can be fixed
-        // later by computing the projected p1' for plutovg.
+        // COLRv1's PaintLinearGradient supplies a third point p2; the gradient
+        // line is the line through p0 perpendicular to (p2 - p0), and the
+        // gradient parameter t at a point P is the signed projection of (P - p0)
+        // onto p1' = p0 + proj(p1-p0, perp_of(p2-p0)). plutovg's linear gradient
+        // takes (start, end) along the axis directly, so we project p1 onto
+        // that axis to get an effective endpoint that produces the same field.
+        // When p2 is collinear with p0..p1 (the common case), perp_of(p2-p0)
+        // points along p0..p1 and the projection is the identity — falls back
+        // to the current p1 endpoint without a special case.
         Painter* p = static_cast<Painter*>(data);
         if (p->aborted) return;
         slurp_color_stops(*p, color_line);
         if (p->pv_stops.empty())
             return;
 
+        // perp = 90° rotation of (p2 - p0). Either rotation direction works
+        // since we end up dotting p1-p0 against it; chose CCW (-vy, vx).
+        const float vx = x2 - x0;
+        const float vy = y2 - y0;
+        const float perp_x = -vy;
+        const float perp_y =  vx;
+        const float perp_len_sq = perp_x * perp_x + perp_y * perp_y;
+        float p1x = x1, p1y = y1;
+        if (perp_len_sq > 1e-6f)
+        {
+            const float dx = x1 - x0;
+            const float dy = y1 - y0;
+            const float t  = (dx * perp_x + dy * perp_y) / perp_len_sq;
+            p1x = x0 + t * perp_x;
+            p1y = y0 + t * perp_y;
+        }
+
         const plutovg_spread_method_t spread = to_pv_spread(hb_color_line_get_extend(color_line));
-        plutovg_canvas_set_linear_gradient(p->canvas, x0, y0, x1, y1,
+        plutovg_canvas_set_linear_gradient(p->canvas, x0, y0, p1x, p1y,
                                            spread, p->pv_stops.data(),
                                            static_cast<int>(p->pv_stops.size()), nullptr);
         plutovg_canvas_paint(p->canvas);
@@ -471,29 +501,57 @@ namespace
             p->aborted = true;
             return;
         }
+        // 4-rook supersampling pattern. Sample offsets within the pixel are
+        // (1/8, 3/8), (3/8, 7/8), (5/8, 1/8), (7/8, 5/8) — distributes
+        // along both axes, no two samples share an x or y, gives 4× AA on
+        // the angular-jump boundaries that single-sample sweep produces.
+        // 4× the sweep cost in this loop only; bounded by surf_w*surf_h
+        // (≤ 1024×1024) and runs once per glyph, atlas-cached afterward.
+        constexpr int  SS_TAPS = 4;
+        constexpr float SS_OFFSETS[SS_TAPS][2] = {
+            {0.125f, 0.375f}, {0.375f, 0.875f},
+            {0.625f, 0.125f}, {0.875f, 0.625f},
+        };
         for (S32 py = 0; py < p->height; ++py)
         {
             unsigned char* row = lut_data + py * lut_stride;
             for (S32 px = 0; px < p->width; ++px)
             {
-                // Pixel center maps better than corner; +0.5 places the
-                // sample at the geometric center of the texel.
-                float ux, uy;
-                plutovg_matrix_map(&inv, (F32)px + 0.5f, (F32)py + 0.5f, &ux, &uy);
-                const F32 dx = ux - x0;
-                const F32 dy = uy - y0;
-                F32 angle = atan2f(dy, dx);
-                // Walk angle into the sweep range [start_angle, end_angle].
-                F32 t = (angle - start_angle) * inv_span;
-                t = apply_extend(t, extend);
-
-                plutovg_color_t c;
-                interp_stops(p->pv_stops, t, &c);
+                F32 r_acc = 0.f, g_acc = 0.f, b_acc = 0.f, a_acc = 0.f;
+                for (int t_i = 0; t_i < SS_TAPS; ++t_i)
+                {
+                    float ux, uy;
+                    plutovg_matrix_map(&inv,
+                        (F32)px + SS_OFFSETS[t_i][0],
+                        (F32)py + SS_OFFSETS[t_i][1],
+                        &ux, &uy);
+                    const F32 dx = ux - x0;
+                    const F32 dy = uy - y0;
+                    F32 angle = atan2f(dy, dx);
+                    F32 t = (angle - start_angle) * inv_span;
+                    t = apply_extend(t, extend);
+                    plutovg_color_t c;
+                    interp_stops(p->pv_stops, t, &c);
+                    r_acc += c.r;
+                    g_acc += c.g;
+                    b_acc += c.b;
+                    a_acc += c.a;
+                }
+                constexpr F32 INV_TAPS = 1.f / (F32)SS_TAPS;
+                const F32 r = r_acc * INV_TAPS;
+                const F32 g = g_acc * INV_TAPS;
+                const F32 b = b_acc * INV_TAPS;
+                const F32 a = a_acc * INV_TAPS;
                 // Write BGRA premultiplied (plutovg's native surface format).
-                const F32 a8 = c.a * 255.f;
-                const F32 r8 = c.r * a8;  // premultiply
-                const F32 g8 = c.g * a8;
-                const F32 b8 = c.b * a8;
+                // Average colors first, then premultiply — the alternative
+                // (premultiply each tap, then average) gives the same result
+                // because premultiplication and linear averaging commute, but
+                // averaging once at the end keeps rounding error to a single
+                // step per channel.
+                const F32 a8 = a * 255.f;
+                const F32 r8 = r * a8;
+                const F32 g8 = g * a8;
+                const F32 b8 = b * a8;
                 row[px * 4 + 0] = (unsigned char)(b8 + 0.5f);
                 row[px * 4 + 1] = (unsigned char)(g8 + 0.5f);
                 row[px * 4 + 2] = (unsigned char)(r8 + 0.5f);
@@ -737,6 +795,17 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
         }
     }
 
+    // Resolve ppem early — used for both the empty-bbox fallback below and
+    // the supersampling threshold further down. Falls back to the caller-
+    // supplied point_size when the hb_font has no scale set; that lets
+    // paintGlyph still produce a sized surface for misconfigured faces.
+    unsigned x_ppem = 0, y_ppem = 0;
+    hb_font_get_ppem(hb_font, &x_ppem, &y_ppem);
+    if (x_ppem == 0 && fallback_point_size > 0.f)
+        x_ppem = static_cast<unsigned>(fallback_point_size + 0.5f);
+    if (y_ppem == 0 && fallback_point_size > 0.f)
+        y_ppem = static_cast<unsigned>(fallback_point_size + 0.5f);
+
     // Empty bbox happens for COLRv1 ligature glyphs (notably ZWJ emoji like
     // family-of-three or flags) whose underlying outline glyph is a stub —
     // the paint tree carries the visual content but the cmap/glyf entry has
@@ -747,18 +816,6 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
     // to the surface, which is acceptable for the rare-edge case.
     if (bbox_width == 0 || bbox_height == 0)
     {
-        unsigned x_ppem = 0, y_ppem = 0;
-        hb_font_get_ppem(hb_font, &x_ppem, &y_ppem);
-        // Fall back to the caller-supplied point_size when the hb_font has
-        // no scale set. Avoids returning a hard `false` on misconfigured
-        // faces; the resulting bbox is generous (2 em square) but at least
-        // gives the paint walk somewhere to draw.
-        if (x_ppem == 0)
-            x_ppem = (fallback_point_size > 0.f)
-                ? static_cast<unsigned>(fallback_point_size + 0.5f) : 0u;
-        if (y_ppem == 0)
-            y_ppem = (fallback_point_size > 0.f)
-                ? static_cast<unsigned>(fallback_point_size + 0.5f) : 0u;
         if (x_ppem == 0 || y_ppem == 0)
             return false;
         const S32 ppem_x_64 = static_cast<S32>(x_ppem) * 64;
@@ -798,8 +855,20 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
         return false;
     }
 
+    // Supersample factor: 2 below the threshold, 1 above. Output (atlas)
+    // dims stay (surf_w, surf_h); the plutovg surface is allocated at
+    // (surf_w * ss_factor, surf_h * ss_factor) and box-downsampled into
+    // mStaging post-paint. Threshold gates on BOTH ppem axes so a font
+    // with anisotropic scale doesn't half-supersample.
+    const int ss_factor = (x_ppem > 0u && x_ppem <= SUPERSAMPLE_PPEM_THRESHOLD &&
+                           y_ppem > 0u && y_ppem <= SUPERSAMPLE_PPEM_THRESHOLD)
+                          ? 2 : 1;
+    mLastUsedSupersampling = (ss_factor > 1);
+    const S32 ss_w = surf_w * ss_factor;
+    const S32 ss_h = surf_h * ss_factor;
+
     Painter p;
-    p.surface = plutovg_surface_create(surf_w, surf_h);
+    p.surface = plutovg_surface_create(ss_w, ss_h);
     if (!p.surface)
         return false;
     // Plutovg doc doesn't explicitly guarantee zero-init; do it ourselves so
@@ -815,8 +884,11 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
         plutovg_surface_destroy(p.surface);
         return false;
     }
-    p.width  = surf_w;
-    p.height = surf_h;
+    // Painter sees the full SS surface dimensions. push_group_cb /
+    // sweep_gradient_cb allocate sub-surfaces against p.width/p.height,
+    // so they need to match the plutovg surface, not the final atlas size.
+    p.width  = ss_w;
+    p.height = ss_h;
     p.origin_x     = (F32)bbox_x_bearing;
     p.origin_y_top = (F32)bbox_y_bearing;
     // hb_color_t is little-endian uint32 layout: blue=byte3, green=byte2,
@@ -833,10 +905,18 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
     // P maps to (-left_px+PAD + (1/64)*P.x, top_px+PAD + (-1/64)*P.y) device.
     // Test: HB top-left (x_bearing, y_bearing) -> (PAD, PAD); HB origin (0,0)
     //       -> (-left_px+PAD, top_px+PAD). Both match the surface layout.
+    //
+    // For supersampling, both the translate and the scale are multiplied
+    // by ss_factor so HB(x_bearing, y_bearing) lands at (PAD*ss, PAD*ss)
+    // on the SS surface — the entire device coord system scales linearly,
+    // and a 2×2 box downsample post-paint lines back up exactly with the
+    // atlas dims.
     constexpr F32 INV_64 = 1.f / 64.f;
-    plutovg_canvas_translate(p.canvas, (F32)(-left_px) + (F32)GLYPH_PAD,
-                                       (F32)top_px    + (F32)GLYPH_PAD);
-    plutovg_canvas_scale(p.canvas, INV_64, -INV_64);
+    const F32 ss_f = (F32)ss_factor;
+    plutovg_canvas_translate(p.canvas,
+        ((F32)(-left_px) + (F32)GLYPH_PAD) * ss_f,
+        ((F32)top_px    + (F32)GLYPH_PAD) * ss_f);
+    plutovg_canvas_scale(p.canvas, INV_64 * ss_f, -INV_64 * ss_f);
 
     // Walk the paint tree. Palette index comes from the caller (typically
     // computed by LLFontFace::load from the EmojiUseDarkPalette setting and
@@ -866,14 +946,15 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
         return teardown(false);
     }
 
-    // Surface is BGRA premultiplied (plutovg native), top-row first. Query
-    // the stride rather than assuming tight packing — plutovg's documented
-    // contract is bytes-per-row, which may include padding. The Gray output
-    // path collapses to a 1-byte/pixel buffer; the BGRA path is a row-by-
-    // row copy that respects the source stride.
+    // Surface is BGRA premultiplied (plutovg native), top-row first, at
+    // (ss_w, ss_h). Query the stride rather than assuming tight packing —
+    // plutovg's documented contract is bytes-per-row and may include
+    // padding. The Gray output path collapses each pixel to 1 byte; the
+    // BGRA path is a row-by-row copy. Both paths box-downsample by 2×2
+    // when ss_factor == 2.
     const S32 src_stride = plutovg_surface_get_stride(p.surface);
     const unsigned char* src = plutovg_surface_get_data(p.surface);
-    if (src_stride < surf_w * 4 || !src)
+    if (src_stride < ss_w * 4 || !src)
     {
         // Sanity: a sane plutovg surface has stride >= width*4 bytes. If
         // we ever see less, the build has changed pixel format under us
@@ -881,6 +962,18 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
         // Fail loudly into the caller's outline-fallback path.
         return teardown(false);
     }
+
+    // Per-source-pixel hybrid fold for the Gray path. Lifted into a lambda
+    // so the SS box-downsample can call it on each of the four source
+    // pixels in a 2×2 block before averaging — `max` doesn't commute with
+    // averaging, so the floor must apply per source pixel, not per block.
+    auto fold_gray = [](U8 b, U8 g, U8 r, U8 a) -> U32 {
+        const U32 y_256     = (U32)r * 54u + (U32)g * 183u + (U32)b * 18u;
+        const U32 floor_256 = (U32)a * GRAY_ALPHA_FLOOR_256;
+        const U32 cov_256   = (y_256 > floor_256) ? y_256 : floor_256;
+        const U32 cov       = cov_256 >> 8;
+        return cov > 255u ? 255u : cov;
+    };
 
     if (format == OutputFormat::Gray)
     {
@@ -892,21 +985,43 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
         // register as a silhouette against light text colors.
         const size_t bytes = static_cast<size_t>(surf_w) * static_cast<size_t>(surf_h);
         mStaging.resize(bytes);
-        for (S32 y = 0; y < surf_h; ++y)
+        if (ss_factor == 1)
         {
-            const unsigned char* row = src + (ptrdiff_t)y * src_stride;
-            U8* dst = mStaging.data() + (ptrdiff_t)y * surf_w;
-            for (S32 x = 0; x < surf_w; ++x)
+            for (S32 y = 0; y < surf_h; ++y)
             {
-                const U8 b = row[x * 4 + 0];
-                const U8 g = row[x * 4 + 1];
-                const U8 r = row[x * 4 + 2];
-                const U8 a = row[x * 4 + 3];
-                const U32 y_256     = (U32)r * 54u + (U32)g * 183u + (U32)b * 18u; // Y << 8
-                const U32 floor_256 = (U32)a * GRAY_ALPHA_FLOOR_256;
-                const U32 cov_256   = (y_256 > floor_256) ? y_256 : floor_256;
-                const U32 cov       = cov_256 >> 8;
-                dst[x] = (U8)(cov > 255u ? 255u : cov);
+                const unsigned char* row = src + (ptrdiff_t)y * src_stride;
+                U8* dst = mStaging.data() + (ptrdiff_t)y * surf_w;
+                for (S32 x = 0; x < surf_w; ++x)
+                {
+                    dst[x] = (U8)fold_gray(row[x*4+0], row[x*4+1],
+                                           row[x*4+2], row[x*4+3]);
+                }
+            }
+        }
+        else
+        {
+            // 2×2 box average of per-source-pixel folds. Round-to-nearest
+            // via (sum + 2) >> 2 keeps the destination centered between
+            // the four taps without cumulative bias.
+            for (S32 dy = 0; dy < surf_h; ++dy)
+            {
+                U8* dst = mStaging.data() + (ptrdiff_t)dy * surf_w;
+                for (S32 dx = 0; dx < surf_w; ++dx)
+                {
+                    U32 sum = 0;
+                    for (int oy = 0; oy < 2; ++oy)
+                    {
+                        const unsigned char* row =
+                            src + (ptrdiff_t)(dy*2 + oy) * src_stride;
+                        for (int ox = 0; ox < 2; ++ox)
+                        {
+                            const S32 sx = dx*2 + ox;
+                            sum += fold_gray(row[sx*4+0], row[sx*4+1],
+                                             row[sx*4+2], row[sx*4+3]);
+                        }
+                    }
+                    dst[dx] = (U8)((sum + 2u) >> 2);
+                }
             }
         }
         out.mPitch  = surf_w;
@@ -914,18 +1029,50 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
     }
     else
     {
-        // BGRA copy. Honor source stride: when src_stride > surf_w*4 the
+        // BGRA copy. Honor source stride: when src_stride > ss_w*4 the
         // padding bytes are skipped, and the destination is written tightly
         // packed (out.mPitch == surf_w*4) so downstream consumers can
         // continue to assume tight rows.
         const S32 dst_stride = surf_w * 4;
         const size_t bytes = static_cast<size_t>(dst_stride) * static_cast<size_t>(surf_h);
         mStaging.resize(bytes);
-        for (S32 y = 0; y < surf_h; ++y)
+        if (ss_factor == 1)
         {
-            std::memcpy(mStaging.data() + (ptrdiff_t)y * dst_stride,
-                        src + (ptrdiff_t)y * src_stride,
-                        (size_t)dst_stride);
+            for (S32 y = 0; y < surf_h; ++y)
+            {
+                std::memcpy(mStaging.data() + (ptrdiff_t)y * dst_stride,
+                            src + (ptrdiff_t)y * src_stride,
+                            (size_t)dst_stride);
+            }
+        }
+        else
+        {
+            // 2×2 box average per channel. Premultiplied BGRA averages
+            // linearly — both luminance and alpha scale linearly with the
+            // mixing ratio, so straight per-channel averaging is correct.
+            for (S32 dy = 0; dy < surf_h; ++dy)
+            {
+                U8* drow = mStaging.data() + (ptrdiff_t)dy * dst_stride;
+                for (S32 dx = 0; dx < surf_w; ++dx)
+                {
+                    U32 sb = 0, sg = 0, sr = 0, sa = 0;
+                    for (int oy = 0; oy < 2; ++oy)
+                    {
+                        const unsigned char* srow =
+                            src + (ptrdiff_t)(dy*2 + oy) * src_stride;
+                        for (int ox = 0; ox < 2; ++ox)
+                        {
+                            const unsigned char* sp = srow + (dx*2 + ox)*4;
+                            sb += sp[0]; sg += sp[1]; sr += sp[2]; sa += sp[3];
+                        }
+                    }
+                    U8* dp = drow + dx*4;
+                    dp[0] = (U8)((sb + 2u) >> 2);
+                    dp[1] = (U8)((sg + 2u) >> 2);
+                    dp[2] = (U8)((sr + 2u) >> 2);
+                    dp[3] = (U8)((sa + 2u) >> 2);
+                }
+            }
         }
         out.mPitch  = dst_stride;
         out.mFormat = OutputFormat::BGRA;
