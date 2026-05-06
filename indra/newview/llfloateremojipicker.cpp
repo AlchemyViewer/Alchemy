@@ -441,11 +441,17 @@ void LLFloaterEmojiPicker::initialize()
             return;
         }
 
+        if (mVariantFlyout)
+        {
+            dismissVariantFlyout();
+        }
+
         mGroups->setVisible(false);
         mFocusedIconRow = -1;
         mFocusedIconCol = -1;
         mFocusedIcon = nullptr;
         mHoveredIcon = nullptr;
+        mFlyoutBaseIcon = nullptr;
         mEmojiScroll->goToTop();
         mEmojiGrid->clearPanels();
 
@@ -711,10 +717,18 @@ void LLFloaterEmojiPicker::fillEmojis(bool fromResize)
 
     mRecentMaxIcons = max_icons;
 
+    // Tear down the flyout first — its base-icon pointer is about to
+    // dangle once we clear the grid panels.
+    if (mVariantFlyout)
+    {
+        dismissVariantFlyout();
+    }
+
     mFocusedIconRow = 0;
     mFocusedIconCol = 0;
     mFocusedIcon = nullptr;
     mHoveredIcon = nullptr;
+    mFlyoutBaseIcon = nullptr;
     mEmojiScroll->goToTop();
     mEmojiGrid->clearPanels();
     mPreview->setIcon(nullptr);
@@ -1250,42 +1264,67 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
     S32 width  = PADDING * 2 + CELL * COLS;
     S32 height = PADDING * 2 + CELL * row_count;
 
-    // Position the flyout next to the base icon, picking the side with
-    // the most room. Prefer above (long-press intuition of "the variants
-    // come up"); fall back below when the cell is near the top. Clamp
-    // only when neither side fits.
+    // Position the flyout next to the base icon. Prefer to the side
+    // (right then left) so the flyout doesn't sit on top of the section
+    // headers/dividers that live in the vertical gaps between grid rows.
+    // Fall back to above-or-below if neither side fits.
     LLRect base_rect = baseIcon->calcScreenRect();
     LLRect floater_rect = calcScreenRect();
+    S32 base_left   = base_rect.mLeft   - floater_rect.mLeft;
+    S32 base_right  = base_rect.mRight  - floater_rect.mLeft;
     S32 base_top    = base_rect.mTop    - floater_rect.mBottom;
     S32 base_bottom = base_rect.mBottom - floater_rect.mBottom;
-    S32 cx = base_rect.mLeft + base_rect.getWidth() / 2 - floater_rect.mLeft;
+    S32 cy = (base_top + base_bottom) / 2;
+    S32 cx = (base_left + base_right) / 2;
 
+    S32 floater_w = getRect().getWidth();
     S32 floater_h = getRect().getHeight();
-    S32 space_above = floater_h - base_top;
-    S32 space_below = base_bottom;
+    S32 space_right = floater_w - base_right;
+    S32 space_left  = base_left;
     const S32 GAP = 4;
 
-    S32 bottom;
-    if (space_above >= height + GAP)
+    S32 left, bottom;
+    if (space_right >= width + GAP)
     {
-        bottom = base_top + GAP;
+        left   = base_right + GAP;
+        bottom = llclamp(cy - height / 2, 0, floater_h - height);
     }
-    else if (space_below >= height + GAP)
+    else if (space_left >= width + GAP)
     {
-        bottom = base_bottom - GAP - height;
+        left   = base_left - GAP - width;
+        bottom = llclamp(cy - height / 2, 0, floater_h - height);
     }
     else
     {
-        bottom = llclamp(base_top + GAP, 0, floater_h - height);
+        // Neither side fits — fall back to vertical placement above the
+        // base when there's room there, otherwise below.
+        S32 space_above = floater_h - base_top;
+        S32 space_below = base_bottom;
+        if (space_above >= height + GAP)
+            bottom = base_top + GAP;
+        else if (space_below >= height + GAP)
+            bottom = base_bottom - GAP - height;
+        else
+            bottom = llclamp(base_top + GAP, 0, floater_h - height);
+        left = llclamp(cx - width / 2, 0, floater_w - width);
     }
-
-    S32 left = llclamp(cx - width / 2, 0, getRect().getWidth() - width);
 
     LLPanel::Params panel_params;
     panel_params.name("variant_flyout");
     panel_params.background_visible(true);
     panel_params.background_opaque(true);
-    panel_params.bg_opaque_color(LLUIColorTable::instance().getColor("MenuDefaultBgColor", LLColor4(0.f, 0.f, 0.f, 0.9f)));
+    // mouse_opaque so hover/click events don't fall through to the main
+    // grid icons sitting underneath the flyout. Without this, the grid
+    // icon under a flyout cell ALSO receives mouse-enter, fires
+    // onEmojiMouseEnter → selectGridIcon, and overwrites the preview
+    // (showing the base shortcode) plus highlights itself in the grid.
+    panel_params.mouse_opaque(true);
+    // Force fully opaque background — the theme's MenuDefaultBgColor often
+    // ships with alpha < 1.0, which lets section headers and grid rows
+    // bleed through the flyout.
+    LLColor4 flyout_bg = LLUIColorTable::instance().getColor("MenuDefaultBgColor", LLColor4(0.f, 0.f, 0.f, 1.0f)).get();
+    flyout_bg.setAlpha(1.f);
+    panel_params.bg_opaque_color(flyout_bg);
     LLPanel* flyout = LLUICtrlFactory::create<LLPanel>(panel_params);
     flyout->setRect(LLRect(left, bottom + height, left + width, bottom));
 
@@ -1331,19 +1370,13 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
             if (auto* p = dynamic_cast<LLEmojiGridIcon*>(c))
             {
                 p->setBackgroundVisible(false);
-                // Fall back to the keyboard-focused flyout cell so the
-                // preview tracks the keyboard cursor when the mouse
-                // wanders off.
-                if (mPreview)
-                {
-                    LLEmojiGridIcon* fallback = nullptr;
-                    if (mFlyoutFocusRow >= 0 && mFlyoutFocusRow < (S32)mFlyoutCells.size()
-                        && mFlyoutFocusCol >= 0 && mFlyoutFocusCol < (S32)mFlyoutCells[mFlyoutFocusRow].size())
-                    {
-                        fallback = mFlyoutCells[mFlyoutFocusRow][mFlyoutFocusCol];
-                    }
-                    mPreview->setIcon(fallback);
-                }
+                // Don't touch the preview here. The framework fires
+                // onMouseEnter for the new view BEFORE onMouseLeave for the
+                // old one — so when cursor moves cell A → cell B, B's
+                // enter has already set the preview to B and a leave-side
+                // setIcon would overwrite it back to a stale fallback.
+                // The next mouse-enter (whichever view receives it) is
+                // responsible for updating the preview.
             }
         });
         cell->setMouseUpCallback([this](LLUICtrl* c, S32, S32, MASK)
@@ -1403,6 +1436,24 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
 
     addChild(flyout);
     mVariantFlyout = flyout;
+    // Drop any stale main-grid highlights (from earlier keyboard nav or
+    // a previously hovered icon). Without this, mFocusedIcon /
+    // mHoveredIcon stay lit and the user sees two highlighted icons in
+    // the grid: the base icon (pinned by us) and the leftover.
+    if (mFocusedIcon && mFocusedIcon != baseIcon)
+    {
+        unselectGridIcon(mFocusedIcon);
+    }
+    if (mHoveredIcon && mHoveredIcon != baseIcon && mHoveredIcon != mFocusedIcon)
+    {
+        unselectGridIcon(mHoveredIcon);
+    }
+    // Pin the base icon as visually selected so the user can see which
+    // emoji's variants they're browsing. onEmojiMouseEnter/Leave check
+    // mFlyoutBaseIcon and skip the usual unselect path while the flyout
+    // is up.
+    mFlyoutBaseIcon = baseIcon;
+    selectGridIcon(baseIcon);
 
     // Initial keyboard focus lands on the first valid cell, scanning
     // top-left to bottom-right. That's typically the gender=-1 row's
@@ -1504,6 +1555,19 @@ void LLFloaterEmojiPicker::dismissVariantFlyout()
     mFlyoutCells.clear();
     mFlyoutFocusRow = -1;
     mFlyoutFocusCol = -1;
+
+    // The base was pinned as selected while the flyout was open. Drop
+    // the highlight unless it's also the currently hovered/focused icon
+    // (in which case the normal hover/focus path keeps it lit).
+    if (mFlyoutBaseIcon)
+    {
+        if (mFlyoutBaseIcon != mHoveredIcon && mFlyoutBaseIcon != mFocusedIcon)
+        {
+            unselectGridIcon(mFlyoutBaseIcon);
+        }
+        mFlyoutBaseIcon = nullptr;
+    }
+
     // Restore the preview to whichever main-grid icon is currently
     // hovered or focused; otherwise blank it.
     if (mPreview)
@@ -1564,12 +1628,19 @@ void LLFloaterEmojiPicker::onEmojiMouseEnter(LLUICtrl* ctrl)
 {
     if (LLEmojiGridIcon* icon = dynamic_cast<LLEmojiGridIcon*>(ctrl))
     {
-        if (mFocusedIcon && mFocusedIcon != icon && mFocusedIcon->isBackgroundVisible())
+        // While the variant flyout is up, the base icon is "locked" —
+        // hovering other grid icons must not highlight them or hijack
+        // the preview. The user is interacting with the flyout; only
+        // the pinned base may show as selected in the grid.
+        if (mVariantFlyout && icon != mFlyoutBaseIcon)
+            return;
+
+        if (mFocusedIcon && mFocusedIcon != icon && mFocusedIcon != mFlyoutBaseIcon && mFocusedIcon->isBackgroundVisible())
         {
             unselectGridIcon(mFocusedIcon);
         }
 
-        if (mHoveredIcon && mHoveredIcon != icon)
+        if (mHoveredIcon && mHoveredIcon != icon && mHoveredIcon != mFlyoutBaseIcon)
         {
             unselectGridIcon(mHoveredIcon);
         }
@@ -1589,7 +1660,9 @@ void LLFloaterEmojiPicker::onEmojiMouseLeave(LLUICtrl* ctrl)
 
         if (icon == mHoveredIcon)
         {
-            if (icon != mFocusedIcon)
+            // Keep the flyout's base icon highlighted while the flyout
+            // is open even after the mouse wanders off.
+            if (icon != mFocusedIcon && icon != mFlyoutBaseIcon)
             {
                 unselectGridIcon(icon);
             }
@@ -1672,6 +1745,9 @@ void LLFloaterEmojiPicker::selectFocusedIcon()
 
 bool LLFloaterEmojiPicker::moveFocusedIconUp()
 {
+    if (mHoveredIcon)
+        return false;
+
     for (S32 i = mFocusedIconRow - 1; i >= 0; --i)
     {
         LLScrollingPanel* panel = mEmojiGrid->getPanelList()[i];
@@ -1690,6 +1766,9 @@ bool LLFloaterEmojiPicker::moveFocusedIconUp()
 
 bool LLFloaterEmojiPicker::moveFocusedIconDown()
 {
+    if (mHoveredIcon)
+        return false;
+
     auto rowCount = mEmojiGrid->getPanelList().size();
     for (size_t i = mFocusedIconRow + 1; i < rowCount; ++i)
     {

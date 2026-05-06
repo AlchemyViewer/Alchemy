@@ -128,6 +128,13 @@ private:
     class LLPanel* mToneStrip { nullptr };
     class LLPanel* mVariantFlyout { nullptr };
     bool mVariantFlyoutPendingDismiss { false };
+    // Main-grid icon that opened the current flyout. Pinned to the
+    // selected/highlighted state for the duration of the flyout so the
+    // user can see which base they're picking variants from. Reset to
+    // nullptr in dismissVariantFlyout. Cleared (without unhighlighting)
+    // by fillEmojis when the grid is rebuilt — the icon is gone in that
+    // case, so the pointer would dangle.
+    LLEmojiGridIcon* mFlyoutBaseIcon { nullptr };
     // 2D matrix of variant-flyout cells; nullptr entries are "gaps"
     // (e.g. man-astronaut has no tone-3 variant in the data). Used by
     // the keyboard nav to walk only valid cells.

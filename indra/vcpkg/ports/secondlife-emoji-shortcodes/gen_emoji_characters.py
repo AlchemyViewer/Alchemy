@@ -37,26 +37,10 @@ ALLOWED_FOLDERS = {'da', 'de', 'en', 'es', 'fr', 'it', 'ja', 'pl', 'pt', 'ru', '
 # Skin-tone modifiers (Fitzpatrick) — emojibase uses tone integers 1..5.
 # We carry the integer through to LLSD; the C++ side maps 1..5 to
 # light / medium-light / medium / medium-dark / dark.
-
-# Gender codes used in the Variants LLSD: -1 unset, 0 man, 1 woman, 2 person.
-GENDER_MAN = 0
-GENDER_WOMAN = 1
-GENDER_PERSON = 2
-
-# Match a leading gender token in a primary shortcode such as
-# "man_health_worker", "woman_astronaut", "person_climbing". Used to roll
-# gender-ZWJ siblings up under a single base.
-_GENDER_PREFIX_RE = re.compile(r'^(man|woman|person)_(.+)$')
-
-# Recognised hair tags inside a shortcode suffix. Order matters for the
-# `_red_hair` / `_curly_hair` / `_white_hair` / `_bald` regex below.
-_HAIR_SUFFIXES = {
-    '_red_hair':   'red',
-    '_curly_hair': 'curly',
-    '_white_hair': 'white',
-    '_bald':       'bald',
-}
-_HAIR_SUFFIX_RE = re.compile(r'^(.*?)(_red_hair|_curly_hair|_white_hair|_bald)$')
+#
+# Gender (man/woman/person) and hair (*_red_haired, *_white_haired, *_bald,
+# etc.) are NOT collapsed into Variants — those entries stay as their own
+# top-level emoji in the picker grid. Only skin-tone is folded.
 
 
 def hexcode_to_chars(hexcode):
@@ -111,138 +95,9 @@ def collect_skin_variants(entry, emojibase_map, cldr_map):
             'hexcode': child['hexcode'],
             'tone': tone1,
             'tone2': tone2,
-            'gender': -1,
-            'hair': '',
             'shortcodes': child_sc,
         })
     return variants
-
-
-def group_gender_triples(top_level_entries):
-    """Identify man/woman/person shortcode siblings.
-
-    Returns (demoted_hexcodes, base_to_extra_variants) where
-    base_to_extra_variants maps a "promoted" entry's hexcode to a list of
-    additional variant dicts (the demoted gender siblings, plus their own
-    skin children with Gender set).
-    """
-    by_suffix = {}  # suffix → {gender_token: entry}
-    for entry in top_level_entries:
-        sc = primary_shortcode(entry['shortcodes'])
-        if not sc:
-            continue
-        m = _GENDER_PREFIX_RE.match(sc)
-        if not m:
-            continue
-        token, suffix = m.group(1), m.group(2)
-        by_suffix.setdefault(suffix, {})[token] = entry
-
-    demoted = set()
-    base_to_extras = {}
-
-    for suffix, group in by_suffix.items():
-        # Need at least 2 of the 3 to consider this a real gender axis.
-        if len(group) < 2:
-            continue
-
-        # Promote person > woman > man.
-        if 'person' in group:
-            base_token = 'person'
-        elif 'woman' in group:
-            base_token = 'woman'
-        else:
-            base_token = 'man'
-        base_entry = group[base_token]
-
-        gender_for = {'man': GENDER_MAN, 'woman': GENDER_WOMAN, 'person': GENDER_PERSON}
-
-        # Annotate the base's pre-existing skin variants with the base's
-        # gender so findVariant on the C++ side can match by gender even
-        # when the user has chosen a tone for the base form.
-        for v in base_entry['variants']:
-            if v['gender'] == -1:
-                v['gender'] = gender_for[base_token]
-
-        extras = []
-        for token, entry in group.items():
-            if token == base_token:
-                continue
-            g = gender_for[token]
-            # The demoted entry itself becomes a (no-tone, gender) variant.
-            extras.append({
-                'character': entry['character'],
-                'hexcode': entry['hexcode'],
-                'tone': 0,
-                'tone2': 0,
-                'gender': g,
-                'hair': '',
-                'shortcodes': entry['shortcodes'],
-            })
-            # Its existing skin variants get re-tagged with this gender.
-            for v in entry['variants']:
-                v['gender'] = g
-                extras.append(v)
-            demoted.add(entry['hexcode'])
-
-        base_to_extras[base_entry['hexcode']] = extras
-
-    return demoted, base_to_extras
-
-
-def group_hair_variants(top_level_entries, already_demoted):
-    """Identify *_red_hair / *_curly_hair / *_white_hair / *_bald siblings.
-
-    Each hair-tagged shortcode (e.g. ":man_red_hair:") is folded under the
-    matching un-tagged entry (e.g. ":man:") as a Hair variant. The
-    un-tagged entry stays at top level; the hair entry is demoted.
-
-    Returns (demoted_hexcodes, base_to_extra_variants) — same shape as
-    group_gender_triples so callers can merge results.
-    """
-    by_shortcode = {}
-    for entry in top_level_entries:
-        if entry['hexcode'] in already_demoted:
-            continue
-        sc = primary_shortcode(entry['shortcodes'])
-        if sc:
-            by_shortcode[sc] = entry
-
-    demoted = set()
-    base_to_extras = {}
-
-    for entry in top_level_entries:
-        if entry['hexcode'] in already_demoted:
-            continue
-        sc = primary_shortcode(entry['shortcodes'])
-        if not sc:
-            continue
-        m = _HAIR_SUFFIX_RE.match(sc)
-        if not m:
-            continue
-        bare_sc, hair_suffix = m.group(1), m.group(2)
-        hair_label = _HAIR_SUFFIXES[hair_suffix]
-        base_entry = by_shortcode.get(bare_sc)
-        if not base_entry or base_entry is entry:
-            continue
-
-        # The hair entry itself becomes a Hair variant.
-        extras = base_to_extras.setdefault(base_entry['hexcode'], [])
-        extras.append({
-            'character': entry['character'],
-            'hexcode': entry['hexcode'],
-            'tone': 0,
-            'tone2': 0,
-            'gender': entry['variants'][0]['gender'] if entry['variants'] else -1,
-            'hair': hair_label,
-            'shortcodes': entry['shortcodes'],
-        })
-        # Its skin children become tone+hair variants.
-        for v in entry['variants']:
-            v['hair'] = hair_label
-            extras.append(v)
-        demoted.add(entry['hexcode'])
-
-    return demoted, base_to_extras
 
 
 def xml_escape_amp(s):
@@ -260,12 +115,6 @@ def emit_variant_xml(variant):
     if variant.get('tone2'):
         parts.append('\t\t\t\t\t<key>Tone2</key>\n')
         parts.append(f'\t\t\t\t\t<integer>{variant["tone2"]}</integer>\n')
-    if variant['gender'] != -1:
-        parts.append('\t\t\t\t\t<key>Gender</key>\n')
-        parts.append(f'\t\t\t\t\t<integer>{variant["gender"]}</integer>\n')
-    if variant.get('hair'):
-        parts.append('\t\t\t\t\t<key>Hair</key>\n')
-        parts.append(f'\t\t\t\t\t<string>{variant["hair"]}</string>\n')
     if variant['shortcodes']:
         parts.append('\t\t\t\t\t<key>ShortCodes</key>\n')
         parts.append('\t\t\t\t\t<array>\n')
@@ -360,27 +209,11 @@ def build_entries(data, cldr, emojibase, messages):
         }
         entries.append(entry)
 
-    # Pass 2 — group man/woman/person triples and demote the non-promoted
-    # ones into Variants of the promoted entry.
-    demoted, base_to_extras = group_gender_triples(entries)
-
-    # Pass 3 — fold *_red_hair / *_curly_hair / etc. siblings under their
-    # un-tagged base. Operates after gender grouping so the demote sets
-    # don't overlap.
-    hair_demoted, hair_extras = group_hair_variants(entries, demoted)
-    demoted = demoted | hair_demoted
-    for hex_, extras in hair_extras.items():
-        base_to_extras.setdefault(hex_, []).extend(extras)
-
-    final_entries = []
-    for entry in entries:
-        if entry['hexcode'] in demoted:
-            continue
-        if entry['hexcode'] in base_to_extras:
-            entry['variants'] = entry['variants'] + base_to_extras[entry['hexcode']]
-        final_entries.append(entry)
-
-    return final_entries
+    # Gender + hair entries (man_X, woman_X, person_X, *_red_haired,
+    # *_white_haired, *_bald, …) stay as their own top-level emoji.
+    # Skin-tone children remain folded into each entry's Variants list
+    # via collect_skin_variants above — that's the only axis we collapse.
+    return entries
 
 
 def render_xml(entries):
@@ -436,11 +269,12 @@ def run_self_test(entries):
     if overlap:
         failures.append(f"top-level/variant overlap: {sorted(overlap)[:5]}...")
 
-    # 2. Each variant must have at least one identifying axis (tone, gender, or hair).
+    # 2. Every variant must carry a tone (tone1 only) or a tone pair
+    #    (tone1 + tone2). Skin-tone is the only axis we fold now.
     for e in entries:
         for v in e['variants']:
-            if not v['tone'] and v['gender'] == -1 and not v.get('hair'):
-                failures.append(f"variant without tone, gender, or hair: {v['hexcode']} under {e['hexcode']}")
+            if not v['tone']:
+                failures.append(f"variant without tone: {v['hexcode']} under {e['hexcode']}")
 
     # 3. Stats.
     n_with_variants = sum(1 for e in entries if e['variants'])
@@ -449,7 +283,7 @@ def run_self_test(entries):
     print(f"  bases with variants: {n_with_variants}")
     print(f"  total variants: {n_variants}")
 
-    # 4. Spot checks: thumbs_up should have 5 tone variants.
+    # 4. Spot check: thumbs_up should have 5 tone variants.
     for e in entries:
         if e['shortcodes'] and e['shortcodes'][0] == 'thumbs_up':
             tones = sorted({v['tone'] for v in e['variants'] if v['tone']})
@@ -457,13 +291,20 @@ def run_self_test(entries):
                 failures.append(f":thumbs_up: tones = {tones}, expected [1..5]")
             break
 
-    # 5. Spot check: astronaut family should have woman+man variants.
-    for e in entries:
-        if e['shortcodes'] and 'astronaut' in e['shortcodes'][0]:
-            genders = sorted({v['gender'] for v in e['variants'] if v['gender'] != -1})
-            if not genders:
-                failures.append(f"astronaut entry {e['shortcodes'][0]} has no gender variants")
-            break
+    # 5. Hair-tagged shortcodes (man_white_haired, woman_red_haired, …)
+    #    MUST appear as their own top-level entries — we no longer fold
+    #    them under :man:/:woman:.
+    top_shortcodes = {sc for e in entries for sc in (e['shortcodes'] or [])}
+    for hair_sc in ('woman_white_haired', 'man_white_haired',
+                    'woman_red_haired', 'man_curly_haired', 'woman_bald'):
+        if hair_sc not in top_shortcodes:
+            failures.append(f":{hair_sc}: should be a top-level entry, not folded as a variant")
+
+    # 6. Same for gender siblings — woman_astronaut, man_astronaut, etc.
+    #    must remain top-level distinct emoji.
+    for gender_sc in ('woman_astronaut', 'man_astronaut'):
+        if gender_sc not in top_shortcodes:
+            failures.append(f":{gender_sc}: should be a top-level entry, not folded as a gender variant")
 
     if failures:
         print("FAIL:")
