@@ -168,9 +168,9 @@ public:
     static void applyMUPose(std::string& text);
     static void applyOOCClose(std::string& text);
 
-protected:
     void updateUsedEmojis(LLWStringView text);
 
+protected:
     S32  mFloaterExtraWidth;
 
     bool mIsNearbyChat;

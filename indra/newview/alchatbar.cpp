@@ -336,6 +336,12 @@ void ALChatBar::sendChat( EChatType type )
             S32 channel = 0;
             LLFloaterIMNearbyChat::stripChannelNumber(text, &channel);
 
+            LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
+            if (nearby_chat)
+            {
+                nearby_chat->updateUsedEmojis(text);
+            }
+
             std::string utf8text = wstring_to_utf8str(text);
 
             if (type == CHAT_TYPE_OOC)
