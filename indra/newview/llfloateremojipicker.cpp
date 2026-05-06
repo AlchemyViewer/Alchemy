@@ -268,7 +268,7 @@ protected:
     {
         F32 x0 = x;
         F32 x1 = (F32)max_pixels;
-        LLFontGL* font = LLFontGL::getFontEmojiLarge();
+        LLFontGL* font = LLFontGL::getFontSansSerifHuge();
         if (mBegin)
         {
             LLWString text = mTitle.substr(0, mBegin);
@@ -358,18 +358,6 @@ bool LLFloaterEmojiPicker::postBuild()
 
     buildToneStrip();
 
-    // Re-render the grid when the tone preference changes so existing
-    // open pickers reflect the new tone immediately.
-    if (LLControlVariable* ctrl = gSavedSettings.getControl("EmojiSkinTonePreference").get())
-    {
-        mTonePrefConnection = ctrl->getCommitSignal()->connect(
-            [this](LLControlVariable*, const LLSD&, const LLSD&)
-            {
-                refreshToneStripHighlight();
-                fillEmojis(true);
-            });
-    }
-
     return LLFloater::postBuild();
 }
 
@@ -427,6 +415,11 @@ void LLFloaterEmojiPicker::dirtyRect()
             resizeGroupButtons();
             fillEmojis(true);
         }
+    }
+
+    if (mToneStrip && mToneStrip->getRect().getWidth() != mToneStripLastWidth)
+    {
+        layoutToneStripButtons();
     }
 }
 
@@ -796,15 +789,61 @@ void LLFloaterEmojiPicker::fillEmojisCategory(const std::vector<LLEmojiSearchRes
     const std::string& category, const LLPanel::Params& row_panel_params, const LLUICtrl::Params& row_list_params,
     const LLPanel::Params& icon_params, const LLRect& icon_rect, S32 max_icons, const LLColor4& bg)
 {
-    // Place the category title
-    std::string title =
-        category == FREQUENTLY_USED_CATEGORY ? getString("title_for_frequently_used") :
-        isupper(category.front()) ? category : LLStringUtil::capitalize(category);
-    LLEmojiGridDivider* div = new LLEmojiGridDivider(row_panel_params, title);
-    mEmojiGrid->addPanel(div, true);
+    // Decide whether to emit the group-level divider. When the category
+    // has descriptors with non-empty subcategories AND we're in the
+    // unfiltered browsing path, the per-subgroup dividers serve as
+    // section headers and the group divider becomes redundant noise
+    // (the active group button already conveys group context).
+    bool show_group_divider = true;
+    if (mFilterPattern.empty() && category != FREQUENTLY_USED_CATEGORY)
+    {
+        const auto& category2Descr = LLEmojiDictionary::instance().getCategory2Descrs();
+        auto c2d = category2Descr.find(category);
+        if (c2d != category2Descr.end())
+        {
+            for (const LLEmojiDescriptor* descr : c2d->second)
+            {
+                if (!descr->Subcategory.empty())
+                {
+                    show_group_divider = false;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (show_group_divider)
+    {
+        const std::string title =
+            category == FREQUENTLY_USED_CATEGORY ? getString("title_for_frequently_used") :
+            isupper(category.front()) ? category : LLStringUtil::capitalize(category);
+        LLEmojiGridDivider* div = new LLEmojiGridDivider(row_panel_params, title);
+        mEmojiGrid->addPanel(div, true);
+    }
 
     int icon_index = 0;
     LLEmojiGridRow* row = nullptr;
+
+    // Track the active subcategory so we can emit a smaller divider on
+    // every transition. Subdividers only fire in the unfiltered,
+    // non-recents path — recents have no meaningful subgroup structure
+    // and search results are better shown as one flat match list.
+    std::string current_subcat;
+    auto maybe_emit_subdivider = [&](const std::string& subcat)
+    {
+        if (subcat.empty() || subcat == current_subcat)
+            return;
+        current_subcat = subcat;
+        // Reset row tracking so the next emoji starts on its own row
+        // beneath the new sub-divider, even if the previous row was
+        // mid-fill.
+        icon_index = 0;
+        row = nullptr;
+        const std::string sub_title =
+            (!subcat.empty() && isupper(subcat.front())) ? subcat : LLStringUtil::capitalize(subcat);
+        LLEmojiGridDivider* sub_div = new LLEmojiGridDivider(row_panel_params, sub_title);
+        mEmojiGrid->addPanel(sub_div, true);
+    };
 
     if (mFilterPattern.empty())
     {
@@ -837,6 +876,7 @@ void LLFloaterEmojiPicker::fillEmojisCategory(const std::vector<LLEmojiSearchRes
             {
                 for (const LLEmojiDescriptor* descr : c2d->second)
                 {
+                    maybe_emit_subdivider(descr->Subcategory);
                     emoji.Character = descr->Character;
                     emoji.String = descr->ShortCodes.front();
                     createEmojiIcon(emoji, category, row_panel_params, row_list_params, icon_params,
@@ -946,14 +986,9 @@ void LLFloaterEmojiPicker::buildToneStrip()
     if (!mToneStrip)
         return;
 
-    // Six buttons: "no preference" + 5 tones. They sit in a single row
-    // across the top of the picker. Width is divvied evenly so resizing
-    // the floater keeps them aligned.
-    const S32 BUTTON_COUNT = 6;
-    S32 strip_width = mToneStrip->getRect().getWidth();
-    S32 strip_height = mToneStrip->getRect().getHeight();
-    S32 button_width = strip_width / BUTTON_COUNT;
-
+    // Six buttons: "no preference" + 5 tones. Construct them once with
+    // a placeholder rect; layoutToneStripButtons() (called from here and
+    // from dirtyRect on resize) sets the actual rects.
     LLButton::Params params;
     params.font = LLFontGL::getFontEmojiLarge();
     params.tab_stop = false;
@@ -962,12 +997,12 @@ void LLFloaterEmojiPicker::buildToneStrip()
     {
         params.name = name;
         LLButton* button = LLUICtrlFactory::create<LLButton>(params);
-        LLRect rect(button_width * (tone_value + 1), strip_height,
-                    button_width * (tone_value + 2), 0);
-        // tone_value -1..4 → button index 0..5
-        button->setRect(rect);
         button->setLabel(LLUIString(LLWString(1, glyph)));
         button->setToolTip(getString(tooltip_key));
+        // Render the tone-modifier glyph in its own font color from the
+        // start — without this the buttons inherit the disabled-grey
+        // styling and the swatches look washed out until first hover.
+        button->setUseFontColor(true);
         S32 captured_tone = tone_value;
         button->setClickedCallback([this, captured_tone](LLUICtrl*, const LLSD&) { onToneButtonClick(captured_tone); });
         mToneStrip->addChild(button);
@@ -982,14 +1017,47 @@ void LLFloaterEmojiPicker::buildToneStrip()
                     "tone_" + std::to_string(i + 1));
     }
 
+    layoutToneStripButtons();
     refreshToneStripHighlight();
+}
+
+void LLFloaterEmojiPicker::layoutToneStripButtons()
+{
+    if (!mToneStrip)
+        return;
+
+    const S32 BUTTON_COUNT = 6;
+    S32 strip_width = mToneStrip->getRect().getWidth();
+    S32 strip_height = mToneStrip->getRect().getHeight();
+    S32 button_width = strip_width / BUTTON_COUNT;
+    mToneStripLastWidth = strip_width;
+
+    auto place = [&](const std::string& name, S32 index)
+    {
+        if (LLButton* b = mToneStrip->findChild<LLButton>(name))
+        {
+            b->setRect(LLRect(button_width * index, strip_height,
+                              button_width * (index + 1), 0));
+        }
+    };
+
+    place("tone_none", 0);
+    for (S32 i = 0; i < 5; ++i)
+    {
+        place("tone_" + std::to_string(i + 1), i + 1);
+    }
 }
 
 void LLFloaterEmojiPicker::onToneButtonClick(S32 tone)
 {
     gSavedSettings.setS32("EmojiSkinTonePreference", tone);
-    // The setting-change listener takes care of refreshing the grid +
-    // tone-strip highlight, so we don't need to call them here directly.
+    // Drive the refresh directly rather than waiting on the setting's
+    // commit signal — the indirect path proved unreliable when the
+    // setting's previous value already matched (no signal fires) and
+    // when the connection wired in postBuild raced with the floater's
+    // initial fillEmojis pass.
+    refreshToneStripHighlight();
+    fillEmojis();
 }
 
 void LLFloaterEmojiPicker::refreshToneStripHighlight()
@@ -1003,7 +1071,6 @@ void LLFloaterEmojiPicker::refreshToneStripHighlight()
         if (LLButton* b = mToneStrip->findChild<LLButton>(name))
         {
             b->setToggleState(on);
-            b->setUseFontColor(on);
         }
     };
 
@@ -1075,29 +1142,151 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
     if (!descr || descr->Variants.empty())
         return;
 
-    // Build a transient panel of LLEmojiGridIcons: one for the base ("no
-    // preference") plus one per variant.
+    // Detect whether the base is a "tone-pair" base (couples kissing,
+    // holding hands, etc.) — those entries carry Tone2 != 0 and don't
+    // have meaningful gender/hair axes. They get a dedicated 5x5 grid
+    // (Tone × Tone2) instead of the (Gender, Hair) × Tone layout that
+    // single-tone bases use.
+    const bool tone_pair_mode = std::any_of(descr->Variants.begin(), descr->Variants.end(),
+        [](const LLEmojiVariant& v) { return v.Tone2 != 0; });
+
+    // Each row of the flyout corresponds to a (Gender, Hair) bucket
+    // (single-tone bases) OR to first-tone (tone-pair bases). Cells
+    // within a row map to tones — column 0 is the "bare" entry for
+    // single-tone rows, columns 1..5 are tones 1..5; tone-pair rows
+    // use columns 1..5 directly for the second tone.
+    struct Row
+    {
+        S8 gender = -1;                               // single-tone mode
+        std::string hair;                             // single-tone mode
+        U8 first_tone = 0;                            // tone-pair mode
+        const LLEmojiVariant* tone_zero = nullptr;    // bare entry (single-tone, may be null)
+        std::array<const LLEmojiVariant*, 5> tones {}; // index 0..4 → tone 1..5, may be null
+    };
+
+    std::vector<Row> rows;
+
+    if (tone_pair_mode)
+    {
+        // 5 rows × 5 columns (Tone × Tone2). Each variant slots into
+        // exactly one cell.
+        for (U8 t = 1; t <= 5; ++t)
+        {
+            Row r;
+            r.first_tone = t;
+            rows.push_back(r);
+        }
+        for (const LLEmojiVariant& v : descr->Variants)
+        {
+            if (v.Tone < 1 || v.Tone > 5) continue;
+            if (v.Tone2 < 1 || v.Tone2 > 5) continue;
+            rows[v.Tone - 1].tones[v.Tone2 - 1] = &v;
+        }
+    }
+    else
+    {
+        // Bucket by (Gender, Hair). Hair entries get their own rows so
+        // a hair=red tone-3 doesn't collide with a non-hair tone-3 in
+        // the same column. The base's own character occupies the
+        // gender=-1, hair="" row's column 0.
+        auto get_or_make_row = [&](S8 gender, const std::string& hair) -> Row&
+        {
+            for (Row& r : rows)
+                if (r.gender == gender && r.hair == hair) return r;
+            Row r;
+            r.gender = gender;
+            r.hair = hair;
+            rows.push_back(r);
+            return rows.back();
+        };
+
+        for (const LLEmojiVariant& v : descr->Variants)
+        {
+            Row& row = get_or_make_row(v.Gender, v.Hair);
+            if (v.Tone == 0)
+            {
+                row.tone_zero = &v;
+            }
+            else if (v.Tone >= 1 && v.Tone <= 5)
+            {
+                row.tones[v.Tone - 1] = &v;
+            }
+        }
+        // Stable order:
+        //   1. (gender=-1, hair="")  — the base axis (top of the grid)
+        //   2. By gender rank: person (2), woman (1), man (0), other
+        //   3. Within a gender: hair="" first, then red, curly, white, bald
+        auto hair_rank = [](const std::string& h) -> int {
+            if (h.empty())     return 0;
+            if (h == "red")    return 1;
+            if (h == "curly")  return 2;
+            if (h == "white")  return 3;
+            if (h == "bald")   return 4;
+            return 5;
+        };
+        auto gender_rank = [](S8 g) -> int {
+            switch (g) {
+            case -1: return 0;
+            case 2:  return 1;
+            case 1:  return 2;
+            case 0:  return 3;
+            default: return 4;
+            }
+        };
+        std::sort(rows.begin(), rows.end(), [&](const Row& a, const Row& b)
+        {
+            int ga = gender_rank(a.gender), gb = gender_rank(b.gender);
+            if (ga != gb) return ga < gb;
+            return hair_rank(a.hair) < hair_rank(b.hair);
+        });
+    }
+
+    // 6 columns (none + 5 tones) × N rows. Tone-pair mode reuses the
+    // same column count, leaving column 0 empty.
+    const S32 CELL = 28;
+    const S32 PADDING = 4;
+    const S32 COLS = 6;
+    S32 row_count = (S32)rows.size();
+    S32 width  = PADDING * 2 + CELL * COLS;
+    S32 height = PADDING * 2 + CELL * row_count;
+
+    // Position the flyout next to the base icon, picking the side with
+    // the most room. Prefer above (long-press intuition of "the variants
+    // come up"); fall back below when the cell is near the top. Clamp
+    // only when neither side fits.
+    LLRect base_rect = baseIcon->calcScreenRect();
+    LLRect floater_rect = calcScreenRect();
+    S32 base_top    = base_rect.mTop    - floater_rect.mBottom;
+    S32 base_bottom = base_rect.mBottom - floater_rect.mBottom;
+    S32 cx = base_rect.mLeft + base_rect.getWidth() / 2 - floater_rect.mLeft;
+
+    S32 floater_h = getRect().getHeight();
+    S32 space_above = floater_h - base_top;
+    S32 space_below = base_bottom;
+    const S32 GAP = 4;
+
+    S32 bottom;
+    if (space_above >= height + GAP)
+    {
+        bottom = base_top + GAP;
+    }
+    else if (space_below >= height + GAP)
+    {
+        bottom = base_bottom - GAP - height;
+    }
+    else
+    {
+        bottom = llclamp(base_top + GAP, 0, floater_h - height);
+    }
+
+    S32 left = llclamp(cx - width / 2, 0, getRect().getWidth() - width);
+
     LLPanel::Params panel_params;
     panel_params.name("variant_flyout");
     panel_params.background_visible(true);
     panel_params.background_opaque(true);
     panel_params.bg_opaque_color(LLUIColorTable::instance().getColor("MenuDefaultBgColor", LLColor4(0.f, 0.f, 0.f, 0.9f)));
     LLPanel* flyout = LLUICtrlFactory::create<LLPanel>(panel_params);
-
-    const S32 CELL = 28;
-    const S32 PADDING = 4;
-    S32 cell_count = 1 + (S32)descr->Variants.size();
-    S32 width = PADDING * 2 + CELL * cell_count;
-    S32 height = PADDING * 2 + CELL;
-
-    // Position the flyout above the base icon, clamped to the floater's
-    // client area so it doesn't spill off-screen.
-    LLRect base_rect = baseIcon->calcScreenRect();
-    LLRect floater_rect = calcScreenRect();
-    S32 cx = base_rect.mLeft + base_rect.getWidth() / 2 - floater_rect.mLeft;
-    S32 cy = base_rect.mTop - floater_rect.mBottom + 4;
-    S32 left = llclamp(cx - width / 2, 0, getRect().getWidth() - width);
-    S32 bottom = llclamp(cy, 0, getRect().getHeight() - height);
     flyout->setRect(LLRect(left, bottom + height, left + width, bottom));
 
     LLPanel::Params cell_params;
@@ -1105,26 +1294,57 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
 
     static LLUIColor hover_color = LLUIColorTable::instance().getColor("MenuItemHighlightBgColor", LLColor4(0.75f, 0.75f, 0.75f, 1.0f));
 
-    auto add_cell = [&](S32 x_offset, const LLWString& seq, const std::string& shortcode)
+    // Reset cell matrix; sized to the row/col grid even when some entries
+    // stay nullptr (data gaps). Keyboard nav walks this.
+    mFlyoutCells.assign(row_count, std::vector<LLEmojiGridIcon*>(COLS, nullptr));
+
+    auto add_cell = [&](S32 col, S32 row_index, const LLWString& seq, const std::string& shortcode)
     {
+        if (seq.empty())
+            return; // skip — empty cell, preserves grid alignment without rendering
+
         LLEmojiSearchResult sr(seq, shortcode, 0, 0);
         LLEmojiGridIcon* cell = new LLEmojiGridIcon(cell_params, sr);
-        cell->setRect(LLRect(x_offset, PADDING + CELL, x_offset + CELL, PADDING));
+        // Y coordinates are bottom-up; topmost row should sit at the top
+        // of the flyout.
+        S32 cell_left   = PADDING + col * CELL;
+        S32 cell_right  = cell_left + CELL;
+        S32 cell_top    = height - PADDING - row_index * CELL;
+        S32 cell_bottom = cell_top - CELL;
+        cell->setRect(LLRect(cell_left, cell_top, cell_right, cell_bottom));
         cell->setBackgroundColor(hover_color);
         cell->setBackgroundOpaque(true);
-        // Hover highlight — match the main-grid hover affordance. We use
-        // a dedicated pair of callbacks here (rather than the floater's
-        // onEmojiMouseEnter/Leave) so the flyout cells don't perturb the
-        // floater's mFocusedIcon/mHoveredIcon tracking.
-        cell->setMouseEnterCallback([](LLUICtrl* c, const LLSD&)
+        cell->setMouseEnterCallback([this](LLUICtrl* c, const LLSD&)
         {
             if (auto* p = dynamic_cast<LLEmojiGridIcon*>(c))
+            {
                 p->setBackgroundVisible(true);
+                // Update the floater's preview pane so the variant's
+                // shortcode + name show under the cursor — matches the
+                // main-grid hover affordance via selectGridIcon().
+                if (mPreview)
+                    mPreview->setIcon(p);
+            }
         });
-        cell->setMouseLeaveCallback([](LLUICtrl* c, const LLSD&)
+        cell->setMouseLeaveCallback([this](LLUICtrl* c, const LLSD&)
         {
             if (auto* p = dynamic_cast<LLEmojiGridIcon*>(c))
+            {
                 p->setBackgroundVisible(false);
+                // Fall back to the keyboard-focused flyout cell so the
+                // preview tracks the keyboard cursor when the mouse
+                // wanders off.
+                if (mPreview)
+                {
+                    LLEmojiGridIcon* fallback = nullptr;
+                    if (mFlyoutFocusRow >= 0 && mFlyoutFocusRow < (S32)mFlyoutCells.size()
+                        && mFlyoutFocusCol >= 0 && mFlyoutFocusCol < (S32)mFlyoutCells[mFlyoutFocusRow].size())
+                    {
+                        fallback = mFlyoutCells[mFlyoutFocusRow][mFlyoutFocusCol];
+                    }
+                    mPreview->setIcon(fallback);
+                }
+            }
         });
         cell->setMouseUpCallback([this](LLUICtrl* c, S32, S32, MASK)
         {
@@ -1132,20 +1352,142 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
                 commitVariant(picked->getChar());
         });
         flyout->addChild(cell);
+        mFlyoutCells[row_index][col] = cell;
     };
 
-    S32 x = PADDING;
-    add_cell(x, descr->Character,
-             descr->ShortCodes.empty() ? std::string() : descr->ShortCodes.front());
-    x += CELL;
-    for (const LLEmojiVariant& v : descr->Variants)
+    auto first_shortcode = [](const std::list<std::string>& codes) -> std::string
     {
-        add_cell(x, v.Character, v.ShortCodes.empty() ? std::string() : v.ShortCodes.front());
-        x += CELL;
+        return codes.empty() ? std::string() : codes.front();
+    };
+
+    for (S32 ri = 0; ri < row_count; ++ri)
+    {
+        const Row& r = rows[ri];
+
+        if (tone_pair_mode)
+        {
+            // Tone-pair: row index encodes the first tone, columns 1..5
+            // encode the second tone. Column 0 stays empty.
+            for (S32 t = 0; t < 5; ++t)
+            {
+                if (const LLEmojiVariant* v = r.tones[t])
+                {
+                    add_cell(t + 1, ri, v->Character, first_shortcode(v->ShortCodes));
+                }
+            }
+        }
+        else
+        {
+            // Column 0 — the "bare" (no-tone) entry for this (Gender, Hair)
+            // bucket. For (gender=-1, hair="") that's the base's own
+            // character; for any other bucket it's the row's tone_zero
+            // variant when present.
+            if (r.gender == -1 && r.hair.empty())
+            {
+                add_cell(0, ri, descr->Character, first_shortcode(descr->ShortCodes));
+            }
+            else if (r.tone_zero)
+            {
+                add_cell(0, ri, r.tone_zero->Character, first_shortcode(r.tone_zero->ShortCodes));
+            }
+
+            for (S32 t = 0; t < 5; ++t)
+            {
+                if (const LLEmojiVariant* v = r.tones[t])
+                {
+                    add_cell(t + 1, ri, v->Character, first_shortcode(v->ShortCodes));
+                }
+            }
+        }
     }
 
     addChild(flyout);
     mVariantFlyout = flyout;
+
+    // Initial keyboard focus lands on the first valid cell, scanning
+    // top-left to bottom-right. That's typically the gender=-1 row's
+    // column 0 (the base "no preference" cell).
+    mFlyoutFocusRow = -1;
+    mFlyoutFocusCol = -1;
+    for (S32 ri = 0; ri < (S32)mFlyoutCells.size() && mFlyoutFocusRow < 0; ++ri)
+    {
+        for (S32 ci = 0; ci < (S32)mFlyoutCells[ri].size(); ++ci)
+        {
+            if (mFlyoutCells[ri][ci])
+            {
+                setFlyoutFocus(ri, ci);
+                break;
+            }
+        }
+    }
+}
+
+void LLFloaterEmojiPicker::clearFlyoutFocus()
+{
+    if (mFlyoutFocusRow >= 0 && mFlyoutFocusRow < (S32)mFlyoutCells.size()
+        && mFlyoutFocusCol >= 0 && mFlyoutFocusCol < (S32)mFlyoutCells[mFlyoutFocusRow].size())
+    {
+        if (LLEmojiGridIcon* prev = mFlyoutCells[mFlyoutFocusRow][mFlyoutFocusCol])
+            prev->setBackgroundVisible(false);
+    }
+    mFlyoutFocusRow = -1;
+    mFlyoutFocusCol = -1;
+}
+
+void LLFloaterEmojiPicker::setFlyoutFocus(S32 row, S32 col)
+{
+    clearFlyoutFocus();
+    if (row < 0 || row >= (S32)mFlyoutCells.size())
+        return;
+    if (col < 0 || col >= (S32)mFlyoutCells[row].size())
+        return;
+    LLEmojiGridIcon* cell = mFlyoutCells[row][col];
+    if (!cell)
+        return;
+    cell->setBackgroundVisible(true);
+    if (mPreview)
+        mPreview->setIcon(cell);
+    mFlyoutFocusRow = row;
+    mFlyoutFocusCol = col;
+}
+
+bool LLFloaterEmojiPicker::moveFlyoutFocus(S32 dRow, S32 dCol)
+{
+    if (mFlyoutCells.empty())
+        return false;
+
+    // Walk in the requested direction skipping nullptr (gap) cells. If
+    // we hit a row/column boundary without finding a target, give up
+    // and leave focus where it was — same shape as the main grid's
+    // moveFocusedIcon* helpers.
+    S32 row = std::max(mFlyoutFocusRow, 0);
+    S32 col = std::max(mFlyoutFocusCol, 0);
+
+    while (true)
+    {
+        row += dRow;
+        col += dCol;
+        if (row < 0 || row >= (S32)mFlyoutCells.size())
+            return false;
+        if (col < 0 || col >= (S32)mFlyoutCells[row].size())
+            return false;
+        if (mFlyoutCells[row][col])
+        {
+            setFlyoutFocus(row, col);
+            return true;
+        }
+    }
+}
+
+bool LLFloaterEmojiPicker::commitFlyoutFocused()
+{
+    if (mFlyoutFocusRow < 0 || mFlyoutFocusCol < 0)
+        return false;
+    LLEmojiGridIcon* cell = mFlyoutCells[mFlyoutFocusRow][mFlyoutFocusCol];
+    if (!cell)
+        return false;
+    commitVariant(cell->getChar());
+    return true;
 }
 
 void LLFloaterEmojiPicker::dismissVariantFlyout()
@@ -1155,6 +1497,19 @@ void LLFloaterEmojiPicker::dismissVariantFlyout()
         removeChild(mVariantFlyout);
         delete mVariantFlyout;
         mVariantFlyout = nullptr;
+    }
+    // Cells lived as children of the flyout panel — they're freed by
+    // the panel destructor above. Clearing the matrix keeps the
+    // pointers from being dereferenced by any stale focus state.
+    mFlyoutCells.clear();
+    mFlyoutFocusRow = -1;
+    mFlyoutFocusCol = -1;
+    // Restore the preview to whichever main-grid icon is currently
+    // hovered or focused; otherwise blank it.
+    if (mPreview)
+    {
+        LLEmojiGridIcon* restore = mHoveredIcon ? mHoveredIcon : mFocusedIcon;
+        mPreview->setIcon(restore);
     }
 }
 
@@ -1429,6 +1784,31 @@ void LLFloaterEmojiPicker::unselectGridIcon(LLEmojiGridIcon* icon)
 // virtual
 bool LLFloaterEmojiPicker::handleKey(KEY key, MASK mask, bool called_from_parent)
 {
+    // While the variant flyout is up, arrow keys + Enter + Esc drive it
+    // instead of the main grid. Esc dismisses just the flyout (returns
+    // focus to the main grid); the next Esc still hides the floater.
+    if (mVariantFlyout)
+    {
+        if (mask == MASK_NONE)
+        {
+            switch (key)
+            {
+            case KEY_UP:    return moveFlyoutFocus(-1,  0) || true;
+            case KEY_DOWN:  return moveFlyoutFocus( 1,  0) || true;
+            case KEY_LEFT:  return moveFlyoutFocus( 0, -1) || true;
+            case KEY_RIGHT: return moveFlyoutFocus( 0,  1) || true;
+            case KEY_RETURN:
+                commitFlyoutFocused();
+                return true;
+            case KEY_ESCAPE:
+                 dismissVariantFlyout();
+                return true;
+            default:
+                break;
+            }
+        }
+    }
+
     if (mask == MASK_NONE)
     {
         switch (key)
@@ -1461,6 +1841,20 @@ bool LLFloaterEmojiPicker::handleKey(KEY key, MASK mask, bool called_from_parent
         case KEY_RIGHT:
             selectEmojiGroup(static_cast<U32>((mSelectedGroupIndex + 1) % mGroupButtons.size()));
             return true;
+        case KEY_DOWN:
+            // Combobox-like "expand the dropdown" gesture: open the
+            // variant flyout for the cell the user is currently aiming
+            // at. The mouse-hovered cell wins when it's set so a user
+            // mid-mouse-hover-then-Alt-Down gets the cell under the
+            // cursor; we fall back to the keyboard-focused cell when
+            // the mouse isn't over the grid.
+            if (LLEmojiGridIcon* target = mHoveredIcon ? mHoveredIcon : mFocusedIcon)
+            {
+                showVariantFlyout(target);
+            }
+            return true;
+        default:
+            break;
         }
     }
 

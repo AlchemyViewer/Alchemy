@@ -238,4 +238,103 @@ namespace tut
         ensure_equals("one valid entry", out.size(), size_t(1));
         ensure_equals("tone parsed", out[0].Tone, U8(1));
     }
+
+    // Helper: build a synthetic dictionary with thumbs_up + 5 tone
+    // variants via the loadEmojisFromSD path. Keeps the assembly
+    // local to the tests that need it.
+    static LLSD make_thumbs_up_dictionary_blob()
+    {
+        LLSD root = LLSD::emptyArray();
+        LLSD entry;
+        entry["Character"] = "\xF0\x9F\x91\x8D"; // 👍
+        LLSD shortcodes = LLSD::emptyArray();
+        shortcodes.append(":thumbs_up:");
+        entry["ShortCodes"] = shortcodes;
+        LLSD categories = LLSD::emptyArray();
+        categories.append("hands");
+        entry["Categories"] = categories;
+
+        // Five tone variants.
+        LLSD variants = LLSD::emptyArray();
+        const char* chars[5] = {
+            "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBB", // 👍🏻
+            "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBC", // 👍🏼
+            "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBD", // 👍🏽
+            "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBE", // 👍🏾
+            "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF", // 👍🏿
+        };
+        const char* codes[5] = {
+            ":thumbs_up_light_skin_tone:",
+            ":thumbs_up_medium_light_skin_tone:",
+            ":thumbs_up_medium_skin_tone:",
+            ":thumbs_up_medium_dark_skin_tone:",
+            ":thumbs_up_dark_skin_tone:",
+        };
+        for (S32 i = 0; i < 5; ++i)
+        {
+            LLSD v;
+            v["Character"] = chars[i];
+            v["Tone"] = i + 1;
+            LLSD vsc = LLSD::emptyArray();
+            vsc.append(codes[i]);
+            v["ShortCodes"] = vsc;
+            variants.append(v);
+        }
+        entry["Variants"] = variants;
+        root.append(entry);
+        return root;
+    }
+
+    // getEmojiFromShortCode returns the BASE character for a base shortcode.
+    template<> template<>
+    void object::test<10>()
+    {
+        dict.loadEmojisFromSD(make_thumbs_up_dictionary_blob());
+        ensure("base char returned",
+               dict.getEmojiFromShortCode(":thumbs_up:") == utf8str_to_wstring("\xF0\x9F\x91\x8D"));
+    }
+
+    // getEmojiFromShortCode returns the VARIANT character for a variant
+    // shortcode — this is the regression we're testing for.
+    template<> template<>
+    void object::test<11>()
+    {
+        dict.loadEmojisFromSD(make_thumbs_up_dictionary_blob());
+        ensure("variant char returned",
+               dict.getEmojiFromShortCode(":thumbs_up_dark_skin_tone:")
+                   == utf8str_to_wstring("\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF"));
+    }
+
+    // getEmojiFromShortCode returns empty for an unknown shortcode.
+    template<> template<>
+    void object::test<12>()
+    {
+        dict.loadEmojisFromSD(make_thumbs_up_dictionary_blob());
+        ensure("empty for unknown", dict.getEmojiFromShortCode(":nonsense:").empty());
+    }
+
+    // findByShortCode prefix-matching now surfaces variants — typing
+    // ":thumbs_up_d" should produce results that include the dark variant
+    // (with the variant Character, not the base Character).
+    template<> template<>
+    void object::test<13>()
+    {
+        dict.loadEmojisFromSD(make_thumbs_up_dictionary_blob());
+
+        std::vector<LLEmojiSearchResult> results;
+        dict.findByShortCode(results, ":thumbs_up_d");
+        ensure("at least one result", !results.empty());
+
+        const LLWString expected_dark = utf8str_to_wstring("\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF");
+        bool saw_dark = false;
+        for (const auto& r : results)
+        {
+            if (r.Character == expected_dark)
+            {
+                saw_dark = true;
+                break;
+            }
+        }
+        ensure("dark variant surfaced in prefix match", saw_dark);
+    }
 }

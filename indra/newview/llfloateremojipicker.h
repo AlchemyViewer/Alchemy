@@ -30,8 +30,6 @@
 #include "llfloater.h"
 #include "llframetimer.h"
 
-#include <boost/signals2/connection.hpp>
-
 class LLEmojiGridRow;
 class LLEmojiGridIcon;
 struct LLEmojiDescriptor;
@@ -87,11 +85,18 @@ private:
 
     // Tone strip and variant flyout helpers.
     void buildToneStrip();
+    void layoutToneStripButtons();
     void onToneButtonClick(S32 tone);
     void refreshToneStripHighlight();
     void showVariantFlyout(LLEmojiGridIcon* baseIcon);
     void dismissVariantFlyout();
     void commitVariant(const LLWString& sequence);
+    // Keyboard nav over the 2D flyout grid. Returns true when the
+    // event was consumed.
+    bool moveFlyoutFocus(S32 dRow, S32 dCol);
+    void setFlyoutFocus(S32 row, S32 col);
+    void clearFlyoutFocus();
+    bool commitFlyoutFocused();
     // Substitute a variant character into a search-result-shaped struct
     // when the global tone preference applies. Skips the substitution if
     // the input is already a variant (i.e. came from recents).
@@ -123,6 +128,12 @@ private:
     class LLPanel* mToneStrip { nullptr };
     class LLPanel* mVariantFlyout { nullptr };
     bool mVariantFlyoutPendingDismiss { false };
+    // 2D matrix of variant-flyout cells; nullptr entries are "gaps"
+    // (e.g. man-astronaut has no tone-3 variant in the data). Used by
+    // the keyboard nav to walk only valid cells.
+    std::vector<std::vector<LLEmojiGridIcon*>> mFlyoutCells;
+    S32 mFlyoutFocusRow { -1 };
+    S32 mFlyoutFocusCol { -1 };
     class LLScrollContainer* mEmojiScroll { nullptr };
     class LLScrollingPanelList* mEmojiGrid { nullptr };
     class LLEmojiPreviewPanel* mPreview { nullptr };
@@ -153,7 +164,9 @@ private:
     LLEmojiGridIcon* mLongPressIcon { nullptr };
     bool mLongPressFired { false };
 
-    boost::signals2::scoped_connection mTonePrefConnection;
+    // Cached strip width so dirtyRect can detect a resize and re-flow
+    // the tone-strip buttons without doing the work every frame.
+    S32 mToneStripLastWidth { 0 };
 };
 
 #endif

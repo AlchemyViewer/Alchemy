@@ -246,18 +246,31 @@ void LLEmojiDictionary::findByShortCode(
 
     std::map<llwchar, std::vector<LLEmojiSearchResult>> results;
 
+    auto try_match = [&](const LLWString& character, const std::string& shortCode)
+    {
+        if (shortCode.size() < needle.size() || shortCode.front() != needle.front())
+            return;
+        std::size_t begin, end;
+        if (searchInShortCode(begin, end, shortCode, needle))
+        {
+            results[static_cast<llwchar>(begin)].emplace_back(character, shortCode, begin, end);
+        }
+    };
+
     for (const LLEmojiDescriptor& d : mEmojis)
     {
         if (!d.ShortCodes.empty())
         {
-            const std::string& shortCode = d.ShortCodes.front();
-            if (shortCode.size() >= needle.size() && shortCode.front() == needle.front())
+            try_match(d.Character, d.ShortCodes.front());
+        }
+        // Variant shortcodes match too — typing :thumbs_up_d should
+        // surface :thumbs_up_dark_skin_tone:, with the dark variant as
+        // the inserted character.
+        for (const LLEmojiVariant& v : d.Variants)
+        {
+            if (!v.ShortCodes.empty())
             {
-                std::size_t begin, end;
-                if (searchInShortCode(begin, end, shortCode, needle))
-                {
-                    results[static_cast<llwchar>(begin)].emplace_back(d.Character, shortCode, begin, end);
-                }
+                try_match(v.Character, v.ShortCodes.front());
             }
         }
     }
@@ -285,9 +298,25 @@ const LLEmojiDescriptor* LLEmojiDictionary::getDescriptorFromShortCode(const std
         return it->second;
     // Variant shortcodes (e.g. :thumbs_up_dark_skin_tone:) resolve to their
     // base descriptor — the caller can substitute the variant's character
-    // via getBaseFromVariant or findVariant.
+    // via getBaseFromVariant, findVariant, or getEmojiFromShortCode.
     const auto vit = mVariantShortCode2Base.find(short_code);
     return (mVariantShortCode2Base.end() != vit) ? vit->second.first : nullptr;
+}
+
+LLWString LLEmojiDictionary::getEmojiFromShortCode(const std::string& short_code) const
+{
+    const auto it = mShortCode2Descr.find(short_code);
+    if (mShortCode2Descr.end() != it)
+        return it->second->Character;
+    const auto vit = mVariantShortCode2Base.find(short_code);
+    if (mVariantShortCode2Base.end() != vit)
+    {
+        const LLEmojiDescriptor* base = vit->second.first;
+        const S32 idx = vit->second.second;
+        if (base && idx >= 0 && idx < (S32)base->Variants.size())
+            return base->Variants[idx].Character;
+    }
+    return LLWString();
 }
 
 const LLEmojiDescriptor* LLEmojiDictionary::getBaseFromVariant(const LLWString& emoji, S32* outIndex) const
@@ -300,41 +329,72 @@ const LLEmojiDescriptor* LLEmojiDictionary::getBaseFromVariant(const LLWString& 
     return it->second.first;
 }
 
-const LLEmojiVariant* LLEmojiDictionary::findVariant(const LLEmojiDescriptor& base, U8 tone, S8 gender) const
+const LLEmojiVariant* LLEmojiDictionary::findVariant(const LLEmojiDescriptor& base,
+                                                      U8 tone,
+                                                      S8 gender,
+                                                      const std::string& hair,
+                                                      U8 tone2) const
 {
     if (base.Variants.empty())
         return nullptr;
-    if (tone == 0 && gender == -1)
+    if (tone == 0 && gender == -1 && hair.empty() && tone2 == 0)
         return nullptr; // no preference → caller uses base character.
 
-    // Score each variant; best wins. An exact match on either axis is
-    // worth 4; a "didn't ask for this axis, variant doesn't carry it"
-    // bonus of 1 lets us prefer the cleanest match (e.g. for tone=3
-    // gender=-1, prefer a variant with tone=3,gender=-1 over a variant
-    // with tone=3,gender=1).
+    // Score each variant; best wins. Each axis contributes either:
+    //   +4 — caller asked for this axis and the variant matches exactly
+    //   +1 — caller didn't ask, and the variant doesn't carry it either
+    //         (i.e. the variant is a "clean" match for the request)
+    //    0 — mismatch (asked for X but variant has Y, or vice versa)
+    // Sum across axes; highest total wins. The +1 "axis-clean" bonus
+    // breaks ties — a tone=3 request prefers a tone-3 plain variant
+    // over a tone-3-with-hair-red one, and the global tone preference
+    // doesn't accidentally substitute hair or paired-tone variants.
     const LLEmojiVariant* best = nullptr;
     int best_score = 0;
     for (const LLEmojiVariant& v : base.Variants)
     {
         int score = 0;
+
+        // Tone axis.
         if (tone != 0)
         {
-            if (v.Tone == tone)
-                score += 4;
+            if (v.Tone == tone) score += 4;
         }
         else if (v.Tone == 0)
         {
             score += 1;
         }
+
+        // Gender axis.
         if (gender != -1)
         {
-            if (v.Gender == gender)
-                score += 4;
+            if (v.Gender == gender) score += 4;
         }
         else if (v.Gender == -1)
         {
             score += 1;
         }
+
+        // Hair axis.
+        if (!hair.empty())
+        {
+            if (v.Hair == hair) score += 4;
+        }
+        else if (v.Hair.empty())
+        {
+            score += 1;
+        }
+
+        // Second-tone axis (tone-pairs).
+        if (tone2 != 0)
+        {
+            if (v.Tone2 == tone2) score += 4;
+        }
+        else if (v.Tone2 == 0)
+        {
+            score += 1;
+        }
+
         if (score > best_score)
         {
             best = &v;
@@ -491,6 +551,11 @@ void LLEmojiDictionary::loadEmojis()
         return;
     }
 
+    loadEmojisFromSD(data);
+}
+
+void LLEmojiDictionary::loadEmojisFromSD(const LLSD& data)
+{
     for (LLSD::array_const_iterator it = data.beginArray(), end = data.endArray(); it != end; ++it)
     {
         const LLSD& sd = *it;
@@ -503,6 +568,7 @@ void LLEmojiDictionary::loadEmojis()
         }
 
         std::string category;
+        std::string subcategory;
         std::list<std::string> categories = loadCategories(sd);
         if (categories.empty())
         {
@@ -512,6 +578,25 @@ void LLEmojiDictionary::loadEmojis()
         else
         {
             category = categories.front();
+            // The generator emits group as the first entry and subgroup
+            // (when present) as the second — pick that up so the picker
+            // can render finer-grained section dividers.
+            if (categories.size() >= 2)
+            {
+                auto it = categories.begin();
+                ++it;
+                subcategory = *it;
+            }
+        }
+        // Route the subcategory through the same name → display map that
+        // emoji_categories.xml drives for top-level groups, so a skin can
+        // override (or localize) emojibase's raw subgroup labels alongside
+        // its group labels in one file.
+        if (!subcategory.empty())
+        {
+            auto tit = mTranslations.find(subcategory);
+            if (tit != mTranslations.end())
+                subcategory = tit->second;
         }
 
         if (std::find(mSkipCategories.begin(), mSkipCategories.end(), category) != mSkipCategories.end())
@@ -527,9 +612,12 @@ void LLEmojiDictionary::loadEmojis()
             continue;
         }
 
-        if (mCategory2Group.find(category) == mCategory2Group.end())
+        if (mCategory2Group.find(category) == mCategory2Group.end() && !mGroups.empty())
         {
-            // Add unknown category to "others" group
+            // Add unknown category to "others" group. mGroups can be empty
+            // when called from tests that don't run the full loadGroups()
+            // pipeline; in that case we just skip the group registration —
+            // category->descriptor lookups still work.
             mGroups.back().Categories.push_back(category);
             mCategory2Group.insert(std::make_pair(category, &mGroups.back()));
         }
@@ -538,6 +626,7 @@ void LLEmojiDictionary::loadEmojis()
         LLEmojiDescriptor& emoji = mEmojis.back();
         emoji.Character = icon;
         emoji.Category = category;
+        emoji.Subcategory = std::move(subcategory);
         emoji.ShortCodes = std::move(shortCodes);
         emoji.Variants = loadVariants(sd);
 
@@ -602,8 +691,12 @@ std::vector<LLEmojiVariant> LLEmojiDictionary::loadVariants(const LLSD& sd)
             continue;
         if (vsd.has("Tone"))
             v.Tone = (U8)vsd["Tone"].asInteger();
+        if (vsd.has("Tone2"))
+            v.Tone2 = (U8)vsd["Tone2"].asInteger();
         if (vsd.has("Gender"))
             v.Gender = (S8)vsd["Gender"].asInteger();
+        if (vsd.has("Hair"))
+            v.Hair = vsd["Hair"].asString();
         v.ShortCodes = loadShortCodes(vsd);
         result.push_back(std::move(v));
     }

@@ -34,14 +34,20 @@
 // LLEmojiVariant / LLEmojiDescriptor classes
 //
 
-// A skin-tone / gender alternate of a base emoji. Tone is 0 when the variant
-// has no tone axis (a pure gender variant), 1..5 = light..dark. Gender is
-// -1 when unset, 0 = man, 1 = woman, 2 = person.
+// A skin-tone / gender / hair alternate of a base emoji.
+//   Tone:   0 = unset, 1..5 = light..dark.
+//   Tone2:  0 = single-tone, 1..5 = second tone for pair variants
+//           (couples kissing, holding hands). Always 0 unless Tone is
+//           also non-zero.
+//   Gender: -1 unset, 0 man, 1 woman, 2 person.
+//   Hair:   "" / "red" / "curly" / "white" / "bald".
 struct LLEmojiVariant
 {
     LLWString Character;
     U8 Tone { 0 };
+    U8 Tone2 { 0 };
     S8 Gender { -1 };
+    std::string Hair;
     std::list<std::string> ShortCodes;
 };
 
@@ -51,7 +57,11 @@ struct LLEmojiDescriptor
     // pairs, keycap, tag subdivision flags) are all addressed as a single
     // logical emoji at this layer.
     LLWString Character;
+    // Top-level emojibase group (e.g. "smileys and emotion").
     std::string Category;
+    // Emojibase subgroup (e.g. "face-smiling"). Optional — empty for
+    // entries whose data file didn't include a second category.
+    std::string Subcategory;
     std::list<std::string> ShortCodes;
     // Skin-tone / gender alternates derived from emojibase data. Empty for
     // emoji that have no axes of variation.
@@ -116,6 +126,13 @@ public:
     void findByShortCode(std::vector<LLEmojiSearchResult>& result, const std::string& needle) const;
     const LLEmojiDescriptor* getDescriptorFromEmoji(const LLWString& emoji) const;
     const LLEmojiDescriptor* getDescriptorFromShortCode(const std::string& short_code) const;
+    // Resolve a shortcode to the LLWString that should be inserted on
+    // commit. For variant shortcodes (e.g. :thumbs_up_dark_skin_tone:)
+    // this is the variant's character — getDescriptorFromShortCode
+    // intentionally returns the *base* descriptor for those, so callers
+    // that insert text must go through this helper instead of reading
+    // descriptor->Character directly.
+    LLWString getEmojiFromShortCode(const std::string& short_code) const;
     std::string getNameFromEmoji(const LLWString& emoji) const;
     // Single-codepoint predicate — used in per-codepoint iteration (font
     // fallback selection, shaping-run detection). For multi-codepoint
@@ -127,17 +144,40 @@ public:
     // and outIndex is provided, *outIndex is set to the index into
     // base->Variants for the matched variant.
     const LLEmojiDescriptor* getBaseFromVariant(const LLWString& emoji, S32* outIndex = nullptr) const;
-    // Pick the best variant on a base descriptor for a given (tone, gender)
-    // preference. tone is 0 (no preference) or 1..5; gender is -1
-    // (no preference) or 0/1/2 (man/woman/person). Returns nullptr if the
-    // base has no variants matching either axis (caller should fall back to
-    // the base character).
-    const LLEmojiVariant* findVariant(const LLEmojiDescriptor& base, U8 tone, S8 gender) const;
+    // Pick the best variant on a base descriptor for a given preference
+    // across all four axes:
+    //   tone   : 0 = no preference, 1..5 = light..dark
+    //   gender : -1 = no preference, 0/1/2 = man/woman/person
+    //   hair   : "" = no preference; "red"/"curly"/"white"/"bald"
+    //   tone2  : 0 = single-tone preference, 1..5 = paired second tone
+    //
+    // The scorer prefers variants that match every axis the caller
+    // specified AND avoid axes the caller left unset (so a "tone=3, no
+    // gender, no hair, single tone" request prefers a clean tone-3
+    // variant over one that also happens to carry a gender or hair tag).
+    // Returns nullptr if no variant scores above zero (caller falls
+    // back to the base character).
+    const LLEmojiVariant* findVariant(const LLEmojiDescriptor& base,
+                                       U8 tone,
+                                       S8 gender,
+                                       const std::string& hair = std::string(),
+                                       U8 tone2 = 0) const;
 
     const std::vector<LLEmojiGroup>& getGroups() const { return mGroups; }
     const emoji2descr_map_t& getEmoji2Descr() const { return mEmoji2Descr; }
     const cat2descrs_map_t& getCategory2Descrs() const { return mCategory2Descrs; }
     const code2descr_map_t& getShortCode2Descr() const { return mShortCode2Descr; }
+
+    // Populate the descriptor list from a parsed LLSD blob (the same
+    // shape as emoji_characters.xml's top-level <array>). Public so unit
+    // tests can build a synthetic dictionary without going through the
+    // file-loader / gDirUtilp. Safe to call when mGroups is empty (the
+    // "unknown category → others" branch is guarded).
+    void loadEmojisFromSD(const LLSD& data);
+    // Parse the <Variants> array inside one descriptor's LLSD <map>.
+    // Public so tests can exercise it without spinning up a full
+    // dictionary load.
+    static std::vector<LLEmojiVariant> loadVariants(const LLSD& sd);
 
 private:
     void loadTranslations();
@@ -147,7 +187,6 @@ private:
     static LLWString loadIcon(const LLSD& sd);
     static std::list<std::string> loadCategories(const LLSD& sd);
     static std::list<std::string> loadShortCodes(const LLSD& sd);
-    static std::vector<LLEmojiVariant> loadVariants(const LLSD& sd);
     void translateCategories(std::list<std::string>& categories);
 
 private:

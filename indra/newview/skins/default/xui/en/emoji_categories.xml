@@ -71,5 +71,608 @@
       <key>Category</key>
       <string>other</string>
     </map>
-  </array>
+    <!-- Subgroup translations (emojibase data.raw.json subgroups for en).
+         Identity-mapped here so the existing translation layer recognises
+         them; localise by overriding the Category field per locale. -->
+    <map>
+        <key>Name</key>
+        <string>smiling</string>
+        <key>Category</key>
+        <string>smiling</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>affectionate</string>
+        <key>Category</key>
+        <string>affectionate</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>with tongue</string>
+        <key>Category</key>
+        <string>with tongue</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>with hands</string>
+        <key>Category</key>
+        <string>with hands</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>neutral / skeptical</string>
+        <key>Category</key>
+        <string>neutral / skeptical</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>sleepy</string>
+        <key>Category</key>
+        <string>sleepy</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>unwell</string>
+        <key>Category</key>
+        <string>unwell</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>with hats</string>
+        <key>Category</key>
+        <string>with hats</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>with glasses</string>
+        <key>Category</key>
+        <string>with glasses</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>concerned</string>
+        <key>Category</key>
+        <string>concerned</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>negative</string>
+        <key>Category</key>
+        <string>negative</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>costumed &amp; creatures</string>
+        <key>Category</key>
+        <string>costumed &amp; creatures</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>cat faces</string>
+        <key>Category</key>
+        <string>cat faces</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>monkey faces</string>
+        <key>Category</key>
+        <string>monkey faces</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>hearts</string>
+        <key>Category</key>
+        <string>hearts</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>emotions</string>
+        <key>Category</key>
+        <string>emotions</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>fingers open</string>
+        <key>Category</key>
+        <string>fingers open</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>hand signs</string>
+        <key>Category</key>
+        <string>hand signs</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>finger pointing</string>
+        <key>Category</key>
+        <string>finger pointing</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>fingers closed</string>
+        <key>Category</key>
+        <string>fingers closed</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>hands</string>
+        <key>Category</key>
+        <string>hands</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>hand props</string>
+        <key>Category</key>
+        <string>hand props</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>body parts</string>
+        <key>Category</key>
+        <string>body parts</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>people</string>
+        <key>Category</key>
+        <string>people</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>gestures</string>
+        <key>Category</key>
+        <string>gestures</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>roles &amp; careers</string>
+        <key>Category</key>
+        <string>roles &amp; careers</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>fantasy</string>
+        <key>Category</key>
+        <string>fantasy</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>activities</string>
+        <key>Category</key>
+        <string>activities</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>athletics</string>
+        <key>Category</key>
+        <string>athletics</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>resting</string>
+        <key>Category</key>
+        <string>resting</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>family</string>
+        <key>Category</key>
+        <string>family</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>people symbols</string>
+        <key>Category</key>
+        <string>people symbols</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>skin tones</string>
+        <key>Category</key>
+        <string>skin tones</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>hair styles</string>
+        <key>Category</key>
+        <string>hair styles</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>mammals</string>
+        <key>Category</key>
+        <string>mammals</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>birds</string>
+        <key>Category</key>
+        <string>birds</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>amphibians</string>
+        <key>Category</key>
+        <string>amphibians</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>reptiles</string>
+        <key>Category</key>
+        <string>reptiles</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>marine life</string>
+        <key>Category</key>
+        <string>marine life</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>bugs</string>
+        <key>Category</key>
+        <string>bugs</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>flowers</string>
+        <key>Category</key>
+        <string>flowers</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>other plants</string>
+        <key>Category</key>
+        <string>other plants</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>fruit</string>
+        <key>Category</key>
+        <string>fruit</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>vegetables</string>
+        <key>Category</key>
+        <string>vegetables</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>cooked / prepared</string>
+        <key>Category</key>
+        <string>cooked / prepared</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>asian</string>
+        <key>Category</key>
+        <string>asian</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>seafood</string>
+        <key>Category</key>
+        <string>seafood</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>drink</string>
+        <key>Category</key>
+        <string>drink</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>dishware</string>
+        <key>Category</key>
+        <string>dishware</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>globes &amp; maps</string>
+        <key>Category</key>
+        <string>globes &amp; maps</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>geographic locations</string>
+        <key>Category</key>
+        <string>geographic locations</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>buildings</string>
+        <key>Category</key>
+        <string>buildings</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>religious buildings</string>
+        <key>Category</key>
+        <string>religious buildings</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>other places</string>
+        <key>Category</key>
+        <string>other places</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>ground transportation</string>
+        <key>Category</key>
+        <string>ground transportation</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>water transportation</string>
+        <key>Category</key>
+        <string>water transportation</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>air transportation</string>
+        <key>Category</key>
+        <string>air transportation</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>hotel</string>
+        <key>Category</key>
+        <string>hotel</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>time</string>
+        <key>Category</key>
+        <string>time</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>weather</string>
+        <key>Category</key>
+        <string>weather</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>events &amp; holidays</string>
+        <key>Category</key>
+        <string>events &amp; holidays</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>award medals</string>
+        <key>Category</key>
+        <string>award medals</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>sports</string>
+        <key>Category</key>
+        <string>sports</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>games &amp; hobbies</string>
+        <key>Category</key>
+        <string>games &amp; hobbies</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>arts &amp; crafts</string>
+        <key>Category</key>
+        <string>arts &amp; crafts</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>clothing</string>
+        <key>Category</key>
+        <string>clothing</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>sound</string>
+        <key>Category</key>
+        <string>sound</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>music</string>
+        <key>Category</key>
+        <string>music</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>musical instruments</string>
+        <key>Category</key>
+        <string>musical instruments</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>phone</string>
+        <key>Category</key>
+        <string>phone</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>computer</string>
+        <key>Category</key>
+        <string>computer</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>light, film &amp; video</string>
+        <key>Category</key>
+        <string>light, film &amp; video</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>books &amp; paper</string>
+        <key>Category</key>
+        <string>books &amp; paper</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>money</string>
+        <key>Category</key>
+        <string>money</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>mail</string>
+        <key>Category</key>
+        <string>mail</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>writing</string>
+        <key>Category</key>
+        <string>writing</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>office supplies</string>
+        <key>Category</key>
+        <string>office supplies</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>lock &amp; keys</string>
+        <key>Category</key>
+        <string>lock &amp; keys</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>tools</string>
+        <key>Category</key>
+        <string>tools</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>science equipment</string>
+        <key>Category</key>
+        <string>science equipment</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>medical</string>
+        <key>Category</key>
+        <string>medical</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>household items</string>
+        <key>Category</key>
+        <string>household items</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>other objects</string>
+        <key>Category</key>
+        <string>other objects</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>transport signs</string>
+        <key>Category</key>
+        <string>transport signs</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>warning symbols</string>
+        <key>Category</key>
+        <string>warning symbols</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>arrows</string>
+        <key>Category</key>
+        <string>arrows</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>religious symbols</string>
+        <key>Category</key>
+        <string>religious symbols</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>zodiac signs</string>
+        <key>Category</key>
+        <string>zodiac signs</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>audio &amp; video symbols</string>
+        <key>Category</key>
+        <string>audio &amp; video symbols</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>gender signs</string>
+        <key>Category</key>
+        <string>gender signs</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>math symbols</string>
+        <key>Category</key>
+        <string>math symbols</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>punctuation</string>
+        <key>Category</key>
+        <string>punctuation</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>currencies</string>
+        <key>Category</key>
+        <string>currencies</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>other symbols</string>
+        <key>Category</key>
+        <string>other symbols</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>keypad characters</string>
+        <key>Category</key>
+        <string>keypad characters</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>alphanumeric symbols</string>
+        <key>Category</key>
+        <string>alphanumeric symbols</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>shapes &amp; colors</string>
+        <key>Category</key>
+        <string>shapes &amp; colors</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>other flags</string>
+        <key>Category</key>
+        <string>other flags</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>country flags</string>
+        <key>Category</key>
+        <string>country flags</string>
+    </map>
+    <map>
+        <key>Name</key>
+        <string>subdivision flags</string>
+        <key>Category</key>
+        <string>subdivision flags</string>
+    </map>
+</array>
 </llsd>

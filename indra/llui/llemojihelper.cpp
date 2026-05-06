@@ -86,10 +86,14 @@ bool LLEmojiHelper::isCursorInEmojiCode(const LLWString& wtext, S32 cursorPos, S
 
 void LLEmojiHelper::showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, const std::string& short_code, std::function<void(const LLWString&)> cb)
 {
-    // Commit immediately if the user already typed a full shortcode
-    if (const auto* emojiDescrp = LLEmojiDictionary::instance().getDescriptorFromShortCode(short_code))
+    // Commit immediately if the user already typed a full shortcode.
+    // Variant shortcodes (e.g. :thumbs_up_dark_skin_tone:) need the
+    // variant's character, not the base's, so we go through
+    // getEmojiFromShortCode rather than reading descriptor->Character.
+    LLWString emoji_chars = LLEmojiDictionary::instance().getEmojiFromShortCode(short_code);
+    if (!emoji_chars.empty())
     {
-        cb(emojiDescrp->Character);
+        cb(emoji_chars);
         hideHelper();
         return;
     }
