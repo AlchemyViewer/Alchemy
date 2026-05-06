@@ -908,6 +908,191 @@ namespace tut
                !painter.lastUsedSupersampling());
     }
 
+    // -------------------------------------------------------------
+    // W3C / HSL / PLUS software blend pinning via testSoftwareBlendPixel.
+    // The per-mode arithmetic is otherwise reachable only via a font
+    // glyph that uses each mode, which the test corpus doesn't cover.
+    // BGRA bytes are premultiplied throughout — for sa=1 / da=1 inputs
+    // the premul and un-premul values are identical, which keeps the
+    // pinned values readable.
+    // -------------------------------------------------------------
+
+    // BGRA-premul helper: (b, g, r, a). Tests express colors RGB-style
+    // and the helper packs into BGRA order to match the painter's surface
+    // format.
+    static inline void packBGRA(U8 buf[4], U8 r, U8 g, U8 b, U8 a)
+    {
+        buf[0] = b; buf[1] = g; buf[2] = r; buf[3] = a;
+    }
+    static inline bool nearU8(U8 actual, U8 expected, S32 tol = 1)
+    {
+        const S32 d = (S32)actual - (S32)expected;
+        return d >= -tol && d <= tol;
+    }
+
+    // MULTIPLY pinning: opaque white over opaque red yields red (multiply
+    // by 1.0 is identity). Opaque black over opaque red yields black.
+    template<> template<>
+    void llfontcolrv1_object::test<20>()
+    {
+        U8 src[4], dst[4], out[4];
+
+        // White × Red = Red.
+        packBGRA(src, 255, 255, 255, 255);
+        packBGRA(dst, 255,   0,   0, 255);
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_MULTIPLY, src, dst, out);
+        ensure("multiply(white, red).b ≈ 0", nearU8(out[0], 0));
+        ensure("multiply(white, red).g ≈ 0", nearU8(out[1], 0));
+        ensure("multiply(white, red).r ≈ 255", nearU8(out[2], 255));
+        ensure("multiply(white, red).a == 255", out[3] == 255);
+
+        // Black × Red = Black.
+        packBGRA(src,   0,   0,   0, 255);
+        packBGRA(dst, 255,   0,   0, 255);
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_MULTIPLY, src, dst, out);
+        ensure("multiply(black, red).b ≈ 0", nearU8(out[0], 0));
+        ensure("multiply(black, red).g ≈ 0", nearU8(out[1], 0));
+        ensure("multiply(black, red).r ≈ 0", nearU8(out[2], 0));
+        ensure("multiply(black, red).a == 255", out[3] == 255);
+    }
+
+    // SCREEN pinning: opaque black over opaque red yields red (screen
+    // with 0 is identity). Opaque white over opaque red yields white
+    // (screen with 1 saturates).
+    template<> template<>
+    void llfontcolrv1_object::test<21>()
+    {
+        U8 src[4], dst[4], out[4];
+
+        packBGRA(src,   0,   0,   0, 255);
+        packBGRA(dst, 255,   0,   0, 255);
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_SCREEN, src, dst, out);
+        ensure("screen(black, red).r ≈ 255", nearU8(out[2], 255));
+        ensure("screen(black, red).g ≈ 0", nearU8(out[1], 0));
+        ensure("screen(black, red).b ≈ 0", nearU8(out[0], 0));
+
+        packBGRA(src, 255, 255, 255, 255);
+        packBGRA(dst, 255,   0,   0, 255);
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_SCREEN, src, dst, out);
+        ensure("screen(white, red).r ≈ 255", nearU8(out[2], 255));
+        ensure("screen(white, red).g ≈ 255", nearU8(out[1], 255));
+        ensure("screen(white, red).b ≈ 255", nearU8(out[0], 255));
+    }
+
+    // DARKEN / LIGHTEN: per-channel min / max of source and destination.
+    template<> template<>
+    void llfontcolrv1_object::test<22>()
+    {
+        U8 src[4], dst[4], out[4];
+
+        // darken((100,200,50), (200,50,100)) = (min,min,min) = (100,50,50).
+        packBGRA(src, 100, 200,  50, 255);
+        packBGRA(dst, 200,  50, 100, 255);
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_DARKEN, src, dst, out);
+        ensure("darken.r ≈ min(100,200)=100", nearU8(out[2], 100));
+        ensure("darken.g ≈ min(200,50)=50",   nearU8(out[1], 50));
+        ensure("darken.b ≈ min(50,100)=50",   nearU8(out[0], 50));
+
+        // lighten((100,200,50), (200,50,100)) = (max,max,max) = (200,200,100).
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_LIGHTEN, src, dst, out);
+        ensure("lighten.r ≈ max(100,200)=200", nearU8(out[2], 200));
+        ensure("lighten.g ≈ max(200,50)=200",  nearU8(out[1], 200));
+        ensure("lighten.b ≈ max(50,100)=100",  nearU8(out[0], 100));
+    }
+
+    // PLUS / additive: clamped per-channel sum of premultiplied bytes.
+    // Distinct from blend modes because PLUS doesn't go through the
+    // un-premul → blend → premul pipeline; it's a direct premul sum.
+    template<> template<>
+    void llfontcolrv1_object::test<23>()
+    {
+        U8 src[4], dst[4], out[4];
+
+        // plus(red, green) = yellow (clamp doesn't trip).
+        packBGRA(src, 255,   0,   0, 255);
+        packBGRA(dst,   0, 255,   0, 255);
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_PLUS, src, dst, out);
+        ensure_equals("plus(red, green).r == 255", (S32)out[2], 255);
+        ensure_equals("plus(red, green).g == 255", (S32)out[1], 255);
+        ensure_equals("plus(red, green).b == 0",   (S32)out[0], 0);
+        ensure_equals("plus alpha clamps at 255",  (S32)out[3], 255);
+
+        // plus(white, white) = white (saturates).
+        packBGRA(src, 255, 255, 255, 255);
+        packBGRA(dst, 255, 255, 255, 255);
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_PLUS, src, dst, out);
+        ensure_equals("plus(white, white).r == 255", (S32)out[2], 255);
+        ensure_equals("plus(white, white).g == 255", (S32)out[1], 255);
+        ensure_equals("plus(white, white).b == 255", (S32)out[0], 255);
+    }
+
+    // Source-zero alpha short-circuit: dst preserved byte-for-byte.
+    // Pins compose_pixel_w3c's early return at sa == 0; without it the
+    // un-premul divide-by-zero would corrupt the result.
+    template<> template<>
+    void llfontcolrv1_object::test<24>()
+    {
+        U8 src[4] = { 0, 0, 0, 0 };
+        U8 dst[4]; packBGRA(dst, 33, 88, 142, 200);
+        U8 out[4];
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_MULTIPLY, src, dst, out);
+        ensure_equals("sa=0 multiply preserves dst.b", (S32)out[0], (S32)dst[0]);
+        ensure_equals("sa=0 multiply preserves dst.g", (S32)out[1], (S32)dst[1]);
+        ensure_equals("sa=0 multiply preserves dst.r", (S32)out[2], (S32)dst[2]);
+        ensure_equals("sa=0 multiply preserves dst.a", (S32)out[3], (S32)dst[3]);
+    }
+
+    // Destination-zero alpha: blend formula reduces to source. Pins the
+    // (1 - da) * Cs + da * B(Cb, Cs) collapse when da = 0 — without that
+    // the (uninitialized) un-premul destination value would leak through.
+    template<> template<>
+    void llfontcolrv1_object::test<25>()
+    {
+        U8 src[4]; packBGRA(src, 200, 100, 50, 255);
+        U8 dst[4] = { 0, 0, 0, 0 };
+        U8 out[4];
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_MULTIPLY, src, dst, out);
+        ensure("da=0 multiply gives src.b",  nearU8(out[0], src[0]));
+        ensure("da=0 multiply gives src.g",  nearU8(out[1], src[1]));
+        ensure("da=0 multiply gives src.r",  nearU8(out[2], src[2]));
+        ensure_equals("da=0 multiply gives src.a", (S32)out[3], 255);
+    }
+
+    // HSL_LUMINOSITY: applies source's luminosity to destination's hue/sat.
+    // Concrete pin: gray src (luminosity = 0.5) over saturated red dst.
+    // The result should be a "darkened red" — same hue family as red, but
+    // mid-luminosity. Verify the red channel still dominates and the
+    // luminosity is roughly 0.5 (within tolerance for the W3C clip step).
+    template<> template<>
+    void llfontcolrv1_object::test<26>()
+    {
+        U8 src[4]; packBGRA(src, 128, 128, 128, 255);  // mid gray
+        U8 dst[4]; packBGRA(dst, 255,   0,   0, 255);  // saturated red
+        U8 out[4];
+        LLFontColrV1Painter::testSoftwareBlendPixel(
+            HB_PAINT_COMPOSITE_MODE_HSL_LUMINOSITY, src, dst, out);
+
+        // Result luminosity should approximate src luminosity (0.3*r + 0.59*g
+        // + 0.11*b for src(128,128,128) ≈ 128). Tolerance covers the
+        // clip_color step which can shift channels a few units.
+        const F32 lum = 0.3f * out[2] + 0.59f * out[1] + 0.11f * out[0];
+        ensure("HSL_LUMINOSITY result ≈ src luminosity (128 ± 8)",
+               lum >= 120.f && lum <= 136.f);
+        // Hue family preserved: red channel still strictly the largest.
+        ensure("HSL_LUMINOSITY preserves dst's red-dominant hue family",
+               out[2] >= out[1] && out[2] >= out[0]);
+    }
+
 #if LL_MESA_HEADLESS
     // -------------------------------------------------------------
     // GL-backed group: COLRv1 painter integrated with the LLFontFreetype

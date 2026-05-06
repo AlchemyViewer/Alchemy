@@ -23,7 +23,9 @@
 #include FT_COLOR_H
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
+#include <utility>
 #include <vector>
 
 namespace
@@ -105,31 +107,290 @@ namespace
         std::vector<GroupFrame> group_stack;
     };
 
-    // Map an hb composite mode to a plutovg Porter-Duff operator. Plutovg
-    // doesn't expose W3C blend modes (multiply/screen/overlay/etc.); those
-    // return SRC_OVER as a graceful fallback with `*exact` set false so the
-    // caller can warn / record the lossy mapping.
-    inline plutovg_operator_t to_pv_operator(hb_paint_composite_mode_t mode, bool& exact)
+    // Map an hb composite mode to a plutovg Porter-Duff operator if the mode
+    // is one of the Porter-Duff set plutovg natively supports. Returns true
+    // and sets *op for native-supported modes; returns false for the W3C
+    // separable blend modes, HSL non-separable blend modes, and PLUS, all
+    // of which run through the software blend path in pop_group_cb.
+    inline bool try_to_pv_operator(hb_paint_composite_mode_t mode, plutovg_operator_t* op)
     {
-        exact = true;
         switch (mode)
         {
-            case HB_PAINT_COMPOSITE_MODE_CLEAR:     return PLUTOVG_OPERATOR_CLEAR;
-            case HB_PAINT_COMPOSITE_MODE_SRC:       return PLUTOVG_OPERATOR_SRC;
-            case HB_PAINT_COMPOSITE_MODE_DEST:      return PLUTOVG_OPERATOR_DST;
-            case HB_PAINT_COMPOSITE_MODE_SRC_OVER:  return PLUTOVG_OPERATOR_SRC_OVER;
-            case HB_PAINT_COMPOSITE_MODE_DEST_OVER: return PLUTOVG_OPERATOR_DST_OVER;
-            case HB_PAINT_COMPOSITE_MODE_SRC_IN:    return PLUTOVG_OPERATOR_SRC_IN;
-            case HB_PAINT_COMPOSITE_MODE_DEST_IN:   return PLUTOVG_OPERATOR_DST_IN;
-            case HB_PAINT_COMPOSITE_MODE_SRC_OUT:   return PLUTOVG_OPERATOR_SRC_OUT;
-            case HB_PAINT_COMPOSITE_MODE_DEST_OUT:  return PLUTOVG_OPERATOR_DST_OUT;
-            case HB_PAINT_COMPOSITE_MODE_SRC_ATOP:  return PLUTOVG_OPERATOR_SRC_ATOP;
-            case HB_PAINT_COMPOSITE_MODE_DEST_ATOP: return PLUTOVG_OPERATOR_DST_ATOP;
-            case HB_PAINT_COMPOSITE_MODE_XOR:       return PLUTOVG_OPERATOR_XOR;
+            case HB_PAINT_COMPOSITE_MODE_CLEAR:     *op = PLUTOVG_OPERATOR_CLEAR;     return true;
+            case HB_PAINT_COMPOSITE_MODE_SRC:       *op = PLUTOVG_OPERATOR_SRC;       return true;
+            case HB_PAINT_COMPOSITE_MODE_DEST:      *op = PLUTOVG_OPERATOR_DST;       return true;
+            case HB_PAINT_COMPOSITE_MODE_SRC_OVER:  *op = PLUTOVG_OPERATOR_SRC_OVER;  return true;
+            case HB_PAINT_COMPOSITE_MODE_DEST_OVER: *op = PLUTOVG_OPERATOR_DST_OVER;  return true;
+            case HB_PAINT_COMPOSITE_MODE_SRC_IN:    *op = PLUTOVG_OPERATOR_SRC_IN;    return true;
+            case HB_PAINT_COMPOSITE_MODE_DEST_IN:   *op = PLUTOVG_OPERATOR_DST_IN;    return true;
+            case HB_PAINT_COMPOSITE_MODE_SRC_OUT:   *op = PLUTOVG_OPERATOR_SRC_OUT;   return true;
+            case HB_PAINT_COMPOSITE_MODE_DEST_OUT:  *op = PLUTOVG_OPERATOR_DST_OUT;   return true;
+            case HB_PAINT_COMPOSITE_MODE_SRC_ATOP:  *op = PLUTOVG_OPERATOR_SRC_ATOP;  return true;
+            case HB_PAINT_COMPOSITE_MODE_DEST_ATOP: *op = PLUTOVG_OPERATOR_DST_ATOP;  return true;
+            case HB_PAINT_COMPOSITE_MODE_XOR:       *op = PLUTOVG_OPERATOR_XOR;       return true;
             default:
-                exact = false;
-                return PLUTOVG_OPERATOR_SRC_OVER;
+                return false;
         }
+    }
+
+    // ---- W3C separable blend functions on un-premultiplied [0..1] components ----
+    // Per W3C Compositing and Blending Level 2, §10.2 (separable blend modes).
+    // Each function returns the blended channel B(Cb, Cs).
+    inline F32 blend_multiply   (F32 cb, F32 cs) { return cb * cs; }
+    inline F32 blend_screen     (F32 cb, F32 cs) { return cb + cs - cb * cs; }
+    inline F32 blend_darken     (F32 cb, F32 cs) { return cb < cs ? cb : cs; }
+    inline F32 blend_lighten    (F32 cb, F32 cs) { return cb > cs ? cb : cs; }
+    inline F32 blend_difference (F32 cb, F32 cs) { return cb > cs ? cb - cs : cs - cb; }
+    inline F32 blend_exclusion  (F32 cb, F32 cs) { return cb + cs - 2.f * cb * cs; }
+    inline F32 blend_hard_light (F32 cb, F32 cs)
+    {
+        return (cs <= 0.5f) ? 2.f * cb * cs
+                            : 1.f - 2.f * (1.f - cb) * (1.f - cs);
+    }
+    inline F32 blend_overlay    (F32 cb, F32 cs) { return blend_hard_light(cs, cb); }
+    inline F32 blend_color_dodge(F32 cb, F32 cs)
+    {
+        if (cb <= 0.f) return 0.f;
+        if (cs >= 1.f) return 1.f;
+        const F32 d = cb / (1.f - cs);
+        return d < 1.f ? d : 1.f;
+    }
+    inline F32 blend_color_burn (F32 cb, F32 cs)
+    {
+        if (cb >= 1.f) return 1.f;
+        if (cs <= 0.f) return 0.f;
+        const F32 d = (1.f - cb) / cs;
+        return 1.f - (d < 1.f ? d : 1.f);
+    }
+    inline F32 blend_soft_light (F32 cb, F32 cs)
+    {
+        // Per W3C §10.2:
+        // if cs <= 0.5:               cb - (1 - 2*cs) * cb * (1 - cb)
+        // if cs >  0.5 and cb <= 0.25: cb + (2*cs - 1) * (((16*cb - 12) * cb + 4) * cb - cb)
+        // if cs >  0.5 and cb >  0.25: cb + (2*cs - 1) * (sqrt(cb) - cb)
+        if (cs <= 0.5f)
+            return cb - (1.f - 2.f * cs) * cb * (1.f - cb);
+        const F32 d = (cb <= 0.25f)
+            ? (((16.f * cb - 12.f) * cb + 4.f) * cb - cb)
+            : (sqrtf(cb) - cb);
+        return cb + (2.f * cs - 1.f) * d;
+    }
+
+    // ---- W3C non-separable HSL helpers (operate on RGB triple, [0..1]) ----
+    // Per W3C §10.3. lum() weights are baked into the spec; sat() is the
+    // simple max-min range. clip_color reins in any out-of-gamut channel
+    // back into [0,1] while preserving luminosity.
+    inline F32 lum_w3c(F32 r, F32 g, F32 b) { return 0.3f * r + 0.59f * g + 0.11f * b; }
+    inline F32 sat_w3c(F32 r, F32 g, F32 b)
+    {
+        const F32 mx = (r > g ? (r > b ? r : b) : (g > b ? g : b));
+        const F32 mn = (r < g ? (r < b ? r : b) : (g < b ? g : b));
+        return mx - mn;
+    }
+    inline void clip_color(F32& r, F32& g, F32& b)
+    {
+        const F32 l  = lum_w3c(r, g, b);
+        const F32 mn = (r < g ? (r < b ? r : b) : (g < b ? g : b));
+        const F32 mx = (r > g ? (r > b ? r : b) : (g > b ? g : b));
+        if (mn < 0.f && (l - mn) > 0.f)
+        {
+            const F32 k = l / (l - mn);
+            r = l + (r - l) * k;
+            g = l + (g - l) * k;
+            b = l + (b - l) * k;
+        }
+        if (mx > 1.f && (mx - l) > 0.f)
+        {
+            const F32 k = (1.f - l) / (mx - l);
+            r = l + (r - l) * k;
+            g = l + (g - l) * k;
+            b = l + (b - l) * k;
+        }
+    }
+    inline void set_lum(F32& r, F32& g, F32& b, F32 target_l)
+    {
+        const F32 d = target_l - lum_w3c(r, g, b);
+        r += d; g += d; b += d;
+        clip_color(r, g, b);
+    }
+    inline void set_sat(F32& r, F32& g, F32& b, F32 target_s)
+    {
+        // Per W3C §10.3: rank channels by value, scale mid/max so range
+        // equals target_s, set min to zero. The pointer-juggling sorts
+        // (mn, md, mx) by current value without copying.
+        F32* mn = &r;
+        F32* md = &g;
+        F32* mx = &b;
+        if (*mn > *md) std::swap(mn, md);
+        if (*mn > *mx) std::swap(mn, mx);
+        if (*md > *mx) std::swap(md, mx);
+        if (*mx > *mn)
+        {
+            *md = (*md - *mn) * target_s / (*mx - *mn);
+            *mx = target_s;
+        }
+        else
+        {
+            *md = 0.f;
+            *mx = 0.f;
+        }
+        *mn = 0.f;
+    }
+
+    // ---- The compose_pixel core ----
+    // Applies a W3C / PLUS composite mode to a single (src, dst) pair of
+    // BGRA-premultiplied bytes and writes the result. Used by both the
+    // pop_group_cb software blend pass and the public testSoftwareBlendPixel
+    // entry point.
+    inline void compose_pixel_w3c(hb_paint_composite_mode_t mode,
+                                  const U8 src[4], const U8 dst[4], U8 out[4])
+    {
+        constexpr F32 INV_255 = 1.f / 255.f;
+        const F32 sa = src[3] * INV_255;
+        const F32 da = dst[3] * INV_255;
+
+        // PLUS is a compositing op, not a blend mode: out = src + dst per
+        // channel (premultiplied), clamped. Handle separately because it
+        // doesn't go through the un-premul → blend → premul path.
+        if (mode == HB_PAINT_COMPOSITE_MODE_PLUS)
+        {
+            const F32 ob = (F32)src[0] + (F32)dst[0];
+            const F32 og = (F32)src[1] + (F32)dst[1];
+            const F32 or_ = (F32)src[2] + (F32)dst[2];
+            const F32 oa = (F32)src[3] + (F32)dst[3];
+            out[0] = (U8)(ob > 255.f ? 255.f : ob);
+            out[1] = (U8)(og > 255.f ? 255.f : og);
+            out[2] = (U8)(or_ > 255.f ? 255.f : or_);
+            out[3] = (U8)(oa > 255.f ? 255.f : oa);
+            return;
+        }
+
+        // sa == 0 means the source contributes nothing to the result. The
+        // W3C composite reduces to "destination unchanged"; short-circuit
+        // both the divide-by-zero un-premul and the per-channel blend math.
+        if (sa <= 0.f)
+        {
+            out[0] = dst[0];
+            out[1] = dst[1];
+            out[2] = dst[2];
+            out[3] = dst[3];
+            return;
+        }
+
+        // Un-premultiply both sides for the blend computation. Source has
+        // sa > 0 here; destination may have da == 0, in which case the
+        // un-premul value is undefined but the blend formula's da term is
+        // zero so the value drops out — safe to leave as 0.
+        const F32 inv_sa = 1.f / sa;
+        const F32 sb = src[0] * INV_255 * inv_sa;
+        const F32 sg = src[1] * INV_255 * inv_sa;
+        const F32 sr = src[2] * INV_255 * inv_sa;
+        F32 db = 0.f, dg = 0.f, dr = 0.f;
+        if (da > 0.f)
+        {
+            const F32 inv_da = 1.f / da;
+            db = dst[0] * INV_255 * inv_da;
+            dg = dst[1] * INV_255 * inv_da;
+            dr = dst[2] * INV_255 * inv_da;
+        }
+
+        // Compute the blended source color B(Cb, Cs) per the requested mode.
+        // Separable modes apply the same scalar function per channel; HSL
+        // modes operate on the RGB triple jointly.
+        F32 br = sr, bg = sg, bb = sb;
+        switch (mode)
+        {
+            case HB_PAINT_COMPOSITE_MODE_MULTIPLY:
+                br = blend_multiply  (dr, sr); bg = blend_multiply  (dg, sg); bb = blend_multiply  (db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_SCREEN:
+                br = blend_screen    (dr, sr); bg = blend_screen    (dg, sg); bb = blend_screen    (db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_OVERLAY:
+                br = blend_overlay   (dr, sr); bg = blend_overlay   (dg, sg); bb = blend_overlay   (db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_DARKEN:
+                br = blend_darken    (dr, sr); bg = blend_darken    (dg, sg); bb = blend_darken    (db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_LIGHTEN:
+                br = blend_lighten   (dr, sr); bg = blend_lighten   (dg, sg); bb = blend_lighten   (db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_COLOR_DODGE:
+                br = blend_color_dodge(dr, sr); bg = blend_color_dodge(dg, sg); bb = blend_color_dodge(db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_COLOR_BURN:
+                br = blend_color_burn(dr, sr); bg = blend_color_burn(dg, sg); bb = blend_color_burn(db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_HARD_LIGHT:
+                br = blend_hard_light(dr, sr); bg = blend_hard_light(dg, sg); bb = blend_hard_light(db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_SOFT_LIGHT:
+                br = blend_soft_light(dr, sr); bg = blend_soft_light(dg, sg); bb = blend_soft_light(db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_DIFFERENCE:
+                br = blend_difference(dr, sr); bg = blend_difference(dg, sg); bb = blend_difference(db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_EXCLUSION:
+                br = blend_exclusion (dr, sr); bg = blend_exclusion (dg, sg); bb = blend_exclusion (db, sb); break;
+            case HB_PAINT_COMPOSITE_MODE_HSL_HUE:
+            {
+                // Hue of source, saturation of source's hue projected onto
+                // the destination's saturation, luminosity of destination.
+                F32 r = sr, g = sg, b = sb;
+                set_sat(r, g, b, sat_w3c(dr, dg, db));
+                set_lum(r, g, b, lum_w3c(dr, dg, db));
+                br = r; bg = g; bb = b;
+                break;
+            }
+            case HB_PAINT_COMPOSITE_MODE_HSL_SATURATION:
+            {
+                // Saturation of source, hue and luminosity of destination.
+                F32 r = dr, g = dg, b = db;
+                set_sat(r, g, b, sat_w3c(sr, sg, sb));
+                set_lum(r, g, b, lum_w3c(dr, dg, db));
+                br = r; bg = g; bb = b;
+                break;
+            }
+            case HB_PAINT_COMPOSITE_MODE_HSL_COLOR:
+            {
+                // Hue and saturation of source, luminosity of destination.
+                F32 r = sr, g = sg, b = sb;
+                set_lum(r, g, b, lum_w3c(dr, dg, db));
+                br = r; bg = g; bb = b;
+                break;
+            }
+            case HB_PAINT_COMPOSITE_MODE_HSL_LUMINOSITY:
+            {
+                // Luminosity of source, hue and saturation of destination.
+                F32 r = dr, g = dg, b = db;
+                set_lum(r, g, b, lum_w3c(sr, sg, sb));
+                br = r; bg = g; bb = b;
+                break;
+            }
+            default:
+                // Unknown / unsupported mode that snuck past try_to_pv_operator.
+                // Behavior matches the old SRC_OVER fallback so we never
+                // produce worse output than before this code existed.
+                br = sr; bg = sg; bb = sb;
+                break;
+        }
+
+        // Mix the blended source back with the un-blended source via
+        // destination alpha (W3C §10.1):
+        //   Cs' = (1 - αb) * Cs + αb * B(Cb, Cs)
+        // When αb == 0 this is just Cs; when αb == 1 it's B().
+        const F32 inv_da = 1.f - da;
+        const F32 mr = inv_da * sr + da * br;
+        const F32 mg = inv_da * sg + da * bg;
+        const F32 mb = inv_da * sb + da * bb;
+
+        // Source-over composite of (mixed_color_unpremul, sa) onto destination
+        // in premultiplied form. (1 - sa) * dst.rgb_premul = (1 - sa) * dst[k].
+        const F32 inv_sa_term = 1.f - sa;
+        const F32 oa = sa + da * inv_sa_term;
+        const F32 ob_p = sa * mb * 255.f + inv_sa_term * (F32)dst[0];
+        const F32 og_p = sa * mg * 255.f + inv_sa_term * (F32)dst[1];
+        const F32 or_p = sa * mr * 255.f + inv_sa_term * (F32)dst[2];
+
+        auto clamp8 = [](F32 v) -> U8 {
+            if (v <= 0.f)   return (U8)0;
+            if (v >= 255.f) return (U8)255;
+            return (U8)(v + 0.5f);
+        };
+        out[0] = clamp8(ob_p);
+        out[1] = clamp8(og_p);
+        out[2] = clamp8(or_p);
+        out[3] = clamp8(oa * 255.f);
     }
 
     // ---- Utility: hb_color_t → plutovg_color_t (unpremultiplied float) ----
@@ -652,32 +913,106 @@ namespace
         p->surface = parent.surface;
         p->canvas  = parent.canvas;
 
-        bool exact = false;
-        const plutovg_operator_t op = to_pv_operator(mode, exact);
-        if (!exact)
-        {
-            // W3C blend mode (multiply/screen/etc.) — plutovg can't compose
-            // these natively. Falling back to SRC_OVER is the standard graceful
-            // degradation and the dominant case in real fonts; a future change
-            // could add a software blend pass here for the missing modes.
-            LL_WARNS_ONCE("Font") << "COLRv1 PaintComposite mode "
-                << (S32)mode << " not supported by plutovg; using SRC_OVER" << LL_ENDL;
-        }
+        plutovg_operator_t op = PLUTOVG_OPERATOR_SRC_OVER;
+        const bool hardware = try_to_pv_operator(mode, &op);
 
-        // Save parent state, draw the sub-surface back onto it. Identity CTM
-        // so texture pixel (i, j) lines up with parent device pixel (i, j) —
-        // the sub was rendered using the parent CTM, so its device pixels
-        // already match positions, no remapping needed. The parent's active
-        // clip naturally bounds the blit.
-        plutovg_canvas_save(p->canvas);
-        plutovg_matrix_t identity;
-        plutovg_matrix_init_identity(&identity);
-        plutovg_canvas_set_matrix(p->canvas, &identity);
-        plutovg_canvas_set_operator(p->canvas, op);
-        plutovg_canvas_set_texture(p->canvas, sub_surface,
-                                   PLUTOVG_TEXTURE_TYPE_PLAIN, 1.f, &identity);
-        plutovg_canvas_paint(p->canvas);
-        plutovg_canvas_restore(p->canvas);
+        if (hardware)
+        {
+            // Native plutovg operator (Porter-Duff). Save parent state, draw
+            // the sub-surface back onto it. Identity CTM so texture pixel
+            // (i, j) lines up with parent device pixel (i, j) — the sub was
+            // rendered using the parent CTM, so its device pixels already
+            // match positions. The parent's active clip naturally bounds
+            // the blit.
+            plutovg_canvas_save(p->canvas);
+            plutovg_matrix_t identity;
+            plutovg_matrix_init_identity(&identity);
+            plutovg_canvas_set_matrix(p->canvas, &identity);
+            plutovg_canvas_set_operator(p->canvas, op);
+            plutovg_canvas_set_texture(p->canvas, sub_surface,
+                                       PLUTOVG_TEXTURE_TYPE_PLAIN, 1.f, &identity);
+            plutovg_canvas_paint(p->canvas);
+            plutovg_canvas_restore(p->canvas);
+        }
+        else
+        {
+            // W3C blend mode (multiply/screen/overlay/etc.), HSL non-separable
+            // mode, or PLUS — plutovg can't compose these natively. Allocate
+            // a temp surface, run the per-pixel blend over (parent, sub) →
+            // temp using the same compose_pixel_w3c path the test entry
+            // point exercises, then SRC-paint temp back onto the parent so
+            // the parent's active clip masks where the result lands. Pixels
+            // outside the clip stay untouched; pixels inside the clip but
+            // where sub.alpha == 0 round-trip through the formula and write
+            // back the unchanged parent bytes.
+            plutovg_surface_t* temp = plutovg_surface_create(p->width, p->height);
+            if (!temp)
+            {
+                // Out-of-memory on the temp allocation — fall back to the
+                // pre-W3C SRC_OVER behavior so the glyph still produces
+                // *something* rather than aborting the paint.
+                LL_WARNS_ONCE("Font")
+                    << "COLRv1 PaintComposite temp surface alloc failed for mode "
+                    << (S32)mode << "; using SRC_OVER" << LL_ENDL;
+                plutovg_canvas_save(p->canvas);
+                plutovg_matrix_t identity;
+                plutovg_matrix_init_identity(&identity);
+                plutovg_canvas_set_matrix(p->canvas, &identity);
+                plutovg_canvas_set_operator(p->canvas, PLUTOVG_OPERATOR_SRC_OVER);
+                plutovg_canvas_set_texture(p->canvas, sub_surface,
+                                           PLUTOVG_TEXTURE_TYPE_PLAIN, 1.f, &identity);
+                plutovg_canvas_paint(p->canvas);
+                plutovg_canvas_restore(p->canvas);
+            }
+            else
+            {
+                const int sub_stride = plutovg_surface_get_stride(sub_surface);
+                const int parent_stride = plutovg_surface_get_stride(p->surface);
+                const int temp_stride = plutovg_surface_get_stride(temp);
+                const unsigned char* sub_data    = plutovg_surface_get_data(sub_surface);
+                const unsigned char* parent_data = plutovg_surface_get_data(p->surface);
+                unsigned char* temp_data         = plutovg_surface_get_data(temp);
+                if (!sub_data || !parent_data || !temp_data ||
+                    sub_stride < p->width * 4 ||
+                    parent_stride < p->width * 4 ||
+                    temp_stride < p->width * 4)
+                {
+                    plutovg_surface_destroy(temp);
+                    p->aborted = true;
+                    plutovg_canvas_destroy(sub_canvas);
+                    plutovg_surface_destroy(sub_surface);
+                    return;
+                }
+
+                for (S32 y = 0; y < p->height; ++y)
+                {
+                    const unsigned char* srow = sub_data    + (ptrdiff_t)y * sub_stride;
+                    const unsigned char* prow = parent_data + (ptrdiff_t)y * parent_stride;
+                    unsigned char* trow       = temp_data   + (ptrdiff_t)y * temp_stride;
+                    for (S32 x = 0; x < p->width; ++x)
+                    {
+                        compose_pixel_w3c(mode, srow + x*4, prow + x*4, trow + x*4);
+                    }
+                }
+
+                // SRC paint of the blended temp back onto the parent. The
+                // parent's active clip masks which pixels are overwritten;
+                // pixels outside the clip stay as they were. Pixels where
+                // sub.alpha == 0 produce trow == prow, so SRC-overwriting
+                // those bytes is a no-op.
+                plutovg_canvas_save(p->canvas);
+                plutovg_matrix_t identity;
+                plutovg_matrix_init_identity(&identity);
+                plutovg_canvas_set_matrix(p->canvas, &identity);
+                plutovg_canvas_set_operator(p->canvas, PLUTOVG_OPERATOR_SRC);
+                plutovg_canvas_set_texture(p->canvas, temp,
+                                           PLUTOVG_TEXTURE_TYPE_PLAIN, 1.f, &identity);
+                plutovg_canvas_paint(p->canvas);
+                plutovg_canvas_restore(p->canvas);
+
+                plutovg_surface_destroy(temp);
+            }
+        }
 
         plutovg_canvas_destroy(sub_canvas);
         plutovg_surface_destroy(sub_surface);
@@ -714,6 +1049,14 @@ namespace
 
 LLFontColrV1Painter::LLFontColrV1Painter() = default;
 LLFontColrV1Painter::~LLFontColrV1Painter() = default;
+
+void LLFontColrV1Painter::testSoftwareBlendPixel(hb_paint_composite_mode_t mode,
+                                                 const U8 src[4],
+                                                 const U8 dst[4],
+                                                 U8       out[4])
+{
+    compose_pixel_w3c(mode, src, dst, out);
+}
 
 bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
                                      U32              glyph_index,

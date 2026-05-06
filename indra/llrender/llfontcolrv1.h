@@ -17,6 +17,8 @@
 #include "stdtypes.h"
 #include "v4coloru.h"
 
+#include <hb.h>  // hb_paint_composite_mode_t for testSoftwareBlendPixel
+
 #include <vector>
 
 struct hb_font_t;
@@ -107,6 +109,17 @@ public:
     // tests want to assert SS kicks in below the threshold and skips
     // above without inferring it from output bytes.
     bool lastUsedSupersampling() const { return mLastUsedSupersampling; }
+
+    // Test entry point: composes one pair of BGRA-premultiplied pixels under
+    // the given hb composite mode using the same software blend path
+    // pop_group_cb invokes for W3C / HSL / PLUS modes. Exposed because the
+    // per-mode blend math is otherwise reachable only via a font that ships
+    // glyphs using that mode, which not all test corpora cover. Production
+    // callers go through paintGlyph; this is for unit tests only.
+    static void testSoftwareBlendPixel(hb_paint_composite_mode_t mode,
+                                       const U8 src[4],
+                                       const U8 dst[4],
+                                       U8 out[4]);
 
 private:
     LLFontColrV1Painter(const LLFontColrV1Painter&) = delete;
