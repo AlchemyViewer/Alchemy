@@ -340,12 +340,6 @@ if(LINUX)
     "LINKER:--no-undefined"
   )
 
-  # Only turn on headless if we can find osmesa libraries.
-  find_package(PkgConfig)
-  pkg_check_modules(OSMESA IMPORTED_TARGET GLOBAL osmesa)
-  if(OSMESA_FOUND)
-    set(BUILD_HEADLESS ON CACHE BOOL "Build headless libraries.")
-  endif(OSMESA_FOUND)
 endif(LINUX)
 
 if(DARWIN)

@@ -68,7 +68,9 @@ LLWindowMesaHeadless::LLWindowMesaHeadless(LLWindowCallbacks* callbacks,
 
 LLWindowMesaHeadless::~LLWindowMesaHeadless()
 {
-    delete mMesaBuffer;
+    gGLManager.shutdownGL();
+
+    delete[] mMesaBuffer;
     OSMesaDestroyContext( mMesaContext );
 }
 

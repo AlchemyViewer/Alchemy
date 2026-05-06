@@ -222,7 +222,7 @@ std::list<LLGLUpdate*> LLGLUpdate::sGLQ;
 
 #if LL_GL_FUNC_POINTER
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_MESA_HEADLESS
 // WGL_ARB_pixel_format
 PFNWGLGETPIXELFORMATATTRIBIVARBPROC wglGetPixelFormatAttribivARB = nullptr;
 PFNWGLGETPIXELFORMATATTRIBFVARBPROC wglGetPixelFormatAttribfvARB = nullptr;

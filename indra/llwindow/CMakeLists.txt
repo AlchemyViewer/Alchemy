@@ -111,6 +111,7 @@ if(WINDOWS)
 endif(WINDOWS)
 
 if(BUILD_HEADLESS)
+  include(Mesa)
   add_library(llwindowheadless STATIC)
 
   target_sources(llwindowheadless
@@ -127,8 +128,7 @@ if(BUILD_HEADLESS)
   target_link_libraries(llwindowheadless
     llrenderheadless
     ${llwindow_BASE_LINK_LIBRARIES}
-    PkgConfig::OSMESA
-    dl
+    ll::osmesa
   )
   target_include_directories(llwindowheadless INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
   target_precompile_headers(llwindowheadless REUSE_FROM llprecompiled)

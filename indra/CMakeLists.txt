@@ -24,6 +24,7 @@ option(USE_VELOPACK "Use Velopack for installer packaging" OFF)
 option(BUILD_VIEWER "Build the viewer project" ON)
 option(BUILD_APPEARANCE_UTIL "Build the appearance utility project" OFF)
 option(BUILD_TESTING "Build and run unit and integration tests: disable for build timing runs to reduce variation" OFF)
+option(BUILD_HEADLESS "Build with support for headless mesa OSR rendering backend" OFF)
 
 # Plugin Build Options
 option(BUILD_EXAMPLE_PLUGIN "Build support for SLPlugin example plugin" ON)
@@ -161,6 +162,10 @@ if(USE_SENTRY)
   list(APPEND VCPKG_MANIFEST_FEATURES "sentry")
 endif()
 
+if(BUILD_HEADLESS)
+  list(APPEND VCPKG_MANIFEST_FEATURES "offscreen")
+endif()
+
 # Export compile_commands.json for ninja and makefile generators
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -240,6 +245,7 @@ include(ICU4C)
 include(JPEG)
 include(LLKDU)
 include(LLPhysicsExtensions)
+include(Mesa)
 include(Meshoptimizer)
 include(Mikktspace)
 include(NDOF)

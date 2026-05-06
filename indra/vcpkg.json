@@ -153,6 +153,17 @@
         "kdu"
       ]
     },
+    "offscreen": {
+      "description": "Build with support for Mesa3D Software OSR backend",
+      "dependencies": [
+        {
+          "name": "mesa",
+          "features": [
+            "offscreen"
+          ]
+        }
+      ]
+    },
     "openxr": {
       "description": "Build with support for OpenXR(experimental)",
       "dependencies": [

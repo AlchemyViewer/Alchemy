@@ -33,6 +33,7 @@ set(cmake_SOURCE_FILES
         LLKDU.cmake
         LLPhysicsExtensions.cmake
         LLTestCommand.cmake
+        Mesa.cmake
         Meshoptimizer.cmake
         Mikktspace.cmake
         NDOF.cmake

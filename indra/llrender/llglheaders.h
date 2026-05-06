@@ -31,11 +31,7 @@
  //----------------------------------------------------------------------------
  // LL_WINDOWS || LL_MESA_HEADLESS || LL_SDL_WINDOW || LL_LINUX
 
-#if LL_MESA_HEADLESS
-#define GL_GLEXT_PROTOTYPES 1
-#else
 #define LL_GL_FUNC_POINTER 1
-#endif
 
  // windows gl headers depend on things like APIENTRY, so include windows.
 #include "llwin32headers.h"
@@ -149,7 +145,7 @@
 
 #if LL_GL_FUNC_POINTER
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_MESA_HEADLESS
 // WGL_AMD_gpu_association
 extern PFNWGLGETGPUIDSAMDPROC                          wglGetGPUIDsAMD;
 extern PFNWGLGETGPUINFOAMDPROC                         wglGetGPUInfoAMD;
