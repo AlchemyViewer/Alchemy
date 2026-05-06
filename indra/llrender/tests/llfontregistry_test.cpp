@@ -1078,6 +1078,89 @@ namespace tut
                       fams[0].label, std::string("Plain"));
     }
 
+    // <use family='A'/> inside <font name='A'> — literal self-reference
+    // by name, distinct from the 'self' alias path (test 26). The cycle
+    // detector must skip both. The post-resolve chain should contain
+    // only A's own files, with no duplicate insertion.
+    template<> template<>
+    void llfontregistry_object::test<45>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Mono'>"
+            "    <use family='Mono'/>"
+            "    <style name='NORMAL'><file>M.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        auto names = fileNames("Mono");
+        ensure_equals("self-reference by literal name doesn't duplicate files",
+                      (S32)names.size(), 1);
+        ensure_equals("only the family's own file in chain",
+                      names[0], std::string("M.woff2"));
+    }
+
+    // Empty <fonts/> root with no children is a degenerate but valid
+    // input — init_from_xml + resolve must complete without crashing
+    // and leave the registry's font map empty. Pins safe handling of
+    // an empty skin layer (e.g., when a skin overrides only the metric
+    // table and leaves families to inherit from a lower layer).
+    template<> template<>
+    void llfontregistry_object::test<46>()
+    {
+        const char* xml = "<fonts></fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        auto fams = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::ANY);
+        ensure_equals("empty XML produces empty available-families list",
+                      (S32)fams.size(), 0);
+    }
+
+    // applyOverrides called twice with different LLSD maps: the second
+    // overrides the first wholesale rather than merging. Pins that
+    // override application is replacement, not accumulation — a
+    // regression that merged would compound stale routings.
+    template<> template<>
+    void llfontregistry_object::test<47>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='UI'>"
+            "    <size name='Custom' size='9.5'/>"
+            "    <style name='NORMAL'><file>UI.woff2</file></style>"
+            "  </font>"
+            "  <font name='AltA'>"
+            "    <size name='Custom' size='11.5'/>"
+            "    <style name='NORMAL'><file>A.woff2</file></style>"
+            "  </font>"
+            "  <font name='AltB'>"
+            "    <size name='Custom' size='13.5'/>"
+            "    <style name='NORMAL'><file>B.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+
+        // First override: UI → AltA. UI's "Custom" size routes to 11.5.
+        LLSD ovr1;
+        ovr1["UI"] = "AltA";
+        applyOverrides(ovr1);
+        F32 sz = 0.f;
+        reg.nameToSize("UI", "Custom", sz);
+        ensure_equals("first override routes UI->AltA (11.5)", sz, 11.5f);
+
+        // Second override: UI → AltB. The earlier UI→AltA mapping must
+        // be replaced, not merged — UI now routes to AltB's 13.5.
+        LLSD ovr2;
+        ovr2["UI"] = "AltB";
+        applyOverrides(ovr2);
+        F32 sz2 = 0.f;
+        reg.nameToSize("UI", "Custom", sz2);
+        ensure_equals("second override replaces first (UI->AltB = 13.5)",
+                      sz2, 13.5f);
+    }
+
 #if LL_MESA_HEADLESS
     // ===================================================================
     // Group 7: GL-requiring paths (LL_MESA_HEADLESS only)
@@ -1128,7 +1211,7 @@ namespace tut
 
     struct llfontregistry_gl_data
     {
-        ll_test::HeadlessGl& gl = ll_test::getHeadlessGl();
+        std::unique_ptr<ll_test::HeadlessGL> gl = std::make_unique<ll_test::HeadlessGL>();
 
         LLFontRegistry reg{ /*create_gl_textures=*/true };
 

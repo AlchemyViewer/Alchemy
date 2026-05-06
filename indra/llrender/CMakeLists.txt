@@ -128,8 +128,11 @@ if (BUILD_TESTING)
     set(registry_test_libs llrender)
   endif()
 
-  LL_ADD_INTEGRATION_TEST(llfontcolrv1 "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfontcolrv1 "" "${registry_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfontregistry "" "${registry_test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfontbitmapcache "" "${registry_test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfontshaping "" "${registry_test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfontfreetype "" "${registry_test_libs}" "${test_project}")
   if (TARGET INTEGRATION_TEST_llfontcolrv1)
     # Hand the source-tree font directory to the test as a string literal.
     # Tests that need a real font file (Noto-COLRv1.ttf, InterVariable.woff2)
@@ -137,6 +140,14 @@ if (BUILD_TESTING)
     # to skip rather than fail, so a partial font set still runs the rest
     # of the suite.
     target_compile_definitions(INTEGRATION_TEST_llfontcolrv1 PRIVATE
+        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
+  endif()
+  if (TARGET INTEGRATION_TEST_llfontshaping)
+    target_compile_definitions(INTEGRATION_TEST_llfontshaping PRIVATE
+        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
+  endif()
+  if (TARGET INTEGRATION_TEST_llfontfreetype)
+    target_compile_definitions(INTEGRATION_TEST_llfontfreetype PRIVATE
         "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
   endif()
 
@@ -159,9 +170,51 @@ if (BUILD_TESTING)
           ${headless_test_compile_defs})
     endif()
 
+    if (TARGET INTEGRATION_TEST_llfontbitmapcache)
+      # llfontbitmapcache's GL-gated group activates with these defs;
+      # the binary already linked llrenderheadless above via registry_test_libs.
+      target_compile_definitions(INTEGRATION_TEST_llfontbitmapcache PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
+    if (TARGET INTEGRATION_TEST_llfontshaping)
+      # llfontshaping's GL-gated monospace tests — same library swap
+      # pattern as llfontbitmapcache and llfontregistry.
+      target_compile_definitions(INTEGRATION_TEST_llfontshaping PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
+    if (TARGET INTEGRATION_TEST_llfontfreetype)
+      # llfontfreetype's GL-gated rasterizer tests need the OSMesa fixture.
+      target_compile_definitions(INTEGRATION_TEST_llfontfreetype PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
+    if (TARGET INTEGRATION_TEST_llfontcolrv1)
+      # llfontcolrv1's GL-gated tests cover the integration of the
+      # painter with the font atlas — same library swap pattern as
+      # llfontbitmapcache and llfontfreetype.
+      target_compile_definitions(INTEGRATION_TEST_llfontcolrv1 PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
     LL_ADD_INTEGRATION_TEST(llfontgl "" "llrenderheadless" "${test_project}")
     if (TARGET INTEGRATION_TEST_llfontgl)
       target_compile_definitions(INTEGRATION_TEST_llfontgl PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
+    # llfontvertexbuffer: pure-headless. The vertex buffer renders
+    # text geometry through gGL; all tests need an OSMesa context.
+    LL_ADD_INTEGRATION_TEST(llfontvertexbuffer "" "llrenderheadless" "${test_project}")
+    if (TARGET INTEGRATION_TEST_llfontvertexbuffer)
+      target_compile_definitions(INTEGRATION_TEST_llfontvertexbuffer PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
+    LL_ADD_INTEGRATION_TEST(llimagegl "" "llrenderheadless" "${test_project}")
+    if (TARGET INTEGRATION_TEST_llimagegl)
+      target_compile_definitions(INTEGRATION_TEST_llimagegl PRIVATE
           ${headless_test_compile_defs})
     endif()
   endif()

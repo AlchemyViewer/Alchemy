@@ -20,7 +20,15 @@
 #include <hb.h>
 #include <hb-ft.h>
 
+#if LL_MESA_HEADLESS
+#  include "../llfontbitmapcache.h"
+#  include "../llimagegl.h"
+#  include "llheadlessgl_fixture.h"
+#endif
+
 #include <cstdio>
+#include <cstring>
+#include <set>
 
 namespace
 {
@@ -220,4 +228,468 @@ namespace tut
         ensure_equals("Noto cmap has no VS-16 glyph",
                       face->getCharGlyphIndex(0xFE0F), 0u);
     }
+
+    // paintGlyph on an out-of-range glyph index (beyond the font's
+    // num_glyphs) must fail cleanly. The painter calls
+    // hb_font_paint_glyph which returns 0 for unknown glyphs; the
+    // wrapper turns that into a Result with mBitmap=null and
+    // mWidth=0.
+    template<> template<>
+    void llfontcolrv1_object::test<6>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+        {
+            skip("Noto-COLRv1.ttf not present in test data dir");
+        }
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        ensure("face loaded", face.notNull() && face->isValid());
+        hb_font_t* hb_font = face->getHbFont();
+        ensure("hb_font available", hb_font != nullptr);
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result result;
+        const LLColor4U fg(255, 255, 255, 255);
+
+        // Use a clearly out-of-range glyph index. Real fonts have
+        // num_glyphs in the thousands; 0xFFFFFFFE is well beyond.
+        const bool ok = painter.paintGlyph(hb_font,
+                                           /*glyph_index=*/0xFFFFFFFE,
+                                           14.f, fg, 0, result);
+        ensure("paintGlyph on out-of-range glyph index fails cleanly",
+               !ok);
+        ensure("result.mBitmap stays null on out-of-range",
+               result.mBitmap == nullptr);
+        ensure_equals("result.mWidth zero on out-of-range",
+                      result.mWidth, 0);
+    }
+
+    // Painter staging surface reuse: paint two different emoji
+    // through one painter. Both calls succeed and the second
+    // call's result must reflect the second glyph (not the first
+    // — a staging-buffer leak would surface as the second result
+    // pointing at stale first-glyph bytes when dimensions match).
+    template<> template<>
+    void llfontcolrv1_object::test<7>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+        {
+            skip("Noto-COLRv1.ttf not present in test data dir");
+        }
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        ensure("face loaded", face.notNull() && face->isValid());
+        hb_font_t* hb_font = face->getHbFont();
+
+        // Two distinct emoji: fire (U+1F525) and red heart (U+2764).
+        // Both should rasterize cleanly through Noto-COLRv1's paint
+        // walker. We don't assert the dimensions match (different
+        // glyphs render to different surfaces) — just that both
+        // succeed and produce live bitmaps.
+        const LLColor4U fg(255, 255, 255, 255);
+
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        hb_codepoint_t heart = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x2764, &heart);
+        if (fire == 0 || heart == 0)
+            skip("Noto-COLRv1 missing one of the test emoji codepoints");
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result r1, r2;
+        ensure("first paintGlyph (fire) succeeded",
+               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r1));
+        ensure("first painter produced bitmap",
+               r1.mBitmap != nullptr && r1.mWidth > 0 && r1.mHeight > 0);
+
+        ensure("second paintGlyph (heart) succeeded on same painter",
+               painter.paintGlyph(hb_font, heart, 14.f, fg, 0, r2));
+        ensure("second painter produced bitmap",
+               r2.mBitmap != nullptr && r2.mWidth > 0 && r2.mHeight > 0);
+    }
+
+    // 2-em-square surface fallback (88585ff86d): a glyph with no
+    // ClipBox AND no FT extents lands the painter on a synthetic
+    // 2-em surface so it still produces SOMETHING rather than
+    // returning a 0×0 bitmap. We can't naturally trigger this with
+    // Noto-COLRv1 (every emoji has extents); the test instead pins
+    // the public contract via a positive-extent glyph and confirms
+    // the surface size is on the order of (point_size, point_size)
+    // rather than 0×0 — i.e. the path that runs when extents work
+    // also produces a sized bitmap. A negative version (synthetic
+    // glyph forcing the fallback) requires a hand-built TTF and
+    // is left for the integration suite.
+    template<> template<>
+    void llfontcolrv1_object::test<8>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+        {
+            skip("Noto-COLRv1.ttf not present in test data dir");
+        }
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        ensure("face loaded", face.notNull() && face->isValid());
+        hb_font_t* hb_font = face->getHbFont();
+
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        constexpr F32 point_size = 14.f;
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result result;
+        const LLColor4U fg(255, 255, 255, 255);
+        ensure("paintGlyph succeeded",
+               painter.paintGlyph(hb_font, fire, point_size, fg, 0, result));
+        // Surface dimensions are on the order of point_size — the
+        // ClipBox / FT-extents path produces a bitmap whose width and
+        // height are within a small multiple of the requested point
+        // size. A regression where the path returned 0×0 would fail
+        // the lower bound; a regression that ballooned to 2× the
+        // 2-em square (32×32 fallback for 14pt) would fail the upper
+        // bound (~3× point_size).
+        ensure("surface width is in a reasonable range for 14pt",
+               result.mWidth >= 4 && result.mWidth <= (S32)(point_size * 4.f));
+        ensure("surface height is in a reasonable range for 14pt",
+               result.mHeight >= 4 && result.mHeight <= (S32)(point_size * 4.f));
+    }
+
+    // mForegroundOnly == false for the fire emoji on Noto-COLRv1 — its
+    // paint tree references CPAL palette entries (orange/yellow gradient
+    // stops). Pins b6ba746728's `saw_palette_color` accumulation in
+    // slurp_color_stops / color_cb (llfontcolrv1.cpp:286-287, 248-249).
+    // A regression that forgot to set saw_palette_color anywhere would
+    // leave the flag default-true and cause every emoji to be tinted.
+    template<> template<>
+    void llfontcolrv1_object::test<9>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        ensure("face loaded", face.notNull() && face->isValid());
+        hb_font_t* hb_font = face->getHbFont();
+
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result result;
+        const LLColor4U fg(255, 255, 255, 255);
+        ensure("paintGlyph succeeded",
+               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, result));
+        ensure("fire emoji uses CPAL palette colors -> mForegroundOnly == false",
+               !result.mForegroundOnly);
+    }
+
+    // Gradient color variance: paint fire emoji and walk the BGRA bitmap.
+    // Among non-zero-alpha pixels, count distinct (b, g, r) triples. A
+    // regression where interp_stops returned `front()` always (or the
+    // gradient sampling used the same color for every offset) would
+    // produce a single solid color → 1 distinct triple. Real gradient
+    // emojis show many colors. Pin >= 3.
+    template<> template<>
+    void llfontcolrv1_object::test<10>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        hb_font_t* hb_font = face->getHbFont();
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result result;
+        // Use a larger point size so the rendered bitmap has enough
+        // pixels to sample distinct gradient stops without aliasing
+        // them away.
+        constexpr F32 ps = 32.f;
+        const LLColor4U fg(255, 255, 255, 255);
+        ensure("paintGlyph succeeded",
+               painter.paintGlyph(hb_font, fire, ps, fg, 0, result));
+        ensure("painter produced bitmap",
+               result.mBitmap != nullptr && result.mWidth > 0 && result.mHeight > 0);
+
+        std::set<U32> distinct;  // packed BGR (alpha excluded)
+        for (S32 y = 0; y < result.mHeight; ++y)
+        {
+            const U8* row = result.mBitmap + (ptrdiff_t)y * result.mPitch;
+            for (S32 x = 0; x < result.mWidth; ++x)
+            {
+                const U8 b = row[x * 4 + 0];
+                const U8 g = row[x * 4 + 1];
+                const U8 r = row[x * 4 + 2];
+                const U8 a = row[x * 4 + 3];
+                if (a > 8)  // ignore near-transparent fringe pixels
+                    distinct.insert((U32(r) << 16) | (U32(g) << 8) | U32(b));
+            }
+        }
+        // Fire emoji has at minimum a yellow body + orange gradient +
+        // red highlights; >= 3 distinct triples is a conservative bound.
+        ensure("fire emoji produces >= 3 distinct RGB triples (gradient)",
+               distinct.size() >= 3);
+    }
+
+    // palette_index argument propagates to hb_font_paint_glyph: paint
+    // the fire emoji once with palette 0 and once with palette 1. If
+    // Noto-COLRv1 ships >= 2 CPAL palettes, the resulting bytes must
+    // differ at non-zero-alpha positions. Skip if only one palette is
+    // present (no observable difference, but the code path is exercised
+    // either way).
+    template<> template<>
+    void llfontcolrv1_object::test<11>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        hb_font_t* hb_font = face->getHbFont();
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        const LLColor4U fg(255, 255, 255, 255);
+
+        LLFontColrV1Painter painter_a, painter_b;
+        LLFontColrV1Painter::Result r0, r1;
+        ensure("palette=0 paintGlyph succeeded",
+               painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0, r0));
+        ensure("palette=1 paintGlyph succeeded",
+               painter_b.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/1, r1));
+        ensure("both produced bitmaps",
+               r0.mBitmap && r1.mBitmap
+            && r0.mWidth == r1.mWidth && r0.mHeight == r1.mHeight);
+
+        // Compare bytes — if the font has only one palette, hb resolves
+        // both calls against palette 0 and the bitmaps match. Skip in
+        // that case; the test would be vacuous.
+        bool any_diff = false;
+        for (S32 y = 0; y < r0.mHeight && !any_diff; ++y)
+        {
+            const U8* a_row = r0.mBitmap + (ptrdiff_t)y * r0.mPitch;
+            const U8* b_row = r1.mBitmap + (ptrdiff_t)y * r1.mPitch;
+            for (S32 x = 0; x < r0.mWidth; ++x)
+            {
+                if (a_row[x * 4 + 3] == 0 && b_row[x * 4 + 3] == 0)
+                    continue;
+                if (std::memcmp(a_row + x * 4, b_row + x * 4, 4) != 0)
+                {
+                    any_diff = true;
+                    break;
+                }
+            }
+        }
+        if (!any_diff)
+            skip("Noto-COLRv1 ships only one CPAL palette");
+
+        ensure("palette swap changed at least one painted pixel", any_diff);
+    }
+
+#if LL_MESA_HEADLESS
+    // -------------------------------------------------------------
+    // GL-backed group: COLRv1 painter integrated with the LLFontFreetype
+    // / LLFontBitmapCache / LLImageGL pipeline. Each fixture builds a
+    // fresh OSMesa context so the addGlyph path's gGL.bind plus the
+    // setSubImageBGRA → LLImageGL upload land on a live GL state.
+    // -------------------------------------------------------------
+
+    struct llfontcolrv1_render_data
+    {
+        std::unique_ptr<ll_test::HeadlessGL> gl = std::make_unique<ll_test::HeadlessGL>();
+        ll_test::FontStateScope font_scope;
+    };
+
+    typedef test_group<llfontcolrv1_render_data> llfontcolrv1_render_test;
+    typedef llfontcolrv1_render_test::object     llfontcolrv1_render_object;
+    tut::llfontcolrv1_render_test llfontcolrv1_render_testcase("LLFontColrV1Render");
+
+    // Build an LLFontFreetype as a real head face. The non-fallback
+    // path's notdef pre-warm calls into the rasterizer, which is fine
+    // here — the headless GL context is alive.
+    static LLPointer<LLFontFreetype> loadFtHead(const std::string& filename)
+    {
+        LLPointer<LLFontFreetype> ft = new LLFontFreetype;
+        if (!ft->loadFace(filename, /*point_size=*/14.f, /*vert_dpi=*/96.f, /*horz_dpi=*/96.f,
+                          /*weight=*/-1, /*is_fallback=*/false, /*face_n=*/0,
+                          EFontHinting::DEFAULT, /*flags=*/0))
+        {
+            return nullptr;
+        }
+        return ft;
+    }
+
+    // End-to-end: requesting a Color glyph for the fire emoji on
+    // Noto-COLRv1 must route through renderColrV1Glyph → painter →
+    // setSubImageBGRA → Color atlas. Verify the returned info has
+    // Color glyph type and the cache's Color page has a live GL
+    // texture name.
+    template<> template<>
+    void llfontcolrv1_render_object::test<1>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+        LLPointer<LLFontFreetype> ft = loadFtHead(path);
+        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+
+        LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
+        ensure("getGlyphInfo returned an entry for fire emoji", gi != nullptr);
+        ensure_equals("delivered glyph type is Color (COLRv1 raster)",
+                      (S32)gi->mGlyphType, (S32)EFontGlyphType::Color);
+        ensure("glyph has positive width",   gi->mWidth   > 0);
+        ensure("glyph has positive height",  gi->mHeight  > 0);
+
+        const LLFontBitmapCache* cache = ft->getFontBitmapCache();
+        ensure("bitmap cache present", cache != nullptr);
+        ensure("Color atlas allocated at least one sheet",
+               cache->getNumBitmaps(EFontGlyphType::Color) >= 1u);
+
+        LLImageGL* page = cache->getImageGL(EFontGlyphType::Color, 0);
+        ensure("Color sheet 0 LLImageGL present", page != nullptr);
+        ensure("Color sheet 0 has a live GL texture name",
+               page->getTexName() != 0);
+    }
+
+    // Several COLRv1 emojis in a row share the Color atlas — a single
+    // 1024² Color sheet has plenty of room for many small color
+    // bitmaps. Pins that the painter+atlas integration doesn't
+    // allocate an extra sheet per glyph.
+    template<> template<>
+    void llfontcolrv1_render_object::test<2>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+        LLPointer<LLFontFreetype> ft = loadFtHead(path);
+        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+
+        const llwchar fire    = 0x1F525;
+        const llwchar heart   = 0x2764;
+        const llwchar rocket  = 0x1F680;
+
+        ensure("fire glyph allocated",
+               ft->getGlyphInfo(fire,   EFontGlyphType::Color) != nullptr);
+        ensure("heart glyph allocated",
+               ft->getGlyphInfo(heart,  EFontGlyphType::Color) != nullptr);
+        ensure("rocket glyph allocated",
+               ft->getGlyphInfo(rocket, EFontGlyphType::Color) != nullptr);
+
+        const LLFontBitmapCache* cache = ft->getFontBitmapCache();
+        ensure_equals("three Color glyphs share a single Color atlas sheet",
+                      cache->getNumBitmaps(EFontGlyphType::Color), 1u);
+    }
+
+    // Repeat lookup is a cache hit, not a re-rasterize. Returning
+    // the same LLFontGlyphInfo pointer pins the head's char_glyph
+    // info cache (so each render call doesn't rebuild the painter
+    // input on every frame).
+    template<> template<>
+    void llfontcolrv1_render_object::test<3>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+        LLPointer<LLFontFreetype> ft = loadFtHead(path);
+        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+
+        LLFontGlyphInfo* first  = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
+        LLFontGlyphInfo* second = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
+        ensure("first lookup non-null", first  != nullptr);
+        ensure("second lookup non-null", second != nullptr);
+        ensure_equals("repeat lookup returns same LLFontGlyphInfo pointer",
+                      first, second);
+    }
+
+    // Color atlas generation counter advances on the first emoji
+    // raster (a sheet allocation bumps generation), so a vertex
+    // buffer captured before the rasterize would invalidate. Pins
+    // the global-generation contract that LLFontBitmapCache holds
+    // for COLRv1 atlases too — not just Grayscale.
+    template<> template<>
+    void llfontcolrv1_render_object::test<4>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+        LLPointer<LLFontFreetype> ft = loadFtHead(path);
+        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+
+        const LLFontBitmapCache* cache = ft->getFontBitmapCache();
+        const S32 gen_before = cache->getCacheGeneration();
+
+        LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
+        ensure("glyph allocated", gi != nullptr);
+
+        const S32 gen_after = cache->getCacheGeneration();
+        ensure("cache generation advanced after Color rasterize",
+               gen_after > gen_before);
+    }
+
+    // mTintWithForeground propagation: the painter's mForegroundOnly
+    // flows into LLFontGlyphInfo via mLastColrV1ForegroundOnly
+    // (llfontfreetype.cpp:714). For the fire emoji on Noto-COLRv1
+    // (CPAL-using paint tree), the resulting glyph info must report
+    // mTintWithForeground == false. Pins the wiring from painter
+    // result to glyph info that LLFontGL::render's tint logic at
+    // llfontgl.cpp:662-664 consumes.
+    template<> template<>
+    void llfontcolrv1_render_object::test<5>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+        LLPointer<LLFontFreetype> ft = loadFtHead(path);
+        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+
+        LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
+        ensure("glyph allocated", gi != nullptr);
+        ensure("CPAL-using glyph -> mTintWithForeground == false",
+               !gi->mTintWithForeground);
+    }
+
+    // Painter staging surface dimension consistency: paint the SAME
+    // glyph twice on one painter; second result's dimensions match
+    // the first. Pins that mStaging.resize at llfontcolrv1.cpp:819
+    // doesn't accumulate state across calls (e.g., a regression that
+    // grew the staging buffer on every call would still produce a
+    // valid bitmap but mWidth/mHeight could drift).
+    template<> template<>
+    void llfontcolrv1_render_object::test<6>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        hb_font_t* hb_font = face->getHbFont();
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result r1, r2;
+        const LLColor4U fg(255, 255, 255, 255);
+        ensure("first paintGlyph succeeded",
+               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r1));
+        const S32 w1 = r1.mWidth, h1 = r1.mHeight;
+        ensure("second paintGlyph (same glyph) succeeded",
+               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r2));
+        ensure_equals("repeat paint width matches",  r2.mWidth,  w1);
+        ensure_equals("repeat paint height matches", r2.mHeight, h1);
+    }
+#endif // LL_MESA_HEADLESS
 }

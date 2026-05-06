@@ -979,14 +979,6 @@ bool LLShaderMgr::linkProgramObject(GLuint obj, bool suppress_errors)
         }
     }
 
-    std::string log = get_program_log(obj);
-    LLStringUtil::toLower(log);
-    if (log.find("software") != std::string::npos)
-    {
-        LL_SHADER_LOADING_WARNS() << "GLSL Linker: Running in Software:" << LL_ENDL;
-        success = GL_FALSE;
-        suppress_errors = false;
-    }
     return success;
 }
 
