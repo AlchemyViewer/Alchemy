@@ -67,7 +67,7 @@ bool LLFontGL::sUseDarkEmojiPalette = false;
 std::string LLFontGL::sAppDir;
 
 LLColor4 LLFontGL::sShadowColor(0.f, 0.f, 0.f, 1.f);
-bool     LLFontGL::sEnableShaderShadow = true;
+bool     LLFontGL::sEnableShaderShadow = false;
 LLFontRegistry* LLFontGL::sFontRegistry = NULL;
 
 LLCoordGL LLFontGL::sCurOrigin;
