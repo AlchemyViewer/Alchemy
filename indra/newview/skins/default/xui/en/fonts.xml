@@ -265,19 +265,26 @@
 
     <font name="Emoji" user_selectable="false">
         <style name="NORMAL">
-            <!-- Noto's COLRv1 emoji as a backup for codepoints Twemoji
-                 doesn't carry (newer Unicode releases). Same range gate;
-                 the chain walker only consults this entry when Twemoji's
-                 charmap misses the requested codepoint. Rasterized via
-                 the in-tree COLRv1 paint walker (HarfBuzz callbacks ->
-                 plutovg). -->
-            <file unicode_ranges="U+2600-U+27BF,U+20E0-U+20E9,U+FE0E-U+FE0F,U+1F000-U+1FFFF,U+1F900-U+1F9FF">Noto-COLRv1.ttf</file>
+            <!-- The unicode_ranges gate enumerates UTS#51 emoji codepoints
+                 so the shape-itemizer keeps a whole emoji cluster on this
+                 face. Codepoints outside the gate route off Noto-COLRv1 to
+                 the next fallback, fragmenting ZWJ chains across faces and
+                 breaking the GSUB ligature lookup (e.g. U+1F408 ZWJ U+2B1B
+                 → 🐈‍⬛ depends on U+2B1B staying on this face). The set
+                 below covers Emoji_Presentation + the BMP emoji codepoints
+                 scattered outside U+2600-U+27BF (big-square / star / arrow
+                 / watch / hourglass / etc. emoji that pair with astral
+                 bases via ZWJ), plus the keycap combiner range, ZWJ, and
+                 VS-15 / VS-16 so emoji presentation selectors and joiners
+                 stay clustered. Rasterized via the in-tree COLRv1 paint
+                 walker (HarfBuzz callbacks -> plutovg). -->
+            <file unicode_ranges="U+200D,U+203C,U+2049,U+2122,U+2139,U+2194-U+2199,U+21A9-U+21AA,U+231A-U+231B,U+2328,U+23CF,U+23E9-U+23F3,U+23F8-U+23FA,U+24C2,U+25AA-U+25AB,U+25B6,U+25C0,U+25FB-U+25FE,U+2600-U+27BF,U+2934-U+2935,U+2B05-U+2B07,U+2B1B-U+2B1C,U+2B50,U+2B55,U+3030,U+303D,U+3297,U+3299,U+20E0-U+20E9,U+FE0E-U+FE0F,U+1F000-U+1FFFF">Noto-COLRv1.ttf</file>
         </style>
     </font>
 
     <font name="LimitedEmoji" user_selectable="false">
         <style name="NORMAL">
-            <file unicode_ranges="U+1F000-U+1FFFF">Noto-COLRv1.ttf</file>
+            <file unicode_ranges="U+2B1B-U+2B1C,U+2B50,U+2B55,U+1F000-U+1FFFF">Noto-COLRv1.ttf</file>
         </style>
     </font>
 
