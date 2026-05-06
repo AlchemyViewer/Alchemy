@@ -1069,16 +1069,26 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
     if (!hb_font)
         return false;
 
+    hb_face_t* hb_face = hb_font_get_face(hb_font);
+    if (!hb_face)
+        return false;
+
+    // Reject out-of-range glyph indices up front. hb_font_paint_glyph silently
+    // succeeds (no callbacks fire) for unknown glyphs, and the empty-bbox
+    // fallback below would then synthesize a 2-em-square surface and the
+    // walker would hand back a transparent bitmap as if it had rendered a
+    // valid glyph. Caller can't distinguish "no paint tree" from "empty
+    // glyph" on the success path, so fail cleanly here instead.
+    if (glyph_index >= hb_face_get_glyph_count(hb_face))
+        return false;
+
     // Clamp the requested palette index to what the font actually carries.
     // hb_font_paint_glyph silently does *something* on out-of-range indices
     // (implementation-defined); pinning to the [0, count) range gives us a
     // deterministic fallback to palette 0 for fonts without the requested
     // palette while still honoring valid alternate-palette requests.
     {
-        hb_face_t* hb_face = hb_font_get_face(hb_font);
-        const unsigned palette_count = hb_face
-            ? hb_ot_color_palette_get_count(hb_face)
-            : 0u;
+        const unsigned palette_count = hb_ot_color_palette_get_count(hb_face);
         if (palette_count == 0u)
             palette_index = 0u;
         else if (palette_index >= palette_count)
