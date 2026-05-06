@@ -820,34 +820,25 @@ static LLNotificationFunctorRegistration jgr_3("JoinGroupCanAfford", join_group_
 //-----------------------------------------------------------------------------
 // Instant Message
 //-----------------------------------------------------------------------------
-class LLOpenAgentOffer : public LLInventoryFetchItemsObserver
+/*virtual*/ void LLOpenAgentOffer::startFetch()
 {
-public:
-    LLOpenAgentOffer(const LLUUID& object_id,
-                     const std::string& from_name) :
-        LLInventoryFetchItemsObserver(object_id),
-        mFromName(from_name) {}
-    /*virtual*/ void startFetch()
+    for (uuid_vec_t::const_iterator it = mIDs.begin(); it < mIDs.end(); ++it)
     {
-        for (uuid_vec_t::const_iterator it = mIDs.begin(); it < mIDs.end(); ++it)
+        LLViewerInventoryCategory* cat = gInventory.getCategory(*it);
+        if (cat)
         {
-            LLViewerInventoryCategory* cat = gInventory.getCategory(*it);
-            if (cat)
-            {
-                mComplete.push_back((*it));
-            }
+            mComplete.push_back((*it));
         }
-        LLInventoryFetchItemsObserver::startFetch();
     }
-    /*virtual*/ void done()
-    {
-        open_inventory_offer(mComplete, mFromName);
-        gInventory.removeObserver(this);
-        delete this;
-    }
-private:
-    std::string mFromName;
-};
+    LLInventoryFetchItemsObserver::startFetch();
+}
+
+/*virtual*/ void LLOpenAgentOffer::done()
+{
+    open_inventory_offer(mComplete, mFromName, mIsManuallyAccepted);
+    gInventory.removeObserver(this);
+    delete this;
+}
 
 /**
  * Class to observe adding of new items moved from the world to user's inventory to select them in inventory.
@@ -1082,7 +1073,14 @@ protected:
             else ++it;
         }
 
-        open_inventory_offer(added, "");
+        if (gSavedSettings.getBOOL("ShowNewInventory"))
+        {
+            open_inventory_offer(added, "");
+        }
+        else if (!added.empty() && gSavedSettings.getBOOL("ShowInInventory") && highlight_offered_object(added.back()))
+        {
+            LLInventoryPanel::openInventoryPanelAndSetSelection(TRUE, added.back());
+        }
     }
  };
 
@@ -1096,7 +1094,14 @@ protected:
         {
             added.push_back(*it);
         }
-        open_inventory_offer(added, "group_offer");
+        if (gSavedSettings.getBOOL("ShowNewInventory"))
+        {
+            open_inventory_offer(added, "group_offer");
+        }
+        else if (!added.empty() && gSavedSettings.getBOOL("ShowInInventory"))
+        {
+            LLInventoryPanel::openInventoryPanelAndSetSelection(TRUE, added.back());
+        }
         gInventory.removeObserver(this);
         delete this;
     }
@@ -1180,9 +1185,6 @@ bool check_offer_throttle(const std::string& from_name, bool check_only)
     LLChat chat;
     std::string log_message;
 
-    if (!gSavedSettings.getBOOL("ShowNewInventory"))
-        return false;
-
     if (check_only)
     {
         return gThrottleTimer.hasExpired();
@@ -1255,7 +1257,7 @@ bool check_asset_previewable(const LLAssetType::EType asset_type)
             (asset_type == LLAssetType::AT_MATERIAL);
 }
 
-void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_name)
+void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_name, bool manual_offer)
 {
     for (uuid_vec_t::const_iterator obj_iter = objects.begin();
          obj_iter != objects.end();
@@ -1388,10 +1390,7 @@ void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_nam
         else
         {
             // Highlight item
-            bool show_in_inventory = gSavedSettings.get<bool>("ShowInInventory");
-            bool auto_open =
-                show_in_inventory && // don't open if ShowInInventory is false
-                !from_name.empty();  // don't open if it's not from anyone
+            bool auto_open = gSavedSettings.getBOOL("ShowInInventory") || (manual_offer && !check_asset_previewable(asset_type));
 
             // SL-20419 : Don't change active tab if floater is visible
             LLFloater* instance = LLFloaterReg::findInstance("inventory");
@@ -1726,10 +1725,8 @@ bool LLOfferInfo::inventory_offer_callback(const LLSD& notification, const LLSD&
                         gInventory.addObserver(pOfferObserver);
                 }
 // [/RLVa:KB]
-
-                if (gSavedSettings.getBOOL("ShowOfferedInventory"))
                 {
-                    LLOpenAgentOffer* open_agent_offer = new LLOpenAgentOffer(mObjectID, from_string);
+                    LLOpenAgentOffer* open_agent_offer = new LLOpenAgentOffer(mObjectID, from_string, true);
                     open_agent_offer->startFetch();
                     if(catp || (itemp && itemp->isFinished()))
                     {
@@ -7473,4 +7470,3 @@ void LLOfferInfo::forceResponse(InventoryOfferResponse response)
     params.functor.function(boost::bind(&LLOfferInfo::inventory_offer_callback, this, _1, _2));
     LLNotifications::instance().forceResponse(params, response);
 }
-

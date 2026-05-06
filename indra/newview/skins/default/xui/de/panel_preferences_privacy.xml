@@ -24,6 +24,12 @@
 	</text>
 	<button label="Durchsuchen" label_selected="Durchsuchen" name="log_path_button"/>
 	<button label="Ignorierte Einwohner/Objekte" name="block_list" width="180"/>
+	<text name="inventory_header">
+		Inventory:
+	</text>
+	<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
+	<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
+	<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
 	<text name="block_list_label">
 		(Personen und/oder Objekte, die Sie blockiert haben)
 	</text>

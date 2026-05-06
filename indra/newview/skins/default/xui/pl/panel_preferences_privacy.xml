@@ -8,6 +8,12 @@
 	<check_box label="Mój status online dostępny tylko dla znajomych i grup" name="online_visibility" />
 	<check_box label="Wyłącz mikrofon po zakończeniu rozmowy głosowej" name="auto_disengage_mic_check" />
 	<button label="Lista zablokowanych" name="block_list" />
+	<text name="inventory_header">
+		Inventory:
+	</text>
+	<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory" />
+	<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory" />
+	<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory" />
 	<text name="block_list_label">
 		(Ludzie oraz/lub obiekty zablokowane przez Ciebie)
 	</text>
