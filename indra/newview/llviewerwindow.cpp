@@ -6330,6 +6330,10 @@ void LLViewerWindow::initFonts(F32 zoom_factor)
     // afterward; without seeding here the first font load runs with the
     // default (false) regardless of the persisted preference.
     LLFontGL::sUseDarkEmojiPalette = gSavedSettings.getBOOL("EmojiUseDarkPalette");
+    // Same logic for the force-monochrome COLRv1 toggle: must be live before
+    // the first font load so the renderer sees the right glyph types from
+    // the start.
+    LLFontGL::sForceMonochromeEmoji = gSavedSettings.getBOOL("AlchemyForceMonochromeEmoji");
 
     LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
                                 mDisplayScale.mV[VX] * zoom_factor,

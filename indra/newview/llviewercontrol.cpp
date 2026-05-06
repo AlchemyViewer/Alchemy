@@ -449,6 +449,18 @@ static bool handleEmojiUseDarkPaletteChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleForceMonochromeEmojiChanged(const LLSD& newvalue)
+{
+    // Toggling force-mono changes the bitmap_type LLFontGL::render asks for
+    // (Grayscale instead of Color for COLRv1 faces), which means the atlas
+    // sheets it would re-use no longer match the requested format. The
+    // pending reload tears the cache down so the next render repopulates
+    // through the new path.
+    LLFontGL::sForceMonochromeEmoji = newvalue.asBoolean();
+    LLFontGL::schedulePendingReload();
+    return true;
+}
+
 static bool handleConsoleMaxLinesChanged(const LLSD& newvalue)
 {
     if(gConsole)
@@ -934,6 +946,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "ChatFontSize", handleChatFontSizeChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyUIFontOverrides", handleUIFontOverridesChanged);
     setting_setup_signal_listener(gSavedSettings, "EmojiUseDarkPalette", handleEmojiUseDarkPaletteChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyForceMonochromeEmoji", handleForceMonochromeEmojiChanged);
     setting_setup_signal_listener(gSavedSettings, "ConsoleMaxLines", handleConsoleMaxLinesChanged);
     setting_setup_signal_listener(gSavedSettings, "UploadBakedTexOld", handleUploadBakedTexOldChanged);
     setting_setup_signal_listener(gSavedSettings, "UseOcclusion", handleUseOcclusionChanged);

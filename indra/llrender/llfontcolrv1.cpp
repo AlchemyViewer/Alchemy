@@ -28,16 +28,28 @@
 
 namespace
 {
-    // Cap recursion through PaintColrGlyph. The COLR spec doesn't bound this,
-    // but a malformed or hostile font could nest indefinitely. 8 is well past
-    // anything observed in real fonts (Noto's deepest paint tree is ~4).
-    constexpr unsigned MAX_PAINT_DEPTH = 8;
+    // PaintColrGlyph recursion is bounded by HB_MAX_NESTING_LEVEL inside
+    // HarfBuzz (currently 64), which is the only depth check that actually
+    // applies here — our callbacks don't recurse on their own.
 
     // Padding around the glyph bbox in surface pixels. Anti-aliased edges of
     // outline-clipped fills can extend ~1 px past the geometric bbox at the
     // shader sample positions; the existing atlas allocator already adds a
     // 4 px border for shadow-tap safety, so 1 px here is plenty.
     constexpr S32 GLYPH_PAD = 1;
+
+    // Floor (×256, fixed-point) applied to the alpha channel when folding
+    // BGRA premul → Gray. Keeps fully-saturated palette black visible as a
+    // ~15% silhouette rather than collapsing to zero, while leaving the
+    // luminance-dominant majority of the glyph unchanged. 0.15 is large
+    // enough to register on light backgrounds and small enough not to wash
+    // out the brightness gradation in lighter regions.
+    constexpr U32 GRAY_ALPHA_FLOOR_256 = 38;  // ≈ 0.15 * 256
+
+    // mStaging high-water cap: keep at most 4× the most recent glyph or
+    // 256 KB, whichever is larger, so a single huge glyph doesn't strand
+    // multiple MB of per-thread memory for the rest of the process.
+    constexpr size_t STAGING_HIGH_WATER_BYTES = 256 * 1024;
 
     struct Painter
     {
@@ -51,13 +63,12 @@ namespace
         F32                origin_y_top = 0.f;  // y_bearing in HB (Y-up) coords
         // Foreground color used for COLRv1 foreground-slot fills. Unpremultiplied.
         hb_color_t         foreground = 0;
-        // Recursion depth through paint_color_glyph. Painter sets to 0 in its
-        // setup; HB increments the conceptual depth via callbacks. We track it
-        // explicitly so we can refuse cycles.
-        unsigned           depth = 0;
         // Whether any callback bailed out because of an unsupported feature
-        // (sweep gradient, image fill, etc.). Caller treats true as "abort
-        // and fall back to outline rasterization".
+        // (image fill, group surface alloc fail, etc.). Caller treats true
+        // as "abort and fall back to outline rasterization". Once set, every
+        // callback below is a no-op — the latch ensures a failed push_group
+        // doesn't leak subsequent paint commands into the parent surface or
+        // throw plutovg's clip/transform stack out of sync.
         bool               aborted = false;
         // Tracks whether any non-foreground (palette / explicit RGBA) color
         // was emitted during the walk. Drives the foreground-only tint flag
@@ -139,6 +150,7 @@ namespace
                            float dx, float dy, void*)
     {
         Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
         plutovg_canvas_save(p->canvas);
         plutovg_matrix_t m;
         plutovg_matrix_init(&m, xx, yx, xy, yy, dx, dy);
@@ -148,6 +160,7 @@ namespace
     void pop_transform_cb(hb_paint_funcs_t*, void* data, void*)
     {
         Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
         plutovg_canvas_restore(p->canvas);
     }
 
@@ -208,6 +221,7 @@ namespace
                             hb_codepoint_t glyph, hb_font_t* font, void*)
     {
         Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
         plutovg_canvas_save(p->canvas);
         plutovg_canvas_new_path(p->canvas);
 
@@ -226,6 +240,7 @@ namespace
                                 float xmin, float ymin, float xmax, float ymax, void*)
     {
         Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
         plutovg_canvas_save(p->canvas);
         plutovg_canvas_new_path(p->canvas);
         plutovg_canvas_move_to(p->canvas, xmin, ymin);
@@ -238,13 +253,16 @@ namespace
 
     void pop_clip_cb(hb_paint_funcs_t*, void* data, void*)
     {
-        plutovg_canvas_restore(static_cast<Painter*>(data)->canvas);
+        Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
+        plutovg_canvas_restore(p->canvas);
     }
 
     void color_cb(hb_paint_funcs_t*, void* data,
                   hb_bool_t is_foreground, hb_color_t color, void*)
     {
         Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
         if (!is_foreground)
             p->saw_palette_color = true;
         plutovg_color_t pc;
@@ -305,6 +323,7 @@ namespace
         // wrong glyphs in a font that uses p2 non-trivially can be fixed
         // later by computing the projected p1' for plutovg.
         Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
         slurp_color_stops(*p, color_line);
         if (p->pv_stops.empty())
             return;
@@ -321,6 +340,7 @@ namespace
                             float x1, float y1, float r1, void*)
     {
         Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
         slurp_color_stops(*p, color_line);
         if (p->pv_stops.empty())
             return;
@@ -396,6 +416,7 @@ namespace
                            float start_angle, float end_angle, void*)
     {
         Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
         slurp_color_stops(*p, color_line);
         if (p->pv_stops.empty())
             return;
@@ -443,7 +464,13 @@ namespace
         const F32 inv_span = 1.f / angle_span;
 
         unsigned char* lut_data = plutovg_surface_get_data(lut);
-        const int lut_stride = p->width * 4;  // BGRA tight-packed
+        const int lut_stride = plutovg_surface_get_stride(lut);
+        if (!lut_data || lut_stride < p->width * 4)
+        {
+            plutovg_surface_destroy(lut);
+            p->aborted = true;
+            return;
+        }
         for (S32 py = 0; py < p->height; ++py)
         {
             unsigned char* row = lut_data + py * lut_stride;
@@ -503,7 +530,9 @@ namespace
         // If a font ships them anyway, mark aborted; FreeType's existing
         // FT_LOAD_COLOR path (already invoked for the base color render
         // attempt earlier) handles those formats natively.
-        static_cast<Painter*>(data)->aborted = true;
+        Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return false;
+        p->aborted = true;
         return false;
     }
 
@@ -516,6 +545,7 @@ namespace
         // copied — the COLRv1 spec composites the group through the parent
         // clip at pop_group time, not during the group itself.
         Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
         plutovg_surface_t* sub_surface = plutovg_surface_create(p->width, p->height);
         if (!sub_surface)
         {
@@ -546,6 +576,7 @@ namespace
                       hb_paint_composite_mode_t mode, void*)
     {
         Painter* p = static_cast<Painter*>(data);
+        if (p->aborted) return;
         if (p->group_stack.empty())
         {
             // pop without matching push — malformed paint tree. HB shouldn't
@@ -626,15 +657,32 @@ namespace
 LLFontColrV1Painter::LLFontColrV1Painter() = default;
 LLFontColrV1Painter::~LLFontColrV1Painter() = default;
 
-bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
-                                     U32           glyph_index,
-                                     F32           /*point_size*/,
+bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
+                                     U32              glyph_index,
+                                     F32              fallback_point_size,
                                      const LLColor4U& foreground,
-                                     U32           palette_index,
-                                     Result&       out)
+                                     U32              palette_index,
+                                     OutputFormat     format,
+                                     Result&          out)
 {
     if (!hb_font)
         return false;
+
+    // Clamp the requested palette index to what the font actually carries.
+    // hb_font_paint_glyph silently does *something* on out-of-range indices
+    // (implementation-defined); pinning to the [0, count) range gives us a
+    // deterministic fallback to palette 0 for fonts without the requested
+    // palette while still honoring valid alternate-palette requests.
+    {
+        hb_face_t* hb_face = hb_font_get_face(hb_font);
+        const unsigned palette_count = hb_face
+            ? hb_ot_color_palette_get_count(hb_face)
+            : 0u;
+        if (palette_count == 0u)
+            palette_index = 0u;
+        else if (palette_index >= palette_count)
+            palette_index = 0u;
+    }
 
     // Surface-sizing bbox in HB paint coordinates (pixels * 64, the same
     // 26.6 convention HB uses everywhere). x_bearing is the leftmost coord;
@@ -653,7 +701,6 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
     // outline bbox if the font has no clip box for this glyph.
     FT_Face ft_face = hb_ft_font_get_ft_face(hb_font);
     FT_ClipBox clip = {};
-    bool used_clip_box = false;
     if (ft_face && FT_Get_Color_Glyph_ClipBox(ft_face, glyph_index, &clip))
     {
         // The clip box gives 4 corners in 26.6 (font-design coords scaled by
@@ -677,7 +724,6 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
         bbox_y_bearing = (S32)ymax;          // HB y_bearing convention: top-most Y, Y-up
         bbox_width     = (S32)(xmax - xmin);
         bbox_height    = (S32)(ymin - ymax); // negative, matching HB convention
-        used_clip_box  = true;
     }
     else
     {
@@ -703,6 +749,16 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
     {
         unsigned x_ppem = 0, y_ppem = 0;
         hb_font_get_ppem(hb_font, &x_ppem, &y_ppem);
+        // Fall back to the caller-supplied point_size when the hb_font has
+        // no scale set. Avoids returning a hard `false` on misconfigured
+        // faces; the resulting bbox is generous (2 em square) but at least
+        // gives the paint walk somewhere to draw.
+        if (x_ppem == 0)
+            x_ppem = (fallback_point_size > 0.f)
+                ? static_cast<unsigned>(fallback_point_size + 0.5f) : 0u;
+        if (y_ppem == 0)
+            y_ppem = (fallback_point_size > 0.f)
+                ? static_cast<unsigned>(fallback_point_size + 0.5f) : 0u;
         if (x_ppem == 0 || y_ppem == 0)
             return false;
         const S32 ppem_x_64 = static_cast<S32>(x_ppem) * 64;
@@ -735,7 +791,6 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
     const S32 height_px  = ceil_div_64(abs_h_26_6);
     const S32 surf_w     = width_px  + 2 * GLYPH_PAD;
     const S32 surf_h     = height_px + 2 * GLYPH_PAD;
-    (void)used_clip_box;
     if (surf_w <= 0 || surf_h <= 0 || surf_w > 1024 || surf_h > 1024)
     {
         // Cap matches the atlas sheet ceiling (LLFontBitmapCache caps at
@@ -811,30 +866,88 @@ bool LLFontColrV1Painter::paintGlyph(hb_font_t* hb_font,
         return teardown(false);
     }
 
-    // Surface is BGRA premultiplied (plutovg native), top-row first, stride
-    // tightly packed at width*4. Copy into mStaging so the caller can keep
-    // pointing at it after we destroy the surface.
-    const S32 stride = surf_w * 4;
-    const size_t bytes = static_cast<size_t>(stride) * static_cast<size_t>(surf_h);
-    mStaging.resize(bytes);
+    // Surface is BGRA premultiplied (plutovg native), top-row first. Query
+    // the stride rather than assuming tight packing — plutovg's documented
+    // contract is bytes-per-row, which may include padding. The Gray output
+    // path collapses to a 1-byte/pixel buffer; the BGRA path is a row-by-
+    // row copy that respects the source stride.
+    const S32 src_stride = plutovg_surface_get_stride(p.surface);
     const unsigned char* src = plutovg_surface_get_data(p.surface);
-    if (src)
+    if (src_stride < surf_w * 4 || !src)
     {
-        std::memcpy(mStaging.data(), src, bytes);
+        // Sanity: a sane plutovg surface has stride >= width*4 bytes. If
+        // we ever see less, the build has changed pixel format under us
+        // and the BGRA->X fold below would walk off the end of the row.
+        // Fail loudly into the caller's outline-fallback path.
+        return teardown(false);
+    }
+
+    if (format == OutputFormat::Gray)
+    {
+        // Hybrid coverage fold: max(Rec.709 luminance, alpha * floor).
+        // Foreground-only glyphs (white premul: r=g=b=a) collapse to alpha
+        // exactly because Y = (54+183+18)*a/256 ≈ a > a*0.15. Palette-painted
+        // pixels keep luminance gradation where it dominates and fall back
+        // to the alpha floor for fully-saturated dark colors so they still
+        // register as a silhouette against light text colors.
+        const size_t bytes = static_cast<size_t>(surf_w) * static_cast<size_t>(surf_h);
+        mStaging.resize(bytes);
+        for (S32 y = 0; y < surf_h; ++y)
+        {
+            const unsigned char* row = src + (ptrdiff_t)y * src_stride;
+            U8* dst = mStaging.data() + (ptrdiff_t)y * surf_w;
+            for (S32 x = 0; x < surf_w; ++x)
+            {
+                const U8 b = row[x * 4 + 0];
+                const U8 g = row[x * 4 + 1];
+                const U8 r = row[x * 4 + 2];
+                const U8 a = row[x * 4 + 3];
+                const U32 y_256     = (U32)r * 54u + (U32)g * 183u + (U32)b * 18u; // Y << 8
+                const U32 floor_256 = (U32)a * GRAY_ALPHA_FLOOR_256;
+                const U32 cov_256   = (y_256 > floor_256) ? y_256 : floor_256;
+                const U32 cov       = cov_256 >> 8;
+                dst[x] = (U8)(cov > 255u ? 255u : cov);
+            }
+        }
+        out.mPitch  = surf_w;
+        out.mFormat = OutputFormat::Gray;
     }
     else
     {
-        std::fill(mStaging.begin(), mStaging.end(), (U8)0);
+        // BGRA copy. Honor source stride: when src_stride > surf_w*4 the
+        // padding bytes are skipped, and the destination is written tightly
+        // packed (out.mPitch == surf_w*4) so downstream consumers can
+        // continue to assume tight rows.
+        const S32 dst_stride = surf_w * 4;
+        const size_t bytes = static_cast<size_t>(dst_stride) * static_cast<size_t>(surf_h);
+        mStaging.resize(bytes);
+        for (S32 y = 0; y < surf_h; ++y)
+        {
+            std::memcpy(mStaging.data() + (ptrdiff_t)y * dst_stride,
+                        src + (ptrdiff_t)y * src_stride,
+                        (size_t)dst_stride);
+        }
+        out.mPitch  = dst_stride;
+        out.mFormat = OutputFormat::BGRA;
     }
     mStagingWidth  = surf_w;
     mStagingHeight = surf_h;
 
     teardown(true);
 
+    // Cap the per-thread staging high-water mark. Once we've held more than
+    // 4× the current glyph and the buffer exceeds STAGING_HIGH_WATER_BYTES,
+    // shrink. Bounded by max(current, threshold) so a steady stream of
+    // similarly-sized glyphs doesn't thrash through reallocations.
+    if (mStaging.capacity() > mStaging.size() * 4
+        && mStaging.size() < STAGING_HIGH_WATER_BYTES)
+    {
+        mStaging.shrink_to_fit();
+    }
+
     out.mBitmap = mStaging.data();
     out.mWidth  = surf_w;
     out.mHeight = surf_h;
-    out.mPitch  = stride;
     // FT bitmap_left/_top are in PIXELS. The surface is PAD pixels wider than
     // the glyph bbox on each side, so the leftmost pixel of the bitmap sits
     // one PAD to the left of where the glyph bbox starts (left_px), and the

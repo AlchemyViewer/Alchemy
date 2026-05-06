@@ -64,6 +64,7 @@ S32 LLFontGL::sResolutionGeneration = 0;
 bool LLFontGL::sFontsXmlDirty = false;
 bool LLFontGL::sDisplayFont = true ;
 bool LLFontGL::sUseDarkEmojiPalette = false;
+bool LLFontGL::sForceMonochromeEmoji = false;
 std::string LLFontGL::sAppDir;
 
 LLColor4 LLFontGL::sShadowColor(0.f, 0.f, 0.f, 1.f);
@@ -557,7 +558,8 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     // where `this` is the root and `fontp` is the fallback.
                     const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
                         sg.face, sg.glyph_id,
-                        (!use_color) ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
+                        (!use_color || LLFontGL::sForceMonochromeEmoji)
+                            ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
                     if (!sfgi)
                         continue;
 
@@ -712,7 +714,9 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         next_glyph = NULL;
         if(!fgi)
         {
-            fgi = mFontFreetype->getGlyphInfo(wch, (!use_color) ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
+            fgi = mFontFreetype->getGlyphInfo(wch,
+                (!use_color || LLFontGL::sForceMonochromeEmoji)
+                    ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
         }
         if (!fgi)
         {
@@ -859,7 +863,9 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             // Kern this puppy. The old `next_char < LAST_CHAR_FULL`
             // gate was a vestigial ASCII-bucket-cache limit; today
             // getXKerning works for any pair.
-            next_glyph = mFontFreetype->getGlyphInfo(next_char, (!use_color) ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
+            next_glyph = mFontFreetype->getGlyphInfo(next_char,
+                (!use_color || LLFontGL::sForceMonochromeEmoji)
+                    ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
             cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
         }
 

@@ -2299,6 +2299,22 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyForceMonochromeEmoji</key>
+        <map>
+            <key>Comment</key>
+            <string>
+                Render color emoji as monochrome (luminance-shaded) glyphs that
+                tint with the surrounding text color. Applies to COLRv1 fonts
+                only; CBDT / sbix / SVG color fonts are unaffected. Triggers a
+                font reload on change.
+            </string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyFancyChatDivider</key>
         <map>
             <key>Comment</key>

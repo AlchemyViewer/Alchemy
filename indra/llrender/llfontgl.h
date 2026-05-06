@@ -315,6 +315,14 @@ public:
     // font reload via the standard schedulePendingReload mechanism, so
     // every face re-runs LLFontFace::load and picks up the new value.
     static bool sUseDarkEmojiPalette;
+    // Threaded in from newview's AlchemyForceMonochromeEmoji setting. When
+    // true, LLFontGL::render downgrades Color → Grayscale lookups so COLRv1
+    // emoji rasterize via the painter's luminance-shaded path and tint with
+    // text_color via the renderer's existing Grayscale-tints-with-text rule.
+    // Has no effect on non-COLRv1 color fonts (CBDT/sbix/SVG) — those keep
+    // their native color rendering. Toggling triggers a font reload to
+    // discard stale color-atlas glyphs.
+    static bool sForceMonochromeEmoji;
     static std::string sAppDir;         // For loading fonts
 
 private:

@@ -1046,12 +1046,16 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
     // COLRv1 fast path. FreeType's FT_LOAD_COLOR + FT_Render_Glyph rasterize
     // COLRv0 / sbix / CBDT / OT-SVG natively but explicitly NOT COLRv1; for
     // those faces we walk the paint tree ourselves via HarfBuzz callbacks
-    // and a plutovg backend. Only attempt when a Color result was actually
-    // requested — Grayscale lookups (for non-emoji code paths) stay on the
-    // standard outline path.
-    if (bitmap_type == EFontGlyphType::Color && mFace && mFace->hasColrV1())
+    // and a plutovg backend. Runs for both Color and Grayscale requests:
+    // Color rasterizes BGRA into the Color atlas, Grayscale folds the paint
+    // tree into a luminance-shaded mask that the Grayscale atlas tints with
+    // text_color at draw time. Either bitmap_type request hits the COLRv1
+    // path on COLRv1 faces; the FT outline fallback below handles glyphs
+    // whose paint tree the walker can't process.
+    if (mFace && mFace->hasColrV1()
+        && (bitmap_type == EFontGlyphType::Color || bitmap_type == EFontGlyphType::Grayscale))
     {
-        if (renderColrV1Glyph(glyph_index, wch))
+        if (renderColrV1Glyph(glyph_index, bitmap_type))
         {
             mRenderGlyphCount++;
             return;
@@ -1115,7 +1119,7 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
     mRenderGlyphCount++;
 }
 
-bool LLFontFreetype::renderColrV1Glyph(U32 glyph_index, llwchar wch) const
+bool LLFontFreetype::renderColrV1Glyph(U32 glyph_index, EFontGlyphType requested) const
 {
     LLFT_Face ft = getFTFace();
     if (!ft || !mFace)
@@ -1131,24 +1135,33 @@ bool LLFontFreetype::renderColrV1Glyph(U32 glyph_index, llwchar wch) const
     // Reuse the painter (and its scratch buffers) across all renderGlyph
     // calls on this thread. The painter holds no per-face state; declaring
     // it static thread_local amortizes the small amount of construction cost
-    // and keeps the BGRA staging buffer sized to the running max glyph.
+    // and keeps the staging buffer sized to the running max glyph.
     static thread_local LLFontColrV1Painter s_painter;
     LLFontColrV1Painter::Result result;
-    // Foreground color: matches the existing emoji draw color in
-    // LLFontGL::render (white at the head's alpha). A future change to thread
-    // the live text color through here lets COLRv1 fonts that reference
-    // foreground tint correctly under text color settings.
+    // Foreground color: white for both BGRA and Gray paths. The Color path
+    // uses white so foreground-only glyphs end up as a luminance mask the
+    // renderer tints with text_color via mTintWithForeground. The Gray path
+    // requires white foreground for the luminance-collapses-to-alpha
+    // invariant: max(Y, a*floor) must equal `a` for fg-only pixels, which
+    // holds iff R=G=B=A. Threading the live text color through here is
+    // tracked as a follow-up (mixed CPAL+foreground glyphs render their
+    // foreground regions in white today; mTintWithForeground only retints
+    // the all-foreground case).
     const LLColor4U emoji_fg(255, 255, 255, 255);
+    const LLFontColrV1Painter::OutputFormat format =
+        (requested == EFontGlyphType::Grayscale)
+            ? LLFontColrV1Painter::OutputFormat::Gray
+            : LLFontColrV1Painter::OutputFormat::BGRA;
     if (!s_painter.paintGlyph(mFace->getHbFont(), glyph_index, mPointSize,
-                              emoji_fg, mFace->paletteIndex(), result))
+                              emoji_fg, mFace->paletteIndex(), format, result))
     {
         return false;
     }
     if (!result.mBitmap || result.mWidth <= 0 || result.mHeight <= 0)
         return false;
 
-    // Patch FT's glyph slot in place. The existing FT_PIXEL_MODE_BGRA branch
-    // in renderAndCreateGlyph reads exactly these fields and is oblivious to
+    // Patch FT's glyph slot in place. The existing pixel_mode switch in
+    // renderAndCreateGlyph reads exactly these fields and is oblivious to
     // whether FT or our painter populated them. The slot resets on the next
     // FT_Load_Glyph call, so the stale buffer pointer doesn't outlive its
     // owner (the painter's mStaging vector, valid until next paintGlyph).
@@ -1157,12 +1170,18 @@ bool LLFontFreetype::renderColrV1Glyph(U32 glyph_index, llwchar wch) const
     bm.rows       = static_cast<unsigned>(result.mHeight);
     bm.pitch      = result.mPitch;
     bm.buffer     = const_cast<unsigned char*>(result.mBitmap);
-    bm.pixel_mode = FT_PIXEL_MODE_BGRA;
+    bm.pixel_mode = (format == LLFontColrV1Painter::OutputFormat::Gray)
+        ? (unsigned char)FT_PIXEL_MODE_GRAY
+        : (unsigned char)FT_PIXEL_MODE_BGRA;
     bm.num_grays  = 256;
     ft->glyph->bitmap_left = result.mLeft;
     ft->glyph->bitmap_top  = result.mTop;
-    mLastColrV1ForegroundOnly = result.mForegroundOnly;
-    (void)wch;  // unused at present; kept in signature for log-friendly callers.
+    // mTintWithForeground is only meaningful for the Color path. The Gray
+    // atlas always tints with text_color (the renderer's "Grayscale → text
+    // tint" rule), so the flag is dead-loaded for Gray glyphs and we leave
+    // it false.
+    if (format == LLFontColrV1Painter::OutputFormat::BGRA)
+        mLastColrV1ForegroundOnly = result.mForegroundOnly;
     return true;
 }
 

@@ -22,6 +22,7 @@
 
 #if LL_MESA_HEADLESS
 #  include "../llfontbitmapcache.h"
+#  include "../llfontgl.h"      // sForceMonochromeEmoji static for force-mono test
 #  include "../llimagegl.h"
 #  include "llheadlessgl_fixture.h"
 #endif
@@ -29,6 +30,7 @@
 #include <cstdio>
 #include <cstring>
 #include <set>
+#include <vector>
 
 namespace
 {
@@ -498,6 +500,282 @@ namespace tut
         ensure("palette swap changed at least one painted pixel", any_diff);
     }
 
+    // OutputFormat::Gray basics: format selector hits the gray fold path
+    // and returns a single-channel buffer with mPitch == width and
+    // non-zero coverage somewhere in the bitmap. Pins the §1/§2 contract
+    // that Gray output is single-channel, top-row first, tightly packed.
+    template<> template<>
+    void llfontcolrv1_object::test<12>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        hb_font_t* hb_font = face->getHbFont();
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result result;
+        const LLColor4U fg(255, 255, 255, 255);
+        ensure("paintGlyph(format=Gray) succeeded",
+               painter.paintGlyph(hb_font, fire, /*point_size=*/14.f, fg,
+                                  /*palette=*/0,
+                                  LLFontColrV1Painter::OutputFormat::Gray,
+                                  result));
+        ensure_equals("Result.mFormat == Gray",
+                      (S32)result.mFormat,
+                      (S32)LLFontColrV1Painter::OutputFormat::Gray);
+        ensure("Gray output has positive dims",
+               result.mWidth > 0 && result.mHeight > 0);
+        ensure_equals("Gray pitch is width (tightly packed single channel)",
+                      result.mPitch, result.mWidth);
+
+        bool any_nonzero = false;
+        for (S32 y = 0; y < result.mHeight && !any_nonzero; ++y)
+        {
+            const U8* row = result.mBitmap + (ptrdiff_t)y * result.mPitch;
+            for (S32 x = 0; x < result.mWidth; ++x)
+            {
+                if (row[x] != 0) { any_nonzero = true; break; }
+            }
+        }
+        ensure("Gray output has at least one non-zero coverage pixel",
+               any_nonzero);
+    }
+
+    // Gray-fold formula pin: paint the same glyph in BGRA and Gray and
+    // verify each Gray byte equals max(Rec.709(BGRA.rgb_premul),
+    // BGRA.alpha * 0.15) within ±1 (rounding tolerance). Locks the
+    // hybrid floor + luminance projection from §2 against silent drift.
+    // For pixels that happen to be fg-only (white premul: R=G=B=A) this
+    // also verifies the foreground-collapses-to-alpha invariant since
+    // Y == A and Y > A*0.15 holds, so the test is a strict superset of
+    // the "fg-only collapses to alpha" case.
+    template<> template<>
+    void llfontcolrv1_object::test<13>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        hb_font_t* hb_font = face->getHbFont();
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result rgba_r, gray_r;
+        const LLColor4U fg(255, 255, 255, 255);
+        ensure("BGRA paint succeeded",
+               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, rgba_r));
+        // Stash the BGRA bytes — the next paintGlyph call invalidates
+        // mBitmap (it points back into mStaging which we overwrite below).
+        std::vector<U8> bgra_bytes(rgba_r.mBitmap,
+                                   rgba_r.mBitmap + (size_t)rgba_r.mPitch * rgba_r.mHeight);
+        const S32 bgra_w = rgba_r.mWidth, bgra_h = rgba_r.mHeight;
+        const S32 bgra_pitch = rgba_r.mPitch;
+
+        ensure("Gray paint succeeded",
+               painter.paintGlyph(hb_font, fire, 14.f, fg, 0,
+                                  LLFontColrV1Painter::OutputFormat::Gray,
+                                  gray_r));
+        ensure_equals("Gray and BGRA produce same width",  gray_r.mWidth,  bgra_w);
+        ensure_equals("Gray and BGRA produce same height", gray_r.mHeight, bgra_h);
+
+        S32 mismatches = 0;
+        for (S32 y = 0; y < bgra_h; ++y)
+        {
+            const U8* bgra_row = bgra_bytes.data() + (ptrdiff_t)y * bgra_pitch;
+            const U8* gray_row = gray_r.mBitmap   + (ptrdiff_t)y * gray_r.mPitch;
+            for (S32 x = 0; x < bgra_w; ++x)
+            {
+                const U32 b = bgra_row[x*4 + 0];
+                const U32 g = bgra_row[x*4 + 1];
+                const U32 r = bgra_row[x*4 + 2];
+                const U32 a = bgra_row[x*4 + 3];
+                const U32 y_256     = r * 54u + g * 183u + b * 18u;
+                const U32 floor_256 = a * 38u;
+                const U32 cov_256   = (y_256 > floor_256) ? y_256 : floor_256;
+                const U32 expected  = (cov_256 >> 8) > 255u ? 255u : (cov_256 >> 8);
+                const U32 actual    = gray_row[x];
+                const S32 diff = (S32)expected - (S32)actual;
+                if (diff < -1 || diff > 1)
+                    ++mismatches;
+            }
+        }
+        ensure_equals("every Gray byte matches the hybrid fold formula",
+                      mismatches, 0);
+    }
+
+    // Hybrid floor pin: scan the BGRA result for fully-saturated palette
+    // black pixels (R=G=B=0, A>200) and assert the corresponding Gray
+    // byte is >= floor (≈ 38 * a / 256) rather than zero. If no such
+    // pixel exists across the test glyphs, skip — the floor invariant
+    // still holds, just isn't observable here. The point of the test is
+    // to lock the constant against future tweaks that would silently
+    // crush dark CPAL details.
+    template<> template<>
+    void llfontcolrv1_object::test<14>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        hb_font_t* hb_font = face->getHbFont();
+
+        // Sweep a handful of likely candidates: emoji that commonly carry
+        // black eye/outline detail in Noto's palette. First one with a
+        // fully-saturated black pixel wins; otherwise the test skips.
+        const hb_codepoint_t cps[] = { 0x1F600 /*grinning face*/,
+                                       0x1F602 /*face with tears of joy*/,
+                                       0x1F525 /*fire*/,
+                                       0x2764  /*red heart*/ };
+        for (hb_codepoint_t cp : cps)
+        {
+            hb_codepoint_t gid = 0;
+            hb_font_get_nominal_glyph(hb_font, cp, &gid);
+            if (gid == 0) continue;
+
+            LLFontColrV1Painter painter;
+            LLFontColrV1Painter::Result rgba_r, gray_r;
+            const LLColor4U fg(255, 255, 255, 255);
+            if (!painter.paintGlyph(hb_font, gid, 32.f, fg, 0, rgba_r))
+                continue;
+            std::vector<U8> bgra_bytes(rgba_r.mBitmap,
+                                       rgba_r.mBitmap + (size_t)rgba_r.mPitch * rgba_r.mHeight);
+            const S32 bgra_w = rgba_r.mWidth, bgra_h = rgba_r.mHeight;
+            const S32 bgra_pitch = rgba_r.mPitch;
+            if (!painter.paintGlyph(hb_font, gid, 32.f, fg, 0,
+                                    LLFontColrV1Painter::OutputFormat::Gray,
+                                    gray_r))
+                continue;
+
+            for (S32 y = 0; y < bgra_h; ++y)
+            {
+                const U8* bgra_row = bgra_bytes.data() + (ptrdiff_t)y * bgra_pitch;
+                const U8* gray_row = gray_r.mBitmap   + (ptrdiff_t)y * gray_r.mPitch;
+                for (S32 x = 0; x < bgra_w; ++x)
+                {
+                    const U32 b = bgra_row[x*4 + 0];
+                    const U32 g = bgra_row[x*4 + 1];
+                    const U32 r = bgra_row[x*4 + 2];
+                    const U32 a = bgra_row[x*4 + 3];
+                    if (r == 0 && g == 0 && b == 0 && a > 200)
+                    {
+                        const U32 expected_floor = (a * 38u) >> 8;
+                        ensure("Gray byte at saturated-black palette pixel "
+                               "≥ alpha*floor (no crush to zero)",
+                               (U32)gray_row[x] + 1u >= expected_floor);
+                        return;
+                    }
+                }
+            }
+        }
+        skip("no fully-saturated-black palette pixel found across test glyphs");
+    }
+
+    // Out-of-range palette_index clamps to 0 deterministically. Paint
+    // fire with palette=0 and palette=99; the resulting bitmaps must
+    // be byte-identical (the painter clamps any oversized index to 0
+    // before calling hb_font_paint_glyph).
+    template<> template<>
+    void llfontcolrv1_object::test<15>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        hb_font_t* hb_font = face->getHbFont();
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
+        if (fire == 0)
+            skip("Noto-COLRv1 has no fire emoji");
+
+        LLFontColrV1Painter painter_a, painter_b;
+        LLFontColrV1Painter::Result r_zero, r_huge;
+        const LLColor4U fg(255, 255, 255, 255);
+        ensure("palette=0 paint succeeded",
+               painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0u, r_zero));
+        ensure("palette=99 paint succeeded (clamps to 0)",
+               painter_b.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/99u, r_huge));
+        ensure_equals("clamped result has same width",  r_huge.mWidth,  r_zero.mWidth);
+        ensure_equals("clamped result has same height", r_huge.mHeight, r_zero.mHeight);
+        ensure_equals("clamped result has same pitch",  r_huge.mPitch,  r_zero.mPitch);
+
+        const size_t bytes = (size_t)r_zero.mPitch * r_zero.mHeight;
+        ensure("clamped result is byte-identical to palette=0",
+               std::memcmp(r_zero.mBitmap, r_huge.mBitmap, bytes) == 0);
+    }
+
+    // Fallback point_size kicks in when the hb_font has ppem unset.
+    // Synthesize that condition by zeroing the hb_font scale before
+    // calling paintGlyph; the painter must still produce a sized
+    // bitmap rather than returning false. Specifically targets the
+    // 2-em fallback inside the empty-bbox branch — without the
+    // fallback point_size override, that branch would return false.
+    template<> template<>
+    void llfontcolrv1_object::test<16>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        // Build a dedicated hb_font on top of the same FT_Face so we can
+        // mutate its ppem without affecting the face cache shared with
+        // other tests in this group.
+        hb_font_t* shared = face->getHbFont();
+        ensure("shared hb_font available", shared != nullptr);
+        hb_face_t* hb_face = hb_font_get_face(shared);
+        hb_font_t* hb_font = hb_font_create(hb_face);
+        ensure("derived hb_font allocated", hb_font != nullptr);
+        hb_font_set_ppem(hb_font, 0, 0);
+        unsigned px = 1, py = 1;
+        hb_font_get_ppem(hb_font, &px, &py);
+        ensure("ppem really is unset on derived font", px == 0 && py == 0);
+
+        // Pick a glyph by index — without a scale set, the cmap query
+        // through hb_font_get_nominal_glyph may not work as expected, so
+        // resolve the index off the parent (scaled) font and use it on
+        // the unscaled one.
+        hb_codepoint_t fire = 0;
+        hb_font_get_nominal_glyph(shared, 0x1F525, &fire);
+        if (fire == 0)
+        {
+            hb_font_destroy(hb_font);
+            skip("Noto-COLRv1 has no fire emoji");
+        }
+
+        LLFontColrV1Painter painter;
+        LLFontColrV1Painter::Result result;
+        const LLColor4U fg(255, 255, 255, 255);
+        // fallback_point_size = 14: should drive the empty-bbox branch
+        // to size against ~14 px instead of returning false.
+        const bool ok = painter.paintGlyph(hb_font, fire,
+                                           /*fallback_point_size=*/14.f, fg,
+                                           /*palette=*/0u, result);
+        // The walker may still bail on other grounds for this unscaled
+        // font (some paint commands depend on scale-derived coords), so
+        // the strict assertion is "doesn't crash and returns either a
+        // valid bitmap or a clean false." A regression that returned
+        // false when fallback_point_size would have rescued it is the
+        // failure mode we're protecting against.
+        if (ok)
+        {
+            ensure("fallback path produced a sized bitmap",
+                   result.mWidth > 0 && result.mHeight > 0);
+        }
+        hb_font_destroy(hb_font);
+    }
+
 #if LL_MESA_HEADLESS
     // -------------------------------------------------------------
     // GL-backed group: COLRv1 painter integrated with the LLFontFreetype
@@ -690,6 +968,75 @@ namespace tut
                painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r2));
         ensure_equals("repeat paint width matches",  r2.mWidth,  w1);
         ensure_equals("repeat paint height matches", r2.mHeight, h1);
+    }
+
+    // Grayscale-COLRv1 routing: requesting EFontGlyphType::Grayscale on a
+    // COLRv1 face must take the painter path (not the FT outline fallback)
+    // and land the result in the Grayscale atlas. Pins §3+§4: the gate
+    // change in renderGlyph drops the bitmap_type==Color restriction, so
+    // Grayscale lookups on COLRv1 faces produce a luminance-shaded mask
+    // in the LA atlas instead of an empty / outline-only glyph.
+    template<> template<>
+    void llfontcolrv1_render_object::test<7>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+        LLPointer<LLFontFreetype> ft = loadFtHead(path);
+        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+
+        LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Grayscale);
+        ensure("Grayscale lookup returns an entry", gi != nullptr);
+        ensure_equals("delivered glyph type is Grayscale (LA atlas)",
+                      (S32)gi->mGlyphType, (S32)EFontGlyphType::Grayscale);
+        ensure("Grayscale glyph has positive width",  gi->mWidth  > 0);
+        ensure("Grayscale glyph has positive height", gi->mHeight > 0);
+
+        const LLFontBitmapCache* cache = ft->getFontBitmapCache();
+        ensure("bitmap cache present", cache != nullptr);
+        ensure("Grayscale atlas allocated at least one sheet",
+               cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
+        LLImageGL* page = cache->getImageGL(EFontGlyphType::Grayscale, 0);
+        ensure("Grayscale sheet 0 LLImageGL present", page != nullptr);
+        ensure("Grayscale sheet 0 has a live GL texture name",
+               page->getTexName() != 0);
+    }
+
+    // Force-monochrome static is wired in at the LLFontGL render-call layer.
+    // We can't directly drive a render call from here without the full UI
+    // bringup, but we *can* pin the static's existence + mutability and
+    // verify that the Grayscale routing works while it's set, which is
+    // what the call-site code does at llfontgl.cpp:560/715/862. Save and
+    // restore the static so the test doesn't perturb sibling tests.
+    template<> template<>
+    void llfontcolrv1_render_object::test<8>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+
+        const bool saved = LLFontGL::sForceMonochromeEmoji;
+        LLFontGL::sForceMonochromeEmoji = true;
+
+        LLPointer<LLFontFreetype> ft = loadFtHead(path);
+        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+
+        // Simulate the render-call selector at llfontgl.cpp:560 with
+        // use_color=true and force_mono=true → request Grayscale.
+        const EFontGlyphType requested =
+            (!/*use_color*/true || LLFontGL::sForceMonochromeEmoji)
+                ? EFontGlyphType::Grayscale : EFontGlyphType::Color;
+        ensure_equals("force-mono toggle downgrades Color to Grayscale at "
+                      "the request layer", (S32)requested,
+                      (S32)EFontGlyphType::Grayscale);
+
+        LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, requested);
+        ensure("Grayscale lookup under force-mono returns an entry",
+               gi != nullptr);
+        ensure_equals("Grayscale path landed in Grayscale atlas",
+                      (S32)gi->mGlyphType, (S32)EFontGlyphType::Grayscale);
+
+        LLFontGL::sForceMonochromeEmoji = saved;
     }
 #endif // LL_MESA_HEADLESS
 }

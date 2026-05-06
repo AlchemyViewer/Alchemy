@@ -326,12 +326,16 @@ private:
     void renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, llwchar wch) const;
     // COLRv1 paint-walker entry point. Loads the glyph in outline mode to
     // populate metrics, then runs LLFontColrV1Painter to rasterize the paint
-    // tree into a BGRA staging buffer; on success, patches the FT glyph slot
-    // (bitmap pointer + pixel_mode + bitmap_left/top) so the existing BGRA
-    // branch in renderAndCreateGlyph consumes it unchanged. Returns false if
-    // the glyph has no paint tree, the walker hit an unsupported feature, or
-    // an allocation failed — caller falls through to the normal FT path.
-    bool renderColrV1Glyph(U32 glyph_index, llwchar wch) const;
+    // tree into a staging buffer; on success, patches the FT glyph slot
+    // (bitmap pointer + pixel_mode + bitmap_left/top) so the existing
+    // pixel_mode switch in renderAndCreateGlyph consumes it unchanged.
+    // `requested` selects between BGRA Color output (FT_PIXEL_MODE_BGRA,
+    // routed to the Color atlas) and luminance-shaded Gray output
+    // (FT_PIXEL_MODE_GRAY, routed to the Grayscale atlas where it tints
+    // with text_color at draw time). Returns false if the glyph has no
+    // paint tree, the walker hit an unsupported feature, or an allocation
+    // failed — caller falls through to the normal FT path.
+    bool renderColrV1Glyph(U32 glyph_index, EFontGlyphType requested) const;
     void insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const;
     void insertShapedGlyphInfo(const LLFontFreetype* fontp, U32 glyph_index, LLFontGlyphInfo* gi) const;
 
