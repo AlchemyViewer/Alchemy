@@ -61,6 +61,12 @@
     </map>
     <map>
       <key>Name</key>
+      <string>flags</string>
+      <key>Category</key>
+      <string>flags</string>
+    </map>
+    <map>
+      <key>Name</key>
       <string>other</string>
       <key>Category</key>
       <string>other</string>

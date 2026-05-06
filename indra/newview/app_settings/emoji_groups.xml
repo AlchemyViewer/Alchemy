@@ -65,6 +65,14 @@
       </array>
     </map>
     <map>
+      <key>Character</key>
+      <string>🏁</string>
+      <key>Categories</key>
+      <array>
+        <string>flags</string>
+      </array>
+    </map>
+    <map>
       <key>Name</key>
       <string>others</string>
       <key>Character</key>

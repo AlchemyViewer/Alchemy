@@ -24,136 +24,405 @@ Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
 $/LicenseInfo$
 """
 import argparse
+import glob
 import json
 import os
-import glob
+import re
+import sys
 
-parser = argparse.ArgumentParser(description='Generate per-language emoji character list')
-parser.add_argument('root_path', help='Path to the root directory containing subfolders with JSON files.')
-parser.add_argument('output_dir', help='Path to the output directory where generated XML files will be stored.')
-args = parser.parse_args()
-
-ROOT_PATH = args.root_path
-OUTPUT_DIR = args.output_dir
-
-print(ROOT_PATH)
-print(OUTPUT_DIR)
-
-# Constants
-# Note: There is no support for Turkish (TR) characters currently
-#       si SL Viewer short-code support will be limited to English
+# Languages we ship emoji_characters.xml for. Kept in sync with
+# `country_codes` in indra/newview/CMakeLists.txt.
 ALLOWED_FOLDERS = {'da', 'de', 'en', 'es', 'fr', 'it', 'ja', 'pl', 'pt', 'ru', 'tr', 'zh'}
 
-# Create output directory if it don't exist
-output_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), OUTPUT_DIR)
-os.makedirs(output_path, exist_ok=True)
+# Skin-tone modifiers (Fitzpatrick) — emojibase uses tone integers 1..5.
+# We carry the integer through to LLSD; the C++ side maps 1..5 to
+# light / medium-light / medium / medium-dark / dark.
 
-def process_folder(data_file, cldr_file, emojibase_file, messages_file, output_file, folder_name):
-    # Read and parse JSON files with specified encoding
-    with open(data_file, 'r', encoding='utf-8') as f1:
-        data = json.load(f1)
+# Gender codes used in the Variants LLSD: -1 unset, 0 man, 1 woman, 2 person.
+GENDER_MAN = 0
+GENDER_WOMAN = 1
+GENDER_PERSON = 2
 
-    with open(cldr_file, 'r', encoding='utf-8') as f2:
-        cldr = json.load(f2)
+# Match a leading gender token in a primary shortcode such as
+# "man_health_worker", "woman_astronaut", "person_climbing". Used to roll
+# gender-ZWJ siblings up under a single base.
+_GENDER_PREFIX_RE = re.compile(r'^(man|woman|person)_(.+)$')
 
-    if os.path.isfile(emojibase_file):
-        with open(emojibase_file, 'r', encoding='utf-8') as f3:
-            emojibase = json.load(f3)
-    else:
-        emojibase = None
+# Hair / tone-pair variants are out of scope for this iteration — they'd
+# need additional fields on LLEmojiVariant (Hair, Tone2). Emit those entries
+# at top-level as today so they remain discoverable in the picker.
+# TODO(emoji-alternates-followup): extend with Hair + Tone2 axes.
 
-    with open(messages_file, 'r', encoding='utf-8') as f4:
-        messages = json.load(f4)
 
-    # Generate the desired output
-    output = []
+def hexcode_to_chars(hexcode):
+    """Convert "1F468-200D-1F680" → "👨‍🚀"."""
+    return ''.join(chr(int(part, 16)) for part in hexcode.split('-'))
 
-    groups = messages['groups']
-    subgroups = messages['subgroups']
 
-    for item in data:
-        hexcode = item['hexcode']
-        short_code = emojibase.get(hexcode) if emojibase else None
-        if not short_code:
-            short_code = cldr.get(hexcode)
+def lookup_shortcodes(hexcode, emojibase_map, cldr_map):
+    """Return the shortcode list (list[str]) or single string, or None."""
+    sc = emojibase_map.get(hexcode) if emojibase_map else None
+    if not sc:
+        sc = cldr_map.get(hexcode)
+    return sc
 
-        if not short_code:
-            # Multi-codepoint sequences (ZWJ families, tag subdivision flags,
-            # etc.) are common to not have a shortcode in the default
-            # emojibase/cldr data we consume — skip quietly. Single-codepoint
-            # entries without a shortcode remain a signal-bearing error
-            # because they indicate missing data we ought to fix.
-            if '-' not in hexcode:
-                print(f"Error: Shortcode not found for hexcode '{hexcode}' in folder {folder_name}")
+
+def normalize_shortcodes(sc):
+    """Normalize shortcode lookup result to list[str]."""
+    if sc is None:
+        return []
+    if isinstance(sc, list):
+        return list(sc)
+    return [sc]
+
+
+def primary_shortcode(shortcodes):
+    """First shortcode is the canonical one for matching/grouping."""
+    return shortcodes[0] if shortcodes else None
+
+
+def collect_skin_variants(entry, emojibase_map, cldr_map):
+    """Walk entry['skins'] and return list of variant dicts.
+
+    Tone-pair entries (whose 'tone' is a list) are skipped — they stay at
+    top-level until the schema grows a Tone2 field.
+    """
+    variants = []
+    for child in entry.get('skins') or []:
+        tone = child.get('tone')
+        if isinstance(tone, list):
+            # 2-tone pair — out of scope for this iteration.
+            continue
+        if tone is None:
+            continue
+        child_sc = normalize_shortcodes(
+            lookup_shortcodes(child['hexcode'], emojibase_map, cldr_map))
+        variants.append({
+            'character': hexcode_to_chars(child['hexcode']),
+            'hexcode': child['hexcode'],
+            'tone': int(tone),
+            'gender': -1,
+            'shortcodes': child_sc,
+        })
+    return variants
+
+
+def group_gender_triples(top_level_entries):
+    """Identify man/woman/person shortcode siblings.
+
+    Returns (demoted_hexcodes, base_to_extra_variants) where
+    base_to_extra_variants maps a "promoted" entry's hexcode to a list of
+    additional variant dicts (the demoted gender siblings, plus their own
+    skin children with Gender set).
+    """
+    by_suffix = {}  # suffix → {gender_token: entry}
+    for entry in top_level_entries:
+        sc = primary_shortcode(entry['shortcodes'])
+        if not sc:
+            continue
+        m = _GENDER_PREFIX_RE.match(sc)
+        if not m:
+            continue
+        token, suffix = m.group(1), m.group(2)
+        by_suffix.setdefault(suffix, {})[token] = entry
+
+    demoted = set()
+    base_to_extras = {}
+
+    for suffix, group in by_suffix.items():
+        # Need at least 2 of the 3 to consider this a real gender axis.
+        if len(group) < 2:
             continue
 
-        # Convert hexcode to the Unicode character(s). Single codepoints come
-        # through as "1F680"; multi-codepoint emoji (ZWJ sequences, flag
-        # pairs, keycap, tag subdivisions) as "1F468-200D-1F469-200D-1F467".
-        character = ''.join(chr(int(part, 16)) for part in hexcode.split('-'))
+        # Promote person > woman > man.
+        if 'person' in group:
+            base_token = 'person'
+        elif 'woman' in group:
+            base_token = 'woman'
+        else:
+            base_token = 'man'
+        base_entry = group[base_token]
 
-        # Get categories from groups and subgroups if they exist
-        group = next((g['message'] for g in groups if item.get('group') is not None and g['order'] == item['group']), '')
-        subgroup = next((sg['message'] for sg in subgroups if item.get('subgroup') is not None and sg['order'] == item['subgroup']), '')
+        gender_for = {'man': GENDER_MAN, 'woman': GENDER_WOMAN, 'person': GENDER_PERSON}
 
-        # The ampersand character is illegal in an XML file outside
-        # of the CDATA section. They appear frequently in the groups/subgroup
-        # tags - "smileys & emotions" for example - so we must replace them
-        group=group.replace(" & ", " &amp; ")
-        subgroup=subgroup.replace(" & ", " &amp; ")
+        # Annotate the base's pre-existing skin variants with the base's
+        # gender so findVariant on the C++ side can match by gender even
+        # when the user has chosen a tone for the base form.
+        for v in base_entry['variants']:
+            if v['gender'] == -1:
+                v['gender'] = gender_for[base_token]
 
-        xml_shortcodes = ("".join([f'\t\t\t\t<string>:{code}:</string>\n' for code in short_code]) if isinstance(short_code, list) else f'\t\t\t\t<string>:{short_code}:</string>\n')
+        extras = []
+        for token, entry in group.items():
+            if token == base_token:
+                continue
+            g = gender_for[token]
+            # The demoted entry itself becomes a (no-tone, gender) variant.
+            extras.append({
+                'character': entry['character'],
+                'hexcode': entry['hexcode'],
+                'tone': 0,
+                'gender': g,
+                'shortcodes': entry['shortcodes'],
+            })
+            # Its existing skin variants get re-tagged with this gender.
+            for v in entry['variants']:
+                v['gender'] = g
+                extras.append(v)
+            demoted.add(entry['hexcode'])
 
-        map_element = (
-            '\t\t<map>\n'
-            '\t\t\t<key>Character</key>\n'
-            f'\t\t\t<string>{character}</string>\n'
-            '\t\t\t<key>ShortCodes</key>\n'
-            '\t\t\t<array>\n'
-            f'{xml_shortcodes}'
-            '\t\t\t</array>\n'
-            '\t\t\t<key>Categories</key>\n'
-            '\t\t\t<array>\n' +
-            (f'\t\t\t\t<string>{group}</string>\n' if group else '') +
-            (f'\t\t\t\t<string>{subgroup}</string>\n' if subgroup else '') +
-            '\t\t\t</array>\n'
-            '\t\t</map>'
+        base_to_extras[base_entry['hexcode']] = extras
+
+    return demoted, base_to_extras
+
+
+def xml_escape_amp(s):
+    """LLSD's XML serializer needs literal & escaped outside CDATA."""
+    return s.replace(' & ', ' &amp; ')
+
+
+def emit_variant_xml(variant):
+    parts = ['\t\t\t\t<map>\n']
+    parts.append('\t\t\t\t\t<key>Character</key>\n')
+    parts.append(f'\t\t\t\t\t<string>{variant["character"]}</string>\n')
+    if variant['tone']:
+        parts.append('\t\t\t\t\t<key>Tone</key>\n')
+        parts.append(f'\t\t\t\t\t<integer>{variant["tone"]}</integer>\n')
+    if variant['gender'] != -1:
+        parts.append('\t\t\t\t\t<key>Gender</key>\n')
+        parts.append(f'\t\t\t\t\t<integer>{variant["gender"]}</integer>\n')
+    if variant['shortcodes']:
+        parts.append('\t\t\t\t\t<key>ShortCodes</key>\n')
+        parts.append('\t\t\t\t\t<array>\n')
+        for code in variant['shortcodes']:
+            parts.append(f'\t\t\t\t\t\t<string>:{code}:</string>\n')
+        parts.append('\t\t\t\t\t</array>\n')
+    parts.append('\t\t\t\t</map>\n')
+    return ''.join(parts)
+
+
+def emit_base_xml(entry, group, subgroup):
+    short_codes = entry['shortcodes']
+    xml_shortcodes = ''.join(f'\t\t\t\t<string>:{c}:</string>\n' for c in short_codes)
+
+    out = ['\t\t<map>\n']
+    out.append('\t\t\t<key>Character</key>\n')
+    out.append(f'\t\t\t<string>{entry["character"]}</string>\n')
+    out.append('\t\t\t<key>ShortCodes</key>\n')
+    out.append('\t\t\t<array>\n')
+    out.append(xml_shortcodes)
+    out.append('\t\t\t</array>\n')
+    out.append('\t\t\t<key>Categories</key>\n')
+    out.append('\t\t\t<array>\n')
+    if group:
+        out.append(f'\t\t\t\t<string>{group}</string>\n')
+    if subgroup:
+        out.append(f'\t\t\t\t<string>{subgroup}</string>\n')
+    out.append('\t\t\t</array>\n')
+
+    if entry['variants']:
+        out.append('\t\t\t<key>Variants</key>\n')
+        out.append('\t\t\t<array>\n')
+        for v in entry['variants']:
+            out.append(emit_variant_xml(v))
+        out.append('\t\t\t</array>\n')
+
+    out.append('\t\t</map>')
+    return ''.join(out)
+
+
+def build_entries(data, cldr, emojibase, messages):
+    """Two-pass build of top-level entries with their Variants.
+
+    Returns list of entry dicts, each shaped:
+        { 'character': str, 'hexcode': str,
+          'shortcodes': list[str], 'group': str, 'subgroup': str,
+          'variants': list[variant_dict] }
+    """
+    groups_msg = messages['groups']
+    subgroups_msg = messages['subgroups']
+
+    # Pass 1 — collect skin-tone variants per top-level entry, and remember
+    # which hexcodes are themselves children-as-tone-variants so we can
+    # exclude them from the top-level emission.
+    skin_child_hexcodes = set()
+    for item in data:
+        for child in item.get('skins') or []:
+            skin_child_hexcodes.add(child['hexcode'])
+
+    entries = []
+    for item in data:
+        hexcode = item['hexcode']
+        if hexcode in skin_child_hexcodes:
+            # This is itself a tone variant — it gets emitted nested under
+            # its parent below, not as a top-level entry.
+            continue
+
+        sc = normalize_shortcodes(lookup_shortcodes(hexcode, emojibase, cldr))
+        if not sc:
+            # Multi-codepoint sequences (ZWJ families, tag subdivision flags,
+            # etc.) without a shortcode are common in upstream data — skip
+            # quietly. Single-codepoint entries without a shortcode remain a
+            # signal-bearing error (missing data we'd want to fix).
+            if '-' not in hexcode:
+                print(f"Error: Shortcode not found for hexcode '{hexcode}'", file=sys.stderr)
+            continue
+
+        skin_variants = collect_skin_variants(item, emojibase, cldr)
+
+        group = next((g['message'] for g in groups_msg
+                      if item.get('group') is not None and g['order'] == item['group']), '')
+        subgroup = next((sg['message'] for sg in subgroups_msg
+                         if item.get('subgroup') is not None and sg['order'] == item['subgroup']), '')
+
+        entry = {
+            'character': hexcode_to_chars(hexcode),
+            'hexcode': hexcode,
+            'shortcodes': sc,
+            'group': xml_escape_amp(group),
+            'subgroup': xml_escape_amp(subgroup),
+            'variants': skin_variants,
+        }
+        entries.append(entry)
+
+    # Pass 2 — group man/woman/person triples and demote the non-promoted
+    # ones into Variants of the promoted entry.
+    demoted, base_to_extras = group_gender_triples(entries)
+
+    final_entries = []
+    for entry in entries:
+        if entry['hexcode'] in demoted:
+            continue
+        if entry['hexcode'] in base_to_extras:
+            entry['variants'] = entry['variants'] + base_to_extras[entry['hexcode']]
+        final_entries.append(entry)
+
+    return final_entries
+
+
+def render_xml(entries):
+    parts = []
+    parts.append('<?xml version="1.0" ?>\n')
+    parts.append('<llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="llsd.xsd">\n')
+    parts.append('\t<!--\n')
+    parts.append('\tNOTE: changes made to this file locally will be overwritten\n')
+    parts.append('\twhen CMake is invoked during autobuild.\n')
+    parts.append('\tTo modify these files, update the 3p package here:\n')
+    parts.append('\thttps://github.com/secondlife/3p-emoji-shortcodes\n')
+    parts.append('\tand add the resulting artifact to autobuild.xml\n')
+    parts.append('\t-->\n')
+    parts.append('\t<array>\n')
+    parts.append('\n'.join(emit_base_xml(e, e['group'], e['subgroup']) for e in entries))
+    parts.append('\n\t</array>\n</llsd>')
+    return ''.join(parts)
+
+
+def process_folder(data_file, cldr_file, emojibase_file, messages_file):
+    with open(data_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    with open(cldr_file, 'r', encoding='utf-8') as f:
+        cldr = json.load(f)
+    if os.path.isfile(emojibase_file):
+        with open(emojibase_file, 'r', encoding='utf-8') as f:
+            emojibase = json.load(f)
+    else:
+        emojibase = None
+    with open(messages_file, 'r', encoding='utf-8') as f:
+        messages = json.load(f)
+
+    return build_entries(data, cldr, emojibase, messages)
+
+
+def run_self_test(entries):
+    """Sanity-check the entry list and print a summary.
+
+    Returns 0 on success, 1 on assertion failure.
+    """
+    failures = []
+
+    # 1. No top-level entry should also appear as a Variant of itself or
+    #    of any other entry.
+    top_level_hex = {e['hexcode'] for e in entries}
+    variant_hex = set()
+    for e in entries:
+        for v in e['variants']:
+            if v['hexcode'] in variant_hex:
+                failures.append(f"variant hexcode {v['hexcode']} appears twice")
+            variant_hex.add(v['hexcode'])
+    overlap = top_level_hex & variant_hex
+    if overlap:
+        failures.append(f"top-level/variant overlap: {sorted(overlap)[:5]}...")
+
+    # 2. Each variant must have at least one identifying axis (tone or gender).
+    for e in entries:
+        for v in e['variants']:
+            if not v['tone'] and v['gender'] == -1:
+                failures.append(f"variant without tone or gender: {v['hexcode']} under {e['hexcode']}")
+
+    # 3. Stats.
+    n_with_variants = sum(1 for e in entries if e['variants'])
+    n_variants = sum(len(e['variants']) for e in entries)
+    print(f"  entries: {len(entries)}")
+    print(f"  bases with variants: {n_with_variants}")
+    print(f"  total variants: {n_variants}")
+
+    # 4. Spot checks: thumbs_up should have 5 tone variants.
+    for e in entries:
+        if e['shortcodes'] and e['shortcodes'][0] == 'thumbs_up':
+            tones = sorted({v['tone'] for v in e['variants'] if v['tone']})
+            if tones != [1, 2, 3, 4, 5]:
+                failures.append(f":thumbs_up: tones = {tones}, expected [1..5]")
+            break
+
+    # 5. Spot check: astronaut family should have woman+man variants.
+    for e in entries:
+        if e['shortcodes'] and 'astronaut' in e['shortcodes'][0]:
+            genders = sorted({v['gender'] for v in e['variants'] if v['gender'] != -1})
+            if not genders:
+                failures.append(f"astronaut entry {e['shortcodes'][0]} has no gender variants")
+            break
+
+    if failures:
+        print("FAIL:")
+        for f in failures:
+            print(f"  - {f}")
+        return 1
+    print("OK")
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Generate per-language emoji character list')
+    parser.add_argument('root_path', help='Path to the root directory containing subfolders with JSON files.')
+    parser.add_argument('output_dir', nargs='?', default=None,
+                        help='Path to the output directory where generated XML files will be stored.')
+    parser.add_argument('--self-test', action='store_true',
+                        help='Run sanity checks on the en folder; do not write output.')
+    args = parser.parse_args()
+
+    if args.self_test:
+        en_dir = os.path.join(args.root_path, 'en')
+        entries = process_folder(
+            os.path.join(en_dir, 'data.raw.json'),
+            os.path.join(en_dir, 'shortcodes', 'cldr.raw.json'),
+            os.path.join(en_dir, 'shortcodes', 'emojibase.raw.json'),
+            os.path.join(en_dir, 'messages.raw.json'),
         )
-        output.append(map_element)
+        sys.exit(run_self_test(entries))
 
-    # Header
-    xml_header = '<?xml version="1.0" ?>\n<llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="llsd.xsd">\n'
+    if not args.output_dir:
+        parser.error('output_dir required (or pass --self-test)')
 
-    # Warning against editing manually at the top of each file
-    # Ideally, this would be right at the top but it seems like
-    # comments can only appear after the initial <?xml> tag.
-    xml_header += '\t<!--\n'
-    xml_header += '\tNOTE: changes made to this file locally will be overwritten\n'
-    xml_header += '\twhen CMake is invoked during autobuild.\n'
-    xml_header += '\tTo modify these files, update the 3p package here:\n'
-    xml_header += '\thttps://github.com/secondlife/3p-emoji-shortcodes\n'
-    xml_header += '\tand add the resulting artifact to autobuild.xml\n'
-    xml_header += '\t-->\n'
-    xml_header += '\t<array>\n'
+    print(args.root_path)
+    print(args.output_dir)
 
-    # Footer
-    xml_footer = '\t</array>\n</llsd>'
+    output_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), args.output_dir)
+    os.makedirs(output_path, exist_ok=True)
 
-    output_str = xml_header + '\n'.join(output) + xml_footer
-
-    # Write the output to a file with specified encoding
-    with open(output_file, 'w', encoding='utf-8') as outfile:
-        outfile.write(output_str)
-
-# Add allowed folder names
-allowed_folders = {'da', 'de', 'en', 'es', 'fr', 'it', 'ja', 'pl', 'pt', 'ru', 'tr', 'zh'}
-
-# Process each subfolder
-for subfolder in glob.glob(os.path.join(ROOT_PATH, '*')):
-    if os.path.isdir(subfolder):
+    for subfolder in glob.glob(os.path.join(args.root_path, '*')):
+        if not os.path.isdir(subfolder):
+            continue
         folder_name = os.path.basename(subfolder)
-
-        # Skip processing if folder_name not in allowed_folders
         if folder_name not in ALLOWED_FOLDERS:
             continue
 
@@ -164,11 +433,17 @@ for subfolder in glob.glob(os.path.join(ROOT_PATH, '*')):
         emojibase_file = os.path.join(subfolder, 'shortcodes', 'emojibase.raw.json')
         messages_file = os.path.join(subfolder, 'messages.raw.json')
 
-        # Create output subfolder if it doesn't exist
+        if not (os.path.isfile(data_file) and os.path.isfile(cldr_file) and os.path.isfile(messages_file)):
+            continue
+
         output_subfolder = os.path.join(output_path, folder_name)
         os.makedirs(output_subfolder, exist_ok=True)
-
         output_file = os.path.join(output_subfolder, 'emoji_characters.xml')
 
-        if os.path.isfile(data_file) and os.path.isfile(cldr_file) and os.path.isfile(messages_file):
-            process_folder(data_file, cldr_file, emojibase_file, messages_file, output_file, folder_name)
+        entries = process_folder(data_file, cldr_file, emojibase_file, messages_file)
+        with open(output_file, 'w', encoding='utf-8') as outfile:
+            outfile.write(render_xml(entries))
+
+
+if __name__ == '__main__':
+    main()

@@ -38,7 +38,9 @@ message(STATUS "Copying Emoji/shortcode mappings")
 set(emoji_mapping_src_folder ${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/secondlife-emoji-shortcodes/xui)
 set(emoji_mapping_dst_folder ${CMAKE_CURRENT_SOURCE_DIR}/skins/default/xui)
 
-# Note Turkey is missing from this set (not available in Emoji package yet)
+# Turkish (tr) is in the generator's ALLOWED_FOLDERS but not yet shipped
+# in the emojibase data we consume; add it here once the upstream port
+# starts producing tr/emoji_characters.xml.
 set(country_codes "da;de;en;es;fr;it;ja;pl;pt;ru;zh")
 foreach(elem ${country_codes})
    set(emoji_mapping_src_file

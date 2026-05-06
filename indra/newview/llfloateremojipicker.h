@@ -28,11 +28,15 @@
 #define LLFLOATEREMOJIPICKER_H
 
 #include "llfloater.h"
+#include "llframetimer.h"
+
+#include <boost/signals2/connection.hpp>
 
 class LLEmojiGridRow;
 class LLEmojiGridIcon;
 struct LLEmojiDescriptor;
 struct LLEmojiSearchResult;
+struct LLEmojiVariant;
 
 class LLFloaterEmojiPicker : public LLFloater
 {
@@ -46,8 +50,14 @@ public:
     LLFloaterEmojiPicker(const LLSD& key);
 
     virtual bool postBuild() override;
+    virtual void draw() override;
     virtual void dirtyRect() override;
     virtual void goneFromFront() override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+
+    // Called by LLEmojiGridIcon when it receives a right-click — pops the
+    // variant flyout for that icon's descriptor (no-op if no variants).
+    void onIconRightClick(LLEmojiGridIcon* icon);
 
     void hideFloater() const;
 
@@ -69,11 +79,23 @@ private:
     void fillEmojisCategory(const std::vector<LLEmojiSearchResult>& emojis,
         const std::string& category, const LLPanel::Params& row_panel_params, const LLUICtrl::Params& row_list_params,
         const LLPanel::Params& icon_params, const LLRect& icon_rect, S32 max_icons, const LLColor4& bg);
-    void createEmojiIcon(const LLEmojiSearchResult& emoji,
+    void createEmojiIcon(LLEmojiSearchResult emoji,
         const std::string& category, const LLPanel::Params& row_panel_params, const LLUICtrl::Params& row_list_params,
         const LLPanel::Params& icon_params, const LLRect& icon_rect, S32 max_icons, const LLColor4& bg,
         LLEmojiGridRow*& row, int& icon_index);
     void showPreview(bool show);
+
+    // Tone strip and variant flyout helpers.
+    void buildToneStrip();
+    void onToneButtonClick(S32 tone);
+    void refreshToneStripHighlight();
+    void showVariantFlyout(LLEmojiGridIcon* baseIcon);
+    void dismissVariantFlyout();
+    void commitVariant(const LLWString& sequence);
+    // Substitute a variant character into a search-result-shaped struct
+    // when the global tone preference applies. Skips the substitution if
+    // the input is already a variant (i.e. came from recents).
+    void applyTonePreference(LLEmojiSearchResult& emoji) const;
 
     void onGroupButtonClick(LLUICtrl* ctrl);
     void onGroupButtonMouseEnter(LLUICtrl* ctrl);
@@ -98,6 +120,9 @@ private:
 
     class LLPanel* mGroups { nullptr };
     class LLPanel* mBadge { nullptr };
+    class LLPanel* mToneStrip { nullptr };
+    class LLPanel* mVariantFlyout { nullptr };
+    bool mVariantFlyoutPendingDismiss { false };
     class LLScrollContainer* mEmojiScroll { nullptr };
     class LLScrollingPanelList* mEmojiGrid { nullptr };
     class LLEmojiPreviewPanel* mPreview { nullptr };
@@ -117,6 +142,18 @@ private:
     LLEmojiGridIcon* mHoveredIcon { nullptr };
 
     U64 mRecentReturnPressedMs { 0 };
+
+    // Long-press detection: we record the icon under the mouse on
+    // mouse-down and check elapsed time in draw(). On expiry the variant
+    // flyout opens. Mouse-up or mouse-leave clears mLongPressIcon.
+    // mLongPressFired guards the subsequent mouse-up from also committing
+    // the base character — once the flyout has opened, the release is
+    // just dismissing the hold, not picking the cell.
+    LLFrameTimer mLongPressTimer;
+    LLEmojiGridIcon* mLongPressIcon { nullptr };
+    bool mLongPressFired { false };
+
+    boost::signals2::scoped_connection mTonePrefConnection;
 };
 
 #endif

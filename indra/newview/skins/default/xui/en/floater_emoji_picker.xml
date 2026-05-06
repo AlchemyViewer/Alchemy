@@ -15,14 +15,20 @@
     width="304">
   <floater.string name="title_for_frequently_used" value="Frequently used"/>
   <floater.string name="text_no_emoji_for_filter" value="No emoji found for '[FILTER]'"/>
+  <floater.string name="tooltip_tone_none" value="No skin tone preference"/>
+  <floater.string name="tooltip_tone_1" value="Light skin tone"/>
+  <floater.string name="tooltip_tone_2" value="Medium-light skin tone"/>
+  <floater.string name="tooltip_tone_3" value="Medium skin tone"/>
+  <floater.string name="tooltip_tone_4" value="Medium-dark skin tone"/>
+  <floater.string name="tooltip_tone_5" value="Dark skin tone"/>
   <scroll_container
       name="EmojiGridContainer"
       layout="topleft"
       follows="all"
       ignore_arrow_keys="true"
-      top="25"
+      top="47"
       left="0"
-      height="275">
+      height="253">
     <scrolling_panel_list
         name="EmojiGrid"
         layout="topleft"
@@ -33,10 +39,17 @@
         left="0"/>
   </scroll_container>
   <panel
-      name="Groups"
+      name="ToneStrip"
       layout="topleft"
       follows="top|left|right"
       top="0"
+      left="0"
+      height="22"/>
+  <panel
+      name="Groups"
+      layout="topleft"
+      follows="top|left|right"
+      top="22"
       left="0"
       height="25">
     <panel

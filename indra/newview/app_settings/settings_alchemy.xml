@@ -774,6 +774,22 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>EmojiSkinTonePreference</key>
+        <map>
+            <key>Comment</key>
+            <string>
+                Default skin tone applied to variant-capable emoji in the
+                picker grid. -1 = no preference (yellow base); 0..4 = light,
+                medium-light, medium, medium-dark, dark. Long-press or
+                right-click an emoji to override on a single pick.
+            </string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>-1</integer>
+        </map>
         <key>EmojiUseDarkPalette</key>
         <map>
             <key>Comment</key>

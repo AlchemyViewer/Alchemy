@@ -34,6 +34,7 @@
 #include "llemojihelper.h"
 #include "llfloaterreg.h"
 #include "llkeyboard.h"
+#include "llrender2dutils.h"
 #include "llscrollcontainer.h"
 #include "llscrollingpanellist.h"
 #include "llscrolllistctrl.h"
@@ -41,7 +42,9 @@
 #include "llsdserialize.h"
 #include "lltextbox.h"
 #include "lltrans.h"
+#include "lluictrlfactory.h"
 #include "llviewerchat.h"
+#include "llviewercontrol.h"
 
 namespace {
 // The following variables and constants are used for storing the floater state
@@ -126,12 +129,15 @@ private:
 class LLEmojiGridIcon : public LLScrollingPanel
 {
 public:
+    typedef std::function<void(LLEmojiGridIcon*)> right_click_cb_t;
+
     LLEmojiGridIcon(
         const LLPanel::Params& panel_params
         , const LLEmojiSearchResult& emoji)
         : LLScrollingPanel(panel_params)
         , mData(emoji)
         , mChar(emoji.Character)
+        , mHasVariants(false)
     {
     }
 
@@ -156,16 +162,41 @@ public:
             nullptr,
             false,
             true);
+
+        // Affordance: a tiny dot in the top-right corner indicates this
+        // emoji has alternates. Right-click (or long-press) opens them.
+        if (mHasVariants)
+        {
+            S32 w = getRect().getWidth();
+            S32 h = getRect().getHeight();
+            gl_rect_2d(w - 5, h - 2, w - 2, h - 5,
+                       LLColor4(1.f, 1.f, 1.f, 0.6f),
+                       /*filled=*/true);
+        }
+    }
+
+    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override
+    {
+        if (mRightClickCb)
+        {
+            mRightClickCb(this);
+            return true;
+        }
+        return LLScrollingPanel::handleRightMouseDown(x, y, mask);
     }
 
     virtual void updatePanel(bool allow_modify) override {}
 
     const LLEmojiSearchResult& getData() const { return mData; }
     const LLWString& getChar() const { return mChar; }
+    void setHasVariants(bool b) { mHasVariants = b; }
+    void setRightClickCallback(right_click_cb_t cb) { mRightClickCb = std::move(cb); }
 
 private:
     const LLEmojiSearchResult mData;
     const LLWString mChar;
+    bool mHasVariants;
+    right_click_cb_t mRightClickCb;
 };
 
 class LLEmojiPreviewPanel : public LLPanel
@@ -316,6 +347,7 @@ bool LLFloaterEmojiPicker::postBuild()
 {
     mGroups = getChild<LLPanel>("Groups");
     mBadge = getChild<LLPanel>("Badge");
+    mToneStrip = getChild<LLPanel>("ToneStrip");
     mEmojiScroll = getChild<LLScrollContainer>("EmojiGridContainer");
     mEmojiGrid = getChild<LLScrollingPanelList>("EmojiGrid");
     mDummy = getChild<LLTextBox>("Dummy");
@@ -323,6 +355,20 @@ bool LLFloaterEmojiPicker::postBuild()
     mPreview = new LLEmojiPreviewPanel();
     mPreview->setVisible(false);
     addChild(mPreview);
+
+    buildToneStrip();
+
+    // Re-render the grid when the tone preference changes so existing
+    // open pickers reflect the new tone immediately.
+    if (LLControlVariable* ctrl = gSavedSettings.getControl("EmojiSkinTonePreference").get())
+    {
+        mTonePrefConnection = ctrl->getCommitSignal()->connect(
+            [this](LLControlVariable*, const LLSD&, const LLSD&)
+            {
+                refreshToneStripHighlight();
+                fillEmojis(true);
+            });
+    }
 
     return LLFloater::postBuild();
 }
@@ -341,6 +387,16 @@ void LLFloaterEmojiPicker::onOpen(const LLSD& key)
 
 void LLFloaterEmojiPicker::onClose(bool app_quitting)
 {
+    // Hide the flyout without deleting — onClose can run inside the same
+    // callstack as a flyout cell's mouse-up (commitVariant → hideFloater →
+    // helper teardown → onClose), and deleting that cell mid-dispatch is
+    // UB. The next showVariantFlyout call clears the stale panel before
+    // building a new one.
+    if (mVariantFlyout)
+    {
+        mVariantFlyout->setVisible(false);
+    }
+
     if (!app_quitting)
     {
         LLEmojiHelper::instance().hideHelper(nullptr, true);
@@ -508,14 +564,19 @@ void LLFloaterEmojiPicker::fillCategoryFrequentlyUsed(std::map<std::string, std:
     if (!mFilterPattern.empty())
     {
         // List all emojis in "Frequently used"
-        const LLEmojiDictionary::emoji2descr_map_t& emoji2descr = LLEmojiDictionary::instance().getEmoji2Descr();
+        const LLEmojiDictionary& dict = LLEmojiDictionary::instance();
+        const LLEmojiDictionary::emoji2descr_map_t& emoji2descr = dict.getEmoji2Descr();
         std::size_t begin, end;
         for (const auto& emoji : sFrequentlyUsed)
         {
+            // Recents may carry a variant sequence (e.g. 👍🏿) that has no
+            // top-level descriptor; resolve through the variant map to its
+            // base so we can still show + filter it.
             auto e2d = emoji2descr.find(emoji.first);
-            if (e2d != emoji2descr.end() && !e2d->second->ShortCodes.empty())
+            const LLEmojiDescriptor* descr = (e2d != emoji2descr.end()) ? e2d->second : dict.getBaseFromVariant(emoji.first);
+            if (descr && !descr->ShortCodes.empty())
             {
-                for (const std::string& shortcode : e2d->second->ShortCodes)
+                for (const std::string& shortcode : descr->ShortCodes)
                 {
                 if (LLEmojiDictionary::searchInShortCode(begin, end, shortcode, mFilterPattern))
                 {
@@ -747,17 +808,22 @@ void LLFloaterEmojiPicker::fillEmojisCategory(const std::vector<LLEmojiSearchRes
 
     if (mFilterPattern.empty())
     {
-        const LLEmojiDictionary::emoji2descr_map_t& emoji2descr = LLEmojiDictionary::instance().getEmoji2Descr();
+        const LLEmojiDictionary& dict = LLEmojiDictionary::instance();
+        const LLEmojiDictionary::emoji2descr_map_t& emoji2descr = dict.getEmoji2Descr();
         LLEmojiSearchResult emoji { LLWString(), "", 0, 0 };
         if (category == FREQUENTLY_USED_CATEGORY)
         {
             for (const auto& code : sFrequentlyUsed)
             {
-                const LLEmojiDictionary::emoji2descr_map_t::const_iterator& e2d = emoji2descr.find(code.first);
-                if (e2d != emoji2descr.end() && !e2d->second->ShortCodes.empty())
+                // Same fallback as fillCategoryFrequentlyUsed: a recent
+                // variant sequence resolves to its base descriptor for
+                // tooltip / category context.
+                const auto e2d = emoji2descr.find(code.first);
+                const LLEmojiDescriptor* descr = (e2d != emoji2descr.end()) ? e2d->second : dict.getBaseFromVariant(code.first);
+                if (descr && !descr->ShortCodes.empty())
                 {
                     emoji.Character = code.first;
-                    emoji.String = e2d->second->ShortCodes.front();
+                    emoji.String = descr->ShortCodes.front();
                     createEmojiIcon(emoji, category, row_panel_params, row_list_params, icon_params,
                         icon_rect, max_icons, bg, row, icon_index);
                 }
@@ -789,11 +855,24 @@ void LLFloaterEmojiPicker::fillEmojisCategory(const std::vector<LLEmojiSearchRes
     }
 }
 
-void LLFloaterEmojiPicker::createEmojiIcon(const LLEmojiSearchResult& emoji,
+void LLFloaterEmojiPicker::createEmojiIcon(LLEmojiSearchResult emoji,
     const std::string& category, const LLPanel::Params& row_panel_params, const LLUICtrl::Params& row_list_params,
     const LLPanel::Params& icon_params, const LLRect& icon_rect, S32 max_icons, const LLColor4& bg,
     LLEmojiGridRow*& row, int& icon_index)
 {
+    // If the global tone preference is set and this emoji has a tone-only
+    // variant matching it, substitute the variant character + shortcode
+    // before constructing the icon. The substitution is skipped when the
+    // input is itself already a variant (e.g. came from recents).
+    applyTonePreference(emoji);
+
+    // Look up the (possibly post-substitution) descriptor so the icon
+    // knows whether to show the variant-affordance dot.
+    const LLEmojiDictionary& dict = LLEmojiDictionary::instance();
+    const LLEmojiDescriptor* descr = dict.getDescriptorFromEmoji(emoji.Character);
+    if (!descr)
+        descr = dict.getBaseFromVariant(emoji.Character);
+
     // Place a new row each (max_icons) icons
     if (!(icon_index % max_icons))
     {
@@ -803,10 +882,12 @@ void LLFloaterEmojiPicker::createEmojiIcon(const LLEmojiSearchResult& emoji,
 
     // Place a new icon to the current row
     LLEmojiGridIcon* icon = new LLEmojiGridIcon(icon_params, emoji);
+    icon->setHasVariants(descr && !descr->Variants.empty());
     icon->setMouseEnterCallback([this](LLUICtrl* ctrl, const LLSD&) { onEmojiMouseEnter(ctrl); });
     icon->setMouseLeaveCallback([this](LLUICtrl* ctrl, const LLSD&) { onEmojiMouseLeave(ctrl); });
     icon->setMouseDownCallback([this](LLUICtrl* ctrl, S32, S32, MASK) { onEmojiMouseDown(ctrl); });
     icon->setMouseUpCallback([this](LLUICtrl* ctrl, S32, S32, MASK) { onEmojiMouseUp(ctrl); });
+    icon->setRightClickCallback([this](LLEmojiGridIcon* i) { onIconRightClick(i); });
     icon->setBackgroundColor(bg);
     icon->setBackgroundOpaque(1);
     icon->setRect(icon_rect);
@@ -815,10 +896,282 @@ void LLFloaterEmojiPicker::createEmojiIcon(const LLEmojiSearchResult& emoji,
     icon_index++;
 }
 
+void LLFloaterEmojiPicker::applyTonePreference(LLEmojiSearchResult& emoji) const
+{
+    S32 tone_pref = gSavedSettings.getS32("EmojiSkinTonePreference");
+    if (tone_pref < 0 || tone_pref > 4)
+        return;
+
+    const LLEmojiDictionary& dict = LLEmojiDictionary::instance();
+    // Already-variant input (e.g. recents) preserves the user's choice.
+    if (dict.getBaseFromVariant(emoji.Character))
+        return;
+
+    const LLEmojiDescriptor* base = dict.getDescriptorFromEmoji(emoji.Character);
+    if (!base || base->Variants.empty())
+        return;
+
+    const LLEmojiVariant* v = dict.findVariant(*base, (U8)(tone_pref + 1), -1);
+    if (!v)
+        return;
+
+    emoji.Character = v->Character;
+    if (!v->ShortCodes.empty())
+        emoji.String = v->ShortCodes.front();
+}
+
 void LLFloaterEmojiPicker::showPreview(bool show)
 {
     mDummy->setVisible(!show);
     mPreview->setVisible(show);
+}
+
+namespace {
+// The five Fitzpatrick skin-tone modifier codepoints, used as button labels
+// in the tone strip. Index 0..4 corresponds to tone values 1..5 in
+// LLEmojiVariant::Tone (light → dark).
+constexpr llwchar TONE_MODIFIER_CODEPOINTS[5] = {
+    0x1F3FB, // light
+    0x1F3FC, // medium-light
+    0x1F3FD, // medium
+    0x1F3FE, // medium-dark
+    0x1F3FF, // dark
+};
+// Yellow circle as the "no preference" marker.
+constexpr llwchar TONE_NONE_CODEPOINT = 0x1F7E1;
+}
+
+void LLFloaterEmojiPicker::buildToneStrip()
+{
+    if (!mToneStrip)
+        return;
+
+    // Six buttons: "no preference" + 5 tones. They sit in a single row
+    // across the top of the picker. Width is divvied evenly so resizing
+    // the floater keeps them aligned.
+    const S32 BUTTON_COUNT = 6;
+    S32 strip_width = mToneStrip->getRect().getWidth();
+    S32 strip_height = mToneStrip->getRect().getHeight();
+    S32 button_width = strip_width / BUTTON_COUNT;
+
+    LLButton::Params params;
+    params.font = LLFontGL::getFontEmojiLarge();
+    params.tab_stop = false;
+
+    auto make_button = [&](S32 tone_value, llwchar glyph, const std::string& tooltip_key, const std::string& name)
+    {
+        params.name = name;
+        LLButton* button = LLUICtrlFactory::create<LLButton>(params);
+        LLRect rect(button_width * (tone_value + 1), strip_height,
+                    button_width * (tone_value + 2), 0);
+        // tone_value -1..4 → button index 0..5
+        button->setRect(rect);
+        button->setLabel(LLUIString(LLWString(1, glyph)));
+        button->setToolTip(getString(tooltip_key));
+        S32 captured_tone = tone_value;
+        button->setClickedCallback([this, captured_tone](LLUICtrl*, const LLSD&) { onToneButtonClick(captured_tone); });
+        mToneStrip->addChild(button);
+    };
+
+    // -1 = no preference; 0..4 = tone 1..5.
+    make_button(-1, TONE_NONE_CODEPOINT,           "tooltip_tone_none", "tone_none");
+    for (S32 i = 0; i < 5; ++i)
+    {
+        make_button(i, TONE_MODIFIER_CODEPOINTS[i],
+                    "tooltip_tone_" + std::to_string(i + 1),
+                    "tone_" + std::to_string(i + 1));
+    }
+
+    refreshToneStripHighlight();
+}
+
+void LLFloaterEmojiPicker::onToneButtonClick(S32 tone)
+{
+    gSavedSettings.setS32("EmojiSkinTonePreference", tone);
+    // The setting-change listener takes care of refreshing the grid +
+    // tone-strip highlight, so we don't need to call them here directly.
+}
+
+void LLFloaterEmojiPicker::refreshToneStripHighlight()
+{
+    if (!mToneStrip)
+        return;
+    S32 tone_pref = gSavedSettings.getS32("EmojiSkinTonePreference");
+
+    auto highlight = [&](const std::string& name, bool on)
+    {
+        if (LLButton* b = mToneStrip->findChild<LLButton>(name))
+        {
+            b->setToggleState(on);
+            b->setUseFontColor(on);
+        }
+    };
+
+    highlight("tone_none", tone_pref < 0 || tone_pref > 4);
+    for (S32 i = 0; i < 5; ++i)
+    {
+        highlight("tone_" + std::to_string(i + 1), tone_pref == i);
+    }
+}
+
+void LLFloaterEmojiPicker::draw()
+{
+    LLFloater::draw();
+
+    // Deferred flyout dismissal — commitVariant flagged it from inside a
+    // child cell's mouse-up callback. Deleting the flyout (which would
+    // delete that cell) mid-dispatch is UB, so we wait one frame.
+    if (mVariantFlyoutPendingDismiss)
+    {
+        mVariantFlyoutPendingDismiss = false;
+        dismissVariantFlyout();
+    }
+
+    // Long-press detection: if the mouse has been held over the same icon
+    // for ~500 ms without releasing, open the variant flyout.
+    static constexpr F32 LONG_PRESS_SECONDS = 0.5f;
+    if (mLongPressIcon && mLongPressTimer.getElapsedTimeF32() > LONG_PRESS_SECONDS)
+    {
+        LLEmojiGridIcon* icon = mLongPressIcon;
+        mLongPressIcon = nullptr;
+        mLongPressFired = true;
+        showVariantFlyout(icon);
+    }
+}
+
+bool LLFloaterEmojiPicker::handleMouseDown(S32 x, S32 y, MASK mask)
+{
+    // Click outside the variant flyout dismisses it. The flyout itself
+    // is a child of the floater so clicks ON it don't reach this method.
+    if (mVariantFlyout && !mVariantFlyout->getRect().pointInRect(x, y))
+    {
+        dismissVariantFlyout();
+    }
+    return LLFloater::handleMouseDown(x, y, mask);
+}
+
+void LLFloaterEmojiPicker::onIconRightClick(LLEmojiGridIcon* icon)
+{
+    // Right-click is the explicit "show me alternates" gesture. Long-press
+    // hits the same code path via draw(); both end up here.
+    mLongPressIcon = nullptr; // cancel any in-flight long-press timer
+    showVariantFlyout(icon);
+}
+
+void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
+{
+    if (!baseIcon)
+        return;
+
+    dismissVariantFlyout(); // never have two open at once
+
+    // Resolve the descriptor: the icon's character may itself be a
+    // variant (when the global tone preference rewrote the base), so we
+    // walk up to the base.
+    const LLEmojiDictionary& dict = LLEmojiDictionary::instance();
+    const LLEmojiDescriptor* descr = dict.getDescriptorFromEmoji(baseIcon->getChar());
+    if (!descr)
+        descr = dict.getBaseFromVariant(baseIcon->getChar());
+    if (!descr || descr->Variants.empty())
+        return;
+
+    // Build a transient panel of LLEmojiGridIcons: one for the base ("no
+    // preference") plus one per variant.
+    LLPanel::Params panel_params;
+    panel_params.name("variant_flyout");
+    panel_params.background_visible(true);
+    panel_params.background_opaque(true);
+    panel_params.bg_opaque_color(LLUIColorTable::instance().getColor("MenuDefaultBgColor", LLColor4(0.f, 0.f, 0.f, 0.9f)));
+    LLPanel* flyout = LLUICtrlFactory::create<LLPanel>(panel_params);
+
+    const S32 CELL = 28;
+    const S32 PADDING = 4;
+    S32 cell_count = 1 + (S32)descr->Variants.size();
+    S32 width = PADDING * 2 + CELL * cell_count;
+    S32 height = PADDING * 2 + CELL;
+
+    // Position the flyout above the base icon, clamped to the floater's
+    // client area so it doesn't spill off-screen.
+    LLRect base_rect = baseIcon->calcScreenRect();
+    LLRect floater_rect = calcScreenRect();
+    S32 cx = base_rect.mLeft + base_rect.getWidth() / 2 - floater_rect.mLeft;
+    S32 cy = base_rect.mTop - floater_rect.mBottom + 4;
+    S32 left = llclamp(cx - width / 2, 0, getRect().getWidth() - width);
+    S32 bottom = llclamp(cy, 0, getRect().getHeight() - height);
+    flyout->setRect(LLRect(left, bottom + height, left + width, bottom));
+
+    LLPanel::Params cell_params;
+    cell_params.background_visible(false);
+
+    static LLUIColor hover_color = LLUIColorTable::instance().getColor("MenuItemHighlightBgColor", LLColor4(0.75f, 0.75f, 0.75f, 1.0f));
+
+    auto add_cell = [&](S32 x_offset, const LLWString& seq, const std::string& shortcode)
+    {
+        LLEmojiSearchResult sr(seq, shortcode, 0, 0);
+        LLEmojiGridIcon* cell = new LLEmojiGridIcon(cell_params, sr);
+        cell->setRect(LLRect(x_offset, PADDING + CELL, x_offset + CELL, PADDING));
+        cell->setBackgroundColor(hover_color);
+        cell->setBackgroundOpaque(true);
+        // Hover highlight — match the main-grid hover affordance. We use
+        // a dedicated pair of callbacks here (rather than the floater's
+        // onEmojiMouseEnter/Leave) so the flyout cells don't perturb the
+        // floater's mFocusedIcon/mHoveredIcon tracking.
+        cell->setMouseEnterCallback([](LLUICtrl* c, const LLSD&)
+        {
+            if (auto* p = dynamic_cast<LLEmojiGridIcon*>(c))
+                p->setBackgroundVisible(true);
+        });
+        cell->setMouseLeaveCallback([](LLUICtrl* c, const LLSD&)
+        {
+            if (auto* p = dynamic_cast<LLEmojiGridIcon*>(c))
+                p->setBackgroundVisible(false);
+        });
+        cell->setMouseUpCallback([this](LLUICtrl* c, S32, S32, MASK)
+        {
+            if (LLEmojiGridIcon* picked = dynamic_cast<LLEmojiGridIcon*>(c))
+                commitVariant(picked->getChar());
+        });
+        flyout->addChild(cell);
+    };
+
+    S32 x = PADDING;
+    add_cell(x, descr->Character,
+             descr->ShortCodes.empty() ? std::string() : descr->ShortCodes.front());
+    x += CELL;
+    for (const LLEmojiVariant& v : descr->Variants)
+    {
+        add_cell(x, v.Character, v.ShortCodes.empty() ? std::string() : v.ShortCodes.front());
+        x += CELL;
+    }
+
+    addChild(flyout);
+    mVariantFlyout = flyout;
+}
+
+void LLFloaterEmojiPicker::dismissVariantFlyout()
+{
+    if (mVariantFlyout)
+    {
+        removeChild(mVariantFlyout);
+        delete mVariantFlyout;
+        mVariantFlyout = nullptr;
+    }
+}
+
+void LLFloaterEmojiPicker::commitVariant(const LLWString& sequence)
+{
+    LLSD value(wstring_to_utf8str(sequence));
+    setValue(value);
+    onCommit();
+    // Defer the actual deletion: this is being invoked from a child cell's
+    // mouse-up callback, and dismissVariantFlyout would delete that very
+    // cell mid-dispatch. draw() picks up mVariantFlyoutPendingDismiss next
+    // frame and tears the panel down safely.
+    mVariantFlyoutPendingDismiss = true;
+    if (!mHint.empty() || !(gKeyboard->currentMask(true) & MASK_SHIFT))
+    {
+        hideFloater();
+    }
 }
 
 void LLFloaterEmojiPicker::onGroupButtonClick(LLUICtrl* ctrl)
@@ -876,6 +1229,9 @@ void LLFloaterEmojiPicker::onEmojiMouseLeave(LLUICtrl* ctrl)
 {
     if (LLEmojiGridIcon* icon = dynamic_cast<LLEmojiGridIcon*>(ctrl))
     {
+        if (icon == mLongPressIcon)
+            mLongPressIcon = nullptr;
+
         if (icon == mHoveredIcon)
         {
             if (icon != mFocusedIcon)
@@ -894,6 +1250,15 @@ void LLFloaterEmojiPicker::onEmojiMouseLeave(LLUICtrl* ctrl)
 
 void LLFloaterEmojiPicker::onEmojiMouseDown(LLUICtrl* ctrl)
 {
+    // Start the long-press timer; draw() polls it so the variant flyout
+    // can fire after a short hold without depending on a global timer pool.
+    if (LLEmojiGridIcon* icon = dynamic_cast<LLEmojiGridIcon*>(ctrl))
+    {
+        mLongPressIcon = icon;
+        mLongPressFired = false;
+        mLongPressTimer.reset();
+    }
+
     if (getSoundFlags() & MOUSE_DOWN)
     {
         make_ui_sound("UISndClick");
@@ -902,6 +1267,18 @@ void LLFloaterEmojiPicker::onEmojiMouseDown(LLUICtrl* ctrl)
 
 void LLFloaterEmojiPicker::onEmojiMouseUp(LLUICtrl* ctrl)
 {
+    // Cancel the pending long-press — a normal click was completed.
+    mLongPressIcon = nullptr;
+
+    // If the long-press already fired (variant flyout is up), the user
+    // is just letting go of the hold; suppress the commit so the cell
+    // doesn't double-trigger.
+    if (mLongPressFired)
+    {
+        mLongPressFired = false;
+        return;
+    }
+
     if (getSoundFlags() & MOUSE_UP)
     {
         make_ui_sound("UISndClickRelease");

@@ -1,6 +1,7 @@
 {
   "name": "secondlife-emoji-shortcodes",
   "version": "17.0.0",
+  "port-version": 1,
   "homepage": "https://github.com/milesj/emojibase",
   "license": "MIT"
 }
