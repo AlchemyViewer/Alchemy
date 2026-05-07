@@ -239,19 +239,46 @@ namespace
         const uint32_t* codepoints = reinterpret_cast<const uint32_t*>(slice.data() + sub_begin_in_slice);
         const int       len        = static_cast<int>(sub_end_in_slice - sub_begin_in_slice);
 
-        // Programmer fonts opted into ligatures via <font ligatures="on">
-        // still need kern disabled (monospace + GPOS pair-kerning is
-        // fundamentally incompatible). Other features stay on so liga/
-        // calt fire as the font intends for sequences like `=>` `!=`.
+        // Monospace feature overrides. Two profiles:
+        //
+        //  - Strict (default for monospace faces): kern off (pair kerning
+        //    breaks columns) AND every ligature lookup off (liga / calt /
+        //    clig / dlig / rlig). Without these, GSUB collapses sequences
+        //    like `==` `!=` `=>` into a single glyph spanning multiple
+        //    cells, throwing off column count. mark / mkmk / ccmp stay on
+        //    so combining marks still position correctly above their base
+        //    via GPOS — that's the GPOS that monospace actually wants.
+        //  - Ligatures-OK (opt-in via <font ligatures="on">): kern off,
+        //    ligatures allowed. For programmer fonts where the user wants
+        //    `=>` `!=` to render as designed; the user accepts that
+        //    ligated runs no longer have one cell per codepoint.
+        //
+        // Variable-width faces get no feature override.
+        static const hb_feature_t kFixedWidthStrict[] = {
+            { HB_TAG('k','e','r','n'), 0, 0, (unsigned)-1 },
+            { HB_TAG('l','i','g','a'), 0, 0, (unsigned)-1 },
+            { HB_TAG('c','a','l','t'), 0, 0, (unsigned)-1 },
+            { HB_TAG('c','l','i','g'), 0, 0, (unsigned)-1 },
+            { HB_TAG('d','l','i','g'), 0, 0, (unsigned)-1 },
+            { HB_TAG('r','l','i','g'), 0, 0, (unsigned)-1 },
+        };
         static const hb_feature_t kFixedWidthLigaturesOk[] = {
             { HB_TAG('k','e','r','n'), 0, 0, (unsigned)-1 },
         };
         const hb_feature_t* features = nullptr;
         unsigned int num_features = 0;
-        if (face->isFixedWidth() && face->getAllowMonospaceLigatures())
+        if (face->isFixedWidth())
         {
-            features = kFixedWidthLigaturesOk;
-            num_features = (unsigned int)(sizeof(kFixedWidthLigaturesOk) / sizeof(kFixedWidthLigaturesOk[0]));
+            if (face->getAllowMonospaceLigatures())
+            {
+                features = kFixedWidthLigaturesOk;
+                num_features = (unsigned int)(sizeof(kFixedWidthLigaturesOk) / sizeof(kFixedWidthLigaturesOk[0]));
+            }
+            else
+            {
+                features = kFixedWidthStrict;
+                num_features = (unsigned int)(sizeof(kFixedWidthStrict) / sizeof(kFixedWidthStrict[0]));
+            }
         }
 
         // VS-16 stripping for faces whose cmap lacks U+FE0F (notably Noto-
