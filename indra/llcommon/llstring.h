@@ -673,8 +673,26 @@ LL_COMMON_API size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t p
 // through some other rule — word-boundary walks, pixel hit-testing — and
 // need to nudge onto the nearest safe cluster edge in a chosen direction
 // without the single-codepoint step that wstring_step_grapheme_* applies.
+//
+// Note: these treat `pos == cluster.first` and `pos == cluster.second` as
+// already-on-a-boundary (no snap). Callers asking "what cluster does pos
+// belong to?" want wstring_emoji_range_at, which is inclusive of the
+// leading boundary and aware of single-codepoint pictographs.
 LL_COMMON_API size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos);
 LL_COMMON_API size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos);
+
+// Return the half-open codepoint range of the emoji cluster (or single
+// pictograph codepoint) that contains `pos`. Returns an empty range with
+// first == second when `pos` lies on a non-pictograph codepoint or out of
+// bounds. Used by tooltip lookup to recover the full cluster from a hit-test
+// position. Symmetric in spirit to wstring_grapheme_align_*, but inclusive of
+// cluster boundaries and aware of single pictographs (BMP and astral) that
+// wstring_find_emoji_clusters skips. Single-codepoint detection uses
+// LLStringOps::isPictographBase, so © / ® / ☦ / ⚓ / ❤ all qualify; bare
+// extenders (ZWJ, VS-15/16, keycap combiner, skin-tone modifiers, tag chars)
+// do not.
+LL_COMMON_API std::pair<size_t, size_t>
+wstring_emoji_range_at(LLWStringView wstr, size_t pos);
 
 #if LL_WINDOWS
 /* @name Windows string helpers

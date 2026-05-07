@@ -30,7 +30,6 @@
 
 #include "lltextbase.h"
 
-#include "llemojidictionary.h"
 #include "llemojihelper.h"
 #include "lllocalcliprect.h"
 #include "llmenugl.h"
@@ -1114,81 +1113,6 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
         {
             LLTextSegment* segmentp = *seg_iter;
             insertSegment(segmentp);
-        }
-    }
-
-    // Insert special segments where necessary (insertSegment takes care of splitting normal text segments around them for us)
-    if (mUseEmoji)
-    {
-        LLStyleSP emoji_style;
-        LLEmojiDictionary* ed = LLEmojiDictionary::instanceExists() ? LLEmojiDictionary::getInstance() : NULL;
-        // Multi-codepoint emoji clusters (ZWJ families, flag pairs, keycap,
-        // tag subdivision flags) must live in a single LLEmojiTextSegment so
-        // LLFontGL::render sees the whole sequence in one call and can shape
-        // it through HarfBuzz. Otherwise the cluster gets chopped into one
-        // segment per emoji base with ZWJ/VS filler falling between, and
-        // each render() only sees an isolated emoji — presentation breaks.
-        const auto emoji_clusters = wstring_find_emoji_clusters(wstr);
-        auto next_run = emoji_clusters.begin();
-        LLTextSegment* segmentp = nullptr;
-        segment_vec_t::iterator seg_iter;
-        if (segments && segments->size() > 0)
-        {
-            seg_iter = segments->begin();
-            segmentp = *seg_iter;
-        }
-        for (S32 text_kitty = 0, text_len = static_cast<S32>(wstr.size()); text_kitty < text_len; text_kitty++)
-        {
-            if (segmentp)
-            {
-                if (segmentp->getEnd() <= pos + text_kitty)
-                {
-                    seg_iter++;
-                    if (seg_iter != segments->end())
-                    {
-                        segmentp = *seg_iter;
-                    }
-                    else
-                    {
-                        segmentp = nullptr;
-                    }
-                }
-                if (segmentp && !segmentp->getPermitsEmoji())
-                {
-                    // Some segments, like LLInlineViewSegment do not permit splitting
-                    // and should not be interrupted by emoji segments
-                    continue;
-                }
-            }
-
-            // Drop runs that are entirely behind us (defensive; runs are
-            // sorted so this is usually a no-op).
-            while (next_run != emoji_clusters.end() && next_run->second <= (size_t)text_kitty)
-                ++next_run;
-
-            const bool is_cluster_start =
-                next_run != emoji_clusters.end() && next_run->first == (size_t)text_kitty;
-            const llwchar code    = wstr[text_kitty];
-            const bool    isEmoji = ed ? ed->isEmoji(code) : LLStringOps::isEmoji(code);
-            if (!is_cluster_start && !isEmoji)
-                continue;
-
-            if (!emoji_style)
-            {
-                emoji_style = new LLStyle(getStyleParams());
-                emoji_style->setFont(LLFontGL::getFontEmojiLarge());
-            }
-
-            const S32 span           = is_cluster_start ? (S32)(next_run->second - next_run->first) : 1;
-            const S32 new_seg_start  = pos + text_kitty;
-            insertSegment(new LLEmojiTextSegment(emoji_style, new_seg_start, new_seg_start + span, *this));
-
-            if (is_cluster_start)
-            {
-                // For-loop's ++ will land us past the cluster's last codepoint.
-                text_kitty += span - 1;
-                ++next_run;
-            }
         }
     }
 
@@ -3381,6 +3305,17 @@ bool LLTextBase::setCursorPos(S32 cursor_pos, bool keep_cursor_offset)
     if (new_cursor_pos != mCursorPos)
     {
         new_cursor_pos = getEditableIndex(new_cursor_pos, new_cursor_pos >= mCursorPos);
+        // Mouse clicks and other pixel-driven callers can land mid-cluster
+        // (charFromPixelOffset rounds at codepoint boundaries, not cluster
+        // boundaries). Snap onto the nearest cluster edge so the caret never
+        // parks inside a ZWJ family / flag pair / keycap. No-op when already
+        // on a boundary, so arrow-key callers (already grapheme-stepped) and
+        // plain ASCII positions pass through unchanged.
+        const bool fwd = new_cursor_pos >= mCursorPos;
+        const LLWString& text = getWText();
+        new_cursor_pos = (S32)(fwd
+            ? wstring_grapheme_align_forward(text, (size_t)new_cursor_pos)
+            : wstring_grapheme_align_backward(text, (size_t)new_cursor_pos));
     }
 
     mCursorPos = llclamp(new_cursor_pos, 0, (S32)getLength());
@@ -4035,6 +3970,30 @@ bool LLNormalTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
         return true;
     }
 
+    // Emoji-cluster tooltip: hit-test (x,y) → doc index, ask
+    // wstring_emoji_range_at for the surrounding cluster, look up the
+    // composed shortcode. Returns empty for non-emoji codepoints, so plain
+    // text falls through to `return false`. Not cached into mTooltip
+    // because a single normal segment can host multiple emoji at different
+    // positions and the explicit-tooltip early-out above would freeze the
+    // first hit.
+    const S32 doc_index = mEditor.getDocIndexFromLocalCoord(x, y, /*round=*/false, /*hit_past_end_of_line=*/false);
+    if (doc_index >= mStart && doc_index < mEnd)
+    {
+        const LLWString& text = getWText();
+        auto range = wstring_emoji_range_at(text, (size_t)doc_index);
+        if (range.second > range.first)
+        {
+            std::string tip = LLEmojiHelper::instance().getToolTip(
+                text.substr(range.first, range.second - range.first));
+            if (!tip.empty())
+            {
+                LLToolTipMgr::instance().show(tip);
+                return true;
+            }
+        }
+    }
+
     return false;
 }
 
@@ -4206,43 +4165,6 @@ const LLWString& LLLabelTextSegment::getWText() const
 const S32 LLLabelTextSegment::getLength() const
 {
     return static_cast<S32>(mEditor.getWlabel().length());
-}
-
-//
-// LLEmojiTextSegment
-//
-LLEmojiTextSegment::LLEmojiTextSegment(LLStyleConstSP style, S32 start, S32 end, LLTextBase& editor)
-    : LLNormalTextSegment(style, start, end, editor)
-{
-}
-
-LLEmojiTextSegment::LLEmojiTextSegment(const LLUIColor& color, S32 start, S32 end, LLTextBase& editor, bool is_visible)
-    : LLNormalTextSegment(color, start, end, editor, is_visible)
-{
-}
-
-// virtual
-LLTextSegmentPtr LLEmojiTextSegment::clone(LLTextBase& target) const
-{
-    LLStyleConstSP sp(cloneStyle(target, mStyle));
-    return new LLEmojiTextSegment(sp, mStart, mEnd, target);
-}
-
-bool LLEmojiTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
-{
-    if (mTooltip.empty())
-    {
-        LLWString emoji = getWText().substr(getStart(), getEnd() - getStart());
-        if (!emoji.empty())
-        {
-            // Pass the whole emoji sequence so ZWJ families / flag pairs
-            // resolve to their composed shortcode name rather than the name
-            // of their first codepoint.
-            mTooltip = LLEmojiHelper::instance().getToolTip(emoji);
-        }
-    }
-
-    return LLNormalTextSegment::handleToolTip(x, y, mask);
 }
 
 //

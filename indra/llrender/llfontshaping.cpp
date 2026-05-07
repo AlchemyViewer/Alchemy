@@ -524,7 +524,7 @@ namespace
                     // cur_face != root_face) is what makes this work both
                     // when the head is a non-emoji font with an emoji
                     // fallback AND when the head IS an emoji font (e.g. the
-                    // SansSerifEmoji family used by LLEmojiTextSegment).
+                    // SansSerifEmoji family used by the emoji picker).
                     face = cur_face;
                 }
                 else if (is_mark)

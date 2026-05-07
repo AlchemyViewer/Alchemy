@@ -201,19 +201,6 @@ protected:
     /*virtual*/ const S32           getLength() const;
 };
 
-// Text segment that represents a single emoji character that has a different style (=font size) than the rest of
-// the document it belongs to
-class LLEmojiTextSegment : public LLNormalTextSegment
-{
-public:
-    LLEmojiTextSegment(LLStyleConstSP style, S32 start, S32 end, LLTextBase& editor);
-    LLEmojiTextSegment(const LLUIColor& color, S32 start, S32 end, LLTextBase& editor, bool is_visible = true);
-    /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const override;
-
-    bool canEdit() const override { return false; }
-    bool handleToolTip(S32 x, S32 y, MASK mask) override;
-};
-
 // Text segment that changes it's style depending of mouse pointer position ( is it inside or outside segment)
 class LLOnHoverChangeableTextSegment : public LLNormalTextSegment
 {

@@ -776,14 +776,21 @@ void LLTextEditor::insertEmoji(const LLWString& emoji)
                << (emoji.size() > 1 ? " +" : "")
                << (emoji.size() > 1 ? std::to_string(emoji.size() - 1) : std::string())
                << ")" << LL_ENDL;
-    auto styleParams = LLStyle::Params();
-    styleParams.font = LLFontGL::getFontEmojiLarge();
-    // Emoji segment spans the full cluster so LLFontGL::render sees the
-    // whole ZWJ/flag/keycap/tag sequence in one call and shapes it through
-    // HarfBuzz. Without a full-cluster segment the render path falls back
-    // to 1:1 codepoint lookup and breaks the composed glyph.
     const S32 span = static_cast<S32>(emoji.size());
-    auto segment = new LLEmojiTextSegment(new LLStyle(styleParams), mCursorPos, mCursorPos + span, *this);
+    // Inherit the style of whatever segment the cursor sits in so the emoji
+    // renders at the surrounding text's font; fall back to the editor default
+    // when no segment exists at the cursor (e.g. empty document, end-of-buffer).
+    LLStyleConstSP style;
+    segment_set_t::iterator seg_it = getSegIterContaining(mCursorPos);
+    if (seg_it != mSegments.end() && (*seg_it)->getStyle().notNull())
+    {
+        style = (*seg_it)->getStyle();
+    }
+    else
+    {
+        style = LLStyleConstSP(new LLStyle(getStyleParams()));
+    }
+    auto segment = new LLNormalTextSegment(style, mCursorPos, mCursorPos + span, *this);
     insert(mCursorPos, emoji, false, segment);
     setCursorPos(mCursorPos + span);
 }

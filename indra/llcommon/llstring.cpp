@@ -684,57 +684,42 @@ bool wstring_has_emoji(LLWStringView wstr)
     return false;
 }
 
-// Joiners and modifiers that extend an emoji into a multi-code-point sequence.
-// Stripping an emoji without also stripping these leaves orphan ZWJ/VS16
-// bytes — visible as empty boxes in most renderers. See Unicode TR51.
-static bool is_emoji_sequence_extender(llwchar wch)
-{
-    return wch == 0x200D                           // ZERO WIDTH JOINER
-        || wch == 0xFE0F                           // VARIATION SELECTOR-16
-        || wch == 0x20E3                           // COMBINING ENCLOSING KEYCAP
-        || (wch >= 0x1F3FB && wch <= 0x1F3FF);     // emoji skin-tone modifiers
-}
-
-// Cut emoji symbols if exist. Strips the emoji plus any immediately trailing
-// sequence extenders (ZWJ/VS16/skin-tone/keycap combiner) and follow-up
-// ZWJ-joined emoji, so families like 👨‍👩‍👧 and skin-toned emoji are removed
-// cleanly without leaving orphan joiners.
+// Strip every emoji-cluster the cluster walker identifies, plus any isolated
+// astral-emoji codepoint (LLStringOps::isEmoji-true) that the walker excludes
+// because it shapes correctly via the 1:1 path. Sharing the cluster walker
+// here means this function and wstring_find_emoji_clusters can never disagree
+// on cluster bounds — historical ad-hoc state machines diverged on tag chars,
+// VS-15, BMP-base ZWJ sequences, and keycaps and produced visibly broken
+// output (orphan ZWJ, leftover tag bytes) in those cases.
+//
+// "Cluster" here means anything HarfBuzz would itemize as a single emoji
+// glyph — keycaps, BMP-base sequences (heart-on-fire, isolated heart+VS16),
+// subdivision flags. Earlier the function used the narrower
+// LLStringOps::isEmoji predicate which let composed glyphs survive partial
+// stripping; the broader contract matches the visual intent of "remove
+// emojis" for input fields like usernames and search.
 bool wstring_remove_emojis(LLWString& wstr)
 {
+    const auto clusters = wstring_find_emoji_clusters(wstr);
     bool found = false;
     size_t read = 0, write = 0;
+    auto cluster_it = clusters.begin();
     while (read < wstr.size())
     {
+        if (cluster_it != clusters.end() && read == cluster_it->first)
+        {
+            read = cluster_it->second;
+            ++cluster_it;
+            found = true;
+            continue;
+        }
         if (LLStringOps::isEmoji(wstr[read]))
         {
-            found = true;
             ++read;
-            while (read < wstr.size())
-            {
-                if (wstr[read] == 0x200D)
-                {
-                    // ZWJ: consume it and the following emoji (if any) to
-                    // continue the sequence.
-                    ++read;
-                    if (read < wstr.size() && LLStringOps::isEmoji(wstr[read]))
-                    {
-                        ++read;
-                        continue;
-                    }
-                    break;
-                }
-                if (is_emoji_sequence_extender(wstr[read]))
-                {
-                    ++read;
-                    continue;
-                }
-                break;
-            }
+            found = true;
+            continue;
         }
-        else
-        {
-            wstr[write++] = wstr[read++];
-        }
+        wstr[write++] = wstr[read++];
     }
     if (found)
         wstr.resize(write);
@@ -762,6 +747,22 @@ bool utf8str_remove_emojis(std::string& utf8str)
 // available to llrender's shape-itemizer and font-fallback walkers without
 // duplicating the range list.)
 
+// Codepoints that extend a pictograph base into a multi-codepoint cluster.
+// ZWJ is deliberately excluded — it joins one cluster to *another base*, not
+// merely a trailing modifier, so the walkers handle it separately. The set
+// matches what HarfBuzz itemizes as part of the same emoji cluster: VS-15/16
+// presentation selectors, the keycap combining mark, skin-tone modifiers, and
+// tag characters (including the U+E007F CANCEL TAG terminator for subdivision
+// flags). Shared by is_shaping_starter and advance_shaping_run so the two
+// walkers can never disagree on what belongs in a cluster.
+static bool is_emoji_extender(llwchar c)
+{
+    return c == 0xFE0E || c == 0xFE0F            // VS-15 / VS-16
+        || c == 0x20E3                           // keycap combiner
+        || (c >= 0x1F3FB && c <= 0x1F3FF)        // skin-tone modifiers
+        || (c >= 0xE0020 && c <= 0xE007F);       // tag chars + CANCEL TAG
+}
+
 // True if position i begins an emoji sequence that the 1:1 codepoint->glyph
 // path cannot render correctly — i.e., the next codepoint transforms the base
 // (ZWJ, VS15/16, skin-tone, keycap combiner, tag character, or regional
@@ -783,14 +784,8 @@ static bool is_shaping_starter(const llwchar* p, size_t n, size_t i)
     if (!LLStringOps::isPictographBase(c) || i + 1 >= n)
         return false;
     const llwchar next = p[i + 1];
-    if (next == 0x200D                               // ZWJ
-        || next == 0xFE0F || next == 0xFE0E          // VS15/VS16
-        || (next >= 0x1F3FB && next <= 0x1F3FF)      // skin tone
-        || next == 0x20E3                            // keycap combiner
-        || (next >= 0xE0020 && next <= 0xE007F))     // tag characters
-    {
+    if (next == 0x200D || is_emoji_extender(next))
         return true;
-    }
     // Regional indicator pair (flag).
     return c >= 0x1F1E6 && c <= 0x1F1FF
         && next >= 0x1F1E6 && next <= 0x1F1FF;
@@ -817,9 +812,8 @@ static size_t advance_shaping_run(const llwchar* p, size_t n, size_t start)
         return r + 1;
     }
 
-    // General case: consume ZWJ-joined emoji, variation selectors, skin-tone
-    // modifiers, keycap combiners, and tag characters (including the U+E007F
-    // CANCEL TAG terminator).
+    // General case: ZWJ joins another base, then any number of plain
+    // extenders (VS, skin-tone, keycap mark, tag chars).
     while (r < n)
     {
         const llwchar c = p[r];
@@ -835,10 +829,7 @@ static size_t advance_shaping_run(const llwchar* p, size_t n, size_t start)
             }
             break; // orphan ZWJ
         }
-        if (c == 0xFE0F || c == 0xFE0E
-            || c == 0x20E3
-            || (c >= 0x1F3FB && c <= 0x1F3FF)
-            || (c >= 0xE0020 && c <= 0xE007F))
+        if (is_emoji_extender(c))
         {
             ++r;
             continue;
@@ -859,7 +850,16 @@ std::vector<std::pair<size_t, size_t>> wstring_find_emoji_clusters(LLWStringView
         if (is_shaping_starter(p, n, i))
         {
             const size_t end = advance_shaping_run(p, n, i);
-            runs.emplace_back(i, end);
+            // is_shaping_starter accepts a base when the *next* codepoint is
+            // an extender, but advance_shaping_run can still bail (e.g. a
+            // ZWJ at end of string with nothing after it, or a ZWJ followed
+            // by something that isn't a pictograph base). That leaves us
+            // with a degenerate length-1 "cluster" that's really just the
+            // base alone with a dangling extender. Skip those — isolated
+            // single-codepoint emoji shape correctly via the 1:1 path and
+            // are intentionally absent from the cluster list.
+            if (end > i + 1)
+                runs.emplace_back(i, end);
             i = end;
         }
         else
@@ -928,6 +928,28 @@ size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
             return run.second;
     }
     return pos;
+}
+
+std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos)
+{
+    if (pos >= wstr.size())
+        return { pos, pos };
+    for (const auto& run : wstring_find_emoji_clusters(wstr))
+    {
+        if (pos < run.first)
+            break;
+        if (pos < run.second)
+            return run;
+    }
+    // Single-codepoint pictographs are intentionally absent from the cluster
+    // list (they shape via the 1:1 path), but tooltip lookup still wants
+    // their bounds. Use isPictographBase rather than isEmoji so BMP
+    // pictographs (©, ®, ☦, ⚓, ❤, …) get a range; isPictographBase already
+    // excludes extenders (ZWJ, VS-15/16, keycap combiner, skin-tone mods,
+    // tag chars) which have no business being a standalone tooltip target.
+    return LLStringOps::isPictographBase(wstr[pos])
+        ? std::make_pair(pos, pos + 1)
+        : std::make_pair(pos, pos);
 }
 
 #if LL_WINDOWS

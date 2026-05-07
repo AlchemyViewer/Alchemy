@@ -639,6 +639,24 @@ namespace tut
         std::string clean = "Hello";
         ensure("utf8str_remove_emojis clean", !utf8str_remove_emojis(clean));
         ensure_equals("clean unchanged", clean, std::string("Hello"));
+
+        // Heart-on-fire ❤️‍🔥 round-trips through utf8 encoding without
+        // the wstring layer disagreeing with the byte layer about cluster
+        // bounds. UTF-8 byte sequence: U+2764 (E2 9D A4) U+FE0F (EF B8 8F)
+        // U+200D (E2 80 8D) U+1F525 (F0 9F 94 A5).
+        std::string fire = "A" "\xE2\x9D\xA4" "\xEF\xB8\x8F" "\xE2\x80\x8D" "\xF0\x9F\x94\xA5" "B";
+        ensure("utf8 heart-on-fire found", utf8str_remove_emojis(fire));
+        ensure_equals("utf8 heart-on-fire stripped", fire, std::string("AB"));
+
+        // Subdivision flag 🏴󠁧󠁢󠁥󠁮󠁧󠁿 — base + 5 tag chars + CANCEL TAG, all
+        // astral. UTF-8 bytes: U+1F3F4 (F0 9F 8F B4) followed by 6 four-byte
+        // tag-char sequences.
+        std::string flag = "[" "\xF0\x9F\x8F\xB4"
+                                "\xF3\xA0\x81\xA7" "\xF3\xA0\x81\xA2" "\xF3\xA0\x81\xB3"
+                                "\xF3\xA0\x81\xA3" "\xF3\xA0\x81\xB4" "\xF3\xA0\x81\xBF"
+                            "]";
+        ensure("utf8 subdiv flag found", utf8str_remove_emojis(flag));
+        ensure_equals("utf8 subdiv flag stripped", flag, std::string("[]"));
     }
 
     // ZWJ family (U+1F468 U+200D U+1F469 U+200D U+1F467) must strip as a
@@ -704,18 +722,131 @@ namespace tut
         ensure_wstring_equals("bare ZWJ preserved", ws, expected);
     }
 
-    // Documented limits of the current strip: BMP emoji like ❤ (U+2764) fall
-    // outside LLStringOps::isEmoji's "genuine emoji" range (0x1F000..0x20000),
-    // so the heart + VS16 pair survives unchanged. Widening isEmoji would
-    // affect UI callers (font fallback, !mAllowEmoji filter) and is out of
-    // scope for the ZWJ-sequence fix.
+    // Broad-contract rewrite: wstring_remove_emojis now drives off the
+    // cluster walker, so anything HarfBuzz would itemize as one emoji glyph
+    // is removed — including BMP-base sequences like the heart + VS-16
+    // pair (which the walker treats as a 2-codepoint cluster). Earlier
+    // builds left this pair intact under a narrower isEmoji-only contract;
+    // the change unifies the strip behavior with cluster-aware tooltip and
+    // cursor logic so they can't disagree on cluster bounds.
     template<> template<>
     void llstring_utf_object_t::test<69>()
     {
         LLWString ws = { (llwchar)0x2764, (llwchar)0xFE0F };
-        const LLWString expected = ws;
-        ensure("BMP heart not considered emoji", !wstring_remove_emojis(ws));
-        ensure_wstring_equals("BMP heart preserved", ws, expected);
+        ensure("BMP heart+VS16 stripped", wstring_remove_emojis(ws));
+        ensure_wstring_equals("BMP heart+VS16 cleared", ws, LLWString());
+
+        // Bare BMP heart (no VS-16) is not a cluster — single-codepoint
+        // pictograph, shaped via the 1:1 path. Outside isEmoji's narrow
+        // range too. Must pass through.
+        LLWString bare_heart = { (llwchar)0x2764 };
+        const LLWString bare_expected = bare_heart;
+        ensure("bare heart not stripped", !wstring_remove_emojis(bare_heart));
+        ensure_wstring_equals("bare heart preserved", bare_heart, bare_expected);
+    }
+
+    // Heart-on-fire ❤️‍🔥 (U+2764 U+FE0F U+200D U+1F525): full ZWJ sequence
+    // with a BMP base. Pre-rewrite the walker would write through the
+    // heart/VS-16/ZWJ then strip the lone fire, leaving `❤️‍` (heart +
+    // VS-16 + dangling ZWJ) on screen. Cluster-driven removal strips
+    // the whole sequence as one unit.
+    template<> template<>
+    void llstring_utf_object_t::test<76>()
+    {
+        LLWString ws = { (llwchar)'A',
+                         (llwchar)0x2764, (llwchar)0xFE0F,
+                         (llwchar)0x200D, (llwchar)0x1F525,
+                         (llwchar)'B' };
+        const LLWString expected = { (llwchar)'A', (llwchar)'B' };
+        ensure("heart-on-fire found", wstring_remove_emojis(ws));
+        ensure_wstring_equals("heart-on-fire cleared", ws, expected);
+    }
+
+    // Keycap `1️⃣` (`'1' + VS-16 + U+20E3`): no codepoint inside the cluster
+    // is isEmoji-true (digit is ASCII, VS-16 / keycap combiner are BMP), so
+    // the old narrow walker left the whole thing intact. The cluster walker
+    // identifies it as a single 3-codepoint cluster, and the broad contract
+    // strips it.
+    template<> template<>
+    void llstring_utf_object_t::test<77>()
+    {
+        LLWString digit_kc = { (llwchar)'1', (llwchar)0xFE0F, (llwchar)0x20E3, (llwchar)'!' };
+        const LLWString expected = { (llwchar)'!' };
+        ensure("digit keycap found", wstring_remove_emojis(digit_kc));
+        ensure_wstring_equals("digit keycap cleared", digit_kc, expected);
+
+        LLWString hash_kc = { (llwchar)'#', (llwchar)0xFE0F, (llwchar)0x20E3 };
+        ensure("hash keycap found", wstring_remove_emojis(hash_kc));
+        ensure_wstring_equals("hash keycap cleared", hash_kc, LLWString());
+
+        LLWString star_kc = { (llwchar)'*', (llwchar)0xFE0F, (llwchar)0x20E3 };
+        ensure("star keycap found", wstring_remove_emojis(star_kc));
+        ensure_wstring_equals("star keycap cleared", star_kc, LLWString());
+
+        // Bare digit (no VS-16 + combiner) must pass through. The cluster
+        // walker rejects it as a starter; nothing to strip.
+        LLWString bare_digit = { (llwchar)'9' };
+        const LLWString bare_expected = bare_digit;
+        ensure("bare digit not stripped", !wstring_remove_emojis(bare_digit));
+        ensure_wstring_equals("bare digit preserved", bare_digit, bare_expected);
+    }
+
+    // Subdivision flag 🏴󠁧󠁢󠁥󠁮󠁧󠁿 (U+1F3F4 + tag bytes + U+E007F CANCEL TAG).
+    // Pre-rewrite the walker stripped the astral 🏴 base via isEmoji but
+    // left tag chars and the U+E007F terminator behind as garbage code
+    // points. Cluster-driven removal sweeps the whole sequence.
+    template<> template<>
+    void llstring_utf_object_t::test<78>()
+    {
+        LLWString ws = { (llwchar)'<',
+                         (llwchar)0x1F3F4,
+                         (llwchar)0xE0067, (llwchar)0xE0062, (llwchar)0xE0073,
+                         (llwchar)0xE0063, (llwchar)0xE0074,
+                         (llwchar)0xE007F,
+                         (llwchar)'>' };
+        const LLWString expected = { (llwchar)'<', (llwchar)'>' };
+        ensure("subdivision flag found", wstring_remove_emojis(ws));
+        ensure_wstring_equals("subdivision flag cleared", ws, expected);
+    }
+
+    // Astral emoji + VS-15 (U+FE0E text-presentation selector) — VS-15 is
+    // an extender for the cluster walker, so it's part of the cluster and
+    // gets stripped together with its base. Pre-rewrite VS-15 was not in
+    // is_emoji_sequence_extender's narrow set and would have been left as
+    // an orphan after the base was stripped.
+    template<> template<>
+    void llstring_utf_object_t::test<79>()
+    {
+        LLWString ws = { (llwchar)0x1F680, (llwchar)0xFE0E, (llwchar)'!' };
+        const LLWString expected = { (llwchar)'!' };
+        ensure("VS-15 cluster found", wstring_remove_emojis(ws));
+        ensure_wstring_equals("VS-15 cluster cleared", ws, expected);
+    }
+
+    // Two flags back-to-back 🇺🇸🇯🇵 — distinct clusters [0,2) and [2,4).
+    // Both must strip cleanly; no leftover RI codepoints.
+    template<> template<>
+    void llstring_utf_object_t::test<83>()
+    {
+        LLWString ws = { (llwchar)0x1F1FA, (llwchar)0x1F1F8,
+                         (llwchar)0x1F1EF, (llwchar)0x1F1F5,
+                         (llwchar)'!' };
+        const LLWString expected = { (llwchar)'!' };
+        ensure("two flags found", wstring_remove_emojis(ws));
+        ensure_wstring_equals("two flags cleared", ws, expected);
+    }
+
+    // ZWSP (U+200B) is not an emoji extender — it must pass through even
+    // when adjacent to an astral emoji. Pre-rewrite this happened to work
+    // (ZWSP isn't in the extender set), but pin it now that the path uses
+    // the cluster walker, which also treats ZWSP as inert.
+    template<> template<>
+    void llstring_utf_object_t::test<84>()
+    {
+        LLWString ws = { (llwchar)0x1F680, (llwchar)0x200B, (llwchar)'X' };
+        const LLWString expected = { (llwchar)0x200B, (llwchar)'X' };
+        ensure("rocket+ZWSP found", wstring_remove_emojis(ws));
+        ensure_wstring_equals("rocket stripped, ZWSP kept", ws, expected);
     }
 
     // ---------------------------------------------------------------
@@ -984,6 +1115,87 @@ namespace tut
         ensure_equals("bare zwj",  wstring_find_emoji_clusters(zwj).size(),  size_t(0));
         LLWString vs16 = { (llwchar)'a', (llwchar)0xFE0F, (llwchar)'b' };
         ensure_equals("bare vs16", wstring_find_emoji_clusters(vs16).size(), size_t(0));
+
+        // Malformed inputs: leading/trailing extenders, lone modifiers, and
+        // singletons that need a partner. Pin current behavior so future
+        // refactors don't silently change cluster boundaries on broken input.
+        LLWString lead_zwj  = { (llwchar)0x200D, (llwchar)0x1F468 };
+        ensure_equals("leading zwj", wstring_find_emoji_clusters(lead_zwj).size(), size_t(0));
+        LLWString trail_zwj = { (llwchar)0x1F468, (llwchar)0x200D };
+        // Trailing ZWJ: is_shaping_starter accepts the base because the
+        // next codepoint is a ZWJ, but advance_shaping_run hits the
+        // orphan-ZWJ break and stops at r=1. The cluster walker discards
+        // the resulting length-1 "run" so the result matches the doc
+        // contract (isolated single-codepoint emoji are intentionally
+        // absent from the cluster list).
+        ensure_equals("trailing zwj", wstring_find_emoji_clusters(trail_zwj).size(), size_t(0));
+        // Same shape but with VS-16 instead of ZWJ: 'is_shaping_starter'
+        // accepts because VS-16 is a valid extender, advance consumes it,
+        // run length is 2 → real 2-codepoint cluster. Confirm we didn't
+        // over-trim and accidentally drop legitimate 2-codepoint clusters.
+        LLWString base_vs16 = { (llwchar)0x1F680, (llwchar)0xFE0F };
+        auto vs_runs = wstring_find_emoji_clusters(base_vs16);
+        ensure_equals("base+VS16 count", vs_runs.size(), size_t(1));
+        ensure_equals("base+VS16 begin", vs_runs[0].first,  size_t(0));
+        ensure_equals("base+VS16 end",   vs_runs[0].second, size_t(2));
+        LLWString lone_skin = { (llwchar)0x1F3FB };
+        ensure_equals("lone skintone", wstring_find_emoji_clusters(lone_skin).size(), size_t(0));
+        LLWString lone_ri = { (llwchar)0x1F1FA };
+        ensure_equals("lone RI", wstring_find_emoji_clusters(lone_ri).size(), size_t(0));
+
+        // Range boundaries on isPictographBase's astral / BMP windows.
+        LLWString just_below_astral = { (llwchar)0x1FFF };
+        ensure_equals("U+1FFF no run", wstring_find_emoji_clusters(just_below_astral).size(), size_t(0));
+        LLWString just_above_bmp    = { (llwchar)0x3300 };
+        ensure_equals("U+3300 no run", wstring_find_emoji_clusters(just_above_bmp).size(), size_t(0));
+
+        // Back-to-back ZWJ families with no separator. Pin current behavior:
+        // each MAN-ZWJ-WOMAN sub-sequence registers as its own cluster, so we
+        // expect two runs of length 3 each.
+        LLWString two_fam = { (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x1F469,
+                              (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x1F469 };
+        auto two_fam_runs = wstring_find_emoji_clusters(two_fam);
+        ensure_equals("two_fam count",   two_fam_runs.size(),     size_t(2));
+        ensure_equals("two_fam[0].first", two_fam_runs[0].first,  size_t(0));
+        ensure_equals("two_fam[0].second", two_fam_runs[0].second, size_t(3));
+        ensure_equals("two_fam[1].first", two_fam_runs[1].first,  size_t(3));
+        ensure_equals("two_fam[1].second", two_fam_runs[1].second, size_t(6));
+
+        // ZWJ followed by a non-pictograph: starter accepts the base
+        // (next is ZWJ), advance_shaping_run reaches the ZWJ, sees the
+        // non-pictograph 'A' afterwards, breaks orphan-ZWJ. Length-1 run
+        // gets discarded by the cluster walker. No cluster emitted.
+        LLWString zwj_plus_nonemoji = { (llwchar)0x1F468, (llwchar)0x200D, (llwchar)'A' };
+        ensure_equals("ZWJ+non-pictograph", wstring_find_emoji_clusters(zwj_plus_nonemoji).size(), size_t(0));
+
+        // Double ZWJ (ZWJ + ZWJ between bases): advance hits the first
+        // ZWJ, looks at the next codepoint, finds another ZWJ which is
+        // not a pictograph base. Orphan-ZWJ break. Length 1, discarded.
+        LLWString double_zwj = { (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x200D, (llwchar)0x1F469 };
+        ensure_equals("double ZWJ", wstring_find_emoji_clusters(double_zwj).size(), size_t(0));
+
+        // Truncated subdivision flag — base 🏴 + a couple of tag bytes,
+        // no U+E007F terminator. Pin: walker greedily eats every tag
+        // codepoint to end-of-string. Real implementation behavior.
+        LLWString trunc_tag = { (llwchar)0x1F3F4, (llwchar)0xE0067, (llwchar)0xE0062 };
+        auto trunc_runs = wstring_find_emoji_clusters(trunc_tag);
+        ensure_equals("trunc tag count", trunc_runs.size(),    size_t(1));
+        ensure_equals("trunc tag begin", trunc_runs[0].first,  size_t(0));
+        ensure_equals("trunc tag end",   trunc_runs[0].second, size_t(3));
+
+        // Three RIs — first two form a flag at [0,2), third RI alone is
+        // not a starter (no partner). Pin: one cluster, length 2.
+        LLWString three_ri = { (llwchar)0x1F1FA, (llwchar)0x1F1F8, (llwchar)0x1F1F8 };
+        auto three_ri_runs = wstring_find_emoji_clusters(three_ri);
+        ensure_equals("three RI count", three_ri_runs.size(),    size_t(1));
+        ensure_equals("three RI begin", three_ri_runs[0].first,  size_t(0));
+        ensure_equals("three RI end",   three_ri_runs[0].second, size_t(2));
+
+        // Star keycap '*' + VS-16 + U+20E3. Pin parity with digit/hash.
+        LLWString star_kc = { (llwchar)'*', (llwchar)0xFE0F, (llwchar)0x20E3 };
+        auto star_runs = wstring_find_emoji_clusters(star_kc);
+        ensure_equals("star kc count", star_runs.size(),    size_t(1));
+        ensure_equals("star kc end",   star_runs[0].second, size_t(3));
     }
 
     // BMP pictograph + VS16 + ZWJ + astral emoji (❤️‍🔥 = U+2764 U+FE0F
@@ -1109,5 +1321,302 @@ namespace tut
                 LLStringOps::isPictographBase((llwchar)0x2000));
         ensure("not isPictographBase U+3300 boundary",
                !LLStringOps::isPictographBase((llwchar)0x3300));
+    }
+
+    // ---------------------------------------------------------------
+    // wstring_emoji_range_at: cluster bounds at a hit-test position.
+    // Inclusive of cluster boundaries (unlike grapheme_align_*) and
+    // synthesises a [pos, pos+1) range for single-codepoint emoji that
+    // wstring_find_emoji_clusters skips.
+    // ---------------------------------------------------------------
+
+    template<> template<>
+    void llstring_utf_object_t::test<103>()
+    {
+        // ZWJ family "H 👨 ZWJ 👩 ZWJ 👧 i" — cluster spans [1, 6).
+        LLWString fam = { (llwchar)'H',
+                          (llwchar)0x1F468, (llwchar)0x200D,
+                          (llwchar)0x1F469, (llwchar)0x200D,
+                          (llwchar)0x1F467,
+                          (llwchar)'i' };
+        auto on_lead   = wstring_emoji_range_at(fam, 1);
+        auto inside    = wstring_emoji_range_at(fam, 3);
+        auto on_end    = wstring_emoji_range_at(fam, 6);
+        ensure_equals("fam pos==first.first", on_lead.first,  size_t(1));
+        ensure_equals("fam pos==first.second", on_lead.second, size_t(6));
+        ensure_equals("fam mid.first", inside.first,  size_t(1));
+        ensure_equals("fam mid.second", inside.second, size_t(6));
+        // pos == run.second is past the cluster — falls through to the
+        // codepoint there ('i', non-emoji), so empty range.
+        ensure_equals("fam past-end empty", on_end.first, on_end.second);
+
+        // Plain ASCII: empty range everywhere.
+        LLWString ascii = { (llwchar)'a', (llwchar)'b', (llwchar)'c' };
+        auto a0 = wstring_emoji_range_at(ascii, 0);
+        auto a2 = wstring_emoji_range_at(ascii, 2);
+        ensure_equals("ascii 0 empty", a0.first, a0.second);
+        ensure_equals("ascii 2 empty", a2.first, a2.second);
+
+        // Single-codepoint emoji 😀 (U+1F600): not in cluster list, but
+        // the helper synthesises [pos, pos+1).
+        LLWString lone = { (llwchar)0x1F600 };
+        auto le = wstring_emoji_range_at(lone, 0);
+        ensure_equals("lone emoji.first", le.first,  size_t(0));
+        ensure_equals("lone emoji.second", le.second, size_t(1));
+
+        // Out-of-bounds and exact-end positions are empty.
+        auto at_end   = wstring_emoji_range_at(ascii, 3);
+        auto past_end = wstring_emoji_range_at(ascii, 99);
+        ensure_equals("ascii at-end empty", at_end.first,   at_end.second);
+        ensure_equals("ascii oob empty",    past_end.first, past_end.second);
+
+        // Empty wstring: empty range.
+        auto empty = wstring_emoji_range_at(LLWString(), 0);
+        ensure_equals("empty wstr empty", empty.first, empty.second);
+
+        // Flag pair 🇺🇸 — one cluster spanning [0, 2).
+        LLWString flag = { (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
+        auto f0 = wstring_emoji_range_at(flag, 0);
+        auto f1 = wstring_emoji_range_at(flag, 1);
+        ensure_equals("flag at lead.first",  f0.first,  size_t(0));
+        ensure_equals("flag at lead.second", f0.second, size_t(2));
+        ensure_equals("flag mid.first",  f1.first,  size_t(0));
+        ensure_equals("flag mid.second", f1.second, size_t(2));
+
+        // BMP pictographs — the orthodox cross bug. isPictographBase accepts
+        // U+2000..U+33FF plus © U+00A9 and ® U+00AE; isEmoji rejects them.
+        // Tooltip lookup must still find them.
+        auto check_bmp = [](llwchar cp, const char* tag) {
+            LLWString ws { cp };
+            auto r = wstring_emoji_range_at(ws, 0);
+            ensure_equals(std::string(tag) + ".first",  r.first,  size_t(0));
+            ensure_equals(std::string(tag) + ".second", r.second, size_t(1));
+        };
+        check_bmp((llwchar)0x2626, "orthodox cross");
+        check_bmp((llwchar)0x00A9, "copyright");
+        check_bmp((llwchar)0x00AE, "registered");
+        check_bmp((llwchar)0x2764, "heart");
+        check_bmp((llwchar)0x2693, "anchor");
+
+        // Bare extenders / out-of-range codepoints get an empty range —
+        // isPictographBase explicitly rejects these so they don't trigger
+        // a tooltip lookup on their own.
+        auto check_no_range = [](llwchar cp, const char* tag) {
+            LLWString ws { cp };
+            auto r = wstring_emoji_range_at(ws, 0);
+            ensure_equals(std::string(tag) + " empty", r.first, r.second);
+        };
+        check_no_range((llwchar)0x200D, "bare ZWJ");
+        check_no_range((llwchar)0xFE0F, "bare VS-16");
+        check_no_range((llwchar)0xFE0E, "bare VS-15");
+        check_no_range((llwchar)0x20E3, "bare keycap combiner");
+        check_no_range((llwchar)0x1F3FB, "bare skintone");
+        check_no_range((llwchar)0xE0067, "bare tag char");
+        check_no_range((llwchar)0x1FFF, "U+1FFF below astral");
+        check_no_range((llwchar)0x3300, "U+3300 above BMP");
+        check_no_range((llwchar)0x20000, "U+20000 above astral");
+
+        // Back-to-back flags 🇺🇸🇯🇵 — pos lookup must find the *second* run
+        // when pos has passed the first. Exercises the ordered-iteration
+        // early-out (`if (pos < run.first) break`) — must not stop early.
+        LLWString two_flags = { (llwchar)0x1F1FA, (llwchar)0x1F1F8,
+                                (llwchar)0x1F1EF, (llwchar)0x1F1F5 };
+        auto tf0 = wstring_emoji_range_at(two_flags, 0);
+        auto tf2 = wstring_emoji_range_at(two_flags, 2);
+        auto tf3 = wstring_emoji_range_at(two_flags, 3);
+        ensure_equals("two_flags[0].first",  tf0.first,  size_t(0));
+        ensure_equals("two_flags[0].second", tf0.second, size_t(2));
+        ensure_equals("two_flags[2].first",  tf2.first,  size_t(2));
+        ensure_equals("two_flags[2].second", tf2.second, size_t(4));
+        ensure_equals("two_flags mid 2nd flag",  tf3.first,  size_t(2));
+        ensure_equals("two_flags mid 2nd second", tf3.second, size_t(4));
+
+        // Mixed "A 🚀 B": ASCII positions return empty, the rocket position
+        // returns its [pos, pos+1) range via the single-codepoint fallback.
+        LLWString mixed = { (llwchar)'A', (llwchar)0x1F680, (llwchar)'B' };
+        auto m0 = wstring_emoji_range_at(mixed, 0);
+        auto m1 = wstring_emoji_range_at(mixed, 1);
+        auto m2 = wstring_emoji_range_at(mixed, 2);
+        ensure_equals("mixed A empty", m0.first, m0.second);
+        ensure_equals("mixed rocket.first",  m1.first,  size_t(1));
+        ensure_equals("mixed rocket.second", m1.second, size_t(2));
+        ensure_equals("mixed B empty", m2.first, m2.second);
+    }
+
+    // ---------------------------------------------------------------
+    // wstring_grapheme_align_backward / _forward: snap onto cluster
+    // boundary only when pos is *strictly inside* a cluster. Existing
+    // word-walk callers (LLTextEditor::prevWordPos, LLLineEditor::*WordPos)
+    // depend on positions already on a boundary being returned unchanged;
+    // setCursorPos newly depends on mid-cluster snap. Pin both halves of
+    // the contract so neither group regresses.
+    // ---------------------------------------------------------------
+
+    template<> template<>
+    void llstring_utf_object_t::test<104>()
+    {
+        // ASCII: every position is already on a boundary, so both halves
+        // are identity functions across the entire range.
+        LLWString ascii = { (llwchar)'a', (llwchar)'b', (llwchar)'c' };
+        for (size_t p = 0; p <= ascii.size(); ++p)
+        {
+            ensure_equals("ascii align_backward",
+                          wstring_grapheme_align_backward(ascii, p), p);
+            ensure_equals("ascii align_forward",
+                          wstring_grapheme_align_forward(ascii, p), p);
+        }
+
+        // ZWJ family "H 👨 ZWJ 👩 ZWJ 👧 i" — cluster spans [1, 6).
+        LLWString fam = { (llwchar)'H',
+                          (llwchar)0x1F468, (llwchar)0x200D,
+                          (llwchar)0x1F469, (llwchar)0x200D,
+                          (llwchar)0x1F467,
+                          (llwchar)'i' };
+
+        // Endpoint short-circuits: pos == 0 stays 0 (backward); pos >= size
+        // stays size (forward) regardless of trailing emoji.
+        ensure_equals("fam align_backward(0)",
+                      wstring_grapheme_align_backward(fam, 0), size_t(0));
+        ensure_equals("fam align_backward(size)",
+                      wstring_grapheme_align_backward(fam, fam.size()), fam.size());
+        ensure_equals("fam align_forward(size)",
+                      wstring_grapheme_align_forward(fam, fam.size()), fam.size());
+        ensure_equals("fam align_forward(99)",
+                      wstring_grapheme_align_forward(fam, 99), fam.size());
+
+        // pos == run.first — strictly outside, returned unchanged. This is
+        // the contract LLTextEditor::prevWordPos relies on: a word-walk
+        // that already landed on a cluster start is fine and must not be
+        // pulled backward into something else.
+        ensure_equals("fam align_backward(1)",
+                      wstring_grapheme_align_backward(fam, 1), size_t(1));
+        ensure_equals("fam align_forward(1)",
+                      wstring_grapheme_align_forward(fam, 1), size_t(1));
+        // pos == run.second — also strictly outside, unchanged.
+        ensure_equals("fam align_backward(6)",
+                      wstring_grapheme_align_backward(fam, 6), size_t(6));
+        ensure_equals("fam align_forward(6)",
+                      wstring_grapheme_align_forward(fam, 6), size_t(6));
+
+        // pos strictly inside [2..5] — backward snaps to 1, forward to 6.
+        for (size_t p = 2; p <= 5; ++p)
+        {
+            ensure_equals("fam mid align_backward",
+                          wstring_grapheme_align_backward(fam, p), size_t(1));
+            ensure_equals("fam mid align_forward",
+                          wstring_grapheme_align_forward(fam, p), size_t(6));
+        }
+
+        // Outside the cluster — surrounding ASCII positions unchanged.
+        ensure_equals("fam align_backward(7)",
+                      wstring_grapheme_align_backward(fam, 7), size_t(7));
+        ensure_equals("fam align_forward(7)",
+                      wstring_grapheme_align_forward(fam, 7), size_t(7));
+
+        // Two disjoint clusters in one string — flag at [1,3), family at
+        // [4,9). Inside-the-second-cluster lookups must reach the second
+        // run despite the first run being earlier in the iteration. Pins
+        // that the early-out (`if (pos <= run.first) break`) doesn't
+        // terminate prematurely.
+        LLWString two = { (llwchar)'H',
+                          (llwchar)0x1F1FA, (llwchar)0x1F1F8,
+                          (llwchar)' ',
+                          (llwchar)0x1F468, (llwchar)0x200D,
+                          (llwchar)0x1F469, (llwchar)0x200D,
+                          (llwchar)0x1F467,
+                          (llwchar)'!' };
+        // Flag interior (pos == 2) → flag.first 1.
+        ensure_equals("two flag mid backward",
+                      wstring_grapheme_align_backward(two, 2), size_t(1));
+        ensure_equals("two flag mid forward",
+                      wstring_grapheme_align_forward(two, 2), size_t(3));
+        // Family interior (pos == 6) → family bounds [4, 9).
+        ensure_equals("two fam mid backward",
+                      wstring_grapheme_align_backward(two, 6), size_t(4));
+        ensure_equals("two fam mid forward",
+                      wstring_grapheme_align_forward(two, 6), size_t(9));
+        // Between the two clusters (the space at pos 3) — unchanged.
+        ensure_equals("two between backward",
+                      wstring_grapheme_align_backward(two, 3), size_t(3));
+        ensure_equals("two between forward",
+                      wstring_grapheme_align_forward(two, 3), size_t(3));
+    }
+
+    // ---------------------------------------------------------------
+    // step_grapheme + emoji_range_at: malformed-input pins. The simple
+    // ZWJ-family / flag cases are covered above (tests 100/101/103/104);
+    // here we cover the rougher edges that show up in user-pasted text:
+    // empty strings, out-of-bounds positions, clusters at the very ends
+    // of the buffer, two clusters back-to-back with no separator, and
+    // hit-test positions sitting on tag chars / extenders inside a
+    // cluster (where the caller wants the whole cluster's range, not a
+    // synthetic singleton range).
+    // ---------------------------------------------------------------
+
+    template<> template<>
+    void llstring_utf_object_t::test<105>()
+    {
+        // Empty wstring — no grapheme moves possible.
+        LLWString empty;
+        ensure_equals("empty step_forward",  wstring_step_grapheme_forward(empty, 0),  size_t(0));
+        ensure_equals("empty step_backward", wstring_step_grapheme_backward(empty, 0), size_t(0));
+
+        // Out-of-bounds position — step_forward clamps to size, step_backward
+        // returns size-1 if size>0 (consistent with `prev = pos - 1`).
+        LLWString ascii = { (llwchar)'a', (llwchar)'b' };
+        ensure_equals("oob step_forward",  wstring_step_grapheme_forward(ascii, 99),  size_t(2));
+        ensure_equals("oob step_backward", wstring_step_grapheme_backward(ascii, 99), size_t(98));
+
+        // Cluster at start of string — backward from inside or just-past
+        // snaps to 0 (cluster.first).
+        LLWString lead = { (llwchar)0x1F1FA, (llwchar)0x1F1F8, (llwchar)'X' };
+        ensure_equals("lead flag step_forward(0)",
+                      wstring_step_grapheme_forward(lead, 0), size_t(2));
+        ensure_equals("lead flag step_backward(2)",
+                      wstring_step_grapheme_backward(lead, 2), size_t(0));
+
+        // Cluster at end of string — forward from inside snaps to size.
+        LLWString trail = { (llwchar)'X', (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
+        ensure_equals("trail flag step_forward(1)",
+                      wstring_step_grapheme_forward(trail, 1), size_t(3));
+        ensure_equals("trail flag step_backward(size)",
+                      wstring_step_grapheme_backward(trail, trail.size()), size_t(1));
+
+        // Two clusters back-to-back with no separator: step_forward from
+        // inside cluster A must land at A.end (which is also B.first), not
+        // skip into cluster B.
+        LLWString two_flags = { (llwchar)0x1F1FA, (llwchar)0x1F1F8,
+                                (llwchar)0x1F1EF, (llwchar)0x1F1F5 };
+        ensure_equals("two flags forward",
+                      wstring_step_grapheme_forward(two_flags, 0), size_t(2));
+        ensure_equals("two flags forward 2nd",
+                      wstring_step_grapheme_forward(two_flags, 2), size_t(4));
+        ensure_equals("two flags backward",
+                      wstring_step_grapheme_backward(two_flags, 4), size_t(2));
+        ensure_equals("two flags backward 1st",
+                      wstring_step_grapheme_backward(two_flags, 2), size_t(0));
+
+        // emoji_range_at on a tag char inside a subdivision flag — the
+        // hit-test caller wants the whole flag's range so the tooltip key
+        // covers the composed glyph, not the raw tag byte.
+        LLWString subdiv = { (llwchar)'<',
+                             (llwchar)0x1F3F4,
+                             (llwchar)0xE0067, (llwchar)0xE0062, (llwchar)0xE0073,
+                             (llwchar)0xE0063, (llwchar)0xE0074,
+                             (llwchar)0xE007F,
+                             (llwchar)'>' };
+        // pos on the base, on a tag interior char, and on the CANCEL TAG
+        // terminator must all return the same [1, 8) cluster range.
+        for (size_t p = 1; p < 8; ++p)
+        {
+            auto r = wstring_emoji_range_at(subdiv, p);
+            ensure_equals("subdiv begin", r.first,  size_t(1));
+            ensure_equals("subdiv end",   r.second, size_t(8));
+        }
+        // pos on the surrounding ASCII falls outside the cluster.
+        auto pre  = wstring_emoji_range_at(subdiv, 0);
+        auto post = wstring_emoji_range_at(subdiv, 8);
+        ensure_equals("subdiv pre empty",  pre.first,  pre.second);
+        ensure_equals("subdiv post empty", post.first, post.second);
     }
 }
