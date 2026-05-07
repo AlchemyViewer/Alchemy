@@ -527,6 +527,111 @@ namespace tut
                           after.data(), addr0);
     }
 
+    // Keycap cluster across face boundary: '9' + U+FE0F + U+20E3 must
+    // route the WHOLE cluster to the emoji face so its GSUB can compose
+    // the keycap glyph. Without Phase 1's cluster-aware itemizer, the
+    // digit lands on the head face (DejaVuSans has '9') and U+FE0F+U+20E3
+    // fragment off onto Noto-COLRv1 — producing a bare '9' followed by a
+    // standalone keycap mark with no base. Pins the keycap fix in
+    // shape_all_sub_runs (llfontshaping.cpp:497-546).
+    template<> template<>
+    void llfontshaping_object::test<13>()
+    {
+        const std::string head_path  = std::string(kFontDir) + "DejaVuSans.woff2";
+        const std::string emoji_path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(head_path) || !fileExists(emoji_path))
+            skip("DejaVuSans + Noto-COLRv1 required");
+
+        LLPointer<LLFontFreetype> head  = loadFt(head_path);
+        LLPointer<LLFontFreetype> emoji = loadFt(emoji_path);
+        ensure("both loaded", head.notNull() && emoji.notNull());
+        head->addFallbackFont(emoji);
+
+        LLWString s = wstr('9', 0xFE0F, 0x20E3);
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        ensure("keycap shaped to non-empty output", !out.empty());
+        // The emoji face has the GSUB rule digit + U+20E3 -> keycap glyph
+        // (VS-16 stripped pre-shape). All output glyphs must come from
+        // the emoji face — not head — to confirm the cluster routed as
+        // one unit. A regression to per-codepoint routing would put the
+        // '9' glyph on `head` and only the keycap mark on `emoji`.
+        for (const auto& g : out)
+        {
+            ensure_equals("every keycap-cluster glyph routes to emoji face",
+                          g.face, emoji.get());
+        }
+    }
+
+    // ZWJ heart-on-fire across face boundary: U+2764 (BMP heart, present
+    // in head's cmap) + U+FE0F + U+200D + U+1F525 (astral fire, only on
+    // emoji face). Phase 1 routes the whole cluster to the emoji face so
+    // its GSUB can collapse the ZWJ ligature. A regression to per-cp
+    // itemization would split the heart onto head, breaking the rule.
+    template<> template<>
+    void llfontshaping_object::test<14>()
+    {
+        const std::string head_path  = std::string(kFontDir) + "DejaVuSans.woff2";
+        const std::string emoji_path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(head_path) || !fileExists(emoji_path))
+            skip("DejaVuSans + Noto-COLRv1 required");
+
+        LLPointer<LLFontFreetype> head  = loadFt(head_path);
+        LLPointer<LLFontFreetype> emoji = loadFt(emoji_path);
+        ensure("both loaded", head.notNull() && emoji.notNull());
+        head->addFallbackFont(emoji);
+
+        // Sanity: head DOES carry U+2764 — selectShapingFace would
+        // happily route it to head without the cluster fast path.
+        ensure("head face has U+2764 in cmap (without Phase 1 the heart "
+               "would route to head and split the cluster)",
+               head->getCharGlyphIndex(0x2764) != 0u);
+
+        LLWString s = wstr(0x2764, 0xFE0F, 0x200D, 0x1F525);
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        ensure("heart-on-fire shaped to non-empty output", !out.empty());
+        for (const auto& g : out)
+        {
+            ensure_equals("every heart-on-fire glyph routes to emoji face",
+                          g.face, emoji.get());
+        }
+        // Pin the ligature too — Noto-COLRv1's GSUB collapses the
+        // sequence to a single glyph. Test 6 covers the same rule when
+        // shaping directly through Noto; this asserts it still fires when
+        // the head is a non-emoji font and the cluster is routed across
+        // the fallback boundary.
+        ensure_equals("heart-on-fire ZWJ ligated to a single glyph "
+                      "even across the fallback boundary",
+                      out.size(), 1u);
+    }
+
+    // Bare digit control: '9' alone (no FE0F + 20E3 follower) is NOT a
+    // cluster per the walker. Phase 1's fast path must not interfere —
+    // the digit routes to head as before, one glyph, no surprises.
+    template<> template<>
+    void llfontshaping_object::test<15>()
+    {
+        const std::string head_path  = std::string(kFontDir) + "DejaVuSans.woff2";
+        const std::string emoji_path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(head_path) || !fileExists(emoji_path))
+            skip("DejaVuSans + Noto-COLRv1 required");
+
+        LLPointer<LLFontFreetype> head  = loadFt(head_path);
+        LLPointer<LLFontFreetype> emoji = loadFt(emoji_path);
+        ensure("both loaded", head.notNull() && emoji.notNull());
+        head->addFallbackFont(emoji);
+
+        LLWString s = wstr('9');
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        ensure_equals("bare '9' produces one glyph", out.size(), 1u);
+        ensure_equals("bare '9' routes to head (not emoji fallback)",
+                      out[0].face, head.get());
+        ensure_equals("bare '9' glyph_id matches head's cmap",
+                      out[0].glyph_id, head->getCharGlyphIndex(L'9'));
+    }
+
 #if LL_MESA_HEADLESS
     // GL-backed group: monospace bypass exercises shape_sub_run's
     // getGlyphInfo path, which routes through addGlyph → atlas →

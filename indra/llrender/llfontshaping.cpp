@@ -409,16 +409,50 @@ namespace
         }
     }
 
+    // Pick a single face to own an entire emoji cluster. The cluster walker
+    // (wstring_find_emoji_clusters) has already certified [cb, ce) as one
+    // cluster — keycap, ZWJ sequence, regional indicator pair, subdivision
+    // flag, or astral + skin-tone modifier. Routing the whole cluster to
+    // one face guarantees HarfBuzz sees every codepoint of the sequence in
+    // one buffer, which is the only way GSUB can collapse keycap/ZWJ
+    // ligatures into the composed glyph.
+    //
+    // Heuristic: the first cluster member whose own selectShapingFace picks
+    // a non-root face — typically the emoji face — wins. For a keycap "9️⃣"
+    // the digit '9' picks root, VS-16 may go either way, and U+20E3 picks
+    // the emoji face; we elect emoji. For a ZWJ sequence "❤️‍🔥" the BMP
+    // heart may resolve in root, but the astral fire forces emoji. If no
+    // member wants a non-root face, we fall back to root_face — the cluster
+    // still rides one buffer, even if shaping won't compose it.
+    const LLFontFreetype* pick_cluster_face(const LLFontFreetype* root_face,
+                                            std::u32string_view   slice,
+                                            size_t                cb,
+                                            size_t                ce)
+    {
+        for (size_t k = cb; k < ce; ++k)
+        {
+            U32 unused = 0;
+            const LLFontFreetype* f = root_face->selectShapingFace(slice[k], unused);
+            if (f && f != root_face)
+                return f;
+        }
+        return root_face;
+    }
+
     // Itemize [begin, end) into contiguous sub-runs whose codepoints share
-    // both an owning face (as chosen by selectShapingFace) and a Unicode
-    // script. Face boundaries let a keycap like 8️⃣ succeed: '8' lives in
-    // the root face while U+FE0F and U+20E3 live in the emoji face. Script
-    // boundaries give HarfBuzz the right script tag per buffer so GPOS
-    // lookups under script-specific feature lists ('latn', 'cyrl', etc.)
-    // fire correctly. COMMON/INHERITED codepoints (spaces, punctuation,
-    // VS selectors, ZWJ) inherit the surrounding script and never trigger
-    // a boundary by themselves; this keeps "Hello, world!" as one run with
-    // script LATIN rather than fragmenting at every comma.
+    // both an owning face and a Unicode script. Within an emoji cluster
+    // (per wstring_find_emoji_clusters) the whole cluster rides on one
+    // face chosen by pick_cluster_face — that's what keeps a keycap like
+    // 9️⃣ on the emoji face that can compose '9' + U+FE0F + U+20E3 into
+    // the composed glyph instead of fragmenting the digit off onto root.
+    // Outside clusters, face boundaries follow per-codepoint
+    // selectShapingFace. Script boundaries give HarfBuzz the right script
+    // tag per buffer so GPOS lookups under script-specific feature lists
+    // ('latn', 'cyrl', etc.) fire correctly. COMMON/INHERITED codepoints
+    // (spaces, punctuation, VS selectors, ZWJ) inherit the surrounding
+    // script and never trigger a boundary by themselves; this keeps
+    // "Hello, world!" as one run with script LATIN rather than fragmenting
+    // at every comma.
     void shape_all_sub_runs(const LLFontFreetype* root_face,
                             std::u32string_view   slice,
                             std::vector<LLShapedGlyph>& out_glyphs)
@@ -429,16 +463,22 @@ namespace
 
         hb_unicode_funcs_t* uf = hb_unicode_funcs_get_default();
 
+        // Authoritative emoji cluster boundaries — the single source of truth
+        // for "what counts as one emoji glyph in this slice" (see
+        // project_emoji_cluster_walker_single_source). Drives the cluster
+        // fast path inside the loop.
+        const EmojiClusterList clusters = wstring_find_emoji_clusters(slice);
+        size_t next_cluster_idx = 0;
+
         const LLFontFreetype* cur_face   = nullptr;
         hb_script_t           cur_script = HB_SCRIPT_INVALID;  // unknown until first non-neutral cp
         size_t                cur_begin  = 0;
-        // True when the current run started on an emoji codepoint — i.e. the
-        // run is "an emoji cluster" and cur_face is the chosen emoji handler.
+        // True when the current run is (or begins with) an emoji cluster.
         // Drives the keeper's decision to retain emoji extenders on cur_face
         // even when cur_face's cmap doesn't carry the extender's glyph (e.g.
-        // Noto-COLRv1 lacks VS-16 by design). When false, the extender's own
-        // selectShapingFace decision wins, so digit-keycap sequences like
-        // "0️⃣" still fragment correctly off Inter and onto the emoji face.
+        // Noto-COLRv1 lacks VS-16 by design). The cluster fast path sets
+        // this for every cluster it routes, so the per-codepoint logic below
+        // only ever sees it false on isolated codepoints.
         bool cur_run_is_emoji = false;
 
         auto set_cur_script_from = [&](hb_script_t cp_script, bool is_neutral)
@@ -456,6 +496,55 @@ namespace
 
         for (size_t i = 0; i < n; ++i)
         {
+            // Cluster fast path: the cluster walker has identified [cb, ce)
+            // as one emoji cluster — route it to a single face so HarfBuzz
+            // can collapse the sequence in one buffer. Without this, e.g.
+            // "9️⃣" fragments into '9' on root + VS-16+U+20E3 on the emoji
+            // face, producing a digit followed by an unbound keycap mark.
+            if (next_cluster_idx < clusters.size()
+                && clusters[next_cluster_idx].first == i)
+            {
+                const size_t cb = clusters[next_cluster_idx].first;
+                const size_t ce = clusters[next_cluster_idx].second;
+                ++next_cluster_idx;
+
+                const LLFontFreetype* cluster_face =
+                    pick_cluster_face(root_face, slice, cb, ce);
+
+                // First non-neutral script in the cluster, COMMON otherwise.
+                hb_script_t cluster_script = HB_SCRIPT_COMMON;
+                for (size_t k = cb; k < ce; ++k)
+                {
+                    const hb_script_t s = hb_unicode_script(uf, slice[k]);
+                    if (s != HB_SCRIPT_COMMON && s != HB_SCRIPT_INHERITED)
+                    {
+                        cluster_script = s;
+                        break;
+                    }
+                }
+
+                if (cur_face != nullptr && cur_face != cluster_face)
+                {
+                    emit(cb);
+                    cur_face = nullptr;
+                }
+
+                if (cur_face == nullptr)
+                {
+                    cur_face  = cluster_face;
+                    cur_begin = cb;
+                    cur_run_is_emoji = true;
+                    cur_script = cluster_script;
+                }
+                // Else: same face — extend the in-progress run through the
+                // cluster without disturbing cur_script (which may be a
+                // surrounding non-neutral script that the cluster's COMMON
+                // would otherwise downgrade).
+
+                i = ce - 1; // for-loop's ++i will land on ce
+                continue;
+            }
+
             U32 unused = 0;
             const LLFontFreetype* face = root_face->selectShapingFace(slice[i], unused);
             if (!face)
