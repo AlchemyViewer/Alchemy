@@ -828,6 +828,112 @@ namespace tut
                out.size() <= s.size());
     }
 
+    // Pre-flight probe for the bypass-deprecation plan. For each
+    // monospace face shipped in newview/fonts/, shape a 200-char
+    // mixed-ASCII line through the monospace-with-ligatures HB path
+    // (existing kFixedWidthLigaturesOk feature override that disables
+    // only `kern`) and report per-glyph advance drift and positioning
+    // against the first glyph's advance. Outcome answers: "with the
+    // existing feature override, does HB preserve cell alignment, or
+    // do always-on lookups (rclt/rlig/ccmp/mark/mkmk) introduce
+    // sub-pixel adjustments even on pure ASCII?" The strict-mono
+    // bypass exists specifically to sidestep that drift; if this test
+    // passes across the shipped monospace fonts, Phase 2's snap
+    // becomes belt-and-suspenders. If it fails, the snap is
+    // load-bearing. Pure-CPU — HB shaping doesn't need GL.
+    template<> template<>
+    void llfontshaping_object::test<20>()
+    {
+        const char* mono_files[] = {
+            "DejaVuSansMono.woff2",
+            "SourceCodeVF-Upright.woff2",
+        };
+
+        // Mixed ASCII pool to exercise more lookups than test 2's
+        // simple AV pair: alphanumerics, punctuation, brackets,
+        // symbols. Repeated to 200 chars so per-glyph drift
+        // accumulates measurably.
+        const std::string ascii_pool =
+            "abcdefghijklmnopqrstuvwxyz"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "0123456789"
+            "!@#$%^&*()_+-=[]{};':\",./<>?";
+        constexpr size_t N = 200;
+        LLWString s;
+        s.reserve(N);
+        for (size_t i = 0; i < N; ++i)
+            s.push_back((llwchar)ascii_pool[i % ascii_pool.size()]);
+
+        size_t fonts_tested = 0;
+        for (const char* fname : mono_files)
+        {
+            const std::string path = std::string(kFontDir) + fname;
+            if (!fileExists(path))
+                continue;
+            LLPointer<LLFontFreetype> ft = loadFt(path);
+            ensure("monospace font loaded", ft.notNull());
+            ensure("font is fixed-width", ft->isFixedWidth());
+            ft->setAllowMonospaceLigatures(true);  // route through HB
+
+            std::vector<LLShapedGlyph> out;
+            LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+            ensure_equals("N codepoints produce N glyphs through HB",
+                          out.size(), N);
+
+            // Reference: first glyph's advance. In a fixed-width face
+            // all ASCII codepoints share one FT mXAdvance, so out[0]
+            // sets the canonical cell. Deliberately don't use
+            // ft->getXAdvance — that path asserts !mIsFallback and
+            // the probe loads as fallback to skip GL pre-warm.
+            ensure("at least one glyph", !out.empty());
+            const F32 ref_advance = out[0].x_advance;
+            ensure("reference advance positive", ref_advance > 0.f);
+
+            F32 max_dev    = 0.f;
+            F32 min_adv    = ref_advance;
+            F32 max_adv    = ref_advance;
+            F32 cumulative = 0.f;
+            F32 max_xoff   = 0.f;
+            F32 max_yoff   = 0.f;
+            for (const auto& g : out)
+            {
+                max_dev = std::max(max_dev, std::abs(g.x_advance - ref_advance));
+                min_adv = std::min(min_adv, g.x_advance);
+                max_adv = std::max(max_adv, g.x_advance);
+                cumulative += g.x_advance;
+                max_xoff = std::max(max_xoff, std::abs(g.x_offset));
+                max_yoff = std::max(max_yoff, std::abs(g.y_offset));
+            }
+            const F32 expected_total = ref_advance * F32(N);
+            const F32 cumulative_dev = std::abs(cumulative - expected_total);
+
+            // Surface measurements regardless of pass/fail — informs
+            // whether Phase 2's snap is load-bearing.
+            std::printf("HB mono drift probe [%s]: ref=%.4f N=%zu "
+                        "min=%.4f max=%.4f cum=%.4f exp=%.4f "
+                        "max_dev=%.6f cum_dev=%.6f "
+                        "max_xoff=%.6f max_yoff=%.6f\n",
+                        fname, ref_advance, N,
+                        min_adv, max_adv,
+                        cumulative, expected_total,
+                        max_dev, cumulative_dev,
+                        max_xoff, max_yoff);
+
+            // Tolerance: 0.5px is generous — meaningful column drift
+            // shows as ~1px by char ~50 in production reports.
+            ensure("per-glyph advance drift < 0.5px", max_dev < 0.5f);
+            ensure("cumulative advance drift < 0.5px", cumulative_dev < 0.5f);
+            // Bypass writes 0 offsets; HB output should match for
+            // ASCII (no GPOS positioning adjustments fire on monospace
+            // ASCII with kern off).
+            ensure("HB ASCII x_offset is zero", max_xoff < 0.5f);
+            ensure("HB ASCII y_offset is zero", max_yoff < 0.5f);
+            ++fonts_tested;
+        }
+        if (fonts_tested == 0)
+            skip("no monospace fonts present in test data dir");
+    }
+
 #if LL_MESA_HEADLESS
     // GL-backed group: monospace bypass exercises shape_sub_run's
     // getGlyphInfo path, which routes through addGlyph → atlas →

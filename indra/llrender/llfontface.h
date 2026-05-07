@@ -133,21 +133,19 @@ public:
     // by N heads writes its emoji glyphs into ONE atlas instead of N.
     LLFontBitmapCache* getBitmapCache() const { return mFontBitmapCachep; }
 
-    // Per-face glyph cache. Keyed on codepoint (llwchar) for the codepoint
-    // path, and on FT glyph index for the shaped path. LLFontGlyphInfo
-    // entries are owned here and deleted in ~LLFontFace.
-    LLFontGlyphInfo* findGlyphInfo(llwchar wch, EFontGlyphType type) const;
-    void             insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const;
-
-    LLFontGlyphInfo* findShapedGlyphInfo(U32 glyph_index, EFontGlyphType type) const;
-    void             insertShapedGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const;
+    // Per-face glyph cache, keyed on FT glyph index. Used by both the
+    // codepoint path (which resolves wch -> glyph_index before the lookup)
+    // and the shaped path (which gets glyph_index directly from HarfBuzz).
+    // One slot per (glyph_index, type), so the same glyph rasterized via
+    // either path lives in one atlas slot. LLFontGlyphInfo entries are
+    // owned here and deleted in ~LLFontFace.
+    LLFontGlyphInfo* findGlyphInfo(U32 glyph_index, EFontGlyphType type) const;
+    void             insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const;
 
     // Iterate and conditionally erase entries. Used by collectGarbage to
     // purge entries that referenced an evicted atlas sheet.
     template<typename Pred>
-    void erase_codepoint_entries(Pred should_erase) const;
-    template<typename Pred>
-    void erase_shaped_entries(Pred should_erase) const;
+    void erase_glyph_entries(Pred should_erase) const;
 
     // Drop all rasterized glyphs and reset the atlas. Used by the registry
     // when DPI changes and the wrapper survives but its atlas state needs
@@ -178,8 +176,7 @@ private:
     // Apply a single OpenType variation axis value, if the face has one.
     bool setVariationAxis(const std::string& axis_tag, F32 value);
 
-    typedef boost::unordered_multimap<llwchar, LLFontGlyphInfo*> char_glyph_info_map_t;
-    typedef boost::unordered_multimap<U32, LLFontGlyphInfo*> shaped_glyph_info_map_t;
+    typedef boost::unordered_multimap<U32, LLFontGlyphInfo*> glyph_info_map_t;
 
     LLFT_Face          mFTFace = nullptr;
     EFontHinting       mHinting;
@@ -187,8 +184,7 @@ private:
     mutable boost::unordered_flat_map<llwchar, U32> mCharIndexCache;
 
     LLFontBitmapCache* mFontBitmapCachep = nullptr;
-    mutable char_glyph_info_map_t   mCharGlyphInfoMap;
-    mutable shaped_glyph_info_map_t mShapedGlyphInfoMap;
+    mutable glyph_info_map_t mGlyphInfoMap;
 
     bool mUseSubpixelPen = false;
     bool mHasColor       = false;
@@ -202,31 +198,14 @@ private:
 // Inline template definitions — kept in the header so callers in
 // llfontfreetype.cpp can instantiate with their own predicates.
 template<typename Pred>
-void LLFontFace::erase_codepoint_entries(Pred should_erase) const
+void LLFontFace::erase_glyph_entries(Pred should_erase) const
 {
-    for (auto it = mCharGlyphInfoMap.begin(); it != mCharGlyphInfoMap.end(); )
+    for (auto it = mGlyphInfoMap.begin(); it != mGlyphInfoMap.end(); )
     {
         if (should_erase(it->second))
         {
             delete it->second;
-            it = mCharGlyphInfoMap.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
-    }
-}
-
-template<typename Pred>
-void LLFontFace::erase_shaped_entries(Pred should_erase) const
-{
-    for (auto it = mShapedGlyphInfoMap.begin(); it != mShapedGlyphInfoMap.end(); )
-    {
-        if (should_erase(it->second))
-        {
-            delete it->second;
-            it = mShapedGlyphInfoMap.erase(it);
+            it = mGlyphInfoMap.erase(it);
         }
         else
         {

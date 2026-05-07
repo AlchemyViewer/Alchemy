@@ -254,17 +254,17 @@ public:
 
     // Pick the face in this font's fallback chain that owns a glyph for
     // `base` and return it, writing the FT glyph index into out_glyph_index.
-    // Walks the same priority as addGlyph: emoji-functor fallbacks first,
-    // then monochrome fallbacks, then emoji fallbacks ignoring the functor,
-    // then `this` as a last resort. Returns `this` with out_glyph_index=0
-    // when no face has a glyph for `base`.
+    // Walks the same priority as the codepoint path in getGlyphInfo:
+    // emoji-functor fallbacks first, then monochrome fallbacks, then emoji
+    // fallbacks ignoring the functor, then `this` as a last resort. Returns
+    // `this` with out_glyph_index=0 when no face has a glyph for `base`.
     const LLFontFreetype* selectShapingFace(llwchar base, U32& out_glyph_index) const;
 
     // True if this face's FreeType charmap directly contains a glyph for
-    // `wch`. Unlike hasGlyph() (which checks the cache), this consults
-    // the underlying charmap and works on fallback faces. Used by shape
-    // itemization to decide whether a face can absorb a given codepoint
-    // without producing notdef.
+    // `wch`. Consults the underlying charmap (via getCharGlyphIndex) and
+    // works on fallback faces. Used by shape itemization to decide
+    // whether a face can absorb a given codepoint without producing
+    // notdef.
     bool faceHasGlyph(llwchar wch) const;
 
     void reset(F32 vert_dpi, F32 horz_dpi);
@@ -306,22 +306,16 @@ private:
     LLFT_Face getFTFace() const { return mFace ? mFace->face() : nullptr; }
 
     void resetBitmapCache();
-    bool hasGlyph(llwchar wch) const;       // Has a glyph for this character
-    LLFontGlyphInfo* addGlyph(llwchar wch, EFontGlyphType glyph_type) const;        // Add a new character to the font if necessary
-    LLFontGlyphInfo* addGlyphFromFont(
-        const LLFontFreetype *fontp,
-        llwchar wch,
-        U32 glyph_index,
-        EFontGlyphType bitmap_type) const; // Add a glyph from this font to the other (returns the glyph_index, 0 if not found)
-    // Same as addGlyphFromFont but inserts into the glyph-id-keyed shaped
-    // cache, for glyphs chosen by the HarfBuzz shaper rather than by codepoint.
+    // Render and cache a glyph for `glyph_index` on `fontp` (the source face,
+    // which can be `this` head or a fallback). Inserts into the source face's
+    // and the head's resolution caches keyed on (face, glyph_index). Used by
+    // both the codepoint path (after wch->glyph_index resolution + chain
+    // walk) and the shaped path (HB output already names the source face).
     LLFontGlyphInfo* addShapedGlyphFromFont(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType bitmap_type) const;
-    // Shared body for both addGlyphFromFont and addShapedGlyphFromFont — runs
-    // the FreeType rasterizer, allocates an LLFontGlyphInfo and populates the
-    // bitmap atlas. The caller is responsible for inserting the returned gi
-    // into whichever cache it owns. `out_bitmap_glyph_type` receives the pixel
-    // format FreeType actually delivered (which can differ from the requested
-    // one — e.g. color requested but mono returned).
+    // Runs the FreeType rasterizer, allocates an LLFontGlyphInfo and populates
+    // the bitmap atlas. `out_bitmap_glyph_type` receives the pixel format
+    // FreeType actually delivered (which can differ from the requested one —
+    // e.g. color requested but mono returned).
     LLFontGlyphInfo* renderAndCreateGlyph(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type, EFontGlyphType& out_bitmap_glyph_type) const;
     void renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, llwchar wch) const;
     // COLRv1 paint-walker entry point. Loads the glyph in outline mode to
@@ -336,8 +330,7 @@ private:
     // paint tree, the walker hit an unsupported feature, or an allocation
     // failed — caller falls through to the normal FT path.
     bool renderColrV1Glyph(U32 glyph_index, EFontGlyphType requested) const;
-    void insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const;
-    void insertShapedGlyphInfo(const LLFontFreetype* fontp, U32 glyph_index, LLFontGlyphInfo* gi) const;
+    void insertGlyphInfo(const LLFontFreetype* fontp, U32 glyph_index, LLFontGlyphInfo* gi) const;
 
     std::string mName;
 
@@ -362,13 +355,6 @@ private:
     bool mUseSubpixelPen = false;
     fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)
 
-    // Per-head fast lookup: codepoint -> non-owning pointer to a glyph info
-    // owned by the source LLFontFace. Avoids re-walking the fallback chain
-    // on every getGlyphInfo call. The pointed-to entries live and die with
-    // their LLFontFace; this map only caches the resolution.
-    typedef boost::unordered_multimap<llwchar, LLFontGlyphInfo*> char_glyph_info_map_t;
-    mutable char_glyph_info_map_t mCharGlyphInfoMap;
-
     // Per-head shaping-face resolution cache: codepoint -> (winning face,
     // glyph index in that face). Replaces an O(fallbacks)-deep walk for
     // each codepoint.
@@ -388,28 +374,31 @@ private:
     // CJK-heavy chat doesn't grow this without limit.
     mutable boost::unordered_flat_map<llwchar, std::pair<const LLFontFreetype*, U32>> mShapingFaceResolution;
 
-    // Per-head fast lookup for shaped-path glyphs: (source face, glyph
-    // index) -> non-owning pointer into the source face's shaped glyph map.
-    struct ShapedGlyphKey
+    // Per-head fast lookup: (source face, glyph index) -> non-owning pointer
+    // into the source face's glyph map. Both the codepoint path (after wch
+    // resolution + chain walk) and the shaped path (HB output) feed into this
+    // single cache, so a glyph rendered by either route lives in one atlas
+    // slot per (face, glyph_index, type).
+    struct GlyphKey
     {
         const LLFontFreetype* face;
         U32                   glyph_index;
-        bool operator==(const ShapedGlyphKey& o) const noexcept
+        bool operator==(const GlyphKey& o) const noexcept
         {
             return face == o.face && glyph_index == o.glyph_index;
         }
     };
-    struct ShapedGlyphKeyHash
+    struct GlyphKeyHash
     {
-        size_t operator()(const ShapedGlyphKey& k) const noexcept
+        size_t operator()(const GlyphKey& k) const noexcept
         {
             size_t h = boost::hash<const void*>{}(k.face);
             boost::hash_combine(h, k.glyph_index);
             return h;
         }
     };
-    typedef boost::unordered_multimap<ShapedGlyphKey, LLFontGlyphInfo*, ShapedGlyphKeyHash> shaped_glyph_info_map_t;
-    mutable shaped_glyph_info_map_t mShapedGlyphInfoMap;
+    typedef boost::unordered_multimap<GlyphKey, LLFontGlyphInfo*, GlyphKeyHash> glyph_info_map_t;
+    mutable glyph_info_map_t mGlyphInfoMap;
 
     // (LLFontBitmapCache moved to LLFontFace — atlas storage is now shared
     // across every LLFontFreetype that wraps the same face. mCharIndexCache

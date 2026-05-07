@@ -145,10 +145,10 @@ LLFontGlyphInfo::LLFontGlyphInfo(const LLFontGlyphInfo& fgi)
     , mTintWithForeground(fgi.mTintWithForeground)
 {
     // mSourceFace MUST propagate: the secondary-publish path in
-    // addGlyphFromFont / addShapedGlyphFromFont copies an existing entry
-    // and republishes it under the actual bitmap_glyph_type, and the
-    // renderer reads sfgi->mSourceFace to pick the atlas. A null here
-    // produces a silent no-op render for typed lookups that hit the dup.
+    // addShapedGlyphFromFont copies an existing entry and republishes it
+    // under the actual bitmap_glyph_type, and the renderer reads
+    // sfgi->mSourceFace to pick the atlas. A null here produces a silent
+    // no-op render for typed lookups that hit the dup.
 }
 
 LLFontFreetype::LLFontFreetype()
@@ -171,10 +171,9 @@ LLFontFreetype::~LLFontFreetype()
     // faces' entries stay valid, so only drop ours.
     LLFontShaping::clearCacheForFace(this);
 
-    // Per-head resolution caches hold non-owning pointers into face-owned
+    // Per-head resolution cache holds non-owning pointers into face-owned
     // glyph info entries. Just clear; entries are deleted by ~LLFontFace.
-    mCharGlyphInfoMap.clear();
-    mShapedGlyphInfoMap.clear();
+    mGlyphInfoMap.clear();
 
     // mFace's FT_Face, hb_font_t, and atlas lifetime is owned by the
     // LLFontFace wrapper — releasing the LLPointer here lets the wrapper
@@ -208,9 +207,9 @@ namespace
     // `wch`. Returns (nullptr, 0) when no entry hits.
     //
     // This is the iteration mechanic shared between the codepoint-path
-    // (addGlyph) and shape-path (selectShapingFace) chain walks. The two
-    // policies still differ — see each call site for which passes run and
-    // why — but the per-pass loop is identical and lives here.
+    // (getGlyphInfo) and shape-path (selectShapingFace) chain walks. The
+    // two policies still differ — see each call site for which passes run
+    // and why — but the per-pass loop is identical and lives here.
     template <typename Keep>
     std::pair<const LLFontFreetype*, U32>
     find_fallback_hit(const LLFontFreetype::fallback_font_vector_t& fallbacks,
@@ -326,11 +325,10 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
         LLFontShaping::clearCacheForFace(this);
     }
     mShapingFaceResolution.clear();
-    // Per-head resolution caches hold non-owning pointers into face-owned
-    // entries. resetBitmapCache (called from reset()) clears them; in the
-    // initial-load path they're already empty.
-    mCharGlyphInfoMap.clear();
-    mShapedGlyphInfoMap.clear();
+    // Per-head resolution cache holds non-owning pointers into face-owned
+    // entries. resetBitmapCache (called from reset()) clears it; in the
+    // initial-load path it's already empty.
+    mGlyphInfoMap.clear();
 
     // Resolve the (file, sized + variable axis) state via the manager's
     // shared face cache. Heads and fallbacks alike consult the cache; same
@@ -367,13 +365,14 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
 
     if (!mIsFallback)
     {
-        // Pre-warm the default glyph (notdef) so misses on this head route
-        // through it without an extra rasterize on first miss. Goes into
-        // mFace's atlas; subsequent faces wrapping the same LLFontFace as
-        // a fallback won't re-pre-warm — atlas already has notdef.
+        // Pre-warm the default glyph (notdef, glyph_index=0) so misses on
+        // this head route through it without an extra rasterize on first
+        // miss. Goes into mFace's atlas; subsequent faces wrapping the
+        // same LLFontFace as a fallback won't re-pre-warm — atlas already
+        // has notdef.
         if (!mFace->findGlyphInfo(0, EFontGlyphType::Grayscale))
         {
-            addGlyphFromFont(this, 0, 0, EFontGlyphType::Grayscale);
+            addShapedGlyphFromFont(this, 0, EFontGlyphType::Grayscale);
         }
     }
 
@@ -480,7 +479,7 @@ F32 LLFontFreetype::getXAdvance(llwchar wch) const
         return 0.0;
 
     // getGlyphInfo always returns a non-null entry once the face is loaded
-    // (addGlyph routes misses through the shared notdef pre-warmed at
+    // (chain-walk misses route through the shared notdef pre-warmed at
     // load time), so the `gi != nullptr` guard plus a getMaxCharWidth
     // fallback that used to live here are dead in practice. Defensive
     // null check kept since a notdef render failure could theoretically
@@ -563,122 +562,6 @@ F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LL
     // FT_Get_Kerning returns delta.x in 26.6 fixed-point regardless of mode;
     // the mode only controls whether values are grid-fitted to integer pixels.
     return (F32)(delta.x * (1.f / 64.f)) + delta_correction;
-}
-
-bool LLFontFreetype::hasGlyph(llwchar wch) const
-{
-    llassert(!mIsFallback);
-    return(mCharGlyphInfoMap.find(wch) != mCharGlyphInfoMap.end());
-}
-
-LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type) const
-{
-    if (!getFTFace())
-    {
-        return nullptr;
-    }
-
-    llassert(!mIsFallback);
-    llassert(glyph_type < EFontGlyphType::Count);
-    //LL_DEBUGS() << "Adding new glyph for " << wch << " to font" << LL_ENDL;
-
-    // Initialize char to glyph map
-    U32 glyph_index = getCharGlyphIndex(wch);
-    if (glyph_index == 0)
-    {
-        // No glyph on this face: walk fallbacks in the codepoint-path
-        // priority order, which differs from the shape-path priority in
-        // selectShapingFace:
-        //   1. Emoji-functor fallbacks, gated on isPictographBase(wch).
-        //      The same predicate the shape itemizer uses to recognise
-        //      an emoji-cluster start, so codepoint-path and shape-path
-        //      agree on which characters are "emoji-eligible" and BMP
-        //      pictographs (heart, etc.) route to the colour face here
-        //      just as they do during shaping.
-        //   2. Monochrome fallbacks (no functor). Priority over emoji
-        //      fallbacks for non-pictograph chars so legacy UI elements
-        //      (LSL dialogs, menu checkmarks at U+2611 etc.) still
-        //      pick monochrome.
-        //   3. Emoji-functor fallbacks ignoring the functor — last-
-        //      resort coverage for codepoints that aren't pictographs
-        //      and aren't in a monochrome fallback but DO exist in an
-        //      emoji font's charmap.
-
-        if (LLStringOps::isPictographBase(wch))
-        {
-            if (auto hit = find_fallback_hit(mFallbackFonts, wch,
-                    [&](const char_functor_t& f) { return f && f(wch); });
-                hit.first)
-            {
-                return addGlyphFromFont(hit.first, wch, hit.second, glyph_type);
-            }
-        }
-        if (auto hit = find_fallback_hit(mFallbackFonts, wch,
-                [](const char_functor_t& f) { return !f; });
-            hit.first)
-        {
-            return addGlyphFromFont(const_cast<LLFontFreetype*>(hit.first),
-                                    wch, hit.second, glyph_type);
-        }
-        if (auto hit = find_fallback_hit(mFallbackFonts, wch,
-                [](const char_functor_t& f) { return (bool)f; });
-            hit.first)
-        {
-            return addGlyphFromFont(const_cast<LLFontFreetype*>(hit.first),
-                                    wch, hit.second, glyph_type);
-        }
-    }
-
-    auto range_it = mCharGlyphInfoMap.equal_range(wch);
-    char_glyph_info_map_t::iterator iter =
-        std::find_if(range_it.first, range_it.second,
-                     [&glyph_type](const char_glyph_info_map_t::value_type& entry)
-                     {
-                        return entry.second->mGlyphType == glyph_type;
-                     });
-    if (iter != range_it.second)
-    {
-        // Already cached. Reachable when getGlyphInfo was called with
-        // Unspecified (wildcard) and routed here on a miss for the
-        // strict glyph_type, but the head's map happens to have the
-        // entry under a different filter path. Return the existing
-        // entry rather than nullptr — returning null pushes callers
-        // onto dead fallback branches and silently mis-renders.
-        return iter->second;
-    }
-
-    if (glyph_index != 0)
-    {
-        // Real glyph in this face — render and cache by wch.
-        return addGlyphFromFont(this, wch, glyph_index, glyph_type);
-    }
-
-    // No face in our chain has this codepoint. Reuse the face's pre-warmed
-    // notdef entry (cached at wch=0 during loadFace) instead of rasterizing
-    // a per-codepoint copy. Caching notdef under each missing wch in the
-    // face's map would pollute it with entries that aren't really "this
-    // face has wch", and sibling heads would then short-circuit their own
-    // chain walk and pick up our notdef when their primary face actually
-    // has the glyph.
-    if (mFace)
-    {
-        if (LLFontGlyphInfo* notdef = mFace->findGlyphInfo(0, glyph_type))
-        {
-            // Mirror into the head's local cache for fast-path repeat lookups.
-            insertGlyphInfo(wch, notdef);
-            return notdef;
-        }
-        // Pre-warm wasn't done (e.g. on a path that loaded without it).
-        // Render once at glyph_index 0 and cache under wch=0.
-        if (LLFontGlyphInfo* notdef = addGlyphFromFont(this, 0, 0, glyph_type))
-        {
-            // addGlyphFromFont already inserted under wch=0 on the head;
-            // also remember the same pointer under the requested wch.
-            insertGlyphInfo(wch, notdef);
-            return notdef;
-        }
-    }
-    return nullptr;
 }
 
 LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type, EFontGlyphType& out_bitmap_glyph_type) const
@@ -876,27 +759,16 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
     return gi;
 }
 
-LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, llwchar wch, U32 glyph_index, EFontGlyphType requested_glyph_type) const
+LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type) const
 {
     // Cross-head dedup: a sibling head sharing fontp's face may have already
-    // rasterized this glyph. Reuse the existing entry rather than allocating
-    // a new atlas slot.
-    //
-    // The dedup gate has two halves:
-    //   - `glyph_index != 0`: the codepoint genuinely lives in fontp; the
-    //     face cache key (wch) is meaningful and deduping is safe.
-    //   - `wch == 0`: the loadFace pre-warm sentinel for the notdef glyph,
-    //     also keyed at wch=0 so heads share a single notdef render.
-    // For the (glyph_index == 0, wch != 0) case — caller wanted a glyph
-    // that fontp doesn't have — addGlyph routes through the shared-notdef
-    // path before reaching us, so we never legitimately see this combo;
-    // the gate keeps us from caching a bogus entry under wch if anyone
-    // calls in directly.
-    if (fontp->mFace && (glyph_index != 0 || wch == 0))
+    // rasterized this glyph. Reuse the face's cached entry rather than
+    // allocating a new atlas slot.
+    if (fontp && fontp->mFace)
     {
-        if (LLFontGlyphInfo* existing = fontp->mFace->findGlyphInfo(wch, requested_glyph_type))
+        if (LLFontGlyphInfo* existing = fontp->mFace->findGlyphInfo(glyph_index, requested_glyph_type))
         {
-            insertGlyphInfo(wch, existing);
+            insertGlyphInfo(fontp, glyph_index, existing);
             return existing;
         }
     }
@@ -906,11 +778,10 @@ LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, l
     if (!gi)
         return nullptr;
 
-    // Face owns the glyph info entry; head's map holds a non-owning pointer
-    // for fast lookup. Insert into face first so head's pointer is to the
-    // canonical entry.
-    fontp->mFace->insertGlyphInfo(wch, gi);
-    insertGlyphInfo(wch, gi);
+    // Face owns the entry; head caches a non-owning pointer keyed on
+    // (face*, glyph_index) so the next lookup short-circuits.
+    fontp->mFace->insertGlyphInfo(glyph_index, gi);
+    insertGlyphInfo(fontp, glyph_index, gi);
 
     // Optimization: when the rendered pixel format differs from what the
     // caller requested (e.g. Color requested but the file is monochrome),
@@ -921,39 +792,12 @@ LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, l
     // would delete the entry under them. Skip the secondary publish if a
     // bitmap_type entry already exists; the existing one is correct.
     if (requested_glyph_type != bitmap_glyph_type
-        && !fontp->mFace->findGlyphInfo(wch, bitmap_glyph_type))
+        && !fontp->mFace->findGlyphInfo(glyph_index, bitmap_glyph_type))
     {
         LLFontGlyphInfo* gi_temp = new LLFontGlyphInfo(*gi);
         gi_temp->mGlyphType = bitmap_glyph_type;
-        fontp->mFace->insertGlyphInfo(wch, gi_temp);
-        insertGlyphInfo(wch, gi_temp);
-    }
-
-    return gi;
-}
-
-LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type) const
-{
-    EFontGlyphType bitmap_glyph_type;
-    LLFontGlyphInfo* gi = renderAndCreateGlyph(fontp, glyph_index, requested_glyph_type, bitmap_glyph_type);
-    if (!gi)
-        return nullptr;
-
-    // Face owns the entry; head caches a non-owning pointer keyed on
-    // (face*, glyph_index) so the next lookup short-circuits.
-    fontp->mFace->insertShapedGlyphInfo(glyph_index, gi);
-    insertShapedGlyphInfo(fontp, glyph_index, gi);
-
-    // Same dangling-pointer hazard as in addGlyphFromFont above: skip the
-    // bitmap_type secondary publish if an entry already exists, otherwise
-    // we'd delete an LLFontGlyphInfo that sibling heads still reference.
-    if (requested_glyph_type != bitmap_glyph_type
-        && !fontp->mFace->findShapedGlyphInfo(glyph_index, bitmap_glyph_type))
-    {
-        LLFontGlyphInfo* gi_temp = new LLFontGlyphInfo(*gi);
-        gi_temp->mGlyphType = bitmap_glyph_type;
-        fontp->mFace->insertShapedGlyphInfo(glyph_index, gi_temp);
-        insertShapedGlyphInfo(fontp, glyph_index, gi_temp);
+        fontp->mFace->insertGlyphInfo(glyph_index, gi_temp);
+        insertGlyphInfo(fontp, glyph_index, gi_temp);
     }
 
     return gi;
@@ -961,36 +805,69 @@ LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fo
 
 LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_type) const
 {
-    // Fast path: head's resolution cache. Holds non-owning pointers into
-    // face-owned entries.
-    auto range_it = mCharGlyphInfoMap.equal_range(wch);
-    auto iter = (EFontGlyphType::Unspecified != glyph_type)
-        ? std::find_if(range_it.first, range_it.second,
-            [&glyph_type](const char_glyph_info_map_t::value_type& entry)
-            { return entry.second->mGlyphType == glyph_type; })
-        : range_it.first;
-    if (iter != range_it.second)
-        return iter->second;
+    if (!getFTFace())
+        return nullptr;
+    llassert(!mIsFallback);
 
-    // Head missed. Defer to addGlyph for the chain walk: the SOURCE face
-    // for `wch` is determined by faceHasGlyph priority order, not by which
-    // face happens to have a cached entry. Cross-head dedup is then handled
-    // inside addGlyphFromFont, which checks the source face's cache before
-    // rasterizing. Walking face caches here would be wrong — a sibling
-    // head's earlier render through a face that's a *fallback* in our
-    // chain could shadow our *primary* face's render of the same codepoint.
-    return addGlyph(wch,
-        (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale);
+    const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type)
+        ? glyph_type : EFontGlyphType::Grayscale;
+
+    // Hot path: codepoint exists on this head's face. One cmap lookup
+    // (cached) + one (face, glyph_index) hash lookup.
+    U32 glyph_index = getCharGlyphIndex(wch);
+    if (glyph_index != 0)
+        return getGlyphInfoByIndex(this, glyph_index, resolve_type);
+
+    // Cold path: walk fallbacks in codepoint-priority order, which
+    // differs from the shape-path priority in selectShapingFace:
+    //   1. Emoji-functor fallbacks gated on isPictographBase(wch). Same
+    //      predicate the shape itemizer uses — codepoint-path and
+    //      shape-path agree on which characters are emoji-eligible, so
+    //      BMP pictographs (heart etc.) route to the colour face here
+    //      just as they do during shaping.
+    //   2. Monochrome fallbacks (no functor). Priority over emoji
+    //      fallbacks for non-pictograph chars so legacy UI elements
+    //      (LSL dialogs, menu checkmarks at U+2611 etc.) still pick
+    //      monochrome.
+    //   3. Emoji-functor fallbacks ignoring the functor — last-resort
+    //      coverage for codepoints that aren't pictographs and aren't
+    //      in a monochrome fallback but DO exist in an emoji font's
+    //      charmap.
+    if (LLStringOps::isPictographBase(wch))
+    {
+        if (auto hit = find_fallback_hit(mFallbackFonts, wch,
+                [&](const char_functor_t& f) { return f && f(wch); });
+            hit.first)
+        {
+            return getGlyphInfoByIndex(hit.first, hit.second, resolve_type);
+        }
+    }
+    if (auto hit = find_fallback_hit(mFallbackFonts, wch,
+            [](const char_functor_t& f) { return !f; });
+        hit.first)
+    {
+        return getGlyphInfoByIndex(hit.first, hit.second, resolve_type);
+    }
+    if (auto hit = find_fallback_hit(mFallbackFonts, wch,
+            [](const char_functor_t& f) { return (bool)f; });
+        hit.first)
+    {
+        return getGlyphInfoByIndex(hit.first, hit.second, resolve_type);
+    }
+
+    // No face in our chain has this codepoint. Use the head face's
+    // notdef (glyph_index=0) — pre-warmed during loadFace.
+    return getGlyphInfoByIndex(this, 0, resolve_type);
 }
 
 LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType glyph_type) const
 {
     // Fast path: head's resolution cache.
-    const ShapedGlyphKey key{fontp, glyph_index};
-    auto range = mShapedGlyphInfoMap.equal_range(key);
+    const GlyphKey key{fontp, glyph_index};
+    auto range = mGlyphInfoMap.equal_range(key);
     auto iter = (EFontGlyphType::Unspecified != glyph_type)
         ? std::find_if(range.first, range.second,
-            [glyph_type](const shaped_glyph_info_map_t::value_type& entry)
+            [glyph_type](const glyph_info_map_t::value_type& entry)
             { return entry.second->mGlyphType == glyph_type; })
         : range.first;
     if (iter != range.second)
@@ -1000,44 +877,30 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp
     const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale;
     if (fontp && fontp->mFace)
     {
-        if (LLFontGlyphInfo* gi = fontp->mFace->findShapedGlyphInfo(glyph_index, resolve_type))
+        if (LLFontGlyphInfo* gi = fontp->mFace->findGlyphInfo(glyph_index, resolve_type))
         {
-            insertShapedGlyphInfo(fontp, glyph_index, gi);
+            insertGlyphInfo(fontp, glyph_index, gi);
             return gi;
         }
     }
     return addShapedGlyphFromFont(fontp, glyph_index, resolve_type);
 }
 
-void LLFontFreetype::insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const
+void LLFontFreetype::insertGlyphInfo(const LLFontFreetype* fontp, U32 glyph_index, LLFontGlyphInfo* gi) const
 {
     // Head's map holds NON-OWNING pointers into face-owned entries — never
     // delete on replace. The face's cache deduplicates so an already-cached
-    // (wch, type) entry reuses the same pointer.
+    // (glyph_index, type) entry reuses the same pointer.
     llassert(gi->mGlyphType < EFontGlyphType::Count);
-    auto range_it = mCharGlyphInfoMap.equal_range(wch);
-    auto iter = std::find_if(range_it.first, range_it.second,
-        [&gi](const char_glyph_info_map_t::value_type& entry)
-        { return entry.second->mGlyphType == gi->mGlyphType; });
-    if (iter != range_it.second)
-        iter->second = gi;
-    else
-        mCharGlyphInfoMap.insert(std::make_pair(wch, gi));
-}
-
-void LLFontFreetype::insertShapedGlyphInfo(const LLFontFreetype* fontp, U32 glyph_index, LLFontGlyphInfo* gi) const
-{
-    // Same non-owning semantics as insertGlyphInfo.
-    llassert(gi->mGlyphType < EFontGlyphType::Count);
-    const ShapedGlyphKey key{fontp, glyph_index};
-    auto range = mShapedGlyphInfoMap.equal_range(key);
+    const GlyphKey key{fontp, glyph_index};
+    auto range = mGlyphInfoMap.equal_range(key);
     auto iter = std::find_if(range.first, range.second,
-        [gi](const shaped_glyph_info_map_t::value_type& entry)
+        [gi](const glyph_info_map_t::value_type& entry)
         { return entry.second->mGlyphType == gi->mGlyphType; });
     if (iter != range.second)
         iter->second = gi;
     else
-        mShapedGlyphInfoMap.insert(std::make_pair(key, gi));
+        mGlyphInfoMap.insert(std::make_pair(key, gi));
 }
 
 void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, llwchar wch) const
@@ -1239,30 +1102,28 @@ void LLFontFreetype::resetBitmapCache()
     // refcount 0 (and naturally tears down its atlas) once all heads
     // have reloaded. For same-key resets the face cache is reused and
     // any previously-rasterized glyphs remain valid.
-    mCharGlyphInfoMap.clear();
-    mShapedGlyphInfoMap.clear();
+    mGlyphInfoMap.clear();
 
     if (!mIsFallback && mFace && !mFace->findGlyphInfo(0, EFontGlyphType::Grayscale))
     {
         // Pre-warm notdef only if the face cache doesn't already have it.
         // Fresh face → insert; reused face → already-pre-warmed by an
         // earlier head, skip.
-        addGlyphFromFont(this, 0, 0, EFontGlyphType::Grayscale);
+        addShapedGlyphFromFont(this, 0, EFontGlyphType::Grayscale);
     }
 }
 
 void LLFontFreetype::destroyGL()
 {
-    // Clear our own non-owning resolution caches before the face deletes
-    // the LLFontGlyphInfo entries they reference. mFace->destroyGL fully
-    // resets the face (clears its owning glyph maps + atlas vectors), so
+    // Clear our own non-owning resolution cache before the face deletes
+    // the LLFontGlyphInfo entries it references. mFace->destroyGL fully
+    // resets the face (clears its owning glyph map + atlas vectors), so
     // any pointers left here would dangle until the next resetSelf().
     // No render runs between here and the resetSelf() that follows — every
     // call site of destroyGL is immediately followed by either initClass
     // (initFonts path) or process exit (stopGL path) — but clearing now
     // keeps the invariant local rather than relying on caller ordering.
-    mCharGlyphInfoMap.clear();
-    mShapedGlyphInfoMap.clear();
+    mGlyphInfoMap.clear();
     if (mFace)
         mFace->destroyGL();
 }
@@ -1367,14 +1228,11 @@ void LLFontFreetype::collectGarbage() const
             // call the predicate on dangling pointers (UB) and could leave
             // the head's map with pointers to freed memory.
             auto matches = [&](const LLFontGlyphInfo* gi) { return glyph_uses_sheet(gi, type, num); };
-            for (auto it = mCharGlyphInfoMap.begin(); it != mCharGlyphInfoMap.end(); )
-                it = matches(it->second) ? mCharGlyphInfoMap.erase(it) : std::next(it);
-            for (auto it = mShapedGlyphInfoMap.begin(); it != mShapedGlyphInfoMap.end(); )
-                it = matches(it->second) ? mShapedGlyphInfoMap.erase(it) : std::next(it);
+            for (auto it = mGlyphInfoMap.begin(); it != mGlyphInfoMap.end(); )
+                it = matches(it->second) ? mGlyphInfoMap.erase(it) : std::next(it);
             if (mFace)
             {
-                mFace->erase_codepoint_entries(matches);
-                mFace->erase_shaped_entries(matches);
+                mFace->erase_glyph_entries(matches);
             }
 
             getBitmapCache()->releaseSheet(type, num);

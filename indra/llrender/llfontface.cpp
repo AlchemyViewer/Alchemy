@@ -39,13 +39,10 @@ LLFontFace::LLFontFace()
 
 LLFontFace::~LLFontFace()
 {
-    // Free LLFontGlyphInfo entries — owned by this face's caches.
-    for (auto& entry : mCharGlyphInfoMap)
+    // Free LLFontGlyphInfo entries — owned by this face's cache.
+    for (auto& entry : mGlyphInfoMap)
         delete entry.second;
-    mCharGlyphInfoMap.clear();
-    for (auto& entry : mShapedGlyphInfoMap)
-        delete entry.second;
-    mShapedGlyphInfoMap.clear();
+    mGlyphInfoMap.clear();
 
     if (mHbFont)
     {
@@ -183,22 +180,22 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
     return true;
 }
 
-LLFontGlyphInfo* LLFontFace::findGlyphInfo(llwchar wch, EFontGlyphType type) const
+LLFontGlyphInfo* LLFontFace::findGlyphInfo(U32 glyph_index, EFontGlyphType type) const
 {
-    auto range = mCharGlyphInfoMap.equal_range(wch);
+    auto range = mGlyphInfoMap.equal_range(glyph_index);
     auto iter = (type != EFontGlyphType::Unspecified)
         ? std::find_if(range.first, range.second,
-            [type](const char_glyph_info_map_t::value_type& e) { return e.second->mGlyphType == type; })
+            [type](const glyph_info_map_t::value_type& e) { return e.second->mGlyphType == type; })
         : range.first;
     return (iter != range.second) ? iter->second : nullptr;
 }
 
-void LLFontFace::insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const
+void LLFontFace::insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const
 {
     llassert(gi->mGlyphType < EFontGlyphType::Count);
-    auto range = mCharGlyphInfoMap.equal_range(wch);
+    auto range = mGlyphInfoMap.equal_range(glyph_index);
     auto iter = std::find_if(range.first, range.second,
-        [gi](const char_glyph_info_map_t::value_type& e) { return e.second->mGlyphType == gi->mGlyphType; });
+        [gi](const glyph_info_map_t::value_type& e) { return e.second->mGlyphType == gi->mGlyphType; });
     if (iter != range.second)
     {
         delete iter->second;
@@ -206,45 +203,15 @@ void LLFontFace::insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const
     }
     else
     {
-        mCharGlyphInfoMap.insert(std::make_pair(wch, gi));
-    }
-}
-
-LLFontGlyphInfo* LLFontFace::findShapedGlyphInfo(U32 glyph_index, EFontGlyphType type) const
-{
-    auto range = mShapedGlyphInfoMap.equal_range(glyph_index);
-    auto iter = (type != EFontGlyphType::Unspecified)
-        ? std::find_if(range.first, range.second,
-            [type](const shaped_glyph_info_map_t::value_type& e) { return e.second->mGlyphType == type; })
-        : range.first;
-    return (iter != range.second) ? iter->second : nullptr;
-}
-
-void LLFontFace::insertShapedGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const
-{
-    llassert(gi->mGlyphType < EFontGlyphType::Count);
-    auto range = mShapedGlyphInfoMap.equal_range(glyph_index);
-    auto iter = std::find_if(range.first, range.second,
-        [gi](const shaped_glyph_info_map_t::value_type& e) { return e.second->mGlyphType == gi->mGlyphType; });
-    if (iter != range.second)
-    {
-        delete iter->second;
-        iter->second = gi;
-    }
-    else
-    {
-        mShapedGlyphInfoMap.insert(std::make_pair(glyph_index, gi));
+        mGlyphInfoMap.insert(std::make_pair(glyph_index, gi));
     }
 }
 
 void LLFontFace::resetBitmapCache()
 {
-    for (auto& entry : mCharGlyphInfoMap)
+    for (auto& entry : mGlyphInfoMap)
         delete entry.second;
-    mCharGlyphInfoMap.clear();
-    for (auto& entry : mShapedGlyphInfoMap)
-        delete entry.second;
-    mShapedGlyphInfoMap.clear();
+    mGlyphInfoMap.clear();
     if (mFontBitmapCachep)
         mFontBitmapCachep->reset();
 }
@@ -256,13 +223,13 @@ void LLFontFace::destroyGL()
     // this same LLFontFace via LLFontManager::mFaceCache (e.g. UI scale
     // change whose new vert/horz DPI floor-round to the same integers as
     // before) gets back an empty face equivalent to a freshly-constructed
-    // one. Without the reset, stale mCharGlyphInfoMap / mShapedGlyphInfoMap
-    // entries continue to point at atlas slots in zombie LLImageGLs (CPU
-    // object alive, GL name 0), every bind() falls through to
-    // sDefaultGLTexture, and text renders as solid colored rectangles.
-    // Heads must clear their non-owning resolution caches BEFORE this
-    // runs (LLFontFreetype::destroyGL handles that) — the deletes below
-    // would otherwise leave dangling pointers in those maps.
+    // one. Without the reset, stale mGlyphInfoMap entries continue to
+    // point at atlas slots in zombie LLImageGLs (CPU object alive, GL
+    // name 0), every bind() falls through to sDefaultGLTexture, and text
+    // renders as solid colored rectangles. Heads must clear their
+    // non-owning resolution caches BEFORE this runs
+    // (LLFontFreetype::destroyGL handles that) — the deletes below would
+    // otherwise leave dangling pointers in those maps.
     if (mFontBitmapCachep)
         mFontBitmapCachep->destroyGL();
     resetBitmapCache();

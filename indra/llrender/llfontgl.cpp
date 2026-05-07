@@ -553,9 +553,11 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                 for (const LLShapedGlyph& sg : run_glyphs)
                 {
                     // Cache lives on the root face and its bitmap atlas; the
-                    // fallback face is only the *source* for the glyph. This
-                    // mirrors the non-shaped fallback path in addGlyphFromFont
-                    // where `this` is the root and `fontp` is the fallback.
+                    // fallback face is only the *source* for the glyph. The
+                    // codepoint path also routes through getGlyphInfoByIndex
+                    // (after wch -> glyph_index resolution), so this lookup
+                    // hits the same atlas slot regardless of which path
+                    // produced the LLShapedGlyph.
                     const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
                         sg.face, sg.glyph_id,
                         (!use_color || LLFontGL::sForceMonochromeEmoji)
