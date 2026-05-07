@@ -4,7 +4,7 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO AlchemyViewer/alchemy-fonts
     REF ${VERSION}
-    SHA512 5d6e0d7487f07573cf8135bb5c923609bf84409deb2b52a2fe74a8b6e55381211f857de774c8c658d5ed2e713a374d73b075d02abe9ac6ca8b07cd70266b8bd1
+    SHA512 6d5325746c60364b2b689ed4e924ae1d3bcc9f5c67a402cbb0a1e7ebed20725a89864a54c2ae99bbb2e2b83f8fbc7f83569b61a619877fb220eef79f6b33be73
     HEAD_REF main
 )
 
@@ -44,6 +44,17 @@ file(INSTALL
 
 file(INSTALL
     DIRECTORY "${SOURCE_PATH}/noto-emoji/"
+    DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
+    FILES_MATCHING
+    PATTERN "*.ttc"
+    PATTERN "*.ttf"
+    PATTERN "*.otf"
+    PATTERN "*.woff2"
+    PATTERN "*.txt"
+)
+
+file(INSTALL
+    DIRECTORY "${SOURCE_PATH}/opendyslexic/"
     DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
     FILES_MATCHING
     PATTERN "*.ttc"
@@ -105,6 +116,7 @@ vcpkg_install_copyright(
         ${SOURCE_PATH}/dejavu-sans/DejaVu-License.txt
         ${SOURCE_PATH}/ibm-plex/IBMPlex-LICENSE.txt
         ${SOURCE_PATH}/noto-emoji/NotoEmoji-LICENSE.txt
+        ${SOURCE_PATH}/opendyslexic/OpenDyslexic-LICENSE.txt
         ${SOURCE_PATH}/source-code/SourceCode.LICENSE.md
         ${SOURCE_PATH}/source-han-sans/SourceHanSans.txt
         ${SOURCE_PATH}/source-sans/SourceSans.LICENSE.md

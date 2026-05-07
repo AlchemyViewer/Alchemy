@@ -166,7 +166,22 @@
   <!-- user_selectable="false" hides them from the font-picker.     -->
   <!-- ========================================================== -->
 
-    <font name="DejaVu" label="DejaVu Sans">
+    <font name="CascadiaCode" label="Cascadia Code" monospace="true" ligatures="true" font_hinting="light">
+        <style name="NORMAL">
+            <file font_weight="400">CascadiaCodeNF.ttf</file>
+        </style>
+        <style name="BOLD" inherit="true">
+            <file flags="bold" font_weight="700">CascadiaCodeNF.ttf</file>
+        </style>
+        <style name="ITALIC" inherit="true">
+            <file font_weight="400">CascadiaCodeNF-Italic.ttf</file>
+        </style>
+        <style name="BOLD|ITALIC" inherit="true">
+            <file flags="bold" font_weight="700">CascadiaCodeNF-Italic.ttf</file>
+        </style>
+    </font>
+
+    <font name="DejaVu" label="DejaVu Sans" font_hinting="light">
         <!-- Per-family size overrides: DejaVu reads larger than the
              other Sans fonts at the same nominal pt, so map each named
              size to a smaller point value to keep visual parity. -->
@@ -176,16 +191,16 @@
         <size name="Small"  size="7.6"/>
 
         <style name="NORMAL">
-            <file font_hinting="force_auto">DejaVuSans.woff2</file>
+            <file>DejaVuSans.woff2</file>
         </style>
         <style name="BOLD" inherit="true">
-            <file font_hinting="force_auto">DejaVuSans-Bold.woff2</file>
+            <file>DejaVuSans-Bold.woff2</file>
         </style>
         <style name="ITALIC" inherit="true">
-            <file font_hinting="force_auto">DejaVuSans-Oblique.woff2</file>
+            <file>DejaVuSans-Oblique.woff2</file>
         </style>
         <style name="BOLD|ITALIC" inherit="true">
-            <file font_hinting="force_auto">DejaVuSans-BoldOblique.woff2</file>
+            <file>DejaVuSans-BoldOblique.woff2</file>
         </style>
     </font>
 
@@ -199,71 +214,109 @@
         </style>
     </font>
 
-    <font name="Inter" label="Inter">
+    <font name="IBMPlexSans" label="IBM Plex Sans" font_hinting="light">
         <style name="NORMAL">
-            <file font_hinting="light" font_weight="400">InterVariable.woff2</file>
+            <file font_weight="400">IBMPlexSansVar-Roman.ttf</file>
         </style>
         <style name="BOLD" inherit="true">
-            <file flags="bold" font_hinting="light" font_weight="600">InterVariable.woff2</file>
+            <file flags="bold" font_weight="700">IBMPlexSansVar-Roman.ttf</file>
         </style>
         <style name="ITALIC" inherit="true">
-            <file font_hinting="light" font_weight="400">InterVariable-Italic.woff2</file>
+            <file font_weight="400">IBMPlexSansVar-Italic.ttf</file>
         </style>
         <style name="BOLD|ITALIC" inherit="true">
-            <file flags="bold" font_hinting="light" font_weight="600">InterVariable-Italic.woff2</file>
+            <file flags="bold" font_weight="700">IBMPlexSansVar-Italic.ttf</file>
         </style>
     </font>
 
-    <font name="SourceCode" label="Source Code Pro" monospace="true">
+    <font name="IBMPlexMono" label="IBM Plex Mono" font_hinting="light" monospace="true">
         <style name="NORMAL">
-            <file font_hinting="light" font_weight="400">SourceCodeVF-Upright.woff2</file>
+            <file>IBMPlexMono-Bold.ttf</file>
         </style>
         <style name="BOLD" inherit="true">
-            <file flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Upright.woff2</file>
+            <file>DejaVuSans-Bold.woff2</file>
         </style>
         <style name="ITALIC" inherit="true">
-            <file font_hinting="light" font_weight="400">SourceCodeVF-Italic.woff2</file>
+            <file>IBMPlexMono-Italic.ttf</file>
         </style>
         <style name="BOLD|ITALIC" inherit="true">
-            <file flags="bold" font_hinting="light" font_weight="600">SourceCodeVF-Italic.woff2</file>
+            <file>IBMPlexMono-BoldItalic.ttf</file>
         </style>
     </font>
 
-    <font name="SourceSans" label="Source Sans 3">
+    <font name="Inter" label="Inter" font_hinting="light">
         <style name="NORMAL">
-            <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
+            <file font_weight="400">InterVariable.woff2</file>
         </style>
         <style name="BOLD" inherit="true">
-            <!-- Variable font: same file, weight axis 600 = semibold/bold. -->
-            <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
+            <file flags="bold" font_weight="700">InterVariable.woff2</file>
         </style>
         <style name="ITALIC" inherit="true">
-            <file font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
+            <file font_weight="400">InterVariable-Italic.woff2</file>
         </style>
         <style name="BOLD|ITALIC" inherit="true">
-            <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
+            <file flags="bold" font_weight="700">InterVariable-Italic.woff2</file>
         </style>
     </font>
 
-    <font name="CJK" user_selectable="false">
+    <font name="OpenDyslexic" label="Open Dyslexic" font_hinting="light">
+        <style name="NORMAL">
+            <file>OpenDyslexic-Regular.otf</file>
+        </style>
+        <style name="BOLD" inherit="true">
+            <file>OpenDyslexic-Bold.otf</file>
+        </style>
+        <style name="ITALIC" inherit="true">
+            <file>OpenDyslexic-Italic.otf</file>
+        </style>
+        <style name="BOLD|ITALIC" inherit="true">
+            <file>OpenDyslexic-BoldItalic.otf</file>
+        </style>
+    </font>
+
+    <font name="SourceCode" label="Source Code Pro" monospace="true" font_hinting="light">
+        <style name="NORMAL">
+            <file font_weight="400">SourceCodeVF-Upright.woff2</file>
+        </style>
+        <style name="BOLD" inherit="true">
+            <file flags="bold" font_weight="700">SourceCodeVF-Upright.woff2</file>
+        </style>
+        <style name="ITALIC" inherit="true">
+            <file font_weight="400">SourceCodeVF-Italic.woff2</file>
+        </style>
+        <style name="BOLD|ITALIC" inherit="true">
+            <file flags="bold" font_weight="700">SourceCodeVF-Italic.woff2</file>
+        </style>
+    </font>
+
+    <font name="SourceSans" label="Source Sans 3" font_hinting="light">
+        <style name="NORMAL">
+            <file font_weight="400">SourceSans3VF-Upright.woff2</file>
+        </style>
+        <style name="BOLD" inherit="true">
+            <file flags="bold" font_weight="700">SourceSans3VF-Upright.woff2</file>
+        </style>
+        <style name="ITALIC" inherit="true">
+            <file font_weight="400">SourceSans3VF-Italic.woff2</file>
+        </style>
+        <style name="BOLD|ITALIC" inherit="true">
+            <file flags="bold" font_weight="700">SourceSans3VF-Italic.woff2</file>
+        </style>
+    </font>
+
+    <font name="CJK" user_selectable="false" font_hinting="light">
         <!-- TTC collection — every face in the file auto-loads as a
              fallback entry, so a single <file> covers all weights/widths
              SourceHanSans ships. -->
         <style name="NORMAL">
-            <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
+            <file load_collection="true" font_weight="400">SourceHanSans-VF.otf.ttc</file>
         </style>
         <style name="BOLD">
-            <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
+            <file load_collection="true" flags="bold" font_weight="700">SourceHanSans-VF.otf.ttc</file>
         </style>
-        <style name="ITALIC">
-            <file load_collection="true" font_hinting="light" font_weight="400">SourceHanSans-VF.otf.ttc</file>
-        </style>
-        <style name="BOLD|ITALIC">
-            <file load_collection="true" flags="bold" font_hinting="light" font_weight="600">SourceHanSans-VF.otf.ttc</file>
-        </style>
-    </font>
+     </font>
 
-    <font name="Emoji" user_selectable="false">
+    <font name="Emoji"  user_selectable="false">
         <style name="NORMAL">
             <!-- The unicode_ranges gate enumerates UTS#51 emoji codepoints
                  so the shape-itemizer keeps a whole emoji cluster on this
@@ -284,7 +337,17 @@
 
     <font name="LimitedEmoji" user_selectable="false">
         <style name="NORMAL">
-            <file unicode_ranges="U+2B1B-U+2B1C,U+2B50,U+2B55,U+1F000-U+1FFFF">Noto-COLRv1.ttf</file>
+            <!-- Narrower than Emoji's range — limited to "obviously
+                 emoji" codepoints for menu chrome and similar UI
+                 surfaces where wide BMP-pictograph coverage would
+                 collide with text styling. Includes the same cluster-
+                 helper codepoints as Emoji (ZWJ, VS-15/16, keycap
+                 combiner U+20E0-U+20E9) so multi-codepoint sequences
+                 anchored on astral bases (keycaps, ZWJ families) keep
+                 their trailing modifiers on this face — without these,
+                 "#️⃣" routes the keycap mark off to root and renders
+                 a tofu next to the digit. -->
+            <file unicode_ranges="U+200D,U+20E0-U+20E9,U+2B1B-U+2B1C,U+2B50,U+2B55,U+FE0E-U+FE0F,U+1F000-U+1FFFF">Noto-COLRv1.ttf</file>
         </style>
     </font>
 
@@ -333,7 +396,7 @@
   <font name="SansSerifBase" label="Sans Serif (Default)">
     <use family="SourceSans"/>
   </font>
-    
+
   <font name="SansSerif" user_selectable="false">
     <use family="SansSerifBase"/>
     <use family="DejaVu"/>
@@ -381,7 +444,7 @@
   <font name="MonospaceBase" label="Monospace (Default)" monospace="true">
     <use family="SourceCode"/>
   </font>
-    
+
   <font name="Monospace" label="Monospace (Default)" monospace="true" user_selectable="false">
     <use family="MonospaceBase"/>
     <use family="DejaVuMono"/>
