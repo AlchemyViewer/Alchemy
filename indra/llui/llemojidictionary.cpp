@@ -505,10 +505,10 @@ void LLEmojiDictionary::loadGroups()
             // Add new group
             mGroups.emplace_back();
             LLEmojiGroup& group = mGroups.back();
-            // Groups use a single-codepoint icon as a visual label; take the
-            // first codepoint if the source happens to be multi-codepoint.
-            const LLWString icon = loadIcon(sd);
-            group.Character = icon.empty() ? 0 : icon[0];
+            // Carry the full LLWString — some group icons need U+FE0F to
+            // force emoji presentation (✈ 🛩 ⏲ etc.), and truncating to
+            // a single codepoint left those buttons blank.
+            group.Character = loadIcon(sd);
             group.Categories = loadCategories(sd);
             translateCategories(group.Categories);
 
@@ -521,7 +521,7 @@ void LLEmojiDictionary::loadGroups()
 
     // Add group "others"
     mGroups.emplace_back();
-    mGroups.back().Character = GROUP_OTHERS_IMAGE_INDEX;
+    mGroups.back().Character = LLWString(1, (llwchar)GROUP_OTHERS_IMAGE_INDEX);
 }
 
 void LLEmojiDictionary::loadEmojis()

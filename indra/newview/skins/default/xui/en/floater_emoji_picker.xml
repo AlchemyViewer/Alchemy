@@ -9,10 +9,10 @@
     can_resize="true"
     auto_close="true"
     layout="topleft"
-    min_width="250"
+    min_width="308"
     chrome="true"
     height="350"
-    width="304">
+    width="308">
   <floater.string name="title_for_frequently_used" value="Frequently used"/>
   <floater.string name="text_no_emoji_for_filter" value="No emoji found for '[FILTER]'"/>
   <floater.string name="tooltip_tone_none" value="No skin tone preference"/>

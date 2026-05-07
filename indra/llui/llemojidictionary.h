@@ -75,7 +75,10 @@ struct LLEmojiDescriptor
 
 struct LLEmojiGroup
 {
-    llwchar Character;
+    // Full sequence (not a single codepoint) so default-text emoji that
+    // need U+FE0F (variation selector-16) for emoji presentation render
+    // correctly — e.g. ✈ U+2708, 🛩 U+1F6E9, ⏲ U+23F2.
+    LLWString Character;
     std::list<std::string> Categories;
 };
 

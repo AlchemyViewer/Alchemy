@@ -514,7 +514,7 @@ void LLFloaterEmojiPicker::fillGroups()
 
     // Create button for "All categories"
     params.name = "all_categories";
-    createGroupButton(params, rect, ALL_EMOJIS_IMAGE_INDEX);
+    createGroupButton(params, rect, LLWString(1, (llwchar)ALL_EMOJIS_IMAGE_INDEX));
 
     // Create group and button for "Frequently used"
     if (!sFrequentlyUsed.empty())
@@ -527,7 +527,7 @@ void LLFloaterEmojiPicker::fillGroups()
             mFilteredEmojiGroups.push_back(USED_EMOJIS_GROUP_INDEX);
             mFilteredEmojis.emplace_back(cats);
             params.name = "used_categories";
-            createGroupButton(params, rect, USED_EMOJIS_IMAGE_INDEX);
+            createGroupButton(params, rect, LLWString(1, (llwchar)USED_EMOJIS_IMAGE_INDEX));
         }
     }
 
@@ -630,7 +630,7 @@ void LLFloaterEmojiPicker::fillGroupEmojis(std::map<std::string, std::vector<LLE
     }
 }
 
-void LLFloaterEmojiPicker::createGroupButton(LLButton::Params& params, const LLRect& rect, llwchar emoji)
+void LLFloaterEmojiPicker::createGroupButton(LLButton::Params& params, const LLRect& rect, const LLWString& emoji)
 {
     LLButton* button = LLUICtrlFactory::create<LLButton>(params);
     button->setClickedCallback([this](LLUICtrl* ctrl, const LLSD&) { onGroupButtonClick(ctrl); });
@@ -639,7 +639,7 @@ void LLFloaterEmojiPicker::createGroupButton(LLButton::Params& params, const LLR
 
     button->setRect(rect);
     button->setTabStop(false);
-    button->setLabel(LLUIString(LLWString(1, emoji)));
+    button->setLabel(LLUIString(emoji));
     button->setUseFontColor(false);
 
     mGroupButtons.push_back(button);

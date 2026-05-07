@@ -70,7 +70,7 @@ private:
     void fillGroups();
     void fillCategoryFrequentlyUsed(std::map<std::string, std::vector<LLEmojiSearchResult>>& cats);
     void fillGroupEmojis(std::map<std::string, std::vector<LLEmojiSearchResult>>& cats, U32 index);
-    void createGroupButton(LLButton::Params& params, const LLRect& rect, llwchar emoji);
+    void createGroupButton(LLButton::Params& params, const LLRect& rect, const LLWString& emoji);
     void resizeGroupButtons();
     void selectEmojiGroup(U32 index);
     void fillEmojis(bool fromResize = false);
