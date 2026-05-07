@@ -1,4 +1,5 @@
 {
     "name": "alchemy-fonts",
-    "version-semver": "2.3.0"
+    "version-semver": "2.3.0",
+    "port-version": 1
 }

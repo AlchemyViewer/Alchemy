@@ -112,7 +112,7 @@ file(INSTALL
 
 vcpkg_install_copyright(
     FILE_LIST
-        ${SOURCE_PATH}/cascadia-code/CascadiaCode-License.txt
+        ${SOURCE_PATH}/cascadia-code/CascadiaCode-LICENSE.txt
         ${SOURCE_PATH}/dejavu-sans/DejaVu-License.txt
         ${SOURCE_PATH}/ibm-plex/IBMPlex-LICENSE.txt
         ${SOURCE_PATH}/noto-emoji/NotoEmoji-LICENSE.txt
