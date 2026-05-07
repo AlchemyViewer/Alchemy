@@ -417,25 +417,56 @@ namespace
     // one buffer, which is the only way GSUB can collapse keycap/ZWJ
     // ligatures into the composed glyph.
     //
-    // Heuristic: the first cluster member whose own selectShapingFace picks
-    // a non-root face — typically the emoji face — wins. For a keycap "9️⃣"
-    // the digit '9' picks root, VS-16 may go either way, and U+20E3 picks
-    // the emoji face; we elect emoji. For a ZWJ sequence "❤️‍🔥" the BMP
-    // heart may resolve in root, but the astral fire forces emoji. If no
-    // member wants a non-root face, we fall back to root_face — the cluster
-    // still rides one buffer, even if shaping won't compose it.
+    // Heuristic:
+    //   1. Walk cluster codepoints, collect the non-root candidates that
+    //      selectShapingFace points at (typically just one — the emoji
+    //      face — but a multi-fallback chain may produce more).
+    //   2. Prefer the first candidate that COVERS the cluster's
+    //      non-strippable codepoints in cmap (VS-15 / VS-16 are
+    //      strippable: shape_sub_run rebuilds the buffer without them
+    //      when the face's cmap lacks them, and GSUB rules in modern
+    //      emoji fonts are written against the VS-stripped form). A
+    //      face that lacks the cluster's base ('#' for "#️⃣", the
+    //      heart for "❤️‍🔥") would produce notdef on the base and
+    //      block the keycap / ZWJ rule from matching at all.
+    //   3. Fall back to root_face if no candidate covers — at least
+    //      the base codepoints render via root's cmap, even if the
+    //      ligature can't compose. Better than rendering tofu on a
+    //      face that can't honor the cluster.
     const LLFontFreetype* pick_cluster_face(const LLFontFreetype* root_face,
                                             std::u32string_view   slice,
                                             size_t                cb,
                                             size_t                ce)
     {
+        auto covers_non_strippable = [&](const LLFontFreetype* f) {
+            for (size_t k = cb; k < ce; ++k)
+            {
+                const llwchar c = slice[k];
+                if (c == 0xFE0E || c == 0xFE0F)
+                    continue; // VS-15/16 strippable in shape_sub_run
+                if (!f->faceHasGlyph(c))
+                    return false;
+            }
+            return true;
+        };
+
+        // First non-root candidate with full coverage.
         for (size_t k = cb; k < ce; ++k)
         {
             U32 unused = 0;
             const LLFontFreetype* f = root_face->selectShapingFace(slice[k], unused);
-            if (f && f != root_face)
+            if (f && f != root_face && covers_non_strippable(f))
                 return f;
         }
+        // Root may itself cover the cluster (e.g. when the head IS an
+        // emoji-aware font, or when the cluster is BMP-only and the
+        // text font has the relevant glyphs).
+        if (covers_non_strippable(root_face))
+            return root_face;
+        // No face has full coverage. Returning root keeps the base
+        // codepoints visible and lets HB produce notdef for the rest;
+        // the alternative (routing to a face that lacks the base)
+        // produces notdef on the base AND on the trailing extender.
         return root_face;
     }
 
@@ -501,6 +532,13 @@ namespace
             // can collapse the sequence in one buffer. Without this, e.g.
             // "9️⃣" fragments into '9' on root + VS-16+U+20E3 on the emoji
             // face, producing a digit followed by an unbound keycap mark.
+            //
+            // Each cluster shapes as its OWN sub-run (separate HarfBuzz
+            // buffer), even when adjacent clusters route to the same face.
+            // Merging them into one buffer would let GSUB rules match
+            // across cluster boundaries — e.g. "3️⃣🏳️‍🌈" (keycap +
+            // pride flag) on Noto-COLRv1 produced spurious matches that
+            // flickered the pride flag down to a bare white flag.
             if (next_cluster_idx < clusters.size()
                 && clusters[next_cluster_idx].first == i)
             {
@@ -523,23 +561,26 @@ namespace
                     }
                 }
 
-                if (cur_face != nullptr && cur_face != cluster_face)
+                // Flush any in-progress non-cluster run before the cluster.
+                if (cur_face != nullptr)
                 {
                     emit(cb);
-                    cur_face = nullptr;
                 }
 
-                if (cur_face == nullptr)
-                {
-                    cur_face  = cluster_face;
-                    cur_begin = cb;
-                    cur_run_is_emoji = true;
-                    cur_script = cluster_script;
-                }
-                // Else: same face — extend the in-progress run through the
-                // cluster without disturbing cur_script (which may be a
-                // surrounding non-neutral script that the cluster's COMMON
-                // would otherwise downgrade).
+                // Emit the cluster as its own sub-run. Reset cur_face so
+                // the next codepoint (whether ASCII or another cluster)
+                // starts a fresh run via the per-codepoint init branch.
+                // cur_run_is_emoji is intentionally not set here — it
+                // only matters across codepoint iterations (it gates
+                // the orphan-extender keep below), and we reset to a
+                // fresh run immediately. Per-codepoint init re-derives
+                // it from isPictographBase on the next non-cluster cp.
+                cur_face  = cluster_face;
+                cur_begin = cb;
+                cur_script = cluster_script;
+                emit(ce);
+                cur_face = nullptr;
+                cur_script = HB_SCRIPT_INVALID;
 
                 i = ce - 1; // for-loop's ++i will land on ce
                 continue;
@@ -563,32 +604,36 @@ namespace
                 continue;
             }
 
-            // Combining marks must stay in the same HarfBuzz buffer as their
-            // preceding base for mark-to-base GPOS attachment to fire — that's
-            // what positions the mark above (or below) the base instead of
-            // landing it standalone at the pen, which produces visible
-            // collisions with the next base.
+            // ORPHAN-EXTENDER SAFETY NET. Real emoji clusters are routed
+            // atomically by the cluster fast path above (driven off
+            // wstring_find_emoji_clusters), so ZWJ / VS / skin-tone /
+            // keycap-combiner codepoints inside a cluster never reach
+            // this branch — they were emit'd as part of the cluster's
+            // own sub-run. What this code handles:
             //
-            // Emoji-sequence extenders (ZWJ, VS15/16, skin-tone, keycap
-            // combiner, tag chars) need the same treatment for a different
-            // reason: HarfBuzz composes ZWJ ligatures (🧑 + ZWJ + 🚀 → 🧑‍🚀)
-            // only when every codepoint of the sequence lands in one buffer
-            // on a face whose GSUB knows the ligature. selectShapingFace
-            // routes ZWJ/VS to root because they sit outside the emoji
-            // functor's astral range, fragmenting the sequence and dropping
-            // back to base + joiner-tofu + base. Keep them on cur_face when
-            // it covers them so the emoji face's GSUB sees the whole cluster.
+            //   * Combining marks on non-emoji bases (e.g. Latin + diacritic
+            //     where the head doesn't cover the mark). They must stay
+            //     in the same HarfBuzz buffer as their preceding base for
+            //     mark-to-base GPOS attachment to fire.
+            //   * Orphan / malformed emoji extenders — a stray U+FE0F
+            //     after a Latin letter, an isolated U+20E3, etc. The
+            //     cluster walker doesn't recognize these as clusters,
+            //     so they reach the per-codepoint loop. Keeping them on
+            //     cur_face when it covers them gives the best-effort
+            //     rendering for malformed input without splitting the
+            //     codepoint across sub-runs.
             const llwchar wch = slice[i];
             const auto cat = hb_unicode_general_category(uf, wch);
             const bool is_mark = (cat == HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK
                                || cat == HB_UNICODE_GENERAL_CATEGORY_ENCLOSING_MARK
                                || cat == HB_UNICODE_GENERAL_CATEGORY_SPACING_MARK);
-            const bool is_emoji_extender =
-                   wch == 0x200D                          // ZWJ
-                || wch == 0xFE0E || wch == 0xFE0F         // VS15/VS16
-                || wch == 0x20E3                          // keycap combiner
-                || (wch >= 0x1F3FB && wch <= 0x1F3FF)     // skin-tone modifiers
-                || (wch >= 0xE0020 && wch <= 0xE007F);    // tag characters
+            // ZWJ is added on top of LLStringOps::isEmojiClusterExtender's
+            // set: the cluster walker excludes ZWJ (it joins to a *next
+            // base*, not as a trailing modifier) but the shape itemizer
+            // wants to keep ZWJ glued to cur_face so HarfBuzz can ligate
+            // the cluster across joiners.
+            const bool is_emoji_extender = wch == 0x200D
+                                        || LLStringOps::isEmojiClusterExtender(wch);
             if ((is_mark || is_emoji_extender) && face != cur_face)
             {
                 if (cur_face->faceHasGlyph(wch))
@@ -598,22 +643,14 @@ namespace
                 }
                 else if (is_emoji_extender && cur_run_is_emoji)
                 {
-                    // cur_face is the emoji handler for this run (the run
-                    // started on a pictograph base) and lacks the extender
-                    // in its cmap. Notable case: Noto-COLRv1 doesn't ship a
-                    // cmap entry for U+FE0F (VS-16); its GSUB rules for ZWJ
-                    // ligatures are written against the VS-stripped form
-                    // (heart + ZWJ + fire, not heart + VS-16 + ZWJ + fire).
-                    // Fragmenting at VS-16 would split the ligature across
-                    // sub-runs and the rule could never match. Keep the
-                    // extender on cur_face — shape_sub_run strips VS-16
-                    // before passing the input to HB when the face's cmap
-                    // lacks it, so the buffer reaches GSUB in the form the
-                    // rules expect. Gating on cur_run_is_emoji (rather than
-                    // cur_face != root_face) is what makes this work both
-                    // when the head is a non-emoji font with an emoji
-                    // fallback AND when the head IS an emoji font (e.g. the
-                    // SansSerifEmoji family used by the emoji picker).
+                    // Orphan extender after a non-cluster pictograph base:
+                    // the run started on an isolated pictograph (single-
+                    // codepoint emoji that the walker didn't promote to a
+                    // cluster), and a malformed extender follows. Keep
+                    // the extender on cur_face so it doesn't split off
+                    // onto root and render as a bare combining mark.
+                    // shape_sub_run handles VS-16 stripping when cur_face's
+                    // cmap lacks it, so the buffer reaches GSUB cleanly.
                     face = cur_face;
                 }
                 else if (is_mark)
@@ -754,6 +791,11 @@ void LLFontShaping::clearCache()
 {
     sShapeIndex.clear();
     sShapeLru.clear();
+}
+
+size_t LLFontShaping::cacheSize()
+{
+    return sShapeIndex.size();
 }
 
 void LLFontShaping::clearCacheForFace(const LLFontFreetype* face)

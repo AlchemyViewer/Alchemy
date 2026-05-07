@@ -747,22 +747,6 @@ bool utf8str_remove_emojis(std::string& utf8str)
 // available to llrender's shape-itemizer and font-fallback walkers without
 // duplicating the range list.)
 
-// Codepoints that extend a pictograph base into a multi-codepoint cluster.
-// ZWJ is deliberately excluded — it joins one cluster to *another base*, not
-// merely a trailing modifier, so the walkers handle it separately. The set
-// matches what HarfBuzz itemizes as part of the same emoji cluster: VS-15/16
-// presentation selectors, the keycap combining mark, skin-tone modifiers, and
-// tag characters (including the U+E007F CANCEL TAG terminator for subdivision
-// flags). Shared by is_shaping_starter and advance_shaping_run so the two
-// walkers can never disagree on what belongs in a cluster.
-static bool is_emoji_extender(llwchar c)
-{
-    return c == 0xFE0E || c == 0xFE0F            // VS-15 / VS-16
-        || c == 0x20E3                           // keycap combiner
-        || (c >= 0x1F3FB && c <= 0x1F3FF)        // skin-tone modifiers
-        || (c >= 0xE0020 && c <= 0xE007F);       // tag chars + CANCEL TAG
-}
-
 // True if position i begins an emoji sequence that the 1:1 codepoint->glyph
 // path cannot render correctly — i.e., the next codepoint transforms the base
 // (ZWJ, VS15/16, skin-tone, keycap combiner, tag character, or regional
@@ -784,7 +768,7 @@ static bool is_shaping_starter(const llwchar* p, size_t n, size_t i)
     if (!LLStringOps::isPictographBase(c) || i + 1 >= n)
         return false;
     const llwchar next = p[i + 1];
-    if (next == 0x200D || is_emoji_extender(next))
+    if (next == 0x200D || LLStringOps::isEmojiClusterExtender(next))
         return true;
     // Regional indicator pair (flag).
     return c >= 0x1F1E6 && c <= 0x1F1FF
@@ -829,7 +813,7 @@ static size_t advance_shaping_run(const llwchar* p, size_t n, size_t start)
             }
             break; // orphan ZWJ
         }
-        if (is_emoji_extender(c))
+        if (LLStringOps::isEmojiClusterExtender(c))
         {
             ++r;
             continue;
@@ -1246,6 +1230,14 @@ bool LLStringOps::isPictographBase(llwchar a)
     return a == 0xA9 || a == 0xAE
         || (a >= 0x2000 && a < 0x3300)
         || (a >= 0x1F000 && a < 0x20000);
+}
+
+bool LLStringOps::isEmojiClusterExtender(llwchar a)
+{
+    return a == 0xFE0E || a == 0xFE0F            // VS-15 / VS-16
+        || a == 0x20E3                           // keycap combiner
+        || (a >= 0x1F3FB && a <= 0x1F3FF)        // skin-tone modifiers
+        || (a >= 0xE0020 && a <= 0xE007F);       // tag chars + CANCEL TAG
 }
 
 S32 LLStringOps::collate(const llwchar* a, const llwchar* b)

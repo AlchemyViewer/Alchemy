@@ -99,6 +99,12 @@ namespace LLFontShaping
     // unrelated entries cached for siblings. No-op when `face` is null
     // or has no entries. Single-threaded.
     void clearCacheForFace(const LLFontFreetype* face);
+
+    // Number of entries currently held in the LRU. Cheap (boost::
+    // unordered_map::size is O(1)). Exposed for tests that need to pin
+    // the cache contract — production callers shouldn't be branching
+    // on this. Use clearCache to get to a known-empty state.
+    size_t cacheSize();
 }
 
 #endif // LL_LLFONTSHAPING_H

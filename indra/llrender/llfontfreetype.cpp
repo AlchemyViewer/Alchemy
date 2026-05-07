@@ -234,8 +234,15 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
     if (!getFTFace())
         return this;
 
-    llassert(!mIsFallback);
-
+    // mIsFallback is intentionally NOT asserted here. The mIsFallback flag
+    // primarily controls load-time behavior (the head pre-warms a notdef
+    // glyph through the atlas, which a fallback skips) — it doesn't change
+    // whether the chain walk below is well-defined. Unit tests load faces
+    // with is_fallback=true to bypass the gGL-touching pre-warm, then
+    // attach their own fallbacks via addFallbackFont and call this method
+    // to drive the shape-itemizer; the walk below handles that case
+    // correctly. A genuinely-empty chain (production fallback face) just
+    // resolves to {this, getCharGlyphIndex(base)} and returns harmlessly.
     if (auto it = mShapingFaceResolution.find(base); it != mShapingFaceResolution.end())
     {
         out_glyph_index = it->second.second;

@@ -495,9 +495,16 @@ namespace tut
                       out[0].glyph_id, 0u);
     }
 
-    // clearCache empties the LRU. Subsequent shapes must rebuild
-    // (storage moves) — we observe the rebuild by comparing the
-    // returned reference's data() pointer before vs after clear.
+    // clearCache empties the LRU; subsequent shapes repopulate it. The
+    // earlier version of this test compared the returned reference's
+    // data() pointer before vs after clear and asserted the address
+    // changed — that was allocator-implementation-defined. Modern
+    // allocators (LFH on Windows, jemalloc, mimalloc, ...) recycle freed
+    // slots LIFO, so the rebuilt entry's vector storage routinely lands
+    // at the just-freed address and the assertion flaked ~3-of-5 runs.
+    // cacheSize() pins the contract the cache actually guarantees
+    // (count goes to 0 then back to 1) without depending on heap
+    // recycling behavior.
     template<> template<>
     void llfontshaping_object::test<8>()
     {
@@ -508,23 +515,36 @@ namespace tut
         ensure("DejaVuSans loaded", ft.notNull());
 
         LLWString s = wstr('h','i');
-        const auto& first  = LLFontShaping::shapeLine(ft, s, 0, s.size());
+        const auto& first = LLFontShaping::shapeLine(ft, s, 0, s.size());
         ensure("shape produced output", !first.empty());
-        const void* addr0  = first.data();
+        ensure_equals("first shape leaves one entry",
+                      LLFontShaping::cacheSize(), 1u);
+        // Snapshot the size BEFORE clearCache invalidates `first` —
+        // shapeLine returns a reference into the LRU, so the entry's
+        // storage is gone the moment the LRU is cleared. Reading
+        // first.size() afterward would be a use-after-free.
+        const size_t first_size = first.size();
+        const void* addr0 = first.data();
 
-        // Cache hit: same storage.
+        // Cache hit: same storage AND the entry count stays at one.
         const auto& second = LLFontShaping::shapeLine(ft, s, 0, s.size());
         ensure_equals("cache hit storage is stable", second.data(), addr0);
+        ensure_equals("cache hit doesn't add an entry",
+                      LLFontShaping::cacheSize(), 1u);
 
         LLFontShaping::clearCache();
+        ensure_equals("clearCache empties the LRU",
+                      LLFontShaping::cacheSize(), 0u);
 
-        // Miss: rebuild allocates a new map node, storage address
-        // changes. (Glyph stream content is identical; this assertion
-        // is about cache state, not output.)
+        // Miss: re-shape repopulates the cache. Output content is
+        // identical (shaping is deterministic given the same face +
+        // codepoints); the cache state is what changed.
         const auto& after = LLFontShaping::shapeLine(ft, s, 0, s.size());
         ensure("post-clear rebuild produced output", !after.empty());
-        ensure_not_equals("post-clear: storage address changed",
-                          after.data(), addr0);
+        ensure_equals("post-clear miss repopulated to one entry",
+                      LLFontShaping::cacheSize(), 1u);
+        ensure_equals("post-clear shape is content-identical",
+                      after.size(), first_size);
     }
 
     // Keycap cluster across face boundary: '9' + U+FE0F + U+20E3 must
@@ -561,6 +581,13 @@ namespace tut
             ensure_equals("every keycap-cluster glyph routes to emoji face",
                           g.face, emoji.get());
         }
+        // Strong pin: the GSUB rule actually fires across the face
+        // boundary. A weaker form of the regression — routing matches
+        // but GSUB doesn't collapse — would leave 2+ glyphs on the
+        // emoji face (the '9' outline plus an unbound keycap mark),
+        // matching exactly what the user sees in the buggy report.
+        ensure_equals("keycap '9️⃣' GSUB-collapsed to a single glyph",
+                      out.size(), 1u);
     }
 
     // ZWJ heart-on-fire across face boundary: U+2764 (BMP heart, present
@@ -606,6 +633,130 @@ namespace tut
                       out.size(), 1u);
     }
 
+    // Adjacent clusters: '3️⃣' (keycap) + '🏳️‍🌈' (pride flag, ZWJ
+    // sequence). Both clusters route to the emoji face. The Phase 1
+    // implementation merged them into one HarfBuzz buffer when their
+    // chosen faces matched, which let GSUB rules match across the
+    // cluster boundary — the user reported the pride flag flickering
+    // down to a bare white flag (the rainbow part of the ZWJ ligature
+    // collapsed against the wrong context). Each cluster must shape as
+    // its own sub-run, so each rule sees only its own codepoints.
+    template<> template<>
+    void llfontshaping_object::test<17>()
+    {
+        const std::string head_path  = std::string(kFontDir) + "DejaVuSans.woff2";
+        const std::string emoji_path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(head_path) || !fileExists(emoji_path))
+            skip("DejaVuSans + Noto-COLRv1 required");
+
+        LLPointer<LLFontFreetype> head  = loadFt(head_path);
+        LLPointer<LLFontFreetype> emoji = loadFt(emoji_path);
+        ensure("both loaded", head.notNull() && emoji.notNull());
+        head->addFallbackFont(emoji);
+
+        // '3' VS-16 U+20E3 (keycap), then U+1F3F3 (waving white flag)
+        // VS-16 ZWJ U+1F308 (rainbow) — pride flag.
+        LLWString s = wstr('3', 0xFE0F, 0x20E3,
+                           0x1F3F3, 0xFE0F, 0x200D, 0x1F308);
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        ensure("adjacent clusters shaped to non-empty output", !out.empty());
+        for (const auto& g : out)
+        {
+            ensure_equals("every glyph routes to emoji face",
+                          g.face, emoji.get());
+        }
+        // Both clusters compose: keycap '3️⃣' -> 1 glyph, pride flag
+        // '🏳️‍🌈' -> 1 glyph. Total 2. A regression that merged the
+        // two clusters into one buffer would produce a different count
+        // (e.g. the pride flag's GSUB matching against the keycap mark
+        // and falling back to bare white-flag + standalone rainbow).
+        ensure_equals("each adjacent cluster collapses independently",
+                      out.size(), 2u);
+    }
+
+    // Cluster with no emoji-face coverage: route to root rather than to
+    // a face that lacks the base. Simulates the "LimitedEmoji" scenario
+    // where the emoji fallback's unicode_ranges excludes the keycap
+    // mark — selectShapingFace returns root for U+20E3 and pick_cluster_face
+    // must NOT route the cluster to a face that can't render its base.
+    // We model this by attaching DejaVu (which has '#' but lacks U+20E3)
+    // as the only fallback and shaping a keycap. Result must keep '#'
+    // visible on root rather than tofu-ing the base on a non-covering face.
+    template<> template<>
+    void llfontshaping_object::test<18>()
+    {
+        const std::string head_path     = std::string(kFontDir) + "InterVariable.woff2";
+        const std::string fallback_path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(head_path) || !fileExists(fallback_path))
+            skip("InterVariable + DejaVuSans required");
+
+        LLPointer<LLFontFreetype> head     = loadFt(head_path);
+        LLPointer<LLFontFreetype> fallback = loadFt(fallback_path);
+        ensure("both loaded", head.notNull() && fallback.notNull());
+        head->addFallbackFont(fallback);
+
+        // Sanity: neither face has U+20E3 (keycap mark) — that's the
+        // scenario this test exercises. Neither has the keycap GSUB
+        // rule. Best-case outcome: the base '#' renders through root.
+        ensure_equals("Inter lacks U+20E3", head->getCharGlyphIndex(0x20E3), 0u);
+        ensure_equals("DejaVu lacks U+20E3", fallback->getCharGlyphIndex(0x20E3), 0u);
+        ensure_not_equals("Inter has '#' in cmap",
+                          head->getCharGlyphIndex(L'#'), 0u);
+
+        LLWString s = wstr('#', 0xFE0F, 0x20E3);
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        ensure("shape produced output", !out.empty());
+        // The base '#' must end up on a face that has it (root). A
+        // regression that routed to a non-covering face would tofu
+        // the '#' (glyph_id == 0) which is the worse failure mode.
+        bool found_hash = false;
+        for (const auto& g : out)
+        {
+            if (g.face == head.get() && g.glyph_id == head->getCharGlyphIndex(L'#'))
+                found_hash = true;
+        }
+        ensure("'#' base routed to a face that has it",
+               found_hash);
+    }
+
+    // Hash-keycap directly through the emoji face: pin that Noto-COLRv1
+    // actually has the GSUB rule for '#' + VS-16 + U+20E3 -> composed
+    // keycap (one glyph). The '9' rule is exercised by test 13 across
+    // a face boundary; this version uses Noto-COLRv1 directly so a font-
+    // level missing rule is observable as glyph_count > 1 (not a routing
+    // bug). User report: '#️⃣' renders as '#' + a standalone keycap mark
+    // — diagnosed by this test as either a font-rule miss or a routing
+    // miss, with the existing rule-fires path through 9️⃣ as the control.
+    template<> template<>
+    void llfontshaping_object::test<16>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+        LLPointer<LLFontFreetype> ft = loadFt(path);
+        ensure("Noto-COLRv1 loaded", ft.notNull());
+
+        // Sanity: the font carries '#' and U+20E3 in cmap. If either
+        // were missing, hb_shape would emit notdef before any GSUB
+        // could match.
+        ensure_not_equals("Noto-COLRv1 has '#' in cmap",
+                          ft->getCharGlyphIndex(L'#'), 0u);
+        ensure_not_equals("Noto-COLRv1 has U+20E3 in cmap",
+                          ft->getCharGlyphIndex(0x20E3), 0u);
+
+        LLWString s = wstr('#', 0xFE0F, 0x20E3);
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        ensure("hash-keycap shaped to non-empty output", !out.empty());
+        // If the GSUB keycap rule fires, the run collapses to a single
+        // composed glyph (the same shape test 6 / test 13 expect for
+        // their respective ligatures).
+        ensure_equals("hash-keycap '#️⃣' GSUB-collapsed to a single glyph",
+                      out.size(), 1u);
+    }
+
     // Bare digit control: '9' alone (no FE0F + 20E3 follower) is NOT a
     // cluster per the walker. Phase 1's fast path must not interfere —
     // the digit routes to head as before, one glyph, no surprises.
@@ -630,6 +781,51 @@ namespace tut
                       out[0].face, head.get());
         ensure_equals("bare '9' glyph_id matches head's cmap",
                       out[0].glyph_id, head->getCharGlyphIndex(L'9'));
+    }
+
+    // Subdivision flag: U+1F3F4 (black flag) + tag chars 'gbeng' + the
+    // U+E007F CANCEL TAG terminator. Validates that LLStringOps::
+    // isEmojiClusterExtender includes the U+E0020-U+E007F tag-char range
+    // and that pick_cluster_face routes the entire 7-codepoint cluster
+    // to a face whose cmap covers the tag chars. A regression that
+    // dropped tag-char support from the predicate would split the flag
+    // off from its tag bytes and render the bytes as visible glyphs.
+    template<> template<>
+    void llfontshaping_object::test<19>()
+    {
+        const std::string head_path  = std::string(kFontDir) + "DejaVuSans.woff2";
+        const std::string emoji_path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(head_path) || !fileExists(emoji_path))
+            skip("DejaVuSans + Noto-COLRv1 required");
+
+        LLPointer<LLFontFreetype> head  = loadFt(head_path);
+        LLPointer<LLFontFreetype> emoji = loadFt(emoji_path);
+        ensure("both loaded", head.notNull() && emoji.notNull());
+        head->addFallbackFont(emoji);
+
+        // 🏴 (U+1F3F4) + 'g' 'b' 'e' 'n' 'g' tag chars + U+E007F.
+        LLWString s = wstr(0x1F3F4,
+                           0xE0067, 0xE0062, 0xE0065, 0xE006E, 0xE0067,
+                           0xE007F);
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        ensure("subdivision flag shaped to non-empty output", !out.empty());
+        // Routing assertion is the load-bearing one: every cluster
+        // member must land on the emoji face. A predicate regression
+        // that excluded tag chars would split the flag onto emoji and
+        // the tag bytes onto root.
+        for (const auto& g : out)
+        {
+            ensure_equals("every tag-flag glyph routes to emoji face",
+                          g.face, emoji.get());
+        }
+        // Stretch goal: if Noto-COLRv1 carries the GB-ENG subdivision
+        // flag, GSUB collapses the whole sequence to one glyph. Some
+        // Noto-COLRv1 builds ship without subdivision flags — tolerate
+        // up to N glyphs, but never MORE than the input length (which
+        // would mean glyph duplication).
+        ensure("output glyph count never exceeds input codepoint count",
+               out.size() <= s.size());
     }
 
 #if LL_MESA_HEADLESS

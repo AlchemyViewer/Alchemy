@@ -120,6 +120,16 @@ public:
     // definition is what matters.
     static bool isPictographBase(llwchar a);
 
+    // Codepoints that extend a pictograph base into a multi-codepoint
+    // cluster as a trailing modifier: VS-15 / VS-16 presentation selectors,
+    // the keycap combining mark, skin-tone modifiers, and tag chars
+    // (including the U+E007F CANCEL TAG terminator for subdivision flags).
+    // ZWJ (U+200D) is *not* included — it joins one cluster to another
+    // base codepoint and walkers handle it separately. Shared by the
+    // cluster walker (wstring_find_emoji_clusters) and the shape-itemizer
+    // so the two never disagree on what belongs in a cluster.
+    static bool isEmojiClusterExtender(llwchar a);
+
     static S32  collate(const char* a, const char* b) { return strcoll(a, b); }
     static S32  collate(const llwchar* a, const llwchar* b);
 
