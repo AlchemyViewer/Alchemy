@@ -646,6 +646,11 @@ LL_COMMON_API bool wstring_remove_emojis(LLWString& wstr);
 
 LL_COMMON_API bool utf8str_remove_emojis(std::string& utf8str);
 
+// Half-open codepoint ranges of multi-codepoint emoji clusters in a wstring,
+// in ascending order. Produced by wstring_find_emoji_clusters and consumed by
+// the cluster-aware grapheme/emoji helpers below.
+using EmojiClusterList = std::vector<std::pair<size_t, size_t>>;
+
 // Locate contiguous ranges [begin, end) of wstr that form a multi-code-point
 // emoji cluster — ZWJ families, VS15/VS16 presentation selectors, skin-tone
 // modifiers, regional indicator flag pairs, keycap sequences (digit/#/* + FE0F
@@ -653,8 +658,15 @@ LL_COMMON_API bool utf8str_remove_emojis(std::string& utf8str);
 // cursor stepping and selection logic, NOT by the renderer (which now shapes
 // the entire line via LLFontShaping::shapeLine). Isolated emoji that render
 // correctly through the 1:1 FT_Get_Char_Index path are intentionally skipped.
-LL_COMMON_API std::vector<std::pair<size_t, size_t>>
+LL_COMMON_API EmojiClusterList
 wstring_find_emoji_clusters(LLWStringView wstr);
+
+// Cost note for the cluster-aware helpers below: the single-argument forms
+// rebuild the cluster list internally on every call (an O(N) scan of `wstr`).
+// Fine for one-off cursor moves; expensive in tight loops over the same text.
+// Callers making multiple cluster-aware queries on the same wstring should
+// call wstring_find_emoji_clusters once and feed the result into the
+// three-argument overloads, amortising the scan across the batch.
 
 // Cluster-aware cursor stepping. Move one codepoint forward/backward from
 // `pos`, then — if that single-codepoint step landed strictly inside an emoji
@@ -664,7 +676,11 @@ wstring_find_emoji_clusters(LLWStringView wstr);
 // wstring_find_emoji_clusters, not the full UAX #29 spec (Hangul LVT, Indic
 // aksara, combining marks outside emoji context still step per codepoint).
 LL_COMMON_API size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos);
+LL_COMMON_API size_t wstring_step_grapheme_forward(
+    LLWStringView wstr, size_t pos, const EmojiClusterList& clusters);
 LL_COMMON_API size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos);
+LL_COMMON_API size_t wstring_step_grapheme_backward(
+    LLWStringView wstr, size_t pos, const EmojiClusterList& clusters);
 
 // Snap `pos` onto a cluster boundary when it currently sits strictly inside an
 // emoji cluster. The backward variant snaps to the cluster's start, the
@@ -679,7 +695,11 @@ LL_COMMON_API size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t p
 // belong to?" want wstring_emoji_range_at, which is inclusive of the
 // leading boundary and aware of single-codepoint pictographs.
 LL_COMMON_API size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos);
+LL_COMMON_API size_t wstring_grapheme_align_backward(
+    LLWStringView wstr, size_t pos, const EmojiClusterList& clusters);
 LL_COMMON_API size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos);
+LL_COMMON_API size_t wstring_grapheme_align_forward(
+    LLWStringView wstr, size_t pos, const EmojiClusterList& clusters);
 
 // Return the half-open codepoint range of the emoji cluster (or single
 // pictograph codepoint) that contains `pos`. Returns an empty range with
@@ -693,6 +713,9 @@ LL_COMMON_API size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t p
 // do not.
 LL_COMMON_API std::pair<size_t, size_t>
 wstring_emoji_range_at(LLWStringView wstr, size_t pos);
+LL_COMMON_API std::pair<size_t, size_t>
+wstring_emoji_range_at(LLWStringView wstr, size_t pos,
+                       const EmojiClusterList& clusters);
 
 #if LL_WINDOWS
 /* @name Windows string helpers

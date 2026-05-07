@@ -839,9 +839,9 @@ static size_t advance_shaping_run(const llwchar* p, size_t n, size_t start)
     return r;
 }
 
-std::vector<std::pair<size_t, size_t>> wstring_find_emoji_clusters(LLWStringView wstr)
+EmojiClusterList wstring_find_emoji_clusters(LLWStringView wstr)
 {
-    std::vector<std::pair<size_t, size_t>> runs;
+    EmojiClusterList runs;
     const llwchar* p = wstr.data();
     const size_t n = wstr.size();
     size_t i = 0;
@@ -870,14 +870,15 @@ std::vector<std::pair<size_t, size_t>> wstring_find_emoji_clusters(LLWStringView
     return runs;
 }
 
-size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos)
+size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos,
+                                     const EmojiClusterList& clusters)
 {
     const size_t n = wstr.size();
     if (pos >= n)
         return n;
     const size_t next = pos + 1;
     // Clusters are sorted by start, so stop scanning once we pass `next`.
-    for (const auto& run : wstring_find_emoji_clusters(wstr))
+    for (const auto& run : clusters)
     {
         if (next <= run.first)
             break;
@@ -887,12 +888,18 @@ size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos)
     return next;
 }
 
-size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos)
+size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos)
+{
+    return wstring_step_grapheme_forward(wstr, pos, wstring_find_emoji_clusters(wstr));
+}
+
+size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos,
+                                      const EmojiClusterList& clusters)
 {
     if (pos == 0)
         return 0;
     const size_t prev = pos - 1;
-    for (const auto& run : wstring_find_emoji_clusters(wstr))
+    for (const auto& run : clusters)
     {
         if (prev < run.first)
             break;
@@ -902,11 +909,17 @@ size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos)
     return prev;
 }
 
-size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos)
+size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos)
+{
+    return wstring_step_grapheme_backward(wstr, pos, wstring_find_emoji_clusters(wstr));
+}
+
+size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos,
+                                       const EmojiClusterList& clusters)
 {
     if (pos == 0 || pos >= wstr.size())
         return pos;
-    for (const auto& run : wstring_find_emoji_clusters(wstr))
+    for (const auto& run : clusters)
     {
         if (pos <= run.first)
             break;
@@ -916,11 +929,17 @@ size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos)
     return pos;
 }
 
-size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
+size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos)
+{
+    return wstring_grapheme_align_backward(wstr, pos, wstring_find_emoji_clusters(wstr));
+}
+
+size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos,
+                                      const EmojiClusterList& clusters)
 {
     if (pos >= wstr.size())
         return wstr.size();
-    for (const auto& run : wstring_find_emoji_clusters(wstr))
+    for (const auto& run : clusters)
     {
         if (pos <= run.first)
             break;
@@ -930,11 +949,17 @@ size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
     return pos;
 }
 
-std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos)
+size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
+{
+    return wstring_grapheme_align_forward(wstr, pos, wstring_find_emoji_clusters(wstr));
+}
+
+std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos,
+                                                 const EmojiClusterList& clusters)
 {
     if (pos >= wstr.size())
         return { pos, pos };
-    for (const auto& run : wstring_find_emoji_clusters(wstr))
+    for (const auto& run : clusters)
     {
         if (pos < run.first)
             break;
@@ -950,6 +975,11 @@ std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos)
     return LLStringOps::isPictographBase(wstr[pos])
         ? std::make_pair(pos, pos + 1)
         : std::make_pair(pos, pos);
+}
+
+std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos)
+{
+    return wstring_emoji_range_at(wstr, pos, wstring_find_emoji_clusters(wstr));
 }
 
 #if LL_WINDOWS

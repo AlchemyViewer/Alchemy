@@ -80,10 +80,21 @@ namespace
 namespace tut
 {
     struct llstring_utf_data {};
-    // Tests are numbered by category (1x conversion, 2x validation, 3x case,
-    // 6x emoji, 8x byte-helpers, 9x shaping, 10x grapheme). The TUT default
-    // registers only test<1>..test<50>, silently dropping everything above.
-    // Keep this in sync with the highest test number used below.
+    // Tests are numbered by category:
+    //   1x  conversion       (utf8 <-> wstring/utf16, basic round-trips)
+    //   2x  validation       (well-formed input pins)
+    //   3x  case             (ICU-backed casing)
+    //   4x  malformed UTF    (replacement-char behavior on bad bytes)
+    //   5x  compose+classifiers (round-trip helpers, isUpper/isDigit/etc)
+    //   6x  emoji            (narrow-contract: isEmoji-driven detection/strip)
+    //   7x  emoji broad      (cluster-driven strip: keycaps, subdivision flags, BMP-base ZWJ)
+    //   8x  byte-helpers
+    //   9x  shaping          (cluster walker: wstring_find_emoji_clusters)
+    //   10x grapheme         (step + align + range_at)
+    //   11x utf8str helpers  (substChar/makeASCII/removeCRLF/split/preview)
+    // The TUT default registers only test<1>..test<50>, but the explicit
+    // test_group<..., 128> below raises that ceiling. Keep this index in
+    // sync with categories used below.
     typedef test_group<llstring_utf_data, 128> llstring_utf_t;
     typedef llstring_utf_t::object llstring_utf_object_t;
     tut::llstring_utf_t tut_llstring_utf("LLStringUTF");
@@ -481,6 +492,17 @@ namespace tut
     }
 
     template<> template<>
+    void llstring_utf_object_t::test<51>()
+    {
+        ensure_equals("compare_insensitive eq",
+                      utf8str_compare_insensitive("Hello", "hello"), S32(0));
+        ensure("compare_insensitive lt",
+               utf8str_compare_insensitive("abc", "abd") < 0);
+        ensure("compare_insensitive gt",
+               utf8str_compare_insensitive("abd", "abc") > 0);
+    }
+
+    template<> template<>
     void llstring_utf_object_t::test<52>()
     {
         // LLStringOps::toLower/toUpper route through ICU u_tolower/u_toupper,
@@ -501,17 +523,6 @@ namespace tut
         LLWString expected;
         expected.push_back(small);
         ensure_wstring_equals("LLWStringUtil::toLower astral", ws, expected);
-    }
-
-    template<> template<>
-    void llstring_utf_object_t::test<51>()
-    {
-        ensure_equals("compare_insensitive eq",
-                      utf8str_compare_insensitive("Hello", "hello"), S32(0));
-        ensure("compare_insensitive lt",
-               utf8str_compare_insensitive("abc", "abd") < 0);
-        ensure("compare_insensitive gt",
-               utf8str_compare_insensitive("abd", "abc") > 0);
     }
 
     // ---------------------------------------------------------------
@@ -745,13 +756,17 @@ namespace tut
         ensure_wstring_equals("bare heart preserved", bare_heart, bare_expected);
     }
 
+    // ---------------------------------------------------------------
+    //          7x emoji broad-strip (cluster-driven)
+    // ---------------------------------------------------------------
+
     // Heart-on-fire ❤️‍🔥 (U+2764 U+FE0F U+200D U+1F525): full ZWJ sequence
     // with a BMP base. Pre-rewrite the walker would write through the
     // heart/VS-16/ZWJ then strip the lone fire, leaving `❤️‍` (heart +
     // VS-16 + dangling ZWJ) on screen. Cluster-driven removal strips
     // the whole sequence as one unit.
     template<> template<>
-    void llstring_utf_object_t::test<76>()
+    void llstring_utf_object_t::test<70>()
     {
         LLWString ws = { (llwchar)'A',
                          (llwchar)0x2764, (llwchar)0xFE0F,
@@ -768,7 +783,7 @@ namespace tut
     // identifies it as a single 3-codepoint cluster, and the broad contract
     // strips it.
     template<> template<>
-    void llstring_utf_object_t::test<77>()
+    void llstring_utf_object_t::test<71>()
     {
         LLWString digit_kc = { (llwchar)'1', (llwchar)0xFE0F, (llwchar)0x20E3, (llwchar)'!' };
         const LLWString expected = { (llwchar)'!' };
@@ -796,7 +811,7 @@ namespace tut
     // left tag chars and the U+E007F terminator behind as garbage code
     // points. Cluster-driven removal sweeps the whole sequence.
     template<> template<>
-    void llstring_utf_object_t::test<78>()
+    void llstring_utf_object_t::test<72>()
     {
         LLWString ws = { (llwchar)'<',
                          (llwchar)0x1F3F4,
@@ -815,7 +830,7 @@ namespace tut
     // is_emoji_sequence_extender's narrow set and would have been left as
     // an orphan after the base was stripped.
     template<> template<>
-    void llstring_utf_object_t::test<79>()
+    void llstring_utf_object_t::test<73>()
     {
         LLWString ws = { (llwchar)0x1F680, (llwchar)0xFE0E, (llwchar)'!' };
         const LLWString expected = { (llwchar)'!' };
@@ -826,7 +841,7 @@ namespace tut
     // Two flags back-to-back 🇺🇸🇯🇵 — distinct clusters [0,2) and [2,4).
     // Both must strip cleanly; no leftover RI codepoints.
     template<> template<>
-    void llstring_utf_object_t::test<83>()
+    void llstring_utf_object_t::test<74>()
     {
         LLWString ws = { (llwchar)0x1F1FA, (llwchar)0x1F1F8,
                          (llwchar)0x1F1EF, (llwchar)0x1F1F5,
@@ -841,7 +856,7 @@ namespace tut
     // (ZWSP isn't in the extender set), but pin it now that the path uses
     // the cluster walker, which also treats ZWSP as inert.
     template<> template<>
-    void llstring_utf_object_t::test<84>()
+    void llstring_utf_object_t::test<75>()
     {
         LLWString ws = { (llwchar)0x1F680, (llwchar)0x200B, (llwchar)'X' };
         const LLWString expected = { (llwchar)0x200B, (llwchar)'X' };
@@ -850,14 +865,14 @@ namespace tut
     }
 
     // ---------------------------------------------------------------
-    //                     utf8str helper smoke pins
+    //                  11x utf8str helper smoke pins
     // ---------------------------------------------------------------
 
     // utf8str_substChar replaces every occurrence of a code point (incl.
     // astrals) with another code point, routing through LLWString so the
     // byte-length change is handled for us.
     template<> template<>
-    void llstring_utf_object_t::test<70>()
+    void llstring_utf_object_t::test<110>()
     {
         const std::string in  = "A\xF0\x9F\x9A\x80" "B\xF0\x9F\x9A\x80" "C";
         const std::string out = utf8str_substChar(in, (llwchar)0x1F680, (llwchar)'X');
@@ -871,7 +886,7 @@ namespace tut
     // utf8str_makeASCII replaces every non-ASCII llwchar (>0x7F) with '?'
     // before serializing back to utf-8.
     template<> template<>
-    void llstring_utf_object_t::test<71>()
+    void llstring_utf_object_t::test<111>()
     {
         const std::string mixed = "A\xE6\x97\xA5" "B\xF0\x9F\x9A\x80" "C";
         const std::string expected = "A?B?C";
@@ -883,7 +898,7 @@ namespace tut
     // mbcsstring_makeASCII is byte-level: every byte >0x7F becomes '?'. So a
     // 3-byte UTF-8 character yields three '?' rather than one.
     template<> template<>
-    void llstring_utf_object_t::test<72>()
+    void llstring_utf_object_t::test<112>()
     {
         const std::string mixed = "A\xE6\x97\xA5" "B";
         const std::string expected = "A???B";
@@ -892,7 +907,7 @@ namespace tut
 
     // utf8str_removeCRLF strips CR (0x0D) only — LF is preserved.
     template<> template<>
-    void llstring_utf_object_t::test<73>()
+    void llstring_utf_object_t::test<113>()
     {
         ensure_equals("removeCRLF crlf", utf8str_removeCRLF("a\r\nb"), std::string("a\nb"));
         ensure_equals("removeCRLF cr",   utf8str_removeCRLF("a\rb"),   std::string("ab"));
@@ -904,7 +919,7 @@ namespace tut
     // falling back to a hard byte cut when no token is in range. Non-final
     // chunks retain the trailing split-token (current implementation).
     template<> template<>
-    void llstring_utf_object_t::test<74>()
+    void llstring_utf_object_t::test<114>()
     {
         {
             std::list<std::string> out;
@@ -926,7 +941,7 @@ namespace tut
     // wchar_utf8_preview formats the code point in hex, plus (when multi-byte)
     // the decoded UTF-8 byte sequence also in hex.
     template<> template<>
-    void llstring_utf_object_t::test<75>()
+    void llstring_utf_object_t::test<115>()
     {
         ensure_equals("preview ASCII", wchar_utf8_preview((llwchar)'A'), std::string("41"));
         // é = U+00E9 -> 0xC3 0xA9
@@ -1618,5 +1633,62 @@ namespace tut
         auto post = wstring_emoji_range_at(subdiv, 8);
         ensure_equals("subdiv pre empty",  pre.first,  pre.second);
         ensure_equals("subdiv post empty", post.first, post.second);
+    }
+
+    // ---------------------------------------------------------------
+    // Pin overload-equivalence: the no-clusters and with-clusters forms
+    // of every cluster-aware helper must produce identical results for
+    // the same input. The with-clusters overloads exist to let callers
+    // amortise the wstring_find_emoji_clusters scan across many lookups,
+    // so any future change that updates one body without the other
+    // (e.g. a bug fix in the loop) needs to fail loudly here.
+    // ---------------------------------------------------------------
+
+    template<> template<>
+    void llstring_utf_object_t::test<106>()
+    {
+        // Same mixed-content string used in test<104>: ASCII + flag +
+        // space + ZWJ family + ASCII. Two disjoint clusters at [1,3) and
+        // [4,9), so the loop bodies exercise both early-out and middle-
+        // of-vector iteration.
+        LLWString two = { (llwchar)'H',
+                          (llwchar)0x1F1FA, (llwchar)0x1F1F8,
+                          (llwchar)' ',
+                          (llwchar)0x1F468, (llwchar)0x200D,
+                          (llwchar)0x1F469, (llwchar)0x200D,
+                          (llwchar)0x1F467,
+                          (llwchar)'!' };
+        const auto clusters = wstring_find_emoji_clusters(two);
+        for (size_t p = 0; p <= two.size(); ++p)
+        {
+            ensure_equals("step_forward overload",
+                          wstring_step_grapheme_forward(two, p),
+                          wstring_step_grapheme_forward(two, p, clusters));
+            ensure_equals("step_backward overload",
+                          wstring_step_grapheme_backward(two, p),
+                          wstring_step_grapheme_backward(two, p, clusters));
+            ensure_equals("align_backward overload",
+                          wstring_grapheme_align_backward(two, p),
+                          wstring_grapheme_align_backward(two, p, clusters));
+            ensure_equals("align_forward overload",
+                          wstring_grapheme_align_forward(two, p),
+                          wstring_grapheme_align_forward(two, p, clusters));
+            auto r1 = wstring_emoji_range_at(two, p);
+            auto r2 = wstring_emoji_range_at(two, p, clusters);
+            ensure_equals("range_at first",  r1.first,  r2.first);
+            ensure_equals("range_at second", r1.second, r2.second);
+        }
+
+        // Empty wstring — pinning that the with-clusters overloads handle
+        // a degenerate empty cluster vector identically to the
+        // no-clusters form.
+        LLWString empty;
+        const EmojiClusterList no_clusters;
+        ensure_equals("empty step_forward overload",
+                      wstring_step_grapheme_forward(empty, 0),
+                      wstring_step_grapheme_forward(empty, 0, no_clusters));
+        ensure_equals("empty range_at first overload",
+                      wstring_emoji_range_at(empty, 0).first,
+                      wstring_emoji_range_at(empty, 0, no_clusters).first);
     }
 }
