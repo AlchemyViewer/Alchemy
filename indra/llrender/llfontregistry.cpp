@@ -596,6 +596,74 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
         replace_files(variant_it, merged_files);
     }
 
+    // Step 4: deduplicate file lists on every template. Two paths feed
+    // dupes in: (a) an override prepend whose source is also reachable
+    // through the family's <use> chain (e.g. override SansSerifBase to
+    // DejaVu, then SansSerif <use family="DejaVu"/> appends DejaVu
+    // again), and (b) a diamond <use> graph where two <use>s
+    // transitively reach the same primitive. The first hit wins —
+    // the renderer treats chain[0] as the head face and walks tail
+    // entries in order for fallback coverage, so an earlier copy
+    // already covers everything a later copy would.
+    //
+    // Equality here ignores CharFunctor when both are null (the common
+    // case — functored entries come from <file unicode_ranges='...'>
+    // and aren't typically prepended by overrides). Two functored
+    // entries with the same filename are treated as distinct because
+    // std::function targets can't be reliably compared and we'd rather
+    // err on the side of keeping a possibly-different gate than
+    // collapsing two genuinely-different functors into one.
+    auto file_info_equivalent = [](const LLFontFileInfo& a, const LLFontFileInfo& b) {
+        if (a.FileName != b.FileName) return false;
+        if (a.mHinting != b.mHinting) return false;
+        if (a.mFlags != b.mFlags) return false;
+        if (a.mWeight != b.mWeight) return false;
+        if (a.mSizeDelta != b.mSizeDelta) return false;
+        if (a.mMonospaceLigatures != b.mMonospaceLigatures) return false;
+        if (a.mLoadCollection != b.mLoadCollection) return false;
+        // CharFunctor: null+null == equivalent; anything else differs.
+        if (static_cast<bool>(a.CharFunctor) != static_cast<bool>(b.CharFunctor)) return false;
+        if (a.CharFunctor || b.CharFunctor) return false;
+        return true;
+    };
+    // Two-phase: collect every (old descriptor, deduped files) update
+    // first, then apply via replace_files. replace_files erases the
+    // iterator it's passed, so doing it inline would invalidate the
+    // outer iteration.
+    std::vector<std::pair<LLFontDescriptor, font_file_info_vec_t>> dedup_updates;
+    for (const auto& entry : mFontMap)
+    {
+        if (!entry.first.isTemplate())
+            continue;
+        const auto& orig = entry.first.getFontFiles();
+        if (orig.size() < 2)
+            continue;
+        font_file_info_vec_t deduped;
+        deduped.reserve(orig.size());
+        for (const auto& f : orig)
+        {
+            bool already_present = false;
+            for (const auto& kept : deduped)
+            {
+                if (file_info_equivalent(f, kept))
+                {
+                    already_present = true;
+                    break;
+                }
+            }
+            if (!already_present)
+                deduped.push_back(f);
+        }
+        if (deduped.size() != orig.size())
+            dedup_updates.emplace_back(entry.first, std::move(deduped));
+    }
+    for (auto& [old_desc, new_files] : dedup_updates)
+    {
+        auto it = mFontMap.find(old_desc);
+        if (it != mFontMap.end())
+            replace_files(it, new_files);
+    }
+
     // Cache the just-applied overrides so a subsequent reload at the same
     // (fonts.xml, overrides) but new DPI can detect the no-content-change
     // case via overridesEqual and take the fast path.

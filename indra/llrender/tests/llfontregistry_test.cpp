@@ -716,11 +716,12 @@ namespace tut
     }
 
     // <use> applies per-style before inherit; then inherit appends NORMAL's
-    // post-<use> chain. F BOLD ends up with [F-B, B] from its own <use>
-    // walk, then [F-R, B] appended from NORMAL's post-<use> list — so B
-    // intentionally appears twice. The freetype-load fallback cache
-    // (mFallbackInstanceCache, keyed by file + face params) dedups at
-    // load time, so the doubled descriptor entry doesn't double-load.
+    // post-<use> chain. F BOLD's pre-dedup chain would be [F-B, B, F-R, B]
+    // — the same B file from both F BOLD's own <use> and from NORMAL's
+    // post-<use> list inherited in. The dedup pass at the end of
+    // resolveFontReferences drops the second B because chain[0..2] already
+    // covers everything the duplicate would; it just wastes the renderer's
+    // per-codepoint chain walk to look up a face it'll handle the same way.
     template<> template<>
     void llfontregistry_object::test<30>()
     {
@@ -738,13 +739,13 @@ namespace tut
         ensure("parse ok", loadXml(xml));
         resolve();
         auto bold = fileNames("F", LLFontGL::BOLD);
-        ensure_equals("4 files: own bold + B from <use> + NORMAL inherit + B again",
-                      (S32)bold.size(), 4);
+        ensure_equals("3 files post-dedup: own bold + B from <use> + NORMAL inherit",
+                      (S32)bold.size(), 3);
         ensure_equals("F-B first",        bold[0], std::string("F-B.woff2"));
         ensure_equals("B from <use>",     bold[1], std::string("B.woff2"));
         ensure_equals("F-R inherited",    bold[2], std::string("F-R.woff2"));
-        ensure_equals("B carried by NORMAL's <use>",
-                      bold[3], std::string("B.woff2"));
+        ensure_equals("duplicate B from NORMAL's <use> deduped out",
+                      countFile("F", "B.woff2", LLFontGL::BOLD), 1);
     }
 
     // Calling resolve() a second time is a no-op — mFamilyUses /
@@ -1437,6 +1438,135 @@ namespace tut
                       menu[0], std::string("Source.woff2"));
         ensure_equals("AltA gone from Menu after clear",
                       countFile("Menu", "AltA.woff2"), 0);
+    }
+
+    // Dedup pin: when the override source is also reachable through the
+    // target's own <use> chain, the resolved chain should NOT carry the
+    // file twice. Reproduces the user-reported case where overriding
+    // "SansSerifBase" → "DejaVu" produced [DejaVu(override), SourceSans,
+    // DejaVu(via <use family="DejaVu"/>), Noto, CJK] — the second DejaVu
+    // is functionally redundant since chain[0] already covers everything
+    // the duplicate would, and the duplicated entry just wastes the
+    // renderer's per-codepoint walk.
+    template<> template<>
+    void llfontregistry_object::test<52>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Source'>"
+            "    <style name='NORMAL'><file>Source.woff2</file></style>"
+            "  </font>"
+            "  <font name='DejaVu'>"
+            "    <style name='NORMAL'><file>DejaVu.woff2</file></style>"
+            "  </font>"
+            "  <font name='Base'>"
+            "    <use family='Source'/>"
+            "  </font>"
+            "  <font name='Menu'>"
+            "    <use family='Base'/>"
+            "    <use family='DejaVu'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+
+        LLSD overrides;
+        overrides["Base"] = "DejaVu";
+        resolve(overrides);
+
+        // Without dedup, Menu would be [DejaVu(override), Source,
+        // DejaVu(<use>), …]. With dedup, the second DejaVu is dropped.
+        ensure_equals("Menu chain has DejaVu exactly once",
+                      countFile("Menu", "DejaVu.woff2"), 1);
+        ensure("Menu chain still has Source",
+               countFile("Menu", "Source.woff2") >= 1);
+        const auto menu = fileNames("Menu");
+        ensure("Menu non-empty", !menu.empty());
+        ensure_equals("Menu[0] is the override file",
+                      menu[0], std::string("DejaVu.woff2"));
+    }
+
+    // Pure <use> diamond, no override. A reaches D twice — once through
+    // B and once through C — and the dedup pass at the end of
+    // resolveFontReferences must drop the second copy. Test 52 covers
+    // the override + <use> shape; this one pins that the dedup logic
+    // also operates on plain chain composition with no override
+    // involved, so a future regression that gates dedup on "did
+    // applyFamilyOverrides run?" would fail here.
+    template<> template<>
+    void llfontregistry_object::test<53>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='D'>"
+            "    <style name='NORMAL'><file>D.woff2</file></style>"
+            "  </font>"
+            "  <font name='B'>"
+            "    <use family='D'/>"
+            "  </font>"
+            "  <font name='C'>"
+            "    <use family='D'/>"
+            "  </font>"
+            "  <font name='A'>"
+            "    <use family='B'/>"
+            "    <use family='C'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+
+        // A reaches D twice (via B and via C). Pre-dedup the chain
+        // would be [D, D]; post-dedup [D] — first hit wins, second
+        // copy dropped.
+        ensure_equals("A chain has D exactly once",
+                      countFile("A", "D.woff2"), 1);
+        const auto a_files = fileNames("A");
+        ensure_equals("A chain length post-dedup",
+                      (S32)a_files.size(), 1);
+    }
+
+    // Two functored entries with the same filename must NOT collapse.
+    // std::function targets can't be reliably compared for equality, so
+    // the dedup predicate guards against false positives via
+    // `if (a.CharFunctor || b.CharFunctor) return false;` — when either
+    // side carries a functor, treat them as distinct. A regression that
+    // weakened this to "compare via target_type or address" would
+    // silently collapse two distinct unicode_ranges gates pointing at
+    // the same multi-script TTF, losing the per-codepoint routing
+    // gate for one of them.
+    //
+    // Two-gate scenario (both entries functored): the outer
+    // `static_cast<bool>(a.CharFunctor) != static_cast<bool>(...)`
+    // check passes (both are non-null), so the inner guard is the only
+    // line keeping them apart.
+    template<> template<>
+    void llfontregistry_object::test<54>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='LatinGated'>"
+            "    <style name='NORMAL'>"
+            "      <file unicode_ranges='U+0000-U+00FF'>Shared.ttf</file>"
+            "    </style>"
+            "  </font>"
+            "  <font name='EmojiGated'>"
+            "    <style name='NORMAL'>"
+            "      <file unicode_ranges='U+1F000-U+1F0FF'>Shared.ttf</file>"
+            "    </style>"
+            "  </font>"
+            "  <font name='Combined'>"
+            "    <use family='LatinGated'/>"
+            "    <use family='EmojiGated'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+
+        // Both entries reference the same filename and carry a non-null
+        // CharFunctor. Dedup must keep both — collapsing would route
+        // every codepoint through whichever functor survived, breaking
+        // coverage for the dropped range.
+        ensure_equals("Combined keeps both functored entries",
+                      countFile("Combined", "Shared.ttf"), 2);
     }
 
 #if LL_MESA_HEADLESS
