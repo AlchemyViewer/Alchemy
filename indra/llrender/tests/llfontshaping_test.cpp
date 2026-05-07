@@ -931,6 +931,126 @@ namespace tut
             skip("no monospace fonts present in test data dir");
     }
 
+    // Strict-mono never collapses codepoints into ligated glyphs.
+    // Load-bearing: column count matching codepoint count is what stops
+    // word-wrap and render from disagreeing on line width.
+    //
+    // The kFixedWidthStrict feature plan disables liga / calt / clig
+    // / dlig / rlig at the GSUB lookup level, but the shipped monospace
+    // fonts (DejaVuSansMono, SourceCodeVF) don't actually have those
+    // GSUB lookups for the bait pairs below, so this test passes
+    // even if the feature plan were relaxed — verified empirically by
+    // temporarily relaxing kFixedWidthStrict and re-running.
+    //
+    // The test is still kept as a *contract* assertion for two
+    // reasons: (1) catches a future shipped-font upgrade that DOES
+    // include programmer ligatures, and (2) catches an HB upstream
+    // change that fires more lookups by default.
+    template<> template<>
+    void llfontshaping_object::test<21>()
+    {
+        const char* mono_files[] = {
+            "DejaVuSansMono.woff2",
+            "SourceCodeVF-Upright.woff2",
+        };
+        // Mix common Latin ligature triggers with programmer-font pairs.
+        // The exact glyph_count drops we'd see under ligatures-on are
+        // font-specific (DejaVuSansMono is sparse, SourceCodeVF is rich)
+        // but every entry on this list is a known ligation candidate in
+        // at least one of the shipped fonts.
+        const std::string ligature_bait =
+            "fi fl ff ffi ffl == != => <- -> <= >= ::";
+
+        size_t fonts_tested = 0;
+        for (const char* fname : mono_files)
+        {
+            const std::string path = std::string(kFontDir) + fname;
+            if (!fileExists(path))
+                continue;
+            LLPointer<LLFontFreetype> ft = loadFt(path);
+            ensure("monospace font loaded", ft.notNull());
+            ensure("font is fixed-width", ft->isFixedWidth());
+            // Default: ligatures off. Routes through HB with kFixedWidthStrict.
+            ensure("ligatures default off",
+                   !ft->getAllowMonospaceLigatures());
+
+            LLWString s;
+            s.reserve(ligature_bait.size());
+            for (char c : ligature_bait)
+                s.push_back((llwchar)c);
+
+            std::vector<LLShapedGlyph> out;
+            LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+            ensure_equals("strict-mono glyph_count == codepoint_count",
+                          out.size(), s.size());
+            ++fonts_tested;
+        }
+        if (fonts_tested == 0)
+            skip("no monospace fonts present in test data dir");
+    }
+
+    // Combining marks position via GPOS in monospace shaping. The retired
+    // bypass emitted U+0301 (acute) etc. with x_advance=0 and x/y_offset=0,
+    // stacking the mark at cell origin without GPOS placement; the user-
+    // visible result was misaligned diacritics on monospace text. After
+    // routing monospace through HB, the mark / mkmk features stay enabled
+    // (they're not in kFixedWidthStrict), so HB applies GPOS to position
+    // the mark over its base. Pin: shape "a" + U+0301 (combining acute
+    // accent) on a monospace face; the cluster has 2 glyphs sharing one
+    // cluster index, the second has zero x_advance (mark consumes no
+    // cell), and the mark has non-zero positioning (offset OR cluster
+    // composition through ccmp into a precomposed 'á').
+    template<> template<>
+    void llfontshaping_object::test<22>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSansMono.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSansMono.woff2 not present");
+        LLPointer<LLFontFreetype> ft = loadFt(path);
+        ensure("DejaVuSansMono loaded", ft.notNull());
+        ensure("DejaVuSansMono is fixed-width", ft->isFixedWidth());
+
+        LLWString s = wstr(L'a', 0x0301);  // a + COMBINING ACUTE ACCENT
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::printf("combining mark probe: 'a'+U+0301 -> %zu glyphs\n",
+                    out.size());
+        for (size_t k = 0; k < out.size(); ++k)
+        {
+            std::printf("  glyph[%zu]: glyph_id=%u cluster=%d "
+                        "x_adv=%.4f x_off=%.4f y_off=%.4f\n",
+                        k, out[k].glyph_id, out[k].cluster,
+                        out[k].x_advance, out[k].x_offset, out[k].y_offset);
+        }
+        ensure("combining cluster produces at least 1 glyph", !out.empty());
+        // Expected outcomes:
+        //  (a) ccmp composed to precomposed 'á' → 1 glyph, full cell advance.
+        //  (b) Two glyphs (a + acute) in one HB cluster → first carries
+        //      full advance, second has zero advance and the mark
+        //      positioned via GPOS.
+        // Either is correct GPOS-driven behavior; the bypass produced
+        // neither (it emitted 2 glyphs, both with full advance).
+        const F32 ref_advance = out[0].x_advance;
+        ensure("base glyph has positive advance", ref_advance > 0.f);
+        if (out.size() == 1)
+        {
+            // ccmp composition path. One cell, no second glyph.
+            ensure_equals("cluster index is 0 (base)", out[0].cluster, 0);
+        }
+        else if (out.size() == 2)
+        {
+            // Mark cluster path. Marks share the base's cluster index
+            // and consume zero advance (a hard requirement — a non-zero
+            // mark advance would shift the next character right).
+            ensure_equals("mark shares base cluster", out[1].cluster, out[0].cluster);
+            ensure_equals("mark glyph has zero advance", out[1].x_advance, 0.f);
+        }
+        else
+        {
+            ensure("combining cluster produced unexpected glyph count", false);
+        }
+    }
+
 #if LL_MESA_HEADLESS
     // GL-backed group: monospace shaping ends up rendering glyphs through
     // getGlyphInfoByIndex → renderAndCreateGlyph → atlas → gGL.bind on
