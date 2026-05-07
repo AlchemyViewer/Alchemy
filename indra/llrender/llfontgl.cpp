@@ -101,13 +101,12 @@ namespace
         std::vector<const std::vector<LLShapedGlyph>*>   glyphs;
     };
 
-    // Build the shape layout for `slice` against `root_face`.
-    // - Non-monospace (or programmer-mono with ligatures on): a single
-    //   all-encompassing range, shaped end-to-end through HarfBuzz.
-    // - Strict-monospace root: legacy emoji-cluster ranges so ASCII keeps
-    //   the codepoint path's exact metrics (visual parity with toggle-off)
-    //   while embedded emoji clusters still shape correctly.
-    // - Empty slice or null face: empty layout, no allocations.
+    // Build the shape layout for `slice` against `root_face`. One
+    // all-encompassing range, shaped end-to-end through HarfBuzz. The
+    // monospace feature plan in shape_sub_run (kern + ligatures off for
+    // strict-mono, kern off only for ligatures-opt-in) preserves column
+    // alignment without a separate codepoint partition. Empty slice or
+    // null face: empty layout, no allocations.
     ShapeLayout build_shape_layout(const LLFontFreetype* root_face,
                                    LLWStringView         slice)
     {
@@ -115,16 +114,7 @@ namespace
         if (!root_face || slice.empty())
             return out;
 
-        const bool strict_mono = root_face->isFixedWidth()
-                              && !root_face->getAllowMonospaceLigatures();
-        if (!strict_mono)
-        {
-            out.ranges.emplace_back(size_t(0), slice.size());
-        }
-        else
-        {
-            out.ranges = wstring_find_emoji_clusters(slice);
-        }
+        out.ranges.emplace_back(size_t(0), slice.size());
 
         out.glyphs.resize(out.ranges.size(), nullptr);
         for (size_t s = 0; s < out.ranges.size(); ++s)

@@ -1,15 +1,14 @@
 /**
  * @file llfontshaping_test.cpp
  * @brief Unit tests for LLFontShaping — HarfBuzz wrapper, ZWJ ligature
- *        retry, VS-16 strip, monospace bypass, LRU cache contract.
+ *        retry, VS-16 strip, monospace feature plans, LRU cache contract.
  *
  * The bulk of the tests are pure-CPU: HB shaping itself doesn't touch
- * the atlas. The monospace-bypass tests at the bottom exercise
- * shape_sub_run's getGlyphInfo path which routes through addGlyph →
- * LLFontBitmapCache::nextOpenPos → gGL.bind, so they're wrapped in
- * #if LL_MESA_HEADLESS and only compile in when CMake links the test
- * binary against llrenderheadless. Same single-file pattern as
- * llfontregistry_test.cpp's GL-gated block.
+ * the atlas. The GL-backed kerning test at the bottom exercises
+ * renderAndCreateGlyph → LLFontBitmapCache::nextOpenPos → gGL.bind,
+ * so it's wrapped in #if LL_MESA_HEADLESS and only compiles in when
+ * CMake links the test binary against llrenderheadless. Same
+ * single-file pattern as llfontregistry_test.cpp's GL-gated block.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -147,9 +146,10 @@ namespace tut
     // 0-advance glyphs even on success.
     //
     // Stays away from ft->getXAdvance / ft->getGlyphInfo because those
-    // route through addGlyph → atlas → gGL.bind, which a pure-CPU test
-    // binary can't satisfy. The cmap match below is the strongest
-    // identity check we can make without rasterizing.
+    // route through getGlyphInfoByIndex → renderAndCreateGlyph → atlas
+    // → gGL.bind, which a pure-CPU test binary can't satisfy. The cmap
+    // match below is the strongest identity check we can make without
+    // rasterizing.
     template<> template<>
     void llfontshaping_object::test<2>()
     {
@@ -828,19 +828,16 @@ namespace tut
                out.size() <= s.size());
     }
 
-    // Pre-flight probe for the bypass-deprecation plan. For each
-    // monospace face shipped in newview/fonts/, shape a 200-char
-    // mixed-ASCII line through the monospace-with-ligatures HB path
-    // (existing kFixedWidthLigaturesOk feature override that disables
-    // only `kern`) and report per-glyph advance drift and positioning
-    // against the first glyph's advance. Outcome answers: "with the
-    // existing feature override, does HB preserve cell alignment, or
-    // do always-on lookups (rclt/rlig/ccmp/mark/mkmk) introduce
-    // sub-pixel adjustments even on pure ASCII?" The strict-mono
-    // bypass exists specifically to sidestep that drift; if this test
-    // passes across the shipped monospace fonts, Phase 2's snap
-    // becomes belt-and-suspenders. If it fails, the snap is
-    // load-bearing. Pure-CPU — HB shaping doesn't need GL.
+    // Cell-alignment probe. For each monospace face shipped in
+    // newview/fonts/, shape a 200-char mixed-ASCII line through the
+    // monospace HB path with kFixedWidthLigaturesOk (kern off only)
+    // and report per-glyph advance drift and positioning against the
+    // first glyph's advance. Originally written as a pre-flight before
+    // dropping the strict-mono bypass; kept as a regression that pins
+    // HB-on-monospace doesn't develop sub-pixel advance drift even on
+    // long lines. If it ever does, the strict feature plan in
+    // shape_sub_run needs more entries (and the long-form fix is a
+    // cluster-aware advance snap on HB output).
     template<> template<>
     void llfontshaping_object::test<20>()
     {
@@ -935,10 +932,11 @@ namespace tut
     }
 
 #if LL_MESA_HEADLESS
-    // GL-backed group: monospace bypass exercises shape_sub_run's
-    // getGlyphInfo path, which routes through addGlyph → atlas →
-    // gGL.bind. Wrapped in a separate fixture that pulls in the
-    // headless OSMesa context so the rasterizer can satisfy the bind.
+    // GL-backed group: monospace shaping ends up rendering glyphs through
+    // getGlyphInfoByIndex → renderAndCreateGlyph → atlas → gGL.bind on
+    // the test 3 (kerning) path. Wrapped in a separate fixture that
+    // pulls in the headless OSMesa context so the rasterizer can
+    // satisfy the bind.
     struct llfontshaping_gl_data
     {
         std::unique_ptr<ll_test::HeadlessGL> gl = std::make_unique<ll_test::HeadlessGL>();
@@ -965,11 +963,12 @@ namespace tut
         return ft;
     }
 
-    // Monospace bypass (ligatures off). Shape "AB" through
-    // DejaVuSansMono. The bypass synthesizes one glyph per codepoint
-    // from FT mXAdvance, so advances are uniform — pins
-    // llfontshaping.cpp:180-201 (the bypass branch) and the cell-
-    // alignment invariant a kern-on regression would break.
+    // Strict-monospace (ligatures off): shape "AB" through DejaVuSansMono.
+    // Routes through HB with the kFixedWidthStrict feature plan
+    // (kern + liga + calt + clig + dlig + rlig all forced off). HB
+    // produces one glyph per codepoint with bit-exact FT mXAdvance and
+    // zero positioning offsets — same contract the retired bypass
+    // enforced. Pins the cell-alignment invariant.
     template<> template<>
     void llfontshaping_gl_object::test<1>()
     {
@@ -985,24 +984,30 @@ namespace tut
         LLWString s = wstr('A','B');
         std::vector<LLShapedGlyph> out;
         LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        ensure_equals("AB produces 2 glyphs through monospace bypass",
+        ensure_equals("AB produces 2 glyphs through HB strict-mono path",
                       out.size(), 2u);
         ensure("each shaped glyph has positive advance",
                out[0].x_advance > 0.f && out[1].x_advance > 0.f);
-        ensure_equals("monospace bypass: A and B advances are equal",
+        ensure_equals("strict-mono: A and B advances are equal",
                       out[0].x_advance, out[1].x_advance);
-        // The bypass path goes through getGlyphInfo, which writes
-        // the canonical mXAdvance. We can therefore compare the
-        // shaped advance against the face's reference advance for
-        // exact equality.
-        ensure_equals("bypass glyph[0] advance == ft->getXAdvance('A')",
+        // HB output for monospace ASCII matches FT mXAdvance bit-exact
+        // under the strict feature plan (verified by the long-line
+        // probe in test 20).
+        ensure_equals("strict-mono glyph[0] advance == ft->getXAdvance('A')",
                       out[0].x_advance, ft->getXAdvance(L'A'));
+        // Strict-mono path also forces zero positioning offsets, since
+        // monospace ASCII triggers no GPOS adjustments under the
+        // feature plan (kern, mark, mkmk all suppressed for ASCII).
+        ensure_equals("strict-mono glyph[0] x_offset is zero",
+                      out[0].x_offset, 0.f);
+        ensure_equals("strict-mono glyph[0] y_offset is zero",
+                      out[0].y_offset, 0.f);
     }
 
-    // Monospace + setAllowMonospaceLigatures(true): falls into the
-    // HarfBuzz path with kern force-disabled. Same column-alignment
-    // invariant — advances must remain uniform — and exercises the
-    // separate code path at llfontshaping.cpp:246-256.
+    // Programmer-mono opt-in via setAllowMonospaceLigatures(true).
+    // Routes through HB with the kFixedWidthLigaturesOk feature plan
+    // (kern off, ligatures allowed). Cell alignment invariant on the
+    // pre-ligation columns still holds.
     template<> template<>
     void llfontshaping_gl_object::test<2>()
     {

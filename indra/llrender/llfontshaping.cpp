@@ -160,46 +160,6 @@ namespace
         if (!face || sub_begin_in_slice >= sub_end_in_slice)
             return;
 
-        // Strict monospace: bypass HarfBuzz entirely and synthesize one
-        // glyph per codepoint using FT's canonical mXAdvance. HB's default
-        // feature set has many always-on lookups (rclt, rlig, ccmp, locl,
-        // mark, mkmk) that we can't disable via the features array, and
-        // some fonts have non-zero positioning under those features that
-        // breaks column alignment even after kern/liga/clig/dlig/calt are
-        // off. Going direct to FT guarantees every glyph in the run gets
-        // exactly the monospace cell width with no positioning drift.
-        // Programmer fonts opting in via <font ligatures="on"> need real
-        // shaping (for liga/calt) so they fall through to the HB path.
-        //
-        // Only valid when face is the head: getGlyphInfo asserts on
-        // fallbacks (the chain walk is rooted at the head). When a fallback
-        // face is itself fixed-width — e.g. SansSerif's DejaVuSansMono leg
-        // resolving Letterlike Symbols like U+210C — fall through to HB.
-        // Column alignment is already lost at the fallback boundary, so
-        // taking the bypass here would offer no benefit even if it worked.
-        if (face == root_face && face->isFixedWidth() && !face->getAllowMonospaceLigatures())
-        {
-            out_glyphs.reserve(out_glyphs.size() + (sub_end_in_slice - sub_begin_in_slice));
-            for (size_t i = sub_begin_in_slice; i < sub_end_in_slice; ++i)
-            {
-                const llwchar wch = slice[i];
-                const LLFontGlyphInfo* fgi = face->getGlyphInfo(wch, EFontGlyphType::Unspecified);
-                if (!fgi)
-                    continue;
-
-                LLShapedGlyph sg;
-                sg.face      = face;
-                sg.glyph_id  = fgi->mGlyphIndex;
-                sg.cluster   = static_cast<S32>(i);
-                sg.x_advance = fgi->mXAdvance;
-                sg.y_advance = 0.f;
-                sg.x_offset  = 0.f;
-                sg.y_offset  = 0.f;
-                out_glyphs.push_back(sg);
-            }
-            return;
-        }
-
         // Early-bail when the chosen face has no hb_font (allocation failure /
         // unloaded face). The retry loop below also rejects null hb_font per
         // candidate, so an empty primary face still produces an empty output
