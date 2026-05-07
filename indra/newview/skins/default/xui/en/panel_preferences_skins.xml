@@ -240,9 +240,9 @@ Jan 1, 2001
    width="160">
     <combo_box.commit_callback
      function="Pref.UIFontSelected"
-     parameter="SansSerif" />
+     parameter="SansSerifBase" />
   </combo_box>
-  <line_editor
+  <!--<line_editor
    follows="left|top"
    height="23"
    layout="topleft"
@@ -253,8 +253,8 @@ Jan 1, 2001
    width="180">
     <line_editor.commit_callback
      function="Pref.UIFontFileEntered"
-     parameter="SansSerif" />
-  </line_editor>
+     parameter="SansSerifBase" />
+  </line_editor>-->
   <text
    type="string"
    length="1"
@@ -278,9 +278,9 @@ Jan 1, 2001
    width="160">
     <combo_box.commit_callback
      function="Pref.UIFontSelected"
-     parameter="Monospace" />
+     parameter="MonospaceBase" />
   </combo_box>
-  <line_editor
+  <!--<line_editor
    follows="left|top"
    height="23"
    layout="topleft"
@@ -291,6 +291,6 @@ Jan 1, 2001
    width="180">
     <line_editor.commit_callback
      function="Pref.UIFontFileEntered"
-     parameter="Monospace" />
-  </line_editor>
+     parameter="MonospaceBase" />
+  </line_editor>-->
 </panel>
