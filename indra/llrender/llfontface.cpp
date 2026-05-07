@@ -19,6 +19,8 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_MULTIPLE_MASTERS_H
+#include FT_TRUETYPE_TABLES_H
+#include FT_TRUETYPE_TAGS_H
 
 #include <hb.h>
 #include <hb-ft.h>
@@ -93,6 +95,21 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
     mHasSvg       = FT_HAS_SVG(mFTFace);
     mIsFixedWidth = (mFTFace->face_flags & FT_FACE_FLAG_FIXED_WIDTH) != 0;
     mUseSubpixelPen = !mHasColor && !mHasSvg && (hinting != EFontHinting::DEFAULT);
+
+    // COLRv1 probe: read the first 2 bytes of the COLR table and check the
+    // version field. FreeType's FT_LOAD_COLOR + FT_Render_Glyph rasterize
+    // COLRv0 directly but explicitly do NOT rasterize COLRv1 (per ftcolor.h
+    // notes); a separate paint walker handles those. Distinguishing here
+    // lets renderGlyph branch without re-probing the table on every glyph.
+    {
+        FT_ULong length = 2;
+        FT_Byte  buf[2] = { 0, 0 };
+        if (FT_Load_Sfnt_Table(mFTFace, TTAG_COLR, 0, buf, &length) == 0 && length >= 2)
+        {
+            const U16 version = (static_cast<U16>(buf[0]) << 8) | buf[1];
+            mHasColrV1 = (version >= 1);
+        }
+    }
 
     if (weight >= 0)
     {

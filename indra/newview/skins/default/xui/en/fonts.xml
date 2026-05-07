@@ -265,15 +265,19 @@
 
     <font name="Emoji" user_selectable="false">
         <style name="NORMAL">
-            <!-- unicode_ranges restricts the Twemoji fallback to actual
-                 emoji codepoints.-->
-            <file unicode_ranges="U+2600-U+27BF,U+20E0-U+20E9,U+FE0E-U+FE0F,U+1F000-U+1FFFF,U+1F900-U+1F9FF">TwemojiSVG.woff2</file>
+            <!-- Noto's COLRv1 emoji as a backup for codepoints Twemoji
+                 doesn't carry (newer Unicode releases). Same range gate;
+                 the chain walker only consults this entry when Twemoji's
+                 charmap misses the requested codepoint. Rasterized via
+                 the in-tree COLRv1 paint walker (HarfBuzz callbacks ->
+                 plutovg). -->
+            <file unicode_ranges="U+2600-U+27BF,U+20E0-U+20E9,U+FE0E-U+FE0F,U+1F000-U+1FFFF,U+1F900-U+1F9FF">Noto-COLRv1.ttf</file>
         </style>
     </font>
 
     <font name="LimitedEmoji" user_selectable="false">
         <style name="NORMAL">
-            <file unicode_ranges="U+1F000-U+1FFFF">TwemojiSVG.woff2</file>
+            <file unicode_ranges="U+1F000-U+1FFFF">Noto-COLRv1.ttf</file>
         </style>
     </font>
 

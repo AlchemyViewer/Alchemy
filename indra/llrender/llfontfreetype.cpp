@@ -42,6 +42,7 @@
 #include <hb.h>
 #include <hb-ft.h>
 
+#include "llfontcolrv1.h"
 #include "llfontshaping.h"
 
 #include "lldir.h"
@@ -1030,6 +1031,25 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
     if (getFTFace() == nullptr)
         return;
 
+    // COLRv1 fast path. FreeType's FT_LOAD_COLOR + FT_Render_Glyph rasterize
+    // COLRv0 / sbix / CBDT / OT-SVG natively but explicitly NOT COLRv1; for
+    // those faces we walk the paint tree ourselves via HarfBuzz callbacks
+    // and a plutovg backend. Only attempt when a Color result was actually
+    // requested — Grayscale lookups (for non-emoji code paths) stay on the
+    // standard outline path.
+    if (bitmap_type == EFontGlyphType::Color && mFace && mFace->hasColrV1())
+    {
+        if (renderColrV1Glyph(glyph_index, wch))
+        {
+            mRenderGlyphCount++;
+            return;
+        }
+        // Fallthrough: walker bailed (unsupported paint feature / alloc / no
+        // paint tree on this glyph). The standard FT path runs next; its
+        // existing retry block downgrades a failed color render to grayscale,
+        // so glyphs without a paint tree still produce a usable bitmap.
+    }
+
     FT_Int32 load_flags = (FT_Int32)mHinting;
     if (EFontGlyphType::Color == bitmap_type)
     {
@@ -1081,6 +1101,56 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
     }
 
     mRenderGlyphCount++;
+}
+
+bool LLFontFreetype::renderColrV1Glyph(U32 glyph_index, llwchar wch) const
+{
+    LLFT_Face ft = getFTFace();
+    if (!ft || !mFace)
+        return false;
+
+    // Outline-mode load just for metrics (advance, lsb/rsb deltas). NO_BITMAP
+    // skips FT producing a bitmap we'd immediately discard. NO_COLOR makes
+    // sure we don't get FT's COLRv0 fallback by accident.
+    const FT_Int32 metrics_flags = ((FT_Int32)mHinting & ~FT_LOAD_COLOR) | FT_LOAD_NO_BITMAP;
+    if (FT_Load_Glyph(ft, glyph_index, metrics_flags) != FT_Err_Ok)
+        return false;
+
+    // Reuse the painter (and its scratch buffers) across all renderGlyph
+    // calls on this thread. The painter holds no per-face state; declaring
+    // it static thread_local amortizes the small amount of construction cost
+    // and keeps the BGRA staging buffer sized to the running max glyph.
+    static thread_local LLFontColrV1Painter s_painter;
+    LLFontColrV1Painter::Result result;
+    // Foreground color: matches the existing emoji draw color in
+    // LLFontGL::render (white at the head's alpha). A future change to thread
+    // the live text color through here lets COLRv1 fonts that reference
+    // foreground tint correctly under text color settings.
+    const LLColor4U emoji_fg(255, 255, 255, 255);
+    if (!s_painter.paintGlyph(mFace->getHbFont(), glyph_index, mPointSize,
+                              emoji_fg, result))
+    {
+        return false;
+    }
+    if (!result.mBitmap || result.mWidth <= 0 || result.mHeight <= 0)
+        return false;
+
+    // Patch FT's glyph slot in place. The existing FT_PIXEL_MODE_BGRA branch
+    // in renderAndCreateGlyph reads exactly these fields and is oblivious to
+    // whether FT or our painter populated them. The slot resets on the next
+    // FT_Load_Glyph call, so the stale buffer pointer doesn't outlive its
+    // owner (the painter's mStaging vector, valid until next paintGlyph).
+    FT_Bitmap& bm = ft->glyph->bitmap;
+    bm.width      = static_cast<unsigned>(result.mWidth);
+    bm.rows       = static_cast<unsigned>(result.mHeight);
+    bm.pitch      = result.mPitch;
+    bm.buffer     = const_cast<unsigned char*>(result.mBitmap);
+    bm.pixel_mode = FT_PIXEL_MODE_BGRA;
+    bm.num_grays  = 256;
+    ft->glyph->bitmap_left = result.mLeft;
+    ft->glyph->bitmap_top  = result.mTop;
+    (void)wch;  // unused at present; kept in signature for log-friendly callers.
+    return true;
 }
 
 void LLFontFreetype::resetSelf(F32 vert_dpi, F32 horz_dpi)
