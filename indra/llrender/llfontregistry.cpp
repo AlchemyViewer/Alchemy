@@ -452,9 +452,23 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
         }
     }
 
-    // Snapshot pre-resolution file lists. <use> targets are looked up in
-    // this snapshot rather than the live mFontMap, so resolution is order-
-    // independent and cycles / self-references behave deterministically:
+    // Apply user-supplied family overrides BEFORE chain resolution so that
+    // every family that <use>s an overridden base picks up the override
+    // through its chain. The earlier ordering (apply at the end) prepended
+    // override files only to the named target; dependents like SansSerif
+    // and SansSerifLimitedEmoji had already baked in the pre-override base
+    // files via collect_chain and were silently left untouched. Override
+    // sources at this point are limited to families with direct <file>
+    // declarations (the picker filters via getAvailableFamilies whose
+    // user_selectable filter excludes <use>-only composites), so reading
+    // the source's direct file list before its own <use> chain is resolved
+    // is sound.
+    applyFamilyOverrides(font_overrides);
+
+    // Snapshot pre-resolution (post-override) file lists. <use> targets are
+    // looked up in this snapshot rather than the live mFontMap, so
+    // resolution is order-independent and cycles / self-references behave
+    // deterministically:
     //   A->B and B->A both end up as [own, other], not double-counted;
     //   <use family="self"/> still warns and is skipped below regardless.
     boost::unordered_map<LLFontDescriptor, font_file_info_vec_t> pre_use;
@@ -581,12 +595,6 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
 
         replace_files(variant_it, merged_files);
     }
-
-    // Step 3: apply caller-supplied user font overrides
-    // (AlchemyUIFontOverrides, plumbed through from newview) on top of the
-    // fully-composed file lists. Done last so the override prepends ahead
-    // of resolved <use> chains and inherited variants.
-    applyFamilyOverrides(font_overrides);
 
     // Cache the just-applied overrides so a subsequent reload at the same
     // (fonts.xml, overrides) but new DPI can detect the no-content-change

@@ -121,9 +121,29 @@ namespace tut
                 if (f == file_name) ++n;
             return n;
         }
+
+        // Mirror the parse-time state wipe that LLFontRegistry::reload()
+        // performs before re-parsing fonts.xml. The CPU-only test fixture
+        // can't call reload() (it needs disk I/O), so this simulates the
+        // teardown so a follow-up loadXml + resolve cycle exercises the
+        // same code paths a runtime override change would. Skips the
+        // shape-cache clear and fallback-instance bookkeeping that only
+        // matter when the registry actually owns LLFontGL instances.
+        void simulateReload()
+        {
+            reg.mFontSizes.clear();
+            reg.mFamilySizes.clear();
+            reg.mFamilyUses.clear();
+            reg.mInheritFlags.clear();
+            reg.mFamilyMeta.clear();
+            reg.mFontMap.clear();
+            reg.mFamilyOverrideSources.clear();
+        }
     };
 
-    typedef test_group<llfontregistry_data> llfontregistry_test;
+    // 128 slots: TUT defaults to 50; we already have 50+ tests and want
+    // headroom before the silent-drop threshold bites again.
+    typedef test_group<llfontregistry_data, 128> llfontregistry_test;
     typedef llfontregistry_test::object     llfontregistry_object;
     tut::llfontregistry_test llfontregistry_testcase("LLFontRegistry");
 
@@ -1159,6 +1179,264 @@ namespace tut
         reg.nameToSize("UI", "Custom", sz2);
         ensure_equals("second override replaces first (UI->AltB = 13.5)",
                       sz2, 13.5f);
+    }
+
+    // Override on a base family must propagate through <use> chains to
+    // every dependent family. Regression for: applying an override to
+    // SansSerifBase only modified SansSerifBase's own template, while
+    // SansSerif and SansSerifLimitedEmoji had already baked in the
+    // pre-override SansSerifBase files via collect_chain — so menus
+    // (which use SansSerifLimitedEmoji) silently kept the old font even
+    // after the user picked a new one in the font picker.
+    //
+    // Mirrors the production family graph:
+    //   Base  -- direct file: Source.woff2
+    //   Plain -- <use Base/> + <use Latin/>
+    //   Menu  -- <use Base/> + <use Latin/> + <use Mark/>
+    // Override Base → Custom must end up in BOTH Plain and Menu.
+    template<> template<>
+    void llfontregistry_object::test<48>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Custom'>"
+            "    <style name='NORMAL'><file>Custom.woff2</file></style>"
+            "  </font>"
+            "  <font name='Source'>"
+            "    <style name='NORMAL'><file>Source.woff2</file></style>"
+            "  </font>"
+            "  <font name='Latin'>"
+            "    <style name='NORMAL'><file>Latin.woff2</file></style>"
+            "  </font>"
+            "  <font name='Mark'>"
+            "    <style name='NORMAL'><file>Mark.woff2</file></style>"
+            "  </font>"
+            "  <font name='Base'>"
+            "    <use family='Source'/>"
+            "  </font>"
+            "  <font name='Plain'>"
+            "    <use family='Base'/>"
+            "    <use family='Latin'/>"
+            "  </font>"
+            "  <font name='Menu'>"
+            "    <use family='Base'/>"
+            "    <use family='Latin'/>"
+            "    <use family='Mark'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+
+        LLSD overrides;
+        overrides["Base"] = "Custom";
+        resolve(overrides);
+
+        // Direct target picks up the override.
+        ensure_equals("Base[0] is the override file",
+                      fileNames("Base").size() > 0u
+                          ? fileNames("Base")[0]
+                          : std::string(),
+                      std::string("Custom.woff2"));
+        // Both dependents see Custom.woff2 in their chain — that's the
+        // load-bearing assertion. A regression to the old order
+        // (overrides applied after <use> resolution) would leave them
+        // without Custom.woff2 entirely.
+        ensure("Plain chain includes Custom.woff2 via Base",
+               countFile("Plain", "Custom.woff2") >= 1);
+        ensure("Menu chain includes Custom.woff2 via Base",
+               countFile("Menu", "Custom.woff2") >= 1);
+        // The chain after the override-driven Base files must still
+        // carry Source (Base's own <use>) and the sibling <use>s — the
+        // override prepends, doesn't replace.
+        ensure("Plain chain still has Source.woff2",
+               countFile("Plain", "Source.woff2") >= 1);
+        ensure("Plain chain still has Latin.woff2",
+               countFile("Plain", "Latin.woff2") >= 1);
+        ensure("Menu chain still has Mark.woff2",
+               countFile("Menu", "Mark.woff2") >= 1);
+
+        // Position pin: the override file MUST be at index 0 of every
+        // dependent chain. The renderer treats position 0 as the head
+        // face — anything later is a fallback that only fires when the
+        // head's cmap returns notdef. If the override files end up
+        // somewhere later than 0, the original Source.woff2 still wins
+        // for every glyph it covers and the user observes "no change."
+        const auto plain_files = fileNames("Plain");
+        ensure("Plain chain non-empty", !plain_files.empty());
+        ensure_equals("Plain[0] must be the override file",
+                      plain_files.empty() ? std::string() : plain_files[0],
+                      std::string("Custom.woff2"));
+        const auto menu_files = fileNames("Menu");
+        ensure("Menu chain non-empty", !menu_files.empty());
+        ensure_equals("Menu[0] must be the override file",
+                      menu_files.empty() ? std::string() : menu_files[0],
+                      std::string("Custom.woff2"));
+    }
+
+    // Override propagation through <use> chains for BOLD style. Real
+    // fonts.xml declares `inherit="true"` on BOLD variants, which
+    // appends the parent NORMAL chain after the variant's own files.
+    // Verify the override (which prepends to the BOLD template) still
+    // ends up at position 0 of dependent chains for the BOLD style.
+    template<> template<>
+    void llfontregistry_object::test<49>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Custom'>"
+            "    <style name='NORMAL'><file>Custom-Regular.woff2</file></style>"
+            "    <style name='BOLD' inherit='true'><file flags='bold'>Custom-Bold.woff2</file></style>"
+            "  </font>"
+            "  <font name='Source'>"
+            "    <style name='NORMAL'><file>Source-Regular.woff2</file></style>"
+            "    <style name='BOLD' inherit='true'><file flags='bold'>Source-Bold.woff2</file></style>"
+            "  </font>"
+            "  <font name='Latin'>"
+            "    <style name='NORMAL'><file>Latin.woff2</file></style>"
+            "  </font>"
+            "  <font name='Base'>"
+            "    <use family='Source'/>"
+            "  </font>"
+            "  <font name='Menu'>"
+            "    <use family='Base'/>"
+            "    <use family='Latin'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+
+        LLSD overrides;
+        overrides["Base"] = "Custom";
+        resolve(overrides);
+
+        // BOLD variant of Menu must lead with the override's BOLD file.
+        const auto menu_bold = fileNames("Menu", LLFontGL::BOLD);
+        ensure("Menu BOLD chain non-empty", !menu_bold.empty());
+        ensure_equals("Menu BOLD[0] must be override BOLD file",
+                      menu_bold.empty() ? std::string() : menu_bold[0],
+                      std::string("Custom-Bold.woff2"));
+        // NORMAL variant unchanged invariant.
+        const auto menu_normal = fileNames("Menu", LLFontGL::NORMAL);
+        ensure_equals("Menu NORMAL[0] must be override NORMAL file",
+                      menu_normal.empty() ? std::string() : menu_normal[0],
+                      std::string("Custom-Regular.woff2"));
+    }
+
+    // Reload with a different override: first resolve applies override A,
+    // simulated reload wipes parse-time state, second resolve applies
+    // override B. Dependent chains must reflect override B and must NOT
+    // carry residue from override A. Mirrors the runtime path where the
+    // user picks one font in the picker, then picks a different one —
+    // each setting change drives LLFontRegistry::reload(font_overrides)
+    // which clears mFontMap before re-parsing.
+    template<> template<>
+    void llfontregistry_object::test<50>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='AltA'>"
+            "    <style name='NORMAL'><file>AltA.woff2</file></style>"
+            "  </font>"
+            "  <font name='AltB'>"
+            "    <style name='NORMAL'><file>AltB.woff2</file></style>"
+            "  </font>"
+            "  <font name='Source'>"
+            "    <style name='NORMAL'><file>Source.woff2</file></style>"
+            "  </font>"
+            "  <font name='Base'>"
+            "    <use family='Source'/>"
+            "  </font>"
+            "  <font name='Menu'>"
+            "    <use family='Base'/>"
+            "  </font>"
+            "</fonts>";
+
+        // First load: override Base -> AltA.
+        ensure("first parse ok", loadXml(xml));
+        LLSD ovr_a;
+        ovr_a["Base"] = "AltA";
+        resolve(ovr_a);
+
+        const auto menu_after_a = fileNames("Menu");
+        ensure("Menu chain non-empty after override A",
+               !menu_after_a.empty());
+        ensure_equals("Menu[0] is AltA after first override",
+                      menu_after_a.empty() ? std::string() : menu_after_a[0],
+                      std::string("AltA.woff2"));
+        ensure("Menu chain has Source after first override",
+               countFile("Menu", "Source.woff2") >= 1);
+
+        // Simulate reload: wipe parse-time state, re-parse, apply
+        // override B. AltA must be GONE from the chain — a regression
+        // would leak the prior override into the new resolution.
+        simulateReload();
+        ensure("re-parse ok after simulated reload", loadXml(xml));
+        LLSD ovr_b;
+        ovr_b["Base"] = "AltB";
+        resolve(ovr_b);
+
+        const auto menu_after_b = fileNames("Menu");
+        ensure("Menu chain non-empty after override B",
+               !menu_after_b.empty());
+        ensure_equals("Menu[0] is AltB after second override",
+                      menu_after_b.empty() ? std::string() : menu_after_b[0],
+                      std::string("AltB.woff2"));
+        ensure_equals("AltA must NOT appear in Menu chain after replace",
+                      countFile("Menu", "AltA.woff2"), 0);
+        ensure("Menu chain still has Source after replace",
+               countFile("Menu", "Source.woff2") >= 1);
+        // Same checks for the direct target — Base itself must show
+        // only the new override at chain[0], no residue from AltA.
+        const auto base_after_b = fileNames("Base");
+        ensure_equals("Base[0] is AltB after second override",
+                      base_after_b.empty() ? std::string() : base_after_b[0],
+                      std::string("AltB.woff2"));
+        ensure_equals("AltA must NOT appear in Base chain after replace",
+                      countFile("Base", "AltA.woff2"), 0);
+    }
+
+    // Reload-and-clear: existing registry has override A, then user picks
+    // "(default)" in the picker which writes an empty overrides map.
+    // Reload with empty overrides must restore the original chain — no
+    // override file lingers from the prior resolution.
+    template<> template<>
+    void llfontregistry_object::test<51>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='AltA'>"
+            "    <style name='NORMAL'><file>AltA.woff2</file></style>"
+            "  </font>"
+            "  <font name='Source'>"
+            "    <style name='NORMAL'><file>Source.woff2</file></style>"
+            "  </font>"
+            "  <font name='Base'>"
+            "    <use family='Source'/>"
+            "  </font>"
+            "  <font name='Menu'>"
+            "    <use family='Base'/>"
+            "  </font>"
+            "</fonts>";
+
+        ensure("first parse ok", loadXml(xml));
+        LLSD ovr_a;
+        ovr_a["Base"] = "AltA";
+        resolve(ovr_a);
+        ensure_equals("Menu[0] is AltA before clear",
+                      fileNames("Menu").empty()
+                          ? std::string()
+                          : fileNames("Menu")[0],
+                      std::string("AltA.woff2"));
+
+        // Reload with empty overrides — picker's "(default)" sentinel.
+        simulateReload();
+        ensure("re-parse ok", loadXml(xml));
+        resolve(LLSD::emptyMap());
+
+        const auto menu = fileNames("Menu");
+        ensure("Menu non-empty after clear", !menu.empty());
+        ensure_equals("Menu[0] returns to Source after override clear",
+                      menu[0], std::string("Source.woff2"));
+        ensure_equals("AltA gone from Menu after clear",
+                      countFile("Menu", "AltA.woff2"), 0);
     }
 
 #if LL_MESA_HEADLESS
