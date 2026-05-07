@@ -1230,14 +1230,11 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
 
     LLFontGlyphInfo* next_glyph = NULL;
 
-    // Pre-shape the entire slice when FontShapeAllText is on so advance accounts
-    // for GPOS pair-kerning and ligatures. The codepoint loop below uses a
-    // parallel walker (shape_idx) to map shaped advances onto codepoints — a
-    // ligature glyph spans multiple cps but its full advance fires on the
-    // cluster's start cp, so trailing cps of the cluster contribute zero.
-    // Skip for strict-monospace root face — see render() for rationale.
-    const bool root_strict_mono = mFontFreetype->isFixedWidth()
-                               && !mFontFreetype->getAllowMonospaceLigatures();
+    // Pre-shape the entire slice so advance accounts for GPOS pair-kerning
+    // and ligatures. The codepoint loop below uses a parallel walker
+    // (shape_idx) to map shaped advances onto codepoints — a ligature
+    // glyph spans multiple cps but its full advance fires on the cluster's
+    // start cp, so trailing cps of the cluster contribute zero.
     // shapeLine returns a const ref into the shape LRU; clusters come back
     // slice-local (relative to begin=0), which equals 0..measure_end here.
     // Keep the ref bound for the lifetime of the loop — no other shape*
@@ -1245,7 +1242,7 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
     static const std::vector<LLShapedGlyph> sEmptyShape;
     const std::vector<LLShapedGlyph>* shape_glyphs = &sEmptyShape;
     size_t shape_idx = 0;
-    if (!root_strict_mono && max_chars > 0 && wchars[0])
+    if (max_chars > 0 && wchars[0])
     {
         S32 measure_end = 0;
         while (measure_end < max_chars && wchars[measure_end] != 0)
@@ -1413,12 +1410,9 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
     // the legacy fgi->mXAdvance + getXKerning chain. Ligatures and ZWJ
     // clusters get their full advance attributed to the cluster's first cp;
     // trailing cps contribute zero, which is what we want for measurement.
-    // Skip for strict-monospace root face — see render() for rationale.
-    const bool root_strict_mono = mFontFreetype->isFixedWidth()
-                               && !mFontFreetype->getAllowMonospaceLigatures();
     std::vector<F32> per_cp_advance;
     F32 per_cp_last_extent = 0.f;
-    if (!root_strict_mono && start >= 0 && wchars[0])
+    if (start >= 0 && wchars[0])
     {
         // shapeLine ref valid through the per_cp_advance fill below since
         // no other shape* calls run in between. Clusters are slice-local
