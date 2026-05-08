@@ -9642,19 +9642,12 @@ void LLPipeline::renderDeferredLighting()
 
         if (local_light_count > 0 && (!gCubeSnapshot || probe_level > 0))
         {
-            gGL.setSceneBlendType(LLRender::BT_ADD);
             static std::vector<LLVector4>        fullscreen_lights;
             static LLDrawable::drawable_vector_t spot_lights;
             static LLDrawable::drawable_vector_t fullscreen_spot_lights;
             static std::vector<LLVector4>        light_colors;
 
-
-            // Clear does not free internal vector storage, so this is more efficient than creating new vectors each frame
-            fullscreen_lights.clear();
-            spot_lights.clear();
-            fullscreen_spot_lights.clear();
-            light_colors.clear();
-
+            gGL.setSceneBlendType(LLRender::BT_ADD);
             LLSettingsSky::ptr_t        psky        = LLEnvironment::instance().getCurrentSky();
 
             if (!gCubeSnapshot)
@@ -9893,6 +9886,12 @@ void LLPipeline::renderDeferredLighting()
                 gDeferredMultiSpotLightProgram.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
                 unbindDeferredShader(gDeferredMultiSpotLightProgram);
             }
+
+            // Clear does not free internal vector storage, so this is more efficient than creating new vectors each frame
+            fullscreen_lights.clear();
+            spot_lights.clear();
+            fullscreen_spot_lights.clear();
+            light_colors.clear();
         }
 
         gGL.setColorMask(true, true);
