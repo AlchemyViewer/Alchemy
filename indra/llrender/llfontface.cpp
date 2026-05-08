@@ -63,7 +63,8 @@ LLFontFace::~LLFontFace()
 
 bool LLFontFace::load(const std::string& filename, S32 face_index,
                       F32 point_size, F32 vert_dpi, F32 horz_dpi,
-                      S32 weight, EFontHinting hinting, S32 flags)
+                      EFontHinting hinting, S32 flags,
+                      const LLFontVarAxes& var_axes)
 {
     llassert(!mFTFace); // load() is called once per LLFontFace instance.
 
@@ -134,14 +135,28 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
         }
     }
 
-    if (weight >= 0)
-    {
-        mWghtAxisSet = setVariationAxis("wght", static_cast<F32>(weight));
-        // For Inter (and any other variable face exposing opsz), set the
-        // optical-size axis from the point size so glyph design adapts to
-        // its rendered size.
-        setVariationAxis("opsz", point_size);
-    }
+    // OpenType variation axes. Each axis is independently gated by its
+    // *_set flag in var_axes; an unset axis is silently skipped (and
+    // setVariationAxis itself silently no-ops on faces that lack the
+    // requested tag, so non-variable fonts pass through cleanly).
+    //
+    // opsz is the one exception to the "explicit only" rule: when no
+    // value is supplied, fall back to the rendered point_size so faces
+    // like Inter automatically pick up the design's optical adjustment
+    // at small / large sizes. Registry callers that want to pin opsz
+    // can supply font_optical_size in fonts.xml.
+    if (var_axes.wght_set)
+        mWghtAxisSet = setVariationAxis("wght", var_axes.wght);
+    if (var_axes.opsz_set)
+        mOpszAxisSet = setVariationAxis("opsz", var_axes.opsz);
+    else
+        mOpszAxisSet = setVariationAxis("opsz", point_size);
+    if (var_axes.ital_set)
+        mItalAxisSet = setVariationAxis("ital", var_axes.ital);
+    if (var_axes.wdth_set)
+        mWdthAxisSet = setVariationAxis("wdth", var_axes.wdth);
+    if (var_axes.slnt_set)
+        mSlntAxisSet = setVariationAxis("slnt", var_axes.slnt);
 
     // Round-to-nearest into 26.6: a plain (S32) cast truncates toward zero,
     // which loses up to ~1/64 pt of precision for non-integer point sizes

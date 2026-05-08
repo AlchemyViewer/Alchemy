@@ -236,7 +236,7 @@ namespace tut
     void llfontregistry_object::test<7>()
     {
         LLFontDescriptor desc("SansSerif", "", 0);
-        desc.addFontFile("Foo.ttf", EFontHinting::DEFAULT, 0, 0.f, -1);
+        desc.addFontFile("Foo.ttf", EFontHinting::DEFAULT, 0, 0.f);
         LLFontDescriptor n = desc.normalize();
         ensure_equals("file count preserved", (S32)n.getFontFiles().size(), 1);
         ensure_equals("file name preserved",
@@ -251,8 +251,8 @@ namespace tut
     {
         LLFontDescriptor a("SansSerif", "Medium", 0);
         LLFontDescriptor b("SansSerif", "Medium", 0);
-        a.addFontFile("a.ttf", EFontHinting::DEFAULT, 0, 0.f, -1);
-        b.addFontFile("b.ttf", EFontHinting::DEFAULT, 0, 0.f, -1);
+        a.addFontFile("a.ttf", EFontHinting::DEFAULT, 0, 0.f);
+        b.addFontFile("b.ttf", EFontHinting::DEFAULT, 0, 0.f);
         ensure("equal regardless of files", a == b);
         ensure_equals("hash matches", hash_value(a), hash_value(b));
     }
@@ -324,13 +324,17 @@ namespace tut
         const LLFontDescriptor* bold   = templateFor("Inter", LLFontGL::BOLD);
         ensure("NORMAL template present", normal != nullptr);
         ensure("BOLD template present",   bold != nullptr);
+        ensure("NORMAL inherits family wght set",
+               normal->getFontFiles()[0].mVarAxes.wght_set);
         ensure_equals("NORMAL inherits family weight 400",
-                      normal->getFontFiles()[0].mWeight, 400);
+                      normal->getFontFiles()[0].mVarAxes.wght, 400.f);
         ensure_equals("NORMAL inherits family hinting light",
                       (S32)normal->getFontFiles()[0].mHinting,
                       (S32)EFontHinting::LIGHT);
+        ensure("BOLD has wght set after override",
+               bold->getFontFiles()[0].mVarAxes.wght_set);
         ensure_equals("BOLD overrides weight to 700",
-                      bold->getFontFiles()[0].mWeight, 700);
+                      bold->getFontFiles()[0].mVarAxes.wght, 700.f);
         ensure_equals("BOLD inherits family hinting",
                       (S32)bold->getFontFiles()[0].mHinting,
                       (S32)EFontHinting::LIGHT);
@@ -842,7 +846,7 @@ namespace tut
                       std::string("user-supplied.ttf"));
         ensure_equals("hinting inherited from target's first file",
                       (S32)files[0].mHinting, (S32)EFontHinting::LIGHT);
-        ensure_equals("weight inherited", files[0].mWeight, 400);
+        ensure_equals("weight inherited", files[0].mVarAxes.wght, 400.f);
         ensure("ligatures inherited",      files[0].mMonospaceLigatures);
     }
 
@@ -2313,10 +2317,10 @@ namespace tut
     void llfontregistry_object::test<78>()
     {
         font_file_info_vec_t files_a;
-        files_a.emplace_back("A.woff2", EFontHinting::FORCE_AUTOHINT, 0, 0.f, -1);
+        files_a.emplace_back("A.woff2", EFontHinting::FORCE_AUTOHINT, 0, 0.f);
         font_file_info_vec_t files_b;
-        files_b.emplace_back("B.woff2", EFontHinting::FORCE_AUTOHINT, 0, 0.f, -1);
-        files_b.emplace_back("C.woff2", EFontHinting::FORCE_AUTOHINT, 0, 0.f, -1);
+        files_b.emplace_back("B.woff2", EFontHinting::FORCE_AUTOHINT, 0, 0.f);
+        files_b.emplace_back("C.woff2", EFontHinting::FORCE_AUTOHINT, 0, 0.f);
 
         LLFontDescriptor a("SansSerif", "Small", 0, files_a);
         LLFontDescriptor b("SansSerif", "Small", 0, files_b);
@@ -2402,6 +2406,117 @@ namespace tut
         // No heads instantiated, no fallback-cache entries.
         reg.sweepGlyphCaches();
         ensure("registry survives sweep with templates only", true);
+    }
+
+    // OpenType variation axes plumbed through XML parse. Family-level
+    // font_italic / font_width / font_slant cascade to child <file>
+    // entries that don't override; per-file overrides win when present.
+    template<> template<>
+    void llfontregistry_object::test<81>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Demo' font_italic='1.0' font_width='87.5' font_slant='-12.0'>"
+            "    <style name='NORMAL'>"
+            "      <file>Demo-Regular.ttf</file>"
+            "    </style>"
+            "    <style name='BOLD'>"
+            "      <file font_width='125.0'>Demo-Regular.ttf</file>"
+            "    </style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+
+        const LLFontDescriptor* normal = templateFor("Demo", LLFontGL::NORMAL);
+        ensure("NORMAL template present", normal != nullptr);
+        const auto& nfiles = normal->getFontFiles();
+        ensure_equals("NORMAL has one file", nfiles.size(), 1u);
+        ensure("NORMAL inherits family ital",
+               nfiles[0].mVarAxes.ital_set);
+        ensure_equals("NORMAL ital == 1.0", nfiles[0].mVarAxes.ital, 1.0f);
+        ensure("NORMAL inherits family wdth",
+               nfiles[0].mVarAxes.wdth_set);
+        ensure_equals("NORMAL wdth == 87.5", nfiles[0].mVarAxes.wdth, 87.5f);
+        ensure("NORMAL inherits family slnt",
+               nfiles[0].mVarAxes.slnt_set);
+        ensure_equals("NORMAL slnt == -12.0", nfiles[0].mVarAxes.slnt, -12.0f);
+
+        // Per-file override on wdth wins; ital/slnt still inherit.
+        const LLFontDescriptor* bold = templateFor("Demo", LLFontGL::BOLD);
+        ensure("BOLD template present", bold != nullptr);
+        const auto& wfiles = bold->getFontFiles();
+        ensure_equals("BOLD has one file", wfiles.size(), 1u);
+        ensure_equals("BOLD overrides wdth to 125.0",
+                      wfiles[0].mVarAxes.wdth, 125.0f);
+        ensure("BOLD keeps inherited ital",
+               wfiles[0].mVarAxes.ital_set);
+        ensure_equals("BOLD inherited ital still 1.0",
+                      wfiles[0].mVarAxes.ital, 1.0f);
+        ensure("BOLD keeps inherited slnt",
+               wfiles[0].mVarAxes.slnt_set);
+        ensure_equals("BOLD inherited slnt still -12.0",
+                      wfiles[0].mVarAxes.slnt, -12.0f);
+    }
+
+    // Files without any axis attribute leave LLFontVarAxes at its
+    // default (no *_set flags). Pins the negative path that the cache
+    // key + face-load skip rely on.
+    template<> template<>
+    void llfontregistry_object::test<82>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Plain'>"
+            "    <style name='NORMAL'><file>Plain.ttf</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        const LLFontDescriptor* d = templateFor("Plain", LLFontGL::NORMAL);
+        ensure("template present", d != nullptr);
+        const auto& f = d->getFontFiles()[0];
+        ensure("no wght", !f.mVarAxes.wght_set);
+        ensure("no opsz", !f.mVarAxes.opsz_set);
+        ensure("no ital", !f.mVarAxes.ital_set);
+        ensure("no wdth", !f.mVarAxes.wdth_set);
+        ensure("no slnt", !f.mVarAxes.slnt_set);
+    }
+
+    // font_optical_size cascades family -> file the same way
+    // font_weight does. Per-file override wins; absence at file level
+    // inherits the family value. Pins the new opsz axis plumbing.
+    template<> template<>
+    void llfontregistry_object::test<83>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Demo' font_optical_size='14.0'>"
+            "    <style name='NORMAL'>"
+            "      <file>Demo-Regular.ttf</file>"
+            "    </style>"
+            "    <style name='BOLD'>"
+            "      <file font_optical_size='28.0'>Demo-Regular.ttf</file>"
+            "    </style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+
+        const LLFontDescriptor* normal = templateFor("Demo", LLFontGL::NORMAL);
+        ensure("NORMAL template present", normal != nullptr);
+        const auto& nfiles = normal->getFontFiles();
+        ensure_equals("NORMAL has one file", nfiles.size(), 1u);
+        ensure("NORMAL inherits family opsz",
+               nfiles[0].mVarAxes.opsz_set);
+        ensure_equals("NORMAL opsz == 14.0",
+                      nfiles[0].mVarAxes.opsz, 14.0f);
+
+        const LLFontDescriptor* bold = templateFor("Demo", LLFontGL::BOLD);
+        ensure("BOLD template present", bold != nullptr);
+        const auto& bfiles = bold->getFontFiles();
+        ensure_equals("BOLD has one file", bfiles.size(), 1u);
+        ensure("BOLD has opsz set after override",
+               bfiles[0].mVarAxes.opsz_set);
+        ensure_equals("BOLD overrides opsz to 28.0",
+                      bfiles[0].mVarAxes.opsz, 28.0f);
     }
 
 #if LL_MESA_HEADLESS

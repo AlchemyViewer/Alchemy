@@ -157,7 +157,7 @@ public:
 
     // is_fallback should be true for fallback fonts that aren't used
     // to render directly (Unicode backup, primarily)
-    bool loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, S32 weight, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags);
+    bool loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags, const LLFontVarAxes& var_axes = {});
 
     S32 getNumFaces(const std::string& filename);
 
@@ -356,7 +356,10 @@ private:
     bool mIsFallback;
     EFontHinting mHinting;
     S32 mFontFlags;
-    S32 mWeight = -1;
+    // OpenType variation axes the head was loaded with. Stored on the
+    // head (not just on mFace) so reset() can round-trip the same axes
+    // back through loadFace when re-resolving for a DPI change.
+    LLFontVarAxes mVarAxes;
     bool mAllowMonospaceLigatures = false;
     bool mUseSubpixelPen = false;
     fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)

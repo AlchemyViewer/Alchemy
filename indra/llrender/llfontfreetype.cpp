@@ -330,7 +330,7 @@ U32 LLFontFreetype::getCharGlyphIndex(llwchar wch) const
     return mFace ? mFace->getCharGlyphIndex(wch) : 0;
 }
 
-bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, S32 weight, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags)
+bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags, const LLFontVarAxes& var_axes)
 {
     if (mFace)
     {
@@ -348,7 +348,7 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     // Resolve the (file, sized + variable axis) state via the manager's
     // shared face cache. Heads and fallbacks alike consult the cache; same
     // params yield the same wrapper.
-    LLFontFaceKey key{filename, face_n, point_size, vert_dpi, horz_dpi, weight, hinting, flags};
+    LLFontFaceKey key{filename, face_n, point_size, vert_dpi, horz_dpi, hinting, flags, var_axes};
     mFace = gFontManagerp->getOrCreateFace(key);
     if (!mFace || !mFace->isValid())
     {
@@ -361,7 +361,7 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     mIsFallback = is_fallback;
     mHinting    = hinting;
     mFontFlags  = flags;
-    mWeight     = weight;
+    mVarAxes    = var_axes;
     mUseSubpixelPen = mFace->useSubpixelPen();
 
     // FreeType's size->metrics is populated by FT_Set_Char_Size (run inside
@@ -405,15 +405,34 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
         // have the bold style flag set (e.g. Inter SemiBold).
         mStyle |= LLFontGL::BOLD;
     }
-    else if (weight >= 600 && mFace->wghtAxisSet())
+    else if (mFace->wghtAxisSet() && var_axes.wght >= 600.f)
     {
         // Variable face whose wght axis we set to 600+ already produced a
-        // heavy face; skip the programmatic bolding pass.
+        // heavy face; skip the programmatic bolding pass. wghtAxisSet()
+        // implies var_axes.wght_set was true at load time (LLFontFace::load
+        // only flips mWghtAxisSet inside the `if (var_axes.wght_set)`
+        // branch), so the value comparison alone discriminates regular
+        // from bold once we know the axis fired.
         mStyle |= LLFontGL::BOLD;
     }
 
     if (ft->style_flags & FT_STYLE_FLAG_ITALIC)
     {
+        mStyle |= LLFontGL::ITALIC;
+    }
+    else if (flags & LLFontGL::ITALIC)
+    {
+        // Programmatic italic flag from the descriptor; the renderer
+        // synthesises a slant if no real italic axis is in effect.
+        mStyle |= LLFontGL::ITALIC;
+    }
+    else if ((mFace->italAxisSet() && var_axes.ital >= 0.5f)
+          || (mFace->slntAxisSet() && var_axes.slnt <= -1.f))
+    {
+        // Variable face whose ital axis we set to ≥0.5, or whose slnt
+        // axis we set to a negative angle, already produced a slanted
+        // face — flag the head as italic so consumers branch correctly
+        // and the synthesised slant pass is skipped.
         mStyle |= LLFontGL::ITALIC;
     }
 
@@ -1078,7 +1097,7 @@ void LLFontFreetype::resetSelf(F32 vert_dpi, F32 horz_dpi)
     // once by whoever owns the shared cache
     // (LLFontRegistry::reloadForDpiChange).
     resetBitmapCache();
-    loadFace(mName, mPointSize, vert_dpi, horz_dpi, mWeight, mIsFallback, 0, mHinting, mFontFlags);
+    loadFace(mName, mPointSize, vert_dpi, horz_dpi, mIsFallback, 0, mHinting, mFontFlags, mVarAxes);
 }
 
 void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
@@ -1341,7 +1360,8 @@ LLPointer<LLFontFace> LLFontManager::getOrCreateFace(const LLFontFaceKey& key)
 
     LLPointer<LLFontFace> face = new LLFontFace;
     if (!face->load(key.filename, key.face_index, key.point_size,
-                    key.vert_dpi, key.horz_dpi, key.weight, key.hinting, key.flags))
+                    key.vert_dpi, key.horz_dpi, key.hinting, key.flags,
+                    key.var_axes))
     {
         // Don't cache failures — caller handles retry through search paths.
         return nullptr;

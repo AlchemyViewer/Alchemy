@@ -53,10 +53,15 @@ namespace
         bool monospace_ligatures = false;
         EFontHinting hinting = EFontHinting::FORCE_AUTOHINT;
         bool hinting_set = false;
-        S32 weight = -1;
-        bool weight_set = false;
         bool load_collection = false;
         bool load_collection_set = false;
+        // Family-level OpenType variation axis defaults (all five OT
+        // axes the registry exposes: wght, opsz, ital, wdth, slnt).
+        // Each *_set flag tracks whether the <font> declared the
+        // matching attribute; child <file> entries inherit the value
+        // when they don't override. font_weight is parsed as S32 from
+        // XML and stored as F32 here so all five axes share one shape.
+        LLFontVarAxes var_axes;
     };
 
     typedef boost::unordered_map<std::string, F32> family_size_overrides_t;
@@ -283,9 +288,9 @@ LLFontDescriptor LLFontDescriptor::normalize() const
     return LLFontDescriptor(new_name,new_size,new_style, getFontFiles());
 }
 
-void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures, bool load_collection)
+void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, const std::function<bool(llwchar)>& char_functor, bool monospace_ligatures, bool load_collection, const LLFontVarAxes& var_axes)
 {
-    mFontFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, weight, char_functor, monospace_ligatures, load_collection));
+    mFontFiles.push_back(LLFontFileInfo(file_name, hinting, flags, size_delta, char_functor, monospace_ligatures, load_collection, var_axes));
 }
 
 LLFontRegistry::LLFontRegistry(bool create_gl_textures)
@@ -620,7 +625,7 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
         if (a.FileName != b.FileName) return false;
         if (a.mHinting != b.mHinting) return false;
         if (a.mFlags != b.mFlags) return false;
-        if (a.mWeight != b.mWeight) return false;
+        if (!(a.mVarAxes == b.mVarAxes)) return false;
         if (a.mSizeDelta != b.mSizeDelta) return false;
         if (a.mMonospaceLigatures != b.mMonospaceLigatures) return false;
         if (a.mLoadCollection != b.mLoadCollection) return false;
@@ -789,26 +794,26 @@ void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
             }
             else
             {
-                // File-name override. Inherit hinting/weight/flags/ligatures
-                // defaults from the target family's first existing file so
-                // the swap behaves like a drop-in replacement (e.g. a
-                // monospace family's ligatures setting carries to the
-                // user-supplied file).
+                // File-name override. Inherit hinting/var_axes/flags/
+                // ligatures defaults from the target family's first
+                // existing file so the swap behaves like a drop-in
+                // replacement (e.g. a monospace family's ligatures
+                // setting carries to the user-supplied file).
                 EFontHinting hinting = EFontHinting::FORCE_AUTOHINT;
-                S32 weight = -1;
+                LLFontVarAxes var_axes;
                 S32 flags = 0;
                 bool monospace_lig = false;
                 const auto& orig_files = target_it->first.getFontFiles();
                 if (!orig_files.empty())
                 {
                     hinting = orig_files[0].mHinting;
-                    weight = orig_files[0].mWeight;
+                    var_axes = orig_files[0].mVarAxes;
                     flags = orig_files[0].mFlags;
                     monospace_lig = orig_files[0].mMonospaceLigatures;
                 }
                 if (style & LLFontGL::BOLD)
                     flags |= LLFontGL::BOLD;
-                prepend_files.emplace_back(override_value, hinting, flags, 0.f, weight, std::function<bool(llwchar)>(nullptr), monospace_lig);
+                prepend_files.emplace_back(override_value, hinting, flags, 0.f, std::function<bool(llwchar)>(nullptr), monospace_lig, false, var_axes);
             }
 
             // Prepend source onto the target's existing chain so the
@@ -894,12 +899,51 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
             defaults.hinting_set = true;
         }
 
+        // Family-level OpenType variation axes — all five share one
+        // shape. Each one cascades to child <file> entries that don't
+        // override. Values are F32 design coords; setVariationAxis at
+        // face-load time clamps to the axis's actual [min, max].
+        // font_weight is parsed as S32 (CSS-weight idiom) but stored
+        // as F32 alongside the others.
         if (node->hasAttribute("font_weight"))
         {
-            S32 fam_weight = -1;
-            node->getAttributeS32("font_weight", fam_weight);
-            defaults.weight = fam_weight;
-            defaults.weight_set = true;
+            S32 v = -1;
+            node->getAttributeS32("font_weight", v);
+            defaults.var_axes.wght = static_cast<F32>(v);
+            // -1 is the legacy "use file default" sentinel — leaving
+            // wght_set false skips setVariationAxis("wght", ...) at
+            // face load. Matches read_family_defaults and the file-level
+            // pass; the three sites must agree or the cascade leaks
+            // a bogus -1 into setVariationAxis.
+            defaults.var_axes.wght_set = (v >= 0);
+        }
+        if (node->hasAttribute("font_optical_size"))
+        {
+            F32 v = 0.f;
+            node->getAttributeF32("font_optical_size", v);
+            defaults.var_axes.opsz = v;
+            defaults.var_axes.opsz_set = true;
+        }
+        if (node->hasAttribute("font_italic"))
+        {
+            F32 v = 0.f;
+            node->getAttributeF32("font_italic", v);
+            defaults.var_axes.ital = v;
+            defaults.var_axes.ital_set = true;
+        }
+        if (node->hasAttribute("font_width"))
+        {
+            F32 v = 0.f;
+            node->getAttributeF32("font_width", v);
+            defaults.var_axes.wdth = v;
+            defaults.var_axes.wdth_set = true;
+        }
+        if (node->hasAttribute("font_slant"))
+        {
+            F32 v = 0.f;
+            node->getAttributeF32("font_slant", v);
+            defaults.var_axes.slnt = v;
+            defaults.var_axes.slnt_set = true;
         }
 
         if (node->hasAttribute("load_collection"))
@@ -939,7 +983,6 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
             std::function<bool(llwchar)> inline_functor;
             EFontHinting hinting = defaults.hinting_set ? defaults.hinting : EFontHinting::FORCE_AUTOHINT;
             S32 flags = 0;
-            S32 weight = defaults.weight_set ? defaults.weight : -1;
             bool load_collection = defaults.load_collection_set ? defaults.load_collection : false;
 
             if (child->hasAttribute("unicode_ranges"))
@@ -973,17 +1016,49 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
                 child->getAttributeF32("size_delta", size_delta);
             }
 
-            if (child->hasAttribute("font_weight"))
-            {
-                child->getAttributeS32("font_weight", weight);
-            }
-
             if (child->hasAttribute("load_collection"))
             {
                 child->getAttributeBOOL("load_collection", load_collection);
             }
 
-            desc.addFontFile(font_file_name, hinting, flags, size_delta, weight, inline_functor, defaults.monospace_ligatures, load_collection);
+            // OpenType variation axes — start from the family default
+            // and allow per-file override. All five axes share the same
+            // shape (cascade + override). font_weight is parsed as S32
+            // (CSS-weight idiom) and stored as F32; the rest are F32.
+            LLFontVarAxes var_axes = defaults.var_axes;
+            if (child->hasAttribute("font_weight"))
+            {
+                S32 v = -1;
+                child->getAttributeS32("font_weight", v);
+                var_axes.wght = static_cast<F32>(v);
+                var_axes.wght_set = (v >= 0);
+            }
+            if (child->hasAttribute("font_optical_size"))
+            {
+                F32 v = 0.f;
+                child->getAttributeF32("font_optical_size", v);
+                var_axes.opsz = v; var_axes.opsz_set = true;
+            }
+            if (child->hasAttribute("font_italic"))
+            {
+                F32 v = 0.f;
+                child->getAttributeF32("font_italic", v);
+                var_axes.ital = v; var_axes.ital_set = true;
+            }
+            if (child->hasAttribute("font_width"))
+            {
+                F32 v = 0.f;
+                child->getAttributeF32("font_width", v);
+                var_axes.wdth = v; var_axes.wdth_set = true;
+            }
+            if (child->hasAttribute("font_slant"))
+            {
+                F32 v = 0.f;
+                child->getAttributeF32("font_slant", v);
+                var_axes.slnt = v; var_axes.slnt_set = true;
+            }
+
+            desc.addFontFile(font_file_name, hinting, flags, size_delta, inline_functor, defaults.monospace_ligatures, load_collection, var_axes);
         }
         else if (child->hasName("size"))
         {
@@ -1035,12 +1110,42 @@ FamilyDefaults read_family_defaults(LLXMLNodePtr font_node)
         d.hinting = h;
         d.hinting_set = true;
     }
+    // OpenType variation axes — all five share one shape.
+    // Cascades to child <file> entries via font_desc_init_from_xml.
     if (font_node->hasAttribute("font_weight"))
     {
-        S32 w = -1;
-        font_node->getAttributeS32("font_weight", w);
-        d.weight = w;
-        d.weight_set = true;
+        S32 v = -1;
+        font_node->getAttributeS32("font_weight", v);
+        d.var_axes.wght = static_cast<F32>(v);
+        d.var_axes.wght_set = (v >= 0);
+    }
+    if (font_node->hasAttribute("font_optical_size"))
+    {
+        F32 v = 0.f;
+        font_node->getAttributeF32("font_optical_size", v);
+        d.var_axes.opsz = v;
+        d.var_axes.opsz_set = true;
+    }
+    if (font_node->hasAttribute("font_italic"))
+    {
+        F32 v = 0.f;
+        font_node->getAttributeF32("font_italic", v);
+        d.var_axes.ital = v;
+        d.var_axes.ital_set = true;
+    }
+    if (font_node->hasAttribute("font_width"))
+    {
+        F32 v = 0.f;
+        font_node->getAttributeF32("font_width", v);
+        d.var_axes.wdth = v;
+        d.var_axes.wdth_set = true;
+    }
+    if (font_node->hasAttribute("font_slant"))
+    {
+        F32 v = 0.f;
+        font_node->getAttributeF32("font_slant", v);
+        d.var_axes.slnt = v;
+        d.var_axes.slnt_set = true;
     }
     if (font_node->hasAttribute("load_collection"))
     {
@@ -1404,7 +1509,7 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     // Add ultimate fallback list - generated dynamically on linux,
     // null elsewhere.
     std::transform(getUltimateFallbackList().begin(), getUltimateFallbackList().end(), std::back_inserter(font_files),
-                   [](const std::string& file_name) { return LLFontFileInfo(file_name, EFontHinting::FORCE_AUTOHINT, 0, 0.f, -1); });
+                   [](const std::string& file_name) { return LLFontFileInfo(file_name, EFontHinting::FORCE_AUTOHINT, 0, 0.f); });
 
     // Load fonts based on names.
     if (font_files.empty())
@@ -1485,7 +1590,8 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
                     FallbackInstanceKey key{
                         {font_file_it->FileName, i, actual_point_size,
                          LLFontGL::sVertDPI, LLFontGL::sHorizDPI,
-                         font_file_it->mWeight, font_file_it->mHinting, font_file_it->mFlags},
+                         font_file_it->mHinting, font_file_it->mFlags,
+                         font_file_it->mVarAxes},
                         font_file_it->mMonospaceLigatures
                     };
                     auto cache_it = mFallbackInstanceCache.find(key);
@@ -1502,7 +1608,7 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
                     fontp = new LLFontGL;
                 }
                 if (fontp->loadFace(font_path, actual_point_size,
-                                 LLFontGL::sVertDPI, LLFontGL::sHorizDPI, font_file_it->mWeight, is_fallback, i, font_file_it->mHinting, font_file_it->mFlags))
+                                 LLFontGL::sVertDPI, LLFontGL::sHorizDPI, is_fallback, i, font_file_it->mHinting, font_file_it->mFlags, font_file_it->mVarAxes))
                 {
                     is_font_loaded = true;
                     fontp->mFontFreetype->setAllowMonospaceLigatures(font_file_it->mMonospaceLigatures);
@@ -1525,7 +1631,8 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
                         FallbackInstanceKey key{
                             {font_file_it->FileName, i, actual_point_size,
                              LLFontGL::sVertDPI, LLFontGL::sHorizDPI,
-                             font_file_it->mWeight, font_file_it->mHinting, font_file_it->mFlags},
+                             font_file_it->mHinting, font_file_it->mFlags,
+                             font_file_it->mVarAxes},
                             font_file_it->mMonospaceLigatures
                         };
                         mFallbackInstanceCache.emplace(key, fontp->mFontFreetype);

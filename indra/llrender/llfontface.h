@@ -34,20 +34,55 @@ class  LLFontFreetype;
 // (e.g. llfontface.cpp) include llfontregistry.h directly.
 enum class EFontHinting : S32;
 
+// Optional values for the OpenType variation axes the registry exposes.
+// Each axis carries a "set" flag (so 0.f isn't ambiguous with "use file
+// default"). All axes are silently skipped at face-load time when the
+// font doesn't expose them — setVariationAxis returns false on a face
+// whose FT_MM_Var lacks the requested tag.
+//   wght: 1   — 1000 (CSS weight scale; 400 regular, 700 bold)
+//   opsz: 6   — 144  (point-size design adaptation; defaults to render pt)
+//   ital: 0   — 1    (0 upright, 1 italic)
+//   wdth: 50  — 200  (% of normal width; 100 = unchanged)
+//   slnt: -90 — 0    (degrees; 0 upright, negative slants forward)
+struct LLFontVarAxes
+{
+    F32  wght     = 0.f;
+    F32  opsz     = 0.f;
+    F32  ital     = 0.f;
+    F32  wdth     = 0.f;
+    F32  slnt     = 0.f;
+    bool wght_set = false;
+    bool opsz_set = false;
+    bool ital_set = false;
+    bool wdth_set = false;
+    bool slnt_set = false;
+
+    bool operator==(const LLFontVarAxes& o) const noexcept
+    {
+        return wght_set == o.wght_set && opsz_set == o.opsz_set
+            && ital_set == o.ital_set && wdth_set == o.wdth_set && slnt_set == o.slnt_set
+            && (!wght_set || wght == o.wght)
+            && (!opsz_set || opsz == o.opsz)
+            && (!ital_set || ital == o.ital)
+            && (!wdth_set || wdth == o.wdth)
+            && (!slnt_set || slnt == o.slnt);
+    }
+};
+
 // Identity key for an FT_Face. Two LLFontFreetype instances that resolve to
 // the same key share the underlying face (via LLFontManager's cache). The
 // key fields are exactly the inputs to FT_Open_Face / FT_Set_Char_Size /
 // FT_Set_Var_Design_Coordinates that determine the face's observable state.
 struct LLFontFaceKey
 {
-    std::string  filename;
-    S32          face_index;
-    F32          point_size;
-    F32          vert_dpi;
-    F32          horz_dpi;
-    S32          weight;       // -1 = use the file's default
-    EFontHinting hinting;
-    S32          flags;
+    std::string   filename;
+    S32           face_index;
+    F32           point_size;
+    F32           vert_dpi;
+    F32           horz_dpi;
+    EFontHinting  hinting;
+    S32           flags;
+    LLFontVarAxes var_axes;     // wght/opsz/ital/wdth/slnt (each independently optional)
 
     bool operator==(const LLFontFaceKey& o) const noexcept
     {
@@ -56,9 +91,9 @@ struct LLFontFaceKey
             && point_size == o.point_size
             && vert_dpi == o.vert_dpi
             && horz_dpi == o.horz_dpi
-            && weight == o.weight
             && hinting == o.hinting
-            && flags == o.flags;
+            && flags == o.flags
+            && var_axes == o.var_axes;
     }
 
     friend std::size_t hash_value(const LLFontFaceKey& k) noexcept
@@ -69,9 +104,21 @@ struct LLFontFaceKey
         boost::hash_combine(seed, k.point_size);
         boost::hash_combine(seed, k.vert_dpi);
         boost::hash_combine(seed, k.horz_dpi);
-        boost::hash_combine(seed, k.weight);
         boost::hash_combine(seed, static_cast<S32>(k.hinting));
         boost::hash_combine(seed, k.flags);
+        // Axis values participate in the hash only when set; an unset
+        // axis must not perturb the bucket from a key with no axes set
+        // (so the common no-axes-configured path keeps a stable hash).
+        boost::hash_combine(seed, k.var_axes.wght_set);
+        boost::hash_combine(seed, k.var_axes.opsz_set);
+        boost::hash_combine(seed, k.var_axes.ital_set);
+        boost::hash_combine(seed, k.var_axes.wdth_set);
+        boost::hash_combine(seed, k.var_axes.slnt_set);
+        if (k.var_axes.wght_set) boost::hash_combine(seed, k.var_axes.wght);
+        if (k.var_axes.opsz_set) boost::hash_combine(seed, k.var_axes.opsz);
+        if (k.var_axes.ital_set) boost::hash_combine(seed, k.var_axes.ital);
+        if (k.var_axes.wdth_set) boost::hash_combine(seed, k.var_axes.wdth);
+        if (k.var_axes.slnt_set) boost::hash_combine(seed, k.var_axes.slnt);
         return seed;
     }
 };
@@ -88,7 +135,8 @@ public:
     // dead-but-harmless state (isValid() returns false).
     bool load(const std::string& filename, S32 face_index,
               F32 point_size, F32 vert_dpi, F32 horz_dpi,
-              S32 weight, EFontHinting hinting, S32 flags);
+              EFontHinting hinting, S32 flags,
+              const LLFontVarAxes& var_axes = {});
 
     LLFT_Face face() const { return mFTFace; }
     bool      isValid() const { return mFTFace != nullptr; }
@@ -126,6 +174,19 @@ public:
     // weight>=600 request already produced a heavy face on its own (in
     // which case programmatic bolding should be suppressed).
     bool wghtAxisSet() const    { return mWghtAxisSet; }
+    // True iff load() successfully applied the matching variation axis.
+    // opszAxisSet exposes whether the face carries an opsz axis at all
+    // (load() always tries opsz — explicitly when var_axes.opsz_set,
+    // otherwise from the rendered point_size).
+    // italAxisSet feeds the equivalent ITALIC-style synthesis check
+    // (skip programmatic italic when a real ital >= 0.5 is in effect).
+    // wdth/slnt have no synthesis interaction today; expose them anyway
+    // so downstream code can probe whether the file actually carries
+    // the axis (vs. silently skipped because the font lacks it).
+    bool opszAxisSet() const    { return mOpszAxisSet; }
+    bool italAxisSet() const    { return mItalAxisSet; }
+    bool wdthAxisSet() const    { return mWdthAxisSet; }
+    bool slntAxisSet() const    { return mSlntAxisSet; }
 
     // Per-face bitmap atlas for glyphs rasterized through this face. Shared
     // across every LLFontFreetype that wraps this face — heads sharing a
@@ -207,6 +268,10 @@ private:
     bool mHasColrV1      = false;
     bool mIsFixedWidth   = false;
     bool mWghtAxisSet    = false;
+    bool mOpszAxisSet    = false;
+    bool mItalAxisSet    = false;
+    bool mWdthAxisSet    = false;
+    bool mSlntAxisSet    = false;
     U32  mPaletteIndex   = 0;
 };
 

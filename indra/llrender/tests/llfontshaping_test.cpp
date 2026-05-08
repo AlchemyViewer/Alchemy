@@ -79,7 +79,6 @@ namespace
                           /*point_size=*/14.f,
                           /*vert_dpi=*/96.f,
                           /*horz_dpi=*/96.f,
-                          /*weight=*/-1,
                           is_fallback,
                           /*face_n=*/0,
                           EFontHinting::DEFAULT,
@@ -1210,16 +1209,19 @@ namespace tut
         const std::string path = std::string(kFontDir) + "InterVariable.woff2";
         if (!fileExists(path))
             skip("InterVariable.woff2 not present");
-        // Load with weight=600 so setVariationAxis sets a non-default
-        // wght (and opsz from point_size). A weight=-1 load would
-        // leave both axes at their defaults and verify nothing.
+        // Load with wght=600 so setVariationAxis sets a non-default
+        // wght. opsz is auto-set from point_size whenever opsz_set is
+        // false (load() handles both axes via the matching *_set
+        // flag), so the verifier below sees a non-default opsz too.
+        LLFontVarAxes va;
+        va.wght = 600.f; va.wght_set = true;
         LLPointer<LLFontFreetype> ft = new LLFontFreetype;
         ensure("InterVariable loaded at weight=600",
                ft->loadFace(path, /*point_size=*/14.f,
                             /*vert_dpi=*/96.f, /*horz_dpi=*/96.f,
-                            /*weight=*/600, /*is_fallback=*/true,
+                            /*is_fallback=*/true,
                             /*face_n=*/0, EFontHinting::DEFAULT,
-                            /*flags=*/0));
+                            /*flags=*/0, va));
 
         const LLFontFace* face = ft->getFontFace();
         FT_Face ftf = face->face();
@@ -1403,7 +1405,7 @@ namespace tut
     static LLPointer<LLFontFreetype> loadFtHead(const std::string& filename)
     {
         LLPointer<LLFontFreetype> ft = new LLFontFreetype;
-        if (!ft->loadFace(filename, 14.f, 96.f, 96.f, /*weight=*/-1,
+        if (!ft->loadFace(filename, 14.f, 96.f, 96.f,
                           /*is_fallback=*/false, /*face_n=*/0,
                           EFontHinting::DEFAULT, /*flags=*/0))
         {

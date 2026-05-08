@@ -50,6 +50,27 @@
   font_weight       Family-level default variable-font weight axis. Each
                     <file> can override. -1 means use the file's own
                     default. Typical values: 400 (regular), 600 (bold).
+                    OpenType `wght` axis (1..1000 design coords).
+  font_optical_size F32. Family-level OpenType `opsz` axis. Variable
+                    fonts only. When absent, opsz defaults to the
+                    rendered point size (Inter benefits from this so
+                    small/large renders pick up the design's optical
+                    adjustment automatically). Explicit values pin
+                    opsz to one design size regardless of pt. Each
+                    <file> can override.
+  font_italic       F32. Family-level OpenType `ital` axis. Variable
+                    fonts only. 0 = upright, 1 = italic. Distinct from
+                    the binary <style name="ITALIC"> file slot — `ital`
+                    smoothly interpolates within a single variable face.
+                    Each <file> can override.
+  font_width        F32. Family-level OpenType `wdth` axis. Variable
+                    fonts only. Percent of normal width (50..200; 100
+                    = unchanged). Each <file> can override.
+  font_slant        F32. Family-level OpenType `slnt` axis. Variable
+                    fonts only. Degrees (-90..0; 0 upright, negative
+                    slants forward). Distinct from font_italic — many
+                    fonts expose only one of the two; check the
+                    foundry's docs. Each <file> can override.
   comment           Free-form. Parser ignores. Use for documentation.
 
   ==========================================================================
@@ -105,7 +126,12 @@
   ==========================================================================
   font_hinting      Override family-level setting. Values as above.
   font_weight       Override family-level weight. Variable fonts only;
-                    static fonts ignore this.
+                    static fonts ignore this. See <font> attrs above
+                    for value range.
+  font_optical_size Override family-level opsz. See <font> attrs above.
+  font_italic       Override family-level ital. See <font> attrs above.
+  font_width        Override family-level wdth. See <font> attrs above.
+  font_slant        Override family-level slnt. See <font> attrs above.
   flags             Comma-separated style flags forced on this file's
                     glyphs. Currently only "bold" is recognized — used
                     when a single .woff2 carries both upright & italic

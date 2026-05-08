@@ -64,7 +64,6 @@ namespace
             /*point_size=*/14.f,
             /*vert_dpi=*/96.f,
             /*horz_dpi=*/96.f,
-            /*weight=*/-1,
             EFontHinting::DEFAULT,
             /*flags=*/0
         };
@@ -875,7 +874,6 @@ namespace tut
             /*point_size=*/50.f,
             /*vert_dpi=*/96.f,
             /*horz_dpi=*/96.f,
-            /*weight=*/-1,
             EFontHinting::DEFAULT,
             /*flags=*/0
         };
@@ -1118,7 +1116,7 @@ namespace tut
     {
         LLPointer<LLFontFreetype> ft = new LLFontFreetype;
         if (!ft->loadFace(filename, /*point_size=*/14.f, /*vert_dpi=*/96.f, /*horz_dpi=*/96.f,
-                          /*weight=*/-1, /*is_fallback=*/false, /*face_n=*/0,
+                          /*is_fallback=*/false, /*face_n=*/0,
                           EFontHinting::DEFAULT, /*flags=*/0))
         {
             return nullptr;

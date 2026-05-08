@@ -58,7 +58,7 @@ namespace
         return LLFontFaceKey{
             filename, /*face_index=*/0, point_size,
             /*vert_dpi=*/96.f, /*horz_dpi=*/96.f,
-            /*weight=*/-1, EFontHinting::DEFAULT, /*flags=*/0
+            EFontHinting::DEFAULT, /*flags=*/0
         };
     }
 
@@ -74,8 +74,14 @@ namespace
                                      EFontHinting hinting = EFontHinting::DEFAULT)
     {
         LLPointer<LLFontFreetype> ft = new LLFontFreetype;
+        LLFontVarAxes va;
+        if (weight >= 0)
+        {
+            va.wght = static_cast<F32>(weight);
+            va.wght_set = true;
+        }
         if (!ft->loadFace(filename, point_size, /*vert_dpi=*/96.f, /*horz_dpi=*/96.f,
-                          weight, is_fallback, /*face_n=*/0, hinting, /*flags=*/0))
+                          is_fallback, /*face_n=*/0, hinting, /*flags=*/0, va))
         {
             return nullptr;
         }
@@ -150,7 +156,7 @@ namespace tut
     {
         LLPointer<LLFontFreetype> ft = new LLFontFreetype;
         const bool ok = ft->loadFace("does/not/exist.ttf",
-                                     14.f, 96.f, 96.f, -1, true, 0,
+                                     14.f, 96.f, 96.f, true, 0,
                                      EFontHinting::DEFAULT, 0);
         ensure("loadFace returns false on missing file", !ok);
         // Don't deref ft beyond this — destructor must run cleanly.
@@ -410,7 +416,7 @@ namespace tut
     template<> template<>
     void llfontface_object::test<1>()
     {
-        LLFontFaceKey a{ "x.ttf", 0, 14.f, 96.f, 96.f, -1, EFontHinting::DEFAULT, 0 };
+        LLFontFaceKey a{ "x.ttf", 0, 14.f, 96.f, 96.f, EFontHinting::DEFAULT, 0 };
         LLFontFaceKey b = a;
         ensure("identical keys equal",
                a == b);
@@ -421,8 +427,8 @@ namespace tut
         ensure("differing point_size keys not equal", !(a == b));
         b = a;  b.face_index = 1;
         ensure("differing face_index keys not equal", !(a == b));
-        b = a;  b.weight = 600;
-        ensure("differing weight keys not equal",     !(a == b));
+        b = a;  b.var_axes.wght = 600.f; b.var_axes.wght_set = true;
+        ensure("differing wght keys not equal",       !(a == b));
         b = a;  b.hinting = EFontHinting::FORCE_AUTOHINT;
         ensure("differing hinting keys not equal",    !(a == b));
         b = a;  b.flags = LLFontGL::BOLD;
@@ -488,15 +494,16 @@ namespace tut
             skip("InterVariable.woff2 not present");
 
         LLFontFaceKey k_default = makeKey(path);
-        k_default.weight = -1;
+        // wght not set -> face takes the file's default
         LLFontFaceKey k_bold = makeKey(path);
-        k_bold.weight = 600;
+        k_bold.var_axes.wght = 600.f;
+        k_bold.var_axes.wght_set = true;
 
         LLPointer<LLFontFace> def = gFontManagerp->getOrCreateFace(k_default);
         LLPointer<LLFontFace> bld = gFontManagerp->getOrCreateFace(k_bold);
         ensure("both loaded", def->isValid() && bld->isValid());
-        ensure("weight=-1 -> wghtAxisSet=false", !def->wghtAxisSet());
-        ensure("weight=600 on variable face -> wghtAxisSet=true",
+        ensure("wght unset -> wghtAxisSet=false", !def->wghtAxisSet());
+        ensure("wght=600 on variable face -> wghtAxisSet=true",
                bld->wghtAxisSet());
     }
 
@@ -652,7 +659,8 @@ namespace tut
             skip("DejaVuSans.woff2 not present");
 
         LLFontFaceKey k = makeKey(path);
-        k.weight = 600;
+        k.var_axes.wght = 600.f;
+        k.var_axes.wght_set = true;
         LLPointer<LLFontFace> f = gFontManagerp->getOrCreateFace(k);
         ensure("face loaded", f.notNull() && f->isValid());
         ensure("non-variable face leaves wghtAxisSet=false",
@@ -671,9 +679,11 @@ namespace tut
             skip("InterVariable.woff2 not present");
 
         LLFontFaceKey k_400 = makeKey(path);
-        k_400.weight = 400;
+        k_400.var_axes.wght = 400.f;
+        k_400.var_axes.wght_set = true;
         LLFontFaceKey k_600 = makeKey(path);
-        k_600.weight = 600;
+        k_600.var_axes.wght = 600.f;
+        k_600.var_axes.wght_set = true;
 
         ensure("k_400 != k_600",      !(k_400 == k_600));
         ensure_not_equals("hash differs by weight",
@@ -684,6 +694,114 @@ namespace tut
         ensure("both faces valid", f400->isValid() && f600->isValid());
         ensure_not_equals("distinct weights produce distinct face entries",
                           f400.get(), f600.get());
+    }
+
+    // ital/wdth/slnt axis plumbing: distinct LLFontVarAxes values must
+    // produce distinct face cache entries even on the same file. Pins
+    // the LLFontFaceKey hash + equality changes that added var_axes
+    // to the key. The bundled fonts don't actually expose ital/wdth/
+    // slnt axes (so setVariationAxis silently no-ops), but the key
+    // identity check fires regardless of whether the axis takes effect.
+    template<> template<>
+    void llfontface_object::test<13>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+
+        LLFontFaceKey k_default = makeKey(path);
+        LLFontFaceKey k_ital    = makeKey(path);
+        k_ital.var_axes.ital     = 1.f;
+        k_ital.var_axes.ital_set = true;
+        LLFontFaceKey k_wdth    = makeKey(path);
+        k_wdth.var_axes.wdth     = 87.5f;
+        k_wdth.var_axes.wdth_set = true;
+        LLFontFaceKey k_slnt    = makeKey(path);
+        k_slnt.var_axes.slnt     = -12.f;
+        k_slnt.var_axes.slnt_set = true;
+
+        ensure("default != ital",  !(k_default == k_ital));
+        ensure("default != wdth",  !(k_default == k_wdth));
+        ensure("default != slnt",  !(k_default == k_slnt));
+        ensure("ital != wdth",     !(k_ital == k_wdth));
+        ensure("wdth != slnt",     !(k_wdth == k_slnt));
+        ensure_not_equals("default hash differs from ital",
+                          hash_value(k_default), hash_value(k_ital));
+        ensure_not_equals("default hash differs from wdth",
+                          hash_value(k_default), hash_value(k_wdth));
+        ensure_not_equals("default hash differs from slnt",
+                          hash_value(k_default), hash_value(k_slnt));
+
+        // Identical axis values produce equal keys + equal hashes.
+        LLFontFaceKey k_ital_dup = makeKey(path);
+        k_ital_dup.var_axes.ital     = 1.f;
+        k_ital_dup.var_axes.ital_set = true;
+        ensure("ital == ital_dup", k_ital == k_ital_dup);
+        ensure_equals("ital hash matches dup",
+                      hash_value(k_ital), hash_value(k_ital_dup));
+
+        // Cache identity round-trips through the face manager.
+        LLPointer<LLFontFace> fd = gFontManagerp->getOrCreateFace(k_default);
+        LLPointer<LLFontFace> fi = gFontManagerp->getOrCreateFace(k_ital);
+        ensure("both faces valid", fd->isValid() && fi->isValid());
+        ensure_not_equals("distinct ital settings produce distinct face entries",
+                          fd.get(), fi.get());
+    }
+
+    // Faces that don't expose the requested axis leave the matching
+    // *AxisSet flag false. Bundled fonts (DejaVuSans, InterVariable)
+    // don't carry ital/wdth/slnt; verify the silent-no-op contract
+    // and that requesting an unsupported axis doesn't poison the
+    // existing wghtAxisSet path.
+    template<> template<>
+    void llfontface_object::test<14>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+
+        LLFontFaceKey k = makeKey(path);
+        k.var_axes.ital     = 1.f;
+        k.var_axes.ital_set = true;
+        k.var_axes.wdth     = 87.5f;
+        k.var_axes.wdth_set = true;
+        k.var_axes.slnt     = -10.f;
+        k.var_axes.slnt_set = true;
+
+        LLPointer<LLFontFace> f = gFontManagerp->getOrCreateFace(k);
+        ensure("face loaded", f.notNull() && f->isValid());
+        ensure("DejaVu lacks ital axis -> italAxisSet false",
+               !f->italAxisSet());
+        ensure("DejaVu lacks wdth axis -> wdthAxisSet false",
+               !f->wdthAxisSet());
+        ensure("DejaVu lacks slnt axis -> slntAxisSet false",
+               !f->slntAxisSet());
+    }
+
+    // LLFontVarAxes equality: the comparison ignores value fields when
+    // *_set is false (an unset axis MUST equal another unset axis with
+    // a different stale value). Required so cache lookups for "no axes
+    // set" don't depend on uninitialised float bits.
+    template<> template<>
+    void llfontface_object::test<15>()
+    {
+        LLFontVarAxes a;
+        LLFontVarAxes b;
+        ensure("default ctor equal", a == b);
+
+        // Differing values with *_set=false still equal.
+        b.ital = 0.5f;
+        b.wdth = 99.f;
+        b.slnt = -3.f;
+        ensure("unset values are ignored in equality", a == b);
+
+        // Once a set flag flips, value differences matter.
+        a.ital_set = true; a.ital = 1.f;
+        b.ital_set = true; b.ital = 0.5f;
+        ensure("set ital with different values is not equal",
+               !(a == b));
+        b.ital = 1.f;
+        ensure("set ital with matching values is equal", a == b);
     }
 
 #if LL_MESA_HEADLESS
@@ -708,7 +826,7 @@ namespace tut
     static LLPointer<LLFontFreetype> loadFtHead(const std::string& filename)
     {
         LLPointer<LLFontFreetype> ft = new LLFontFreetype;
-        if (!ft->loadFace(filename, 14.f, 96.f, 96.f, /*weight=*/-1,
+        if (!ft->loadFace(filename, 14.f, 96.f, 96.f,
                           /*is_fallback=*/false, /*face_n=*/0,
                           EFontHinting::DEFAULT, /*flags=*/0))
         {
@@ -841,16 +959,20 @@ namespace tut
         if (!fileExists(path))
             skip("InterVariable.woff2 not present");
 
+        LLFontVarAxes va_light;
+        va_light.wght = 300.f; va_light.wght_set = true;
         LLPointer<LLFontFreetype> ft_light = new LLFontFreetype;
         ensure("weight=300 load",
                ft_light->loadFace(path, 32.f, 96.f, 96.f,
-                                  /*weight=*/300, /*is_fallback=*/false, 0,
-                                  EFontHinting::DEFAULT, /*flags=*/0));
+                                  /*is_fallback=*/false, 0,
+                                  EFontHinting::DEFAULT, /*flags=*/0, va_light));
+        LLFontVarAxes va_black;
+        va_black.wght = 900.f; va_black.wght_set = true;
         LLPointer<LLFontFreetype> ft_black = new LLFontFreetype;
         ensure("weight=900 load",
                ft_black->loadFace(path, 32.f, 96.f, 96.f,
-                                  /*weight=*/900, /*is_fallback=*/false, 0,
-                                  EFontHinting::DEFAULT, /*flags=*/0));
+                                  /*is_fallback=*/false, 0,
+                                  EFontHinting::DEFAULT, /*flags=*/0, va_black));
 
         const F32 adv_light = ft_light->getXAdvance(L'A');
         const F32 adv_black = ft_black->getXAdvance(L'A');
