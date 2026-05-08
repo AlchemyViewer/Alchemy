@@ -159,8 +159,8 @@ public:
     bool hasSvg() const         { return mHasSvg; }
     // True iff the face carries a COLR table whose version >= 1. FT_HAS_COLOR
     // is true for any color table (sbix / CBDT / COLRv0 / COLRv1 / SVG); only
-    // COLRv1 needs the in-tree plutovg paint walker — FT itself rasterizes
-    // the others via FT_LOAD_COLOR. Used by renderGlyph to decide whether to
+    // COLRv1 needs the hb-raster paint walker — FT itself rasterizes the
+    // others via FT_LOAD_COLOR. Used by renderGlyph to decide whether to
     // route a Color request through the COLRv1 painter.
     bool hasColrV1() const      { return mHasColrV1; }
     // CPAL palette index passed to hb_font_paint_glyph for COLRv1 rasterization.

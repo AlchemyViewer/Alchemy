@@ -91,7 +91,8 @@ namespace tut
     // Regression for 8e85c68d69 — the partial-rect setSubImage path
     // used to disable() unit 0 after the upload, leaving the next
     // batch flush bound to nothing (one-frame glyph flicker on cache
-    // miss). Verify the GL texture binding survives a setSubImage.
+    // miss). Verify the GL texture binding survives a setSubImage that
+    // skips unbind.
     template<> template<>
     void llimagegl_object::test<3>()
     {
@@ -121,7 +122,7 @@ namespace tut
                img->setSubImage(patch.get(),
                                 /*x_pos=*/4, /*y_pos=*/4,
                                 /*width=*/8, /*height=*/8,
-                                /*force_fast_update=*/true));
+                                /*force_fast_update=*/true, 0, true));
 
         glActiveTexture(GL_TEXTURE0);
         GLint bound_after = 0;

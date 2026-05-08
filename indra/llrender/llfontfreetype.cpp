@@ -157,7 +157,6 @@ LLFontGlyphInfo::LLFontGlyphInfo(const LLFontGlyphInfo& fgi)
     , mRsbDelta(fgi.mRsbDelta)
     , mPhaseSlots(fgi.mPhaseSlots)
     , mPhaseCount(fgi.mPhaseCount)
-    , mTintWithForeground(fgi.mTintWithForeground)
 {
     // mSourceFace MUST propagate: the secondary-publish path in
     // addShapedGlyphFromFont copies an existing entry and republishes it
@@ -630,12 +629,6 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
         // wch is only meaningful for the SVG glyph hook's debug output; shaped
         // lookups don't have a single source codepoint to pass here.
         fontp->renderGlyph(requested_glyph_type, glyph_index, 0);
-        // Propagate the COLRv1 foreground-only flag from the just-finished
-        // renderGlyph call. The flag is per-glyph, not per-phase (color
-        // glyphs only ever run a single phase), so writing on every phase
-        // is harmless. Stays false for non-COLRv1 paths.
-        if (phase == 0)
-            gi->mTintWithForeground = fontp->mLastColrV1ForegroundOnly;
 
         EFontGlyphType phase_type = EFontGlyphType::Unspecified;
         switch (fontp->getFTFace()->glyph->bitmap.pixel_mode)
@@ -942,15 +935,10 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
     if (getFTFace() == nullptr)
         return;
 
-    // Reset the COLRv1 stash so a subsequent non-COLRv1 glyph in the same
-    // renderAndCreateGlyph call doesn't pick up a stale flag from the prior
-    // glyph. renderColrV1Glyph below sets it back to true on success.
-    mLastColrV1ForegroundOnly = false;
-
     // COLRv1 fast path. FreeType's FT_LOAD_COLOR + FT_Render_Glyph rasterize
     // COLRv0 / sbix / CBDT / OT-SVG natively but explicitly NOT COLRv1; for
-    // those faces we walk the paint tree ourselves via HarfBuzz callbacks
-    // and a plutovg backend. Runs for both Color and Grayscale requests:
+    // those faces we hand the paint walk off to HarfBuzz hb-raster. Runs
+    // for both Color and Grayscale requests:
     // Color rasterizes BGRA into the Color atlas, Grayscale folds the paint
     // tree into a luminance-shaded mask that the Grayscale atlas tints with
     // text_color at draw time. Either bitmap_type request hits the COLRv1
@@ -1042,15 +1030,14 @@ bool LLFontFreetype::renderColrV1Glyph(U32 glyph_index, EFontGlyphType requested
     // and keeps the staging buffer sized to the running max glyph.
     static thread_local LLFontColrV1Painter s_painter;
     LLFontColrV1Painter::Result result;
-    // Foreground color: white for both BGRA and Gray paths. The Color path
-    // uses white so foreground-only glyphs end up as a luminance mask the
-    // renderer tints with text_color via mTintWithForeground. The Gray path
-    // requires white foreground for the luminance-collapses-to-alpha
-    // invariant: max(Y, a*floor) must equal `a` for fg-only pixels, which
-    // holds iff R=G=B=A. Threading the live text color through here is
-    // tracked as a follow-up (mixed CPAL+foreground glyphs render their
-    // foreground regions in white today; mTintWithForeground only retints
-    // the all-foreground case).
+    // Foreground color: white for both BGRA and Gray paths. The BGRA atlas
+    // tints with white at draw time so CPAL palette colors come through
+    // verbatim; the Gray path needs white for the
+    // luminance-collapses-to-alpha invariant (max(Y, a*floor) == a holds
+    // iff R=G=B=A) so the rendered silhouette tints cleanly with
+    // text_color. Mixed CPAL+foreground glyphs render their foreground
+    // regions in white — threading the live text color through here is a
+    // follow-up.
     const LLColor4U emoji_fg(255, 255, 255, 255);
     const LLFontColrV1Painter::OutputFormat format =
         (requested == EFontGlyphType::Grayscale)
@@ -1080,12 +1067,6 @@ bool LLFontFreetype::renderColrV1Glyph(U32 glyph_index, EFontGlyphType requested
     bm.num_grays  = 256;
     ft->glyph->bitmap_left = result.mLeft;
     ft->glyph->bitmap_top  = result.mTop;
-    // mTintWithForeground is only meaningful for the Color path. The Gray
-    // atlas always tints with text_color (the renderer's "Grayscale → text
-    // tint" rule), so the flag is dead-loaded for Gray glyphs and we leave
-    // it false.
-    if (format == LLFontColrV1Painter::OutputFormat::BGRA)
-        mLastColrV1ForegroundOnly = result.mForegroundOnly;
     return true;
 }
 
