@@ -1117,7 +1117,7 @@ void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 w
     }
 }
 
-bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update /* = false */, LLGLuint use_name)
+bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update /* = false */, LLGLuint use_name /* = 0 */, bool skip_unbind /* = false */)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     if (!width || !height)
@@ -1210,18 +1210,10 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
         {
             sub_image_lines(mTarget, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap, data_width);
         }
-        // Do NOT disable() the unit here. setSubImage gets called mid-render
-        // from font cache misses (LLFontFreetype::renderAndCreateGlyph →
-        // image_gl->setSubImage on the atlas the renderer just bound). The
-        // partial-rect path used to disable() unit 0 as defensive cleanup,
-        // which left the next batch flush in LLFontGL::render drawing with
-        // no texture — visible as glyph flicker on first appearance of any
-        // codepoint that triggered a cache miss. The full-rect setImage
-        // path (taken when force_fast_update is false and dims match) never
-        // unbound, which is why the old "upload the whole atlas" approach
-        // in renderAndCreateGlyph didn't flicker. The texture upload itself
-        // doesn't require the unit to be unbound after; leave the bind
-        // state alone so callers' surrounding render state survives.
+        if (!skip_unbind)
+        {
+            gGL.getTexUnit(0)->disable();
+        }
         stop_glerror();
 
         if(mFormatSwapBytes)
@@ -1237,10 +1229,10 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
     return true;
 }
 
-bool LLImageGL::setSubImage(const LLImageRaw* imageraw, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update /* = false */, LLGLuint use_name)
+bool LLImageGL::setSubImage(const LLImageRaw* imageraw, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update /* = false */, LLGLuint use_name, bool skip_unbind /* = false */)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    return setSubImage(imageraw->getData(), imageraw->getWidth(), imageraw->getHeight(), x_pos, y_pos, width, height, force_fast_update, use_name);
+    return setSubImage(imageraw->getData(), imageraw->getWidth(), imageraw->getHeight(), x_pos, y_pos, width, height, force_fast_update, use_name, skip_unbind);
 }
 
 // Copy sub image from frame buffer
