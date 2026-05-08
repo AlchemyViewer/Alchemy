@@ -1126,6 +1126,28 @@ void LLFontFreetype::destroyGL()
     mGlyphInfoMap.clear();
     if (mFace)
         mFace->destroyGL();
+
+    // Recurse into the fallback chain so each fallback face's atlas is
+    // cleared too. The registry's destroyGL iterates mFontMap (heads
+    // only), so without this recursion fallback faces — only reachable
+    // through the head's mFallbackFonts — would survive a teardown with
+    // stale atlas content. After a font reload that lands a new freetype
+    // on the SAME LLFontFaceKey (e.g. point size unchanged for a
+    // particular descriptor), getOrCreateFace returns the cached face
+    // with whatever glyphs the previous run rasterized into it.
+    // Idempotent: multiple heads may share a fallback face via
+    // mFallbackInstanceCache; calling destroyGL on an already-cleared
+    // face is a no-op. mIsFallback gate avoids descending into a
+    // fallback's own (empty) mFallbackFonts vector — only heads carry
+    // a populated chain.
+    if (!mIsFallback)
+    {
+        for (auto& fb : mFallbackFonts)
+        {
+            if (fb.first)
+                fb.first->destroyGL();
+        }
+    }
 }
 
 const std::string &LLFontFreetype::getName() const

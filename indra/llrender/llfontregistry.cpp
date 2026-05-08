@@ -381,18 +381,19 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
     };
 
     // Helper: depth-first walk of mFamilyUses checking whether `fam` or any
-    // family transitively reachable through its <use> chain declares `style`
-    // (or NORMAL fallback). Used by the synthesis pre-step so a use-only
-    // family that pulls in chains exposes whatever styles those chains
-    // ultimately cover, not just what its direct references declare.
+    // family transitively reachable through its <use> chain explicitly
+    // declares `style`. NORMAL fallback is NOT consulted here — synthesis
+    // only fires for styles authored somewhere in the chain. A use-only
+    // family whose chain only ever declares NORMAL therefore gets ONLY a
+    // NORMAL host; lookups at BOLD/ITALIC fall through getClosestFontTemplate
+    // (which already accepts NORMAL as a closest match for any style
+    // request) rather than minting synthetic BOLD/ITALIC hosts that just
+    // alias NORMAL's chain.
     std::function<bool(const std::string&, U8, std::set<std::string>&)> chain_has_style;
     chain_has_style = [&](const std::string& fam, U8 style, std::set<std::string>& visited) -> bool {
         if (!visited.insert(fam).second)
             return false;
         if (mFontMap.find(LLFontDescriptor(fam, s_template_string, style)) != mFontMap.end())
-            return true;
-        if (style != 0
-            && mFontMap.find(LLFontDescriptor(fam, s_template_string, 0)) != mFontMap.end())
             return true;
         auto uses_it = mFamilyUses.find(fam);
         if (uses_it == mFamilyUses.end())
@@ -406,10 +407,12 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
     };
 
     // Pre-step: synthesize style descriptors for <use>-only families based
-    // on which styles their referenced families (transitively) declare. A
-    // family that declared no <style> blocks gets a host descriptor for
-    // each style any family reachable through its <use> chain supports —
-    // either at that exact style or fallback-to-NORMAL.
+    // on which styles their referenced families (transitively) explicitly
+    // declare. A family that declared no <style> blocks gets a host
+    // descriptor for exactly those styles authored somewhere in the chain.
+    // Styles not authored anywhere in the chain are left unsynthesized;
+    // getClosestFontTemplate's bit-mask fallback at lookup time substitutes
+    // NORMAL (or any subset style) for the missing-style request.
     for (const auto& kv : mFamilyUses)
     {
         const std::string& family = kv.first;
@@ -671,18 +674,15 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
 
     // Consume both maps so a subsequent call (e.g. on dynamic skin reload)
     // doesn't double-append references to already-resolved entries.
+    // Per-family sizes (mFamilySizes) and per-file source-family tags
+    // (mSourceFamily on each LLFontFileInfo) survive — those are the
+    // runtime data createFont consults at load time.
     mFamilyUses.clear();
     mInheritFlags.clear();
 }
 
 void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
 {
-    // Always clear the override-source map so a removed override stops
-    // routing size lookups through the prior source. Even an empty
-    // overrides map needs this — early-returning before would leave
-    // stale entries from a previous parse.
-    mFamilyOverrideSources.clear();
-
     if (!overrides.isMap() || overrides.size() == 0)
         return;
 
@@ -762,15 +762,6 @@ void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
                 source_is_family = true;
                 break;
             }
-        }
-
-        // Record family→family override so nameToSize can route per-family
-        // <size> lookups through the source family. File-name overrides
-        // don't get an entry — there's no source family to inherit sizes
-        // from.
-        if (source_is_family)
-        {
-            mFamilyOverrideSources[family] = override_value;
         }
 
         for (U8 style : kStyles)
@@ -996,7 +987,7 @@ bool font_desc_init_from_xml(LLXMLNodePtr node,
         }
         else if (child->hasName("size"))
         {
-            // Per-family size override. Ignored on <os> recursion (extras is
+            // Per-family size pin. Ignored on <os> recursion (extras is
             // null there) since OS blocks shouldn't redefine sizes.
             if (extras)
             {
@@ -1176,6 +1167,14 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
         // <size>/<use>/inherit at <style> level are not supported.
         font_desc_init_from_xml(c, desc, defaults, nullptr);
 
+        // Stamp this family onto every file the <style> contributed so
+        // createFont can later look up the family's per-family <size>
+        // entry and pin these specific files at that point size. <use>-
+        // chain copies preserve the tag, so a family's pinned-size files
+        // keep their preferred point size when they appear as fallbacks
+        // under a different head.
+        desc.tagSourceFamily(family_name);
+
         bool style_inherit = false;
         if (c->hasAttribute("inherit"))
             c->getAttributeBOOL("inherit", style_inherit);
@@ -1242,6 +1241,12 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
             LLFontDescriptor norm_desc = desc.normalize();
             if (font_succ)
             {
+                // Stamp the normalized family name onto every file so the
+                // per-family size pin lookup at render time can route
+                // through mFamilySizes (also keyed by normalized family
+                // name).
+                desc.tagSourceFamily(norm_desc.getName());
+
                 // if this is the first time we've seen this font name,
                 // create a new template map entry for it.
                 const LLFontDescriptor *match_desc = registry->getMatchingFontDesc(desc);
@@ -1301,30 +1306,23 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
 
 bool LLFontRegistry::nameToSize(const std::string& family, const std::string& size_name, F32& size)
 {
-    auto try_family = [&](const std::string& fam) -> bool
-    {
-        family_size_map_t::const_iterator fam_it = mFamilySizes.find(fam);
-        if (fam_it == mFamilySizes.end())
-            return false;
-        font_size_map_t::const_iterator size_it = fam_it->second.find(size_name);
-        if (size_it == fam_it->second.end())
-            return false;
-        size = size_it->second;
-        return true;
-    };
-
+    // Per-family <size> is an absolute pin for THIS family only; never
+    // propagates across families via <use> chains or AlchemyUIFontOverrides.
+    // Each file in a chain consults its own source family's pin at
+    // createFont time (see the per-file effective_point_size lookup);
+    // this function only resolves the chain head's nominal pt.
     if (!family.empty())
     {
-        // If `family` was overridden by a known source family via
-        // AlchemyUIFontOverrides, consult the source's per-family <size>
-        // table first so an override picks up the source's size scale
-        // (e.g. Monospace -> SourceCode brings SourceCode's sizes).
-        // Single-level only — chains aren't followed.
-        auto ov_it = mFamilyOverrideSources.find(family);
-        if (ov_it != mFamilyOverrideSources.end() && try_family(ov_it->second))
-            return true;
-        if (try_family(family))
-            return true;
+        family_size_map_t::const_iterator fam_it = mFamilySizes.find(family);
+        if (fam_it != mFamilySizes.end())
+        {
+            font_size_map_t::const_iterator size_it = fam_it->second.find(size_name);
+            if (size_it != fam_it->second.end())
+            {
+                size = size_it->second;
+                return true;
+            }
+        }
     }
     font_size_map_t::iterator it = mFontSizes.find(size_name);
     if (it != mFontSizes.end())
@@ -1442,7 +1440,29 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
         // creation of OpenGL textures for test apps. JC
         bool is_fallback = !is_first_found || !mCreateGLTextures;
         F32 extra_scale = (is_fallback) ? fallback_scale : 1.0f;
-        F32 point_size_scale = extra_scale * point_size;
+        // Per-family absolute pin: if this file's source family declares
+        // a <size> for the requested size_name, that point size pins THIS
+        // file regardless of the chain head's resolved pt. Lets a fallback
+        // family render at its own preferred size beneath any head.
+        // mSourceFamily is empty for files without an attributable family
+        // (e.g. the ultimate-fallback list synthesized in createFont, or
+        // bare-filename overrides) — those fall through to the chain pt.
+        F32 effective_point_size = point_size;
+        if (!font_file_it->mSourceFamily.empty())
+        {
+            family_size_map_t::const_iterator fam_it =
+                mFamilySizes.find(font_file_it->mSourceFamily);
+            if (fam_it != mFamilySizes.end())
+            {
+                font_size_map_t::const_iterator sz_it =
+                    fam_it->second.find(norm_desc.getSize());
+                if (sz_it != fam_it->second.end())
+                {
+                    effective_point_size = sz_it->second;
+                }
+            }
+        }
+        F32 point_size_scale = extra_scale * effective_point_size;
         F32 actual_point_size = point_size_scale + font_file_it->mSizeDelta;
         bool is_font_loaded = false;
         for(string_vec_t::iterator font_search_path_it = font_search_paths.begin();
@@ -1535,13 +1555,18 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     if (result)
     {
         result->mFontDescriptor = desc;
+        mFontMap[desc] = result;
     }
     else
     {
+        // Don't poison mFontMap with a NULL entry — getFont uses
+        // find()-then-return-as-is, so a cached NULL would mask every future
+        // request for this descriptor and silently hand widgets a NULL font
+        // pointer. Leaving the slot absent lets the next getFont call retry
+        // creation; if creation keeps failing, the warning below logs each
+        // retry but the registry never returns a stale NULL.
         LL_WARNS() << "createFont failed in some way" << LL_ENDL;
     }
-
-    mFontMap[desc] = result;
     return result;
 }
 

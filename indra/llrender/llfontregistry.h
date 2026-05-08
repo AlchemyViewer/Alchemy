@@ -37,10 +37,11 @@
 class LLFontGL;
 class LLFontFreetype;
 
-// Forward-declare the test fixture so LLFontRegistry's friend declaration
-// can reference it. Defined inside namespace tut by
+// Forward-declare the test fixtures so LLFontRegistry's friend declarations
+// can reference them. Defined inside namespace tut by
 // indra/llrender/tests/llfontregistry_test.cpp.
 namespace tut { struct llfontregistry_data; }
+namespace tut { struct llfontregistry_gl_data; }
 
 typedef std::vector<std::string> string_vec_t;
 
@@ -69,18 +70,6 @@ struct LLFontFileInfo
     {
     }
 
-    LLFontFileInfo(const LLFontFileInfo& ffi, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight)
-        : FileName(ffi.FileName)
-        , CharFunctor(ffi.CharFunctor)
-        , mHinting(hinting)
-        , mFlags(flags)
-        , mWeight(weight)
-        , mSizeDelta(size_delta)
-        , mMonospaceLigatures(ffi.mMonospaceLigatures)
-        , mLoadCollection(ffi.mLoadCollection)
-    {
-    }
-
     std::string FileName;
     std::function<bool(llwchar)> CharFunctor;
     EFontHinting mHinting;
@@ -101,9 +90,17 @@ struct LLFontFileInfo
 
     // Opt-in: this file is a TTC/OTC collection — createFont probes
     // FT's num_faces and creates one LLFontGL per face. Off by default
-    // so we don't pay the open/probe cost for plain .ttf/.otf/.woff2.
+    // so we don't pay the open/probe cost for plain <ttf/otf/woff2>.
     // Set via <file load_collection="true"> in fonts.xml.
     bool mLoadCollection;
+
+    // The font family that contributed this file via its <style> block.
+    // Stamped at parse time and preserved across <use>-chain copies and
+    // override prepends, so createFont can look up the source family's
+    // per-family <size force="true"> entry and override this file's
+    // point size when rendering. Empty for files without an attributable
+    // family (e.g. ultimate-fallback list, bare-filename overrides).
+    std::string mSourceFamily;
 };
 typedef std::vector<LLFontFileInfo> font_file_info_vec_t;
 
@@ -142,6 +139,20 @@ public:
     void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, S32 weight, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false, bool load_collection = false);
     const font_file_info_vec_t & getFontFiles() const { return mFontFiles; }
     void setFontFiles(const font_file_info_vec_t& font_files) { mFontFiles = font_files; }
+    // Stamp `family` onto every file in this descriptor whose mSourceFamily
+    // is currently empty. Caller invokes this right after parsing so files
+    // contributed by this <font>'s own <style> blocks carry the family
+    // tag while files copied later from <use> chains retain their
+    // already-set source. Used by createFont to look up forced per-family
+    // sizes that should override the chain's point size.
+    void tagSourceFamily(const std::string& family)
+    {
+        for (auto& f : mFontFiles)
+        {
+            if (f.mSourceFamily.empty())
+                f.mSourceFamily = family;
+        }
+    }
 
     const U8 getStyle() const { return mStyle; }
     void setStyle(U8 style) { mStyle = style; }
@@ -163,6 +174,10 @@ public:
     // reach parseFontInfo. Lives in `namespace tut`, where TUT requires
     // the fixture struct.
     friend struct ::tut::llfontregistry_data;
+    // GL-fixture sibling: needs the same private-member access to drive
+    // simulateReload-style state wipes in tests that exercise actual
+    // freetype loading + size-change reloads.
+    friend struct ::tut::llfontregistry_gl_data;
     // create_gl_textures - set to false for test apps with no OpenGL window,
     // such as llui_libtest
     LLFontRegistry(bool create_gl_textures);
@@ -276,16 +291,6 @@ public:
         }
     };
 
-    // Look up or create a fallback LLFontFreetype with the supplied params.
-    // Returns null on load failure. The returned instance is registered in
-    // mFallbackInstanceCache and shared across every head that asks for
-    // matching params.
-    LLPointer<class LLFontFreetype> getOrCreateFallbackFont(
-        const std::string& font_path,
-        const LLFontFileInfo& file_info,
-        F32 point_size, F32 vert_dpi, F32 horz_dpi, S32 face_index,
-        EFontHinting hinting, S32 flags);
-
 private:
     LLFontRegistry(const LLFontRegistry& other); // no-copy
     LLFontGL *createFont(const LLFontDescriptor& desc);
@@ -343,18 +348,12 @@ private:
     inherit_map_t mInheritFlags;
     // mFamilyUses[family] = [other_family, ...] — append each referenced
     // family's matching-style files (or NORMAL fallback) to every style of
-    // `family` during resolveFontReferences().
+    // `family` during resolveFontReferences(). Consumed at the end of
+    // resolveFontReferences so a re-call doesn't double-append.
     family_uses_map_t mFamilyUses;
     // Per-family ui_label / user_selectable from fonts.xml. Absent entries
     // mean defaults: label = family name, selectable = true.
     family_meta_map_t mFamilyMeta;
-    // target_family -> source_family for family-name overrides applied via
-    // AlchemyUIFontOverrides. nameToSize consults the source family's
-    // per-family <size> table before the target's, so a Monospace ->
-    // SourceCode override picks up SourceCode's own size scale (if any).
-    // Only family-name overrides populate this; file-name overrides
-    // don't, since there's no source family to draw size metadata from.
-    std::map<std::string, std::string> mFamilyOverrideSources;
     // Cache of fallback LLFontFreetype instances keyed by face params +
     // monospace_ligatures. Heads always create fresh (their fallback chain
     // and atlas are head-specific); fallback instances dedup. Shared across

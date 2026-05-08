@@ -56,10 +56,23 @@
   <font> children
   ==========================================================================
   <size name=".." size=".."/>
-                    Per-family size override. Consulted BEFORE the global
-                    <font_size> table for lookups in this family. Lets
-                    one family scale differently (e.g. DejaVu's "Large"
-                    is 10.6 vs the global 11.0).
+                    Per-family size pin. THIS family's files render at
+                    this point size whenever they appear in any chain —
+                    head OR fallback — regardless of what point size
+                    the surrounding chain asks for. size_delta on
+                    individual <file> entries still adds on top.
+
+                    Lookup priority for nameToSize(family, name):
+                      1. `family`'s own <size> table.
+                      2. Global <font_size> table.
+
+                    No cross-family propagation: per-family <size> does
+                    NOT flow through <use> chains, and
+                    AlchemyUIFontOverrides only changes file lists, not
+                    the override target's resolved point size. Each file
+                    in a chain looks up its own source family's <size>
+                    at render time; non-pinned files render at the chain
+                    head's resolved pt.
   <use family="OtherFamily"/>
                     Append OtherFamily's matching-style files to this
                     family's chain, then recursively walk OtherFamily's
@@ -259,7 +272,11 @@
         </style>
     </font>
 
-    <font name="OpenDyslexic" label="Open Dyslexic" font_hinting="light">
+    <font name="OpenDyslexic" label="Open Dyslexic" font_hinting="default">
+        <size name="Huge"   size="14.0"/>
+        <size name="Large"  size="9.6"/>
+        <size name="Medium" size="8.6"/>
+        <size name="Small"  size="7.6"/>
         <style name="NORMAL">
             <file>OpenDyslexic-Regular.otf</file>
         </style>
@@ -317,6 +334,11 @@
      </font>
 
     <font name="Emoji"  user_selectable="false">
+        <size name="Huge"      size="16.0"/>
+        <size name="Large"     size="13.0"/>
+        <size name="Medium"    size="12"/>
+        <size name="Small"     size="11"/>
+        <size name="Monospace" size="11"/>
         <style name="NORMAL">
             <!-- The unicode_ranges gate enumerates UTS#51 emoji codepoints
                  so the shape-itemizer keeps a whole emoji cluster on this
