@@ -217,7 +217,18 @@ void LLDrawPoolAvatar::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
-    render(pass);
+    if (LLPipeline::sImpostorRender)
+    {
+        ++pass;
+        if (pass >= getNumDeferredPasses())
+        {
+            return;
+        }
+        renderAvatars(NULL, pass);
+        return;
+    }
+
+    renderAvatars(NULL, pass); // render all avatars
 }
 
 S32 LLDrawPoolAvatar::getNumPostDeferredPasses()
@@ -425,7 +436,12 @@ void LLDrawPoolAvatar::render(S32 pass)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     if (LLPipeline::sImpostorRender)
     {
-        renderAvatars(NULL, ++pass);
+        ++pass;
+        if (pass >= getNumPasses())
+        {
+            return;
+        }
+        renderAvatars(NULL, pass);
         return;
     }
 
