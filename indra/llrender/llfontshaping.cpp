@@ -276,7 +276,18 @@ namespace
             const uint32_t* in_cps = codepoints;
             int             in_len = len;
             stripped_for_last_shape = false;
-            if (!shape_face->faceHasGlyph((llwchar)0xFE0F))
+            // VS-15 (U+FE0E, text presentation) and VS-16 (U+FE0F, emoji
+            // presentation) both need stripping when the chosen face's cmap
+            // lacks them. Otherwise HB shapes them as a notdef glyph that
+            // sits between cluster bases and adjacent ZWJ / keycap parts and
+            // prevents ligature lookups from matching (the rule's components
+            // are heart + ZWJ + fire, not heart + .notdef + ZWJ + fire). The
+            // cluster fast path's pick_cluster_face already treats both
+            // selectors as strippable for coverage decisions; this aligns
+            // do_shape with that policy.
+            const bool strip_vs15 = !shape_face->faceHasGlyph((llwchar)0xFE0E);
+            const bool strip_vs16 = !shape_face->faceHasGlyph((llwchar)0xFE0F);
+            if (strip_vs15 || strip_vs16)
             {
                 stripped_buf.clear();
                 cluster_back_map.clear();
@@ -284,7 +295,8 @@ namespace
                 cluster_back_map.reserve(len);
                 for (int k = 0; k < len; ++k)
                 {
-                    if (codepoints[k] == 0xFE0F)
+                    if ((strip_vs15 && codepoints[k] == 0xFE0E)
+                     || (strip_vs16 && codepoints[k] == 0xFE0F))
                         continue;
                     stripped_buf.push_back(codepoints[k]);
                     cluster_back_map.push_back(k);

@@ -179,9 +179,24 @@ private:
     typedef boost::unordered_multimap<U32, LLFontGlyphInfo*> glyph_info_map_t;
 
     LLFT_Face          mFTFace = nullptr;
+    // Single source for both HB load flags (set once in getHbFont via
+    // hb_ft_font_set_load_flags) and FT load flags (read by
+    // LLFontFreetype::renderGlyph as (FT_Int32)mHinting). Set in load() and
+    // never rewritten — divergence between the two paths would break advance
+    // consistency between shaped and codepoint runs. The casts to int /
+    // FT_Int32 rely on EFontHinting's bit pattern matching FT_LOAD_* (see
+    // llfontregistry.h:48-56).
     EFontHinting       mHinting;
     mutable hb_font_t* mHbFont = nullptr;
     mutable boost::unordered_flat_map<llwchar, U32> mCharIndexCache;
+
+    // Snapshot of the FT face's pixel-per-em at the moment FT_Set_Char_Size
+    // ran in load(). The lazily-created hb_font_t (getHbFont) snapshots
+    // size->metrics at creation and uses ppem/scale from it; if anything
+    // resizes the face after load() without calling hb_ft_font_changed,
+    // these stay at the load-time values and the assert in getHbFont fires.
+    U16                mLoadedXPpem = 0;
+    U16                mLoadedYPpem = 0;
 
     LLFontBitmapCache* mFontBitmapCachep = nullptr;
     mutable glyph_info_map_t mGlyphInfoMap;

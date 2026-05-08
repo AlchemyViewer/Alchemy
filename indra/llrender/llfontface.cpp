@@ -28,6 +28,7 @@
 #include <hb-ft.h>
 
 #include <algorithm>
+#include <vector>
 
 extern FT_Library gFTLibrary;
 
@@ -158,9 +159,31 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
         return false;
     }
 
-    if (!mFTFace->charmap)
+    // FT_Set_Char_Size runs once per LLFontFace lifetime. The hb_font_t
+    // (lazy in getHbFont) snapshots size->metrics at creation and uses
+    // its ppem/scale for subsequent shape calls; resizing the face after
+    // this point would require hb_ft_font_changed(mHbFont) to resync HB.
+    // New sized state goes through a fresh LLFontFace — the registry's
+    // face cache enforces this, since point_size/DPI are part of the
+    // LLFontFaceKey. Snapshot ppem so getHbFont can assert the invariant.
+    mLoadedXPpem = mFTFace->size->metrics.x_ppem;
+    mLoadedYPpem = mFTFace->size->metrics.y_ppem;
+
+    // Prefer Unicode cmap explicitly. FT's auto-pick prefers Unicode when
+    // present, but a font whose first cmap is non-Unicode (Apple Roman,
+    // Symbol, Mac legacy) would otherwise drive every FT_Get_Char_Index to
+    // a wrong-or-zero glyph for non-ASCII codepoints. Both FT and HB share
+    // the cmap, so the failure is consistent — and consistently wrong.
+    // Fall back to the existing first-charmap pick (with a warning) when
+    // the font has no Unicode cmap at all.
+    if (FT_Select_Charmap(mFTFace, FT_ENCODING_UNICODE) != 0)
     {
-        FT_Set_Charmap(mFTFace, mFTFace->charmaps[0]);
+        LL_WARNS("Font") << "No Unicode cmap in " << filename
+            << "; non-ASCII glyph lookups may be wrong" << LL_ENDL;
+        if (!mFTFace->charmap && mFTFace->num_charmaps > 0)
+        {
+            FT_Set_Charmap(mFTFace, mFTFace->charmaps[0]);
+        }
     }
 
     // Size the bitmap atlas from the just-set face metrics. Same calculation
@@ -363,12 +386,48 @@ hb_font_t* LLFontFace::getHbFont() const
 {
     if (!mHbFont && mFTFace)
     {
+        // FT face must still be at the size load() set. If anything resized
+        // it after load (without also dropping mHbFont), hb_ft_font_create
+        // would snapshot the wrong ppem/scale and HB advances would silently
+        // drift from FT advances. Cheap two-integer check; debug-only.
+        llassert(mFTFace->size->metrics.x_ppem == mLoadedXPpem
+              && mFTFace->size->metrics.y_ppem == mLoadedYPpem);
+
         // hb_ft_font_create_referenced retains mFTFace for the lifetime of
         // the hb_font; the FT_Face won't be freed before the hb_font is.
         // ~LLFontFace destroys the hb_font first then calls FT_Done_Face.
         mHbFont = hb_ft_font_create_referenced(mFTFace);
         if (mHbFont)
         {
+            // Mirror FT's variation axis state into HB. hb_ft_font_create_*
+            // does NOT propagate var coords; without this, HB's GSUB/GPOS
+            // (ItemVariationStore lookups) run at the font's default axis
+            // values even when FT renders the varied outlines correctly.
+            // Visible on variation-aware kerning in fonts like Inter at
+            // wght=600. Outlines stay correct because HB queries them via
+            // FT callbacks; only HB-internal OT lookups need this.
+            FT_MM_Var* mm = nullptr;
+            if (FT_Get_MM_Var(mFTFace, &mm) == 0 && mm)
+            {
+                FT_UInt num_axis = mm->num_axis;
+                if (num_axis > 0)
+                {
+                    std::vector<FT_Fixed> ft_coords(num_axis);
+                    if (FT_Get_Var_Design_Coordinates(mFTFace, num_axis, ft_coords.data()) == 0)
+                    {
+                        std::vector<float> hb_coords(num_axis);
+                        for (FT_UInt i = 0; i < num_axis; ++i)
+                        {
+                            // 16.16 fixed -> design-space float. HB's design
+                            // coords are in the same units FT exposes.
+                            hb_coords[i] = ft_coords[i] / 65536.0f;
+                        }
+                        hb_font_set_var_coords_design(mHbFont, hb_coords.data(), num_axis);
+                    }
+                }
+                FT_Done_MM_Var(gFTLibrary, mm);
+            }
+
             // Hinting choice for measurement-time outline loads inside hb-ft.
             // Drawing-time loads in renderGlyph build their own load_flags;
             // those override these. EFontHinting's bit pattern is laid out to

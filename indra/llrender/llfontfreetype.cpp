@@ -98,6 +98,21 @@ LLFontManager::LLFontManager()
 #ifdef ENABLE_OT_SVG_SUPPORT
     FT_Property_Set(gFTLibrary, "ot-svg", "svg-hooks", &plutosvg_ft_hooks);
 #endif
+
+    // Disable FT's stem darkening on every hinter module. Stem darkening
+    // assumes gamma-correct (linear-space) compositing — the renderer here
+    // blends fonts in sRGB space (no linearization in the UI font shaders),
+    // so darkened stems would over-thicken against our blend curve. The
+    // autofitter is off by default in FT 2.7+, but cff/type1/t1cid all
+    // default ON; a CFF font loaded with EFontHinting::DEFAULT would pick
+    // up unwanted darkening without these explicit overrides.
+    {
+        FT_Bool no_darken = 1;
+        FT_Property_Set(gFTLibrary, "autofitter", "no-stem-darkening", &no_darken);
+        FT_Property_Set(gFTLibrary, "cff",        "no-stem-darkening", &no_darken);
+        FT_Property_Set(gFTLibrary, "type1",      "no-stem-darkening", &no_darken);
+        FT_Property_Set(gFTLibrary, "t1cid",      "no-stem-darkening", &no_darken);
+    }
 }
 
 LLFontManager::~LLFontManager()

@@ -28,8 +28,23 @@
 #  include "llheadlessgl_fixture.h"
 #endif
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_MULTIPLE_MASTERS_H
+#include FT_MODULE_H
+
+#include <hb.h>
+#include <hb-ft.h>
+
 #include <cstdio>
+#include <cstdint>
+#include <cmath>
 #include <string>
+#include <vector>
+
+// LLFontManager owns the global FT_Library. Forward-declared so the
+// stem-darkening test below can FT_Property_Get against it.
+extern FT_Library gFTLibrary;
 
 namespace
 {
@@ -1049,6 +1064,320 @@ namespace tut
         {
             ensure("combining cluster produced unexpected glyph count", false);
         }
+    }
+
+    // -----------------------------------------------------------------
+    // FT/HB consistency block (tests 23-31). Locks the integration
+    // invariants between FreeType and HarfBuzz so a refactor that breaks
+    // size, scale, glyph identity, hinting, variation axes, cmap
+    // selection, or stem-darkening surfaces immediately. Every test
+    // here is pure-CPU (no GL); fonts load with is_fallback=true via
+    // loadFt so the rasterizer pre-warm doesn't fire.
+    // -----------------------------------------------------------------
+
+    // HB's shape-time scale (set by hb_ft_font_create_referenced from
+    // the FT face) must match HB's own derivation from FT state. This
+    // is the size invariant the codebase relies on — every shaped
+    // advance is sized through this scale, so a regression that
+    // resized the FT face after hb_font creation (without
+    // hb_ft_font_changed) shows up as a mismatch here.
+    //
+    // The expected formula mirrors hb_ft_font_changed:
+    //   scale = (face->size->metrics.x_scale * face->units_per_EM
+    //            + (1<<15)) >> 16
+    // which evaluates to the un-rounded fractional pixel size × 64
+    // (e.g. 14pt @ 96dpi → 18.666 px → scale 1195, distinct from FT's
+    // rounded x_ppem of 19).
+    //
+    // Note: hb_font_get_h_extents and hb_font_get_ppem are NOT good
+    // invariants to lock. HB derives extents from face->ascender (raw
+    // hhea, ignoring USE_TYPO_METRICS), while FT's size->metrics
+    // ascender honors USE_TYPO_METRICS — so they differ by design.
+    // hb_ft_font_create_referenced leaves ppem at 0 (only scale is set).
+    template<> template<>
+    void llfontshaping_object::test<23>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+        LLPointer<LLFontFreetype> ft = loadFt(path);
+        ensure("DejaVuSans loaded", ft.notNull());
+
+        const LLFontFace* face = ft->getFontFace();
+        ensure("face accessible", face != nullptr);
+        hb_font_t* hbf = face->getHbFont();
+        ensure("hb_font accessible", hbf != nullptr);
+
+        int hb_x_scale = 0, hb_y_scale = 0;
+        hb_font_get_scale(hbf, &hb_x_scale, &hb_y_scale);
+
+        FT_Face ftf = face->face();
+        const FT_Size_Metrics& m = ftf->size->metrics;
+        // Replicate hb-ft's internal formula. Cast through uint64_t to
+        // avoid 32-bit overflow at large UPEM × scale products.
+        const int expected_x = (int)((((std::uint64_t)m.x_scale * (std::uint64_t)ftf->units_per_EM) + (1u << 15)) >> 16);
+        const int expected_y = (int)((((std::uint64_t)m.y_scale * (std::uint64_t)ftf->units_per_EM) + (1u << 15)) >> 16);
+        ensure_equals("HB x_scale matches hb-ft derivation from FT state",
+                      hb_x_scale, expected_x);
+        ensure_equals("HB y_scale matches hb-ft derivation from FT state",
+                      hb_y_scale, expected_y);
+        // Sanity: scale must be positive (zero would mean uninitialized).
+        ensure("HB x_scale is positive", hb_x_scale > 0);
+        ensure("HB y_scale is positive", hb_y_scale > 0);
+    }
+
+    // (test<24> intentionally absent — formerly checked hb_font_get_ppem
+    // against FT ppem, but hb_ft_font_create_referenced doesn't set
+    // ppem on the HB font; only scale carries the size invariant.
+    // Keeping the gap so the audit's test numbering (23 + 25..31)
+    // matches the plan file unchanged.)
+
+    // For an unligatured / unkerned ASCII run, HB's per-glyph
+    // x_advance must equal FT's slot->advance.x for the same glyph
+    // index loaded with the same flags. Catches divergence in HB↔FT
+    // outline scaling or load-flag plumbing. DejaVuSans has no GPOS
+    // kern between adjacent lowercase letters, so HB's GPOS pass is
+    // a no-op and per-glyph advances come straight from FT.
+    template<> template<>
+    void llfontshaping_object::test<25>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+        LLPointer<LLFontFreetype> ft = loadFt(path);
+        ensure("DejaVuSans loaded", ft.notNull());
+
+        const LLFontFace* face = ft->getFontFace();
+        FT_Face ftf = face->face();
+        const FT_Int32 load_flags = static_cast<FT_Int32>(face->hinting());
+
+        LLWString s = wstr('a','b','c','d','e','f');
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        ensure_equals("6 glyphs for 'abcdef'", out.size(), 6u);
+
+        for (size_t i = 0; i < out.size(); ++i)
+        {
+            ensure_equals("FT_Load_Glyph succeeded",
+                          FT_Load_Glyph(ftf, out[i].glyph_id, load_flags), 0);
+            const F32 ft_advance = ftf->glyph->advance.x * (1.f / 64.f);
+            // 26.6 -> float; equality in float at this precision
+            // would be exact when no GPOS adjustment fired. Tolerate
+            // 1/64 px to cover HB's internal rounding paths.
+            const F32 delta = std::fabs(out[i].x_advance - ft_advance);
+            ensure("HB x_advance matches FT advance for unkerned glyph",
+                   delta < (1.f / 64.f) + 1e-5f);
+        }
+    }
+
+    // HB's reported load flags after construction must equal what the
+    // FT renderGlyph path uses. Both are casts of mHinting; any
+    // refactor that splits the casts asymmetrically breaks shaped vs
+    // codepoint advance consistency. hb_ft_font_get_load_flags has
+    // existed since HB 1.7 — the codebase requires newer than that.
+    template<> template<>
+    void llfontshaping_object::test<26>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+        LLPointer<LLFontFreetype> ft = loadFt(path);
+        ensure("DejaVuSans loaded", ft.notNull());
+
+        const LLFontFace* face = ft->getFontFace();
+        hb_font_t* hbf = face->getHbFont();
+        ensure("hb_font accessible", hbf != nullptr);
+
+        const int hb_flags = hb_ft_font_get_load_flags(hbf);
+        const int expected = static_cast<int>(face->hinting());
+        ensure_equals("HB load flags == (int)mHinting",
+                      hb_flags, expected);
+        // And confirm the cast equivalence between the two surfaces
+        // (HB takes int, FT takes FT_Int32) hasn't drifted.
+        ensure_equals("(int)mHinting == (FT_Int32)mHinting",
+                      static_cast<int>(face->hinting()),
+                      (int)static_cast<FT_Int32>(face->hinting()));
+    }
+
+    // HB must see the same OT-VAR design coordinates that FT was
+    // configured with. Without this, HB's GSUB/GPOS run at the
+    // font's default axis values (typically wght=400) even when FT
+    // renders varied outlines, breaking variation-aware kerning on
+    // fonts like Inter at non-default weights.
+    template<> template<>
+    void llfontshaping_object::test<27>()
+    {
+        const std::string path = std::string(kFontDir) + "InterVariable.woff2";
+        if (!fileExists(path))
+            skip("InterVariable.woff2 not present");
+        // Load with weight=600 so setVariationAxis sets a non-default
+        // wght (and opsz from point_size). A weight=-1 load would
+        // leave both axes at their defaults and verify nothing.
+        LLPointer<LLFontFreetype> ft = new LLFontFreetype;
+        ensure("InterVariable loaded at weight=600",
+               ft->loadFace(path, /*point_size=*/14.f,
+                            /*vert_dpi=*/96.f, /*horz_dpi=*/96.f,
+                            /*weight=*/600, /*is_fallback=*/true,
+                            /*face_n=*/0, EFontHinting::DEFAULT,
+                            /*flags=*/0));
+
+        const LLFontFace* face = ft->getFontFace();
+        FT_Face ftf = face->face();
+        hb_font_t* hbf = face->getHbFont();
+        ensure("hb_font accessible", hbf != nullptr);
+
+        FT_MM_Var* mm = nullptr;
+        ensure_equals("FT_Get_MM_Var on a variable font",
+                      FT_Get_MM_Var(ftf, &mm), 0);
+        ensure("FT_MM_Var allocated", mm != nullptr);
+        const FT_UInt num_axis = mm->num_axis;
+        ensure("variable font reports >= 1 axis", num_axis >= 1u);
+
+        std::vector<FT_Fixed> ft_coords(num_axis);
+        ensure_equals("FT_Get_Var_Design_Coordinates",
+                      FT_Get_Var_Design_Coordinates(ftf, num_axis, ft_coords.data()), 0);
+
+        unsigned int hb_len = 0;
+        const float* hb_coords = hb_font_get_var_coords_design(hbf, &hb_len);
+        ensure("HB has design coords set", hb_coords != nullptr);
+        ensure_equals("HB axis count matches FT", hb_len, (unsigned int)num_axis);
+
+        for (FT_UInt i = 0; i < num_axis; ++i)
+        {
+            const float ft_design = ft_coords[i] / 65536.0f;  // 16.16 -> design
+            const float delta = std::fabs(hb_coords[i] - ft_design);
+            // 16.16 round-trip: equality should be exact, but allow
+            // 1/65536 to cover any internal float-conversion rounding.
+            ensure("HB design coord matches FT design coord",
+                   delta < (1.f / 65536.f) + 1e-6f);
+        }
+
+        FT_Done_MM_Var(gFTLibrary, mm);
+    }
+
+    // Stem darkening must be disabled on every FT hinter module — the
+    // renderer composites in sRGB space and FT's stem darkening assumes
+    // linear-space compositing. autofitter is off by default in FT
+    // 2.7+, but cff/type1 default ON; without explicit Property_Set on
+    // those, a CFF font with EFontHinting::DEFAULT picks up unwanted
+    // stem darkening.
+    template<> template<>
+    void llfontshaping_object::test<28>()
+    {
+        ensure("gFTLibrary initialized", gFTLibrary != nullptr);
+
+        const char* modules[] = { "autofitter", "cff", "type1", "t1cid" };
+        for (const char* mod : modules)
+        {
+            FT_Bool no_darken = 0;
+            const FT_Error err = FT_Property_Get(gFTLibrary, mod, "no-stem-darkening", &no_darken);
+            // Some modules may not expose the property in older FT
+            // builds; treat err != 0 as "module didn't have it to set
+            // either" and skip without failing. The Set call in
+            // LLFontManager does the same — an unknown property is
+            // a no-op.
+            if (err != 0)
+                continue;
+            ensure(std::string("no-stem-darkening enabled on ") + mod,
+                   no_darken != 0);
+        }
+    }
+
+    // FT_Select_Charmap(FT_ENCODING_UNICODE) must succeed on a normal
+    // Unicode font — the resulting active charmap encoding should be
+    // FT_ENCODING_UNICODE so all FT_Get_Char_Index lookups operate on
+    // the Unicode cmap subtable, not whichever subtable FT auto-picked.
+    template<> template<>
+    void llfontshaping_object::test<29>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+        LLPointer<LLFontFreetype> ft = loadFt(path);
+        ensure("DejaVuSans loaded", ft.notNull());
+
+        const LLFontFace* face = ft->getFontFace();
+        FT_Face ftf = face->face();
+        ensure("active charmap is set", ftf->charmap != nullptr);
+        ensure_equals("active charmap encoding is FT_ENCODING_UNICODE",
+                      (int)ftf->charmap->encoding,
+                      (int)FT_ENCODING_UNICODE);
+    }
+
+    // VS-15 strip parity with VS-16: a face that lacks U+FE0E in cmap
+    // must still produce identical shape output for `<base, VS-15>`
+    // vs just `<base>` — the do_shape strip pass should drop VS-15
+    // before HB so the notdef glyph for VS-15 doesn't sit between
+    // base and follow-up codepoints. Mirrors test<7>'s VS-16 proof.
+    template<> template<>
+    void llfontshaping_object::test<30>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("Noto-COLRv1.ttf not present");
+        LLPointer<LLFontFreetype> ft = loadFt(path);
+        ensure("Noto-COLRv1 loaded", ft.notNull());
+
+        // Sanity: the test only verifies anything if Noto-COLRv1 also
+        // lacks VS-15. Color emoji fonts typically don't ship VS-15.
+        if (ft->getCharGlyphIndex(0xFE0E) != 0u)
+            skip("Noto-COLRv1 unexpectedly has U+FE0E in cmap");
+
+        LLWString with_vs    = wstr(0x2764, 0xFE0E);
+        LLWString without_vs = wstr(0x2764);
+
+        std::vector<LLShapedGlyph> with_out;
+        std::vector<LLShapedGlyph> without_out;
+        LLFontShaping::shapeRun(ft, with_vs,    0, with_vs.size(),    with_out);
+        LLFontShaping::shapeRun(ft, without_vs, 0, without_vs.size(), without_out);
+
+        ensure_equals("with-VS15 and without-VS15 produce same glyph count",
+                      with_out.size(), without_out.size());
+        ensure("with-VS15 produced at least one glyph", !with_out.empty());
+        for (size_t i = 0; i < with_out.size(); ++i)
+        {
+            ensure_equals("with-VS15 glyph_id matches without-VS15",
+                          with_out[i].glyph_id, without_out[i].glyph_id);
+        }
+    }
+
+    // Identity check between codepoint→glyph (cmap) and shape result
+    // for a non-Latin codepoint that DejaVuSans covers. test<2> covers
+    // ASCII; this extends the contract to the upper BMP so a regression
+    // limited to Unicode-cmap binding (Defect B in the audit plan) is
+    // caught even when ASCII still works.
+    template<> template<>
+    void llfontshaping_object::test<31>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+        LLPointer<LLFontFreetype> ft = loadFt(path);
+        ensure("DejaVuSans loaded", ft.notNull());
+
+        // Pick the first non-ASCII codepoint the face has. DejaVuSans
+        // covers Greek and Cyrillic; try a Greek alpha (U+03B1) first.
+        const llwchar candidates[] = { 0x03B1, 0x0430, 0x00E9, 0x00FC };
+        llwchar wch = 0;
+        for (llwchar c : candidates)
+        {
+            if (ft->getCharGlyphIndex(c) != 0u)
+            {
+                wch = c;
+                break;
+            }
+        }
+        if (wch == 0)
+            skip("no non-ASCII codepoint covered in DejaVuSans");
+
+        LLWString s; s.push_back(wch);
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        ensure_equals("1 glyph for non-ASCII codepoint", out.size(), 1u);
+        ensure_equals("shape glyph_id matches cmap lookup",
+                      out[0].glyph_id, ft->getCharGlyphIndex(wch));
+        ensure("non-ASCII glyph has positive advance",
+               out[0].x_advance > 0.f);
     }
 
 #if LL_MESA_HEADLESS

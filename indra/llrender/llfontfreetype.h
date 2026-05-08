@@ -300,6 +300,12 @@ public:
     // can probe each fallback without needing friendship.
     U32 getCharGlyphIndex(llwchar wch) const;
 
+    // Tests-only accessor for the shared face wrapper. Lets the consistency
+    // tests reach LLFontFace's hb_font_t, FT_Face, hinting, and ppem snapshot
+    // without friend declarations. No production caller — render and
+    // measurement paths use mFace internally.
+    const LLFontFace* getFontFace() const { return mFace.get(); }
+
 private:
     // Convenience: dereference the shared face wrapper. Null when this
     // instance hasn't been loaded yet or was unloaded.
