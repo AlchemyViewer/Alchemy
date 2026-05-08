@@ -909,19 +909,43 @@ void LLFloaterPreference::refreshSkinInfo(const skin_t& skin)
 
 namespace
 {
+    // Per-family policy: when true, the picker writes the map-shape
+    // override `{ value, replace_first: true }` so the override
+    // DISPLACES the target's head file rather than sitting in front of
+    // it. This is the right semantics for emoji-font swaps — picking
+    // "Twemoji" should make Twemoji *be* the emoji font, not just sit
+    // in front of Noto and fall back to Noto for codepoints it covers
+    // less well. For text-font overrides (SansSerifBase / MonospaceBase)
+    // the prepend semantics are still correct: the picked font becomes
+    // the primary face but DejaVu / CJK / Emoji fallbacks behind it
+    // still cover what the user-supplied font lacks.
+    bool fontOverrideReplacesHead(const std::string& family)
+    {
+        return family == "EmojiBase";
+    }
+
     // Returns the override string currently stored for `family`, or empty
-    // if there's no override. The setting is an LLSD map; missing keys
-    // return undefined which asString() coerces to empty.
+    // if there's no override. The setting is an LLSD map keyed on family
+    // name; each value can be either a flat string (legacy / prepend) or
+    // a map { value, replace_first } (head-replace). Both shapes resolve
+    // to the same picker selection — the combo always shows the family
+    // name, regardless of which shape persisted it.
     std::string getCurrentFontOverride(const std::string& family)
     {
         const LLSD overrides = gSavedSettings.getLLSD("AlchemyUIFontOverrides");
-        if (!overrides.isMap())
+        if (!overrides.isMap() || !overrides.has(family))
             return std::string();
-        return overrides.has(family) ? overrides[family].asString() : std::string();
+        const LLSD& entry = overrides[family];
+        if (entry.isMap())
+            return entry.has("value") ? entry["value"].asString() : std::string();
+        return entry.asString();
     }
 
     // Read-modify-write the AlchemyUIFontOverrides map. Empty `value`
-    // erases the family's entry (returns to built-in default).
+    // erases the family's entry (returns to built-in default). The
+    // written shape is the map form `{ value, replace_first: true }`
+    // when fontOverrideReplacesHead(family) is true, otherwise the
+    // legacy flat string.
     void setFontOverride(const std::string& family, const std::string& value)
     {
         LLSD overrides = gSavedSettings.getLLSD("AlchemyUIFontOverrides");
@@ -936,9 +960,41 @@ namespace
         }
         else
         {
-            if (overrides.has(family) && overrides[family].asString() == value)
-                return; // No-op.
-            overrides[family] = value;
+            const bool replace_head = fontOverrideReplacesHead(family);
+            // Idempotency check across both stored shapes: skip the
+            // write when the existing entry already matches what we'd
+            // write, including the replace_first bit. Without this an
+            // open-and-close of the picker without a real change would
+            // re-trigger the registry reload.
+            if (overrides.has(family))
+            {
+                const LLSD& existing = overrides[family];
+                if (existing.isMap())
+                {
+                    const bool same_value = existing.has("value")
+                        && existing["value"].asString() == value;
+                    const bool same_flag = existing.has("replace_first")
+                        && existing["replace_first"].asBoolean() == replace_head;
+                    if (same_value && same_flag)
+                        return;
+                }
+                else if (!replace_head && existing.asString() == value)
+                {
+                    return;
+                }
+            }
+
+            if (replace_head)
+            {
+                LLSD entry = LLSD::emptyMap();
+                entry["value"] = value;
+                entry["replace_first"] = true;
+                overrides[family] = entry;
+            }
+            else
+            {
+                overrides[family] = value;
+            }
         }
         gSavedSettings.setLLSD("AlchemyUIFontOverrides", overrides);
     }
@@ -946,13 +1002,20 @@ namespace
 
 void LLFloaterPreference::populateUIFontDropdowns()
 {
-    // Two curated dropdowns expose the common case (UI font + monospace);
-    // the underlying setting is a generic family→override map so power
-    // users can set overrides for any other family via Debug Settings
-    // without needing matching UI here. Each dropdown filters by the
-    // per-family monospace attribute so the UI Font picker only shows
-    // proportional faces and the Mono Font picker only shows monospace
-    // faces.
+    // Three curated dropdowns expose the common cases (UI font, monospace,
+    // emoji); the underlying setting is a generic family→override map so
+    // power users can set overrides for any other family via Debug
+    // Settings without needing matching UI here. Each dropdown filters by
+    // the per-family monospace / emoji attributes so the UI Font picker
+    // only shows proportional faces, the Mono Font picker only shows
+    // monospace faces, and the Emoji Font picker only shows emoji-flagged
+    // source families (NotoEmoji / Twemoji / etc.).
+    //
+    // The Emoji row targets the registry's `EmojiBase` family — the
+    // single touchpoint that propagates through the Emoji / LimitedEmoji
+    // aliases to every emoji-consuming chain (SansSerif, SansSerifEmoji,
+    // SansSerifLimitedEmoji, Monospace) with each consumer's filter
+    // intact.
     struct Row {
         const char* combo_name;
         const char* family;
@@ -961,6 +1024,7 @@ void LLFloaterPreference::populateUIFontDropdowns()
     static const Row rows[] = {
         { "ui_font_sansserif", "SansSerifBase", LLFontRegistry::FamilyFilter::PROPORTIONAL },
         { "ui_font_monospace", "MonospaceBase", LLFontRegistry::FamilyFilter::MONOSPACE },
+        { "ui_font_emoji",     "EmojiBase",     LLFontRegistry::FamilyFilter::EMOJI },
     };
 
     for (const auto& [combo_name, family, filter] : rows)

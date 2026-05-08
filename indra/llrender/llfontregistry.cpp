@@ -1282,6 +1282,12 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
             font_node->getAttributeBOOL("monospace", mono);
             meta.monospace = mono;
         }
+        if (font_node->hasAttribute("emoji"))
+        {
+            bool em = false;
+            font_node->getAttributeBOOL("emoji", em);
+            meta.emoji = em;
+        }
     }
 
     // First sweep: collect family-level <size>, <use>; defer <style> to
@@ -1929,8 +1935,13 @@ std::vector<LLFontRegistry::FamilyInfo> LLFontRegistry::getAvailableFamilies(Fam
     //   - any family with user_selectable="false" attribute in fonts.xml
     //     (e.g. internal fallbacks like Emoji/CJK that exist only to be
     //     <use>'d by user-facing families).
-    //   - if filter == MONOSPACE/PROPORTIONAL, families whose `monospace`
-    //     metadata flag doesn't match the requested side.
+    //   - filter-specific exclusions:
+    //       MONOSPACE    — only families with monospace=true, emoji=false.
+    //       PROPORTIONAL — only families with monospace=false, emoji=false.
+    //       EMOJI        — only families with emoji=true.
+    //     Emoji families are kept out of both MONOSPACE and PROPORTIONAL
+    //     so the picker doesn't surface a color emoji font in the regular
+    //     UI/Mono lists; callers wanting an emoji-font picker pass EMOJI.
     std::set<std::string> uniq;
     for (const auto& kv : mFontMap)
     {
@@ -1943,14 +1954,21 @@ std::vector<LLFontRegistry::FamilyInfo> LLFontRegistry::getAvailableFamilies(Fam
         const bool has_meta = (meta_it != mFamilyMeta.end());
         if (has_meta && !meta_it->second.user_selectable)
             continue;
+        const bool is_monospace = has_meta && meta_it->second.monospace;
+        const bool is_emoji     = has_meta && meta_it->second.emoji;
         if (filter == FamilyFilter::MONOSPACE)
         {
-            if (!has_meta || !meta_it->second.monospace)
+            if (!is_monospace || is_emoji)
                 continue;
         }
         else if (filter == FamilyFilter::PROPORTIONAL)
         {
-            if (has_meta && meta_it->second.monospace)
+            if (is_monospace || is_emoji)
+                continue;
+        }
+        else if (filter == FamilyFilter::EMOJI)
+        {
+            if (!is_emoji)
                 continue;
         }
         uniq.insert(name);

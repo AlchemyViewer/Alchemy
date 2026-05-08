@@ -33,6 +33,14 @@
                     routes it to the Monospace category and the renderer
                     bypasses HarfBuzz GPOS so column alignment holds.
                     Default false.
+  emoji             true/false. Marks the family as a color-emoji
+                    source font (e.g. Noto-COLRv1, Twemoji). Picker
+                    routes it to a separate "Emoji Font" category via
+                    getAvailableFamilies(FamilyFilter::EMOJI). Emoji
+                    families are excluded from the regular UI/Mono
+                    pickers (PROPORTIONAL and MONOSPACE filter them
+                    out) so a color emoji file doesn't surface as a
+                    selectable text font. Default false.
   ligatures         on/true/1 keeps liga/clig/dlig/calt features enabled
                     even on monospace faces. For programmer fonts (Fira
                     Code, JetBrains Mono) where ligatures are width-
@@ -165,6 +173,13 @@
                     insensitive; "0xXXXX" is also accepted. Default:
                     handle all codepoints.
 
+                    See also `<use unicode_ranges="...">` (in <font>
+                    children docs above) for applying the same gate at
+                    the use site instead of on the file itself — useful
+                    when one source family is shared by multiple
+                    consumers each wanting their own filter without
+                    duplicating the file reference.
+
   ==========================================================================
   <file> path resolution
   ==========================================================================
@@ -214,6 +229,18 @@
       writing the flat-string shape. Use when you want the override
       to fully displace the original primary face rather than sit
       in front of it.
+
+  Single-touchpoint emoji swap: the `EmojiBase` family is the
+  registry's single source-of-truth for the color emoji file. Both
+  `Emoji` (broad UTS#51 set) and `LimitedEmoji` (narrow UI-chrome set)
+  are aliases that <use> EmojiBase with their respective filters at
+  the use site. Setting AlchemyUIFontOverrides["EmojiBase"] = "..."
+  therefore propagates to every emoji consumer in one entry, with
+  each consumer's filter intact. Combine with replace_first=true to
+  fully displace Noto-COLRv1 rather than sit in front of it. Prefer
+  this over overriding `Emoji` / `LimitedEmoji` directly, since those
+  paths only affect their own consumers (SansSerifEmoji,
+  SansSerifLimitedEmoji) and not the Monospace/SansSerif chains.
 
   ==========================================================================
   Cross-script fallback families
@@ -386,7 +413,7 @@
         </style>
      </font>
 
-    <font name="NotoEmoji" label="Noto Emoji" user_selectable="false">
+    <font name="NotoEmoji" label="Noto Emoji" emoji="true">
         <size name="Huge"      size="16.0"/>
         <size name="Large"     size="13.0"/>
         <size name="Medium"    size="12"/>
@@ -394,6 +421,17 @@
         <size name="Monospace" size="11"/>
         <style name="NORMAL">
             <file>Noto-COLRv1.ttf</file>
+        </style>
+    </font>
+
+    <font name="Twemoji" label="Twemoji" emoji="true">
+        <size name="Huge"      size="16.0"/>
+        <size name="Large"     size="13.0"/>
+        <size name="Medium"    size="12"/>
+        <size name="Small"     size="11"/>
+        <size name="Monospace" size="11"/>
+        <style name="NORMAL">
+            <file>TwemojiSVG.woff2</file>
         </style>
     </font>
 

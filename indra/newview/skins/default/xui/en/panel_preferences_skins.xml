@@ -293,4 +293,29 @@ Jan 1, 2001
      function="Pref.UIFontFileEntered"
      parameter="MonospaceBase" />
   </line_editor>-->
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="16"
+   layout="topleft"
+   left="40"
+   name="ui_font_emoji_label"
+   top_pad="6"
+   width="80">
+   Emoji Font:
+  </text>
+  <combo_box
+   follows="left|top"
+   height="23"
+   layout="topleft"
+   left_pad="0"
+   name="ui_font_emoji"
+   tool_tip="Override the color emoji font used everywhere emoji appear (chat, names, UI). Routes through EmojiBase so the swap propagates to every emoji-consuming chain with each chain's filter intact."
+   top_delta="-3"
+   width="160">
+    <combo_box.commit_callback
+     function="Pref.UIFontSelected"
+     parameter="EmojiBase" />
+  </combo_box>
 </panel>

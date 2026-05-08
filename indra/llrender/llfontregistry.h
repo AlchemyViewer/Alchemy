@@ -251,13 +251,20 @@ public:
         std::string label;
     };
 
-    // Filter for getAvailableFamilies. Backed by the per-family
-    // `monospace="true|false"` attribute in fonts.xml (defaults to false).
+    // Filter for getAvailableFamilies. Backed by per-family
+    // `monospace="true|false"` and `emoji="true|false"` attributes in
+    // fonts.xml (both default to false). The three categories are
+    // treated as mutually exclusive at filter time so the picker
+    // doesn't show e.g. an emoji family in the proportional list:
+    //   PROPORTIONAL: !monospace && !emoji
+    //   MONOSPACE:     monospace && !emoji
+    //   EMOJI:         emoji      (regardless of monospace)
     enum class FamilyFilter
     {
         ANY,           // any user-selectable family
-        MONOSPACE,     // only families with monospace="true"
-        PROPORTIONAL,  // only families WITHOUT monospace="true"
+        MONOSPACE,     // monospace="true" AND emoji is unset
+        PROPORTIONAL,  // monospace is unset AND emoji is unset
+        EMOJI,         // emoji="true"
     };
 
     // Families declared in fonts.xml (after skin layering and reference
@@ -339,18 +346,21 @@ private:
         std::function<bool(llwchar)> functor;  // null = no use-level filter
     };
     typedef std::map<std::string, std::vector<FamilyUseRef>> family_uses_map_t;
-    // Family-level metadata read from <font> attributes. All three fields
+    // Family-level metadata read from <font> attributes. All four fields
     // are optional: ui_label defaults to the family name, user_selectable
-    // defaults to true (preserving pre-attribute behavior), monospace
-    // defaults to false. monospace classifies the family for the
-    // Preferences "UI Font" vs "Mono Font" pickers — the data path itself
-    // doesn't care about monospace at the family level (per-file
-    // `ligatures` / `font_weight` etc. handle the rendering side).
+    // defaults to true (preserving pre-attribute behavior), monospace and
+    // emoji default to false. monospace and emoji classify the family
+    // for the Preferences "UI Font" / "Mono Font" / "Emoji Font" pickers
+    // — the data path itself doesn't care about either flag at the
+    // family level (per-file `ligatures` / `font_weight` etc. handle the
+    // rendering side; emoji-ness is enforced via per-file unicode_ranges
+    // gates on the actual COLRv1 file).
     struct FamilyMeta
     {
         std::string ui_label;
         bool        user_selectable = true;
         bool        monospace = false;
+        bool        emoji = false;
     };
     typedef std::map<std::string, FamilyMeta> family_meta_map_t;
 

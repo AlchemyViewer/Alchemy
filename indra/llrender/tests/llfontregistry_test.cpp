@@ -2832,6 +2832,206 @@ namespace tut
                !nf[0].CharFunctor((llwchar)0x1F100));
     }
 
+    // Combined replace_first + EmojiBase: { value: "Twemoji.ttf",
+    // replace_first: true } on EmojiBase fully displaces Noto rather
+    // than prepending in front of it. Each consumer's chain ends up
+    // with just the override file gated by the consumer's filter.
+    template<> template<>
+    void llfontregistry_object::test<93>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='EmojiBase'>"
+            "    <style name='NORMAL'><file>Noto.ttf</file></style>"
+            "  </font>"
+            "  <font name='Broad'>"
+            "    <use family='EmojiBase' unicode_ranges='U+1F000-U+1FFFF'/>"
+            "  </font>"
+            "  <font name='Narrow'>"
+            "    <use family='EmojiBase' unicode_ranges='U+1F600-U+1F6FF'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+
+        LLSD overrides;
+        LLSD entry = LLSD::emptyMap();
+        entry["value"] = "Twemoji.ttf";
+        entry["replace_first"] = true;
+        overrides["EmojiBase"] = entry;
+        resolve(overrides);
+
+        const auto& bf = templateFor("Broad")->getFontFiles();
+        const auto& nf = templateFor("Narrow")->getFontFiles();
+        // replace_first dropped Noto from EmojiBase's chain; consumers
+        // pull just Twemoji through their respective use-level filters.
+        ensure_equals("Broad has 1 file (Noto displaced)",
+                      (S32)bf.size(), 1);
+        ensure_equals("Broad head is Twemoji",
+                      bf[0].FileName, std::string("Twemoji.ttf"));
+        ensure_equals("Narrow has 1 file (Noto displaced)",
+                      (S32)nf.size(), 1);
+        ensure_equals("Narrow head is Twemoji",
+                      nf[0].FileName, std::string("Twemoji.ttf"));
+        ensure("Broad's Twemoji accepts U+1F100",
+               bf[0].CharFunctor((llwchar)0x1F100));
+        ensure("Narrow's Twemoji rejects U+1F100",
+               !nf[0].CharFunctor((llwchar)0x1F100));
+        ensure("Both accept U+1F600",
+               bf[0].CharFunctor((llwchar)0x1F600)
+            && nf[0].CharFunctor((llwchar)0x1F600));
+    }
+
+    // No-cascade regression: a use-level filter applies ONLY to the
+    // named family's own files. When that family <use>s another, the
+    // filter does NOT propagate to the inner use's files. This is the
+    // explicit design rule (filter is local to the use site) — pin it
+    // so a future "fix" that propagates the filter through the chain
+    // doesn't silently change semantics for existing chains.
+    template<> template<>
+    void llfontregistry_object::test<94>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Inner'>"
+            "    <style name='NORMAL'><file>Inner.ttf</file></style>"
+            "  </font>"
+            "  <font name='Mid'>"
+            "    <use family='Inner'/>"
+            "    <style name='NORMAL'><file>Mid.ttf</file></style>"
+            "  </font>"
+            "  <font name='Outer'>"
+            "    <use family='Mid' unicode_ranges='U+1F000-U+1FFFF'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        const LLFontDescriptor* d = templateFor("Outer");
+        ensure("Outer template present", d != nullptr);
+        const auto& files = d->getFontFiles();
+        // Outer pulls Mid's own files (Mid.ttf) PLUS Mid's <use> chain
+        // (Inner.ttf). The filter applies only to Mid's direct files.
+        ensure_equals("Outer has 2 files", (S32)files.size(), 2);
+
+        // Locate the entries by filename rather than positional index —
+        // collect_chain orders direct files before use-chain files
+        // today, but the rule under test is functor presence, not
+        // ordering. Find each by name and check its functor.
+        const LLFontFileInfo* mid = nullptr;
+        const LLFontFileInfo* inner = nullptr;
+        for (const auto& f : files)
+        {
+            if (f.FileName == "Mid.ttf")   mid = &f;
+            if (f.FileName == "Inner.ttf") inner = &f;
+        }
+        ensure("Mid.ttf contributed",   mid   != nullptr);
+        ensure("Inner.ttf contributed", inner != nullptr);
+
+        // Mid is filtered (use-level filter applied to its own files).
+        ensure("Mid has functor",            static_cast<bool>(mid->CharFunctor));
+        ensure("Mid functor accepts U+1F600", mid->CharFunctor((llwchar)0x1F600));
+        ensure("Mid functor rejects U+0041", !mid->CharFunctor((llwchar)0x0041));
+
+        // Inner is NOT filtered — the use-level filter doesn't cascade.
+        ensure("Inner has no functor (no cascade)",
+               !static_cast<bool>(inner->CharFunctor));
+    }
+
+    // emoji="true" attribute parses; getAvailableFamilies(EMOJI) returns
+    // only emoji-flagged families. PROPORTIONAL and MONOSPACE filter
+    // emoji families OUT so they don't surface in regular text-font
+    // pickers (a color-emoji file shouldn't appear as a UI choice).
+    template<> template<>
+    void llfontregistry_object::test<95>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Sans'>"
+            "    <style name='NORMAL'><file>S.woff2</file></style>"
+            "  </font>"
+            "  <font name='Mono' monospace='true'>"
+            "    <style name='NORMAL'><file>M.woff2</file></style>"
+            "  </font>"
+            "  <font name='NotoEmoji' emoji='true'>"
+            "    <style name='NORMAL'><file>N.ttf</file></style>"
+            "  </font>"
+            "  <font name='Twemoji' emoji='true'>"
+            "    <style name='NORMAL'><file>T.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+
+        // EMOJI returns the two emoji families, sorted by label.
+        auto em = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::EMOJI);
+        ensure_equals("EMOJI: 2 families", (S32)em.size(), 2);
+        std::set<std::string> em_names;
+        for (const auto& f : em) em_names.insert(f.name);
+        ensure("EMOJI returns NotoEmoji", em_names.count("NotoEmoji") == 1);
+        ensure("EMOJI returns Twemoji",   em_names.count("Twemoji")   == 1);
+
+        // PROPORTIONAL excludes both monospace AND emoji.
+        auto prop = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::PROPORTIONAL);
+        ensure_equals("PROPORTIONAL: 1 family (just Sans)",
+                      (S32)prop.size(), 1);
+        ensure_equals("PROPORTIONAL returns Sans",
+                      prop[0].name, std::string("Sans"));
+
+        // MONOSPACE excludes emoji families even if they were also
+        // marked monospace=true (emoji wins for filter routing).
+        auto mono = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::MONOSPACE);
+        ensure_equals("MONOSPACE: 1 family (just Mono)",
+                      (S32)mono.size(), 1);
+        ensure_equals("MONOSPACE returns Mono",
+                      mono[0].name, std::string("Mono"));
+    }
+
+    // emoji="true" + monospace="true" on the same family routes to
+    // EMOJI only, not MONOSPACE. Locks the "emoji wins" rule from the
+    // FamilyFilter docs.
+    template<> template<>
+    void llfontregistry_object::test<96>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='WeirdMonoEmoji' monospace='true' emoji='true'>"
+            "    <style name='NORMAL'><file>W.ttf</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        auto em = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::EMOJI);
+        ensure_equals("EMOJI returns the dual-flagged family",
+                      (S32)em.size(), 1);
+        auto mono = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::MONOSPACE);
+        ensure_equals("MONOSPACE excludes the dual-flagged family",
+                      (S32)mono.size(), 0);
+    }
+
+    // user_selectable="false" still hides a family from EMOJI just like
+    // it hides from PROPORTIONAL/MONOSPACE. Pin so internal aliases
+    // (EmojiBase, Emoji, LimitedEmoji) don't surface even if some
+    // future change marks them emoji=true.
+    template<> template<>
+    void llfontregistry_object::test<97>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Public' emoji='true'>"
+            "    <style name='NORMAL'><file>P.ttf</file></style>"
+            "  </font>"
+            "  <font name='Internal' emoji='true' user_selectable='false'>"
+            "    <style name='NORMAL'><file>I.ttf</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        auto em = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::EMOJI);
+        ensure_equals("EMOJI: only the user-selectable family",
+                      (S32)em.size(), 1);
+        ensure_equals("EMOJI returns Public",
+                      em[0].name, std::string("Public"));
+    }
+
 #if LL_MESA_HEADLESS
     // ===================================================================
     // Group 7: GL-requiring paths (LL_MESA_HEADLESS only)
