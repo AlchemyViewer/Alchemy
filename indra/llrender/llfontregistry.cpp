@@ -403,9 +403,9 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
         auto uses_it = mFamilyUses.find(fam);
         if (uses_it == mFamilyUses.end())
             return false;
-        for (const std::string& used : uses_it->second)
+        for (const auto& used_ref : uses_it->second)
         {
-            if (chain_has_style(used, style, visited))
+            if (chain_has_style(used_ref.family, style, visited))
                 return true;
         }
         return false;
@@ -437,8 +437,9 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
         for (U8 style : kStyles)
         {
             bool any_ref_has_style = false;
-            for (const std::string& used : kv.second)
+            for (const auto& used_ref : kv.second)
             {
+                const std::string& used = used_ref.family;
                 if (used == family)
                     continue; // self-reference is rejected during resolution
                 std::set<std::string> visited;
@@ -493,8 +494,18 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
     // family twice (A->B, A->C, both B and C use D — D's files appear
     // once, contributed by whichever path the walk reached first).
     // Style is honoured per family with NORMAL fallback at each level.
-    std::function<void(const std::string&, U8, std::set<std::string>&, font_file_info_vec_t&)> collect_chain;
-    collect_chain = [&](const std::string& fam, U8 style, std::set<std::string>& visited, font_file_info_vec_t& out) {
+    //
+    // `filter` is the optional CharFunctor from the <use> at the top of
+    // this walk (null when the use has no unicode_ranges). It composes
+    // (intersects) with each contributed file's own CharFunctor for the
+    // FILES THIS FAMILY DIRECTLY CONTRIBUTES — recursive descent into
+    // `fam`'s own <use> chain DROPS the filter, so the use-level range
+    // gates only the source family's own files, not its transitive
+    // dependencies. (e.g. `<use family="EmojiBase" unicode_ranges="..."/>`
+    // filters EmojiBase's files; if EmojiBase itself <use>d another
+    // family, that other family's files come through unfiltered.)
+    std::function<void(const std::string&, U8, std::set<std::string>&, font_file_info_vec_t&, const std::function<bool(llwchar)>&)> collect_chain;
+    collect_chain = [&](const std::string& fam, U8 style, std::set<std::string>& visited, font_file_info_vec_t& out, const std::function<bool(llwchar)>& filter) {
         if (!visited.insert(fam).second)
             return;
         LLFontDescriptor key(fam, s_template_string, style);
@@ -508,23 +519,49 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
         if (snap_it != pre_use.end())
         {
             const auto& src_files = snap_it->second;
-            out.insert(out.end(), src_files.begin(), src_files.end());
+            if (!filter)
+            {
+                out.insert(out.end(), src_files.begin(), src_files.end());
+            }
+            else
+            {
+                // Compose the use-level filter with each file's existing
+                // CharFunctor (intersection). Files keep their own gate;
+                // the use's gate restricts further. A file with no functor
+                // adopts the use's functor outright.
+                for (const auto& file : src_files)
+                {
+                    LLFontFileInfo copy = file;
+                    if (copy.CharFunctor)
+                    {
+                        auto a = copy.CharFunctor;
+                        auto b = filter;
+                        copy.CharFunctor = [a, b](llwchar c) { return a(c) && b(c); };
+                    }
+                    else
+                    {
+                        copy.CharFunctor = filter;
+                    }
+                    out.push_back(std::move(copy));
+                }
+            }
         }
         // Recurse into fam's own <use> chain even when its file list at this
         // style is missing — the chain may carry the coverage on its own.
+        // The use-level filter is intentionally NOT propagated through here.
         auto uses_it = mFamilyUses.find(fam);
         if (uses_it == mFamilyUses.end())
             return;
-        for (const std::string& used : uses_it->second)
+        for (const auto& used_ref : uses_it->second)
         {
-            collect_chain(used, style, visited, out);
+            collect_chain(used_ref.family, style, visited, out, used_ref.functor);
         }
     };
 
     for (const auto& kv : mFamilyUses)
     {
         const std::string& family = kv.first;
-        const std::vector<std::string>& used_families = kv.second;
+        const std::vector<FamilyUseRef>& used_families = kv.second;
 
         for (U8 style : kStyles)
         {
@@ -537,8 +574,9 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
             std::set<std::string> visited;
             visited.insert(family); // the chain walks below must not loop back to us
 
-            for (const std::string& used : used_families)
+            for (const auto& used_ref : used_families)
             {
+                const std::string& used = used_ref.family;
                 if (used == family)
                 {
                     LL_WARNS() << "fonts.xml: <use family='" << used
@@ -561,7 +599,7 @@ void LLFontRegistry::resolveFontReferences(const LLSD& font_overrides)
                                << "' but no such family is defined" << LL_ENDL;
                     continue;
                 }
-                collect_chain(used, style, visited, merged_files);
+                collect_chain(used, style, visited, merged_files, used_ref.functor);
             }
 
             replace_files(it, merged_files);
@@ -721,12 +759,37 @@ void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
         mFontMap[new_desc] = fontp;
     };
 
+    // An override entry is either a flat string (legacy / user-facing
+    // picker shape) or a map { value, replace_first } (programmatic
+    // shape used when the override should drop the target's head face
+    // instead of riding in front of it). Map shape is non-user-facing —
+    // the Preferences picker keeps writing strings; callers that want
+    // head-replace semantics build the map themselves before handing it
+    // to the registry. replace_first defaults to false so an unset or
+    // missing flag preserves the legacy prepend behavior.
+    auto extract_override = [](const LLSD& v, std::string& out_value, bool& out_replace_first)
+    {
+        out_replace_first = false;
+        if (v.isMap())
+        {
+            out_value = v.has("value") ? v["value"].asString() : std::string();
+            if (v.has("replace_first"))
+                out_replace_first = v["replace_first"].asBoolean();
+        }
+        else
+        {
+            out_value = v.asString();
+        }
+    };
+
     for (LLSD::map_const_iterator ov_it = overrides.beginMap();
          ov_it != overrides.endMap();
          ++ov_it)
     {
         const std::string& family = ov_it->first;
-        std::string override_value = ov_it->second.asString();
+        std::string override_value;
+        bool replace_first = false;
+        extract_override(ov_it->second, override_value, replace_first);
         if (override_value.empty())
             continue;
 
@@ -816,13 +879,22 @@ void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
                 prepend_files.emplace_back(override_value, hinting, flags, 0.f, std::function<bool(llwchar)>(nullptr), monospace_lig, false, var_axes);
             }
 
-            // Prepend source onto the target's existing chain so the
-            // override wins for the head face but DejaVu/Emoji/CJK
-            // fallbacks (already resolved in onto target via <use>) stay
+            // Default: prepend source onto the target's existing chain so
+            // the override wins for the head face but DejaVu/Emoji/CJK
+            // fallbacks (already resolved onto target via <use>) stay
             // available behind it.
+            //
+            // replace_first: drop the target's head file (orig_files[0])
+            // so the override displaces it rather than sitting in front
+            // of it. The rest of the chain (orig_files[1..]) is still
+            // appended so glyph coverage from the inherited fallbacks
+            // remains. No-op when the chain is empty.
             font_file_info_vec_t merged_files = prepend_files;
             const auto& orig_files = target_it->first.getFontFiles();
-            merged_files.insert(merged_files.end(), orig_files.begin(), orig_files.end());
+            auto tail_begin = (replace_first && !orig_files.empty())
+                                  ? orig_files.begin() + 1
+                                  : orig_files.begin();
+            merged_files.insert(merged_files.end(), tail_begin, orig_files.end());
 
             replace_files(target_it, merged_files);
         }
@@ -1215,7 +1287,7 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
     // First sweep: collect family-level <size>, <use>; defer <style> to
     // a second sweep so we can warn cleanly on stray children.
     family_size_overrides_t family_sizes;
-    std::vector<std::string> uses;
+    std::vector<LLFontRegistry::FamilyUseRef> uses;
     for (LLXMLNodePtr c = font_node->getFirstChild(); c.notNull(); c = c->getNextSibling())
     {
         if (c->hasName("size"))
@@ -1238,7 +1310,19 @@ void LLFontRegistry::processNewFormatFont(LLPointer<LLXMLNode> font_node)
             std::string used;
             if (c->getAttributeString("family", used))
             {
-                uses.push_back(used);
+                LLFontRegistry::FamilyUseRef ref;
+                ref.family = used;
+                // Optional use-level glyph filter. Composes with each
+                // contributed file's CharFunctor at chain-resolve time
+                // so a single source family can be `<use>`-d by multiple
+                // consumers each applying their own range gate.
+                if (c->hasAttribute("unicode_ranges"))
+                {
+                    std::string spec;
+                    c->getAttributeString("unicode_ranges", spec);
+                    ref.functor = parseUnicodeRanges(spec);
+                }
+                uses.push_back(std::move(ref));
             }
             else
             {

@@ -2519,6 +2519,319 @@ namespace tut
                       bfiles[0].mVarAxes.opsz, 28.0f);
     }
 
+    // replace_first=true on a family→family override drops the target's
+    // head file before prepending the source. Mirror of test<32> with
+    // the new map shape.
+    template<> template<>
+    void llfontregistry_object::test<84>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='UI'>"
+            "    <style name='NORMAL'><file>UI.woff2</file></style>"
+            "  </font>"
+            "  <font name='Alt'>"
+            "    <style name='NORMAL'><file>Alt.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        LLSD overrides;
+        LLSD entry = LLSD::emptyMap();
+        entry["value"] = "Alt";
+        entry["replace_first"] = true;
+        overrides["UI"] = entry;
+        applyOverrides(overrides);
+        auto names = fileNames("UI");
+        ensure_equals("head replaced -> only one file remains",
+                      (S32)names.size(), 1);
+        ensure_equals("Alt is the head", names[0], std::string("Alt.woff2"));
+    }
+
+    // replace_first=true preserves orig_files[1..]. Verifies the
+    // tail-merge contract: drop only the head, keep DejaVu/Emoji/CJK.
+    template<> template<>
+    void llfontregistry_object::test<85>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='DejaVu'>"
+            "    <style name='NORMAL'><file>DejaVu.woff2</file></style>"
+            "  </font>"
+            "  <font name='UI'>"
+            "    <use family='DejaVu'/>"
+            "    <style name='NORMAL'><file>UI.woff2</file></style>"
+            "  </font>"
+            "  <font name='Alt'>"
+            "    <style name='NORMAL'><file>Alt.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        // Sanity: post-resolve UI's chain is [UI.woff2, DejaVu.woff2].
+        auto pre_names = fileNames("UI");
+        ensure_equals("UI starts with 2 files", (S32)pre_names.size(), 2);
+        ensure_equals("UI head is UI.woff2",
+                      pre_names[0], std::string("UI.woff2"));
+
+        LLSD overrides;
+        LLSD entry = LLSD::emptyMap();
+        entry["value"] = "Alt";
+        entry["replace_first"] = true;
+        overrides["UI"] = entry;
+        applyOverrides(overrides);
+
+        auto names = fileNames("UI");
+        ensure_equals("[Alt, DejaVu] -> 2 files",
+                      (S32)names.size(), 2);
+        ensure_equals("Alt is the head", names[0], std::string("Alt.woff2"));
+        ensure_equals("DejaVu fallback preserved",
+                      names[1], std::string("DejaVu.woff2"));
+    }
+
+    // replace_first=true with family→file override: the target's head
+    // is dropped and the synthesized override file takes its slot;
+    // tail still preserved.
+    template<> template<>
+    void llfontregistry_object::test<86>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='DejaVu'>"
+            "    <style name='NORMAL'><file>DejaVu.woff2</file></style>"
+            "  </font>"
+            "  <font name='UI'>"
+            "    <use family='DejaVu'/>"
+            "    <style name='NORMAL'><file>UI.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+
+        LLSD overrides;
+        LLSD entry = LLSD::emptyMap();
+        entry["value"] = "user.ttf";
+        entry["replace_first"] = true;
+        overrides["UI"] = entry;
+        applyOverrides(overrides);
+
+        auto names = fileNames("UI");
+        ensure_equals("[user.ttf, DejaVu] -> 2 files",
+                      (S32)names.size(), 2);
+        ensure_equals("user.ttf head", names[0], std::string("user.ttf"));
+        ensure_equals("DejaVu fallback preserved",
+                      names[1], std::string("DejaVu.woff2"));
+    }
+
+    // replace_first=false in the map shape behaves identically to the
+    // bare string shape: the override is prepended onto the chain and
+    // the target's head stays as a fallback. Pin the legacy semantics
+    // on the new map shape so it can't accidentally diverge.
+    template<> template<>
+    void llfontregistry_object::test<87>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='UI'>"
+            "    <style name='NORMAL'><file>UI.woff2</file></style>"
+            "  </font>"
+            "  <font name='Alt'>"
+            "    <style name='NORMAL'><file>Alt.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+
+        LLSD overrides;
+        LLSD entry = LLSD::emptyMap();
+        entry["value"] = "Alt";
+        entry["replace_first"] = false;  // explicit false
+        overrides["UI"] = entry;
+        applyOverrides(overrides);
+
+        auto names = fileNames("UI");
+        ensure_equals("map(replace_first=false) -> [Alt, UI]",
+                      (S32)names.size(), 2);
+        ensure_equals("Alt prepended", names[0], std::string("Alt.woff2"));
+        ensure_equals("UI head preserved as fallback (no replace)",
+                      names[1], std::string("UI.woff2"));
+    }
+
+    // String shape continues to prepend (no replace). Regression guard
+    // for the most common user-facing override path.
+    template<> template<>
+    void llfontregistry_object::test<88>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='UI'>"
+            "    <style name='NORMAL'><file>UI.woff2</file></style>"
+            "  </font>"
+            "  <font name='Alt'>"
+            "    <style name='NORMAL'><file>Alt.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        LLSD overrides;
+        overrides["UI"] = "Alt";  // bare string
+        applyOverrides(overrides);
+        auto names = fileNames("UI");
+        ensure_equals("string shape -> [Alt, UI]", (S32)names.size(), 2);
+        ensure_equals("Alt prepended", names[0], std::string("Alt.woff2"));
+        ensure_equals("UI head preserved as fallback",
+                      names[1], std::string("UI.woff2"));
+    }
+
+    // <use unicode_ranges="..."/> attaches a CharFunctor to every file
+    // contributed by the named family. Pin: a consumer that does
+    // `<use family="EmojiBase" unicode_ranges="U+1F000-U+1FFFF"/>`
+    // ends up with EmojiBase's file gated by that range — accepts an
+    // astral codepoint, rejects ASCII.
+    template<> template<>
+    void llfontregistry_object::test<89>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='EmojiBase'>"
+            "    <style name='NORMAL'><file>Noto.ttf</file></style>"
+            "  </font>"
+            "  <font name='Consumer'>"
+            "    <use family='EmojiBase' unicode_ranges='U+1F000-U+1FFFF'/>"
+            "    <style name='NORMAL'><file>UI.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        const LLFontDescriptor* d = templateFor("Consumer");
+        ensure("template present", d != nullptr);
+        const auto& files = d->getFontFiles();
+        ensure_equals("Consumer has 2 files", (S32)files.size(), 2);
+        ensure_equals("UI head", files[0].FileName, std::string("UI.woff2"));
+        ensure_equals("Noto from EmojiBase", files[1].FileName, std::string("Noto.ttf"));
+        ensure("Noto has a use-level functor",
+               static_cast<bool>(files[1].CharFunctor));
+        ensure("functor accepts U+1F600",
+               files[1].CharFunctor((llwchar)0x1F600));
+        ensure("functor rejects ASCII",
+               !files[1].CharFunctor((llwchar)0x0041));
+    }
+
+    // Composition: file's own unicode_ranges intersects with the
+    // use-level filter. Both gates must accept a codepoint for it to
+    // pass.
+    template<> template<>
+    void llfontregistry_object::test<90>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Source'>"
+            "    <style name='NORMAL'>"
+            "      <file unicode_ranges='U+1F000-U+1FFFF'>F.ttf</file>"
+            "    </style>"
+            "  </font>"
+            "  <font name='Consumer'>"
+            "    <use family='Source' unicode_ranges='U+1F500-U+1F5FF'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        const LLFontDescriptor* d = templateFor("Consumer");
+        ensure("template present", d != nullptr);
+        const auto& files = d->getFontFiles();
+        ensure_equals("Consumer has 1 file", (S32)files.size(), 1);
+        ensure("composed functor accepts U+1F500 (in both)",
+               files[0].CharFunctor((llwchar)0x1F500));
+        ensure("composed functor rejects U+1F100 (in file, NOT in use)",
+               !files[0].CharFunctor((llwchar)0x1F100));
+        ensure("composed functor rejects U+1F900 (in use, NOT in file)",
+               !files[0].CharFunctor((llwchar)0x1F900));
+        ensure("composed functor rejects U+0041 (in neither)",
+               !files[0].CharFunctor((llwchar)0x0041));
+    }
+
+    // Two consumers share one source with different filters. Each
+    // resolved chain has its own functor — no cross-talk.
+    template<> template<>
+    void llfontregistry_object::test<91>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='EmojiBase'>"
+            "    <style name='NORMAL'><file>Noto.ttf</file></style>"
+            "  </font>"
+            "  <font name='Broad'>"
+            "    <use family='EmojiBase' unicode_ranges='U+1F000-U+1FFFF'/>"
+            "  </font>"
+            "  <font name='Narrow'>"
+            "    <use family='EmojiBase' unicode_ranges='U+1F600-U+1F6FF'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+
+        const auto& bf = templateFor("Broad")->getFontFiles();
+        const auto& nf = templateFor("Narrow")->getFontFiles();
+        ensure_equals("Broad has 1 file", (S32)bf.size(), 1);
+        ensure_equals("Narrow has 1 file", (S32)nf.size(), 1);
+        // Broad accepts U+1F100; Narrow doesn't.
+        ensure("Broad accepts U+1F100", bf[0].CharFunctor((llwchar)0x1F100));
+        ensure("Narrow rejects U+1F100", !nf[0].CharFunctor((llwchar)0x1F100));
+        // Both accept U+1F600 (in their own range).
+        ensure("Broad accepts U+1F600", bf[0].CharFunctor((llwchar)0x1F600));
+        ensure("Narrow accepts U+1F600", nf[0].CharFunctor((llwchar)0x1F600));
+    }
+
+    // Single override on the source family propagates to every consumer
+    // with each consumer's filter intact. This is the load-bearing
+    // motivation for use-level filters: one override entry, two chains
+    // updated, each with its own glyph gate.
+    template<> template<>
+    void llfontregistry_object::test<92>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='EmojiBase'>"
+            "    <style name='NORMAL'><file>Noto.ttf</file></style>"
+            "  </font>"
+            "  <font name='Broad'>"
+            "    <use family='EmojiBase' unicode_ranges='U+1F000-U+1FFFF'/>"
+            "  </font>"
+            "  <font name='Narrow'>"
+            "    <use family='EmojiBase' unicode_ranges='U+1F600-U+1F6FF'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+
+        // Override at the SOURCE — EmojiBase gets prepended with Twemoji.
+        // Apply BEFORE resolveFontReferences so the consumers' use chains
+        // pick up the new EmojiBase head when collected. (The fixture's
+        // `resolve()` calls resolveFontReferences which itself runs
+        // applyFamilyOverrides first.)
+        LLSD overrides;
+        overrides["EmojiBase"] = "Twemoji.ttf";
+        resolve(overrides);
+
+        const auto& bf = templateFor("Broad")->getFontFiles();
+        const auto& nf = templateFor("Narrow")->getFontFiles();
+        // Each consumer sees BOTH files (Twemoji prepended onto the
+        // EmojiBase chain by the override; Noto preserved behind it),
+        // each with the consumer's filter applied.
+        ensure_equals("Broad has 2 files (Twemoji + Noto)",
+                      (S32)bf.size(), 2);
+        ensure_equals("Broad head is Twemoji",
+                      bf[0].FileName, std::string("Twemoji.ttf"));
+        ensure_equals("Narrow has 2 files",
+                      (S32)nf.size(), 2);
+        ensure_equals("Narrow head is Twemoji",
+                      nf[0].FileName, std::string("Twemoji.ttf"));
+        // Filter still gates each consumer independently.
+        ensure("Broad's Twemoji accepts U+1F100",
+               bf[0].CharFunctor((llwchar)0x1F100));
+        ensure("Narrow's Twemoji rejects U+1F100",
+               !nf[0].CharFunctor((llwchar)0x1F100));
+    }
+
 #if LL_MESA_HEADLESS
     // ===================================================================
     // Group 7: GL-requiring paths (LL_MESA_HEADLESS only)

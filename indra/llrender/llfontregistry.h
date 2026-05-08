@@ -326,8 +326,19 @@ private:
     // a style variant; expanded at the end of parseFontInfo.
     typedef std::map<std::pair<std::string, U8>, bool> inherit_map_t;
     // Per-family <use family="X"/> references, resolved at parse-time after
-    // all skin layers have loaded.
-    typedef std::map<std::string, std::vector<std::string>> family_uses_map_t;
+    // all skin layers have loaded. Each ref carries an optional CharFunctor
+    // built from a `<use unicode_ranges="...">` attribute; when present, the
+    // functor composes (intersects) with each contributed file's own
+    // CharFunctor so a single source family can serve multiple consumers
+    // each applying their own glyph filter at the use site (e.g. EmojiBase
+    // shared between SansSerifEmoji's broad UTS#51 set and
+    // SansSerifLimitedEmoji's narrower set without duplicating the file).
+    struct FamilyUseRef
+    {
+        std::string                  family;
+        std::function<bool(llwchar)> functor;  // null = no use-level filter
+    };
+    typedef std::map<std::string, std::vector<FamilyUseRef>> family_uses_map_t;
     // Family-level metadata read from <font> attributes. All three fields
     // are optional: ui_label defaults to the family name, user_selectable
     // defaults to true (preserving pre-attribute behavior), monospace

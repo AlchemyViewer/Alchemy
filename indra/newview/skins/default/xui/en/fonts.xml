@@ -107,6 +107,20 @@
                     (e.g. a "ScriptFallbacks" family that <use>s
                     DejaVu/Emoji/CJK; user-facing families just <use>
                     "ScriptFallbacks").
+  <use family="OtherFamily" unicode_ranges="..."/>
+                    Optional `unicode_ranges` attribute: gates the
+                    files contributed by OtherFamily to the listed
+                    codepoint ranges (same syntax as <file>'s own
+                    unicode_ranges). Composes (intersects) with each
+                    contributed file's existing range filter. Lets a
+                    single source family be `<use>`d by multiple
+                    consumers each applying their own filter at the
+                    use site (e.g. EmojiBase shared between Emoji's
+                    broad UTS#51 set and LimitedEmoji's narrower set
+                    without duplicating the file). The filter applies
+                    only to OtherFamily's own files — it does NOT
+                    cascade through OtherFamily's internal <use>
+                    chain.
   <style name="..">
                     Style variant block. `name` is one of NORMAL, BOLD,
                     ITALIC, BOLD|ITALIC. Anything else maps to NORMAL.
@@ -187,6 +201,19 @@
     - A bare font filename (e.g. "consola.ttf")  ->  prepended as a
       single file with the target family's hinting/weight/flags
       inherited from its first existing file.
+
+  Each entry's value can take one of two LLSD shapes:
+    - Flat string (user-facing default)  ->  the override value is
+      prepended in front of the target's chain; the original head
+      stays as a fallback for glyphs the override doesn't cover. This
+      is the shape the Preferences font picker writes.
+    - Map { "value": "...", "replace_first": true }  ->  same as
+      above, but DROPS the target's head file before prepending. The
+      rest of the target's chain (DejaVu/Emoji/CJK fallbacks) stays.
+      Non-user-facing — programmatic callers only; the picker keeps
+      writing the flat-string shape. Use when you want the override
+      to fully displace the original primary face rather than sit
+      in front of it.
 
   ==========================================================================
   Cross-script fallback families
@@ -359,44 +386,56 @@
         </style>
      </font>
 
-    <font name="Emoji"  user_selectable="false">
+    <font name="NotoEmoji" label="Noto Emoji" user_selectable="false">
         <size name="Huge"      size="16.0"/>
         <size name="Large"     size="13.0"/>
         <size name="Medium"    size="12"/>
         <size name="Small"     size="11"/>
         <size name="Monospace" size="11"/>
         <style name="NORMAL">
-            <!-- The unicode_ranges gate enumerates UTS#51 emoji codepoints
-                 so the shape-itemizer keeps a whole emoji cluster on this
-                 face. Codepoints outside the gate route off Noto-COLRv1 to
-                 the next fallback, fragmenting ZWJ chains across faces and
-                 breaking the GSUB ligature lookup (e.g. U+1F408 ZWJ U+2B1B
-                 → 🐈‍⬛ depends on U+2B1B staying on this face). The set
-                 below covers Emoji_Presentation + the BMP emoji codepoints
-                 scattered outside U+2600-U+27BF (big-square / star / arrow
-                 / watch / hourglass / etc. emoji that pair with astral
-                 bases via ZWJ), plus the keycap combiner range, ZWJ, and
-                 VS-15 / VS-16 so emoji presentation selectors and joiners
-                 stay clustered. Rasterized via the in-tree COLRv1 paint
-                 walker (HarfBuzz callbacks -> plutovg). -->
-            <file unicode_ranges="U+200D,U+203C,U+2049,U+2122,U+2139,U+2194-U+2199,U+21A9-U+21AA,U+231A-U+231B,U+2328,U+23CF,U+23E9-U+23F3,U+23F8-U+23FA,U+24C2,U+25AA-U+25AB,U+25B6,U+25C0,U+25FB-U+25FE,U+2600-U+27BF,U+2934-U+2935,U+2B05-U+2B07,U+2B1B-U+2B1C,U+2B50,U+2B55,U+3030,U+303D,U+3297,U+3299,U+20E0-U+20E9,U+FE0E-U+FE0F,U+1F000-U+1FFFF">Noto-COLRv1.ttf</file>
+            <file>Noto-COLRv1.ttf</file>
         </style>
     </font>
 
+    <!-- Single source-of-truth for the color emoji file. Consumers reach
+         it via `<use family="EmojiBase" unicode_ranges="..."/>` so each
+         consumer can pick its own glyph filter at the use site without
+         duplicating the file reference. An AlchemyUIFontOverrides entry
+         on `EmojiBase` propagates to every consumer (Emoji, LimitedEmoji,
+         and any future variant) with the consumer's filter intact. -->
+    <font name="EmojiBase" user_selectable="false">
+        <use family="NotoEmoji"/>
+    </font>
+
+    <font name="Emoji" user_selectable="false">
+        <!-- The unicode_ranges gate enumerates UTS#51 emoji codepoints
+             so the shape-itemizer keeps a whole emoji cluster on this
+             face. Codepoints outside the gate route off Noto-COLRv1 to
+             the next fallback, fragmenting ZWJ chains across faces and
+             breaking the GSUB ligature lookup (e.g. U+1F408 ZWJ U+2B1B
+             → 🐈‍⬛ depends on U+2B1B staying on this face). The set
+             below covers Emoji_Presentation + the BMP emoji codepoints
+             scattered outside U+2600-U+27BF (big-square / star / arrow
+             / watch / hourglass / etc. emoji that pair with astral
+             bases via ZWJ), plus the keycap combiner range, ZWJ, and
+             VS-15 / VS-16 so emoji presentation selectors and joiners
+             stay clustered. Rasterized via the in-tree COLRv1 paint
+             walker (HarfBuzz callbacks -> plutovg). -->
+        <use family="EmojiBase" unicode_ranges="U+200D,U+203C,U+2049,U+2122,U+2139,U+2194-U+2199,U+21A9-U+21AA,U+231A-U+231B,U+2328,U+23CF,U+23E9-U+23F3,U+23F8-U+23FA,U+24C2,U+25AA-U+25AB,U+25B6,U+25C0,U+25FB-U+25FE,U+2600-U+27BF,U+2934-U+2935,U+2B05-U+2B07,U+2B1B-U+2B1C,U+2B50,U+2B55,U+3030,U+303D,U+3297,U+3299,U+20E0-U+20E9,U+FE0E-U+FE0F,U+1F000-U+1FFFF"/>
+    </font>
+
     <font name="LimitedEmoji" user_selectable="false">
-        <style name="NORMAL">
-            <!-- Narrower than Emoji's range — limited to "obviously
-                 emoji" codepoints for menu chrome and similar UI
-                 surfaces where wide BMP-pictograph coverage would
-                 collide with text styling. Includes the same cluster-
-                 helper codepoints as Emoji (ZWJ, VS-15/16, keycap
-                 combiner U+20E0-U+20E9) so multi-codepoint sequences
-                 anchored on astral bases (keycaps, ZWJ families) keep
-                 their trailing modifiers on this face — without these,
-                 "#️⃣" routes the keycap mark off to root and renders
-                 a tofu next to the digit. -->
-            <file unicode_ranges="U+200D,U+20E0-U+20E9,U+2B1B-U+2B1C,U+2B50,U+2B55,U+FE0E-U+FE0F,U+1F000-U+1FFFF">Noto-COLRv1.ttf</file>
-        </style>
+        <!-- Narrower than Emoji's range — limited to "obviously
+             emoji" codepoints for menu chrome and similar UI
+             surfaces where wide BMP-pictograph coverage would
+             collide with text styling. Includes the same cluster-
+             helper codepoints as Emoji (ZWJ, VS-15/16, keycap
+             combiner U+20E0-U+20E9) so multi-codepoint sequences
+             anchored on astral bases (keycaps, ZWJ families) keep
+             their trailing modifiers on this face — without these,
+             "#️⃣" routes the keycap mark off to root and renders
+             a tofu next to the digit. -->
+        <use family="EmojiBase" unicode_ranges="U+200D,U+20E0-U+20E9,U+2B1B-U+2B1C,U+2B50,U+2B55,U+FE0E-U+FE0F,U+1F000-U+1FFFF"/>
     </font>
 
     <!-- The "default" font is appended (style-agnostically) to every
