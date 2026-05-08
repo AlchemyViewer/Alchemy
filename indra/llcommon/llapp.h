@@ -257,7 +257,7 @@ public:
 
 #ifdef LL_WINDOWS
     virtual bool reportCrashToBugsplat(void* pExcepInfo /*EXCEPTION_POINTERS*/) { return false; }
-    virtual bool reportCustomToBugsplat(const std::string& desription) { return false; }
+    virtual bool reportCustomToBugsplat(const std::string& description) { return false; }
 #endif
 
 public:
