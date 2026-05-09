@@ -561,7 +561,22 @@ bool LLLineEditor::dragSelectCursorTo(S32 local_mouse_x)
 void LLLineEditor::setCursor( S32 pos )
 {
     S32 old_cursor_pos = getCursor();
-    mCursorPos = llclamp( pos, 0, mText.length());
+
+    S32 new_pos = llclamp(pos, 0, mText.length());
+    if (new_pos != old_cursor_pos)
+    {
+        // Snap onto the nearest grapheme boundary so callers that hand in a
+        // mid-cluster offset (autoreplace callbacks, IME caret positions,
+        // calculator error positions, anything pre-dating the cluster work)
+        // don't park the caret inside a ZWJ family / flag pair / keycap.
+        // Mirrors LLTextBase::setCursorPos. No-op for already-aligned values.
+        const LLWString& wtext = mText.getWString();
+        const bool fwd = new_pos >= old_cursor_pos;
+        new_pos = (S32)(fwd
+            ? wstring_grapheme_align_forward(wtext, (size_t)new_pos)
+            : wstring_grapheme_align_backward(wtext, (size_t)new_pos));
+    }
+    mCursorPos = new_pos;
 
     // position of end of next character after cursor
     S32 pixels_after_scroll = findPixelNearestPos();
