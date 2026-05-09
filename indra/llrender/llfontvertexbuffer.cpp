@@ -209,7 +209,7 @@ S32 LLFontVertexBuffer::render(
         // glyphs need fixed (255,255,255) RGB even on color change.
         if (sEnableColorOnlyRegen && !mLastUsesColorAtlas)
         {
-            recolorBuffers(fontp, color, shadow);
+            recolorBuffers(color, shadow);
             renderBuffers();
             if (right_x)
             {
@@ -373,7 +373,6 @@ void LLFontVertexBuffer::genBuffers(
 }
 
 void LLFontVertexBuffer::recolorBuffers(
-    const LLFontGL* fontp,
     const LLColor4& color,
     LLFontGL::ShadowType shadow)
 {

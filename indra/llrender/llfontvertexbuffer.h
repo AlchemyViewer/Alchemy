@@ -110,7 +110,7 @@ private:
     // attribute streams in place via LLVertexBuffer::setColorData. Avoids the
     // full HarfBuzz shape + per-glyph vertex build that genBuffers does. Used
     // by the dominant hover/fade animation case in UI buttons.
-    void recolorBuffers(const LLFontGL* fontp, const LLColor4& color, LLFontGL::ShadowType shadow);
+    void recolorBuffers(const LLColor4& color, LLFontGL::ShadowType shadow);
 
     // Each pass (shadow, foreground) is captured into its own list so that
     // every vertex within a list shares the same color (foreground color, or
