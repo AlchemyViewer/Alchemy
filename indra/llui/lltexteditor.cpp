@@ -1059,7 +1059,26 @@ bool LLTextEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
 
         LLWString text = getWText();
 
-        if( LLWStringUtil::isPartOfWord( text[mCursorPos] ) )
+        // Prefer selecting a whole emoji cluster — covers both halves of the
+        // glyph hit-test (cursor lands at cluster_start or cluster_end after
+        // setCursorAtLocalPos) and avoids splitting a multi-codepoint cluster
+        // like 🏳️‍⚧️ into base scalar + tail.
+        auto cluster = wstring_emoji_range_at(text, (size_t)mCursorPos);
+        if (cluster.first == cluster.second && mCursorPos > 0)
+        {
+            const auto prev = wstring_emoji_range_at(text, (size_t)(mCursorPos - 1));
+            if ((S32)prev.second == mCursorPos)
+                cluster = prev;
+        }
+
+        if (cluster.first != cluster.second)
+        {
+            setCursorPos((S32)cluster.first);
+            startSelection();
+            setCursorPos((S32)cluster.second);
+            mSelectionEnd = mCursorPos;
+        }
+        else if( LLWStringUtil::isPartOfWord( text[mCursorPos] ) )
         {
             // Select word the cursor is over
             while ((mCursorPos > 0) && LLWStringUtil::isPartOfWord(text[mCursorPos-1]))
@@ -1077,9 +1096,11 @@ bool LLTextEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
         }
         else if ((mCursorPos < (S32)text.length()) && !LLStringOps::isSpace( text[mCursorPos]) )
         {
-            // Select the character the cursor is over
+            // Single non-word, non-space, non-emoji char (punctuation etc.) —
+            // select the lone glyph. Step one grapheme to be defensive about
+            // anything wstring_emoji_range_at didn't classify as a cluster.
             startSelection();
-            setCursorPos(mCursorPos + 1);
+            setCursorPos((S32)wstring_step_grapheme_forward(text, (size_t)mCursorPos));
             mSelectionEnd = mCursorPos;
         }
 
@@ -1325,7 +1346,15 @@ void LLTextEditor::addChar(llwchar wc)
     }
     else if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode())
     {
-        removeChar(mCursorPos);
+        // Overwrite the whole grapheme cluster, not just one codepoint —
+        // otherwise typing over an emoji like 🏳️‍⚧️ peels off only the base
+        // (🏳) and leaves the variation selector / ZWJ / payload behind.
+        const LLWString& text = getWText();
+        const S32 span = (S32)wstring_step_grapheme_forward(text, (size_t)mCursorPos) - mCursorPos;
+        if (span > 0)
+        {
+            remove(mCursorPos, span, false);
+        }
     }
 
     setCursorPos(mCursorPos + addChar( mCursorPos, wc ));
@@ -1426,7 +1455,14 @@ void LLTextEditor::addLineBreakChar(bool group_together)
     }
     else if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode())
     {
-        removeChar(mCursorPos);
+        // Mirror addChar's cluster-aware overwrite: an Enter pressed in
+        // overwrite mode over an emoji should consume the whole cluster.
+        const LLWString& text = getWText();
+        const S32 span = (S32)wstring_step_grapheme_forward(text, (size_t)mCursorPos) - mCursorPos;
+        if (span > 0)
+        {
+            remove(mCursorPos, span, false);
+        }
     }
 
     LLStyleConstSP sp(new LLStyle(LLStyle::Params()));
@@ -1884,7 +1920,12 @@ bool LLTextEditor::handleControlKey(const KEY key, const MASK mask)
                 // all move the cursor as if clicking, so should deselect.
                 deselect();
 
-                setCursorPos(nextWordPos(mCursorPos + 1));
+                // Step past the current cluster before scanning so multi-
+                // codepoint emoji (🏳️‍⚧️) get treated as one unit, matching
+                // the single-codepoint emoji case (🐶) where +1 already does.
+                const LLWString& wtext = getWText();
+                const S32 stepped = (S32)wstring_step_grapheme_forward(wtext, (size_t)mCursorPos);
+                setCursorPos(nextWordPos(stepped));
             }
             break;
 
@@ -1896,7 +1937,9 @@ bool LLTextEditor::handleControlKey(const KEY key, const MASK mask)
                 // all move the cursor as if clicking, so should deselect.
                 deselect();
 
-                setCursorPos(prevWordPos(mCursorPos - 1));
+                const LLWString& wtext = getWText();
+                const S32 stepped = (S32)wstring_step_grapheme_backward(wtext, (size_t)mCursorPos);
+                setCursorPos(prevWordPos(stepped));
             }
             break;
 

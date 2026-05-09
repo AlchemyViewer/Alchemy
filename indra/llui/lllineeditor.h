@@ -310,6 +310,13 @@ public:
     void            removeWord(bool prev);
     void            addChar(const llwchar c);
     void            setCursorAtLocalPos(S32 local_mouse_x);
+    // Drag-select cursor placement with cluster-aware hysteresis. Mirrors
+    // LLTextBase::dragSelectCursorTo: while old/new positions span exactly
+    // one emoji cluster, the cursor stays at its current boundary until the
+    // mouse passes the cluster's 30%/70% line, so sub-pixel jitter doesn't
+    // bounce the highlight rect across the full glyph. Returns true if the
+    // cursor moved.
+    bool            dragSelectCursorTo(S32 local_mouse_x);
     S32             findPixelNearestPos(S32 cursor_offset = 0) const;
     S32             calcCursorPos(S32 mouse_x);
     bool            handleSpecialKey(KEY key, MASK mask);

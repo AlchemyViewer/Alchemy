@@ -485,6 +485,79 @@ void LLLineEditor::setCursorAtLocalPos( S32 local_mouse_x )
     setCursor(cursor_pos);
 }
 
+bool LLLineEditor::dragSelectCursorTo(S32 local_mouse_x)
+{
+    S32 new_pos = calcCursorPos(local_mouse_x);
+    const S32 old_pos = getCursor();
+
+    // Snap to a grapheme boundary up front. calcCursorPos / charFromPixelOffset
+    // can hand back a position mid-cluster (the past-end-of-text branch);
+    // without alignment, the spans_cluster check below would miss and
+    // setCursor's clamp-only behaviour would let mid-cluster placements through.
+    const LLWString& text = mText.getWString();
+    new_pos = llclamp(new_pos, 0, mText.length());
+    const bool fwd = new_pos >= old_pos;
+    new_pos = (S32)(fwd
+        ? wstring_grapheme_align_forward(text, (size_t)new_pos)
+        : wstring_grapheme_align_backward(text, (size_t)new_pos));
+
+    if (new_pos == old_pos)
+        return false;
+
+    const S32 lo = llmin(old_pos, new_pos);
+    const S32 hi = llmax(old_pos, new_pos);
+    const auto range = wstring_emoji_range_at(text, (size_t)lo);
+    const bool spans_cluster = range.first != range.second
+                            && (S32)range.first  == lo
+                            && (S32)range.second == hi;
+    if (spans_cluster)
+    {
+        // Use the rendered text (asterisks in password mode) so widths match
+        // what the mouse is actually hitting on screen.
+        LLWString asterix_text;
+        const llwchar* wtext = text.c_str();
+        if (mDrawAsterixes)
+        {
+            for (S32 i = 0; i < mText.length(); i++)
+                asterix_text += utf8str_to_wstring(PASSWORD_ASTERISK);
+            wtext = asterix_text.c_str();
+        }
+        const S32 left_offset = (S32)range.first - mScrollHPos;
+        const S32 cluster_left_px = mTextLeftEdge
+            + (left_offset > 0 ? mGLFont->getWidth(wtext, mScrollHPos, left_offset) : 0);
+        const S32 cluster_pixel_width =
+            mGLFont->getWidth(wtext, (S32)range.first, (S32)(range.second - range.first));
+
+        if (cluster_pixel_width > 0)
+        {
+            const S32 stick_to_left  = cluster_left_px + cluster_pixel_width * 3 / 10;
+            const S32 stick_to_right = cluster_left_px + cluster_pixel_width * 7 / 10;
+            const bool was_at_cluster_end = (old_pos == (S32)range.second);
+            if (was_at_cluster_end)
+            {
+                if (local_mouse_x >= stick_to_left)
+                    return false;
+            }
+            else
+            {
+                if (local_mouse_x <= stick_to_right)
+                    return false;
+            }
+        }
+    }
+
+    if (mIsSelecting)
+    {
+        const S32 left_pos = llmin(mSelectionStart, new_pos);
+        const S32 length = llabs(mSelectionStart - new_pos);
+        if (!prevalidateInput(text.substr(left_pos, length)))
+            return false;
+    }
+
+    setCursor(new_pos);
+    return true;
+}
+
 void LLLineEditor::setCursor( S32 pos )
 {
     S32 old_cursor_pos = getCursor();
@@ -707,8 +780,33 @@ bool LLLineEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
 
         bool doSelectAll = true;
 
+        // If the cursor sits on (or just past) an emoji cluster, prefer
+        // selecting that whole cluster — otherwise emojis fall through to
+        // selectAll, which is wildly larger than the click implied.
+        auto cluster = wstring_emoji_range_at(wtext, (size_t)mCursorPos);
+        if (cluster.first == cluster.second && mCursorPos > 0)
+        {
+            const auto prev = wstring_emoji_range_at(wtext, (size_t)(mCursorPos - 1));
+            if ((S32)prev.second == mCursorPos)
+                cluster = prev;
+        }
+
+        if (cluster.first != cluster.second)
+        {
+            const S32 old_selection_start = mLastSelectionStart;
+            const S32 old_selection_end = mLastSelectionEnd;
+
+            mCursorPos = (S32)cluster.first;
+            startSelection();
+            mCursorPos = (S32)cluster.second;
+            mSelectionEnd = mCursorPos;
+
+            // Same expand-on-repeat behaviour as the word path below.
+            doSelectAll = (old_selection_start == mSelectionStart) &&
+                          (old_selection_end   == mSelectionEnd);
+        }
         // Select the word we're on
-        if( LLWStringUtil::isPartOfWord( wtext[mCursorPos] ) )
+        else if( LLWStringUtil::isPartOfWord( wtext[mCursorPos] ) )
         {
             S32 old_selection_start = mLastSelectionStart;
             S32 old_selection_end = mLastSelectionEnd;
@@ -907,7 +1005,7 @@ bool LLLineEditor::handleHover(S32 x, S32 y, MASK mask)
             }
         }
 
-        setCursorAtLocalPos( x );
+        dragSelectCursorTo(x);
         mSelectionEnd = getCursor();
 
         // delay cursor flashing
@@ -947,7 +1045,7 @@ bool LLLineEditor::handleMouseUp(S32 x, S32 y, MASK mask)
 
     if( mIsSelecting )
     {
-        setCursorAtLocalPos( x );
+        dragSelectCursorTo(x);
         mSelectionEnd = getCursor();
 
         handled = true;
@@ -1037,14 +1135,24 @@ void LLLineEditor::addChar(const llwchar uni_char)
     }
     else if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode())
     {
-        if (!prevalidateInput(mText.getWString().substr(getCursor(), 1)))
-            return;
+        // Overwrite the whole grapheme cluster, not just one codepoint —
+        // otherwise typing over an emoji like 🏳️‍⚧️ peels off only the base
+        // (🏳) and leaves the variation selector / ZWJ / payload behind.
+        // span == 0 (cursor at end of string) falls through to plain insert.
+        const LLWString& wtext = mText.getWString();
+        const S32 cur = getCursor();
+        const S32 span = (S32)wstring_step_grapheme_forward(wtext, (size_t)cur) - cur;
+        if (span > 0)
+        {
+            if (!prevalidateInput(wtext.substr(cur, span)))
+                return;
 
-        mText.erase(getCursor(), 1);
+            mText.erase(cur, span);
 
-        mFontBufferPreSelection.reset();
-        mFontBufferSelection.reset();
-        mFontBufferPostSelection.reset();
+            mFontBufferPreSelection.reset();
+            mFontBufferSelection.reset();
+            mFontBufferPostSelection.reset();
+        }
     }
 
     S32 cur_bytes = static_cast<S32>(mText.getString().size());
@@ -1551,7 +1659,12 @@ bool LLLineEditor::handleSpecialKey(KEY key, MASK mask)
         {
             if( hasSelection() )
             {
-                setCursor(llmin( getCursor() - 1, mSelectionStart, mSelectionEnd ));
+                // Collapse to the left edge of the selection. Matches
+                // LLTextEditor's behaviour and avoids the previous
+                // `getCursor() - 1` step landing mid-cluster on emoji at
+                // selection edges (and going one past the edge on
+                // reverse-direction drags).
+                setCursor(llmin( mSelectionStart, mSelectionEnd ));
             }
             else
             if( 0 < getCursor() )
@@ -1578,7 +1691,9 @@ bool LLLineEditor::handleSpecialKey(KEY key, MASK mask)
         {
             if (hasSelection())
             {
-                setCursor(llmax(getCursor() + 1, mSelectionStart, mSelectionEnd));
+                // Collapse to the right edge of the selection — same fix as
+                // KEY_LEFT above.
+                setCursor(llmax(mSelectionStart, mSelectionEnd));
             }
             else
             if (getCursor() < mText.length())
