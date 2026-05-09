@@ -913,8 +913,13 @@ bool LLTextEditor::handleRightMouseDown(S32 x, S32 y, MASK mask)
     // Prefer editor menu if it has selection. See EXT-6806.
     if (hasSelection())
     {
-        S32 click_pos = getDocIndexFromLocalCoord(x, y, false);
-        if (click_pos > mSelectionStart && click_pos < mSelectionEnd)
+        const S32 click_pos = getDocIndexFromLocalCoord(x, y, false);
+        // mSelectionStart/End aren't ordered — reverse-direction drags
+        // (right-to-left) leave start > end, in which case the strict
+        // comparison below would always be false. Normalise to left/right.
+        const S32 sel_left  = llmin(mSelectionStart, mSelectionEnd);
+        const S32 sel_right = llmax(mSelectionStart, mSelectionEnd);
+        if (click_pos > sel_left && click_pos < sel_right)
         {
             show_menu = true;
         }
