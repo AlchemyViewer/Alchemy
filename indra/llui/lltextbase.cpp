@@ -3130,6 +3130,114 @@ void LLTextBase::setCursorAtLocalPos( S32 local_x, S32 local_y, bool round, bool
     setCursorPos(getDocIndexFromLocalCoord(local_x, local_y, round), keep_cursor_offset);
 }
 
+bool LLTextBase::dragSelectCursorTo(S32 local_x, S32 local_y)
+{
+    S32 new_pos = getDocIndexFromLocalCoord(local_x, local_y, /*round=*/true);
+    const S32 old_pos = mCursorPos;
+
+    // Mirror setCursorPos's grapheme alignment ahead of the spans_cluster
+    // check below. Without it, the hysteresis is bypassed for mouse
+    // positions past the line's text width: getDocIndexFromLocalCoord's
+    // hit-past-end-of-line branch returns line.mDocIndexEnd - 1, which
+    // lands strictly inside an end-of-string emoji cluster. The cluster
+    // bounds check (lo == range.first && hi == range.second) then sees
+    // (mid-cluster, cluster_end) instead of (cluster_start, cluster_end)
+    // and falls through, so setCursorPos's own grapheme-align snaps
+    // mCursorPos through the cluster without consulting the gate. Aligning
+    // here means we evaluate the cursor's actual landing position.
+    const LLWString& text = getWText();
+    const bool fwd = new_pos >= old_pos;
+    new_pos = (S32)(fwd
+        ? wstring_grapheme_align_forward(text, (size_t)new_pos)
+        : wstring_grapheme_align_backward(text, (size_t)new_pos));
+
+    if (new_pos == old_pos)
+    {
+        return false;
+    }
+
+    // Cluster-aware hysteresis. wstring_emoji_range_at(text, lo) returns
+    // the cluster range that strictly contains lo (or a single-codepoint
+    // pictograph's range when lo points at one). When old_pos and new_pos
+    // are exactly the cluster's bounds, an ordinary drag commits this hover
+    // would flip the highlight rect across the cluster's full pixel span —
+    // what users perceive as flicker when sub-pixel jitter (or just slow
+    // motion through the glyph) repeatedly crosses charFromPixelOffset's
+    // 50% snap threshold. Lock the cursor to its current boundary until
+    // the mouse is clearly in the other half (past 30% from the far edge).
+    // Non-cluster moves (regular text where each codepoint is its own
+    // grapheme) bypass the gate so per-codepoint precision is preserved.
+    const S32 lo = llmin(old_pos, new_pos);
+    const S32 hi = llmax(old_pos, new_pos);
+    const auto range = wstring_emoji_range_at(text, (size_t)lo);
+    const bool spans_cluster = range.first != range.second
+                            && (S32)range.first  == lo
+                            && (S32)range.second == hi;
+    if (spans_cluster)
+    {
+        // Cluster's pixel span in widget-local coords. cluster_left_px comes
+        // from getLocalRectFromDocIndex (mLeft is the rendered X at the
+        // cluster's start). cluster_right_px is computed instead from the
+        // owning segment's getDimensionsF32 over the cluster's characters,
+        // because getLocalRectFromDocIndex(end) clamps pos to
+        // mDocIndexEnd-1 — which lands inside the cluster when it sits at
+        // the very end of the document. The clamp would zero out
+        // cluster_width and disable the gate exactly for end-of-string
+        // emoji (e.g. the rightmost 🏳️‍⚧️ in a chat line), where the
+        // flicker is most visible.
+        const S32 cluster_left_px = getLocalRectFromDocIndex((S32)range.first).mLeft;
+
+        segment_set_t::iterator seg_iter;
+        S32 seg_offset;
+        getSegmentAndOffset((S32)range.first, &seg_iter, &seg_offset);
+        F32 cluster_pixel_width = 0.f;
+        if (seg_iter != mSegments.end())
+        {
+            // Copy the smart pointer out of the multiset's iterator (whose
+            // dereference is const, since elements are part of the set's
+            // ordering key) so we can call non-const getDimensionsF32 on
+            // the segment.
+            LLTextSegmentPtr segmentp = *seg_iter;
+            // Clamp num_chars to the segment's end so a cluster that
+            // somehow straddles a segment boundary doesn't read past it
+            // (clusters normally don't, but the assert is cheap).
+            const S32 num_chars = llmin((S32)range.second, segmentp->getEnd())
+                                - (S32)range.first;
+            S32 cluster_pixel_height = 0;
+            segmentp->getDimensionsF32(seg_offset, num_chars,
+                                       cluster_pixel_width,
+                                       cluster_pixel_height);
+        }
+
+        if (cluster_pixel_width > 0.f)
+        {
+            // 30%/70% deadband around the midpoint. Asymmetric thresholds
+            // so the rule reads as "must move clearly into the new half."
+            // Wider than a delta gate, and independent of drag speed —
+            // a fast drag through a cluster still snaps once at the 30%
+            // line, but slow motion or jitter inside the deadband never
+            // does.
+            const S32 cluster_width = (S32)cluster_pixel_width;
+            const S32 stick_to_left  = cluster_left_px + cluster_width * 3 / 10;
+            const S32 stick_to_right = cluster_left_px + cluster_width * 7 / 10;
+            const bool was_at_cluster_end = (old_pos == (S32)range.second);
+            if (was_at_cluster_end)
+            {
+                if (local_x >= stick_to_left)
+                    return false;
+            }
+            else
+            {
+                if (local_x <= stick_to_right)
+                    return false;
+            }
+        }
+    }
+
+    setCursorPos(new_pos);
+    return true;
+}
+
 
 void LLTextBase::changeLine( S32 delta )
 {

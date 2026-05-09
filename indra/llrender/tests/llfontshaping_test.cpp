@@ -1423,6 +1423,54 @@ namespace tut
         }
     }
 
+    // Cluster atomicity: every glyph emitted by the cluster fast path
+    // must carry the cluster's start codepoint as its cluster ID, not
+    // a per-glyph ID HarfBuzz hands back when the face fails to ligate.
+    // charFromPixelOffset feeds sg.cluster directly into the cursor
+    // position it returns for round=true mid-glyph hit-tests; a
+    // mid-cluster cluster value lands the cursor inside the cluster
+    // and oscillates the drag-select highlight rect across the
+    // cluster's interior. Force a multi-glyph case by routing the
+    // trans-flag ZWJ sequence through DejaVuSans alone (no emoji
+    // fallback) — DejaVu has ZWJ but lacks the astral pictographs and
+    // the GSUB rule for the composed flag, so HB emits one glyph per
+    // covered codepoint plus notdefs.
+    template<> template<>
+    void llfontshaping_object::test<33>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+        LLPointer<LLFontFreetype> ft = loadFt(path);
+        ensure("DejaVuSans loaded", ft.notNull());
+
+        // "X" + trans flag (5 cps, [1, 6)) + "Y". The cluster walker
+        // identifies [1, 6) as one emoji cluster; the fast path shapes it
+        // as a cluster sub-run on DejaVu, which can't ligate the
+        // sequence. Without cluster atomicity, HB hands back glyph
+        // cluster IDs 1..5 — the bug we're pinning.
+        LLWString s = wstr(L'X', 0x1F3F3, 0xFE0F, 0x200D, 0x26A7,
+                           0xFE0F, L'Y');
+        std::vector<LLShapedGlyph> out;
+        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        ensure("shape produced output", !out.empty());
+
+        // Every glyph whose cluster falls inside [1, 6) must report 1
+        // (the cluster's start). Glyphs for X (cluster=0) and Y (cluster=6)
+        // are unaffected.
+        bool saw_cluster_glyph = false;
+        for (const auto& g : out)
+        {
+            if (g.cluster >= 1 && g.cluster < 6)
+                saw_cluster_glyph = true;
+            ensure("trans-flag cluster glyphs collapse to cluster start",
+                   !(g.cluster > 1 && g.cluster < 6));
+        }
+        ensure("at least one glyph routed through the cluster sub-run "
+               "(otherwise this test isn't exercising the fast path)",
+               saw_cluster_glyph);
+    }
+
 #if LL_MESA_HEADLESS
     // GL-backed group: monospace shaping ends up rendering glyphs through
     // getGlyphInfoByIndex → renderAndCreateGlyph → atlas → gGL.bind on

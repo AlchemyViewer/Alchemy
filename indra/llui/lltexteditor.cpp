@@ -970,7 +970,7 @@ bool LLTextEditor::handleHover(S32 x, S32 y, MASK mask)
             }
             S32 clamped_x = llclamp(x, mVisibleTextRect.mLeft, mVisibleTextRect.mRight);
             S32 clamped_y = llclamp(y, mVisibleTextRect.mBottom, mVisibleTextRect.mTop);
-            setCursorAtLocalPos( clamped_x, clamped_y, true );
+            dragSelectCursorTo(clamped_x, clamped_y);
             mSelectionEnd = mCursorPos;
         }
         LL_DEBUGS("UserInput") << "hover handled by " << getName() << " (active)" << LL_ENDL;
@@ -1021,7 +1021,7 @@ bool LLTextEditor::handleMouseUp(S32 x, S32 y, MASK mask)
             }
             S32 clamped_x = llclamp(x, mVisibleTextRect.mLeft, mVisibleTextRect.mRight);
             S32 clamped_y = llclamp(y, mVisibleTextRect.mBottom, mVisibleTextRect.mTop);
-            setCursorAtLocalPos( clamped_x, clamped_y, true );
+            dragSelectCursorTo(clamped_x, clamped_y);
             endSelection();
         }
 

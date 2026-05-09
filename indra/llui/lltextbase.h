@@ -517,6 +517,14 @@ public:
     // cursor manipulation
     bool                    setCursor(S32 row, S32 column);
     bool                    setCursorPos(S32 cursor_pos, bool keep_cursor_offset = false);
+
+    // Drag-select cursor placement with cluster-aware hysteresis. Locks
+    // mCursorPos to whichever boundary it's already on (cluster start vs
+    // end) until the mouse moves clearly into the cluster's other half,
+    // so sub-pixel jitter or slow motion across the glyph doesn't bounce
+    // the highlight rect across the cluster's full pixel span. Returns
+    // true if the cursor moved.
+    bool                    dragSelectCursorTo(S32 local_x, S32 local_y);
     void                    startOfLine();
     void                    endOfLine();
     void                    startOfDoc();

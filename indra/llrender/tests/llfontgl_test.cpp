@@ -455,6 +455,60 @@ namespace tut
                std::abs(wac - (wa + wc)) <= 0.5f);
     }
 
+    // charFromPixelOffset must snap to cluster boundaries on a
+    // multi-codepoint emoji during mouse-driven cursor placement.
+    // The trans-flag ZWJ sequence (1F3F3 FE0F 200D 26A7 FE0F) shapes
+    // to a single glyph; as target_x walks across that glyph's pixel
+    // span, the returned cursor position must only ever be the
+    // cluster's start or its end. Mid-cluster returns oscillate the
+    // selection rect's right edge across the cluster's interior —
+    // observed as drag-select highlight flicker on ZWJ flags / family
+    // emoji where 🐶 (1 codepoint) is unaffected.
+    template<> template<>
+    void llfontgl_object::test<18>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        // "X" + trans flag (5 cps) + "Y": cluster occupies indices 1..6.
+        const llwchar arr[] = { L'X', 0x1F3F3, 0xFE0F, 0x200D, 0x26A7,
+                                0xFE0F, L'Y', 0 };
+        LLWString s(arr, 7);
+
+        const F32 wfull = font->getWidthF32(s.c_str(), 0, 7, false);
+        if (wfull <= 0.f)
+            skip("emoji fallback not available");
+
+        // Sanity: width up to cluster end (6) must exceed width up to
+        // cluster start (1) by at least a few pixels — otherwise the
+        // emoji didn't actually shape and the cluster-snap test below
+        // would trivially pass on an unrendered glyph.
+        const F32 w_pre  = font->getWidthF32(s.c_str(), 0, 1, false);
+        const F32 w_post = font->getWidthF32(s.c_str(), 0, 6, false);
+        if (w_post - w_pre < 2.f)
+            skip("emoji cluster did not shape to a measurable glyph");
+
+        // Walk target_x across the rendered cluster's pixel span at
+        // sub-pixel granularity. Every returned cursor pos must land
+        // on a cluster boundary — never inside the cluster (2..5).
+        const F32 cluster_left  = w_pre;
+        const F32 cluster_right = w_post;
+        for (F32 x = cluster_left - 1.f; x <= cluster_right + 1.f;
+             x += 0.25f)
+        {
+            const S32 cp = font->charFromPixelOffset(s.c_str(), 0,
+                                                     x, F32_MAX,
+                                                     7, /*round=*/true);
+            const bool inside_cluster = (cp >= 2 && cp <= 5);
+            ensure("charFromPixelOffset round=true returns mid-cluster index",
+                   !inside_cluster);
+        }
+    }
+
     // Static getter family — every named getter must resolve to a
     // non-null LLFontGL after a successful initClass. Smoke check
     // that the default fonts.xml covers all the families exposed.
