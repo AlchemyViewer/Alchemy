@@ -185,10 +185,6 @@ LLFontFreetype::~LLFontFreetype()
     // faces' entries stay valid, so only drop ours.
     LLFontShaping::clearCacheForFace(this);
 
-    // Per-head resolution cache holds non-owning pointers into face-owned
-    // glyph info entries. Just clear; entries are deleted by ~LLFontFace.
-    mGlyphInfoMap.clear();
-
     // mFace's FT_Face, hb_font_t, and atlas lifetime is owned by the
     // LLFontFace wrapper — releasing the LLPointer here lets the wrapper
     // drop its refcount; FT_Done_Face and atlas teardown fire when the
@@ -333,16 +329,14 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
 {
     if (mFace)
     {
-        // Reload: cached shape entries depend on the previous face state,
-        // and our resolution cache holds entries from the old fallback chain.
+        // Reload: cached shape entries depend on the previous face state.
         // Only this face's entries become stale here — siblings keep theirs.
         LLFontShaping::clearCacheForFace(this);
     }
+    // Drop the per-head shaping-face resolution cache: a fresh fallback chain
+    // is about to be wired up and any cached (codepoint -> winning face)
+    // mappings would resolve through the wrong faces.
     mShapingFaceResolution.clear();
-    // Per-head resolution cache holds non-owning pointers into face-owned
-    // entries. resetBitmapCache (called from reset()) clears it; in the
-    // initial-load path it's already empty.
-    mGlyphInfoMap.clear();
 
     // Resolve the (file, sized + variable axis) state via the manager's
     // shared face cache. Heads and fallbacks alike consult the cache; same
@@ -794,10 +788,7 @@ LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fo
     if (fontp && fontp->mFace)
     {
         if (LLFontGlyphInfo* existing = fontp->mFace->findGlyphInfo(glyph_index, requested_glyph_type))
-        {
-            insertGlyphInfo(fontp, glyph_index, existing);
             return existing;
-        }
     }
 
     EFontGlyphType bitmap_glyph_type;
@@ -805,18 +796,12 @@ LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fo
     if (!gi)
         return nullptr;
 
-    // Face owns the entry; head caches a non-owning pointer keyed on
-    // (face*, glyph_index) so the next lookup short-circuits.
     fontp->mFace->insertGlyphInfo(glyph_index, gi);
-    insertGlyphInfo(fontp, glyph_index, gi);
 
     // Optimization: when the rendered pixel format differs from what the
     // caller requested (e.g. Color requested but the file is monochrome),
     // also publish the entry under the bitmap_type so a future lookup that
-    // asks for that type hits dedup. We must NOT replace an existing entry
-    // here — sibling heads sharing this face hold non-owning pointers to
-    // the existing entry in their local resolution caches, and replacing
-    // would delete the entry under them. Skip the secondary publish if a
+    // asks for that type hits dedup. Skip the secondary publish if a
     // bitmap_type entry already exists; the existing one is correct.
     if (requested_glyph_type != bitmap_glyph_type
         && !fontp->mFace->findGlyphInfo(glyph_index, bitmap_glyph_type))
@@ -824,7 +809,6 @@ LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fo
         LLFontGlyphInfo* gi_temp = new LLFontGlyphInfo(*gi);
         gi_temp->mGlyphType = bitmap_glyph_type;
         fontp->mFace->insertGlyphInfo(glyph_index, gi_temp);
-        insertGlyphInfo(fontp, glyph_index, gi_temp);
     }
 
     return gi;
@@ -889,45 +873,25 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_
 
 LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType glyph_type) const
 {
-    // Fast path: head's resolution cache.
-    const GlyphKey key{fontp, glyph_index};
-    auto range = mGlyphInfoMap.equal_range(key);
-    auto iter = (EFontGlyphType::Unspecified != glyph_type)
-        ? std::find_if(range.first, range.second,
-            [glyph_type](const glyph_info_map_t::value_type& entry)
-            { return entry.second->mGlyphType == glyph_type; })
-        : range.first;
-    if (iter != range.second)
-        return iter->second;
-
-    // Head missed. Source face may have a cached entry from a sibling head.
+    // Single source of truth: the source face's owning glyph cache. The head
+    // used to memoize this lookup in its own (fontp, glyph_index) map, but
+    // that introduced a dangling-pointer hazard on cross-face GC — the face
+    // would delete an entry in collectGarbage while sibling heads' maps
+    // still held non-owning copies of the pointer, and the next render
+    // would either dereference freed memory or short-circuit on a stuck
+    // bitmap_entry that pointed at a released sheet (manifesting as glyphs
+    // that "appear unloaded and never reload" after long idle periods).
+    // Routing every lookup through the face cache means atlas eviction
+    // is observed consistently by every freetype that ever rendered the
+    // glyph: the face's findGlyphInfo returns null after eviction, so we
+    // fall through to addShapedGlyphFromFont and re-rasterize.
     const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale;
     if (fontp && fontp->mFace)
     {
         if (LLFontGlyphInfo* gi = fontp->mFace->findGlyphInfo(glyph_index, resolve_type))
-        {
-            insertGlyphInfo(fontp, glyph_index, gi);
             return gi;
-        }
     }
     return addShapedGlyphFromFont(fontp, glyph_index, resolve_type);
-}
-
-void LLFontFreetype::insertGlyphInfo(const LLFontFreetype* fontp, U32 glyph_index, LLFontGlyphInfo* gi) const
-{
-    // Head's map holds NON-OWNING pointers into face-owned entries — never
-    // delete on replace. The face's cache deduplicates so an already-cached
-    // (glyph_index, type) entry reuses the same pointer.
-    llassert(gi->mGlyphType < EFontGlyphType::Count);
-    const GlyphKey key{fontp, glyph_index};
-    auto range = mGlyphInfoMap.equal_range(key);
-    auto iter = std::find_if(range.first, range.second,
-        [gi](const glyph_info_map_t::value_type& entry)
-        { return entry.second->mGlyphType == gi->mGlyphType; });
-    if (iter != range.second)
-        iter->second = gi;
-    else
-        mGlyphInfoMap.insert(std::make_pair(key, gi));
 }
 
 void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, llwchar wch) const
@@ -1106,19 +1070,13 @@ void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
 
 void LLFontFreetype::resetBitmapCache()
 {
-    // Drop the head's non-owning resolution caches. Do NOT call into
-    // mFace->resetBitmapCache(): that would delete glyph entries that
-    // sibling heads sharing this LLFontFace still reference in their
-    // own local resolution caches, leaving them with dangling pointers
-    // and reading freed memory on the next render. Atlas + face-owned
-    // entry lifetime is tied to LLFontFace's refcount — for DPI/scale
-    // changes that drive resetSelf, loadFace below picks up a new face
-    // wrapper (different LLFontFaceKey) and the old wrapper drops to
-    // refcount 0 (and naturally tears down its atlas) once all heads
-    // have reloaded. For same-key resets the face cache is reused and
-    // any previously-rasterized glyphs remain valid.
-    mGlyphInfoMap.clear();
-
+    // No-op for the head's own state — atlas + glyph map are owned by
+    // LLFontFace and shared across freetypes that resolve to the same
+    // key. For DPI/scale changes that drive resetSelf, loadFace picks up
+    // a new face wrapper (different LLFontFaceKey) and the old wrapper
+    // drops to refcount 0 (naturally tearing down its atlas) once all
+    // heads have reloaded. For same-key resets the face cache is reused
+    // and any previously-rasterized glyphs remain valid.
     if (!mIsFallback && mFace && !mFace->findGlyphInfo(0, EFontGlyphType::Grayscale))
     {
         // Pre-warm notdef only if the face cache doesn't already have it.
@@ -1130,15 +1088,6 @@ void LLFontFreetype::resetBitmapCache()
 
 void LLFontFreetype::destroyGL()
 {
-    // Clear our own non-owning resolution cache before the face deletes
-    // the LLFontGlyphInfo entries it references. mFace->destroyGL fully
-    // resets the face (clears its owning glyph map + atlas vectors), so
-    // any pointers left here would dangle until the next resetSelf().
-    // No render runs between here and the resetSelf() that follows — every
-    // call site of destroyGL is immediately followed by either initClass
-    // (initFonts path) or process exit (stopGL path) — but clearing now
-    // keeps the invariant local rather than relying on caller ordering.
-    mGlyphInfoMap.clear();
     if (mFace)
         mFace->destroyGL();
 
@@ -1258,15 +1207,13 @@ void LLFontFreetype::collectGarbage() const
             if ((now - last_used) <= IDLE_THRESHOLD_SEC)
                 continue;
 
-            // Order matters: drop the head's non-owning pointers FIRST, while
-            // the face entries they reference are still alive and the
-            // predicate can read them safely. Then have the face delete the
-            // matching owned entries. Doing it the other way around would
-            // call the predicate on dangling pointers (UB) and could leave
-            // the head's map with pointers to freed memory.
+            // Delete the face-owned glyph entries that reference this sheet,
+            // then release the sheet itself. There is no head-side cache to
+            // invalidate: getGlyphInfoByIndex routes every lookup through the
+            // face's findGlyphInfo, so siblings sharing this face (other
+            // heads, or heads using this face as a fallback) automatically
+            // observe the deletion on their next render and re-rasterize.
             auto matches = [&](const LLFontGlyphInfo* gi) { return glyph_uses_sheet(gi, type, num); };
-            for (auto it = mGlyphInfoMap.begin(); it != mGlyphInfoMap.end(); )
-                it = matches(it->second) ? mGlyphInfoMap.erase(it) : std::next(it);
             if (mFace)
             {
                 mFace->erase_glyph_entries(matches);

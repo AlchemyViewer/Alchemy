@@ -1050,5 +1050,126 @@ namespace tut
         const S32 gen2 = LLFontBitmapCache::getGlobalGeneration();
         ensure("gen advanced after head_b raster", gen2 > gen1);
     }
+
+    // Cross-head sheet eviction: when one freetype's collectGarbage
+    // releases a sheet and deletes face-owned glyph entries, a *sibling*
+    // freetype that shares the same LLFontFace must continue rendering
+    // the same glyph correctly on its next lookup. Pre-fix, the head
+    // memoized glyph pointers in its own (fontp, glyph_index) map, and
+    // the sibling's map was untouched by the GC — so its fast-path
+    // lookup returned freed memory or short-circuited on a stuck
+    // bitmap_entry pointing at the released sheet (manifesting as
+    // "glyphs unload after long idle and never reload"). The fix routes
+    // every lookup through the face's owned cache so all freetypes that
+    // share the face observe the eviction consistently.
+    template<> template<>
+    void llfontfreetype_render_object::test<8>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+
+        LLPointer<LLFontFreetype> head_a = loadFtHead(path);
+        LLPointer<LLFontFreetype> head_b = loadFtHead(path);
+        ensure("both heads loaded", head_a.notNull() && head_b.notNull());
+        // Same LLFontFaceKey -> shared LLFontFace via getOrCreateFace.
+        ensure_equals("siblings share the underlying face wrapper",
+                      head_a->getFontFace(), head_b->getFontFace());
+
+        // Cache a glyph through both heads. Face dedup means both
+        // calls return the same entry pointer.
+        LLFontGlyphInfo* a_gi = head_a->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
+        LLFontGlyphInfo* b_gi = head_b->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
+        ensure("head_a got glyph", a_gi != nullptr);
+        ensure("head_b got glyph", b_gi != nullptr);
+        ensure_equals("shared face returns the same glyph entry", a_gi, b_gi);
+
+        const auto pre_entry = a_gi->mPhaseSlots[0].mBitmapEntry;
+        ensure("phase 0 bitmap entry references a real sheet",
+               pre_entry.first == EFontGlyphType::Grayscale && pre_entry.second >= 0);
+
+        // Simulate head_a's collectGarbage path on the shared face:
+        // delete face-owned entries that reference this sheet, then
+        // release the sheet. erase_glyph_entries deletes a_gi/b_gi —
+        // pre-fix, head_b's mGlyphInfoMap retained the dangling
+        // pointer; post-fix there is no per-head cache to leak.
+        const auto target = pre_entry;
+        LLFontBitmapCache* cache = head_a->getBitmapCache();
+        ensure("bitmap cache present", cache != nullptr);
+        head_a->getFontFace()->erase_glyph_entries(
+            [target](const LLFontGlyphInfo* gi)
+            {
+                for (U8 p = 0; p < gi->mPhaseCount; ++p)
+                {
+                    const auto& e = gi->mPhaseSlots[p].mBitmapEntry;
+                    if (e.first == target.first && e.second == target.second)
+                        return true;
+                }
+                return false;
+            });
+        cache->releaseSheet(target.first, static_cast<U32>(target.second));
+        ensure("target sheet reports released",
+               cache->isSheetReleased(target.first, static_cast<U32>(target.second)));
+
+        // head_b looks up the same glyph again. The lookup must:
+        //   1. not crash on a dangling pointer,
+        //   2. produce a non-null entry,
+        //   3. land on a live sheet (not the just-released one).
+        LLFontGlyphInfo* b_gi2 = head_b->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
+        ensure("head_b got fresh glyph after sibling-driven eviction",
+               b_gi2 != nullptr);
+        const auto post_entry = b_gi2->mPhaseSlots[0].mBitmapEntry;
+        ensure("post-eviction phase 0 references a live sheet",
+               !cache->isSheetReleased(post_entry.first,
+                                       static_cast<U32>(post_entry.second)));
+    }
+
+    // Single-head atlas eviction: collectGarbage's release path also
+    // works correctly within a single freetype. A glyph rasterized
+    // before eviction, then evicted, then re-requested must come back
+    // on a live sheet. (The pre-fix bug bit only the cross-head
+    // scenario, but this test pins the single-head invariant so future
+    // refactors of the eviction path don't silently regress.)
+    template<> template<>
+    void llfontfreetype_render_object::test<9>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+
+        LLPointer<LLFontFreetype> ft = loadFtHead(path);
+        ensure("ft loaded", ft.notNull());
+
+        LLFontGlyphInfo* g1 = ft->getGlyphInfo(L'Z', EFontGlyphType::Grayscale);
+        ensure("got glyph", g1 != nullptr);
+        const auto target = g1->mPhaseSlots[0].mBitmapEntry;
+        ensure("bitmap entry valid",
+               target.first == EFontGlyphType::Grayscale && target.second >= 0);
+
+        // Run the same delete + release dance the GC path uses.
+        ft->getFontFace()->erase_glyph_entries(
+            [target](const LLFontGlyphInfo* gi)
+            {
+                for (U8 p = 0; p < gi->mPhaseCount; ++p)
+                {
+                    const auto& e = gi->mPhaseSlots[p].mBitmapEntry;
+                    if (e.first == target.first && e.second == target.second)
+                        return true;
+                }
+                return false;
+            });
+        ft->getBitmapCache()->releaseSheet(target.first,
+                                           static_cast<U32>(target.second));
+
+        // Re-request the same glyph. Lookup goes through the face cache
+        // (now empty for this glyph), falls through to addShapedGlyphFromFont,
+        // and rasterizes onto a live sheet.
+        LLFontGlyphInfo* g2 = ft->getGlyphInfo(L'Z', EFontGlyphType::Grayscale);
+        ensure("re-requested glyph allocated post-eviction", g2 != nullptr);
+        const auto post = g2->mPhaseSlots[0].mBitmapEntry;
+        ensure("post-eviction bitmap entry references a live sheet",
+               !ft->getBitmapCache()->isSheetReleased(
+                   post.first, static_cast<U32>(post.second)));
+    }
 #endif // LL_MESA_HEADLESS
 }

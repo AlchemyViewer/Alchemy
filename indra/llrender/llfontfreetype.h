@@ -306,9 +306,9 @@ private:
     void resetBitmapCache();
     // Render and cache a glyph for `glyph_index` on `fontp` (the source face,
     // which can be `this` head or a fallback). Inserts into the source face's
-    // and the head's resolution caches keyed on (face, glyph_index). Used by
-    // both the codepoint path (after wch->glyph_index resolution + chain
-    // walk) and the shaped path (HB output already names the source face).
+    // glyph cache, keyed on glyph_index. Used by both the codepoint path
+    // (after wch->glyph_index resolution + chain walk) and the shaped path
+    // (HB output already names the source face).
     LLFontGlyphInfo* addShapedGlyphFromFont(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType bitmap_type) const;
     // Runs the FreeType rasterizer, allocates an LLFontGlyphInfo and populates
     // the bitmap atlas. `out_bitmap_glyph_type` receives the pixel format
@@ -328,7 +328,6 @@ private:
     // paint tree, the walker hit an unsupported feature, or an allocation
     // failed — caller falls through to the normal FT path.
     bool renderColrV1Glyph(U32 glyph_index, EFontGlyphType requested) const;
-    void insertGlyphInfo(const LLFontFreetype* fontp, U32 glyph_index, LLFontGlyphInfo* gi) const;
 
     std::string mName;
 
@@ -375,32 +374,17 @@ private:
     // CJK-heavy chat doesn't grow this without limit.
     mutable boost::unordered_flat_map<llwchar, std::pair<const LLFontFreetype*, U32>> mShapingFaceResolution;
 
-    // Per-head fast lookup: (source face, glyph index) -> non-owning pointer
-    // into the source face's glyph map. Both the codepoint path (after wch
-    // resolution + chain walk) and the shaped path (HB output) feed into this
-    // single cache, so a glyph rendered by either route lives in one atlas
-    // slot per (face, glyph_index, type).
-    struct GlyphKey
-    {
-        const LLFontFreetype* face;
-        U32                   glyph_index;
-        bool operator==(const GlyphKey& o) const noexcept
-        {
-            return face == o.face && glyph_index == o.glyph_index;
-        }
-    };
-    struct GlyphKeyHash
-    {
-        size_t operator()(const GlyphKey& k) const noexcept
-        {
-            size_t h = boost::hash<const void*>{}(k.face);
-            boost::hash_combine(h, k.glyph_index);
-            return h;
-        }
-    };
-    typedef boost::unordered_multimap<GlyphKey, LLFontGlyphInfo*, GlyphKeyHash> glyph_info_map_t;
-    mutable glyph_info_map_t mGlyphInfoMap;
-
+    // (Glyph info cache lives on LLFontFace::mGlyphInfoMap. The head used to
+    // memoize lookups in its own (fontp, glyph_index) map, but that
+    // introduced a dangling-pointer hazard whenever the face's collectGarbage
+    // deleted entries: sibling heads — and any head holding this face as a
+    // fallback — kept non-owning copies of the freed pointer, and the next
+    // render either dereferenced freed memory or short-circuited on a stuck
+    // bitmap_entry pointing at the released sheet, manifesting as glyphs
+    // that "appeared unloaded and never reloaded" after long idle. Routing
+    // every lookup through the face cache means atlas eviction is observed
+    // consistently by every freetype that ever rendered the glyph.)
+    //
     // (LLFontBitmapCache moved to LLFontFace — atlas storage is now shared
     // across every LLFontFreetype that wraps the same face. mCharIndexCache
     // and mHbFont also live on LLFontFace for the same reason.)

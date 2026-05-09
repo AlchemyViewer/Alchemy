@@ -264,10 +264,7 @@ void LLFontFace::destroyGL()
     // one. Without the reset, stale mGlyphInfoMap entries continue to
     // point at atlas slots in zombie LLImageGLs (CPU object alive, GL
     // name 0), every bind() falls through to sDefaultGLTexture, and text
-    // renders as solid colored rectangles. Heads must clear their
-    // non-owning resolution caches BEFORE this runs
-    // (LLFontFreetype::destroyGL handles that) — the deletes below would
-    // otherwise leave dangling pointers in those maps.
+    // renders as solid colored rectangles.
     if (mFontBitmapCachep)
         mFontBitmapCachep->destroyGL();
     resetBitmapCache();
