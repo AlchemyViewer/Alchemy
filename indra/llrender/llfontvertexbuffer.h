@@ -32,6 +32,8 @@
 
 class LLVertexBufferData;
 
+namespace ll_test { struct VertexBufferProbe; }
+
 // Rendering fonts is expensive, this class is intended to store
 // vertex buffers for rendered text, so that they can be reused.
 // LLFontVertexBuffer tracks font and rendering parameters, but
@@ -39,6 +41,7 @@ class LLVertexBufferData;
 // text changes.
 class LLFontVertexBuffer
 {
+    friend struct ll_test::VertexBufferProbe;
 public:
     LLFontVertexBuffer();
     ~LLFontVertexBuffer();

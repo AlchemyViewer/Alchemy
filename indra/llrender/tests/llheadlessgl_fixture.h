@@ -24,6 +24,7 @@
 #include "../llimagegl.h"
 #include "../llfontfreetype.h"
 #include "../llfontshaping.h"
+#include "../llfontvertexbuffer.h"
 #include "../llrender.h"
 #include "../llshadermgr.h"
 #include "../llvertexbuffer.h"
@@ -33,6 +34,28 @@
 
 namespace ll_test
 {
+    // Test-only accessor for LLFontVertexBuffer's private capture lists.
+    // Friended in llfontvertexbuffer.h so we can count emitted quads per
+    // pass without poisoning the production API with public accessors.
+    struct VertexBufferProbe
+    {
+        struct CaptureCounts
+        {
+            size_t shadow_quads     = 0;
+            size_t foreground_quads = 0;
+        };
+
+        static CaptureCounts count(const LLFontVertexBuffer& buf)
+        {
+            CaptureCounts c;
+            for (const LLVertexBufferData& e : buf.mShadowBufferList)
+                c.shadow_quads += e.mCount / 6;
+            for (const LLVertexBufferData& e : buf.mForegroundBufferList)
+                c.foreground_quads += e.mCount / 6;
+            return c;
+        }
+    };
+
     // Drop transient font caches that would otherwise leak between tests
     // sharing this binary's HeadlessGl singleton. Safe to call repeatedly;
     // does NOT touch LLFontManager / LLImageGL / GL state — those stay

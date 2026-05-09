@@ -399,6 +399,10 @@ namespace
             {
                 src_cluster = cluster_back_map[src_cluster];
             }
+            // ZWJ-retry candidates and corrupt GSUB tables can produce cluster
+            // values outside [0, len). Clamp at the producer so consumers can
+            // index into the original slice without per-site bounds checks.
+            src_cluster  = llclamp(src_cluster, 0, len - 1);
             sg.cluster   = cluster_base + src_cluster;
             sg.x_advance = positions[i].x_advance * INV_64;
             sg.y_advance = positions[i].y_advance * INV_64;

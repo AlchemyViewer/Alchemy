@@ -1382,6 +1382,47 @@ namespace tut
                out[0].x_advance > 0.f);
     }
 
+    // Cluster index invariant: every glyph emitted by shapeRun has
+    // cluster ∈ [begin, end). The producer-side clamp in shape_sub_run
+    // protects downstream consumers (firstDrawableChar, maxDrawableChars)
+    // that index per-codepoint arrays by cluster. ZWJ-retry candidates
+    // and corrupt GSUB tables can synthesize cluster values outside the
+    // input range; the clamp pins them back into the slice.
+    template<> template<>
+    void llfontshaping_object::test<32>()
+    {
+        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(path))
+            skip("DejaVuSans.woff2 not present");
+        LLPointer<LLFontFreetype> ft = loadFt(path);
+        ensure("DejaVuSans loaded", ft.notNull());
+
+        struct Case { LLWString s; size_t begin; size_t end; };
+        const std::vector<Case> cases = {
+            { wstr('a','b','c'),                          0, 3 },
+            { wstr('A','V','A','W','T','o','L','T'),      0, 8 },
+            { wstr('h','e','l','l','o',' ','w','o','r','l','d'), 0, 11 },
+            { wstr('a','b','c','d','e','f'),              2, 5 },
+            // VS-16 / ZWJ extenders interleaved with Latin — exercises
+            // the strip+rebase path even on a face that covers them.
+            { wstr('A', 0xFE0F, 'B', 0x200D, 'C'),        0, 5 },
+        };
+
+        for (size_t ci = 0; ci < cases.size(); ++ci)
+        {
+            const auto& c = cases[ci];
+            std::vector<LLShapedGlyph> out;
+            LLFontShaping::shapeRun(ft, c.s, c.begin, c.end, out);
+            for (const auto& g : out)
+            {
+                ensure(("cluster >= begin (case " + std::to_string(ci) + ")").c_str(),
+                       g.cluster >= (S32)c.begin);
+                ensure(("cluster < end (case " + std::to_string(ci) + ")").c_str(),
+                       g.cluster < (S32)c.end);
+            }
+        }
+    }
+
 #if LL_MESA_HEADLESS
     // GL-backed group: monospace shaping ends up rendering glyphs through
     // getGlyphInfoByIndex → renderAndCreateGlyph → atlas → gGL.bind on

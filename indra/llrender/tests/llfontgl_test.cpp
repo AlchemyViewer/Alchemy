@@ -478,6 +478,49 @@ namespace tut
         ensure("FontDefault",          LLFontGL::getFontDefault()             != nullptr);
     }
 
+    // Style string parser round-trip: every output of getStringFromStyle
+    // must round-trip through getStyleFromString. The legacy parser used
+    // substring search, so a poisoned token like "FAUX-BOLD" set BOLD;
+    // the new tokenizer-based parser splits on '|' and matches whole
+    // tokens. NORMAL has its own dedicated string ("NORMAL", no leading
+    // pipe), so the round-trip pins both edge cases at once.
+    template<> template<>
+    void llfontgl_object::test<17>()
+    {
+        const U8 cases[] = {
+            LLFontGL::NORMAL,
+            LLFontGL::BOLD,
+            LLFontGL::ITALIC,
+            LLFontGL::UNDERLINE,
+            LLFontGL::BOLD | LLFontGL::ITALIC,
+            LLFontGL::BOLD | LLFontGL::UNDERLINE,
+            LLFontGL::ITALIC | LLFontGL::UNDERLINE,
+            LLFontGL::BOLD | LLFontGL::ITALIC | LLFontGL::UNDERLINE,
+        };
+        for (U8 style : cases)
+        {
+            const std::string s = LLFontGL::getStringFromStyle(style);
+            ensure("string output is non-empty", !s.empty());
+            ensure("no leading pipe", s.front() != '|');
+            ensure("no trailing pipe", s.back() != '|');
+            ensure_equals("round-trip preserves style bits",
+                          LLFontGL::getStyleFromString(s), style);
+        }
+
+        // Substring-match regression guard: legacy parser matched
+        // "BOLD" inside "FAUX-BOLD"; new parser tokenizes on '|'.
+        ensure_equals("FAUX-BOLD does not set BOLD",
+                      LLFontGL::getStyleFromString("FAUX-BOLD"), 0);
+        ensure_equals("NOTBOLD does not set BOLD",
+                      LLFontGL::getStyleFromString("NOTBOLD"), 0);
+        ensure_equals("empty string is NORMAL",
+                      LLFontGL::getStyleFromString(""),
+                      LLFontGL::NORMAL);
+        ensure_equals("BOLD|ITALIC tokenizes correctly",
+                      LLFontGL::getStyleFromString("BOLD|ITALIC"),
+                      LLFontGL::BOLD | LLFontGL::ITALIC);
+    }
+
     // ===================================================================
     // Render-output group: fixture brings up gUIProgram (needs_render=true)
     // so LLFontGL::render() completes end-to-end against the OSMesa

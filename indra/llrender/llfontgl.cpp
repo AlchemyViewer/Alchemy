@@ -952,7 +952,12 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     if (draw_ellipses)
     {
         // recursively render ellipses at end of string
-        // we've already reserved enough room
+        // we've already reserved enough room.
+        // NO_SHADOW for the ellipsis: the outer render's on_pass_boundary
+        // already split the capture lists, and forwarding the callback would
+        // double-fire it. Rendering the ellipsis without a shadow keeps the
+        // captured streams consistent and avoids tinting the ellipsis shadow
+        // with the foreground color in LLFontVertexBuffer.
         static const LLWString elipses_wstr(U"...");
         render(elipses_wstr,
                 0,
@@ -960,7 +965,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                 color,
                 LEFT, valign,
                 style_to_add,
-                shadow,
+                NO_SHADOW,
                 S32_MAX, max_pixels,
                 right_x,
                 false,
@@ -1202,13 +1207,12 @@ void LLFontGL::generateASCIIglyphs()
 S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_chars, EWordWrapStyle end_on_word_boundary) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    if (!wchars || !wchars[0] || max_chars == 0)
+    if (!wchars || !wchars[0] || max_chars <= 0)
     {
         return 0;
     }
 
     llassert(max_pixels >= 0.f);
-    llassert(max_chars >= 0);
 
     bool clip = false;
     F32 cur_x = 0;
@@ -1386,7 +1390,7 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
 
 S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_len, S32 start_pos, S32 max_chars) const
 {
-    if (!wchars || !wchars[0] || max_chars == 0)
+    if (!wchars || !wchars[0] || max_chars <= 0)
     {
         return 0;
     }
@@ -1503,7 +1507,7 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
 
 S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 target_x, F32 max_pixels, S32 max_chars, bool round) const
 {
-    if (!wchars || !wchars[0] || max_chars == 0)
+    if (!wchars || !wchars[0] || max_chars <= 0)
     {
         return 0;
     }
@@ -1867,42 +1871,35 @@ void LLFontGL::destroyAllGL()
 // static
 U8 LLFontGL::getStyleFromString(const std::string &style)
 {
+    // Tokenize on '|' so substrings inside other tokens ("FAUX-BOLD",
+    // "NOTBOLD") don't accidentally set the bit. Empty input → NORMAL.
     S32 ret = 0;
-    if (style.find("BOLD") != style.npos)
+    boost::char_separator<char> sep("|");
+    boost::tokenizer<boost::char_separator<char>> tokens(style, sep);
+    for (const auto& token : tokens)
     {
-        ret |= BOLD;
+        if (token == "BOLD")           ret |= BOLD;
+        else if (token == "ITALIC")    ret |= ITALIC;
+        else if (token == "UNDERLINE") ret |= UNDERLINE;
     }
-    if (style.find("ITALIC") != style.npos)
-    {
-        ret |= ITALIC;
-    }
-    if (style.find("UNDERLINE") != style.npos)
-    {
-        ret |= UNDERLINE;
-    }
-    return ret;
+    return (U8)ret;
 }
 
 // static
 std::string LLFontGL::getStringFromStyle(U8 style)
 {
-    std::string style_string;
     if (style == NORMAL)
-    {
-        style_string += "|NORMAL";
-    }
-    if (style & BOLD)
-    {
-        style_string += "|BOLD";
-    }
-    if (style & ITALIC)
-    {
-        style_string += "|ITALIC";
-    }
-    if (style & UNDERLINE)
-    {
-        style_string += "|UNDERLINE";
-    }
+        return "NORMAL";
+
+    std::string style_string;
+    auto append = [&](const char* part) {
+        if (!style_string.empty())
+            style_string += '|';
+        style_string += part;
+    };
+    if (style & BOLD)      append("BOLD");
+    if (style & ITALIC)    append("ITALIC");
+    if (style & UNDERLINE) append("UNDERLINE");
     return style_string;
 }
 

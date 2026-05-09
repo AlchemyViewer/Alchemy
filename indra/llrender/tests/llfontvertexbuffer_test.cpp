@@ -513,4 +513,104 @@ namespace tut
         ensure_equals("char count stable across style flip", n_norm, n_bold);
         ensure("both renders returned positive", n_norm > 0);
     }
+
+    // Truncated DROP_SHADOW_SOFT render with use_ellipses=true: the
+    // appended ellipsis must NOT contribute shadow geometry to either
+    // capture list. Pre-fix, the inner ellipsis render dropped the
+    // outer's on_pass_boundary callback and routed its shadow batch
+    // into mForegroundBufferList — visible as off-color shadow tinting
+    // in the recolor fast path. Fix renders the ellipsis with NO_SHADOW.
+    template<> template<>
+    void llfontvertexbuffer_render_object::test<7>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not present in test data dir");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font available", font != nullptr);
+
+        ll_test::FontStateScope scope;
+
+        // Long ASCII run + narrow max_pixels forces truncation. The
+        // exact visible count depends on font metrics; the test reads
+        // it back from render's return and computes expected quad
+        // counts off that.
+        LLWString s = utf8str_to_wstring("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        font->generateASCIIglyphs();
+
+        LLFontVertexBuffer vb;
+        const S32 n = vb.render(font, s, 0,
+                                /*x=*/0.f, /*y=*/100.f,
+                                LLColor4::white,
+                                LLFontGL::LEFT, LLFontGL::BASELINE,
+                                LLFontGL::NORMAL,
+                                LLFontGL::DROP_SHADOW_SOFT,
+                                /*max_chars=*/S32_MAX,
+                                /*max_pixels=*/40,
+                                /*right_x=*/nullptr,
+                                /*use_ellipses=*/true,
+                                /*use_color=*/true);
+        ensure("truncation actually happened (n < full string)",
+               n > 0 && n < (S32)s.length());
+
+        const auto counts = ll_test::VertexBufferProbe::count(vb);
+
+        // Pass-A SOFT shadow: 5 quads per visible char. Ellipsis must
+        // NOT add to this list — the ellipsis render is single-pass
+        // (NO_SHADOW) post-fix.
+        const size_t expected_shadow = static_cast<size_t>(n) * 5u;
+        ensure_equals("shadow list = visible chars * 5 (ellipsis adds 0)",
+                      counts.shadow_quads, expected_shadow);
+
+        // Foreground: 1 quad per visible char + 3 ellipsis chars.
+        const size_t expected_fg = static_cast<size_t>(n) + 3u;
+        ensure_equals("foreground list = visible + 3 ellipsis foreground",
+                      counts.foreground_quads, expected_fg);
+    }
+
+    // Sanity check on chars_drawn: when use_ellipses=true triggers
+    // truncation, render's return value reports only the visible
+    // pre-ellipsis character count, not including the appended "...".
+    template<> template<>
+    void llfontvertexbuffer_render_object::test<8>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not present in test data dir");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font available", font != nullptr);
+
+        ll_test::FontStateScope scope;
+
+        LLWString s = utf8str_to_wstring("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        font->generateASCIIglyphs();
+
+        LLFontVertexBuffer vb;
+        const S32 n_truncated = vb.render(font, s, 0,
+                                          0.f, 100.f,
+                                          LLColor4::white,
+                                          LLFontGL::LEFT, LLFontGL::BASELINE,
+                                          LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                          S32_MAX,
+                                          /*max_pixels=*/40,
+                                          nullptr,
+                                          /*use_ellipses=*/true,
+                                          true);
+        ensure("truncated count is positive but less than full string",
+               n_truncated > 0 && n_truncated < (S32)s.length());
+
+        // Same render with max_pixels wide enough to fit the whole
+        // string. No truncation, no ellipsis path; full count returned.
+        LLFontVertexBuffer vb2;
+        const S32 n_full = vb2.render(font, s, 0,
+                                      0.f, 100.f,
+                                      LLColor4::white,
+                                      LLFontGL::LEFT, LLFontGL::BASELINE,
+                                      LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                      S32_MAX,
+                                      /*max_pixels=*/2000,
+                                      nullptr,
+                                      /*use_ellipses=*/true,
+                                      true);
+        ensure_equals("full-fit render returns the entire string length",
+                      n_full, (S32)s.length());
+    }
 }
