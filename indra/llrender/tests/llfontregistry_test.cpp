@@ -2936,6 +2936,85 @@ namespace tut
                !static_cast<bool>(inner->CharFunctor));
     }
 
+    // Baseline: a use-only EmojiBase that <use>s NotoEmoji, consumed
+    // by Emoji with a unicode_ranges filter. Emoji's resolved chain
+    // contains exactly one Noto file (contributed via the deepest <use>
+    // step, with no filter — the use-level range is dropped on
+    // recursion per the explicit design rule, see test<94>).
+    template<> template<>
+    void llfontregistry_object::test<98>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='NotoEmoji' emoji='true'>"
+            "    <style name='NORMAL'><file>Noto.ttf</file></style>"
+            "  </font>"
+            "  <font name='EmojiBase'>"
+            "    <use family='NotoEmoji'/>"
+            "  </font>"
+            "  <font name='Emoji'>"
+            "    <use family='EmojiBase' unicode_ranges='U+1F000-U+1FFFF'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        resolve();
+        const auto& files = templateFor("Emoji")->getFontFiles();
+        ensure_equals("Emoji has exactly 1 file (baseline)",
+                      (S32)files.size(), 1);
+        ensure_equals("the file is Noto.ttf",
+                      files[0].FileName, std::string("Noto.ttf"));
+        ensure("Noto fallback has NO functor (recursion dropped use-level filter)",
+               !static_cast<bool>(files[0].CharFunctor));
+    }
+
+    // Override target already <use>s the override source: a use-only
+    // EmojiBase that <use>s NotoEmoji, with override EmojiBase=NotoEmoji
+    // (replace_first=true, matching the production picker write for
+    // EmojiBase). Mirrors the production workflow Preferences > Themes
+    // > Emoji Font: pick "Noto Emoji" while EmojiBase already <use>s
+    // NotoEmoji underneath.
+    //
+    // Expected (no-op): Emoji's resolved chain stays at 1 file —
+    // identical to the baseline above — because the override source is
+    // what EmojiBase already pulls through <use>.
+    //
+    // Observed pre-fix: Emoji's chain ends up with TWO copies of the
+    // file — one filtered (the override-prepended file gated by the
+    // use-level range), one unfiltered (the <use NotoEmoji> recursion
+    // drops the use-level filter). Step-4 dedup keeps both because
+    // their CharFunctors differ. The duplicate filtered head perturbs
+    // the shape-itemizer priority (priority-1 functored hit before the
+    // priority-3 no-functor hit) and is observable as differing emoji
+    // metrics through the codepoint vs shape paths.
+    template<> template<>
+    void llfontregistry_object::test<99>()
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='NotoEmoji' emoji='true'>"
+            "    <style name='NORMAL'><file>Noto.ttf</file></style>"
+            "  </font>"
+            "  <font name='EmojiBase'>"
+            "    <use family='NotoEmoji'/>"
+            "  </font>"
+            "  <font name='Emoji'>"
+            "    <use family='EmojiBase' unicode_ranges='U+1F000-U+1FFFF'/>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(xml));
+        LLSD overrides;
+        LLSD entry = LLSD::emptyMap();
+        entry["value"] = "NotoEmoji";
+        entry["replace_first"] = true;
+        overrides["EmojiBase"] = entry;
+        resolve(overrides);
+
+        const auto& files = templateFor("Emoji")->getFontFiles();
+        ensure_equals("Emoji chain length unchanged by no-op override "
+                      "(EmojiBase already <use>s NotoEmoji)",
+                      (S32)files.size(), 1);
+    }
+
     // emoji="true" attribute parses; getAvailableFamilies(EMOJI) returns
     // only emoji-flagged families. PROPORTIONAL and MONOSPACE filter
     // emoji families OUT so they don't surface in regular text-font

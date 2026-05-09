@@ -832,6 +832,66 @@ void LLFontRegistry::applyFamilyOverrides(const LLSD& overrides)
             }
         }
 
+        // No-op detection: when `family` is a <use>-only composite (no
+        // direct <file> at any style) AND its <use> chain transitively
+        // reaches `override_value`, the user's override matches what the
+        // chain already pulls. Prepending the source's files anyway would
+        // produce a duplicate that Step-4 dedup can't merge once a
+        // consumer's <use> attaches a use-level filter to the
+        // override-prepended copy but not to the recursion-contributed
+        // copy. The asymmetric pair (filtered head + unfiltered tail with
+        // the same file) shifts shape-itemizer priority — observable as
+        // emoji rendering at different metrics through the codepoint vs
+        // shape paths. Production repro: AlchemyUIFontOverrides
+        // ["EmojiBase"] = "NotoEmoji" while EmojiBase already <use>s
+        // NotoEmoji.
+        if (source_is_family)
+        {
+            bool target_is_use_only = true;
+            for (U8 style : kStyles)
+            {
+                auto pre_it = pre_override.find(
+                    LLFontDescriptor(family, s_template_string, style));
+                if (pre_it != pre_override.end() && !pre_it->second.empty())
+                {
+                    target_is_use_only = false;
+                    break;
+                }
+            }
+            if (target_is_use_only)
+            {
+                // Walk mFamilyUses transitively (visited set guards cycles
+                // and diamond <use> graphs).
+                std::set<std::string> visited;
+                std::function<bool(const std::string&)> reaches;
+                reaches = [&](const std::string& fam) -> bool
+                {
+                    if (!visited.insert(fam).second)
+                        return false;
+                    auto uses_it = mFamilyUses.find(fam);
+                    if (uses_it == mFamilyUses.end())
+                        return false;
+                    for (const auto& used_ref : uses_it->second)
+                    {
+                        if (used_ref.family == override_value)
+                            return true;
+                        if (reaches(used_ref.family))
+                            return true;
+                    }
+                    return false;
+                };
+                if (reaches(family))
+                {
+                    LL_INFOS() << "AlchemyUIFontOverrides: '" << family
+                               << "' is <use>-only and already reaches source '"
+                               << override_value
+                               << "' via its <use> chain; override is a no-op, skipping"
+                               << LL_ENDL;
+                    continue;
+                }
+            }
+        }
+
         for (U8 style : kStyles)
         {
             LLFontDescriptor target_key(family, s_template_string, style);
