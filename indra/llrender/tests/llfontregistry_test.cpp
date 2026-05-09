@@ -3594,5 +3594,149 @@ namespace tut
         ensure_equals("sweep does not drop in-use atlas pages",
                       pages_after, pages_before);
     }
+
+    // End-to-end shared-fallback eviction: two heads built via the
+    // registry resolve to the SAME fallback LLFontFreetype instance via
+    // mFallbackInstanceCache (matching file + size + hinting + flags).
+    // Both heads rasterize an emoji glyph through that shared fallback,
+    // populating the fallback face's atlas. Then we simulate what the
+    // fallback's collectGarbage would do after long idle: delete the
+    // face-owned glyph entries pointing at the sheet, then release the
+    // sheet. Both heads must continue rendering the emoji correctly on
+    // the next lookup.
+    //
+    // Pre-fix: each head's mGlyphInfoMap held a non-owning pointer to the
+    // fallback face's glyph entry. erase_glyph_entries deleted those
+    // entries, so the heads' fast-path lookup returned freed memory; if
+    // the heap was untouched, bitmap_entry still pointed at the released
+    // sheet, getImageGL returned null, the bind was skipped, and the
+    // emoji silently never rendered again — matching the production
+    // "glyphs unload after idle and never reload" symptom.
+    //
+    // Post-fix: heads have no mGlyphInfoMap; lookup goes through the
+    // face's findGlyphInfo, which misses post-eviction and falls through
+    // to addShapedGlyphFromFont to re-rasterize on a fresh sheet.
+    template<> template<>
+    void llfontregistry_gl_object::test<11>()
+    {
+        const std::string emoji_path  = std::string(kFontsDir) + "Noto-COLRv1.ttf";
+        const std::string dejavu_path = std::string(kFontsDir) + "DejaVuSans.woff2";
+        const std::string inter_path  = std::string(kFontsDir) + "InterVariable.woff2";
+        if (!fileExists(emoji_path) || !fileExists(dejavu_path) || !fileExists(inter_path))
+        {
+            skip("Noto-COLRv1.ttf + DejaVuSans.woff2 + InterVariable.woff2 required");
+            return;
+        }
+
+        // Two heads with DIFFERENT primary faces (so they don't share a
+        // head LLFontFace) but a COMMON Noto-COLRv1 fallback at the same
+        // size — that's what triggers mFallbackInstanceCache deduplication.
+        constexpr const char* kXml =
+            "<fonts>"
+            "  <font_size name='Small' size='12.0'/>"
+            "  <font name='Emoji' emoji='true'>"
+            "    <style name='NORMAL'><file>Noto-COLRv1.ttf</file></style>"
+            "  </font>"
+            "  <font name='HeadA'>"
+            "    <use family='Emoji'/>"
+            "    <style name='NORMAL'><file>DejaVuSans.woff2</file></style>"
+            "  </font>"
+            "  <font name='HeadB'>"
+            "    <use family='Emoji'/>"
+            "    <style name='NORMAL'><file>InterVariable.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        ensure("parse ok", loadXml(kXml));
+        resolve();
+
+        LLFontGL* head_a = reg.getFont(LLFontDescriptor("HeadA", "Small", 0));
+        LLFontGL* head_b = reg.getFont(LLFontDescriptor("HeadB", "Small", 0));
+        ensure("HeadA resolves", head_a != nullptr);
+        ensure("HeadB resolves", head_b != nullptr);
+
+        // Locate the Noto-COLRv1 fallback inside each head's chain.
+        auto find_emoji_fallback = [](LLFontGL* head) -> const LLFontFreetype*
+        {
+            for (const auto& fb : head->getFontFreetype()->getFallbackFonts())
+            {
+                if (fb.first && fb.first->getName().find("Noto-COLRv1") != std::string::npos)
+                    return fb.first.get();
+            }
+            return nullptr;
+        };
+        const LLFontFreetype* emoji_a = find_emoji_fallback(head_a);
+        const LLFontFreetype* emoji_b = find_emoji_fallback(head_b);
+        ensure("HeadA chain includes Noto-COLRv1", emoji_a != nullptr);
+        ensure("HeadB chain includes Noto-COLRv1", emoji_b != nullptr);
+        ensure_equals("siblings share the fallback freetype instance "
+                      "(mFallbackInstanceCache dedup)",
+                      emoji_a, emoji_b);
+
+        // Rasterize an emoji glyph through both heads. Both routes go
+        // through getGlyphInfo → cmap miss on the head face → fallback
+        // walk picks Noto-COLRv1 → face's findGlyphInfo allocates and
+        // caches on the FIRST call; the SECOND head hits the face cache.
+        constexpr llwchar kFire = 0x1F525;
+        const LLFontGlyphInfo* gi_a = head_a->getFontFreetype()->getGlyphInfo(
+            kFire, EFontGlyphType::Color);
+        const LLFontGlyphInfo* gi_b = head_b->getFontFreetype()->getGlyphInfo(
+            kFire, EFontGlyphType::Color);
+        ensure("HeadA produced an emoji glyph entry", gi_a != nullptr);
+        ensure("HeadB produced an emoji glyph entry", gi_b != nullptr);
+        // Face-level dedup → both heads see the same face-owned entry.
+        ensure_equals("face dedup returns the same entry to both heads",
+                      gi_a, gi_b);
+
+        const auto target = gi_a->mPhaseSlots[0].mBitmapEntry;
+        ensure("emoji glyph references a real Color sheet",
+               target.first == EFontGlyphType::Color && target.second >= 0);
+
+        // Simulate the fallback's collectGarbage releasing this sheet.
+        // Delete face-owned entries pointing at (Color, target.second),
+        // then release the sheet itself. The whole point of this test:
+        // pre-fix, both heads' mGlyphInfoMap retained dangling pointers
+        // to the deleted entry; post-fix, neither head has such a cache.
+        const LLFontFace* emoji_face = emoji_a->getFontFace();
+        LLFontBitmapCache* cache = emoji_a->getBitmapCache();
+        ensure("fallback freetype exposes its face", emoji_face != nullptr);
+        ensure("fallback freetype exposes its atlas", cache != nullptr);
+
+        emoji_face->erase_glyph_entries(
+            [target](const LLFontGlyphInfo* gi)
+            {
+                for (U8 p = 0; p < gi->mPhaseCount; ++p)
+                {
+                    const auto& e = gi->mPhaseSlots[p].mBitmapEntry;
+                    if (e.first == target.first && e.second == target.second)
+                        return true;
+                }
+                return false;
+            });
+        cache->releaseSheet(target.first, static_cast<U32>(target.second));
+        ensure("target sheet reports released",
+               cache->isSheetReleased(target.first,
+                                      static_cast<U32>(target.second)));
+
+        // Re-request the emoji through both heads. Each lookup must:
+        //  1. not crash on a freed face entry,
+        //  2. produce a non-null glyph entry,
+        //  3. land that entry on a LIVE sheet (not the released one).
+        const LLFontGlyphInfo* gi_a2 = head_a->getFontFreetype()->getGlyphInfo(
+            kFire, EFontGlyphType::Color);
+        const LLFontGlyphInfo* gi_b2 = head_b->getFontFreetype()->getGlyphInfo(
+            kFire, EFontGlyphType::Color);
+        ensure("HeadA re-rasterized after sibling-driven eviction",
+               gi_a2 != nullptr);
+        ensure("HeadB re-rasterized after sibling-driven eviction",
+               gi_b2 != nullptr);
+        const auto post_a = gi_a2->mPhaseSlots[0].mBitmapEntry;
+        const auto post_b = gi_b2->mPhaseSlots[0].mBitmapEntry;
+        ensure("HeadA's post-eviction entry points at a live sheet",
+               !cache->isSheetReleased(post_a.first,
+                                       static_cast<U32>(post_a.second)));
+        ensure("HeadB's post-eviction entry points at a live sheet",
+               !cache->isSheetReleased(post_b.first,
+                                       static_cast<U32>(post_b.second)));
+    }
 #endif // LL_MESA_HEADLESS
 }
