@@ -1471,6 +1471,58 @@ namespace tut
                saw_cluster_glyph);
     }
 
+    // addFallbackFont must invalidate cached shape entries for the head:
+    // shape a CJK codepoint via head A (no CJK fallback) — cached as
+    // notdef, glyph_id=0. Attach a CJK fallback. Re-shape the same
+    // string. The fallback now covers the CJK codepoint, so the new
+    // shape must route the cluster to the fallback (glyph_id != 0)
+    // rather than re-using the stale notdef cache entry. Pre-fix,
+    // addFallbackFont only cleared mShapingFaceResolution and left the
+    // LLFontShaping cache dirty — so the second shape call returned the
+    // stale entry and rendered tofu through A's notdef even though the
+    // CJK fallback was attached and would have covered the codepoint.
+    template<> template<>
+    void llfontshaping_object::test<34>()
+    {
+        const std::string a_path = std::string(kFontDir) + "DejaVuSans.woff2";
+        const std::string b_path = std::string(kFontDir) + "SourceHanSans-Regular.woff2";
+        if (!fileExists(a_path) || !fileExists(b_path))
+            skip("DejaVuSans + SourceHanSans required");
+
+        LLPointer<LLFontFreetype> a = loadFt(a_path);
+        LLPointer<LLFontFreetype> b = loadFt(b_path);
+        ensure("both loaded", a.notNull() && b.notNull());
+
+        // Pre-fallback shape: U+4F60 (你) is not in DejaVuSans's cmap, so
+        // HB returns one notdef glyph (glyph_id=0) on face A.
+        LLWString s = wstr(0x4F60);
+        std::vector<LLShapedGlyph> pre;
+        LLFontShaping::shapeRun(a, s, 0, s.size(), pre);
+        ensure_equals("pre-fallback shape produces 1 glyph", pre.size(), 1u);
+        ensure_equals("pre-fallback glyph routes to head A", pre[0].face, a.get());
+        ensure_equals("pre-fallback glyph is notdef (glyph_id=0)",
+                      pre[0].glyph_id, 0u);
+        ensure_equals("pre-fallback shape leaves one cache entry",
+                      LLFontShaping::cacheSize(), 1u);
+
+        // Attach the CJK fallback. addFallbackFont must clear the cached
+        // entry for `a` so the next shape() re-itemizes through the new
+        // chain instead of returning the stale notdef.
+        a->addFallbackFont(b);
+        ensure_equals("addFallbackFont(this) drops cached entries for this",
+                      LLFontShaping::cacheSize(), 0u);
+
+        // Post-fallback shape: U+4F60 should now route to face B with a
+        // non-zero glyph_id (B has the CJK glyph in its cmap).
+        std::vector<LLShapedGlyph> post;
+        LLFontShaping::shapeRun(a, s, 0, s.size(), post);
+        ensure_equals("post-fallback shape produces 1 glyph", post.size(), 1u);
+        ensure_equals("post-fallback glyph routes to fallback B",
+                      post[0].face, b.get());
+        ensure_not_equals("post-fallback glyph is real (not notdef)",
+                          post[0].glyph_id, 0u);
+    }
+
 #if LL_MESA_HEADLESS
     // GL-backed group: monospace shaping ends up rendering glyphs through
     // getGlyphInfoByIndex → renderAndCreateGlyph → atlas → gGL.bind on

@@ -461,10 +461,22 @@ void LLFontFreetype::addFallbackFont(const LLPointer<LLFontFreetype>& fallback_f
                                      const char_functor_t& functor)
 {
     mFallbackFonts.emplace_back(fallback_font, functor);
-    // Resolution cache encodes the previous fallback list; new fallback may
-    // win for codepoints that previously resolved to a later face or to
-    // notdef on this face.
+    // Both caches encode the previous fallback list; the new fallback may win
+    // for codepoints that previously resolved to a later face or to notdef on
+    // this face. Clear both:
+    //  - mShapingFaceResolution caches per-codepoint (winning face, glyph_id)
+    //    decisions made by selectShapingFace.
+    //  - LLFontShaping's global cache stores already-shaped runs keyed on
+    //    (codepoints, root_face). Entries with root_face == this still reflect
+    //    the OLD itemization (e.g. CJK codepoints rendered as the head's
+    //    notdef before the CJK fallback was attached) and must be discarded
+    //    so the next shape() re-itemizes through the new chain.
+    // Production today only calls addFallbackFont from LLFontRegistry::createFont
+    // before any shaping happens, so neither cache typically holds entries at
+    // this point — but clearing them defensively prevents a future runtime
+    // fallback-mutation path from silently returning stale shape results.
     mShapingFaceResolution.clear();
+    LLFontShaping::clearCacheForFace(this);
 }
 
 F32 LLFontFreetype::getLineHeight() const
