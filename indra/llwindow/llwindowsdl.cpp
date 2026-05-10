@@ -999,8 +999,10 @@ LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_reso
                 if ((w >= 800) && (h >= 600))
                 {
                     // make sure we don't add the same resolution multiple times!
+                    // A row is "the same" only when both width AND height match the previous row;
+                    // if either dimension differs we keep it.
                     if ( (mNumSupportedResolutions == 0) ||
-                        ((mSupportedResolutions[mNumSupportedResolutions-1].mWidth != w) &&
+                        ((mSupportedResolutions[mNumSupportedResolutions-1].mWidth != w) ||
                          (mSupportedResolutions[mNumSupportedResolutions-1].mHeight != h)) )
                     {
                         mSupportedResolutions[mNumSupportedResolutions].mWidth = w;
