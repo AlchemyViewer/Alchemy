@@ -535,6 +535,23 @@ void LLWindowSDL::destroyContext()
 
     {
         LLMutexLock osr_lock(&mOSRMutex);
+
+        // Tear down any still-live OSR contexts. Worker threads are expected to
+        // release them via destroySharedContext() first; if we still have entries
+        // here at shutdown it means a thread didn't, and we'd leak both the GL
+        // context and its hidden window.
+        if (!mOSRContexts.empty())
+        {
+            LL_WARNS() << "destroyContext: " << mOSRContexts.size()
+                       << " shared GL context(s) still alive at shutdown — releasing." << LL_ENDL;
+            for (auto& kv : mOSRContexts)
+            {
+                SDL_GL_DestroyContext(kv.first);
+                mDeadOSRWindows.push_back(kv.second);
+            }
+            mOSRContexts.clear();
+        }
+
         for(SDL_Window* pWindow : mDeadOSRWindows)
         {
             SDL_DestroyWindow(pWindow);
