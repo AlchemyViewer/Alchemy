@@ -1525,6 +1525,23 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             mCallbacks->handleDPIChanged(this, getSystemUISize(), w, h);
             break;
         }
+        case SDL_EVENT_DISPLAY_ADDED:
+        case SDL_EVENT_DISPLAY_REMOVED:
+        case SDL_EVENT_DISPLAY_ORIENTATION:
+        case SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED:
+        {
+            // Display set changed (monitor plugged/unplugged, rotated, or scale changed).
+            // Invalidate the cached resolution list so the next getSupportedResolutions()
+            // rebuilds it from the current display set.
+            LL_INFOS() << "Display event 0x" << std::hex << event.type << std::dec
+                       << " for display " << event.display.displayID
+                       << " — invalidating supported-resolution cache." << LL_ENDL;
+            delete[] mSupportedResolutions;
+            mSupportedResolutions = nullptr;
+            mNumSupportedResolutions = 0;
+            mCallbacks->handleDisplayChanged();
+            break;
+        }
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
         {
             if(mCallbacks->handleCloseRequest(this, true))
