@@ -557,7 +557,7 @@ U32 LLKeyboardSDL::mapSDLtoWin( U32 aSymbol )
         mSDL_to_Win[ SDLK_R ] = (U32)WindowsVK::LL_VK_R;
         mSDL_to_Win[ SDLK_S ] = (U32)WindowsVK::LL_VK_S;
         mSDL_to_Win[ SDLK_T ] = (U32)WindowsVK::LL_VK_T;
-        mSDL_to_Win[ SDLK_Y ] = (U32)WindowsVK::LL_VK_U;
+        mSDL_to_Win[ SDLK_U ] = (U32)WindowsVK::LL_VK_U;
         mSDL_to_Win[ SDLK_V ] = (U32)WindowsVK::LL_VK_V;
         mSDL_to_Win[ SDLK_W ] = (U32)WindowsVK::LL_VK_W;
         mSDL_to_Win[ SDLK_X ] = (U32)WindowsVK::LL_VK_X;
