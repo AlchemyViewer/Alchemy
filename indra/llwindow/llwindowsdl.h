@@ -233,6 +233,26 @@ private:
     U32 mKeyVirtualKey = 0;
     U32 mKeyModifiers = SDL_KMOD_NONE;
 
+    // Off-screen rendering (OSR) shared GL contexts.
+    //
+    // Worker threads (texture loader, etc.) ask for a shared GL context via
+    // createSharedContext() and bind it via makeContextCurrent() so they can
+    // upload textures without interrupting the main render thread. SDL3's
+    // OSR pattern is one hidden 1x1 SDL_Window per shared GL context.
+    //
+    // Threading contract:
+    //   * mOSRContexts is touched ONLY under mOSRMutex.
+    //   * Worker threads MAY call createSharedContext / destroySharedContext /
+    //     makeContextCurrent — those acquire the mutex internally.
+    //   * SDL_DestroyWindow is main-thread-only on at least X11 (the X11
+    //     backend grabs the global SDL video lock and assumes single-threaded
+    //     entry), so destroySharedContext does NOT destroy the carrier window
+    //     directly; it queues it onto mDeadOSRWindows for the main thread to
+    //     reap in processMiscNativeEvents() / destroyContext().
+    //   * destroyContext() also walks any contexts still in mOSRContexts at
+    //     shutdown — those represent worker threads that didn't release
+    //     their context — and queues their windows for destruction on the
+    //     same path.
     LLMutex mOSRMutex;
     std::unordered_map<SDL_GLContext, SDL_Window*> mOSRContexts;
     std::list<SDL_Window*> mDeadOSRWindows;

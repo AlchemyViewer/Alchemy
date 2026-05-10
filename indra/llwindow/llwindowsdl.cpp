@@ -896,16 +896,20 @@ bool LLWindowSDL::setCursorPosition(const LLCoordWindow position)
 
 bool LLWindowSDL::getCursorPosition(LLCoordWindow *position)
 {
-    //Point cursor_point;
-    LLCoordScreen screen_pos;
-
-    float x, y;
+    if (!position) return false;
+    // SDL3 SDL_GetMouseState already returns the cursor position relative to
+    // the focus window in screen-coord (logical) units — the same units
+    // SDL_EVENT_MOUSE_MOTION delivers and the same units the rest of the
+    // SDL3 backend treats LLCoordWindow as. Write through directly; an
+    // earlier version routed through LLCoordScreen + convertCoords as a
+    // tautological no-op, which only happened to work because the
+    // Screen→Window conversion was itself a no-op. (See the long comment
+    // in convertCoords below for the coord-space contract on SDL3.)
+    float x = 0, y = 0;
     SDL_GetMouseState(&x, &y);
-
-    screen_pos.mX = (S32)x;
-    screen_pos.mY = (S32)y;
-
-    return convertCoords(screen_pos, position);
+    position->mX = (S32)x;
+    position->mY = (S32)y;
+    return true;
 }
 
 F32 LLWindowSDL::getNativeAspectRatio()
@@ -1110,76 +1114,134 @@ std::vector<std::string> LLWindowSDL::getDisplaysResolutionList()
 }
 
 
+// =====================================================================
+// Coordinate-space contract on the SDL3 backend
+// =====================================================================
+//
+// SDL3 has two distinct coordinate units that this code shuttles between:
+//
+//   * "screen coordinates" — the logical-pixel space used by SDL3 for
+//     mouse events, SDL_GetWindowSize, SDL_GetWindowPosition,
+//     SDL_GetMouseState, SDL_WarpMouseInWindow, etc. On a 1.0x display
+//     this equals pixels; on HiDPI (Retina, fractional Wayland scaling)
+//     a screen-coord unit covers `pixel_density` physical pixels.
+//
+//   * "pixels" — the actual back-buffer / GL viewport units. Reported by
+//     SDL_GetWindowSizeInPixels and the SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
+//     event.
+//
+// The ratio `pixel_density = pixel_w / screen_coord_w` is queried with
+// SDL_GetWindowPixelDensity().
+//
+// LLWindowSDL maps these onto the LL coord types as follows:
+//
+//   LLCoordWindow — window-relative SCREEN-COORD units. The Y axis grows
+//                   downward (top-left origin).
+//   LLCoordGL     — window-relative PIXEL units. The Y axis grows upward
+//                   (bottom-left origin), matching glViewport / GL clip
+//                   space.
+//   LLCoordScreen — DESKTOP-relative SCREEN-COORD units. The desktop
+//                   origin depends on the platform: X11 places windows
+//                   in a global desktop coord space; Wayland does not
+//                   expose absolute window position, so SDL_GetWindowPosition
+//                   reports (0, 0) and these conversions become no-ops on
+//                   Wayland.
+//
+// Two asymmetries to be aware of:
+//
+//   1) WindowToGL multiplies by pixel_density; GLToWindow divides by it.
+//      That's because LLCoordWindow and LLCoordGL live in different unit
+//      systems despite both being window-relative.
+//
+//   2) `mWindowRectRaw` on the viewer side is set in PIXELS (handleResize
+//      multiplies the SDL-delivered screen-coord size by pixel_density
+//      before calling handleResize), so comparing a screen-coord
+//      LLCoordWindow against mWindowRectRaw on a HiDPI display is unit-
+//      mismatched. This is a known wart; fixing it requires touching
+//      every viewer-side consumer of LLCoordWindow and isn't worth the
+//      churn until/unless HiDPI Linux becomes a primary use case.
+// =====================================================================
+
 bool LLWindowSDL::convertCoords(LLCoordGL from, LLCoordWindow *to)
 {
-    if (!to)
+    if (!to || !mWindow)
         return false;
 
-    if (!mWindow)
-        return false;
+    // Input is window-relative pixels (Y up); output is window-relative
+    // screen-coord (Y down). Use the pixel-space window height for the Y flip
+    // so it matches the input units, then scale into screen-coord at the end.
+    S32 height_pixels = 0;
+    SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
 
-    S32 height;
-    SDL_GetWindowSizeInPixels(mWindow, nullptr, &height);
+    const float pixel_density = SDL_GetWindowPixelDensity(mWindow);
 
-    float pixel_scale = SDL_GetWindowPixelDensity(mWindow);
-
-    to->mX = from.mX / pixel_scale;
-    to->mY = (height - from.mY - 1) / pixel_scale;
+    to->mX = from.mX / pixel_density;
+    to->mY = (height_pixels - from.mY - 1) / pixel_density;
 
     return true;
 }
 
 bool LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordGL* to)
 {
-    if (!to)
+    if (!to || !mWindow)
         return false;
 
-    if (!mWindow)
-        return false;
-    S32 height;
-    SDL_GetWindowSize(mWindow, nullptr, &height);
+    // Input is window-relative screen-coord (Y down); output is window-
+    // relative pixels (Y up). Use the screen-coord window height for the
+    // Y flip so it matches the input units, then scale into pixels at the
+    // end. (Mirror image of the GL-to-Window function above.)
+    S32 height_screen = 0;
+    SDL_GetWindowSize(mWindow, nullptr, &height_screen);
 
-    float pixel_scale = SDL_GetWindowPixelDensity(mWindow);
+    const float pixel_density = SDL_GetWindowPixelDensity(mWindow);
 
-    to->mX = from.mX * pixel_scale;
-    to->mY = (height - from.mY - 1) * pixel_scale;
+    to->mX = from.mX * pixel_density;
+    to->mY = (height_screen - from.mY - 1) * pixel_density;
 
     return true;
 }
 
 bool LLWindowSDL::convertCoords(LLCoordScreen from, LLCoordWindow* to)
 {
-    if (!to)
+    if (!to || !mWindow)
         return false;
 
-    // In the fullscreen case, window and screen coordinates are the same.
-    to->mX = from.mX;
-    to->mY = from.mY;
+    // LLCoordScreen is desktop-relative; subtract the window's desktop
+    // position to get window-relative coords. SDL_GetWindowPosition
+    // returns (0, 0) on Wayland (Wayland intentionally does not expose
+    // absolute window positions), in which case this is a no-op — the
+    // best we can do without an absolute frame of reference.
+    int win_x = 0, win_y = 0;
+    SDL_GetWindowPosition(mWindow, &win_x, &win_y);
+
+    to->mX = from.mX - win_x;
+    to->mY = from.mY - win_y;
     return true;
 }
 
 bool LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordScreen *to)
 {
-    if (!to)
+    if (!to || !mWindow)
         return false;
 
-    // In the fullscreen case, window and screen coordinates are the same.
-    to->mX = from.mX;
-    to->mY = from.mY;
+    // Inverse of the above: window-relative -> desktop-relative.
+    int win_x = 0, win_y = 0;
+    SDL_GetWindowPosition(mWindow, &win_x, &win_y);
+
+    to->mX = from.mX + win_x;
+    to->mY = from.mY + win_y;
     return true;
 }
 
 bool LLWindowSDL::convertCoords(LLCoordScreen from, LLCoordGL *to)
 {
     LLCoordWindow window_coord;
-
     return convertCoords(from, &window_coord) && convertCoords(window_coord, to);
 }
 
 bool LLWindowSDL::convertCoords(LLCoordGL from, LLCoordScreen *to)
 {
     LLCoordWindow window_coord;
-
     return convertCoords(from, &window_coord) && convertCoords(window_coord, to);
 }
 
