@@ -21,9 +21,9 @@ configure_file("${INDRA_SOURCE_DIR}/externals/js/three.min.js" "${CMAKE_CURRENT_
 configure_file("${INDRA_SOURCE_DIR}/externals/js/OrbitControls.js" "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/OrbitControls.js" COPYONLY)
 
 # LSL Definitions
-configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/definitions/lsl_keywords_pretty.xml"
+configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/lsl_definitions/lsl_keywords.xml"
                "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lsl_default.xml" COPYONLY)
-configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/definitions/lua_keywords_pretty.xml"
+configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/lsl_definitions/lua_keywords.xml"
                "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lua_default.xml" COPYONLY)
 
 message(STATUS "Copying fonts")
@@ -1861,7 +1861,6 @@ set(viewer_APPSETTINGS_FILES
     app_settings/std_bump.ini
     app_settings/toolbars.xml
     app_settings/trees.xml
-    app_settings/types_lua_default.xml
     app_settings/viewerart.xml
     app_settings/message.xml
     ${SCRIPTS_DIR}/messages/message_template.msg

@@ -524,11 +524,10 @@ bool LLScriptEdCore::postBuild()
 
     initMenu();
 
-    mSyntaxIDConnection = LLSyntaxIdLSL::getInstance()->addSyntaxIDCallback(boost::bind(&LLScriptEdCore::processKeywords, this));
+    mSyntaxIDConnection = LLSyntaxDefCache::getInstance()->addSyntaxIDCallback(boost::bind(&LLScriptEdCore::processKeywords, this));
 
     // Intialise keyword highlighting for the current simulator's version of LSL
-    LLSyntaxIdLSL::getInstance()->initialize();
-    LLSyntaxLua::getInstance()->initialize();
+    LLSyntaxDefCache::getInstance();
     processKeywords();
 
     mCommitCallbackRegistrar.add("FontSize.Set", boost::bind(&LLScriptEdCore::onChangeFontSize, this, _2));

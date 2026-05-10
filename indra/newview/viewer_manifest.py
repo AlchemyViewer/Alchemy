@@ -66,6 +66,16 @@ class ViewerManifest(LLManifest):
 
         os.environ["XZ_DEFAULTS"] = "-T0"
 
+        # ... and the lsl/lua script definition files (needed at build time and packaging)
+        definitions_dir = os.path.join(self.args['vcpkg_dir'], 'share', 'lsl-definitions')
+        with self.prefix(src=os.path.join(definitions_dir, 'lsl_definitions'), dst="app_settings/syntax_default"):
+            self.path("*.txt")
+            self.path("*.yaml")
+            self.path("*.xml")
+            self.path("*.json")
+            self.path("*.luau")
+            self.path("*.yml")
+
         if self.is_packaging_viewer():
             with self.prefix(src_dst="app_settings"):
                 self.exclude("logcontrol.xml")
@@ -100,7 +110,7 @@ class ViewerManifest(LLManifest):
                 with self.prefix(src=dicts_dir):
                     self.path("dictionaries")
 
-                # include the extracted packages information (see BuildPackagesInfo.cmake)
+                # include the extracted packages information
                 # self.path(src=os.path.join(self.args['build'],"packages-info.txt"), dst="packages-info.txt")
                 # CHOP-955: If we have "sourceid" or "viewer_channel" in the
                 # build process environment, generate it into
