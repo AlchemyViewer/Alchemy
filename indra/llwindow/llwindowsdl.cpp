@@ -106,6 +106,12 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     // Assume 4:3 aspect ratio until we know better
     mNativeAspectRatio = 1024.f / 768.f;
 
+    // Record the requested MSAA sample count so createContext can ask SDL for it.
+    // Without this, the constructor argument was being dropped on the floor and
+    // the Windows-backend setFSAASamples() pattern (which only stores) didn't
+    // actually take effect because the GL attribute was never set.
+    mFSAASamples = fsaa_samples;
+
     if (title.empty())
         mWindowTitle = "Alchemy";
     else
@@ -230,6 +236,19 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depthBits);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencilBits);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+    // Multi-sample anti-aliasing. Driver may quietly downgrade to 0/2/4/8
+    // if the requested sample count isn't supported.
+    if (mFSAASamples > 0)
+    {
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, mFSAASamples);
+    }
+    else
+    {
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+    }
 
     SDL_GLContextFlag context_flags{};
     if(LLRender::sGLCoreProfile)
