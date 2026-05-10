@@ -782,6 +782,7 @@ F32 LLWindowSDL::getGamma()
 
 bool LLWindowSDL::restoreGamma()
 {
+    // SDL3 removed SDL_SetWindowGammaRamp; nothing to restore at the OS level.
     return true;
 }
 
@@ -793,6 +794,17 @@ bool LLWindowSDL::setGamma(const F32 gamma)
         if (mGamma == 0)
             mGamma = 0.1f;
         mGamma = 1.f / mGamma;
+
+        // SDL3 dropped hardware gamma-ramp support. We still record the value so
+        // callers see a coherent get/set, but it doesn't change pixels until the
+        // shader pipeline grows a software gamma stage.
+        static bool warned = false;
+        if (!warned)
+        {
+            LL_WARNS("Window") << "Hardware gamma is unavailable on SDL3; "
+                               << "the brightness preference is currently a no-op." << LL_ENDL;
+            warned = true;
+        }
     }
     return true;
 }
