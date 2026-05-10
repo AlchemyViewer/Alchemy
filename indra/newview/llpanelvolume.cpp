@@ -608,7 +608,7 @@ void LLPanelVolume::getState( )
     std::string LEGACY_FULLBRIGHT_DESC = LLTrans::getString("Fullbright");
 
     bool enable_material = editable && single_volume && material_same;
-    LLCachedControl<bool> edit_linked(gSavedSettings, "EditLinkedParts", false);
+    static LLCachedControl<bool> edit_linked(gSavedSettings, "EditLinkedParts", false);
     if (!enable_material)
     {
         LLViewerObject* root = selection->getPrimaryObject();

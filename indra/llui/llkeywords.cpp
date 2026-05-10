@@ -35,8 +35,6 @@
 #include "llstl.h"
 #include "llcontrol.h"
 
-extern LLControlGroup gSavedSettings;
-
 inline bool LLKeywordToken::isHead(const llwchar* s) const
 {
     size_t bytes = mToken.size() * sizeof(llwchar);
@@ -903,7 +901,7 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
         return;
     }
 
-    static LLCachedControl<bool> sDisableSyntaxHighlighting(gSavedSettings, "ScriptEditorDisableSyntaxHighlight", false);
+    static LLUICachedControl<bool> sDisableSyntaxHighlighting("ScriptEditorDisableSyntaxHighlight", false);
     const bool disable_syntax_highlighting = sDisableSyntaxHighlighting;
 
     segment_ops_t ops;
