@@ -898,8 +898,11 @@ void LLWindowSDL::afterDialog()
 {
     LL_INFOS() << "LLWindowSDL::afterDialog()" << LL_ENDL;
 
-    if (mFullscreen && mWindow )
-        SDL_SetWindowFullscreen( mWindow, 0 );
+    if (mFullscreen && mWindow)
+    {
+        // Restore fullscreen state that beforeDialog() left so dialogs could draw above us.
+        SDL_SetWindowFullscreen(mWindow, true);
+    }
 }
 
 void LLWindowSDL::flashIcon(F32 seconds)
