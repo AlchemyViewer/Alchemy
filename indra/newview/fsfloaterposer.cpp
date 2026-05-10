@@ -547,7 +547,7 @@ void FSFloaterPoser::onClickPoseSave()
         // show a modal dialog, passing the pose name along
         LLSD args;
         args["POSE_NAME"] = filename;
-       
+
         LLNotificationsUtil::add("ConfirmPoserOverwrite", args, LLSD(), // no payload
             [this, avatar, filename](const LLSD& notification, const LLSD& response)
             {
@@ -845,7 +845,7 @@ void FSFloaterPoser::updatePosedBones(const std::string& jointName, const LLQuat
     bool                   savingToExternal = getSavingToBvh();
     E_PoserReferenceFrame  frame            = getReferenceFrame();
     E_BoneDeflectionStyles defl             = getUiSelectedBoneDeflectionStyle();
-    mPoserAnimator.updateJointFromManip(avatar, poserJoint, savingToExternal, defl, frame, rotation, position, scale); 
+    mPoserAnimator.updateJointFromManip(avatar, poserJoint, savingToExternal, defl, frame, rotation, position, scale);
 
     refreshRotationSlidersAndSpinners();
     refreshPositionSlidersAndSpinners();
@@ -1858,7 +1858,7 @@ void FSFloaterPoser::selectJointByName(const std::string& jointName)
         mMiscJointsPnl,
         mCollisionVolumesPnl
     };
-    
+
     std::vector<LLScrollListCtrl*> scrollLists = {
         mEntireAvJointScroll,
         mBodyJointsScrollList,
@@ -1945,7 +1945,7 @@ std::vector<FSPoserAnimator::FSPoserJoint*> FSFloaterPoser::getUiSelectedPoserJo
     }
 
     LLScrollListCtrl* scrollList{ nullptr };
-    
+
     scrollList = getScrollListForTab(activeTab);
     if (activeTab == mPositionRotationPnl)
     {
@@ -2006,7 +2006,7 @@ E_RotationStyle FSFloaterPoser::getUiSelectedBoneRotationStyle(const std::string
     bool hasRotationStylePreferenceParameter = hasString(XML_JOINT_DELTAROT_STRING_PREFIX + jointName);
     if (!hasRotationStylePreferenceParameter)
         return ABSOLUTE_ROT;
- 
+
     std::string paramValue = getString(XML_JOINT_DELTAROT_STRING_PREFIX + jointName);
     if (paramValue == "true")
         return DELTAIC_ROT;
@@ -2112,7 +2112,7 @@ void FSFloaterPoser::onPositionSet()
     F32 posX = (F32)mAdvPosXSpnr->getValue().asReal();
     F32 posY = (F32)mAdvPosYSpnr->getValue().asReal();
     F32 posZ = (F32)mAdvPosZSpnr->getValue().asReal();
-    
+
     mInOutSpnr->setValue(posX);
     mLeftRightSpnr->setValue(posY);
     mUpDownSpnr->setValue(posZ);
@@ -2419,7 +2419,7 @@ LLVector3 FSFloaterPoser::getScaleOfFirstSelectedJoint() const
 void FSFloaterPoser::onJointTabSelect()
 {
     refreshPositionSlidersAndSpinners();
-    refreshRotationSlidersAndSpinners(); 
+    refreshRotationSlidersAndSpinners();
     refreshTrackpadCursor();
     enableOrDisableRedoAndUndoButton();
     refreshScaleSlidersAndSpinners();

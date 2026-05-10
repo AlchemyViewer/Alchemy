@@ -204,7 +204,7 @@ public:
     /// <param name="toFind">The avatar UUID to find on the avatars scroll list.</param>
     /// <returns>The scroll-list index for the supplied avatar, if found, otherwise -1.</returns>
     S32 getAvatarListIndexForUuid(const LLUUID& toFind) const;
-    
+
     /// <summary>
     /// There are several control-callbacks manipulating rotations etc, they all devolve to these.
     /// In these are the appeals to the posing business layer.
@@ -213,7 +213,7 @@ public:
     /// Using a set, then a get does not guarantee the value you just set.
     /// There may be +/- PI difference two axes, because harmonics.
     /// Thus keep your UI synced with less gets.
-    /// </remarks>    
+    /// </remarks>
     void setSelectedJointsRotation(const LLVector3& absoluteRot, const LLVector3& deltaRot);
     void setSelectedJointsPosition(F32 x, F32 y, F32 z);
     void setSelectedJointsScale(F32 x, F32 y, F32 z);

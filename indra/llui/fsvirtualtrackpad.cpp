@@ -27,6 +27,8 @@
 
 // A two dimensional slider control with optional pinch-mode.
 
+#include "linden_common.h"
+
 #include "fsvirtualtrackpad.h"
 #include "llrect.h"
 #include "lluictrlfactory.h"

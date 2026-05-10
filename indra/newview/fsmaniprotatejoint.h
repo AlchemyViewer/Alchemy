@@ -77,7 +77,7 @@ class FSManipRotateJoint : public LLManipRotate
         LLVector3 naturalX;
         LLVector3 naturalY;
         LLVector3 naturalZ;
-    };    
+    };
     LLQuaternion computeAlignmentQuat( const BoneAxes& boneAxes ) const;
     BoneAxes computeBoneAxes() const;
 
@@ -115,7 +115,7 @@ public:
     void drag(S32 x, S32 y) override;
     bool isAlwaysRendered() override { return true; }
     void highlightManipulators(S32 x, S32 y) override;
-    bool handleMouseDownOnPart(S32 x, S32 y, MASK mask) override; 
+    bool handleMouseDownOnPart(S32 x, S32 y, MASK mask) override;
     void highlightHoverSpheres(S32 mouseX, S32 mouseY);
 
 protected:

@@ -24,8 +24,11 @@
  * $/LicenseInfo$
  */
 
+#include "llviewerprecompiledheaders.h"
+
+#include "fsjointpose.h"
+
 #include <deque>
-#include "fsposingmotion.h"
 #include "llcharacter.h"
 
 /// <summary>

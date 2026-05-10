@@ -4,6 +4,7 @@ add_library (llui STATIC)
 
 target_sources(llui
     PRIVATE
+    fsvirtualtrackpad.cpp
     llaccordionctrl.cpp
     llaccordionctrltab.cpp
     llbadge.cpp
@@ -113,6 +114,7 @@ target_sources(llui
     PUBLIC
     FILE_SET HEADERS
     FILES
+    fsvirtualtrackpad.h
     llaccordionctrl.h
     llaccordionctrltab.h
     llbadge.h

@@ -387,7 +387,7 @@ public:
         { "L_FOOT", "R_FOOT", COL_VOLUMES, {}, "0.0 -0.041 0.077", "0.000 -0.026 0.089" },
         { "R_FOOT", "L_FOOT", COL_VOLUMES, {}, "0.0 -0.041 0.077", "0.000 -0.026 0.089", true },
     };
-    
+
 public:
     /// <summary>
     /// Get a PoserJoint case-insensitive-matching the supplied name.

@@ -207,7 +207,6 @@ set(viewer_SOURCE_FILES
     fsposeranimator.cpp
     fsposestate.cpp
     fsposingmotion.cpp
-    fsvirtualtrackpad.cpp
     gltfscenemanager.cpp
     gltf/asset.cpp
     gltf/accessor.cpp
@@ -966,9 +965,8 @@ set(viewer_HEADER_FILES
     fsmaniprotatejoint.h
     fsmaniptranslatejoint.h
     fsposeranimator.h
-	  fsposestate.h
+    fsposestate.h
     fsposingmotion.h
-    fsvirtualtrackpad.h
     gltfscenemanager.h
     groupchatlistener.h
     gltf/asset.h

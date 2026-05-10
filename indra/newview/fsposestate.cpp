@@ -1,3 +1,5 @@
+#include "llviewerprecompiledheaders.h"
+
 #include "fsposestate.h"
 #include "llvoavatarself.h"   // gAgentAvatarp
 #include "llinventorymodel.h" // gInventory

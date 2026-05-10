@@ -235,7 +235,7 @@ private:
     const F32 mInterpolationTime = 0.25f;
 
     /// <summary>
-    /// The collection of joint poses this motion uses to pose the joints of the character this is animating. 
+    /// The collection of joint poses this motion uses to pose the joints of the character this is animating.
     /// </summary>
     std::vector<FSJointPose> mJointPoses;
 

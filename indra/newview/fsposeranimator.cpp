@@ -24,12 +24,16 @@
  * $/LicenseInfo$
  */
 
-#include <boost/algorithm/string.hpp>
+#include "llviewerprecompiledheaders.h"
+
 #include "fsposeranimator.h"
+
 #include "llcharacter.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "fsposingmotion.h"
+
+#include <boost/algorithm/string.hpp>
 
 std::map<LLUUID, LLAssetID> FSPoserAnimator::sAvatarIdToRegisteredAnimationId;
 
@@ -837,7 +841,7 @@ LLVector3 FSPoserAnimator::getJointRotation(LLVOAvatar* avatar, const FSPoserJoi
     FSJointPose* jointPose = posingMotion->getJointPoseByJointName(joint.jointName());
     if (!jointPose)
         return vec3;
- 
+
     return translateRotationFromQuaternion(jointPose, translation, negation, jointPose->getPublicRotation());
 }
 

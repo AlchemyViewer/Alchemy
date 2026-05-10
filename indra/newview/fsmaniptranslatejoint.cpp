@@ -25,7 +25,10 @@
  * $/LicenseInfo$
  */
 
+#include "llviewerprecompiledheaders.h"
+
 #include "fsmaniptranslatejoint.h"
+
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llviewercontrol.h"
