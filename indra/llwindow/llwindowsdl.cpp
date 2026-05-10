@@ -1669,24 +1669,17 @@ void LLWindowSDL::initCursors()
 
 void LLWindowSDL::quitCursors()
 {
-    if (mWindow)
+    // SDL3 cursors are owned by the SDL library, not by any window —
+    // SDL_DestroyCursor must be called regardless of whether mWindow is
+    // still alive. The previous mWindow-guard skipped destruction when
+    // the window was nulled (e.g. failed switchContext), leaking cursors.
+    for (int i=0; i<UI_CURSOR_COUNT; ++i)
     {
-        for (int i=0; i<UI_CURSOR_COUNT; ++i)
+        if (mSDLCursors[i])
         {
-            if (mSDLCursors[i])
-            {
-                SDL_DestroyCursor(mSDLCursors[i]);
-                mSDLCursors[i] = nullptr;
-            }
-        }
-    }
-    else
-    {
-        // SDL doesn't refcount cursors, so if the window has
-        // already been destroyed then the cursors have gone with it.
-        LL_INFOS() << "Skipping quitCursors: mWindow already gone." << LL_ENDL;
-        for (int i=0; i<UI_CURSOR_COUNT; ++i)
+            SDL_DestroyCursor(mSDLCursors[i]);
             mSDLCursors[i] = nullptr;
+        }
     }
 }
 
