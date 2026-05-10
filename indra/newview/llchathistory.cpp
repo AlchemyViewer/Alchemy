@@ -1373,7 +1373,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
     }
     else if (chat.mChatType == CHAT_TYPE_SHOUT)
     {
-        body_message_params.font.style = "BOLD";
+        body_message_params.font.style = irc_me ? "BOLD ITALIC" : "BOLD";
     }
 
     bool message_from_log = chat.mChatStyle == CHAT_STYLE_HISTORY;
