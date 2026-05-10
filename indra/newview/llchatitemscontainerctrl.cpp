@@ -177,7 +177,7 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
 
         if(notification["chat_style"].asInteger()== CHAT_STYLE_IRC)
         {
-            style_params.font.style = chat_type == CHAT_TYPE_SHOUT ? "BOLD ITALIC" : "ITALIC";
+            style_params.font.style = chat_type == CHAT_TYPE_SHOUT ? "BOLD|ITALIC" : "ITALIC";
         }
         else if( chat_type == CHAT_TYPE_SHOUT)
         {
