@@ -1549,6 +1549,74 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             LL_INFOS() << "System locale changed — viewer localisation honors only the value at startup." << LL_ENDL;
             break;
         }
+        case SDL_EVENT_DROP_BEGIN:
+        {
+            // Drag-and-drop session starting. SDL3 doesn't populate event.drop.x/y
+            // or deliver file paths until later (DROP_FILE between BEGIN and
+            // COMPLETE), so we can't START_TRACKING here — just reset the buffer.
+            mPendingDropFiles.clear();
+            break;
+        }
+        case SDL_EVENT_DROP_FILE:
+        {
+            // SDL3 sends one DROP_FILE per dropped file — accumulate, then dispatch
+            // the full sequence on DROP_COMPLETE.
+            if (event.drop.data)
+            {
+                mPendingDropFiles.emplace_back(event.drop.data);
+            }
+            break;
+        }
+        case SDL_EVENT_DROP_TEXT:
+        {
+            // The current handleDragNDrop pipeline is file-only (DNDT_FILE); SDL3
+            // also delivers dropped text but we have nowhere to route it. Drop silently.
+            break;
+        }
+        case SDL_EVENT_DROP_COMPLETE:
+        {
+            // End of the drag-and-drop session.
+            //
+            // LLViewerWindow::handleDragNDropFile populates its mDragItems cache
+            // *only* on DNDA_START_TRACKING (it iterates the file list and builds
+            // LLViewerInventoryItem objects), then consumes the cache on
+            // DNDA_DROPPED — a DROPPED event with no preceding START_TRACKING is
+            // a no-op (see indra/newview/llviewerwindow.cpp:1455+).
+            //
+            // SDL3's drop API only surfaces file paths between DROP_BEGIN and
+            // DROP_COMPLETE, so we can't drive START/TRACK live the way the
+            // Win32 OLE backend does (DragEnter/DragOver/Drop). Instead we
+            // synthesise the same three-step sequence here so the receiver's
+            // state machine sees a well-formed transaction:
+            //
+            //   1) DNDA_START_TRACKING with the file list -> mDragItems populated
+            //   2) DNDA_DROPPED                           -> upload / apply
+            //   3) DNDA_STOP_TRACKING                     -> mDragItems cleared
+            LLCoordWindow winCoord(llfloor(event.drop.x), llfloor(event.drop.y));
+            LLCoordGL openGlCoord;
+            convertCoords(winCoord, &openGlCoord);
+            const MASK mask = gKeyboard->currentMask(true);
+            if (!mPendingDropFiles.empty())
+            {
+                mCallbacks->handleDragNDrop(this, openGlCoord, mask,
+                                            LLWindowCallbacks::DNDA_START_TRACKING,
+                                            LLWindowCallbacks::DNDT_FILE,
+                                            mPendingDropFiles);
+                mCallbacks->handleDragNDrop(this, openGlCoord, mask,
+                                            LLWindowCallbacks::DNDA_DROPPED,
+                                            LLWindowCallbacks::DNDT_FILE,
+                                            mPendingDropFiles);
+            }
+            // Always send STOP_TRACKING so any cached state (mDragItems,
+            // hover highlight) is cleared, whether or not files were dropped
+            // (text-only drops and cancelled drags both arrive here too).
+            mCallbacks->handleDragNDrop(this, openGlCoord, mask,
+                                        LLWindowCallbacks::DNDA_STOP_TRACKING,
+                                        LLWindowCallbacks::DNDT_FILE,
+                                        {});
+            mPendingDropFiles.clear();
+            break;
+        }
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
         {
             if(mCallbacks->handleCloseRequest(this, true))

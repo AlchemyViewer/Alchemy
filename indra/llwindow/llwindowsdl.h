@@ -236,6 +236,11 @@ private:
     std::unordered_map<SDL_GLContext, SDL_Window*> mOSRContexts;
     std::list<SDL_Window*> mDeadOSRWindows;
 
+    // Files accumulated between SDL_EVENT_DROP_BEGIN and SDL_EVENT_DROP_COMPLETE.
+    // Each SDL_EVENT_DROP_FILE only carries one path, so we batch them and
+    // dispatch a single handleDragNDrop on COMPLETE.
+    std::vector<std::string> mPendingDropFiles;
+
     void tryFindFullscreenSize(int &aWidth, int &aHeight);
 
     enum EServerProtocol{ X11, Wayland, Unknown };
