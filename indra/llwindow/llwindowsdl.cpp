@@ -1437,7 +1437,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
         }
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
         {
-            S32 w, h = 0;
+            S32 w = 0, h = 0;
             SDL_GetWindowSizeInPixels(mWindow, &w, &h);
             mCallbacks->handleDPIChanged(this, getSystemUISize(), w, h);
             break;
