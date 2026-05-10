@@ -324,10 +324,10 @@
 
     <font name="IBMPlexMono" label="IBM Plex Mono" font_hinting="light" monospace="true">
         <style name="NORMAL">
-            <file>IBMPlexMono-Bold.ttf</file>
+            <file>IBMPlexMono-Regular.ttf</file>
         </style>
         <style name="BOLD" inherit="true">
-            <file>DejaVuSans-Bold.woff2</file>
+            <file>IBMPlexMono-Bold.ttf</file>
         </style>
         <style name="ITALIC" inherit="true">
             <file>IBMPlexMono-Italic.ttf</file>
@@ -543,29 +543,6 @@
     <use family="CJK"/>
   </font>
 
-  <font name="Helvetica" label="Helvetica / Arial" user_selectable="false">
-    <style name="NORMAL">
-      <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
-      <os name="Windows"><file>arial.ttf</file></os>
-      <os name="Mac"><file>arial.ttf</file></os>
-    </style>
-    <style name="BOLD" inherit="true">
-      <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
-      <os name="Windows"><file>arialbd.ttf</file></os>
-      <os name="Mac"><file>arialbd.ttf</file></os>
-    </style>
-    <style name="ITALIC" inherit="true">
-      <file font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
-      <os name="Windows"><file>ariali.ttf</file></os>
-      <os name="Mac"><file>ariali.ttf</file></os>
-    </style>
-    <style name="BOLD|ITALIC" inherit="true">
-      <file font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
-      <os name="Windows"><file>arialbi.ttf</file></os>
-      <os name="Mac"><file>arialbi.ttf</file></os>
-    </style>
-  </font>
-
   <font name="MonospaceBase" label="Monospace (Default)" monospace="true">
     <use family="SourceCode"/>
   </font>
@@ -577,7 +554,46 @@
     <use family="CJK"/>
   </font>
 
-  <!-- Test family for AlchemyUIFontOverrides: not user-selectable;
+    <font name="Helvetica" label="Helvetica / Arial" user_selectable="false">
+        <style name="NORMAL">
+            <file font_hinting="light" font_weight="400">SourceSans3VF-Upright.woff2</file>
+            <os name="Windows">
+                <file>arial.ttf</file>
+            </os>
+            <os name="Mac">
+                <file>arial.ttf</file>
+            </os>
+        </style>
+        <style name="BOLD" inherit="true">
+            <file flags="bold" font_hinting="light" font_weight="600">SourceSans3VF-Upright.woff2</file>
+            <os name="Windows">
+                <file>arialbd.ttf</file>
+            </os>
+            <os name="Mac">
+                <file>arialbd.ttf</file>
+            </os>
+        </style>
+        <style name="ITALIC" inherit="true">
+            <file font_hinting="light" font_weight="400">SourceSans3VF-Italic.woff2</file>
+            <os name="Windows">
+                <file>ariali.ttf</file>
+            </os>
+            <os name="Mac">
+                <file>ariali.ttf</file>
+            </os>
+        </style>
+        <style name="BOLD|ITALIC" inherit="true">
+            <file font_hinting="light" font_weight="600">SourceSans3VF-Italic.woff2</file>
+            <os name="Windows">
+                <file>arialbi.ttf</file>
+            </os>
+            <os name="Mac">
+                <file>arialbi.ttf</file>
+            </os>
+        </style>
+    </font>
+
+    <!-- Test family for AlchemyUIFontOverrides: not user-selectable;
        intentionally lists Times first so the override (typically a
        valid file like SourceSans3VF) replaces it for verification. -->
   <font name="OverrideTest" user_selectable="false">
