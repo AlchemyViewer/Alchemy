@@ -184,6 +184,50 @@
          tool_tip="See a line connecting the camera focus point to the avatar. Useful to find where they are."
          top_pad="0"
          width="350" />
+      <text
+         type="string"
+         length="1"
+         follows="left|top"
+         height="20"
+         layout="topleft"
+         left="20"
+         name="inventory_header"
+         width="200"
+         top_pad="8"
+         valign="center"
+         text_color="LtGray_50">
+         Inventory:
+      </text>
+      <check_box
+         control_name="AutoAcceptNewInventory"
+         height="16"
+         label="Automatically accept new inventory items"
+         layout="topleft"
+         follows="left|top"
+         name="Auto_Accept_New_Inventory"
+         width="350"
+         left="30"
+         top_pad="4" />
+      <check_box
+         control_name="ShowInInventory"
+         height="16"
+         label="Automatically show newly accepted items in inventory"
+         layout="topleft"
+         follows="left|top"
+         name="Show_In_Inventory"
+         width="350"
+         left="30"
+         top_pad="4" />
+      <check_box
+         control_name="ShowNewInventory"
+         height="16"
+         label="Automatically view notecards, textures, landmarks after accepting"
+         layout="topleft"
+         follows="left|top"
+         name="Show_New_Inventory"
+         left="30"
+         top_pad="4"
+         width="350" />
 
         <text
          type="string"
@@ -193,6 +237,7 @@
          layout="topleft"
          left="20"
          name="mylookat"
+         top_pad="8"
          width="200">
             My LookAt:
         </text>

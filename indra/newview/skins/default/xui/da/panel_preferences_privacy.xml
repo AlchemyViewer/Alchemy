@@ -24,6 +24,12 @@
 	</text>
 	<button label="Ændre sti" label_selected="Ændre sti" left="150" name="log_path_button"/>
 	<button label="Liste med blokeringer" name="block_list"/>
+	<text name="inventory_header">
+		Inventory:
+	</text>
+	<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
+	<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
+	<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
 	<text name="block_list_label">
 		(Personer og/eller objekter du har blokeret)
 	</text>

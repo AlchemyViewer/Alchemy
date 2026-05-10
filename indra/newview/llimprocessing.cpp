@@ -61,6 +61,7 @@
 #include "rlvactions.h"
 #include "rlvhelper.h"
 #include "rlvhandler.h"
+#include "rlvinventory.h"
 #include "rlvui.h"
 // [/RLVa:KB]
 
@@ -210,16 +211,6 @@ void inventory_offer_handler(LLOfferInfo* info)
     }
 
     bool bAutoAccept(false);
-    // Avoid the Accept/Discard dialog if the user so desires. JC
-    if (gSavedSettings.getBOOL("AutoAcceptNewInventory")
-        && (info->mType == LLAssetType::AT_NOTECARD
-        || info->mType == LLAssetType::AT_LANDMARK
-        || info->mType == LLAssetType::AT_TEXTURE))
-    {
-        // For certain types, just accept the items into the inventory,
-        // and possibly open them on receipt depending upon "ShowNewInventory".
-        bAutoAccept = true;
-    }
 
     // Strip any SLURL from the message display. (DEV-2754)
     std::string msg = info->mDesc;
@@ -242,6 +233,32 @@ void inventory_offer_handler(LLOfferInfo* info)
     if (indx >= 0)
     {
         LLStringUtil::truncate(msg, indx);
+    }
+
+    // Avoid the Accept/Discard dialog if the user so desires.
+    if (gSavedSettings.getBOOL("AutoAcceptNewInventory")
+        && ((!rlv_handler_t::isEnabled()) || (!RlvInventory::instance().isGiveToRLVOffer(*info))))
+    {
+        bAutoAccept = true;
+
+        // Archive parity: announce auto-accepted inventory in a toast.
+        if (info->mType != LLAssetType::AT_NOTECARD
+            || info->mType != LLAssetType::AT_LANDMARK
+            || info->mType != LLAssetType::AT_TEXTURE)
+        {
+            LLSD auto_accept_args;
+            auto_accept_args["NAME"] = LLSLURL(info->mFromGroup ? "group" : "agent", info->mFromID, "about").getSLURLString();
+            if (info->mFromObject)
+            {
+                auto_accept_args["ITEM"] = msg;
+            }
+            else
+            {
+                const std::string& verb = "select?name=" + LLURI::escape(msg);
+                auto_accept_args["ITEM"] = LLSLURL("inventory", info->mObjectID, verb.c_str()).getSLURLString();
+            }
+            LLNotificationsUtil::add("AutoAcceptedInventory", auto_accept_args);
+        }
     }
 
     LLSD args;
@@ -372,6 +389,28 @@ void inventory_offer_handler(LLOfferInfo* info)
             payload["give_inventory_notification"] = true;
             p.payload = payload;
             LLPostponedNotification::add<LLPostponedOfferNotification>(p, info->mFromID, false);
+        }
+
+        if (bAutoAccept && gSavedSettings.getBOOL("ShowNewInventory"))
+        {
+            LLViewerInventoryCategory* catp = nullptr;
+            catp = (LLViewerInventoryCategory*)gInventory.getCategory(info->mObjectID);
+            LLViewerInventoryItem* itemp = nullptr;
+            if (!catp)
+            {
+                itemp = (LLViewerInventoryItem*)gInventory.getItem(info->mObjectID);
+            }
+
+            LLOpenAgentOffer* open_agent_offer = new LLOpenAgentOffer(info->mObjectID, info->mFromName, false);
+            open_agent_offer->startFetch();
+            if (catp || (itemp && itemp->isFinished()))
+            {
+                open_agent_offer->done();
+            }
+            else
+            {
+                gInventory.addObserver(open_agent_offer);
+            }
         }
     }
 
@@ -1969,4 +2008,3 @@ void LLIMProcessing::requestOfflineMessagesLegacy()
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     gAgent.sendReliableMessage();
 }
-

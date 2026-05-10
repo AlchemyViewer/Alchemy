@@ -13032,6 +13032,13 @@ are wearing now.
      yestext="OK"/>
   </notification>
   <notification
+   icon="notify.tga"
+   name="AutoAcceptedInventory"
+   persist="true"
+   type="notify">
+    Auto-accepted [ITEM] from [NAME] and placed in inventory.
+  </notification>
+  <notification
    icon="alertmodal.tga"
    name="RemoveSkinSuccess"
    type="alertmodal">

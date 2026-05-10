@@ -25,6 +25,12 @@
 	<line_editor left="288" name="log_path_string" right="-20"/>
 	<button label="Sfoglia" label_selected="Sfoglia" name="log_path_button" width="130"/>
 	<button label="Lista dei bloccati" name="block_list"/>
+	<text name="inventory_header">
+		Inventory:
+	</text>
+	<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
+	<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
+	<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
 	<text name="block_list_label">
 		(Persone e/o Oggetti bloccati)
 	</text>

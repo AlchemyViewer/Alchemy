@@ -716,7 +716,7 @@
   <key>AutoAcceptNewInventory</key>
     <map>
       <key>Comment</key>
-      <string>Automatically accept new notecards/textures/landmarks</string>
+      <string>Automatically accept new inventory items</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
