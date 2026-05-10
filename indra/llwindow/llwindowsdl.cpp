@@ -1542,6 +1542,13 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             mCallbacks->handleDisplayChanged();
             break;
         }
+        case SDL_EVENT_LOCALE_CHANGED:
+        {
+            // The viewer reads the system locale once at startup via FL_FindLocale;
+            // we don't currently re-localise live. Log for support visibility.
+            LL_INFOS() << "System locale changed — viewer localisation honors only the value at startup." << LL_ENDL;
+            break;
+        }
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
         {
             if(mCallbacks->handleCloseRequest(this, true))
