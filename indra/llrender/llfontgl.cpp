@@ -1888,10 +1888,10 @@ U8 LLFontGL::getStyleFromString(const std::string &style)
 // static
 std::string LLFontGL::getStringFromStyle(U8 style)
 {
+    std::string style_string = "NORMAL";
     if (style == NORMAL)
-        return "NORMAL";
+        return style_string;
 
-    std::string style_string;
     auto append = [&](const char* part) {
         if (!style_string.empty())
             style_string += '|';
