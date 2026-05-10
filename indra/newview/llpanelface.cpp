@@ -1241,6 +1241,7 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
                 {
                     case GL_RGBA:
                     case GL_ALPHA:
+                    case GL_RED:
                     case GL_RGB:
                         break;
                     default:
@@ -3383,6 +3384,7 @@ void LLPanelFace::onSelectTexture()
         {
         case GL_RGBA:
         case GL_ALPHA:
+        case GL_RED:
         case GL_RGB:
             break;
         default:
@@ -5360,7 +5362,7 @@ void LLPanelFace::LLSelectedTE::getImageFormat(LLGLenum& image_format_to_return,
             {
                 format = image->getPrimaryFormat();
                 missing = image->isMissingAsset();
-                if (format == GL_RGBA || format == GL_ALPHA)
+                if (format == GL_RGBA || format == GL_ALPHA || format == GL_RED) // GL_RED is used for alpha in deprecated format swizzle cases
                 {
                     mHasAlpha = true;
                 }
@@ -5594,7 +5596,7 @@ void LLPanelFace::LLSelectedTEMaterial::getCurrentDiffuseAlphaMode(U8& diffuse_a
             if (image)
             {
                 LLGLenum format = image->getPrimaryFormat();
-                if (format == GL_RGBA || format == GL_ALPHA)
+                if (format == GL_RGBA || format == GL_ALPHA || format == GL_RED) // GL_RED is used for alpha in deprecated format swizzle cases
                 {
                     has_alpha = true;
                 }

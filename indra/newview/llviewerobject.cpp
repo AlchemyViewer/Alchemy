@@ -5932,6 +5932,7 @@ bool LLViewerObject::isImageAlphaBlended(const U8 te) const
     {
         case GL_RGBA:
         case GL_ALPHA:
+        case GL_RED:
         {
             return true;
         }
