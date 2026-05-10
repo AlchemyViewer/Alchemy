@@ -1471,6 +1471,19 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             mCallbacks->handleResize(this, width, height);
             break;
         }
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        {
+            // Distinct from RESIZED: PIXEL_SIZE_CHANGED fires when the back-buffer
+            // dimensions change even if the window's logical size stayed the same
+            // (e.g. moving to a monitor with a different scale factor under
+            // fractional Wayland scaling). data1/data2 are already in pixels here,
+            // so we don't multiply by pixel density.
+            LL_INFOS() << "Handling a pixel-size event: " << event.window.data1 << "x" << event.window.data2 << LL_ENDL;
+            S32 width  = llmax(event.window.data1, (S32)mMinWindowWidth);
+            S32 height = llmax(event.window.data2, (S32)mMinWindowHeight);
+            mCallbacks->handleResize(this, width, height);
+            break;
+        }
         case SDL_EVENT_WINDOW_MOUSE_ENTER:
             break;
         case SDL_EVENT_WINDOW_MOUSE_LEAVE:
