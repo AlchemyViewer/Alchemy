@@ -1076,6 +1076,7 @@ set(viewer_HEADER_FILES
     llfeaturemanager.h
     llfetchedgltfmaterial.h
     llfilepicker.h
+    llsdlfiledialog.h
     llfilteredwearablelist.h
     llfirstuse.h
     llflexibleobject.h

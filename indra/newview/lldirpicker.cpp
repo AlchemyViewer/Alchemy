@@ -37,6 +37,7 @@
 
 #if LL_SDL_WINDOW
 #include "llwindowsdl.h"  // LLWindowSDL::getMainSDLWindow()
+#include "llsdlfiledialog.h"
 #endif
 #include "llviewercontrol.h"
 #include "llwin32headers.h"
@@ -115,55 +116,8 @@ bool LLDirPicker::getDirModeless(std::string* filename,
         return false;
     }
 
-    {
-        struct LLSDLFileUserdata
-        {
-            LLSDLFileUserdata(void (*callback_func)(bool, std::string&, void*), void* callback_userdata)
-                : mCallback(callback_func), mUserdata(callback_userdata)
-            {
-            }
-            void (*mCallback)(bool, std::string&, void*);
-            void* mUserdata;
-        };
-
-        auto sdl_callback = [](void* userdata, const char* const* filelist, int filter)
-            {
-                LLSDLFileUserdata* callback_struct = (LLSDLFileUserdata*)userdata;
-
-                auto* callback_func = callback_struct->mCallback;
-                auto* callback_data = callback_struct->mUserdata;
-                delete callback_struct; // delete callback container
-
-                std::string rtn;
-                if (!filelist)
-                {
-                    LL_WARNS() << "Error during SDL folder picking: " << SDL_GetError() << LL_ENDL;
-                    callback_func(false, rtn, callback_data);
-                    return;
-                }
-                else if (!*filelist)
-                {
-                    LL_INFOS() << "User did not select any folders. Dialog likely cancelled." << LL_ENDL;
-                    callback_func(false, rtn, callback_data);
-                    return;
-                }
-
-                if (*filelist)
-                {
-                    rtn = std::string(*filelist);
-                }
-                callback_func(true, rtn, callback_data);
-
-            };
-
-        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata);
-
-        SDL_PropertiesID props = SDL_CreateProperties();
-        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, LLWindowSDL::getMainSDLWindow());
-        SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFOLDER, sdl_callback, llfilecallback, props);
-
-        SDL_DestroyProperties(props);
-    }
+    auto* ctx = new LLSDLFileDialogContext<std::string>(callback, userdata);
+    LLSDLFileDialog::show(SDL_FILEDIALOG_OPENFOLDER, ctx, /*allow_many=*/false);
 
     return true;
 }
