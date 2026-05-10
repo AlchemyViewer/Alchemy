@@ -267,6 +267,12 @@ private:
     // on focus-in; cleared on focus-out. Null when no widget owns IME.
     LLPreeditor* mPreeditor = nullptr;
 
+    // Whether SDL3 text input is currently turned on for mWindow. The flag
+    // exists so we can make allowLanguageTextInput()'s SDL_StartTextInput /
+    // SDL_StopTextInput calls idempotent (LLLineEditor & friends may invoke
+    // it more than once per focus transition).
+    bool mTextInputActive = false;
+
     void tryFindFullscreenSize(int &aWidth, int &aHeight);
 
     enum EServerProtocol{ X11, Wayland, Unknown };

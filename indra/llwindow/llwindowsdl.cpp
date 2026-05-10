@@ -447,10 +447,12 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         bmpsurface = nullptr;
     }
 
-    if (!SDL_StartTextInput(mWindow))
-    {
-        LL_WARNS() << "SDL_StartTextInput failed: " << SDL_GetError() << LL_ENDL;
-    }
+    // Text input is now driven per-widget by allowLanguageTextInput() (called
+    // from LLLineEditor/LLTextEditor focus handlers), so we no longer turn it
+    // on unconditionally here. Keeping it off until a real text widget asks
+    // for it means the IME indicator doesn't appear over the world view, and
+    // SDL3 doesn't fire SDL_EVENT_TEXT_INPUT events for keystrokes that
+    // weren't meant for an editable field.
     return true;
 }
 
@@ -596,8 +598,15 @@ void LLWindowSDL::destroyContext()
         mDeadOSRWindows.clear();
     }
 
-    // Stop unicode input
-    SDL_StopTextInput(mWindow);
+    // Stop unicode input if a widget left it on. If no widget called
+    // allowLanguageTextInput(true) during this window's lifetime (or the
+    // last focused widget already called it with false), this is a no-op.
+    if (mTextInputActive)
+    {
+        SDL_StopTextInput(mWindow);
+        mTextInputActive = false;
+    }
+    mPreeditor = nullptr;
 
     // Clean up remaining GL state before blowing away window
     LL_INFOS() << "shutdownGL begins" << LL_ENDL;
@@ -1469,6 +1478,9 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             mKeyVirtualKey = event.key.key;
             mKeyModifiers = event.key.mod;
 
+            // Collapse the alternate Return keysyms (USB-HID secondary Return
+            // and numpad Enter) onto the canonical SDLK_RETURN so downstream
+            // bindings only have to look for one value.
             if (mKeyVirtualKey == SDLK_RETURN2 || mKeyVirtualKey == SDLK_KP_ENTER)
             {
                 mKeyVirtualKey = SDLK_RETURN;
@@ -1478,7 +1490,17 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
             if (mKeyVirtualKey == SDLK_RETURN)
             {
-                // fix return key not working when capslock, scrolllock or numlock are enabled
+                // Synthesise a Unicode-char event for Return. SDL3 only fires
+                // SDL_EVENT_TEXT_INPUT for printable characters that the
+                // platform IME composed, never for control keys like Return,
+                // Tab, or Backspace — so we have to deliver Return to the
+                // focused text widget ourselves. This is independent of
+                // whether SDL_StartTextInput is currently on; SDL3 simply
+                // does not consider Return part of "text input".
+                //
+                // The modifier mask is filtered to drop NumLock/CapsLock/etc.
+                // so that, e.g., NumLock being on doesn't make the chat bar
+                // treat Return as a modified key and ignore it.
                 mKeyModifiers &= (~(SDL_KMOD_NUM | SDL_KMOD_CAPS | SDL_KMOD_MODE | SDL_KMOD_SCROLL));
                 mCallbacks->handleUnicodeChar(mKeyVirtualKey, gKeyboard->currentMask(false));
             }
@@ -2276,21 +2298,55 @@ void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
 
 void LLWindowSDL::allowLanguageTextInput(LLPreeditor* preeditor, bool b)
 {
-    // Track which widget (if any) currently wants to receive IME composition
-    // updates. The TEXT_EDITING event handler dispatches to mPreeditor when set.
+    // Drive SDL3 text input on/off in lockstep with widget focus.
     //
-    // SDL_StartTextInput is called unconditionally at window creation today, so
-    // we don't gate it from here — see the deferred per-widget Start/Stop work.
+    //   * Called by LLLineEditor / LLTextEditor on focus-in (b == true) and
+    //     focus-out (b == false).
+    //   * `preeditor` is the widget making the request — used to track which
+    //     LLPreeditor receives SDL_EVENT_TEXT_EDITING composition updates,
+    //     and to ignore stale disable requests from widgets that don't
+    //     currently own IME.
+    //   * Calling multiple times in the same state is a no-op (LLLineEditor
+    //     does this on setEnabled changes that don't actually move focus).
+    if (!mWindow)
+    {
+        return;
+    }
+
     if (b)
     {
         mPreeditor = preeditor;
+        if (!mTextInputActive)
+        {
+            if (SDL_StartTextInput(mWindow))
+            {
+                mTextInputActive = true;
+            }
+            else
+            {
+                LL_WARNS() << "SDL_StartTextInput failed: " << SDL_GetError() << LL_ENDL;
+            }
+        }
     }
-    else if (mPreeditor == preeditor)
+    else
     {
-        // Mirror the Win32 backend's "ignore disable from a non-owning widget"
-        // behaviour: an unfocused widget's setEnabled(false) shouldn't stomp on
-        // the focused widget's IME state.
-        mPreeditor = nullptr;
+        // Mirror the Win32 backend's "only let the owning widget release IME"
+        // rule: an unfocused widget calling setEnabled(false) shouldn't stomp
+        // on the focused widget's text-input state. If a different widget
+        // already became the active preeditor (focus moved on before this
+        // call arrived), we leave SDL text input alone.
+        if (mPreeditor == preeditor)
+        {
+            mPreeditor = nullptr;
+            if (mTextInputActive)
+            {
+                if (!SDL_StopTextInput(mWindow))
+                {
+                    LL_WARNS() << "SDL_StopTextInput failed: " << SDL_GetError() << LL_ENDL;
+                }
+                mTextInputActive = false;
+            }
+        }
     }
 }
 
