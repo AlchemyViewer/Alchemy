@@ -97,7 +97,13 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
         : LLWindow(callbacks, fullscreen, flags),
         mGamma(1.0f), mFlashing(false)
 {
-    SDL_GL_LoadLibrary(nullptr);
+    if (!SDL_GL_LoadLibrary(nullptr))
+    {
+        // SDL3 returns bool; on failure GL functions won't be available.
+        // The caller will hit a setupFailure when context creation fails,
+        // but log the underlying cause here so the chain is visible.
+        LL_WARNS() << "SDL_GL_LoadLibrary failed: " << SDL_GetError() << LL_ENDL;
+    }
 
     // Initialize the keyboard
     gKeyboard = new LLKeyboardSDL();
@@ -441,7 +447,10 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         bmpsurface = nullptr;
     }
 
-    SDL_StartTextInput(mWindow);
+    if (!SDL_StartTextInput(mWindow))
+    {
+        LL_WARNS() << "SDL_StartTextInput failed: " << SDL_GetError() << LL_ENDL;
+    }
     return true;
 }
 
@@ -467,8 +476,14 @@ void* LLWindowSDL::createSharedContext()
     SDL_DestroyProperties(props); // Free properties once window is created
     SDL_GLContext pContext = SDL_GL_CreateContext(osr_window);
 
-    // Hack to ensure main window context is bound
-    SDL_GL_MakeCurrent(mWindow, mContext);
+    // Restore the main window's context as current — creating the OSR context
+    // typically leaves the new (or null) context bound. Failure here is rare
+    // but serious: the rest of the frame would render without a valid context.
+    if (!SDL_GL_MakeCurrent(mWindow, mContext))
+    {
+        LL_WARNS() << "SDL_GL_MakeCurrent(main) failed after createSharedContext: "
+                   << SDL_GetError() << LL_ENDL;
+    }
 
     if (!pContext)
     {
@@ -492,7 +507,10 @@ void LLWindowSDL::makeContextCurrent(void* contextPtr)
     auto it = mOSRContexts.find((SDL_GLContext)contextPtr);
     if(it != mOSRContexts.end())
     {
-        SDL_GL_MakeCurrent((SDL_Window*)it->second, (SDL_GLContext)it->first);
+        if (!SDL_GL_MakeCurrent((SDL_Window*)it->second, (SDL_GLContext)it->first))
+        {
+            LL_WARNS() << "SDL_GL_MakeCurrent(OSR) failed: " << SDL_GetError() << LL_ENDL;
+        }
     }
     LL_PROFILER_GPU_CONTEXT;
 }
@@ -1799,7 +1817,11 @@ void LLSplashScreenSDL::hideImpl()
 
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type)
 {
-    SDL_MessageBoxData oData = { SDL_MESSAGEBOX_INFORMATION, nullptr, caption.c_str(), text.c_str(), 0, nullptr, nullptr };
+    // Use the main viewer window as the message box's parent so it is modal
+    // to the viewer and stacks correctly above fullscreen on compositors that
+    // place dialogs relative to their parent window.
+    SDL_Window* const parent = LLWindowSDL::getMainSDLWindow();
+    SDL_MessageBoxData oData = { SDL_MESSAGEBOX_INFORMATION, parent, caption.c_str(), text.c_str(), 0, nullptr, nullptr };
     SDL_MessageBoxButtonData btnOk[] = {{SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, OSBTN_OK, "OK" }};
     SDL_MessageBoxButtonData btnOkCancel [] =  {{SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, OSBTN_OK, "OK" }, {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, OSBTN_CANCEL, "Cancel"} };
     SDL_MessageBoxButtonData btnYesNo[] = { {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, OSBTN_YES, "Yes" }, {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, OSBTN_NO, "No"} };
@@ -1909,6 +1931,12 @@ void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
 
 void* LLWindowSDL::getPlatformWindow()
 {
+    // Note: on Linux this returns nullptr by design. The X11 Window handle
+    // (typedef Window = XID = unsigned long, not a pointer) and the Wayland
+    // wl_surface* don't share a single native-handle type, and current
+    // callers all cast directly to HWND. Linux code that needs the native
+    // handle should reach into LLWindowSDL::sX11Data or sWaylandData, which
+    // are populated in createContext() with the correct typed pointers.
     void* ret = nullptr;
     if (mWindow)
     {
