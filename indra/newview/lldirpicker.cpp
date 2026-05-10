@@ -34,6 +34,10 @@
 #include "llframetimer.h"
 #include "lltrans.h"
 #include "llwindow.h"   // beforeDialog()
+
+#if LL_SDL_WINDOW
+#include "llwindowsdl.h"  // LLWindowSDL::getMainSDLWindow()
+#endif
 #include "llviewercontrol.h"
 #include "llwin32headers.h"
 
@@ -144,9 +148,9 @@ bool LLDirPicker::getDirModeless(std::string* filename,
                     return;
                 }
 
-                while (*filelist) {
+                if (*filelist)
+                {
                     rtn = std::string(*filelist);
-                    break;
                 }
                 callback_func(true, rtn, callback_data);
 
@@ -155,7 +159,7 @@ bool LLDirPicker::getDirModeless(std::string* filename,
         LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata);
 
         SDL_PropertiesID props = SDL_CreateProperties();
-        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, SDL_GL_GetCurrentWindow());
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, LLWindowSDL::getMainSDLWindow());
         SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFOLDER, sdl_callback, llfilecallback, props);
 
         SDL_DestroyProperties(props);

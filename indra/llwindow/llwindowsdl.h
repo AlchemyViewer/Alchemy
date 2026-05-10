@@ -167,6 +167,12 @@ public:
 
     static std::vector<std::string> getDisplaysResolutionList();
 
+    // Accessor for the main viewer SDL_Window used by the singleton viewer instance.
+    // Code outside llwindowsdl (e.g. file pickers) should prefer this over
+    // SDL_GL_GetCurrentWindow() so the parent window is correct even when a
+    // worker thread has its own GL context current.
+    static SDL_Window* getMainSDLWindow();
+
 #if LL_DARWIN
     static U64 getVramSize();
     static void setUseMultGL(bool use_mult_gl);

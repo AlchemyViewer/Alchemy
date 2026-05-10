@@ -1047,6 +1047,12 @@ LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_reso
 }
 
 //static
+SDL_Window* LLWindowSDL::getMainSDLWindow()
+{
+    return gWindowImplementation ? gWindowImplementation->mWindow : nullptr;
+}
+
+//static
 std::vector<std::string> LLWindowSDL::getDisplaysResolutionList()
 {
     std::vector<std::string> ret;

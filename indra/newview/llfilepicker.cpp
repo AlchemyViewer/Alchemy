@@ -263,19 +263,23 @@ bool LLFilePicker::getOpenFileModeless(ELoadFilter filter,
         return false;
     }
 
-    auto file_filters = setupLoadFilter(filter);
-
     reset();
 
     {
         struct LLSDLFileUserdata
         {
-            LLSDLFileUserdata(void (*callback_func)(bool, std::vector<std::string>&, void*), void* callback_userdata)
-                : mCallback(callback_func), mUserdata(callback_userdata)
+            LLSDLFileUserdata(void (*callback_func)(bool, std::vector<std::string>&, void*),
+                              void* callback_userdata,
+                              std::vector<SDL_DialogFileFilter> filters)
+                : mCallback(callback_func), mUserdata(callback_userdata), mFilters(std::move(filters))
             {
             }
             void (*mCallback)(bool, std::vector<std::string>&, void*);
             void* mUserdata;
+            // Owned: SDL3 backends differ on whether they snapshot the filter
+            // strings before SDL_ShowFileDialogWithProperties returns. Keep the
+            // vector alive until the callback fires (which destroys this object).
+            std::vector<SDL_DialogFileFilter> mFilters;
         };
 
         auto sdl_callback = [](void* userdata, const char* const* filelist, int filter)
@@ -311,12 +315,12 @@ bool LLFilePicker::getOpenFileModeless(ELoadFilter filter,
 
             };
 
-        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata);
+        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata, setupLoadFilter(filter));
 
         SDL_PropertiesID props = SDL_CreateProperties();
-        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, file_filters.data());
-        SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, file_filters.size());
-        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, SDL_GL_GetCurrentWindow());
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, llfilecallback->mFilters.data());
+        SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, llfilecallback->mFilters.size());
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, LLWindowSDL::getMainSDLWindow());
         SDL_SetBooleanProperty(props, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, false);
 
         SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFILE, sdl_callback, llfilecallback, props);
@@ -347,19 +351,20 @@ bool LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
         return false;
     }
 
-    auto file_filters = setupLoadFilter(filter);
-
     reset();
 
     {
         struct LLSDLFileUserdata
         {
-            LLSDLFileUserdata(void (*callback_func)(bool, std::vector<std::string>&, void*), void* callback_userdata)
-                : mCallback(callback_func), mUserdata(callback_userdata)
+            LLSDLFileUserdata(void (*callback_func)(bool, std::vector<std::string>&, void*),
+                              void* callback_userdata,
+                              std::vector<SDL_DialogFileFilter> filters)
+                : mCallback(callback_func), mUserdata(callback_userdata), mFilters(std::move(filters))
             {
             }
             void (*mCallback)(bool, std::vector<std::string>&, void*);
             void* mUserdata;
+            std::vector<SDL_DialogFileFilter> mFilters;
         };
 
         auto sdl_callback = [](void* userdata, const char* const* filelist, int filter)
@@ -395,12 +400,12 @@ bool LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
 
             };
 
-        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata);
+        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata, setupLoadFilter(filter));
 
         SDL_PropertiesID props = SDL_CreateProperties();
-        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, file_filters.data());
-        SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, file_filters.size());
-        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, SDL_GL_GetCurrentWindow());
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, llfilecallback->mFilters.data());
+        SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, llfilecallback->mFilters.size());
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, LLWindowSDL::getMainSDLWindow());
         SDL_SetBooleanProperty(props, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, true);
 
         SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFILE, sdl_callback, llfilecallback, props);
@@ -573,12 +578,15 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
     {
         struct LLSDLFileUserdata
         {
-            LLSDLFileUserdata(void (*callback_func)(bool, std::string&, void*), void* callback_userdata)
-                : mCallback(callback_func), mUserdata(callback_userdata)
+            LLSDLFileUserdata(void (*callback_func)(bool, std::string&, void*),
+                              void* callback_userdata,
+                              std::vector<SDL_DialogFileFilter> filters)
+                : mCallback(callback_func), mUserdata(callback_userdata), mFilters(std::move(filters))
             {
             }
             void (*mCallback)(bool, std::string&, void*);
             void* mUserdata;
+            std::vector<SDL_DialogFileFilter> mFilters;
         };
 
         auto sdl_callback = [](void* userdata, const char* const* filelist, int filter)
@@ -603,20 +611,20 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
                     return;
                 }
 
-                while (*filelist) {
+                if (*filelist)
+                {
                     rtn = std::string(*filelist);
-                    break;
                 }
                 callback_func(true, rtn, callback_data);
 
             };
 
-        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata);
+        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata, std::move(file_filters));
 
         SDL_PropertiesID props = SDL_CreateProperties();
-        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, file_filters.data());
-        SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, file_filters.size());
-        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, SDL_GL_GetCurrentWindow());
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, llfilecallback->mFilters.data());
+        SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, llfilecallback->mFilters.size());
+        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, LLWindowSDL::getMainSDLWindow());
 
         // Disabled default file name functionality currently due to inconsistency between various SDL3 backends
         // if(!default_filename.empty())
