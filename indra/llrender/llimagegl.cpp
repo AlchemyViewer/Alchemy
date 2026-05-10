@@ -1700,7 +1700,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
             // glTexImage2D / scaleDown reallocations, so we never re-set it.
             if (mDeprecatedSourceFormat != 0)
             {
-                applySwizzleForDeprecatedFormat(LLTexUnit::getInternalType(mBindTarget),
+                applySwizzleForDeprecatedFormat(mBindTarget,
                                                 mDeprecatedSourceFormat);
             }
         }
@@ -2232,7 +2232,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
 }
 
 // static
-void LLImageGL::applySwizzleForDeprecatedFormat(U32 target, U32 original_format)
+void LLImageGL::applySwizzleForDeprecatedFormat(LLTexUnit::eTextureType type, U32 original_format)
 {
     // Swizzle table is owned here; callers (LLImageGL::createGLTexture for
     // resolved instances, llvoavatar's morph-mask upload for raw GL textures)
@@ -2260,7 +2260,7 @@ void LLImageGL::applySwizzleForDeprecatedFormat(U32 target, U32 original_format)
     default:
         return;  // not a format we re-express via swizzle
     }
-    glTexParameteriv(target, GL_TEXTURE_SWIZZLE_RGBA, mask);
+    glTexParameteriv(LLTexUnit::getInternalType(type), GL_TEXTURE_SWIZZLE_RGBA, mask);
 }
 
 void LLImageGL::resolveDeprecatedFormat()

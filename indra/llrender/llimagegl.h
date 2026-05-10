@@ -150,7 +150,7 @@ public:
     // on the format resolved by setExplicitFormat / the auto-format switch;
     // direct setManualImage callers (e.g. llvoavatar's morph-mask upload
     // on a raw GL texture) call this themselves before/after binding.
-    static void applySwizzleForDeprecatedFormat(U32 target, U32 original_format);
+    static void applySwizzleForDeprecatedFormat(LLTexUnit::eTextureType type, U32 original_format);
 
     bool createGLTexture() ;
     bool createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S32 usename = 0, bool to_create = true,

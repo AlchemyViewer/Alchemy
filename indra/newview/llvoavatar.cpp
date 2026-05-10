@@ -10368,7 +10368,7 @@ void LLVOAvatar::onBakedTextureMasksLoaded( bool success, LLViewerFetchedTexture
             // for core-profile compatibility but no longer writes the
             // swizzle attribute itself. Apply the matching mask via the
             // LLImageGL helper so {0,0,0,A} sample semantics are preserved.
-            LLImageGL::applySwizzleForDeprecatedFormat(GL_TEXTURE_2D, GL_ALPHA);
+            LLImageGL::applySwizzleForDeprecatedFormat(LLTexUnit::TT_TEXTURE, GL_ALPHA);
 
             LLImageGL::setManualImage(
                 GL_TEXTURE_2D, 0, GL_ALPHA8,
