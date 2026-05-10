@@ -1455,6 +1455,40 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             break;
         }
 
+        case SDL_EVENT_TEXT_EDITING:
+        {
+            // IME composition update (the in-progress preedit string the user is
+            // composing before commit). Without an active LLPreeditor the viewer
+            // has no widget that wants to display preedit feedback — drop it; the
+            // eventual SDL_EVENT_TEXT_INPUT delivers the committed text.
+            if (mPreeditor && event.edit.text)
+            {
+                const LLWString preedit = utf8str_to_wstring(event.edit.text);
+                S32 caret = static_cast<S32>(preedit.length());
+                if (event.edit.start > 0)
+                {
+                    // event.edit.start is a UTF-8 byte offset within event.edit.text;
+                    // convert to llwchar (UTF-32) offset by re-encoding the prefix.
+                    const std::string prefix(event.edit.text, event.edit.start);
+                    caret = static_cast<S32>(utf8str_to_wstring(prefix).length());
+                }
+                const LLPreeditor::segment_lengths_t lengths { static_cast<S32>(preedit.length()) };
+                const LLPreeditor::standouts_t standouts { false };
+                mPreeditor->updatePreedit(preedit, lengths, standouts, caret);
+            }
+            break;
+        }
+
+        case SDL_EVENT_TEXT_EDITING_CANDIDATES:
+        {
+            // SDL3 IMEs surface a candidate list (Japanese/Chinese 候補 selection).
+            // The viewer has no candidate-list UI, so the platform IME renders its
+            // own popup. Logged at debug for diagnostic correlation.
+            LL_DEBUGS("SDL") << "TEXT_EDITING_CANDIDATES: "
+                             << event.edit_candidates.num_candidates << " candidate(s)" << LL_ENDL;
+            break;
+        }
+
         case SDL_EVENT_WINDOW_EXPOSED:
         {
             mCallbacks->handlePaint(this, 0, 0, 0, 0);
@@ -2176,6 +2210,26 @@ void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
     r.h = 16;
 
     SDL_SetTextInputArea(mWindow, &r, 0);
+}
+
+void LLWindowSDL::allowLanguageTextInput(LLPreeditor* preeditor, bool b)
+{
+    // Track which widget (if any) currently wants to receive IME composition
+    // updates. The TEXT_EDITING event handler dispatches to mPreeditor when set.
+    //
+    // SDL_StartTextInput is called unconditionally at window creation today, so
+    // we don't gate it from here — see the deferred per-widget Start/Stop work.
+    if (b)
+    {
+        mPreeditor = preeditor;
+    }
+    else if (mPreeditor == preeditor)
+    {
+        // Mirror the Win32 backend's "ignore disable from a non-owning widget"
+        // behaviour: an unfocused widget's setEnabled(false) shouldn't stomp on
+        // the focused widget's IME state.
+        mPreeditor = nullptr;
+    }
 }
 
 F32 LLWindowSDL::getSystemUISize()

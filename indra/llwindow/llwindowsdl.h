@@ -151,6 +151,7 @@ public:
     void bringToFront() override;
 
     void setLanguageTextInput(const LLCoordGL& pos) override;
+    void allowLanguageTextInput(LLPreeditor* preeditor, bool b) override;
 
     void spawnWebBrowser(const std::string &escaped_url, bool async) override;
 
@@ -240,6 +241,11 @@ private:
     // Each SDL_EVENT_DROP_FILE only carries one path, so we batch them and
     // dispatch a single handleDragNDrop on COMPLETE.
     std::vector<std::string> mPendingDropFiles;
+
+    // Currently-focused preeditor receiving SDL_EVENT_TEXT_EDITING composition
+    // updates. Set by LLLineEditor/LLTextEditor via allowLanguageTextInput()
+    // on focus-in; cleared on focus-out. Null when no widget owns IME.
+    LLPreeditor* mPreeditor = nullptr;
 
     void tryFindFullscreenSize(int &aWidth, int &aHeight);
 
