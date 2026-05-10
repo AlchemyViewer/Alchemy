@@ -453,7 +453,7 @@ void* LLWindowSDL::createSharedContext()
 
     if (!pContext)
     {
-        LL_WARNS() << "Creating shared OpenGL context failed!" << LL_ENDL;
+        LL_WARNS() << "Creating shared OpenGL context failed: " << SDL_GetError() << LL_ENDL;
         SDL_DestroyWindow(osr_window);
         return nullptr;
     }
@@ -491,15 +491,13 @@ void LLWindowSDL::destroySharedContext(void* contextPtr)
 
 void LLWindowSDL::toggleVSync(bool enable_vsync)
 {
-    if (!enable_vsync)
+    const int interval = enable_vsync ? 1 : 0;
+    LL_INFOS("Window") << (enable_vsync ? "Enabling" : "Disabling") << " vertical sync" << LL_ENDL;
+    if (!SDL_GL_SetSwapInterval(interval))
     {
-        LL_INFOS("Window") << "Disabling vertical sync" << LL_ENDL;
-        SDL_GL_SetSwapInterval(0);
-    }
-    else
-    {
-        LL_INFOS("Window") << "Enabling vertical sync" << LL_ENDL;
-        SDL_GL_SetSwapInterval(1);
+        // Some compositors (notably Wayland) refuse interval=0; the driver may also reject it.
+        LL_WARNS("Window") << "SDL_GL_SetSwapInterval(" << interval << ") failed: "
+                           << SDL_GetError() << LL_ENDL;
     }
 }
 
@@ -1498,6 +1496,13 @@ static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty
         cursurface = SDL_CreateSurface(bmpsurface->w,
                                            bmpsurface->h,
                                            pix_format);
+        if (!cursurface)
+        {
+            LL_WARNS() << "SDL_CreateSurface failed for cursor " << filename
+                       << ": " << SDL_GetError() << LL_ENDL;
+            SDL_DestroySurface(bmpsurface);
+            return nullptr;
+        }
         SDL_FillSurfaceRect(cursurface, nullptr, SDL_Swap32LE(0x00000000U));
 
         // Blit the cursor pixel data onto a 32-bit RGBA surface so we
