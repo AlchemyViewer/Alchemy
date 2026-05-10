@@ -1143,23 +1143,23 @@ bool LLWindowSDL::SDLReallyCaptureInput(bool capture)
     bool newGrab = wantGrab;
     if (!mFullscreen) /* only bother if we're windowed anyway */
     {
-        int result;
         if (wantGrab)
         {
-            // LL_INFOS() << "X11 POINTER GRABBY" << LL_ENDL;
-            result = SDL_SetWindowMouseGrab(mWindow, true);
-            if (0 == result)
-                newGrab = true;
-            else
-                newGrab = false;
+            newGrab = SDL_SetWindowMouseGrab(mWindow, true);
+            if (!newGrab)
+            {
+                LL_WARNS() << "SDL_SetWindowMouseGrab(true) failed: " << SDL_GetError() << LL_ENDL;
+            }
         }
         else
         {
             newGrab = false;
-            result = SDL_SetWindowMouseGrab(mWindow, false);
+            if (!SDL_SetWindowMouseGrab(mWindow, false))
+            {
+                LL_WARNS() << "SDL_SetWindowMouseGrab(false) failed: " << SDL_GetError() << LL_ENDL;
+            }
         }
     }
-        // pretend we got what we wanted, when really we don't care.
 
     // return boolean success for whether we ended up in the desired state
     return capture == newGrab;
