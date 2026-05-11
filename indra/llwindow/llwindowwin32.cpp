@@ -3364,6 +3364,14 @@ bool LLWindowWin32::copyTextToClipboard(const LLWString& wstr)
                 {
                     success = true;
                 }
+                else
+                {
+                    GlobalFree(hglobal_copy_utf16);
+                }
+            }
+            else
+            {
+                GlobalFree(hglobal_copy_utf16);
             }
         }
 
