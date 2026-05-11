@@ -306,6 +306,12 @@ private:
     // window center every frame and read the position delta" path is gone.
     bool mRelativeMouseMode = false;
 
+    // Snapshot of mRelativeMouseMode at the most recent beforeDialog() entry.
+    // We drop relative mode while a modal dialog is up (otherwise the user
+    // can't see the cursor to click it) and use this to decide whether to
+    // re-enter pointer-lock in afterDialog().
+    bool mDialogSavedRelativeMode = false;
+
     // The exit position the viewer asked for via setCursorPosition() while
     // we were in relative mode. SDL3 keeps the cursor parked during relative
     // mode, so an in-flight warp can't be honoured immediately; we cache the

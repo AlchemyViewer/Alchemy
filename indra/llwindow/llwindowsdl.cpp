@@ -477,6 +477,19 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     {
         LL_WARNS() << "SDL_StartTextInput failed: " << SDL_GetError() << LL_ENDL;
     }
+
+    // Refresh the pixel-unit minimum-size shadow against this window's
+    // density. setMinSize may have run before the window existed (then
+    // density=1 was used as a fallback) or against a prior window with a
+    // different density (after switchContext). Recompute now that mWindow
+    // reflects the active display.
+    if (mMinWindowWidth > 0 && mMinWindowHeight > 0)
+    {
+        const float density = SDL_GetWindowPixelDensity(mWindow);
+        const float scale = density > 0.f ? density : 1.f;
+        mMinWindowWidthPx = (U32)(mMinWindowWidth * scale);
+        mMinWindowHeightPx = (U32)(mMinWindowHeight * scale);
+    }
     return true;
 }
 
@@ -623,7 +636,13 @@ void LLWindowSDL::destroyContext()
     }
 
     // Stop unicode input — paired with the SDL_StartTextInput in createContext().
-    SDL_StopTextInput(mWindow);
+    // Guard against the early-failure path where SDL_CreateWindowWithProperties
+    // never gave us a window (setupFailure → close → destroyContext): mWindow
+    // is null and SDL_StopTextInput would dereference it.
+    if (mWindow)
+    {
+        SDL_StopTextInput(mWindow);
+    }
     mPreeditor = nullptr;
 
     // Balance the SDL_DisableScreenSaver we may have issued on FOCUS_GAINED.
@@ -660,6 +679,38 @@ void LLWindowSDL::destroyContext()
     {
         LL_INFOS() << "SDL Window already destroyed" << LL_ENDL;
     }
+
+    // Final OSR drain in case a worker thread queued more dead windows
+    // between the earlier drain and now. Normal shutdown ordering joins
+    // worker threads before destroyContext runs, so this is defensive —
+    // it pairs with the inline note in destroySharedContext that the
+    // drain is single-owner from the main thread.
+    {
+        LLMutexLock osr_lock(&mOSRMutex);
+        for (SDL_Window* pWindow : mDeadOSRWindows)
+        {
+            SDL_DestroyWindow(pWindow);
+        }
+        mDeadOSRWindows.clear();
+    }
+
+    // Reset per-window state so switchContext (which calls destroyContext +
+    // createContext) doesn't inherit accumulators / pending warp suppression /
+    // device classification from the prior window. Stale values would survive
+    // a fullscreen toggle or display change and bias the first few frames of
+    // the new context.
+    mPendingWarpSuppressCount = 0;
+    mMouseDeltaAccumX = 0.f;
+    mMouseDeltaAccumY = 0.f;
+    mScrollWheelAccumX = 0.f;
+    mScrollWheelAccumY = 0.f;
+    mHasDeferredCursorWarp = false;
+    mAbsoluteCursorPosition = false;
+    mRelativeMouseMode = false;
+    mPendingDropFiles.clear();
+    mKeyVirtualKey = 0;
+    mKeyModifiers = SDL_KMOD_NONE;
+
     LL_INFOS() << "destroyContext end" << LL_ENDL;
 }
 
@@ -1113,6 +1164,20 @@ void LLWindowSDL::beforeDialog()
 {
     LL_INFOS() << "LLWindowSDL::beforeDialog()" << LL_ENDL;
 
+    // If the user is in mouselook / a tool with pointer-lock, the cursor is
+    // parked and invisible. A modal dialog popping up in that state is a
+    // dead-end — the user can't see their cursor to click it. Drop relative
+    // mode for the dialog's duration; afterDialog re-enters if the viewer
+    // still wants pointer-lock (mHideCursorPermanent stays set throughout
+    // because we don't call showCursor here).
+    mDialogSavedRelativeMode = mRelativeMouseMode;
+    if (mRelativeMouseMode && mWindow)
+    {
+        SDL_SetWindowRelativeMouseMode(mWindow, false);
+        mRelativeMouseMode = false;
+        SDL_ShowCursor();
+    }
+
     if (SDLReallyCaptureInput(false)) // must ungrab input so popup works!
     {
         if (mFullscreen && mWindow )
@@ -1129,6 +1194,23 @@ void LLWindowSDL::afterDialog()
         // Restore fullscreen state that beforeDialog() left so dialogs could draw above us.
         SDL_SetWindowFullscreen(mWindow, true);
     }
+
+    // Restore pointer-lock if we dropped it for the dialog AND the viewer is
+    // still in a mouselook/grab session (mHideCursorPermanent is the signal
+    // for that — beforeDialog doesn't touch it, so it's a reliable indicator).
+    if (mDialogSavedRelativeMode && mHideCursorPermanent && mWindow
+        && !mAbsoluteCursorPosition)
+    {
+        if (SDL_SetWindowRelativeMouseMode(mWindow, true))
+        {
+            mRelativeMouseMode = true;
+            // Don't drag stale motion into the resumed session.
+            mMouseDeltaAccumX = 0.f;
+            mMouseDeltaAccumY = 0.f;
+            mPendingWarpSuppressCount = 0;
+        }
+    }
+    mDialogSavedRelativeMode = false;
 }
 
 void LLWindowSDL::flashIcon(F32 seconds)
@@ -1548,12 +1630,12 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
     {
         case SDL_EVENT_MOUSE_MOTION:
         {
-            // Track whether this event came from a touchscreen or stylus.
-            // SDL3 synthesises mouse-motion events for these devices with
-            // event.motion.which set to SDL_TOUCH_MOUSEID / SDL_PEN_MOUSEID
-            // — matches LLWindowWin32's mAbsoluteCursorPosition tracking.
-            mAbsoluteCursorPosition = (event.motion.which == SDL_TOUCH_MOUSEID
-                                       || event.motion.which == SDL_PEN_MOUSEID);
+            // SDL3 synthesises mouse-motion events for touchscreens / stylus
+            // with event.motion.which set to SDL_TOUCH_MOUSEID /
+            // SDL_PEN_MOUSEID — matches LLWindowWin32's mAbsoluteCursorPosition.
+            const bool from_absolute_device =
+                    (event.motion.which == SDL_TOUCH_MOUSEID
+                     || event.motion.which == SDL_PEN_MOUSEID);
 
             // Drop synthetic motion events generated by SDL_WarpMouseInWindow.
             // Without this, every alt-cam recenter-warp (or any other warp
@@ -1562,11 +1644,24 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // user motion. The viewer-side caller has already set its
             // notion of the cursor position to the warp target, so dropping
             // the event entirely leaves consistent state.
-            if (mPendingWarpSuppressCount > 0)
+            //
+            // Only mouse events can be synthetic warps — touch/pen emulated
+            // motion never is — so gate the suppress consumption on the
+            // source. Otherwise a touch sample that arrives between our
+            // warp call and SDL's synthetic event would consume the
+            // suppress and let the synthetic warp slip through.
+            if (!from_absolute_device && mPendingWarpSuppressCount > 0)
             {
                 --mPendingWarpSuppressCount;
                 break;
             }
+
+            // Defer the device-class update until after the suppress check
+            // so a suppressed real-mouse warp event doesn't override a
+            // previous touch/pen classification with the warp's mouse-source
+            // ID (the user is still on touch; the synthetic was just SDL
+            // bookkeeping for our warp call).
+            mAbsoluteCursorPosition = from_absolute_device;
 
             // event.motion.x/y are SDL3 screen-coord (logical) units. Scale to
             // PIXEL units so LLCoordWindow stays in the same unit as
@@ -1897,10 +1992,11 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // dimensions change even if the window's logical size stayed the same
             // (e.g. moving to a monitor with a different scale factor under
             // fractional Wayland scaling). data1/data2 are already in pixels here,
-            // so we don't multiply by pixel density.
+            // so the clamp has to use the PIXEL-unit minimum shadow — the
+            // screen-coord mMinWindowWidth/Height would under-clamp on HiDPI.
             LL_INFOS() << "Handling a pixel-size event: " << event.window.data1 << "x" << event.window.data2 << LL_ENDL;
-            S32 width  = llmax(event.window.data1, (S32)mMinWindowWidth);
-            S32 height = llmax(event.window.data2, (S32)mMinWindowHeight);
+            S32 width  = llmax(event.window.data1, (S32)mMinWindowWidthPx);
+            S32 height = llmax(event.window.data2, (S32)mMinWindowHeightPx);
             mCallbacks->handleResize(this, width, height);
             break;
         }
@@ -1921,6 +2017,13 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             mCallbacks->handleFocusLost(this);
+            // Drop the IME preeditor reference defensively. The viewer's
+            // focus manager normally clears keyboard focus on app focus
+            // loss, which triggers allowLanguageTextInput(nullptr) — but
+            // if any path leaves mPreeditor pointing at a widget that
+            // thinks it's defocused, a stray TEXT_EDITING event would
+            // update a non-active widget.
+            mPreeditor = nullptr;
             SDL_EnableScreenSaver();
             //SDL_SetWindowKeyboardGrab(mWindow, false);
             break;
@@ -2148,6 +2251,18 @@ static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty
     // legacy path we keep the rest of the pixel data intact — the old
     // code quantised everything to 1-bit black/white, which is why
     // multi-colour cursors looked degraded vs Win32.
+    //
+    // A converted SDL3 RGBA32 surface shouldn't need locking, but the
+    // pair is cheap and defends against future SDL changes that flag the
+    // surface as RLE / GPU-backed.
+    const bool must_lock = SDL_MUSTLOCK(rgba);
+    if (must_lock && !SDL_LockSurface(rgba))
+    {
+        LL_WARNS() << "SDL_LockSurface failed for cursor " << filename
+                   << ": " << SDL_GetError() << LL_ENDL;
+        SDL_DestroySurface(rgba);
+        return nullptr;
+    }
     for (int y = 0; y < rgba->h; ++y)
     {
         U8 *row = (U8*)rgba->pixels + (size_t)y * rgba->pitch;
@@ -2159,6 +2274,10 @@ static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty
                 px[3] = 0;
             }
         }
+    }
+    if (must_lock)
+    {
+        SDL_UnlockSurface(rgba);
     }
 
     // Clamp the hot-spot — out-of-range coordinates are undefined behaviour
