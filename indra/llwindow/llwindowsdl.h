@@ -306,11 +306,15 @@ private:
     // window center every frame and read the position delta" path is gone.
     bool mRelativeMouseMode = false;
 
-    // Snapshot of mRelativeMouseMode at the most recent beforeDialog() entry.
+    // Snapshot of mRelativeMouseMode at the OUTERMOST beforeDialog() entry.
     // We drop relative mode while a modal dialog is up (otherwise the user
     // can't see the cursor to click it) and use this to decide whether to
-    // re-enter pointer-lock in afterDialog().
+    // re-enter pointer-lock when the outermost afterDialog() balances out.
+    // Nested dialogs (e.g. a device-loss notification surfacing while a
+    // file picker is open) are gated by mDialogDepth so only the outermost
+    // pair saves/restores state.
     bool mDialogSavedRelativeMode = false;
+    S32 mDialogDepth = 0;
 
     // The exit position the viewer asked for via setCursorPosition() while
     // we were in relative mode. SDL3 keeps the cursor parked during relative

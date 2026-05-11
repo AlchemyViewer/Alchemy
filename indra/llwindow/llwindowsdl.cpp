@@ -707,6 +707,8 @@ void LLWindowSDL::destroyContext()
     mHasDeferredCursorWarp = false;
     mAbsoluteCursorPosition = false;
     mRelativeMouseMode = false;
+    mDialogDepth = 0;
+    mDialogSavedRelativeMode = false;
     mPendingDropFiles.clear();
     mKeyVirtualKey = 0;
     mKeyModifiers = SDL_KMOD_NONE;
@@ -1162,32 +1164,54 @@ F32 LLWindowSDL::getPixelAspectRatio()
 // dialogs are still usable in fullscreen.
 void LLWindowSDL::beforeDialog()
 {
-    LL_INFOS() << "LLWindowSDL::beforeDialog()" << LL_ENDL;
+    LL_INFOS() << "LLWindowSDL::beforeDialog() depth=" << mDialogDepth << LL_ENDL;
 
-    // If the user is in mouselook / a tool with pointer-lock, the cursor is
-    // parked and invisible. A modal dialog popping up in that state is a
-    // dead-end — the user can't see their cursor to click it. Drop relative
-    // mode for the dialog's duration; afterDialog re-enters if the viewer
-    // still wants pointer-lock (mHideCursorPermanent stays set throughout
-    // because we don't call showCursor here).
-    mDialogSavedRelativeMode = mRelativeMouseMode;
-    if (mRelativeMouseMode && mWindow)
+    // Only the outermost beforeDialog/afterDialog pair captures and
+    // restores window state. Nested dialogs (e.g. a device-loss notice
+    // popping up while a file picker is open) MUST NOT re-snapshot
+    // mDialogSavedRelativeMode — the outer call already dropped relative
+    // mode, so the nested call would read `false` and clobber the true
+    // value the outer pair needs to know to restore.
+    if (mDialogDepth == 0)
     {
-        SDL_SetWindowRelativeMouseMode(mWindow, false);
-        mRelativeMouseMode = false;
-        SDL_ShowCursor();
-    }
+        // If the user is in mouselook / a tool with pointer-lock, the
+        // cursor is parked and invisible. A modal dialog popping up in
+        // that state is a dead-end — the user can't see their cursor to
+        // click it. Drop relative mode for the dialog's duration;
+        // afterDialog re-enters if the viewer still wants pointer-lock
+        // (mHideCursorPermanent stays set throughout because we don't
+        // call showCursor here).
+        mDialogSavedRelativeMode = mRelativeMouseMode;
+        if (mRelativeMouseMode && mWindow)
+        {
+            SDL_SetWindowRelativeMouseMode(mWindow, false);
+            mRelativeMouseMode = false;
+            SDL_ShowCursor();
+        }
 
-    if (SDLReallyCaptureInput(false)) // must ungrab input so popup works!
-    {
-        if (mFullscreen && mWindow )
-            SDL_SetWindowFullscreen( mWindow, 0 );
+        if (SDLReallyCaptureInput(false)) // must ungrab input so popup works!
+        {
+            if (mFullscreen && mWindow )
+                SDL_SetWindowFullscreen( mWindow, 0 );
+        }
     }
+    ++mDialogDepth;
 }
 
 void LLWindowSDL::afterDialog()
 {
-    LL_INFOS() << "LLWindowSDL::afterDialog()" << LL_ENDL;
+    if (mDialogDepth > 0)
+    {
+        --mDialogDepth;
+    }
+    LL_INFOS() << "LLWindowSDL::afterDialog() depth=" << mDialogDepth << LL_ENDL;
+
+    if (mDialogDepth > 0)
+    {
+        // Nested afterDialog: still inside an outer dialog scope, nothing
+        // to restore yet.
+        return;
+    }
 
     if (mFullscreen && mWindow)
     {
@@ -1737,7 +1761,13 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             if (ix != 0)
             {
                 mScrollWheelAccumX -= (F32)ix;
-                mCallbacks->handleScrollHWheel(this, -ix);
+                // Win32 sends WM_MOUSEHWHEEL's HIWORD (+=right) directly with
+                // no sign flip (llwindowwin32.cpp:2929: `h_delta / WHEEL_DELTA`).
+                // SDL3 `event.wheel.x` follows the same +=right convention, so
+                // forward unmodified. Only the Y axis negates to match
+                // Win32's vertical convention ("+ clicks = scroll content
+                // down" — see the line just above).
+                mCallbacks->handleScrollHWheel(this, ix);
             }
             break;
         }
@@ -2450,8 +2480,13 @@ void LLWindowSDL::hideCursor()
             // Fresh session: forget any deferred warp left over from a
             // prior aborted exit so it doesn't surface on next showCursor().
             mHasDeferredCursorWarp = false;
-            // No more non-relative warps to suppress while in this mode.
-            mPendingWarpSuppressCount = 0;
+            // Intentionally NOT zeroing mPendingWarpSuppressCount: any
+            // pending synthetic motion events from non-relative-mode warps
+            // queued just before mouselook entry are still sitting in SDL's
+            // event queue, and the motion handler needs them suppressed
+            // before they reach the accumulator (where, in relative mode,
+            // they'd be sampled as camera input). The count drains
+            // naturally as those events are processed.
         }
         else
         {
@@ -2478,6 +2513,16 @@ void LLWindowSDL::showCursor()
     {
         if (mRelativeMouseMode)
         {
+            // Pre-increment the suppress count: on some platforms (X11 with
+            // XInput2 raw input being deactivated, in particular) SDL emits
+            // a synthetic motion event when relative mode is disabled, as
+            // the cursor "un-parks" back to the lock position. Without this
+            // bump that motion would land in the accumulator at exactly the
+            // moment the user is exiting mouselook — visible as a one-frame
+            // camera jolt. On platforms that don't emit (Wayland), the bump
+            // costs one real motion event of suppression at exit, which is
+            // unobservable during the mouselook→non-mouselook transition.
+            ++mPendingWarpSuppressCount;
             SDL_SetWindowRelativeMouseMode(mWindow, false);
             mRelativeMouseMode = false;
             mMouseDeltaAccumX = 0.f;
