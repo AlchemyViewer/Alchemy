@@ -214,7 +214,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
     FMOD_ADVANCEDSETTINGS settings;
     memset(&settings, 0, sizeof(settings));
     settings.cbSize = sizeof(FMOD_ADVANCEDSETTINGS);
-    settings.resamplerMethod = FMOD_DSP_RESAMPLER_LINEAR;
+    settings.resamplerMethod = FMOD_DSP_RESAMPLER_SPLINE;
 
     result = mSystem->setAdvancedSettings(&settings);
     Check_FMOD_Error(result, "FMOD::System::setAdvancedSettings");
