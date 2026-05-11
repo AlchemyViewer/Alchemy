@@ -3095,10 +3095,13 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("MWP - WM_INPUT");
 
             UINT dwSize = 0;
-            GetRawInputData((HRAWINPUT)l_param, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
-            llassert(dwSize < 1024);
-
             U8 lpb[1024];
+
+            if (GetRawInputData((HRAWINPUT)l_param, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER)) == (UINT)-1
+                || dwSize == 0 || dwSize > sizeof(lpb))
+            {
+                break;
+            }
 
             if (GetRawInputData((HRAWINPUT)l_param, RID_INPUT, (void*)lpb, &dwSize, sizeof(RAWINPUTHEADER)) == dwSize)
             {
