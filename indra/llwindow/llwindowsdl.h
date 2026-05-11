@@ -263,6 +263,18 @@ private:
     // window center every frame and read the position delta" path is gone.
     bool mRelativeMouseMode = false;
 
+    // The exit position the viewer asked for via setCursorPosition() while
+    // we were in relative mode. SDL3 keeps the cursor parked during relative
+    // mode, so an in-flight warp can't be honoured immediately; we cache the
+    // requested position and apply it as one real warp on showCursor(),
+    // right before the OS cursor becomes visible again. Without this,
+    // alt-cam handleMouseUp's "put the cursor back at the click point"
+    // call would be silently dropped, leaving the cursor at wherever SDL
+    // parked it. Mouselook deselect doesn't set this, so showCursor()
+    // defaults to window center in that case.
+    LLCoordWindow mDeferredCursorWarp;
+    bool mHasDeferredCursorWarp = false;
+
     // Off-screen rendering (OSR) shared GL contexts.
     //
     // Worker threads (texture loader, etc.) ask for a shared GL context via

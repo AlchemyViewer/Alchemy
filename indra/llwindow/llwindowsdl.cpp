@@ -909,8 +909,16 @@ bool LLWindowSDL::setCursorPosition(const LLCoordWindow position)
     // the warp distance which would slam the camera. The viewer's caller
     // (LLViewerWindow::moveCursorToCenter) zeroes its own delta state for
     // the same reason; we just zero ours and skip the warp.
+    //
+    // Stash the requested position so showCursor() can apply it as a real
+    // warp on exit. The viewer's tool exit code (LLToolCamera::handleMouseUp
+    // → setMousePositionScreen(mMouseDownX, mMouseDownY)) calls us while
+    // still in relative mode; without deferring, the cursor would reappear
+    // wherever SDL parked it instead of at the requested point.
     if (mRelativeMouseMode)
     {
+        mDeferredCursorWarp = position;
+        mHasDeferredCursorWarp = true;
         mMouseDeltaAccumX = 0.f;
         mMouseDeltaAccumY = 0.f;
         return true;
@@ -2152,6 +2160,9 @@ void LLWindowSDL::hideCursor()
             // it isn't relevant to the new camera-control session.
             mMouseDeltaAccumX = 0.f;
             mMouseDeltaAccumY = 0.f;
+            // Fresh session: forget any deferred warp left over from a
+            // prior aborted exit so it doesn't surface on next showCursor().
+            mHasDeferredCursorWarp = false;
         }
         else
         {
@@ -2176,6 +2187,37 @@ void LLWindowSDL::showCursor()
         {
             SDL_SetWindowRelativeMouseMode(mWindow, false);
             mRelativeMouseMode = false;
+            mMouseDeltaAccumX = 0.f;
+            mMouseDeltaAccumY = 0.f;
+
+            // Place the visible cursor where the viewer wants it before it
+            // becomes visible again. Two cases:
+            //   * alt-cam / focus-tool handleMouseUp called setCursorPosition
+            //     during relative mode → mHasDeferredCursorWarp carries the
+            //     click-point or screen-target it asked for.
+            //   * mouselook deselect doesn't call setCursorPosition at all
+            //     (moveCursorToCenter is a no-op on SDL3) → default to the
+            //     window center, which matches the "you exit mouselook
+            //     looking at the middle of the world view" expectation.
+            LLCoordWindow warp_to;
+            if (mHasDeferredCursorWarp)
+            {
+                warp_to = mDeferredCursorWarp;
+                mHasDeferredCursorWarp = false;
+            }
+            else
+            {
+                int w = 0, h = 0;
+                SDL_GetWindowSizeInPixels(mWindow, &w, &h);
+                warp_to.mX = w / 2;
+                warp_to.mY = h / 2;
+            }
+            const float density = SDL_GetWindowPixelDensity(mWindow);
+            const float div = density > 0.f ? density : 1.f;
+            SDL_WarpMouseInWindow(mWindow, (F32)warp_to.mX / div, (F32)warp_to.mY / div);
+            // SDL emits a synthetic motion event for the warp; drop the
+            // delta so it doesn't feed back into the camera signal on the
+            // next frame.
             mMouseDeltaAccumX = 0.f;
             mMouseDeltaAccumY = 0.f;
         }
