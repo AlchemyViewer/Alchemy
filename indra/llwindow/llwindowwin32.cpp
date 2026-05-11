@@ -1202,6 +1202,7 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
         bool success = false;
         DWORD closest_refresh = 0;
 
+        S32 closest_diff = S32_MAX;
         for (S32 mode_num = 0;; mode_num++)
         {
             if (!EnumDisplaySettings(NULL, mode_num, &dev_mode))
@@ -1214,9 +1215,11 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
                 dev_mode.dmBitsPerPel == BITS_PER_PIXEL)
             {
                 success = true;
-                if ((dev_mode.dmDisplayFrequency - current_refresh)
-                    < (closest_refresh - current_refresh))
+                S32 signed_diff = (S32)dev_mode.dmDisplayFrequency - (S32)current_refresh;
+                S32 diff = signed_diff < 0 ? -signed_diff : signed_diff;
+                if (diff < closest_diff)
                 {
+                    closest_diff = diff;
                     closest_refresh = dev_mode.dmDisplayFrequency;
                 }
             }
