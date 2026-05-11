@@ -1969,6 +1969,24 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
                 break;
             }
 
+            const bool empty = !event.edit.text || event.edit.text[0] == '\0';
+
+            // Skip the entire handler when both the incoming composition is
+            // empty AND there's no active preedit to clear. Some Linux IMEs
+            // (ibus, fcitx) emit empty TEXT_EDITING events on every
+            // modifier-only keypress to "cancel composition mode" — Ctrl-A
+            // is a common trigger. Calling resetPreedit() in that state has
+            // a nasty side effect: LLLineEditor::resetPreedit treats
+            // "selection-without-preedit" as the IME-overwrites-selection
+            // pattern and calls deleteSelection(), which wipes the text the
+            // user just selected with the menu accelerator.
+            S32 preedit_pos = 0, preedit_len = 0;
+            mPreeditor->getPreeditRange(&preedit_pos, &preedit_len);
+            if (empty && preedit_len == 0)
+            {
+                break;
+            }
+
             // resetPreedit must be called before every updatePreedit (see
             // lllineeditor.cpp:2763). Each TEXT_EDITING delivers the FULL
             // current composition string, so we drop the previous preedit
@@ -1978,7 +1996,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
             // An empty composition string means the IME cancelled or cleared
             // the preedit; the reset above is the entire job.
-            if (!event.edit.text || event.edit.text[0] == '\0')
+            if (empty)
             {
                 break;
             }
