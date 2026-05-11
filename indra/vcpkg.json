@@ -35,10 +35,6 @@
       "platform": "linux"
     },
     {
-      "name": "fontconfig",
-      "platform": "linux"
-    },
-    {
       "name": "freetype",
       "features": [
         "brotli",
