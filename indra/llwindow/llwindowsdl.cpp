@@ -2604,16 +2604,21 @@ void LLWindowSDL::showCursor()
     {
         if (mRelativeMouseMode)
         {
-            // Pre-increment the suppress count: on some platforms (X11 with
-            // XInput2 raw input being deactivated, in particular) SDL emits
-            // a synthetic motion event when relative mode is disabled, as
-            // the cursor "un-parks" back to the lock position. Without this
-            // bump that motion would land in the accumulator at exactly the
-            // moment the user is exiting mouselook — visible as a one-frame
-            // camera jolt. On platforms that don't emit (Wayland), the bump
-            // costs one real motion event of suppression at exit, which is
-            // unobservable during the mouselook→non-mouselook transition.
-            ++mPendingWarpSuppressCount;
+            // Pre-increment the suppress count on X11: when XInput2 raw
+            // input is deactivated, SDL emits a synthetic motion event as
+            // the cursor un-parks back to the lock position. Without the
+            // bump that motion would land in the accumulator at the moment
+            // the user is exiting mouselook — visible as a one-frame camera
+            // jolt. Wayland's relative-pointer protocol
+            // (Wayland_input_disable_relative_pointer) does not synthesise
+            // a motion event on disable, so the bump would eat the user's
+            // first real motion sample after exit — visible as a one-frame
+            // cursor stutter. Gate on the protocol we detected at
+            // createContext.
+            if (mServerProtocol == X11)
+            {
+                ++mPendingWarpSuppressCount;
+            }
             SDL_SetWindowRelativeMouseMode(mWindow, false);
             mRelativeMouseMode = false;
             mMouseDeltaAccumX = 0.f;
