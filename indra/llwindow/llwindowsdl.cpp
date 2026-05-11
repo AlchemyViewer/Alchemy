@@ -976,8 +976,13 @@ bool LLWindowSDL::getCursorDelta(LLCoordCommon* delta)
     // rates (where mouse motion is < 1 pixel/frame) integrate over time
     // instead of being silently rounded to zero each frame. The
     // accumulator is fed by SDL_EVENT_MOUSE_MOTION below.
-    const S32 ix = llfloor(mMouseDeltaAccumX);
-    const S32 iy = llfloor(mMouseDeltaAccumY);
+    //
+    // Use lltrunc (toward-zero) rather than llfloor: llfloor(-0.1) = -1
+    // would amplify sub-pixel negative noise into a -1 pixel per several
+    // frames of constant drift. Toward-zero truncation only emits a
+    // non-zero delta once the accumulator's magnitude actually reaches 1.
+    const S32 ix = lltrunc(mMouseDeltaAccumX);
+    const S32 iy = lltrunc(mMouseDeltaAccumY);
     mMouseDeltaAccumX -= (F32)ix;
     mMouseDeltaAccumY -= (F32)iy;
     delta->mX = ix;
@@ -1478,8 +1483,17 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // values come directly from the OS pointer driver (libinput
             // rel-pointer / XInput2 raw / raw input); otherwise SDL emulates
             // them from absolute-position diffs.
+            //
+            // Sign convention: getCursorDelta is consumed by viewer code
+            // (alt-cam, mouselook, focus tool) that was written against
+            // Win32's raw-input convention where mY is Y-UP — see
+            // LLWindowWin32::WM_INPUT, "mRawMouseDelta.mY -= ...". SDL3's
+            // event.motion.yrel is Y-DOWN (positive when the cursor moves
+            // down); negate it on the way into the accumulator so the
+            // viewer's "-dy pitches the camera up" math behaves the same
+            // on both backends. X is Y-RIGHT-positive on both, no flip.
             mMouseDeltaAccumX += event.motion.xrel * scale;
-            mMouseDeltaAccumY += event.motion.yrel * scale;
+            mMouseDeltaAccumY -= event.motion.yrel * scale;
 
             // When relative mode is on, motion.x/y is undefined (SDL parks
             // the cursor) and we're in mouselook — UI hover/hit-testing
