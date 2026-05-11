@@ -718,6 +718,11 @@ void LLWindowSDL::destroyContext()
     mPendingDropFiles.clear();
     mKeyVirtualKey = 0;
     mKeyModifiers = SDL_KMOD_NONE;
+    mPenInProximity = false;
+    mPenEraserTip = false;
+    mPenPressure = 1.f;
+    mPenTiltX = 0.f;
+    mPenTiltY = 0.f;
 
     LL_INFOS() << "destroyContext end" << LL_ENDL;
 }
@@ -1774,6 +1779,91 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             }
             break;
         }
+
+        // Pen / stylus native events. SDL3 also emits mouse-emulation events
+        // for these (with event.motion.which == SDL_PEN_MOUSEID) which our
+        // mouse handlers already route through the usual input plumbing. The
+        // native channel is consumed here purely to harvest the rich
+        // metadata — pressure, tilt, eraser-tip flag — that mouse emulation
+        // throws away. Tools query the cached values via
+        // LLWindow::getPointerPressure / getPointerTiltX/Y /
+        // isPointerEraserTip / isPointerPenActive.
+        case SDL_EVENT_PEN_PROXIMITY_IN:
+        {
+            mPenInProximity = true;
+            // Eraser-tip flag isn't on the proximity event itself; it shows
+            // up on subsequent PEN_DOWN/UP via event.ptouch.eraser, and on
+            // PEN_MOTION / PEN_AXIS via the pen_state bitfield. Start
+            // assuming writing tip.
+            mPenEraserTip = false;
+            LL_DEBUGS("Window") << "Pen entered proximity" << LL_ENDL;
+            break;
+        }
+        case SDL_EVENT_PEN_PROXIMITY_OUT:
+        {
+            mPenInProximity = false;
+            mPenEraserTip = false;
+            mPenPressure = 1.f;
+            mPenTiltX = 0.f;
+            mPenTiltY = 0.f;
+            LL_DEBUGS("Window") << "Pen left proximity" << LL_ENDL;
+            break;
+        }
+        case SDL_EVENT_PEN_AXIS:
+        {
+            mPenEraserTip = (event.paxis.pen_state & SDL_PEN_INPUT_ERASER_TIP) != 0;
+            switch (event.paxis.axis)
+            {
+                case SDL_PEN_AXIS_PRESSURE:
+                    mPenPressure = event.paxis.value;
+                    break;
+                case SDL_PEN_AXIS_XTILT:
+                    mPenTiltX = event.paxis.value;
+                    break;
+                case SDL_PEN_AXIS_YTILT:
+                    mPenTiltY = event.paxis.value;
+                    break;
+                default:
+                    // Distance / rotation / slider / tangential-pressure are
+                    // not currently surfaced through LLWindow. The values
+                    // are still available via direct SDL polling if a tool
+                    // needs them.
+                    break;
+            }
+            break;
+        }
+        case SDL_EVENT_PEN_DOWN:
+        case SDL_EVENT_PEN_UP:
+            // ptouch carries the eraser-tip flag directly; keep it in sync.
+            mPenEraserTip = event.ptouch.eraser;
+            // Mouse-emulation events handle the actual click routing.
+            break;
+        case SDL_EVENT_PEN_MOTION:
+            mPenEraserTip = (event.pmotion.pen_state & SDL_PEN_INPUT_ERASER_TIP) != 0;
+            // Mouse-emulation events handle motion routing.
+            break;
+        case SDL_EVENT_PEN_BUTTON_DOWN:
+        case SDL_EVENT_PEN_BUTTON_UP:
+            // Mouse-emulation events handle button routing. Logging only.
+            LL_DEBUGS("Window") << "Pen button event "
+                                << std::hex << event.type << std::dec << LL_ENDL;
+            break;
+
+        // Touchscreen finger events. As with pen, SDL3 emits mouse-emulation
+        // events alongside these and the viewer's mouse plumbing handles
+        // routing. We track pressure on single-finger contacts; multi-touch
+        // gesture recognition would require a dedicated callback layer that
+        // doesn't exist yet.
+        case SDL_EVENT_FINGER_DOWN:
+        case SDL_EVENT_FINGER_MOTION:
+            mPenPressure = event.tfinger.pressure;
+            mPenInProximity = true;
+            break;
+        case SDL_EVENT_FINGER_UP:
+        case SDL_EVENT_FINGER_CANCELED:
+            mPenPressure = 1.f;
+            mPenInProximity = false;
+            break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
         {

@@ -111,6 +111,24 @@ public:
     // for the underlying letter. Default false — Win32 and SDL3 override.
     virtual bool isAltGrPressed() const { return false; }
 
+    // Pointer-device state for tools that care about pen / stylus / touch
+    // metadata richer than a mouse can provide. The default implementations
+    // model a regular mouse (always full pressure, no tilt, no eraser tip),
+    // so tools that don't opt into these queries continue to work unchanged.
+    //
+    // SDL3 populates these from SDL_EVENT_PEN_AXIS / FINGER_* events while
+    // also keeping the mouse-emulation event stream that the viewer's
+    // input plumbing already consumes (LLWindowSDL handles this).
+    //
+    // The pressure value is normalised [0, 1]. Tilt is in degrees, range
+    // [-90, 90] per axis. isPointerEraserTip distinguishes the eraser end
+    // of a stylus from the writing tip (most graphics tablets surface this).
+    virtual F32 getPointerPressure() const { return 1.f; }
+    virtual F32 getPointerTiltX() const { return 0.f; }
+    virtual F32 getPointerTiltY() const { return 0.f; }
+    virtual bool isPointerEraserTip() const { return false; }
+    virtual bool isPointerPenActive() const { return false; }
+
     virtual void showCursor() = 0;
     virtual void hideCursor() = 0;
     virtual bool isCursorHidden() = 0;

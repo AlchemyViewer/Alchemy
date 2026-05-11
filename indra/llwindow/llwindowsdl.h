@@ -105,6 +105,17 @@ public:
             && !(mKeyModifiers & SDL_KMOD_LALT)
             && !(mKeyModifiers & SDL_KMOD_CTRL);
     }
+
+    // Pen / stylus and touchscreen metadata sourced from SDL_EVENT_PEN_AXIS
+    // (pressure, tilt) and SDL_EVENT_PEN_PROXIMITY_IN/OUT (active state +
+    // eraser-tip flag). For touch input, mPenPressure carries the contact
+    // pressure of the most recent SDL_EVENT_FINGER_* sample if the device
+    // reports one. Mouse events keep their defaults (pressure=1, no tilt).
+    F32 getPointerPressure() const override { return mPenInProximity ? mPenPressure : 1.f; }
+    F32 getPointerTiltX() const override { return mPenTiltX; }
+    F32 getPointerTiltY() const override { return mPenTiltY; }
+    bool isPointerEraserTip() const override { return mPenEraserTip; }
+    bool isPointerPenActive() const override { return mPenInProximity; }
     void showCursor() override;
     void hideCursor() override;
     bool isCursorHidden() override;
@@ -317,6 +328,18 @@ private:
     // relative deltas for finger drags — relative mode there would freeze
     // mouselook input entirely.
     bool mAbsoluteCursorPosition = false;
+
+    // Pen / stylus state cached from the native SDL3 pen events. SDL3
+    // continues to deliver mouse-emulation events alongside these (we
+    // don't disable SDL_HINT_PEN_MOUSE_EVENTS), so the viewer's existing
+    // input plumbing keeps working unchanged; this state is purely for
+    // tools that opt into pressure/tilt/eraser data via the LLWindow
+    // virtual getters.
+    bool mPenInProximity = false;
+    bool mPenEraserTip = false;
+    F32 mPenPressure = 1.f;
+    F32 mPenTiltX = 0.f;
+    F32 mPenTiltY = 0.f;
 
     // True while SDL_SetWindowRelativeMouseMode is active. We enter relative
     // mode on hideCursor() (the permanent-hide path used by mouselook /
