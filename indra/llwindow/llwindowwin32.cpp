@@ -4307,7 +4307,7 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
     if (indexes & GCS_CURSORPOS)
     {
         const S32 caret_position_utf16 = LLWinImm::getCompositionString(himc, GCS_CURSORPOS, NULL, 0);
-        if (caret_position_utf16 >= 0 && caret_position <= preedit_string_utf16_length)
+        if (caret_position_utf16 >= 0 && caret_position_utf16 <= preedit_string_utf16_length)
         {
             caret_position = wstring_wstring_length_from_utf16_length(preedit_string, 0, caret_position_utf16);
         }
