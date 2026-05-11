@@ -1494,17 +1494,17 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             if (mKeyVirtualKey == SDLK_RETURN)
             {
                 // Synthesise a Unicode-char event for Return. SDL3 only fires
-                // SDL_EVENT_TEXT_INPUT for printable characters that the
-                // platform IME composed, never for control keys like Return,
-                // Tab, or Backspace — so we have to deliver Return to the
-                // focused text widget ourselves. This is independent of
-                // whether SDL_StartTextInput is currently on; SDL3 simply
-                // does not consider Return part of "text input".
+                // SDL_EVENT_TEXT_INPUT for printable characters the platform
+                // IME composed, never for control keys like Return, Tab, or
+                // Backspace — so we deliver Return to
+                // LLViewerWindow::handleUnicodeChar ourselves, which then
+                // funnels uni_char == '\r' into gViewerInput.handleKey(KEY_RETURN, …)
+                // for chat-send and similar (see llviewerwindow.cpp:3406).
                 //
-                // The modifier mask is filtered to drop NumLock/CapsLock/etc.
-                // so that, e.g., NumLock being on doesn't make the chat bar
-                // treat Return as a modified key and ignore it.
-                mKeyModifiers &= (~(SDL_KMOD_NUM | SDL_KMOD_CAPS | SDL_KMOD_MODE | SDL_KMOD_SCROLL));
+                // The mask we pass is the live MASK from currentMask(false),
+                // which only reflects SHIFT/CTRL/ALT — NumLock/CapsLock/etc.
+                // don't translate into the MASK type at all, so lock-key state
+                // has no effect on the chat-send path here.
                 mCallbacks->handleUnicodeChar(mKeyVirtualKey, gKeyboard->currentMask(false));
             }
 
