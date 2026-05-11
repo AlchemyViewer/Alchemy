@@ -2119,93 +2119,67 @@ SDL_AppResult LLWindowSDL::handleEvents(const SDL_Event& event)
 
 static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty)
 {
-    SDL_Cursor *sdlcursor = nullptr;
-    SDL_Surface *bmpsurface;
-
-    // Load cursor pixel data from BMP file
-    bmpsurface = Load_BMP_Resource(filename);
-    if (bmpsurface && bmpsurface->w%8==0)
+    SDL_Surface *bmpsurface = Load_BMP_Resource(filename);
+    if (!bmpsurface)
     {
-        SDL_Surface *cursurface;
-        LL_DEBUGS() << "Loaded cursor file " << filename << " "
-                    << bmpsurface->w << "x" << bmpsurface->h << LL_ENDL;
-        SDL_PixelFormat pix_format = SDL_GetPixelFormatForMasks(32,
-            SDL_Swap32LE(0xFFU),
-            SDL_Swap32LE(0xFF00U),
-            SDL_Swap32LE(0xFF0000U),
-            SDL_Swap32LE(0xFF000000U));
-        if (pix_format == SDL_PIXELFORMAT_UNKNOWN)
-        {
-            return nullptr;
-        }
-
-        const SDL_PixelFormatDetails* pix_format_details = SDL_GetPixelFormatDetails(pix_format);
-        if(!pix_format_details)
-        {
-            return nullptr;
-        }
-
-        cursurface = SDL_CreateSurface(bmpsurface->w,
-                                           bmpsurface->h,
-                                           pix_format);
-        if (!cursurface)
-        {
-            LL_WARNS() << "SDL_CreateSurface failed for cursor " << filename
-                       << ": " << SDL_GetError() << LL_ENDL;
-            SDL_DestroySurface(bmpsurface);
-            return nullptr;
-        }
-        SDL_FillSurfaceRect(cursurface, nullptr, SDL_Swap32LE(0x00000000U));
-
-        // Blit the cursor pixel data onto a 32-bit RGBA surface so we
-        // only have to cope with processing one type of pixel format.
-        if (SDL_BlitSurface(bmpsurface, nullptr,
-                                 cursurface, nullptr))
-        {
-            // n.b. we already checked that width is a multiple of 8.
-            const int bitmap_bytes = (cursurface->w * cursurface->h) / 8;
-            unsigned char *cursor_data = new unsigned char[bitmap_bytes];
-            unsigned char *cursor_mask = new unsigned char[bitmap_bytes];
-            memset(cursor_data, 0, bitmap_bytes);
-            memset(cursor_mask, 0, bitmap_bytes);
-            int i,j;
-            // Walk the RGBA cursor pixel data, extracting both data and
-            // mask to build SDL-friendly cursor bitmaps from.  The mask
-            // is inferred by color-keying against 200,200,200
-            for (i=0; i<cursurface->h; ++i) {
-                for (j=0; j<cursurface->w; ++j) {
-                    U8 *pixelp =
-                            ((U8*)cursurface->pixels)
-                            + cursurface->pitch * i
-                            + j*pix_format_details->bytes_per_pixel;
-                    U8 srcred = pixelp[0];
-                    U8 srcgreen = pixelp[1];
-                    U8 srcblue = pixelp[2];
-                    bool mask_bit = (srcred != 200)
-                                    || (srcgreen != 200)
-                                    || (srcblue != 200);
-                    bool data_bit = mask_bit && (srcgreen <= 80);//not 0x80
-                    unsigned char bit_offset = (cursurface->w/8) * i
-                                               + j/8;
-                    cursor_data[bit_offset] |= (data_bit) << (7 - (j&7));
-                    cursor_mask[bit_offset] |= (mask_bit) << (7 - (j&7));
-                }
-            }
-            sdlcursor = SDL_CreateCursor((Uint8*)cursor_data,
-                                         (Uint8*)cursor_mask,
-                                         cursurface->w, cursurface->h,
-                                         hotx, hoty);
-            delete[] cursor_data;
-            delete[] cursor_mask;
-        } else {
-            LL_WARNS() << "CURSOR BLIT FAILURE, cursurface: " << cursurface << LL_ENDL;
-        }
-        SDL_DestroySurface(cursurface);
-        SDL_DestroySurface(bmpsurface);
-    } else {
-        LL_WARNS() << "CURSOR LOAD FAILURE " << filename << LL_ENDL;
+        LL_WARNS() << "Cursor BMP failed to load: " << filename << LL_ENDL;
+        return nullptr;
     }
 
+    LL_DEBUGS() << "Loaded cursor file " << filename << " "
+                << bmpsurface->w << "x" << bmpsurface->h << LL_ENDL;
+
+    // Normalise to RGBA32 (byte order R,G,B,A in memory regardless of
+    // host endianness) so we have a predictable layout to color-key
+    // against, and so SDL_CreateColorCursor gets a surface with alpha.
+    SDL_Surface *rgba = SDL_ConvertSurface(bmpsurface, SDL_PIXELFORMAT_RGBA32);
+    SDL_DestroySurface(bmpsurface);
+    if (!rgba)
+    {
+        LL_WARNS() << "Cursor RGBA conversion failed for " << filename
+                   << ": " << SDL_GetError() << LL_ENDL;
+        return nullptr;
+    }
+
+    // Color-key the legacy (200,200,200) "background" pixels to fully
+    // transparent. The viewer's cursor BMPs were authored against this
+    // exact gray as the transparency key (same convention the old SDL2
+    // path used), so the assets stay drop-in compatible. Unlike the
+    // legacy path we keep the rest of the pixel data intact — the old
+    // code quantised everything to 1-bit black/white, which is why
+    // multi-colour cursors looked degraded vs Win32.
+    for (int y = 0; y < rgba->h; ++y)
+    {
+        U8 *row = (U8*)rgba->pixels + (size_t)y * rgba->pitch;
+        for (int x = 0; x < rgba->w; ++x)
+        {
+            U8 *px = row + (size_t)x * 4;
+            if (px[0] == 200 && px[1] == 200 && px[2] == 200)
+            {
+                px[3] = 0;
+            }
+        }
+    }
+
+    // Clamp the hot-spot — out-of-range coordinates are undefined behaviour
+    // on most platforms and at minimum produce a cursor that "clicks"
+    // nowhere near the visible tip.
+    if (hotx < 0 || hotx >= rgba->w || hoty < 0 || hoty >= rgba->h)
+    {
+        LL_WARNS() << "Cursor " << filename << " hot-spot ("
+                   << hotx << "," << hoty << ") is outside "
+                   << rgba->w << "x" << rgba->h << "; clamping." << LL_ENDL;
+        hotx = llclamp(hotx, 0, rgba->w - 1);
+        hoty = llclamp(hoty, 0, rgba->h - 1);
+    }
+
+    SDL_Cursor *sdlcursor = SDL_CreateColorCursor(rgba, hotx, hoty);
+    SDL_DestroySurface(rgba);
+    if (!sdlcursor)
+    {
+        LL_WARNS() << "SDL_CreateColorCursor failed for " << filename
+                   << ": " << SDL_GetError() << LL_ENDL;
+    }
     return sdlcursor;
 }
 
