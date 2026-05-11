@@ -4,7 +4,7 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO AlchemyViewer/alchemy-fonts
     REF ${VERSION}
-    SHA512 6d5325746c60364b2b689ed4e924ae1d3bcc9f5c67a402cbb0a1e7ebed20725a89864a54c2ae99bbb2e2b83f8fbc7f83569b61a619877fb220eef79f6b33be73
+    SHA512 a3e6581b5893d3d0b12d6ac9733e8d1b505a8c68d3688da6542145cf1cfc237c6094247ad6eddf7959ee5fcbb8b65199183ebc04bb79447f27ff10d4ed6f85f4
     HEAD_REF main
 )
 
@@ -33,6 +33,17 @@ file(INSTALL
 
 file(INSTALL
     DIRECTORY "${SOURCE_PATH}/ibm-plex/"
+    DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
+    FILES_MATCHING
+    PATTERN "*.ttc"
+    PATTERN "*.ttf"
+    PATTERN "*.otf"
+    PATTERN "*.woff2"
+    PATTERN "*.txt"
+)
+
+file(INSTALL
+    DIRECTORY "${SOURCE_PATH}/inter/"
     DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
     FILES_MATCHING
     PATTERN "*.ttc"
@@ -115,6 +126,7 @@ vcpkg_install_copyright(
         ${SOURCE_PATH}/cascadia-code/CascadiaCode-LICENSE.txt
         ${SOURCE_PATH}/dejavu-sans/DejaVu-License.txt
         ${SOURCE_PATH}/ibm-plex/IBMPlex-LICENSE.txt
+        ${SOURCE_PATH}/inter/Inter-LICENSE.txt
         ${SOURCE_PATH}/noto-emoji/NotoEmoji-LICENSE.txt
         ${SOURCE_PATH}/opendyslexic/OpenDyslexic-LICENSE.txt
         ${SOURCE_PATH}/source-code/SourceCode.LICENSE.md
