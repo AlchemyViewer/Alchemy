@@ -2348,10 +2348,36 @@ void LLWindowSDL::allowLanguageTextInput(LLPreeditor* preeditor, bool b)
     if (b)
     {
         mPreeditor = preeditor;
+        return;
     }
-    else if (mPreeditor == preeditor)
+
+    if (mPreeditor != preeditor)
     {
-        mPreeditor = nullptr;
+        return;
+    }
+
+    // Owning widget is releasing IME. Two cleanups before we forget about it:
+    //
+    //   1) resetPreedit on the widget — the in-flight composition string
+    //      lives inside the widget's mText (as a marked-up range) and
+    //      LLPreeditor::resetPreedit is the documented way to remove it.
+    //      Without this, focusing away mid-composition leaves the partial
+    //      preedit text visible as if it had been committed, and a future
+    //      re-focus would render it as a stale "preedit" highlight.
+    //
+    //   2) SDL_ClearComposition on the window — tells the platform IME
+    //      (ibus/fcitx/IMM) to dismiss its composition popup. Win32's
+    //      interruptLanguageTextInput uses NI_COMPOSITIONSTR/CPS_COMPLETE
+    //      to *commit* instead, but SDL3 only exposes the cancel path;
+    //      losing in-flight composition on focus-away is the tradeoff.
+    if (mPreeditor)
+    {
+        mPreeditor->resetPreedit();
+    }
+    mPreeditor = nullptr;
+    if (mWindow)
+    {
+        SDL_ClearComposition(mWindow);
     }
 }
 
