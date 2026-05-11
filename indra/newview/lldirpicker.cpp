@@ -91,14 +91,61 @@ void LLDirPicker::reset()
 {
 }
 
+namespace
+{
+    struct BlockingDirContext
+    {
+        bool mDone = false;
+        bool mOk = false;
+        std::string mDir;
+    };
+
+    void blocking_dir_callback(bool ok, std::string& dir, void* userdata)
+    {
+        auto* ctx = static_cast<BlockingDirContext*>(userdata);
+        ctx->mOk = ok;
+        ctx->mDir = dir;
+        ctx->mDone = true;
+    }
+}
+
 bool LLDirPicker::getDir(std::string* filename, bool blocking)
 {
+    if (!blocking)
+    {
+        // Use getDirModeless for the async API.
+        return false;
+    }
+
+    BlockingDirContext ctx;
+    if (!getDirModeless(filename, &blocking_dir_callback, &ctx))
+    {
+        return false;
+    }
+    // Spin SDL events until the async dialog completes — same pattern as
+    // LLFilePicker's blocking variants; see the comment there for the
+    // rationale (legacy callers want blocking semantics that the Win32 and
+    // macOS backends get from their native dialog APIs).
+    while (!ctx.mDone)
+    {
+        SDL_PumpEvents();
+        SDL_Delay(16);
+    }
+    if (ctx.mOk && !ctx.mDir.empty())
+    {
+        mDir = ctx.mDir;
+        if (filename)
+        {
+            *filename = ctx.mDir;
+        }
+        return true;
+    }
     return false;
 }
 
 std::string LLDirPicker::getDirName()
 {
-    return {};
+    return mDir;
 }
 
 bool LLDirPicker::getDirModeless(std::string* filename,

@@ -233,6 +233,13 @@ protected:
     bool SDLReallyCaptureInput(bool capture);
     U32 SDLCheckGrabbyKeys(U32 keysym, bool gain);
 
+    // Recompute mMinWindowWidthPx/HeightPx from the base-class screen-coord
+    // minimum scaled by the current SDL_GetWindowPixelDensity. Called at the
+    // end of createContext (after mWindow exists), from setMinSize, and from
+    // the display/scale-change event handlers when the active monitor's
+    // density might have changed under us.
+    void refreshMinSizePixelShadow();
+
     //
     // Platform specific variables
     //

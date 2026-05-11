@@ -243,9 +243,72 @@ namespace
     }
 }
 
+namespace
+{
+    struct BlockingPickerContext
+    {
+        bool mDone = false;
+        bool mOk = false;
+        std::vector<std::string> mFiles;
+    };
+
+    void blocking_open_callback(bool ok, std::vector<std::string>& files, void* userdata)
+    {
+        auto* ctx = static_cast<BlockingPickerContext*>(userdata);
+        ctx->mOk = ok;
+        ctx->mFiles = files;
+        ctx->mDone = true;
+    }
+
+    void blocking_save_callback(bool ok, std::string& filename, void* userdata)
+    {
+        auto* ctx = static_cast<BlockingPickerContext*>(userdata);
+        ctx->mOk = ok;
+        if (ok)
+        {
+            ctx->mFiles.push_back(filename);
+        }
+        ctx->mDone = true;
+    }
+
+    // Spin SDL events on the main thread until the async file dialog reports
+    // completion. SDL3's file dialog is inherently async; legacy LLFilePicker
+    // callers (estate region-info Up/Download Raw Terrain, the Develop
+    // Compress Image/File debug menus, etc.) still want blocking semantics
+    // so they can pull the chosen path off `mFiles` on the same stack frame.
+    // The Win32 and macOS backends get blocking for free from the native
+    // OS dialog APIs; on SDL3 we synthesise it.
+    void pump_until_picker_done(BlockingPickerContext& ctx)
+    {
+        while (!ctx.mDone)
+        {
+            SDL_PumpEvents();
+            SDL_Delay(16);
+        }
+    }
+}
+
 bool LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
 {
-    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    if (!blocking)
+    {
+        // Async API is getOpenFileModeless; this entry point is contract-
+        // blocking and the caller will inspect mFiles inline.
+        return false;
+    }
+
+    BlockingPickerContext ctx;
+    if (!getOpenFileModeless(filter, &blocking_open_callback, &ctx))
+    {
+        return false;
+    }
+    pump_until_picker_done(ctx);
+    if (ctx.mOk && !ctx.mFiles.empty())
+    {
+        mFiles = ctx.mFiles;
+        mCurrentFile = 0;
+        return true;
+    }
     return false;
 }
 
@@ -274,7 +337,23 @@ bool LLFilePicker::getOpenFileModeless(ELoadFilter filter,
 
 bool LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
 {
-    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    if (!blocking)
+    {
+        return false;
+    }
+
+    BlockingPickerContext ctx;
+    if (!getMultipleOpenFilesModeless(filter, &blocking_open_callback, &ctx))
+    {
+        return false;
+    }
+    pump_until_picker_done(ctx);
+    if (ctx.mOk && !ctx.mFiles.empty())
+    {
+        mFiles = ctx.mFiles;
+        mCurrentFile = 0;
+        return true;
+    }
     return false;
 }
 
@@ -303,7 +382,23 @@ bool LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
 
 bool LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, bool blocking)
 {
-    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    if (!blocking)
+    {
+        return false;
+    }
+
+    BlockingPickerContext ctx;
+    if (!getSaveFileModeless(filter, filename, &blocking_save_callback, &ctx))
+    {
+        return false;
+    }
+    pump_until_picker_done(ctx);
+    if (ctx.mOk && !ctx.mFiles.empty())
+    {
+        mFiles = ctx.mFiles;
+        mCurrentFile = 0;
+        return true;
+    }
     return false;
 }
 

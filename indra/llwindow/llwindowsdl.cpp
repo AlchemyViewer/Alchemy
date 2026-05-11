@@ -483,14 +483,20 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     // density=1 was used as a fallback) or against a prior window with a
     // different density (after switchContext). Recompute now that mWindow
     // reflects the active display.
-    if (mMinWindowWidth > 0 && mMinWindowHeight > 0)
-    {
-        const float density = SDL_GetWindowPixelDensity(mWindow);
-        const float scale = density > 0.f ? density : 1.f;
-        mMinWindowWidthPx = (U32)(mMinWindowWidth * scale);
-        mMinWindowHeightPx = (U32)(mMinWindowHeight * scale);
-    }
+    refreshMinSizePixelShadow();
     return true;
+}
+
+void LLWindowSDL::refreshMinSizePixelShadow()
+{
+    if (!mWindow || mMinWindowWidth <= 0 || mMinWindowHeight <= 0)
+    {
+        return;
+    }
+    const float density = SDL_GetWindowPixelDensity(mWindow);
+    const float scale = density > 0.f ? density : 1.f;
+    mMinWindowWidthPx = (U32)(mMinWindowWidth * scale);
+    mMinWindowHeightPx = (U32)(mMinWindowHeight * scale);
 }
 
 void* LLWindowSDL::createSharedContext()
@@ -997,10 +1003,7 @@ void LLWindowSDL::setMinSize(U32 min_width, U32 min_height, bool enforce_immedia
     // shadow that setSizeImpl(LLCoordWindow) can re-clamp against.
     LLWindow::setMinSize(min_width, min_height, enforce_immediately);
 
-    const float density = mWindow ? SDL_GetWindowPixelDensity(mWindow) : 1.f;
-    const float scale = density > 0.f ? density : 1.f;
-    mMinWindowWidthPx = (U32)(min_width * scale);
-    mMinWindowHeightPx = (U32)(min_height * scale);
+    refreshMinSizePixelShadow();
 
     if (mWindow && min_width > 0 && min_height > 0)
     {
@@ -2091,6 +2094,25 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // We pair this with EnableScreenSaver on focus-loss so the
             // screensaver can run normally while the user is in another app.
             SDL_DisableScreenSaver();
+            // Re-engage relative mouse mode if the viewer still expects
+            // pointer-lock (the user was in mouselook / a tool-grab session
+            // when focus was lost, and the next-best signal "we have a
+            // permanently hidden cursor" is still set). SDL3 silently drops
+            // relative mode on focus loss, so without this the camera
+            // signal would be dead until the next showCursor/hideCursor
+            // cycle. mHideCursorPermanent is the right indicator since
+            // beforeDialog/auto-idle paths don't set it.
+            if (mWindow && mHideCursorPermanent && !mAbsoluteCursorPosition
+                && !mRelativeMouseMode)
+            {
+                if (SDL_SetWindowRelativeMouseMode(mWindow, true))
+                {
+                    mRelativeMouseMode = true;
+                    mMouseDeltaAccumX = 0.f;
+                    mMouseDeltaAccumY = 0.f;
+                    mPendingWarpSuppressCount = 0;
+                }
+            }
             mCallbacks->handleFocus(this);
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
@@ -2102,6 +2124,21 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // thinks it's defocused, a stray TEXT_EDITING event would
             // update a non-active widget.
             mPreeditor = nullptr;
+            // Sync our relative-mode state to SDL3's. SDL3's keyboard
+            // layer auto-disables relative mode on focus loss; if we don't
+            // mirror that, our member stays true and setCursorPosition
+            // defers warps + getCursorPosition reports center while real
+            // motion is now actually being delivered, manifesting as a
+            // camera jolt or a stuck-centered cursor on focus return.
+            // Zero accumulators and suppress count so no stale motion
+            // bleeds into the next session.
+            if (mRelativeMouseMode)
+            {
+                mRelativeMouseMode = false;
+                mMouseDeltaAccumX = 0.f;
+                mMouseDeltaAccumY = 0.f;
+                mPendingWarpSuppressCount = 0;
+            }
             SDL_EnableScreenSaver();
             //SDL_SetWindowKeyboardGrab(mWindow, false);
             break;
@@ -2123,6 +2160,9 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
                 mRefreshRate = ll_round(displayMode->refresh_rate);
                 mNativeAspectRatio = ((F32)displayMode->w) / ((F32)displayMode->h);
             }
+            // Pixel density may have changed; refresh the pixel-unit min-size
+            // shadow so setSizeImpl(LLCoordWindow)'s re-clamp stays unit-correct.
+            refreshMinSizePixelShadow();
             mCallbacks->handleDisplayChanged();
             break;
         }
@@ -2130,6 +2170,9 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
         {
             S32 w = 0, h = 0;
             SDL_GetWindowSizeInPixels(mWindow, &w, &h);
+            // Same as DISPLAY_CHANGED: the pixel-unit shadow tracks the
+            // window's current density, which just changed.
+            refreshMinSizePixelShadow();
             mCallbacks->handleDPIChanged(this, getSystemUISize(), w, h);
             break;
         }
