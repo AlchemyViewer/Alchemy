@@ -1893,13 +1893,19 @@ void* LLWindowWin32::createSharedContext()
 
 void LLWindowWin32::makeContextCurrent(void* contextPtr)
 {
-    wglMakeCurrent(mhDC, (HGLRC) contextPtr);
+    if (!wglMakeCurrent(mhDC, (HGLRC) contextPtr))
+    {
+        LL_WARNS("Window") << "wglMakeCurrent failed: " << GetLastError() << LL_ENDL;
+    }
     LL_PROFILER_GPU_CONTEXT;
 }
 
 void LLWindowWin32::destroySharedContext(void* contextPtr)
 {
-    wglDeleteContext((HGLRC)contextPtr);
+    if (!wglDeleteContext((HGLRC)contextPtr))
+    {
+        LL_WARNS("Window") << "wglDeleteContext failed: " << GetLastError() << LL_ENDL;
+    }
 }
 
 void LLWindowWin32::toggleVSync(bool enable_vsync)
