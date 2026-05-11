@@ -54,18 +54,22 @@ LLKeyboardSDL::LLKeyboardSDL()
         mTranslateKeyMap[cur_char] = cur_char;
     }
 
-    // These ones are translated manually upon keydown/keyup because
-    // SDL doesn't handle their numlock transition.
-    //mTranslateKeyMap[SDLK_KP4] = KEY_PAD_LEFT;
-    //mTranslateKeyMap[SDLK_KP6] = KEY_PAD_RIGHT;
-    //mTranslateKeyMap[SDLK_KP8] = KEY_PAD_UP;
-    //mTranslateKeyMap[SDLK_KP2] = KEY_PAD_DOWN;
-    //mTranslateKeyMap[SDLK_KP_PERIOD] = KEY_DELETE;
-    //mTranslateKeyMap[SDLK_KP7] = KEY_HOME;
-    //mTranslateKeyMap[SDLK_KP1] = KEY_END;
-    //mTranslateKeyMap[SDLK_KP9] = KEY_PAGE_UP;
-    //mTranslateKeyMap[SDLK_KP3] = KEY_PAGE_DOWN;
-    //mTranslateKeyMap[SDLK_KP0] = KEY_INSERT;
+    // Numpad digits when NumLock is on. With NumLock off, adjustNativekeyFromUnhandledMask
+    // below remaps SDLK_KP_<n> onto SDLK_LEFT/RIGHT/HOME/etc. before this map is consulted,
+    // so this only fires for NumLock-on. Map to the ASCII digit values (KEY_0..KEY_9 share
+    // the same constants — see indra_constants.h) so a numpad digit drives the same
+    // KEY_DOWN as the top-row digit. Win32 does the equivalent at llkeyboardwin32.cpp:57-60;
+    // without this loop numpad digits silently produced no KEY_DOWN at all on SDL3.
+    mTranslateKeyMap[SDLK_KP_0] = '0';
+    mTranslateKeyMap[SDLK_KP_1] = '1';
+    mTranslateKeyMap[SDLK_KP_2] = '2';
+    mTranslateKeyMap[SDLK_KP_3] = '3';
+    mTranslateKeyMap[SDLK_KP_4] = '4';
+    mTranslateKeyMap[SDLK_KP_5] = '5';
+    mTranslateKeyMap[SDLK_KP_6] = '6';
+    mTranslateKeyMap[SDLK_KP_7] = '7';
+    mTranslateKeyMap[SDLK_KP_8] = '8';
+    mTranslateKeyMap[SDLK_KP_9] = '9';
 
     mTranslateKeyMap[SDLK_SPACE] = ' ';
     mTranslateKeyMap[SDLK_RETURN] = KEY_RETURN;
