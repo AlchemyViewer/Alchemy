@@ -1202,6 +1202,7 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
         bool success = false;
         DWORD closest_refresh = 0;
 
+        S32 closest_diff = S32_MAX;
         for (S32 mode_num = 0;; mode_num++)
         {
             if (!EnumDisplaySettings(NULL, mode_num, &dev_mode))
@@ -1214,9 +1215,11 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
                 dev_mode.dmBitsPerPel == BITS_PER_PIXEL)
             {
                 success = true;
-                if ((dev_mode.dmDisplayFrequency - current_refresh)
-                    < (closest_refresh - current_refresh))
+                S32 signed_diff = (S32)dev_mode.dmDisplayFrequency - (S32)current_refresh;
+                S32 diff = signed_diff < 0 ? -signed_diff : signed_diff;
+                if (diff < closest_diff)
                 {
+                    closest_diff = diff;
                     closest_refresh = dev_mode.dmDisplayFrequency;
                 }
             }
@@ -1893,13 +1896,19 @@ void* LLWindowWin32::createSharedContext()
 
 void LLWindowWin32::makeContextCurrent(void* contextPtr)
 {
-    wglMakeCurrent(mhDC, (HGLRC) contextPtr);
+    if (!wglMakeCurrent(mhDC, (HGLRC) contextPtr))
+    {
+        LL_WARNS("Window") << "wglMakeCurrent failed: " << GetLastError() << LL_ENDL;
+    }
     LL_PROFILER_GPU_CONTEXT;
 }
 
 void LLWindowWin32::destroySharedContext(void* contextPtr)
 {
-    wglDeleteContext((HGLRC)contextPtr);
+    if (!wglDeleteContext((HGLRC)contextPtr))
+    {
+        LL_WARNS("Window") << "wglDeleteContext failed: " << GetLastError() << LL_ENDL;
+    }
 }
 
 void LLWindowWin32::toggleVSync(bool enable_vsync)
@@ -3031,6 +3040,7 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         case WM_DISPLAYCHANGE:
         {
             WINDOW_IMP_POST(window_imp->mCallbacks->handleDisplayChanged());
+            return 0;
         }
 
         case WM_SETFOCUS:
@@ -3094,10 +3104,13 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("MWP - WM_INPUT");
 
             UINT dwSize = 0;
-            GetRawInputData((HRAWINPUT)l_param, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
-            llassert(dwSize < 1024);
-
             U8 lpb[1024];
+
+            if (GetRawInputData((HRAWINPUT)l_param, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER)) == (UINT)-1
+                || dwSize == 0 || dwSize > sizeof(lpb))
+            {
+                break;
+            }
 
             if (GetRawInputData((HRAWINPUT)l_param, RID_INPUT, (void*)lpb, &dwSize, sizeof(RAWINPUTHEADER)) == dwSize)
             {
@@ -3363,6 +3376,14 @@ bool LLWindowWin32::copyTextToClipboard(const LLWString& wstr)
                 {
                     success = true;
                 }
+                else
+                {
+                    GlobalFree(hglobal_copy_utf16);
+                }
+            }
+            else
+            {
+                GlobalFree(hglobal_copy_utf16);
             }
         }
 
@@ -4306,7 +4327,7 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
     if (indexes & GCS_CURSORPOS)
     {
         const S32 caret_position_utf16 = LLWinImm::getCompositionString(himc, GCS_CURSORPOS, NULL, 0);
-        if (caret_position_utf16 >= 0 && caret_position <= preedit_string_utf16_length)
+        if (caret_position_utf16 >= 0 && caret_position_utf16 <= preedit_string_utf16_length)
         {
             caret_position = wstring_wstring_length_from_utf16_length(preedit_string, 0, caret_position_utf16);
         }
