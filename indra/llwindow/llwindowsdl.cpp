@@ -902,25 +902,34 @@ void LLWindowSDL::setMinSize(U32 min_width, U32 min_height, bool enforce_immedia
 
 bool LLWindowSDL::setCursorPosition(const LLCoordWindow position)
 {
-    SDL_WarpMouseInWindow(mWindow, (F32)position.mX, (F32)position.mY);
+    if (!mWindow) return false;
+    // LLCoordWindow is in window-relative PIXEL units, but
+    // SDL_WarpMouseInWindow expects screen-coord (logical) units —
+    // divide by pixel density to convert. See the coord-space contract
+    // comment below convertCoords for the unit conventions.
+    const float density = SDL_GetWindowPixelDensity(mWindow);
+    const float div = density > 0.f ? density : 1.f;
+    SDL_WarpMouseInWindow(mWindow, (F32)position.mX / div, (F32)position.mY / div);
     return true;
 }
 
 bool LLWindowSDL::getCursorPosition(LLCoordWindow *position)
 {
-    if (!position) return false;
-    // SDL3 SDL_GetMouseState already returns the cursor position relative to
-    // the focus window in screen-coord (logical) units — the same units
-    // SDL_EVENT_MOUSE_MOTION delivers and the same units the rest of the
-    // SDL3 backend treats LLCoordWindow as. Write through directly; an
-    // earlier version routed through LLCoordScreen + convertCoords as a
-    // tautological no-op, which only happened to work because the
-    // Screen→Window conversion was itself a no-op. (See the long comment
-    // in convertCoords below for the coord-space contract on SDL3.)
+    if (!position || !mWindow) return false;
+    // SDL3 SDL_GetMouseState returns the cursor position relative to the
+    // focus window in screen-coord (logical) units. Multiply by pixel
+    // density so the result is in window-relative PIXEL units, matching
+    // the unit convention LLCoordWindow holds on this backend (see the
+    // coord-space contract comment below convertCoords). Without the
+    // density scale, comparing the result against mWindowRectRaw (which
+    // the viewer stores in pixels) silently mis-tests window bounds on
+    // HiDPI displays.
     float x = 0, y = 0;
     SDL_GetMouseState(&x, &y);
-    position->mX = (S32)x;
-    position->mY = (S32)y;
+    const float density = SDL_GetWindowPixelDensity(mWindow);
+    const float scale = density > 0.f ? density : 1.f;
+    position->mX = llfloor(x * scale);
+    position->mY = llfloor(y * scale);
     return true;
 }
 
@@ -1132,46 +1141,46 @@ std::vector<std::string> LLWindowSDL::getDisplaysResolutionList()
 //
 // SDL3 has two distinct coordinate units that this code shuttles between:
 //
-//   * "screen coordinates" — the logical-pixel space used by SDL3 for
-//     mouse events, SDL_GetWindowSize, SDL_GetWindowPosition,
-//     SDL_GetMouseState, SDL_WarpMouseInWindow, etc. On a 1.0x display
-//     this equals pixels; on HiDPI (Retina, fractional Wayland scaling)
-//     a screen-coord unit covers `pixel_density` physical pixels.
+//   * "screen coordinates" — the logical-pixel space SDL3 uses internally
+//     for mouse-event delivery, SDL_GetWindowSize, SDL_GetWindowPosition,
+//     SDL_GetMouseState, SDL_WarpMouseInWindow, SDL_SetTextInputArea, etc.
+//     On a 1.0x display this equals pixels; on HiDPI (Retina, fractional
+//     Wayland scaling) one screen-coord unit covers `pixel_density`
+//     physical pixels.
 //
-//   * "pixels" — the actual back-buffer / GL viewport units. Reported by
-//     SDL_GetWindowSizeInPixels and the SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
-//     event.
+//   * "pixels" — the actual back-buffer / GL viewport units, reported by
+//     SDL_GetWindowSizeInPixels and SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED.
 //
 // The ratio `pixel_density = pixel_w / screen_coord_w` is queried with
 // SDL_GetWindowPixelDensity().
 //
-// LLWindowSDL maps these onto the LL coord types as follows:
+// LLWindowSDL converts at the SDL boundary so the LL coord types speak
+// consistent units regardless of what unit SDL handed them:
 //
-//   LLCoordWindow — window-relative SCREEN-COORD units. The Y axis grows
-//                   downward (top-left origin).
-//   LLCoordGL     — window-relative PIXEL units. The Y axis grows upward
-//                   (bottom-left origin), matching glViewport / GL clip
-//                   space.
-//   LLCoordScreen — DESKTOP-relative SCREEN-COORD units. The desktop
-//                   origin depends on the platform: X11 places windows
-//                   in a global desktop coord space; Wayland does not
-//                   expose absolute window position, so SDL_GetWindowPosition
-//                   reports (0, 0) and these conversions become no-ops on
-//                   Wayland.
+//   LLCoordWindow — window-relative PIXEL units (Y-down). This matches
+//                   the Win32 / macOS backends, and matches the unit the
+//                   viewer's mWindowRectRaw and pixel-coordinate hit
+//                   testing already use. Mouse-event handlers above scale
+//                   event.motion.x/y by pixel_density before storing into
+//                   LLCoordWindow; getCursorPosition does the same.
+//   LLCoordGL     — window-relative PIXEL units (Y-up, GL clip-space
+//                   convention). Window<->GL conversion is a Y-flip,
+//                   nothing else; both spaces share the unit.
+//   LLCoordScreen — DESKTOP-relative SCREEN-COORD (logical) units. This
+//                   is what SDL_GetWindowPosition reports, so we keep
+//                   LLCoordScreen in the same unit. On Wayland
+//                   SDL_GetWindowPosition returns (0, 0) (Wayland
+//                   intentionally hides absolute window position), so
+//                   convertCoords involving LLCoordScreen degenerates to
+//                   a density-only conversion there.
 //
-// Two asymmetries to be aware of:
-//
-//   1) WindowToGL multiplies by pixel_density; GLToWindow divides by it.
-//      That's because LLCoordWindow and LLCoordGL live in different unit
-//      systems despite both being window-relative.
-//
-//   2) `mWindowRectRaw` on the viewer side is set in PIXELS (handleResize
-//      multiplies the SDL-delivered screen-coord size by pixel_density
-//      before calling handleResize), so comparing a screen-coord
-//      LLCoordWindow against mWindowRectRaw on a HiDPI display is unit-
-//      mismatched. This is a known wart; fixing it requires touching
-//      every viewer-side consumer of LLCoordWindow and isn't worth the
-//      churn until/unless HiDPI Linux becomes a primary use case.
+// Boundary conversions:
+//   * Window<->GL: pure Y-flip using SDL_GetWindowSizeInPixels for the
+//     height. Both sides are pixels.
+//   * Window<->Screen: cross-unit. Window->Screen divides pixels by
+//     density and adds the window's screen-coord desktop position.
+//     Screen->Window subtracts the desktop position and multiplies by
+//     density.
 // =====================================================================
 
 bool LLWindowSDL::convertCoords(LLCoordGL from, LLCoordWindow *to)
@@ -1179,16 +1188,14 @@ bool LLWindowSDL::convertCoords(LLCoordGL from, LLCoordWindow *to)
     if (!to || !mWindow)
         return false;
 
-    // Input is window-relative pixels (Y up); output is window-relative
-    // screen-coord (Y down). Use the pixel-space window height for the Y flip
-    // so it matches the input units, then scale into screen-coord at the end.
+    // Both spaces are window-relative PIXEL units. Y-flip using the pixel
+    // window height; the X axis is identity. Y-down LLCoordWindow has
+    // mY = 0 at the top, Y-up LLCoordGL has mY = 0 at the bottom.
     S32 height_pixels = 0;
     SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
 
-    const float pixel_density = SDL_GetWindowPixelDensity(mWindow);
-
-    to->mX = from.mX / pixel_density;
-    to->mY = (height_pixels - from.mY - 1) / pixel_density;
+    to->mX = from.mX;
+    to->mY = height_pixels - from.mY - 1;
 
     return true;
 }
@@ -1198,17 +1205,12 @@ bool LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordGL* to)
     if (!to || !mWindow)
         return false;
 
-    // Input is window-relative screen-coord (Y down); output is window-
-    // relative pixels (Y up). Use the screen-coord window height for the
-    // Y flip so it matches the input units, then scale into pixels at the
-    // end. (Mirror image of the GL-to-Window function above.)
-    S32 height_screen = 0;
-    SDL_GetWindowSize(mWindow, nullptr, &height_screen);
+    // Inverse of the above — Y-flip in pixels, X is identity.
+    S32 height_pixels = 0;
+    SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
 
-    const float pixel_density = SDL_GetWindowPixelDensity(mWindow);
-
-    to->mX = from.mX * pixel_density;
-    to->mY = (height_screen - from.mY - 1) * pixel_density;
+    to->mX = from.mX;
+    to->mY = height_pixels - from.mY - 1;
 
     return true;
 }
@@ -1218,16 +1220,22 @@ bool LLWindowSDL::convertCoords(LLCoordScreen from, LLCoordWindow* to)
     if (!to || !mWindow)
         return false;
 
-    // LLCoordScreen is desktop-relative; subtract the window's desktop
-    // position to get window-relative coords. SDL_GetWindowPosition
-    // returns (0, 0) on Wayland (Wayland intentionally does not expose
-    // absolute window positions), in which case this is a no-op — the
-    // best we can do without an absolute frame of reference.
+    // LLCoordScreen is desktop-relative screen-coord (logical) units;
+    // LLCoordWindow is window-relative pixels. Subtract the window's
+    // desktop position (which SDL_GetWindowPosition reports in screen-
+    // coord units), then scale the resulting window-relative screen-
+    // coord into pixels.
+    //
+    // SDL_GetWindowPosition returns (0, 0) on Wayland by design (no
+    // absolute window position is exposed to clients); this degenerates
+    // to a pure density scale there — the best we can do.
     int win_x = 0, win_y = 0;
     SDL_GetWindowPosition(mWindow, &win_x, &win_y);
+    const float density = SDL_GetWindowPixelDensity(mWindow);
+    const float scale = density > 0.f ? density : 1.f;
 
-    to->mX = from.mX - win_x;
-    to->mY = from.mY - win_y;
+    to->mX = llfloor((from.mX - win_x) * scale);
+    to->mY = llfloor((from.mY - win_y) * scale);
     return true;
 }
 
@@ -1236,12 +1244,16 @@ bool LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordScreen *to)
     if (!to || !mWindow)
         return false;
 
-    // Inverse of the above: window-relative -> desktop-relative.
+    // Inverse: pixel window-relative -> desktop-relative screen-coord.
+    // Divide pixels by density to recover screen-coord, then add the
+    // window's desktop position.
     int win_x = 0, win_y = 0;
     SDL_GetWindowPosition(mWindow, &win_x, &win_y);
+    const float density = SDL_GetWindowPixelDensity(mWindow);
+    const float div = density > 0.f ? density : 1.f;
 
-    to->mX = from.mX + win_x;
-    to->mY = from.mY + win_y;
+    to->mX = llfloor(from.mX / div) + win_x;
+    to->mY = llfloor(from.mY / div) + win_y;
     return true;
 }
 
@@ -1399,7 +1411,14 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
     {
         case SDL_EVENT_MOUSE_MOTION:
         {
-            LLCoordWindow winCoord(llfloor(event.motion.x), llfloor(event.motion.y));
+            // event.motion.x/y are SDL3 screen-coord (logical) units. Scale to
+            // PIXEL units so LLCoordWindow stays in the same unit as
+            // mWindowRectRaw and the rest of the viewer's pixel-based hit
+            // testing — see the coord-space contract below convertCoords.
+            const float density = SDL_GetWindowPixelDensity(mWindow);
+            const float scale = density > 0.f ? density : 1.f;
+            LLCoordWindow winCoord(llfloor(event.motion.x * scale),
+                                   llfloor(event.motion.y * scale));
             LLCoordGL openGlCoord;
             convertCoords(winCoord, &openGlCoord);
             mCallbacks->handleMouseMove(this, openGlCoord, gKeyboard->currentMask(true));
@@ -1421,7 +1440,11 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
         {
-            LLCoordWindow winCoord(llfloor(event.button.x), llfloor(event.button.y));
+            // Scale screen-coord event coords up to PIXEL units for LLCoordWindow.
+            const float density = SDL_GetWindowPixelDensity(mWindow);
+            const float scale = density > 0.f ? density : 1.f;
+            LLCoordWindow winCoord(llfloor(event.button.x * scale),
+                                   llfloor(event.button.y * scale));
             LLCoordGL openGlCoord;
             convertCoords(winCoord, &openGlCoord);
             MASK mask = gKeyboard->currentMask(true);
@@ -1451,7 +1474,10 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
         case SDL_EVENT_MOUSE_BUTTON_UP:
         {
-            LLCoordWindow winCoord(llfloor(event.button.x), llfloor(event.button.y));
+            const float density = SDL_GetWindowPixelDensity(mWindow);
+            const float scale = density > 0.f ? density : 1.f;
+            LLCoordWindow winCoord(llfloor(event.button.x * scale),
+                                   llfloor(event.button.y * scale));
             LLCoordGL openGlCoord;
             convertCoords(winCoord, &openGlCoord);
             MASK mask = gKeyboard->currentMask(true);
@@ -1757,7 +1783,11 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             //   1) DNDA_START_TRACKING with the file list -> mDragItems populated
             //   2) DNDA_DROPPED                           -> upload / apply
             //   3) DNDA_STOP_TRACKING                     -> mDragItems cleared
-            LLCoordWindow winCoord(llfloor(event.drop.x), llfloor(event.drop.y));
+            // event.drop.x/y are screen-coord units; scale to PIXEL units.
+            const float density = SDL_GetWindowPixelDensity(mWindow);
+            const float scale = density > 0.f ? density : 1.f;
+            LLCoordWindow winCoord(llfloor(event.drop.x * scale),
+                                   llfloor(event.drop.y * scale));
             LLCoordGL openGlCoord;
             convertCoords(winCoord, &openGlCoord);
             const MASK mask = gKeyboard->currentMask(true);
@@ -2336,6 +2366,14 @@ void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
         return;
     }
 
+    // SDL_SetTextInputArea wants the rect and cursor offset in screen-coord
+    // (logical) units, not pixels — that's the unit the IME backends
+    // (ibus / fcitx / IMM via SDL) speak. LLCoordWindow on this backend is
+    // in PIXELS (see the coord-space contract above), so we divide by
+    // pixel density at the boundary.
+    const float density = SDL_GetWindowPixelDensity(mWindow);
+    const float div = density > 0.f ? density : 1.f;
+
     // If the active preeditor can give us its actual bounds + caret, feed
     // those to SDL so the platform IME anchors its candidate-list popup to
     // the real text input area (rather than a magic 500x16 box guessed at
@@ -2361,10 +2399,10 @@ void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
             convertCoords(caret_gl, &caret_win);
 
             SDL_Rect rect;
-            rect.x = top_left.mX;
-            rect.y = top_left.mY;
-            rect.w = bottom_right.mX - top_left.mX;
-            rect.h = bottom_right.mY - top_left.mY;
+            rect.x = llfloor(top_left.mX / div);
+            rect.y = llfloor(top_left.mY / div);
+            rect.w = llfloor((bottom_right.mX - top_left.mX) / div);
+            rect.h = llfloor((bottom_right.mY - top_left.mY) / div);
 
             // A widget that's still being laid out can return a default-
             // constructed LLRect (all zeros); SDL_SetTextInputArea with a
@@ -2372,7 +2410,7 @@ void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
             // origin. Fall through to the caret-based fallback instead.
             if (rect.w > 0 && rect.h > 0)
             {
-                const int cursor_x = caret_win.mX - rect.x;
+                const int cursor_x = llfloor((caret_win.mX - top_left.mX) / div);
                 SDL_SetTextInputArea(mWindow, &rect, cursor_x);
                 return;
             }
@@ -2387,8 +2425,8 @@ void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
     convertCoords(position, &caret_win);
 
     SDL_Rect rect;
-    rect.x = caret_win.mX;
-    rect.y = caret_win.mY;
+    rect.x = llfloor(caret_win.mX / div);
+    rect.y = llfloor(caret_win.mY / div);
     rect.w = 500;
     rect.h = 16;
     SDL_SetTextInputArea(mWindow, &rect, 0);
