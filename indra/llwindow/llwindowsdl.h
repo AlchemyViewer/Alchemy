@@ -265,13 +265,17 @@ private:
     // Currently-focused preeditor receiving SDL_EVENT_TEXT_EDITING composition
     // updates. Set by LLLineEditor/LLTextEditor via allowLanguageTextInput()
     // on focus-in; cleared on focus-out. Null when no widget owns IME.
+    //
+    // Note: we do NOT toggle SDL_StartTextInput / SDL_StopTextInput in step
+    // with mPreeditor. SDL3 ties both committed-text events
+    // (SDL_EVENT_TEXT_INPUT) and composition events (SDL_EVENT_TEXT_EDITING)
+    // to the same SDL_StartTextInput flag — turning it off when no text
+    // widget is focused would also kill the TEXT_INPUT path that
+    // LLMenuGL::handleUnicodeCharHere() needs to drive menu jump keys
+    // (see llmenugl.cpp:3135-3142). Unlike Win32's IMM, which keeps WM_CHAR
+    // delivery on regardless of composition state, there is no way to get
+    // just-the-commits from SDL3.
     LLPreeditor* mPreeditor = nullptr;
-
-    // Whether SDL3 text input is currently turned on for mWindow. The flag
-    // exists so we can make allowLanguageTextInput()'s SDL_StartTextInput /
-    // SDL_StopTextInput calls idempotent (LLLineEditor & friends may invoke
-    // it more than once per focus transition).
-    bool mTextInputActive = false;
 
     void tryFindFullscreenSize(int &aWidth, int &aHeight);
 

@@ -447,12 +447,21 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         bmpsurface = nullptr;
     }
 
-    // Text input is now driven per-widget by allowLanguageTextInput() (called
-    // from LLLineEditor/LLTextEditor focus handlers), so we no longer turn it
-    // on unconditionally here. Keeping it off until a real text widget asks
-    // for it means the IME indicator doesn't appear over the world view, and
-    // SDL3 doesn't fire SDL_EVENT_TEXT_INPUT events for keystrokes that
-    // weren't meant for an editable field.
+    // SDL3 ties both committed-text events (SDL_EVENT_TEXT_INPUT) and
+    // composition events (SDL_EVENT_TEXT_EDITING) to the same
+    // SDL_StartTextInput flag. The viewer routes plain unicode chars
+    // through TEXT_INPUT for things like menu jump keys
+    // (LLMenuGL::handleUnicodeCharHere -> handleJumpKey), so we have to
+    // leave text input on whenever the window is alive — gating it on
+    // text-widget focus would kill the menu accelerator path.
+    //
+    // Composition routing IS per-widget: see allowLanguageTextInput() /
+    // mPreeditor, which decides whether TEXT_EDITING events get dispatched
+    // to a preeditor or dropped.
+    if (!SDL_StartTextInput(mWindow))
+    {
+        LL_WARNS() << "SDL_StartTextInput failed: " << SDL_GetError() << LL_ENDL;
+    }
     return true;
 }
 
@@ -598,14 +607,8 @@ void LLWindowSDL::destroyContext()
         mDeadOSRWindows.clear();
     }
 
-    // Stop unicode input if a widget left it on. If no widget called
-    // allowLanguageTextInput(true) during this window's lifetime (or the
-    // last focused widget already called it with false), this is a no-op.
-    if (mTextInputActive)
-    {
-        SDL_StopTextInput(mWindow);
-        mTextInputActive = false;
-    }
+    // Stop unicode input — paired with the SDL_StartTextInput in createContext().
+    SDL_StopTextInput(mWindow);
     mPreeditor = nullptr;
 
     // Clean up remaining GL state before blowing away window
@@ -1529,6 +1532,18 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
         case SDL_EVENT_TEXT_INPUT:
         {
+            // SDL3 fires TEXT_INPUT to deliver committed text from the platform
+            // IME (or from direct keyboard typing if no IME is active). If a
+            // preeditor was mid-composition, reset its preedit state first so
+            // the in-flight preedit string is cleared from the widget's mText
+            // before the commit chars are inserted — otherwise the preedit
+            // accumulates alongside the commit and corrupts the field. (See
+            // LLLineEditor::updatePreedit at lllineeditor.cpp:2754, which
+            // explicitly notes its calls "must be preceded by resetPreedit".)
+            if (mPreeditor)
+            {
+                mPreeditor->resetPreedit();
+            }
             auto string = utf8str_to_wstring(event.text.text);
             MASK current_mask = gKeyboard->currentMask(false);
             for (auto key : string)
@@ -1545,21 +1560,37 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // composing before commit). Without an active LLPreeditor the viewer
             // has no widget that wants to display preedit feedback — drop it; the
             // eventual SDL_EVENT_TEXT_INPUT delivers the committed text.
-            if (mPreeditor && event.edit.text)
+            if (!mPreeditor)
             {
-                const LLWString preedit = utf8str_to_wstring(event.edit.text);
-                S32 caret = static_cast<S32>(preedit.length());
-                if (event.edit.start > 0)
-                {
-                    // event.edit.start is a UTF-8 byte offset within event.edit.text;
-                    // convert to llwchar (UTF-32) offset by re-encoding the prefix.
-                    const std::string prefix(event.edit.text, event.edit.start);
-                    caret = static_cast<S32>(utf8str_to_wstring(prefix).length());
-                }
-                const LLPreeditor::segment_lengths_t lengths { static_cast<S32>(preedit.length()) };
-                const LLPreeditor::standouts_t standouts { false };
-                mPreeditor->updatePreedit(preedit, lengths, standouts, caret);
+                break;
             }
+
+            // resetPreedit must be called before every updatePreedit (see
+            // lllineeditor.cpp:2763). Each TEXT_EDITING delivers the FULL
+            // current composition string, so we drop the previous preedit
+            // before inserting the new one — otherwise the field accumulates
+            // every intermediate composition state.
+            mPreeditor->resetPreedit();
+
+            // An empty composition string means the IME cancelled or cleared
+            // the preedit; the reset above is the entire job.
+            if (!event.edit.text || event.edit.text[0] == '\0')
+            {
+                break;
+            }
+
+            const LLWString preedit = utf8str_to_wstring(event.edit.text);
+            S32 caret = static_cast<S32>(preedit.length());
+            if (event.edit.start > 0)
+            {
+                // event.edit.start is a UTF-8 byte offset within event.edit.text;
+                // convert to llwchar (UTF-32) offset by re-encoding the prefix.
+                const std::string prefix(event.edit.text, event.edit.start);
+                caret = static_cast<S32>(utf8str_to_wstring(prefix).length());
+            }
+            const LLPreeditor::segment_lengths_t lengths { static_cast<S32>(preedit.length()) };
+            const LLPreeditor::standouts_t standouts { false };
+            mPreeditor->updatePreedit(preedit, lengths, standouts, caret);
             break;
         }
 
@@ -2298,55 +2329,29 @@ void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
 
 void LLWindowSDL::allowLanguageTextInput(LLPreeditor* preeditor, bool b)
 {
-    // Drive SDL3 text input on/off in lockstep with widget focus.
+    // Track which widget (if any) currently wants to receive IME composition
+    // updates. SDL3's SDL_EVENT_TEXT_EDITING events are dispatched to
+    // mPreeditor in handleEvent(); if no widget owns IME they get dropped.
     //
-    //   * Called by LLLineEditor / LLTextEditor on focus-in (b == true) and
-    //     focus-out (b == false).
-    //   * `preeditor` is the widget making the request — used to track which
-    //     LLPreeditor receives SDL_EVENT_TEXT_EDITING composition updates,
-    //     and to ignore stale disable requests from widgets that don't
-    //     currently own IME.
-    //   * Calling multiple times in the same state is a no-op (LLLineEditor
-    //     does this on setEnabled changes that don't actually move focus).
-    if (!mWindow)
-    {
-        return;
-    }
-
+    // We deliberately do NOT toggle SDL_StartTextInput / SDL_StopTextInput
+    // here: SDL3 binds both committed-text events (TEXT_INPUT) and
+    // composition events (TEXT_EDITING) to the same flag, and the viewer
+    // routes plain unicode chars through TEXT_INPUT for menu jump keys
+    // (LLMenuGL::handleUnicodeCharHere -> handleJumpKey, llmenugl.cpp:3139)
+    // and similar non-editor-focused unicode consumers. Gating SDL text
+    // input on widget focus the way Win32's allowLanguageTextInput gates
+    // IMM would kill those paths.
+    //
+    // Mirror the Win32 backend's "only the owning widget releases IME" rule
+    // so a non-focused widget's setEnabled(false) can't stomp on the
+    // focused widget's preedit state.
     if (b)
     {
         mPreeditor = preeditor;
-        if (!mTextInputActive)
-        {
-            if (SDL_StartTextInput(mWindow))
-            {
-                mTextInputActive = true;
-            }
-            else
-            {
-                LL_WARNS() << "SDL_StartTextInput failed: " << SDL_GetError() << LL_ENDL;
-            }
-        }
     }
-    else
+    else if (mPreeditor == preeditor)
     {
-        // Mirror the Win32 backend's "only let the owning widget release IME"
-        // rule: an unfocused widget calling setEnabled(false) shouldn't stomp
-        // on the focused widget's text-input state. If a different widget
-        // already became the active preeditor (focus moved on before this
-        // call arrived), we leave SDL text input alone.
-        if (mPreeditor == preeditor)
-        {
-            mPreeditor = nullptr;
-            if (mTextInputActive)
-            {
-                if (!SDL_StopTextInput(mWindow))
-                {
-                    LL_WARNS() << "SDL_StopTextInput failed: " << SDL_GetError() << LL_ENDL;
-                }
-                mTextInputActive = false;
-            }
-        }
+        mPreeditor = nullptr;
     }
 }
 
