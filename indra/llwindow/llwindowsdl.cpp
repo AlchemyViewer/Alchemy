@@ -818,7 +818,20 @@ bool LLWindowSDL::setSizeImpl(const LLCoordScreen size)
 
 bool LLWindowSDL::setSizeImpl(const LLCoordWindow size)
 {
-    return ::setSizeImpl( size, mWindow );
+    if (!mWindow) return false;
+
+    // LLCoordWindow is in pixel units on this backend (see the coord-space
+    // contract below convertCoords). SDL_SetWindowSize expects screen-coord
+    // (logical) units — without scaling, asking for 1920x1080 client pixels
+    // on a 2x display would create a 960x540 window. Convert by inverse
+    // pixel density so a pixel request produces that many pixels on screen.
+    const float density = SDL_GetWindowPixelDensity(mWindow);
+    const float div = density > 0.f ? density : 1.f;
+
+    LLCoordScreen logical_size;
+    logical_size.mX = (S32)((F32)size.mX / div);
+    logical_size.mY = (S32)((F32)size.mY / div);
+    return ::setSizeImpl(logical_size, mWindow);
 }
 
 
@@ -1520,13 +1533,37 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
         case SDL_EVENT_MOUSE_WHEEL:
         {
-            if(event.wheel.integer_y != 0)
+            // Use the float-precision deltas (event.wheel.x/y) rather than
+            // the truncated event.wheel.integer_x/integer_y so touchpads and
+            // high-resolution wheels deliver smooth scroll instead of being
+            // quantised to integer notches and dropping sub-tick motion.
+            //
+            // event.wheel.direction is informational — SDL3 has already
+            // applied the OS natural-scroll preference to x/y, so using the
+            // values as-is respects the user's system setting. Linux users
+            // who enabled natural scroll in GNOME/KDE/Wayland get natural
+            // scroll inside the viewer too; we intentionally don't
+            // normalise FLIPPED back to "Win32 direction".
+            mScrollWheelAccumX += event.wheel.x;
+            mScrollWheelAccumY += event.wheel.y;
+
+            // handleScrollWheel/HWheel take S32 "clicks". Emit integer ticks
+            // when the accumulator crosses ±1 and carry the sub-tick residue
+            // forward so smooth-scroll gestures eventually integrate. lltrunc
+            // (toward zero) matches the mouse-delta accumulator and avoids
+            // amplifying sub-tick noise into spurious scroll events the way
+            // llfloor would for negative residue.
+            const S32 iy = lltrunc(mScrollWheelAccumY);
+            if (iy != 0)
             {
-                mCallbacks->handleScrollWheel(this, -event.wheel.integer_y);
+                mScrollWheelAccumY -= (F32)iy;
+                mCallbacks->handleScrollWheel(this, -iy);
             }
-            if (event.wheel.integer_x != 0)
+            const S32 ix = lltrunc(mScrollWheelAccumX);
+            if (ix != 0)
             {
-                mCallbacks->handleScrollHWheel(this, -event.wheel.integer_x);
+                mScrollWheelAccumX -= (F32)ix;
+                mCallbacks->handleScrollHWheel(this, -ix);
             }
             break;
         }

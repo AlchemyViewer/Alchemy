@@ -254,6 +254,16 @@ private:
     F32 mMouseDeltaAccumX = 0.f;
     F32 mMouseDeltaAccumY = 0.f;
 
+    // Per-frame scroll-wheel accumulator. SDL_EVENT_MOUSE_WHEEL delivers
+    // float-precision deltas (event.wheel.x/y) that we sum here, then
+    // emit integer "clicks" through handleScrollWheel/HWheel each time the
+    // accumulator crosses ±1. Lets smooth-scroll devices (touchpads,
+    // high-resolution wheels) eventually integrate into scroll events
+    // instead of having every sub-tick dropped by the integer_x/integer_y
+    // truncation the legacy code used.
+    F32 mScrollWheelAccumX = 0.f;
+    F32 mScrollWheelAccumY = 0.f;
+
     // True while SDL_SetWindowRelativeMouseMode is active. We enter relative
     // mode on hideCursor() (the permanent-hide path used by mouselook /
     // camera-grab tools) and leave on showCursor(). In this mode the OS
