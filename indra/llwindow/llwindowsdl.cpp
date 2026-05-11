@@ -2315,16 +2315,60 @@ std::vector<std::string> LLWindowSDL::getDynamicFallbackFontList()
 
 void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
 {
-    LLCoordWindow win_pos;
-    convertCoords( position, &win_pos );
+    if (!mWindow)
+    {
+        return;
+    }
 
-    SDL_Rect r;
-    r.x = win_pos.mX;
-    r.y = win_pos.mY;
-    r.w = 500;
-    r.h = 16;
+    // If the active preeditor can give us its actual bounds + caret, feed
+    // those to SDL so the platform IME anchors its candidate-list popup to
+    // the real text input area (rather than a magic 500x16 box guessed at
+    // the caret). Mirrors how the Win32 backend builds CANDIDATEFORM from
+    // the same LLPreeditor::getPreeditLocation query — see
+    // llwindowwin32.cpp:4164.
+    if (mPreeditor)
+    {
+        LLCoordGL caret_gl;
+        LLRect bounds_gl;
+        if (mPreeditor->getPreeditLocation(-1, &caret_gl, &bounds_gl, nullptr))
+        {
+            // LLRect uses GL convention (Y up, mTop > mBottom). convertCoords
+            // flips Y so the GL-top-left maps to the window-top-left (the
+            // corner with the smaller window-Y), and likewise GL-bottom-right
+            // maps to window-bottom-right.
+            LLCoordWindow top_left;
+            LLCoordWindow bottom_right;
+            convertCoords(LLCoordGL(bounds_gl.mLeft, bounds_gl.mTop), &top_left);
+            convertCoords(LLCoordGL(bounds_gl.mRight, bounds_gl.mBottom), &bottom_right);
 
-    SDL_SetTextInputArea(mWindow, &r, 0);
+            LLCoordWindow caret_win;
+            convertCoords(caret_gl, &caret_win);
+
+            SDL_Rect rect;
+            rect.x = top_left.mX;
+            rect.y = top_left.mY;
+            rect.w = bottom_right.mX - top_left.mX;
+            rect.h = bottom_right.mY - top_left.mY;
+
+            const int cursor_x = caret_win.mX - rect.x;
+            SDL_SetTextInputArea(mWindow, &rect, cursor_x);
+            return;
+        }
+    }
+
+    // Fallback: no preeditor (or it couldn't compute its bounds). Use a
+    // single-line guess centred at the supplied caret position, in line with
+    // the pre-improvement behaviour — enough for the IME to place its popup
+    // roughly under the cursor.
+    LLCoordWindow caret_win;
+    convertCoords(position, &caret_win);
+
+    SDL_Rect rect;
+    rect.x = caret_win.mX;
+    rect.y = caret_win.mY;
+    rect.w = 500;
+    rect.h = 16;
+    SDL_SetTextInputArea(mWindow, &rect, 0);
 }
 
 void LLWindowSDL::allowLanguageTextInput(LLPreeditor* preeditor, bool b)

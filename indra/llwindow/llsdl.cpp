@@ -99,7 +99,15 @@ void init_sdl(const std::string& app_name)
                     {SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH,"1"},
                     {SDL_HINT_MOUSE_EMULATE_WARP_WITH_RELATIVE,"0"},
                     {SDL_HINT_MOUSE_RELATIVE_WARP_MOTION,"1"},
-                    {SDL_HINT_KEYCODE_OPTIONS,"french_numbers,latin_letters"}
+                    {SDL_HINT_KEYCODE_OPTIONS,"french_numbers,latin_letters"},
+                    // The viewer renders the IME composition string itself
+                    // via LLPreeditor::updatePreedit (see the SDL_EVENT_TEXT_EDITING
+                    // handler in llwindowsdl.cpp). Tell SDL/the platform IME
+                    // to suppress its own preedit popup so we don't render
+                    // the composition twice. We do NOT advertise "candidates"
+                    // — the viewer has no candidate-list UI, so the IME
+                    // should keep drawing that natively.
+                    {SDL_HINT_IME_IMPLEMENTED_UI,"composition"}
             };
 
     for (auto hint: hintList)
