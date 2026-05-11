@@ -92,7 +92,13 @@ public:
 
     virtual bool setCursorPosition(LLCoordWindow position) = 0;
     virtual bool getCursorPosition(LLCoordWindow *position) = 0;
-#if LL_WINDOWS && !LL_SDL_WINDOW && !LL_MESA_HEADLESS
+#if (LL_WINDOWS || LL_SDL_WINDOW) && !LL_MESA_HEADLESS
+    // Return the cumulative mouse motion delta in PIXELS since the previous
+    // call, then reset the accumulator to zero. Backends should accumulate
+    // event-level relative motion (Win32 raw input, SDL3 event.motion.xrel/yrel)
+    // so per-frame delta queries stay accurate at high frame rates, where the
+    // per-frame change in absolute position can be sub-pixel and round to
+    // zero. Returns true if delta was populated.
     virtual bool getCursorDelta(LLCoordCommon* delta) = 0;
 #endif
     virtual bool isWrapMouse() const = 0;

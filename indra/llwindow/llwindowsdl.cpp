@@ -910,6 +910,14 @@ bool LLWindowSDL::setCursorPosition(const LLCoordWindow position)
     const float density = SDL_GetWindowPixelDensity(mWindow);
     const float div = density > 0.f ? density : 1.f;
     SDL_WarpMouseInWindow(mWindow, (F32)position.mX / div, (F32)position.mY / div);
+
+    // Drop the accumulated motion so the inevitable post-warp SDL motion
+    // event (which carries xrel = warp distance) doesn't get reported to
+    // the viewer as user input. LLViewerWindow::moveCursorToCenter already
+    // zeroes its own mCurrentMouseDelta / mLastMousePoint for the same
+    // reason; this mirrors that for the new xrel-based accumulator.
+    mMouseDeltaAccumX = 0.f;
+    mMouseDeltaAccumY = 0.f;
     return true;
 }
 
@@ -930,6 +938,24 @@ bool LLWindowSDL::getCursorPosition(LLCoordWindow *position)
     const float scale = density > 0.f ? density : 1.f;
     position->mX = llfloor(x * scale);
     position->mY = llfloor(y * scale);
+    return true;
+}
+
+bool LLWindowSDL::getCursorDelta(LLCoordCommon* delta)
+{
+    if (!delta) return false;
+
+    // Return the integer part of the accumulated motion and carry the
+    // sub-pixel residue forward so fractional deltas at very high frame
+    // rates (where mouse motion is < 1 pixel/frame) integrate over time
+    // instead of being silently rounded to zero each frame. The
+    // accumulator is fed by SDL_EVENT_MOUSE_MOTION below.
+    const S32 ix = llfloor(mMouseDeltaAccumX);
+    const S32 iy = llfloor(mMouseDeltaAccumY);
+    mMouseDeltaAccumX -= (F32)ix;
+    mMouseDeltaAccumY -= (F32)iy;
+    delta->mX = ix;
+    delta->mY = iy;
     return true;
 }
 
@@ -1417,6 +1443,16 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // testing — see the coord-space contract below convertCoords.
             const float density = SDL_GetWindowPixelDensity(mWindow);
             const float scale = density > 0.f ? density : 1.f;
+
+            // Accumulate every event's relative motion into the per-frame
+            // delta. LLViewerWindow::updateMouseDelta drains the accumulator
+            // via getCursorDelta() once per frame — without this, the
+            // viewer's "delta = current_pos - last_pos" path would only
+            // capture the LAST motion event of each frame and lose every
+            // sub-pixel motion at high frame rates.
+            mMouseDeltaAccumX += event.motion.xrel * scale;
+            mMouseDeltaAccumY += event.motion.yrel * scale;
+
             LLCoordWindow winCoord(llfloor(event.motion.x * scale),
                                    llfloor(event.motion.y * scale));
             LLCoordGL openGlCoord;

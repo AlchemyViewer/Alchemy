@@ -4146,8 +4146,13 @@ void LLViewerWindow::updateLayout()
 
 void LLViewerWindow::updateMouseDelta()
 {
-#if LL_WINDOWS
-    LLCoordCommon delta;
+#if LL_WINDOWS || LL_SDL_WINDOW
+    // Pull the accumulated per-event motion delta from the backend.
+    // Win32 sources this from raw input; SDL3 from SDL_EVENT_MOUSE_MOTION
+    // event.motion.xrel/yrel. Either way it captures every sub-frame
+    // motion event, which the position-difference fallback below truncates
+    // away at high frame rates where the per-frame motion is sub-pixel.
+    LLCoordCommon delta { 0, 0 };
     mWindow->getCursorDelta(&delta);
     S32 dx = delta.mX;
     S32 dy = delta.mY;

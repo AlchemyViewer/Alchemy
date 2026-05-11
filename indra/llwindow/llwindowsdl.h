@@ -81,6 +81,7 @@ public:
     bool setCursorPosition(LLCoordWindow position) override;
 
     bool getCursorPosition(LLCoordWindow *position) override;
+    bool getCursorDelta(LLCoordCommon* delta) override;
     bool isWrapMouse() const override { return true; }
     void showCursor() override;
     void hideCursor() override;
@@ -232,6 +233,20 @@ private:
     LLTimer mFlashTimer;
     U32 mKeyVirtualKey = 0;
     U32 mKeyModifiers = SDL_KMOD_NONE;
+
+    // Per-frame mouse-motion accumulator. SDL_EVENT_MOUSE_MOTION delivers
+    // event.motion.xrel/yrel (relative motion since the last event in
+    // screen-coord units); we scale by pixel density and sum into this
+    // member so getCursorDelta() — queried once per frame from
+    // LLViewerWindow::updateMouseDelta — sees every motion event, not
+    // just the last-position-minus-first-position which truncates to zero
+    // at high frame rates.
+    //
+    // Float storage carries sub-pixel residue across queries so fractional
+    // motion eventually integrates into integer deltas instead of being
+    // rounded away each frame.
+    F32 mMouseDeltaAccumX = 0.f;
+    F32 mMouseDeltaAccumY = 0.f;
 
     // Off-screen rendering (OSR) shared GL contexts.
     //
