@@ -253,6 +253,15 @@ private:
     // Float storage carries sub-pixel residue across queries so fractional
     // motion eventually integrates into integer deltas instead of being
     // rounded away each frame.
+    // Pixel-unit shadow of the screen-coord minimum size stored in the base
+    // class. LLWindow::setSize(LLCoordWindow) clamps against
+    // mMinWindowWidth/Height as a U32, but LLCoordWindow is in pixels on
+    // this backend while the base stores screen-coord (logical) units —
+    // direct comparison under-clamps on HiDPI. setSizeImpl(LLCoordWindow)
+    // re-clamps against this pixel-unit copy to make the dimensions match.
+    U32 mMinWindowWidthPx = 0;
+    U32 mMinWindowHeightPx = 0;
+
     F32 mMouseDeltaAccumX = 0.f;
     F32 mMouseDeltaAccumY = 0.f;
 

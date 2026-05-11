@@ -841,6 +841,16 @@ bool LLWindowSDL::setSizeImpl(const LLCoordWindow size)
 {
     if (!mWindow) return false;
 
+    // Re-clamp against the pixel-unit minimum. The base setSize(LLCoordWindow)
+    // already ran its clamp, but against mMinWindowWidth/Height which is in
+    // screen-coord units on this backend — that under-clamps on HiDPI, so a
+    // request for a window smaller than the configured minimum would slip
+    // through to SDL which then enforces its own (logical) minimum, blowing
+    // the actual window much larger than the user asked for.
+    LLCoordWindow clamped = size;
+    clamped.mX = llmax(clamped.mX, (S32)mMinWindowWidthPx);
+    clamped.mY = llmax(clamped.mY, (S32)mMinWindowHeightPx);
+
     // LLCoordWindow is in pixel units on this backend (see the coord-space
     // contract below convertCoords). SDL_SetWindowSize expects screen-coord
     // (logical) units — without scaling, asking for 1920x1080 client pixels
@@ -850,8 +860,8 @@ bool LLWindowSDL::setSizeImpl(const LLCoordWindow size)
     const float div = density > 0.f ? density : 1.f;
 
     LLCoordScreen logical_size;
-    logical_size.mX = (S32)((F32)size.mX / div);
-    logical_size.mY = (S32)((F32)size.mY / div);
+    logical_size.mX = (S32)((F32)clamped.mX / div);
+    logical_size.mY = (S32)((F32)clamped.mY / div);
     return ::setSizeImpl(logical_size, mWindow);
 }
 
@@ -926,11 +936,22 @@ void LLWindowSDL::setMouseClipping(bool b)
 // virtual
 void LLWindowSDL::setMinSize(U32 min_width, U32 min_height, bool enforce_immediately)
 {
+    // Callers pass min sizes in screen-coord (logical) units — the historical
+    // Win32 convention and what SDL_SetWindowMinimumSize expects directly.
+    // The base class stores those values as-is and uses them to clamp
+    // setSize(LLCoordScreen) (correct) AND setSize(LLCoordWindow) (wrong on
+    // this backend, since LLCoordWindow is in pixels). Maintain a pixel-unit
+    // shadow that setSizeImpl(LLCoordWindow) can re-clamp against.
     LLWindow::setMinSize(min_width, min_height, enforce_immediately);
+
+    const float density = mWindow ? SDL_GetWindowPixelDensity(mWindow) : 1.f;
+    const float scale = density > 0.f ? density : 1.f;
+    mMinWindowWidthPx = (U32)(min_width * scale);
+    mMinWindowHeightPx = (U32)(min_height * scale);
 
     if (mWindow && min_width > 0 && min_height > 0)
     {
-        SDL_SetWindowMinimumSize(mWindow, mMinWindowWidth, mMinWindowHeight);
+        SDL_SetWindowMinimumSize(mWindow, min_width, min_height);
     }
 }
 
@@ -1638,6 +1659,15 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
         case SDL_EVENT_MOUSE_BUTTON_UP:
         {
+            // Mirror the touch/pen tracking from MOUSE_MOTION / BUTTON_DOWN
+            // so a button-up arriving without a preceding same-frame motion
+            // event still updates mAbsoluteCursorPosition. Without this, a
+            // device-class transition that happened to land on a button-up
+            // boundary would leave the previous device's classification
+            // stuck until the next motion/down.
+            mAbsoluteCursorPosition = (event.button.which == SDL_TOUCH_MOUSEID
+                                       || event.button.which == SDL_PEN_MOUSEID);
+
             const float density = SDL_GetWindowPixelDensity(mWindow);
             const float scale = density > 0.f ? density : 1.f;
             LLCoordWindow winCoord(llfloor(event.button.x * scale),
@@ -2431,15 +2461,13 @@ LLSD LLWindowSDL::getNativeKeyData()
     // what a plugin under GDK under Qt under SL under SDL under X11 considers
     // a 'native' modifier mask.  this has been sort of reverse-engineered... they *appear*
     // to match GDK consts, but that may be co-incidence.
-    modifiers |= (mKeyModifiers & SDL_KMOD_LSHIFT) ? 0x0001 : 0;
-    modifiers |= (mKeyModifiers & SDL_KMOD_RSHIFT) ? 0x0001 : 0;// munge these into the same shift
-    modifiers |= (mKeyModifiers & SDL_KMOD_CAPS)   ? 0x0002 : 0;
-    modifiers |= (mKeyModifiers & SDL_KMOD_LCTRL)  ? 0x0004 : 0;
-    modifiers |= (mKeyModifiers & SDL_KMOD_RCTRL)  ? 0x0004 : 0;// munge these into the same ctrl
-    modifiers |= (mKeyModifiers & SDL_KMOD_LALT)   ? 0x0008 : 0;// untested
-    modifiers |= (mKeyModifiers & SDL_KMOD_RALT)   ? 0x0008 : 0;// untested
-    // *todo: test ALTs - I don't have a case for testing these.  Do you?
-    // *todo: NUM? - I don't care enough right now (and it's not a GDK modifier).
+    // SDL3 provides SDL_KMOD_{SHIFT,CTRL,ALT} as L|R aliases — use those
+    // instead of OR-ing L and R copies manually.
+    modifiers |= (mKeyModifiers & SDL_KMOD_SHIFT) ? 0x0001 : 0;
+    modifiers |= (mKeyModifiers & SDL_KMOD_CAPS)  ? 0x0002 : 0;
+    modifiers |= (mKeyModifiers & SDL_KMOD_CTRL)  ? 0x0004 : 0;
+    modifiers |= (mKeyModifiers & SDL_KMOD_ALT)   ? 0x0008 : 0;
+    // *todo: NUM? - not a GDK modifier; CEF/Qt don't seem to care.
 
     result["virtual_key"] = (S32)mKeyVirtualKey;
     result["virtual_key_win"] = (S32)LLKeyboardSDL::mapSDLtoWin( mKeyVirtualKey );
