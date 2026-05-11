@@ -2058,6 +2058,50 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             }
             break;
         }
+        case SDL_EVENT_RENDER_DEVICE_RESET:
+        case SDL_EVENT_RENDER_DEVICE_LOST:
+        case SDL_EVENT_RENDER_TARGETS_RESET:
+        {
+            // The GL device underneath us has been reset, lost, or had its
+            // render targets invalidated — display sleep/wake, GPU driver
+            // restart, VT switch on some Mesa stacks. Every texture, VBO,
+            // shader program, framebuffer object, and reflection probe is
+            // now in an undefined state and subsequent GL calls will either
+            // silently no-op or crash. The pre-relative-mode viewer simply
+            // crashed; this gives the user a visible cause-of-death and a
+            // proper log line for support before we tear down.
+            //
+            // True recovery — destroying every GL resource and rebuilding
+            // it from scratch — is a substantial cross-subsystem effort
+            // (LLPipeline, LLViewerTextureList, LLReflectionMapManager,
+            // every loaded shader, the UI atlas) and is deliberately not
+            // attempted here. The viewer exits cleanly so the user knows
+            // to restart instead of staring at a black or corrupted window.
+            const char* kind = (event.type == SDL_EVENT_RENDER_DEVICE_RESET)
+                                   ? "device reset"
+                                   : (event.type == SDL_EVENT_RENDER_DEVICE_LOST)
+                                         ? "device lost"
+                                         : "render targets reset";
+            LL_WARNS("Window") << "GL " << kind
+                               << " detected via SDL3 event. SDL error: "
+                               << SDL_GetError() << LL_ENDL;
+
+            OSMessageBoxSDL(
+                "The graphics driver reported an OpenGL device "
+                + std::string(kind)
+                + ". Alchemy can't continue rendering and will now exit.\n\n"
+                  "This usually follows display sleep/wake, a GPU driver "
+                  "restart, or a virtual-terminal switch. Please relaunch "
+                  "the viewer to resume.",
+                "OpenGL device lost",
+                OSMB_OK);
+
+            if (mCallbacks)
+            {
+                mCallbacks->handleQuit(this);
+            }
+            break;
+        }
         default:
             break;
     }
