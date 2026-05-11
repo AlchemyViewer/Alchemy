@@ -82,7 +82,13 @@ public:
 
     bool getCursorPosition(LLCoordWindow *position) override;
     bool getCursorDelta(LLCoordCommon* delta) override;
-    bool isWrapMouse() const override { return true; }
+    // Whether LLViewerWindow::moveCursorToCenter should warp the cursor when
+    // MouseWarpMode == 0 (the default, "trust the backend"). SDL3 says no:
+    // when the viewer wants pointer-lock for camera control it hides the
+    // cursor, which we translate to SDL_SetWindowRelativeMouseMode where
+    // motion arrives as hardware deltas. There is no warp-recenter loop on
+    // this backend any more. (See hideCursor / setCursorPosition.)
+    bool isWrapMouse() const override { return false; }
     void showCursor() override;
     void hideCursor() override;
     bool isCursorHidden() override;
@@ -247,6 +253,15 @@ private:
     // rounded away each frame.
     F32 mMouseDeltaAccumX = 0.f;
     F32 mMouseDeltaAccumY = 0.f;
+
+    // True while SDL_SetWindowRelativeMouseMode is active. We enter relative
+    // mode on hideCursor() (the permanent-hide path used by mouselook /
+    // camera-grab tools) and leave on showCursor(). In this mode the OS
+    // cursor is parked and SDL delivers hardware-level relative motion via
+    // SDL_EVENT_MOUSE_MOTION xrel/yrel; the absolute motion.x/y is undefined
+    // and we don't forward it to the viewer. The legacy "warp cursor to
+    // window center every frame and read the position delta" path is gone.
+    bool mRelativeMouseMode = false;
 
     // Off-screen rendering (OSR) shared GL contexts.
     //

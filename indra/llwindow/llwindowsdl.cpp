@@ -903,6 +903,19 @@ void LLWindowSDL::setMinSize(U32 min_width, U32 min_height, bool enforce_immedia
 bool LLWindowSDL::setCursorPosition(const LLCoordWindow position)
 {
     if (!mWindow) return false;
+
+    // In relative mouse mode the cursor is parked by SDL and warping is both
+    // pointless and harmful — some SDL backends emit a synthetic xrel for
+    // the warp distance which would slam the camera. The viewer's caller
+    // (LLViewerWindow::moveCursorToCenter) zeroes its own delta state for
+    // the same reason; we just zero ours and skip the warp.
+    if (mRelativeMouseMode)
+    {
+        mMouseDeltaAccumX = 0.f;
+        mMouseDeltaAccumY = 0.f;
+        return true;
+    }
+
     // LLCoordWindow is in window-relative PIXEL units, but
     // SDL_WarpMouseInWindow expects screen-coord (logical) units —
     // divide by pixel density to convert. See the coord-space contract
@@ -913,9 +926,7 @@ bool LLWindowSDL::setCursorPosition(const LLCoordWindow position)
 
     // Drop the accumulated motion so the inevitable post-warp SDL motion
     // event (which carries xrel = warp distance) doesn't get reported to
-    // the viewer as user input. LLViewerWindow::moveCursorToCenter already
-    // zeroes its own mCurrentMouseDelta / mLastMousePoint for the same
-    // reason; this mirrors that for the new xrel-based accumulator.
+    // the viewer as user input.
     mMouseDeltaAccumX = 0.f;
     mMouseDeltaAccumY = 0.f;
     return true;
@@ -924,6 +935,21 @@ bool LLWindowSDL::setCursorPosition(const LLCoordWindow position)
 bool LLWindowSDL::getCursorPosition(LLCoordWindow *position)
 {
     if (!position || !mWindow) return false;
+
+    // In relative mouse mode the OS cursor is parked and SDL_GetMouseState
+    // returns either the lock position or stale pre-lock coordinates. Report
+    // the window center so LLViewerWindow::updateMouseDelta's
+    // "is the cursor inside the window?" test keeps mMouseInWindow=true,
+    // matching the actual pointer-lock semantics.
+    if (mRelativeMouseMode)
+    {
+        int w = 0, h = 0;
+        SDL_GetWindowSizeInPixels(mWindow, &w, &h);
+        position->mX = w / 2;
+        position->mY = h / 2;
+        return true;
+    }
+
     // SDL3 SDL_GetMouseState returns the cursor position relative to the
     // focus window in screen-coord (logical) units. Multiply by pixel
     // density so the result is in window-relative PIXEL units, matching
@@ -1444,20 +1470,29 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             const float density = SDL_GetWindowPixelDensity(mWindow);
             const float scale = density > 0.f ? density : 1.f;
 
-            // Accumulate every event's relative motion into the per-frame
-            // delta. LLViewerWindow::updateMouseDelta drains the accumulator
-            // via getCursorDelta() once per frame — without this, the
-            // viewer's "delta = current_pos - last_pos" path would only
-            // capture the LAST motion event of each frame and lose every
-            // sub-pixel motion at high frame rates.
+            // Always accumulate the per-event relative motion (xrel/yrel) so
+            // getCursorDelta() — drained once per frame from
+            // LLViewerWindow::updateMouseDelta — sees every sample even at
+            // very high frame rates where the per-frame absolute-position
+            // diff would truncate to zero. In relative mouse mode these
+            // values come directly from the OS pointer driver (libinput
+            // rel-pointer / XInput2 raw / raw input); otherwise SDL emulates
+            // them from absolute-position diffs.
             mMouseDeltaAccumX += event.motion.xrel * scale;
             mMouseDeltaAccumY += event.motion.yrel * scale;
 
-            LLCoordWindow winCoord(llfloor(event.motion.x * scale),
-                                   llfloor(event.motion.y * scale));
-            LLCoordGL openGlCoord;
-            convertCoords(winCoord, &openGlCoord);
-            mCallbacks->handleMouseMove(this, openGlCoord, gKeyboard->currentMask(true));
+            // When relative mode is on, motion.x/y is undefined (SDL parks
+            // the cursor) and we're in mouselook — UI hover/hit-testing
+            // isn't running, and camera input is driven via getCursorDelta.
+            // Don't forward a fake absolute position to the viewer.
+            if (!mRelativeMouseMode)
+            {
+                LLCoordWindow winCoord(llfloor(event.motion.x * scale),
+                                       llfloor(event.motion.y * scale));
+                LLCoordGL openGlCoord;
+                convertCoords(winCoord, &openGlCoord);
+                mCallbacks->handleMouseMove(this, openGlCoord, gKeyboard->currentMask(true));
+            }
             break;
         }
 
@@ -2082,49 +2117,77 @@ void LLWindowSDL::releaseMouse()
 
 void LLWindowSDL::hideCursor()
 {
-    if(!mCursorHidden)
+    if (mCursorHidden) return;
+
+    mCursorHidden = true;
+    mHideCursorPermanent = true;
+
+    // The "permanent hide" path is what mouselook / camera-grab tools take
+    // when they want pointer-lock semantics. SDL3 expresses this as relative
+    // mouse mode: the OS cursor is hidden and parked, and motion arrives as
+    // hardware-level xrel/yrel via SDL_EVENT_MOUSE_MOTION. This is the modern
+    // replacement for the warp-cursor-to-center loop — warps go through the
+    // compositor (Wayland in particular coalesces and rate-limits them) and
+    // the resulting position-diff motion truncates at high frame rates.
+    if (mWindow)
     {
-        // LL_INFOS() << "hideCursor: hiding" << LL_ENDL;
-        mCursorHidden = true;
-        mHideCursorPermanent = true;
-        SDL_HideCursor();
-    }
-    else
-    {
-        // LL_INFOS() << "hideCursor: already hidden" << LL_ENDL;
+        if (SDL_SetWindowRelativeMouseMode(mWindow, true))
+        {
+            mRelativeMouseMode = true;
+            // Drop any motion that was queued before entering pointer-lock —
+            // it isn't relevant to the new camera-control session.
+            mMouseDeltaAccumX = 0.f;
+            mMouseDeltaAccumY = 0.f;
+        }
+        else
+        {
+            LL_WARNS("Window") << "SDL_SetWindowRelativeMouseMode(true) failed: "
+                               << SDL_GetError()
+                               << " — falling back to visibility-only hide." << LL_ENDL;
+            SDL_HideCursor();
+        }
     }
 }
 
 void LLWindowSDL::showCursor()
 {
-    if(mCursorHidden)
-    {
-        // LL_INFOS() << "showCursor: showing" << LL_ENDL;
-        mCursorHidden = false;
-        mHideCursorPermanent = false;
-        SDL_ShowCursor();
-    }
-    else
-    {
-        // LL_INFOS() << "showCursor: already visible" << LL_ENDL;
-    }
-}
+    if (!mCursorHidden) return;
 
-void LLWindowSDL::showCursorFromMouseMove()
-{
-    if (!mHideCursorPermanent)
+    mCursorHidden = false;
+    mHideCursorPermanent = false;
+
+    if (mWindow)
     {
-        showCursor();
+        if (mRelativeMouseMode)
+        {
+            SDL_SetWindowRelativeMouseMode(mWindow, false);
+            mRelativeMouseMode = false;
+            mMouseDeltaAccumX = 0.f;
+            mMouseDeltaAccumY = 0.f;
+        }
+        // Safe to call unconditionally — SDL_ShowCursor is a no-op when the
+        // cursor is already visible, and we need it for the fallback path
+        // where relative mode failed and we used SDL_HideCursor instead.
+        SDL_ShowCursor();
     }
 }
 
 void LLWindowSDL::hideCursorUntilMouseMove()
 {
-    if (!mHideCursorPermanent)
-    {
-        hideCursor();
-        mHideCursorPermanent = false;
-    }
+    // Auto-hide after the cursor sits idle — visibility-only. Must NOT enter
+    // relative mode here: the cursor is supposed to reappear at its current
+    // screen position on the next motion event, not get teleported back to
+    // wherever pointer-lock parked it.
+    if (mHideCursorPermanent || mCursorHidden) return;
+    mCursorHidden = true;
+    SDL_HideCursor();
+}
+
+void LLWindowSDL::showCursorFromMouseMove()
+{
+    if (mHideCursorPermanent || !mCursorHidden) return;
+    mCursorHidden = false;
+    SDL_ShowCursor();
 }
 
 //
