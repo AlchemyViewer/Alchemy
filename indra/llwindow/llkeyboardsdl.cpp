@@ -95,6 +95,10 @@ LLKeyboardSDL::LLKeyboardSDL()
     mTranslateKeyMap[SDLK_EQUALS] = KEY_EQUALS;
     mTranslateKeyMap[SDLK_KP_EQUALS] = KEY_EQUALS;
     mTranslateKeyMap[SDLK_INSERT] = KEY_INSERT;
+    // KP_5 with NumLock off remaps to SDLK_CLEAR via adjustNativekeyFromUnhandledMask
+    // below. This entry lets the binding system reach KEY_PAD_CENTER through that
+    // remap — matching Win32's VK_CLEAR -> KEY_PAD_CENTER (llkeyboardwin32.cpp:114).
+    mTranslateKeyMap[SDLK_CLEAR] = KEY_PAD_CENTER;
     mTranslateKeyMap[SDLK_CAPSLOCK] = KEY_CAPSLOCK;
     mTranslateKeyMap[SDLK_TAB] = KEY_TAB;
     mTranslateKeyMap[SDLK_KP_PLUS] = KEY_ADD;
@@ -200,12 +204,18 @@ LLKeyboard::NATIVE_KEY_TYPE adjustNativekeyFromUnhandledMask(const LLKeyboard::N
     {
         switch (key)
         {
-            case SDLK_KP_PERIOD: rtn = SDLK_DELETE; break;
+            case SDLK_KP_PERIOD:  rtn = SDLK_DELETE; break;
+            case SDLK_KP_DECIMAL: rtn = SDLK_DELETE; break;
             case SDLK_KP_0: rtn = SDLK_INSERT; break;
             case SDLK_KP_1: rtn = SDLK_END; break;
             case SDLK_KP_2: rtn = SDLK_DOWN; break;
             case SDLK_KP_3: rtn = SDLK_PAGEDOWN; break;
             case SDLK_KP_4: rtn = SDLK_LEFT; break;
+            // KP_5 with NumLock off maps to SDLK_CLEAR; mTranslateKeyMap then
+            // routes that to KEY_PAD_CENTER so the binding system can reach
+            // the one numpad key that has no arrow / nav equivalent. Mirrors
+            // Win32, where the OS sends VK_CLEAR for that physical key.
+            case SDLK_KP_5: rtn = SDLK_CLEAR; break;
             case SDLK_KP_6: rtn = SDLK_RIGHT; break;
             case SDLK_KP_7: rtn = SDLK_HOME; break;
             case SDLK_KP_8: rtn = SDLK_UP; break;
