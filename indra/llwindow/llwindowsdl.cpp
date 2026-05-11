@@ -1532,6 +1532,14 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
         case SDL_EVENT_TEXT_INPUT:
         {
+            // event.text.text is "UTF-8 encoded" per SDL3 SDL_TextInputEvent
+            // docs; nothing in the spec actually rules out a NULL pointer for
+            // a malformed event, so guard. Empty string is similarly skipped.
+            if (!event.text.text || event.text.text[0] == '\0')
+            {
+                break;
+            }
+
             // SDL3 fires TEXT_INPUT to deliver committed text from the platform
             // IME (or from direct keyboard typing if no IME is active). If a
             // preeditor was mid-composition, reset its preedit state first so
@@ -1580,11 +1588,19 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             }
 
             const LLWString preedit = utf8str_to_wstring(event.edit.text);
+
+            // event.edit.start is a UTF-8 byte offset within event.edit.text
+            // (the IME's caret position inside the composition), or -1 when
+            // the IME hasn't reported a position. start == 0 is a legitimate
+            // "caret at the beginning" value and must NOT be confused with
+            // the -1 default (the earlier `> 0` check did exactly that and
+            // pinned the caret to the end of the preedit whenever the IME
+            // started the cursor at byte 0).
             S32 caret = static_cast<S32>(preedit.length());
-            if (event.edit.start > 0)
+            if (event.edit.start >= 0)
             {
-                // event.edit.start is a UTF-8 byte offset within event.edit.text;
-                // convert to llwchar (UTF-32) offset by re-encoding the prefix.
+                // Convert from UTF-8 byte offset to llwchar (UTF-32) offset
+                // by re-encoding the prefix and taking its length.
                 const std::string prefix(event.edit.text, event.edit.start);
                 caret = static_cast<S32>(utf8str_to_wstring(prefix).length());
             }
@@ -2350,9 +2366,16 @@ void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
             rect.w = bottom_right.mX - top_left.mX;
             rect.h = bottom_right.mY - top_left.mY;
 
-            const int cursor_x = caret_win.mX - rect.x;
-            SDL_SetTextInputArea(mWindow, &rect, cursor_x);
-            return;
+            // A widget that's still being laid out can return a default-
+            // constructed LLRect (all zeros); SDL_SetTextInputArea with a
+            // zero-sized rect would anchor the IME popup to the window
+            // origin. Fall through to the caret-based fallback instead.
+            if (rect.w > 0 && rect.h > 0)
+            {
+                const int cursor_x = caret_win.mX - rect.x;
+                SDL_SetTextInputArea(mWindow, &rect, cursor_x);
+                return;
+            }
         }
     }
 
