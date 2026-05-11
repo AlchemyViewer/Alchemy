@@ -95,10 +95,32 @@ void init_sdl(const std::string& app_name)
 #if LL_SDL_WINDOW
     std::initializer_list<std::tuple< char const*, char const * > > hintList =
             {
+                    // Don't ask the compositor to bypass us in fullscreen —
+                    // keeps screen recorders, alt-tab thumbnails, picom-style
+                    // effects, etc. working. Slight latency cost in exclusive
+                    // fullscreen vs. taking the bypass.
                     {SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR,"0"},
+
+                    // Process clicks immediately on focus instead of swallowing
+                    // the first click to focus the window.
                     {SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH,"1"},
+
+                    // SDL3 auto-sets this to "1" when an app uses
+                    // SDL_SetWindowRelativeMouseMode (which we now do — see
+                    // LLWindowSDL::hideCursor). That auto-default would cause
+                    // explicit SDL_WarpMouseInWindow calls (LLWindowSDL::
+                    // setCursorPosition while NOT in relative mode) to secretly
+                    // enter relative mode under the hood. We want plain warps
+                    // there, so force the explicit "0".
                     {SDL_HINT_MOUSE_EMULATE_WARP_WITH_RELATIVE,"0"},
-                    {SDL_HINT_MOUSE_RELATIVE_WARP_MOTION,"1"},
+
+                    // SDL3 default ("0"): a SDL_WarpMouseInWindow while in
+                    // relative mode does NOT generate a synthetic motion event
+                    // — apps don't have to filter the warp distance out of
+                    // xrel/yrel. We rely on that: getCursorDelta accumulates
+                    // every motion event, and we never want a warp-distance
+                    // to land in the camera signal. Don't override.
+
                     {SDL_HINT_KEYCODE_OPTIONS,"french_numbers,latin_letters"},
                     // The viewer renders the IME composition string itself
                     // via LLPreeditor::updatePreedit (see the SDL_EVENT_TEXT_EDITING
