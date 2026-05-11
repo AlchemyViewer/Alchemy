@@ -389,11 +389,14 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
 
         gGLManager.initEGL();
 
-        // If set (XWayland) remove DISPLAY, this will prompt dullahan to also use Wayland
-        if(getenv("DISPLAY"))
-        {
-            unsetenv("DISPLAY");
-        }
+        // NOTE: the Wayland init path used to unsetenv("DISPLAY") here to
+        // coax dullahan/CEF onto the native Wayland path. That global env
+        // mutation affected every other subprocess the viewer spawns, so
+        // we dropped it. Routing CEF to Wayland needs a per-spawn fix on
+        // the dullahan side (e.g. scrubbing DISPLAY only when launching
+        // dullahan_host, or passing OZONE_PLATFORM=wayland via the launch
+        // env). Until that lands, CEF will continue to use XWayland when
+        // DISPLAY is set, which is the SDL2-era behaviour.
     }
 #endif
 
