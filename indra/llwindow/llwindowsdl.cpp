@@ -1812,10 +1812,17 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             break;
         case SDL_EVENT_WINDOW_FOCUS_GAINED:
             //SDL_SetWindowKeyboardGrab(mWindow, true);
+            // Inhibit the screensaver while the viewer is the focused window.
+            // On Wayland this routes through the org.freedesktop.ScreenSaver
+            // Inhibit portal; on X11 it suppresses the XScreenSaver timer.
+            // We pair this with EnableScreenSaver on focus-loss so the
+            // screensaver can run normally while the user is in another app.
+            SDL_DisableScreenSaver();
             mCallbacks->handleFocus(this);
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             mCallbacks->handleFocusLost(this);
+            SDL_EnableScreenSaver();
             //SDL_SetWindowKeyboardGrab(mWindow, false);
             break;
         case SDL_EVENT_WINDOW_RESTORED:
