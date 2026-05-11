@@ -3031,6 +3031,7 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         case WM_DISPLAYCHANGE:
         {
             WINDOW_IMP_POST(window_imp->mCallbacks->handleDisplayChanged());
+            return 0;
         }
 
         case WM_SETFOCUS:
