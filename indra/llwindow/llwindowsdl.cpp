@@ -1492,6 +1492,13 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
     {
         case SDL_EVENT_MOUSE_MOTION:
         {
+            // Track whether this event came from a touchscreen or stylus.
+            // SDL3 synthesises mouse-motion events for these devices with
+            // event.motion.which set to SDL_TOUCH_MOUSEID / SDL_PEN_MOUSEID
+            // — matches LLWindowWin32's mAbsoluteCursorPosition tracking.
+            mAbsoluteCursorPosition = (event.motion.which == SDL_TOUCH_MOUSEID
+                                       || event.motion.which == SDL_PEN_MOUSEID);
+
             // event.motion.x/y are SDL3 screen-coord (logical) units. Scale to
             // PIXEL units so LLCoordWindow stays in the same unit as
             // mWindowRectRaw and the rest of the viewer's pixel-based hit
@@ -1573,6 +1580,12 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
         {
+            // Touch / pen also fire mouse-button events; track which source
+            // they came from so the next hideCursor() can pick the right
+            // pointer-lock strategy. See the MOUSE_MOTION case above.
+            mAbsoluteCursorPosition = (event.button.which == SDL_TOUCH_MOUSEID
+                                       || event.button.which == SDL_PEN_MOUSEID);
+
             // Scale screen-coord event coords up to PIXEL units for LLCoordWindow.
             const float density = SDL_GetWindowPixelDensity(mWindow);
             const float scale = density > 0.f ? density : 1.f;
@@ -2198,7 +2211,14 @@ void LLWindowSDL::hideCursor()
     // replacement for the warp-cursor-to-center loop — warps go through the
     // compositor (Wayland in particular coalesces and rate-limits them) and
     // the resulting position-diff motion truncates at high frame rates.
-    if (mWindow)
+    //
+    // Skip relative mode when the active pointer is touch/pen: SDL3 doesn't
+    // deliver relative deltas from finger drags or stylus motion (the OS
+    // model is absolute positions, not relative motion), so relative mode
+    // would just freeze the mouselook camera. Visibility-only hide on those
+    // devices lets the position-diff path (xrel/yrel synthesised by SDL
+    // from consecutive touch positions) drive the camera signal instead.
+    if (mWindow && !mAbsoluteCursorPosition)
     {
         if (SDL_SetWindowRelativeMouseMode(mWindow, true))
         {
@@ -2218,6 +2238,10 @@ void LLWindowSDL::hideCursor()
                                << " — falling back to visibility-only hide." << LL_ENDL;
             SDL_HideCursor();
         }
+    }
+    else if (mWindow)
+    {
+        SDL_HideCursor();
     }
 }
 

@@ -83,12 +83,14 @@ public:
     bool getCursorPosition(LLCoordWindow *position) override;
     bool getCursorDelta(LLCoordCommon* delta) override;
     // Whether LLViewerWindow::moveCursorToCenter should warp the cursor when
-    // MouseWarpMode == 0 (the default, "trust the backend"). SDL3 says no:
-    // when the viewer wants pointer-lock for camera control it hides the
-    // cursor, which we translate to SDL_SetWindowRelativeMouseMode where
-    // motion arrives as hardware deltas. There is no warp-recenter loop on
-    // this backend any more. (See hideCursor / setCursorPosition.)
-    bool isWrapMouse() const override { return false; }
+    // MouseWarpMode == 0 (the default, "trust the backend"). Same semantics
+    // as LLWindowWin32::isWrapMouse: false when the active pointing device
+    // is absolute-positioned (touchscreen, stylus) so we don't try to warp
+    // a finger; true for ordinary mice. The "true" case is also the path
+    // that would have warped pre-relative-mode — relative mode covers it
+    // now, so isWrapMouse no longer drives camera-control warping, but the
+    // touch/pen branch still needs to disable warp.
+    bool isWrapMouse() const override { return !mAbsoluteCursorPosition; }
     void showCursor() override;
     void hideCursor() override;
     bool isCursorHidden() override;
@@ -263,6 +265,16 @@ private:
     // truncation the legacy code used.
     F32 mScrollWheelAccumX = 0.f;
     F32 mScrollWheelAccumY = 0.f;
+
+    // Mirrors LLWindowWin32::mAbsoluteCursorPosition. Set true while the
+    // most recent mouse motion/button event was synthesised from a touch
+    // screen (event.motion.which == SDL_TOUCH_MOUSEID) or a pen / stylus
+    // (SDL_PEN_MOUSEID). Drives isWrapMouse() so MouseWarpMode=0 skips
+    // the warp path for absolute-positioned devices, and also suppresses
+    // relative-mouse-mode entry in hideCursor() since SDL3 doesn't deliver
+    // relative deltas for finger drags — relative mode there would freeze
+    // mouselook input entirely.
+    bool mAbsoluteCursorPosition = false;
 
     // True while SDL_SetWindowRelativeMouseMode is active. We enter relative
     // mode on hideCursor() (the permanent-hide path used by mouselook /
