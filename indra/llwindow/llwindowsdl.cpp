@@ -1952,7 +1952,16 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             MASK current_mask = gKeyboard->currentMask(false);
             for (auto key : string)
             {
-                mKeyVirtualKey = key;
+                // Deliberately do NOT overwrite mKeyVirtualKey here.
+                // mKeyVirtualKey is read by getNativeKeyData() and forwarded
+                // to Dullahan/CEF as the virtual-key code; Win32 keeps it as
+                // the most recent WM_KEYDOWN VK (mKeyCharCode is the
+                // character-code field on that backend). Writing the Unicode
+                // codepoint here corrupts the value CEF sees — multi-codepoint
+                // commits (combined emoji, ZWJ sequences) would leave the
+                // final character cached, and the CEF keysym layer at
+                // media_plugin_cef.cpp:1108-1164 treats anything >= 0x7f as
+                // a special-case sysmod path with that bogus value.
                 mCallbacks->handleUnicodeChar(key, current_mask);
             }
             break;

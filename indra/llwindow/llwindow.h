@@ -102,6 +102,15 @@ public:
     virtual bool getCursorDelta(LLCoordCommon* delta) = 0;
 #endif
     virtual bool isWrapMouse() const = 0;
+
+    // True when the user's current modifier state is AltGr (Right-Alt acting
+    // as a level-3 chooser) rather than plain Alt. On layouts that use AltGr
+    // for character composition (€/Å/Ø/ñ/etc. on European keyboards), an
+    // AltGr-modified key delivers its composed character via the text-input
+    // channel; the viewer should NOT also fire its Alt-bound in-world action
+    // for the underlying letter. Default false — Win32 and SDL3 override.
+    virtual bool isAltGrPressed() const { return false; }
+
     virtual void showCursor() = 0;
     virtual void hideCursor() = 0;
     virtual bool isCursorHidden() = 0;

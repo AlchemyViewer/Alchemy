@@ -91,6 +91,20 @@ public:
     // now, so isWrapMouse no longer drives camera-control warping, but the
     // touch/pen branch still needs to disable warp.
     bool isWrapMouse() const override { return !mAbsoluteCursorPosition; }
+
+    // On Linux/X11 and Wayland AltGr is delivered as Right-Alt alone (no
+    // Ctrl prefix). LLKeyboardSDL folds RALT into MASK_ALT, so a chat-bar
+    // user typing AltGr+E (€ on German layout) would otherwise see the
+    // in-world "Alt+E" binding fire alongside the € insert. We detect the
+    // RAlt-without-LAlt-and-without-Ctrl signature here so handleKey can
+    // short-circuit before the binding dispatch — mirrors the AltGr block
+    // in LLWindowWin32 / LLViewerWindow::handleKey.
+    bool isAltGrPressed() const override
+    {
+        return (mKeyModifiers & SDL_KMOD_RALT)
+            && !(mKeyModifiers & SDL_KMOD_LALT)
+            && !(mKeyModifiers & SDL_KMOD_CTRL);
+    }
     void showCursor() override;
     void hideCursor() override;
     bool isCursorHidden() override;

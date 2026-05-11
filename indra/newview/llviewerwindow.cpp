@@ -3135,6 +3135,22 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
         if (cur_focus && cur_focus->acceptsTextInput())
 #endif
         {
+#if LL_SDL_WINDOW
+            // SDL3 / Linux: AltGr is delivered as Right-Alt with no Ctrl
+            // (unlike Win32 where the AltGr generates a synthetic Ctrl too).
+            // LLKeyboardSDL folds RAlt into MASK_ALT, so the menu/binding
+            // dispatch below would otherwise route an AltGr-modified
+            // printable key (AltGr+E for €, AltGr+S for ß, AltGr+W for the
+            // ł on Polish, etc.) to the in-world "Alt+letter" binding
+            // alongside SDL3's TEXT_INPUT delivering the composed character.
+            // Suppress the binding dispatch when AltGr is active and the
+            // key is a printable ASCII letter / digit / symbol.
+            if (mWindow->isAltGrPressed() && (mask & MASK_ALT) && key >= 0x20 && key < 0x80)
+            {
+                return true;
+            }
+#endif
+
 #ifdef LL_WINDOWS
             // On windows Alt Gr key generates additional Ctrl event, as result handling situations
             // like 'AltGr + D' will result in 'Alt+Ctrl+D'. If it results in WM_CHAR, don't let it
