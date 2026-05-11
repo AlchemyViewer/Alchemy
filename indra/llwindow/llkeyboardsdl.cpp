@@ -251,10 +251,10 @@ bool LLKeyboardSDL::handleKeyUp(const LLKeyboard::NATIVE_KEY_TYPE key, const MAS
     return handled;
 }
 
-MASK LLKeyboardSDL::currentMask(bool for_mouse_event)
+MASK LLKeyboardSDL::currentMask(bool /*for_mouse_event*/)
 {
     MASK result = MASK_NONE;
-    SDL_Keymod mask = SDL_GetModState();
+    const SDL_Keymod mask = SDL_GetModState();
 
     if (mask & SDL_KMOD_SHIFT)
         result |= MASK_SHIFT;
@@ -263,12 +263,18 @@ MASK LLKeyboardSDL::currentMask(bool for_mouse_event)
     if (mask & SDL_KMOD_ALT)
         result |= MASK_ALT;
 
-    // For keyboard events, consider Meta keys equivalent to Control
-    if (!for_mouse_event)
-    {
-        if (mask & SDL_KMOD_GUI)
-            result |= MASK_CONTROL;
-    }
+    // SDL_KMOD_GUI is intentionally NOT translated to MASK_CONTROL here.
+    // The macOS backend (llkeyboardmacosx.cpp) does the equivalent for
+    // MAC_CMD_KEY because Cmd is the OS's primary command modifier — but
+    // the SDL3 backend is Linux-only (LL_SDL_WINDOW gates it), and on
+    // Linux SDL_KMOD_GUI is the Super / Mod4 key, which is reserved for
+    // the window manager (Activities, workspace switching, app launching).
+    // Treating Super as Control would cause Super+letter chords to fire
+    // viewer Ctrl+letter shortcuts the user didn't ask for.
+    //
+    // The `for_mouse_event` argument is preserved to match the
+    // LLKeyboard::currentMask base signature shared across backends, but
+    // there is no per-event-type difference on Linux.
 
     return result;
 }
