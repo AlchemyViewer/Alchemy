@@ -162,6 +162,35 @@ GLuint SafeChoosePixelFormat(HDC &hdc, const PIXELFORMATDESCRIPTOR *ppfd)
     }
 }
 
+// AdjustWindowRectExForDpi / GetDpiForWindow are Win10 1607+. Fall back
+// to the legacy non-DPI-aware variant on older systems.
+static void ll_adjust_window_rect_dpi(HWND hwnd, LPRECT rect, DWORD dw_style, DWORD dw_ex_style)
+{
+    typedef BOOL (WINAPI *PFN_AdjustWindowRectExForDpi)(LPRECT, DWORD, BOOL, DWORD, UINT);
+    typedef UINT (WINAPI *PFN_GetDpiForWindow)(HWND);
+    static PFN_AdjustWindowRectExForDpi p_adjust = nullptr;
+    static PFN_GetDpiForWindow p_get_dpi = nullptr;
+    static bool resolved = false;
+    if (!resolved)
+    {
+        if (HMODULE u32 = GetModuleHandleW(L"user32.dll"))
+        {
+            p_adjust = (PFN_AdjustWindowRectExForDpi)GetProcAddress(u32, "AdjustWindowRectExForDpi");
+            p_get_dpi = (PFN_GetDpiForWindow)GetProcAddress(u32, "GetDpiForWindow");
+        }
+        resolved = true;
+    }
+    if (hwnd && p_adjust && p_get_dpi)
+    {
+        UINT dpi = p_get_dpi(hwnd);
+        if (dpi && p_adjust(rect, dw_style, FALSE, dw_ex_style, dpi))
+        {
+            return;
+        }
+    }
+    AdjustWindowRectEx(rect, dw_style, FALSE, dw_ex_style);
+}
+
 //static
 bool LLWindowWin32::sIsClassRegistered = false;
 
@@ -1142,7 +1171,7 @@ bool LLWindowWin32::setSizeImpl(const LLCoordWindow size)
     DWORD dw_ex_style = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
     DWORD dw_style = WS_OVERLAPPEDWINDOW;
 
-    AdjustWindowRectEx(&window_rect, dw_style, FALSE, dw_ex_style);
+    ll_adjust_window_rect_dpi(mWindowHandle, &window_rect, dw_style, dw_ex_style);
 
     return setSizeImpl(LLCoordScreen(window_rect.right - window_rect.left, window_rect.bottom - window_rect.top));
 }
@@ -1263,7 +1292,7 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
 
             // Move window borders out not to cover window contents.
             // This converts client rect to window rect, i.e. expands it by the window border size.
-            AdjustWindowRectEx(&window_rect, dw_style, FALSE, dw_ex_style);
+            ll_adjust_window_rect_dpi(mWindowHandle, &window_rect, dw_style, dw_ex_style);
         }
         // If it failed, we don't want to run fullscreen
         else
@@ -1287,6 +1316,10 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
         // Window with an edge
         dw_ex_style = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
         dw_style = WS_OVERLAPPEDWINDOW;
+
+        // Caller passes the desired client size; expand to include
+        // borders/title bar so CreateWindowEx gets a window rect.
+        ll_adjust_window_rect_dpi(mWindowHandle, &window_rect, dw_style, dw_ex_style);
     }
 
 
@@ -3063,8 +3096,19 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
             {
                 // received a URL
                 PCOPYDATASTRUCT myCDS = (PCOPYDATASTRUCT)l_param;
-                U8* data = new U8[myCDS->cbData];
-                memcpy(data, myCDS->lpData, myCDS->cbData);
+                // The only downstream consumer (LLViewerWindow::handleDataCopy)
+                // treats payload as a C string. Reject oversized or empty
+                // messages and guarantee NUL-termination so a misbehaving
+                // sender can't force a huge alloc or trigger an OOB read.
+                constexpr DWORD MAX_WM_COPYDATA_BYTES = 64 * 1024;
+                if (!myCDS || !myCDS->lpData || myCDS->cbData == 0 || myCDS->cbData > MAX_WM_COPYDATA_BYTES)
+                {
+                    return 0;
+                }
+                const DWORD cb = myCDS->cbData;
+                U8* data = new U8[cb + 1];
+                memcpy(data, myCDS->lpData, cb);
+                data[cb] = 0;
                 auto myType = myCDS->dwData;
 
                 window_imp->post([=]()
@@ -3992,10 +4036,12 @@ void LLWindowWin32::allowLanguageTextInput(LLPreeditor *preeditor, bool b)
             // using same Input Locale (aka Keyboard Layout).
             if (sWinIMEOpened && GetKeyboardLayout(0) == sWinInputLocale)
             {
-                HIMC himc = LLWinImm::getContext(mWindowHandle);
-                LLWinImm::setOpenStatus(himc, true);
-                LLWinImm::setConversionStatus(himc, sWinIMEConversionMode, sWinIMESentenceMode);
-                LLWinImm::releaseContext(mWindowHandle, himc);
+                if (HIMC himc = LLWinImm::getContext(mWindowHandle))
+                {
+                    LLWinImm::setOpenStatus(himc, true);
+                    LLWinImm::setConversionStatus(himc, sWinIMEConversionMode, sWinIMESentenceMode);
+                    LLWinImm::releaseContext(mWindowHandle, himc);
+                }
             }
         });
     }
@@ -4010,18 +4056,20 @@ void LLWindowWin32::allowLanguageTextInput(LLPreeditor *preeditor, bool b)
             sWinIMEOpened = LLWinImm::isIME(sWinInputLocale);
             if (sWinIMEOpened)
             {
-                HIMC himc = LLWinImm::getContext(mWindowHandle);
-                sWinIMEOpened = LLWinImm::getOpenStatus(himc);
-                if (sWinIMEOpened)
+                if (HIMC himc = LLWinImm::getContext(mWindowHandle))
                 {
-                    LLWinImm::getConversionStatus(himc, &sWinIMEConversionMode, &sWinIMESentenceMode);
+                    sWinIMEOpened = LLWinImm::getOpenStatus(himc);
+                    if (sWinIMEOpened)
+                    {
+                        LLWinImm::getConversionStatus(himc, &sWinIMEConversionMode, &sWinIMESentenceMode);
 
-                    // We need both ImmSetConversionStatus and ImmSetOpenStatus here to surely disable IME's
-                    // keyboard hooking, because Some IME reacts only on the former and some other on the latter...
-                    LLWinImm::setConversionStatus(himc, IME_CMODE_NOCONVERSION, sWinIMESentenceMode);
-                    LLWinImm::setOpenStatus(himc, false);
+                        // We need both ImmSetConversionStatus and ImmSetOpenStatus here to surely disable IME's
+                        // keyboard hooking, because Some IME reacts only on the former and some other on the latter...
+                        LLWinImm::setConversionStatus(himc, IME_CMODE_NOCONVERSION, sWinIMESentenceMode);
+                        LLWinImm::setOpenStatus(himc, false);
+                    }
+                    LLWinImm::releaseContext(mWindowHandle, himc);
                 }
-                LLWinImm::releaseContext(mWindowHandle, himc);
             }
         });
     }
@@ -4052,6 +4100,10 @@ void LLWindowWin32::setLanguageTextInput( const LLCoordGL & position )
     if (sLanguageTextInputAllowed && LLWinImm::isAvailable())
     {
         HIMC himc = LLWinImm::getContext(mWindowHandle);
+        if (!himc)
+        {
+            return;
+        }
 
         LLCoordWindow win_pos;
         convertCoords( position, &win_pos );
@@ -4190,16 +4242,18 @@ void LLWindowWin32::updateLanguageTextInputArea()
         CANDIDATEFORM candidate_form;
         fillCandidateForm(caret_coord, preedit_bounds, &candidate_form);
 
-        HIMC himc = LLWinImm::getContext(mWindowHandle);
-        // Win32 document says there may be up to 4 candidate windows.
-        // This magic number 4 appears only in the document, and
-        // there are no constant/macro for the value...
-        for (int i = 3; i >= 0; --i)
+        if (HIMC himc = LLWinImm::getContext(mWindowHandle))
         {
-            candidate_form.dwIndex = i;
-            LLWinImm::setCandidateWindow(himc, &candidate_form);
+            // Win32 document says there may be up to 4 candidate windows.
+            // This magic number 4 appears only in the document, and
+            // there are no constant/macro for the value...
+            for (int i = 3; i >= 0; --i)
+            {
+                candidate_form.dwIndex = i;
+                LLWinImm::setCandidateWindow(himc, &candidate_form);
+            }
+            LLWinImm::releaseContext(mWindowHandle, himc);
         }
-        LLWinImm::releaseContext(mWindowHandle, himc);
     }
 }
 
@@ -4208,9 +4262,11 @@ void LLWindowWin32::interruptLanguageTextInput()
     ASSERT_MAIN_THREAD();
     if (mPreeditor && LLWinImm::isAvailable())
     {
-        HIMC himc = LLWinImm::getContext(mWindowHandle);
-        LLWinImm::notifyIME(himc, NI_COMPOSITIONSTR, CPS_COMPLETE, 0);
-        LLWinImm::releaseContext(mWindowHandle, himc);
+        if (HIMC himc = LLWinImm::getContext(mWindowHandle))
+        {
+            LLWinImm::notifyIME(himc, NI_COMPOSITIONSTR, CPS_COMPLETE, 0);
+            LLWinImm::releaseContext(mWindowHandle, himc);
+        }
     }
 }
 
@@ -4219,9 +4275,11 @@ void LLWindowWin32::handleStartCompositionMessage()
     // Let IME know the font to use in feedback UI.
     LOGFONT logfont;
     fillCompositionLogfont(&logfont);
-    HIMC himc = LLWinImm::getContext(mWindowHandle);
-    LLWinImm::setCompositionFont(himc, &logfont);
-    LLWinImm::releaseContext(mWindowHandle, himc);
+    if (HIMC himc = LLWinImm::getContext(mWindowHandle))
+    {
+        LLWinImm::setCompositionFont(himc, &logfont);
+        LLWinImm::releaseContext(mWindowHandle, himc);
+    }
 }
 
 // Handle WM_IME_COMPOSITION message.
@@ -4242,6 +4300,10 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
     // Step I: Receive details of preedits from IME.
 
     HIMC himc = LLWinImm::getContext(mWindowHandle);
+    if (!himc)
+    {
+        return;
+    }
 
     if (indexes & GCS_RESULTSTR)
     {
@@ -4504,9 +4566,13 @@ bool LLWindowWin32::handleImeRequests(WPARAM request, LPARAM param, LRESULT *res
                         // Let the IME to decide the reconversion range, and
                         // adjust the reconvert_string structure accordingly.
                         HIMC himc = LLWinImm::getContext(mWindowHandle);
-                        const bool adjusted = LLWinImm::setCompositionString(himc,
-                                    SCS_QUERYRECONVERTSTRING, reconvert_string, size, NULL, 0);
-                        LLWinImm::releaseContext(mWindowHandle, himc);
+                        bool adjusted = false;
+                        if (himc)
+                        {
+                            adjusted = LLWinImm::setCompositionString(himc,
+                                        SCS_QUERYRECONVERTSTRING, reconvert_string, size, NULL, 0);
+                            LLWinImm::releaseContext(mWindowHandle, himc);
+                        }
                         if (adjusted)
                         {
                             const std::wstring text_utf16 = ll_convert<std::wstring>(context);
