@@ -265,6 +265,18 @@ private:
     F32 mMouseDeltaAccumX = 0.f;
     F32 mMouseDeltaAccumY = 0.f;
 
+    // Count of synthetic SDL_EVENT_MOUSE_MOTION events queued by recent
+    // non-relative-mode SDL_WarpMouseInWindow calls. Each warp that moves
+    // the cursor produces one synthetic event with xrel/yrel set to the
+    // warp distance — feeding that into the camera signal would partially
+    // cancel real user motion (visible during alt-cam recenter every
+    // frame). Incremented in setCursorPosition / showCursor wherever we
+    // warp, decremented by the MOUSE_MOTION handler which drops the
+    // synthetic event before it reaches the accumulator. Win32 raw input
+    // doesn't have this problem; SDL3 emits the synthetic event by API
+    // contract in non-relative mode.
+    S32 mPendingWarpSuppressCount = 0;
+
     // Per-frame scroll-wheel accumulator. SDL_EVENT_MOUSE_WHEEL delivers
     // float-precision deltas (event.wheel.x/y) that we sum here, then
     // emit integer "clicks" through handleScrollWheel/HWheel each time the
