@@ -105,13 +105,14 @@ void init_sdl(const std::string& app_name)
                     // the first click to focus the window.
                     {SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH,"1"},
 
-                    // SDL3 auto-sets this to "1" when an app uses
-                    // SDL_SetWindowRelativeMouseMode (which we now do — see
-                    // LLWindowSDL::hideCursor). That auto-default would cause
-                    // explicit SDL_WarpMouseInWindow calls (LLWindowSDL::
-                    // setCursorPosition while NOT in relative mode) to secretly
-                    // enter relative mode under the hood. We want plain warps
-                    // there, so force the explicit "0".
+                    // Per SDL3's hint docs: when an app uses relative mouse
+                    // mode directly (as we do — see LLWindowSDL::hideCursor)
+                    // this hint is automatically *disabled* by SDL, so our
+                    // explicit "0" matches the current default. Setting it
+                    // explicitly is defensive: if a future SDL3 release ever
+                    // changed the auto-default, we want plain warps to stay
+                    // plain warps (never silently flip the cursor into
+                    // relative mode underneath us).
                     {SDL_HINT_MOUSE_EMULATE_WARP_WITH_RELATIVE,"0"},
 
                     // SDL3 default ("0"): a SDL_WarpMouseInWindow while in

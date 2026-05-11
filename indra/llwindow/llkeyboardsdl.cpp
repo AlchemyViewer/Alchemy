@@ -129,10 +129,21 @@ LLKeyboardSDL::LLKeyboardSDL()
     mTranslateKeyMap[SDLK_RIGHTBRACKET] = ']';
     mTranslateKeyMap[SDLK_APOSTROPHE] = '\'';
 
-    // Build inverse map
+    // Build inverse map. Several KEY_* values are shared by multiple SDL
+    // keys — KEY_RETURN ← SDLK_RETURN and SDLK_KP_ENTER, the digit chars
+    // '0'..'9' ← SDLK_0..9 and SDLK_KP_0..9, KEY_EQUALS ← SDLK_EQUALS and
+    // SDLK_KP_EQUALS. We want inverseTranslateKey() to return the main-row
+    // SDL keycode (bindings UI / CEF forwarding / etc. all expect that),
+    // not the numpad variant.
+    //
+    // std::map iterates in ascending key order; main-row SDLK_* are in the
+    // ASCII range (0x0d..0x7e) and numpad SDLK_KP_* live in SDL3's
+    // scancode-prefixed range (0x4000_0000+), so the main-row source is
+    // visited first. emplace() inserts only when the key is absent, so the
+    // first-seen (main-row) source wins and numpad duplicates are skipped.
     for (auto iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
     {
-        mInvTranslateKeyMap[iter->second] = iter->first;
+        mInvTranslateKeyMap.emplace(iter->second, iter->first);
     }
 
     // numpad map

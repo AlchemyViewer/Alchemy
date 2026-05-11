@@ -123,6 +123,21 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     else
         mWindowTitle = title;
 
+    // Zero the cursor pointer array before any path that might destroy them.
+    // initCursors() does this too, but createContext() can fail before
+    // initCursors runs, and the destructor's quitCursors() walks this array
+    // unconditionally — uninitialised garbage there would crash on
+    // SDL_DestroyCursor.
+    for (int i = 0; i < UI_CURSOR_COUNT; ++i)
+        mSDLCursors[i] = nullptr;
+
+    // Stash the object pointer for OSMessageBox() BEFORE createContext().
+    // A setupFailure() path inside createContext routes through OSMessageBox
+    // → OSMessageBoxSDL → LLWindowSDL::getMainSDLWindow(), which reads
+    // gWindowImplementation. If we set this after createContext, the error
+    // dialog runs unparented.
+    gWindowImplementation = this;
+
     // Create the GL context and set it up for windowed or fullscreen, as appropriate.
     if(createContext(x, y, width, height, 32, fullscreen, enable_vsync))
     {
@@ -135,9 +150,6 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     }
 
     stop_glerror();
-
-    // Stash an object pointer for OSMessageBox()
-    gWindowImplementation = this;
 }
 
 static SDL_Surface *Load_BMP_Resource(const char *basename)
@@ -613,6 +625,12 @@ void LLWindowSDL::destroyContext()
     // Stop unicode input — paired with the SDL_StartTextInput in createContext().
     SDL_StopTextInput(mWindow);
     mPreeditor = nullptr;
+
+    // Balance the SDL_DisableScreenSaver we may have issued on FOCUS_GAINED.
+    // Normally SDL_Quit cleans this up, but quit_sdl() skips SDL_Quit when
+    // the framework owns the lifecycle (SDL_MAIN_USE_CALLBACKS) — make sure
+    // the screensaver inhibit doesn't outlive the viewer's window.
+    SDL_EnableScreenSaver();
 
     // Clean up remaining GL state before blowing away window
     LL_INFOS() << "shutdownGL begins" << LL_ENDL;
@@ -1801,7 +1819,12 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
         case SDL_EVENT_WINDOW_RESIZED:
         {
             LL_INFOS() << "Handling a resize event: " << event.window.data1 << "x" << event.window.data2 << LL_ENDL;
-            F32 pixel_density = SDL_GetWindowPixelDensity(mWindow);
+            // Guard pixel_density against the 0.f the SDL backend can return
+            // briefly during display-change races. Without this, the multiply
+            // below would zero out width/height and we'd call handleResize
+            // with a degenerate 0x0 rectangle.
+            const F32 raw_density = SDL_GetWindowPixelDensity(mWindow);
+            const F32 pixel_density = raw_density > 0.f ? raw_density : 1.f;
             S32 width = llmax(event.window.data1, (S32)mMinWindowWidth) * pixel_density;
             S32 height = llmax(event.window.data2, (S32)mMinWindowHeight) * pixel_density;
 
