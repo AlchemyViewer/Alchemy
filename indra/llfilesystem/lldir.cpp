@@ -1096,8 +1096,7 @@ void LLDir::openDir(const std::string& filepath)
         return;
     }
 
-    // Extract directory path from full filepath
-    std::string dir_path = getDirName(filepath);
+    bool is_dir = LLFile::isdir(filepath);
 
     LLProcess::Params params;
 
@@ -1114,18 +1113,19 @@ void LLDir::openDir(const std::string& filepath)
         system_root = "C:\\Windows"; // Last resort fallback
     }
     params.executable = system_root + "\\explorer.exe";
-    params.args.add("/select,");
+    if(!is_dir) params.args.add("/select,");
     params.args.add(filepath);
 #elif LL_DARWIN
     // macOS: Use 'open' command with -R flag to reveal in Finder
     params.executable = "/usr/bin/open";
-    params.args.add("-R");
+    if(!is_dir) params.args.add("-R");
     params.args.add(filepath);
 #elif LL_LINUX
     // Linux: Use xdg-open to open the directory
     // Note: Most file managers don't support file selection, so we open the directory
+
     params.executable = "/usr/bin/xdg-open";
-    params.args.add(dir_path);
+    params.args.add(is_dir ? filepath : getDirName(filepath));
 #else
     LL_WARNS() << "Platform not supported for file browser opening" << LL_ENDL;
     return;
