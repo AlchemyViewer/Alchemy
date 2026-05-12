@@ -173,6 +173,7 @@
         {
           "name": "sdl3",
           "features": [
+            "alsa",
             "dbus",
             "ibus",
             "wayland",
