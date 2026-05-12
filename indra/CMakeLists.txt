@@ -42,8 +42,8 @@ option(USE_PRECOMPILED_HEADERS "Enable use of precompiled header directives wher
 
 # Audio Engines
 option(USE_FMODSTUDIO "Enable support for the FMOD Studio audio engine" OFF)
-option(USE_FAUDIO "Enable support for the FAudio audio engine" OFF)
-option(USE_OPENAL "Enable support for the OpenAL audio engine" ON)
+option(USE_FAUDIO "Enable support for the FAudio audio engine" ON)
+option(USE_OPENAL "Enable support for the OpenAL audio engine" OFF)
 
 # SIMD Options (x86_64 only)
 option(USE_SSE4_2 "Use SSE4.2/x86-64-v2 instruction sets (x86_64 only)" OFF)
