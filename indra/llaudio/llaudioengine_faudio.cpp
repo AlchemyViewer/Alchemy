@@ -27,6 +27,7 @@
 
 #include "llaudioengine_faudio.h"
 #include "lllistener_faudio.h"
+#include "llstring.h"
 #include "llwavfile.h"
 #include "llwindgen.h"
 
@@ -68,25 +69,23 @@ namespace
     }
 
     // FAudio stores device DeviceID and DisplayName as UTF-16 int16_t[256]
-    // regardless of platform. Real device ids and names are ASCII in
-    // practice (WASAPI ids like "{0.0.0.00000000}.{...}", SDL device
-    // names "default" / "Built-in Output"); lossy-downcast anything
-    // outside [0x01, 0x7F] to '?' for logging / matching.
-    std::string utf16_to_ascii(const int16_t* buf, size_t cap)
+    // regardless of platform. int16_t and char16_t have identical layout
+    // and aliasing rules for utf16 codeunits, so we reinterpret-cast and
+    // hand off to llcommon's UTF-16 -> UTF-8 converter (handles
+    // surrogate pairs and invalid sequences, substituting the Unicode
+    // replacement char for the latter).
+    std::string utf16_buf_to_utf8(const int16_t* buf, size_t cap)
     {
-        std::string s;
-        s.reserve(64);
-        for (size_t i = 0; i < cap && buf[i]; ++i)
-        {
-            int16_t ch = buf[i];
-            s.push_back((ch > 0 && ch < 0x80) ? static_cast<char>(ch) : '?');
-        }
-        return s;
+        // Manually find the null terminator within the cap; the FAudio
+        // struct fields are fixed-size with C-string-style termination.
+        size_t len = 0;
+        while (len < cap && buf[len]) ++len;
+        return utf16str_to_utf8str(reinterpret_cast<const char16_t*>(buf), len);
     }
     std::string device_id(const FAudioDeviceDetails& d)
-    { return utf16_to_ascii(d.DeviceID, 256); }
+    { return utf16_buf_to_utf8(d.DeviceID, 256); }
     std::string device_name(const FAudioDeviceDetails& d)
-    { return utf16_to_ascii(d.DisplayName, 256); }
+    { return utf16_buf_to_utf8(d.DisplayName, 256); }
 
     // FAudioFXReverb's DspReverb_Create asserts (in_channels == 1 || 2 || 6)
     // and likewise for out_channels. Asserts compile out under NDEBUG, after
@@ -103,15 +102,54 @@ namespace
         if (master_channels >= 6) return 6;   // 5.1, 7.1, atmos -> 5.1 reverb
         return 2;                              // 2/3/4/5 -> stereo reverb
     }
+
+    // Lookup I3DL2 preset by name. Case-insensitive; unknown -> PLAIN.
+    // Each FAUDIOFX_I3DL2_PRESET_* expands to a struct initialiser, so
+    // the table holds them by value rather than via pointer-to-macro.
+    FAudioFXReverbI3DL2Parameters pick_i3dl2_preset(std::string name)
+    {
+        for (auto& c : name) c = static_cast<char>(std::toupper(c));
+        if (name == "DEFAULT")         return FAUDIOFX_I3DL2_PRESET_DEFAULT;
+        if (name == "GENERIC")         return FAUDIOFX_I3DL2_PRESET_GENERIC;
+        if (name == "PADDEDCELL")      return FAUDIOFX_I3DL2_PRESET_PADDEDCELL;
+        if (name == "ROOM")            return FAUDIOFX_I3DL2_PRESET_ROOM;
+        if (name == "BATHROOM")        return FAUDIOFX_I3DL2_PRESET_BATHROOM;
+        if (name == "LIVINGROOM")      return FAUDIOFX_I3DL2_PRESET_LIVINGROOM;
+        if (name == "STONEROOM")       return FAUDIOFX_I3DL2_PRESET_STONEROOM;
+        if (name == "AUDITORIUM")      return FAUDIOFX_I3DL2_PRESET_AUDITORIUM;
+        if (name == "CONCERTHALL")     return FAUDIOFX_I3DL2_PRESET_CONCERTHALL;
+        if (name == "CAVE")            return FAUDIOFX_I3DL2_PRESET_CAVE;
+        if (name == "ARENA")           return FAUDIOFX_I3DL2_PRESET_ARENA;
+        if (name == "HANGAR")          return FAUDIOFX_I3DL2_PRESET_HANGAR;
+        if (name == "CARPETEDHALLWAY") return FAUDIOFX_I3DL2_PRESET_CARPETEDHALLWAY;
+        if (name == "HALLWAY")         return FAUDIOFX_I3DL2_PRESET_HALLWAY;
+        if (name == "STONECORRIDOR")   return FAUDIOFX_I3DL2_PRESET_STONECORRIDOR;
+        if (name == "ALLEY")           return FAUDIOFX_I3DL2_PRESET_ALLEY;
+        if (name == "FOREST")          return FAUDIOFX_I3DL2_PRESET_FOREST;
+        if (name == "CITY")            return FAUDIOFX_I3DL2_PRESET_CITY;
+        if (name == "MOUNTAINS")       return FAUDIOFX_I3DL2_PRESET_MOUNTAINS;
+        if (name == "QUARRY")          return FAUDIOFX_I3DL2_PRESET_QUARRY;
+        if (name == "PLAIN")           return FAUDIOFX_I3DL2_PRESET_PLAIN;
+        if (name == "PARKINGLOT")      return FAUDIOFX_I3DL2_PRESET_PARKINGLOT;
+        if (name == "SEWERPIPE")       return FAUDIOFX_I3DL2_PRESET_SEWERPIPE;
+        if (name == "UNDERWATER")      return FAUDIOFX_I3DL2_PRESET_UNDERWATER;
+        if (name == "SMALLROOM")       return FAUDIOFX_I3DL2_PRESET_SMALLROOM;
+        return FAUDIOFX_I3DL2_PRESET_PLAIN;
+    }
 }
 
 //
 // ─── Engine ──────────────────────────────────────────────────────────────
 //
 
-LLAudioEngine_FAudio::LLAudioEngine_FAudio(std::string preferred_device_id)
-    : mPreferredDeviceId(std::move(preferred_device_id))
-{}
+LLAudioEngine_FAudio::LLAudioEngine_FAudio(LLAudioEngineFAudioConfig config)
+    : mConfig(std::move(config))
+{
+    // Defensive clamps — keep math sane on misconfigured settings.
+    if (mConfig.audible_range     < 1.0f) mConfig.audible_range     = 1.0f;
+    if (mConfig.inner_radius      < 0.0f) mConfig.inner_radius      = 0.0f;
+    if (mConfig.reverb_send_scale < 0.0f) mConfig.reverb_send_scale = 0.0f;
+}
 
 LLAudioEngine_FAudio::~LLAudioEngine_FAudio() = default;
 
@@ -180,7 +218,7 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
     uint32_t device_index = 0;
     mActiveDeviceId.clear();
     mActiveDeviceName.clear();
-    if (!mPreferredDeviceId.empty())
+    if (!mConfig.preferred_device_id.empty())
     {
         uint32_t count = 0;
         FAudio_GetDeviceCount(mFAudio, &count);
@@ -189,7 +227,7 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
             FAudioDeviceDetails details{};
             if (FAudio_GetDeviceDetails(mFAudio, i, &details) != 0) continue;
             const std::string id = device_id(details);
-            if (id == mPreferredDeviceId)
+            if (id == mConfig.preferred_device_id)
             {
                 device_index = i;
                 mActiveDeviceId = id;
@@ -200,7 +238,7 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
         if (mActiveDeviceId.empty())
         {
             LL_INFOS() << "LLAudioEngine_FAudio::initFAudioDevice() preferred "
-                          "output device id '" << mPreferredDeviceId
+                          "output device id '" << mConfig.preferred_device_id
                        << "' not found; using system default." << LL_ENDL;
         }
     }
@@ -320,7 +358,7 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
                                       0, 0, nullptr, &reverb_chain);
         if (hr == 0 && mReverbVoice)
         {
-            FAudioFXReverbI3DL2Parameters i3dl2 = FAUDIOFX_I3DL2_PRESET_PLAIN;
+            FAudioFXReverbI3DL2Parameters i3dl2 = pick_i3dl2_preset(mConfig.reverb_preset);
             FAudioFXReverbParameters native{};
             ReverbConvertI3DL2ToNative(&i3dl2, &native);
             FAudioVoice_SetEffectParameters(mReverbVoice, 0,
@@ -491,7 +529,7 @@ void LLAudioEngine_FAudio::releaseFAudioDevice()
 
 void LLAudioEngine_FAudio::setOutputDevice(const std::string& id)
 {
-    if (id == mPreferredDeviceId && mFAudio)
+    if (id == mConfig.preferred_device_id && mFAudio)
     {
         // Same device and we're already running — nothing to do.
         return;
@@ -501,7 +539,7 @@ void LLAudioEngine_FAudio::setOutputDevice(const std::string& id)
                << (id.empty() ? "<system default>" : id.c_str())
                << "'" << LL_ENDL;
 
-    mPreferredDeviceId = id;
+    mConfig.preferred_device_id = id;
 
     // Wind is fully tracked by the engine — drop and recreate. The
     // LLWindGen instance gets reconstructed in initWind, losing its

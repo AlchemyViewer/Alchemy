@@ -765,8 +765,13 @@ bool idle_startup()
 #endif // !LL_WINDOWS
                 )
             {
-                gAudiop = (LLAudioEngine *) new LLAudioEngine_FAudio(
-                    gSavedSettings.getString("AudioOutputDevice"));
+                LLAudioEngineFAudioConfig faudio_cfg;
+                faudio_cfg.preferred_device_id = gSavedSettings.getString("AudioOutputDevice");
+                faudio_cfg.audible_range       = gSavedSettings.getF32("AudioFAudioAudibleRange");
+                faudio_cfg.inner_radius        = gSavedSettings.getF32("AudioFAudioInnerRadius");
+                faudio_cfg.reverb_preset       = gSavedSettings.getString("AudioFAudioReverbPreset");
+                faudio_cfg.reverb_send_scale   = gSavedSettings.getF32("AudioFAudioReverbSendScale");
+                gAudiop = (LLAudioEngine *) new LLAudioEngine_FAudio(std::move(faudio_cfg));
             }
 #endif
 

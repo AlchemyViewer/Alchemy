@@ -13,6 +13,50 @@
             <key>Value</key>
             <string></string>
         </map>
+        <key>AudioFAudioAudibleRange</key>
+        <map>
+            <key>Comment</key>
+            <string>FAudio backend: distance in metres at which the volume curve reaches silence (CurveDistanceScaler at rolloff=1). 384 covers a 256x256 SL region's diagonal. Takes effect at next viewer launch.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>384.0</real>
+        </map>
+        <key>AudioFAudioInnerRadius</key>
+        <map>
+            <key>Comment</key>
+            <string>FAudio backend: F3DAudio emitter InnerRadius in metres. Below this distance source channels diffuse to all speakers; above, clean directional pan. Takes effect at next viewer launch.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
+        <key>AudioFAudioReverbPreset</key>
+        <map>
+            <key>Comment</key>
+            <string>FAudio backend: FAudioFX I3DL2 preset applied to the reverb submix. PLAIN is the open-outdoor default; case-insensitive. Recognised: DEFAULT, GENERIC, PADDEDCELL, ROOM, BATHROOM, LIVINGROOM, STONEROOM, AUDITORIUM, CONCERTHALL, CAVE, ARENA, HANGAR, CARPETEDHALLWAY, HALLWAY, STONECORRIDOR, ALLEY, FOREST, CITY, MOUNTAINS, QUARRY, PLAIN, PARKINGLOT, SEWERPIPE, UNDERWATER, SMALLROOM. Takes effect at next viewer launch.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>PLAIN</string>
+        </map>
+        <key>AudioFAudioReverbSendScale</key>
+        <map>
+            <key>Comment</key>
+            <string>FAudio backend: scalar applied to F3DAudio's dsp.ReverbLevel before writing the per-source -> reverb-submix send. 0 disables reverb. Takes effect at next viewer launch.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.05</real>
+        </map>
         <key>AlchemyAppearanceShowHints</key>
         <map>
             <key>Comment</key>

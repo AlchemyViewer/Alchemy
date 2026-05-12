@@ -43,16 +43,45 @@
 class LLAudioChannelFAudio;
 class LLAudioBufferFAudio;
 
+// Startup tunables read from gSavedSettings by llstartup and passed in
+// once at engine construction. Defaults match the previous hardcoded
+// constants — overridable for advanced tuning without touching code.
+struct LLAudioEngineFAudioConfig
+{
+    // FAudio device id (LLAudioOutputDevice::id). Empty -> system default.
+    std::string preferred_device_id;
+    // CurveDistanceScaler base (metres). Curve hits silence at this
+    // distance / rolloff.
+    float audible_range     = 384.0f;
+    // F3DAudio emitter InnerRadius (metres). Below this, channels diffuse
+    // to all speakers; above, clean directional pan.
+    float inner_radius      = 2.0f;
+    // FAudioFX I3DL2 preset name applied to the reverb submix. Case-
+    // insensitive; unknown names fall back to PLAIN. Recognised:
+    // DEFAULT, GENERIC, PADDEDCELL, ROOM, BATHROOM, LIVINGROOM,
+    // STONEROOM, AUDITORIUM, CONCERTHALL, CAVE, ARENA, HANGAR,
+    // CARPETEDHALLWAY, HALLWAY, STONECORRIDOR, ALLEY, FOREST, CITY,
+    // MOUNTAINS, QUARRY, PLAIN, PARKINGLOT, SEWERPIPE, UNDERWATER,
+    // SMALLROOM.
+    std::string reverb_preset = "PLAIN";
+    // Scalar applied to dsp.ReverbLevel before writing the per-source ->
+    // reverb-submix matrix. 0 disables reverb sends entirely.
+    float reverb_send_scale = 0.05f;
+};
+
 class LLAudioEngine_FAudio : public LLAudioEngine
 {
 public:
-    // preferred_device_id is a FAudio device id (the stable identifier
-    // returned in LLAudioOutputDevice::id by enumerateOutputDevices());
-    // empty string means use the system default. If the id isn't found
-    // at init time — device unplugged, replaced, OS reassigned ids —
-    // we fall back to the default.
-    explicit LLAudioEngine_FAudio(std::string preferred_device_id = std::string());
+    // Config carries the user-tunable startup parameters; defaults match
+    // the previously-hardcoded constants when an empty config is used.
+    explicit LLAudioEngine_FAudio(LLAudioEngineFAudioConfig config = {});
     ~LLAudioEngine_FAudio() override;
+
+    // Accessors for the listener (run_f3d reads these per call) and
+    // anyone inspecting the live tuning.
+    float getAudibleRange()    const { return mConfig.audible_range; }
+    float getInnerRadius()     const { return mConfig.inner_radius; }
+    float getReverbSendScale() const { return mConfig.reverb_send_scale; }
 
     // Returns every output device FAudio reports as {id, name} pairs.
     // Index 0 in the underlying device list is FAudio's notion of the
@@ -137,11 +166,8 @@ private:
     static constexpr float WIND_BUFFER_SIZE_SEC = 0.05f;
     static constexpr int   MAX_WIND_QUEUED      = 4;
 
-    // User-preferred device id (read from settings at engine
-    // construction). Resolved to a device index in init() by walking
-    // the FAudio device list and matching against the DeviceID field.
-    // Empty means "use system default".
-    std::string            mPreferredDeviceId;
+    // Startup tunables (device id, distance / reverb knobs).
+    LLAudioEngineFAudioConfig mConfig;
     // Id and display name of the device init() actually opened, for
     // getActiveOutputDevice() / getActiveOutputDeviceId().
     std::string            mActiveDeviceId;

@@ -60,9 +60,9 @@ namespace
     }
 
     // Custom distance-attenuation curve. Distances are normalized to
-    // CurveDistanceScaler (which we set to BASE_AUDIBLE_RANGE / rolloff
-    // below). Points approximate 1/d inverse rolloff through the audible
-    // mid-range so it sits in the same ballpark as FMOD's default
+    // CurveDistanceScaler (which we set to engine->getAudibleRange() /
+    // rolloff below). Points approximate 1/d inverse rolloff through the
+    // audible mid-range so it sits in the same ballpark as FMOD's default
     // INVERSEROLLOFF, but with two quality wins:
     //   1. A held near-field (full volume to 1% of scaler distance) — close
     //      sounds don't get over-attenuated by sub-metre position jitter.
@@ -70,10 +70,11 @@ namespace
     //      asymptotic 0.01 tail — cleaner mix, no ghost sounds at extreme
     //      distance.
     // Distances below are fractions of CurveDistanceScaler (= 384 m at
-    // default rolloff), e.g. 0.039 -> 15 m. Near and mid-range gains track
-    // 1/d at the same absolute metres as before; the curve just extends
-    // its tail further so ambients placed at one corner of a 256x256 SL
-    // region don't hard-cut from the opposite corner (diagonal ~362 m).
+    // default audible_range, default rolloff), e.g. 0.039 -> 15 m. Near
+    // and mid-range gains track 1/d at the same absolute metres as before;
+    // the curve just extends its tail further so ambients placed at one
+    // corner of a 256x256 SL region don't hard-cut from the opposite
+    // corner (diagonal ~362 m).
     F3DAUDIO_DISTANCE_CURVE_POINT kVolumeCurvePoints[] = {
         { 0.000f, 1.000f },   //    0 m: full
         { 0.004f, 1.000f },   //  1.5 m: hold near-field
@@ -91,13 +92,6 @@ namespace
                               sizeof(kVolumeCurvePoints[0]))
     };
 
-    // Default audible range in metres before the curve hits silence. SL
-    // regions are 256 x 256 m, so the corner-to-corner diagonal is ~362
-    // m; 384 m gives that plus a small margin without bleeding sounds in
-    // from adjacent regions. The listener's rolloff factor compresses
-    // this: rolloff=1 -> 384 m, rolloff=2 -> 192 m, rolloff=0.5 -> 768 m.
-    constexpr float kBaseAudibleRange = 384.0f;
-
     // Doppler clamp: F3DAudio's raw output can spike on fast camera moves
     // or teleports, producing audible "garble". Clamping to roughly a
     // perfect-fifth-down / octave-up keeps the cue intact without the
@@ -112,14 +106,6 @@ namespace
     // close, narrow enough not to dominate over the emitter's position
     // when far away.
     constexpr float kStereoChannelRadius = 0.5f;
-
-    // Global scale applied to dsp.ReverbLevel before it hits the per-
-    // source -> reverb-submix send. Aim is "barely perceptible space"
-    // rather than an obvious effect — at close range with default
-    // ReverbLevel ~1.0 this yields a -20 dB send into the reverb, well
-    // below the dry signal. Far sources get even less because
-    // ReverbLevel itself decreases with distance.
-    constexpr float kReverbSendScale = 0.05f;
 }
 
 LLListener_FAudio::LLListener_FAudio(LLAudioEngine_FAudio* engine)
@@ -293,11 +279,12 @@ namespace
         emitter.ChannelCount = src_channels;
         emitter.ChannelRadius = (src_channels > 1) ? kStereoChannelRadius : 0.f;
         emitter.pChannelAzimuths = (src_channels > 1) ? azimuths.data() : nullptr;
-        emitter.InnerRadius = DEFAULT_MIN_DISTANCE;
+        emitter.InnerRadius = engine->getInnerRadius();
         emitter.InnerRadiusAngle = F3DAUDIO_PI / 4.0f;
+        const float base_range = engine->getAudibleRange();
         emitter.CurveDistanceScaler = (rolloff > 0.f)
-            ? (kBaseAudibleRange / rolloff)
-            : kBaseAudibleRange;
+            ? (base_range / rolloff)
+            : base_range;
         emitter.DopplerScaler = doppler_scaler;
         emitter.pVolumeCurve = &kVolumeCurve;
         emitter.pLFECurve = nullptr;
@@ -363,7 +350,7 @@ namespace
                 ? channel->getSecondaryGain()
                 : 1.0f;
             const float send_gain = calc_doppler
-                ? (dsp.ReverbLevel * kReverbSendScale * secondary_for_reverb)
+                ? (dsp.ReverbLevel * engine->getReverbSendScale() * secondary_for_reverb)
                 : 0.0f;
             // Matrix dims target the reverb submix's input channel count,
             // not the master's. The reverb submix may be a different size
