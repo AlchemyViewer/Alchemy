@@ -3057,7 +3057,8 @@ void LLPanelPreferenceSound::populateOutputDeviceCombo()
     // survives device renumbering / OS-locale changes / display-name
     // changes across reboots. Backend-agnostic via the LLAudioEngine
     // base interface; backends without device support inherit an empty
-    // enumeration.
+    // enumeration and an empty settings-key name (the latter disables
+    // the read / write below entirely).
     if (gAudiop)
     {
         for (const auto& dev : gAudiop->enumerateOutputDevices())
@@ -3067,24 +3068,38 @@ void LLPanelPreferenceSound::populateOutputDeviceCombo()
         }
     }
 
+    // The active backend tells us which settings key its device id lives
+    // in — different backends use different id formats (WASAPI strings,
+    // OpenAL device names, FMOD GUIDs) so they each store under their
+    // own key to avoid cross-pollination when the user changes engines.
+    const std::string setting_key =
+        gAudiop ? gAudiop->getOutputDeviceSettingName() : std::string();
+    if (setting_key.empty())
+    {
+        // Backend doesn't support device selection — leave the combo on
+        // "System default" and don't wire commit / restore. The single
+        // default entry above keeps the UI consistent across backends.
+        return;
+    }
+
     // Restore the user's stored selection (an id). If the saved device
     // isn't in the live list (unplugged / replaced), UI falls back to
     // "system default" while leaving the stored id intact so it
     // re-engages when the hardware reappears.
-    const std::string current = gSavedSettings.getString("AudioOutputDevice");
+    const std::string current = gSavedSettings.getString(setting_key);
     if (!combo->setSelectedByValue(LLSD(current), true))
     {
         combo->setSelectedByValue(LLSD(std::string()), true);
     }
 
     combo->setCommitCallback(
-        [](LLUICtrl* ctrl, const LLSD&)
+        [setting_key](LLUICtrl* ctrl, const LLSD&)
         {
             if (auto* c = dynamic_cast<LLComboBox*>(ctrl))
             {
                 const std::string id = c->getSelectedValue().asString();
                 // Persist for next launch …
-                gSavedSettings.setString("AudioOutputDevice", id);
+                gSavedSettings.setString(setting_key, id);
                 // … and apply live. Backends that don't support hot-swap
                 // inherit the base no-op.
                 if (gAudiop) gAudiop->setOutputDevice(id);

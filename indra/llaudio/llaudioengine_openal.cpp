@@ -43,8 +43,9 @@
 
 const float LLAudioEngine_OpenAL::WIND_BUFFER_SIZE_SEC = 0.05f;
 
-LLAudioEngine_OpenAL::LLAudioEngine_OpenAL()
+LLAudioEngine_OpenAL::LLAudioEngine_OpenAL(std::string preferred_device_id)
     :
+    mPreferredDevice(std::move(preferred_device_id)),
     mWindGen(NULL),
     mWindBuf(NULL),
     mWindBufFreq(0),
@@ -66,11 +67,35 @@ bool LLAudioEngine_OpenAL::init(void* userdata, const std::string &app_title)
     mWindGen = NULL;
     LLAudioEngine::init(userdata, app_title);
 
-    mALCDevice = alcOpenDevice(NULL);
+    // alcOpenDevice(NULL) is the system default; pass the preferred name
+    // through verbatim if the user picked one. If the name no longer
+    // matches any present device, alcOpenDevice returns NULL and we
+    // fall back to default — covers unplugged / renamed hardware
+    // without forcing the user to re-pick.
+    const char* device_name = mPreferredDevice.empty() ? nullptr : mPreferredDevice.c_str();
+    mALCDevice = alcOpenDevice(device_name);
+    if (!mALCDevice && device_name)
+    {
+        LL_INFOS() << "LLAudioEngine_OpenAL::init() Preferred ALC device '"
+                   << mPreferredDevice << "' not available; falling back to "
+                   "system default." << LL_ENDL;
+        mALCDevice = alcOpenDevice(nullptr);
+    }
     if (!mALCDevice)
     {
         LL_WARNS() << "LLAudioEngine_OpenAL::init() Could not open default ALC device" << LL_ENDL;
         return false;
+    }
+
+    // Record what we actually opened so getActiveOutputDevice / the
+    // driver-name log can show the live device name.
+    if (const char* opened = alcGetString(mALCDevice, ALC_ALL_DEVICES_SPECIFIER))
+    {
+        mActiveDevice = opened;
+    }
+    else if (const char* opened_basic = alcGetString(mALCDevice, ALC_DEVICE_SPECIFIER))
+    {
+        mActiveDevice = opened_basic;
     }
 
     mALCContext = alcCreateContext(mALCDevice, NULL);
@@ -199,6 +224,90 @@ void LLAudioEngine_OpenAL::setInternalGain(F32 gain)
 {
     //LL_INFOS() << "LLAudioEngine_OpenAL::setInternalGain() Gain: " << gain << LL_ENDL;
     alListenerf(AL_GAIN, gain);
+}
+
+// virtual
+std::vector<LLAudioOutputDevice> LLAudioEngine_OpenAL::enumerateOutputDevices() const
+{
+    std::vector<LLAudioOutputDevice> devices;
+    // ALC enumeration returns a NULL-separated list terminated by a
+    // double-NULL. ALC_ALL_DEVICES_SPECIFIER (the ALC_ENUMERATE_ALL_EXT
+    // form) lists every device the implementation can open; the older
+    // ALC_DEVICE_SPECIFIER is a per-implementation summary list and is
+    // our fallback if the extension isn't present. Either way the
+    // returned strings double as the names we pass to alcOpenDevice —
+    // OpenAL doesn't surface a separate stable id, so id == name here.
+    const ALCchar* list = nullptr;
+    if (alcIsExtensionPresent(nullptr, "ALC_ENUMERATE_ALL_EXT") == ALC_TRUE)
+    {
+        list = alcGetString(nullptr, ALC_ALL_DEVICES_SPECIFIER);
+    }
+    if (!list)
+    {
+        list = alcGetString(nullptr, ALC_DEVICE_SPECIFIER);
+    }
+    if (!list) return devices;
+    for (const ALCchar* p = list; *p; p += std::strlen(p) + 1)
+    {
+        LLAudioOutputDevice d;
+        d.id = p;
+        d.name = p;
+        devices.push_back(std::move(d));
+    }
+    return devices;
+}
+
+// virtual
+void LLAudioEngine_OpenAL::setOutputDevice(const std::string& id)
+{
+    if (id == mPreferredDevice && mALCDevice)
+    {
+        return;  // already running on this device
+    }
+    mPreferredDevice = id;
+
+    if (!mALCDevice)
+    {
+        // No live device — the preference will take effect on next init.
+        return;
+    }
+
+    // ALC_SOFT_reopen_device lets us swap the underlying device on an
+    // existing context, keeping all sources / buffers / context state
+    // intact. Without it, switching would require a full teardown +
+    // recreate of every AL object, which the existing channel pool
+    // isn't set up to drive. In that case persist for next launch and
+    // log the limitation.
+    using ReopenFn = ALCboolean (ALC_APIENTRY *)(ALCdevice*, const ALCchar*,
+                                                  const ALCint*);
+    auto reopen = reinterpret_cast<ReopenFn>(
+        alcGetProcAddress(mALCDevice, "alcReopenDeviceSOFT"));
+    if (!reopen)
+    {
+        LL_WARNS() << "LLAudioEngine_OpenAL::setOutputDevice() "
+                      "ALC_SOFT_reopen_device unavailable; preference "
+                      "saved but will only take effect on next launch."
+                   << LL_ENDL;
+        return;
+    }
+
+    const char* device_name = id.empty() ? nullptr : id.c_str();
+    if (reopen(mALCDevice, device_name, nullptr) != ALC_TRUE)
+    {
+        LL_WARNS() << "LLAudioEngine_OpenAL::setOutputDevice() "
+                      "alcReopenDeviceSOFT failed for '"
+                   << (device_name ? device_name : "<default>")
+                   << "': 0x" << std::hex << alcGetError(mALCDevice)
+                   << std::dec << LL_ENDL;
+        return;
+    }
+
+    if (const char* opened = alcGetString(mALCDevice, ALC_ALL_DEVICES_SPECIFIER))
+    {
+        mActiveDevice = opened;
+    }
+    LL_INFOS() << "LLAudioEngine_OpenAL::setOutputDevice() switched to '"
+               << mActiveDevice << "'" << LL_ENDL;
 }
 
 LLAudioChannelOpenAL::LLAudioChannelOpenAL()

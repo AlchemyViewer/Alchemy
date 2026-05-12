@@ -754,7 +754,9 @@ bool idle_startup()
 #endif // !LL_WINDOWS
                 )
             {
-                gAudiop = (LLAudioEngine *) new LLAudioEngine_FMODSTUDIO(gSavedSettings.getBOOL("FMODExProfilerEnable"));
+                gAudiop = (LLAudioEngine *) new LLAudioEngine_FMODSTUDIO(
+                    gSavedSettings.getBOOL("FMODExProfilerEnable"),
+                    gSavedSettings.getString("AudioFMODOutputDevice"));
             }
 #endif
 
@@ -766,7 +768,7 @@ bool idle_startup()
                 )
             {
                 LLAudioEngineFAudioConfig faudio_cfg;
-                faudio_cfg.preferred_device_id = gSavedSettings.getString("AudioOutputDevice");
+                faudio_cfg.preferred_device_id = gSavedSettings.getString("AudioFAudioOutputDevice");
                 faudio_cfg.audible_range       = gSavedSettings.getF32("AudioFAudioAudibleRange");
                 faudio_cfg.inner_radius        = gSavedSettings.getF32("AudioFAudioInnerRadius");
                 faudio_cfg.reverb_preset       = gSavedSettings.getString("AudioFAudioReverbPreset");
@@ -782,7 +784,8 @@ bool idle_startup()
 #endif // !LL_WINDOWS
                 )
             {
-                gAudiop = (LLAudioEngine *) new LLAudioEngine_OpenAL();
+                gAudiop = (LLAudioEngine *) new LLAudioEngine_OpenAL(
+                    gSavedSettings.getString("AudioOpenALOutputDevice"));
             }
 #endif
 

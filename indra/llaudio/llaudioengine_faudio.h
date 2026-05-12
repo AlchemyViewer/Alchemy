@@ -92,6 +92,7 @@ public:
 
     std::string getActiveOutputDevice()   const override { return mActiveDeviceName; }
     std::string getActiveOutputDeviceId() const override { return mActiveDeviceId;   }
+    std::string getOutputDeviceSettingName() const override { return "AudioFAudioOutputDevice"; }
 
     // Live device hot-swap. Tears down the FAudio voice graph
     // (channels' source voices, wind, reverb, submixes, master), then

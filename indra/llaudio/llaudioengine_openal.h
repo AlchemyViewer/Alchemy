@@ -37,12 +37,16 @@
 #include "lllistener_openal.h"
 #include "llwindgen.h"
 
+#include <string>
 #include <vector>
 
 class LLAudioEngine_OpenAL : public LLAudioEngine
 {
     public:
-        LLAudioEngine_OpenAL();
+        // preferred_device_id is an ALC device name (which doubles as the
+        // stable id in OpenAL — there's no separate GUID surface). Empty
+        // string means use the system default (alcOpenDevice(NULL)).
+        explicit LLAudioEngine_OpenAL(std::string preferred_device_id = std::string());
         virtual ~LLAudioEngine_OpenAL();
 
         virtual bool init(void *user_data, const std::string &app_title);
@@ -54,6 +58,17 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
 
         void setInternalGain(F32 gain);
 
+        // Device selection (override base API). In OpenAL the device's
+        // name doubles as its stable id — there's no separate GUID
+        // surface — so getActiveOutputDevice() == getActiveOutputDeviceId().
+        std::vector<LLAudioOutputDevice> enumerateOutputDevices() const override;
+        std::string getActiveOutputDevice()   const override { return mActiveDevice; }
+        std::string getActiveOutputDeviceId() const override { return mActiveDevice; }
+        std::string getOutputDeviceSettingName() const override { return "AudioOpenALOutputDevice"; }
+        // Hot-swap via the ALC_SOFT_reopen_device extension if available;
+        // otherwise persists and warns that a restart is needed.
+        void setOutputDevice(const std::string& id) override;
+
         LLAudioBuffer* createBuffer();
         LLAudioChannel* createChannel();
 
@@ -62,6 +77,9 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
         /*virtual*/ void updateWind(LLVector3 direction, F32 camera_altitude);
 
     private:
+        std::string mPreferredDevice;
+        std::string mActiveDevice;
+
         typedef F32 WIND_SAMPLE_T;
         LLWindGen<WIND_SAMPLE_T> *mWindGen;
         F32 *mWindBuf;

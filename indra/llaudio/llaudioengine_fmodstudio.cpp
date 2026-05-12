@@ -44,17 +44,39 @@
 #include <fmod.hpp>
 #include <fmod_errors.h>
 
+#include <cstdio>
+
 FMOD_RESULT F_CALL windCallback(FMOD_DSP_STATE *dsp_state, float *inbuffer, float *outbuffer, unsigned int length, int inchannels, int *outchannels);
 
 FMOD::ChannelGroup *LLAudioEngine_FMODSTUDIO::mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT] = {0};
 
-LLAudioEngine_FMODSTUDIO::LLAudioEngine_FMODSTUDIO(bool enable_profiler)
+namespace
+{
+    // Serialise an FMOD_GUID into the canonical Windows-style
+    // "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" form. Used as the stable
+    // device id in the picker UI / settings; round-trips via simple
+    // string compare against another FMOD_GUID's serialised form.
+    std::string guid_to_string(const FMOD_GUID& g)
+    {
+        char buf[40];
+        std::snprintf(buf, sizeof(buf),
+            "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
+            g.Data1, g.Data2, g.Data3,
+            g.Data4[0], g.Data4[1], g.Data4[2], g.Data4[3],
+            g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7]);
+        return buf;
+    }
+}
+
+LLAudioEngine_FMODSTUDIO::LLAudioEngine_FMODSTUDIO(bool enable_profiler,
+                                                     std::string preferred_device_id)
 :   mInited(false),
     mWindGen(nullptr),
     mWindDSP(nullptr),
     mSystem(nullptr),
     mEnableProfiler(enable_profiler),
-    mWindDSPDesc(nullptr)
+    mWindDSPDesc(nullptr),
+    mPreferredDeviceId(std::move(preferred_device_id))
 {
 }
 
@@ -95,6 +117,46 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
     {
         LL_WARNS("AppInit") << "FMOD Studio version mismatch, actual: " << version
             << " expected:" << FMOD_VERSION << LL_ENDL;
+    }
+
+    // Resolve preferred device id -> FMOD driver index. Default (0)
+    // when id is empty or no current driver matches — covers unplugged
+    // or replaced devices without forcing a re-pick. Must run before
+    // mSystem->init() — that's when FMOD locks in the driver.
+    int active_driver = 0;
+    if (!mPreferredDeviceId.empty())
+    {
+        int num_drivers = 0;
+        mSystem->getNumDrivers(&num_drivers);
+        bool matched = false;
+        for (int i = 0; i < num_drivers; ++i)
+        {
+            FMOD_GUID g{};
+            char name[256] = {0};
+            if (mSystem->getDriverInfo(i, name, sizeof(name), &g,
+                                        nullptr, nullptr, nullptr) != FMOD_OK)
+                continue;
+            if (guid_to_string(g) == mPreferredDeviceId)
+            {
+                active_driver = i;
+                mActiveDeviceId = mPreferredDeviceId;
+                name[sizeof(name)-1] = '\0';
+                mActiveDeviceName = name;
+                matched = true;
+                break;
+            }
+        }
+        if (!matched)
+        {
+            LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init() preferred "
+                                   "driver id '" << mPreferredDeviceId
+                                << "' not present; using system default."
+                                << LL_ENDL;
+        }
+    }
+    if (active_driver != 0)
+    {
+        mSystem->setDriver(active_driver);
     }
 
     FMOD_ADVANCEDSETTINGS settings;
@@ -214,8 +276,19 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
     LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): r_bufferlength=" << r_bufferlength << " bytes" << LL_ENDL;
     LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): r_numbuffers=" << r_numbuffers << LL_ENDL;
 
-    mSystem->getDriverInfo(0, r_name, 511, nullptr, &r_samplerate, nullptr, &r_channels);
-    r_name[511] = '\0';
+    {
+        // Query whichever driver FMOD actually selected (may be 0 if we
+        // didn't match the preferred id, or the index we set above).
+        // Record id + name so getActiveOutputDevice() reports the live
+        // device rather than always driver 0.
+        int live_driver = 0;
+        mSystem->getDriver(&live_driver);
+        FMOD_GUID g{};
+        mSystem->getDriverInfo(live_driver, r_name, 511, &g, &r_samplerate, nullptr, &r_channels);
+        r_name[511] = '\0';
+        mActiveDeviceName = r_name;
+        mActiveDeviceId = guid_to_string(g);
+    }
     LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): r_name=\"" << r_name << "\"" << LL_ENDL;
     LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): r_samplerate=" << r_samplerate << "Hz" << LL_ENDL;
     LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): r_channels=" << r_channels << LL_ENDL;
@@ -229,6 +302,106 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
     LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): initialization complete." << LL_ENDL;
 
     return true;
+}
+
+// virtual
+std::vector<LLAudioOutputDevice> LLAudioEngine_FMODSTUDIO::enumerateOutputDevices() const
+{
+    std::vector<LLAudioOutputDevice> devices;
+    if (!mSystem) return devices;
+    int num_drivers = 0;
+    mSystem->getNumDrivers(&num_drivers);
+    devices.reserve(num_drivers);
+    for (int i = 0; i < num_drivers; ++i)
+    {
+        FMOD_GUID g{};
+        char name[256] = {0};
+        if (mSystem->getDriverInfo(i, name, sizeof(name), &g,
+                                    nullptr, nullptr, nullptr) != FMOD_OK)
+        {
+            devices.emplace_back();  // keep index alignment
+            continue;
+        }
+        name[sizeof(name)-1] = '\0';
+        devices.push_back({ guid_to_string(g), std::string(name) });
+    }
+    return devices;
+}
+
+// virtual
+void LLAudioEngine_FMODSTUDIO::setOutputDevice(const std::string& id)
+{
+    if (id == mPreferredDeviceId && mInited) return;
+    mPreferredDeviceId = id;
+
+    if (!mSystem || !mInited)
+    {
+        // Preference saved; next init() will pick it up.
+        return;
+    }
+
+    // Resolve preferred id (or empty -> driver 0) to a driver index.
+    int target = 0;
+    if (!id.empty())
+    {
+        int num_drivers = 0;
+        mSystem->getNumDrivers(&num_drivers);
+        bool matched = false;
+        for (int i = 0; i < num_drivers; ++i)
+        {
+            FMOD_GUID g{};
+            char name[256] = {0};
+            if (mSystem->getDriverInfo(i, name, sizeof(name), &g,
+                                        nullptr, nullptr, nullptr) != FMOD_OK)
+                continue;
+            if (guid_to_string(g) == id)
+            {
+                target = i;
+                matched = true;
+                break;
+            }
+        }
+        if (!matched)
+        {
+            LL_INFOS() << "LLAudioEngine_FMODSTUDIO::setOutputDevice() driver id '"
+                       << id << "' not found among live drivers; preference "
+                       "saved but no live swap performed." << LL_ENDL;
+            return;
+        }
+    }
+
+    int current = 0;
+    mSystem->getDriver(&current);
+    if (target == current) return;
+
+    // Per FMOD docs (System::setDriver), when called after System::init the
+    // current driver is shut down and the newly selected one is
+    // initialized — so this is a true hot-swap, no manual teardown
+    // needed. Active channels may glitch briefly while FMOD reinitialises
+    // its output but the system stays alive.
+    LL_INFOS() << "LLAudioEngine_FMODSTUDIO::setOutputDevice() switching to "
+                  "driver " << target << " (id '"
+               << (id.empty() ? "<system default>" : id.c_str()) << "')"
+               << LL_ENDL;
+    FMOD_RESULT result = mSystem->setDriver(target);
+    if (Check_FMOD_Error(result, "FMOD::System::setDriver"))
+    {
+        LL_WARNS() << "LLAudioEngine_FMODSTUDIO::setOutputDevice() setDriver "
+                      "failed; preference saved but live swap aborted."
+                   << LL_ENDL;
+        return;
+    }
+
+    // Refresh active id + display name from the live driver.
+    FMOD_GUID g{};
+    char name[256] = {0};
+    if (mSystem->getDriverInfo(target, name, sizeof(name), &g,
+                                nullptr, nullptr, nullptr) == FMOD_OK)
+    {
+        name[sizeof(name)-1] = '\0';
+        mActiveDeviceId = guid_to_string(g);
+        mActiveDeviceName = name;
+    }
 }
 
 

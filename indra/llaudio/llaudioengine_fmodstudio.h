@@ -47,7 +47,11 @@ typedef struct FMOD_DSP_DESCRIPTION FMOD_DSP_DESCRIPTION;
 class LLAudioEngine_FMODSTUDIO : public LLAudioEngine
 {
 public:
-    LLAudioEngine_FMODSTUDIO(bool enable_profiler);
+    // preferred_device_id is a FMOD driver GUID serialised as
+    // "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" — see guid_to_string in
+    // the cpp. Empty string uses driver 0 (FMOD's system default).
+    LLAudioEngine_FMODSTUDIO(bool enable_profiler,
+                              std::string preferred_device_id = std::string());
     virtual ~LLAudioEngine_FMODSTUDIO();
 
     // initialization/startup/shutdown
@@ -57,6 +61,18 @@ public:
     virtual void allocateListener();
 
     virtual void shutdown();
+
+    // Device selection (override base API). The id is the FMOD_GUID
+    // string format; the name is the driver display name from
+    // getDriverInfo. setOutputDevice persists the preference but
+    // applies on next launch — runtime setDriver() in FMOD requires
+    // a full System reinit which the existing channel pool isn't
+    // structured to drive.
+    std::vector<LLAudioOutputDevice> enumerateOutputDevices() const override;
+    std::string getActiveOutputDevice()   const override { return mActiveDeviceName; }
+    std::string getActiveOutputDeviceId() const override { return mActiveDeviceId; }
+    std::string getOutputDeviceSettingName() const override { return "AudioFMODOutputDevice"; }
+    void setOutputDevice(const std::string& id) override;
 
     /*virtual*/ bool initWind();
     /*virtual*/ void cleanupWind();
@@ -80,6 +96,10 @@ protected:
     FMOD::DSP *mWindDSP;
     FMOD::System *mSystem;
     bool mEnableProfiler;
+
+    std::string mPreferredDeviceId;
+    std::string mActiveDeviceId;
+    std::string mActiveDeviceName;
 
 public:
     static FMOD::ChannelGroup *mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT];

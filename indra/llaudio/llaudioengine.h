@@ -111,17 +111,19 @@ public:
 
     // Output device enumeration / selection. The base defaults are
     // empty / no-op — backends that support user-pickable output devices
-    // (currently FAudio) override. Selection is stored as the device id
-    // (stable across reboots and OS updates / locale changes), not the
-    // display name. gSavedSettings("AudioOutputDevice") holds the id;
-    // backends resolve it to a live device at init() and applyForDevice
-    // hot-swap; an empty id means "system default".
+    // override. Selection is stored as the device id (stable across
+    // reboots and OS updates / locale changes), not the display name.
+    // Each backend owns its own gSavedSettings key — device ids from
+    // one backend (e.g. WASAPI GUIDs from FAudio) won't match those of
+    // another (OpenAL device names, FMOD GUIDs), so storing them under
+    // separate keys avoids cross-backend confusion when the user
+    // changes the active engine. Backends return their key name via
+    // getOutputDeviceSettingName(); empty means the backend doesn't
+    // surface device selection.
     virtual std::vector<LLAudioOutputDevice> enumerateOutputDevices() const { return {}; }
-    // Display name of the live active device (for log / UI labels).
     virtual std::string getActiveOutputDevice() const { return {}; }
-    // Stable id of the live active device (matches what the UI / setting
-    // stores). Empty when running on the system default.
     virtual std::string getActiveOutputDeviceId() const { return {}; }
+    virtual std::string getOutputDeviceSettingName() const { return {}; }
     // Tear down + re-create the backend's voice graph against the device
     // matching this id. Empty id picks the system default. Backends that
     // don't support hot-swap inherit the no-op default.
