@@ -522,7 +522,6 @@ class Windows_x86_64_Manifest(ViewerManifest):
             self.path(self.final_exe())
             self.path("*.dll")
             self.path("SLPlugin.exe")
-            self.path("SLVoice.exe")
 
         # Plugins are only built in non-debug builds on windows
         if self.args['buildtype'].lower() != 'debug':
@@ -911,14 +910,6 @@ class DarwinManifest(ViewerManifest):
                 # Need to get the llcommon dll from any of the build directories as well.
                 libfile_parent = self.get_dst_prefix()
                 dylibs=[]
-                # SLVoice executable
-                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'slvoice', 'darwin64')):
-                    for libfile in (
-                                    'SLVoice',
-                                    'libortp.dylib',
-                                    'libvivoxsdk.dylib',
-                                    ):
-                        self.path(libfile)
 
                 # our apps
                 executable_path = {}
@@ -1285,17 +1276,6 @@ class Linux_x86_64_Manifest(LinuxManifest):
         with self.prefix(src=vcpkgdir, dst="lib"):
             if self.args['discord'] == 'ON':
                 self.path("libdiscord_partner_sdk.so*")
-
-        # Vivox runtimes
-        vcpkg_voicedir = os.path.join(self.args['vcpkg_dir'], 'share', 'slvoice', 'linux')
-        with self.prefix(src=vcpkg_voicedir, dst="bin"):
-            self.path("SLVoice")
-        with self.prefix(src=vcpkg_voicedir, dst="lib"):
-            self.path("libortp.so")
-            self.path("libsndfile.so.1*")
-            self.path("libvivoxoal.so.1*") # no - we'll re-use the viewer's own OpenAL lib
-            self.path("libvivoxplatform.so")
-            self.path("libvivoxsdk.so")
 
 ################################################################
 

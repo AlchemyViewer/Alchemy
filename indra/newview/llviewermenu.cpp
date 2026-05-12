@@ -128,7 +128,6 @@
 #include "llviewerstatsrecorder.h"
 #include "llvlcomposition.h"
 #include "llvoavatarself.h"
-#include "llvoicevivox.h"
 #include "llworld.h"
 #include "llworldmap.h"
 #include "pipeline.h"

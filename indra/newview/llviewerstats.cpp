@@ -62,7 +62,6 @@
 #include "llsdserialize.h"
 #include "llsdutil.h"
 #include "llcorehttputil.h"
-#include "llvoicevivox.h"
 #include "llinventorymodel.h"
 #include "lltranslate.h"
 
@@ -808,8 +807,6 @@ void send_viewer_stats(bool include_preferences)
     gInventory.mValidationInfo->asLLSD(validation_info);
 
     body["ui"] = LLSD();
-
-    body["stats"]["voice"] = LLVoiceVivoxStats::getInstance()->read();
 
     // Misc stats, two strings and two ints
     // These are not expecticed to persist across multiple releases

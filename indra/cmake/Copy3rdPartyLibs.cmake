@@ -38,15 +38,6 @@ endmacro()
 # set up platform specific lists of files that need to be copied
 ###################################################################
 if(WINDOWS)
-    #*******************************
-    # VIVOX - *NOTE: no debug version
-    set(vivox_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/slvoice/windows64")
-    list(APPEND vivox_libs
-        vivoxsdk_x64.dll
-        ortp_x64.dll
-        SLVoice.exe
-        )
-
     set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")
 
     # Files that vcpkg fails to automatically stage
@@ -85,12 +76,6 @@ if(WINDOWS)
         ${release_libs}
     )
 
-    to_viewer_staging_dirs(
-        ${vivox_lib_dir}
-        third_party_targets
-        ${vivox_libs}
-        )
-
     if(USE_FMODSTUDIO)
         list(APPEND fmod_libs
             fmod$<$<CONFIG:Debug>:L>.dll
@@ -102,36 +87,16 @@ if(WINDOWS)
             )
     endif()
 elseif(DARWIN)
-    set(vivox_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/slvoice/darwin64")
-    set(vivox_libs
-        libortp.dylib
-        libvivoxsdk.dylib
-       )
-    set(slvoice_files SLVoice)
-
     set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
     set(release_libs
     "libhunspell-1.7.0.dylib"
     )
 elseif(LINUX)
-    set(vivox_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/slvoice/linux")
-    set(vivox_libs
-        libsndfile.so.1
-        libortp.so
-        libvivoxoal.so.1
-        libvivoxplatform.so
-        libvivoxsdk.so
-        )
-    set(slvoice_files SLVoice)
-
     set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
     set(release_libs "")
 else(WINDOWS)
     message(STATUS "WARNING: unrecognized platform for staging 3rd party libs, skipping...")
     set(vcpkg_lib_dir "")
-    set(vivox_lib_dir "")
-    set(vivox_libs "")
-    set(slvoice_files "")
 endif(WINDOWS)
 
 

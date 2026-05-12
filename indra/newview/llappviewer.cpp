@@ -3215,7 +3215,6 @@ bool LLAppViewer::initConfiguration()
     {
         // This is the second instance of SL. Mute voice,
         // but make sure the setting is *not* persisted.
-        // Also see LLVivoxVoiceClient::voiceEnabled()
         LLControlVariable* enable_voice = gSavedSettings.getControl("EnableVoiceChat");
         if (enable_voice)
         {

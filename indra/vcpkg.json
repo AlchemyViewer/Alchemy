@@ -93,7 +93,6 @@
     "secondlife-certificates",
     "secondlife-emoji-shortcodes",
     "simdutf",
-    "slvoice",
     {
       "name": "sse2neon",
       "platform": "osx"
