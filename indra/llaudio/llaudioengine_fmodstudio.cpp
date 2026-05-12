@@ -124,7 +124,6 @@ namespace
 LLAudioEngine_FMODSTUDIO::LLAudioEngine_FMODSTUDIO(bool enable_profiler,
                                                      std::string preferred_device_id)
 :   mInited(false),
-    mWindGen(nullptr),
     mWindDSP(nullptr),
     mSystem(nullptr),
     mEnableProfiler(enable_profiler),
@@ -467,6 +466,9 @@ void LLAudioEngine_FMODSTUDIO::setOutputDevice(const std::string& id)
         mActiveDeviceId = guid_to_string(g);
         mActiveDeviceName = name;
     }
+
+    // Notify any subscribed UIs that the active device shifted.
+    mDevicesChangedSignal();
 }
 
 // virtual
@@ -586,8 +588,7 @@ bool LLAudioEngine_FMODSTUDIO::initWind()
         if (Check_FMOD_Error(mSystem->createDSP(mWindDSPDesc, &mWindDSP), "FMOD::createDSP"))
             return false;
 
-        if (mWindGen)
-            delete mWindGen;
+        mWindGen.reset();
 
         int frequency = 44100;
 
@@ -598,9 +599,9 @@ bool LLAudioEngine_FMODSTUDIO::initWind()
             return false;
         }
 
-        mWindGen = new LLWindGen<MIXBUFFERFORMAT>((U32)frequency);
+        mWindGen = std::make_unique<LLWindGen<MIXBUFFERFORMAT>>((U32)frequency);
 
-        if (Check_FMOD_Error(mWindDSP->setUserData((void*)mWindGen), "FMOD::DSP::setUserData"))
+        if (Check_FMOD_Error(mWindDSP->setUserData((void*)mWindGen.get()), "FMOD::DSP::setUserData"))
         {
             cleanupWind();
             return false;
@@ -639,39 +640,35 @@ void LLAudioEngine_FMODSTUDIO::cleanupWind()
     delete mWindDSPDesc;
     mWindDSPDesc = nullptr;
 
-    delete mWindGen;
-    mWindGen = nullptr;
+    mWindGen.reset();
 }
 
 
 //-----------------------------------------------------------------------
 void LLAudioEngine_FMODSTUDIO::updateWind(LLVector3 wind_vec, F32 camera_height_above_water)
 {
-    LLVector3 wind_pos;
-    F64 pitch;
-    F64 center_freq;
-
-    if (!mEnableWind)
+    if (!mEnableWind || !mWindGen)
     {
         return;
     }
 
     if (mWindUpdateTimer.checkExpirationAndReset(LL_WIND_UPDATE_INTERVAL))
     {
+        // Shared Linden -> DS3D flip via the base helper.
+        wind_vec = lindenToDS3DWind(wind_vec);
 
-        // wind comes in as Linden coordinate (+X = forward, +Y = left, +Z = up)
-        // need to convert this to the conventional orientation DS3D and OpenAL use
-        // where +X = right, +Y = up, +Z = backwards
+        F64 pitch       = 1.0 + mapWindVecToPitch(wind_vec);
+        F64 center_freq = 80.0 * pow(pitch, 2.5 * (mapWindVecToGain(wind_vec) + 1.0));
 
-        wind_vec.setVec(-wind_vec.mV[1], wind_vec.mV[2], -wind_vec.mV[0]);
+        // Altitude shape applied upstream of LLWindGen — FMOD's DSP
+        // callback reads mTargetFreq / mTargetGain / mTargetPanGainR
+        // from the LLWindGen we set up via setUserData, so the
+        // shaped values propagate naturally without touching the
+        // callback itself.
+        const WindAltitudeShape shape = computeWindAltitudeShape(camera_height_above_water);
 
-        // cerr << "Wind update" << endl;
-
-        pitch = 1.0 + mapWindVecToPitch(wind_vec);
-        center_freq = 80.0 * pow(pitch, 2.5*(mapWindVecToGain(wind_vec) + 1.0));
-
-        mWindGen->mTargetFreq = (F32)center_freq;
-        mWindGen->mTargetGain = (F32)mapWindVecToGain(wind_vec) * mMaxWindGain;
+        mWindGen->mTargetFreq     = (F32)center_freq * shape.freq_mul;
+        mWindGen->mTargetGain     = (F32)mapWindVecToGain(wind_vec) * mMaxWindGain * shape.gain_mul;
         mWindGen->mTargetPanGainR = (F32)mapWindVecToPan(wind_vec);
     }
 }

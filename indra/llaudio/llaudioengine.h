@@ -44,6 +44,7 @@
 
 #include "lllistener.h"
 
+#include <boost/signals2/signal.hpp>
 #include <boost/unordered_map.hpp>
 
 const F32 LL_WIND_UPDATE_INTERVAL = 0.1f;
@@ -128,6 +129,20 @@ public:
     // matching this id. Empty id picks the system default. Backends that
     // don't support hot-swap inherit the no-op default.
     virtual void setOutputDevice(const std::string& /*id*/) {}
+
+    // Push notification surface for "the device list or active device
+    // has changed". UIs subscribe via boost::signals2::scoped_connection
+    // and refresh against enumerateOutputDevices / getActiveOutputDevice.
+    // Backends fire it from setOutputDevice after a successful swap so
+    // the prefs combo's active-selection display tracks reality without
+    // the user needing to open the dropdown to trigger a refresh. The
+    // signal is owned by the engine; signals2 makes scoped disconnect
+    // safe even if the engine outlives the slot's owner.
+    using devices_changed_signal_t = boost::signals2::signal<void()>;
+    devices_changed_signal_t& getDevicesChangedSignal()
+    {
+        return mDevicesChangedSignal;
+    }
 
     // Reverb. Backends that surface an I3DL2-style preset (FAudio via
     // FAudioFXReverb, OpenAL via the EFX EAXReverb effect) override
@@ -250,7 +265,60 @@ protected:
     F64 mapWindVecToPitch(LLVector3 wind_vec);
     F64 mapWindVecToPan(LLVector3 wind_vec);
 
+    // Maximum wind-vector magnitude (m/s) at which mapWindVecToGain
+    // saturates to 1.0. Region wind layers don't typically exceed
+    // ~10 m/s but bursty data + the avatar-velocity subtraction in
+    // llvieweraudio.cpp can push the relative vector above that, so
+    // we clip rather than letting gain blow past unity.
+    static constexpr F32 WIND_MAX_VELOCITY_MPS = 20.f;
+
+    // Altitude-dependent shaping result. Applied to the wind synth's
+    // mTargetFreq / mTargetGain before each updateWind tick. Single
+    // policy carried by computeWindAltitudeShape() below so each
+    // backend gets the same "what does wind sound like at this
+    // altitude / depth" behaviour.
+    struct WindAltitudeShape
+    {
+        F32 freq_mul = 1.f;   // multiplier on mTargetFreq
+        F32 gain_mul = 1.f;   // multiplier on mTargetGain
+    };
+
+public:
+    // Live setters for the wind tunables — public because they're
+    // driven from llstartup's settings-signal handlers. Routed
+    // through virtuals so each backend forwards to its own LLWindGen
+    // instance; the base class doesn't own a generator. Default
+    // no-op overrides keep backends without wind support (headless)
+    // honest.
+    virtual void setWindGustiness(F32 /*depth*/) {}
+    void setWindAltitudeBoost(F32 boost)
+    {
+        if (boost < 0.f) boost = 0.f;
+        if (boost > 1.f) boost = 1.f;
+        mAltitudeBoost = boost;
+    }
+
 protected:
+    // Linden frame (+X fwd, +Y left, +Z up) -> DirectSound 3D / X3D
+    // frame (+X right, +Y up, +Z back) flip applied to the wind
+    // vector before it's fed into the spatialiser. Lives in the
+    // base class so OpenAL and FAudio share the same transform —
+    // the historical pattern was duplicated identically across the
+    // two backends. FMOD uses LLVector3 directly via its DSP path
+    // and doesn't call this helper.
+    static LLVector3 lindenToDS3DWind(const LLVector3& v)
+    {
+        return LLVector3(-v.mV[1], v.mV[2], -v.mV[0]);
+    }
+
+    // Compute the altitude shape from camera_height_above_water.
+    // Negative = submerged; muffles via lower resonator cutoff +
+    // attenuates gain (wind doesn't fully cut at the water-line
+    // because a brief tail feels more natural than an instantaneous
+    // mute). Positive = above water; subtle gain lift with altitude,
+    // scaled by mAltitudeBoost.
+    WindAltitudeShape computeWindAltitudeShape(F32 height_above_water) const;
+
     LLListener *mListenerp;
 
     bool mMuted;
@@ -259,6 +327,15 @@ protected:
     S32 mLastStatus;
 
     bool mEnableWind;
+
+    // Strength multiplier for altitude-dependent gain lift in
+    // computeWindAltitudeShape. 0 = no lift; 1 = full 1.5x at
+    // 100m+ above water. Default 0.5 means a modest 1.25x at the
+    // saturation point — felt rather than heard, the way real
+    // altitude wind tends to register.
+    F32 mAltitudeBoost = 0.5f;
+
+    devices_changed_signal_t mDevicesChangedSignal;
 
     LLUUID mCurrentTransfer; // Audio file currently being transferred by the system
     LLFrameTimer mCurrentTransferTimer;

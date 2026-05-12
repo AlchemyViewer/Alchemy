@@ -31,6 +31,8 @@
 #include "llaudioengine.h"
 #include "llwindgen.h"
 
+#include <memory>
+
 //Stubs
 class LLAudioStreamManagerFMODSTUDIO;
 namespace FMOD
@@ -85,6 +87,11 @@ public:
     void setReverbPreset(const std::string& preset_name) override;
     void setReverbSendScale(float scale) override;
 
+    void setWindGustiness(F32 depth) override
+    {
+        if (mWindGen) mWindGen->setGustinessDepth(depth);
+    }
+
     /*virtual*/ bool initWind();
     /*virtual*/ void cleanupWind();
 
@@ -101,7 +108,7 @@ protected:
 
     bool mInited;
 
-    LLWindGen<MIXBUFFERFORMAT> *mWindGen;
+    std::unique_ptr<LLWindGen<MIXBUFFERFORMAT>> mWindGen;
 
     FMOD_DSP_DESCRIPTION *mWindDSPDesc;
     FMOD::DSP *mWindDSP;

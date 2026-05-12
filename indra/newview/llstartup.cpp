@@ -826,6 +826,24 @@ bool idle_startup()
                         gAudiop->setReverbPreset(v.asString());
                 });
 
+            // Wind tunables. Backend-agnostic via the lifted base
+            // virtuals — setWindGustiness routes to the active engine's
+            // LLWindGen; setWindAltitudeBoost stores on the base class
+            // and is read by computeWindAltitudeShape on each update
+            // tick.
+            gSavedSettings.getControl("AudioWindGustiness")->getSignal()->connect(
+                [](LLControlVariable*, const LLSD& v, const LLSD&)
+                {
+                    if (gAudiop)
+                        gAudiop->setWindGustiness(static_cast<F32>(v.asReal()));
+                });
+            gSavedSettings.getControl("AudioWindAltitudeBoost")->getSignal()->connect(
+                [](LLControlVariable*, const LLSD& v, const LLSD&)
+                {
+                    if (gAudiop)
+                        gAudiop->setWindAltitudeBoost(static_cast<F32>(v.asReal()));
+                });
+
             if (gAudiop)
             {
 #if LL_WINDOWS
@@ -865,6 +883,21 @@ bool idle_startup()
                         gAudiop->setReverbSendScale(
                             gSavedSettings.getF32("AudioReverbSendScale"));
                     }
+
+                    // Push the saved wind tunables onto the live engine
+                    // once. setWindGustiness only takes effect after
+                    // initWind has allocated the LLWindGen (the first
+                    // time wind is enabled — typically once flight is
+                    // toggled on), so for cold-start sessions where the
+                    // user has saved a non-zero gustiness the value
+                    // will only audibly apply once wind comes up; the
+                    // setter is null-guarded inside the engine override
+                    // for that case. setWindAltitudeBoost is base-class
+                    // state and applies immediately.
+                    gAudiop->setWindGustiness(
+                        gSavedSettings.getF32("AudioWindGustiness"));
+                    gAudiop->setWindAltitudeBoost(
+                        gSavedSettings.getF32("AudioWindAltitudeBoost"));
 
                     gAudiop->setMuted(true);
                 }

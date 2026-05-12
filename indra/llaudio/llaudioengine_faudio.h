@@ -37,6 +37,7 @@
 #include <atomic>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -92,6 +93,11 @@ public:
     void setReverbSendScale(float scale) override;
     void setReverbPreset(const std::string& preset_name) override;
     bool supportsReverb() const override { return true; }
+
+    void setWindGustiness(F32 depth) override
+    {
+        if (mWindGen) mWindGen->setGustinessDepth(depth);
+    }
 
     // Returns every output device FAudio reports as {id, name} pairs.
     // Index 0 in the underlying device list is FAudio's notion of the
@@ -208,7 +214,7 @@ private:
     F3DAUDIO_HANDLE        mX3DInstance{};
 
     // Wind synthesis.
-    LLWindGen<WIND_SAMPLE_T>* mWindGen     = nullptr;
+    std::unique_ptr<LLWindGen<WIND_SAMPLE_T>> mWindGen;
     FAudioSourceVoice*        mWindVoice   = nullptr;
     U32                       mWindBufFreq = 0;
     U32                       mWindBufSamples = 0;

@@ -82,8 +82,18 @@ namespace
         while (len < cap && buf[len]) ++len;
         return utf16str_to_utf8str(reinterpret_cast<const char16_t*>(buf), len);
     }
+    // FAudio's DeviceID field has turned out to be unstable across
+    // FAudio_Release / FAudioCreate cycles on at least one user's
+    // setup — same physical device, different DeviceID string across
+    // swaps — so persisting it as the user's "selected device" id
+    // doesn't round-trip reliably. The DisplayName is what the user
+    // picks in the UI and what they expect to see preserved, and the
+    // underlying platform name is stable across hot-swaps. Use the
+    // display name as the engine's "id" so matching at the next init
+    // resolves to the same physical device the user selected, even
+    // if the FAudio-internal DeviceID has shuffled.
     std::string device_id(const FAudioDeviceDetails& d)
-    { return utf16_buf_to_utf8(d.DeviceID, 256); }
+    { return utf16_buf_to_utf8(d.DisplayName, 256); }
     std::string device_name(const FAudioDeviceDetails& d)
     { return utf16_buf_to_utf8(d.DisplayName, 256); }
 
@@ -181,13 +191,24 @@ std::vector<LLAudioOutputDevice> LLAudioEngine_FAudio::enumerateOutputDevices() 
     if (!mFAudio) return devices;
     uint32_t count = 0;
     if (FAudio_GetDeviceCount(mFAudio, &count) != 0) return devices;
-    devices.reserve(count);
-    for (uint32_t i = 0; i < count; ++i)
+    // Skip FAudio's index 0 — it's the platform's "default endpoint"
+    // alias, exposed by the prefs UI as a synthetic "System default"
+    // entry. Surfacing it again here as a separate item (FAudio names
+    // it "Default Device" via the underlying platform layer) would
+    // give the user two visually-distinct entries that pick the same
+    // device, which is confusing. Specific hardware endpoints start at
+    // index 1. The enumeration result is the index-1+ stretch returned
+    // in caller order so callers can still use index 0 implicitly via
+    // an empty preferred_device_id (which is exactly what the synthetic
+    // "System default" entry does).
+    if (count > 1) devices.reserve(count - 1);
+    for (uint32_t i = 1; i < count; ++i)
     {
         FAudioDeviceDetails details{};
         if (FAudio_GetDeviceDetails(mFAudio, i, &details) != 0)
         {
-            devices.emplace_back();  // placeholder; keeps index alignment
+            devices.emplace_back();  // placeholder; keeps caller-side
+                                     // diagnostics distinguishable
             continue;
         }
         devices.push_back({ device_id(details), device_name(details) });
@@ -294,6 +315,64 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
     FAudioVoice_GetVoiceDetails(mMasterVoice, &details);
     mSampleRate     = details.InputSampleRate;
     mOutputChannels = static_cast<uint16_t>(details.InputChannels);
+
+    // Some platform layers (notably SDL3 on Windows when the requested
+    // endpoint is also the OS-default and held by another role) can
+    // return success from CreateMasteringVoice for a specific device
+    // index but hand back a voice with zero channels / zero sample
+    // rate — the voice is technically alive but produces no audio.
+    // Detect that here and fall back to the system default (index 0),
+    // which the same platform reliably opens.
+    if (device_index != 0
+        && (mOutputChannels == 0 || mSampleRate == 0))
+    {
+        LL_WARNS() << "LLAudioEngine_FAudio::initFAudioDevice() device index "
+                   << device_index << " (id '" << mActiveDeviceId
+                   << "') opened with invalid format ("
+                   << mOutputChannels << "ch @ " << mSampleRate
+                   << "Hz). Falling back to system default endpoint."
+                   << LL_ENDL;
+        FAudioVoice_DestroyVoice(mMasterVoice);
+        mMasterVoice = nullptr;
+        mActiveDeviceId.clear();
+        mActiveDeviceName.clear();
+        hr = FAudio_CreateMasteringVoice(mFAudio, &mMasterVoice,
+                                         FAUDIO_DEFAULT_CHANNELS,
+                                         FAUDIO_DEFAULT_SAMPLERATE,
+                                         0, 0, nullptr);
+        if (hr != 0 || !mMasterVoice)
+        {
+            LL_WARNS() << "LLAudioEngine_FAudio::initFAudioDevice() default "
+                          "endpoint fallback also failed: 0x"
+                       << std::hex << hr << std::dec << LL_ENDL;
+            FAudio_Release(mFAudio);
+            mFAudio = nullptr;
+            return false;
+        }
+        FAudioVoice_GetVoiceDetails(mMasterVoice, &details);
+        mSampleRate     = details.InputSampleRate;
+        mOutputChannels = static_cast<uint16_t>(details.InputChannels);
+        // Record what we actually opened — the default endpoint's
+        // human-readable name for the driver-name log + UI.
+        FAudioDeviceDetails ddet{};
+        if (FAudio_GetDeviceDetails(mFAudio, 0, &ddet) == 0)
+        {
+            mActiveDeviceName = device_name(ddet);
+        }
+    }
+
+    // Re-apply the cached master gain. The new mastering voice opens
+    // at FAudio's default unity, but the base class's mInternalGain
+    // holds whatever value the user's master-volume slider has been
+    // set to (and whether mute is on). Without this re-apply, a hot-
+    // swap mid-session would reset the master volume to 1.0 and stay
+    // there until the user next moved the slider. The -1.0f sentinel
+    // (from setDefaults() before the first setMasterGain call lands)
+    // is preserved by the range check so first-init isn't disturbed.
+    if (mInternalGain >= 0.f && mInternalGain <= 1.f)
+    {
+        FAudioVoice_SetVolume(mMasterVoice, mInternalGain, FAUDIO_COMMIT_NOW);
+    }
 
     // F3DAudio needs the output speaker mask to know geometry.
     uint32_t channel_mask = 0;
@@ -567,20 +646,18 @@ void LLAudioEngine_FAudio::setOutputDevice(const std::string& id)
 
     LL_INFOS() << "LLAudioEngine_FAudio::setOutputDevice() switching to id '"
                << (id.empty() ? "<system default>" : id.c_str())
-               << "'" << LL_ENDL;
+               << "' (from '"
+               << (mActiveDeviceName.empty() ? "<unknown>" : mActiveDeviceName.c_str())
+               << "')" << LL_ENDL;
 
     mConfig.preferred_device_id = id;
 
-    // Wind: keep mWindGen and its smoothing state alive across the swap
-    // — the audible synthesis stays continuous, only the FAudio source
-    // voice underneath gets recreated. releaseFAudioDevice() tears
-    // down mWindVoice for us, and the re-init below sees mWindGen
-    // already alive and just re-attaches a fresh voice on the new
-    // device. mWindFadeIn is also preserved so a settled wind voice
-    // restarts at its previous volume rather than re-ramping from
-    // silence (the inherent WASAPI/CoreAudio re-bootstrap silence is
-    // unavoidable, but at least we don't add a 300 ms fade-in on top
-    // of it).
+    // Snapshot wind state. We carry mWindGen across the swap when the
+    // sample rate didn't change, so synthesis stays continuous; if it
+    // did change, initWind below recreates the generator at the new
+    // rate to avoid the FAudio resampler trying to stitch across a
+    // format mismatch (a known cause of intermittent silent-wind on
+    // hot-swap).
     const bool had_wind = mEnableWind && mWindGen != nullptr;
 
     releaseFAudioDevice();
@@ -592,11 +669,28 @@ void LLAudioEngine_FAudio::setOutputDevice(const std::string& id)
                       "device is selected." << LL_ENDL;
         return;
     }
+    LL_INFOS() << "LLAudioEngine_FAudio::setOutputDevice() opened '"
+               << mActiveDeviceName << "' (" << mOutputChannels << "ch @ "
+               << mSampleRate << "Hz)" << LL_ENDL;
 
     if (had_wind)
     {
-        initWind();
+        if (initWind())
+        {
+            LL_INFOS() << "LLAudioEngine_FAudio::setOutputDevice() wind voice "
+                          "re-attached at " << mWindBufFreq << "Hz" << LL_ENDL;
+        }
+        else
+        {
+            LL_WARNS() << "LLAudioEngine_FAudio::setOutputDevice() wind voice "
+                          "re-attach failed; wind silent until re-init."
+                       << LL_ENDL;
+        }
     }
+
+    // Tell any subscribed UIs (Sound prefs combo) that the active
+    // device may have shifted so they can refresh their display.
+    mDevicesChangedSignal();
 }
 
 FAudioSubmixVoice* LLAudioEngine_FAudio::getGroupVoice(S32 type) const
@@ -679,21 +773,34 @@ LLAudioChannel* LLAudioEngine_FAudio::createChannel()
 
 bool LLAudioEngine_FAudio::initWind()
 {
-    if (!mFAudio) return false;
+    if (!mFAudio || mSampleRate == 0)
+    {
+        LL_WARNS() << "LLAudioEngine_FAudio::initWind() preconditions not met "
+                      "(mFAudio=" << (mFAudio ? "alive" : "null")
+                   << ", mSampleRate=" << mSampleRate << ")" << LL_ENDL;
+        return false;
+    }
 
-    // Allocate the wind generator on the first call only — across a
-    // device hot-swap initWind() is re-entered while mWindGen still
-    // carries its smoothing state from the prior device, so we keep
-    // the synthesis seamless. cleanupWind() (full shutdown) clears
-    // mWindGen, after which the next initWind starts fresh.
-    const bool fresh_gen = (mWindGen == nullptr);
+    // Allocate (or re-allocate) the wind generator. We carry the
+    // generator across device swaps so the filter / smoothing state
+    // stays continuous, but only when the device's sample rate didn't
+    // change — if it did, the wind voice would be created at the new
+    // master's rate while the generator emits at the old rate, leaving
+    // FAudio's resampler stitching across the mismatch on every chunk.
+    // That's been the source of intermittent silent-wind cases on
+    // hot-swap. Recreating mWindGen at the new rate trades the carry-
+    // over smoothing state for a guaranteed format match.
+    const bool fresh_gen = !mWindGen ||
+                            mWindGen->getInputSamplingRate() != mSampleRate;
     if (fresh_gen)
     {
-        mWindGen = new LLWindGen<WIND_SAMPLE_T>;
+        mWindGen = std::make_unique<LLWindGen<WIND_SAMPLE_T>>(mSampleRate);
         mWindBufFreq    = mWindGen->getInputSamplingRate();
         mWindBufSamples = llceil(mWindBufFreq * WIND_BUFFER_SIZE_SEC);
-        // Initial cold-start: voice begins silent and updateWind ramps
-        // it to unity over ~300 ms, masking the synthesis ramp-up.
+        // Cold-start: voice begins silent and updateWind ramps it to
+        // unity over ~300 ms, masking the synthesis ramp-up. Across a
+        // sample-rate-changing hot-swap we also reset the fade because
+        // the new generator's first samples are silence-from-zero.
         mWindFadeIn = 0.0f;
     }
     // else: mWindFadeIn keeps whatever value it had on the prior
@@ -725,8 +832,7 @@ bool LLAudioEngine_FAudio::initWind()
             // paths (device swap) leave the pre-existing generator
             // alone so a transient device failure doesn't lose the
             // synthesis state.
-            delete mWindGen;
-            mWindGen = nullptr;
+            mWindGen.reset();
         }
         return false;
     }
@@ -757,11 +863,10 @@ void LLAudioEngine_FAudio::cleanupWind()
     // before the mixer drains flush_buffers).
     mWindChunks.clear();
 
-    delete mWindGen;
-    mWindGen = nullptr;
+    mWindGen.reset();
 }
 
-void LLAudioEngine_FAudio::updateWind(LLVector3 wind_vec, F32 /*camera_altitude*/)
+void LLAudioEngine_FAudio::updateWind(LLVector3 wind_vec, F32 camera_altitude)
 {
     LL_PROFILE_ZONE_SCOPED;
 
@@ -786,15 +891,22 @@ void LLAudioEngine_FAudio::updateWind(LLVector3 wind_vec, F32 /*camera_altitude*
 
     if (mWindUpdateTimer.checkExpirationAndReset(LL_WIND_UPDATE_INTERVAL))
     {
-        // Linden (+X fwd, +Y left, +Z up) -> DS3D convention (+X right, +Y up, +Z back)
-        // matches the OpenAL backend so wind direction maps to pan identically.
-        wind_vec.setVec(-wind_vec.mV[1], wind_vec.mV[2], -wind_vec.mV[0]);
+        // Linden -> DS3D flip shared with the OpenAL backend via the
+        // base helper so wind direction maps to pan identically across
+        // both engines.
+        wind_vec = lindenToDS3DWind(wind_vec);
 
         F64 pitch       = 1.0 + mapWindVecToPitch(wind_vec);
         F64 center_freq = 80.0 * pow(pitch, 2.5 * (mapWindVecToGain(wind_vec) + 1.0));
 
-        mWindGen->mTargetFreq     = (F32)center_freq;
-        mWindGen->mTargetGain     = (F32)mapWindVecToGain(wind_vec) * mMaxWindGain;
+        // Altitude shape: muffle the resonator + attenuate gain
+        // when the camera is underwater; subtle gain lift when high
+        // above water. Shape is computed once per coefficient update,
+        // not per audio sample.
+        const WindAltitudeShape shape = computeWindAltitudeShape(camera_altitude);
+
+        mWindGen->mTargetFreq     = (F32)center_freq * shape.freq_mul;
+        mWindGen->mTargetGain     = (F32)mapWindVecToGain(wind_vec) * mMaxWindGain * shape.gain_mul;
         mWindGen->mTargetPanGainR = (F32)mapWindVecToPan(wind_vec);
     }
 
@@ -1161,6 +1273,26 @@ bool LLAudioChannelFAudio::updateBuffer()
             return false;
         }
         mStarted = false;
+
+        // Kick the freshly-built voice into playback. The base
+        // LLAudioEngine::idle() calls channelp->play() *before*
+        // updateChannels — i.e. before this rebuild branch had a
+        // chance to create the voice — so for channels that already
+        // had a source assigned (the device-hot-swap case in
+        // particular: prepareForDeviceReset destroyed the voice but
+        // left mCurrentSourcep alive, and the source is still
+        // expected to be playing) there is no other caller that
+        // would start the voice after we rebuild it. Without this
+        // kick the freshly-built voice sits stopped indefinitely
+        // — what users see as "device swap goes silent and never
+        // recovers". Skip when the channel is a sync-slave that's
+        // explicitly been told to wait. play() is idempotent (gated
+        // on mStarted) so the normal external play() callers from
+        // LLAudioSource still work cleanly.
+        if (!isWaiting())
+        {
+            play();
+        }
     }
 
     if (mVoice)

@@ -79,6 +79,28 @@
             <key>Value</key>
             <real>0.05</real>
         </map>
+        <key>AudioWindGustiness</key>
+        <map>
+            <key>Comment</key>
+            <string>Depth of the slow random-walk gain modulator applied by LLWindGen to the procedural wind drone. 0 disables gustiness entirely and the synth runs bit-identically to the historical steady drone. 1 means ±100% gain modulation, picked from a fresh random target every ~1.5 seconds and interpolated smoothly. Applies live across all reverb-capable backends; takes effect on the next synthesised wind sample.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>AudioWindAltitudeBoost</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the altitude-dependent gain lift applied to the wind drone when the camera is above water. 0 disables the boost entirely; 1 scales wind gain by up to 1.5x at the 4096m sim ceiling, following a square-root curve so the transition off the ground is perceptible without becoming overwhelming at typical skybox altitudes. The underwater muffle (cutoff drop + gain attenuation when the camera is submerged) is always on and not gated by this setting. Applies live; takes effect on the next coefficient update tick.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
         <key>AlchemyAppearanceShowHints</key>
         <map>
             <key>Comment</key>

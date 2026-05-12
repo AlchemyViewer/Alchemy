@@ -40,6 +40,8 @@
 #include "llsetkeybinddialog.h"
 #include "llkeyconflict.h"
 
+#include <boost/signals2/connection.hpp>
+
 class LLConversationLogObserver;
 class LLPanelPreference;
 class LLPanelLCD;
@@ -372,10 +374,17 @@ private:
     void populateOutputDeviceCombo();
     // Refreshes the items in the audio_output_device_combo against the
     // current engine enumeration. Invoked from postBuild() for the
-    // initial fill and from the combo's prearrange callback so a
-    // hot-plugged DAC shows up the next time the user drops the menu
-    // open — without us having to poll the device list.
+    // initial fill, from the combo's prearrange callback (covers
+    // hot-plug while the panel is open), and from the engine's
+    // devices-changed signal (covers active-device shifts driven by
+    // setOutputDevice).
     void refreshOutputDeviceItems(const std::string& setting_key);
+
+    // Subscription to LLAudioEngine::getDevicesChangedSignal(). The
+    // scoped_connection disconnects automatically when the panel is
+    // destroyed; boost::signals2 makes that safe even if the engine
+    // outlives the panel.
+    boost::signals2::scoped_connection mDevicesChangedConn;
 };
 
 class LLPanelPreferenceControls : public LLPanelPreference, public LLKeyBindResponderInterface

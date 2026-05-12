@@ -725,14 +725,52 @@ F64 LLAudioEngine::mapWindVecToGain(LLVector3 wind_vec)
 
     if (gain)
     {
-        if (gain > 20.0)
+        if (gain > static_cast<F64>(WIND_MAX_VELOCITY_MPS))
         {
-            gain = 20.0;
+            gain = static_cast<F64>(WIND_MAX_VELOCITY_MPS);
         }
-        gain = gain/20.0;
+        gain = gain / static_cast<F64>(WIND_MAX_VELOCITY_MPS);
     }
 
     return (gain);
+}
+
+LLAudioEngine::WindAltitudeShape
+LLAudioEngine::computeWindAltitudeShape(F32 height_above_water) const
+{
+    WindAltitudeShape shape;
+    if (height_above_water < 0.f)
+    {
+        // Submerged: water muffles + attenuates. Cutoff drops to
+        // ~30 % over the first 2 m of depth (head plus a margin);
+        // gain drops to ~20 % within the first 0.5 m of submersion.
+        // Both clamp to a floor so very-deep camera doesn't go all
+        // the way to silence — at extreme depth you'd expect zero
+        // wind, but ambient sounds + sim audio carry the scene; the
+        // tail keeps the transition from sounding broken.
+        const F32 depth = -height_above_water;
+        const F32 depth_for_freq = llmin(1.f, depth / 2.f);
+        const F32 depth_for_gain = llmin(1.f, depth / 0.5f);
+        shape.freq_mul = lerp(1.f, 0.3f, depth_for_freq);
+        shape.gain_mul = lerp(1.f, 0.2f, depth_for_gain);
+    }
+    else if (mAltitudeBoost > 0.f)
+    {
+        // Above water: subtle gain lift with altitude. SL regions
+        // allow camera altitudes from 0 to 4096 m (skyboxes at 1-3 km
+        // are common; 4 km is the ceiling), so the boost is shaped
+        // over the full range rather than saturating at low hundreds
+        // of metres. A square-root curve gives perceptible lift down
+        // low (where the user notices the transition off the ground)
+        // while still leaving headroom at the higher altitudes where
+        // skyboxes live — linear would feel flat at ground level and
+        // over-eager at the ceiling. Max gain multiplier at 4096 m
+        // and boost=1 is 1.5x; ground level is always 1.0x.
+        constexpr F32 kSimAltitudeMaxM = 4096.f;
+        const F32 alt_norm = sqrtf(llmin(1.f, height_above_water / kSimAltitudeMaxM));
+        shape.gain_mul = 1.f + 0.5f * alt_norm * mAltitudeBoost;
+    }
+    return shape;
 }
 
 
@@ -777,7 +815,17 @@ F64 LLAudioEngine::mapWindVecToPan(LLVector3 wind_vec)
     // put it on 0, 1
     theta /= F_PI;
 
-    return (theta);
+    // Compress the full [0, 1] hard-L / hard-R range into a milder
+    // [0.3, 0.7] so the wind drone keeps both ears active when the
+    // listener rotates. Ambient wind is perceptually "all around
+    // you" — a hard pan that fully empties the opposite ear breaks
+    // that mental model. The compressed range still gives a
+    // perceptible directional cue (the windward ear is louder) but
+    // doesn't make the drone slide audibly from ear to ear as the
+    // camera spins, which was the symptom users hit on the FAudio
+    // backend (and would have hit on OpenAL / FMOD too — same
+    // LLWindGen pan math underneath all three).
+    return 0.3 + theta * 0.4;
 }
 
 

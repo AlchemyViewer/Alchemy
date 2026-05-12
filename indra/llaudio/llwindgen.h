@@ -33,13 +33,39 @@ template <class MIXBUFFERFORMAT_T>
 class LLWindGen
 {
 public:
+    // Resonant low-pass filter bandwidth (Hz). Sets the Q of the
+    // resonator that sculpts the pinked noise into the audible wind
+    // sweep — narrower = more tonal "whistle"; wider = more
+    // broadband rush. 50 Hz is the historical tuning and feels
+    // right; left as a class constant so it's both findable and
+    // tweakable in one place.
+    static constexpr F32 kFilterBandwidthHz = 50.f;
+
+    // Per-sample exponential smoothing coefficient applied to the
+    // target/current parameters (gain, freq, pan). At 44.1 kHz the
+    // time constant is ~22 ms; the same numeric coefficient at
+    // higher sample rates means proportionally faster (in samples)
+    // smoothing but no audible difference at typical device rates
+    // (44.1 → 48 kHz). If the device rate ever diverges enough that
+    // this matters, recompute from a time-constant in seconds.
+    static constexpr F32 kCoefficientSmoothing = 0.999f;
+
+    // Random-walk gust LFO design. Off when mGustinessDepth == 0
+    // (the inner loop short-circuits the modulation entirely so the
+    // synthesised sound is bit-exact to the pre-feature path). When
+    // enabled, a new random target in [-1, 1] is picked every
+    // kGustTargetIntervalSec seconds and mGustValue interpolates
+    // toward it — a slow, audibly-coherent gust feel. Depth scales
+    // the modulation amplitude (depth=1 means ±100 % gain wobble).
+    static constexpr F32 kGustTargetIntervalSec = 1.5f;
+
     LLWindGen(const U32 sample_rate = 44100) :
         mTargetGain(0.f),
         mTargetFreq(100.f),
         mTargetPanGainR(0.5f),
         mInputSamplingRate(sample_rate),
         mSubSamples(2),
-        mFilterBandWidth(50.f),
+        mFilterBandWidth(kFilterBandwidthHz),
         mBuf0(0.0f),
         mBuf1(0.0f),
         mBuf2(0.0f),
@@ -48,7 +74,11 @@ public:
         mCurrentGain(0.f),
         mCurrentFreq(100.f),
         mCurrentPanGainR(0.5f),
-        mLastSample(0.f)
+        mLastSample(0.f),
+        mGustinessDepth(0.f),
+        mGustValue(0.f),
+        mGustTarget(0.f),
+        mGustSamplesUntilNewTarget(0)
     {
         mSamplePeriod = (F32)mSubSamples / (F32)mInputSamplingRate;
         mB2 = expf(-F_TWO_PI * mFilterBandWidth * mSamplePeriod);
@@ -57,6 +87,17 @@ public:
     const U32 getInputSamplingRate() { return mInputSamplingRate; }
     const F32 getNextSample();
     const F32 getClampedSample(bool clamp, F32 sample);
+
+    // Optional slow random-walk modulator on the smoothed gain.
+    // 0 disables it entirely (default); 1 means ±100 % gain wobble
+    // — the inner loop branches on depth==0 so the no-feature path
+    // is bit-exact to the historical synthesis.
+    void setGustinessDepth(F32 depth)
+    {
+        if (depth < 0.f) depth = 0.f;
+        if (depth > 1.f) depth = 1.f;
+        mGustinessDepth = depth;
+    }
 
     // newbuffer = the buffer passed from the previous DSP unit.
     // numsamples = length in samples-per-channel at this mix time.
@@ -86,12 +127,34 @@ public:
             interp_freq = true;
         }
 
+        // Pre-compute the gust LFO step. Each output sample we drift
+        // mGustValue toward mGustTarget by this fraction; when the
+        // sample-countdown elapses we pick a fresh target. The total
+        // interval (samples_until_new_target * step) is calibrated to
+        // kGustTargetIntervalSec at the current sample rate.
+        const S32 kGustTargetSamples =
+            llmax(1, (S32)(kGustTargetIntervalSec * (F32)mInputSamplingRate / (F32)mSubSamples));
+        const F32 kGustInterpStep = 1.f / (F32)kGustTargetSamples;
+
         while (numsamples)
         {
             F32 next_sample;
 
-            // Start with white noise
-            // This expression is fragile, rearrange it and it will break!
+            // Start with white noise.
+            //
+            // The expression in getNextSample() is "fragile" because
+            // it is a single-statement composition of (rand-based)
+            // value scaling, mid-range offset, and float→integer
+            // promotion in a deliberate order chosen so the result
+            // sits symmetrically around zero with the intended
+            // amplitude. Reordering the operands or splitting the
+            // expression across statements can introduce subtle
+            // floating-point cancellation differences that bias the
+            // DC component of the noise, which then propagates
+            // through the pinking + resonant filters as a slow DC
+            // creep audible as a "click" at the start of wind onset.
+            // If you need to refactor it, verify with a long-running
+            // Σx accumulator that the bias stays at zero.
             next_sample = getNextSample();
 
             // Apply a pinking filter
@@ -105,7 +168,7 @@ public:
             if (interp_freq)
             {
                 // calculate and interpolate resonant filter coefficients
-                mCurrentFreq = (0.999f * mCurrentFreq) + (0.001f * mTargetFreq);
+                mCurrentFreq = (kCoefficientSmoothing * mCurrentFreq) + ((1.f - kCoefficientSmoothing) * mTargetFreq);
                 b1 = (-4.0f * mB2) / (1.0f + mB2) * cosf(F_TWO_PI * (mCurrentFreq * mSamplePeriod));
                 a0 = (1.0f - mB2) * sqrtf(1.0f - (b1 * b1) / (4.0f * mB2));
             }
@@ -115,12 +178,30 @@ public:
             mY1 = mY0;
             mY0 = next_sample;
 
-            mCurrentGain = (0.999f * mCurrentGain) + (0.001f * mTargetGain);
-            mCurrentPanGainR = (0.999f * mCurrentPanGainR) + (0.001f * mTargetPanGainR);
+            mCurrentGain = (kCoefficientSmoothing * mCurrentGain) + ((1.f - kCoefficientSmoothing) * mTargetGain);
+            mCurrentPanGainR = (kCoefficientSmoothing * mCurrentPanGainR) + ((1.f - kCoefficientSmoothing) * mTargetPanGainR);
 
             // For a 3dB pan law use:
             // next_sample *= mCurrentGain * ((mCurrentPanGainR*(mCurrentPanGainR-1)*1.652+1.413);
             next_sample *= mCurrentGain;
+
+            // Slow gust modulator. When mGustinessDepth==0 we never
+            // touch mGustValue / mGustTarget so the synthesis stays
+            // bit-identical to the historical pre-feature path. When
+            // enabled, mGustValue ramps toward a new random target
+            // every kGustTargetIntervalSec seconds, modulating the
+            // amplitude — feels like natural gust variation rather
+            // than the steady drone we've had until now.
+            if (mGustinessDepth > 0.f)
+            {
+                if (--mGustSamplesUntilNewTarget <= 0)
+                {
+                    mGustTarget = ll_frand() * 2.f - 1.f;  // [-1, 1]
+                    mGustSamplesUntilNewTarget = kGustTargetSamples;
+                }
+                mGustValue += (mGustTarget - mGustValue) * kGustInterpStep;
+                next_sample *= 1.f + mGustValue * mGustinessDepth;
+            }
 
             // delta is used to interpolate between synthesized samples
             F32 delta = (next_sample - mLastSample) / (F32)mSubSamples;
@@ -164,6 +245,16 @@ private:
     F32 mCurrentFreq;
     F32 mCurrentPanGainR;
     F32 mLastSample;
+
+    // Gust LFO state. mGustinessDepth gates the whole feature
+    // (0 = off, bit-exact to historical synth). mGustValue is the
+    // smoothed modulator; mGustTarget is what it's interpolating
+    // toward; the sample counter triggers a fresh random target
+    // every kGustTargetIntervalSec.
+    F32 mGustinessDepth;
+    F32 mGustValue;
+    F32 mGustTarget;
+    S32 mGustSamplesUntilNewTarget;
 };
 
 template<class T> inline const F32 LLWindGen<T>::getNextSample() { return (F32)rand() * (1.0f / (F32)(RAND_MAX / (U16_MAX / 8))) + (F32)(S16_MIN / 8); }

@@ -3127,13 +3127,28 @@ void LLPanelPreferenceSound::refreshOutputDeviceItems(const std::string& setting
     // changes across reboots. Backend-agnostic via the LLAudioEngine
     // base interface; backends without device support inherit an empty
     // enumeration and an empty settings-key name.
+    //
+    // Sort the enumeration result by display name (case-insensitive)
+    // before populating the combo. FAudio's SDL3 / WASAPI underlying
+    // enumeration doesn't guarantee a stable order across calls — the
+    // platform layer can shuffle device handles between probes — so
+    // without sorting the dropdown re-ordered itself every time the
+    // user opened it. Sorting by name keeps the list stable across
+    // refreshes and is the natural ordering for a picker UI.
+    std::vector<LLAudioOutputDevice> devices;
     if (gAudiop)
     {
-        for (const auto& dev : gAudiop->enumerateOutputDevices())
+        devices = gAudiop->enumerateOutputDevices();
+    }
+    std::sort(devices.begin(), devices.end(),
+        [](const LLAudioOutputDevice& a, const LLAudioOutputDevice& b)
         {
-            if (dev.id.empty() && dev.name.empty()) continue;
-            combo->add(dev.name, LLSD(dev.id));
-        }
+            return LLStringUtil::compareInsensitive(a.name, b.name) < 0;
+        });
+    for (const auto& dev : devices)
+    {
+        if (dev.id.empty() && dev.name.empty()) continue;
+        combo->add(dev.name, LLSD(dev.id));
     }
 
     // Restore the user's stored selection (an id). If the saved device
@@ -3199,6 +3214,17 @@ void LLPanelPreferenceSound::populateOutputDeviceCombo()
         {
             refreshOutputDeviceItems(setting_key);
         });
+
+    // Subscribe to the engine's devices-changed signal so the combo's
+    // active-device display refreshes whenever a swap completes — even
+    // if the dropdown isn't open. The scoped_connection auto-
+    // disconnects on panel destruction; safe even if gAudiop outlives
+    // the panel (boost::signals2 holds the slot, not the signal).
+    if (gAudiop)
+    {
+        mDevicesChangedConn = gAudiop->getDevicesChangedSignal().connect(
+            [this, setting_key]() { refreshOutputDeviceItems(setting_key); });
+    }
 }
 
 bool LLPanelPreferenceGraphics::postBuild()

@@ -37,6 +37,9 @@
 #include "lllistener_openal.h"
 #include "llwindgen.h"
 
+#include <deque>
+#include <memory>
+
 // alext.h pulls in the ALC_EXT_EFX function-pointer typedefs (LPALGEN
 // EFFECTS, LPALAUXILIARYEFFECTSLOTI, etc.) we resolve via alGetProcAddress.
 // Including here keeps the engine's effect-slot / effect handles in the
@@ -84,6 +87,11 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
         // otherwise persists and warns that a restart is needed.
         void setOutputDevice(const std::string& id) override;
 
+        void setWindGustiness(F32 depth) override
+        {
+            if (mWindGen) mWindGen->setGustinessDepth(depth);
+        }
+
         // Reverb via ALC_EXT_EFX. Only active when EFX is available on the
         // current device; supportsReverb() reflects that — so the prefs UI
         // hides the controls if the user's OpenAL implementation doesn't
@@ -110,13 +118,15 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
         std::string mActiveDevice;
 
         typedef F32 WIND_SAMPLE_T;
-        LLWindGen<WIND_SAMPLE_T> *mWindGen;
-        F32 *mWindBuf;
+        std::unique_ptr<LLWindGen<WIND_SAMPLE_T>> mWindGen;
+        // Single scratch buffer that windGenerate writes into each
+        // refill — interleaved L/R, stereo float. Sized by initWind
+        // from the per-chunk frame count.
+        std::vector<WIND_SAMPLE_T> mWindBuf;
         U32 mWindBufFreq;
         U32 mWindBufSamples;
         U32 mWindBufBytes;
         ALuint mWindSource;
-        int mNumEmptyWindALBuffers;
 
         ALCdevice*  mALCDevice  = nullptr;
         ALCcontext* mALCContext = nullptr;
@@ -137,10 +147,24 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
         int          mConsecutiveDisconnects = 0;
         LLFrameTimer mDisconnectPollTimer;
 
-        std::vector<ALuint> mWindRecycleBuffers;
-        std::vector<ALuint> mWindQueueBuffers;
+        // Pre-allocated buffer pool. Replaces the historical per-frame
+        // alGenBuffers / alDeleteBuffers churn that ran every update
+        // tick. At initWind we gen MAX_NUM_WIND_BUFFERS buffer ids
+        // once; mWindFreeBuffers is the free-list of currently-
+        // unqueued ids. The update tick pulls from the free list,
+        // rewrites the buffer contents via alBufferData (re-using
+        // the same id), and re-queues. Cleanup deletes the pool
+        // once.
+        std::vector<ALuint> mWindBufferPool;
+        std::deque<ALuint>  mWindFreeBuffers;
 
-        static const int MAX_NUM_WIND_BUFFERS = 80;
+        // Pool size. 16 buffers @ 50 ms each = ~800 ms total — plenty
+        // of headroom even on bursty schedulers without the 4-second
+        // queue the historical MAX=80 reserved. kWindTargetQueueDepth
+        // is the desired in-flight (queued) count; we top up to this
+        // depth from the free list each tick.
+        static constexpr int MAX_NUM_WIND_BUFFERS    = 16;
+        static constexpr int kWindTargetQueueDepth   = 8;
         static const float WIND_BUFFER_SIZE_SEC; // 1/20th sec
 
         // ─── EFX reverb state ───────────────────────────────────────
