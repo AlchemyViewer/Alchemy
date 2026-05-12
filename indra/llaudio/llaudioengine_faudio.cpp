@@ -96,6 +96,22 @@ static void FAUDIOCALL wind_on_buffer_end(FAudioVoiceCallback* cb, void* context
 static void FAUDIOCALL wind_on_loop_end(FAudioVoiceCallback*, void*) {}
 static void FAUDIOCALL wind_on_voice_error(FAudioVoiceCallback*, void*, uint32_t) {}
 
+// Engine-level callbacks. OnCriticalError fires from a FAudio internal
+// thread when the audio device disappears or the driver crashes. Keep
+// the handler minimal — just stash the error so the main thread can
+// log it on its next pass.
+static void FAUDIOCALL faudio_on_critical_error(FAudioEngineCallback* cb, uint32_t error)
+{
+    auto* self = static_cast<LLAudioEngine_FAudio::EngineCallback*>(cb);
+    if (self && self->engine)
+    {
+        self->engine->mCriticalErrorCode.store(error, std::memory_order_relaxed);
+        self->engine->mCriticalError.store(true, std::memory_order_release);
+    }
+}
+static void FAUDIOCALL faudio_on_pass_start(FAudioEngineCallback*) {}
+static void FAUDIOCALL faudio_on_pass_end(FAudioEngineCallback*) {}
+
 bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
 {
     // Parent init creates the listener via allocateListener().
@@ -124,8 +140,8 @@ bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
 
     FAudioVoiceDetails details{};
     FAudioVoice_GetVoiceDetails(mMasterVoice, &details);
-    mSampleRate = details.InputSampleRate;
-    mChannels   = static_cast<uint16_t>(details.InputChannels);
+    mSampleRate     = details.InputSampleRate;
+    mOutputChannels = static_cast<uint16_t>(details.InputChannels);
 
     // F3DAudio needs the output speaker mask to know geometry.
     uint32_t channel_mask = 0;
@@ -134,7 +150,7 @@ bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
     {
         // Fallback when the backend doesn't report a mask: derive a sane one
         // from the channel count.
-        switch (mChannels)
+        switch (mOutputChannels)
         {
             case 1: channel_mask = SPEAKER_MONO; break;
             case 4: channel_mask = SPEAKER_QUAD; break;
@@ -156,7 +172,7 @@ bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
     for (S32 i = 0; i < LLAudioEngine::AUDIO_TYPE_COUNT; ++i)
     {
         hr = FAudio_CreateSubmixVoice(mFAudio, &mGroupVoices[i],
-                                      mChannels, mSampleRate,
+                                      mOutputChannels, mSampleRate,
                                       0, 0, nullptr, nullptr);
         if (hr != 0 || !mGroupVoices[i])
         {
@@ -170,11 +186,23 @@ bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
         FAudioVoice_SetVolume(mGroupVoices[i], mSecondaryGain[i], FAUDIO_COMMIT_NOW);
     }
 
+    // Engine callbacks — currently only OnCriticalError is wired up, but
+    // we provide stub pass-start/end fns so FAudio can call into the
+    // struct without segfaulting on null pointers.
+    mEngineCallback.OnCriticalError      = &faudio_on_critical_error;
+    mEngineCallback.OnProcessingPassStart = &faudio_on_pass_start;
+    mEngineCallback.OnProcessingPassEnd   = &faudio_on_pass_end;
+    mEngineCallback.engine                = this;
+    if (FAudio_RegisterForCallbacks(mFAudio, &mEngineCallback) == 0)
+    {
+        mEngineCallbackRegistered = true;
+    }
+
     LL_INFOS() << "LLAudioEngine_FAudio::init() FAudio "
                << ((FAudioLinkedVersion() >> 16) & 0xFF) << "."
                << ((FAudioLinkedVersion() >>  8) & 0xFF) << "."
                <<  (FAudioLinkedVersion()        & 0xFF)
-               << " — " << mChannels << "ch @ " << mSampleRate << "Hz" << LL_ENDL;
+               << " — " << mOutputChannels << "ch @ " << mSampleRate << "Hz" << LL_ENDL;
 
     return true;
 }
@@ -186,9 +214,32 @@ std::string LLAudioEngine_FAudio::getDriverName(bool verbose)
     std::ostringstream o;
     uint32_t v = FAudioLinkedVersion();
     o << "FAudio " << ((v >> 16) & 0xFF) << "." << ((v >> 8) & 0xFF) << "." << (v & 0xFF);
-    if (mChannels)
+
+    // Pull the underlying device's display name. FAudio stores it as a UTF-16
+    // (int16_t[256]) string regardless of platform. On Linux/macOS the SDL
+    // backend fills it with the device name as reported by SDL; on Windows
+    // it's the wchar_t name from WASAPI. Either way, on the audio-device
+    // names the viewer cares about, the bytes are well within ASCII, so a
+    // lossy ASCII downcast is good enough for a log line.
+    if (mFAudio)
     {
-        o << " (" << mChannels << "ch @ " << mSampleRate << "Hz)";
+        FAudioDeviceDetails details{};
+        if (FAudio_GetDeviceDetails(mFAudio, 0, &details) == 0)
+        {
+            std::string name;
+            name.reserve(64);
+            for (int i = 0; i < 256 && details.DisplayName[i]; ++i)
+            {
+                int16_t ch = details.DisplayName[i];
+                name.push_back((ch > 0 && ch < 0x80) ? static_cast<char>(ch) : '?');
+            }
+            if (!name.empty()) o << " — " << name;
+        }
+    }
+
+    if (mOutputChannels)
+    {
+        o << " (" << mOutputChannels << "ch @ " << mSampleRate << "Hz)";
     }
     return o.str();
 }
@@ -223,6 +274,12 @@ void LLAudioEngine_FAudio::shutdown()
         mMasterVoice = nullptr;
     }
 
+    if (mEngineCallbackRegistered && mFAudio)
+    {
+        FAudio_UnregisterForCallbacks(mFAudio, &mEngineCallback);
+        mEngineCallbackRegistered = false;
+    }
+
     if (mFAudio)
     {
         FAudio_Release(mFAudio);
@@ -237,6 +294,16 @@ FAudioSubmixVoice* LLAudioEngine_FAudio::getGroupVoice(S32 type) const
 {
     if (type < 0 || type >= LLAudioEngine::AUDIO_TYPE_COUNT) return nullptr;
     return mGroupVoices[type];
+}
+
+void LLAudioEngine_FAudio::releaseBufferReferences(LLAudioBufferFAudio* buf)
+{
+    if (!buf) return;
+    for (size_t i = 0; i < mChannels.size(); ++i)
+    {
+        if (!mChannels[i]) continue;
+        static_cast<LLAudioChannelFAudio*>(mChannels[i])->releaseIfReferencing(buf);
+    }
 }
 
 void LLAudioEngine_FAudio::setInternalGain(F32 gain)
@@ -325,6 +392,21 @@ void LLAudioEngine_FAudio::cleanupWind()
 
 void LLAudioEngine_FAudio::updateWind(LLVector3 wind_vec, F32 /*camera_altitude*/)
 {
+    LL_PROFILE_ZONE_SCOPED;
+
+    // Drain any pending critical-error notification posted from a mixer
+    // thread by the engine callback. Logged once per event (the atomic is
+    // exchanged false so a sustained fault doesn't spam the log).
+    if (mCriticalError.exchange(false, std::memory_order_acquire))
+    {
+        const uint32_t code = mCriticalErrorCode.load(std::memory_order_relaxed);
+        LL_WARNS("AudioEngine") << "FAudio reported a critical engine error: 0x"
+                                << std::hex << code << std::dec
+                                << " — audio device may have disappeared or the"
+                                << " driver crashed. Sounds may stop until the"
+                                << " viewer is restarted." << LL_ENDL;
+    }
+
     if (!mEnableWind || !mWindGen || !mWindVoice) return;
 
     if (mWindUpdateTimer.checkExpirationAndReset(LL_WIND_UPDATE_INTERVAL))
@@ -431,6 +513,7 @@ void LLAudioChannelFAudio::destroyVoice()
     mFinished = false;
     mLoopCount = 0;
     mObservedLoopCount = 0;
+    mSmoothedDoppler = 1.0f;
 }
 
 bool LLAudioChannelFAudio::ensureVoice(const FAudioWaveFormatEx& fmt)
@@ -649,6 +732,7 @@ bool LLAudioChannelFAudio::updateBuffer()
 
 void LLAudioChannelFAudio::update3DPosition()
 {
+    LL_PROFILE_ZONE_SCOPED;
     if (!mCurrentSourcep || !mVoice) return;
 
     LLListener_FAudio* listener = mEnginep->getFAudioListener();
@@ -672,6 +756,21 @@ void LLAudioChannelFAudio::update3DPosition()
             * (mRoutedThroughGroup ? 1.0f : getSecondaryGain());
         FAudioVoice_SetVolume(mVoice, gain, FAUDIO_COMMIT_NOW);
     }
+}
+
+void LLAudioChannelFAudio::releaseIfReferencing(LLAudioBufferFAudio* buf)
+{
+    if (mCurrentBufferp != buf) return;
+    if (mVoice)
+    {
+        // Stop then flush so the mixer thread releases its pAudioData
+        // reference synchronously before the destructor body returns.
+        FAudioSourceVoice_Stop(mVoice, 0, FAUDIO_COMMIT_NOW);
+        FAudioSourceVoice_FlushSourceBuffers(mVoice);
+    }
+    mCurrentBufferp = nullptr;
+    mStarted = false;
+    mFinished = true;
 }
 
 void LLAudioChannelFAudio::updateLoop()
@@ -743,4 +842,16 @@ U32 LLAudioBufferFAudio::getLength()
 {
     if (mBytesPerFrame == 0) return 0;
     return static_cast<U32>(mPcm.size() / mBytesPerFrame);
+}
+
+LLAudioBufferFAudio::~LLAudioBufferFAudio()
+{
+    // The base engine may evict a buffer that's still referenced by a
+    // source voice's submitted FAudioBuffer descriptor — mInUse tracking
+    // has a one-frame gap. Synchronously flush any voice pointing at our
+    // mPcm before the vector's storage is freed.
+    if (gAudiop)
+    {
+        static_cast<LLAudioEngine_FAudio*>(gAudiop)->releaseBufferReferences(this);
+    }
 }

@@ -101,6 +101,14 @@ namespace
     // extreme cases. FMOD doesn't clamp — this is a quality win.
     constexpr float kDopplerMin = 0.5f;
     constexpr float kDopplerMax = 2.0f;
+
+    // Stereo emitter spread (metres). Channels are positioned at the
+    // emitter's left/right by this distance. ~0.5 m is the X3DAudio
+    // sample-code default and feels right for the SL "stereo speaker on
+    // an object" use case — wide enough to perceive a stereo image when
+    // close, narrow enough not to dominate over the emitter's position
+    // when far away.
+    constexpr float kStereoChannelRadius = 0.5f;
 }
 
 LLListener_FAudio::LLListener_FAudio(LLAudioEngine_FAudio* engine)
@@ -193,21 +201,34 @@ namespace
         const uint32_t dst_channels = engine->getOutputChannelCount();
         if (src_channels == 0 || dst_channels == 0) return;
 
-        // For multi-channel source voices we must report a matching emitter
-        // ChannelCount with pChannelAzimuths set, otherwise F3DAudio's mono
-        // path writes coefficients at mat[speaker * 1 + 0] while the real
-        // matrix layout is mat[speaker * SrcChannelCount + src] — the rest
-        // of the entries stay zero, silencing src channels > 0. Co-locate
-        // the channels at the emitter's point (azimuth 0, radius 0) so the
-        // resulting spatial routing is consistent across all source chans.
-        std::array<float, 8> azimuths{};  // zero-initialised
+        // Multi-channel source voices require emitter.ChannelCount to
+        // match SrcChannelCount with pChannelAzimuths set, otherwise the
+        // mono path writes mat[speaker * 1 + 0] while the real matrix
+        // layout is mat[speaker * SrcChannelCount + src] — the rest of
+        // the entries stay zero and src channels > 0 are silenced.
+        //
+        // For stereo (the common case) we additionally spread the
+        // channels: ChannelRadius positions them on the emitter's
+        // left/right, giving a real stereo image. The azimuth-to-listener
+        // mapping looks swapped because the emitter "faces forward"
+        // (OrientFront = +Z) and the listener looking back at the emitter
+        // sees a mirror — the emitter's right side ends up on the
+        // listener's left, so the LEFT audio channel goes at azimuth π/2
+        // (emitter's right) and RIGHT at 3π/2 (emitter's left).
+        std::array<float, 8> azimuths{};  // zero-initialised; > 2 chans
+                                          // co-locate (rare in SL).
+        if (src_channels == 2)
+        {
+            azimuths[0] = F3DAUDIO_PI * 0.5f;   // L audio  -> emitter right
+            azimuths[1] = F3DAUDIO_PI * 1.5f;   // R audio  -> emitter left
+        }
         F3DAUDIO_EMITTER emitter{};
         emitter.Position = emitter_pos_x3d;
         emitter.Velocity = emitter_vel_x3d;
         emitter.OrientFront = F3DAUDIO_VECTOR{ 0.f, 0.f, 1.f };
         emitter.OrientTop   = F3DAUDIO_VECTOR{ 0.f, 1.f, 0.f };
         emitter.ChannelCount = src_channels;
-        emitter.ChannelRadius = 0.f;
+        emitter.ChannelRadius = (src_channels > 1) ? kStereoChannelRadius : 0.f;
         emitter.pChannelAzimuths = (src_channels > 1) ? azimuths.data() : nullptr;
         emitter.InnerRadius = DEFAULT_MIN_DISTANCE;
         emitter.InnerRadiusAngle = F3DAUDIO_PI / 4.0f;
@@ -240,15 +261,24 @@ namespace
                                     dsp.SrcChannelCount, dsp.DstChannelCount,
                                     dsp.pMatrixCoefficients, FAUDIO_COMMIT_NOW);
 
-        float doppler = calc_doppler ? dsp.DopplerFactor : 1.0f;
-        if (doppler < kDopplerMin) doppler = kDopplerMin;
-        else if (doppler > kDopplerMax) doppler = kDopplerMax;
-        FAudioSourceVoice_SetFrequencyRatio(voice, doppler, FAUDIO_COMMIT_NOW);
+        float target = calc_doppler ? dsp.DopplerFactor : 1.0f;
+        if (target < kDopplerMin) target = kDopplerMin;
+        else if (target > kDopplerMax) target = kDopplerMax;
+        // Exponential smoothing on the per-channel doppler factor. Alpha
+        // ~0.2 reaches 50% in ~3 frames / ~50 ms at 60 Hz; absorbs
+        // single-frame velocity spikes from teleports or flycam without
+        // making the cue feel laggy.
+        constexpr float kSmoothAlpha = 0.2f;
+        channel->mSmoothedDoppler +=
+            (target - channel->mSmoothedDoppler) * kSmoothAlpha;
+        FAudioSourceVoice_SetFrequencyRatio(voice, channel->mSmoothedDoppler,
+                                            FAUDIO_COMMIT_NOW);
     }
 }
 
 void LLListener_FAudio::apply3D(LLAudioChannelFAudio* channel)
 {
+    LL_PROFILE_ZONE_SCOPED;
     if (!channel || !mEnginep) return;
     LLAudioSource* source = channel->getSource();
     if (!source) return;

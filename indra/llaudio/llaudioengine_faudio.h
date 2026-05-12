@@ -67,7 +67,7 @@ public:
     FAudio*                getFAudio() const          { return mFAudio; }
     FAudioMasteringVoice*  getMasterVoice() const     { return mMasterVoice; }
     FAudioSubmixVoice*     getGroupVoice(S32 type) const;
-    uint32_t               getOutputChannelCount() const { return mChannels; }
+    uint32_t               getOutputChannelCount() const { return mOutputChannels; }
     uint32_t               getOutputSampleRate() const   { return mSampleRate; }
     const F3DAUDIO_HANDLE& getX3DInstance() const      { return mX3DInstance; }
     LLListener_FAudio* getFAudioListener() const
@@ -81,10 +81,28 @@ public:
     // OnBufferEnd callback; public so the static C callback can reach it.
     std::atomic<int>       mWindQueueDepth{0};
 
+    // Set from the FAudio mixer thread when OnCriticalError fires (device
+    // disappeared, driver crashed, etc). Polled on the main thread so the
+    // log message lands on the main log without doing UI work from inside
+    // a mixer callback.
+    std::atomic<bool>      mCriticalError{false};
+    std::atomic<uint32_t>  mCriticalErrorCode{0};
+
     struct WindVoiceCallback : public FAudioVoiceCallback
     {
         LLAudioEngine_FAudio* engine = nullptr;
     };
+    struct EngineCallback : public FAudioEngineCallback
+    {
+        LLAudioEngine_FAudio* engine = nullptr;
+    };
+
+    // Called by LLAudioBufferFAudio's destructor: flush any source voice
+    // still referencing this buffer's PCM so FAudio isn't reading freed
+    // memory after the vector is destructed. The base engine's eviction
+    // path can delete a buffer that's still queued on a voice when mInUse
+    // hasn't been refreshed yet within a frame.
+    void releaseBufferReferences(class LLAudioBufferFAudio* buf);
 
 private:
     using WIND_SAMPLE_T = F32;
@@ -95,9 +113,13 @@ private:
     FAudio*                mFAudio       = nullptr;
     FAudioMasteringVoice*  mMasterVoice  = nullptr;
     FAudioSubmixVoice*     mGroupVoices[LLAudioEngine::AUDIO_TYPE_COUNT]{};
+    EngineCallback         mEngineCallback{};
+    bool                   mEngineCallbackRegistered = false;
 
-    uint32_t               mSampleRate = 0;
-    uint16_t               mChannels   = 0;
+    uint32_t               mSampleRate     = 0;
+    // Output channel count from the mastering voice. Named distinctly so
+    // it doesn't shadow the base class's `mChannels` channel-pool array.
+    uint16_t               mOutputChannels = 0;
 
     F3DAUDIO_HANDLE        mX3DInstance{};
 
@@ -121,6 +143,16 @@ public:
     FAudioVoice*       getDestVoice() const        { return mDestVoice; }
     uint32_t           getSourceChannelCount() const { return mFormat.nChannels; }
     LLAudioSource*     getSource() const           { return mCurrentSourcep; }
+
+    // Exponentially-smoothed doppler frequency ratio. Single-writer (main
+    // thread via apply3D / applyForcedPriority), single-reader (same path
+    // next frame) — no atomic needed.
+    float              mSmoothedDoppler = 1.0f;
+
+    // Called from LLAudioBufferFAudio's destructor when this channel's
+    // current buffer is about to be freed. Flush the voice so the mixer
+    // thread stops reading the buffer's PCM before the vector is gone.
+    void releaseIfReferencing(class LLAudioBufferFAudio* buf);
 
     // Updated from the FAudio mixer thread by the static C callbacks; public
     // so those free functions can reach them via the ChannelCallback owner
@@ -171,7 +203,7 @@ class LLAudioBufferFAudio : public LLAudioBuffer
 {
 public:
     LLAudioBufferFAudio() = default;
-    ~LLAudioBufferFAudio() override = default;
+    ~LLAudioBufferFAudio() override;
 
     bool loadWAV(const std::string& filename) override;
     U32  getLength() override;
