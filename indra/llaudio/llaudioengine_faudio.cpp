@@ -591,6 +591,36 @@ void LLAudioEngine_FAudio::setInternalGain(F32 gain)
     }
 }
 
+void LLAudioEngine_FAudio::setAudibleRange(float meters)
+{
+    if (meters < 1.0f) meters = 1.0f;
+    mConfig.audible_range = meters;
+}
+
+void LLAudioEngine_FAudio::setInnerRadius(float meters)
+{
+    if (meters < 0.0f) meters = 0.0f;
+    mConfig.inner_radius = meters;
+}
+
+void LLAudioEngine_FAudio::setReverbSendScale(float scale)
+{
+    if (scale < 0.0f) scale = 0.0f;
+    mConfig.reverb_send_scale = scale;
+}
+
+void LLAudioEngine_FAudio::setReverbPreset(const std::string& preset_name)
+{
+    mConfig.reverb_preset = preset_name;
+    if (!mReverbVoice) return;
+    FAudioFXReverbI3DL2Parameters i3dl2 = pick_i3dl2_preset(preset_name);
+    FAudioFXReverbParameters native{};
+    ReverbConvertI3DL2ToNative(&i3dl2, &native);
+    FAudioVoice_SetEffectParameters(mReverbVoice, 0,
+                                    &native, sizeof(native),
+                                    FAUDIO_COMMIT_NOW);
+}
+
 void LLAudioEngine_FAudio::setSecondaryGain(S32 type, F32 gain)
 {
     LLAudioEngine::setSecondaryGain(type, gain);

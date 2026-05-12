@@ -774,6 +774,36 @@ bool idle_startup()
                 faudio_cfg.reverb_preset       = gSavedSettings.getString("AudioFAudioReverbPreset");
                 faudio_cfg.reverb_send_scale   = gSavedSettings.getF32("AudioFAudioReverbSendScale");
                 gAudiop = (LLAudioEngine *) new LLAudioEngine_FAudio(std::move(faudio_cfg));
+
+                // Wire each tunable to a control-changed callback so
+                // edits in the debug pane apply live without restart.
+                // The lambdas look up gAudiop fresh on every fire so a
+                // future backend swap doesn't leave us calling into a
+                // stale FAudio engine pointer.
+                gSavedSettings.getControl("AudioFAudioAudibleRange")->getSignal()->connect(
+                    [](LLControlVariable*, const LLSD& v, const LLSD&)
+                    {
+                        if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+                            fa->setAudibleRange(static_cast<F32>(v.asReal()));
+                    });
+                gSavedSettings.getControl("AudioFAudioInnerRadius")->getSignal()->connect(
+                    [](LLControlVariable*, const LLSD& v, const LLSD&)
+                    {
+                        if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+                            fa->setInnerRadius(static_cast<F32>(v.asReal()));
+                    });
+                gSavedSettings.getControl("AudioFAudioReverbSendScale")->getSignal()->connect(
+                    [](LLControlVariable*, const LLSD& v, const LLSD&)
+                    {
+                        if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+                            fa->setReverbSendScale(static_cast<F32>(v.asReal()));
+                    });
+                gSavedSettings.getControl("AudioFAudioReverbPreset")->getSignal()->connect(
+                    [](LLControlVariable*, const LLSD& v, const LLSD&)
+                    {
+                        if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+                            fa->setReverbPreset(v.asString());
+                    });
             }
 #endif
 

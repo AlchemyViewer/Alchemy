@@ -3040,6 +3040,17 @@ static LLPanelInjector<LLPanelPreferenceSound> t_pref_sound("panel_preference_so
 bool LLPanelPreferenceSound::postBuild()
 {
     populateOutputDeviceCombo();
+
+    // FAudio-specific tunables live alongside the device picker. Hide
+    // them when another backend is active so the panel doesn't expose
+    // controls that the active engine ignores.
+    const bool faudio_active =
+        gAudiop && gAudiop->getDriverName(false) == "FAudio";
+    if (LLView* lbl = findChild<LLView>("audio_faudio_reverb_label"))
+        lbl->setVisible(faudio_active);
+    if (LLView* cb = findChild<LLView>("audio_faudio_reverb_combo"))
+        cb->setVisible(faudio_active);
+
     return LLPanelPreference::postBuild();
 }
 

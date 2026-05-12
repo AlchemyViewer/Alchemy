@@ -3,7 +3,7 @@
  border="true"
  class="panel_preference_sound"
  follows="all"
- height="463"
+ height="492"
  label="Sounds"
  layout="topleft"
  left="102"
@@ -90,6 +90,53 @@
      top_delta="-4"
      tool_tip="Pick a specific audio output device. Applies immediately (brief silence while audio re-bootstraps); also saved for next launch."
      width="280" />
+    <text
+     follows="left|top"
+     height="15"
+     halign="right"
+     layout="topleft"
+     left="0"
+     name="audio_faudio_reverb_label"
+     top_pad="6"
+     width="120">
+     Reverb preset:
+    </text>
+    <combo_box
+     control_name="AudioFAudioReverbPreset"
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left_pad="5"
+     name="audio_faudio_reverb_combo"
+     top_delta="-4"
+     tool_tip="I3DL2 reverb preset applied to the FAudio reverb submix. Applies immediately."
+     width="280">
+        <item label="Default"           value="DEFAULT" />
+        <item label="Generic"           value="GENERIC" />
+        <item label="Padded cell"       value="PADDEDCELL" />
+        <item label="Room"              value="ROOM" />
+        <item label="Bathroom"          value="BATHROOM" />
+        <item label="Living room"       value="LIVINGROOM" />
+        <item label="Stone room"        value="STONEROOM" />
+        <item label="Auditorium"        value="AUDITORIUM" />
+        <item label="Concert hall"      value="CONCERTHALL" />
+        <item label="Cave"              value="CAVE" />
+        <item label="Arena"             value="ARENA" />
+        <item label="Hangar"            value="HANGAR" />
+        <item label="Carpeted hallway"  value="CARPETEDHALLWAY" />
+        <item label="Hallway"           value="HALLWAY" />
+        <item label="Stone corridor"    value="STONECORRIDOR" />
+        <item label="Alley"             value="ALLEY" />
+        <item label="Forest"            value="FOREST" />
+        <item label="City"              value="CITY" />
+        <item label="Mountains"         value="MOUNTAINS" />
+        <item label="Quarry"            value="QUARRY" />
+        <item label="Plain (outdoor)"   value="PLAIN" />
+        <item label="Parking lot"       value="PARKINGLOT" />
+        <item label="Sewer pipe"        value="SEWERPIPE" />
+        <item label="Underwater"        value="UNDERWATER" />
+        <item label="Small room"        value="SMALLROOM" />
+    </combo_box>
 	<slider
 		control_name="AudioLevelUI"
 		disabled_control="MuteAudio"

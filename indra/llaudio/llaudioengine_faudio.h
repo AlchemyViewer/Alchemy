@@ -83,6 +83,15 @@ public:
     float getInnerRadius()     const { return mConfig.inner_radius; }
     float getReverbSendScale() const { return mConfig.reverb_send_scale; }
 
+    // Live setters. AudibleRange / InnerRadius / ReverbSendScale are
+    // read each F3DAudioCalculate call so changes take effect on the
+    // next frame's spatial update. ReverbPreset re-applies via the
+    // FAudioFX FAPO's SetEffectParameters — also instant.
+    void setAudibleRange(float meters);
+    void setInnerRadius(float meters);
+    void setReverbSendScale(float scale);
+    void setReverbPreset(const std::string& preset_name);
+
     // Returns every output device FAudio reports as {id, name} pairs.
     // Index 0 in the underlying device list is FAudio's notion of the
     // system default and shows up here verbatim — UI typically prepends
