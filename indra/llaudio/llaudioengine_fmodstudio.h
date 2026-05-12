@@ -86,6 +86,10 @@ public:
     bool supportsReverb() const override { return mReverbActive; }
     void setReverbPreset(const std::string& preset_name) override;
     void setReverbSendScale(float scale) override;
+    std::string getReverbSendScaleSettingName() const override
+    {
+        return "AudioFMODReverbSendScale";
+    }
 
     void setWindGustiness(F32 depth) override
     {

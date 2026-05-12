@@ -213,6 +213,30 @@ std::vector<LLAudioOutputDevice> LLAudioEngine_FAudio::enumerateOutputDevices() 
         }
         devices.push_back({ device_id(details), device_name(details) });
     }
+    // Disambiguate devices that share a display name. Windows can hand
+    // back duplicate strings (USB DAC + onboard line-out both reported
+    // as "Speakers" on some setups) and the FAudio backend uses display
+    // name as the persistence id — without disambiguation the two
+    // collide on id and "pick BlackShark" might resolve to either. Walk
+    // the list and append a 1-based ordinal suffix to names that occur
+    // more than once. Mirroring the change into id keeps the round-trip
+    // stable.
+    std::map<std::string, int> name_seen;
+    for (auto& d : devices)
+    {
+        if (d.name.empty()) continue;
+        ++name_seen[d.name];
+    }
+    std::map<std::string, int> name_order;
+    for (auto& d : devices)
+    {
+        if (d.name.empty()) continue;
+        if (name_seen[d.name] <= 1) continue;
+        const int n = ++name_order[d.name];
+        const std::string suffix = " (" + std::to_string(n) + ")";
+        d.name += suffix;
+        d.id   += suffix;
+    }
     return devices;
 }
 
@@ -258,6 +282,15 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
     // Resolve preferred device id -> FAudio device index. Default (0)
     // when id is empty or no match. Record both id and display name of
     // what we actually opened.
+    //
+    // Skip index 0 in the lookup. enumerateOutputDevices already hides
+    // it (the platform "default endpoint" alias is represented by the
+    // synthetic "System default" entry in the UI, with empty
+    // preferred_device_id). Without this skip, a user whose preferred
+    // id happens to match index 0's display name (e.g. "Speakers" on a
+    // system where that's both the default endpoint label and a real
+    // device's name) would resolve to the default-alias instead of the
+    // specific hardware endpoint.
     uint32_t device_index = 0;
     mActiveDeviceId.clear();
     mActiveDeviceName.clear();
@@ -265,17 +298,96 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
     {
         uint32_t count = 0;
         FAudio_GetDeviceCount(mFAudio, &count);
-        for (uint32_t i = 0; i < count; ++i)
+        // The display-name disambiguation in enumerateOutputDevices
+        // appends " (N)" suffixes to names that occur more than once,
+        // mirroring the change into the persisted id. Reproduce the
+        // same suffix scheme during lookup so a saved disambiguated
+        // id round-trips to the matching index.
+        std::map<std::string, int> name_seen;
+        for (uint32_t i = 1; i < count; ++i)
+        {
+            FAudioDeviceDetails d{};
+            if (FAudio_GetDeviceDetails(mFAudio, i, &d) != 0) continue;
+            ++name_seen[device_name(d)];
+        }
+        std::map<std::string, int> name_order;
+        for (uint32_t i = 1; i < count; ++i)
         {
             FAudioDeviceDetails details{};
             if (FAudio_GetDeviceDetails(mFAudio, i, &details) != 0) continue;
-            const std::string id = device_id(details);
+            std::string id = device_id(details);
+            std::string name = device_name(details);
+            if (name_seen[name] > 1)
+            {
+                const int n = ++name_order[name];
+                const std::string suffix = " (" + std::to_string(n) + ")";
+                id += suffix;
+                name += suffix;
+            }
             if (id == mConfig.preferred_device_id)
             {
                 device_index = i;
                 mActiveDeviceId = id;
-                mActiveDeviceName = device_name(details);
+                mActiveDeviceName = name;
                 break;
+            }
+        }
+        // Disambiguation-stickiness fallback. If the saved id ends in
+        // a " (N)" digit suffix (it was disambiguated because the user
+        // had two devices sharing a display name at save time) but no
+        // exact match was found, strip the suffix and try matching the
+        // base name. This handles the case where the duplicate device
+        // has since been unplugged and the surviving same-named device
+        // is reported un-disambiguated; without the fallback the user's
+        // saved pick fails to resolve and we silently fall through to
+        // system default.
+        if (mActiveDeviceId.empty())
+        {
+            std::string base = mConfig.preferred_device_id;
+            const std::size_t open = base.rfind(" (");
+            if (open != std::string::npos && !base.empty() && base.back() == ')')
+            {
+                const std::size_t num_start = open + 2;
+                const std::size_t num_end = base.size() - 1;
+                if (num_end > num_start)
+                {
+                    bool all_digits = true;
+                    for (std::size_t p = num_start; p < num_end; ++p)
+                    {
+                        if (!std::isdigit(static_cast<unsigned char>(base[p])))
+                        {
+                            all_digits = false;
+                            break;
+                        }
+                    }
+                    if (all_digits)
+                    {
+                        base = base.substr(0, open);
+                    }
+                }
+            }
+            if (base != mConfig.preferred_device_id)
+            {
+                for (uint32_t i = 1; i < count; ++i)
+                {
+                    FAudioDeviceDetails details{};
+                    if (FAudio_GetDeviceDetails(mFAudio, i, &details) != 0) continue;
+                    const std::string name = device_name(details);
+                    if (name == base)
+                    {
+                        device_index = i;
+                        mActiveDeviceId = name;  // un-suffixed; the
+                                                 // saved id will heal
+                                                 // on next persist.
+                        mActiveDeviceName = name;
+                        LL_INFOS() << "LLAudioEngine_FAudio::initFAudioDevice() "
+                                      "preferred id '" << mConfig.preferred_device_id
+                                   << "' not found exactly; matched base name '"
+                                   << base << "' (duplicate disambiguation no "
+                                      "longer needed)" << LL_ENDL;
+                        break;
+                    }
+                }
             }
         }
         if (mActiveDeviceId.empty())
@@ -433,7 +545,7 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
     mReverbChannels = pick_reverb_channels(mOutputChannels);
     if (mReverbChannels == 0)
     {
-        LL_INFOS() << "LLAudioEngine_FAudio::init() reverb disabled (no "
+        LL_WARNS() << "LLAudioEngine_FAudio::init() reverb disabled (no "
                       "supported reverb channel count for "
                    << mOutputChannels << "-ch output)." << LL_ENDL;
     }
@@ -465,12 +577,14 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
             FAudioVoice_SetEffectParameters(mReverbVoice, 0,
                                             &native, sizeof(native),
                                             FAUDIO_COMMIT_NOW);
-            // FAudio_INTERNAL_AllocEffectChain AddRefs the FAPO when it
-            // adds it to the submix's effect chain (FAudio_internal.c:1676),
-            // and Releases on DestroyVoice (:1717). Our reference from
-            // FAudioCreateReverb is now redundant — drop it so the only
-            // live count is held by the submix, otherwise the FAPO
-            // outlives the submix and leaks at shutdown.
+            // FAudio's effect-chain attach AddRefs the FAPO when it's
+            // added to the submix and Releases on DestroyVoice (verified
+            // against FAudio 24.x source — function names and line
+            // numbers intentionally not cited because internal symbol
+            // names shift with FAudio versions). Our reference from
+            // FAudioCreateReverb is now redundant — drop it so the
+            // only live count is held by the submix, otherwise the
+            // FAPO outlives the submix and leaks at shutdown.
             mReverbApo->Release(mReverbApo);
             mReverbApo = nullptr;
             if (mReverbChannels != mOutputChannels)
@@ -1159,6 +1273,20 @@ void LLAudioChannelFAudio::playSynced(LLAudioChannel* master)
         play();
         return;
     }
+    // SamplesPlayed counts consumed input frames including loop
+    // iterations, so % gives the within-loop position *only if* the
+    // master is actually looping. For a non-looping master whose
+    // playback has run past the end of its buffer, the modulo result
+    // would be a position the master has already left behind —
+    // synchronising the slave to that point would mean starting it in
+    // the middle of an already-over sound. Fall through to plain
+    // play() in that case (the master is functionally done).
+    if (!master_ch->mLooping
+        && state.SamplesPlayed >= master_frames_per_loop)
+    {
+        play();
+        return;
+    }
     const uint64_t master_pos_frames = state.SamplesPlayed % master_frames_per_loop;
 
     // Convert via wall-clock time so different sample rates align correctly.
@@ -1344,6 +1472,21 @@ void LLAudioChannelFAudio::prepareForDeviceReset()
     // buffer's own sample rate — FrequencyRatio adjusts playback
     // speed, not the consume rate — so frame counts translate 1:1
     // when the rebuilt voice is created at the same format.
+    //
+    // What we *don't* preserve across the swap:
+    // - mSmoothedDoppler resets to 1.0 in destroyVoice(). The next
+    //   update3DPosition pass re-converges from the listener +
+    //   source motion — perceptually inaudible at the swap moment
+    //   because the brief device-reinit silence covers the
+    //   re-convergence ramp.
+    // - mLoopCount + mObservedLoopCount reset to 0. Anyone tracking
+    //   "I've heard this loop N times" via mLoopedThisFrame sees a
+    //   reset; in practice nothing in the viewer's source/channel
+    //   API relies on absolute loop counts across a device reset.
+    // - With heavy Doppler frequency-ratio modulation, "frames
+    //   consumed" diverges from wall-clock playback position over
+    //   long durations; the modulo-into-buffer-frames approach is
+    //   still close-enough for resume positioning on the new device.
     if (mVoice && mStarted && mFormat.nBlockAlign && mCurrentBufferp)
     {
         FAudioVoiceState state{};

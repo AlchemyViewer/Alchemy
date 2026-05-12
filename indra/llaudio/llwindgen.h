@@ -210,15 +210,15 @@ public:
             for (U8 i=mSubSamples; i && numsamples; --i, --numsamples)
             {
                 mLastSample = mLastSample + delta;
-                MIXBUFFERFORMAT_T   sample_right = (MIXBUFFERFORMAT_T)getClampedSample(clip, mLastSample * mCurrentPanGainR);
-                MIXBUFFERFORMAT_T   sample_left = (MIXBUFFERFORMAT_T)getClampedSample(clip, mLastSample - (F32)sample_right);
+                MIXBUFFERFORMAT_T sample_right = (MIXBUFFERFORMAT_T)getClampedSample(clip, mLastSample * mCurrentPanGainR);
+                MIXBUFFERFORMAT_T sample_left  = (MIXBUFFERFORMAT_T)getClampedSample(clip, mLastSample - (F32)sample_right);
 
                 *cursamplep = sample_left;
-                    ++cursamplep;
+                ++cursamplep;
                 *cursamplep = sample_right;
-                    ++cursamplep;
-                }
+                ++cursamplep;
             }
+        }
 
         return newbuffer;
     }

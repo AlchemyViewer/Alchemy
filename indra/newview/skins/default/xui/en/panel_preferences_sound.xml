@@ -138,7 +138,6 @@
         <item label="Small room"        value="SMALLROOM" />
     </combo_box>
     <slider
-     control_name="AudioReverbSendScale"
      follows="left|top"
      height="15"
      increment="0.005"
@@ -147,12 +146,12 @@
      label_width="120"
      layout="topleft"
      left="0"
-     max_val="0.3"
+     max_val="1.0"
      min_val="0.0"
      name="audio_reverb_send_slider"
      show_text="true"
      slider_label.halign="right"
-     tool_tip="How wet the reverb submix mixes back into the master. 0 disables the reverb send. Applies immediately."
+     tool_tip="How wet the reverb submix mixes back into the master. 0 disables the reverb send. Bound to the active backend's per-backend send-scale key (FAudio / OpenAL / FMOD each persist their own value because the same scalar drives three different DSPs). Applies immediately."
      top_pad="4"
      width="300" />
 	<slider

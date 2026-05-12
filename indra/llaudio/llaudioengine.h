@@ -154,6 +154,18 @@ public:
     virtual void setReverbPreset(const std::string& /*name*/) {}
     virtual void setReverbSendScale(float /*scale*/) {}
 
+    // The reverb-wet scalar maps to three different DSP scales across
+    // backends — FAudio writes it as a matrix coefficient on top of
+    // F3DAudio's dsp.ReverbLevel; OpenAL writes it directly to AL_
+    // EFFECTSLOT_GAIN; FMOD writes it to Channel::setReverbProperties
+    // wet. The same numeric value perceives very differently across
+    // them, so each backend persists its own value under its own key.
+    // Empty string means "no reverb-scale persistence" — a backend
+    // that doesn't override returns empty and the UI falls back to a
+    // no-op binding. AudioPreset stays shared (preset *names* are
+    // semantically equivalent across all three backend implementations).
+    virtual std::string getReverbSendScaleSettingName() const { return {}; }
+
     // Used by the mechanics of the engine
     //virtual void processQueue(const LLUUID &sound_guid);
     virtual void setListener(LLVector3 pos,LLVector3 vel,LLVector3 up,LLVector3 at);

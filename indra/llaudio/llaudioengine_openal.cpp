@@ -208,15 +208,20 @@ void LLAudioEngine_OpenAL::allocateListener()
 // virtual
 void LLAudioEngine_OpenAL::shutdown()
 {
+    // Tear EFX down BEFORE LLAudioEngine::shutdown() so shutdownEfx can
+    // walk the live channel pool and detach each source's AUX send from
+    // our slot. The base shutdown() deletes the channels and nulls
+    // mChannels[*], so doing this after it would leave the per-channel
+    // unwind as a dead-code walk over null pointers. The defensive
+    // null-check inside shutdownEfx prevents a crash if the order ever
+    // regresses, but the *intent* of the walk only holds with this
+    // ordering.
+    shutdownEfx();
+
     LL_INFOS() << "About to LLAudioEngine::shutdown()" << LL_ENDL;
     LLAudioEngine::shutdown();
 
     LL_INFOS() << "About to tear down OpenAL context/device" << LL_ENDL;
-
-    // Tear EFX down before destroying the context so the slot + effect
-    // are detached from a live context. shutdownEfx no-ops if init never
-    // ran (mEfxAvailable stays false in that case).
-    shutdownEfx();
 
     if (mALCContext)
     {
@@ -602,6 +607,16 @@ void LLAudioEngine_OpenAL::shutdownEfx()
 {
     if (!mEfxAvailable) return;
 
+    // INVARIANT: this must run BEFORE LLAudioEngine::shutdown() (which
+    // deletes the channel pool and nulls mChannels[*]). The per-
+    // channel walk below relies on live channels being present so the
+    // AL_AUXILIARY_SEND_FILTER detach actually fires for each source —
+    // otherwise it's a dead-code walk over null slots. shutdown() at
+    // the top of this file orders the call correctly; keep it that
+    // way. The defensive null-check on each slot prevents a crash if
+    // the order regresses, but the *purpose* of the walk only holds
+    // with the right ordering.
+    //
     // Channels that already wired AL_AUXILIARY_SEND_FILTER to our slot
     // hold a stale slot id past this point. Walk the pool and reset
     // their latch + clear the send back to AL_EFFECTSLOT_NULL — if EFX
@@ -980,9 +995,17 @@ bool LLAudioEngine_OpenAL::initWind()
 
     alGenSources(1,&mWindSource);
 
-    if((error=alGetError()) != AL_NO_ERROR)
+    if((error=alGetError()) != AL_NO_ERROR || mWindSource == AL_NONE)
     {
-        LL_WARNS() << "LLAudioEngine_OpenAL::initWind() Error creating wind sources: "<<error<<LL_ENDL;
+        LL_WARNS() << "LLAudioEngine_OpenAL::initWind() alGenSources failed: "
+                   << error << " — wind disabled until next initWind()" << LL_ENDL;
+        // Bail before allocating mWindGen / scratch buffer / pool. The
+        // historical pattern just logged and continued, leaving every
+        // subsequent updateWind call issuing AL_INVALID_NAME against
+        // mWindSource == AL_NONE and the pool buffers leaking via
+        // queue/unqueue against an invalid source.
+        mWindSource = AL_NONE;
+        return false;
     }
 
     // Synthesise at the device's actual sample rate so OpenAL Soft
@@ -1060,7 +1083,6 @@ void LLAudioEngine_OpenAL::cleanupWind()
     mWindFreeBuffers.clear();
 
     mWindBuf.clear();
-    mWindBuf.shrink_to_fit();
 
     mWindGen.reset();
 }

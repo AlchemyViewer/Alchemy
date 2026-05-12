@@ -93,6 +93,10 @@ public:
     void setReverbSendScale(float scale) override;
     void setReverbPreset(const std::string& preset_name) override;
     bool supportsReverb() const override { return true; }
+    std::string getReverbSendScaleSettingName() const override
+    {
+        return "AudioFAudioReverbSendScale";
+    }
 
     void setWindGustiness(F32 depth) override
     {
@@ -175,9 +179,7 @@ private:
     // playing channels can transparently re-attach on the new device.
     bool initFAudioDevice();
     void releaseFAudioDevice();
-public:
 
-private:
     using WIND_SAMPLE_T = F32;
 
     static constexpr float WIND_BUFFER_SIZE_SEC = 0.05f;

@@ -100,6 +100,10 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
         bool supportsReverb() const override { return mEfxAvailable; }
         void setReverbPreset(const std::string& preset_name) override;
         void setReverbSendScale(float scale) override;
+        std::string getReverbSendScaleSettingName() const override
+        {
+            return "AudioOpenALReverbSendScale";
+        }
 
         // Channel uses this to wire its AUX send to the engine's effect
         // slot when EFX is active. 0 / AL_EFFECTSLOT_NULL when EFX is

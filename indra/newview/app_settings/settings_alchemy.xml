@@ -68,16 +68,38 @@
             <key>Value</key>
             <string>PLAIN</string>
         </map>
-        <key>AudioReverbSendScale</key>
+        <key>AudioFAudioReverbSendScale</key>
         <map>
             <key>Comment</key>
-            <string>Wet-send level for the reverb submix, applied by whichever audio backend supports reverb. 0 disables reverb entirely. On FAudio this scales F3DAudio's dsp.ReverbLevel per source; on OpenAL it's the EFX aux-slot gain; on FMOD it's the Channel::setReverbProperties wet scalar. Applies live; new value is picked up on the next update tick.</string>
+            <string>FAudio backend: reverb wet-send level. Scales F3DAudio's dsp.ReverbLevel per source before writing the per-source -> reverb-submix matrix. 0 disables reverb. The default (0.05) is intentionally subtle because the FAudioFX reverb tail is fairly pronounced at full strength. Applies live; picked up on the next update tick.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
             <real>0.05</real>
+        </map>
+        <key>AudioOpenALReverbSendScale</key>
+        <map>
+            <key>Comment</key>
+            <string>OpenAL backend (EFX): reverb wet-send level, written directly to AL_EFFECTSLOT_GAIN on the auxiliary effect slot. 0 disables; range [0, 1]. The default (0.25) is higher than the FAudio key because the EFX slot-gain is a single global multiplier on the whole effect output rather than a per-source coefficient, so it needs less scaling to feel similarly "subtle". Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.25</real>
+        </map>
+        <key>AudioFMODReverbSendScale</key>
+        <map>
+            <key>Comment</key>
+            <string>FMOD backend: reverb wet-send level, applied per channel via Channel::setReverbProperties on instance 0. Range [0, 1]; 0 disables. The default (0.15) sits between FAudio's per-source coefficient and OpenAL's slot-gain because FMOD's wet scalar interacts with the per-channel mix differently from either. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.15</real>
         </map>
         <key>AudioWindGustiness</key>
         <map>

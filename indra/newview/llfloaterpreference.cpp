@@ -3054,7 +3054,8 @@ bool LLPanelPreferenceSound::postBuild()
     LLView* reverb_label  = findChild<LLView>("audio_reverb_label");
     LLComboBox* reverb_combo =
         findChild<LLComboBox>("audio_reverb_combo");
-    LLView* reverb_slider = findChild<LLView>("audio_reverb_send_slider");
+    LLSliderCtrl* reverb_slider =
+        findChild<LLSliderCtrl>("audio_reverb_send_slider");
 
     // If the saved AudioReverbPreset value isn't one of the items
     // (renamed in code, edited via about:config to a typo, etc.) the
@@ -3067,6 +3068,30 @@ bool LLPanelPreferenceSound::postBuild()
     {
         reverb_combo->setSelectedByValue(LLSD("PLAIN"), true);
         gSavedSettings.setString("AudioReverbPreset", "PLAIN");
+    }
+
+    // Bind the reverb send-scale slider to the active backend's per-
+    // backend setting key. We can't use control_name in XML because
+    // each backend persists under its own key (FAudio / OpenAL / FMOD
+    // values aren't perceptually comparable). Slider seeds from the
+    // current saved value, writes back on commit, and pushes to the
+    // engine via the base setReverbSendScale virtual.
+    if (reverb_slider && gAudiop)
+    {
+        const std::string scale_key =
+            gAudiop->getReverbSendScaleSettingName();
+        if (!scale_key.empty())
+        {
+            reverb_slider->setValue(LLSD(gSavedSettings.getF32(scale_key)));
+            reverb_slider->setCommitCallback(
+                [scale_key](LLUICtrl* ctrl, const LLSD&)
+                {
+                    if (!ctrl) return;
+                    const F32 v = static_cast<F32>(ctrl->getValue().asReal());
+                    gSavedSettings.setF32(scale_key, v);
+                    if (gAudiop) gAudiop->setReverbSendScale(v);
+                });
+        }
     }
 
     if (reverb_label && reverb_combo && reverb_slider && !reverb_active)

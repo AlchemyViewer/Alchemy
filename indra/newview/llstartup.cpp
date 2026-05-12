@@ -772,7 +772,7 @@ bool idle_startup()
                 faudio_cfg.audible_range       = gSavedSettings.getF32("AudioFAudioAudibleRange");
                 faudio_cfg.inner_radius        = gSavedSettings.getF32("AudioFAudioInnerRadius");
                 faudio_cfg.reverb_preset       = gSavedSettings.getString("AudioReverbPreset");
-                faudio_cfg.reverb_send_scale   = gSavedSettings.getF32("AudioReverbSendScale");
+                faudio_cfg.reverb_send_scale   = gSavedSettings.getF32("AudioFAudioReverbSendScale");
                 gAudiop = (LLAudioEngine *) new LLAudioEngine_FAudio(std::move(faudio_cfg));
 
                 // Wire each tunable to a control-changed callback so
@@ -807,24 +807,38 @@ bool idle_startup()
             }
 #endif
 
-            // Reverb settings are backend-agnostic — FAudio, OpenAL
-            // (when EFX is available) and FMOD all read the same
-            // AudioReverb* keys. The signals connect once and
-            // dispatch through the base virtual so a future backend
-            // swap (and the no-reverb backends that inherit the base
-            // no-op) Just Work without re-wiring.
-            gSavedSettings.getControl("AudioReverbSendScale")->getSignal()->connect(
-                [](LLControlVariable*, const LLSD& v, const LLSD&)
-                {
-                    if (gAudiop)
-                        gAudiop->setReverbSendScale(static_cast<F32>(v.asReal()));
-                });
+            // Reverb preset is shared — the I3DL2 preset *name* means
+            // the same thing across all three backends. Send-scale is
+            // per-backend because the same numeric value drives three
+            // different DSP scales (FAudio matrix coefficient vs
+            // OpenAL slot gain vs FMOD wet); each backend's setting
+            // key is reported by getReverbSendScaleSettingName(). We
+            // wire all three send-scale settings unconditionally but
+            // each handler only dispatches when the active engine is
+            // the matching backend — that way switching engines
+            // doesn't require re-wiring, and a value edited in the
+            // wrong backend's key just sits inert until that engine
+            // becomes active.
             gSavedSettings.getControl("AudioReverbPreset")->getSignal()->connect(
                 [](LLControlVariable*, const LLSD& v, const LLSD&)
                 {
                     if (gAudiop)
                         gAudiop->setReverbPreset(v.asString());
                 });
+            auto wire_reverb_scale = [](const std::string& key) {
+                gSavedSettings.getControl(key)->getSignal()->connect(
+                    [key](LLControlVariable*, const LLSD& v, const LLSD&)
+                    {
+                        if (gAudiop
+                            && gAudiop->getReverbSendScaleSettingName() == key)
+                        {
+                            gAudiop->setReverbSendScale(static_cast<F32>(v.asReal()));
+                        }
+                    });
+            };
+            wire_reverb_scale("AudioFAudioReverbSendScale");
+            wire_reverb_scale("AudioOpenALReverbSendScale");
+            wire_reverb_scale("AudioFMODReverbSendScale");
 
             // Wind tunables. Backend-agnostic via the lifted base
             // virtuals — setWindGustiness routes to the active engine's
@@ -874,14 +888,19 @@ bool idle_startup()
                     // construction config, so this is a redundant write
                     // for that backend (and a cheap one); for OpenAL EFX
                     // this is how the engine first picks up the
-                    // user-chosen preset / wet level. Backends without
-                    // reverb inherit the base no-op overrides.
+                    // user-chosen preset / wet level. Send-scale comes
+                    // from the engine-reported per-backend key.
                     if (gAudiop->supportsReverb())
                     {
                         gAudiop->setReverbPreset(
                             gSavedSettings.getString("AudioReverbPreset"));
-                        gAudiop->setReverbSendScale(
-                            gSavedSettings.getF32("AudioReverbSendScale"));
+                        const std::string scale_key =
+                            gAudiop->getReverbSendScaleSettingName();
+                        if (!scale_key.empty())
+                        {
+                            gAudiop->setReverbSendScale(
+                                gSavedSettings.getF32(scale_key));
+                        }
                     }
 
                     // Push the saved wind tunables onto the live engine
