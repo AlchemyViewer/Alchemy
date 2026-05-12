@@ -765,7 +765,8 @@ bool idle_startup()
 #endif // !LL_WINDOWS
                 )
             {
-                gAudiop = (LLAudioEngine *) new LLAudioEngine_FAudio();
+                gAudiop = (LLAudioEngine *) new LLAudioEngine_FAudio(
+                    gSavedSettings.getString("AudioOutputDevice"));
             }
 #endif
 

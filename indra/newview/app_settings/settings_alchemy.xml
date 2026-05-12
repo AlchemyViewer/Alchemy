@@ -2,6 +2,17 @@
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="llsd.xsd">
     <map>
+        <key>AudioOutputDevice</key>
+        <map>
+            <key>Comment</key>
+            <string>Audio output device id (stable across reboots / OS-locale changes / display-name renames) for backends that support output device selection — currently FAudio. Empty string uses the system default. The Sound preferences picker shows display names but stores ids here.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
+        </map>
         <key>AlchemyAppearanceShowHints</key>
         <map>
             <key>Comment</key>

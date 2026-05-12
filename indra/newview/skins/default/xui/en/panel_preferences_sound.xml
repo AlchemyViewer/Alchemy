@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel
  border="true"
+ class="panel_preference_sound"
  follows="all"
- height="438"
+ height="463"
  label="Sounds"
  layout="topleft"
  left="102"
@@ -20,6 +21,10 @@
     <panel.string
      name="button5_mouse">
      Mouse Button 5
+    </panel.string>
+    <panel.string
+     name="audio_output_system_default">
+     System default
     </panel.string>
     <slider
      control_name="AudioLevelMaster"
@@ -65,6 +70,26 @@
      width="20"
      label="Mute when minimized"
      word_wrap="true"/>
+    <text
+     follows="left|top"
+     height="15"
+     halign="right"
+     layout="topleft"
+     left="0"
+     name="audio_output_device_label"
+     top_pad="6"
+     width="120">
+     Output device:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left_pad="5"
+     name="audio_output_device_combo"
+     top_delta="-4"
+     tool_tip="Pick a specific audio output device. Applies immediately (brief silence while audio re-bootstraps); also saved for next launch."
+     width="280" />
 	<slider
 		control_name="AudioLevelUI"
 		disabled_control="MuteAudio"

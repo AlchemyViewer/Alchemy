@@ -31,6 +31,8 @@
 #include <list>
 #include <map>
 #include <array>
+#include <string>
+#include <vector>
 
 #include "v3math.h"
 #include "v3dmath.h"
@@ -49,6 +51,16 @@ const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
 
 const F32 ATTACHED_OBJECT_TIMEOUT = 5.0f;
 const F32 DEFAULT_MIN_DISTANCE = 2.0f;
+
+// One entry in an audio engine's output-device enumeration. The id is a
+// backend-provided stable identifier (e.g. a WASAPI / PulseAudio device
+// node, an SDL device ID) suitable for persisting across sessions; the
+// name is the user-facing label suitable for display in a combo box.
+struct LLAudioOutputDevice
+{
+    std::string id;
+    std::string name;
+};
 
 #define LL_MAX_AUDIO_CHANNELS 120
 #define LL_MAX_AUDIO_BUFFERS 140 // Some extra for preloading, maybe?
@@ -96,6 +108,24 @@ public:
     virtual std::string getDriverName(bool verbose) = 0;
     virtual LLStreamingAudioInterface *createDefaultStreamingAudioImpl() const = 0;
     virtual void shutdown();
+
+    // Output device enumeration / selection. The base defaults are
+    // empty / no-op — backends that support user-pickable output devices
+    // (currently FAudio) override. Selection is stored as the device id
+    // (stable across reboots and OS updates / locale changes), not the
+    // display name. gSavedSettings("AudioOutputDevice") holds the id;
+    // backends resolve it to a live device at init() and applyForDevice
+    // hot-swap; an empty id means "system default".
+    virtual std::vector<LLAudioOutputDevice> enumerateOutputDevices() const { return {}; }
+    // Display name of the live active device (for log / UI labels).
+    virtual std::string getActiveOutputDevice() const { return {}; }
+    // Stable id of the live active device (matches what the UI / setting
+    // stores). Empty when running on the system default.
+    virtual std::string getActiveOutputDeviceId() const { return {}; }
+    // Tear down + re-create the backend's voice graph against the device
+    // matching this id. Empty id picks the system default. Backends that
+    // don't support hot-swap inherit the no-op default.
+    virtual void setOutputDevice(const std::string& /*id*/) {}
 
     // Used by the mechanics of the engine
     //virtual void processQueue(const LLUUID &sound_guid);

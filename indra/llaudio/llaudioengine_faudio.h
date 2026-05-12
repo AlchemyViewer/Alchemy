@@ -37,6 +37,7 @@
 #include <atomic>
 #include <cstdint>
 #include <deque>
+#include <string>
 #include <vector>
 
 class LLAudioChannelFAudio;
@@ -45,8 +46,31 @@ class LLAudioBufferFAudio;
 class LLAudioEngine_FAudio : public LLAudioEngine
 {
 public:
-    LLAudioEngine_FAudio();
+    // preferred_device_id is a FAudio device id (the stable identifier
+    // returned in LLAudioOutputDevice::id by enumerateOutputDevices());
+    // empty string means use the system default. If the id isn't found
+    // at init time — device unplugged, replaced, OS reassigned ids —
+    // we fall back to the default.
+    explicit LLAudioEngine_FAudio(std::string preferred_device_id = std::string());
     ~LLAudioEngine_FAudio() override;
+
+    // Returns every output device FAudio reports as {id, name} pairs.
+    // Index 0 in the underlying device list is FAudio's notion of the
+    // system default and shows up here verbatim — UI typically prepends
+    // a synthetic "System default" entry with empty id. Empty list if
+    // FAudio hasn't been initialised yet.
+    std::vector<LLAudioOutputDevice> enumerateOutputDevices() const override;
+
+    std::string getActiveOutputDevice()   const override { return mActiveDeviceName; }
+    std::string getActiveOutputDeviceId() const override { return mActiveDeviceId;   }
+
+    // Live device hot-swap. Tears down the FAudio voice graph
+    // (channels' source voices, wind, reverb, submixes, master), then
+    // rebuilds against the device matching this id. Playing channels
+    // capture their playback frame before teardown and resume on the
+    // new device at the same position. No-op if id matches the current
+    // preference and the device is already live.
+    void setOutputDevice(const std::string& id) override;
 
     bool init(void* userdata, const std::string& app_title) override;
     std::string getDriverName(bool verbose) override;
@@ -99,10 +123,29 @@ public:
     void releaseBufferReferences(class LLAudioBufferFAudio* buf);
 
 private:
+    // FAudio-only init / teardown. init() composes them with the parent
+    // LLAudioEngine::init bookkeeping; setOutputDevice composes them
+    // without disturbing the channel pool / source list above us so
+    // playing channels can transparently re-attach on the new device.
+    bool initFAudioDevice();
+    void releaseFAudioDevice();
+public:
+
+private:
     using WIND_SAMPLE_T = F32;
 
     static constexpr float WIND_BUFFER_SIZE_SEC = 0.05f;
     static constexpr int   MAX_WIND_QUEUED      = 4;
+
+    // User-preferred device id (read from settings at engine
+    // construction). Resolved to a device index in init() by walking
+    // the FAudio device list and matching against the DeviceID field.
+    // Empty means "use system default".
+    std::string            mPreferredDeviceId;
+    // Id and display name of the device init() actually opened, for
+    // getActiveOutputDevice() / getActiveOutputDeviceId().
+    std::string            mActiveDeviceId;
+    std::string            mActiveDeviceName;
 
     FAudio*                mFAudio       = nullptr;
     FAudioMasteringVoice*  mMasterVoice  = nullptr;
@@ -172,6 +215,14 @@ public:
     // thread stops reading the buffer's PCM before the vector is gone.
     void releaseIfReferencing(class LLAudioBufferFAudio* buf);
 
+    // Snapshot the current playback frame within mCurrentBufferp, then
+    // destroy the voice. The next updateBuffer pass rebuilds the voice
+    // on the new FAudio instance and resumes from the saved frame —
+    // used by the engine's setOutputDevice hot-swap path so a long
+    // looping ambient doesn't jump to its loop start when the user
+    // picks a different output device.
+    void prepareForDeviceReset();
+
     // Updated from the FAudio mixer thread by the static C callbacks; public
     // so those free functions can reach them via the ChannelCallback owner
     // pointer without a friend declaration shuffle.
@@ -200,6 +251,11 @@ private:
     LLAudioEngine_FAudio* mEnginep = nullptr;
 
     FAudioSourceVoice*    mVoice = nullptr;
+    // Frame offset to resume from when the voice is rebuilt after the
+    // engine hot-swaps its output device. Set by prepareForDeviceReset,
+    // consumed and cleared by the next successful updateBuffer.
+    uint32_t              mResumeFrames = 0;
+    bool                  mResumePending = false;
     // The voice this source routes to — either a per-type submix or the
     // mastering voice as a fallback. SetOutputMatrix must target whatever
     // is actually in the voice's send list.

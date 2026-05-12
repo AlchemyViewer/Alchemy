@@ -67,6 +67,27 @@ namespace
             && a.wBitsPerSample == b.wBitsPerSample;
     }
 
+    // FAudio stores device DeviceID and DisplayName as UTF-16 int16_t[256]
+    // regardless of platform. Real device ids and names are ASCII in
+    // practice (WASAPI ids like "{0.0.0.00000000}.{...}", SDL device
+    // names "default" / "Built-in Output"); lossy-downcast anything
+    // outside [0x01, 0x7F] to '?' for logging / matching.
+    std::string utf16_to_ascii(const int16_t* buf, size_t cap)
+    {
+        std::string s;
+        s.reserve(64);
+        for (size_t i = 0; i < cap && buf[i]; ++i)
+        {
+            int16_t ch = buf[i];
+            s.push_back((ch > 0 && ch < 0x80) ? static_cast<char>(ch) : '?');
+        }
+        return s;
+    }
+    std::string device_id(const FAudioDeviceDetails& d)
+    { return utf16_to_ascii(d.DeviceID, 256); }
+    std::string device_name(const FAudioDeviceDetails& d)
+    { return utf16_to_ascii(d.DisplayName, 256); }
+
     // FAudioFXReverb's DspReverb_Create asserts (in_channels == 1 || 2 || 6)
     // and likewise for out_channels. Asserts compile out under NDEBUG, after
     // which the FAPO indexes a fixed 5-slot channel array with up to 8 — UB.
@@ -88,9 +109,31 @@ namespace
 // ─── Engine ──────────────────────────────────────────────────────────────
 //
 
-LLAudioEngine_FAudio::LLAudioEngine_FAudio() = default;
+LLAudioEngine_FAudio::LLAudioEngine_FAudio(std::string preferred_device_id)
+    : mPreferredDeviceId(std::move(preferred_device_id))
+{}
 
 LLAudioEngine_FAudio::~LLAudioEngine_FAudio() = default;
+
+std::vector<LLAudioOutputDevice> LLAudioEngine_FAudio::enumerateOutputDevices() const
+{
+    std::vector<LLAudioOutputDevice> devices;
+    if (!mFAudio) return devices;
+    uint32_t count = 0;
+    if (FAudio_GetDeviceCount(mFAudio, &count) != 0) return devices;
+    devices.reserve(count);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        FAudioDeviceDetails details{};
+        if (FAudio_GetDeviceDetails(mFAudio, i, &details) != 0)
+        {
+            devices.emplace_back();  // placeholder; keeps index alignment
+            continue;
+        }
+        devices.push_back({ device_id(details), device_name(details) });
+    }
+    return devices;
+}
 
 // Wind voice callbacks. Dispatch table sets these on the wind callback
 // struct; FAudio invokes them on its mixer thread when buffers complete.
@@ -118,19 +161,66 @@ bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
 {
     // Parent init creates the listener via allocateListener().
     LLAudioEngine::init(userdata, app_title);
+    return initFAudioDevice();
+}
 
+bool LLAudioEngine_FAudio::initFAudioDevice()
+{
     uint32_t hr = FAudioCreate(&mFAudio, 0, FAUDIO_DEFAULT_PROCESSOR);
     if (hr != 0 || !mFAudio)
     {
-        LL_WARNS() << "LLAudioEngine_FAudio::init() FAudioCreate failed: 0x"
+        LL_WARNS() << "LLAudioEngine_FAudio::initFAudioDevice() FAudioCreate failed: 0x"
                    << std::hex << hr << std::dec << LL_ENDL;
         return false;
+    }
+
+    // Resolve preferred device id -> FAudio device index. Default (0)
+    // when id is empty or no match. Record both id and display name of
+    // what we actually opened.
+    uint32_t device_index = 0;
+    mActiveDeviceId.clear();
+    mActiveDeviceName.clear();
+    if (!mPreferredDeviceId.empty())
+    {
+        uint32_t count = 0;
+        FAudio_GetDeviceCount(mFAudio, &count);
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            FAudioDeviceDetails details{};
+            if (FAudio_GetDeviceDetails(mFAudio, i, &details) != 0) continue;
+            const std::string id = device_id(details);
+            if (id == mPreferredDeviceId)
+            {
+                device_index = i;
+                mActiveDeviceId = id;
+                mActiveDeviceName = device_name(details);
+                break;
+            }
+        }
+        if (mActiveDeviceId.empty())
+        {
+            LL_INFOS() << "LLAudioEngine_FAudio::initFAudioDevice() preferred "
+                          "output device id '" << mPreferredDeviceId
+                       << "' not found; using system default." << LL_ENDL;
+        }
+    }
+    if (mActiveDeviceId.empty())
+    {
+        // Resolve the system default's id + display name. Note we keep
+        // mActiveDeviceId empty when we fell back to the default (no
+        // explicit pick), so the UI sees "no preference active" rather
+        // than the default's incidental id.
+        FAudioDeviceDetails details{};
+        if (FAudio_GetDeviceDetails(mFAudio, 0, &details) == 0)
+        {
+            mActiveDeviceName = device_name(details);
+        }
     }
 
     hr = FAudio_CreateMasteringVoice(mFAudio, &mMasterVoice,
                                      FAUDIO_DEFAULT_CHANNELS,
                                      FAUDIO_DEFAULT_SAMPLERATE,
-                                     0, 0, nullptr);
+                                     0, device_index, nullptr);
     if (hr != 0 || !mMasterVoice)
     {
         LL_WARNS() << "LLAudioEngine_FAudio::init() CreateMasteringVoice failed: 0x"
@@ -274,26 +364,12 @@ std::string LLAudioEngine_FAudio::getDriverName(bool verbose)
     uint32_t v = FAudioLinkedVersion();
     o << "FAudio " << ((v >> 16) & 0xFF) << "." << ((v >> 8) & 0xFF) << "." << (v & 0xFF);
 
-    // Pull the underlying device's display name. FAudio stores it as a UTF-16
-    // (int16_t[256]) string regardless of platform. On Linux/macOS the SDL
-    // backend fills it with the device name as reported by SDL; on Windows
-    // it's the wchar_t name from WASAPI. Either way, on the audio-device
-    // names the viewer cares about, the bytes are well within ASCII, so a
-    // lossy ASCII downcast is good enough for a log line.
-    if (mFAudio)
+    // Prefer the name we resolved at init() if available — that's the
+    // device the mastering voice is actually running on, which may
+    // differ from index 0 when the user picked a non-default device.
+    if (!mActiveDeviceName.empty())
     {
-        FAudioDeviceDetails details{};
-        if (FAudio_GetDeviceDetails(mFAudio, 0, &details) == 0)
-        {
-            std::string name;
-            name.reserve(64);
-            for (int i = 0; i < 256 && details.DisplayName[i]; ++i)
-            {
-                int16_t ch = details.DisplayName[i];
-                name.push_back((ch > 0 && ch < 0x80) ? static_cast<char>(ch) : '?');
-            }
-            if (!name.empty()) o << " — " << name;
-        }
+        o << " — " << mActiveDeviceName;
     }
 
     if (mOutputChannels)
@@ -352,6 +428,105 @@ void LLAudioEngine_FAudio::shutdown()
 
     delete mListenerp;
     mListenerp = nullptr;
+}
+
+void LLAudioEngine_FAudio::releaseFAudioDevice()
+{
+    // Drop every channel's source voice first so the mixer thread isn't
+    // racing dying voices. prepareForDeviceReset captures playback frame
+    // before tearing down so the next updateBuffer resumes mid-stream.
+    // mCurrentBufferp / mCurrentSourcep are preserved.
+    for (size_t i = 0; i < mChannels.size(); ++i)
+    {
+        if (mChannels[i])
+        {
+            static_cast<LLAudioChannelFAudio*>(mChannels[i])->prepareForDeviceReset();
+        }
+    }
+
+    if (mWindVoice)
+    {
+        FAudioSourceVoice_Stop(mWindVoice, 0, FAUDIO_COMMIT_NOW);
+        FAudioSourceVoice_FlushSourceBuffers(mWindVoice);
+        FAudioVoice_DestroyVoice(mWindVoice);
+        mWindVoice = nullptr;
+    }
+    mWindQueueDepth = 0;
+    mWindChunks.clear();
+
+    if (mReverbVoice)
+    {
+        FAudioVoice_DestroyVoice(mReverbVoice);
+        mReverbVoice = nullptr;
+    }
+    mReverbApo = nullptr;
+    mReverbChannels = 0;
+
+    for (auto*& voice : mGroupVoices)
+    {
+        if (voice)
+        {
+            FAudioVoice_DestroyVoice(voice);
+            voice = nullptr;
+        }
+    }
+
+    if (mMasterVoice)
+    {
+        FAudioVoice_DestroyVoice(mMasterVoice);
+        mMasterVoice = nullptr;
+    }
+
+    if (mFAudio)
+    {
+        FAudio_Release(mFAudio);
+        mFAudio = nullptr;
+    }
+
+    mOutputChannels = 0;
+    mSampleRate = 0;
+    mActiveDeviceId.clear();
+    mActiveDeviceName.clear();
+}
+
+void LLAudioEngine_FAudio::setOutputDevice(const std::string& id)
+{
+    if (id == mPreferredDeviceId && mFAudio)
+    {
+        // Same device and we're already running — nothing to do.
+        return;
+    }
+
+    LL_INFOS() << "LLAudioEngine_FAudio::setOutputDevice() switching to id '"
+               << (id.empty() ? "<system default>" : id.c_str())
+               << "'" << LL_ENDL;
+
+    mPreferredDeviceId = id;
+
+    // Wind is fully tracked by the engine — drop and recreate. The
+    // LLWindGen instance gets reconstructed in initWind, losing its
+    // smoothing state, but the voice fade-in in updateWind smooths the
+    // amplitude transition. mEnableWind survives unchanged.
+    const bool had_wind = mEnableWind && mWindGen != nullptr;
+    if (had_wind)
+    {
+        cleanupWind();
+    }
+
+    releaseFAudioDevice();
+
+    if (!initFAudioDevice())
+    {
+        LL_WARNS() << "LLAudioEngine_FAudio::setOutputDevice() failed to open "
+                      "device id '" << id << "' — audio silent until another "
+                      "device is selected." << LL_ENDL;
+        return;
+    }
+
+    if (had_wind)
+    {
+        initWind();
+    }
 }
 
 FAudioSubmixVoice* LLAudioEngine_FAudio::getGroupVoice(S32 type) const
@@ -799,6 +974,8 @@ void LLAudioChannelFAudio::cleanup()
 {
     destroyVoice();
     mCurrentBufferp = nullptr;
+    mResumePending = false;
+    mResumeFrames = 0;
 }
 
 bool LLAudioChannelFAudio::isPlaying()
@@ -817,6 +994,15 @@ bool LLAudioChannelFAudio::updateBuffer()
 
     if (buffer_changed || !mVoice)
     {
+        // A genuine buffer swap makes any stashed resume offset stale —
+        // it was a frame count for the old buffer's length, not this
+        // one. Clear before submission.
+        if (buffer_changed)
+        {
+            mResumePending = false;
+            mResumeFrames = 0;
+        }
+
         if (!ensureVoice(buf->getFormat()))
         {
             return false;
@@ -829,6 +1015,16 @@ bool LLAudioChannelFAudio::updateBuffer()
         fbuf.LoopCount = wants_loop ? FAUDIO_LOOP_INFINITE : 0;
         fbuf.Flags     = FAUDIO_END_OF_STREAM;
         fbuf.pContext  = nullptr;
+
+        // Resume from the prior playback frame if this voice is being
+        // rebuilt after a device-hot-swap. PlayBegin is consumed once
+        // per snapshot.
+        if (mResumePending)
+        {
+            fbuf.PlayBegin = mResumeFrames;
+            mResumePending = false;
+            mResumeFrames = 0;
+        }
 
         FAudioSourceVoice_FlushSourceBuffers(mVoice);
         mFinished = false;
@@ -883,6 +1079,31 @@ void LLAudioChannelFAudio::update3DPosition()
             * (mRoutedThroughGroup ? 1.0f : getSecondaryGain());
         FAudioVoice_SetVolume(mVoice, gain, FAUDIO_COMMIT_NOW);
     }
+}
+
+void LLAudioChannelFAudio::prepareForDeviceReset()
+{
+    // SamplesPlayed counts input frames consumed since voice start
+    // (including loop iterations); modulo the buffer's frame count
+    // gives the current loop-relative offset. Voice rate is the
+    // buffer's own sample rate — FrequencyRatio adjusts playback
+    // speed, not the consume rate — so frame counts translate 1:1
+    // when the rebuilt voice is created at the same format.
+    if (mVoice && mStarted && mFormat.nBlockAlign && mCurrentBufferp)
+    {
+        FAudioVoiceState state{};
+        FAudioSourceVoice_GetState(mVoice, &state, 0);
+        auto* buf = static_cast<LLAudioBufferFAudio*>(mCurrentBufferp);
+        const uint32_t buf_frames =
+            buf->getFAudioBuffer().AudioBytes / mFormat.nBlockAlign;
+        if (buf_frames > 0)
+        {
+            mResumeFrames =
+                static_cast<uint32_t>(state.SamplesPlayed % buf_frames);
+            mResumePending = true;
+        }
+    }
+    destroyVoice();
 }
 
 void LLAudioChannelFAudio::releaseIfReferencing(LLAudioBufferFAudio* buf)

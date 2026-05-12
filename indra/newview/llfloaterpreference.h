@@ -358,6 +358,20 @@ private:
     LOG_CLASS(LLPanelPreferenceGraphics);
 };
 
+// Specialised audio-preferences panel. Adds an output-device combo box
+// populated at panel-open time from the active FAudio engine's device
+// enumeration. The control_name binding writes the user's pick to
+// AudioFAudioOutputDevice; the engine reads it at next launch.
+class LLPanelPreferenceSound : public LLPanelPreference
+{
+    LOG_CLASS(LLPanelPreferenceSound);
+public:
+    bool postBuild() override;
+
+private:
+    void populateOutputDeviceCombo();
+};
+
 class LLPanelPreferenceControls : public LLPanelPreference, public LLKeyBindResponderInterface
 {
     LOG_CLASS(LLPanelPreferenceControls);

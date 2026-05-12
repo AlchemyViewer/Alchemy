@@ -34,6 +34,7 @@
 
 #include "llfloaterpreference.h"
 
+#include "llaudioengine.h"
 #include "message.h"
 #include "llfloaterautoreplacesettings.h"
 #include "llagent.h"
@@ -3034,6 +3035,62 @@ private:
 
 static LLPanelInjector<LLPanelPreferenceGraphics> t_pref_graph("panel_preference_graphics");
 static LLPanelInjector<LLPanelPreferencePrivacy> t_pref_privacy("panel_preference_privacy");
+static LLPanelInjector<LLPanelPreferenceSound> t_pref_sound("panel_preference_sound");
+
+bool LLPanelPreferenceSound::postBuild()
+{
+    populateOutputDeviceCombo();
+    return LLPanelPreference::postBuild();
+}
+
+void LLPanelPreferenceSound::populateOutputDeviceCombo()
+{
+    LLComboBox* combo = findChild<LLComboBox>("audio_output_device_combo");
+    if (!combo) return;
+
+    combo->removeall();
+    // First entry: empty id -> "let the engine pick the system default".
+    combo->add(getString("audio_output_system_default"), LLSD(std::string()));
+
+    // Combo label is the display name, value is the stable id — the id
+    // is what we persist and pass to the engine, so the user's pick
+    // survives device renumbering / OS-locale changes / display-name
+    // changes across reboots. Backend-agnostic via the LLAudioEngine
+    // base interface; backends without device support inherit an empty
+    // enumeration.
+    if (gAudiop)
+    {
+        for (const auto& dev : gAudiop->enumerateOutputDevices())
+        {
+            if (dev.id.empty() && dev.name.empty()) continue;
+            combo->add(dev.name, LLSD(dev.id));
+        }
+    }
+
+    // Restore the user's stored selection (an id). If the saved device
+    // isn't in the live list (unplugged / replaced), UI falls back to
+    // "system default" while leaving the stored id intact so it
+    // re-engages when the hardware reappears.
+    const std::string current = gSavedSettings.getString("AudioOutputDevice");
+    if (!combo->setSelectedByValue(LLSD(current), true))
+    {
+        combo->setSelectedByValue(LLSD(std::string()), true);
+    }
+
+    combo->setCommitCallback(
+        [](LLUICtrl* ctrl, const LLSD&)
+        {
+            if (auto* c = dynamic_cast<LLComboBox*>(ctrl))
+            {
+                const std::string id = c->getSelectedValue().asString();
+                // Persist for next launch …
+                gSavedSettings.setString("AudioOutputDevice", id);
+                // … and apply live. Backends that don't support hot-swap
+                // inherit the base no-op.
+                if (gAudiop) gAudiop->setOutputDevice(id);
+            }
+        });
+}
 
 bool LLPanelPreferenceGraphics::postBuild()
 {
