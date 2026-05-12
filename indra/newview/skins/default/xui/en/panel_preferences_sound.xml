@@ -10,6 +10,24 @@
  name="Preference Media panel"
  top="1"
  width="517">
+    <tab_container 
+    top_pad="0" 
+    enabled="true" 
+    follows="left|top" 
+    height="430" 
+    left_delta="0"
+    mouse_opaque="false" 
+    name="sound_tab_container" 
+    tab_position="top"
+    tab_stop="false" 
+    width="517">
+
+    <panel
+    label="General"
+    name="general_sound"
+    layout="topleft"
+    follows="top|left"><!-- General Tab -->
+
     <panel.string
      name="middle_mouse">
      Middle Mouse
@@ -399,6 +417,61 @@
 		left_pad="5"
 		name="enable_voice_check"
 		width="110"/>
+
+  
+  <check_box
+   name="gesture_audio_play_btn"
+   control_name="EnableGestureSounds"
+   disabled_control="MuteAudio"
+   value="true"
+   follows="left|top"
+   height="15"
+   tool_tip="Check this to hear sounds from gestures"
+   label="Play sounds from gestures"
+   top_pad="20"
+   left="20"/>
+  <check_box
+   control_name="EnableCollisionSounds"
+   label="Play sound on collisions"
+   tool_tip="Should teleports make the *woosh* sound"
+   name="sound_on_collisions"
+   height="15"
+   layout="topleft"
+   left="275"
+   top_pad="-15"
+   width="200"/>
+  <check_box
+   control_name="AlchemyPlayTypingSound"
+   height="15"
+   label="Typing sounds"
+   tool_tip="Should avatars typing make a sound"
+   layout="topleft"
+   left="20"
+   name="al_enable_typing_sounds"
+   top_pad="10"
+   width="237"/>
+  <check_box
+   control_name="AlchemyPlayTeleportSound"
+   height="15"
+   tool_tip="Should teleports make the *woosh* sound"
+   label="Teleport sound"
+   follows="left|top"
+   layout="topleft"
+   left="275"
+   name="al_enable_teleport_sound"
+   top_pad="-15"
+   width="200"/>
+   <text
+   layout="topleft"
+   follows="top|left"
+   height="15"
+   width="187"
+   name="voice_label"
+   left="16"
+   top_delta="52"
+   halign="left">
+   Media:
+   </text>
   <text
    type="string"
    length="1"
@@ -543,13 +616,19 @@
     top_pad="-15"
     width="15"
     height="15"/>
+</panel><!-- /General Tab -->
+<panel
+    label="Voice"
+    name="general_voice"
+    layout="topleft"
+    follows="top|left"><!-- Voice Tab -->
   <text
    layout="topleft"
-   follows="left"
+   follows="top|left"
    height="15"
    width="187"
    name="noise_suppression_label"
-   left="23"
+   left="16"
    top_delta="22"
    halign="right">
      Microphone Noise Suppression
@@ -559,7 +638,7 @@
    enabled_control="EnableVoiceChat"
    follows="left|top"
    layout="topleft"
-   left_delta="190"
+   left_delta="197"
    top_delta="-6"
    width="130"
    height="23"
@@ -663,17 +742,7 @@
    top_pad="-15"
    width="200"/>
   <check_box
-   name="gesture_audio_play_btn"
-   control_name="EnableGestureSounds"
-   disabled_control="MuteAudio"
-   value="true"
-   follows="left|bottom|right"
-   height="15"
-   tool_tip="Check this to hear sounds from gestures"
-   label="Play sounds from gestures"
-   top_pad="5"
-   left="20"/>
-  <check_box
+   follows="top|left"
    control_name="VoiceVisualizerEnabled"
    enabled_control="EnableVoiceChat"
    height="15"
@@ -681,8 +750,8 @@
    label="Show voice dot above avatars"
    layout="topleft"
    name="voice_dot_visualizer"
-   left="275"
-   top_pad="-15"
+   left="20"
+   top_pad="5"
    width="200"/>
   <button
    control_name="ShowDeviceSettings"
@@ -706,4 +775,9 @@
     width="480"
     left="18"
     class="panel_voice_device_settings"/>
-    </panel>
+
+    </panel><!-- /Media Tab -->
+
+</tab_container>
+
+</panel>
