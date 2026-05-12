@@ -8,6 +8,7 @@ target_sources(llaudio
     lllistener.cpp
     llaudiodecodemgr.cpp
     llvorbisencode.cpp
+    llwavfile.cpp
     )
 
 target_sources(llaudio
@@ -18,6 +19,7 @@ target_sources(llaudio
     lllistener.h
     llaudiodecodemgr.h
     llvorbisencode.h
+    llwavfile.h
     llwindgen.h
     )
 
@@ -67,7 +69,25 @@ if (TARGET ll::fmodstudio)
         lllistener_fmodstudio.h
         llstreamingaudio_fmodstudio.h
         )
-	 
+
     target_link_libraries(llaudio PUBLIC ll::fmodstudio)
+endif ()
+
+if (TARGET ll::faudio)
+    target_sources(llaudio
+        PRIVATE
+        llaudioengine_faudio.cpp
+        lllistener_faudio.cpp
+        )
+
+    target_sources(llaudio
+        PUBLIC
+        FILE_SET HEADERS
+        FILES
+        llaudioengine_faudio.h
+        lllistener_faudio.h
+        )
+
+    target_link_libraries(llaudio PUBLIC ll::faudio)
 endif ()
 

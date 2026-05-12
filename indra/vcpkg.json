@@ -29,6 +29,7 @@
     },
     "dullahan-bin",
     "expat",
+    "faudio",
     "fmt",
     {
       "name": "fontconfig",

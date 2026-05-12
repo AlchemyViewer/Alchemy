@@ -122,7 +122,7 @@ public:
     void setMasterGain(F32 gain);
 
     F32 getSecondaryGain(S32 type);
-    void setSecondaryGain(S32 type, F32 gain);
+    virtual void setSecondaryGain(S32 type, F32 gain);
 
     F32 getInternetStreamGain();
 

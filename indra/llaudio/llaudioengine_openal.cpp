@@ -34,6 +34,7 @@
 
 #include "llaudioengine_openal.h"
 #include "lllistener_openal.h"
+#include "llwavfile.h"
 
 #include <cstring>
 #include <new>
@@ -386,147 +387,33 @@ void LLAudioBufferOpenAL::cleanup()
     mBytesPerFrame = 0;
 }
 
-namespace
-{
-    inline U16 read_u16_le(const U8* p) { return (U16)p[0] | ((U16)p[1] << 8); }
-    inline U32 read_u32_le(const U8* p)
-    {
-        return (U32)p[0] | ((U32)p[1] << 8) | ((U32)p[2] << 16) | ((U32)p[3] << 24);
-    }
-}
-
 bool LLAudioBufferOpenAL::loadWAV(const std::string& filename)
 {
     cleanup();
 
-    if (filename.empty())
+    LLAudio::WavInfo wav;
+    if (!LLAudio::parseWav(filename, wav))
     {
         return false;
     }
 
-    llifstream infile(filename, std::ios::in | std::ios::binary);
-    if (!infile)
-    {
-        if (LLFile::isfile(filename))
-        {
-            LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Unable to open "
-                << filename << LL_ENDL;
-        }
-        else
-        {
-            // It's common for the file to not actually exist.
-            LL_DEBUGS() << "LLAudioBufferOpenAL::loadWAV() File missing "
-                << filename << LL_ENDL;
-        }
-        return false;
-    }
-
-    U8 riff[12];
-    infile.read(reinterpret_cast<char*>(riff), sizeof(riff));
-    if (!infile || static_cast<size_t>(infile.gcount()) != sizeof(riff)
-        || memcmp(riff, "RIFF", 4) != 0
-        || memcmp(riff + 8, "WAVE", 4) != 0)
-    {
-        LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Not a RIFF/WAVE file: "
-            << filename << LL_ENDL;
-        return false;
-    }
-
-    U16 format_tag = 0;
-    U16 channels = 0;
-    U32 sample_rate = 0;
-    U16 bits_per_sample = 0;
-    std::vector<U8> pcm_data;
-    bool have_fmt = false;
-    bool have_data = false;
-
-    while (infile)
-    {
-        U8 chunk_hdr[8];
-        infile.read(reinterpret_cast<char*>(chunk_hdr), sizeof(chunk_hdr));
-        if (static_cast<size_t>(infile.gcount()) != sizeof(chunk_hdr))
-        {
-            break;
-        }
-        U32 chunk_size = read_u32_le(chunk_hdr + 4);
-
-        if (memcmp(chunk_hdr, "fmt ", 4) == 0)
-        {
-            if (chunk_size < 16)
-            {
-                LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Malformed fmt chunk in "
-                    << filename << LL_ENDL;
-                return false;
-            }
-            std::vector<U8> fmt(chunk_size);
-            infile.read(reinterpret_cast<char*>(fmt.data()), chunk_size);
-            if (static_cast<U32>(infile.gcount()) != chunk_size)
-            {
-                LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Truncated fmt chunk in "
-                    << filename << LL_ENDL;
-                return false;
-            }
-            format_tag      = read_u16_le(fmt.data() + 0);
-            channels        = read_u16_le(fmt.data() + 2);
-            sample_rate     = read_u32_le(fmt.data() + 4);
-            bits_per_sample = read_u16_le(fmt.data() + 14);
-            have_fmt = true;
-        }
-        else if (memcmp(chunk_hdr, "data", 4) == 0)
-        {
-            pcm_data.resize(chunk_size);
-            if (chunk_size > 0)
-            {
-                infile.read(reinterpret_cast<char*>(pcm_data.data()), chunk_size);
-                if (static_cast<U32>(infile.gcount()) != chunk_size)
-                {
-                    LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Truncated data chunk in "
-                        << filename << LL_ENDL;
-                    return false;
-                }
-            }
-            have_data = true;
-            break;
-        }
-        else
-        {
-            U32 padded = chunk_size + (chunk_size & 1);
-            infile.seekg(padded, std::ios::cur);
-        }
-    }
-
-    if (!have_fmt || !have_data)
-    {
-        LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Missing fmt or data chunk in "
-            << filename << LL_ENDL;
-        return false;
-    }
-
-    if (format_tag != 1 /* WAVE_FORMAT_PCM */)
+    if (wav.format_tag != 1 /* WAVE_FORMAT_PCM */)
     {
         LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Unsupported WAV format 0x"
-            << std::hex << format_tag << std::dec
+            << std::hex << wav.format_tag << std::dec
             << " (only PCM is supported) in " << filename << LL_ENDL;
         return false;
     }
 
-    if (channels == 0 || sample_rate == 0)
-    {
-        LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Invalid fmt chunk ("
-            << channels << "ch @ " << sample_rate << "Hz) in "
-            << filename << LL_ENDL;
-        return false;
-    }
-
     ALenum al_format = AL_NONE;
-    if (channels == 1 && bits_per_sample == 8)       al_format = AL_FORMAT_MONO8;
-    else if (channels == 1 && bits_per_sample == 16) al_format = AL_FORMAT_MONO16;
-    else if (channels == 2 && bits_per_sample == 8)  al_format = AL_FORMAT_STEREO8;
-    else if (channels == 2 && bits_per_sample == 16) al_format = AL_FORMAT_STEREO16;
+    if (wav.channels == 1 && wav.bits_per_sample == 8)       al_format = AL_FORMAT_MONO8;
+    else if (wav.channels == 1 && wav.bits_per_sample == 16) al_format = AL_FORMAT_MONO16;
+    else if (wav.channels == 2 && wav.bits_per_sample == 8)  al_format = AL_FORMAT_STEREO8;
+    else if (wav.channels == 2 && wav.bits_per_sample == 16) al_format = AL_FORMAT_STEREO16;
     else
     {
         LL_WARNS() << "LLAudioBufferOpenAL::loadWAV() Unsupported PCM layout: "
-            << channels << "ch " << bits_per_sample << "-bit in "
+            << wav.channels << "ch " << wav.bits_per_sample << "-bit in "
             << filename << LL_ENDL;
         return false;
     }
@@ -542,9 +429,9 @@ bool LLAudioBufferOpenAL::loadWAV(const std::string& filename)
         return false;
     }
 
-    alBufferData(mALBuffer, al_format, pcm_data.data(),
-                 static_cast<ALsizei>(pcm_data.size()),
-                 static_cast<ALsizei>(sample_rate));
+    alBufferData(mALBuffer, al_format, wav.pcm.data(),
+                 static_cast<ALsizei>(wav.pcm.size()),
+                 static_cast<ALsizei>(wav.sample_rate));
     err = alGetError();
     if (err != AL_NO_ERROR)
     {
@@ -555,7 +442,7 @@ bool LLAudioBufferOpenAL::loadWAV(const std::string& filename)
         return false;
     }
 
-    mBytesPerFrame = static_cast<U16>(channels * (bits_per_sample / 8));
+    mBytesPerFrame = static_cast<U16>(wav.channels * (wav.bits_per_sample / 8));
     return true;
 }
 

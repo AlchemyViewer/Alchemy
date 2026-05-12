@@ -42,6 +42,7 @@ option(USE_PRECOMPILED_HEADERS "Enable use of precompiled header directives wher
 
 # Audio Engines
 option(USE_FMODSTUDIO "Enable support for the FMOD Studio audio engine" OFF)
+option(USE_FAUDIO "Enable support for the FAudio audio engine" OFF)
 option(USE_OPENAL "Enable support for the OpenAL audio engine" ON)
 
 # SIMD Options (x86_64 only)
@@ -231,6 +232,7 @@ include(Collada-Dom)
 include(CURL)
 include(Discord)
 include(EXPAT)
+include(FAudio)
 include(FMODSTUDIO)
 include(FMT)
 include(FontConfig)
