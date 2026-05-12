@@ -3211,9 +3211,22 @@ void LLWindowSDL::allowLanguageTextInput(LLPreeditor* preeditor, bool b)
     //      interruptLanguageTextInput uses NI_COMPOSITIONSTR/CPS_COMPLETE
     //      to *commit* instead, but SDL3 only exposes the cancel path;
     //      losing in-flight composition on focus-away is the tradeoff.
+    //
+    // Gate resetPreedit on an active composition for the same reason as the
+    // SDL_EVENT_TEXT_EDITING handler above: LLLineEditor::resetPreedit treats
+    // "selection-without-preedit" as the IME-overwrites-selection pattern and
+    // calls deleteSelection(). Focus loss via Tab on a line editor with
+    // SelectAllOnFocusReceived (the viewer default for most fields) lands
+    // here with the whole text selected and no preedit — and would wipe the
+    // field's contents on every tab-out.
     if (mPreeditor)
     {
-        mPreeditor->resetPreedit();
+        S32 preedit_pos = 0, preedit_len = 0;
+        mPreeditor->getPreeditRange(&preedit_pos, &preedit_len);
+        if (preedit_len > 0)
+        {
+            mPreeditor->resetPreedit();
+        }
     }
     mPreeditor = nullptr;
     if (mWindow)
