@@ -31,6 +31,8 @@
 #include "llwindgen.h"
 
 #include <FAudio.h>
+#include <FAudioFX.h>
+#include <FAPO.h>
 #include <F3DAudio.h>
 
 #include <algorithm>
@@ -198,6 +200,51 @@ bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
         mEngineCallbackRegistered = true;
     }
 
+    // Reverb submix. Holds an FAudioFXReverb FAPO; source voices send a
+    // wet signal here based on F3DAudio's per-emitter ReverbLevel. Output
+    // routes back into the mastering voice (default null pSendList).
+    // Configured with the I3DL2 PLAIN preset — a fairly open outdoor
+    // ambience, the closest match for the SL world feel. Non-fatal if
+    // creation fails: channels will just route to the type submix
+    // without a reverb send and the world sounds normal-but-dry.
+    if (FAudioCreateReverb(&mReverbApo, 0) == 0 && mReverbApo)
+    {
+        FAudioEffectDescriptor reverb_desc{};
+        reverb_desc.pEffect = mReverbApo;
+        reverb_desc.InitialState = 1;
+        reverb_desc.OutputChannels = mOutputChannels;
+
+        FAudioEffectChain reverb_chain{};
+        reverb_chain.EffectCount = 1;
+        reverb_chain.pEffectDescriptors = &reverb_desc;
+
+        hr = FAudio_CreateSubmixVoice(mFAudio, &mReverbVoice,
+                                      mOutputChannels, mSampleRate,
+                                      0, 0, nullptr, &reverb_chain);
+        if (hr == 0 && mReverbVoice)
+        {
+            FAudioFXReverbI3DL2Parameters i3dl2 = FAUDIOFX_I3DL2_PRESET_PLAIN;
+            FAudioFXReverbParameters native{};
+            ReverbConvertI3DL2ToNative(&i3dl2, &native);
+            FAudioVoice_SetEffectParameters(mReverbVoice, 0,
+                                            &native, sizeof(native),
+                                            FAUDIO_COMMIT_NOW);
+        }
+        else
+        {
+            LL_WARNS() << "LLAudioEngine_FAudio::init() reverb submix "
+                       "creation failed: 0x" << std::hex << hr << std::dec
+                       << " — reverb disabled" << LL_ENDL;
+            mReverbVoice = nullptr;
+        }
+    }
+    else
+    {
+        LL_WARNS() << "LLAudioEngine_FAudio::init() FAudioCreateReverb "
+                   "failed — reverb disabled" << LL_ENDL;
+        mReverbApo = nullptr;
+    }
+
     LL_INFOS() << "LLAudioEngine_FAudio::init() FAudio "
                << ((FAudioLinkedVersion() >> 16) & 0xFF) << "."
                << ((FAudioLinkedVersion() >>  8) & 0xFF) << "."
@@ -258,6 +305,16 @@ void LLAudioEngine_FAudio::shutdown()
     // Parent shutdown releases sources/buffers/channels, which in turn
     // destroy their FAudio source voices via LLAudioChannelFAudio::cleanup().
     LLAudioEngine::shutdown();
+
+    // Reverb submix owns the FAPO via its effect chain; DestroyVoice
+    // releases the FAPO. We still null mReverbApo to avoid a stale
+    // pointer in case shutdown is re-entered.
+    if (mReverbVoice)
+    {
+        FAudioVoice_DestroyVoice(mReverbVoice);
+        mReverbVoice = nullptr;
+    }
+    mReverbApo = nullptr;
 
     for (auto*& voice : mGroupVoices)
     {
@@ -524,8 +581,16 @@ bool LLAudioChannelFAudio::ensureVoice(const FAudioWaveFormatEx& fmt)
     }
     destroyVoice();
 
+    // Two-entry send list: slot 0 is the dry mix path (per-type submix
+    // when available, otherwise the mastering voice as a fallback);
+    // slot 1 routes a wet send into the reverb submix when reverb is
+    // available. The reverb send level is controlled per-frame from
+    // F3DAudio's dsp.ReverbLevel — initialised to silence below so the
+    // voice isn't audibly fed into reverb before the first apply3D.
     FAudioVoiceSends sends{};
-    FAudioSendDescriptor send{};
+    FAudioSendDescriptor send_list[2]{};
+    int num_sends = 0;
+
     FAudioVoice* dest = reinterpret_cast<FAudioVoice*>(mEnginep->getMasterVoice());
     bool through_group = false;
     if (mCurrentSourcep)
@@ -534,20 +599,34 @@ bool LLAudioChannelFAudio::ensureVoice(const FAudioWaveFormatEx& fmt)
         FAudioSubmixVoice* group = mEnginep->getGroupVoice(type);
         if (group)
         {
-            send.Flags = 0;
-            send.pOutputVoice = group;
-            sends.SendCount = 1;
-            sends.pSends = &send;
             dest = reinterpret_cast<FAudioVoice*>(group);
             through_group = true;
         }
     }
+    send_list[num_sends].Flags = 0;
+    send_list[num_sends].pOutputVoice = dest;
+    num_sends++;
 
+    FAudioSubmixVoice* reverb = mEnginep->getReverbVoice();
+    if (reverb)
+    {
+        send_list[num_sends].Flags = 0;
+        send_list[num_sends].pOutputVoice = reinterpret_cast<FAudioVoice*>(reverb);
+        num_sends++;
+    }
+    sends.SendCount = num_sends;
+    sends.pSends = send_list;
+
+    // FAUDIO_VOICE_USEFILTER enables per-voice LPF for occlusion / distance
+    // high-frequency rolloff. F3DAudio writes the cutoff coefficient into
+    // dsp.LPFDirectCoefficient each frame; the listener applies it via
+    // FAudioVoice_SetFilterParameters.
     uint32_t hr = FAudio_CreateSourceVoice(mEnginep->getFAudio(),
                                          &mVoice, &fmt,
-                                         0, FAUDIO_DEFAULT_FREQ_RATIO,
+                                         FAUDIO_VOICE_USEFILTER,
+                                         FAUDIO_DEFAULT_FREQ_RATIO,
                                          &mCallback,
-                                         sends.SendCount ? &sends : nullptr,
+                                         &sends,
                                          nullptr);
     if (hr != 0 || !mVoice)
     {
@@ -561,6 +640,19 @@ bool LLAudioChannelFAudio::ensureVoice(const FAudioWaveFormatEx& fmt)
     mFormat = fmt;
     mDestVoice = dest;
     mRoutedThroughGroup = through_group;
+
+    // Silence the reverb send until F3DAudio sets a per-frame level —
+    // otherwise FAudio's default identity matrix would route the dry
+    // signal into the reverb at full gain.
+    if (reverb)
+    {
+        const uint32_t reverb_ch = mEnginep->getOutputChannelCount();
+        std::array<float, 64> zero{};
+        FAudioVoice_SetOutputMatrix(mVoice,
+                                    reinterpret_cast<FAudioVoice*>(reverb),
+                                    fmt.nChannels, reverb_ch, zero.data(),
+                                    FAUDIO_COMMIT_NOW);
+    }
     return true;
 }
 

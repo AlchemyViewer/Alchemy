@@ -69,19 +69,21 @@ namespace
     //   2. Hits actual silence at the scaler distance instead of FMOD's
     //      asymptotic 0.01 tail — cleaner mix, no ghost sounds at extreme
     //      distance.
-    // Distances below are fractions of CurveDistanceScaler (= 150 m at
-    // default rolloff), e.g. 0.10 -> 15 m. Gains hold full near-field, then
-    // approximate 1/d through the audible range, then hit clean silence at
-    // the scaler distance.
+    // Distances below are fractions of CurveDistanceScaler (= 384 m at
+    // default rolloff), e.g. 0.039 -> 15 m. Near and mid-range gains track
+    // 1/d at the same absolute metres as before; the curve just extends
+    // its tail further so ambients placed at one corner of a 256x256 SL
+    // region don't hard-cut from the opposite corner (diagonal ~362 m).
     F3DAUDIO_DISTANCE_CURVE_POINT kVolumeCurvePoints[] = {
-        { 0.00f, 1.00f },   //   0 m: full
-        { 0.01f, 1.00f },   // 1.5 m: hold near-field
-        { 0.02f, 0.50f },   //   3 m: 1/d
-        { 0.05f, 0.20f },   // 7.5 m: 1/d
-        { 0.10f, 0.10f },   //  15 m: 1/d
-        { 0.25f, 0.04f },   //  38 m: 1/d
-        { 0.50f, 0.02f },   //  75 m: 1/d
-        { 1.00f, 0.00f },   // 150 m: clean silence (vs ~0.007 in FMOD)
+        { 0.000f, 1.000f },   //    0 m: full
+        { 0.004f, 1.000f },   //  1.5 m: hold near-field
+        { 0.008f, 0.500f },   //    3 m: 1/d
+        { 0.020f, 0.200f },   //  7.5 m: 1/d
+        { 0.039f, 0.100f },   //   15 m: 1/d
+        { 0.099f, 0.040f },   //   38 m: 1/d
+        { 0.195f, 0.020f },   //   75 m: 1/d
+        { 0.391f, 0.005f },   //  150 m: long-tail (~-46 dB)
+        { 1.000f, 0.000f },   //  384 m: clean silence
     };
     F3DAUDIO_DISTANCE_CURVE kVolumeCurve = {
         kVolumeCurvePoints,
@@ -89,11 +91,12 @@ namespace
                               sizeof(kVolumeCurvePoints[0]))
     };
 
-    // Default audible range in metres before the curve hits silence. The
-    // listener's rolloff factor compresses this: rolloff=1 -> 150 m,
-    // rolloff=2 -> 75 m, rolloff=0.5 -> 300 m. Matches FMOD's qualitative
-    // behavior when the global rolloff_scale changes.
-    constexpr float kBaseAudibleRange = 150.0f;
+    // Default audible range in metres before the curve hits silence. SL
+    // regions are 256 x 256 m, so the corner-to-corner diagonal is ~362
+    // m; 384 m gives that plus a small margin without bleeding sounds in
+    // from adjacent regions. The listener's rolloff factor compresses
+    // this: rolloff=1 -> 384 m, rolloff=2 -> 192 m, rolloff=0.5 -> 768 m.
+    constexpr float kBaseAudibleRange = 384.0f;
 
     // Doppler clamp: F3DAudio's raw output can spike on fast camera moves
     // or teleports, producing audible "garble". Clamping to roughly a
@@ -109,6 +112,14 @@ namespace
     // close, narrow enough not to dominate over the emitter's position
     // when far away.
     constexpr float kStereoChannelRadius = 0.5f;
+
+    // Global scale applied to dsp.ReverbLevel before it hits the per-
+    // source -> reverb-submix send. Aim is "barely perceptible space"
+    // rather than an obvious effect — at close range with default
+    // ReverbLevel ~1.0 this yields a -20 dB send into the reverb, well
+    // below the dry signal. Far sources get even less because
+    // ReverbLevel itself decreases with distance.
+    constexpr float kReverbSendScale = 0.05f;
 }
 
 LLListener_FAudio::LLListener_FAudio(LLAudioEngine_FAudio* engine)
@@ -250,7 +261,16 @@ namespace
         dsp.pMatrixCoefficients = matrix.data();
         dsp.DopplerFactor = 1.f;
 
-        uint32_t flags = F3DAUDIO_CALCULATE_MATRIX;
+        // CALCULATE_LPF_DIRECT fills dsp.LPFDirectCoefficient — a [0, 1]
+        // factor representing high-frequency passthrough vs cutoff,
+        // derived from distance (default curve) or pLPFDirectCurve. Maps
+        // directly onto FAudio's voice filter Frequency parameter so
+        // distant sources get an air-absorption HF rolloff for free.
+        // CALCULATE_REVERB fills dsp.ReverbLevel — the per-emitter wet
+        // send level fed into the engine's reverb submix.
+        uint32_t flags = F3DAUDIO_CALCULATE_MATRIX
+                       | F3DAUDIO_CALCULATE_LPF_DIRECT
+                       | F3DAUDIO_CALCULATE_REVERB;
         if (calc_doppler) flags |= F3DAUDIO_CALCULATE_DOPPLER;
         F3DAudioCalculate(engine->getX3DInstance(), &listener, &emitter,
                           flags, &dsp);
@@ -260,6 +280,53 @@ namespace
         FAudioVoice_SetOutputMatrix(voice, dest,
                                     dsp.SrcChannelCount, dsp.DstChannelCount,
                                     dsp.pMatrixCoefficients, FAUDIO_COMMIT_NOW);
+
+        // Air-absorption / occlusion LPF. F3DAudio's coefficient maps
+        // directly onto FAudio's normalized [0, 1] Frequency param —
+        // 1 = full passthrough, lower values cut HF progressively.
+        FAudioFilterParameters lpf{};
+        lpf.Type = FAudioLowPassFilter;
+        lpf.Frequency = dsp.LPFDirectCoefficient;
+        lpf.OneOverQ = 1.0f;
+        FAudioVoice_SetFilterParameters(voice, &lpf, FAUDIO_COMMIT_NOW);
+
+        // Reverb wet send. Spatial sounds bleed into the reverb submix at
+        // dsp.ReverbLevel (a single scalar from F3DAudio); each source
+        // channel routes equally into every reverb input channel so the
+        // reverb is heard as ambient wash rather than spatially placed.
+        // Forced-priority (UI) sounds get a zero send so they stay dry.
+        //
+        // The reverb send bypasses the per-type submix that carries the
+        // secondary (per-type slider) gain — so for channels routed
+        // through a group submix we have to fold that gain into the
+        // reverb matrix manually, otherwise lowering e.g. the SFX
+        // slider muting the dry signal leaves the reverb at full level.
+        // Channels that fell back to direct master routing already have
+        // secondary multiplied into voice volume, which gates the reverb
+        // send naturally.
+        FAudioSubmixVoice* reverb = engine->getReverbVoice();
+        if (reverb)
+        {
+            const float secondary_for_reverb = channel->isRoutedThroughGroup()
+                ? channel->getSecondaryGain()
+                : 1.0f;
+            const float send_gain = calc_doppler
+                ? (dsp.ReverbLevel * kReverbSendScale * secondary_for_reverb)
+                : 0.0f;
+            const uint32_t reverb_ch = engine->getOutputChannelCount();
+            std::array<float, 64> reverb_mat{};
+            for (uint32_t s = 0; s < src_channels && s < 8; ++s)
+            {
+                for (uint32_t d = 0; d < reverb_ch && d < 8; ++d)
+                {
+                    reverb_mat[d * src_channels + s] = send_gain;
+                }
+            }
+            FAudioVoice_SetOutputMatrix(voice,
+                                        reinterpret_cast<FAudioVoice*>(reverb),
+                                        src_channels, reverb_ch,
+                                        reverb_mat.data(), FAUDIO_COMMIT_NOW);
+        }
 
         float target = calc_doppler ? dsp.DopplerFactor : 1.0f;
         if (target < kDopplerMin) target = kDopplerMin;

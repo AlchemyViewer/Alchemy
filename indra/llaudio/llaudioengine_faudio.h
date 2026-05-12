@@ -67,6 +67,7 @@ public:
     FAudio*                getFAudio() const          { return mFAudio; }
     FAudioMasteringVoice*  getMasterVoice() const     { return mMasterVoice; }
     FAudioSubmixVoice*     getGroupVoice(S32 type) const;
+    FAudioSubmixVoice*     getReverbVoice() const     { return mReverbVoice; }
     uint32_t               getOutputChannelCount() const { return mOutputChannels; }
     uint32_t               getOutputSampleRate() const   { return mSampleRate; }
     const F3DAUDIO_HANDLE& getX3DInstance() const      { return mX3DInstance; }
@@ -113,6 +114,11 @@ private:
     FAudio*                mFAudio       = nullptr;
     FAudioMasteringVoice*  mMasterVoice  = nullptr;
     FAudioSubmixVoice*     mGroupVoices[LLAudioEngine::AUDIO_TYPE_COUNT]{};
+    // Single global reverb submix with an FAudioFXReverb FAPO on it. All
+    // spatial source voices send a wet-level signal here in addition to
+    // their dry submix; the reverb output mixes back into the master.
+    FAudioSubmixVoice*     mReverbVoice  = nullptr;
+    FAPO*                  mReverbApo    = nullptr;
     EngineCallback         mEngineCallback{};
     bool                   mEngineCallbackRegistered = false;
 
@@ -141,6 +147,7 @@ public:
     // Used by LLListener_FAudio::apply3D().
     FAudioSourceVoice* getVoice() const            { return mVoice; }
     FAudioVoice*       getDestVoice() const        { return mDestVoice; }
+    bool               isRoutedThroughGroup() const { return mRoutedThroughGroup; }
     uint32_t           getSourceChannelCount() const { return mFormat.nChannels; }
     LLAudioSource*     getSource() const           { return mCurrentSourcep; }
 
