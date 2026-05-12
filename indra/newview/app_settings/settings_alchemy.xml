@@ -38,7 +38,7 @@
         <key>AudioFAudioAudibleRange</key>
         <map>
             <key>Comment</key>
-            <string>FAudio backend: distance in metres at which the volume curve reaches silence (CurveDistanceScaler at rolloff=1). 384 covers a 256x256 SL region's diagonal. Takes effect at next viewer launch.</string>
+            <string>FAudio backend: distance in metres at which the volume curve reaches silence (CurveDistanceScaler at rolloff=1). 384 covers a 256x256 SL region's diagonal. Applies live; new value is picked up on the next 3D update tick.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -49,7 +49,7 @@
         <key>AudioFAudioInnerRadius</key>
         <map>
             <key>Comment</key>
-            <string>FAudio backend: F3DAudio emitter InnerRadius in metres. Below this distance source channels diffuse to all speakers; above, clean directional pan. Takes effect at next viewer launch.</string>
+            <string>FAudio backend: F3DAudio emitter InnerRadius in metres. Below this distance source channels diffuse to all speakers; above, clean directional pan. Applies live; new value is picked up on the next 3D update tick.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -60,7 +60,7 @@
         <key>AudioFAudioReverbPreset</key>
         <map>
             <key>Comment</key>
-            <string>FAudio backend: FAudioFX I3DL2 preset applied to the reverb submix. PLAIN is the open-outdoor default; case-insensitive. Recognised: DEFAULT, GENERIC, PADDEDCELL, ROOM, BATHROOM, LIVINGROOM, STONEROOM, AUDITORIUM, CONCERTHALL, CAVE, ARENA, HANGAR, CARPETEDHALLWAY, HALLWAY, STONECORRIDOR, ALLEY, FOREST, CITY, MOUNTAINS, QUARRY, PLAIN, PARKINGLOT, SEWERPIPE, UNDERWATER, SMALLROOM. Takes effect at next viewer launch.</string>
+            <string>FAudio backend: FAudioFX I3DL2 preset applied to the reverb submix. PLAIN is the open-outdoor default; case-insensitive. Recognised: DEFAULT, GENERIC, PADDEDCELL, ROOM, BATHROOM, LIVINGROOM, STONEROOM, AUDITORIUM, CONCERTHALL, CAVE, ARENA, HANGAR, CARPETEDHALLWAY, HALLWAY, STONECORRIDOR, ALLEY, FOREST, CITY, MOUNTAINS, QUARRY, PLAIN, PARKINGLOT, SEWERPIPE, UNDERWATER, SMALLROOM. Applies live; preset changes are pushed to the reverb submix on the next signal callback.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -71,7 +71,7 @@
         <key>AudioFAudioReverbSendScale</key>
         <map>
             <key>Comment</key>
-            <string>FAudio backend: scalar applied to F3DAudio's dsp.ReverbLevel before writing the per-source -> reverb-submix send. 0 disables reverb. Takes effect at next viewer launch.</string>
+            <string>FAudio backend: scalar applied to F3DAudio's dsp.ReverbLevel before writing the per-source -> reverb-submix send. 0 disables reverb. Applies live; new value is picked up on the next 3D update tick.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

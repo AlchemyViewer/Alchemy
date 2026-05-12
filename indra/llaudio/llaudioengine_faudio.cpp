@@ -103,11 +103,14 @@ namespace
         return 2;                              // 2/3/4/5 -> stereo reverb
     }
 
-    // Lookup I3DL2 preset by name. Case-insensitive; unknown -> PLAIN.
-    // Each FAUDIOFX_I3DL2_PRESET_* expands to a struct initialiser, so
-    // the table holds them by value rather than via pointer-to-macro.
-    FAudioFXReverbI3DL2Parameters pick_i3dl2_preset(std::string name)
+    // Lookup I3DL2 preset by name. Case-insensitive; unknown -> PLAIN
+    // with a warn so a typo'd AudioFAudioReverbPreset setting is visible
+    // in the log instead of silently falling back. Each
+    // FAUDIOFX_I3DL2_PRESET_* expands to a struct initialiser, so the
+    // table holds them by value rather than via pointer-to-macro.
+    FAudioFXReverbI3DL2Parameters pick_i3dl2_preset(const std::string& raw_name)
     {
+        std::string name(raw_name);
         for (auto& c : name) c = static_cast<char>(std::toupper(c));
         if (name == "DEFAULT")         return FAUDIOFX_I3DL2_PRESET_DEFAULT;
         if (name == "GENERIC")         return FAUDIOFX_I3DL2_PRESET_GENERIC;
@@ -134,6 +137,9 @@ namespace
         if (name == "SEWERPIPE")       return FAUDIOFX_I3DL2_PRESET_SEWERPIPE;
         if (name == "UNDERWATER")      return FAUDIOFX_I3DL2_PRESET_UNDERWATER;
         if (name == "SMALLROOM")       return FAUDIOFX_I3DL2_PRESET_SMALLROOM;
+        LL_WARNS() << "Unknown I3DL2 reverb preset '" << raw_name
+                   << "' — falling back to PLAIN. See settings_alchemy.xml "
+                      "AudioFAudioReverbPreset for the valid names." << LL_ENDL;
         return FAUDIOFX_I3DL2_PRESET_PLAIN;
     }
 }
@@ -151,7 +157,20 @@ LLAudioEngine_FAudio::LLAudioEngine_FAudio(LLAudioEngineFAudioConfig config)
     if (mConfig.reverb_send_scale < 0.0f) mConfig.reverb_send_scale = 0.0f;
 }
 
-LLAudioEngine_FAudio::~LLAudioEngine_FAudio() = default;
+LLAudioEngine_FAudio::~LLAudioEngine_FAudio()
+{
+    // If init() failed partway through after LLAudioEngine::init had
+    // already allocated the listener, llstartup deletes us without
+    // calling shutdown(). Drive shutdown ourselves in that case so
+    // mListenerp + any partially-built FAudio resources are cleaned
+    // up. shutdown() is idempotent — all its branches no-op on null
+    // pointers — so it's also safe in the normal "shutdown was
+    // called explicitly" path where mListenerp is already nullptr.
+    if (mListenerp || mFAudio)
+    {
+        shutdown();
+    }
+}
 
 std::vector<LLAudioOutputDevice> LLAudioEngine_FAudio::enumerateOutputDevices() const
 {
@@ -364,6 +383,14 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
             FAudioVoice_SetEffectParameters(mReverbVoice, 0,
                                             &native, sizeof(native),
                                             FAUDIO_COMMIT_NOW);
+            // FAudio_INTERNAL_AllocEffectChain AddRefs the FAPO when it
+            // adds it to the submix's effect chain (FAudio_internal.c:1676),
+            // and Releases on DestroyVoice (:1717). Our reference from
+            // FAudioCreateReverb is now redundant — drop it so the only
+            // live count is held by the submix, otherwise the FAPO
+            // outlives the submix and leaks at shutdown.
+            mReverbApo->Release(mReverbApo);
+            mReverbApo = nullptr;
             if (mReverbChannels != mOutputChannels)
             {
                 LL_INFOS() << "LLAudioEngine_FAudio::init() reverb running at "
@@ -541,15 +568,17 @@ void LLAudioEngine_FAudio::setOutputDevice(const std::string& id)
 
     mConfig.preferred_device_id = id;
 
-    // Wind is fully tracked by the engine — drop and recreate. The
-    // LLWindGen instance gets reconstructed in initWind, losing its
-    // smoothing state, but the voice fade-in in updateWind smooths the
-    // amplitude transition. mEnableWind survives unchanged.
+    // Wind: keep mWindGen and its smoothing state alive across the swap
+    // — the audible synthesis stays continuous, only the FAudio source
+    // voice underneath gets recreated. releaseFAudioDevice() tears
+    // down mWindVoice for us, and the re-init below sees mWindGen
+    // already alive and just re-attaches a fresh voice on the new
+    // device. mWindFadeIn is also preserved so a settled wind voice
+    // restarts at its previous volume rather than re-ramping from
+    // silence (the inherent WASAPI/CoreAudio re-bootstrap silence is
+    // unavoidable, but at least we don't add a 300 ms fade-in on top
+    // of it).
     const bool had_wind = mEnableWind && mWindGen != nullptr;
-    if (had_wind)
-    {
-        cleanupWind();
-    }
 
     releaseFAudioDevice();
 
@@ -649,9 +678,24 @@ bool LLAudioEngine_FAudio::initWind()
 {
     if (!mFAudio) return false;
 
-    mWindGen = new LLWindGen<WIND_SAMPLE_T>;
-    mWindBufFreq    = mWindGen->getInputSamplingRate();
-    mWindBufSamples = llceil(mWindBufFreq * WIND_BUFFER_SIZE_SEC);
+    // Allocate the wind generator on the first call only — across a
+    // device hot-swap initWind() is re-entered while mWindGen still
+    // carries its smoothing state from the prior device, so we keep
+    // the synthesis seamless. cleanupWind() (full shutdown) clears
+    // mWindGen, after which the next initWind starts fresh.
+    const bool fresh_gen = (mWindGen == nullptr);
+    if (fresh_gen)
+    {
+        mWindGen = new LLWindGen<WIND_SAMPLE_T>;
+        mWindBufFreq    = mWindGen->getInputSamplingRate();
+        mWindBufSamples = llceil(mWindBufFreq * WIND_BUFFER_SIZE_SEC);
+        // Initial cold-start: voice begins silent and updateWind ramps
+        // it to unity over ~300 ms, masking the synthesis ramp-up.
+        mWindFadeIn = 0.0f;
+    }
+    // else: mWindFadeIn keeps whatever value it had on the prior
+    // device. A settled (mWindFadeIn==1.0) voice resumes at unity;
+    // an in-flight fade resumes where it left off.
 
     mWindCallback.OnVoiceProcessingPassStart = &wind_on_pass_start;
     mWindCallback.OnVoiceProcessingPassEnd   = &wind_on_pass_end;
@@ -671,16 +715,24 @@ bool LLAudioEngine_FAudio::initWind()
     {
         LL_WARNS() << "LLAudioEngine_FAudio::initWind() CreateSourceVoice failed: 0x"
                    << std::hex << hr << std::dec << LL_ENDL;
-        delete mWindGen;
-        mWindGen = nullptr;
+        if (fresh_gen)
+        {
+            // We allocated mWindGen earlier in this call; tear it down
+            // so the engine returns to its pre-init state. Re-entry
+            // paths (device swap) leave the pre-existing generator
+            // alone so a transient device failure doesn't lose the
+            // synthesis state.
+            delete mWindGen;
+            mWindGen = nullptr;
+        }
         return false;
     }
 
-    // Start silent; updateWind ramps the voice up to unity over ~300 ms,
-    // masking the click that would otherwise occur as wind generation
-    // ramps from zero against a silent baseline.
-    FAudioVoice_SetVolume(mWindVoice, 0.0f, FAUDIO_COMMIT_NOW);
-    mWindFadeIn = 0.0f;
+    // Set the FAudio voice volume to whatever fade state mWindFadeIn is
+    // already in: 0 on a cold start (ramps to unity over ~300 ms in
+    // updateWind, masking the click against the silent baseline) or
+    // the prior value across a device swap (no audible ramp on resume).
+    FAudioVoice_SetVolume(mWindVoice, mWindFadeIn, FAUDIO_COMMIT_NOW);
     FAudioSourceVoice_Start(mWindVoice, 0, FAUDIO_COMMIT_NOW);
     return true;
 }
@@ -1177,16 +1229,19 @@ void LLAudioChannelFAudio::prepareForDeviceReset()
 void LLAudioChannelFAudio::releaseIfReferencing(LLAudioBufferFAudio* buf)
 {
     if (mCurrentBufferp != buf) return;
-    if (mVoice)
-    {
-        // Stop then flush so the mixer thread releases its pAudioData
-        // reference synchronously before the destructor body returns.
-        FAudioSourceVoice_Stop(mVoice, 0, FAUDIO_COMMIT_NOW);
-        FAudioSourceVoice_FlushSourceBuffers(mVoice);
-    }
+    // FAudioSourceVoice_Stop just flips voice->src.active; the mixer
+    // thread may already be inside FAudio_INTERNAL_MixSource for this
+    // voice and continue reading pAudioData (= mPcm.data()) past our
+    // Stop call. FlushSourceBuffers only manages the queued-buffer
+    // list and doesn't synchronize either. Only DestroyVoice waits for
+    // the mixer (busy-loops on voice == audio->processingSource in
+    // destroy_voice), so we tear the voice down completely before the
+    // buffer's mPcm vector is freed. The channel's source association
+    // is preserved; the next updateBuffer rebuilds the voice on
+    // whatever new buffer the source has (likely null after eviction,
+    // in which case it stays silent).
+    destroyVoice();
     mCurrentBufferp = nullptr;
-    mStarted = false;
-    mFinished = true;
 }
 
 void LLAudioChannelFAudio::updateLoop()

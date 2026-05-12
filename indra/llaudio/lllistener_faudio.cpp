@@ -99,6 +99,28 @@ namespace
     constexpr float kDopplerMin = 0.5f;
     constexpr float kDopplerMax = 2.0f;
 
+    // Custom LPF curve for distance-based HF rolloff ("air absorption").
+    // F3DAudio's default LPFDirect curve is a single linear segment
+    // 1.0 -> 0.75 across the full audible range — too mild for the SL
+    // distance scale where we want clearly muffled sounds at the edge
+    // of a region. Frequency parameter at the source voice is [0, 1]
+    // where 1 = full HF passthrough, 0 = full cutoff. Distances below
+    // are fractions of CurveDistanceScaler (= 384 m at default tunings).
+    F3DAUDIO_DISTANCE_CURVE_POINT kLpfCurvePoints[] = {
+        { 0.000f, 1.000f },   //    0 m: full HF
+        { 0.039f, 1.000f },   //   15 m: hold passthrough in the close field
+        { 0.099f, 0.900f },   //   38 m: barely-perceptible HF tilt
+        { 0.195f, 0.800f },   //   75 m: clearly "across the parcel" tone
+        { 0.391f, 0.600f },   //  150 m: noticeable air absorption
+        { 0.781f, 0.400f },   //  300 m: strong muffling
+        { 1.000f, 0.300f },   //  384 m: at silence anyway, but cap the bottom
+    };
+    F3DAUDIO_DISTANCE_CURVE kLpfCurve = {
+        kLpfCurvePoints,
+        static_cast<uint32_t>(sizeof(kLpfCurvePoints) /
+                              sizeof(kLpfCurvePoints[0]))
+    };
+
     // Stereo emitter spread (metres). Channels are positioned at the
     // emitter's left/right by this distance. ~0.5 m is the X3DAudio
     // sample-code default and feels right for the SL "stereo speaker on
@@ -288,7 +310,12 @@ namespace
         emitter.DopplerScaler = doppler_scaler;
         emitter.pVolumeCurve = &kVolumeCurve;
         emitter.pLFECurve = nullptr;
-        emitter.pLPFDirectCurve = nullptr;
+        // Drive the source voice's LPF cutoff from a curve tuned for the
+        // SL audible range rather than F3DAudio's mild default. Reverb
+        // path stays on the default — wet signal is already an ambient
+        // wash and per-tap LPF on top would muddy the global reverb
+        // submix more than help spatially.
+        emitter.pLPFDirectCurve = &kLpfCurve;
         emitter.pLPFReverbCurve = nullptr;
         emitter.pReverbCurve = nullptr;
         emitter.pCone = nullptr;
@@ -375,13 +402,21 @@ namespace
         float target = calc_doppler ? dsp.DopplerFactor : 1.0f;
         if (target < kDopplerMin) target = kDopplerMin;
         else if (target > kDopplerMax) target = kDopplerMax;
-        // Exponential smoothing on the per-channel doppler factor. Alpha
-        // ~0.2 reaches 50% in ~3 frames / ~50 ms at 60 Hz; absorbs
-        // single-frame velocity spikes from teleports or flycam without
-        // making the cue feel laggy.
+        // Exponential smoothing on the per-channel doppler factor.
+        // Alpha ~0.2 reaches 50% in ~3 frames / ~50 ms at 60 Hz —
+        // absorbs single-frame velocity spikes from teleports or flycam
+        // without making the cue feel laggy. Smoothing runs in log
+        // space so a slowdown (1.0 -> 0.5, a downward octave) and a
+        // speedup (1.0 -> 2.0, an upward octave) take the same number
+        // of frames to settle in pitch perception — linear smoothing
+        // is biased toward asymmetric ramps because frequency ratio is
+        // multiplicative, not additive.
         constexpr float kSmoothAlpha = 0.2f;
-        channel->mSmoothedDoppler +=
-            (target - channel->mSmoothedDoppler) * kSmoothAlpha;
+        const float log_target = std::log(std::max(kDopplerMin, target));
+        const float log_curr   = std::log(std::max(kDopplerMin,
+                                                   channel->mSmoothedDoppler));
+        const float log_next   = log_curr + (log_target - log_curr) * kSmoothAlpha;
+        channel->mSmoothedDoppler = std::exp(log_next);
         FAudioSourceVoice_SetFrequencyRatio(voice, channel->mSmoothedDoppler,
                                             FAUDIO_COMMIT_NOW);
     }
@@ -404,6 +439,7 @@ void LLListener_FAudio::apply3D(LLAudioChannelFAudio* channel)
 
 void LLListener_FAudio::applyForcedPriority(LLAudioChannelFAudio* channel)
 {
+    LL_PROFILE_ZONE_SCOPED;
     if (!channel || !mEnginep) return;
 
     // Emitter co-located with the listener so distance == 0; F3DAudio's

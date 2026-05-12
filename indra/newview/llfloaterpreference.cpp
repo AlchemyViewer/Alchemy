@@ -3043,18 +3043,53 @@ bool LLPanelPreferenceSound::postBuild()
 
     // FAudio-specific tunables live alongside the device picker. Hide
     // them when another backend is active so the panel doesn't expose
-    // controls that the active engine ignores.
+    // controls that the active engine ignores. Because the layout uses
+    // absolute top_pad positioning rather than a layout_stack, hiding
+    // the reverb row would otherwise leave a vertical gap above the
+    // volume sliders — so we also shift every sibling that sits below
+    // the reverb row up by the row's height to close that gap.
     const bool faudio_active =
         gAudiop && gAudiop->getDriverName(false) == "FAudio";
-    if (LLView* lbl = findChild<LLView>("audio_faudio_reverb_label"))
-        lbl->setVisible(faudio_active);
-    if (LLView* cb = findChild<LLView>("audio_faudio_reverb_combo"))
-        cb->setVisible(faudio_active);
+    LLView* reverb_label = findChild<LLView>("audio_faudio_reverb_label");
+    LLView* reverb_combo = findChild<LLView>("audio_faudio_reverb_combo");
+    if (reverb_label && reverb_combo && !faudio_active)
+    {
+        LLView* anchor = findChild<LLView>("audio_output_device_combo");
+        // Linden coords: y grows upward, so the row above has the larger
+        // mBottom. The visual height we need to reclaim equals the
+        // distance from the device combo's bottom to the reverb combo's
+        // bottom — that span exactly covers the top_pad above the label
+        // plus the label + combo verticals.
+        const S32 shift = anchor
+            ? (anchor->getRect().mBottom - reverb_combo->getRect().mBottom)
+            : 0;
+        const S32 reverb_top = std::max(
+            reverb_label->getRect().mTop, reverb_combo->getRect().mTop);
+
+        reverb_label->setVisible(false);
+        reverb_combo->setVisible(false);
+
+        if (shift > 0)
+        {
+            for (LLView* child : *getChildList())
+            {
+                if (!child || child == reverb_label || child == reverb_combo)
+                    continue;
+                // Visually below the reverb row → its top is at a lower
+                // y (Linden). Shift only those; everything above the
+                // reverb stays put.
+                if (child->getRect().mTop < reverb_top)
+                {
+                    child->translate(0, shift);
+                }
+            }
+        }
+    }
 
     return LLPanelPreference::postBuild();
 }
 
-void LLPanelPreferenceSound::populateOutputDeviceCombo()
+void LLPanelPreferenceSound::refreshOutputDeviceItems(const std::string& setting_key)
 {
     LLComboBox* combo = findChild<LLComboBox>("audio_output_device_combo");
     if (!combo) return;
@@ -3068,8 +3103,7 @@ void LLPanelPreferenceSound::populateOutputDeviceCombo()
     // survives device renumbering / OS-locale changes / display-name
     // changes across reboots. Backend-agnostic via the LLAudioEngine
     // base interface; backends without device support inherit an empty
-    // enumeration and an empty settings-key name (the latter disables
-    // the read / write below entirely).
+    // enumeration and an empty settings-key name.
     if (gAudiop)
     {
         for (const auto& dev : gAudiop->enumerateOutputDevices())
@@ -3079,28 +3113,43 @@ void LLPanelPreferenceSound::populateOutputDeviceCombo()
         }
     }
 
+    // Restore the user's stored selection (an id). If the saved device
+    // isn't in the live list (unplugged / replaced), UI falls back to
+    // "system default" while leaving the stored id intact so it
+    // re-engages when the hardware reappears. setting_key may be empty
+    // for backends with no device-selection support — in that case the
+    // combo stays on "System default" naturally.
+    if (!setting_key.empty())
+    {
+        const std::string current = gSavedSettings.getString(setting_key);
+        if (!combo->setSelectedByValue(LLSD(current), true))
+        {
+            combo->setSelectedByValue(LLSD(std::string()), true);
+        }
+    }
+}
+
+void LLPanelPreferenceSound::populateOutputDeviceCombo()
+{
+    LLComboBox* combo = findChild<LLComboBox>("audio_output_device_combo");
+    if (!combo) return;
+
     // The active backend tells us which settings key its device id lives
     // in — different backends use different id formats (WASAPI strings,
     // OpenAL device names, FMOD GUIDs) so they each store under their
     // own key to avoid cross-pollination when the user changes engines.
     const std::string setting_key =
         gAudiop ? gAudiop->getOutputDeviceSettingName() : std::string();
+
+    refreshOutputDeviceItems(setting_key);
+
     if (setting_key.empty())
     {
         // Backend doesn't support device selection — leave the combo on
-        // "System default" and don't wire commit / restore. The single
-        // default entry above keeps the UI consistent across backends.
+        // "System default" and don't wire commit / prearrange. The
+        // single default entry kept by refreshOutputDeviceItems is the
+        // only thing in the list.
         return;
-    }
-
-    // Restore the user's stored selection (an id). If the saved device
-    // isn't in the live list (unplugged / replaced), UI falls back to
-    // "system default" while leaving the stored id intact so it
-    // re-engages when the hardware reappears.
-    const std::string current = gSavedSettings.getString(setting_key);
-    if (!combo->setSelectedByValue(LLSD(current), true))
-    {
-        combo->setSelectedByValue(LLSD(std::string()), true);
     }
 
     combo->setCommitCallback(
@@ -3115,6 +3164,17 @@ void LLPanelPreferenceSound::populateOutputDeviceCombo()
                 // inherit the base no-op.
                 if (gAudiop) gAudiop->setOutputDevice(id);
             }
+        });
+
+    // Re-enumerate just before the dropdown opens so a hot-plugged DAC
+    // (or one that was unplugged and reappeared) shows up without the
+    // user having to close and reopen Preferences. Prearrange runs on
+    // the main thread, so calling FAudio_GetDeviceCount / its OpenAL +
+    // FMOD analogues is safe from here.
+    combo->setPrearrangeCallback(
+        [this, setting_key](LLUICtrl*, const LLSD&)
+        {
+            refreshOutputDeviceItems(setting_key);
         });
 }
 

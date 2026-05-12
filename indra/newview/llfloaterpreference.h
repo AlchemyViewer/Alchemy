@@ -370,6 +370,12 @@ public:
 
 private:
     void populateOutputDeviceCombo();
+    // Refreshes the items in the audio_output_device_combo against the
+    // current engine enumeration. Invoked from postBuild() for the
+    // initial fill and from the combo's prearrange callback so a
+    // hot-plugged DAC shows up the next time the user drops the menu
+    // open — without us having to poll the device list.
+    void refreshOutputDeviceItems(const std::string& setting_key);
 };
 
 class LLPanelPreferenceControls : public LLPanelPreference, public LLKeyBindResponderInterface
