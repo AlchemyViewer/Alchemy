@@ -193,6 +193,48 @@ void LLListener_FAudio::syncListenerPose()
 
 namespace
 {
+    // Build an orthonormal emitter basis whose Front points from the
+    // emitter toward the listener. Top is world-up Gram-Schmidt'd
+    // against Front so the L/R stereo channels stay horizontal in the
+    // world even when the listener is off-elevation. Falls back to the
+    // canonical fixed orientation for the two degenerate cases:
+    // listener-co-located and listener-directly-above/below.
+    inline void compute_facing_basis(const F3DAUDIO_VECTOR& emitter_pos,
+                                     const F3DAUDIO_VECTOR& listener_pos,
+                                     F3DAUDIO_VECTOR& out_front,
+                                     F3DAUDIO_VECTOR& out_top)
+    {
+        float dx = listener_pos.x - emitter_pos.x;
+        float dy = listener_pos.y - emitter_pos.y;
+        float dz = listener_pos.z - emitter_pos.z;
+        float len2 = dx*dx + dy*dy + dz*dz;
+        if (len2 < 1e-8f)
+        {
+            out_front = F3DAUDIO_VECTOR{ 0.f, 0.f, 1.f };
+            out_top   = F3DAUDIO_VECTOR{ 0.f, 1.f, 0.f };
+            return;
+        }
+        const float inv_len = 1.0f / std::sqrt(len2);
+        const F3DAUDIO_VECTOR front{ dx*inv_len, dy*inv_len, dz*inv_len };
+
+        // Project world-up (X3D +Y) onto the plane perpendicular to front.
+        const float dot_uf = front.y;  // world_up = (0,1,0) so dot = front.y
+        F3DAUDIO_VECTOR top{ -front.x * dot_uf,
+                             1.0f - front.y * dot_uf,
+                             -front.z * dot_uf };
+        const float top_len2 = top.x*top.x + top.y*top.y + top.z*top.z;
+        if (top_len2 < 1e-8f)
+        {
+            // Front parallel to world-up — listener directly above/below.
+            out_front = F3DAUDIO_VECTOR{ 0.f, 0.f, 1.f };
+            out_top   = F3DAUDIO_VECTOR{ 0.f, 1.f, 0.f };
+            return;
+        }
+        const float inv_top = 1.0f / std::sqrt(top_len2);
+        out_front = front;
+        out_top   = F3DAUDIO_VECTOR{ top.x * inv_top, top.y * inv_top, top.z * inv_top };
+    }
+
     // Common F3DAudio dispatch shared between the spatial-3D path and the
     // forced-priority (UI / preview) path. The two differ only in emitter
     // position/velocity and whether Doppler is calculated.
@@ -218,14 +260,16 @@ namespace
         // layout is mat[speaker * SrcChannelCount + src] — the rest of
         // the entries stay zero and src channels > 0 are silenced.
         //
-        // For stereo (the common case) we additionally spread the
-        // channels: ChannelRadius positions them on the emitter's
-        // left/right, giving a real stereo image. The azimuth-to-listener
-        // mapping looks swapped because the emitter "faces forward"
-        // (OrientFront = +Z) and the listener looking back at the emitter
-        // sees a mirror — the emitter's right side ends up on the
-        // listener's left, so the LEFT audio channel goes at azimuth π/2
-        // (emitter's right) and RIGHT at 3π/2 (emitter's left).
+        // For stereo (the common case) the emitter's basis is rebuilt
+        // each frame so OrientFront points from emitter toward listener
+        // — the emitter "faces the listener". With that frame, the L/R
+        // image is consistent regardless of where the listener has
+        // moved (vs the alternative fixed-orientation model where
+        // walking around the back of an emitter flips L/R).
+        //
+        // Azimuth mapping: emitter's right (azimuth π/2) ends up on the
+        // listener's left because emitter and listener face each other
+        // (mirror). So LEFT audio channel goes at π/2 and RIGHT at 3π/2.
         std::array<float, 8> azimuths{};  // zero-initialised; > 2 chans
                                           // co-locate (rare in SL).
         if (src_channels == 2)
@@ -236,8 +280,16 @@ namespace
         F3DAUDIO_EMITTER emitter{};
         emitter.Position = emitter_pos_x3d;
         emitter.Velocity = emitter_vel_x3d;
-        emitter.OrientFront = F3DAUDIO_VECTOR{ 0.f, 0.f, 1.f };
-        emitter.OrientTop   = F3DAUDIO_VECTOR{ 0.f, 1.f, 0.f };
+        if (src_channels == 2)
+        {
+            compute_facing_basis(emitter_pos_x3d, listener.Position,
+                                 emitter.OrientFront, emitter.OrientTop);
+        }
+        else
+        {
+            emitter.OrientFront = F3DAUDIO_VECTOR{ 0.f, 0.f, 1.f };
+            emitter.OrientTop   = F3DAUDIO_VECTOR{ 0.f, 1.f, 0.f };
+        }
         emitter.ChannelCount = src_channels;
         emitter.ChannelRadius = (src_channels > 1) ? kStereoChannelRadius : 0.f;
         emitter.pChannelAzimuths = (src_channels > 1) ? azimuths.data() : nullptr;
@@ -313,7 +365,12 @@ namespace
             const float send_gain = calc_doppler
                 ? (dsp.ReverbLevel * kReverbSendScale * secondary_for_reverb)
                 : 0.0f;
-            const uint32_t reverb_ch = engine->getOutputChannelCount();
+            // Matrix dims target the reverb submix's input channel count,
+            // not the master's. The reverb submix may be a different size
+            // (e.g. 5.1 reverb feeding a 7.1 master); FAudio's default
+            // submix->master matrix handles the channel-count conversion
+            // on the output side.
+            const uint32_t reverb_ch = engine->getReverbChannelCount();
             std::array<float, 64> reverb_mat{};
             for (uint32_t s = 0; s < src_channels && s < 8; ++s)
             {

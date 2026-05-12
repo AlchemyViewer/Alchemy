@@ -36,6 +36,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <deque>
 #include <vector>
 
 class LLAudioChannelFAudio;
@@ -68,6 +69,7 @@ public:
     FAudioMasteringVoice*  getMasterVoice() const     { return mMasterVoice; }
     FAudioSubmixVoice*     getGroupVoice(S32 type) const;
     FAudioSubmixVoice*     getReverbVoice() const     { return mReverbVoice; }
+    uint32_t               getReverbChannelCount() const { return mReverbChannels; }
     uint32_t               getOutputChannelCount() const { return mOutputChannels; }
     uint32_t               getOutputSampleRate() const   { return mSampleRate; }
     const F3DAUDIO_HANDLE& getX3DInstance() const      { return mX3DInstance; }
@@ -80,20 +82,11 @@ public:
 
     // Wind queue depth is updated from the FAudio mixer thread via the
     // OnBufferEnd callback; public so the static C callback can reach it.
+    // Main thread uses it as a high-water mark to drain consumed chunks
+    // from mWindChunks (FIFO).
     std::atomic<int>       mWindQueueDepth{0};
 
-    // Set from the FAudio mixer thread when OnCriticalError fires (device
-    // disappeared, driver crashed, etc). Polled on the main thread so the
-    // log message lands on the main log without doing UI work from inside
-    // a mixer callback.
-    std::atomic<bool>      mCriticalError{false};
-    std::atomic<uint32_t>  mCriticalErrorCode{0};
-
     struct WindVoiceCallback : public FAudioVoiceCallback
-    {
-        LLAudioEngine_FAudio* engine = nullptr;
-    };
-    struct EngineCallback : public FAudioEngineCallback
     {
         LLAudioEngine_FAudio* engine = nullptr;
     };
@@ -117,10 +110,15 @@ private:
     // Single global reverb submix with an FAudioFXReverb FAPO on it. All
     // spatial source voices send a wet-level signal here in addition to
     // their dry submix; the reverb output mixes back into the master.
+    // FAudioFXReverb only supports 1/2/6 channel I/O, so the submix is
+    // created at the closest supported size and FAudio's default
+    // submix->master matrix handles the channel-count conversion when
+    // master is e.g. quad (4) or 7.1 (8). mReverbChannels records the
+    // size we picked so source-side reverb-send matrices are sized to
+    // match.
     FAudioSubmixVoice*     mReverbVoice  = nullptr;
     FAPO*                  mReverbApo    = nullptr;
-    EngineCallback         mEngineCallback{};
-    bool                   mEngineCallbackRegistered = false;
+    uint16_t               mReverbChannels = 0;
 
     uint32_t               mSampleRate     = 0;
     // Output channel count from the mastering voice. Named distinctly so
@@ -134,6 +132,19 @@ private:
     FAudioSourceVoice*        mWindVoice   = nullptr;
     U32                       mWindBufFreq = 0;
     U32                       mWindBufSamples = 0;
+    // FIFO of wind PCM chunks owned by the engine. Each submit pushes a
+    // new chunk; OnBufferEnd decrements mWindQueueDepth (without freeing,
+    // because FAudio's flush-then-destroy path can drop OnBufferEnd
+    // events on the floor); the main thread drains consumed chunks from
+    // the front of the deque the next time updateWind runs by comparing
+    // deque size against mWindQueueDepth.
+    std::deque<std::vector<WIND_SAMPLE_T>> mWindChunks;
+    // Wind voice volume ramp. initWind starts the voice silent; updateWind
+    // ramps up to unity over ~300 ms. Smooths the initial-startup
+    // transient when the wind voice begins playing freshly-generated
+    // samples against a silent baseline.
+    float                  mWindFadeIn = 1.0f;
+    static constexpr float kWindFadeInPerFrame = 0.05f;
 
     WindVoiceCallback mWindCallback{};
 };

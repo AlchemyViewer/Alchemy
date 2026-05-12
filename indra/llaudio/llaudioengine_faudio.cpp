@@ -35,10 +35,8 @@
 #include <FAPO.h>
 #include <F3DAudio.h>
 
-#include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstring>
 #include <sstream>
 
 namespace
@@ -68,6 +66,22 @@ namespace
             && a.nSamplesPerSec == b.nSamplesPerSec
             && a.wBitsPerSample == b.wBitsPerSample;
     }
+
+    // FAudioFXReverb's DspReverb_Create asserts (in_channels == 1 || 2 || 6)
+    // and likewise for out_channels. Asserts compile out under NDEBUG, after
+    // which the FAPO indexes a fixed 5-slot channel array with up to 8 — UB.
+    // Pick a supported reverb-submix channel count for the given master
+    // channel count; FAudio's default submix->master coefficient matrix
+    // handles the conversion when the two differ (e.g. 6-ch reverb to 7.1
+    // master upmixes the rears, 2-ch reverb to quad replicates fronts).
+    // 0 means "no reverb supported for this configuration".
+    uint16_t pick_reverb_channels(uint16_t master_channels)
+    {
+        if (master_channels == 0) return 0;
+        if (master_channels == 1) return 1;
+        if (master_channels >= 6) return 6;   // 5.1, 7.1, atmos -> 5.1 reverb
+        return 2;                              // 2/3/4/5 -> stereo reverb
+    }
 }
 
 //
@@ -80,15 +94,17 @@ LLAudioEngine_FAudio::~LLAudioEngine_FAudio() = default;
 
 // Wind voice callbacks. Dispatch table sets these on the wind callback
 // struct; FAudio invokes them on its mixer thread when buffers complete.
-// Each submitted buffer's pContext holds a heap-allocated std::vector<F32>
-// that owns the PCM payload — we free it here once FAudio is done with it.
+// The wind PCM chunks are owned by the engine (mWindChunks) rather than
+// the callback — FAudio's flush-then-destroy path drops OnBufferEnd
+// events on the floor, which would have leaked any callback-owned heap.
+// Here we only signal completion via the atomic counter; the main thread
+// drains the deque on its next pass.
 static void FAUDIOCALL wind_on_pass_start(FAudioVoiceCallback*, uint32_t) {}
 static void FAUDIOCALL wind_on_pass_end(FAudioVoiceCallback*) {}
 static void FAUDIOCALL wind_on_stream_end(FAudioVoiceCallback*) {}
 static void FAUDIOCALL wind_on_buffer_start(FAudioVoiceCallback*, void*) {}
-static void FAUDIOCALL wind_on_buffer_end(FAudioVoiceCallback* cb, void* context)
+static void FAUDIOCALL wind_on_buffer_end(FAudioVoiceCallback* cb, void*)
 {
-    delete static_cast<std::vector<F32>*>(context);
     auto* self = static_cast<LLAudioEngine_FAudio::WindVoiceCallback*>(cb);
     if (self && self->engine)
     {
@@ -97,22 +113,6 @@ static void FAUDIOCALL wind_on_buffer_end(FAudioVoiceCallback* cb, void* context
 }
 static void FAUDIOCALL wind_on_loop_end(FAudioVoiceCallback*, void*) {}
 static void FAUDIOCALL wind_on_voice_error(FAudioVoiceCallback*, void*, uint32_t) {}
-
-// Engine-level callbacks. OnCriticalError fires from a FAudio internal
-// thread when the audio device disappears or the driver crashes. Keep
-// the handler minimal — just stash the error so the main thread can
-// log it on its next pass.
-static void FAUDIOCALL faudio_on_critical_error(FAudioEngineCallback* cb, uint32_t error)
-{
-    auto* self = static_cast<LLAudioEngine_FAudio::EngineCallback*>(cb);
-    if (self && self->engine)
-    {
-        self->engine->mCriticalErrorCode.store(error, std::memory_order_relaxed);
-        self->engine->mCriticalError.store(true, std::memory_order_release);
-    }
-}
-static void FAUDIOCALL faudio_on_pass_start(FAudioEngineCallback*) {}
-static void FAUDIOCALL faudio_on_pass_end(FAudioEngineCallback*) {}
 
 bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
 {
@@ -188,18 +188,6 @@ bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
         FAudioVoice_SetVolume(mGroupVoices[i], mSecondaryGain[i], FAUDIO_COMMIT_NOW);
     }
 
-    // Engine callbacks — currently only OnCriticalError is wired up, but
-    // we provide stub pass-start/end fns so FAudio can call into the
-    // struct without segfaulting on null pointers.
-    mEngineCallback.OnCriticalError      = &faudio_on_critical_error;
-    mEngineCallback.OnProcessingPassStart = &faudio_on_pass_start;
-    mEngineCallback.OnProcessingPassEnd   = &faudio_on_pass_end;
-    mEngineCallback.engine                = this;
-    if (FAudio_RegisterForCallbacks(mFAudio, &mEngineCallback) == 0)
-    {
-        mEngineCallbackRegistered = true;
-    }
-
     // Reverb submix. Holds an FAudioFXReverb FAPO; source voices send a
     // wet signal here based on F3DAudio's per-emitter ReverbLevel. Output
     // routes back into the mastering voice (default null pSendList).
@@ -207,19 +195,38 @@ bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
     // ambience, the closest match for the SL world feel. Non-fatal if
     // creation fails: channels will just route to the type submix
     // without a reverb send and the world sounds normal-but-dry.
-    if (FAudioCreateReverb(&mReverbApo, 0) == 0 && mReverbApo)
+    //
+    // The reverb FAPO supports only 1/2/6-channel I/O. For other master
+    // channel counts (quad/3/5/7.1/atmos) we still get reverb by creating
+    // the submix at the closest supported size; FAudio's default
+    // submix->master coefficient matrix handles the channel-count
+    // conversion when reverb output mixes back into the master.
+    mReverbChannels = pick_reverb_channels(mOutputChannels);
+    if (mReverbChannels == 0)
+    {
+        LL_INFOS() << "LLAudioEngine_FAudio::init() reverb disabled (no "
+                      "supported reverb channel count for "
+                   << mOutputChannels << "-ch output)." << LL_ENDL;
+    }
+    else if (FAudioCreateReverb(&mReverbApo, 0) != 0 || !mReverbApo)
+    {
+        LL_WARNS() << "LLAudioEngine_FAudio::init() FAudioCreateReverb "
+                   "failed — reverb disabled" << LL_ENDL;
+        mReverbApo = nullptr;
+    }
+    else
     {
         FAudioEffectDescriptor reverb_desc{};
         reverb_desc.pEffect = mReverbApo;
         reverb_desc.InitialState = 1;
-        reverb_desc.OutputChannels = mOutputChannels;
+        reverb_desc.OutputChannels = mReverbChannels;
 
         FAudioEffectChain reverb_chain{};
         reverb_chain.EffectCount = 1;
         reverb_chain.pEffectDescriptors = &reverb_desc;
 
         hr = FAudio_CreateSubmixVoice(mFAudio, &mReverbVoice,
-                                      mOutputChannels, mSampleRate,
+                                      mReverbChannels, mSampleRate,
                                       0, 0, nullptr, &reverb_chain);
         if (hr == 0 && mReverbVoice)
         {
@@ -229,20 +236,25 @@ bool LLAudioEngine_FAudio::init(void* userdata, const std::string& app_title)
             FAudioVoice_SetEffectParameters(mReverbVoice, 0,
                                             &native, sizeof(native),
                                             FAUDIO_COMMIT_NOW);
+            if (mReverbChannels != mOutputChannels)
+            {
+                LL_INFOS() << "LLAudioEngine_FAudio::init() reverb running at "
+                           << mReverbChannels << "ch, mixing into "
+                           << mOutputChannels << "ch master." << LL_ENDL;
+            }
         }
         else
         {
             LL_WARNS() << "LLAudioEngine_FAudio::init() reverb submix "
                        "creation failed: 0x" << std::hex << hr << std::dec
                        << " — reverb disabled" << LL_ENDL;
+            // CreateSubmixVoice failed; the FAPO is unowned. Release it
+            // manually so we don't leak the heap allocation.
+            mReverbApo->Release(mReverbApo);
+            mReverbApo = nullptr;
             mReverbVoice = nullptr;
+            mReverbChannels = 0;
         }
-    }
-    else
-    {
-        LL_WARNS() << "LLAudioEngine_FAudio::init() FAudioCreateReverb "
-                   "failed — reverb disabled" << LL_ENDL;
-        mReverbApo = nullptr;
     }
 
     LL_INFOS() << "LLAudioEngine_FAudio::init() FAudio "
@@ -315,6 +327,7 @@ void LLAudioEngine_FAudio::shutdown()
         mReverbVoice = nullptr;
     }
     mReverbApo = nullptr;
+    mReverbChannels = 0;
 
     for (auto*& voice : mGroupVoices)
     {
@@ -329,12 +342,6 @@ void LLAudioEngine_FAudio::shutdown()
     {
         FAudioVoice_DestroyVoice(mMasterVoice);
         mMasterVoice = nullptr;
-    }
-
-    if (mEngineCallbackRegistered && mFAudio)
-    {
-        FAudio_UnregisterForCallbacks(mFAudio, &mEngineCallback);
-        mEngineCallbackRegistered = false;
     }
 
     if (mFAudio)
@@ -426,6 +433,11 @@ bool LLAudioEngine_FAudio::initWind()
         return false;
     }
 
+    // Start silent; updateWind ramps the voice up to unity over ~300 ms,
+    // masking the click that would otherwise occur as wind generation
+    // ramps from zero against a silent baseline.
+    FAudioVoice_SetVolume(mWindVoice, 0.0f, FAUDIO_COMMIT_NOW);
+    mWindFadeIn = 0.0f;
     FAudioSourceVoice_Start(mWindVoice, 0, FAUDIO_COMMIT_NOW);
     return true;
 }
@@ -435,13 +447,17 @@ void LLAudioEngine_FAudio::cleanupWind()
     if (mWindVoice)
     {
         FAudioSourceVoice_Stop(mWindVoice, 0, FAUDIO_COMMIT_NOW);
-        // Flushing triggers OnBufferEnd for every in-flight buffer, which
-        // releases their heap-allocated PCM via wind_on_buffer_end.
         FAudioSourceVoice_FlushSourceBuffers(mWindVoice);
         FAudioVoice_DestroyVoice(mWindVoice);
         mWindVoice = nullptr;
     }
     mWindQueueDepth = 0;
+    // DestroyVoice removed the source from FAudio's graph; the mixer can
+    // no longer touch our chunks. Safe to clear regardless of whether
+    // OnBufferEnd ever fired for them (FAudio's flush path can drop
+    // pending OnBufferEnd events on the floor when the voice is destroyed
+    // before the mixer drains flush_buffers).
+    mWindChunks.clear();
 
     delete mWindGen;
     mWindGen = nullptr;
@@ -451,20 +467,24 @@ void LLAudioEngine_FAudio::updateWind(LLVector3 wind_vec, F32 /*camera_altitude*
 {
     LL_PROFILE_ZONE_SCOPED;
 
-    // Drain any pending critical-error notification posted from a mixer
-    // thread by the engine callback. Logged once per event (the atomic is
-    // exchanged false so a sustained fault doesn't spam the log).
-    if (mCriticalError.exchange(false, std::memory_order_acquire))
+    if (!mEnableWind || !mWindGen || !mWindVoice) return;
+
+    // Drain consumed chunks from the front of mWindChunks. FAudio fires
+    // OnBufferEnd in submission (FIFO) order, decrementing mWindQueueDepth;
+    // our deque size mirrors that.
     {
-        const uint32_t code = mCriticalErrorCode.load(std::memory_order_relaxed);
-        LL_WARNS("AudioEngine") << "FAudio reported a critical engine error: 0x"
-                                << std::hex << code << std::dec
-                                << " — audio device may have disappeared or the"
-                                << " driver crashed. Sounds may stop until the"
-                                << " viewer is restarted." << LL_ENDL;
+        const int depth = mWindQueueDepth.load(std::memory_order_relaxed);
+        while (static_cast<int>(mWindChunks.size()) > depth)
+        {
+            mWindChunks.pop_front();
+        }
     }
 
-    if (!mEnableWind || !mWindGen || !mWindVoice) return;
+    if (mWindFadeIn < 1.0f)
+    {
+        mWindFadeIn = std::min(1.0f, mWindFadeIn + kWindFadeInPerFrame);
+        FAudioVoice_SetVolume(mWindVoice, mWindFadeIn, FAUDIO_COMMIT_NOW);
+    }
 
     if (mWindUpdateTimer.checkExpirationAndReset(LL_WIND_UPDATE_INTERVAL))
     {
@@ -481,20 +501,21 @@ void LLAudioEngine_FAudio::updateWind(LLVector3 wind_vec, F32 /*camera_altitude*
     }
 
     // Top up the queue so FAudio always has at least MAX_WIND_QUEUED chunks
-    // pending. Each chunk is heap-allocated and handed to FAudio with
-    // pContext = its pointer; OnBufferEnd deletes it once consumed.
+    // pending. Chunks are owned by mWindChunks (FIFO); FAudio reads them
+    // in place and signals completion via OnBufferEnd.
     int depth = mWindQueueDepth.load(std::memory_order_relaxed);
     while (depth < MAX_WIND_QUEUED)
     {
-        auto* chunk = new std::vector<WIND_SAMPLE_T>(mWindBufSamples * 2 /*stereo*/, 0.f);
-        mWindGen->windGenerate(chunk->data(), mWindBufSamples);
+        mWindChunks.emplace_back(mWindBufSamples * 2 /*stereo*/, 0.f);
+        auto& chunk = mWindChunks.back();
+        mWindGen->windGenerate(chunk.data(), mWindBufSamples);
 
         FAudioBuffer buf{};
-        buf.AudioBytes = static_cast<uint32_t>(chunk->size() * sizeof(WIND_SAMPLE_T));
-        buf.pAudioData = reinterpret_cast<const uint8_t*>(chunk->data());
+        buf.AudioBytes = static_cast<uint32_t>(chunk.size() * sizeof(WIND_SAMPLE_T));
+        buf.pAudioData = reinterpret_cast<const uint8_t*>(chunk.data());
         buf.Flags      = 0;  // wind is continuous, never end-of-stream
         buf.LoopCount  = 0;
-        buf.pContext   = chunk;
+        buf.pContext   = nullptr;
 
         mWindQueueDepth.fetch_add(1, std::memory_order_relaxed);
 
@@ -503,7 +524,7 @@ void LLAudioEngine_FAudio::updateWind(LLVector3 wind_vec, F32 /*camera_altitude*
         {
             LL_WARNS() << "LLAudioEngine_FAudio::updateWind() SubmitSourceBuffer failed: 0x"
                        << std::hex << hr << std::dec << LL_ENDL;
-            delete chunk;
+            mWindChunks.pop_back();
             mWindQueueDepth.fetch_sub(1, std::memory_order_relaxed);
             break;
         }
@@ -575,7 +596,31 @@ void LLAudioChannelFAudio::destroyVoice()
 
 bool LLAudioChannelFAudio::ensureVoice(const FAudioWaveFormatEx& fmt)
 {
-    if (mVoice && formats_equal(mFormat, fmt))
+    if (!mEnginep->getFAudio())
+    {
+        // No live FAudio engine — nothing we can build a voice on. Caller
+        // (updateBuffer) will return false and the channel stays silent.
+        return false;
+    }
+
+    // Compute what the routing SHOULD be for this source. The short-circuit
+    // below has to reject not only format mismatches but also routing
+    // mismatches — a source whose type changed while the channel is reused
+    // would otherwise keep playing through the old type's submix.
+    FAudioSubmixVoice* desired_group = nullptr;
+    if (mCurrentSourcep)
+    {
+        desired_group = mEnginep->getGroupVoice(mCurrentSourcep->getType());
+    }
+    FAudioVoice* desired_dest = desired_group
+        ? reinterpret_cast<FAudioVoice*>(desired_group)
+        : reinterpret_cast<FAudioVoice*>(mEnginep->getMasterVoice());
+    const bool desired_through_group = (desired_group != nullptr);
+
+    if (mVoice
+        && formats_equal(mFormat, fmt)
+        && mDestVoice == desired_dest
+        && mRoutedThroughGroup == desired_through_group)
     {
         return true;
     }
@@ -591,20 +636,8 @@ bool LLAudioChannelFAudio::ensureVoice(const FAudioWaveFormatEx& fmt)
     FAudioSendDescriptor send_list[2]{};
     int num_sends = 0;
 
-    FAudioVoice* dest = reinterpret_cast<FAudioVoice*>(mEnginep->getMasterVoice());
-    bool through_group = false;
-    if (mCurrentSourcep)
-    {
-        S32 type = mCurrentSourcep->getType();
-        FAudioSubmixVoice* group = mEnginep->getGroupVoice(type);
-        if (group)
-        {
-            dest = reinterpret_cast<FAudioVoice*>(group);
-            through_group = true;
-        }
-    }
     send_list[num_sends].Flags = 0;
-    send_list[num_sends].pOutputVoice = dest;
+    send_list[num_sends].pOutputVoice = desired_dest;
     num_sends++;
 
     FAudioSubmixVoice* reverb = mEnginep->getReverbVoice();
@@ -638,15 +671,17 @@ bool LLAudioChannelFAudio::ensureVoice(const FAudioWaveFormatEx& fmt)
         return false;
     }
     mFormat = fmt;
-    mDestVoice = dest;
-    mRoutedThroughGroup = through_group;
+    mDestVoice = desired_dest;
+    mRoutedThroughGroup = desired_through_group;
 
     // Silence the reverb send until F3DAudio sets a per-frame level —
     // otherwise FAudio's default identity matrix would route the dry
-    // signal into the reverb at full gain.
+    // signal into the reverb at full gain. Matrix dims are
+    // src_channels x reverb_channels (the submix's input count, not the
+    // master's — the reverb submix can be a different size).
     if (reverb)
     {
-        const uint32_t reverb_ch = mEnginep->getOutputChannelCount();
+        const uint32_t reverb_ch = mEnginep->getReverbChannelCount();
         std::array<float, 64> zero{};
         FAudioVoice_SetOutputMatrix(mVoice,
                                     reinterpret_cast<FAudioVoice*>(reverb),
