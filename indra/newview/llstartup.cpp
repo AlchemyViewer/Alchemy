@@ -774,24 +774,12 @@ bool idle_startup()
                 faudio_cfg.reverb_preset       = gSavedSettings.getString("AudioReverbPreset");
                 faudio_cfg.reverb_send_scale   = gSavedSettings.getF32("AudioFAudioReverbSendScale");
                 gAudiop = (LLAudioEngine *) new LLAudioEngine_FAudio(std::move(faudio_cfg));
-
-                // Wire each tunable to a control-changed callback so
-                // edits in the debug pane apply live without restart.
-                // The lambdas look up gAudiop fresh on every fire so a
-                // future backend swap doesn't leave us calling into a
-                // stale FAudio engine pointer.
-                gSavedSettings.getControl("AudioFAudioAudibleRange")->getSignal()->connect(
-                    [](LLControlVariable*, const LLSD& v, const LLSD&)
-                    {
-                        if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
-                            fa->setAudibleRange(static_cast<F32>(v.asReal()));
-                    });
-                gSavedSettings.getControl("AudioFAudioInnerRadius")->getSignal()->connect(
-                    [](LLControlVariable*, const LLSD& v, const LLSD&)
-                    {
-                        if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
-                            fa->setInnerRadius(static_cast<F32>(v.asReal()));
-                    });
+                // Live tunables (AudioFAudioAudibleRange, InnerRadius,
+                // ReverbPreset, ReverbSendScale, WindGustiness,
+                // WindAltitudeBoost) are wired via
+                // settings_setup_listeners in llviewercontrol.cpp —
+                // same place every other global setting's signal
+                // listener lives.
             }
 #endif
 
@@ -806,57 +794,6 @@ bool idle_startup()
                     gSavedSettings.getString("AudioOpenALOutputDevice"));
             }
 #endif
-
-            // Reverb preset is shared — the I3DL2 preset *name* means
-            // the same thing across all three backends. Send-scale is
-            // per-backend because the same numeric value drives three
-            // different DSP scales (FAudio matrix coefficient vs
-            // OpenAL slot gain vs FMOD wet); each backend's setting
-            // key is reported by getReverbSendScaleSettingName(). We
-            // wire all three send-scale settings unconditionally but
-            // each handler only dispatches when the active engine is
-            // the matching backend — that way switching engines
-            // doesn't require re-wiring, and a value edited in the
-            // wrong backend's key just sits inert until that engine
-            // becomes active.
-            gSavedSettings.getControl("AudioReverbPreset")->getSignal()->connect(
-                [](LLControlVariable*, const LLSD& v, const LLSD&)
-                {
-                    if (gAudiop)
-                        gAudiop->setReverbPreset(v.asString());
-                });
-            auto wire_reverb_scale = [](const std::string& key) {
-                gSavedSettings.getControl(key)->getSignal()->connect(
-                    [key](LLControlVariable*, const LLSD& v, const LLSD&)
-                    {
-                        if (gAudiop
-                            && gAudiop->getReverbSendScaleSettingName() == key)
-                        {
-                            gAudiop->setReverbSendScale(static_cast<F32>(v.asReal()));
-                        }
-                    });
-            };
-            wire_reverb_scale("AudioFAudioReverbSendScale");
-            wire_reverb_scale("AudioOpenALReverbSendScale");
-            wire_reverb_scale("AudioFMODReverbSendScale");
-
-            // Wind tunables. Backend-agnostic via the lifted base
-            // virtuals — setWindGustiness routes to the active engine's
-            // LLWindGen; setWindAltitudeBoost stores on the base class
-            // and is read by computeWindAltitudeShape on each update
-            // tick.
-            gSavedSettings.getControl("AudioWindGustiness")->getSignal()->connect(
-                [](LLControlVariable*, const LLSD& v, const LLSD&)
-                {
-                    if (gAudiop)
-                        gAudiop->setWindGustiness(static_cast<F32>(v.asReal()));
-                });
-            gSavedSettings.getControl("AudioWindAltitudeBoost")->getSignal()->connect(
-                [](LLControlVariable*, const LLSD& v, const LLSD&)
-                {
-                    if (gAudiop)
-                        gAudiop->setWindAltitudeBoost(static_cast<F32>(v.asReal()));
-                });
 
             if (gAudiop)
             {

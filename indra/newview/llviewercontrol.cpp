@@ -37,6 +37,9 @@
 
 // For Listeners
 #include "llaudioengine.h"
+#ifdef LL_FAUDIO
+#include "llaudioengine_faudio.h"
+#endif
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llconsole.h"
@@ -474,6 +477,72 @@ static void handleAudioVolumeChanged(const LLSD& newvalue)
 {
     audio_update_volume(true);
 }
+
+// Audio backend live-tuning. Each handler looks up gAudiop fresh on
+// every fire so a future backend swap doesn't leave us calling into
+// a stale engine pointer. All routes through the LLAudioEngine base
+// virtuals; backends that don't surface the relevant tunable inherit
+// the base no-op override.
+
+static void handleAudioReverbPresetChanged(const LLSD& newvalue)
+{
+    if (gAudiop)
+        gAudiop->setReverbPreset(newvalue.asString());
+}
+
+// Reverb send-scale is split into per-backend keys because the same
+// numeric value drives three different DSP scales (FAudio matrix
+// coefficient vs OpenAL EFX slot gain vs FMOD wet). Each handler
+// only dispatches when its key matches the active backend's reported
+// key, so a value edited in the "wrong" backend's key sits inert
+// until that engine becomes active — no re-wiring needed on swap.
+static void handleAudioFAudioReverbSendScaleChanged(const LLSD& newvalue)
+{
+    if (gAudiop && gAudiop->getReverbSendScaleSettingName() == "AudioFAudioReverbSendScale")
+        gAudiop->setReverbSendScale(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioOpenALReverbSendScaleChanged(const LLSD& newvalue)
+{
+    if (gAudiop && gAudiop->getReverbSendScaleSettingName() == "AudioOpenALReverbSendScale")
+        gAudiop->setReverbSendScale(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioFMODReverbSendScaleChanged(const LLSD& newvalue)
+{
+    if (gAudiop && gAudiop->getReverbSendScaleSettingName() == "AudioFMODReverbSendScale")
+        gAudiop->setReverbSendScale(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioWindGustinessChanged(const LLSD& newvalue)
+{
+    if (gAudiop)
+        gAudiop->setWindGustiness(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioWindAltitudeBoostChanged(const LLSD& newvalue)
+{
+    if (gAudiop)
+        gAudiop->setWindAltitudeBoost(static_cast<F32>(newvalue.asReal()));
+}
+
+#ifdef LL_FAUDIO
+// FAudio-specific tunables: AudibleRange controls F3DAudio's
+// CurveDistanceScaler, InnerRadius the emitter's near-field diffusion
+// radius. dynamic_cast keeps the dispatch safe when a non-FAudio
+// engine is live (cast returns null, no-op).
+static void handleAudioFAudioAudibleRangeChanged(const LLSD& newvalue)
+{
+    if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+        fa->setAudibleRange(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioFAudioInnerRadiusChanged(const LLSD& newvalue)
+{
+    if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+        fa->setInnerRadius(static_cast<F32>(newvalue.asReal()));
+}
+#endif
 
 static bool handleJoystickChanged(const LLSD& newvalue)
 {
@@ -963,6 +1032,18 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "MuteVoice", handleAudioVolumeChanged);
     setting_setup_signal_listener(gSavedSettings, "MuteAmbient", handleAudioVolumeChanged);
     setting_setup_signal_listener(gSavedSettings, "MuteUI", handleAudioVolumeChanged);
+    // Audio backend live tunables — dispatch through the LLAudioEngine
+    // base virtuals so backend swaps don't require re-wiring.
+    setting_setup_signal_listener(gSavedSettings, "AudioReverbPreset", handleAudioReverbPresetChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioReverbSendScale", handleAudioFAudioReverbSendScaleChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioOpenALReverbSendScale", handleAudioOpenALReverbSendScaleChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFMODReverbSendScale", handleAudioFMODReverbSendScaleChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioWindGustiness", handleAudioWindGustinessChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioWindAltitudeBoost", handleAudioWindAltitudeBoostChanged);
+#ifdef LL_FAUDIO
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioAudibleRange", handleAudioFAudioAudibleRangeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioInnerRadius", handleAudioFAudioInnerRadiusChanged);
+#endif
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis0", handleJoystickChanged);
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis1", handleJoystickChanged);
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis2", handleJoystickChanged);
