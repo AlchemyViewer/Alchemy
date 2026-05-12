@@ -15,6 +15,7 @@ set(cmake_SOURCE_FILES
         CURL.cmake
         Discord.cmake
         EXPAT.cmake
+        FAudio.cmake
         FindPipeWire.cmake
         FMODSTUDIO.cmake
         FontConfig.cmake

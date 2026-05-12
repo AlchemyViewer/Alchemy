@@ -167,6 +167,14 @@ if(BUILD_HEADLESS)
   list(APPEND VCPKG_MANIFEST_FEATURES "offscreen")
 endif()
 
+if(USE_FAUDIO)
+  list(APPEND VCPKG_MANIFEST_FEATURES "faudio")
+endif()
+
+if(USE_OPENAL)
+  list(APPEND VCPKG_MANIFEST_FEATURES "openal")
+endif()
+
 # Export compile_commands.json for ninja and makefile generators
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

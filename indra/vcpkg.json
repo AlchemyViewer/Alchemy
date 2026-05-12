@@ -29,7 +29,6 @@
     },
     "dullahan-bin",
     "expat",
-    "faudio",
     "fmt",
     {
       "name": "fontconfig",
@@ -72,19 +71,6 @@
     {
       "name": "open-libndofdev",
       "platform": "linux"
-    },
-    {
-      "name": "openal-soft",
-      "features": [
-        {
-          "name": "pipewire",
-          "platform": "linux"
-        },
-        {
-          "name": "pulseaudio",
-          "platform": "linux"
-        }
-      ]
     },
     "opengl-registry",
     "openjpeg",
@@ -144,6 +130,12 @@
         }
       ]
     },
+    "faudio": {
+      "description": "Build with support for the FAudio audio engine",
+      "dependencies": [
+        "faudio"
+      ]
+    },
     "kdu": {
       "description": "Build with support for Kakadu JPEG2000",
       "dependencies": [
@@ -157,6 +149,24 @@
           "name": "mesa",
           "features": [
             "offscreen"
+          ]
+        }
+      ]
+    },
+    "openal": {
+      "description": "Build with support for the OpenAL Soft audio engine",
+      "dependencies": [
+        {
+          "name": "openal-soft",
+          "features": [
+            {
+              "name": "pipewire",
+              "platform": "linux"
+            },
+            {
+              "name": "pulseaudio",
+              "platform": "linux"
+            }
           ]
         }
       ]
