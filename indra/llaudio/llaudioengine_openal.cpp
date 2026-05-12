@@ -36,6 +36,12 @@
 #include "lllistener_openal.h"
 #include "llwavfile.h"
 
+// efx-presets.h carries the EFXEAXREVERBPROPERTIES struct + macro
+// initialisers. Pulled in here rather than from the public header so
+// the cpp file is the only TU that depends on the preset surface.
+#include <AL/efx-presets.h>
+
+#include <algorithm>
 #include <cstring>
 #include <new>
 #include <vector>
@@ -139,6 +145,28 @@ bool LLAudioEngine_OpenAL::init(void* userdata, const std::string &app_title)
                            ALC_DEFAULT_DEVICE_SPECIFIER))
         << LL_ENDL;
 
+    // Best-effort EFX init for reverb. Failure is non-fatal — the engine
+    // runs without reverb and supportsReverb() reports false so the UI
+    // hides the controls.
+    if (initEfx())
+    {
+        LL_INFOS() << "LLAudioEngine_OpenAL::init() EFX reverb available" << LL_ENDL;
+    }
+
+    // ALC_EXT_disconnect is OpenAL Soft's mechanism for surfacing
+    // device-loss. Without it we silently keep running on a dead
+    // device — with it the per-frame idle() poll catches the drop and
+    // tries to reopen. FAudio's device-loss path is handled inside
+    // SDL3, so this is OpenAL-only.
+    mDisconnectExtAvailable = (alcIsExtensionPresent(mALCDevice,
+                                                     "ALC_EXT_disconnect") == ALC_TRUE);
+    if (mDisconnectExtAvailable)
+    {
+        LL_INFOS() << "LLAudioEngine_OpenAL::init() ALC_EXT_disconnect "
+                      "available — will poll for device-loss." << LL_ENDL;
+        mDisconnectPollTimer.reset();
+    }
+
     return true;
 }
 
@@ -187,6 +215,11 @@ void LLAudioEngine_OpenAL::shutdown()
     LLAudioEngine::shutdown();
 
     LL_INFOS() << "About to tear down OpenAL context/device" << LL_ENDL;
+
+    // Tear EFX down before destroying the context so the slot + effect
+    // are detached from a live context. shutdownEfx no-ops if init never
+    // ran (mEfxAvailable stays false in that case).
+    shutdownEfx();
 
     if (mALCContext)
     {
@@ -310,6 +343,341 @@ void LLAudioEngine_OpenAL::setOutputDevice(const std::string& id)
                << mActiveDevice << "'" << LL_ENDL;
 }
 
+//
+// ─── Device-loss detection (ALC_EXT_disconnect) ─────────────────────────
+//
+
+// virtual
+void LLAudioEngine_OpenAL::idle()
+{
+    // Run the base bookkeeping first — source / buffer aging, priority
+    // recomputation, channel reassignment. Our disconnect poll is
+    // independent of any of it and just rides on top once a second.
+    LLAudioEngine::idle();
+
+    if (!mDisconnectExtAvailable || !mALCDevice) return;
+
+    // Polling ALC_CONNECTED on every frame would generate an ALC call
+    // per frame for no benefit — once every couple seconds catches a
+    // user unplugging a device well within the typical "did the audio
+    // just stop?" cognitive window without flooding the driver.
+    static constexpr F32 kDisconnectPollIntervalSec = 2.0f;
+    if (mDisconnectPollTimer.getElapsedTimeF32() < kDisconnectPollIntervalSec) return;
+    mDisconnectPollTimer.reset();
+
+    ALCint connected = ALC_TRUE;
+    alcGetIntegerv(mALCDevice, ALC_CONNECTED, 1, &connected);
+
+    if (connected == ALC_TRUE)
+    {
+        // Any healthy poll clears the disconnect-debounce counter so
+        // flicker doesn't accumulate toward the edge threshold.
+        mConsecutiveDisconnects = 0;
+        if (mDeviceDisconnected)
+        {
+            // Edge transition disconnected -> connected. The driver
+            // recovered on its own (some implementations reconnect
+            // transparently after the OS audio service restarts).
+            LL_INFOS() << "LLAudioEngine_OpenAL: device reconnected." << LL_ENDL;
+            mDeviceDisconnected = false;
+        }
+        return;
+    }
+
+    // Device is currently disconnected. Require N consecutive
+    // disconnected polls (~N*kDisconnectPollIntervalSec wall-clock)
+    // before treating the disconnect as real — some drivers flicker
+    // the ALC_CONNECTED bit during sample-rate negotiation, exclusive-
+    // mode handoff, etc. Two consecutive polls (~4 seconds) is well
+    // under the human "did the audio stop" threshold and well above
+    // typical flicker durations.
+    static constexpr int kDisconnectEdgeThreshold = 2;
+    mConsecutiveDisconnects++;
+    if (mConsecutiveDisconnects < kDisconnectEdgeThreshold && !mDeviceDisconnected)
+    {
+        // Not yet considered lost — wait for the next poll.
+        return;
+    }
+
+    if (!mDeviceDisconnected)
+    {
+        LL_WARNS() << "LLAudioEngine_OpenAL: device lost — attempting "
+                      "alcReopenDeviceSOFT recovery every "
+                   << kDisconnectPollIntervalSec << "s until it returns."
+                   << LL_ENDL;
+        mDeviceDisconnected = true;
+    }
+
+    // Try alcReopenDeviceSOFT to the preferred device (or system
+    // default if no preference). On success the context, sources,
+    // buffers, EFX state all survive — alcReopenDeviceSOFT preserves
+    // them by design. The function pointer is resolved fresh each
+    // attempt: when the underlying device went away, the previously-
+    // resolved pointer is still valid for the surviving ALCdevice
+    // wrapper, but resolving each time is cheap and matches the
+    // pattern in setOutputDevice.
+    using ReopenFn = ALCboolean (ALC_APIENTRY *)(ALCdevice*, const ALCchar*,
+                                                  const ALCint*);
+    auto reopen = reinterpret_cast<ReopenFn>(
+        alcGetProcAddress(mALCDevice, "alcReopenDeviceSOFT"));
+    if (!reopen) return;
+
+    // If the user originally picked a device that was already gone at
+    // init() we still try that name first here — desirable behaviour
+    // since hot-plug of the original target should restore the pick.
+    // Empty mPreferredDevice means "no explicit preference, use
+    // system default", and alcReopenDeviceSOFT(NULL) does exactly that.
+    const char* device_name = mPreferredDevice.empty() ? nullptr
+                                                       : mPreferredDevice.c_str();
+    if (reopen(mALCDevice, device_name, nullptr) == ALC_TRUE)
+    {
+        // Verify the live device actually reports connected post-reopen
+        // — alcReopenDeviceSOFT can succeed against a device that's
+        // still gone (e.g., returning EOF immediately). The next poll
+        // tick (~2s) will catch that and retry.
+        ALCint post = ALC_TRUE;
+        alcGetIntegerv(mALCDevice, ALC_CONNECTED, 1, &post);
+        if (post == ALC_TRUE)
+        {
+            LL_INFOS() << "LLAudioEngine_OpenAL: device recovered via "
+                          "alcReopenDeviceSOFT." << LL_ENDL;
+            mDeviceDisconnected = false;
+            if (const char* opened =
+                    alcGetString(mALCDevice, ALC_ALL_DEVICES_SPECIFIER))
+            {
+                mActiveDevice = opened;
+            }
+        }
+    }
+}
+
+//
+// ─── EFX reverb ──────────────────────────────────────────────────────────
+//
+
+namespace
+{
+    // Lookup an EFX EAXReverb preset struct by I3DL2 name. Mirrors the
+    // FAudio backend's pick_i3dl2_preset so the same AudioReverbPreset
+    // setting drives both backends identically. DEFAULT and SMALLROOM
+    // aren't in the EFX preset table — map to the closest available
+    // (GENERIC and CASTLE_SMALLROOM respectively). Unknown -> PLAIN
+    // with a warn.
+    EFXEAXREVERBPROPERTIES pick_efx_preset(const std::string& raw_name)
+    {
+        std::string name(raw_name);
+        // std::toupper takes int and is UB for char values >0x7F on
+        // platforms with signed char. Cast through unsigned char first.
+        for (auto& c : name)
+            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+
+        // I3DL2 names that exist verbatim in EFX.
+        if (name == "GENERIC")         { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_GENERIC;         return p; }
+        if (name == "PADDEDCELL")      { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_PADDEDCELL;      return p; }
+        if (name == "ROOM")            { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_ROOM;            return p; }
+        if (name == "BATHROOM")        { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_BATHROOM;        return p; }
+        if (name == "LIVINGROOM")      { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_LIVINGROOM;      return p; }
+        if (name == "STONEROOM")       { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_STONEROOM;       return p; }
+        if (name == "AUDITORIUM")      { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_AUDITORIUM;      return p; }
+        if (name == "CONCERTHALL")     { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_CONCERTHALL;     return p; }
+        if (name == "CAVE")            { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_CAVE;            return p; }
+        if (name == "ARENA")           { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_ARENA;           return p; }
+        if (name == "HANGAR")          { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_HANGAR;          return p; }
+        if (name == "CARPETEDHALLWAY") { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_CARPETEDHALLWAY; return p; }
+        if (name == "HALLWAY")         { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_HALLWAY;         return p; }
+        if (name == "STONECORRIDOR")   { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_STONECORRIDOR;   return p; }
+        if (name == "ALLEY")           { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_ALLEY;           return p; }
+        if (name == "FOREST")          { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_FOREST;          return p; }
+        if (name == "CITY")            { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_CITY;            return p; }
+        if (name == "MOUNTAINS")       { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_MOUNTAINS;       return p; }
+        if (name == "QUARRY")          { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_QUARRY;          return p; }
+        if (name == "PLAIN")           { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_PLAIN;           return p; }
+        if (name == "PARKINGLOT")      { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_PARKINGLOT;      return p; }
+        if (name == "SEWERPIPE")       { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_SEWERPIPE;       return p; }
+        if (name == "UNDERWATER")      { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_UNDERWATER;      return p; }
+
+        // FAudio I3DL2 has these; EFX uses different names — map to the
+        // closest match so the user's pick still resolves to a sensible
+        // sound rather than the silent fallback.
+        if (name == "DEFAULT")   { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_GENERIC;        return p; }
+        if (name == "SMALLROOM") { EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_CASTLE_SMALLROOM; return p; }
+
+        LL_WARNS() << "LLAudioEngine_OpenAL: unknown reverb preset '" << raw_name
+                   << "' — falling back to PLAIN. See settings_alchemy.xml "
+                      "AudioReverbPreset for the valid names." << LL_ENDL;
+        EFXEAXREVERBPROPERTIES p = EFX_REVERB_PRESET_PLAIN;
+        return p;
+    }
+}
+
+bool LLAudioEngine_OpenAL::initEfx()
+{
+    // ALC_EXT_EFX is the umbrella; checked on the device, not the
+    // context. Without it the EAXReverb effect type isn't available.
+    if (alcIsExtensionPresent(mALCDevice, "ALC_EXT_EFX") != ALC_TRUE)
+    {
+        LL_INFOS() << "LLAudioEngine_OpenAL::initEfx() ALC_EXT_EFX not "
+                      "available; running without reverb." << LL_ENDL;
+        return false;
+    }
+
+    // Resolve the function pointers we use. alGetProcAddress returns
+    // the implementation's function for the current context, so this
+    // has to run after alcMakeContextCurrent.
+    mAlGenEffects = reinterpret_cast<LPALGENEFFECTS>(
+        alGetProcAddress("alGenEffects"));
+    mAlDeleteEffects = reinterpret_cast<LPALDELETEEFFECTS>(
+        alGetProcAddress("alDeleteEffects"));
+    mAlEffecti = reinterpret_cast<LPALEFFECTI>(
+        alGetProcAddress("alEffecti"));
+    mAlEffectf = reinterpret_cast<LPALEFFECTF>(
+        alGetProcAddress("alEffectf"));
+    mAlEffectfv = reinterpret_cast<LPALEFFECTFV>(
+        alGetProcAddress("alEffectfv"));
+    mAlGenAuxiliaryEffectSlots = reinterpret_cast<LPALGENAUXILIARYEFFECTSLOTS>(
+        alGetProcAddress("alGenAuxiliaryEffectSlots"));
+    mAlDeleteAuxiliaryEffectSlots = reinterpret_cast<LPALDELETEAUXILIARYEFFECTSLOTS>(
+        alGetProcAddress("alDeleteAuxiliaryEffectSlots"));
+    mAlAuxiliaryEffectSloti = reinterpret_cast<LPALAUXILIARYEFFECTSLOTI>(
+        alGetProcAddress("alAuxiliaryEffectSloti"));
+    mAlAuxiliaryEffectSlotf = reinterpret_cast<LPALAUXILIARYEFFECTSLOTF>(
+        alGetProcAddress("alAuxiliaryEffectSlotf"));
+
+    if (!mAlGenEffects || !mAlDeleteEffects || !mAlEffecti || !mAlEffectf
+        || !mAlEffectfv || !mAlGenAuxiliaryEffectSlots
+        || !mAlDeleteAuxiliaryEffectSlots || !mAlAuxiliaryEffectSloti
+        || !mAlAuxiliaryEffectSlotf)
+    {
+        LL_WARNS() << "LLAudioEngine_OpenAL::initEfx() failed to resolve "
+                      "one or more EFX function pointers; running without "
+                      "reverb." << LL_ENDL;
+        return false;
+    }
+
+    alGetError();  // clear any stale error before the EFX object gens
+
+    mAlGenAuxiliaryEffectSlots(1, &mEffectSlot);
+    mAlGenEffects(1, &mEffect);
+
+    // Prefer EAXReverb (full I3DL2 surface). Drivers that only advertise
+    // ALC_EXT_EFX but don't implement EAXReverb fall back to AL_EFFECT_
+    // REVERB — coarser but still functional. iDecayHFLimit / GainLF /
+    // panning fields are dropped on the standard REVERB type.
+    mAlEffecti(mEffect, AL_EFFECT_TYPE, AL_EFFECT_EAXREVERB);
+    if (alGetError() != AL_NO_ERROR)
+    {
+        mAlEffecti(mEffect, AL_EFFECT_TYPE, AL_EFFECT_REVERB);
+        if (alGetError() != AL_NO_ERROR)
+        {
+            LL_WARNS() << "LLAudioEngine_OpenAL::initEfx() neither "
+                          "EAXReverb nor standard reverb supported; "
+                          "running without reverb." << LL_ENDL;
+            mAlDeleteEffects(1, &mEffect);
+            mAlDeleteAuxiliaryEffectSlots(1, &mEffectSlot);
+            mEffect = 0;
+            mEffectSlot = 0;
+            return false;
+        }
+    }
+
+    mEfxAvailable = true;
+    // Seed with PLAIN at silent slot gain so the effect chain is live
+    // but inaudible from the moment init returns; llstartup pushes the
+    // user's saved preset / send scale via setReverbPreset /
+    // setReverbSendScale once the engine is up. The 0.0f initial gain
+    // matters because anything that plays in the window between
+    // initEfx() and llstartup's push would otherwise reverb at full
+    // wet — nothing in the viewer's startup ordering actually plays
+    // that early, but seeding silent costs nothing and is safer.
+    // The engine itself stays free of gSavedSettings, matching the
+    // FAudio backend's "config in, no direct llcontrol coupling" shape.
+    applyReverbPreset("PLAIN");
+    mAlAuxiliaryEffectSlotf(mEffectSlot, AL_EFFECTSLOT_GAIN, 0.0f);
+
+    return true;
+}
+
+void LLAudioEngine_OpenAL::shutdownEfx()
+{
+    if (!mEfxAvailable) return;
+
+    // Channels that already wired AL_AUXILIARY_SEND_FILTER to our slot
+    // hold a stale slot id past this point. Walk the pool and reset
+    // their latch + clear the send back to AL_EFFECTSLOT_NULL — if EFX
+    // is ever re-initialized while channels are alive (no caller does
+    // this today, but the design should fail gracefully if one is
+    // added) the lazy-wire in play() will re-attach to the new slot.
+    for (size_t i = 0; i < mChannels.size(); ++i)
+    {
+        if (auto* ch = static_cast<LLAudioChannelOpenAL*>(mChannels[i]))
+        {
+            ch->onEfxShutdown();
+        }
+    }
+
+    // Detach effect from slot, then delete both. Sources auto-clean
+    // their AUX sends when the source itself is destroyed (in
+    // LLAudioChannelOpenAL::~LLAudioChannelOpenAL).
+    mAlAuxiliaryEffectSloti(mEffectSlot, AL_EFFECTSLOT_EFFECT, AL_EFFECT_NULL);
+    mAlDeleteEffects(1, &mEffect);
+    mAlDeleteAuxiliaryEffectSlots(1, &mEffectSlot);
+    mEffect = 0;
+    mEffectSlot = 0;
+    mEfxAvailable = false;
+}
+
+void LLAudioEngine_OpenAL::applyReverbPreset(const std::string& name)
+{
+    if (!mEfxAvailable) return;
+
+    EFXEAXREVERBPROPERTIES p = pick_efx_preset(name);
+
+    // EAXReverb has the full surface area. The standard REVERB effect
+    // type silently ignores writes to enums it doesn't support, so
+    // setting everything is safe regardless of which fallback we landed
+    // on in initEfx.
+    mAlEffectf (mEffect, AL_EAXREVERB_DENSITY,             p.flDensity);
+    mAlEffectf (mEffect, AL_EAXREVERB_DIFFUSION,           p.flDiffusion);
+    mAlEffectf (mEffect, AL_EAXREVERB_GAIN,                p.flGain);
+    mAlEffectf (mEffect, AL_EAXREVERB_GAINHF,              p.flGainHF);
+    mAlEffectf (mEffect, AL_EAXREVERB_GAINLF,              p.flGainLF);
+    mAlEffectf (mEffect, AL_EAXREVERB_DECAY_TIME,          p.flDecayTime);
+    mAlEffectf (mEffect, AL_EAXREVERB_DECAY_HFRATIO,       p.flDecayHFRatio);
+    mAlEffectf (mEffect, AL_EAXREVERB_DECAY_LFRATIO,       p.flDecayLFRatio);
+    mAlEffectf (mEffect, AL_EAXREVERB_REFLECTIONS_GAIN,    p.flReflectionsGain);
+    mAlEffectf (mEffect, AL_EAXREVERB_REFLECTIONS_DELAY,   p.flReflectionsDelay);
+    mAlEffectfv(mEffect, AL_EAXREVERB_REFLECTIONS_PAN,     p.flReflectionsPan);
+    mAlEffectf (mEffect, AL_EAXREVERB_LATE_REVERB_GAIN,    p.flLateReverbGain);
+    mAlEffectf (mEffect, AL_EAXREVERB_LATE_REVERB_DELAY,   p.flLateReverbDelay);
+    mAlEffectfv(mEffect, AL_EAXREVERB_LATE_REVERB_PAN,     p.flLateReverbPan);
+    mAlEffectf (mEffect, AL_EAXREVERB_ECHO_TIME,           p.flEchoTime);
+    mAlEffectf (mEffect, AL_EAXREVERB_ECHO_DEPTH,          p.flEchoDepth);
+    mAlEffectf (mEffect, AL_EAXREVERB_MODULATION_TIME,     p.flModulationTime);
+    mAlEffectf (mEffect, AL_EAXREVERB_MODULATION_DEPTH,    p.flModulationDepth);
+    mAlEffectf (mEffect, AL_EAXREVERB_AIR_ABSORPTION_GAINHF, p.flAirAbsorptionGainHF);
+    mAlEffectf (mEffect, AL_EAXREVERB_HFREFERENCE,         p.flHFReference);
+    mAlEffectf (mEffect, AL_EAXREVERB_LFREFERENCE,         p.flLFReference);
+    mAlEffectf (mEffect, AL_EAXREVERB_ROOM_ROLLOFF_FACTOR, p.flRoomRolloffFactor);
+    mAlEffecti (mEffect, AL_EAXREVERB_DECAY_HFLIMIT,       p.iDecayHFLimit);
+
+    // Re-binding the effect to the slot is what makes parameter
+    // changes audible — slot state is sampled at attach time.
+    mAlAuxiliaryEffectSloti(mEffectSlot, AL_EFFECTSLOT_EFFECT,
+                            static_cast<ALint>(mEffect));
+}
+
+void LLAudioEngine_OpenAL::setReverbPreset(const std::string& preset_name)
+{
+    applyReverbPreset(preset_name);
+}
+
+void LLAudioEngine_OpenAL::setReverbSendScale(float scale)
+{
+    if (!mEfxAvailable) return;
+    if (scale < 0.0f) scale = 0.0f;
+    mAlAuxiliaryEffectSlotf(mEffectSlot, AL_EFFECTSLOT_GAIN, scale);
+}
+
 LLAudioChannelOpenAL::LLAudioChannelOpenAL()
     :
     mALSource(AL_NONE),
@@ -347,11 +715,45 @@ void LLAudioChannelOpenAL::play()
         return;
     }
 
+    // Lazy-wire the AUX send to the engine's reverb slot on first play.
+    // Deferred from the constructor because engine init order doesn't
+    // guarantee initEfx has run before the channel pool spawns. EFX
+    // unavailable -> getEffectSlot() returns 0 -> source AUX send
+    // stays at AL_EFFECTSLOT_NULL (silently dry).
+    if (!mAuxSendWired)
+    {
+        if (auto* eng = dynamic_cast<LLAudioEngine_OpenAL*>(gAudiop))
+        {
+            const ALuint slot = eng->getEffectSlot();
+            if (slot)
+            {
+                alSource3i(mALSource, AL_AUXILIARY_SEND_FILTER,
+                           static_cast<ALint>(slot), 0,
+                           AL_FILTER_NULL);
+            }
+            mAuxSendWired = true;
+        }
+    }
+
     if(!isPlaying())
     {
         alSourcePlay(mALSource);
         getSource()->setPlayedOnce(true);
     }
+}
+
+void LLAudioChannelOpenAL::onEfxShutdown()
+{
+    // The engine is tearing down its effect slot; clear our reference
+    // to it and reset the lazy-wire flag so a subsequent initEfx
+    // re-attaches us via the next play() call. Skip the alSource3i if
+    // we never wired in the first place — saves an ALC round-trip.
+    if (mAuxSendWired && mALSource != AL_NONE)
+    {
+        alSource3i(mALSource, AL_AUXILIARY_SEND_FILTER,
+                   AL_EFFECTSLOT_NULL, 0, AL_FILTER_NULL);
+    }
+    mAuxSendWired = false;
 }
 
 void LLAudioChannelOpenAL::playSynced(LLAudioChannel *channelp)

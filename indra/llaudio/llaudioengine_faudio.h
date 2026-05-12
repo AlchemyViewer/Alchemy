@@ -89,8 +89,9 @@ public:
     // FAudioFX FAPO's SetEffectParameters — also instant.
     void setAudibleRange(float meters);
     void setInnerRadius(float meters);
-    void setReverbSendScale(float scale);
-    void setReverbPreset(const std::string& preset_name);
+    void setReverbSendScale(float scale) override;
+    void setReverbPreset(const std::string& preset_name) override;
+    bool supportsReverb() const override { return true; }
 
     // Returns every output device FAudio reports as {id, name} pairs.
     // Index 0 in the underlying device list is FAudio's notion of the

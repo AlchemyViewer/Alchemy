@@ -37,6 +37,15 @@
 #include "lllistener_openal.h"
 #include "llwindgen.h"
 
+// alext.h pulls in the ALC_EXT_EFX function-pointer typedefs (LPALGEN
+// EFFECTS, LPALAUXILIARYEFFECTSLOTI, etc.) we resolve via alGetProcAddress.
+// Including here keeps the engine's effect-slot / effect handles in the
+// public header so the channel class can refer to them.
+#include <AL/al.h>
+#include <AL/alc.h>
+#include <AL/alext.h>
+#include <AL/efx.h>
+
 #include <string>
 #include <vector>
 
@@ -54,6 +63,12 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
         virtual LLStreamingAudioInterface* createDefaultStreamingAudioImpl() const { return nullptr; }
         virtual void allocateListener();
 
+        // Per-frame hook. Overridden to add a throttled
+        // ALC_EXT_disconnect poll on top of the base bookkeeping —
+        // detect a USB-unplug / driver-crash / OS audio-service reset
+        // and try alcReopenDeviceSOFT to recover automatically.
+        void idle() override;
+
         virtual void shutdown();
 
         void setInternalGain(F32 gain);
@@ -68,6 +83,20 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
         // Hot-swap via the ALC_SOFT_reopen_device extension if available;
         // otherwise persists and warns that a restart is needed.
         void setOutputDevice(const std::string& id) override;
+
+        // Reverb via ALC_EXT_EFX. Only active when EFX is available on the
+        // current device; supportsReverb() reflects that — so the prefs UI
+        // hides the controls if the user's OpenAL implementation doesn't
+        // ship EFX. The preset name set mirrors FAudio's I3DL2 list (case-
+        // insensitive); unknown -> EFX_REVERB_PRESET_PLAIN with a warn.
+        bool supportsReverb() const override { return mEfxAvailable; }
+        void setReverbPreset(const std::string& preset_name) override;
+        void setReverbSendScale(float scale) override;
+
+        // Channel uses this to wire its AUX send to the engine's effect
+        // slot when EFX is active. 0 / AL_EFFECTSLOT_NULL when EFX is
+        // disabled, in which case channels skip the AUX send entirely.
+        ALuint getEffectSlot() const { return mEffectSlot; }
 
         LLAudioBuffer* createBuffer();
         LLAudioChannel* createChannel();
@@ -92,11 +121,55 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
         ALCdevice*  mALCDevice  = nullptr;
         ALCcontext* mALCContext = nullptr;
 
+        // ALC_EXT_disconnect: ALC_CONNECTED query lets us detect a
+        // device-loss event (USB unplug, driver crash, OS audio-service
+        // restart). Cached at init; false means we don't poll. Recovery
+        // is via alcReopenDeviceSOFT to the same preferred device,
+        // falling back to system default if the preferred is gone.
+        // mDisconnectPollTimer throttles the per-frame poll to once
+        // every ~2 seconds; mDeviceDisconnected gates log spam so we
+        // log only on the disconnect edge + the reconnect edge.
+        // mConsecutiveDisconnects debounces flickering drivers — log
+        // the edge only after N consecutive disconnected polls so a
+        // bouncy ALC_CONNECTED bit doesn't produce log-spam pairs.
+        bool         mDisconnectExtAvailable = false;
+        bool         mDeviceDisconnected     = false;
+        int          mConsecutiveDisconnects = 0;
+        LLFrameTimer mDisconnectPollTimer;
+
         std::vector<ALuint> mWindRecycleBuffers;
         std::vector<ALuint> mWindQueueBuffers;
 
         static const int MAX_NUM_WIND_BUFFERS = 80;
         static const float WIND_BUFFER_SIZE_SEC; // 1/20th sec
+
+        // ─── EFX reverb state ───────────────────────────────────────
+        // mEfxAvailable is set in init() once we've checked ALC_EXT_EFX
+        // and successfully resolved the function pointers + created the
+        // effect / slot. False means OpenAL is running but without
+        // reverb — supportsReverb() returns false and the prefs UI
+        // hides the reverb controls.
+        bool   mEfxAvailable = false;
+        ALuint mEffectSlot   = 0;   // AL_AUXILIARY_EFFECT_SLOT object
+        ALuint mEffect       = 0;   // AL_EFFECT_EAXREVERB object
+
+        // EFX function pointers resolved at init via alGetProcAddress.
+        // Stored on the engine so the channel class can reach the SLOT
+        // attachment helper without re-resolving on every play. nullptr
+        // when EFX isn't available.
+        LPALGENEFFECTS                mAlGenEffects                = nullptr;
+        LPALDELETEEFFECTS             mAlDeleteEffects             = nullptr;
+        LPALEFFECTI                   mAlEffecti                   = nullptr;
+        LPALEFFECTF                   mAlEffectf                   = nullptr;
+        LPALEFFECTFV                  mAlEffectfv                  = nullptr;
+        LPALGENAUXILIARYEFFECTSLOTS   mAlGenAuxiliaryEffectSlots   = nullptr;
+        LPALDELETEAUXILIARYEFFECTSLOTS mAlDeleteAuxiliaryEffectSlots = nullptr;
+        LPALAUXILIARYEFFECTSLOTI      mAlAuxiliaryEffectSloti      = nullptr;
+        LPALAUXILIARYEFFECTSLOTF      mAlAuxiliaryEffectSlotf      = nullptr;
+
+        bool initEfx();          // resolve fns + gen effect/slot, attach
+        void shutdownEfx();      // detach + delete + null fn pointers
+        void applyReverbPreset(const std::string& name);  // configure mEffect
 };
 
 class LLAudioChannelOpenAL : public LLAudioChannel
@@ -104,6 +177,14 @@ class LLAudioChannelOpenAL : public LLAudioChannel
     public:
         LLAudioChannelOpenAL();
         virtual ~LLAudioChannelOpenAL();
+
+        // Engine calls this from shutdownEfx() so we drop our AUX send
+        // before the slot is destroyed and reset mAuxSendWired — a
+        // subsequent initEfx() would otherwise leave this channel
+        // pointing at a stale slot id. Idempotent / safe to call when
+        // the channel never wired its send.
+        void onEfxShutdown();
+
     protected:
         /*virtual*/ void play();
         /*virtual*/ void playSynced(LLAudioChannel *channelp);
@@ -116,6 +197,13 @@ class LLAudioChannelOpenAL : public LLAudioChannel
 
         ALuint mALSource;
             ALint mLastSamplePos;
+        // True once the source's AL_AUXILIARY_SEND_FILTER has been
+        // wired to the engine's reverb effect slot. play() runs the
+        // attach lazily on first use so the engine has had a chance to
+        // finish initEfx() before we ask it for its slot id. Stays
+        // false when EFX isn't available — the source's AUX send sits
+        // at AL_EFFECTSLOT_NULL and contributes nothing to reverb.
+        bool   mAuxSendWired = false;
 };
 
 class LLAudioBufferOpenAL : public LLAudioBuffer{

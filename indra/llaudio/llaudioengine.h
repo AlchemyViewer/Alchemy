@@ -129,6 +129,16 @@ public:
     // don't support hot-swap inherit the no-op default.
     virtual void setOutputDevice(const std::string& /*id*/) {}
 
+    // Reverb. Backends that surface an I3DL2-style preset (FAudio via
+    // FAudioFXReverb, OpenAL via the EFX EAXReverb effect) override
+    // these — base class no-ops let other backends (FMOD studio, the
+    // headless test backend) inherit "no reverb" cleanly. supportsReverb
+    // gates UI visibility so the Sound prefs panel doesn't surface the
+    // preset / wet-level controls on backends that ignore them.
+    virtual bool supportsReverb() const { return false; }
+    virtual void setReverbPreset(const std::string& /*name*/) {}
+    virtual void setReverbSendScale(float /*scale*/) {}
+
     // Used by the mechanics of the engine
     //virtual void processQueue(const LLUUID &sound_guid);
     virtual void setListener(LLVector3 pos,LLVector3 vel,LLVector3 up,LLVector3 at);

@@ -104,14 +104,17 @@ namespace
     }
 
     // Lookup I3DL2 preset by name. Case-insensitive; unknown -> PLAIN
-    // with a warn so a typo'd AudioFAudioReverbPreset setting is visible
-    // in the log instead of silently falling back. Each
+    // with a warn so a typo'd AudioReverbPreset setting is visible in
+    // the log instead of silently falling back. Each
     // FAUDIOFX_I3DL2_PRESET_* expands to a struct initialiser, so the
     // table holds them by value rather than via pointer-to-macro.
     FAudioFXReverbI3DL2Parameters pick_i3dl2_preset(const std::string& raw_name)
     {
         std::string name(raw_name);
-        for (auto& c : name) c = static_cast<char>(std::toupper(c));
+        // std::toupper takes int and is UB for char values >0x7F on
+        // platforms with signed char. Cast through unsigned char first.
+        for (auto& c : name)
+            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
         if (name == "DEFAULT")         return FAUDIOFX_I3DL2_PRESET_DEFAULT;
         if (name == "GENERIC")         return FAUDIOFX_I3DL2_PRESET_GENERIC;
         if (name == "PADDEDCELL")      return FAUDIOFX_I3DL2_PRESET_PADDEDCELL;
@@ -139,7 +142,7 @@ namespace
         if (name == "SMALLROOM")       return FAUDIOFX_I3DL2_PRESET_SMALLROOM;
         LL_WARNS() << "Unknown I3DL2 reverb preset '" << raw_name
                    << "' — falling back to PLAIN. See settings_alchemy.xml "
-                      "AudioFAudioReverbPreset for the valid names." << LL_ENDL;
+                      "AudioReverbPreset for the valid names." << LL_ENDL;
         return FAUDIOFX_I3DL2_PRESET_PLAIN;
     }
 }

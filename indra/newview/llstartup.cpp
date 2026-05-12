@@ -771,8 +771,8 @@ bool idle_startup()
                 faudio_cfg.preferred_device_id = gSavedSettings.getString("AudioFAudioOutputDevice");
                 faudio_cfg.audible_range       = gSavedSettings.getF32("AudioFAudioAudibleRange");
                 faudio_cfg.inner_radius        = gSavedSettings.getF32("AudioFAudioInnerRadius");
-                faudio_cfg.reverb_preset       = gSavedSettings.getString("AudioFAudioReverbPreset");
-                faudio_cfg.reverb_send_scale   = gSavedSettings.getF32("AudioFAudioReverbSendScale");
+                faudio_cfg.reverb_preset       = gSavedSettings.getString("AudioReverbPreset");
+                faudio_cfg.reverb_send_scale   = gSavedSettings.getF32("AudioReverbSendScale");
                 gAudiop = (LLAudioEngine *) new LLAudioEngine_FAudio(std::move(faudio_cfg));
 
                 // Wire each tunable to a control-changed callback so
@@ -792,18 +792,6 @@ bool idle_startup()
                         if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
                             fa->setInnerRadius(static_cast<F32>(v.asReal()));
                     });
-                gSavedSettings.getControl("AudioFAudioReverbSendScale")->getSignal()->connect(
-                    [](LLControlVariable*, const LLSD& v, const LLSD&)
-                    {
-                        if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
-                            fa->setReverbSendScale(static_cast<F32>(v.asReal()));
-                    });
-                gSavedSettings.getControl("AudioFAudioReverbPreset")->getSignal()->connect(
-                    [](LLControlVariable*, const LLSD& v, const LLSD&)
-                    {
-                        if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
-                            fa->setReverbPreset(v.asString());
-                    });
             }
 #endif
 
@@ -818,6 +806,25 @@ bool idle_startup()
                     gSavedSettings.getString("AudioOpenALOutputDevice"));
             }
 #endif
+
+            // Reverb settings are backend-agnostic — FAudio, OpenAL
+            // (when EFX is available) and FMOD all read the same
+            // AudioReverb* keys. The signals connect once and
+            // dispatch through the base virtual so a future backend
+            // swap (and the no-reverb backends that inherit the base
+            // no-op) Just Work without re-wiring.
+            gSavedSettings.getControl("AudioReverbSendScale")->getSignal()->connect(
+                [](LLControlVariable*, const LLSD& v, const LLSD&)
+                {
+                    if (gAudiop)
+                        gAudiop->setReverbSendScale(static_cast<F32>(v.asReal()));
+                });
+            gSavedSettings.getControl("AudioReverbPreset")->getSignal()->connect(
+                [](LLControlVariable*, const LLSD& v, const LLSD&)
+                {
+                    if (gAudiop)
+                        gAudiop->setReverbPreset(v.asString());
+                });
 
             if (gAudiop)
             {
@@ -842,6 +849,21 @@ bool idle_startup()
                     {
                         LL_INFOS("AppInit") << "Using media plugins to render streaming audio" << LL_ENDL;
                         gAudiop->setStreamingAudioImpl(new LLStreamingAudio_MediaPlugins());
+                    }
+
+                    // Push the user's saved reverb tunables onto the live
+                    // engine. FAudio already consumed these via its
+                    // construction config, so this is a redundant write
+                    // for that backend (and a cheap one); for OpenAL EFX
+                    // this is how the engine first picks up the
+                    // user-chosen preset / wet level. Backends without
+                    // reverb inherit the base no-op overrides.
+                    if (gAudiop->supportsReverb())
+                    {
+                        gAudiop->setReverbPreset(
+                            gSavedSettings.getString("AudioReverbPreset"));
+                        gAudiop->setReverbSendScale(
+                            gSavedSettings.getF32("AudioReverbSendScale"));
                     }
 
                     gAudiop->setMuted(true);

@@ -57,10 +57,10 @@
             <key>Value</key>
             <real>2.0</real>
         </map>
-        <key>AudioFAudioReverbPreset</key>
+        <key>AudioReverbPreset</key>
         <map>
             <key>Comment</key>
-            <string>FAudio backend: FAudioFX I3DL2 preset applied to the reverb submix. PLAIN is the open-outdoor default; case-insensitive. Recognised: DEFAULT, GENERIC, PADDEDCELL, ROOM, BATHROOM, LIVINGROOM, STONEROOM, AUDITORIUM, CONCERTHALL, CAVE, ARENA, HANGAR, CARPETEDHALLWAY, HALLWAY, STONECORRIDOR, ALLEY, FOREST, CITY, MOUNTAINS, QUARRY, PLAIN, PARKINGLOT, SEWERPIPE, UNDERWATER, SMALLROOM. Applies live; preset changes are pushed to the reverb submix on the next signal callback.</string>
+            <string>I3DL2 reverb preset applied by whichever audio backend supports reverb (FAudio always, OpenAL when ALC_EXT_EFX is present, FMOD always). PLAIN is the open-outdoor default; case-insensitive. Recognised: DEFAULT, GENERIC, PADDEDCELL, ROOM, BATHROOM, LIVINGROOM, STONEROOM, AUDITORIUM, CONCERTHALL, CAVE, ARENA, HANGAR, CARPETEDHALLWAY, HALLWAY, STONECORRIDOR, ALLEY, FOREST, CITY, MOUNTAINS, QUARRY, PLAIN, PARKINGLOT, SEWERPIPE, UNDERWATER, SMALLROOM. DEFAULT / SMALLROOM are mapped to backend-specific equivalents where the underlying preset table doesn't carry them by name. Applies live; preset changes are pushed to the engine on the next signal callback.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -68,10 +68,10 @@
             <key>Value</key>
             <string>PLAIN</string>
         </map>
-        <key>AudioFAudioReverbSendScale</key>
+        <key>AudioReverbSendScale</key>
         <map>
             <key>Comment</key>
-            <string>FAudio backend: scalar applied to F3DAudio's dsp.ReverbLevel before writing the per-source -> reverb-submix send. 0 disables reverb. Applies live; new value is picked up on the next 3D update tick.</string>
+            <string>Wet-send level for the reverb submix, applied by whichever audio backend supports reverb. 0 disables reverb entirely. On FAudio this scales F3DAudio's dsp.ReverbLevel per source; on OpenAL it's the EFX aux-slot gain; on FMOD it's the Channel::setReverbProperties wet scalar. Applies live; new value is picked up on the next update tick.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

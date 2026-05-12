@@ -3041,40 +3041,63 @@ bool LLPanelPreferenceSound::postBuild()
 {
     populateOutputDeviceCombo();
 
-    // FAudio-specific tunables live alongside the device picker. Hide
-    // them when another backend is active so the panel doesn't expose
-    // controls that the active engine ignores. Because the layout uses
-    // absolute top_pad positioning rather than a layout_stack, hiding
-    // the reverb row would otherwise leave a vertical gap above the
-    // volume sliders — so we also shift every sibling that sits below
-    // the reverb row up by the row's height to close that gap.
-    const bool faudio_active =
-        gAudiop && gAudiop->getDriverName(false) == "FAudio";
-    LLView* reverb_label = findChild<LLView>("audio_faudio_reverb_label");
-    LLView* reverb_combo = findChild<LLView>("audio_faudio_reverb_combo");
-    if (reverb_label && reverb_combo && !faudio_active)
+    // The reverb controls (preset combo + send-scale slider) only apply
+    // to backends that surface reverb — FAudio (always) and OpenAL when
+    // ALC_EXT_EFX is present. Hide them on backends that ignore the
+    // settings so the panel doesn't expose dead controls. Because the
+    // layout uses absolute top_pad positioning rather than a layout_
+    // stack, hiding the reverb row would otherwise leave a vertical gap
+    // above the volume sliders — so we also shift every sibling that
+    // sits below the reverb row up by the row's height to close that
+    // gap.
+    const bool reverb_active = gAudiop && gAudiop->supportsReverb();
+    LLView* reverb_label  = findChild<LLView>("audio_reverb_label");
+    LLComboBox* reverb_combo =
+        findChild<LLComboBox>("audio_reverb_combo");
+    LLView* reverb_slider = findChild<LLView>("audio_reverb_send_slider");
+
+    // If the saved AudioReverbPreset value isn't one of the items
+    // (renamed in code, edited via about:config to a typo, etc.) the
+    // XUI control-name binding leaves the combo blank. Force-correct
+    // to PLAIN so the UI shows the same preset the engine has fallen
+    // back to (every backend's preset lookup also returns PLAIN for
+    // unknowns) and persist the fix so subsequent sessions don't re-
+    // trip the warning.
+    if (reverb_combo && reverb_combo->getCurrentIndex() < 0)
+    {
+        reverb_combo->setSelectedByValue(LLSD("PLAIN"), true);
+        gSavedSettings.setString("AudioReverbPreset", "PLAIN");
+    }
+
+    if (reverb_label && reverb_combo && reverb_slider && !reverb_active)
     {
         LLView* anchor = findChild<LLView>("audio_output_device_combo");
-        // Linden coords: y grows upward, so the row above has the larger
-        // mBottom. The visual height we need to reclaim equals the
-        // distance from the device combo's bottom to the reverb combo's
-        // bottom — that span exactly covers the top_pad above the label
-        // plus the label + combo verticals.
+        // Linden coords: y grows upward, so rows above have larger
+        // mBottom. The visual height we need to reclaim spans from the
+        // device combo's bottom down to the lowest member of the
+        // reverb row (the slider, after #8 added it), so a single
+        // anchor->bottom - slider->bottom is the full row span
+        // including the inter-row paddings.
         const S32 shift = anchor
-            ? (anchor->getRect().mBottom - reverb_combo->getRect().mBottom)
+            ? (anchor->getRect().mBottom - reverb_slider->getRect().mBottom)
             : 0;
-        const S32 reverb_top = std::max(
-            reverb_label->getRect().mTop, reverb_combo->getRect().mTop);
+        const S32 reverb_top = std::max({
+            reverb_label->getRect().mTop,
+            reverb_combo->getRect().mTop,
+            reverb_slider->getRect().mTop });
 
         reverb_label->setVisible(false);
         reverb_combo->setVisible(false);
+        reverb_slider->setVisible(false);
 
         if (shift > 0)
         {
             for (LLView* child : *getChildList())
             {
-                if (!child || child == reverb_label || child == reverb_combo)
-                    continue;
+                if (!child
+                    || child == reverb_label
+                    || child == reverb_combo
+                    || child == reverb_slider) continue;
                 // Visually below the reverb row → its top is at a lower
                 // y (Linden). Shift only those; everything above the
                 // reverb stays put.

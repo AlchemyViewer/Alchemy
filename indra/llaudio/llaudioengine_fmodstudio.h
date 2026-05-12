@@ -74,6 +74,17 @@ public:
     std::string getOutputDeviceSettingName() const override { return "AudioFMODOutputDevice"; }
     void setOutputDevice(const std::string& id) override;
 
+    // Reverb via FMOD's built-in DSP reverb on instance 0. setReverb
+    // Properties on the system configures the I3DL2-style preset (FMOD
+    // preset names mirror the I3DL2 set, with CARPETTEDHALLWAY spelt
+    // with two T's); per-channel wet level is set in play() from the
+    // cached static sReverbSendScale. supportsReverb returns true once
+    // init() succeeds — reverb is always available on FMOD, no
+    // extension check needed.
+    bool supportsReverb() const override { return mReverbActive; }
+    void setReverbPreset(const std::string& preset_name) override;
+    void setReverbSendScale(float scale) override;
+
     /*virtual*/ bool initWind();
     /*virtual*/ void cleanupWind();
 
@@ -101,8 +112,15 @@ protected:
     std::string mActiveDeviceId;
     std::string mActiveDeviceName;
 
+    bool mReverbActive = false;
+
 public:
     static FMOD::ChannelGroup *mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT];
+    // Cached wet-send level applied to every new channel in play().
+    // Static so the channel class can reach it without an engine back-
+    // pointer (matches the existing mChannelGroups[] pattern). Updated
+    // by setReverbSendScale, which also iterates live channels.
+    static float sReverbSendScale;
 };
 
 
@@ -111,6 +129,14 @@ class LLAudioChannelFMODSTUDIO : public LLAudioChannel
 public:
     LLAudioChannelFMODSTUDIO(FMOD::System *audioengine);
     virtual ~LLAudioChannelFMODSTUDIO();
+
+    // Apply a wet-send level for the engine's instance-0 reverb slot.
+    // Called by LLAudioEngine_FMODSTUDIO::setReverbSendScale to push a
+    // live slider change to all active channels, and by play() on
+    // first start so a freshly-created channel matches the current
+    // scale. No-op when the channel hasn't been bound to an FMOD::
+    // Channel yet (sReverbSendScale will be picked up in play()).
+    void setReverbWet(float wet);
 
 protected:
     /*virtual*/ void play();

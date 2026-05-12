@@ -3,7 +3,7 @@
  border="true"
  class="panel_preference_sound"
  follows="all"
- height="492"
+ height="511"
  label="Sounds"
  layout="topleft"
  left="102"
@@ -96,20 +96,20 @@
      halign="right"
      layout="topleft"
      left="0"
-     name="audio_faudio_reverb_label"
+     name="audio_reverb_label"
      top_pad="6"
      width="120">
      Reverb preset:
     </text>
     <combo_box
-     control_name="AudioFAudioReverbPreset"
+     control_name="AudioReverbPreset"
      follows="left|top"
      height="23"
      layout="topleft"
      left_pad="5"
-     name="audio_faudio_reverb_combo"
+     name="audio_reverb_combo"
      top_delta="-4"
-     tool_tip="I3DL2 reverb preset applied to the FAudio reverb submix. Applies immediately."
+     tool_tip="I3DL2 reverb preset applied by the active audio backend. Applies immediately."
      width="280">
         <item label="Default"           value="DEFAULT" />
         <item label="Generic"           value="GENERIC" />
@@ -137,6 +137,24 @@
         <item label="Underwater"        value="UNDERWATER" />
         <item label="Small room"        value="SMALLROOM" />
     </combo_box>
+    <slider
+     control_name="AudioReverbSendScale"
+     follows="left|top"
+     height="15"
+     increment="0.005"
+     initial_value="0.05"
+     label="Reverb amount"
+     label_width="120"
+     layout="topleft"
+     left="0"
+     max_val="0.3"
+     min_val="0.0"
+     name="audio_reverb_send_slider"
+     show_text="true"
+     slider_label.halign="right"
+     tool_tip="How wet the reverb submix mixes back into the master. 0 disables the reverb send. Applies immediately."
+     top_pad="4"
+     width="300" />
 	<slider
 		control_name="AudioLevelUI"
 		disabled_control="MuteAudio"

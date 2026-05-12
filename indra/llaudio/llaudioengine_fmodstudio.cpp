@@ -49,6 +49,7 @@
 FMOD_RESULT F_CALL windCallback(FMOD_DSP_STATE *dsp_state, float *inbuffer, float *outbuffer, unsigned int length, int inchannels, int *outchannels);
 
 FMOD::ChannelGroup *LLAudioEngine_FMODSTUDIO::mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT] = {0};
+float LLAudioEngine_FMODSTUDIO::sReverbSendScale = 0.0f;
 
 namespace
 {
@@ -65,6 +66,58 @@ namespace
             g.Data4[0], g.Data4[1], g.Data4[2], g.Data4[3],
             g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7]);
         return buf;
+    }
+
+    // Lookup a FMOD I3DL2-style preset by name. Mirrors the FAudio
+    // pick_i3dl2_preset / OpenAL pick_efx_preset surfaces so the shared
+    // AudioReverbPreset setting drives all three backends identically.
+    // FMOD has no DEFAULT / SMALLROOM presets — map to the closest
+    // available (GENERIC and ROOM); CARPETTEDHALLWAY is spelt with two
+    // T's in FMOD's headers (vs CARPETEDHALLWAY in I3DL2 / EFX) —
+    // accept both. Unknown -> PLAIN with a warn.
+    FMOD_REVERB_PROPERTIES pick_fmod_preset(const std::string& raw_name)
+    {
+        std::string name(raw_name);
+        // std::toupper takes int and is UB for char values >0x7F on
+        // platforms with signed char. Cast through unsigned char first.
+        for (auto& c : name)
+            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+
+        if (name == "GENERIC")        { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_GENERIC;        return p; }
+        if (name == "PADDEDCELL")     { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_PADDEDCELL;     return p; }
+        if (name == "ROOM")           { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_ROOM;           return p; }
+        if (name == "BATHROOM")       { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_BATHROOM;       return p; }
+        if (name == "LIVINGROOM")     { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_LIVINGROOM;     return p; }
+        if (name == "STONEROOM")      { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_STONEROOM;      return p; }
+        if (name == "AUDITORIUM")     { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_AUDITORIUM;     return p; }
+        if (name == "CONCERTHALL")    { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_CONCERTHALL;    return p; }
+        if (name == "CAVE")           { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_CAVE;           return p; }
+        if (name == "ARENA")          { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_ARENA;          return p; }
+        if (name == "HANGAR")         { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_HANGAR;         return p; }
+        if (name == "CARPETEDHALLWAY"
+         || name == "CARPETTEDHALLWAY"){ FMOD_REVERB_PROPERTIES p = FMOD_PRESET_CARPETTEDHALLWAY; return p; }
+        if (name == "HALLWAY")        { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_HALLWAY;        return p; }
+        if (name == "STONECORRIDOR")  { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_STONECORRIDOR;  return p; }
+        if (name == "ALLEY")          { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_ALLEY;          return p; }
+        if (name == "FOREST")         { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_FOREST;         return p; }
+        if (name == "CITY")           { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_CITY;           return p; }
+        if (name == "MOUNTAINS")      { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_MOUNTAINS;      return p; }
+        if (name == "QUARRY")         { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_QUARRY;         return p; }
+        if (name == "PLAIN")          { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_PLAIN;          return p; }
+        if (name == "PARKINGLOT")     { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_PARKINGLOT;     return p; }
+        if (name == "SEWERPIPE")      { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_SEWERPIPE;      return p; }
+        if (name == "UNDERWATER")     { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_UNDERWATER;     return p; }
+
+        // I3DL2 has these; FMOD doesn't — map to the closest match.
+        if (name == "DEFAULT")        { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_GENERIC;        return p; }
+        if (name == "SMALLROOM")      { FMOD_REVERB_PROPERTIES p = FMOD_PRESET_ROOM;           return p; }
+
+        LL_WARNS() << "LLAudioEngine_FMODSTUDIO: unknown reverb preset '"
+                   << raw_name << "' — falling back to PLAIN. See "
+                      "settings_alchemy.xml AudioReverbPreset for the "
+                      "valid names." << LL_ENDL;
+        FMOD_REVERB_PROPERTIES p = FMOD_PRESET_PLAIN;
+        return p;
     }
 }
 
@@ -299,6 +352,18 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 
     mInited = true;
 
+    // Mark reverb as available — FMOD always ships its DSP reverb, no
+    // extension check needed. Preset / send-scale come from llstartup
+    // via the lifted base setters after init returns.
+    mReverbActive = true;
+    {
+        FMOD_REVERB_PROPERTIES off = FMOD_PRESET_OFF;
+        // Seed instance 0 with OFF so the slot exists but contributes
+        // nothing until llstartup pushes the user's saved preset.
+        Check_FMOD_Error(mSystem->setReverbProperties(0, &off),
+                         "FMOD::System::setReverbProperties (init seed)");
+    }
+
     LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): initialization complete." << LL_ENDL;
 
     return true;
@@ -401,6 +466,41 @@ void LLAudioEngine_FMODSTUDIO::setOutputDevice(const std::string& id)
         name[sizeof(name)-1] = '\0';
         mActiveDeviceId = guid_to_string(g);
         mActiveDeviceName = name;
+    }
+}
+
+// virtual
+void LLAudioEngine_FMODSTUDIO::setReverbPreset(const std::string& preset_name)
+{
+    if (!mSystem || !mReverbActive) return;
+    FMOD_REVERB_PROPERTIES p = pick_fmod_preset(preset_name);
+    // Instance 0 is the default reverb slot every channel mixes into
+    // unless explicitly retargeted; updating it propagates the new
+    // preset to all active channels without a per-channel reapply.
+    Check_FMOD_Error(mSystem->setReverbProperties(0, &p),
+                     "FMOD::System::setReverbProperties");
+}
+
+// virtual
+void LLAudioEngine_FMODSTUDIO::setReverbSendScale(float scale)
+{
+    if (scale < 0.0f) scale = 0.0f;
+    sReverbSendScale = scale;
+    if (!mReverbActive) return;
+    // Per-channel wet level only takes effect when set on each channel
+    // — System::setReverbProperties carries the preset shape, not the
+    // wet send. Iterate the live channel pool and apply; new channels
+    // pick the value up in play().
+    // Channels in mChannels were created by this engine's createChannel,
+    // so the static_cast to the FMOD derived type is safe. setReverbWet
+    // no-ops if the channel hasn't been bound to an FMOD::Channel yet —
+    // the next play() will pick the value up from sReverbSendScale.
+    for (size_t i = 0; i < mChannels.size(); ++i)
+    {
+        if (auto* ch = static_cast<LLAudioChannelFMODSTUDIO*>(mChannels[i]))
+        {
+            ch->setReverbWet(scale);
+        }
     }
 }
 
@@ -765,6 +865,22 @@ void LLAudioChannelFMODSTUDIO::play()
 
     if (LLAudioEngine_FMODSTUDIO::mChannelGroups[getSource()->getType()])
         mChannelp->setChannelGroup(LLAudioEngine_FMODSTUDIO::mChannelGroups[getSource()->getType()]);
+
+    // Pick up the current wet level. setReverbSendScale also iterates
+    // live channels for already-running sounds, so this catches the
+    // freshly-started case.
+    setReverbWet(LLAudioEngine_FMODSTUDIO::sReverbSendScale);
+}
+
+void LLAudioChannelFMODSTUDIO::setReverbWet(float wet)
+{
+    if (!mChannelp) return;
+    if (wet < 0.0f) wet = 0.0f;
+    // Channel::setReverbProperties takes a wet scalar (0 = dry, 1 =
+    // fully wet). Apply to instance 0 — the slot the engine
+    // configures in setReverbPreset.
+    Check_FMOD_Error(mChannelp->setReverbProperties(0, wet),
+                     "FMOD::Channel::setReverbProperties");
 }
 
 
