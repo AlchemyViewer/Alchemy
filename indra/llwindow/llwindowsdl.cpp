@@ -329,7 +329,56 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         return false;
     }
 
-    const SDL_DisplayMode* displayMode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(mWindow));
+    // If the caller requested fullscreen at a specific resolution, switch
+    // from SDL3's default borderless-desktop-fullscreen mode to an
+    // exclusive fullscreen mode at that resolution. width/height come from
+    // either the user's saved-window-size setting or from tryFindFullscreenSize
+    // above (which scans the display's supported modes); either way they are
+    // a deliberate resolution request, not "whatever the desktop is."
+    //
+    // On Wayland compositors that don't allow client-driven mode changes
+    // (most of them), SDL_SetWindowFullscreenMode quietly fails and we keep
+    // the borderless default. On X11 + KMS this actually changes the
+    // physical display mode.
+    if (mFullscreen && width > 0 && height > 0)
+    {
+        SDL_DisplayMode mode = {};
+        const SDL_DisplayID display = SDL_GetDisplayForWindow(mWindow);
+        if (SDL_GetClosestFullscreenDisplayMode(display, width, height, 0.f,
+                                                /*include_high_density_modes=*/false,
+                                                &mode))
+        {
+            if (SDL_SetWindowFullscreenMode(mWindow, &mode))
+            {
+                LL_INFOS() << "Exclusive fullscreen mode: "
+                           << mode.w << "x" << mode.h
+                           << " @ " << mode.refresh_rate << "Hz" << LL_ENDL;
+            }
+            else
+            {
+                LL_WARNS() << "SDL_SetWindowFullscreenMode " << mode.w << "x" << mode.h
+                           << " @ " << mode.refresh_rate << "Hz failed: "
+                           << SDL_GetError() << " — staying at borderless desktop." << LL_ENDL;
+            }
+        }
+        else
+        {
+            LL_INFOS() << "No fullscreen mode matches " << width << "x" << height
+                       << " on display " << display
+                       << " — using borderless desktop fullscreen." << LL_ENDL;
+        }
+    }
+
+    // Prefer the window's actually-applied fullscreen mode (which reflects
+    // any exclusive mode we just set) over the desktop's current mode. When
+    // the window is borderless-desktop or windowed, SDL_GetWindowFullscreenMode
+    // returns nullptr and we fall back to SDL_GetCurrentDisplayMode — the
+    // pre-exclusive-mode-support behaviour.
+    const SDL_DisplayMode* displayMode = SDL_GetWindowFullscreenMode(mWindow);
+    if (!displayMode)
+    {
+        displayMode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(mWindow));
+    }
     if(displayMode)
     {
         mRefreshRate = ll_round(displayMode->refresh_rate);
