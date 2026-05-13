@@ -79,7 +79,7 @@
       layout="topleft"
       left="30"
       name="online_visibility"
-      top_pad="30"
+      top_pad="15"
       width="350" />
 
     <check_box
@@ -90,7 +90,7 @@
      layout="topleft"
      left="30"
      name="auto_disengage_mic_check"
-     top_pad="10"
+     top_pad="5"
      width="350" />
     <check_box
      control_name="EnableSelectionHints"
@@ -100,7 +100,7 @@
      layout="topleft"
      left="30"
      name="enable_selection_hints"
-     top_pad="10"
+     top_pad="5"
      width="350" />
         <text
          type="string"
@@ -291,7 +291,7 @@
      layout="topleft"
      left="30"
      name="block_list"
-     top_pad="28"
+     top_pad="18"
      width="145">
         <!--<button.commit_callback
          function="SideTray.ShowPanel"-->
