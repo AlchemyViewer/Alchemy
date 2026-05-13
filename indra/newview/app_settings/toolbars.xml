@@ -4,7 +4,6 @@
     button_display_mode="icons_with_text">
     <command name="chat"/>
     <command name="speak"/>
-    <command name="voice"/>
     <command name="people"/>
     <command name="profile"/>
     <command name="map"/>
