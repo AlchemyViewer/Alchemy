@@ -51,9 +51,6 @@ struct LLAudioEngineFAudioConfig
 {
     // FAudio device id (LLAudioOutputDevice::id). Empty -> system default.
     std::string preferred_device_id;
-    // CurveDistanceScaler base (metres). Curve hits silence at this
-    // distance / rolloff.
-    float audible_range     = 384.0f;
     // F3DAudio emitter InnerRadius (metres). Below this, channels diffuse
     // to all speakers; above, clean directional pan.
     float inner_radius      = 2.0f;
@@ -68,6 +65,26 @@ struct LLAudioEngineFAudioConfig
     // Scalar applied to dsp.ReverbLevel before writing the per-source ->
     // reverb-submix matrix. 0 disables reverb sends entirely.
     float reverb_send_scale = 0.05f;
+    // FAPOFX FXMasteringLimiter attached to the mastering voice. FAudio's
+    // float-internal mix can sum past unity when many sources play at
+    // once or after F3DAudio matrix scaling, producing distortion at the
+    // device-side integer quantizer. The limiter pulls peaks back below
+    // unity transparently for typical content.
+    //
+    //   limiter_enable   — chain is always attached at init; this flag
+    //                      controls whether the FAPO starts enabled
+    //                      (live-toggleable via FAudioVoice_Enable/
+    //                      DisableEffect).
+    //   limiter_release  — gain-recovery time in ms (FAPOFX range 1-20,
+    //                      default 6). Lower = snappier release;
+    //                      higher = smoother but slower recovery.
+    //   limiter_loudness — unit-less threshold target (FAPOFX range
+    //                      1-1800, default 1000). Higher leaves more
+    //                      headroom before the limiter engages; lower
+    //                      compresses earlier.
+    bool     limiter_enable   = true;
+    uint32_t limiter_release  = 6;
+    uint32_t limiter_loudness = 1000;
 };
 
 class LLAudioEngine_FAudio : public LLAudioEngine
@@ -80,18 +97,24 @@ public:
 
     // Accessors for the listener (run_f3d reads these per call) and
     // anyone inspecting the live tuning.
-    float getAudibleRange()    const { return mConfig.audible_range; }
-    float getInnerRadius()     const { return mConfig.inner_radius; }
-    float getReverbSendScale() const { return mConfig.reverb_send_scale; }
+    float    getInnerRadius()            const { return mConfig.inner_radius; }
+    float    getReverbSendScale()        const { return mConfig.reverb_send_scale; }
+    bool     getMasterLimiterEnable()    const { return mConfig.limiter_enable; }
+    uint32_t getMasterLimiterRelease()   const { return mConfig.limiter_release; }
+    uint32_t getMasterLimiterLoudness()  const { return mConfig.limiter_loudness; }
 
-    // Live setters. AudibleRange / InnerRadius / ReverbSendScale are
-    // read each F3DAudioCalculate call so changes take effect on the
-    // next frame's spatial update. ReverbPreset re-applies via the
-    // FAudioFX FAPO's SetEffectParameters — also instant.
-    void setAudibleRange(float meters);
+    // Live setters. InnerRadius / ReverbSendScale are read each
+    // F3DAudioCalculate call so changes take effect on the next frame's
+    // spatial update. ReverbPreset re-applies via the FAudioFX FAPO's
+    // SetEffectParameters — also instant. The MasterLimiter* setters
+    // dispatch directly to the FAPO via SetEffectParameters /
+    // Enable/DisableEffect — also instant.
     void setInnerRadius(float meters);
     void setReverbSendScale(float scale) override;
     void setReverbPreset(const std::string& preset_name) override;
+    void setMasterLimiterEnable(bool enable);
+    void setMasterLimiterRelease(uint32_t ms);
+    void setMasterLimiterLoudness(uint32_t value);
     bool supportsReverb() const override { return true; }
     std::string getReverbSendScaleSettingName() const override
     {
@@ -208,6 +231,19 @@ private:
     FAPO*                  mReverbApo    = nullptr;
     uint16_t               mReverbChannels = 0;
 
+    // FXMasteringLimiter is attached to the mastering voice's effect chain
+    // (index 0). The chain holds the FAPO reference after attach, so we
+    // don't keep an FAPO* member — live tuning is done by calling
+    // FAudioVoice_SetEffectParameters on mMasterVoice with the
+    // FAPOFXMasteringLimiterParameters struct. mHasMasterLimiter tracks
+    // whether the chain attach succeeded so setters short-circuit on
+    // backends/configs where it didn't.
+    bool                   mHasMasterLimiter = false;
+    // Effect index of the limiter within the mastering voice's chain.
+    // Single-effect chain so this is always 0; pulled out as a constant
+    // so the setters and clean-up paths read self-documenting.
+    static constexpr uint32_t kMasterLimiterEffectIndex = 0;
+
     uint32_t               mSampleRate     = 0;
     // Output channel count from the mastering voice. Named distinctly so
     // it doesn't shadow the base class's `mChannels` channel-pool array.
@@ -249,6 +285,11 @@ public:
     bool               isRoutedThroughGroup() const { return mRoutedThroughGroup; }
     uint32_t           getSourceChannelCount() const { return mFormat.nChannels; }
     LLAudioSource*     getSource() const           { return mCurrentSourcep; }
+    // True when the underlying source voice was created with
+    // FAUDIO_VOICE_USEFILTER. SetFilterParameters is invalid on voices
+    // without that flag, so the listener consults this before writing the
+    // air-absorption LPF coefficient.
+    bool               getVoiceUsesFilter() const  { return mVoiceUsesFilter; }
 
     // Exponentially-smoothed doppler frequency ratio. Single-writer (main
     // thread via apply3D / applyForcedPriority), single-reader (same path
@@ -267,6 +308,48 @@ public:
     // detect convergence to passthrough and stop calling.
     float              mSmoothedLpf    = 1.0f;
     float              mLastAppliedLpf = 1.0f;
+
+    // Exponentially-smoothed reverb-send level (F3DAudio's dsp.ReverbLevel
+    // scaled by the engine's reverb_send_scale and, for grouped channels,
+    // their secondary gain). FAudio interpolates SetOutputMatrix across
+    // the audio frame, but per-frame writes still produce small steps
+    // when send_gain changes rapidly — fast listener motion or a source
+    // crossing the reverb curve's steep section. Smoothing + skip-when-
+    // settled-at-silence mirrors the LPF approach in mSmoothedLpf above.
+    // mLastAppliedReverbSend tracks the most recently written value so
+    // run_f3d can detect convergence and stop poking the matrix.
+    float              mSmoothedReverbSend    = 0.0f;
+    float              mLastAppliedReverbSend = 0.0f;
+
+    // Per-channel fade-in gain multiplier (0..1). Only armed by
+    // playSynced, which restarts the voice at an arbitrary mid-buffer
+    // PlayBegin offset whose first sample is guaranteed non-zero
+    // amplitude — a discontinuity FMOD's own setVolumeRamp also has to
+    // ramp through. Regular play() does NOT arm a fade-in (FMOD doesn't
+    // either; the FAudio-specific first-quantum dip-out is handled by
+    // updateBuffer's silent pre-roll buffer rather than a gain ramp,
+    // matching FMOD's perceptual behaviour on every fresh sound start).
+    //
+    // The per-frame gain assignments in updateBuffer / update3DPosition
+    // multiply by mFadeIn; the tick at the top of updateBuffer ramps it
+    // back to 1.0. At rest (mFadeIn == 1.0) the multiplier is a no-op.
+    // Single-writer (main thread), no atomic needed.
+    //
+    // Tick placement note: the tick lives at the *top* of updateBuffer
+    // rather than in update3DPosition. playSynced may be called between
+    // updateBuffer and update3DPosition for the same channel — a tick
+    // later in the same frame would immediately bump mFadeIn back
+    // toward 1.0 and the SetVolume(target=source.gain*mFadeIn) at the
+    // bottom of updateBuffer / inside update3DPosition would land on a
+    // non-zero target, defeating the synced-restart ramp.
+    float              mFadeIn         = 1.0f;
+    float              mFadeInPerFrame = 0.34f;
+    // ~50 ms ramp at 60 Hz. Single source of fade-in rate now — only
+    // playSynced arms a fade — but kept as a named constant so the
+    // duration is documented and easy to tweak. ~50 ms is long enough
+    // to mask a mid-buffer restart's first-sample discontinuity without
+    // shifting the perceived attack of the synced sound noticeably.
+    static constexpr float kFadeInPerFrameSynced = 0.34f;
 
     // Called from LLAudioBufferFAudio's destructor when this channel's
     // current buffer is about to be freed. Flush the voice so the mixer
@@ -291,6 +374,17 @@ public:
     {
         LLAudioChannelFAudio* owner = nullptr;
     };
+
+    // Move the current source voice into the dying-voice slot for cross-
+    // frame fade-out. Used by the "safe" destruction paths (channel reuse
+    // via ensureVoice's rebuild branch, cleanup() at end-of-source). The
+    // dying voice's callback owner is nulled so its OnStreamEnd /
+    // OnLoopEnd no longer mutate the live channel state, then it fades
+    // out under updateLoop's per-frame tick before final destruction. The
+    // "unsafe" paths (releaseIfReferencing, prepareForDeviceReset, the
+    // destructor) still go through destroyVoice() — there's no time to
+    // fade because the underlying resources are about to disappear.
+    void retireVoice();
 
 protected:
     void play() override;
@@ -323,12 +417,75 @@ private:
     // straight to master — then the source voice must apply secondary gain
     // itself.
     bool                  mRoutedThroughGroup = false;
+    // Records whether the source voice was built with FAUDIO_VOICE_USEFILTER.
+    // Forced-priority sources (UI / preview) sit at listener distance 0 —
+    // the LPF curve is at passthrough and the biquad would only contribute
+    // floating-point housekeeping noise — so we omit the flag and skip
+    // SetFilterParameters entirely. Tracked here so ensureVoice can rebuild
+    // when a channel is reused for a source whose forced-priority state
+    // differs from the previous occupant.
+    bool                  mVoiceUsesFilter = false;
     FAudioWaveFormatEx    mFormat{};
     bool                  mLooping  = false;
     bool                  mStarted  = false;
     U32                   mObservedLoopCount = 0;
 
-    ChannelCallback       mCallback{};
+    // One master-quantum of silence in the source's PCM format, prepended
+    // to every fresh real-buffer submit. Without it, FAudio's mixer would
+    // mix the real buffer's first sample at the voice's default
+    // currentVolume of 1.0 — defeating SetVolume(0) + mFadeIn since the
+    // first quantum's "previous volume" hasn't been updated yet. With the
+    // pre-roll, the mixer's first quantum outputs silence while
+    // currentVolume ramps from 1.0 to 0; the real buffer starts on the
+    // next quantum with currentVolume already at 0 and the fade-in tick
+    // raising the target back toward source.gain. Sized in ensureVoice
+    // when the format is known (source_rate / 100 samples * nBlockAlign);
+    // costs ~1-2 KB per active channel.
+    std::vector<U8>       mSilentPreroll;
+
+    // Shared ownership of the live voice's PCM, captured from the
+    // LLAudioBufferFAudio at submit time. FAudio's submitted FAudioBuffer
+    // descriptor stores pAudioData as a raw pointer; if the
+    // LLAudioBufferFAudio object is destroyed (engine eviction) the raw
+    // pointer would dangle. The shared_ptr ref-count keeps the underlying
+    // vector alive for as long as a voice queue references it, so the
+    // engine can free the buffer object without pulling the rug out from
+    // under the mixer — and releaseIfReferencing no longer needs the
+    // synchronous-destroy-on-eviction click that was its only previous
+    // option.
+    std::shared_ptr<std::vector<U8>> mVoicePcm;
+    // Transferred from mVoicePcm by retireVoice. The dying voice plays
+    // out its grace window backed by this shared_ptr; reset when the
+    // dying voice is destroyed in updateLoop, which drops the last ref
+    // (or one of several, if the underlying buffer was already destroyed
+    // earlier).
+    std::shared_ptr<std::vector<U8>> mDyingVoicePcm;
+
+    // Two callback structs so a dying voice can have its owner pointer
+    // nulled — preventing channel_on_stream_end / channel_on_loop_end from
+    // racing into the live channel's mFinished / mLoopCount during the
+    // dying voice's fade-out — without disabling callbacks on the new
+    // voice. FAudio binds a callback pointer at CreateSourceVoice time
+    // and doesn't expose a way to swap it later, so we cycle between
+    // mCallbackA and mCallbackB on each retire. mActiveCallback names
+    // the slot the next ensureVoice will pass to FAudio.
+    ChannelCallback       mCallbackA{};
+    ChannelCallback       mCallbackB{};
+    ChannelCallback*      mActiveCallback = &mCallbackA;
+
+    // Cross-frame fade-out slot. retireVoice() moves mVoice here, sets
+    // its target volume to 0 (FAudio interpolates the dry/reverb output
+    // matrix internally), and starts a grace countdown. updateLoop ticks
+    // the countdown each frame and destroys the voice when it reaches 0.
+    // Only one slot — a second retire while one is in progress hard-
+    // destroys the older fading voice so the channel doesn't grow an
+    // unbounded queue of fading voices on rapid channel reuse.
+    FAudioSourceVoice*    mDyingVoice = nullptr;
+    int                   mDyingFramesLeft = 0;
+    // ~2 frames @ 60 Hz gives FAudio ~32 ms to apply its quantum-level
+    // ramp from the prior volume to 0 before we DestroyVoice. Matches
+    // the perceptual length of FMOD's default ramp on Stop.
+    static constexpr int  kFadeOutGraceFrames = 2;
 };
 
 class LLAudioBufferFAudio : public LLAudioBuffer
@@ -347,7 +504,14 @@ public:
     U16                       getBytesPerFrame() const { return mBytesPerFrame; }
 
 private:
-    std::vector<U8>    mPcm;
+    // shared_ptr so a channel can keep the PCM alive after this buffer
+    // object is destroyed by the engine's eviction sweep. FAudio's
+    // submitted FAudioBuffer descriptor caches pAudioData = mPcm->data()
+    // (which is allocation-pointer-preserving as long as mPcm is alive);
+    // channels capture this shared_ptr on submit, transfer it on retire,
+    // and drop it when the dying voice is destroyed. See
+    // LLAudioChannelFAudio::mVoicePcm / mDyingVoicePcm.
+    std::shared_ptr<std::vector<U8>> mPcm;
     FAudioWaveFormatEx mFormat{};
     FAudioBuffer       mBuffer{};
     U16                mBytesPerFrame = 0;

@@ -5,3 +5,7 @@ set(VCPKG_BUILD_TYPE release)
 
 set(VCPKG_C_FLAGS_RELEASE "")
 set(VCPKG_CXX_FLAGS_RELEASE "/std:c++20 /Zc:__cplusplus")
+
+if(PORT MATCHES "faudio")
+    set(VCPKG_LIBRARY_LINKAGE static)
+endif()

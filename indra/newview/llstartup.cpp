@@ -769,10 +769,12 @@ bool idle_startup()
             {
                 LLAudioEngineFAudioConfig faudio_cfg;
                 faudio_cfg.preferred_device_id = gSavedSettings.getString("AudioFAudioOutputDevice");
-                faudio_cfg.audible_range       = gSavedSettings.getF32("AudioFAudioAudibleRange");
                 faudio_cfg.inner_radius        = gSavedSettings.getF32("AudioFAudioInnerRadius");
                 faudio_cfg.reverb_preset       = gSavedSettings.getString("AudioReverbPreset");
                 faudio_cfg.reverb_send_scale   = gSavedSettings.getF32("AudioFAudioReverbSendScale");
+                faudio_cfg.limiter_enable      = gSavedSettings.getBOOL("AudioFAudioMasterLimiterEnable");
+                faudio_cfg.limiter_release     = gSavedSettings.getU32("AudioFAudioMasterLimiterRelease");
+                faudio_cfg.limiter_loudness    = gSavedSettings.getU32("AudioFAudioMasterLimiterLoudness");
                 gAudiop = (LLAudioEngine *) new LLAudioEngine_FAudio(std::move(faudio_cfg));
                 // Live tunables (AudioFAudioAudibleRange, InnerRadius,
                 // ReverbPreset, ReverbSendScale, WindGustiness,

@@ -35,17 +35,6 @@
             <key>Value</key>
             <string></string>
         </map>
-        <key>AudioFAudioAudibleRange</key>
-        <map>
-            <key>Comment</key>
-            <string>FAudio backend: distance in metres at which the volume curve reaches silence (CurveDistanceScaler at rolloff=1). 384 covers a 256x256 SL region's diagonal. Applies live; new value is picked up on the next 3D update tick.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>F32</string>
-            <key>Value</key>
-            <real>384.0</real>
-        </map>
         <key>AudioFAudioInnerRadius</key>
         <map>
             <key>Comment</key>
@@ -78,6 +67,39 @@
             <string>F32</string>
             <key>Value</key>
             <real>0.05</real>
+        </map>
+        <key>AudioFAudioMasterLimiterEnable</key>
+        <map>
+            <key>Comment</key>
+            <string>FAudio backend: enable the FAPOFX FXMasteringLimiter on the mastering voice. Prevents the device-side integer quantizer from clipping when many sources sum past unity in the float-internal mix (typical SL scenes with dozens of simultaneous sources). Disable only if you specifically want raw post-mix peaks, accepting the resulting distortion. Applies live; toggles the FAPO's enabled state without rebuilding the chain.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AudioFAudioMasterLimiterRelease</key>
+        <map>
+            <key>Comment</key>
+            <string>FAudio backend: gain-recovery time of the master limiter in milliseconds. FAPOFX range is [1, 20]; default 6. Lower = snappier release (more transparent on percussive material but can pump on sustained peaks); higher = smoother recovery at the cost of slightly attenuated transients after a hit. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>6</integer>
+        </map>
+        <key>AudioFAudioMasterLimiterLoudness</key>
+        <map>
+            <key>Comment</key>
+            <string>FAudio backend: master limiter loudness/threshold parameter. FAPOFX range is [1, 1800]; default 1000. Higher values leave more headroom before the limiter engages (less aggressive); lower values compress earlier (more aggressive). MSDN doesn't document the unit; treat as a subjective dial. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1000</integer>
         </map>
         <key>AudioOpenALReverbSendScale</key>
         <map>
@@ -764,7 +786,7 @@
             <key>Type</key>
             <string>Boolean</string>
             <key>Value</key>
-            <integer>0</integer>
+            <integer>1</integer>
         </map>
         <key>AlchemyPlayTypingSound</key>
         <map>
@@ -775,7 +797,7 @@
             <key>Type</key>
             <string>Boolean</string>
             <key>Value</key>
-            <integer>0</integer>
+            <integer>1</integer>
         </map>
         <key>AlchemyRainbowEffects</key>
         <map>

@@ -59,38 +59,77 @@ namespace
         return F3DAUDIO_VECTOR{ -v.mV[1] * inv, v.mV[2] * inv, v.mV[0] * inv };
     }
 
-    // Custom distance-attenuation curve. Distances are normalized to
-    // CurveDistanceScaler (which we set to engine->getAudibleRange() /
-    // rolloff below). Points approximate 1/d inverse rolloff through the
-    // audible mid-range so it sits in the same ballpark as FMOD's default
-    // INVERSEROLLOFF, but with two quality wins:
-    //   1. A held near-field (full volume to 1% of scaler distance) — close
-    //      sounds don't get over-attenuated by sub-metre position jitter.
-    //   2. Hits actual silence at the scaler distance instead of FMOD's
-    //      asymptotic 0.01 tail — cleaner mix, no ghost sounds at extreme
-    //      distance.
-    // Distances below are fractions of CurveDistanceScaler (= 384 m at
-    // default audible_range, default rolloff), e.g. 0.039 -> 15 m. Near
-    // and mid-range gains track 1/d at the same absolute metres as before;
-    // the curve just extends its tail further so ambients placed at one
-    // corner of a 256x256 SL region don't hard-cut from the opposite
-    // corner (diagonal ~362 m).
-    F3DAUDIO_DISTANCE_CURVE_POINT kVolumeCurvePoints[] = {
-        { 0.000f, 1.000f },   //    0 m: full
-        { 0.004f, 1.000f },   //  1.5 m: hold near-field
-        { 0.008f, 0.500f },   //    3 m: 1/d
-        { 0.020f, 0.200f },   //  7.5 m: 1/d
-        { 0.039f, 0.100f },   //   15 m: 1/d
-        { 0.099f, 0.040f },   //   38 m: 1/d
-        { 0.195f, 0.020f },   //   75 m: 1/d
-        { 0.391f, 0.005f },   //  150 m: long-tail (~-46 dB)
-        { 1.000f, 0.000f },   //  384 m: clean silence
+    // Audible range base distance (metres). The volume curve below is
+    // normalized to a CurveDistanceScaler computed as kAudibleRange /
+    // rolloff; with the default unit rolloff this puts the asymptote
+    // (kVolumeCurvePoints[end].x = 1.0) at 384 m — roughly the diagonal
+    // of a 256 x 256 m SL region. Fixed rather than user-tunable: the
+    // earlier "audible range" knob exposed a setting that mostly drifted
+    // away from FMOD parity when touched, and the curve table is tuned
+    // assuming this value.
+    constexpr float kAudibleRange = 384.0f;
+
+    // Distance-attenuation curve. Tracks FMOD's FMOD_3D_INVERSEROLLOFF
+    // with default min_distance = 1.0 m:
+    //   volume = min_dist / (min_dist + rolloff * (d - min_dist))   for d > min_dist
+    //   volume = 1.0                                                 for d <= min_dist
+    //
+    // FMOD's set3DRolloff factor changes the *shape* of the curve (sound
+    // drops faster at higher factors) rather than the audible range, so
+    // we apply rolloff by regenerating the curve points each time the
+    // factor changes — not by scaling CurveDistanceScaler. The other
+    // FAudio knobs that touch the curve (kAudibleRange) stay fixed.
+    //
+    // F3DAudio interpolates linearly between supplied points; sampling
+    // at 10 points keeps worst-case interpolation error below the dB
+    // resolution of typical hearing across the audible band.
+    //
+    // Beyond fractional 1.0, F3DAudio clamps to the last point's gain —
+    // sources past the audible range settle at the curve's tail value
+    // instead of continuing to drop. Negligible in practice (~-52 dB at
+    // rolloff=1) and a clean stop-loss against extreme-distance
+    // ghosting.
+    constexpr float kVolumeCurveMinDistance = 1.0f;
+    constexpr float kVolumeCurveSampleDistances[] = {
+        0.0f, 1.0f, 1.5f, 3.0f, 7.5f, 15.0f, 38.0f, 75.0f, 150.0f, 384.0f
     };
+    constexpr std::size_t kVolumeCurvePointCount =
+        sizeof(kVolumeCurveSampleDistances) /
+        sizeof(kVolumeCurveSampleDistances[0]);
+
+    F3DAUDIO_DISTANCE_CURVE_POINT kVolumeCurvePoints[kVolumeCurvePointCount];
     F3DAUDIO_DISTANCE_CURVE kVolumeCurve = {
         kVolumeCurvePoints,
-        static_cast<uint32_t>(sizeof(kVolumeCurvePoints) /
-                              sizeof(kVolumeCurvePoints[0]))
+        static_cast<uint32_t>(kVolumeCurvePointCount)
     };
+
+    // Regenerate kVolumeCurvePoints for the given rolloff factor. Main
+    // thread only — FAudio's mixer thread reads matrices written by
+    // F3DAudio, not the curve itself, so in-place modification is safe
+    // here as long as we're not mid-F3DAudioCalculate. The listener
+    // constructor seeds at rolloff=1.0; setRolloffFactor re-seeds on
+    // change.
+    void recompute_volume_curve(float rolloff)
+    {
+        if (rolloff <= 0.0f) rolloff = 1.0f;  // safety
+        for (std::size_t i = 0; i < kVolumeCurvePointCount; ++i)
+        {
+            const float d = kVolumeCurveSampleDistances[i];
+            kVolumeCurvePoints[i].Distance = d / kAudibleRange;
+            if (d <= kVolumeCurveMinDistance)
+            {
+                kVolumeCurvePoints[i].DSPSetting = 1.0f;
+            }
+            else
+            {
+                const float effective_d =
+                    kVolumeCurveMinDistance
+                  + rolloff * (d - kVolumeCurveMinDistance);
+                kVolumeCurvePoints[i].DSPSetting =
+                    kVolumeCurveMinDistance / effective_d;
+            }
+        }
+    }
 
     // Doppler clamp: F3DAudio's raw output can spike on fast camera moves
     // or teleports, producing audible "garble". Clamping to roughly a
@@ -134,6 +173,10 @@ LLListener_FAudio::LLListener_FAudio(LLAudioEngine_FAudio* engine)
     : mEnginep(engine)
 {
     init();
+    // Seed the shared volume curve at the default rolloff. setRolloffFactor
+    // regenerates it on change; we need a valid initial state here so the
+    // first run_f3d after construction reads a populated curve.
+    recompute_volume_curve(mRolloffFactor);
     syncListenerPose();
 }
 
@@ -182,7 +225,14 @@ F32 LLListener_FAudio::getDopplerFactor()
 
 void LLListener_FAudio::setRolloffFactor(F32 factor)
 {
+    if (mRolloffFactor == factor) return;
     mRolloffFactor = factor;
+    // Match FMOD's set3DRolloff behaviour: the rolloff factor changes
+    // the *shape* of the inverse-rolloff curve (volume = min_dist /
+    // (min_dist + rolloff * (d - min_dist))), not the audible range.
+    // Regenerate the shared curve table so the next F3DAudioCalculate
+    // pass reads the new gains.
+    recompute_volume_curve(factor);
 }
 
 F32 LLListener_FAudio::getRolloffFactor()
@@ -303,10 +353,14 @@ namespace
         emitter.pChannelAzimuths = (src_channels > 1) ? azimuths.data() : nullptr;
         emitter.InnerRadius = engine->getInnerRadius();
         emitter.InnerRadiusAngle = F3DAUDIO_PI / 4.0f;
-        const float base_range = engine->getAudibleRange();
-        emitter.CurveDistanceScaler = (rolloff > 0.f)
-            ? (base_range / rolloff)
-            : base_range;
+        // CurveDistanceScaler stays fixed at the audible range. Rolloff
+        // is baked into the shared volume curve by recompute_volume_curve
+        // — see the kVolumeCurvePoints comment — matching FMOD's
+        // set3DRolloff behaviour where the factor changes curve shape
+        // rather than reach. rolloff parameter is unused here but kept
+        // in the signature for symmetry with the listener interface.
+        (void)rolloff;
+        emitter.CurveDistanceScaler = kAudibleRange;
         emitter.DopplerScaler = doppler_scaler;
         emitter.pVolumeCurve = &kVolumeCurve;
         emitter.pLFECurve = nullptr;
@@ -361,25 +415,32 @@ namespace
         // the smoothed value has settled at passthrough so a freshly-
         // built voice (whose filter defaults to Frequency=1.0) stays
         // bit-identical to the source until distance starts attenuating.
-        constexpr float kLpfSmoothAlpha       = 0.18f;
-        constexpr float kLpfPassthroughThresh = 0.999f;
-        constexpr float kLpfApplyEpsilon      = 0.002f;
-        const float target_lpf = dsp.LPFDirectCoefficient;
-        channel->mSmoothedLpf +=
-            (target_lpf - channel->mSmoothedLpf) * kLpfSmoothAlpha;
-        const bool at_passthrough =
-            channel->mSmoothedLpf    >= kLpfPassthroughThresh &&
-            channel->mLastAppliedLpf >= kLpfPassthroughThresh;
-        if (!at_passthrough &&
-            std::abs(channel->mSmoothedLpf - channel->mLastAppliedLpf)
-                > kLpfApplyEpsilon)
+        //
+        // Voices created without FAUDIO_VOICE_USEFILTER (forced-priority
+        // sources at listener distance 0) skip this entirely —
+        // SetFilterParameters is invalid on those voices.
+        if (channel->getVoiceUsesFilter())
         {
-            FAudioFilterParameters lpf{};
-            lpf.Type = FAudioLowPassFilter;
-            lpf.Frequency = channel->mSmoothedLpf;
-            lpf.OneOverQ  = 1.0f;
-            FAudioVoice_SetFilterParameters(voice, &lpf, FAUDIO_COMMIT_NOW);
-            channel->mLastAppliedLpf = channel->mSmoothedLpf;
+            constexpr float kLpfSmoothAlpha       = 0.18f;
+            constexpr float kLpfPassthroughThresh = 0.999f;
+            constexpr float kLpfApplyEpsilon      = 0.002f;
+            const float target_lpf = dsp.LPFDirectCoefficient;
+            channel->mSmoothedLpf +=
+                (target_lpf - channel->mSmoothedLpf) * kLpfSmoothAlpha;
+            const bool at_passthrough =
+                channel->mSmoothedLpf    >= kLpfPassthroughThresh &&
+                channel->mLastAppliedLpf >= kLpfPassthroughThresh;
+            if (!at_passthrough &&
+                std::abs(channel->mSmoothedLpf - channel->mLastAppliedLpf)
+                    > kLpfApplyEpsilon)
+            {
+                FAudioFilterParameters lpf{};
+                lpf.Type = FAudioLowPassFilter;
+                lpf.Frequency = channel->mSmoothedLpf;
+                lpf.OneOverQ  = 1.0f;
+                FAudioVoice_SetFilterParameters(voice, &lpf, FAUDIO_COMMIT_NOW);
+                channel->mLastAppliedLpf = channel->mSmoothedLpf;
+            }
         }
 
         // Reverb wet send. Spatial sounds bleed into the reverb submix at
@@ -402,27 +463,52 @@ namespace
             const float secondary_for_reverb = channel->isRoutedThroughGroup()
                 ? channel->getSecondaryGain()
                 : 1.0f;
-            const float send_gain = calc_doppler
+            const float target_send = calc_doppler
                 ? (dsp.ReverbLevel * engine->getReverbSendScale() * secondary_for_reverb)
                 : 0.0f;
-            // Matrix dims target the reverb submix's input channel count,
-            // not the master's. The reverb submix may be a different size
-            // (e.g. 5.1 reverb feeding a 7.1 master); FAudio's default
-            // submix->master matrix handles the channel-count conversion
-            // on the output side.
-            const uint32_t reverb_ch = engine->getReverbChannelCount();
-            std::array<float, 64> reverb_mat{};
-            for (uint32_t s = 0; s < src_channels && s < 8; ++s)
+
+            // Smooth + gate the reverb send the same way we treat the
+            // LPF coefficient. FAudio interpolates SetOutputMatrix across
+            // the audio frame, but per-frame writes still produce small
+            // steps when the underlying scalar (F3DAudio's dsp.ReverbLevel
+            // composed with the engine's send scale) jumps rapidly during
+            // fast listener motion. Smoothing absorbs those jumps and the
+            // gate skips the matrix write entirely once a dry channel has
+            // settled at silence — forced-priority sources (calc_doppler
+            // == false → target_send always 0) stay there permanently.
+            constexpr float kReverbSmoothAlpha    = 0.20f;
+            constexpr float kReverbSilenceThresh  = 0.0001f;
+            constexpr float kReverbApplyEpsilon   = 0.001f;
+            channel->mSmoothedReverbSend +=
+                (target_send - channel->mSmoothedReverbSend) * kReverbSmoothAlpha;
+            const bool at_silence =
+                channel->mSmoothedReverbSend    <= kReverbSilenceThresh &&
+                channel->mLastAppliedReverbSend <= kReverbSilenceThresh;
+            if (!at_silence &&
+                std::abs(channel->mSmoothedReverbSend
+                         - channel->mLastAppliedReverbSend) > kReverbApplyEpsilon)
             {
-                for (uint32_t d = 0; d < reverb_ch && d < 8; ++d)
+                // Matrix dims target the reverb submix's input channel
+                // count, not the master's. The reverb submix may be a
+                // different size (e.g. 5.1 reverb feeding a 7.1 master);
+                // FAudio's default submix->master matrix handles the
+                // channel-count conversion on the output side.
+                const uint32_t reverb_ch = engine->getReverbChannelCount();
+                std::array<float, 64> reverb_mat{};
+                const float send = channel->mSmoothedReverbSend;
+                for (uint32_t s = 0; s < src_channels && s < 8; ++s)
                 {
-                    reverb_mat[d * src_channels + s] = send_gain;
+                    for (uint32_t d = 0; d < reverb_ch && d < 8; ++d)
+                    {
+                        reverb_mat[d * src_channels + s] = send;
+                    }
                 }
+                FAudioVoice_SetOutputMatrix(voice,
+                                            reinterpret_cast<FAudioVoice*>(reverb),
+                                            src_channels, reverb_ch,
+                                            reverb_mat.data(), FAUDIO_COMMIT_NOW);
+                channel->mLastAppliedReverbSend = channel->mSmoothedReverbSend;
             }
-            FAudioVoice_SetOutputMatrix(voice,
-                                        reinterpret_cast<FAudioVoice*>(reverb),
-                                        src_channels, reverb_ch,
-                                        reverb_mat.data(), FAUDIO_COMMIT_NOW);
         }
 
         float target = calc_doppler ? dsp.DopplerFactor : 1.0f;

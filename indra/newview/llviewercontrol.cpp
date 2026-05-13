@@ -527,20 +527,33 @@ static void handleAudioWindAltitudeBoostChanged(const LLSD& newvalue)
 }
 
 #ifdef LL_FAUDIO
-// FAudio-specific tunables: AudibleRange controls F3DAudio's
-// CurveDistanceScaler, InnerRadius the emitter's near-field diffusion
-// radius. dynamic_cast keeps the dispatch safe when a non-FAudio
-// engine is live (cast returns null, no-op).
-static void handleAudioFAudioAudibleRangeChanged(const LLSD& newvalue)
-{
-    if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
-        fa->setAudibleRange(static_cast<F32>(newvalue.asReal()));
-}
-
+// FAudio-specific tunables: InnerRadius controls the F3DAudio emitter's
+// near-field diffusion radius, MasterLimiter* drives the FAPOFX
+// FXMasteringLimiter on the mastering voice. dynamic_cast keeps each
+// dispatch safe when a non-FAudio engine is live (cast returns null,
+// no-op).
 static void handleAudioFAudioInnerRadiusChanged(const LLSD& newvalue)
 {
     if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
         fa->setInnerRadius(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioFAudioMasterLimiterEnableChanged(const LLSD& newvalue)
+{
+    if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+        fa->setMasterLimiterEnable(newvalue.asBoolean());
+}
+
+static void handleAudioFAudioMasterLimiterReleaseChanged(const LLSD& newvalue)
+{
+    if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+        fa->setMasterLimiterRelease(static_cast<uint32_t>(newvalue.asInteger()));
+}
+
+static void handleAudioFAudioMasterLimiterLoudnessChanged(const LLSD& newvalue)
+{
+    if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+        fa->setMasterLimiterLoudness(static_cast<uint32_t>(newvalue.asInteger()));
 }
 #endif
 
@@ -1041,8 +1054,10 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "AudioWindGustiness", handleAudioWindGustinessChanged);
     setting_setup_signal_listener(gSavedSettings, "AudioWindAltitudeBoost", handleAudioWindAltitudeBoostChanged);
 #ifdef LL_FAUDIO
-    setting_setup_signal_listener(gSavedSettings, "AudioFAudioAudibleRange", handleAudioFAudioAudibleRangeChanged);
     setting_setup_signal_listener(gSavedSettings, "AudioFAudioInnerRadius", handleAudioFAudioInnerRadiusChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioMasterLimiterEnable", handleAudioFAudioMasterLimiterEnableChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioMasterLimiterRelease", handleAudioFAudioMasterLimiterReleaseChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioMasterLimiterLoudness", handleAudioFAudioMasterLimiterLoudnessChanged);
 #endif
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis0", handleJoystickChanged);
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis1", handleJoystickChanged);
