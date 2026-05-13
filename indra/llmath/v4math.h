@@ -399,9 +399,13 @@ inline constexpr LLVector4 operator*(F32 k, const LLVector4& a) noexcept
 
 inline constexpr bool operator==(const LLVector4& a, const LLVector4& b) noexcept
 {
+    // operator!= checks all four components; this used to check only xyz, so
+    // (a == b) and (a != b) could both be true when xyz matched but W
+    // differed. Match operator!= and check all four.
     return (  (a.mV[VX] == b.mV[VX])
             &&(a.mV[VY] == b.mV[VY])
-            &&(a.mV[VZ] == b.mV[VZ]));
+            &&(a.mV[VZ] == b.mV[VZ])
+            &&(a.mV[VW] == b.mV[VW]));
 }
 
 inline constexpr bool operator!=(const LLVector4& a, const LLVector4& b) noexcept
