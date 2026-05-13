@@ -475,7 +475,10 @@ inline void LLVector4a::setAllLength3( const LLVector4a& v )
 // Get this vector's length
 inline LLSimdScalar LLVector4a::getLength3() const
 {
-    return _mm_sqrt_ss( dot3( (const LLVector4a)mQ ) );
+    // Previously did `dot3((const LLVector4a)mQ)`, which used the implicit
+    // LLVector4a(LLQuad) ctor to materialize a fresh LLVector4a from the same
+    // storage we already have via `*this`. Pass *this directly.
+    return _mm_sqrt_ss( dot3(*this) );
 }
 
 // Set the components of this vector to the minimum of the corresponding components of lhs and rhs

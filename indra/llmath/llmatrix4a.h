@@ -79,17 +79,32 @@ public:
 
     inline const F32* getF32ptr() const
     {
-        return (F32*)&mMatrix;
+        // Previously cast away const via (F32*), then implicitly re-added it
+        // on return. Cast through the matching const pointer type instead so
+        // a typo in the cast direction would actually be caught.
+        return (const F32*)&mMatrix;
     }
 
-    inline LLMatrix4& asMatrix4()
+    // Store the LLMatrix4a's data into an LLMatrix4 via SSE unaligned stores.
+    // This is the inverse of loadu(LLMatrix4). The previous asMatrix4()
+    // returned a reference to *this reinterpreted as LLMatrix4, which was
+    // strict-aliasing UB -- LLMatrix4a is stored as four LLVector4a (each
+    // wrapping __m128) and LLMatrix4 is stored as F32[4][4]. The SSE
+    // intrinsic-ABI exemption covers _mm_*_ps on F32 buffers, so a real
+    // store+load round-trip is well-defined where the cast wasn't.
+    inline void store(LLMatrix4& dst) const
     {
-        return *(LLMatrix4*)this;
+        _mm_storeu_ps(dst.mMatrix[0], mMatrix[0]);
+        _mm_storeu_ps(dst.mMatrix[1], mMatrix[1]);
+        _mm_storeu_ps(dst.mMatrix[2], mMatrix[2]);
+        _mm_storeu_ps(dst.mMatrix[3], mMatrix[3]);
     }
 
-    inline const LLMatrix4& asMatrix4() const
+    inline LLMatrix4 toMatrix4() const
     {
-        return *(LLMatrix4*)this;
+        LLMatrix4 out;
+        store(out);
+        return out;
     }
 
     inline void clear()

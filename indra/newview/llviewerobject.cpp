@@ -4543,7 +4543,7 @@ void LLViewerObject::getGLTFNodeTransformAgent(S32 node_index, LLVector3* positi
 
     if (rotation)
     {
-        rotation->set(node_to_agent.asMatrix4());
+        rotation->set(node_to_agent.toMatrix4());
     }
 
     if (scale)
@@ -4559,7 +4559,7 @@ void decomposeMatrix(const LLMatrix4a& mat, LLVector3& position, LLQuaternion& r
     LLVector4a p = mat.getTranslation();
     position.set(p.getF32ptr());
 
-    rotation.set(mat.asMatrix4());
+    rotation.set(mat.toMatrix4());
 
     scale.mV[0] = mat.mMatrix[0].getLength3().getF32();
     scale.mV[1] = mat.mMatrix[1].getLength3().getF32();
@@ -4583,7 +4583,7 @@ void LLViewerObject::setGLTFNodeRotationAgent(S32 node_index, const LLQuaternion
             matMul(agent_to_asset, ami, agent_to_node);
         }
 
-        LLQuaternion agent_to_node_rot(agent_to_node.asMatrix4());
+        LLQuaternion agent_to_node_rot(agent_to_node.toMatrix4());
         LLQuaternion new_rot;
 
         new_rot = rotation * agent_to_node_rot;
@@ -4596,7 +4596,14 @@ void LLViewerObject::setGLTFNodeRotationAgent(S32 node_index, const LLQuaternion
         mat.loadu(glm::value_ptr(node.mMatrix));
         decomposeMatrix(mat, pos, rot, scale);
 
-        mat.asMatrix4().initAll(scale, new_rot, pos);
+        // Build the transform in a local LLMatrix4 then SSE-load back into
+        // the LLMatrix4a. The previous `mat.asMatrix4().initAll(...)` wrote
+        // through a reinterpret_cast of LLMatrix4a to LLMatrix4, which is
+        // strict-aliasing UB (the two classes' element types differ even
+        // though their byte layouts match).
+        LLMatrix4 tmp;
+        tmp.initAll(scale, new_rot, pos);
+        mat.loadu(tmp);
 
         node.mMatrix = glm::make_mat4(mat.getF32ptr());
 
