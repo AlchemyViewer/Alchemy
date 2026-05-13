@@ -350,11 +350,37 @@ namespace
         // Air-absorption / occlusion LPF. F3DAudio's coefficient maps
         // directly onto FAudio's normalized [0, 1] Frequency param —
         // 1 = full passthrough, lower values cut HF progressively.
-        FAudioFilterParameters lpf{};
-        lpf.Type = FAudioLowPassFilter;
-        lpf.Frequency = dsp.LPFDirectCoefficient;
-        lpf.OneOverQ = 1.0f;
-        FAudioVoice_SetFilterParameters(voice, &lpf, FAUDIO_COMMIT_NOW);
+        //
+        // FAudio does not interpolate SetFilterParameters across an audio
+        // frame the way it does SetVolume / SetOutputMatrix — the new
+        // biquad coefficients are applied immediately while y[n-1]/y[n-2]
+        // still reflect the old filter response. A meaningful per-frame
+        // step in the cutoff (camera move, teleport, fast forward motion)
+        // therefore produces an IIR transient audible as a "pop". Smooth
+        // the coefficient on the main-thread side and skip the call when
+        // the smoothed value has settled at passthrough so a freshly-
+        // built voice (whose filter defaults to Frequency=1.0) stays
+        // bit-identical to the source until distance starts attenuating.
+        constexpr float kLpfSmoothAlpha       = 0.18f;
+        constexpr float kLpfPassthroughThresh = 0.999f;
+        constexpr float kLpfApplyEpsilon      = 0.002f;
+        const float target_lpf = dsp.LPFDirectCoefficient;
+        channel->mSmoothedLpf +=
+            (target_lpf - channel->mSmoothedLpf) * kLpfSmoothAlpha;
+        const bool at_passthrough =
+            channel->mSmoothedLpf    >= kLpfPassthroughThresh &&
+            channel->mLastAppliedLpf >= kLpfPassthroughThresh;
+        if (!at_passthrough &&
+            std::abs(channel->mSmoothedLpf - channel->mLastAppliedLpf)
+                > kLpfApplyEpsilon)
+        {
+            FAudioFilterParameters lpf{};
+            lpf.Type = FAudioLowPassFilter;
+            lpf.Frequency = channel->mSmoothedLpf;
+            lpf.OneOverQ  = 1.0f;
+            FAudioVoice_SetFilterParameters(voice, &lpf, FAUDIO_COMMIT_NOW);
+            channel->mLastAppliedLpf = channel->mSmoothedLpf;
+        }
 
         // Reverb wet send. Spatial sounds bleed into the reverb submix at
         // dsp.ReverbLevel (a single scalar from F3DAudio); each source

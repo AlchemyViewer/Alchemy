@@ -255,6 +255,19 @@ public:
     // next frame) — no atomic needed.
     float              mSmoothedDoppler = 1.0f;
 
+    // Exponentially-smoothed F3DAudio LPF coefficient (FAudio voice filter
+    // Frequency, [0,1] passthrough->cutoff). FAudio interpolates SetVolume
+    // and SetOutputMatrix across the audio frame, but SetFilterParameters
+    // is applied at once — so per-frame coefficient writes drive the IIR
+    // biquad's poles out from under stale y[n-1]/y[n-2] state, producing
+    // audible "pops" on rapid listener motion. Smoothing here is the main-
+    // thread half of the fix; the listener's run_f3d skips the API call
+    // entirely when the smoothed value has settled at passthrough.
+    // mLastAppliedLpf tracks what was actually written so the run can
+    // detect convergence to passthrough and stop calling.
+    float              mSmoothedLpf    = 1.0f;
+    float              mLastAppliedLpf = 1.0f;
+
     // Called from LLAudioBufferFAudio's destructor when this channel's
     // current buffer is about to be freed. Flush the voice so the mixer
     // thread stops reading the buffer's PCM before the vector is gone.

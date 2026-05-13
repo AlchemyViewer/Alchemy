@@ -1116,6 +1116,12 @@ void LLAudioChannelFAudio::destroyVoice()
     mLoopCount = 0;
     mObservedLoopCount = 0;
     mSmoothedDoppler = 1.0f;
+    // A freshly-built voice's filter defaults to Frequency=1.0 (passthrough),
+    // so reset our tracking to match. Otherwise the first run_f3d after a
+    // voice rebuild would see a non-passthrough mLastAppliedLpf and force a
+    // SetFilterParameters call before the smoother has any signal.
+    mSmoothedLpf = 1.0f;
+    mLastAppliedLpf = 1.0f;
 }
 
 bool LLAudioChannelFAudio::ensureVoice(const FAudioWaveFormatEx& fmt)
