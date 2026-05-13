@@ -16549,7 +16549,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>2.0</real>
+    <real>0.01</real>
   </map>
   <key>TeleportLocalDelay</key>
   <map>
@@ -16560,7 +16560,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>1.0</real>
+    <real>0.01</real>
   </map>
   <key>FMODExProfilerEnable</key>
   <map>
