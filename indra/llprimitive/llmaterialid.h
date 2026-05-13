@@ -64,8 +64,6 @@ public:
     static const LLMaterialID null;
 
 private:
-    // definitions follow class
-    friend std::hash<LLMaterialID>;
     friend size_t hash_value(const LLMaterialID&) noexcept;
 
     void parseFromBinary(const LLSD::Binary& pMaterialID);
@@ -74,46 +72,39 @@ private:
     U8 mID[MATERIAL_ID_SIZE];
 } ;
 
-// std::hash implementation for LLMaterialID
+// Canonical hash for LLMaterialID (also used by boost::container_hash via ADL).
+// Golden-ratio multiply with avalanche mixing: shift by 31 mixes the upper
+// half into the lower half; shift by 47 lifts the highest bits into output.
+// U64 arithmetic throughout keeps the byte-pack and mixing shifts well-defined
+// regardless of size_t width.
+inline size_t hash_value(const LLMaterialID& id) noexcept
+{
+    U64 h = 0;
+    for (int i = 0; i < MATERIAL_ID_SIZE; i += 8)
+    {
+        const U64 chunk =
+              (U64)id.mID[i]
+            | ((U64)id.mID[i + 1] << 8)
+            | ((U64)id.mID[i + 2] << 16)
+            | ((U64)id.mID[i + 3] << 24)
+            | ((U64)id.mID[i + 4] << 32)
+            | ((U64)id.mID[i + 5] << 40)
+            | ((U64)id.mID[i + 6] << 48)
+            | ((U64)id.mID[i + 7] << 56);
+        h ^= (chunk * 0x9e3779b97f4a7c15ULL) ^ (h >> 31) ^ (h >> 47);
+    }
+    return (size_t)h;
+}
+
 namespace std
 {
     template<> struct hash<LLMaterialID>
     {
         inline size_t operator()(const LLMaterialID& id) const noexcept
         {
-            size_t h = 0;
-            // Golden ratio hash with avalanche mixing
-            // Process 8 bytes at a time by manually constructing 64-bit values
-            // Shift by 31: mixes upper half into lower half for better bit distribution
-            // Shift by 47: ensures highest bits influence final hash output
-            for (int i = 0; i < MATERIAL_ID_SIZE; i += 8) {
-                size_t chunk = (size_t)id.mID[i] | ((size_t)id.mID[i + 1] << 8) |
-                               ((size_t)id.mID[i+2] << 16) | ((size_t)id.mID[i+3] << 24) |
-                               ((size_t)id.mID[i+4] << 32) | ((size_t)id.mID[i+5] << 40) |
-                               ((size_t)id.mID[i + 6] << 48) | ((size_t)id.mID[i + 7] << 56);
-                h ^= (chunk * 0x9e3779b97f4a7c15ULL) ^ (h >> 31) ^ (h >> 47);
-            }
-            return h;
+            return hash_value(id);
         }
     };
-}
-
-// For use with boost::container_hash
-inline size_t hash_value(const LLMaterialID& id) noexcept
-{
-    size_t h = 0;
-    // Golden ratio hash with avalanche mixing
-    // Process 8 bytes at a time by manually constructing 64-bit values
-    // Shift by 31: mixes upper half into lower half for better bit distribution
-    // Shift by 47: ensures highest bits influence final hash output
-    for (int i = 0; i < MATERIAL_ID_SIZE; i += 8)
-    {
-        size_t chunk = (size_t)id.mID[i] | ((size_t)id.mID[i + 1] << 8) | ((size_t)id.mID[i + 2] << 16) | ((size_t)id.mID[i + 3] << 24) |
-                       ((size_t)id.mID[i + 4] << 32) | ((size_t)id.mID[i + 5] << 40) | ((size_t)id.mID[i + 6] << 48) |
-                       ((size_t)id.mID[i + 7] << 56);
-        h ^= (chunk * 0x9e3779b97f4a7c15ULL) ^ (h >> 31) ^ (h >> 47);
-    }
-    return h;
 }
 
 #endif // LL_LLMATERIALID_H
