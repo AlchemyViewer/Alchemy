@@ -46,9 +46,6 @@
 #include "llmutex.h"
 #include "llmd5.h"
 
-const LLUUID LLUUID::null;
-const LLTransactionID LLTransactionID::tnull;
-
 // static
 LLMutex* LLUUID::mMutex = NULL;
 
@@ -946,13 +943,6 @@ LLAssetID LLTransactionID::makeAssetID(const LLUUID& session) const
     }
     return result;
 }
-
-// Construct
-LLUUID::LLUUID()
-{
-    setNull();
-}
-
 
 void LLUUID::setNull()
 {

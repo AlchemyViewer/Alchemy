@@ -35,6 +35,18 @@ namespace tut
     tut::lluuid_t tut_lluuid("LLUUID");
 
     static const std::string kSampleStr = "01020304-0506-0708-090a-0b0c0d0e0f10";
+
+    // Compile-time verification that LLUUID is constexpr-constructible.
+    static_assert(LLUUID{}.mData[0] == 0, "default LLUUID is zero-initialised at compile time");
+    static_assert(LLUUID::null.mData[0] == 0, "LLUUID::null is a compile-time constant");
+    static_assert(LLTransactionID::tnull.mData[0] == 0, "LLTransactionID::tnull is a compile-time constant");
+
+    constexpr U8 kConstexprBytes[UUID_BYTES] = {
+        0xde, 0xad, 0xbe, 0xef, 0xfe, 0xed, 0xfa, 0xce,
+        0xca, 0xfe, 0xba, 0xbe, 0x12, 0x34, 0x56, 0x78
+    };
+    static_assert(LLUUID(kConstexprBytes).mData[0]  == 0xde, "constexpr byte-array ctor copies bytes");
+    static_assert(LLUUID(kConstexprBytes).mData[15] == 0x78, "constexpr byte-array ctor reaches last byte");
     static void fill_sample(LLUUID& id)
     {
         for (int i = 0; i < UUID_BYTES; ++i)

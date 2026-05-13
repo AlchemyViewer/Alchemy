@@ -54,7 +54,11 @@ public:
     //
     // CREATORS
     //
-    LLUUID();
+    constexpr LLUUID() noexcept = default;
+    explicit constexpr LLUUID(const U8 (&bytes)[UUID_BYTES]) noexcept
+    {
+        for (S32 i = 0; i < UUID_BYTES; ++i) mData[i] = bytes[i];
+    }
     explicit LLUUID(const char *in_string); // Convert from string.
     explicit LLUUID(const std::string& in_string); // Convert from string.
     ~LLUUID() = default;
@@ -138,11 +142,15 @@ public:
 
     static bool parseUUID(const std::string& buf, LLUUID* value);
 
-    U8 mData[UUID_BYTES];
+    U8 mData[UUID_BYTES] {};
 };
 static_assert(std::is_trivially_copyable<LLUUID>::value, "LLUUID must be trivial copy");
 static_assert(std::is_trivially_move_assignable<LLUUID>::value, "LLUUID must be trivial move");
 static_assert(std::is_standard_layout<LLUUID>::value, "LLUUID must be a standard layout type");
+
+// Defined as inline constexpr after the class definition because the static
+// data member is of LLUUID type, which is incomplete inside the class body.
+inline constexpr LLUUID LLUUID::null{};
 
 typedef std::vector<LLUUID> uuid_vec_t;
 typedef std::set<LLUUID> uuid_set_t;
@@ -171,11 +179,13 @@ typedef LLUUID LLAssetID;
 class LL_COMMON_API LLTransactionID : public LLUUID
 {
 public:
-    LLTransactionID() : LLUUID() { }
+    constexpr LLTransactionID() noexcept = default;
 
     static const LLTransactionID tnull;
     LLAssetID makeAssetID(const LLUUID& session) const;
 };
+
+inline constexpr LLTransactionID LLTransactionID::tnull{};
 
 // Canonical hash for LLUUID (also used by boost::container_hash via ADL).
 // Golden-ratio multiply with avalanche mixing: shift by 31 mixes the upper
