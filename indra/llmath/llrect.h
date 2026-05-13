@@ -37,21 +37,20 @@ template <class Type> class LLRectBase
 {
 public:
     typedef Type tCoordType;
-    Type        mLeft;
-    Type        mTop;
-    Type        mRight;
-    Type        mBottom;
+    Type        mLeft   { 0 };
+    Type        mTop    { 0 };
+    Type        mRight  { 0 };
+    Type        mBottom { 0 };
 
     // Note: follows GL_QUAD conventions: the top and right edges are not considered part of the rect
-    Type        getWidth()  const { return mRight - mLeft; }
-    Type        getHeight() const { return mTop - mBottom; }
-    Type        getCenterX() const { return (mLeft + mRight) / 2; }
-    Type        getCenterY() const { return (mTop + mBottom) / 2; }
+    constexpr Type getWidth()   const noexcept { return mRight - mLeft; }
+    constexpr Type getHeight()  const noexcept { return mTop - mBottom; }
+    constexpr Type getCenterX() const noexcept { return (mLeft + mRight) / 2; }
+    constexpr Type getCenterY() const noexcept { return (mTop + mBottom) / 2; }
 
-    LLRectBase():   mLeft(0), mTop(0), mRight(0), mBottom(0)
-    {}
+    constexpr LLRectBase() noexcept = default;
 
-    LLRectBase(Type left, Type top, Type right, Type bottom):
+    constexpr LLRectBase(Type left, Type top, Type right, Type bottom) noexcept:
     mLeft(left), mTop(top), mRight(right), mBottom(bottom)
     {}
 
@@ -79,26 +78,26 @@ public:
     }
 
     // Note: follows GL_QUAD conventions: the top and right edges are not considered part of the rect
-    bool        pointInRect(const Type x, const Type y) const
+    constexpr bool pointInRect(const Type x, const Type y) const noexcept
     {
         return  mLeft <= x && x < mRight &&
                 mBottom <= y && y < mTop;
     }
 
     //// Note: follows GL_QUAD conventions: the top and right edges are not considered part of the rect
-    bool        localPointInRect(const Type x, const Type y) const
+    constexpr bool localPointInRect(const Type x, const Type y) const noexcept
     {
         return  0 <= x && x < getWidth() &&
                 0 <= y && y < getHeight();
     }
 
-    void        clampPointToRect(Type& x, Type& y)
+    constexpr void clampPointToRect(Type& x, Type& y) noexcept
     {
         x = llclamp(x, mLeft, mRight);
         y = llclamp(y, mBottom, mTop);
     }
 
-    void        clipPointToRect(const Type start_x, const Type start_y, Type& end_x, Type& end_y)
+    constexpr void clipPointToRect(const Type start_x, const Type start_y, Type& end_x, Type& end_y) noexcept
     {
         if (!pointInRect(start_x, start_y))
         {
@@ -134,7 +133,7 @@ public:
 
     // Note: Does NOT follow GL_QUAD conventions: the top and right edges ARE considered part of the rect
     // returns true if any part of rect is is inside this LLRect
-    bool        overlaps(const LLRectBase& rect) const
+    constexpr bool overlaps(const LLRectBase& rect) const noexcept
     {
         return !(mLeft > rect.mRight
             || mRight < rect.mLeft
@@ -142,7 +141,7 @@ public:
             || mTop < rect.mBottom);
     }
 
-    bool        contains(const LLRectBase& rect) const
+    constexpr bool contains(const LLRectBase& rect) const noexcept
     {
         return mLeft <= rect.mLeft
             && mRight >= rect.mRight
@@ -150,7 +149,7 @@ public:
             && mTop >= rect.mTop;
     }
 
-    LLRectBase& set(Type left, Type top, Type right, Type bottom)
+    constexpr LLRectBase& set(Type left, Type top, Type right, Type bottom) noexcept
     {
         mLeft = left;
         mTop = top;
@@ -160,7 +159,7 @@ public:
     }
 
     // Note: follows GL_QUAD conventions: the top and right edges are not considered part of the rect
-    LLRectBase& setOriginAndSize( Type left, Type bottom, Type width, Type height)
+    constexpr LLRectBase& setOriginAndSize( Type left, Type bottom, Type width, Type height) noexcept
     {
         mLeft = left;
         mTop = bottom + height;
@@ -170,7 +169,7 @@ public:
     }
 
     // Note: follows GL_QUAD conventions: the top and right edges are not considered part of the rect
-    LLRectBase& setLeftTopAndSize( Type left, Type top, Type width, Type height)
+    constexpr LLRectBase& setLeftTopAndSize( Type left, Type top, Type width, Type height) noexcept
     {
         mLeft = left;
         mTop = top;
@@ -179,7 +178,7 @@ public:
         return *this;
     }
 
-    LLRectBase& setCenterAndSize(Type x, Type y, Type width, Type height)
+    constexpr LLRectBase& setCenterAndSize(Type x, Type y, Type width, Type height) noexcept
     {
         // width and height could be odd, so favor top, right with extra pixel
         mLeft = x - width/2;
@@ -190,7 +189,7 @@ public:
     }
 
 
-    LLRectBase& translate(Type horiz, Type vertical)
+    constexpr LLRectBase& translate(Type horiz, Type vertical) noexcept
     {
         mLeft += horiz;
         mRight += horiz;
@@ -199,7 +198,7 @@ public:
         return *this;
     }
 
-    LLRectBase& stretch( Type dx, Type dy)
+    constexpr LLRectBase& stretch( Type dx, Type dy) noexcept
     {
         mLeft -= dx;
         mRight += dx;
@@ -208,35 +207,35 @@ public:
         return makeValid();
     }
 
-    LLRectBase& stretch( Type delta )
+    constexpr LLRectBase& stretch( Type delta ) noexcept
     {
         stretch(delta, delta);
         return *this;
     }
 
-    LLRectBase& makeValid()
+    constexpr LLRectBase& makeValid() noexcept
     {
         mLeft = llmin(mLeft, mRight);
         mBottom = llmin(mBottom, mTop);
         return *this;
     }
 
-    bool isValid() const
+    constexpr bool isValid() const noexcept
     {
         return mLeft <= mRight && mBottom <= mTop;
     }
 
-    bool isEmpty() const
+    constexpr bool isEmpty() const noexcept
     {
         return mLeft == mRight || mBottom == mTop;
     }
 
-    bool notEmpty() const
+    constexpr bool notEmpty() const noexcept
     {
         return !isEmpty();
     }
 
-    void unionWith(const LLRectBase &other)
+    constexpr void unionWith(const LLRectBase &other) noexcept
     {
         mLeft = llmin(mLeft, other.mLeft);
         mRight = llmax(mRight, other.mRight);
@@ -244,7 +243,7 @@ public:
         mTop = llmax(mTop, other.mTop);
     }
 
-    void intersectWith(const LLRectBase &other)
+    constexpr void intersectWith(const LLRectBase &other) noexcept
     {
         mLeft = llmax(mLeft, other.mLeft);
         mRight = llmin(mRight, other.mRight);
@@ -267,7 +266,7 @@ public:
         return s;
     }
 
-    bool operator==(const LLRectBase &b) const
+    constexpr bool operator==(const LLRectBase &b) const noexcept
     {
         return ((mLeft == b.mLeft) &&
                 (mTop == b.mTop) &&
@@ -275,7 +274,7 @@ public:
                 (mBottom == b.mBottom));
     }
 
-    bool operator!=(const LLRectBase &b) const
+    constexpr bool operator!=(const LLRectBase &b) const noexcept
     {
         return ((mLeft != b.mLeft) ||
                 (mTop != b.mTop) ||
@@ -283,10 +282,10 @@ public:
                 (mBottom != b.mBottom));
     }
 
-    static LLRectBase<Type> null;
+    static const LLRectBase<Type> null;
 };
 
-template <class Type> LLRectBase<Type> LLRectBase<Type>::null(0,0,0,0);
+template <class Type> inline constexpr LLRectBase<Type> LLRectBase<Type>::null{};
 
 typedef LLRectBase<S32> LLRect;
 typedef LLRectBase<F32> LLRectf;

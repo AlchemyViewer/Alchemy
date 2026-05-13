@@ -38,89 +38,9 @@
 
 //////////////////////////////////////////////////////////////////////////////
 
-LLColor4 LLColor4::red(     1.f, 0.f, 0.f, 1.f);
-LLColor4 LLColor4::green(   0.f, 1.f, 0.f, 1.f);
-LLColor4 LLColor4::blue(    0.f, 0.f, 1.f, 1.f);
-LLColor4 LLColor4::black(   0.f, 0.f, 0.f, 1.f);
-LLColor4 LLColor4::yellow(  1.f, 1.f, 0.f, 1.f);
-LLColor4 LLColor4::magenta( 1.0f, 0.0f, 1.0f, 1.0f);
-LLColor4 LLColor4::cyan(    0.0f, 1.0f, 1.0f, 1.0f);
-LLColor4 LLColor4::white(   1.f, 1.f, 1.f, 1.f);
-LLColor4 LLColor4::smoke(   0.5f, 0.5f, 0.5f, 0.5f);
-LLColor4 LLColor4::grey(    0.5f, 0.5f, 0.5f, 1.0f);
-LLColor4 LLColor4::orange(  1.f, 0.5, 0.f, 1.f );
-LLColor4 LLColor4::purple(  0.6f, 0.2f, 0.8f, 1.0f);
-LLColor4 LLColor4::pink(    1.0f, 0.5f, 0.8f, 1.0f);
-LLColor4 LLColor4::transparent( 0.f, 0.f, 0.f, 0.f );
-
-//////////////////////////////////////////////////////////////////////////////
-
-LLColor4 LLColor4::grey1(0.8f, 0.8f, 0.8f, 1.0f);
-LLColor4 LLColor4::grey2(0.6f, 0.6f, 0.6f, 1.0f);
-LLColor4 LLColor4::grey3(0.4f, 0.4f, 0.4f, 1.0f);
-LLColor4 LLColor4::grey4(0.3f, 0.3f, 0.3f, 1.0f);
-// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
-LLColor4 LLColor4::silhouette(0.05f, 0.05f, 0.05f, 1.0f);
-// [/RLVa:KB]
-
-LLColor4 LLColor4::red1(1.0f, 0.0f, 0.0f, 1.0f);
-LLColor4 LLColor4::red2(0.6f, 0.0f, 0.0f, 1.0f);
-LLColor4 LLColor4::red3(1.0f, 0.2f, 0.2f, 1.0f);
-LLColor4 LLColor4::red4(0.5f, 0.1f, 0.1f, 1.0f);
-LLColor4 LLColor4::red5(0.8f, 0.1f, 0.0f, 1.0f);
-
-LLColor4 LLColor4::green1(0.0f, 1.0f, 0.0f, 1.0f);
-LLColor4 LLColor4::green2(0.0f, 0.6f, 0.0f, 1.0f);
-LLColor4 LLColor4::green3(0.0f, 0.4f, 0.0f, 1.0f);
-LLColor4 LLColor4::green4(0.0f, 1.0f, 0.4f, 1.0f);
-LLColor4 LLColor4::green5(0.2f, 0.6f, 0.4f, 1.0f);
-LLColor4 LLColor4::green6(0.4f, 0.6f, 0.2f, 1.0f);
-
-LLColor4 LLColor4::blue1(0.0f, 0.0f, 1.0f, 1.0f);
-LLColor4 LLColor4::blue2(0.0f, 0.4f, 1.0f, 1.0f);
-LLColor4 LLColor4::blue3(0.2f, 0.2f, 0.8f, 1.0f);
-LLColor4 LLColor4::blue4(0.0f, 0.0f, 0.6f, 1.0f);
-LLColor4 LLColor4::blue5(0.4f, 0.2f, 1.0f, 1.0f);
-LLColor4 LLColor4::blue6(0.4f, 0.5f, 1.0f, 1.0f);
-
-LLColor4 LLColor4::yellow1(1.0f, 1.0f, 0.0f, 1.0f);
-LLColor4 LLColor4::yellow2(0.6f, 0.6f, 0.0f, 1.0f);
-LLColor4 LLColor4::yellow3(0.8f, 1.0f, 0.2f, 1.0f);
-LLColor4 LLColor4::yellow4(1.0f, 1.0f, 0.4f, 1.0f);
-LLColor4 LLColor4::yellow5(0.6f, 0.4f, 0.2f, 1.0f);
-LLColor4 LLColor4::yellow6(1.0f, 0.8f, 0.4f, 1.0f);
-LLColor4 LLColor4::yellow7(0.8f, 0.8f, 0.0f, 1.0f);
-LLColor4 LLColor4::yellow8(0.8f, 0.8f, 0.2f, 1.0f);
-LLColor4 LLColor4::yellow9(0.8f, 0.8f, 0.4f, 1.0f);
-
-LLColor4 LLColor4::orange1(1.0f, 0.8f, 0.0f, 1.0f);
-LLColor4 LLColor4::orange2(1.0f, 0.6f, 0.0f, 1.0f);
-LLColor4 LLColor4::orange3(1.0f, 0.4f, 0.2f, 1.0f);
-LLColor4 LLColor4::orange4(0.8f, 0.4f, 0.0f, 1.0f);
-LLColor4 LLColor4::orange5(0.9f, 0.5f, 0.0f, 1.0f);
-LLColor4 LLColor4::orange6(1.0f, 0.8f, 0.2f, 1.0f);
-
-LLColor4 LLColor4::magenta1(1.0f, 0.0f, 1.0f, 1.0f);
-LLColor4 LLColor4::magenta2(0.6f, 0.2f, 0.4f, 1.0f);
-LLColor4 LLColor4::magenta3(1.0f, 0.4f, 0.6f, 1.0f);
-LLColor4 LLColor4::magenta4(1.0f, 0.2f, 0.8f, 1.0f);
-
-LLColor4 LLColor4::purple1(0.6f, 0.2f, 0.8f, 1.0f);
-LLColor4 LLColor4::purple2(0.8f, 0.2f, 1.0f, 1.0f);
-LLColor4 LLColor4::purple3(0.6f, 0.0f, 1.0f, 1.0f);
-LLColor4 LLColor4::purple4(0.4f, 0.0f, 0.8f, 1.0f);
-LLColor4 LLColor4::purple5(0.6f, 0.0f, 0.8f, 1.0f);
-LLColor4 LLColor4::purple6(0.8f, 0.0f, 0.6f, 1.0f);
-
-LLColor4 LLColor4::pink1(1.0f, 0.5f, 0.8f, 1.0f);
-LLColor4 LLColor4::pink2(1.0f, 0.8f, 0.9f, 1.0f);
-
-LLColor4 LLColor4::cyan1(0.0f, 1.0f, 1.0f, 1.0f);
-LLColor4 LLColor4::cyan2(0.4f, 0.8f, 0.8f, 1.0f);
-LLColor4 LLColor4::cyan3(0.0f, 1.0f, 0.6f, 1.0f);
-LLColor4 LLColor4::cyan4(0.6f, 1.0f, 1.0f, 1.0f);
-LLColor4 LLColor4::cyan5(0.2f, 0.6f, 1.0f, 1.0f);
-LLColor4 LLColor4::cyan6(0.2f, 0.6f, 0.6f, 1.0f);
+// All named LLColor4 colour constants are inline constexpr in v4color.h so
+// they can be used as compile-time constants and avoid static-init ordering
+// quirks.
 
 //////////////////////////////////////////////////////////////////////////////
 

@@ -619,7 +619,7 @@ void LLHUDNameTag::updateVisibility()
     sVisibleTextObjects.push_back(LLPointer<LLHUDNameTag> (this));
 }
 
-LLVector2 LLHUDNameTag::updateScreenPos(LLVector2 &offset)
+LLVector2 LLHUDNameTag::updateScreenPos(const LLVector2 &offset)
 {
     LLCoordGL screen_pos;
     LLVector2 screen_pos_vec;

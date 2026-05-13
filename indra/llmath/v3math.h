@@ -51,7 +51,7 @@ static constexpr U32 LENGTHOFVECTOR3 = 3;
 class LLVector3
 {
     public:
-        F32 mV[LENGTHOFVECTOR3];
+        F32 mV[LENGTHOFVECTOR3] {};
 
         static const LLVector3 zero;
         static const LLVector3 x_axis;
@@ -62,9 +62,9 @@ class LLVector3
         static const LLVector3 z_axis_neg;
         static const LLVector3 all_one;
 
-        inline LLVector3();                         // Initializes LLVector3 to (0, 0, 0)
-        inline LLVector3(const F32 x, const F32 y, const F32 z);            // Initializes LLVector3 to (x. y, z)
-        inline explicit LLVector3(const F32 *vec);              // Initializes LLVector3 to (vec[0]. vec[1], vec[2])
+        constexpr LLVector3() noexcept = default;                                          // Initializes LLVector3 to (0, 0, 0)
+        constexpr LLVector3(const F32 x, const F32 y, const F32 z) noexcept;               // Initializes LLVector3 to (x. y, z)
+        constexpr explicit LLVector3(const F32 *vec) noexcept;                             // Initializes LLVector3 to (vec[0]. vec[1], vec[2])
         explicit LLVector3(const LLVector2 &vec);               // Initializes LLVector3 to (vec[0]. vec[1], 0)
         explicit LLVector3(const LLVector3d &vec);              // Initializes LLVector3 to (vec[0]. vec[1], vec[2])
         explicit LLVector3(const LLVector4 &vec);               // Initializes LLVector4 to (vec[0]. vec[1], vec[2])
@@ -92,35 +92,35 @@ class LLVector3
 
         bool        abs();                      // sets all values to absolute value of original value (first octant), returns true if changed
 
-        inline void clear();                        // Clears LLVector3 to (0, 0, 0)
-        inline void setZero();                      // Clears LLVector3 to (0, 0, 0)
-        inline void clearVec();                     // deprecated
-        inline void zeroVec();                      // deprecated
+        constexpr void clear() noexcept;                  // Clears LLVector3 to (0, 0, 0)
+        constexpr void setZero() noexcept;                // Clears LLVector3 to (0, 0, 0)
+        constexpr void clearVec() noexcept;               // deprecated
+        constexpr void zeroVec() noexcept;                // deprecated
 
-        inline void set(F32 x, F32 y, F32 z);       // Sets LLVector3 to (x, y, z, 1)
-        inline void set(const LLVector3 &vec);      // Sets LLVector3 to vec
-        inline void set(const F32 *vec);            // Sets LLVector3 to vec
+        constexpr void set(F32 x, F32 y, F32 z) noexcept; // Sets LLVector3 to (x, y, z, 1)
+        constexpr void set(const LLVector3 &vec) noexcept;// Sets LLVector3 to vec
+        constexpr void set(const F32 *vec) noexcept;      // Sets LLVector3 to vec
         const LLVector3& set(const LLVector4 &vec);
         const LLVector3& set(const LLVector3d &vec);// Sets LLVector3 to vec
         inline void set(const glm::vec4& vec); // Sets LLVector3 to vec
         inline void set(const glm::vec3& vec); // Sets LLVector3 to vec
 
-        inline void setVec(F32 x, F32 y, F32 z);    // deprecated
-        inline void setVec(const LLVector3 &vec);   // deprecated
-        inline void setVec(const F32 *vec);         // deprecated
+        constexpr void setVec(F32 x, F32 y, F32 z) noexcept;    // deprecated
+        constexpr void setVec(const LLVector3 &vec) noexcept;   // deprecated
+        constexpr void setVec(const F32 *vec) noexcept;         // deprecated
 
         const LLVector3& setVec(const LLVector4 &vec);  // deprecated
         const LLVector3& setVec(const LLVector3d &vec); // deprecated
 
         F32 length() const;         // Returns magnitude of LLVector3
-        F32 lengthSquared() const;  // Returns magnitude squared of LLVector3
+        constexpr F32 lengthSquared() const noexcept; // Returns magnitude squared of LLVector3
         F32 magVec() const;         // deprecated
         F32 magVecSquared() const;  // deprecated
 
         inline F32 normalize();    // Normalizes and returns the magnitude of LLVector3
         inline F32 normVec();      // deprecated
 
-        inline bool inRange(F32 min, F32 max) const; // Returns true if all values of the vector are between min and max
+        constexpr bool inRange(F32 min, F32 max) const noexcept; // Returns true if all values of the vector are between min and max
 
         const LLVector3& rotVec(F32 angle, const LLVector3 &vec);    // Rotates about vec by angle radians
         const LLVector3& rotVec(F32 angle, F32 x, F32 y, F32 z);     // Rotates about x,y,z by angle radians
@@ -131,33 +131,33 @@ class LLVector3
         const LLVector3& scaleVec(const LLVector3& vec);             // scales per component by vec
         LLVector3 scaledVec(const LLVector3& vec) const;             // get a copy of this vector scaled by vec
 
-        bool isNull() const;            // Returns true if vector has a _very_small_ length
-        bool isExactlyZero() const      { return !mV[VX] && !mV[VY] && !mV[VZ]; }
+        constexpr bool isNull() const noexcept;            // Returns true if vector has a _very_small_ length
+        constexpr bool isExactlyZero() const noexcept { return !mV[VX] && !mV[VY] && !mV[VZ]; }
 
-        F32 operator[](int idx) const { return mV[idx]; }
-        F32 &operator[](int idx) { return mV[idx]; }
+        constexpr F32 operator[](int idx) const noexcept { return mV[idx]; }
+        constexpr F32 &operator[](int idx) noexcept { return mV[idx]; }
 
-        friend LLVector3 operator+(const LLVector3 &a, const LLVector3 &b); // Return vector a + b
-        friend LLVector3 operator-(const LLVector3 &a, const LLVector3 &b); // Return vector a minus b
-        friend F32 operator*(const LLVector3 &a, const LLVector3 &b);       // Return a dot b
-        friend LLVector3 operator%(const LLVector3 &a, const LLVector3 &b); // Return a cross b
-        friend LLVector3 operator*(const LLVector3 &a, F32 k);              // Return a times scaler k
-        friend LLVector3 operator/(const LLVector3 &a, F32 k);              // Return a divided by scaler k
-        friend LLVector3 operator*(F32 k, const LLVector3 &a);              // Return a times scaler k
-        friend bool operator==(const LLVector3 &a, const LLVector3 &b);     // Return a == b
-        friend bool operator!=(const LLVector3 &a, const LLVector3 &b);     // Return a != b
+        friend constexpr LLVector3 operator+(const LLVector3 &a, const LLVector3 &b) noexcept; // Return vector a + b
+        friend constexpr LLVector3 operator-(const LLVector3 &a, const LLVector3 &b) noexcept; // Return vector a minus b
+        friend constexpr F32 operator*(const LLVector3 &a, const LLVector3 &b) noexcept;       // Return a dot b
+        friend constexpr LLVector3 operator%(const LLVector3 &a, const LLVector3 &b) noexcept; // Return a cross b
+        friend constexpr LLVector3 operator*(const LLVector3 &a, F32 k) noexcept;              // Return a times scaler k
+        friend constexpr LLVector3 operator/(const LLVector3 &a, F32 k) noexcept;              // Return a divided by scaler k
+        friend constexpr LLVector3 operator*(F32 k, const LLVector3 &a) noexcept;              // Return a times scaler k
+        friend constexpr bool operator==(const LLVector3 &a, const LLVector3 &b) noexcept;     // Return a == b
+        friend constexpr bool operator!=(const LLVector3 &a, const LLVector3 &b) noexcept;     // Return a != b
         // less than operator useful for using vectors as std::map keys
-        friend bool operator<(const LLVector3 &a, const LLVector3 &b);      // Return a < b
+        friend constexpr bool operator<(const LLVector3 &a, const LLVector3 &b) noexcept;      // Return a < b
 
-        friend const LLVector3& operator+=(LLVector3 &a, const LLVector3 &b);   // Return vector a + b
-        friend const LLVector3& operator-=(LLVector3 &a, const LLVector3 &b);   // Return vector a minus b
-        friend const LLVector3& operator%=(LLVector3 &a, const LLVector3 &b);   // Return a cross b
-        friend const LLVector3& operator*=(LLVector3 &a, const LLVector3 &b);   // Returns a * b;
-        friend const LLVector3& operator*=(LLVector3 &a, F32 k);                // Return a times scaler k
-        friend const LLVector3& operator/=(LLVector3 &a, F32 k);                // Return a divided by scaler k
+        friend constexpr const LLVector3& operator+=(LLVector3 &a, const LLVector3 &b) noexcept;   // Return vector a + b
+        friend constexpr const LLVector3& operator-=(LLVector3 &a, const LLVector3 &b) noexcept;   // Return vector a minus b
+        friend constexpr const LLVector3& operator%=(LLVector3 &a, const LLVector3 &b) noexcept;   // Return a cross b
+        friend constexpr const LLVector3& operator*=(LLVector3 &a, const LLVector3 &b) noexcept;   // Returns a * b;
+        friend constexpr const LLVector3& operator*=(LLVector3 &a, F32 k) noexcept;                // Return a times scaler k
+        friend constexpr const LLVector3& operator/=(LLVector3 &a, F32 k) noexcept;                // Return a divided by scaler k
         friend const LLVector3& operator*=(LLVector3 &a, const LLQuaternion &b);    // Returns a * b;
 
-        friend LLVector3 operator-(const LLVector3 &a);                 // Return vector -a
+        friend constexpr LLVector3 operator-(const LLVector3 &a) noexcept;                 // Return vector -a
 
         friend std::ostream&     operator<<(std::ostream& s, const LLVector3 &a);       // Stream a
 
@@ -185,19 +185,18 @@ LLVector3 lerp(const LLVector3 &a, const LLVector3 &b, F32 u); // Returns a vect
 LLVector3 point_to_box_offset(LLVector3& pos, const LLVector3* box); // Displacement from query point to nearest point on bounding box.
 bool box_valid_and_non_zero(const LLVector3* box);
 
-inline LLVector3::LLVector3()
+constexpr LLVector3::LLVector3(const F32 x, const F32 y, const F32 z) noexcept
 {
-    clear();
+    mV[VX] = x;
+    mV[VY] = y;
+    mV[VZ] = z;
 }
 
-inline LLVector3::LLVector3(const F32 x, const F32 y, const F32 z)
+constexpr LLVector3::LLVector3(const F32 *vec) noexcept
 {
-    set(x, y, z);
-}
-
-inline LLVector3::LLVector3(const F32 *vec)
-{
-    set(vec);
+    mV[VX] = vec[VX];
+    mV[VY] = vec[VY];
+    mV[VZ] = vec[VZ];
 }
 
 inline LLVector3::LLVector3(const glm::vec3& vec)
@@ -234,39 +233,39 @@ inline bool LLVector3::isFinite() const
 
 // Clear and Assignment Functions
 
-inline void LLVector3::clear()
+constexpr void LLVector3::clear() noexcept
 {
     set(0.f, 0.f, 0.f);
 }
 
-inline void LLVector3::setZero()
+constexpr void LLVector3::setZero() noexcept
 {
     clear();
 }
 
-inline void LLVector3::clearVec()
+constexpr void LLVector3::clearVec() noexcept
 {
     clear();
 }
 
-inline void LLVector3::zeroVec()
+constexpr void LLVector3::zeroVec() noexcept
 {
     clear();
 }
 
-inline void LLVector3::set(F32 x, F32 y, F32 z)
+constexpr void LLVector3::set(F32 x, F32 y, F32 z) noexcept
 {
     mV[VX] = x;
     mV[VY] = y;
     mV[VZ] = z;
 }
 
-inline void LLVector3::set(const LLVector3& vec)
+constexpr void LLVector3::set(const LLVector3& vec) noexcept
 {
     set(vec.mV[VX], vec.mV[VY], vec.mV[VZ]);
 }
 
-inline void LLVector3::set(const F32* vec)
+constexpr void LLVector3::set(const F32* vec) noexcept
 {
     set(vec[VX], vec[VY], vec[VZ]);
 }
@@ -286,19 +285,19 @@ inline void LLVector3::set(const glm::vec3& vec)
 }
 
 // deprecated
-inline void LLVector3::setVec(F32 x, F32 y, F32 z)
+constexpr void LLVector3::setVec(F32 x, F32 y, F32 z) noexcept
 {
     set(x, y, z);
 }
 
 // deprecated
-inline void LLVector3::setVec(const LLVector3& vec)
+constexpr void LLVector3::setVec(const LLVector3& vec) noexcept
 {
     set(vec);
 }
 
 // deprecated
-inline void LLVector3::setVec(const F32* vec)
+constexpr void LLVector3::setVec(const F32* vec) noexcept
 {
     set(vec);
 }
@@ -332,7 +331,7 @@ inline F32 LLVector3::length() const
     return sqrt(lengthSquared());
 }
 
-inline F32 LLVector3::lengthSquared() const
+constexpr F32 LLVector3::lengthSquared() const noexcept
 {
     return mV[VX]*mV[VX] + mV[VY]*mV[VY] + mV[VZ]*mV[VZ];
 }
@@ -347,66 +346,66 @@ inline F32 LLVector3::magVecSquared() const
     return lengthSquared();
 }
 
-inline bool LLVector3::inRange(F32 min, F32 max) const
+constexpr bool LLVector3::inRange(F32 min, F32 max) const noexcept
 {
     return mV[VX] >= min && mV[VX] <= max &&
            mV[VY] >= min && mV[VY] <= max &&
            mV[VZ] >= min && mV[VZ] <= max;
 }
 
-inline LLVector3 operator+(const LLVector3& a, const LLVector3& b)
+inline constexpr LLVector3 operator+(const LLVector3& a, const LLVector3& b) noexcept
 {
     LLVector3 c(a);
     return c += b;
 }
 
-inline LLVector3 operator-(const LLVector3& a, const LLVector3& b)
+inline constexpr LLVector3 operator-(const LLVector3& a, const LLVector3& b) noexcept
 {
     LLVector3 c(a);
     return c -= b;
 }
 
-inline F32  operator*(const LLVector3& a, const LLVector3& b)
+inline constexpr F32 operator*(const LLVector3& a, const LLVector3& b) noexcept
 {
     return (a.mV[VX]*b.mV[VX] + a.mV[VY]*b.mV[VY] + a.mV[VZ]*b.mV[VZ]);
 }
 
-inline LLVector3 operator%(const LLVector3& a, const LLVector3& b)
+inline constexpr LLVector3 operator%(const LLVector3& a, const LLVector3& b) noexcept
 {
     return LLVector3(a.mV[VY]*b.mV[VZ] - b.mV[VY]*a.mV[VZ], a.mV[VZ]*b.mV[VX] - b.mV[VZ]*a.mV[VX], a.mV[VX]*b.mV[VY] - b.mV[VX]*a.mV[VY]);
 }
 
-inline LLVector3 operator/(const LLVector3& a, F32 k)
+inline constexpr LLVector3 operator/(const LLVector3& a, F32 k) noexcept
 {
     F32 t = 1.f / k;
     return LLVector3( a.mV[VX] * t, a.mV[VY] * t, a.mV[VZ] * t );
 }
 
-inline LLVector3 operator*(const LLVector3& a, F32 k)
+inline constexpr LLVector3 operator*(const LLVector3& a, F32 k) noexcept
 {
     return LLVector3( a.mV[VX] * k, a.mV[VY] * k, a.mV[VZ] * k );
 }
 
-inline LLVector3 operator*(F32 k, const LLVector3& a)
+inline constexpr LLVector3 operator*(F32 k, const LLVector3& a) noexcept
 {
     return LLVector3( a.mV[VX] * k, a.mV[VY] * k, a.mV[VZ] * k );
 }
 
-inline bool operator==(const LLVector3& a, const LLVector3& b)
+inline constexpr bool operator==(const LLVector3& a, const LLVector3& b) noexcept
 {
     return (  (a.mV[VX] == b.mV[VX])
             &&(a.mV[VY] == b.mV[VY])
             &&(a.mV[VZ] == b.mV[VZ]));
 }
 
-inline bool operator!=(const LLVector3& a, const LLVector3& b)
+inline constexpr bool operator!=(const LLVector3& a, const LLVector3& b) noexcept
 {
     return (  (a.mV[VX] != b.mV[VX])
             ||(a.mV[VY] != b.mV[VY])
             ||(a.mV[VZ] != b.mV[VZ]));
 }
 
-inline bool operator<(const LLVector3& a, const LLVector3& b)
+inline constexpr bool operator<(const LLVector3& a, const LLVector3& b) noexcept
 {
     return (a.mV[VX] < b.mV[VX]
             || (a.mV[VX] == b.mV[VX]
@@ -415,7 +414,7 @@ inline bool operator<(const LLVector3& a, const LLVector3& b)
                         && a.mV[VZ] < b.mV[VZ]))));
 }
 
-inline const LLVector3& operator+=(LLVector3& a, const LLVector3& b)
+inline constexpr const LLVector3& operator+=(LLVector3& a, const LLVector3& b) noexcept
 {
     a.mV[VX] += b.mV[VX];
     a.mV[VY] += b.mV[VY];
@@ -423,7 +422,7 @@ inline const LLVector3& operator+=(LLVector3& a, const LLVector3& b)
     return a;
 }
 
-inline const LLVector3& operator-=(LLVector3& a, const LLVector3& b)
+inline constexpr const LLVector3& operator-=(LLVector3& a, const LLVector3& b) noexcept
 {
     a.mV[VX] -= b.mV[VX];
     a.mV[VY] -= b.mV[VY];
@@ -431,14 +430,14 @@ inline const LLVector3& operator-=(LLVector3& a, const LLVector3& b)
     return a;
 }
 
-inline const LLVector3& operator%=(LLVector3& a, const LLVector3& b)
+inline constexpr const LLVector3& operator%=(LLVector3& a, const LLVector3& b) noexcept
 {
     LLVector3 ret(a.mV[VY]*b.mV[VZ] - b.mV[VY]*a.mV[VZ], a.mV[VZ]*b.mV[VX] - b.mV[VZ]*a.mV[VX], a.mV[VX]*b.mV[VY] - b.mV[VX]*a.mV[VY]);
     a = ret;
     return a;
 }
 
-inline const LLVector3& operator*=(LLVector3& a, F32 k)
+inline constexpr const LLVector3& operator*=(LLVector3& a, F32 k) noexcept
 {
     a.mV[VX] *= k;
     a.mV[VY] *= k;
@@ -446,7 +445,7 @@ inline const LLVector3& operator*=(LLVector3& a, F32 k)
     return a;
 }
 
-inline const LLVector3& operator*=(LLVector3& a, const LLVector3& b)
+inline constexpr const LLVector3& operator*=(LLVector3& a, const LLVector3& b) noexcept
 {
     a.mV[VX] *= b.mV[VX];
     a.mV[VY] *= b.mV[VY];
@@ -454,13 +453,13 @@ inline const LLVector3& operator*=(LLVector3& a, const LLVector3& b)
     return a;
 }
 
-inline const LLVector3& operator/=(LLVector3& a, F32 k)
+inline constexpr const LLVector3& operator/=(LLVector3& a, F32 k) noexcept
 {
     a *= 1.f / k;
     return a;
 }
 
-inline LLVector3 operator-(const LLVector3& a)
+inline constexpr LLVector3 operator-(const LLVector3& a) noexcept
 {
     return LLVector3(-a.mV[VX], -a.mV[VY], -a.mV[VZ]);
 }
@@ -541,7 +540,7 @@ inline LLVector3 lerp(const LLVector3& a, const LLVector3& b, F32 u)
 }
 
 
-inline bool LLVector3::isNull() const
+constexpr bool LLVector3::isNull() const noexcept
 {
     return F_APPROXIMATELY_ZERO > mV[VX]*mV[VX] + mV[VY]*mV[VY] + mV[VZ]*mV[VZ];
 }
@@ -606,5 +605,16 @@ inline std::ostream& operator<<(std::ostream& s, const LLVector3 &a)
     s << "{ " << a.mV[VX] << ", " << a.mV[VY] << ", " << a.mV[VZ] << " }";
     return s;
 }
+
+// Defined out-of-line after the inline constexpr ctor bodies are visible so
+// the constant initialisation can call those constructors at compile time.
+inline constexpr LLVector3 LLVector3::zero       {};
+inline constexpr LLVector3 LLVector3::x_axis     { 1.f,  0.f,  0.f};
+inline constexpr LLVector3 LLVector3::y_axis     { 0.f,  1.f,  0.f};
+inline constexpr LLVector3 LLVector3::z_axis     { 0.f,  0.f,  1.f};
+inline constexpr LLVector3 LLVector3::x_axis_neg {-1.f,  0.f,  0.f};
+inline constexpr LLVector3 LLVector3::y_axis_neg { 0.f, -1.f,  0.f};
+inline constexpr LLVector3 LLVector3::z_axis_neg { 0.f,  0.f, -1.f};
+inline constexpr LLVector3 LLVector3::all_one    { 1.f,  1.f,  1.f};
 
 #endif

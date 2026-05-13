@@ -29,12 +29,8 @@
 #include "v4coloru.h"
 #include "llmath.h"
 
-// LLColor4U
-LLColor4U LLColor4U::white(255, 255, 255, 255);
-LLColor4U LLColor4U::black(  0,   0,   0, 255);
-LLColor4U LLColor4U::red  (255,   0,   0, 255);
-LLColor4U LLColor4U::green(  0, 255,   0, 255);
-LLColor4U LLColor4U::blue (  0,   0, 255, 255);
+// LLColor4U::white / black / red / green / blue are inline constexpr in
+// v4coloru.h.
 
 std::ostream& operator<<(std::ostream& s, const LLColor4U& a)
 {

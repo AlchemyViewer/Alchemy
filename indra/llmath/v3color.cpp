@@ -30,9 +30,7 @@
 #include "v4color.h"
 #include "v4math.h"
 
-LLColor3 LLColor3::white(1.0f, 1.0f, 1.0f);
-LLColor3 LLColor3::black(0.0f, 0.0f, 0.0f);
-LLColor3 LLColor3::grey(0.5f, 0.5f, 0.5f);
+// LLColor3::white / black / grey are now inline constexpr in v3color.h.
 
 LLColor3::LLColor3(const LLColor4& a)
 {

@@ -37,9 +37,8 @@
 #include "m3math.h"
 #include "llquantize.h"
 
-// WARNING: Don't use this for global const definitions!  using this
-// at the top of a *.cpp file might not give you what you think.
-const LLQuaternion LLQuaternion::DEFAULT;
+// LLQuaternion::DEFAULT is now inline constexpr in llquaternion.h so it can be
+// used as a compile-time constant.
 
 // Constructors
 

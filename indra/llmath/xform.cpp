@@ -27,14 +27,9 @@
 
 #include "xform.h"
 
-LLXform::LLXform()
-{
-    init();
-}
-
-LLXform::~LLXform()
-{
-}
+// LLXform default ctor and destructor are now inline constexpr defaulted in
+// the header (using in-class member initialisers). isRoot/isRootEdit below
+// serve as the vtable key function.
 
 // Link optimization - don't inline these LL_WARNS()
 void LLXform::warn(const char* const msg)

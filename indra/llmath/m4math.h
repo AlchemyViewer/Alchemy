@@ -95,13 +95,15 @@ static const U32 NUM_VALUES_IN_MAT4 = 4;
 class LLMatrix4
 {
 public:
-    F32 mMatrix[NUM_VALUES_IN_MAT4][NUM_VALUES_IN_MAT4];
+    F32 mMatrix[NUM_VALUES_IN_MAT4][NUM_VALUES_IN_MAT4] {
+        {1.f, 0.f, 0.f, 0.f},
+        {0.f, 1.f, 0.f, 0.f},
+        {0.f, 0.f, 1.f, 0.f},
+        {0.f, 0.f, 0.f, 1.f}
+    };
 
     // Initializes Matrix to identity matrix
-    LLMatrix4()
-    {
-        setIdentity();
-    }
+    constexpr LLMatrix4() noexcept = default;
     explicit LLMatrix4(const F32 *mat);                             // Initializes Matrix to values in mat
     explicit LLMatrix4(const LLMatrix3 &mat);                       // Initializes Matrix to values in mat and sets position to (0,0,0)
     explicit LLMatrix4(const LLQuaternion &q);                      // Initializes Matrix with rotation q and sets position to (0,0,0)
@@ -133,8 +135,8 @@ public:
                   const LLVector4 &row3);
 
     // various useful matrix functions
-    const LLMatrix4& setIdentity();                 // Load identity matrix
-    bool isIdentity() const;
+    constexpr const LLMatrix4& setIdentity() noexcept; // Load identity matrix
+    constexpr bool isIdentity() const noexcept;
     const LLMatrix4& setZero();                     // Clears matrix to all zeros.
 
     const LLMatrix4& initRotation(const F32 angle, const LLVector4 &axis);  // Calculate rotation matrix for rotating angle radians about vec
@@ -244,7 +246,7 @@ static_assert(std::is_trivially_copyable<LLMatrix4>::value, "LLMatrix4 must be t
 static_assert(std::is_trivially_move_assignable<LLMatrix4>::value, "LLMatrix4 must be trivial move");
 static_assert(std::is_standard_layout<LLMatrix4>::value, "LLMatrix4 must be a standard layout type");
 
-inline const LLMatrix4& LLMatrix4::setIdentity()
+constexpr const LLMatrix4& LLMatrix4::setIdentity() noexcept
 {
     mMatrix[0][0] = 1.f;
     mMatrix[0][1] = 0.f;
@@ -268,7 +270,7 @@ inline const LLMatrix4& LLMatrix4::setIdentity()
     return (*this);
 }
 
-inline bool LLMatrix4::isIdentity() const
+constexpr bool LLMatrix4::isIdentity() const noexcept
 {
     return
         mMatrix[0][0] == 1.f &&

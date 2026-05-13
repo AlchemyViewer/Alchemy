@@ -50,14 +50,14 @@ static const U32 LENGTHOFQUAT = 4;
 class LLQuaternion
 {
 public:
-    F32 mQ[LENGTHOFQUAT];
+    F32 mQ[LENGTHOFQUAT] { 0.f, 0.f, 0.f, 1.f };
 
     static const LLQuaternion DEFAULT;
 
-    LLQuaternion();                                 // Initializes Quaternion to (0,0,0,1)
+    constexpr LLQuaternion() noexcept = default;                // Initializes Quaternion to (0,0,0,1)
     explicit LLQuaternion(const LLMatrix4 &mat);                // Initializes Quaternion from Matrix4
     explicit LLQuaternion(const LLMatrix3 &mat);                // Initializes Quaternion from Matrix3
-    LLQuaternion(F32 x, F32 y, F32 z, F32 w);       // Initializes Quaternion to normalize(x, y, z, w)
+    constexpr LLQuaternion(F32 x, F32 y, F32 z, F32 w) noexcept; // Initializes Quaternion to (x, y, z, w); NB: no normalization
     LLQuaternion(F32 angle, const LLVector4 &vec);  // Initializes Quaternion to axis_angle2quat(angle, vec)
     LLQuaternion(F32 angle, const LLVector3 &vec);  // Initializes Quaternion to axis_angle2quat(angle, vec)
     LLQuaternion(const F32 *q);                     // Initializes Quaternion to normalize(x, y, z, w)
@@ -69,15 +69,15 @@ public:
     LLSD getValue() const;
     void setValue(const LLSD& sd);
 
-    bool isIdentity() const;
-    bool isNotIdentity() const;
+    constexpr bool isIdentity() const noexcept;
+    constexpr bool isNotIdentity() const noexcept;
     bool isFinite() const;                                  // checks to see if all values of LLQuaternion are finite
     void quantize16(F32 lower, F32 upper);                  // changes the vector to reflect quatization
     void quantize8(F32 lower, F32 upper);                           // changes the vector to reflect quatization
-    void loadIdentity();                                            // Loads the quaternion that represents the identity rotation
+    constexpr void loadIdentity() noexcept;                         // Loads the quaternion that represents the identity rotation
 
-    bool isEqualEps(const LLQuaternion &quat, F32 epsilon) const;
-    bool isNotEqualEps(const LLQuaternion &quat, F32 epsilon) const;
+    constexpr bool isEqualEps(const LLQuaternion &quat, F32 epsilon) const noexcept;
+    constexpr bool isNotEqualEps(const LLQuaternion &quat, F32 epsilon) const noexcept;
 
     const LLQuaternion& set(F32 x, F32 y, F32 z, F32 w);        // Sets Quaternion to normalize(x, y, z, w)
     const LLQuaternion& set(const LLQuaternion &quat);          // Copies Quaternion
@@ -111,30 +111,30 @@ public:
     F32 normalize();    // Normalizes Quaternion and returns magnitude
     F32 normQuat();     // deprecated
 
-    const LLQuaternion& conjugate(void);    // Conjugates Quaternion and returns result
-    const LLQuaternion& conjQuat(void);     // deprecated
+    constexpr const LLQuaternion& conjugate() noexcept;    // Conjugates Quaternion and returns result
+    constexpr const LLQuaternion& conjQuat() noexcept;     // deprecated
 
     // Other useful methods
-    const LLQuaternion& transpose();        // transpose (same as conjugate)
-    const LLQuaternion& transQuat();        // deprecated
+    constexpr const LLQuaternion& transpose() noexcept;    // transpose (same as conjugate)
+    constexpr const LLQuaternion& transQuat() noexcept;    // deprecated
 
     void            shortestArc(const LLVector3 &a, const LLVector3 &b);    // shortest rotation from a to b
     const LLQuaternion& constrain(F32 radians);                     // constrains rotation to a cone angle specified in radians
 
     // Standard operators
     friend std::ostream& operator<<(std::ostream &s, const LLQuaternion &a);                    // Prints a
-    friend LLQuaternion operator+(const LLQuaternion &a, const LLQuaternion &b);    // Addition
-    friend LLQuaternion operator-(const LLQuaternion &a, const LLQuaternion &b);    // Subtraction
-    friend LLQuaternion operator-(const LLQuaternion &a);                           // Negation
-    friend LLQuaternion operator*(F32 a, const LLQuaternion &q);                    // Scale
-    friend LLQuaternion operator*(const LLQuaternion &q, F32 b);                    // Scale
+    friend constexpr LLQuaternion operator+(const LLQuaternion &a, const LLQuaternion &b) noexcept; // Addition
+    friend constexpr LLQuaternion operator-(const LLQuaternion &a, const LLQuaternion &b) noexcept; // Subtraction
+    friend constexpr LLQuaternion operator-(const LLQuaternion &a) noexcept;                        // Negation
+    friend constexpr LLQuaternion operator*(F32 a, const LLQuaternion &q) noexcept;                 // Scale
+    friend constexpr LLQuaternion operator*(const LLQuaternion &q, F32 b) noexcept;                 // Scale
     friend LLQuaternion operator*(const LLQuaternion &a, const LLQuaternion &b);    // Returns a * b
-    friend LLQuaternion operator~(const LLQuaternion &a);                           // Returns a* (Conjugate of a)
-    bool operator==(const LLQuaternion &b) const;           // Returns a == b
-    bool operator!=(const LLQuaternion &b) const;           // Returns a != b
-    F64 operator[](int idx) const { return mQ[idx]; }
+    friend constexpr LLQuaternion operator~(const LLQuaternion &a) noexcept;                        // Returns a* (Conjugate of a)
+    constexpr bool operator==(const LLQuaternion &b) const noexcept;           // Returns a == b
+    constexpr bool operator!=(const LLQuaternion &b) const noexcept;           // Returns a != b
+    constexpr F64 operator[](int idx) const noexcept { return mQ[idx]; }
 
-    friend const LLQuaternion& operator*=(LLQuaternion &a, const LLQuaternion &b);  // Returns a * b
+    friend constexpr const LLQuaternion& operator*=(LLQuaternion &a, const LLQuaternion &b) noexcept;  // Returns a * b
 
     friend LLVector4 operator*(const LLVector4 &a, const LLQuaternion &rot);        // Rotates a by rot
     friend LLVector3 operator*(const LLVector3 &a, const LLQuaternion &rot);        // Rotates a by rot
@@ -202,7 +202,7 @@ inline bool LLQuaternion::isFinite() const
     return (llfinite(mQ[VX]) && llfinite(mQ[VY]) && llfinite(mQ[VZ]) && llfinite(mQ[VS]));
 }
 
-inline bool LLQuaternion::isIdentity() const
+constexpr bool LLQuaternion::isIdentity() const noexcept
 {
     return
         ( mQ[VX] == 0.f ) &&
@@ -211,7 +211,7 @@ inline bool LLQuaternion::isIdentity() const
         ( mQ[VS] == 1.f );
 }
 
-inline bool LLQuaternion::isNotIdentity() const
+constexpr bool LLQuaternion::isNotIdentity() const noexcept
 {
     return
         ( mQ[VX] != 0.f ) ||
@@ -222,15 +222,7 @@ inline bool LLQuaternion::isNotIdentity() const
 
 
 
-inline LLQuaternion::LLQuaternion(void)
-{
-    mQ[VX] = 0.f;
-    mQ[VY] = 0.f;
-    mQ[VZ] = 0.f;
-    mQ[VS] = 1.f;
-}
-
-inline LLQuaternion::LLQuaternion(F32 x, F32 y, F32 z, F32 w)
+constexpr LLQuaternion::LLQuaternion(F32 x, F32 y, F32 z, F32 w) noexcept
 {
     mQ[VX] = x;
     mQ[VY] = y;
@@ -264,7 +256,7 @@ inline LLQuaternion::LLQuaternion(const F32 *q)
 }
 
 
-inline void LLQuaternion::loadIdentity()
+constexpr void LLQuaternion::loadIdentity() noexcept
 {
     mQ[VX] = 0.0f;
     mQ[VY] = 0.0f;
@@ -272,20 +264,28 @@ inline void LLQuaternion::loadIdentity()
     mQ[VW] = 1.0f;
 }
 
-inline bool LLQuaternion::isEqualEps(const LLQuaternion &quat, F32 epsilon) const
+constexpr bool LLQuaternion::isEqualEps(const LLQuaternion &quat, F32 epsilon) const noexcept
 {
-    return ( fabs(mQ[VX] - quat.mQ[VX]) < epsilon
-        &&   fabs(mQ[VY] - quat.mQ[VY]) < epsilon
-        &&   fabs(mQ[VZ] - quat.mQ[VZ]) < epsilon
-        &&   fabs(mQ[VS] - quat.mQ[VS]) < epsilon );
+    const F32 dx = mQ[VX] - quat.mQ[VX];
+    const F32 dy = mQ[VY] - quat.mQ[VY];
+    const F32 dz = mQ[VZ] - quat.mQ[VZ];
+    const F32 ds = mQ[VS] - quat.mQ[VS];
+    return ( (dx < 0 ? -dx : dx) < epsilon
+        &&   (dy < 0 ? -dy : dy) < epsilon
+        &&   (dz < 0 ? -dz : dz) < epsilon
+        &&   (ds < 0 ? -ds : ds) < epsilon );
 }
 
-inline bool LLQuaternion::isNotEqualEps(const LLQuaternion &quat, F32 epsilon) const
+constexpr bool LLQuaternion::isNotEqualEps(const LLQuaternion &quat, F32 epsilon) const noexcept
 {
-    return (  fabs(mQ[VX] - quat.mQ[VX]) > epsilon
-        ||    fabs(mQ[VY] - quat.mQ[VY]) > epsilon
-        ||    fabs(mQ[VZ] - quat.mQ[VZ]) > epsilon
-        ||    fabs(mQ[VS] - quat.mQ[VS]) > epsilon );
+    const F32 dx = mQ[VX] - quat.mQ[VX];
+    const F32 dy = mQ[VY] - quat.mQ[VY];
+    const F32 dz = mQ[VZ] - quat.mQ[VZ];
+    const F32 ds = mQ[VS] - quat.mQ[VS];
+    return ( (dx < 0 ? -dx : dx) > epsilon
+        ||   (dy < 0 ? -dy : dy) > epsilon
+        ||   (dz < 0 ? -dz : dz) > epsilon
+        ||   (ds < 0 ? -ds : ds) > epsilon );
 }
 
 inline const LLQuaternion&  LLQuaternion::set(F32 x, F32 y, F32 z, F32 w)
@@ -378,7 +378,7 @@ inline void LLQuaternion::getAngleAxis(F32* angle, F32* x, F32* y, F32* z) const
     }
 }
 
-inline const LLQuaternion& LLQuaternion::conjugate()
+constexpr const LLQuaternion& LLQuaternion::conjugate() noexcept
 {
     mQ[VX] *= -1.f;
     mQ[VY] *= -1.f;
@@ -386,7 +386,7 @@ inline const LLQuaternion& LLQuaternion::conjugate()
     return (*this);
 }
 
-inline const LLQuaternion& LLQuaternion::conjQuat()
+constexpr const LLQuaternion& LLQuaternion::conjQuat() noexcept
 {
     mQ[VX] *= -1.f;
     mQ[VY] *= -1.f;
@@ -395,7 +395,7 @@ inline const LLQuaternion& LLQuaternion::conjQuat()
 }
 
 // Transpose
-inline const LLQuaternion& LLQuaternion::transpose()
+constexpr const LLQuaternion& LLQuaternion::transpose() noexcept
 {
     mQ[VX] *= -1.f;
     mQ[VY] *= -1.f;
@@ -404,7 +404,7 @@ inline const LLQuaternion& LLQuaternion::transpose()
 }
 
 // deprecated
-inline const LLQuaternion& LLQuaternion::transQuat()
+constexpr const LLQuaternion& LLQuaternion::transQuat() noexcept
 {
     mQ[VX] *= -1.f;
     mQ[VY] *= -1.f;
@@ -413,7 +413,7 @@ inline const LLQuaternion& LLQuaternion::transQuat()
 }
 
 
-inline LLQuaternion     operator+(const LLQuaternion &a, const LLQuaternion &b)
+inline constexpr LLQuaternion operator+(const LLQuaternion &a, const LLQuaternion &b) noexcept
 {
     return LLQuaternion(
         a.mQ[VX] + b.mQ[VX],
@@ -423,7 +423,7 @@ inline LLQuaternion     operator+(const LLQuaternion &a, const LLQuaternion &b)
 }
 
 
-inline LLQuaternion     operator-(const LLQuaternion &a, const LLQuaternion &b)
+inline constexpr LLQuaternion operator-(const LLQuaternion &a, const LLQuaternion &b) noexcept
 {
     return LLQuaternion(
         a.mQ[VX] - b.mQ[VX],
@@ -433,7 +433,7 @@ inline LLQuaternion     operator-(const LLQuaternion &a, const LLQuaternion &b)
 }
 
 
-inline LLQuaternion     operator-(const LLQuaternion &a)
+inline constexpr LLQuaternion operator-(const LLQuaternion &a) noexcept
 {
     return LLQuaternion(
         -a.mQ[VX],
@@ -443,7 +443,7 @@ inline LLQuaternion     operator-(const LLQuaternion &a)
 }
 
 
-inline LLQuaternion     operator*(F32 a, const LLQuaternion &q)
+inline constexpr LLQuaternion operator*(F32 a, const LLQuaternion &q) noexcept
 {
     return LLQuaternion(
         a * q.mQ[VX],
@@ -453,7 +453,7 @@ inline LLQuaternion     operator*(F32 a, const LLQuaternion &q)
 }
 
 
-inline LLQuaternion     operator*(const LLQuaternion &q, F32 a)
+inline constexpr LLQuaternion operator*(const LLQuaternion &q, F32 a) noexcept
 {
     return LLQuaternion(
         a * q.mQ[VX],
@@ -462,14 +462,14 @@ inline LLQuaternion     operator*(const LLQuaternion &q, F32 a)
         a * q.mQ[VW] );
 }
 
-inline LLQuaternion operator~(const LLQuaternion &a)
+inline constexpr LLQuaternion operator~(const LLQuaternion &a) noexcept
 {
     LLQuaternion q(a);
     q.conjQuat();
     return q;
 }
 
-inline bool LLQuaternion::operator==(const LLQuaternion &b) const
+constexpr bool LLQuaternion::operator==(const LLQuaternion &b) const noexcept
 {
     return (  (mQ[VX] == b.mQ[VX])
             &&(mQ[VY] == b.mQ[VY])
@@ -477,7 +477,7 @@ inline bool LLQuaternion::operator==(const LLQuaternion &b) const
             &&(mQ[VS] == b.mQ[VS]));
 }
 
-inline bool LLQuaternion::operator!=(const LLQuaternion &b) const
+constexpr bool LLQuaternion::operator!=(const LLQuaternion &b) const noexcept
 {
     return (  (mQ[VX] != b.mQ[VX])
             ||(mQ[VY] != b.mQ[VY])
@@ -485,7 +485,7 @@ inline bool LLQuaternion::operator!=(const LLQuaternion &b) const
             ||(mQ[VS] != b.mQ[VS]));
 }
 
-inline const LLQuaternion&  operator*=(LLQuaternion &a, const LLQuaternion &b)
+inline constexpr const LLQuaternion& operator*=(LLQuaternion &a, const LLQuaternion &b) noexcept
 {
 #if 1
     LLQuaternion q(
@@ -618,5 +618,9 @@ LLQuaternion::Order StringToOrder( const char *str );
 //     |                                                                    |
 //     | 2 * (x * z + y * w)   2 * (y * z - x * w)     1 - 2 * (x^2 + y^2)  |
 //     |                                                                    |
+
+// Defined out-of-line after the inline constexpr default ctor body is visible
+// so the constant initialisation can call it at compile time.
+inline constexpr LLQuaternion LLQuaternion::DEFAULT {};
 
 #endif

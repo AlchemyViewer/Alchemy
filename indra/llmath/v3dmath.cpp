@@ -37,17 +37,8 @@
 #include "llquantize.h"
 
 // LLVector3d
-// WARNING: Don't use these for global const definitions!
-// For example:
-//      const LLQuaternion(0.5f * F_PI, LLVector3d::zero);
-// at the top of a *.cpp file might not give you what you think.
-const LLVector3d LLVector3d::zero(0,0,0);
-const LLVector3d LLVector3d::x_axis(1, 0, 0);
-const LLVector3d LLVector3d::y_axis(0, 1, 0);
-const LLVector3d LLVector3d::z_axis(0, 0, 1);
-const LLVector3d LLVector3d::x_axis_neg(-1, 0, 0);
-const LLVector3d LLVector3d::y_axis_neg(0, -1, 0);
-const LLVector3d LLVector3d::z_axis_neg(0, 0, -1);
+// LLVector3d::zero / x_axis / y_axis / z_axis / x_axis_neg / y_axis_neg /
+// z_axis_neg are inline constexpr in v3dmath.h.
 
 
 // Clamps each values to range (min,max).

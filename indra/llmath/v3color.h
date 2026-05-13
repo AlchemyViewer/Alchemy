@@ -43,16 +43,16 @@ static constexpr U32 LENGTHOFCOLOR3 = 3;
 class LLColor3
 {
 public:
-    F32 mV[LENGTHOFCOLOR3];
+    F32 mV[LENGTHOFCOLOR3] {};
 
-    static LLColor3 white;
-    static LLColor3 black;
-    static LLColor3 grey;
+    static const LLColor3 white;
+    static const LLColor3 black;
+    static const LLColor3 grey;
 
 public:
-    LLColor3();                                  // Initializes LLColor3 to (0, 0, 0)
-    LLColor3(F32 r, F32 g, F32 b);               // Initializes LLColor3 to (r, g, b)
-    LLColor3(const F32* vec);                    // Initializes LLColor3 to (vec[0]. vec[1], vec[2])
+    constexpr LLColor3() noexcept = default;                  // Initializes LLColor3 to (0, 0, 0)
+    constexpr LLColor3(F32 r, F32 g, F32 b) noexcept;         // Initializes LLColor3 to (r, g, b)
+    constexpr LLColor3(const F32* vec) noexcept;              // Initializes LLColor3 to (vec[0]. vec[1], vec[2])
     LLColor3(const char* color_string);          // html format color ie "#FFDDEE"
     explicit LLColor3(const LLColor4& color4);   // "explicit" to avoid automatic conversion
     explicit LLColor3(const LLVector4& vector4); // "explicit" to avoid automatic conversion
@@ -77,16 +77,16 @@ public:
     void setHSL(F32 hue, F32 saturation, F32 luminance);
     void calcHSL(F32* hue, F32* saturation, F32* luminance) const;
 
-    const LLColor3& setToBlack(); // Clears LLColor3 to (0, 0, 0)
-    const LLColor3& setToWhite(); // Zero LLColor3 to (0, 0, 0)
+    constexpr const LLColor3& setToBlack() noexcept; // Clears LLColor3 to (0, 0, 0)
+    constexpr const LLColor3& setToWhite() noexcept; // Zero LLColor3 to (0, 0, 0)
 
-    const LLColor3& setVec(F32 x, F32 y, F32 z); // deprecated
-    const LLColor3& setVec(const LLColor3& vec); // deprecated
-    const LLColor3& setVec(const F32* vec);      // deprecated
+    constexpr const LLColor3& setVec(F32 x, F32 y, F32 z) noexcept; // deprecated
+    constexpr const LLColor3& setVec(const LLColor3& vec) noexcept; // deprecated
+    constexpr const LLColor3& setVec(const F32* vec) noexcept;      // deprecated
 
-    const LLColor3& set(F32 x, F32 y, F32 z); // Sets LLColor3 to (x, y, z)
-    const LLColor3& set(const LLColor3& vec); // Sets LLColor3 to vec
-    const LLColor3& set(const F32* vec);      // Sets LLColor3 to vec
+    constexpr const LLColor3& set(F32 x, F32 y, F32 z) noexcept; // Sets LLColor3 to (x, y, z)
+    constexpr const LLColor3& set(const LLColor3& vec) noexcept; // Sets LLColor3 to vec
+    constexpr const LLColor3& set(const F32* vec) noexcept;      // Sets LLColor3 to vec
 
     // set from a vector of unknown type and size
     // may leave some data unmodified
@@ -103,14 +103,14 @@ public:
     F32 normVec();             // deprecated
 
     F32 length() const;        // Returns magnitude of LLColor3
-    F32 lengthSquared() const; // Returns magnitude squared of LLColor3
+    constexpr F32 lengthSquared() const noexcept; // Returns magnitude squared of LLColor3
     F32 normalize();           // Normalizes and returns the magnitude of LLColor3
 
-    F32 brightness() const; // Returns brightness of LLColor3
+    constexpr F32 brightness() const noexcept; // Returns brightness of LLColor3
 
     const LLColor3& operator=(const LLColor4& a);
 
-    LL_FORCE_INLINE LLColor3 divide(const LLColor3& col2) const
+    LL_FORCE_INLINE constexpr LLColor3 divide(const LLColor3& col2) const noexcept
     {
         return LLColor3(mV[VRED] / col2.mV[VRED], mV[VGREEN] / col2.mV[VGREEN], mV[VBLUE] / col2.mV[VBLUE]);
     }
@@ -122,25 +122,25 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& s, const LLColor3& a);  // Print a
-    friend LLColor3      operator+(const LLColor3& a, const LLColor3& b); // Return vector a + b
-    friend LLColor3      operator-(const LLColor3& a, const LLColor3& b); // Return vector a minus b
+    friend constexpr LLColor3      operator+(const LLColor3& a, const LLColor3& b) noexcept; // Return vector a + b
+    friend constexpr LLColor3      operator-(const LLColor3& a, const LLColor3& b) noexcept; // Return vector a minus b
 
-    friend const LLColor3& operator+=(LLColor3& a, const LLColor3& b); // Return vector a + b
-    friend const LLColor3& operator-=(LLColor3& a, const LLColor3& b); // Return vector a minus b
-    friend const LLColor3& operator*=(LLColor3& a, const LLColor3& b);
+    friend constexpr const LLColor3& operator+=(LLColor3& a, const LLColor3& b) noexcept; // Return vector a + b
+    friend constexpr const LLColor3& operator-=(LLColor3& a, const LLColor3& b) noexcept; // Return vector a minus b
+    friend constexpr const LLColor3& operator*=(LLColor3& a, const LLColor3& b) noexcept;
 
-    friend LLColor3 operator*(const LLColor3& a, const LLColor3& b); // Return component wise a * b
-    friend LLColor3 operator*(const LLColor3& a, F32 k);             // Return a times scaler k
-    friend LLColor3 operator*(F32 k, const LLColor3& a);             // Return a times scaler k
+    friend constexpr LLColor3 operator*(const LLColor3& a, const LLColor3& b) noexcept; // Return component wise a * b
+    friend constexpr LLColor3 operator*(const LLColor3& a, F32 k) noexcept;             // Return a times scaler k
+    friend constexpr LLColor3 operator*(F32 k, const LLColor3& a) noexcept;             // Return a times scaler k
 
-    friend bool operator==(const LLColor3& a, const LLColor3& b); // Return a == b
-    friend bool operator!=(const LLColor3& a, const LLColor3& b); // Return a != b
+    friend constexpr bool operator==(const LLColor3& a, const LLColor3& b) noexcept; // Return a == b
+    friend constexpr bool operator!=(const LLColor3& a, const LLColor3& b) noexcept; // Return a != b
 
-    friend const LLColor3& operator*=(LLColor3& a, F32 k); // Return a times scaler k
+    friend constexpr const LLColor3& operator*=(LLColor3& a, F32 k) noexcept; // Return a times scaler k
 
-    friend LLColor3 operator-(const LLColor3& a); // Return vector 1-rgb (inverse)
+    friend constexpr LLColor3 operator-(const LLColor3& a) noexcept; // Return vector 1-rgb (inverse)
 
-    inline void clamp();
+    constexpr void clamp() noexcept;
     inline void exp(); // Do an exponential on the color
 };
 
@@ -149,7 +149,7 @@ static_assert(std::is_trivially_move_assignable<LLColor3>::value, "LLColor3 must
 static_assert(std::is_standard_layout<LLColor3>::value, "LLColor3 must be a standard layout type");
 
 LLColor3 lerp(const LLColor3& a, const LLColor3& b, F32 u);
-void LLColor3::clamp()
+constexpr void LLColor3::clamp() noexcept
 {
     // Clamp the color...
     if (mV[VRED] < 0.f)
@@ -182,21 +182,14 @@ void LLColor3::clamp()
 F32 distVec(const LLColor3& a, const LLColor3& b);         // Returns distance between a and b
 F32 distVec_squared(const LLColor3& a, const LLColor3& b); // Returns distance squared between a and b
 
-inline LLColor3::LLColor3()
-{
-    mV[VRED]   = 0.f;
-    mV[VGREEN] = 0.f;
-    mV[VBLUE]  = 0.f;
-}
-
-inline LLColor3::LLColor3(F32 r, F32 g, F32 b)
+constexpr LLColor3::LLColor3(F32 r, F32 g, F32 b) noexcept
 {
     mV[VRED]   = r;
     mV[VGREEN] = g;
     mV[VBLUE]  = b;
 }
 
-inline LLColor3::LLColor3(const F32* vec)
+constexpr LLColor3::LLColor3(const F32* vec) noexcept
 {
     mV[VRED]   = vec[VRED];
     mV[VGREEN] = vec[VGREEN];
@@ -223,7 +216,7 @@ inline LLColor3::LLColor3(const char* color_string) // takes a string of format 
     mV[VRED]   = (F32)strtol(&tempstr[0], nullptr, 16) / 255.f;
 }
 
-inline const LLColor3& LLColor3::setToBlack()
+constexpr const LLColor3& LLColor3::setToBlack() noexcept
 {
     mV[VRED]   = 0.f;
     mV[VGREEN] = 0.f;
@@ -231,7 +224,7 @@ inline const LLColor3& LLColor3::setToBlack()
     return (*this);
 }
 
-inline const LLColor3& LLColor3::setToWhite()
+constexpr const LLColor3& LLColor3::setToWhite() noexcept
 {
     mV[VRED]   = 1.f;
     mV[VGREEN] = 1.f;
@@ -239,7 +232,7 @@ inline const LLColor3& LLColor3::setToWhite()
     return (*this);
 }
 
-inline const LLColor3& LLColor3::set(F32 r, F32 g, F32 b)
+constexpr const LLColor3& LLColor3::set(F32 r, F32 g, F32 b) noexcept
 {
     mV[VRED]   = r;
     mV[VGREEN] = g;
@@ -247,7 +240,7 @@ inline const LLColor3& LLColor3::set(F32 r, F32 g, F32 b)
     return (*this);
 }
 
-inline const LLColor3& LLColor3::set(const LLColor3& vec)
+constexpr const LLColor3& LLColor3::set(const LLColor3& vec) noexcept
 {
     mV[VRED]   = vec.mV[VRED];
     mV[VGREEN] = vec.mV[VGREEN];
@@ -255,7 +248,7 @@ inline const LLColor3& LLColor3::set(const LLColor3& vec)
     return (*this);
 }
 
-inline const LLColor3& LLColor3::set(const F32* vec)
+constexpr const LLColor3& LLColor3::set(const F32* vec) noexcept
 {
     mV[VRED]   = vec[VRED];
     mV[VGREEN] = vec[VGREEN];
@@ -264,7 +257,7 @@ inline const LLColor3& LLColor3::set(const F32* vec)
 }
 
 // deprecated
-inline const LLColor3& LLColor3::setVec(F32 r, F32 g, F32 b)
+constexpr const LLColor3& LLColor3::setVec(F32 r, F32 g, F32 b) noexcept
 {
     mV[VRED]   = r;
     mV[VGREEN] = g;
@@ -273,7 +266,7 @@ inline const LLColor3& LLColor3::setVec(F32 r, F32 g, F32 b)
 }
 
 // deprecated
-inline const LLColor3& LLColor3::setVec(const LLColor3& vec)
+constexpr const LLColor3& LLColor3::setVec(const LLColor3& vec) noexcept
 {
     mV[VRED]   = vec.mV[VRED];
     mV[VGREEN] = vec.mV[VGREEN];
@@ -282,7 +275,7 @@ inline const LLColor3& LLColor3::setVec(const LLColor3& vec)
 }
 
 // deprecated
-inline const LLColor3& LLColor3::setVec(const F32* vec)
+constexpr const LLColor3& LLColor3::setVec(const F32* vec) noexcept
 {
     mV[VRED]   = vec[VRED];
     mV[VGREEN] = vec[VGREEN];
@@ -290,7 +283,7 @@ inline const LLColor3& LLColor3::setVec(const F32* vec)
     return (*this);
 }
 
-inline F32 LLColor3::brightness() const
+constexpr F32 LLColor3::brightness() const noexcept
 {
     return (mV[VRED] + mV[VGREEN] + mV[VBLUE]) / 3.0f;
 }
@@ -300,7 +293,7 @@ inline F32 LLColor3::length() const
     return sqrt(mV[VRED] * mV[VRED] + mV[VGREEN] * mV[VGREEN] + mV[VBLUE] * mV[VBLUE]);
 }
 
-inline F32 LLColor3::lengthSquared() const
+constexpr F32 LLColor3::lengthSquared() const noexcept
 {
     return mV[VRED] * mV[VRED] + mV[VGREEN] * mV[VGREEN] + mV[VBLUE] * mV[VBLUE];
 }
@@ -361,42 +354,42 @@ inline void LLColor3::exp()
 #endif
 }
 
-inline LLColor3 operator+(const LLColor3& a, const LLColor3& b)
+inline constexpr LLColor3 operator+(const LLColor3& a, const LLColor3& b) noexcept
 {
     return LLColor3(a.mV[VRED] + b.mV[VRED], a.mV[VGREEN] + b.mV[VGREEN], a.mV[VBLUE] + b.mV[VBLUE]);
 }
 
-inline LLColor3 operator-(const LLColor3& a, const LLColor3& b)
+inline constexpr LLColor3 operator-(const LLColor3& a, const LLColor3& b) noexcept
 {
     return LLColor3(a.mV[VRED] - b.mV[VRED], a.mV[VGREEN] - b.mV[VGREEN], a.mV[VBLUE] - b.mV[VBLUE]);
 }
 
-inline LLColor3 operator*(const LLColor3& a, const LLColor3& b)
+inline constexpr LLColor3 operator*(const LLColor3& a, const LLColor3& b) noexcept
 {
     return LLColor3(a.mV[VRED] * b.mV[VRED], a.mV[VGREEN] * b.mV[VGREEN], a.mV[VBLUE] * b.mV[VBLUE]);
 }
 
-inline LLColor3 operator*(const LLColor3& a, F32 k)
+inline constexpr LLColor3 operator*(const LLColor3& a, F32 k) noexcept
 {
     return LLColor3(a.mV[VRED] * k, a.mV[VGREEN] * k, a.mV[VBLUE] * k);
 }
 
-inline LLColor3 operator*(F32 k, const LLColor3& a)
+inline constexpr LLColor3 operator*(F32 k, const LLColor3& a) noexcept
 {
     return LLColor3(a.mV[VRED] * k, a.mV[VGREEN] * k, a.mV[VBLUE] * k);
 }
 
-inline bool operator==(const LLColor3& a, const LLColor3& b)
+inline constexpr bool operator==(const LLColor3& a, const LLColor3& b) noexcept
 {
     return ((a.mV[VRED] == b.mV[VRED]) && (a.mV[VGREEN] == b.mV[VGREEN]) && (a.mV[VBLUE] == b.mV[VBLUE]));
 }
 
-inline bool operator!=(const LLColor3& a, const LLColor3& b)
+inline constexpr bool operator!=(const LLColor3& a, const LLColor3& b) noexcept
 {
     return ((a.mV[VRED] != b.mV[VRED]) || (a.mV[VGREEN] != b.mV[VGREEN]) || (a.mV[VBLUE] != b.mV[VBLUE]));
 }
 
-inline const LLColor3& operator*=(LLColor3& a, const LLColor3& b)
+inline constexpr const LLColor3& operator*=(LLColor3& a, const LLColor3& b) noexcept
 {
     a.mV[VRED] *= b.mV[VRED];
     a.mV[VGREEN] *= b.mV[VGREEN];
@@ -404,7 +397,7 @@ inline const LLColor3& operator*=(LLColor3& a, const LLColor3& b)
     return a;
 }
 
-inline const LLColor3& operator+=(LLColor3& a, const LLColor3& b)
+inline constexpr const LLColor3& operator+=(LLColor3& a, const LLColor3& b) noexcept
 {
     a.mV[VRED] += b.mV[VRED];
     a.mV[VGREEN] += b.mV[VGREEN];
@@ -412,7 +405,7 @@ inline const LLColor3& operator+=(LLColor3& a, const LLColor3& b)
     return a;
 }
 
-inline const LLColor3& operator-=(LLColor3& a, const LLColor3& b)
+inline constexpr const LLColor3& operator-=(LLColor3& a, const LLColor3& b) noexcept
 {
     a.mV[VRED] -= b.mV[VRED];
     a.mV[VGREEN] -= b.mV[VGREEN];
@@ -420,7 +413,7 @@ inline const LLColor3& operator-=(LLColor3& a, const LLColor3& b)
     return a;
 }
 
-inline const LLColor3& operator*=(LLColor3& a, F32 k)
+inline constexpr const LLColor3& operator*=(LLColor3& a, F32 k) noexcept
 {
     a.mV[VRED] *= k;
     a.mV[VGREEN] *= k;
@@ -428,7 +421,7 @@ inline const LLColor3& operator*=(LLColor3& a, F32 k)
     return a;
 }
 
-inline LLColor3 operator-(const LLColor3& a)
+inline constexpr LLColor3 operator-(const LLColor3& a) noexcept
 {
     return LLColor3(1.f - a.mV[VRED], 1.f - a.mV[VGREEN], 1.f - a.mV[VBLUE]);
 }
@@ -509,5 +502,11 @@ void LLColor3::write(std::vector<T>& v) const
         v[i] = (T)mV[i];
     }
 }
+
+// Defined out-of-line after the inline constexpr ctor bodies are visible so
+// the constant initialisation can call those constructors at compile time.
+inline constexpr LLColor3 LLColor3::white { 1.0f, 1.0f, 1.0f };
+inline constexpr LLColor3 LLColor3::black { 0.0f, 0.0f, 0.0f };
+inline constexpr LLColor3 LLColor3::grey  { 0.5f, 0.5f, 0.5f };
 
 #endif

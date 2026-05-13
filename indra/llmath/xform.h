@@ -39,21 +39,6 @@ constexpr F32 MAX_PRIM_SCALE = 65536.f; // something very high but not near FLT_
 
 class LLXform
 {
-protected:
-    LLVector3     mPosition;
-    LLQuaternion  mRotation;
-    LLVector3     mScale;
-
-    //RN: TODO: move these world transform members to LLXformMatrix
-    // as they are *never* updated or accessed in the base class
-    LLVector3     mWorldPosition;
-    LLQuaternion  mWorldRotation;
-
-    LLXform*      mParent;
-    U32           mChanged;
-
-    bool          mScaleChildOffset;
-
 public:
     typedef enum e_changed_flags
     {
@@ -69,9 +54,25 @@ public:
         ALL_CHANGED = 0x7f
     }EChangedFlags;
 
-    void init()
+protected:
+    LLVector3     mPosition {};
+    LLQuaternion  mRotation {};
+    LLVector3     mScale { 1.f, 1.f, 1.f };
+
+    //RN: TODO: move these world transform members to LLXformMatrix
+    // as they are *never* updated or accessed in the base class
+    LLVector3     mWorldPosition {};
+    LLQuaternion  mWorldRotation {};
+
+    LLXform*      mParent { nullptr };
+    U32           mChanged { UNCHANGED };
+
+    bool          mScaleChildOffset { false };
+
+public:
+    constexpr void init() noexcept
     {
-        mParent  = NULL;
+        mParent  = nullptr;
         mChanged = UNCHANGED;
         mPosition.setVec(0,0,0);
         mRotation.loadIdentity();
@@ -81,8 +82,8 @@ public:
         mScaleChildOffset = false;
     }
 
-     LLXform();
-    virtual ~LLXform();
+    constexpr LLXform() noexcept = default;
+    virtual constexpr ~LLXform() = default;
 
     void getLocalMat4(LLMatrix4 &mat) const { mat.initAll(mScale, mRotation, mPosition); }
 

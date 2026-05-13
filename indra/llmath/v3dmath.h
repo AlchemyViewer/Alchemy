@@ -33,7 +33,7 @@
 class LLVector3d
 {
 public:
-    F64 mdV[3];
+    F64 mdV[3] {};
 
     const static LLVector3d zero;
     const static LLVector3d x_axis;
@@ -43,10 +43,10 @@ public:
     const static LLVector3d y_axis_neg;
     const static LLVector3d z_axis_neg;
 
-    inline LLVector3d();                            // Initializes LLVector3d to (0, 0, 0)
-    inline LLVector3d(const F64 x, const F64 y, const F64 z);           // Initializes LLVector3d to (x. y, z)
-    inline explicit LLVector3d(const F64 *vec);             // Initializes LLVector3d to (vec[0]. vec[1], vec[2])
-    inline explicit LLVector3d(const LLVector3 &vec);
+    constexpr LLVector3d() noexcept = default;                                          // Initializes LLVector3d to (0, 0, 0)
+    constexpr LLVector3d(const F64 x, const F64 y, const F64 z) noexcept;               // Initializes LLVector3d to (x. y, z)
+    constexpr explicit LLVector3d(const F64 *vec) noexcept;                             // Initializes LLVector3d to (vec[0]. vec[1], vec[2])
+    constexpr explicit LLVector3d(const LLVector3 &vec) noexcept;
     explicit LLVector3d(const LLSD& sd)
     {
         setValue(sd);
@@ -72,25 +72,25 @@ public:
     bool        clamp(const F64 min, const F64 max);        // Clamps all values to (min,max), returns true if data changed
     bool        abs();                      // sets all values to absolute value of original value (first octant), returns true if changed
 
-    inline const LLVector3d&    clear();        // Clears LLVector3d to (0, 0, 0, 1)
-    inline const LLVector3d&    clearVec();     // deprecated
-    inline const LLVector3d&    setZero();      // Zero LLVector3d to (0, 0, 0, 0)
-    inline const LLVector3d&    zeroVec();      // deprecated
-    inline const LLVector3d&    set(const F64 x, const F64 y, const F64 z); // Sets LLVector3d to (x, y, z, 1)
-    inline const LLVector3d&    set(const LLVector3d &vec); // Sets LLVector3d to vec
-    inline const LLVector3d&    set(const F64 *vec);        // Sets LLVector3d to vec
-    inline const LLVector3d&    set(const LLVector3 &vec);
-    inline const LLVector3d&    setVec(const F64 x, const F64 y, const F64 z);  // deprecated
-    inline const LLVector3d&    setVec(const LLVector3d &vec);  // deprecated
-    inline const LLVector3d&    setVec(const F64 *vec);         // deprecated
-    inline const LLVector3d&    setVec(const LLVector3 &vec);   // deprecated
+    constexpr const LLVector3d& clear() noexcept;    // Clears LLVector3d to (0, 0, 0, 1)
+    constexpr const LLVector3d& clearVec() noexcept; // deprecated
+    constexpr const LLVector3d& setZero() noexcept;  // Zero LLVector3d to (0, 0, 0, 0)
+    constexpr const LLVector3d& zeroVec() noexcept;  // deprecated
+    constexpr const LLVector3d& set(const F64 x, const F64 y, const F64 z) noexcept; // Sets LLVector3d to (x, y, z, 1)
+    constexpr const LLVector3d& set(const LLVector3d &vec) noexcept; // Sets LLVector3d to vec
+    constexpr const LLVector3d& set(const F64 *vec) noexcept;        // Sets LLVector3d to vec
+    constexpr const LLVector3d& set(const LLVector3 &vec) noexcept;
+    constexpr const LLVector3d& setVec(const F64 x, const F64 y, const F64 z) noexcept; // deprecated
+    constexpr const LLVector3d& setVec(const LLVector3d &vec) noexcept; // deprecated
+    constexpr const LLVector3d& setVec(const F64 *vec) noexcept;        // deprecated
+    constexpr const LLVector3d& setVec(const LLVector3 &vec) noexcept;  // deprecated
 
     F64     magVec() const;             // deprecated
-    F64     magVecSquared() const;      // deprecated
+    constexpr F64 magVecSquared() const noexcept; // deprecated
     inline F64      normVec();                  // deprecated
 
     F64 length() const;         // Returns magnitude of LLVector3d
-    F64 lengthSquared() const;  // Returns magnitude squared of LLVector3d
+    constexpr F64 lengthSquared() const noexcept;  // Returns magnitude squared of LLVector3d
     inline F64 normalize();     // Normalizes and returns the magnitude of LLVector3d
 
     const LLVector3d&   rotVec(const F64 angle, const LLVector3d &vec); // Rotates about vec by angle radians
@@ -98,34 +98,34 @@ public:
     const LLVector3d&   rotVec(const LLMatrix3 &mat);               // Rotates by LLMatrix4 mat
     const LLVector3d&   rotVec(const LLQuaternion &q);              // Rotates by LLQuaternion q
 
-    bool isNull() const;            // Returns true if vector has a _very_small_ length
-    bool isExactlyZero() const      { return !mdV[VX] && !mdV[VY] && !mdV[VZ]; }
+    constexpr bool isNull() const noexcept;        // Returns true if vector has a _very_small_ length
+    constexpr bool isExactlyZero() const noexcept { return !mdV[VX] && !mdV[VY] && !mdV[VZ]; }
 
     const LLVector3d&   operator=(const LLVector4 &a);
 
-    F64 operator[](int idx) const { return mdV[idx]; }
-    F64 &operator[](int idx) { return mdV[idx]; }
+    constexpr F64 operator[](int idx) const noexcept { return mdV[idx]; }
+    constexpr F64 &operator[](int idx) noexcept { return mdV[idx]; }
 
-    friend LLVector3d operator+(const LLVector3d& a, const LLVector3d& b);  // Return vector a + b
-    friend LLVector3d operator-(const LLVector3d& a, const LLVector3d& b);  // Return vector a minus b
-    friend F64 operator*(const LLVector3d& a, const LLVector3d& b);     // Return a dot b
-    friend LLVector3d operator%(const LLVector3d& a, const LLVector3d& b);  // Return a cross b
-    friend LLVector3d operator*(const LLVector3d& a, const F64 k);              // Return a times scaler k
-    friend LLVector3d operator/(const LLVector3d& a, const F64 k);              // Return a divided by scaler k
-    friend LLVector3d operator*(const F64 k, const LLVector3d& a);              // Return a times scaler k
-    friend bool operator==(const LLVector3d& a, const LLVector3d& b);       // Return a == b
-    friend bool operator!=(const LLVector3d& a, const LLVector3d& b);       // Return a != b
+    friend constexpr LLVector3d operator+(const LLVector3d& a, const LLVector3d& b) noexcept;  // Return vector a + b
+    friend constexpr LLVector3d operator-(const LLVector3d& a, const LLVector3d& b) noexcept;  // Return vector a minus b
+    friend constexpr F64 operator*(const LLVector3d& a, const LLVector3d& b) noexcept;         // Return a dot b
+    friend constexpr LLVector3d operator%(const LLVector3d& a, const LLVector3d& b) noexcept;  // Return a cross b
+    friend constexpr LLVector3d operator*(const LLVector3d& a, const F64 k) noexcept;          // Return a times scaler k
+    friend constexpr LLVector3d operator/(const LLVector3d& a, const F64 k) noexcept;          // Return a divided by scaler k
+    friend constexpr LLVector3d operator*(const F64 k, const LLVector3d& a) noexcept;          // Return a times scaler k
+    friend constexpr bool operator==(const LLVector3d& a, const LLVector3d& b) noexcept;       // Return a == b
+    friend constexpr bool operator!=(const LLVector3d& a, const LLVector3d& b) noexcept;       // Return a != b
 // [RLVa:KB] - RlvBehaviourModifierCompMin/Max
-    friend bool operator<(const LLVector3 &a, const LLVector3 &b);      // Return a < b
+    friend constexpr bool operator<(const LLVector3d &a, const LLVector3d &b) noexcept;        // Return a < b
 // [/RLVa:KB]
 
-    friend const LLVector3d& operator+=(LLVector3d& a, const LLVector3d& b);    // Return vector a + b
-    friend const LLVector3d& operator-=(LLVector3d& a, const LLVector3d& b);    // Return vector a minus b
-    friend const LLVector3d& operator%=(LLVector3d& a, const LLVector3d& b);    // Return a cross b
-    friend const LLVector3d& operator*=(LLVector3d& a, const F64 k);                // Return a times scaler k
-    friend const LLVector3d& operator/=(LLVector3d& a, const F64 k);                // Return a divided by scaler k
+    friend constexpr const LLVector3d& operator+=(LLVector3d& a, const LLVector3d& b) noexcept;    // Return vector a + b
+    friend constexpr const LLVector3d& operator-=(LLVector3d& a, const LLVector3d& b) noexcept;    // Return vector a minus b
+    friend constexpr const LLVector3d& operator%=(LLVector3d& a, const LLVector3d& b) noexcept;    // Return a cross b
+    friend constexpr const LLVector3d& operator*=(LLVector3d& a, const F64 k) noexcept;            // Return a times scaler k
+    friend constexpr const LLVector3d& operator/=(LLVector3d& a, const F64 k) noexcept;            // Return a divided by scaler k
 
-    friend LLVector3d operator-(const LLVector3d& a);                   // Return vector -a
+    friend constexpr LLVector3d operator-(const LLVector3d& a) noexcept;                   // Return vector -a
 
     friend std::ostream&     operator<<(std::ostream& s, const LLVector3d& a);      // Stream a
 
@@ -138,7 +138,7 @@ static_assert(std::is_standard_layout<LLVector3d>::value, "LLVector3d must be a 
 
 typedef LLVector3d LLGlobalVec;
 
-inline const LLVector3d &LLVector3d::set(const LLVector3 &vec)
+constexpr const LLVector3d &LLVector3d::set(const LLVector3 &vec) noexcept
 {
     mdV[VX] = vec.mV[VX];
     mdV[VY] = vec.mV[VY];
@@ -146,7 +146,7 @@ inline const LLVector3d &LLVector3d::set(const LLVector3 &vec)
     return *this;
 }
 
-inline const LLVector3d &LLVector3d::setVec(const LLVector3 &vec)
+constexpr const LLVector3d &LLVector3d::setVec(const LLVector3 &vec) noexcept
 {
     mdV[VX] = vec.mV[VX];
     mdV[VY] = vec.mV[VY];
@@ -155,28 +155,21 @@ inline const LLVector3d &LLVector3d::setVec(const LLVector3 &vec)
 }
 
 
-inline LLVector3d::LLVector3d(void)
-{
-    mdV[VX] = 0.f;
-    mdV[VY] = 0.f;
-    mdV[VZ] = 0.f;
-}
-
-inline LLVector3d::LLVector3d(const F64 x, const F64 y, const F64 z)
+constexpr LLVector3d::LLVector3d(const F64 x, const F64 y, const F64 z) noexcept
 {
     mdV[VX] = x;
     mdV[VY] = y;
     mdV[VZ] = z;
 }
 
-inline LLVector3d::LLVector3d(const F64 *vec)
+constexpr LLVector3d::LLVector3d(const F64 *vec) noexcept
 {
     mdV[VX] = vec[VX];
     mdV[VY] = vec[VY];
     mdV[VZ] = vec[VZ];
 }
 
-inline LLVector3d::LLVector3d(const LLVector3 &vec)
+constexpr LLVector3d::LLVector3d(const LLVector3 &vec) noexcept
 {
     mdV[VX] = vec.mV[VX];
     mdV[VY] = vec.mV[VY];
@@ -203,7 +196,7 @@ inline bool LLVector3d::isFinite() const
 
 // Clear and Assignment Functions
 
-inline const LLVector3d&    LLVector3d::clear(void)
+constexpr const LLVector3d& LLVector3d::clear() noexcept
 {
     mdV[VX] = 0.f;
     mdV[VY] = 0.f;
@@ -211,7 +204,7 @@ inline const LLVector3d&    LLVector3d::clear(void)
     return (*this);
 }
 
-inline const LLVector3d&    LLVector3d::clearVec(void)
+constexpr const LLVector3d& LLVector3d::clearVec() noexcept
 {
     mdV[VX] = 0.f;
     mdV[VY] = 0.f;
@@ -219,7 +212,7 @@ inline const LLVector3d&    LLVector3d::clearVec(void)
     return (*this);
 }
 
-inline const LLVector3d&    LLVector3d::setZero(void)
+constexpr const LLVector3d& LLVector3d::setZero() noexcept
 {
     mdV[VX] = 0.f;
     mdV[VY] = 0.f;
@@ -227,7 +220,7 @@ inline const LLVector3d&    LLVector3d::setZero(void)
     return (*this);
 }
 
-inline const LLVector3d&    LLVector3d::zeroVec(void)
+constexpr const LLVector3d& LLVector3d::zeroVec() noexcept
 {
     mdV[VX] = 0.f;
     mdV[VY] = 0.f;
@@ -235,7 +228,7 @@ inline const LLVector3d&    LLVector3d::zeroVec(void)
     return (*this);
 }
 
-inline const LLVector3d&    LLVector3d::set(const F64 x, const F64 y, const F64 z)
+constexpr const LLVector3d& LLVector3d::set(const F64 x, const F64 y, const F64 z) noexcept
 {
     mdV[VX] = x;
     mdV[VY] = y;
@@ -243,7 +236,7 @@ inline const LLVector3d&    LLVector3d::set(const F64 x, const F64 y, const F64 
     return (*this);
 }
 
-inline const LLVector3d&    LLVector3d::set(const LLVector3d &vec)
+constexpr const LLVector3d& LLVector3d::set(const LLVector3d &vec) noexcept
 {
     mdV[VX] = vec.mdV[VX];
     mdV[VY] = vec.mdV[VY];
@@ -251,7 +244,7 @@ inline const LLVector3d&    LLVector3d::set(const LLVector3d &vec)
     return (*this);
 }
 
-inline const LLVector3d&    LLVector3d::set(const F64 *vec)
+constexpr const LLVector3d& LLVector3d::set(const F64 *vec) noexcept
 {
     mdV[VX] = vec[0];
     mdV[VY] = vec[1];
@@ -259,7 +252,7 @@ inline const LLVector3d&    LLVector3d::set(const F64 *vec)
     return (*this);
 }
 
-inline const LLVector3d&    LLVector3d::setVec(const F64 x, const F64 y, const F64 z)
+constexpr const LLVector3d& LLVector3d::setVec(const F64 x, const F64 y, const F64 z) noexcept
 {
     mdV[VX] = x;
     mdV[VY] = y;
@@ -267,7 +260,7 @@ inline const LLVector3d&    LLVector3d::setVec(const F64 x, const F64 y, const F
     return (*this);
 }
 
-inline const LLVector3d&    LLVector3d::setVec(const LLVector3d& vec)
+constexpr const LLVector3d& LLVector3d::setVec(const LLVector3d& vec) noexcept
 {
     mdV[VX] = vec.mdV[VX];
     mdV[VY] = vec.mdV[VY];
@@ -275,7 +268,7 @@ inline const LLVector3d&    LLVector3d::setVec(const LLVector3d& vec)
     return (*this);
 }
 
-inline const LLVector3d&    LLVector3d::setVec(const F64* vec)
+constexpr const LLVector3d& LLVector3d::setVec(const F64* vec) noexcept
 {
     mdV[VX] = vec[VX];
     mdV[VY] = vec[VY];
@@ -330,72 +323,72 @@ inline F64 LLVector3d::normalize()
 
 // LLVector3d Magnitude and Normalization Functions
 
-inline F64  LLVector3d::magVec() const
+inline F64 LLVector3d::magVec() const
 {
     return sqrt(mdV[VX]*mdV[VX] + mdV[VY]*mdV[VY] + mdV[VZ]*mdV[VZ]);
 }
 
-inline F64  LLVector3d::magVecSquared() const
+constexpr F64 LLVector3d::magVecSquared() const noexcept
 {
     return mdV[VX]*mdV[VX] + mdV[VY]*mdV[VY] + mdV[VZ]*mdV[VZ];
 }
 
-inline F64  LLVector3d::length() const
+inline F64 LLVector3d::length() const
 {
     return sqrt(mdV[VX]*mdV[VX] + mdV[VY]*mdV[VY] + mdV[VZ]*mdV[VZ]);
 }
 
-inline F64  LLVector3d::lengthSquared() const
+constexpr F64 LLVector3d::lengthSquared() const noexcept
 {
     return mdV[VX]*mdV[VX] + mdV[VY]*mdV[VY] + mdV[VZ]*mdV[VZ];
 }
 
-inline LLVector3d operator+(const LLVector3d& a, const LLVector3d& b)
+inline constexpr LLVector3d operator+(const LLVector3d& a, const LLVector3d& b) noexcept
 {
     LLVector3d c(a);
     return c += b;
 }
 
-inline LLVector3d operator-(const LLVector3d& a, const LLVector3d& b)
+inline constexpr LLVector3d operator-(const LLVector3d& a, const LLVector3d& b) noexcept
 {
     LLVector3d c(a);
     return c -= b;
 }
 
-inline F64  operator*(const LLVector3d& a, const LLVector3d& b)
+inline constexpr F64 operator*(const LLVector3d& a, const LLVector3d& b) noexcept
 {
     return (a.mdV[VX]*b.mdV[VX] + a.mdV[VY]*b.mdV[VY] + a.mdV[VZ]*b.mdV[VZ]);
 }
 
-inline LLVector3d operator%(const LLVector3d& a, const LLVector3d& b)
+inline constexpr LLVector3d operator%(const LLVector3d& a, const LLVector3d& b) noexcept
 {
     return LLVector3d( a.mdV[VY]*b.mdV[VZ] - b.mdV[VY]*a.mdV[VZ], a.mdV[VZ]*b.mdV[VX] - b.mdV[VZ]*a.mdV[VX], a.mdV[VX]*b.mdV[VY] - b.mdV[VX]*a.mdV[VY] );
 }
 
-inline LLVector3d operator/(const LLVector3d& a, const F64 k)
+inline constexpr LLVector3d operator/(const LLVector3d& a, const F64 k) noexcept
 {
     F64 t = 1.f / k;
     return LLVector3d( a.mdV[VX] * t, a.mdV[VY] * t, a.mdV[VZ] * t );
 }
 
-inline LLVector3d operator*(const LLVector3d& a, const F64 k)
+inline constexpr LLVector3d operator*(const LLVector3d& a, const F64 k) noexcept
 {
     return LLVector3d( a.mdV[VX] * k, a.mdV[VY] * k, a.mdV[VZ] * k );
 }
 
-inline LLVector3d operator*(F64 k, const LLVector3d& a)
+inline constexpr LLVector3d operator*(F64 k, const LLVector3d& a) noexcept
 {
     return LLVector3d( a.mdV[VX] * k, a.mdV[VY] * k, a.mdV[VZ] * k );
 }
 
-inline bool operator==(const LLVector3d& a, const LLVector3d& b)
+inline constexpr bool operator==(const LLVector3d& a, const LLVector3d& b) noexcept
 {
     return (  (a.mdV[VX] == b.mdV[VX])
             &&(a.mdV[VY] == b.mdV[VY])
             &&(a.mdV[VZ] == b.mdV[VZ]));
 }
 
-inline bool operator!=(const LLVector3d& a, const LLVector3d& b)
+inline constexpr bool operator!=(const LLVector3d& a, const LLVector3d& b) noexcept
 {
     return (  (a.mdV[VX] != b.mdV[VX])
             ||(a.mdV[VY] != b.mdV[VY])
@@ -403,13 +396,13 @@ inline bool operator!=(const LLVector3d& a, const LLVector3d& b)
 }
 
 // [RLVa:KB] - RlvBehaviourModifierCompMin/Max
-inline bool operator<(const LLVector3d& lhs, const LLVector3d& rhs)
+inline constexpr bool operator<(const LLVector3d& lhs, const LLVector3d& rhs) noexcept
 {
     return std::tie(lhs.mdV[0], lhs.mdV[1], lhs.mdV[2]) < std::tie(rhs.mdV[0], rhs.mdV[1], rhs.mdV[2]);
 }
 // [/RLVa:KB]
 
-inline const LLVector3d& operator+=(LLVector3d& a, const LLVector3d& b)
+inline constexpr const LLVector3d& operator+=(LLVector3d& a, const LLVector3d& b) noexcept
 {
     a.mdV[VX] += b.mdV[VX];
     a.mdV[VY] += b.mdV[VY];
@@ -417,7 +410,7 @@ inline const LLVector3d& operator+=(LLVector3d& a, const LLVector3d& b)
     return a;
 }
 
-inline const LLVector3d& operator-=(LLVector3d& a, const LLVector3d& b)
+inline constexpr const LLVector3d& operator-=(LLVector3d& a, const LLVector3d& b) noexcept
 {
     a.mdV[VX] -= b.mdV[VX];
     a.mdV[VY] -= b.mdV[VY];
@@ -425,14 +418,14 @@ inline const LLVector3d& operator-=(LLVector3d& a, const LLVector3d& b)
     return a;
 }
 
-inline const LLVector3d& operator%=(LLVector3d& a, const LLVector3d& b)
+inline constexpr const LLVector3d& operator%=(LLVector3d& a, const LLVector3d& b) noexcept
 {
     LLVector3d ret( a.mdV[VY]*b.mdV[VZ] - b.mdV[VY]*a.mdV[VZ], a.mdV[VZ]*b.mdV[VX] - b.mdV[VZ]*a.mdV[VX], a.mdV[VX]*b.mdV[VY] - b.mdV[VX]*a.mdV[VY]);
     a = ret;
     return a;
 }
 
-inline const LLVector3d& operator*=(LLVector3d& a, const F64 k)
+inline constexpr const LLVector3d& operator*=(LLVector3d& a, const F64 k) noexcept
 {
     a.mdV[VX] *= k;
     a.mdV[VY] *= k;
@@ -440,7 +433,7 @@ inline const LLVector3d& operator*=(LLVector3d& a, const F64 k)
     return a;
 }
 
-inline const LLVector3d& operator/=(LLVector3d& a, const F64 k)
+inline constexpr const LLVector3d& operator/=(LLVector3d& a, const F64 k) noexcept
 {
     F64 t = 1.f / k;
     a.mdV[VX] *= t;
@@ -449,7 +442,7 @@ inline const LLVector3d& operator/=(LLVector3d& a, const F64 k)
     return a;
 }
 
-inline LLVector3d operator-(const LLVector3d& a)
+inline constexpr LLVector3d operator-(const LLVector3d& a) noexcept
 {
     return LLVector3d( -a.mdV[VX], -a.mdV[VY], -a.mdV[VZ] );
 }
@@ -486,7 +479,7 @@ inline LLVector3d lerp(const LLVector3d& a, const LLVector3d& b, const F64 u)
 }
 
 
-inline bool LLVector3d::isNull() const
+constexpr bool LLVector3d::isNull() const noexcept
 {
     if ( F_APPROXIMATELY_ZERO > mdV[VX]*mdV[VX] + mdV[VY]*mdV[VY] + mdV[VZ]*mdV[VZ] )
     {
@@ -540,5 +533,15 @@ inline LLVector3d inverse_projected_vec(const LLVector3d& a, const LLVector3d& b
     F64 dot_product = normalized_a * normalized_b;
     return normalized_a * (b_length / dot_product);
 }
+
+// Defined out-of-line after the inline constexpr ctor bodies are visible so
+// the constant initialisation can call those constructors at compile time.
+inline constexpr LLVector3d LLVector3d::zero       {};
+inline constexpr LLVector3d LLVector3d::x_axis     { 1.0, 0.0, 0.0};
+inline constexpr LLVector3d LLVector3d::y_axis     { 0.0, 1.0, 0.0};
+inline constexpr LLVector3d LLVector3d::z_axis     { 0.0, 0.0, 1.0};
+inline constexpr LLVector3d LLVector3d::x_axis_neg {-1.0, 0.0, 0.0};
+inline constexpr LLVector3d LLVector3d::y_axis_neg { 0.0,-1.0, 0.0};
+inline constexpr LLVector3d LLVector3d::z_axis_neg { 0.0, 0.0,-1.0};
 
 #endif // LL_V3DMATH_H

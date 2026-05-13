@@ -37,10 +37,10 @@ typedef LLCoord<LL_COORD_TYPE_SCREEN> LLCoordScreen;
 
 struct LLCoordCommon
 {
-    LLCoordCommon(S32 x, S32 y) : mX(x), mY(y) {}
-    LLCoordCommon() : mX(0), mY(0) {}
-    S32 mX;
-    S32 mY;
+    constexpr LLCoordCommon(S32 x, S32 y) noexcept : mX(x), mY(y) {}
+    constexpr LLCoordCommon() noexcept = default;
+    S32 mX { 0 };
+    S32 mY { 0 };
 };
 
 // A two-dimensional pixel value
@@ -49,12 +49,11 @@ class LLCoord : protected COORD_FRAME
 {
 public:
     typedef LLCoord<COORD_FRAME> self_t;
-    typename COORD_FRAME::value_t   mX;
-    typename COORD_FRAME::value_t   mY;
+    typename COORD_FRAME::value_t   mX { 0 };
+    typename COORD_FRAME::value_t   mY { 0 };
 
-    LLCoord():  mX(0), mY(0)
-    {}
-    LLCoord(typename COORD_FRAME::value_t x, typename COORD_FRAME::value_t y): mX(x), mY(y)
+    constexpr LLCoord() noexcept = default;
+    constexpr LLCoord(typename COORD_FRAME::value_t x, typename COORD_FRAME::value_t y) noexcept : mX(x), mY(y)
     {}
 
     LLCoord(const LLCoordCommon& other)
@@ -67,12 +66,12 @@ public:
         return COORD_FRAME::convertToCommon();
     }
 
-    void set(typename COORD_FRAME::value_t x, typename COORD_FRAME::value_t y) { mX = x; mY = y;}
-    bool operator==(const self_t& other) const { return mX == other.mX && mY == other.mY; }
-    bool operator!=(const self_t& other) const { return !(*this == other); }
+    constexpr void set(typename COORD_FRAME::value_t x, typename COORD_FRAME::value_t y) noexcept { mX = x; mY = y;}
+    constexpr bool operator==(const self_t& other) const noexcept { return mX == other.mX && mY == other.mY; }
+    constexpr bool operator!=(const self_t& other) const noexcept { return !(*this == other); }
 
-    static const self_t& getTypedCoords(const COORD_FRAME& self) { return static_cast<const self_t&>(self); }
-    static self_t& getTypedCoords(COORD_FRAME& self) { return static_cast<self_t&>(self); }
+    static constexpr const self_t& getTypedCoords(const COORD_FRAME& self) noexcept { return static_cast<const self_t&>(self); }
+    static constexpr self_t& getTypedCoords(COORD_FRAME& self) noexcept { return static_cast<self_t&>(self); }
 };
 
 struct LL_COORD_TYPE_GL

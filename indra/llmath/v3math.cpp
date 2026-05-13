@@ -37,18 +37,9 @@
 #include "v3dmath.h"
 
 // LLVector3
-// WARNING: Don't use these for global const definitions!
-// For example:
-//      const LLQuaternion(0.5f * F_PI, LLVector3::zero);
-// at the top of a *.cpp file might not give you what you think.
-const LLVector3 LLVector3::zero(0,0,0);
-const LLVector3 LLVector3::x_axis(1.f, 0, 0);
-const LLVector3 LLVector3::y_axis(0, 1.f, 0);
-const LLVector3 LLVector3::z_axis(0, 0, 1.f);
-const LLVector3 LLVector3::x_axis_neg(-1.f, 0, 0);
-const LLVector3 LLVector3::y_axis_neg(0, -1.f, 0);
-const LLVector3 LLVector3::z_axis_neg(0, 0, -1.f);
-const LLVector3 LLVector3::all_one(1.f,1.f,1.f);
+// LLVector3::zero / x_axis / y_axis / z_axis / x_axis_neg / y_axis_neg /
+// z_axis_neg / all_one are now inline constexpr in v3math.h, so they're safe
+// to use in global const definitions and other static-init contexts.
 
 
 // Clamps each values to range (min,max).

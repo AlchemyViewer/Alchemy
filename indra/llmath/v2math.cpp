@@ -35,8 +35,6 @@
 
 // LLVector2
 
-LLVector2 LLVector2::zero(0,0);
-
 
 // Non-member functions
 

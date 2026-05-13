@@ -37,32 +37,32 @@
 class LLBBox
 {
 public:
-    LLBBox() {mEmpty = true;}
-    LLBBox( const LLVector3& pos_agent,
+    constexpr LLBBox() noexcept = default;
+    constexpr LLBBox( const LLVector3& pos_agent,
         const LLQuaternion& rot,
         const LLVector3& min_local,
-        const LLVector3& max_local )
+        const LLVector3& max_local ) noexcept
         :
-        mMinLocal( min_local ), mMaxLocal( max_local ), mPosAgent(pos_agent), mRotation( rot), mEmpty( true )
+        mMinLocal( min_local ), mMaxLocal( max_local ), mPosAgent(pos_agent), mRotation( rot)
         {}
 
     // Default copy constructor is OK.
 
-    const LLVector3&    getPositionAgent() const            { return mPosAgent; }
-    const LLQuaternion& getRotation() const                 { return mRotation; }
+    constexpr const LLVector3&    getPositionAgent() const noexcept     { return mPosAgent; }
+    constexpr const LLQuaternion& getRotation() const noexcept          { return mRotation; }
 
     LLVector3           getMinAgent() const;
-    const LLVector3&    getMinLocal() const                 { return mMinLocal; }
-    void                setMinLocal( const LLVector3& min ) { mMinLocal = min; }
+    constexpr const LLVector3&    getMinLocal() const noexcept           { return mMinLocal; }
+    constexpr void                setMinLocal( const LLVector3& min ) noexcept { mMinLocal = min; }
 
     LLVector3           getMaxAgent() const;
-    const LLVector3&    getMaxLocal() const                 { return mMaxLocal; }
-    void                setMaxLocal( const LLVector3& max ) { mMaxLocal = max; }
+    constexpr const LLVector3&    getMaxLocal() const noexcept           { return mMaxLocal; }
+    constexpr void                setMaxLocal( const LLVector3& max ) noexcept { mMaxLocal = max; }
 
-    LLVector3           getCenterLocal() const              { return (mMaxLocal - mMinLocal) * 0.5f + mMinLocal; }
+    constexpr LLVector3           getCenterLocal() const noexcept        { return (mMaxLocal - mMinLocal) * 0.5f + mMinLocal; }
     LLVector3           getCenterAgent() const              { return localToAgent( getCenterLocal() ); }
 
-    LLVector3           getExtentLocal() const              { return mMaxLocal - mMinLocal; }
+    constexpr LLVector3           getExtentLocal() const noexcept        { return mMaxLocal - mMinLocal; }
 
     bool                containsPointLocal(const LLVector3& p) const;
     bool                containsPointAgent(const LLVector3& p) const;
@@ -88,11 +88,11 @@ public:
 //  friend LLBBox operator*(const LLBBox& a, const LLMatrix4& b);
 
 private:
-    LLVector3           mMinLocal;
-    LLVector3           mMaxLocal;
-    LLVector3           mPosAgent;  // Position relative to Agent's Region
-    LLQuaternion        mRotation;
-    bool                mEmpty;     // Nothing has been added to this bbox yet
+    LLVector3           mMinLocal {};
+    LLVector3           mMaxLocal {};
+    LLVector3           mPosAgent {};  // Position relative to Agent's Region
+    LLQuaternion        mRotation {};
+    bool                mEmpty { true };     // Nothing has been added to this bbox yet
 };
 
 static_assert(std::is_trivially_copyable<LLBBox>::value, "LLBBox must be trivial copy");

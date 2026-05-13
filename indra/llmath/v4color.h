@@ -44,14 +44,14 @@ static constexpr U32 MAX_LENGTH_OF_COLOR_NAME = 15; // Give plenty of room for a
 class LLColor4
 {
 public:
-    F32 mV[LENGTHOFCOLOR4];
-    LLColor4();                                 // Initializes LLColor4 to (0, 0, 0, 1)
-    LLColor4(F32 r, F32 g, F32 b);              // Initializes LLColor4 to (r, g, b, 1)
-    LLColor4(F32 r, F32 g, F32 b, F32 a);       // Initializes LLColor4 to (r. g, b, a)
+    F32 mV[LENGTHOFCOLOR4] { 0.f, 0.f, 0.f, 1.f };
+    constexpr LLColor4() noexcept = default;                  // Initializes LLColor4 to (0, 0, 0, 1)
+    constexpr LLColor4(F32 r, F32 g, F32 b) noexcept;         // Initializes LLColor4 to (r, g, b, 1)
+    constexpr LLColor4(F32 r, F32 g, F32 b, F32 a) noexcept;  // Initializes LLColor4 to (r. g, b, a)
     LLColor4(const LLColor3& vec, F32 a = 1.f); // Initializes LLColor4 to (vec, a)
     explicit LLColor4(const LLSD& sd);
-    explicit LLColor4(const F32* vec);           // Initializes LLColor4 to (vec[0]. vec[1], vec[2], 1)
-    explicit LLColor4(U32 clr);                  // Initializes LLColor4 to (r=clr>>24, etc))
+    constexpr explicit LLColor4(const F32* vec) noexcept;     // Initializes LLColor4 to (vec[0]. vec[1], vec[2], 1)
+    constexpr explicit LLColor4(U32 clr) noexcept;            // Initializes LLColor4 to (r=clr>>24, etc))
     explicit LLColor4(const LLColor4U& color4u); // "explicit" to avoid automatic conversion
     explicit LLColor4(const LLVector4& vector4); // "explicit" to avoid automatic conversion
 
@@ -70,24 +70,24 @@ public:
     void setHSL(F32 hue, F32 saturation, F32 luminance);
     void calcHSL(F32* hue, F32* saturation, F32* luminance) const;
 
-    const LLColor4& setToBlack(); // zero LLColor4 to (0, 0, 0, 1)
-    const LLColor4& setToWhite(); // zero LLColor4 to (0, 0, 0, 1)
+    constexpr const LLColor4& setToBlack() noexcept; // zero LLColor4 to (0, 0, 0, 1)
+    constexpr const LLColor4& setToWhite() noexcept; // zero LLColor4 to (0, 0, 0, 1)
 
-    const LLColor4& setVec(F32 r, F32 g, F32 b, F32 a); // deprecated -- use set()
-    const LLColor4& setVec(F32 r, F32 g, F32 b);        // deprecated -- use set()
-    const LLColor4& setVec(const LLColor4& vec);        // deprecated -- use set()
+    constexpr const LLColor4& setVec(F32 r, F32 g, F32 b, F32 a) noexcept; // deprecated -- use set()
+    constexpr const LLColor4& setVec(F32 r, F32 g, F32 b) noexcept;        // deprecated -- use set()
+    constexpr const LLColor4& setVec(const LLColor4& vec) noexcept;        // deprecated -- use set()
     const LLColor4& setVec(const LLColor3& vec);        // deprecated -- use set()
     const LLColor4& setVec(const LLColor3& vec, F32 a); // deprecated -- use set()
-    const LLColor4& setVec(const F32* vec);             // deprecated -- use set()
+    constexpr const LLColor4& setVec(const F32* vec) noexcept;             // deprecated -- use set()
     const LLColor4& setVec(const LLColor4U& color4u);   // deprecated -- use set()
 
-    const LLColor4& set(F32 r, F32 g, F32 b, F32 a); // Sets LLColor4 to (r, g, b, a)
-    const LLColor4& set(F32 r, F32 g, F32 b);        // Sets LLColor4 to (r, g, b) (no change in a)
-    const LLColor4& set(const LLColor4& vec);        // Sets LLColor4 to vec
+    constexpr const LLColor4& set(F32 r, F32 g, F32 b, F32 a) noexcept; // Sets LLColor4 to (r, g, b, a)
+    constexpr const LLColor4& set(F32 r, F32 g, F32 b) noexcept;        // Sets LLColor4 to (r, g, b) (no change in a)
+    constexpr const LLColor4& set(const LLColor4& vec) noexcept;        // Sets LLColor4 to vec
     const LLColor4& set(const LLColor3& vec);        // Sets LLColor4 to LLColor3 vec (no change in alpha)
     const LLColor4& set(const LLColor3& vec, F32 a); // Sets LLColor4 to LLColor3 vec, with alpha specified
-    const LLColor4& set(const F32* vec);             // Sets LLColor4 to vec
-    const LLColor4& set(const F64* vec);             // Sets LLColor4 to (double)vec
+    constexpr const LLColor4& set(const F32* vec) noexcept;             // Sets LLColor4 to vec
+    constexpr const LLColor4& set(const F64* vec) noexcept;             // Sets LLColor4 to (double)vec
     const LLColor4& set(const LLColor4U& color4u);   // Sets LLColor4 to color4u, rescaled.
 
     // set from a vector of unknown type and size
@@ -100,138 +100,138 @@ public:
     template<typename T>
     void write(std::vector<T>& v) const;
 
-    const LLColor4& setAlpha(F32 a);
+    constexpr const LLColor4& setAlpha(F32 a) noexcept;
 
     F32 magVec() const;        // deprecated -- use length()
     F32 magVecSquared() const; // deprecated -- use lengthSquared()
     F32 normVec();             // deprecated -- use normalize()
 
     F32 length() const;        // Returns magnitude of LLColor4
-    F32 lengthSquared() const; // Returns magnitude squared of LLColor4
+    constexpr F32 lengthSquared() const noexcept; // Returns magnitude squared of LLColor4
     F32 normalize();           // deprecated -- use normalize()
 
-    bool isOpaque() const { return mV[VALPHA] == 1.f; }
+    constexpr bool isOpaque() const noexcept { return mV[VALPHA] == 1.f; }
 
-    F32  operator[](int idx) const { return mV[idx]; }
-    F32& operator[](int idx) { return mV[idx]; }
+    constexpr F32  operator[](int idx) const noexcept { return mV[idx]; }
+    constexpr F32& operator[](int idx) noexcept { return mV[idx]; }
 
     const LLColor4& operator=(const LLColor3& a); // Assigns vec3 to vec4 and returns vec4
 
-    bool                 operator<(const LLColor4& rhs) const;
+    constexpr bool       operator<(const LLColor4& rhs) const noexcept;
     friend std::ostream& operator<<(std::ostream& s, const LLColor4& a);  // Print a
-    friend LLColor4      operator+(const LLColor4& a, const LLColor4& b); // Return vector a + b
-    friend LLColor4      operator-(const LLColor4& a, const LLColor4& b); // Return vector a minus b
-    friend LLColor4      operator*(const LLColor4& a, const LLColor4& b); // Return component wise a * b
-    friend LLColor4      operator*(const LLColor4& a, F32 k);             // Return rgb times scaler k (no alpha change)
-    friend LLColor4      operator/(const LLColor4& a, F32 k);             // Return rgb divided by scalar k (no alpha change)
-    friend LLColor4      operator*(F32 k, const LLColor4& a);             // Return rgb times scaler k (no alpha change)
-    friend LLColor4      operator%(const LLColor4& a, F32 k);             // Return alpha times scaler k (no rgb change)
-    friend LLColor4      operator%(F32 k, const LLColor4& a);             // Return alpha times scaler k (no rgb change)
+    friend constexpr LLColor4      operator+(const LLColor4& a, const LLColor4& b) noexcept; // Return vector a + b
+    friend constexpr LLColor4      operator-(const LLColor4& a, const LLColor4& b) noexcept; // Return vector a minus b
+    friend constexpr LLColor4      operator*(const LLColor4& a, const LLColor4& b) noexcept; // Return component wise a * b
+    friend constexpr LLColor4      operator*(const LLColor4& a, F32 k) noexcept;             // Return rgb times scaler k (no alpha change)
+    friend constexpr LLColor4      operator/(const LLColor4& a, F32 k) noexcept;             // Return rgb divided by scalar k (no alpha change)
+    friend constexpr LLColor4      operator*(F32 k, const LLColor4& a) noexcept;             // Return rgb times scaler k (no alpha change)
+    friend constexpr LLColor4      operator%(const LLColor4& a, F32 k) noexcept;             // Return alpha times scaler k (no rgb change)
+    friend constexpr LLColor4      operator%(F32 k, const LLColor4& a) noexcept;             // Return alpha times scaler k (no rgb change)
 
-    friend bool operator==(const LLColor4& a, const LLColor4& b); // Return a == b
-    friend bool operator!=(const LLColor4& a, const LLColor4& b); // Return a != b
+    friend constexpr bool operator==(const LLColor4& a, const LLColor4& b) noexcept; // Return a == b
+    friend constexpr bool operator!=(const LLColor4& a, const LLColor4& b) noexcept; // Return a != b
 
     friend bool operator==(const LLColor4& a, const LLColor3& b); // Return a == b
     friend bool operator!=(const LLColor4& a, const LLColor3& b); // Return a != b
 
-    friend const LLColor4& operator+=(LLColor4& a, const LLColor4& b); // Return vector a + b
-    friend const LLColor4& operator-=(LLColor4& a, const LLColor4& b); // Return vector a minus b
-    friend const LLColor4& operator*=(LLColor4& a, F32 k);             // Return rgb times scaler k (no alpha change)
-    friend const LLColor4& operator%=(LLColor4& a, F32 k);             // Return alpha times scaler k (no rgb change)
+    friend constexpr const LLColor4& operator+=(LLColor4& a, const LLColor4& b) noexcept; // Return vector a + b
+    friend constexpr const LLColor4& operator-=(LLColor4& a, const LLColor4& b) noexcept; // Return vector a minus b
+    friend constexpr const LLColor4& operator*=(LLColor4& a, F32 k) noexcept;             // Return rgb times scaler k (no alpha change)
+    friend constexpr const LLColor4& operator%=(LLColor4& a, F32 k) noexcept;             // Return alpha times scaler k (no rgb change)
 
-    friend const LLColor4& operator*=(LLColor4& a, const LLColor4& b); // Doesn't multiply alpha! (for lighting)
+    friend constexpr const LLColor4& operator*=(LLColor4& a, const LLColor4& b) noexcept; // Doesn't multiply alpha! (for lighting)
 
     // conversion
     operator LLColor4U() const;
 
     // Basic color values.
-    static LLColor4 red;
-    static LLColor4 green;
-    static LLColor4 blue;
-    static LLColor4 black;
-    static LLColor4 white;
-    static LLColor4 yellow;
-    static LLColor4 magenta;
-    static LLColor4 cyan;
-    static LLColor4 smoke;
-    static LLColor4 grey;
-    static LLColor4 orange;
-    static LLColor4 purple;
-    static LLColor4 pink;
-    static LLColor4 transparent;
+    static const LLColor4 red;
+    static const LLColor4 green;
+    static const LLColor4 blue;
+    static const LLColor4 black;
+    static const LLColor4 white;
+    static const LLColor4 yellow;
+    static const LLColor4 magenta;
+    static const LLColor4 cyan;
+    static const LLColor4 smoke;
+    static const LLColor4 grey;
+    static const LLColor4 orange;
+    static const LLColor4 purple;
+    static const LLColor4 pink;
+    static const LLColor4 transparent;
 
     // Extra color values.
-    static LLColor4 grey1;
-    static LLColor4 grey2;
-    static LLColor4 grey3;
-    static LLColor4 grey4;
+    static const LLColor4 grey1;
+    static const LLColor4 grey2;
+    static const LLColor4 grey3;
+    static const LLColor4 grey4;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
-    static LLColor4 silhouette;
+    static const LLColor4 silhouette;
 // [/RLVa:KB]
 
-    static LLColor4 red1;
-    static LLColor4 red2;
-    static LLColor4 red3;
-    static LLColor4 red4;
-    static LLColor4 red5;
+    static const LLColor4 red1;
+    static const LLColor4 red2;
+    static const LLColor4 red3;
+    static const LLColor4 red4;
+    static const LLColor4 red5;
 
-    static LLColor4 green1;
-    static LLColor4 green2;
-    static LLColor4 green3;
-    static LLColor4 green4;
-    static LLColor4 green5;
-    static LLColor4 green6;
+    static const LLColor4 green1;
+    static const LLColor4 green2;
+    static const LLColor4 green3;
+    static const LLColor4 green4;
+    static const LLColor4 green5;
+    static const LLColor4 green6;
 
-    static LLColor4 blue1;
-    static LLColor4 blue2;
-    static LLColor4 blue3;
-    static LLColor4 blue4;
-    static LLColor4 blue5;
-    static LLColor4 blue6;
+    static const LLColor4 blue1;
+    static const LLColor4 blue2;
+    static const LLColor4 blue3;
+    static const LLColor4 blue4;
+    static const LLColor4 blue5;
+    static const LLColor4 blue6;
 
-    static LLColor4 yellow1;
-    static LLColor4 yellow2;
-    static LLColor4 yellow3;
-    static LLColor4 yellow4;
-    static LLColor4 yellow5;
-    static LLColor4 yellow6;
-    static LLColor4 yellow7;
-    static LLColor4 yellow8;
-    static LLColor4 yellow9;
+    static const LLColor4 yellow1;
+    static const LLColor4 yellow2;
+    static const LLColor4 yellow3;
+    static const LLColor4 yellow4;
+    static const LLColor4 yellow5;
+    static const LLColor4 yellow6;
+    static const LLColor4 yellow7;
+    static const LLColor4 yellow8;
+    static const LLColor4 yellow9;
 
-    static LLColor4 orange1;
-    static LLColor4 orange2;
-    static LLColor4 orange3;
-    static LLColor4 orange4;
-    static LLColor4 orange5;
-    static LLColor4 orange6;
+    static const LLColor4 orange1;
+    static const LLColor4 orange2;
+    static const LLColor4 orange3;
+    static const LLColor4 orange4;
+    static const LLColor4 orange5;
+    static const LLColor4 orange6;
 
-    static LLColor4 magenta1;
-    static LLColor4 magenta2;
-    static LLColor4 magenta3;
-    static LLColor4 magenta4;
+    static const LLColor4 magenta1;
+    static const LLColor4 magenta2;
+    static const LLColor4 magenta3;
+    static const LLColor4 magenta4;
 
-    static LLColor4 purple1;
-    static LLColor4 purple2;
-    static LLColor4 purple3;
-    static LLColor4 purple4;
-    static LLColor4 purple5;
-    static LLColor4 purple6;
+    static const LLColor4 purple1;
+    static const LLColor4 purple2;
+    static const LLColor4 purple3;
+    static const LLColor4 purple4;
+    static const LLColor4 purple5;
+    static const LLColor4 purple6;
 
-    static LLColor4 pink1;
-    static LLColor4 pink2;
+    static const LLColor4 pink1;
+    static const LLColor4 pink2;
 
-    static LLColor4 cyan1;
-    static LLColor4 cyan2;
-    static LLColor4 cyan3;
-    static LLColor4 cyan4;
-    static LLColor4 cyan5;
-    static LLColor4 cyan6;
+    static const LLColor4 cyan1;
+    static const LLColor4 cyan2;
+    static const LLColor4 cyan3;
+    static const LLColor4 cyan4;
+    static const LLColor4 cyan5;
+    static const LLColor4 cyan6;
 
     static bool parseColor(const std::string& buf, LLColor4* color);
     static bool parseColor4(const std::string& buf, LLColor4* color);
 
-    inline void clamp();
+    constexpr void clamp() noexcept;
 };
 
 static_assert(std::is_trivially_copyable<LLColor4>::value, "LLColor4 must be trivial copy");
@@ -245,20 +245,12 @@ LLColor3 vec4to3(const LLColor4& vec);
 LLColor4 vec3to4(const LLColor3& vec);
 LLColor4 lerp(const LLColor4& a, const LLColor4& b, F32 u);
 
-inline LLColor4::LLColor4()
-{
-    mV[VRED]   = 0.f;
-    mV[VGREEN] = 0.f;
-    mV[VBLUE]  = 0.f;
-    mV[VALPHA] = 1.f;
-}
-
 inline LLColor4::LLColor4(const LLSD& sd)
 {
     this->setValue(sd);
 }
 
-inline LLColor4::LLColor4(F32 r, F32 g, F32 b)
+constexpr LLColor4::LLColor4(F32 r, F32 g, F32 b) noexcept
 {
     mV[VRED]   = r;
     mV[VGREEN] = g;
@@ -266,7 +258,7 @@ inline LLColor4::LLColor4(F32 r, F32 g, F32 b)
     mV[VALPHA] = 1.f;
 }
 
-inline LLColor4::LLColor4(F32 r, F32 g, F32 b, F32 a)
+constexpr LLColor4::LLColor4(F32 r, F32 g, F32 b, F32 a) noexcept
 {
     mV[VRED]   = r;
     mV[VGREEN] = g;
@@ -274,7 +266,7 @@ inline LLColor4::LLColor4(F32 r, F32 g, F32 b, F32 a)
     mV[VALPHA] = a;
 }
 
-inline LLColor4::LLColor4(U32 clr)
+constexpr LLColor4::LLColor4(U32 clr) noexcept
 {
     mV[VRED]   = (clr & 0xff) * (1.0f / 255.0f);
     mV[VGREEN] = ((clr >> 8) & 0xff) * (1.0f / 255.0f);
@@ -282,7 +274,7 @@ inline LLColor4::LLColor4(U32 clr)
     mV[VALPHA] = (clr >> 24) * (1.0f / 255.0f);
 }
 
-inline LLColor4::LLColor4(const F32* vec)
+constexpr LLColor4::LLColor4(const F32* vec) noexcept
 {
     mV[VRED]   = vec[VRED];
     mV[VGREEN] = vec[VGREEN];
@@ -290,7 +282,7 @@ inline LLColor4::LLColor4(const F32* vec)
     mV[VALPHA] = vec[VALPHA];
 }
 
-inline const LLColor4& LLColor4::setToBlack(void)
+constexpr const LLColor4& LLColor4::setToBlack() noexcept
 {
     mV[VRED]   = 0.f;
     mV[VGREEN] = 0.f;
@@ -299,7 +291,7 @@ inline const LLColor4& LLColor4::setToBlack(void)
     return (*this);
 }
 
-inline const LLColor4& LLColor4::setToWhite(void)
+constexpr const LLColor4& LLColor4::setToWhite() noexcept
 {
     mV[VRED]   = 1.f;
     mV[VGREEN] = 1.f;
@@ -308,7 +300,7 @@ inline const LLColor4& LLColor4::setToWhite(void)
     return (*this);
 }
 
-inline const LLColor4& LLColor4::set(F32 x, F32 y, F32 z)
+constexpr const LLColor4& LLColor4::set(F32 x, F32 y, F32 z) noexcept
 {
     mV[VRED]   = x;
     mV[VGREEN] = y;
@@ -320,7 +312,7 @@ inline const LLColor4& LLColor4::set(F32 x, F32 y, F32 z)
     return (*this);
 }
 
-inline const LLColor4& LLColor4::set(F32 x, F32 y, F32 z, F32 a)
+constexpr const LLColor4& LLColor4::set(F32 x, F32 y, F32 z, F32 a) noexcept
 {
     mV[VRED]   = x;
     mV[VGREEN] = y;
@@ -329,7 +321,7 @@ inline const LLColor4& LLColor4::set(F32 x, F32 y, F32 z, F32 a)
     return (*this);
 }
 
-inline const LLColor4& LLColor4::set(const LLColor4& vec)
+constexpr const LLColor4& LLColor4::set(const LLColor4& vec) noexcept
 {
     mV[VRED]   = vec.mV[VRED];
     mV[VGREEN] = vec.mV[VGREEN];
@@ -338,7 +330,7 @@ inline const LLColor4& LLColor4::set(const LLColor4& vec)
     return (*this);
 }
 
-inline const LLColor4& LLColor4::set(const F32* vec)
+constexpr const LLColor4& LLColor4::set(const F32* vec) noexcept
 {
     mV[VRED]   = vec[VRED];
     mV[VGREEN] = vec[VGREEN];
@@ -347,7 +339,7 @@ inline const LLColor4& LLColor4::set(const F32* vec)
     return (*this);
 }
 
-inline const LLColor4& LLColor4::set(const F64* vec)
+constexpr const LLColor4& LLColor4::set(const F64* vec) noexcept
 {
     mV[VRED]   = static_cast<F32>(vec[VRED]);
     mV[VGREEN] = static_cast<F32>(vec[VGREEN]);
@@ -357,7 +349,7 @@ inline const LLColor4& LLColor4::set(const F64* vec)
 }
 
 // deprecated
-inline const LLColor4& LLColor4::setVec(F32 x, F32 y, F32 z)
+constexpr const LLColor4& LLColor4::setVec(F32 x, F32 y, F32 z) noexcept
 {
     mV[VRED]   = x;
     mV[VGREEN] = y;
@@ -370,7 +362,7 @@ inline const LLColor4& LLColor4::setVec(F32 x, F32 y, F32 z)
 }
 
 // deprecated
-inline const LLColor4& LLColor4::setVec(F32 x, F32 y, F32 z, F32 a)
+constexpr const LLColor4& LLColor4::setVec(F32 x, F32 y, F32 z, F32 a) noexcept
 {
     mV[VRED]   = x;
     mV[VGREEN] = y;
@@ -380,7 +372,7 @@ inline const LLColor4& LLColor4::setVec(F32 x, F32 y, F32 z, F32 a)
 }
 
 // deprecated
-inline const LLColor4& LLColor4::setVec(const LLColor4& vec)
+constexpr const LLColor4& LLColor4::setVec(const LLColor4& vec) noexcept
 {
     mV[VRED]   = vec.mV[VRED];
     mV[VGREEN] = vec.mV[VGREEN];
@@ -390,7 +382,7 @@ inline const LLColor4& LLColor4::setVec(const LLColor4& vec)
 }
 
 // deprecated
-inline const LLColor4& LLColor4::setVec(const F32* vec)
+constexpr const LLColor4& LLColor4::setVec(const F32* vec) noexcept
 {
     mV[VRED]   = vec[VRED];
     mV[VGREEN] = vec[VGREEN];
@@ -399,7 +391,7 @@ inline const LLColor4& LLColor4::setVec(const F32* vec)
     return (*this);
 }
 
-inline const LLColor4& LLColor4::setAlpha(F32 a)
+constexpr const LLColor4& LLColor4::setAlpha(F32 a) noexcept
 {
     mV[VALPHA] = a;
     return (*this);
@@ -412,7 +404,7 @@ inline F32 LLColor4::length() const
     return sqrt(mV[VRED] * mV[VRED] + mV[VGREEN] * mV[VGREEN] + mV[VBLUE] * mV[VBLUE]);
 }
 
-inline F32 LLColor4::lengthSquared() const
+constexpr F32 LLColor4::lengthSquared() const noexcept
 {
     return mV[VRED] * mV[VRED] + mV[VGREEN] * mV[VGREEN] + mV[VBLUE] * mV[VBLUE];
 }
@@ -462,61 +454,61 @@ inline F32 LLColor4::normVec()
 
 // LLColor4 Operators
 
-inline LLColor4 operator+(const LLColor4& a, const LLColor4& b)
+inline constexpr LLColor4 operator+(const LLColor4& a, const LLColor4& b) noexcept
 {
     return LLColor4(a.mV[VRED] + b.mV[VRED], a.mV[VGREEN] + b.mV[VGREEN], a.mV[VBLUE] + b.mV[VBLUE], a.mV[VALPHA] + b.mV[VALPHA]);
 }
 
-inline LLColor4 operator-(const LLColor4& a, const LLColor4& b)
+inline constexpr LLColor4 operator-(const LLColor4& a, const LLColor4& b) noexcept
 {
     return LLColor4(a.mV[VRED] - b.mV[VRED], a.mV[VGREEN] - b.mV[VGREEN], a.mV[VBLUE] - b.mV[VBLUE], a.mV[VALPHA] - b.mV[VALPHA]);
 }
 
-inline LLColor4 operator*(const LLColor4& a, const LLColor4& b)
+inline constexpr LLColor4 operator*(const LLColor4& a, const LLColor4& b) noexcept
 {
     return LLColor4(a.mV[VRED] * b.mV[VRED], a.mV[VGREEN] * b.mV[VGREEN], a.mV[VBLUE] * b.mV[VBLUE], a.mV[VALPHA] * b.mV[VALPHA]);
 }
 
-inline LLColor4 operator*(const LLColor4& a, F32 k)
+inline constexpr LLColor4 operator*(const LLColor4& a, F32 k) noexcept
 {
     // only affects rgb (not a!)
     return LLColor4(a.mV[VRED] * k, a.mV[VGREEN] * k, a.mV[VBLUE] * k, a.mV[VALPHA]);
 }
 
-inline LLColor4 operator/(const LLColor4& a, F32 k)
+inline constexpr LLColor4 operator/(const LLColor4& a, F32 k) noexcept
 {
     return LLColor4(a.mV[VRED] / k, a.mV[VGREEN] / k, a.mV[VBLUE] / k, a.mV[VALPHA]);
 }
 
-inline LLColor4 operator*(F32 k, const LLColor4& a)
+inline constexpr LLColor4 operator*(F32 k, const LLColor4& a) noexcept
 {
     // only affects rgb (not a!)
     return LLColor4(a.mV[VRED] * k, a.mV[VGREEN] * k, a.mV[VBLUE] * k, a.mV[VALPHA]);
 }
 
-inline LLColor4 operator%(F32 k, const LLColor4& a)
+inline constexpr LLColor4 operator%(F32 k, const LLColor4& a) noexcept
 {
     // only affects alpha (not rgb!)
     return LLColor4(a.mV[VRED], a.mV[VGREEN], a.mV[VBLUE], a.mV[VALPHA] * k);
 }
 
-inline LLColor4 operator%(const LLColor4& a, F32 k)
+inline constexpr LLColor4 operator%(const LLColor4& a, F32 k) noexcept
 {
     // only affects alpha (not rgb!)
     return LLColor4(a.mV[VRED], a.mV[VGREEN], a.mV[VBLUE], a.mV[VALPHA] * k);
 }
 
-inline bool operator==(const LLColor4& a, const LLColor4& b)
+inline constexpr bool operator==(const LLColor4& a, const LLColor4& b) noexcept
 {
     return ((a.mV[VRED] == b.mV[VRED]) && (a.mV[VGREEN] == b.mV[VGREEN]) && (a.mV[VBLUE] == b.mV[VBLUE]) && (a.mV[VALPHA] == b.mV[VALPHA]));
 }
 
-inline bool operator!=(const LLColor4& a, const LLColor4& b)
+inline constexpr bool operator!=(const LLColor4& a, const LLColor4& b) noexcept
 {
     return ((a.mV[VRED] != b.mV[VRED]) || (a.mV[VGREEN] != b.mV[VGREEN]) || (a.mV[VBLUE] != b.mV[VBLUE]) || (a.mV[VALPHA] != b.mV[VALPHA]));
 }
 
-inline const LLColor4& operator+=(LLColor4& a, const LLColor4& b)
+inline constexpr const LLColor4& operator+=(LLColor4& a, const LLColor4& b) noexcept
 {
     a.mV[VRED] += b.mV[VRED];
     a.mV[VGREEN] += b.mV[VGREEN];
@@ -525,7 +517,7 @@ inline const LLColor4& operator+=(LLColor4& a, const LLColor4& b)
     return a;
 }
 
-inline const LLColor4& operator-=(LLColor4& a, const LLColor4& b)
+inline constexpr const LLColor4& operator-=(LLColor4& a, const LLColor4& b) noexcept
 {
     a.mV[VRED] -= b.mV[VRED];
     a.mV[VGREEN] -= b.mV[VGREEN];
@@ -534,7 +526,7 @@ inline const LLColor4& operator-=(LLColor4& a, const LLColor4& b)
     return a;
 }
 
-inline const LLColor4& operator*=(LLColor4& a, F32 k)
+inline constexpr const LLColor4& operator*=(LLColor4& a, F32 k) noexcept
 {
     // only affects rgb (not a!)
     a.mV[VRED] *= k;
@@ -543,7 +535,7 @@ inline const LLColor4& operator*=(LLColor4& a, F32 k)
     return a;
 }
 
-inline const LLColor4& operator*=(LLColor4& a, const LLColor4& b)
+inline constexpr const LLColor4& operator*=(LLColor4& a, const LLColor4& b) noexcept
 {
     a.mV[VRED] *= b.mV[VRED];
     a.mV[VGREEN] *= b.mV[VGREEN];
@@ -552,7 +544,7 @@ inline const LLColor4& operator*=(LLColor4& a, const LLColor4& b)
     return a;
 }
 
-inline const LLColor4& operator%=(LLColor4& a, F32 k)
+inline constexpr const LLColor4& operator%=(LLColor4& a, F32 k) noexcept
 {
     // only affects alpha (not rgb!)
     a.mV[VALPHA] *= k;
@@ -581,7 +573,7 @@ inline LLColor4 lerp(const LLColor4& a, const LLColor4& b, F32 u)
                     a.mV[VALPHA] + (b.mV[VALPHA] - a.mV[VALPHA]) * u);
 }
 
-inline bool LLColor4::operator<(const LLColor4& rhs) const
+constexpr bool LLColor4::operator<(const LLColor4& rhs) const noexcept
 {
     if (mV[VRED] != rhs.mV[VRED])
     {
@@ -599,7 +591,7 @@ inline bool LLColor4::operator<(const LLColor4& rhs) const
     return mV[VALPHA] < rhs.mV[VALPHA];
 }
 
-void LLColor4::clamp()
+constexpr void LLColor4::clamp() noexcept
 {
     // Clamp the color...
     if (mV[VRED] < 0.f)
@@ -680,5 +672,89 @@ void LLColor4::write(std::vector<T>& v) const
         v[i] = (T)mV[i];
     }
 }
+
+// Defined out-of-line after the inline constexpr ctor bodies are visible so
+// the constant initialisation can call those constructors at compile time.
+inline constexpr LLColor4 LLColor4::red        { 1.f, 0.f, 0.f, 1.f };
+inline constexpr LLColor4 LLColor4::green      { 0.f, 1.f, 0.f, 1.f };
+inline constexpr LLColor4 LLColor4::blue       { 0.f, 0.f, 1.f, 1.f };
+inline constexpr LLColor4 LLColor4::black      { 0.f, 0.f, 0.f, 1.f };
+inline constexpr LLColor4 LLColor4::yellow     { 1.f, 1.f, 0.f, 1.f };
+inline constexpr LLColor4 LLColor4::magenta    { 1.0f, 0.0f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::cyan       { 0.0f, 1.0f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::white      { 1.f, 1.f, 1.f, 1.f };
+inline constexpr LLColor4 LLColor4::smoke      { 0.5f, 0.5f, 0.5f, 0.5f };
+inline constexpr LLColor4 LLColor4::grey       { 0.5f, 0.5f, 0.5f, 1.0f };
+inline constexpr LLColor4 LLColor4::orange     { 1.f, 0.5f, 0.f, 1.f };
+inline constexpr LLColor4 LLColor4::purple     { 0.6f, 0.2f, 0.8f, 1.0f };
+inline constexpr LLColor4 LLColor4::pink       { 1.0f, 0.5f, 0.8f, 1.0f };
+inline constexpr LLColor4 LLColor4::transparent{ 0.f, 0.f, 0.f, 0.f };
+
+inline constexpr LLColor4 LLColor4::grey1      { 0.8f, 0.8f, 0.8f, 1.0f };
+inline constexpr LLColor4 LLColor4::grey2      { 0.6f, 0.6f, 0.6f, 1.0f };
+inline constexpr LLColor4 LLColor4::grey3      { 0.4f, 0.4f, 0.4f, 1.0f };
+inline constexpr LLColor4 LLColor4::grey4      { 0.3f, 0.3f, 0.3f, 1.0f };
+// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
+inline constexpr LLColor4 LLColor4::silhouette { 0.05f, 0.05f, 0.05f, 1.0f };
+// [/RLVa:KB]
+
+inline constexpr LLColor4 LLColor4::red1       { 1.0f, 0.0f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::red2       { 0.6f, 0.0f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::red3       { 1.0f, 0.2f, 0.2f, 1.0f };
+inline constexpr LLColor4 LLColor4::red4       { 0.5f, 0.1f, 0.1f, 1.0f };
+inline constexpr LLColor4 LLColor4::red5       { 0.8f, 0.1f, 0.0f, 1.0f };
+
+inline constexpr LLColor4 LLColor4::green1     { 0.0f, 1.0f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::green2     { 0.0f, 0.6f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::green3     { 0.0f, 0.4f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::green4     { 0.0f, 1.0f, 0.4f, 1.0f };
+inline constexpr LLColor4 LLColor4::green5     { 0.2f, 0.6f, 0.4f, 1.0f };
+inline constexpr LLColor4 LLColor4::green6     { 0.4f, 0.6f, 0.2f, 1.0f };
+
+inline constexpr LLColor4 LLColor4::blue1      { 0.0f, 0.0f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::blue2      { 0.0f, 0.4f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::blue3      { 0.2f, 0.2f, 0.8f, 1.0f };
+inline constexpr LLColor4 LLColor4::blue4      { 0.0f, 0.0f, 0.6f, 1.0f };
+inline constexpr LLColor4 LLColor4::blue5      { 0.4f, 0.2f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::blue6      { 0.4f, 0.5f, 1.0f, 1.0f };
+
+inline constexpr LLColor4 LLColor4::yellow1    { 1.0f, 1.0f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::yellow2    { 0.6f, 0.6f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::yellow3    { 0.8f, 1.0f, 0.2f, 1.0f };
+inline constexpr LLColor4 LLColor4::yellow4    { 1.0f, 1.0f, 0.4f, 1.0f };
+inline constexpr LLColor4 LLColor4::yellow5    { 0.6f, 0.4f, 0.2f, 1.0f };
+inline constexpr LLColor4 LLColor4::yellow6    { 1.0f, 0.8f, 0.4f, 1.0f };
+inline constexpr LLColor4 LLColor4::yellow7    { 0.8f, 0.8f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::yellow8    { 0.8f, 0.8f, 0.2f, 1.0f };
+inline constexpr LLColor4 LLColor4::yellow9    { 0.8f, 0.8f, 0.4f, 1.0f };
+
+inline constexpr LLColor4 LLColor4::orange1    { 1.0f, 0.8f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::orange2    { 1.0f, 0.6f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::orange3    { 1.0f, 0.4f, 0.2f, 1.0f };
+inline constexpr LLColor4 LLColor4::orange4    { 0.8f, 0.4f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::orange5    { 0.9f, 0.5f, 0.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::orange6    { 1.0f, 0.8f, 0.2f, 1.0f };
+
+inline constexpr LLColor4 LLColor4::magenta1   { 1.0f, 0.0f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::magenta2   { 0.6f, 0.2f, 0.4f, 1.0f };
+inline constexpr LLColor4 LLColor4::magenta3   { 1.0f, 0.4f, 0.6f, 1.0f };
+inline constexpr LLColor4 LLColor4::magenta4   { 1.0f, 0.2f, 0.8f, 1.0f };
+
+inline constexpr LLColor4 LLColor4::purple1    { 0.6f, 0.2f, 0.8f, 1.0f };
+inline constexpr LLColor4 LLColor4::purple2    { 0.8f, 0.2f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::purple3    { 0.6f, 0.0f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::purple4    { 0.4f, 0.0f, 0.8f, 1.0f };
+inline constexpr LLColor4 LLColor4::purple5    { 0.6f, 0.0f, 0.8f, 1.0f };
+inline constexpr LLColor4 LLColor4::purple6    { 0.8f, 0.0f, 0.6f, 1.0f };
+
+inline constexpr LLColor4 LLColor4::pink1      { 1.0f, 0.5f, 0.8f, 1.0f };
+inline constexpr LLColor4 LLColor4::pink2      { 1.0f, 0.8f, 0.9f, 1.0f };
+
+inline constexpr LLColor4 LLColor4::cyan1      { 0.0f, 1.0f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::cyan2      { 0.4f, 0.8f, 0.8f, 1.0f };
+inline constexpr LLColor4 LLColor4::cyan3      { 0.0f, 1.0f, 0.6f, 1.0f };
+inline constexpr LLColor4 LLColor4::cyan4      { 0.6f, 1.0f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::cyan5      { 0.2f, 0.6f, 1.0f, 1.0f };
+inline constexpr LLColor4 LLColor4::cyan6      { 0.2f, 0.6f, 0.6f, 1.0f };
 
 #endif
