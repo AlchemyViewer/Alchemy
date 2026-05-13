@@ -49,39 +49,7 @@ const char* const LLGLTFMaterial::GLTF_FILE_EXTENSION_TRANSFORM_ROTATION = "rota
 // special UUID that indicates a null UUID in override data
 const LLUUID LLGLTFMaterial::GLTF_OVERRIDE_NULL_UUID = LLUUID("ffffffff-ffff-ffff-ffff-ffffffffffff");
 
-LLGLTFMaterial::LLGLTFMaterial()
-{
-    // IMPORTANT: since we use the hash of the member variables memory block of
-    // this class to detect changes, we must ensure that all its padding bytes
-    // have been zeroed out. But of course, we must leave the LLRefCount member
-    // variable untouched (and skip it when hashing), and we cannot either
-    // touch the local texture overrides map (else we destroy pointers, and
-    // sundry private data, which would lead to a crash when using that map).
-    // The variable members have therefore been arranged so that anything,
-    // starting at mLocalTexDataDigest and up to the end of the members, can be
-    // safely zeroed. HB
-    const size_t offset = intptr_t(&mLocalTexDataDigest) - intptr_t(this);
-    memset((void*)((const char*)this + offset), 0, sizeof(*this) - offset);
-
-    // Now that we zeroed out our member variables, we can set the ones that
-    // should not be zero to their default value. HB
-    mBaseColor.set(1.f, 1.f, 1.f, 1.f);
-    mMetallicFactor = mRoughnessFactor = 1.f;
-    mAlphaCutoff = 0.5f;
-    for (U32 i = 0; i < GLTF_TEXTURE_INFO_COUNT; ++i)
-    {
-        mTextureTransform[i].mScale.set(1.f, 1.f);
-#if 0
-        mTextureTransform[i].mOffset.clear();
-        mTextureTransform[i].mRotation = 0.f;
-#endif
-    }
-#if 0
-    mLocalTexDataDigest = 0;
-    mAlphaMode = ALPHA_MODE_OPAQUE;    // This is 0
-    mOverrideDoubleSided = mOverrideAlphaMode = false;
-#endif
-}
+LLGLTFMaterial::LLGLTFMaterial() = default;
 
 void LLGLTFMaterial::TextureTransform::getPacked(Pack& packed) const
 {
@@ -862,20 +830,52 @@ void LLGLTFMaterial::applyOverrideLLSD(const LLSD& data)
     }
 }
 
-LLUUID LLGLTFMaterial::getHash() const
+void LLGLTFMaterial::packHashBytes(U8* buf) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    // *HACK: hash the bytes of this object but do not include the ref count
-    // neither the local texture overrides (which is a map, with pointers to
-    // key/value pairs that would change from one LLGLTFMaterial instance to
-    // the other, even though the key/value pairs could be the same, and stored
-    // elsewhere in the memory heap or on the stack).
-    // Note: this does work properly to compare two LLGLTFMaterial instances
-    // only because the padding bytes between their member variables have been
-    // dutifully zeroed in the constructor. HB
-    const size_t offset = intptr_t(&mLocalTexDataDigest) - intptr_t(this);
-    return HBXXH128::digest((const void*)((const char*)this + offset),
-                            sizeof(*this) - offset);
+
+    // Pack the semantically meaningful members into a contiguous, padding-free
+    // byte sequence in canonical order. Excludes the LLRefCount base, the
+    // mTrackingIdToLocalTexture map (which holds pointer-shaped state that
+    // varies between equivalent instances; its content is summarized in
+    // mLocalTexDataDigest, which IS hashed), and any inter-member padding.
+    U8* p = buf;
+    auto pack = [&p](const void* src, size_t len) noexcept
+    {
+        std::memcpy(p, src, len);
+        p += len;
+    };
+
+    pack(&mLocalTexDataDigest, sizeof(mLocalTexDataDigest));
+    for (U32 i = 0; i < GLTF_TEXTURE_INFO_COUNT; ++i)
+    {
+        pack(mTextureId[i].mData, UUID_BYTES);
+    }
+    for (U32 i = 0; i < GLTF_TEXTURE_INFO_COUNT; ++i)
+    {
+        const TextureTransform& t = mTextureTransform[i];
+        pack(t.mOffset.mV, 2 * sizeof(F32));
+        pack(t.mScale.mV,  2 * sizeof(F32));
+        pack(&t.mRotation, sizeof(F32));
+    }
+    pack(mBaseColor.mV,     4 * sizeof(F32));
+    pack(mEmissiveColor.mV, 3 * sizeof(F32));
+    pack(&mMetallicFactor,  sizeof(F32));
+    pack(&mRoughnessFactor, sizeof(F32));
+    pack(&mAlphaCutoff,     sizeof(F32));
+
+    // Normalize enum / bools to fixed widths so the hash payload doesn't
+    // depend on the compiler's choice of enum underlying type or bool storage.
+    const S32 alpha_mode = (S32)mAlphaMode;
+    pack(&alpha_mode, sizeof(S32));
+    const U8 flags[3] = {
+        (U8)(mDoubleSided         ? 1 : 0),
+        (U8)(mOverrideDoubleSided ? 1 : 0),
+        (U8)(mOverrideAlphaMode   ? 1 : 0),
+    };
+    pack(flags, sizeof(flags));
+
+    llassert(p == buf + HASH_BYTES);
 }
 
 void LLGLTFMaterial::addLocalTextureTracking(const LLUUID& tracking_id, const LLUUID& tex_id)
