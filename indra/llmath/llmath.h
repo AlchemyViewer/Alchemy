@@ -29,7 +29,9 @@
 
 #include "llpreprocessor.h"
 
+#include <bit>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <vector>
 #include <limits>
@@ -108,36 +110,49 @@ constexpr bool is_approx_zero(F32 f) { return (-F_APPROXIMATELY_ZERO < f) && (f 
 // infinity is comparable with F32_MIN
 
 // handles negative and positive zeros
-inline bool is_zero(F32 x)
+constexpr bool is_zero(F32 x) noexcept
 {
-    return (*(U32*)(&x) & 0x7fffffff) == 0;
+    return (std::bit_cast<U32>(x) & 0x7fffffffu) == 0;
 }
 
-inline bool is_approx_equal(F32 x, F32 y)
+constexpr bool is_approx_equal(F32 x, F32 y) noexcept
 {
-    constexpr S32 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
-    return (std::abs((S32) ((U32&)x - (U32&)y) ) < COMPARE_MANTISSA_UP_TO_BIT);
+    constexpr U32 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
+    const U32 xb = std::bit_cast<U32>(x);
+    const U32 yb = std::bit_cast<U32>(y);
+    const U32 diff = (xb > yb) ? (xb - yb) : (yb - xb);
+    return diff < COMPARE_MANTISSA_UP_TO_BIT;
 }
 
-inline bool is_approx_equal(F64 x, F64 y)
+constexpr bool is_approx_equal(F64 x, F64 y) noexcept
 {
-    constexpr S64 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
-    return (std::abs((S32) ((U64&)x - (U64&)y) ) < COMPARE_MANTISSA_UP_TO_BIT);
+    // The previous implementation cast (U64 - U64) down to S32, which silently
+    // truncated the high 32 bits of the bit-pattern difference -- it called
+    // pairs of doubles "equal" when they only matched in the low half of their
+    // bit pattern. Use the full 64-bit diff (and bit_cast to avoid strict
+    // aliasing UB).
+    constexpr U64 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
+    const U64 xb = std::bit_cast<U64>(x);
+    const U64 yb = std::bit_cast<U64>(y);
+    const U64 diff = (xb > yb) ? (xb - yb) : (yb - xb);
+    return diff < COMPARE_MANTISSA_UP_TO_BIT;
 }
 
-inline S32 llabs(const S32 a)
+constexpr S32 llabs(const S32 a) noexcept
 {
-    return S32(std::labs(a));
+    return a < 0 ? -a : a;
 }
 
-inline F32 llabs(const F32 a)
+// Clears the sign bit. Constexpr-compatible (unlike std::fabs in C++20) and
+// behaves the same as std::fabs for +/-0, +/-inf, NaN, and ordinary values.
+constexpr F32 llabs(const F32 a) noexcept
 {
-    return F32(std::fabs(a));
+    return std::bit_cast<F32>(std::bit_cast<U32>(a) & 0x7fffffffu);
 }
 
-inline F64 llabs(const F64 a)
+constexpr F64 llabs(const F64 a) noexcept
 {
-    return F64(std::fabs(a));
+    return std::bit_cast<F64>(std::bit_cast<U64>(a) & 0x7fffffffffffffffull);
 }
 
 constexpr S32 lltrunc(F32 f)
@@ -294,27 +309,32 @@ constexpr S32 LL_SHIFT_AMOUNT           = 16;                    //16.16 fixed p
 
 // Implementation of fast exp() approximation (from a paper by Nicol N. Schraudolph
 // http://www.inf.ethz.ch/~schraudo/pubs/exp.pdf
-static union
-{
-    double d;
-    struct
-    {
-#ifdef LL_LITTLE_ENDIAN
-        S32 j, i;
-#else
-        S32 i, j;
-#endif
-    } n;
-} LLECO; // not sure what the name means
-
+//
+// The trick: pack an integer (derived from the input) into the high 32 bits of
+// a double's bit pattern (i.e. the sign + exponent + top mantissa bits), with
+// the low 32 bits set to zero. The previous implementation did this with a
+// file-scope static union, which had two problems: (1) the union member
+// access for type-punning is UB in C++ even though it works in practice on
+// gcc/clang, and (2) the static union is shared by every caller in the TU,
+// so concurrent calls from multiple threads race on LLECO.n.i. Use std::bit_cast
+// (well-defined since C++20) over a stack-local U64 to fix both.
 #define LL_EXP_A (1048576 * OO_LN2) // use 1512775 for integer
 #define LL_EXP_C (60801)            // this value of C good for -4 < y < 4
 
-#define LL_FAST_EXP(y) (LLECO.n.i = ll_round(F32(LL_EXP_A*(y))) + (1072693248 - LL_EXP_C), LLECO.d)
+inline double ll_fast_exp(double y) noexcept
+{
+    const S32 i = ll_round(F32(LL_EXP_A * y)) + (1072693248 - LL_EXP_C);
+    const U64 bits = static_cast<U64>(static_cast<U32>(i)) << 32;
+    return std::bit_cast<double>(bits);
+}
+
+// Preserved as a macro for the existing call sites; the implementation is
+// thread-safe and free of UB. Callers cast the result to F32 explicitly.
+#define LL_FAST_EXP(y) ll_fast_exp(y)
 
 inline F32 llfastpow(const F32 x, const F32 y)
 {
-    return (F32)(LL_FAST_EXP(y * log(x)));
+    return (F32)(ll_fast_exp(y * log(x)));
 }
 
 
