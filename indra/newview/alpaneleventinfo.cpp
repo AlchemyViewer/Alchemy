@@ -43,7 +43,7 @@
 #include "llfloaterworldmap.h"
 #include "llviewercontrol.h"
 
-static LLPanelInjector<ALPanelEventInfo> t_event_info("panel_al_event_info");
+static LLPanelInjector<ALPanelEventInfo> t_al_event_info("panel_al_event_info");
 
 ALPanelEventInfo::ALPanelEventInfo()
 :   LLPanel()

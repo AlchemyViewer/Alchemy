@@ -6,7 +6,7 @@
  layout="topleft"
  left="0"
  min_height="350"
- name="panel_classified_info"
+ name="panel_al_classified_info"
  help_topic="profile_classified_info"
  top="0"
  width="333">

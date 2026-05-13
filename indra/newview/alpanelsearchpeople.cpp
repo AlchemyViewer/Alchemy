@@ -38,7 +38,7 @@
 #include "llsearcheditor.h"
 #include "llsearchhistory.h"
 
-static LLPanelInjector<ALPanelSearchPeople> t_panel_search_people("panel_al_search_people");
+static LLPanelInjector<ALPanelSearchPeople> t_panel_al_search_people("panel_al_search_people");
 
 ALPanelSearchPeople::ALPanelSearchPeople()
 :   ALPanelSearch()

@@ -42,7 +42,7 @@
 #include "llviewerregion.h"
 #include "llweb.h"
 
-static LLPanelInjector<ALPanelSearchWeb> t_panel_search_web("panel_al_search_web");
+static LLPanelInjector<ALPanelSearchWeb> t_panel_al_search_web("panel_al_search_web");
 
 ALPanelSearchWeb::ALPanelSearchWeb()
 :   LLPanel()

@@ -40,7 +40,7 @@
 #include "llsearcheditor.h"
 #include "llsearchhistory.h"
 
-static LLPanelInjector<ALPanelSearchGroups> t_panel_search_groups("panel_al_search_groups");
+static LLPanelInjector<ALPanelSearchGroups> t_panel_al_search_groups("panel_al_search_groups");
 
 ALPanelSearchGroups::ALPanelSearchGroups()
     : ALPanelSearch()

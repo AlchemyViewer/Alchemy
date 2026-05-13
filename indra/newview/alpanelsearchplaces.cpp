@@ -42,7 +42,7 @@
 #include "llsearcheditor.h"
 #include "llsearchhistory.h"
 
-static LLPanelInjector<ALPanelSearchPlaces> t_panel_search_places("panel_al_search_places");
+static LLPanelInjector<ALPanelSearchPlaces> t_panel_al_search_places("panel_al_search_places");
 
 ALPanelSearchPlaces::ALPanelSearchPlaces()
 :   ALPanelSearch()

@@ -58,7 +58,7 @@
 
 //static
 ALPanelClassifiedInfo::panel_list_t ALPanelClassifiedInfo::sAllPanels;
-static LLPanelInjector<ALPanelClassifiedInfo> t_panel_classified_info("panel_al_classified_info");
+static LLPanelInjector<ALPanelClassifiedInfo> t_panel_al_classified_info("panel_al_classified_info");
 
 // "classifiedclickthrough"
 // strings[0] = classified_id
@@ -92,7 +92,7 @@ static LLDispatchClassifiedClickThrough sClassifiedClickThrough;
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-static LLPanelInjector<ALPanelClassifiedInfo> t_classified_info("panel_classified_info");
+static LLPanelInjector<ALPanelClassifiedInfo> t_al_classified_info("panel_al_classified_info");
 
 ALPanelClassifiedInfo::ALPanelClassifiedInfo()
  : LLPanel()

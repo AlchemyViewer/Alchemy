@@ -41,7 +41,7 @@
 #include "llsearchhistory.h"
 #include "llviewercontrol.h"
 
-static LLPanelInjector<ALPanelSearchLandSales> t_panel_search_land_sales("panel_al_search_landsales");
+static LLPanelInjector<ALPanelSearchLandSales> t_panel_al_search_land_sales("panel_al_search_landsales");
 
 ALPanelSearchLandSales::ALPanelSearchLandSales()
 :   ALPanelSearch()
