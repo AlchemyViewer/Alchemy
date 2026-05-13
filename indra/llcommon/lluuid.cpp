@@ -376,12 +376,14 @@ bool LLUUID::validate(const std::string& in_string)
 
 const LLUUID& LLUUID::operator^=(const LLUUID& rhs)
 {
-    U32* me = (U32*)&(mData[0]);
-    const U32* other = (U32*)&(rhs.mData[0]);
-    for (S32 i = 0; i < 4; ++i)
-    {
-        me[i] = me[i] ^ other[i];
-    }
+    // memcpy through locals avoids strict-aliasing/alignment UB of reading
+    // U8[16] as U32*. Result bit pattern matches the previous behavior.
+    U64 me[2], other[2];
+    memcpy(me,    mData,     UUID_BYTES);
+    memcpy(other, rhs.mData, UUID_BYTES);
+    me[0] ^= other[0];
+    me[1] ^= other[1];
+    memcpy(mData, me, UUID_BYTES);
     return *this;
 }
 
@@ -952,41 +954,24 @@ LLUUID::LLUUID()
 }
 
 
-// Faster than copying from memory
 void LLUUID::setNull()
 {
-    U32* word = (U32*)mData;
-    word[0] = 0;
-    word[1] = 0;
-    word[2] = 0;
-    word[3] = 0;
+    memset(mData, 0, UUID_BYTES);
 }
 
 
-// Compare
+// memcmp lets the compiler emit a single SIMD compare on a fixed 16-byte
+// payload while avoiding the strict-aliasing/alignment UB of reading U8[16]
+// as U32*.
 bool LLUUID::operator==(const LLUUID& rhs) const
 {
-    U32* tmp = (U32*)mData;
-    U32* rhstmp = (U32*)rhs.mData;
-    // Note: binary & to avoid branching
-    return
-        (tmp[0] == rhstmp[0]) &
-        (tmp[1] == rhstmp[1]) &
-        (tmp[2] == rhstmp[2]) &
-        (tmp[3] == rhstmp[3]);
+    return memcmp(mData, rhs.mData, UUID_BYTES) == 0;
 }
 
 
 bool LLUUID::operator!=(const LLUUID& rhs) const
 {
-    U32* tmp = (U32*)mData;
-    U32* rhstmp = (U32*)rhs.mData;
-    // Note: binary | to avoid branching
-    return
-        (tmp[0] != rhstmp[0]) |
-        (tmp[1] != rhstmp[1]) |
-        (tmp[2] != rhstmp[2]) |
-        (tmp[3] != rhstmp[3]);
+    return memcmp(mData, rhs.mData, UUID_BYTES) != 0;
 }
 
 /*
@@ -1001,17 +986,20 @@ bool LLUUID::operator!=(const LLUUID& rhs) const
 
 bool LLUUID::notNull() const
 {
-    U32* word = (U32*)mData;
-    return (word[0] | word[1] | word[2] | word[3]) > 0;
+    U64 a, b;
+    memcpy(&a, mData,     sizeof(a));
+    memcpy(&b, mData + 8, sizeof(b));
+    return (a | b) != 0;
 }
 
 // Faster than == LLUUID::null because doesn't require
 // as much memory access.
 bool LLUUID::isNull() const
 {
-    U32* word = (U32*)mData;
-    // If all bits are zero, return !0 == true
-    return !(word[0] | word[1] | word[2] | word[3]);
+    U64 a, b;
+    memcpy(&a, mData,     sizeof(a));
+    memcpy(&b, mData + 8, sizeof(b));
+    return (a | b) == 0;
 }
 
 LLUUID::LLUUID(const char* in_string)
@@ -1036,52 +1024,37 @@ LLUUID::LLUUID(const std::string& in_string)
     set(in_string);
 }
 
-// IW: DON'T "optimize" these w/ U32s or you'll scoogie the sort order
-// IW: this will make me very sad
+// IW: DON'T "optimize" these by reading mData through a wider integer type --
+// reinterpreting the bytes as U32/U64 reverses the sort order on LE hosts.
+// memcmp is fine: it is defined as byte-wise unsigned comparison and matches
+// the byte-by-byte loop exactly.
 bool LLUUID::operator<(const LLUUID& rhs) const
 {
-    U32 i;
-    for (i = 0; i < (UUID_BYTES - 1); i++)
-    {
-        if (mData[i] != rhs.mData[i])
-        {
-            return (mData[i] < rhs.mData[i]);
-        }
-    }
-    return (mData[UUID_BYTES - 1] < rhs.mData[UUID_BYTES - 1]);
+    return memcmp(mData, rhs.mData, UUID_BYTES) < 0;
 }
 
 bool LLUUID::operator>(const LLUUID& rhs) const
 {
-    U32 i;
-    for (i = 0; i < (UUID_BYTES - 1); i++)
-    {
-        if (mData[i] != rhs.mData[i])
-        {
-            return (mData[i] > rhs.mData[i]);
-        }
-    }
-    return (mData[UUID_BYTES - 1] > rhs.mData[UUID_BYTES - 1]);
+    return memcmp(mData, rhs.mData, UUID_BYTES) > 0;
 }
 
 U16 LLUUID::getCRC16() const
 {
-    // A UUID is 16 bytes, or 8 shorts.
-    U16* short_data = (U16*)mData;
+    // A UUID is 16 bytes, or 8 shorts. Copy into aligned locals to avoid
+    // strict-aliasing/alignment UB; the bit-level sum is unchanged per-platform.
+    U16 shorts[UUID_BYTES / sizeof(U16)];
+    memcpy(shorts, mData, UUID_BYTES);
     U16 out = 0;
-    out += short_data[0];
-    out += short_data[1];
-    out += short_data[2];
-    out += short_data[3];
-    out += short_data[4];
-    out += short_data[5];
-    out += short_data[6];
-    out += short_data[7];
+    for (size_t i = 0; i < UUID_BYTES / sizeof(U16); ++i)
+    {
+        out += shorts[i];
+    }
     return out;
 }
 
 U32 LLUUID::getCRC32() const
 {
-    U32* tmp = (U32*)mData;
-    return tmp[0] + tmp[1] + tmp[2] + tmp[3];
+    U32 words[UUID_BYTES / sizeof(U32)];
+    memcpy(words, mData, UUID_BYTES);
+    return words[0] + words[1] + words[2] + words[3];
 }
