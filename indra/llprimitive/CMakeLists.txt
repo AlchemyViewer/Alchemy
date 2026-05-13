@@ -81,6 +81,7 @@ if (BUILD_TESTING)
       llprimitive.cpp
       llgltfmaterial.cpp
       llmaterialid.cpp
+      llmaterial.cpp
       )
 
     set_property(SOURCE llprimitive.cpp PROPERTY LL_TEST_ADDITIONAL_LIBRARIES llmessage)

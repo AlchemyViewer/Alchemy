@@ -123,6 +123,7 @@ const LLUUID& LLMaterial::getNormalID() const
 void LLMaterial::setNormalID(const LLUUID& normal_id)
 {
     mNormalID = normal_id;
+    mHashDirty = true;
 }
 
 void LLMaterial::getNormalOffset(F32& offset_x, F32& offset_y) const
@@ -145,16 +146,19 @@ void LLMaterial::setNormalOffset(F32 offset_x, F32 offset_y)
 {
     mNormalOffsetX = offset_x;
     mNormalOffsetY = offset_y;
+    mHashDirty = true;
 }
 
 void LLMaterial::setNormalOffsetX(F32 offset_x)
 {
     mNormalOffsetX = offset_x;
+    mHashDirty = true;
 }
 
 void LLMaterial::setNormalOffsetY(F32 offset_y)
 {
     mNormalOffsetY = offset_y;
+    mHashDirty = true;
 }
 
 void LLMaterial::getNormalRepeat(F32& repeat_x, F32& repeat_y) const
@@ -177,16 +181,19 @@ void LLMaterial::setNormalRepeat(F32 repeat_x, F32 repeat_y)
 {
     mNormalRepeatX = repeat_x;
     mNormalRepeatY = repeat_y;
+    mHashDirty = true;
 }
 
 void LLMaterial::setNormalRepeatX(F32 repeat_x)
 {
     mNormalRepeatX = repeat_x;
+    mHashDirty = true;
 }
 
 void LLMaterial::setNormalRepeatY(F32 repeat_y)
 {
     mNormalRepeatY = repeat_y;
+    mHashDirty = true;
 }
 
 F32 LLMaterial::getNormalRotation() const
@@ -197,6 +204,7 @@ F32 LLMaterial::getNormalRotation() const
 void LLMaterial::setNormalRotation(F32 rot)
 {
     mNormalRotation = rot;
+    mHashDirty = true;
 }
 
 const LLUUID& LLMaterial::getSpecularID() const
@@ -207,6 +215,7 @@ const LLUUID& LLMaterial::getSpecularID() const
 void LLMaterial::setSpecularID(const LLUUID& specular_id)
 {
     mSpecularID = specular_id;
+    mHashDirty = true;
 }
 
 void LLMaterial::getSpecularOffset(F32& offset_x, F32& offset_y) const
@@ -229,16 +238,19 @@ void LLMaterial::setSpecularOffset(F32 offset_x, F32 offset_y)
 {
     mSpecularOffsetX = offset_x;
     mSpecularOffsetY = offset_y;
+    mHashDirty = true;
 }
 
 void LLMaterial::setSpecularOffsetX(F32 offset_x)
 {
     mSpecularOffsetX = offset_x;
+    mHashDirty = true;
 }
 
 void LLMaterial::setSpecularOffsetY(F32 offset_y)
 {
     mSpecularOffsetY = offset_y;
+    mHashDirty = true;
 }
 
 void LLMaterial::getSpecularRepeat(F32& repeat_x, F32& repeat_y) const
@@ -260,16 +272,19 @@ F32 LLMaterial::getSpecularRepeatY() const
 void LLMaterial::setSpecularRepeat(F32 repeat_x, F32 repeat_y)
 {
     mSpecularRepeatX = repeat_x; mSpecularRepeatY = repeat_y;
+    mHashDirty = true;
 }
 
 void LLMaterial::setSpecularRepeatX(F32 repeat_x)
 {
     mSpecularRepeatX = repeat_x;
+    mHashDirty = true;
 }
 
 void LLMaterial::setSpecularRepeatY(F32 repeat_y)
 {
     mSpecularRepeatY = repeat_y;
+    mHashDirty = true;
 }
 
 F32 LLMaterial::getSpecularRotation() const
@@ -280,6 +295,7 @@ F32 LLMaterial::getSpecularRotation() const
 void LLMaterial::setSpecularRotation(F32 rot)
 {
     mSpecularRotation = rot;
+    mHashDirty = true;
 }
 
 const LLColor4U LLMaterial::getSpecularLightColor() const
@@ -290,6 +306,7 @@ const LLColor4U LLMaterial::getSpecularLightColor() const
 void LLMaterial::setSpecularLightColor(const LLColor4U& color)
 {
     mSpecularLightColor = color;
+    mHashDirty = true;
 }
 
 U8 LLMaterial::getSpecularLightExponent() const
@@ -300,6 +317,7 @@ U8 LLMaterial::getSpecularLightExponent() const
 void LLMaterial::setSpecularLightExponent(U8 exponent)
 {
     mSpecularLightExponent = exponent;
+    mHashDirty = true;
 }
 
 U8 LLMaterial::getEnvironmentIntensity() const
@@ -310,6 +328,7 @@ U8 LLMaterial::getEnvironmentIntensity() const
 void LLMaterial::setEnvironmentIntensity(U8 intensity)
 {
     mEnvironmentIntensity = intensity;
+    mHashDirty = true;
 }
 
 U8 LLMaterial::getDiffuseAlphaMode() const
@@ -320,6 +339,7 @@ U8 LLMaterial::getDiffuseAlphaMode() const
 void LLMaterial::setDiffuseAlphaMode(U8 alpha_mode)
 {
     mDiffuseAlphaMode = alpha_mode;
+    mHashDirty = true;
 }
 
 U8 LLMaterial::getAlphaMaskCutoff() const
@@ -330,6 +350,7 @@ U8 LLMaterial::getAlphaMaskCutoff() const
 void LLMaterial::setAlphaMaskCutoff(U8 cutoff)
 {
     mAlphaMaskCutoff = cutoff;
+    mHashDirty = true;
 }
 
 LLSD LLMaterial::asLLSD() const
@@ -403,6 +424,8 @@ void LLMaterial::fromLLSD(const LLSD& material_data)
     mEnvironmentIntensity  = (U8)getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_ENV_INTENSITY_FIELD,      LLSD::TypeInteger);
     mDiffuseAlphaMode      = (U8)getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_DIFFUSE_ALPHA_MODE_FIELD, LLSD::TypeInteger);
     mAlphaMaskCutoff       = (U8)getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_ALPHA_MASK_CUTOFF_FIELD,  LLSD::TypeInteger);
+
+    mHashDirty = true;
 }
 
 bool LLMaterial::isNull() const
@@ -465,12 +488,48 @@ U32 LLMaterial::getShaderMask(U32 alpha_mode, bool is_alpha)
     return ret;
 }
 
-LLUUID LLMaterial::getHash() const
+void LLMaterial::recomputeHash() const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    // HACK - hash the bytes of this LLMaterial, but trim off the S32 in LLRefCount
-    LLUUID id;
-    HBXXH128::digest(id, (unsigned char*)this + sizeof(LLRefCount), sizeof(*this) - sizeof(LLRefCount));
-    return id;
+
+    // Pack the semantically meaningful members into a contiguous, padding-free
+    // stack buffer and hash that. This avoids the previous raw-memory-of-this
+    // approach, which read the LLRefCount vtable pointer, the mutable mRef,
+    // and inter-member padding bytes (the latter are indeterminate per the C++
+    // object model, so the resulting hash depended on compiler layout choices
+    // and whatever happened to live in padding at construction time).
+    constexpr size_t HASH_BYTES = 2 * UUID_BYTES   // mNormalID + mSpecularID
+                                + 10 * sizeof(F32) // 5 normal + 5 specular floats
+                                + 4                // mSpecularLightColor (4 U8)
+                                + 4;               // 4 trailing U8 fields
+    U8 buf[HASH_BYTES];
+    U8* p = buf;
+    auto pack = [&p](const void* src, size_t len) noexcept
+    {
+        memcpy(p, src, len);
+        p += len;
+    };
+
+    pack(mNormalID.mData,           UUID_BYTES);
+    pack(&mNormalOffsetX,           sizeof(F32));
+    pack(&mNormalOffsetY,           sizeof(F32));
+    pack(&mNormalRepeatX,           sizeof(F32));
+    pack(&mNormalRepeatY,           sizeof(F32));
+    pack(&mNormalRotation,          sizeof(F32));
+    pack(mSpecularID.mData,         UUID_BYTES);
+    pack(&mSpecularOffsetX,         sizeof(F32));
+    pack(&mSpecularOffsetY,         sizeof(F32));
+    pack(&mSpecularRepeatX,         sizeof(F32));
+    pack(&mSpecularRepeatY,         sizeof(F32));
+    pack(&mSpecularRotation,        sizeof(F32));
+    pack(mSpecularLightColor.mV,    sizeof(mSpecularLightColor.mV));
+    pack(&mSpecularLightExponent,   sizeof(mSpecularLightExponent));
+    pack(&mEnvironmentIntensity,    sizeof(mEnvironmentIntensity));
+    pack(&mDiffuseAlphaMode,        sizeof(mDiffuseAlphaMode));
+    pack(&mAlphaMaskCutoff,         sizeof(mAlphaMaskCutoff));
+    llassert(p == buf + sizeof(buf));
+
+    HBXXH128::digest(mHashCache, buf, sizeof(buf));
+    mHashDirty = false;
 }
 
