@@ -53,6 +53,15 @@ namespace
 #endif
     }
 
+    bool localtime_utc(time_t secs, struct tm& out)
+    {
+#if LL_WINDOWS
+        return localtime_s(&out, &secs) == 0;
+#else
+        return localtime_r(&secs, &out) != nullptr;
+#endif
+    }
+
     time_t timegm_utc(struct tm& in)
     {
 #if LL_WINDOWS
@@ -100,8 +109,9 @@ std::string LLDate::toLocalDateString (std::string fmt) const
     LL_PROFILE_ZONE_SCOPED;
 
     time_t locSeconds = (time_t) mSecondsSinceEpoch;
-    struct tm * lt = localtime (&locSeconds);
-    return toHTTPDateString(lt, fmt);
+    struct tm lt = {};
+    if (!localtime_utc(locSeconds, lt)) return std::string();
+    return toHTTPDateString(&lt, fmt);
 }
 
 std::string LLDate::toHTTPDateString (std::string fmt) const
@@ -109,8 +119,9 @@ std::string LLDate::toHTTPDateString (std::string fmt) const
     LL_PROFILE_ZONE_SCOPED;
 
     time_t locSeconds = (time_t) mSecondsSinceEpoch;
-    struct tm * gmt = gmtime (&locSeconds);
-    return toHTTPDateString(gmt, fmt);
+    struct tm gmt = {};
+    if (!gmtime_utc(locSeconds, gmt)) return std::string();
+    return toHTTPDateString(&gmt, fmt);
 }
 
 std::string LLDate::toHTTPDateString (tm * gmt, std::string fmt)
@@ -300,25 +311,10 @@ bool LLDate::fromYMDHMS(S32 year, S32 month, S32 day, S32 hour, S32 min, S32 sec
     return true;
 }
 
-F64 LLDate::secondsSinceEpoch() const
-{
-    return mSecondsSinceEpoch;
-}
-
-void LLDate::secondsSinceEpoch(F64 seconds)
-{
-    mSecondsSinceEpoch = seconds;
-}
-
 /* static */ LLDate LLDate::now()
 {
     // time() returns seconds, we want fractions of a second, which LLTimer provides --RN
     return LLDate(LLTimer::getTotalSeconds());
-}
-
-bool LLDate::operator<(const LLDate& rhs) const
-{
-    return mSecondsSinceEpoch < rhs.mSecondsSinceEpoch;
 }
 
 std::ostream& operator<<(std::ostream& s, const LLDate& date)

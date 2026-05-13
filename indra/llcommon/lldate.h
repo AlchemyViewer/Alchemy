@@ -101,14 +101,14 @@ public:
      *
      * @return The number of seconds since epoch UTC.
      */
-    F64 secondsSinceEpoch() const;
+    constexpr F64 secondsSinceEpoch() const { return mSecondsSinceEpoch; }
 
     /**
      * @brief Set the date in seconds since epoch.
      *
      * @param seconds The number of seconds since epoch UTC.
      */
-    void secondsSinceEpoch(F64 seconds);
+    constexpr void secondsSinceEpoch(F64 seconds) { mSecondsSinceEpoch = seconds; }
 
     /**
      * @brief Create an LLDate object set to the current time.
@@ -122,7 +122,7 @@ public:
      *
      * @param rhs -- the right hand side of the comparison operator
      */
-    bool operator<(const LLDate& rhs) const;
+    constexpr bool operator<(const LLDate& rhs) const { return mSecondsSinceEpoch < rhs.mSecondsSinceEpoch; }
 
     /**
      * @brief Remaining comparison operators in terms of operator<
@@ -130,22 +130,22 @@ public:
      *
      * @param rhs -- the right hand side of the comparison operator
      */
-    bool operator>(const LLDate& rhs) const { return rhs < *this; }
-    bool operator<=(const LLDate& rhs) const { return !(rhs < *this); }
-    bool operator>=(const LLDate& rhs) const { return !(*this < rhs); }
-    bool operator!=(const LLDate& rhs) const { return (*this < rhs) || (rhs < *this); }
-    bool operator==(const LLDate& rhs) const { return !(*this != rhs); }
+    constexpr bool operator>(const LLDate& rhs) const { return rhs < *this; }
+    constexpr bool operator<=(const LLDate& rhs) const { return !(rhs < *this); }
+    constexpr bool operator>=(const LLDate& rhs) const { return !(*this < rhs); }
+    constexpr bool operator!=(const LLDate& rhs) const { return (*this < rhs) || (rhs < *this); }
+    constexpr bool operator==(const LLDate& rhs) const { return !(*this != rhs); }
 
     /**
      * @brief Compare to epoch UTC.
      */
 
-    bool isNull() const { return mSecondsSinceEpoch == 0.0; }
-    bool notNull() const { return mSecondsSinceEpoch != 0.0; }
+    constexpr bool isNull() const { return mSecondsSinceEpoch == 0.0; }
+    constexpr bool notNull() const { return mSecondsSinceEpoch != 0.0; }
 
 
 private:
-    F64 mSecondsSinceEpoch;
+    F64 mSecondsSinceEpoch = DATE_EPOCH;
 };
 
 // Helper function to stream out a date

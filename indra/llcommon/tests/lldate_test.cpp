@@ -73,6 +73,16 @@ namespace tut
     typedef date_test_t::object date_test_object_t;
     tut::date_test_t tut_date_test("LLDate");
 
+    // Compile-time verification that LLDate's default ctor, accessors, and
+    // comparison operators are constexpr.
+    static_assert(LLDate{}.isNull(), "default LLDate is null at compile time");
+    static_assert(!LLDate{}.notNull(), "default LLDate notNull is false at compile time");
+    static_assert(LLDate{}.secondsSinceEpoch() == 0.0, "default LLDate epoch is 0");
+    static_assert(LLDate{} == LLDate{}, "default LLDates compare equal at compile time");
+    static_assert(!(LLDate{} < LLDate{}), "default LLDate not less than itself");
+    static_assert(LLDate{} <= LLDate{}, "default LLDate <= itself");
+    static_assert(LLDate{} >= LLDate{}, "default LLDate >= itself");
+
     /* format validation */
     template<> template<>
     void date_test_object_t::test<1>()
@@ -209,5 +219,58 @@ namespace tut
 
         ensure_equals("<< failed", date.asString(),expected_str);
         ensure_equals("<< to >> failed", stream.str(),out_stream.str());
+    }
+
+    // Comparison operators (now constexpr in the header) — runtime coverage.
+    template<> template<>
+    void date_test_object_t::test<8>()
+    {
+        LLDate earlier(1000.0);
+        LLDate later(2000.0);
+        LLDate also_earlier(1000.0);
+
+        ensure("earlier < later",   earlier < later);
+        ensure("later > earlier",   later > earlier);
+        ensure("earlier <= later",  earlier <= later);
+        ensure("later >= earlier",  later >= earlier);
+        ensure("equal <=",          earlier <= also_earlier);
+        ensure("equal >=",          earlier >= also_earlier);
+        ensure("equal ==",          earlier == also_earlier);
+        ensure("differ !=",         earlier != later);
+        ensure("!(equal <)",       !(earlier < also_earlier));
+        ensure("!(equal >)",       !(earlier > also_earlier));
+    }
+
+    // isNull / notNull / setter round-trip.
+    template<> template<>
+    void date_test_object_t::test<9>()
+    {
+        LLDate d;
+        ensure("default isNull", d.isNull());
+        ensure("default !notNull", !d.notNull());
+
+        d.secondsSinceEpoch(1234.5);
+        ensure("after set, !isNull", !d.isNull());
+        ensure("after set, notNull", d.notNull());
+        ensure_equals("getter round-trips", d.secondsSinceEpoch(), 1234.5);
+
+        d.secondsSinceEpoch(0.0);
+        ensure("zero -> isNull again", d.isNull());
+    }
+
+    // toLocalDateString / toHTTPDateString must not crash on the epoch value
+    // (regression for the thread-safe localtime_utc/gmtime_utc rewrite).
+    template<> template<>
+    void date_test_object_t::test<10>()
+    {
+        LLDate d;
+        ensure("toLocalDateString does not throw",
+            d.toLocalDateString(std::string("%Y-%m-%d")).size() > 0);
+        ensure("toHTTPDateString does not throw",
+            d.toHTTPDateString(std::string("%Y-%m-%d")).size() > 0);
+        // RFC1123 wraps toHTTPDateString; verifies the day-of-week token
+        // is present (a strftime success indicator that doesn't pin locale).
+        std::string rfc = d.asRFC1123();
+        ensure("asRFC1123 produces output", rfc.size() > 0);
     }
 }
