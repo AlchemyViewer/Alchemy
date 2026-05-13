@@ -216,12 +216,18 @@ namespace tut
         LLQuaternion res_lerp, res_slerp, res_nlerp;
 
         //test case for lerp(F32 t, const LLQuaternion &q) fn.
+        // value1 = 15, quat1 = (1, 2, 4, 1). lerp from identity to quat1:
+        //   pre-normalize r = (15, 30, 60, 1)  (W = 1 + 15*(1 - 1) = 1)
+        //   |r| = sqrt(4726) ~= 68.7459
+        //   r/|r| ~= (0.218195, 0.436390, 0.872779, 0.014546)
+        // Previous "expected" values were derived from a typo that read
+        // q.mQ[VZ] for W instead of q.mQ[VW].
         res_lerp = lerp(value1, quat1);
         ensure("1. LLQuaternion lerp(F32 t, const LLQuaternion &q) failed",
-                                        is_approx_equal_fraction(0.181355f, res_lerp.mQ[0], 16) &&
-                                        is_approx_equal_fraction(0.362711f, res_lerp.mQ[1], 16) &&
-                                        is_approx_equal_fraction(0.725423f, res_lerp.mQ[2], 16) &&
-                                        is_approx_equal_fraction(0.556158f, res_lerp.mQ[3], 16));
+                                        is_approx_equal_fraction(0.218195f, res_lerp.mQ[0], 16) &&
+                                        is_approx_equal_fraction(0.436390f, res_lerp.mQ[1], 16) &&
+                                        is_approx_equal_fraction(0.872779f, res_lerp.mQ[2], 16) &&
+                                        is_approx_equal_fraction(0.014546f, res_lerp.mQ[3], 16));
 
         //test case for lerp(F32 t, const LLQuaternion &p, const LLQuaternion &q) fn.
         res_lerp = lerp(value1, quat1, quat2);
@@ -259,18 +265,28 @@ namespace tut
         LLQuaternion res_nlerp1;
         value1 = 100.0f;
         res_nlerp1 = nlerp(value1, quat3);
+        // nlerp delegates to lerp(t, q) when q.W >= 0; quat3.W = 10.5 > 0 so
+        // this exercises the same fix. value1 = 100, quat3 = (2, 1, 5.5, 10.5):
+        //   pre-normalize r = (200, 100, 550, 951)  (W = 1 + 100*(10.5 - 1) = 951)
+        //   |r| = sqrt(1256901) ~= 1121.116
+        //   r/|r| ~= (0.178394, 0.089197, 0.490583, 0.848262)
         ensure("6. LLQuaternion nlerp(F32 t, const LLQuaternion &q)  failed",
-                                        is_approx_equal_fraction(0.268245f, res_nlerp1.mQ[0], 16) &&                                        is_approx_equal_fraction(0.134122f, res_nlerp1.mQ[1], 2) &&
-                                        is_approx_equal_fraction(0.737673f, res_nlerp1.mQ[2], 16) &&
-                                        is_approx_equal_fraction(0.604892f, res_nlerp1.mQ[3], 16));
+                                        is_approx_equal_fraction(0.178394f, res_nlerp1.mQ[0], 16) &&
+                                        is_approx_equal_fraction(0.089197f, res_nlerp1.mQ[1], 16) &&
+                                        is_approx_equal_fraction(0.490583f, res_nlerp1.mQ[2], 16) &&
+                                        is_approx_equal_fraction(0.848262f, res_nlerp1.mQ[3], 16));
 
         //test case for lerp(F32 t, const LLQuaternion &q) fn.
+        // value1 = 100, quat2 = (4, 3, 6.5, 9.7):
+        //   pre-normalize r = (400, 300, 650, 871)  (W = 1 + 100*(9.7 - 1) = 871)
+        //   |r| = sqrt(1431141) ~= 1196.303
+        //   r/|r| ~= (0.334363, 0.250773, 0.543341, 0.728076)
         res_lerp = lerp(value1, quat2);
         ensure("7. LLQuaternion lerp(F32 t, const LLQuaternion &q) failed",
-                                        is_approx_equal_fraction(0.404867f, res_lerp.mQ[0], 16) &&
-                                        is_approx_equal_fraction(0.303650f, res_lerp.mQ[1], 16) &&
-                                        is_approx_equal_fraction(0.657909f, res_lerp.mQ[2], 16) &&
-                                        is_approx_equal_fraction(0.557704f, res_lerp.mQ[3], 16));
+                                        is_approx_equal_fraction(0.334363f, res_lerp.mQ[0], 16) &&
+                                        is_approx_equal_fraction(0.250773f, res_lerp.mQ[1], 16) &&
+                                        is_approx_equal_fraction(0.543341f, res_lerp.mQ[2], 16) &&
+                                        is_approx_equal_fraction(0.728076f, res_lerp.mQ[3], 16));
 
     }
 

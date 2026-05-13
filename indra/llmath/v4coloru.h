@@ -310,8 +310,14 @@ inline LLColor4U LLColor4U::addClampMax(const LLColor4U& color)
 
 inline LLColor4U LLColor4U::multAll(const F32 k)
 {
-    // Round to nearest
-    return LLColor4U((U8)ll_round(mV[VRED] * k), (U8)ll_round(mV[VGREEN] * k), (U8)ll_round(mV[VBLUE] * k), (U8)ll_round(mV[VALPHA] * k));
+    // Round to nearest, clamping to [0, 255] -- the previous version cast
+    // ll_round's S32 result straight to U8 which wraps modulo 256 for k > 1
+    // (or k < 0), turning e.g. multAll(2.f) on (200, 0, 0, 255) into a
+    // wildly wrong (144, 0, 0, 254).
+    return LLColor4U((U8)llclampb(ll_round(mV[VRED]   * k)),
+                     (U8)llclampb(ll_round(mV[VGREEN] * k)),
+                     (U8)llclampb(ll_round(mV[VBLUE]  * k)),
+                     (U8)llclampb(ll_round(mV[VALPHA] * k)));
 }
 
 inline constexpr bool operator==(const LLColor4U& a, const LLColor4U& b) noexcept

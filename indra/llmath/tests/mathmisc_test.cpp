@@ -485,18 +485,26 @@ namespace tut
         ensure("yz and xy planes should intersect", y_success);
         ensure("zx and yz planes should intersect", z_success);
 
+        // These directions come from normalize() of a cross product of unit
+        // axes -- analytically exact (1, 0, 0) etc., but under -ffast-math the
+        // compiler may substitute an approximate rsqrt for 1/sqrt and the unit
+        // component drifts to ~0.99997. Use a tolerance instead of ==.
+        constexpr F32 AXIS_EPS = 1e-4f;
         LLVector3 direction = x_line.getDirection();
-        ensure("x_line should be parallel to x_axis", fabs(direction.mV[VX]) == 1.f
-                                                      && 0.f == direction.mV[VY]
-                                                      && 0.f == direction.mV[VZ] );
+        ensure("x_line should be parallel to x_axis",
+                                                      fabs(fabs(direction.mV[VX]) - 1.f) < AXIS_EPS
+                                                      && fabs(direction.mV[VY])         < AXIS_EPS
+                                                      && fabs(direction.mV[VZ])         < AXIS_EPS);
         direction = y_line.getDirection();
-        ensure("y_line should be parallel to y_axis", 0.f == direction.mV[VX]
-                                                      && fabs(direction.mV[VY]) == 1.f
-                                                      && 0.f == direction.mV[VZ] );
+        ensure("y_line should be parallel to y_axis",
+                                                      fabs(direction.mV[VX])         < AXIS_EPS
+                                                      && fabs(fabs(direction.mV[VY]) - 1.f) < AXIS_EPS
+                                                      && fabs(direction.mV[VZ])         < AXIS_EPS);
         direction = z_line.getDirection();
-        ensure("z_line should be parallel to z_axis", 0.f == direction.mV[VX]
-                                                      && 0.f == direction.mV[VY]
-                                                      && fabs(direction.mV[VZ]) == 1.f );
+        ensure("z_line should be parallel to z_axis",
+                                                      fabs(direction.mV[VX])         < AXIS_EPS
+                                                      && fabs(direction.mV[VY])         < AXIS_EPS
+                                                      && fabs(fabs(direction.mV[VZ]) - 1.f) < AXIS_EPS);
 
         // next some random tests
         F32 allowable_relative_error = 0.0001f;

@@ -300,8 +300,15 @@ namespace tut
         LLColor4U llcolor4u(r,g,b,a),llcolor4u1;
         const F32 fVal = 3.f;
         llcolor4u1 = llcolor4u.multAll(fVal);
-        ensure("multAll:Fail to multiply ", (((U8)ll_round(r * fVal) == llcolor4u1.mV[VRED]) && (U8)ll_round(g * fVal) == llcolor4u1.mV[VGREEN]
-                                            && ((U8)ll_round(b * fVal) == llcolor4u1.mV[VBLUE])&& ((U8)ll_round(a * fVal) == llcolor4u1.mV[VALPHA])));
+        // Each channel multiplied by fVal then rounded and clamped to [0,255].
+        // Previously the test used (U8)ll_round(...) directly, which wraps
+        // modulo 256 for products > 255 (e.g. 123 * 3 = 369 -> 113), locking
+        // in the wrap bug. multAll now clamps, so green saturates at 255.
+        ensure("multAll:Fail to multiply ",
+               ((U8)llclampb(ll_round(r * fVal)) == llcolor4u1.mV[VRED])
+            && ((U8)llclampb(ll_round(g * fVal)) == llcolor4u1.mV[VGREEN])
+            && ((U8)llclampb(ll_round(b * fVal)) == llcolor4u1.mV[VBLUE])
+            && ((U8)llclampb(ll_round(a * fVal)) == llcolor4u1.mV[VALPHA]));
     }
 
     template<> template<>

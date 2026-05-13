@@ -310,48 +310,52 @@ LLVector4 LLMatrix4::getUpRow4() const
 LLQuaternion    LLMatrix4::quaternion() const
 {
     LLQuaternion    quat;
-    F32     tr, s, q[4];
+    F32     s, q[4];
     U32     i, j, k;
-    U32     nxt[3] = {1, 2, 0};
+    constexpr U32 nxt[3] = {1, 2, 0};
 
-    tr = mMatrix[0][0] + mMatrix[1][1] + mMatrix[2][2];
+    const F32 tr = mMatrix[0][0] + mMatrix[1][1] + mMatrix[2][2];
 
     // check the diagonal
     if (tr > 0.f)
     {
-        s = (F32)sqrt (tr + 1.f);
-        quat.mQ[VS] = s / 2.f;
+        s = sqrtf(tr + 1.f);
+        quat.mQ[VS] = s * 0.5f;
         s = 0.5f / s;
         quat.mQ[VX] = (mMatrix[1][2] - mMatrix[2][1]) * s;
         quat.mQ[VY] = (mMatrix[2][0] - mMatrix[0][2]) * s;
         quat.mQ[VZ] = (mMatrix[0][1] - mMatrix[1][0]) * s;
+        return quat;
     }
-    else
+
+    // diagonal is non-positive: pick the largest diagonal entry
+    i = 0;
+    if (mMatrix[1][1] > mMatrix[0][0])
+        i = 1;
+    if (mMatrix[2][2] > mMatrix[i][i])
+        i = 2;
+
+    j = nxt[i];
+    k = nxt[j];
+
+    // For a proper rotation matrix this argument is always non-negative.
+    // Guard against non-rotation input so we don't sqrt a negative and
+    // propagate NaN; see LLMatrix3::quaternion for the longer rationale.
+    const F32 arg = (mMatrix[i][i] - (mMatrix[j][j] + mMatrix[k][k])) + 1.f;
+    if (!(arg > 0.f))
     {
-        // diagonal is negative
-        i = 0;
-        if (mMatrix[1][1] > mMatrix[0][0])
-            i = 1;
-        if (mMatrix[2][2] > mMatrix[i][i])
-            i = 2;
-
-        j = nxt[i];
-        k = nxt[j];
-
-
-        s = (F32)sqrt ((mMatrix[i][i] - (mMatrix[j][j] + mMatrix[k][k])) + 1.f);
-
-        q[i] = s * 0.5f;
-
-        if (s != 0.f)
-            s = 0.5f / s;
-
-        q[3] = (mMatrix[j][k] - mMatrix[k][j]) * s;
-        q[j] = (mMatrix[i][j] + mMatrix[j][i]) * s;
-        q[k] = (mMatrix[i][k] + mMatrix[k][i]) * s;
-
-        quat.setQuat(q);
+        return LLQuaternion();
     }
+
+    s = sqrtf(arg);
+    q[i] = s * 0.5f;
+    s = 0.5f / s;
+
+    q[3] = (mMatrix[j][k] - mMatrix[k][j]) * s;
+    q[j] = (mMatrix[i][j] + mMatrix[j][i]) * s;
+    q[k] = (mMatrix[i][k] + mMatrix[k][i]) * s;
+
+    quat.setQuat(q);
     return quat;
 }
 
@@ -489,7 +493,7 @@ const LLMatrix4& LLMatrix4::initAll(const LLVector3 &scale, const LLQuaternion &
     mMatrix[3][0]  = pos.mV[0];
     mMatrix[3][1]  = pos.mV[1];
     mMatrix[3][2]  = pos.mV[2];
-    mMatrix[3][3]  = 1.0;
+    mMatrix[3][3]  = 1.f;
 
     // TODO -- should we set the translation portion to zero?
     return (*this);
