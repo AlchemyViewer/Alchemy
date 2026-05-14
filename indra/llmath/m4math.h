@@ -196,7 +196,18 @@ public:
 
     LLMatrix3 getMat3() const;
 
-    const LLVector3& getTranslation() const { return *(LLVector3*)&mMatrix[3][0]; }
+    // Return the translation row (row 3, xyz) as an LLVector3. Previously
+    // this was returned by reference via `*(LLVector3*)&mMatrix[3][0]`,
+    // which type-puns a 3-element interior of an F32[4] array as an
+    // LLVector3 object. The two have the same byte layout but unrelated
+    // types -- the LLVector3 object was never created at that address, so
+    // accessing it through an LLVector3& is strict-aliasing UB and the
+    // pattern LTO is permitted to miscompile. Return by value so callers
+    // get a real LLVector3 from the three floats; no caller relied on the
+    // aliased-reference lifetime (all known uses copy the result or bind
+    // it to a short-lived `const LLVector3&` which the temporary still
+    // satisfies).
+    LLVector3 getTranslation() const { return LLVector3(mMatrix[3][0], mMatrix[3][1], mMatrix[3][2]); }
 
     ///////////////////////////
     //
