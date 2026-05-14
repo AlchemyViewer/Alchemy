@@ -955,17 +955,21 @@ namespace LLInitParam
         }
 
         U32 getEnclosingBlockOffset() const
-    {
-            return ((U32)mEnclosingBlockOffsetHigh << 16) | (U32)mEnclosingBlockOffsetLow;
+        {
+            return mEnclosingBlockOffset;
         }
 
     private:
         friend class BaseBlock;
 
-        // 23 bits for member offset (16 low + 7 high) and 1 bit for provided flag.
-        U16     mEnclosingBlockOffsetLow;
-        U8      mEnclosingBlockOffsetHigh:7;
-        U8      mIsProvided:1;
+        // 31 bits for the member offset (just over 2 GB of range, well past
+        // any realistic BaseBlock subclass size) and 1 bit for the provided
+        // flag. Replaces an earlier U16-low + U8:7-high split that capped
+        // offsets at 8 MB and silently truncated beyond that. Sharing one
+        // U32 backing keeps sizeof(Param) at 4 bytes -- identical to the
+        // pre-fix layout.
+        U32     mEnclosingBlockOffset : 31;
+        U32     mIsProvided : 1;
 
     };
 

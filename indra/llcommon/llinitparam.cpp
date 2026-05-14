@@ -43,13 +43,22 @@ namespace LLInitParam
     // Param
     //
     Param::Param(BaseBlock* enclosing_block)
-    :   mIsProvided(false)
+    :   mEnclosingBlockOffset(0)
+    ,   mIsProvided(false)
     {
-        const U8* my_addr = reinterpret_cast<const U8*>(this);
-        const U8* block_addr = reinterpret_cast<const U8*>(enclosing_block);
-        U32 enclosing_block_offset = 0x7FFFffff & (U32)(my_addr - block_addr);
-        mEnclosingBlockOffsetLow = enclosing_block_offset & 0x0000ffff;
-        mEnclosingBlockOffsetHigh = (enclosing_block_offset & 0x007f0000) >> 16;
+        // Store the byte offset from the enclosing BaseBlock subobject to
+        // this Param subobject. With 31 bits of storage the limit is just
+        // over 2 GB -- well past any realistic block size -- so the only
+        // remaining precondition is that the offset is non-negative: under
+        // multiple inheritance arrangements where BaseBlock is not the
+        // leading base, a Param member could land at a lower address than
+        // the BaseBlock subobject and we'd wrap. None of the in-tree blocks
+        // do that, but assert both invariants so a regression fails loudly.
+        const ptrdiff_t offset =
+            reinterpret_cast<const U8*>(this) - reinterpret_cast<const U8*>(enclosing_block);
+        llassert(offset >= 0);
+        llassert(offset <= 0x7fffffff);
+        mEnclosingBlockOffset = static_cast<U32>(offset);
     }
 
     //
