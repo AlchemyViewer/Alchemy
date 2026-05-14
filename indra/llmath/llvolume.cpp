@@ -2375,10 +2375,17 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                 continue;
             }
 
-            U16* indices = (U16*) &(idx[0]);
+            // idx is std::vector<U8>; the on-wire indices are pairs of bytes
+            // representing little-endian U16 values. Casting U8* -> U16* and
+            // dereferencing is strict-aliasing UB (you may not access a
+            // char-typed object through a non-char pointer). std::memcpy is
+            // defined and compiles down to a load on every supported target.
+            const U8* indices_bytes = idx.data();
             for (U32 j = 0; j < num_indices; ++j)
             {
-                face.mIndices[j] = indices[j];
+                U16 idx_v;
+                std::memcpy(&idx_v, indices_bytes + j * sizeof(U16), sizeof(U16));
+                face.mIndices[j] = idx_v;
             }
 
             //copy out vertices
@@ -2429,15 +2436,18 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             LLVector4a* tc_out = (LLVector4a*) face.mTexCoords;
 
             {
-                U16* v = (U16*) &(pos[0]);
+                // Same aliasing issue as the index loop above: pos is a
+                // std::vector<U8> with three little-endian U16s per vertex.
+                const U8* v_bytes = pos.data();
                 for (U32 j = 0; j < num_verts; ++j)
                 {
+                    U16 v[3];
+                    std::memcpy(v, v_bytes + j * sizeof(v), sizeof(v));
                     pos_out->set((F32) v[0], (F32) v[1], (F32) v[2]);
                     pos_out->div(65535.f);
                     pos_out->mul(pos_range);
                     pos_out->add(min_pos);
                     pos_out++;
-                    v += 3;
                 }
 
             }
@@ -2445,15 +2455,16 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             {
                 if (!norm.empty())
                 {
-                    U16* n = (U16*) &(norm[0]);
+                    const U8* n_bytes = norm.data();
                     for (U32 j = 0; j < num_verts; ++j)
                     {
+                        U16 n[3];
+                        std::memcpy(n, n_bytes + j * sizeof(n), sizeof(n));
                         norm_out->set((F32) n[0], (F32) n[1], (F32) n[2]);
                         norm_out->div(65535.f);
                         norm_out->mul(2.f);
                         norm_out->sub(1.f);
                         norm_out++;
-                        n += 3;
                     }
                 }
                 else
@@ -2471,7 +2482,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                 if (!tangent.empty())
                 {
                     face.allocateTangents(face.mNumVertices);
-                    U16* t = (U16*)&(tangent[0]);
+                    const U8* t_bytes = tangent.data();
 
                     // NOTE: tangents coming from the asset may not be mikkt space, but they should always be used by the GLTF shaders to
                     // maintain compliance with the GLTF spec
@@ -2479,6 +2490,8 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 
                     for (U32 j = 0; j < num_verts; ++j)
                     {
+                        U16 t[4];
+                        std::memcpy(t, t_bytes + j * sizeof(t), sizeof(t));
                         t_out->set((F32)t[0], (F32)t[1], (F32)t[2], (F32) t[3]);
                         t_out->div(65535.f);
                         t_out->mul(2.f);
@@ -2488,7 +2501,6 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                         tp[3] = tp[3] < 0.f ? -1.f : 1.f;
 
                         t_out++;
-                        t += 4;
                     }
                 }
             }
@@ -2497,9 +2509,15 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             {
                 if (!tc.empty())
                 {
-                    U16* t = (U16*) &(tc[0]);
+                    // tc is std::vector<U8>; packs two vertices' UV pairs
+                    // into one LLVector4a, so we read four little-endian
+                    // U16s (8 bytes) per loop iteration.
+                    const U8* t_bytes = tc.data();
+                    U32 t_offset = 0;
                     for (U32 j = 0; j < num_verts; j+=2)
                     {
+                        U16 t[4];
+                        std::memcpy(t, t_bytes + t_offset, sizeof(t));
                         if (j < num_verts-1)
                         {
                             tc_out->set((F32) t[0], (F32) t[1], (F32) t[2], (F32) t[3]);
@@ -2509,7 +2527,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                             tc_out->set((F32) t[0], (F32) t[1], 0.f, 0.f);
                         }
 
-                        t += 4;
+                        t_offset += sizeof(t);
 
                         tc_out->div(65535.f);
                         tc_out->mul(tc_range);
