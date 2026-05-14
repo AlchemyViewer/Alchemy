@@ -208,14 +208,17 @@ void LLTransferManager::processTransferRequest(LLMessageSystem *msgp, void **)
     //LL_INFOS() << "LLTransferManager::processTransferRequest" << LL_ENDL;
 
     LLUUID transfer_id;
-    LLTransferSourceType source_type;
-    LLTransferChannelType channel_type;
     F32 priority;
 
     msgp->getUUIDFast(_PREHASH_TransferInfo, _PREHASH_TransferID, transfer_id);
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_SourceType, (S32 &)source_type);
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, (S32 &)channel_type);
+    // getS32Fast takes an S32&. Casting an enum reference to S32& is a
+    // strict-aliasing violation; round-trip via a real S32 instead.
+    S32 source_type_i = 0, channel_type_i = 0;
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_SourceType, source_type_i);
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, channel_type_i);
     msgp->getF32Fast(_PREHASH_TransferInfo, _PREHASH_Priority, priority);
+    const LLTransferSourceType source_type   = static_cast<LLTransferSourceType>(source_type_i);
+    const LLTransferChannelType channel_type = static_cast<LLTransferChannelType>(channel_type_i);
 
     LLTransferSourceChannel *tscp = gTransferManager.getSourceChannel(msgp->getSender(), channel_type);
 
@@ -277,16 +280,18 @@ void LLTransferManager::processTransferInfo(LLMessageSystem *msgp, void **)
     //LL_INFOS() << "LLTransferManager::processTransferInfo" << LL_ENDL;
 
     LLUUID transfer_id;
-    LLTransferTargetType target_type;
-    LLTransferChannelType channel_type;
-    LLTSCode status;
     S32 size;
 
     msgp->getUUIDFast(_PREHASH_TransferInfo, _PREHASH_TransferID, transfer_id);
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_TargetType, (S32 &)target_type);
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, (S32 &)channel_type);
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_Status, (S32 &)status);
+    // Round-trip enums via S32 -- see processTransferRequest above.
+    S32 target_type_i = 0, channel_type_i = 0, status_i = 0;
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_TargetType, target_type_i);
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, channel_type_i);
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_Status, status_i);
     msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_Size, size);
+    const LLTransferTargetType target_type   = static_cast<LLTransferTargetType>(target_type_i);
+    const LLTransferChannelType channel_type = static_cast<LLTransferChannelType>(channel_type_i);
+    LLTSCode status                          = static_cast<LLTSCode>(status_i);
 
     //LL_INFOS() << transfer_id << ":" << target_type<< ":" << channel_type << LL_ENDL;
     LLTransferTargetChannel *ttcp = gTransferManager.getTargetChannel(msgp->getSender(), channel_type);
@@ -415,14 +420,16 @@ void LLTransferManager::processTransferPacket(LLMessageSystem *msgp, void **)
     //LL_INFOS() << "LLTransferManager::processTransferPacket" << LL_ENDL;
 
     LLUUID transfer_id;
-    LLTransferChannelType channel_type;
     S32 packet_id;
-    LLTSCode status;
     S32 size;
     msgp->getUUIDFast(_PREHASH_TransferData, _PREHASH_TransferID, transfer_id);
-    msgp->getS32Fast(_PREHASH_TransferData, _PREHASH_ChannelType, (S32 &)channel_type);
+    // Round-trip enums via S32 -- see processTransferRequest above.
+    S32 channel_type_i = 0, status_i = 0;
+    msgp->getS32Fast(_PREHASH_TransferData, _PREHASH_ChannelType, channel_type_i);
     msgp->getS32Fast(_PREHASH_TransferData, _PREHASH_Packet, packet_id);
-    msgp->getS32Fast(_PREHASH_TransferData, _PREHASH_Status, (S32 &)status);
+    msgp->getS32Fast(_PREHASH_TransferData, _PREHASH_Status, status_i);
+    const LLTransferChannelType channel_type = static_cast<LLTransferChannelType>(channel_type_i);
+    LLTSCode status                          = static_cast<LLTSCode>(status_i);
 
     // Find the transfer associated with this packet.
     //LL_INFOS() << transfer_id << ":" << channel_type << LL_ENDL;
@@ -569,9 +576,11 @@ void LLTransferManager::processTransferAbort(LLMessageSystem *msgp, void **)
     //LL_INFOS() << "LLTransferManager::processTransferPacket" << LL_ENDL;
 
     LLUUID transfer_id;
-    LLTransferChannelType channel_type;
     msgp->getUUIDFast(_PREHASH_TransferInfo, _PREHASH_TransferID, transfer_id);
-    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, (S32 &)channel_type);
+    // Round-trip enum via S32 -- see processTransferRequest above.
+    S32 channel_type_i = 0;
+    msgp->getS32Fast(_PREHASH_TransferInfo, _PREHASH_ChannelType, channel_type_i);
+    const LLTransferChannelType channel_type = static_cast<LLTransferChannelType>(channel_type_i);
 
     // See if it's a target that we're trying to abort
     // Find the transfer associated with this packet.

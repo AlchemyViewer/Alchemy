@@ -1670,13 +1670,20 @@ const char *LLXMLNode::parseFloat(const char *str, F64 *dest, U32 precision, Enc
         {
         case 32:
             {
-                U32 short_dest = (U32)bytes_dest;
-                F32 ret_val = *(F32 *)&short_dest;
+                // Reinterpret the parsed bits as IEEE-754 float without
+                // tripping strict-aliasing UB.
+                const U32 short_dest = (U32)bytes_dest;
+                F32 ret_val;
+                std::memcpy(&ret_val, &short_dest, sizeof(F32));
                 *dest = ret_val;
             }
             break;
         case 64:
-            *dest = *(F64 *)&bytes_dest;
+            {
+                F64 ret_val;
+                std::memcpy(&ret_val, &bytes_dest, sizeof(F64));
+                *dest = ret_val;
+            }
             break;
         default:
             return NULL;
@@ -2835,12 +2842,16 @@ void LLXMLNode::createUnitTest(S32 max_num_children)
                     S32 sign = get_rand(2) * 2 - 1;
                     random_float_values[value] = F32(fractional_part) / F32(0xffffffff) * exp(F32(exponent)) * F32(sign);
 
-                    U32 *float_bits = &((U32 *)random_float_values)[value];
-                    if (*float_bits == 0x80000000)
+                    // Inspect the IEEE-754 bit pattern without aliasing
+                    // F32 storage through U32* (strict-aliasing UB).
+                    U32 float_bits;
+                    std::memcpy(&float_bits, &random_float_values[value], sizeof(F32));
+                    if (float_bits == 0x80000000)
                     {
-                        *float_bits = 0x00000000;
+                        float_bits = 0x00000000;
+                        std::memcpy(&random_float_values[value], &float_bits, sizeof(F32));
                     }
-                    float_checksum ^= (*float_bits & 0xfffff000);
+                    float_checksum ^= (float_bits & 0xfffff000);
                 }
                 new_child->setFloatValue(array_size, random_float_values, new_encoding, 12);
             }
@@ -2855,12 +2866,14 @@ void LLXMLNode::createUnitTest(S32 max_num_children)
                     S32 sign = get_rand(2) * 2 - 1;
                     random_float_values[value] = F64(fractional_part) / F64(0xffffffff) * exp(F64(exponent)) * F64(sign);
 
-                    U64 *float_bits = &((U64 *)random_float_values)[value];
-                    if (*float_bits == 0x8000000000000000ll)
+                    U64 float_bits;
+                    std::memcpy(&float_bits, &random_float_values[value], sizeof(F64));
+                    if (float_bits == 0x8000000000000000ull)
                     {
-                        *float_bits = 0x0000000000000000ll;
+                        float_bits = 0x0000000000000000ull;
+                        std::memcpy(&random_float_values[value], &float_bits, sizeof(F64));
                     }
-                    float_checksum ^= ((*float_bits & 0xfffffff000000000ll) >> 32);
+                    float_checksum ^= ((float_bits & 0xfffffff000000000ull) >> 32);
                 }
                 new_child->setDoubleValue(array_size, random_float_values, new_encoding, 12);
             }
@@ -3009,7 +3022,8 @@ bool LLXMLNode::performUnitTest(std::string &error_buffer)
                     }
                     for (U32 pos=0; pos<(U32)node->mLength; ++pos)
                     {
-                        U32 float_bits = ((U32 *)float_array)[pos];
+                        U32 float_bits;
+                        std::memcpy(&float_bits, &float_array[pos], sizeof(F32));
                         float_checksum ^= (float_bits & 0xfffff000);
                     }
                 }
@@ -3023,8 +3037,9 @@ bool LLXMLNode::performUnitTest(std::string &error_buffer)
                     }
                     for (U32 pos=0; pos<(U32)node->mLength; ++pos)
                     {
-                        U64 float_bits = ((U64 *)float_array)[pos];
-                        float_checksum ^= ((float_bits & 0xfffffff000000000ll) >> 32);
+                        U64 float_bits;
+                        std::memcpy(&float_bits, &float_array[pos], sizeof(F64));
+                        float_checksum ^= ((float_bits & 0xfffffff000000000ull) >> 32);
                     }
                 }
             }
@@ -3098,8 +3113,9 @@ bool LLXMLNode::performUnitTest(std::string &error_buffer)
         }
         if (node_long_checksum != long_checksum)
         {
-            U32 *pp1 = (U32 *)&node_long_checksum;
-            U32 *pp2 = (U32 *)&long_checksum;
+            U32 pp1[2], pp2[2];
+            std::memcpy(pp1, &node_long_checksum, sizeof(U64));
+            std::memcpy(pp2, &long_checksum, sizeof(U64));
             error_buffer.append(llformat("ERROR Node %s: Long Integer checksum mismatch: read %08X%08X / calc %08X%08X.\n", mName->mString, pp1[1], pp1[0], pp2[1], pp2[0]));
             return false;
         }

@@ -49,41 +49,44 @@
 #endif
 
 #ifdef LL_BIG_ENDIAN
-    // big endian requires a bit of work.
-    inline void llendianswizzle(void *p,int typesize, int count)
+    // big endian requires a bit of work. Read/write each element via
+    // memcpy on the void* byte cursor -- the previous ((U16*)p)/((U32*)p)
+    // casts on an arbitrarily-typed caller buffer were strict-aliasing UB.
+    inline void llendianswizzle(void *p, int typesize, int count)
     {
-        int i;
-        switch(typesize)
+        U8* bytes = static_cast<U8*>(p);
+        switch (typesize)
         {
             case 2:
             {
-                U16 temp;
-                for(i=count ;i!=0 ;i--)
+                for (int i = 0; i < count; ++i)
                 {
-                    temp = ((U16*)p)[0];
-                    ((U16*)p)[0] =  ((temp >> 8)  & 0x000000FF) | ((temp << 8)  & 0x0000FF00);
-                    p = (void*)(((U16*)p) + 1);
+                    U16 temp;
+                    std::memcpy(&temp, bytes, sizeof(U16));
+                    temp = static_cast<U16>(((temp >> 8) & 0x00FF) | ((temp << 8) & 0xFF00));
+                    std::memcpy(bytes, &temp, sizeof(U16));
+                    bytes += sizeof(U16);
                 }
             }
             break;
 
             case 4:
             {
-                U32 temp;
-                for(i=count; i!=0; i--)
+                for (int i = 0; i < count; ++i)
                 {
-                    temp = ((U32*)p)[0];
-                    ((U32*)p)[0] =
-                            ((temp >> 24) & 0x000000FF) |
-                            ((temp >> 8)  & 0x0000FF00) |
-                            ((temp << 8)  & 0x00FF0000) |
-                            ((temp << 24) & 0xFF000000);
-                    p = (void*)(((U32*)p) + 1);
+                    U32 temp;
+                    std::memcpy(&temp, bytes, sizeof(U32));
+                    temp =
+                            ((temp >> 24) & 0x000000FFu) |
+                            ((temp >> 8)  & 0x0000FF00u) |
+                            ((temp << 8)  & 0x00FF0000u) |
+                            ((temp << 24) & 0xFF000000u);
+                    std::memcpy(bytes, &temp, sizeof(U32));
+                    bytes += sizeof(U32);
                 }
             }
             break;
         }
-
     }
 #endif
 

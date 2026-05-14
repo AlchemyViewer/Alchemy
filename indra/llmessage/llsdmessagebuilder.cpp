@@ -39,6 +39,22 @@
 #include "v3math.h"
 #include "v4math.h"
 
+namespace
+{
+    // The message variable storage is a raw `U8[]` buffer (allocated as
+    // `new U8[size]` in LLMsgVarData), so reading it as the variable's
+    // logical type via `*(T*)mvci.getData()` is strict-aliasing UB. memcpy
+    // through a trivially-copyable local stays inside the rules and lowers
+    // to the same load on every supported toolchain.
+    template <typename T>
+    inline T read_msg_var(const void* p)
+    {
+        T v;
+        std::memcpy(&v, p, sizeof(T));
+        return v;
+    }
+}
+
 LLSDMessageBuilder::LLSDMessageBuilder() :
     mCurrentMessage(LLSD::emptyMap()),
     mCurrentBlock(NULL),
@@ -288,61 +304,61 @@ void LLSDMessageBuilder::copyFromMessageData(const LLMsgData& data)
                 }
 
             case MVT_U8:
-                addU8(varname, *(U8*)mvci.getData());
+                addU8(varname, read_msg_var<U8>(mvci.getData()));
                 break;
 
             case MVT_U16:
-                addU16(varname, *(U16*)mvci.getData());
+                addU16(varname, read_msg_var<U16>(mvci.getData()));
                 break;
 
             case MVT_U32:
-                addU32(varname, *(U32*)mvci.getData());
+                addU32(varname, read_msg_var<U32>(mvci.getData()));
                 break;
 
             case MVT_U64:
-                addU64(varname, *(U64*)mvci.getData());
+                addU64(varname, read_msg_var<U64>(mvci.getData()));
                 break;
 
             case MVT_S8:
-                addS8(varname, *(S8*)mvci.getData());
+                addS8(varname, read_msg_var<S8>(mvci.getData()));
                 break;
 
             case MVT_S16:
-                addS16(varname, *(S16*)mvci.getData());
+                addS16(varname, read_msg_var<S16>(mvci.getData()));
                 break;
 
             case MVT_S32:
-                addS32(varname, *(S32*)mvci.getData());
+                addS32(varname, read_msg_var<S32>(mvci.getData()));
                 break;
 
             // S64 not supported in LLSD so we just truncate it
             case MVT_S64:
-                addS32(varname, (S32)*(S64*)mvci.getData());
+                addS32(varname, static_cast<S32>(read_msg_var<S64>(mvci.getData())));
                 break;
 
             case MVT_F32:
-                addF32(varname, *(F32*)mvci.getData());
+                addF32(varname, read_msg_var<F32>(mvci.getData()));
                 break;
 
             case MVT_F64:
-                addF64(varname, *(F64*)mvci.getData());
+                addF64(varname, read_msg_var<F64>(mvci.getData()));
                 break;
 
             case MVT_LLVector3:
-                addVector3(varname, *(LLVector3*)mvci.getData());
+                addVector3(varname, read_msg_var<LLVector3>(mvci.getData()));
                 break;
 
             case MVT_LLVector3d:
-                addVector3d(varname, *(LLVector3d*)mvci.getData());
+                addVector3d(varname, read_msg_var<LLVector3d>(mvci.getData()));
                 break;
 
             case MVT_LLVector4:
-                addVector4(varname, *(LLVector4*)mvci.getData());
+                addVector4(varname, read_msg_var<LLVector4>(mvci.getData()));
                 break;
 
             case MVT_LLQuaternion:
                 {
-                    LLVector3 v = *(LLVector3*)mvci.getData();
+                    LLVector3 v = read_msg_var<LLVector3>(mvci.getData());
                     LLQuaternion q;
                     q.unpackFromVector3(v);
                     addQuat(varname, q);
@@ -350,19 +366,19 @@ void LLSDMessageBuilder::copyFromMessageData(const LLMsgData& data)
                 }
 
             case MVT_LLUUID:
-                addUUID(varname, *(LLUUID*)mvci.getData());
+                addUUID(varname, read_msg_var<LLUUID>(mvci.getData()));
                 break;
 
             case MVT_BOOL:
-                addBOOL(varname, *(bool*)mvci.getData());
+                addBOOL(varname, read_msg_var<bool>(mvci.getData()));
                 break;
 
             case MVT_IP_ADDR:
-                addIPAddr(varname, *(U32*)mvci.getData());
+                addIPAddr(varname, read_msg_var<U32>(mvci.getData()));
                 break;
 
             case MVT_IP_PORT:
-                addIPPort(varname, *(U16*)mvci.getData());
+                addIPPort(varname, read_msg_var<U16>(mvci.getData()));
                 break;
 
             case MVT_U16Vec3:

@@ -66,7 +66,13 @@ LLReliablePacket::LLReliablePacket(
     }
 
     mExpirationTime = (F64Seconds)totalTime() + mTimeout;
-    mPacketID = ntohl(*((U32*)(&buf_ptr[PHL_PACKET_ID])));
+    // Read the 4 packet-id bytes from the U8 buffer via memcpy rather
+    // than aliasing them as U32 (strict-aliasing UB).
+    {
+        U32 packet_id_net;
+        std::memcpy(&packet_id_net, &buf_ptr[PHL_PACKET_ID], sizeof(U32));
+        mPacketID = ntohl(packet_id_net);
+    }
 
     mSocket = socket;
     if (mRetries)

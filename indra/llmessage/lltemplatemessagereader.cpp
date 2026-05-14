@@ -115,27 +115,15 @@ void LLTemplateMessageReader::getData(const char *blockname, const char *varname
     const S32 vardata_size = vardata.getSize();
     if( max_size >= vardata_size )
     {
-        switch( vardata_size )
+        // The size-1/2/4/8 cases used to be unrolled with U16/U32 punning
+        // for speed, but reading the U8 mData buffer through those pointer
+        // types is strict-aliasing UB. Modern GCC lowers a fixed-size
+        // memcpy to a single load/store, so the unrolling is no longer
+        // worth the UB. The size==0 guard stays because the standard
+        // requires memcpy's source pointer to be valid even with n=0.
+        if (vardata_size > 0)
         {
-        case 0:
-            // This is here to prevent a memcpy from a null value which is undefined behavior.
-            break;
-        case 1:
-            *((U8*)datap) = *((U8*)vardata.getData());
-            break;
-        case 2:
-            *((U16*)datap) = *((U16*)vardata.getData());
-            break;
-        case 4:
-            *((U32*)datap) = *((U32*)vardata.getData());
-            break;
-        case 8:
-            ((U32*)datap)[0] = ((U32*)vardata.getData())[0];
-            ((U32*)datap)[1] = ((U32*)vardata.getData())[1];
-            break;
-        default:
             memcpy(datap, vardata.getData(), vardata_size);
-            break;
         }
     }
     else

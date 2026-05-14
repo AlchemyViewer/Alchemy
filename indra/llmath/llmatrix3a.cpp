@@ -28,12 +28,14 @@
 
 #include "llmath.h"
 
-alignas(16) static const F32 M_IDENT_3A[12] =
-                                                {   1.f, 0.f, 0.f, 0.f, // Column 1
-                                                    0.f, 1.f, 0.f, 0.f, // Column 2
-                                                    0.f, 0.f, 1.f, 0.f }; // Column 3
-
-extern const LLMatrix3a LL_M3A_IDENTITY = *reinterpret_cast<const LLMatrix3a*> (M_IDENT_3A);
+// Build the identity LLMatrix3a column-by-column rather than reinterpreting
+// an F32 array: LLMatrix3a stores LLVector4a columns (each wrapping __m128),
+// so casting F32[12] to LLMatrix3a is strict-aliasing UB that GCC flags at
+// -Wstrict-aliasing=2.
+extern const LLMatrix3a LL_M3A_IDENTITY(
+    LLVector4a(1.f, 0.f, 0.f, 0.f),
+    LLVector4a(0.f, 1.f, 0.f, 0.f),
+    LLVector4a(0.f, 0.f, 1.f, 0.f));
 
 void LLMatrix3a::setMul( const LLMatrix3a& lhs, const LLMatrix3a& rhs )
 {

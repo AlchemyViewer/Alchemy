@@ -858,6 +858,7 @@ namespace LLInitParam
 
         const Param* getParamFromHandle(const param_handle_t param_handle) const
         {
+            if (param_handle == 0) return NULL;
             const U8* baseblock_address = reinterpret_cast<const U8*>(this);
             return reinterpret_cast<const Param*>(baseblock_address + param_handle);
         }
@@ -961,7 +962,7 @@ namespace LLInitParam
     private:
         friend class BaseBlock;
 
-        //24 bits for member offset field and 1 bit for provided flag
+        // 23 bits for member offset (16 low + 7 high) and 1 bit for provided flag.
         U16     mEnclosingBlockOffsetLow;
         U8      mEnclosingBlockOffsetHigh:7;
         U8      mIsProvided:1;

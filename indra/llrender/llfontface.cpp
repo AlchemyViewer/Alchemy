@@ -302,7 +302,10 @@ bool LLFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
     llassert(image_raw->getComponents() == 4);
 
     // Inspired by LLImageRaw::setSubImage(); copy + ARGB swizzle.
-    U32* image_data = (U32*)image_raw->getData();
+    // image_raw->getData() is a U8* buffer; storing pixels through a U32*
+    // alias is strict-aliasing UB. Go through the byte cursor + memcpy
+    // (folded to a single 32-bit store by both GCC and Clang).
+    U8* const image_data = image_raw->getData();
     if (!image_data)
         return false;
 
@@ -324,7 +327,8 @@ bool LLFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
         for (U32 idxCol = 0; idxCol < width; idxCol++)
         {
             const ptrdiff_t nTemp = nSrcOffset + (ptrdiff_t)idxCol * 4;
-            image_data[nDstOffset + idxCol] = data[nTemp + 3] << 24 | data[nTemp] << 16 | data[nTemp + 1] << 8 | data[nTemp + 2];
+            const U32 pixel = data[nTemp + 3] << 24 | data[nTemp] << 16 | data[nTemp + 1] << 8 | data[nTemp + 2];
+            std::memcpy(image_data + (nDstOffset + idxCol) * sizeof(U32), &pixel, sizeof(U32));
         }
     }
 

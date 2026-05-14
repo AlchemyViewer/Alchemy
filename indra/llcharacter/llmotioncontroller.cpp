@@ -578,22 +578,38 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
         {
             for (S32 i = 0; i < NUM_JOINT_SIGNATURE_STRIDES; i++)
             {
-                U32 *current_signature = (U32*)&(mJointSignature[0][i * 4]);
-                U32 test_signature = *(U32*)&(motionp->mJointSignature[0][i * 4]);
+                // The joint signatures live in U8[] arrays; treating four-byte
+                // strides as U32 directly is strict-aliasing UB. memcpy in/out
+                // of U32 locals lets GCC fold each direction to a single load
+                // or store while staying inside the rules.
+                const S32 offset = i * 4;
 
-                if ((*current_signature | test_signature) > (*current_signature))
+                // Pass 0: merge motionp's pass-0 signature into our pass-0
+                // signature; if any new bits land, mark for update.
+                U32 cur0;
+                std::memcpy(&cur0, &mJointSignature[0][offset], sizeof(U32));
+                U32 test0;
+                std::memcpy(&test0, &motionp->mJointSignature[0][offset], sizeof(U32));
+                if ((cur0 | test0) > cur0)
                 {
-                    *current_signature |= test_signature;
+                    cur0 |= test0;
+                    std::memcpy(&mJointSignature[0][offset], &cur0, sizeof(U32));
                     update_motion = true;
                 }
 
-                *((U32*)&last_joint_signature[i * 4]) = *(U32*)&(mJointSignature[1][i * 4]);
-                current_signature = (U32*)&(mJointSignature[1][i * 4]);
-                test_signature = *(U32*)&(motionp->mJointSignature[1][i * 4]);
+                // Snapshot pass 1 of our previous signature into
+                // last_joint_signature, then do the same merge as pass 0.
+                U32 last1;
+                std::memcpy(&last1, &mJointSignature[1][offset], sizeof(U32));
+                std::memcpy(&last_joint_signature[offset], &last1, sizeof(U32));
 
-                if ((*current_signature | test_signature) > (*current_signature))
+                U32 cur1 = last1;
+                U32 test1;
+                std::memcpy(&test1, &motionp->mJointSignature[1][offset], sizeof(U32));
+                if ((cur1 | test1) > cur1)
                 {
-                    *current_signature |= test_signature;
+                    cur1 |= test1;
+                    std::memcpy(&mJointSignature[1][offset], &cur1, sizeof(U32));
                     update_motion = true;
                 }
             }

@@ -2098,7 +2098,10 @@ bool LLVolume::generate()
                 0, 0, scale[2], 0,
                     0, 0, 0, 1 };
 
-            LLMatrix4 rot((F32*) mPathp->mPath[s].mRot.mMatrix);
+            // Was: LLMatrix4 rot((F32*) mPathp->mPath[s].mRot.mMatrix) -- reading
+            // LLVector4a[4] through F32* is strict-aliasing UB. toMatrix4()
+            // round-trips via SSE unaligned stores, which is well-defined.
+            LLMatrix4 rot = mPathp->mPath[s].mRot.toMatrix4();
             LLMatrix4 scale_mat(sc);
 
             scale_mat *= rot;

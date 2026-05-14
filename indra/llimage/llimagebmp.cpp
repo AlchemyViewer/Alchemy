@@ -426,7 +426,11 @@ bool LLImageBMP::decodeColorMask16( U8* dst, const U8* src )
     {
         for( S32 col = 0; col < getWidth(); col++ )
         {
-            U32 value = *((U16*)src);
+            // src is a U8 byte cursor; pull the 16-bit pixel out via
+            // memcpy rather than aliasing it as U16.
+            U16 pixel;
+            std::memcpy(&pixel, src, sizeof(U16));
+            U32 value = pixel;
             dst[0] = U8((value & mBitfieldMask[2]) >> r_shift); // Red
             dst[1] = U8((value & mBitfieldMask[1]) >> g_shift); // Green
             dst[2] = U8((value & mBitfieldMask[0]) >> b_shift); // Blue
@@ -469,7 +473,10 @@ bool LLImageBMP::decodeColorMask32( U8* dst, const U8* src )
     {
         for( S32 col = 0; col < getWidth(); col++ )
         {
-            U32 value = *((U32*)src);
+            // src is a U8 byte cursor; pull the 32-bit pixel out via
+            // memcpy rather than aliasing it as U32.
+            U32 value;
+            std::memcpy(&value, src, sizeof(U32));
             dst[0] = U8((value & mBitfieldMask[0]) >> r_shift); // Red
             dst[1] = U8((value & mBitfieldMask[1]) >> g_shift); // Green
             dst[2] = U8((value & mBitfieldMask[2]) >> b_shift); // Blue

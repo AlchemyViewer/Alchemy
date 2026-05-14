@@ -67,8 +67,12 @@ public:
 
     static inline const LLSimdScalar& getZero()
     {
+        // Construct via the LLQuad ctor (value-copies the __m128 into mQ)
+        // rather than reinterpret_cast<const LLSimdScalar&>(LLQuad), which
+        // is strict-aliasing UB.
         extern const LLQuad F_ZERO_4A;
-        return reinterpret_cast<const LLSimdScalar&>(F_ZERO_4A);
+        static const LLSimdScalar zero(F_ZERO_4A);
+        return zero;
     }
 
     inline F32 getF32() const;

@@ -548,7 +548,10 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
         }
         minimum_alphas[i] = min_alpha;
     }
-    shader->uniform4fv(LLShaderMgr::TERRAIN_BASE_COLOR_FACTORS, terrain_material_count, (F32*)base_color_factors);
+    // Go through .mV (a real F32[4] member) instead of casting the LLColor4
+    // array to F32* directly -- the latter trips -Wstrict-aliasing=2 even
+    // though LLColor4 is just a wrapper around F32[4].
+    shader->uniform4fv(LLShaderMgr::TERRAIN_BASE_COLOR_FACTORS, terrain_material_count, base_color_factors[0].mV);
     if (sPBRDetailMode >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
     {
         shader->uniform4f(LLShaderMgr::TERRAIN_METALLIC_FACTORS, metallic_factors[0], metallic_factors[1], metallic_factors[2], metallic_factors[3]);
@@ -556,7 +559,7 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
     }
     if (sPBRDetailMode >= TERRAIN_PBR_DETAIL_EMISSIVE)
     {
-        shader->uniform3fv(LLShaderMgr::TERRAIN_EMISSIVE_COLORS, terrain_material_count, (F32*)emissive_colors);
+        shader->uniform3fv(LLShaderMgr::TERRAIN_EMISSIVE_COLORS, terrain_material_count, emissive_colors[0].mV);
     }
     shader->uniform4f(LLShaderMgr::TERRAIN_MINIMUM_ALPHAS, minimum_alphas[0], minimum_alphas[1], minimum_alphas[2], minimum_alphas[3]);
 

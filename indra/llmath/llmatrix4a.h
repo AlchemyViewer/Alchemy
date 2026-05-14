@@ -72,17 +72,20 @@ public:
         return !(*this == rhs);
     }
 
+    // The four LLVector4a's are contiguous (each is a single __m128) so the
+    // F32 view of mMatrix[0] covers all 16 floats. Going through LLVector4a's
+    // getF32ptr (which casts &mQ -- a may_alias __m128) avoids the
+    // -Wstrict-aliasing=2 warning that (F32*)&mMatrix produced; reading a
+    // LLVector4a array through F32* directly isn't covered by the SSE
+    // intrinsic-ABI exemption.
     inline F32* getF32ptr()
     {
-        return (F32*) &mMatrix;
+        return mMatrix[0].getF32ptr();
     }
 
     inline const F32* getF32ptr() const
     {
-        // Previously cast away const via (F32*), then implicitly re-added it
-        // on return. Cast through the matching const pointer type instead so
-        // a typo in the cast direction would actually be caught.
-        return (const F32*)&mMatrix;
+        return mMatrix[0].getF32ptr();
     }
 
     // Store the LLMatrix4a's data into an LLMatrix4 via SSE unaligned stores.

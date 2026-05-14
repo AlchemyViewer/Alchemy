@@ -2037,9 +2037,10 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
 
             S32 index = mTextureIndex < FACE_DO_NOT_BATCH_TEXTURES ? mTextureIndex : 0;
 
-            F32 val = 0.f;
-            S32* vp = (S32*) &val;
-            *vp = index;
+            // Smuggle an integer index through a float vertex attribute by
+            // bit-casting; the shader bit-casts it back. The previous
+            // `*(S32*)&val = index` was strict-aliasing UB.
+            const F32 val = std::bit_cast<F32>(index);
 
             llassert(index < LLGLSLShader::sIndexedTextureChannels);
 
@@ -2125,12 +2126,9 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
             LL_PROFILE_ZONE_NAMED_CATEGORY_FACE("getGeometryVolume - color");
             mVertexBuffer->getColorStrider(colors, mGeomIndex, mGeomCount);
 
-            LLVector4a src;
-
-            U32 vec[4];
-            vec[0] = vec[1] = vec[2] = vec[3] = color.asRGBA();
-
-            src.loadua((F32*) vec);
+            // Splat the RGBA bits directly through an integer __m128 to
+            // avoid the U32[4]->F32* alias cast that loadua() needed.
+            LLVector4a src(_mm_castsi128_ps(_mm_set1_epi32(color.asRGBA())));
 
             F32* dst = (F32*) colors.get();
             S32 num_vecs = num_vertices/4;
@@ -2159,17 +2157,9 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
                 glow = (U8)llclamp((S32)(tep->getGlow() * 255), 0, 255);
             }
 
-            LLVector4a src;
-
-
-            LLColor4U glow4u = LLColor4U(0,0,0,glow);
-
-            U32 glow32 = glow4u.asRGBA();
-
-            U32 vec[4];
-            vec[0] = vec[1] = vec[2] = vec[3] = glow32;
-
-            src.loadua((F32*) vec);
+            const LLColor4U glow4u(0, 0, 0, glow);
+            // See the color path above for the splat-via-integer-__m128 trick.
+            LLVector4a src(_mm_castsi128_ps(_mm_set1_epi32(glow4u.asRGBA())));
 
             F32* dst = (F32*) emissive.get();
             S32 num_vecs = num_vertices/4;

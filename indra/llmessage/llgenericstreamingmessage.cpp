@@ -54,8 +54,12 @@ void LLGenericStreamingMessage::send(LLMessageSystem* msg)
 
 void LLGenericStreamingMessage::unpack(LLMessageSystem* msg)
 {
-    U16* m = (U16*)&mMethod; // squirrely pass enum as U16 by reference
-    msg->getU16Fast(_PREHASH_MethodData, _PREHASH_Method, *m);
+    // Round-trip the enum value through a real U16 -- aliasing the enum
+    // storage as U16 to satisfy getU16Fast's U16& parameter is
+    // strict-aliasing UB.
+    U16 method = 0;
+    msg->getU16Fast(_PREHASH_MethodData, _PREHASH_Method, method);
+    mMethod = static_cast<decltype(mMethod)>(method);
 
     constexpr int MAX_SIZE = 7 * 1024;
 

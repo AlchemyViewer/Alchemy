@@ -833,7 +833,10 @@ void GLTFSceneManager::bind(Asset& asset, Material& material)
 
 LLMatrix4a inverse(const LLMatrix4a& mat)
 {
-    glm::mat4 m = glm::make_mat4((F32*)mat.mMatrix);
+    // getF32ptr() goes through __m128's may_alias accessor, which is
+    // alias-safe; the previous (F32*)mat.mMatrix cast read an array of
+    // LLVector4a as F32* and tripped -Wstrict-aliasing=2.
+    glm::mat4 m = glm::make_mat4(mat.getF32ptr());
     m = glm::inverse(m);
     LLMatrix4a ret;
     ret.loadu(glm::value_ptr(m));

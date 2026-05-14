@@ -439,14 +439,29 @@ inline void LLVector4a::normalize3fast_checked(LLVector4a* d)
     mQ = _mm_mul_ps( mQ, approxRsqrt );
 }
 
+// Convert an absolute length tolerance to the equivalent absolute lensq
+// tolerance. We have lensq = a.a so |lensq - 1| = |(len-1)(len+1)| =
+// |len - 1| * (len + 1) for len >= 0. The check we want -- |len - 1| <=
+// tolerance -- is equivalent to |lensq - 1| <= tolerance * (len + 1), and
+// the upper-boundary case len = 1 + tolerance gives the largest safe
+// threshold: tolerance * (2 + tolerance) = 2*tolerance + tolerance^2. The
+// previous code multiplied tolerance by itself, which produced tolerance^2
+// and made the effective length tolerance roughly tolerance^2 / 2 -- two
+// orders of magnitude tighter than the documented behaviour at the default
+// tolerance = 1e-3 (effective ~5e-7).
+static LL_FORCE_INLINE LLSimdScalar lensq_tolerance_from_len(LLSimdScalar lenTol)
+{
+    const LLSimdScalar two = _mm_set_ss(2.f);
+    return _mm_mul_ss(lenTol, _mm_add_ss(lenTol, two));
+}
+
 // Return true if this vector is normalized with respect to x,y,z up to tolerance
 inline LLBool32 LLVector4a::isNormalized3( F32 tolerance ) const
 {
-    alignas(16) static const U32 ones[4] = { 0x3f800000, 0x3f800000, 0x3f800000, 0x3f800000 };
-    LLSimdScalar tol = _mm_load_ss( &tolerance );
-    tol = _mm_mul_ss( tol, tol );
+    const LLSimdScalar tol = lensq_tolerance_from_len(_mm_load_ss(&tolerance));
     LLVector4a lenSquared; lenSquared.setAllDot3( *this, *this );
-    lenSquared.sub( *reinterpret_cast<const LLVector4a*>(ones) );
+    LLVector4a ones; ones.splat(1.f);
+    lenSquared.sub( ones );
     lenSquared.setAbs(lenSquared);
     return _mm_comile_ss( lenSquared, tol );
 }
@@ -454,11 +469,10 @@ inline LLBool32 LLVector4a::isNormalized3( F32 tolerance ) const
 // Return true if this vector is normalized with respect to all components up to tolerance
 inline LLBool32 LLVector4a::isNormalized4( F32 tolerance ) const
 {
-    alignas(16) static const U32 ones[4] = { 0x3f800000, 0x3f800000, 0x3f800000, 0x3f800000 };
-    LLSimdScalar tol = _mm_load_ss( &tolerance );
-    tol = _mm_mul_ss( tol, tol );
+    const LLSimdScalar tol = lensq_tolerance_from_len(_mm_load_ss(&tolerance));
     LLVector4a lenSquared; lenSquared.setAllDot4( *this, *this );
-    lenSquared.sub( *reinterpret_cast<const LLVector4a*>(ones) );
+    LLVector4a ones; ones.splat(1.f);
+    lenSquared.sub( ones );
     lenSquared.setAbs(lenSquared);
     return _mm_comile_ss( lenSquared, tol );
 }

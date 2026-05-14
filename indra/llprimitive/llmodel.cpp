@@ -1842,7 +1842,12 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
         const LLSD::Binary& hulls = decomp["HullList"].asBinary();
         const LLSD::Binary& position = decomp["Positions"].asBinary();
 
-        U16* p = (U16*) &position[0];
+        // The on-disk Positions blob is a `std::vector<U8>` packed as
+        // 3-U16 little-endian tuples. The earlier `(U16*) &position[0]`
+        // alias was strict-aliasing UB; cursor through the bytes and
+        // memcpy each point into a U16 triple instead.
+        const U8* p_bytes = position.data();
+        const size_t point_bytes = 3 * sizeof(U16);
 
         mHull.resize(hulls.size());
 
@@ -1874,6 +1879,9 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
 
             for (U32 j = 0; j < count; ++j)
             {
+                U16 p[3];
+                std::memcpy(p, p_bytes, point_bytes);
+
                 U64 test = (U64) p[0] | ((U64) p[1] << 16) | ((U64) p[2] << 32);
                 //point must be unique
                 //llassert(valid.find(test) == valid.end());
@@ -1883,9 +1891,7 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
                     (F32) p[0]/65535.f*range.mV[0]+min.mV[0],
                     (F32) p[1]/65535.f*range.mV[1]+min.mV[1],
                     (F32) p[2]/65535.f*range.mV[2]+min.mV[2]));
-                p += 3;
-
-
+                p_bytes += point_bytes;
             }
 
             //each hull must contain at least 4 unique points
@@ -1897,7 +1903,9 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
     {
         const LLSD::Binary& position = decomp["BoundingVerts"].asBinary();
 
-        U16* p = (U16*) &position[0];
+        // Same packing as the HullList Positions blob above.
+        const U8* p_bytes = position.data();
+        const size_t point_bytes = 3 * sizeof(U16);
 
         LLVector3 min;
         LLVector3 max;
@@ -1920,11 +1928,14 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
 
         for (U32 j = 0; j < count; ++j)
         {
+            U16 p[3];
+            std::memcpy(p, p_bytes, point_bytes);
+
             mBaseHull.push_back(LLVector3(
                 (F32) p[0]/65535.f*range.mV[0]+min.mV[0],
                 (F32) p[1]/65535.f*range.mV[1]+min.mV[1],
                 (F32) p[2]/65535.f*range.mV[2]+min.mV[2]));
-            p += 3;
+            p_bytes += point_bytes;
         }
     }
     else

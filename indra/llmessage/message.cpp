@@ -581,7 +581,13 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
 
             // process the message as normal
             mIncomingCompressedSize = zeroCodeExpand(&buffer, &receive_size);
-            mCurrentRecvPacketID = ntohl(*((U32*)(&buffer[1])));
+            // buffer is U8*; pull the 4 packet-id bytes through memcpy
+            // rather than aliasing them as U32.
+            {
+                U32 packet_id_net;
+                std::memcpy(&packet_id_net, &buffer[1], sizeof(U32));
+                mCurrentRecvPacketID = ntohl(packet_id_net);
+            }
             host = getSender();
 
             const bool resetPacketId = true;

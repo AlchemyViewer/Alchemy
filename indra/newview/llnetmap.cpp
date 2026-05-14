@@ -1145,7 +1145,17 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
     const S32 origin_y = ll_round(origin_local.mV[VY] * mObjectMapTPM + img_height / 2);
 
     LLImageDataLock lock(mParcelRawImagep);
-    U32* texture_data = reinterpret_cast<U32*>(mParcelRawImagep->getData());
+    // The raw image buffer is U8*; storing 32-bit pixels through a U32*
+    // aliased pointer is strict-aliasing UB (and Clang on AArch64 is
+    // happy to vectorize loops like the ones below into NEON stores that
+    // assume that aliasing assumption). Route every per-pixel write
+    // through memcpy on the byte cursor instead -- the optimizer folds
+    // memcpy(&buf, &rgba, 4) into a single 32-bit store.
+    U8* const texture_data = mParcelRawImagep->getData();
+    auto write_pixel = [texture_data](S32 pixel_idx, U32 rgba)
+    {
+        std::memcpy(texture_data + pixel_idx * sizeof(U32), &rgba, sizeof(U32));
+    };
 
     //
     // Draw the north and east region borders
@@ -1157,7 +1167,7 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
         S32 cur_x = llclamp(origin_x, 0, img_width);
         S32 end_x = llclamp(origin_x + ll_round(real_width * mObjectMapTPM), 0, img_width - 1);
         for (; cur_x <= end_x; cur_x++)
-            texture_data[border_y * img_width + cur_x] = overlay_color.asRGBA();
+            write_pixel(border_y * img_width + cur_x, overlay_color.asRGBA());
     }
     const S32 border_x = origin_x + ll_round(real_width * mObjectMapTPM);
     if ( (border_x >= 0) && (border_x < img_width) )
@@ -1165,7 +1175,7 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
         S32 cur_y = llclamp(origin_y, 0, img_height);
         S32 end_y = llclamp(origin_y + ll_round(real_width * mObjectMapTPM), 0, img_height - 1);
         for (; cur_y <= end_y; cur_y++)
-            texture_data[cur_y * img_width + border_x] = overlay_color.asRGBA();
+            write_pixel(cur_y * img_width + border_x, overlay_color.asRGBA());
     }
 
     //
@@ -1213,7 +1223,7 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
                             texcolor = LLColor4U(128, 0, 255, 102).asRGBA();
                         }
 
-                        texture_data[cur_y * img_width + cur_x] = texcolor;
+                        write_pixel(cur_y * img_width + cur_x, texcolor);
                     }
                 }
             }
@@ -1224,7 +1234,7 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
                     S32 cur_x = llclamp(pos_x, 0, img_width);
                     S32 end_x = llclamp(pos_x + ll_round(GRID_STEP * mObjectMapTPM), 0, img_width - 1);
                     for (; cur_x <= end_x; cur_x++)
-                        texture_data[pos_y * img_width + cur_x] = overlay_color.asRGBA();
+                        write_pixel(pos_y * img_width + cur_x, overlay_color.asRGBA());
                 }
             }
             if (overlay & PARCEL_WEST_LINE)
@@ -1234,7 +1244,7 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
                     S32 cur_y = llclamp(pos_y, 0, img_height);
                     S32 end_y = llclamp(pos_y + ll_round(GRID_STEP * mObjectMapTPM), 0, img_height - 1);
                     for (; cur_y <= end_y; cur_y++)
-                        texture_data[cur_y * img_width + pos_x] = overlay_color.asRGBA();
+                        write_pixel(cur_y * img_width + pos_x, overlay_color.asRGBA());
                 }
             }
         }

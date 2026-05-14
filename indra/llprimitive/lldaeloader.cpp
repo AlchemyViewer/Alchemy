@@ -1004,8 +1004,12 @@ bool LLDAELoader::OpenFile(const std::string& filename)
     bool result = false;
     for (U32 i = 0; i < controllerCount; ++i)
     {
-        domController* pController = NULL;
-        db->getElement( (daeElement**) &pController, i , NULL, "controller" );
+        // getElement writes to a daeElement**; downcasting via (daeElement**)
+        // &pController aliases a domController* slot through a daeElement**
+        // (strict-aliasing UB). Use a real daeElement* slot and downcast.
+        daeElement* pElem = nullptr;
+        db->getElement( &pElem, i , NULL, "controller" );
+        domController* pController = daeSafeCast<domController>(pElem);
         result = verifyController( pController );
         if (!result)
         {
@@ -1061,8 +1065,10 @@ bool LLDAELoader::OpenFile(const std::string& filename)
     U32 submodel_limit = count > 0 ? mGeneratedModelLimit/count : 0;
     for (daeInt idx = 0; idx < count; ++idx)
     { //build map of domEntities to LLModel
-        domMesh* mesh = NULL;
-        db->getElement((daeElement**) &mesh, idx, NULL, COLLADA_TYPE_MESH);
+        // See note in the controller loop above -- alias-clean downcast.
+        daeElement* pElem = nullptr;
+        db->getElement(&pElem, idx, NULL, COLLADA_TYPE_MESH);
+        domMesh* mesh = daeSafeCast<domMesh>(pElem);
 
         if (mesh)
         {
@@ -1115,8 +1121,9 @@ bool LLDAELoader::OpenFile(const std::string& filename)
     count = db->getElementCount(NULL, COLLADA_TYPE_SKIN);
     for (daeInt idx = 0; idx < count; ++idx)
     { //add skinned meshes as instances
-        domSkin* skin = NULL;
-        db->getElement((daeElement**) &skin, idx, NULL, COLLADA_TYPE_SKIN);
+        daeElement* pElem = nullptr;
+        db->getElement(&pElem, idx, NULL, COLLADA_TYPE_SKIN);
+        domSkin* skin = daeSafeCast<domSkin>(pElem);
 
         if (skin)
         {
@@ -2304,8 +2311,9 @@ LLImportMaterial LLDAELoader::profileToMaterial(domProfile_COMMON* material, DAE
             }
             else if (texture->getTexture())
             {
-                domImage* image = NULL;
-                dae->getDatabase()->getElement((daeElement**) &image, 0, texture->getTexture(), COLLADA_TYPE_IMAGE);
+                daeElement* pElem = nullptr;
+                dae->getDatabase()->getElement(&pElem, 0, texture->getTexture(), COLLADA_TYPE_IMAGE);
+                domImage* image = daeSafeCast<domImage>(pElem);
                 if (image)
                 {
                     // we only support init_from now - embedded data will come later
