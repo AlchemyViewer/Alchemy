@@ -188,23 +188,32 @@ bool LLImageDXT::updateData()
     }
 
     S32 width, height, miplevelmax;
-    dxtfile_header_t* header = (dxtfile_header_t*)data;
-    if (header->fourcc != 0x20534444)
+
+    S32 first_fourcc = 0;
+    memcpy(&first_fourcc, data,
+           llmin(data_size, static_cast<S32>(sizeof(first_fourcc))));
+
+    if (first_fourcc != 0x20534444)
     {
-        dxtfile_header_old_t* oldheader = (dxtfile_header_old_t*)header;
+        dxtfile_header_old_t oldheader{};
+        memcpy(&oldheader, data,
+               llmin(data_size, static_cast<S32>(sizeof(oldheader))));
         mHeaderSize = sizeof(dxtfile_header_old_t);
-        mFileFormat = EFileFormat(oldheader->format);
-        miplevelmax = llmin(oldheader->maxlevel,MAX_IMAGE_MIP);
-        width = oldheader->maxwidth;
-        height = oldheader->maxheight;
+        mFileFormat = EFileFormat(oldheader.format);
+        miplevelmax = llmin(oldheader.maxlevel, MAX_IMAGE_MIP);
+        width = oldheader.maxwidth;
+        height = oldheader.maxheight;
     }
     else
     {
+        dxtfile_header_t header{};
+        memcpy(&header, data,
+               llmin(data_size, static_cast<S32>(sizeof(header))));
         mHeaderSize = sizeof(dxtfile_header_t);
-        mFileFormat = getFormat(header->pixel_fmt.fourcc);
-        miplevelmax = llmin(header->num_mips-1,MAX_IMAGE_MIP);
-        width = header->maxwidth;
-        height = header->maxheight;
+        mFileFormat = getFormat(header.pixel_fmt.fourcc);
+        miplevelmax = llmin(header.num_mips - 1, MAX_IMAGE_MIP);
+        width = header.maxwidth;
+        height = header.maxheight;
     }
 
     if (data_size < mHeaderSize)
@@ -382,14 +391,15 @@ bool LLImageDXT::encodeDXT(const LLImageRaw* raw_image, F32 time, bool explicit_
     allocateData(totbytes);
 
     U8* data = getData();
-    dxtfile_header_t* header = (dxtfile_header_t*)data;
     llassert(mHeaderSize > 0);
-    memset(header, 0, mHeaderSize);
-    header->fourcc = 0x20534444;
-    header->pixel_fmt.fourcc = getFourCC(format);
-    header->num_mips = nmips;
-    header->maxwidth = width;
-    header->maxheight = height;
+
+    dxtfile_header_t header{};
+    header.fourcc = 0x20534444;
+    header.pixel_fmt.fourcc = getFourCC(format);
+    header.num_mips = nmips;
+    header.maxwidth = width;
+    header.maxheight = height;
+    memcpy(data, &header, sizeof(header));
 
     U8* prev_mipdata = 0;
     w = width, h = height;
@@ -472,8 +482,9 @@ bool LLImageDXT::convertToDXR()
         width >>= 1;
         height >>= 1;
     }
-    dxtfile_header_t* header = (dxtfile_header_t*)newdata;
-    header->pixel_fmt.fourcc = getFourCC(newformat);
+    const S32 new_fourcc = getFourCC(newformat);
+    memcpy(newdata + offsetof(dxtfile_header_t, pixel_fmt.fourcc),
+           &new_fourcc, sizeof(new_fourcc));
     setData(newdata, total_bytes);
     updateData();
     return true;
