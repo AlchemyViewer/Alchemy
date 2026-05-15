@@ -1355,7 +1355,7 @@ void LLVOAvatar::updateDrawable(bool force_damped)
 
 void LLVOAvatar::onShift(const LLVector4a& shift_vector)
 {
-    const LLVector3& shift = reinterpret_cast<const LLVector3&>(shift_vector);
+    const LLVector3 shift(shift_vector);
     mLastAnimExtents[0] += shift;
     mLastAnimExtents[1] += shift;
 }

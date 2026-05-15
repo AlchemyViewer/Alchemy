@@ -1314,7 +1314,7 @@ void drawBox(const LLVector3& c, const LLVector3& r)
 
 void drawBox(const LLVector4a& c, const LLVector4a& r)
 {
-    drawBox(reinterpret_cast<const LLVector3&>(c), reinterpret_cast<const LLVector3&>(r));
+    drawBox(LLVector3(c), LLVector3(r));
 }
 
 void drawBoxOutline(const LLVector3& pos, const LLVector3& size)
@@ -1368,7 +1368,7 @@ void drawBoxOutline(const LLVector3& pos, const LLVector3& size)
 
 void drawBoxOutline(const LLVector4a& pos, const LLVector4a& size)
 {
-    drawBoxOutline(reinterpret_cast<const LLVector3&>(pos), reinterpret_cast<const LLVector3&>(size));
+    drawBoxOutline(LLVector3(pos), LLVector3(size));
 }
 
 

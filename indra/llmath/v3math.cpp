@@ -307,8 +307,12 @@ LLVector3::LLVector3(const LLVector4& vec)
 }
 
 LLVector3::LLVector3(const LLVector4a& vec)
-    : LLVector3(vec.getF32ptr())
 {
+    alignas(16) F32 tmp[4];
+    vec.store4a(tmp);
+    mV[VX] = tmp[VX];
+    mV[VY] = tmp[VY];
+    mV[VZ] = tmp[VZ];
 }
 
 LLVector3::LLVector3(const LLSD& sd)
