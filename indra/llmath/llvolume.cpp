@@ -2436,7 +2436,10 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 
             LLVector4a* pos_out = face.mPositions;
             LLVector4a* norm_out = face.mNormals;
-            LLVector4a* tc_out = (LLVector4a*) face.mTexCoords;
+            // mTexCoords is LLVector2* into a 16-byte-aligned slab; write 4
+            // floats (= 2 UV pairs) per iteration via store4a through F32*,
+            // avoiding a cast to LLVector4a* of unrelated-class storage.
+            F32* tc_out = (F32*) face.mTexCoords;
 
             {
                 // Same aliasing issue as the index loop above: pos is a
@@ -2522,32 +2525,36 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                     for (U32 j = 0; j < num_verts; j+=2)
                     {
                         U16 t[4] = { 0, 0, 0, 0 };
+                        LLVector4a tc4;
                         if (j < num_verts-1)
                         {
                             std::memcpy(t, t_bytes + t_offset, sizeof(t));
-                            tc_out->set((F32) t[0], (F32) t[1], (F32) t[2], (F32) t[3]);
+                            tc4.set((F32) t[0], (F32) t[1], (F32) t[2], (F32) t[3]);
                             t_offset += sizeof(t);
                         }
                         else
                         {
                             std::memcpy(t, t_bytes + t_offset, sizeof(U16) * 2);
-                            tc_out->set((F32) t[0], (F32) t[1], 0.f, 0.f);
+                            tc4.set((F32) t[0], (F32) t[1], 0.f, 0.f);
                             t_offset += sizeof(U16) * 2;
                         }
 
-                        tc_out->div(65535.f);
-                        tc_out->mul(tc_range);
-                        tc_out->add(min_tc4);
+                        tc4.div(65535.f);
+                        tc4.mul(tc_range);
+                        tc4.add(min_tc4);
 
-                        tc_out++;
+                        tc4.store4a(tc_out);
+                        tc_out += 4;
                     }
                 }
                 else
                 {
+                    LLVector4a zero;
+                    zero.clear();
                     for (U32 j = 0; j < num_verts; j += 2)
                     {
-                        tc_out->clear();
-                        tc_out++;
+                        zero.store4a(tc_out);
+                        tc_out += 4;
                     }
                 }
             }
@@ -6922,17 +6929,25 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         mTexCoords[mNumVertices] = mTexCoords[mNumVertices-1];
     }
 
-    LLVector4a* cur_tc = (LLVector4a*) mTexCoords;
-    LLVector4a* end_tc = (LLVector4a*) (mTexCoords+tc_count);
+    // mTexCoords is LLVector2* into a 16-byte-aligned slab; iterate as
+    // floats 4-at-a-time and let load4a build each LLVector4a, avoiding
+    // a cast to LLVector4a* of unrelated-class storage.
+    const F32* cur_tc = (const F32*) mTexCoords;
+    const F32* const end_tc = (const F32*) (mTexCoords + tc_count);
 
     LLVector4a tc_min;
     LLVector4a tc_max;
 
-    tc_min = tc_max = *cur_tc++;
+    tc_min.load4a(cur_tc);
+    cur_tc += 4;
+    tc_max = tc_min;
 
     while (cur_tc < end_tc)
     {
-        update_min_max(tc_min, tc_max, *cur_tc++);
+        LLVector4a tc;
+        tc.load4a(cur_tc);
+        cur_tc += 4;
+        update_min_max(tc_min, tc_max, tc);
     }
 
     F32* minp = tc_min.getF32ptr();

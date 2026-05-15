@@ -1738,7 +1738,11 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
                         {
                             LL_PROFILE_ZONE_NAMED_CATEGORY_FACE("ggv - texgen 2");
                             F32* dst = (F32*) tex_coords0.get();
-                            LLVector4a* src = (LLVector4a*) vf.mTexCoords;
+                            // mTexCoords is LLVector2* into a 16-byte-aligned
+                            // slab; read 2 UVs at a time as floats and let
+                            // load4a build the LLVector4a, avoiding a
+                            // reinterpret_cast through an unrelated class.
+                            const F32* src = (const F32*) vf.mTexCoords;
 
                             LLVector4a trans;
                             trans.splat(-0.5f);
@@ -1764,7 +1768,9 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
 
                             for (S32 i = 0; i < count; i++)
                             {
-                                LLVector4a res = *src++;
+                                LLVector4a res;
+                                res.load4a(src);
+                                src += 4;
                                 xform4a(res, trans, mask, rot0, rot1, offset, scale);
                                 res.store4a(dst);
                                 dst += 4;
