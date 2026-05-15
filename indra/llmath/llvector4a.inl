@@ -74,7 +74,9 @@ const F32* const LLVector4a::getF32ptr() const
 // the data at the whole vector level or you will incur a substantial penalty. Consider using the splat functions instead
 inline F32 LLVector4a::operator[](const S32 idx) const
 {
-    return ((F32*)&mQ)[idx];
+    alignas(16) F32 tmp[4];
+    _mm_store_ps(tmp, mQ);
+    return tmp[idx];
 }
 
 // Prefer this method for read-only access to a single element. Prefer the templated version if the elem is known at compile time.
@@ -428,7 +430,7 @@ inline void LLVector4a::normalize3fast_checked(LLVector4a* d)
 
     LLVector4a lenSqrd; lenSqrd.setAllDot3( *this, *this );
 
-    if (lenSqrd.getF32ptr()[0] <= FLT_EPSILON)
+    if (lenSqrd[0] <= FLT_EPSILON)
     {
         *this = d ? *d : LLVector4a(0,1,0,1);
         return;
