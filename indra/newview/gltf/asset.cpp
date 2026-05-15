@@ -732,6 +732,17 @@ bool Asset::load(std::string_view filename, bool loadIntoVRAM)
     return false;
 }
 
+// Read a little-endian U32 from the byte cursor and advance it. memcpy
+// avoids strict-aliasing UB of *(U32*)ptr against a std::string-backed
+// byte buffer.
+static U32 read_u32(const U8*& ptr)
+{
+    U32 v;
+    memcpy(&v, ptr, sizeof(v));
+    ptr += sizeof(v);
+    return v;
+}
+
 bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
 {
     mLoadIntoVRAM = loadIntoVRAM;
@@ -745,8 +756,7 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    U32 magic = *(U32*)ptr;
-    ptr += 4;
+    U32 magic = read_u32(ptr);
 
     if (magic != 0x46546C67)
     {
@@ -754,8 +764,7 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    U32 version = *(U32*)ptr;
-    ptr += 4;
+    U32 version = read_u32(ptr);
 
     if (version != 2)
     {
@@ -763,8 +772,7 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    U32 length = *(U32*)ptr;
-    ptr += 4;
+    U32 length = read_u32(ptr);
 
     if (length != data.size())
     {
@@ -772,8 +780,7 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    U32 chunkLength = *(U32*)ptr;
-    ptr += 4;
+    U32 chunkLength = read_u32(ptr);
 
     if (end - ptr < chunkLength + 8)
     {
@@ -781,8 +788,7 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    U32 chunkType = *(U32*)ptr;
-    ptr += 4;
+    U32 chunkType = read_u32(ptr);
 
     if (chunkType != 0x4E4F534A)
     {
@@ -804,11 +810,8 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
             return false;
         }
 
-        chunkLength = *(U32*)ptr;
-        ptr += 4;
-
-        chunkType = *(U32*)ptr;
-        ptr += 4;
+        chunkLength = read_u32(ptr);
+        chunkType = read_u32(ptr);
 
         if (chunkType != 0x004E4942)
         {
