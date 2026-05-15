@@ -61,6 +61,17 @@ void LLImageBase::deleteData() { }
 U8* LLImageBase::allocateData(S32 size) { return NULL; }
 U8* LLImageBase::reallocateData(S32 size) { return NULL; }
 
+LLImageFormatted::LLImageFormatted(S8 codec)
+    : LLImageBase(),
+      mCodec(codec),
+      mDecoding(0),
+      mDecoded(0),
+      mDiscardLevel(-1),
+      mLevels(0)
+{
+}
+LLImageFormatted::~LLImageFormatted(){}
+
 LLImageRaw::LLImageRaw(U16 width, U16 height, S8 components) { }
 LLImageRaw::~LLImageRaw() { }
 void LLImageRaw::deleteData() { }
