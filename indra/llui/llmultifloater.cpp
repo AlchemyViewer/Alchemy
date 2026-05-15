@@ -396,7 +396,8 @@ bool LLMultiFloater::addChild(LLView* child, S32 tab_group)
 
 LLFloater* LLMultiFloater::getActiveFloater()
 {
-    return (LLFloater*)mTabContainer->getCurrentPanel();
+    // Tabs may host plain LLPanels; only return one if it's actually a floater.
+    return dynamic_cast<LLFloater*>(mTabContainer->getCurrentPanel());
 }
 
 S32 LLMultiFloater::getFloaterCount() const
