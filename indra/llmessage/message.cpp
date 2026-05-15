@@ -1211,8 +1211,11 @@ S32 LLMessageSystem::sendMessage(const LLHost &host)
     // add the send id to the front of the message
     cdp->nextPacketOutID();
 
-    // Packet ID size is always 4
-    *((S32*)&mSendBuffer[PHL_PACKET_ID]) = htonl(cdp->getPacketOutID());
+    // Packet ID size is always 4. PHL_PACKET_ID is byte offset 1, so the
+    // destination isn't 4-byte aligned — write via memcpy (mirrors the
+    // memcpy-based read of the same field in checkMessages above).
+    const S32 packet_id_net = htonl(cdp->getPacketOutID());
+    std::memcpy(&mSendBuffer[PHL_PACKET_ID], &packet_id_net, sizeof(packet_id_net));
 
     // Compress the message, which will usually reduce its size.
     U8 * buf_ptr = (U8 *)mSendBuffer;
