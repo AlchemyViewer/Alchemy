@@ -1318,6 +1318,7 @@ void LLPipeline::releaseGLBuffers()
     mHeroProbeManager.cleanup(); // release hero probes
 
     releaseScreenBuffers();
+    releaseShadowBuffers();
 
     gBumpImageList.destroyGL();
     LLVOAvatar::resetImpostors();
@@ -1341,44 +1342,43 @@ void LLPipeline::releaseLUTBuffers()
 
 void LLPipeline::releaseShadowBuffers()
 {
-    releaseSunShadowTargets();
+    // Sun shadows are allocated through mRT->shadow[], and mRT is swapped
+    // between packs during cube snapshots, so any of the three packs may
+    // hold allocations. releaseSunShadowTargets() only handles the active
+    // pack (because resize callers want exactly that); for full teardown
+    // we have to walk every pack ourselves.
+    auto release_sun_shadows = [](RenderTargetPack& rt)
+    {
+        for (U32 i = 0; i < 4; i++)
+        {
+            rt.shadow[i].release();
+        }
+    };
+    release_sun_shadows(mMainRT);
+    release_sun_shadows(mAuxillaryRT);
+    release_sun_shadows(mHeroProbeRT);
+
     releaseSpotShadowTargets();
 }
 
 void LLPipeline::releaseScreenBuffers()
 {
-    mMainRT.screen.release();
-    mMainRT.deferredScreen.release();
-    mMainRT.deferredLight.release();
-    mMainRT.postPingMap.release();
-    mMainRT.postPongMap.release();
-    for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
+    auto release_pack = [](RenderTargetPack& rt)
     {
-        mHeroProbeRT.bloomMip[i].release();
-    }
-    mHeroProbeRT.bloomMipCount = 0;
-
-    mAuxillaryRT.screen.release();
-    mAuxillaryRT.deferredScreen.release();
-    mAuxillaryRT.deferredLight.release();
-    mAuxillaryRT.postPingMap.release();
-    mAuxillaryRT.postPongMap.release();
-    for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
-    {
-        mHeroProbeRT.bloomMip[i].release();
-    }
-    mHeroProbeRT.bloomMipCount = 0;
-
-    mHeroProbeRT.screen.release();
-    mHeroProbeRT.deferredScreen.release();
-    mHeroProbeRT.deferredLight.release();
-    mHeroProbeRT.postPingMap.release();
-    mHeroProbeRT.postPongMap.release();
-    for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
-    {
-        mHeroProbeRT.bloomMip[i].release();
-    }
-    mHeroProbeRT.bloomMipCount = 0;
+        rt.screen.release();
+        rt.deferredScreen.release();
+        rt.deferredLight.release();
+        rt.postPingMap.release();
+        rt.postPongMap.release();
+        for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
+        {
+            rt.bloomMip[i].release();
+        }
+        rt.bloomMipCount = 0;
+    };
+    release_pack(mMainRT);
+    release_pack(mAuxillaryRT);
+    release_pack(mHeroProbeRT);
 }
 
 void LLPipeline::releaseSunShadowTarget(U32 index)
