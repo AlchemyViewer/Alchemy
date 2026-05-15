@@ -2751,12 +2751,14 @@ void FSFloaterPoser::refreshTextHighlightingOnAvatarScrollList()
         LLUUID selectedAvatarId = cell->getValue().asUUID();
         LLVOAvatar* listAvatar = getAvatarByUuid(selectedAvatarId);
 
-        ((LLScrollListText*)listItem->getColumn(COL_ICON))->setValue(getIconNameForAvatar(listAvatar));
+        // COL_ICON is an LLScrollListIcon, not LLScrollListText; setValue is
+        // virtual on LLScrollListCell, so call it through the base.
+        if (LLScrollListCell* icon_cell = listItem->getColumn(COL_ICON))
+            icon_cell->setValue(getIconNameForAvatar(listAvatar));
 
-        if (mPoserAnimator.isPosingAvatar(listAvatar))
-            ((LLScrollListText*)listItem->getColumn(COL_NAME))->setFontStyle(LLFontGL::BOLD);
-        else
-            ((LLScrollListText*)listItem->getColumn(COL_NAME))->setFontStyle(LLFontGL::NORMAL);
+        // setFontStyle only exists on LLScrollListText.
+        if (auto* name_cell = dynamic_cast<LLScrollListText*>(listItem->getColumn(COL_NAME)))
+            name_cell->setFontStyle(mPoserAnimator.isPosingAvatar(listAvatar) ? LLFontGL::BOLD : LLFontGL::NORMAL);
     }
 }
 
@@ -2793,12 +2795,11 @@ void FSFloaterPoser::addBoldToScrollList(LLScrollListCtrl* list, LLVOAvatar* ava
         if (!poserJoint)
             continue;
 
-        ((LLScrollListText*)listItem->getColumn(COL_ICON))->setValue(getScrollListIconForJoint(avatar, *poserJoint));
+        if (LLScrollListCell* icon_cell = listItem->getColumn(COL_ICON))
+            icon_cell->setValue(getScrollListIconForJoint(avatar, *poserJoint));
 
-        if (mPoserAnimator.isPosingAvatarJoint(avatar, *poserJoint))
-            ((LLScrollListText*)listItem->getColumn(COL_NAME))->setFontStyle(LLFontGL::BOLD);
-        else
-            ((LLScrollListText*)listItem->getColumn(COL_NAME))->setFontStyle(LLFontGL::NORMAL);
+        if (auto* name_cell = dynamic_cast<LLScrollListText*>(listItem->getColumn(COL_NAME)))
+            name_cell->setFontStyle(mPoserAnimator.isPosingAvatarJoint(avatar, *poserJoint) ? LLFontGL::BOLD : LLFontGL::NORMAL);
     }
 }
 
