@@ -1695,8 +1695,14 @@ void LLViewerWindow::handleMouseDragged(LLWindow *window,  LLCoordGL pos, MASK m
 
 void LLViewerWindow::handleMouseLeave(LLWindow *window)
 {
-    // Note: we won't get this if we have captured the mouse.
-    llassert( gFocusMgr.getMouseCapture() == NULL );
+    // SDL3 delivers SDL_EVENT_WINDOW_MOUSE_LEAVE whenever the cursor crosses
+    // the window edge, including while we have capture (e.g. mid-drag). In
+    // that case the mouse is still logically ours, so don't drop the
+    // in-window state or block tooltips.
+    if (gFocusMgr.getMouseCapture() != NULL)
+    {
+        return;
+    }
     mMouseInWindow = false;
     LLToolTipMgr::instance().blockToolTips();
 }
@@ -6540,8 +6546,14 @@ void LLViewerWindow::setUIVisibility(bool visible)
     }
 
     const U32 location_bar = gSavedSettings.getU32("NavigationBarStyle");
-    LLNavigationBar::getInstance()->setVisible(visible ? (location_bar == 2) : false);
-    LLPanelTopInfoBar::getInstance()->setVisible(visible ? (location_bar == 1) : false);
+    if (LLNavigationBar::instanceExists())
+    {
+        LLNavigationBar::getInstance()->setVisible(visible ? (location_bar == 2) : false);
+    }
+    if (LLPanelTopInfoBar::instanceExists())
+    {
+        LLPanelTopInfoBar::getInstance()->setVisible(visible ? (location_bar == 1) : false);
+    }
     mStatusBarContainer->setVisible(visible);
 }
 
