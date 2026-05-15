@@ -1272,9 +1272,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     // This needs to match the largest size below. See switch(length)
     U8  data[MAX_OBJECT_BINARY_DATA_SIZE];
 
-#ifdef LL_BIG_ENDIAN
     U16 valswizzle[4];
-#endif
     U16 *val;
     const F32 size = LLWorld::getInstance()->getRegionWidthInMeters();
     const F32 MAX_HEIGHT = LLWorld::getInstance()->getRegionMaxHeight();
@@ -1614,57 +1612,37 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     this_update_precision = 16;
                     test_pos_parent.quantize16(-0.5f*size, 1.5f*size, MIN_HEIGHT, MAX_HEIGHT);
 
-#ifdef LL_BIG_ENDIAN
                     htolememcpy(valswizzle, &data[count], MVT_U16Vec3, 6);
                     val = valswizzle;
-#else
-                    val = (U16 *) &data[count];
-#endif
                     count += sizeof(U16)*3;
                     new_pos_parent.mV[VX] = U16_to_F32(val[VX], -0.5f*size, 1.5f*size);
                     new_pos_parent.mV[VY] = U16_to_F32(val[VY], -0.5f*size, 1.5f*size);
                     new_pos_parent.mV[VZ] = U16_to_F32(val[VZ], MIN_HEIGHT, MAX_HEIGHT);
 
-#ifdef LL_BIG_ENDIAN
                     htolememcpy(valswizzle, &data[count], MVT_U16Vec3, 6);
                     val = valswizzle;
-#else
-                    val = (U16 *) &data[count];
-#endif
                     count += sizeof(U16)*3;
                     setVelocity(U16_to_F32(val[VX], -size, size),
                                 U16_to_F32(val[VY], -size, size),
                                 U16_to_F32(val[VZ], -size, size));
 
-#ifdef LL_BIG_ENDIAN
                     htolememcpy(valswizzle, &data[count], MVT_U16Vec3, 6);
                     val = valswizzle;
-#else
-                    val = (U16 *) &data[count];
-#endif
                     count += sizeof(U16)*3;
                     setAcceleration(U16_to_F32(val[VX], -size, size),
                                     U16_to_F32(val[VY], -size, size),
                                     U16_to_F32(val[VZ], -size, size));
 
-#ifdef LL_BIG_ENDIAN
                     htolememcpy(valswizzle, &data[count], MVT_U16Quat, 8);
                     val = valswizzle;
-#else
-                    val = (U16 *) &data[count];
-#endif
                     count += sizeof(U16)*4;
                     new_rot.mQ[VX] = U16_to_F32(val[VX], -1.f, 1.f);
                     new_rot.mQ[VY] = U16_to_F32(val[VY], -1.f, 1.f);
                     new_rot.mQ[VZ] = U16_to_F32(val[VZ], -1.f, 1.f);
                     new_rot.mQ[VW] = U16_to_F32(val[VW], -1.f, 1.f);
 
-#ifdef LL_BIG_ENDIAN
                     htolememcpy(valswizzle, &data[count], MVT_U16Vec3, 6);
                     val = valswizzle;
-#else
-                    val = (U16 *) &data[count];
-#endif
                     new_angv.set(U16_to_F32(val[VX], -size, size),
                                         U16_to_F32(val[VY], -size, size),
                                         U16_to_F32(val[VZ], -size, size));
