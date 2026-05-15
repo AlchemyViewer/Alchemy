@@ -1807,9 +1807,13 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
         if(!is_font_loaded)
         {
             LL_INFOS_ONCE("LLFontRegistry") << "Couldn't load font " << font_file_it->FileName <<  LL_ENDL;
-            delete fontp;
-            fontp = NULL;
         }
+        // fontp is non-NULL here when every face of this file hit
+        // mFallbackInstanceCache (the inner loop's `continue` skips the
+        // delete branches), or when all search paths failed. Either way
+        // ownership wasn't transferred to result/cache, so free it.
+        delete fontp;
+        fontp = NULL;
     }
 
     if (result)
