@@ -54,8 +54,9 @@ inline LLVector4a& LLQuaternion2::getVector4aRw()
 // Set this quaternion to the conjugate of src
 inline void LLQuaternion2::setConjugate(const LLQuaternion2& src)
 {
-    alignas(16) static const U32 F_QUAT_INV_MASK_4A[4] = { 0x80000000, 0x80000000, 0x80000000, 0x00000000 };
-    mQ = _mm_xor_ps(src.mQ, *reinterpret_cast<const LLQuad*>(&F_QUAT_INV_MASK_4A));
+    // XOR the sign bit (bit pattern 0x80000000 == -0.f) into x/y/z; leave w.
+    const __m128 signMask = _mm_set_ps(0.f, -0.f, -0.f, -0.f);
+    mQ = _mm_xor_ps(src.mQ, signMask);
 }
 
 // Renormalizes the quaternion. Assumes it has nonzero length.

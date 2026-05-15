@@ -196,8 +196,7 @@ inline void LLVector4a::setDiv(const LLVector4a& a, const LLVector4a& b)
 // Set this to the element-wise absolute value of src
 inline void LLVector4a::setAbs(const LLVector4a& src)
 {
-    alignas(16) static const U32 F_ABS_MASK_4A[4] = { 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF };
-    mQ = _mm_and_ps(src.mQ, *reinterpret_cast<const LLQuad*>(F_ABS_MASK_4A));
+    mQ = _mm_andnot_ps(_mm_set1_ps(-0.f), src.mQ);
 }
 
 // Add to each component in this vector the corresponding component in rhs
@@ -518,21 +517,18 @@ inline void LLVector4a::setLerp(const LLVector4a& lhs, const LLVector4a& rhs, F3
 
 inline LLBool32 LLVector4a::isFinite3() const
 {
-    alignas(16) static const U32 nanOrInfMask[4] = { 0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000 };
-    ll_assert_aligned(nanOrInfMask,16);
-    const __m128i nanOrInfMaskV = *reinterpret_cast<const __m128i*> (nanOrInfMask);
-    const __m128i maskResult = _mm_and_si128( _mm_castps_si128(mQ), nanOrInfMaskV );
-    const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32( maskResult, nanOrInfMaskV ));
-    return !equalityCheck.areAnySet( LLVector4Logical::MASK_XYZ );
+    const __m128i nanOrInfMaskV = _mm_set1_epi32(0x7f800000);
+    const __m128i maskResult = _mm_and_si128(_mm_castps_si128(mQ), nanOrInfMaskV);
+    const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32(maskResult, nanOrInfMaskV));
+    return !equalityCheck.areAnySet(LLVector4Logical::MASK_XYZ);
 }
 
 inline LLBool32 LLVector4a::isFinite4() const
 {
-    alignas(16) static const U32 nanOrInfMask[4] = { 0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000 };
-    const __m128i nanOrInfMaskV = *reinterpret_cast<const __m128i*> (nanOrInfMask);
-    const __m128i maskResult = _mm_and_si128( _mm_castps_si128(mQ), nanOrInfMaskV );
-    const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32( maskResult, nanOrInfMaskV ));
-    return !equalityCheck.areAnySet( LLVector4Logical::MASK_XYZW );
+    const __m128i nanOrInfMaskV = _mm_set1_epi32(0x7f800000);
+    const __m128i maskResult = _mm_and_si128(_mm_castps_si128(mQ), nanOrInfMaskV);
+    const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32(maskResult, nanOrInfMaskV));
+    return !equalityCheck.areAnySet(LLVector4Logical::MASK_XYZW);
 }
 
 inline void LLVector4a::setRotatedInv( const LLRotation& rot, const LLVector4a& vec )

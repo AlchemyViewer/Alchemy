@@ -39,14 +39,6 @@
 // contact someone with SSE experience (Falcon, Richard, Davep, e.g.)
 ////////////////////////////
 
-alignas(16) static const U32 S_V4LOGICAL_MASK_TABLE[4*4] =
-{
-    0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000,
-    0x00000000, 0xFFFFFFFF, 0x00000000, 0x00000000,
-    0x00000000, 0x00000000, 0xFFFFFFFF, 0x00000000,
-    0x00000000, 0x00000000, 0x00000000, 0xFFFFFFFF
-};
-
 class LLVector4Logical
 {
 public:
@@ -77,9 +69,8 @@ public:
     // Invert this mask
     inline LLVector4Logical& invert()
     {
-        alignas(16) static const U32 allOnes[4] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
-        ll_assert_aligned(allOnes,16);
-        mQ = _mm_andnot_ps( mQ, *(LLQuad*)(allOnes) );
+        const __m128 allOnes = _mm_castsi128_ps(_mm_set1_epi32(-1));
+        mQ = _mm_andnot_ps(mQ, allOnes);
         return *this;
     }
 
@@ -115,7 +106,13 @@ public:
 
     template<int N> void setElement()
     {
-        mQ = _mm_or_ps( mQ, *reinterpret_cast<const LLQuad*>(S_V4LOGICAL_MASK_TABLE + 4*N) );
+        static_assert(N >= 0 && N < 4, "setElement<N>: lane out of range");
+        const __m128 mask = _mm_castsi128_ps(_mm_set_epi32(
+            (N == 3) ? -1 : 0,
+            (N == 2) ? -1 : 0,
+            (N == 1) ? -1 : 0,
+            (N == 0) ? -1 : 0));
+        mQ = _mm_or_ps(mQ, mask);
     }
 
 private:
