@@ -31,6 +31,7 @@
 #include "llpointer.h"
 #include "llstreamtools.h" // for fullread
 
+#include <bit>
 #include <iostream>
 #include <simdutf.h>
 
@@ -271,24 +272,13 @@ U64 ll_ntohll(U64 netlonglong)
     return ((U64)(ntohl((U32)((netlonglong >> 32) & 0xFFFFFFFF))) |
             ((U64)(ntohl((U32)(netlonglong & 0xFFFFFFFF))) << 32));
 }
-union LLEndianSwapper
-{
-    F64 d;
-    U64 i;
-};
 F64 ll_htond(F64 hostdouble)
 {
-    LLEndianSwapper tmp;
-    tmp.d = hostdouble;
-    tmp.i = ll_htonll(tmp.i);
-    return tmp.d;
+    return std::bit_cast<F64>(ll_htonll(std::bit_cast<U64>(hostdouble)));
 }
 F64 ll_ntohd(F64 netdouble)
 {
-    LLEndianSwapper tmp;
-    tmp.d = netdouble;
-    tmp.i = ll_ntohll(tmp.i);
-    return tmp.d;
+    return std::bit_cast<F64>(ll_ntohll(std::bit_cast<U64>(netdouble)));
 }
 #endif
 
