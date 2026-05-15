@@ -2514,23 +2514,26 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                 {
                     // tc is std::vector<U8>; packs two vertices' UV pairs
                     // into one LLVector4a, so we read four little-endian
-                    // U16s (8 bytes) per loop iteration.
+                    // U16s (8 bytes) per loop iteration. On odd num_verts the
+                    // final iteration only has one vertex left (4 bytes),
+                    // and copying 8 bytes would walk past the buffer end.
                     const U8* t_bytes = tc.data();
                     U32 t_offset = 0;
                     for (U32 j = 0; j < num_verts; j+=2)
                     {
-                        U16 t[4];
-                        std::memcpy(t, t_bytes + t_offset, sizeof(t));
+                        U16 t[4] = { 0, 0, 0, 0 };
                         if (j < num_verts-1)
                         {
+                            std::memcpy(t, t_bytes + t_offset, sizeof(t));
                             tc_out->set((F32) t[0], (F32) t[1], (F32) t[2], (F32) t[3]);
+                            t_offset += sizeof(t);
                         }
                         else
                         {
+                            std::memcpy(t, t_bytes + t_offset, sizeof(U16) * 2);
                             tc_out->set((F32) t[0], (F32) t[1], 0.f, 0.f);
+                            t_offset += sizeof(U16) * 2;
                         }
-
-                        t_offset += sizeof(t);
 
                         tc_out->div(65535.f);
                         tc_out->mul(tc_range);
