@@ -230,8 +230,12 @@ public:
     }
 
 protected:
-    LL_UBSAN_SUPRESS_VPTR
-    LLInstanceTracker(const KEY& key)
+    // CRTP self-registration during base construction: static_cast<T*>(this)
+    // yields the correct address per ABI, but the derived T isn't constructed
+    // yet, so the cast is technically UB and UBSan's vptr check trips. The
+    // stored pointer is only ever dereferenced through snapshot iteration,
+    // which happens after derived construction completes.
+    LL_UBSAN_SUPRESS_VPTR LLInstanceTracker(const KEY& key)
     {
         // We do not intend to manage the lifespan of this object with
         // shared_ptr, so give it a no-op deleter. We store shared_ptrs in our
@@ -457,8 +461,9 @@ public:
     using key_snapshot_of = instance_snapshot_of<SUBCLASS>;
 
 protected:
-    LL_UBSAN_SUPRESS_VPTR
-    LLInstanceTracker()
+    // See keyed-tracker constructor above for the rationale on suppressing
+    // UBSan's vptr check during this CRTP self-registration.
+    LL_UBSAN_SUPRESS_VPTR LLInstanceTracker()
     {
         // Since we do not intend for this shared_ptr to manage lifespan, give
         // it a no-op deleter.
