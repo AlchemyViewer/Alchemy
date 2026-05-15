@@ -44,7 +44,15 @@ public:
     {
     }
 
-    ~LLWatchdogTimerThread() {}
+    ~LLWatchdogTimerThread() override
+    {
+        // Signal and join the worker before the derived part of this object
+        // ends its lifetime. Otherwise the worker may still be inside run()
+        // accessing derived members (mStopping/mSleepMsecs) after the vtable
+        // has transitioned to the base, which is UB.
+        stop();
+        shutdown();
+    }
 
     void setSleepTime(long ms) { mSleepMsecs = ms; }
     void stop()
