@@ -2153,25 +2153,30 @@ void LLInventoryModel::deleteObject(const LLUUID& id, bool fix_broken_links, boo
     mCategoryMap.erase(id);
     mItemMap.erase(id);
     //mInventory.erase(id);
-    item_array_t* item_list = getUnlockedItemArray(parent_id);
-    if(item_list)
+    // obj is exactly one of item or category — dispatch by actual type
+    // instead of unconditionally cross-casting (which is UB).
+    if (LLViewerInventoryItem* item_ptr = dynamic_cast<LLViewerInventoryItem*>(obj.get()))
     {
-        LLPointer<LLViewerInventoryItem> item = (LLViewerInventoryItem*)((LLInventoryObject*)obj);
-        vector_replace_with_last(*item_list, item);
+        if (item_array_t* item_list = getUnlockedItemArray(parent_id))
+        {
+            LLPointer<LLViewerInventoryItem> item(item_ptr);
+            vector_replace_with_last(*item_list, item);
+        }
     }
-    cat_array_t* cat_list = getUnlockedCatArray(parent_id);
-    if(cat_list)
+    else if (LLViewerInventoryCategory* cat_ptr = dynamic_cast<LLViewerInventoryCategory*>(obj.get()))
     {
-        LLPointer<LLViewerInventoryCategory> cat = (LLViewerInventoryCategory*)((LLInventoryObject*)obj);
-        vector_replace_with_last(*cat_list, cat);
+        if (cat_array_t* cat_list = getUnlockedCatArray(parent_id))
+        {
+            LLPointer<LLViewerInventoryCategory> cat(cat_ptr);
+            vector_replace_with_last(*cat_list, cat);
+        }
     }
 
     // Note : We need to tell the inventory observers that those things are going to be deleted *before* the tree is cleared or they won't know what to delete (in views and view models)
     addChangedMask(LLInventoryObserver::REMOVE, id);
     gInventory.notifyObservers();
 
-    item_list = getUnlockedItemArray(id);
-    if(item_list)
+    if (item_array_t* item_list = getUnlockedItemArray(id))
     {
         if (item_list->size())
         {
@@ -2180,8 +2185,7 @@ void LLInventoryModel::deleteObject(const LLUUID& id, bool fix_broken_links, boo
         delete item_list;
         mParentChildItemTree.erase(id);
     }
-    cat_list = getUnlockedCatArray(id);
-    if(cat_list)
+    if (cat_array_t* cat_list = getUnlockedCatArray(id))
     {
         if (cat_list->size())
         {
