@@ -1070,6 +1070,10 @@ bool LLAppViewer::init()
     LLAvatarNameCache::createInstance();
     LLMuteList::createInstance();
 
+    // Init media before initWindow(): main_view.xml constructs LLProgressView,
+    // whose postBuild() calls LLViewerMedia::getInstance().
+    LLViewerMedia::createInstance();
+
     // Initialize tool manager if not already instantiated
     //
     // Initialize the window
@@ -1339,9 +1343,6 @@ bool LLAppViewer::init()
     /*----------------------------------------------------------------------*/
     // Load User's bindings
     loadKeyBindings();
-
-    // Init media
-    LLViewerMedia::createInstance();
 
     //LLSimpleton creations
     LLEnvironment::createInstance();
