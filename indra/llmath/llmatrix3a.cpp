@@ -45,27 +45,20 @@ void LLMatrix3a::setMul( const LLMatrix3a& lhs, const LLMatrix3a& rhs )
 
     for ( int i = 0; i < 3; i++ )
     {
-        LLVector4a xxxx = _mm_load_ss( rhs.mColumns[i].getF32ptr() );
-        xxxx.splat<0>( xxxx );
-        xxxx.mul( col0 );
+        // Value-copy the column so the splats access it through LLVector4a
+        // (its real type) instead of via _mm_load_ss((F32*)getF32ptr()),
+        // which puns __m128 → F32* and is unsafe on sse2neon AArch64.
+        const LLVector4a v = rhs.mColumns[i];
 
-        {
-            LLVector4a yyyy = _mm_load_ss( rhs.mColumns[i].getF32ptr() +  1 );
-            yyyy.splat<0>( yyyy );
-            yyyy.mul( col1 );
-            xxxx.add( yyyy );
-        }
+        LLVector4a xxxx; xxxx.splat<0>(v); xxxx.mul(col0);
+        LLVector4a yyyy; yyyy.splat<1>(v); yyyy.mul(col1);
+        LLVector4a zzzz; zzzz.splat<2>(v); zzzz.mul(col2);
 
-        {
-            LLVector4a zzzz = _mm_load_ss( rhs.mColumns[i].getF32ptr() +  2 );
-            zzzz.splat<0>( zzzz );
-            zzzz.mul( col2 );
-            xxxx.add( zzzz );
-        }
+        xxxx.add(yyyy);
+        xxxx.add(zzzz);
 
-        xxxx.store4a( mColumns[i].getF32ptr() );
+        mColumns[i] = xxxx;
     }
-
 }
 
 /*static */void LLMatrix3a::batchTransform( const LLMatrix3a& xform, const LLVector4a* src, int numVectors, LLVector4a* dst )
@@ -75,64 +68,45 @@ void LLMatrix3a::setMul( const LLMatrix3a& lhs, const LLMatrix3a& rhs )
     const LLVector4a col2 = xform.getColumn(2);
     const LLVector4a* maxAddr = src + numVectors;
 
+    // Each iteration value-copies the source LLVector4a(s) and splats the
+    // x/y/z lanes via splat<N>, which goes through LLVector4a's real type
+    // (no F32* pun of __m128 storage — unsafe under sse2neon on AArch64).
+
     if ( numVectors & 0x1 )
     {
-        LLVector4a xxxx = _mm_load_ss( (const F32*)src );
-        LLVector4a yyyy = _mm_load_ss( (const F32*)src + 1 );
-        LLVector4a zzzz = _mm_load_ss( (const F32*)src + 2 );
-        xxxx.splat<0>( xxxx );
-        yyyy.splat<0>( yyyy );
-        zzzz.splat<0>( zzzz );
-        xxxx.mul( col0 );
-        yyyy.mul( col1 );
-        zzzz.mul( col2 );
-        xxxx.add( yyyy );
-        xxxx.add( zzzz );
-        xxxx.store4a( (F32*)dst );
+        const LLVector4a v = *src;
+
+        LLVector4a x; x.splat<0>(v); x.mul(col0);
+        LLVector4a y; y.splat<1>(v); y.mul(col1);
+        LLVector4a z; z.splat<2>(v); z.mul(col2);
+        x.add(y);
+        x.add(z);
+
+        *dst = x;
         src++;
         dst++;
     }
 
-
-    numVectors >>= 1;
     while ( src < maxAddr )
     {
-        _mm_prefetch( (const char*)(src + 32 ), _MM_HINT_NTA );
+        _mm_prefetch( (const char*)(src + 32), _MM_HINT_NTA );
         _mm_prefetch( (const char*)(dst + 32), _MM_HINT_NTA );
-        LLVector4a xxxx = _mm_load_ss( (const F32*)src );
-        LLVector4a xxxx1= _mm_load_ss( (const F32*)(src + 1) );
 
-        xxxx.splat<0>( xxxx );
-        xxxx1.splat<0>( xxxx1 );
-        xxxx.mul( col0 );
-        xxxx1.mul( col0 );
+        const LLVector4a v0 = src[0];
+        const LLVector4a v1 = src[1];
 
-        {
-            LLVector4a yyyy = _mm_load_ss( (const F32*)src + 1 );
-            LLVector4a yyyy1 = _mm_load_ss( (const F32*)(src + 1) + 1);
-            yyyy.splat<0>( yyyy );
-            yyyy1.splat<0>( yyyy1 );
-            yyyy.mul( col1 );
-            yyyy1.mul( col1 );
-            xxxx.add( yyyy );
-            xxxx1.add( yyyy1 );
-        }
+        LLVector4a x0, y0, z0;
+        LLVector4a x1, y1, z1;
+        x0.splat<0>(v0); y0.splat<1>(v0); z0.splat<2>(v0);
+        x1.splat<0>(v1); y1.splat<1>(v1); z1.splat<2>(v1);
+        x0.mul(col0); y0.mul(col1); z0.mul(col2);
+        x1.mul(col0); y1.mul(col1); z1.mul(col2);
+        x0.add(y0); x0.add(z0);
+        x1.add(y1); x1.add(z1);
 
-        {
-            LLVector4a zzzz = _mm_load_ss( (const F32*)(src) + 2 );
-            LLVector4a zzzz1 = _mm_load_ss( (const F32*)(++src) + 2 );
-            zzzz.splat<0>( zzzz );
-            zzzz1.splat<0>( zzzz1 );
-            zzzz.mul( col2 );
-            zzzz1.mul( col2 );
-            xxxx.add( zzzz );
-            xxxx1.add( zzzz1 );
-        }
-
-        xxxx.store4a(dst->getF32ptr());
-        src++;
-        dst++;
-
-        xxxx1.store4a((F32*)dst++);
+        dst[0] = x0;
+        dst[1] = x1;
+        src += 2;
+        dst += 2;
     }
 }
