@@ -232,7 +232,10 @@ private:
     bool mIsModerator;           // default is false
     bool mDisplayModeratorLabel; // default is false
 // [RLVa:KB] - @shownames
-    bool mRlvCheckShowNames;
+    // default is false; setRlvCheckShowNames() may run after fetchAvatarName(),
+    // and the name-cache callback can fire synchronously when the name is
+    // already cached, so we need a defined value before the setter runs.
+    bool mRlvCheckShowNames{ false };
 // [/RLVa:KB]
     std::string mDisplayName;
     F64  mDistToAgent;  // Distance to the agent. A negative (meaningless) value means the distance has not been set.
