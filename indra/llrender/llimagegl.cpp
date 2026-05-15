@@ -2065,7 +2065,9 @@ S32 LLImageGL::getHeight(S32 discard_level) const
 {
     if (discard_level < 0)
     {
-        discard_level = mCurrentDiscardLevel;
+        // mCurrentDiscardLevel can still be -1 if no discard has been set;
+        // treat that as "full resolution" rather than shifting by a negative.
+        discard_level = llmax<S32>(mCurrentDiscardLevel, 0);
     }
     S32 height = mHeight >> discard_level;
     if (height < 1) height = 1;
@@ -2076,7 +2078,7 @@ S32 LLImageGL::getWidth(S32 discard_level) const
 {
     if (discard_level < 0)
     {
-        discard_level = mCurrentDiscardLevel;
+        discard_level = llmax<S32>(mCurrentDiscardLevel, 0);
     }
     S32 width = mWidth >> discard_level;
     if (width < 1) width = 1;
@@ -2087,7 +2089,7 @@ S64 LLImageGL::getBytes(S32 discard_level) const
 {
     if (discard_level < 0)
     {
-        discard_level = mCurrentDiscardLevel;
+        discard_level = llmax<S32>(mCurrentDiscardLevel, 0);
     }
     S32 w = mWidth>>discard_level;
     S32 h = mHeight>>discard_level;
