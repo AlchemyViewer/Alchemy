@@ -27,8 +27,11 @@
 
 #include "linden_common.h"
 
+#include <bit>
 #include <iostream>
+#include <limits>
 #include <map>
+#include <vector>
 
 #include "llxmlnode.h"
 
@@ -1530,22 +1533,22 @@ const char *LLXMLNode::parseFloat(const char *str, F64 *dest, U32 precision, Enc
 
         if (memcmp(str, "inf", 3) == 0)
         {
-            *(U64 *)dest = 0x7FF0000000000000ll;
+            *dest = std::numeric_limits<F64>::infinity();
             return str + 3;
         }
         if (memcmp(str, "-inf", 4) == 0)
         {
-            *(U64 *)dest = 0xFFF0000000000000ll;
+            *dest = -std::numeric_limits<F64>::infinity();
             return str + 4;
         }
         if (memcmp(str, "1.#INF", 6) == 0)
         {
-            *(U64 *)dest = 0x7FF0000000000000ll;
+            *dest = std::numeric_limits<F64>::infinity();
             return str + 6;
         }
         if (memcmp(str, "-1.#INF", 7) == 0)
         {
-            *(U64 *)dest = 0xFFF0000000000000ll;
+            *dest = -std::numeric_limits<F64>::infinity();
             return str + 7;
         }
 
@@ -2426,8 +2429,13 @@ void LLXMLNode::setFloatValue(U32 length, const F32 *array, Encoding encoding, U
     }
     else if (encoding == ENCODING_HEX)
     {
-        U32 *byte_array = (U32 *)array;
-        setUnsignedValue(length, byte_array, ENCODING_HEX);
+        for (U32 pos = 0; pos < length; ++pos)
+        {
+            const U32 bits = std::bit_cast<U32>(array[pos]);
+            const char* fmt = (pos > 0 && pos % 16 == 0) ? " %08X" : "%08X";
+            new_value.append(llformat(fmt, bits));
+        }
+        mValue = new_value;
     }
     else
     {
@@ -2476,8 +2484,15 @@ void LLXMLNode::setDoubleValue(U32 length, const F64 *array, Encoding encoding, 
     }
     if (encoding == ENCODING_HEX)
     {
-        U64 *byte_array = (U64 *)array;
-        setLongValue(length, byte_array, ENCODING_HEX);
+        for (U32 pos = 0; pos < length; ++pos)
+        {
+            const U64 bits = std::bit_cast<U64>(array[pos]);
+            const U32 upper_32 = U32(bits >> 32);
+            const U32 lower_32 = U32(bits & 0xffffffff);
+            const char* fmt = (pos > 0 && pos % 8 == 0) ? " %08X%08X" : "%08X%08X";
+            new_value.append(llformat(fmt, upper_32, lower_32));
+        }
+        mValue = new_value;
     }
     else
     {
