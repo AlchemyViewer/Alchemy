@@ -1336,7 +1336,7 @@ void LLGLSLShader::fastUniform1f(U32 index, GLfloat x)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
     llassert(sCurBoundShaderPtr == this);
     llassert(mProgramObject);
-    llassert(mUniform.size() <= index);
+    llassert(index < mUniform.size());
     llassert(mUniform[index] >= 0);
     glUniform1f(mUniform[index], x);
 }
