@@ -796,9 +796,8 @@ bool LLRender::init(bool needs_vertex_buffer)
 #endif
 
     { //bind a dummy vertex array object so we're core profile compliant
-        U32 ret;
-        glGenVertexArrays(1, &ret);
-        glBindVertexArray(ret);
+        glGenVertexArrays(1, &mDummyVAO);
+        glBindVertexArray(mDummyVAO);
     }
 
     if (needs_vertex_buffer)
@@ -830,6 +829,12 @@ void LLRender::resetVertexBuffer()
 void LLRender::shutdown()
 {
     resetVertexBuffer();
+    if (mDummyVAO)
+    {
+        glBindVertexArray(0);
+        glDeleteVertexArrays(1, &mDummyVAO);
+        mDummyVAO = 0;
+    }
 }
 
 void LLRender::refreshState(void)

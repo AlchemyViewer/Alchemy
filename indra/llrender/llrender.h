@@ -524,6 +524,7 @@ private:
     LLStrider<LLVector4a>       mVerticesp;
     LLStrider<LLVector2>        mTexcoordsp;
     LLStrider<LLColor4U>        mColorsp;
+    U32                         mDummyVAO = 0;
     std::array<LLTexUnit, LL_NUM_TEXTURE_LAYERS> mTexUnits;
     LLTexUnit           mDummyTexUnit;
     std::array<LLLightState, LL_NUM_LIGHT_UNITS> mLightState;
