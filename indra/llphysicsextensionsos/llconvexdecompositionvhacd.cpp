@@ -94,11 +94,11 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     mVHACDParameters.m_asyncACD = false;
 
     mDecompStages[0].mName = "Analyze";
-    mDecompStages[0].mDescription = "";
+    mDecompStages[0].mDescription = "Voxelize the source mesh and decompose it into approximating convex hulls.";
 
     LLCDParam param;
     param.mName = "Fill Mode";
-    param.mDescription = "";
+    param.mDescription = "How interior voxels are classified: Flood (default, watertight meshes), Surface Only (hollow shells), or Raycast (meshes with holes).";
     param.mType = LLCDParam::LLCD_ENUM;
     param.mDetails.mEnumValues.mNumEnums = 3;
 
@@ -129,7 +129,7 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     };
 
     param.mName = "Voxel Resolution";
-    param.mDescription = "";
+    param.mDescription = "Voxel grid resolution for the source mesh; higher values capture finer detail at the cost of compute time and memory.";
     param.mType = LLCDParam::LLCD_ENUM;
     param.mDetails.mEnumValues.mNumEnums = E_NUM_QUALITY_LEVELS;
 
@@ -154,7 +154,7 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     mDecompParams.push_back(param);
 
     param.mName = "Num Hulls";
-    param.mDescription = "";
+    param.mDescription = "Maximum number of convex hulls produced. More hulls capture concavity better but raise simulation cost and upload land impact.";
     param.mType = LLCDParam::LLCD_FLOAT;
     param.mDetails.mRange.mLow.mFloat = 1.f;
     param.mDetails.mRange.mHigh.mFloat = MAX_HULLS;
@@ -165,7 +165,7 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     mDecompParams.push_back(param);
 
     param.mName = "Num Vertices";
-    param.mDescription = "";
+    param.mDescription = "Maximum vertices per convex hull. Higher values let each hull better approximate curved surfaces.";
     param.mType = LLCDParam::LLCD_FLOAT;
     param.mDetails.mRange.mLow.mFloat = 3.f;
     param.mDetails.mRange.mHigh.mFloat = MAX_VERTICES_PER_HULL;
@@ -176,12 +176,60 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     mDecompParams.push_back(param);
 
     param.mName = "Error Tolerance";
-    param.mDescription = "";
+    param.mDescription = "Allowed volume error per hull, expressed as a percentage. Stop subdividing once a hull is within this much of its source volume; smaller is more accurate but slower.";
     param.mType = LLCDParam::LLCD_FLOAT;
     param.mDetails.mRange.mLow.mFloat = 0.0001f;
-    param.mDetails.mRange.mHigh.mFloat = 99.f;
+    // Capped at 10%; anything higher produces hulls so coarse they're useless and the runtime clamp
+    // in setParam tops out at 100 anyway.
+    param.mDetails.mRange.mHigh.mFloat = 10.f;
     param.mDetails.mRange.mDelta.mFloat = 0.001f;
     param.mDefault.mFloat = 1.f;
+    param.mStage = 0;
+    param.mReserved = -1;
+    mDecompParams.push_back(param);
+
+    // Max Recursion Depth: VHACD doubles candidate hull count per level (capped by Num Hulls).
+    // Default 10 matches VHACD; raising helps capture concavity on complex meshes at the cost of compute time.
+    param.mName = "Max Recursion Depth";
+    param.mDescription = "Maximum depth of the voxel-split tree. Each extra level doubles the candidate hull count (final count still capped by Num Hulls); raise for complex concave shapes.";
+    param.mType = LLCDParam::LLCD_FLOAT;
+    param.mDetails.mRange.mLow.mFloat = 1.f;
+    param.mDetails.mRange.mHigh.mFloat = 20.f;
+    param.mDetails.mRange.mDelta.mFloat = 1.f;
+    param.mDefault.mFloat = 10.f;
+    param.mStage = 0;
+    param.mReserved = -1;
+    mDecompParams.push_back(param);
+
+    // Shrink Wrap: when true (VHACD default), hull vertices are projected back onto the source mesh
+    // for a tighter fit. Disabling is faster but leaves voxel-grid stair-steps visible on the hull.
+    param.mName = "Shrink Wrap";
+    param.mDescription = "Project hull vertices back onto the source mesh for a tighter fit. Disable for faster decomposition that leaves voxel-grid stair-steps on the hull surface.";
+    param.mType = LLCDParam::LLCD_BOOLEAN;
+    param.mDefault.mBool = 1;
+    param.mStage = 0;
+    param.mReserved = -1;
+    mDecompParams.push_back(param);
+
+    // Find Best Plane: VHACD experimental, default false. When on, VHACD searches for the optimal split
+    // location at each recursion step instead of always splitting at the midpoint.
+    param.mName = "Find Best Plane";
+    param.mDescription = "Search for the best split plane at each recursion step instead of splitting at the midpoint. Produces cleaner cuts on organic meshes but costs extra compute time.";
+    param.mType = LLCDParam::LLCD_BOOLEAN;
+    param.mDefault.mBool = 0;
+    param.mStage = 0;
+    param.mReserved = -1;
+    mDecompParams.push_back(param);
+
+    // Min Edge Length: VHACD stops recursing once a voxel patch has edges shorter than 2x this value
+    // on all three axes. Default 2; larger values yield coarser hulls and finish faster.
+    param.mName = "Min Edge Length";
+    param.mDescription = "Smallest voxel patch (in voxels per side) that VHACD will keep subdividing. Smaller values produce finer hulls at the cost of compute time.";
+    param.mType = LLCDParam::LLCD_FLOAT;
+    param.mDetails.mRange.mLow.mFloat = 1.f;
+    param.mDetails.mRange.mHigh.mFloat = 8.f;
+    param.mDetails.mRange.mDelta.mFloat = 1.f;
+    param.mDefault.mFloat = 2.f;
     param.mStage = 0;
     param.mReserved = -1;
     mDecompParams.push_back(param);
@@ -297,6 +345,14 @@ LLCDResult LLConvexDecompositionVHACD::setParam(const char* name, float val)
     {
         mVHACDParameters.m_minimumVolumePercentErrorAllowed = llclamp(val, 0.0001f, 100.f);
     }
+    else if (name == "Max Recursion Depth"sv)
+    {
+        mVHACDParameters.m_maxRecursionDepth = (uint32_t)llclamp(ll_round(val), 1, 20);
+    }
+    else if (name == "Min Edge Length"sv)
+    {
+        mVHACDParameters.m_minEdgeLength = (uint32_t)llclamp(ll_round(val), 1, 8);
+    }
     else
     {
         return LLCD_UNKNOWN_PARAM;
@@ -306,8 +362,23 @@ LLCDResult LLConvexDecompositionVHACD::setParam(const char* name, float val)
 
 LLCDResult LLConvexDecompositionVHACD::setParam(const char* name, bool val)
 {
-    // No boolean parameters exposed today.
-    return LLCD_UNKNOWN_PARAM;
+    LLMutexLock lock(&mParamsMutex);
+
+    using namespace std::literals;
+
+    if (name == "Shrink Wrap"sv)
+    {
+        mVHACDParameters.m_shrinkWrap = val;
+    }
+    else if (name == "Find Best Plane"sv)
+    {
+        mVHACDParameters.m_findBestPlane = val;
+    }
+    else
+    {
+        return LLCD_UNKNOWN_PARAM;
+    }
+    return LLCD_OK;
 }
 
 LLCDResult LLConvexDecompositionVHACD::setParam(const char* name, int val)
@@ -414,17 +485,42 @@ LLCDResult LLConvexDecompositionVHACD::executeStage(int stage)
         return LLCD_INVALID_HULL_DATA;
     }
 
-    for (uint32_t i = 0; num_convex_hulls > i; ++i)
+    // Pull all hulls and tally volume so we can filter against the total.
+    std::vector<VHACD::IVHACD::ConvexHull> hulls;
+    hulls.reserve(num_convex_hulls);
+    double total_volume = 0.0;
+    for (uint32_t i = 0; i < num_convex_hulls; ++i)
     {
         VHACD::IVHACD::ConvexHull ch;
         if (!vhacd_impl->GetConvexHull(i, ch))
             continue;
+        total_volume += ch.m_volume;
+        hulls.push_back(std::move(ch));
+    }
+
+    // Physics engines reject hulls with fewer than 4 unique vertices (need a tetrahedron),
+    // and sliver hulls below 0.01% of the total volume are noise that bloats the upload payload
+    // without changing the simulated shape.
+    constexpr size_t MIN_HULL_VERTICES = 4;
+    const double volume_threshold = total_volume * 0.0001;
+    for (auto& ch : hulls)
+    {
+        if (ch.m_points.size() < MIN_HULL_VERTICES || ch.m_volume < volume_threshold)
+        {
+            continue;
+        }
 
         LLConvexMesh out_mesh;
         out_mesh.setVertices(ch.m_points);
         out_mesh.setIndices(ch.m_triangles);
 
         bound_decomp->mDecomposedHulls.push_back(std::move(out_mesh));
+    }
+
+    if (bound_decomp->mDecomposedHulls.empty())
+    {
+        LL_WARNS("VHACD") << "All " << num_convex_hulls << " hulls were filtered as degenerate." << LL_ENDL;
+        return LLCD_INVALID_HULL_DATA;
     }
 
     return LLCD_OK;
