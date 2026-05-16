@@ -282,7 +282,6 @@ if(LINUX)
     $<$<CONFIG:RelWithDebInfo,Release>:-fstack-protector>
     -fexceptions
     -fno-math-errno
-    -fno-strict-aliasing
     -fsigned-char
     -g
   )
@@ -374,7 +373,6 @@ if(DARWIN)
   set(CMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS YES)
   set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf")
 
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_STRICT_ALIASING NO)
   set(CMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH NO)
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_X86_VECTOR_INSTRUCTIONS sse4.2)
   # we must hard code this to off for now.  xcode's built in signing does not
@@ -396,7 +394,7 @@ if(DARWIN)
   add_compile_definitions(LL_DARWIN=1)
 
   # Ensure debug symbols are always generated
-  add_compile_options(-g2 -gdwarf -fno-fast-math -fno-strict-aliasing)
+  add_compile_options(-g2 -gdwarf -fno-fast-math)
 
   if(BUILD_TARGET_IS_X86_64)
     add_compile_options(-msse4.2)
@@ -448,6 +446,8 @@ if(LINUX OR DARWIN)
   endif()
 
   if(COMPILER_IS_GCC)
+    add_compile_options(-Wstrict-aliasing=2)
+
     add_compile_options(-Wno-stringop-truncation -Wno-stringop-overflow -Wno-parentheses -Wno-maybe-uninitialized -Wno-unused-local-typedefs)
 
     # This warning is extremely false positive sensitive, including on libstdc++'s own headers.
