@@ -1824,10 +1824,6 @@ void LLTexLayerSet::cloneTemplates(LLLocalTextureObject *lto, LLAvatarAppearance
             {
                 lto->addTexLayer(layer_template, wearable);
             }
-            else if (LLTexLayer* tex_layer = dynamic_cast<LLTexLayer*>(layer))
-            {
-                lto->addTexLayer(tex_layer, wearable);
-            }
         }
     };
     cloneList(mLayerList);
