@@ -41,6 +41,19 @@
 constexpr S32 MAX_HULLS = 256;
 constexpr S32 MAX_VERTICES_PER_HULL = 256;
 
+// Hard ceiling on voxel resolution to keep a stray int from blowing up memory via int->uint32_t conversion.
+constexpr S32 MIN_VOXEL_RESOLUTION = 10000;
+constexpr S32 MAX_VOXEL_RESOLUTION = 16000000;
+
+// Vertex/Triangle are reinterpret_cast'd through double*/uint32_t* when handed to VHACD::Compute.
+// Lock in the layout so a future field addition fails the build instead of silently misreading the mesh.
+static_assert(sizeof(VHACD::Vertex) == 3 * sizeof(double), "VHACD::Vertex must be tightly packed");
+static_assert(alignof(VHACD::Vertex) == alignof(double), "VHACD::Vertex must be double-aligned");
+static_assert(sizeof(VHACD::Triangle) == 3 * sizeof(uint32_t), "VHACD::Triangle must be tightly packed");
+static_assert(alignof(VHACD::Triangle) == alignof(uint32_t), "VHACD::Triangle must be uint32_t-aligned");
+
+thread_local int LLConvexDecompositionVHACD::sBoundDecompID = LLConvexDecompositionVHACD::INVALID_DECOMP_ID;
+
 bool LLConvexDecompositionVHACD::isFunctional()
 {
     return true;
@@ -87,13 +100,14 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     param.mType = LLCDParam::LLCD_ENUM;
     param.mDetails.mEnumValues.mNumEnums = 3;
 
+    // Index by ordinal (not by enum value) so reordering/adding values upstream can't OOB-write this array.
     static LLCDParam::LLCDEnumItem fill_enums[3];
-    fill_enums[(size_t)VHACD::FillMode::FLOOD_FILL].mName = "Flood";
-    fill_enums[(size_t)VHACD::FillMode::FLOOD_FILL].mValue = (int)VHACD::FillMode::FLOOD_FILL;
-    fill_enums[(size_t)VHACD::FillMode::SURFACE_ONLY].mName = "Surface Only";
-    fill_enums[(size_t)VHACD::FillMode::SURFACE_ONLY].mValue = (int)VHACD::FillMode::SURFACE_ONLY;
-    fill_enums[(size_t)VHACD::FillMode::RAYCAST_FILL].mName = "Raycast";
-    fill_enums[(size_t)VHACD::FillMode::RAYCAST_FILL].mValue = (int)VHACD::FillMode::RAYCAST_FILL;
+    fill_enums[0].mName = "Flood";
+    fill_enums[0].mValue = (int)VHACD::FillMode::FLOOD_FILL;
+    fill_enums[1].mName = "Surface Only";
+    fill_enums[1].mValue = (int)VHACD::FillMode::SURFACE_ONLY;
+    fill_enums[2].mName = "Raycast";
+    fill_enums[2].mValue = (int)VHACD::FillMode::RAYCAST_FILL;
 
     param.mDetails.mEnumValues.mEnumsArray = fill_enums;
     param.mDefault.mIntOrEnumValue = (int)VHACD::FillMode::FLOOD_FILL;
@@ -203,11 +217,10 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
 
 LLConvexDecompositionVHACD::~LLConvexDecompositionVHACD()
 {
-    {
-        LLMutexLock lock(&mDecompDataMutex);
-        mBoundDecompID = INVALID_DECOMP_ID;
-        mDecompData.clear();
-    }
+    LLMutexLock lock(&mDecompDataMutex);
+    // sBoundDecompID is thread_local; per-thread values fall away with thread exit.
+    // After the map is cleared, any subsequent getBoundDecomp() returns null regardless.
+    mDecompData.clear();
 }
 
 void LLConvexDecompositionVHACD::genDecomposition(int& decomp)
@@ -227,9 +240,9 @@ void LLConvexDecompositionVHACD::deleteDecomposition(int decomp)
     auto iter = mDecompData.find(decomp);
     if (iter != mDecompData.end())
     {
-        if (mBoundDecompID == decomp)
+        if (sBoundDecompID == decomp)
         {
-            mBoundDecompID = INVALID_DECOMP_ID;
+            sBoundDecompID = INVALID_DECOMP_ID;
         }
         mDecompData.erase(iter);
     }
@@ -241,12 +254,12 @@ void LLConvexDecompositionVHACD::bindDecomposition(int decomp)
 
     if (mDecompData.contains(decomp))
     {
-        mBoundDecompID = decomp;
+        sBoundDecompID = decomp;
     }
     else
     {
         LL_WARNS() << "Failed to bind unknown decomposition: " << decomp << LL_ENDL;
-        mBoundDecompID = INVALID_DECOMP_ID;
+        sBoundDecompID = INVALID_DECOMP_ID;
     }
 }
 
@@ -255,7 +268,7 @@ LLConvexDecompositionVHACD::data_ptr_t LLConvexDecompositionVHACD::getBoundDecom
     data_ptr_t bound_decomp;
     {
         LLMutexLock lock(&mDecompDataMutex);
-        auto it = mDecompData.find(mBoundDecompID);
+        auto it = mDecompData.find(sBoundDecompID);
         if (it != mDecompData.end())
         {
             bound_decomp = it->second; // Take a copy of the shared_ptr to avoid potential deletion
@@ -280,14 +293,19 @@ LLCDResult LLConvexDecompositionVHACD::setParam(const char* name, float val)
     }
     else if (name == "Error Tolerance"sv)
     {
-        mVHACDParameters.m_minimumVolumePercentErrorAllowed = val;
+        mVHACDParameters.m_minimumVolumePercentErrorAllowed = llclamp(val, 0.0001f, 100.f);
+    }
+    else
+    {
+        return LLCD_UNKNOWN_PARAM;
     }
     return LLCD_OK;
 }
 
 LLCDResult LLConvexDecompositionVHACD::setParam(const char* name, bool val)
 {
-    return LLCD_OK;
+    // No boolean parameters exposed today.
+    return LLCD_UNKNOWN_PARAM;
 }
 
 LLCDResult LLConvexDecompositionVHACD::setParam(const char* name, int val)
@@ -298,11 +316,20 @@ LLCDResult LLConvexDecompositionVHACD::setParam(const char* name, int val)
 
     if (name == "Fill Mode"sv)
     {
+        if (val < (int)VHACD::FillMode::FLOOD_FILL || val > (int)VHACD::FillMode::RAYCAST_FILL)
+        {
+            return LLCD_BAD_VALUE;
+        }
         mVHACDParameters.m_fillMode = (VHACD::FillMode)val;
     }
     else if (name == "Voxel Resolution"sv)
     {
-        mVHACDParameters.m_resolution = val;
+        // m_resolution is uint32_t; clamp the signed input so negatives don't wrap to billions of voxels.
+        mVHACDParameters.m_resolution = (uint32_t)llclamp(val, MIN_VOXEL_RESOLUTION, MAX_VOXEL_RESOLUTION);
+    }
+    else
+    {
+        return LLCD_UNKNOWN_PARAM;
     }
     return LLCD_OK;
 }
@@ -366,6 +393,8 @@ LLCDResult LLConvexDecompositionVHACD::executeStage(int stage)
         return LLCD_NULL_PTR;
     }
 
+    // Give the progress callback a handle so a zero-returning user callback can cooperatively cancel the run.
+    callbacks.setCancelTarget(vhacd_impl);
 
     if (!vhacd_impl->Compute((const double*)decomp_mesh.mVertices.data(), static_cast<uint32_t>(decomp_mesh.mVertices.size()),
                              (const uint32_t*)decomp_mesh.mIndices.data(), static_cast<uint32_t>(decomp_mesh.mIndices.size()),
@@ -513,10 +542,13 @@ LLCDResult LLConvexDecompositionVHACD::getMeshFromHull( LLCDHull* hullIn, LLCDMe
     uint32_t num_tris = quickhull.ComputeConvexHull(inMesh.mVertices, MAX_VERTICES_PER_HULL);
     if (num_tris > 0)
     {
-        mMeshFromHullData.setVertices(quickhull.GetVertices());
-        mMeshFromHullData.setIndices(quickhull.GetIndices());
+        // thread_local: each caller thread gets its own scratch buffer so concurrent callers
+        // don't stomp each other's pointer returned via meshOut.
+        thread_local LLConvexMesh sMeshFromHullData;
+        sMeshFromHullData.setVertices(quickhull.GetVertices());
+        sMeshFromHullData.setIndices(quickhull.GetIndices());
 
-        mMeshFromHullData.to(meshOut);
+        sMeshFromHullData.to(meshOut);
         return LLCD_OK;
     }
 
@@ -533,10 +565,12 @@ LLCDResult LLConvexDecompositionVHACD::generateSingleHullMeshFromMesh(LLCDMeshDa
     uint32_t num_tris = quickhull.ComputeConvexHull(inMesh.mVertices, MAX_VERTICES_PER_HULL);
     if (num_tris > 0)
     {
-        mSingleHullMeshFromMeshData.setVertices(quickhull.GetVertices());
-        mSingleHullMeshFromMeshData.setIndices(quickhull.GetIndices());
+        // thread_local: see comment in getMeshFromHull.
+        thread_local LLConvexMesh sSingleHullMeshFromMeshData;
+        sSingleHullMeshFromMeshData.setVertices(quickhull.GetVertices());
+        sSingleHullMeshFromMeshData.setIndices(quickhull.GetIndices());
 
-        mSingleHullMeshFromMeshData.to(meshOut);
+        sSingleHullMeshFromMeshData.to(meshOut);
         return LLCD_OK;
     }
 

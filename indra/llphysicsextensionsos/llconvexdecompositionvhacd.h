@@ -49,7 +49,7 @@ class LLConvexDecompositionVHACD : public LLSimpleton<LLConvexDecompositionVHACD
         void Update(const double overallProgress, const double stageProgress, const char* const stage, const char* operation) override
         {
             std::string out_msg = llformat("Stage: %s Operation: %s", stage, operation);
-            if (mCurrentStage != stage && mCurrentOperation != operation)
+            if (mCurrentStage != stage || mCurrentOperation != operation)
             {
                 mCurrentStage = stage;
                 mCurrentOperation = operation;
@@ -58,7 +58,12 @@ class LLConvexDecompositionVHACD : public LLSimpleton<LLConvexDecompositionVHACD
 
             if(mCallbackFunc)
             {
-                mCallbackFunc(out_msg.c_str(), ll_round(static_cast<F32>(stageProgress)), ll_round(static_cast<F32>(overallProgress)));
+                int keep_running = mCallbackFunc(out_msg.c_str(), ll_round(static_cast<F32>(stageProgress)), ll_round(static_cast<F32>(overallProgress)));
+                // llcdCallbackFunc contract: returning zero requests early termination.
+                if (keep_running == 0 && mVHACD)
+                {
+                    mVHACD->Cancel();
+                }
             }
         }
 
@@ -67,10 +72,16 @@ class LLConvexDecompositionVHACD : public LLSimpleton<LLConvexDecompositionVHACD
             mCallbackFunc = func;
         }
 
+        void setCancelTarget(VHACD::IVHACD* vhacd)
+        {
+            mVHACD = vhacd;
+        }
+
     private:
         std::string mCurrentStage;
         std::string mCurrentOperation;
         llcdCallbackFunc mCallbackFunc = nullptr;
+        VHACD::IVHACD* mVHACD = nullptr;
     };
 
     class VHACDLogger : public VHACD::IVHACD::IUserLogger
@@ -330,12 +341,15 @@ private:
 
     data_ptr_t getBoundDecomp();
 
-    // MUST lock before accessing mDecompData mBoundDecompID or mNextDecompID
+    // MUST lock before accessing mDecompData or mNextDecompID.
+    // sBoundDecompID is per-thread, so unlocked access from the owning thread is safe.
     LLMutex mDecompDataMutex;
 
     static constexpr int INVALID_DECOMP_ID = -1;
 
-    int mBoundDecompID = INVALID_DECOMP_ID;
+    // Per-thread bind so multiple worker threads can drive independent decompositions
+    // without clobbering each other's currently bound id.
+    static thread_local int sBoundDecompID;
     int mNextDecompID = 0; // Only for use inside genDecomposition.
 
     boost::unordered_map<int, data_ptr_t> mDecompData;
@@ -344,10 +358,7 @@ private:
 
     LLMutex mParamsMutex;
     VHACD::IVHACD::Parameters mVHACDParameters;
-    llcdCallbackFunc mCurrentCallbackFunc;
-
-    LLConvexMesh mMeshFromHullData;
-    LLConvexMesh mSingleHullMeshFromMeshData;
+    llcdCallbackFunc mCurrentCallbackFunc = nullptr;
 };
 
 #endif //LL_CONVEX_DECOMP_UTIL_VHACD_H
