@@ -398,9 +398,6 @@ void LLGLSLShader::unloadInternal()
         mSamplesQuery = 0;
     }
 
-    //hack to make apple not complain
-    glGetError();
-
     stop_glerror();
 }
 
