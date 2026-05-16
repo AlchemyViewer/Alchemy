@@ -220,7 +220,6 @@ void LLCubeMap::initEnvironmentMap(const std::vector<LLPointer<LLImageRaw> >& ra
     enableTexture(0);
     bind();
     mImages[0]->setFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
-    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
     gGL.getTexUnit(0)->disable();
     disable();
