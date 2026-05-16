@@ -987,7 +987,7 @@ bool LLShaderMgr::validateProgramObject(GLuint obj)
     //check program validity against current GL
     glValidateProgram(obj);
     GLint success = GL_TRUE;
-    glGetProgramiv(obj, GL_LINK_STATUS, &success);
+    glGetProgramiv(obj, GL_VALIDATE_STATUS, &success);
     if (success == GL_FALSE)
     {
         LL_SHADER_LOADING_WARNS() << "GLSL program not valid: " << LL_ENDL;
