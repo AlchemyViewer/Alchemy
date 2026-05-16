@@ -90,13 +90,15 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
 {
     // Setup default parameters
     mVHACDParameters.m_logger = &mVHACDLogger;
+    // We use CreateVHACD() (synchronous); make the params struct reflect that so it isn't misleading.
+    mVHACDParameters.m_asyncACD = false;
 
     mDecompStages[0].mName = "Analyze";
-    mDecompStages[0].mDescription = nullptr;
+    mDecompStages[0].mDescription = "";
 
     LLCDParam param;
     param.mName = "Fill Mode";
-    param.mDescription = nullptr;
+    param.mDescription = "";
     param.mType = LLCDParam::LLCD_ENUM;
     param.mDetails.mEnumValues.mNumEnums = 3;
 
@@ -127,7 +129,7 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     };
 
     param.mName = "Voxel Resolution";
-    param.mDescription = nullptr;
+    param.mDescription = "";
     param.mType = LLCDParam::LLCD_ENUM;
     param.mDetails.mEnumValues.mNumEnums = E_NUM_QUALITY_LEVELS;
 
@@ -152,7 +154,7 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     mDecompParams.push_back(param);
 
     param.mName = "Num Hulls";
-    param.mDescription = nullptr;
+    param.mDescription = "";
     param.mType = LLCDParam::LLCD_FLOAT;
     param.mDetails.mRange.mLow.mFloat = 1.f;
     param.mDetails.mRange.mHigh.mFloat = MAX_HULLS;
@@ -163,7 +165,7 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     mDecompParams.push_back(param);
 
     param.mName = "Num Vertices";
-    param.mDescription = nullptr;
+    param.mDescription = "";
     param.mType = LLCDParam::LLCD_FLOAT;
     param.mDetails.mRange.mLow.mFloat = 3.f;
     param.mDetails.mRange.mHigh.mFloat = MAX_VERTICES_PER_HULL;
@@ -174,7 +176,7 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     mDecompParams.push_back(param);
 
     param.mName = "Error Tolerance";
-    param.mDescription = nullptr;
+    param.mDescription = "";
     param.mType = LLCDParam::LLCD_FLOAT;
     param.mDetails.mRange.mLow.mFloat = 0.0001f;
     param.mDetails.mRange.mHigh.mFloat = 99.f;
@@ -184,26 +186,26 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
     param.mReserved = -1;
     mDecompParams.push_back(param);
 
-    for (const LLCDParam& param : mDecompParams)
+    for (const LLCDParam& default_param : mDecompParams)
     {
-        const char* const name = param.mName;
+        const char* const name = default_param.mName;
 
-        switch (param.mType)
+        switch (default_param.mType)
         {
         case LLCDParam::LLCD_FLOAT:
         {
-            setParam(name, param.mDefault.mFloat);
+            setParam(name, default_param.mDefault.mFloat);
             break;
         }
         case LLCDParam::LLCD_ENUM:
         case LLCDParam::LLCD_INTEGER:
         {
-            setParam(name, param.mDefault.mIntOrEnumValue);
+            setParam(name, default_param.mDefault.mIntOrEnumValue);
             break;
         }
         case LLCDParam::LLCD_BOOLEAN:
         {
-            setParam(name, (param.mDefault.mBool != 0));
+            setParam(name, (default_param.mDefault.mBool != 0));
             break;
         }
         case LLCDParam::LLCD_INVALID:
@@ -386,7 +388,10 @@ LLCDResult LLConvexDecompositionVHACD::executeStage(int stage)
     }
     current_params.m_callback = &callbacks;
 
-    auto vhacd_impl = VHACD::CreateVHACD();
+    // RAII handle so we don't leak the IVHACD on any return path; IVHACD has a non-virtual public destructor
+    // and is freed exclusively through Release().
+    auto vhacd_deleter = [](VHACD::IVHACD* p) { if (p) p->Release(); };
+    std::unique_ptr<VHACD::IVHACD, decltype(vhacd_deleter)> vhacd_impl(VHACD::CreateVHACD(), vhacd_deleter);
     if (!vhacd_impl)
     {
         LL_WARNS() << "Failed to create VHACD instance" << LL_ENDL;
@@ -394,20 +399,18 @@ LLCDResult LLConvexDecompositionVHACD::executeStage(int stage)
     }
 
     // Give the progress callback a handle so a zero-returning user callback can cooperatively cancel the run.
-    callbacks.setCancelTarget(vhacd_impl);
+    callbacks.setCancelTarget(vhacd_impl.get());
 
     if (!vhacd_impl->Compute((const double*)decomp_mesh.mVertices.data(), static_cast<uint32_t>(decomp_mesh.mVertices.size()),
                              (const uint32_t*)decomp_mesh.mIndices.data(), static_cast<uint32_t>(decomp_mesh.mIndices.size()),
                              current_params))
     {
-        vhacd_impl->Release();
         return LLCD_INVALID_HULL_DATA;
     }
 
     uint32_t num_convex_hulls = vhacd_impl->GetNConvexHulls();
     if (num_convex_hulls == 0)
     {
-        vhacd_impl->Release();
         return LLCD_INVALID_HULL_DATA;
     }
 
@@ -423,8 +426,6 @@ LLCDResult LLConvexDecompositionVHACD::executeStage(int stage)
 
         bound_decomp->mDecomposedHulls.push_back(std::move(out_mesh));
     }
-
-    vhacd_impl->Release();
 
     return LLCD_OK;
 }

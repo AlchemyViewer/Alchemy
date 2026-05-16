@@ -197,16 +197,17 @@ private:
             mVertices = std::move(vertices);
         }
 
-        void setIndices(const void* data, int num_indices, int index_stride_bytes, LLCDMeshData::IndexType type)
+        // index_stride_bytes is the stride between triangles (i.e. 3 * sizeof(index)), not between scalar indices.
+        void setIndices(const void* data, int num_triangles, int index_stride_bytes, LLCDMeshData::IndexType type)
         {
             index_array_type indices;
-            indices.reserve(num_indices);
+            indices.reserve(num_triangles);
 
             if (type == LLCDMeshData::INT_16)
             {
                 const U16* index_data = static_cast<const U16*>(data);
                 const int stride = index_stride_bytes / sizeof(U16);
-                for (int i = 0; i < num_indices; ++i)
+                for (int i = 0; i < num_triangles; ++i)
                 {
                     indices.emplace_back(index_data[i * stride + 0],
                                          index_data[i * stride + 1],
@@ -217,7 +218,7 @@ private:
             {
                 const U32* index_data = static_cast<const U32*>(data);
                 const int stride = index_stride_bytes / sizeof(U32);
-                for (int i = 0; i < num_indices; ++i)
+                for (int i = 0; i < num_triangles; ++i)
                 {
                     indices.emplace_back(index_data[i * stride + 0],
                                          index_data[i * stride + 1],

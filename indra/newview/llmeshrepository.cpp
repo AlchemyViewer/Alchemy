@@ -4214,7 +4214,9 @@ void LLMeshRepository::init()
 {
     mMeshMutex = new LLMutex();
 
-    LLConvexDecomposition::getInstance()->initSystem();
+    // initSystem is static; call it directly. getInstance() returns null here (s_isInitialized is false)
+    // and dispatching a static method through a null pointer is UB.
+    LLConvexDecomposition::initSystem();
 
     if (!LLConvexDecomposition::isFunctional())
     {
