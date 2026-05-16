@@ -113,23 +113,30 @@ LLCubeMapArray::LLCubeMapArray(LLCubeMapArray& lhs, U32 width, U32 count) : mTex
     // Allocate a new cubemap array with the same criteria as the incoming cubemap array
     allocate(mWidth, lhs.mImage->getComponents(), count, lhs.mImage->getUseMipMaps(), lhs.mHDR);
 
-    // Copy each cubemap from the incoming array to the new array
     U32 min_count = std::min(count, lhs.mCount);
+    if (min_count == 0)
+        return;
+
+    const S32 components = lhs.mImage->getComponents();
+    const GLenum format = (components == 4) ? GL_RGBA : GL_RGB;
+
+    // glGetTexImage on a cube-map array returns ALL layers in a single call (spec §8.11);
+    // sizing the destination for a single face would write past the end of the buffer.
+    const size_t face_bytes = (size_t)lhs.mWidth * lhs.mWidth * components;
+    std::vector<U8> src_layers(face_bytes * 6 * min_count);
+
+    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP_ARRAY, lhs.getGLName());
+    glGetTexImage(GL_TEXTURE_CUBE_MAP_ARRAY, 0, format, GL_UNSIGNED_BYTE, src_layers.data());
+
+    bind(0);
     for (U32 i = 0; i < min_count * 6; ++i)
     {
-        {
-            GLint components = GL_RGB;
-            if (mImage->getComponents() == 4)
-                components = GL_RGBA;
-
-            // Handle different resolutions by scaling the image
-            LLPointer<LLImageRaw> src_image = new LLImageRaw(lhs.mWidth, lhs.mWidth, lhs.mImage->getComponents());
-            glGetTexImage(GL_TEXTURE_CUBE_MAP_ARRAY, 0, components, GL_UNSIGNED_BYTE, src_image->getData());
-
-            LLPointer<LLImageRaw> scaled_image = src_image->scaled(mWidth, mWidth);
-            glTexSubImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, 0, 0, i, mWidth, mWidth, 1, components, GL_UNSIGNED_BYTE, scaled_image->getData());
-        }
+        LLPointer<LLImageRaw> face_image = new LLImageRaw(lhs.mWidth, lhs.mWidth, components);
+        memcpy(face_image->getData(), src_layers.data() + i * face_bytes, face_bytes);
+        LLPointer<LLImageRaw> scaled_image = face_image->scaled(mWidth, mWidth);
+        glTexSubImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, 0, 0, i, mWidth, mWidth, 1, format, GL_UNSIGNED_BYTE, scaled_image->getData());
     }
+    unbind();
 }
 
 LLCubeMapArray::~LLCubeMapArray()
