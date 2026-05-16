@@ -157,7 +157,6 @@ LLVoiceClient::LLVoiceClient(LLPumpIO *pump)
 
 LLVoiceClient::~LLVoiceClient()
 {
-    LLVivoxVoiceClient::deleteSingleton();
 #ifndef DISABLE_WEBRTC
     LLWebRTCVoiceClient::deleteSingleton();
 #endif
