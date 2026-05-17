@@ -1081,7 +1081,6 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
             allowedv->push_back("png");
             allowedv->push_back("webp");
             break;
-            break;
         case FFLOAD_WAV:
             allowedv->push_back("wav");
             break;
@@ -1096,6 +1095,7 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
             break;
         case FFLOAD_HDRI:
             allowedv->push_back("exr");
+            break;
         case FFLOAD_MODEL:
             allowedv->push_back("gltf");
             allowedv->push_back("glb");
