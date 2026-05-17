@@ -28,17 +28,16 @@
 #include <algorithm>
 #include <string.h>
 
-#include <api/audio_codecs/audio_decoder_factory.h>
-#include <api/audio_codecs/audio_encoder_factory.h>
-#include <api/audio_codecs/builtin_audio_decoder_factory.h>
-#include <api/audio_codecs/builtin_audio_encoder_factory.h>
-#include <api/audio/create_audio_device_module.h>
-#include <api/audio/builtin_audio_processing_builder.h>
-#include <api/media_stream_interface.h>
-#include <api/media_stream_track.h>
-#include <modules/audio_processing/audio_buffer.h>
-#include <modules/audio_mixer/audio_mixer_impl.h>
-#include <api/environment/environment_factory.h>
+#include "api/audio_codecs/audio_decoder_factory.h"
+#include "api/audio_codecs/audio_encoder_factory.h"
+#include "api/audio_codecs/builtin_audio_decoder_factory.h"
+#include "api/audio_codecs/builtin_audio_encoder_factory.h"
+#include "api/audio/builtin_audio_processing_builder.h"
+#include "api/media_stream_interface.h"
+#include "api/media_stream_track.h"
+#include "modules/audio_processing/audio_buffer.h"
+#include "modules/audio_mixer/audio_mixer_impl.h"
+#include "api/environment/environment_factory.h"
 
 namespace llwebrtc
 {
@@ -274,6 +273,8 @@ void LLWebRTCImpl::init()
     webrtc::LogMessage::SetLogToStderr(true);
     webrtc::LogMessage::AddLogToStream(mLogSink, webrtc::LS_VERBOSE);
 
+    mTaskQueueFactory = webrtc::CreateDefaultTaskQueueFactory();
+
     // Create the native threads.
     mNetworkThread = webrtc::Thread::CreateWithSocketServer();
     mNetworkThread->SetName("WebRTCNetworkThread", nullptr);
@@ -289,7 +290,7 @@ void LLWebRTCImpl::init()
         [this]()
         {
             webrtc::scoped_refptr<webrtc::AudioDeviceModule> realADM =
-                webrtc::CreateAudioDeviceModule(webrtc::CreateEnvironment(), webrtc::AudioDeviceModule::AudioLayer::kPlatformDefaultAudio);
+                webrtc::AudioDeviceModule::Create(webrtc::AudioDeviceModule::AudioLayer::kPlatformDefaultAudio, mTaskQueueFactory.get());
             mDeviceModule = webrtc::make_ref_counted<LLWebRTCAudioDeviceModule>(realADM);
             mDeviceModule->SetObserver(this);
         });
@@ -381,6 +382,7 @@ void LLWebRTCImpl::terminate()
                 mDeviceModule->Terminate();
             }
             mDeviceModule     = nullptr;
+            mTaskQueueFactory = nullptr;
         });
 
     // In case peer connections still somehow have jobs in workers,

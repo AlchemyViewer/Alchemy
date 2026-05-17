@@ -9,7 +9,7 @@ if(VCPKG_TARGET_IS_WINDOWS)
         WEBRTC_ARCHIVE
         URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m${VERSION}/webrtc.windows_x86_64.tar.xz
         FILENAME webrtc.${VERSION}.windows_x86_64.tar.xz
-        SHA512 965cf9ea22f60af1ca298873fbb961e6dc239187053f40a001b55dfed72d798fb2e3ff4054f98fafd6280b33e1a806186fbfc65d4dc2801ea6009b378f11bf30
+        SHA512 f4215881234c9d2b64ee7c21ed5d321952ab1de73e9511846a994d9cc4d76d7e4dccbd3c5e87e7d2068f9871bee7833669d4a0a90cce4482a3d79905cf40bc97
     )
 elseif(VCPKG_TARGET_IS_OSX)
     set(WEBRTC_LIBNAME "libwebrtc.a")
@@ -19,14 +19,14 @@ elseif(VCPKG_TARGET_IS_OSX)
             WEBRTC_ARCHIVE
             URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m${VERSION}/webrtc.macos_arm64.tar.xz
             FILENAME webrtc.${VERSION}.macos_arm64.tar.xz
-            SHA512 23b5caa7f675aa91d95f1dc99d324bf0d87f55e2181eaed6f6344c27ee12d8dd52602264cf4f2d0674631db5b57af74ee8892ff89e9114cbc85014977c8b3e91
+            SHA512 64f0dd819f33a446c480a56897ffb928abdaedb745bd021f1efed50f790ad3ffbefb7b1655ba6f91ac6f7490fb4d4f66892d1882e03a27077a1f4078ffc97ab5
         )
     else()
         vcpkg_download_distfile(
             WEBRTC_ARCHIVE
             URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m${VERSION}/webrtc.ubuntu-22.04_x86_64.tar.xz
             FILENAME webrtc.${VERSION}.macos_x86_64.tar.xz
-            SHA512 0d232b2d59524307c50496e519d008250c74c6c00d0d9048932f3650a2bf7eccaa2ab9dcba55fc88943de080b9819817c27bd724a33c9b20bdc155e577addfc4
+            SHA512 53e831d19c4bcd41145d7f183dfbe401da153dbc311ea8d26b3bdef146cb1349e7792a8b1f94098eebd88fe74801f465344167d6a8b06f99d06f01fa6286ea2e
         )
     endif()
 elseif(VCPKG_TARGET_IS_LINUX)
@@ -36,7 +36,7 @@ elseif(VCPKG_TARGET_IS_LINUX)
         WEBRTC_ARCHIVE
         URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m${VERSION}/webrtc.ubuntu-22.04_x86_64.tar.xz
         FILENAME webrtc.${VERSION}.ubuntu-22.04_x86_64.tar.xz
-        SHA512 4c977f9b2df7761b833f307de6c92c1b21569feccf449522accd706af0c08c33afb2dfb3e55c61567b4f6a8c9a086fb862fbd0d2f45ec7a9e9428f2b88a537ab
+        SHA512 7a7c248929055b0026cf9362188848a4e5624c9ceb149ae3b2f4a27c2e15e41c9063ac20a87c2a6e140fd3ad5c46b010f12be9ab076f383ed871c534bf51403e
     )
 endif()
 

@@ -537,6 +537,10 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceO
 
     webrtc::scoped_refptr<webrtc::AudioProcessing>                mAudioProcessingModule;
 
+    // more native webrtc stuff
+    std::unique_ptr<webrtc::TaskQueueFactory>                     mTaskQueueFactory;
+
+
     // Devices
     void updateDevices();
     void deployDevices();
