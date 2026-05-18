@@ -267,35 +267,67 @@ S32 LLImageJ2C::calcHeaderSizeJ2C()
 //static
 S32 LLImageJ2C::calcDataSizeJ2C(S32 w, S32 h, S32 comp, S32 discard_level, F32 rate)
 {
-    // Note: This provides an estimation for the first to last quality layer of a given discard level
-    // This is however an efficient approximation, as the true discard level boundary would be
-    // in general too big for fast fetching.
-    // For details about the equation used here, see https://wiki.lindenlab.com/wiki/THX1138_KDU_Improvements#Byte_Range_Study
+    // Estimates the byte budget needed to decode at `discard_level`. Smaller
+    // discards (higher quality) take more bytes.
+    //
+    // This is the historical sqrt-based "Byte Range Study" formula from the
+    // THX1138 KDU work (see
+    // https://wiki.lindenlab.com/wiki/THX1138_KDU_Improvements#Byte_Range_Study)
+    // restored with modern hygiene. PRs #2032/#2406/#2525/#4018 progressively
+    // inflated this estimate as a safety net against OpenJPEG aborting on
+    // mid-tile-part truncation; with the patched openjpeg in
+    // indra/vcpkg/ports/openjpeg/, OJ tolerates truncation natively and the
+    // inflated curve only delays progressive previews unnecessarily.
+    //
+    // Two estimators are computed and the smaller picked when
+    // `LLImage::useNewByteRange()` is on (default true):
+    //   * `new_bytes` = sqrt(w*h) * comp * rate * 1000 / layer_factor
+    //     — KDU-derived approximation tracking the rate-distortion curve.
+    //   * `old_bytes` = w * h * comp * rate
+    //     — uncompressed-times-rate; a conservative ceiling.
+    // The final result is clamped to at least the codestream header size.
 
-    // Estimate the number of layers. This is consistent with what's done for j2c encoding in LLImageJ2CKDU::encodeImpl().
-    constexpr S32 precision = 8; // assumed bitrate per component channel, might change in future for HDR support
-    constexpr S32 max_components = 4; // assumed the file has four components; three color and alpha
-    // Use MAX_IMAGE_SIZE_DEFAULT (currently 2048) if either dimension is unknown (zero)
-    S32 width  = (w > 0) ? w : 2048;
-    S32 height = (h > 0) ? h : 2048;
-    S32 max_dimension = llmax(width, height); // Find largest dimension
-    S32 block_area = MAX_BLOCK_SIZE * MAX_BLOCK_SIZE; // Calculated initial block area from established max block size (currently 64)
-    S32 max_layers = (S32)llmax(ll_round(log2f((float)max_dimension) - log2f((float)MAX_BLOCK_SIZE)), 4); // Find number of powers of two between extents and block size to a minimum of 4
-    block_area *= llmax(max_layers, 1); // Adjust initial block area by max number of layers
-    S32 totalbytes = (S32) (MIN_LAYER_SIZE * max_components * precision); // Start estimation with a minimum reasonable size
-    S32 block_layers = 0;
-    while (block_layers <= max_layers) // Walk the layers
-    {
-        if (block_layers <= (5 - discard_level))  // Walk backwards from discard 5 to required discard layer.
-            totalbytes += (S32) (block_area * max_components * precision * rate); // Add each block layer reduced by assumed compression rate
-        block_layers++; // Move to next layer
-        block_area *= 4; // Increase block area by power of four
-    }
+    // Estimate the number of quality layers used during encoding so the
+    // byte estimate tracks the codestreams our encoder actually produces.
+    // Matches JPEG2KEncode::estimate_num_layers in
+    // indra/llimagej2coj/llimagej2coj.cpp; keep the two tables aligned or
+    // the layer_factor diverges from real layer counts and the budget
+    // shifts out from under partial decodes.
+    S32 nb_layers;
+    S32 surface = w * h;
+    if      (surface <=    1024) nb_layers = 2;  // <= 32x32
+    else if (surface <=   16384) nb_layers = 3;  // <= 128x128
+    else if (surface <=  262144) nb_layers = 4;  // <= 512x512
+    else if (surface <= 1048576) nb_layers = 5;  // <= 1024x1024 (~1 MP)
+    else                         nb_layers = 6;  // larger
+    F32 layer_factor = 3.0f * (7 - llclamp(nb_layers, 1, 6));
 
-    totalbytes /= 8; // to bytes
-    totalbytes += calcHeaderSizeJ2C();  // header
+    // Reduce dimensions by 2^discard, with a floor of 1 so the sqrt doesn't
+    // collapse to zero.
+    w >>= discard_level;
+    h >>= discard_level;
+    w = llmax(w, 1);
+    h = llmax(h, 1);
 
-    return totalbytes;
+    // Honour the actual component count: RGB textures shouldn't budget as
+    // if they had an alpha channel. Fall back to 4 if the caller hasn't
+    // populated `comp` yet (pre-getMetadata path).
+    S32 components = (comp > 0) ? comp : 4;
+
+    S32 new_bytes = (S32)(sqrt((F32)(w * h)) * (F32)components * rate * 1000.f / layer_factor);
+    S32 old_bytes = (S32)((F32)(w * h * components) * rate);
+    S32 bytes = (LLImage::useNewByteRange() && (new_bytes < old_bytes)) ? new_bytes : old_bytes;
+    // Floor at MIN_LAYER_SIZE rather than calcHeaderSizeJ2C() (== FIRST_PACKET_SIZE,
+    // 600). At a 50% reverse-byte-range threshold, the old floor triggered
+    // decode at ~300 bytes — past the main header but before any packet
+    // body data was present. With OpenJPEG patched to tolerate truncated
+    // tile-parts, the empty decode no longer errors out but still produces
+    // mid-grey via the DC level shift on zero coefficients (until the
+    // openjpeg tcd.c overlay patch lands too). MIN_LAYER_SIZE (2000) gives
+    // a 1000-byte threshold, which is enough for the main header plus at
+    // least one packet body of low-resolution coefficient data.
+    bytes = llmax(bytes, MIN_LAYER_SIZE);
+    return bytes;
 }
 
 S32 LLImageJ2C::calcHeaderSize()
