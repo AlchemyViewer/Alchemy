@@ -273,6 +273,11 @@ void LLFontFace::resetBitmapCache()
         mFontBitmapCachep->reset();
 }
 
+void LLFontFace::destroyGlyphInfo(LLFontGlyphInfo* gi)
+{
+    delete gi;
+}
+
 void LLFontFace::destroyGL()
 {
     // Tear down GL textures up front for prompt GPU memory release, then

@@ -256,6 +256,12 @@ private:
     // Apply a single OpenType variation axis value, if the face has one.
     bool setVariationAxis(const std::string& axis_tag, F32 value);
 
+    // Out-of-line delete of an LLFontGlyphInfo*. Defined in llfontface.cpp,
+    // where llfontfreetype.h provides the complete type — lets the inline
+    // template below stay in the header without triggering
+    // -Wdelete-incomplete (a hard error under C++26).
+    static void destroyGlyphInfo(LLFontGlyphInfo* gi);
+
     typedef boost::unordered_multimap<U32, LLFontGlyphInfo*> glyph_info_map_t;
 
     LLFT_Face          mFTFace = nullptr;
@@ -303,7 +309,7 @@ void LLFontFace::erase_glyph_entries(Pred should_erase) const
     {
         if (should_erase(it->second))
         {
-            delete it->second;
+            destroyGlyphInfo(it->second);
             it = mGlyphInfoMap.erase(it);
         }
         else
