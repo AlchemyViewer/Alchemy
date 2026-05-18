@@ -210,7 +210,7 @@
   ==========================================================================
   AlchemyUIFontOverrides is an LLSD map that prepends a different
   source onto a family's chain at runtime. The override value can be:
-    - Another family name (e.g. "SourceSans")  ->  pulls that family's
+    - Another family name (e.g. "Inter")  ->  pulls that family's
       files in front of the target. Per-family <size> lookups also
       route through the source so the visual scale follows.
     - A bare font filename (e.g. "consola.ttf")  ->  prepended as a
@@ -519,7 +519,7 @@
   <!-- via <use>. The implicit "default" family is appended after.  -->
   <!-- ========================================================== -->
   <font name="SansSerifBase" label="Sans Serif (Default)">
-    <use family="SourceSans"/>
+    <use family="Inter"/>
   </font>
 
   <font name="SansSerif" user_selectable="false">
@@ -544,7 +544,7 @@
   </font>
 
   <font name="MonospaceBase" label="Monospace (Default)" monospace="true">
-    <use family="SourceCode"/>
+    <use family="CascadiaCode"/>
   </font>
 
   <font name="Monospace" label="Monospace (Default)" monospace="true" user_selectable="false">
