@@ -920,6 +920,7 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
             }
 
             LLViewerInventoryItem *inv_item = gInventory.getItem(mUUID);
+            static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
             if (show_asset_id)
             {
                 items.push_back(std::string("Copy Asset UUID"));
@@ -938,7 +939,6 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
                     is_asset_knowable = false;
                 }
 
-                static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
                 if (is_asset_knowable && sPowerfulWizard)
                 {
                     items.push_back(LLStringExplicit("Extras Separator"));
@@ -950,6 +950,8 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
                     }
                 }
             }
+
+            if (sPowerfulWizard) items.push_back(std::string("Copy Inventory UUID"));
 
             if(!single_folder_root)
             {
@@ -1836,6 +1838,18 @@ void LLItemBridge::performAction(LLInventoryModel* model, std::string action)
         LLUUID asset_id = item->getProtectedAssetUUID();
         std::string buffer;
         asset_id.toString(buffer);
+
+        gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(buffer));
+        return;
+    }
+    else if ("copy_inventory_uuid" == action)
+    {
+        // Single item only
+        LLViewerInventoryItem* item = static_cast<LLViewerInventoryItem*>(getItem());
+        if(!item) return;
+        LLUUID inventory_id = item->getUUID();
+        std::string buffer;
+        inventory_id.toString(buffer);
 
         gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(buffer));
         return;

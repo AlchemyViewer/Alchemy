@@ -86,7 +86,7 @@ bool LLPanelContents::postBuild()
 {
     setMouseOpaque(false);
 
-    childSetAction("button new script",&LLPanelContents::onClickNewScript, this);
+    getChild<LLUICtrl>("button new script")->setCommitCallback(boost::bind(&LLPanelContents::onClickNewScript, this, _1));
     childSetAction("button permissions",&LLPanelContents::onClickPermissions, this);
 
     mFilterEditor = getChild<LLFilterEditor>("contents_filter");
@@ -112,6 +112,17 @@ LLPanelContents::~LLPanelContents()
     // Children all cleaned up by default view destructor.
 }
 
+bool LLPanelContents::isLuaEnabledForObjectRegion(LLViewerObject *objectp)
+{
+    LLViewerRegion* region = objectp ? objectp->getRegion() : nullptr;
+    if (region && region->simulatorFeaturesReceived())
+    {
+        LLSD simulatorFeatures;
+        region->getSimulatorFeatures(simulatorFeatures);
+        return simulatorFeatures["LuaScriptsEnabled"].asBoolean();
+    }
+    return false;
+}
 
 void LLPanelContents::getState(LLViewerObject *objectp )
 {
@@ -155,6 +166,10 @@ void LLPanelContents::getState(LLViewerObject *objectp )
         all_volume &&
         ((LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() == 1)
             || (LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1)));
+
+    // Disable the "new_lua_script_item" child if editable is false
+    bool lua_enabled = isLuaEnabledForObjectRegion(objectp);
+    getChild<LLComboBox>("button new script")->setEnabledByValue("lua", lua_enabled);
 
     getChildView("button permissions")->setEnabled(!objectp->isPermanentEnforced());
     mPanelInventoryObject->setEnabled(!objectp->isPermanentEnforced());
@@ -240,15 +255,24 @@ void LLPanelContents::clearContents()
     }
 }
 
-//
-// Static functions
-//
-
-// static
-void LLPanelContents::onClickNewScript(void *userdata)
+void LLPanelContents::onClickNewScript(LLUICtrl* ctrl)
 {
+    const std::string& value = ctrl->getValue().asString();
+
     const bool children_ok = true;
     LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
+    bool lua_enabled = isLuaEnabledForObjectRegion(object);
+
+    U8 script_language = lua_enabled ? SST_LUA : SST_LSL;
+    if (value == "lua")
+    {
+        script_language = SST_LUA;
+    }
+    else if (value == "lsl")
+    {
+        script_language = SST_LSL;
+    }
+
     if (object)
     {
 // [RLVa:KB] - Checked: 2010-03-31 (RLVa-1.2.0c) | Modified: RLVa-1.0.5a
@@ -279,21 +303,13 @@ void LLPanelContents::onClickNewScript(void *userdata)
         std::string desc;
         LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_LSL_TEXT, desc);
 
-        U8 script_language = SST_LSL;
-        LLUUID template_id;
-
-        LLViewerRegion* region = object->getRegion();
-        if (region && region->simulatorFeaturesReceived())
-        {
-            LLSD simulatorFeatures;
-            region->getSimulatorFeatures(simulatorFeatures);
-            if (simulatorFeatures["LuaScriptsEnabled"].asBoolean())
-            {
-                script_language = SST_LUA;
-            }
-        }
-        // *TODO* Get a template ID and script_language based on user preferences.  Template ID is the inventory item UUID of a script
-        // in the user's inventory that is used as a template for new scripts.
+        // template_id is an inventory item UUID of a script in the user's
+        // inventory pulled from per account settings. The sim should fallback
+        // to the default script on an invalid uuid.
+        const char* template_setting = (script_language == SST_LUA)
+            ? "AlchemySLuaScriptTemplateID"
+            : "AlchemyLSLScriptTemplateID";
+        LLUUID template_id(gSavedPerAccountSettings.getString(template_setting));
 
         LLPointer<LLViewerInventoryItem> new_item =
             new LLViewerInventoryItem(

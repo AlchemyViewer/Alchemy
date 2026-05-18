@@ -133,6 +133,14 @@
          function="Inventory.DoToSelected"
          parameter="copy_uuid" />
     </menu_item_call>
+    <menu_item_call
+     label="Copy Inventory UUID"
+     layout="topleft"
+     name="Copy Inventory UUID">
+        <menu_item_call.on_click
+         function="Inventory.DoToSelected"
+         parameter="copy_inventory_uuid" />
+    </menu_item_call>
     <menu_item_separator
      layout="topleft" 
      name="Copy Separator" />

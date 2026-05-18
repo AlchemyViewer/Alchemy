@@ -418,7 +418,7 @@
 		</panel>
 		<panel label="Texture" name="Texture"/>
 		<panel label="Contenuto" name="Contents">
-			<button label="Nuovo Script" label_selected="Nuovo script" name="button new script"/>
+			<flyout_button label="Nuovo Script" label_selected="Nuovo script" name="button new script"/>
 			<button label="Permessi" name="button permissions"/>
 		</panel>
 	</tab_container>

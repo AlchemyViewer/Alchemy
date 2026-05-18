@@ -369,7 +369,7 @@
 		</panel>
 		<panel label="Tekstura" name="Texture" />
 		<panel label="Zawart." name="Contents">
-			<button label="Nowy skrypt" label_selected="Nowy skrypt" name="button new script" />
+			<flyout_button label="Nowy skrypt" label_selected="Nowy skrypt" name="button new script" />
 			<button label="Prawa" name="button permissions" />
 		</panel>
 	</tab_container>

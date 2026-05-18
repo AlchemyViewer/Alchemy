@@ -2989,7 +2989,7 @@ even though the user gets a free copy.
          name="Contents"
          top_delta="0"
          width="300">
-            <button
+            <flyout_button
              follows="left|top"
              height="23"
              label="New Script"
@@ -2997,8 +2997,18 @@ even though the user gets a free copy.
              layout="topleft"
              left="10"
              name="button new script"
+             tool_tip="Create a new script in this object"
              top="10"
-             width="140" />
+             width="140">
+                <flyout_button.item
+                 label="New LSL Script"
+                 name="new_lsl_script_item"
+                 value="lsl" />
+                <flyout_button.item
+                 label="New Lua Script"
+                 name="new_lua_script_item"
+                 value="lua" />
+            </flyout_button>
             <button
              follows="left|top"
              height="23"
