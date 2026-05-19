@@ -607,6 +607,21 @@ void LLFloaterSettingsDebug::setSearchFilter(const std::string& filter)
         return;
     mSearchFilter = filter;
     LLStringUtil::toLower(mSearchFilter);
+    // Split mSearchFilter into tokens on '+' and store in mSearchTokens
+    mSearchTokens.clear();
+    std::string::size_type start = 0;
+    while (true)
+    {
+        std::string::size_type plus = mSearchFilter.find('+', start);
+        std::string token = mSearchFilter.substr(start, plus == std::string::npos ? plus : plus - start);
+        LLStringUtil::trim(token);
+        if (!token.empty())
+        {
+            mSearchTokens.push_back(token);
+        }
+        if (plus == std::string::npos) break;
+        start = plus + 1;
+    }
     updateList();
 }
 
@@ -616,9 +631,19 @@ bool LLFloaterSettingsDebug::matchesSearchFilter(std::string setting_name)
     if (mSearchFilter.empty()) return true;
 
     LLStringUtil::toLower(setting_name);
-    std::string::size_type match_name = setting_name.find(mSearchFilter);
 
-    return (std::string::npos != match_name);
+    std::string::size_type match_name = std::string::npos;
+
+    for(const std::string& token : mSearchTokens)
+    {
+        match_name = setting_name.find(token);
+        if(std::string::npos == match_name)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool LLFloaterSettingsDebug::isSettingHidden(LLControlVariable* control)
