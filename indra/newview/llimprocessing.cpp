@@ -243,8 +243,8 @@ void inventory_offer_handler(LLOfferInfo* info)
 
         // Archive parity: announce auto-accepted inventory in a toast.
         if (info->mType != LLAssetType::AT_NOTECARD
-            || info->mType != LLAssetType::AT_LANDMARK
-            || info->mType != LLAssetType::AT_TEXTURE)
+            && info->mType != LLAssetType::AT_LANDMARK
+            && info->mType != LLAssetType::AT_TEXTURE)
         {
             LLSD auto_accept_args;
             auto_accept_args["NAME"] = LLSLURL(info->mFromGroup ? "group" : "agent", info->mFromID, "about").getSLURLString();

@@ -1365,7 +1365,7 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
                     mPreview->setIcon(p);
             }
         });
-        cell->setMouseLeaveCallback([this](LLUICtrl* c, const LLSD&)
+        cell->setMouseLeaveCallback([](LLUICtrl* c, const LLSD&)
         {
             if (auto* p = dynamic_cast<LLEmojiGridIcon*>(c))
             {
