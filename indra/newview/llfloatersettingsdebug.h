@@ -68,6 +68,8 @@ private:
 
     LLScrollListCtrl* mSettingList;
 
+    std::vector<std::string> mSearchTokens;
+
 protected:
     class LLTextEditor* mComment;
     LLSpinCtrl*         mValSpinner1 = nullptr;
