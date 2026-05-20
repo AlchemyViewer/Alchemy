@@ -98,7 +98,13 @@ namespace
         sizeof(kVolumeCurveSampleDistances[0]);
 
     F3DAUDIO_DISTANCE_CURVE_POINT kVolumeCurvePoints[kVolumeCurvePointCount];
-    F3DAUDIO_DISTANCE_CURVE kVolumeCurve = {
+    // F3DAudio.h wraps its structs in `#pragma pack(push, 1)`, giving
+    // F3DAUDIO_DISTANCE_CURVE an alignment of 1 even though its first
+    // field is a pointer. On arm64 the linker refuses to merge globals
+    // when a pointer relocation lands on an under-aligned offset
+    // ("ld: pointer not aligned in '__MergedGlobals'+0xC"). Force each
+    // curve instance to pointer alignment so pPoints stays 8-aligned.
+    alignas(void*) F3DAUDIO_DISTANCE_CURVE kVolumeCurve = {
         kVolumeCurvePoints,
         static_cast<uint32_t>(kVolumeCurvePointCount)
     };
@@ -154,7 +160,7 @@ namespace
         { 0.781f, 0.400f },   //  300 m: strong muffling
         { 1.000f, 0.300f },   //  384 m: at silence anyway, but cap the bottom
     };
-    F3DAUDIO_DISTANCE_CURVE kLpfCurve = {
+    alignas(void*) F3DAUDIO_DISTANCE_CURVE kLpfCurve = {
         kLpfCurvePoints,
         static_cast<uint32_t>(sizeof(kLpfCurvePoints) /
                               sizeof(kLpfCurvePoints[0]))
