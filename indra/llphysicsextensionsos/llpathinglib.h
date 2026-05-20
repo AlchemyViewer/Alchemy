@@ -170,7 +170,7 @@ public:
     virtual void renderSimpleShapes( LLRender& gl, F32 regionsWaterHeight ) = 0;
 
     //Method called from second life to create a capsule from properties of a character
-    virtual void createPhysicsCapsuleRep( F32 length, F32 radius,  BOOL horizontal, const LLUUID& id ) = 0;
+    virtual void createPhysicsCapsuleRep( F32 length, F32 radius,  bool horizontal, const LLUUID& id ) = 0;
     //Removes any cached physics capsule using a list of cached uuids
     virtual void cleanupPhysicsCapsuleRepResiduals() = 0;
     //Renders a selected uuids physics rep

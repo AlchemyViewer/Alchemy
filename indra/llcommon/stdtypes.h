@@ -54,7 +54,6 @@ typedef char32_t            llwchar;
 typedef float               F32;
 typedef double              F64;
 
-typedef S32             BOOL;
 typedef U8              KEY;
 typedef U32             MASK;
 typedef U32             TPACKETID;
@@ -77,15 +76,6 @@ typedef U32             TPACKETID;
 #define U32_MIN     (0)
 #define F32_MIN     (FLT_MIN)
 #define F64_MIN     (DBL_MIN)
-
-
-#ifndef TRUE
-#define TRUE            (1)
-#endif
-
-#ifndef FALSE
-#define FALSE           (0)
-#endif
 
 #ifndef NULL
 #define NULL            (0)

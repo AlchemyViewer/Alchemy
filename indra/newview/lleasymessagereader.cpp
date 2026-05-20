@@ -78,9 +78,9 @@ LLMessageTemplate* LLEasyMessageReader::decodeTemplateMessage(U8 *data, S32 data
         sequence_id = ntohl(net_sec_id);
 
         mTemplateMessageReader.clearMessage();
-        if(mTemplateMessageReader.validateMessage(decodep, data_len, from_host, TRUE))
+        if(mTemplateMessageReader.validateMessage(decodep, data_len, from_host, true))
         {
-            if(mTemplateMessageReader.decodeData(decodep, from_host, TRUE))
+            if(mTemplateMessageReader.decodeData(decodep, from_host, true))
             {
                 message_template = mTemplateMessageReader.getTemplate();
             }

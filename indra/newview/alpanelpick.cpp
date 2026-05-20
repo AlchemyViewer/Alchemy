@@ -295,7 +295,7 @@ std::string ALPanelPickInfo::createLocationText(const std::string& owner_name, c
 void ALPanelPickInfo::setSnapshotId(const LLUUID& id)
 {
     mSnapshotCtrl->setImageAssetID(id);
-    mSnapshotCtrl->setValid(TRUE);
+    mSnapshotCtrl->setValid(true);
 }
 
 void ALPanelPickInfo::setPickName(const std::string& name)
@@ -562,7 +562,7 @@ void ALPanelPickEdit::onClickSetLocation()
     setPickLocation(createLocationText(getLocationNotice(), parcel_name, region_name, getPosGlobal()));
 
     mLocationChanged = true;
-    enableSaveButton(TRUE);
+    enableSaveButton(true);
 }
 
 void ALPanelPickEdit::onClickSave()
@@ -598,15 +598,15 @@ void ALPanelPickEdit::initTexturePickerMouseEvents()
     mSnapshotCtrl->setMouseEnterCallback(boost::bind(&ALPanelPickEdit::onTexturePickerMouseEnter, this, _1));
     mSnapshotCtrl->setMouseLeaveCallback(boost::bind(&ALPanelPickEdit::onTexturePickerMouseLeave, this, _1));
 
-    text_icon->setVisible(FALSE);
+    text_icon->setVisible(false);
 }
 
 void ALPanelPickEdit::onTexturePickerMouseEnter(LLUICtrl* ctrl)
 {
-        text_icon->setVisible(TRUE);
+        text_icon->setVisible(true);
 }
 
 void ALPanelPickEdit::onTexturePickerMouseLeave(LLUICtrl* ctrl)
 {
-    text_icon->setVisible(FALSE);
+    text_icon->setVisible(false);
 }

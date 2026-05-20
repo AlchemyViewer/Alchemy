@@ -284,7 +284,7 @@ void ALPanelClassifiedEdit::resetControls()
     {
         getChild<LLUICtrl>("price_for_listing")->setValue(MINIMUM_PRICE_FOR_LISTING);
     }
-    getChildView("price_for_listing")->setEnabled(TRUE);
+    getChildView("price_for_listing")->setEnabled(true);
 }
 
 bool ALPanelClassifiedEdit::canClose() { return mCanClose; }
@@ -522,9 +522,9 @@ void ALPanelClassifiedEdit::notifyInvalidName()
     }
 }
 
-void ALPanelClassifiedEdit::onTexturePickerMouseEnter(LLUICtrl* ctrl) { ctrl->setVisible(TRUE); }
+void ALPanelClassifiedEdit::onTexturePickerMouseEnter(LLUICtrl* ctrl) { ctrl->setVisible(true); }
 
-void ALPanelClassifiedEdit::onTexturePickerMouseLeave(LLUICtrl* ctrl) { ctrl->setVisible(FALSE); }
+void ALPanelClassifiedEdit::onTexturePickerMouseLeave(LLUICtrl* ctrl) { ctrl->setVisible(false); }
 
 void ALPanelClassifiedEdit::onTextureSelected()
 {
