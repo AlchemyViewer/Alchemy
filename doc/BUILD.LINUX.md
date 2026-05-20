@@ -8,9 +8,9 @@ For presets, options, configuration types, and tests, see [BUILD.md](BUILD.md). 
 <summary>Arch</summary>
 
 ```
-sudo pacman -Syu automake autoconf base-devel cmake fontconfig git glib2-devel \
-    gstreamer gst-plugins-base-libs ninja libglvnd libvlc libx11 pkgconf python \
-    wayland dotnet-sdk rustup
+sudo pacman -Syu automake autoconf autoconf-archive base-devel cmake fontconfig git glib2-devel \
+    gstreamer gst-plugins-base-libs ninja libglvnd libtool libvlc libx11 pkgconf python \
+    wayland dotnet-sdk rustup zip
 ```
 
 </details>
