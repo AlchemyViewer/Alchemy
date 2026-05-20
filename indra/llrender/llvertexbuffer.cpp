@@ -1382,16 +1382,10 @@ void LLVertexBuffer::flush_vbo(GLenum target, U32 start, U32 end, void* data, U8
             LL_PROFILE_ZONE_NUM(end);
             LL_PROFILE_ZONE_NUM(end-start);
 
-            constexpr U32 block_size = 65536;
-
-            for (U32 i = start; i <= end; i += block_size)
-            {
-                //LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("glBufferSubData block");
-                //LL_PROFILE_GPU_ZONE("glBufferSubData");
-                U32 tend = llmin(i + block_size, end);
-                U32 size = tend - i + 1;
-                glBufferSubData(target, i, size, (U8*) data + (i-start));
-            }
+            // Issue a single glBufferSubData; modern drivers handle internal
+            // chunking better than user-space loops, and the chunked loop is
+            // a relic that fragments DMA scheduling.
+            glBufferSubData(target, start, end - start + 1, data);
         }
     }
 }
