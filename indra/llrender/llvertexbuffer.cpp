@@ -428,7 +428,15 @@ public:
         //(245/276)/385 MB (distributed/allocated)/reserved in VBO Pool. Overhead: 57 percent. Hit rate: 69 percent
         //(187/209)/397 MB (distributed/allocated)/reserved in VBO Pool. Overhead: 112 percent. Hit rate: 76 percent
         U32 block_size = llmax(nhpo2(size) / 8, (U32) 16);
-        size += block_size - (size % block_size);
+        // Round size UP to the next multiple of block_size, but DON'T add a full block
+        // when size is already aligned. The previous "size += block_size - (size %
+        // block_size)" form unconditionally added block_size for aligned inputs, wasting
+        // memory at every bucket boundary.
+        const U32 rem = size % block_size;
+        if (rem != 0)
+        {
+            size += block_size - rem;
+        }
     }
 
     void allocateVBO(GLenum type, U32 size, GLuint& name, U8*& data) override
