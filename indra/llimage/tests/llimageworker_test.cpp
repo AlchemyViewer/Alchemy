@@ -71,6 +71,16 @@ LLImageFormatted::LLImageFormatted(S8 codec)
 {
 }
 LLImageFormatted::~LLImageFormatted(){}
+void LLImageFormatted::dump() { }
+void LLImageFormatted::sanityCheck() { }
+void LLImageFormatted::deleteData() { }
+U8* LLImageFormatted::allocateData(S32 size) { return NULL; }
+U8* LLImageFormatted::reallocateData(S32 size) { return NULL; }
+void LLImageFormatted::resetLastError() { }
+void LLImageFormatted::setLastError(const std::string&, const std::string&) { }
+S32 LLImageFormatted::calcDataSize(S32 discard_level) { return 0; }
+S32 LLImageFormatted::calcDiscardLevelBytes(S32 bytes) { return 0; }
+bool LLImageFormatted::decodeChannels(LLImageRaw* raw_image,F32  decode_time, S32 first_channel, S32 max_channel) { return false; }
 
 LLImageRaw::LLImageRaw(U16 width, U16 height, S8 components) { }
 LLImageRaw::~LLImageRaw() { }

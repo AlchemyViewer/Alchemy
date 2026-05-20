@@ -64,8 +64,6 @@ class LLViewerJoystick;
 class LLPurgeDiskCacheThread;
 class LLViewerRegion;
 
-extern LLTrace::BlockTimerStatHandle FTM_FRAME;
-
 typedef enum
 {
     LAST_EXEC_NORMAL = 0,

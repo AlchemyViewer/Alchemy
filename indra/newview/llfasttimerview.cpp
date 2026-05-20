@@ -59,6 +59,8 @@
 
 using namespace LLTrace;
 
+extern LLTrace::BlockTimerStatHandle FTM_FRAME;
+
 static constexpr S32 MAX_VISIBLE_HISTORY = 12;
 static constexpr S32 LINE_GRAPH_HEIGHT = 240;
 static constexpr S32 MIN_BAR_HEIGHT = 3;
