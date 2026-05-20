@@ -52,7 +52,7 @@ public:
     void            clearContents();
 
 
-    static void     onClickNewScript(void*);
+    void     onClickNewScript(LLUICtrl* ctrl);
     static void     onClickPermissions(void*);
 
     // Key suffix for "tentative" fields
@@ -71,6 +71,9 @@ protected:
     void onFilterEdit();
 
     bool mDirtyFilter { false };
+
+private:
+    bool isLuaEnabledForObjectRegion(LLViewerObject *objectp);
 
 public:
     class LLFilterEditor* mFilterEditor;

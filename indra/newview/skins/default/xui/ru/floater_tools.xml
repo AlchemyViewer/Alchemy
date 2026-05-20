@@ -414,7 +414,7 @@
 		</panel>
 		<panel label="Текстура" name="Texture"/>
 		<panel label="Контент" name="Contents">
-			<button label="Создать скрипт" label_selected="Создать скрипт" name="button new script"/>
+			<flyout_button label="Создать скрипт" label_selected="Создать скрипт" name="button new script"/>
 			<button label="Разрешения" name="button permissions"/>
 		</panel>
 	</tab_container>
