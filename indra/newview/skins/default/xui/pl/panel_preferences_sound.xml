@@ -3,6 +3,8 @@
 	<panel.string name="middle_mouse">
 		Środkowy przycisk myszy
 	</panel.string>
+    <tab_container name="sound_prefs_tab_container">
+    <panel name="general_sound_panel">
 	<slider label="Głośność ogólna" name="System Volume" />
 	<text name="mute_chb_label">
 		Wycisz gdy zminimalizowane
@@ -21,17 +23,21 @@
 	<text name="voice_chat_settings">
 		Rozmowy głosowe
 	</text>
-	<text name="Listen from">
-		Odtwarzaj głos z:
-	</text>
-	<radio_group name="ear_location">
-		<radio_item label="Pozycji mojej kamery" name="0" />
-		<radio_item label="Pozycji mojego awatara" name="1" />
-	</radio_group>
-	<check_box label="Poruszaj ustami awatara podczas mówienia" name="enable_lip_sync" />
-	<check_box label="Włącz/wyłącz mikrofon kiedy naciskam:" name="push_to_talk_toggle_check" tool_tip="Kiedy aktywny jest tryb przełączania wciśnij i zwolnij przełącznik RAZ, aby włączyć lub wyłączyć mikrofon. Kiedy tryb przełączania nie jest aktywny mikrofon nadaje głos tylko wtedy, gdy przełącznik jest wciśnięty." />
 	<line_editor name="modifier_combo" label="Przełącznik naciśnij-by-mówić" />
 	<button label="Ustaw klawisz" name="set_voice_hotkey_button" />
 	<button tool_tip="Zresetuj do środkowego przycisku myszy" name="set_voice_middlemouse_button" />
+	</panel>
+	<panel name="voice_sound_panel">
+	<text name="Listen from">
+		Odtwarzaj głos z:
+	</text>
+	<combo_box name="ear_location_combo">
+		<item label="Pozycji mojej kamery" name="camera_position" />
+		<item label="Pozycji mojego awatara" name="avatar_position" />
+	</combo_box>
+	<check_box label="Poruszaj ustami awatara podczas mówienia" name="enable_lip_sync" />
+	<check_box label="Włącz/wyłącz mikrofon kiedy naciskam:" name="push_to_talk_toggle_check" tool_tip="Kiedy aktywny jest tryb przełączania wciśnij i zwolnij przełącznik RAZ, aby włączyć lub wyłączyć mikrofon. Kiedy tryb przełączania nie jest aktywny mikrofon nadaje głos tylko wtedy, gdy przełącznik jest wciśnięty." />
 	<button label="Ustawienia sprzętowe audio" name="device_settings_btn" />
+	</panel>
+	</tab_container>
 </panel>

@@ -33,7 +33,7 @@
     height="430" 
     left_delta="0"
     mouse_opaque="false" 
-    name="sound_tab_container" 
+    name="sound_prefs_tab_container" 
     tab_position="top"
     tab_stop="false" 
     width="517">
@@ -86,90 +86,6 @@
      width="20"
      label="Mute when minimized"
      word_wrap="true"/>
-    <text
-     follows="left|top"
-     height="15"
-     halign="right"
-     layout="topleft"
-     left="0"
-     name="audio_output_device_label"
-     top_pad="6"
-     width="120">
-     Output device:
-    </text>
-    <combo_box
-     follows="left|top"
-     height="23"
-     layout="topleft"
-     left_pad="5"
-     name="audio_output_device_combo"
-     top_delta="-4"
-     tool_tip="Pick a specific audio output device. Applies immediately (brief silence while audio re-bootstraps); also saved for next launch."
-     width="280" />
-    <text
-     follows="left|top"
-     height="15"
-     halign="right"
-     layout="topleft"
-     left="0"
-     name="audio_reverb_label"
-     top_pad="6"
-     width="120">
-     Reverb preset:
-    </text>
-    <combo_box
-     control_name="AudioReverbPreset"
-     follows="left|top"
-     height="23"
-     layout="topleft"
-     left_pad="5"
-     name="audio_reverb_combo"
-     top_delta="-4"
-     tool_tip="I3DL2 reverb preset applied by the active audio backend. Applies immediately."
-     width="280">
-        <item label="Default"           value="DEFAULT" />
-        <item label="Generic"           value="GENERIC" />
-        <item label="Padded cell"       value="PADDEDCELL" />
-        <item label="Room"              value="ROOM" />
-        <item label="Bathroom"          value="BATHROOM" />
-        <item label="Living room"       value="LIVINGROOM" />
-        <item label="Stone room"        value="STONEROOM" />
-        <item label="Auditorium"        value="AUDITORIUM" />
-        <item label="Concert hall"      value="CONCERTHALL" />
-        <item label="Cave"              value="CAVE" />
-        <item label="Arena"             value="ARENA" />
-        <item label="Hangar"            value="HANGAR" />
-        <item label="Carpeted hallway"  value="CARPETEDHALLWAY" />
-        <item label="Hallway"           value="HALLWAY" />
-        <item label="Stone corridor"    value="STONECORRIDOR" />
-        <item label="Alley"             value="ALLEY" />
-        <item label="Forest"            value="FOREST" />
-        <item label="City"              value="CITY" />
-        <item label="Mountains"         value="MOUNTAINS" />
-        <item label="Quarry"            value="QUARRY" />
-        <item label="Plain (outdoor)"   value="PLAIN" />
-        <item label="Parking lot"       value="PARKINGLOT" />
-        <item label="Sewer pipe"        value="SEWERPIPE" />
-        <item label="Underwater"        value="UNDERWATER" />
-        <item label="Small room"        value="SMALLROOM" />
-    </combo_box>
-    <slider
-     follows="left|top"
-     height="15"
-     increment="0.005"
-     initial_value="0.05"
-     label="Reverb amount"
-     label_width="120"
-     layout="topleft"
-     left="0"
-     max_val="1.0"
-     min_val="0.0"
-     name="audio_reverb_send_slider"
-     show_text="true"
-     slider_label.halign="right"
-     tool_tip="How wet the reverb submix mixes back into the master. 0 disables the reverb send. Bound to the active backend's per-backend send-scale key (FAudio / OpenAL / FMOD each persist their own value because the same scalar drives three different DSPs). Applies immediately."
-     top_pad="4"
-     width="300" />
 	<slider
 		control_name="AudioLevelUI"
 		disabled_control="MuteAudio"
@@ -456,31 +372,31 @@
      top_delta="-4"
      tool_tip="I3DL2 reverb preset applied by the active audio backend. Applies immediately."
      width="280">
-        <item label="Default"           value="DEFAULT" />
-        <item label="Generic"           value="GENERIC" />
-        <item label="Padded cell"       value="PADDEDCELL" />
-        <item label="Room"              value="ROOM" />
-        <item label="Bathroom"          value="BATHROOM" />
-        <item label="Living room"       value="LIVINGROOM" />
-        <item label="Stone room"        value="STONEROOM" />
-        <item label="Auditorium"        value="AUDITORIUM" />
-        <item label="Concert hall"      value="CONCERTHALL" />
-        <item label="Cave"              value="CAVE" />
-        <item label="Arena"             value="ARENA" />
-        <item label="Hangar"            value="HANGAR" />
-        <item label="Carpeted hallway"  value="CARPETEDHALLWAY" />
-        <item label="Hallway"           value="HALLWAY" />
-        <item label="Stone corridor"    value="STONECORRIDOR" />
-        <item label="Alley"             value="ALLEY" />
-        <item label="Forest"            value="FOREST" />
-        <item label="City"              value="CITY" />
-        <item label="Mountains"         value="MOUNTAINS" />
-        <item label="Quarry"            value="QUARRY" />
-        <item label="Plain (outdoor)"   value="PLAIN" />
-        <item label="Parking lot"       value="PARKINGLOT" />
-        <item label="Sewer pipe"        value="SEWERPIPE" />
-        <item label="Underwater"        value="UNDERWATER" />
-        <item label="Small room"        value="SMALLROOM" />
+        <item name="reverb_default"       label="Default"           value="DEFAULT" />
+        <item name="reverb_generic"       label="Generic"           value="GENERIC" />
+        <item name="reverb_paddedcell"    label="Padded cell"       value="PADDEDCELL" />
+        <item name="reverb_room"          label="Room"              value="ROOM" />
+        <item name="reverb_bathroom"      label="Bathroom"          value="BATHROOM" />
+        <item name="reverb_livingroom"    label="Living room"       value="LIVINGROOM" />
+        <item name="reverb_stoneroom"     label="Stone room"        value="STONEROOM" />
+        <item name="reverb_auditorium"    label="Auditorium"        value="AUDITORIUM" />
+        <item name="reverb_concerthall"   label="Concert hall"      value="CONCERTHALL" />
+        <item name="reverb_cave"          label="Cave"              value="CAVE" />
+        <item name="reverb_arena"         label="Arena"             value="ARENA" />
+        <item name="reverb_hangar"        label="Hangar"            value="HANGAR" />
+        <item name="reverb_carpetedhallway" label="Carpeted hallway"  value="CARPETEDHALLWAY" />
+        <item name="reverb_hallway"       label="Hallway"           value="HALLWAY" />
+        <item name="reverb_stonecorridor" label="Stone corridor"  value="STONECORRIDOR" />
+        <item name="reverb_alley"         label="Alley"             value="ALLEY" />
+        <item name="reverb_forest"        label="Forest"            value="FOREST" />
+        <item name="reverb_city"          label="City"              value="CITY" />
+        <item name="reverb_mountains"     label="Mountains"         value="MOUNTAINS" />
+        <item name="reverb_quarry"        label="Quarry"            value="QUARRY" />
+        <item name="reverb_plain"         label="Plain (outdoor)"   value="PLAIN" />
+        <item name="reverb_parkinglot"    label="Parking lot"       value="PARKINGLOT" />
+        <item name="reverb_sewerpipe"     label="Sewer pipe"        value="SEWERPIPE" />
+        <item name="reverb_underwater"    label="Underwater"        value="UNDERWATER" />
+        <item name="reverb_smallroom"     label="Small room"        value="SMALLROOM" />
     </combo_box>
     <slider
      follows="left|top"

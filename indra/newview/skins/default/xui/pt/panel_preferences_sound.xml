@@ -1,6 +1,8 @@
 <?xml version="1.0" ?>
 <panel label="Sons" name="Preference Media panel">
 	<panel.string name="middle_mouse">Botão do meio do mouse</panel.string>
+    <tab_container name="sound_prefs_tab_container">
+    <panel name="general_sound_panel">
 	<slider label="Volume principal" name="System Volume"/>
 	<check_box initial_value="true" name="mute_when_minimized"/>
 	<text name="mute_chb_label">Silenciar ao minimizar</text>
@@ -17,21 +19,25 @@
 	<check_box label="Tocar mídia anexada em outros avatares" name="media_show_on_others_btn" tool_tip="Desmarque esta opção para ocultar mídias anexadas em avatares por perto" value="true"/>
 	<check_box label="Tocar áudio de gestos" name="gesture_audio_play_btn" tool_tip="Selecione para ouvir o áudio de gestos" value="true"/>
 	<text name="voice_chat_settings">Configuração de bate-papo de voz</text>
-	<text name="Listen from">Ouvir a partir de:</text>
-	<radio_group name="ear_location">
-		<radio_item label="Posição de câmera" name="0"/>
-		<radio_item label="Posição do avatar" name="1"/>
-	</radio_group>
-	<check_box label="Mover os lábios do avatar quando estiver falando" name="enable_lip_sync"/>
-	<check_box label="Tecla liga/desliga da minha voz:" name="push_to_talk_toggle_check" tool_tip="Quando em modo de alternância, pressione e solte o botão UMA vez para ligar e desligar o microfone. Fora do modo de alternância, o microfone só transmite sua voz enquanto o botão estiver pressionado."/>
 	<line_editor label="Botão apertar e falar" name="modifier_combo"/>
 	<button label="Definir chave" name="set_voice_hotkey_button"/>
 	<button name="set_voice_middlemouse_button" tool_tip="Redefinir como botão do meio do mouse"/>
-	<button label="Controles de entrada/saída" name="device_settings_btn" width="180"/>
 	<panel label="Configuração dos dispositivo" name="device_settings_panel"/>
 	<combo_box name="media_auto_play_combo">
 		<item name="autoplay_enabled" label="Sim"/>
 		<item name="autoplay_ask" label="Perguntar"/>
 		<item name="autoplay_disabled" label="Não"/>
 	</combo_box>
+	</panel>
+	<panel name="voice_sound_panel">
+	<text name="Listen from">Ouvir a partir de:</text>
+	<combo_box name="ear_location_combo">
+		<item label="Posição de câmera" name="camera_position"/>
+		<item label="Posição do avatar" name="avatar_position"/>
+	</combo_box>
+	<check_box label="Mover os lábios do avatar quando estiver falando" name="enable_lip_sync"/>
+	<check_box label="Tecla liga/desliga da minha voz:" name="push_to_talk_toggle_check" tool_tip="Quando em modo de alternância, pressione e solte o botão UMA vez para ligar e desligar o microfone. Fora do modo de alternância, o microfone só transmite sua voz enquanto o botão estiver pressionado."/>
+	<button label="Controles de entrada/saída" name="device_settings_btn" width="180"/>
+	</panel>
+	</tab_container>
 </panel>

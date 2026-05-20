@@ -3,6 +3,8 @@
 	<panel.string name="middle_mouse">
 		Orta Fare
 	</panel.string>
+    <tab_container name="sound_prefs_tab_container">
+    <panel name="general_sound_panel">
 	<slider label="Ana ses düzeyi" name="System Volume"/>
 	<check_box initial_value="true" name="mute_when_minimized"/>
 	<text name="mute_chb_label">
@@ -23,18 +25,22 @@
 	<text name="voice_chat_settings">
 		Sesli Sohbet Ayarları
 	</text>
-	<text name="Listen from">
-		Şuradan dinle:
-	</text>
-	<radio_group name="ear_location">
-		<radio_item label="Kamera konumu" name="0"/>
-		<radio_item label="Avatar konumu" name="1"/>
-	</radio_group>
-	<check_box label="Konuşurken avatar dudaklarını hareket ettir" name="enable_lip_sync"/>
-	<check_box label="Aşağıdaki düğmeye bastığımda konuşmayı aç/kapat:" name="push_to_talk_toggle_check" tool_tip="Toggle (dönüşümlü) modda mikrofonunuzu açıp kapatmak için tetikleyici tuşuna BİR KERE basıp bırakın. Toggle (dönüşümlü) modda değilken mikrofonunuz sadece tetikleyici tuş basılı tutulurken sesinizi yayınlar."/>
 	<line_editor label="Bas-Konuş tetikleyici" name="modifier_combo"/>
 	<button label="Tuş Ayarla" name="set_voice_hotkey_button"/>
 	<button name="set_voice_middlemouse_button" tool_tip="Orta Fare Düğmesine Sıfırla"/>
-	<button label="Giriş/Çıkış cihazları" name="device_settings_btn"/>
 	<panel label="Cihaz Ayarları" name="device_settings_panel"/>
+	</panel>
+	<panel name="voice_sound_panel">
+	<text name="Listen from">
+		Şuradan dinle:
+	</text>
+	<combo_box name="ear_location_combo">
+		<item label="Kamera konumu" name="camera_position"/>
+		<item label="Avatar konumu" name="avatar_position"/>
+	</combo_box>
+	<check_box label="Konuşurken avatar dudaklarını hareket ettir" name="enable_lip_sync"/>
+	<check_box label="Aşağıdaki düğmeye bastığımda konuşmayı aç/kapat:" name="push_to_talk_toggle_check" tool_tip="Toggle (dönüşümlü) modda mikrofonunuzu açıp kapatmak için tetikleyici tuşuna BİR KERE basıp bırakın. Toggle (dönüşümlü) modda değilken mikrofonunuz sadece tetikleyici tuş basılı tutulurken sesinizi yayınlar."/>
+	<button label="Giriş/Çıkış cihazları" name="device_settings_btn"/>
+	</panel>
+	</tab_container>
 </panel>
