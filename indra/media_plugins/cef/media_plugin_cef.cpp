@@ -722,10 +722,6 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 
                 // now we can set page zoom factor
                 F32 factor = (F32)message_in.getValueReal("factor");
-#if LL_DARWIN
-                //temporary fix for SL-10473: issue with displaying checkboxes on Mojave
-                factor*=1.001;
-#endif
                 mCEFLib->setPageZoom(factor);
 
                 // Plugin gets to decide the texture parameters to use.
@@ -895,23 +891,6 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
             }
             else if (message_name == "key_event")
             {
-#if LL_DARWIN
-                std::string event = message_in.getValue("event");
-                LLSD native_key_data = message_in.getValueLLSD("native_key_data");
-
-                dullahan::EKeyEvent key_event = dullahan::KE_KEY_UP;
-                if (event == "down")
-                {
-                    key_event = dullahan::KE_KEY_DOWN;
-                }
-                else if (event == "repeat")
-                {
-                    key_event = dullahan::KE_KEY_REPEAT;
-                }
-
-                keyEvent(key_event, native_key_data);
-
-#else
                 std::string event = message_in.getValue("event");
                 LLSD native_key_data = message_in.getValueLLSD("native_key_data");
 
@@ -927,7 +906,6 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 }
 
                 keyEvent(key_event, native_key_data);
-#endif
             }
             else if (message_name == "enable_media_plugin_debugging")
             {
@@ -993,10 +971,6 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
             if (message_name == "set_page_zoom_factor")
             {
                 F32 factor = (F32)message_in.getValueReal("factor");
-#if LL_DARWIN
-                //temporary fix for SL-10473: issue with displaying checkboxes on Mojave
-                factor*=1.001;
-#endif
                 mCEFLib->setPageZoom(factor);
             }
             if (message_name == "browse_stop")
