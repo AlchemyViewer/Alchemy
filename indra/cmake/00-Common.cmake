@@ -399,6 +399,11 @@ if(DARWIN)
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES)
   add_compile_options($<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
 
+
+  # Enable C++ modules support for compatability with modern Apple frameworks
+  # and third party libraries that use them, and to speed up compilation.
+  add_compile_options(-fmodules -fcxx-modules)
+
   # Ensure debug symbols are always generated
   add_compile_options(-g2 -gdwarf -fno-fast-math)
 

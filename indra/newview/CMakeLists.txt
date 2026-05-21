@@ -1698,17 +1698,6 @@ if (DARWIN)
       )
 
     set_source_files_properties(llappviewersdl.cpp PROPERTIES LANGUAGE OBJCXX)
-    # BugsplatMac is consumed via @import (an Objective-C module), which
-    # requires -fmodules / -fcxx-modules. The BugsplatMac headers also don't
-    # annotate nullability everywhere, so silence that warning to match the
-    # legacy Cocoa path. Skip the precompiled header here because modules
-    # don't play well with PCH for this translation unit.
-    set_source_files_properties(
-      llappviewersdl.cpp
-      PROPERTIES
-      SKIP_PRECOMPILE_HEADERS TRUE
-      COMPILE_FLAGS "-fmodules -fcxx-modules -Wno-nullability-completeness"
-      )
   else()
     LIST(APPEND viewer_SOURCE_FILES llappdelegate-objc.mm)
     LIST(APPEND viewer_SOURCE_FILES llappviewermacosx.cpp)
@@ -1735,13 +1724,6 @@ if (DARWIN)
       llappdelegate-objc.mm
       PROPERTIES
       SKIP_PRECOMPILE_HEADERS TRUE
-      # BugsplatMac is a module, imported with @import. That language feature
-      # demands these -f switches.
-      # Xcode 10.2 requires that Objective-C++ headers declare nullability of
-      # pointer variables. As of 2019-06-26, the BugsplatMac version we're using
-      # does not yet do so in its own header files. This -W flag prevents fatal
-      # warnings.
-      COMPILE_FLAGS "-fmodules -fcxx-modules -Wno-nullability-completeness"
       )
 
     LIST(APPEND viewer_RESOURCE_FILES
