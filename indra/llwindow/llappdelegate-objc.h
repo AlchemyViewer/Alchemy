@@ -28,19 +28,19 @@
 #import "llopenglview-objc.h"
 
 @interface LLAppDelegate : NSObject <NSApplicationDelegate> {
-    LLNSWindow *window;
-    NSWindow *inputWindow;
-    LLNonInlineTextView *inputView;
+    __weak LLNSWindow *window;
+    __weak NSWindow *inputWindow;
+    __weak LLNonInlineTextView *inputView;
     NSTimer *frameTimer;
     NSString *currentInputLanguage;
     std::string secondLogPath;
 }
 
-@property (assign) IBOutlet LLNSWindow * _Nullable window;
-@property (assign) IBOutlet NSWindow * _Nullable inputWindow;
-@property (assign) IBOutlet LLNonInlineTextView * _Nullable inputView;
+@property (weak) IBOutlet LLNSWindow * _Nullable window;
+@property (weak) IBOutlet NSWindow * _Nullable inputWindow;
+@property (weak) IBOutlet LLNonInlineTextView * _Nullable inputView;
 
-@property (retain) NSString * _Nullable currentInputLanguage;
+@property (strong) NSString * _Nullable currentInputLanguage;
 
 - (void) oneFrame;
 - (void) showInputWindow:(bool)show withEvent:(nullable NSEvent *)textEvent;

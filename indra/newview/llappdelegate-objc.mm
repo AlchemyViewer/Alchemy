@@ -46,12 +46,6 @@
 @synthesize inputView;
 @synthesize currentInputLanguage;
 
-- (void)dealloc
-{
-    [currentInputLanguage release];
-    [super dealloc];
-}
-
 - (void) applicationWillFinishLaunching:(NSNotification *)notification
 {
     [[NSAppleEventManager sharedAppleEventManager] setEventHandler:self andSelector:@selector(handleGetURLEvent:withReplyEvent:) forEventClass:kInternetEventClass andEventID:kAEGetURL];
@@ -152,7 +146,7 @@
         return NSTerminateCancel;
     } else {
         // pumpMainLoop() returned true: it's done. Okay, done with frameTimer.
-        [frameTimer release];
+        [frameTimer invalidate];
         cleanupViewer();
         return NSTerminateNow;
     }
@@ -165,7 +159,7 @@
     {
         // Once pumpMainLoop() reports that we're done, cancel frameTimer:
         // stop the repetitive calls.
-        [frameTimer release];
+        [frameTimer invalidate];
         [[NSApplication sharedApplication] terminate:self];
     }
 }
@@ -199,6 +193,11 @@
 - (void) languageUpdated
 {
     TISInputSourceRef currentInput = TISCopyCurrentKeyboardInputSource();
+    if (!currentInput)
+    {
+        return;
+    }
+
     CFArrayRef languages = (CFArrayRef)TISGetInputSourceProperty(currentInput, kTISPropertyInputSourceLanguages);
 
 #if 0 // In the event of ever needing to add new language sources, change this to 1 and watch the terminal for "languages:"
@@ -206,22 +205,20 @@
 #endif
 
     // Typically the language we want is going to be the very first result in the array.
-    currentInputLanguage = (NSString*)CFArrayGetValueAtIndex(languages, 0);
+    if (languages && CFArrayGetCount(languages) > 0)
+    {
+        self.currentInputLanguage = (__bridge NSString *)CFArrayGetValueAtIndex(languages, 0);
+    }
+
+    CFRelease(currentInput);
 }
 
 - (bool) romanScript
 {
-    @autoreleasepool {
-        // How to add support for new languages with the input window:
-        // Simply append this array with the language code (ja for japanese, ko for korean, zh for chinese, etc.)
-        NSArray* nonRomanScript = @[@"ja", @"ko", @"zh-Hant", @"zh-Hans"];
-        if ([nonRomanScript containsObject:currentInputLanguage])
-        {
-            return false;
-        }
-    }
-
-    return true;
+    // How to add support for new languages with the input window:
+    // Simply append this array with the language code (ja for japanese, ko for korean, zh for chinese, etc.)
+    NSArray* nonRomanScript = @[@"ja", @"ko", @"zh-Hant", @"zh-Hans"];
+    return ![nonRomanScript containsObject:currentInputLanguage];
 }
 
 - (void) setBugsplatValue:(nullable NSString *)value forAttribute:(NSString *)attribute

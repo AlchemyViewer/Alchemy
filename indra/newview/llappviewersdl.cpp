@@ -66,7 +66,7 @@ static void handleUrl(const char* url_utf8);
 // back to SDL — so SDL's termination / focus / drop-file plumbing keeps
 // working unchanged.
 @interface LLSDLAppDelegate : NSObject <NSApplicationDelegate>
-@property (nonatomic, retain) id<NSApplicationDelegate> sdlDelegate;
+@property (nonatomic, strong) id<NSApplicationDelegate> sdlDelegate;
 - (instancetype)initWithSDLDelegate:(id<NSApplicationDelegate>)sdlDelegate;
 - (void)handleGetURLEvent:(NSAppleEventDescriptor *)event
            withReplyEvent:(NSAppleEventDescriptor *)replyEvent;
@@ -187,7 +187,7 @@ static bool isSLURL(const char* s)
     self = [super init];
     if (self)
     {
-        _sdlDelegate = [sdlDelegate retain];
+        _sdlDelegate = sdlDelegate;
         // Re-register the Apple Event handler for kInternetEventClass/kAEGetURL.
         // NSAppleEventManager replaces any previously-installed handler for
         // the same (class, id) pair, so this displaces SDL's own URL handler
@@ -206,10 +206,6 @@ static bool isSLURL(const char* s)
     [[NSAppleEventManager sharedAppleEventManager]
         removeEventHandlerForEventClass:kInternetEventClass
                              andEventID:kAEGetURL];
-#if !__has_feature(objc_arc)
-    [_sdlDelegate release];
-    [super dealloc];
-#endif
 }
 
 - (void)handleGetURLEvent:(NSAppleEventDescriptor *)event
@@ -502,16 +498,15 @@ bool LLAppViewerSDL::init()
         // nothing to wrap. By the time LLAppViewer::init() returns here,
         // initWindow() has run, SDL3's SDL3AppDelegate (SDL_cocoaevents.m)
         // owns NSApp.delegate, and we can capture+replace it.
+        //
+        // NSApp.delegate is a weak/assign reference, so we keep a strong
+        // reference here for the app's lifetime.
+        static LLSDLAppDelegate *sOurs = nil;
         @autoreleasepool
         {
             id<NSApplicationDelegate> sdlDelegate = [NSApp delegate];
-            LLSDLAppDelegate *ours =
-                [[LLSDLAppDelegate alloc] initWithSDLDelegate:sdlDelegate];
-            [NSApp setDelegate:ours];
-            // NSApp retains the delegate; drop our +1 from alloc.
-#if !__has_feature(objc_arc)
-            [ours release];
-#endif
+            sOurs = [[LLSDLAppDelegate alloc] initWithSDLDelegate:sdlDelegate];
+            [NSApp setDelegate:sOurs];
         }
 
         // From here on, handleUrl() will dispatch directly instead of buffering.

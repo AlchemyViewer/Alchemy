@@ -34,6 +34,14 @@
 
 #include "slplugin-objc.h"
 
+// libobjc runtime entry points used by @autoreleasepool; declared here so we
+// can push/pop pools across the C++ event-loop function boundaries in
+// slplugin.cpp where lexical @autoreleasepool blocks don't fit.
+extern "C" {
+    void *objc_autoreleasePoolPush(void);
+    void  objc_autoreleasePoolPop(void *pool);
+}
+
 //Note: NSApp is a global defined by cocoa which is an id to the application.
 
 void LLCocoaPlugin::setupCocoa()
@@ -42,53 +50,57 @@ void LLCocoaPlugin::setupCocoa()
 
     if(!inited)
     {
-        createAutoReleasePool();
+        @autoreleasepool {
+            // The following prevents the Cocoa command line parser from trying to open 'unknown' arguements as documents.
+            // ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
+            // when init'ing the Cocoa App window.
+            [[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
 
-        // The following prevents the Cocoa command line parser from trying to open 'unknown' arguements as documents.
-        // ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
-        // when init'ing the Cocoa App window.
-        [[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
+            // This is a bit of voodoo taken from the Apple sample code "CarbonCocoa_PictureCursor":
+            //   http://developer.apple.com/samplecode/CarbonCocoa_PictureCursor/index.html
 
-        // This is a bit of voodoo taken from the Apple sample code "CarbonCocoa_PictureCursor":
-        //   http://developer.apple.com/samplecode/CarbonCocoa_PictureCursor/index.html
+            //  Needed for Carbon based applications which call into Cocoa
+            NSApplicationLoad();
 
-        //  Needed for Carbon based applications which call into Cocoa
-        NSApplicationLoad();
+            //  Must first allocate an NSWindow to get the NSWindow machinery set up so that NSCursor can use a window to cache the cursor image
+            (void)[[NSWindow alloc] init];
 
-        //  Must first call [[[NSWindow alloc] init] release] to get the NSWindow machinery set up so that NSCursor can use a window to cache the cursor image
-        [[[NSWindow alloc] init] release];
-
-        mPluginWindow = [NSApp mainWindow];
-
-        deleteAutoReleasePool();
+            mPluginWindow = [NSApp mainWindow];
+        }
 
         inited = true;
     }
 }
 
-static NSAutoreleasePool *sPool = NULL;
+// ARC autorelease pools are normally lexically scoped (@autoreleasepool { ... }),
+// but the C++ slplugin event loop pushes/pops pools across function boundaries,
+// so we go directly to the runtime entry points that back @autoreleasepool.
+static void *sPool = NULL;
 
 void LLCocoaPlugin::createAutoReleasePool()
 {
-    if(!sPool)
+    if (!sPool)
     {
-        sPool = [[NSAutoreleasePool alloc] init];
+        sPool = objc_autoreleasePoolPush();
     }
 }
 
 void LLCocoaPlugin::deleteAutoReleasePool()
 {
-    if(sPool)
+    if (sPool)
     {
-        [sPool release];
+        objc_autoreleasePoolPop(sPool);
         sPool = NULL;
     }
 }
 
-LLCocoaPlugin::LLCocoaPlugin():mHackState(0)
+LLCocoaPlugin::LLCocoaPlugin():mFrontWindow(nullptr), mPluginWindow(nullptr), mHackState(0)
 {
     NSArray* window_list = [NSApp orderedWindows];
-    mFrontWindow = [window_list objectAtIndex:0];
+    if ([window_list count] > 0)
+    {
+        mFrontWindow = [window_list objectAtIndex:0];
+    }
 }
 
 void LLCocoaPlugin::processEvents()

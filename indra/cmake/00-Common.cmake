@@ -393,6 +393,12 @@ if(DARWIN)
   # Platform define
   add_compile_definitions(LL_DARWIN=1)
 
+  # Enable Automatic Reference Counting for Objective-C and Objective-C++.
+  # The Xcode attribute is what the Xcode generator actually honors; the
+  # compile option covers Ninja/Makefile generators.
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES)
+  add_compile_options($<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
+
   # Ensure debug symbols are always generated
   add_compile_options(-g2 -gdwarf -fno-fast-math)
 

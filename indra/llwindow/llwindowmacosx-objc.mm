@@ -67,7 +67,7 @@ bool copyToPBoard(const unsigned short *str, unsigned int len)
         NSPasteboard *pboard = [NSPasteboard generalPasteboard];
         [pboard clearContents];
 
-        NSArray *contentsToPaste = [[[NSArray alloc] initWithObjects:[NSString stringWithCharacters:str length:len], nil] autorelease];
+        NSArray *contentsToPaste = [[NSArray alloc] initWithObjects:[NSString stringWithCharacters:str length:len], nil];
         return [pboard writeObjects:contentsToPaste];
     }
 }
@@ -101,18 +101,15 @@ CursorRef createImageCursor(const char *fullpath, int hotspotX, int hotspotY)
 {
     NSCursor *cursor = nil;
     @autoreleasepool {
-        // extra retain on the NSCursor since we want it to live for the lifetime of the app.
-        cursor =
-        [[[NSCursor alloc]
-          initWithImage:
-              [[[NSImage alloc] initWithContentsOfFile:
-                    [NSString stringWithUTF8String:fullpath]
-               ] autorelease]
-          hotSpot:NSMakePoint(hotspotX, hotspotY)
-         ] retain];
+        NSImage *image = [[NSImage alloc] initWithContentsOfFile:
+                          [NSString stringWithUTF8String:fullpath]];
+        cursor = [[NSCursor alloc] initWithImage:image
+                                         hotSpot:NSMakePoint(hotspotX, hotspotY)];
     }
 
-    return (CursorRef)cursor;
+    // Transfer ownership of the +1 retain to the opaque CursorRef.
+    // releaseImageCursor() takes it back via CFBridgingRelease.
+    return (__bridge_retained CursorRef)cursor;
 }
 
 void setArrowCursor()
@@ -187,10 +184,9 @@ OSErr releaseImageCursor(CursorRef ref)
 {
     if( ref != NULL )
     {
-        @autoreleasepool {
-            NSCursor *cursor = (NSCursor*)ref;
-            [cursor autorelease];
-        }
+        // Transfer ownership back into ARC so the cursor is released at scope exit.
+        NSCursor *cursor = (__bridge_transfer NSCursor *)ref;
+        (void)cursor;
     }
     else
     {
@@ -204,10 +200,8 @@ OSErr setImageCursor(CursorRef ref)
 {
     if( ref != NULL )
     {
-        @autoreleasepool {
-            NSCursor *cursor = (NSCursor*)ref;
-            [cursor set];
-        }
+        NSCursor *cursor = (__bridge NSCursor *)ref;
+        [cursor set];
     }
     else
     {
@@ -228,55 +222,60 @@ NSWindowRef createNSWindow(int x, int y, int width, int height)
     [window makeKeyAndOrderFront:nil];
     [window setAcceptsMouseMovedEvents:TRUE];
     [window setRestorable:FALSE]; // Viewer manages state from own settings
-    return window;
+    // Transfer ownership of the +1 retain to the opaque NSWindowRef.
+    // closeWindow() takes it back via __bridge_transfer.
+    return (__bridge_retained NSWindowRef)window;
 }
 
 GLViewRef createOpenGLView(NSWindowRef window, unsigned int samples, bool vsync)
 {
-    LLOpenGLView *glview = [[LLOpenGLView alloc]initWithFrame:[(LLNSWindow*)window frame] withSamples:samples andVsync:vsync];
-    [(LLNSWindow*)window setContentView:glview];
-    return glview;
+    LLNSWindow *nsWindow = (__bridge LLNSWindow *)window;
+    LLOpenGLView *glview = [[LLOpenGLView alloc]initWithFrame:[nsWindow frame] withSamples:samples andVsync:vsync];
+    [nsWindow setContentView:glview];
+    // The window retains the view as its contentView; transfer our +1 to the
+    // opaque GLViewRef so removeGLView() can balance via CFBridgingRelease.
+    return (__bridge_retained GLViewRef)glview;
 }
 
 void glSwapBuffers(void* context)
 {
-    [(NSOpenGLContext*)context flushBuffer];
+    [(__bridge NSOpenGLContext *)context flushBuffer];
 }
 
 CGLContextObj getCGLContextObj(GLViewRef view)
 {
-    return [(LLOpenGLView *)view getCGLContextObj];
+    return [(__bridge LLOpenGLView *)view getCGLContextObj];
 }
 
 CGLPixelFormatObj* getCGLPixelFormatObj(NSWindowRef window)
 {
-    LLOpenGLView *glview = [(LLNSWindow*)window contentView];
+    LLOpenGLView *glview = [(__bridge LLNSWindow *)window contentView];
     return [glview getCGLPixelFormatObj];
 }
 
 unsigned long getVramSize(GLViewRef view)
 {
-    return [(LLOpenGLView *)view getVramSize];
+    return [(__bridge LLOpenGLView *)view getVramSize];
 }
 
 float getDeviceUnitSize(GLViewRef view)
 {
-    return [(LLOpenGLView*)view convertSizeToBacking:NSMakeSize(1, 1)].width;
+    return [(__bridge LLOpenGLView *)view convertSizeToBacking:NSMakeSize(1, 1)].width;
 }
 
 CGRect getContentViewRect(NSWindowRef window)
 {
-    return [[(LLNSWindow*)window contentView] bounds];
+    return [[(__bridge LLNSWindow *)window contentView] bounds];
 }
 
 CGRect getBackingViewRect(NSWindowRef window, GLViewRef view)
 {
-    return [(NSOpenGLView*)view convertRectToBacking:[[(LLNSWindow*)window contentView] bounds]];
+    return [(__bridge NSOpenGLView *)view convertRectToBacking:[[(__bridge LLNSWindow *)window contentView] bounds]];
 }
 
 void getWindowSize(NSWindowRef window, float* size)
 {
-    NSRect frame = [(LLNSWindow*)window frame];
+    NSRect frame = [(__bridge LLNSWindow *)window frame];
     size[0] = frame.origin.x;
     size[1] = frame.origin.y;
     size[2] = frame.size.width;
@@ -285,10 +284,11 @@ void getWindowSize(NSWindowRef window, float* size)
 
 void setWindowSize(NSWindowRef window, int width, int height)
 {
-    NSRect frame = [(LLNSWindow*)window frame];
+    LLNSWindow *nsWindow = (__bridge LLNSWindow *)window;
+    NSRect frame = [nsWindow frame];
     frame.size.width = width;
     frame.size.height = height;
-    [(LLNSWindow*)window setFrame:frame display:TRUE];
+    [nsWindow setFrame:frame display:TRUE];
 }
 
 void setWindowPos(NSWindowRef window, float* pos)
@@ -296,26 +296,26 @@ void setWindowPos(NSWindowRef window, float* pos)
     NSPoint point;
     point.x = pos[0];
     point.y = pos[1];
-    [(LLNSWindow*)window setFrameOrigin:point];
+    [(__bridge LLNSWindow *)window setFrameOrigin:point];
 }
 
 void getCursorPos(NSWindowRef window, float* pos)
 {
     NSPoint mLoc;
-    mLoc = [(LLNSWindow*)window mouseLocationOutsideOfEventStream];
+    mLoc = [(__bridge LLNSWindow *)window mouseLocationOutsideOfEventStream];
     pos[0] = mLoc.x;
     pos[1] = mLoc.y;
 }
 
 void makeWindowOrderFront(NSWindowRef window)
 {
-    [(LLNSWindow*)window makeKeyAndOrderFront:nil];
+    [(__bridge LLNSWindow *)window makeKeyAndOrderFront:nil];
 }
 
 void convertScreenToWindow(NSWindowRef window, float *coord)
 {
     NSRect point = NSMakeRect(coord[0], coord[1], 0,0);
-    point = [(LLNSWindow*)window convertRectFromScreen:point];
+    point = [(__bridge LLNSWindow *)window convertRectFromScreen:point];
     coord[0] = point.origin.x;
     coord[1] = point.origin.y;
 }
@@ -323,7 +323,7 @@ void convertScreenToWindow(NSWindowRef window, float *coord)
 void convertRectToScreen(NSWindowRef window, float *coord)
 {
     NSRect rect = NSMakeRect(coord[0], coord[1], coord[2], coord[3]);;
-    rect = [(LLNSWindow*)window convertRectToScreen:rect];
+    rect = [(__bridge LLNSWindow *)window convertRectToScreen:rect];
 
     coord[0] = rect.origin.x;
     coord[1] = rect.origin.y;
@@ -334,7 +334,7 @@ void convertRectToScreen(NSWindowRef window, float *coord)
 void convertRectFromScreen(NSWindowRef window, float *coord)
 {
     NSRect point = NSMakeRect(coord[0], coord[1], coord[2], coord[3]);
-    point = [(LLNSWindow*)window convertRectFromScreen:point];
+    point = [(__bridge LLNSWindow *)window convertRectFromScreen:point];
 
     coord[0] = point.origin.x;
     coord[1] = point.origin.y;
@@ -345,7 +345,7 @@ void convertRectFromScreen(NSWindowRef window, float *coord)
 void convertWindowToScreen(NSWindowRef window, float *coord)
 {
     NSRect rect = NSMakeRect(coord[0], coord[1], 0, 0);
-    rect = [(LLNSWindow*)window convertRectToScreen:rect];
+    rect = [(__bridge LLNSWindow *)window convertRectToScreen:rect];
 
       coord[0] = rect.origin.x;
     coord[1] = [[NSScreen screens][0] frame].size.height - rect.origin.y;
@@ -353,29 +353,34 @@ void convertWindowToScreen(NSWindowRef window, float *coord)
 
 void closeWindow(NSWindowRef window)
 {
-    [(LLNSWindow*)window close];
-    [(LLNSWindow*)window release];
+    // Take the +1 created by createNSWindow back into ARC and close it.
+    LLNSWindow *nsWindow = (__bridge_transfer LLNSWindow *)window;
+    [nsWindow close];
 }
 
 void removeGLView(GLViewRef view)
 {
-    [(LLOpenGLView*)view clearGLContext];
-    [(LLOpenGLView*)view removeFromSuperview];
+    // Take the +1 created by createOpenGLView back into ARC. The view is also
+    // retained by the window as its contentView; that reference drops when
+    // setContentView: replaces it or when the window itself is released.
+    LLOpenGLView *glView = (__bridge_transfer LLOpenGLView *)view;
+    [glView clearGLContext];
+    [glView removeFromSuperview];
 }
 
 void setupInputWindow(NSWindowRef window, GLViewRef glview)
 {
-    [[(LLAppDelegate*)[NSApp delegate] inputView] setGLView:(LLOpenGLView*)glview];
+    [[(LLAppDelegate*)[NSApp delegate] inputView] setGLView:(__bridge LLOpenGLView *)glview];
 }
 
 void commitCurrentPreedit(GLViewRef glView)
 {
-    [(LLOpenGLView*)glView commitCurrentPreedit];
+    [(__bridge LLOpenGLView *)glView commitCurrentPreedit];
 }
 
 void allowDirectMarkedTextInput(bool allow, GLViewRef glView)
 {
-    [(LLOpenGLView*)glView allowMarkedTextInput:allow];
+    [(__bridge LLOpenGLView *)glView allowMarkedTextInput:allow];
 }
 
 NSWindowRef getMainAppWindow()
@@ -383,12 +388,13 @@ NSWindowRef getMainAppWindow()
     LLNSWindow *winRef = [(LLAppDelegate*)[[NSApplication sharedApplication] delegate] window];
 
     [winRef setAcceptsMouseMovedEvents:TRUE];
-    return winRef;
+    // Hand C++ a +1 on the window so closeWindow()'s __bridge_transfer balances.
+    return (__bridge_retained NSWindowRef)winRef;
 }
 
 void makeFirstResponder(NSWindowRef window, GLViewRef view)
 {
-    [(LLNSWindow*)window makeFirstResponder:(LLOpenGLView*)view];
+    [(__bridge LLNSWindow *)window makeFirstResponder:(__bridge LLOpenGLView *)view];
 }
 
 void requestUserAttention()
@@ -400,7 +406,7 @@ long showAlert(std::string text, std::string title, int type)
 {
     long ret = 0;
     @autoreleasepool {
-        NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+        NSAlert *alert = [[NSAlert alloc] init];
 
         [alert setMessageText:[NSString stringWithCString:title.c_str() encoding:[NSString defaultCStringEncoding]]];
         [alert setInformativeText:[NSString stringWithCString:text.c_str() encoding:[NSString defaultCStringEncoding]]];

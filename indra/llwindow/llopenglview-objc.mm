@@ -194,7 +194,6 @@ attributedStringInfo getSegments(NSAttributedString *str)
 - (void)dealloc
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-    [super dealloc];
 }
 
 - (id) init
@@ -220,8 +219,12 @@ attributedStringInfo getSegments(NSAttributedString *str)
 
 - (id) initWithFrame:(NSRect)frame withSamples:(NSUInteger)samples andVsync:(BOOL)vsync
 {
+    self = [self initWithFrame:frame];
+    if (!self)
+    {
+        return nil;
+    }
     [self registerForDraggedTypes:[NSArray arrayWithObject:NSPasteboardTypeURL]];
-    [self initWithFrame:frame];
 
     // Initialize with a default "safe" pixel format that will work with versions dating back to OS X 10.6.
     // Any specialized pixel formats, i.e. a core profile pixel format, should be initialized through rebuildContextWithFormat.
@@ -241,7 +244,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
         0
     };
 
-    NSOpenGLPixelFormat *pixelFormat = [[[NSOpenGLPixelFormat alloc] initWithAttributes:attrs] autorelease];
+    NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
 
     if (pixelFormat == nil)
     {
@@ -293,7 +296,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
     NSOpenGLContext *ctx = [self openGLContext];
 
     [ctx clearDrawable];
-    [ctx initWithFormat:format shareContext:nil];
+    ctx = [ctx initWithFormat:format shareContext:nil];
 
     if (ctx == nil)
     {
