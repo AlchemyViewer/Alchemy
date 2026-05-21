@@ -54,6 +54,23 @@
 #include <sys/sysctl.h>
 
 #include <ApplicationServices/ApplicationServices.h>
+#import <AppKit/AppKit.h>
+#import <Carbon/Carbon.h>   // kInternetEventClass / kAEGetURL
+
+// Forward decl so the Obj-C @implementation below can call into the C++ side.
+static void handleUrl(const char* url_utf8);
+
+// A thin NSApplicationDelegate that wraps SDL3's delegate so we can receive
+// secondlife:// Apple Events. We capture SDL's existing delegate, install
+// ourselves as NSApp.delegate, and forward every selector we don't implement
+// back to SDL — so SDL's termination / focus / drop-file plumbing keeps
+// working unchanged.
+@interface LLSDLAppDelegate : NSObject <NSApplicationDelegate>
+@property (nonatomic, retain) id<NSApplicationDelegate> sdlDelegate;
+- (instancetype)initWithSDLDelegate:(id<NSApplicationDelegate>)sdlDelegate;
+- (void)handleGetURLEvent:(NSAppleEventDescriptor *)event
+           withReplyEvent:(NSAppleEventDescriptor *)replyEvent;
+@end
 #endif
 
 #ifdef LL_GLIB
@@ -93,7 +110,144 @@ namespace
     char **gArgV = NULL;
     LLAppViewerSDL* gViewerAppPtr = NULL;
     void (*gOldTerminateHandler)() = NULL;
+#if LL_DARWIN
+    // Buffers a secondlife:// URL that arrived from the OS before the viewer
+    // was ready to dispatch it. Drained at the end of LLAppViewerSDL::init().
+    std::string gHandleSLURL;
+    // Becomes true once LLAppViewerSDL::init() finishes. handleUrl() gates on
+    // this rather than gViewerAppPtr because the latter is set at the top of
+    // SDL_AppInit — long before LLURLDispatcher is ready to dispatch.
+    bool gAppFullyInited = false;
+#endif
 }
+
+#if LL_DARWIN
+static void dispatchUrl(std::string url)
+{
+    // Safari 3.2 silently mangles secondlife:///app/ URLs into
+    // secondlife:/app/ (only one leading slash). Fix them up to meet the URL
+    // specification — matches indra/newview/llappviewermacosx.cpp:459.
+    const std::string prefix = "secondlife:/app/";
+    std::string test_prefix = url.substr(0, prefix.length());
+    LLStringUtil::toLower(test_prefix);
+    if (test_prefix == prefix)
+    {
+        url.replace(0, prefix.length(), "secondlife:///app/");
+    }
+
+    LLMediaCtrl* web = nullptr;
+    const bool trusted_browser = false;
+    LLURLDispatcher::dispatch(url, "", web, trusted_browser);
+}
+
+static void handleUrl(const char* url_utf8)
+{
+    if (!url_utf8)
+    {
+        return;
+    }
+    if (gAppFullyInited)
+    {
+        gHandleSLURL.clear();
+        dispatchUrl(url_utf8);
+    }
+    else
+    {
+        // Last URL wins — same as the native macOS path
+        // (llappviewermacosx.cpp), which also stashes a single SLURL.
+        gHandleSLURL = url_utf8;
+    }
+}
+
+// Pre-init SLURL detection. SDL3 on macOS catches launch-time
+// kAEGetURL Apple Events in its own NSApplicationDelegate
+// (SDL_cocoaevents.m) and re-emits them as SDL_EVENT_DROP_FILE
+// events — by the time our LLSDLAppDelegate wrapper installs
+// itself at the end of LLAppViewerSDL::init(), the launch URL
+// has already been routed through SDL's file-drop conversion.
+// Recognise SLURL-shaped DROP_FILE payloads in SDL_AppEvent and
+// hand them to handleUrl() (which buffers or dispatches based on
+// init state). Runtime URLs continue to flow through the
+// delegate-wrapped kAEGetURL path.
+static bool isSLURL(const char* s)
+{
+    if (!s)
+    {
+        return false;
+    }
+    // URL schemes are case-insensitive (RFC 3986 §3.1).
+    return strncasecmp(s, "secondlife:", 11) == 0
+        || strncasecmp(s, "x-grid-location-info:", 21) == 0;
+}
+
+@implementation LLSDLAppDelegate
+
+- (instancetype)initWithSDLDelegate:(id<NSApplicationDelegate>)sdlDelegate
+{
+    self = [super init];
+    if (self)
+    {
+        _sdlDelegate = [sdlDelegate retain];
+        // Re-register the Apple Event handler for kInternetEventClass/kAEGetURL.
+        // NSAppleEventManager replaces any previously-installed handler for
+        // the same (class, id) pair, so this displaces SDL's own URL handler
+        // (set in SDL_cocoaevents.m:556) without disturbing SDL's delegate.
+        [[NSAppleEventManager sharedAppleEventManager]
+            setEventHandler:self
+                andSelector:@selector(handleGetURLEvent:withReplyEvent:)
+              forEventClass:kInternetEventClass
+                 andEventID:kAEGetURL];
+    }
+    return self;
+}
+
+- (void)dealloc
+{
+    [[NSAppleEventManager sharedAppleEventManager]
+        removeEventHandlerForEventClass:kInternetEventClass
+                             andEventID:kAEGetURL];
+#if !__has_feature(objc_arc)
+    [_sdlDelegate release];
+    [super dealloc];
+#endif
+}
+
+- (void)handleGetURLEvent:(NSAppleEventDescriptor *)event
+           withReplyEvent:(NSAppleEventDescriptor *)replyEvent
+{
+    NSString *url = [[[[NSAppleEventManager sharedAppleEventManager]
+                          currentAppleEvent]
+                         paramDescriptorForKeyword:keyDirectObject]
+                        stringValue];
+    if (url)
+    {
+        handleUrl([url UTF8String]);
+    }
+}
+
+// Anything we don't implement, defer to SDL's delegate so SDL's lifecycle
+// hooks (termination, hide/unhide, screen changes, dock file-open, etc.)
+// keep working as if SDL were still the delegate.
+- (BOOL)respondsToSelector:(SEL)aSelector
+{
+    if ([super respondsToSelector:aSelector])
+    {
+        return YES;
+    }
+    return [_sdlDelegate respondsToSelector:aSelector];
+}
+
+- (id)forwardingTargetForSelector:(SEL)aSelector
+{
+    if (_sdlDelegate && [_sdlDelegate respondsToSelector:aSelector])
+    {
+        return _sdlDelegate;
+    }
+    return nil;
+}
+
+@end
+#endif // LL_DARWIN
 
 void check_vm_bloat()
 {
@@ -309,6 +463,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
+#if LL_DARWIN
+    if (event && event->type == SDL_EVENT_DROP_FILE && isSLURL(event->drop.data))
+    {
+        handleUrl(event->drop.data);
+        return SDL_APP_CONTINUE;
+    }
+#endif
     return LLWindowSDL::handleEvents(*event);
 }
 
@@ -331,6 +492,41 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 bool LLAppViewerSDL::init()
 {
     bool success = LLAppViewer::init();
+
+#if LL_DARWIN
+    if (success)
+    {
+        // initSLURLHandler() is called by LLAppViewer::initApp() *before*
+        // initWindow() runs SDL_InitSubSystem(SDL_INIT_VIDEO) — at that point
+        // SDL hasn't installed its NSApplicationDelegate yet, so there's
+        // nothing to wrap. By the time LLAppViewer::init() returns here,
+        // initWindow() has run, SDL3's SDL3AppDelegate (SDL_cocoaevents.m)
+        // owns NSApp.delegate, and we can capture+replace it.
+        @autoreleasepool
+        {
+            id<NSApplicationDelegate> sdlDelegate = [NSApp delegate];
+            LLSDLAppDelegate *ours =
+                [[LLSDLAppDelegate alloc] initWithSDLDelegate:sdlDelegate];
+            [NSApp setDelegate:ours];
+            // NSApp retains the delegate; drop our +1 from alloc.
+#if !__has_feature(objc_arc)
+            [ours release];
+#endif
+        }
+
+        // From here on, handleUrl() will dispatch directly instead of buffering.
+        gAppFullyInited = true;
+
+        // Drain any URL that arrived during launch and was buffered before
+        // the viewer was ready. Mirrors initViewer() in llappviewermacosx.cpp.
+        if (!gHandleSLURL.empty())
+        {
+            std::string url;
+            url.swap(gHandleSLURL);
+            dispatchUrl(url);
+        }
+    }
+#endif
 
 #if LL_SEND_CRASH_REPORTS
     if (success)
@@ -544,6 +740,21 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
     return true;
 }
 
+#elif LL_DARWIN
+bool LLAppViewerSDL::initSLURLHandler()
+{
+    // The real Apple Event handler / delegate install happens at the tail of
+    // LLAppViewerSDL::init(), once initWindow() has let SDL install its own
+    // NSApplicationDelegate. Returning true reports that the viewer accepts
+    // OS-delivered SLURLs on this platform.
+    return true;
+}
+bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
+{
+    // macOS routes secondlife:// URLs to the running instance via Launch
+    // Services / Apple Events automatically — no IPC needed from us.
+    return false;
+}
 #else // LL_GLIB
 bool LLAppViewerSDL::initSLURLHandler()
 {
