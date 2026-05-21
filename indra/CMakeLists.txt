@@ -67,7 +67,7 @@ option(HAVOK "Use Havok physics library" OFF)
 #cmake_dependent_option(USE_DISCORD "Enable Discord SDK and Rich Prescence support" ON "INSTALL_PROPRIETARY" OFF)
 
 # SDL Options
-cmake_dependent_option(USE_SDL_WINDOW "Build with SDL based window management and input" ON "UNIX;NOT APPLE" OFF)
+cmake_dependent_option(USE_SDL_WINDOW "Build with SDL based window management and input" ON "UNIX" OFF)
 
 # Configure crash reporting
 option(RELEASE_CRASH_REPORTING "Enable use of crash reporting in release builds" OFF)
