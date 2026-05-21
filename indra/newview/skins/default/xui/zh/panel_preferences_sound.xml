@@ -3,6 +3,8 @@
 	<panel.string name="middle_mouse">
 		滑鼠中鍵
 	</panel.string>
+    <tab_container name="sound_prefs_tab_container">
+    <panel name="general_sound_panel">
 	<slider label="主音量" name="System Volume"/>
 	<check_box initial_value="true" name="mute_when_minimized"/>
 	<text name="mute_chb_label">
@@ -23,18 +25,22 @@
 	<text name="voice_chat_settings">
 		語音聊天設定
 	</text>
-	<text name="Listen from">
-		傾聽位置：
-	</text>
-	<radio_group name="ear_location">
-		<radio_item label="攝影機位置" name="0"/>
-		<radio_item label="化身位置" name="1"/>
-	</radio_group>
-	<check_box label="說話時同步移動化身嘴唇" name="enable_lip_sync"/>
-	<check_box label="切換說話 / 靜音，當我按下：" name="push_to_talk_toggle_check" tool_tip="在切換模式下，按下再放開啟動鍵一次，即可打開或關閉麥克風。 不在切換狀態時，麥克風只有在啟動鍵被按下時才會放送你的聲音。"/>
 	<line_editor label="「按下後說話」啟動鍵" name="modifier_combo"/>
 	<button label="設定按鍵" name="set_voice_hotkey_button"/>
 	<button name="set_voice_middlemouse_button" tool_tip="重設滑鼠中鍵按鈕"/>
-	<button label="輸入 / 輸出設備" name="device_settings_btn"/>
 	<panel label="設備設定" name="device_settings_panel"/>
+	</panel>
+	<panel name="voice_sound_panel">
+	<text name="Listen from">
+		傾聽位置：
+	</text>
+	<combo_box name="ear_location_combo">
+		<item label="攝影機位置" name="camera_position"/>
+		<item label="化身位置" name="avatar_position"/>
+	</combo_box>
+	<check_box label="說話時同步移動化身嘴唇" name="enable_lip_sync"/>
+	<check_box label="切換說話 / 靜音，當我按下：" name="push_to_talk_toggle_check" tool_tip="在切換模式下，按下再放開啟動鍵一次，即可打開或關閉麥克風。 不在切換狀態時，麥克風只有在啟動鍵被按下時才會放送你的聲音。"/>
+	<button label="輸入 / 輸出設備" name="device_settings_btn"/>
+	</panel>
+	</tab_container>
 </panel>

@@ -9,6 +9,8 @@
 	<panel.string name="button5_mouse">
 		５ボタン
 	</panel.string>
+    <tab_container name="sound_prefs_tab_container">
+    <panel name="general_sound_panel">
 	<slider label="全体のボリューム" name="System Volume"/>
 	<check_box  name="mute_when_minimized" label="最小化時にミュート"/>
 	<slider label="ボタン" name="UI Volume"/>
@@ -50,6 +52,9 @@
 	</combo_box>
 	<check_box name="media_show_on_others_btn" tool_tip="ここのチェックを外すと、近くにいる他のアバターに取り付けられたメディアを非表示にします。" label="近くのアバターのメディアを自動再生"/>
 	<check_box name="media_huds_autoplay" tool_tip="チェックを外すと、ＨＵＤは標準のメディア自動再生設定に従います。" label="ＨＵＤに装着されたメディアを自動再生する"/>
+	<check_box name="gesture_audio_play_btn" tool_tip="ジェスチャーからのサウンドを聞くにはこれを選択します。" label="ジェスチャーのサウンドを再生する"/>
+	</panel>
+	<panel name="voice_sound_panel">
 	<text name="noise_suppression_label">
 		マイクのノイズ抑制：
 	</text>
@@ -71,7 +76,8 @@
 	<check_box tool_tip="ここをチェックするとボイスのエコーを除去します。" label="エコー除去" name="enable_echo_cancellation"/>
 	<check_box label="ツールバーのボタンでボイスの切り替え" name="push_to_talk_toggle_check" tool_tip="トグルモードでは、トリガーキーを押すことでマイクのオン／オフを切り替えます。そうでない場合は、トリガーキーを押している間だけマイクがオンになります。"/>
 	<check_box tool_tip="ここをチェックすると、自動ゲインコントロールを有効化します。" label="自動音量調整" name="voice_automatic_gain_control"/>
-	<check_box name="gesture_audio_play_btn" tool_tip="ジェスチャーからのサウンドを聞くにはこれを選択します。" label="ジェスチャーのサウンドを再生する"/>
 	<check_box tool_tip="アバターの上に音声ドットインジケーターを表示するにはチェックを入れます。" label="アバターの上にボイスのドットを表示する" name="voice_dot_visualizer"/>
 	<button label="入出力機器の設定" name="device_settings_btn"/>
+	</panel>
+	</tab_container>
 </panel>
