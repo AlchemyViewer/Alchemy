@@ -502,6 +502,7 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     gGLManager.mVRAM = getVramSize();
 #endif
 
+#if LL_LINUX
     // Set the application icon.
     SDL_Surface* bmpsurface = Load_BMP_Resource("ll_icon.BMP");
     if (bmpsurface)
@@ -510,6 +511,7 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         SDL_DestroySurface(bmpsurface);
         bmpsurface = nullptr;
     }
+#endif
 
     // SDL3 ties both committed-text events (SDL_EVENT_TEXT_INPUT) and
     // composition events (SDL_EVENT_TEXT_EDITING) to the same

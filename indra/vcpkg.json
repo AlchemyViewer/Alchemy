@@ -182,11 +182,26 @@
         {
           "name": "sdl3",
           "features": [
-            "alsa",
-            "dbus",
-            "ibus",
-            "wayland",
-            "x11"
+            {
+              "name": "alsa",
+              "platform": "linux"
+            },
+            {
+              "name": "dbus",
+              "platform": "linux"
+            },
+            {
+              "name": "ibus",
+              "platform": "linux"
+            },
+            {
+              "name": "wayland",
+              "platform": "linux"
+            },
+            {
+              "name": "x11",
+              "platform": "linux"
+            }
           ]
         }
       ]

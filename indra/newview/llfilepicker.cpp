@@ -69,7 +69,7 @@ LLFilePicker LLFilePicker::sInstance;
 #define ZIP_FILTER L"ZIP files (*.zip)\0*.zip\0"
 #endif
 
-#ifdef LL_DARWIN
+#if LL_DARWIN && !LL_SDL_WINDOW
 #include "llfilepicker_mac.h"
 //#include <boost/algorithm/string/predicate.hpp>
 #endif
@@ -1049,7 +1049,7 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
     return false;
 }
 
-#elif LL_DARWIN
+#elif LL_DARWIN && !LL_SDL_WINDOW
 
 std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadFilter filter) //(AEDesc *theItem, void *info, void *callBackUD, NavFilterModes filterMode)
 {

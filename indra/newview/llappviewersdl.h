@@ -1,6 +1,6 @@
 /**
- * @file llappviewerlinux.h
- * @brief The LLAppViewerLinux class declaration
+ * @file llappviewersdl.h
+ * @brief The LLAppViewerSDL class declaration
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -24,8 +24,8 @@
  * $/LicenseInfo$
  */
 
-#ifndef LL_LLAPPVIEWERLINUX_H
-#define LL_LLAPPVIEWERLINUX_H
+#ifndef LL_LLAPPVIEWERSDL_H
+#define LL_LLAPPVIEWERSDL_H
 
 #ifndef LL_LLAPPVIEWER_H
 #include "llappviewer.h"
@@ -33,19 +33,21 @@
 
 class LLCommandLineParser;
 
-class LLAppViewerLinux final : public LLAppViewer
+class LLAppViewerSDL final : public LLAppViewer
 {
 public:
-    LLAppViewerLinux() = default;
-    ~LLAppViewerLinux() override = default;
+    LLAppViewerSDL() = default;
+    ~LLAppViewerSDL() override = default;
 
     //
     // Main application logic
     //
     bool init() override;            // Override to do application initialization
     std::string generateSerialNumber() override;
-    bool setupSLURLHandler();
 
+#if LL_DARWIN
+    void forceErrorOSSpecificException() override;
+#endif
 protected:
     bool beingDebugged() override;
 
@@ -58,4 +60,4 @@ protected:
     bool sendURLToOtherInstance(const std::string& url) override;
 };
 
-#endif // LL_LLAPPVIEWERLINUX_H
+#endif // LL_LLAPPVIEWERSDL_H

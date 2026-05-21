@@ -72,7 +72,7 @@ if(USE_SDL_WINDOW)
   )
 endif()
 
-if(DARWIN)
+if(DARWIN AND NOT USE_SDL_WINDOW)
   target_sources(llwindow
     PRIVATE
       llkeyboardmacosx.cpp
@@ -93,7 +93,7 @@ if(DARWIN)
     PROPERTIES
     SKIP_PRECOMPILE_HEADERS TRUE
   )
-endif(DARWIN)
+endif()
 
 if(WINDOWS)
   target_sources(llwindow

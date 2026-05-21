@@ -29,15 +29,14 @@
 
 #include "SDL3/SDL.h"
 
-#ifndef LL_SDL_APP
-#define SDL_MAIN_HANDLED 1
-#include "SDL3/SDL_main.h"
-#endif
-
 #include "llerror.h"
 #include "llwindow.h"
 
 bool gSDLMainHandled = false;
+
+#ifndef LL_SDL_WINDOW
+#define SDL_MAIN_HANDLED 1
+#include "SDL3/SDL_main.h"
 
 void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const char *message)
 {
@@ -62,14 +61,15 @@ void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const ch
     }
 }
 
+#endif
+
 void init_sdl(const std::string& app_name)
 {
-#ifndef LL_SDL_APP
+#ifndef LL_SDL_WINDOW
     if (!gSDLMainHandled)
     {
         SDL_SetMainReady();
     }
-#endif
 
     SDL_SetLogOutputFunction(&sdl_logger, nullptr);
 
@@ -83,6 +83,7 @@ void init_sdl(const std::string& app_name)
                << SDL_VERSIONNUM_MAJOR(r_sdl_version) << "."
                << SDL_VERSIONNUM_MINOR(r_sdl_version) << "."
                << SDL_VERSIONNUM_MICRO(r_sdl_version) << LL_ENDL;
+#endif
 
 #if LL_WINDOWS && defined(LL_SDL_WINDOW)
     Uint32 style = 0;
@@ -130,7 +131,10 @@ void init_sdl(const std::string& app_name)
                     // the composition twice. We do NOT advertise "candidates"
                     // — the viewer has no candidate-list UI, so the IME
                     // should keep drawing that natively.
-                    {SDL_HINT_IME_IMPLEMENTED_UI,"composition"}
+                    {SDL_HINT_IME_IMPLEMENTED_UI,"composition"},
+
+                    // Prevent popup of text overlay when holding movement keys on macos
+                    {SDL_HINT_MAC_PRESS_AND_HOLD, "0"},
             };
 
     for (auto hint: hintList)

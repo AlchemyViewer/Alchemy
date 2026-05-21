@@ -285,7 +285,7 @@ std::string LLDirPicker::getDirName()
 }
 
 /////////////////////////////////////////////DARWIN
-#elif LL_DARWIN
+#elif LL_DARWIN && !LL_SDL_WINDOW
 
 LLDirPicker::LLDirPicker() :
 mFileName(NULL),

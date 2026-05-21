@@ -1672,46 +1672,12 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
            "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n")
 
 if (DARWIN)
-  LIST(APPEND viewer_SOURCE_FILES llappviewermacosx.cpp)
-  LIST(APPEND viewer_SOURCE_FILES llappviewermacosx-objc.mm)
-  LIST(APPEND viewer_SOURCE_FILES llappviewermacosx-objc.h)
-  LIST(APPEND viewer_SOURCE_FILES llfilepicker_mac.mm)
-  LIST(APPEND viewer_HEADER_FILES llfilepicker_mac.h)
   LIST(APPEND viewer_SOURCE_FILES llvelopack.cpp)
   LIST(APPEND viewer_HEADER_FILES llvelopack.h)
-
-  set_source_files_properties(
-    llappviewermacosx-objc.mm
-    PROPERTIES
-    SKIP_PRECOMPILE_HEADERS TRUE
-  )
-
-  set_source_files_properties(
-    llfilepicker_mac.mm
-    PROPERTIES
-    SKIP_PRECOMPILE_HEADERS TRUE
-  )
-
-  # This should be compiled with the viewer.
-  LIST(APPEND viewer_SOURCE_FILES llappdelegate-objc.mm)
-  set_source_files_properties(
-    llappdelegate-objc.mm
-    PROPERTIES
-    SKIP_PRECOMPILE_HEADERS TRUE
-    # BugsplatMac is a module, imported with @import. That language feature
-    # demands these -f switches.
-    # Xcode 10.2 requires that Objective-C++ headers declare nullability of
-    # pointer variables. As of 2019-06-26, the BugsplatMac version we're using
-    # does not yet do so in its own header files. This -W flag prevents fatal
-    # warnings.
-    COMPILE_FLAGS "-fmodules -fcxx-modules -Wno-nullability-completeness"
-    )
 
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
     alchemy.icns
-    Info-Alchemy.plist
-    Alchemy.xib
     # CMake doesn't seem to support Xcode language variants well just yet
     English.lproj/InfoPlist.strings
     English.lproj/language.txt
@@ -1719,6 +1685,55 @@ if (DARWIN)
     Japanese.lproj/language.txt
     Korean.lproj/language.txt
     )
+
+  if(USE_SDL_WINDOW)
+    LIST(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
+    LIST(APPEND viewer_HEADER_FILES llappviewersdl.h llsdlfiledialog.h)
+    LIST(APPEND viewer_RESOURCE_FILES
+      Info-AlchemySDL.plist
+      )
+
+    set_source_files_properties(llappviewersdl.cpp PROPERTIES LANGUAGE OBJCXX)
+  else()
+    LIST(APPEND viewer_SOURCE_FILES llappdelegate-objc.mm)
+    LIST(APPEND viewer_SOURCE_FILES llappviewermacosx.cpp)
+    LIST(APPEND viewer_HEADER_FILES llappviewermacosx.h)
+    LIST(APPEND viewer_SOURCE_FILES llappviewermacosx-objc.mm)
+    LIST(APPEND viewer_SOURCE_FILES llappviewermacosx-objc.h)
+    LIST(APPEND viewer_SOURCE_FILES llfilepicker_mac.mm)
+    LIST(APPEND viewer_HEADER_FILES llfilepicker_mac.h)
+
+    set_source_files_properties(
+      llappviewermacosx-objc.mm
+      PROPERTIES
+      SKIP_PRECOMPILE_HEADERS TRUE
+    )
+
+    set_source_files_properties(
+      llfilepicker_mac.mm
+      PROPERTIES
+      SKIP_PRECOMPILE_HEADERS TRUE
+    )
+
+    # This should be compiled with the viewer.
+    set_source_files_properties(
+      llappdelegate-objc.mm
+      PROPERTIES
+      SKIP_PRECOMPILE_HEADERS TRUE
+      # BugsplatMac is a module, imported with @import. That language feature
+      # demands these -f switches.
+      # Xcode 10.2 requires that Objective-C++ headers declare nullability of
+      # pointer variables. As of 2019-06-26, the BugsplatMac version we're using
+      # does not yet do so in its own header files. This -W flag prevents fatal
+      # warnings.
+      COMPILE_FLAGS "-fmodules -fcxx-modules -Wno-nullability-completeness"
+      )
+
+    LIST(APPEND viewer_RESOURCE_FILES
+      Info-Alchemy.plist
+      Alchemy.xib
+      )
+  endif()
 
   SOURCE_GROUP("Resources" FILES ${viewer_RESOURCE_FILES})
   list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
@@ -1729,7 +1744,6 @@ if (LINUX)
 endif (LINUX)
 
 if (WINDOWS)
-
     list(APPEND viewer_SOURCE_FILES
          llappviewerwin32.cpp
          llvelopack.cpp
@@ -2065,6 +2079,12 @@ elseif(DARWIN)
   set(MACOSX_BUNDLE_NSMAIN_NIB_FILE "Alchemy.nib")
   set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
 
+  if(USE_SDL_WINDOW)
+    set(VIEWER_INFO_PLIST "Info-AlchemySDL.plist")
+  else()
+    set(VIEWER_INFO_PLIST "Info-Alchemy.plist")
+  endif()
+
   # https://blog.kitware.com/upcoming-in-cmake-2-8-12-osx-rpath-support/
   set(CMAKE_MACOSX_RPATH 1)
 
@@ -2076,17 +2096,19 @@ elseif(DARWIN)
     # From Contents/MacOS/Alchemy, look in Contents/Frameworks
     BUILD_WITH_INSTALL_RPATH 1
     INSTALL_RPATH "@executable_path/../Frameworks"
-    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info-Alchemy.plist"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/${VIEWER_INFO_PLIST}"
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
     )
 
   # Support generating nib and dsym for non-xcode generators
   if(XCODE)
-    set_target_properties(
-        ${VIEWER_BINARY_NAME}
-        PROPERTIES
-        RESOURCE "Alchemy.xib"
-        )
+    if(NOT USE_SDL_WINDOW)
+      set_target_properties(
+          ${VIEWER_BINARY_NAME}
+          PROPERTIES
+          RESOURCE "Alchemy.xib"
+          )
+    endif()
   else()
     if(USE_BUGSPLAT)
       set(VIEWER_DEBUG_BUNDLE "${SYMBOLS_STAGING_DIR}/dSYMs/${product}.dSYM")
@@ -2096,10 +2118,12 @@ elseif(DARWIN)
             COMMENT "Generating Alchemy.dSYM")
     endif()
 
-    find_program(IBTOOL_PROGRAM ibtool REQUIRED)
-    add_custom_command(TARGET ${VIEWER_BINARY_NAME} POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E env MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET} ${IBTOOL_PROGRAM} --compile $<TARGET_BUNDLE_DIR:${VIEWER_BINARY_NAME}>/Contents/Resources/Alchemy.nib ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib
-          COMMENT "Compiling Alchemy.nib")
+    if(NOT USE_SDL_WINDOW)
+      find_program(IBTOOL_PROGRAM ibtool REQUIRED)
+      add_custom_command(TARGET ${VIEWER_BINARY_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E env MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET} ${IBTOOL_PROGRAM} --compile $<TARGET_BUNDLE_DIR:${VIEWER_BINARY_NAME}>/Contents/Resources/Alchemy.nib ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib
+            COMMENT "Compiling Alchemy.nib")
+    endif()
   endif()
 
   if(HAVOK)

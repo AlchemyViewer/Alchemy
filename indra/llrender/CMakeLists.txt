@@ -104,7 +104,7 @@ target_link_libraries(llrender
 
 target_precompile_headers(llrender REUSE_FROM llprecompiled)
 
-if (NOT USE_SDL_WINDOW)
+if (DARWIN OR NOT USE_SDL_WINDOW)
   target_link_libraries(llrender
           OpenGL::GL
           )

@@ -153,7 +153,7 @@
 #include "cef/dullahan_version.h"
 #include "vlc/libvlc_version.h"
 
-#if LL_DARWIN
+#if LL_DARWIN && !LL_SDL_WINDOW
 #include "llwindowmacosx.h"
 #endif
 
@@ -323,10 +323,6 @@ static LLAppViewerListener sAppViewerListener(LLAppViewer::instance);
 //
 //----------------------------------------------------------------------------
 // viewer.cpp - these are only used in viewer, should be easily moved.
-
-#if LL_DARWIN
-extern void init_apple_menu(const char* product);
-#endif // LL_DARWIN
 
 extern bool gRandomizeFramerate;
 extern bool gPeriodicSlowFrame;
@@ -616,7 +612,11 @@ static void settings_to_globals()
     LLWorldMapView::setScaleSetting(gSavedSettings.getF32("MapScale"));
 
 #if LL_DARWIN
+#if LL_SDL_WINDOW
+    LLWindowSDL::sUseMultGL = gSavedSettings.getBOOL("RenderAppleUseMultGL");
+#else
     LLWindowMacOSX::sUseMultGL = gSavedSettings.getBOOL("RenderAppleUseMultGL");
+#endif
 #endif
 
 #if LL_DARWIN || LL_SDL_WINDOW
@@ -3852,7 +3852,7 @@ std::string LLAppViewer::getViewerInfoString(bool default_string) const
     }
     support << "\n" << LLTrans::getString("AboutOGL", args, default_string);
     support << "\n\n" << LLTrans::getString("AboutSettings", args, default_string);
-#if LL_DARWIN
+#if LL_DARWIN || LL_SDL_WINDOW
     support << "\n" << LLTrans::getString("AboutOSXHiDPI", args, default_string);
 #endif
     support << "\n\n" << LLTrans::getString("AboutLibs", args, default_string);
@@ -5375,7 +5375,7 @@ void LLAppViewer::idle()
     // hover callbacks
     //
 
-#ifdef LL_DARWIN
+#if LL_DARWIN && !LL_SDL_WINDOW
     if (!mQuitRequested)  //MAINT-4243
 #endif
     {

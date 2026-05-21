@@ -1,6 +1,6 @@
 /**
- * @file llappviewerlinux.cpp
- * @brief The LLAppViewerLinux class definitions
+ * @file llappviewersdl.cpp
+ * @brief The LLAppViewerSDL class definitions
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -26,7 +26,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "llappviewerlinux.h"
+#include "llappviewersdl.h"
 
 #include "llcommandlineparser.h"
 
@@ -48,9 +48,17 @@
 #include "llsdl.h"
 #include "llwindowsdl.h"
 
+#if LL_DARWIN
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/sysctl.h>
+
+#include <ApplicationServices/ApplicationServices.h>
+#endif
+
 #ifdef LL_GLIB
 #include <gio/gio.h>
-#endif
+
 
 #define VIEWERAPI_SERVICE "com.secondlife.ViewerAppAPIService"
 #define VIEWERAPI_PATH "/com/secondlife/ViewerAppAPI"
@@ -71,11 +79,19 @@ typedef struct
     GObject parent;
 } ViewerAppAPI;
 
+#endif
+
+#if LL_DARWIN
+// *FIX:Mani It would be nice to provide a clean interface to get the
+// default_unix_signal_handler for the LLApp class.
+extern void default_unix_signal_handler(int, siginfo_t *, void *);
+#endif
+
 namespace
 {
     int gArgC = 0;
     char **gArgV = NULL;
-    LLAppViewerLinux* gViewerAppPtr = NULL;
+    LLAppViewerSDL* gViewerAppPtr = NULL;
     void (*gOldTerminateHandler)() = NULL;
 }
 
@@ -183,6 +199,29 @@ static void exceptionTerminateHandler()
     gOldTerminateHandler(); // call old terminate() handler
 }
 
+void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const char *message)
+{
+    switch (priority)
+    {
+        case SDL_LOG_PRIORITY_TRACE:
+        case SDL_LOG_PRIORITY_VERBOSE:
+        case SDL_LOG_PRIORITY_DEBUG:
+            LL_DEBUGS("SDL") << "log='" << message << "'" << LL_ENDL;
+            break;
+        case SDL_LOG_PRIORITY_INFO:
+            LL_INFOS("SDL") << "log='" << message << "'" << LL_ENDL;
+            break;
+        case SDL_LOG_PRIORITY_WARN:
+        case SDL_LOG_PRIORITY_ERROR:
+        case SDL_LOG_PRIORITY_CRITICAL:
+            LL_WARNS("SDL") << "log='" << message << "'" << LL_ENDL;
+            break;
+        case SDL_LOG_PRIORITY_INVALID:
+        default:
+            break;
+    }
+}
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
     // Call Tracy first thing to have it allocate memory
@@ -195,7 +234,20 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     gArgC = argc;
     gArgV = argv;
 
-    gViewerAppPtr = new LLAppViewerLinux();
+    gViewerAppPtr = new LLAppViewerSDL();
+
+    SDL_SetLogOutputFunction(&sdl_logger, nullptr);
+
+    const int c_sdl_version = SDL_VERSION;
+    LL_INFOS() << "Compiled against SDL "
+    << SDL_VERSIONNUM_MAJOR(c_sdl_version) << "."
+    << SDL_VERSIONNUM_MINOR(c_sdl_version) << "."
+    << SDL_VERSIONNUM_MICRO(c_sdl_version) << LL_ENDL;
+    const int r_sdl_version = SDL_GetVersion();
+    LL_INFOS() << "Running with SDL "
+    << SDL_VERSIONNUM_MAJOR(r_sdl_version) << "."
+    << SDL_VERSIONNUM_MINOR(r_sdl_version) << "."
+    << SDL_VERSIONNUM_MICRO(r_sdl_version) << LL_ENDL;
 
     // install unexpected exception handler
     gOldTerminateHandler = std::set_terminate(exceptionTerminateHandler);
@@ -226,7 +278,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     // Run the application main loop
     if (!gViewerAppPtr->frame())
     {
-#if LL_GLIB
+#if LL_LINUX && LL_GLIB
         // Pump until we've nothing left to do or passed 1/15th of a
         // second pumping for this frame.
         static LLTimer pump_timer;
@@ -276,7 +328,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     gViewerAppPtr = nullptr;
 }
 
-bool LLAppViewerLinux::init()
+bool LLAppViewerSDL::init()
 {
     bool success = LLAppViewer::init();
 
@@ -291,15 +343,69 @@ bool LLAppViewerLinux::init()
     return success;
 }
 
-bool LLAppViewerLinux::restoreErrorTrap()
+bool LLAppViewerSDL::restoreErrorTrap()
 {
+#if LL_DARWIN
+    // This method intends to reinstate signal handlers.
+    // *NOTE:Mani It was found that the first execution of a shader was overriding
+    // our initial signal handlers somehow.
+    // This method will be called (at least) once per mainloop execution.
+    // *NOTE:Mani The signals used below are copied over from the
+    // setup_signals() func in LLApp.cpp
+    // LLApp could use some way of overriding that func, but for this viewer
+    // fix I opt to avoid affecting the server code.
+
+    // Set up signal handlers that may result in program termination
+    //
+    struct sigaction act;
+    struct sigaction old_act;
+    act.sa_sigaction = default_unix_signal_handler;
+    sigemptyset( &act.sa_mask );
+    act.sa_flags = SA_SIGINFO;
+
+    unsigned int reset_count = 0;
+
+#define SET_SIG(SIGNAL) sigaction(SIGNAL, &act, &old_act); \
+if(act.sa_sigaction != old_act.sa_sigaction) ++reset_count;
+    // Synchronous signals
+#   ifndef LL_BUGSPLAT
+    SET_SIG(SIGABRT) // let bugsplat catch this
+#   endif
+    SET_SIG(SIGALRM)
+    SET_SIG(SIGBUS)
+    SET_SIG(SIGFPE)
+    SET_SIG(SIGHUP)
+    SET_SIG(SIGILL)
+    SET_SIG(SIGPIPE)
+    SET_SIG(SIGSEGV)
+    SET_SIG(SIGSYS)
+
+    SET_SIG(LL_HEARTBEAT_SIGNAL)
+    SET_SIG(LL_SMACKDOWN_SIGNAL)
+
+    // Asynchronous signals that are normally ignored
+    SET_SIG(SIGCHLD)
+    SET_SIG(SIGUSR2)
+
+    // Asynchronous signals that result in attempted graceful exit
+    SET_SIG(SIGHUP)
+    SET_SIG(SIGTERM)
+    SET_SIG(SIGINT)
+
+    // Asynchronous signals that result in core
+    SET_SIG(SIGQUIT)
+#undef SET_SIG
+
+    return reset_count == 0;
+#else
     // *NOTE:Mani there is a case for implementing this on the mac.
     // Linux doesn't need it to my knowledge.
     return true;
+#endif
 }
 
 /////////////////////////////////////////
-#if LL_GLIB
+#if LL_LINUX && LL_GLIB
 
 typedef struct
 {
@@ -385,7 +491,7 @@ void viewerappapi_init(ViewerAppAPI *server)
 ///
 
 //virtual
-bool LLAppViewerLinux::initSLURLHandler()
+bool LLAppViewerSDL::initSLURLHandler()
 {
     //ViewerAppAPI *api_server = (ViewerAppAPI*)
     g_object_new(viewerappapi_get_type(), NULL);
@@ -394,7 +500,7 @@ bool LLAppViewerLinux::initSLURLHandler()
 }
 
 //virtual
-bool LLAppViewerLinux::sendURLToOtherInstance(const std::string& url)
+bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
 {
     auto *pBus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, nullptr);
 
@@ -439,22 +545,51 @@ bool LLAppViewerLinux::sendURLToOtherInstance(const std::string& url)
 }
 
 #else // LL_GLIB
-bool LLAppViewerLinux::initSLURLHandler()
+bool LLAppViewerSDL::initSLURLHandler()
 {
     return false; // not implemented without dbus
 }
-bool LLAppViewerLinux::sendURLToOtherInstance(const std::string& url)
+bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
 {
     return false; // not implemented without dbus
 }
 #endif // LL_GLIB
 
-void LLAppViewerLinux::initCrashReporting(bool reportFreeze)
+void LLAppViewerSDL::initCrashReporting(bool reportFreeze)
 {
 }
 
-bool LLAppViewerLinux::beingDebugged()
+bool LLAppViewerSDL::beingDebugged()
 {
+#if LL_DARWIN
+    int                 junk;
+    int                 mib[4];
+    struct kinfo_proc   info;
+    size_t              size;
+
+    // Initialize the flags so that, if sysctl fails for some bizarre
+    // reason, we get a predictable result.
+
+    info.kp_proc.p_flag = 0;
+
+    // Initialize mib, which tells sysctl the info we want, in this case
+    // we're looking for information about a specific process ID.
+
+    mib[0] = CTL_KERN;
+    mib[1] = KERN_PROC;
+    mib[2] = KERN_PROC_PID;
+    mib[3] = getpid();
+
+    // Call sysctl.
+
+    size = sizeof(info);
+    junk = sysctl(mib, sizeof(mib) / sizeof(*mib), &info, &size, NULL, 0);
+    assert(junk == 0);
+
+    // We're being debugged if the P_TRACED flag is set.
+
+    return ( (info.kp_proc.p_flag & P_TRACED) != 0 );
+#elif LL_LINUX
     static enum {unknown, no, yes} debugged = unknown;
 
     if (debugged == unknown)
@@ -491,42 +626,94 @@ bool LLAppViewerLinux::beingDebugged()
     }
 
     return debugged == yes;
+#else
+    return false;
+#endif
 }
 
-bool LLAppViewerLinux::initParseCommandLine(LLCommandLineParser& clp)
+#if LL_DARWIN
+void LLAppViewerSDL::forceErrorOSSpecificException()
+{
+    NSException *exception = [NSException exceptionWithName:@"Forced NSException" reason:nullptr userInfo:nullptr];
+    @throw exception;
+}
+#endif
+
+bool LLAppViewerSDL::initParseCommandLine(LLCommandLineParser& clp)
 {
     if (!clp.parseCommandLine(gArgC, gArgV))
     {
         return false;
     }
 
-    // Find the system language.
-    FL_Locale *locale = NULL;
-    FL_Success success = FL_FindLocale(&locale, FL_MESSAGES);
-    if (success != 0)
+    int count = 0;
+    // Returns a NULL-terminated array of locale pointers
+    SDL_Locale **locales = SDL_GetPreferredLocales(&count);
+
+    if (locales == nullptr)
     {
-        if (success >= 2 && locale->lang) // confident!
+        LL_WARNS() << "Could not retrieve locales: " << SDL_GetError() << LL_ENDL;
+    }
+    else
+    {
+        for (int i = 0; locales[i] != nullptr; ++i)
         {
-            LL_INFOS("AppInit") << "Language " << ll_safe_string(locale->lang) << LL_ENDL;
-            LL_INFOS("AppInit") << "Location " << ll_safe_string(locale->country) << LL_ENDL;
-            LL_INFOS("AppInit") << "Variant " << ll_safe_string(locale->variant) << LL_ENDL;
+            const char *lang = locales[i]->language; // e.g., "en"
+            const char *country = locales[i]->country; // e.g., "US" or NULL
+
+            LL_INFOS("AppInit") << "Language " << ll_safe_string(lang) << LL_ENDL;
+            LL_INFOS("AppInit") << "Location " << ll_safe_string(country) << LL_ENDL;
 
             LLControlVariable* c = gSavedSettings.getControl("SystemLanguage");
             if(c)
             {
-                c->setValue(std::string(locale->lang), false);
+                // SystemLanguage expects bare ISO 639-1 codes ("en", "de"); strip
+                // any region/script suffix SDL may emit ("en-us", "zh-Hans-CN").
+                std::string lang_str = ll_safe_string(lang);
+                const auto sep = lang_str.find_first_of("-_");
+                if (sep != std::string::npos)
+                {
+                    lang_str.erase(sep);
+                }
+                c->setValue(lang_str, false);
             }
+            break;
         }
+        // Remember to free the returned memory
+        SDL_free(locales);
     }
-    FL_FreeLocale(&locale);
 
     return true;
 }
 
-std::string LLAppViewerLinux::generateSerialNumber()
+std::string LLAppViewerSDL::generateSerialNumber()
 {
-    char serial_md5[MD5HEX_STR_SIZE];
+    char serial_md5[MD5HEX_STR_SIZE];       // Flawfinder: ignore
     serial_md5[0] = 0;
+#if LL_DARWIN
+    // JC: Sample code from http://developer.apple.com/technotes/tn/tn1103.html
+    CFStringRef serialNumber = NULL;
+    io_service_t    platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,
+                                                                 IOServiceMatching("IOPlatformExpertDevice"));
+    if (platformExpert)
+    {
+        serialNumber = (CFStringRef) IORegistryEntryCreateCFProperty(platformExpert,
+                                                                     CFSTR(kIOPlatformSerialNumberKey),
+                                                                     kCFAllocatorDefault, 0);
+        IOObjectRelease(platformExpert);
+    }
+
+    if (serialNumber)
+    {
+        char buffer[MAX_STRING];        // Flawfinder: ignore
+        if (CFStringGetCString(serialNumber, buffer, MAX_STRING, kCFStringEncodingASCII))
+        {
+            LLMD5 md5( (unsigned char*)buffer );
+            md5.hex_digest(serial_md5);
+        }
+        CFRelease(serialNumber);
+    }
+#elif LL_LINUX
     std::string best;
     std::string uuiddir("/dev/disk/by-uuid/");
 
@@ -548,6 +735,6 @@ std::string LLAppViewerLinux::generateSerialNumber()
     // we don't return the actual serial number, just a hash of it.
     LLMD5 md5( reinterpret_cast<const unsigned char*>(best.c_str()) );
     md5.hex_digest(serial_md5);
-
+#endif
     return serial_md5;
 }
