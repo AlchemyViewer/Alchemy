@@ -1400,13 +1400,6 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     }
                     setAngularVelocity(new_angv);
                     count += sizeof(LLVector3);
-#if LL_DARWIN
-                    if (length == OBJECTDATA_FIELD_SIZE_76 ||
-                        length == OBJECTDATA_FIELD_SIZE_140)
-                    {
-                        setAngularVelocity(LLVector3::zero);
-                    }
-#endif
                     break;
 
                 // length values 48, 32 and 16 were once in viewer code but
