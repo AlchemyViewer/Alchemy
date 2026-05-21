@@ -203,6 +203,13 @@
               "platform": "linux"
             }
           ]
+        },
+        {
+          "name": "sdl3-image",
+          "platform": "osx",
+          "features": [
+            "tiff"
+          ]
         }
       ]
     },

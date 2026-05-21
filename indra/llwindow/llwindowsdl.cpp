@@ -69,6 +69,7 @@ LLWindowSDL::WAYLAND_DATA LLWindowSDL::sWaylandData = {};
 #include <Carbon/Carbon.h>
 #include <CoreServices/CoreServices.h>
 #include <CoreGraphics/CGDisplayConfiguration.h>
+#include <SDL3_image/SDL_image.h>
 
 bool LLWindowSDL::sUseMultGL = false;
 #endif
@@ -152,6 +153,11 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     stop_glerror();
 }
 
+#if !LL_DARWIN
+// The BMP cursor/icon tree (res-sdl/) is only shipped in the Linux bundle. On
+// macOS we load cursors from cursors_mac/*.tif (see makeSDLCursorFromMacTIF
+// below), so this helper would be unused there — and the build is -Werror on
+// unused static functions.
 static SDL_Surface *Load_BMP_Resource(const char *basename)
 {
     const int PATH_BUFFER_SIZE=1000;
@@ -167,6 +173,7 @@ static SDL_Surface *Load_BMP_Resource(const char *basename)
 
     return SDL_LoadBMP(path_buffer);
 }
+#endif // !LL_DARWIN
 
 void LLWindowSDL::setTitle(const std::string title)
 {
@@ -2482,6 +2489,59 @@ SDL_AppResult LLWindowSDL::handleEvents(const SDL_Event& event)
     return gWindowImplementation->handleEvent(event);
 }
 
+#if LL_DARWIN
+// On macOS the viewer ships TIFF cursor art in <Bundle>/Contents/Resources/cursors_mac/
+// (see viewer_manifest.py). The legacy res-sdl/*.BMP tree is Linux-only, so on the
+// SDL build for Mac we load the native TIFFs via SDL3_image. The TIFFs already carry
+// proper alpha, so unlike the BMP path we skip the color-key step.
+static SDL_Cursor *makeSDLCursorFromMacTIF(const char *basename, int hotx, int hoty)
+{
+    std::string fullpath = gDirUtilp->add(
+        gDirUtilp->getAppRODataDir(),
+        "cursors_mac",
+        basename);
+
+    SDL_Surface *surface = IMG_Load(fullpath.c_str());
+    if (!surface)
+    {
+        LL_WARNS() << "Cursor TIFF failed to load: " << fullpath
+                   << ": " << SDL_GetError() << LL_ENDL;
+        return nullptr;
+    }
+
+    LL_DEBUGS() << "Loaded cursor file " << fullpath << " "
+                << surface->w << "x" << surface->h << LL_ENDL;
+
+    SDL_Surface *rgba = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
+    SDL_DestroySurface(surface);
+    if (!rgba)
+    {
+        LL_WARNS() << "Cursor RGBA conversion failed for " << fullpath
+                   << ": " << SDL_GetError() << LL_ENDL;
+        return nullptr;
+    }
+
+    if (hotx < 0 || hotx >= rgba->w || hoty < 0 || hoty >= rgba->h)
+    {
+        LL_WARNS() << "Cursor " << fullpath << " hot-spot ("
+                   << hotx << "," << hoty << ") is outside "
+                   << rgba->w << "x" << rgba->h << "; clamping." << LL_ENDL;
+        hotx = llclamp(hotx, 0, rgba->w - 1);
+        hoty = llclamp(hoty, 0, rgba->h - 1);
+    }
+
+    SDL_Cursor *sdlcursor = SDL_CreateColorCursor(rgba, hotx, hoty);
+    SDL_DestroySurface(rgba);
+    if (!sdlcursor)
+    {
+        LL_WARNS() << "SDL_CreateColorCursor failed for " << fullpath
+                   << ": " << SDL_GetError() << LL_ENDL;
+    }
+    return sdlcursor;
+}
+#endif // LL_DARWIN
+
+#if !LL_DARWIN
 static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty)
 {
     SDL_Surface *bmpsurface = Load_BMP_Resource(filename);
@@ -2563,6 +2623,7 @@ static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty
     }
     return sdlcursor;
 }
+#endif // !LL_DARWIN
 
 void LLWindowSDL::updateCursor()
 {
@@ -2611,6 +2672,43 @@ void LLWindowSDL::initCursors()
     mSDLCursors[UI_CURSOR_SIZEALL] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_MOVE);
     mSDLCursors[UI_CURSOR_NO] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NOT_ALLOWED);
     mSDLCursors[UI_CURSOR_WORKING] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_PROGRESS);
+#if LL_DARWIN
+    // The macOS bundle ships TIFF cursors under cursors_mac/ (not the res-sdl BMP
+    // tree), and uses Mac-specific hot-spots — keep these in sync with
+    // LLWindowMacOSX::initCursors() so the SDL build matches the native client.
+    // ARROWCOPY/ARROWCOPYMULTI/ARROWDRAGMULTI have no TIF counterpart (the native
+    // path handles them via NSCursor.dragCopy / remapping in updateCursor), so we
+    // leave them null and let updateCursor's nullptr→arrow fallback take over.
+    mSDLCursors[UI_CURSOR_TOOLGRAB] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLGRAB.tif", 2, 14);
+    mSDLCursors[UI_CURSOR_TOOLLAND] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLLAND.tif", 13, 8);
+    mSDLCursors[UI_CURSOR_TOOLFOCUS] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLFOCUS.tif", 7, 6);
+    mSDLCursors[UI_CURSOR_TOOLCREATE] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLCREATE.tif", 7, 7);
+    mSDLCursors[UI_CURSOR_ARROWDRAG] = makeSDLCursorFromMacTIF("UI_CURSOR_ARROWDRAG.tif", 1, 1);
+    mSDLCursors[UI_CURSOR_NOLOCKED] = makeSDLCursorFromMacTIF("UI_CURSOR_NOLOCKED.tif", 8, 8);
+    mSDLCursors[UI_CURSOR_ARROWLOCKED] = makeSDLCursorFromMacTIF("UI_CURSOR_ARROWLOCKED.tif", 1, 1);
+    mSDLCursors[UI_CURSOR_GRABLOCKED] = makeSDLCursorFromMacTIF("UI_CURSOR_GRABLOCKED.tif", 2, 14);
+    mSDLCursors[UI_CURSOR_TOOLTRANSLATE] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLTRANSLATE.tif", 1, 1);
+    mSDLCursors[UI_CURSOR_TOOLROTATE] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLROTATE.tif", 1, 1);
+    mSDLCursors[UI_CURSOR_TOOLSCALE] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLSCALE.tif", 1, 1);
+    mSDLCursors[UI_CURSOR_TOOLCAMERA] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLCAMERA.tif", 7, 6);
+    mSDLCursors[UI_CURSOR_TOOLPAN] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLPAN.tif", 7, 6);
+    mSDLCursors[UI_CURSOR_TOOLZOOMIN] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLZOOMIN.tif", 7, 6);
+    mSDLCursors[UI_CURSOR_TOOLZOOMOUT] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLZOOMOUT.tif", 7, 6);
+    mSDLCursors[UI_CURSOR_TOOLPICKOBJECT3] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLPICKOBJECT3.tif", 1, 1);
+    mSDLCursors[UI_CURSOR_TOOLPLAY] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLPLAY.tif", 1, 1);
+    mSDLCursors[UI_CURSOR_TOOLPAUSE] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLPAUSE.tif", 1, 1);
+    mSDLCursors[UI_CURSOR_TOOLMEDIAOPEN] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLMEDIAOPEN.tif", 1, 1);
+    mSDLCursors[UI_CURSOR_PIPETTE] = makeSDLCursorFromMacTIF("UI_CURSOR_PIPETTE.tif", 3, 29);
+    mSDLCursors[UI_CURSOR_TOOLSIT] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLSIT.tif", 20, 15);
+    mSDLCursors[UI_CURSOR_TOOLBUY] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLBUY.tif", 20, 15);
+    mSDLCursors[UI_CURSOR_TOOLOPEN] = makeSDLCursorFromMacTIF("UI_CURSOR_TOOLOPEN.tif", 20, 15);
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING] = makeSDLCursorFromMacTIF("UI_CURSOR_PATHFINDING.tif", 16, 16);
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START] = makeSDLCursorFromMacTIF("UI_CURSOR_PATHFINDING_START.tif", 16, 16);
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START_ADD] = makeSDLCursorFromMacTIF("UI_CURSOR_PATHFINDING_START_ADD.tif", 16, 16);
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END] = makeSDLCursorFromMacTIF("UI_CURSOR_PATHFINDING_END.tif", 16, 16);
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromMacTIF("UI_CURSOR_PATHFINDING_END_ADD.tif", 16, 16);
+    mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromMacTIF("UI_CURSOR_NO.tif", 8, 8);
+#else
     mSDLCursors[UI_CURSOR_TOOLGRAB] = makeSDLCursorFromBMP("lltoolgrab.BMP",2,13);
     mSDLCursors[UI_CURSOR_TOOLLAND] = makeSDLCursorFromBMP("lltoolland.BMP",1,6);
     mSDLCursors[UI_CURSOR_TOOLFOCUS] = makeSDLCursorFromBMP("lltoolfocus.BMP",8,5);
@@ -2643,6 +2741,7 @@ void LLWindowSDL::initCursors()
     mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END] = makeSDLCursorFromBMP("lltoolpathfindingpathend.BMP", 16, 16);
     mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromBMP("lltoolpathfindingpathendadd.BMP", 16, 16);
     mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromBMP("llno.BMP",8,8);
+#endif // LL_DARWIN
 }
 
 void LLWindowSDL::quitCursors()
