@@ -69,12 +69,16 @@
 //----------------------------------------------------------------------------
 // LL_DARWIN
 
-#define GL_GLEXT_LEGACY 1
 #include <OpenGL/gl3.h>
+#include <OpenGL/gl3ext.h>
 
-#define GL_EXT_separate_specular_color 1
-#define GL_GLEXT_PROTOTYPES 1
-#include <GL/glext.h>
+#ifndef GL_TEXTURE_MAX_ANISOTROPY
+#define GL_TEXTURE_MAX_ANISOTROPY GL_TEXTURE_MAX_ANISOTROPY_EXT
+#endif
+
+#ifndef GL_MAX_TEXTURE_MAX_ANISOTROPY
+#define GL_MAX_TEXTURE_MAX_ANISOTROPY GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT
+#endif
 
 #endif // LL_MESA_HEADLESS / LL_SDL_WINDOW // LL_LINUX / LL_WINDOWS / LL_DARWIN
 
