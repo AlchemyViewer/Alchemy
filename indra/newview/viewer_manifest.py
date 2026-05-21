@@ -823,6 +823,13 @@ class DarwinManifest(ViewerManifest):
                                           'llwebrtc', self.args['configuration'])):
                     self.path('libllwebrtc.dylib')
 
+                # BugsplatMac framework — required at runtime when LL_BUGSPLAT
+                # is enabled. The viewer binary's INSTALL_RPATH
+                # (@executable_path/../Frameworks) resolves the @rpath load
+                # command emitted by the BugsplatMac framework here.
+                if self.args.get('bugsplat'):
+                    self.path("BugSplatMac.framework")
+
             with self.prefix(dst="MacOS"):
                 executable = self.dst_path_of(self.channel())
                 # Xcode generator handles stripping as part of deploy processing

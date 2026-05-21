@@ -1675,6 +1675,10 @@ if (DARWIN)
   LIST(APPEND viewer_SOURCE_FILES llvelopack.cpp)
   LIST(APPEND viewer_HEADER_FILES llvelopack.h)
 
+  # Crash-metadata helpers shared by both the legacy Cocoa and SDL backends.
+  LIST(APPEND viewer_SOURCE_FILES llbugsplat_mac.cpp)
+  LIST(APPEND viewer_HEADER_FILES llbugsplat_mac.h)
+
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
     alchemy.icns
@@ -1694,6 +1698,17 @@ if (DARWIN)
       )
 
     set_source_files_properties(llappviewersdl.cpp PROPERTIES LANGUAGE OBJCXX)
+    # BugsplatMac is consumed via @import (an Objective-C module), which
+    # requires -fmodules / -fcxx-modules. The BugsplatMac headers also don't
+    # annotate nullability everywhere, so silence that warning to match the
+    # legacy Cocoa path. Skip the precompiled header here because modules
+    # don't play well with PCH for this translation unit.
+    set_source_files_properties(
+      llappviewersdl.cpp
+      PROPERTIES
+      SKIP_PRECOMPILE_HEADERS TRUE
+      COMPILE_FLAGS "-fmodules -fcxx-modules -Wno-nullability-completeness"
+      )
   else()
     LIST(APPEND viewer_SOURCE_FILES llappdelegate-objc.mm)
     LIST(APPEND viewer_SOURCE_FILES llappviewermacosx.cpp)

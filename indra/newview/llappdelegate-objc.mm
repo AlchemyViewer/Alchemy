@@ -76,6 +76,15 @@
     [BugSplat shared].expirationTimeInterval = 0;
     [[BugSplat shared] start];
 
+    // BugsplatMac submits queued crash reports on a background thread, so
+    // its delegate callbacks (attachmentsForBugSplat:, etc.) can land
+    // *after* initViewer() runs writeSystemInfo() and clobbers
+    // static_debug_info.log with this run's data. Force the singleton to
+    // read the previous run's file now — constructViewer() above already
+    // ran the LLAppViewer constructor (and setDebugFileNames()), but the
+    // base init() hasn't yet overwritten the file contents.
+    CrashMetadata_instance();
+
     // Optionally, add some attributes to your crash reports.
     // Attributes are artibrary key/value pairs that are searchable in the BugSplat dashboard.
     // [[BugSplat shared] setValue:@"Value of Plain Attribute" forAttribute:@"PlainAttribute"];
