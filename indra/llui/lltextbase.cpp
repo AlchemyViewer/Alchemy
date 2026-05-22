@@ -2006,22 +2006,31 @@ void LLTextBase::reflow()
         else if (hasSelection() && follow_selection)
         {
             // keep cursor in same vertical position on screen when selecting text
+            // scrollToShowRect expects the constraint in content-window-relative
+            // coords (origin at content window bottom-left); convert from the
+            // top-relative form captured pre-reflow by using getHeight() — which
+            // matches the convention every other caller (updateScrollFromCursor,
+            // LLFolderView, inventory gallery) uses.
             LLRect new_cursor_rect_doc = getDocRectFromDocIndex(mCursorPos);
             LLRect old_cursor_rect = cursor_rect;
-            old_cursor_rect.mTop = mVisibleTextRect.mTop - cursor_rect.mTop;
-            old_cursor_rect.mBottom = mVisibleTextRect.mTop - cursor_rect.mBottom;
+            old_cursor_rect.mTop = mVisibleTextRect.getHeight() - cursor_rect.mTop;
+            old_cursor_rect.mBottom = mVisibleTextRect.getHeight() - cursor_rect.mBottom;
+            old_cursor_rect.mLeft = cursor_rect.mLeft - mVisibleTextRect.mLeft;
+            old_cursor_rect.mRight = cursor_rect.mRight - mVisibleTextRect.mLeft;
 
             mScroller->scrollToShowRect(new_cursor_rect_doc, old_cursor_rect);
         }
         else
         {
-            // keep first line of text visible
+            // keep first line of text visible — same content-window-relative
+            // conversion as above
             LLRect new_first_char_rect = getDocRectFromDocIndex(mScrollIndex);
 
-            // pass in desired rect in the coordinate frame of the document viewport
             LLRect old_first_char_rect = first_char_rect;
-            old_first_char_rect.mTop = mVisibleTextRect.mTop - first_char_rect.mTop;
-            old_first_char_rect.mBottom = mVisibleTextRect.mTop - first_char_rect.mBottom;
+            old_first_char_rect.mTop = mVisibleTextRect.getHeight() - first_char_rect.mTop;
+            old_first_char_rect.mBottom = mVisibleTextRect.getHeight() - first_char_rect.mBottom;
+            old_first_char_rect.mLeft = first_char_rect.mLeft - mVisibleTextRect.mLeft;
+            old_first_char_rect.mRight = first_char_rect.mRight - mVisibleTextRect.mLeft;
 
             mScroller->scrollToShowRect(new_first_char_rect, old_first_char_rect);
         }
