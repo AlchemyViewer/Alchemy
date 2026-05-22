@@ -1692,7 +1692,7 @@ if (DARWIN)
 
   if(USE_SDL_WINDOW)
     LIST(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
-    LIST(APPEND viewer_HEADER_FILES llappviewersdl.h llsdlfiledialog.h)
+    LIST(APPEND viewer_HEADER_FILES llappviewersdl.h)
     LIST(APPEND viewer_RESOURCE_FILES
       Info-AlchemySDL.plist
       )
@@ -1737,7 +1737,8 @@ if (DARWIN)
 endif (DARWIN)
 
 if (LINUX)
-    LIST(APPEND viewer_SOURCE_FILES llappviewerlinux.cpp)
+    LIST(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
+    LIST(APPEND viewer_HEADER_FILES llappviewersdl.h)
 endif (LINUX)
 
 if (WINDOWS)
