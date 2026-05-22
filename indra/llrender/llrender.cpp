@@ -203,6 +203,13 @@ void LLTexUnit::bindFast(LLTexture* texture)
         texture->bindDefaultImage(mIndex);
     }
     glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
+    // Track the actual bound target so later callers that read mCurrTexType
+    // (e.g. LLTexUnit::setTextureFilteringOption, called from
+    // LLImageGL::setFilteringOption via LLDrawPoolWater::renderPostDeferred)
+    // don't apply glTexParameteri against a stale target left over from
+    // earlier passes. The fast path used to skip this — the slow enable()
+    // path was the only place mCurrTexType was updated.
+    mCurrTexType = gl_tex->getTarget();
     mHasMipMaps = gl_tex->mHasMipMaps;
     if (gl_tex->mTexOptionsDirty)
     {
