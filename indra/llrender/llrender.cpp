@@ -1647,7 +1647,16 @@ LLVertexBuffer* LLRender::genBuffer(U32 attribute_mask, S32 count)
     LLVertexBuffer * vb = new LLVertexBuffer(attribute_mask);
     vb->allocateBuffer(count, 0);
 
-    vb->setBuffer();
+    // Non-Apple path uses glBufferSubData inside setXxxData, so the VBO
+    // must already be bound. On Apple, the VBO is lazily created in
+    // _unmapBuffer (LLAppleVBOPool); calling setBuffer() here would bind
+    // mGLBuffer == 0 and then setupVertexBuffer would issue
+    // glVertexAttribPointer with a non-null offset against no bound
+    // GL_ARRAY_BUFFER — GL_INVALID_OPERATION in core profile.
+    if (!gGLManager.mIsApple)
+    {
+        vb->setBuffer();
+    }
 
     vb->setPositionData(mVerticesp.get());
 
@@ -1662,6 +1671,9 @@ LLVertexBuffer* LLRender::genBuffer(U32 attribute_mask, S32 count)
     }
 
 #if LL_DARWIN
+    // unmapBuffer creates the GL buffer, uploads, and leaves it bound;
+    // drawBuffer's later setBuffer() then runs setupVertexBuffer against
+    // a valid VBO.
     vb->unmapBuffer();
 #endif
     vb->unbind();
