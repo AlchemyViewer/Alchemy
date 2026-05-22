@@ -576,6 +576,9 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
             renderStarsDeferred(origin);
             renderAuroraDeferred(origin, camHeightLocal);
             renderMeteorsDeferred(origin);
+
+            // Reset blend type after drawing effects that need BT_ADD
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
         }
 
         if (!gCubeSnapshot || gPipeline.mReflectionMapManager.isRadiancePass()) // don't draw clouds in irradiance maps to avoid popping
