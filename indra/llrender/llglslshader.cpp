@@ -378,6 +378,15 @@ void LLGLSLShader::unloadInternal()
             if (glIsShader(obj[i]))
             {
                 glDeleteShader(obj[i]);
+#if LL_DARWIN
+                // Apple's GL 4.1 core driver spuriously raises
+                // GL_INVALID_OPERATION on glDeleteShader of a just-detached,
+                // valid shader (already vetted by glIsShader above). Drain
+                // it. Commit 7e9bf817a7 removed the original sweep on the
+                // belief that the driver had been fixed; empirically it has
+                // not been.
+                flush_glerror();
+#endif
             }
         }
 
