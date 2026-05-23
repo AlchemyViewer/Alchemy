@@ -326,9 +326,10 @@ public:
     // PlayBegin offset whose first sample is guaranteed non-zero
     // amplitude — a discontinuity FMOD's own setVolumeRamp also has to
     // ramp through. Regular play() does NOT arm a fade-in (FMOD doesn't
-    // either; the FAudio-specific first-quantum dip-out is handled by
-    // updateBuffer's silent pre-roll buffer rather than a gain ramp,
-    // matching FMOD's perceptual behaviour on every fresh sound start).
+    // either; the FAudio-specific first-quantum interpolation from
+    // defaults to the configured targets is handled by updateBuffer's
+    // silent pre-roll buffer rather than a gain ramp, matching FMOD's
+    // perceptual behaviour on every fresh sound start).
     //
     // The per-frame gain assignments in updateBuffer / update3DPosition
     // multiply by mFadeIn; the tick at the top of updateBuffer ramps it
@@ -432,15 +433,19 @@ private:
 
     // One master-quantum of silence in the source's PCM format, prepended
     // to every fresh real-buffer submit. Without it, FAudio's mixer would
-    // mix the real buffer's first sample at the voice's default
-    // currentVolume of 1.0 — defeating SetVolume(0) + mFadeIn since the
-    // first quantum's "previous volume" hasn't been updated yet. With the
-    // pre-roll, the mixer's first quantum outputs silence while
-    // currentVolume ramps from 1.0 to 0; the real buffer starts on the
-    // next quantum with currentVolume already at 0 and the fade-in tick
-    // raising the target back toward source.gain. Sized in ensureVoice
-    // when the format is known (source_rate / 100 samples * nBlockAlign);
-    // costs ~1-2 KB per active channel.
+    // mix the real buffer's first sample against the voice's default
+    // currentVolume (1.0) and default output matrix (FAudio's mono->Nch
+    // fan-out, which differs from F3DAudio's near-field spread). The
+    // pre-roll gives the mixer one quantum of silence in which to
+    // interpolate cur_volume / cur_matrix from those defaults to the
+    // targets committed by updateBuffer's pre-Start SetVolume + listener
+    // applyForcedPriority/apply3D calls; the real buffer then starts on
+    // the next quantum with both already settled to the intended values.
+    // Used by every source — UI / preview included — because the matrix
+    // transition (~3 dB on UI mono->stereo) otherwise produced occasional
+    // master-clipping audible as "clipped UI sounds". Sized in
+    // ensureVoice when the format is known (source_rate / 100 samples *
+    // nBlockAlign); costs ~1-2 KB per active channel.
     std::vector<U8>       mSilentPreroll;
 
     // Shared ownership of the live voice's PCM, captured from the

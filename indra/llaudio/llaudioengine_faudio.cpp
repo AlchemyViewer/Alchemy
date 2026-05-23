@@ -1509,14 +1509,15 @@ void LLAudioChannelFAudio::play()
         // No explicit fade-in here. FMOD doesn't ramp at sound start
         // either (its setVolumeRamp covers volume *changes*, not the
         // initial unpause), and we want responsiveness parity with the
-        // FMOD backend on every play() — not just forced-priority. The
-        // FAudio-specific first-quantum dip-out (default currentVolume
-        // = 1.0 ramping toward whatever target the first mix block
-        // sees) is handled by the silent pre-roll buffer that
-        // updateBuffer queues ahead of the real buffer for spatial
-        // sources: the pre-roll's quantum absorbs the 1.0 → source.gain
-        // settling, so the real audio's first sample mixes at the
-        // intended gain. See updateBuffer for the pre-roll details, and
+        // FMOD backend on every play(). The FAudio-specific
+        // first-quantum interpolation (default currentVolume = 1.0
+        // and default output matrix ramping toward whatever targets
+        // updateBuffer set) is handled by the silent pre-roll buffer
+        // updateBuffer queues ahead of the real buffer for every
+        // source (including forced-priority UI / preview): the
+        // pre-roll's quantum absorbs the default→target settling, so
+        // the real audio's first sample mixes at the intended gain
+        // and matrix. See updateBuffer for the pre-roll details, and
         // playSynced for the one legitimate fade-in use (mid-buffer
         // restart at an arbitrary PlayBegin offset — a genuine
         // discontinuity FMOD also has to ramp through).
@@ -1740,23 +1741,32 @@ bool LLAudioChannelFAudio::updateBuffer()
         // FAudio consumes submitted buffers in submission order — the
         // mixer's first quantum after Start mixes silence (output=0
         // regardless of volume/matrix state), giving FAudio's
-        // per-quantum SetVolume interpolation a full quantum to ramp
-        // currentVolume from the default 1.0 down to the 0 target
-        // committed by play(). When the real buffer's first sample
-        // hits the mixer (quantum 1), currentVolume≈0 and the
-        // fade-in tick raises target back toward source.gain on
-        // subsequent quanta — clean ramp-in with no first-sample
-        // click. Pre-roll skipped when mSilentPreroll is empty (which
-        // it shouldn't be after ensureVoice's success path, but
-        // defensively guarded).
+        // per-quantum SetVolume / SetOutputMatrix interpolation a full
+        // quantum to ramp from the freshly-created voice's defaults
+        // (currentVolume=1.0; FAudio's default mono->Nch fan-out
+        // matrix) to the targets committed via the SetVolume +
+        // listener apply3D/applyForcedPriority calls below. When the
+        // real buffer's first sample hits the mixer (quantum 2),
+        // currentVolume and the routing matrix are already at their
+        // intended values — clean attack with no first-sample click
+        // and no over-loud first quantum routed through the default
+        // matrix. Pre-roll skipped only when mSilentPreroll is empty
+        // (which it shouldn't be after ensureVoice's success path,
+        // but defensively guarded).
         //
-        // Forced-priority sources (UI / preview) also skip the pre-roll
-        // — the 10 ms latency it costs delays the perceived attack of
-        // a UI click well past the response threshold. See play() for
-        // the matching skip on the fade-in side.
-        const bool forced_for_preroll =
-            mCurrentSourcep && mCurrentSourcep->isForcedPriority();
-        if (!mSilentPreroll.empty() && !forced_for_preroll)
+        // UI / preview (forced-priority) sources also use the pre-roll.
+        // Their matrix transition is the largest — FAudio's default
+        // mono->stereo fan-out is [1.0, 1.0] while F3DAudio's near-
+        // field spread at listener distance 0 is ~[0.707, 0.707], a
+        // ~3 dB difference. Without the pre-roll, the first quantum
+        // of real audio mixes through the louder default matrix and
+        // can push the master past unity when combined with other
+        // sources, producing audible clipping users perceive as
+        // "occasional clipped play of UI sounds". The 10 ms latency
+        // cost is below human audio-visual perception thresholds
+        // (~40 ms) and well below the ~100 ms "feels instant"
+        // threshold — invisible to the user.
+        if (!mSilentPreroll.empty())
         {
             FAudioBuffer preroll{};
             preroll.AudioBytes = static_cast<uint32_t>(mSilentPreroll.size());
@@ -1789,6 +1799,44 @@ bool LLAudioChannelFAudio::updateBuffer()
         mVoicePcm = buf->mPcm;
         mStarted = false;
 
+        // Lock in target volume + output matrix BEFORE Start. The
+        // SetVolume here used to live at the end of updateBuffer
+        // (after play()), and the matrix was set later still by the
+        // update3DPosition pass setSource runs immediately after us.
+        // Both Set* calls happen microseconds apart on the main
+        // thread, but FAudio's mixer thread runs on its own ~10 ms
+        // cadence — so it can race a first mix pass in between
+        // play() and the Set* commits, landing the first-quantum
+        // interpolation against stale defaults (currentVolume=1.0;
+        // FAudio default matrix). For non-UI sources that quantum
+        // would be the pre-roll, but a stale-default first quantum
+        // still leaves cur_matrix at default heading into quantum 2
+        // (real audio), so the matrix ramp lands on the real audio
+        // anyway and produces an audible attack glitch. For UI
+        // sources (forced-priority, near-field spread vs default
+        // fan-out is the +3 dB transition that pushes the master
+        // past unity) this is the "occasional clipped play"
+        // symptom. Set targets before Start so the first mix pass
+        // (the pre-roll quantum above) sees the correct targets and
+        // settles cur_volume / cur_matrix cleanly inside the silent
+        // window.
+        const F32 gain = mCurrentSourcep->getGain() * mFadeIn
+            * (mRoutedThroughGroup ? 1.0f : getSecondaryGain());
+        FAudioVoice_SetVolume(mVoice, gain, FAUDIO_COMMIT_NOW);
+
+        LLListener_FAudio* listener = mEnginep->getFAudioListener();
+        if (listener)
+        {
+            if (mCurrentSourcep->isForcedPriority())
+            {
+                listener->applyForcedPriority(this);
+            }
+            else
+            {
+                listener->apply3D(this);
+            }
+        }
+
         // Kick the freshly-built voice into playback. The base
         // LLAudioEngine::idle() calls channelp->play() *before*
         // updateChannels — i.e. before this rebuild branch had a
@@ -1808,15 +1856,20 @@ bool LLAudioChannelFAudio::updateBuffer()
         {
             play();
         }
+
+        // Targets already locked in above; the per-frame SetVolume
+        // below is redundant in the rebuild path.
+        return true;
     }
 
     if (mVoice)
     {
-        // Submix already applies the per-type secondary gain; the source
-        // voice only needs the source's own gain. When we fell back to
-        // master routing (submix creation failed), the source voice has
-        // to multiply secondary gain in itself. mFadeIn is 1.0 except
-        // during a playSynced ramp-in.
+        // Per-frame volume update for the no-rebuild path. Submix
+        // already applies the per-type secondary gain; the source
+        // voice only needs the source's own gain. When we fell back
+        // to master routing (submix creation failed), the source
+        // voice has to multiply secondary gain in itself. mFadeIn is
+        // 1.0 except during a playSynced ramp-in.
         const F32 gain = mCurrentSourcep->getGain() * mFadeIn
             * (mRoutedThroughGroup ? 1.0f : getSecondaryGain());
         FAudioVoice_SetVolume(mVoice, gain, FAUDIO_COMMIT_NOW);
