@@ -57,6 +57,9 @@ extern LL_COMMON_API bool on_main_thread();
 const F32 MIN_TEXTURE_LIFETIME = 10.f;
 const F32 CONVERSION_SCRATCH_BUFFER_GL_VERSION = 3.29f;
 
+constexpr int DELETE_DELAY = 3; // number of frames to wait before deleting textures
+static std::vector<U32> sFreeList[DELETE_DELAY+1];
+
 //which power of 2 is i?
 //assumes i is a power of 2 > 0
 U32 wpo2(U32 i);
@@ -191,7 +194,7 @@ void LLImageGL::checkTexSize(bool forced) const
         bool error = false;
         if (texname != mTexName)
         {
-            LL_INFOS() << "Bound: " << texname << " Should bind: " << mTexName << " Default: " << LLImageGL::sDefaultGLTexture->getTexName() << LL_ENDL;
+            LL_INFOS() << "Bound: " << texname << " Should bind: " << mTexName << " Default: " << (sDefaultGLTexture ? sDefaultGLTexture->getTexName() : 0 ) << LL_ENDL;
 
             error = true;
             if (gDebugSession)
@@ -213,7 +216,11 @@ void LLImageGL::checkTexSize(bool forced) const
         {
             return ;
         }
-        if(x != (mWidth >> mCurrentDiscardLevel) || y != (mHeight >> mCurrentDiscardLevel))
+        // Clamp like getWidth/getHeight: mCurrentDiscardLevel can be -1
+        // when no upload has happened yet; shifting by a negative value
+        // is UB. Treat "no discard set" as full resolution.
+        const S32 cur_discard = llmax<S32>(mCurrentDiscardLevel, 0);
+        if(x != (mWidth >> cur_discard) || y != (mHeight >> cur_discard))
         {
             error = true;
             if (gDebugSession)
@@ -290,7 +297,28 @@ void LLImageGL::cleanupClass()
         sScratchPBOSize = 0;
     }
 
+    // Drain the deferred-delete ring so leftover texture names don't dangle
+    // in sTextureAllocs across re-init (the test fixture calls cleanupClass
+    // between tests). Always clear the C++ bookkeeping; only issue
+    // glDeleteTextures if GL is still around.
+    const bool gl_alive = gGLManager.mInited;
+    for (S32 i = 0; i < DELETE_DELAY + 1; ++i)
+    {
+        if (!sFreeList[i].empty())
+        {
+            free_tex_images((GLsizei)sFreeList[i].size(), sFreeList[i].data());
+            if (gl_alive)
+            {
+                glDeleteTextures((GLsizei)sFreeList[i].size(), sFreeList[i].data());
+            }
+            sFreeList[i].resize(0);
+        }
+    }
+
     delete[] sManualScratch;
+    // Null after free so a second cleanupClass call (e.g. test fixture
+    // teardown) doesn't double-delete.
+    sManualScratch = nullptr;
 }
 
 
@@ -302,7 +330,7 @@ S32 LLImageGL::dataFormatBits(S32 dataformat)
     case GL_COMPRESSED_RED:                         return 8;
     case GL_COMPRESSED_RG:                          return 16;
     case GL_COMPRESSED_RGB:                         return 24;
-    case GL_COMPRESSED_SRGB:                        return 32;
+    case GL_COMPRESSED_SRGB:                        return 24;
     case GL_COMPRESSED_RGBA:                        return 32;
     case GL_COMPRESSED_SRGB_ALPHA:                  return 32;
     case GL_COMPRESSED_LUMINANCE:                   return 8;
@@ -520,9 +548,15 @@ LLImageGL::LLImageGL(
 
 LLImageGL::~LLImageGL()
 {
-    if (!mExternalTexture && gGLManager.mInited)
+    if (!mExternalTexture)
     {
-        LLImageGL::cleanup();
+        // Always run the C++ bookkeeping (sImageList/sCount/freePickMask)
+        // even if GL is gone. The previous gate on gGLManager.mInited left
+        // stale `this` pointers in sImageList when an LLImageGL outlived GL
+        // teardown — a later iteration (e.g. dirtyTexOptions) would UAF.
+        // cleanup() is C++-safe on its own: destroyGLTexture is gated on
+        // mIsDisabled, and deleteTextures no-ops when mInited is false.
+        cleanup();
         sImageList.erase(this);
         freePickMask();
         sCount--;
@@ -808,12 +842,17 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                         stop_glerror();
                     }
 
-                    LLImageGL::setManualImage(mTarget, gl_level, mFormatInternal, w, h, mFormatPrimary, GL_UNSIGNED_BYTE, (GLvoid*)data_in, mAllowCompression);
+                    LLImageGL::setManualImage(mTarget, gl_level, mFormatInternal, w, h, mFormatPrimary, mFormatType, (GLvoid*)data_in, mAllowCompression);
                     if (gl_level == 0)
                     {
                         analyzeAlpha(data_in, w, h);
+                        // Match the auto-mip and manual-mip paths: pick mask
+                        // is built once from the largest level. Calling it
+                        // every iteration overwrote the mask with each
+                        // smaller mip's data, leaving the final mask at the
+                        // coarsest resolution.
+                        updatePickMask(w, h, data_in);
                     }
-                    updatePickMask(w, h, data_in);
 
                     if(mFormatSwapBytes)
                     {
@@ -875,9 +914,6 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                 S32 w = width, h = height;
 
 
-                const U8* new_data = 0;
-                (void)new_data;
-
                 const U8* prev_mip_data = 0;
                 const U8* cur_mip_data = 0;
 #ifdef SHOW_ASSERT
@@ -906,17 +942,21 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                         {
                             stop_glerror();
 
-                            if (prev_mip_data)
+                            // At m == 1, both prev_mip_data and cur_mip_data
+                            // are still aliased to the caller's data_in (the
+                            // m==0 iteration set prev = cur = data_in). Guard
+                            // every delete against the caller-owned buffer.
+                            if (prev_mip_data && prev_mip_data != data_in
+                                && prev_mip_data != cur_mip_data)
                             {
-                                if (prev_mip_data != cur_mip_data)
-                                    delete[] prev_mip_data;
-                                prev_mip_data = nullptr;
+                                delete[] prev_mip_data;
                             }
-                            if (cur_mip_data)
+                            prev_mip_data = nullptr;
+                            if (cur_mip_data && cur_mip_data != data_in)
                             {
                                 delete[] cur_mip_data;
-                                cur_mip_data = nullptr;
                             }
+                            cur_mip_data = nullptr;
 
                             mGLTextureCreated = false;
                             return false;
@@ -1141,7 +1181,9 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
     // HACK: allow the caller to explicitly force the fast path (i.e. using glTexSubImage2D here instead of calling setImage) even when updating the full texture.
     if (!force_fast_update && x_pos == 0 && y_pos == 0 && width == getWidth() && height == getHeight() && data_width == width && data_height == height)
     {
-        setImage(datap, false, tex_name);
+        // Propagate setImage failure (e.g. manual mip alloc failure) so the
+        // caller doesn't see "success" with a half-uploaded texture.
+        return setImage(datap, false, tex_name);
     }
     else
     {
@@ -1280,9 +1322,6 @@ void LLImageGL::generateTextures(S32 numTextures, U32 *textures)
     }
 }
 
-constexpr int DELETE_DELAY = 3; // number of frames to wait before deleting textures
-static std::vector<U32> sFreeList[DELETE_DELAY+1];
-
 // static
 void LLImageGL::updateClass()
 {
@@ -1356,9 +1395,17 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
     }
     else
     {
+        // Manual-pack scratch (sManualScratch) is sized for MAX_IMAGE_AREA
+        // U32s. Images larger than that would write past the end of the
+        // buffer. Texture sizes are clamped by the loader long before they
+        // get here, but guard anyway so a bad caller can't trash the heap.
+        const bool scratch_fits =
+            ((S64)width * (S64)height) <= (S64)MAX_IMAGE_AREA
+            && sManualScratch != nullptr;
+
         if (pixformat == GL_ALPHA && pixtype == GL_UNSIGNED_BYTE)
         { //GL_ALPHA is deprecated, convert to RGBA via manual-pack scratch
-            if (pixels != nullptr)
+            if (pixels != nullptr && scratch_fits)
             {
                 U32 pixel_count = (U32)(width * height);
                 for (U32 i = 0; i < pixel_count; i++)
@@ -1370,6 +1417,12 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 
                 pixels = sManualScratch;
             }
+            else if (pixels != nullptr)
+            {
+                LL_WARNS_ONCE() << "setManualImage: GL_ALPHA conversion skipped, "
+                                << width << "x" << height << " exceeds scratch buffer" << LL_ENDL;
+                pixels = nullptr;
+            }
 
             pixformat = GL_RGBA;
             intformat = GL_RGBA8;
@@ -1377,7 +1430,7 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 
         if (pixformat == GL_LUMINANCE_ALPHA && pixtype == GL_UNSIGNED_BYTE)
         { //GL_LUMINANCE_ALPHA is deprecated, convert to RGBA via manual-pack scratch
-            if (pixels != nullptr)
+            if (pixels != nullptr && scratch_fits)
             {
                 U32 pixel_count = (U32)(width * height);
                 for (U32 i = 0; i < pixel_count; i++)
@@ -1392,14 +1445,20 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 
                 pixels = sManualScratch;
             }
+            else if (pixels != nullptr)
+            {
+                LL_WARNS_ONCE() << "setManualImage: GL_LUMINANCE_ALPHA conversion skipped, "
+                                << width << "x" << height << " exceeds scratch buffer" << LL_ENDL;
+                pixels = nullptr;
+            }
 
             pixformat = GL_RGBA;
             intformat = GL_RGBA8;
         }
 
         if (pixformat == GL_LUMINANCE && pixtype == GL_UNSIGNED_BYTE)
-        { //GL_LUMINANCE is deprecated, convert to RGB via manual-pack scratch
-            if (pixels != nullptr)
+        { //GL_LUMINANCE is deprecated, convert to RGBA via manual-pack scratch
+            if (pixels != nullptr && scratch_fits)
             {
                 U32 pixel_count = (U32)(width * height);
                 for (U32 i = 0; i < pixel_count; i++)
@@ -1413,8 +1472,14 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 
                 pixels = sManualScratch;
             }
+            else if (pixels != nullptr)
+            {
+                LL_WARNS_ONCE() << "setManualImage: GL_LUMINANCE conversion skipped, "
+                                << width << "x" << height << " exceeds scratch buffer" << LL_ENDL;
+                pixels = nullptr;
+            }
             pixformat = GL_RGBA;
-            intformat = GL_RGB8;
+            intformat = GL_RGBA8;
         }
     }
 
@@ -1471,7 +1536,17 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
         LL_PROFILE_ZONE_NUM(width);
         LL_PROFILE_ZONE_NUM(height);
 
-        free_cur_tex_image();
+        // Memory accounting tracks level 0 only — see comment on
+        // LLImageGL::getTextureBytesAllocated (consumer multiplies by 2 to
+        // estimate the full mip pyramid). Updating on every miplevel
+        // call replaced the level-0 size with each successive sub-mip's
+        // tiny size, leaving e.g. a 256x256 RGBA texture tracked at the
+        // bytes of mip 8 instead of mip 0.
+        const bool track_alloc = (miplevel == 0);
+        if (track_alloc)
+        {
+            free_cur_tex_image();
+        }
         const bool use_sub_image = should_stagger_image_set(compress);
         if (!use_sub_image)
         {
@@ -1493,7 +1568,10 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
                 sub_image_lines(target, miplevel, 0, 0, width, height, pixformat, pixtype, src, width);
             }
         }
-        alloc_tex_image(width, height, intformat, 1);
+        if (track_alloc)
+        {
+            alloc_tex_image(width, height, intformat, 1);
+        }
     }
     stop_glerror();
 }
@@ -2102,7 +2180,10 @@ S64 LLImageGL::getMipBytes(S32 discard_level) const
 {
     if (discard_level < 0)
     {
-        discard_level = mCurrentDiscardLevel;
+        // Match getWidth/getHeight/getBytes: mCurrentDiscardLevel can still
+        // be -1 if no discard has been set; treat that as "full resolution"
+        // rather than shifting by a negative (which is UB).
+        discard_level = llmax<S32>(mCurrentDiscardLevel, 0);
     }
     S32 w = mWidth>>discard_level;
     S32 h = mHeight>>discard_level;
@@ -2304,6 +2385,12 @@ void LLImageGL::resolveDeprecatedFormat()
         mFormatInternal = GL_RG8;
         break;
     default:
+        // Reset so a stale value from a prior format doesn't make
+        // createGLTexture apply the wrong swizzle on a fresh non-deprecated
+        // format (e.g. setExplicitFormat(LUMINANCE) followed by
+        // setExplicitFormat(RGBA), or an LLImageGL whose component count
+        // changed across createGLTexture calls).
+        mDeprecatedSourceFormat = 0;
         break;
     }
 }
@@ -2421,14 +2508,18 @@ U32 LLImageGL::createPickMask(S32 pWidth, S32 pHeight)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     freePickMask();
-    U32 pick_width = pWidth/2 + 1;
-    U32 pick_height = pHeight/2 + 1;
+    // updatePickMask walks the source with `for (x = 0; x < width; x += 2)`,
+    // so the actual cells-per-row stored linearly in the bitmap is
+    // ceil(width/2). The reader must use the same stride, otherwise odd
+    // widths read from the wrong row.
+    U32 stride_w = (U32)((pWidth + 1) / 2);
+    U32 stride_h = (U32)((pHeight + 1) / 2);
 
-    U32 size = pick_width * pick_height;
+    U32 size = stride_w * stride_h;
     size = (size + 7) / 8; // pixelcount-to-bits
     mPickMask = new U8[size];
-    mPickMaskWidth = pick_width - 1;
-    mPickMaskHeight = pick_height - 1;
+    mPickMaskWidth = stride_w;
+    mPickMaskHeight = stride_h;
 
     memset(mPickMask, 0, sizeof(U8) * size);
 
