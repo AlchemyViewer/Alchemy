@@ -2453,12 +2453,19 @@ void LLTextBase::appendTextImpl(const std::string& new_text, const LLStyle::Para
     style_params.overwriteFrom(input_params);
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+    // Per-appendText dedup of highlight-signal fires. URL parsing below splits
+    // new_text into multiple appendAndHighlightTextImpl calls; without a shared
+    // dedup set, a keyword appearing in two different chunks would trigger
+    // sound/flash twice for one logical message. Cleared here and consulted by
+    // appendAndHighlightTextImpl and the full-line check below.
+    mAppendTextFiredEntries.clear();
+
     // Whole-line highlight match (LLHighlightEntry::ALL or MATCHES). Recolors the entire
     // appended text and fires the highlight signal exactly once for the new_text.
     const LLHighlightEntry* pFullEntry = nullptr;
     if (mParseHighlights && LLTextParser::instance().parseFullLineHighlights(new_text, mHighlightsMask, &pFullEntry) && pFullEntry)
     {
-        if (mHighlightsSignal)
+        if (mHighlightsSignal && mAppendTextFiredEntries.insert(pFullEntry).second)
             (*mHighlightsSignal)(new_text, pFullEntry);
 
         style_params.color = pFullEntry->mColor;
@@ -2716,10 +2723,10 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
         auto pieces = LLTextParser::instance().parsePartialLineHighlights(new_text, mHighlightsMask, (LLTextParser::EHighlightPosition)highlight_part);
-        // Dedupe per-entry signal firing across the partial pieces of one appendText
-        // call. A single message containing the same keyword multiple times must not
-        // trigger the sound/flash callback once per occurrence.
-        std::set<const LLHighlightEntry*> fired;
+        // Dedup uses mAppendTextFiredEntries (a LLTextBase member) so it spans every
+        // chunk of one appendText — including the multiple appendAndHighlightTextImpl
+        // calls appendTextImpl makes when splitting around URLs. The set is cleared
+        // once at the start of appendTextImpl.
         for (const auto& piece_pair : pieces)
         {
             // Reset to caller's color; per-entry color is applied below only if matched.
@@ -2729,7 +2736,7 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
             const LLHighlightEntry* pEntry = piece_pair.second;
             if (pEntry)
             {
-                if (mHighlightsSignal && fired.insert(pEntry).second)
+                if (mHighlightsSignal && mAppendTextFiredEntries.insert(pEntry).second)
                     (*mHighlightsSignal)(new_text, pEntry);
 
                 highlight_params.color = pEntry->mColor;

@@ -847,6 +847,10 @@ protected:
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
     S32                         mHighlightsMask;    // category mask for matching highlights
     highlights_signal_t*        mHighlightsSignal;  // signal fires whenever a highlighted segment is appended
+    // Dedup of highlight-signal fires across one appendText call. Cleared by
+    // appendTextImpl, populated by it and appendAndHighlightTextImpl. Per-instance
+    // and main-thread-only — appendText is not called from worker threads.
+    std::set<const LLHighlightEntry*> mAppendTextFiredEntries;
 // [/SL:KB]
 
     LLUIString                  mLabel; // text label that is visible when no user text provided
