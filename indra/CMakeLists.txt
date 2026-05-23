@@ -198,6 +198,13 @@ set(INDRA_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 # Set up common variables
 include(Variables)
 
+# Enable supported languages
+enable_language(C CXX)
+
+if(DARWIN)
+  enable_language(OBJC OBJCXX)
+endif()
+
 # Set up Python
 include(Python)
 
