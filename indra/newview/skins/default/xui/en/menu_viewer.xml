@@ -604,6 +604,16 @@
              function="Floater.Toggle"
              parameter="conversation" />
         </menu_item_check>
+        <menu_item_check
+         label="Chat Alerts..."
+         name="Chat Alerts">
+            <menu_item_check.on_check
+             function="Floater.Visible"
+             parameter="chat_alerts" />
+            <menu_item_check.on_click
+             function="Floater.Toggle"
+             parameter="chat_alerts" />
+        </menu_item_check>
         <menu_item_separator/>
         <menu_item_check
          label="Gestures..."

@@ -1053,8 +1053,18 @@ void LLFloaterIMSession::reloadMessages(bool clean_messages/* = false*/)
 
     mChatHistory->clear();
     mLastMessageIndex = -1;
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-27 (Catznip-3.3)
+    // Suppress chat alerts while we replay history. The mask must be U32 — a bool
+    // here truncates PARSE_ALL (0xFF) to 0x01, which then permanently disables
+    // PARSE_SOUND on every subsequent reload (and 0x04+ if added later).
+    const U32 fParseMask = mChatHistory->getParseHighlightTypeMask();
+    mChatHistory->setParseHighlightTypeMask(LLChatHistory::PARSE_NONE);
+// [/SL:KB]
     updateMessages();
     mInputEditor->setFont(LLViewerChat::getChatFont());
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-27 (Catznip-3.3)
+    mChatHistory->setParseHighlightTypeMask(fParseMask);
+// [/SL:KB]
 }
 
 // static

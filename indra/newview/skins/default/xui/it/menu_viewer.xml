@@ -39,6 +39,7 @@
 		<menu_item_check label="Chat nei dintorni..." name="Nearby Chat"/>
 		<menu_item_check label="Parla" name="Speak"/>
 		<menu_item_check label="Registro conversazioni..." name="Conversation Log..."/>
+		<menu_item_check label="Avvisi chat..." name="Chat Alerts"/>
 		<menu_item_call label="Facebook..." name="Facebook"/>
 		<menu_item_call label="Twitter..." name="Twitter"/>
 		<menu_item_call label="Flickr..." name="Flickr"/>

@@ -45,6 +45,9 @@
 #include "llagentdata.h"
 
 #include "llslurl.h"
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+#include "lltextparser.h"
+// [/SL:KB]
 
 // [RLVa:KB] - Checked: 2010-04-21 (RLVa-1.2.0f)
 #include "rlvhandler.h"
@@ -187,7 +190,20 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
         {
             style_params.font.style = "ITALIC";
         }
-        mMsgText->appendText(messageText, true, style_params);
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+        static LLCachedControl<bool> sEnableChatAlerts(gSavedSettings, "ChatAlerts", false);
+        if (sEnableChatAlerts && gAgentID != mFromID)
+        {
+            const S32 nHighlightMask = mMsgText->getHighlightsMask();
+            mMsgText->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_NEARBYCHAT);
+            mMsgText->appendText(messageText, true, style_params);
+            mMsgText->setHighlightsMask(nHighlightMask);
+        }
+        else
+        {
+            mMsgText->appendText(messageText, true, style_params);
+        }
+// [/SL:KB]
     }
 
     snapToMessageHeight();
@@ -307,7 +323,20 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
         {
             style_params.font.style = "ITALIC";
         }
-        mMsgText->appendText(messageText, false, style_params);
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+        static LLCachedControl<bool> sEnableChatAlerts(gSavedSettings, "ChatAlerts", false);
+        if (sEnableChatAlerts && gAgentID != mFromID)
+        {
+            const S32 nHighlightMask = mMsgText->getHighlightsMask();
+            mMsgText->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_NEARBYCHAT);
+            mMsgText->appendText(messageText, false, style_params);
+            mMsgText->setHighlightsMask(nHighlightMask);
+        }
+        else
+        {
+            mMsgText->appendText(messageText, false, style_params);
+        }
+// [/SL:KB]
     }
 
 

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater name="floater_chat_alerts" title="Alertas de palavras-chave do chat">
+	<sound_drop_target name="sound_drop_target"/>
+	<check_box label="Ativar alertas" name="alerts_check"/>
+	<scroll_list draw_heading="true" name="alerts_list">
+		<scroll_list.columns label="Palavra-chave" name="alert_keyword"/>
+	</scroll_list>
+	<button label="Novo" name="alerts_new_btn"/>
+	<button label="Excluir" name="alerts_delete_btn"/>
+	<view_border name="divisor"/>
+	<text name="alerts_keyword_label">
+		Palavra-chave:
+	</text>
+	<line_editor name="alerts_keyword"/>
+	<check_box label="Diferenciar maiúsculas" name="alerts_keyword_case"/>
+	<text name="alerts_color_label">
+		Cor de destaque:
+	</text>
+	<color_swatch name="alerts_highlight_color"/>
+	<text name="alerts_sound_label">
+		Reproduzir som:
+	</text>
+	<line_editor label="Arraste um item do inventário aqui" name="alerts_sound_name"/>
+	<icon name="alerts_sound_icon"/>
+	<button name="alerts_sound_clear_btn"/>
+	<text name="alerts_trigger_label">
+		Acionar em:
+	</text>
+	<check_box label="Chat" name="alerts_trigger_chat"/>
+	<check_box label="MIs" name="alerts_trigger_im"/>
+	<check_box label="Grupos" name="alerts_trigger_group"/>
+	<button label="Salvar entrada" name="alerts_save_btn"/>
+	<button label="Reverter entrada" name="alerts_revert_btn"/>
+</floater>

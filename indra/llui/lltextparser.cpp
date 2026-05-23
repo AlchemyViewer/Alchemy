@@ -3,6 +3,7 @@
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
+ * Copyright (C) 2012, Kitty Barnett
  * Copyright (C) 2010, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
@@ -38,160 +39,210 @@
 #include "lldir.h"
 #include "lluicolor.h"
 
+#include <algorithm>
+#include <boost/algorithm/string.hpp>
+
 //
-// Member Functions
+// LLHighlightEntry
+//
+
+LLHighlightEntry::LLHighlightEntry()
+    : mCategoryMask(CAT_NONE)
+    , mCondition(CONTAINS)
+    , mCaseSensitive(false)
+    , mColor(LLColor4::white)
+    , mColorReadOnly(true)
+    , mHighlightType(PART)
+    , mFlashWindow(false)
+    , mId(LLUUID::generateNewID())
+{
+}
+
+LLHighlightEntry::LLHighlightEntry(const LLSD& sdEntry)
+    : mCategoryMask(CAT_NONE)
+    , mCondition(CONTAINS)
+    , mCaseSensitive(false)
+    , mColor(LLColor4::white)
+    , mColorReadOnly(true)
+    , mHighlightType(PART)
+    , mFlashWindow(false)
+    , mId(LLUUID::generateNewID())
+{
+    if (sdEntry.has("id"))
+        mId = sdEntry["id"].asUUID();
+    if (sdEntry.has("category_mask"))
+        mCategoryMask = sdEntry["category_mask"].asInteger();
+    if (sdEntry.has("condition"))
+        mCondition = (EConditionType)sdEntry["condition"].asInteger();
+    if (sdEntry.has("pattern"))
+        mPattern = sdEntry["pattern"].asString();
+    if (sdEntry.has("case_sensitive"))
+        mCaseSensitive = sdEntry["case_sensitive"].asBoolean();
+    if (sdEntry.has("color"))
+        mColor.setValue(sdEntry["color"]);
+    if (sdEntry.has("color_readonly"))
+        mColorReadOnly = sdEntry["color_readonly"].asBoolean();
+    if (sdEntry.has("highlight"))
+        mHighlightType = (EHighlightType)sdEntry["highlight"].asInteger();
+    if (sdEntry.has("sound_asset"))
+        mSoundAsset = sdEntry["sound_asset"].asUUID();
+    if (sdEntry.has("sound_item"))
+        mSoundItem = sdEntry["sound_item"].asUUID();
+    if (sdEntry.has("flash_window"))
+        mFlashWindow = sdEntry["flash_window"].asBoolean();
+}
+
+LLSD LLHighlightEntry::toLLSD() const
+{
+    LLSD sdEntry;
+    sdEntry["id"] = mId;
+    sdEntry["category_mask"] = mCategoryMask;
+    sdEntry["condition"] = (S32)mCondition;
+    sdEntry["pattern"] = mPattern;
+    sdEntry["case_sensitive"] = mCaseSensitive;
+    sdEntry["color"] = mColor.getValue();
+    sdEntry["color_readonly"] = mColorReadOnly;
+    sdEntry["highlight"] = (S32)mHighlightType;
+    if (mSoundAsset.notNull())
+        sdEntry["sound_asset"] = mSoundAsset;
+    if (mSoundItem.notNull())
+        sdEntry["sound_item"] = mSoundItem;
+    sdEntry["flash_window"] = mFlashWindow;
+    return sdEntry;
+}
+
+S32 LLHighlightEntry::findPattern(const std::string& text, S32 cat_mask) const
+{
+    if ((mPattern.empty()) || ((mCategoryMask & cat_mask) == 0))
+        return -1;
+
+    size_t idxFound = std::string::npos;
+    switch (mCondition)
+    {
+        case CONTAINS:
+        {
+            boost::iterator_range<std::string::const_iterator> itRange = (mCaseSensitive) ? boost::find_first(text, mPattern) : boost::ifind_first(text, mPattern);
+            if (!itRange.empty())
+                idxFound = itRange.begin() - text.begin();
+            break;
+        }
+        case MATCHES:
+        {
+            if (((mCaseSensitive) && (boost::equals(text, mPattern))) || (!mCaseSensitive && boost::iequals(text, mPattern)))
+                idxFound = 0;
+            break;
+        }
+        case STARTS_WITH:
+        {
+            if (((mCaseSensitive) && (boost::starts_with(text, mPattern))) || (!mCaseSensitive && boost::istarts_with(text, mPattern)))
+                idxFound = 0;
+            break;
+        }
+        case ENDS_WITH:
+        {
+            if (((mCaseSensitive) && (boost::ends_with(text, mPattern))) || (!mCaseSensitive && boost::iends_with(text, mPattern)))
+                idxFound = text.length() - mPattern.length();
+            break;
+        }
+    }
+    return (idxFound != std::string::npos) ? static_cast<S32>(idxFound) : -1;
+}
+
+//
+// LLTextParser
 //
 
 LLTextParser::LLTextParser()
 :   mLoaded(false)
 {}
 
-
-S32 LLTextParser::findPattern(const std::string &text, LLSD highlight)
+LLTextParser::parser_out_vec_t LLTextParser::parsePartialLineHighlights(const std::string& text, S32 cat_mask, EHighlightPosition part, S32 index)
 {
-    if (!highlight.has("pattern")) return -1;
+    parser_out_vec_t result;
 
-    std::string pattern=std::string(highlight["pattern"]);
-    std::string ltext=text;
-
-    if (!(bool)highlight["case_sensitive"])
+    for (S32 i = index, size = static_cast<S32>(mHighlightEntries.size()); i < size; i++)
     {
-        ltext   = utf8str_tolower(text);
-        pattern= utf8str_tolower(pattern);
-    }
+        const LLHighlightEntry& entry = mHighlightEntries[i];
+        if ((entry.mHighlightType != LLHighlightEntry::PART) || (entry.mCondition == LLHighlightEntry::MATCHES))
+            continue;
 
-    size_t found=std::string::npos;
-
-    switch ((S32)highlight["condition"])
-    {
-        case CONTAINS:
-            found = ltext.find(pattern);
-            break;
-        case MATCHES:
-            found = (! ltext.compare(pattern) ? 0 : std::string::npos);
-            break;
-        case STARTS_WITH:
-            found = (! ltext.find(pattern) ? 0 : std::string::npos);
-            break;
-        case ENDS_WITH:
-            auto pos = ltext.rfind(pattern);
-            if (pos != std::string::npos && pos >= 0 && (ltext.length() - pattern.length() == pos)) found = pos;
-            break;
-    }
-    return static_cast<S32>(found);
-}
-
-LLTextParser::parser_out_vec_t LLTextParser::parsePartialLineHighlights(const std::string &text, const LLUIColor& color, EHighlightPosition part, S32 index)
-{
-    loadKeywords();
-
-    //evil recursive string atomizer.
-    parser_out_vec_t ret_vec, start_vec, middle_vec, end_vec;
-
-    for (S32 i=index, size = (S32)mHighlights.size();i< size;i++)
-    {
-        S32 condition = mHighlights[i]["condition"];
-        if ((S32)mHighlights[i]["highlight"]==PART && condition!=MATCHES)
+        if (!((entry.mCondition == LLHighlightEntry::STARTS_WITH && part == START) ||
+              (entry.mCondition == LLHighlightEntry::ENDS_WITH   && part == END)   ||
+              (entry.mCondition == LLHighlightEntry::CONTAINS)                     ||
+              (part == WHOLE)))
         {
-            if ( (condition==STARTS_WITH && part==START) ||
-                 (condition==ENDS_WITH   && part==END)   ||
-                  condition==CONTAINS    || part==WHOLE )
+            continue;
+        }
+
+        S32 start = entry.findPattern(text, cat_mask);
+        if (start < 0)
+            continue;
+
+        const S32 end = static_cast<S32>(entry.mPattern.length());
+        const S32 len = static_cast<S32>(text.length());
+        EHighlightPosition newpart;
+
+        parser_out_vec_t resStart, resMiddle, resEnd;
+        if (start == 0)
+        {
+            resStart.emplace_back(text.substr(0, end), &entry);
+
+            if (end < len)
             {
-                S32 start = findPattern(text,mHighlights[i]);
-                if (start >= 0 )
-                {
-                    auto end =  std::string(mHighlights[i]["pattern"]).length();
-                    auto len = text.length();
-                    EHighlightPosition newpart;
-                    if (start==0)
-                    {
-                        if (start_vec.empty())
-                        {
-                            start_vec.push_back(std::make_pair(text.substr(0, end), LLColor4(mHighlights[i]["color"])));
-                        }
-                        else
-                        {
-                            start_vec[0] = std::make_pair(text.substr(0, end), LLColor4(mHighlights[i]["color"]));
-                        }
-
-                        if (end < len)
-                        {
-                            if (part==END   || part==WHOLE) newpart=END; else newpart=MIDDLE;
-                            end_vec = parsePartialLineHighlights(text.substr( end ),color,newpart,i);
-                        }
-                    }
-                    else
-                    {
-                        if (part==START || part==WHOLE) newpart=START; else newpart=MIDDLE;
-
-                        start_vec = parsePartialLineHighlights(text.substr(0,start),color,newpart,i+1);
-
-                        if (end < len)
-                        {
-                            if (middle_vec.empty())
-                            {
-                                middle_vec.push_back(std::make_pair(text.substr(start, end), LLColor4(mHighlights[i]["color"])));
-                            }
-                            else
-                            {
-                                middle_vec[0] = std::make_pair(text.substr(start, end), LLColor4(mHighlights[i]["color"]));
-                            }
-
-                            if (part==END   || part==WHOLE) newpart=END; else newpart=MIDDLE;
-
-                            end_vec = parsePartialLineHighlights(text.substr( (start+end) ),color,newpart,i);
-                        }
-                        else
-                        {
-                            if (end_vec.empty())
-                            {
-                                end_vec.push_back(std::make_pair(text.substr(start, end), LLColor4(mHighlights[i]["color"])));
-                            }
-                            else
-                            {
-                                end_vec[0] = std::make_pair(text.substr(start, end), LLColor4(mHighlights[i]["color"]));
-                            }
-                        }
-                    }
-
-                    ret_vec.reserve(start_vec.size() + middle_vec.size() + end_vec.size());
-                    ret_vec.insert(ret_vec.end(), start_vec.begin(), start_vec.end());
-                    ret_vec.insert(ret_vec.end(), middle_vec.begin(), middle_vec.end());
-                    ret_vec.insert(ret_vec.end(), end_vec.begin(), end_vec.end());
-
-                    return ret_vec;
-                }
+                newpart = (part == END || part == WHOLE) ? END : MIDDLE;
+                resEnd = parsePartialLineHighlights(text.substr(end), cat_mask, newpart, i);
             }
         }
+        else
+        {
+            newpart = (part == START || part == WHOLE) ? START : MIDDLE;
+            resStart = parsePartialLineHighlights(text.substr(0, start), cat_mask, newpart, i + 1);
+
+            if (end < len)
+            {
+                resMiddle.emplace_back(text.substr(start, end), &entry);
+
+                newpart = (part == END || part == WHOLE) ? END : MIDDLE;
+                resEnd = parsePartialLineHighlights(text.substr(start + end), cat_mask, newpart, i);
+            }
+            else
+            {
+                resEnd.emplace_back(text.substr(start, end), &entry);
+            }
+        }
+
+        result.reserve(resStart.size() + resMiddle.size() + resEnd.size());
+        result.insert(result.end(), resStart.begin(), resStart.end());
+        result.insert(result.end(), resMiddle.begin(), resMiddle.end());
+        result.insert(result.end(), resEnd.begin(), resEnd.end());
+        return result;
     }
 
-    //No patterns found.  Just send back what was passed in.
-    ret_vec.push_back(std::make_pair(text, color));
-    return ret_vec;
+    // No patterns matched — send back the text untouched
+    result.emplace_back(text, static_cast<const LLHighlightEntry*>(nullptr));
+    return result;
 }
 
-bool LLTextParser::parseFullLineHighlights(const std::string &text, LLColor4 *color)
+bool LLTextParser::parseFullLineHighlights(const std::string& text, S32 cat_mask, const LLHighlightEntry** ppEntry) const
 {
-    loadKeywords();
-
-    for (S32 i=0;i<mHighlights.size();i++)
+    for (const LLHighlightEntry& entry : mHighlightEntries)
     {
-        if ((S32)mHighlights[i]["highlight"]==ALL || (S32)mHighlights[i]["condition"]==MATCHES)
+        if ((entry.mHighlightType == LLHighlightEntry::ALL) || (entry.mCondition == LLHighlightEntry::MATCHES))
         {
-            if (findPattern(text,mHighlights[i]) >= 0 )
+            if (entry.findPattern(text, cat_mask) >= 0)
             {
-                LLSD color_llsd = mHighlights[i]["color"];
-                color->setValue(color_llsd);
+                if (ppEntry)
+                    *ppEntry = &entry;
                 return true;
             }
         }
     }
-    return false;   //No matches found.
+    return false;
 }
 
-std::string LLTextParser::getFileName()
+std::string LLTextParser::getFileName() const
 {
-    std::string path=gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "");
+    std::string path = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "");
 
     if (!path.empty())
     {
@@ -200,38 +251,94 @@ std::string LLTextParser::getFileName()
     return path;
 }
 
-void LLTextParser::loadKeywords()
+bool LLTextParser::loadKeywords()
 {
-    if (mLoaded)
-    {// keywords already loaded
-        return;
-    }
-    std::string filename=getFileName();
-    if (!filename.empty())
+    const std::string filename = getFileName();
+    if (filename.empty())
+        return false;
+
+    llifstream fileHighlights(filename.c_str());
+    if (!fileHighlights.is_open())
     {
-        llifstream file;
-        file.open(filename.c_str());
-        if (file.is_open())
-        {
-            LLSDSerialize::fromXML(mHighlights, file);
-        }
-        file.close();
-        mLoaded = true;
+        LL_INFOS() << "No highlights file present" << LL_ENDL;
+        return false;
     }
+
+    mHighlightEntries.clear();
+
+    LLSD sdIn;
+    if (LLSDSerialize::fromXML(sdIn, fileHighlights) == LLSDParser::PARSE_FAILURE)
+    {
+        LL_WARNS() << "Failed to parse highlights file" << LL_ENDL;
+        return false;
+    }
+
+    if (sdIn.isArray())
+    {
+        for (LLSD::array_const_iterator it = sdIn.beginArray(); it != sdIn.endArray(); ++it)
+        {
+            mHighlightEntries.emplace_back(*it);
+        }
+    }
+
+    mLoaded = true;
+    return true;
 }
 
-bool LLTextParser::saveToDisk(LLSD highlights)
+void LLTextParser::saveToDisk() const
 {
-    mHighlights=highlights;
-    std::string filename=getFileName();
+    const std::string filename = getFileName();
     if (filename.empty())
     {
         LL_WARNS() << "LLTextParser::saveToDisk() no valid user directory." << LL_ENDL;
-        return false;
+        return;
     }
-    llofstream file;
-    file.open(filename.c_str());
-    LLSDSerialize::toPrettyXML(mHighlights, file);
-    file.close();
-    return true;
+
+    llofstream fileHighlights(filename.c_str());
+    if (!fileHighlights.is_open())
+    {
+        LL_WARNS() << "Can't open highlights file for writing" << LL_ENDL;
+        return;
+    }
+
+    LLSD out = LLSD::emptyArray();
+    for (const auto& entry : mHighlightEntries)
+    {
+        out.append(entry.toLLSD());
+    }
+    LLSDSerialize::toPrettyXML(out, fileHighlights);
+}
+
+void LLTextParser::addHighlight(const LLHighlightEntry& entry)
+{
+    if (getHighlightById(entry.getId()) != nullptr)
+        return;
+    mHighlightEntries.push_back(entry);
+}
+
+LLHighlightEntry* LLTextParser::getHighlightById(const LLUUID& idEntry)
+{
+    auto it = std::find_if(mHighlightEntries.begin(), mHighlightEntries.end(),
+        [&idEntry](const LLHighlightEntry& e) { return e.getId() == idEntry; });
+    return (it != mHighlightEntries.end()) ? &(*it) : nullptr;
+}
+
+const LLHighlightEntry* LLTextParser::getHighlightById(const LLUUID& idEntry) const
+{
+    auto it = std::find_if(mHighlightEntries.begin(), mHighlightEntries.end(),
+        [&idEntry](const LLHighlightEntry& e) { return e.getId() == idEntry; });
+    return (it != mHighlightEntries.end()) ? &(*it) : nullptr;
+}
+
+const LLTextParser::highlight_list_t& LLTextParser::getHighlights() const
+{
+    return mHighlightEntries;
+}
+
+void LLTextParser::removeHighlight(const LLUUID& idEntry)
+{
+    auto it = std::find_if(mHighlightEntries.begin(), mHighlightEntries.end(),
+        [&idEntry](const LLHighlightEntry& e) { return e.getId() == idEntry; });
+    if (it != mHighlightEntries.end())
+        mHighlightEntries.erase(it);
 }

@@ -246,6 +246,10 @@ LLTextBase::LLTextBase(const LLTextBase::Params &p)
     mParseHTML(p.parse_urls),
     mForceUrlsExternal(p.force_urls_external),
     mParseHighlights(p.parse_highlights),
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+    mHighlightsMask(LLHighlightEntry::CAT_GENERAL),
+    mHighlightsSignal(nullptr),
+// [/SL:KB]
     mBGVisible(p.bg_visible),
     mScroller(NULL),
     mStyleDirty(true)
@@ -304,6 +308,9 @@ LLTextBase::~LLTextBase()
     delete mIsFriendSignal;
     delete mIsObjectBlockedSignal;
     delete mIsObjectReachableSignal;
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+    delete mHighlightsSignal;
+// [/SL:KB]
 }
 
 void LLTextBase::initFromParams(const LLTextBase::Params& p)
@@ -2445,6 +2452,21 @@ void LLTextBase::appendTextImpl(const std::string& new_text, const LLStyle::Para
     LLStyle::Params style_params(getStyleParams());
     style_params.overwriteFrom(input_params);
 
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+    // Whole-line highlight match (LLHighlightEntry::ALL or MATCHES). Recolors the entire
+    // appended text and fires the highlight signal exactly once for the new_text.
+    const LLHighlightEntry* pFullEntry = nullptr;
+    if (mParseHighlights && LLTextParser::instance().parseFullLineHighlights(new_text, mHighlightsMask, &pFullEntry) && pFullEntry)
+    {
+        if (mHighlightsSignal)
+            (*mHighlightsSignal)(new_text, pFullEntry);
+
+        style_params.color = pFullEntry->mColor;
+        if (pFullEntry->mColorReadOnly)
+            style_params.readonly_color = pFullEntry->mColor;
+    }
+// [/SL:KB]
+
     S32 part = (S32)LLTextParser::WHOLE;
     if ((mParseHTML || force_slurl) && !style_params.is_link) // Don't search for URLs inside a link segment (STORM-358).
     {
@@ -2692,14 +2714,31 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
     {
         LLStyle::Params highlight_params(style_params);
 
-        auto pieces = LLTextParser::instance().parsePartialLineHighlights(new_text, highlight_params.color, (LLTextParser::EHighlightPosition)highlight_part);
-        for (S32 i = 0; i < pieces.size(); i++)
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+        auto pieces = LLTextParser::instance().parsePartialLineHighlights(new_text, mHighlightsMask, (LLTextParser::EHighlightPosition)highlight_part);
+        // Dedupe per-entry signal firing across the partial pieces of one appendText
+        // call. A single message containing the same keyword multiple times must not
+        // trigger the sound/flash callback once per occurrence.
+        std::set<const LLHighlightEntry*> fired;
+        for (const auto& piece_pair : pieces)
         {
-            const auto& piece_pair = pieces[i];
-            highlight_params.color = piece_pair.second;
+            // Reset to caller's color; per-entry color is applied below only if matched.
+            highlight_params.color = style_params.color();
+            highlight_params.readonly_color = style_params.readonly_color();
 
-            LLWString wide_text;
-            wide_text = utf8str_to_wstring(piece_pair.first);
+            const LLHighlightEntry* pEntry = piece_pair.second;
+            if (pEntry)
+            {
+                if (mHighlightsSignal && fired.insert(pEntry).second)
+                    (*mHighlightsSignal)(new_text, pEntry);
+
+                highlight_params.color = pEntry->mColor;
+                if (pEntry->mColorReadOnly)
+                    highlight_params.readonly_color = pEntry->mColor;
+            }
+
+            LLWString wide_text = utf8str_to_wstring(piece_pair.first);
+// [/SL:KB]
 
             S32 cur_length = getLength();
             LLStyleConstSP sp(new LLStyle(highlight_params));
@@ -3729,6 +3768,15 @@ boost::signals2::connection LLTextBase::setIsObjectReachableCallback(const is_ob
     }
     return mIsObjectReachableSignal->connect(cb);
 }
+
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+boost::signals2::connection LLTextBase::setHighlightsCallback(const highlights_signal_t::slot_type& cb)
+{
+    if (!mHighlightsSignal)
+        mHighlightsSignal = new highlights_signal_t();
+    return mHighlightsSignal->connect(cb);
+}
+// [/SL:KB]
 
 //
 // LLTextSegment

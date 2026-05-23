@@ -39,6 +39,7 @@
 		<menu_item_check label="Chat près de moi..." name="Nearby Chat"/>
 		<menu_item_check label="Parler" name="Speak"/>
 		<menu_item_check label="Journal des conversations..." name="Conversation Log..."/>
+		<menu_item_check label="Alertes de chat..." name="Chat Alerts"/>
 		<menu_item_call label="Facebook..." name="Facebook"/>
 		<menu_item_call label="Twitter..." name="Twitter"/>
 		<menu_item_call label="Flickr..." name="Flickr"/>

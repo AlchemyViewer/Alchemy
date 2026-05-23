@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater name="floater_chat_alerts" title="Alertes de mots-clés du chat">
+	<sound_drop_target name="sound_drop_target"/>
+	<check_box label="Activer les alertes" name="alerts_check"/>
+	<scroll_list draw_heading="true" name="alerts_list">
+		<scroll_list.columns label="Mot-clé" name="alert_keyword"/>
+	</scroll_list>
+	<button label="Nouveau" name="alerts_new_btn"/>
+	<button label="Supprimer" name="alerts_delete_btn"/>
+	<view_border name="divisor"/>
+	<text name="alerts_keyword_label">
+		Mot-clé :
+	</text>
+	<line_editor name="alerts_keyword"/>
+	<check_box label="Sensible à la casse" name="alerts_keyword_case"/>
+	<text name="alerts_color_label">
+		Couleur de surlignage :
+	</text>
+	<color_swatch name="alerts_highlight_color"/>
+	<text name="alerts_sound_label">
+		Jouer un son :
+	</text>
+	<line_editor label="Glissez un objet d'inventaire ici" name="alerts_sound_name"/>
+	<icon name="alerts_sound_icon"/>
+	<button name="alerts_sound_clear_btn"/>
+	<text name="alerts_trigger_label">
+		Déclencher sur :
+	</text>
+	<check_box label="Chat" name="alerts_trigger_chat"/>
+	<check_box label="MI" name="alerts_trigger_im"/>
+	<check_box label="Groupes" name="alerts_trigger_group"/>
+	<button label="Enregistrer" name="alerts_save_btn"/>
+	<button label="Annuler" name="alerts_revert_btn"/>
+</floater>

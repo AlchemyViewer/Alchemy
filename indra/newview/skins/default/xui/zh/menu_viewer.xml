@@ -37,6 +37,7 @@
 		<menu_item_check label="附近的聊天……" name="Nearby Chat"/>
 		<menu_item_check label="說話" name="Speak"/>
 		<menu_item_check label="交談記錄…" name="Conversation Log..."/>
+		<menu_item_check label="聊天提醒…" name="Chat Alerts"/>
 		<menu_item_call label="臉書…" name="Facebook"/>
 		<menu_item_call label="推特…" name="Twitter"/>
 		<menu_item_call label="Flickr…" name="Flickr"/>

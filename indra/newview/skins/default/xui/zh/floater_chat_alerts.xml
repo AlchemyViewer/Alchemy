@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater name="floater_chat_alerts" title="聊天關鍵字提醒">
+	<sound_drop_target name="sound_drop_target"/>
+	<check_box label="啟用提醒" name="alerts_check"/>
+	<scroll_list draw_heading="true" name="alerts_list">
+		<scroll_list.columns label="關鍵字" name="alert_keyword"/>
+	</scroll_list>
+	<button label="新增" name="alerts_new_btn"/>
+	<button label="刪除" name="alerts_delete_btn"/>
+	<view_border name="divisor"/>
+	<text name="alerts_keyword_label">
+		關鍵字：
+	</text>
+	<line_editor name="alerts_keyword"/>
+	<check_box label="區分大小寫" name="alerts_keyword_case"/>
+	<text name="alerts_color_label">
+		標示顏色：
+	</text>
+	<color_swatch name="alerts_highlight_color"/>
+	<text name="alerts_sound_label">
+		播放音效：
+	</text>
+	<line_editor label="將物品庫物件拖放至此" name="alerts_sound_name"/>
+	<icon name="alerts_sound_icon"/>
+	<button name="alerts_sound_clear_btn"/>
+	<text name="alerts_trigger_label">
+		觸發於：
+	</text>
+	<check_box label="聊天" name="alerts_trigger_chat"/>
+	<check_box label="即時訊息" name="alerts_trigger_im"/>
+	<check_box label="群組" name="alerts_trigger_group"/>
+	<button label="儲存項目" name="alerts_save_btn"/>
+	<button label="還原項目" name="alerts_revert_btn"/>
+</floater>

@@ -1,0 +1,127 @@
+/**
+ *
+ * Copyright (c) 2012, Kitty Barnett
+ *
+ * The source code in this file is provided to you under the terms of the
+ * GNU Lesser General Public License, version 2.1, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ * PARTICULAR PURPOSE. Terms of the LGPL can be found in doc/LGPL-licence.txt
+ * in this distribution, or online at http://www.gnu.org/licenses/lgpl-2.1.txt
+ *
+ * By copying, modifying or distributing this software, you acknowledge that
+ * you have read and understood your obligations described above, and agree to
+ * abide by those obligations.
+ *
+ */
+#ifndef LLFLOATERCHATALERTS_H
+#define LLFLOATERCHATALERTS_H
+
+#include "llfloater.h"
+
+class LLButton;
+class LLCheckBoxCtrl;
+class LLColorSwatchCtrl;
+class LLIconCtrl;
+class LLLineEditor;
+class LLScrollListCtrl;
+
+// ============================================================================
+
+class LLFloaterChatAlerts final : public LLFloater
+{
+    friend class LLFloaterReg;
+private:
+    LLFloaterChatAlerts(const LLSD& sdKey);
+public:
+    ~LLFloaterChatAlerts() override;
+    bool canClose() override;
+    void onOpen(const LLSD& sdKey) override;
+    void onClose(bool app_quitting) override;
+    bool postBuild() override;
+    S32  notifyParent(const LLSD& sdInfo) override;
+
+public:
+    bool isEntryDirty() const;
+protected:
+    void onEntryNew();
+    void onEntryDelete();
+    void onEntrySave();
+    void onEntrySaveChanges(const LLUUID& idNewEntry, bool fCloseFloater);
+    void onEntrySaveChangesCallback(const LLSD& notification, const LLSD& response);
+    void onEntryRevert();
+    void onEntrySelect();
+    void onSoundClearItem();
+    void onToggleChatAlerts(const LLSD& sdValue);
+    void onToggleTriggerType();
+    void refresh() override;
+    void refreshList();
+    void refreshEntry(bool fNewEntry);
+    void refreshSound();
+
+    /*
+     * Member variables
+     */
+protected:
+    LLScrollListCtrl*  m_pAlertList;
+    bool               m_fNewEntry;
+    LLUUID             m_idCurEntry;
+    LLLineEditor*      m_pKeywordEditor;
+    LLCheckBoxCtrl*    m_pKeywordCase;
+    LLColorSwatchCtrl* m_pColorCtrl;
+    bool               m_fSoundChanged;
+    LLUUID             m_idSoundItem;
+    LLIconCtrl*        m_pSoundIconCtrl;
+    LLLineEditor*      m_pSoundEditor;
+    LLButton*          m_pSoundClearBtn;
+    LLCheckBoxCtrl*    m_pTriggerChat;
+    LLCheckBoxCtrl*    m_pTriggerIM;
+    LLCheckBoxCtrl*    m_pTriggerGroup;
+    bool               m_fChatAlertsEnabled;
+    bool               m_fPendingSave;
+    bool               m_fPendingSaveNotification; // True while a SaveChanges modal is up — suppress new ones
+    LLHandle<LLFloater> m_FloaterHandle;           // Captured at construction for safe notification callbacks
+    boost::signals2::connection mChatAlertsConnection;
+};
+
+// ============================================================================
+// LLSoundDropTarget helper class
+//
+
+class LLSoundDropTarget final : public LLView
+{
+public:
+    struct Params : public LLInitParam::Block<Params, LLView::Params>
+    {
+        Params()
+        {
+            changeDefault(mouse_opaque, false);
+            changeDefault(follows.flags, FOLLOWS_ALL);
+        }
+    };
+
+    LLSoundDropTarget(const Params&);
+    ~LLSoundDropTarget() override;
+
+    /*
+     * Member functions
+     */
+public:
+    typedef boost::signals2::signal<void (const LLUUID& idItem)> drop_signal_t;
+    boost::signals2::connection setDropCallback(const drop_signal_t::slot_type& cb);
+
+    /*
+     * LLView overrides
+     */
+public:
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override;
+
+    /*
+     * Member variables
+     */
+protected:
+    drop_signal_t* m_pDropSignal;
+};
+
+// ============================================================================
+
+#endif // LLFLOATERCHATALERTS_H

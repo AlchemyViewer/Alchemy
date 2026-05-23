@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater name="floater_chat_alerts" title="Avvisi per parole chiave">
+	<sound_drop_target name="sound_drop_target"/>
+	<check_box label="Abilita avvisi" name="alerts_check"/>
+	<scroll_list draw_heading="true" name="alerts_list">
+		<scroll_list.columns label="Parola chiave" name="alert_keyword"/>
+	</scroll_list>
+	<button label="Nuovo" name="alerts_new_btn"/>
+	<button label="Elimina" name="alerts_delete_btn"/>
+	<view_border name="divisor"/>
+	<text name="alerts_keyword_label">
+		Parola chiave:
+	</text>
+	<line_editor name="alerts_keyword"/>
+	<check_box label="Maiuscole/minuscole" name="alerts_keyword_case"/>
+	<text name="alerts_color_label">
+		Colore evidenziazione:
+	</text>
+	<color_swatch name="alerts_highlight_color"/>
+	<text name="alerts_sound_label">
+		Riproduci suono:
+	</text>
+	<line_editor label="Trascina qui un oggetto dell'inventario" name="alerts_sound_name"/>
+	<icon name="alerts_sound_icon"/>
+	<button name="alerts_sound_clear_btn"/>
+	<text name="alerts_trigger_label">
+		Attiva su:
+	</text>
+	<check_box label="Chat" name="alerts_trigger_chat"/>
+	<check_box label="IM" name="alerts_trigger_im"/>
+	<check_box label="Gruppi" name="alerts_trigger_group"/>
+	<button label="Salva voce" name="alerts_save_btn"/>
+	<button label="Ripristina voce" name="alerts_revert_btn"/>
+</floater>

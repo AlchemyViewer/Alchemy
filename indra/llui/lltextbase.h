@@ -47,6 +47,7 @@ class LLScrollContainer;
 class LLContextMenu;
 class LLUrlMatch;
 class LLTextBase;
+class LLHighlightEntry;
 
 ///
 /// A text segment is used to specify a subsection of a text string
@@ -559,6 +560,15 @@ public:
     void                    setWordWrap(bool wrap);
     LLScrollContainer*      getScrollContainer() const { return mScroller; }
 
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+    void setParseHighlights(bool parse)       { mParseHighlights = parse; }
+    S32  getHighlightsMask() const            { return mHighlightsMask; }
+    void setHighlightsMask(S32 category_mask) { mHighlightsMask = category_mask; }
+
+    typedef boost::signals2::signal<void(const std::string&, const LLHighlightEntry*)> highlights_signal_t;
+    boost::signals2::connection setHighlightsCallback(const highlights_signal_t::slot_type& cb);
+// [/SL:KB]
+
 protected:
     // protected member variables
     // List of offsets and segment index of the start of each line.  Always has at least one node (0).
@@ -833,6 +843,11 @@ protected:
     is_friend_signal_t*         mIsFriendSignal;
     is_blocked_signal_t*        mIsObjectBlockedSignal;
     is_obj_reachable_signal_t*  mIsObjectReachableSignal;
+
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+    S32                         mHighlightsMask;    // category mask for matching highlights
+    highlights_signal_t*        mHighlightsSignal;  // signal fires whenever a highlighted segment is appended
+// [/SL:KB]
 
     LLUIString                  mLabel; // text label that is visible when no user text provided
 };

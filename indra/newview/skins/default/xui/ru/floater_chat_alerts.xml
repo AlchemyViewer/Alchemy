@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater name="floater_chat_alerts" title="Оповещения по ключевым словам">
+	<sound_drop_target name="sound_drop_target"/>
+	<check_box label="Включить оповещения" name="alerts_check"/>
+	<scroll_list draw_heading="true" name="alerts_list">
+		<scroll_list.columns label="Ключевое слово" name="alert_keyword"/>
+	</scroll_list>
+	<button label="Создать" name="alerts_new_btn"/>
+	<button label="Удалить" name="alerts_delete_btn"/>
+	<view_border name="divisor"/>
+	<text name="alerts_keyword_label">
+		Ключевое слово:
+	</text>
+	<line_editor name="alerts_keyword"/>
+	<check_box label="С учётом регистра" name="alerts_keyword_case"/>
+	<text name="alerts_color_label">
+		Цвет выделения:
+	</text>
+	<color_swatch name="alerts_highlight_color"/>
+	<text name="alerts_sound_label">
+		Воспроизвести звук:
+	</text>
+	<line_editor label="Перетащите элемент инвентаря сюда" name="alerts_sound_name"/>
+	<icon name="alerts_sound_icon"/>
+	<button name="alerts_sound_clear_btn"/>
+	<text name="alerts_trigger_label">
+		Срабатывать в:
+	</text>
+	<check_box label="Чат" name="alerts_trigger_chat"/>
+	<check_box label="ЛС" name="alerts_trigger_im"/>
+	<check_box label="Группы" name="alerts_trigger_group"/>
+	<button label="Сохранить" name="alerts_save_btn"/>
+	<button label="Откатить" name="alerts_revert_btn"/>
+</floater>

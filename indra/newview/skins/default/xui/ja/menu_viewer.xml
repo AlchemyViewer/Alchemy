@@ -71,6 +71,7 @@
 		<menu_item_check label="近くのチャット…" name="Nearby Chat"/>
 		<menu_item_check label="ボイスチャット" name="Speak"/>
 		<menu_item_check label="会話ログ…" name="Conversation Log..."/>
+		<menu_item_check label="チャットアラート…" name="Chat Alerts"/>
 		<menu_item_check label="ジェスチャー…" name="Gestures"/>
 		<menu_item_check label="喋る" name="Speak"/>
 		<menu_item_check label="ジェスチャー…" name="Gestures"/>

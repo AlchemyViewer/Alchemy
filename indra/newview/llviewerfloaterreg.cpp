@@ -82,6 +82,7 @@
 #include "llfloatercamera.h"
 #include "llfloatercamerapresets.h"
 #include "llfloaterchangeitemthumbnail.h"
+#include "llfloaterchatalerts.h"
 #include "llfloaterchatmentionpicker.h"
 #include "llfloaterchatvoicevolume.h"
 #include "llfloaterclassified.h"
@@ -589,6 +590,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("blocked", "floater_al_blocked.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterBlocked>);
 // [/SL:KB]
     LLFloaterReg::add("chatbar", "floater_al_chatbar.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALChatBar>);
+    LLFloaterReg::add("chat_alerts", "floater_chat_alerts.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterChatAlerts>);
     LLFloaterReg::add("delete_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeleteQueue>);
     LLFloaterReg::add("generic_text", "floater_al_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGenericText>);
     LLFloaterReg::add("group_profile", "floater_al_group_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGroupProfile>);

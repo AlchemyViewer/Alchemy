@@ -43,6 +43,9 @@
 
 #include "llviewermedia_streamingaudio.h"
 #include "llaudioengine.h"
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-17 (Catznip-3.3)
+#include "lltextparser.h"
+// [/SL:KB]
 
 #ifdef LL_FMODSTUDIO
 # include "llaudioengine_fmodstudio.h"
@@ -302,6 +305,9 @@ void apply_udp_blacklist(const std::string& csv);
 bool process_login_success_response();
 void on_benefits_failed_callback(const LLSD& notification, const LLSD& response);
 void transition_back_to_login_panel(const std::string& emsg);
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-09-22 (Catznip-3.3)
+void handleLoadChatAlertSounds();
+// [/SL:KB]
 
 void callback_cache_name(const LLUUID& id, const std::string& full_name, bool is_group)
 {
@@ -1193,6 +1199,13 @@ bool idle_startup()
         LLAvatarIconIDCache::getInstance()->load();
 
         LLRenderMuteList::getInstance()->loadFromFile();
+
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-09-22 (Catznip-3.3)
+        if (LLTextParser::instance().loadKeywords() && LLTextParser::instance().getHighlightCount() > 0)
+        {
+            LLAppViewer::instance()->setOnLoginCompletedCallback(boost::bind(&handleLoadChatAlertSounds));
+        }
+// [/SL:KB]
 
         //-------------------------------------------------
         // Handle startup progress screen
@@ -4196,4 +4209,29 @@ void transition_back_to_login_panel(const std::string& emsg)
     reset_login(); // calls LLStartUp::setStartupState( STATE_LOGIN_SHOW );
     gSavedSettings.setBOOL("AutoLogin", false);
 }
+
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-09-22 (Catznip-3.3)
+void handleLoadChatAlertSounds()
+{
+    const LLTextParser::highlight_list_t& highlights = LLTextParser::instance().getHighlights();
+
+    uuid_vec_t assetIDs;
+    for (const LLHighlightEntry& entry : highlights)
+    {
+        if (entry.mSoundAsset.notNull() &&
+            std::find(assetIDs.begin(), assetIDs.end(), entry.mSoundAsset) == assetIDs.end())
+        {
+            assetIDs.push_back(entry.mSoundAsset);
+        }
+    }
+
+    for (const LLUUID& assetID : assetIDs)
+    {
+        if (gAssetStorage && !gAssetStorage->hasLocalAsset(assetID, LLAssetType::AT_SOUND) && gAudiop)
+        {
+            gAssetStorage->getAssetData(assetID, LLAssetType::AT_SOUND, LLAudioEngine::assetCallback, nullptr);
+        }
+    }
+}
+// [/SL:KB]
 

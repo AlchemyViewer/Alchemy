@@ -26,6 +26,7 @@
 		<menu_item_call label="Venner" name="My Friends"/>
 		<menu_item_call label="Grupper" name="My Groups"/>
 		<menu_item_check label="Chat i nærheden" name="Nearby Chat"/>
+		<menu_item_check label="Chat-meddelelser..." name="Chat Alerts"/>
 		<menu_item_call label="Personer tæt på" name="Active Speakers"/>
 	</menu>
 	<menu label="Verden" name="World">

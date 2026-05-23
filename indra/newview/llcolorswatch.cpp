@@ -61,6 +61,9 @@ LLColorSwatchCtrl::LLColorSwatchCtrl(const Params& p)
 :   LLUICtrl(p),
     mValid( true ),
     mColor(p.color()),
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+    mPrevColor(p.color()),
+// [/SL:KB]
     mCanApplyImmediately(p.can_apply_immediately),
     mAlphaGradientImage(p.alpha_background_image),
     mOnCancelCallback(p.cancel_callback()),
@@ -128,10 +131,25 @@ bool LLColorSwatchCtrl::handleUnicodeCharHere(llwchar uni_char)
     return LLUICtrl::handleUnicodeCharHere(uni_char);
 }
 
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+bool LLColorSwatchCtrl::isDirty() const
+{
+    return (mColor != mPrevColor);
+}
+
+void LLColorSwatchCtrl::resetDirty()
+{
+    mPrevColor = mColor;
+}
+// [/SL:KB]
+
 // forces color of this swatch and any associated floater to the input value, if currently invalid
 void LLColorSwatchCtrl::setOriginal(const LLColor4& color)
 {
     mColor = color;
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+    mPrevColor = mColor;
+// [/SL:KB]
     LLFloaterColorPicker* pickerp = (LLFloaterColorPicker*)mPickerHandle.get();
     if (pickerp)
     {
@@ -142,6 +160,9 @@ void LLColorSwatchCtrl::setOriginal(const LLColor4& color)
 void LLColorSwatchCtrl::set(const LLColor4& color, bool update_picker, bool from_event)
 {
     mColor = color;
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+    mPrevColor = mColor;
+// [/SL:KB]
     LLFloaterColorPicker* pickerp = (LLFloaterColorPicker*)mPickerHandle.get();
     if (pickerp && update_picker)
     {

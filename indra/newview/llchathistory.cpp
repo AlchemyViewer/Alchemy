@@ -69,6 +69,12 @@
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llviewerobjectlist.h"
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-07-10 (Catznip-3.3)
+#include "llaudioengine.h"
+#include "lltextparser.h"
+#include "llviewerwindow.h"
+#include "llwindow.h"
+// [/SL:KB]
 // [RLVa:KB] - Checked: 2010-04-22 (RLVa-1.2.0f)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -1153,6 +1159,9 @@ private:
 
 LLChatHistory::LLChatHistory(const LLChatHistory::Params& p)
 :   LLUICtrl(p),
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-27 (Catznip-3.3)
+    mParseHighlightTypeMask(PARSE_ALL),
+// [/SL:KB]
     mMessageHeaderFilename(p.message_header),
     mMessageSeparatorFilename(p.message_separator),
     mLeftTextPad(p.left_text_pad),
@@ -1182,6 +1191,9 @@ LLChatHistory::LLChatHistory(const LLChatHistory::Params& p)
             LLViewerObject* object = gObjectList.findObject(obj_id);
             return object && object->isReachable();
         });
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-07-10 (Catznip-3.3)
+    mEditor->setHighlightsCallback(boost::bind(&LLChatHistory::onTextHighlight, this, _1, _2));
+// [/SL:KB]
 }
 
 LLSD LLChatHistory::getValue() const
@@ -1704,7 +1716,13 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
             {
                 from_name = av_name.getCompleteName();
             }
-            message = from_name + message;
+// [AL:SE] - Patch: Chat-Alerts | Checked: 2020-01-05
+            // Append the name separately and unparsed so it can never satisfy a
+            // chat-alert keyword. Without this, every /me from a user whose name
+            // happens to contain a keyword would fire the alert.
+            mEditor->appendText(from_name, prependNewLineState, body_message_params);
+            prependNewLineState = false;
+// [/AL:SE]
         }
 
         if (square_brackets)
@@ -1712,7 +1730,42 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
             message += "]";
         }
 
-        mEditor->appendText(message, prependNewLineState, body_message_params);
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-07-10 (Catznip-3.3)
+        static LLCachedControl<bool> sEnableChatAlerts(gSavedSettings, "ChatAlerts", false);
+        if (sEnableChatAlerts)
+        {
+            const S32 nHighlightMask = mEditor->getHighlightsMask();
+            S32 nMask = nHighlightMask;
+            if ((chat.mChatStyle != CHAT_STYLE_HISTORY) && chat.mFromID.notNull() && (gAgentID != chat.mFromID) && (chat.mFromName != SYSTEM_FROM))
+            {
+                if (chat.mSessionID.isNull())
+                {
+                    nMask = nHighlightMask | LLHighlightEntry::CAT_NEARBYCHAT;
+                }
+                else if (const LLIMModel::LLIMSession* pSession = LLIMModel::getInstance()->findIMSession(chat.mSessionID))
+                {
+                    if (pSession->isP2PSessionType())
+                        nMask = nHighlightMask | LLHighlightEntry::CAT_IM;
+                    else if ((pSession->isGroupSessionType()) || (pSession->isAdHocSessionType()))
+                        nMask = nHighlightMask | LLHighlightEntry::CAT_GROUP;
+                }
+            }
+            else
+            {
+                // History/system/self messages get CAT_GENERAL only — never trigger
+                // chat-class keywords. Keep CAT_GENERAL bit on for legacy highlights.
+                nMask = LLHighlightEntry::CAT_GENERAL;
+            }
+
+            mEditor->setHighlightsMask(nMask);
+            mEditor->appendText(message, prependNewLineState, body_message_params);
+            mEditor->setHighlightsMask(nHighlightMask);
+        }
+        else
+        {
+            mEditor->appendText(message, prependNewLineState, body_message_params);
+        }
+// [/SL:KB]
         prependNewLineState = false;
     }
 
@@ -1735,3 +1788,22 @@ void LLChatHistory::draw()
 
     LLUICtrl::draw();
 }
+
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-27 (Catznip-3.3)
+void LLChatHistory::onTextHighlight(const std::string& /*strText*/, const LLHighlightEntry* pEntry)
+{
+    if (!pEntry)
+        return;
+
+    if ((mParseHighlightTypeMask & PARSE_SOUND) && (pEntry->mSoundAsset.notNull()) && (gAudiop))
+    {
+        gAudiop->triggerSound(pEntry->mSoundAsset, gAgent.getID(), 1.f, LLAudioEngine::AUDIO_TYPE_UI);
+    }
+    if ((mParseHighlightTypeMask & PARSE_FLASH) && (pEntry->mFlashWindow))
+    {
+        LLWindow* pWindow = gViewerWindow->getWindow();
+        if ((pWindow) && (pWindow->getMinimized()))
+            pWindow->flashIcon(5.f);
+    }
+}
+// [/SL:KB]
