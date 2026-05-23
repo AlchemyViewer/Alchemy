@@ -71,9 +71,9 @@ protected:
 public:
     ~LLColorSwatchCtrl ();
 
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
 
-    /*virtual*/ LLSD getValue() const { return mColor.getValue(); }
+    /*virtual*/ LLSD getValue() const override { return mColor.getValue(); }
     const LLColor4& get()                           { return mColor; }
 // [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
     bool            isDirty() const override;       // Returns true if user changed value at all
@@ -93,13 +93,13 @@ public:
 
     void            showPicker(bool take_focus);
 
-    /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool    handleDoubleClick(S32 x,S32 y,MASK mask);
-    /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool    handleUnicodeCharHere(llwchar uni_char);
-    /*virtual*/ void    draw();
-    /*virtual*/ void    setEnabled( bool enabled );
+    /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleDoubleClick(S32 x,S32 y,MASK mask) override;
+    /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleUnicodeCharHere(llwchar uni_char) override;
+    /*virtual*/ void    draw() override;
+    /*virtual*/ void    setEnabled( bool enabled ) override;
 
     static void     onColorChanged ( void* data, EColorPickOp pick_op = COLOR_CHANGE );
     void            closeFloaterColorPicker();
