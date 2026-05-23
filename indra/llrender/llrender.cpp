@@ -289,13 +289,16 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32
     stop_glerror();
     if (mIndex < 0) return false;
 
-    U32 texname = usename ? usename : texture->getTexName();
-
     if(!texture)
     {
         LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
         return false;
     }
+
+    // Resolve texname after the null-check; previously this line dereferenced
+    // `texture` when usename == 0 and texture was null, crashing before the
+    // diagnostic could fire.
+    U32 texname = usename ? usename : texture->getTexName();
 
     if(!texname)
     {
@@ -344,6 +347,14 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap)
     if (cubeMap == NULL)
     {
         LL_WARNS() << "NULL LLTexUnit::bind cubemap" << LL_ENDL;
+        return false;
+    }
+
+    // mImages[0] is normally populated by LLCubeMap::initGL, but a
+    // partially-constructed cubemap could have a null face here.
+    if (cubeMap->mImages[0].isNull())
+    {
+        LL_WARNS() << "LLTexUnit::bind cubemap with null face 0" << LL_ENDL;
         return false;
     }
 
@@ -980,7 +991,7 @@ void LLRender::syncMatrices()
                 shader->uniformMatrix3fv(LLShaderMgr::NORMAL_MATRIX, 1, GL_FALSE, norm_mat);
             }
 
-            if (shader->getUniformLocation(LLShaderMgr::INVERSE_MODELVIEW_MATRIX))
+            if (shader->getUniformLocation(LLShaderMgr::INVERSE_MODELVIEW_MATRIX) > -1)
             {
                 shader->uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_MATRIX, 1, GL_FALSE, glm::value_ptr(cached_inv_mdv));
             }
@@ -1012,14 +1023,14 @@ void LLRender::syncMatrices()
             // GZ: This was previously disabled seemingly due to a bug involving the deferred renderer's regular pushing and popping of mats.
             // We're reenabling this and cleaning up the code around that - that would've been the appropriate course initially.
             // Anything beyond the standard proj and inv proj mats are special cases.  Please setup special uniforms accordingly in the future.
-            if (shader->getUniformLocation(LLShaderMgr::INVERSE_PROJECTION_MATRIX))
+            if (shader->getUniformLocation(LLShaderMgr::INVERSE_PROJECTION_MATRIX) > -1)
             {
                 glm::mat4 inv_proj = glm::inverse(mat);
                 shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, false, glm::value_ptr(inv_proj));
             }
 
             // Used by some full screen effects - such as full screen lights, glow, etc.
-            if (shader->getUniformLocation(LLShaderMgr::IDENTITY_MATRIX))
+            if (shader->getUniformLocation(LLShaderMgr::IDENTITY_MATRIX) > -1)
             {
                 shader->uniformMatrix4fv(LLShaderMgr::IDENTITY_MATRIX, 1, GL_FALSE, glm::value_ptr(glm::identity<glm::mat4>()));
             }
