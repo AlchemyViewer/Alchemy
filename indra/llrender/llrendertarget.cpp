@@ -48,6 +48,47 @@ namespace
         U32 bytes_per_pixel;
     };
 
+    // Bytes per pixel for the GL color internal formats we actually allocate as
+    // render targets. Used for sBytesAllocated accounting. Unknown formats fall
+    // back to 4 to preserve the historical estimate.
+    U32 get_color_format_bytes_per_pixel(U32 internal_format)
+    {
+        switch (internal_format)
+        {
+            case GL_R8:
+                return 1;
+            case GL_RG8:
+            case GL_R16:
+            case GL_R16F:
+                return 2;
+            case GL_RGB8:
+            case GL_SRGB8:
+                return 3;
+            case GL_RGBA8:
+            case GL_SRGB8_ALPHA8:
+            case GL_RGB10_A2:
+            case GL_R11F_G11F_B10F:
+            case GL_RG16:
+            case GL_RG16F:
+            case GL_R32F:
+            case GL_RGB9_E5:
+                return 4;
+            case GL_RGB16:
+            case GL_RGB16F:
+                return 6;
+            case GL_RGBA16:
+            case GL_RGBA16F:
+            case GL_RG32F:
+                return 8;
+            case GL_RGB32F:
+                return 12;
+            case GL_RGBA32F:
+                return 16;
+            default:
+                return 4;
+        }
+    }
+
     DepthFormatInfo get_depth_format_info(LLRenderTarget::eDepthFormat fmt, bool stencil)
     {
         if (stencil)
@@ -112,7 +153,7 @@ LLRenderTarget::~LLRenderTarget()
 void LLRenderTarget::resize(U32 resx, U32 resy)
 {
     //for accounting, get the number of pixels added/subtracted
-    S32 pix_diff = (resx*resy)-(mResX*mResY);
+    S64 pix_diff = static_cast<S64>(resx) * resy - static_cast<S64>(mResX) * mResY;
 
     mResX = resx;
     mResY = resy;
@@ -123,7 +164,7 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
     { //resize color attachments
         gGL.getTexUnit(0)->bindManual(mUsage, mTex[i]);
         LLImageGL::setManualImage(LLTexUnit::getInternalType(mUsage), 0, mInternalFormat[i], mResX, mResY, GL_RGBA, GL_UNSIGNED_BYTE, NULL, false);
-        sBytesAllocated += pix_diff*4;
+        sBytesAllocated += static_cast<S32>(pix_diff * get_color_format_bytes_per_pixel(mInternalFormat[i]));
     }
 
     if (mDepth)
@@ -133,7 +174,7 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
         const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
         LLImageGL::setManualImage(internal_type, 0, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL, false);
 
-        sBytesAllocated += pix_diff * static_cast<S32>(info.bytes_per_pixel);
+        sBytesAllocated += static_cast<S32>(pix_diff * info.bytes_per_pixel);
     }
 }
 
@@ -279,7 +320,7 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
         }
     }
 
-    sBytesAllocated += mResX*mResY*4;
+    sBytesAllocated += mResX * mResY * get_color_format_bytes_per_pixel(color_fmt);
 
     stop_glerror();
 
@@ -431,7 +472,10 @@ void LLRenderTarget::release()
         size_t z;
         for (z = mTex.size() - 1; z >= 1; z--)
         {
-            sBytesAllocated -= mResX*mResY*4;
+            if (z < mInternalFormat.size())
+            {
+                sBytesAllocated -= mResX * mResY * get_color_format_bytes_per_pixel(mInternalFormat[z]);
+            }
             glFramebufferTexture2D(GL_FRAMEBUFFER, static_cast<GLenum>(GL_COLOR_ATTACHMENT0+z), LLTexUnit::getInternalType(mUsage), 0, 0);
             LLImageGL::deleteTextures(1, &mTex[z]);
         }
@@ -450,9 +494,12 @@ void LLRenderTarget::release()
         mFBO = 0;
     }
 
-    if (mTex.size() > 0)
+    // mTex[0] is owned only when addColorAttachment populated mInternalFormat.
+    // setColorAttachment leaves mInternalFormat empty for an externally-owned
+    // texture and relies on the caller to manage that lifetime.
+    if (!mTex.empty() && !mInternalFormat.empty())
     {
-        sBytesAllocated -= mResX*mResY*4;
+        sBytesAllocated -= mResX * mResY * get_color_format_bytes_per_pixel(mInternalFormat[0]);
         LLImageGL::deleteTextures(1, &mTex[0]);
     }
 
