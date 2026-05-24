@@ -50,6 +50,7 @@ set(llrender_HEADER_FILES
     llrender2dutils.h
     llrendernavprim.h
     llrendersphere.h
+    llrendertarget.h
     llshadermgr.h
     lltexture.h
     lltexturemanagerbridge.h
