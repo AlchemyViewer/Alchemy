@@ -215,6 +215,7 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
         if (!allocateDepth())
         {
             LL_WARNS() << "Failed to allocate depth buffer for render target." << LL_ENDL;
+            release();
             return false;
         }
     }
@@ -231,7 +232,12 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
     }
 
-    return addColorAttachment(color_fmt);
+    if (!addColorAttachment(color_fmt))
+    {
+        release();
+        return false;
+    }
+    return true;
 }
 
 void LLRenderTarget::setColorAttachment(LLImageGL* img, LLGLuint use_name)
@@ -320,6 +326,7 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
         if (glGetError() != GL_NO_ERROR)
         {
             LL_WARNS() << "Could not allocate color buffer for render target." << LL_ENDL;
+            LLImageGL::deleteTextures(1, &tex);
             return false;
         }
     }
