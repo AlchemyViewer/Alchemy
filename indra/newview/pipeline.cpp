@@ -9260,7 +9260,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
                                     (F32) gGLViewport[3]);
     }
 
-    if (sReflectionRender && !shader.getUniformLocation(LLShaderMgr::MODELVIEW_MATRIX))
+    if (sReflectionRender && shader.getUniformLocation(LLShaderMgr::MODELVIEW_MATRIX) != -1)
     {
         shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_MATRIX, 1, false, glm::value_ptr(mReflectionModelView));
     }
