@@ -69,17 +69,70 @@ std::set<LLViewerFetchedTexture*> LLTextureView::sDebugImages;
 
 ////////////////////////////////////////////////////////////////////////////
 
-static std::string title_string1a("Tex UUID Area  DDis(Req)  DecodePri(Fetch)     [download] pk/max");
-static std::string title_string1b("Tex UUID Area  DDis(Req)  Fetch(DecodePri)     [download] pk/max");
+// "DecodePri(Fetch)" and "pk/max" used to label columns that the data row no
+// longer renders; trimmed out so the header matches what's actually shown.
+static std::string title_string1("Tex UUID Area  DDis(Req)  [download]");
 static std::string title_string2("State");
 static std::string title_string3("Pkt Bnd");
 static std::string title_string4("  W x H (Dis) Mem");
 
+// Column layout — recomputed each frame in LLTextureView::draw() based on the
+// current monospace font's metrics so widening the font doesn't make headers
+// overlap each other or the per-row pip / progress-bar columns.
 static S32 title_x1 = 0;
 static S32 title_x2 = 460;
 static S32 title_x3 = title_x2 + 40;
 static S32 title_x4 = title_x3 + 46;
-static S32 texture_bar_height = 8;
+static S32 char_w = 8;
+static S32 bar_left = 260;
+static S32 bar_width = 100;
+// Right-edge (in LLGLTexMemBar local coords) of the widest status line drawn by
+// that bar; published each frame in LLGLTexMemBar::draw() and read on the next
+// frame by required_view_width() so the parent view grows to fit.
+static S32 max_status_w = 0;
+
+static void update_layout()
+{
+    const LLFontGL* font = LLFontGL::getFontMonospace();
+    char_w = llmax(1, font->getWidth(std::string("M")));
+
+    // Align the progress bar with "[download]" in the column-1 header so the
+    // bar sits where its label says.
+    const size_t dl_pos = title_string1.find("[download]");
+    if (dl_pos != std::string::npos)
+    {
+        bar_left = font->getWidth(title_string1.substr(0, dl_pos));
+        bar_width = font->getWidth(title_string1.substr(dl_pos));
+    }
+    else
+    {
+        bar_left = char_w * 26;
+        bar_width = char_w * 10;
+    }
+
+    const S32 title1_w = font->getWidth(title_string1);
+    // Two 6px pips with 14px spacing need ~50px regardless of font.
+    const S32 pip_column_w = 50;
+
+    title_x1 = 0;
+    title_x2 = llmax(bar_left + bar_width + char_w * 2, title1_w + char_w);
+    title_x3 = title_x2 + font->getWidth(title_string2) + char_w * 2;
+    title_x4 = title_x3 + llmax(font->getWidth(title_string3), pip_column_w) + char_w * 2;
+}
+
+static S32 required_view_width()
+{
+    const LLFontGL* font = LLFontGL::getFontMonospace();
+    // Col-4 data row is "%3dx%3d (%2d) %7d" — up to 21 chars; pick the wider of
+    // the header text and that data extent.
+    const S32 col4_w = llmax(font->getWidth(title_string4), char_w * 21);
+    const S32 columns_w = title_x4 + col4_w;
+    // The non-header status lines drawn by LLGLTexMemBar (e.g. the "Est. Free…
+    // Cache:" line and "Net Tot Tex…") run wider than the column row.
+    const S32 content_w = llmax(columns_w, max_status_w);
+    // arrange() pads with left=10 / right=2 around each child (12 total).
+    return content_w + char_w + 12;
+}
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -249,16 +302,16 @@ void LLTextureBar::draw()
                                      LLFontGL::LEFT, LLFontGL::TOP);
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
-    // Draw the progress bar.
-    S32 bar_width = 100;
-    S32 bar_left = 260;
+    // Draw the progress bar (column / width set in update_layout()).
     left = bar_left;
     right = left + bar_width;
 
     gGL.color4f(0.f, 0.f, 0.f, 0.75f);
     gl_rect_2d(left, top, right, bottom);
 
-    F32 data_progress = mImagep->mDownloadProgress;
+    // Clamp: mDownloadProgress can temporarily exceed 1.0 mid-fetch; an unclamped
+    // value paints the blue bar far past its column.
+    F32 data_progress = llclamp(mImagep->mDownloadProgress, 0.f, 1.f);
 
     if (data_progress > 0.0f)
     {
@@ -348,9 +401,9 @@ bool LLTextureBar::handleMouseDown(S32 x, S32 y, MASK mask)
 LLRect LLTextureBar::getRequiredRect()
 {
     LLRect rect;
-
-    rect.mTop = texture_bar_height;
-
+    // One line of text plus the 6px progress bar at the bottom; keep a small floor
+    // so tiny fonts still leave room for the pip drawing at y=0..6.
+    rect.mTop = llmax(LLFontGL::getFontMonospace()->getLineHeight(), 8);
     return rect;
 }
 
@@ -440,8 +493,26 @@ bool LLAvatarTexBar::handleMouseDown(S32 x, S32 y, MASK mask)
 LLRect LLAvatarTexBar::getRequiredRect()
 {
     LLRect rect;
-    rect.mTop = 100;
-    if (!gSavedSettings.getBOOL("DebugAvatarRezTime")) rect.mTop = 0;
+    if (!gSavedSettings.getBOOL("DebugAvatarRezTime")) return rect;
+
+    LLVOAvatarSelf* avatarp = gAgentAvatarp;
+    if (!avatarp) return rect;
+
+    // Count exactly what draw() will render: one line per baked layerset that has
+    // a viewer composite buffer, plus the two trailing header/section lines.
+    S32 line_count = 0;
+    for (auto baked_iter = LLAvatarAppearance::getDictionary()->getBakedTextures().begin();
+         baked_iter != LLAvatarAppearance::getDictionary()->getBakedTextures().end();
+         ++baked_iter)
+    {
+        const LLViewerTexLayerSet* layerset = avatarp->debugGetLayerSet(baked_iter->first);
+        if (!layerset) continue;
+        if (!layerset->getViewerComposite()) continue;
+        ++line_count;
+    }
+    line_count += 2; // header_text + section_text
+
+    rect.mTop = LLFontGL::getFontMonospace()->getLineHeight() * line_count;
     return rect;
 }
 
@@ -457,7 +528,7 @@ public:
         :   texture_view("texture_view")
         {
             S32 line_height = LLFontGL::getFontMonospace()->getLineHeight();
-            changeDefault(rect, LLRect(0,0,0,line_height * 7));
+            changeDefault(rect, LLRect(0,0,0,line_height * 8));
         }
     };
 
@@ -480,13 +551,17 @@ void LLGLTexMemBar::draw()
     F32 cache_usage = (F32)LLAppViewer::getTextureCache()->getUsage().valueInUnits<LLUnits::Megabytes>();
     F32 cache_max_usage = (F32)LLAppViewer::getTextureCache()->getMaxUsage().valueInUnits<LLUnits::Megabytes>();
     S32 line_height = LLFontGL::getFontMonospace()->getLineHeight();
-    S32 v_offset = 0;//(S32)((texture_bar_height + 2.2f) * mTextureView->mNumTextureBars + 2.0f);
+    S32 v_offset = 0;
     F32Bytes total_texture_downloaded = gTotalTextureData;
     F32Bytes total_object_downloaded = gTotalObjectData;
     U32 total_http_requests = LLAppViewer::getTextureFetch()->getTotalNumHTTPRequests();
     U32 total_active_cached_objects = LLWorld::getInstance()->getNumOfActiveCachedObjects();
     U32 total_objects = gObjectList.getNumObjects();
     F32 x_right = 0.0;
+    // Right-edge of the widest status line drawn this frame; published to the
+    // file-scope max_status_w at the bottom so the view grows to fit.
+    S32 widest = 0;
+    const LLFontGL* font_mono = LLFontGL::getFontMonospace();
 
     U32 image_count = gTextureList.getNumImages();
     U32 raw_image_count = 0;
@@ -556,10 +631,8 @@ void LLGLTexMemBar::draw()
     U32 texFetchLatMed = U32(recording.getMean(LLTextureFetch::sTexFetchLatency).value() * 1000.0f);
     U32 texFetchLatMax = U32(recording.getMax(LLTextureFetch::sTexFetchLatency).value() * 1000.0f);
 
-    // draw a background above first line.... no idea where the rest of the background comes from for the below text
-    gGL.color4f(0.f, 0.f, 0.f, 0.25f);
-    gl_rect_2d(-10, getRect().getHeight() + line_height*2 + 1, getRect().getWidth()+2, getRect().getHeight()+2);
-
+    // Parent LLContainerView already paints the full-rect background; this bar's
+    // required height (see getRequiredRect) covers all eight lines of text below.
     text = llformat("Est. Free: %d MB Sys Free: %d MB FBO: %d MB Probe#: %d Probe Mem: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
                     (S32)LLViewerTexture::sFreeVRAMMegabytes,
                     LLMemory::getAvailableMemKB()/1024,
@@ -569,13 +642,15 @@ void LLGLTexMemBar::draw()
                     discard_bias,
                     cache_usage,
                     cache_max_usage);
-    LLFontGL::getFontMonospace()->renderUTF8(text, 0, 0, v_offset + line_height*8,
-                                             text_color, LLFontGL::LEFT, LLFontGL::TOP);
+    widest = llmax(widest, font_mono->getWidth(text));
+    font_mono->renderUTF8(text, 0, 0, v_offset + line_height*8,
+                          text_color, LLFontGL::LEFT, LLFontGL::TOP);
 
     text = llformat("Images: %d   Raw: %d (%.2f MB)  Saved: %d (%.2f MB) Aux: %d (%.2f MB)", image_count, raw_image_count, raw_image_bytes_MB,
         saved_raw_image_count, saved_raw_image_bytes_MB,
         aux_raw_image_count, aux_raw_image_bytes_MB);
-    LLFontGL::getFontMonospace()->renderUTF8(text, 0, 0, v_offset + line_height * 7,
+    widest = llmax(widest, font_mono->getWidth(text));
+    font_mono->renderUTF8(text, 0, 0, v_offset + line_height * 7,
         text_color, LLFontGL::LEFT, LLFontGL::TOP);
 
     text = llformat("Textures: %.2f MB  Vertex: %.2f MB  Render: %.2f MB  Total: %.2f MB",
@@ -583,7 +658,8 @@ void LLGLTexMemBar::draw()
                     vertex_bytes_alloc,
                     render_bytes_alloc,
         texture_bytes_alloc+vertex_bytes_alloc);
-    LLFontGL::getFontMonospace()->renderUTF8(text, 0, 0, v_offset + line_height * 6,
+    widest = llmax(widest, font_mono->getWidth(text));
+    font_mono->renderUTF8(text, 0, 0, v_offset + line_height * 6,
         text_color, LLFontGL::LEFT, LLFontGL::TOP);
 
     U32 cache_read(0U), cache_write(0U), res_wait(0U);
@@ -598,8 +674,9 @@ void LLGLTexMemBar::draw()
                     cache_read,
                     cache_write,
                     res_wait);
-    LLFontGL::getFontMonospace()->renderUTF8(text, 0, 0, v_offset + line_height*5,
-                                             text_color, LLFontGL::LEFT, LLFontGL::TOP);
+    widest = llmax(widest, font_mono->getWidth(text));
+    font_mono->renderUTF8(text, 0, 0, v_offset + line_height*5,
+                          text_color, LLFontGL::LEFT, LLFontGL::TOP);
 
     text = llformat("CacheHitRate: %3.2f Read: %d/%d/%d Decode: %d/%d/%d Fetch: %d/%d/%d",
                     cacheHitRate,
@@ -613,8 +690,9 @@ void LLGLTexMemBar::draw()
                     texFetchLatMed,
                     texFetchLatMax);
 
-    LLFontGL::getFontMonospace()->renderUTF8(text, 0, 0, v_offset + line_height*4,
-                                             text_color, LLFontGL::LEFT, LLFontGL::TOP);
+    widest = llmax(widest, font_mono->getWidth(text));
+    font_mono->renderUTF8(text, 0, 0, v_offset + line_height*4,
+                          text_color, LLFontGL::LEFT, LLFontGL::TOP);
 
     //----------------------------------------------------------------------------
 
@@ -629,17 +707,19 @@ void LLGLTexMemBar::draw()
                     gTextureList.mCreateTextureList.size());
 
     x_right = 550.0f;
-    LLFontGL::getFontMonospace()->renderUTF8(text, 0, 0.f, (F32)(v_offset + line_height*3),
-                                             text_color, LLFontGL::LEFT, LLFontGL::TOP,
-                                             LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, &x_right);
+    font_mono->renderUTF8(text, 0, 0.f, (F32)(v_offset + line_height*3),
+                          text_color, LLFontGL::LEFT, LLFontGL::TOP,
+                          LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, &x_right);
 
     F32Kilobits bandwidth(LLAppViewer::getTextureFetch()->getTextureBandwidth());
     F32Kilobits max_bandwidth(LLViewerThrottle::getMaxBandwidthKbps());
     color = bandwidth > max_bandwidth ? LLColor4::red : bandwidth > max_bandwidth*.75f ? LLColor4::yellow : text_color;
     color[VALPHA] = text_color[VALPHA];
     text = llformat("BW:%.0f/%.0f",bandwidth.value(), max_bandwidth.value());
-    LLFontGL::getFontMonospace()->renderUTF8(text, 0, (S32)x_right, v_offset + line_height*3,
-                                             color, LLFontGL::LEFT, LLFontGL::TOP);
+    // x_right is the right-edge of the previous main segment; BW is drawn at it.
+    widest = llmax(widest, (S32)x_right + font_mono->getWidth(text));
+    font_mono->renderUTF8(text, 0, (S32)x_right, v_offset + line_height*3,
+                          color, LLFontGL::LEFT, LLFontGL::TOP);
 
     // Mesh status line
     text = llformat("Mesh: Reqs(Tot/Htp/Big): %u/%u/%u Rtr/Err: %u/%u Cread/Cwrite: %u/%u Low/At/High: %d/%d/%d",
@@ -647,8 +727,9 @@ void LLGLTexMemBar::draw()
                     LLMeshRepository::sHTTPRetryCount, LLMeshRepository::sHTTPErrorCount,
                     (U32)LLMeshRepository::sCacheReads, (U32)LLMeshRepository::sCacheWrites,
                     LLMeshRepoThread::sRequestLowWater, LLMeshRepoThread::sRequestWaterLevel, LLMeshRepoThread::sRequestHighWater);
-    LLFontGL::getFontMonospace()->renderUTF8(text, 0, 0, v_offset + line_height*2,
-                                             text_color, LLFontGL::LEFT, LLFontGL::TOP);
+    widest = llmax(widest, font_mono->getWidth(text));
+    font_mono->renderUTF8(text, 0, 0, v_offset + line_height*2,
+                          text_color, LLFontGL::LEFT, LLFontGL::TOP);
 
     // Header for texture table columns
     S32 dx1 = 0;
@@ -656,24 +737,16 @@ void LLGLTexMemBar::draw()
     {
         LLFontGL::getFontMonospace()->renderUTF8(std::string("!"), 0, title_x1, v_offset + line_height,
                                          text_color, LLFontGL::LEFT, LLFontGL::TOP);
-        dx1 += 8;
+        dx1 += char_w;
     }
     if (mTextureView->mFreezeView)
     {
-        LLFontGL::getFontMonospace()->renderUTF8(std::string("*"), 0, title_x1, v_offset + line_height,
+        LLFontGL::getFontMonospace()->renderUTF8(std::string("*"), 0, title_x1 + dx1, v_offset + line_height,
                                          text_color, LLFontGL::LEFT, LLFontGL::TOP);
-        dx1 += 8;
+        dx1 += char_w;
     }
-    if (mTextureView->mOrderFetch)
-    {
-        LLFontGL::getFontMonospace()->renderUTF8(title_string1b, 0, title_x1+dx1, v_offset + line_height,
-                                         text_color, LLFontGL::LEFT, LLFontGL::TOP);
-    }
-    else
-    {
-        LLFontGL::getFontMonospace()->renderUTF8(title_string1a, 0, title_x1+dx1, v_offset + line_height,
-                                         text_color, LLFontGL::LEFT, LLFontGL::TOP);
-    }
+    LLFontGL::getFontMonospace()->renderUTF8(title_string1, 0, title_x1+dx1, v_offset + line_height,
+                                     text_color, LLFontGL::LEFT, LLFontGL::TOP);
 
     LLFontGL::getFontMonospace()->renderUTF8(title_string2, 0, title_x2, v_offset + line_height,
                                      text_color, LLFontGL::LEFT, LLFontGL::TOP);
@@ -683,6 +756,11 @@ void LLGLTexMemBar::draw()
 
     LLFontGL::getFontMonospace()->renderUTF8(title_string4, 0, title_x4, v_offset + line_height,
                                      text_color, LLFontGL::LEFT, LLFontGL::TOP);
+
+    // Publish for next frame's required_view_width(). Column-header widths are
+    // captured separately via title_x4 in update_layout(), so we only track the
+    // non-header status lines here.
+    max_status_w = widest;
 }
 
 bool LLGLTexMemBar::handleMouseDown(S32 x, S32 y, MASK mask)
@@ -693,7 +771,8 @@ bool LLGLTexMemBar::handleMouseDown(S32 x, S32 y, MASK mask)
 LLRect LLGLTexMemBar::getRequiredRect()
 {
     LLRect rect;
-    rect.mTop = 78; //LLFontGL::getFontMonospace()->getLineHeight() * 6;
+    // draw() renders eight lines of text at v_offset + line_height * (1..8).
+    rect.mTop = LLFontGL::getFontMonospace()->getLineHeight() * 8;
     return rect;
 }
 
@@ -808,8 +887,16 @@ void LLTextureView::draw()
 {
     if (!mFreezeView)
     {
-//      LLViewerObject *objectp;
-//      S32 te;
+        // Recompute column positions for the current font, then make sure this
+        // view is wide enough to hold all the content + LLContainerView padding.
+        update_layout();
+        const S32 req_w = required_view_width();
+        if (getRect().getWidth() != req_w)
+        {
+            LLRect r = getRect();
+            r.mRight = r.mLeft + req_w;
+            setRect(r);
+        }
 
         for_each(mTextureBars.begin(), mTextureBars.end(), KillView());
         mTextureBars.clear();
