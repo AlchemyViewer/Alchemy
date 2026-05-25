@@ -154,13 +154,17 @@ void preProbeSample(vec3 pos)
     int start = getStartIndex(pos);
 
     // TODO: make some sort of structure that reduces the number of distance checks
-    for (int i = start; i < refmapCount; ++i)
+    for (int i = start; i < refmapCount && probeInfluences < REF_SAMPLE_COUNT; ++i)
     {
         // found an influencing probe
         if (shouldSampleProbe(i, pos))
         {
             probeIndex[probeInfluences] = i;
             ++probeInfluences;
+            if (probeInfluences == REF_SAMPLE_COUNT)
+            {
+                break;
+            }
 
             int neighborIdx = refIndex[i].y;
             if (neighborIdx != -1)
@@ -240,7 +244,7 @@ void preProbeSample(vec3 pos)
         }
     }
 
-    if (sample_automatic)
+    if (sample_automatic && probeInfluences < REF_SAMPLE_COUNT)
     { // probe at index 0 is a special probe for smoothing out automatic probes
         probeIndex[probeInfluences++] = 0;
     }
@@ -786,7 +790,10 @@ void sampleReflectionProbesWater(inout vec3 ambenv, inout vec3 glossenv,
     preProbeSample(pos);
     sample_automatic = true;
     // always include void probe on water
-    probeIndex[probeInfluences++] = 0;
+    if (probeInfluences < REF_SAMPLE_COUNT)
+    {
+        probeIndex[probeInfluences++] = 0;
+    }
 
     doProbeSample(ambenv, glossenv, tc, pos, norm, glossiness, false, amblit);
 }
